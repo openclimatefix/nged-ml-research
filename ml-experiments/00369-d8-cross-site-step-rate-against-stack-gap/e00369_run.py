@@ -131,6 +131,67 @@ def _rho(table: pl.DataFrame, *, keep) -> float:  # noqa: ANN001
     return float(spearmanr(part["rate_per_month"], part["gap_points"]).statistic)
 
 
+SHARES: Final[tuple[float, ...]] = (0.01, 0.02, 0.03, 0.05, 0.08, 0.10, 0.15)
+PLACEBO_SHARES: Final[tuple[float, ...]] = (0.03, 0.10)
+N_SHUFFLES_SHARE: Final[int] = 5
+
+
+def _count(*, times: np.ndarray, power: np.ndarray, threshold_mw: float) -> int:
+    """Return the rises and falls whose start is in the scored year."""
+    total = 0
+    for negative in (True, False):
+        seg = detect.detect(power_mw=power, threshold_mw=threshold_mw, negative=negative)
+        starts = times[seg.start]
+        total += int(((starts >= SCORED_FIRST) & (starts < SCORED_LAST)).sum())
+    return total
+
+
+def capacity_share_sweep(*, gap: dict[str, float]) -> dict:
+    """Post hoc: threshold = a share of each site's effective capacity, to match the gap's units."""
+    cache = common.load_cache()
+    capacity = {s: float(cache.sites[s].table.effective_capacity_mw) for s in SITES}
+    out: dict = {"capacity_mw": capacity}
+    for share in SHARES:
+        counts = {}
+        placebo = {}
+        for site in SITES:
+            times, power = detect.load_power_mw(site=site)
+            thr = share * capacity[site]
+            counts[site] = _count(times=times, power=power, threshold_mw=thr)
+            if share in PLACEBO_SHARES:
+                shuffled = [
+                    _count(
+                        times=times[: len(p)],
+                        power=p,
+                        threshold_mw=thr,
+                    )
+                    for p in (
+                        shuffled_within_month_and_day_type(times=times, power=power, seed=k)
+                        for k in range(N_SHUFFLES_SHARE)
+                    )
+                ]
+                placebo[site] = float(np.mean(shuffled))
+        order = sorted(SITES, key=lambda s: -counts[s])
+        rate = np.array([counts[s] for s in SITES]) / MONTHS_SCORED
+        gaps = np.array([gap[s] for s in SITES])
+        keep = [i for i, s in enumerate(SITES) if s != "D8"]
+        keep2 = [i for i, s in enumerate(SITES) if s not in ("D8", "D12")]
+        entry = {
+            "spearman": float(spearmanr(rate, gaps).statistic),
+            "without_d8": float(spearmanr(rate[keep], gaps[keep]).statistic),
+            "without_d8_d12": float(spearmanr(rate[keep2], gaps[keep2]).statistic),
+            "rank_d8_d12_d22": [order.index(s) + 1 for s in ("D8", "D12", "D22")],
+            "rate_per_month_min_max": [float(rate.min()), float(rate.max())],
+        }
+        if placebo:
+            entry["placebo_to_real"] = {
+                s: (placebo[s] / counts[s] if counts[s] else None) for s in SITES
+            }
+        out[f"share_{share}"] = entry
+        print(share, json.dumps(entry, default=float))
+    return out
+
+
 def main() -> None:
     """Build the step rates and gaps, correlate them, and write the tables."""
     WORK.mkdir(parents=True, exist_ok=True)
@@ -202,6 +263,7 @@ def main() -> None:
         "excluding_d8_spearman": _rho(table, keep=lambda s: s != "D8"),
         "mva_only_spearman": _rho(table, keep=lambda s: s in MVA_SITES),
     }
+    result["capacity_share_post_hoc"] = capacity_share_sweep(gap=gap)
     print(json.dumps(result, indent=1, default=float))
     (WORK / "report.json").write_text(json.dumps(result, indent=1, default=float))
 

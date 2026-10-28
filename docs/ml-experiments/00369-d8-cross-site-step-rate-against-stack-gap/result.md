@@ -51,33 +51,37 @@ best_arm: >-
   None. No arm was fitted. The step rate and the stack-minus-BG2 gap have Spearman rank correlation
   +0.007 over the 14 Primaries (95% interval -0.683 to +0.594)
 headline: >-
-  The detector's step rate does not rank the 14 Primaries by the stack's gap to BG2 (Spearman +0.007;
-  -0.242 without D8). D8 is first by rate (9.95 steps per month) and by gap (+3.619 points), but D12
-  ranks 6th and D22 14th, and shuffled copies of the readings show 0.8 to 2.7 times as many steps
-  as the real readings, so the rate is mostly ordinary demand variation.
+  With the pre-registered 1.5 MW threshold the step rate does not rank the 14 Primaries by the
+  stack's gap to BG2 (Spearman +0.007; -0.242 without D8), and D12 and D22 rank 6th and 14th. A
+  post hoc threshold set as a share of each site's capacity gives +0.49 to +0.71, but shuffled
+  copies of the readings show 0.8 to 2.7 times as many steps as the real readings at 1.5 MW, so
+  the rate mostly measures ordinary demand variation.
 lessons:
   - >-
-    The 1.5 MW detector cannot tell a persistent step from ordinary demand variation at 13 of the 14
-    Primaries: even a shuffle that keeps each day's month and day type finds 0.8 to 2.7 times as
-    many steps as the real series, so no site's rate clearly stands out from shuffled readings.
+    Whether step rate tracks the gap depends on the threshold: about 0 at a fixed 1.5 MW, +0.49 to
+    +0.71 at 1% to 15% of each site's capacity (post hoc, 14 sites, 7 thresholds tried).
   - >-
-    The stack's gap to BG2 at D12 (+0.947) and D22 (+0.639) is not a step-rate effect, so a
-    generator-like step does not explain every Primary where the stack trails BG2.
+    Shuffled copies of the readings show 0.8 to 2.7 times the real step rate at 1.5 MW, and 1.0 to
+    2.0 times at 3% and 10% of capacity, so the rate mostly measures how volatile demand is
+    relative to capacity, not generator-like steps.
+  - >-
+    The 1.5 MW threshold is 32% of D12's capacity and 47% of D22's, so it cannot see small sites'
+    steps; the stack's gaps at D12 (+0.947) and D22 (+0.639) are not shown to be step effects.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  A simple step counter does not flag the Primaries where the best-guess forecast trails the
-  production-style forecast. D8 has the most steps and the largest gap, but D12 and D22 have large
-  gaps with few steps, and shuffled copies of the readings show as many steps as the real ones, so
-  the detector mostly counts ordinary demand swings. The cause of D12's and D22's gaps needs a
-  different test, and any step-based explanation needs a detector that survives its placebo.
+  The test was inconclusive. A simple step counter at a fixed 1.5 MW does not flag the Primaries
+  where the best-guess forecast trails the production-style forecast, but a counter scaled to each
+  site's capacity does correlate with the gap (post hoc, 14 sites). Shuffled copies of the readings
+  show as many steps as the real ones either way, so the counter mostly measures how volatile
+  demand is, and a step-based explanation needs a detector that survives its placebo.
 advice:
   - >-
-    Do not use the experiment 361 detector's step count at 1.5 MW to flag Primaries whose bands need
-    widening; its placebo finds as many steps as the real readings at 13 of 14 Primaries (Figure 2).
+    Set a step detector's threshold as a share of each site's capacity when relating it to a gap
+    measured in points of capacity (the capacity-share sweep).
   - >-
-    Look for the cause of the stack's gaps at D12 and D22 outside generator-like steps, because
-    their step rates rank 6th and 14th of 14 (Figure 1).
+    Do not read a step rate as evidence of generator-like steps until the detector passes a placebo
+    that shuffles days within month and day type (Figure 2).
 ---
 
 **A simple step counter does not flag the Primaries where the best-guess forecast trails the
@@ -89,14 +93,17 @@ We then asked whether sites with more steps are the sites where the best-guess f
 stack, a generalised additive model with a Kalman filter on its effects) scores worse than BG2.
 The gap is the stack's mean quantile score minus BG2's, in points of the site's effective capacity;
 the quantile score is twice the mean pinball loss over 11 quantiles. They are not: the rank
-correlation is +0.007, with a 95% interval of -0.683 to +0.594. Fourteen sites are a weak test. A
+correlation is +0.007, with a 95% interval of -0.683 to +0.594. A post hoc threshold set as a share
+of each site's capacity changes this to
++0.49 to +0.71, so the answer depends on the threshold. Fourteen sites are a weak test. A
 placebo check also failed: copies of the
 readings with their days shuffled showed as many steps as the real readings. The verdict is
 therefore inconclusive.
 
 D8 has the most steps (9.95 per month in the scored year, 2025-07-02 to 2026-06-30) and the largest
 gap to BG2 (+3.619 quantile-score points, as in [experiment
-252](../00252-gam-stack-at-eight-more-primaries/result.md)). D12 has a gap of +0.947 and ranks 6th by
+252](../00252-gam-stack-at-eight-more-primaries/result.md)). D12 has a gap of +0.947 and ranks 6th
+by
 step rate. D22 has a gap of +0.639 and no detected steps. Caveat for every number here: the result
 is interim, it covers one scored year, and it is unproven whether the generator explains the steps
 and the gap at D8, the one substation suspected of a nearby generator.
@@ -154,6 +161,25 @@ and the gap at D8, the one substation suspected of a nearby generator.
 - **Size and direction.** Median step size is 1.7 to 2.9 MW at every site, and D2 has rises
   and falls in similar numbers (40 and 33), as ordinary demand swings would; D14 is fall-heavy
   (17 rises, 35 falls), and D4 and D12 have almost only rises.
+- **Capacity-share threshold (post hoc).** The gap is in points of capacity, so a fixed 1.5 MW
+  threshold treats sites of 3.2 to 18.2 MW differently (it is 47% of D22's capacity and 32% of
+  D12's). The audit asked for a sweep of 7 thresholds, each a share of the site's effective
+  capacity, on the 14 sites. The plan fixed 1.5 MW, so these rows are post hoc.
+
+| Threshold | Spearman | Without D8 | Without D8 and D12 | Rank of D8, D12, D22 |
+|---|---|---|---|---|
+| 1% | +0.62 | +0.52 | +0.39 | 1, 2, 4 |
+| 2% | +0.67 | +0.59 | +0.48 | 1, 2, 4 |
+| 3% | +0.71 | +0.64 | +0.55 | 1, 2, 3 |
+| 5% | +0.49 | +0.36 | +0.19 | 1, 2, 3 |
+| 8% | +0.51 | +0.38 | +0.22 | 1, 2, 5 |
+| 10% | +0.56 | +0.45 | +0.30 | 1, 2, 5 |
+| 15% | +0.53 | +0.41 | +0.24 | 1, 2, 6 |
+
+- **Reading the sweep.** At 1% to 3% every site has 16 to 33 steps per month, and the within-month
+  shuffle gives about 1.0 to 1.3 times the real count at 3%, so those correlations mostly track
+  volatility relative to capacity. At 10% the shuffle gives 1.0 to 2.0 times the real count. The
+  pre-registered threshold stays 1.5 MW.
 - **Not covered.** The detector threshold is in MW, so a site with a larger capacity has more
   chance to cross it; no capacity-share threshold was tried. The scored-year window is 12 months, so
   rates of 0 to 2 steps are single-digit counts. The MVA sites' gaps average over rows that also
@@ -169,10 +195,13 @@ and the gap at D8, the one substation suspected of a nearby generator.
   the gaps are read from stored forecasts that earlier experiments already checked.
 - **Mean-forecast error beside the quantile-score gap:** not computed, because the gap is only the
   correlate and the experiment makes no forecasting contrast.
-- **Triggers fired:** trigger 1 of the `ml-experiment` skill's audit list, a failed placebo. The
-  failure has an explanation tested
-  post hoc (the within-month shuffle), which also fails, so the experiment's session reports it to
-  the manager for the audit decision before any merge.
+- **Triggers fired:** trigger 1 of the `ml-experiment` skill's audit list, a failed placebo. A
+  Sonnet audit (the manager chose Sonnet only) re-derived the step counts, gaps, Spearman, and
+  placebos from the raw inputs and reproduced them. Mixing experiment 252's and 155's stack arms
+  does not move the ranking (all 14 sites with one arm give -0.011 against +0.007), and counting
+  steps by overlap with the window gives identical counts. The audit also found that the
+  capacity-share threshold changes the correlation, which this page now reports. Leaving out D8
+  makes the 1.5 MW correlation negative (-0.242), so it rests on D8 alone.
 
 ## What to try next
 
