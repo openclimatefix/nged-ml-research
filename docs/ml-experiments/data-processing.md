@@ -172,6 +172,16 @@ switched-out transformer. Evidence: [experiment
 132](00132-ro-nc-rescored-with-p12-and-p13-residuals-in-2025/result.md). Confidence: medium, from 5
 transfers at one Primary substation.
 
+**Treat an isolated zero reading between readings of 43 to 59% of effective capacity as missing
+(provisional; low confidence).** The cached power readings hold 6 half-hours of exactly 0.0 MW at
+two Primary substations, D9 (5 half-hours) and D16 (1 half-hour). The zeros look like telemetry
+dropping out. A scorer that keeps them adds about 42 points of capacity to the error of each
+affected forecast row. Experiment 87 stored these actuals as missing, and experiment 379 scored
+them. The signed-MW six's CRPS then moved by about 0.002 points. Applies to experiments. For
+production, the maintainer has to decide whether the rule applies. Evidence: [experiment
+379](00379-bg2-components-all-16-primaries-to-14-days/result.md). Confidence: low, from 6
+half-hours at two Primary substations.
+
 ## Unlabelled jumps
 
 **Before reading flow on two substations with no interconnection (a placebo pair) as a fault of a
