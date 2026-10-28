@@ -8,6 +8,7 @@ months.
 """
 
 from datetime import UTC, datetime, timedelta
+from functools import cache
 from pathlib import Path
 from typing import Final
 
@@ -1203,8 +1204,13 @@ def test_the_monthly_steps_carry_era5_minus_station_and_a_deseasonalised_copy_of
 # --- post hoc rows and report fixes ---------------------------------------------------------------
 
 
+@cache
 def _hourly_losses(*, domain: fit.DomainType = "wind") -> pl.DataFrame:
-    """Losses with every hour of the day, across all three UKV eras and the published window."""
+    """Losses with every hour of the day, across all three UKV eras and the published window.
+
+    Cached per domain, so the frame is built once per process. A Polars frame is immutable, and
+    the tests that edit these losses do so through `with_columns`, which returns a new frame.
+    """
     rng = np.random.default_rng(1)
     days = [datetime(2019, 9, 20, tzinfo=UTC) + timedelta(days=45 * i) for i in range(60)]
     times = [d + timedelta(hours=h) for d in days for h in range(24)]
@@ -1226,9 +1232,15 @@ def _hourly_losses(*, domain: fit.DomainType = "wind") -> pl.DataFrame:
     return pl.concat(rows).with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
 
 
+@cache
+def _hourly_records(*, domain: fit.DomainType = "wind") -> tuple[fit.IntervalRecord, ...]:
+    """The records `fit.domain_records` builds from the unedited `_hourly_losses`, once."""
+    return tuple(fit.domain_records(domain=domain, losses=_hourly_losses(domain=domain)))
+
+
 def test_a_lead_is_the_utc_hour_modulo_six_and_the_post_hoc_scopes_are_not_planned():
     losses = _hourly_losses()
-    records = fit.domain_records(domain="wind", losses=losses)
+    records = _hourly_records()
 
     by_lead = {r["scope"]: r for r in records if r["kind"] == "lead" and r["setting"] == "pooled"}
 
@@ -1245,7 +1257,7 @@ def test_a_lead_is_the_utc_hour_modulo_six_and_the_post_hoc_scopes_are_not_plann
 
 
 def test_the_eras_and_the_published_window_split_at_their_stated_boundaries():
-    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+    records = _hourly_records()
 
     pooled = {r["scope"]: r for r in records if r["setting"] == "pooled" and r["label"] == "P3"}
     losses = _hourly_losses().filter(
@@ -1261,7 +1273,7 @@ def test_the_eras_and_the_published_window_split_at_their_stated_boundaries():
 
 
 def test_a_control_or_replication_has_no_margin_and_reads_significant_or_not():
-    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+    records = _hourly_records()
 
     controls = [r for r in records if r["label"] in {"control", "hour-ending pair"}]
     products = [r for r in records if r["label"] == "P3" and r["kind"] == "all"]
@@ -1275,9 +1287,7 @@ def test_a_control_or_replication_has_no_margin_and_reads_significant_or_not():
 def test_the_matched_height_pair_has_equal_columns_and_is_a_post_hoc_product_contrast():
     jobs = fit.domain_jobs(domain="wind_matched")
     widths = {len(columns) for _, _, _, columns, _, _ in jobs}
-    records = fit.domain_records(
-        domain="wind_matched", losses=_hourly_losses(domain="wind_matched")
-    )
+    records = _hourly_records(domain="wind_matched")
 
     assert widths == {6}
     assert {arm for arm, *_ in jobs} == {"era5_wind_10m", "ukv_ceda_wind_10m"}
@@ -1325,7 +1335,7 @@ def test_set_a_prints_each_lead_and_each_leave_one_station_out_as_post_hoc_rows(
 
 
 def test_the_third_era_lines_say_which_setting_is_significant():
-    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+    records = _hourly_records()
 
     lines = fit.era_lines(records=records)
 
@@ -1335,7 +1345,7 @@ def test_the_third_era_lines_say_which_setting_is_significant():
 
 
 def test_the_veto_lines_compare_the_margin_with_the_whole_value_of_temperature():
-    records = fit.domain_records(domain="solar", losses=_hourly_losses(domain="solar"))
+    records = _hourly_records(domain="solar")
 
     text = " ".join(fit.veto_lines(records=records, n_farms=6))
 
@@ -1555,7 +1565,7 @@ def test_an_analysis_only_domain_keeps_the_first_leads_and_refits_the_planned_ar
 
 
 def test_analysis_only_and_trend_records_are_post_hoc_and_only_planned_contrasts_get_a_trend():
-    wind = fit.domain_records(domain="wind", losses=_hourly_losses())
+    wind = _hourly_records()
     lead0 = fit.domain_records(
         domain="wind_lead0",
         losses=_hourly_losses().filter(
@@ -1609,7 +1619,7 @@ def test_the_matched_and_scan_domains_and_the_restricted_domains_are_optional_un
 
 def test_each_utc_hour_scope_holds_exactly_that_hour_and_the_run_boundaries_are_printed():
     losses = _hourly_losses()
-    records = fit.domain_records(domain="wind", losses=losses)
+    records = _hourly_records()
     pair = losses.filter(
         pl.col("setting") == "pooled", pl.col("arm") == "era5_wind", pl.col("seed") == 0
     )
@@ -1630,7 +1640,7 @@ def test_each_utc_hour_scope_holds_exactly_that_hour_and_the_run_boundaries_are_
 
 
 def test_the_third_era_line_counts_how_many_of_its_months_fall_in_april_to_september():
-    records = fit.domain_records(domain="wind", losses=_hourly_losses())
+    records = _hourly_records()
     months = [f"2026-{m:02d}" for m in range(2, 10)]
 
     lines = fit.era_lines(records=records, era2_months=months)
@@ -1683,7 +1693,7 @@ def test_set_a_prints_block_and_per_station_slopes_beside_the_trend():
 
 def test_the_set_b_trend_is_also_printed_without_era_2_and_with_month_blocks():
     losses = _hourly_losses()
-    records = fit.domain_records(domain="wind", losses=losses)
+    records = _hourly_records()
 
     trends = {
         r["scope"]: r
