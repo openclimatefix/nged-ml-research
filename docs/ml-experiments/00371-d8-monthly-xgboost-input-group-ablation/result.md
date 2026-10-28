@@ -62,8 +62,9 @@ take_home_message: >-
   the power measured shortly before the forecast starts: without them its score rises from 7.70 to
   8.25, within 0.1 of the GAM stack's 8.34. The five extra weather inputs (0.05) and the ensemble
   mean (0.01) explain little of the gap, and the recency weighting (0.23 at D8) explains a smaller
-  part and only at D8. A GAM term that uses recent power is the next candidate to test. This is one
-  substation and one scored year.
+  part and only at D8. The lags also help at two other Primary substations (D4 +0.28, D2 +0.11),
+  so the pre-registered expectation that only D8 would respond failed. A GAM term that uses recent
+  power is the next candidate to test. This is one substation and one scored year.
 advice:
   - >-
     Look for the GAM stack's shortfall at D8 in how it uses power measured shortly before the
@@ -170,7 +171,13 @@ rounds,
   half-width, no result contradicts experiment 364 (recent power matters), and the mean absolute
   error of the median agrees in sign with the score for every arm. Trigger 7 (a later experiment's
   design depends on this result and the result is unreplicated) fires, because the proposed GAM
-  recent-power term depends on it. The manager decides whether to commission an audit.
+  recent-power term depends on it. A Sonnet audit (the manager's decision; no Opus) re-derived the D8,
+  D4, and D2 contrasts from the raw stored forecasts with its own code and reproduced them to within
+  0.004, found no lookahead and no missing rows, and found that the refitted control matches the
+  stored member at all three substations. It also found that the D8 lag effect is uneven across
+  months: leaving out any one month keeps it between +0.391 and +0.606, but it is large in August
+  2025 (+2.25) and December 2025 (+1.25) and slightly negative in February 2026 (-0.12). "86% of
+  the gap" is a difference of two scores, and does not show that the GAM stack lacks the lags.
 
 ## Caveats and what to try next
 
