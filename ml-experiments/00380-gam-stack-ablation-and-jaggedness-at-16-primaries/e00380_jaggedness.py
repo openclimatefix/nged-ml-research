@@ -99,7 +99,7 @@ def main() -> None:
     measure_table = pl.DataFrame(rows)
     print("== Measures from readings before 2025-07-01 ==")
     print(measure_table.sort("label"))
-    print("\n== Time-shuffled readings (placebo): M1 to M4 should sit near zero ==")
+    print("\n== Time-shuffled readings (placebo): M3 near zero, M1 and M2 small, M4 large ==")
     print(pl.DataFrame(placebo_rows).sort("label"))
     gap = pl.read_parquet(OWN / "gap_stack_minus_bg2.parquet")
     joined = measure_table.join(gap, on="label").sort("label")
@@ -119,7 +119,7 @@ def main() -> None:
             permuted = np.array(
                 [spearmanr(rng.permutation(x), g).statistic for _ in range(N_PERMUTATIONS)]
             )
-            p_value = float((np.abs(permuted) >= abs(observed)).mean())
+            p_value = (float((np.abs(permuted) >= abs(observed)).sum()) + 1) / (N_PERMUTATIONS + 1)
             loo = []
             for k in range(len(x)):
                 keep = np.arange(len(x)) != k

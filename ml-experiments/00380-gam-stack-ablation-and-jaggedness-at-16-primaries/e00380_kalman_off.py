@@ -8,6 +8,9 @@ months from the same unfiltered forecasts. Output: `a2_<period>_<site>.parquet` 
     PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility \
     E00377_SOURCE=control E00377_ARM=a0 uv run --no-sync python \
         ml-experiments/00380-*/e00380_kalman_off.py --sites D5
+
+Run the donors of a Primary without tuning months before it (D2, D3, D4, D19, D21, D22 before D8),
+and set `E00377_DONORS=D5,D9,D10,D11,D14,D16` with `E00377_SOURCE=control` for D18.
 """
 
 import argparse

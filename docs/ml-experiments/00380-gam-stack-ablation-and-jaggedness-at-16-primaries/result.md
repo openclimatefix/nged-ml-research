@@ -17,7 +17,8 @@ size: >-
   stage 1 monthly fits are experiment 377's stored fits, and the Kalman-off arm forecasts them
   again with no filter correction.
 hypothesis: >-
-  (H1) Each stage of experiment 377's GAM stack (the Kalman filter on stage 1's residuals, the winter
+  (H1) Each stage of experiment 377's GAM stack (the Kalman filter on stage 1's residuals, the
+  winter
   night offset, recipe R, and the per-fold stage 2 spread) earns its place only if removing it
   raises the days 1 to 10 quantile score by more than that stage's production cost justifies; some
   stages will not. (H2) The stack trails BG2 most at the Primaries whose demand is least regular
@@ -69,16 +70,18 @@ headline: >-
   is not related to the regularity measures at n = 16 (Spearman -0.02 and +0.19).
 take_home_message: >-
   Two of the four correction stages in the GAM stack carry the result: the Kalman filter on recent
-  errors, which matters mostly on day 1 and costs score after day 7 at the signed-MW Primaries, and
-  recipe R, a small steady gain. The winter night offset adds nothing and slightly hurts at the
-  MVA-only Primaries, so it is the first stage that could go. The per-fold spread matters only at
+  errors, which matters mostly on day 1 and may cost score after day 7 at the signed-MW Primaries,
+  and
+  recipe R, a small steady gain. The winter night offset adds nothing, and its small harm at the
+  MVA-only Primaries comes from
+  D8, so it is the first stage that could go. The per-fold spread matters only at
   D8. The tails follow the same pattern: without the Kalman filter the upper tail is too narrow
   (q95 coverage 0.917 against 0.946), and in the 7 days after a load-shift event the filter raises
-  the curtailment cost. The stack trails BG2 at Primaries with large steps, but 16 Primaries
-  cannot show whether regularity explains the gap.
+  the curtailment cost at one Primary (D16). The stack's gap to BG2 shows no relation to
+  regularity at 16 Primaries, which cannot show whether one exists.
 lessons:
   - >-
-    The Kalman filter helps on day 1 (+0.50 at the signed-MW six, 99% +0.20 to +0.94) and is
+    The Kalman filter helps on day 1 (+0.50 at the signed-MW six, 99% +0.20 to +0.94) and may be
     neutral or harmful beyond day 7 there (-0.07 days 8 to 10, -0.15 days 11 to 14, both intervals
     include zero), so a filter that fades out with lead is the obvious next test.
   - >-
@@ -89,18 +92,19 @@ lessons:
     0.78 at D18), so the filter is essential for short-history Primaries.
 advice:
   - >-
-    Keep the Kalman filter for leads under 2 days and test fading it out beyond day 7 at the
-    signed-MW Primaries, where days 8 to 14 score better without it (days 8 to 10, Figure 2).
+    Keep the Kalman filter, and test fading it out beyond day 7 at the signed-MW Primaries, where
+    days 8 to 14 score no worse without it (point estimates better, intervals include zero,
+    Figure 2).
   - >-
     Drop the winter night offset from the stack when simplifying: it scores the same at the
-    signed-MW six and 0.05 points worse at the MVA-only eight (Figure 1).
+    signed-MW six and without D8 (-0.002, -0.003), and 0.05 points worse with D8 (Figure 1).
   - >-
     Do not read the stack-minus-BG2 gap against Primary regularity at n = 16; the two registered
     measures show no slope (Figure 3). Test the step rate again at more Primaries or with
     simulated series.
   - >-
     Report the avoidable curtailment cost in the 7 days after load-shift events for any change to
-    the Kalman filter: it is higher with the filter on (Checks).
+    the Kalman filter: it is higher with the filter on at D16 (Checks).
 date: 2026-10-28
 ---
 
@@ -129,7 +133,7 @@ power in megavolt-amperes (MVA); every number there assumes reactive power is ze
 registered in the plan. The winter offset and the per-fold spread do not, apart from D8. The
 regularity hypothesis is not supported at n = 16, and 16 Primaries are too few to refute it.
 
-## Results (quantile score, points of effective capacity; positive difference: stage helps)
+## Results (quantile score, points of effective capacity)
 
 - **Arms.** `full` is experiment 377's stack, rebuilt; it reproduces the stored quantiles exactly
   (largest difference 0.0 at all 16 Primaries). Stages: Kalman filter on stage 1's residuals
@@ -141,18 +145,21 @@ regularity hypothesis is not supported at n = 16, and 16 Primaries are too few t
   (99%): -0.07 (-0.28 to +0.14) signed-MW; +0.34 (+0.09 to +0.60) MVA-only; +0.18 (-0.02 to +0.39)
   without D8. The plain GAM minus BG2: +0.30 (+0.07 to +0.54), +1.05 (+0.73 to +1.39), +0.61
   (+0.38 to +0.90).
-- **Removing one stage, days 1 to 10, 99% interval (signed-MW six; MVA-only eight with D8; MVA-only
+- **Removing one stage (positive: the stage helps), days 1 to 10, 99% interval (signed-MW six;
+  MVA-only eight with D8; MVA-only
   seven without D8).** K: +0.121 (+0.026 to +0.219); +0.465 (+0.179 to +0.821); +0.330 (+0.120 to
   +0.604). O: -0.002 (-0.011 to +0.008); -0.049 (-0.116 to -0.005); -0.003 (-0.020 to +0.012). R:
   +0.027 (+0.014 to +0.040); +0.095 (+0.047 to +0.149); +0.079 (+0.043 to +0.120). F (stage 1
   tuning-month spread instead): -0.001 (-0.015 to +0.011); +0.270 (+0.138 to +0.420); +0.017
   (-0.006 to +0.044). At D8 the per-fold arm is the own-residual spread and the replacement is the
-  donor spread, so the +0.270 is D8's +1.6 spread effect and not a general spread effect.
+  donor spread, so the +0.270 is D8's own effect of +2.21 (95% +1.37 to +3.12), averaged over
+  eight Primaries, and not a general spread effect.
 - **Thresholds from the plan.** K (0.05): earns its place at both groups with D8; at the signed-MW
-  six the point estimate is +0.12 but the effect is on day 1 only. O (0.02): does not. R (0.02):
-  earns its place at the MVA-only Primaries (+0.08 to +0.10) and sits at the threshold at the
-  signed-MW six (+0.027, a small gain). F (0.02): does not outside D8.
-- **Build-up, days 1 to 10 (signed-MW; MVA-only with D8; without D8).** Adding F to the plain GAM:
+  six the point estimate is +0.12 and mostly comes from day 1. O (0.02): does not. R (0.02): earns
+  its place at the MVA-only Primaries (+0.08 to +0.10) and at the signed-MW six (+0.027, just
+  over the threshold, interval +0.014 to +0.040). F (0.02): does not outside D8.
+- **Build-up (negative: the added stage helps), days 1 to 10 (signed-MW; MVA-only with D8;
+  without D8).** Adding F to the plain GAM:
   -0.001, -0.266, -0.039. Adding K: -0.328 (-0.466 to -0.193), -0.397, -0.293. Adding O: -0.011
   (-0.031 to +0.008), +0.048 (-0.022 to +0.154), -0.022. Adding R: -0.027 (-0.040 to -0.014),
   -0.095, -0.079. The filter is the largest single step by far.
@@ -166,9 +173,11 @@ regularity hypothesis is not supported at n = 16, and 16 Primaries are too few t
   against 4.27; 5.68 against 5.72. Sunny April to June 4.38 against 4.20; 5.58 against 5.53. Cold
   nights 4.18 against 4.94; 3.30 against 4.27. Christmas 4.38 against 4.20; 3.41 against 3.81. The
   filter makes the sunny-half-hour and Christmas scores worse at the signed-MW six, the slices where
-  the stack trails BG2 (3.99 and 3.72 for BG2 on sunny daylight and Christmas).
-- **D15 and D18.** Without the filter D15's score is 17.2 (mean of both, against 7.7 with it) and
-  q95 coverage is 0.32 at D15. The unfiltered forecast there is badly biased and the cause was not
+  the stack trails BG2 (4.00 and 3.72 for BG2 on sunny daylight and Christmas).
+- **D15 and D18.** Without the filter the mean score of D15 and D18 is 17.2 (7.7 with it): D15 30.7
+  against
+  12.8, D18 3.6 against 2.5. Without the filter q95 coverage is 0.32 at D15. The unfiltered
+  forecast there is badly biased and the cause was not
   investigated.
 - **Jaggedness measures** (registered in the plan; readings before 2025-07-01, hand-filtered events
   excluded). M1: share of variance in a half-hour-of-week profile, 0.12 (D15) to 0.65 (D9). M2:
@@ -177,11 +186,14 @@ regularity hypothesis is not supported at n = 16, and 16 Primaries are too few t
   0.35 (D12). M5 (reverse-flow share, signed-MW six only) is 0.000 to 0.002.
 - **Spearman correlation with the gap (stack minus BG2, days 1 to 10), registered sign in
   brackets.** n = 16: M1 -0.02 (-) with permutation p = 0.94; M2 -0.02 (-) p = 0.94; M3 -0.19 (+)
-  p = 0.46; M4 +0.19 (+) p = 0.48; M5 -0.21 (+) n = 6. The decision rule needs M1 at most -0.5 and M4
+  p = 0.46; M4 +0.19 (+) p = 0.48; M5 -0.21 (+) n = 6. The decision rule needs M1 at most -0.5 and
+  M4
   at least +0.5 with p under 0.025, so H2 is not supported. Leave-one-out ranges: M1 -0.24 to +0.09,
-  M4 +0.04 to +0.39. Post hoc at n = 14 (D15 and D18 dropped): M1 -0.45 (p = 0.10), M4 +0.53 (p =
+  M4 +0.04 to +0.39. Post hoc at n = 14 (D15 and D18 dropped): M1 -0.45 (p = 0.105), M4 +0.53 (p =
   0.057), leave-one-out M4 +0.45 to +0.74. Both point the registered way and neither passes the
-  rule. The gap is large at D8, D12, and D22, which have low weekly-profile shares (0.14, 0.18, 0.16),
+  rule. D15 (M1 0.12, M4 0.32) and D18 (M1 0.13, M4 0.21) have the stack ahead of BG2 (-0.51 and
+  -0.15), against the registered direction. The gap is large at D8, D12, and D22, which have low
+  weekly-profile shares (0.14, 0.18, 0.16),
   and at most +0.18 at D3 and D2, which have the highest shares after D9 (0.48 and 0.46); D9, with
   the highest share (0.65), has zero gap.
 - **Placebo.** Time-shuffled readings give M1 to M3 near zero (0.003, 0.0002, 0.00) and M4 near 0.82
@@ -201,14 +213,18 @@ regularity hypothesis is not supported at n = 16, and 16 Primaries are too few t
   and its lower tail worse (q05 coverage 0.067 against 0.045). The full per-Primary table is below.
 - **Avoidable curtailment cost, signed-MW six, limit 0.9 of the earlier maximum, in pounds (full,
   filter removed, plain GAM, BG2, manual heuristic).** All rows: 4.24 million, 10.09 million, 10.59
-  million, 7.31 million, 10.41 million. Event rows (D5, D10, D14, D16 only; D9 and D11 have no scored
+  million, 7.31 million, 10.41 million. Event rows (D5, D10, D14, D16 only; D9 and D11 have no
+  scored
   half-hour above the limit): 2.81 million, 7.55 million, 7.80 million, 5.24 million, 6.88 million.
-  The 7 days after events: 0.343 million, 0.226 million, 0.234 million, 0.285 million, 0.496 million.
+  The 7 days after events: 0.343 million, 0.226 million, 0.234 million, 0.285 million, 0.496
+  million.
 - **At limit 0.5 (same order).** All rows: 59.8 million, 85.2 million, 98.2 million, 72.9 million,
   104.8 million. Event rows: 7.75 million, 22.99 million, 27.41 million, 11.96 million, 18.28
   million. The 7 days after events: 3.25 million, 2.67 million, 3.09 million, 4.07 million, 3.57
-  million. The filter lowers the cost on all rows and during events, and raises it in the 7 days
-  after events (at both limits), which agrees with experiment 367's finding that the Kalman
+  million. The filter lowers the cost on all rows and during events. In the 7 days after events it
+  raises the total at both limits, mostly at D16 at limit 0.9 (£45,000 without the filter
+  against £155,000 with it) and with mixed signs by Primary at limit 0.5, which agrees with
+  experiment 367's finding that the Kalman
   transient adds error after a step.
 - **No input is nulled** in this experiment, so there are no nulled rows to compare.
 
@@ -270,10 +286,17 @@ Kalman filter, and BG2.
 
 ## Checks
 
-- **Control.** The arm `full` equals experiment 377's stored stack: the largest absolute difference in
+- **Control.** The arm `full` equals experiment 377's stored stack: the largest absolute difference
+  in
   q50 and q95 is 0.0 at all 16 Primaries on the scored year.
 - **Median minus mean forecast, per site.** 0.0 at every Primary and every arm: the stored `mean`
   is the centre of the centred spread tables, so no independent mean-forecast contrast exists.
+- **Predictions.** P1 failed on days 1 to 10 (+0.12 and +0.47, not under 0.05) and held on day 1.
+  P2 held at the signed-MW six (+0.027) and failed at the MVA-only eight (+0.095). P3 held at the
+  signed-MW six and failed at the MVA-only eight (-0.049, D8; held without D8, -0.003). P4 held
+  without D8 (+0.017) and failed with it (+0.270, D8's donor spread); q05 coverage worsened at
+  the MVA-only eight (0.070 to 0.088) and moved from 0.067 to 0.064 at the signed-MW six. P5
+  held at the signed-MW six (+0.37) and failed at the MVA-only eight (+0.73). P6 failed.
 - **Triggers fired.** Trigger 2 (predictions P1 days 1 to 10, P2 and P3 at the MVA-only eight, P5
   at the MVA-only eight, and P6 failed, and the MVA-only misses are explained by D8 alone only
   partly); trigger 5 (the arm without the winter offset beats the full stack at the MVA-only eight,
