@@ -25,12 +25,15 @@ from typing import Final
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00087_fit_demand as fit  # ty: ignore[unresolved-import]
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 ARMS: Final[tuple[str, ...]] = ("control", "nolag", "norecent")
 SITE: Final[str] = "D8"
-OUT_ROOT: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/"
-    "00364-d8-stage-blame-and-analogue-recent-power/work/analogue_preds"
+OUT_ROOT: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00364-d8-stage-blame-and-analogue-recent-power"
+    / "work"
+    / "analogue_preds"
 )
 NO_RECENT_AGE: Final[int] = 7 * common.STEPS_PER_DAY
 """Half-hours: with `norecent`, power newer than this before the origin is never used."""

@@ -58,7 +58,7 @@ from market_common import (
     write_parquet_atomic,
     write_readme,
 )
-from studies.sources import MARKET_DOWNLOADS_DIR
+from studies.sources import MARKET_DOWNLOADS_DIR, PER_STUDY_DIR
 
 SCRIPT_PATH: Final[str] = "studies/market_downloads/fetch_neso_eac.py"
 SOURCE_NAMES: Final[tuple[str, ...]] = (
@@ -992,10 +992,7 @@ def main() -> None:
     parser.add_argument(
         "--bmu-list",
         type=Path,
-        default=Path(
-            "/home/jack/dev/nged-substation-forecast/data/studies/per_study/"
-            "battery_pv_separation/bmu_list.csv"
-        ),
+        default=PER_STUDY_DIR / "battery_pv_separation" / "bmu_list.csv",
     )
     args = parser.parse_args()
     runners: dict[str, Callable[[], None]] = {

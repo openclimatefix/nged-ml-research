@@ -196,7 +196,7 @@ packages.
   absolute because a worktree has no `data/` folder. Run one command at a time:
 
   ```bash
-  D=/home/jack/dev/nged-substation-forecast/data/studies
+  D=${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}/studies
   P=$D/per_study/nwp_forecast_comparison/original
   LEAN=$D/per_study/nwp_forecast_comparison/aifs_extra_days
   WN3=$D/per_study/nwp_forecast_comparison/wn3_extra_days
@@ -354,7 +354,7 @@ packages.
 Run these in order, one job at a time, from the repository root. `D` is the shared data folder.
 
 ```bash
-D=/home/jack/dev/nged-substation-forecast/data/studies
+D=${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}/studies
 uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs \
   --aifs-days 1 2 7 14 --published-dir $D/per_study/nwp_forecast_comparison/original \
   --output-dir $D/per_study/nwp_forecast_comparison/aifs_blends
@@ -394,7 +394,7 @@ Run these in order, one job at a time, from the repository root, after `uptime` 
 idle. `D` is the shared data folder.
 
 ```bash
-D=/home/jack/dev/nged-substation-forecast/data/studies
+D=${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}/studies
 P=$D/per_study/nwp_forecast_comparison/original
 DAY4=$D/per_study/nwp_forecast_comparison/day4_shared
 DAY5=$D/per_study/nwp_forecast_comparison/day5_aifs_wn3
@@ -429,7 +429,7 @@ blend fits took about 8 to 10 s each, so the 315 (arm, site) fits take about 1 h
 `per_study/nwp_forecast_comparison/aifs_blends`, and lists the fits without fitting.
 
 ```bash
-D=/home/jack/dev/nged-substation-forecast/data/studies
+D=${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}/studies
 P=$D/per_study/nwp_forecast_comparison/original
 OUT=$D/per_study/nwp_forecast_comparison/product_blends
 uv run python studies/nwp_forecast_comparison/fit_product_blends.py --dry-run --lookahead-cleared \

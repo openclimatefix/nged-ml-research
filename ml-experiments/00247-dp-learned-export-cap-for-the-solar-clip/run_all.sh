@@ -2,7 +2,7 @@
 # Usage: run_all.sh : run every learned-cap arm chain at the four sites, four jobs at a time.
 set -euo pipefail
 D=ml-experiments/00247-dp-learned-export-cap-for-the-solar-clip
-L=/home/jack/dev/nged-substation-forecast/data/ml-experiments/00247-dp-learned-export-cap-for-the-solar-clip/logs
+L="${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL}/ml-experiments/00247-dp-learned-export-cap-for-the-solar-clip/logs"
 mkdir -p "$L"
 one() {
   local arm=${1%%:*} site=${1##*:}
