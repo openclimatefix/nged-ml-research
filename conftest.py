@@ -16,6 +16,8 @@ os.environ["OMP_NUM_THREADS"] = "4"
 os.environ["POLARS_MAX_THREADS"] = "4"
 
 _STUDIES_TESTS_DIR = Path(__file__).parent / "tests" / "studies"
+# The known-answer tests of the evaluation protocol are fast and run in the plain pytest run.
+_ALWAYS_RUN_DIR = _STUDIES_TESTS_DIR / "eval_protocol"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -34,5 +36,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: Iterable[pytest.
     for item in items:
         # A path check, not a `studies` keyword: the `tests/studies` directory node is itself a
         # keyword of every test beneath it.
-        if item.path.is_relative_to(_STUDIES_TESTS_DIR) and not config.getoption("--run-studies"):
+        if (
+            item.path.is_relative_to(_STUDIES_TESTS_DIR)
+            and not item.path.is_relative_to(_ALWAYS_RUN_DIR)
+            and not config.getoption("--run-studies")
+        ):
             item.add_marker(skip_studies)
