@@ -51,6 +51,11 @@ SITES: Final[tuple[str, ...]] = tuple(APPLY_GROUP)
 MIN_ROWS: Final[int] = 200
 
 
+def arms_source(site: str) -> str:
+    """Return the source a site's arms run under: D15 joins the signed-MW sites, whose fit it takes."""
+    return "control" if site == "D15" else common.SOURCE_OF_SITE[site]
+
+
 def stage_two_rows(*, site: str) -> pl.DataFrame:
     """Return experiment 377's stage-2 rows of a site with a lead in (168, 240] hours."""
     path = common.stage_path(site=site, stage="dp_preds_s2")
@@ -65,7 +70,7 @@ def stage_two_rows(*, site: str) -> pl.DataFrame:
 def load_rows(*, cache, source: str) -> tuple[pl.DataFrame, np.ndarray]:  # noqa: ANN001
     """Return the labelled long-lead rows of the sites in one source, and their (rows, 51) responses."""
     frames, deltas = [], []
-    for site in (s for s in SITES if common.SOURCE_OF_SITE[s] == source):
+    for site in (s for s in SITES if arms_source(s) == source):
         chain = stage_two_rows(site=site).with_columns(period=pl.lit("scored"))
         pieces = []
         for period in ("tuning", "scored"):

@@ -32,7 +32,7 @@ QUANTILES = common.QUANTILES
 def load_low(*, cache, source: str) -> tuple[pl.DataFrame, np.ndarray]:  # noqa: ANN001
     """Return the labelled rows of at most 168 hours of one source's sites and their responses."""
     frames, deltas = [], []
-    for site in (s for s in arms.SITES if common.SOURCE_OF_SITE[s] == source):
+    for site in (s for s in arms.SITES if arms.arms_source(s) == source):
         path = common.stage_path(site=site, stage="dp_preds_s2")
         if site == "D8":
             path = path.with_name("stack_d_donor_D8.parquet")
