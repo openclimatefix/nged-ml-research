@@ -64,42 +64,46 @@ best_arm: >-
   at the six signed-MW Primaries (99% interval -0.28 to +0.14); dropping the winter offset scores
   0.05 points better at the eight MVA-only Primaries
 headline: >-
-  Signed-MW six, days 1 to 10, removing the Kalman filter costs +0.12 (99% +0.03 to +0.22),
-  recipe R +0.03 (+0.01 to +0.04), the winter offset -0.00 (-0.01 to +0.01), the per-fold spread
-  -0.00 (-0.02 to +0.01). The plain GAM trails BG2 by +0.30 (+0.07 to +0.54) there. The gap to BG2
-  is not related to the regularity measures at n = 16 (Spearman -0.02 and +0.19).
+  At the 6 signed-MW Primaries, days 1 to 10, removing the Kalman filter raises the score by +0.12
+  points (99% interval +0.03 to +0.22), removing recipe R by +0.03 (+0.01 to +0.04), removing the
+  winter offset by -0.00 (-0.01 to +0.01), and removing the per-fold spread by -0.00 (-0.02 to
+  +0.01). The plain GAM scores +0.30 (+0.07 to +0.54) worse than BG2 there. The gap to BG2 is not
+  related to the regularity measures at 16 Primaries (Spearman rank correlations -0.02 and +0.19).
 take_home_message: >-
-  Two of the four correction stages in the GAM stack carry the result: the Kalman filter on recent
-  errors, which matters mostly on day 1 and may cost score after day 7 at the signed-MW Primaries,
-  and
-  recipe R, a small steady gain. The winter night offset adds nothing, and its small harm at the
-  MVA-only Primaries comes from
-  D8, so it is the first stage that could go. The per-fold spread matters only at
-  D8. The tails follow the same pattern: without the Kalman filter the upper tail is too narrow
-  (q95 coverage 0.917 against 0.946), and in the 7 days after a load-shift event the filter raises
-  the curtailment cost at one Primary (D16). The stack's gap to BG2 shows no relation to
-  regularity at 16 Primaries, which cannot show whether one exists.
+  Two of the four correction stages in the forecasting pipeline carry its score. The Kalman filter,
+  which corrects the forecast from recent errors, helps mostly on day 1 and may cost score after
+  day 7 at the 6 Primaries that report signed megawatts. Recipe R, a 14-day error profile
+  subtracted from the forecast, is a small steady gain. The winter night offset adds nothing, and
+  its small harm at the 8 Primaries that report only apparent power comes from one Primary, D8, so
+  the offset is the stage most worth dropping. Refitting the width of the quantile bands each
+  month matters only at D8. Without the Kalman filter the upper tail is too narrow (the share of
+  readings below the 95th-percentile forecast is 0.917, against 0.946 with it and 0.95 ideal). In
+  the 7 days after a load-shift event the filter raises the avoidable curtailment cost, mostly at
+  one Primary (D16). The pipeline's gap to BG2 shows no relation to how regular each Primary's
+  demand is, and 16 Primaries are too few to show whether any relation exists.
 lessons:
   - >-
     The Kalman filter helps on day 1 (+0.50 at the signed-MW six, 99% +0.20 to +0.94) and may be
-    neutral or harmful beyond day 7 there (-0.07 days 8 to 10, -0.15 days 11 to 14, both intervals
-    include zero), so a filter that fades out with lead is the obvious next test.
+    neutral or harmful beyond day 7 there (-0.07 days 8 to 10, -0.15 days 11 to 14, both ranges
+    include zero), so a filter that fades out with lead is a next test.
   - >-
     The winter night offset does nothing at the signed-MW six (-0.002) and worsens the MVA-only
     eight (removing it scores -0.049 better, 99% -0.116 to -0.005, driven by D8).
   - >-
     At D15 and D18 the unfiltered stage 1 forecast is badly biased (q95 coverage 0.32 at D15 and
-    0.78 at D18), so the filter is essential for short-history Primaries.
+    0.78 at D18), so the filter was necessary at these two short-history Primaries.
 advice:
   - >-
-    Keep the Kalman filter, and test fading it out beyond day 7 at the signed-MW Primaries, where
+    Keep the Kalman filter, and test fading the filter out beyond day 7 at the signed-MW Primaries,
+    where
     days 8 to 14 score no worse without it (point estimates better, intervals include zero,
     Figure 2).
   - >-
-    Drop the winter night offset from the stack when simplifying: it scores the same at the
+    The winter night offset could be dropped when simplifying: it scores the same at the
     signed-MW six and without D8 (-0.002, -0.003), and 0.05 points worse with D8 (Figure 1).
   - >-
-    Do not read the stack-minus-BG2 gap against Primary regularity at n = 16; the two registered
+    Do not read the stack-minus-BG2 gap against how regular each Primary's demand is at n = 16; the
+    two registered
     measures show no slope (Figure 3). Test the step rate again at more Primaries or with
     simulated series.
   - >-
@@ -111,17 +115,26 @@ date: 2026-10-28
 # The GAM stack taken apart at all 16 Primaries, and why it is jagged
 
 **Two stages of the GAM stack carry its score and two do not.** A Primary is a 33 kV to 11 kV
-substation, labelled D2 to D22. We took apart the stack that [experiment
-377](../00377-demand-v1-first-run-feasibility/result.md) scored: a generalised additive model (GAM)
-per Primary, a Kalman filter that corrects it from recent errors, a winter night offset, recipe R
-(a 14-day error profile subtracted from the forecast), and spread tables fitted on earlier months.
-We removed one stage at a time and scored the rest against BG2, the best-guess forecast of
-experiment 87 that production does not run. We also built the stack up from the plain GAM, and
-asked whether the stack does worse at the Primaries whose demand is less regular. A score is the
-quantile score (twice the mean pinball loss over 11 quantiles, which equals the continuous ranked
-probability score, CRPS, up to the estimation from 11 quantiles) in points of effective capacity,
-and a difference is positive when the first forecast is worse. "MVA-only" Primaries report apparent
-power in megavolt-amperes (MVA); every number there assumes reactive power is zero.
+substation. The labels D2 to D22 are the study's anonymised labels, and they are not consecutive
+because the study covers 16 of the 22 substations in the original numbering. We took apart the
+forecasting pipeline (the "stack") that [experiment
+377](../00377-demand-v1-first-run-feasibility/result.md) scored. Stage 1 is a generalised
+additive model (GAM) per Primary with a Kalman filter that corrects it from recent errors. Stage 2
+is a winter night offset (a fixed correction to winter night-time forecasts), recipe R (a 14-day
+error profile subtracted from the forecast), and quantile bands whose width is refitted each month
+on earlier months. We removed one stage at a time and scored what remained against BG2, the
+best-guess forecast of experiment 87, a blend of five forecasts that production does not run. We
+also built the stack up from the plain GAM, and asked whether the stack does worse at the
+Primaries whose demand is less regular.
+
+A score is the quantile score: twice the mean pinball loss over 11 quantiles, which equals the
+continuous ranked probability score (CRPS) up to the estimation from 11 quantiles. The unit is
+percentage points of a Primary's effective capacity (the capacity its meter can carry), and a
+lower score is better. "Signed-MW" Primaries are the 6 that report power in signed megawatts.
+"MVA-only" Primaries are the 8 that report only apparent power in megavolt-amperes (MVA); every
+number for those Primaries assumes reactive power is zero. D15 and D18 have under a year of history
+and are report only. A "step" is a half-hour change in power above 5% of capacity. In the lists
+below, "positive: the stage helps" means that removing the stage raises the score.
 
 ![Figure 1: cost of removing each stage](figure_1_stage_costs.svg)
 
@@ -130,7 +143,8 @@ power in megavolt-amperes (MVA); every number there assumes reactive power is ze
 ![Figure 3: the gap to BG2 against two regularity measures](figure_3_gap_against_regularity.svg)
 
 **Verdict: partly supported.** The Kalman filter and recipe R earn their place under the thresholds
-registered in the plan. The winter offset and the per-fold spread do not, apart from D8. The
+pre-registered in this page's front matter. The winter offset and the per-fold spread do not, apart
+from D8. The
 regularity hypothesis is not supported at n = 16, and 16 Primaries are too few to refute it.
 
 ## Results (quantile score, points of effective capacity)
@@ -190,8 +204,9 @@ regularity hypothesis is not supported at n = 16, and 16 Primaries are too few t
   M4
   at least +0.5 with p under 0.025, so H2 is not supported. Leave-one-out ranges: M1 -0.24 to +0.09,
   M4 +0.04 to +0.39. Post hoc at n = 14 (D15 and D18 dropped): M1 -0.45 (p = 0.105), M4 +0.53 (p =
-  0.057), leave-one-out M4 +0.45 to +0.74. Both point the registered way and neither passes the
-  rule. D15 (M1 0.12, M4 0.32) and D18 (M1 0.13, M4 0.21) have the stack ahead of BG2 (-0.51 and
+  0.057), leave-one-out M4 +0.45 to +0.74. Both correlations point the registered way, and neither
+  passes the decision rule. D15 (M1 0.12, M4 0.32) and D18 (M1 0.13, M4 0.21) have the stack ahead
+  of BG2 (-0.51 and
   -0.15), against the registered direction. The gap is large at D8, D12, and D22, which have low
   weekly-profile shares (0.14, 0.18, 0.16),
   and at most +0.18 at D3 and D2, which have the highest shares after D9 (0.48 and 0.46); D9, with
@@ -301,8 +316,7 @@ Kalman filter, and BG2.
   at the MVA-only eight, and P6 failed, and the MVA-only misses are explained by D8 alone only
   partly); trigger 5 (the arm without the winter offset beats the full stack at the MVA-only eight,
   and the arm without the filter beats it at days 8 to 14 at the signed-MW six, within noise).
-  Triggers 1, 3, 4, 6, 7 did not fire. The audit and the triage of its findings are listed under
-  "Audit" below.
+  Triggers 1, 3, 4, 6, 7 did not fire.
 - **Placebos.** A permutation placebo (10,000 shuffles of each measure across Primaries) gives the
   p values above; a time-shuffled-readings placebo gives M1 to M3 near zero.
 
@@ -313,16 +327,18 @@ Kalman filter, and BG2.
 - The per-fold spread contrast at D8 compares the own-residual arm with the donor spread, so it
   reports D8's spread choice and not whether refitting the spread monthly helps.
 - D15 and D18 without the filter are badly biased; their contrasts are report only.
-- H2 has 16 Primaries and a measure whose first 4 of 5 readings are not independent of each other.
+- The regularity hypothesis was tested at 16 Primaries with measures M1 to M4 that are not
+  independent of each other.
   A larger test would use more Primaries or simulated series with set regularity.
 - Next: a filter that fades out beyond day 7 (signed-MW days 8 to 14 score better without it), and
-  a stack without the winter offset as the simpler release candidate.
+  a stack without the winter offset is a simpler release candidate.
 
 ## Audit
 
-A fresh Sonnet agent audited the numbers (about 75 quoted numbers, all 384 per-Primary tail cells,
+A fresh Sonnet agent audited the numbers (about 75 quoted numbers, all 384 entries of the
+per-Primary tail table (16 Primaries, 3 arms, 8 measures),
 and a re-derivation of four Primaries' scores from the stored arms, which agree within 0.01 and
-0.1 at D15) and a second reviewed the code. Findings and triage:
+0.1 at D15) and a second agent reviewed the code. Findings and triage:
 
 - **Accepted and fixed:** D8's spread effect was misquoted (+2.21, not +1.6); the D15 score
   of 17.2 is a mean of D15 and D18; BG2's sunny-daylight score is 4.00; the sign conventions were
