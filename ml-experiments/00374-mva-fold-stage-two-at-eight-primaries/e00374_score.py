@@ -206,6 +206,15 @@ def main() -> None:
         }
         for column in ("c1", "c2", "c3", "c4")
     }
+    out["contrast_leave_one_out"] = {
+        column: {
+            left_out: score_module.contrast(
+                frames={s: w for s, w in wides.items() if s != left_out}, column=column, flag="all"
+            )["pooled"]
+            for left_out in SITES
+        }
+        for column in ("c1", "c3")
+    }
     out["tails"] = {
         site: {flag: tails(wide=w, flag=flag) for flag in ("all", "sunny", "cold_night")}
         for site, w in wides.items()
