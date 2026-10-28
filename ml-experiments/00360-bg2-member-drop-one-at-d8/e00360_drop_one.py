@@ -22,12 +22,14 @@ import e00087_assemble as asm  # ty: ignore[unresolved-import]
 import e00087_common as common  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-OUT: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00360-bg2-member-drop-one-at-d8/work"
-)
-D8_ROWS: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00355-d8-weekly-refit-and-median-band-swap/work/scores_wide.parquet"
+OUT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00360-bg2-member-drop-one-at-d8" / "work"
+D8_ROWS: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00355-d8-weekly-refit-and-median-band-swap"
+    / "work"
+    / "scores_wide.parquet"
 )
 SITES: Final[tuple[str, ...]] = ("D8", "D2", "D3", "D4")
 MEMBERS: Final[tuple[str, ...]] = asm.BLEND_FIVE

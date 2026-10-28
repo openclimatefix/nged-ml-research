@@ -81,13 +81,10 @@ from market_common import (
     write_parquet_atomic,
     write_readme,
 )
-from studies.sources import MARKET_DOWNLOADS_DIR
+from studies.sources import MARKET_DOWNLOADS_DIR, PER_STUDY_DIR
 
 SCRIPT_PATH: Final[str] = "studies/market_downloads/fetch_system_series.py"
-DEFAULT_BMU_LIST: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/studies/per_study/battery_pv_separation/"
-    "bmu_list.csv"
-)
+DEFAULT_BMU_LIST: Final[Path] = PER_STUDY_DIR / "battery_pv_separation" / "bmu_list.csv"
 BOD_URL: Final[str] = f"{ELEXON_API}/datasets/BOD/stream"
 FREQUENCY_URL: Final[str] = f"{ELEXON_API}/system/frequency/stream"
 NESO_FREQUENCY_PACKAGE_URL: Final[str] = (

@@ -40,7 +40,7 @@ from run_experiment import results_dir_for
 from studies.arm_runner import dataset_path_for
 from studies.bootstrap import bootstrap_difference
 from studies.pv_dataset import METADATA_PATH, pv_sites
-from studies.sources import SOURCE_CHOICES
+from studies.sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("anm_curtailment")
@@ -48,7 +48,7 @@ _LOG: Final[logging.Logger] = logging.getLogger("anm_curtailment")
 CURTAILMENT_PREFIX: Final[str] = "curtailment/"
 """Where NGED publishes the ANM feed, beside the `timeseries/` prefix this project ingests."""
 
-CACHE_PATH: Final[Path] = Path("/home/jack/scratch/bd/anm_curtailment.parquet")
+CACHE_PATH: Final[Path] = STUDY_DATA_DIR / "anm_curtailment.parquet"
 """Where the downloaded feed is cached, so a re-run does not re-fetch 579 objects."""
 
 BRIGHT_W_M2: Final[float] = 400.0

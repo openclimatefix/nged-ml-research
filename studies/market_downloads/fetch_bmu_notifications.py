@@ -56,13 +56,10 @@ from market_common import (
     write_parquet_atomic,
     write_readme,
 )
-from studies.sources import MARKET_DOWNLOADS_DIR
+from studies.sources import MARKET_DOWNLOADS_DIR, PER_STUDY_DIR
 
 SCRIPT_PATH: Final[str] = "studies/market_downloads/fetch_bmu_notifications.py"
-DEFAULT_BMU_LIST: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/studies/per_study/battery_pv_separation/"
-    "bmu_list.csv"
-)
+DEFAULT_BMU_LIST: Final[Path] = PER_STUDY_DIR / "battery_pv_separation" / "bmu_list.csv"
 BATCH_COUNT: Final[int] = 16
 """BMUs are split into this many batches by a hash of each identifier, so that adding or deleting a
 BMU changes the cache key of one batch only."""

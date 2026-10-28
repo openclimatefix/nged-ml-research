@@ -13,16 +13,14 @@ from typing import Final
 import numpy as np
 import polars as pl
 from studies.pv_dataset import pv_sites
-from studies.sources import ML_EXPERIMENTS_DATA_DIR
+from studies.sources import LEGACY_WEATHER_DATA_DIR, ML_EXPERIMENTS_DATA_DIR
 
 SLUG: Final[str] = "00286-metered-farm-drift-soiling-injection"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / SLUG
 FARMS_FILE: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00179-metered-solar-farm-exploration" / "cleaned_solar_farms.parquet"
 )
-TP_FILE: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/studies/weather/ERA5/stage1_box/tp.parquet"
-)
+TP_FILE: Final[Path] = LEGACY_WEATHER_DATA_DIR / "ERA5" / "stage1_box" / "tp.parquet"
 DRIFT_RATES: Final[tuple[float, ...]] = (0.5, 1.0, 2.0)
 """Injected linear losses, percent of output per year."""
 N_STARTS: Final[int] = 8

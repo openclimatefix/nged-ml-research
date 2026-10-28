@@ -38,8 +38,9 @@ import e00354_lib as lib  # ty: ignore[unresolved-import]
 import e00354_step as step  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-DATA: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR
 WORK: Final[Path] = DATA / "00364-d8-stage-blame-and-analogue-recent-power" / "work"
 FOLDERS: Final[dict[tuple[str, str], Path]] = {
     ("D8", "monthly"): DATA / "00354-d8-own-residual-bands-and-longer-fit-history/work/fits_b",

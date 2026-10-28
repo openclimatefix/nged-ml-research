@@ -12,14 +12,18 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-SRC: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/"
-    "00111-differentiable-physics-6-ens-forecast-engine-against-bg2/work/ens_store"
+SRC: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00111-differentiable-physics-6-ens-forecast-engine-against-bg2"
+    / "work"
+    / "ens_store"
 )
-OUT: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/"
-    "00144-differentiable-physics-weather-forecast-bias-persistence-on-gam-k/work"
+OUT: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00144-differentiable-physics-weather-forecast-bias-persistence-on-gam-k"
+    / "work"
 )
 SITES: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16", "D18")
 SEASONS: Final[dict[str, tuple[int, ...]]] = {

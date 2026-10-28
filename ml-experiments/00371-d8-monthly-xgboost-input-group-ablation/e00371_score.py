@@ -23,11 +23,9 @@ import e00087_stack as stack  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from e00371_fit import ARM_DIR, ARMS, SITES, WORK_DIR
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-FRAME_DIR: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/"
-    "00360-bg2-member-drop-one-at-d8/work"
-)
+FRAME_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00360-bg2-member-drop-one-at-d8" / "work"
 LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
 N_RESAMPLES: Final[int] = 20_000
 SEED: Final[int] = 0

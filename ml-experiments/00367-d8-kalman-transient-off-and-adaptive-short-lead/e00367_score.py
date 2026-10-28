@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Score the Kalman-transient arms (control, K0 off, KA adaptive gain) from experiment 364's stage columns.
 
-    DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data OMP_NUM_THREADS=2 \
+    DATA_PATH_INTERNAL=$DATA_PATH_INTERNAL OMP_NUM_THREADS=2 \
         uv run --no-sync python ml-experiments/00367-*/e00367_score.py > printed_report.txt
 
 Stage columns (experiment 364): `S1` plain GAM plus Kalman level, `S2` plus Kalman transient,
