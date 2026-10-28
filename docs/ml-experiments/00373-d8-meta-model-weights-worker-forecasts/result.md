@@ -10,8 +10,10 @@ also_relevant_to:
 status: done
 kind: other
 size: >-
-  medium. Stored: private files under data/ml-experiments/00373-d8-meta-model-weights-worker-forecasts/
-  only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is defensible
+  medium. Stored: private files under
+  data/ml-experiments/00373-d8-meta-model-weights-worker-forecasts/
+  only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is
+  defensible
   for the meta-model's target (the actual, or the actual minus a base median), so the plan fixes the
   second. Callers: the scripts read the stored D8 forecasts of experiments 355 and 360 and call
   experiment 354's scoring helpers. Asset graph: not touched.
@@ -20,17 +22,23 @@ hypothesis: >-
   lead time, calendar, and each worker's recent error can weight the workers by context, and so
   scores better than the best single family chosen out of sample.
 prediction: >-
-  Written before any score is read. The meta-model scores at least 0.2 points of quantile score below
+  Written before any score is read. The meta-model scores at least 0.2 points of quantile score
+  below
   the best single family chosen out of sample at D8, and at least 0.1 points below the fixed 50/50
-  blend of the GAM stack and BG2. It fails if the meta-model is within 0.1 points of the 50/50 blend.
+  blend of the GAM stack and BG2. It fails if the meta-model is within 0.1 points of the 50/50
+  blend.
 decision_rule: >-
   Paired contrasts, whole valid months resampled (20,000 resamples, seed 0), 95% intervals, on the
   scored months October 2025 to June 2026 (the first 3 valid months only train the meta-model).
-  C1 meta-model minus the best single family (BG2, itself a blend, excluded after the first run); C2 meta-model minus the 50/50 blend; C3 meta-model minus
+  C1 meta-model minus the best single family (BG2, itself a blend, excluded after the first run); C2
+  meta-model minus the 50/50 blend; C3 meta-model minus
   BG2; C4 meta-model minus the meta-model without lagged power; C5 meta-model minus the meta-model
-  without calendar context. `supported` when C1 is at most -0.2 with an interval wholly below zero and
+  without calendar context. `supported` when C1 is at most -0.2 with an interval wholly below zero
+  and
   C2 is at most -0.1. `small gain` when C2 is wholly below zero but above -0.1. `not supported`
-  otherwise. Stop rule: if C2 is above -0.1 at D8, stop and run nothing at D2, D3, or D4. The threshold for C2 is 0.1 and for C1 is 0.2, because the meta-model needs every family to run for every substation in production. Gate: the script reproduces 8.338 (GAM
+  otherwise. Stop rule: if C2 is above -0.1 at D8, stop and run nothing at D2, D3, or D4. The
+  threshold for C2 is 0.1 and for C1 is 0.2, because the meta-model needs every family to run for
+  every substation in production. Gate: the script reproduces 8.338 (GAM
   stack) and 7.593 (BG2) on the 96,986 rows of experiment 354 before any meta-model is fitted.
 benchmark: >-
   BG2, the GAM stack (experiment 355 arm W), each of BG2's five members alone (experiment 360),
@@ -55,10 +63,12 @@ headline: >-
   level with both on other days.
 lessons:
   - >-
-    A likely reason is that the stored forecasts' errors are alike: the meta-model's median error correlates 0.956 with the blend's. We did not test this.
+    A likely reason is that the stored forecasts' errors are alike: the meta-model's median error
+    correlates 0.956 with the blend's. We did not test this.
   - >-
     On 3,765 rows from bank holidays and 24 December to 2 January (18 dates in 4 months, a post hoc
-    slice) the meta-model scores 0.47 points below the 50/50 blend. The gain is not shown to come from
+    slice) the meta-model scores 0.47 points below the 50/50 blend. The gain is not shown to come
+    from
     the calendar features, because the meta-model without them keeps 0.38 of it.
 production_status: not-for-production
 adopted_in: none
@@ -67,11 +77,13 @@ take_home_message: >-
   no better than a fixed 50/50 blend at substation D8 (0.03 points of capacity lower, an interval
   that includes zero), so serving every family for every substation is not justified on this
   evidence. It scored 0.47 points lower on holidays and the Christmas period (a post hoc slice of 18
-  dates), but it kept most of that gain without calendar inputs, so the cause is unknown. This is one substation and
+  dates), but it kept most of that gain without calendar inputs, so the cause is unknown. This is
+  one substation and
   9 scored months.
 advice:
   - >-
-    On this evidence a meta-model over worker forecasts is not worth building for D8's forecast intervals; it is 0.028 points below
+    On this evidence a meta-model over worker forecasts is not worth building for D8's forecast
+    intervals; it is 0.028 points below
     the 50/50 blend with an interval including zero (C2, Figure 1).
   - >-
     If a worker blend is wanted, test why the meta-model scores lower on holidays and 24 December
@@ -79,7 +91,8 @@ advice:
     blend, because the meta-model's only gain is on those days (event-day row in Figure 1).
   - >-
     Store rolling-origin forecasts from earlier years before testing any learned weighting again,
-    because one scored year leaves 9 months to score and 3 to train on (Rows bullet, Results section).
+    because one scored year leaves 9 months to score and 3 to train on (Rows bullet, Results
+    section).
 date: 2026-10-28
 ---
 
