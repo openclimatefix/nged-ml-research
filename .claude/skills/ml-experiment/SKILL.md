@@ -479,8 +479,9 @@ and `.claude/worktrees/`); screenshot and render folders; downloaded files you n
 the worktrees and local branches you created. Remove a worktree with `git worktree remove` from the
 main checkout, never with `-f` over uncommitted work, and delete its branch with `git branch -d`,
 never `-D`, after checking that nothing is unpushed. First check that no process has the worktree as
-its working directory, and keep any file that a committed file refers to. Do this before you report
-the experiment as finished, so the maintainer never has to sweep up after the session.
+its working directory, and keep any file that a committed file refers to. Do not delete remote
+branches, because GitHub deletes the head branch when the PR merges. Do this before you report the
+experiment as finished, so the maintainer never has to sweep up after the session.
 
 **Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
