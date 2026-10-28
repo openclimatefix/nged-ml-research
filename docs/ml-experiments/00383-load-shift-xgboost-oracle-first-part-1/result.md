@@ -1,8 +1,6 @@
 ---
 id: "00383"
 slug: load-shift-xgboost-oracle-first-part-1
-title: >-
-  Do nulled load-shift lags and wider bands fix the weekly XGBoost model's tails after a load shift?
 theme: lsc-detectors
 also_relevant_to:
   - lagged-power-and-error-correction
@@ -16,8 +14,9 @@ size: >-
   experiments 87, 371, 379, and 381 are read and never written. Production serving path: not
   touched (this repository holds none). Degradation rule: not touched, but arm c2 tests a lagless
   fallback and arm W tests widening on missing inputs, which are candidate degradation rules for a
-  later port. Designs: more than one would test the hypothesis (nulled lags with dropout, or a lagless
-  fallback; a fixed or an as-of widening factor); the plan fixes all of them before any score is read.
+  later port. Designs: more than one would test the hypothesis (nulled lags with dropout, or a
+  lagless fallback; a fixed or an as-of widening factor); the plan fixes all of them before any
+  score is read.
   Callers: the fit script imports experiment 87's folder and copies experiment 100's pseudo-event
   recipe; the scorer imports experiment 377's folder and `studies.eval_protocol`.
 hypothesis: >-
