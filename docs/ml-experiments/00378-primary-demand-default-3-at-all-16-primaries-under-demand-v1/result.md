@@ -121,6 +121,11 @@ This page is the plan. The write-up replaces it when the scores exist.
   (`e00202_arms.fit_factors`) to those leads. The control gate compares the six against
   experiment 322's stored scores at 0.5 to 240 hours.
 
+- **Comparison with experiment 377.** Experiment 377's "default 1 extended to 240 hours" lacks S
+  at every lead, so it is not default 1. The default 1 comparison here (C3) is the faithful one:
+  default 3 minus default 1 means the S layer below 168 hours, S at 168 to 240 hours, and the
+  daylight blend. Experiment 377's stack is reported as a third reference, "the stack without S".
+
 ## Open questions for the manager
 
 - None. Experiment 377's stored forecasts are in place; its scores and PR are still to come.
