@@ -51,7 +51,7 @@ colour a group of products instead and put every product's name on the axis.
 **Size a chart to the page's text column, so the chart shows at about 1:1 scale in the built site.**
 Stack panels vertically rather than side by side, let the plot area fill the column's width, put
 every key above the plot, and keep subtitles short in total words. `studies.charts` draws every figure
-`CONTENT_WIDTH_PX` (`packages/studies/src/studies/charts.py`) wide for this reason, the width of
+`CONTENT_WIDTH_PX` (`src/studies/charts.py`) wide for this reason, the width of
 `docs/`'s text column; match that width for a chart outside `docs/studies/` too, and check that the
 text is legible in the built site, not only in the SVG.
 

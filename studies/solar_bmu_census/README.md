@@ -23,7 +23,7 @@ wrote.**
 | `census_charts.py` | Draws the page's five figures. |
 
 The tests for `fetch_sources.py`, `classify.py`, `collate.py`, `solar_estimate.py`, and `report.py`
-are in `packages/studies/tests/solar_bmu_census/`.
+are in `tests/studies/solar_bmu_census/`.
 
 ## The capacity columns
 

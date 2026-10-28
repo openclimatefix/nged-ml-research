@@ -67,8 +67,21 @@ start**, because most of what the skills hold are traps that fail silently.
 | `data-validation` | trusting the output of a finished download or data build |
 
 **Some skills still mention material that belongs to `nged-substation-forecast`:** the Dagster
-cross-validation chain, the `release-model` skill, and MLflow. Those parts are corrected as the move
-described in issue 1 proceeds.
+cross-validation chain, MLflow, `conf/cv/` consumers such as `scripts/forecasting/score_study.py`,
+and the skills `plan-issue`, `implement-issue`, `github-issue-pr-workflow`, `github-graphql`,
+`literature-review`, and `release-model`, which stay in that repository. Those parts are corrected
+as the move described in issue 1 proceeds.
+
+**Tests that need `torch` skip in CI, to keep CI fast.** They run on the workstation after `uv sync
+--group gpu`.
+
+**Link to the rendered production docs site, never to a `github.com/.../blob/main/docs/...` path.**
+Run a Vega/Altair SVG export through `npx svgo@4 --multipass --precision=1 --final-newline
+chart.svg` before committing it, because the `check-added-large-files` hook rejects files over 500
+KB.
+
+**Never edit a production data contract from here.** The Patito schemas in `contracts` belong to
+`nged-substation-forecast`, where a human reviews every change to them.
 
 ## Import rules
 

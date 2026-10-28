@@ -560,7 +560,7 @@ def run_metadata() -> dict[str, str]:
 
     return {
         "checkout": last_commit(),
-        "graph_module": last_commit("--", "packages/studies/src/studies/dp_gam_graph.py"),
+        "graph_module": last_commit("--", "src/studies/dp_gam_graph.py"),
     }
 
 

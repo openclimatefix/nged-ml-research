@@ -22,6 +22,7 @@ dependencies = [
     "weather_utils",
     "xgboost_forecaster",
     "altair>=6.0.0",
+    "deltalake",
     "holidays>=0.106",
     "httpx",
     "numpy>=1.24",
@@ -330,8 +331,7 @@ exclude = '\.git|\.venv'
 # Each folder under `studies/` that holds a script a test imports by bare name is listed here and in
 # `pythonpath` under `[tool.pytest.ini_options]`, so `ty` resolves `import wind_products` the same
 # way pytest does. A script may import its own folder, other study and experiment folders,
-# `studies.*`, and the other reviewed packages. `tests/studies/test_study_boundaries.py`
-# enforces that production never imports a script.
+# `studies.*`, and the other reviewed packages. Production never imports a script.
 extra-paths = [
     "tests",
     "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
@@ -354,7 +354,7 @@ extra-paths = [
 ]
 
 [[tool.ty.overrides]]
-# `torch` and `triton` come from the optional `gpu` dependency group of `packages/studies`, which CI
+# `torch` and `triton` come from the optional `gpu` dependency group of `src/studies`, which CI
 # does not install, so `ty` cannot resolve them there. The files listed in `include` are the ones
 # that import them, directly or through the differentiable-physics modules, and the tests and
 # scripts that go with those.

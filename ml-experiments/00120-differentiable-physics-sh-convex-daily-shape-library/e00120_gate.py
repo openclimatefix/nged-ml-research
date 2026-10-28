@@ -896,7 +896,7 @@ def module_tests_pass() -> bool:
             "run",
             "--no-sync",
             "pytest",
-            "packages/studies/tests/test_dp_shape_library.py",
+            "tests/studies/test_dp_shape_library.py",
             "--run-studies",
             "-q",
         ],

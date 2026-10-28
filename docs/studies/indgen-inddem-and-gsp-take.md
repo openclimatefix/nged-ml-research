@@ -487,7 +487,7 @@ in
 [`studies/market_downloads/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/market_downloads),
 and the analysis is in
 [`studies/indgen_inddem/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/indgen_inddem).
-The tests of the download scripts are in `packages/studies/tests/`.
+The tests of the download scripts are in `tests/studies/`.
 
 ## Reproducing the figures
 

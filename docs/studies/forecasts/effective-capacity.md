@@ -589,7 +589,7 @@ The ensemble-mean forecasts, the satellite irradiance, and the lag-features stud
 that the project holds. NGED's power data are private, and no plant's name, identifier, or
 coordinates appear on this page. The scripts are in
 [`studies/effective_capacity/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/effective_capacity),
-at the commit that merged this page, and the shared code is in `packages/studies/`. XGBoost 3.4.1
+at the commit that merged this page, and the shared code is in `src/studies/`. XGBoost 3.4.1
 (from the repository's lock file) fitted every XGBoost model, with the commands below, at the lag
 study's two hyperparameter settings. The study folder's README says what each saved file holds.
 

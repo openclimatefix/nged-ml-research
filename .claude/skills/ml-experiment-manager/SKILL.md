@@ -110,7 +110,7 @@ rebase run follows if it does. Write the naming rule into every `change` brief: 
 `kind: change`. Before merging a `change` PR, check the five adoption conditions, assign the version
 number, and confirm the PR adds the log row. Four cases need the maintainer's approval: a new data
 source, a cost above £30 or a recurring production cost, a change that would need a serving-path
-change to port, and a change whose code must enter `packages/studies`.
+change to port, and a change whose code must enter `src/studies`.
 
 ## Starting a session
 
@@ -193,7 +193,7 @@ because `closingIssuesReferences` is empty until the merge lands.
   those lines has the same cause, so ignore it.
 - **A diff outside those paths, such as a change under `src/` or `packages/`, stops at a reviewed PR
   for the maintainer.** Tell a session
-  that wants shared code in `packages/studies` to keep the code inside its own experiment folder
+  that wants shared code in `src/studies` to keep the code inside its own experiment folder
   and to say in `result.md` that moving it needs the maintainer's review.
 - **A permission denial is not a puzzle to solve.** Report it to the maintainer and wait. The
   maintainer can add an allow rule for a command such as `gh pr merge`, and can give an explicit

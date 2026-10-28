@@ -350,7 +350,7 @@ private.** The Open-Meteo means are in `data/studies/downloads/NWP/OPEN-METEO-EN
 local ECMWF ENS series is built from `data/studies/downloads/NWP/ENS_SITE_EXTRACT/`, which reads
 this project's own ENS Delta table. NGED's power readings are private. Every output carries only the
 anonymised labels `A` to `F` and `W1` to `W3`. The code is in `studies/open_meteo_ensemble_means/`
-and `packages/studies/`, at the commit that adds this page.
+and `src/studies/`, at the commit that adds this page.
 
 ## Reproducing the figures
 

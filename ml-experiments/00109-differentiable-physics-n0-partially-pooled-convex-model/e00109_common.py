@@ -293,5 +293,5 @@ def run_metadata() -> dict[str, str]:
 
     return {
         "checkout": last_commit(),
-        "pooled_module": last_commit("--", "packages/studies/src/studies/dp_gam_pooled.py"),
+        "pooled_module": last_commit("--", "src/studies/dp_gam_pooled.py"),
     }

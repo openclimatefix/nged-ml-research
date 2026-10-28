@@ -318,7 +318,7 @@ example in the arm names `lagmw_xl` and `mask_xl` of experiment 86, so a search 
 **A season-year is a 12-month period, and its start month depends on the series of work.** In the
 solar-disaggregation experiments it runs from September to August, such as 2019/20 ([experiment
 39](00039-pv-disaggregation-cams-injection/result.md)). In the differentiable-physics series it
-runs from July to June (`FIRST_SEASON_MONTH` in `packages/studies/src/studies/dp_calendar.py`).
+runs from July to June (`FIRST_SEASON_MONTH` in `src/studies/dp_calendar.py`).
 
 ### Skill
 

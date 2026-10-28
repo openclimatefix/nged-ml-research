@@ -138,7 +138,7 @@ frame.with_columns(pl.col(time_col).dt.hour().alias("hour")).group_by("hour").ag
 ).sort("hour")
 ```
 
-`packages/studies/src/studies/served_column_checks.py`'s
+`src/studies/served_column_checks.py`'s
 `check_hourly_value_is_a_backward_mean` and `check_direct_is_not_a_separation_model` are the tested
 version of this pattern for Open-Meteo's own point downloads, referenced by the `study` skill as
 something to run at fetch time; write the equivalent hour-of-day check for a product that pattern

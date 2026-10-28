@@ -7,8 +7,7 @@ themselves are not.** `studies/README.md` says which code moves here, and why.
 its own folder, from the folder of another study or experiment, from `studies.*` (this package),
 and from the other reviewed packages in `packages/*`.** `src/` and every package under `packages/`
 except this one must never import `studies` or a script, because humans review that code and the
-study code is fast-moving and agent-written. `tests/test_study_boundaries.py` enforces that rule,
-and no module here imports a script by its bare name.
+study code is fast-moving and agent-written. No module here imports a script by its bare name.
 
 ## What this package owns, and what it does not
 
@@ -26,7 +25,7 @@ it.
 It does not own the question, the arms, which charts a page draws, or the write-up. Those stay in
 the study, as scripts, because a one-off comparison is not a library and should not be dressed as
 one. It does not own downloads either: a fetcher needs the network to exercise, which is what the
-`--run-network` gate covers, so the fetchers stay in the study alongside the arms they serve.
+network-test gate covers, so the fetchers stay in the study alongside the arms they serve.
 
 Two neighbouring packages own things a reader might look for here. `geo` owns H3 indexing, including
 the mapping from a coordinate to a cell. `contracts` owns every data schema, including

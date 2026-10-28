@@ -1984,7 +1984,7 @@ on 2026-09-30. The generator telemetry and the `effective_capacity` table are pr
 single generator's output can be commercially sensitive.
 
 **The code is in the repository, at a fixed commit and with fixed XGBoost settings.** The scripts
-under `studies/nwp_forecast_comparison/` and the shared code under `packages/studies/` last changed
+under `studies/nwp_forecast_comparison/` and the shared code under `src/studies/` last changed
 at commit 1e5ec75acbba956c4c6bd2d7efd3102c9417c3b4. The XGBoost version is 3.4.1. The primary
 setting has a maximum depth of 6, a learning rate of 0.05, 500 boosting rounds, a row subsample of
 0.8, a minimum child weight of 20, and an L2 penalty of 1. The sensitivity setting has a maximum

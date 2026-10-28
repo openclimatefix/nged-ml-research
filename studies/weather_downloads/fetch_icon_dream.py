@@ -26,7 +26,7 @@ wind power prediction using more than one vertical level.
 **Vertical interpolation to a fixed hub height is out of scope here.** `WS`/`U`/`V` are served on
 model levels, referenced to height-above-ground through `HHL` in
 `ICON-DREAM-EU_constant_fields.grb`, and turning that into "wind speed at 100 m" is new, tested code
-that belongs in `packages/studies/`, not in this download script. This script keeps the raw
+that belongs in `src/studies/`, not in this download script. This script keeps the raw
 per-level values so that interpolation step has every level to work from.
 
 **Date range defaults to the metered wind site list's own coverage, not the product's full span.**

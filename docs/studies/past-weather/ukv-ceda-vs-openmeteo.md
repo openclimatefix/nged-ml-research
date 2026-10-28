@@ -594,7 +594,7 @@ it does not say which archive is closer to what happened.
 Attribution-NonCommercial-ShareAlike 4.0 licence, and Open-Meteo's historical-forecast archive is
 public.** The power data, the farm locations, and the frames and per-row losses are private. The
 scores and charts on this page carry no UKV values. The code is in `studies/past_weather/` and
-`packages/studies/` at the commit that merged this page. The XGBoost version is 3.4.1, the device is
+`src/studies/` at the commit that merged this page. The XGBoost version is 3.4.1, the device is
 an NVIDIA RTX A6000, and the two settings are those of the CEDA-against-ERA5 study. The source for
 CEDA's data is [Met Office (2016): NWP-UKV: Met Office UK Atmospheric High Resolution Model
 data](https://catalogue.ceda.ac.uk/uuid/f47bc62786394626b665e23b658d385f), Centre for Environmental

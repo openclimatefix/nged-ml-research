@@ -1005,7 +1005,7 @@ single-site BMUs' public positions and at 18 grid points. The download script is
 `studies/weather_downloads/fetch_cams_public_points.py`. The two hand-made match tables are
 committed beside the scripts. The code is in
 [`studies/solar_bmu_census/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/solar_bmu_census),
-and its tests are in `packages/studies/tests/solar_bmu_census/`.
+and its tests are in `tests/studies/solar_bmu_census/`.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's

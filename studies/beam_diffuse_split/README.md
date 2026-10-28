@@ -38,7 +38,7 @@ separation model's estimate of the same split, says what the *published field* b
 ## The scripts, in the order they run
 
 This folder holds the scripts of this experiment and of the studies that grew out of it. The modules
-that other studies share are in `packages/studies/src/studies/`, and their rows below name the
+that other studies share are in `src/studies/`, and their rows below name the
 module. The scripts that feed the past-weather pages are in
 [`studies/past_weather/`](../past_weather/README.md), and the ENS-horizons scripts are in
 [`studies/nwp_forecast_comparison/`](../nwp_forecast_comparison/README.md).
@@ -187,7 +187,7 @@ actual`, so adding the metered power back recovers each arm's capped point forec
 whose right answer is known.** One site, 30 days, a 3-hour spike each day, scored against a
 threshold the spike clears: a forecast identical to the observation, one an hour late, one three
 hours late, and one twelve hours late. The four cases live in
-`packages/studies/tests/test_fractions_skill_score.py`, which asserts the score at four tolerances
+`tests/studies/test_fractions_skill_score.py`, which asserts the score at four tolerances
 for each. The last is the control the other three are read against — widening the window must not
 rescue a forecast whose spike lies beyond every tolerance, or every recovery along a row would be the
 window inflating the score rather than the score crediting timing.

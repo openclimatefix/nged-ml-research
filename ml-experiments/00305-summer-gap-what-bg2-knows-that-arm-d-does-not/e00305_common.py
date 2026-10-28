@@ -9,7 +9,7 @@ experiment, so the copies are the only link. The 14-day correction lives in `e00
 """
 
 # Copied unchanged from experiment 00087's `e00087_common.py`, because a script imports only its own
-# folder (see `packages/studies/tests/test_study_boundaries.py`).
+# folder.
 
 import json
 import os

@@ -9,7 +9,7 @@ forecast model's own error), the sign is ambiguous and the update is skipped, ex
 missing reading is.
 
 This is an experiment-local copy of `studies.dp_assimilation._kalman_band` with a time-varying
-observation row; it moves into `packages/studies` only if the arm wins.
+observation row; it moves into `src/studies` only if the arm wins.
 """
 
 from dataclasses import dataclass

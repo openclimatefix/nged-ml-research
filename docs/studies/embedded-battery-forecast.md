@@ -451,7 +451,7 @@ September 2025 to August 2026 (scored from October 2025).
 Embedded Capacity Register is NGED's workbook, marked shared and not open, so only a holder of the
 workbook can rerun the census; this page carries only counts from it. NGED battery A's series is
 private, and the page shows it only as a fraction of its own p99, on days numbered 1 to 7. The
-code is under `studies/embedded_battery_forecast/` and `packages/studies/`, at the commit of the
+code is under `studies/embedded_battery_forecast/` and `src/studies/`, at the commit of the
 pull request that added this page. XGBoost 3.4.1 runs the `reg:quantileerror` objective, and the
 hyperparameters are `PRIMARY_HYPER_PARAMETERS` and `SENSITIVITY_HYPER_PARAMETERS` in
 `studies.cross_validation`.

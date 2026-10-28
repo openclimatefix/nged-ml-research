@@ -132,11 +132,11 @@ the experiment's page says which.
 - **Tier 2 changes act inside a fitted stage.** A change to the convex model, the head, the solar
   summary, or the features needs the research default's code. The experiment imports that code
   directly from the folder of the experiment that holds it, with that folder on `PYTHONPATH`, as the
-  `ml-experiment` skill describes. The code moves into `packages/studies` in a reviewed pull request
+  `ml-experiment` skill describes. The code moves into `src/studies` in a reviewed pull request
   only when several experiment folders need it or when production might one day need it.
 
 **The research default's definition holds four items.** These are the code (a script in an
-experiment folder and its commit, a module and commit in `packages/studies`, or "stored forecasts
+experiment folder and its commit, a module and commit in `src/studies`, or "stored forecasts
 only"), a configuration file naming every setting and the seed policy, the stored forecasts for
 every scored, replicate, and holdout period, and the scores. The seed policy matters: averaging
 three seeds of the correction network scored 0.123 points below arm D, against 0.104 for the mean
@@ -315,7 +315,7 @@ superseded` on its experiment.
 
 **Adoption needs the maintainer's approval in four cases.** These are a new data source, a cost
 above £30 or a recurring cost in production, a change that would need a serving-path
-change to port, and a change whose code must enter `packages/studies`. Other adoptions run
+change to port, and a change whose code must enter `src/studies`. Other adoptions run
 autonomously under the merge rules in the `ml-experiment` skill.
 
 **A model release is a separate step.** The Primary-demand research default is a GAM stack, and a

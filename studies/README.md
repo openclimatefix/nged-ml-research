@@ -14,28 +14,27 @@ forecasts Delta table is partitioned by `experiment_name`. A study of whether a 
 published field carries information is a different kind of thing from both.
 
 **A script under `studies/` may import from its own folder, from the folder of another study or
-experiment, from `studies.*` (`packages/studies`), and from the other reviewed packages in
-`packages/*`.** `src/` and every package under `packages/` except `packages/studies` must never
+experiment, from `studies.*` (`src/studies`), and from the other reviewed packages in
+`packages/*`.** `src/` and every package under `packages/` except `src/studies` must never
 import `studies` or a script, because humans review that code and the study code is fast-moving and
-agent-written. Code that production or a package needs lives in `packages/studies/src/studies/`.
-`packages/studies/tests/test_study_boundaries.py` enforces that rule.
+agent-written. Code that production or a package needs lives in `src/studies/`.
 
 ## What this tier promises, and what it does not
 
 | | `packages/` and `src/` | `studies/` |
 |---|---|---|
 | Runs in production | yes | never |
-| Has tests | yes | the machinery does, and `packages/studies/tests/<folder>/` tests some scripts; the study as a whole does not |
+| Has tests | yes | the machinery does, and `tests/studies/<folder>/` tests some scripts; the study as a whole does not |
 | Maintained as the repository changes | yes | no |
 | Backwards compatibility | within reason | none |
 | Linted by CI | yes | yes |
 | Validated against a Patito contract | yes | no |
 
-**The tested half is `packages/studies/`, and the split is deliberate.** A study's arms, charts and
+**The tested half is `src/studies/`, and the split is deliberate.** A study's arms, charts and
 write-up answer one question and are then done, so tests on them would have no second reader. The
 machinery those arms call is different: it is used by every arm, it will be used by the next study,
 and its failures are silent — a centred rolling window off by one step, a timestamp assigned to the
-wrong hour, a site label derived two different ways. Code moves into `packages/studies/` when a
+wrong hour, a site label derived two different ways. Code moves into `src/studies/` when a
 study has already got it wrong once, or when getting it wrong would produce a plausible-looking
 number rather than an error.
 
@@ -98,7 +97,7 @@ cleaned reading, including the whole validation year.
 **Every download is filed under `data/studies/downloads/` by what it is, never by the study that
 first fetched it.** Each product has one folder. A product's frames cut or fetched at each site's
 coordinates sit in a `site_points/` subfolder of that folder, beside the gridded download. The names
-of the folders are constants in `packages/studies/src/studies/sources.py`, and scripts never spell a
+of the folders are constants in `src/studies/sources.py`, and scripts never spell a
 folder name themselves.
 
 | Folder under `data/studies/downloads/` | What it holds | Written by |

@@ -96,7 +96,7 @@ apart from its score with the last 12 months only.
 
 **The full model is a plan with four changes, and each change can be switched on alone, so a later
 experiment can tell which change helps.** The framework module built for experiment 104
-(`packages/studies/src/studies/dp_pooled.py`) contains switches for several of these changes. At the
+(`src/studies/dp_pooled.py`) contains switches for several of these changes. At the
 time of writing, no merged experiment has scored them. The 6.6-times GPU speed-up reported in
 experiment 104 came from a proxy for the pooled model and not from a scored forecast.
 

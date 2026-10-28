@@ -74,8 +74,8 @@ STEPS_PER_DAY: Final[int] = 48
 MARGIN_TOLERANCE: Final[float] = 0.20
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 MODULE_TESTS: Final[tuple[str, ...]] = (
-    "packages/studies/tests/test_dp_ens.py",
-    "packages/studies/tests/test_dp_ens_weather.py",
+    "tests/studies/test_dp_ens.py",
+    "tests/studies/test_dp_ens_weather.py",
 )
 
 

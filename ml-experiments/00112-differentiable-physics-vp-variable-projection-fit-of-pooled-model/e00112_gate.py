@@ -1,6 +1,6 @@
 """The blocking known-answer gate of experiment 112, before any replicate-year or scored-year fit.
 
-Module tests 1 to 5 of the plan are `packages/studies/tests/test_dp_pooled_vp.py`. This script runs
+Module tests 1 to 5 of the plan are `tests/studies/test_dp_pooled_vp.py`. This script runs
 the other three, each fitted at the replicate cut (2024-07-01) with the interaction network on.
 Every fit starts cold and is saved, so a rerun loads it. The results go to `work/gate.json`, which
 the fit, forecast, onboarding, profile, and ladder scripts check before they run.

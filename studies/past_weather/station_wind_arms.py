@@ -1726,7 +1726,7 @@ def group_difference_interval(
     months from its own months only. The statistic is the first group's mean over the rows of its
     drawn months minus the second's. The bounds are the 2.5th and 97.5th percentiles.
 
-    Untested in `packages/studies`, because this function is a copy for one page.
+    Untested in `src/studies`, because this function is a copy for one page.
 
     Args:
         first: The first group's per-seed, per-row differences and each row's month label.

@@ -6,16 +6,16 @@ published pages carry the design and the results. Every script's module docstrin
 that runs it.
 
 **A script imports from this folder, from other study and experiment folders, from `studies.*`
-(`packages/studies/`), and from the other reviewed packages in `packages/*`.** The code that
+(`src/studies/`), and from the other reviewed packages in `packages/*`.** The code that
 several study folders share lives in
-`packages/studies/src/studies/`: the solar and wind common rows (`studies.solar_product_frames`,
+`src/studies/`: the solar and wind common rows (`studies.solar_product_frames`,
 `studies.wind_product_frames`, `studies.product_frames`), the PV dataset readers
 (`studies.pv_dataset`), the fit runner (`studies.arm_runner`), the data paths (`studies.sources`),
 and the trial-area box (`studies.trial_area`). Nothing in `src/` or in any package other than
-`packages/studies` imports this folder.
+`src/studies` imports this folder.
 
 **The folder holds 43 scripts for seven pages, so find a page's scripts in the table below rather than
-by the folder name.** Tests of these scripts are in `packages/studies/tests/past_weather/`. The data
+by the folder name.** Tests of these scripts are in `tests/studies/past_weather/`. The data
 the scripts read and write is under `data/studies/`, which no version control tracks.
 
 ## The scripts, by page

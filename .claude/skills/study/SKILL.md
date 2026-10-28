@@ -10,7 +10,7 @@ description: >-
   timestamp conventions, grid cells, steps in served data); how to chart a study so the charts tell
   the story alone; how to write the page without overclaiming; and anonymisation. Load before
   planning, running, re-running, charting, writing up, or reviewing any study under `studies/`,
-  before changing `packages/studies/`, and before any ml-experiment or study whose numbers will
+  before changing `src/studies/`, and before any ml-experiment or study whose numbers will
   reach `docs/`.
 ---
 
@@ -36,7 +36,7 @@ review after `plan-issue`'s plan. Two decisions still belong to the maintainer:
 
 **A study PR may be merged without waiting for the maintainer when all three of these hold:**
 
-- **The diff is confined to studies.** It touches only `studies/`, `packages/studies/`, and
+- **The diff is confined to studies.** It touches only `studies/`, `src/studies/`, and
   `docs/studies/` (with the study skill and study docs they need), and nothing else: no `src/`, no
   other package, no Patito contract, no CI configuration, no dependency change.
 - **Every line of code has been through at least one fresh agentic review**, with the findings
@@ -50,37 +50,35 @@ A PR that touches anything outside that list stops at a reviewed PR, as `impleme
 
 | What | Where |
 |---|---|
-| Tested machinery shared by studies: the out-of-fold fit loop, the paired bootstrap, grid sampling, anonymisation, solar geometry, power aggregation, served-column checks, the Fractions Skill Score, and the common rows of the past-weather studies | `packages/studies/src/studies/` |
+| Tested machinery shared by studies: the out-of-fold fit loop, the paired bootstrap, grid sampling, anonymisation, solar geometry, power aggregation, served-column checks, the Fractions Skill Score, and the common rows of the past-weather studies | `src/studies/` |
 | The study's own scripts: fetch, build, run, report, chart | `studies/<folder>/`, one folder per family of pages (`past_weather/`, `nwp_forecast_comparison/`, ...), run with `uv run python studies/<folder>/<script>.py` |
-| Tests of a study's scripts | `packages/studies/tests/<folder>/`, and tests of the machinery in `packages/studies/tests/` |
+| Tests of a study's scripts | `tests/studies/<folder>/`, and tests of the machinery in `tests/studies/` |
 | Downloaded weather, one directory per product, filed by kind | `data/studies/downloads/NWP/<PRODUCT>/`, `downloads/reanalysis/<PRODUCT>/`, or `downloads/observations/<PRODUCT>/` |
 | A product's frames cut or fetched at each site's coordinates | `site_points/` inside the product's directory |
 | NGED's active-network-management exports | `data/studies/downloads/observations/NGED-ANM/` |
 | A study's datasets and results, and a `superseded/` directory for outputs a later run replaced | `data/studies/<study>/` |
 | The published page and its charts | `docs/studies/<page>.md`, `docs/studies/assets/` |
 
-**`packages/studies/` is Claude's to own.** Keep it tidy, and restructure it whenever a study needs
+**`src/studies/` is Claude's to own.** Keep it tidy, and restructure it whenever a study needs
 to. Every function in it carries tests, and each test must be able to fail on the bug it exists to
 catch; run a mutation pass (the `implement-issue` skill, step 7) whenever the package changes. When
 two studies need the same code, move that code into the package with tests.
 
-**A plain `uv run pytest` skips the `packages/studies` tests, so run them with `--run-studies`.**
-Use `uv run pytest --run-studies -n auto packages/studies` for only those tests, which take about 3
-minutes. Run them before pushing any change to `packages/studies/` or `studies/`, for faster
-feedback than the `studies_tests.yml` workflow gives. `test_study_boundaries.py` is the one
-exception and always runs.
+**A plain `uv run pytest` skips the `src/studies` tests, so run them with `--run-studies`.**
+Use `uv run pytest --run-studies -n auto src/studies` for only those tests, which take about 3
+minutes. Run them before pushing any change to `src/studies/` or `studies/`, for faster
+feedback than the `studies_tests.yml` workflow gives.
 
 **Import rules: a study script may import from its own folder, from the folder of another study or
-experiment, from `studies.*` (`packages/studies`), and from the other reviewed packages in
+experiment, from `studies.*` (`src/studies`), and from the other reviewed packages in
 `packages/*`.** The rule for production code is the other half: `src/` and every package under
-`packages/` except `packages/studies` must never import `studies` or a script, because humans review
+`packages/` except `src/studies` must never import `studies` or a script, because humans review
 that code and the study code is fast-moving and agent-written. A name that production or a package
-needs moves into `packages/studies/src/studies/`, and a name imported from a package is public, so
+needs moves into `src/studies/`, and a name imported from a package is public, so
 it loses its leading underscore on the way. A script never mutates `sys.path` and never loads
 another script by path. A script that imports from another folder is run with that folder on
 `PYTHONPATH`, because only the script's own folder is on `sys.path` otherwise. No two scripts under
 `studies/` or `ml-experiments/` share a basename, so a bare-name import names one script.
-`packages/studies/tests/test_study_boundaries.py` enforces all of this.
 
 **A study's leaderboard number comes only from `scripts/forecasting/score_study.py`.** Run the
 script on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number
@@ -144,7 +142,7 @@ review goes on the page only after a committed script prints it into the report.
 1. **Plan the study with the `plan-issue` skill, and state the five trigger answers.** A published
    page counts as what gets stored, so a study is complex. The plan names the question, the arms,
    the row set, the folds, the metric, and the interval method. The mutation pass
-   (`implement-issue` step 7) runs only when `packages/studies/` changes, because study scripts
+   (`implement-issue` step 7) runs only when `src/studies/` changes, because study scripts
    have no tests; say so in the PR body.
 2. **Name the deciding contrasts in the plan, before any result exists.** Name two to five contrasts
    that answer the question: the planned contrasts, labelled "(planned)" on the page, never "named
@@ -381,7 +379,7 @@ sets out the rule and the products the rule covers.
   months later should read these files, not rerun hours of fitting. Record in the study's README
   what each file holds.
 - **After a refactor, prove the per-row outputs are unchanged, bit for bit.** Moving the fit loop
-  into `packages/studies` was accepted only after 5,289,312 per-row losses and 504 intervals came
+  into `src/studies` was accepted only after 5,289,312 per-row losses and 504 intervals came
   out identical to `main`'s. Per-row outputs are the level to compare: a per-site summary built from
   a frame concatenated in completion order is not bit-stable even between two runs of `main`, and
   XGBoost's row subsampling depends on row order.
@@ -634,7 +632,7 @@ findings:**
 > independent Claude reviewers have checked the method, the evidence, and the prose adversarially.
 
 Take MODEL from the `Co-Authored-By` trailers of the commits that touch the page and the study
-code behind it, including the shared code in `packages/studies/` and the older study scripts the
+code behind it, including the shared code in `src/studies/` and the older study scripts the
 study imports. Name every Claude model that wrote any part of the page or of its code:
 
 ```bash

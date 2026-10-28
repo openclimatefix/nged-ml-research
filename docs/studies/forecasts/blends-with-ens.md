@@ -192,7 +192,7 @@ UKV from the CEDA archive at days 1 to 4.
 
 **The inputs and fitted losses are in the private data store, and every output carries only the
 anonymised `site` label.** The code is `studies/nwp_forecast_comparison/fit_product_blends.py` and
-`dot_interval_vs_ens.py --blends`, with `fit_aifs.py` and `packages/studies/`. XGBoost 3.4.1 fitted
+`dot_interval_vs_ens.py --blends`, with `fit_aifs.py` and `src/studies/`. XGBoost 3.4.1 fitted
 every model on one RTX A6000 GPU.
 
 ## Reproducing the figures

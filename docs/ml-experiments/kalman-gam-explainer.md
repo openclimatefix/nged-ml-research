@@ -32,14 +32,14 @@ forecast band.**
   surprise that the filter takes on) averaging about 8% for the level and about 42% for the fast
   part over the week. The correction holds the level flat across the lead time and fades only the
   fast part. The filter code is
-  [`dp_assimilation.py`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/packages/studies/src/studies/dp_assimilation.py),
+  [`dp_assimilation.py`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/src/studies/dp_assimilation.py),
   with the noise parameters that [experiment
   133](00133-differentiable-physics-vk-learned-noise-and-observation-variance-in-gam-k/result.md)
   learned.
 - **The band comes from a table of past forecast errors, not from the filter's variance.** The table
   holds quantiles of past forecast errors for each lead-time band, hour band, and calendar quarter
   (`LeadHourSpread` in
-  [`dp_ens.py`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/packages/studies/src/studies/dp_ens.py)).
+  [`dp_ens.py`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/src/studies/dp_ens.py)).
   Neither the filter's variance nor the spread of the weather ensemble enters the band. [Experiment
   169](00169-calibration-combined-fixes-and-ensemble-spread/result.md) found that adding the
   ensemble spread improved nothing. The week shown uses the forecasts stored by [experiment

@@ -289,7 +289,7 @@ reads each price-taking battery's schedule between precomputed linear-programme 
 them for the merchant battery, called the *stack*) and passes the schedule through a smooth
 state-of-charge recurrence. It then fits the power, duration, efficiency, and cycle-cap weight (the
 mix of a cap of 1 and a cap of 2 charge cycles a day) by gradient descent (the PyTorch optional
-`gpu` dependency group of `packages/studies`, with a fused Triton kernel for the recurrence),
+`gpu` dependency group of `src/studies`, with a fused Triton kernel for the recurrence),
 polishes the fit, and approximates the posterior around the optimum (a Laplace approximation). The
 three starts of the gradient descent agree in all but 2 of 5,868 sums with an interval. **Tempering
 the likelihood by the residual's autocorrelation widens every interval.** The likelihood is raised
@@ -620,7 +620,7 @@ are National Energy System Operator (NESO) data under the NESO Open Data Licence
 Midlands Agile rates come from Octopus Energy's public API. NGED's primary and bulk supply point
 telemetry and the Embedded Capacity Register extract are private, and no generator's name,
 identifier, or coordinates appear on this page. The scripts are in
-`studies/unmetered_battery_capacity/`, the shared machinery is in `packages/studies/src/studies/`,
+`studies/unmetered_battery_capacity/`, the shared machinery is in `src/studies/`,
 and the results are under `data/studies/per_study/unmetered_battery_capacity/`, which are not
 committed. The estimator runs on PyTorch with a Triton kernel on one RTX A6000.
 

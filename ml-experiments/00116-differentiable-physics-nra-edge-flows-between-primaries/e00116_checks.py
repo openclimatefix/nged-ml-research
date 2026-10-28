@@ -46,7 +46,7 @@ def module_tests() -> bool:
             sys.executable,
             "-m",
             "pytest",
-            "packages/studies/tests/test_dp_edge_flow.py",
+            "tests/studies/test_dp_edge_flow.py",
             "--run-studies",
             "-q",
         ],

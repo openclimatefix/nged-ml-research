@@ -367,7 +367,7 @@ output, with the verdict capped at `inconclusive`.
 def require_gate_passed() -> None:
     """Raise unless the known-answer gate has run and passed (tests 2, 3, and 4).
 
-    Module tests 1 to 5 are the pytest suite of `packages/studies`, which must pass before this
+    Module tests 1 to 5 are the pytest suite of `src/studies`, which must pass before this
     script runs; the gate file records the other three.
 
     Raises:

@@ -388,7 +388,7 @@ the five CERRA serves, or regions other than Lincolnshire.**
 **Every input except the wind farms' metered output, coordinates, and capacity table is public, and
 the code is in the repository at the commit that merged this page.** The code is in
 `studies/past_weather/` (`cerra_wind_levels.py`, `cerra_wind_levels_shear.py`, and
-`cerra_wind_levels_charts.py`) and in `packages/studies/`.
+`cerra_wind_levels_charts.py`) and in `src/studies/`.
 
 - **Public inputs:** CERRA's wind speed from the Copernicus Climate Data Store, at 10 m from
   [`reanalysis-cerra-single-levels`](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels)

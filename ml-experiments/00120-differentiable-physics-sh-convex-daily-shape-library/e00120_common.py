@@ -221,7 +221,7 @@ def run_metadata() -> dict[str, str]:
             check=True,
         ).stdout.strip()
 
-    module = "packages/studies/src/studies/dp_shape_library.py"
+    module = "src/studies/dp_shape_library.py"
     return {
         "checkout": last_commit(),
         "library_module_blob": subprocess.run(

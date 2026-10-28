@@ -87,11 +87,10 @@ review as `implement-issue` does.
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
   `ml-experiments/` may share a basename. A script may import its own folder, the folder of an
   earlier experiment or study, `studies.*`, and the other reviewed packages, and nothing in `src/`
-  or any other package imports it (`packages/studies/tests/test_study_boundaries.py` enforces
-  this). Run a script that imports from another folder with that folder on `PYTHONPATH`, because
+  or any other package imports it. Run a script that imports from another folder with that folder on `PYTHONPATH`, because
   only the script's own folder is on `sys.path` otherwise. An example is
   `PYTHONPATH=ml-experiments/<earlier-folder> uv run --no-sync python <script>`. An experiment has
-  no tests of its own scripts; the machinery it calls is tested in `packages/studies/`.
+  no tests of its own scripts; the machinery it calls is tested in `src/studies/`.
 - **Reuse of an earlier experiment's code:** when a script imports another experiment's module,
   name that experiment's folder in the `result.md` bullets. Never edit an earlier experiment's
   script after its PR merged, except to fix a bug, and record that fix in the later experiment's PR
@@ -207,7 +206,7 @@ time would have taken under an hour.
 first commit that adds the `planned` `result.md`, and again in the pull request that adds the
 finished write-up.** An experiment opens one pull request, when its result is ready, and the plan
 commit is the first commit in that pull request's history. No pull request is opened at plan time. A
-change to `packages/studies/` that the experiment needs is the exception: open its pull request as
+change to `src/studies/` that the experiment needs is the exception: open its pull request as
 soon as the module is ready for review, because the module needs its own review. The planning commit
 updates the experiment's row in the priority table at the top of the page with its id, the question
 in one line, the priority, what it waits for, and the state, and commits the `result.md` with
@@ -449,10 +448,10 @@ such as how quantiles are built, how a base margin enters, and how a held value 
 does not re-check the printed arithmetic. The audit report goes in the private
 `data/ml-experiments/briefs/` folder, and the PR triages each finding.
 
-**A shared method is audited once, where it lives.** A method reused from `packages/studies/`, such
+**A shared method is audited once, where it lives.** A method reused from `src/studies/`, such
 as a spread model or a base-margin helper, counts as checked only once its own tests or an audit
 cover the property in question. An experiment that is first to depend on an unchecked property
-audits it there. The fix lands in its own reviewed PR to `packages/studies/` first, as "Merging"
+audits it there. The fix lands in its own reviewed PR to `src/studies/` first, as "Merging"
 requires. The experiment either waits for that PR or records the unchecked property as a caveat.
 
 **Every write-up carries a short "Checks" list of bullets after its figures, triggered or not:**
@@ -484,4 +483,4 @@ loads the `prose-review` skill, and reads the opening paragraph first. It report
 abbreviation, and number in the opening that a reader who has not seen the experiment could not
 parse, and then checks the rest of the page against the prose rules in `CLAUDE.md`. The experiment's
 session triages the findings, applies the valid ones, and records each rejected one with its reason.
-A change to `packages/studies/` stops at a reviewed PR, as `implement-issue` does.
+A change to `src/studies/` stops at a reviewed PR, as `implement-issue` does.

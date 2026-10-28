@@ -22,7 +22,7 @@ and from the other reviewed packages.**
 | `build_tables.py` | Builds the two views of every target half-hour, recovers the zones, nets each interconnector's BMUs in the sampled Physical Notifications, fits the zones' shares, joins AGV and PV_Live, writes the tables, and writes `report.md`, which holds every number the page quotes. |
 | `make_charts.py` | Draws the page's 11 figures from the tables, as SVG under `docs/studies/assets/`. |
 
-**The tests for the download scripts are in `packages/studies/tests/`.** They are
+**The tests for the download scripts are in `tests/studies/`.** They are
 `test_market_system_series.py`, `test_market_downloads.py`, and `test_market_agv_pv_live.py`.
 `build_tables.py` and `make_charts.py` have no tests, so the page's numbers are checked against
 `report.md`.

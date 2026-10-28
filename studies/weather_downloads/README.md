@@ -27,7 +27,7 @@ index (`point_id`, `cell_id`, `y_index`/`x_index`) rather than a coordinate.
 fetches several variables into one directory, as `fetch_cerra.py` and `fetch_icon_dream.py` do).
 Each note records the source address, what was requested, the variables kept, and the retrieval time
 — the one format every fetch script here reuses, per the convention in
-`packages/studies/src/studies/sources.py`.
+`src/studies/sources.py`.
 
 ## Running a fetch script
 

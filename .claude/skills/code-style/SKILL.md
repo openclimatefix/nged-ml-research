@@ -11,8 +11,8 @@ description: >-
 
 # Code style
 
-**The rules live in one file: `docs/architecture/code-style.md`. Read it now, in full, before
-writing or editing Python.** It is deliberately the only copy — this skill exists to make sure it
+**The rules live in one page, published by `nged-substation-forecast`: <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/>. Read it now, in
+full, before writing or editing Python.** It is deliberately the only copy — this skill exists to make sure it
 gets read, not to restate it, because two copies of a style guide drift apart and then nobody knows
 which one is binding.
 
@@ -40,8 +40,5 @@ rules and the traps are separate documents on purpose.
 
 ## When you change the rules
 
-Edit `docs/architecture/code-style.md` — never copy a rule into `CLAUDE.md` or into this skill. The
-page is published at
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/> and is linked
-from `docs/index.md`, `docs/design-philosophy/index.md` and `design-principles.md`, so it is the
-version humans read too.
+Change the rules in a pull request to `nged-substation-forecast`, where a human reviews them. Never
+copy a rule into `CLAUDE.md` or into this skill.

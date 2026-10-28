@@ -502,7 +502,7 @@ single 9 km forecast because it averages members.
 the Dynamical.org store, and CAMS irradiance from the Copernicus Atmosphere Data Store.** The page
 contains modified Copernicus Atmosphere Monitoring Service information. The farms' output is private
 to National Grid Electricity Distribution (NGED) and appears only as fractions of each farm's
-capacity under labels A to F. The code is in `studies/ifs_solar_variables/` and `packages/studies/`.
+capacity under labels A to F. The code is in `studies/ifs_solar_variables/` and `src/studies/`.
 XGBoost runs on a graphics processing unit with `colsample_bytree=1`.
 
 ## Reproducing the figures

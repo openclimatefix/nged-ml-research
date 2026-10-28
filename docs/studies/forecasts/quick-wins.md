@@ -662,6 +662,6 @@ described in [issue
 
 **The scripts are in
 [`studies/quick_wins/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/quick_wins),
-and the tests are in `packages/studies/tests/quick_wins/`.** `report_summary.py` prints the tables
+and the tests are in `tests/studies/quick_wins/`.** `report_summary.py` prints the tables
 this page quotes into `summary.md`, and `report_compute.py` prints the training-time table. The
 input data are private. The commands that reproduce the study are in the folder's README.

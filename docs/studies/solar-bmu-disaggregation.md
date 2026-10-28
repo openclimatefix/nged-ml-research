@@ -408,7 +408,7 @@ data and does not forecast.**
 ## Data and code availability
 
 The scripts are in `studies/solar_disaggregation/`, the shared machinery in
-`packages/studies/src/studies/` (`pv_physics.py`, `pv_fit.py`, `pv_separation.py`), and the results
+`src/studies/` (`pv_physics.py`, `pv_fit.py`, `pv_separation.py`), and the results
 under `data/studies/per_study/solar_disaggregation/`, which are not committed.
 
 ## Reproducing

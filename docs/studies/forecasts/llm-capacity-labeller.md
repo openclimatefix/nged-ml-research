@@ -201,5 +201,5 @@ Grid Electricity Distribution's (NGED's) power data are private, and no plant's 
 coordinates appear here. The prompt and answer log pairs plant letters with dates, so it stays in
 the private data store. The scripts are in
 [`studies/llm_capacity_labeller/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/llm_capacity_labeller),
-with the reproduction commands, and the shared code is in `packages/studies/`. The model is Claude
+with the reproduction commands, and the shared code is in `src/studies/`. The model is Claude
 Sonnet 5.5 through `claude -p` (version 2.1.296).

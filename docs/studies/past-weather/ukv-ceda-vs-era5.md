@@ -735,7 +735,7 @@ metered generator is.** The public inputs are the CEDA archive of UKV runs (lice
 from the Copernicus Climate Data Store and Open-Meteo's copy, CAMS irradiance, and the Met Office
 MIDAS Open release `dataset-version-202607`. The generators appear only as W1 to W3 and A to F, and
 the stations as S1 to S4 with no identifier or coordinate. The code that produced every figure is in
-`studies/past_weather/` and `packages/studies/`, at the commit that merged this page. Every XGBoost
+`studies/past_weather/` and `src/studies/`, at the commit that merged this page. Every XGBoost
 model used XGBoost 3.4.1, `tree_method` `hist`, the objective `reg:absoluteerror`, and four threads
 per fit. The hyperparameter settings are `studies.cross_validation.PRIMARY_HYPER_PARAMETERS` and
 `SENSITIVITY_HYPER_PARAMETERS`. The plan for this study is in the repository's git history.

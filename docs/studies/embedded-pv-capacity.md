@@ -378,7 +378,7 @@ products other than CAMS irradiance.
 The stored fit results and the CAMS-based table come from experiments 00039 and 00040, whose inputs
 are NGED's private telemetry and the public CAMS irradiance. The study code is in
 [`studies/embedded_pv_capacity/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies/embedded_pv_capacity),
-and the shared test is in `packages/studies/src/studies/pv_capacity_misfit.py`. No solar farm is
+and the shared test is in `src/studies/pv_capacity_misfit.py`. No solar farm is
 named or drawn. The code is at the commit of the pull request that merged this page.
 
 ## Reproducing the figures

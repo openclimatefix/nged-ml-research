@@ -473,7 +473,7 @@ modified Copernicus Climate Change Service information (ERA5) and modified Coper
 Monitoring Service information (CAMS irradiance and the CAMS global reanalysis). The farms' output
 is private to National Grid Electricity Distribution (NGED) and appears only as fractions of each
 farm's capacity under labels A to F. The code is in `studies/era5_solar_variables/` and
-`packages/studies/`. XGBoost runs on a graphics processing unit with `colsample_bytree=1` and the
+`src/studies/`. XGBoost runs on a graphics processing unit with `colsample_bytree=1` and the
 settings in "Data and methods".
 
 ## Reproducing the figures

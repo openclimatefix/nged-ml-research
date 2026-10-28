@@ -667,7 +667,7 @@ themselves](https://openclimatefix.github.io/nged-substation-forecast/background
 
 - **The scripts were first run during exploration, before their code review.** No separate diff
   review of the page and its scripts has been done yet, and the mutation-testing pass of
-  `packages/studies` is pending.
+  `src/studies` is pending.
 - **The contrasts are labelled planned, post hoc, or exploratory, and no correction is made for
   multiple comparisons.** The planned contrasts are B1, B3, and B4 (variance rule). The post hoc
   contrasts are B5 to B8, B4 (capacity rule), and those involving A1b. The plan's B2 was not run,
@@ -726,7 +726,7 @@ Data Licence. CAMS irradiance comes through the solar study. The market datasets
 conventions.
 
 The scripts are in `studies/battery_pv_separation/`. The shared machinery is in
-`packages/studies/src/studies/` (`battery_dispatch.py`, `battery_joint_lp.py`, `pv_fit.py`), and the
+`src/studies/` (`battery_dispatch.py`, `battery_joint_lp.py`, `pv_fit.py`), and the
 results are under `data/studies/per_study/battery_pv_separation/`, which are not committed.
 
 ## Reproducing
