@@ -211,11 +211,11 @@ because `closingIssuesReferences` is empty until the merge lands.
   session open.
 - **Put plan-page edits for dropped work in the PR of the experiment that closes the row.** A
   separate documentation PR for one table row costs a full CI run.
-- **Make every worker session tidy up before it is archived.** Put in its brief that, once its PR has
-  merged, it removes its scratch files and directories (in `~/`, `~/dev/`, and the repository's
-  `.claude/scratch/`), its screenshot and render folders, its worktree (with `git worktree remove`,
-  never `-f` over work it has not pushed), and its local branch. Check that the worker's worktree
-  is gone before you archive it, and remove the worktree yourself if the worker could not.
+- **Make every worker session tidy up before it is archived.** Put in its brief that, once its PR
+  has merged, it removes the leftovers the `ml-experiment` skill's "Tidy up" paragraph lists. Before
+  you archive the worker, check that its worktree is gone. If the worker could not remove it, first
+  check that no process or other session has that worktree as its working directory, and then remove
+  it yourself from the main checkout.
 - **Remove the temporary worktrees and branches** that the manager created for its own PRs once those
   PRs have merged.
 

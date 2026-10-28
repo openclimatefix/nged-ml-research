@@ -473,12 +473,14 @@ in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or
 branch was cut sits under `docs/` or `ml-experiments/` and touches no file the PR changes, a merge
 commit and not a squash).
 
-**Tidy up when the PR has merged.** Remove scratch files and directories (in `~/`, `~/dev/`, and the
-repository's `.claude/scratch/`), screenshot and render folders, and downloaded files you no longer
-need, the worktrees you created (with `git worktree remove`, never `-f` over work you have not
-pushed), and the local branches whose PRs have merged. Check that no process has the worktree as its
-working directory first, and keep any file that a committed file refers to. Do this before you
-report the experiment as finished, so the maintainer never has to sweep up after the session.
+**Tidy up when the PR has merged.** Remove four kinds of leftover, each only if you created it and
+none of it is under `data/`: scratch files and directories (in `~/`, `~/dev/`, `.claude/scratch/`,
+and `.claude/worktrees/`); screenshot and render folders; downloaded files you no longer need; and
+the worktrees and local branches you created. Remove a worktree with `git worktree remove` from the
+main checkout, never with `-f` over uncommitted work, and delete its branch with `git branch -d`,
+never `-D`, after checking that nothing is unpushed. First check that no process has the worktree as
+its working directory, and keep any file that a committed file refers to. Do this before you report
+the experiment as finished, so the maintainer never has to sweep up after the session.
 
 **Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
