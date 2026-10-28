@@ -4,7 +4,7 @@ Reads each substation's stage 1 forecasts for every run (`e00377_forecast.py`), 
 mean corrections of experiment 155's arm d (the winter offset and recipe R, both already monthly and
 causal), then fits the spread for each scored month on the corrected residuals of earlier months
 only: runs whose origin and valid time are both before the month's first instant, outside the
-hand-filtered events. The spread has five lead bands, so that 168 to 240 hours has its own band.
+hand-filtered events. The spread has six lead bands, so that 168 to 240 hours has its own band.
 D8 borrows the residuals of its six donors (the protocol's labelled exception) and, from the months
 the 12-month rule allows, also gets an own-residual arm. Output: one file per substation and arm.
 
@@ -20,11 +20,12 @@ import e00377s2_common as common
 import e00377s2_corrections as corr
 import numpy as np
 import polars as pl
+from studies.dp_ens_weather import PROTOCOL_LEAD_BAND_UPPER_HOURS
 from studies.dp_gam import ResidualSpread
 from studies.eval_protocol.slices import fold_plan
 
-LEAD_EDGES_HOURS: Final[tuple[float, ...]] = (24.0, 48.0, 144.0, 168.0, 240.0)
-"""Upper edges of the five lead bands: the four of the calibration, then 168 to 240 hours."""
+LEAD_EDGES_HOURS: Final[tuple[float, ...]] = PROTOCOL_LEAD_BAND_UPPER_HOURS
+"""Upper edges of the protocol's six lead bands, reaching 336 hours."""
 N_BANDS: Final[int] = len(LEAD_EDGES_HOURS)
 FIRST_FOLD_MONTH: Final[datetime] = datetime(2025, 4, 1, tzinfo=UTC)
 """The first month with 12 months of ENS runs before it (ENS starts 2024-04-01)."""
@@ -42,7 +43,9 @@ MIN_ROWS_PER_BAND: Final[int] = 200
 
 def lead_band(*, lead_hours: np.ndarray) -> np.ndarray:
     """Return the lead band index of each lead, the last band taking anything beyond 240 hours."""
-    return np.minimum(np.searchsorted(np.array(LEAD_EDGES_HOURS), lead_hours, side="left"), N_BANDS - 1)
+    return np.minimum(
+        np.searchsorted(np.array(LEAD_EDGES_HOURS), lead_hours, side="left"), N_BANDS - 1
+    )
 
 
 def fit_spread(*, residual: pl.DataFrame) -> list[ResidualSpread]:
@@ -52,7 +55,7 @@ def fit_spread(*, residual: pl.DataFrame) -> list[ResidualSpread]:
         residual: Columns `resid`, `hour_band`, `quarter`, `lead_hours`.
 
     Returns:
-        The five spreads.
+        The six spreads.
 
     Raises:
         ValueError: If a lead band holds fewer than `MIN_ROWS_PER_BAND` residuals.
@@ -62,7 +65,9 @@ def fit_spread(*, residual: pl.DataFrame) -> list[ResidualSpread]:
     for index in range(N_BANDS):
         chosen = lead == index
         if chosen.sum() < MIN_ROWS_PER_BAND:
-            msg = f"lead band {index} holds {int(chosen.sum())} residuals, under {MIN_ROWS_PER_BAND}"
+            msg = (
+                f"lead band {index} holds {int(chosen.sum())} residuals, under {MIN_ROWS_PER_BAND}"
+            )
             raise ValueError(msg)
         out.append(
             ResidualSpread.fit(
@@ -111,9 +116,8 @@ def with_fold_spread(
     for month in months:
         rows = frame.filter(
             pl.col("power_fcst_init_time") >= month,
-            pl.col("power_fcst_init_time") < month.replace(
-                year=month.year + (month.month == 12), month=month.month % 12 + 1
-            ),
+            pl.col("power_fcst_init_time")
+            < month.replace(year=month.year + (month.month == 12), month=month.month % 12 + 1),
         )
         if rows.is_empty():
             continue
@@ -176,16 +180,17 @@ def main() -> None:
         frame = corrected_frame(site=site)
         if site == "D8":
             donors = [corrected_frame(site=donor) for donor in common.DONORS]
-            donor_months = [m for m in eligible_months(first_reading=first["D2"]) if m >= D8_DONOR_MONTHS_FROM]
+            donor_months = [
+                m for m in eligible_months(first_reading=first["D2"]) if m >= D8_DONOR_MONTHS_FROM
+            ]
             write(
-                frame=with_fold_spread(frame=frame, pools=donors, months=donor_months, arm=DONOR_ARM),
+                frame=with_fold_spread(
+                    frame=frame, pools=donors, months=donor_months, arm=DONOR_ARM
+                ),
                 site=site,
                 arm=DONOR_ARM,
             )
-            own = [
-                m
-                for m in eligible_months(first_reading=first["D2"], first_month=D8_FIRST_OWN_MONTH)
-            ]
+            own = eligible_months(first_reading=first["D2"], first_month=D8_FIRST_OWN_MONTH)
             write(
                 frame=with_fold_spread(frame=frame, pools=[frame], months=own, arm=OWN_ARM),
                 site=site,

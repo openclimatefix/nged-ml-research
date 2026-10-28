@@ -141,6 +141,8 @@ def fit_calibration(*, cache: FeatureCache, setup: SiteSetup) -> Calibration:
     lead_hours = np.arange(1, HORIZON_HALF_HOURS + 1) / 2.0
     lead = lead_band_of_hours(lead_hours=lead_hours)
     for index in setup.indices(periods={"tuning"}):
+        if common.month_of_origin(run=setup.run_dates[index]) not in common.TUNING_MONTHS:
+            continue
         run = setup.runs[index]
         rows = np.arange(run.origin_position + 1, run.origin_position + 1 + HORIZON_HALF_HOURS)
         months = cache.calendar.local_date[rows].astype("datetime64[M]").astype(np.int64) % 12 + 1

@@ -111,6 +111,10 @@ def predict_tall(*, cache: FeatureCache, fit: TallFit, index: np.ndarray) -> np.
 
 def monthly_cuts(*, site: str) -> list[datetime]:
     """Return the cuts of experiment 152's stored monthly fits at a site (D8 from its first day)."""
+    if site == "D15":
+        return [
+            datetime(2025 + (5 + i) // 12, (5 + i) % 12 + 1, 1, tzinfo=UTC) for i in range(13)
+        ]  # D15 has no stored fits: monthly cuts from 2025-06-01 (90 days after first usable)
     stored: list[GamFit] = pickle.loads(
         (common.FITS_DIR / common.CUT_FILE.format(site=site)).read_bytes()
     )

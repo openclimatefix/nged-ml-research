@@ -56,7 +56,12 @@ E152_WORK_DIR: Final[Path] = (
 """Experiment 152's folder: the eight sites' ensemble stores, calibrations, and monthly cuts."""
 SOURCE: Final[str] = os.environ.get("E00377_SOURCE", "mva")
 """`mva` runs the eight new sites; `control` runs a MW site from experiment 111's stores."""
-if SOURCE == "control":
+if SOURCE == "d15":
+    STORE_DIR: Final[Path] = WORK_DIR / "ens_store"
+    CALIBRATION_DIR: Final[Path] = WORK_DIR / "calibration"
+    CUT_FILE: Final[str] = ""
+    FITS_DIR: Final[Path] = WORK_DIR / "unused_fits"
+elif SOURCE == "control":
     STORE_DIR: Final[Path] = SOURCE_WORK_DIR / "ens_store"
     CALIBRATION_DIR: Final[Path] = SOURCE_WORK_DIR / "calibration"
     CUT_FILE: Final[str] = "gamk/{site}.pkl"
@@ -80,6 +85,8 @@ DONORS: Final[tuple[str, ...]] = tuple(
     os.environ.get("E00377_DONORS", "D2,D3,D4,D19,D21,D22").split(",")
 )  # D18 uses the signed-MW Primaries
 """The sites whose tuning-month residuals supply the spread of D8, which has no tuning month."""
+D15_FIRST_USABLE: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
+"""D15's first usable day in experiment 103's series table."""
 D8_FIRST_DAY: Final[datetime] = datetime(2025, 4, 1, tzinfo=UTC)
 """D8 enters training and scoring on this day, when its series changed meaning."""
 
@@ -107,9 +114,11 @@ START_CHOICE_MONTHS: Final[frozenset[tuple[int, int]]] = frozenset(
 MIN_TRAINING_DAYS: Final[int] = 90
 """A site's first fit has at least this many days of usable rows."""
 SEASON_YEARS: Final[range] = range(2019, 2027)
-HORIZON_HALF_HOURS: Final[int] = 480
-"""240 hours. `studies.dp_ens_weather` caps every run's window at 336 half-hours (168 hours), so
-this module raises that cap before any other module reads it."""
+HORIZON_HALF_HOURS: Final[int] = 672
+"""336 hours (14 days). `studies.dp_ens_weather.HORIZON_HALF_HOURS` is the horizon of a window built
+without an explicit `horizon_half_hours`, and the stage 1 code of this folder builds its windows
+without one, so this module sets it before any other module reads it. The permanent fix of
+`studies.dp_ens_weather` (`horizon_half_hours=`) takes the same code path with the same value."""
 dp_ens_weather.HORIZON_HALF_HOURS = HORIZON_HALF_HOURS
 PROXY_WARM_UP_RUNS: Final[int] = 9
 """Runs before this index lack a week of analysis proxy before their origin."""
@@ -250,9 +259,16 @@ def clip_of(*, site: str, pinned: PinnedCapacity) -> ClipSpec | None:
 
 def masked_cache(*, cache: FeatureCache, site: str) -> FeatureCache:
     """Return the cache with D8's rows before its first day removed; other sites are unchanged."""
+    features = cache.sites[site]
+    if site == "D15":
+        # D15 is a `generator_case` in experiment 103 and has no pool row. Its training rows are
+        # built here: every present half-hour outside the hand-filtered mask, from its first
+        # usable day.
+        usable = features.present & ~features.switching_mask
+        usable &= cache.end_times > naive_utc(moment=D15_FIRST_USABLE)
+        return replace_site(cache=cache, site=site, default_rows=usable, in_pool=usable)
     if site != "D8":
         return cache
-    features = cache.sites[site]
     early = cache.end_times <= naive_utc(moment=D8_FIRST_DAY)
     return replace_site(
         cache=cache,
@@ -306,6 +322,6 @@ def zero_vintages(*, cache: FeatureCache) -> pl.DataFrame:
             capacity_mw=pl.lit(0.0),
             unobserved=pl.lit(False),
         )
-        for site in SCORED_SITES
+        for site in (*SCORED_SITES, "D15")
     ]
     return pl.concat(frames)

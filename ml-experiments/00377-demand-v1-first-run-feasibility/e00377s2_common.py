@@ -89,7 +89,7 @@ MIN_DAY_READINGS: Final[int] = 40
 D1_FIRST_LEAD: Final[float] = 15.5
 D1_LAST_LEAD: Final[float] = 39.0
 SHORT_LEAD_LIMIT_HOURS: Final[float] = 48.0
-HORIZON_HOURS: Final[float] = 240.0
+HORIZON_HOURS: Final[float] = 336.0
 
 BASE_COLUMNS: Final[tuple[str, ...]] = (
     "time_series_id", "run", "power_fcst_init_time", "valid_time", "lead_hours", "seed",

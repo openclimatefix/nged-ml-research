@@ -49,8 +49,9 @@ def forecast_frame(
     Args:
         stored: A stored forecast.
         series: The series table, which supplies the dtype of `time_series_id` and the capacity.
-        unit: The unit of the stored quantiles. Experiments 374 and 376 store points of effective
-            capacity (1% of capacity); experiment 87's BG2 stores MW.
+        unit: The unit of the stored quantiles: `"points"` (1% of effective capacity, as experiments
+            374, 376, and 377 store), `"fraction"` (of effective capacity, as experiment 87 stores
+            BG2, climatology, and the manual heuristic), or `"mw"` (already in MW).
         arm: The value of the `arm` column to keep, for a file that holds several arms.
         seed: The value of the `seed` column to keep.
 
