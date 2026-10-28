@@ -104,6 +104,14 @@ lags are missing against half-hours whose lags are present, and tries one simple
 (scaling the quantile distances from the median by a factor fitted on the earlier months of the
 same fold) if coverage on the missing rows falls short.
 
+## Avoidable-curtailment cost (maintainer, 2026-10-28)
+
+Because the arms feed missing lags on event rows, the write-up reports the protocol's avoidable
+curtailment cost (`studies.eval_protocol`) during each hand-labelled load-shift event, in the 7 days
+after it ends, and across all rows, per group and per Primary, beside CRPS and the tail measures. The
+cost is defined only for the signed-MW six, so the MVA-only eight carry the label "not defined".
+The take-home names it.
+
 ## Constraints
 
 Sonnet only. At most 3 threads and `MemoryMax=16G` per job. The GPU is shared. Tail calibration,
