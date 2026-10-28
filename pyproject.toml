@@ -619,6 +619,14 @@ invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 invalid-method-override = "ignore"
 
+[tool.ty.rules]
+# With the `gpu` dependency group installed, `torch` resolves, so `ty` reports every
+# `# ty: ignore[unresolved-import]` on a `torch` import as unused and every `nn.Module.forward`
+# override as an `invalid-mutable-override`. CI does not install the group, so neither rule can
+# fire there. Both are off so that `ty check` passes with and without the group.
+unused-ignore-comment = "ignore"
+invalid-mutable-override = "ignore"
+
 [tool.ty.src]
 # The era-fold measurement scripts are a record, not maintained code (see the ruff exclude).
 exclude = ["studies/era_fold_design/scripts"]
