@@ -64,13 +64,14 @@ headline: >-
   Primaries have readings from the start of the record
   (2019-09).
 take_home_message: >-
-  The 8 Primaries that report only apparent power are not bigger, smaller, noisier overall, or
-  more price-driven than the 6 that report signed megawatts, so none of the four guesses explains
-  why the GAM stack trails BG2 there. Inside the MVA-only group the gap does grow with how often
-  demand makes large half-hour steps (Primaries D12 and D22 have the most steps and the largest
-  gaps after D8), which suggests testing a forecast that models steps; D8's gap comes with the
-  largest steps in the 99th percentile, and it is unproven whether the generator explains the
-  steps and the gap. With 16 Primaries, a relation would have to be strong to show.
+  Eight Primary substations report only apparent power (the size of the power flow, not its
+  direction), and our generalised additive model (GAM) forecast is less accurate than BG2, the
+  best-guess forecast we compare against, there. These Primaries are not bigger, smaller, noisier
+  overall, or more price-driven than the six that report signed megawatts, so none of four guesses
+  (age, size, randomness, embedded generation) explains the gap. Inside the MVA-only group the gap
+  grows with how often demand jumps by more than 5% of capacity between half-hours, which suggests
+  testing a forecast with a term for sudden jumps. D8 has the largest jumps in the 99th percentile,
+  and it is unproven whether the generator explains the steps and the gap.
 lessons:
   - >-
     The MVA-only and signed-MW groups do not differ in size (median 7.99 against 8.11 MW), step
@@ -92,7 +93,8 @@ advice:
     Do not use the metering group as a proxy for regularity; the measures do not separate the two
     groups (Figure 1).
   - >-
-    Ask NGED for commissioning dates of the Primaries before testing the age hypothesis; the
+    Ask the network operator (NGED) for commissioning dates of the Primaries before testing the
+    age hypothesis; the
     first reading is the record start for 11 of the 16 Primaries and within 5 weeks of it for a
     twelfth (Results).
 date: 2026-10-28
@@ -107,12 +109,14 @@ megavolt-amperes, and every number for them assumes reactive power is zero. The 
 Primaries (D5, D9, D10, D11, D14, D16) report power in signed megawatts. D15 and D18 have under a
 year of history and are short-history. The GAM stack of [experiment
 377](../00377-demand-v1-first-run-feasibility/result.md) trails BG2 by +0.18 quantile-score points
-on average (3 of 7 Primaries are ahead of BG2) at the MVA-only Primaries without D8 and by +1.61 at
-D8, where the quantile score is twice the mean pinball loss over 11 quantiles, in points of
-effective capacity (lower is better). We compared the two metering groups on their size, age, step
-rate, regularity, price response, and generators, and related each measure to the per-Primary gap by
-rank correlation (n = 16). Experiment 380's measures M1 to M4 are reused from its stored table; the
-others are new here.
+on average at the MVA-only Primaries without D8, where 3 of the 7 Primaries are ahead of BG2. It
+trails BG2 by +1.61 at D8. The quantile score is twice the mean pinball loss over 11 quantiles, in
+points of effective capacity, and a lower score is better. We compared the two metering groups on
+their size, age, step rate, regularity, price response, and generators, and related each measure to
+the per-Primary gap by rank correlation (n = 16). Experiment 380's four measures are reused from its
+stored table: M1 (share of variance in the weekly profile), M2 (extra share explained by
+temperature), M3 (lag-1 half-hour residual autocorrelation), and M4 (step rate above 5% of
+capacity). The other measures are new here.
 
 ![Figure 1: the two metering groups compared](figure_1_groups_compared.svg)
 
@@ -151,16 +155,17 @@ sign opposite to the one hypothesis C predicts.
   gap are +0.19 (M4) and +0.19 (steps above 10%), against the +0.4 predicted for M4. At n = 14 (D15
   and D18 dropped), the steps above 10% reach +0.57 (p = 0.033, leave-one-out +0.47 to +0.71) and
   the lag-1-day autocorrelation reaches -0.59 (p = 0.029). About 200 correlations were computed (21
-  measures, 2 gaps, 5 row sets), so about 10 would pass p under 0.05 by chance.
+  measures, 2 gaps, 5 sets of Primaries), so about 10 would pass p under 0.05 by chance.
 - **Within the MVA-only group the gap follows the step rate.** Across the 8 MVA-only Primaries, M4
   has rho +0.79 (p = 0.031) and the steps above 10% rho +0.79 (p = 0.030); across the 7 without D8,
   M4 has rho +0.93 (p = 0.007, leave-one-out +0.89 to +0.94). The 6 signed-MW Primaries show rho
   +0.26 for M4 (p = 0.66) and +0.09 for the steps above 10%. The same relation holds for the
-  experiment 378 gap (default 3 minus BG2, a CRPS gap in points, where D8's gap is +3.97): +0.79 for
-  M4 across 8, +0.93 across 7. D12 (M4 0.346, gap +0.76) and D22 (M4 0.210, gap +0.36) have the
-  highest step rates and gaps, and the relation survives dropping any one of the seven. D8's own gap
-  (+1.61) does not follow from its step rate (0.128). D8's 99th-percentile step (41.9 points) is the
-  largest of the 16. It is unproven whether the generator explains the steps and the gap.
+  experiment 378 gap (default 3 minus BG2, a gap in the continuous ranked probability score (CRPS),
+  in points, where D8's gap is +3.97): +0.79 for M4 across 8, +0.93 across 7. D12 (M4 0.346, gap
+  +0.76) and D22 (M4 0.210, gap +0.36) have the highest step rates and gaps, and the relation
+  survives dropping any single Primary. D8's own gap (+1.61) does not follow from its step rate
+  (0.128). D8's 99th-percentile step (41.9 points) is the largest of the 16. It is unproven whether
+  the generator explains the steps and the gap.
 - **Hypothesis D, embedded generation: not shown, and only partly measurable.** The hierarchy files
   list generators per bulk supply point, not per Primary, and only two bulk supply points (900004
   and 900005) carry the 16 Primaries. The count of listed generators at the bulk supply point is 6
@@ -199,8 +204,8 @@ sign opposite to the one hypothesis C predicts.
 - The data are 16 Primaries. A rank correlation has to be about 0.5 to reach p = 0.05, so a failure
   here is "not shown", not "false".
 - The within-group step relation was found after looking at 200 correlations and rests on 7
-  Primaries (it survives dropping any one). Treat it as a hypothesis to test, for example by adding
-  a step term to the GAM at D12 and D22, or by simulating series with set step rates.
+  Primaries (it survives dropping any single Primary). Treat it as a hypothesis to test, for example
+  by adding a step term to the GAM at D12 and D22, or by simulating series with set step rates.
 - Next: ask NGED for the commissioning dates of the Primaries and for the generator capacity behind
   each Primary, which would test hypotheses A and D directly.
 
