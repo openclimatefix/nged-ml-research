@@ -91,7 +91,23 @@ This page is the plan. The write-up replaces it when the scores exist.
 - Sonnet only. An Opus audit only with the manager's approval; a Sonnet audit before merge.
 - 12 cores, 16 GB per job; `uptime` first. No fetch or egress. No NGED generator named.
 
+## What the reconnaissance found
+
+- **Stored inputs exist for 15 Primaries.** Experiment 377 stores per-fold stage-2 forecasts (11
+  quantiles, `mean`, `actual`, `run`, `lead_hours` to 240 hours) under `work/control/arms/a0/dp_preds_s2/`
+  (the signed-MW seven, D18 included) and `work/mva/arms/a0/dp_preds_s2/` (the MVA-only eight, D8
+  with an own and a donor file). Experiment 377 did not fit D15.
+- **The solar summary S needs member-level solar responses that nobody has stored for 15
+  Primaries.** Experiment 319 computed them with experiment 184's engine for six Primaries only.
+  The engine's inputs exist for all 15: experiment 111's calibrations for the signed-MW seven and
+  experiment 152's for the MVA-only eight; experiment 377 stores the monthly solar fits
+  (`tall_fits/monthly`) for both groups. Stage A therefore runs the 184 member pass through 377's
+  copies of the modules (`E00377_SOURCE=control|mva`).
+- **Experiment 377's forecasts differ from experiment 317's chain.** Experiment 377 refits stage 2
+  per month, so the control gate compares the port on the six against experiment 322's stored
+  scores at the six Primaries and judges the difference as the effect of the folds, not as a bug,
+  only when the unchanged-fold run (S and blend on experiment 317's chain) reproduces 322 first.
+
 ## Open questions for the manager
 
-- Experiment 377 is still `planned`; stage C needs its per-fold stage 2 stored. Default: read its
-  branch code now and wait for its stored forecasts before stage C.
+- None. Experiment 377's stored forecasts are in place; its scores and PR are still to come.
