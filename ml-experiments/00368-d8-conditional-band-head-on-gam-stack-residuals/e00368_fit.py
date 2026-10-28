@@ -136,6 +136,19 @@ def fit_predict_mdn(*, train_x, train_y, test_x, threads: int) -> np.ndarray:  #
     return out
 
 
+def permutation_within_site_and_month(*, frame: pl.DataFrame) -> np.ndarray:
+    """Return a row order that shuffles rows only among rows of the same site and valid month."""
+    groups = frame.select(
+        pl.concat_str("site", pl.col("valid_time").dt.strftime("%Y-%m")).alias("group")
+    )["group"].to_numpy()
+    rng = np.random.default_rng(SEED)
+    order = np.arange(len(frame))
+    for group in np.unique(groups):
+        members = np.flatnonzero(groups == group)
+        order[members] = rng.permutation(members)
+    return order
+
+
 def run_month(*, frame: pl.DataFrame, fit_at: datetime, arm: str, threads: int) -> pl.DataFrame:
     """Fit on rows read before `fit_at`, and return the new quantiles of the rows originating in its month."""
     fit_ns = int(fit_at.timestamp() * 1e9)
@@ -150,7 +163,7 @@ def run_month(*, frame: pl.DataFrame, fit_at: datetime, arm: str, threads: int) 
         train = train.sample(n=MAX_TRAIN_ROWS, seed=SEED)
     train_x, train_y, test_x = design(frame=train), train["residual"].to_numpy(), design(frame=test)
     if arm.endswith("shuf"):
-        train_x = train_x[np.random.default_rng(SEED).permutation(len(train_x))]
+        train_x = train_x[permutation_within_site_and_month(frame=train)]
     fit = fit_predict_xgboost if arm.startswith("x") else fit_predict_mdn
     offsets = fit(train_x=train_x, train_y=train_y, test_x=test_x, threads=threads)
     offsets = offsets - offsets[:, MEDIAN_INDEX : MEDIAN_INDEX + 1]

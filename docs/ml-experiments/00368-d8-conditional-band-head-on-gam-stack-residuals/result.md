@@ -67,8 +67,8 @@ lessons:
     their tails are worse at D8: 5.3% to 5.8% of readings fall below q01, against 3.9% for the
     control and 0.2% for BG2.
   - >-
-    The conditioning matters: heads fitted on shuffled features score 1.0 point worse than the
-    control at D8, so lead, hour, weather, and recent residuals do carry information.
+    The XGBoost head's conditioning carries information at D8 (the shuffled-feature placebo scores
+    8.466 against 8.205), but the mixture head's does not (placebo 8.461 against 8.456).
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
@@ -76,7 +76,7 @@ take_home_message: >-
   0.18 points of capacity beyond experiment 354's D8-only band, which is 22% of the remaining gap to
   BG2, so band work alone cannot close D8's gap. The remaining gap is mostly in the median forecast.
   A small mixture density network head is harmless at the other Primaries (0.08 points better), but
-  it is no better at D8.
+  the mixture head is no better at D8.
 advice:
   - >-
     Stop band work for D8: a pooled conditional head closes 22% of the control's gap to BG2 and the
@@ -93,7 +93,7 @@ advice:
 at D8, so the band is not where most of D8's gap lies.**
 
 D8 is a primary substation whose forecast band, in experiment 354, was rebuilt from D8's own past
-errors. That cut D8's score but raised D2's by 5.5% and D4's by 6.1%. We fitted one band head on
+errors. The rebuilt band cut D8's score but raised D2's by 5.5% and D4's by 6.1% (experiment 354's arm 2). We fitted one band head on
 the stored forecasts' residuals at eight Primaries (D2, D3, D4, D8, D12, D19, D21, D22), refitted
 every month on readings that had arrived, and conditioned it on lead, hour, weather, the site, and
 the stack's recent residuals. The XGBoost head lowered D8's score by 0.18 points beyond the
@@ -123,16 +123,21 @@ quantile loss for the XGBoost head.
   donated band (other Primaries). Arm X: XGBoost multi-quantile offsets around the stored median
   (200 trees, depth 5, no column subsampling). Arm M: a three-component Gaussian mixture density
   network (two hidden layers of 64). Placebos: the same heads fitted on features permuted across
-  rows. Median unchanged in every arm. Code: `ml-experiments/00368-*/`, importing experiments 252,
+  rows. No arm changes the median. Code: `ml-experiments/00368-*/`, importing experiments 252,
   264, and 354.
+- **Terms.** D8 and the other Primaries are primary substations. BG2 is the production-style
+  forecast. The stack is a generalised additive model of demand with a Kalman filter on recent errors.
+  The control is experiment 354's band built from D8's own residuals by hour block and season. A band
+  head is a model that predicts the 11 forecast quantiles from the stored median. Scores are in points
+  of the substation's effective capacity.
 - **Rows and fits.** 96,986 rows at D8 (`fold_a_daily_gap_v1`, scored year 2025-07-02 to
   2026-06-30). Fits refit on the first of each month from 2025-08-01 on rows read before that date
   (months of data: 1 to 11), at all leads; rows before the first fit keep the stored band. Monthly
-  refits, a 300,000-row subsample per fit, lab shortcuts: stored ensemble forecasts, a 6-hour reading
-  lag, horizon 0.5 to 168 hours (NGED needs 1 to 10 days).
+  refits, a 300,000-row subsample per fit. Three lab shortcuts apply: the forecasts are stored ones, readings
+  are assumed to arrive 6 hours late, and the horizon is 0.5 to 168 hours (NGED needs 1 to 10 days).
 - **Gate.** The control reproduces 8.382 at D8.
 - **Absolute scores at D8, all rows.** Stored 10.428, control 8.382, XGBoost head 8.205, mixture
-  head 8.456, shuffled-feature placebos 9.422 and 9.420, BG2 7.593, manual heuristic 8.469,
+  head 8.456, shuffled-feature placebos 8.466 (XGBoost) and 8.461 (mixture), BG2 7.593, manual heuristic 8.469,
   climatology 9.757. Over the seven other Primaries the mean score is 3.174 (stored), 3.159
   (control rule), 3.203 (X), and 3.094 (M).
 - **Planned contrasts (99% intervals).** C1, X minus control at D8: -0.177 (-0.276 to -0.083), fails
@@ -140,8 +145,13 @@ quantile loss for the XGBoost head.
   limit. C3, D4: +0.029 (-0.085 to +0.114), +1.3%. C4, pooled over the seven: +0.030 (-0.052 to
   +0.108), fails the +0.02 limit. Mixture head: C1 +0.074 (+0.018 to +0.164), C2 -0.007, C3 -0.001, C4
   -0.080 (-0.161 to -0.007).
-- **Placebo.** The shuffled-feature heads score 1.04 points worse than the control at D8, so the
-  placebo does not fail: conditioning carries information.
+- **Placebo.** Each head is refitted with its training features shuffled among rows of the same
+  site and valid month. At D8 the XGBoost placebo scores 8.466 against 8.205 for the real head, so
+  that placebo passes (the real head is 0.26 better). The mixture placebo scores 8.461 against 8.456,
+  within the 0.05 limit, so the mixture head's conditioning adds nothing measurable at D8 and its
+  placebo fails. The stop rule's placebo clause therefore also applies. An earlier placebo that
+  shuffled rows across sites scored 9.42, because it removed the site and median information; it was
+  replaced, to match the plan.
 - **Tails at D8 (share of readings below q01, below q05, above q95, above q99).** Control 3.9%, 8.3%,
   7.1%, 2.9%; X 5.8%, 12.0%, 9.4%, 3.4%; M 5.3%, 10.9%, 7.6%, 3.0%; BG2 0.2%, 4.0%, 5.6%, 0.2%. By lead
   band the X head's score is 8.30, 8.12, 8.19, 8.26 (0 to 24, 24 to 72, 72 to 120, 120 to 168 hours)
@@ -157,8 +167,8 @@ quantile loss for the XGBoost head.
   1.505 MW for every head and the control's stored median.
 - **Mean-forecast error beside each contrast.** Identical across arms (1.505 MW at D8), because no
   arm changes the median.
-- **Triggers fired.** Trigger 4: removing D12 turns the XGBoost head's pooled change (C4) from
-  +0.030 to -0.009 (the other six leave-one-out values are +0.023 to +0.075). Trigger 3 cannot
+- **Audit triggers fired.** The trigger for a leave-one-out sign flip: removing D12 turns the XGBoost head's pooled change (C4) from
+  +0.030 to -0.009 (the other six leave-one-out values are +0.023 to +0.075). The trigger comparing quantile-score and mean-error contrasts cannot
   fire. The
   verdict rests on the D8 stop rule, which no leave-one-out result changes, so no audit was run.
 
