@@ -58,7 +58,17 @@ from studies.power import HALF_HOURS_PER_HOUR
 from studies.pv_physics import PlantParameters, SunAndSky, plant_power_mw, solar_position
 
 HORIZON_HALF_HOURS: Final[int] = 336
-"""The forecast horizon: 168 hours of half-hours, from the origin."""
+"""The default forecast horizon: 168 hours of half-hours, from the origin.
+
+Experiments that need another horizon set this constant at run time, so `RunWindow.build` reads it
+when called. A caller that wants a different horizon without that should pass `horizon_half_hours`.
+"""
+
+STORED_HORIZON_HALF_HOURS: Final[int] = 702
+"""The longest horizon the stored ENS arrays hold: 351 hours of half-hours."""
+
+PROTOCOL_HORIZON_HALF_HOURS: Final[int] = 480
+"""The horizon of the demand protocol `demand-v1`: 240 hours of half-hours."""
 
 HISTORY_HALF_HOURS: Final[int] = HALF_HOURS_PER_HOUR * max(SMOOTHING_HOURS)
 """Half-hours of past temperature the longest trailing mean needs."""
@@ -68,6 +78,12 @@ LEAD_BAND_UPPER_HOURS: Final[tuple[float, ...]] = (24.0, 48.0, 144.0, 168.0)
 
 N_LEAD_BANDS: Final[int] = len(LEAD_BAND_UPPER_HOURS)
 """The number of calibration lead bands."""
+
+PROTOCOL_LEAD_BAND_UPPER_HOURS: Final[tuple[float, ...]] = (24.0, 48.0, 96.0, 168.0, 240.0, 336.0)
+"""Upper edges of the lead bands of the demand protocol `demand-v1`.
+
+The bands are day 1, day 2, days 3 to 4, days 5 to 7, days 8 to 10, and days 11 to 14.
+"""
 
 N_SEASONS: Final[int] = 4
 """The number of calibration seasons: December to February, March to May, and so on."""
@@ -95,17 +111,23 @@ def season_of_months(*, months: np.ndarray) -> np.ndarray:
     return ((months % 12) // 3).astype(np.int64)
 
 
-def lead_band_of_hours(*, lead_hours: np.ndarray) -> np.ndarray:
-    """Return the calibration lead band of leads in hours: 0 to 3, over (0, 168] hours.
+def lead_band_of_hours(
+    *,
+    lead_hours: np.ndarray,
+    upper_hours: tuple[float, ...] = LEAD_BAND_UPPER_HOURS,
+) -> np.ndarray:
+    """Return the lead band of leads in hours, from 0 to the number of bands minus 1.
 
     Args:
         lead_hours: Leads from the origin, in hours.
+        upper_hours: The upper edge of each band, in hours. The default is the calibration's four
+            bands over (0, 168] hours; `PROTOCOL_LEAD_BAND_UPPER_HOURS` gives the protocol's.
 
     Returns:
-        Band indices; a lead beyond 168 hours takes the last band.
+        Band indices; a lead beyond the last edge takes the last band.
     """
-    edges = np.array(LEAD_BAND_UPPER_HOURS)
-    return np.minimum(np.searchsorted(edges, lead_hours, side="left"), N_LEAD_BANDS - 1).astype(
+    edges = np.array(upper_hours)
+    return np.minimum(np.searchsorted(edges, lead_hours, side="left"), len(edges) - 1).astype(
         np.int64
     )
 
@@ -811,24 +833,43 @@ class RunWindow:
     climatology_w_m2: np.ndarray
 
     @staticmethod
-    def build(*, cache: FeatureCache, context: WeatherContext, run: EnsSiteRun) -> RunWindow:
+    def build(
+        *,
+        cache: FeatureCache,
+        context: WeatherContext,
+        run: EnsSiteRun,
+        horizon_half_hours: int | None = None,
+    ) -> RunWindow:
         """Compute the member-independent parts of a run's window.
 
         Args:
             cache: The full feature cache.
             context: The substation's weather context.
             run: The run.
+            horizon_half_hours: The horizon to cover. `None` takes `HORIZON_HALF_HOURS`, which
+                clips a longer run silently. An explicit value must fit in the run.
 
         Returns:
             The window.
 
         Raises:
-            ValueError: If the window is shorter than a day, the proxy lacks the past week's
+            ValueError: If an explicit horizon exceeds `STORED_HORIZON_HALF_HOURS` or the run's
+                targets, the window is shorter than a day, the proxy lacks the past week's
                 temperature, or the proxy holds a value from a run published after the origin.
         """
         features = cache.sites[context.site]
         first = run.origin_position + 1
-        count = min(HORIZON_HALF_HOURS, run.n_targets, len(cache.end_times) - first)
+        if horizon_half_hours is None:
+            horizon = HORIZON_HALF_HOURS
+        elif horizon_half_hours > min(STORED_HORIZON_HALF_HOURS, run.n_targets):
+            msg = (
+                f"a horizon of {horizon_half_hours} half-hours exceeds the {run.n_targets} the run "
+                f"holds and the {STORED_HORIZON_HALF_HOURS} the stored arrays allow"
+            )
+            raise ValueError(msg)
+        else:
+            horizon = horizon_half_hours
+        count = min(horizon, run.n_targets, len(cache.end_times) - first)
         count -= count % 2
         if count < HALF_HOURS_PER_DAY:
             msg = "the run's window is shorter than a day"
