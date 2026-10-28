@@ -157,9 +157,10 @@ model trains or scores on it.
 - **Benchmark.** To beat an earlier experiment, read its predictions with
   `experiment_store.read_predictions(experiment_id=..., name=..., row_set_id=...)`. The function
   raises when the set covers a different row set, because scores on different rows are not
-  comparable. The first shared row set is `fold_a_tuesdays_v1`, the stage 1 pilot's: 53 runs, all
-  on Tuesdays, and the 9 generator series. State a different `row_set_id` in the plan, with the
-  reason, when the experiment needs different rows. No experiment scores a valid time on or after
+  comparable. `fold_a_tuesdays_v1` is the stage 1 pilot's row set (53 runs, all on Tuesdays, and
+  the 9 generator series), and the family's evaluation protocol names the current row set.
+  State a different `row_set_id` in the plan, with the reason, when the experiment needs different
+  rows. No experiment scores a valid time on or after
   2026-07-01, which is kept for a finalist.
 - **Interval.** Build the loss frame with `experiment_store.losses_for_bootstrap`, which pairs rows
   on the run and the valid time together and refuses arms with different seeds. Read each planned
@@ -279,11 +280,13 @@ committed. A Sonnet agent writes it from the write-ups and one Sonnet agent revi
 ## Adopting a change into the research default
 
 **Each target family has a research default, and a change to it is adopted one change at a time.**
-`docs/ml-experiments/research-default.md` defines the families, the headline metric, the tolerances,
-the minimum gain by tier, the five adoption conditions, and the cadence, and
+`docs/ml-experiments/research-default.md` defines the families and the cadence. The family's
+evaluation protocol (`docs/ml-experiments/evaluation-protocol-<family>.md`) defines the headline
+metric, the folds, the tolerances, the minimum gain by tier, and the adoption conditions. Every
+`change` experiment records `protocol: <family>-v<N>` in its front matter, and
 `docs/ml-experiments/research-default-log.md` lists each family's versions. Read the rule page before
 planning any experiment that could improve a family's forecast. Do not write a metric, a tolerance,
-or a minimum gain into the plan for a `change` experiment, because the family definition owns them.
+or a minimum gain into the plan for a `change` experiment, because the family's protocol owns them.
 
 **Naming checklist for a `change` experiment.**
 
@@ -302,8 +305,9 @@ or a minimum gain into the plan for a `change` experiment, because the family de
 - If the experiment evaluates a blend, report each constituent model family alone beside the blend.
   The single-family table comes first, and the page states the blend's added value over the best
   single family, with an interval.
-- If the five conditions hold, set `promoted_to` to the new version's name, and add a row to the log
-  in the same pull request. If they do not, the verdict stays and the result is a candidate.
+- If the adoption conditions of the family's evaluation protocol hold, set `promoted_to` to the new
+  version's name, and add a row to the log in the same pull request. If they do not, the verdict
+  stays and the result is a candidate.
 
 **`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls
 under the stated threshold.** It is not `inconclusive`, because the direction is established. The

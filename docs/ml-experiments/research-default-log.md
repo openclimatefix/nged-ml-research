@@ -1,9 +1,9 @@
 # Log of research default versions
 
 **This log lists every version of each family's research default, newest first.** The [rule
-page](research-default.md) defines the families, the adoption conditions, and the eight items in
-each row. The pull request of the adopting experiment adds the row, and a row is never edited
-afterwards except to change its status.
+page](research-default.md) defines the families and the eight items in each row, and each family's
+evaluation protocol defines the adoption conditions. The pull request of the adopting experiment
+adds the row, and a row is never edited afterwards except to change its status.
 
 ## Primary demand
 
@@ -26,8 +26,8 @@ ensemble spread, the unit mean, and the availability ratio) 5.45 and 5.56. The f
 update uses one model family, so these rows show what each family scores without the blend.
 
 **The scored lead range of this row is 12 to 36 hours, and NGED's range is 1 to 10 days.**
-Experiment 310 scores the row from 1 to 10 days. The frozen XGBoost reference is the XGBoost forecast
-of experiment 243 with the floors of experiment 224.
+Experiment 310 scores the row from 1 to 10 days. The frozen XGBoost reference is the XGBoost
+forecast of experiment 243 with the floors of experiment 224.
 
 ## Wind farms
 

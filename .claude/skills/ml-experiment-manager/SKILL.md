@@ -107,7 +107,8 @@ the versions. A `change` experiment names the research default version it starts
 whether the first one's adoption would make the second one stale, and say in the second brief that a
 rebase run follows if it does. Write the naming rule into every `change` brief: the plan, the
 `result.md`, and the PR body cite the version by its full name, and the front matter sets
-`kind: change`. Before merging a `change` PR, check the five adoption conditions, assign the version
+`kind: change`. Before merging a `change` PR, check the adoption conditions of the family's
+evaluation protocol, assign the version
 number, and confirm the PR adds the log row. Four cases need the maintainer's approval: a new data
 source, a cost above £30 or a recurring production cost, a change that would need a serving-path
 change to port, and a change whose code must enter `src/studies`.

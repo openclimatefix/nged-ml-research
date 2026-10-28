@@ -102,6 +102,9 @@ nav:
           - Adopted and open questions: ml-experiments/background/adopted-and-open-questions.md
       - Research default:
           - Rule: ml-experiments/research-default.md
+          - Evaluation protocol, demand: ml-experiments/evaluation-protocol-demand.md
+          - Evaluation protocol, solar: ml-experiments/evaluation-protocol-solar.md
+          - Evaluation protocol, wind: ml-experiments/evaluation-protocol-wind.md
           - Log of versions: ml-experiments/research-default-log.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
