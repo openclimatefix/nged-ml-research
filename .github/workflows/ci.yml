@@ -44,7 +44,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Depth 2 keeps the base commit, which is the first parent of a pull request's merge commit.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v9.0.0
@@ -72,11 +75,22 @@ jobs:
         run: uv run --no-sync python scripts/lint/check_docs_links.py
 
       # Every hook without a step above. SKIP lists the hooks that have a step above running the
-      # same command over the same files.
-      - name: Pre-commit (every hook without a step above, every file)
+      # same command over the same files. The docstring and markdown linters take about 4 minutes
+      # over the whole tree and the experiment folders almost never change, so a pull request
+      # checks only the files it changes. A push to `main` checks every file. So does a pull
+      # request that changes a linter, its configuration, or the locked tool versions. The strict
+      # docs build validates the front matter of every experiment, including after a deletion.
+      - name: Pre-commit (every hook without a step above)
         env:
           SKIP: ruff-check,ruff-format,ty,pydoclint,check-docs-links
-        run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [[ "$EVENT" == "pull_request" ]] && ! git diff --name-only HEAD^1 HEAD \
+              | grep -qE '^(\.pre-commit-config\.yaml|pyproject\.toml|uv\.lock|mkdocs\.yml|\.pymarkdown-docstrings\.json|\.github/workflows/|scripts/lint/|scripts/mkdocs_hooks/)'; then
+            uv run --no-sync pre-commit run --from-ref HEAD^1 --to-ref HEAD --show-diff-on-failure
+          else
+            uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+          fi
 
   tests:
     runs-on: ubuntu-latest
