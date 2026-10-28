@@ -29,7 +29,8 @@ prediction: >-
   Written before any score is read. P1. No arm moves the pooled CRPS of days 1 to 10 by more than
   0.01 points in either group (about 2% of the main-score rows have a contaminated lag, so the gain
   cannot reach the protocol's 0.02-point bar). P2. Arm c1 nets slightly worse than arm d over all
-  rows, from the dropout harm on ordinary rows (experiment 100 found +0.035 on 98% of rows). P3. Arm c2
+  rows, from the dropout harm on ordinary rows (experiment 100 found +0.035 on 98% of rows). P3. Arm
+  c2
   equals arm d on every row without a contaminated lag, bit for bit. P4. On the contaminated-lag
   rows, arm d's 5% to 95% coverage is about 0.80 (experiment 100: 0.799); widening by k = 1.28 lifts
   it to 0.87 to 0.92 and changes the CRPS by under 0.1 points. P5. Widening arm d alone, with no
