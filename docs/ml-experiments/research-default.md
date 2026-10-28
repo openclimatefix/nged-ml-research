@@ -37,7 +37,7 @@ score, the mean absolute error of the median, tail-weighted continuous ranked pr
 
 | Family | Rows and period | Lead range | First version of the research default | Retraining cadence |
 |---|---|---|---|---|
-| Primary demand (six Primaries) | `fold_a_daily_gap_v1`, scored year 2025-07-02 to 2026-06-30, replicate year 2024-25, rows outside hand-filtered events | 0.5 to 168 hours (7 days) | Primary demand research default 1: the GAM stack A+H+S of experiments [220](00220-dp-bg-stage4-assembly-with-drop-one/result.md) and [251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) | Monthly for the GAM stack; weekly for its XGBoost benchmark BG2 |
+| Primary demand (16 Primaries) | Before `demand-v1`: `fold_a_daily_gap_v1` on six Primaries, scored year 2025-07-02 to 2026-06-30, replicate year 2024-25. From `demand-v1`: contiguous months, see the protocol | 0.5 to 168 hours before `demand-v1`, 0.5 to 240 hours from it | Primary demand research default 1: the GAM stack A+H+S of experiments [220](00220-dp-bg-stage4-assembly-with-drop-one/result.md) and [251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) | Monthly for the GAM stack; weekly for its XGBoost benchmark BG2 |
 | Metered solar farms A to F | Daylight half-hours, scored year 2025-09 to 2026-08, 6-month replicate | 12 to 36 hours | Metered solar farms research default 1: the blend assembled by experiment 300 | A single fit or monthly, as the family's first version states |
 | Wind farms W1 to W3 and the public wind farms of experiment 288 | `fold_a_tuesdays_v1`, 53 Tuesday runs | 0.5 hours to 15 days scored, and true days 1 to 10 beside it | Wind farms research default 1: the ERA5-trained XGBoost with the offset table of experiment [303](00303-wind-adapter-in-production-setting/result.md); the current version is Wind farms research default 2, the frozen physics plant plus a mixture-density head of experiment [347](00347-wind-physics-hybrid-plant-then-mdn/result.md) | A single fit of the physics plant, with the head trained once on the hindcast (experiment 347); experiment 346 tested refit cadence for the offset table of Wind farms research default 1 |
 | Bulk and grid supply points | `fold_a_daily_gap_v1` | To be named with the first default | Bulk and grid supply points research default 1: to be named when the first default is chosen. No adoption until then | Weekly |
@@ -55,31 +55,10 @@ the bar for it.** Three wind farms on 53 runs give wide intervals, so a wind cha
 satisfy the gain condition. A change that cannot reach the bar stays a candidate, and the maintainer
 may judge it by a descriptive report instead.
 
-**The Primary-demand family fixes the following tolerances, in points unless stated.** A tolerance
-is the harm a protected group may suffer before an adoption fails.
-
-| Protected group | Tolerance |
-|---|---|
-| Pooled six-Primary headline | 0.02 |
-| 0.01 and 0.99 pinball tails (the worse end is scored, with coverage reported beside it) | 0.05 |
-| Cold winter nights | 0.05 |
-| Sunny daylight half-hours | 0.05 |
-| twCRPS | 2% relative |
-
-**The other three families use a headline tolerance of 0.02 and the same tail tolerance of 0.05.**
-Their other protected groups are set when each family's first version is written.
-
-**The minimum gain depends on the complexity of the change.** The point estimate of the gain must
-reach the value for the change's tier.
-
-| Tier | Minimum gain |
-|---|---|
-| A changed setting, an added column, or a changed loss | 0 |
-| A new fitted step, a new input, or a new data source | 0.02 points |
-| A new head | 0.03 points |
-
-[Experiment 278](00278-stack-retraining-cadence/result.md) anchors the values: it used 0.02 points
-for the convex model's cadence and 0.03 for the head.
+**Each family's evaluation protocol fixes its tolerances and minimum gains.** A tolerance is the harm
+a protected group may suffer before an adoption fails, and the minimum gain depends on the tier of
+the change. The tables are on the [Primary demand](evaluation-protocol-demand.md) page and are not
+repeated here. Where this page and a protocol disagree, the protocol governs.
 
 **Two further lists are part of each family's definition.** The reported groups have no pass or
 fail: each Primary on its own, and the rows near a load shift (seven logged transfers are too few
@@ -180,8 +159,8 @@ serve as the next version without a separate regeneration job.
 protocols are [Primary demand](evaluation-protocol-demand.md), [metered solar
 farms](evaluation-protocol-solar.md), and [wind farms](evaluation-protocol-wind.md). Each protocol
 fixes the metrics, folds, tolerances, minimum gains, and the adoption conditions for its family, and
-the section "When a change is adopted" of the demand protocol is the reference text. This page keeps
-the definitions of the families, the research default versions, and the rebase and ablation rules.
+the section "When a change is adopted" of the demand protocol is the reference text. Where this
+page and a protocol disagree, the protocol governs.
 
 **A change that wins on the gain condition but fails another condition is recorded as a candidate,
 not adopted.** Candidates are retested when the missing evidence arrives, or when a rebase run is
