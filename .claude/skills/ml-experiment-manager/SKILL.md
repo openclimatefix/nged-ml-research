@@ -212,10 +212,12 @@ because `closingIssuesReferences` is empty until the merge lands.
 - **Put plan-page edits for dropped work in the PR of the experiment that closes the row.** A
   separate documentation PR for one table row costs a full CI run.
 - **Make every worker session tidy up before it is archived.** Put in its brief that, once its PR
-  has merged, it removes the leftovers the `ml-experiment` skill's "Tidy up" paragraph lists. Before
-  you archive the worker, check that its worktree is gone. If the worker could not remove it, first
-  check that no process or other session has that worktree as its working directory, and then remove
-  it yourself from the main checkout.
+  has merged, it removes the leftovers the `ml-experiment` skill's "Tidy up" paragraph lists, except
+  its own worktree and branch, because a session cannot remove the worktree it is running in. Once
+  you have archived the worker, remove its worktree from the main checkout (first check that no
+  process or other session has that worktree as its working directory) and delete its local branch.
+  Use `git branch -D` only for a branch whose content you have confirmed is on `main`, and never
+  delete a remote branch, because GitHub deletes the head branch when the PR merges.
 - **Remove the temporary worktrees and branches** that the manager created for its own PRs once those
   PRs have merged.
 
