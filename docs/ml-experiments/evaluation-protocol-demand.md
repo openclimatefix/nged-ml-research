@@ -44,8 +44,8 @@ overwritten. Each reference is never retuned. Earlier scores of the references, 
 hours and use other row sets, are not comparable with scores under this protocol.
 
 **The lead range is 0.5 to 240 hours, and every experiment scores all of it.** NGED's horizon is 1
-to 10 days. Days 11 to 14 are reported only for the arms that have forecasts at those leads, and a table
-lists which arms are covered.
+to 10 days. Days 11 to 14 are reported only for the arms that have forecasts at those leads, and a
+table lists which arms are covered.
 
 **The first run under this protocol produces the forecasts for 168 to 240 hours that the references
 lack.** The stored demand forecasts stop at 168 hours, so BG2 has never been scored past 168 hours,
@@ -138,10 +138,10 @@ megawatts beside it, as the substation cards do. The headline metric is CRPS.
 
 **Four tail measures and the curtailment cost are reported and have no pass or fail.** The tail
 measures are pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles, per group and
-per Primary. The curtailment cost is the avoidable-curtailment-cost measure of `studies.eval_protocol`. It is
-read only for the signed-MW group. The MVA-only meters record unsigned apparent power, which hides
-reverse flow, so the cost is not defined there and carries the label "reactive power assumed
-zero".
+per Primary. The curtailment cost is the avoidable-curtailment-cost measure of
+`studies.eval_protocol`. It is read only for the signed-MW group. The MVA-only meters record
+unsigned apparent power, which hides reverse flow, so the cost is not defined there and carries the
+label "reactive power assumed zero".
 
 **The implementing code is the package `studies.eval_protocol`.** The package lives in
 `src/studies/eval_protocol/`, with the modules `metrics.py` and `slices.py`, and a separate pull

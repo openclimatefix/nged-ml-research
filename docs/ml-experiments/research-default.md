@@ -13,7 +13,8 @@ farms](evaluation-protocol-solar.md), or [wind farms](evaluation-protocol-wind.m
 `release-model` skill governs production changes. This page says "research default" and "adopt"
 because [production
 deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)
-already uses "champion" and "promote" for the deployed XGBoost model. Every version has a name made of the family, the words
+already uses "champion" and "promote" for the deployed XGBoost model. Every version has a name made
+of the family, the words
 "research default", and a number N that counts up within the family from 1, for example "Primary
 demand research default 1" for the GAM stack A+H+S. "C1" and "C2" already name the planned contrasts
 on every result page, so a bare "default 3" or "v3" is never used. Every `result.md` and

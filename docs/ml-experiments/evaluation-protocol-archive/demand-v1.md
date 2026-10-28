@@ -6,10 +6,11 @@
 different experiments can be compared.** An experiment records `protocol: demand-v1` in its front
 matter. A change to any metric, fold, series list, slice, interval, or tolerance on this page makes
 a new version. The superseded text moves to `evaluation-protocol-archive/` as `demand-v1.md`, and
-the table of versions below gains a row. The protocols for [solar](../evaluation-protocol-solar.md) and
-[wind](../evaluation-protocol-wind.md) have their own version numbers, so a change here does not move
-theirs. The [research default rule](../research-default.md) defines the research default and the log of
-its versions. This page defines how a change to it is scored and when the change is adopted.
+the table of versions below gains a row. The protocols for [solar](../evaluation-protocol-solar.md)
+and [wind](../evaluation-protocol-wind.md) have their own version numbers, so a change here does not
+move theirs. The [research default rule](../research-default.md) defines the research default and
+the log of its versions. This page defines how a change to it is scored and when the change is
+adopted.
 
 | Version | Date | Change |
 |---|---|---|
@@ -46,8 +47,8 @@ overwritten. Each reference is never retuned. Earlier scores of the references, 
 hours and use other row sets, are not comparable with scores under this protocol.
 
 **The lead range is 0.5 to 240 hours, and every experiment scores all of it.** NGED's horizon is 1
-to 10 days. Days 11 to 14 are reported only for the arms that have forecasts at those leads, and a table
-lists which arms are covered.
+to 10 days. Days 11 to 14 are reported only for the arms that have forecasts at those leads, and a
+table lists which arms are covered.
 
 **The first run under this protocol produces the forecasts for 168 to 240 hours that the references
 lack.** The stored demand forecasts stop at 168 hours, so BG2 has never been scored past 168 hours,
@@ -73,14 +74,14 @@ points, BG2 is the weekly-refitted XGBoost model alone (`b_weekly`).
 
 **Production does not run BG2.** Production serves a much weaker XGBoost model, stored as
 `xgboost_baseline`. Experiment 87 scored it at 10.536 points on the Primary quantile score, against
-5.260 for [BG2](../glossary.md#bg2). A page that names BG2 as a benchmark says that production does not
-run BG2.
+5.260 for [BG2](../glossary.md#bg2). A page that names BG2 as a benchmark says that production does
+not run BG2.
 
 **The GAM stack trails BG2 on sunny April-to-June half-hours.** [Experiment
-251](../00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) found the stack worse
-than BG2 in April, May, and June (+0.162, +0.220, and +0.054 points), and at D5 on sunny half-hours.
-Every Primary-demand `change` page reports this finding until a version of the research default
-closes the gap.
+251](../00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) found the stack
+worse than BG2 in April, May, and June (+0.162, +0.220, and +0.054 points), and at D5 on sunny
+half-hours. Every Primary-demand `change` page reports this finding until a version of the research
+default closes the gap.
 
 ## Folds
 
@@ -140,10 +141,10 @@ megawatts beside it, as the substation cards do. The headline metric is CRPS.
 
 **Four tail measures and the curtailment cost are reported and have no pass or fail.** The tail
 measures are pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles, per group and
-per Primary. The curtailment cost is the avoidable-curtailment-cost measure of `studies.eval_protocol`. It is
-read only for the signed-MW group. The MVA-only meters record unsigned apparent power, which hides
-reverse flow, so the cost is not defined there and carries the label "reactive power assumed
-zero".
+per Primary. The curtailment cost is the avoidable-curtailment-cost measure of
+`studies.eval_protocol`. It is read only for the signed-MW group. The MVA-only meters record
+unsigned apparent power, which hides reverse flow, so the cost is not defined there and carries the
+label "reactive power assumed zero".
 
 **The implementing code is the package `studies.eval_protocol`.** The package lives in
 `src/studies/eval_protocol/`, with the modules `metrics.py` and `slices.py`, and a separate pull
@@ -178,8 +179,8 @@ A slice with few half-hours is labelled "thin", as the substation cards do.
 **The two load-shift slices have no pass or fail.** The row set of the main score excludes the rows
 inside hand-filtered events, so the scores during the events and in the 7 days after each event
 ends are reported separately. Seven logged transfers are too few for an interval, per [experiment
-277](../00277-lsc-curtailment-metric-on-existing-forecasts/result.md). The length of 7 days is a choice
-of `demand-v1`, which the maintainer may change in a later version. The event list is the
+277](../00277-lsc-curtailment-metric-on-existing-forecasts/result.md). The length of 7 days is a
+choice of `demand-v1`, which the maintainer may change in a later version. The event list is the
 hand-filtered list and never the output of a detector.
 
 **The tolerance for "sunny daylight half-hours" applies to the sunny-by-clear-sky-index slice.** The
