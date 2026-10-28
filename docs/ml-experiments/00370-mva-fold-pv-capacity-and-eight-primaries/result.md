@@ -122,7 +122,9 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
 
 ## Results (reactive power zero, scored cut unless stated)
 
-- **P1 holds.** The chosen fit's capacity is within 15% of S's at 6 of 6 Primaries at level 0.0
+- **P1 holds, and level 1.0 is the real test.** With no injection the result is mostly a check that
+  the rule does not pick L0 at D5, because N equals S where there is no reverse flow. The chosen
+  fit's capacity is within 15% of S's at 6 of 6 Primaries at level 0.0
   (ratios 0.999 to 1.006) and at level 1.0 (0.991 to 1.030). The rule chooses N at D5, D11, D14, D16,
   and D9 and L0 at D10 with no injection, and L0 everywhere at level 1.0. L0's own ratio at D5 with
   no injection is 1.30, the placebo failure of experiment 358.
@@ -132,9 +134,10 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
   8 MVA-only Primaries at both cuts. At D12 it is 0.70 (scored) and 0.62 (replicate). At D8 and at
   the other six it is at most 0.006. At D22 (NGED "Maybe") L0 and N have nearly the same capacity
   (51.4 and 51.2), and at D8 they are identical, so L0 finds nothing there that N lacks.
-- **P4 holds.** At D12 the rule chooses L0 at both cuts, and L0's reading error on sunny half-hours
-  is 9.3 points of capacity below N's at the scored cut (16.2 against 25.5) and 10.7 below at the
-  replicate cut. At the seven others the chosen arm is N, so its error equals N's by construction.
+- **P4 holds, against a weak comparator.** N's fitted capacity at D12 is 0.0 at both cuts, so the gap
+  is "some solar against none". At D12 the rule chooses L0 at both cuts, and L0's reading error on
+  sunny half-hours is 9.3 points of capacity below N's at the scored cut (16.2 against 25.5) and 10.7
+  below at the replicate cut. At the seven others the chosen arm is N, so its error equals N's by construction.
 - **Rule statistics at the census.** D12 has correlation +0.55 and a 1st percentile of 26.7. The
   seven others have correlations of -0.54 to -0.04 and 1st percentiles of 5.9 to 40.2, which
   repeats experiment 366.
@@ -145,13 +148,18 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
 ## Checks
 
 - **Triggers.** Trigger 2 fired on P3, which contradicts experiment 365's finding that L0 fits
-  reverse flow on 96% to 97% of summer midday half-hours at D5. The explanation offered, not tested separately:
-  experiment 365 reported that figure at the signed-MW sites it checked, including D5, where the
-  readings dip towards zero, and the eight census
-  Primaries have 1st percentiles of 5.9 or more, so no mirror basin sits close to the data. Trigger
-  7 fired, because a planned all-16-Primaries experiment depends on this result and it has not been
-  replicated. An audit is required before merge: the series brief allows Sonnet only, so a fresh
-  Sonnet auditor runs it, as for experiment 358; its findings are triaged in the pull request.
+  reverse flow on 96% to 97% of summer midday half-hours at D5. The explanation offered is weak and
+  untested: experiment 365 reported that figure at the signed-MW sites it checked, including D5,
+  where the readings dip towards zero, and the eight census Primaries have 1st percentiles of 5.9 or
+  more. The gap is small (D5's 1st percentile is 3.8 against 5.9 at D8), and the D5 comparison on
+  sunny half-hours was not computed. Trigger 7 fired, because a planned all-16-Primaries experiment
+  depends on this result and it has not been replicated. A fresh Sonnet auditor (the series brief
+  allows Sonnet only) re-derived the headline numbers from the stored files and found no error. Its
+  findings, all triaged: level 0.0 of P1 is largely true by construction (accepted, now stated);
+  N's capacity at D12 is zero, so the gap is "some solar against none" (accepted, now stated); D8's
+  statistics move between the cuts (accepted, now a caveat); the pin's source at D9 and D16 was not
+  checked (accepted, now a caveat); the explanation for the clash with experiment 365 is weak
+  (accepted, now stated).
 - **Median against mean forecast.** Not applicable: frozen point fits, no quantile forecasts.
 - **Mean forecast error beside each contrast.** The contrasts here are the reading errors and the
   capacity ratios above.
@@ -162,6 +170,10 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
   have little rests on the NGED monitor file and
   [experiment 110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md).
   It is unconfirmed whether the fit cannot see reverse flow at D8 or D22 or whether there is none.
+- D8's L0 capacity moves from 32.6 (replicate cut) to 44.4 (scored cut) and its 1st percentile from
+  24.7 to 5.9, so D8's census statistics are unstable between the two cuts. The `source` of the pin
+  at D9 and D16 (vintage or growth prior) was not checked, so the reason for the pin being 45% and
+  58% high is unknown.
 - Frozen fits on past weather: no ensemble forecast, no quantiles, no Kalman filter.
 - The all-16-Primaries step should run the full forecast stack and must include the power factor
   0.97 case, where the rule and the fit are known to fail.
