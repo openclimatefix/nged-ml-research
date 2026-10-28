@@ -100,7 +100,8 @@ substation.** We asked whether the second-level XGBoost model of
 meta-model, would beat a fixed average of two forecasts at all 16 Primary substations, not only at D8.
 The meta-model sees the quantiles of seven stored forecasts (six at D15 and D18), the lead time,
 the power at the forecast's origin, the calendar, and each forecast's error over the previous 7
-days. The fixed average is the 50/50 blend of the GAM stack and BG2. Pooled over the 14 Primaries that have a stored
+days. The fixed average is the 50/50 blend of the GAM stack and BG2. Pooled over the 14 Primaries
+that have a stored
 GAM stack, the meta-model's quantile score was 3.288 (percent of capacity; lower is better) against
 3.181 for the blend. Its score was worse by 0.107 points (95% interval +0.032 to +0.183). It was
 lower than the blend at 4 Primaries and higher at 10. The verdict is `not supported`.
@@ -145,7 +146,8 @@ settings are those of experiment 373 with no tuning.
   three months only train the meta-model), leads up to 168 hours, outside the hand-filtered
   load-shift events at the 13 Primaries whose stack file carries the event mask (D8, D15, and D18
   carry none, so no events are removed there), `fold_a_daily_gap_v1`. Intervals resample whole valid
-  months, the same months at every Primary (20,000 resamples, seed 0); the pooled figure is the mean of the Primaries' means.
+  months, the same months at every Primary (20,000 resamples, seed 0); the pooled figure is the
+  mean of the Primaries' means.
 - **Gate.** The rebuilt D8 frame reproduces the GAM stack (8.338), BG2 (7.593), and the five members
   (7.560, 7.694, 7.472, 7.633, 8.562) on 96,986 rows, and the D8 meta-model, blend, and best single
   scores equal experiment 373's.
@@ -209,7 +211,8 @@ settings are those of experiment 373 with no tuning.
   meta-model is higher than the blend on error at 12 of 14 Primaries, the same direction as C1.
 - **Leave-one-out.** Dropping any one Primary leaves C1 between +0.081 and +0.122, with every
   interval above zero, so no site drives the result.
-- **Triggers.** None of the seven triggers in the `ml-experiment` skill fired. The gate passed; the result agrees with the pre-registered expectation that the
+- **Triggers.** None of the seven triggers in the `ml-experiment` skill fired. The gate passed;
+  the result agrees with the pre-registered expectation that the
   prediction would fail; the score and error contrasts agree; leaving one Primary out never
   flips C1; C4 and C5 move the score by less than their interval half-widths; D8's C1 interval
   (-0.142 to +0.093) matches experiment 373's (-0.145 to +0.094); and no later design depends on this
