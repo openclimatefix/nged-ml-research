@@ -144,8 +144,11 @@ request adds it. Slice masks and the twCRPS threshold are defined there. The def
 of the substation cards (sunny by clear-sky index, sunny by unit shape, cold nights at 3 °C or
 below, and bank holidays). The twCRPS threshold is fixed per Primary and named in
 `studies.eval_protocol`. The docstrings of the package are the definition, and a change to a mask
-or a threshold makes a new version of this protocol. The pull request that adds the package names
-the temperature source and the curtailment-cost function.
+or a threshold makes a new version of this protocol. The package defines the
+slices with the ERA5 2 m temperature at each series' location, and the ENS forecasts are scored
+over those slices. The slice of a half-hour is therefore the same for every forecast, because it
+depends on an estimate of the weather that happened and not on any forecast. ERA5 is an estimate of
+past weather, so a half-hour near a threshold can sit in the wrong slice, equally for every arm.
 
 **Experiment code must import the metric definitions from `studies.eval_protocol`.** A hard-coded
 copy of a metric is a defect, because copies are how a changed definition stops applying to some
