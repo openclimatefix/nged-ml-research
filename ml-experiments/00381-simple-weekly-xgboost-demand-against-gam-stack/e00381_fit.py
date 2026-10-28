@@ -1,4 +1,4 @@
-"""Refit experiment 87's XGBoost demand member with small input or weighting changes (experiment 381).
+"""Refit experiment 87's XGBoost demand member with small input or weighting changes (381).
 
 Each arm refits the `n1h` configuration of experiment 87 (the BG2 weekly and monthly member) at the
 refit times of one regime, for the chosen series, with experiment 87's training rows, parameters,
@@ -124,9 +124,9 @@ def add_extras(*, frame: pl.DataFrame, arm: Arm) -> pl.DataFrame:
     if arm.solar:
         keys = ["power_fcst_init_time", "ensemble_member", "_local_date"]
         daily = out.group_by(keys).agg(pl.col("shortwave").mean().alias("shortwave_day_mean"))
-        previous = daily.with_columns(_local_date=pl.col("_local_date") + pl.duration(days=1)).rename(
-            {"shortwave_day_mean": "shortwave_prev_day_mean"}
-        )
+        previous = daily.with_columns(
+            _local_date=pl.col("_local_date") + pl.duration(days=1)
+        ).rename({"shortwave_day_mean": "shortwave_prev_day_mean"})
         out = out.join(daily, on=keys, how="left", validate="m:1", maintain_order="left").join(
             previous, on=keys, how="left", validate="m:1", maintain_order="left"
         )
@@ -185,7 +185,7 @@ def run_job(
     """Fit one arm at one refit for each site lacking its file, and forecast the refit's runs."""
     arm = make_arm(name=arm_name)
     config = fd.CONFIGS["n1h"]
-    series, arrays = fd._series_and_arrays()  # noqa: SLF001
+    series, arrays = fd._series_and_arrays()
     rows_of = {row["site"]: row for row in series.iter_rows(named=True)}
     todo = [
         s
@@ -199,7 +199,7 @@ def run_job(
         row = rows_of[site]
         known = fd.known_rows(
             rows=add_extras(
-                frame=fd._training_rows_cached(row=row, arrays=arrays[site], config=config),  # noqa: SLF001
+                frame=fd._training_rows_cached(row=row, arrays=arrays[site], config=config),
                 arm=arm,
             ),
             refit=refit,
