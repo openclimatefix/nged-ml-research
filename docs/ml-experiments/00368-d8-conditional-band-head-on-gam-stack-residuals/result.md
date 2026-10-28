@@ -7,7 +7,7 @@ title: >-
 theme: calibration-and-uncertainty
 also_relevant_to:
   - production-reference-and-best-guess
-status: planned
+status: done
 kind: other
 size: >-
   medium. Stored: private files under data/ml-experiments/00368-*/ only. Serving path: not touched.
@@ -48,44 +48,123 @@ metric: >-
   capacity; share of readings below q01 and q05 and above q95 and q99; coverage by lead band
 code: ml-experiments/00368-d8-conditional-band-head-on-gam-stack-residuals/
 date: 2026-10-28
+verdict: not supported
+best_arm: >-
+  XGBoost quantile head: 8.205 at D8 against the control's 8.382 (BG2 7.593); the head minus the
+  control is -0.177 points (99% interval -0.276 to -0.083), closing 22% of the control's gap to BG2.
+headline: >-
+  A band head fitted on all eight Primaries' residuals lowers D8's score by only 0.18 points
+  (-0.28 to -0.08) against experiment 354's own-residual band, closing 22% of the gap to BG2, under
+  the 50% target and under the 25% stop rule. The XGBoost head raises the pooled score at the seven
+  other Primaries by 0.03 points (-0.05 to +0.11) and D2's by 3.5%. The mixture head leaves D8
+  0.07 points worse (+0.02 to +0.16) and the other Primaries 0.08 better (-0.16 to -0.01).
+lessons:
+  - >-
+    The D8 band cannot close the gap with the median unchanged: the stack's median error at D8 is
+    1.50 MW and the heads leave it unchanged, so the remaining gap to BG2 sits in the median.
+  - >-
+    The heads score better than the own-residual band at some Primaries by becoming sharper, and
+    their tails are worse at D8: 5.3% to 5.8% of readings fall below q01, against 3.9% for the
+    control and 0.2% for BG2.
+  - >-
+    The conditioning matters: heads fitted on shuffled features score 1.0 point worse than the
+    control at D8, so lead, hour, weather, and recent residuals do carry information.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  A single band head fitted on every Primary's own residuals improves D8's forecast band by only
+  0.18 points of capacity beyond experiment 354's D8-only band, which is 22% of the remaining gap to
+  BG2, so band work alone cannot close D8's gap. The remaining gap is mostly in the median forecast.
+  A small mixture density network head is harmless at the other Primaries (0.08 points better), but
+  it is no better at D8.
+advice:
+  - >-
+    Stop band work for D8: a pooled conditional head closes 22% of the control's gap to BG2 and the
+    heads' D8 tails stay worse than BG2's (C1, Figure 1, Figure 3).
+  - >-
+    Look for the rest of D8's gap in the median forecast, not in the band, because the median error
+    is 1.50 MW and unchanged by any band (Checks).
+  - >-
+    Do not apply an XGBoost quantile head to D12 without a check: it raises D12's score by 0.26
+    points, and removing D12 turns the pooled change from +0.03 to -0.01 (Figure 2, Checks).
 ---
 
-**Plan only: no score has been read.**
+**A band head fitted on all eight Primaries' residuals closes only 22% of the control's gap to BG2
+at D8, so the band is not where most of D8's gap lies.**
 
 D8 is a primary substation whose forecast band, in experiment 354, was rebuilt from D8's own past
-errors. That cut D8's score by 2.27 points but raised D2's by 5.5% and D4's by 6.1%, because the
-band did not widen with lead time. This experiment fits one band head on the residuals of the
-stack's stored median at eight Primaries and conditions it on lead, hour of day, weather, the site,
-and the stack's recent residuals.
+errors. That cut D8's score but raised D2's by 5.5% and D4's by 6.1%. We fitted one band head on
+the stored forecasts' residuals at eight Primaries (D2, D3, D4, D8, D12, D19, D21, D22), refitted
+every month on readings that had arrived, and conditioned it on lead, hour, weather, the site, and
+the stack's recent residuals. The XGBoost head lowered D8's score by 0.18 points beyond the
+control, 22% of the 0.79-point gap to BG2, against a target of 50%. The stop rule (under 25%)
+applies, so band work stops. The verdict is `not supported`. The method follows
+[experiment 354](../00354-d8-own-residual-bands-and-longer-fit-history/result.md),
+[experiment 311](../00311-primary-demand-mixture-density-band-head/result.md) (mixture density
+network head), and [experiment 240](../00240-no-xgboost-forecast-sprinkle-part-2/result.md)
+(XGBoost quantile offsets), with [Koenker and Bassett (1978)](https://doi.org/10.2307/1913643)'s
+quantile loss for the XGBoost head.
 
-## The five plan items
+**Figure 1: the XGBoost head closes 22% of the control's gap to BG2 at D8.**
 
-- **Arms.** Control is experiment 354's arm 3 at D8, and the stored donated-spread forecast at the
-  seven other Primaries (D2, D3, D4, D12, D19, D21, D22). Arm X is XGBoost quantile offsets around
-  the stored median (one `reg:quantileerror` model for all 11 quantiles, median offset fixed at 0).
-  Arm M is a three-component Gaussian mixture density network on the residual. Arm X-shuffled is
-  arm X fitted on permuted features, as the placebo. Experiment 354's arm 2 is the comparison at
-  every Primary.
-- **Features.** Lead hours, the stored median, the stored band width (q95 minus q05), local hour,
-  day of week, temperature, the unit solar shape, solar elevation, a site code, and the as-of mean
-  absolute residual of the last 24 hours and of the last 7 days. No month or day-of-year column, so
-  the head cannot memorise the calendar.
-- **Fit and rows.** Refit at the start of each calendar month on residuals whose reading arrived
-  (valid time plus 6 hours) before that month, so nothing from the future enters. Rows before the
-  first fit with 28 days of resolved data keep the stored band, as in experiment 354. Scored rows
-  are the scored year 2025-07-02 to 2026-06-30.
-- **Scoring.** The quantile score, tail shares, and coverage by lead band, at D8, D2, D4, and the
-  pooled seven, with month-resampled 95% intervals from `e00252_score`.
-- **Checks.** Gate, the median-minus-mean and mean-forecast error per arm, a leave-one-site-out
-  check of C4, and the audit triggers.
+![D8 scores](figure_1_d8_scores.svg)
 
-## Not part of this plan
+**Figure 2: the mixture head leaves the other Primaries unchanged or slightly better.**
 
-- The "six decision Primaries" of the brief are not stored in experiment 252's forecasts, so the
-  pooled set is the seven other Primaries that are. This is a stated deviation.
-- The curtailment-cost metric needs a node and its generators, so it is not run here.
-- Lab shortcuts: stored forecasts, hindsight-free as-of residuals with a 6-hour reporting lag,
-  horizon 0.5 to 168 hours (NGED needs 1 to 10 days).
+![Other Primaries](figure_2_other_primaries.svg)
 
-Caveat for every headline number: interim, one substation, one scored year; it is unproven whether
-the generator explains the steps and the gap.
+**Figure 3: the heads' lower score comes with more readings beyond q01 and q05 at D8.**
+
+![D8 tails](figure_3_d8_tails.svg)
+
+## Results
+
+- **Arms.** Control: experiment 354's arm 3 on the stack's fit `b` monthly (D8) and the stored
+  donated band (other Primaries). Arm X: XGBoost multi-quantile offsets around the stored median
+  (200 trees, depth 5, no column subsampling). Arm M: a three-component Gaussian mixture density
+  network (two hidden layers of 64). Placebos: the same heads fitted on features permuted across
+  rows. Median unchanged in every arm. Code: `ml-experiments/00368-*/`, importing experiments 252,
+  264, and 354.
+- **Rows and fits.** 96,986 rows at D8 (`fold_a_daily_gap_v1`, scored year 2025-07-02 to
+  2026-06-30). Fits refit on the first of each month from 2025-08-01 on rows read before that date
+  (months of data: 1 to 11), at all leads; rows before the first fit keep the stored band. Monthly
+  refits, a 300,000-row subsample per fit, lab shortcuts: stored ensemble forecasts, a 6-hour reading
+  lag, horizon 0.5 to 168 hours (NGED needs 1 to 10 days).
+- **Gate.** The control reproduces 8.382 at D8.
+- **Absolute scores at D8, all rows.** Stored 10.428, control 8.382, XGBoost head 8.205, mixture
+  head 8.456, shuffled-feature placebos 9.422 and 9.420, BG2 7.593, manual heuristic 8.469,
+  climatology 9.757. Over the seven other Primaries the mean score is 3.174 (stored), 3.159
+  (control rule), 3.203 (X), and 3.094 (M).
+- **Planned contrasts (99% intervals).** C1, X minus control at D8: -0.177 (-0.276 to -0.083), fails
+  the -0.41 threshold. C2, X minus stored at D2: +0.073 (+0.019 to +0.126), +3.5%, fails the 3%
+  limit. C3, D4: +0.029 (-0.085 to +0.114), +1.3%. C4, pooled over the seven: +0.030 (-0.052 to
+  +0.108), fails the +0.02 limit. Mixture head: C1 +0.074 (+0.018 to +0.164), C2 -0.007, C3 -0.001, C4
+  -0.080 (-0.161 to -0.007).
+- **Placebo.** The shuffled-feature heads score 1.04 points worse than the control at D8, so the
+  placebo does not fail: conditioning carries information.
+- **Tails at D8 (share of readings below q01, below q05, above q95, above q99).** Control 3.9%, 8.3%,
+  7.1%, 2.9%; X 5.8%, 12.0%, 9.4%, 3.4%; M 5.3%, 10.9%, 7.6%, 3.0%; BG2 0.2%, 4.0%, 5.6%, 0.2%. By lead
+  band the X head's score is 8.30, 8.12, 8.19, 8.26 (0 to 24, 24 to 72, 72 to 120, 120 to 168 hours)
+  against 8.51, 8.29, 8.37, 8.42 for the control. Pinball loss at the four tail quantiles and the
+  curtailment-cost metric are not computed here.
+- **Caveat.** Interim, one substation, one scored year; it is unproven whether the generator
+  explains the steps and the gap.
+
+## Checks
+
+- **Median minus mean forecast, per site.** The stored mean equals the stored median at every
+  Primary, so the head cannot shift the mean and the check is uninformative. Median error at D8 is
+  1.505 MW for every head and the control's stored median.
+- **Mean-forecast error beside each contrast.** Identical across arms (1.505 MW at D8), because no
+  arm changes the median.
+- **Triggers fired.** Trigger 4: removing D12 turns the XGBoost head's pooled change (C4) from
+  +0.030 to -0.009 (the other six leave-one-out values are +0.023 to +0.075). Trigger 3 cannot
+  fire. The
+  verdict rests on the D8 stop rule, which no leave-one-out result changes, so no audit was run.
+
+## What to try next
+
+- Look for the rest of D8's gap in the median forecast, for example the stored median's bias on
+  sunny half-hours, because the band cannot move it.
+- The mixture head could replace the stored donated band at Primaries without a gas engine; it
+  scores 0.08 points better pooled (-0.16 to -0.01), a small gain that needs a replication.
