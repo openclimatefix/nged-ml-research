@@ -6,6 +6,7 @@
 | 353 | How well does Primary demand research default 3's stack forecast D8 when the MVA meter's fold is modelled? | High (maintainer asked) | Nothing | Planned |
 | 360 | Which of BG2's five Primary members carries its lead over the GAM stack at D8? | Medium (maintainer agreed 2026-10-27) | Nothing | Planned |
 | 333 | Does a pre-trained time-series foundation model (Chronos-2), used zero-shot with or without weather covariates, come close to Primary demand research default 3? | Medium | Nothing | Planned |
+| 377 | How does Primary demand research default 1, extended to 240 hours, score against BG2, the manual heuristic, and climatology at all 16 Primaries under demand-v1? | High (manager) | Nothing | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 
