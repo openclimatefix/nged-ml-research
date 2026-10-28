@@ -108,6 +108,15 @@ This page is the plan. The write-up replaces it when the scores exist.
   scores at the six Primaries and judges the difference as the effect of the folds, not as a bug,
   only when the unchanged-fold run (S and blend on experiment 317's chain) reproduces 322 first.
 
+## Assumptions
+
+- **MVA-only fit.** Until the experiment 377 worker answers, experiment 377's `a0` arm at the
+  MVA-only Primaries is treated as the naive fit, so it is the second arm. The main arm, the
+  rule-chosen fit of experiment 374 at 240 hours, needs a re-run of experiment 377's stage 1 and
+  stage 2 with experiment 374's fits; that re-run is stage C2 and starts after stage C on the naive
+  fit has been scored.
+- **Below 168 hours.** The forecast is experiment 377's stage 2 unchanged, as the brief states.
+
 ## Open questions for the manager
 
 - None. Experiment 377's stored forecasts are in place; its scores and PR are still to come.
