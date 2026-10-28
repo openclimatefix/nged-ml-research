@@ -237,5 +237,24 @@ def test_placeholder_is_replaced_on_theme_pages(experiments_dir: Path) -> None:
     assert other_page == "Nothing.\n"
 
 
+def test_pages_reuse_the_experiments_that_on_config_loaded(
+    experiments_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_experiment(experiments_dir, "00003", production_status="candidate")
+    monkeypatch.setattr(experiment_tables, "EXPERIMENTS_DIR", experiments_dir)
+    page = type(
+        "Page", (), {"file": type("File", (), {"src_path": "ml-experiments/README.md"})()}
+    )()
+    experiment_tables.on_config({})
+
+    def fail_if_reloaded(*, experiments_dir: Path) -> None:
+        raise AssertionError(f"Reloaded the experiments of {experiments_dir} for a page")
+
+    monkeypatch.setattr(experiment_tables, "load_experiments", fail_if_reloaded)
+    markdown = experiment_tables.on_page_markdown("<!-- candidates-table -->\n", page, {}, [])
+
+    assert "(00003-slug-00003/result.md)" in markdown
+
+
 def test_cell_escapes_pipes_and_collapses_newlines() -> None:
     assert experiment_tables._cell("a | b\n  c\n\nd") == "a \\| b c d"
