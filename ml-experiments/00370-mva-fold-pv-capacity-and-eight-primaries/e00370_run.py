@@ -55,7 +55,7 @@ def run_job(job: tuple[str, str, str, float, str]) -> Path:
     path = OUT_DIR / "census" / f"{site}_{cut_name}.json"
     if path.exists():
         return path
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(2)
     cut = known.CUTS[cut_name]
