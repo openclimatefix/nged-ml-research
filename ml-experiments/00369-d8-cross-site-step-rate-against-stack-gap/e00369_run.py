@@ -16,9 +16,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Final
 
-import e00252_common as common
-import e00252_score as score252
-import e00361_detect as detect
+import e00252_common as common  # ty: ignore[unresolved-import]
+import e00252_score as score252  # ty: ignore[unresolved-import]
+import e00361_detect as detect  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from scipy.stats import spearmanr
@@ -163,8 +163,8 @@ def main() -> None:
                 "rate_per_month": scored.height / MONTHS_SCORED,
                 "rises": scored.filter(pl.col("direction") == "rise").height,
                 "falls": scored.filter(pl.col("direction") == "fall").height,
-                "median_size_mw": float(scored["size_mw"].median()) if scored.height else None,
-                "p90_size_mw": float(scored["size_mw"].quantile(0.9)) if scored.height else None,
+                "median_size_mw": float(scored["size_mw"].median()) if scored.height else None,  # ty: ignore[invalid-argument-type]
+                "p90_size_mw": float(scored["size_mw"].quantile(0.9)) if scored.height else None,  # ty: ignore[invalid-argument-type]
                 "history_rate_per_month": real_hist,
                 "placebo_rate_per_month": float(np.mean(placebo)),
                 "placebo_to_real": float(np.mean(placebo)) / real_hist if real_hist else None,

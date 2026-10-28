@@ -42,7 +42,7 @@ def main() -> None:
         color=alt.Color("group:N", scale=alt.Scale(domain=["D8, D12, D22", "Other Primaries"], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]), legend=alt.Legend(title=None, orient="top")),
     )  # fmt: skip
     chart = (
-        points.mark_point(filled=True, size=60)  # ty: ignore[unresolved-attribute]
+        points.mark_point(filled=True, size=60)
         + points.mark_text(dx=8, dy=-6, align="left", fontSize=11).encode(text="site:N")  # ty: ignore[unresolved-attribute]
     ).properties(
         width=WIDTH, height=300,
