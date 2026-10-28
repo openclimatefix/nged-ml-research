@@ -40,7 +40,8 @@ metric: >-
 code: ml-experiments/00367-d8-kalman-transient-off-and-adaptive-short-lead/
 verdict: partly supported
 best_arm: >-
-  Arm K0 (transient off up to 24 hours) at D8 only, not for every substation: 8.058 against the stack's 8.451 at 0 to 24 hours
+  Arm K0 (transient off up to 24 hours) at D8 only, not for every substation:
+  8.058 against the stack's 8.451 at 0 to 24 hours
   (-0.394, 95% interval -0.566 to -0.244). The adaptive arm KA scores 8.142 (-0.310, -0.428 to
   -0.195) but is worse than the stack at D4 (+0.096, +0.007 to +0.187).
 headline: >-
@@ -60,14 +61,14 @@ production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   The Kalman filter's short-lived correction costs D8 about 0.4 points of quantile score at leads
-  under 24 hours, and turning the correction off recovers that, but the same step hurts D4, where the correction helps. The
-  simple rule we tried for scaling it by each substation's own recent benefit recovers 0.31 points
-  at D8 and still hurts D4, so it is not safe as it stands. The next step is a more responsive gain
-  rule, tested with the same placebos.
+  under 24 hours, and turning the correction off recovers that, but the same step hurts D4, where the
+  correction helps. The simple rule we tried, which scales the correction by each substation's own
+  recent benefit, recovers 0.31 points at D8 and still hurts D4, so it is not safe as it stands.
+  The next step is a more responsive gain rule, tested with the same placebos.
 advice:
   - >-
-    Do not switch the Kalman transient off for every substation at leads under 24 hours; the transient helps D4
-    by 0.136 points (K0 minus control, D4, 0 to 24 h).
+    Do not switch the Kalman transient off for every substation at leads under 24 hours; the transient
+    helps D4 by 0.136 points (K0 minus control, D4, 0 to 24 h).
   - >-
     If an adaptive transient gain is tried again, make it respond faster than a 90-day trailing
     benefit-to-size ratio, which gave a mean gain of only 0.19 at D4 (KA, D4).
@@ -99,8 +100,8 @@ The five plan items:
     - KA: as K0 at leads up to 24 hours, but the transient is multiplied by a gain g. For each
       forecast run, g is the trailing 90-day mean of (|error of S1| minus |error of S2|) over rows
       with lead up to 24 hours whose valid time is at or before the run's forecast initialisation
-      time, divided by the trailing mean absolute size of the transient, clipped to the range 0 to
-      1. Until 672 such rows (14 days of half-hours) exist, g is 1 (the control). The same rule
+      time, divided by the trailing mean absolute size of the transient, clipped to between zero
+      and one. Until 672 such rows (14 days of half-hours) exist, g is 1 (the control). The same rule
       applies at every substation. Beyond 24 hours the transient is untouched, because experiment
       364 found it neutral or helpful there.
 2. **Row set and sites.** The 96,986 D8 rows of experiment 354 (weekly stage columns), plus D2 and
