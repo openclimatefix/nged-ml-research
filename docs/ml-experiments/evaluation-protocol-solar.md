@@ -21,7 +21,8 @@ interval, or tolerance makes a new version, and the superseded text moves to
 - **Lead range:** 12 to 36 hours is the scored range today. NGED's horizon is 1 to 10 days, so every
   result states that it was scored at 12 to 36 hours only, until a version scores days 1 to 10.
 - **Forecasts compared:** the forecast under test, `manual_heuristic`, `climatology`, and the
-  XGBoost reference of experiment 243 with the floors of experiment 224.
+  XGBoost reference of experiment 243 with the floors of experiment 224. The frozen reference of
+  the family is not yet named.
 
 ## Slices
 
@@ -44,6 +45,11 @@ those of the frozen [`demand-v1`](evaluation-protocol-archive/demand-v1.md)**, w
 page states. Linking the frozen copy means a later change to the demand protocol does not change
 this protocol. The scored year 2025-09 to 2026-08 and its 6-month replicate are those of Metered
 solar farms research default 1, and the held-out period for solar starts on 2026-09-01.
+
+**The metered-farm family has already scored part of the holdout.** Experiments 224, 243, 257, 270,
+272, 275, 284, 287, and 293 state a scored year of 2025-09 to 2026-08, so July and August 2026 are
+no longer untouched for metered solar farms. The holdout of the family starts at 2026-09-01 at the
+earliest.
 
 | Item | Value for solar |
 |---|---|

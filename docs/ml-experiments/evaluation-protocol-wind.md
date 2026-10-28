@@ -21,7 +21,8 @@ or tolerance makes a new version, and the superseded text moves to `evaluation-p
 - **Lead range:** 0.5 hours to 15 days is scored, with true days 1 to 10 reported beside it. Days 1
   to 10 is the headline band.
 - **Forecasts compared:** the forecast under test, `climatology`, and the XGBoost forecast without
-  the offset table. `manual_heuristic` and BG2 are not scored for wind farms.
+  the offset table. `manual_heuristic` and BG2 are not scored for wind farms. The frozen reference
+  of the family is not yet named.
 
 ## Slices
 

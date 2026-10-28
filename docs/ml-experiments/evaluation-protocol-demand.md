@@ -49,6 +49,33 @@ and BG2, the GAM stack, `manual_heuristic`, and `climatology` need new runs at t
 MANAGER schedules this run. Until it has finished, no experiment scores the 168 to 240 hour leads,
 and the days 8 to 10 and 11 to 14 slices are empty.
 
+## The three fixed benchmarks
+
+**Each family keeps three benchmarks whose recipes never change: `manual_heuristic`, `climatology`,
+and one frozen XGBoost-based reference.** The rows grow as months arrive, and the benchmarks are
+extended with the same recipe and never retuned. Every `change` page reports the research default's
+absolute score against the three benchmarks, with intervals, because a chain of small contrasts can
+hide a drift in absolute skill. Diagnostic pages need not report them.
+
+**For Primary demand the frozen reference is BG2.** BG2 is the stored arm `p_s6_bg2` of [experiment
+87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md). BG2 is a quantile blend of
+five forecasts, with an explicit solar offset at the 5 of 16 Primaries that have a clean solar
+capacity estimate. The five forecasts are a weekly-refitted XGBoost model, a monthly-refitted
+XGBoost model, an analogue model (the experiment 87 page does not state its type), an XGBoost model
+pooled by substation type, and the frozen stack of experiment 48. For the bulk and grid supply
+points, BG2 is the weekly-refitted XGBoost model alone (`b_weekly`).
+
+**Production does not run BG2.** Production serves a much weaker XGBoost model, stored as
+`xgboost_baseline`. Experiment 87 scored it at 10.536 points on the Primary quantile score, against
+5.260 for [BG2](glossary.md#bg2). A page that names BG2 as a benchmark says that production does not
+run BG2.
+
+**The GAM stack trails BG2 on sunny April-to-June half-hours.** [Experiment
+251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) found the stack worse
+than BG2 in April, May, and June (+0.162, +0.220, and +0.054 points), and at D5 on sunny half-hours.
+Every Primary-demand `change` page reports this finding until a version of the research default
+closes the gap.
+
 ## Folds
 
 **Folds are contiguous months with a training window that ends before the first forecast origin of
@@ -57,8 +84,8 @@ forecast run whose origin date falls in month M(k)+1, at every lead up to 240 ho
 lag of the power data counts as part of the training cut. The row set is every daily ensemble run,
 at the 00:00 UTC origin, in the scored period. It includes the runs that `fold_a_every5d_v1` holds,
 and it gets a new `row_set_id` when the first experiment under this protocol stores its forecasts.
-The publication lag of the power data is the lag in production, and the shared module states its
-value.
+The publication lag of the power data is the lag in production, and `studies.eval_protocol` states
+its value.
 
 **The experimenter chooses the training regime and states it in the plan.** An expanding window and
 a sliding window (for example, the last 24 months) are both allowed. The regime must be the same for
@@ -109,16 +136,18 @@ megawatts beside it, as the substation cards do. The headline metric is CRPS.
 measures are pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles, per group and
 per Primary. The curtailment cost is the existing avoidable-curtailment-cost measure.
 
-**Slice masks and the twCRPS threshold are defined in the shared metric module.** The definitions
-are those of the substation cards (sunny by clear-sky index, sunny by unit shape, cold nights at
-3 °C or below, and bank holidays). The twCRPS threshold is fixed per Primary and named in the
-module. The module's docstrings are the definition, and a change to a mask or a threshold makes a
-new version of this protocol. The pull request that adds the module names the temperature source and
-the curtailment-cost function.
+**The implementing code is the package `studies.eval_protocol`.** The package lives in
+`src/studies/eval_protocol/`, with the modules `metrics.py` and `slices.py`, and a separate pull
+request adds it. Slice masks and the twCRPS threshold are defined there. The definitions are those
+of the substation cards (sunny by clear-sky index, sunny by unit shape, cold nights at 3 °C or
+below, and bank holidays). The twCRPS threshold is fixed per Primary and named in
+`studies.eval_protocol`. The docstrings of the package are the definition, and a change to a mask
+or a threshold makes a new version of this protocol. The pull request that adds the package names
+the temperature source and the curtailment-cost function.
 
-**Experiment code must import the metric definitions from one module.** The pull request that
-implements this protocol names the module. A hard-coded copy of a metric is a defect, because
-copies are how a changed definition stops applying to some experiments.
+**Experiment code must import the metric definitions from `studies.eval_protocol`.** A hard-coded
+copy of a metric is a defect, because copies are how a changed definition stops applying to some
+experiments.
 
 ## Slices
 
@@ -128,10 +157,18 @@ A slice with few half-hours is labelled "thin", as the substation cards do.
 | Kind | Slices |
 |---|---|
 | Lead time | Day 1 (0 to 24 hours), day 2, days 3 to 4, days 5 to 7, days 8 to 10, days 11 to 14. Days 1 to 10 is the headline band |
-| Time of day | Night, morning, midday, and evening, in local time, with the hour boundaries stated in the shared module |
+| Time of day | Night, morning, midday, and evening, in local time, with the hour boundaries stated in `studies.eval_protocol` |
 | Condition | All days; sunny by clear-sky index; sunny by unit shape; sunny April to June; the months excluded by the 12-month rule; winter (December to February); winter nights; cold nights (3 °C or below); Economy 7 step hours; Christmas (24 December to 1 January); bank holidays |
+| Load-shift events | During each hand-labelled load-shift (switching) event; in the 7 days after each event ends |
 | Group | Signed-MW, MVA-only, and short-history, each separately |
 | Series | Every Primary on its own row |
+
+**The two load-shift slices have no pass or fail.** The row set of the main score excludes the rows
+inside hand-filtered events, so the scores during the events and in the 7 days after each event
+ends are reported separately. Seven logged transfers are too few for an interval, per [experiment
+277](00277-lsc-curtailment-metric-on-existing-forecasts/result.md). The length of 7 days is a choice
+of `demand-v1`, which the maintainer may change in a later version. The event list is the
+hand-filtered list and never the output of a detector.
 
 **The tolerance for "sunny daylight half-hours" applies to the sunny-by-clear-sky-index slice.** The
 other sunny slices are reported.
@@ -140,6 +177,11 @@ other sunny slices are reported.
 because NGED's horizon is 1 to 10 days.
 
 ## Reporting in every write-up
+
+**Each write-up reports the load-shift slices beside the main score.** The write-up shows the score
+during the events and the score in the 7 days after each event ends, for the forecast under test
+and for the current research default, with the half-hour count of each slice. The write-up draws no
+pass or fail from them.
 
 **Each write-up carries a per-Primary table, the worst Primary, and a leave-one-out contrast.** The
 table lists every Primary's paired difference and its 95% interval, sorted by gap. Beside the pooled
@@ -242,8 +284,79 @@ under this protocol.
 384 stack fits per change for two arms. An experiment's plan may screen with fewer folds or
 Primaries, and says so. Only a full run under this protocol supports an adoption.
 
-**The cumulative harm budget and the retest rules on the research default rule page still apply.**
-The budget is 2 times a group's tolerance, measured against the family's first version.
+**The cumulative harm budget is 2 times the group's tolerance, measured against the family's first
+version.** The no-harm condition compares each adoption only with the previous version, so n
+adoptions that each cost up to the tolerance could cost n times the tolerance in total. At each
+adoption, the current research default must also stay within the budget against the first version,
+using the first version's stored forecasts. The retest rules of the [research default
+rule](research-default.md#the-rebase-rule-for-stale-results) still apply.
+
+**A change that wins on the gain condition but fails another condition is recorded as a
+candidate, not adopted.** Candidates are retested when the missing evidence arrives, or when a
+rebase run is available, as the [research default rule](research-default.md) describes.
+
+**A targeted adoption on a subgroup uses a short list of admissible subgroups, set in advance.** The
+list is cold nights, the Economy 7 step, and sunny daylight. A targeted adoption on a subgroup also
+needs no harm on the family headline.
+
+**An experiment may hold several default-plus-x arms, and at most one of them is adopted.** Each arm
+is read at the level 1 − 0.01/k, and the others become candidates that rebase on the new version. A
+bundle of two components is adopted as one change only when it was pre-registered as one change and
+its leave-one-out arms show neither component harmful.
+
+**Only a pre-registered arm can be adopted.** A post hoc arm becomes a candidate that needs a fresh
+experiment. When an experiment tests k variants of one change (tilt 20 and tilt 27, for example),
+the best variant needs replication on its own after the Bonferroni read.
+
+**An experiment that evaluates a blend reports each constituent model family alone beside the
+blend.** The single-family table comes first, and the page states the blend's added value over the
+best single family, with an interval. A blend is adopted into the research default only with that
+table present. The first production update is a relatively simple model implemented as one model
+family, for example XGBoost only, while blends stay of interest.
+
+**The default plus x is produced on the research default's full row set.** Its stored forecasts then
+serve as the next version without a separate regeneration job.
+
+**The ablation that follows every fifth adoption drops a component only on evidence.** A component
+is dropped only when the interval of its removal lies wholly on the better side, or when its
+removal is non-inferior within the tolerance and the component sits in a higher complexity tier.
+
+**The nominal 99% interval covers less than 99% on short periods.** A percentile bootstrap that
+resampled independent normal months with a nominal 99% interval covered 96.5% of the time at 12
+months, 92.0% at 6 months, and 83.7% at 4 months (1,500 trials of 2,000 resamples each). The real
+procedure also resamples seeds and has autocorrelated months, so the figures are indicative. For
+periods under 12 months, add a t test on the monthly paired differences or use a studentised
+bootstrap. Adoption contrasts use 99% whatever the number of arms, as a stated exception to the
+[interval-level convention](glossary.md#interval-level-convention), and a `change` page says "the
+99% interval lies wholly on the better side of zero" in place of the `study` skill's
+"statistically significant at the 5% level".
+
+**The recorded gain of each version is an upper bound.** Winners are selected on the scored year, so
+the recorded estimate overstates the true gain. In a simulation, a true gain of 2 standard errors
+was recorded on average as 2.7. The log therefore also reports the cumulative gain on the replicate
+period, which carries no selection bias, beside the scored-year sum.
+
+## The holdout
+
+**The frozen period is the existing holdout: valid times on or after 2026-07-01.** No experiment
+scores those valid times, which are kept for a finalist. The `release-model` skill scores the
+holdout once per release, on the sign of the effect only, and a month may confirm one release only.
+
+**The holdout holds under four months and no winter on 2026-10-23.** It covers July to October 2026,
+and the months from November to February arrive by about March 2027. Until then, a change that acts
+in winter (the heating curve, cold nights, the Economy 7 step) is adopted on the replicate year
+alone, and its log entry reads "winter-unconfirmed". The holdout confirms its sign in March 2027 or
+later.
+
+**The same-months shrinkage check pauses a family's adoptions only on evidence of shrinkage.** The
+check compares the holdout months with the same calendar months of the scored year (July to October
+2025 for the current holdout). Adoptions in the family pause when the one-sided 90% upper bound of
+the holdout months' cumulative gain lies below half of the cumulative gain on those same scored-year
+months. A month read for a decision, or for a pause investigation, joins the scored months, and the
+holdout rolls forward as new months arrive. In a simulation of a 12-month scored year and a
+4-month holdout, the check paused the family after 29% of false adoptions, 7% of adoptions with a
+true gain of 2 standard errors, and 3% of adoptions with a true gain of 3 standard errors. The
+check understates the chance of a pause for a change whose effect is seasonal.
 
 ## Retraining
 
@@ -253,7 +366,7 @@ There is no separate screening tier, because monthly retraining is already the R
 ## Known-answer tests
 
 **The protocol requires tests on synthetic series whose correct scores are known.** The pull
-request that implements the shared metric module adds them, and they run in continuous integration.
+request that adds `studies.eval_protocol` adds them, and they run in continuous integration.
 They cover each metric, the month bootstrap, the folds (including the 12-month rule and the training
 cut), and the slice masks. A change to the evaluation code that breaks a known answer fails the
 build.
@@ -263,3 +376,8 @@ build.
 - A physical lock that stops research sessions reading the held-out actuals.
 - Logging scores to MLflow, which a follow-on pull request adds.
 - Wind and solar, whose own protocols are linked at the top of this page.
+- The bulk and grid supply points. Their row set is `fold_a_daily_gap_v1`, their lead range is to
+  be named with their first research default, and no adoption happens until then.
+- Scores before `demand-v1`. Those scores used `fold_a_daily_gap_v1` on six Primaries, a scored
+  year of 2025-07-02 to 2026-06-30, a replicate year of 2024-25, and a lead range of 0.5 to 168
+  hours.

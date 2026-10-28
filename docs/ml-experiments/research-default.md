@@ -1,18 +1,19 @@
 # The research default and the rule for adopting a change
 
-**Each target family has one fixed research default forecast, one fixed test for adding a change to
+**Each target family has one fixed research default forecast, one fixed rule for adding a change to
 it, and a [log of versions](research-default-log.md).** An experiment of kind `change` asks whether
 the research default plus change x beats the research default. A win produces the next version of
 the research default. The rule exists so that the experiments build one forecast in order, and so
 that a gain is always measured against the current forecast and never against a stale or partial
-one.
+one. How a change is scored, and when it is adopted, is fixed by the family's evaluation protocol:
+[Primary demand](evaluation-protocol-demand.md), [metered solar
+farms](evaluation-protocol-solar.md), or [wind farms](evaluation-protocol-wind.md).
 
 **Adopting a change into the research default does not put the change into production.** The
 `release-model` skill governs production changes. This page says "research default" and "adopt"
 because [production
 deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)
-already uses "champion"
-and "promote" for the deployed XGBoost model. Every version has a name made of the family, the words
+already uses "champion" and "promote" for the deployed XGBoost model. Every version has a name made of the family, the words
 "research default", and a number N that counts up within the family from 1, for example "Primary
 demand research default 1" for the GAM stack A+H+S. "C1" and "C2" already name the planned contrasts
 on every result page, so a bare "default 3" or "v3" is never used. Every `result.md` and
@@ -21,82 +22,22 @@ research default 1". The two arms of a `change` experiment are called "default" 
 x".
 
 **The research default is not what runs in production.** Production serves a much weaker XGBoost
-model, stored as `xgboost_baseline`. [Experiment
-87](00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) scored it at 10.536 points on
-the Primary quantile score, against 5.260 for [BG2](glossary.md#bg2). A page that names BG2 as a
-benchmark says that production does not run BG2.
+model, stored as `xgboost_baseline`. The [demand protocol](evaluation-protocol-demand.md#the-three-fixed-benchmarks)
+gives its score beside the score of the frozen reference BG2.
 
 ## Families
 
-**Each family has its own research default, row set, headline metric, protected groups, benchmarks,
-retraining cadence, and version line.** The family definition below fixes these values once, and an
-experiment's plan never sets or changes them. A per-plan choice would let an experiment pick the
-metric on which its change wins. The metrics used across the experiments so far include the quantile
-score, the mean absolute error of the median, tail-weighted continuous ranked probability score
-(twCRPS), a single quantile's pinball loss, and avoidable curtailment cost.
+**Each family has its own research default, series, retraining cadence, and version line.** The
+family definition below fixes these values once, and an experiment's plan never sets or changes
+them. The row set, lead range, headline metric, protected groups, and benchmarks of each family are
+in its evaluation protocol.
 
-| Family | Rows and period | Lead range | First version of the research default | Retraining cadence |
-|---|---|---|---|---|
-| Primary demand (16 Primaries) | Before `demand-v1`: `fold_a_daily_gap_v1` on six Primaries, scored year 2025-07-02 to 2026-06-30, replicate year 2024-25. From `demand-v1`: contiguous months, see the protocol | 0.5 to 168 hours before `demand-v1`, 0.5 to 240 hours from it | Primary demand research default 1: the GAM stack A+H+S of experiments [220](00220-dp-bg-stage4-assembly-with-drop-one/result.md) and [251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) | Monthly for the GAM stack; weekly for its XGBoost benchmark BG2 |
-| Metered solar farms A to F | Daylight half-hours, scored year 2025-09 to 2026-08, 6-month replicate | 12 to 36 hours | Metered solar farms research default 1: the blend assembled by experiment 300 | A single fit or monthly, as the family's first version states |
-| Wind farms W1 to W3 and the public wind farms of experiment 288 | `fold_a_tuesdays_v1`, 53 Tuesday runs | 0.5 hours to 15 days scored, and true days 1 to 10 beside it | Wind farms research default 1: the ERA5-trained XGBoost with the offset table of experiment [303](00303-wind-adapter-in-production-setting/result.md); the current version is Wind farms research default 2, the frozen physics plant plus a mixture-density head of experiment [347](00347-wind-physics-hybrid-plant-then-mdn/result.md) | A single fit of the physics plant, with the head trained once on the hindcast (experiment 347); experiment 346 tested refit cadence for the offset table of Wind farms research default 1 |
-| Bulk and grid supply points | `fold_a_daily_gap_v1` | To be named with the first default | Bulk and grid supply points research default 1: to be named when the first default is chosen. No adoption until then | Weekly |
-
-**NGED care about the 1 day to 10 day horizon, so each family states its lead range, and a lead
-range shorter than that is a limit on every result.** The Primary-demand range stops at 7 days and
-the metered-farm range stops at 36 hours. A `change` result for such a family repeats its lead range
-in its headline caveat, for example "scored at 12 to 36 hour leads only".
-
-**The headline metric for all four families is the quantile score over 11 levels, in points of
-effective capacity.** A point is 1% of a series' capacity.
-
-**A family with few series and few runs will rarely pass the gain test, and the rule does not lower
-the bar for it.** Three wind farms on 53 runs give wide intervals, so a wind change will seldom
-satisfy the gain condition. A change that cannot reach the bar stays a candidate, and the maintainer
-may judge it by a descriptive report instead.
-
-**Each family's evaluation protocol fixes its tolerances and minimum gains.** A tolerance is the harm
-a protected group may suffer before an adoption fails, and the minimum gain depends on the tier of
-the change. The tables are on the [Primary demand](evaluation-protocol-demand.md) page and are not
-repeated here. Where this page and a protocol disagree, the protocol governs.
-
-**Two further lists are part of each family's definition.** The reported groups have no pass or
-fail: each Primary on its own, and the rows near a load shift (seven logged transfers are too few
-for an interval, per [experiment
-277](00277-lsc-curtailment-metric-on-existing-forecasts/result.md)). The admissible subgroups for a
-targeted gain are a short list set in advance (cold nights, the Economy 7 step, sunny daylight), and
-a targeted adoption on a subgroup also needs no harm on the family headline.
-
-**The cumulative harm budget is 2 times the group's tolerance, measured against the family's first
-version.** The no-harm condition compares each adoption only with the previous version, so n
-adoptions that each cost up to the tolerance could cost n times the tolerance in total. At each
-adoption, the current research default must also stay within the budget against the first version,
-using the first version's stored forecasts.
-
-## The three fixed benchmarks
-
-**Each family keeps three benchmarks whose recipes never change: `manual_heuristic`, `climatology`,
-and one frozen XGBoost-based reference.** The rows grow as months arrive, and the benchmarks are
-extended with the same recipe and never retuned. Every `change` page reports the research default's
-absolute score against the three benchmarks, with intervals, because a chain of small contrasts can
-hide a drift in absolute skill. Diagnostic pages need not report them.
-
-**For Primary demand the frozen reference is BG2.** BG2 is the stored arm `p_s6_bg2` of experiment
-87. BG2 is a quantile blend of five forecasts, with an explicit solar offset at the 5 of 16
-    Primaries
-that have a clean solar capacity estimate. The five forecasts are a weekly-refitted XGBoost model, a
-monthly-refitted XGBoost model, an analogue model (the experiment 87 page does not state its type),
-an XGBoost model pooled by substation type, and the frozen stack of experiment 48. For the bulk and
-grid supply points, BG2 is the weekly-refitted XGBoost model alone (`b_weekly`). The metered-farm
-pages compare with the XGBoost forecast of experiment 243 and the floors of experiment 224, and the
-frozen reference for the farm and wind families is named when each family's first version is
-written.
-
-**The GAM stack trails BG2 on sunny April-to-June half-hours.** [Experiment
-251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) found the stack worse
-than BG2 in April, May, and June (+0.162, +0.220, and +0.054 points), and at D5 on sunny half-hours.
-Every Primary-demand `change` page reports this finding until a version of the research default
-closes the gap.
+| Family | Series | First version of the research default | Retraining cadence |
+|---|---|---|---|
+| Primary demand | 16 Primaries | Primary demand research default 1: the GAM stack A+H+S of experiments [220](00220-dp-bg-stage4-assembly-with-drop-one/result.md) and [251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) | Monthly for the GAM stack; weekly for its XGBoost benchmark BG2 |
+| Metered solar farms | Farms A to F | Metered solar farms research default 1: the blend assembled by experiment 300 | A single fit or monthly, as the family's first version states |
+| Wind farms | W1 to W3 and the public wind farms of experiment 288 | Wind farms research default 1: the ERA5-trained XGBoost with the offset table of experiment [303](00303-wind-adapter-in-production-setting/result.md); the current version is Wind farms research default 2, the frozen physics plant plus a mixture-density head of experiment [347](00347-wind-physics-hybrid-plant-then-mdn/result.md) | A single fit of the physics plant, with the head trained once on the hindcast (experiment 347); experiment 346 tested refit cadence for the offset table of Wind farms research default 1 |
+| Bulk and grid supply points | To be named with the first default | Bulk and grid supply points research default 1: to be named when the first default is chosen. No adoption until then | Weekly |
 
 ## Reusing the research default's code and forecasts
 
@@ -123,7 +64,7 @@ single seed ([experiments 201 and 220](00220-dp-bg-stage4-assembly-with-drop-one
 "more seeds" would otherwise adopt as a change.
 
 **Each version's stored forecasts are written once and never overwritten.** Several worktrees share
-one `data/` folder,, and a re-run by one session would replace the evidence of another.
+one `data/` folder, and a re-run by one session would replace the evidence of another.
 Experiments in flight read Primary demand research default N while Primary demand research
 default N+1 is being built. Each version is written once with `experiment_store.write_predictions`
 under the adopting
@@ -140,85 +81,20 @@ detection or decision studies are `kind: other` and never adopt. The five items 
 - The arms: the default, and the default plus x. The default's arm reads the stored forecasts of
   that version, with a reproduction gate when the experiment refits the default, as experiment 278
   did.
-- The tier of the change (tier 1 or tier 2) and its complexity tier from the minimum-gain table.
+- The tier of the change (tier 1 or tier 2) and its complexity tier, as the evaluation protocol of
+  the family defines them.
 - The pre-registered default-plus-x arm or arms.
 - The controls that apply: a known-answer test, a placebo, a leakage check.
 
-**An experiment that evaluates a blend reports each constituent model family alone beside the
-blend.** The single-family table comes first, and the page states the blend's added value over the
-best single family, with an interval. The first production update is a relatively simple model
-implemented as one model family, for example XGBoost only, while blends stay of interest. A blend is
-adopted into the research default only with that table present.
-
-**The default plus x is produced on the research default's full row set.** Its stored forecasts then
-serve as the next version without a separate regeneration job.
-
-## The adoption rule
+## When a change is adopted
 
 **A change is adopted only when the conditions of the family's evaluation protocol hold.** The
-protocols are [Primary demand](evaluation-protocol-demand.md), [metered solar
-farms](evaluation-protocol-solar.md), and [wind farms](evaluation-protocol-wind.md). Each protocol
-fixes the metrics, folds, tolerances, minimum gains, and the adoption conditions for its family, and
-the section "When a change is adopted" of the demand protocol is the reference text. Where this
-page and a protocol disagree, the protocol governs.
+conditions, the candidate status for a change that fails one of them, the rules for several arms and
+for blends, the holdout, and the interval conventions are all in the protocol. The reference text is
+the section ["When a change is adopted"](evaluation-protocol-demand.md#when-a-change-is-adopted) of
+the demand protocol.
 
-**A change that wins on the gain condition but fails another condition is recorded as a candidate,
-not adopted.** Candidates are retested when the missing evidence arrives, or when a rebase run is
-available.
-
-**The nominal 99% interval covers less than 99% on short periods.** A percentile
-bootstrap that resampled independent normal months with a nominal 99% interval covered 96.5% of the
-time at 12 months, 92.0% at 6 months, and 83.7% at 4 months (1,500 trials of 2,000 resamples each).
-The real procedure also resamples seeds and has autocorrelated months, so the figures are
-indicative. For periods under 12 months, add a t test on the monthly paired differences or use a
-studentised bootstrap. Adoption contrasts use 99% whatever the number of arms, as a stated exception
-to the [interval-level convention](glossary.md#interval-level-convention), and a `change` page says
-"the 99% interval lies wholly on the better side of zero" in place of the `study` skill's
-"statistically significant at the 5% level".
-
-**The recorded gain of each version is an upper bound.** Winners are selected on the scored year, so
-the recorded estimate overstates the true gain. In a simulation, a true gain of 2 standard errors
-was recorded on average as 2.7. The log therefore also reports the cumulative gain on the replicate
-period, which carries no selection bias, beside the scored-year sum.
-
-## The holdout
-
-**The frozen period is the existing holdout: valid times on or after 2026-07-01.** No experiment
-scores those valid times, which are kept for a finalist. The `release-model` skill scores the
-holdout once per release, on the sign of the effect only, and a month may confirm one release only.
-
-**The holdout holds under four months and no winter on 2026-10-23.** It covers July to October 2026,
-and the months from November to February arrive by about March 2027. Until then, a change that acts
-in winter (the heating curve, cold nights, the Economy 7 step) is adopted on the replicate year
-alone, and its log entry reads "winter-unconfirmed". The holdout confirms its sign in March 2027 or
-later.
-
-**The metered-farm family has already scored part of the holdout.** Experiments 224, 243, 257, 270,
-272, 275, 284, 287, and 293 state a scored year of 2025-09 to 2026-08, so July and August 2026 are
-no longer untouched for metered solar farms. That family's holdout starts at 2026-09-01 at the
-earliest.
-
-**The same-months shrinkage check pauses a family's adoptions only on evidence of shrinkage.** The
-check compares the holdout months with the same calendar months of the scored year (July to October
-2025 for the current holdout). Adoptions in the family pause when the one-sided 90% upper bound of
-the holdout months' cumulative gain lies below half of the cumulative gain on those same scored-year
-months. A month read for a decision, or for a pause investigation, joins the scored months, and the
-holdout rolls forward as new months arrive. In a simulation of a 12-month scored year and a 4-month
-holdout, the check paused the family after 29% of false adoptions, 7% of adoptions with a true gain
-of 2 standard errors, and 3% of adoptions with a true gain of 3 standard errors. The check
-understates the
-chance of a pause for a change whose effect is seasonal.
-
-## Several arms, post hoc arms, and experiments planned before the rule
-
-**An experiment may hold several default-plus-x arms, and at most one of them is adopted.** Each arm
-is read at the level 1 − 0.01/k, and the others become candidates that rebase on the new version. A
-bundle of two components is adopted as one change only when it was pre-registered as one change and
-its leave-one-out arms show neither component harmful.
-
-**Only a pre-registered arm can be adopted.** A post hoc arm becomes a candidate that needs a fresh
-experiment. When an experiment tests k variants of one change (tilt 20 and tilt 27, for example),
-the best variant needs replication on its own after the Bonferroni read.
+## Experiments planned before the rule
 
 **Experiments planned before the rule are grandfathered, and their winners reach the research
 default only through a rebase run.** Their front matter has no `kind`, and `experiment_tables.py
@@ -252,9 +128,9 @@ term improved the bare GAM-K by 0.40 points and worsened arm D by 0.03.
    revisits.
 
 **After every fifth adoption in a family, an ablation experiment removes each adopted component in
-turn.** The ablation is an experiment with its own id and a planned `result.md`. A component is
-dropped only when the interval of its removal lies wholly on the better side, or when its removal is
-non-inferior within the tolerance and the component sits in a higher complexity tier.
+turn.** The ablation is an experiment with its own id and a planned `result.md`. The
+[demand protocol](evaluation-protocol-demand.md#when-a-change-is-adopted) states when a component is
+dropped.
 
 ## Who adopts, and what the log holds
 
