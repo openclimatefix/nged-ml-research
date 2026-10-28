@@ -31,13 +31,13 @@ decision_rule: >-
   Contrasts (paired, month-resampled 99% intervals, Bonferroni for the four planned contrasts): C1,
   best head minus control at D8; C2, best head minus stored forecast at D2; C3, the same at D4; C4,
   the same pooled over the seven other Primaries. Supported when C1 is at or below -0.41 (half the
-gap to BG2 closes: D8 at 7.97 or lower), C2 and C3 are no more than +3% of the stored score, and C4
-is no more than +0.02 points. The threshold for C1 is set by the cost of a new pipeline step that
-every Primary would carry. Stop rule from the brief: if the best head closes under 25% of the gap
-(D8 above 8.18), or a placebo fails, stop band work. Placebo: the same head fitted on features
-permuted across rows within each site and month. The placebo fails if it scores within 0.05 points
-of, or better than, the real head at D8. Control gate: the script reproduces 8.382 at D8 for
-experiment 354's arm 3 before any head is read.
+  gap to BG2 closes: D8 at 7.97 or lower), C2 and C3 are no more than +3% of the stored score, and C4
+  is no more than +0.02 points. The threshold for C1 is set by the cost of a new pipeline step that
+  every Primary would carry. Stop rule from the brief: if the best head closes under 25% of the gap
+  (D8 above 8.18), or a placebo fails, stop band work. Placebo: the same head fitted on
+  features permuted across rows within each site and month. The placebo fails if it scores within
+  0.05 points of, or better than, the real head at D8. Control gate: the script reproduces 8.382 at
+  D8 for experiment 354's arm 3 before any head is read.
 benchmark: >-
   Experiment 354's best arm at D8 (fit b monthly, arm 3 band, 8.382; weekly 8.338 from experiment
   355 as a reference), the stored donated-spread forecast at the other Primaries, BG2, climatology,
