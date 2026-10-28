@@ -4,7 +4,7 @@ slug: mva-fold-pv-capacity-and-eight-primaries
 theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - solar-disaggregation
-status: planned
+status: finished
 kind: other
 size: >-
   medium. Stored: small result files in the private folder only. Production serving path: not
@@ -51,33 +51,115 @@ row_set_id: >-
 metric: >-
   Ratio of the chosen fit's last-season-year solar capacity to the signed fit's; the fit's share of
   sunny-midday training half-hours with reverse flow; mean absolute error on the reading in points of capacity
-verdict: ""
+verdict: partly supported
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-28
+best_arm: >-
+  the rule of experiment 366 choosing between L0 and N: capacity within 15% of the signed fit's at
+  6 of 6 signed-MW Primaries in both injection cases, and at D12 the reading error 9.3 points of
+  capacity below N's on sunny half-hours (scored cut)
+headline: >-
+  With reactive power zero, the chosen fit's solar capacity matches the signed fit's at all 6
+  signed-MW Primaries, and the fit through the meter finds reverse flow at Stickney (D12) and at no
+  other MVA-only Primary, including Marsh Lane (D8), which NGED marks "Yes".
+take_home_message: >-
+  With the meter's reactive power at zero, the rule of experiment 366 recovers each signed-MW
+  Primary's solar capacity to within 3% of the signed fit, and the fit through the meter reads
+  Stickney's heavy reverse flow far better than the naive fit. The fit through the meter does not
+  find reverse flow at Marsh Lane (D8) or Langrick (D22), so either those substations have little
+  reverse flow or the fit cannot see it. The pinned solar capacity is 45% and 58% above the signed
+  fit's at D9 and D16, which is a reason to treat the pin as a reference and not as the truth.
+lessons:
+  - >-
+    The fit through the meter does not invent reverse flow at the seven MVA-only Primaries other
+    than Stickney (D12), where experiment 365 feared it would, because their midday readings stay
+    far from zero.
+  - >-
+    The pinned capacity is within 25% of the signed fit's at 4 of 6 Primaries, and 45% to 58% too
+    high at D9 and D16.
+advice:
+  - >-
+    Read the fit through the meter's fitted reverse flow only at a substation whose rule statistics
+    pick it (Stickney, D12), and treat reverse flow it does not find at D8 and D22 as unproven (the
+    census table).
+  - >-
+    Compare the pinned capacity with a fit to the signed series before using it as truth at a
+    Primary, because it is 45% to 58% above that fit at D9 and D16 (figure 1).
+  - >-
+    Test the all-Primaries forecast stack with reactive power at power factor 0.97 before trusting
+    any MVA-only result, because the rule and the fit both fail there (experiments 358 and 366).
 ---
+
 
 # MVA fold: solar capacity and the eight MVA-only Primaries
 
-**Planned. Written before any score of this experiment is read.**
+**With reactive power zero, the chosen fit recovers the solar capacity at all six signed-MW
+Primaries, and the fit through the meter finds reverse flow at Stickney (D12) and nowhere else among
+the eight MVA-only Primaries.** We asked whether the rule of
+[experiment 366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md), which
+chooses between a fit that reads the meter reading as signed power (N) and a fit through the meter
+that can see reverse flow (L0), keeps the fitted solar capacity close to the capacity of a fit to
+the signed series (S), and where L0 finds reverse flow at the eight Primaries whose meters report
+only apparent power (MVA). The capacity of the chosen fit is within 3% of S's at all six signed-MW
+Primaries, with and without added solar output. L0 finds reverse flow at D12 and at no other
+MVA-only Primary, including Marsh Lane (D8), which NGED marks "Yes". Verdict: partly supported,
+because the capacity and D12 results hold and the prediction that L0 would invent reverse flow
+elsewhere failed.
 
-This is steps 2 and 3 of the MVA sequence. Experiment 366 registered a rule that chooses between
-the fit through the meter and the naive fit, and it fails at power factor 0.97: real MVA-only meters
-have unknown reactive power, so every result here holds only for reactive power zero. The rule is
-used exactly as experiment 366 registered it and is not tuned on the census.
+Every result holds for reactive power zero only. [Experiment 366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md)
+found that the rule fails at power factor 0.97, and real MVA-only meters have unknown reactive
+power. The rule is used as registered and was not tuned. The fits are frozen at the cut on past
+weather, as in [experiment 358](../00358-mva-fold-known-answer-at-folded-mw-primaries/result.md),
+which also holds the injection levels. The fitted capacity is the last season-year's at the cut;
+the 2025-07-01 cut uses no later rows. D9 is new; D5, D10, D11, D14, and D16 reuse experiment 358's
+cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capacity`.
 
-## Plan
+![Figure 1: capacity divided by the signed fit's capacity, six signed-MW Primaries, scored cut](figure_1_capacity_ratio_signed_primaries.svg)
 
-- **Capacity source.** Experiments 349 and 350 found no source better than the pinned capacity
-  (349's estimate scored 0.047 points worse, 350's capacity-free curve was not supported), so the
-  pin is the reference. The eight MVA-only Primaries have no pin, so there the fitted capacity is
-  reported without a reference.
-- **Signed-MW Primaries.** D9 is new; D5, D10, D11, D14 and D16 reuse the cells of experiment 358.
-  The cells are the three injection levels, at both cuts, with reactive power zero.
-- **Census.** L0 and N are fitted at the eight MVA-only Primaries at both cuts, frozen on past
-  weather as in experiment 358, and scored on the following year's readings. No signed truth
-  exists, so the raw reading is passed as the folded reading, and only reading error and fitted
-  reverse flow are reported. This needs a new script: experiment 358's cells cover only D5, D10,
-  D11, D14 and D16, so D9 and the eight MVA-only Primaries are new runs.
-- **Not covered.** Power factor 0.97; the all-16-Primaries forecast stack (a separate experiment,
-  planned only if this one passes); D15 and D18 (not MVA-only census members, handled there).
+![Figure 2: share of sunny training half-hours with fitted reverse flow by L0, eight MVA-only Primaries, scored cut](figure_2_census_fitted_reverse_flow.svg)
+
+## Results (reactive power zero, scored cut unless stated)
+
+- **P1 holds.** The chosen fit's capacity is within 15% of S's at 6 of 6 Primaries at level 0.0
+  (ratios 0.999 to 1.006) and at level 1.0 (0.991 to 1.030). The rule chooses N at D5, D11, D14, D16,
+  and D9 and L0 at D10 with no injection, and L0 everywhere at level 1.0. L0's own ratio at D5 with
+  no injection is 1.30, the placebo failure of experiment 358.
+- **P2 holds, narrowly.** The pin is within 25% of S's capacity at 4 of 6 at level 0.0: D5 1.07, D10
+  1.12, D11 1.14, D14 0.92. It is 1.45 at D9 and 1.58 at D16.
+- **P3 fails.** L0's fitted reverse-flow share of sunny training half-hours exceeds 50% at 1 of the
+  8 MVA-only Primaries at both cuts. At D12 it is 0.70 (scored) and 0.62 (replicate). At D8 and at
+  the other six it is at most 0.006. At D22 (NGED "Maybe") L0 and N have nearly the same capacity
+  (51.4 and 51.2), and at D8 they are identical, so L0 finds nothing there that N lacks.
+- **P4 holds.** At D12 the rule chooses L0 at both cuts, and L0's reading error on sunny half-hours
+  is 9.3 points of capacity below N's at the scored cut (16.2 against 25.5) and 10.7 below at the
+  replicate cut. At the seven others the chosen arm is N, so its error equals N's by construction.
+- **Rule statistics at the census.** D12 has correlation +0.55 and a 1st percentile of 26.7. The
+  seven others have correlations of -0.54 to -0.04 and 1st percentiles of 5.9 to 40.2, which
+  repeats experiment 366.
+- **Starting points disagree.** The six starting points of L0's fit disagree on capacity by 125
+  points at D12 and 176 at D4 (11 to 20 at D2, D8, D19, D21; under 0.2 at D3 and D22), so a single
+  fit's capacity at D4 or D12 is uncertain.
+
+## Checks
+
+- **Triggers.** Trigger 2 fired on P3, which contradicts experiment 365's finding that L0 fits
+  reverse flow on 96% to 97% of summer midday half-hours at D5. The explanation offered, not tested separately:
+  experiment 365 reported that figure at the signed-MW sites it checked, including D5 (where the readings dip towards zero), and the eight census
+  Primaries have 1st percentiles of 5.9 or more, so no mirror basin sits close to the data. Trigger
+  7 fired, because a planned all-16-Primaries experiment depends on this result and it has not been
+  replicated. An audit is required before merge: the series brief allows Sonnet only, so a fresh
+  Sonnet auditor runs it, as for experiment 358; its findings are triaged in the pull request.
+- **Median against mean forecast.** Not applicable: frozen point fits, no quantile forecasts.
+- **Mean forecast error beside each contrast.** The contrasts here are the reading errors and the
+  capacity ratios above.
+
+## Caveats and what to try next
+
+- No signed truth exists at the census Primaries. The claim that D12 has reverse flow and the others
+  have little rests on the NGED monitor file and
+  [experiment 110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md).
+  It is unconfirmed whether the fit cannot see reverse flow at D8 or D22 or whether there is none.
+- Frozen fits on past weather: no ensemble forecast, no quantiles, no Kalman filter.
+- The all-16-Primaries step should run the full forecast stack and must include the power factor
+  0.97 case, where the rule and the fit are known to fail.
