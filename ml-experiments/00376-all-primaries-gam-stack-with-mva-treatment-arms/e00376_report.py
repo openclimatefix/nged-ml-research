@@ -17,6 +17,7 @@ os.environ.setdefault("E00376_ARM", "a0")
 
 import altair as alt
 import e00376s2_common as s2common
+import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -57,9 +58,10 @@ def gate() -> None:
         joined = mine.join(
             stored[0], on=["power_fcst_init_time", "valid_time", "seed"], suffix="_s", how="inner"
         )
-        print(site, joined.height, (joined["q50"] - joined["q50_s"]).abs().max())
+        worst = np.abs((joined["q50"] - joined["q50_s"]).to_numpy()).max()
+        print(site, joined.height, worst)
         assert joined.height == mine.height
-        assert (joined["q50"] - joined["q50_s"]).abs().max() < 1e-6
+        assert worst < 1e-6
 
 
 def print_scores(*, scores: dict) -> None:
