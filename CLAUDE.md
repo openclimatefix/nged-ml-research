@@ -100,8 +100,7 @@ another study or experiment, from `studies.*` (`src/studies`), and from the prod
 
 **Experiments read and write the data folder that `DATA_PATH_INTERNAL` names.** Without that
 variable, the path helpers use `data/` in the main checkout. Experiment output goes under
-`data/ml-experiments/` and `data/studies/`. A later change gives experiments a data folder of their
-own.
+`data/ml-experiments/` and `data/studies/`.
 
 ### Running an experiment
 
