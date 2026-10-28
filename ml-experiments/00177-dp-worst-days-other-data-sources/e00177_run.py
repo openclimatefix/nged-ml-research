@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Final
 
 import numpy as np
-import openpyxl  # ty: ignore[unresolved-import]
+import openpyxl
 import polars as pl
 from studies.power import scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR

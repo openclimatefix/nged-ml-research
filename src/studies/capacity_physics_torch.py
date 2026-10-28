@@ -15,7 +15,8 @@ data outweigh the wide prior; the tuning draw chooses it.
 The refits happen every seventh day and warm-start from the previous refit's posterior, so the
 estimate for day `d` is the latest refit that ended on or before `d`, and it can be up to 6 days
 old. Every plant and every record (the original and each planted draw) fits in one batch, so a
-refit takes a few milliseconds on a GPU. Nothing outside `packages/studies` may import torch.
+refit takes a few milliseconds on a GPU. Nothing outside `src/studies` and the experiment folders
+may import torch.
 """
 
 from collections.abc import Mapping, Sequence

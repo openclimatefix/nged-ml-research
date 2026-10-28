@@ -71,7 +71,9 @@ or converting it with a fitted sign scored within 0.03 points at one bulk supply
 **Read power through the cleaned table, and read the raw table only when the question is about
 availability.** The cleaned table holds only unflagged rows
 (`nged_data.storage.scan_cleaned_power`). Applies to experiments and production. Evidence: the
-[data-cleaning roadmap page](../roadmap/data-cleaning.md) and [experiment
+[data-cleaning roadmap
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-cleaning/) and
+[experiment
 6](00006-stage1a-demand-input-feature-sweep/result.md), which scores on cleaned power.
 
 **Count a series' history from its first unflagged row, which is later than its first row of any

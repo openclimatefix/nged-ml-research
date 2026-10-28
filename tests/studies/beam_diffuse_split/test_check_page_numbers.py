@@ -1,6 +1,6 @@
 """Tests for the command line of `studies/beam_diffuse_split/check_page_numbers.py`.
 
-The rules themselves are tested in `packages/studies/tests/test_page_numbers.py`; these tests cover
+The rules themselves are tested in `tests/studies/test_page_numbers.py`; these tests cover
 what the script adds: reading its arguments, finding `intervals.parquet` beside the report, and
 raising on a mismatch.
 """

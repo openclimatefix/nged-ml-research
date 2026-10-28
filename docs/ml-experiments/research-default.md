@@ -9,7 +9,9 @@ one.
 
 **Adopting a change into the research default does not put the change into production.** The
 `release-model` skill governs production changes. This page says "research default" and "adopt"
-because [production deployment](../architecture/production-deployment.md) already uses "champion"
+because [production
+deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)
+already uses "champion"
 and "promote" for the deployed XGBoost model. Every version has a name made of the family, the words
 "research default", and a number N that counts up within the family from 1, for example "Primary
 demand research default 1" for the GAM stack A+H+S. "C1" and "C2" already name the planned contrasts

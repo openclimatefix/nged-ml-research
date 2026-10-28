@@ -1,0 +1,77 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        # Unified diffs need the single-space markers on blank context lines.
+        exclude: ^studies/wind_storage/variants/.*\.patch$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      # A Vega/Altair chart exported straight to SVG trips the hook's 500 KB default, because a
+      # plot of half-hourly data carries one path point per reading. Run the export through
+      # `npx svgo@4 --multipass --precision=1 --final-newline chart.svg` before committing it.
+      - id: check-added-large-files
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (--fix)
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types: [python]
+      # Markdown is in scope because ruff formats the Python inside a fenced code block, and CI
+      # runs `ruff format --check .` over the whole tree.
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, markdown]
+      - id: ty
+        name: ty
+        entry: uv run ty check --project .
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: pymarkdown
+        name: pymarkdown (markdown files)
+        entry: uv run pymarkdown scan
+        language: system
+        types: [markdown]
+        # The era-fold folder holds a generated report and one-line-paragraph notes.
+        exclude: ^(plans/|studies/era_fold_design/)
+      - id: lint-docstring-markdown
+        name: pymarkdown (Python docstrings)
+        entry: uv run python scripts/lint/lint_docstring_markdown.py
+        language: system
+        types: [python]
+        exclude: ^studies/era_fold_design/scripts/
+      # Ruff's D417 fires only when an `Args:` section is present and incomplete. pydoclint reads
+      # the signature and the docstring and compares them; `[tool.pydoclint]` in pyproject.toml
+      # says which of its checks this repo runs.
+      - id: pydoclint
+        name: pydoclint (docstrings match signatures)
+        entry: uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google
+        language: system
+        types: [python]
+      # A Sphinx cross-reference role reaches the published page as literal markup, because
+      # mkdocstrings parses these docstrings as Markdown and no extension interprets the role.
+      # Write plain backticks instead.
+      - id: no-sphinx-roles
+        name: no Sphinx cross-reference roles (they render as raw text)
+        entry: '(?<![\w:]):(?:py:)?[a-z]{2,10}:`'
+        language: pygrep
+        types_or: [python, markdown]
+      - id: check-experiment-front-matter
+        name: experiment front matter (experiment_tables --check)
+        entry: uv run python scripts/mkdocs_hooks/experiment_tables.py --check
+        language: system
+        files: ^docs/ml-experiments/
+        pass_filenames: false
+      # `mkdocs build --strict` only validates links inside docs/, so a link to the published site
+      # from a docstring, a comment, or a workflow file can point at a page that a rename moved.
+      - id: check-docs-links
+        name: docs links (check_docs_links)
+        entry: uv run python scripts/lint/check_docs_links.py
+        language: system
+        pass_filenames: false
+        always_run: true

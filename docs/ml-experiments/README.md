@@ -81,7 +81,9 @@ theme.** A planned experiment has a `result.md` with status `planned`, committed
 runs. An idea that has no folder yet is marked "proposed" in the priority table and carries a
 tentative id, P1, P2, and so on, which the proposal sections use as headings. A proposal receives
 its numeric id when its plan is committed, and the tentative id then disappears. The design under
-test is the [staged probabilistic forecast](../roadmap/staged-probabilistic-forecast.md), in which
+test is the [staged probabilistic
+forecast](https://openclimatefix.github.io/nged-substation-forecast/roadmap/staged-probabilistic-forecast/),
+in which
 stage 1 turns weather into power, stage 2 calibrates the result, uses lagged power, and blends
 weather products, and a coupling step restores coherent ensemble members.
 
@@ -94,7 +96,9 @@ planned contrasts the sample cannot resolve.
 
 **These experiments are flagged `candidate` and are not yet adopted.** The flags are proposals for
 the maintainer to confirm. The maintainer decides which candidates to port into a new model release.
-The [release log](../live_service/model-releases.md) records which experiments each release adopted.
+The [release
+log](https://openclimatefix.github.io/nged-substation-forecast/live_service/model-releases/) records
+which experiments each release adopted.
 
 <!-- candidates-table -->
 

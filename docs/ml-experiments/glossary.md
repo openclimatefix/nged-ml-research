@@ -60,7 +60,9 @@ against 5.260 for BG2.
 **A grid supply point (GSP) is a substation where the transmission network feeds NGED's distribution
 network, and a bulk supply point (BSP) is a substation one step further down.** NGED's GSPs step
 voltage from 400 kV or 275 kV to 132 kV, and its BSPs step from 132 kV to 33 kV or 66 kV ([NGED's
-network and its data](../background/network.md)). A Primary substation sits below a BSP. The trial
+network and its
+data](https://openclimatefix.github.io/nged-substation-forecast/background/network/)). A Primary
+substation sits below a BSP. The trial
 area holds two GSPs and two BSPs, and the experiments report them together as "supply points" or
 "BSP and GSP". The [data-processing page](data-processing.md#decide-which-rows-are-demand) says not
 to treat them as clean demand.
@@ -250,7 +252,9 @@ write-up marks a verdict that its decision rule does not cover as not pre-regist
 ### Primary substation
 
 **A Primary substation steps voltage down from 33 kV or 66 kV to 11 kV.** NGED operates 1,161
-Primary substations ([NGED's network and its data](../background/network.md)), and 16 of the 32
+Primary substations ([NGED's network and its
+data](https://openclimatefix.github.io/nged-substation-forecast/background/network/)), and 16 of the
+32
 trial series are Primaries. A Primary is fed from a bulk supply point, which is a higher-voltage
 substation (see [Bulk supply point and grid supply
 point](#bulk-supply-point-and-grid-supply-point)).
@@ -348,7 +352,7 @@ its write-up does not state, and there the stack is the frozen forecast plus the
 with no power lags and no lead time.** Stage 0 maps ENS weather toward the weather that stage 1a
 trained on (a quantile mapping in experiments 16 and 20). Stage 2 is a calibrator, a second XGBoost
 model that corrects the stage 1a quantiles and can use lagged power ([staged probabilistic
-forecast](../roadmap/staged-probabilistic-forecast.md)).
+forecast](https://openclimatefix.github.io/nged-substation-forecast/roadmap/staged-probabilistic-forecast/)).
 
 ### Tail coverage
 

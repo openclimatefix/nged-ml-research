@@ -7,7 +7,7 @@ from typing import Final
 
 from studies import figure_numbers
 
-REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
+REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 ASSETS_DIR: Final[Path] = REPO_ROOT / "docs" / "studies" / "assets"
 SOLAR_SVG_PREFIXES: Final[tuple[str, ...]] = ("sunshine_", "ens_past_solar_", "station_past_solar_")
 WIND_SVG_PREFIXES: Final[tuple[str, ...]] = ("wind_", "ens_hres_wind_", "station_wind_")

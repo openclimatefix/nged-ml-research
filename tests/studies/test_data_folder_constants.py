@@ -33,7 +33,7 @@ from studies.sources import (
 
 from studies import sources
 
-REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
+REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 
 PRODUCT_FOLDERS: Final[dict[str, str]] = {
     "ERA5_PRODUCT_DIR": "downloads/reanalysis/ERA5",
@@ -174,7 +174,7 @@ HAND_WRITTEN_FOLDER_NAMES: Final[frozenset[str]] = frozenset(
 
 SCANNED_FOLDERS: Final[tuple[Path, ...]] = (
     REPO_ROOT / "studies",
-    REPO_ROOT / "packages" / "studies" / "src",
+    REPO_ROOT / "src" / "studies",
 )
 FROZEN_FOLDER: Final[str] = "era_fold_design"
 

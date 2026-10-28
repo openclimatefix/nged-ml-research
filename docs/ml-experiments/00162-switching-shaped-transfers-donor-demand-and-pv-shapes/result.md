@@ -144,7 +144,9 @@ earlier experiments, which both detectors find as easily as a constant transfer.
 
 **We asked whether the power a transfer moves follows the donor's demand and solar shapes, and
 whether injecting a constant number of megawatts flatters the detectors.** The idea comes from the
-roadmap's [magnitude-only mixture model](../../roadmap/switching-events.md): a switch moves houses,
+roadmap's [magnitude-only mixture
+model](https://openclimatefix.github.io/nged-substation-forecast/roadmap/switching-events/): a
+switch moves houses,
 factories, and solar sites, not a constant. Part 1 split the convex model of [experiment
 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md) (a generalised additive model, GAM)
 into its demand term and its solar term, and fitted each logged transfer's effect on the donor's

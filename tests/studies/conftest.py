@@ -1,4 +1,4 @@
-"""Fixtures shared by the tests of `packages/studies`.
+"""Fixtures shared by the tests of `src/studies`.
 
 `dp_synthetic_inputs` writes small input files in the schemas that experiment 103 and the weather
 files use, and `dp_synthetic_cache` builds the differentiable-physics feature cache from them with

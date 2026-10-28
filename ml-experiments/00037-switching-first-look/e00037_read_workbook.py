@@ -7,7 +7,7 @@ Run with `uv run --no-project --with openpyxl --with polars python e00037_read_w
 import datetime as dt
 import sys
 
-import openpyxl  # ty: ignore[unresolved-import]
+import openpyxl
 import polars as pl
 
 
