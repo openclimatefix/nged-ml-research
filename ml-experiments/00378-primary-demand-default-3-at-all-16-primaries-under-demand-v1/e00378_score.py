@@ -50,8 +50,8 @@ def stored_arms(*, site: str) -> dict[str, pl.DataFrame]:
     low = pl.read_parquet(common.ARMS_DIR / f"low_lead_{source}.parquet").filter(pl.col("site") == site)
     long = pl.read_parquet(common.ARMS_DIR / f"long_lead_{source}.parquet").filter(pl.col("site") == site)
     time_keys = KEYS[1:]
-    low_x1 = low.select(time_keys, *[pl.col(f"x1_{q}").alias(f"low_{q}") for q in Q])
-    long_d3 = long.select(time_keys, *[pl.col(f"d3_{q}") for q in Q])
+    low_x1 = low.select(*time_keys, *[pl.col(f"x1_{q}").alias(f"low_{q}") for q in Q])
+    long_d3 = long.select(*time_keys, *[pl.col(f"d3_{q}") for q in Q])
     # Experiment 377's frames carry `time_series_id`; the arms' files do not, so join on the two
     # time keys, site by site.
     joined = base.join(low_x1, on=time_keys, how="left").join(long_d3, on=time_keys, how="left")
@@ -178,6 +178,33 @@ def main() -> None:
         print(t.group_by("group", "metric").agg(pl.col("value").mean()).pivot(on="metric", index="group", values="value").sort("group"))
     print("\n== Tail measures per Primary, default_3, slice lead_days_1_10 ==")
     print(scored["default_3"].filter(pl.col("slice") == HEADLINE_BAND, pl.col("metric").is_in(tails)).pivot(on="metric", index=["label", "group"], values="value").sort("group", "label"))
+    print("\n== MAE of the median beside the CRPS contrasts (99%, 20,000 resamples), lead_days_1_10 ==")
+    for treatment, ref in (("default_3", "bg2"), ("default_3", "default_1"), ("default_3", "manual_heuristic")):
+        for gname, where in groups.items():
+            result = metrics.headline_month_bootstrap_contrast(
+                treatment=rows[treatment], reference=rows[ref], metric="mae_median",
+                where=where & pl.col(HEADLINE_BAND), slice_table=table,
+            )
+            print(
+                f"{treatment} - {ref:18s} {gname:38s} {result['difference']:+.3f} "
+                f"({result['lower']:+.3f} to {result['upper']:+.3f})"
+            )
+    print("\n== Leave-one-out default_3 - bg2 and default_3 - default_1 (95%), lead_days_1_10 ==")
+    for gname, labels in (
+        ("signed-MW", ["D5", "D9", "D10", "D11", "D14", "D16"]),
+        ("MVA-only", ["D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22"]),
+    ):
+        for ref in ("bg2", "default_1"):
+            for left_out in labels:
+                keep = pl.col("label").is_in([x for x in labels if x != left_out])
+                result = metrics.month_bootstrap_contrast(
+                    treatment=rows["default_3"], reference=rows[ref], metric="crps",
+                    where=keep & pl.col(HEADLINE_BAND), slice_table=table,
+                )
+                print(
+                    f"{gname:10s} vs {ref:10s} without {left_out:4s} {result['difference']:+.3f} "
+                    f"({result['lower']:+.3f} to {result['upper']:+.3f})"
+                )
     print("\n== Median minus mean of default_3's stored stage 2, per site, in points ==")
     print(
         pl.concat(
