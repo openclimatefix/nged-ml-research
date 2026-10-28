@@ -139,8 +139,8 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
   seven others have correlations of -0.54 to -0.04 and 1st percentiles of 5.9 to 40.2, which
   repeats experiment 366.
 - **Starting points disagree.** The six starting points of L0's fit disagree on capacity by 125
-  points at D12 and 176 at D4 (11 to 20 at D2, D8, D19, D21; under 0.2 at D3 and D22; scored cut), so a single
-  fit's capacity at D4 or D12 is uncertain.
+  points at D12 and 176 at D4 (11 to 20 at D2, D8, D19, D21; under 0.2 at D3 and D22; scored cut),
+  so a single fit's capacity at D4 or D12 is uncertain.
 
 ## Checks
 
