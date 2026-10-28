@@ -31,10 +31,10 @@ prediction: >-
   a third of that bias.
 decision_rule: >-
   Screening runs at monthly refits (12 refits, P-roll recipe is not used: whole-history, half-life
-  0.5 years, 500 rounds, as experiment 87). Contrasts, pre-registered: C1 to C4, each candidate arm
+  0.5 years, 500 rounds, as experiment 87). Contrasts, pre-registered: C1 to C7 (A1 to A5 give seven arms), each candidate arm
   minus the monthly control, CRPS at days 1 to 10 in points of effective capacity, pooled per group,
-  paired month-resampled bootstrap of `studies.eval_protocol`, read at the 99% level with k = 4
-  (level 1 - 0.01/4, 20,000 resamples). An arm is kept when its interval lies wholly below zero in
+  paired month-resampled bootstrap of `studies.eval_protocol`, read at the 99% level with k = 7
+  (level 1 - 0.01/7, 20,000 resamples). An arm is kept when its interval lies wholly below zero in
   the signed-MW group or the MVA-only group and it breaks no tolerance of the protocol's table.
   The kept arms form one bundle, fitted weekly as the final arm (C5: bundle minus the stored weekly
   baseline) and scored against the stack (C6: bundle minus stack, per Primary and per group, 99%
@@ -84,6 +84,18 @@ the local hour and day of week, the distance to the nearest bank holiday and to 
   shortwave. A second variant reads the rule-chosen fit of experiments 366 and 374 as an input column
   if the stored fit exists for the run origins and uses data from before each origin only; the plan
   records at the start of the work whether it does, and drops the variant otherwise.
+- **A5, recency (maintainer, 2026-10-28).** Experiments 17 and 34 found that a half-life of 0.5 years
+  beats 2 years by 0.03 to 0.15 points (experiment 34) and that a 12-month sliding window is about as
+  good (experiment 17: -0.92 for the half-life, -0.84 for the window, against an expanding window), while a
+  6-month window is worse. The control already uses 0.5 years, so the arms test the neighbours:
+  `hl025` (0.25 years), `hl1` (1 year), and `win12` (a 365-day window with the 0.5-year half-life).
+  The half-lives are fixed here and not chosen on tuning months, which lie before the scored year.
+- **A6, GAM shapes as XGBoost inputs (optional, only if time allows).** Not run in this experiment.
+  It would fit the GAM per fold on that fold's training window only, take its fitted partial effects
+  for time of day, day of week, and temperature and its stage-1 fitted value, and give the training
+  rows out-of-fold values (the GAM refitted with each training month held out in turn) so that no row
+  sees an in-sample fit; the scored rows use the fold's full-window fit. This needs the GAM stack
+  fitted on 12 held-out-month folds per refit, so it is a separate experiment.
 - **Bundle.** The arms kept by the decision rule, fitted weekly.
 
 ## Diagnostics before the arms

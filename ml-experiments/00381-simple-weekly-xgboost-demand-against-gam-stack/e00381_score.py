@@ -5,7 +5,7 @@ Two modes:
 - `screen`: the monthly arms (control plus the candidates) against the monthly control. Prints the
   reference gate (the refitted control against the stored monthly member `only_M` of experiment
   379), then each arm's CRPS minus the control's at days 1 to 10, per group (99.75% interval,
-  20,000 resamples, the Bonferroni level for k = 4) and per Primary (95%), and the slices the arm
+  20,000 resamples, the Bonferroni level for k = 7) and per Primary (95%), and the slices the arm
   aims at (Economy 7 step hours, sunny daylight half-hours).
 - `final`: the weekly bundle against the stored weekly member `only_W`, the GAM stack of experiment
   377, BG2, `manual_heuristic`, and `climatology`. Prints the per-Primary table, the Primaries
@@ -35,7 +35,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR
 WORK: Final[Path] = DATA / "00381-simple-weekly-xgboost-demand-against-gam-stack" / "work"
 E379_ARMS: Final[Path] = DATA / "00379-bg2-components-all-16-primaries-to-14-days" / "work" / "arms"
-SCREEN_LEVEL: Final[float] = 100 * (1 - 0.01 / 4)
+SCREEN_LEVEL: Final[float] = 100 * (1 - 0.01 / 7)
 SCREEN_RESAMPLES: Final[int] = 20_000
 HEADLINE: Final[str] = base.HEADLINE_BAND
 MATCH_TOLERANCE: Final[float] = 0.05
@@ -351,7 +351,9 @@ def main() -> None:
     pl.Config.set_tbl_width_chars(250)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("screen", "final"))
-    parser.add_argument("--arms", nargs="+", default=["e7", "solar", "leadw", "sunny"])
+    parser.add_argument(
+        "--arms", nargs="+", default=["e7", "solar", "leadw", "sunny", "hl025", "hl1", "win12"]
+    )
     parser.add_argument("--bundle", default="bundle_e7+solar")
     args = parser.parse_args()
     series = adapter.series_table()

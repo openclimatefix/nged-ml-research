@@ -16,6 +16,8 @@ Arms (the control changes nothing):
 - `leadw`: row weights use a half-life of 0.25 years at leads under 48 hours and 1 year beyond.
 - `sunny`: adds a sunny flag (shortwave over the Haurwitz clear-sky irradiance above 0.6) and its
   product with shortwave.
+- `hl025`, `hl1`: the single half-life changed to 0.25 or 1 year. `win12`: only rows from the last
+  365 days before the refit, with the 0.5-year half-life.
 - `bundle_<names>`: the arms joined by `+`, for example `bundle_e7+solar`.
 
 ```bash
@@ -31,7 +33,7 @@ import multiprocessing
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -58,6 +60,12 @@ SHORT_LEAD_HOURS: Final[float] = 48.0
 SHORT_LEAD_HALF_LIFE_DAYS: Final[float] = 0.25 * 365.25
 LONG_LEAD_HALF_LIFE_DAYS: Final[float] = 1.0 * 365.25
 SMOKE_ROUNDS: Final[int] = 20
+RECENCY_ARMS: Final[dict[str, tuple[float | None, int | None]]] = {
+    "hl025": (0.25, None),
+    "hl1": (1.0, None),
+    "win12": (None, 365),
+}
+"""Recency arms: a half-life in years, or a sliding window in days (rows older are dropped)."""
 MVA_ONLY: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
 
 
@@ -70,6 +78,8 @@ class Arm:
     solar: bool = False
     sunny: bool = False
     lead_weights: bool = False
+    half_life_years: float | None = None
+    window_days: int | None = None
 
     def extra_columns(self) -> list[str]:
         """Return the added input columns in matrix order."""
@@ -87,7 +97,7 @@ class Arm:
 def make_arm(*, name: str) -> Arm:
     """Return the arm called `name`; `bundle_a+b` joins the changes of arms `a` and `b`."""
     parts = name.removeprefix("bundle_").split("+") if name.startswith("bundle_") else [name]
-    unknown = set(parts) - {"control", "e7", "solar", "leadw", "sunny"}
+    unknown = set(parts) - {"control", "e7", "solar", "leadw", "sunny", *RECENCY_ARMS}
     if unknown:
         msg = f"unknown arm parts {sorted(unknown)}"
         raise ValueError(msg)
@@ -97,6 +107,8 @@ def make_arm(*, name: str) -> Arm:
         solar="solar" in parts,
         sunny="sunny" in parts,
         lead_weights="leadw" in parts,
+        half_life_years=next((RECENCY_ARMS[p][0] for p in parts if p in RECENCY_ARMS), None),
+        window_days=next((RECENCY_ARMS[p][1] for p in parts if p in RECENCY_ARMS), None),
     )
 
 
@@ -151,6 +163,8 @@ def train_matrix(*, known: pl.DataFrame, row: dict, refit: datetime, arm: Arm) -
             SHORT_LEAD_HALF_LIFE_DAYS,
             LONG_LEAD_HALF_LIFE_DAYS,
         )
+    elif arm.half_life_years is not None:
+        half_life = arm.half_life_years * 365.25
     else:
         half_life = common.SHORT_HALF_LIFE_DAYS
     return xgb.DMatrix(
@@ -205,6 +219,8 @@ def run_job(
             refit=refit,
             config=config,
         )
+        if arm.window_days is not None:
+            known = known.filter(pl.col("valid_time") > refit - timedelta(days=arm.window_days))
         models[site] = xgb.train(
             fd.parameters(config=config, seed=seed, nthread=nthread),
             train_matrix(known=known, row=row, refit=refit, arm=arm),
