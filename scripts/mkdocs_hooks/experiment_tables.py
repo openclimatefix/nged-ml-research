@@ -290,12 +290,23 @@ def fill_placeholders(*, markdown: str, src_path: str, experiments: Sequence[Exp
     )
 
 
+_experiments_this_build: list[Experiment] | None = None
+"""The experiments that `on_config` loaded, which every page of the same build reuses.
+
+Parsing the front matter of every experiment once per page took 98% of the build time. `on_config`
+runs at the start of every build, including each rebuild under `mkdocs serve`, so the list is never
+stale.
+"""
+
+
 def on_config(config: Any) -> Any:
     """MkDocs hook: fail the build if any `result.md` front matter is invalid."""
+    global _experiments_this_build  # noqa: PLW0603
     experiments = load_experiments(experiments_dir=EXPERIMENTS_DIR)
     errors = validate_experiments(experiments=experiments, experiments_dir=EXPERIMENTS_DIR)
     if errors:
         raise ValueError("Invalid experiment front matter:\n" + "\n".join(errors))
+    _experiments_this_build = experiments
     return config
 
 
@@ -304,7 +315,9 @@ def on_page_markdown(markdown: str, page: Any, config: Any, files: Any) -> str:
     return fill_placeholders(
         markdown=markdown,
         src_path=page.file.src_path.replace("\\", "/"),
-        experiments=load_experiments(experiments_dir=EXPERIMENTS_DIR),
+        experiments=_experiments_this_build
+        if _experiments_this_build is not None
+        else load_experiments(experiments_dir=EXPERIMENTS_DIR),
     )
 
 
