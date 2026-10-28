@@ -58,6 +58,8 @@ def gate() -> None:
             stored[0], on=["power_fcst_init_time", "valid_time", "seed"], suffix="_s", how="inner"
         )
         print(site, joined.height, (joined["q50"] - joined["q50_s"]).abs().max())
+        assert joined.height == mine.height
+        assert (joined["q50"] - joined["q50_s"]).abs().max() < 1e-6
 
 
 def print_scores(*, scores: dict) -> None:

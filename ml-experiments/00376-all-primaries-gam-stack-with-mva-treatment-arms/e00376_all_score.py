@@ -56,7 +56,7 @@ def stack_frames(*, site: str) -> dict[str, pl.DataFrame]:
 def e7_flag(*, frame: pl.DataFrame) -> pl.Series:
     """Return whether each valid time is one of the four half-hours at the Economy 7 edges."""
     local = frame["valid_time"].dt.convert_time_zone("Europe/London")
-    key = local.dt.hour() * 100 + local.dt.minute()
+    key = local.dt.hour().cast(pl.Int32) * 100 + local.dt.minute().cast(pl.Int32)
     return key.is_in([30, 100, 730, 800]).alias("e7_step")
 
 

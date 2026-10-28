@@ -33,7 +33,7 @@ decision_rule: >-
   or above +0.10 or the whole interval lies above zero by more than 0.10; otherwise
   `inconclusive`. MVA-only group: the contrast of the chosen fit minus the naive fit is
   descriptive, and the gap to BG2 is reported with and without D8. The threshold of +0.10 is zero
-  cost to port, because the stack already exists; it follows experiment 374's non-inferiority
+  porting work, because the stack already exists; it follows experiment 374's non-inferiority
   margin. D15 and D18 are scored against references only if the stack cannot be fitted. One verdict
   per group, never one for all 16.
 benchmark: >-
@@ -61,12 +61,13 @@ take_home_message: >-
   One recipe gives the same average score as BG2 at the six Primaries that report signed megawatts,
   but one year of data cannot rule out a gap of up to 0.13 points, and the stack is worse than BG2
   on sunny half-hours and better on cold nights. At the eight Primaries that report only apparent
-  power, the gap to BG2 is a Marsh Lane (D8) gap, and the rule that picks the fit adds only 0.03
-  points over the naive fit, all of it at Stickney (D12). This holds for reactive power zero only.
+  power, the gap to BG2 is a Marsh Lane (D8) gap, and the rule that picks the fit scores 0.03
+  points better than the naive fit, within noise and all of it at Stickney (D12).
+  This holds for reactive power zero only.
 lessons:
   - >-
-    The architecture is not what separates the MVA-only Primaries from the signed-MW ones: without
-    D8 the MVA-only gap to BG2 (+0.07) is about the size of the signed-MW interval's upper end.
+    Without D8 the MVA-only gap to BG2 (+0.07, -0.03 to +0.17) lies inside the signed-MW interval
+    (-0.17 to +0.13), so the data show no architecture gap that D8 does not explain.
   - >-
     The stack's lower tail is too narrow at both groups (q05 coverage 0.072 at the six signed-MW
     Primaries, 0.112 at the eight MVA-only ones, against 0.041 and 0.040 for BG2).
@@ -86,12 +87,18 @@ date: 2026-10-28
 # One GAM stack at all 16 Primaries, with the MVA treatment as an explicit arm
 
 **One stack, run unchanged, scores level with BG2 on average at the six Primaries that report signed
-megawatts, but one year of data cannot rule out a gap of 0.13 points, and the stack is worse than
-BG2 on sunny half-hours.** BG2 is the production-style forecast. Stack minus BG2 over all
+megawatts. One year of data cannot rule out a gap of 0.13 points. The stack is worse than BG2 on
+sunny half-hours.** A Primary is a 33 kV to 11 kV substation. The stack is a two-stage additive
+forecast (a generalised additive model with a correction stage) fitted separately at each Primary.
+BG2 is the production-style forecast that the stack is compared with. A score is the quantile score
+(twice the mean pinball loss over 11 quantiles), and a negative difference means the stack is
+better. Stack minus BG2 over all
 half-hours, pooled over the six, is -0.02 points of effective capacity (percent of a Primary's
-capacity; 95% interval -0.17 to +0.13). The registered bar was an upper end below +0.10, so the
-verdict for that group is inconclusive. The sunny-daylight gap is +0.46 (+0.20 to +0.70). Winter and
-cold nights go the other way (-0.29 and -0.44). Every result holds for reactive power zero.
+capacity; 95% interval -0.17 to +0.13). The pre-registered bar was an interval whose upper end is
+below +0.10, so the
+verdict for that group is inconclusive (neither supported nor not supported). The sunny-daylight gap
+is +0.46 (+0.20 to +0.70). Winter half-hours
+and cold nights go the other way (-0.29 and -0.44). Every result holds for reactive power zero.
 
 We asked whether the best-guess stack of [experiment
 252](../00252-gam-stack-at-eight-more-primaries/result.md), with stage 2, scores as well as BG2 at
@@ -122,8 +129,8 @@ fit at all eight minus BG2 is +0.57 (+0.40 to +0.75). The rule-chosen fit minus 
   interval includes zero. Stack minus the manual heuristic is -0.70 (-0.96 to -0.44), and minus
   climatology -0.97 (-1.31 to -0.65).
 - **Slices, stack minus BG2, signed-MW group.** Sunny daylight +0.46 (+0.20 to +0.70); winter
-  nights -0.17 (-0.30 to +0.03); cold nights -0.44 (-0.95 to -0.00); Economy 7 step +0.10 (-0.02 to
-  +0.22). Registered prediction P1 (between -0.20 and +0.20) holds.
+  nights -0.17 (-0.30 to +0.03); cold nights -0.44 (-0.95 to -0.00); Economy 7 step -0.06 (-0.16 to
+  +0.04). Registered prediction P1 (between -0.20 and +0.20) holds.
 - **Absolute scores, all half-hours (stack, BG2, manual heuristic, climatology).** D5 3.52, 3.38,
   3.90, 4.26; D9 2.38, 2.40, 2.91, 3.00; D10 3.22, 3.28, 4.13, 4.31; D11 2.35, 2.51, 3.39, 3.55;
   D14 2.09, 2.25, 2.95, 3.45; D16 2.67, 2.55, 3.15, 3.49.
@@ -135,15 +142,14 @@ fit at all eight minus BG2 is +0.57 (+0.40 to +0.75). The rule-chosen fit minus 
 - **D8 on its own.** Chosen and naive fits score 11.37, BG2 7.59, climatology 9.76, manual
   heuristic 8.47. D8 is the only Primary where the stack trails climatology.
 - **Slices, chosen minus BG2, MVA-only group.** Sunny daylight +0.65 (+0.41 to +0.90); winter nights
-  +0.28 (+0.16 to +0.39); cold nights -0.12 (-0.26 to +0.13); Economy 7 step +0.71 (+0.29 to
-  +1.26).
+  +0.28 (+0.16 to +0.39); cold nights -0.12 (-0.26 to +0.13); Economy 7 step +0.60 (+0.33 to
+  +0.90).
 - **D18 (third group).** The stack fits with 12 monthly fits and borrows its spread from the six
   signed-MW Primaries. Stack 2.81, BG2 2.78, manual heuristic 4.09, climatology 12.13; stack minus
   BG2 +0.04 (-0.60 to +1.01) on 61,519 rows, one Primary and few months, so the interval is wide.
 - **D15 (third group).** No ensemble store exists and fetching one was out of scope, so only
   references are scored: BG2 11.27, manual heuristic 17.02, climatology 35.14 (experiment 372).
-- **Pooled training.** Not run: it needs machinery that does not exist (the brief allowed it only
-  if the plan found no new machinery).
+- **Pooled training.** Not run: it needs machinery that does not exist .
 - **Tail calibration** (share of readings at or below each quantile, mean over the Primaries of
   the group; ideal 0.01, 0.05, 0.95, 0.99; pinball loss not computed). Signed-MW stack: 0.024,
   0.072, 0.946, 0.982; BG2: 0.010, 0.041, 0.944, 0.983. MVA-only chosen fit: 0.054, 0.112, 0.916,
@@ -165,7 +171,8 @@ fit at all eight minus BG2 is +0.57 (+0.40 to +0.75). The rule-chosen fit minus 
   without D5 and +0.11 to +0.17 without any other Primary. The point estimate flips sign without
   D11 or D14 (+0.01), so trigger 4 fired for the sign. The verdict is inconclusive in all six
   leave-one-out runs, except that leaving out D5 would meet the +0.10 bar.
-- **Triggers.** Trigger 4 fired as described. Triggers 1 (the gate passed), 3, 5 (no nested arm in
+- **Triggers.** Trigger 4 (a leave-one-out run flips the sign of a contrast) fired as described.
+  Triggers 1 (the gate passed), 3, 5 (no nested arm in
   the signed-MW group; D8's stage-2 worsening is experiment 374's finding), 6, and 7 did not fire.
   Trigger 2: P4 contradicts its prediction, and the explanation is untested. No Opus audit ran,
   because the brief allows Sonnet only and the verdict does not depend on trigger 4: the
