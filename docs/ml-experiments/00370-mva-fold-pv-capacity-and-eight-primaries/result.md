@@ -66,16 +66,16 @@ headline: >-
   other MVA-only Primary, including Marsh Lane (D8), which NGED marks "Yes".
 take_home_message: >-
   With the meter's reactive power at zero, the rule of experiment 366 recovers each signed-MW
-  Primary's solar capacity to within 3% of the signed fit, and the fit through the meter reads
-  Stickney's heavy reverse flow far better than the naive fit. The fit through the meter does not
+  Primary's solar capacity to within 3.1% of the signed fit, and the fit through the meter fits
+  Stickney's sunny-half-hour readings far better than the naive fit. The fit through the meter does not
   find reverse flow at Marsh Lane (D8) or Langrick (D22), so either those substations have little
   reverse flow or the fit cannot see it. The pinned solar capacity is 45% and 58% above the signed
   fit's at D9 and D16, which is a reason to treat the pin as a reference and not as the truth.
 lessons:
   - >-
-    The fit through the meter does not invent reverse flow at the seven MVA-only Primaries other
-    than Stickney (D12), where experiment 365 feared it would, because their midday readings stay
-    far from zero.
+    The fit through the meter reports reverse flow at none of the seven MVA-only Primaries other
+    than Stickney (D12), where experiment 365 feared it would invent some. Without signed truth
+    there, this does not show that none exists.
   - >-
     The pinned capacity is within 25% of the signed fit's at 4 of 6 Primaries, and 45% to 58% too
     high at D9 and D16.
@@ -101,11 +101,12 @@ the eight MVA-only Primaries.** We asked whether the rule of
 chooses between a fit that reads the meter reading as signed power (N) and a fit through the meter
 that can see reverse flow (L0), keeps the fitted solar capacity close to the capacity of a fit to
 the signed series (S), and where L0 finds reverse flow at the eight Primaries whose meters report
-only apparent power (MVA). The capacity of the chosen fit is within 3% of S's at all six signed-MW
+only apparent power (MVA). The capacity of the chosen fit is within 3.1% of S's at all six signed-MW
 Primaries, with and without added solar output. L0 finds reverse flow at D12 and at no other
-MVA-only Primary, including Marsh Lane (D8), which NGED marks "Yes". Verdict: partly supported,
-because the capacity and D12 results hold and the prediction that L0 would invent reverse flow
-elsewhere failed.
+MVA-only Primary, including Marsh Lane (D8), which NGED marks "Yes". Verdict: partly supported.
+The capacity and D12 results hold. The second half of the hypothesis, that L0 finds reverse flow at
+the substations NGED marks "Yes" or "Maybe", was refuted, and so was the prediction P3 that L0
+would invent reverse flow elsewhere.
 
 Every result holds for reactive power zero only. [Experiment 366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md)
 found that the rule fails at power factor 0.97, and real MVA-only meters have unknown reactive
@@ -138,7 +139,7 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
   seven others have correlations of -0.54 to -0.04 and 1st percentiles of 5.9 to 40.2, which
   repeats experiment 366.
 - **Starting points disagree.** The six starting points of L0's fit disagree on capacity by 125
-  points at D12 and 176 at D4 (11 to 20 at D2, D8, D19, D21; under 0.2 at D3 and D22), so a single
+  points at D12 and 176 at D4 (11 to 20 at D2, D8, D19, D21; under 0.2 at D3 and D22; scored cut), so a single
   fit's capacity at D4 or D12 is uncertain.
 
 ## Checks
