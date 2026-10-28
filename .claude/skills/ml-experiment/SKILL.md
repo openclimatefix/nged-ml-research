@@ -158,8 +158,9 @@ model trains or scores on it.
   `experiment_store.read_predictions(experiment_id=..., name=..., row_set_id=...)`. The function
   raises when the set covers a different row set, because scores on different rows are not
   comparable. `fold_a_tuesdays_v1` is the stage 1 pilot's row set (53 runs, all on Tuesdays, and
-  the 9 generator series), and the family's evaluation protocol names the current row set. State a different `row_set_id` in the plan, with the
-  reason, when the experiment needs different rows. No experiment scores a valid time on or after
+  the 9 generator series), and the family's evaluation protocol names the current row set.
+  State a different `row_set_id` in the plan, with the reason, when the experiment needs different
+  rows. No experiment scores a valid time on or after
   2026-07-01, which is kept for a finalist.
 - **Interval.** Build the loss frame with `experiment_store.losses_for_bootstrap`, which pairs rows
   on the run and the valid time together and refuses arms with different seeds. Read each planned
