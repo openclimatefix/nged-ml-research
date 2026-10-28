@@ -11,7 +11,7 @@ Primaries' spread, as in experiment 353.
 | `n2` | the re-run of arm N plus stage-2 arm d |
 | `l02` | the re-run of arm A (the fit through the meter) plus stage-2 arm d |
 | `chosen2` | `l02` at D12, where experiment 366's rule picks it; else `n2` |
-| `n_raw`, `l0_raw`, `chosen_raw` | the same arms without stage 2 (the control against experiment 372) |
+| `n_raw`, `l0_raw`, `chosen_raw` | the same arms without stage 2 (control for experiment 372) |
 
     PYTHONPATH=ml-experiments/00252-gam-stack-at-eight-more-primaries \
         uv run --no-sync python ml-experiments/00374-*/e00374_score.py
