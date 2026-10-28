@@ -17,7 +17,8 @@ experiment 377's stored `a2`; with the filter off it is `e00380_kalman_off.py`'s
 | `drop_f` | on | on | on | stage 1 tuning months |
 
     PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility \
-    E00377_SOURCE=control E00377_ARM=a0 uv run --no-sync python ml-experiments/00380-*/e00380_arms.py
+    E00377_SOURCE=control E00377_ARM=a0 uv run --no-sync python \
+        ml-experiments/00380-*/e00380_arms.py
 """
 
 import os
@@ -26,9 +27,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
-import e00377s2_common as common
-import e00377s2_corrections as corr
-import e00377s3_stack as stack
+import e00377s2_common as common  # ty: ignore[unresolved-import]
+import e00377s2_corrections as corr  # ty: ignore[unresolved-import]
+import e00377s3_stack as stack  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.dp_features import default_input_paths, load_or_build_feature_cache
@@ -71,9 +72,7 @@ def read_base(*, site: str, kalman: bool) -> pl.DataFrame:
         for period in common.PERIODS
         if (folder / f"a2_{period}_{site}.parquet").exists()
     ]
-    return corr.add_calendar(
-        frame=pl.concat(pieces).sort(["power_fcst_init_time", "valid_time"])
-    )
+    return corr.add_calendar(frame=pl.concat(pieces).sort(["power_fcst_init_time", "valid_time"]))
 
 
 def shifted(*, base: pl.DataFrame, offset: bool, recipe_r: bool) -> tuple[pl.DataFrame, np.ndarray]:
@@ -115,12 +114,12 @@ def build_site(*, site: str, first: datetime, arm_names: list[str]) -> dict[str,
         frame, shift = shifted(base=base, offset=offset, recipe_r=recipe_r)
         if fold:
             if site == "D8":
-                months = stack.eligible_months(first_reading=first, first_month=stack.D8_FIRST_OWN_MONTH)
+                months = stack.eligible_months(
+                    first_reading=first, first_month=stack.D8_FIRST_OWN_MONTH
+                )
             else:
                 months = stack.eligible_months(first_reading=first)
-            result = stack.with_fold_spread(
-                frame=frame, pools=[frame], months=months, arm=name
-            )
+            result = stack.with_fold_spread(frame=frame, pools=[frame], months=months, arm=name)
         else:
             result = base.with_columns(
                 pl.Series("mean", frame["mean"]),

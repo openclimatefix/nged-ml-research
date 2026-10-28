@@ -11,8 +11,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-import e00377_adapter as adapter
-import e00377_score as base
+import e00377_adapter as adapter  # ty: ignore[unresolved-import]
+import e00377_score as base  # ty: ignore[unresolved-import]
 import polars as pl
 from studies.dp_features import default_input_paths, load_or_build_feature_cache
 from studies.eval_protocol import metrics
@@ -53,7 +53,7 @@ def arm_frame(*, name: str, series: pl.DataFrame) -> pl.DataFrame:
     return pl.concat(pieces)
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Print the scores."""
     pl.Config.set_tbl_rows(200)
     pl.Config.set_tbl_cols(30)
@@ -110,6 +110,12 @@ def main() -> None:  # noqa: PLR0915
     for band in BANDS:
         for treat, ref, text in CONTRASTS:
             for gname, where in GROUPS.items():
+                if band != base.HEADLINE_BAND and (
+                    (treat, ref, text) not in CONTRASTS[:4]
+                    or "MVA-only without" in gname
+                    or "short" in gname
+                ):
+                    continue  # other bands: the four stage contrasts, signed-MW and MVA-only
                 r = metrics.headline_month_bootstrap_contrast(
                     treatment=rows[treat], reference=rows[ref], metric="crps",
                     where=where & pl.col(band), slice_table=table,
@@ -197,7 +203,11 @@ def main() -> None:  # noqa: PLR0915
                 pl.col("power_fcst_init_time") >= base.SCORED_FIRST
             )
             diffs.append(
-                f.select(arm=pl.lit(name), site=pl.lit(site), diff=(pl.col("q50") - pl.col("mean")).mean())
+                f.select(
+                    arm=pl.lit(name),
+                    site=pl.lit(site),
+                    diff=(pl.col("q50") - pl.col("mean")).mean(),
+                )
             )
     print(pl.concat(diffs).pivot(on="arm", index="site", values="diff").sort("site"))
     print("\n== Control: full vs experiment 377's stored stack, max abs quantile difference ==")
@@ -206,9 +216,17 @@ def main() -> None:  # noqa: PLR0915
             pl.col("power_fcst_init_time") >= base.SCORED_FIRST
         )
         stored = pl.read_parquet(base.stage_2_path(site=site))
-        j = mine.join(stored, on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_s")
-        print(site, mine.height, stored.height, j.height,
-              float((j["q50"] - j["q50_s"]).abs().max()), float((j["q95"] - j["q95_s"]).abs().max()))  # fmt: skip
+        j = mine.join(
+            stored, on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_s"
+        )
+        print(
+            site,
+            mine.height,
+            stored.height,
+            j.height,
+            float((j["q50"] - j["q50_s"]).abs().max()),  # ty: ignore[invalid-argument-type]
+            float((j["q95"] - j["q95_s"]).abs().max()),  # ty: ignore[invalid-argument-type]
+        )
     gap = (
         scored["full"].filter(pl.col("slice") == base.HEADLINE_BAND, pl.col("metric") == "crps")
         .select("label", "group", full=pl.col("value"))

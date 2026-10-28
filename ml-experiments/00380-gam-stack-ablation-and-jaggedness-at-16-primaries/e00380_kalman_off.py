@@ -19,9 +19,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Final
 
-import e00377_common as common
-import e00377_ens as ens
-import e00377_run as run
+import e00377_common as common  # ty: ignore[unresolved-import]
+import e00377_ens as ens  # ty: ignore[unresolved-import]
+import e00377_run as run  # ty: ignore[unresolved-import]
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
@@ -56,10 +56,7 @@ class UnfilteredForecaster(run.ArmForecaster):
             tuning_frame = self._frame(runs=self.tuning, spread=ens.ZERO_SPREAD)
         else:
             tuning_frame = pl.concat(
-                [
-                    pl.read_parquet(OUT_DIR / f"a2_tuning_{donor}.parquet")
-                    for donor in common.DONORS
-                ]
+                [pl.read_parquet(OUT_DIR / f"a2_tuning_{donor}.parquet") for donor in common.DONORS]
             )
         self.spread = ens.fit_spread_from_frame(frame=tuning_frame)
 

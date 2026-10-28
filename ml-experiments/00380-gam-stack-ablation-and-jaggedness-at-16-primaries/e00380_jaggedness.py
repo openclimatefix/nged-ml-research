@@ -8,17 +8,19 @@ hand-filtered events. They are registered in the plan of experiment 380.
 """
 
 from datetime import UTC, datetime
-from typing import Final
+from typing import Any, Final
 
-import e00377_adapter as adapter
-import e00377_score as base
+import e00377_adapter as adapter  # ty: ignore[unresolved-import]
+import e00377_score as base  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from scipy.stats import spearmanr
 from studies.dp_features import default_input_paths, load_or_build_feature_cache
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-OWN: Final = ML_EXPERIMENTS_DATA_DIR / "00380-gam-stack-ablation-and-jaggedness-at-16-primaries" / "work"
+OWN: Final = (
+    ML_EXPERIMENTS_DATA_DIR / "00380-gam-stack-ablation-and-jaggedness-at-16-primaries" / "work"
+)
 CUT: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
 STEP_POINTS: Final[float] = 5.0
 """A step is a half-hour change above 5% of effective capacity (readings are in points)."""
@@ -32,8 +34,15 @@ EXPECTED_SIGN: Final[dict[str, int]] = {"m1_profile_share": -1, "m2_temperature_
                                         "m5_reverse_flow_share": 1}  # fmt: skip
 
 
-def measures_of(*, y: np.ndarray, temperature: np.ndarray, times: np.ndarray,
-                present: np.ndarray, allowed: np.ndarray, signed: bool) -> dict[str, float]:  # fmt: skip
+def measures_of(
+    *,
+    y: np.ndarray,
+    temperature: np.ndarray,
+    times: np.ndarray,
+    present: np.ndarray,
+    allowed: np.ndarray,
+    signed: bool,
+) -> dict[str, float]:
     """Return M1 to M5 for one series from its readings `y` (points) before the cut."""
     usable = present & allowed & np.isfinite(y) & np.isfinite(temperature)
     slot = (
@@ -42,7 +51,9 @@ def measures_of(*, y: np.ndarray, temperature: np.ndarray, times: np.ndarray,
     )  # fmt: skip
     yy, ss, tt = y[usable], slot[usable], temperature[usable]
     total = float(yy.var())
-    profile = np.bincount(ss, weights=yy, minlength=336) / np.maximum(np.bincount(ss, minlength=336), 1)
+    profile = np.bincount(ss, weights=yy, minlength=336) / np.maximum(
+        np.bincount(ss, minlength=336), 1
+    )
     res1 = yy - profile[ss]
     m1 = 1.0 - float(res1.var()) / total
     edges = np.quantile(tt, np.linspace(0, 1, N_TEMPERATURE_BINS + 1)[1:-1])
@@ -63,7 +74,7 @@ def measures_of(*, y: np.ndarray, temperature: np.ndarray, times: np.ndarray,
             "m4_step_rate": m4, "m5_reverse_flow_share": m5}  # fmt: skip
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:
     """Print the measures, the correlations, and the placebos."""
     pl.Config.set_tbl_rows(100)
     pl.Config.set_tbl_width_chars(220)
@@ -76,14 +87,15 @@ def main() -> None:  # noqa: PLR0915
     for _, label, _ in series.iter_rows():
         site = cache.sites[label]
         signed = label in ("D5", "D9", "D10", "D11", "D14", "D16")
-        args = {
-            "y": site.y[before].astype(np.float64), "temperature": site.temperature_c[before].astype(np.float64),
+        args: dict[str, Any] = {
+            "y": site.y[before].astype(np.float64),
+            "temperature": site.temperature_c[before].astype(np.float64),
             "times": times[before], "present": np.asarray(site.present)[before],
             "allowed": ~np.asarray(site.switching_mask)[before], "signed": signed,
         }  # fmt: skip
         rows.append({"label": label, **measures_of(**args)})
         shuffled = {**args, "y": rng.permutation(args["y"])}
-        placebo_rows.append({"label": label, **measures_of(**shuffled)})
+        placebo_rows.append({"label": label, **measures_of(**shuffled)})  # ty: ignore[invalid-argument-type]
     measure_table = pl.DataFrame(rows)
     print("== Measures from readings before 2025-07-01 ==")
     print(measure_table.sort("label"))
@@ -104,7 +116,9 @@ def main() -> None:  # noqa: PLR0915
                 data = data.filter(pl.col("label").is_in(["D5", "D9", "D10", "D11", "D14", "D16"]))
             x, g = data[measure].to_numpy(), data["gap"].to_numpy()
             observed = float(spearmanr(x, g).statistic)
-            permuted = np.array([spearmanr(rng.permutation(x), g).statistic for _ in range(N_PERMUTATIONS)])
+            permuted = np.array(
+                [spearmanr(rng.permutation(x), g).statistic for _ in range(N_PERMUTATIONS)]
+            )
             p_value = float((np.abs(permuted) >= abs(observed)).mean())
             loo = []
             for k in range(len(x)):

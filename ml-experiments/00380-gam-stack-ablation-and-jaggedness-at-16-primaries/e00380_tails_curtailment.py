@@ -13,16 +13,24 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-import e00377_adapter as adapter
-import e00377_score as base
+import e00377_adapter as adapter  # ty: ignore[unresolved-import]
+import e00377_score as base  # ty: ignore[unresolved-import]
 import e00380_score as score
 import polars as pl
 from studies.dp_features import default_input_paths, load_or_build_feature_cache
 from studies.eval_protocol import metrics
 
 ARMS = ("full", "drop_k", "build0")
-TAILS = ("coverage_q01", "coverage_q05", "coverage_q95", "coverage_q99",
-         "pinball_q01", "pinball_q05", "pinball_q95", "pinball_q99")  # fmt: skip
+TAILS = (
+    "coverage_q01",
+    "coverage_q05",
+    "coverage_q95",
+    "coverage_q99",
+    "pinball_q01",
+    "pinball_q05",
+    "pinball_q95",
+    "pinball_q99",
+)
 SIGNED = ["D5", "D9", "D10", "D11", "D14", "D16"]
 
 
@@ -61,7 +69,8 @@ def main() -> None:
         )
     for measure_group in (TAILS[:4], TAILS[4:]):
         parts = [
-            scored[n].filter(pl.col("slice") == base.HEADLINE_BAND, pl.col("metric").is_in(measure_group))
+            scored[n]
+            .filter(pl.col("slice") == base.HEADLINE_BAND, pl.col("metric").is_in(measure_group))
             .select("label", "group", "metric", pl.col("value").alias(n))
             for n in scored
         ]
@@ -83,7 +92,9 @@ def main() -> None:
         selected = table.filter(flag).select(keys)
         print(f"\n-- {set_name}: {selected.height} half-hours across the six --")
         forecasts = {
-            n: arms[n].join(selected, on=keys, how="semi").join(actuals, on=["time_series_id", "valid_time"])
+            n: arms[n]
+            .join(selected, on=keys, how="semi")
+            .join(actuals, on=["time_series_id", "valid_time"])
             for n in arms
             if n in (*ARMS, "bg2", "manual_heuristic")
         }
@@ -94,9 +105,12 @@ def main() -> None:
                 try:
                     pieces.append(
                         metrics.avoidable_curtailment_cost(
-                            forecasts=forecasts, series=one, flows=flows,
-                            scored_start=base.SCORED_FIRST, fraction=fraction,
-                        )  # fmt: skip
+                            forecasts=forecasts,
+                            series=one,
+                            flows=flows,
+                            scored_start=base.SCORED_FIRST,
+                            fraction=fraction,
+                        )
                     )
                 except ValueError:
                     print(f"{label}: no scored half-hour above the limit in these rows (undefined)")
