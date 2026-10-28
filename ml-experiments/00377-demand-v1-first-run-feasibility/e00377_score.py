@@ -44,7 +44,6 @@ CONTROL_SITES = ("D5", "D9", "D10", "D11", "D14", "D16", "D18")
 HEADLINE_BAND = "lead_days_1_10"
 LATE_BAND = "lead_days_8_10"
 BEYOND_BAND = "lead_days_11_14"
-STAGE_2_NAME = "stack_d_{site}.parquet"
 
 
 def stage_2_path(*, site: str, name: str | None = None) -> Path:
@@ -108,7 +107,6 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         history=actuals.rename({"actual": "power_mw"}), series=series, before=SCORED_FIRST
     )
     arms = {**stack_frames(series=series), **reference_frames(series=series)}
-    # The unit check: every stored reference actual equals the cache actual.
     fitted = series.filter(pl.col("label").is_in(STACK_SITES))
     main_arms = {n: arms[n] for n in ("stack", "bg2", "climatology", "manual_heuristic")}
     table = metrics.shared_slice_table(
@@ -346,7 +344,6 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         "\n== Replicate months 2025-04 to 2025-06 and the same months a year later, "
         "stack CRPS days 1 to 10 (no reference forecasts exist for 2025-04 to 2025-06) =="
     )
-    full = arms["stack"].join(actuals, on=["time_series_id", "valid_time"], how="inner")
     only = metrics.row_losses(
         forecast=arms["stack"], actuals=actuals, series=fitted, thresholds=thresholds
     )
@@ -362,7 +359,6 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         .agg(pl.col("crps").mean(), n=pl.len())
         .sort("group", "month")
     )
-    del full
     print("\n== D15, report only: stack and references on shared rows ==")
     d15 = series.filter(pl.col("label") == "D15")
     d15_id = d15["time_series_id"][0]

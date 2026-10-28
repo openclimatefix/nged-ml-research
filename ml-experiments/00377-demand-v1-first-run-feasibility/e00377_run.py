@@ -1,11 +1,6 @@
-"""Forecast every arm of experiment 136 at every substation and write the prediction frames.
+"""Forecast arm `a2` (T-all monthly fits, pooled filter noise) at each substation.
 
-| Arm | Fits | Filter noise | Cadence |
-|---|---|---|---|
-| `a0` | experiment 111's `gamk` | FIX (experiment 111's values) | monthly |
-| `a1` | T-all | FIX | monthly |
-| `a2` | T-all | POOL (experiment 133) | monthly |
-| `a3` | T-all | POOL | weekly |
+The code descends from experiment 136, which ran four arms; this experiment runs `a2` only.
 
 Every arm is driven by the calibrated ensemble mean. The filter runs on the arm's own fits'
 residuals against the analysis proxy; the quantiles are the corrected mean plus a residual table

@@ -4,9 +4,10 @@ Reads each substation's stage 1 forecasts for every run (`e00377_forecast.py`), 
 mean corrections of experiment 155's arm d (the winter offset and recipe R, both already monthly and
 causal), then fits the spread for each scored month on the corrected residuals of earlier months
 only: runs whose origin and valid time are both before the month's first instant, outside the
-hand-filtered events. The spread has six lead bands, so that 168 to 240 hours has its own band.
-D8 borrows the residuals of its six donors (the protocol's labelled exception) and, from the months
-the 12-month rule allows, also gets an own-residual arm. Output: one file per substation and arm.
+hand-filtered events. The spread has six lead bands, so that 240 to 336 hours has its own band.
+D8 borrows the residuals of its six donors (the protocol's labelled exception) and, from fold
+month 2025-08, also gets an own-residual arm (under 12 months of history until 2026-04). Output:
+one file per substation and arm.
 
     E00377_SOURCE=control|mva E00377_ARM=a0 uv run --no-sync python \
         ml-experiments/00377-*/e00377s3_stack.py --sites D10
@@ -33,7 +34,6 @@ LAST_FOLD_MONTH: Final[datetime] = datetime(2026, 6, 1, tzinfo=UTC)
 D8_FIRST_OWN_MONTH: Final[datetime] = datetime(2025, 8, 1, tzinfo=UTC)
 """D8's stage 1 forecasts start with the 2025-07-01 origin (its series is masked before 2025-04-01
 and the first fit needs 90 days), so its own residuals exist from this fold month."""
-D8_TWELVE_MONTH_RULE_MET: Final[datetime] = datetime(2026, 4, 1, tzinfo=UTC)
 """D8's history from 2025-04-01 reaches 12 months at this fold month."""
 D8_DONOR_MONTHS_FROM: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
 DONOR_ARM: Final[str] = "d_donor"
@@ -42,7 +42,7 @@ MIN_ROWS_PER_BAND: Final[int] = 200
 
 
 def lead_band(*, lead_hours: np.ndarray) -> np.ndarray:
-    """Return the lead band index of each lead, the last band taking anything beyond 240 hours."""
+    """Return the lead band index of each lead, the last band taking anything beyond 336 hours."""
     return np.minimum(
         np.searchsorted(np.array(LEAD_EDGES_HOURS), lead_hours, side="left"), N_BANDS - 1
     )
