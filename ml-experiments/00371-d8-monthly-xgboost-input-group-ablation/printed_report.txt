@@ -1,0 +1,112 @@
+GATE refitted control 7.695 vs stored 7.694 (brief 7.694); gap 0.001, tolerance 0.05: PASS
+
+== D8: 96,986 rows (GAM stack weekly 8.338 at D8)
+stored             7.694 (7.003 to 8.413) minus control -0.001 (-0.004 to +0.002); MAE 14.019 bias +3.434 corr 0.4469 cov 0.928
+    0-24 h     7.567 minus control -0.001 (-0.006 to +0.002); MAE 13.777 bias +3.264 corr 0.4637
+    24-72 h    7.583 minus control -0.001 (-0.005 to +0.002); MAE 13.783 bias +3.381 corr 0.4670
+    72-120 h   7.744 minus control -0.001 (-0.004 to +0.001); MAE 14.105 bias +3.523 corr 0.4396
+    120-168 h  7.822 minus control -0.000 (-0.003 to +0.002); MAE 14.295 bias +3.486 corr 0.4255
+control            7.695 (7.002 to 8.416); MAE 14.021 bias +3.433 corr 0.4468 cov 0.928
+    0-24 h     7.568; MAE 13.779 bias +3.272 corr 0.4638
+    24-72 h    7.584; MAE 13.785 bias +3.380 corr 0.4668
+    72-120 h   7.745; MAE 14.107 bias +3.520 corr 0.4394
+    120-168 h  7.822; MAE 14.295 bias +3.481 corr 0.4254
+no_extra_weather   7.741 (7.026 to 8.495) minus control +0.045 (+0.009 to +0.087); MAE 14.124 bias +3.385 corr 0.4351 cov 0.928
+    0-24 h     7.618 minus control +0.050 (+0.019 to +0.083); MAE 13.885 bias +3.199 corr 0.4495
+    24-72 h    7.640 minus control +0.056 (+0.016 to +0.102); MAE 13.911 bias +3.311 corr 0.4522
+    72-120 h   7.790 minus control +0.045 (+0.002 to +0.091); MAE 14.207 bias +3.439 corr 0.4283
+    120-168 h  7.854 minus control +0.032 (-0.002 to +0.072); MAE 14.378 bias +3.501 corr 0.4175
+no_lags            8.245 (7.423 to 9.100) minus control +0.550 (+0.237 to +0.944); MAE 15.134 bias +5.869 corr 0.3904 cov 0.920
+    0-24 h     8.173 minus control +0.604 (+0.308 to +0.971); MAE 14.938 bias +5.498 corr 0.3967
+    24-72 h    8.195 minus control +0.611 (+0.318 to +0.985); MAE 15.051 bias +5.757 corr 0.3980
+    72-120 h   8.268 minus control +0.523 (+0.194 to +0.937); MAE 15.150 bias +5.994 corr 0.3898
+    120-168 h  8.309 minus control +0.487 (+0.151 to +0.903); MAE 15.303 bias +6.044 corr 0.3802
+equal_weights      7.920 (7.233 to 8.638) minus control +0.225 (+0.144 to +0.308); MAE 14.580 bias +5.338 corr 0.4254 cov 0.925
+    0-24 h     7.779 minus control +0.210 (+0.138 to +0.286); MAE 14.328 bias +5.220 corr 0.4423
+    24-72 h    7.809 minus control +0.224 (+0.132 to +0.315); MAE 14.349 bias +5.360 corr 0.4470
+    72-120 h   7.983 minus control +0.238 (+0.151 to +0.329); MAE 14.692 bias +5.457 corr 0.4167
+    120-168 h  8.043 minus control +0.221 (+0.149 to +0.299); MAE 14.830 bias +5.255 corr 0.4038
+ens_mean           7.702 (6.998 to 8.440) minus control +0.007 (-0.007 to +0.026); MAE 14.032 bias +3.395 corr 0.4458 cov 0.926
+    0-24 h     7.572 minus control +0.003 (-0.003 to +0.011); MAE 13.797 bias +3.281 corr 0.4630
+    24-72 h    7.591 minus control +0.007 (-0.005 to +0.023); MAE 13.804 bias +3.383 corr 0.4659
+    72-120 h   7.755 minus control +0.010 (-0.007 to +0.032); MAE 14.114 bias +3.498 corr 0.4384
+    120-168 h  7.827 minus control +0.005 (-0.015 to +0.033); MAE 14.299 bias +3.362 corr 0.4244
+gam_inputs_only    8.339 (7.483 to 9.218) minus control +0.644 (+0.288 to +1.101); MAE 15.331 bias +6.009 corr 0.3729 cov 0.923
+    0-24 h     8.262 minus control +0.694 (+0.364 to +1.120); MAE 15.134 bias +5.513 corr 0.3753
+    24-72 h    8.296 minus control +0.712 (+0.373 to +1.151); MAE 15.249 bias +5.784 corr 0.3766
+    72-120 h   8.359 minus control +0.614 (+0.243 to +1.090); MAE 15.338 bias +6.102 corr 0.3722
+    120-168 h  8.401 minus control +0.579 (+0.192 to +1.071); MAE 15.508 bias +6.394 corr 0.3688
+
+== D2: 121,492 rows (GAM stack weekly 8.338 at D8)
+stored             2.238 (2.114 to 2.378) minus control +0.000 (-0.001 to +0.001); MAE 3.976 bias -1.165 corr 0.9349 cov 0.923
+    0-24 h     2.010 minus control +0.000 (-0.001 to +0.003); MAE 3.479 bias -0.981 corr 0.9519
+    24-72 h    2.117 minus control +0.001 (-0.001 to +0.002); MAE 3.719 bias -1.111 corr 0.9446
+    72-120 h   2.279 minus control +0.000 (-0.001 to +0.001); MAE 4.066 bias -1.187 corr 0.9315
+    120-168 h  2.434 minus control -0.000 (-0.001 to +0.001); MAE 4.396 bias -1.292 corr 0.9196
+control            2.238 (2.114 to 2.378); MAE 3.974 bias -1.166 corr 0.9349 cov 0.923
+    0-24 h     2.010; MAE 3.478 bias -0.984 corr 0.9520
+    24-72 h    2.117; MAE 3.718 bias -1.113 corr 0.9446
+    72-120 h   2.278; MAE 4.064 bias -1.186 corr 0.9315
+    120-168 h  2.434; MAE 4.395 bias -1.292 corr 0.9196
+no_extra_weather   2.271 (2.152 to 2.406) minus control +0.033 (+0.016 to +0.052); MAE 4.039 bias -1.270 corr 0.9337 cov 0.923
+    0-24 h     2.049 minus control +0.039 (+0.018 to +0.061); MAE 3.538 bias -1.080 corr 0.9509
+    24-72 h    2.163 minus control +0.046 (+0.028 to +0.065); MAE 3.804 bias -1.222 corr 0.9426
+    72-120 h   2.310 minus control +0.031 (+0.012 to +0.052); MAE 4.131 bias -1.284 corr 0.9304
+    120-168 h  2.453 minus control +0.019 (+0.003 to +0.037); MAE 4.439 bias -1.401 corr 0.9193
+no_lags            2.346 (2.208 to 2.501) minus control +0.109 (+0.052 to +0.164); MAE 4.120 bias -1.538 corr 0.9351 cov 0.920
+    0-24 h     2.185 minus control +0.175 (+0.113 to +0.244); MAE 3.774 bias -1.400 corr 0.9489
+    24-72 h    2.259 minus control +0.142 (+0.081 to +0.209); MAE 3.923 bias -1.494 corr 0.9432
+    72-120 h   2.375 minus control +0.097 (+0.044 to +0.148); MAE 4.182 bias -1.551 corr 0.9329
+    120-168 h  2.488 minus control +0.054 (-0.021 to +0.119); MAE 4.434 bias -1.638 corr 0.9219
+equal_weights      2.205 (2.084 to 2.348) minus control -0.033 (-0.045 to -0.019); MAE 3.910 bias -1.262 corr 0.9377 cov 0.922
+    0-24 h     1.975 minus control -0.035 (-0.052 to -0.018); MAE 3.405 bias -1.060 corr 0.9547
+    24-72 h    2.085 minus control -0.032 (-0.047 to -0.016); MAE 3.652 bias -1.199 corr 0.9470
+    72-120 h   2.243 minus control -0.035 (-0.046 to -0.023); MAE 3.994 bias -1.289 corr 0.9348
+    120-168 h  2.404 minus control -0.030 (-0.047 to -0.014); MAE 4.343 bias -1.401 corr 0.9226
+ens_mean           2.243 (2.113 to 2.389) minus control +0.005 (-0.008 to +0.019); MAE 3.988 bias -0.950 corr 0.9339 cov 0.916
+    0-24 h     2.013 minus control +0.003 (-0.004 to +0.010); MAE 3.485 bias -0.872 corr 0.9514
+    24-72 h    2.119 minus control +0.002 (-0.010 to +0.015); MAE 3.721 bias -0.910 corr 0.9439
+    72-120 h   2.284 minus control +0.006 (-0.011 to +0.024); MAE 4.082 bias -0.919 corr 0.9303
+    120-168 h  2.443 minus control +0.008 (-0.008 to +0.026); MAE 4.417 bias -1.059 corr 0.9183
+gam_inputs_only    2.388 (2.256 to 2.532) minus control +0.150 (+0.086 to +0.216); MAE 4.199 bias -1.650 corr 0.9342 cov 0.920
+    0-24 h     2.226 minus control +0.216 (+0.140 to +0.299); MAE 3.839 bias -1.501 corr 0.9485
+    24-72 h    2.310 minus control +0.193 (+0.117 to +0.279); MAE 4.019 bias -1.625 corr 0.9421
+    72-120 h   2.419 minus control +0.140 (+0.076 to +0.204); MAE 4.269 bias -1.657 corr 0.9317
+    120-168 h  2.518 minus control +0.083 (+0.008 to +0.149); MAE 4.491 bias -1.743 corr 0.9215
+
+== D4: 121,492 rows (GAM stack weekly 8.338 at D8)
+stored             2.398 (1.975 to 2.847) minus control -0.000 (-0.001 to +0.001); MAE 4.162 bias -0.626 corr 0.8599 cov 0.894
+    0-24 h     2.093 minus control +0.001 (-0.001 to +0.003); MAE 3.556 bias -0.497 corr 0.9045
+    24-72 h    2.296 minus control -0.000 (-0.002 to +0.001); MAE 3.954 bias -0.548 corr 0.8784
+    72-120 h   2.473 minus control -0.000 (-0.001 to +0.001); MAE 4.326 bias -0.643 corr 0.8483
+    120-168 h  2.580 minus control -0.000 (-0.001 to +0.001); MAE 4.514 bias -0.752 corr 0.8292
+control            2.398 (1.975 to 2.847); MAE 4.162 bias -0.629 corr 0.8600 cov 0.894
+    0-24 h     2.092; MAE 3.555 bias -0.498 corr 0.9047
+    24-72 h    2.296; MAE 3.955 bias -0.553 corr 0.8785
+    72-120 h   2.474; MAE 4.327 bias -0.648 corr 0.8481
+    120-168 h  2.580; MAE 4.513 bias -0.753 corr 0.8292
+no_extra_weather   2.389 (1.962 to 2.844) minus control -0.009 (-0.045 to +0.027); MAE 4.151 bias -0.707 corr 0.8608 cov 0.900
+    0-24 h     2.064 minus control -0.028 (-0.083 to +0.023); MAE 3.521 bias -0.511 corr 0.9076
+    24-72 h    2.296 minus control -0.001 (-0.043 to +0.042); MAE 3.966 bias -0.608 corr 0.8771
+    72-120 h   2.466 minus control -0.007 (-0.043 to +0.029); MAE 4.315 bias -0.724 corr 0.8498
+    120-168 h  2.570 minus control -0.010 (-0.041 to +0.023); MAE 4.492 bias -0.889 corr 0.8304
+no_lags            2.681 (2.190 to 3.235) minus control +0.283 (+0.143 to +0.435); MAE 4.690 bias -1.054 corr 0.8188 cov 0.885
+    0-24 h     2.631 minus control +0.539 (+0.353 to +0.745); MAE 4.587 bias -1.035 corr 0.8280
+    24-72 h    2.650 minus control +0.353 (+0.191 to +0.532); MAE 4.630 bias -1.049 corr 0.8252
+    72-120 h   2.693 minus control +0.219 (+0.076 to +0.376); MAE 4.720 bias -1.055 corr 0.8164
+    120-168 h  2.727 minus control +0.147 (+0.035 to +0.267); MAE 4.773 bias -1.067 corr 0.8101
+equal_weights      2.339 (1.903 to 2.812) minus control -0.059 (-0.109 to -0.009); MAE 4.056 bias -0.719 corr 0.8652 cov 0.898
+    0-24 h     2.041 minus control -0.051 (-0.109 to +0.005); MAE 3.468 bias -0.601 corr 0.9061
+    24-72 h    2.247 minus control -0.050 (-0.101 to +0.007); MAE 3.877 bias -0.667 corr 0.8796
+    72-120 h   2.416 minus control -0.057 (-0.113 to -0.002); MAE 4.223 bias -0.743 corr 0.8546
+    120-168 h  2.506 minus control -0.073 (-0.119 to -0.031); MAE 4.365 bias -0.806 corr 0.8397
+ens_mean           2.415 (1.990 to 2.866) minus control +0.017 (+0.004 to +0.030); MAE 4.191 bias -0.520 corr 0.8578 cov 0.886
+    0-24 h     2.102 minus control +0.009 (+0.004 to +0.016); MAE 3.573 bias -0.451 corr 0.9035
+    24-72 h    2.310 minus control +0.014 (+0.003 to +0.025); MAE 3.978 bias -0.461 corr 0.8766
+    72-120 h   2.491 minus control +0.018 (+0.003 to +0.033); MAE 4.360 bias -0.522 corr 0.8459
+    120-168 h  2.602 minus control +0.023 (+0.001 to +0.042); MAE 4.550 bias -0.612 corr 0.8263
+gam_inputs_only    2.653 (2.149 to 3.230) minus control +0.255 (+0.106 to +0.419); MAE 4.624 bias -1.182 corr 0.8234 cov 0.891
+    0-24 h     2.607 minus control +0.515 (+0.312 to +0.739); MAE 4.527 bias -1.169 corr 0.8320
+    24-72 h    2.623 minus control +0.327 (+0.158 to +0.518); MAE 4.566 bias -1.168 corr 0.8294
+    72-120 h   2.662 minus control +0.188 (+0.038 to +0.351); MAE 4.642 bias -1.169 corr 0.8216
+    120-168 h  2.698 minus control +0.119 (-0.004 to +0.244); MAE 4.712 bias -1.215 corr 0.8148
