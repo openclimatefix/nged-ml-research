@@ -72,6 +72,14 @@ and the skills `plan-issue`, `implement-issue`, `github-issue-pr-workflow`, `git
 `literature-review`, and `release-model`, which stay in that repository. Those parts are corrected
 as the move described in issue 1 proceeds.
 
+**Some paths in the skills and docs do not exist here yet.** They are `plans/`, `docs/cross-validation/`,
+`docs/live_service/`, `docs/design-philosophy/`, `packages/*` (the production packages are git
+dependencies here), and the helper scripts that `prose-review` cites relative to its own folder.
+Read the production repository for them.
+
+**Tracked files contain absolute paths under `/home/jack`.** They record where an experiment ran on
+the workstation. Set `DATA_PATH_INTERNAL` rather than editing them.
+
 **Tests that need `torch` skip in CI, to keep CI fast.** They run on the workstation after `uv sync
 --group gpu`.
 

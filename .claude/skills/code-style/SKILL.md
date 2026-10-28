@@ -11,10 +11,11 @@ description: >-
 
 # Code style
 
-**The rules live in one page, published by `nged-substation-forecast`: <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/>. Read it now, in
-full, before writing or editing Python.** It is deliberately the only copy — this skill exists to make sure it
-gets read, not to restate it, because two copies of a style guide drift apart and then nobody knows
-which one is binding.
+**The rules live in one page, published by `nged-substation-forecast`:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/>. Read it now,
+in full, before writing or editing Python.** It is deliberately the only copy — this skill exists
+to make sure it gets read, not to restate it, because two copies of a style guide drift apart and
+then nobody knows which one is binding.
 
 What is in there, so you know what you are getting:
 

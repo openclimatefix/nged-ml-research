@@ -87,8 +87,8 @@ review as `implement-issue` does.
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
   `ml-experiments/` may share a basename. A script may import its own folder, the folder of an
   earlier experiment or study, `studies.*`, and the other reviewed packages, and nothing in `src/`
-  or any other package imports it. Run a script that imports from another folder with that folder on `PYTHONPATH`, because
-  only the script's own folder is on `sys.path` otherwise. An example is
+  or any other package imports it. Run a script that imports from another folder with that folder
+  on `PYTHONPATH`, because only the script's own folder is on `sys.path` otherwise. An example is
   `PYTHONPATH=ml-experiments/<earlier-folder> uv run --no-sync python <script>`. An experiment has
   no tests of its own scripts; the machinery it calls is tested in `src/studies/`.
 - **Reuse of an earlier experiment's code:** when a script imports another experiment's module,
