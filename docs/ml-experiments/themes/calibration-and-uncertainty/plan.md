@@ -7,7 +7,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
-| [373](../../00373-d8-meta-model-weights-worker-forecasts/result.md) | Does an XGBoost meta-model that weights worker forecasts by context beat the best single family at D8? | 2 | Stored D8 worker forecasts | Planned |
 
 ## Planned experiments
 
