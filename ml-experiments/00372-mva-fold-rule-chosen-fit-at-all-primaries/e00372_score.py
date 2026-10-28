@@ -1,4 +1,4 @@
-"""Score the rule-chosen raw fit at the 8 MVA-only Primaries, and the references at all 16 Primaries.
+"""Score the rule-chosen raw fit at the 8 MVA-only Primaries and the references at all 16.
 
 No stage-2 correction is applied: this is close to a repeat of experiment 152 and makes no claim
 against experiment 252's arm A1. Arms at each MVA-only Primary (scored year 2025-07-02 to
@@ -8,7 +8,7 @@ against experiment 252's arm A1. Arms at each MVA-only Primary (scored year 2025
 |---|---|
 | `n` | arm N, the reading taken as signed demand |
 | `l0` | arm A, the fit through the meter |
-| `chosen` | `l0` at Stickney (D12), where experiment 366's rule picks the fit through the meter; `n` elsewhere |
+| `chosen` | `l0` at Stickney (D12), where experiment 366's rule picks it; `n` elsewhere |
 
 References: BG2, climatology, and the manual heuristic, as stored by experiment 87, at all 16
 Primaries. Intervals come from experiment 252's paired bootstrap that resamples whole valid-time
