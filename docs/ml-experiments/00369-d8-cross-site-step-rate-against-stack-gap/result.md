@@ -8,7 +8,7 @@ theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - calibration-and-uncertainty
   - lsc-detectors
-status: planned
+status: done
 kind: other
 size: >-
   simple. Stored: private files under data/ml-experiments/00369-d8-cross-site-step-rate-against-stack-gap/
@@ -46,8 +46,125 @@ metric: >-
   pinball loss over 11 quantiles, in points of effective capacity); rank of D8, D12, and D22 by step
   rate; step rate on shuffled copies
 code: ml-experiments/00369-d8-cross-site-step-rate-against-stack-gap/
+verdict: inconclusive
+best_arm: >-
+  None. No arm was fitted. The step rate and the stack-minus-BG2 gap have Spearman rank correlation
+  +0.007 over the 14 Primaries (95% interval -0.683 to +0.594)
+headline: >-
+  The detector's step rate does not rank the 14 Primaries by the stack's gap to BG2 (Spearman +0.007;
+  -0.242 without D8). D8 is first by rate (9.95 steps per month) and by gap (+3.619 points), but D12
+  ranks 6th and D22 14th, and shuffled copies of the readings show 0.8 to 2.7 times as many steps
+  as the real readings, so the rate is mostly ordinary demand variation.
+lessons:
+  - >-
+    The 1.5 MW detector cannot tell a persistent step from ordinary demand variation at 13 of the 14
+    Primaries: even a shuffle that keeps each day's month and day type finds as many steps as the
+    real series. D8 is the one site whose real rate (7.4 per month over all history) stands out.
+  - >-
+    The stack's gap to BG2 at D12 (+0.947) and D22 (+0.639) is not a step-rate effect, so a
+    generator-like step does not explain every Primary where the stack trails BG2.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  A simple step counter does not flag the Primaries where the best-guess forecast trails the
+  production-style forecast. D8 has the most steps and the largest gap, but D12 and D22 have large
+  gaps with few steps, and shuffled copies of the readings show as many steps as the real ones, so
+  the detector mostly counts ordinary demand swings. The cause of D12's and D22's gaps needs a
+  different test, and any step-based explanation needs a detector that survives its placebo.
+advice:
+  - >-
+    Do not use the experiment 361 detector's step count at 1.5 MW to flag Primaries whose bands need
+    widening; its placebo finds as many steps as the real readings at 13 of 14 Primaries (Figure 2).
+  - >-
+    Look for the cause of the stack's gaps at D12 and D22 outside generator-like steps, because
+    their step rates rank 6th and 14th of 14 (Figure 1).
 ---
 
-# Does a Primary's rate of generator-like steps predict how much the best-guess stack trails BG2?
+**A simple step counter does not flag the Primaries where the best-guess forecast trails the
+production-style forecast (BG2), so the experiment cannot link D8's gap to steps at other sites.**
+We counted, at each of 14 Primary substations, how often the demand drops or rises by at least
+1.5 MW for at least 6 hours, using the step detector of
+[experiment 361](../00361-d8-step-catalogue-detector-injection-and-gam-stack/result.md) unchanged.
+We then asked whether sites with more steps are the sites where the best-guess forecast (the
+stack) scores worse than BG2. They are not: the rank correlation is +0.007, with a 95% interval of
+-0.683 to +0.594. Fourteen sites are a weak test, and the placebo failed, so the verdict is
+inconclusive.
 
-Planned. The write-up follows the run.
+D8 has the most steps (9.95 per month in the scored year, 2025-07-02 to 2026-06-30) and the largest
+gap to BG2 (+3.619 quantile-score points, as in [experiment
+252](../00252-gam-stack-at-eight-more-primaries/result.md)). D12 has a gap of +0.947 and ranks 6th by
+step rate. D22 has a gap of +0.639 and no detected steps. Caveat for every number here: interim,
+one substation's generator question, one scored year, and it is unproven whether the generator
+explains the steps and the gap.
+
+**Figure 1: step rate and gap do not line up outside D8.**
+
+![Step rate against stack minus BG2](figure_1_rate_against_gap.svg)
+
+**Figure 2: shuffled copies of the readings show as many steps as the real readings.**
+
+![Real and shuffled step rates](figure_2_placebo.svg)
+
+- **Arms.** No model is fitted. The detector is experiment 361's `detect` at 1.5 MW, 6 hours, run
+  once for falls and once for rises over each site's whole history, and a step counts in the scored
+  year if it starts between 2025-07-02 and 2026-06-30. Code reused from experiment 361's folder (the
+  detector) and experiment 252's folder (the site cache, the BG2 reader, and the scorer).
+- **Stack and rows.** The stack is experiment 252 arm A0 at D2, D3, D4, D8, D12, D19, D21, and D22
+  (apparent-power sites), and [experiment
+  155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) arm C (recipe R
+  alone) at D5, D9, D10, D11, D14, and D16 (MW sites), so the two groups use different stack
+  versions. The gap is the stack's mean quantile score minus BG2's on the scored year's rows
+  outside the hand-filtered load-shift events, leads up to 168 hours, in points of effective
+  capacity. The control gate passed: D8's gap reproduces at +3.619.
+- **Retraining schedule.** None; stored forecasts are scored. The contrast cannot depend on a
+  schedule.
+
+| Site | Gap (points) | Steps in scored year | Per month | Rises / falls | Median size (MW) | Rank |
+|---|---|---|---|---|---|---|
+| D8 | +3.619 | 119 | 9.95 | 72 / 47 | 2.86 | 1 |
+| D2 | +0.241 | 73 | 6.10 | 40 / 33 | 2.57 | 2 |
+| D14 | -0.155 | 52 | 4.35 | 17 / 35 | 2.08 | 3 |
+| D4 | -0.084 | 22 | 1.84 | 22 / 0 | 1.98 | 4 |
+| D16 | +0.119 | 21 | 1.76 | 10 / 11 | 1.97 | 5 |
+| D12 | +0.947 | 14 | 1.17 | 12 / 2 | 2.46 | 6 |
+| D11 | -0.157 | 9 | 0.75 | 7 / 2 | 1.87 | 7 |
+| D3 | -0.022 | 7 | 0.59 | 4 / 3 | 1.79 | 8 |
+| D5 | +0.147 | 5 | 0.42 | 2 / 3 | 1.84 | 9 |
+| D10 | -0.057 | 5 | 0.42 | 3 / 2 | 1.71 | 10 |
+| D9 | -0.011 | 2 | 0.17 | 2 / 0 | 2.18 | 11 |
+| D19 | +0.131 | 1 | 0.08 | 1 / 0 | 2.36 | 12 |
+| D21 | +0.050 | 1 | 0.08 | 0 / 1 | 2.85 | 13 |
+| D22 | +0.639 | 0 | 0.00 | 0 / 0 | none | 14 |
+
+- **P1 (rank correlation at least 0.5): fails.** +0.007 over 14 sites (95% interval from resampling
+  sites -0.683 to +0.594); -0.242 without D8; +0.228 over the eight apparent-power sites only.
+- **P2 (D8, D12, and D22 all in the top five by rate): fails.** D8 is 1st, D12 is 6th, D22 is 14th.
+- **P3 (shuffled rate under half the real rate): fails.** Shuffling whole days moves the rate to 2.3
+  to 20.2 times the real rate at the 13 sites with steps. The decision rule says no verdict is
+  drawn from P1 and P2 when P3 fails, hence `inconclusive`. The shuffle moves summer days next to
+  winter days, so a post hoc placebo permutes days only among days of the same month and day type.
+  It still gives 0.8 to 2.7 times the real rate (D8 1.17, D12 1.35, D2 1.45). The detector's
+  rate is therefore mostly ordinary demand variation, except possibly at D8 and D2, where it is
+  close to the real rate.
+- **Size and direction.** Median step size is 1.7 to 2.9 MW at every site, and D14 and D2 have
+  rises and falls in similar numbers, as ordinary demand swings would; D4 and D12 have almost only
+  rises.
+- **Not covered.** The detector threshold is in MW, so a site with a larger capacity has more
+  chance to cross it; no capacity-share threshold was tried. The scored-year window is 12 months, so
+  rates of 0 to 2 steps are single-digit counts.
+
+## Checks
+
+- **Median minus mean forecast per site:** not applicable, because no forecast was produced here;
+  the gaps are read from stored forecasts that earlier experiments already checked.
+- **Mean-forecast error beside the quantile-score gap:** not computed, because the gap is only the
+  correlate and the experiment makes no forecasting contrast.
+- **Triggers fired:** trigger 1 (the placebo failed). The failure has an explanation tested
+  post hoc (the within-month shuffle), which also fails, so the experiment's session reports it to
+  the manager for the audit decision before any merge.
+
+## What to try next
+
+- Test the cause of D12's and D22's gaps directly (reverse flow at D12, an unexplained gap at D22),
+  because their step rates are low.
+- A detector for D8's multi-day drops needs a placebo it passes before it is used across sites.
