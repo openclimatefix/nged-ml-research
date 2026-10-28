@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
+| [375](../../00375-meta-model-over-worker-forecasts-at-all-primaries/result.md) | Does the meta-model over worker forecasts beat a 50/50 blend across the 16 Primaries? | 2 | Experiment 373 | Planned |
 
 ## Planned experiments
 
