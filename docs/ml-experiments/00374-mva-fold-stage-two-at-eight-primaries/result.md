@@ -118,8 +118,8 @@ explains the steps and the gap.
 
 ![Figure 2: chosen fit minus A1 and minus BG2, 95% interval](figure_2_contrasts_by_primary.svg)
 
-Figure 1 shows the chosen fit and A1 on top of each other at seven of the eight Primaries, because
-their scores differ by 0.01 to 0.05 points.
+Figure 1 shows the chosen fit and A1 on top of each other at six of the eight Primaries (all but D8
+and D12), because their scores differ by 0.01 to 0.05 points there.
 
 ## Method
 
@@ -129,7 +129,9 @@ their scores differ by 0.01 to 0.05 points.
   needs and that experiment 152 did not store.
 - **Stage 2.** Experiment 252's `build_arms` was imported unchanged and applied to arms N and A, as
   [experiment 353](../00353-d8-research-default-with-mva-fold/result.md) did at D8. D8 has no tuning
-  month and borrows the spread of the donor Primaries D2, D3, D4, D19, D21, and D22.
+  month and borrows the spread of the donor Primaries D2, D3, D4, D19, D21, and D22. The donor
+  spread is taken from experiment 252's stored tuning forecasts of A1, not from re-run chosen-arm
+  forecasts.
 - **Chosen arm.** The fit through the meter with stage 2 at D12, and the naive fit with stage 2 at
   the other seven.
 - **Scoring.** Quantile scores in points of effective capacity over the scored year 2025-07-02 to
@@ -147,14 +149,15 @@ their scores differ by 0.01 to 0.05 points.
   fit with stage 2 is -0.76 (-2.52 to +0.89) on sunny daylight half-hours and -0.27 (-0.61 to
   +0.04) over all half-hours. The intervals include zero, so one year does not resolve it.
   Pooled over the eight it is -0.06 (-0.13 to -0.00). The fit through the meter also beats the
-  naive fit at D8 by 0.21 raw and 0.24 with stage 2, and differs by at most 0.01 at the other
-  six.
+  naive fit at D8 by 0.21 raw and 0.24 with stage 2, and scores the same to two decimal places
+  at the other six (table of absolute scores below).
 - **P3 holds.** Stage 2 narrows the gap to BG2 a little at D12 (+0.76 raw, +0.65 with stage 2) and
   D22 (+0.42, +0.37), and leaves D8 at +3.77.
-- **P4, the control gate, passes.** The re-run raw fits reproduce experiment 372's chosen scores
-  to within 0.04 points at every Primary (exactly at five of the eight; D21 differs by 0.038). The
-  references differ from experiment 372's by at most 0.039, because the re-run changes a few
-  scored rows at D8, D12, and D21.
+- **P4, the control gate, passes.** The re-run raw fits reproduce experiment 372's chosen scores to
+  within 0.04 points at every Primary (exactly at five of the eight; D21 differs by 0.038). The gate
+  compares with experiment 372 (which matched experiment 252's stored values), and no tolerance was
+  registered for the references. They differ from experiment 372's by at most 0.039, because the
+  re-run changes a few scored rows at D8, D12, and D21.
 - **Stage 2 against the raw fit (c4).** Pooled -0.03 (-0.06 to +0.00). It improves 7 Primaries by
   0.04 to 0.14 points and worsens D8 by +0.42 (+0.19 to +0.69). A1 also scores worse at D8 than
   the raw naive fit (11.43 against 10.95).

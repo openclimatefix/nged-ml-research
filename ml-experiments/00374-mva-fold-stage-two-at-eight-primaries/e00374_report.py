@@ -114,6 +114,9 @@ def print_scores(*, scores: dict) -> None:  # noqa: PLR0912
         print(
             site, {k: round(v, 2) for k, v in scores["checks"][site]["mae_mean_forecast"].items()}
         )
+    print("== D8 tails, share of readings at or below each quantile")
+    for arm, shares in scores["tails"]["D8"]["all"].items():
+        print(arm, {k: round(v, 3) for k, v in shares.items()})
     print("== rows", scores["rows"])
 
 
