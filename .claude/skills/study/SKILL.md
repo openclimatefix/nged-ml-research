@@ -797,3 +797,8 @@ NGED ones. In a study of NGED's generators:
   `github-issue-pr-workflow` skill has the check to run before merging.
 - **Rename a PR titled "Plan: …" before merging**, because the title becomes the merge commit's
   subject.
+- **Tidy up when the PR has merged.** Remove scratch files and directories (in `~/`, `~/dev/`, and
+  the repository's `.claude/scratch/`), screenshot and render folders, and downloaded files you no
+  longer need, the worktrees you created (with `git worktree remove`, never `-f` over work you have
+  not pushed), and the local branches whose PRs have merged. Check that no process has the worktree
+  as its working directory first, and keep any file that a committed file refers to.

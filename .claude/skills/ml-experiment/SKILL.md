@@ -473,6 +473,13 @@ in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or
 branch was cut sits under `docs/` or `ml-experiments/` and touches no file the PR changes, a merge
 commit and not a squash).
 
+**Tidy up when the PR has merged.** Remove scratch files and directories (in `~/`, `~/dev/`, and the
+repository's `.claude/scratch/`), screenshot and render folders, and downloaded files you no longer
+need, the worktrees you created (with `git worktree remove`, never `-f` over work you have not
+pushed), and the local branches whose PRs have merged. Check that no process has the worktree as its
+working directory first, and keep any file that a committed file refers to. Do this before you
+report the experiment as finished, so the maintainer never has to sweep up after the session.
+
 **Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
 `experiment_tables.py --check`. A failure found by CI costs a ten-minute rerun.
