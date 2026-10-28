@@ -5,7 +5,8 @@ of Part 2 works and how the planned full model would extend it.** The six-part
 differentiable-physics series builds models of [Primary
 substation](../glossary.md#primary-substation) demand from physical terms: a daily profile,
 holidays, heating, and solar output. The [techniques
-page](../../techniques/differentiable-physics.md) explains the method in general. [Experiment
+page](https://openclimatefix.github.io/nged-substation-forecast/techniques/differentiable-physics/)
+explains the method in general. [Experiment
 103](../00103-differentiable-physics-1-data-look/result.md) looked at the data, and [experiment
 104](../00104-differentiable-physics-2-simple-structural-model/result.md) fitted the Part 2 model.
 Only what those two experiments built counts as built. Everything under "The full model" is a plan,

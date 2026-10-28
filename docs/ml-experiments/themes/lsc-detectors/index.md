@@ -137,7 +137,7 @@ which arrives about 5 days after the event, and the end rule uses hindsight.
 - **An untested option** is to run RO-NC retrospectively to build a table of switching events for
   NGED. Experiment 44 found that a perfect detector would improve the best guess's quantile score by
   little, so the table would serve NGED's own use of the events (roadmap page: [switching
-  events](../../../roadmap/switching-events.md)).
+  events](https://openclimatefix.github.io/nged-substation-forecast/roadmap/switching-events/)).
 
 ## Gotchas and implementation details
 

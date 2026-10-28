@@ -118,7 +118,8 @@ runs from about 2°W on the south coast to about 2.5°W in the Midlands.
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N, so a
 blend that needs ICON-D2 cannot serve the west of Great Britain. The map also draws AROME France,
-which this page does not test](../../roadmap/assets/weather_product_domains.svg)
+which this page does not
+test](https://openclimatefix.github.io/nged-substation-forecast/roadmap/assets/weather_product_domains.svg)
 
 **Each blend reads one set of products; the last column says which consumer the set could serve:**
 
@@ -595,7 +596,8 @@ over less than 4 years for solar and 2 years for wind.**
   models beat the best single weather model by 0.34 points for solar (post hoc) and 0.46 points for
   wind (exploratory). A live blend needs every product at run time, so a blend has more products
   that can go missing, and under this project's [inherent stability
-  rules](../../design-philosophy/inherent-stability.md) each needs a fallback. Every result here scores
+rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
+each needs a fallback. Every result here scores
   the archive's freshest run for each hour, and at run time the last few hours come from an older
   run.
 - **Training history: CAMS with ICON-EU for solar anywhere in Great Britain from December 2022, or

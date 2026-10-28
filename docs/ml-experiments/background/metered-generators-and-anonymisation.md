@@ -39,13 +39,17 @@ treated differently, and the last section says how.
 
 - **One generator in the trial area is connected under active network management (ANM), and NGED has
   confirmed there are no others.** A generator with no cap record therefore ran free
-  ([network page](../../background/network.md#active-network-management-caps-what-a-generator-may-export);
+  ([network
+page](https://openclimatefix.github.io/nged-substation-forecast/background/network/#active-network-management-caps-what-a-generator-may-export);
   docs).
 - **Two records exist and they are different quantities.** The setpoint history is one row per change
   of the export cap, in MW. The `curtailment/` feed on NGED's S3 bucket is a derived volume of MW lost
-  ([data sources](../../roadmap/data-sources.md#what-the-curtailment-feed-holds); docs).
+  ([data
+sources](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#what-the-curtailment-feed-holds);
+docs).
 - **The setpoint history is the one to use.** The cap's sign, its start date, and the month the
-  scheme goes live are on the [network page](../../background/network.md#active-network-management-caps-what-a-generator-may-export)
+  scheme goes live are on the [network
+page](https://openclimatefix.github.io/nged-substation-forecast/background/network/#active-network-management-caps-what-a-generator-may-export)
   (docs).
 - **The export sits in `data/studies/downloads/observations/NGED-ANM/`**, and `studies.export_cap`
   joins it onto an experiment's grid. It drops capped hours from training and keeps them at scoring

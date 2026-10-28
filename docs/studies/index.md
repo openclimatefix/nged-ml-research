@@ -2,9 +2,13 @@
 
 This section holds the **findings of experiments we have run**, written up so the conclusion
 survives the code that produced it. It complements the other sections:
-[background](../background/index.md) describes the *problem*, [techniques](../techniques/index.md)
-explains the *methods*, the [roadmap](../roadmap/index.md) says what we plan to build, and
-[architecture](../architecture/overview.md) documents what is already built.
+[background](https://openclimatefix.github.io/nged-substation-forecast/background/) describes the
+*problem*, [techniques](https://openclimatefix.github.io/nged-substation-forecast/techniques/)
+explains the *methods*, the
+[roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/) says what we plan to
+build, and
+[architecture](https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/)
+documents what is already built.
 
 **A page lands here when a study answers a question that outlives its code.** The code behind a page
 here is deliberately lighter than production code — no Dagster asset, no data contract, and no

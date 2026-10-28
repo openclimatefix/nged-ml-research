@@ -175,7 +175,9 @@ the combinations here were never fitted at 0.8.
 ## Introduction
 
 **The production forecast is a first version, and the cheap ideas for improving it had not been
-tried together.** [The XGBoost improvements page](../../roadmap/xgboost-improvements.md) lists them.
+tried together.** [The XGBoost improvements
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/xgboost-improvements/) lists
+them.
 The maintainer's starting hunches were that solar farms, wind farms, and substations need different
 columns, that the probabilistic forecast needs calibrating, and that a handful of other ideas would
 help. The study also tried several ways of cleaning the training data, and the XGBoost settings of
@@ -597,7 +599,8 @@ training on CRPS, and features from the ensemble itself.
 
 - **A two-stage forecaster:** train a first stage on ERA5 for many years, then a second stage on the
   ECMWF forecasts' errors, as described on [the switching-events roadmap
-  page](../../roadmap/switching-events.md#approach-1-the-two-stage-forecaster). The study's learning
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/switching-events/#approach-1-the-two-stage-forecaster).
+The study's learning
   curve cannot say whether extra years help.
 - **A climatology column,** built so that a training row's own value never enters its own
   climatological mean.
@@ -624,7 +627,8 @@ training on CRPS, and features from the ensemble itself.
 - **Tuning depth, learning rate, and the number of trees,** which the study left at production's
   values.
 - **The auto-research agent,** a [large language model agent for automated
-  experiments](../../roadmap/auto-research.md) described in [issue
+  experiments](https://openclimatefix.github.io/nged-substation-forecast/roadmap/auto-research/)
+described in [issue
   #1038](https://github.com/openclimatefix/nged-substation-forecast/issues/1038) could take the
   cheap, repeatable arms here, since each changes a configuration and is scored the same way.
 

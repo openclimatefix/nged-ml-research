@@ -138,7 +138,8 @@ row. An era cut at Cycle 49r1 on all solar rows gives the same day-7 and day-14 
 **A horizon is a whole UTC day after the run's own day: day d forecasts a calendar day from the 00
 UTC run d days earlier.** The horizons scored are days 0, 1, 2, 3, 5, 7, 10, and 14: every day to
 day 3, then days 5, 7, and 10, which span the 3-to-10-day band [the
-roadmap](../../roadmap/xgboost-improvements.md) names as the live service's primary band, and day 14,
+roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/xgboost-improvements/)
+names as the live service's primary band, and day 14,
 near the end of the run. The live service reads a 00 UTC run from about 09:00 UTC, so day 1, the
 day-ahead product, is 15 to 39 hours after the forecast is issued. Most of day 0 is over before the
 run can be read, so day 0 is a best case, not a product the live service can deliver.
@@ -148,7 +149,8 @@ run can be read, so day 0 is a best case, not a product the live service can del
 **ENS's radiation reaches this study as a mean over each 3- or 6-hour step, and its wind as a value at
 each step, so every ENS input is first upsampled to hourly values.** ECMWF publishes the radiation as
 an accumulation since the run's start, which Dynamical.org converts to step means. [NWP variable
-conventions](../../architecture/nwp-variable-conventions.md) sets out why a straight line between steps
+conventions](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/)
+sets out why a straight line between steps
 misreads a period mean. Each member is upsampled before any is averaged. The techniques tested are
 straight-line interpolation of every field, which is what the live service does today; for solar
 radiation, the clear-sky-index resample that page describes, with and without scaling each step's

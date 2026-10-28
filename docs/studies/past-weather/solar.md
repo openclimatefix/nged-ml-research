@@ -223,7 +223,8 @@ from 1.8°W at 49.9°N, on the south coast, through 2.6°W at 53.2°N, in the Mi
 57.3°N.
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N.
-The map also draws AROME France, which this page does not test](../../roadmap/assets/weather_product_domains.svg)
+The map also draws AROME France, which this page does not
+test](https://openclimatefix.github.io/nged-substation-forecast/roadmap/assets/weather_product_domains.svg)
 
 | Product | What it is | Served lead | Covers all of Great Britain? | Grid spacing, native and as served | Start of the archive read here | Available after |
 |---|---|---|---|---|---|---|
@@ -248,7 +249,7 @@ in each place it is written -->
 
 **Most of the latencies come from each service's own documentation, and CERRA's latency is the
 [weather-products
-survey's](../../background/weather-products-survey.md#reanalyses-hindcasts-and-satellite-retrievals)
+survey's](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#reanalyses-hindcasts-and-satellite-retrievals)
 check of the Copernicus Climate Data Store on 2026-09-23:** CAMS's [radiation-service
 notes](https://confluence.ecmwf.int/x/jOLjDw), the [ERA5 dataset
 page](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=overview),
@@ -258,7 +259,8 @@ CM SAF's [Surface Solar Radiation Data Set – Heliosat, Edition
 3](https://doi.org/10.5676/EUM_SAF_CM/SARAH/V003), published by the European Organisation for the
 Exploitation of Meteorological Satellites (EUMETSAT) and available by manual order from CM SAF; its
 2-to-5-day figure is this project's own tracking, cross-referenced in the [disaggregation
-roadmap](../../roadmap/disaggregation.md#an-irradiance-nowcast-would-be-a-more-useful-product), not
+roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/disaggregation/#an-irradiance-nowcast-would-be-a-more-useful-product),
+not
 a figure CM SAF itself publishes. DWD publishes ICON-DREAM-EU a month at a time, after the month
 ends: its readme states 2 to 3 months' delay, but August 2026 was on DWD's server by 23 September
 2026. DMI's and KNMI's joint UWC-West run is documented on [KNMI's data
@@ -788,7 +790,7 @@ ranges from 1.81 points in winter to 3.07 in autumn, and in each calendar year f
 
 **ERA5 has the largest error of the eight main-row-set products, and [Why ERA5 describes past
 sunshine and wind worse than most current weather
-products](../../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)
+products](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)
 sets out ERA5's documented weaknesses.**
 
 **The gap is not an artefact of lead or of reading CAMS in full.** On the hours ICON-D2 is served 1

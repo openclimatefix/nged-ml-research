@@ -389,7 +389,7 @@ so the share of rows with an FPN is not known from these registers. It is probab
 141 of the 176 rows are under 1 MW. The census finds no storage BMU in NGED's grid supply point
 groups that matches NGED battery A by name or capacity, so NGED battery A is very probably not a
 BMU. The counts and their method are in [the background page on battery
-scheduling](../background/gb-battery-scheduling.md#how-many-batteries-are-connected-in-ngeds-area).
+scheduling](https://openclimatefix.github.io/nged-substation-forecast/background/gb-battery-scheduling/#how-many-batteries-are-connected-in-ngeds-area).
 
 ## Discussion: what to use
 

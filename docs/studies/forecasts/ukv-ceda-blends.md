@@ -87,7 +87,8 @@ The [blends page](blends-with-ens.md) tests UKV at day 1 only, from Open-Meteo's
 UKV. CEDA's archive holds whole UKV runs out to 120 hours, so this page tests days 2 to 4 as well.
 The page covers solar and wind power separately, at the 6 solar farms and 3 wind farms used by the
 [matched-lead page](matched-lead.md). The [weather products
-survey](../../background/weather-products-survey.md) describes both products.
+survey](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/)
+describes both products.
 
 **The ENS mean and UKV-CEDA read different runs, and UKV-CEDA's run starts later.** For a valid hour
 on day D at lead day N, ENS reads the 00 UTC run of day D−N (UTC is Coordinated Universal Time), at
@@ -540,7 +541,9 @@ rebuilt table would move every number.
   later centring changes the error.
 - **The licence of the UKV-CEDA data is not settled on this page.** The fetch script records the
   licence as Creative Commons Attribution-NonCommercial-ShareAlike 4.0 (non-commercial use only).
-  The [weather products survey](../../background/weather-products-survey.md) lists it only as the
+  The [weather products
+survey](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/)
+lists it only as the
   "Met Office licence via CEDA", and the [CEDA catalogue
   record](https://catalogue.ceda.ac.uk/uuid/78f23c539d304591b137cf986b69a525/) that the survey cites
   does not state the terms. The page can say that the study is research use and cannot say that

@@ -18,5 +18,6 @@
 
 **The coupling step turns calibrated quantiles back into 51 coherent members.** The arms are ECC-Q
 with the interpolation, tail, and tie rules of the [staged forecast roadmap
-page](../../../roadmap/staged-probabilistic-forecast.md), and the Schaake shuffle, scored by the
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/staged-probabilistic-forecast/),
+and the Schaake shuffle, scored by the
 variogram score and the CRPS of summed solar farms in a weather cell, by lead band.

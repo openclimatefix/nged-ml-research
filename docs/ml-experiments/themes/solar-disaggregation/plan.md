@@ -117,7 +117,9 @@ first:
 latest capacity table.** Nothing in this line adds a fitting step to the serving path. [Experiment
 73](../../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) (PVDIS-6) found that the mix of
 panel orientations behind each Primary, the quantity the `UniversalSolarFleetNode` sketched in
-[differentiable physics](../../../techniques/differentiable-physics.md) would fit, is not stable
+[differentiable
+physics](https://openclimatefix.github.io/nged-substation-forecast/techniques/differentiable-physics/)
+would fit, is not stable
 across season-years, so the explicit solar forecast keeps one south-facing shape.
 
 **Experiments 00039 and 00040 are parts 1 and 2 of the series, and the parts below follow the

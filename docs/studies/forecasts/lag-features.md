@@ -152,8 +152,8 @@ used directly as the forecast) 16.56 points and climatology 14.54, against the b
 
 | Input | Source and grid | Lead read | Plant data read | Delay assumed |
 |---|---|---|---|---|
-| ENS mean of ECMWF's 51 members | ECMWF open data at 0.25° (the forecast system runs at about 9 km), averaged over each plant's H3 cell; 3-hourly steps to 144 hours and 6-hourly beyond, interpolated to hourly as in the matched-lead study | the 00 UTC run, lead-days 0, 1, 2, 3, 5, 7, 10, and 14, treated as available at 09:00 UTC | NGED power up to the issue time (09:00 UTC on the run's day; 00 UTC at lead-day 0) | none for power: the live service reads NGED power from an S3 bucket [updated every 6 hours](../../roadmap/data-sources.md), and a delay of up to 9 hours changes only one arm |
-| All-sky global horizontal irradiance from the Copernicus Atmosphere Monitoring Service (CAMS) Radiation Service, retrieved from Meteosat Second Generation imagery (one input, PC) | point time series at each plant: hourly irradiation, stamped at the end of the hour | whole days before the issue day | not applicable | 1 day: at 09:00 UTC the whole previous day is available ([the service's latency since February 2026](../../roadmap/data-sources.md); 2 days before then) |
+| ENS mean of ECMWF's 51 members | ECMWF open data at 0.25° (the forecast system runs at about 9 km), averaged over each plant's H3 cell; 3-hourly steps to 144 hours and 6-hourly beyond, interpolated to hourly as in the matched-lead study | the 00 UTC run, lead-days 0, 1, 2, 3, 5, 7, 10, and 14, treated as available at 09:00 UTC | NGED power up to the issue time (09:00 UTC on the run's day; 00 UTC at lead-day 0) | none for power: the live service reads NGED power from an S3 bucket [updated every 6 hours](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/), and a delay of up to 9 hours changes only one arm |
+| All-sky global horizontal irradiance from the Copernicus Atmosphere Monitoring Service (CAMS) Radiation Service, retrieved from Meteosat Second Generation imagery (one input, PC) | point time series at each plant: hourly irradiation, stamped at the end of the hour | whole days before the issue day | not applicable | 1 day: at 09:00 UTC the whole previous day is available ([the service's latency since February 2026](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/); 2 days before then) |
 
 ## Data and methods
 
@@ -463,7 +463,9 @@ The analogue ensemble gained 0.164 points [−0.281, −0.044] at day 1, over 18
 
 **With IFS HRES as the weather input, the single-lag null also holds (post hoc).** IFS HRES is
 ECMWF's single high-resolution forecast. Since Cycle 50r1 on 2026-05-12, [that single forecast is
-the ENS control member](../../background/weather-products-survey.md). The lag minus B0 was +0.014
+the ENS control
+member](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/).
+The lag minus B0 was +0.014
 points [−0.030, +0.053] at lead-day 1 and −0.027 [−0.101, +0.047] at lead-day 2, on the same rows.
 B0's error was 9.86 with IFS HRES against 8.95 with the ENS mean. That difference is not a ranking
 of the products, because an ensemble mean is smoother than a single forecast and usually scores

@@ -43,7 +43,8 @@ aim is a lower error on convective and frontal days, when a single cell misses t
 weather. Experiment 119, the first encoder experiment, ended inconclusive, and about two-thirds of
 its gain survived when the network read the wrong date's weather. The retest therefore waits for a
 plain recalibration of GAM-K's quantiles, and runs on the GPU. The [encoders
-technique page](../../../techniques/encoders.md) is the first thing to read.
+technique page](https://openclimatefix.github.io/nged-substation-forecast/techniques/encoders/) is
+the first thing to read.
 
 ## Planned experiments
 

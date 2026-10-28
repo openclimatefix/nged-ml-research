@@ -136,10 +136,11 @@ then under-forecast a normal March by 14.6 points ([lag-features
 study](lag-features.md#one-plants-3-low-output-training-months-carry-most-of-the-satellite-ratios-and-weekly-statistics-gains)).
 The question came from [issue #1143 (Is a time-varying effective capacity worth estimating for solar
 forecasts?)](https://github.com/openclimatefix/nged-substation-forecast/issues/1143), and the
-[roadmap](../../roadmap/capacity-estimation.md) names this head-to-head as its decision.
+[roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/capacity-estimation/)
+names this head-to-head as its decision.
 
 **The project's [energy-forecasting
-review](../../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)
+review](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/#3-estimating-the-effective-capacity-of-metered-generators)
 names the published methods, and most estimators here follow one of them.** CX1 and CX2 are
 linear-programme counterparts of the quadratic optimisation of [Viotti et al.
 (2026)](https://doi.org/10.1002/we.70136), who fit a capacity time series against a capacity factor
@@ -509,7 +510,7 @@ that the variant that recovers wind capacity best is not the variant that foreca
 study found the same split for solar. They also report a day-ahead error 2.0% below that of a
 running-maximum normalisation for a Swedish bidding zone, and that at 5-minute resolution the
 running maximum is already a robust estimate of one farm's capacity (see the
-[review](../../background/energy-forecasting-review.md#3-estimating-the-effective-capacity-of-metered-generators)).
+[review](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/#3-estimating-the-effective-capacity-of-metered-generators)).
 Viotti et al. note that a forecast gain may reflect corrected seasonal wind-speed biases and not
 better normalisation, which is the trap seen here.
 

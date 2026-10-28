@@ -5,7 +5,9 @@ design of the differentiable-physics experiments.** A Sonnet agent read the pape
 last section in full. Every number below comes from the full text of the paper named, and all the
 papers are held in the project's private library folder `literature/papers/`. The notes are a
 working record, not a reviewed survey. The project's main review is [The current state of the art in
-energy forecasting](../../background/energy-forecasting-review.md). The papers report a normalised
+energy
+forecasting](https://openclimatefix.github.io/nged-substation-forecast/background/energy-forecasting-review/).
+The papers report a normalised
 root mean square error (nRMSE) and a normalised ranked probability score (nRPS), each in its own
 normalisation.
 

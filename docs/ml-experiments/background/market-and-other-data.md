@@ -4,8 +4,11 @@
 source that improved a forecast of NGED's series by more than the experiment's decision
 threshold.** This page lists each source, what it is for, when its values become known, and where it
 sits on disk. The price series are described in
-full on the [GB price data page](../../background/gb-price-data-and-ancillary-markets.md) and in the
-[data sources page](../../roadmap/data-sources.md#electricity-price-data).
+full on the [GB price data
+page](https://openclimatefix.github.io/nged-substation-forecast/background/gb-price-data-and-ancillary-markets/)
+and in the
+[data sources
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#electricity-price-data).
 
 ## What each source is for
 
@@ -22,14 +25,17 @@ full on the [GB price data page](../../background/gb-price-data-and-ancillary-ma
 | PV_Live | `pv_live`, `pv_live_gsp` | Sheffield Solar's estimate of solar generation | Revised after first publication; `updated_at` gives the last revision |
 | Octopus Agile | `octopus_agile_east_midlands` | Half-hourly import tariff, East Midlands | The afternoon before the delivery day |
 
-The "known when" column digests the [publication table](../../roadmap/data-sources.md#when-each-series-is-published)
+The "known when" column digests the [publication
+table](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#when-each-series-is-published)
 and the folders' READMEs (docs, disk). Nothing we hold says when the frequency series is published.
 
 ## Timestamps and coverage
 
 - **The market tables mark the start of each period, in UTC, whereas the NGED power feed marks the
   end of each half-hour.** Shift one side by 30 minutes before joining
-  ([data sources](../../roadmap/data-sources.md#what-the-data-looks-like); docs).
+  ([data
+sources](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#what-the-data-looks-like);
+docs).
 - **PV_Live labels each half-hour by its end.** The stored `time` column is PV_Live's `datetime_gmt`
   minus 30 minutes (disk).
 - **Most market folders cover one year, 2025-09-01 to 2026-09-30.** The two exceptions are

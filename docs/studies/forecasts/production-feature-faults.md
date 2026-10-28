@@ -6,7 +6,8 @@
 **This audit describes the polar pipeline at commit
 `5ac2e16a7088d13f2f7103f0385a58f54388bfba`.** Reproduction uses the matching polar archive and
 engineered caches. References to the current calculations below mean that audited implementation.
-The [component pipeline interpolates u/v before deriving speed and bearing](../../architecture/nwp-variable-conventions.md#what-the-half-hourly-resample-does-today);
+The [component pipeline interpolates u/v before deriving speed and
+bearing](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#what-the-half-hourly-resample-does-today);
 the historical wrap results below do not describe its behaviour.
 
 Two reproducible calculation problems affected conversion to the half-hourly timestamps used by
@@ -67,7 +68,8 @@ neither receives an invented “corrected” score.
 
 **The radiation probe below records production behaviour before interval-aware resampling.** The
 saved figure and numbers remain a historical snapshot, reproduced from the pinned checkout above.
-See [radiation resampling](../../architecture/nwp-variable-conventions.md#radiation-resampling)
+See [radiation
+resampling](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling)
 for the current policy and before/after comparison.
 
 Each native radiation value is a mean over the **interval before its timestamp**. Here, “native”
@@ -111,8 +113,9 @@ continuous-field set’s storage, rounding, and dashboard callers when implement
 change.
 
 See [variable
-conventions](../../architecture/nwp-variable-conventions.md#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)
-and the [resampling roadmap](../../roadmap/xgboost-improvements.md).
+conventions](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#period-ending-variables-are-interpolated-as-though-they-were-instantaneous)
+and the [resampling
+roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/xgboost-improvements/).
 
 ## Wind: interpolation crosses the wrong side of the circle
 
@@ -135,7 +138,7 @@ shortest-arc interpolation at both heights while leaving speeds unchanged. Its r
 does not measure every effect of the component interpolation pipeline.
 
 See [the documented wind
-convention](../../architecture/nwp-variable-conventions.md#wind-direction-is-interpolated-across-the-0360-wrap).
+convention](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-direction-is-interpolated-across-the-0360-wrap).
 
 ## Windchill: the formula runs beyond its intended conditions
 
@@ -176,7 +179,7 @@ Treat any diurnal reconstruction beyond the native grid as a separately validate
 claim that switching interpolants alone restores the omitted extrema.
 
 See [instantaneous-variable amplitude
-loss](../../architecture/nwp-variable-conventions.md#instantaneous-variables-lose-diurnal-amplitude).
+loss](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#instantaneous-variables-lose-diurnal-amplitude).
 
 ## Precipitation: training spans an availability boundary
 
@@ -288,7 +291,8 @@ available.
 
 ### 1. Give radiation an interval-aware resampler
 
-**Production implementation:** the [radiation resampling policy](../../architecture/nwp-variable-conventions.md#radiation-resampling)
+**Production implementation:** the [radiation resampling
+policy](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#radiation-resampling)
 uses midpoint clear-sky indices for short-wave and piecewise cubic Hermite interpolating polynomial
 (PCHIP) interpolation through native-window midpoint means for long-wave.
 Unlike this study candidate, the production helper conserves each short-wave window's energy and

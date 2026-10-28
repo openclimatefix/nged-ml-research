@@ -264,7 +264,8 @@ matched](#how-the-leads-are-matched)). The scored rows start on 2024-12-01, afte
 date of every product in the table. The grids, coverage, and delivery times of UKV, ICON-D2, and
 ICON-EU come from [the past-wind study](../past-weather/wind.md), which measured the
 delivery times for a different purpose. The archive start dates come from the [weather-products
-survey](../../background/weather-products-survey.md). The study did not measure the delivery time of
+survey](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/).
+The study did not measure the delivery time of
 ENS, GEFS, or IFS 0.25°, and ECMWF's published dissemination schedule was not checked against the
 09:00 UTC assumption.
 <!-- source: the past-wind study's product table and the weather-products survey; none of these
@@ -1279,9 +1280,10 @@ that [How AIFS is read](matched-lead-extra-products.md#how-aifs-is-read) names. 
 the primary setting unless a row says otherwise. The rows are the `single` row set, 6 solar farms
 and 3 wind farms, 16 months, and the AIFS Single versions those months hold. The survey page says
 that [AIFS has not been shown to improve faster than the physics-based
-IFS](../../background/weather-products-survey.md#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
+IFS](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
 and that [each AIFS version should be scored
-separately](../../background/weather-products-survey.md#score-each-aifs-version-separately), and
+separately](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#score-each-aifs-version-separately),
+and
 this section treats AIFS Single as a forecast that has a lower or higher error, never as one that
 has improved.
 
@@ -1975,7 +1977,9 @@ public inputs are ECMWF ENS (from 2024-04-01), NOAA GEFS (from 2020-10-01), NOAA
 and ECMWF's AIFS Single and AIFS ENS from Dynamical.org, and the Previous Runs values and the IFS
 HRES Single Runs archive of Open-Meteo. Open-Meteo's day-offset archive starts on 2024-01-19 for
 ICON-EU and ICON-D2, on 2024-03-06 for IFS 0.25°, and on 2024-08-06 for UKV (start dates from the
-[weather-products survey](../../background/weather-products-survey.md)). Dynamical.org's access ends
+[weather-products
+survey](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/)).
+Dynamical.org's access ends
 on 2026-09-30. The generator telemetry and the `effective_capacity` table are private, because a
 single generator's output can be commercially sensitive.
 

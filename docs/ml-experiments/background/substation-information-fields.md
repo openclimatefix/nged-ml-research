@@ -29,7 +29,8 @@ themselves are on the [NGED power telemetry page](nged-power-telemetry.md), and 
   one BSP (disk).
 - **`Primary Substation Interconnections.csv` lists pairs of Primaries that can be connected.**
   Every trial-area Primary has at least one pair, so the topology looks complete
-  ([data sources](../../roadmap/data-sources.md#provided-as-reference-files-mostly-static-reference-historical);
+  ([data
+sources](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#provided-as-reference-files-mostly-static-reference-historical);
   docs).
 - **`Monitor Direction.csv` gives each series' meter type and flow direction.** One solar farm's
   substation number differs from its metadata row, and the other sources agree with the metadata

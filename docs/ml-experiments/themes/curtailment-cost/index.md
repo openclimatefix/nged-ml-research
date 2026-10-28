@@ -97,7 +97,7 @@ design: no forecast design curtailed less with significance at the headline limi
 
 **Nothing is ready.** Both experiments are `not-for-production`. The cost-savings roadmap describes
 the metric and the larger delivery that would allow a ranking ([cost-savings
-metrics](../../../roadmap/cost-savings-metrics.md)).
+metrics](https://openclimatefix.github.io/nged-substation-forecast/roadmap/cost-savings-metrics/)).
 
 ## Gotchas and implementation details
 

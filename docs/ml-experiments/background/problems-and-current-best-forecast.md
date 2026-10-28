@@ -7,14 +7,17 @@ generators, and curtailment with its tails.** Each bullet ends with an evidence 
 ## What NGED asks for
 
 - **The project must give NGED new information about forecasting for its assets, and a negative
-  result counts** ([requirements](../../background/requirements.md#core-objectives)) (docs).
+  result counts**
+([requirements](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#core-objectives))
+(docs).
 - **The requirements page sets the forecast's shape, horizon, update cycle, and day-ahead deadline.**
   Users mostly act on 1 to 10 days ahead, so skill in that band matters most
-  ([requirements](../../background/requirements.md#core-objectives)) (docs).
+([requirements](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#core-objectives))
+(docs).
 - **The forecast is used for two decisions: buying flexibility ahead of a high-demand risk, and
   curtailing generators ahead of a high-export risk.** The question users ask is how likely net
   demand is to cross a limit, so the tails of each forecast matter most
-  ([requirements](../../background/requirements.md#the-worst-case-matters-most-forecasting-threshold-exceedance))
+([requirements](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#the-worst-case-matters-most-forecasting-threshold-exceedance))
   (docs).
 
 ## Problem 1: demand at Primary substations
@@ -23,7 +26,8 @@ generators, and curtailment with its tails.** Each bullet ends with an evidence 
   substations](../glossary.md#primary-substation)** ([NGED power
   telemetry](nged-power-telemetry.md#the-series) counts the rest by type) (docs).
 - **`manual_heuristic` is the baseline NGED recognises, and beating it is the core deliverable.** It
-  forecasts each half-hour from 13 analogues of past weeks ([manual heuristic](../../background/manual-heuristic-forecast.md);
+  forecasts each half-hour from 13 analogues of past weeks ([manual
+heuristic](https://openclimatefix.github.io/nged-substation-forecast/background/manual-heuristic-forecast/);
   [glossary](../glossary.md#manual_heuristic)) (docs).
 - **`climatology` is the second baseline.** It forecasts from past power in the same calendar cell
   and uses no weather ([glossary](../glossary.md#climatology)) (docs).
@@ -71,7 +75,8 @@ generators, and curtailment with its tails.** Each bullet ends with an evidence 
 ## The staged design
 
 - **The design under test splits the forecast into stages 0, 1a, and 2**
-  ([staged probabilistic forecast](../../roadmap/staged-probabilistic-forecast.md);
+  ([staged probabilistic
+forecast](https://openclimatefix.github.io/nged-substation-forecast/roadmap/staged-probabilistic-forecast/);
   [glossary](../glossary.md#stages-0-1a-and-2)) (docs).
 - **N1 is a single-stage model that the best guesses below build on** ([glossary](../glossary.md#n1))
   (docs).
@@ -144,7 +149,9 @@ generators, and curtailment with its tails.** Each bullet ends with an evidence 
 ## What production does today
 
 - **No numbered model release exists, so the live service has no adopted experiment winner**
-  ([model releases](../../live_service/model-releases.md)) (docs).
+  ([model
+releases](https://openclimatefix.github.io/nged-substation-forecast/live_service/model-releases/))
+(docs).
 - **The production-style forecast loses to `manual_heuristic` at Primaries.** In experiment 13 its
   mean absolute error of the median was 1.69 points of capacity higher (99% interval +0.98 to
   +2.59) ([experiment

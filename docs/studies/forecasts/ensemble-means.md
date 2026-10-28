@@ -299,12 +299,14 @@ noisier than a mean over 18 lagged members.** The MOGREPS-UK mean scored 8.69% f
 every other ensemble mean here except the local ECMWF ENS series, and 0.08 points better than UKV's
 freshest deterministic run (8.77%). The result is consistent with a mean of 3 members adding little
 to a single run, but it does not show that, because the products differ in more than member count.
-[The roadmap](../../roadmap/data-sources.md#what-we-learnt-about-mogreps-uk-on-2026-09-26) records
+[The
+roadmap](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#what-we-learnt-about-mogreps-uk-on-2026-09-26)
+records
 why members of lagged runs need weights and run ages.
 
 The Met Office's calibrated IMPROVER blend of MOGREPS-UK holds no raw members, so the blend cannot
 stand in for MOGREPS-UK members
-([details](../../roadmap/data-sources.md#what-we-learnt-about-met-office-improver-on-2026-09-26)).
+([details](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#what-we-learnt-about-met-office-improver-on-2026-09-26)).
 
 ## Limitations
 

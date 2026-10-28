@@ -9,7 +9,10 @@ called rungs. A Balancing Mechanism Unit (BMU) is the unit that Elexon, the sett
 in the Balancing Mechanism, the market in which the system operator buys changes to generation and
 demand close to delivery. A BMU can be a power station, a battery, or an aggregate of embedded
 generation held by a supplier. Two background pages explain [how batteries in Great Britain (GB)
-schedule themselves](../background/gb-battery-scheduling.md) and [GB electricity prices](../background/gb-price-data-and-ancillary-markets.md).
+schedule
+themselves](https://openclimatefix.github.io/nged-substation-forecast/background/gb-battery-scheduling/)
+and [GB electricity
+prices](https://openclimatefix.github.io/nged-substation-forecast/background/gb-price-data-and-ancillary-markets/).
 
 **A joint model of solar and a battery recovers the solar part of a simple synthetic aggregate
 when it is given the battery's true power. Once a demand-like part is added, the joint model
@@ -93,7 +96,8 @@ day](assets/battery_pv_separation_rung6_story.svg)
   in 8 and 4 of the 16 at a 1 MW threshold
   ([rung 6](#rung-6-solar-and-a-battery-fitted-together)).
 - **Do not trust a structured schedule built from prices to beat unconstrained price regressors.** A
-  rank rule (charge in the cheapest [price ranks](../background/gb-battery-scheduling.md#price-rank)
+  rank rule (charge in the cheapest [price
+ranks](https://openclimatefix.github.io/nged-substation-forecast/background/gb-battery-scheduling/#price-rank)
   of each day and discharge in the dearest) and a linear programme each recover the solar about 7
   points worse than unconstrained price regressors
   ([rung 5](#rung-5-structured-schedules-do-not-beat-unconstrained-price-regressors)).
@@ -192,7 +196,9 @@ of 0 half-hours. The correlation peaks at a shift of 0 for all four batteries, a
 a shift of one half-hour lowers it by 0.004 to 0.014.
 
 **The planned output and the accepted balancing volumes explain most of a battery's output.** [How
-GB batteries schedule themselves](../background/gb-battery-scheduling.md) shows the decomposition of
+GB batteries schedule
+themselves](https://openclimatefix.github.io/nged-substation-forecast/background/gb-battery-scheduling/)
+shows the decomposition of
 metered output into planned output, accepted balancing volume, and a remainder (Figure P2 there).
 Over the year, the planned output alone explains 29.2% to 36.3% of the variance of output across the
 four batteries. The planned output plus the accepted volumes explains 81.4% to 97.2%. The remainder
@@ -204,7 +210,9 @@ has a standard deviation of 3.91 to 10.33 MW.
 
 **Knowing the day's price ranking lowers a battery's prediction error, but only slightly.** The
 prediction fits the mean output of each half-hour of the day, then adds the day-ahead price rank and
-price level. A half-hour's [price rank](../background/gb-battery-scheduling.md#price-rank) is its
+price level. A half-hour's [price
+rank](https://openclimatefix.github.io/nged-substation-forecast/background/gb-battery-scheduling/#price-rank)
+is its
 place in that day's cheapest-to-dearest order. Four held-out 3-month blocks score each fit. Pooled
 over the four batteries, the price rank lowers the error from 21.30% to 20.72% of p99, a change of
 −0.58 points [−0.89, −0.29]. The price-rank gain is planned contrast B1, which claimed that adding
@@ -653,7 +661,7 @@ this study did not use. A demand model would describe the non-solar part of a su
 mostly demand. Planned-output data for the BMU (its physical notification) would say what the
 battery intended, leaving the remainder. Response-contract data would explain the frequency-driven
 remainder (Figure P3 of [how GB batteries schedule
-themselves](../background/gb-battery-scheduling.md)).
+themselves](https://openclimatefix.github.io/nged-substation-forecast/background/gb-battery-scheduling/)).
 
 ## Limitations
 
@@ -681,7 +689,8 @@ themselves](../background/gb-battery-scheduling.md)).
   raises the false-alarm counts of the unconstrained price regressors.
 - **State of charge is never observed**, so no check on it is independent of the fit.
 - **Response-contract blocks are candidates**, matched by identifier only (see [how GB batteries
-  schedule themselves](../background/gb-battery-scheduling.md)).
+  schedule
+themselves](https://openclimatefix.github.io/nged-substation-forecast/background/gb-battery-scheduling/)).
 - **The four batteries are all registered in the Balancing Mechanism.** Batteries that trade in
   other markets are not seen in the price-response data.
 - **Rung 7c's demand-like halves come from three BMUs, half of them as real output and half as

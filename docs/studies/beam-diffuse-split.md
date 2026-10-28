@@ -102,10 +102,10 @@ variable list.** Dynamical.org build the feed from ECMWF's free open-data subset
 carry `fdir` — the ECMWF archive's name for the direct beam on a horizontal surface. ECMWF's full
 Real-time Catalogue does carry `fdir`, so the obstacle is which ECMWF feed the data comes from.
 [What taking `fdir` from ECMWF directly
-involves](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost),
+involves](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost),
 licence and delivery charges included, is set out on the data-sources page. ECMWF [have published no
 plan to add the direct beam to the free
-subset](../roadmap/data-sources.md#ecmwf-has-published-no-plan-to-open-a-direct-beam-or-hourly-ensemble-steps).
+subset](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#ecmwf-has-published-no-plan-to-open-a-direct-beam-or-hourly-ensemble-steps).
 
 **Four routes to a split remain, and each costs money or engineering effort.** The split can come
 from ECMWF's own delivery of `fdir`, from a different weather model whose free feed already carries
@@ -744,7 +744,8 @@ reanalysis gain should not be read as more than a hint.
 
 **The six sites' biases drift in different directions at the same time, which is the pattern an
 effective-capacity estimator needs in order to separate a plant that is changing from an irradiance
-product that is biased.** The [effective-capacity estimation](../roadmap/capacity-estimation.md)
+product that is biased.** The [effective-capacity
+estimation](https://openclimatefix.github.io/nged-substation-forecast/roadmap/capacity-estimation/)
 work plans to fit a shared regional irradiance-bias term across the metered fleet, on the reasoning
 that every site in a region sees the same weather bias while genuine capacity changes are
 site-specific. This experiment did not set out to test that premise, but its residuals do.
@@ -778,9 +779,12 @@ likeliest reading is that the drift is in the power rather than in the weather d
 
 **A single full-history P99 is the denominator throughout this page. At site A it averages over a
 plant whose output moved by about 6 points across the record.** That is the same quantity the
-[normalised mean absolute error](../roadmap/metrics-and-leaderboard.md) uses to compare series of
+[normalised mean absolute
+error](https://openclimatefix.github.io/nged-substation-forecast/roadmap/metrics-and-leaderboard/)
+uses to compare series of
 different sizes, and the same static estimate the
-[`effective_capacity`](../roadmap/delivery-tables.md) table currently carries. Where a plant moves,
+[`effective_capacity`](https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/)
+table currently carries. Where a plant moves,
 a fixed denominator flatters or penalises a site depending on which part of the record a score is
 computed over.
 
@@ -839,29 +843,33 @@ to fit against — and a feed carrying no beam carries no such archive either.
 publishes at 25 km, within a few kilometres of the 31 km reanalysis where the published beam added
 nothing detectable. Even if the free subset carried the field, the direct beam would be the
 lowest-value of the routes to a split this page can speak to — and [taking `fdir` from ECMWF
-directly](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)
+directly](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)
 comes through ECMWF's dissemination system or a MARS subscription, not the free subset Dynamical.org
 reads. Whether Dynamical.org would carry `fdir` from ECMWF's own delivery is a question the project
 has not yet asked.
 
 **The same result points the other way for ICON-EU, the German weather service's European weather
 model.** At about 6.5 km ICON-EU sits beside the 5 km retrieval where the beam field did help, and
-it already carries the split, so the planned [ICON-EU ablation](../roadmap/data-sources.md) is where
+it already carries the split, so the planned [ICON-EU
+ablation](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/) is where
 the beam question is worth asking again rather than assumed settled by this page.
 
 **The satellite retrieval's advantage is an argument for CAMS on power forecasting, not only on
 capacity estimation.** CAMS is already planned as an input to [capacity
-estimation](../roadmap/capacity-estimation.md); the 4.29-point gap over ERA5 makes which irradiance
+estimation](https://openclimatefix.github.io/nged-substation-forecast/roadmap/capacity-estimation/);
+the 4.29-point gap over ERA5 makes which irradiance
 product feeds the PV power model much the largest lever measured here, about 34 times the widest
 pooled split contrast. CAMS publishes a day behind real time and offers no same-day access, so this
 is a result about an input to offline work rather than about the serving path — see [CAMS's latency
 and the access route it
-forces](../roadmap/data-sources.md#cams-use-the-point-api-not-the-gridded-product).
+forces](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#cams-use-the-point-api-not-the-gridded-product).
 
 **The fitted physical PV model's case in the capacity contest rests on interpretability and graceful
 degradation, not on accuracy.** It trails XGBoost by 1.05 points on PV power, and calibrating its
 output with XGBoost recovers most of that gap without overtaking XGBoost alone. That result is
-consistent with what the [capacity-estimation page](../roadmap/capacity-estimation.md) already
+consistent with what the [capacity-estimation
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/capacity-estimation/)
+already
 claims for the differentiable-physics candidate, and it is evidence against expecting an accuracy
 win too.
 
@@ -881,7 +889,8 @@ series on this feed that are not PV meters.
 
 **NGED holds a usable record of active network management, and of the two records it holds, the
 setpoint history is the one to read.** The [capacity-estimation
-page](../roadmap/capacity-estimation.md) treats active network management as a confounder to be
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/capacity-estimation/) treats
+active network management as a confounder to be
 masked out. The setpoint history is the export cap itself rather than a quantity derived from it,
 and it reaches 31 months against the separate curtailment feed's five. Over the 25 months the
 setpoint history has been live, it flags 46 of the 50 bright hours whose yield falls below half.
@@ -1064,7 +1073,7 @@ sets tomorrow's cap nearer the time. A service that clamped a forecast to a cap 
 would be scored on megawatts it could never have published, which is the lookahead bias this
 experiment escapes. The roadmap carries that distinction where the production work will meet it,
 under [dropping curtailed hours from the training
-target](../roadmap/xgboost-improvements.md#drop-curtailed-hours-from-the-training-target).
+target](https://openclimatefix.github.io/nged-substation-forecast/roadmap/xgboost-improvements/#drop-curtailed-hours-from-the-training-target).
 
 **The clamp is what stops one site's curtailment instructions swamping its weather signal.** Inside
 a curtailed hour every setup's mean absolute error lands between 9.39% and 9.52% of P99 output once
@@ -1113,7 +1122,8 @@ multi-day plateaus at 12%, 29%, 56%, 76%, and 88% of its settled level through A
 climb through 12%, 33%, and 71% in July after a 24-day outage, a plateau at 81% from 11 July, and
 the settled level only from 6 October 2024. The evidence and the figure are under [how a new solar
 farm reaches full output in
-stages](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months). The
+stages](https://openclimatefix.github.io/nged-substation-forecast/background/network/#a-new-solar-farm-reaches-full-output-in-stages-over-months).
+The
 cut removes 2,097 of 128,033 rows, all of them site E's.
 
 **The shortfall is a fixed fraction of what the weather allowed, which is what rules out the other

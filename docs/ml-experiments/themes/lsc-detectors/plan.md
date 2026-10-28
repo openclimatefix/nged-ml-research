@@ -27,7 +27,9 @@ labelled set of visible events, and leaves the use of the detector until the det
 detector serves two purposes later. The first is a lower forecast error, if switching periods act as
 unexplained noise for the XGBoost model and corrupt its lagged power inputs. The second, and the
 more important to NGED, is a forecast under the normal running arrangement (NRA), into which NGED
-can add its own switching. The [switching events](../../../roadmap/switching-events.md) roadmap page
+can add its own switching. The [switching
+events](https://openclimatefix.github.io/nged-substation-forecast/roadmap/switching-events/) roadmap
+page
 proposes building that forecast by excluding switching periods from the training target. An event
 table for NGED is a third purpose, at lower priority. The production detector has to run on power
 alone, because the switching logs exist only for the trial area, so the logs are used here for

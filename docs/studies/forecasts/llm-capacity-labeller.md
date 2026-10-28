@@ -148,13 +148,15 @@ and judge a labeller against a fixed rule, not against holding the capacity cons
 **Each idea is speculation unless a page is cited, and each follows the pattern this study tests:
 deterministic tools first, the model reads their output.**
 
-- **Labelling faulty metering and switching events.** The [requirements](../../background/requirements.md)
+- **Labelling faulty metering and switching events.** The
+  [requirements](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/)
   list both as objectives. A model could read changepoint candidates, stuck-run flags, and neighbours'
   power and propose a label; the risk is a confident label with no evidence.
 - **Reading outage, curtailment, and distribution network operator notices.** A model could turn
   text into dated rows; the risk is a mis-parsed date or substation entering the data unnoticed.
 - **Explaining data-quality warnings and forecast misses, and writing the daily health summary.** The
-  [inherent-stability design](../../design-philosophy/inherent-stability.md#three-audiences-three-channels)
+  [inherent-stability
+design](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels)
   already sends attributable events to developers; a model could write the paragraph. The risk is a
   plausible explanation that names a cause nobody tested.
 - **Cleaning the substation metadata table.** A model could propose fixes for a human to accept; the
@@ -164,7 +166,8 @@ deterministic tools first, the model reads their output.**
 and cost; a case file here cost about US$0.03) and three requirements:** answers cached by prompt
 hash, every prompt and answer logged, and a guarded fallback to the path without a model. The three
 requirements follow the [degradation
-rules](../../design-philosophy/inherent-stability.md#the-rules): an absent or invalid answer is
+rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules):
+an absent or invalid answer is
 missing input, widens the uncertainty, and is recorded on the row. A capability that could live in
 the training loop belongs there, so the model's output would be a training label.
 

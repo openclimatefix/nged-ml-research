@@ -200,7 +200,8 @@ ICON-D2.
 | ECMWF ENS day 0 | mean of the 51 members of ECMWF's ensemble forecast, hours 00 to 23 UTC of the 00 UTC run's own day | about 9 km native (O1280 octahedral reduced Gaussian grid) since IFS Cycle 48r1 on 27 June 2023; served on a 0.25° grid in 3-hourly steps rebuilt to hourly here, each value the area-weighted mean of the 0.25° cells overlapping the farm's resolution-5 cell of the H3 hexagonal grid, with the eastward and northward wind averaged before the speed is taken | 10 m and 100 m | 0 to 23 hours | yes | April 2024 (Dynamical.org's archive of the 00 UTC run starts on 1 April 2024); this study reads it from 1 December 2024 | about 09:00 UTC for a 00 UTC run, this repository's assumption; ECMWF's [dissemination schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule) lists the 00 UTC ENS perturbation forecasts' hourly steps 0 to 90 at 06:40 to 06:55 UTC, and open-data publication and Dynamical.org's ingest come later and are not measured here |
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N.
-The map also draws AROME France, which this page does not test](../../roadmap/assets/weather_product_domains.svg)
+The map also draws AROME France, which this page does not
+test](https://openclimatefix.github.io/nged-substation-forecast/roadmap/assets/weather_product_domains.svg)
 
 ## Data and methods
 
@@ -740,7 +741,7 @@ error is lower than ENS day 0's at each](../assets/ens_hres_wind_per_farm_error.
 points [0.40, 0.75].** ICON-D2 also beats ICON-EU at every generator, by 0.26 points [0.19, 0.33]
 across the three. ERA5 trails every product except ICON global, and [Why ERA5 describes past
 sunshine and wind worse than most current weather
-products](../../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)
+products](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)
 sets out ERA5's documented weaknesses. The table below gives each product's mean absolute error on
 the main row set.
 
@@ -1624,7 +1625,8 @@ weather-station feed, the spread of ENS members, or products it does not score.*
   check.
 - **Products that this page does not score are not covered.** CAMS publishes no wind, and the
   [weather products
-  survey](../../background/weather-products-survey.md#candidates-for-the-past-wind-study) lists
+survey](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#candidates-for-the-past-wind-study)
+lists
   candidates for the past-wind study that this page does not score.
 - **Regions other than Lincolnshire, and offshore wind, are not covered,** as
   [Limitations](#limitations) explains.

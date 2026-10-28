@@ -4,10 +4,13 @@
 product feeds each column at forecast time and which feeds it at training time.** The two are
 usually different products. This page is a digest: it holds the table of what exists when, and the
 traps that cost experiments a re-run. The long accounts are the [weather products
-survey](../../background/weather-products-survey.md), the [data-sources
-page](../../roadmap/data-sources.md#weather-data), the [NWP variable
-conventions](../../architecture/nwp-variable-conventions.md), and the [ECMWF ENS known
-issues](../../architecture/ecmwf-ens-known-issues.md).
+survey](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/),
+the [data-sources
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#weather-data),
+the [NWP variable
+conventions](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/),
+and the [ECMWF ENS known
+issues](https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/).
 
 ## Availability at forecast time
 
@@ -51,14 +54,20 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 ## ECMWF ENS
 
 - **The step grid and the publication delay are owned by the architecture pages.** See the [step
-  grid](../../architecture/nwp-variable-conventions.md#the-forecast-step-grid) and the [ECMWF ENS
-  known issues](../../architecture/ecmwf-ens-known-issues.md) (code).
+grid](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#the-forecast-step-grid)
+and the [ECMWF ENS
+  known
+issues](https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/)
+(code).
 - **The ENS archive on disk starts at 2024-04-01.** Source Cooperative stages about 3 further years
   as raw GRIB1 (complete dates 2021-03-21 to 2024-03-31), and a pilot decoded them bit-exact. See
-  the [training-history page](../../roadmap/training-history.md) for whether the full fetch has
+  the [training-history
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/training-history/) for
+whether the full fetch has
   run (disk; docs).
 - **Instantaneous and period-ending variables differ.** See the [NWP variable
-  conventions](../../architecture/nwp-variable-conventions.md) (code).
+conventions](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/)
+(code).
 - **Drop an ensemble member that has a missing weather value, and refuse a run whose control member
   is incomplete.** `studies.dp_ens_weather` does both (code; exp 111 dropped one member of one run).
 - **Repeated ENS runs repeat each valid time about 15 times.** An ENS-trained model with calendar
@@ -69,23 +78,27 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 
 - **ERA5 arrives about 5 days late through the Climate Data Store.** A faster public Zarr copy
   (ARCO-ERA5) carries ERA5T at about a week's lag
-  ([data-sources page](../../roadmap/data-sources.md#era5-which-access-route)) (docs).
+  ([data-sources
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#era5-which-access-route))
+(docs).
 - **The half-hourly file's :30 values are interpolated.** Each is the mean of the two neighbouring
   hourly values and contains the next hour's reading (exp 104; ERA5 half-hourly file; provisional).
 - **ERA5T hours from the last few months are preliminary.** See the [five
-  traps](../../roadmap/data-sources.md#five-traps-when-era5-hourly-fields-are-forecasting-model-inputs)
+traps](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#five-traps-when-era5-hourly-fields-are-forecasting-model-inputs)
   (docs).
 - **ERA5 is one of several estimates of past weather, and it describes past sunshine and wind worse
   than several current products.** CAMS beat ERA5 by 3.7 to 4.1 points of capacity on past sunshine
   at the solar study's five headline row sets, an exploratory comparison ([training-history
-  page](../../roadmap/training-history.md#which-estimate-of-past-weather-to-train-on); solar study,
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/training-history/#which-estimate-of-past-weather-to-train-on);
+solar study,
   5 row sets; provisional).
 
 ## CAMS
 
 - **Use the point time-series API, not the gridded product.** The gridded product lags years behind
   ([data-sources
-  page](../../roadmap/data-sources.md#cams-use-the-point-api-not-the-gridded-product)) (docs).
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#cams-use-the-point-api-not-the-gridded-product))
+(docs).
 - **The latency is 1 day.** A forecast job at 09:00 UTC gets nothing about the day it forecasts, so
   no intraday correction rests on CAMS (docs).
 - **Values are accumulated irradiation in Wh/m²** and each is stamped at the end of its step. Set
@@ -97,7 +110,8 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 
 - **Three UKV variants are different products.** The CEDA archive, Open-Meteo's archive, and the
   live feed differ in lead, irradiance, temperature, and units
-  ([data-sources page](../../roadmap/data-sources.md)) (docs).
+  ([data-sources
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/)) (docs).
 - **Open-Meteo's UKV archive is the T+0 analysis.** It holds no forecast at any lead, so it
   compares with a reanalysis and does not measure forecast skill (docs).
 - **The CEDA archive has no 100 m wind, lacks four hourly steps, and is licensed for
@@ -132,7 +146,9 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
   bias correction, to an ERA5-trained wind model: 2.5 and 1.3 points worse at days 1 and 2 (exp 52;
   3 wind farms; provisional).
 - **CERRA runs about 3 months behind real time.** It is deprioritised
-  ([data-sources page](../../roadmap/data-sources.md#weather-data)) (docs).
+  ([data-sources
+page](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#weather-data))
+(docs).
 
 ## Blending experiments
 

@@ -74,7 +74,8 @@ and terms are in the [glossary](../glossary.md).
   by default and 0.75 and 0.5 as sweeps. The real published thermal limit appears only as a
   reference mark and in the event census, because NGED curtails so that one more fault still leaves
   headroom. Metric details: [cost-savings
-  metrics](../../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) (code).
+metrics](https://openclimatefix.github.io/nged-substation-forecast/roadmap/cost-savings-metrics/#metric-2-curtailment-cost)
+(code).
 - **Report the manual-heuristic baseline arm (`capacity_forecast`) as the maintainer's unconfirmed
   understanding of NGED's practice.** Experiment 84 is the pattern to copy (exp 84; 2 bulk supply
   points; provisional).

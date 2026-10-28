@@ -51,7 +51,8 @@ coupling (ECC), or with the Schaake shuffle, which orders the members by a templ
 history. It then sums the members across substations and scores the summed ensemble against the
 observed sum, and scores the joint distribution with the variogram score. The staged probabilistic
 forecast already specifies [ECC and the coherence
-scores](../../../roadmap/staged-probabilistic-forecast.md) for the production forecast. The pass asks
+scores](https://openclimatefix.github.io/nged-substation-forecast/roadmap/staged-probabilistic-forecast/)
+for the production forecast. The pass asks
 whether the convex model's spread, once calibrated, keeps the cross-substation dependence that
 those scores reward. It runs after the per-substation calibration, on the same rows.
 

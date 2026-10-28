@@ -8,7 +8,8 @@ holds as settled or planned. Evidence tags follow the [update rule](index.md#upd
 ## Adopted
 
 - **Nothing is adopted.** The release log lists no numbered model release, and no `result.md`
-  carries `production_status: adopted` ([model releases](../../live_service/model-releases.md))
+  carries `production_status: adopted` ([model
+releases](https://openclimatefix.github.io/nged-substation-forecast/live_service/model-releases/))
   (docs).
 
 ## Candidates for the next release

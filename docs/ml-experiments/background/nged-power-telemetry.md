@@ -4,7 +4,7 @@
 area, and several of their properties change how an experiment must read them.** This page lists
 the properties that have cost experiments time. The processing steps themselves are on the
 [data-processing page](../data-processing.md), and the context of the network is on the [network
-page](../../background/network.md).
+page](https://openclimatefix.github.io/nged-substation-forecast/background/network/).
 
 ## The series
 
@@ -14,7 +14,9 @@ page](../../background/network.md).
 - **The `TimeSeriesMetadata` table has 33 rows.** One row has no data. Count 32 series, and do not
   change 32 to 33 (disk).
 - **"32" also counts something else on the network page.** The 41 connected hydro sites sit across
-  "32 distinct primary substations" ([network page](../../background/network.md)). That is a count
+  "32 distinct primary substations" ([network
+page](https://openclimatefix.github.io/nged-substation-forecast/background/network/)). That is a
+count
   of Primaries across all four licence areas and has no link to the 32 trial series (docs).
 - **The `time_series_type` column does not say what a generator is.** A type of "Other
   (Generation)" need not be solar, so do not assume a daylight profile (exp 182; one farm
@@ -102,7 +104,7 @@ page](../../background/network.md).
   strictly below it (exp 321; 6 farms, scored year; provisional).
 - **A metered solar farm can climb to its rated output in stages over months.** One farm took eight
   months ([network
-  page](../../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months)).
+page](https://openclimatefix.github.io/nged-substation-forecast/background/network/#a-new-solar-farm-reaches-full-output-in-stages-over-months)).
   The metered farms miss 7.6% to 27.6% of their half-hours, so check coverage before comparing farms
   (exp 179; 6 farms, one year; provisional).
 - **A flat top in a farm's output is not proof of clipping.** A pre-registered rule found AC
