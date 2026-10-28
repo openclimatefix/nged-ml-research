@@ -64,30 +64,43 @@ lessons:
     so the gas price adds about 4 points.
   - >-
     The pre-registered flat-block cutoff of 0.25 is too strict. Injected constant 2.8 MW blocks pass
-    it in 9% of windows, so the cutoff cannot confirm a block on this noisy residual. Compared
-    with the injected blocks, D8's drops are still less flat: 3 of 28 are flatter than the control
-    median.
+    it in 9% of windows, so the cutoff cannot confirm a block on this noisy residual. Compared with
+    the injected blocks, D8's drops are still less flat: 3 of 28 (1 of 28 in the audit's
+    rerun) are flatter than the median of the injected blocks.
   - >-
     The Triad half-hours do not mark the plant. One of the nine Triad half-hours falls inside a drop
     (random winter weekdays give at least 1 with probability 0.62), and winter evening peaks are not
-    deeper inside drops (-0.2 MW, interval -1.1 to +0.8), although nine Triads give the test little power.
+    deeper inside drops (-0.2 MW, interval -1.1 to +0.8), although nine Triads give the test little
+    power.
+  - >-
+    The audit's placebo (drops shifted by whole weeks) gives p of 0.008 or less for the spread-share
+    difference. The placebo's spread is 1.5 to 2 times the bootstrap interval's. Matching on wind
+    speed as well brings the difference to about +22 points.
+  - >-
+    Inside drops, depth rises with expected demand (+0.61 MW per MW against +0.16 for injected
+    blocks), which fits a plant or a load that follows site demand better than a constant-output
+    peaker.
 take_home_message: >-
   The evidence fits a gas engine below D8 that runs when electricity is dear relative to gas,
   but does not prove it. Drop days have a positive spark spread 28 percentage points more often
-  than matched ordinary days (at 40% efficiency), the spread rises as drops start and falls as
-  they end, and the public Capacity Market register lists a 6 MW gas engine 0.5 km from D8. The
-  drops are not flat blocks, the system price rather than the gas price drives the signal, and
-  Triad half-hours do not mark the plant, so the next step is to ask NGED for the plant's name or
-  its operator's contact and for its half-hourly output.
+  than matched ordinary days. The spread rises at the start of 20 of 28 drops and falls at the end
+  of 18 of 28, and the public Capacity Market register lists a 6 MW gas engine 0.5 km from D8 with
+  an agreement running to 2037-38. Four findings argue against a constant-output peaker: the drops
+  are not flat blocks, their depth rises with site demand, the signal comes mostly from the system
+  price, and Triad half-hours do not mark the plant. The next step is to ask NGED whether the
+  engine was built and for its half-hourly output.
 advice:
+  - >-
+    Treat the stated interval of the spread-share difference as too narrow, and use a spread of
+    about 9.5 to 12.5 points from the placebo instead (see the Audit bullet under Checks).
   - >-
     Ask NGED for the half-hourly output of the gas engine registered near D8, because the spread
     test cannot separate a gas engine from any other load that follows the system price (Results,
     spread-share figure).
   - >-
-    Do not build a D8 on/off regressor from the spark spread alone: the gas price adds about 4
-    points to the system price's signal, and the drops are not flat blocks (spread-share and flatness
-    figures).
+    Do not build a D8 on/off regressor from the spark spread alone. The gas price adds about 4
+    points to the system price's signal, and the drops are not flat blocks (spread-share and
+    flatness figures).
   - >-
     Calibrate any flat-block test with injected constant blocks on the same residual before reading
     a count of flat drops, because the injected blocks pass a 0.25 cutoff in only 9% of windows
@@ -185,21 +198,23 @@ system price.
   gas-fuelled plants (landfill gas, anaerobic digestion) totalling 8.6 MW within 20 km; none is a
   natural-gas peaker. The Capacity Market register (National Energy System Operator, 21 October
   2026) lists a gas plant of 6 MW (reciprocating engines, distribution-connected) at a grid
-  reference 0.5 km from D8's coordinates, with agreements for the delivery years 2022-23 and
-  2023-24. Its obligation therefore ended by September 2024, while the drops run to January 2026, so
-  the plant is not proven to be the source of all drops. A second unit of 20 MW (delivery year
-  2022-23) shares the grid reference, but the register describes it as many generating units
-  controlled centrally, so the register does not give its sites. A further 20 MW
-  reciprocating-engine unit lies 21.6 km away. Plant names are withheld here.
-- **Daily regression.** Leaving one month out, adding to the temperature and season terms the spark
-  spread raises R-squared by +0.035, the gas price alone by +0.038, the system price alone by
-  −0.001, and the system price and gas price together by +0.063, from a baseline of −0.07. Drop days
-  and matched days do not differ in gas price, so the gain from the gas price probably reflects a
-  time trend (gas prices fell while drops became more frequent in 2025), which this experiment did
-  not test.
+  reference 0.5 km from D8's coordinates. The unit won a capacity agreement in the 2023-24
+  four-year-ahead auction, valid for the delivery years 2023-24 to 2037-38, and the register does
+  not mark the agreement terminated. A second unit of 20 MW (reciprocating engines) lies at a grid
+  reference 0.5 km from D8 on the other side. The two grid references are 1.0 km apart. The second
+  unit was conditionally prequalified in 2022-23 and won no agreement. A reciprocating-engine unit
+  of 20 MW also lies 21.6 km away. The register does not show whether the 6 MW plant was built, and
+  nothing in it rules out
+  combined heat and power. Plant names are withheld here.
+- **Daily regression.** The baseline out-of-fold R-squared, from temperature and season terms with
+  one month left out, is −0.07. Adding the spark spread raises it by +0.035. Adding the gas price
+  alone raises it by +0.038, the system price alone by −0.001, and the system price and gas price
+  together by +0.063. Drop days and matched days do not differ in gas price, so the gain from the
+  gas price may reflect a time trend (gas prices fell while drops became more frequent in 2025).
+  This experiment did not test that explanation.
 - **Matching on year (post hoc).** 84 of the 126 drop days fall in 2025. Matching on calendar year
   as well, for the 101 drop days that have a same-year match, gives +31.6 points (+14.4 to +48.9),
-  so the difference does not come from comparing different years.
+  so comparing different years does not explain the difference.
 
 ## Whether the spread could become a D8 regressor
 
@@ -225,6 +240,32 @@ system price.
   difference between drop days and matched days, not a share of the forecast's daily loss), no
   nested arms, no sister experiment, no leave-one-out flip, and no later design depends on this
   result.
+- **Audit.** A fresh Opus audit ran after the code and prose reviews, with its own code (not
+  committed; its report is kept privately). It reproduced the +28.4 points (+28.3 in its code) and
+  found that the verdict follows the pre-registered rule. It changed or added the following.
+    - **Register.** The register paragraph now follows the agreement terms. The first draft read the
+      prequalification years and wrongly said the 6 MW obligation ended in September 2024.
+    - **Interval.** Drop days shifted by whole weeks (a placebo, with real drops excluded) give a
+      spread-share difference with mean 0 and standard deviation 9.5 to 12.5 points. That is 1.5 to
+      2 times the spread the cluster bootstrap implies, so the interval above is too narrow. The
+      observed +28.4 points still has p of 0.008 or less.
+    - **Leave-out checks.** Leaving out any one drop gives +27.3 to +30.6. Leaving out 2025 gives
+      +41.3, and 2025 alone gives +21.8.
+    - **Wind.** Drop days are 1.26 m/s less windy than matched days, and wind correlates with the
+      system price at −0.37. Matching on wind speed as well gives +21.4 to +23.2.
+    - **Flat-block control.** Injected blocks that go through the same drop detector are detected
+      90% of the time and pass the 0.25 cutoff 8% of the time. The claim that the drops are less
+      flat than injected blocks holds, and only 1 of 28 drops is flatter than the median of the
+      injected blocks (the earlier count of 3 of 28 used a control that skipped the detector).
+    - **Load dependence.** After removing the hour-of-day profile, drops vary more than injected
+      blocks (median 1.15 against 0.82 MW). Depth rises with expected demand: +0.61 MW per MW,
+      positive in 25 of 28 drops, against +0.16 for the control.
+    - **Ordinary days.** Depth is +0.60 MW higher on positive-spread days, so the association is
+      continuous and does not need drops.
+    - **Other price-following units.** The register lists a 10 MW battery 0.09 km from D8 and a 2.9
+      MW demand-side-response unit with an industrial-site component 0.15 km away. A battery cannot
+      sustain a multi-day drop, and demand-side response can.
+    - **Verdict.** The verdict and the 6 MW engine as a candidate stand.
 - **Bad gas values.** The daily gas price has four values far outside the others: 72.8 (2024-07-25),
   63.9 (2026-06-12), 0.51 (2025-11-29), and 0.47 (2026-06-17) pence per kWh, against 1.9 to 5.2 for
   the rest. All four are excluded, and 5 of the 1,090 days in the window have no spread (a missing
@@ -237,7 +278,9 @@ system price.
 
 ## What the next experiment should answer
 
-Ask NGED for the plant's name, operator contact, and half-hourly output. With the output, test
-whether D8's drops equal the plant's generation, and whether the plant's dispatch follows the
-spread. We found no public-data test that could separate a gas engine from other loads
-that follow the system price.
+Ask NGED whether the 6 MW gas engine registered next to D8 was built, who operates it, and what its
+half-hourly output is. Ask separately whether D8's other nearby price-following units
+(demand-side response and battery) can explain the multi-day drops. With the plant's half-hourly
+output, test whether D8's drops equal the plant's generation. Then test whether the plant's
+dispatch follows the spread. Among the public data we checked, we found no test that could separate
+a gas engine from other loads that follow the system price.
