@@ -847,7 +847,11 @@ class RunWindow:
             context: The substation's weather context.
             run: The run.
             horizon_half_hours: The horizon to cover. `None` takes `HORIZON_HALF_HOURS`, which
-                clips a longer run silently. An explicit value must fit in the run.
+                clips a longer run silently. An explicit value must fit in the run and in the
+                feature cache, and an odd value is rounded down to a whole number of hours. The
+                window's `lead_band` keeps the four calibration bands, so a caller that scores by
+                the protocol's bands calls `lead_band_of_hours` with
+                `PROTOCOL_LEAD_BAND_UPPER_HOURS`.
 
         Returns:
             The window.
@@ -871,6 +875,12 @@ class RunWindow:
             horizon = horizon_half_hours
         count = min(horizon, run.n_targets, len(cache.end_times) - first)
         count -= count % 2
+        if horizon_half_hours is not None and count < horizon_half_hours - horizon_half_hours % 2:
+            msg = (
+                f"a horizon of {horizon_half_hours} half-hours runs past the feature cache, which "
+                f"holds {count} after the origin"
+            )
+            raise ValueError(msg)
         if count < HALF_HOURS_PER_DAY:
             msg = "the run's window is shorter than a day"
             raise ValueError(msg)
