@@ -183,4 +183,3 @@ rounds,
   folder (`e00087_fit_demand.py`, `e00087_common.py`, `e00087_regimes.py`, `e00087_stack.py`) and
   reads experiment 360's stored frames. Printed numbers are in `printed_report.txt` beside the
   scripts.
-

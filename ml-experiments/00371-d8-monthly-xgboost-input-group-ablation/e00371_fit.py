@@ -14,9 +14,11 @@ Arms (the control changes nothing):
 - `ens_mean`: predicts from the ensemble-mean input row of each valid time (no mixture).
 - `gam_inputs_only`: drops the five extra weather columns and the three origin lags.
 
-    PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations \
-        systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00371-*/e00371_fit.py --workers 4 --cores 12
+```bash
+PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations \
+    systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
+    uv run --no-sync python ml-experiments/00371-*/e00371_fit.py --workers 4 --cores 12
+```
 """
 
 import argparse
@@ -27,9 +29,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Final
 
-import e00087_common as common
-import e00087_fit_demand as fd
-import e00087_regimes as regimes
+import e00087_common as common  # ty: ignore[unresolved-import]
+import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
+import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import xgboost as xgb

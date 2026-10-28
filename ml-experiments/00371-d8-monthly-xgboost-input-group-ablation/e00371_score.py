@@ -7,17 +7,19 @@ the stored monthly XGBoost member (`only_M__q*`). D8 has the 96,986 rows of expe
 D4 have all stored rows to 168 hours with a finite actual. Prints every number the write-up quotes
 and writes `work/results.json` and `work/printed_report.txt`.
 
-    PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations \
-        uv run --no-sync python ml-experiments/00371-*/e00371_score.py
+```bash
+PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations \
+    uv run --no-sync python ml-experiments/00371-*/e00371_score.py
+```
 """
 
 import json
 from pathlib import Path
 from typing import Final
 
-import e00087_common as common
-import e00087_regimes as regimes
-import e00087_stack as stack
+import e00087_common as common  # ty: ignore[unresolved-import]
+import e00087_regimes as regimes  # ty: ignore[unresolved-import]
+import e00087_stack as stack  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from e00371_fit import ARM_DIR, ARMS, SITES, WORK_DIR

@@ -40,8 +40,8 @@ def main() -> None:
     rule = (
         alt.Chart(pl.DataFrame({"x": [GAM_STACK_SCORE]}))
         .mark_rule(strokeDash=[4, 3])
-        .encode(x="x:Q")
-    )  # ty: ignore[unresolved-attribute]
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
     label = (
         alt.Chart(pl.DataFrame({"x": [GAM_STACK_SCORE], "t": ["GAM stack, weekly (8.338)"]}))
         .mark_text(align="right", dx=-4, dy=-110, fontSize=11)
