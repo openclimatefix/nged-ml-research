@@ -19,7 +19,9 @@ often cannot post to the leaderboard. A **study** is the other kind of work: a l
 answers several scientific questions, often on a new dataset, run with the `study` skill.
 
 **"Experiment" means only an ml-experiment.** A pass of the production pipeline over the
-cross-validation folds is a cross-validation run, and `docs/cross-validation/` describes it. Adding
+cross-validation folds is a cross-validation run, which the production repository
+([nged-substation-forecast](https://github.com/openclimatefix/nged-substation-forecast)) runs and
+documents at <https://openclimatefix.github.io/nged-substation-forecast/cross-validation/>. Adding
 an improvement to the production pipeline after an experiment supports it is updating the pipeline,
 and the cross-validation run that follows checks the update. That run is not a second experiment.
 
@@ -43,10 +45,10 @@ the threshold into the decision rule, with the reason. Do not copy a threshold f
 experiment, because a paired contrast on the same rows often resolves gains much finer than the
 whole-sample figures a theme's Research plan page quotes.
 
-**Size the experiment with the five `plan-issue` triggers, and write one line for each:** what gets
-stored, whether the experiment touches the production serving path, whether it touches a degradation
-rule, whether more than one design would defensibly test the hypothesis, and whether it spans code
-whose callers you could not name without searching.
+**Size the experiment, and write one line for each question:** what gets stored, whether more than
+one design would defensibly test the hypothesis, and whether the experiment spans code whose callers
+you could not name without searching. This repository holds no production serving path or
+degradation rule, so an experiment never touches either.
 
 - **Simple** is a permutation of settings the pipeline already has (input-feature sets, a
   hyperparameter, a loss), with no new data and no new method. Write the plan section, implement,
@@ -60,10 +62,10 @@ whose callers you could not name without searching.
 
 Either size then runs the triggers in "Audit before merge", below, and gets an audit if one fires.
 
-Reuse `implement-issue` by reference for the mechanics: the worktree, the green-before-push set, one
-commit per review, and the triage rule (verify each finding, record each rejected one with its
-reason). An experiment merges on its own under "Merging", below, so it does not stop for human
-review as `implement-issue` does.
+Work in a worktree, and run the CI steps listed in "Merging", below, before each push. Make one
+commit per review, and triage each review's findings: verify each finding, and record each rejected
+one with its reason. An experiment merges on its own under "Merging", below, so it does not stop for
+human review.
 
 **A download follows the `data-download` and `data-validation` skills.**
 
@@ -175,8 +177,9 @@ model trains or scores on it.
   any inner early-stopping or cross-validation split by valid time, because repeated ensemble runs
   of one valid time would otherwise sit on both sides of the split.
 - **The leaderboard.** An experiment whose output has `PowerForecast`'s columns and covers the
-  reference experiment's row keys may post through `score_study.py`, as the `study` skill
-  describes.
+  reference experiment's row keys may post to the leaderboard, as the `study` skill describes.
+  The scoring script lives in the production repository, so a session here prepares the file and
+  leaves the posting to a session there.
 
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
@@ -325,8 +328,10 @@ incorporated experiment's `result.md`, and add a row to `docs/live_service/model
 listing the experiments the release incorporates. The pull requests that port the winners earlier do
 not set `adopted_in`, because the release number does not exist until the release is cut. A later
 experiment that overturns an adopted result sets `production_status` to `superseded` on the old
-experiment and names the new one in its `take_home_message`. The `release-model` skill describes the
-whole routine.
+experiment and names the new one in its `take_home_message`. The production repository owns the
+release routine (its `release-model` skill) and the release log (`docs/live_service/model-releases.md`,
+published at <https://openclimatefix.github.io/nged-substation-forecast/live_service/model-releases/>).
+A session here sets the two front-matter fields and leaves the release log to that repository.
 
 ## The write-up
 
@@ -412,9 +417,9 @@ skill and not on that page.
 **A review that checks the printed numbers against the stored predictions cannot catch a method that
 is wrong, so a result that looks wrong in any of the ways below gets an audit before it merges.**
 Experiment 104 showed why. Its numbers review confirmed every printed number. An audit afterwards
-(`data/ml-experiments/briefs/e104_audit.md`) found that the residual spread shifted each forecast by
-the previous year's bias, which reversed two of the headline conclusions. Three failed controls had
-been explained away instead of investigated.
+(`briefs/e104_audit.md`, in the private `data/ml-experiments/` folder) found that the residual
+spread shifted each forecast by the previous year's bias, which reversed two of the headline
+conclusions. Three failed controls had been explained away instead of investigated.
 
 **An audit is triggered when any of these holds:**
 
@@ -492,4 +497,4 @@ loads the `prose-review` skill, and reads the opening paragraph first. It report
 abbreviation, and number in the opening that a reader who has not seen the experiment could not
 parse, and then checks the rest of the page against the prose rules in `CLAUDE.md`. The experiment's
 session triages the findings, applies the valid ones, and records each rejected one with its reason.
-A change to `src/studies/` stops at a reviewed PR, as `implement-issue` does.
+A change to `src/studies/` merges only after the agentic review that `CLAUDE.md` describes.
