@@ -5,11 +5,12 @@ Two kinds of job, each writing its own JSON file atomically:
 * `signed`: experiment 358's job for D9, written to this experiment's folder (the five other
   signed-MW Primaries reuse 358's stored cells);
 * `census`: at an MVA-only Primary and a cut, fit the naive fit (N) and the fit through the meter
-  (L0) to the raw readings, record the rule of experiment 366's statistics, the fitted capacity, the
-  share of sunny-midday training half-hours with fitted reverse flow, and the readings' mean absolute
-  error on the following year.
+  (L0) to the raw readings, record the rule of experiment 366's statistics, the fitted capacity,
+  the share of sunny-midday training half-hours with fitted reverse flow, and the readings' mean
+  absolute error on the following year.
 
-    PYTHONPATH=ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity:ml-experiments/00358-mva-fold-known-answer-at-folded-mw-primaries:ml-experiments/00366-mva-fold-irradiance-correlation-reverse-flow-rule \
+    EXP=$(ls -d ml-experiments/00{110,358,366}-* | paste -sd:)
+    PYTHONPATH=$EXP \
         systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00370-*/e00370_run.py --workers 4
 """
@@ -54,7 +55,7 @@ def run_job(job: tuple[str, str, str, float, str]) -> Path:
     path = OUT_DIR / "census" / f"{site}_{cut_name}.json"
     if path.exists():
         return path
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(2)
     cut = known.CUTS[cut_name]
@@ -88,13 +89,13 @@ def run_job(job: tuple[str, str, str, float, str]) -> Path:
         & np.isfinite(features.pv_unit_shape)
         & ~features.switching_mask
     )
-    train_sunny = train[known._sunny(cache=cache, site=site, index=train)]  # noqa: SLF001
+    train_sunny = train[known._sunny(cache=cache, site=site, index=train)]
     pred_train = predict_meter(cache=cache, meter=meter, index=train_sunny)
     index = common.scoring_index(
         cache=cache, site=site, after=cut, through=common.year_end(cut=cut)
     )
     index = index[np.isfinite(reading[index]) & ~features.switching_mask[index]]
-    sunny = known._sunny(cache=cache, site=site, index=index)  # noqa: SLF001
+    sunny = known._sunny(cache=cache, site=site, index=index)
     pred_l0 = predict_meter(cache=cache, meter=meter, index=index)
     pred_n = predict_gam(cache=cache, fit=fit_n, index=index)
     result: dict[str, Any] = {

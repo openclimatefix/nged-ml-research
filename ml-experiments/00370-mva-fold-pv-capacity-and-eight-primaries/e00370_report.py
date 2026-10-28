@@ -1,6 +1,7 @@
 r"""Experiment 370: print every number the write-up quotes, and draw its two figures.
 
-    PYTHONPATH=ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity:ml-experiments/00358-mva-fold-known-answer-at-folded-mw-primaries:ml-experiments/00366-mva-fold-irradiance-correlation-reverse-flow-rule \
+EXP=$(ls -d ml-experiments/00{110,358,366}-* | paste -sd:)
+PYTHONPATH=$EXP \
         uv run --no-sync python ml-experiments/00370-*/e00370_report.py
 """
 
@@ -44,10 +45,11 @@ def _chart(data: Any) -> Any:
 
 def signed_cells() -> pl.DataFrame:
     """Return every signed-MW cell with the rule's choice, from 358's folder, this one, and 366."""
-    rows = []
-    for folder in (known.OUT_DIR, WORK / "signed"):
-        for path in sorted(folder.glob("*.json")):
-            rows.append(json.loads(path.read_text()))
+    rows = [
+        json.loads(path.read_text())
+        for folder in (known.OUT_DIR, WORK / "signed")
+        for path in sorted(folder.glob("*.json"))
+    ]
     cells = pl.DataFrame(rows, infer_schema_length=None).filter(pl.col("site").is_in(SIGNED_SITES))
     chosen = pl.read_parquet(
         ML_EXPERIMENTS_DATA_DIR
@@ -133,7 +135,9 @@ def main() -> None:
     for cut in known.CUTS:
         part = census.filter(pl.col("cut") == cut)
         above = int((part["reverse_share_sunny_train_l0"] > 0.5).sum())
-        print(f"P3 {cut}: L0 sunny training reverse-flow share above 50% at {above} of {part.height}")
+        print(
+            f"P3 {cut}: L0 sunny training reverse-flow share above 50% at {above} of {part.height}"
+        )
     d12 = census.filter(pl.col("site") == "D12").sort("cut")
     print("P4: D12 mae_n - mae_l0 (points)")
     print(d12.select("cut", "chosen", gap_sunny=pl.col("mae_n_sunny") - pl.col("mae_l0_sunny")))
@@ -158,7 +162,11 @@ def main() -> None:
             color=alt.Color(
                 "kind:N",
                 scale=alt.Scale(
-                    domain=["Chosen fit, no injection", "Chosen fit, level 1.0", "Pin, no injection"],
+                    domain=[
+                        "Chosen fit, no injection",
+                        "Chosen fit, level 1.0",
+                        "Pin, no injection",
+                    ],
                     range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_AMBER],
                 ),
                 legend=alt.Legend(title=None, orient="top", direction="vertical"),
@@ -166,7 +174,9 @@ def main() -> None:
         )
     )
     band = (
-        _chart(pl.DataFrame({"y": [1 - CAPACITY_TOLERANCE, 1.0, 1 + CAPACITY_TOLERANCE]}).to_pandas())
+        _chart(
+            pl.DataFrame({"y": [1 - CAPACITY_TOLERANCE, 1.0, 1 + CAPACITY_TOLERANCE]}).to_pandas()
+        )
         .mark_rule(strokeDash=[4, 4])
         .encode(y="y:Q")
     )
@@ -193,7 +203,9 @@ def main() -> None:
             ),
         )
     )
-    (bars).properties(width=560, height=260).save(DOCS_DIR / "figure_2_census_fitted_reverse_flow.svg")
+    (bars).properties(width=560, height=260).save(
+        DOCS_DIR / "figure_2_census_fitted_reverse_flow.svg"
+    )
 
 
 if __name__ == "__main__":

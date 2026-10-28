@@ -50,7 +50,8 @@ row_set_id: >-
   D12, D19, D21, D22 (census, reading error only); cuts 2024-07-01 and 2025-07-01
 metric: >-
   Ratio of the chosen fit's last-season-year solar capacity to the signed fit's; the fit's share of
-  sunny-midday training half-hours with reverse flow; mean absolute error on the reading in points of capacity
+  sunny-midday training half-hours with reverse flow; mean absolute error on the reading in points
+  of capacity
 verdict: partly supported
 production_status: not-for-production
 adopted_in: none
@@ -91,7 +92,6 @@ advice:
     any MVA-only result, because the rule and the fit both fail there (experiments 358 and 366).
 ---
 
-
 # MVA fold: solar capacity and the eight MVA-only Primaries
 
 **With reactive power zero, the chosen fit recovers the solar capacity at all six signed-MW
@@ -117,7 +117,7 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
 
 ![Figure 1: capacity divided by the signed fit's capacity, six signed-MW Primaries, scored cut](figure_1_capacity_ratio_signed_primaries.svg)
 
-![Figure 2: share of sunny training half-hours with fitted reverse flow by L0, eight MVA-only Primaries, scored cut](figure_2_census_fitted_reverse_flow.svg)
+![Figure 2: L0's fitted reverse-flow share of sunny training half-hours, MVA-only Primaries](figure_2_census_fitted_reverse_flow.svg)
 
 ## Results (reactive power zero, scored cut unless stated)
 
@@ -145,7 +145,8 @@ cells, and the pin is experiment 45's `frozen` vintage as read by `pinned_capaci
 
 - **Triggers.** Trigger 2 fired on P3, which contradicts experiment 365's finding that L0 fits
   reverse flow on 96% to 97% of summer midday half-hours at D5. The explanation offered, not tested separately:
-  experiment 365 reported that figure at the signed-MW sites it checked, including D5 (where the readings dip towards zero), and the eight census
+  experiment 365 reported that figure at the signed-MW sites it checked, including D5, where the
+  readings dip towards zero, and the eight census
   Primaries have 1st percentiles of 5.9 or more, so no mirror basin sits close to the data. Trigger
   7 fired, because a planned all-16-Primaries experiment depends on this result and it has not been
   replicated. An audit is required before merge: the series brief allows Sonnet only, so a fresh
