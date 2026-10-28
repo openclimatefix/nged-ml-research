@@ -302,7 +302,7 @@ or a minimum gain into the plan for a `change` experiment, because the family de
 - If the experiment evaluates a blend, report each constituent model family alone beside the blend.
   The single-family table comes first, and the page states the blend's added value over the best
   single family, with an interval.
-- If the five conditions hold, set `promoted_to` to the new version's name, and add a row to the log
+- If the adoption conditions of the family's evaluation protocol hold, set `promoted_to` to the new version's name, and add a row to the log
   in the same pull request. If they do not, the verdict stays and the result is a candidate.
 
 **`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls

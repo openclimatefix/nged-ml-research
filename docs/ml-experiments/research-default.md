@@ -52,7 +52,7 @@ effective capacity.** A point is 1% of a series' capacity.
 
 **A family with few series and few runs will rarely pass the gain test, and the rule does not lower
 the bar for it.** Three wind farms on 53 runs give wide intervals, so a wind change will seldom
-satisfy condition 1. A change that cannot reach the bar stays a candidate, and the maintainer may
+satisfy the gain condition. A change that cannot reach the bar stays a candidate, and the maintainer may
 judge it by a descriptive report instead.
 
 **The Primary-demand family fixes the following tolerances, in points unless stated.** A tolerance
@@ -176,35 +176,14 @@ serve as the next version without a separate regeneration job.
 
 ## The adoption rule
 
-**A change is adopted only when all five conditions hold.**
+**A change is adopted only when the conditions of the family's evaluation protocol hold.** The
+protocols are [Primary demand](evaluation-protocol-demand.md), [metered solar
+farms](evaluation-protocol-solar.md), and [wind farms](evaluation-protocol-wind.md). Each protocol
+fixes the metrics, folds, tolerances, minimum gains, and the adoption conditions for its family, and
+the section "When a change is adopted" of the demand protocol is the reference text. This page keeps
+the definitions of the families, the research default versions, and the rebase and ablation rules.
 
-1. **Gain.** The 99% month-block interval of (default plus x, minus default) on the family headline
-   lies wholly on the better side of zero, and the point estimate is at least the minimum gain for
-   the change's tier. With k pre-registered arms the interval is read at the level 1 − 0.01/k.
-2. **No harm.** Each protected group is gated by a one-sided 95% non-inferiority bound: the upper
-   bound of the harm must not exceed the group's tolerance. The six Primaries are pooled for this
-   gate, and the per-Primary results are reported. A Primary whose point estimate is worse than the
-   tolerance triggers a look, not a failure. Because every group must pass, the gate is an
-   intersection test and needs no multiplicity correction. A neutral change passes a group with
-   probability Φ(τ/SE − 1.645), where τ is the group's tolerance and SE is its standard error, so a
-   tolerance of 2 standard errors passes a neutral change 64% of the time and a tolerance of 3
-   standard errors passes it 91% of the time. A change that truly harms a group by exactly the
-   tolerance passes that group 5% of the time.
-3. **Replication.** The gain has the same sign in a second period, and the replicate estimate is at
-   least half of the smaller of the main estimate and the minimum gain. Where the minimum gain is
-   zero, the condition reduces to the same sign. Leave-one-series-out is a check for changes tuned
-   on one series and does not stand in for a second period: a change with no second period stays a
-   candidate. A change that fails condition 3 is not retried on the same replicate period with a
-   tweaked x unless the tweak is pre-registered as a new experiment and the failed attempt is
-   counted.
-4. **Controls.** The experiment's own controls passed, and none of the audit triggers in the
-   `ml-experiment` skill is unresolved. The audit's findings are triaged in the pull request before
-   the adoption. A change that meets condition 3 satisfies audit trigger 7, and a candidate that
-   fails condition 3 never becomes a base for later work.
-5. **Serving.** The change uses only inputs available at forecast time. If the change would need a
-   serving-path change to port, the page says so.
-
-**A change that wins on condition 1 but fails conditions 2 to 5 is recorded as a candidate, not
+**A change that wins on the gain condition but fails another condition is recorded as a candidate, not
 adopted.** Candidates are retested when the missing evidence arrives, or when a rebase run is
 available.
 
@@ -283,7 +262,7 @@ term improved the bare GAM-K by 0.40 points and worsened arm D by 0.03.
 1. A result that passes against a version that is no longer current becomes a candidate with the
    status "candidate (stale)".
 2. A short rebase run scores (current default plus x, minus current default) against the stored
-   forecasts of the current version, under the same five conditions and with no new plan.
+   forecasts of the current version, under the same adoption conditions and with no new plan.
 3. A rebase is needed unless every adoption since the experiment's version belongs to a different
    family.
 4. Where two candidates change the same component (two widening rules, for example), the rebase
@@ -303,7 +282,7 @@ non-inferior within the tolerance and the component sits in a higher complexity 
 **The experiment's own pull request carries the adoption.** Its front matter holds `promoted_to`
 (the name of the new version, for example "Primary demand research default 2") and the scores
 against the three benchmarks, and the same pull request adds a row to the
-[log](research-default-log.md). The reviewing session checks the five conditions before merging and
+[log](research-default-log.md). The reviewing session checks the adoption conditions before merging and
 assigns the version number. Versions are serial within a family.
 
 **Each log row holds eight items.** These are the change, the adopting experiment, the scored-year
