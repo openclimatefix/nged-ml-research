@@ -13,6 +13,7 @@ from studies.eval_protocol.slices import (
     SERIES_GROUPS,
     SLICE_NAMES,
     add_slice_columns,
+    build_slice_table,
     cold_start_flag,
     fold_plan,
 )
@@ -343,3 +344,17 @@ def test_series_groups_match_the_protocol() -> None:
         "MVA-only": sorted(["D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22"]),
         "short-history": ["D15", "D18"],
     }
+
+
+def test_slice_table_holds_the_keys_and_the_slice_columns_and_refuses_a_repeated_key() -> None:
+    """The table is keyed by the three key columns and carries one boolean column per slice."""
+    rows = make_rows(
+        valid_times=[utc(2026, 1, 5, 12) + timedelta(minutes=30 * k) for k in range(4)]
+    )
+    table = build_slice_table(rows=rows)
+    assert table.columns[:3] == ["time_series_id", "power_fcst_init_time", "valid_time"]
+    assert set(table.columns[3:]) <= set(SLICE_NAMES)
+    assert "winter" in table.columns
+    assert table.height == 4
+    with pytest.raises(ValueError, match="each key once"):
+        build_slice_table(rows=pl.concat([rows, rows]))

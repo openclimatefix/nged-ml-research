@@ -18,12 +18,24 @@ Input columns of `add_slice_columns`:
 - `elevation_deg`: the sun's elevation at the half-hour's midpoint (`SiteFeatures.elevation_deg`).
 - `pv_unit_shape`: the photovoltaic (PV) output per MW of AC capacity from CAMS irradiance
   (`SiteFeatures.pv_unit_shape`, built by `studies.dp_features.unit_pv_shape`).
-- `clear_sky_index` (optional): the clear-sky index, the global horizontal irradiance over the
-  Haurwitz clear-sky irradiance (`studies.baselines.haurwitz_w_m2`), zero where the clear-sky
-  irradiance is under 20 W/m2 (`clear_sky_index` in `e00323_basis.py`). Experiments 325 and 329 take
-  it from the ensemble-mean shortwave flux, so the slice means "forecast sunny". A caller that
-  passes the CAMS realised index (experiments 178, 235, and 269) gets a "realised sunny" slice.
-  The slice `sunny_clear_sky_index` exists only when this column is present.
+- `clear_sky_index` (optional): **a realised value, which the caller must pass**: the global
+  horizontal irradiance over the Haurwitz clear-sky irradiance (`studies.baselines.haurwitz_w_m2`),
+  zero where the clear-sky irradiance is under 20 W/m2 (`clear_sky_index` in `e00323_basis.py`).
+  Experiments 178, 235, and 269 take it from the CAMS realised irradiance. A forecast of the index
+  (experiments 325 and 329 take it from the ensemble-mean shortwave flux) is not what the protocol
+  asks for, because the sunny half-hours must be the same for every forecast under test. The slice
+  `sunny_clear_sky_index` exists only when this column is present.
+
+**Which sunny definition feeds the protected-slice tolerance.** The protocol's protected-slice
+tolerance reads `sunny_clear_sky_index` (sunny by clear-sky index). `sunny_unit_shape` and
+`sunny_april_june` (sunny by unit shape) are card slices, reported beside it and never read by the
+tolerance. A caller that does not pass the realised `clear_sky_index` column therefore has no
+protected sunny slice.
+
+**One slice table for every arm.** `sunny_unit_shape` takes a per-series quantile of the rows it is
+given, so two forecasts scored on different rows would be compared on different half-hours. The
+slice columns are therefore computed once, by `build_slice_table`, on the row set that every arm
+shares, and `studies.eval_protocol.metrics` joins that table to every arm.
 
 **Slice definitions** (a missing or non-finite input makes a slice's flag false, never null):
 
@@ -37,8 +49,8 @@ Input columns of `add_slice_columns`:
   half-hour starts in, from `studies.dp_calendar`: night 00:00 to 05:59, morning 06:00 to 10:59,
   midday 11:00 to 15:59, evening 16:00 to 23:59.
 - `sunny_unit_shape`: the unit PV shape is at or above the series' own 2/3 quantile of its daylight
-  rows, where daylight is a unit shape above 0.01. The edge is computed over the rows passed in, so
-  pass each series' scored rows, as the cards do.
+  rows, where daylight is a unit shape above 0.01. The edge is computed over the rows passed to
+  `build_slice_table`, which must be the half-hours shared by every arm under comparison.
 - `sunny_april_june`: `sunny_unit_shape` in local April, May, or June.
 - `sunny_clear_sky_index`: daylight (unit shape above 0.01) with a clear-sky index of 0.9 or more.
 - `winter`: local month December, January, or February.
@@ -83,6 +95,9 @@ import numpy as np
 import polars as pl
 
 from studies.dp_calendar import BAND_NAMES, calendar_columns
+
+KEY_COLUMNS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
+"""The columns that identify one scored half-hour of one forecast origin."""
 
 HOURS_PER_DAY: Final[int] = 24
 SUN_UP_UNIT_SHAPE: Final[float] = 0.01
@@ -369,3 +384,37 @@ def add_slice_columns(
         flags["event_rows"], flags["event_following_7_days"] = event_flags(rows=rows, events=events)
     ordered = [name for name in SLICE_NAMES if name in flags]
     return rows.with_columns(*[_as_column(name=name, value=flags[name]) for name in ordered])
+
+
+def build_slice_table(
+    *,
+    rows: pl.DataFrame,
+    events: pl.DataFrame | None = None,
+    first_readings: Mapping[int, datetime] | None = None,
+) -> pl.DataFrame:
+    """Return the slice columns of the half-hours that every arm shares, keyed by `KEY_COLUMNS`.
+
+    Compute this once, on the row set that all arms under comparison are scored on, and pass the
+    result to `studies.eval_protocol.metrics.score_forecast`. Every arm then sees the same
+    half-hours in each slice.
+
+    Args:
+        rows: The shared half-hours: `KEY_COLUMNS` and the other columns of `REQUIRED_COLUMNS`, and
+            optionally `clear_sky_index`. One row per key.
+        events: Hand-labelled events, as in `add_slice_columns`.
+        first_readings: Each series' first power reading, as in `add_slice_columns`.
+
+    Returns:
+        `KEY_COLUMNS` and one boolean column per available slice.
+
+    Raises:
+        ValueError: If `rows` lacks a required column or holds a key twice.
+    """
+    _check_columns(rows=rows)
+    if rows.select(*KEY_COLUMNS).is_duplicated().any():
+        msg = "the rows of a slice table must hold each key once"
+        raise ValueError(msg)
+    with_slices = add_slice_columns(rows=rows, events=events, first_readings=first_readings)
+    return with_slices.select(
+        *KEY_COLUMNS, *[name for name in SLICE_NAMES if name in with_slices.columns]
+    )
