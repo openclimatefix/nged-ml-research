@@ -97,7 +97,8 @@ result = pl.DataFrame._from_pydf(patito_df._df).cast({"foo": pl.Categorical})
 Patito use and is correct. Expression/Series casts like `pl.col("foo").cast(pl.Int8)` are always
 plain Polars and unaffected.)
 
-This is the caveat behind the Polars style rule in the [code style page](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/) that prefers
+This is the caveat behind the Polars style rule in the
+[code style page][code-style] that prefers
 `df.cast({"foo": pl.Int8})` over `df.with_columns(pl.col("foo").cast(pl.Int8))`: the preference
 holds only on a plain Polars frame.
 
@@ -251,5 +252,8 @@ These are Polars changes, not Patito traps, so they do not count against the bud
 ## The friction budget
 
 Five Patito traps is the budget. If a sixth workaround becomes necessary, revisit the approach
-rather than adding it here — the alternatives are in the [code style page](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/) under "Patito
+rather than adding it here — the alternatives are in the
+[code style page][code-style] under "Patito
 friction budget".
+
+[code-style]: https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/
