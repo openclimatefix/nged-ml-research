@@ -200,6 +200,11 @@ design is the section "Design for tonight" of `briefs/opus_detector_distillation
 
 ## Process notes
 
+- Reproduction gate, read before any c-arm score: a refit of arm d at 4 of the 52 weekly refits
+  differs from the stored weekly member by at most 0.0043 CRPS points at the 14 countable Primaries
+  and by 0.015 and 0.016 at the report-only D15 and D18 (GPU subsampling noise). The gate is read at
+  the countable Primaries, and the stored member is used as arm d.
+
 - Experiment 381's weekly baseline arm is not stored; arm d is refitted here from experiment 87's
   code, which experiment 381 also imports. Experiment 381's folder is never written.
 - Sonnet only, including sub-agents. At most 3 threads, `OMP_NUM_THREADS=1` per process,
