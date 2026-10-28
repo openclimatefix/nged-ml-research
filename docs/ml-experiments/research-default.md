@@ -52,8 +52,8 @@ effective capacity.** A point is 1% of a series' capacity.
 
 **A family with few series and few runs will rarely pass the gain test, and the rule does not lower
 the bar for it.** Three wind farms on 53 runs give wide intervals, so a wind change will seldom
-satisfy the gain condition. A change that cannot reach the bar stays a candidate, and the maintainer may
-judge it by a descriptive report instead.
+satisfy the gain condition. A change that cannot reach the bar stays a candidate, and the maintainer
+may judge it by a descriptive report instead.
 
 **The Primary-demand family fixes the following tolerances, in points unless stated.** A tolerance
 is the harm a protected group may suffer before an adoption fails.
@@ -183,8 +183,8 @@ fixes the metrics, folds, tolerances, minimum gains, and the adoption conditions
 the section "When a change is adopted" of the demand protocol is the reference text. This page keeps
 the definitions of the families, the research default versions, and the rebase and ablation rules.
 
-**A change that wins on the gain condition but fails another condition is recorded as a candidate, not
-adopted.** Candidates are retested when the missing evidence arrives, or when a rebase run is
+**A change that wins on the gain condition but fails another condition is recorded as a candidate,
+not adopted.** Candidates are retested when the missing evidence arrives, or when a rebase run is
 available.
 
 **The nominal 99% interval covers less than 99% on short periods.** A percentile
