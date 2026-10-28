@@ -65,8 +65,25 @@ jobs:
 
       # Ruff's D417 only catches an `Args:` section that is present and incomplete; pydoclint
       # compares the whole of `Args:` and `Returns:` against the signature.
+      # The whole tree takes about 32 s, so a pull request checks only the Python files it changes
+      # (the same rule as the pre-commit step below). A push to `main` checks every file, and so
+      # does a pull request that changes the pydoclint configuration or the locked tool versions.
       - name: Docstring lint (pydoclint)
-        run: uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google .
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          pydoclint_cmd=(uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google)
+          if [[ "$EVENT" == "pull_request" ]] && ! git diff --name-only HEAD^1 HEAD \
+              | grep -qE '^(\.pre-commit-config\.yaml|pyproject\.toml|uv\.lock|\.github/workflows/|scripts/lint/)'; then
+            mapfile -t changed < <(git diff --name-only --diff-filter=ACMR HEAD^1 HEAD -- '*.py')
+            if [[ ${#changed[@]} -eq 0 ]]; then
+              echo "No changed Python files; nothing to check."
+            else
+              "${pydoclint_cmd[@]}" "${changed[@]}"
+            fi
+          else
+            "${pydoclint_cmd[@]}" .
+          fi
 
       - name: Type-check (ty)
         run: uv run --no-sync ty check
