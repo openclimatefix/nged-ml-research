@@ -102,7 +102,7 @@ def main() -> None:
     interval_chart(
         rows=rows,
         y_sort=[r["label"] for r in rows],
-        title="The meta-model beats the blend only in sunny April to June half-hours",
+        title="The meta-model beats the blend, with an interval below zero, only in sunny April to June half-hours",
         subtitle="Pooled over the 14 Primaries with a stored GAM stack, 95% intervals",
         height=360,
     ).save(DOCS_DIR / "figure_2_by_slice.svg")

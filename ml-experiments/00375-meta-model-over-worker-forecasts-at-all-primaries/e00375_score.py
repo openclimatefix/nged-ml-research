@@ -85,6 +85,27 @@ def site_frame(*, cache: FeatureCache, site: str) -> pl.DataFrame:
     )
 
 
+def bootstrap(*, sums: np.ndarray, counts: np.ndarray) -> dict:
+    """Resample months (seed 0); a Primary with no rows in the drawn months is left out of that draw."""
+    rng = np.random.default_rng(0)
+    n_months = sums.shape[1]
+    draws = rng.integers(0, n_months, size=(s252.N_RESAMPLES, n_months))
+    drawn_counts = counts[:, draws].sum(axis=2)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        site_means = np.where(drawn_counts > 0, sums[:, draws].sum(axis=2) / drawn_counts, np.nan)
+    pooled = np.nanmean(site_means, axis=0)
+    point = sums.sum(axis=1) / np.maximum(counts.sum(axis=1), 1)
+    low, high = np.nanpercentile(site_means, s252.INTERVAL, axis=1)
+    return {
+        "site": [(float(p), float(a), float(b)) for p, a, b in zip(point, low, high, strict=True)],
+        "pooled": (
+            float(point.mean()),
+            float(np.nanpercentile(pooled, s252.INTERVAL[0])),
+            float(np.nanpercentile(pooled, s252.INTERVAL[1])),
+        ),
+    }
+
+
 def contrast(*, frames: dict[str, pl.DataFrame], column: str, flag: str) -> dict:
     """Return the paired month-resampled contrast of per-row differences over a slice (seed 0)."""
     months = sorted({m for f in frames.values() for m in f["month"].unique().to_list()})
@@ -97,7 +118,7 @@ def contrast(*, frames: dict[str, pl.DataFrame], column: str, flag: str) -> dict
         ):
             sums[i, months.index(month)] = total
             counts[i, months.index(month)] = count
-    return s252.bootstrap(sums=sums, counts=counts, seed=0) | {"sites": list(frames)}
+    return bootstrap(sums=sums, counts=counts) | {"sites": list(frames)}
 
 
 def main() -> None:  # noqa: PLR0912

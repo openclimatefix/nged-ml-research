@@ -59,13 +59,13 @@ headline: >-
   A meta-model over the worker forecasts scores worse than a fixed 50/50 blend of the GAM stack and
   BG2: +0.107 points pooled over 14 Primaries (95% +0.032 to +0.183), below the blend at only 4 of
   14 and wholly above it at 2 (D9, D11). It is level with the blend on cold winter nights (-0.010,
-  -0.142 to +0.046) and lower in sunny April-to-June half-hours (-0.143, -0.220 to 0.000).
+  -0.142 to +0.046) and lower in sunny April-to-June half-hours (-0.143, -0.220 to -0.026).
 lessons:
   - >-
     The 50/50 blend of the GAM stack and BG2 scores below BG2 at 13 of the 14 Primaries (D12 is the
     exception), so the fixed blend is already a strong comparator.
   - >-
-    Dropping the learned weights costs nothing: leaving out any one Primary leaves the pooled
+    No single Primary drives the result: leaving out any one Primary leaves the pooled
     meta-model-minus-blend contrast between +0.081 and +0.122.
 production_status: not-for-production
 adopted_in: none
@@ -73,8 +73,8 @@ take_home_message: >-
   A second-level XGBoost model that weights the stored worker forecasts by context scored worse than
   a fixed 50/50 blend of the GAM stack and BG2 across 14 Primaries (0.107 points of capacity
   higher; the blend is lower at 10 of 14). One meta-model architecture therefore does not work for
-  every substation as a replacement for the blend; its only gain is in sunny April-to-June
-  half-hours. This is one scored year, leads up to 168 hours.
+  every substation as a replacement for the blend; its one clear gain is in sunny April-to-June
+  half-hours. The data cover one scored year and leads up to 168 hours.
 advice:
   - >-
     Use the fixed 50/50 blend of the GAM stack and BG2 as the comparator for any learned weighting,
@@ -86,7 +86,7 @@ advice:
     Figure 1).
   - >-
     If a learned weighting is tried again, test it on sunny April-to-June half-hours only, where it
-    lowers the score by 0.143 points against the blend (-0.220 to 0.000) (Figure 2).
+    lowers the score by 0.143 points against the blend (-0.220 to -0.026) (Figure 2).
   - >-
     Test a fixed blend at D15 and D18 once a GAM stack is stored there; no stack exists at either
     Primary (Scope section).
@@ -98,15 +98,21 @@ date: 2026-10-28
 substation.** We asked whether the second-level XGBoost model of
 [experiment 373](../00373-d8-meta-model-weights-worker-forecasts/result.md), which we call the
 meta-model, would beat a fixed average of two forecasts at all 16 Primary substations, not only at D8.
-The meta-model sees the quantiles of eight stored forecasts, the lead time, the power at the
+The meta-model sees the quantiles of seven stored forecasts (six at D15 and D18), the lead time, the power at the
 forecast's origin, the calendar, and each forecast's error over the previous 7 days. The fixed
 average is the 50/50 blend of the GAM stack and BG2. Pooled over the 14 Primaries that have a stored
 GAM stack, the meta-model's quantile score was 3.288 (percent of capacity; lower is better) against
 3.181 for the blend. Its score was worse by 0.107 points (95% interval +0.032 to +0.183). It was
 lower than the blend at 4 Primaries and higher at 10. The verdict is `not supported`.
 
+**Terms.** A Primary is a primary substation of the electricity distribution network, and D2 to D22
+are anonymised labels for 16 of them. The GAM stack is a forecast from a generalised additive model
+with a Kalman filter. BG2 is the best-guess blend of five machine-learning forecasts (BG2's
+members). A point is 1% of a substation's effective capacity, and a lower quantile score is better.
+The `not supported` verdict follows the decision rule in the front matter.
+
 **The meta-model reproduces experiment 373 at D8 and fails to generalise.** At D8 the meta-model
-scored 7.406, the blend 7.434, and the best single forecast 7.405, exactly as experiment 373 found.
+scored 7.406, the blend 7.434, and the best single forecast 7.405, equal to experiment 373's.
 No forecast was fitted again: the five members of BG2 and BG2 are rebuilt for all 16 Primaries from
 the stored refit predictions of
 [experiment 87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) with the code of
@@ -120,7 +126,7 @@ settings are those of experiment 373 with no tuning.
 
 ![By Primary](figure_1_by_primary.svg)
 
-**Figure 2: the meta-model is lower than the blend only in sunny April-to-June half-hours.**
+**Figure 2: the meta-model is lower than the blend with an interval below zero only in sunny April-to-June half-hours.**
 
 ![By slice](figure_2_by_slice.svg)
 
@@ -135,9 +141,10 @@ settings are those of experiment 373 with no tuning.
   BG2; each of BG2's five members alone; climatology; manual heuristic. Code is in
   `ml-experiments/00375-*/` (`e00375_build.py`, `e00375_meta.py`, `e00375_score.py`,
   `e00375_charts.py`) and copies experiment 373's recipe.
-- **Rows.** 60,456 to 73,365 half-hourly rows per Primary, October 2025 to June 2026 (the first
+- **Rows.** 48,409 to 73,365 half-hourly rows per Primary, October 2025 to June 2026 (the first
   three months only train the meta-model), leads up to 168 hours, outside the hand-filtered
-  load-shift events, `fold_a_daily_gap_v1`. Intervals resample whole valid months, the same months at
+  load-shift events at the 13 Primaries whose stack file carries the event mask (D8, D15, and D18
+  carry none, so no events are removed there), `fold_a_daily_gap_v1`. Intervals resample whole valid months, the same months at
   every Primary (20,000 resamples, seed 0); the pooled figure is the mean of the Primaries' means.
 - **Gate.** The rebuilt D8 frame reproduces the GAM stack (8.338), BG2 (7.593), and the five members
   (7.560, 7.694, 7.472, 7.633, 8.562) on 96,986 rows, and the D8 meta-model, blend, and best single
@@ -174,8 +181,8 @@ settings are those of experiment 373 with no tuning.
   worker 3.345; BG2 3.360; GAM stack 3.450; manual heuristic 4.134; climatology 4.535. The blend is
   below BG2 at 13 of 14 Primaries.
 - **Slices, C1 pooled (95%).** Cold winter nights -0.010 (-0.142 to +0.046). Sunny April-to-June
-  half-hours -0.143 (-0.220 to 0.000). Bank holidays and 24 December to 2 January +0.208 (-0.195 to
-  +0.330). All other days +0.101 (+0.028 to +0.177). Experiment 373's holiday gain at D8 (-0.471)
+  half-hours -0.143 (-0.220 to -0.026). Bank holidays and 24 December to 2 January +0.208 (-0.195 to
+  +0.356). All other days +0.101 (+0.028 to +0.177). Experiment 373's holiday gain at D8 (-0.471)
   does not appear at the other Primaries: only D4, D5, D8, D12, and D22 are lower there.
 - **Primaries with no stored stack (D15, D18).** The base is BG2, the blend is BG2, and these two are
   not in the pooled figure. The meta-model is lower than BG2 at both (D18 wholly below, -0.080,
@@ -202,7 +209,7 @@ settings are those of experiment 373 with no tuning.
   meta-model is higher than the blend on error at 12 of 14 Primaries, the same direction as C1.
 - **Leave-one-out.** Dropping any one Primary leaves C1 between +0.081 and +0.122, with every
   interval above zero, so no site drives the result.
-- **Triggers.** None fired. The gate passed; the result agrees with the pre-registered expectation
+- **Triggers.** None of the seven triggers in the `ml-experiment` skill fired. The gate passed; the result agrees with the pre-registered expectation
   that the prediction would fail; the score and error contrasts agree; leaving one Primary out never
   flips C1; C4 and C5 move the score by less than their interval half-widths; D8's C1 interval
   (-0.142 to +0.093) matches experiment 373's (-0.145 to +0.094); and no later design depends on this
@@ -216,4 +223,4 @@ settings are those of experiment 373 with no tuning.
   of the GAM stack and BG2 on ordinary days at 14 Primaries, so the next gain in uncertainty is more
   likely to come from a better single forecast than from a better combiner. The one lead left is
   sunny April-to-June half-hours, where the meta-model is lower than the blend by 0.143 points
-  (-0.220 to 0.000) and the intervals touch zero.
+  (-0.220 to -0.026), a slice chosen after the first look.
