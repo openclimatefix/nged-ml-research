@@ -162,6 +162,31 @@ def _full_fixture(
             )
 
 
+@pytest.fixture(scope="module")
+def full_data_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """One folder holding the full solar and wind fixtures, written once and only ever read."""
+    data_dir = tmp_path_factory.mktemp("full_fixture")
+    _full_fixture(data_dir, domain="solar")
+    _full_fixture(data_dir, domain="wind")
+    return data_dir
+
+
+@pytest.fixture(scope="module")
+def solar_rows(full_data_dir: Path) -> pl.DataFrame:
+    return compute(data_dir=full_data_dir, domain="solar")
+
+
+@pytest.fixture(scope="module")
+def wind_rows(full_data_dir: Path) -> pl.DataFrame:
+    return compute(data_dir=full_data_dir, domain="wind")
+
+
+@pytest.fixture(scope="module")
+def solar_spec_19(solar_rows: pl.DataFrame) -> dict:
+    """The solar figure's Vega-Lite spec, drawn once as figure 19; tests only read it."""
+    return draw(rows=solar_rows, domain="solar", number=19).to_dict()
+
+
 def test_a_folder_without_an_ens_mean_reads_the_ens_mean_of_the_leads_day10_folder(
     tmp_path: Path,
 ) -> None:
@@ -497,10 +522,9 @@ def test_six_months_is_enough_for_an_interval_and_five_is_not(tmp_path: Path) ->
 
 
 def test_the_three_fewer_month_products_have_a_second_mark_against_the_leaderboard_ens_mean(
-    tmp_path: Path,
+    solar_rows: pl.DataFrame,
 ) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
+    rows = solar_rows
 
     for label in (AIFS_SINGLE, AIFS_ENS, WN3):
         row = _row(rows, label, 3)
@@ -516,14 +540,13 @@ def test_the_three_fewer_month_products_have_a_second_mark_against_the_leaderboa
 
 
 def test_the_second_mark_is_drawn_as_a_hollow_diamond_with_its_own_interval(
-    tmp_path: Path,
+    solar_rows: pl.DataFrame, solar_spec_19: dict
 ) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
+    rows = solar_rows
 
     shaped = chart_rows(rows=rows, day=3, domain="solar")
     paired = shaped.filter(pl.col("other_difference").is_not_null())
-    spec = draw(rows=rows, domain="solar", number=19).to_dict()
+    spec = solar_spec_19
 
     assert sorted(paired["label"].to_list()) == sorted([AIFS_SINGLE, AIFS_ENS, WN3])
     assert paired.filter(pl.col("other_lower_95").is_null()).is_empty()
@@ -567,23 +590,24 @@ def test_the_second_mark_reads_the_leaderboards_ens_mean_arm_for_every_day() -> 
     assert {c.reference for c in wind_wn3} == {f"ens_meanvec_day{c.day}" for c in wind_wn3}
 
 
-def test_an_interval_from_fewer_than_twelve_months_is_dashed(tmp_path: Path) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
+def test_an_interval_from_fewer_than_twelve_months_is_dashed(
+    solar_rows: pl.DataFrame, solar_spec_19: dict
+) -> None:
+    rows = solar_rows
 
     assert _row(rows, AIFS_SINGLE, 3)["dashed"] is False
     assert _row(rows, AIFS_ENS, 3)["dashed"] is True
     assert _row(rows, WN3, 3)["dashed"] is True
     assert _row(rows, "UKV", 0)["dashed"] is False
     assert _row(rows, WN3, 3)["second_dashed"] is True
-    assert "strokeDash" in str(draw(rows=rows, domain="solar", number=19).to_dict())
+    assert "strokeDash" in str(solar_spec_19)
 
 
-def test_the_wind_wn3_day_10_row_is_footnoted_with_the_reports_numbers(tmp_path: Path) -> None:
-    _full_fixture(tmp_path, domain="solar")
-    _full_fixture(tmp_path, domain="wind")
-    wind = compute(data_dir=tmp_path, domain="wind")
-    solar = compute(data_dir=tmp_path, domain="solar")
+def test_the_wind_wn3_day_10_row_is_footnoted_with_the_reports_numbers(
+    solar_rows: pl.DataFrame, wind_rows: pl.DataFrame
+) -> None:
+    wind = wind_rows
+    solar = solar_rows
 
     notes = footnotes_for(domain="wind", rows=wind)
     wind_text = " ".join(subtitle_lines(domain="wind", rows=wind))
@@ -601,14 +625,11 @@ def test_the_wind_wn3_day_10_row_is_footnoted_with_the_reports_numbers(tmp_path:
 
 
 def test_the_gap_between_the_two_references_is_computed_for_each_short_history_row(
-    tmp_path: Path,
+    solar_rows: pl.DataFrame, wind_rows: pl.DataFrame
 ) -> None:
-    _full_fixture(tmp_path, domain="solar")
-    _full_fixture(tmp_path, domain="wind")
     gap = (OWN_FILE_ENS_ERROR - LEADERBOARD_ENS_ERROR) * 100
 
-    for domain in ("solar", "wind"):
-        rows = compute(data_dir=tmp_path, domain=domain)
+    for rows in (solar_rows, wind_rows):
         for label in (AIFS_SINGLE, AIFS_ENS, WN3):
             row = _row(rows, label, 4)
             assert row["reference_gap_value"] == pytest.approx(gap)
@@ -618,13 +639,10 @@ def test_the_gap_between_the_two_references_is_computed_for_each_short_history_r
         assert _row(rows, "UKV", 0)["reference_gap_value"] is None
 
 
-def test_the_report_marks_dashed_cells_and_prints_the_footnotes(tmp_path: Path) -> None:
-    _full_fixture(tmp_path, domain="solar")
-    _full_fixture(tmp_path, domain="wind")
-    rows: dict[DomainType, pl.DataFrame] = {
-        "solar": compute(data_dir=tmp_path, domain="solar"),
-        "wind": compute(data_dir=tmp_path, domain="wind"),
-    }
+def test_the_report_marks_dashed_cells_and_prints_the_footnotes(
+    solar_rows: pl.DataFrame, wind_rows: pl.DataFrame
+) -> None:
+    rows: dict[DomainType, pl.DataFrame] = {"solar": solar_rows, "wind": wind_rows}
 
     report = report_text(rows=rows)
 
@@ -633,9 +651,8 @@ def test_the_report_marks_dashed_cells_and_prints_the_footnotes(tmp_path: Path) 
     assert "Own-file ENS mean minus the 21-month ENS mean" in report
 
 
-def test_chart_rows_are_sorted_best_first_and_hold_one_day(tmp_path: Path) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
+def test_chart_rows_are_sorted_best_first_and_hold_one_day(solar_rows: pl.DataFrame) -> None:
+    rows = solar_rows
 
     shaped = chart_rows(rows=rows, day=0, domain="solar")
 
@@ -643,12 +660,11 @@ def test_chart_rows_are_sorted_best_first_and_hold_one_day(tmp_path: Path) -> No
     assert shaped.height == rows.filter(pl.col("day") == 0).height
 
 
-def test_the_figure_draws_with_its_number(tmp_path: Path) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
-
+def test_the_figure_draws_with_its_number(solar_rows: pl.DataFrame) -> None:
     assert FIRST_FIGURE_NUMBER == 1
-    assert "Figure 1:" in str(draw(rows=rows, domain="solar", number=FIRST_FIGURE_NUMBER).to_dict())
+    assert "Figure 1:" in str(
+        draw(rows=solar_rows, domain="solar", number=FIRST_FIGURE_NUMBER).to_dict()
+    )
 
 
 def _bar_layers_per_panel(spec: dict) -> list[int]:
@@ -658,9 +674,8 @@ def _bar_layers_per_panel(spec: dict) -> list[int]:
     return [count for child in spec.get("vconcat", []) for count in _bar_layers_per_panel(child)]
 
 
-def test_row_bands_draw_one_band_layer_in_every_panel(tmp_path: Path) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
+def test_row_bands_draw_one_band_layer_in_every_panel(solar_rows: pl.DataFrame) -> None:
+    rows = solar_rows
     days = set(rows["day"].to_list())
 
     banded = _bar_layers_per_panel(
@@ -671,9 +686,8 @@ def test_row_bands_draw_one_band_layer_in_every_panel(tmp_path: Path) -> None:
     assert set(banded) == {1}
 
 
-def test_the_default_figure_and_a_blends_figure_draw_no_bands(tmp_path: Path) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
+def test_the_default_figure_and_a_blends_figure_draw_no_bands(solar_rows: pl.DataFrame) -> None:
+    rows = solar_rows
 
     default = _bar_layers_per_panel(draw(rows=rows, domain="solar", number=1).to_dict())
     blends = _bar_layers_per_panel(
@@ -685,26 +699,26 @@ def test_the_default_figure_and_a_blends_figure_draw_no_bands(tmp_path: Path) ->
     assert not any(blends)
 
 
-def test_the_titles_name_the_quantity_and_count_no_rows(tmp_path: Path) -> None:
+def test_the_titles_name_the_quantity_and_count_no_rows(
+    solar_rows: pl.DataFrame, solar_spec_19: dict
+) -> None:
     assert figure_title(domain="solar") == (
         "For solar power, each weather product's error minus the ENS mean's error, by lead day"
     )
     assert figure_title(domain="wind") == (
         "For wind power, each weather product's error minus the ENS mean's error, by lead day"
     )
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
-    text = str(draw(rows=rows, domain="solar", number=19).to_dict())
+    rows = solar_rows
+    text = str(solar_spec_19)
     assert "product-and-lead rows" not in text
     assert "told apart" not in text
     assert "includes zero" in " ".join(subtitle_lines(domain="solar", rows=rows))
 
 
 def test_the_subtitle_says_which_products_read_a_shorter_lead_and_what_that_means(
-    tmp_path: Path,
+    solar_rows: pl.DataFrame,
 ) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
+    rows = solar_rows
 
     text = " ".join(subtitle_lines(domain="solar", rows=rows))
 
@@ -714,11 +728,8 @@ def test_the_subtitle_says_which_products_read_a_shorter_lead_and_what_that_mean
     assert "a lower error is not evidence of skill at equal lead" in text
 
 
-def test_the_figure_draws_no_accessibility_text_on_its_marks(tmp_path: Path) -> None:
-    _full_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")
-
-    spec = str(draw(rows=rows, domain="solar", number=19).to_dict())
+def test_the_figure_draws_no_accessibility_text_on_its_marks(solar_spec_19: dict) -> None:
+    spec = str(solar_spec_19)
 
     assert "'aria': False" in spec
 
@@ -951,10 +962,8 @@ def test_ifs_single_keys_the_treatment_lacks_still_raise_the_other_way() -> None
         )
 
 
-def test_each_row_records_how_many_rows_each_arm_holds(tmp_path: Path) -> None:
-    _full_fixture(tmp_path)
-
-    rows = compute(data_dir=tmp_path, domain="solar")
+def test_each_row_records_how_many_rows_each_arm_holds(solar_rows: pl.DataFrame) -> None:
+    rows = solar_rows
 
     row = rows.filter((pl.col("label") == "UKV") & (pl.col("day") == 0)).row(0, named=True)
     assert row["treatment_rows"] == row["reference_rows"] == 2 * 12 * 4 * 3
