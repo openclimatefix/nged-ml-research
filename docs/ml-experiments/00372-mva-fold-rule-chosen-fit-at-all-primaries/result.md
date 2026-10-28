@@ -7,41 +7,43 @@ also_relevant_to:
 status: planned
 kind: other
 size: >-
-  medium. Stored: small result files in the private folder only. Production serving path: not
-  touched. Degradation rule: not touched. Designs: more than one would test the hypothesis (a full
-  refit of the stack with the rule's fit, or the stored fits of experiment 152 plus the stage-2
-  corrections of experiment 252); the stored fits plus stage 2 are chosen because experiment 353
-  already runs that pipeline at D8 and it needs no new fit. Callers: reuses the scripts of
-  experiments 252 and 353, whose callers are all in those folders.
+  simple. Stored: small result files in the private folder only. Production serving path: not
+  touched. Degradation rule: not touched. Designs: more than one would test the hypothesis (a
+  re-run of experiment 152's engine to get tuning forecasts for stage 2, or the stored fits as
+  they are); the stored fits are chosen because re-running the engine needs hours of compute and a
+  maintainer decision. Callers: reuses the scoring helpers of experiment 252, whose callers are all
+  in that folder.
 hypothesis: >-
-  At the eight MVA-only Primaries, a forecast that uses the fit the rule of experiment 366 chooses
-  (the fit through the meter at Stickney, D12, and the naive fit that reads the meter reading as
-  signed power at the other seven), followed by the stage-2 corrections of experiment 252, scores
-  no worse than experiment 252's arm A1 pooled over the eight Primaries, and scores better than the
-  naive fit at D12.
+  At the eight MVA-only Primaries, the fit that the rule of experiment 366 chooses (the fit through
+  the meter at Stickney, D12, and the naive fit that reads the meter reading as signed power at the
+  other seven) scores better than the naive fit at D12 on sunny daylight half-hours, and scores no
+  better than BG2, the production-style forecast, at most of the eight.
 prediction: >-
-  C1 (chosen minus A1, quantile score over all rows, pooled over the eight Primaries) lies between
-  -0.30 and +0.30 points, because experiment 353 found the fold changes D8's score by -0.23 points
-  and experiment 252's A1 differs from the stored fits in having a fitted solar term and clip. C2
-  (D12, chosen minus naive fit, sunny daylight half-hours) is at most -0.30 points, in line with
-  experiment 152's gain of about 0.4. C3 (the chosen arm minus A1 at the seven naive-fit
-  Primaries) is positive at 4 or more of 7, because experiment 252 found that dropping the fitted
-  solar term costs 0.19 to 0.34 points; this is the prediction most likely to fail.
+  P1. At D12, the fit through the meter minus the naive fit on sunny daylight half-hours is between
+  -1.0 and 0.0 points of effective capacity (experiment 152 found about -0.4 for a variant of the
+  fit through the meter with folded quantiles), with a month-resampled 95% interval wholly below
+  zero. P2. At the seven Primaries where the rule chooses the naive fit, the chosen fit equals the
+  naive fit by construction, so their contrast is exactly zero and is not evidence. P3. The chosen
+  fit scores worse than BG2 over all rows at 6 or more of the 8 Primaries, because experiment 252
+  found that raw fits without stage-2 corrections trail BG2 at most MVA-only Primaries; this can
+  fail. P4. The two Primaries without a stack fit (D15 and D18) are scored only against the three
+  references, so no prediction applies.
 decision_rule: >-
-  C1 bears the verdict. Paired month-resampled bootstrap, 20,000 resamples, 95% interval, as in
-  experiment 353. `supported` when the interval lies wholly below zero and the point estimate is at
-  most -0.10 points (a stored meter fit is existing reviewed code, so the threshold covers only the
-  added choice between two fits); `small gain` when wholly below zero but above -0.10; `not
-  supported` when the interval includes zero and C2 is not at most -0.30. C2 and C3 are descriptive.
-  Control gate: rescoring A1 and the three references must reproduce experiment 252's stored
-  scores. Reactive power zero only; the rule fails at power factor 0.97 (experiments 358, 366).
+  P1 bears the verdict: `supported` when the interval at D12 lies wholly below zero, `not
+  supported` when it includes zero or lies above zero. The threshold on the gain is zero, because
+  switching to a stored fit at one Primary adds no pipeline step. P3 and P4 are descriptive. Control
+  gate: the three references rescored here must reproduce the scores that experiment 252 prints
+  for the same Primaries and rows. All results are for zero reactive power, and the rule fails at
+  power factor 0.97 (experiments 358 and 366). This experiment is close to a repeat of experiment
+  152, applies no stage-2 correction, and makes no claim against experiment 252's arm A1.
 benchmark: >-
-  Experiment 252's arm A1; BG2, climatology, and manual_heuristic as stored by experiment 87
+  The naive fit (arm N of experiment 152); BG2, climatology, and manual_heuristic as stored by
+  experiment 87
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Quantile score (twice the mean pinball loss over 11 quantiles) in points of effective capacity,
   scored year 2025-07-02 to 2026-06-30, leads 0.5 to 168 hours, rows outside the hand-filtered
-  events; slices sunny daylight, winter nights, cold nights; tail coverage at q01, q05, q95, q99
+  events; slices sunny daylight, winter nights, cold nights
 verdict: ""
 production_status: not-for-production
 adopted_in: none
@@ -52,22 +54,19 @@ date: 2026-10-28
 
 **Planned. Written before any score of this experiment is read.**
 
-This is step 4 of the MVA sequence. The 16 Primaries split into six with signed-MW readings, eight
-with MVA-only readings, and two (D15 and D18) with short histories.
+This is step 4 of the MVA sequence, in its cheap form. Re-running experiment 152's ensemble engine
+into a new folder, to get the tuning forecasts that experiment 252's stage-2 corrections need, is
+the follow-up the maintainer may choose.
 
 ## Plan
 
-- **Eight MVA-only Primaries.** For each, take the fit the rule of
-  [experiment 366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md) chooses
-  (L0 at D12, N elsewhere) from the stored fits of experiment 152, apply the stage-2 corrections of
-  experiment 252 as experiment 353 did at D8, and score it against A1 and the references.
-- **Six signed-MW Primaries.** Not refitted: they need no fold. Their stack scores come from the
-  research-default log, quoted and not recomputed; BG2, climatology, and the manual heuristic are
-  rescored on the same rows.
-- **D15 and D18.** The stack has never run at either, so only BG2, climatology, and the manual
-  heuristic are scored. D15 (about 0.8 months of usable history) and D18 (about 2.6 months) have
-  short histories; running the stack there would need new fits and is not done here.
+- **Eight MVA-only Primaries.** Score the stored forecasts of experiment 152: arm N (the naive
+  fit) and arm A (the fit through the meter). The chosen fit is arm A at D12, where the rule of
+  [experiment 366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md) picks the
+  fit through the meter on the training rows before 2025-07-01, and arm N at the other seven.
+- **All 16 Primaries.** Score BG2, climatology, and the manual heuristic on the rows they share.
+  The six signed-MW Primaries have no stored stack scores on these rows, so the stack is not scored
+  there. The stack has never run at D15 or D18, whose usable histories are about 0.8 and 2.6 months.
 - **Hand-filtered event lists.** The number of masked half-hours of the scored year is reported for
   every Primary, so the Primaries without a list are visible.
-- **Reactive power.** All results hold for zero reactive power. Real MVA-only meters have unknown
-  reactive power, and the rule fails at power factor 0.97.
+- **Reactive power.** Every result holds for reactive power zero.
