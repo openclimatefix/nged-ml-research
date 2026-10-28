@@ -34,7 +34,8 @@ prediction: >-
 decision_rule: >-
   P1 bears the verdict, by a paired month-resampled bootstrap with 20,000 resamples and a 95%
   interval, as in experiment 353. `supported` when the interval's upper end is below +0.10 points
-  (non-inferiority: the added cost of the chosen fit's choice is zero) and the control gate passes.
+  (non-inferiority: the rule's choice must not score worse than A1 by 0.10 points or more) and
+  the control gate passes.
   `not supported` when the upper end is at or above +0.10 points, or when the interval lies wholly
   above zero. `inconclusive` when the control gate fails. P2 to P4 are descriptive. Every result
   holds for reactive power zero, and the rule fails at power factor 0.97 (experiments 358 and 366).
@@ -66,8 +67,8 @@ take_home_message: >-
 lessons:
   - >-
     Stage 2 improves the raw fits by 0.04 to 0.14 points at 7 of the 8 Primaries and makes D8 worse
-    by 0.42 (0.19 to 0.69), where it borrows the donor Primaries' spread because D8 has no tuning
-    month.
+    by 0.42 (0.19 to 0.69). D8 has no tuning month and borrows the spread of six donor Primaries,
+    which may explain the worsening.
   - >-
     The gap to BG2 is a D8 gap: without D8 the pooled gap is +0.07 (-0.03 to +0.17).
 advice:
@@ -86,27 +87,32 @@ advice:
 
 **The fit that experiment 366's rule chooses, followed by experiment 252's stage-2 corrections,
 scores no worse than the stack's arm A1 at the eight Primaries that report only apparent power.**
-Over all half-hours, pooled over the eight, the difference is -0.03 points of effective capacity
-(95% interval -0.08 to +0.02). The registered threshold was an upper end below +0.10, and the
+A1 is the arm of experiment 252's stack that carries stage 2. Over all half-hours, pooled over the
+eight, the difference is -0.03 points of effective capacity (percent of the Primary's capacity;
+95% interval -0.08 to +0.02). The registered threshold was an upper end below +0.10, and the
 control gate passed. Verdict: supported.
 
 A Primary is a substation that steps 33 kV down to 11 kV. Eight Primaries report apparent power in
-megavolt-amperes (MVA), which has no sign, so reverse flow is hidden. The rule of
-[experiment 366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md) picks the
-fit through the meter at D12 and the naive fit, which reads the meter reading as signed power, at
-the other seven. Stage 2 is the correction step of
-[experiment 252](../00252-gam-stack-at-eight-more-primaries/result.md): a night offset, recipe R,
-and a lead-hour spread refitted on tuning-month residuals. A1 is that experiment's stack arm.
+megavolt-amperes (MVA), which has no sign, so reverse flow is hidden. The rule of [experiment
+366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md) picks the fit through the
+meter at D12 and the naive fit, which reads the meter reading as signed power, at the other seven.
+Stage 2 is the correction step of [experiment
+252](../00252-gam-stack-at-eight-more-primaries/result.md): a night offset, recipe R, and a
+lead-hour spread refitted on tuning-month residuals. The fit through the meter models the lost sign
+of the flow. D2, D3, D4, D8, D12, D19, D21, and D22 are the eight Primaries' short names; D8 is
+Marsh Lane, D12 Stickney, and D22 Langrick.
 
-**The forecast still trails BG2, the production-style forecast.** Chosen fit with stage 2 minus BG2
-is +0.53 (+0.35 to +0.73) over all half-hours. The gap sits at D8 (+3.77), D12 (+0.65), and D22
-(+0.37). A1 trails BG2 by +0.56 (+0.39 to +0.75), so stage 2 does not change that.
+**The chosen fit's forecast still trails BG2, the production-style forecast.** Chosen fit with stage
+2 minus BG2 is +0.53 (+0.35 to +0.73) over all half-hours. The gap sits at D8 (+3.77), D12 (+0.65),
+and D22 (+0.37). A1 trails BG2 by +0.56 (+0.39 to +0.75), so the choice of fit does not change the
+gap.
 
 **Every result holds for reactive power zero (power factor 1).** Experiment 366's rule fails at
-power factor 0.97 ([experiment
-358](../00358-mva-fold-known-answer-at-folded-mw-primaries/result.md) and 366), and real MVA-only
-meters have unknown reactive power. The maintainer decided on 2026-10-28 to keep zero and count experiment 366 as a win. The rule is used as 366 registered it and is not tuned on these
-Primaries. For D8, it is unproven whether the generator explains the steps and the gap.
+power factor 0.97 ([experiment 358](../00358-mva-fold-known-answer-at-folded-mw-primaries/result.md)
+and 366), and real MVA-only meters have unknown reactive power. The maintainer decided on 2026-10-28
+to keep reactive power at zero and to count experiment 366 as a win. The rule is used as 366
+registered it and is not tuned on these Primaries. For D8, it is unproven whether the generator
+explains the steps and the gap.
 
 ![Figure 1: quantile score at the 8 MVA-only Primaries](figure_1_score_by_primary.svg)
 
@@ -160,10 +166,10 @@ their scores differ by 0.01 to 0.05 points.
   (-0.04 to +0.04) on winter nights. Minus BG2 it is -0.12 (-0.26 to +0.13) on cold nights and +0.28
   (+0.16 to +0.39) on winter nights.
 - **Tail calibration** (share of readings at or below each quantile, mean over the eight; ideal
-  0.01, 0.05, 0.95, 0.99). Chosen with stage 2: 0.054, 0.112, 0.916, 0.964 over all half-hours.
-  A1: 0.054, 0.112, 0.917, 0.963. BG2: 0.005, 0.040, 0.957, 0.995. The stack's lower tail is too
-  high, so its low quantiles are too narrow, and BG2's tails are closer to ideal. D8 shows it
-  most: q05 coverage 0.311 for the chosen fit and 0.040 for BG2.
+  0.01, 0.05, 0.95, 0.99). Chosen with stage 2: 0.054, 0.112, 0.916, 0.964 over all half-hours. A1:
+  0.054, 0.112, 0.917, 0.963. BG2: 0.005, 0.040, 0.957, 0.995. The share of readings below the q05
+  forecast is 0.112 rather than 0.05, so the stack's low quantiles are too high, and BG2's tails are
+  closer to ideal. D8 shows it most: q05 coverage 0.311 for the chosen fit and 0.040 for BG2.
 - **D15 and D18.** The stack has never run at either, so only the references are scored.
   [Experiment 372](../00372-mva-fold-rule-chosen-fit-at-all-primaries/result.md) reports BG2
   scores of 11.27 at D15 and 2.74 at D18, and the hand-filtered half-hours at every Primary. The
