@@ -25,8 +25,11 @@ groups answer different questions, so no headline pools them.
 | Short-history | D15, D18 | Report-only: no adoption rests on this group. No experiment we found fitted the GAM stack at D15 |
 
 **D8 is a labelled exception.** D8 has no tuning month and borrows the second-stage spread of six
-donor Primaries (D2, D3, D4, D19, D21, and D22). A forecast for D8 that uses donor spread is allowed
-and is labelled as such in every table.
+donor Primaries (D2, D3, D4, D19, D21, and D22). D8 is scored in two labelled arms: one with donor
+spread, and one with own-residual bands fitted on earlier folds. The own-residual arm is the D8 row
+in the per-Primary table, because the donor-spread arm is known to be the weaker one and would make
+D8 the worst Primary for a reason that is already understood. Donor spread is fitted before D8 is
+scored, so D8 is fitted last.
 
 **Every number for the MVA-only group carries the label "reactive power assumed zero".** The rule
 that picks the fit fails at a power factor of 0.97, and the reactive power of the real MVA-only
@@ -41,7 +44,8 @@ overwritten. Each reference is never retuned. Earlier scores of the references, 
 hours and use other row sets, are not comparable with scores under this protocol.
 
 **The lead range is 0.5 to 240 hours, and every experiment scores all of it.** NGED's horizon is 1
-to 10 days. Days 11 to 14 are reported where the forecast exists.
+to 10 days. Days 11 to 14 are reported only for the arms that have forecasts at those leads, and a table
+lists which arms are covered.
 
 **The first run under this protocol produces the forecasts for 168 to 240 hours that the references
 lack.** The stored demand forecasts stop at 168 hours, so BG2 has never been scored past 168 hours,
@@ -127,14 +131,17 @@ on the held-out data is a separate, later piece of work.
 
 **The three scored metrics are the mean absolute error of the median, the continuous ranked
 probability score (CRPS), and the tail-weighted CRPS (twCRPS).** CRPS is estimated as the quantile
-score over 11 levels, which is the headline metric of the research default rule. The ensemble CRPS
+score over 11 levels, which is the headline metric of every family. The ensemble CRPS
 of `studies.ensemble_scores` is a different estimator and is not used here. Pass or fail is judged
 in points of effective capacity, where a point is 1% of a Primary's capacity, and every table shows
 megawatts beside it, as the substation cards do. The headline metric is CRPS.
 
 **Four tail measures and the curtailment cost are reported and have no pass or fail.** The tail
 measures are pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles, per group and
-per Primary. The curtailment cost is the existing avoidable-curtailment-cost measure.
+per Primary. The curtailment cost is the avoidable-curtailment-cost measure of `studies.eval_protocol`. It is
+read only for the signed-MW group. The MVA-only meters record unsigned apparent power, which hides
+reverse flow, so the cost is not defined there and carries the label "reactive power assumed
+zero".
 
 **The implementing code is the package `studies.eval_protocol`.** The package lives in
 `src/studies/eval_protocol/`, with the modules `metrics.py` and `slices.py`, and a separate pull
@@ -162,9 +169,9 @@ A slice with few half-hours is labelled "thin", as the substation cards do.
 | Lead time | Day 1 (0 to 24 hours), day 2, days 3 to 4, days 5 to 7, days 8 to 10, days 11 to 14. Days 1 to 10 is the headline band |
 | Time of day | Night, morning, midday, and evening, in local time, with the hour boundaries stated in `studies.eval_protocol` |
 | Condition | All days; sunny by clear-sky index; sunny by unit shape; sunny April to June; the months excluded by the 12-month rule; winter (December to February); winter nights; cold nights (3 °C or below); Economy 7 step hours; Christmas (24 December to 1 January); bank holidays |
-| Load-shift events | During each hand-labelled load-shift (switching) event; in the 7 days after each event ends |
+| Load-shift events | During each hand-labelled load-shift event; in the 7 days after each event ends |
 | Group | Signed-MW, MVA-only, and short-history, each separately |
-| Series | Every Primary on its own row |
+| Series | Every Primary on its own row, and every Primary in each lead band (at least the day 1 band beside days 1 to 10) |
 
 **The two load-shift slices have no pass or fail.** The row set of the main score excludes the rows
 inside hand-filtered events, so the scores during the events and in the 7 days after each event
@@ -174,12 +181,28 @@ of `demand-v1`, which the maintainer may change in a later version. The event li
 hand-filtered list and never the output of a detector.
 
 **The tolerance for "sunny daylight half-hours" applies to the sunny-by-clear-sky-index slice.** The
+first run passes the realised clear-sky index (global horizontal irradiance over the Haurwitz
+clear-sky irradiance). The
 other sunny slices are reported.
 
 **The verdict names the lead band it rests on.** A verdict that rests on days 1 to 2 says so,
 because NGED's horizon is 1 to 10 days.
 
 ## Reporting in every write-up
+
+**The twCRPS threshold and the curtailment limit need at least 12 months of readings before the
+scored period.** A series with fewer readings gets a null value and a status, not a threshold from
+a short history.
+
+**An arm that is missing at a Primary is reported as "not fitted", never dropped.** The tally of
+Primaries where the forecast under test wins states its denominator, which is the number of
+Primaries scored for both arms, and the number of Primaries not fitted.
+
+**For each pre-registered contrast, the write-up states the 99% interval of the adoption condition
+and the 95% interval of the reported contrast, with the direction, the lead band, and the pooling
+decided before scoring.** The 99% interval undercovers on short periods (96.5% at 12 months), and
+the write-up says so beside it. The first run states, for each Primary, whether it has a replicate
+and which Primaries have hand-labelled events, since an empty event list gives an empty slice.
 
 **Each write-up reports the load-shift slices beside the main score.** The write-up shows the score
 during the events and the score in the 7 days after each event ends, for the forecast under test
