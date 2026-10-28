@@ -127,7 +127,7 @@ def stack_gap_mw_sites() -> dict[str, float]:
 
 def _rho(table: pl.DataFrame, *, keep) -> float:  # noqa: ANN001
     """Return the Spearman correlation of step rate and gap over the sites `keep` accepts."""
-    part = table.filter(pl.col("site").map_elements(keep, return_dtype=pl.Boolean))
+    part = table.filter(pl.Series([keep(s) for s in table["site"]]))
     return float(spearmanr(part["rate_per_month"], part["gap_points"]).statistic)
 
 
