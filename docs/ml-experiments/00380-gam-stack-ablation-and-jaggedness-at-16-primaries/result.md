@@ -320,4 +320,17 @@ Kalman filter, and BG2.
 
 ## Audit
 
-(Filled in after the audit.)
+A fresh Sonnet agent audited the numbers (about 75 quoted numbers, all 384 per-Primary tail cells,
+and a re-derivation of four Primaries' scores from the stored arms, which agree within 0.01 and
+0.1 at D15) and a second reviewed the code. Findings and triage:
+
+- **Accepted and fixed:** D8's spread effect was misquoted (+2.21, not +1.6); the D15 score
+  of 17.2 is a mean of D15 and D18; BG2's sunny-daylight score is 4.00; the sign conventions were
+  missing from two list headings; P4 was not scored; the claim that the stack trails BG2 where
+  steps are large, "after day 7" and "day 1 only" overstated the evidence; the offset harm is
+  D8's; the post-event curtailment rise is mostly D16. The permutation p value now adds one to
+  numerator and denominator, and the placebo header names which measure is near zero.
+- **Rejected:** the claim that D8's fold months were built from D8's own first reading and cover
+  about two months. The control prints 219,674 D8 rows for `full` and the stored stack alike.
+  The claim that stage 1's spread may be uncentred: the median minus the mean is 0.0 for every
+  arm, including the arms that keep stage 1's spread.
