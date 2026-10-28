@@ -94,6 +94,16 @@ the local hour and day of week, the distance to the nearest bank holiday and to 
 - **Reference rows.** The stack from experiment 377, BG2, `manual_heuristic`, `climatology`, and the
   stored weekly baseline, each reported with its absolute score.
 
+## Tails and nulled inputs (maintainer, 2026-10-28)
+
+Tail pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles are reported per group
+and per Primary beside CRPS and twCRPS, and the take-home names the tail result. The control and every
+arm already carry the three recent-power lags, which are missing (NaN) when the telemetry has a gap
+near the origin. The write-up reports mean 5%-to-95% interval width and coverage on half-hours whose
+lags are missing against half-hours whose lags are present, and tries one simple widening rule
+(scaling the quantile distances from the median by a factor fitted on the earlier months of the
+same fold) if coverage on the missing rows falls short.
+
 ## Constraints
 
 Sonnet only. At most 3 threads and `MemoryMax=16G` per job. The GPU is shared. Tail calibration,
