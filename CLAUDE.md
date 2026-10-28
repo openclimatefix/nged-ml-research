@@ -66,11 +66,10 @@ start**, because most of what the skills hold are traps that fail silently.
 | `data-download` | writing or resuming a bulk-download script that makes more than a handful of requests |
 | `data-validation` | trusting the output of a finished download or data build |
 
-**Some skills still mention material that belongs to `nged-substation-forecast`:** the Dagster
-cross-validation chain, MLflow, `conf/cv/` consumers such as `scripts/forecasting/score_study.py`,
-and the skills `plan-issue`, `implement-issue`, `github-issue-pr-workflow`, `github-graphql`,
-`literature-review`, and `release-model`, which stay in that repository. Those parts are corrected
-as the move described in issue 1 proceeds.
+**The skills describe the production-only steps as happening in the production repository.** The
+Dagster cross-validation chain, MLflow, `scripts/forecasting/score_study.py`, and the skills
+`plan-issue`, `implement-issue`, `github-issue-pr-workflow`, `github-graphql`, `literature-review`,
+and `release-model` stay in `nged-substation-forecast`. A session here does not run them.
 
 **Some paths in the skills and docs do not exist here yet.** They are `plans/`, `docs/cross-validation/`,
 `docs/live_service/`, `docs/design-philosophy/`, `packages/*` (the production packages are git
@@ -101,8 +100,25 @@ another study or experiment, from `studies.*` (`src/studies`), and from the prod
 
 **Experiments read and write the data folder that `DATA_PATH_INTERNAL` names.** Without that
 variable, the path helpers use `data/` in the main checkout. Experiment output goes under
-`data/ml-experiments/` and `data/studies/`. The plan in issue 1 moves that output to a data folder
-of its own.
+`data/ml-experiments/` and `data/studies/`.
+
+### Running an experiment
+
+**On the maintainer's workstation, set these environment variables before running any script or
+test:**
+
+```bash
+export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data  # shared private data folder, unchanged by the move
+export NGED_S3_BUCKET_URL=https://example.com  # dummy; the contracts package reads it at import
+export NGED_S3_BUCKET_ACCESS_KEY=dummy
+export NGED_S3_BUCKET_SECRET=dummy
+```
+
+**For the PyTorch experiments, run `uv sync --group gpu`, then run everything with `uv run
+--no-sync`.** A plain `uv run` re-syncs the environment and removes the `gpu` group's packages.
+
+**A script that imports another experiment's folder needs that folder on `PYTHONPATH`.** The
+`ml-experiment` skill says how.
 
 ## Rules that apply to all research
 

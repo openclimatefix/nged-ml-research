@@ -29,7 +29,7 @@ write-up, uses the `ml-experiment` skill instead.
 **Work autonomously: the maintainer has asked for studies to run with as little waiting on a human
 as possible.** Plan, run, review, re-run, chart, and write up without stopping to ask, and post short
 progress updates while working and a full report at the end. So a study does not stop for human
-review after `plan-issue`'s plan. Two decisions still belong to the maintainer:
+review after its plan. Two decisions still belong to the maintainer:
 
 - **Spending money.**
 - **Ordering data or accepting a data licence** in someone's name.
@@ -44,7 +44,8 @@ review after `plan-issue`'s plan. Two decisions still belong to the maintainer:
 - **The merge checks pass**: `ci` green, no closing keyword in the PR body or commit messages, no
   `data/` or `.env` files, the branch contains `main`, and a merge commit rather than a squash.
 
-A PR that touches anything outside that list stops at a reviewed PR, as `implement-issue` does.
+A PR that touches anything outside that list stops after its agentic review, and the maintainer
+merges it.
 
 ## Where a study's pieces live
 
@@ -61,7 +62,8 @@ A PR that touches anything outside that list stops at a reviewed PR, as `impleme
 
 **`src/studies/` is Claude's to own.** Keep it tidy, and restructure it whenever a study needs
 to. Every function in it carries tests, and each test must be able to fail on the bug it exists to
-catch; run a mutation pass (the `implement-issue` skill, step 7) whenever the package changes. When
+catch; run a mutation pass whenever the package changes: a fresh agent writes plausible bugs into the
+changed code one at a time and checks that a test fails each time. When
 two studies need the same code, move that code into the package with tests.
 
 **A plain `uv run pytest` skips the `src/studies` tests, so run them with `--run-studies`.**
@@ -80,7 +82,11 @@ another script by path. A script that imports from another folder is run with th
 `PYTHONPATH`, because only the script's own folder is on `sys.path` otherwise. No two scripts under
 `studies/` or `ml-experiments/` share a basename, so a bare-name import names one script.
 
-**A study's leaderboard number comes only from `scripts/forecasting/score_study.py`.** Run the
+**A study's leaderboard number comes only from `scripts/forecasting/score_study.py`, which lives in
+the production repository.** This repository holds no copy of the script, the `metrics` asset, or the
+MLflow tracking server that the script writes to. A session here prepares the predictions file and
+reports its own scores, and a session in the production repository runs the script. The rest of this
+section describes that script. Run the
 script on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number
 from the `forecast_metrics` row that the `metrics` asset writes under the `experiment_name`
 `study/<study name>`. Never quote a leaderboard skill number computed by the study's own scoring
@@ -139,11 +145,10 @@ review goes on the page only after a committed script prints it into the report.
 
 ## The order of work
 
-1. **Plan the study with the `plan-issue` skill, and state the five trigger answers.** A published
-   page counts as what gets stored, so a study is complex. The plan names the question, the arms,
-   the row set, the folds, the metric, and the interval method. The mutation pass
-   (`implement-issue` step 7) runs only when `src/studies/` changes, because study scripts
-   have no tests; say so in the PR body.
+1. **Write the plan first.** A published page counts as stored output, so every study gets the full
+   process. The plan names the question, the arms, the row set, the folds, the metric, and the
+   interval method. The mutation pass (see "`src/studies/` is Claude's to own") runs only when
+   `src/studies/` changes, because study scripts have no tests; say so in the PR body.
 2. **Name the deciding contrasts in the plan, before any result exists.** Name two to five contrasts
    that answer the question: the planned contrasts, labelled "(planned)" on the page, never "named
    before the run". Every other number the study produces is exploratory, and is labelled so on the
@@ -161,9 +166,9 @@ review goes on the page only after a committed script prints it into the report.
    that no reviewer-requested re-run forces a resubmission. It also means that the second Opus
    reviewer has already checked that the fit stopped at the fold's `train_end`.
 6. **Finish the charts and the page** (sections below).
-7. **Diff review**, with steps 5 to 8 of the `implement-issue` skill, using that skill's models:
-   Sonnet for the cut-down review, Opus for the correctness review. Step 8 below replaces that
-   skill's prose-review step.
+7. **Diff review**: first a Sonnet agent that cuts the code, tests, and prose down to what the study
+   needs, then an Opus agent that checks correctness, committing and triaging after each. Step 8
+   below is the prose review.
 8. **End with a first-stumble review and then a `prose-review` of the page, one rule per pass,
    alongside persona and evidence reviews** (see "Reviews"). The text inside the figures gets the
    same two reviews before the figures are first rendered (see "Review the text of every figure").
@@ -752,9 +757,9 @@ with the page's chart renders:
 - **The evidence:** a reviewer who checks every number, every "beats", every "best", every causal
   "because", and every chart title against the report and the saved losses, computing what the
   report does not print. Where the page quotes a leaderboard skill number, the reviewer also checks
-  that the number traces to a `forecast_metrics` row that the `metrics` asset wrote for a
-  `scripts/forecasting/score_study.py` submission, and that the study's training data ended at the
-  fold's `train_end`.
+  that the number traces to a `forecast_metrics` row that the production repository's `metrics` asset
+  wrote for a `scripts/forecasting/score_study.py` submission, and that the study's training data
+  ended at the fold's `train_end`.
 
 The personas earn their place. On the two weather-product pages, the builder reviewers found that
 ICON global's wind steps look like an artefact of how the archive serves its grid cells rather than
@@ -790,11 +795,12 @@ NGED ones. In a study of NGED's generators:
 
 ## GitHub hygiene
 
-- **Give every study issue the org issue Type `Spike`.** The `github-graphql` skill has the
-  mutation that sets the Type.
+- **Give every study issue in the production repository the org issue Type `Spike`.** That
+  repository's `github-graphql` skill has the mutation that sets the Type.
 - **Keep closing keywords away from the parent issue's number.** A study usually lives under a parent
-  issue, and "fixed" near "#809" in a PR body would have closed that parent on merge. The
-  `github-issue-pr-workflow` skill has the check to run before merging.
+  issue, and "fixed" near "#809" in a PR body would have closed that parent on merge. Before
+  merging, run `gh pr view <N> --json body,commits` and check that no closing keyword (close, fix,
+  resolve, in any tense) sits near an issue number.
 - **Rename a PR titled "Plan: …" before merging**, because the title becomes the merge commit's
   subject.
 - **Tidy up when the PR has merged.** Remove four kinds of leftover, each only if you created it and
