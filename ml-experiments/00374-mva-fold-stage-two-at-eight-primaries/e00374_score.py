@@ -95,7 +95,7 @@ def site_arms(*, site: str) -> dict[str, pl.DataFrame]:
     """Return every arm's scored-year frame at one Primary."""
     raw = {name: read_raw(arm=arm, site=site) for name, arm in (("n", "N"), ("l0", "A"))}
     staged = {
-        name: stage2.build_arms(site=site, frame=corr.add_calendar(frame=frame.drop("period")))["d"]
+        name: stage2.build_arms(site=site, frame=corr.add_calendar(frame=frame))["d"]
         for name, frame in raw.items()
     }
     columns = list(s2common.BASE_COLUMNS)
