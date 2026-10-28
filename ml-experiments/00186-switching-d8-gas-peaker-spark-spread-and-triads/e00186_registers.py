@@ -117,8 +117,10 @@ def main() -> None:
         .agg(
             mw=pl.col("mw").max(),
             transmission_or_distribution=pl.col("Transmission or Distribution").first(),
-            first_delivery_year=pl.col("Delivery Year").min(),
-            last_delivery_year=pl.col("Delivery Year").max(),
+            awarded=(pl.col("Capacity Agreement Awarded") == "Yes").any(),
+            valid_years=pl.col("Delivery Years for which Agreement Valid").drop_nulls().first(),
+            terminated=pl.col("Capacity Agreement has been Terminated").drop_nulls().first(),
+            decisions=pl.col("Pre Qualification Decision").unique().sort().str.join(" / "),
         )
     )
     squares = {
@@ -158,16 +160,22 @@ def main() -> None:
                     row["Generating Technology Class"],
                     info["mw"],
                     info["transmission_or_distribution"],
-                    info["first_delivery_year"],
-                    info["last_delivery_year"],
+                    info["awarded"],
+                    info["valid_years"],
+                    info["terminated"],
+                    info["decisions"],
+                    row["grid"],
                 )
             )
     say(
         "\nCapacity Market gas-fuelled CM units with a grid reference within 30 km of D8 (unit names withheld):"
     )
-    for km, tech, mw, td, first, last in sorted(near_rows):
+    for km, tech, mw, td, awarded, valid, term, dec, ref in sorted(
+        near_rows, key=lambda r: (r[0], str(r[1:]))
+    ):
         say(
-            f"  {km:.1f} km from D8: {tech}, connection capacity {mw} MW, {td}, delivery years {first} to {last}"
+            f"  {km:.1f} km from D8 ({ref}): {tech}, connection capacity {mw} MW, {td}; agreement "
+            f"awarded {awarded}; years valid {valid}; terminated {term}; decisions {dec}"
         )
     say(f"Gas-fuelled CM units with any grid reference in the register: {len(seen)}")
     (common.WORK_DIR / "printed_registers.txt").write_text("\n".join(REPORT) + "\n")

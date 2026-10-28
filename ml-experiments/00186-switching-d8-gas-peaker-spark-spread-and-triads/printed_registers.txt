@@ -30,30 +30,30 @@ Gas-like Capacity Market components with a postcode in ('PE20', 'PE21', 'PE22', 
   description of a unit at 0.5 km: The CMU will be formed of multiple individual generating units controlled centrally and ex
 
 Capacity Market gas-fuelled CM units with a grid reference within 30 km of D8 (unit names withheld):
-  0.5 km from D8: Reciprocating engines, connection capacity 6.0 MW, Distribution, delivery years 2022 to 2022
-  0.5 km from D8: Reciprocating engines, connection capacity 6.0 MW, Distribution, delivery years 2022 to 2023
-  0.5 km from D8: Reciprocating engines, connection capacity 20.0 MW, Distribution, delivery years 2022 to 2022
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2027 to 2027
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2028 to 2028
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2029 to 2029
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2022 to 2022
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2022 to 2023
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2024 to 2024
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2025 to 2025
-  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2026 to 2026
-  19.3 km from D8: Open Cycle Gas Turbine (OCGT), connection capacity 299.99 MW, Transmission, delivery years 2019 to 2019
-  19.5 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 903.0 MW, Transmission, delivery years 2021 to 2021
-  19.5 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 530.0 MW, Transmission, delivery years 2021 to 2021
-  21.6 km from D8: Reciprocating engines, connection capacity 20.0 MW, Distribution, delivery years 2022 to 2022
-  21.6 km from D8: Reciprocating engines, connection capacity 20.0 MW, Distribution, delivery years 2022 to 2023
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 819.0 MW, Transmission, delivery years 2021 to 2021
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2022 to 2022
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2022 to 2023
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2024 to 2024
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2025 to 2025
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2025 to 2025
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2026 to 2026
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2027 to 2027
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2028 to 2028
-  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2029 to 2029
+  0.5 km from D8 (TF 335 428): Reciprocating engines, connection capacity 6.0 MW, Distribution; agreement awarded False; years valid None; terminated None; decisions Not Prequalified
+  0.5 km from D8 (TF 335 428): Reciprocating engines, connection capacity 6.0 MW, Distribution; agreement awarded True; years valid 2023/2024, 2024/2025, 2025/2026, 2026/2027, 2027/2028, 2028/2029, 2029/2030, 2030/2031, 2031/2032, 2032/2033, 2033/2034, 2034/2035, 2035/2036, 2036/2037, 2037/2038; terminated None; decisions Not Prequalified / Prequalified
+  0.5 km from D8 (TF 335 418): Reciprocating engines, connection capacity 20.0 MW, Distribution; agreement awarded False; years valid None; terminated None; decisions Conditionally Prequalified
+  19.0 km from D8 (TF 260 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded True; years valid 2027/2028; terminated None; decisions Prequalified
+  19.0 km from D8 (TF 260 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded True; years valid 2028/2029; terminated None; decisions Prequalified
+  19.0 km from D8 (TF 260 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded True; years valid 2029/2030; terminated None; decisions Prequalified
+  19.0 km from D8 (TF 259 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded False; years valid None; terminated None; decisions Prequalified
+  19.0 km from D8 (TF 258 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded True; years valid 2022/2023; terminated None; decisions Prequalified
+  19.0 km from D8 (TF 258 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded True; years valid 2024/2025; terminated None; decisions Prequalified
+  19.0 km from D8 (TF 258 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded True; years valid 2025/2026; terminated None; decisions Prequalified
+  19.0 km from D8 (TF 258 249): Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission; agreement awarded True; years valid 2026/2027; terminated None; decisions Prequalified
+  19.3 km from D8 (TF 259 246): Open Cycle Gas Turbine (OCGT), connection capacity 299.99 MW, Transmission; agreement awarded False; years valid None; terminated None; decisions Prequalified
+  19.5 km from D8 (TF 259 244): Combined Cycle Gas Turbine (CCGT), connection capacity 903.0 MW, Transmission; agreement awarded True; years valid 2021/2022; terminated None; decisions Prequalified
+  19.5 km from D8 (TF 257 244): Combined Cycle Gas Turbine (CCGT), connection capacity 530.0 MW, Transmission; agreement awarded False; years valid None; terminated None; decisions Prequalified
+  21.6 km from D8 (TF 379 635): Reciprocating engines, connection capacity 20.0 MW, Distribution; agreement awarded False; years valid None; terminated None; decisions Conditionally Prequalified
+  21.6 km from D8 (TF 379 635): Reciprocating engines, connection capacity 20.0 MW, Distribution; agreement awarded False; years valid None; terminated None; decisions Not Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 819.0 MW, Transmission; agreement awarded True; years valid 2021/2022; terminated Yes; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded False; years valid None; terminated None; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded False; years valid None; terminated None; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded False; years valid None; terminated None; decisions Rejected
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded True; years valid 2022/2023; terminated Yes; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded True; years valid 2025/2026; terminated None; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded True; years valid 2026/2027; terminated None; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded True; years valid 2027/2028; terminated None; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded True; years valid 2028/2029; terminated None; decisions Prequalified
+  26.7 km from D8 (TF 480 199): Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission; agreement awarded True; years valid 2029/2030; terminated None; decisions Prequalified
 Gas-fuelled CM units with any grid reference in the register: 1508
