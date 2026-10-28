@@ -150,8 +150,53 @@ All arms use experiment 87's `n1h` weekly recipe (the weekly member of BG2), see
 
 ## Detector b2
 
-Fixed in full in this section before arm b2 starts, following the section "Design for tonight" of
-`briefs/opus_detector_distillation_answer.md`. Arms d, c1, c2, and W do not depend on it.
+Fixed here before any score is read. Everything in this section runs only if gate O passes; the
+design is the section "Design for tonight" of `briefs/opus_detector_distillation_answer.md`.
+
+- **Statistic.** For each half-hour, the position of the observed power in the lagless model's
+  quantiles (interpolated linearly between the 11 levels, clipped to 0.005 to 0.995), converted to a
+  normal score. At 00, 06, 12, and 18 UTC the window statistic Z is the mean of the normal score over
+  the previous 24 half-hours (at least 18 present). Per Primary, Z is standardised by its median and
+  1.4826 times its median absolute deviation over 2024-04 to 2025-06 (no label filter), giving Z~.
+- **Two inputs.** The ERA5 version uses a lagless model fed with ERA5 and CAMS estimates of past
+  weather (4-block month-cross-fitted before 2025-07, walk-forward weekly folds after). The ENS
+  version uses the walk-forward lagless ENS forecasts at leads 0 to 24 hours. The ERA5 version may
+  read windows ending no later than the origin minus 120 hours; the ENS version no later than the
+  origin minus the power publication lag.
+- **Alarm.** A flag is |Z~| above k. An alarm opens at the second of two consecutive same-sign
+  flagged origins; its onset is the start of the first flagged window. Same-sign alarms less than 48
+  hours apart merge. An alarm ends when Z~ of the same sign is below k/2 at two consecutive
+  origins, is capped at 14 days (a new alarm may open at once), and stays open to the data cut at
+  forecast time. Marks run from onset to end at the alarmed Primary, with no padding.
+- **Veto.** The neighbour list is NGED's own interconnection table (`work/neighbours_nged.json`,
+  built by `e00383_neighbours.py`; it equals experiment 298's static list, with D15 and D18 sharing
+  one substation number). A neighbour is eligible if it is metered, has at least 180 days of
+  residual history, and has at least 18 of the window's 24 half-hours. Drop an alarm when at least
+  two eligible neighbours have the same sign with a window mean residual of at least 0.25 of the
+  Primary's, and the summed opposite-sign residual of all eligible neighbours is under 0.25 of the
+  Primary's (counted only above twice its own noise). Keep alarms with no eligible neighbour and
+  report them apart. Tag each alarm balanced, partly covered, or uncovered (report-only). The
+  confirmation rule of the brief runs as a labelled comparison row; variant C of experiment 298
+  runs as a detector-only comparison row.
+- **Threshold.** One global k per version, the smallest on a grid from 1.5 to 6.0 in steps of 0.05
+  that gives at most 2.0 false alarms per Primary-year after the veto, pooled over 2024-04 to
+  2025-06 with that period's labels only.
+- **Known-answer gate (before any real score).** Inject transfers into the tuning months of the 10
+  Primaries of experiment 298's injection set, at 10% and 25% of load, for 12 hours and 1, 2, 3, 7,
+  and 14 days, split over 1, 2, and 3 metered neighbours and over one unmetered receiver, plus a
+  common-mode placebo. The gate passes when recall at 25% and 2 days or more is at least 0.55, the
+  veto keeps at least 95% of the plain detector's hits on 2- and 3-receiver splits, and it drops at
+  least half the placebo alarms.
+- **Uses.** Training labels (ERA5 marks inside each fold's cut) through whichever of c1 or c2 won
+  gate O, plus W. Forecast time: b2-ERA5 (marks from windows ending by the origin minus 120 hours)
+  and b2-ENS (marks up to the origin minus the power publication lag). Report how many events are
+  still undetected at each origin.
+- **Predictions that can fail.** 20 to 27 of the 35 hand-labelled events over 1 day found by the
+  ERA5 version, and fewer by the ENS version; at most 3 of the 17 block days; at least 15 of the 29
+  D8 drops flagged; the veto cuts false alarms by 30% to 45% and loses at most 2 found events; the
+  confirmation rule cuts them by 60% to 75% and loses 25% to 55% of events with a metered partner;
+  b2-ERA5 leaves most recent-lag contamination unmarked at the origin; neither arm clears the
+  pooled 0.02-point bar.
 
 ## Process notes
 
