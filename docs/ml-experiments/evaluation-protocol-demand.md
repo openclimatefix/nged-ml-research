@@ -100,19 +100,21 @@ terms, and a fold that has never seen a winter measures extrapolation, not the c
 Each Primary's report says which months were excluded by this rule.
 
 **The scored period is 2025-07 to 2026-06, with a replicate period of 2024-07 to 2025-06
-for the Primaries that have one.** Only a Primary with at least 12 months of history before the
-replicate period has a replicate. Five long-history Primaries qualified at 2024-07-01 in
-experiment 103, so the other Primaries have no replicate, and an adoption that needs a replicate
-cannot rest on them. Rows inside hand-filtered events are excluded, as in the research default's row
-set, except that a detected step day at a Primary like D8 is never excluded.
+for the Primaries that have one.** The ENS archive starts on 2024-04-01 at every Primary, so an
+arm trained on ENS forecasts has a replicate of 2025-04 to 2025-06 only, at 13 Primaries, and none
+at D8, D15, and D18. Only a Primary with at least 12 months of history before the replicate period
+has a replicate, and an adoption that needs a replicate cannot rest on the others. Rows inside
+hand-filtered events are excluded, as in the research default's row set, except that a detected step
+day at a Primary like D8 is never excluded.
 
 **Every Primary in a group is scored over the same months, so that a pooled group score averages
 the same rows.** A Primary whose history is too short for a month is left out of that month for its
-whole group, or the pooled score is labelled with the months it covers. D15 and D18 first have 12
-months of history on 2025-03-01 (experiment 103), so they are scored from March 2026 for about four
-months, with no replicate. A 95% month bootstrap on four months under-covers, so their numbers are
-reported only and do not count in the tally of Primaries where the forecast under test wins. D9's
-history starts on 2023-10-01, so it has no replicate months before 2024-10.
+whole group, or the pooled score is labelled with the months it covers. D15 and D18 are scored from
+the first month that `studies.eval_protocol.fold_plan` returns for each of them, with no replicate.
+The module governs the first scorable month at every Primary, and the scored months are a few. A 95%
+month bootstrap on four months under-covers, so their numbers are reported only and do not count in
+the tally of Primaries where the forecast under test wins. D9's history starts on 2023-10-01, so it
+has no replicate months before 2024-10.
 
 **The months that the 12-month rule excludes are reported as their own labelled slice.** Cold-start
 months are where a longer fit history helps most, and a gain there is otherwise invisible.
@@ -247,14 +249,17 @@ non-inferiority bound. A breach at a group makes the verdict `rejected`.
 3. **No harm to a Primary.** A Primary whose point estimate is worse than 0.05 points makes the
    verdict `needs-human`, with the Primary named. The interval is not tested at each Primary,
    because 16 one-sided tests would breach by chance more often than not.
-4. **Replication.** The gain has the same sign in the replicate period at the Primaries that have
-   one, and the replicate estimate is at least half of the smaller of the main estimate and the
-   minimum gain. Where the minimum gain is zero, the condition reduces to the same sign. Leaving
-   out one series at a time is a check for changes tuned on one series and does not stand in for a
-   second period: a change with no second period stays a candidate. A change that fails replication
-   is not retried on the same replicate period with a changed x, unless the change is pre-registered
-   as a new experiment and the failed attempt is counted. A change that meets this condition
-   satisfies audit trigger 7, and a candidate that fails it never becomes a base for later work.
+4. **Replication.** An arm trained on ENS forecasts can be replicated only over 2025-04 to
+   2025-06 at 13 Primaries. An adoption that rests on that weak replicate has the outcome
+`needs-human` and is never `adopted` automatically. The gain has the same sign in the replicate
+period at the Primaries that have one, and the replicate estimate is at least half of the smaller of
+the main estimate and the minimum gain. Where the minimum gain is zero, the condition reduces to the
+same sign. Leaving out one series at a time is a check for changes tuned on one series and does not
+stand in for a second period: a change with no second period stays a candidate. A change that fails
+replication is not retried on the same replicate period with a changed x, unless the change is
+pre-registered as a new experiment and the failed attempt is counted. A change that meets this
+condition satisfies audit trigger 7, and a candidate that fails it never becomes a base for later
+work.
 5. **Controls.** The experiment's own controls passed, the placebos did not fail, and no audit
    trigger in the `ml-experiment` skill is unresolved. The audit's findings are triaged in the pull
    request before the adoption.
