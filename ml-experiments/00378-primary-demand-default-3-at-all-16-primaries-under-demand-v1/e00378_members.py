@@ -54,9 +54,9 @@ def stage_one(*, site: str, period: str) -> pl.DataFrame:
     return pl.read_parquet(path) if path.exists() else pl.DataFrame()
 
 
-def job(arguments: tuple[str, str, bool]) -> str:
+def job(arguments: tuple[str, str, bool, bool]) -> str:
     """Compute one site and period's member responses, or run the gate on two runs."""
-    site, period, gate = arguments
+    site, period, gate, low = arguments
     torch.set_num_threads(1)
     started = time.monotonic()
     context = run377.load_site(site=site)
@@ -68,6 +68,8 @@ def job(arguments: tuple[str, str, bool]) -> str:
     if gate:
         rows = rows.filter(pl.col("lead_hours") <= common.STORED_HORIZON_HOURS)
         rows = rows.filter(pl.col("run").is_in(rows["run"].unique().sort().to_list()[-2:]))
+    elif low:
+        rows = rows.filter(pl.col("lead_hours") <= common.STORED_HORIZON_HOURS)
     else:
         rows = rows.filter(
             (pl.col("lead_hours") > common.STORED_HORIZON_HOURS)
@@ -93,7 +95,7 @@ def job(arguments: tuple[str, str, bool]) -> str:
             }
         )
     out = {name: np.concatenate([p[name] for p in pieces]) for name in pieces[0]}
-    tag = "gate_" if gate else ""
+    tag = "gate_" if gate else "low_" if low else ""
     target = common.MEMBERS_DIR / f"{tag}{site}_{period}.npz"
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp.npz")
@@ -107,6 +109,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--gate", action="store_true")
+    parser.add_argument("--low", action="store_true", help="store leads of 168 hours or less")
     parser.add_argument("--sites", nargs="+", required=True)
     args = parser.parse_args()
     wrong = [s for s in args.sites if common.SOURCE_OF_SITE[s] != c377.SOURCE]
@@ -114,7 +117,7 @@ def main() -> None:
         msg = f"{wrong} are not in experiment 377's source {c377.SOURCE!r}; set E00377_SOURCE"
         raise ValueError(msg)
     periods = ("scored",) if args.gate else PERIODS
-    jobs = [(s, p, args.gate) for p in periods for s in args.sites]
+    jobs = [(s, p, args.gate, args.low) for p in periods for s in args.sites]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for line in pool.map(job, jobs):
             print(line, flush=True)
