@@ -1,0 +1,97 @@
+---
+id: "00378"
+slug: primary-demand-default-3-at-all-16-primaries-under-demand-v1
+title: >-
+  How does Primary demand research default 3, ported to all 16 Primaries, score against BG2, the
+  manual heuristic, and climatology under the demand-v1 protocol?
+theme: production-reference-and-best-guess
+also_relevant_to:
+  - calibration-and-uncertainty
+status: planned
+kind: other
+protocol: demand-v1
+size: >-
+  medium. Stored: forecasts, fits, and small result files in this experiment's private folder only;
+  experiments 87, 111, 152, 317, 319, 322, 374, 376, and 377 are read and never written. Production
+  serving path: not touched. Degradation rule: not touched. Designs: more than one is defensible
+  (refit the long-lead weights per Primary or pooled per group); the choice is fixed below. Callers:
+  the scripts copy and import the folders of experiments 317, 319, 322, and 377, whose callers are
+  all in those folders; no change under `packages/` or `src/`.
+hypothesis: >-
+  Primary demand research default 3 ported to all 16 Primaries is not worse than BG2 by more than
+  0.20 points of effective capacity at days 1 to 10 at the six signed-MW Primaries, and it beats
+  Primary demand research default 1 extended to 240 hours (experiment 377) at 168 to 240 hours at
+  both groups.
+prediction: >-
+  Written before any score is read. P1. Signed-MW six, default 3 minus BG2 on the shared rows, days
+  1 to 10, pooled: between -0.20 and +0.20 points. P2. Default 3 minus default 1 extended at 168 to
+  240 hours is below zero at the signed-MW six (experiment 322 found -0.064 - 0.075 = about -0.14
+  points against default 1) and between -0.20 and 0 at the MVA-only eight. P3. MVA-only eight
+  days 1 to 10 minus BG2: between +0.30 and +0.90 points with D8, between -0.05 and +0.25 without.
+  P4. The control gate holds: the port reproduces experiment 322's stored default 3 scores on the
+  six within 0.05 points at 0.5 to 240 hours and at 168 to 240 hours.
+decision_rule: >-
+  Descriptive, no adoption. Contrasts registered before any score is read, CRPS in points of
+  effective capacity on the shared rows, by the paired month-resampled bootstrap of
+  `studies.eval_protocol` at 99% (20,000 resamples) with 95% beside it. C1: default 3 minus BG2,
+  days 1 to 10 (BG2 only to 168 hours), signed-MW six pooled. C2: the same for the MVA-only eight,
+  with and without D8, labelled "reactive power assumed zero". C3: default 3 minus default 1
+  extended (experiment 377), 168 to 240 hours, per group. C4: default 3 minus climatology and minus
+  the manual heuristic, per group. D15 and D18 are report-only and enter no tally. One verdict per
+  group.
+benchmark: >-
+  BG2, climatology, and `manual_heuristic` as stored by experiment 87 on `fold_a_daily_gap_v1`;
+  Primary demand research default 1 extended to 240 hours (experiment 377).
+row_set_id: fold_a_daily_gap_v1
+metric: >-
+  Continuous ranked probability score from the 11 quantiles, mean absolute error of the median, and
+  twCRPS, in points of effective capacity, from `studies.eval_protocol`; leads 0.5 to 240 hours.
+code: ml-experiments/00378-primary-demand-default-3-at-all-16-primaries-under-demand-v1/
+---
+
+# Primary demand research default 3 at all 16 Primaries under demand-v1 (plan)
+
+This page is the plan. The write-up replaces it when the scores exist.
+
+## What depends on the six-Primary set
+
+- **Chain below 168 hours.** Default 1's stack comes from experiment 376 and 377 at all 16
+  Primaries, so nothing is ported here.
+- **Solar summary S (experiment 319).** Fitted per scored month on the trailing 365 days of
+  origins, per Primary (`WINDOW_DAYS` in `e00319_common.py`). The loops over `SCORED_SITES` (D5,
+  D9, D10, D11, D14, D16) become the 16 Primaries. Each MVA-only Primary needs its own fitted S on
+  its rule-chosen fit (experiment 374), with the naive fit as a second arm.
+- **Heuristic blend (experiments 319 and 322).** The convex weight is fitted per lead band and
+  season group on trailing 365 days, per Primary. The daylight gate (sun above 5 degrees) needs no
+  fit. Inputs: the stored `manual_heuristic` forecasts of experiment 87 at all 16, and the ENS
+  temperature store of experiment 111 at each site (needed only by the D3 reference arm, which is
+  not ported).
+- **Hand-filtered event lists.** Scoring excludes the hand-filtered events; the 16-Primary lists
+  come from the demand-v1 protocol module. Any Primary without a list is reported.
+- **Fold set.** Experiment 322 used the six-month-plus tuning and replicate periods; demand-v1 uses
+  the contiguous-month folds, so every fit is refitted for each scored month on earlier months
+  only, as experiment 377 does.
+
+## Method
+
+- **Stage A (build).** Copy experiment 377's fold, stage-2 and adapter code, then add the
+  experiment 319 summary S and the experiment 322 daylight blend at 168 to 240 hours, with
+  `SCORED_SITES` replaced by the 16 Primaries.
+- **Stage B (control gate).** Run the port at the six signed-MW Primaries on experiment 322's own
+  folds and compare with its stored default 3 scores. Pass: within 0.05 points at 0.5 to 240 hours
+  and at 168 to 240 hours. Do not run the other ten Primaries until this passes.
+- **Stage C (all 16, demand-v1 folds).** MVA-only eight use the rule-chosen fit of experiment 374
+  (main arm) and the naive fit (second arm). D8 uses the donor spread and is the labelled
+  exception. D15 and D18 are report-only.
+- **Stage D (scoring).** Score through `studies.eval_protocol` with the contrasts above, with and
+  without D8, plus per-Primary and leave-one-out contrasts beside C1 and C2.
+
+## Resources and rules
+
+- Sonnet only. An Opus audit only with the manager's approval; a Sonnet audit before merge.
+- 12 cores, 16 GB per job; `uptime` first. No fetch or egress. No NGED generator named.
+
+## Open questions for the manager
+
+- Experiment 377 is still `planned`; stage C needs its per-fold stage 2 stored. Default: read its
+  branch code now and wait for its stored forecasts before stage C.
