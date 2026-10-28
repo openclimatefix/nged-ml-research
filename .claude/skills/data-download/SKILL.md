@@ -205,7 +205,7 @@ checkpointed downloader is likely to need.
 ## Get an adversarial review before a download script's first real run
 
 **Run every not-yet-executed download script through a fresh adversarial review before its first
-real run, however small the script**, like the correctness review under `implement-issue` — a second
+real run, however small the script**, like a correctness review of a code change — a second
 reader with no stake in the code finding what the author is too close to see, and with network
 access and permission to make one small real fetch, not just a static read of the diff. The reviewer
 should check for four kinds of fault, each of which wastes a real request or corrupts output
@@ -244,8 +244,9 @@ request is right.
 
 **Merge the download PR when three conditions hold: a fresh reviewer has reviewed the script, the
 script has started running, and the first chunk of data has passed the `data-validation`
-checklist.** Merging follows the `github-issue-pr-workflow` skill. Do not hold the PR open for the
-days a bulk download takes. A bug found after more data has arrived is fixed in a follow-on PR.
+checklist.** Merging follows "Merging" in the `ml-experiment` skill, or the study merge conditions in
+the `study` skill. Do not hold the PR open for the days a bulk download takes. A bug found after
+more data has arrived is fixed in a follow-on PR.
 
 **The issue that tracks the download stays open, with Status "In progress", until the whole download
 has finished and been validated.** Keep closing keywords out of the PR body, so the merge does not
