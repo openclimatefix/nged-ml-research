@@ -117,25 +117,21 @@ def guarded_factors(*, frame: pl.DataFrame, delta: np.ndarray, rows: np.ndarray)
     return a319.fit_factors(frame=frame, delta=delta, rows=rows)
 
 
-def run_source(*, source: str) -> pl.DataFrame:
-    """Replay every fold month for the sites of one source and return their rows with arm quantiles."""
-    cache = c377.load_cache()
-    frame, delta = load_rows(cache=cache, source=source)
+def replay(
+    *, frame: pl.DataFrame, delta: np.ndarray, in_fit: np.ndarray, scored: np.ndarray, label: str
+) -> tuple[dict[str, np.ndarray], dict]:
+    """Replay every fold month of the `scored` rows and return the arms' quantiles and the fit log."""
     origin = frame["power_fcst_init_time"].dt.replace_time_zone(None).to_numpy()
     month = frame["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
     usable = (~frame["switching_mask"] & frame["actual"].is_finite()).to_numpy()
     group = frame["group"].to_numpy()
-    site = frame["site"].to_numpy()
-    in_fit = np.array([s in FIT_GROUPS[APPLY_GROUP[s]] for s in site])
     horizon = np.timedelta64(int(timedelta(hours=common.HORIZON_HOURS).total_seconds()), "s")
     q0 = frame.select(list(QUANTILES)).to_numpy().astype(np.float64)
     out = {name: q0.copy() for name in ("x1", "r319", "d3")}
     log: dict = {}
-    # Fold months are those of experiment 377's scored rows. Fit rows of every group sit in the
-    # same frame, because a source holds one or both groups.
-    for m in sorted(set(month)):
+    for m in sorted(set(month[scored])):
         for g in sorted(set(group)):
-            rows_m = np.flatnonzero((month == m) & (group == g))
+            rows_m = np.flatnonzero((month == m) & (group == g) & scored)
             if len(rows_m) == 0:
                 continue
             first = origin[rows_m].min()
@@ -163,13 +159,25 @@ def run_source(*, source: str) -> pl.DataFrame:
             out["x1"][rows_m] = x1
             out["r319"][rows_m] = r319
             out["d3"][rows_m] = np.where(day, r319, x1)
-            log[f"{source}/{g}/{m}"] = {
+            log[f"{label}/{g}/{m}"] = {
                 "n_fit_rows": len(fit_rows),
                 "identity_fallback": bool(thin),
                 "factors": factors,
                 "weights": weights.tolist(),
             }
-            print(source, g, m, len(fit_rows), "identity" if thin else "fitted", flush=True)
+            print(label, g, m, len(fit_rows), "identity" if thin else "fitted", flush=True)
+    return out, log
+
+
+def run_source(*, source: str) -> pl.DataFrame:
+    """Replay every fold month for the sites of one source and return their rows with arm quantiles."""
+    cache = c377.load_cache()
+    frame, delta = load_rows(cache=cache, source=source)
+    site = frame["site"].to_numpy()
+    in_fit = np.array([s in FIT_GROUPS[APPLY_GROUP[s]] for s in site])
+    out, log = replay(
+        frame=frame, delta=delta, in_fit=in_fit, scored=np.ones(frame.height, dtype=bool), label=source
+    )
     keep = frame.select(
         "site",
         "group",

@@ -126,6 +126,12 @@ This page is the plan. The write-up replaces it when the scores exist.
   default 3 minus default 1 means the S layer below 168 hours, S at 168 to 240 hours, and the
   daylight blend. Experiment 377's stack is reported as a third reference, "the stack without S".
 
+- **Tails (maintainer, 2026-10-28).** The tails matter most. Every table reports pinball loss and
+  coverage at q01, q05, q95, and q99 beside CRPS and twCRPS, per group and per Primary, and the
+  take-home names the tail result. Rows where the solar summary or the heuristic is missing (no
+  member, no heuristic median) fall back to the stage-2 quantiles; width and coverage are reported
+  on those rows against the rest.
+
 ## Open questions for the manager
 
 - None. Experiment 377's stored forecasts are in place; its scores and PR are still to come.
