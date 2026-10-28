@@ -118,7 +118,8 @@ and 366).
   point estimate is inside the predicted -1.0 to 0.0, and the interval includes zero.
 - **P2 holds by construction.** At the seven other Primaries the chosen fit is the naive fit. The
   fit through the meter and the naive fit also score within 0.001 points of each other at D2, D3,
-  D4, D19, D21, and D22, and differ only at D8 (-0.21 over all half-hours; interval -0.74 to +0.20) and D12.
+  D4, D19, D21, and D22, and differ only at D8 (-0.21 over all half-hours; interval -0.74 to
+  +0.20) and D12.
 - **P3 fails.** The chosen fit scores worse than BG2 over all half-hours at 4 of 8 Primaries: D8
   (+3.36; 2.19 to 4.65), D12 (+0.76; 0.40 to 1.15), D22 (+0.42; 0.17 to 0.68), and D19 (+0.07; -0.01
   to +0.15). It is level with or below BG2 at D2, D3, D4, and D21. Pooled over the eight it is +0.56
