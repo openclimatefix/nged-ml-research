@@ -154,19 +154,14 @@ def is_scored_run(*, run: datetime) -> bool:
 
 
 def period_of_run(*, run: datetime) -> str:
-    """Return `tuning`, `replicate`, `scored`, `stride`, or `warm_up` for a run.
+    """Return `tuning` for a run whose origin is before 2025-07-01, else `scored`.
 
-    `stride` is a run of the scored year on the every-fifth-day stride, which chose BG2's blend and
-    offset and is never scored; `warm_up` is a run before 2024-07 or in no named period.
+    Under demand-v1 every run is forecast, and stage 2 is refitted for each month on the runs of
+    earlier months, so the two names only separate the files.
     """
-    key = month_of_origin(run=run)
-    if key in TUNING_MONTHS:
-        return "tuning"
-    if key in REPLICATE_MONTHS:
-        return "replicate"
-    if run >= SCORED_FIRST_RUN:
-        return "scored" if is_scored_run(run=run) else "stride"
-    return "warm_up"
+    if run < FIRST_RUN + timedelta(days=9):  # the analysis proxy needs a week of earlier runs
+        return "warm_up"
+    return "scored" if run >= SCORED_FIRST_RUN else "tuning"
 
 
 def write_json_atomic(*, path: Path, content: dict) -> None:

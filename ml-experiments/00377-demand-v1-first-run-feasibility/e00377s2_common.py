@@ -56,7 +56,7 @@ DONORS: Final[tuple[str, ...]] = tuple(
 )  # D18 uses the signed-MW Primaries
 """The sites whose tuning-month residuals supply the spread of D8, which has no tuning month."""
 SCORED_SITES: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
-PERIODS: Final[tuple[str, ...]] = ("tuning", "replicate", "scored")
+PERIODS: Final[tuple[str, ...]] = ("tuning", "scored")
 QUANTILES: Final[tuple[str, ...]] = (
     "q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99",
 )  # fmt: skip
@@ -108,17 +108,10 @@ def run_dates() -> list[datetime]:
 
 
 def period_of_run(*, run: datetime) -> str:
-    """Return `tuning`, `replicate`, `scored`, `stride`, or `warm_up` for a run."""
-    origin = run + PUBLICATION_DELAY
-    key = (origin.year, origin.month)
-    if key in TUNING_MONTHS:
-        return "tuning"
-    if key in REPLICATE_MONTHS:
-        return "replicate"
-    if run >= SCORED_FIRST_RUN:
-        stride = (run - SCORED_FIRST_RUN).days % EVERY5D_STRIDE_DAYS == 0
-        return "stride" if stride else "scored"
-    return "warm_up"
+    """Return `tuning` for a run whose origin is before 2025-07-01, else `scored`."""
+    if run < FIRST_RUN + timedelta(days=9):  # the analysis proxy needs a week of earlier runs
+        return "warm_up"
+    return "scored" if run >= SCORED_FIRST_RUN else "tuning"
 
 
 def period_origins(*, period: str) -> list[datetime]:
