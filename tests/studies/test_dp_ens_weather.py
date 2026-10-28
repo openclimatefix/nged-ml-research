@@ -607,3 +607,75 @@ def test_a_cache_slice_holds_views_of_the_same_rows(dp_synthetic_cache: FeatureC
         sliced.sites[SITE].smoothed_temperature_c, original.smoothed_temperature_c[70_000:70_100]
     )
     assert np.array_equal(sliced.calendar.band, dp_synthetic_cache.calendar.band[70_000:70_100])
+
+
+def test_the_default_horizon_clips_a_run_to_168_hours_as_before(dp_synthetic_cache: FeatureCache):
+    cache = dp_synthetic_cache
+    position = _position(cache=cache, moment=ORIGIN)
+    context = _context(cache=cache, origin_position=position)
+    run = _run(cache=cache, origin_position=position)
+    window = weather.RunWindow.build(cache=cache, context=context, run=run)
+    assert window.window.stop - window.window.start == weather.HORIZON_HALF_HOURS == 336
+
+
+def test_a_240_hour_request_returns_480_half_hours(dp_synthetic_cache: FeatureCache):
+    cache = dp_synthetic_cache
+    position = _position(cache=cache, moment=ORIGIN)
+    context = _context(cache=cache, origin_position=position)
+    run = _run(cache=cache, origin_position=position)
+    window = weather.RunWindow.build(
+        cache=cache,
+        context=context,
+        run=run,
+        horizon_half_hours=weather.PROTOCOL_HORIZON_HALF_HOURS,
+    )
+    assert window.window.stop - window.window.start == 480
+
+
+def test_a_request_beyond_the_stored_arrays_raises_instead_of_clipping(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache = dp_synthetic_cache
+    position = _position(cache=cache, moment=ORIGIN)
+    context = _context(cache=cache, origin_position=position)
+    run = _run(cache=cache, origin_position=position)
+    stored = weather.STORED_HORIZON_HALF_HOURS
+    weather.RunWindow.build(cache=cache, context=context, run=run, horizon_half_hours=stored)
+    with pytest.raises(ValueError, match="exceeds"):
+        weather.RunWindow.build(
+            cache=cache, context=context, run=run, horizon_half_hours=stored + 2
+        )
+
+
+def test_a_request_beyond_the_runs_own_targets_raises_even_below_the_stored_limit(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache = dp_synthetic_cache
+    position = _position(cache=cache, moment=ORIGIN)
+    context = _context(cache=cache, origin_position=position)
+    run = _run(cache=cache, origin_position=position)
+    short = weather.EnsSiteRun(
+        origin_position=run.origin_position,
+        temperature_c=run.temperature_c[:, :400],
+        shortwave_w_m2=run.shortwave_w_m2[:, :400],
+    )
+    weather.RunWindow.build(cache=cache, context=context, run=short, horizon_half_hours=400)
+    with pytest.raises(ValueError, match="exceeds"):
+        weather.RunWindow.build(cache=cache, context=context, run=short, horizon_half_hours=402)
+
+
+def test_the_protocol_lead_bands_put_200_hours_in_days_8_to_10_and_300_in_days_11_to_14():
+    bands = weather.lead_band_of_hours(
+        lead_hours=np.array([0.5, 30.0, 60.0, 120.0, 200.0, 300.0]),
+        upper_hours=weather.PROTOCOL_LEAD_BAND_UPPER_HOURS,
+    )
+    assert bands.tolist() == [0, 1, 2, 3, 4, 5]
+    edges = weather.PROTOCOL_LEAD_BAND_UPPER_HOURS
+    on_edge = weather.lead_band_of_hours(lead_hours=np.array(edges, dtype=float), upper_hours=edges)
+    past_edge = weather.lead_band_of_hours(
+        lead_hours=np.array(edges, dtype=float) + 0.5, upper_hours=edges
+    )
+    assert on_edge.tolist() == [0, 1, 2, 3, 4, 5]
+    assert past_edge.tolist() == [1, 2, 3, 4, 5, 5]
+    old = weather.lead_band_of_hours(lead_hours=np.array([200.0, 300.0]))
+    assert old.tolist() == [3, 3]
