@@ -59,47 +59,53 @@ headline: >-
 take_home_message: >-
   Using the fit through the meter at Stickney, the one MVA-only Primary where it is chosen, lowers
   the score by 0.57 points on sunny half-hours, but twelve months of data cannot tell that from
-  zero. At six of the eight MVA-only Primaries the stored raw fits already score within 0.1 points of
-  BG2 over all half-hours, so the large gaps sit at D8 and D12, not across the board. This repeats
-  most of experiment 152, and the stack with its stage-2 corrections was not rerun.
+  zero. At five of the eight MVA-only Primaries the stored raw fits already score within 0.1 points
+  of
+  BG2 over all half-hours, so the large gaps sit at D8, D12, and D22, not across the board.
+  Experiment 372 repeats most of experiment 152, and the stack with its stage-2 corrections was not
+  rerun.
 lessons:
   - >-
-    The stored raw fits of experiment 152 match BG2 within 0.1 points over all half-hours at 6 of
-    the 8 MVA-only Primaries, so the gaps to BG2 are at D8 (+3.36) and D12 (+0.76).
+    The stored raw fits of experiment 152 match BG2 within 0.1 points over all half-hours at 5 of
+    the 8 MVA-only Primaries, so the gaps to BG2 are at D8 (+3.36), D12 (+0.76), and D22 (+0.42).
   - >-
     One year of data gives the D12 contrast an interval 3.7 points wide on sunny half-hours, so a
     gain of 0.6 points needs more months or more Primaries with reverse flow to be resolved.
 advice:
   - >-
-    Look for the MVA-only gap to BG2 at D8 and D12 and D22, not at the other five, before building
-    a fix for all eight (figure 2).
+    Look for the gap to BG2 at D8, D12, and D22, the three Primaries where it is widest, before
+    building a fix for all eight (figure 2).
   - >-
-    Do not run experiment 152's engine again for stage-2 corrections at seven Primaries unless the
-    maintainer asks, because the raw fits are already level with BG2 at six of the eight (figure
-    2).
+    Re-run experiment 152's engine for stage-2 corrections only if the maintainer asks, because the
+    raw fits are already level with BG2 at 5 of the 8 Primaries (figure 2).
 ---
 
 # MVA fold: the rule-chosen fit at all 16 Primaries
 
-**At Stickney (D12), the fit through the meter scores 0.57 points better than the naive fit on
-sunny daylight half-hours, but twelve months of data cannot tell that from no difference.** A
-Primary is a substation that steps 33 kV down to 11 kV. Eight Primaries report apparent power
-(MVA), which has no sign, so reverse flow (power flowing from the substation back into the grid)
-is hidden. We asked whether the fit that the rule of
+**At the Primary substation D12 (Stickney), the fit through the meter scores 0.57 points better
+than the naive fit on sunny daylight half-hours, but twelve months of data cannot distinguish that
+gain from zero.** A Primary is a substation that steps 33 kV down to 11 kV. Eight Primaries report
+apparent power in megavolt-amperes (MVA), which carries no direction of flow, so reverse flow
+(power flowing from the substation back into the grid) is hidden. The naive fit treats the meter
+reading as signed power. The fit through the meter models the lost sign. We asked whether the fit
+that the rule of
 [experiment 366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md) chooses
-scores better than the naive fit, which reads the meter reading as signed power. The rule chooses
-the fit through the meter at D12 and the naive fit at the other seven. We scored the stored
-forecasts of [experiment 152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md) over
+scores better than the naive fit. The rule picks the fit through the meter when the training
+readings rise with irradiance or come close to zero, and it picks the fit through the meter at D12
+only. Scores are quantile scores in points of effective capacity (percent of the Primary's
+capacity). The scored year is 2025-07-02 to 2026-06-30. We scored the stored forecasts of
+[experiment 152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md) over
 2025-07-02 to 2026-06-30, leads 0.5 to 168 hours, beside BG2 (the production-style forecast),
 climatology, and the manual heuristic at all 16 Primaries. Verdict: not supported, because the D12
 interval includes zero.
 
-**This experiment is close to a repeat of experiment 152.** It applies no stage-2 correction and
+**Experiment 372 is close to a repeat of experiment 152.** It applies no stage-2 correction and
 makes no claim against the arm A1 of
-[experiment 252](../00252-gam-stack-at-eight-more-primaries/result.md). Stage 2 needs tuning-period
-forecasts that experiment 152 did not store, so applying it means re-running experiment 152's
-engine into a new folder, which is the follow-up the maintainer may choose. Every result holds for
-reactive power zero; the rule fails at power factor 0.97 (experiments 358 and 366).
+[experiment 252](../00252-gam-stack-at-eight-more-primaries/result.md). Stage 2 is the correction
+step fitted on tuning-period forecasts. Experiment 152 did not store
+those forecasts. Applying stage 2 means re-running experiment 152's engine into a new folder.
+Every result holds for reactive power zero. The rule fails at power factor 0.97 (experiments 358
+and 366).
 
 ![Figure 1: quantile score of the chosen fit, BG2, the manual heuristic, and climatology at the 16 Primaries](figure_1_score_by_primary.svg)
 
@@ -134,7 +140,8 @@ reactive power zero; the rule fails at power factor 0.97 (experiments 358 and 36
 
 - **Median against mean forecast.** This check does not apply, because only quantiles are scored.
 - **Triggers.** Trigger 2 applies to P3, which failed against experiment 252's reading that raw
-  fits trail BG2 at most MVA-only Primaries; the raw fits are level with BG2 at six of eight, and
+  fits trail BG2 at most MVA-only Primaries; the raw fits are level with BG2 (within 0.1 points) at
+  five of eight, and
   the reason (the lead range and the stage-2 correction) was not tested. No other trigger fired.
   The pooled contrast without D8 stays positive (+0.16), so leaving out D8 does not flip its sign.
 - **Tail calibration** (coverage and pinball loss at q01, q05, q95, q99) was not computed here;
