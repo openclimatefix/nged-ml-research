@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [368](../../00368-d8-conditional-band-head-on-gam-stack-residuals/result.md) | Does one band head on the GAM stack's residuals, pooled across Primaries, improve D8's uncertainty without hurting other Primaries? | 1 | Nothing | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
