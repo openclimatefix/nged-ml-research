@@ -1,0 +1,47 @@
+name: Studies tests
+
+# Runs the slow tests under tests/studies, which the per-pull-request gate in ci.yml skips
+# (`--run-studies` lifts the skip). A pull request runs them only when it touches code or pages a
+# study depends on; every push to main runs them in full, so a pull request that skipped them is
+# still checked before the next one starts from it.
+
+on:
+  pull_request:
+    paths:
+      - "src/studies/**"
+      - "tests/studies/**"
+      - "studies/**"
+      - "docs/studies/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/studies_tests.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: studies-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  studies-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Dummy values for the required Settings fields of the `contracts` package.
+      NGED_S3_BUCKET_URL: "https://example.com"
+      NGED_S3_BUCKET_ACCESS_KEY: "dummy"
+      NGED_S3_BUCKET_SECRET: "dummy"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Studies tests
+        run: uv run --no-sync pytest -n auto --run-studies tests/studies

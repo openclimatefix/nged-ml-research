@@ -1,0 +1,739 @@
+# --- PROJECT CONFIGURATION --- #
+
+[project]
+name = "nged-ml-research"
+version = "0.1.0"
+description = "Machine-learning experiments and studies for the NGED substation forecast"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.14"
+license = {text = "MIT License"}
+authors = [
+    { name = "Open Climate Fix Team", email = "info@openclimatefix.org"}
+]
+dependencies = [
+    "baseline_forecasters",
+    "contracts",
+    "delta_store",
+    "dynamical_data",
+    "geo",
+    "ml_core",
+    "nged_data",
+    "plotting",
+    "weather_utils",
+    "xgboost_forecaster",
+    "altair>=6.0.0",
+    "deltalake",
+    "holidays>=0.106",
+    "httpx",
+    "numpy>=1.24",
+    "openpyxl",
+    "patito",
+    "polars>=1.38.1",
+    "pvlib>=0.11.0",
+    "pyarrow",
+    "pydantic",
+    "pyproj>=3.6.0",
+    "pyyaml",
+    "scipy>=1.18.1",
+    "vl-convert-python>=1.8.0",
+    "xarray>=2026.1.0",
+    "xgboost>=2.1.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "studies"
+
+[dependency-groups]
+dev = [
+    "gcsfs",
+    "icechunk>=2.2.0",
+    "mkdocs-include-markdown-plugin>=7.2.2",
+    "mkdocs-material>=9.7.6",
+    # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
+    # which prints an unsolicited warning urging a switch away from MkDocs on every build.
+    "mkdocs-redirects>=1.1.0,<1.2.3",
+    "mkdocstrings[python]>=1.0.3",
+    "mlflow>=3.14.0",
+    "pre-commit>=4.5.1",
+    "pymarkdownlnt>=0.9.13",
+    "pytest>=9.0.2",
+    "pytest-xdist>=3.6.1",
+    "ruff>=0.14.13",
+    "ty>=0.0.16",
+    "zarr>=3.4.0",
+]
+# Optional: the differentiable battery estimator fits on the GPU. The PyPI wheel is built against
+# CUDA 13.0, which the workstation's driver supports. Install with `uv sync --group gpu`. Only
+# `src/studies` and the experiment folders that need a GPU may import torch.
+gpu = [
+    "torch>=2.14.1",
+]
+
+[project.urls]
+repository = "https://github.com/openclimatefix/nged-ml-research"
+
+# --- PRODUCTION PACKAGES --- #
+# The packages below live in the `nged-substation-forecast` workspace. `uv` honours only the
+# sources of the root project, so every package that this project or another package needs is
+# listed here, each at the same commit.
+
+[tool.uv.sources]
+baseline_forecasters = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/baseline_forecasters", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+contracts = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/contracts", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+delta_store = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/delta_store", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+dynamical_data = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/dynamical_data", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+geo = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/geo", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+ml_core = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/ml_core", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+nged_data = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/nged_data", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+plotting = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/plotting", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+weather_utils = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/weather_utils", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+xgboost_forecaster = { git = "https://github.com/openclimatefix/nged-substation-forecast", subdirectory = "packages/xgboost_forecaster", rev = "2c1bb51fe0e6ede4b37ac685a7a5209b3b2204ff" }
+
+# --- LINTING AND TYPING CONFIGURATION --- #
+
+# Ruff configuration
+# See https://docs.astral.sh/ruff/configuration/
+[tool.ruff]
+line-length = 100
+# Ruff's default is `[".", "src"]`, which makes `studies` first-party and sorts it apart from
+# the bare-name sibling modules that the experiment scripts import. Keeping `studies` in the same
+# block as those modules preserves the import order that production's ruff settings produced.
+src = ["."]
+# The era-fold measurement scripts are a record of how `studies/era_fold_design/report.md` was made.
+# They hard-code a scratch directory and star-import a sibling helper, so they run only from that
+# directory and are not linted or formatted.
+extend-exclude = ["studies/era_fold_design/scripts"]
+
+[tool.ruff.lint]
+# `select` is always written out here, never inherited. Ruff's *default* rule set is a curated
+# menu, not a standard: the docs state no selection criteria and make no stability promise, so an
+# inherited selection means a `uv lock` refresh can change which rules this repo enforces. Naming
+# the families keeps that decision ours. A ruff upgrade that adds a rule to a family below can
+# still surface new findings — but it does so by failing CI on the lock-bump PR, which is one
+# visible decision to take, not silent drift.
+#
+# The families here are chosen from ruff's defaults, then widened. Note that ruff's defaults are
+# *not* a superset of the older E4/E7/E9/F gate: of pycodestyle-E they keep only E722 and E902, so
+# adopting the defaults verbatim would stop enforcing all fourteen of E401, E402, E701, E702, E703,
+# E711, E712, E713, E714, E721, E731, E741, E742 and E743. E4/E7/E9 are therefore listed
+# explicitly.
+#
+# "The code-style page", below and in `ignore`, means
+# <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/>.
+select = [
+    "ANN",   # flake8-annotations: complete signatures are a house rule (the code-style page)
+    "ASYNC", # flake8-async
+    "B",     # flake8-bugbear
+    "BLE",   # flake8-blind-except
+    "C4",    # flake8-comprehensions
+    "D",     # pydocstyle (google convention, configured below)
+    "DTZ",   # flake8-datetimez: naive datetimes can silently corrupt our UTC-everywhere data
+    "E4",    # pycodestyle: import placement
+    "E5",    # pycodestyle: line length (the formatter does not wrap comments or long strings)
+    "E7",    # pycodestyle: statement-level errors
+    "E9",    # pycodestyle: syntax and IO errors
+    "EXE",   # flake8-executable
+    "F",     # pyflakes
+    "FA",    # flake8-future-annotations
+    "FLY",   # flynt
+    "FURB",  # refurb
+    "G",     # flake8-logging-format
+    "I",     # isort
+    "INT",   # flake8-gettext
+    "ISC",   # flake8-implicit-str-concat
+    "LOG",   # flake8-logging
+    "N",     # pep8-naming: the naming conventions the code-style page mandates
+    "PERF",  # perflint
+    "PGH",   # pygrep-hooks
+    "PIE",   # flake8-pie
+    "PL",    # pylint
+    "PT",    # flake8-pytest-style
+    "PTH",   # flake8-use-pathlib
+    "PYI",   # flake8-pyi
+    "RET",   # flake8-return
+    "RUF",   # ruff-specific rules
+    # flake8-bandit, restricted to the three rules ruff enables by default. The whole family
+    # reports about 1,170 findings, of which ~1,149 are S101 (`assert` used) — almost all of them
+    # the asserts that *are* the test suite. Exempting S101 in tests the way the DTZ/D entries do
+    # leaves 30: our own `git`/`uv` invocations (S603/S607 ×12), settings and moto dummy credentials
+    # (S106 ×4), `urlopen` against a local moto server and the MLflow test server (S310 ×5), and 9
+    # asserts outside tests. That is 30 suppressions for no signal in a repo that handles no
+    # untrusted input. Real security linting is a separate decision, not a side effect of this file.
+    "S102",  # exec used
+    "S110",  # try-except-pass
+    "S112",  # try-except-continue
+    "SIM",   # flake8-simplify
+    "T10",   # flake8-debugger: never commit a breakpoint
+    "TC",    # flake8-type-checking
+    "TID251",  # flake8-tidy-imports banned-api only (see banned-api table below)
+    "TRY",   # tryceratops
+    "UP",    # pyupgrade
+    "W",     # pycodestyle warnings
+    "YTT",   # flake8-2020
+]
+
+# Every entry is a family member we deliberately decline, with the reason. Prefer adding a line
+# here (and its justification) over dropping a whole family from `select`.
+ignore = [
+    # --- Rules that fight this repo's own conventions ---
+    # The code-style page explicitly blesses long-but-clear parameter lists ("Eight parameters is
+    # acceptable when each is distinct"), and prefers extracting named helpers with more parameters
+    # over letting a function body grow.
+    "PLR0913", # too many arguments
+    "PLR0917", # too many positional arguments
+    # Our prose — docstrings and error messages alike — uses en-dashes and typographic quotes on
+    # purpose. RUF001-003 flag every one of them as an "ambiguous" Unicode character.
+    "RUF001", # ambiguous character in a string
+    "RUF002", # ambiguous character in a docstring
+    "RUF003", # ambiguous character in a comment
+    # f-strings in log calls are fine here: this is not a high-volume hot path, and the eager
+    # formatting cost is worth the readability.
+    "G004", # logging statement uses f-string
+    # The code-style page asks for *complete* type hints, which is what the rest of
+    # flake8-annotations enforces. It does not ask for the elimination of `Any`, and the places
+    # that use it — a `**kwargs: Any` forwarded verbatim, a test double that accepts and ignores
+    # every argument — have no honest narrower type.
+    "ANN401", # dynamically typed expressions (`typing.Any`) are disallowed
+    # Asserting against a literal is the whole point of a unit test, and `magic-value-comparison`
+    # cannot tell a test's expected value from a hard-coded constant in production code. That
+    # argument covers 162 of the 169 findings; the rule is nonetheless declined repo-wide rather
+    # than under `**/tests/**`, which would leave 7 sites live in `src/` and the notebooks. Those 7
+    # are quantile levels, longitude bounds and similar domain literals that read better inline
+    # than as named constants. Tighten to a tests-only entry if that ever stops being true.
+    "PLR2004", # magic value used in comparison
+    # The code-style page asks for UPPER_SNAKE_CASE constants, and N806 rejects that spelling for a
+    # constant that happens to be function-local (`RAD_TO_DEG`, `COMPRESSION`), as well as
+    # domain-conventional names such as `X` for a feature matrix. The rest of pep8-naming (N801
+    # classes, N802 functions, N815/N816 mixedCase) is left on and does encode the conventions that
+    # page states. N803 is *not* ignored here — every site is a marimo-generated cell parameter, so
+    # it is declined in `per-file-ignores` for the notebooks alone and stays live over `src/` and
+    # the tests.
+    "N806", # variable in function should be lowercase
+    # The sites are `NoReadingsInFile`, `NwpRunNotYetAvailable` and `NwpVariableWhollyMissing`;
+    # renaming any of them is a public-API change across several packages, not a lint fix. Revisit
+    # deliberately if we ever want the `Error` suffix.
+    "N818", # exception name should be suffixed with `Error`
+
+    # --- Rules that would break Patito/pydantic ---
+    # Patito and pydantic build their models from *runtime* annotations, so moving an annotation-only
+    # import into an `if TYPE_CHECKING:` block turns a working schema into a NameError at import
+    # time. That is decisive for the schema modules; the rule is declined repo-wide rather than
+    # per-file because the 105 sites are not worth sorting by hand for a rule that has found no
+    # defect. TC004/TC005/TC007/TC010 (the rules ruff enables by default) are safe and stay on.
+    "TC001", # move application import into a type-checking block
+    "TC002", # move third-party import into a type-checking block
+    "TC003", # move standard-library import into a type-checking block
+    # TC006 moves no imports, so the reason above does not cover it. It wants every `typing.cast()`
+    # target quoted, which costs 15 edits and buys nothing here: `cast` never evaluates its type
+    # argument at runtime in a way that a quote would rescue, and the unquoted form reads better.
+    "TC006", # add quotes to type expression in `typing.cast()`
+
+    # --- Rules whose cure is worse than the disease ---
+    # TRY003 wants every message moved into a custom exception class. We raise plain built-in
+    # exceptions with a specific, readable message; a class per message would be pure ceremony.
+    "TRY003", # long message outside the exception class
+    # All 13 sites are deliberate late imports in tests (importing inside the test body so a
+    # `monkeypatch` lands first, ×11) and in a marimo notebook cell (×2). Nothing in `src/` defers
+    # an import today; the rule is ignored rather than per-file-ignored so that a future late
+    # import in `src/` does not have to argue with the linter.
+    "PLC0415", # `import` should be at the top level of a file
+    # Overlaps with the formatter, which owns line breaks inside implicit string concatenations.
+    "ISC001", # single-line implicit string concatenation
+]
+
+[tool.ruff.lint.per-file-ignores]
+# `**/tests/**` covers both the root `tests/` directory and every `packages/*/tests/`.
+#
+# DTZ: test frames are hand-built with `datetime(2023, 1, 1, 12, 0)` and fed to helpers that are
+#   indifferent to time zone. The rule earns its keep where a naive datetime could reach stored
+#   data, which is `src/`, not here.
+# D: a test's name is its documentation; requiring a docstring per test case adds noise, not
+#   information.
+# ANN201: every test function returns `None`; spelling that out on each one is pure boilerplate.
+"**/tests/**" = ["ANN201", "D", "DTZ"]
+# conftest.py is test scaffolding and follows the same conventions as the tests it serves.
+"**/conftest.py" = ["ANN201", "D", "DTZ"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# pandas is strictly forbidden in this repo — Polars only. See
+# <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/>.
+"pandas".msg = "pandas is forbidden in this repo: use Polars (`pl.LazyFrame`/`pl.DataFrame`)."
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 100
+
+# pydoclint checks a docstring's `Args:` and `Returns:` sections against the signature, which is
+# the half of docstring drift ruff leaves uncovered. Ruff's D417 fires only when an `Args:` section
+# is *present and incomplete*: parameters filed under `Attributes:` instead of `Args:`, and an
+# `Args:` entry naming a parameter a rename removed, both pass every rule selected above.
+# `packages/geo/src/geo/h3.py` carried one of each for months. Ruff does ship DOC102 for the second
+# case, but only in preview, and implements neither DOC101 nor DOC103 for the first.
+#
+# pydoclint is deliberately NOT a dependency of this workspace, and is run from an isolated
+# ephemeral environment instead. pydoclint requires `docstring-parser-fork` while Dagster requires
+# `docstring-parser`, and both distributions ship the same top-level `docstring_parser` module. In a
+# shared virtual environment, whichever distribution is installed last overwrites the other's files.
+# Installing `docstring-parser` last breaks pydoclint at import with `cannot import name
+# 'DocstringYields'`, so a `uv sync` that reorders the installs can break the linter with no edit to
+# this file.
+#
+# Removing `docstring-parser-fork` from a shared environment breaks Dagster instead, and the
+# breakage outlasts the fork's removal. The uninstall deletes every path listed in the fork's
+# install manifest (`RECORD`), and that manifest lists the whole `docstring_parser` module.
+# `docstring-parser`'s own `.dist-info` directory survives untouched. uv reads the surviving
+# `.dist-info` and counts `docstring-parser` as installed, so `uv sync` reports success and installs
+# nothing. `uv run dg dev` then fails with `ModuleNotFoundError: No module named
+# 'docstring_parser'`. A virtual environment that has ever held both distributions stays broken
+# until `uv sync --reinstall-package docstring-parser` rewrites the module files.
+#
+# `uv run --isolated --no-project --with pydoclint` gives pydoclint an environment of its own; the
+# config below is still read, because pydoclint looks for pyproject.toml in the working directory.
+#
+# The options below switch off the checks this repo does not want, each for its own reason.
+[tool.pydoclint]
+style = "google"
+# Types belong in the signature, where `ANN` already requires them and `ty` checks them. Repeating
+# them in the docstring gives them a second place to drift, and mkdocstrings renders the
+# signature's annotations either way.
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-yield-types = false
+# A `Raises:` section is not a house rule, so DOC501/502/503 would report 25 functions that
+# deliberately do not carry one. Ruff ships DOC501 and DOC502 for whoever wants to adopt the rule
+# later; this is not that decision.
+skip-checking-raises = true
+# `__init__` may carry its own docstring. The alternative — DOC301, which demands the text move up
+# into the class docstring — conflicts with how the Patito models here are written.
+allow-init-docstring = true
+exclude = '\.git|\.venv'
+
+[tool.ty.environment]
+# Mirror `pythonpath` in `[tool.pytest.ini_options]` below, so `ty` resolves a bare
+# `_nwp_test_data` import the same way pytest does. Without this setting, the import resolves only
+# from a module sitting beside `_nwp_test_data` in `tests/`, and the same import from a package's
+# own test suite — `packages/ml_core/tests`, say — is an `unresolved-import` error even though
+# pytest runs it fine.
+#
+# `scripts/mkdocs_hooks` is listed so the tests can import the MkDocs hook `experiment_tables` by
+# bare name; MkDocs loads it by path, so it needs no installed package.
+#
+# Each folder under `studies/` that holds a script a test imports by bare name is listed here and in
+# `pythonpath` under `[tool.pytest.ini_options]`, so `ty` resolves `import wind_products` the same
+# way pytest does. A script may import its own folder, other study and experiment folders,
+# `studies.*`, and the other reviewed packages. Production never imports a script.
+extra-paths = [
+    "tests",
+    "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
+    "ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth",
+    "scripts/mkdocs_hooks",
+    "studies/beam_diffuse_split",
+    "studies/embedded_battery_forecast",
+    "studies/ens_backfill_pilot",
+    "studies/lag_features",
+    "studies/llm_capacity_labeller",
+    "studies/nwp_forecast_comparison",
+    "studies/open_meteo_ensemble_means",
+    "studies/market_downloads",
+    "studies/past_weather",
+    "studies/quick_wins",
+    "studies/solar_bmu_census",
+    "studies/weather_downloads",
+    "studies/wind_storage",
+    "tests/studies/past_weather",
+]
+
+[[tool.ty.overrides]]
+# `torch` and `triton` come from the optional `gpu` dependency group of `src/studies`, which CI
+# does not install, so `ty` cannot resolve them there. The files listed in `include` are the ones
+# that import them, directly or through the differentiable-physics modules, and the tests and
+# scripts that go with those.
+include = [
+    "src/studies/battery_recurrence.py",
+    "ml-experiments/00241-pv-capacity-calibrated-interval/e00241_calibrate.py",
+    "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_common.py",
+    "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_fit.py",
+    "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_report.py",
+    "ml-experiments/00238-pv-capacity-nearest-farm-sunshine-reference/e00238_common.py",
+    "ml-experiments/00238-pv-capacity-nearest-farm-sunshine-reference/e00238_fit.py",
+    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_common.py",
+    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_fit.py",
+    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_real.py",
+    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_report.py",
+    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_design.py",
+    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_levels.py",
+    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_run.py",
+    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_tall.py",
+    "ml-experiments/00236-pv-capacity-clear-sky-fit/e00236_common.py",
+    "ml-experiments/00236-pv-capacity-clear-sky-fit/e00236_fit.py",
+    "ml-experiments/00236-pv-capacity-clear-sky-fit/e00236_report.py",
+    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_common.py",
+    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_fit.py",
+    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_report.py",
+    "ml-experiments/00231-pv-capacity-audit-where-recovery-goes/e00231_common.py",
+    "ml-experiments/00231-pv-capacity-audit-where-recovery-goes/e00231_fit.py",
+    "ml-experiments/00231-pv-capacity-audit-where-recovery-goes/e00231_report.py",
+    "src/studies/battery_state_space.py",
+    "src/studies/capacity_physics_torch.py",
+    "src/studies/dp_edge_flow.py",
+    "src/studies/dp_filter_grid.py",
+    "src/studies/dp_gam.py",
+    "src/studies/dp_meter.py",
+    "src/studies/dp_gam_pooled.py",
+    "src/studies/dp_shape_library.py",
+    "src/studies/dp_hierarchy.py",
+    "src/studies/dp_joint_fit.py",
+    "src/studies/dp_gam_graph.py",
+    "src/studies/dp_onboarding.py",
+    "src/studies/dp_operator.py",
+    "src/studies/dp_pooled.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_c1.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_c2.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_c3.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_causal.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_checks.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_common.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_data.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_decide.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_flows.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_gam.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_gate.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_inject.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_local.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_refit.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_run.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_score.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_tune.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_charts.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_real_events.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_report.py",
+    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_variants.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_arms.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_charts.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_diag.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_equiv.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_fit.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_gate.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_onboard.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_tune.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_common.py",
+    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_losses.py",
+    "src/studies/dp_pooled_vp.py",
+    "ml-experiments/00104-differentiable-physics-2-simple-structural-model/e00104_benchmark.py",
+    "ml-experiments/00104-differentiable-physics-2-simple-structural-model/e00104_gam.py",
+    "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_cards.py",
+    "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_fit.py",
+    "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_tune.py",
+    "ml-experiments/00150-differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds/e00150_tune.py",
+    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_extra.py",
+    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_grid.py",
+    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_refit.py",
+    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_tune.py",
+    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_capacity.py",
+    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_fit.py",
+    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_gate.py",
+    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_gate_intervals.py",
+    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_meter_boot.py",
+    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_tune.py",
+    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_xgb.py",
+    "ml-experiments/00108-differentiable-physics-shared-anomaly-factor-across-substations/e00108_fits.py",
+    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_arms.py",
+    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_common.py",
+    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_tune.py",
+    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_fit.py",
+    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_gate.py",
+    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_report.py",
+    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_cell.py",
+    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_common.py",
+    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_controls.py",
+    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_design.py",
+    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_dp_run.py",
+    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_drift.py",
+    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_fits.py",
+    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_gam_ens.py",
+    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_gate.py",
+    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_tune.py",
+    "ml-experiments/00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/e00125_build_cache.py",
+    "ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/e00118_gate.py",
+    "ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/e00118_noise.py",
+    "ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/e00118_run.py",
+    "ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/e00128_gate.py",
+    "ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/e00128_fit.py",
+    "ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/e00128_run.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_bundle.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_cards.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_checks.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_cv.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_final.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_gamk.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_model.py",
+    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_sensitivities.py",
+    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_common.py",
+    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_design.py",
+    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_fit.py",
+    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_gate2.py",
+    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_profile.py",
+    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_tune.py",
+    "ml-experiments/00126-differentiable-physics-s1-cheap-screens-added-to-gam-k/e00126_common.py",
+    "ml-experiments/00126-differentiable-physics-s1-cheap-screens-added-to-gam-k/e00126_design.py",
+    "ml-experiments/00126-differentiable-physics-s1-cheap-screens-added-to-gam-k/e00126_tune.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_arms.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_charts.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_common.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_ens.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_gate.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_members.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_numbers.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_report.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_score.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_shape.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_site.py",
+    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_tune.py",
+    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_armb.py",
+    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_audit.py",
+    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_gate.py",
+    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_run.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_arms.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_common.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_controls.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_ens.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_figures.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_fits.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_joint_fits.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_known_answer.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_p1.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_report.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_run.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_score.py",
+    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_tune.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_arms.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_asof.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_beam.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_charts.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_common.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_july.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_pilot.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_real.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_registers.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_report.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_semi.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_semi_run.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_stage_c.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_step.py",
+    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_timeseries.py",
+    "tests/studies/test_battery_state_space.py",
+    "tests/studies/test_capacity_physics_torch.py",
+    "tests/studies/test_dp_edge_flow.py",
+    "tests/studies/test_dp_filter_grid.py",
+    "studies/dp_filter_grid_benchmark/benchmark_filter_grid.py",
+    "tests/studies/test_dp_gam.py",
+    "tests/studies/test_dp_generation.py",
+    "tests/studies/test_dp_hierarchy.py",
+    "tests/studies/test_dp_joint_fit.py",
+    "tests/studies/test_dp_meter.py",
+    "tests/studies/test_dp_gam_pooled.py",
+    "tests/studies/test_dp_shape_library.py",
+    "tests/studies/test_dp_shape_library.py",
+    "tests/studies/test_dp_gam_graph.py",
+    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_common.py",
+    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_design.py",
+    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_gate2.py",
+    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_gate4.py",
+    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_test1.py",
+    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_tune.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_capacity_diagnosis.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_controls.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_gate.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_leave_one_out.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_real_intervals.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_synth.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_tune.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_fit.py",
+    "tests/studies/test_dp_onboarding.py",
+    "tests/studies/test_dp_operator.py",
+    "tests/studies/test_dp_pooled.py",
+    "tests/studies/test_dp_pooled_vp.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_common.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_vp.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_fit.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_forecast.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gate.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gradient.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_ladder.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_onboard.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_profile.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_convex.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_refs.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_objectives.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_report.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_budget.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gate_diagnostics.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_charts.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_checks.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_diagnose.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_gam_panel.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_variants.py",
+    "ml-experiments/00133-differentiable-physics-vk-learned-noise-and-observation-variance-in-gam-k/e00133_run.py",
+    "ml-experiments/00133-differentiable-physics-vk-learned-noise-and-observation-variance-in-gam-k/e00133_select.py",
+    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_data.py",
+    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_model.py",
+    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_run.py",
+    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_members.py",
+    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_members.py",
+    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_run.py",
+    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_tune.py",
+    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_design.py",
+    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_run.py",
+    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_tall.py",
+    "ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/e00180_design.py",
+    "ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/e00180_run.py",
+    "ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/e00180_tall.py",
+    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_asof_table.py",
+    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_fits.py",
+    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_kat.py",
+    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_run.py",
+    "studies/unmetered_battery_capacity/capacity_runs.py",
+    "studies/unmetered_battery_capacity/capacity_state_space.py",
+]
+
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"
+
+[[tool.ty.overrides]]
+# Triton's kernel decorators and `torch.autograd.Function`'s context object are not typed in a way
+# `ty` can follow, so the kernel file is checked for the other rules only.
+include = ["src/studies/battery_recurrence.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+invalid-method-override = "ignore"
+
+[tool.ty.src]
+# The era-fold measurement scripts are a record, not maintained code (see the ruff exclude).
+exclude = ["studies/era_fold_design/scripts"]
+
+[tool.pytest.ini_options]
+# importlib mode lets test modules in different directories share a basename; the default
+# prepend mode aborts collection with an "import file mismatch" error on a duplicate name.
+# A full-suite run adds `-n auto` (pytest-xdist) itself, via the `tests/_pytest_autoinject.py`
+# plugin loaded below; see that module's docstring for why it is not a plain `addopts` entry.
+addopts = "--import-mode=importlib -p _pytest_autoinject"
+# Pytest's default patterns.
+python_files = ["test_*.py", "*_test.py"]
+# Put the root `tests/` dir on sys.path so its integration tests can import shared, non-fixture
+# test data (e.g. `_nwp_test_data`) by bare name — importlib mode does not add each test file's
+# own directory to sys.path the way prepend mode does. This is also load-bearing for the `-p
+# _pytest_autoinject` entry in `addopts` above: `-p` resolves a bare module name against sys.path,
+# and `tests/_pytest_autoinject.py` is only importable as `_pytest_autoinject` because of this line.
+#
+# Each folder under `studies/` that holds a script a test imports by bare name is listed too, and in
+# `extra-paths` under `[tool.ty.environment]` above. A script that imports another folder's
+# script passes under this setting and fails under `uv run python studies/<folder>/<script>.py`
+# unless the other folder is on `PYTHONPATH`. A test directory is listed when its
+# tests import helpers from a sibling test module by bare name.
+pythonpath = [
+    "tests",
+    "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
+    "scripts/mkdocs_hooks",
+    "studies/beam_diffuse_split",
+    "studies/embedded_battery_forecast",
+    "studies/ens_backfill_pilot",
+    "studies/lag_features",
+    "studies/llm_capacity_labeller",
+    "studies/nwp_forecast_comparison",
+    "studies/open_meteo_ensemble_means",
+    "studies/market_downloads",
+    "studies/past_weather",
+    "studies/quick_wins",
+    "studies/solar_bmu_census",
+    "studies/weather_downloads",
+    "studies/wind_storage",
+    "tests/studies/past_weather",
+]
+# `error` first: any warning not explicitly excepted below fails the test that raised it, so a
+# deprecation in our own code is caught by the PR that introduces it instead of accumulating in the
+# summary. Later entries win, so every exception below is applied on top of `error`.
+#
+# Each exception silences one *third-party* deprecation we cannot fix from this repo, and is pinned
+# to the exact message and the exact upstream module that raises it, so it can never match a warning
+# from our own code. Delete an entry when the upstream release named in its comment ships a fix.
+# When a dependency upgrade adds a new upstream warning, the suite fails loudly: add an entry here,
+# named and dated the same way, rather than widening an existing one.
+filterwarnings = [
+    "error",
+    # mlflow 3.15.1: `utils/file_utils.py` and `utils/yaml_utils.py` (the only two call sites, and
+    # both read and write) still use the `codecs.open()` that Python 3.14 deprecated. Triggered by
+    # every file-store access, so most of the MLflow-backed tests hit it. Delete once MLflow
+    # switches to the builtin `open()`.
+    "ignore:codecs\\.open\\(\\) is deprecated:DeprecationWarning:mlflow\\.utils\\.(file_utils|yaml_utils)$",
+]
+# `.claude` holds git worktrees (`.claude/worktrees/*`), each a full checkout carrying its own
+# copy of this `conftest.py`; recursing into them re-registers the `--run-studies` option and
+# aborts collection with "option names {'--run-studies'} already added".
+norecursedirs = [".venv", "venv", ".git", ".claude", "__pycache__"]
+
+[tool.pymarkdown]
+# Line length: prose in docs/, the READMEs and the skill files is hard-wrapped at 100 characters.
+# `strict` and `stern` default to off, so a line is only flagged when it could actually have been
+# wrapped — an unbreakable token such as a long URL passes. Headings are exempt because an ATX
+# heading is one line by construction and was never part of the wrapped-prose convention.
+plugins.md013.enabled = true
+plugins.md013.line_length = 100
+plugins.md013.tables = false
+plugins.md013.code_blocks = false
+plugins.md013.headings = false
+# Duplicate heading: only flag duplicates under the same parent heading, not across
+# the whole file (e.g. "Usage" appearing under two different top-level sections).
+plugins.md024.siblings_only = true
+# Nested list indent: MkDocs' renderer (Python-Markdown, no sane-lists extension) only treats a
+# sub-list as nested when it's indented a full 4 spaces; 2-space indent (a bare list's default)
+# silently renders as a flat, unnested list instead. Match the renderer, not the default.
+#
+# Use PML101 ("anchored list indentation"), not the more common MD007 ("ul-indent"), to enforce
+# this: MD007 hard-codes bullets nested under an *ordered* item to align with the parent's
+# content column (3 spaces for a "1. " marker) and ignores its own `indent` setting for that
+# case — but Python-Markdown still needs a full 4 spaces to nest there, so MD007's own preferred
+# indent renders flat. It also never checks a numbered sublist's indentation at all. PML101
+# anchors every level at (depth − 1) × indent regardless of parent marker width, which is exactly
+# Python-Markdown's model, so it accepts 4-space nesting under both bullet and numbered parents
+# with no pragmas — and catches under-indented numbered sublists that MD007 misses entirely.
+plugins.md007.enabled = false
+plugins.pml101.enabled = true
+plugins.pml101.indent = 4
+# Front matter: Claude Code skills (.claude/skills/*/SKILL.md) require a YAML frontmatter block.
+# Without this, pymarkdown misreads the frontmatter as document content (e.g. "---" as a setext
+# heading underline), producing spurious heading-style/blank-line errors.
+extensions.front-matter.enabled = true
+# Tables: MD013's `tables = false` above only exempts a pipe table's rows from the line-length
+# check if pymarkdown recognises them as table tokens in the first place, which needs this
+# extension. Without it, a table row is scanned as an ordinary paragraph line and MD013 flags
+# every row wider than 100 characters, even though a wrapped table row would not render as a table.
+extensions.markdown-tables.enabled = true
+# Table column style: this extension turns MD060 on too, which wants every pipe table in the repo
+# reformatted to its "compact" delimiter style — hundreds of pre-existing rows, out of #690's
+# scope of line length alone.
+plugins.md060.enabled = false
+# Link fragments: pymarkdownlnt 0.9.40 (the first release to implement this rule) doesn't
+# reproduce Python-Markdown's slug algorithm for a heading containing an em dash, so it flags
+# every anchor link to a heading like "### 10 — Every write is atomic..." as broken even though
+# the anchor is exactly what MkDocs generates and renders correctly — confirmed against
+# scripts/lint/check_docs_links.py, which parses MkDocs' actual output and passes on the same links.
+plugins.md051.enabled = false
+# Emphasis style: pymarkdownlnt 0.9.40 also newly implements this rule, and it doesn't know that
+# an underscore inside `$...$`/`$$...$$` math is a LaTeX subscript, not markdown emphasis — e.g.
+# `\hat{q}_t(\tau_{\mathrm{lo}})` in docs/techniques/evaluation-metrics.md gets misread as an
+# emphasis span and flagged. That's mixed in the same rule output with genuine underscore-vs-
+# asterisk inconsistencies in prose, so the finding list can't be trusted without a per-instance
+# check the math would make risky to automate. Revisit once upstream is math-aware.
+plugins.md049.enabled = false

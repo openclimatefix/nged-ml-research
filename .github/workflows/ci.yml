@@ -1,0 +1,109 @@
+name: CI
+
+# Per-pull-request quality gate: docs build, lint, format, types, markdown, and the fast test suite.
+# The slow studies tests run in studies_tests.yml. The three jobs run in parallel, and the final
+# job, named `ci`, is the one required status check in the repository ruleset.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to a pull request cancels the run it supersedes. A push to `main` gets a group of its
+# own (named by commit hash), so two merges landing minutes apart are each checked.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Dummy values for the required Settings fields of the `contracts` package.
+  NGED_S3_BUCKET_URL: "https://example.com"
+  NGED_S3_BUCKET_ACCESS_KEY: "dummy"
+  NGED_S3_BUCKET_SECRET: "dummy"
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      # --locked fails the build if uv.lock is out of date with pyproject.toml.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Docs build (mkdocs --strict)
+        run: uv run --no-sync mkdocs build --strict --site-dir /tmp/ci-site
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Lint (ruff check)
+        run: uv run --no-sync ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run --no-sync ruff format --check .
+
+      # Ruff's D417 only catches an `Args:` section that is present and incomplete; pydoclint
+      # compares the whole of `Args:` and `Returns:` against the signature.
+      - name: Docstring lint (pydoclint)
+        run: uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google .
+
+      - name: Type-check (ty)
+        run: uv run --no-sync ty check
+
+      - name: Docs links (check_docs_links)
+        run: uv run --no-sync python scripts/lint/check_docs_links.py
+
+      # Every hook without a step above. SKIP lists the hooks that have a step above running the
+      # same command over the same files.
+      - name: Pre-commit (every hook without a step above, every file)
+        env:
+          SKIP: ruff-check,ruff-format,ty,pydoclint,check-docs-links
+        run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # The slow tests under tests/studies are skipped here and run in studies_tests.yml.
+      - name: Tests
+        run: uv run --no-sync pytest
+
+  # The single required status check. It passes only when every job above passed.
+  ci:
+    if: always()
+    needs: [docs, lint, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that every job passed
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            exit 1
+          fi

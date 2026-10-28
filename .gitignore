@@ -1,0 +1,89 @@
+#######################
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+#######################
+# Virtual environments
+.venv
+
+#######################
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+#######################
+# Environment variables & secrets. The committed .env.example documents the keys; copy it to .env.
+.env
+.env.backup
+# Dashboard S3-mode overrides (issue #297); the committed .env.s3.example documents the keys.
+packages/dashboard/.env.s3
+
+#######################
+# Data storage
+# Anchored: an unanchored `data/` also matches `packages/*/tests/data/`, which hold *tracked* test
+# fixtures — and because ruff respects .gitignore, that hid two tracked Python files from
+# `ruff check .` and from CI while pre-commit still checked them. No trailing slash, because that
+# would match only a directory: a git worktree reaches the data root through a `data` symlink,
+# which would then show up as an untracked file in every worktree.
+/data
+
+#######################
+# Dagster
+packages/dynamical_data/uint8_nwp.parquet
+.tmp_dagster_home_*
+# `dagster_history/` is defined in `$DAGSTER_HOME/dagster.yaml`
+dagster_history/
+
+#######################
+# MLflow
+
+# This directory contains all the artifacts (e.g. the XGBoost models), parameters, and metrics for
+# every experiment you run locally. It can grow very large and contains binary files that don't
+# belong in Git.
+mlruns/
+
+# If you use a SQLite backend for MLflow (which is common for local development to enable better
+# searching/filtering than the file backend), this database file stores the run metadata. Like any
+# database file, it shouldn't be versioned. The glob covers the timestamped copies taken before an
+# MLflow upgrade, such as mlflow.db.bak-pre-upgrade-20260915T115931.
+mlflow.db
+mlflow.db.bak*
+
+
+#######################
+# opencode agents
+
+# opencode's exploration scripts to test functionality
+exploration_scripts/
+
+
+#######################
+# Testing
+tests/xgboost_integration_plot.html
+tests/xgboost_dagster_integration_plot.html
+test.parquet
+*.zarr/
+example_data/
+packages/dynamical_data/example_data
+site/
+
+#######################
+# Claude Code
+
+# Personal permission allowlist — local to this machine, not project config.
+.claude/settings.local.json
+
+# Coverage artifacts (pytest-cov)
+.coverage
+
+#######################
+# Downloaded literature (papers, third-party project deliverables).
+# Copyrighted third-party material: never commit.
+literature/
+temp/
