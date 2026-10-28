@@ -24,7 +24,7 @@ from typing import Final
 import e00368_features as feat
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 import xgboost as xgb
 
 LEVELS: Final[np.ndarray] = np.array(
