@@ -76,8 +76,9 @@ and `release-model` stay in `nged-substation-forecast`. A session here does not 
 dependencies here), and the helper scripts that `prose-review` cites relative to its own folder.
 Read the production repository for them.
 
-**Tracked files contain absolute paths under `/home/jack`.** They record where an experiment ran on
-the workstation. Set `DATA_PATH_INTERNAL` rather than editing them.
+**Only logs and past-run reports contain absolute paths under `/home/jack`.** They record where an
+experiment ran on the workstation. A test fails if a script or shell file names such a path, so use
+the constants in `studies.sources` and set `DATA_PATH_INTERNAL`.
 
 **Tests that need `torch` skip in CI, to keep CI fast.** They run on the workstation after `uv sync
 --group gpu`.
