@@ -110,12 +110,16 @@ This page is the plan. The write-up replaces it when the scores exist.
 
 ## Assumptions
 
-- **MVA-only fit.** Until the experiment 377 worker answers, experiment 377's `a0` arm at the
-  MVA-only Primaries is treated as the naive fit, so it is the second arm. The main arm, the
-  rule-chosen fit of experiment 374 at 240 hours, needs a re-run of experiment 377's stage 1 and
-  stage 2 with experiment 374's fits; that re-run is stage C2 and starts after stage C on the naive
-  fit has been scored.
-- **Below 168 hours.** The forecast is experiment 377's stage 2 unchanged, as the brief states.
+- **MVA-only fit.** Experiment 377's `a0` arm uses the naive fit at all eight MVA-only Primaries,
+  including D12 (confirmed by the 377 worker). The rule-chosen fit of experiment 374 was not run at
+  240 hours, so the main arm needs a re-run of experiment 377's stage 1 and stage 2 with experiment
+  374's fits; that re-run is stage C2 and starts after stage C on the naive fit has been scored.
+- **Below 168 hours.** Experiment 377's stage 2 has no two-number solar summary S at any lead
+  (confirmed by the 377 worker). Default 1 includes S below 168 hours (experiments 202 and 251), so
+  the brief's "default 1 stack below 168 h" needs S applied there too. Stage A therefore also
+  stores member responses at 0.5 to 168 hours and applies experiment 202's per-band fit
+  (`e00202_arms.fit_factors`) to those leads. The control gate compares the six against
+  experiment 322's stored scores at 0.5 to 240 hours.
 
 ## Open questions for the manager
 
