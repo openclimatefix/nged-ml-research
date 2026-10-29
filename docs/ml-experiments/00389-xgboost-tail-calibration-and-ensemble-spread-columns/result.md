@@ -44,13 +44,17 @@ decision_rule: >-
   minus baseline. C4: S1 minus baseline. C5: S2 minus the better of T2 and T3, then S2 minus S1.
   Success in tail terms, pre-registered: an arm succeeds if its absolute coverage error
   |coverage - nominal| at q95 and q99 (signed-MW six pooled) and at q99 (MVA-only eight pooled)
-  is smaller than the baseline's, with the interval of the coverage difference by month resampling
+  is smaller than the baseline's at all three cells (signed-MW six q95 and q99, MVA-only eight q99;
+  AND, not OR), with the 99% pooled interval of the coverage-error difference (month resampling)
   excluding zero in that direction, and its CRPS (days 1 to 10) is no worse than the baseline's by
-  more than the half-width of the paired interval. No threshold by porting cost for T1, which
+  more than a fixed 0.02 points in each group. The lower tails (q01, q05) are scored and reported
+  but are not part of success. No threshold by porting cost for T1, which
   removes a constant. T2 and T3 add a trailing-coverage table refreshed weekly, a pipeline step the
   size of the existing spread factor, so each needs a coverage-error reduction of at least 30% at
-  the target quantiles. S1 adds two input columns built from the ensemble archive at serving time,
-  a new data dependency, so it needs a CRPS gain with an interval excluding zero as well.
+  the target quantiles. S1 adds input columns built from the ensemble archive at serving time,
+  a new data dependency, so it must meet the same tail rule and also show a CRPS gain whose 99%
+  interval excludes zero. P1 to P5 are expectations, not tests: the decision rule alone decides
+  success. C5 is evaluated only if S2 runs.
 benchmark: >-
   The baseline arm (stored weekly member of experiment 87 with spread factor 1.15, the `only_W`
   arm of experiment 379), BG2 (stored), default 3 of the GAM stack (experiment 378), `manual_heuristic`,
@@ -95,7 +99,9 @@ is too wide at the eight whose meters do not
 
 All arms use the weekly refit regime of experiment 87 (the `n1h` configuration, half-life 0.5
 years, 500 rounds, eta 0.05, depth 6), `colsample_bytree` and `colsample_bynode` fixed at 1.0
-(unchanged from the recipe, so no arm is given extra columns to sample from), and the same rows.
+(unchanged from the recipe, so no arm is given extra columns to sample from), `subsample` 0.8, the
+fitting seed of experiment 87, the offset twins at the five offset Primaries (S1 follows the same
+base-margin path as the baseline there), and the same rows.
 
 - **Baseline.** The stored raw weekly member with factor 1.15 (experiment 379's `only_W`). Gate:
   the S1 fitting code, run with its spread columns switched off, refits the baseline at D5, D8,
@@ -108,13 +114,19 @@ years, 500 rounds, eta 0.05, depth 6), `colsample_bytree` and `colsample_bynode`
   experiment 364 (0 to 24 h, 24 to 72 h, 72 to 168 h, 168 to 240 h), one upper and one lower factor
   multiplying the distance of each quantile from the median. Before each weekly refit, the factor
   is the smallest value in a grid (0.8 to 1.6 in steps of 0.05) at which the trailing year of the
-  raw member's forecasts (forecast origins at least 14 days older than the refit, so every
-  observation used is known) reaches nominal coverage at q95 and q99 (upper) and q05 and q01
+  raw member's forecasts reaches nominal coverage. Only forecast rows whose valid time is at most
+  3.5 hours before the refit enter (the observation is then known, as in `known_rows` of
+  `e00087_fit_demand.py`); a forecast origin's 14-day horizon would otherwise reach past the refit.
+  The scored runs start on 2025-07-01, so the window starts empty and grows. A Primary-band needs
+  at least 60 days of such rows (about 60 origins); until then, and wherever the window is shorter,
+  the factor is the global 1.15 of the baseline. The window is the trailing year of rows older
+  than the refit, using the stored runs of 2025-07-01 onward only (earlier runs of the member are
+  not stored). Coverage is checked at at q95 and q99 (upper) and q05 and q01
   (lower). The grid and the 14-day gap are fixed here. D8, D15, and D18 have under 12 months of
   history: D8 uses the donor spread (the mean of the factors of the MVA-only Primaries other than
   D8), and D15 and D18 are report-only with the same donor. The arm needs no refit, because
   recalibrating does not change the fitted model.
-- **T3, per-Primary, per-lead-band quantile offsets.** The same trailing window and bands. Each of
+- **T3, per-Primary, per-lead-band quantile offsets.** The same trailing window, minimum of 60 days, 1.15-equivalent fallback (no shift), and bands. Each of
   q01, q05, q95, q99 is shifted by the empirical quantile of the raw member's trailing misses
   (observed minus the member's quantile), in units of capacity, then the 11 quantiles are sorted to
   stay monotone. The same donor rule at D8, D15, and D18. No refit.
@@ -125,12 +137,21 @@ years, 500 rounds, eta 0.05, depth 6), `colsample_bytree` and `colsample_bynode`
   spread columns on each of the 51 member rows (the column is a property of the run, not of the
   member), so each member's row differs only in its own weather. The 51-member archive for the
   training runs (2024-04-01 onward) comes from the stored ensemble stores of experiments 111, 152,
-  374, and 377, which hold 51-member temperature and shortwave at every Primary for 821 origins from
-  2024-04-01 to 2026-06-30; the first job confirms they cover all 16 Primaries and that the run and
-  valid-time keys match the control rows. A window of 0 (the value at the valid time itself) is used,
+  374, and 377, which hold 51-member temperature and shortwave for 821 origins from 2024-04-01 to 2026-06-30:
+  D5, D9, D10, D11, D14, D16, and D18 in experiment 111, D2, D3, D4, D8, D12, D19, D21, and D22 in
+  experiments 152 and 374, and D15 in `00377*/work/d15/ens_store/`. The store origins are stamped
+  at the run's initialisation time plus the 9-hour publication delay, so the join key is
+  `power_fcst_init_time`, not `nwp_init_time`; the first job asserts the keys match the control rows
+  and that the stores cover all 16 Primaries. Training rows older than 2024-04-01 have no spread
+  columns; S1 drops them, and the baseline gate and a second control arm (the baseline refit on the
+  same shortened history, columns off, `S0`) show how much of any S1 change comes from the history
+  rather than the columns. A train/serve shift is accepted and reported: the control member is one
+  of the 51, so its deviation from the ensemble mean is small in training and larger for the other
+  members at prediction. A window of 0 (the value at the valid time itself) is used,
   not experiment 169's 24-half-hour window, because the control member's own columns are also
   pointwise. Cost to port: a new data dependency at serving time (the 51-member forecast at the
   same grid points, already read to run the 51 members).
+- **S0, history control.** The baseline refit on S1's shortened history with the spread columns off.
 - **S2, best of T2 and T3 on S1.** Run only if S1 and the better of T2 and T3 each succeed alone,
   with the calibration table fitted on S1's own trailing forecasts. Otherwise reported as not run.
 - Not included: a second model, a stacked stage, or a blend.
