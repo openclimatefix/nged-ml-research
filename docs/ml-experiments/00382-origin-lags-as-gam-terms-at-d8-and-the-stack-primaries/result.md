@@ -59,24 +59,31 @@ best_arm: >-
   (+0.445 points, 99% interval +0.090 to +0.983); BG2 scores 7.616.
 headline: >-
   Adding the three origin lags to the stack's stage 2 as smooth terms did not close the D8 gap. It
-  made D8 worse (+0.445), mostly in the first three months of the scored year when D8 had under
-  three months of history to fit on. At the other Primaries the change is within 0.05 points.
+  made D8 worse (+0.445), mostly in the first three months of the scored year, when D8's fits rested
+  on 20 to 60 daily origins and the spline was close to unpenalised. A post hoc version with a
+  penalty that bites is neutral at D8 (+0.080, -0.012 to +0.154). At 13 of 14 counted Primaries the
+  pre-registered arm moves CRPS by under 0.05 points; D22 is worse by 0.096.
 take_home_message: >-
   Putting recent power into the GAM stack as three smooth stage 2 terms does not recover what
   monthly XGBoost gets from its origin lags: D8 scores 0.445 points worse, not 0.3 to 0.6 better,
   and the harm is concentrated in August to October 2025, when D8 had little history to fit on.
-  The signed-MW six improve by 0.02 points and D2 and D4 by 0.02, so the lags carry little that the
-  stack's Kalman filter and recipe R do not already use. The lower-tail coverage at D8 is
-  unchanged (q05 0.058 against 0.059). The interaction between the lags and stage 1's inputs, which
-  XGBoost can learn and a separate additive term cannot, is the remaining candidate.
+  The signed-MW six improve by 0.02 points and D2 and D4 by 0.02, and a penalised post hoc version
+  gives no gain at D8 either (+0.080), so an additive stage 2 term does not reproduce XGBoost's use
+  of the lags. The experiment does not say whether the Kalman filter and recipe R already use the
+  same information. The lower-tail coverage at D8 is unchanged (q05 0.058 against 0.059). The
+  interaction between the lags and stage 1's inputs, which XGBoost can learn and a separate
+  additive term cannot, is the remaining candidate.
 lessons:
   - >-
-    The harm at D8 is a short-history effect: the monthly difference falls from +1.89 points in
-    August 2025 to +0.03 to +0.15 from January 2026, while D2 and D4 show no such pattern.
+    The harm at D8 is fit variance: the pre-registered penalty weight of 10 was almost zero next to
+    a Gram matrix that grows with the row count, and the August 2025 fits used 21 to 29 independent
+    daily origins per lead band. The monthly difference falls from +1.89 points in August 2025 to
+    +0.03 to +0.15 from January 2026, and a penalty of 1e5 (post hoc) gives +0.080 (-0.012 to
+    +0.154) for the year.
   - >-
     A linear version of the three terms is nearly neutral at D8 (+0.089, 99% interval +0.004 to
-    +0.162) and gains 0.022 (0.001 to 0.043) at the signed-MW six, so the spline's flexibility is
-    what hurts at D8.
+    +0.162) and gains 0.022 (0.001 to 0.043) at the signed-MW six, and the heavily penalised spline
+    gives +0.080 at D8 and -0.027 (-0.056 to -0.004) at the signed-MW six.
 advice:
   - >-
     Do not add the origin lags to the stack as stage 2 smooth terms for D8, because the spline
@@ -86,14 +93,16 @@ advice:
     weather terms before concluding that recent power cannot help the GAM at D8, because the stage 2
     additive form is the only design tried here.
   - >-
-    Give any lag term a fit history of at least a year before scoring it, because D8's harm falls
-    with history (+1.89 in 2025-08, +0.03 to +0.15 from 2026-01).
+    Count independent daily origins, not rows, when sizing a lag term's fit, and scale its penalty
+    to the row count, because the unscaled penalty let 24 coefficients fit 21 to 29 origins
+    (audit; D8 +1.89 in 2025-08).
 date: 2026-10-28
 ---
 
 ## Do three recent-power lags, added to the GAM stack as smooth terms, close the D8 gap?
 
-**No. The terms made D8 worse, and changed the other Primaries by 0.05 points or less.** Experiment
+**No. The terms made D8 worse, and moved 13 of the 14 counted Primaries by under 0.05 points (D22
+is 0.096 worse).** Experiment
 371 found that monthly XGBoost leads the GAM stack at substation D8 mainly through three lagged
 values of recent power. We gave the stack the same three values (the newest reading, the reading a
 day earlier at the target half-hour, and the reading a week earlier) as smooth terms in its stage 2
@@ -116,9 +125,14 @@ better, and contrasts are treatment minus default.
   10: +0.695 (+0.162 to +1.489). The harm grows with lead, the opposite of prediction P2.
 - Signed-MW six: -0.019 (-0.052 to +0.008); days 1 to 2: -0.043 (-0.061 to -0.028).
 - MVA-only eight with D8: +0.055 (+0.012 to +0.125); without D8: +0.004 (-0.022 to +0.027).
+- Post hoc `spline_heavy` arm (penalty weight 1e5 in place of 10, added after the audit found the
+  pre-registered weight almost zero; not adoptable): D8 +0.080 (-0.012 to +0.154); signed-MW six
+  -0.027 (-0.056 to -0.004); MVA-only eight with D8 +0.004 (-0.018 to +0.023); D2 and D4 -0.026
+  (-0.054 to -0.003); short-history group +0.016 (-0.019 to +0.063).
 - Placebos D2 and D4 pooled: -0.023 (-0.066 to +0.007). Both improve slightly, the opposite
   direction to D8, so neither placebo fails.
-- Per Primary (95%): D8 +0.445 (+0.127 to +0.838), D22 +0.096 (+0.037 to +0.159), D15 +0.283
+- Per Primary (95%, pre-registered spline): D8 +0.445 (+0.127 to +0.838), D22 +0.096 (+0.037 to
+  +0.159), D15 +0.283
   (+0.020 to +0.654, report only), D14 -0.048 (-0.074 to -0.019), D4 -0.048 (-0.095 to -0.010). The
   spline wins at 10 of 14 counted Primaries. The worst Primary is D8.
 - Linear arm: D8 +0.089 (+0.004 to +0.162); signed-MW six -0.022 (-0.043 to -0.001).
@@ -143,6 +157,7 @@ rule. A widening rule was not tried, because nulled rows are under 1% of every P
 
 ## Checks
 
+- The zero-shift gate (no shift reproduces experiment 377's stored stack) was run at D2 only.
 - Median minus mean forecast per site is 0.0 points for default and spline at every Primary, so the
   spread does not shift the forecast. The mean-forecast absolute error at D8 rises from 15.93 to
   16.47 points, in the same direction as the quantile score.
@@ -150,15 +165,24 @@ rule. A widening rule was not tried, because nulled rows are under 1% of every P
   is the monthly pattern above, which is post hoc) and 5 (the default arm, nested inside the spline
   arm, beats it at D8). Triggers 1, 3, 4, and 6 did not fire (the placebos did not fail; the
   quantile and median-error contrasts agree in sign; leaving one month out leaves D8 positive at
-  +0.293 to +0.489). Trigger 7 does not apply. An audit is requested; its findings are triaged in the
-  pull request.
+  +0.293 to +0.489). Trigger 7 does not apply. A Sonnet audit found no lookahead (it corrupted
+  readings after the newest usable one and the anomalies did not change) and no code bug, and
+  reproduced D8's stored forecast exactly. It found that the pre-registered penalty was almost zero
+  and that D8's early fits rested on 21 to 29 independent daily origins per lead band; both are
+  now stated here, and the post hoc penalised arm above was added in response. Not acted on: the
+  missing intercept in the fit (a free constant made D8 worse in the audit's test), and the
+  whole-table cleaning pass that 377 shares.
 
 ## Caveats and what to try next
 
 - The terms are stage 2 additive terms, not stage 1 GAM terms and not interactions with the weather
   inputs. The refutation covers that form only.
-- D8 has under 12 months of history for the whole scored year, so its fits have 1,000 to 20,000
-  rows per band. A year of history may change D8's result; the by-month pattern suggests it would.
+- D8 has under 12 months of history for the whole scored year. Its first scored month rests on one
+  month of history, and its fits use 21 to 29 independent daily origins per lead band in August
+  2025 (rows per band overstate this, because the newest-lag term takes one value per origin). This
+  departs from the 12-month rule in the plan, as experiment 377's D8 own-residual arm does. The
+  linear and penalised versions stay slightly positive at D8 through spring 2026, so more history
+  alone may not turn the result.
 - Rows before 2024-07 carry no shift in the spread pool of the early fold months, which slightly
   widens the treated spread there.
 - Next: the lags as origin-dependent inputs to stage 1, or an interaction of the day-lag anomaly

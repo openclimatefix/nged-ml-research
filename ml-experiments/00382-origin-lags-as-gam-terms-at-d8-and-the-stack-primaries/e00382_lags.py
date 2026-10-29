@@ -31,13 +31,16 @@ OUT_DIR: Final[Path] = (
     / "00382-origin-lags-as-gam-terms-at-d8-and-the-stack-primaries"
     / "work"
 )
-ARMS: Final[tuple[str, ...]] = ("spline", "linear", "zero")
+ARMS: Final[tuple[str, ...]] = ("spline", "linear", "zero", "spline_heavy")
 """`zero` adds no shift: the gate that the pipeline reproduces experiment 377's stored stack."""
 FIRST_CUT: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 LAST_CUT: Final[datetime] = datetime(2026, 6, 1, tzinfo=UTC)
 N_BASIS: Final[int] = 8
 DEGREE: Final[int] = 3
 PENALTY_WEIGHT: Final[float] = 10.0
+HEAVY_PENALTY_WEIGHT: Final[float] = 1e5
+"""Post hoc arm `spline_heavy`: the audit found the pre-registered weight of 10 almost zero next
+to a Gram matrix that scales with the row count."""
 RIDGE: Final[float] = 1e-6
 MIN_FIT_ROWS: Final[int] = 2_000
 CLIP_QUANTILES: Final[tuple[float, float]] = (0.01, 0.99)
@@ -100,9 +103,10 @@ def fit_term_set(*, anomalies: np.ndarray, target: np.ndarray, arm: str) -> list
     design = np.hstack(blocks)
     width = [b.shape[1] for b in blocks]
     penalty = np.eye(design.shape[1]) * RIDGE
-    if arm == "spline":
+    if arm in ("spline", "spline_heavy"):
+        weight = HEAVY_PENALTY_WEIGHT if arm == "spline_heavy" else PENALTY_WEIGHT
         diff = np.diff(np.eye(N_BASIS), n=2, axis=0)
-        block = PENALTY_WEIGHT * diff.T @ diff
+        block = weight * diff.T @ diff
         for k in range(N_LAGS):
             start = k * N_BASIS
             penalty[start : start + N_BASIS, start : start + N_BASIS] += block

@@ -20,7 +20,7 @@ from studies.dp_features import default_input_paths, load_or_build_feature_cache
 from studies.eval_protocol import metrics
 
 WORK = base.DATA / "00382-origin-lags-as-gam-terms-at-d8-and-the-stack-primaries" / "work"
-TREATED = ("spline", "linear")
+TREATED = ("spline", "linear", "spline_heavy")
 BANDS = {
     "days 1 to 10": pl.col("lead_days_1_10"),
     "days 1 to 2": pl.col("lead_day_1") | pl.col("lead_day_2"),
