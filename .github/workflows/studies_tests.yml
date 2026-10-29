@@ -3,10 +3,12 @@ name: Studies tests
 # Runs the slow tests under tests/studies, which the per-pull-request gate in ci.yml skips
 # (`--run-studies` lifts the skip). A pull request runs them only when it touches code or pages a
 # study depends on; every push to main runs them in full, so a pull request that skipped them is
-# still checked before the next one starts from it.
+# still checked before the next one starts from it. A draft pull request runs nothing; marking it
+# ready for review runs the checks.
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "src/studies/**"
       - "tests/studies/**"
@@ -25,6 +27,7 @@ concurrency:
 
 jobs:
   studies-tests:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
