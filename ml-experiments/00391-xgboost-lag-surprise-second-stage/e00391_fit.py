@@ -50,8 +50,8 @@ CACHE_DIR: Final[Path] = (
     / "cache"
 )
 BOOSTER_DIR: Final[Path] = WORK_DIR / "boosters"
-BOOSTER_MONTHS: Final[tuple[int, ...]] = (1, 4, 7, 10)
-"""Boosters are saved at the quarterly refits for the prediction-only sweep."""
+BOOSTER_MONTHS: Final[tuple[int, ...]] = tuple(range(1, 13))
+"""Boosters are saved at every monthly refit for the prediction-only sweep."""
 K_PATH: Final[Path] = WORK_DIR / "detector" / "k.json"
 SMOKE_ROUNDS: Final[int] = 20
 OWN_COLUMNS: Final[tuple[str, ...]] = ("u_lag_origin", "u_lag_day", "u_lag_week", "z_own")

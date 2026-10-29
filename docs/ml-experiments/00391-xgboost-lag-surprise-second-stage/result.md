@@ -256,9 +256,10 @@ event level and cannot tell the two apart. Tolerances, fixed before any score is
   widens by at most 10%, and CRPS there changes by at most +0.02 points of effective capacity, at
   all 16 Primaries.
 
-**The sweep is prediction-only.** The fitted boosters of every arm are saved (`.ubj`) at the
-quarterly monthly refits (2025-07, 2025-10, 2026-01, 2026-04) under `work/boosters/<arm>/`;
-the sweep uses those four refits. Clean rows (target outside any event, all lags clean) get a step
+**The sweep is prediction-only.** The fitted boosters of every arm are saved (`.ubj`) at every
+monthly refit (12 per arm and Primary) under
+`data/ml-experiments/00391-xgboost-lag-surprise-second-stage/work/boosters/<arm>/`; the sweep uses
+all 12. Clean rows (target outside any event, all lags clean) get a step
 of depth D added to the k most recent lagged inputs, in order: the newest reading (origin minus
 3.5 hours), the same time on the latest day, the same time in the latest week. Levels: k of 0
 (control), 1, 2, and 3. Depths: 2%, 5%, and 10% of effective capacity, plus the label table's
@@ -275,4 +276,4 @@ value by the 5% to 95% band and their quantile positions; and the k at which the
 reaches the event level. The lagless stage 1 model is the control (share 0, no widening). A few
 real labelled events, chosen by a rule fixed before looking (the three longest events with a
 metered neighbour), are compared with the synthetic ones. The sweep is also run on experiment 392's
-request for arm N1 (its arm R5) at the same quarterly refits.
+request for arm N1 (its arm R5) at the same refits.
