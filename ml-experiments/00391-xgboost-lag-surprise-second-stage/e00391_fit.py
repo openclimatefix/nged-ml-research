@@ -23,6 +23,7 @@ PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations
 import argparse
 import json
 import multiprocessing
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -53,6 +54,12 @@ BOOSTER_DIR: Final[Path] = WORK_DIR / "boosters"
 BOOSTER_MONTHS: Final[tuple[int, ...]] = tuple(range(1, 13))
 """Boosters are saved at every monthly refit for the prediction-only sweep."""
 K_PATH: Final[Path] = WORK_DIR / "detector" / "k.json"
+ROUNDS: Final[int] = 150
+ETA: Final[float] = 0.15
+"""The screening recipe of the common brief, used by every arm; experiment 381 used 500 and 0.05."""
+DEVICE: Final[str] = os.environ.get("E391_DEVICE", "cuda")
+SUBSET_SITES: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16", "D8")
+"""The signed-MW six and D8: the Primaries where the secondary arms run (manager, 2026-10-29)."""
 SMOKE_ROUNDS: Final[int] = 20
 OWN_COLUMNS: Final[tuple[str, ...]] = ("u_lag_origin", "u_lag_day", "u_lag_week", "z_own")
 NEIGHBOUR_COLUMNS: Final[tuple[str, ...]] = ("nb_max_abs_zt", "nb_mean_zt", "nb_opposite_count")
@@ -74,6 +81,7 @@ class Arm:
     groups: tuple[str, ...]
     version: str = "ens"
     veto: bool = True
+    subset: bool = False
 
     def columns(self) -> list[str]:
         """Return the input columns in matrix order: the baseline's, then the arm's extras."""
@@ -86,13 +94,13 @@ class Arm:
 
 ARMS: Final[dict[str, Arm]] = {
     "b0": Arm("b0", ()),
-    "n0": Arm("n0", ("own",)),
+    "n0": Arm("n0", ("own",), subset=True),
     "n1": Arm("n1", ("own", "neighbour")),
     "n2": Arm("n2", ("own", "neighbour", "detector")),
-    "n2_noveto": Arm("n2_noveto", ("own", "neighbour", "detector"), veto=False),
-    "n3": Arm("n3", ("detector",)),
+    "n2_noveto": Arm("n2_noveto", ("own", "neighbour", "detector"), veto=False, subset=True),
+    "n3": Arm("n3", ("detector",), subset=True),
     "o": Arm("o", ("oracle",)),
-    "n1_era5": Arm("n1_era5", ("own", "neighbour"), version="era5"),
+    "n1_era5": Arm("n1_era5", ("own", "neighbour"), version="era5", subset=True),
 }
 
 
@@ -276,6 +284,7 @@ def run_job(
     todo = [
         s
         for s in sites
+        if not arm.subset or s in SUBSET_SITES
         if not fd.job_path(root=out_dir, config=arm.name, site=s, seed=seed, refit=refit).exists()
     ]
     lines, models = [], {}
@@ -289,7 +298,11 @@ def run_job(
         )
         known = add_columns(frame=known, site=site, arm=arm, ctx=ctx, mask=masks[site])
         models[site] = xgb.train(
-            fd.parameters(config=config, seed=seed, nthread=nthread),
+            {
+                **fd.parameters(config=config, seed=seed, nthread=nthread),
+                "device": DEVICE,
+                "eta": ETA,
+            },
             train_matrix(known=known, row=row, refit=refit, arm=arm),
             num_boost_round=rounds,
         )
@@ -344,7 +357,7 @@ def main() -> None:
     sites = args.sites or series.filter(pl.col("substation_type") == "Primary")["site"].to_list()
     jobs = regimes.jobs_for(regime_names=(args.regime,), origins=common.all_origins())
     jobs = dict(list(jobs.items())[:: args.refit_stride][: args.refits])
-    rounds, out = common.N_ROUNDS, ARM_DIR / args.regime
+    rounds, out = ROUNDS, ARM_DIR / args.regime
     if args.smoke:
         jobs = {r: runs[:3] for r, runs in list(jobs.items())[:2]}
         rounds, out = SMOKE_ROUNDS, WORK_DIR / "arm_preds_smoke"

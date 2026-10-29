@@ -89,7 +89,8 @@ skill (read before the code step); departures are recorded here before any score
 ## Design
 
 **Cadence.** Every arm, the baseline control, and the stage 1 lagless model refit monthly on the
-rolling recipe of experiment 87's `n1h` configuration (500 rounds, half-life 0.5 years),
+rolling recipe of experiment 87's `n1h` configuration (half-life 0.5 years; see the recipe note
+below),
 `colsample_bytree` and `colsample_bynode` fixed at 1.0 in every arm, seed 0. Weekly refits are run
 only for the reproduction gate. A winning arm is re-checked weekly before any release claim, and
 that re-check is outside this experiment.
@@ -124,10 +125,15 @@ inside that span carry a labelled-tuning shortcut, reported in the write-up. The
 uses the same monthly walk-forward as the ENS-driven one. The ENS run frames must hold steps at
 leads 5.5 to 29.5 hours; the code step checks this first and builds them from the ENS store if not.
 
-**Stage 1 recipe.** Stage 1 uses the screening recipe of the common brief (150 rounds, eta 0.15)
-because 500 rounds at eta 0.05 would take about 15 hours at 3 threads on the shared GPU. It runs on
-the CPU (`E391_DEVICE=cpu`) for the same reason. Stage 2 keeps experiment 87's 500 rounds and eta
-0.05.
+**Recipe and compute cut (manager, 2026-10-29).** The machine is saturated, so every fit, stage 1
+and stage 2 alike, uses the screening recipe of the common brief (150 rounds, eta 0.15) instead of
+experiment 87's 500 rounds and eta 0.05. This differs from experiment 381's recipe, so absolute
+scores here are not comparable to experiment 381's. The control B0 is refitted at 150 rounds, so
+contrasts compare like with like, and no arm is widened (every table is also given at 1.15). The
+core arms B0, N1, N2, and O run at all 16 Primaries. The secondary arms N0, N3, N2 without the
+veto, and N1-ERA5 run at seven Primaries only (the signed-MW six D5, D9, D10, D11, D14, and D16,
+plus D8), so C1, C4, C6, and C7 are read at those seven. Fits run on the GPU as 3 single-thread
+processes (benchmark: 73 s for one 150-round fit at 1 thread on the GPU, 84 s at 3 CPU threads).
 
 **Reproduction gate (before any other arm is read).** Refit the baseline weekly at every fourth
 refit with experiment 383's gate (`d` arm) and reproduce the stored weekly member within that gate's
