@@ -46,8 +46,7 @@ decision_rule: >-
   candidate when its interval lies wholly below zero in a group and it breaks no tolerance of the
   protocol. Placebos: D2 and D4 for any gain at D8. No adoption claim.
 benchmark: >-
-  The baseline arm (the stored weekly member `only_W` of experiment 379, once the reproduction gate
-  passes), BG2, the default 3 GAM stack (experiment 377), `manual_heuristic`, and `climatology`, on
+  The baseline arm (refitted at all 52 weekly refits; experiment 87's stored weekly `n1h` member is a reference), BG2, the default 3 GAM stack (experiment 377), `manual_heuristic`, and `climatology`, on
   `fold_a_daily_gap_v1`.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
@@ -77,9 +76,14 @@ is at least 3.5 hours older than the forecast origin; otherwise it is null.
 
 - **Baseline.** The three origin lags as `e00087_common.origin_lags` defines them: the newest usable
   reading, the reading at the latest earlier time with the valid time's half-hour of day, and the
-  reading at the latest earlier time with the valid time's weekday and half-hour. Refitted at a
-  subset of refits as a reproduction gate against `only_W` (mean CRPS within 0.01 points at every
-  Primary, the gate of experiment 383); after it passes, `only_W` is the baseline for all contrasts.
+  reading at the latest earlier time with the valid time's weekday and half-hour. The reproduction
+  gate (experiment 383's: mean CRPS within 0.01 points at every Primary) refits the baseline at 4
+  of the 52 weekly refits and compares it with experiment 87's stored weekly `n1h` member. The
+  gate failed at one Primary: D22 differed by 0.0195 points, and the other 15 Primaries differed
+  by at most 0.0045 (the GPU fit is not bit-reproducible, and the largest median gap sat at the
+  refit of 2025-12-30). Because a stored baseline would carry that noise into every contrast, all
+  contrasts use a baseline refitted at all 52 refits with the same code and settings as the arms.
+  The stored `n1h` member remains a reference row, with the gate's gaps reported.
 - **A, weekly analogues.** Baseline plus power at the valid time minus 1, 2, 3, 4, 5, and 6 weeks
   (6 columns); the 1-week analogue is null beyond about 6.9 days of lead.
 - **B, analogue summaries.** Baseline plus the mean and median of whichever of those six are usable
@@ -95,6 +99,6 @@ is at least 3.5 hours older than the forecast origin; otherwise it is null.
 
 - Sonnet only. At most 3 threads and `MemoryMax=16G`; `uv run --no-sync`, the `spawn` start method.
 - About 76 s per fit in experiment 381, 832 fits per weekly arm: each arm takes about 6 hours of
-  wall-clock time at 3 threads.
+  wall-clock time at 3 threads, and the refitted baseline is a fourth arm.
 - References and slices as the brief lists: tails (0.01, 0.05, 0.95, 0.99), cold nights, sunny
   half-hours, load-shift event half-hours, and the avoidable-curtailment cost in three row sets.

@@ -2,12 +2,14 @@
 
 Two modes:
 
-- `gate`: the `base` arm, refitted at every 13th weekly refit, against experiment 379's stored
-  weekly member `only_W` on the origins both cover. Passes when the mean CRPS (days 1 to 10)
-  differs by at most 0.01 points of effective capacity at every Primary (experiment 383's gate).
-- `final`: each lag arm minus the stored weekly baseline `only_W`, per group, per lead band, per
-  Primary, with leave-one-out, tails, slices, load-shift rows, and the avoidable curtailment cost,
-  beside the GAM stack of experiment 377, BG2, `manual_heuristic`, and `climatology`.
+- `gate`: the `base` arm, refitted at every 13th weekly refit, against experiment 87's stored
+  weekly `n1h` member (no solar offset) on the origins both cover. The gate passes when the mean
+  CRPS (days 1 to 10) differs by at most 0.01 points of effective capacity at every Primary
+  (experiment 383's gate).
+- `final`: each lag arm minus the refitted baseline (`base` at all 52 refits), per group, per lead
+  band, and per Primary, with leave-one-out, tails, slices, load-shift rows, and the avoidable
+  curtailment cost, beside experiment 87's stored `n1h` member, the GAM stack of experiment 377,
+  BG2, `manual_heuristic`, and `climatology`.
 
 ```bash
 PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility:\
@@ -22,6 +24,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
+import e00087_common as common  # ty: ignore[unresolved-import]
+import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00377_score as base  # ty: ignore[unresolved-import]
 import polars as pl
@@ -31,6 +35,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR
 WORK: Final[Path] = DATA / "00388-xgboost-lagged-power-column-sets-weekly-demand" / "work"
+STORED_87: Final[Path] = DATA / "00087-bg2-best-guess-assembled-with-drop-one-ablations" / "work"
 E379_ARMS: Final[Path] = DATA / "00379-bg2-components-all-16-primaries-to-14-days" / "work" / "arms"
 CONTRAST_COUNT: Final[int] = 4
 LEVEL: Final[float] = 100 * (1 - 0.01 / CONTRAST_COUNT)
@@ -76,9 +81,29 @@ def arm_frame(*, arm: str, series: pl.DataFrame) -> pl.DataFrame:
 
 
 def stored_frame(*, name: str, series: pl.DataFrame) -> pl.DataFrame:
-    """Return an experiment 379 arm (`only_W`) in MW."""
+    """Return an experiment 379 arm in MW."""
     stored = pl.read_parquet(E379_ARMS / f"{name}.parquet").filter(
         pl.col("time_series_id").is_in(series["time_series_id"].to_list())
+    )
+    return adapter.forecast_frame(stored=stored, series=series, unit="fraction")
+
+
+def stored_n1h_frame(*, series: pl.DataFrame, stride: int = 1) -> pl.DataFrame:
+    """Return experiment 87's stored weekly `n1h` member (no solar offset) in MW.
+
+    Only files at weekly refit times are read, because the monthly regime's files hold the same
+    origins under a different refit. `stride` keeps every n-th weekly refit (the gate uses 13).
+    """
+    refits = sorted(regimes.WEEKLY)[::stride]
+    sites = series["label"].to_list()
+    folder = STORED_87 / "anchor_preds" / "n1h"
+    files = [
+        folder / f"{site}_s{common.SEED}_{refit:%Y%m%dT%H%M}.parquet"
+        for site in sites
+        for refit in refits
+    ]
+    stored = pl.concat([pl.read_parquet(f) for f in files]).filter(
+        pl.col("power_fcst_init_time") >= base.SCORED_FIRST
     )
     return adapter.forecast_frame(stored=stored, series=series, unit="fraction")
 
@@ -145,7 +170,7 @@ def gate(*, series: pl.DataFrame, ctx: dict) -> None:
     """Print the reproduction gate and raise if any Primary's CRPS gap exceeds the tolerance."""
     arms = {
         "base": arm_frame(arm="base", series=series),
-        "stored_weekly": stored_frame(name="only_W", series=series),
+        "stored_weekly": stored_n1h_frame(series=series, stride=13),
     }
     _table, scored, _rows = score_arms(arms=arms, series=series, ctx=ctx)
     crps = {
@@ -180,7 +205,8 @@ def final(*, series: pl.DataFrame, ctx: dict, lag_arms: list[str]) -> None:
     refs = base.reference_frames(series=series)
     arms = {
         **{a: arm_frame(arm=a, series=series) for a in lag_arms},
-        "baseline": stored_frame(name="only_W", series=series),
+        "baseline": arm_frame(arm="base", series=series),
+        "stored_n1h": stored_n1h_frame(series=series),
         "stack": base.stack_frames(series=series)["stack"],
         **refs,
     }
