@@ -129,7 +129,8 @@ def draw_coverage() -> None:
             title=alt.TitleParams(
                 text=textwrap.wrap("Tails are close to nominal except at Marsh Lane (D8)", 80),
                 subtitle=textwrap.wrap(
-                    "Default 3, days 1 to 10, shared half-hours of 2025-07 to 2026-06. Dashed line: "
+                    "Default 3, days 1 to 10, shared half-hours of 2025-07 to 2026-06. Dashed "
+                    "line: "
                     "the ideal share (0.01, 0.05, 0.95, 0.99). D15 and D18 are short-history, "
                     "report only.",
                     WRAP,
