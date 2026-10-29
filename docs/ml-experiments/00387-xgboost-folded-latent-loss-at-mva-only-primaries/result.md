@@ -38,9 +38,8 @@ decision_rule: >-
   Pre-registered contrasts, all CRPS or sign accuracy on the shared rows of `fold_a_daily_gap_v1`.
   Gate G (known answer, read before any D12 or MVA-only number): an arm passes when its recovered
   sign accuracy on reverse-flow half-hours is at least 80% and its signed-power MAE is under half
-  that of the plain model read as signed, at injection level 1.0 and power factor 1.0; the same
-  arms are then reported at power factor 0.97, once with the fold assuming 1.0 and once with the
-  true 0.97. An arm that fails G is not read at D12. If F1 and F2 both fail G, F3 (sign
+  that of the plain model read as signed, at injection level 1.0 and the first reactive setting (pf 1.0, Q = 0), with the best (kappa, Q0)
+  chosen on gate data; the other reactive settings are reported, not gated. An arm that fails G is not read at D12. If F1 and F2 both fail G, F3 (sign
   probability model, then magnitude model) is built, after the plan is amended and reviewed, and
   nothing else is read. Contrasts after G: C1 (F2 minus plain weekly, CRPS days 1 to 10, MVA-only eight
   pooled and D12 alone), C2 (F1 minus plain), C3 (F2 minus F0, the unfolded custom-objective
@@ -86,8 +85,21 @@ factor so a reactive term can enter later.
   half-life 0.5 years, 500 rounds, eta 0.05, depth 6, `colsample` 1.0, the three recent-power lags,
   `lead_hours`), copied from experiment 381's fitter. The plain refit must reproduce experiment 379's stored
   `only_W` (and `only_M`) within 0.05 points before any new arm is read.
-- **Fold.** The fold is S(*l*) = |*l*| / pf, with pf = 1.0 by default (reactive power zero). Inputs
-  and lags are the metered series, folded or not.
+- **Fold.** The fold is the smooth S(*l*) = sqrt(*l*² + Q0²) / pf. Q0 is the reactive-power floor,
+  because an MVA reading never reaches zero while some reactive power flows (maintainer, 2026-10-29);
+  pf = 1.0 is the working assumption (NGED recommends it). Q0 is fixed before any score is read, as
+  a share of effective capacity, at three values: 0 (the strict |*l*| case), Q_lo, and 2 Q_lo,
+  where Q_lo is the 0.5th percentile of a Primary's training readings. The sensitivity to Q0 is
+  reported. Inputs and lags are the metered series, folded or not.
+- **Identification of the sign.** The folded loss is symmetric in the sign of *l*, and a trial on
+  synthetic data (a V-shaped |*l*| against shortwave) showed that gradient descent from a positive start
+  fits the V on the positive branch and never crosses zero (sign accuracy 0.50). Sign recovery
+  needed two structural choices, both pre-registered here and both tested in gate G: a monotone
+  constraint (non-increasing) on every shortwave input, so that generation can only lower *l*, and a
+  start *l*0 = (the plain model's level) - kappa x shortwave, with kappa in {0, 0.5, 1.0} times
+  the 95th percentile of the training readings per 1000 W/m². kappa is chosen on the gate's synthetic
+  data only, never on D12 or any MVA-only score. The write-up says that the sign then comes from
+  this structure and not from the loss alone.
 - **F0 (control).** The same custom multi-quantile pinball objective with no fold (*l* unsigned),
   unit hessian, started from the plain model's per-level fit. It separates the fold from the loss
   implementation, because XGBoost's built-in `reg:quantileerror` also adjusts leaf values, which a custom
@@ -99,8 +111,8 @@ factor so a reactive term can enter later.
   quantiles are *l̂* plus the same residual quantiles (an assumption that the error is symmetric
   about the latent, stated beside every signed number).
 - **F2 (folded pinball).** The 11-level pinball loss of y against S(*l*), one output per level,
-  gradient -(α - 1[y < S])·sign(*l*)/pf, hessian constant 1, started from the plain model's
-  per-level fit (so *l* starts positive). Quantiles are sorted at the end to avoid crossing. The 11
+  gradient -(α - 1[y < S])·*l*/(S pf), hessian constant 1, started from the plain model's
+  per-level fit with the tilt. Quantiles are sorted at the end to avoid crossing. The 11
   signed quantiles are the signed outputs *l*, not folded.
 - **F3 (sign then magnitude).** Built only if F1 and F2 both fail gate G.
 - **Weekly refits for the final arm; monthly refits for screening.** Seed, rows, runs, and scoring rows
@@ -112,12 +124,14 @@ At each of the six signed-MW Primaries (D5, D9, D10, D11, D14, D16), add a synth
 plant (the physics model of `studies.pv_physics`, two plants: east-west and south-west, as in
 experiment 110) to the signed series at levels 0, 1.0, and 2.0, sized so the injected output
 makes reverse flow common on sunny middays (the sizing of experiments 358 and 366). The result is a signed
-truth with real reverse flow. Convert the series to synthetic MVA at pf 1.0 and at pf 0.97 (Q = P tan(arccos pf),
-sign discarded), replace the training labels and the lags by that synthetic MVA, and train the folded models on
+truth with real reverse flow. Convert the series to synthetic MVA S = sqrt(P² + Q²) at four reactive settings: pf 1.0 with Q = 0, pf 0.97
+(Q = P tan(arccos pf)), a constant Q of 1.0 point of effective capacity, and pf 0.97 with that constant Q
+(sign discarded). Replace the training labels and the lags by that synthetic MVA, and train the folded models on
 it alone. Report, against the true signed series: mean absolute error in points of effective
 capacity, sign accuracy on reverse-flow half-hours, and the CRPS of the recovered signed
-quantiles, for F0 (read as signed), F1, and F2, at pf 1.0 with the fold assuming 1.0, and at pf
-0.97 with the fold assuming 1.0 and 0.97. No metered generator output enters, so nothing needs
+quantiles, for F0 (read as signed), F1, and F2, at each reactive setting with the fold assuming pf 1.0
+and Q0 in {0, Q_lo, 2 Q_lo}, plus pf 0.97 with the fold assuming 0.97, and for kappa in {0, 0.5, 1.0}, with and
+without the monotone constraint. No metered generator output enters, so nothing needs
 anonymising.
 
 ## Reading at the MVA-only Primaries
