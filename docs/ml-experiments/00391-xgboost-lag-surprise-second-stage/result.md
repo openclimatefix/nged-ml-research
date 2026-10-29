@@ -66,8 +66,8 @@ a measure of how surprising its own recent readings are, at its Primary and at t
 Primaries, gives it the same help.** A load shift moves demand between substations, so a lagged
 reading that lies inside one misleads the model. The detector of
 [experiment 327](../00327-lsc-label-free-detect-mask-train-pipeline/result.md) and the
-distillation design flag such periods from the lagless forecast's residuals. A surprise input hands the model the same residuals without
-the state machine.
+distillation design flag such periods from the lagless forecast's residuals.
+A surprise input hands the model the same residuals without the state machine.
 
 **Prior work (figures to be checked against the pages before the write-up relies on them).**
 Experiments 5 and 18 tried a staged chain with lag anomalies on old rows: in 18 the chain minus the
