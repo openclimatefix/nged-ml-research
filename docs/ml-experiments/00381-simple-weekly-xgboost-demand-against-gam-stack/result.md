@@ -63,7 +63,8 @@ best_arm: >-
   signed-MW six
 headline: >-
   The simple weekly XGBoost model matches the GAM stack (within +0.05 points) at 9 of 14 countable
-  Primaries and beats it by more than its 95% interval at 4 (D5, D8, D12, D22). It trails at D11
+  Primaries and beats it by more than its 95% interval at 3 (D8, D12, D22) and borderline at D5. It
+  trails at D11
   (+0.15) and D14 (+0.30), and its upper tail is worse at the signed-MW six.
 take_home_message: >-
   A single XGBoost model per Primary, refitted weekly, is as good as the GAM stack at 9 of 14
@@ -133,7 +134,8 @@ model family with the refit schedule.
 - **Hypothesis.** Not supported as stated: the XGBoost model is not within +0.05 points of the stack
   at all 14 countable Primaries. Verdict "partly supported" because it is at 9 of 14.
 - **Matches the stack (point estimate within +0.05).** D8, D12, D22, D5, D2, D19, D4, D9, D21.
-  The 95% interval lies wholly below zero at D8 (-1.62), D12 (-0.80), D22 (-0.29), and D5 (-0.25).
+  The 95% interval lies wholly below zero at D8 (-1.62), D12 (-0.80), D22 (-0.29), and D5 (-0.25),
+  although the audit's alternative bootstrap puts D5 at -0.62 to +0.11.
   Worse than the stack with an interval above zero: D14 (+0.30; +0.04 to +0.63) and D11 (+0.15;
   +0.02 to +0.30). Inconclusive: D10 (+0.16), D16 (+0.09), D3 (+0.05). The worst Primary is D14.
   D15 and D18 are report only: +2.34 (0.14 to 4.24) over 4 months and +0.07 over 6 months.
@@ -158,8 +160,8 @@ model family with the refit schedule.
   1-year half-life (A5): -0.019 (-0.034 to -0.006) and +0.004. Sunny flag: -0.002 at both groups.
   Economy 7 input (A1): 0.000 (-0.002 to +0.002). Lead-dependent half-life (A3): +0.007 and +0.025
   (worse at MVA-only). 12-month window: +0.043 and +0.024. 0.25-year half-life: +0.072 and +0.039.
-  The refitted control matches the stored monthly member (mean median gap 0.02 MW), so the gate
-  passed.
+  The refitted control matches the stored monthly member in the median (mean gap 0.02 MW) but not
+  fully in CRPS (up to 0.066 points at D16; see "Audit"). The screening used all 365 daily runs.
 - **Predictions.** P1 holds (9 of 14 against 9 to 11 predicted). P2 fails: the Economy 7 input
   moved the Economy 7 step hours by -0.002 (signed-MW) against a predicted -0.03 to -0.10. The local
   hour is already an input, so a tree can split on the step. P3 partly holds: the solar summary
@@ -228,7 +230,39 @@ points
 
 ## Audit
 
-AUDIT_PLACEHOLDER
+A fresh Sonnet agent re-derived the headline contrasts from the stored predictions with its own
+join and pinball code (report: `briefs/e381_audit_report.md` in the private data folder). Triage:
+
+- **Headline numbers reproduce.** Bundle at D5, D12, and D8 is 3.827, 6.716, and 7.615 (log: 3.829,
+  6.716, 7.612), and bundle minus stack is -0.253, -0.800, and -1.618 (log: -0.253, -0.799, -1.615).
+  Accepted: nothing changes.
+- **The reference gate is only partly met.** The refitted monthly control differs from the stored
+  monthly member by up to 0.066 points of CRPS per Primary (D16 breaks the plan's 0.05 gate) and by
+  +0.031 on average at the signed-MW six. The printed gate was a median gap (mean 0.02 MW), not a
+  CRPS gate. A cause such as GPU non-determinism is likely and untested. Accepted: the screening
+  contrasts compare two refits made the same way, so they are unaffected, but the bundle's gain over
+  the stored weekly baseline (-0.04 signed-MW, -0.03 MVA-only) is the same size as this
+  reproducibility gap and is not read as a gain.
+- **D5 is borderline.** The agent's row-weighted month bootstrap gives -0.62 to +0.11 for D5 against
+  the stack. Accepted: the headline names three Primaries (D8, D12, D22) with clear gains and D5 as
+  borderline.
+- **Screening rows.** The screening used all 365 daily runs (4,012,330 half-hours), not the
+  registered 292 `fold_a_daily_gap_v1` runs. Accepted as a caveat: the final comparison uses the
+  shared rows (2,824,844 half-hours, which BG2, `manual_heuristic`, and `climatology` limit to the
+  292
+  runs, and the stack limits further at D8, D15, and D18).
+- **Selection.** Almost all of the bundle's gain over the control comes from the solar summary, and
+  the sunny flag is kept on a 0.002-point effect, both chosen on the scored year. Accepted: stated
+  in
+  the caveats.
+- **No leakage found.** The previous-day shortwave mean is missing on the first day of every run,
+and
+  every scored run is served by the latest refit at or before its origin. The daily shortwave mean
+  has
+  a negligible train-and-serve difference (half-hours with missing power are dropped from training).
+- **Triggers.** Trigger 2 fires and its explanation holds: the control already has `hour_local`.
+  Triggers 3 and 4 do not fire. The audit did not compute trigger 6, and did not rerun the tail,
+  curtailment, or load-shift sections.
 
 ## Arms (pre-registered in the plan above)
 
