@@ -1,10 +1,11 @@
 """Draw the figures of experiment 390's write-up from the tables `e00390_build.py` wrote.
 
-The events of the fan figure are chosen by a rule fixed before any event was inspected: at each of
-D5, D14, and D16, the event with the largest matched depth and the event with the longest duration,
-among the events that end on or after 2025-07-01 (D11 has none, so D16, the next signed-MW
-Primary with two events, replaces it; the choice used event counts only); plus the event with the most rows that carry a
-lag inside it, among the six signed-MW Primaries. An event picked twice is drawn once.
+The events of the fan figure are chosen by a rule fixed before any event was inspected: at
+each of D5, D14, and D16, the event with the largest matched depth and the event with the
+longest duration, among the events that end on or after 2025-07-01 (D11 has none, so D16,
+the next signed-MW Primary with two events, replaces it; the choice used event counts
+only); plus the event with the most rows that carry a lag inside it, among the six signed-
+MW Primaries. An event picked twice is drawn once.
 
 ```bash
 PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility:\
@@ -14,7 +15,6 @@ ml-experiments/00390-xgboost-d11-d14-gap-and-load-shift-event-lags \
     uv run --no-sync python ml-experiments/00390-*/e00390_charts.py
 ```
 """
-# ruff: noqa: E501
 
 import textwrap
 from datetime import UTC, datetime, timedelta
