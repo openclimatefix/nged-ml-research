@@ -70,9 +70,9 @@ take_home_message: >-
   The signed-MW six improve by 0.02 points and D2 and D4 by 0.02, and a penalised post hoc version
   gives no gain at D8 either (+0.080), so the one additive stage 2 form tried here does not reproduce
   XGBoost's use of the lags. The experiment does not say whether the Kalman filter and recipe R
-  already use the same information. The lower-tail coverage at D8 is unchanged (q05 0.058 against 0.059). The
-  interaction between the lags and stage 1's inputs, which XGBoost can learn and a separate
-  additive term cannot, is one explanation not tested here.
+  already use the same information. The lower-tail coverage at D8 is unchanged (q05 0.058 against
+  0.059). The interaction between the lags and stage 1's inputs, which XGBoost can learn and a
+  separate additive term cannot, is one explanation not tested here.
 lessons:
   - >-
     The harm at D8 is fit variance: the pre-registered penalty weight of 10 was almost zero next to
