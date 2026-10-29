@@ -56,23 +56,23 @@ production_status: not-for-production
 adopted_in: none
 best_arm: >-
   None adopted. At D8, default plus origin lags (spline) scores 9.672 against default's 9.227
-  (+0.445 points, 99% interval +0.090 to +0.983); BG2 scores 7.616.
+  (+0.445 points, 99% interval +0.090 to +0.983); BG2 scores 7.615.
 headline: >-
   Adding the three origin lags to the stack's stage 2 as smooth terms did not close the D8 gap. It
   made D8 worse (+0.445), mostly in the first three months of the scored year, when D8's fits rested
-  on 20 to 60 daily origins and the spline was close to unpenalised. A post hoc version with a
-  penalty that bites is neutral at D8 (+0.080, -0.012 to +0.154). At 13 of 14 counted Primaries the
-  pre-registered arm moves CRPS by under 0.05 points; D22 is worse by 0.096.
+  on 21 to 29 daily origins and the spline was close to unpenalised. A post hoc version with a
+  penalty that bites is neutral at D8 (+0.080, -0.012 to +0.154). At 12 of the other 13 counted
+  Primaries the pre-registered arm moves CRPS by under 0.05 points; D22 is worse by 0.096.
 take_home_message: >-
   Putting recent power into the GAM stack as three smooth stage 2 terms does not recover what
   monthly XGBoost gets from its origin lags: D8 scores 0.445 points worse, not 0.3 to 0.6 better,
   and the harm is concentrated in August to October 2025, when D8 had little history to fit on.
   The signed-MW six improve by 0.02 points and D2 and D4 by 0.02, and a penalised post hoc version
-  gives no gain at D8 either (+0.080), so an additive stage 2 term does not reproduce XGBoost's use
-  of the lags. The experiment does not say whether the Kalman filter and recipe R already use the
-  same information. The lower-tail coverage at D8 is unchanged (q05 0.058 against 0.059). The
+  gives no gain at D8 either (+0.080), so the one additive stage 2 form tried here does not reproduce
+  XGBoost's use of the lags. The experiment does not say whether the Kalman filter and recipe R
+  already use the same information. The lower-tail coverage at D8 is unchanged (q05 0.058 against 0.059). The
   interaction between the lags and stage 1's inputs, which XGBoost can learn and a separate
-  additive term cannot, is the remaining candidate.
+  additive term cannot, is one explanation not tested here.
 lessons:
   - >-
     The harm at D8 is fit variance: the pre-registered penalty weight of 10 was almost zero next to
@@ -101,18 +101,31 @@ date: 2026-10-28
 
 ## Do three recent-power lags, added to the GAM stack as smooth terms, close the D8 gap?
 
-**No. The terms made D8 worse, and moved 13 of the 14 counted Primaries by under 0.05 points (D22
-is 0.096 worse).** Experiment
-371 found that monthly XGBoost leads the GAM stack at substation D8 mainly through three lagged
-values of recent power. We gave the stack the same three values (the newest reading, the reading a
-day earlier at the target half-hour, and the reading a week earlier) as smooth terms in its stage 2
-mean correction, fitted each month on earlier months only, and scored the result under the
-demand-v1 protocol. The terms sit in stage 2 because stage 1 does not depend on the forecast
-origin. Each lag enters as an anomaly: the reading minus the stack's own mean for that half-hour.
-The full design is in the plan above. The stack is "Primary demand research default 1, extended to
-336 hours" (experiment 377); "default plus origin lags" is the spline arm, and a linear version is
-a sensitivity arm. Scores are the quantile score (CRPS) in points of effective capacity, lower is
-better, and contrasts are treatment minus default.
+Giving the forecast three recent readings of the substation's power did not help at D8, the
+substation where the competing XGBoost method leads, and made D8's forecast worse. We asked whether
+a forecast of electricity demand improves when it is told how much power a substation drew in the
+hours just before the forecast was made. The extra readings raised D8's forecast error by 0.445
+points of the substation's effective capacity (error 9.672 against 9.227). At 12 of the other 13
+counted substations the error moved by under 0.05 points; at D22 it rose by 0.096.
+
+**The three readings are the newest one available at forecast time, the reading one day earlier at
+the target half-hour, and the reading one week earlier.** [Experiment
+371](../00371-d8-monthly-xgboost-input-group-ablation/result.md) found that monthly XGBoost leads
+the GAM stack at D8 mainly through these readings. We gave the GAM stack of [experiment
+377](../00377-demand-v1-first-run-feasibility/result.md) (Primary demand research default 1,
+extended to 336 hours) the same readings. The stack fits in two stages: the first predicts from
+weather and calendar for each target time, so it cannot use readings taken before the forecast was
+made, and the second corrects the first stage's mean forecast. We added the readings to the second
+stage as smooth terms, each fitted every month on earlier months only. Each reading enters as the
+reading minus the stack's own forecast for that half-hour.
+
+**Scores are the quantile score (CRPS, the continuous ranked probability score estimated from 11
+quantiles) in points of effective capacity; lower is better, and a contrast is the arm with the
+readings minus the stack without them.** The "spline arm" is the pre-registered design, the "linear
+arm" is a sensitivity check, and the "penalised spline arm" was added after the audit. BG2 is the
+best-guess forecast of experiment 87. D8 and the other labels D2 to D22 are Primary substations. The
+signed-MW six are the six Primaries that report signed megawatts. The full design is in the plan
+below.
 
 ![Figure 1: change in CRPS per Primary at days 1 to 10 (95% intervals)](per_primary.svg)
 
@@ -120,25 +133,25 @@ better, and contrasts are treatment minus default.
 
 **Results (days 1 to 10, spline minus default, 99% intervals, 20,000 resamples of whole months).**
 
-- D8 (own-residual arm): +0.445 (+0.090 to +0.983); default 9.227, spline 9.672, BG2 7.616.
+- D8 (own-residual arm): +0.445 (+0.090 to +0.983); default 9.227, spline 9.672, BG2 7.615.
 - Days 1 to 2 at D8: +0.108 (-0.064 to +0.391). Days 3 to 10: +0.531 (+0.115 to +1.184). Days 8 to
-  10: +0.695 (+0.162 to +1.489). The harm grows with lead, the opposite of prediction P2.
+  10: +0.695 (+0.162 to +1.489). The harm grows with lead, the opposite of the prediction that the
+  gain would be larger at days 1 to 2.
 - Signed-MW six: -0.019 (-0.052 to +0.008); days 1 to 2: -0.043 (-0.061 to -0.028).
 - MVA-only eight with D8: +0.055 (+0.012 to +0.125); without D8: +0.004 (-0.022 to +0.027).
-- Post hoc `spline_heavy` arm (penalty weight 1e5 in place of 10, added after the audit found the
-  pre-registered weight almost zero; not adoptable): D8 +0.080 (-0.012 to +0.154); signed-MW six
-  -0.027 (-0.056 to -0.004); MVA-only eight with D8 +0.004 (-0.018 to +0.023); D2 and D4 -0.026
-  (-0.054 to -0.003); short-history group +0.016 (-0.019 to +0.063).
-- Placebos D2 and D4 pooled: -0.023 (-0.066 to +0.007). Both improve slightly, the opposite
-  direction to D8, so neither placebo fails.
+- Penalised spline arm (post hoc; smoothness penalty weight 100,000 in place of 10, added after the
+  audit found the pre-registered weight almost zero; not adoptable): D8 +0.080 (-0.012 to +0.154);
+  signed-MW six -0.027 (-0.056 to -0.004); MVA-only eight with D8 +0.004 (-0.018 to +0.023); D2 and
+  D4 -0.026 (-0.054 to -0.003); short-history group +0.016 (-0.019 to +0.063).
+- Placebos D2 and D4 pooled: -0.023 (-0.066 to +0.007). The pooled change is slightly towards a
+  gain, the opposite direction to D8, so neither placebo fails.
 - Per Primary (95%, pre-registered spline): D8 +0.445 (+0.127 to +0.838), D22 +0.096 (+0.037 to
-  +0.159), D15 +0.283
-  (+0.020 to +0.654, report only), D14 -0.048 (-0.074 to -0.019), D4 -0.048 (-0.095 to -0.010). The
-  spline wins at 10 of 14 counted Primaries. The worst Primary is D8.
+  +0.159), D15 +0.283 (+0.020 to +0.654, report only), D14 -0.048 (-0.074 to -0.019), D4 -0.048
+  (-0.095 to -0.010). The spline wins at 10 of 14 counted Primaries. The worst Primary is D8.
 - Linear arm: D8 +0.089 (+0.004 to +0.162); signed-MW six -0.022 (-0.043 to -0.001).
 - D8 by month (days 1 to 10): +1.89 (2025-08), +1.46, +0.50, +0.20, +0.32, +0.03, +0.10, +0.07,
-  +0.15, +0.03, +0.04 (2026-06). Leaving out August 2025 moves the pooled D8 difference from
-  +0.445 to +0.293.
+  +0.15, +0.03, +0.04 (2026-06). Leaving out August 2025 moves the pooled D8 difference from +0.445
+  to +0.293.
 - Donor-spread arm at D8: default 11.588, spline 12.112 (+0.524).
 
 **Tails.** At D8 the coverage of the 0.05 quantile is 0.0589 (default) and 0.0583 (spline), of the
@@ -149,11 +162,11 @@ twCRPS contrast at D8 is +0.050 (+0.011 to +0.118) (the spline is worse); at the
 -0.004 (-0.015 to +0.002).
 
 **Nulled rows.** A row is nulled when any of the three lags is missing (a gap in the power record).
-Such rows are rare: 19 to 1,404 rows per Primary against 55,000 to 172,800 un-nulled rows. Their
-coverage of the 5% to 95% interval is erratic because the samples are tiny (0.58 to 1.00), and
-interval width on nulled rows is not systematically wider, since the treatment adds no widening
-rule. A widening rule was not tried, because nulled rows are under 1% of every Primary except D21
-(0.8%), D15 (1.1%), and D18 (0.7%).
+Such rows are under 2% of every Primary: 19 to 3,226 rows per Primary against 55,178 to 172,783
+un-nulled rows. Their coverage of the 5% to 95% interval is erratic because the samples are tiny
+(0.42 to 1.00), and interval width on nulled rows is not systematically wider, since the treatment
+adds no widening rule. A widening rule was not tried, because nulled rows are under 1% of every
+Primary except D15 (1.1%) and D5 (1.9%).
 
 ## Checks
 
@@ -165,21 +178,21 @@ rule. A widening rule was not tried, because nulled rows are under 1% of every P
   is the monthly pattern above, which is post hoc) and 5 (the default arm, nested inside the spline
   arm, beats it at D8). Triggers 1, 3, 4, and 6 did not fire (the placebos did not fail; the
   quantile and median-error contrasts agree in sign; leaving one month out leaves D8 positive at
-  +0.293 to +0.489). Trigger 7 does not apply. A Sonnet audit found no lookahead (it corrupted
-  readings after the newest usable one and the anomalies did not change) and no code bug, and
-  reproduced D8's stored forecast exactly. It found that the pre-registered penalty was almost zero
-  and that D8's early fits rested on 21 to 29 independent daily origins per lead band; both are
-  now stated here, and the post hoc penalised arm above was added in response. Not acted on: the
-  missing intercept in the fit (a free constant made D8 worse in the audit's test), and the
-  whole-table cleaning pass that 377 shares.
+  +0.293 to +0.489). Trigger 7 does not apply. An independent audit by a Sonnet agent found no
+  lookahead (it corrupted readings after the newest usable one and the anomalies did not change) and
+  no code bug, and reproduced D8's stored forecast exactly. It found that the pre-registered penalty
+  was almost zero and that D8's early fits rested on 21 to 29 independent daily origins per lead
+  band; both are now stated here, and the post hoc penalised arm above was added in response. Not
+  acted on: the missing intercept in the fit (a free constant made D8 worse in the audit's test),
+  and the whole-table cleaning pass that 377 shares.
 
 ## Caveats and what to try next
 
 - The terms are stage 2 additive terms, not stage 1 GAM terms and not interactions with the weather
   inputs. The refutation covers that form only.
 - D8 has under 12 months of history for the whole scored year. Its first scored month rests on one
-  month of history, and its fits use 21 to 29 independent daily origins per lead band in August
-  2025 (rows per band overstate this, because the newest-lag term takes one value per origin). This
+  month of history, and its fits use 21 to 29 independent daily origins per lead band in August 2025
+  (rows per band overstate this, because the newest-lag term takes one value per origin). This
   departs from the 12-month rule in the plan, as experiment 377's D8 own-residual arm does. The
   linear and penalised versions stay slightly positive at D8 through spring 2026, so more history
   alone may not turn the result.
@@ -206,13 +219,13 @@ in its opening.
 
 **The three lags and their anomaly form.** For a run with origin `o` and a row with valid time `v`,
 the newest usable reading is the half-hour ending at `o - 3.5 h` (371's telemetry delay of 3 hours
-plus the half-hour a reading spans), the day lag is the latest earlier reading with `v`'s half-hour of
-day, and the week lag is the latest earlier reading with `v`'s weekday and half-hour, all no later
-than the newest usable reading (the definition of `origin_lags` in experiment 87). Each lag enters
-as an **anomaly**: the reading minus the stack's own corrected mean for that half-hour, taken from
-the run with the latest origin not after that half-hour (always before `o`, so it is known at `o`).
-The anomaly removes the daily and weekly shape that a raw lag would carry, which a lag-only additive
-term cannot remove.
+plus the half-hour a reading spans), the day lag is the latest earlier reading with `v`'s half-hour
+of day, and the week lag is the latest earlier reading with `v`'s weekday and half-hour, all no
+later than the newest usable reading (the definition of `origin_lags` in experiment 87). Each lag
+enters as an **anomaly**: the reading minus the stack's own corrected mean for that half-hour, taken
+from the run with the latest origin not after that half-hour (always before `o`, so it is known at
+`o`). The anomaly removes the daily and weekly shape that a raw lag would carry, which a lag-only
+additive term cannot remove.
 
 **No lookahead, and no leaky lags.** Every lag time is at least 3.5 hours before `o`, so no lag is
 at or after the origin at any lead; the nullification of leaky lags that the feature pipeline does
@@ -220,22 +233,22 @@ for lags shorter than the lead cannot trigger, and the code asserts that every l
 the newest usable index. A missing reading gives no contribution (the term is zero), so absent data
 degrades to "default".
 
-**Term form.** For each lag and each of the six protocol lead bands, a penalised cubic B-spline
-(8 basis functions, second-difference penalty, weight fixed at 10 before any score is read) of the
+**Term form.** For each lag and each of the six protocol lead bands, a penalised cubic B-spline (8
+basis functions, second-difference penalty, weight fixed at 10 before any score is read) of the
 anomaly, clipped to the 1st to 99th percentile of the fit rows; the shift is the sum of the three
 terms, fitted by penalised least squares on the residual of the stack's mean, on rows whose origin
 and valid time both precede the fold month's first instant (the 12-month rule), outside the
 hand-filtered events. The spread for each fold month is fitted on earlier months' residuals of the
 treated mean, each earlier month using its own out-of-fold shift. Fits start at cut 2024-07-01 (rows
-before it get no shift). A band with under 2,000 fit rows gets no shift and is listed.
-Sensitivity arm, pre-registered: the three terms linear (penalty weight infinite).
+before it get no shift). A band with under 2,000 fit rows gets no shift and is listed. Sensitivity
+arm, pre-registered: the three terms linear (penalty weight infinite).
 
 **Arms.** `default` (the 377 stack as stored, unchanged), `default_plus_origin_lags`, and
 `default_plus_origin_lags_linear` (sensitivity only; at most one pre-registered arm can be adopted,
 and it is the spline arm). BG2, climatology and the manual heuristic are the references.
 
-**Rows and unit.** The 16 Primaries of experiment 377; D15 and D18 are report only, D8 follows
-377's two-arm rule. Compute: 3 threads.
+**Rows and unit.** The 16 Primaries of experiment 377; D15 and D18 are report only, D8 follows 377's
+two-arm rule. Compute: 3 threads.
 
 **Tails and nulled inputs.** The write-up reports pinball loss and coverage at the 0.01, 0.05, 0.95,
 and 0.99 quantiles per group and per Primary, beside CRPS and twCRPS, and names the tail result in
