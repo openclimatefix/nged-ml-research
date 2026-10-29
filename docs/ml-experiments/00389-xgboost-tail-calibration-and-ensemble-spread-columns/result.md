@@ -153,6 +153,17 @@ base-margin path as the baseline there), and the same rows.
   not experiment 169's 24-half-hour window, because the control member's own columns are also
   pointwise. Cost to port: a new data dependency at serving time (the 51-member forecast at the
   same grid points, already read to run the 51 members).
+- **Second baseline, the weekly bundle (B).** The release candidate of
+  [experiment 381](../00381-simple-weekly-xgboost-demand-against-gam-stack/result.md): the plain weekly
+  member plus a daily solar summary column, a sunny flag, and a 1-year half-life, read from 381's
+  stored weekly forecasts (`arm_preds/weekly/bundle_solar+sunny+hl1`, read only). The first job
+  checks whether those stored quantiles carry the 1.15 factor, by reproducing 381's printed bundle
+  scores (D5 3.827, D12 6.716, D8 7.615) with and without it, and builds B-T1, B-T2, and B-T3 from
+  the raw quantiles exactly as T1, T2, and T3 are built for the plain member. The success rule and
+  contrasts apply to B-T1 to B-T3 against B with factor 1.15. The bundle already carries a solar
+  summary column, so some of the gain from ensemble spread columns may be taken already; the
+  write-up says so. S1 is fitted on the plain member first. **S1b**, the bundle refitted with the
+  four spread columns, runs only if S1 meets the success rule, to avoid a second full refit.
 - **S0, history control.** The baseline refit on S1's shortened history with the spread columns off.
 - **S2, best of T2 and T3 on S1.** Run only if S1 and the better of T2 and T3 each succeed alone,
   with the calibration table fitted on S1's own trailing forecasts. Otherwise reported as not run.
