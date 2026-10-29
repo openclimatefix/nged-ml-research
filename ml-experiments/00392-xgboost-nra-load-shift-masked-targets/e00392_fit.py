@@ -4,8 +4,7 @@ Each arm refits the `n1h` configuration of experiment 87 at the monthly refit ti
 87's training rows, parameters, and leakage checks, and writes the 11 quantiles per daily run to
 `work/arm_preds/<arm>_<form>/<site>_s<seed>_<refit>.parquet`. `colsample_bytree` and
 `colsample_bynode` stay at 1.0. The fit loop follows experiment 383's `run_job`; only the training
-mask differs. One booster per series is saved at the quarterly refits for the lag-encroachment
-sweep.
+mask differs. Every fitted booster is saved for the lag-encroachment sweep.
 
 Arms (`--arms`), each fitted in a `lagged` form (three origin lags) and a `lagless` form:
 
@@ -56,7 +55,6 @@ CACHE_PADDING_STEPS: Final[int] = 48
 """The feature cache pads each hand-labelled event by 24 hours (48 half-hours) on each side."""
 POST_EVENT_STEPS: Final[int] = 96
 """Training rows within 48 hours after an event's end are dropped as well."""
-QUARTERLY_MONTHS: Final[frozenset[int]] = frozenset({1, 4, 7, 10})
 ARM_NAMES: Final[tuple[str, ...]] = ("r0", "r1", "r2", "rc1", "rc2")
 FORM_NAMES: Final[tuple[str, ...]] = ("lagged", "lagless")
 
@@ -190,10 +188,9 @@ def run_job(
             base.train_matrix(known=known, row=row, refit=refit, arm=arm),
             num_boost_round=rounds,
         )
-        if refit.month in QUARTERLY_MONTHS:
-            path = BOOSTER_DIR / name / f"{site}_s{seed}_{refit:%Y%m%d}.ubj"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            models[site].save_model(path)
+        path = BOOSTER_DIR / name / f"{site}_s{seed}_{refit:%Y%m%d}.ubj"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        models[site].save_model(path)
         lines.append(
             f"{name} {site} refit {refit:%Y-%m-%d}: {known.height:,} rows, "
             f"fit {time.monotonic() - started:.0f} s"

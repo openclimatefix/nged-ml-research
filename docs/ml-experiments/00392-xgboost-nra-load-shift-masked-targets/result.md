@@ -10,7 +10,7 @@ status: planned
 kind: other
 protocol: demand-v1
 size: >-
-  complex. Stored: per-arm monthly forecasts, kept boosters (one refit per quarter), mask tables
+  complex. Stored: per-arm monthly forecasts, every fitted booster (about 27 MB each, under `work/boosters/<arm>_<form>/` in this experiment's private folder), mask tables
   and injected-transfer tables, all in this experiment's private folder; experiments 87, 379, 381,
   383, and 391 are read and never written. Designs: more than one defensible (which half-hours the
   detector marks, how long after an event to keep dropping rows, how injected transfers are built);
@@ -139,7 +139,7 @@ after, and all rows.
 
 ## Lag-encroachment sweep
 
-Prediction-only, on kept boosters (one refit per quarter, to bound storage). The three lags are
+Prediction-only, on the saved boosters of every refit (path in the front matter's size line). The three lags are
 ordered by recency: origin, day-earlier, week-earlier (the exact times come from experiment 87's
 `origin_lags`). Levels k = 0 to 3. A step of depth D (2%, 5%, 10% of capacity and the three
 quartile depths; both signs) is added to every lag inside the synthetic event. For R5 and R4 the
