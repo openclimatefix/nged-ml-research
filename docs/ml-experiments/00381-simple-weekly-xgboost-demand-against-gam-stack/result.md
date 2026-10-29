@@ -63,19 +63,18 @@ best_arm: >-
   signed-MW six
 headline: >-
   The simple weekly XGBoost model matches the GAM stack (within +0.05 points) at 9 of 14 countable
-  Primaries and beats it by more than its 95% interval at 3 (D8, D12, D22) and borderline at D5. It
+  Primaries and beats it, with a 95% interval wholly below zero, at 4 (D8, D12, D22, D5). It
   trails at D11
   (+0.15) and D14 (+0.30), and its upper tail is worse at the signed-MW six.
 take_home_message: >-
   A single XGBoost model per Primary, refitted weekly, is as good as the GAM stack at 9 of 14
-  Primaries and clearly better at the eight whose meters hide reverse flow (D8 by 1.6 points), so
-  the
+  Primaries and better on average at the eight whose meters hide reverse flow (D8 by 1.6 points;
+  clearly so at D8, D12, and D22), so the
   stack's extra parts do not pay at those eight. At the six Primaries with signed readings the
   XGBoost model is level on average (+0.08, not distinguishable from zero) but worse at D11 and
   D14 and has a narrower upper tail, so the stack still protects against curtailment better there:
-  its avoidable curtailment cost at a limit of 0.9 times the maximum observed export is lower at 5
-  of
-  6. The only input changes that helped were a daily solar summary (-0.05) and a 1-year half-life
+  its avoidable curtailment cost at a limit of 0.9 times the maximum observed export is lower at 4
+  of 6. The input changes that helped in practice were a daily solar summary (-0.05) and a 1-year half-life
   (-0.02); an Economy 7 input did nothing, and no input tried fixed the 4.9-point under-forecast of
   sunny demand at D12.
 lessons:
@@ -111,7 +110,7 @@ date: 2026-10-28
 
 **A single XGBoost model per Primary, refitted weekly, is as good as the GAM stack at 9 of 14
 Primaries
-and clearly better at the eight whose meters hide reverse flow. At the six Primaries with signed
+and better on average at the eight whose meters hide reverse flow. At the six Primaries with signed
 readings it is level on average but worse at D11 and D14, and its upper tail is narrower.** A
 Primary is a 33 kV to 11 kV substation, labelled D2 to D22. The XGBoost model is the weekly member
 of BG2 (experiment 87), which uses the weather forecast of the 51-member ECMWF ensemble, the
@@ -137,7 +136,8 @@ model family with the refit schedule.
   The 95% interval lies wholly below zero at D8 (-1.62), D12 (-0.80), D22 (-0.29), and D5 (-0.25),
   although the audit's alternative bootstrap puts D5 at -0.62 to +0.11.
   Worse than the stack with an interval above zero: D14 (+0.30; +0.04 to +0.63) and D11 (+0.15;
-  +0.02 to +0.30). Inconclusive: D10 (+0.16), D16 (+0.09), D3 (+0.05). The worst Primary is D14.
+  +0.02 to +0.30). Inconclusive: D10 (+0.16), D16 (+0.09), D3 (+0.050, which misses the tolerance by
+  0.0002). The worst Primary is D14.
   D15 and D18 are report only: +2.34 (0.14 to 4.24) over 4 months and +0.07 over 6 months.
 - **Pooled, 99% interval.** Signed-MW six +0.075 (-0.120 to +0.266). MVA-only eight with D8 -0.361
   (-0.602 to -0.101), without D8 -0.197 (-0.399 to -0.025). Leaving one Primary out never changes
@@ -167,17 +167,17 @@ model family with the refit schedule.
   hour is already an input, so a tree can split on the step. P3 partly holds: the solar summary
   lowers the score on sunny April-to-June half-hours by 0.074 at the signed-MW six and 0.056 at the
   MVA-only eight. P4 holds (lead-dependent half-life +0.007 and +0.025, both under 0.03). P5 fails:
-  the sunny flag removes about 0.1% of the D12 bias.
+  the sunny flag removes about 0.15% of the D12 bias (4.92 to 4.91 points).
 - **MVA-only handling.** The control under-forecasts demand on sunny half-hours at D12 by 4.92
 points
   of capacity (median minus actual) and over-forecasts it by 6.19 points at D19, 4.75 at D21, and
   9.88
   at D8. The sunny flag leaves each bias unchanged to within 0.05 points at the 14 countable
   Primaries. The rule-chosen
-  reverse-flow column of experiments 366 and 374 is off at D12, D2, and D8 when computed from
-  forecast shortwave (correlation +0.21 to +0.28 at D12 against a threshold of 0.3), so that arm
-  equals the control by construction and was not fitted. The signed-MW six serve as controls: the
-  sunny flag moves their bias by under 0.05 points.
+  reverse-flow column of experiments 366 and 374 is off at D12, D2, and D8 (the three checked) when
+  computed from forecast shortwave (correlation +0.21 to +0.28 at D12 against a threshold of 0.3),
+  so that arm equals the control by construction and was not fitted. The signed-MW six serve as
+  controls: the sunny flag moves their bias by under 0.05 points.
 
 ## Tails and curtailment
 
@@ -193,13 +193,13 @@ points
   and its q99 pinball loss is 0.36 against 0.27 for the stack. At the MVA-only eight the XGBoost
   model has the lower pinball loss at q05, q95, and q01, and the lower twCRPS.
 - **Avoidable curtailment cost, signed-MW six, scored year.** At a limit of 0.9 times the maximum
-  observed export, the stack costs less at 5 of 6 (D16 £2.95 million against £6.64 million; D14
+  observed export, the stack costs less at 4 of 6 (D16 £2.95 million against £6.64 million; D14
   £0.54 million against £1.69 million). At a limit of 0.5 the stack costs less at all six. The
   cost is not defined at the MVA-only eight (reactive power assumed zero).
 - **Load-shift events (hand-labelled).** Event rows: signed-MW bundle 8.23 against stack 7.35 and
   BG2 7.96; MVA-only 5.18 against 5.46 and 5.15. The 7 days after: signed-MW 4.55 against 5.11
   and 5.07; MVA-only 2.90 against 2.98 and 2.88. No pass or fail is drawn.
-- **Lag-missing rows.** Only 0.3% of scored half-hours have a missing power lag (3,630 at the
+- **Lag-missing rows.** Only 0.2% of scored half-hours have a missing power lag (3,630 at the
   signed-MW six, 3,226 of them at D5; 2,238 at the MVA-only eight). Their 5%-to-95% interval is
   23.6 points wide at the signed-MW six against 20.1 on rows with lags, and 23.3 against 26.0 at the
   MVA-only eight. Coverage of that interval is 0.826 and 0.842 on missing rows, against 0.863 and

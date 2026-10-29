@@ -110,6 +110,9 @@ def make_arm(*, name: str) -> Arm:
     if unknown:
         msg = f"unknown arm parts {sorted(unknown)}"
         raise ValueError(msg)
+    if "leadw" in parts and any(p in RECENCY_ARMS for p in parts):
+        msg = f"Arm {name!r} combines lead weights with a recency arm, which they would override."
+        raise ValueError(msg)
     return Arm(
         name=name,
         e7="e7" in parts,

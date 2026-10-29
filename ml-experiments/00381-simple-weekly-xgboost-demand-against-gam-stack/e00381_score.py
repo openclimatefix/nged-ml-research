@@ -4,7 +4,7 @@ Two modes:
 
 - `screen`: the monthly arms (control plus the candidates) against the monthly control. Prints the
   reference gate (the refitted control against the stored monthly member `only_M` of experiment
-  379), then each arm's CRPS minus the control's at days 1 to 10, per group (99.75% interval,
+  379), then each arm's CRPS minus the control's at days 1 to 10, per group (99.86% interval,
   20,000 resamples, the Bonferroni level for k = 7) and per Primary (95%), and the slices the arm
   aims at (Economy 7 step hours, sunny daylight half-hours).
 - `final`: the weekly bundle against the stored weekly member `only_W`, the GAM stack of experiment
@@ -392,7 +392,7 @@ def main() -> None:
     parser.add_argument(
         "--arms", nargs="+", default=["e7", "solar", "leadw", "sunny", "hl025", "hl1", "win12"]
     )
-    parser.add_argument("--bundle", default="bundle_e7+solar")
+    parser.add_argument("--bundle", default="bundle_solar+sunny+hl1")
     args = parser.parse_args()
     series = adapter.series_table()
     ctx = build_context(series=series)
