@@ -148,6 +148,42 @@ anonymising.
   Interval width and coverage on half-hours whose lags are missing, with one simple widening rule if coverage falls short.
   Reactive power assumed zero, stated beside every MVA-only number.
 
+## Plan review triage (Sonnet reviewer, 2026-10-29)
+
+Accepted, and now part of the plan:
+
+- **Signed quantiles.** F2's 11 outputs are folded quantiles, so F2 reports a signed *point*
+  forecast only (the median latent). Signed-quantile CRPS is reported for F1 only, with the residual
+  multiplied by sign(*l̂*) so that it moves the signed value the right way.
+- **Does the fold act?** Report the share of training rows and of sunny middays with *l̂* < 0 at
+  the last round. If F2 equals F0 with no crossings, the hypothesis was not tested, and the page
+  says so. The mechanism is the function class plus the tilted start, not the loss alone.
+- **Details.** The smooth fold removes the kink at zero. The pinball hessian is 1/pf². Every
+  DMatrix (fit and predict) gets the explicit base margin, and `predict(output_margin=True)` returns
+  the latents. A finite-difference gradient test and a K = 3 smoke test run first. In the
+  known-answer test the start fit is the plain fit on synthetic MVA.
+- **Gate G.** Pooled over the six Primaries with no Primary under 60% sign accuracy. Reverse flow means
+  true P below -1 point of effective capacity, with at least 200 such half-hours per Primary. Sign
+  accuracy is reported as balanced accuracy with the false-reverse rate. Baselines: predict +|y|, and
+  a threshold rule on ENS shortwave fitted on the training window. The 80% gate is a threshold and the
+  85% in P1 is a prediction.
+- **Contrasts.** The confirmatory family is C1 and C2 at the MVA-only pooled group and D12 (k = 4);
+  C3, C4, and C5 are descriptive. Per-Primary 95% intervals are descriptive. Weekly intervals are
+  post-selection from monthly screening, and the page says so. An arm that passes G but shows no
+  C1 gain changes nothing.
+- **C4 and P4.** At the signed-MW six, F2 trains on |P| as MVA and is scored against |P| for both
+  arms, against the protocol's per-Primary tolerance of +0.05 points.
+- **Known-answer design.** Plant size comes from training-window data only. A constant-Q setting
+  (above) tests the floor. The page says injection is the easy case and that D12 stays unvalidated by it.
+- **F1 residuals.** The calibration window respects the protocol's embargo, and the sunny flag
+  uses ENS shortwave. Residuals are slightly wide because the final model sees more data.
+- **D12 recovery check.** Sign agreement on sunny middays and mean absolute difference in points
+  of effective capacity against the signed fits of experiments 366, 370, and 374, labelled a
+  consistency check, not validation.
+- **Code to read.** Experiment 365 and 366 rule code and experiment 358's known-answer code are
+  copied for the synthetic-MVA device. The 11 levels include 0.01 and 0.99 (checked in
+  `e00087_common.LEVELS`).
+
 ## Constraints
 
 Sonnet only. At most 3 threads and `MemoryMax=16G` per job. The GPU is shared; a custom objective runs
