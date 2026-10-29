@@ -22,7 +22,7 @@ import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache
-from studies.dp_gam import GamFit, GamLayout, design_matrix, pinned_solar_points
+from studies.dp_gam import GamLayout, design_matrix, pinned_solar_points
 from studies.dp_pinned_capacity import PinnedCapacity
 
 CADENCES: Final[tuple[str, ...]] = ("monthly", "weekly")
@@ -112,7 +112,6 @@ def predict_tall(*, cache: FeatureCache, fit: TallFit, index: np.ndarray) -> np.
 def monthly_cuts(*, site: str) -> list[datetime]:
     """Return the cuts of experiment 152's stored monthly fits at a site (D8 from its first day)."""
     return common.monthly_cuts()
-
 
 
 def cuts_of(*, site: str, cadence: str) -> list[datetime]:

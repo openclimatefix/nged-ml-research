@@ -19,7 +19,7 @@ from typing import Final
 import e00386_common as base_common
 import numpy as np
 import polars as pl
-from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
+from studies.dp_features import FeatureCache
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 EXPERIMENT_ID: Final[int] = 386

@@ -1,4 +1,4 @@
-"""Adapter (copied from experiment 377) from stored demand forecasts to the frames of `studies.eval_protocol`.
+"""Adapter, copied from experiment 377, from stored forecasts to `studies.eval_protocol` frames.
 
 The stored forecasts of experiments 87, 374, and 376 carry the quantile columns `q01` to `q99`, the
 keys `time_series_id`, `power_fcst_init_time`, and `valid_time`, and extra columns (`arm`, `seed`,
@@ -15,8 +15,8 @@ from typing import Final, Literal
 import numpy as np
 import polars as pl
 from studies.dp_features import FeatureCache, default_input_paths
-from studies.eval_protocol.metrics import QUANTILE_COLUMNS
 from studies.eval_protocol import metrics as _metrics
+from studies.eval_protocol.metrics import QUANTILE_COLUMNS
 from studies.eval_protocol.slices import KEY_COLUMNS, SERIES_GROUPS
 
 BSP_GSP_GROUPS: Final[dict[str, str]] = {"D13": "BSP", "D17": "BSP", "D1": "GSP", "D6": "GSP"}

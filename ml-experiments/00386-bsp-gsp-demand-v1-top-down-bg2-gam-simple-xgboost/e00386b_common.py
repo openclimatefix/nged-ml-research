@@ -25,8 +25,6 @@ from studies.dp_ens_weather import SunGeometry, replace_site
 from studies.dp_features import (
     FLEET,
     FeatureCache,
-    default_input_paths,
-    load_or_build_feature_cache,
     naive_utc,
 )
 from studies.dp_gam import CLIP_BETA_PER_POINT, ClipSpec, GamSpec, TrainingWindow

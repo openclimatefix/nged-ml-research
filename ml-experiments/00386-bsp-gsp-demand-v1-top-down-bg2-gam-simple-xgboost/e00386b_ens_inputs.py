@@ -1,12 +1,11 @@
-"""Build the ensemble arrays of D13, D17, D1, and D6 from the local ECMWF ENS archive and fit its calibration.
+"""Build the ensemble arrays of D13, D17, D1, and D6 and fit their calibrations.
 
-The four series have no stored 336-hour arrays. The arrays are cut
-from the archive that the production `ecmwf_ens` asset writes (read only, no fetch), at D15's H3
-cell, with the extraction of experiment 152 (`read_run`), then compared with an existing Primary's
-stored arrays for the same runs. The calibration is fitted on the tuning months with experiment
-111's function.
+The four series have no stored 336-hour arrays. The arrays are cut from the archive that the
+production `ecmwf_ens` asset writes (read only, no fetch), at each series' H3 cell, with the
+extraction of experiment 152 (`read_run`), then compared with an existing Primary's stored arrays
+for the same runs. The calibration is fitted on the tuning months with experiment 111's function.
 
-    E00386_SOURCE=d15 uv run --no-sync python ml-experiments/00377-*/e00386b_ens_inputs.py
+    uv run --no-sync python ml-experiments/00386-*/e00386b_ens_inputs.py
 """
 
 import sys

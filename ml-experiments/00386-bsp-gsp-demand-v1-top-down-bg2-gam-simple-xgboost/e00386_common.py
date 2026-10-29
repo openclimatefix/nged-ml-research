@@ -36,7 +36,7 @@ SCORED_FIRST: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
 
 
 def series_rows() -> pl.DataFrame:
-    """Return the cache rows of the BSPs and GSPs, built from experiment 103's panel by its rows rule.
+    """Return the cache rows of the BSPs and GSPs, from experiment 103's panel by its rows rule.
 
     A half-hour is a default row when the reading is present and unflagged, on or after the series'
     first usable instant, outside the fixed lockdown window, and outside the hand-filtered
