@@ -114,7 +114,10 @@ restated as absolute changes in points of CRPS, with the O minus B0 gap reported
 **Timing.** The telemetry delay is 3.5 hours. Z in N0 is the mean of u over the 24 half-hours ending
 at the origin minus 3.5 hours. The neighbour columns and the detector state come from the latest
 6-hourly detector origin (00, 06, 12, 18 UTC) at or before the origin minus 3.5 hours. Stage 1's
-quantiles are the 51-member mixture, as in experiment 383's `forecast_run`. The noise units for Z~
+quantiles for a half-hour come from the control member only: the training history holds one member
+per run, so one member is used everywhere, and the run for half-hour s is the one with the latest
+forecast origin before s (lead 0.5 to 24 hours; daily runs from 2024-04-01 cover every half-hour).
+The first stage 1 refit is 2024-10-01, with 6 months of training rows. The noise units for Z~
 use the expanding history up to the detector origin, so no row sees later medians. The threshold k
 and the known-answer gate use the 2024-04 to 2025-06 labels as the distillation specifies, so rows
 inside that span carry a labelled-tuning shortcut, reported in the write-up. The ERA5-fed stage 1
