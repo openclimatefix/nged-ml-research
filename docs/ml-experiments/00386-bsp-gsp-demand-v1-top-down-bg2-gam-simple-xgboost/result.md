@@ -68,16 +68,16 @@ take_home_message: >-
   reading does much worse than BG2 (the weekly XGBoost model), by 1.0 points at the bulk supply
   points and 2.0 at the grid supply points, and scores about level with the manual heuristic and
   climatology. The gap is largest on day 1 and shrinks with lead, so the stack is missing what
-  recent power gives BG2 at these aggregates, not the weather response. The lower tail is not the
-  problem here: BG2's 5% quantile covers 2.8% to 4.4% of readings, and the stack's covers 5.5% to
-  10.4%, so the stack's lower tail is too narrow, most clearly at D1.
+  recent power gives BG2 at these aggregates, not the weather response. Both forecasts have
+  tail errors: BG2's 5% quantile covers 2.8% to 4.4% of readings (too wide), and the stack's covers
+  5.5% to 10.4% (too narrow, most clearly at D1).
 lessons:
   - >-
-    Days 1 to 10 gap to BG2 is smallest at D13 (+0.55) and largest at D1 (+2.54); no series is
-    close to the +0.20 margin.
+    Days 1 to 10 gap to BG2 is smallest at D13 (+0.55) and largest at D1 (+2.54); the lower end of
+    D13's 95% interval (+0.11) is the only one below the +0.20 margin.
   - >-
-    The gap falls from day 1 (+0.9 at D13, +2.4 at D17, +5.0 at D1, +1.6 at D6) to days 8 to 10
-    (+0.4, +0.9, +0.5, +1.3), which fits the stack lacking a way to use recent power. This
+    The gap falls from day 1 (+0.9 at D13, +2.4 at D17, +4.9 at D1, +1.6 at D6) to days 8 to 10
+    (+0.4, +0.9, +0.5, +1.3; flat at D6), which fits the stack lacking a way to use recent power. This
     explanation was read from the lead pattern and not tested with a fit.
 advice:
   - >-
@@ -127,20 +127,26 @@ at these series (stage D, a second pull request).
   +0.30), GSPs -0.34 (-1.02 to +0.13). Against climatology: BSPs -0.33 (-0.90 to +0.11), GSPs -0.37
   (-1.27 to +0.56). All four intervals include zero. The stack wins 0 of 4 series against BG2, 3 of
   4 against the manual heuristic, and 4 of 4 against climatology (days 1 to 10).
+- **BG2 against the references (stage A rows).** The references were scored in a first script on
+  the half-hours shared by BG2, climatology, and the manual heuristic; the stack contrasts use
+  the half-hours shared by all four arms. BG2's score differs by less than 0.001 points between the
+  two row sets.
 - **BG2 against the references (99%).** BG2 minus the manual heuristic is -1.06 (BSPs) and -2.35
   (GSPs); BG2 minus climatology is -1.35 and -2.38. All four intervals exclude zero.
 - **By lead (stack minus BG2, pooled).** Days 8 to 10: BSPs +0.68 (+0.39 to +1.01), GSPs +0.94
   (+0.23 to +1.72). Days 11 to 14 (beyond NGED's horizon, descriptive): BSPs +0.62, GSPs +1.14. On
   day 1 the gap per series is D13 +0.90, D17 +2.39, D1 +4.94, D6 +1.64.
-- **Slices (stack, BG2).** The gap is spread over every slice read: sunny half-hours (BSPs 11.9
-  against 9.8, GSPs 15.2 against 14.2), winter nights, Economy 7 steps, and worst on Christmas and
-  bank holidays (GSPs 22.0 against 15.9 on Christmas).
+- **Slices (stack, BG2).** The stack is worse than BG2 in every slice except BSP cold nights (5.21 against
+  5.20): sunny half-hours (BSPs 11.9 against 9.8, GSPs 15.2 against 14.2), winter nights, and
+  Economy 7 steps. The gap is largest at the GSPs on Christmas (22.0 against 15.9) and bank
+  holidays (22.4 against 14.6).
 - **Tails, days 1 to 10 (stack; BG2).** Pinball loss at q01, q05, q95, q99 and coverage at the
   same quantiles are printed per series by `e00386_score_b.py`. Coverage at q05 is 0.063 (D13), 0.061
   (D17), 0.104 (D1), and 0.055 (D6) for the stack against 0.028, 0.037, 0.042, and 0.044 for BG2;
   coverage at q95 is 0.935, 0.927, 0.971, and 0.949 against 0.927, 0.960, 0.955, and 0.935. The
-  stack's lower tail is too narrow at D1 and slightly at the other three; BG2's lower tail is too
-  wide.
+  stack's lower tail is too narrow at D1 (0.104) and a little at D13 and D17; D6 is near nominal
+  (0.055). The stack's upper tail is too wide at D1 (q95 coverage 0.971). BG2's lower tail is too
+  wide at all four.
 - **Curtailment cost** is not scored: the metric needs the node and generator tables, and the
   readings here are the aggregates alone.
 

@@ -68,7 +68,7 @@ CACHE_DIR: Final[Path] = (
 PART_4_TUNED: Final[Path] = CACHE_DIR.parent / "work" / "tuned.json"
 
 SCORED_SITES: Final[tuple[str, ...]] = ("D13", "D17", "D1", "D6")
-"""The eight Primaries metered only in MVA that have no stack forecast yet."""
+"""The two BSPs and two GSPs this experiment forecasts."""
 DONORS: Final[tuple[str, ...]] = tuple(
     os.environ.get("E00386_DONORS", "D2,D3,D4,D19,D21,D22").split(",")
 )  # D18 uses the signed-MW Primaries

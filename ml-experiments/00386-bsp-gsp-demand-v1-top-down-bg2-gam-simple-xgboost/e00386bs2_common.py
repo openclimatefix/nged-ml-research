@@ -27,7 +27,7 @@ SLUG: Final[str] = "bsp-gsp-demand-v1-top-down-bg2-gam-simple-xgboost"
 ROW_SET_ID: Final[str] = "fold_a_daily_gap_v1"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
 WORK_DIR: Final[Path] = DATA_DIR / "work" / os.environ.get("E00386_SOURCE", "bg")
-ARM_DIR: Final[Path] = WORK_DIR / "arms" / os.environ.get("E00386_ARM", "c")
+ARM_DIR: Final[Path] = WORK_DIR / "arms" / os.environ.get("E00386_ARM", "a0")
 OUT_DIR: Final[Path] = ARM_DIR / "dp_preds_s2"
 E136_WORK_DIR: Final[Path] = ARM_DIR
 """The running arm's own A2 forecasts, written by `e00386b_forecast.py`."""
