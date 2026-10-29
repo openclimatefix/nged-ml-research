@@ -6,7 +6,8 @@ ENS control member, not ERA5 irradiance). The script prints, for the refits at 2
 with shortwave, the 1st percentile of the readings (points of capacity), and the rule's flag.
 
 ```bash
-PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:ml-experiments/00381-simple-weekly-xgboost-demand-against-gam-stack \
+PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
+    ml-experiments/00381-simple-weekly-xgboost-demand-against-gam-stack \
     uv run --no-sync python ml-experiments/00381-*/e00381_rf_check.py
 ```
 """
@@ -27,11 +28,11 @@ REFITS = (
 
 def main() -> None:
     """Print the rule's statistics."""
-    series, arrays = fd._series_and_arrays()  # noqa: SLF001
+    series, arrays = fd._series_and_arrays()
     config = fd.CONFIGS["n1h"]
     for site in SITES:
         row = series.filter(series["site"] == site).row(0, named=True)
-        rows = fd._training_rows_cached(row=row, arrays=arrays[site], config=config)  # noqa: SLF001
+        rows = fd._training_rows_cached(row=row, arrays=arrays[site], config=config)
         for refit in REFITS:
             known = fd.known_rows(rows=rows, refit=refit, config=config)
             flag, slope = fit.reverse_flow_rule(
