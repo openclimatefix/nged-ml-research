@@ -45,6 +45,10 @@ GROUPS: Final[dict[str, pl.Expr]] = {
     "MVA-only with D8": pl.col("group") == "MVA-only",
     "MVA-only without D8": (pl.col("group") == "MVA-only") & (pl.col("label") != "D8"),
 }
+LABEL_GROUPS: Final[dict[str, str]] = {
+    **dict.fromkeys(("D5", "D9", "D10", "D11", "D14", "D16"), "signed-MW"),
+    **dict.fromkeys(("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22"), "MVA-only"),
+}
 QUANTILE_COLUMNS: Final[list[str]] = [
     "q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99",
 ]  # fmt: skip
@@ -199,6 +203,40 @@ def screen(*, series: pl.DataFrame, ctx: dict, candidate_arms: list[str]) -> Non
     )
 
 
+def diagnose(*, series: pl.DataFrame, ctx: dict, arm_names: list[str]) -> None:
+    """Print the median-minus-actual bias (points of capacity) on sunny daylight half-hours."""
+    arms = {a: arm_frame(regime="monthly", arm=a, series=series) for a in arm_names}
+    table, _, _ = score_arms(arms=arms, series=series, ctx=ctx)
+    flags = table.select(
+        "time_series_id", "power_fcst_init_time", "valid_time", HEADLINE, "sunny_unit_shape"
+    )
+    parts = []
+    for name, frame in arms.items():
+        joined = (
+            frame.join(
+                flags, on=["time_series_id", "power_fcst_init_time", "valid_time"], how="inner"
+            )
+            .join(ctx["actuals"], on=["time_series_id", "valid_time"])
+            .join(series.select("time_series_id", "label", "capacity_mw"), on="time_series_id")
+            .filter(pl.col(HEADLINE))
+            .with_columns(
+                group=pl.col("label").replace_strict(LABEL_GROUPS, default="short-history"),
+                err=(pl.col("q50") - pl.col("actual")) / pl.col("capacity_mw") * 100,
+                sunny=pl.col("sunny_unit_shape"),
+            )
+        )
+        parts.append(
+            joined.group_by("label", "group", "sunny")
+            .agg(pl.col("err").mean().alias(f"bias_{name}"))
+            .sort("group", "label", "sunny")
+        )
+    out = parts[0]
+    for p in parts[1:]:
+        out = out.join(p, on=["label", "group", "sunny"])
+    print("\n== bias of the median (median minus actual), points of capacity, days 1 to 10 ==")
+    print(out.sort("group", "label", "sunny"))
+
+
 def final(*, series: pl.DataFrame, ctx: dict, bundle: str) -> None:
     """Print the weekly bundle against the stored weekly member and the references."""
     stack = base.stack_frames(series=series)["stack"]
@@ -350,7 +388,7 @@ def main() -> None:
     pl.Config.set_tbl_cols(30)
     pl.Config.set_tbl_width_chars(250)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("screen", "final"))
+    parser.add_argument("mode", choices=("screen", "final", "diagnose"))
     parser.add_argument(
         "--arms", nargs="+", default=["e7", "solar", "leadw", "sunny", "hl025", "hl1", "win12"]
     )
@@ -358,7 +396,9 @@ def main() -> None:
     args = parser.parse_args()
     series = adapter.series_table()
     ctx = build_context(series=series)
-    if args.mode == "screen":
+    if args.mode == "diagnose":
+        diagnose(series=series, ctx=ctx, arm_names=["control", "sunny", "solar"])
+    elif args.mode == "screen":
         screen(series=series, ctx=ctx, candidate_arms=args.arms)
     else:
         final(series=series, ctx=ctx, bundle=args.bundle)
