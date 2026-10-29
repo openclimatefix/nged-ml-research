@@ -1,17 +1,20 @@
-# Evaluation protocol for Primary demand, version 1
+# Evaluation protocol for Primary demand, version 2
 
 **This page fixes how every experiment on Primary substation demand is scored, so that results from
-different experiments can be compared.** An experiment records `protocol: demand-v1` in its front
+different experiments can be compared.** An experiment records `protocol: demand-v2` in its front
 matter. A change to any metric, fold, series list, slice, interval, or tolerance on this page makes
-a new version. The superseded text moves to `evaluation-protocol-archive/` as `demand-v1.md`, and
-the table of versions below gains a row. The protocols for [solar](evaluation-protocol-solar.md) and
-[wind](evaluation-protocol-wind.md) have their own version numbers, so a change here does not move
-theirs. The [research default rule](research-default.md) defines the research default and the log of
-its versions. This page defines how a change to it is scored and when the change is adopted.
+a new version. The superseded text moves to `evaluation-protocol-archive/`, where `demand-v1.md`
+already holds version 1, and the table of versions below gains a row. An experiment whose plan was
+written before version 2 merged finishes under `demand-v1`. The protocols for
+[solar](evaluation-protocol-solar.md) and [wind](evaluation-protocol-wind.md) have their own version
+numbers, so a change here does not move theirs. The [research default rule](research-default.md)
+defines the research default and the log of its versions. This page defines how a change to it is
+scored and when the change is adopted.
 
 | Version | Date | Change |
 |---|---|---|
 | `demand-v1` | 2026-10-28 | First version |
+| `demand-v2` | 2026-10-29 | Per-Primary floor against the benchmarks, stop rule for blind alleys, and the replicate rule for ENS-trained arms |
 
 ## What is scored
 
@@ -246,20 +249,28 @@ arms, the interval is read at the level 1 − 0.01/k. The short-history group ta
 within the tolerance of its headline, with D8 and without D8, and is not required to show a gain.
 Each protected slice stays within its tolerance in each group, judged by a one-sided 95%
 non-inferiority bound. A breach at a group makes the verdict `rejected`.
-3. **No harm to a Primary.** A Primary whose point estimate is worse than 0.05 points makes the
-   verdict `needs-human`, with the Primary named. The interval is not tested at each Primary,
-   because 16 one-sided tests would breach by chance more often than not.
+3. **No harm to a Primary, and a floor against the benchmarks.** A Primary whose point estimate
+   is worse than 0.05 points than the previous default makes the verdict `needs-human`, with the
+   Primary named. The candidate must also score no worse than `manual_heuristic` at any Primary,
+   and no more than 1.10 times BG2's score at each Primary, both on the point estimate of the CRPS
+   over days 1 to 10. D8 is judged with its own-residual arm. A breach makes the verdict
+   `needs-human`, with the worst Primary named. The interval is not tested at each Primary, because
+   16 one-sided tests would breach by chance more often than not. The ratio of 1.10 is a starting
+   value read from one table of experiment 378, where default 3 passed at 13 of 14 Primaries,
+   and it is reviewed after two releases.
 4. **Replication.** An arm trained on ENS forecasts can be replicated only over 2025-04 to
-   2025-06 at 13 Primaries. An adoption that rests on that weak replicate has the outcome
-`needs-human` and is never `adopted` automatically. The gain has the same sign in the replicate
-period at the Primaries that have one, and the replicate estimate is at least half of the smaller of
-the main estimate and the minimum gain. Where the minimum gain is zero, the condition reduces to the
-same sign. Leaving out one series at a time is a check for changes tuned on one series and does not
-stand in for a second period: a change with no second period stays a candidate. A change that fails
-replication is not retried on the same replicate period with a changed x, unless the change is
-pre-registered as a new experiment and the failed attempt is counted. A change that meets this
-condition satisfies audit trigger 7, and a candidate that fails it never becomes a base for later
-work.
+   2025-06, at 13 Primaries. That replicate is reported and labelled "weak replicate", and the
+   adoption is not `needs-human` for that reason alone. The release gate then reads the holdout
+   (July to October 2026) once, as the holdout section describes, and a release is judged on the
+one scored year plus that holdout. No ensemble archive is fetched for this purpose. The gain has the
+same sign in the replicate period at the Primaries that have one, and the replicate estimate is at
+least half of the smaller of the main estimate and the minimum gain. Where the minimum gain is zero,
+the condition reduces to the same sign. Leaving out one series at a time is a check for changes
+tuned on one series and does not stand in for a second period: a change with no second period stays
+a candidate. A change that fails replication is not retried on the same replicate period with a
+changed x, unless the change is pre-registered as a new experiment and the failed attempt is
+counted. A change that meets this condition satisfies audit trigger 7, and a candidate that fails it
+never becomes a base for later work.
 5. **Controls.** The experiment's own controls passed, the placebos did not fail, and no audit
    trigger in the `ml-experiment` skill is unresolved. The audit's findings are triaged in the pull
    request before the adoption.
@@ -388,6 +399,15 @@ holdout rolls forward as new months arrive. In a simulation of a 12-month scored
 4-month holdout, the check paused the family after 29% of false adoptions, 7% of adoptions with a
 true gain of 2 standard errors, and 3% of adoptions with a true gain of 3 standard errors. The
 check understates the chance of a pause for a change whose effect is seasonal.
+
+## Stop rule for blind alleys
+
+**After three experiments with the verdict `not supported` on one series or one idea, the next
+experiment on it needs the maintainer's approval and is scored at every Primary.** Only the verdict
+`not supported` in the `result.md` front matter counts. `partly supported` and `inconclusive` do not
+count. A series or an idea is identified by the theme and the idea in the `hypothesis` field, not by
+the wording of the hypothesis. The approval is recorded in the experiment's brief. An experiment
+that the maintainer asks for by name, in chat or through a Discuss session, counts as that approval.
 
 ## Retraining
 

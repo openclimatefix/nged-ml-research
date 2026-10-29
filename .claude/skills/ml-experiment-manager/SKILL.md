@@ -112,6 +112,9 @@ evaluation protocol, assign the version
 number, and confirm the PR adds the log row. Four cases need the maintainer's approval: a new data
 source, a cost above £30 or a recurring production cost, a change that would need a serving-path
 change to port, and a change whose code must enter `src/studies`.
+Before starting a brief, count the experiments with the verdict `not supported` on its theme and
+idea (read the Experiments table). After three, the stop rule of the demand protocol applies: record
+the maintainer's approval in the brief and score the experiment at every Primary.
 
 ## Starting a session
 
