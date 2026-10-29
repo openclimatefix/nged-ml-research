@@ -69,11 +69,10 @@ adopted_in: none
   of an event, taken from `load_or_build_feature_cache`). R1 here drops rows inside an event and
   the 48 hours after it ends, with no padding before the onset. Its refits are weekly; this
   experiment refits monthly. Its forecasts are therefore not comparable with R0 arm for arm.
-- **Consequence for R1.** The brief says to refit R1 only if the rules differ, and they do. The
-  plan asks the manager whether to (a) refit R1 monthly under the brief's rule (10 fit sets
-  with the lagless form, about the cost of R0), or (b) read 383's weekly `lagless` forecasts as a
-  labelled non-comparable reference and run no R1. The plan assumes (a) unless the manager says
-  otherwise.
+- **Consequence for R1.** The rules differ, so R1 is refitted monthly under the brief's rule
+  (event plus 48 hours after), as R0's twin; the manager agreed on 2026-10-29. 383's stored
+  `lagless` arm is not reused because its padding, its weekly cadence, and its single lagless form
+  make it incomparable with R0 arm for arm.
 - **Which NRA checks 383 reports.** Check 4 (tails and avoidable-curtailment cost) on
   contaminated-lag rows, during events, in the 7 days after, and on all rows, and a partial check 1
   (main score outside events, days 1 to 10, no lead bands). It does not report check 2 (share of
@@ -104,9 +103,12 @@ labelled monthly; any winner is re-checked weekly before a release claim.
   391 has not merged when R2 is due, the file is copied into this folder with a note. The mask for
   a fold uses only half-hours before its `train_end`, and the detector's tuning months are fixed
   before any score is read.
-- **R5 shares 391's forecasts and surprise tables**; the plan does not refit it. Its path comes
-  from the manager. R5 is scored on all four checks in the forms where it applies. If 391 has not
-  stored the lagless form, R5 is scored lagged only.
+- **R5 shares 391's N1 forecasts and surprise tables**; the plan does not refit it. The tables
+  will be under `data/ml-experiments/00391-xgboost-lag-surprise-second-stage/surprise_tables/`
+  (not yet written). N1 keeps the three lags, so R5 exists in the lagged form only, and the
+  lagless contrast is R0 and R1's. Experiment 391 refits with no widening and scores raw and at
+  1.15, which this experiment copies. R5 enters the sweep only if 391 keeps N1's boosters; the
+  391 session is asked to keep one refit per quarter.
 - **Widening.** Each arm's quantiles are stored raw, and every score is reported raw and at the
   1.15 widening factor, for R0 and every arm alike. The widening of 391's N1 is read from its page
   before any comparison with R5.
@@ -162,12 +164,11 @@ per process, `MemoryMax=16G`, spawn start method. Fit counts: 5 arms (R0, R1, R2
 forms, each with 12 to 14 monthly refits at 16 Primaries, plus injected-transfer refits for 10
 Primaries. The manager sizes the slot from these counts.
 
-## Open questions for the manager
+## Open items
 
-- Refit R1 monthly under the brief's rule (assumed), or read 383's weekly forecasts only?
-- Path to experiment 391's stage 1 surprise tables and N1 forecasts, and whether it stores the
-  lagless form.
-- A compute slot (3 threads) once the machine is below its load.
+- A compute slot (3 threads), granted by the manager once the load falls. Until then only code and
+  a 1-core smoke test run.
+- Experiment 391's surprise tables and N1 boosters (above).
 
 ## Sources
 
