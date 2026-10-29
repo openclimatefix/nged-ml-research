@@ -1,6 +1,6 @@
 """Refit experiment 87's weekly XGBoost member with GAM-learnt shapes as input columns (385).
 
-Each arm refits the `n1h` configuration of experiment 87 (the BG2 weekly member) at the 52 weekly
+Each arm refits the `n1h` configuration of experiment 87 (the BG2 weekly member) at the monthly (default) or weekly
 refit times, with experiment 87's training rows, parameters, and leakage checks (its
 `e00087_fit_demand` module). `colsample_bytree` and `colsample_bynode` stay at 1.0 in every arm.
 The 11 quantiles per daily run go to `work/arm_preds/<arm>/<site>_s<seed>_<refit>.parquet`.
@@ -135,6 +135,7 @@ def run_job(
     rounds: int,
     seed: int,
     out_dir: Path,
+    model_dir: Path,
 ) -> list[str]:
     """Fit each arm at one refit for each site lacking its file, and forecast the refit's runs."""
     config = fd.CONFIGS["n1h"]
@@ -185,6 +186,10 @@ def run_job(
             )
             for n in todo
         }
+        for n, booster in models_by_arm.items():
+            model_path = model_dir / n / f"{site}_{refit:%Y%m%dT%H%M}.ubj"
+            model_path.parent.mkdir(parents=True, exist_ok=True)
+            booster.save_model(model_path)
         pieces: dict[str, list[pl.DataFrame]] = {n: [] for n in todo}
         for origin in origins:
             frame = pl.read_parquet(common.demand_frame_path(run=origin - common.PUBLICATION_DELAY))
@@ -221,10 +226,11 @@ def run_job(
 
 
 def main() -> None:
-    """Fit the requested arms at the weekly refits."""
+    """Fit the requested arms at the refits of the chosen regime."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arms", nargs="+", required=True, choices=sorted(ARMS))
     parser.add_argument("--sites", nargs="+", default=None, help="default: the source's sites")
+    parser.add_argument("--regime", choices=("monthly", "weekly"), default="monthly")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--cores", type=int, default=1)
     parser.add_argument("--seed", type=int, default=common.SEED)
@@ -232,12 +238,12 @@ def main() -> None:
     parser.add_argument("--refits", type=int, default=None, help="only the first N refits")
     args = parser.parse_args()
     sites = args.sites or list(SITES_BY_SOURCE[common377.SOURCE])
-    jobs = regimes.jobs_for(regime_names=("weekly",), origins=common.all_origins())
-    rounds, out = common.N_ROUNDS, ARM_DIR
+    jobs = regimes.jobs_for(regime_names=(args.regime,), origins=common.all_origins())
+    rounds, out = common.N_ROUNDS, ARM_DIR / args.regime
     if args.smoke:
         jobs = {r: runs[:3] for r, runs in list(jobs.items())[:2]}
         rounds = SMOKE_ROUNDS
-        out = WORK_DIR / "arm_preds_smoke"
+        out = WORK_DIR / "arm_preds_smoke" / args.regime
     if args.refits is not None:
         jobs = dict(sorted(jobs.items())[: args.refits])
     nthread = max(1, args.cores // args.workers)
@@ -256,6 +262,7 @@ def main() -> None:
                 rounds=rounds,
                 seed=args.seed,
                 out_dir=out,
+                model_dir=WORK_DIR / ("models_smoke" if args.smoke else "models") / args.regime,
             )
             for r, runs in sorted(jobs.items(), key=lambda kv: -len(kv[1]))
         ]
