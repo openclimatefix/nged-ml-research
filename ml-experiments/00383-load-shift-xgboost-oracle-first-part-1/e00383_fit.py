@@ -134,6 +134,14 @@ def pseudo_mask(
     plus half the tolerance, and drawing stops once the share reaches the target minus half the
     tolerance (experiment 100's recipe, for the 30% target only).
 
+    Args:
+        site: The series' site label, which seeds the draw.
+        rows: The series' training rows, with `valid_time` and `power_fcst_init_time`.
+        durations: The event durations (grid steps) that the interval lengths are drawn from.
+
+    Returns:
+        The boolean mask on the grid and the share of rows with at least one masked lag.
+
     Raises:
         ValueError: If the draw cannot reach the target share within the tolerance.
     """
