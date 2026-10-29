@@ -18,6 +18,8 @@ Arms (the control changes nothing):
   product with shortwave.
 - `hl025`, `hl1`: the single half-life changed to 0.25 or 1 year. `win12`: only rows from the last
   365 days before the refit, with the 0.5-year half-life.
+- `rf`: adds one column, the reverse-flow rule of experiment 366 (recomputed at each refit from the
+  training rows) times the fitted slope of sunny midday readings on shortwave, times shortwave.
 - `bundle_<names>`: the arms joined by `+`, for example `bundle_e7+solar`.
 
 ```bash
@@ -52,6 +54,11 @@ ARM_DIR: Final[Path] = WORK_DIR / "arm_preds"
 E7_COLUMNS: Final[tuple[str, ...]] = ("e7_flag", "half_hours_since_0030")
 SOLAR_COLUMNS: Final[tuple[str, ...]] = ("shortwave_day_mean", "shortwave_prev_day_mean")
 SUNNY_COLUMNS: Final[tuple[str, ...]] = ("sunny_flag", "sunny_times_shortwave")
+RF_COLUMN: Final[str] = "reverse_flow_shortwave"
+RF_CORRELATION_THRESHOLD: Final[float] = 0.3
+RF_PERCENTILE_THRESHOLD_POINTS: Final[float] = 1.0
+RF_MIN_ROWS: Final[int] = 200
+RF_MIDDAY_HOURS: Final[tuple[float, float]] = (10.0, 14.0)
 E7_FIRST_HALF_HOUR: Final[int] = 1
 E7_LAST_HALF_HOUR: Final[int] = 6
 E7_RAMP_CLIP: Final[int] = 12
@@ -77,6 +84,7 @@ class Arm:
     e7: bool = False
     solar: bool = False
     sunny: bool = False
+    rf: bool = False
     lead_weights: bool = False
     half_life_years: float | None = None
     window_days: int | None = None
@@ -87,6 +95,7 @@ class Arm:
             *(E7_COLUMNS if self.e7 else ()),
             *(SOLAR_COLUMNS if self.solar else ()),
             *(SUNNY_COLUMNS if self.sunny else ()),
+            *((RF_COLUMN,) if self.rf else ()),
         ]
 
     def columns(self) -> list[str]:
@@ -97,7 +106,7 @@ class Arm:
 def make_arm(*, name: str) -> Arm:
     """Return the arm called `name`; `bundle_a+b` joins the changes of arms `a` and `b`."""
     parts = name.removeprefix("bundle_").split("+") if name.startswith("bundle_") else [name]
-    unknown = set(parts) - {"control", "e7", "solar", "leadw", "sunny", *RECENCY_ARMS}
+    unknown = set(parts) - {"control", "e7", "solar", "leadw", "sunny", "rf", *RECENCY_ARMS}
     if unknown:
         msg = f"unknown arm parts {sorted(unknown)}"
         raise ValueError(msg)
@@ -106,6 +115,7 @@ def make_arm(*, name: str) -> Arm:
         e7="e7" in parts,
         solar="solar" in parts,
         sunny="sunny" in parts,
+        rf="rf" in parts,
         lead_weights="leadw" in parts,
         half_life_years=next((RECENCY_ARMS[p][0] for p in parts if p in RECENCY_ARMS), None),
         window_days=next((RECENCY_ARMS[p][1] for p in parts if p in RECENCY_ARMS), None),
@@ -118,7 +128,7 @@ def add_extras(*, frame: pl.DataFrame, arm: Arm) -> pl.DataFrame:
     Every added column is computed from the row's own valid time, its own run's forecast weather,
     and its own ensemble member, so no column reads a later run or the observed power.
     """
-    if not arm.extra_columns():
+    if not [c for c in arm.extra_columns() if c != RF_COLUMN]:
         return frame
     local = pl.col("valid_time").dt.offset_by("-30m").dt.convert_time_zone("Europe/London")
     half_hour = local.dt.hour() * 2 + local.dt.minute() // 30
@@ -152,6 +162,43 @@ def add_extras(*, frame: pl.DataFrame, arm: Arm) -> pl.DataFrame:
             sunny_flag=flag, sunny_times_shortwave=flag * pl.col("shortwave")
         ).with_columns(pl.col(*SUNNY_COLUMNS).cast(pl.Float32))
     return out.drop("_half_hour", "_local_date")
+
+
+def reverse_flow_rule(*, known: pl.DataFrame, capacity_mw: float) -> tuple[float, float]:
+    """Return the rule's flag (1.0 or 0.0) and slope for one refit, from the training rows only.
+
+    The rule is experiment 366's: on sunny midday training readings (points of capacity), the fit
+    through the meter is chosen when the Pearson correlation with shortwave exceeds 0.3 or the 1st
+    percentile is below 1.0 point. The slope is the least-squares slope of the readings on
+    shortwave over the same rows.
+    """
+    cosine = np.cos(np.radians(known["solar_zenith"].to_numpy())).clip(min=0.0)
+    clear = 1098.0 * cosine * np.exp(-0.057 / np.maximum(cosine, 0.01))
+    shortwave = known["shortwave"].to_numpy().astype(float)
+    hour = known["hour_local"].to_numpy()
+    mask = (
+        (clear > 1.0)
+        & (shortwave > SUNNY_INDEX * np.maximum(clear, 1.0))
+        & (hour >= RF_MIDDAY_HOURS[0])
+        & (hour <= RF_MIDDAY_HOURS[1])
+    )
+    if mask.sum() < RF_MIN_ROWS:
+        return 0.0, 0.0
+    reading = known["power"].to_numpy()[mask] / capacity_mw * 100
+    x = shortwave[mask]
+    correlation = float(np.corrcoef(x, reading)[0, 1])
+    low = float(np.percentile(reading, 1.0))
+    if correlation > RF_CORRELATION_THRESHOLD or low < RF_PERCENTILE_THRESHOLD_POINTS:
+        slope = float(np.polyfit(x, reading, 1)[0])
+        return 1.0, slope
+    return 0.0, 0.0
+
+
+def add_rf(*, frame: pl.DataFrame, flag: float, slope: float) -> pl.DataFrame:
+    """Add the reverse-flow column: flag times slope times shortwave (zero where the flag is 0)."""
+    return frame.with_columns(
+        (pl.col("shortwave") * (flag * slope)).cast(pl.Float32).alias(RF_COLUMN)
+    )
 
 
 def train_matrix(*, known: pl.DataFrame, row: dict, refit: datetime, arm: Arm) -> xgb.DMatrix:
@@ -208,6 +255,7 @@ def run_job(
     ]
     lines = []
     models: dict[str, xgb.Booster] = {}
+    rules: dict[str, tuple[float, float]] = {}
     for site in todo:
         started = time.monotonic()
         row = rows_of[site]
@@ -219,6 +267,14 @@ def run_job(
             refit=refit,
             config=config,
         )
+        flag, slope = 0.0, 0.0
+        if arm.rf:
+            flag, slope = reverse_flow_rule(known=known, capacity_mw=row["effective_capacity_mw"])
+            known = add_rf(frame=known, flag=flag, slope=slope)
+            lines.append(
+                f"{arm.name} {site} refit {refit:%Y-%m-%d}: rule flag {flag}, slope {slope:.4f}"
+            )
+        rules[site] = (flag, slope)
         if arm.window_days is not None:
             known = known.filter(pl.col("valid_time") > refit - timedelta(days=arm.window_days))
         models[site] = xgb.train(
@@ -242,6 +298,8 @@ def run_job(
                 a7=False,
             )
             prepared = add_extras(frame=prepared, arm=arm)
+            if arm.rf:
+                prepared = add_rf(frame=prepared, flag=rules[site][0], slope=rules[site][1])
             pieces[site].append(
                 forecast_run(model=models[site], prepared=prepared, arm=arm, seed=seed)
             )

@@ -96,6 +96,18 @@ the local hour and day of week, the distance to the nearest bank holiday and to 
   rows out-of-fold values (the GAM refitted with each training month held out in turn) so that no row
   sees an in-sample fit; the scored rows use the fold's full-window fit. This needs the GAM stack
   fitted on 12 held-out-month folds per refit, so it is a separate experiment.
+- **A7, rule-chosen reverse-flow column (MVA-only eight; added 2026-10-29 at the manager's request,
+  after the A1 to A5 screening).** One extra column, no second model: experiment 366's rule
+  recomputed at each monthly refit from that refit's training rows only (sunny midday readings: the
+  Pearson correlation with shortwave above 0.3, or a 1st percentile below 1.0 point of capacity,
+  switches the column on), times the fitted slope of those readings on shortwave, times the
+  forecast shortwave. Prediction: the rule switches the column on at D12 only; the column is a
+  monotone function of shortwave at D12, which a tree can already split on, so the arm moves the
+  D12 score by under 0.02 points and leaves the sunny-half-hour bias at about -4.9 points. A bigger
+  change would mean the shortwave inputs interact badly with the folded meter. Tested monthly at
+  the eight MVA-only Primaries with the signed-MW six as unchanged controls (the rule is off there).
+  A signed-capacity-times-irradiance column from the same fit is the same function again, so it is
+  not run separately.
 - **Bundle.** The arms kept by the decision rule, fitted weekly.
 
 ## Diagnostics before the arms
