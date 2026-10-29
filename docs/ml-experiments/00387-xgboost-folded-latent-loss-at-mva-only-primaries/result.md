@@ -150,6 +150,24 @@ and Q0 in {0, 2, 4}, plus pf 0.97 with the fold assuming 0.97, and for kappa in 
 without the monotone constraint. No metered generator output enters, so nothing needs
 anonymising.
 
+### Gate stage A, read 2026-10-29 (before any MVA-only number)
+
+Run on D5, D9, and D10 at three monthly refits (July, November, March), synthetic MVA at level 1.0
+with pf 1.0, Q = 0, fold Q0 = 0, over days 1 to 10. Choice of the sign mechanism, made on this
+synthetic data only: **kappa = 1.0 and no monotone constraint** (`f2:k1:m0`). Without the tilt
+(kappa = 0) the sign is not recovered (balanced accuracy 0.51, as the plain model and F0 give,
+0.50). The monotone constraint did not help (balanced accuracy 0.867 against 0.895 at kappa 1.0).
+At kappa 1.0 without the constraint, pooled over the three sites: balanced accuracy 0.895, recall on
+reverse-flow half-hours 0.918, false-reverse rate 0.128, and a signed MAE on reverse-flow
+half-hours of 6.3 points against 21.1 for the plain model read as signed. Over all half-hours
+the signed MAE is 9.9 against 7.5, because false reversals cost points on ordinary rows. The
+fitted threshold rule on ERA5 shortwave (optimistic) scores a balanced accuracy of 0.94 to 0.95
+and 5.5 to 8.9 points on reverse-flow half-hours, so the folded model does not beat a
+shortwave rule on the sign; its advantage, if any, shows in the folded CRPS at D12.
+Deviations from the plan to fit the compute: the reactive settings other than the first are run on
+D5, D9, and D10 at these three refits only, and Q0 in {2, 4} likewise. The gate's "signed MAE under
+half the plain model's" is read on reverse-flow half-hours, where the plain model cannot be right.
+
 ## Reading at the MVA-only Primaries
 
 - Per-Primary table, worst Primary, leave-one-out, tails, and the load-shift curtailment rows follow

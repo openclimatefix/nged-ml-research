@@ -6,8 +6,8 @@ points of effective capacity and over leads up to 240 hours (days 1 to 10):
 - signed MAE of `latent_mean` against the true signed power;
 - reverse flow: true power below -1 point; balanced accuracy of "latent below 0" against it, the
   recall on reverse-flow half-hours, and the false-reverse rate on the others;
-- baselines: predict +S (the metered apparent power itself), and a shortwave threshold rule fitted
-  on the training window's true signs (ERA5 shortwave at the valid time, so it is optimistic).
+- baselines: predict the plain median read as signed, and the plain median with its sign set negative when ERA5 shortwave
+  exceeds a threshold fitted on the training window's true signs (optimistic: ERA5 at the valid time).
 
     PYTHONPATH=... uv run --no-sync python ml-experiments/00387-*/e00387_gate.py --mode syn:none:1.0 \
         --specs plain f0 f2:k1:m1:q0 --sites D5 D9 D10
@@ -87,13 +87,18 @@ def score_site(*, root: Path, mode: str, specs: list[str], site: str) -> list[di
         truth = joined["truth"].to_numpy()
         latent = joined["latent_mean"].to_numpy() * 100
         rev = truth < REVERSE_POINTS
+        plain = read_preds(root=root, mode=mode, spec="plain", site=site).select(
+            "power_fcst_init_time", "valid_time", plain_median=pl.col("latent_mean")
+        )
+        joined = joined.join(plain, on=["power_fcst_init_time", "valid_time"], how="left")
+        plain_signed = joined["plain_median"].to_numpy() * 100
         cases = {
             spec: latent,
-            "baseline_plus_S": joined["observed"].to_numpy(),
+            "baseline_plain_as_signed": plain_signed,
             f"baseline_rule_T{threshold:.0f}": np.where(
                 joined["era5_shortwave"].to_numpy() > threshold, -1.0, 1.0
             )
-            * joined["observed"].to_numpy(),
+            * plain_signed,
         }
         for name, estimate in cases.items():
             ba, recall, false = balanced(truth_reverse=rev, predicted_reverse=estimate < 0)
@@ -125,10 +130,12 @@ def main() -> None:
     pl.Config.set_tbl_cols(20)
     pl.Config.set_fmt_str_lengths(40)
     print(table.with_columns(pl.col(pl.Float64).round(3)))
+    table = table.filter(~pl.col("spec").str.starts_with("baseline_rule") | True)
     pooled = (
         table.group_by("spec")
         .agg(
             pl.col("mae_points").mean(),
+            pl.col("mae_reverse_points").mean(),
             pl.col("balanced_accuracy").mean(),
             pl.col("recall").mean(),
             pl.col("false_reverse").mean(),
