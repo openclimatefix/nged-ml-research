@@ -71,6 +71,71 @@ MINUS_DEFAULT_1: Final[list[tuple[str, str, float, float, float]]] = [
 ]
 
 
+COVERAGE: Final[list[tuple[str, str, float, float, float, float]]] = [
+    ("D5", "signed-MW six", 0.0319, 0.0734, 0.9298, 0.9751),
+    ("D9", "signed-MW six", 0.0118, 0.0572, 0.9496, 0.9872),
+    ("D10", "signed-MW six", 0.0082, 0.0413, 0.9779, 0.9958),
+    ("D11", "signed-MW six", 0.0091, 0.0461, 0.9550, 0.9910),
+    ("D14", "signed-MW six", 0.0132, 0.0546, 0.9497, 0.9870),
+    ("D16", "signed-MW six", 0.0363, 0.0738, 0.9213, 0.9603),
+    ("D2", "MVA-only eight", 0.0119, 0.0592, 0.9434, 0.9845),
+    ("D3", "MVA-only eight", 0.0265, 0.0720, 0.9536, 0.9873),
+    ("D4", "MVA-only eight", 0.0248, 0.0734, 0.9366, 0.9794),
+    ("D8", "MVA-only eight", 0.1827, 0.2906, 0.7208, 0.8264),
+    ("D12", "MVA-only eight", 0.0225, 0.0752, 0.9416, 0.9812),
+    ("D19", "MVA-only eight", 0.0232, 0.0777, 0.9435, 0.9830),
+    ("D21", "MVA-only eight", 0.0240, 0.0782, 0.9525, 0.9875),
+    ("D22", "MVA-only eight", 0.0128, 0.0524, 0.9525, 0.9886),
+    ("D15", "short history", 0.0634, 0.1280, 0.7621, 0.8994),
+    ("D18", "short history", 0.0042, 0.0256, 0.9718, 0.9946),
+]
+
+
+def draw_coverage() -> None:
+    """Write the tail-calibration chart: the share of readings at or below each tail quantile."""
+    frame = pl.DataFrame(
+        COVERAGE, schema=["row", "group", "q01", "q05", "q95", "q99"], orient="row"
+    ).unpivot(index=["row", "group"], variable_name="quantile", value_name="coverage")
+    ideal = pl.DataFrame(
+        {"quantile": ["q01", "q05", "q95", "q99"], "ideal": [0.01, 0.05, 0.95, 0.99]}
+    )
+    order = [r[0] for r in COVERAGE]
+    base = alt.Chart(frame).encode(
+        y=alt.Y("row:N", sort=order, title=None),
+        color=alt.Color(
+            "group:N",
+            scale=alt.Scale(domain=list(GROUP_COLOURS), range=list(GROUP_COLOURS.values())),
+            legend=alt.Legend(title=None, orient="top"),
+        ),
+    )
+    dots = base.mark_point(filled=True, size=50).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X("coverage:Q", title="Share of readings at or below the quantile", scale=alt.Scale(domain=[0, 1]))
+    )
+    rule = (
+        alt.Chart(ideal)
+        .mark_rule(color="#808080", strokeDash=[4, 3])
+        .encode(x="ideal:Q")  # ty: ignore[unresolved-attribute]
+    )
+    chart = (
+        alt.layer(rule, dots, data=frame)
+        .facet(column=alt.Column("quantile:N", sort=["q01", "q05", "q95", "q99"], title=None), data=frame)
+        .resolve_scale(x="independent")
+        .properties(
+            title=alt.TitleParams(
+                text=textwrap.wrap("Tails are close to nominal except at Marsh Lane (D8)", 80),
+                subtitle=textwrap.wrap(
+                    "Default 3, days 1 to 10, shared half-hours of 2025-07 to 2026-06. Dashed line: "
+                    "the ideal share (0.01, 0.05, 0.95, 0.99). D15 and D18 are short-history, "
+                    "report only.",
+                    WRAP,
+                ),
+                anchor="start",
+            )
+        )
+    )
+    chart.save(DOCS_DIR / "tail_coverage.svg")
+
+
 def draw(
     *,
     rows: list[tuple[str, str, float, float, float]],
@@ -114,7 +179,8 @@ def draw(
 
 
 def main() -> None:
-    """Write both SVGs."""
+    """Write the three SVGs."""
+    draw_coverage()
     note = (
         "Days 1 to 10, shared half-hours of 2025-07 to 2026-06. Short history is D15 and D18, "
         "report only. Dot: estimate. Line: 95% interval per Primary and 99% interval for pooled "
