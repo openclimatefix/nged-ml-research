@@ -64,9 +64,9 @@ take_home_message: >-
   5% quantile 29% of the time. This holds for reactive power zero only.
 lessons:
   - >-
-    The solar summary below 168 h and the daylight blend beyond it lower the score by 0.03 points
-    at days 1 to 10 and 0.12 at days 8 to 10 at the signed-MW six, and the gain is in the same
-    direction at all 14 countable Primaries.
+    Against default 1, the solar summary and daylight blend at 168 to 240 hours lower the score by
+    0.03 points at days 1 to 10 and 0.12 at days 8 to 10 at the signed-MW six, and the gain has the
+    same direction at all 14 countable Primaries.
   - >-
     The MVA-only tails fail because of D8: without it, coverage at q01, q05, q95, and q99 is 0.021,
     0.070, 0.946, and 0.985, and with it 0.041, 0.097, 0.918, and 0.965.
