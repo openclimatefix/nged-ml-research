@@ -88,8 +88,12 @@ factor so a reactive term can enter later.
 - **Fold.** The fold is the smooth S(*l*) = sqrt(*l*² + Q0²) / pf. Q0 is the reactive-power floor,
   because an MVA reading never reaches zero while some reactive power flows (maintainer, 2026-10-29);
   pf = 1.0 is the working assumption (NGED recommends it). Q0 is fixed before any score is read, as
-  a share of effective capacity, at three values: 0 (the strict |*l*| case), Q_lo, and 2 Q_lo,
-  where Q_lo is the 0.5th percentile of a Primary's training readings. The sensitivity to Q0 is
+  points of effective capacity, at three values common to all Primaries: 0 (the strict |*l*|
+  case), 2, and 4. Step 0 (below) set the values: D12's training readings have a minimum of 0.36
+  points, a 0.1% quantile of 4.3, and a 1% quantile of 6.2, only 3 half-hours below 1 point and 283
+  below 5, so the bottom of its V is rounded at about 4 to 6 points, not at zero. A Q0 taken from
+  each Primary's own lowest readings is rejected, because at D2 and D3 the lowest readings (22 and
+  18 points) are baseload demand, not reactive power. The sensitivity to Q0 is
   reported. Inputs and lags are the metered series, folded or not.
 - **Identification of the sign.** The folded loss is symmetric in the sign of *l*, and a trial on
   synthetic data (a V-shaped |*l*| against shortwave) showed that gradient descent from a positive start
@@ -118,6 +122,18 @@ factor so a reactive term can enter later.
 - **Weekly refits for the final arm; monthly refits for screening.** Seed, rows, runs, and scoring rows
   are the plain model's.
 
+## Step 0: how close the readings get to zero (maintainer's third note)
+
+Script `e00387_step0.py`, training period (before 2025-07-01) and the full record, readings in
+points of effective capacity. D12 (MVA): minimum 0.36, 0.1% quantile 4.3, 1% quantile 6.2, 5% 8.9;
+3 half-hours below 1 point, 4 below 2, 283 below 5 in training (5, 7, and 307 in the full record);
+the few readings below 2 points fall in July, September, and December near midday. D2 and D3
+(MVA, no reverse flow): minimum 22 and 18, no reading below 5. D5 and D10 (signed MW, absolute
+value taken): D10 touches 0.02 and has 66 half-hours below 1 point in training, almost all sunny
+middays from April to August; D5 has 12. Reading: D12 does not touch zero except in a handful
+of half-hours, so a sharp |*l*| fold is not appropriate there, and Q0 of 2 to 4 points is the
+range consistent with its floor. The objective is the smooth fold at Q0 in {0, 2, 4}.
+
 ## Gate G: the known-answer test (read before any MVA-only number)
 
 At each of the six signed-MW Primaries (D5, D9, D10, D11, D14, D16), add a synthetic photovoltaic
@@ -125,12 +141,12 @@ plant (the physics model of `studies.pv_physics`, two plants: east-west and sout
 experiment 110) to the signed series at levels 0, 1.0, and 2.0, sized so the injected output
 makes reverse flow common on sunny middays (the sizing of experiments 358 and 366). The result is a signed
 truth with real reverse flow. Convert the series to synthetic MVA S = sqrt(P² + Q²) at four reactive settings: pf 1.0 with Q = 0, pf 0.97
-(Q = P tan(arccos pf)), a constant Q of 1.0 point of effective capacity, and pf 0.97 with that constant Q
+(Q = P tan(arccos pf)), a constant Q of 2.0 points of effective capacity, and pf 0.97 with that constant Q (a constant Q of 4.0 points is also run)
 (sign discarded). Replace the training labels and the lags by that synthetic MVA, and train the folded models on
 it alone. Report, against the true signed series: mean absolute error in points of effective
 capacity, sign accuracy on reverse-flow half-hours, and the CRPS of the recovered signed
 quantiles, for F0 (read as signed), F1, and F2, at each reactive setting with the fold assuming pf 1.0
-and Q0 in {0, Q_lo, 2 Q_lo}, plus pf 0.97 with the fold assuming 0.97, and for kappa in {0, 0.5, 1.0}, with and
+and Q0 in {0, 2, 4}, plus pf 0.97 with the fold assuming 0.97, and for kappa in {0, 0.5, 1.0}, with and
 without the monotone constraint. No metered generator output enters, so nothing needs
 anonymising.
 
