@@ -17,8 +17,8 @@ ml-experiments/00383-* DATA_PATH_INTERNAL=... \\
 from datetime import UTC, datetime
 from typing import Final
 
-import e00379_adapter as adapter
-import e00379_score as ref379
+import e00379_adapter as adapter  # ty: ignore[unresolved-import]
+import e00379_score as ref379  # ty: ignore[unresolved-import]
 import polars as pl
 from e00383_score import HEADLINE_BAND, OUT
 from studies.dp_features import default_input_paths, load_or_build_feature_cache

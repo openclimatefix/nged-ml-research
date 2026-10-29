@@ -21,8 +21,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
-import e00379_adapter as adapter
-import e00379_score as ref379
+import e00379_adapter as adapter  # ty: ignore[unresolved-import]
+import e00379_score as ref379  # ty: ignore[unresolved-import]
 import polars as pl
 from studies.dp_features import default_input_paths, load_or_build_feature_cache
 from studies.eval_protocol import metrics

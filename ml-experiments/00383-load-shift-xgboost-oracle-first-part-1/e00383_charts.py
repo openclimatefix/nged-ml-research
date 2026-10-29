@@ -55,7 +55,7 @@ def main() -> None:
     chart = (
         alt.Chart(summary.to_pandas())
         .mark_circle(size=90)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("value:Q", title=None, scale=alt.Scale(zero=False)),
             y=alt.Y("arm_label:N", sort=[LABELS[a] for a in ARMS], title=None),
             color=alt.Color(

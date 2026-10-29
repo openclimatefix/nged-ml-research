@@ -78,17 +78,21 @@ headline: >-
   those rows (arm c2) gives -1.32 (-2.98 to +0.21) at the signed-MW six and +0.65 (+0.12 to +1.19)
   at the MVA-only eight. Gate O fails, so the detector arm b2 was not run.
 lessons: >-
-  Widening raises the 5% to 95% coverage on contaminated rows at the signed-MW six from 0.705 to
-  0.774 (arm d) or 0.820 (arm c2), still under the 0.90 target. The lagless fallback gain at the
+  Fixed widening raises the 5% to 95% coverage on contaminated rows at the signed-MW six from
+  0.705 to 0.774 (arm d) or 0.820 (arm c2), still under 0.90; widening by a factor fitted on
+  earlier months reaches 0.883 (d) and 0.929 (c2) but sits at its cap of 2 in most months.
+  The lagless fallback gain at the
   signed-MW six rests on two events (the D16 event over Christmas and the D10 event in November),
-  and leaving the D16 event out cuts it from -1.41 to -0.98. The MVA-only eight already cover 0.88
+  and leaving out the D16 event, the D10 event, or both moves it from -1.41 to -0.86, -1.05, or
+  -0.44 (audit, attribution by lag). The MVA-only eight already cover 0.88
   of readings on these rows.
 take_home_message: >-
   Telling the weekly XGBoost model which of its recent-power inputs lie inside a load-shift event
   does not fix its upper tail: nulling the inputs makes no measurable difference, and a lagless
   model helps at the six Primaries whose meters record the sign of the flow but hurts at the eight
-  that do not. Widening the bands raises coverage on these rows but leaves it under the 0.90 target,
-  so a detector would have to do more than flag the rows. The detector was not built, because even
+  that do not. Fixed widening raises coverage on these rows but leaves it under the 0.90 target, and
+  a factor fitted on earlier months reaches it only by doubling the band.
+  The detector was not built, because even
   with perfect event labels no gain is established; the next experiment should try to widen the
   band by a learned amount on the flagged rows, or to forecast the transfers instead.
 kind: other
@@ -101,8 +105,8 @@ advice:
     more than two events, because its gain rests on the D16 Christmas event and one November
     event (leave-one-event-out table).
   - >-
-    Widen bands on rows with a contaminated lag by a factor fitted on earlier months, not a fixed
-    1.28, because a fixed factor leaves the signed-MW coverage at 0.77 to 0.82 (W).
+    Treat widening of contaminated-lag rows as unresolved: a fixed 1.28 leaves the signed-MW
+    coverage at 0.77 to 0.82, and the as-of factor reaches 0.88 to 0.93 only at its cap of 2 (W).
 ---
 
 # Nulled load-shift lags and wider bands in the weekly XGBoost model
@@ -114,8 +118,9 @@ whether blanking the model's three recent-power inputs inside an event, or switc
 with no power inputs, or widening the forecast band, improves the forecast on the rows whose power
 inputs lie inside an event. At the six Primaries whose meters record the sign of the flow, the
 lagless model lowered the score but with an interval that includes zero, and the result rests on two
-events. At the eight Primaries whose meters do not, it raised the score. No band reached the
-target coverage of 0.90. Because the oracle gain is not established, the detector arm was not run.
+events. At the eight Primaries whose meters do not, it raised the score. Fixed widening left the signed-MW
+coverage under the target of 0.90; widening by a factor fitted on earlier months reached it, at
+the price of much wider bands. Because the oracle gain is not established, the detector arm was not run.
 
 ![Score and band coverage on the rows with a contaminated lag](figure_1_contaminated_rows.svg)
 
@@ -174,7 +179,8 @@ target coverage of 0.90. Because the oracle gain is not established, the detecto
 - **Two events carry most of it.** On the contaminated rows attributed to each event, c2 minus d is
   -3.69 for the D16 event of 17.5 days over Christmas and -4.77 for the D10 event in November. For
   the 42-day D5 event it is -0.83. Leaving out the D16 event over Christmas moves the signed-MW c2
-  plus widening contrast from -1.41 to -0.98. Leaving out the D5 events leaves it at -1.37 and
+  plus widening contrast from -1.41 to -0.98 (the audit's attribution by lag gives -0.86, and -1.05
+  without the D10 event, and -0.44 without both). Leaving out the D5 events leaves it at -1.37 and
   -1.57.
 - **The gain grows with time since onset.** Signed-MW c2 minus d is -0.57 within 1 day of onset,
   -0.68 from 1 to 3 days, and -1.85 beyond 3 days. A detector can see events only after about a day
@@ -205,13 +211,28 @@ result.
 - **Audit triggers that fire:** trigger 2 (the c2 gain at the signed-MW six was not predicted, the
   prediction was no change beyond 0.1 points of CRPS on contaminated rows with W) and trigger 5
   (c2 plus widening scores better than c2 at the signed-MW six but worse at the MVA-only eight, and
-  d plus widening is worse than d at the MVA-only eight). An audit by a fresh Sonnet agent is
-  recorded below.
+  d plus widening is worse than d at the MVA-only eight). An audit by a fresh Sonnet agent re-derived
+  every headline contrast from the stored arms (they reproduce) and found no training leakage; its
+  findings are in the caveats above, and its report is in the private briefs folder.
 - **Reproduction gate:** a refit of arm d at 4 of 52 weekly refits differs from the stored weekly
   member by at most 0.0043 CRPS points at the 14 countable Primaries, and by 0.015 and 0.016 at
   D15 and D18 (GPU subsampling noise). The gate is read at the countable Primaries.
 
 ## Caveats and limits
+
+- **The event mask is padded by 24 hours on each side** (the feature cache's padding). The audit
+  found that in 54% of the signed-MW contaminated rows and 81% of the MVA-only ones no lag lies
+  inside the unpadded event, only inside the padding. On the 9,864 signed-MW rows with a lag inside
+  the unpadded event, d covers 0.542 (not 0.705) and c2 plus widening minus d is -2.63 (-3.58 to
+  +0.54). The pre-onset padding also tells the oracle arms about an event the forecaster cannot
+  yet know, on 2,040 signed-MW rows; dropping them moves the contrast from -1.41 to about -1.50.
+- **The sample is smaller than the group names suggest.** The signed-MW contaminated rows come from
+  four series (D5, D10, D14, D16) and the MVA-only ones from five (D3, D4, D12, D19, D22).
+- **Arm c2 is confounded.** The lagless model drops event targets in training and all three lags
+  together; only c1 isolates the nulling, and c1 shows nothing.
+- **Arm d is the stored member, c1 and the lagless model are refits.** The refit-versus-stored
+  difference was measured at 4 of 52 refits only (at most 0.0043 CRPS points), not at the events.
+- **The as-of widening factor is pooled over 11 series,** including the report-only D15 and D18.
 
 - **Lead range:** days 1 to 10 headline, leads to 14 days scored. NGED's horizon is 1 to 10 days.
 - **Reactive power assumed zero** at the MVA-only eight.

@@ -103,7 +103,7 @@ def contaminated_flags(*, frame: pl.DataFrame, masks: dict[str, np.ndarray]) -> 
 
 
 def widen(
-    *, frame: pl.DataFrame, rows: pl.Series | pl.Expr, factor: float | pl.Expr
+    *, frame: pl.DataFrame, rows: pl.Series | pl.Expr, factor: float | pl.Expr | pl.Series
 ) -> pl.DataFrame:
     """Scale each quantile's distance from the median by `factor` where `rows` is true."""
     median = pl.col("q50")
