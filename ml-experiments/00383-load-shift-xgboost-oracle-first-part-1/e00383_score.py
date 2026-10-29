@@ -339,14 +339,22 @@ def cost_report(
                 .join(actuals, on=["time_series_id", "valid_time"])
                 for n in chosen
             }
-            cost = metrics.avoidable_curtailment_cost(
-                forecasts=forecasts,
-                series=signed,
-                flows=flows,
-                scored_start=SCORED_FIRST,
-                fraction=fraction,
-            )
-            print(f"\n== Avoidable curtailment cost, pounds, limit fraction {fraction}, {name} ==")
+            parts = []
+            for label in SIGNED_MW_LABELS:
+                one = signed.filter(pl.col("label") == label)
+                try:
+                    parts.append(
+                        metrics.avoidable_curtailment_cost(
+                            forecasts=forecasts,
+                            series=one,
+                            flows=flows,
+                            scored_start=SCORED_FIRST,
+                            fraction=fraction,
+                        )
+                    )
+                except ValueError as error:
+                    print(f"{label}: {name}: no cost ({error})")
+            cost = pl.concat(parts)
             print(cost.pivot(on="arm", index="label", values="avoidable_cost_gbp").sort("label"))
 
 
