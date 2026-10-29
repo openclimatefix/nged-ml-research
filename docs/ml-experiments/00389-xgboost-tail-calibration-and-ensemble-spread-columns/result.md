@@ -126,7 +126,8 @@ base-margin path as the baseline there), and the same rows.
   history: D8 uses the donor spread (the mean of the factors of the MVA-only Primaries other than
   D8), and D15 and D18 are report-only with the same donor. The arm needs no refit, because
   recalibrating does not change the fitted model.
-- **T3, per-Primary, per-lead-band quantile offsets.** The same trailing window, minimum of 60 days, bands, and
+- **T3, per-Primary, per-lead-band quantile offsets.**
+  The same trailing window, minimum of 60 days, bands, and
   fallback (no shift). Each of
   q01, q05, q95, q99 is shifted by the empirical quantile of the raw member's trailing misses
   (observed minus the member's quantile), in units of capacity, then the 11 quantiles are sorted to
