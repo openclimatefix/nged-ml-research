@@ -13,7 +13,8 @@ Two versions are built:
 Each version writes `work/stage1/<version>/<site>.parquet` with the dense-grid half-hours that
 have a prediction: `valid_time`, `u` (the normal score of the reading's probability integral
 transform in the 11 quantiles, clipped to 0.005 to 0.995), `r_mw` (reading minus median, in MW),
-`median_mw`, and `refit` (the refit whose model predicted the half-hour).
+`median_mw`, the 11 quantile columns in MW (`q01` to `q99`), and `refit` (the refit whose model
+predicted the half-hour).
 
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations \
@@ -147,11 +148,19 @@ def fit_predict(
     quantiles = np.sort(raw.reshape(-1, len(common.LEVELS)), axis=1)
     actual = (target["power"] / capacity).to_numpy()
     median = quantiles[:, common.MEDIAN]
-    return target.select("valid_time").with_columns(
-        u=pl.Series(pit_normal_score(quantiles=quantiles, actual=actual)),
-        r_mw=pl.Series((actual - median) * capacity),
-        median_mw=pl.Series(median * capacity),
-        refit=pl.lit(refit),
+    return (
+        target.select("valid_time")
+        .hstack(
+            pl.DataFrame(
+                (quantiles * capacity).astype(np.float32), schema=list(common.LEVEL_COLUMNS)
+            )
+        )
+        .with_columns(
+            u=pl.Series(pit_normal_score(quantiles=quantiles, actual=actual)),
+            r_mw=pl.Series((actual - median) * capacity),
+            median_mw=pl.Series(median * capacity),
+            refit=pl.lit(refit),
+        )
     )
 
 
@@ -200,7 +209,8 @@ def run_job(*, version: str, site: str, nthread: int, rounds: int, seed: int, sm
             )
         )
     common.atomic_write(frame=pl.concat(pieces), target=target_path)
-    return f"{version} {site}: {sum(p.height for p in pieces):,} half-hours, {time.monotonic() - started:.0f} s"
+    half_hours = sum(p.height for p in pieces)
+    return f"{version} {site}: {half_hours:,} half-hours, {time.monotonic() - started:.0f} s"
 
 
 def main() -> None:
