@@ -111,22 +111,31 @@ advice:
 
 # Nulled load-shift lags and wider bands in the weekly XGBoost model
 
-**Telling the weekly XGBoost model which of its recent-power inputs lie inside a load-shift event
-does not repair its tails.** A load shift is a period when NGED moves a substation's load onto its
-neighbours. We took the hand-labelled load-shift events as known (a perfect detector) and asked
-whether blanking the model's three recent-power inputs inside an event, or switching to a model
-with no power inputs, or widening the forecast band, improves the forecast on the rows whose power
-inputs lie inside an event. At the six Primaries whose meters record the sign of the flow, the
-lagless model lowered the score but with an interval that includes zero, and the result rests on two
-events. At the eight Primaries whose meters do not, it raised the score. Fixed widening left the signed-MW
-coverage under the target of 0.90; widening by a factor fitted on earlier months reached it, at
-the price of much wider bands. Because the oracle gain is not established, the detector arm was not run.
+**Telling the weekly XGBoost model which of its power lags lie inside a load-shift event does not
+repair its upper-tail forecasts.** The XGBoost model forecasts each Primary substation's half-hourly
+power 1 to 10 days ahead and is refitted every week. A load shift is a period when National Grid
+Electricity Distribution (NGED) moves a substation's load onto its neighbours. A power lag is the
+substation's own power at the forecast origin, at the same time on the latest day, or at the same
+time in the latest week. We took the hand-labelled load-shift events as known, which is a perfect
+detector, and tested three fixes on the forecasts whose power lags lie inside an event. The fixes
+were to set those lags to missing, to switch to a model with no power lags, and to widen the
+forecast band.
+
+At the six Primaries whose meters report signed megawatts (signed-MW), the model with no power lags
+lowered the continuous ranked probability score (CRPS, lower is better), but the interval includes
+zero and the result rests on two events. At the eight Primaries whose meters report only apparent
+power (MVA-only), the same model raised the CRPS. The 5% to 95% band should contain 0.90 of the
+readings. Fixed widening left the signed-MW share at 0.77 to 0.82. Widening by a factor fitted on
+earlier months raised the share to 0.88 to 0.93, but the factor sat at its cap of 2 in most months,
+which doubles the band width. Gate O is the pre-registered test of whether perfect labels help
+enough to justify building a detector. Gate O failed, so the detector arm b2 was not run.
 
 ![Score and band coverage on the rows with a contaminated lag](figure_1_contaminated_rows.svg)
 
 ## Result
 
-- **Verdict:** not supported. Gate O fails on four of its five tests; the detector arm b2 did not
+- **Verdict:** not supported. Gate O fails four of its five conditions (listed under Gate O below);
+  the detector arm b2 did not
   run, as the stop rule requires.
 - **Rows:** the contaminated-lag rows are rows outside events, days 1 to 10, with at least one of
   the three lags inside an event: 21,601 at the signed-MW six (6 months) and 22,232 at the MVA-only
@@ -163,7 +172,7 @@ the price of much wider bands. Because the oracle gain is not established, the d
   c2. The report-only D18 is worse by +1.95 (c1) and +1.51 (c2), and D15 by +0.97 (c1).
 - **Placebos D2, D9, D11, and D21:** arms c2 and widening equal d, bit for bit.
 
-## Gate O
+## Gate O: whether perfect labels justify building a detector
 
 1. The CRPS interval of c2 plus widening includes zero (-3.12 to +0.32), and the tail pinball
    interval includes zero (upper bound +0.06). **Fails.**
@@ -212,8 +221,8 @@ result.
   prediction was no change beyond 0.1 points of CRPS on contaminated rows with W) and trigger 5
   (c2 plus widening scores better than c2 at the signed-MW six but worse at the MVA-only eight, and
   d plus widening is worse than d at the MVA-only eight). An audit by a fresh Sonnet agent re-derived
-  every headline contrast from the stored arms (they reproduce) and found no training leakage; its
-  findings are in the caveats above, and its report is in the private briefs folder.
+  every headline contrast from the stored arms (they reproduce) and found no training leakage; the
+  audit's findings are in Caveats and limits below, and its report is in the private briefs folder.
 - **Reproduction gate:** a refit of arm d at 4 of 52 weekly refits differs from the stored weekly
   member by at most 0.0043 CRPS points at the 14 countable Primaries, and by 0.015 and 0.016 at
   D15 and D18 (GPU subsampling noise). The gate is read at the countable Primaries.
@@ -230,16 +239,16 @@ result.
   four series (D5, D10, D14, D16) and the MVA-only ones from five (D3, D4, D12, D19, D22).
 - **Arm c2 is confounded.** The lagless model drops event targets in training and all three lags
   together; only c1 isolates the nulling, and c1 shows nothing.
-- **Arm d is the stored member, c1 and the lagless model are refits.** The refit-versus-stored
+- **Arm d is the stored weekly member; arms c1 and the lagless model are refits.** The
+  refit-versus-stored
   difference was measured at 4 of 52 refits only (at most 0.0043 CRPS points), not at the events.
 - **The as-of widening factor is pooled over 11 series,** including the report-only D15 and D18.
-
 - **Lead range:** days 1 to 10 headline, leads to 14 days scored. NGED's horizon is 1 to 10 days.
 - **Reactive power assumed zero** at the MVA-only eight.
 - **The events are hand-labelled and known to the model at forecast time.** A live detector sees an
   event only after about a day, so these numbers are an upper bound on what a detector could give.
 - **Fixed widening factor 1.28 is tuning-adjacent:** experiment 100 looked at the same year. The
-  as-of factor reached its cap of 2 in most months (it stored the full table in `work/arms`).
+  as-of factor reached its cap of 2 in most months (the full table is in `work/arms`).
 - **Only 6 months at the signed-MW six** hold contaminated rows, so a month bootstrap has wide
   intervals. Not scored: injected-transfer scoring (aim 2), the second tuning of the lagless model,
   and arm a.
