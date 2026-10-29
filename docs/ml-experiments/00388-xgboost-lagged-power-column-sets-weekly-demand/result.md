@@ -94,7 +94,7 @@ is at least 3.5 hours older than the forecast origin; otherwise it is null.
 ## Constraints and compute
 
 - Sonnet only. At most 3 threads and `MemoryMax=16G`; `uv run --no-sync`, the `spawn` start method.
-- About 76 s per fit in experiment 381, 832 fits per weekly arm: each arm takes about a day of
+- About 76 s per fit in experiment 381, 832 fits per weekly arm: each arm takes about 6 hours of
   wall-clock time at 3 threads.
 - References and slices as the brief lists: tails (0.01, 0.05, 0.95, 0.99), cold nights, sunny
   half-hours, load-shift event half-hours, and the avoidable-curtailment cost in three row sets.
