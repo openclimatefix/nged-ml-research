@@ -91,7 +91,7 @@ labelled monthly; any winner is re-checked weekly before a release claim.
 
 | Arm | Training rows dropped | Source of the mask | Role |
 |---|---|---|---|
-| R0 | none | none | control, refitted monthly |
+| R0 | none | none | control: lagged form is experiment 381's stored monthly `control` (see below); lagless form refitted here |
 | R1 | valid time inside a hand-labelled transfer, or within 48 h after it ends | the 66 hand labels, events that ended before the fold's `train_end` | ceiling, never a candidate |
 | R2 | same rule | the "deep and long" detector with the neighbour veto, built from data inside the fold's training window | candidate |
 | Rc1, Rc2 | as many rows as R1 and R2, in random blocks of the same lengths | random | control for the smaller training set |
@@ -109,6 +109,13 @@ labelled monthly; any winner is re-checked weekly before a release claim.
   lagless contrast is R0 and R1's. Experiment 391 refits with no widening and scores raw and at
   1.15, which this experiment copies. R5 enters the sweep only if 391 keeps N1's boosters; the
   391 session is asked to keep one refit per quarter.
+- **R0 lagged reuses experiment 381's monthly `control`** (`work/arm_preds/monthly/control/`, 192
+  files, 16 Primaries by 12 refits, origins 2025-07-01 to 2026-06-01, no 1.15 widening), as the
+  manager allowed. The recipe matches: 381's control uses `fd.input_columns(a7=False)` and
+  experiment 87's `n1h` configuration with `common.N_ROUNDS`, the same modules this experiment's fit
+  script calls, and drops no rows. A reproduction gate confirms it before use: one refit (D2,
+  2025-07-01) is fitted here and must match the stored file within 0.0043 CRPS points, 383's gate.
+  If it fails, R0 lagged is refitted. R0 lagless is always fitted here.
 - **Widening.** Each arm's quantiles are stored raw, and every score is reported raw and at the
   1.15 widening factor, for R0 and every arm alike. The widening of 391's N1 is read from its page
   before any comparison with R5.
