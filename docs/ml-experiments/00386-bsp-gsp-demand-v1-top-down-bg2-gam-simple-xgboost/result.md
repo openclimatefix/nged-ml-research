@@ -67,8 +67,8 @@ take_home_message: >-
   At the two bulk supply points and two grid supply points, the GAM stack fitted on each aggregate
   reading does much worse than BG2 (the weekly XGBoost model), by 1.0 points at the bulk supply
   points and 2.0 at the grid supply points, and scores about level with the manual heuristic and
-  climatology. The gap is largest on day 1 and shrinks with lead, so the stack is missing what
-  recent power gives BG2 at these aggregates, not the weather response. Both forecasts have
+  climatology. The gap is largest on day 1 and shrinks with lead, which is consistent with the
+  stack lacking the recent-power input that BG2 has; this explanation is untested. Both forecasts have
   tail errors: BG2's 5% quantile covers 2.8% to 4.4% of readings (too wide), and the stack's covers
   5.5% to 10.4% (too narrow, most clearly at D1).
 lessons:
@@ -77,34 +77,36 @@ lessons:
     D13's 95% interval (+0.11) is the only one below the +0.20 margin.
   - >-
     The gap falls from day 1 (+0.9 at D13, +2.4 at D17, +4.9 at D1, +1.6 at D6) to days 8 to 10
-    (+0.4, +0.9, +0.5, +1.3; flat at D6), which fits the stack lacking a way to use recent power. This
-    explanation was read from the lead pattern and not tested with a fit.
+    (+0.4, +0.9, +0.5, +1.3; falls least at D6), which fits the stack lacking a way to use recent
+    power. This explanation was read from the lead pattern and not tested with a fit.
 advice:
   - >-
     Use BG2 (the weekly XGBoost model alone) as the bulk and grid supply point forecast to beat,
     and do not port the Primary GAM stack to these series (C1, C2).
   - >-
     Give a stack at an aggregate series a recent-power input before testing its weather response
-    (day-1 gap in the lead table).
+    (the day-1 gaps in the 'By lead' bullet).
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-29
 ---
 
-# BG2, the GAM stack, and the references at the bulk and grid supply points
+# Top-down forecasts at four bulk and grid supply points: a GAM stack against a weekly XGBoost model
 
-**The GAM stack of experiment 377, fitted separately on the aggregate readings of two bulk supply
-points and two grid supply points, scores much worse than BG2 and about level with the manual
-heuristic and climatology.** A bulk supply point (BSP) connects the 132 kV network to the 33 kV
-network, and a grid supply point (GSP) connects the transmission network to the 132 kV network.
-The series are D13 and D17 (BSPs) and D1 and D6 (GSPs). The stack is a generalised additive model
-with a correction stage, here labelled "stack without S below 168 h" (it has no two-number solar
-summary below 168 hours and no daylight blend). BG2 at these series is the weekly-refitted XGBoost
-model alone (experiment 87's `b_weekly`). Scores are the quantile score (the continuous ranked
-probability score, CRPS, estimated from 11 quantiles) in points of effective capacity, and negative
-differences favour the stack. No research default exists for this family, so nothing is adopted,
-and a "simple weekly XGBoost" arm is added once experiment 381's weekly forecasts have been scored
-at these series (stage D, a second pull request).
+**A generalised additive model (GAM) with a correction stage, fitted on the aggregate readings of
+two bulk supply points and two grid supply points, scores 1.0 to 2.0 points of capacity worse than
+BG2 and about level with two simple benchmarks.** A bulk supply point (BSP) connects the 132 kV
+electricity network to the 33 kV electricity network, and a grid supply point (GSP) connects the
+transmission network to the 132 kV electricity network. The four series are D13 and D17 (BSPs) and
+D1 and D6 (GSPs), labelled as in earlier experiments. "The stack" is the GAM of experiment 377,
+labelled "stack without S below 168 h": the stack has no two-number summary of solar output below
+168 hours and no daylight blend. BG2 is the best-guess forecast of experiment 87, which at these
+series is its weekly-refitted XGBoost model alone (`b_weekly`). The two benchmarks are
+`manual_heuristic` (NGED's rule of thumb) and `climatology` (the typical value for the month,
+half-hour, and weekday type). A score is the continuous ranked probability score (CRPS), estimated
+from 11 quantiles, in points of effective capacity (percent of the series' capacity); a negative
+difference favours the stack. No research default exists for this family, so nothing is adopted.
+The simple weekly XGBoost arm of experiment 381 is not yet scored here.
 
 ![Figure 1: stack minus BG2 at days 1 to 10, per series and pooled](headline.svg)
 
@@ -118,15 +120,15 @@ at these series (stage D, a second pull request).
   together.
 - **Per series (95%, 2,000 resamples).** D13 +0.55 (+0.11 to +0.98); D17 +1.49 (+1.12 to +1.89); D1
   +2.54 (+1.51 to +3.41); D6 +1.51 (+1.04 to +1.94). Leaving out one series leaves every pooled
-  interval above zero (BSP without D13 +1.49, without D17 +0.55; GSP without D1 +1.51, without D6
+  estimate above zero (BSP without D13 +1.49, without D17 +0.55; GSP without D1 +1.51, without D6
   +2.54).
 - **Absolute scores, days 1 to 10 (BG2, stack, manual heuristic, climatology).** D13 4.68, 5.23,
   5.47, 5.62; D17 7.06, 8.55, 8.39, 8.82; D1 14.06, 16.60, 16.97, 16.98; D6 13.68, 15.19, 15.50,
   15.55.
 - **The stack against the references (99%).** Against the manual heuristic: BSPs -0.04 (-0.44 to
   +0.30), GSPs -0.34 (-1.02 to +0.13). Against climatology: BSPs -0.33 (-0.90 to +0.11), GSPs -0.37
-  (-1.27 to +0.56). All four intervals include zero. The stack wins 0 of 4 series against BG2, 3 of
-  4 against the manual heuristic, and 4 of 4 against climatology (days 1 to 10).
+  (-1.27 to +0.56). All four intervals include zero. The stack scores better than BG2 at 0 of 4
+  series, than the manual heuristic at 3 of 4, and than climatology at 4 of 4 (days 1 to 10).
 - **BG2 against the references (stage A rows).** The references were scored in a first script on
   the half-hours shared by BG2, climatology, and the manual heuristic; the stack contrasts use
   the half-hours shared by all four arms. BG2's score differs by less than 0.001 points between the
@@ -136,17 +138,17 @@ at these series (stage D, a second pull request).
 - **By lead (stack minus BG2, pooled).** Days 8 to 10: BSPs +0.68 (+0.39 to +1.01), GSPs +0.94
   (+0.23 to +1.72). Days 11 to 14 (beyond NGED's horizon, descriptive): BSPs +0.62, GSPs +1.14. On
   day 1 the gap per series is D13 +0.90, D17 +2.39, D1 +4.94, D6 +1.64.
-- **Slices (stack, BG2).** The stack is worse than BG2 in every slice except BSP cold nights (5.21 against
-  5.20): sunny half-hours (BSPs 11.9 against 9.8, GSPs 15.2 against 14.2), winter nights, and
-  Economy 7 steps. The gap is largest at the GSPs on Christmas (22.0 against 15.9) and bank
-  holidays (22.4 against 14.6).
+- **Slices (stack, BG2).** The stack is worse than BG2 in every slice read, and level at BSP cold
+  nights (5.21 against 5.20): sunny half-hours (BSPs 11.9 against 9.8, GSPs 15.2 against 14.2),
+  winter nights, and Economy 7 steps. The gap is largest at the GSPs on Christmas (22.0 against
+  15.9) and bank holidays (22.4 against 14.6).
 - **Tails, days 1 to 10 (stack; BG2).** Pinball loss at q01, q05, q95, q99 and coverage at the
-  same quantiles are printed per series by `e00386_score_b.py`. Coverage at q05 is 0.063 (D13), 0.061
-  (D17), 0.104 (D1), and 0.055 (D6) for the stack against 0.028, 0.037, 0.042, and 0.044 for BG2;
-  coverage at q95 is 0.935, 0.927, 0.971, and 0.949 against 0.927, 0.960, 0.955, and 0.935. The
-  stack's lower tail is too narrow at D1 (0.104) and a little at D13 and D17; D6 is near nominal
-  (0.055). The stack's upper tail is too wide at D1 (q95 coverage 0.971). BG2's lower tail is too
-  wide at all four.
+same quantiles are computed per series by `e00386_score_b.py`. Coverage at q05 is 0.063 (D13), 0.061
+(D17), 0.104 (D1), and 0.055 (D6) for the stack against 0.028, 0.037, 0.042, and 0.044 for BG2;
+coverage at q95 is 0.935, 0.927, 0.971, and 0.949 against 0.927, 0.960, 0.955, and 0.935. The
+stack's lower tail is too narrow at D1 (0.104) and a little at D13 and D17; D6 is near nominal
+(0.055). The stack's upper tail is too wide at D1 (q95 coverage 0.971). BG2's lower tail is too wide
+at all four.
 - **Curtailment cost** is not scored: the metric needs the node and generator tables, and the
   readings here are the aggregates alone.
 
@@ -158,24 +160,24 @@ at these series (stage D, a second pull request).
 - **Mean-forecast error beside the quantile score.** The mean-forecast error was not computed; the
   error of the median forecast (MAE of the median, days 1 to 10) is printed and agrees in direction
   with CRPS at all four series (BG2 8.33, 12.62, 25.91, 24.89 for D13, D17, D1, D6).
-- **Triggers fired.** Trigger 2: the result contradicts its registered predictions P1 and P2 (stack
-  minus BG2 expected at most +0.40 and +0.80). The lead pattern supplies an untested explanation
-  (the stack lacks BG2's recent-power input). No later experiment depends on this result yet. An
-  audit by a fresh agent is requested in the pull request; its findings are triaged there.
+- **Triggers fired.** Review trigger 2 (a result contradicts a registered prediction): the result
+  contradicts its registered predictions P1 and P2 (stack minus BG2 expected at most +0.40 and
+  +0.80). The lead pattern supplies an untested explanation (the stack lacks BG2's recent-power
+  input). No later experiment depends on this result yet. An audit by a fresh agent is requested in
+  the pull request; its findings are triaged there.
 
 ## Setup and caveats
 
 - **Code and reuse.** `ml-experiments/00386-*/` copies experiment 377's stack (`e00386b_*` and
   `e00386bs*_*`) and experiment 161's input rows; the ensemble arrays are rebuilt from the local
-  ECMWF archive (read only, no fetch), and the rebuild reproduces D10's stored arrays exactly. BG2,
-  climatology, and the manual heuristic are experiment 87's stored forecasts on `fold_a_daily_gap_v1`.
-- **What could not be fitted.** The PV capacity is pinned to zero at all four series (no vintage
-  exists), so the stack has no explicit solar term; the stack has no regional wind or solar input,
-  which experiment 36 found helped at GSPs.
+ECMWF archive (read only, no fetch), and the rebuild reproduces the stored arrays of another
+substation (D10) exactly. BG2, climatology, and the manual heuristic are experiment 87's stored
+forecasts on `fold_a_daily_gap_v1`.
+- **What could not be fitted.** The PV capacity is pinned to zero at all four series (no record of
+  when each installation's capacity changed exists), so the stack has no explicit solar term; the
+  stack has no regional wind or solar input, which experiment 36 found helped at GSPs.
 - **Protocol.** `demand-v1` metrics, folds by month, 12-month minimum history (all four series have
   more than 12 months). The protocol's group table knows only the Primaries, so the scoring script
-  adds the labels BSP and GSP. The stack's monthly refit follows the new monthly rule.
-- **Plan change.** The plan put the GSPs in stage C; the ensemble arrays for the GSPs were cheap to
-  build, so the stack at the GSPs is in this pull request. Stage D (simple weekly XGBoost) remains.
+  adds the labels BSP and GSP. The stack refits monthly.
 - **What to try next.** A stack with a recent-power term at these aggregates, and a stack with the
   embedded generation and storage under each node as explicit terms.
