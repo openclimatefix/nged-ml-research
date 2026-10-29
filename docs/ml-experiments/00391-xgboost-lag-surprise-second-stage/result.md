@@ -124,6 +124,11 @@ inside that span carry a labelled-tuning shortcut, reported in the write-up. The
 uses the same monthly walk-forward as the ENS-driven one. The ENS run frames must hold steps at
 leads 5.5 to 29.5 hours; the code step checks this first and builds them from the ENS store if not.
 
+**Stage 1 recipe.** Stage 1 uses the screening recipe of the common brief (150 rounds, eta 0.15)
+because 500 rounds at eta 0.05 would take about 15 hours at 3 threads on the shared GPU. It runs on
+the CPU (`E391_DEVICE=cpu`) for the same reason. Stage 2 keeps experiment 87's 500 rounds and eta
+0.05.
+
 **Reproduction gate (before any other arm is read).** Refit the baseline weekly at every fourth
 refit with experiment 383's gate (`d` arm) and reproduce the stored weekly member within that gate's
 tolerance. If the gate fails the experiment stops and reports the failure.

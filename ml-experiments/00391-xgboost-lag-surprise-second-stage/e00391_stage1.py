@@ -26,6 +26,7 @@ PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations
 
 import argparse
 import multiprocessing
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, datetime
@@ -48,6 +49,11 @@ END: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
 """The first half-hour that no stage 1 refit predicts."""
 REFIT_CUTOFF_HOURS: Final[float] = 3.5
 PIT_CLIP: Final[tuple[float, float]] = (0.005, 0.995)
+DEVICE: Final[str] = os.environ.get("E391_DEVICE", "cuda")
+"""XGBoost device; the GPU is shared, so `E391_DEVICE=cpu` runs the fits on the job's threads."""
+STAGE1_ROUNDS: Final[int] = 150
+STAGE1_ETA: Final[float] = 0.15
+"""Stage 1 uses the P-roll screening recipe (150 rounds, eta 0.15) to fit in the 3-thread slot."""
 SMOKE_ROUNDS: Final[int] = 20
 VERSIONS: Final[tuple[str, ...]] = ("ens", "era5")
 HALF_HOURS_PER_MONTH_FLOOR: Final[int] = 1_000
@@ -140,7 +146,11 @@ def fit_predict(
         weight=0.5 ** (age_days / common.SHORT_HALF_LIFE_DAYS),
     )
     model = xgb.train(
-        fd.parameters(config=fd.CONFIGS["n1h"], seed=seed, nthread=nthread),
+        {
+            **fd.parameters(config=fd.CONFIGS["n1h"], seed=seed, nthread=nthread),
+            "device": DEVICE,
+            "eta": STAGE1_ETA,
+        },
         train,
         num_boost_round=rounds,
     )
@@ -226,7 +236,7 @@ def main() -> None:
     series = common.series_table()
     sites = args.sites or series.filter(pl.col("substation_type") == "Primary")["site"].to_list()
     nthread = max(1, args.cores // args.workers)
-    rounds = SMOKE_ROUNDS if args.smoke else common.N_ROUNDS
+    rounds = SMOKE_ROUNDS if args.smoke else STAGE1_ROUNDS
     with ProcessPoolExecutor(
         max_workers=args.workers, mp_context=multiprocessing.get_context("spawn")
     ) as pool:
