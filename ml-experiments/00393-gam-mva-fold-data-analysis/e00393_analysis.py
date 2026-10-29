@@ -335,12 +335,17 @@ def main() -> None:  # noqa: PLR0915
             level=(pl.col("actual_points").abs() / pl.col("peak_points")),
         )
         .with_columns(
-            level_bin=pl.col("level")
-            .cut(
-                [0.1, 0.2, 0.4, 0.6, 0.8],
-                labels=["0-10%", "10-20%", "20-40%", "40-60%", "60-80%", "80%+"],
-            )
-            .cast(pl.String)
+            level_bin=pl.when(pl.col("level") <= 0.1)
+            .then(pl.lit("0-10%"))
+            .when(pl.col("level") <= 0.2)
+            .then(pl.lit("10-20%"))
+            .when(pl.col("level") <= 0.4)
+            .then(pl.lit("20-40%"))
+            .when(pl.col("level") <= 0.6)
+            .then(pl.lit("40-60%"))
+            .when(pl.col("level") <= 0.8)
+            .then(pl.lit("60-80%"))
+            .otherwise(pl.lit("80%+"))
         )
     )
     c3 = (
