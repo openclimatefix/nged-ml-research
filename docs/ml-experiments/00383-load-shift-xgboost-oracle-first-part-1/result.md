@@ -6,8 +6,7 @@ also_relevant_to:
   - lagged-power-and-error-correction
   - calibration-and-uncertainty
   - curtailment-cost
-status: planned
-kind: other
+status: done
 protocol: demand-v1
 size: >-
   complex. Stored: forecasts and small result files in this experiment's private folder only;
@@ -67,146 +66,171 @@ metric: >-
 code: ml-experiments/00383-load-shift-xgboost-oracle-first-part-1/
 production_status: not-for-production
 adopted_in: none
-date: 2026-10-28
+date: 2026-10-29
+verdict: not supported
+best_arm: >-
+  Arm c2 with fixed widening on the signed-MW six: CRPS 4.070 points on the contaminated-lag rows
+  against 5.477 for the weekly XGBoost model (arm d), interval -3.12 to +0.32 on the difference.
+headline: >-
+  Nulling the lags that lie inside a load-shift event (arm c1) does not repair the weekly XGBoost
+  model: on the rows with a contaminated lag, the signed-MW six change by +0.06 CRPS points
+  (-0.52 to +1.60) and the MVA-only eight by +0.10 (-0.08 to +0.21). Serving a lagless model on
+  those rows (arm c2) gives -1.32 (-2.98 to +0.21) at the signed-MW six and +0.65 (+0.12 to +1.19)
+  at the MVA-only eight. Gate O fails, so the detector arm b2 was not run.
+lessons: >-
+  Widening raises the 5% to 95% coverage on contaminated rows at the signed-MW six from 0.705 to
+  0.774 (arm d) or 0.820 (arm c2), still under the 0.90 target. The lagless fallback gain at the
+  signed-MW six rests on two events (the D16 event over Christmas and the D10 event in November),
+  and leaving the D16 event out cuts it from -1.41 to -0.98. The MVA-only eight already cover 0.88
+  of readings on these rows.
+take_home_message: >-
+  Telling the weekly XGBoost model which of its recent-power inputs lie inside a load-shift event
+  does not fix its upper tail: nulling the inputs makes no measurable difference, and a lagless
+  model helps at the six Primaries whose meters record the sign of the flow but hurts at the eight
+  that do not. Widening the bands raises coverage on these rows but leaves it under the 0.90 target,
+  so a detector would have to do more than flag the rows. The detector was not built, because even
+  with perfect event labels no gain is established; the next experiment should try to widen the
+  band by a learned amount on the flagged rows, or to forecast the transfers instead.
+kind: other
+advice:
+  - >-
+    Do not build a load-shift detector to null power lags for the weekly XGBoost model, because
+    perfect labels give no interval-backed gain on the contaminated-lag rows (C1, C2).
+  - >-
+    If a lagless fallback is tried again, apply it at the signed-MW Primaries only and test it on
+    more than two events, because its gain rests on the D16 Christmas event and one November
+    event (leave-one-event-out table).
+  - >-
+    Widen bands on rows with a contaminated lag by a factor fitted on earlier months, not a fixed
+    1.28, because a fixed factor leaves the signed-MW coverage at 0.77 to 0.82 (W).
 ---
 
 # Nulled load-shift lags and wider bands in the weekly XGBoost model
 
-**Plan (status `planned`).** The question is whether telling the weekly XGBoost demand model which of
-its recent-power inputs lie inside a load-shift event, and widening its band on those rows, repairs
-its tails after a load shift. Hand-labelled events touch about 2% of the main-score rows, so the
-experiment cannot move the pooled score. It can show whether the tails and interval widths on the
-contaminated rows improve. A positive answer would make a detector worth building. A negative answer
-leaves the detector deprioritised.
+**Telling the weekly XGBoost model which of its recent-power inputs lie inside a load-shift event
+does not repair its tails.** A load shift is a period when NGED moves a substation's load onto its
+neighbours. We took the hand-labelled load-shift events as known (a perfect detector) and asked
+whether blanking the model's three recent-power inputs inside an event, or switching to a model
+with no power inputs, or widening the forecast band, improves the forecast on the rows whose power
+inputs lie inside an event. At the six Primaries whose meters record the sign of the flow, the
+lagless model lowered the score but with an interval that includes zero, and the result rests on two
+events. At the eight Primaries whose meters do not, it raised the score. No band reached the
+target coverage of 0.90. Because the oracle gain is not established, the detector arm was not run.
 
-The design follows `briefs/opus_load_shift_detector_review_answer.md` (the experiment brief at its
-end) and `briefs/opus_detector_distillation_answer.md` (the detector). The nulled-lag and dropout
-recipe is experiment 100's, the lagless model is experiment 371's `no_lags` arm, the detector is
-built on arm A of experiment 327 with the neighbour veto of experiment 315, and the scoring is
-experiment 379's.
+![Score and band coverage on the rows with a contaminated lag](figure_1_contaminated_rows.svg)
 
-## Sizing (the five triggers)
+## Result
 
-- **What gets stored:** forecasts and small result files in this experiment's private folder only.
-- **Production serving path:** not touched; this repository holds none.
-- **Degradation rule:** not touched, but c2 and W are candidates for one.
-- **More than one defensible design:** yes (nulled lags or lagless fallback; fixed or as-of widening
-  factor). The plan fixes all of them.
-- **Callers unknown without searching:** no. The scripts import experiments 87, 100, 298, 315, 327,
-  371, 377, and 379, whose callers are all in their own folders.
+- **Verdict:** not supported. Gate O fails on four of its five tests; the detector arm b2 did not
+  run, as the stop rule requires.
+- **Rows:** the contaminated-lag rows are rows outside events, days 1 to 10, with at least one of
+  the three lags inside an event: 21,601 at the signed-MW six (6 months) and 22,232 at the MVA-only
+  eight (8 months). They make up 2.2% and 1.6% of the main-score rows.
+- **Arms:** d, the weekly member of BG2 (experiment 87, stored). c1, event targets dropped, lags
+  inside events set to missing in training and at test time, 30% pseudo-event lag dropout in
+  training. c2, a lagless model (event targets dropped) served on the contaminated rows, d elsewhere.
+  Fixed widening (k = 1.28, tuning-adjacent) and as-of widening (k from earlier months, cap 2) on
+  the contaminated rows. Seed 0, `colsample` 1.0, weekly refits, ENS control-member training.
+- **CRPS on contaminated rows (points of capacity), signed-MW six:** d 5.477, c1 5.539, c2 4.153,
+  d plus widening 5.296, c1 plus widening 5.326, c2 plus widening 4.070, BG2 6.095. MVA-only eight:
+  d 3.197, c1 3.292, c2 3.846, d plus widening 3.326, c1 plus widening 3.442, c2 plus widening
+  3.967, BG2 3.150.
+- **Contrasts against d (95% Bonferroni over 6, month bootstrap):**
 
-## Arms
+  | Group | Contrast | CRPS | Tail pinball (mean of q95 and q99) |
+  |---|---|---|---|
+  | signed-MW | c1 + widening | -0.15 (-0.86 to +1.06) | -0.22 (-0.39 to +0.06) |
+  | signed-MW | c2 + widening | -1.41 (-3.12 to +0.32) | -0.70 (-2.23 to +0.06) |
+  | signed-MW | widening alone | -0.18 (-0.46 to +0.16) | -0.34 (-0.89 to +0.06) |
+  | MVA-only | c1 + widening | +0.24 (+0.09 to +0.35) | +0.11 (-0.05 to +0.25) |
+  | MVA-only | c2 + widening | +0.77 (+0.17 to +1.54) | +0.18 (-0.03 to +0.51) |
 
-All arms use experiment 87's `n1h` weekly recipe (the weekly member of BG2), seed 0,
-`colsample_bytree = colsample_bynode = 1.0`, ENS control-member training, and weekly retraining. All
-16 Primaries are scored to 336 hours under `demand-v1`.
+- **Tail calibration on contaminated rows, signed-MW six (d, c1, c2, c2 plus widening):** q95
+  pinball 2.29, 2.58, 1.58, 1.19; q99 pinball 0.58, 0.86, 0.43, 0.29; coverage of q95 0.774, 0.709,
+  0.743, 0.824; coverage of q99 0.917, 0.889, 0.926, 0.972; coverage of the 5% to 95% band 0.705,
+  0.696, 0.731, 0.820. At the MVA-only eight d already covers 0.882.
+- **Nulled against un-nulled rows (signed-MW six, 5% to 95% band):** d covers 0.705 on contaminated
+  rows (width 21.7 points) and 0.876 on ordinary rows (20.2). Widening by 1.28 widens the contaminated
+  rows to 27.8 points and lifts coverage to 0.774. c1 and c2 do not widen the band (22.7 and 21.7).
+- **Main score, outside events, days 1 to 10, minus d (90% interval):** signed-MW c1 -0.015
+  (-0.032 to 0.000), c2 -0.029 (-0.066 to 0.000); MVA-only c1 -0.004 (-0.018 to +0.009), c2 +0.011
+  (+0.003 to +0.019). Largest per-Primary difference among the countable Primaries: D12 +0.058 for
+  c2. The report-only D18 is worse by +1.95 (c1) and +1.51 (c2), and D15 by +0.97 (c1).
+- **Placebos D2, D9, D11, and D21:** arms c2 and widening equal d, bit for bit.
 
-- **d, baseline.** No nulling. Reproduction gate: within 0.01 points of the stored weekly member
-  (experiment 379 `only_W`) on shared rows. Experiment 381's own weekly baseline arm is not stored
-  yet, so this experiment refits d with the same code and reads experiment 381's code only.
-- **c1, oracle, lags nulled.** Training targets inside a hand-labelled event are dropped. Each of the
-  three power lags is set to missing where its time lies inside an event, in training and at test
-  time. Training adds 30% random pseudo-event lag dropout (experiment 100's `drop30`).
-- **c2, oracle, lagless fallback.** A lagless weekly model (experiment 371's `no_lags` recipe, event
-  targets dropped) is served on every row with any lag inside an event. Every other row is arm d,
-  unchanged. A script check asserts that c2 equals d on those rows.
-- **W, widening.** Post-processing with no refit, on the nulled or fallback rows of c1 and c2 (and of
-  d, for comparison). Each quantile's distance from the median is multiplied by k = 1.28 (the ratio of
-  z(0.95) = 1.645 to z(0.90) = 1.28). The k is labelled "tuning-adjacent", because experiment 100
-  looked at the same year. A second, as-of k sets each month's k from the coverage on nulled rows in
-  all earlier scored months, capped at 2, with k = 1.28 until any exist.
-- **b2, detector (runs only if gate O passes).** One arm replaces the brief's (b) and (b2). It is the
-  12-hour mean of each reading's position in the lagless model's quantile bands, with the neighbour
-  veto of experiment 315. The exact rule, the thresholds, and the known-answer gate are fixed in the
-  section "Detector b2" below before any score is read.
-- **a, target nulling only.** Optional, last, descriptive. Experiment 75 measured +0.004.
+## Gate O
 
-## Rows, groups, and slices
+1. The CRPS interval of c2 plus widening includes zero (-3.12 to +0.32), and the tail pinball
+   interval includes zero (upper bound +0.06). **Fails.**
+2. The 5% to 95% coverage of c2 plus widening on contaminated rows is 0.820, 0.08 under 0.90.
+   **Fails.**
+3. Main headline per group within 0.02: signed-MW passes; MVA-only c2 plus widening has an upper
+   bound of +0.023. **Fails for c2.**
+4. No countable Primary worse than 0.05: D12 is +0.058 under c2. **Fails for c2.**
+5. Placebos identical to d. **Passes.**
 
-- **Event labels.** The padded hand-filtered `switching_mask` in the DP feature cache, read through
-  experiment 377's `adapter.events_from_masks`. In 2025-07 to 2026-06 it holds 33 Primary-events: at
-  D3, D4, D5, D10, D12, D14, D16, D19, D22, D15, and D18. D5 has a 42-day event and D16 a 17.5-day
-  event, both over Christmas.
-- **Targets:** D3, D4, D5, D10, D12, D14, D16, D19, and D22. **Pre-registered placebos** (no events
-  in the scored year): D2, D9, D11, and D21. **Harm watch for b2:** D8, reported apart and not
-  exempted. **Report-only:** D15 and D18.
-- **Headline rows.** Real rows outside the hand-filtered events, days 1 to 10, with at least one of
-  the three lags inside an event (the contaminated-lag rows). The signed-MW six and the MVA-only eight
-  are read separately.
-- **Metrics on the headline rows.** CRPS; pinball loss and coverage at 0.01, 0.05, 0.95, and 0.99;
-  mean width and coverage of the 5% to 95% and 1% to 99% bands, on nulled against un-nulled rows, per
-  arm, group, and Primary.
-- **Also reported.** The full `demand-v1` report for every arm (per-Primary table, worst Primary,
-  leave-one-out, groups, lead bands to 14 days, cold nights, Economy 7 step hours, sunny daylight,
-  Christmas, the event slice, the 7-days-after slice, the four tail measures), with BG2,
-  `manual_heuristic`, and `climatology`. The avoidable-curtailment cost during each event, in the 7
-  days after it ends, and across all rows, per group and per Primary (signed-MW only; the MVA-only
-  eight carry "not defined"). The take-home names the tail result and the curtailment cost.
-- **Event-block views.** A per-event table and leave-one-event-out contrasts for the D5 and D16
-  events; every contrast with and without 20 December to 10 January; the gain by days since onset
-  (0 to 1, 1 to 3, over 3); the number of events counted, not only half-hours.
-- **Injected NRA scoring (report-only, aim 2).** The stored injected transfers of experiments 88 and
-  100, families A and B, scored against the unmodified series, for d, c1, c2, and b2.
+## Where the c2 gain comes from
 
-## Detector b2
+- **Two events carry most of it.** On the contaminated rows attributed to each event, c2 minus d is
+  -3.69 for the D16 event of 17.5 days over Christmas and -4.77 for the D10 event in November. For
+  the 42-day D5 event it is -0.83. Leaving out the D16 event over Christmas moves the signed-MW c2
+  plus widening contrast from -1.41 to -0.98. Leaving out the D5 events leaves it at -1.37 and
+  -1.57.
+- **The gain grows with time since onset.** Signed-MW c2 minus d is -0.57 within 1 day of onset,
+  -0.68 from 1 to 3 days, and -1.85 beyond 3 days. A detector can see events only after about a day
+  (experiment 298), so the first-day rows are the ones it would miss.
+- **No contaminated signed-MW rows lie in 20 December to 10 January,** because the events that cover
+  that period exclude the rows.
+- **D18 is the exception that matters.** One D18 event (December, 3 days) has a CRPS of 8.5 for d and
+  53.0 for c2, a rise of 44 points, and drives the report-only group's loss.
 
-Fixed here before any score is read. Everything in this section runs only if gate O passes; the
-design is the section "Design for tonight" of `briefs/opus_detector_distillation_answer.md`.
+## Avoidable-curtailment cost
 
-- **Statistic.** For each half-hour, the position of the observed power in the lagless model's
-  quantiles (interpolated linearly between the 11 levels, clipped to 0.005 to 0.995), converted to a
-  normal score. At 00, 06, 12, and 18 UTC the window statistic Z is the mean of the normal score over
-  the previous 24 half-hours (at least 18 present). Per Primary, Z is standardised by its median and
-  1.4826 times its median absolute deviation over 2024-04 to 2025-06 (no label filter), giving Z~.
-- **Two inputs.** The ERA5 version uses a lagless model fed with ERA5 and CAMS estimates of past
-  weather (4-block month-cross-fitted before 2025-07, walk-forward weekly folds after). The ENS
-  version uses the walk-forward lagless ENS forecasts at leads 0 to 24 hours. The ERA5 version may
-  read windows ending no later than the origin minus 120 hours; the ENS version no later than the
-  origin minus the power publication lag.
-- **Alarm.** A flag is |Z~| above k. An alarm opens at the second of two consecutive same-sign
-  flagged origins; its onset is the start of the first flagged window. Same-sign alarms less than 48
-  hours apart merge. An alarm ends when Z~ of the same sign is below k/2 at two consecutive
-  origins, is capped at 14 days (a new alarm may open at once), and stays open to the data cut at
-  forecast time. Marks run from onset to end at the alarmed Primary, with no padding.
-- **Veto.** The neighbour list is NGED's own interconnection table (`work/neighbours_nged.json`,
-  built by `e00383_neighbours.py`; it equals experiment 298's static list, with D15 and D18 sharing
-  one substation number). A neighbour is eligible if it is metered, has at least 180 days of
-  residual history, and has at least 18 of the window's 24 half-hours. Drop an alarm when at least
-  two eligible neighbours have the same sign with a window mean residual of at least 0.25 of the
-  Primary's, and the summed opposite-sign residual of all eligible neighbours is under 0.25 of the
-  Primary's (counted only above twice its own noise). Keep alarms with no eligible neighbour and
-  report them apart. Tag each alarm balanced, partly covered, or uncovered (report-only). The
-  confirmation rule of the brief runs as a labelled comparison row; variant C of experiment 298
-  runs as a detector-only comparison row.
-- **Threshold.** One global k per version, the smallest on a grid from 1.5 to 6.0 in steps of 0.05
-  that gives at most 2.0 false alarms per Primary-year after the veto, pooled over 2024-04 to
-  2025-06 with that period's labels only.
-- **Known-answer gate (before any real score).** Inject transfers into the tuning months of the 10
-  Primaries of experiment 298's injection set, at 10% and 25% of load, for 12 hours and 1, 2, 3, 7,
-  and 14 days, split over 1, 2, and 3 metered neighbours and over one unmetered receiver, plus a
-  common-mode placebo. The gate passes when recall at 25% and 2 days or more is at least 0.55, the
-  veto keeps at least 95% of the plain detector's hits on 2- and 3-receiver splits, and it drops at
-  least half the placebo alarms.
-- **Uses.** Training labels (ERA5 marks inside each fold's cut) through whichever of c1 or c2 won
-  gate O, plus W. Forecast time: b2-ERA5 (marks from windows ending by the origin minus 120 hours)
-  and b2-ENS (marks up to the origin minus the power publication lag). Report how many events are
-  still undetected at each origin.
-- **Predictions that can fail.** 20 to 27 of the 35 hand-labelled events over 1 day found by the
-  ERA5 version, and fewer by the ENS version; at most 3 of the 17 block days; at least 15 of the 29
-  D8 drops flagged; the veto cuts false alarms by 30% to 45% and loses at most 2 found events; the
-  confirmation rule cuts them by 60% to 75% and loses 25% to 55% of events with a metered partner;
-  b2-ERA5 leaves most recent-lag contamination unmarked at the origin; neither arm clears the
-  pooled 0.02-point bar.
+The cost is in pounds at the scaled limit of 0.9 times the earlier maximum, over leads of 12 to 36
+hours, for the signed-MW six (D9 and D11 have no event rows). No interval has been computed, because
+the metric returns one total per series. During events D16 costs 7.76 million pounds for d, 9.87
+million for c1, 9.56 million for c2, and 7.31 million for d plus widening; D5 costs 241 thousand for
+d and 236 thousand to 246 thousand for the other arms; D10 and D14 cost about nothing. In the 7 days
+after events D5 costs 185 thousand for d against 162 thousand for c1; D16 costs 50 thousand for d
+against 63 thousand for c1 and 39 thousand for c2. Across all rows D16 costs 8.10 million for d and
+10.16 million for c1, and no other signed-MW Primary differs between d, c1, and c2 by more than 3%.
+The D16 numbers come from one site and one long event, so they are a lead for later work, not a
+result.
 
-## Process notes
+## Checks
 
-- Reproduction gate, read before any c-arm score: a refit of arm d at 4 of the 52 weekly refits
-  differs from the stored weekly member by at most 0.0043 CRPS points at the 14 countable Primaries
-  and by 0.015 and 0.016 at the report-only D15 and D18 (GPU subsampling noise). The gate is read at
-  the countable Primaries, and the stored member is used as arm d.
+- **Median minus mean forecast per site:** not computed. The stored forecasts hold quantiles only.
+- **Error of the median beside the quantile score:** stored in `work/scores/rows.parquet` and not
+  tabulated here.
+- **Audit triggers that fire:** trigger 2 (the c2 gain at the signed-MW six was not predicted, the
+  prediction was no change beyond 0.1 points of CRPS on contaminated rows with W) and trigger 5
+  (c2 plus widening scores better than c2 at the signed-MW six but worse at the MVA-only eight, and
+  d plus widening is worse than d at the MVA-only eight). An audit by a fresh Sonnet agent is
+  recorded below.
+- **Reproduction gate:** a refit of arm d at 4 of 52 weekly refits differs from the stored weekly
+  member by at most 0.0043 CRPS points at the 14 countable Primaries, and by 0.015 and 0.016 at
+  D15 and D18 (GPU subsampling noise). The gate is read at the countable Primaries.
 
-- Experiment 381's weekly baseline arm is not stored; arm d is refitted here from experiment 87's
-  code, which experiment 381 also imports. Experiment 381's folder is never written.
-- Sonnet only, including sub-agents. At most 3 threads, `OMP_NUM_THREADS=1` per process,
-  `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue`, and `free -g` before each
-  launch. No production code is changed, and nothing is fetched. No metered generator series is named.
+## Caveats and limits
+
+- **Lead range:** days 1 to 10 headline, leads to 14 days scored. NGED's horizon is 1 to 10 days.
+- **Reactive power assumed zero** at the MVA-only eight.
+- **The events are hand-labelled and known to the model at forecast time.** A live detector sees an
+  event only after about a day, so these numbers are an upper bound on what a detector could give.
+- **Fixed widening factor 1.28 is tuning-adjacent:** experiment 100 looked at the same year. The
+  as-of factor reached its cap of 2 in most months (it stored the full table in `work/arms`).
+- **Only 6 months at the signed-MW six** hold contaminated rows, so a month bootstrap has wide
+  intervals. Not scored: injected-transfer scoring (aim 2), the second tuning of the lagless model,
+  and arm a.
+
+## What the next experiment should answer
+
+Whether a widening factor learned per Primary and lead from earlier contaminated rows, applied
+without any detector (for example on rows whose lag disagrees with the lagless forecast), reaches
+0.90 coverage. Experiment 309 tests the disagreement signal.
+
+## Problems caused by the move
+
+- Experiment 298's common module imports PyTorch, which a worktree synced without the `gpu` group
+  lacks, so the neighbour tables were copied instead of imported.
+- `pkill -f` on a script name also killed the calling shell.
