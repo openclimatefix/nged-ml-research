@@ -109,16 +109,21 @@ def draw_coverage() -> None:
         ),
     )
     dots = base.mark_point(filled=True, size=50).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("coverage:Q", title="Share of readings at or below the quantile", scale=alt.Scale(domain=[0, 1]))
+        x=alt.X(
+            "coverage:Q",
+            title="Share of readings at or below the quantile",
+            scale=alt.Scale(domain=[0, 1]),
+        )
     )
     rule = (
-        alt.Chart(ideal)
-        .mark_rule(color="#808080", strokeDash=[4, 3])
-        .encode(x="ideal:Q")  # ty: ignore[unresolved-attribute]
+        alt.Chart(ideal).mark_rule(color="#808080", strokeDash=[4, 3]).encode(x="ideal:Q")  # ty: ignore[unresolved-attribute]
     )
     chart = (
         alt.layer(rule, dots, data=frame)
-        .facet(column=alt.Column("quantile:N", sort=["q01", "q05", "q95", "q99"], title=None), data=frame)
+        .facet(
+            column=alt.Column("quantile:N", sort=["q01", "q05", "q95", "q99"], title=None),
+            data=frame,
+        )
         .resolve_scale(x="independent")
         .properties(
             title=alt.TitleParams(
