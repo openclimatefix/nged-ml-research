@@ -103,7 +103,11 @@ synthetic step of depth D (plus and minus 2%, 5%, and 10% of capacity) to the la
 first the most recent lag only (k = 1), then the two most recent (k = 2), then all of them,
 including the weekly-analogue columns that lie inside the step. Per arm and lead band it reports
 the shift of the median as a share of D, the band-width ratio against k = 0, and whether the
-quantiles span both levels. It uses at most 3 threads.
+quantiles span both levels. It also reports, per arm: the share of event-level readings inside the
+1-99% and 5-95% bands, whether q95 and q99 reach the event level at each k, and the price of
+spanning (band widening, and CRPS outside events). NGED would accept a forecast whose median is the
+normal running arrangement while its tails always span the normal and the abnormal levels. The sweep
+uses at most 3 threads.
 
 ## Constraints and compute
 
