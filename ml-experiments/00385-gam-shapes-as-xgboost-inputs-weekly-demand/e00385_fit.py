@@ -1,8 +1,9 @@
-"""Refit experiment 87's weekly XGBoost member with GAM-learnt shapes as input columns (385).
+"""Refit experiment 87's XGBoost member with GAM-learnt shapes as input columns (385).
 
-Each arm refits the `n1h` configuration of experiment 87 (the BG2 weekly member) at the monthly (default) or weekly
-refit times, with experiment 87's training rows, parameters, and leakage checks (its
-`e00087_fit_demand` module). `colsample_bytree` and `colsample_bynode` stay at 1.0 in every arm.
+Each arm refits the `n1h` configuration of experiment 87 (the BG2 weekly and monthly member) at
+the monthly (default) or weekly refit times, with experiment 87's training rows, parameters, and
+leakage checks (its `e00087_fit_demand` module). `colsample_bytree` and `colsample_bynode` stay
+at 1.0 in every arm.
 The 11 quantiles per daily run go to `work/arm_preds/<arm>/<site>_s<seed>_<refit>.parquet`.
 
 Arms:
