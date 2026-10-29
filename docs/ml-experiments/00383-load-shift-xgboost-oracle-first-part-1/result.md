@@ -252,6 +252,8 @@ result.
 - **Only 6 months at the signed-MW six** hold contaminated rows, so a month bootstrap has wide
   intervals. Not scored: injected-transfer scoring (aim 2), the second tuning of the lagless model,
   and arm a.
+- **Lag-encroachment sweep not run:** the fitted boosters were not saved, because the fit script
+  keeps only predictions, so a synthetic step in the lagged-power inputs cannot be scored.
 
 ## What the next experiment should answer
 
