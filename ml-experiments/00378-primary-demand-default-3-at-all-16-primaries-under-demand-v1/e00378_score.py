@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915
+# ruff: noqa: E501, PLR0912, PLR0915
 """Score Primary demand research default 3 at all 16 Primaries under demand-v1.
 
 Arms, each with leads 0.5 to 240 hours:
@@ -47,8 +47,12 @@ def stored_arms(*, site: str) -> dict[str, pl.DataFrame]:
         (pl.col("seed") == 0) & (pl.col("lead_hours") <= common.HORIZON_HOURS)
     )
     source = arms.arms_source(site)
-    low = pl.read_parquet(common.ARMS_DIR / f"low_lead_{source}.parquet").filter(pl.col("site") == site)
-    long = pl.read_parquet(common.ARMS_DIR / f"long_lead_{source}.parquet").filter(pl.col("site") == site)
+    low = pl.read_parquet(common.ARMS_DIR / f"low_lead_{source}.parquet").filter(
+        pl.col("site") == site
+    )
+    long = pl.read_parquet(common.ARMS_DIR / f"long_lead_{source}.parquet").filter(
+        pl.col("site") == site
+    )
     time_keys = KEYS[1:]
     low_x1 = low.select(*time_keys, *[pl.col(f"x1_{q}").alias(f"low_{q}") for q in Q])
     long_d3 = long.select(*time_keys, *[pl.col(f"d3_{q}") for q in Q])
@@ -62,10 +66,7 @@ def stored_arms(*, site: str) -> dict[str, pl.DataFrame]:
     )
     out["default_3"] = joined.select(
         *KEYS,
-        *[
-            pl.when(short).then(pl.col(f"low_{q}")).otherwise(pl.col(f"d3_{q}")).alias(q)
-            for q in Q
-        ],
+        *[pl.when(short).then(pl.col(f"low_{q}")).otherwise(pl.col(f"d3_{q}")).alias(q) for q in Q],
     )
     for name, frame in out.items():
         if frame.select(Q).null_count().sum_horizontal().item() > 0:
@@ -82,29 +83,49 @@ def main() -> None:
     series = adapter.series_table()
     cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=CACHE_DIR)
     actuals, context = adapter.actuals_and_context(
-        cache=cache, series=series, first=datetime(2024, 4, 1, tzinfo=UTC), last=datetime(2026, 7, 1, tzinfo=UTC)
+        cache=cache,
+        series=series,
+        first=datetime(2024, 4, 1, tzinfo=UTC),
+        last=datetime(2026, 7, 1, tzinfo=UTC),
     )
     events = adapter.events_from_masks(cache=cache, series=series)
     first_readings = {
-        int(sid): next(t for t, p in zip(cache.times_series(), cache.sites[lab].present, strict=True) if p)
+        int(sid): next(
+            t for t, p in zip(cache.times_series(), cache.sites[lab].present, strict=True) if p
+        )
         for sid, lab, _ in series.iter_rows()
     }
     thresholds = metrics.twcrps_thresholds(
         history=actuals.rename({"actual": "power_mw"}), series=series, before=SCORED_FIRST
     )
-    per_arm: dict[str, list[pl.DataFrame]] = {"default_3": [], "default_1": [], "stack_without_s": []}
+    per_arm: dict[str, list[pl.DataFrame]] = {
+        "default_3": [],
+        "default_1": [],
+        "stack_without_s": [],
+    }
     for site in arms.SITES:
         one = series.filter(pl.col("label") == site)
         for name, stored in stored_arms(site=site).items():
             per_arm[name].append(adapter.forecast_frame(stored=stored, series=one, unit="points"))
     forecasts = {name: pl.concat(frames) for name, frames in per_arm.items()}
-    for arm, stored_name in (("bg2", "p_s6_bg2"), ("climatology", "ref_climatology"), ("manual_heuristic", "ref_manual_heuristic")):
+    for arm, stored_name in (
+        ("bg2", "p_s6_bg2"),
+        ("climatology", "ref_climatology"),
+        ("manual_heuristic", "ref_manual_heuristic"),
+    ):
         stored = pl.read_parquet(
-            adapter.stored_path(root=common.ML_EXPERIMENTS_DATA_DIR, pattern=f"00087*/predictions/{stored_name}/predictions.parquet")
+            adapter.stored_path(
+                root=common.ML_EXPERIMENTS_DATA_DIR,
+                pattern=f"00087*/predictions/{stored_name}/predictions.parquet",
+            )
         ).filter(pl.col("time_series_id").is_in(series["time_series_id"].to_list()))
         forecasts[arm] = adapter.forecast_frame(stored=stored, series=series, unit="fraction")
     table = metrics.shared_slice_table(
-        forecasts=forecasts, actuals=actuals, context=context, events=events, first_readings=first_readings
+        forecasts=forecasts,
+        actuals=actuals,
+        context=context,
+        events=events,
+        first_readings=first_readings,
     )
     print(f"shared half-hours of the six arms: {table.height}")
     scored, rows = {}, {}
@@ -118,7 +139,9 @@ def main() -> None:
         )
     out = common.WORK_DIR / "scores"
     out.mkdir(exist_ok=True)
-    pl.concat([t.with_columns(arm=pl.lit(n)) for n, t in scored.items()]).write_parquet(out / "scores.parquet")
+    pl.concat([t.with_columns(arm=pl.lit(n)) for n, t in scored.items()]).write_parquet(
+        out / "scores.parquet"
+    )
 
     def crps_table(slice_name: str) -> pl.DataFrame:
         parts = [
@@ -141,7 +164,9 @@ def main() -> None:
         "MVA-only without D8": (pl.col("group") == "MVA-only") & (pl.col("label") != "D8"),
         "short-history (D15, D18, report only)": pl.col("group") == "short-history",
     }
-    print("\n== HEADLINE contrasts (99% interval, 20,000 resamples), treatment minus reference, CRPS ==")
+    print(
+        "\n== HEADLINE contrasts (99% interval, 20,000 resamples), treatment minus reference, CRPS =="
+    )
     contrasts = [
         ("default_3", "bg2"),
         ("default_3", "default_1"),
@@ -154,36 +179,73 @@ def main() -> None:
         for treatment, ref in contrasts:
             for gname, where in groups.items():
                 result = metrics.headline_month_bootstrap_contrast(
-                    treatment=rows[treatment], reference=rows[ref], metric="crps",
-                    where=where & pl.col(band), slice_table=table,
+                    treatment=rows[treatment],
+                    reference=rows[ref],
+                    metric="crps",
+                    where=where & pl.col(band),
+                    slice_table=table,
                 )
                 print(
                     f"{band:15s} {treatment} - {ref:18s} {gname:38s} {result['difference']:+.3f} "
                     f"({result['lower']:+.3f} to {result['upper']:+.3f}) n={result['n_half_hours']}, months={result['n_months']}"
                 )
-    print("\n== Per-Primary contrasts default_3 - bg2 and default_3 - default_1, 95%, 2,000 resamples, lead_days_1_10 ==")
+    print(
+        "\n== Per-Primary contrasts default_3 - bg2 and default_3 - default_1, 95%, 2,000 resamples, lead_days_1_10 =="
+    )
     for ref in ("bg2", "default_1"):
         print(ref)
         print(
             metrics.reported_contrast_by_primary(
-                treatment=rows["default_3"], reference=rows[ref], metric="crps",
-                where=pl.col(HEADLINE_BAND), slice_table=table,
+                treatment=rows["default_3"],
+                reference=rows[ref],
+                metric="crps",
+                where=pl.col(HEADLINE_BAND),
+                slice_table=table,
             )
         )
     print("\n== Tail measures and twCRPS, slice lead_days_1_10, mean over Primaries per group ==")
-    tails = ["pinball_q01", "pinball_q05", "pinball_q95", "pinball_q99", "coverage_q01", "coverage_q05", "coverage_q95", "coverage_q99", "twcrps"]
+    tails = [
+        "pinball_q01",
+        "pinball_q05",
+        "pinball_q95",
+        "pinball_q99",
+        "coverage_q01",
+        "coverage_q05",
+        "coverage_q95",
+        "coverage_q99",
+        "twcrps",
+    ]
     for name in ("default_3", "default_1", "bg2", "manual_heuristic", "climatology"):
         t = scored[name].filter(pl.col("slice") == HEADLINE_BAND, pl.col("metric").is_in(tails))
         print(name)
-        print(t.group_by("group", "metric").agg(pl.col("value").mean()).pivot(on="metric", index="group", values="value").sort("group"))
+        print(
+            t.group_by("group", "metric")
+            .agg(pl.col("value").mean())
+            .pivot(on="metric", index="group", values="value")
+            .sort("group")
+        )
     print("\n== Tail measures per Primary, default_3, slice lead_days_1_10 ==")
-    print(scored["default_3"].filter(pl.col("slice") == HEADLINE_BAND, pl.col("metric").is_in(tails)).pivot(on="metric", index=["label", "group"], values="value").sort("group", "label"))
-    print("\n== MAE of the median beside the CRPS contrasts (99%, 20,000 resamples), lead_days_1_10 ==")
-    for treatment, ref in (("default_3", "bg2"), ("default_3", "default_1"), ("default_3", "manual_heuristic")):
+    print(
+        scored["default_3"]
+        .filter(pl.col("slice") == HEADLINE_BAND, pl.col("metric").is_in(tails))
+        .pivot(on="metric", index=["label", "group"], values="value")
+        .sort("group", "label")
+    )
+    print(
+        "\n== MAE of the median beside the CRPS contrasts (99%, 20,000 resamples), lead_days_1_10 =="
+    )
+    for treatment, ref in (
+        ("default_3", "bg2"),
+        ("default_3", "default_1"),
+        ("default_3", "manual_heuristic"),
+    ):
         for gname, where in groups.items():
             result = metrics.headline_month_bootstrap_contrast(
-                treatment=rows[treatment], reference=rows[ref], metric="mae_median",
-                where=where & pl.col(HEADLINE_BAND), slice_table=table,
+                treatment=rows[treatment],
+                reference=rows[ref],
+                metric="mae_median",
+                where=where & pl.col(HEADLINE_BAND),
+                slice_table=table,
             )
             print(
                 f"{treatment} - {ref:18s} {gname:38s} {result['difference']:+.3f} "
@@ -198,8 +260,11 @@ def main() -> None:
             for left_out in labels:
                 keep = pl.col("label").is_in([x for x in labels if x != left_out])
                 result = metrics.month_bootstrap_contrast(
-                    treatment=rows["default_3"], reference=rows[ref], metric="crps",
-                    where=keep & pl.col(HEADLINE_BAND), slice_table=table,
+                    treatment=rows["default_3"],
+                    reference=rows[ref],
+                    metric="crps",
+                    where=keep & pl.col(HEADLINE_BAND),
+                    slice_table=table,
                 )
                 print(
                     f"{gname:10s} vs {ref:10s} without {left_out:4s} {result['difference']:+.3f} "

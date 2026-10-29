@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Apply experiment 202's two-number solar summary S at 0.5 to 168 hours at every Primary.
 
 Experiment 377's stage 2 has no S at any lead, and default 1 has S below 168 hours (experiments
@@ -56,7 +55,9 @@ def load_low(*, cache, source: str) -> tuple[pl.DataFrame, np.ndarray]:  # noqa:
             pieces.append(part.drop("row"))
         site_frame = pl.concat(pieces)
         if site_frame.height != chain.height:
-            msg = f"{site}: {chain.height - site_frame.height} stage-2 rows have no member responses"
+            msg = (
+                f"{site}: {chain.height - site_frame.height} stage-2 rows have no member responses"
+            )
             raise ValueError(msg)
         index = np.searchsorted(
             cache.end_times, site_frame["valid_time"].dt.replace_time_zone(None).to_numpy()
@@ -99,7 +100,9 @@ def main() -> None:
                 & in_fit
                 & (group == g)
             )
-            counts = [int((day[fit_rows] & (lead_band[fit_rows] == b)).sum()) for b in range(N_LEAD_BANDS)]
+            counts = [
+                int((day[fit_rows] & (lead_band[fit_rows] == b)).sum()) for b in range(N_LEAD_BANDS)
+            ]
             thin = min(counts) < arms.MIN_ROWS
             if thin:
                 factors = [(1.0, 1.0)] * N_LEAD_BANDS
@@ -129,11 +132,23 @@ def main() -> None:
                 factors=factors,
             )
             out[rows_m] = np.sort(q, axis=1)
-            log[f"{source}/{g}/{m}"] = {"daylight_rows_per_band": counts, "identity": bool(thin), "factors": factors}
+            log[f"{source}/{g}/{m}"] = {
+                "daylight_rows_per_band": counts,
+                "identity": bool(thin),
+                "factors": factors,
+            }
             print(source, g, m, counts, "identity" if thin else "fitted", flush=True)
     keep = frame.select(
-        "site", "group", "run", "power_fcst_init_time", "valid_time", "lead_hours", "actual",
-        "switching_mask", "kind", *QUANTILES,
+        "site",
+        "group",
+        "run",
+        "power_fcst_init_time",
+        "valid_time",
+        "lead_hours",
+        "actual",
+        "switching_mask",
+        "kind",
+        *QUANTILES,
     ).rename({q: f"base_{q}" for q in QUANTILES})
     keep = keep.with_columns(
         [pl.Series(f"x1_{q}", out[:, k].astype(np.float32)) for k, q in enumerate(QUANTILES)]

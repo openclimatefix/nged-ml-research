@@ -1,9 +1,6 @@
 ---
 id: "00378"
 slug: primary-demand-default-3-at-all-16-primaries-under-demand-v1
-title: >-
-  How does Primary demand research default 3, ported to all 16 Primaries, score against BG2, the
-  manual heuristic, and climatology under the demand-v1 protocol?
 theme: production-reference-and-best-guess
 also_relevant_to:
   - calibration-and-uncertainty
@@ -60,11 +57,11 @@ headline: >-
   (-0.03 signed-MW, -0.02 MVA-only, intervals below zero). D15 and D18: report only.
 take_home_message: >-
   Default 3 scores level with BG2 at the six Primaries that report signed megawatts, and the solar
-  summary and daylight blend lower its error from 6 to 10 days ahead by about 0.12 points against
-  default 1. At the eight Primaries that report only apparent power it trails BG2 by 0.16 points
-  without Marsh Lane (D8) and 0.63 with it. The tails are close to nominal at the signed-MW six and
-  at the MVA-only seven without D8, and far off at D8, where the readings fall below the 5% quantile
-  29% of the time. This holds for reactive power zero only.
+  summary and daylight blend lower its error at days 8 to 10 by about 0.12 points against default 1
+  at the signed-MW six. At the eight Primaries that report only apparent power it trails BG2 by 0.16
+  points without Marsh Lane (D8) and 0.63 with it. The tails are close to nominal at the signed-MW
+  six and at the MVA-only seven without D8, and far off at D8, where the readings fall below the
+  5% quantile 29% of the time. This holds for reactive power zero only.
 lessons:
   - >-
     The solar summary below 168 h and the daylight blend beyond it lower the score by 0.03 points
@@ -115,13 +112,29 @@ below +0.20, and +0.06 is below it. Days 8 to 10 give -0.14 (-0.33 to +0.01). De
 
 **MVA-only eight: partly supported.** Default 3 minus BG2 is +0.63 (+0.35 to +0.94) with D8 and
 +0.16 (-0.02 to +0.35) without. Prediction P3 (+0.30 to +0.90 with D8; -0.05 to +0.25 without) holds
-on both ranges. D8 alone is +3.97 (95% interval +2.29 to +5.81), because D8 uses the donor spread in
-every arm here. Default 3 minus default 1 is -0.02 (-0.05 to -0.00) with D8 and -0.02 (-0.04 to
--0.01) without.
+on both ranges. D8 alone is +3.97 (95% interval +2.29 to +5.81). D8 uses the donor spread in every
+arm here; with its own-residual spread, experiment 377 found +1.61 for the stack without S.
+Default 3 minus default 1 is -0.02 (-0.05 to -0.00) with D8 and -0.02 (-0.04 to -0.01) without.
 
 **D15 and D18 (short history, report only).** Default 3 minus BG2 is -0.00 (-0.93 to +0.70) over 6
 months. D15 scores worse than default 1 (+0.62, -0.20 to +1.32) because it takes the signed-MW fits
-of S and the blend, and its readings differ from those Primaries.
+of S and the blend; its 4 months of scored history leave the interval wide.
+
+## Method
+
+- **Rows.** Experiment 377's stage-2 forecasts at all 16 Primaries on the demand-v1 folds, one fit per
+  fold month on earlier months only. Experiment 378 adds S at 0.5 to 168 hours, and S and the blend at
+  168 to 240 hours.
+- **Solar summary S.** Each ensemble member's solar response is passed through the Primary's monthly
+  T-all fit (experiment 184's code, run on experiment 377's setup; the gate on D5 matched experiment
+  184's stored values exactly). S summarises the 51 responses as a mean and a standard deviation,
+  with a scale and a spread factor fitted per lead band on the trailing 365 days of runs completed
+  before the fold month.
+- **Daylight blend.** At 168 to 240 hours the median moves towards the manual heuristic's median
+  with a weight fitted per lead band and season group on the same trailing rows. The blend applies
+  only where the sun is above 5 degrees.
+- **Fit groups.** The fits are pooled within the signed-MW six and within the MVA-only seven
+  without D8.
 
 ## Results (quantile score in points of effective capacity; lower is better)
 
@@ -136,7 +149,8 @@ of S and the blend, and its readings differ from those Primaries.
   3's favour at D11 (-0.16), D14 (-0.21), and D18 (-0.21). It excludes zero against default 3 at D12
   (+0.72), D22 (+0.33), and D8 (+3.97).
 - **Primaries won, days 1 to 10 (D15 and D18 not counted, denominator 14).** Against BG2 default 3
-  wins 8 and loses 6; against the manual heuristic and against climatology, it wins 14 and loses 0.
+  wins 8 and loses 6; against the manual heuristic and against climatology, it wins 13 and loses 1
+  (D8).
   Against default 1 it scores lower at all 14, and the interval excludes zero at 10 of them.
 - **Against the other references, pooled, days 1 to 10 (99%).** Minus the manual heuristic: -0.71
   (-1.06 to -0.39) signed-MW, -0.02 (-0.38 to +0.31) MVA-only with D8, -0.46 (-0.78 to -0.22)

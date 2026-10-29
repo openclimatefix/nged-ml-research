@@ -80,7 +80,9 @@ def job(arguments: tuple[str, str, bool, bool]) -> str:
         full = m184.compute_run(cache=cache, setup=setup, fits=fits, index=int(run_index[0]))
         start = int(full["window_start"][0])
         position = (
-            np.searchsorted(cache.end_times, part["valid_time"].dt.replace_time_zone(None).to_numpy())
+            np.searchsorted(
+                cache.end_times, part["valid_time"].dt.replace_time_zone(None).to_numpy()
+            )
             - start
         )
         if position.min() < 0 or position.max() >= len(full["base"]):

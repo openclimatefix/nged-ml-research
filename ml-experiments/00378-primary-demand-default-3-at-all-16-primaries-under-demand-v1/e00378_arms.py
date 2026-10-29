@@ -41,8 +41,8 @@ FIT_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     "mva": ("D2", "D3", "D4", "D12", "D19", "D21", "D22"),
 }
 APPLY_GROUP: Final[dict[str, str]] = {
-    **{s: "mw" for s in FIT_GROUPS["mw"]},
-    **{s: "mva" for s in FIT_GROUPS["mva"]},
+    **dict.fromkeys(FIT_GROUPS["mw"], "mw"),
+    **dict.fromkeys(FIT_GROUPS["mva"], "mva"),
     "D18": "mw",
     "D15": "mw",
     "D8": "mva",
@@ -92,7 +92,9 @@ def load_rows(*, cache, source: str) -> tuple[pl.DataFrame, np.ndarray]:  # noqa
             pieces.append(part.drop("row"))
         site_frame = pl.concat(pieces)
         if site_frame.height != chain.height:
-            msg = f"{site}: {chain.height - site_frame.height} stage-2 rows have no member responses"
+            msg = (
+                f"{site}: {chain.height - site_frame.height} stage-2 rows have no member responses"
+            )
             raise ValueError(msg)
         index = np.searchsorted(
             cache.end_times, site_frame["valid_time"].dt.replace_time_zone(None).to_numpy()
@@ -157,7 +159,7 @@ def replay(
                 factors = guarded_factors(frame=frame, delta=delta, rows=fit_rows)
                 weights = a319.fit_weights(frame=frame, rows=fit_rows)
             x1 = a319.apply_x1(frame=frame, delta=delta, rows=rows_m, factors=factors)
-            w_table = a320._table_w(frame=frame, rows=rows_m, weights=weights)  # noqa: SLF001
+            w_table = a320._table_w(frame=frame, rows=rows_m, weights=weights)
             heuristic = frame["heuristic_median"].to_numpy()[rows_m]
             r319 = a320.apply_blend(base=x1, heuristic=heuristic, w=w_table)
             day = (frame["kind"] == "daylight").to_numpy()[rows_m][:, None]
@@ -181,7 +183,11 @@ def run_source(*, source: str) -> pl.DataFrame:
     site = frame["site"].to_numpy()
     in_fit = np.array([s in FIT_GROUPS[APPLY_GROUP[s]] for s in site])
     out, log = replay(
-        frame=frame, delta=delta, in_fit=in_fit, scored=np.ones(frame.height, dtype=bool), label=source
+        frame=frame,
+        delta=delta,
+        in_fit=in_fit,
+        scored=np.ones(frame.height, dtype=bool),
+        label=source,
     )
     keep = frame.select(
         "site",

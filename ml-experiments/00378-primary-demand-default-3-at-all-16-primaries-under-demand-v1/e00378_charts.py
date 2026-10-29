@@ -72,10 +72,17 @@ MINUS_DEFAULT_1: Final[list[tuple[str, str, float, float, float]]] = [
 
 
 def draw(
-    *, rows: list[tuple[str, str, float, float, float]], axis: str, title: str, subtitle: str, name: str
+    *,
+    rows: list[tuple[str, str, float, float, float]],
+    axis: str,
+    title: str,
+    subtitle: str,
+    name: str,
 ) -> None:
     """Write one forest chart."""
-    frame = pl.DataFrame(rows, schema=["row", "group", "difference", "lower", "upper"], orient="row")
+    frame = pl.DataFrame(
+        rows, schema=["row", "group", "difference", "lower", "upper"], orient="row"
+    )
     order = [r[0] for r in rows]
     base = alt.Chart(frame).encode(
         y=alt.Y("row:N", sort=order, title=None),

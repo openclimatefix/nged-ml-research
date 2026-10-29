@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Control gate: the port reproduces experiment 322's stored default 3 on the six Primaries.
 
 The arms of `e00378_arms.py` run on experiment 319's own rows (the convex chain of experiment 317 at
@@ -49,7 +48,7 @@ def main() -> None:
         return float(2.0 * loss[ok].mean())
 
     result = {
-        "rows": int(len(idx)),
+        "rows": len(idx),
         "max_abs_quantile_difference": float(np.nanmax(np.abs(mine - theirs))),
         "quantile_score_port": score(mine),
         "quantile_score_stored_322": score(theirs),

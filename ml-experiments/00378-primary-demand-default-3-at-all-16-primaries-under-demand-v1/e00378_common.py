@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Constants shared by the scripts of experiment 378 (default 3 at all 16 Primaries, demand-v1).
 
 Every input is a stored file of an earlier experiment, read and never written. This experiment
@@ -20,9 +19,7 @@ MEMBERS_DIR: Final[Path] = WORK_DIR / "members"
 ARMS_DIR: Final[Path] = WORK_DIR / "arms"
 REPORT_DIR: Final[Path] = WORK_DIR / "report"
 
-E377_WORK: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00377-demand-v1-first-run-feasibility" / "work"
-)
+E377_WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00377-demand-v1-first-run-feasibility" / "work"
 """Experiment 377's folder, read only: stage 1 (`dp_preds`) and stage 2 (`dp_preds_s2`) per site."""
 SOURCE_OF_SITE: Final[dict[str, str]] = {
     **dict.fromkeys(("D5", "D9", "D10", "D11", "D14", "D16", "D18"), "control"),
@@ -30,7 +27,19 @@ SOURCE_OF_SITE: Final[dict[str, str]] = {
     "D15": "d15",
 }
 """Which of experiment 377's `work/<source>/` folders holds each site, and its `E00377_SOURCE`."""
-QUANTILES: Final[tuple[str, ...]] = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
+QUANTILES: Final[tuple[str, ...]] = (
+    "q01",
+    "q05",
+    "q10",
+    "q25",
+    "q40",
+    "q50",
+    "q60",
+    "q75",
+    "q90",
+    "q95",
+    "q99",
+)
 LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
 HORIZON_HOURS: Final[float] = 240.0
 STORED_HORIZON_HOURS: Final[float] = 168.0
