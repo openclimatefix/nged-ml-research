@@ -49,6 +49,9 @@ CACHE_DIR: Final[Path] = (
     / "00106-differentiable-physics-4-all-years-drift-and-recent-level"
     / "cache"
 )
+BOOSTER_DIR: Final[Path] = WORK_DIR / "boosters"
+BOOSTER_MONTHS: Final[tuple[int, ...]] = (1, 4, 7, 10)
+"""Boosters are saved at the quarterly refits for the prediction-only sweep."""
 K_PATH: Final[Path] = WORK_DIR / "detector" / "k.json"
 SMOKE_ROUNDS: Final[int] = 20
 OWN_COLUMNS: Final[tuple[str, ...]] = ("u_lag_origin", "u_lag_day", "u_lag_week", "z_own")
@@ -294,6 +297,13 @@ def run_job(
             f"{arm.name} {site} refit {refit:%Y-%m-%d}: {known.height:,} rows, "
             f"fit {time.monotonic() - started:.0f} s"
         )
+    if refit.month in BOOSTER_MONTHS:
+        for site, model in models.items():
+            booster_dir = BOOSTER_DIR / arm.name
+            booster_dir.mkdir(parents=True, exist_ok=True)
+            temporary = booster_dir / f"{site}_{refit:%Y%m%d}.tmp.ubj"
+            model.save_model(temporary)
+            temporary.replace(booster_dir / f"{site}_{refit:%Y%m%d}.ubj")
     pieces: dict[str, list[pl.DataFrame]] = {s: [] for s in todo}
     for origin in origins:
         frame = pl.read_parquet(common.demand_frame_path(run=origin - common.PUBLICATION_DELAY))

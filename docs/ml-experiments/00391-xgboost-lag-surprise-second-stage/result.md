@@ -239,3 +239,40 @@ N1-ERA5) at 16 Primaries for each test month. The exact fit count and wall-clock
 written
 here from the first timed fit, before the full run. Stage 1 predictions stream the daily run frames
 one at a time and are cached per Primary. Event counts per slice are reported in every table.
+
+## Design target and lag-encroachment sweep
+
+**NGED would like a normal-running-arrangement (NRA) forecast, and it may be enough that only the
+median is NRA while the outer quantiles span the NRA level and the abnormal level.** Each arm is
+judged on three properties together, because CRPS on event rows rewards a forecast that follows the
+event level and cannot tell the two apart. Tolerances, fixed before any score is read:
+
+- **Median is NRA:** the median's share of the step depth D in the sweep is at most 0.2 at every
+  encroachment level k (0 means NRA, 1 means the event level).
+- **Tails span both levels:** at least 90% of event-level readings (rows whose target is in an
+  event, and synthetic rows at the event level) lie inside the 1% to 99% band at k of 1 or more,
+  and q95 and q99 (q05 and q01 for a negative event) reach the event level.
+- **The price of spanning:** the 5% to 95% band on rows outside events and the 7 days after them
+  widens by at most 10%, and CRPS there changes by at most +0.02 points of effective capacity, at
+  all 16 Primaries.
+
+**The sweep is prediction-only.** The fitted boosters of every arm are saved (`.ubj`) at the
+quarterly monthly refits (2025-07, 2025-10, 2026-01, 2026-04) under `work/boosters/<arm>/`;
+the sweep uses those four refits. Clean rows (target outside any event, all lags clean) get a step
+of depth D added to the k most recent lagged inputs, in order: the newest reading (origin minus
+3.5 hours), the same time on the latest day, the same time in the latest week. Levels: k of 0
+(control), 1, 2, and 3. Depths: 2%, 5%, and 10% of effective capacity, plus the label table's
+quartile depths (0.71, 1.1, and 2.3 MW) as shares of capacity, both signs. Two target cases are
+reported separately: the event is still under way (reading is the clean value plus D), and it ended
+before the valid time (reading is the clean value). For arms with surprise or detector columns,
+the shifted readings replace the stored readings at the lag times: `u` is recomputed from the
+stored stage 1 quantiles, the window mean and Z~ follow, the neighbours carry the opposite step
+(shared equally over the listed neighbours, so load is conserved), and the detector is re-run on
+the shifted statistics. Reported per arm and k, by lead band (0 to 24, 24 to 72, 72 to 168, 168 to
+240 hours), group, and Primary: the median shift and its share of D; the ratio of the 5% to 95% and
+1% to 99% band widths to their k of 0 values; the coverage of the clean and of the event-level
+value by the 5% to 95% band and their quantile positions; and the k at which the band first
+reaches the event level. The lagless stage 1 model is the control (share 0, no widening). A few
+real labelled events, chosen by a rule fixed before looking (the three longest events with a
+metered neighbour), are compared with the synthetic ones. The sweep is also run on experiment 392's
+request for arm N1 (its arm R5) at the same quarterly refits.
