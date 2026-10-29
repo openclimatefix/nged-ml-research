@@ -1,11 +1,13 @@
 name: CI
 
-# Per-pull-request quality gate: docs build, lint, format, types, markdown, and the fast test suite.
+# Per-pull-request quality gate (skipped while the pull request is a draft; marking it ready for
+# review runs it): docs build, lint, format, types, markdown, and the fast test suite.
 # The slow studies tests run in studies_tests.yml. The three jobs run in parallel, and the final
 # job, named `ci`, is the one required status check in the repository ruleset.
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
     branches: [main]
 
@@ -23,6 +25,7 @@ env:
 
 jobs:
   docs:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -41,6 +44,7 @@ jobs:
         run: uv run --no-sync mkdocs build --strict --site-dir /tmp/ci-site
 
   lint:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -110,6 +114,7 @@ jobs:
           fi
 
   tests:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -129,7 +134,7 @@ jobs:
 
   # The single required status check. It passes only when every job above passed.
   ci:
-    if: always()
+    if: always() && github.event.pull_request.draft != true
     needs: [docs, lint, tests]
     runs-on: ubuntu-latest
     steps:

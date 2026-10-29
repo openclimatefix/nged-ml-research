@@ -496,6 +496,12 @@ experiment as finished, so the maintainer never has to sweep up after the sessio
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
 `experiment_tables.py --check`. A failure found by CI costs a ten-minute rerun.
 
+**Open the pull request as a draft, and mark it ready only when you are ready to merge.** CI does not
+run on a draft pull request, so pushes to a draft cost no CI minutes. Open the pull request with
+`gh pr create --draft`. When the local checks pass and the reviews are triaged, run `gh pr ready N`,
+which starts CI once. Wait for the `ci` check to pass before you merge. Every later push to a ready
+pull request runs CI again, so batch the fixes into one commit.
+
 **Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its
 `take_home_message`.** The agent receives the files and no account of the reasoning behind them,
 loads the `prose-review` skill, and reads the opening paragraph first. It reports every term,
