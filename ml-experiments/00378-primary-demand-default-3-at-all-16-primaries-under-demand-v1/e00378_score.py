@@ -18,7 +18,7 @@ experiment 377's naive fit, "reactive power assumed zero". D15 and D18 are repor
 
 from datetime import UTC, datetime
 
-import e00377_adapter as adapter
+import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00378_arms as arms
 import e00378_common as common
 import polars as pl
