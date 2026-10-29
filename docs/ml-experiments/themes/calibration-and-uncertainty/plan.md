@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [389](../../00389-xgboost-tail-calibration-and-ensemble-spread-columns/result.md) | Do per-Primary tail corrections or ensemble spread columns fix the tails of the weekly XGBoost model? | 1 | Nothing | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
