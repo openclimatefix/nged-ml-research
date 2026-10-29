@@ -132,9 +132,9 @@ base-margin path as the baseline there), and the same rows.
   q01, q05, q95, q99 is shifted by the empirical quantile of the raw member's trailing misses
   (observed minus the member's quantile), in units of capacity, then the 11 quantiles are sorted to
   stay monotone. The same donor rule at D8, D15, and D18. No refit.
-- **S1, ensemble spread columns.** The weekly member refitted with four extra columns: the mean and
-  the standard deviation across the 51 members of `temperature_2m` and of `shortwave`, at the
-  series' location and valid time. Training rows are the control member's rows, as in the baseline,
+- **S1, ensemble spread columns.** The member refitted (monthly; see the changes below) with four
+  extra columns: the mean and the standard deviation across the 51 members of `temperature_2m` and
+  of `shortwave`, at the series' location and valid time. Training rows are the control member's rows, as in the baseline,
   with the spread columns taken from the same run's 51 members. Prediction rows carry the same
   spread columns on each of the 51 member rows (the column is a property of the run, not of the
   member), so each member's row differs only in its own weather. The 51-member archive for the
@@ -185,3 +185,29 @@ weekly refits (the weekly regime of experiment 87; that experiment's full `n1h` 
 the monthly regime, BSP, and GSP, took 53 GPU hours). Slot: 3 threads, `MemoryMax=16G`, one GPU
 fit at a time, checked with `uptime` and `nvidia-smi` in the first minutes. Folders of
 experiments 379 and 381 are read only.
+
+## Changes made after the plan was first committed
+
+- **Before any score was read.** T3 shifts the baseline's 1.15-widened quantiles, not the raw ones,
+  so its interior stays equal to the baseline's. T2 picks, per side, the grid factor with the
+  smallest summed absolute coverage error over the two quantiles of that side (q95 and q99; q05
+  and q01), with a fifth lead band of 240 to 336 hours. Rows with no reading are left out of the
+  calibration. S0, the history control, is dropped because the training rows already start on
+  2024-04-01, the first day of the ensemble stores. The weekly bundle of experiment 381 turned out
+  to be stored without the 1.15 factor; the plan scores it raw and at 1.15.
+- **After seeing the gate result (recorded so a reader can judge it).** The gate was pre-registered
+  as a mean absolute quantile gap under 0.001 points and a CRPS gap under 0.005 points. The
+  refitted baseline on D5, D8, and D12 over the first 4 weekly refits gave a mean absolute quantile
+  gap of 0.062 points and a mean CRPS gap of -0.0004 points (mean over the 12 files of the absolute
+  CRPS gap 0.0019, largest 0.0059 at D8 on the refit of 2025-07-08). The quantile criterion failed;
+  the CRPS criterion passed. We kept the CRPS criterion only, because the refits run on a GPU whose
+  run-to-run differences move individual quantiles but not the score. The refit noise floor is
+  therefore about 0.002 points of CRPS, and an S1 difference under that size is not read.
+- **By the manager's instruction, after the T1 to T3 scores.** S1 and its control S0 are fitted at
+  monthly refits (the 12 refits of experiment 87's monthly regime, 2025-07-01 to 2026-06-01), not
+  weekly, because a weekly S1 would take 12 to 20 hours. The T1 to T3 results stay on the weekly
+  forecasts. Monthly S1 is therefore compared with a monthly S0 refitted here under the same
+  recipe, not with the weekly baseline, and an S1 gain is re-checked weekly only if S1 wins. S1
+  uses the offset twins at the five offset Primaries, as the baseline does. Fitted boosters are
+  saved as `.ubj` files under `work/boosters/` of this experiment's private data folder, one per
+  Primary and refit (path `data/ml-experiments/00389-*/work/boosters/`).
