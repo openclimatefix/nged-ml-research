@@ -95,6 +95,16 @@ is at least 3.5 hours older than the forecast origin; otherwise it is null.
   The 4-week window is a choice, not a tested value.
 - **D, B plus C.** Fitted only if C2 and C3 each help alone (see the decision rule).
 
+## Lag-encroachment sweep (requested by the manager, rule fixed before any score is read)
+
+After the main fits, the baseline and arms a, b, and c are refitted once more at the latest weekly
+refit of the scored year (2026-06-23), with the boosters saved. A prediction-only sweep then adds a
+synthetic step of depth D (plus and minus 2%, 5%, and 10% of capacity) to the lagged-power inputs:
+first the most recent lag only (k = 1), then the two most recent (k = 2), then all of them,
+including the weekly-analogue columns that lie inside the step. Per arm and lead band it reports
+the shift of the median as a share of D, the band-width ratio against k = 0, and whether the
+quantiles span both levels. It uses at most 3 threads.
+
 ## Constraints and compute
 
 - Sonnet only. At most 3 threads and `MemoryMax=16G`; `uv run --no-sync`, the `spawn` start method.
