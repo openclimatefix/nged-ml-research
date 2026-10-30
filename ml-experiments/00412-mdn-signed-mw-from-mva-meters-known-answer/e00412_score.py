@@ -26,6 +26,7 @@ from typing import Final
 
 import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import e00397_prep as base  # ty: ignore[unresolved-import]
+import e00412_fit as fit
 import e00412_inputs as inputs
 import e00412_models as models
 import numpy as np
@@ -75,6 +76,25 @@ def threshold_fit(*, site: str, setting: inputs.Setting, month: str) -> float:
     return best
 
 
+def recall_at_false_rate(
+    *, truth: np.ndarray, score: np.ndarray, false_rate: float
+) -> dict[str, float]:
+    """Return the recall of a score at a given false-reverse rate, with the counts behind it.
+
+    The cut is the quantile of the score over the half-hours with no reverse flow that leaves
+    `false_rate` of them above it; the method calls reverse flow where its score exceeds the cut.
+    """
+    other = score[~truth]
+    if not truth.any() or len(other) == 0 or not np.isfinite(false_rate):
+        return {"recall": float("nan"), "n_reverse": int(truth.sum())}
+    cut = float(np.quantile(other, 1.0 - false_rate))
+    return {
+        "recall": float(np.mean(score[truth] > cut)),
+        "false_reverse": float(np.mean(other > cut)),
+        "n_reverse": int(truth.sum()),
+    }
+
+
 def pinball(*, frame: pl.DataFrame) -> float:
     """Return the mean pinball loss of the 11 signed quantiles against the signed truth."""
     truth = frame["truth_points"].to_numpy()[:, None]
@@ -108,6 +128,22 @@ def score_file(*, path: Path, setting: inputs.Setting, month: str) -> list[dict]
                 "threshold": threshold,
             },
             "hour_month_baseline": balanced(truth_reverse=truth[gate], predicted=midday[gate]),
+            "matched": {
+                "model_at_rule_false_rate": recall_at_false_rate(
+                    truth=truth[gate],
+                    score=part["p_negative"].to_numpy()[gate],
+                    false_rate=balanced(truth_reverse=truth[gate], predicted=rule[gate])[
+                        "false_reverse"
+                    ],
+                ),
+                "rule_at_model_false_rate": recall_at_false_rate(
+                    truth=truth[gate],
+                    score=u_gate[gate],
+                    false_rate=balanced(truth_reverse=truth[gate], predicted=pred[gate])[
+                        "false_reverse"
+                    ],
+                ),
+            },
             "false_reverse_sunny_midday": float(pred[gate & midday & ~truth].mean())
             if (gate & midday & ~truth).any()
             else float("nan"),
@@ -143,12 +179,23 @@ def run_first() -> None:
     for path in sorted((OUT_DIR / "first").glob("*/*.parquet")):
         setting, month, seed = parse_name(name=path.stem)
         key = f"{path.parent.name} {setting.tag} {month} s{seed}"
+        info = json.loads(path.with_suffix(".json").read_text())
+        capacity = dict(
+            zip(base.primaries()["site"].to_list(), info["capacity_points"], strict=True)
+        )
         results[key] = score_file(path=path, setting=setting, month=month)
-        for r in results[key]:
+        results[key].append(
+            {
+                "site": "capacity_points",
+                "learned": capacity,
+                "prior_centre": fit.prior_centre_points(refit=base.refit_of(month=month)),
+            }
+        )
+        for r in results[key][:-1]:
             m = r["model"]
             print(
                 f"{key} {r['site']:>6}: BA {m['balanced_accuracy']:.3f} recall {m['recall']:.3f} "
-                f"false {m['false_reverse']:.3f} | rule BA {r['threshold_rule']['balanced_accuracy']:.3f} "
+                f"false {m['false_reverse']:.3f} n_rev {m['n_reverse']} | rule BA {r['threshold_rule']['balanced_accuracy']:.3f} "
                 f"| hour-month BA {r['hour_month_baseline']['balanced_accuracy']:.3f}"
             )
     (OUT_DIR / "first_scores.json").write_text(json.dumps(results, indent=1))
