@@ -6,7 +6,8 @@ Two modes:
   weekly `n1h` member (no solar offset) on the origins both cover. The gate passes when the mean
   CRPS (days 1 to 10) differs by at most 0.01 points of effective capacity at every Primary
   (experiment 383's gate).
-- `final`: each lag arm minus the refitted baseline (`base` at all 52 refits), per group, per lead
+- `final`: each lag arm minus the baseline (experiment 381's monthly `control`, or `base` at all
+  52 weekly refits with `--regime weekly`), per group, per lead
   band, and per Primary, with leave-one-out, tails, slices, load-shift rows, and the avoidable
   curtailment cost, beside experiment 87's stored `n1h` member, the GAM stack of experiment 377,
   BG2, `manual_heuristic`, and `climatology`.
@@ -35,6 +36,9 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR
 WORK: Final[Path] = DATA / "00388-xgboost-lagged-power-column-sets-weekly-demand" / "work"
+E381_WORK: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00381-simple-weekly-xgboost-demand-against-gam-stack" / "work"
+)
 STORED_87: Final[Path] = DATA / "00087-bg2-best-guess-assembled-with-drop-one-ablations" / "work"
 E379_ARMS: Final[Path] = DATA / "00379-bg2-components-all-16-primaries-to-14-days" / "work" / "arms"
 CONTRAST_COUNT: Final[int] = 4
@@ -67,9 +71,11 @@ TAILS: Final[list[str]] = [
 ]  # fmt: skip
 
 
-def arm_frame(*, arm: str, series: pl.DataFrame) -> pl.DataFrame:
+def arm_frame(
+    *, arm: str, series: pl.DataFrame, regime: str = "weekly", root: Path = WORK
+) -> pl.DataFrame:
     """Return an arm's forecast in MW: every refit file of every Primary, concatenated."""
-    folder = WORK / "arm_preds" / "weekly" / arm
+    folder = root / "arm_preds" / regime / arm
     files = sorted(folder.glob("*.parquet"))
     if not files:
         msg = f"no files in {folder}"
@@ -200,12 +206,16 @@ def band(name: str) -> pl.Expr:
     return (pl.col("lead_hours") > low) & (pl.col("lead_hours") <= high)
 
 
-def final(*, series: pl.DataFrame, ctx: dict, lag_arms: list[str]) -> None:
+def final(*, series: pl.DataFrame, ctx: dict, lag_arms: list[str], regime: str = "monthly") -> None:
     """Print each lag arm against the stored weekly baseline and the references."""
     refs = base.reference_frames(series=series)
     arms = {
-        **{a: arm_frame(arm=a, series=series) for a in lag_arms},
-        "baseline": arm_frame(arm="base", series=series),
+        **{a: arm_frame(arm=a, series=series, regime=regime) for a in lag_arms},
+        "baseline": (
+            arm_frame(arm="control", series=series, regime="monthly", root=E381_WORK)
+            if regime == "monthly"
+            else arm_frame(arm="base", series=series)
+        ),
         "stored_n1h": stored_n1h_frame(series=series),
         "stack": base.stack_frames(series=series)["stack"],
         **refs,
@@ -372,13 +382,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("gate", "final"))
     parser.add_argument("--arms", nargs="+", default=["a", "b", "c"])
+    parser.add_argument(
+        "--regime", choices=("monthly", "weekly"), default="monthly", help="refit cadence scored"
+    )
     args = parser.parse_args()
     series = adapter.series_table()
     ctx = build_context(series=series)
     if args.mode == "gate":
         gate(series=series, ctx=ctx)
     else:
-        final(series=series, ctx=ctx, lag_arms=args.arms)
+        final(series=series, ctx=ctx, lag_arms=args.arms, regime=args.regime)
 
 
 if __name__ == "__main__":
