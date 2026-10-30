@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -42,15 +42,96 @@ row_set_id: fold_a_daily_gap_v1
 metric: >-
   Exact CRPS of the distribution linear between the 11 quantiles, in points of effective capacity;
   leads up to 240 hours (day 10).
+verdict: inconclusive
+best_arm: >-
+  none. Filling the gaps added no event, so the result is experiment 411's: real lags 5.061 and clean
+  lags 5.897 CRPS points at the six signed-MW Primaries (gain -0.836, 95% -2.468 to +1.301, 9 events).
+headline: >-
+  Filling the gaps in the stage-1 median added no scored event, because 129 of the 184 corrected
+  events lie outside the reach of the 4 test refit months and the 3 events within reach that have a
+  gap also lack observed power. The 15 events of experiment 411 reproduce exactly, so the question
+  stays open and the sample is capped by the test window, not by the median.
+lessons:
+  - >-
+    A filter listed first in a loss count takes the blame for events that later filters would also
+    drop: experiment 411 blamed gaps for 99 events, and 96 of those lie outside the test window.
+  - >-
+    The reachable events are few: 55 of 184 lie within reach of the 4 test months, and 25 of those
+    pass the sign, step, and bias filters.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  The gap-filled re-score changed nothing. Filling the gaps in the stage-1 median added no scored
+  event, and the 15 events of experiment 411 reproduced to three decimals, so the six signed-MW gain
+  stays at -0.836 CRPS points (interval -2.468 to +1.301) and still rests on 9 events. The sample is
+  limited by the 4 test months, not by the gaps. The maintainer still has to decide whether
+  experiment 404 skips batches 1 and 2 on this evidence.
+advice:
+  - >-
+    To score more load-shift events, produce boosters and rows for more months, or loosen the
+    event filters, and do not fill the median.
+  - >-
+    Count events lost to filters in the order the code applies them, and count the events outside the
+    test window first.
+date: 2026-10-30
 code: ml-experiments/00414-post-hoc-gap-filled-counterfactual-lag-rescore/
 ---
 
-**Take-home message (to be written when the result is known).**
-
-This page is the plan. It is committed before any score exists. The experiment is **post hoc**: it
+**Status: done. Filling the gaps added no scored event.** The sections from "The fill rule" onward
+are the plan, written before any score of the filled run was read. The experiment is **post hoc**: it
 exists because [experiment 411](../00411-counterfactual-lag-rescore-harm-rows-r1-boosters/result.md)
 scored only 15 of 184 corrected events, and the design change (the fill rule) was chosen after that
 result was read. The fill rule below was fixed from counts of the input gaps, not from any score.
+
+## Results
+
+**The filled run scored the same 15 events as experiment 411, with the same numbers.** The
+prediction (at least 40 events scored) failed, and so did its reason: the fill rule fixes the gaps
+in the stage-1 median, and the gaps were not what limited the sample. Intervals are 95% event-cluster
+bootstraps (2,000 resamples). They differ from experiment 411's in the third decimal only because
+the resampling draws differ.
+
+| Group | Harm rows | Events | CRPS real lags | CRPS clean lags | Gain | 95% interval |
+|---|---|---|---|---|---|---|
+| Six signed-MW | 5,354 | 9 | 5.061 | 5.897 | -0.836 | -2.468 to +1.301 |
+| Eight MVA-only | 3,241 | 6 | 6.514 | 6.489 | +0.024 | -0.568 to +1.550 |
+| All 14 | 8,595 | 15 | 5.609 | 6.120 | -0.512 | -1.798 to +0.863 |
+
+- **Added events:** none. The report's "added events" section is empty.
+- **Leave-one-event-out gain range:** -1.278 to +0.460 at the six, and -0.354 to +0.877 at the eight.
+  Dropping D5's one event still flips the six-Primary sign.
+- **No figure:** the scored events are experiment 411's, so its figure applies unchanged.
+
+## Why no event was added
+
+**129 of the 184 corrected events lie outside the reach of the 4 test refit months.** A sampled run
+reads lags from the week or two before its origin, so an event can only affect a run if it falls
+between 14 days before the first test origin and the last test origin (the count allows 14 days, a
+wide margin). Experiment 411's count of "99
+events lost to gaps" took the gap filter first, and 96 of those events are in the 129. Counting in
+the order of the sweep:
+
+- **Outside the reach of the test months:** 129 events.
+- **Gap in the observed power:** 3 events within reach. These also have a gap in the stage-1 median,
+  and the fill cannot repair observed power.
+- **Sign, step share, and bias filters:** 12, 8, and 7 events within reach.
+- **Pass every event filter:** 25 events, of which 15 produce harm rows in the sampled runs.
+
+After the fill, no event within reach has a gap left in the stage-1 median, so the fill worked as
+intended on the 3 events it could touch.
+
+## Checks
+
+- **Median minus mean forecast per site and the error of the mean forecast:** not computed, because
+  the boosters' mean forecast is not stored; the scored forecasts are the mixture quantiles.
+- **Reproduction:** the 15 events reproduce experiment 411 to three decimals in every row of the
+  table, including the per-Primary and lead-band gains.
+- **Triggers fired:** trigger 2 (the result contradicts its prediction: 15 events scored against at
+  least 40 predicted) and trigger 7 (the experiment 404 plan depends on the headline). The cause is
+  explained and tested above (the reach count), so trigger 2 has an explanation recorded.
+- **Audit:** a fresh Sonnet agent reviewed the code before the first run and found that the fill
+  would change the pre-event bias of the original events; the fix computes the bias on the
+  unfilled median, and the reproduction above confirms it.
 
 ## The fill rule
 
