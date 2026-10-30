@@ -103,6 +103,7 @@ nav:
       - Research default:
           - Rule: ml-experiments/research-default.md
           - Evaluation protocol, demand: ml-experiments/evaluation-protocol-demand.md
+          - Scoreboard, demand: ml-experiments/scoreboard-demand.md
           - Evaluation protocol, solar: ml-experiments/evaluation-protocol-solar.md
           - Evaluation protocol, wind: ml-experiments/evaluation-protocol-wind.md
           - Log of versions: ml-experiments/research-default-log.md
