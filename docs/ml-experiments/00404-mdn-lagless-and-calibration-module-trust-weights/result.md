@@ -47,18 +47,23 @@ prediction: >-
   and the harm rows by under 0.1 in either direction. P11. B6 (learned windows) differs from B1 by
   under 0.1 points on harm rows; a gain above 0.1 would mean the hand-built statistics lose
   information. P12. B7 (7-day demand window) lowers harm-row CRPS against B1 by under 0.05 points,
-  because the window contains the suspect readings. P13. Replacing the mean combining rule by the
+  because the window contains the suspect readings. P14. B8 minus B1 on harm rows is between -0.1
+  and +0.05 points, because the probe only shapes the shared hidden layer. P13. Replacing the mean
+  combining rule by the
   product rule (sensitivity arm B1p) changes harm-row CRPS by under 0.1 points.
 decision_rule: >-
   Contrasts, registered before any score is read and read per group (signed-MW six; MVA-only
   eight; D15 and D18 report-only) on CRPS at days 1 to 10, each on three row sets: harm rows, rows
   outside events, and all rows. Batch 1: C1 B1 minus A0-inj (the architecture); C2 A0-inj minus A0
-  (the training data); C3 B1 minus B0 (the trust inputs); C4 B1 minus A0; C5 B1 minus B2; C6 B5 minus
-  B1. Batch 2: C7 B3 minus B2 (attention over lags); C8 B4 minus B1; C9 B6 minus B1; C10 B7 minus B1;
-  C11 B1p minus B1. The screen has five test months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06),
+  (the training data); C3 B1 minus B0 (the trust inputs); C4 B1 minus A0; C5 B1 minus B2; C6 B5
+  minus
+  B1. Batch 2: C7 B3 minus B2 (attention over lags); C8 B4 minus B1; C9 B6 minus B1; C10 B7 minus
+  B1;
+  C11 B1p minus B1; C12 B8 minus B1. The screen has five test months (2025-10, 2025-12, 2026-01,
+  2026-03, 2026-06),
   so every number is labelled interim. Harm rows carry whole-event bootstrap intervals (95%,
   resampling events); rows outside events carry month-block bootstrap intervals with no 99% claim;
-  the Bonferroni k is 22 (11 contrasts, 2 groups). A contrast counts as a gain when its interval
+  the Bonferroni k is 24 (12 contrasts, 2 groups). A contrast counts as a gain when its interval
   excludes zero and its sign agrees in at least 2 of 3 seeds. Inert rule: the trust head is inert
   if the mean trust weight inside events minus the mean outside events is under 0.2, whatever the
   score does; an inert arm is reported and stopped. Batch 1 stop rule: stop after batch 1 (A0,
@@ -201,6 +206,11 @@ input groups stays closed in every arm.
 - **B1p.** B1 with the product of the 3 trust weights as the mixture weight.
 - **B7 (lowest priority; runs only if a slot is spare).** B1 plus a 1D convolutional neural network
   over the latest 7 days of actual demand up to the forecast origin, with the same trust inputs.
+- **B8 (low priority; runs after B1 reads clean).** B1 plus an auxiliary probe head that reads the
+  trust head's hidden layer and predicts, for each lagged timestep, whether the injected generator
+  put it inside an event or a spike. The loss is binary cross-entropy at a weight of 0.1 of the
+  mixture loss, and 0.3 if 0.1 moves nothing. The probe trains only on the injected labels, which
+  are known truth and need no NGED label, and it is never used at forecast time.
 
 The maintainer's expectation (not a result): B1 beats B2.
 
@@ -236,7 +246,8 @@ publishes a generator before fitting starts, this experiment switches to it. The
 durations come from the table's real events, so the test distribution informs the generator's
 distributions even though the real events never enter training; the write-up states this.
 
-**Real events are a held-out test only.** The label table's events never enter training. The write-up
+**Real events are a held-out test only.** The label table's events never enter training. The write-
+up
 reports the real-event count per fold and excludes folds without label coverage from the harm rows.
 
 ## Leakage rules
@@ -261,6 +272,8 @@ reports the real-event count per fold and excludes folds without label coverage 
 - **The lag-encroachment sweep** (experiment 395 Part E harness): the median's share of a synthetic
   step by the number of lags inside the event, the band width ratio, and where the probability mass
   sits.
+- **Probe (B8).** The precision-recall area of the probe on held-out real events from the corrected
+  label table, per metering group (signed-MW six and MVA-only eight).
 - **Loss outside events** and the overall five-fold CRPS, per Primary.
 - **Tails.** Coverage and pinball loss at q01, q05, q95, and q99, raw and at the 1.15 widening,
   beside every headline score.
@@ -280,7 +293,7 @@ exceeds 15 GB). Batch 1 is 6 arms times 5 folds times 3 seeds, 90 fits, plus abo
 cross-fitted lagless fits (about 9 blocks per fold). The first task after the slot is granted is to
 time one fit of each kind. Order of work once granted: the cross-fitted lagless table; the realism
 check; A0 (reused if experiment 397's rows match); A0-inj; B0; B1; B2; B5; the stop-rule check;
-then batch 2 in the order B3, B6, B4, B1p, B7. The weekend scope is batch 1.
+then batch 2 in the order B3, B6, B4, B1p, B8, B7. The weekend scope is batch 1.
 
 ## Problems caused by the move
 
