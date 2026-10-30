@@ -163,8 +163,8 @@ The no-injection group is D5, D9, D11, D14, and D16, and D10 is reported on its 
 real reverse half-hours make it no clean placebo.
 
 - **C, the W-shape score.** On each sunny day, with `t0` the solar noon: the left minimum is the
-  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to `t0
-  + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the smaller
+  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to
+  `t0 + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the smaller
   of the two differences (centre maximum minus each minimum), in points of capacity. It is positive
   when the reading crosses zero twice and negative on a day with one smooth midday dip. The area
   under the curve compares injected days with no-injection days, per Primary and pooled. The

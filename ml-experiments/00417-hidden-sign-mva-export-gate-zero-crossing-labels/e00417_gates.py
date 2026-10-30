@@ -25,7 +25,7 @@ from typing import Final
 import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00405_pv as pv  # ty: ignore[unresolved-import]
-import e00417_diag_flip as flip
+import e00417_day_flip as dayflip
 import e00417_diagnostics as diag
 import e00417_inputs as inputs
 import numpy as np
@@ -200,15 +200,17 @@ def labels_for_fold(*, fold: inputs.Fold, refit) -> tuple[np.ndarray, dict]:  # 
     return label, info
 
 
-# --- the day-level gate (design I) ------------------------------------------------------------
+# --- the day-level gate (designs I and C merged) ----------------------------------------------
+
+BREAKPOINT_MARGIN: Final[float] = 0.05
 
 
 @dataclass
 class DayGate:
-    """The whole-day flip gate: a threshold fitted on the visible signed Primaries, and profiles."""
+    """The whole-day gate: a threshold fitted on the visible signed Primaries, and profiles."""
 
     threshold: float
-    profiles: dict[str, dict[int, float]]
+    profiles: dict[str, dayflip.Profile]
     window_lo: int
     window_hi: int
     setting: inputs.Setting
@@ -218,49 +220,63 @@ class DayGate:
 def fit_day_gate(*, fold: inputs.Fold, refit) -> DayGate:  # noqa: ANN001
     """Fit the day gate's threshold on the visible signed Primaries' no-injection training days.
 
-    The threshold is the 95th percentile of the flip score over those days, so no hidden Primary
+    The threshold is the 98th percentile of the day score over those days, so no hidden Primary
     enters it. Each folded Primary's demand profile comes from its own training window.
     """
     window_lo = int((refit - timedelta(days=base.WINDOW_DAYS)).timestamp() * 1_000_000)
     window_hi = int((refit - regimes.REFIT_CUTOFF_AGE).timestamp() * 1_000_000) + 1
     placebo = inputs.Setting(0.0, fold.setting.q_points, fold.setting.power_factor)
-    visible = [s for s in inputs.SIGNED_SIX if s not in fold.pair]
-    scores = np.concatenate(
-        [
-            flip.day_scores(
-                t=diag.load_table(site=s, setting=placebo, start_us=window_lo, end_us=window_hi)
-            )["score"]
-            for s in visible
-        ]
-    )
+    scores = []
+    for s in (s for s in inputs.SIGNED_SIX if s not in fold.pair):
+        h = dayflip.hourly(
+            t=diag.load_table(site=s, setting=placebo, start_us=window_lo, end_us=window_hi)
+        )
+        scores.append(dayflip.score_days(h=h, profile=dayflip.build_profile(h=h)).score)
+    all_scores = np.concatenate(scores)
     profiles = {}
     for row in base.primaries().iter_rows(named=True):
         if fold.folded[row["primary"]]:
             t = diag.load_table(
                 site=row["site"], setting=fold.setting, start_us=window_lo, end_us=window_hi
             )
-            profiles[row["site"]] = flip.build_profile(t=t)
+            profiles[row["site"]] = dayflip.build_profile(h=dayflip.hourly(t=t))
     return DayGate(
-        threshold=float(np.percentile(scores, flip.CALIBRATION_PERCENTILE)),
+        threshold=float(np.percentile(all_scores, dayflip.THRESHOLD_PERCENTILE)),
         profiles=profiles,
         window_lo=window_lo,
         window_hi=window_hi,
         setting=fold.setting,
-        n_visible_days=len(scores),
+        n_visible_days=len(all_scores),
     )
 
 
-def day_open_rows(*, gate: DayGate, site: str, valid_us: np.ndarray) -> np.ndarray:
-    """Return, per row of one Primary, whether its day is flagged and its `u` is above the flip point."""
-    lo, hi = int(valid_us.min()) - inputs.US_PER_DAY, int(valid_us.max()) + inputs.US_PER_DAY
-    t = diag.load_table(site=site, setting=gate.setting, start_us=lo, end_us=hi)
-    sc = flip.day_scores(t=t, profile=gate.profiles[site])
+def day_open_rows(
+    *,
+    gate: DayGate,
+    site: str,
+    valid_us: np.ndarray,
+    start_us: int | None = None,
+    end_us: int | None = None,
+) -> np.ndarray:
+    """Return, per row of one Primary, whether its day is flagged and `u` is near or above the breakpoint.
+
+    Training rows pass the training window as `start_us` and `end_us`, so a day at the window's edge is
+    scored on the same truncated readings the threshold used. Test rows leave them unset, so the table
+    covers the rows' days whole. The gate reads the observed folded readings and never the signed truth.
+    A day outside April to September, or an ineligible day, is closed.
+    """
+    if len(valid_us) == 0:
+        return np.zeros(0, dtype=bool)
+    lo = start_us if start_us is not None else int(valid_us.min()) - inputs.US_PER_DAY
+    hi = end_us if end_us is not None else int(valid_us.max()) + inputs.US_PER_DAY
+    h = dayflip.hourly(t=diag.load_table(site=site, setting=gate.setting, start_us=lo, end_us=hi))
+    result = dayflip.score_days(h=h, profile=gate.profiles[site])
     flagged = {
-        int(d): float(u)
-        for d, s, u in zip(sc["day"], sc["score"], sc["flip_u"], strict=True)
-        if s > gate.threshold
+        int(d): float(bp)
+        for d, sc, bp in zip(result.day, result.score, result.breakpoint, strict=True)
+        if sc > gate.threshold and np.isfinite(bp)
     }
     u_rows, _k = inputs.cams_for_rows(site=site, valid_us=valid_us)
     day = (valid_us - inputs.US_PER_HALF_HOUR) // inputs.US_PER_DAY
-    flip_u = np.array([flagged.get(int(d), np.inf) for d in day])
-    return np.nan_to_num(u_rows) >= flip_u
+    breakpoint_u = np.array([flagged.get(int(d), np.inf) for d in day])
+    return np.nan_to_num(u_rows) >= breakpoint_u - BREAKPOINT_MARGIN
