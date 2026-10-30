@@ -40,7 +40,7 @@ RAW_DIR: Final[Path] = WORK_DIR / "work" / "raw"
 SCHEMES: Final[tuple[str, ...]] = ("member", "summary")
 WEATHER: Final[tuple[str, ...]] = fd.WEATHER
 FIRST_RUN: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
-LAST_RUN: Final[datetime] = datetime(2026, 6, 29, tzinfo=UTC)
+LAST_RUN: Final[datetime] = datetime(2026, 6, 30, tzinfo=UTC)
 INPUT_CLIP_SD: Final[float] = 5.0
 WINDOW_DAYS: Final[int] = 730
 """A fold trains on the 24 months before its refit."""
@@ -367,6 +367,7 @@ def build_train(*, scheme: str, refit: datetime, validation: bool = False) -> Fo
             }
         )
     cat = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
+    del parts
     origin_day = ((cat["origin"] - _us(t=FIRST_RUN)) // (86_400 * 1_000_000)).astype(np.int64)
     if validation:
         first_day = (VALIDATION_FIRST - FIRST_RUN).days
@@ -386,8 +387,10 @@ def build_train(*, scheme: str, refit: datetime, validation: bool = False) -> Fo
             target_mean[p] = cat["y"][sel].mean()
             target_std[p] = max(float(cat["y"][sel].std()), 1e-3)
     keep = train | held
+    x_kept = standardiser.apply(x=cat["x"][keep])
+    del cat["x"]
     return FoldTrain(
-        x=standardiser.apply(x=cat["x"][keep]),
+        x=x_kept,
         y=cat["y"][keep],
         primary=cat["primary"][keep],
         weight=weight[keep].astype(np.float32),

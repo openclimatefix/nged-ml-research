@@ -7,7 +7,7 @@ title: >-
 theme: production-reference-and-best-guess
 also_relevant_to:
   - calibration-and-uncertainty
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -73,15 +73,127 @@ metric: >-
   Continuous ranked probability score from the 11 quantiles, coverage and pinball loss at q01, q05,
   q95, q99, and the avoidable-curtailment cost, in points of effective capacity, from
   `studies.eval_protocol`; leads 0.5 to 336 hours; the headline band is days 1 to 10.
+verdict: partly supported
+best_arm: >-
+  Pooled plain network (one network across the 16 Primaries, summary scheme): CRPS 3.264 at the
+  signed-MW six and 3.860 at the MVA-only eight (days 1 to 10, five screen months), against 3.542
+  and 4.014 for the monthly XGBoost control.
+headline: >-
+  A plain mixture density network with the XGBoost model's inputs scores 0.049 points below the
+  monthly XGBoost control at the signed-MW six (3.493 against 3.542; 3 of 5 folds) and 0.025 below
+  at the MVA-only eight, but its q95 coverage at the signed-MW six is no better (0.84 to 0.86
+  against 0.86). One pooled
+  network scores 0.278 below the control at the signed-MW six and 0.154 below at the MVA-only eight.
+  Attention over five input groups does not help: A2 is 0.033 points better than A0 at the
+  signed-MW six and 0.034 worse at the MVA-only eight, and the gate weights stay within 0.01 of
+  0.2 over lead, so the gate is inert.
+lessons: >-
+  A small neural network matched or beat the simple XGBoost model on the screen months, and pooling
+  across Primaries helped more than any change to the network. The gate learned nothing worth
+  reading, so attention over input groups is not worth carrying forward as designed.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  A small neural network given the same inputs as the simple XGBoost forecast scores about as well
+  as it, or slightly better, on five test months: 3.49 against 3.54 points of capacity at the six
+  signed-direction substations with one network per substation, and 3.26 with one network across
+  all 16. Adding attention over the input groups did not help, because the gate gave every group
+  nearly the same weight at every lead time. The network's top quantiles still cover too few
+  outcomes (84% to 86% below its 95% quantile at the signed-direction six), so its tails need
+  work before it replaces the XGBoost model.
+advice:
+  - >-
+    Use one pooled network, not one per Primary, as the neural baseline, because it scored 0.23
+    points lower at the signed-MW six in the same screen (the contrast is tested in experiment 403).
+  - >-
+    Do not add gated attention over input groups to the network, because the gate stayed within 0.01
+    of uniform, and A2 gained only 0.033 points on A0 at the signed-MW six and lost 0.034 at the
+    MVA-only eight.
+  - >-
+    Fix the tails of the network before judging it against XGBoost on extreme nights, because its
+    q95 coverage at the signed-MW six is 0.84 to 0.86 and widening by 1.15 only lifts it to 0.89.
 code: ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand/
 ---
 
-**Take-home message (to be written when the result is known).**
+**Take-home message: a small neural network matches the simple XGBoost demand forecast on five test
+months, and attention over its inputs does not help.** With the XGBoost model's inputs, one network
+per Primary scores a CRPS (days 1 to 10) of 3.493 points of capacity at the six signed-MW Primaries,
+against 3.542 for the monthly XGBoost control. One pooled network across the 16 Primaries scores
+3.264, and 0.278 points below the control. **Attention does not help:** A2 (the gate sees the lead,
+calendar, and holidays) scores 3.288 against 3.320 for A0 (uniform weights), and the gate weights
+move by under 0.01 over lead time. The verdict is `partly supported`: the network matched XGBoost,
+the attention part failed. **The tails are the open problem:** the networks cover 0.84 to 0.86 of
+outcomes with their 95% quantile at the signed-MW six, so they are too narrow there. Every number
+comes from five test months, so all are interim.
 
-This page is the plan. It is committed before any network is fitted, so that its commit order proves
-the predictions came first.
+![Weights of each input group in A2 against lead time](weights_by_lead.svg)
 
-## Question
+## Results
+
+CRPS at days 1 to 10, mean over the five test months, mean over Primaries with equal weight, in
+points of capacity (smaller is better).
+
+| Arm | Signed-MW six | MVA-only eight |
+|---|---|---|
+| Plain network, one per Primary, 51 control-member passes | 3.493 | 3.989 |
+| Plain network, one per Primary, one pass on mean and spread | 3.504 | 3.931 |
+| Plain network, one pooled network | 3.264 | 3.860 |
+| Pooled attention A0 (uniform weights) | 3.320 | 3.775 |
+| Pooled attention A2 | 3.288 | 3.809 |
+| XGBoost monthly control (experiment 389, S0M raw) | 3.542 | 4.014 |
+| XGBoost with mean and spread columns (S1M raw) | 3.498 | 3.979 |
+| XGBoost weekly bundle (experiment 381) | 3.412 | 3.936 |
+| BG2 | 3.393 | 3.919 |
+| GAM stack (experiment 377) | 3.239 | 4.140 |
+
+- **Stage 1.** The per-Primary network beat S0M raw in 3 of 5 folds at the signed-MW six, short of
+  the 4 of 5 the screen required, so stage 1 did not advance to the full year.
+- **Stage 2.** A2 beat A0 in 1 of 5 folds at the signed-MW six. The stage 2 stop rule fired because
+  the gate was inert.
+- **Gate weights (A2).** W1 (weather weight falls from day 1 to days 8 to 10): +0.010. W2 (lag
+  weight falls): +0.004. W3 (calendar plus holiday weight rises): +0.004. W4 (holiday weight over 24
+  December to 1 January): +0.043, short of the 0.05 required. W6: the largest range of any group's
+  mean weight over lead bands is 0.0095, under 0.05, so the gate is reported as inert.
+- **Tails.** At the signed-MW six the networks' q95 coverage is 0.84 to 0.86 and q99 coverage 0.93
+  to 0.94, against 0.86 and 0.96 for the XGBoost control. Widening by 1.15 lifts the pooled
+  network's q95 coverage to 0.88 to 0.89. At the MVA-only eight q95 coverage is 0.91 to 0.92. The
+  networks' q99 pinball loss is lower than XGBoost's (0.41 to 0.44 against 0.49 at the signed-MW
+  six).
+
+![Weights of each input group in A2 by type of day](weights_by_day_type.svg)
+
+## Predictions
+
+- **P1 failed in the network's favour.** The plain network does not trail S0M raw; it leads it by
+  0.049 points.
+- **P2 failed.** The network's q95 and q99 coverage is further from nominal than the XGBoost model's.
+- **P3 half held.** The one-pass arm is within 0.05 points of the member arm at both groups, but
+  its tail coverage is not better.
+- **P4 failed narrowly.** A2 minus A0 is -0.033 at the signed-MW six and +0.034 at the MVA-only
+  eight, just outside the plus or minus 0.03 the prediction allowed.
+- **P5 not tested.** The stop rule fired before the lead-band contrast was read.
+- **W1 to W4 and W6 failed**, as listed above.
+
+## Not run
+
+The permutation importance of each input group, arm A3, the Primary-embedding ablation, the
+pinball-loss head, and the full-year runs. The stop rules fired before any of them. The other
+gate plots are in the experiment's private folder.
+
+## Deviations
+
+- Early stopping holds out one week in every 12, not every fourth week (see the plan below).
+- The widening of 1.15 about the median on q01, q05, q95, and q99 is applied at scoring.
+- The summary scheme rebuilds the ensemble mean and spread for the training runs of 2024-04 to
+  2025-06 from the archive, and uses the stored 51-member frames from 2025-07-01. On 2025-07-01 the
+  two routes gave identical values.
+- Every fitted network is saved under `work/models/` in the experiment's private folder.
+- Reused forecasts are the stored XGBoost, GAM stack, BG2, `manual_heuristic`, and `climatology`
+  sets listed below. No XGBoost model was refitted.
+
+## Plan as committed before any fit
+
+### Question
 
 **We test whether a small neural network can replace the simple XGBoost model for Primary demand,
 and whether attention over its inputs helps.** Two experiments queued by the maintainer share one
@@ -100,7 +212,7 @@ merge in chat on 2026-10-30.
   fixes the weights at 0.2. The design is in `briefs/attention_mdn_design_answer.md` and its
   addendum (private).
 
-## Reused predictions and what is fitted
+### Reused predictions and what is fitted
 
 **No XGBoost model is refitted.** The references are stored forecasts, read from the private
 folders of earlier experiments. A fitted network is the only new fit.
@@ -121,7 +233,7 @@ The scorer restricts each arm and each reference to the half-hours they share, a
 count. The stored rows cover the same 16 Primaries and origins as the networks' rows. A gap would
 show as a shorter shared count.
 
-## Inputs and rows
+### Inputs and rows
 
 **The network sees the XGBoost model's inputs, plus two bank-holiday columns.** `e00397_prep.py`
 builds them from experiment 87's control-member training rows.
@@ -154,7 +266,7 @@ builds them from experiment 87's control-member training rows.
   weights halve every 0.5 years, as for the XGBoost model. Hand-filtered load-shift events stay in
   the rows, as for the XGBoost control.
 
-## Folds, refits, and arms
+### Folds, refits, and arms
 
 **Screen folds.** Test months 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06. The four months are
 those of `common.md` and December is added because none of the four contains Christmas. Each fold
@@ -193,7 +305,7 @@ that tuning cannot favour them.
 5e-4 and a weight decay of 1e-3 unless the setting says otherwise, batch 16,384, at most 40 epochs,
 patience 6. Every network is saved with its standardiser and setting.
 
-## Checks the write-up reports
+### Checks the write-up reports
 
 - **Cold winter nights first**, then the pooled score, then cold nights at 3 °C or below, sunny
   half-hours, the Economy 7 step hours, the Christmas slice, and bank holidays.
@@ -211,14 +323,14 @@ patience 6. Every network is saved with its standardiser and setting.
   explains the steps and the gap". D15 and D18 are report-only.
 - **Absolute scores** of every arm beside the references.
 
-## Counting towards the demand-v2 stop rule
+### Counting towards the demand-v2 stop rule
 
 **This experiment counts if it ends `not supported` or `refuted`.** The idea is "a neural network as
 the main demand model". Experiment 334 (`not supported`) is the only counted experiment so far, so
 the count is 1 of 3 and rises to 2 of 3 here. The maintainer named this experiment, which counts as
 approval whatever the count.
 
-## Advice followed from earlier experiments
+### Advice followed from earlier experiments
 
 - **Followed.** Experiment 334: give a neural replacement the past-week information and score cold
   winter nights before the pooled score (the three origin lags and the cold-night slice here).
@@ -227,7 +339,7 @@ approval whatever the count.
 - **Departed from.** Experiment 334 advised testing neural parts as additions to the stack. The
   maintainer asked for the replacement test, so this experiment tests the replacement.
 
-## Compute
+### Compute
 
 **Estimate, to be replaced by a measured time.** A pooled fold has about 7 million rows and 46
 columns, about 1.3 GB, which fits on the GPU. The design's estimate is 2 to 4 minutes per pooled fit
@@ -238,4 +350,4 @@ screen is 5 folds, 3 seeds, 2 schemes; the stage 2 simplest version is 5 folds, 
 
 ## Problems caused by the move
 
-To be filled in. None so far.
+None.
