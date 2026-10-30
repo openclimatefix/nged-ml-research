@@ -165,9 +165,9 @@ benchmark is measured on the same series as the fit.
    269 estimate), C2, C3, C4, C5a (monthly capacity path, smoothness penalty), and C5b (persistence
    penalty), all with the day-of-year term, 3 seeds, 5 folds; A0 is read from experiment 403. The
    contrasts at the signed-MW six, CRPS at days 1 to 10, month-block bootstrap at 95% with 20,000
-   resamples, Bonferroni across the eight: C3 minus A0-noirr-doy, C2 minus A0-noirr-doy, C2 minus A0,
-   C3 minus A0, C3 minus C2, C2 minus C1, C4 minus C3, C5a minus C3, C5b minus C3 (nine contrasts;
-   the correction uses nine). The MVA-only eight are reported, not contrasted.
+   resamples, Bonferroni across the nine: C3 minus A0-noirr-doy, C2 minus A0-noirr-doy, C2 minus A0,
+   C3 minus A0, C3 minus C2, C2 minus C1, C4 minus C3, C5a minus C3, C5b minus C3.
+   The MVA-only eight are reported, not contrasted.
 6. **Minimum detectable effect** and the gain rule are as in the decision rule above.
 
 ## Reports
