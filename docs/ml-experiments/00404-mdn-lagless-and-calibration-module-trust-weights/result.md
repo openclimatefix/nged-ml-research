@@ -26,10 +26,13 @@ hypothesis: >-
   and loses no more than 0.05 points of CRPS (continuous ranked probability score, in points of
   effective capacity) on rows outside events.
 prediction: >-
-  Written before any score is read. P1. B1 minus A0-inj on harm rows at the signed-MW six
-  Primaries is between -0.1 and -0.4 points. The interim XGBoost series (experiment 402,
-  unaudited) found -0.40 for a flag oracle against a fitted constant mixture, and a learned weight
-  with no labels should land below that oracle. P2. B1 minus B0 on harm rows at the signed-MW six is
+  Written before any score is read. P0. The batch 0 counterfactual gain at the signed-MW six is
+  between
+  0.05 and 0.3 CRPS points. P1. B1 minus A0-inj on harm rows at the signed-MW six
+  Primaries is between -0.05 and -0.2 points. Experiment 402's `ceilings3.txt` (interim, unaudited)
+  found -0.179 (interval -0.470 to +0.016)
+  for a flag oracle against a fitted constant mixture, so the gain of a learned weight with no
+  labels is capped near that oracle. P2. B1 minus B0 on harm rows at the signed-MW six is
   between -0.05 and -0.3 points: the trust inputs add some gain over a constant weight, less than
   the architecture adds (experiment 400 found a fixed 50/50 mixture as good as a logistic gate).
   P3. The loss on rows outside events, B1 minus A0-inj, is under 0.05 points at the signed-MW six.
@@ -69,14 +72,19 @@ decision_rule: >-
   outside events carry month-block bootstrap intervals with no 99% claim; the Bonferroni k is 32
   (16 contrasts, 2 groups) for the reported contrasts, and none for the stop rules. A contrast
   counts as a gain when its interval excludes zero and its sign agrees in at least 2 of 3 seeds.
-  Batch 1 stop rule, computed on harm rows at the signed-MW six with an event-cluster bootstrap
-  (resampling whole real events with their harm rows, 1,000 resamples) and a 95% interval, without
-  Bonferroni correction: run batch 2 only if, for both B1 minus A0-inj and B1 minus B0, the point
-  estimate is at or below -0.1 CRPS points and the upper bound of the interval is below zero, and
-  if the point estimate of B1 minus A0-inj on rows outside events is at or below +0.05 points.
-  Otherwise stop, write up, and release the slot. The threshold of -0.1 is a quarter of the oracle
-  gain of experiment 402 (the flag oracle minus the fitted constant mixture, -0.40), so a trust head
-  that recovers a quarter of the oracle's gain qualifies. Inert rule: define the combined trust as
+  Batch 0 rule: re-score the stored forecasts of experiment 402 on harm rows with the lags inside
+  each real event replaced by clean counterfactual values (experiment 401's harness); if the gain
+  is under 0.1 CRPS points at the signed-MW six, skip batches 1 and 2, write up, and release the
+  slot. Batch 1 stop rule, computed on harm rows at the signed-MW six with an event-cluster
+  bootstrap (resampling whole real events with their harm rows, 1,000 resamples) and a 95%
+  interval, without Bonferroni correction: run batch 2 only if, for both B1 minus A0-inj and B1
+  minus B0, the point estimate is at or below -0.1 CRPS points and the upper bound of the interval
+  is below zero, and if the point estimate of B1 minus A0-inj on rows outside events is at or
+  below +0.05 points. Otherwise stop, write up, and release the slot. The threshold of -0.1 is
+  about half of the oracle gain in experiment 402's `ceilings3.txt` (the flag oracle minus the
+  fitted constant mixture is -0.179, interval -0.470 to +0.016, pooled; -0.197, interval -0.587 to
+  +0.084, for the signed-MW group), whose interval includes zero. Batch 1 is therefore expected
+  to stop, which is a cheap and useful answer. Inert rule: define the combined trust as
   the geometric mean of the 3 per-lag trust weights (for B3, the attention mass on the
   lagless-forecast token). A half-hour is inside an event if any of its 3 lags lies inside a real
   corrected event (unpadded). An arm is inert if its mean combined trust outside events minus its
@@ -162,7 +170,9 @@ a stated choice; a different choice is a later experiment.
   lagless module is fitted on the other 5 blocks and forecasts the held-out block. The 6
   cross-fitted forecasts form the table of out-of-sample lagless forecasts for the training rows.
   One further lagless module is fitted on all months before the scored month, for the scored month
-  and for test-time inference. The table is shared across all arms and seeds, and is fitted once
+  and for test-time inference. A lag whose valid time falls before the scored month takes its
+  surprise from the cross-fit table and not from the further module, because the further module was
+  fitted on those months. The table is shared across all arms and seeds, and is fitted once
   per refit and seed. The calibration module and the trust head both take the table's lagless
   mixture as input in training, and the further module's mixture at test time. A stop-gradient
   on the lagless forecast stops the lagless module shaping its own surprises. Cross-fitting never
@@ -210,14 +220,26 @@ experiment 397, called U0 here, to the plain network. The interim scores of expe
 plan infers no ranking between them. Both modules get the Primary embedding. The group gate over
 input groups stays closed in every arm. Every arm trains on the injected data below, except A0.
 
+**Batch 0 (a cheap check before batch 1).** Re-score the stored forecasts of experiment 402 on harm
+rows with the lags inside each real event replaced by clean counterfactual values, using experiment
+401's harness. This gives the most that any lag-trust method can gain, because experiment 401 found
+real events move the forecast by only 0.02 to 0.03 of the step, yet the forecast with lags scores
+5.119 against 4.292 without lags on harm rows, so most of that gap is the two forecasts differing as
+whole forecasts. If the counterfactual gain is under 0.1 CRPS points at the signed-MW six, the plan
+skips batches 1 and 2.
+
 **Batch 1:**
 
+- **L0 (free).** The lagless module's own forecast, scored on all rows and on harm rows. Experiment
+  402's weights suggest the lags help the signed-MW six only at days 1 to 2, and L0 shows that
+  directly.
 - **A0.** The pooled plain network with the three lags, trained on the plain clean data (the
   reference for the architecture alone).
 - **A0-inj.** A0 trained on the same injected data as B1. B1 minus A0-inj isolates the
   architecture, and A0-inj minus A0 isolates the training data.
-- **B0.** Constant trust: B1's architecture with a learned scalar trust weight per lead band and
-  lag that does not depend on the trust inputs (the control experiment 400 recommended). B1 minus
+- **B0.** Constant trust: B1's architecture with one learned constant trust weight per metering
+  group, lead band, and lag that does not depend on the trust inputs (the control experiment 400
+  recommended). B1 minus
   B0 isolates the trust inputs.
 - **B1.** The architecture above, with the three lags.
 - **B2.** A0-inj with token-level lag dropout during training (each lag token zeroed with
@@ -284,19 +306,19 @@ lag effect). The injection writes the full event
 depth into the lag values, as a real event does, and does not set a share of the forecast. The
 share that reaches the forecast is then an output, measured by the lag-encroachment sweep.
 
-**Realism check before training: calibrate the injected lag response to the real one.** In
-experiment 401's counterfactual (replace the lags inside each real event and re-predict), the real
-lag response of the forecast is about 0.03 of the event step, against 0.32 for synthetic events of
-the same kind (interim and unaudited). A forecast with no lags reads the same 0.95 median share, so
-the 0.94 of experiment 395 Part F is not a lag effect. Injected events may therefore overstate how
-strongly the lags move the forecast on real events. Before training, the plan measures the injected
-lag response with the same counterfactual (the code is on experiment 401's branch,
-`real-vs-synthetic-share-fixed-mixture`, PR 55; the plan reads it from `origin` and imports the
-merged folder once it lands). It then tunes the injected depth, duration, and rate until the
-injected
-response is within a factor of 2 of the real response. The window statistics of injected surprises
-are also compared with those of real events, with the same factor of 2, as the lag-gate brief
-requires. Every arm is judged on real events as well as injected ones.
+**Realism check before training: match surprise statistics, not a lag response.** In experiment
+401's counterfactual (replace the lags inside each real event and re-predict), the real lag
+response of the forecast is about 0.02 to 0.03 of the event step, against 0.32 to 0.34 for
+synthetic events of the same kind (interim and unaudited). That response belongs to the fitted
+forecaster and not to the injection, so the plan does not tune the injection to a response. It
+matches the injected surprise statistics (the window statistics of the surprise series, the event
+depth as a share of the series, and the duration) to those of real events, and redesigns the
+injection if they differ by more than a factor of 2, as the lag-gate brief requires. For each
+fold, the injected depths and durations are drawn, and all tuning is done, only from real events
+outside that fold's scored month, so that the events that score an arm never tune its training
+data. The write-up reports the fitted network's counterfactual lag response on injected and on real
+events as a diagnostic. Every arm is judged on real events as well as injected ones. The plan
+follows experiment 395 Part F (the full depth in the lag values) and not Part E.
 
 **Harm-row results are a lower bound.** Because some events are unlogged, harm-row results are
 reported as a lower bound on harm. Our series are one per substation, not per transformer, so a
@@ -337,6 +359,11 @@ harm rows.
 
 ## Scoring
 
+- **Harm rows (defined once).** A harm row is a half-hour of the real held-out data whose target
+  is outside every real corrected event (unpadded, with the 7 days after each event excluded, as
+  experiment 400 did) and at least one of whose 3 origin lags lies inside a real corrected event.
+  The B4 arms' extra lags do not redefine the harm rows. A contrast on harm rows is the difference
+  of the two arms' mean CRPS on those same rows, and scoring uses real data only.
 - **The harm table** of the lag-gate brief: rows whose target is outside every event but whose lags
   lie inside one, minus the rows with clean lags, by number of lags inside the event. Each arm minus
   A0 on the harm rows, with whole-event bootstrap intervals.
@@ -397,7 +424,8 @@ is granted is to time one fit of each kind and report K and the timed duration t
   blocks from the precomputed series, not stored in full. These figures are estimates; the first
   task after the slot is granted is to time and measure one fit of each kind.
 
-Order of work once granted: the cross-fitted lagless networks; the realism check; A0 (reused if
+Order of work once granted: batch 0 (the counterfactual re-score of the stored forecasts, which
+takes no fit); the cross-fitted lagless networks; the realism check; A0 (reused if
 experiment 397's rows match); A0-inj; B0; B1; B2; B5; the stop-rule check; then batch 2 if the
 stop rule passes, in the order B3, B6, B4a, B4b, B4c, B8a, B8b, B1-rw, B1-nn, B1m, then B7 and B9.
 Every arm
