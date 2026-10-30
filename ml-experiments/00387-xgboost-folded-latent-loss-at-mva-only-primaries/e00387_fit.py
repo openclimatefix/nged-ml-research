@@ -13,12 +13,14 @@ Arms (a spec is `name[:k<kappa>][:m<0|1>][:q<Q0>]`):
   non-increasing monotone constraint on shortwave when `m1`.
 
 Data modes: `real` (the metered series) or `syn:<reactive>:<level>` (the gate's synthetic MVA
-from a signed-MW Primary, see `e00387_data`). Output: `work/preds/<mode>/<spec>/<site>_<refit>.parquet`
+from a signed-MW Primary, see `e00387_data`). Output:
+`work/preds/<mode>/<spec>/<site>_<refit>.parquet`
 with the 11 mixture quantiles of S (points of capacity are label units, a fraction), plus
 `latent_mean` (the member mean of the median latent) and `neg_share` (members with a negative
 median latent).
 
-    PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:ml-experiments/00387-* \
+    PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
+        ml-experiments/00387-* \
         systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00387-*/e00387_fit.py --selftest
 """
@@ -29,7 +31,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
@@ -50,7 +52,7 @@ SMOKE_ROUNDS: Final[int] = 20
 TILT_QUANTILE: Final[float] = 95.0
 
 
-def parse_spec(*, spec: str) -> dict[str, object]:
+def parse_spec(*, spec: str) -> dict[str, Any]:
     """Return the arm name, kappa, monotone flag, and Q0 (points of capacity) of a spec."""
     name, *parts = spec.split(":")
     out: dict[str, object] = {"name": name, "kappa": 0.0, "mono": False, "q0": 0.0}
@@ -92,7 +94,9 @@ def objective(*, levels: np.ndarray, q0: float, folded: bool, pf: float = 1.0): 
         if folded:
             apparent = fold(latent=latent, q0=q0, pf=pf)
             denominator = pf * np.sqrt(latent**2 + q0**2)
-            slope = np.where(denominator > 0, latent / np.where(denominator > 0, denominator, 1), 1 / pf)
+            slope = np.where(
+                denominator > 0, latent / np.where(denominator > 0, denominator, 1), 1 / pf
+            )
             hess = np.full_like(latent, 1 / pf**2)
         else:
             apparent, slope, hess = latent, 1.0, np.ones_like(latent)
@@ -189,7 +193,14 @@ def fit_job(  # noqa: PLR0915
     series, arrays = fd._series_and_arrays()
     row = next(r for r in series.iter_rows(named=True) if r["site"] == site)
     todo = [
-        s for s in specs if not (root / mode.replace(":", "_") / s.replace(":", "_") / f"{site}_{refit:%Y%m%dT%H%M}.parquet").exists()
+        s
+        for s in specs
+        if not (
+            root
+            / mode.replace(":", "_")
+            / s.replace(":", "_")
+            / f"{site}_{refit:%Y%m%dT%H%M}.parquet"
+        ).exists()
     ]
     if not todo:
         return []
@@ -221,15 +232,15 @@ def fit_job(  # noqa: PLR0915
         q0 = float(p["q0"]) / 100.0
         kappa = float(p["kappa"]) if folded else 0.0
         tilt = kappa * amplitude * shortwave_train / 1000.0
-        d = xgb.DMatrix(
-            matrix, label=label, weight=weight, base_margin=start_train - tilt[:, None]
-        )
+        d = xgb.DMatrix(matrix, label=label, weight=weight, base_margin=start_train - tilt[:, None])
         arm_params = {**params, "num_target": len(LEVELS), "disable_default_eval_metric": 1}
         if p["mono"]:
             arm_params["monotone_constraints"] = monotone(columns=columns)
         models[spec] = (
             xgb.train(
-                arm_params, d, num_boost_round=rounds,
+                arm_params,
+                d,
+                num_boost_round=rounds,
                 obj=objective(levels=LEVELS, q0=q0, folded=folded),
             ),
             kappa,
@@ -270,7 +281,12 @@ def fit_job(  # noqa: PLR0915
             pieces[spec].append(piece)
     lines = []
     for spec, tables in pieces.items():
-        target = root / mode.replace(":", "_") / spec.replace(":", "_") / f"{site}_{refit:%Y%m%dT%H%M}.parquet"
+        target = (
+            root
+            / mode.replace(":", "_")
+            / spec.replace(":", "_")
+            / f"{site}_{refit:%Y%m%dT%H%M}.parquet"
+        )
         target.parent.mkdir(parents=True, exist_ok=True)
         common.atomic_write(frame=pl.concat(tables), target=target)
     lines.append(f"{mode} {site} {refit:%Y-%m-%d} {todo}: {time.monotonic() - started:.0f} s")
@@ -308,9 +324,16 @@ def main() -> None:
     ) as pool:
         futures = [
             pool.submit(
-                fit_job, mode=args.mode, specs=args.specs, site=site, refit=r,
-                origins=served[r][:3] if args.smoke else served[r], nthread=1, rounds=rounds,
-                seed=args.seed, root=root,
+                fit_job,
+                mode=args.mode,
+                specs=args.specs,
+                site=site,
+                refit=r,
+                origins=served[r][:3] if args.smoke else served[r],
+                nthread=1,
+                rounds=rounds,
+                seed=args.seed,
+                root=root,
             )
             for r in refits
             for site in args.sites

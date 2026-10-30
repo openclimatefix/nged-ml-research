@@ -1,4 +1,4 @@
-"""Score the known-answer gate of experiment 387: recovered signed power against the true signed power.
+"""Score experiment 387's known-answer gate: recovered signed against true signed power.
 
 For each spec of a synthetic mode (see `e00387_data`), pooled over the sites and per site, in
 points of effective capacity and over leads up to 240 hours (days 1 to 10):
@@ -6,11 +6,14 @@ points of effective capacity and over leads up to 240 hours (days 1 to 10):
 - signed MAE of `latent_mean` against the true signed power;
 - reverse flow: true power below -1 point; balanced accuracy of "latent below 0" against it, the
   recall on reverse-flow half-hours, and the false-reverse rate on the others;
-- baselines: predict the plain median read as signed, and the plain median with its sign set negative when ERA5 shortwave
-  exceeds a threshold fitted on the training window's true signs (optimistic: ERA5 at the valid time).
+- baselines: the plain median read as signed, and the plain median with its sign set negative
+  when ERA5 shortwave exceeds a threshold fitted on the training window's true signs
+  (optimistic: ERA5 at the valid time).
 
-    PYTHONPATH=... uv run --no-sync python ml-experiments/00387-*/e00387_gate.py --mode syn:none:1.0 \
-        --specs plain f0 f2:k1:m1:q0 --sites D5 D9 D10
+```bash
+PYTHONPATH=... uv run --no-sync python ml-experiments/00387-*/e00387_gate.py \
+    --mode syn:none:1.0 --specs plain f0 f2:k1:m1:q0 --sites D5 D9 D10
+```
 """
 
 import argparse
@@ -34,7 +37,9 @@ def read_preds(*, root: Path, mode: str, spec: str, site: str) -> pl.DataFrame:
     return pl.concat([pl.read_parquet(f) for f in files]) if files else pl.DataFrame()
 
 
-def balanced(*, truth_reverse: np.ndarray, predicted_reverse: np.ndarray) -> tuple[float, float, float]:
+def balanced(
+    *, truth_reverse: np.ndarray, predicted_reverse: np.ndarray
+) -> tuple[float, float, float]:
     """Return balanced accuracy, recall on reverse flow, and the false-reverse rate."""
     recall = float(predicted_reverse[truth_reverse].mean()) if truth_reverse.any() else float("nan")
     false = float(predicted_reverse[~truth_reverse].mean())
@@ -104,10 +109,17 @@ def score_site(*, root: Path, mode: str, specs: list[str], site: str) -> list[di
             ba, recall, false = balanced(truth_reverse=rev, predicted_reverse=estimate < 0)
             out.append(
                 {
-                    "site": site, "spec": name, "n": len(truth), "n_reverse": int(rev.sum()),
+                    "site": site,
+                    "spec": name,
+                    "n": len(truth),
+                    "n_reverse": int(rev.sum()),
                     "mae_points": float(np.abs(estimate - truth).mean()),
-                    "mae_reverse_points": float(np.abs(estimate - truth)[rev].mean()) if rev.any() else float("nan"),
-                    "balanced_accuracy": ba, "recall": recall, "false_reverse": false,
+                    "mae_reverse_points": float(np.abs(estimate - truth)[rev].mean())
+                    if rev.any()
+                    else float("nan"),
+                    "balanced_accuracy": ba,
+                    "recall": recall,
+                    "false_reverse": false,
                     "negative_share_of_training_rows": float("nan"),
                 }
             )
@@ -124,7 +136,11 @@ def main() -> None:
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
     root = fit.WORK / ("preds_smoke" if args.smoke else "preds")
-    rows = [r for s in args.sites for r in score_site(root=root, mode=args.mode, specs=args.specs, site=s)]
+    rows = [
+        r
+        for s in args.sites
+        for r in score_site(root=root, mode=args.mode, specs=args.specs, site=s)
+    ]
     table = pl.DataFrame(rows).drop("negative_share_of_training_rows")
     pl.Config.set_tbl_rows(200)
     pl.Config.set_tbl_cols(20)
@@ -143,7 +159,9 @@ def main() -> None:
         .sort("spec")
     )
     print(pooled.with_columns(pl.col(pl.Float64).round(3)))
-    table.write_parquet(fit.WORK / f"gate_{args.mode.replace(':', '_')}_{'smoke' if args.smoke else 'full'}.parquet")
+    table.write_parquet(
+        fit.WORK / f"gate_{args.mode.replace(':', '_')}_{'smoke' if args.smoke else 'full'}.parquet"
+    )
 
 
 if __name__ == "__main__":

@@ -33,9 +33,16 @@ def main() -> None:
             & pl.col("valid_time").dt.hour().is_between(10, 14)
         )
         latent = p["latent_mean"].to_numpy() * 100
-        rows.append({"site": site, "n": len(latent), "share_negative": float((latent < 0).mean()),
-                     "p5": float(np.percentile(latent, 5)), "median": float(np.median(latent)),
-                     "mean_neg_share_members": float(p["neg_share"].mean())})
+        rows.append(
+            {
+                "site": site,
+                "n": len(latent),
+                "share_negative": float((latent < 0).mean()),
+                "p5": float(np.percentile(latent, 5)),
+                "median": float(np.median(latent)),
+                "mean_neg_share_members": float(np.mean(p["neg_share"].to_numpy())),
+            }
+        )
     pl.Config.set_tbl_rows(20)
     print(pl.DataFrame(rows).with_columns(pl.col(pl.Float64).round(3)))
 

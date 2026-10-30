@@ -51,17 +51,26 @@ def main() -> None:
             ("train", frame.filter(pl.col("valid_time") < TRAIN_END)),
             ("full", frame),
         ):
-            for kind, mask in (("all", sub), ("abs", sub.with_columns(reading=pl.col("reading").abs()))):
+            for kind, mask in (
+                ("all", sub),
+                ("abs", sub.with_columns(reading=pl.col("reading").abs())),
+            ):
                 if site in ("D5", "D10") and kind == "all":
                     continue
                 r = kind == "abs" and site in ("D5", "D10")
                 values = mask["reading"]
-                qs = {q: values.quantile(q) for q in QUANTILES}
+                qs = {q: float(np.quantile(values.to_numpy(), q)) for q in QUANTILES}
                 counts = {t: int((values < t).sum()) for t in THRESHOLDS}
                 print(
-                    site, row["units"], label, "abs-of-signed" if r else "metered", values.len(),
-                    "min/q0.1/q1/q5 =", [round(v, 3) for v in qs.values()],
-                    "counts<1,2,5% =", counts,
+                    site,
+                    row["units"],
+                    label,
+                    "abs-of-signed" if r else "metered",
+                    values.len(),
+                    "min/q0.1/q1/q5 =",
+                    [round(v, 3) for v in qs.values()],
+                    "counts<1,2,5% =",
+                    counts,
                 )
         low = frame.filter(pl.col("reading") < 2.0)
         local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
@@ -73,7 +82,7 @@ def main() -> None:
                 "\n  by hour",
                 low.group_by(local.dt.hour().alias("h")).len().sort("h").rows(),
                 "\n  sunny share",
-                round(float((low["shortwave"] > SUNNY_SHORTWAVE).mean()), 3),
+                round(float(np.mean((low["shortwave"] > SUNNY_SHORTWAVE).to_numpy())), 3),
             )
         frames.append(frame)
     pl.concat(frames).write_parquet(WORK / "step0.parquet")

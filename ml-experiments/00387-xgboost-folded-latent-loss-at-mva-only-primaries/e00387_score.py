@@ -74,21 +74,31 @@ def main() -> None:
     stored = s381.stored_frame(name="only_M", series=series)
     gate = {"plain": arms["plain"], "stored_monthly": stored}
     joined = (
-        gate["plain"].select("time_series_id", "power_fcst_init_time", "valid_time", "q50")
+        gate["plain"]
+        .select("time_series_id", "power_fcst_init_time", "valid_time", "q50")
         .join(
             stored.select("time_series_id", "power_fcst_init_time", "valid_time", "q50"),
-            on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_stored",
+            on=["time_series_id", "power_fcst_init_time", "valid_time"],
+            suffix="_stored",
         )
     )
     gap = (joined["q50"] - joined["q50_stored"]).abs()
-    print(f"GATE (refit plain vs stored only_M): {joined.height} rows, mean |gap| {gap.mean():.4f} MW")
+    print(
+        f"GATE (refit plain vs stored only_M): {joined.height} rows, mean |gap| {gap.mean():.4f} MW"
+    )
     table, scored, rows = s381.score_arms(arms=arms, series=series, ctx=ctx)
     print("\n== absolute CRPS, days 1 to 10, per Primary ==")
     print(
         pl.concat(
-            [t.filter(pl.col("metric") == "crps", pl.col("slice") == HEADLINE)
-             .select("label", "group", pl.lit(n).alias("arm"), "value") for n, t in scored.items()]
-        ).pivot(on="arm", index=["label", "group"], values="value").sort("group", "label")
+            [
+                t.filter(pl.col("metric") == "crps", pl.col("slice") == HEADLINE).select(
+                    "label", "group", pl.lit(n).alias("arm"), "value"
+                )
+                for n, t in scored.items()
+            ]
+        )
+        .pivot(on="arm", index=["label", "group"], values="value")
+        .sort("group", "label")
     )
     for name, treat, ref in CONTRASTS:
         print(f"\n== {name}: {treat} minus {ref}, CRPS, points, level {LEVEL:.2f}% ==")
@@ -96,16 +106,25 @@ def main() -> None:
             where_slice = pl.col(HEADLINE) if sl == HEADLINE else pl.col(sl) & pl.col(HEADLINE)
             for gname, where in SELECTIONS.items():
                 r = metrics.month_bootstrap_contrast(
-                    treatment=rows[treat], reference=rows[ref], metric="crps",
-                    where=where & where_slice, level_percent=LEVEL, n_resamples=RESAMPLES,
+                    treatment=rows[treat],
+                    reference=rows[ref],
+                    metric="crps",
+                    where=where & where_slice,
+                    level_percent=LEVEL,
+                    n_resamples=RESAMPLES,
                     slice_table=table,
                 )
-                print(f"{sl:18s} {gname:20s} {r['difference']:+.3f} "
-                      f"({r['lower']:+.3f} to {r['upper']:+.3f}) n={r['n_half_hours']}")
+                print(
+                    f"{sl:18s} {gname:20s} {r['difference']:+.3f} "
+                    f"({r['lower']:+.3f} to {r['upper']:+.3f}) n={r['n_half_hours']}"
+                )
         print("per Primary, 95%, days 1 to 10")
         by_primary = metrics.reported_contrast_by_primary(
-            treatment=rows[treat], reference=rows[ref], metric="crps",
-            where=pl.col(HEADLINE), slice_table=table,
+            treatment=rows[treat],
+            reference=rows[ref],
+            metric="crps",
+            where=pl.col(HEADLINE),
+            slice_table=table,
         )
         print(by_primary)
         (WORK / "scores").mkdir(exist_ok=True)
@@ -116,12 +135,18 @@ def main() -> None:
     for left_out in MVA_ONLY_SITES:
         keep = pl.col("label").is_in([x for x in MVA_ONLY_SITES if x != left_out])
         r = metrics.month_bootstrap_contrast(
-            treatment=rows["f2_q2"], reference=rows["plain"], metric="crps",
-            where=keep & pl.col(HEADLINE), slice_table=table,
+            treatment=rows["f2_q2"],
+            reference=rows["plain"],
+            metric="crps",
+            where=keep & pl.col(HEADLINE),
+            slice_table=table,
         )
-        print(f"without {left_out:4s} {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f})")
+        print(
+            f"without {left_out:4s} {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f})"
+        )
     tails = ["pinball_q01", "pinball_q05", "pinball_q95", "pinball_q99",
-             "coverage_q01", "coverage_q05", "coverage_q95", "coverage_q99", "twcrps", "mae_median"]  # fmt: skip
+             "coverage_q01", "coverage_q05", "coverage_q95", "coverage_q99",
+             "twcrps", "mae_median"]  # fmt: skip
     print("\n== tails, twCRPS, MAE of the median: mean over Primaries, days 1 to 10 ==")
     for name in arms:
         t = scored[name].filter(pl.col("slice") == HEADLINE, pl.col("metric").is_in(tails))
@@ -129,14 +154,17 @@ def main() -> None:
         print(t.group_by("metric").agg(pl.col("value").mean()).sort("metric"))
     print("\n== D12 tails and MAE ==")
     for name in arms:
-        t = scored[name].filter(pl.col("slice") == HEADLINE, pl.col("metric").is_in(tails),
-                                pl.col("label") == "D12")
+        t = scored[name].filter(
+            pl.col("slice") == HEADLINE, pl.col("metric").is_in(tails), pl.col("label") == "D12"
+        )
         print(name, dict(zip(t["metric"], t["value"].round(3), strict=True)))
     print("\n== slice CRPS, MVA-only mean over Primaries: plain, f0, f2_q2 ==")
     for sl in ("sunny_unit_shape", "sunny_april_june", "winter_nights", "cold_nights",
                "economy_7_step", "event_rows", "event_following_7_days"):  # fmt: skip
         parts = [
-            rows[n].filter(pl.col(sl), pl.col(HEADLINE)).group_by("group")
+            rows[n]
+            .filter(pl.col(sl), pl.col(HEADLINE))
+            .group_by("group")
             .agg(pl.col("crps").mean().alias(n), n_half_hours=pl.len())
             for n in ("plain", "f0", "f2_q2")
         ]

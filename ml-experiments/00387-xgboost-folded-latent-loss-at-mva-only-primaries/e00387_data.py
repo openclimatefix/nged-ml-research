@@ -42,9 +42,7 @@ def shortwave_of(*, arrays: common.SeriesArrays) -> np.ndarray:
     return arrays.features[:, common.feature_columns().index("shortwave")].astype(float)
 
 
-def synthesise(
-    *, arrays: common.SeriesArrays, level: float, reactive: str
-) -> Synthetic:
+def synthesise(*, arrays: common.SeriesArrays, level: float, reactive: str) -> Synthetic:
     """Inject photovoltaic output of size `level`, discard the sign, and add reactive power.
 
     The output at 1000 W/m² is `level` x `PEAK_FACTOR` x the median reading of the training
