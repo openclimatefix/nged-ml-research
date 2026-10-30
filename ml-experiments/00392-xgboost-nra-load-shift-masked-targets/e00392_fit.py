@@ -155,6 +155,7 @@ def run_job(
     seed: int,
     out_dir: Path,
     mask_dir: Path | None,
+    device: str = "cuda",
 ) -> list[str]:
     """Fit one arm and form at one refit for each site lacking its file, and forecast its runs."""
     name = f"{arm_name}_{form}"
@@ -184,7 +185,7 @@ def run_job(
                 pl.Series(common.take(values=drop.astype(np.float32), index=target) < 0.5)
             )
         models[site] = xgb.train(
-            fd.parameters(config=config, seed=seed, nthread=nthread),
+            {**fd.parameters(config=config, seed=seed, nthread=nthread), "device": device},
             base.train_matrix(known=known, row=row, refit=refit, arm=arm),
             num_boost_round=rounds,
         )
@@ -231,6 +232,7 @@ def main() -> None:
     parser.add_argument("--cores", type=int, default=1)
     parser.add_argument("--seed", type=int, default=common.SEED)
     parser.add_argument("--mask-dir", type=Path, default=None, help="detector masks for r2 and rc2")
+    parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument("--smoke", action="store_true", help="2 refits, 3 runs, 20 rounds")
     args = parser.parse_args()
     series = common.series_table()
@@ -262,6 +264,7 @@ def main() -> None:
                 seed=args.seed,
                 out_dir=out,
                 mask_dir=args.mask_dir,
+                device=args.device,
             )
             for r, runs in jobs.items()
             for a in args.arms

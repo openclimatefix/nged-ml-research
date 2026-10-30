@@ -182,6 +182,16 @@ band, per group and per Primary. The lagless forms must show share 0 and no wide
 the code. A few real labelled events chosen by a rule fixed here (the longest event per Primary
 with high confidence) are compared with the synthetic ones.
 
+## Time series plots of real events (maintainer, 2026-10-30)
+
+At least 6 plots, spread over both metering groups (the signed-MW six and the MVA-only eight), each
+for one real labelled event from the corrected label table. Each plot marks the event's start and
+end and shows the actuals, the median, and the 5% to 95% band of R0, R1, and R5, in the lagged and
+lagless forms where both exist, from the forecast origin one day before the onset. The events are
+chosen by a rule fixed before looking: for each of the two groups, the three events with the largest
+labelled depth that fall inside the four screen folds (fewer if fewer exist, said on the page).
+Plots follow the `dataviz` skill, label substations by anonymised letters, and name no generator.
+
 ## Also reported
 
 Per Primary, worst Primary, per group (signed-MW six, MVA-only eight, D15 and D18 report-only),
