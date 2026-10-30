@@ -277,6 +277,28 @@ two test months, and the P1 and P4 bars and the matched false-reverse comparison
   the failed registered test. If none passes, the page is written up as the sixth failed treatment of
   the MVA problem, and S1e and the full run do not run.
 
+## Second post hoc round: the capacity prior at full weight (fixed before any score was read)
+
+**The neural Discuss session asked for one more labelled rerun after `sd03` showed the registered
+prior to be inert.** The registered loss adds the prior's negative log density to the mean loss
+divided by the effective row count (5.6 million rows with weights). That is the posterior over the
+summed log-likelihood, so the prior weighs as little as one row in 5.6 million. The rows are not
+independent, because each valid time appears once for every run that forecasts it, which is why the
+request is reasonable. The two new arms add the prior to the mean loss undivided, so its weight is
+the effective row count times larger.
+
+- **`p07`.** Undivided prior, log standard deviation 0.7 (the registered width).
+- **`p03`.** Undivided prior, log standard deviation 0.3.
+- **Fits.** As the first post hoc round: the real-sky arm at level 2.0 with Q = 2 and with no
+  injection, and the shuffled-sky arm at level 2.0 with Q = 2, on both test months, 6 fits per arm
+  and 12 in all. Rotation r1 and seed 0.
+- **Reported.** The capacity reached at D5 against the prior centre of 33.5 points, and the prior's
+  share of the gradient on the log capacities (all Primaries, and D5 alone) at the start of training
+  and at the best state, measured on one fixed batch of 16,384 training rows.
+- **Decision.** The P1 and P4 bars and the matched false-reverse comparison are unchanged. If neither
+  arm passes, the page is written up as the seventh failed treatment and the maintainer decides what
+  follows.
+
 ## Variant results (post hoc, one seed, two test months, interim)
 
 **No variant passed.** Fixing the capacity removed the false reverse-flow calls and the skill with

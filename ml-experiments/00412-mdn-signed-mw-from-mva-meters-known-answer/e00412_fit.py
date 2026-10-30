@@ -61,6 +61,7 @@ class Arm:
     """The starting capacity as a multiple of the prior centre."""
     capacity_mode: str = "learned"
     prior_log_sd: float = models.PRIOR_LOG_SD
+    prior_undivided: bool = False
 
 
 ARMS: Final[dict[str, Arm]] = {
@@ -78,6 +79,11 @@ VARIANTS: Final[dict[str, dict]] = {
 """The post hoc capacity variants of the maintainer's ruling: `C_p` held at the prior centre,
 `C_p` set only by the Primaries whose target is not folded, and a prior log standard deviation of
 0.3. Each runs as a real-sky arm and a shuffled-sky arm."""
+VARIANTS["p07"] = {"prior_log_sd": 0.7, "prior_undivided": True}
+VARIANTS["p03"] = {"prior_log_sd": 0.3, "prior_undivided": True}
+"""The capacity prior added to the mean loss undivided by the row count, at the registered log
+standard deviation 0.7 and at 0.3 (the neural Discuss session's request after `sd03` showed the
+divided prior to be inert)."""
 for _name, _kw in VARIANTS.items():
     ARMS[f"S1c-{_name}"] = Arm(**_kw)
     ARMS[f"S1c-{_name}-shuffle"] = Arm(shuffle_u=True, **_kw)
@@ -116,6 +122,7 @@ def make_model(*, arm: Arm, fold: inputs.Fold, refit: datetime, seed: int) -> mo
         u_forced_zero=arm.u_forced_zero,
         capacity_mode=arm.capacity_mode,
         prior_log_sd=arm.prior_log_sd,
+        prior_undivided=arm.prior_undivided,
     )
 
 
@@ -126,8 +133,12 @@ def train(
     seed: int,
     device: str,
     max_epochs: int = MAX_EPOCHS,
-) -> tuple[int, float]:
-    """Train with the weighted folded negative log-likelihood and early stopping on the held weeks."""
+) -> tuple[int, float, dict[str, float]]:
+    """Train with the weighted folded negative log-likelihood and early stopping on the held weeks.
+
+    Returns the epochs, the best validation loss, and the share of the capacity gradient that the
+    prior carries on a fixed batch of 16,384 training rows at the start and at the best state.
+    """
     torch.manual_seed(seed)
     t = {
         "x": torch.from_numpy(fold.x).to(device),
@@ -164,6 +175,28 @@ def train(
             gate_u=t["g"][b],
         )
 
+    diag_idx = train_idx[torch.randperm(len(train_idx), device=device)[:BATCH]]
+    prior_divisor = 1.0 if model.prior_undivided else n_eff
+
+    def prior_share() -> dict[str, float]:
+        """Return the prior's share of the gradient on `log_c` (all Primaries, and D5 alone)."""
+        if not model.log_c.requires_grad:
+            return {"all": float("nan"), "D5": float("nan")}
+        b = diag_idx
+        nll = (t["w"][b] * batch_nll(b)).sum() / t["w"][b].sum()
+        g_nll = torch.autograd.grad(nll, model.log_c)[0]
+        g_prior = torch.autograd.grad(model.penalty() / prior_divisor, model.log_c)[0]
+        d5 = int(base.primaries().filter(pl.col("site") == "D5")["primary"][0])
+        total = g_nll + g_prior
+        return {
+            "all": float(g_prior.norm() / total.norm()),
+            "D5": float(g_prior[d5].abs() / total[d5].abs()),
+            "prior_norm": float(g_prior.norm()),
+            "nll_norm": float(g_nll.norm()),
+        }
+
+    model.eval()
+    share_start = prior_share()
     best, best_state, stale, epochs = float("inf"), None, 0, 0
     for epoch in range(max_epochs):
         model.train()
@@ -171,7 +204,7 @@ def train(
         for start in range(0, len(order), BATCH):
             b = order[start : start + BATCH]
             nll = batch_nll(b)
-            loss = (t["w"][b] * nll).sum() / t["w"][b].sum() + model.penalty() / n_eff
+            loss = (t["w"][b] * nll).sum() / t["w"][b].sum() + model.penalty() / prior_divisor
             optimiser.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
@@ -190,7 +223,7 @@ def train(
     assert best_state is not None
     model.load_state_dict(best_state)
     model.eval()
-    return epochs, best
+    return epochs, best, {"start": share_start, "end": prior_share()}  # ty: ignore[invalid-return-type]
 
 
 def forecast_pair(
@@ -264,15 +297,17 @@ def fit_one(
     seed: int,
     device: str,
     max_epochs: int = MAX_EPOCHS,
-) -> tuple[models.SignedMdn, inputs.Fold, int, float, float]:
+) -> tuple[models.SignedMdn, inputs.Fold, int, float, float, dict]:
     """Fit one arm at one setting on one refit; return the network, fold, epochs, loss, seconds."""
     arm = ARMS[arm_name]
     started = time.monotonic()
     refit = refit_time(month=month)
     fold = inputs.build_fold(refit=refit, pair=pair, setting=setting, shuffle_u=arm.shuffle_u)
     model = make_model(arm=arm, fold=fold, refit=refit, seed=seed)
-    epochs, val = train(model=model, fold=fold, seed=seed, device=device, max_epochs=max_epochs)
-    return model, fold, epochs, val, time.monotonic() - started
+    epochs, val, shares = train(
+        model=model, fold=fold, seed=seed, device=device, max_epochs=max_epochs
+    )
+    return model, fold, epochs, val, time.monotonic() - started, shares
 
 
 def run_time(*, device: str) -> None:
@@ -290,7 +325,7 @@ def run_time(*, device: str) -> None:
     )
     model = make_model(arm=arm, fold=fold, refit=refit, seed=0)
     fit_started = time.monotonic()
-    epochs, val = train(model=model, fold=fold, seed=0, device=device)
+    epochs, val, _shares = train(model=model, fold=fold, seed=0, device=device)
     fit_seconds = time.monotonic() - fit_started
     cap = model.capacity().detach().cpu().numpy()
     print(
@@ -319,7 +354,7 @@ def run_first(*, arms: list[str], seed: int, device: str, months: list[str]) -> 
                 target = OUT_DIR / "first" / arm_name / f"{setting.tag}_{month}_s{seed}.parquet"
                 if target.exists():
                     continue
-                model, fold, epochs, val, seconds = fit_one(
+                model, fold, epochs, val, seconds, shares = fit_one(
                     arm_name=arm_name,
                     pair=pair,
                     setting=setting,
@@ -344,6 +379,7 @@ def run_first(*, arms: list[str], seed: int, device: str, months: list[str]) -> 
                             "epochs": epochs,
                             "val_nll": val,
                             "seconds": seconds,
+                            "prior_gradient_share": shares,
                             "capacity_points": cap,
                             "dropped": fold.n_dropped,
                         }

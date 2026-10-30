@@ -58,6 +58,7 @@ class SignedMdn(nn.Module):
         u_forced_zero: bool = False,
         capacity_mode: str = "learned",
         prior_log_sd: float = PRIOR_LOG_SD,
+        prior_undivided: bool = False,
         components: int = 3,
         hidden: int = 64,
         layers: int = 2,
@@ -79,6 +80,9 @@ class SignedMdn(nn.Module):
                 set `C_p`; a folded Primary uses the geometric mean of those, with no gradient from
                 the folded rows).
             prior_log_sd: The log standard deviation of the log-normal prior.
+            prior_undivided: Add the prior's negative log density to the mean loss as it is (the
+                prior then weighs as much as one row's likelihood) instead of dividing it by the
+                effective row count, which is the posterior over the summed log-likelihood.
             components: Mixture components.
             hidden: Width of the demand module.
             layers: Hidden layers of the demand module.
@@ -90,6 +94,7 @@ class SignedMdn(nn.Module):
             raise ValueError(msg)
         self.components, self.u_forced_zero = components, u_forced_zero
         self.capacity_mode, self.prior_log_sd = capacity_mode, prior_log_sd
+        self.prior_undivided = prior_undivided
         self.demand = base.PlainMdn(
             n_inputs=n_inputs,
             hidden=hidden,

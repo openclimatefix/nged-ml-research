@@ -106,8 +106,10 @@ def main() -> None:
         rule = (
             alt.Chart(pl.DataFrame({"bar": [bar]}).to_pandas())
             .mark_rule(strokeDash=[4, 3], color=theme.GREY_1)
-            .encode(x="bar:Q")
-        )  # ty: ignore[unresolved-attribute]
+            .encode(  # ty: ignore[unresolved-attribute]
+                x="bar:Q"
+            )
+        )
         panels.append(
             (points + rule).properties(
                 width=WIDTH,
