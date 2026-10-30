@@ -55,59 +55,64 @@ metric: >-
   `studies.eval_protocol`; leads 0.5 to 336 hours; the headline band is days 1 to 10.
 verdict: not supported
 best_arm: >-
-  D0, the pooled plain network: CRPS 3.322 at the signed-MW six and 3.908 at the MVA-only eight
-  (days 1 to 10, five test months, 3 seeds). Of the library arms, D1 scored 3.405 and 3.956, and D2
+  D0, the pooled plain neural network: CRPS 3.322 points of capacity at the signed-MW six and 3.908
+  at the MVA-only eight (days 1 to 10, five test months, 3 seeds). D1 scored 3.405 and 3.956, and D2
   scored 3.496 and 4.136.
 headline: >-
-  The network built from shared learned shapes and temperature responses (D2) scored 0.174 points
-  worse than the plain pooled network (D0) at the signed-MW six and 0.228 points worse at the
-  MVA-only eight, and was lower in 2 of 5 months at the six and 1 of 5 at the eight. Its one-month
-  gain in 2026-01 (-0.195 at the six) came from a yearly term that learned January's level.
+  The neural network built from shared learned shapes and temperature responses (D2) scored 0.174
+  points of capacity worse than the plain pooled neural network (D0) at the 6 substations that
+  record the direction of flow, and 0.228 worse at the other 8. It was better in 2 of 5 test months
+  at the six and 1 of 5 at the eight.
 lessons: >-
-  The libraries made the forecast no better and a little worse, and the learned curves were not
-  cleanly separated. D2's upper-tail coverage and upper-quantile loss were better than the plain
-  network's, and its lower-tail loss and median error were worse.
+  The libraries made the forecast slightly worse, and the learned heating curves of the one fit we
+  inspected were nearly identical. At the six, D2 covered the upper tail better than D0 and had a
+  lower loss at the upper quantiles. At the eight, D2 was worse in both tails, and its median error
+  was larger at both groups.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   A neural network built from shared, readable parts (learned daily shapes and temperature
-  responses) forecast Primary demand worse than the plain neural network on five test months: by
-  0.17 points of capacity at the 6 substations that record the direction of flow and by 0.23 points
-  at the other 8. It gave better coverage of the highest outcomes, but its typical forecast error was
-  larger, and its three heating curves came out nearly identical, so they added little to read. The
-  readable-parts design is not worth carrying forward as built.
+  responses) forecast substation demand less accurately than the plain neural network on five test
+  months: by 0.17 points of capacity at the 6 substations that record the direction of flow, and by
+  0.23 points at the other 8. Its error in the middle of the distribution was larger at both groups.
+  At the six it covered the highest outcomes better, but at the eight it was worse in both tails.
+  Under the default rule the design does not advance, and whether to pursue it is the maintainer's
+  call.
 advice:
   - >-
-    Do not carry the shape-and-response library network forward as built: it scored 0.174 worse than
-    the pooled plain network at the signed-MW six and 0.228 worse at the MVA-only eight over five
-    months (C1).
+    Do not advance the shape-and-response library network as built: it scored 0.174 worse than the
+    pooled plain network at the signed-MW six and 0.228 worse at the MVA-only eight over five months
+    (C1).
   - >-
-    Judge any design with a yearly term on at least five test months, because on 2026-01 alone the
-    term gave D2 a gain of 0.195 that reversed over the other four months (C1).
+    Judge a design that has yearly terms on at least five test months, because D2's coefficients
+    gave a gain of 0.195 in 2026-01 that reversed in other months (C1, and the audit in Checks).
   - >-
-    Give a control the same yearly columns as the arm under test (arm D0Y), because the yearly
+    Give the control the same yearly columns as the arm under test (arm D0Y), because the yearly
     columns alone moved the plain network by +0.014 at the six and -0.015 at the eight (C6).
   - >-
-    If the readable-parts idea returns, normalise heating curves so that they cannot duplicate each
-    other, because the three heating curves of D2 were nearly the same (learned temperature
-    responses figure).
+    Stop heating curves duplicating each other before reading them, because the three heating
+    curves of the one D2 fit inspected were nearly identical (learned temperature responses figure).
 date: 2026-10-30
 code: ml-experiments/00413-differentiable-physics-demand-network-part-1/
 ---
 
-**Take-home message: a network built from shared, readable parts did not forecast Primary demand as
-well as the plain pooled network.** We asked whether a network that writes each Primary's demand as
-a mix of shared learned daily shapes and shared learned temperature responses, with a plain mixture
-head on the leftover, can match the plain pooled mixture density network of [experiment
-397](../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md). Over five
-test months with three seeds each, it could not: it scored 0.174 points of capacity worse (CRPS,
-days 1 to 10) at the 6 Primaries that record the direction of flow (signed-MW six), and 0.228 worse
-at the other 8 (MVA-only eight). **The one-month result we first saw was misleading:** in 2026-01
-the library network scored 0.195 better at the six, but the gain came from a yearly term that
-learned the level of the one January it had seen, and it reversed in other months. The verdict is
-`not supported`. By the default rule (D2 within 0.03 points of D0 at both groups, which the
-maintainer has not confirmed) D2 does not advance. All numbers are interim: five test months, no
-interval.
+**Take-home message: a neural network built from shared, readable parts forecast substation demand
+less accurately than the plain neural network.** We asked whether a neural network that writes each
+substation's demand as a mix of shared learned daily shapes and shared learned temperature responses
+can forecast as accurately as the plain pooled neural network of [experiment
+397](../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md). Both
+predict a full range of outcomes, and we tested both on five held-out months, with three training
+runs (seeds) each. The error score is the continuous ranked probability score (CRPS) at 1 to 10 days
+ahead, in points of the substation's capacity. The library network scored 0.174 points worse at the
+6 substations that record the direction of flow (the signed-MW six) and 0.228 points worse at the
+other 8 (the MVA-only eight). It beat the plain network in 2 of 5 months at the six and in 1 of 5 at
+the eight.
+
+**The first month we scored was misleading.** In 2026-01 alone, with one seed, the library network
+scored 0.379 points better at the six. A fresh audit found no code error. It traced the gain to the
+library network's own yearly (day-of-year) coefficients, which had learned the level of the one
+earlier January in the training data. Over the five months the mean difference reversed, and the
+verdict is `not supported`. All numbers are interim: five test months, no interval.
 
 ![CRPS by test month for each arm](scores_by_fold.svg)
 
@@ -115,9 +120,10 @@ interval.
 
 ## Results
 
-CRPS at days 1 to 10, mean over five test months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06),
-equal weight per Primary, in points of capacity (smaller is better). Arms D0, D0Y, D1, and D2 use 3
-seeds averaged in quantile space.
+CRPS at days 1 to 10, mean over the five test months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06),
+equal weight per Primary substation, in points of capacity (smaller is better). Arms D0 to D2 use 3
+seeds averaged in quantile space. D0 is the plain pooled network, D0Y is D0 plus the yearly columns,
+D1 adds the shape library, and D2 has the shape and response libraries.
 
 | Arm | Signed-MW six | MVA-only eight |
 |---|---|---|
@@ -125,24 +131,28 @@ seeds averaged in quantile space.
 | D0Y, D0 plus the yearly columns | 3.336 | 3.893 |
 | D1, shape library, head reads all inputs | 3.405 | 3.956 |
 | D2, shape and response libraries, Primary mix | 3.496 | 4.136 |
-| GAM stack (experiment 377, stored) | 3.247 | 4.135 |
+| Generalised additive model (GAM) stack (experiment 377, stored) | 3.247 | 4.135 |
 | Monthly XGBoost (experiment 389, stored) | 3.544 | 4.019 |
 | Pooled plain network of experiment 397 (stored, no D15 and D18 cut) | 3.270 | 3.866 |
 
-- **C1, D2 minus D0:** +0.174 at the six (lower in 2 of 5 months: 2025-10 +0.139, 2025-12 +0.699,
-  2026-01 -0.195, 2026-03 +0.248, 2026-06 -0.021) and +0.228 at the eight (lower in 1 of 5).
-- **C2, D1 minus D0:** +0.082 at the six and +0.048 at the eight. Adding a shape-library mean to the
-  plain network did not help.
-- **C3, D2 minus D1:** +0.092 and +0.180. The response library did not help either.
-- **C5, D2 minus D0Y:** +0.160 and +0.243. **C6, D0Y minus D0:** +0.014 and -0.015. The yearly
-  columns alone do not explain D2's loss.
-- **Stop rule:** D2 minus D0 exceeded +0.30 in 2025-12 at the six, and the mean exceeded +0.03 at
-  both groups, so D2 does not advance. Arm D3 (one fleet-wide mix) was fitted on 2026-01 only: it
-  scored 4.745 at the six and 4.503 at the eight, so D3 minus D2 was +0.883 and +0.565.
-- **Median error:** the mean absolute error of the median forecast, in MW at the six and the eight,
-  is 5.69 and 7.08 for D0, 5.76 and 7.04 for D0Y, 5.82 and 7.13 for D1, and 6.02 and 7.23 for D2.
-  D2's typical error is larger, in the same direction as its CRPS.
-- **Tails, mean over months** (coverage nominal 0.95 and 0.99; pinball loss in points):
+- **The library network scored worse than the plain network at both groups (C1, D2 minus D0).** The
+  difference is +0.174 at the six and +0.228 at the eight. The monthly values at the six are in the
+  second figure.
+- **The libraries did not help one at a time either.** D1 minus D0 is +0.082 and +0.048 (C2), and D2
+  minus D1 is +0.092 and +0.180 (C3).
+- **The yearly columns alone do not explain the loss.** D2 minus D0Y is +0.160 and +0.243 (C5), and
+  D0Y minus D0 is +0.014 and -0.015 (C6).
+- **Under the pre-registered rule D2 does not advance.** The five-month mean of D2 minus D0 exceeds
+  +0.03 at both groups. It lies between +0.03 and +0.30, so the stop rule did not fire on the mean,
+  and the choice to continue or stop is the maintainer's. D2 minus D0 reached +0.699 at the six in
+  2025-12.
+- **Arm D3 (one fleet-wide mix) was fitted on 2026-01 only,** with one seed. It scored 4.745 at the
+  six and 4.503 at the eight, so D3 minus D2 was +0.883 and +0.565.
+- **The median error of D2 was larger at both groups.** The mean absolute error of the median
+  forecast, in MW at the six and the eight, is 5.69 and 7.08 for D0, 5.76 and 7.04 for D0Y, 5.82 and
+  7.13 for D1, and 6.02 and 7.23 for D2.
+- **D2 covered the upper tail better than D0 at the six and worse at the eight.** The table gives
+  coverage (nominal 0.95 and 0.99) and pinball loss in points, mean over months.
 
 | Arm, group | q95 coverage | q99 coverage | pinball q01 | pinball q05 | pinball q95 | pinball q99 |
 |---|---|---|---|---|---|---|
@@ -151,82 +161,79 @@ seeds averaged in quantile space.
 | D0, eight | 0.899 | 0.969 | 0.224 | 0.851 | 1.011 | 0.281 |
 | D2, eight | 0.889 | 0.966 | 0.292 | 0.998 | 1.164 | 0.372 |
 
-  At the six, D2's upper quantiles cover more outcomes and cost less (q99 pinball 0.243 against
-  0.436), and its lower quantiles cost more. At the eight, D2 is worse in both tails. The
-  curtailment-cost measure was not computed for this screen.
+- **At the six, D2's upper quantiles have the lower pinball loss and its lower quantiles the
+  higher.** For example, the q99 loss is 0.243 against 0.436. At the eight, both tails are worse.
+  The curtailment-cost measure was not computed for this screen.
+- **Per Primary (C1, mean of five months),** D2 is better at D5 (-0.276), D16 (-0.094), D14
+  (-0.068), and D21 (-0.053). It is worse at D11 (+1.161), D8 (+0.657), D12 (+0.401), D3 (+0.262),
+  and D10 (+0.249). D15 and D18 are report-only.
 
-![Day-ahead forecasts of D0 and D2 at D5](example_day_ahead.svg)
+![Day-ahead forecasts of D0 and D2 at D5, run 2026-01-12](example_day_ahead.svg)
 
-![A 14-day forecast of D0 and D2 at D5](example_14_day.svg)
-
-![D2's eight learned shapes](learned_shapes.svg)
+![A 14-day forecast of D0 and D2 at D5, run 2026-01-12](example_14_day.svg)
 
 ![D2's learned temperature responses](learned_temperature_responses.svg)
 
 - **Learned curves (D2, 2026-01 fold, seed 0).** The three heating curves are nearly identical, so
-  the library did not learn three different responses. The eight shapes are smooth and mix freely,
-  and the page makes no claim that any one of them stands for a physical daily profile. The
+  the library did not learn three different responses. The eight learned shapes are smooth and mix
+  freely, and this page does not claim that any one of them is a physical daily profile. The
   comparison with the GAM's fitted curves and the three-seed stability check were not run, because
   D2 did not advance.
-- **Per Primary (C1, mean of five months):** D2 is better at D5 (-0.276), D16 (-0.094), D14
-  (-0.068), and D21 (-0.053), and worse at D11 (+1.161), D8 (+0.657), D12 (+0.401), and D10
-  (+0.249). D15 and D18 are report-only.
 
 ## Predictions
 
-- **P1 held, but the advance rule failed.** D2 minus D0 lies between -0.05 and +0.25 at both groups
-  (+0.174 and +0.228), yet the rule needs at most +0.03.
-- **P2 held:** D1 minus D0 is +0.082 and +0.048, within -0.05 to +0.10.
-- **P3 not tested on five months:** D3 ran on 2026-01 only, where D3 minus D2 was +0.883 at the six,
-  outside the predicted 0 to +0.30.
-- **P4 held:** the six's q95 coverage is 0.829 (D0), 0.827 (D1), and 0.880 (D2), within 0.82 to
-  0.90.
-- **P5 holds by construction,** because each library curve is monotone.
+The predictions were written for the 2026-01 fold with one seed. We judge them here on the
+five-month means, and note the one-fold outcome where it differs.
+
+- **P1 (D2 minus D0 between -0.05 and +0.25 at both groups):** held on the five-month means (+0.174
+  and +0.228). It failed on 2026-01 with seed 0 at the six (-0.379).
+- **P2 (D1 minus D0 between -0.05 and +0.10):** held on the means (+0.082 and +0.048). It failed at
+  the six on 2026-01 (+0.269 with three seeds).
+- **P3 (D3 minus D2 between 0 and +0.30):** failed on 2026-01, the only fold with D3 (+0.883 at the
+  six, +0.565 at the eight).
+- **P4 (q95 coverage at the six between 0.82 and 0.90):** held on the means for D0 (0.829), D1
+  (0.827), and D2 (0.880). It failed for D0 and D1 on 2026-01 with seed 0 (0.757 and 0.698).
+- **P5 (mixed temperature response monotone at 14 of 16 Primaries):** all 16 were monotone, which
+  holds by construction.
 
 ## Checks
 
-- **Median minus the mean of the 11 quantiles (a weighted average, MW):** D0 -0.028, D0Y -0.026, D1
-  -0.033, D2 -0.026. No arm's spread shifts its forecast.
-- **Error of the median beside the CRPS contrasts:** the mean absolute error of the median points
-  the same way as the CRPS (above).
-- **Audit triggers fired:** trigger 2 (D2 minus D0 on 2026-01 was -0.379 against a predicted -0.05
-  to +0.25) and trigger 5 (D1, which contains D0's inputs, scored worse than D0 in 2026-01). A fresh
-  Sonnet audit found no bug. It re-derived the per-Primary scores, found no leakage, and attributed
-  the 2026-01 gap to the yearly term: zeroing D2's yearly coefficients at inference moved its
-  2026-01 score at the six from 3.861 to 5.298. The audit could not say why D0 sits 0.1 to 0.2 above
-  experiment 397's plain network seeds. The other five months settle the question the audit left
-  open: the 2026-01 gain was specific to that month.
-- **Leave-one-out and interval triggers:** the screen reports no intervals and no
-  leave-one-site-out, so triggers 4 and 6 were not tested.
+- **The median forecast and the mean forecast agree.** Median minus the weighted mean of the 11
+  quantiles (MW) is -0.028 for D0, -0.026 for D0Y, -0.033 for D1, and -0.026 for D2, so no arm's
+  spread shifts its forecast.
+- **The median error points the same way as the CRPS.** The error figures are in Results.
+- **Two audit triggers fired.** D2 minus D0 on 2026-01 with seed 0 was -0.379, outside the predicted
+  -0.05 to +0.25. D1, which contains D0's inputs, scored worse than D0 on 2026-01.
+- **A fresh Sonnet audit found no bug.** It re-derived the per-Primary scores, found no leakage, and
+  traced the 2026-01 gap to D2's yearly coefficients: zeroing them at inference, without a refit,
+  moved D2's seed-0 score at the six from 3.861 to 5.298. The audit could not say why seed-0 D0 sat
+  0.1 to 0.25 above the stored seeds of experiment 397 on 2026-01. On five months the gap is 0.05 at
+  the six and 0.04 at the eight.
+- **The five months show the 2026-01 gain was specific to that month,** because D2 minus D0 is
+  positive in four of the five months at the eight and in three at the six.
+- **Not tested:** the screen has no intervals and no leave-one-Primary-out check, so the audit
+  triggers for those were not run.
 
 ## Caveats
 
-- **Advance rule not confirmed.** The 0.03 threshold was the manager's default, and the maintainer
-  has not confirmed it.
-- **Five test months, no interval, seed-averaged.** Every number is interim.
-- **Lead range.** The headline band is days 1 to 10, the range NGED care about.
-- **Yearly harmonics sit in D1 to D3 and in D0Y, not in D0.** The data start in 2024-04, so a fold
-  holds at most two of each calendar month, and the yearly term fits very few years.
-- **D0 is not a copy of experiment 397's network.** D0 uses the D15 and D18 cut, its own
-  standardiser, and its own seed stream, and scores 0.05 worse than the stored 3-seed pooled network
-  at the six.
-- **Rows dropped for a missing target: none were found.** The raw matrices from experiment 397 omit
-  the flagged half-hours already, so this experiment did not count them.
+- **The advance threshold of 0.03 points is the manager's default,** and the maintainer has not
+  confirmed it. The five months have no interval, so every number is interim.
+- **The headline range is 1 to 10 days ahead,** the range NGED care about.
+- **Yearly harmonics sit in D1, D2, and D0Y but not in D0.** The data start in April 2024, so the
+  yearly terms were fitted on at most two years.
+- **D0 is not a copy of the network of experiment 397.** It uses the D15 and D18 cut, its own
+  standardiser, and its own seed stream, and it scores 0.05 worse than the stored 3-seed pooled
+  network at the six.
+- **No rows with a missing target were found.** The raw matrices from experiment 397 omit the
+  flagged half-hours already, so this experiment did not count them.
 - **Shapes and the gate are normalised on 4,096 sampled training rows,** not on a grid of ordinary
   days.
-- **The monotonicity check cannot fail,** because each curve is monotone by construction.
 - **Unlogged load-shift events.** NGED says load-shift events may be missing from their logs, so the
   rows may hold events that no label covers.
-- **Resources.** Fits ran on the GPU: D2 took 59 to 257 s per fit (2026 months), peak GPU memory 1.6
-  GB, and peak host memory 8.3 GB on the largest fold. Fitted networks are in the experiment's
-  private folder under `work/models/`, and the scripts are in
+- **Resources.** The fits ran on the GPU. A D2 fit took 51 to 257 s, peak GPU memory was 1.6 GB, and
+  peak host memory was 8.3 GB on the largest fold. Fitted networks are in the experiment's private
+  folder under `work/models/`, and the scripts are in
   `ml-experiments/00413-differentiable-physics-demand-network-part-1/`.
-
-## What the next experiment should answer
-
-Whether a network with readable parts can be made to match the plain network at all. The shapes and
-heating curves overlap, so the first step would be to force them apart and to read them against the
-GAM's fitted curves. No experiment is started by this page.
 
 ## Plan as committed before any fit
 
@@ -239,7 +246,7 @@ GAM's fitted curves. No experiment is started by this page.
 **The question is whether a neural network built from shared, readable parts can forecast Primary
 demand as well as a plain neural network.** The aim behind the series is a forecaster that keeps the
 GAM's (generalised additive model's) readable shapes and temperature curves and gains the
-adaptability of the networks. Experiment 397's pooled plain network scored 3.264 points of CRPS
+adaptability of the networks. Experiment 397's page gave its pooled plain network 3.264 points of CRPS
 (days 1 to 10) at the signed-MW six, close to the GAM stack's 3.239. The first fit checks, on one
 winter month, whether the library design loses much against that plain network. It is a screen to
 stop a poor design early, not a ranking.
