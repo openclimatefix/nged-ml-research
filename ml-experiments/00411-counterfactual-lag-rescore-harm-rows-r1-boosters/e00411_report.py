@@ -79,10 +79,10 @@ def main() -> None:
         for site in sites:
             one = sel.filter(pl.col("site") == site)
             if not one.is_empty():
-                print(
-                    f"  {site}: {one.height} rows, gain "
-                    f"{one['crps_real'].sum() / one.height - one['crps_cf'].sum() / one.height:+.3f}"
+                site_gain = float(one["crps_real"].mean() or 0.0) - float(
+                    one["crps_cf"].mean() or 0.0
                 )
+                print(f"  {site}: {one.height} rows, gain {site_gain:+.3f}")
 
 
 if __name__ == "__main__":
