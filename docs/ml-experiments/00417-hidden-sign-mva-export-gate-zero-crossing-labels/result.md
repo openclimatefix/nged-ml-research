@@ -31,23 +31,29 @@ prediction: >-
   score (design C), the Sunday-and-holiday contrast (D), and the sunny-versus-cloudy slope (E) each
   separate injected from no-injection days or Primary-months with an area under the receiver
   operating characteristic curve of at least 0.9 for C and at least 0.8 for D and E. At level 1.0
-  and at power factor 0.97 the areas fall, and at least one stays at 0.8 or above. P1 (design A on
-  rotation r1, level 2.0, reactive floor 2 points): pooled balanced accuracy of the sign at least
-  0.85, each hidden Primary at least 0.70, false-reverse rate at most 5%, no-injection false reverse
-  at most 1% at D5, and a margin of at least 0.1 balanced accuracy over the shuffled-sky arm. P2
-  (A with H): removes at least half of A's false calls at the injected pair, and the D5 placebo
-  still passes with A alone. P3 (C): the same bars as P1. P4 (power factor 0.97): reported, with no
-  bar, because experiment 366's rule failed there. The row-level false-reverse rate at the injected
-  pair stays above 5% under A in June (experiment 408's rule-only labels gave 3.8% to 6.1% at level
-  2.0), which would show that a Primary-level gate fixes the placebo and not the pair.
+  the areas fall, and at least one stays at 0.8 or above. The bars
+  (P1 for design A, P3 for design C) are read on rotation r1, level 2.0, reactive floor 2 points,
+  in the injected setting, pooled over the hidden pair D5 and D10: balanced accuracy of the sign at
+  least 0.85 pooled and at least 0.70 at each hidden Primary, false-reverse rate at most 5%, and a
+  margin of at least 0.1 balanced accuracy over the shuffled-sky arm; in the no-injection setting,
+  false reverse at most 1% at D5. Prediction for A: it passes the D5 placebo bar (by construction,
+  because a shut gate truncates the density at zero) and fails the 5% bar at the pair in June,
+  which would show that a Primary-level gate fixes the placebo and not the pair (experiment 408's
+  rule-only labels gave 3.8% to 6.1% at level 2.0). The hypothesis is refuted for A if the gate
+  opens at neither injected Primary or shuts at one of them. P2 (A with H): removes at least half
+  of the false calls of S1c-ref at the injected pair. P3 (C): passes all bars, the 5% bar included.
+  P4 (power factor 0.97, reactive power proportional to the Primary's own demand): reported with no
+  bar, because experiment 366's rule failed there; the W-shape area under the curve stays at or
+  above 0.8.
 decision_rule: >-
   The bars of P1 apply unchanged to A, A with H, and C, on rotation r1 only. Stop rule, registered:
-  stop the signed-MW work if A (with or without H) and C both fail the bars on rotation r1 (about 20
-  to 32 fits in all, the reference included), or if every zero-fit diagnostic gives an area under
+  stop the signed-MW work if A (with or without H) and C both fail the bars on rotation r1 (S1c-ref, A, and
+  C make about 20 fits; A with H and the power-factor fits bring the most to 32), or if every zero-fit diagnostic gives an area under
   the curve below 0.8 between level-2.0 injected days and no-injection days. Stopping means: publish
   unsigned MVA forecasts at the eight, label D12 alone "inferred, heavy reverse flow only", count
-  the result as the eighth failed treatment, and add no further capacity priors. Passing means
-  running rotations r2 and r3 for the winning design as a follow-up experiment, not here. No porting
+  the result as the eighth failed treatment, and add no further capacity priors. Design B is a
+  follow-up, run only after the stop decision and only if A passes the placebo and leaves the pair
+  above 5%. Passing means running rotations r2 and r3 for the winning design as a follow-up experiment, not here. No porting
   threshold applies, because the experiment is a lab test and nothing here ports to production.
 benchmark: >-
   S1c refitted on the CAMS-and-ERA5 inputs (the reference of this experiment), S1c with the sky
@@ -62,6 +68,8 @@ metric: >-
   operating characteristic curve.
 date: 2026-10-30
 code: ml-experiments/00417-hidden-sign-mva-export-gate-zero-crossing-labels/
+take_home_message: >-
+  Written when the experiment finishes.
 production_status: not-for-production
 adopted_in: none
 ---
@@ -119,18 +127,24 @@ All code is in `ml-experiments/00417-hidden-sign-mva-export-gate-zero-crossing-l
 - `e00417_inputs.py` copies experiment 412's `site_arrays` and `build_fold`, and changes three
   things. The demand module's input columns are the irradiance-free columns of experiment 405 with
   every ensemble mean and spread column removed and one ERA5 temperature column added
-  (standardised on the training rows). `Setting` gains a power factor, so the reading is
-  `sqrt(P^2 (1 + tan^2 phi) + Q^2)` (power factor 1 is experiment 412's reading). The fold also
+  (standardised on the training rows). `Setting` gains a power factor with demand-driven reactive power, as in experiment 366: the reading
+  is `sqrt(P'^2 + (tan(phi) y)^2 + Q^2)`, with `y` the Primary's own signed power before the farm is
+  injected and `tan(phi)` from `studies.dp_operator.tan_phi_from_power_factor` (power factor 1 is
+  experiment 412's reading). The reactive term follows the demand, so it fills the midday dip, which
+  is what defeated experiment 366's rule. The lags use the same definition. The fold also
   carries each row's valid time and `k`.
 - `e00417_models.py` imports experiment 412's `SignedMdn`, mixture functions, and quantiles. It adds
   a negative log-likelihood with a per-row mask for where the folded density applies and an optional
   signed label for labelled rows.
 - `e00417_gates.py` holds the Primary-level gate (design A: experiment 366's rule as experiment 408
   fits it, a Spearman correlation of the reading with `u` above +0.3 on sunny summer-midday
-  training rows, or a 1st percentile below 1.0 point of capacity) and the high-irradiance gate H
+  training rows, or a 1st percentile below 3 points of capacity, which is 1 point above the reactive floor, because every
+  folded reading is at least 2 points and only the correlation branch can fire. The +0.3 comes from
+  experiment 366's results on these same Primaries, so the gate is not a clean out-of-sample
+  choice) and the high-irradiance gate H
   (`u_hi(h) = D_ref(h) / C_max` with `D_ref(h)` the median reading at UTC hour `h` on overcast summer
-  training rows (`k` below 0.3) and `C_max` the largest studies-page capacity, in points, among the
-  four signed Primaries that are not hidden, never the hidden pair; `u_hi` is at least 0.3).
+  training rows (`k` below 0.3) and `C_max` the largest studies-page capacity (an external figure), in points, among the
+  four signed Primaries that are not hidden, never the hidden pair; the gate is `u >= max(0.3, u_hi(h))` with `u` the scaled shape).
 - `e00417_diagnostics.py` runs the zero-fit diagnostics of C, D, and E, and the zero-crossing
   labeller of design C.
 - `e00417_fit.py` fits and forecasts, `e00417_score.py` scores (copying experiment 412's metrics
@@ -140,7 +154,8 @@ All code is in `ml-experiments/00417-hidden-sign-mva-export-gate-zero-crossing-l
 
 **The diagnostics read the folded readings at the six signed-MW Primaries before any network is
 trained.** Rows are unique valid times before 2025-07-01 (the window that sets the injection level),
-with `k` at least 0.7 on the day for C and at least 0.7 at the half-hour for D and E. Settings:
+with the minimum of `k` over `t0 +- 5 h` at least 0.7 on the day for C (a clear day) and `k` at
+least 0.7 at the half-hour for D and E. Settings:
 level 2.0 (reactive floor 2 points), level 1.0, level 2.0 at power factor 0.97, and no injection.
 The no-injection group is D5, D9, D11, D14, and D16, and D10 is reported on its own, because its 130
 real reverse half-hours make it no clean placebo.
@@ -154,7 +169,10 @@ real reverse half-hours make it no clean placebo.
   The labeller calls the half-hours between the two minima reverse flow on days whose score exceeds a
   threshold, which is the 99th percentile of the score over the no-injection days of the four
   visible signed Primaries (D9, D11, D14, D16), so the threshold uses no information from the hidden
-  pair.
+  pair. In a fit the threshold is recomputed per refit from the rows `build_fold` selects (up to the
+  refit minus the cutoff age, inside the 730-day window), and its value is reported per refit. The
+  diagnostics also report the labeller's recall and false-positive rate at that threshold on D5's
+  injected and no-injection days.
 - **D, the Sunday-and-holiday contrast.** For each clear Sunday or bank holiday, the difference
   between its midday reading (10 to 14 UTC) and the mean midday reading of clear Tuesdays to
   Thursdays within 14 days, after removing a linear ERA5-temperature term fitted on those days. The
@@ -164,7 +182,10 @@ real reverse half-hours make it no clean placebo.
   `k` after removing a mean for each half-hour of the day and ISO week, with ERA5 temperature as a
   covariate. The area under the curve compares injected and no-injection Primary-months.
 - **Reported with each area:** the number of units behind it (days, pairs, or Primary-months), and
-  its bootstrap 95% interval over those units.
+  its 95% interval from a bootstrap that resamples whole days within each Primary (E: Primary-months
+  within a Primary). The bars (0.9 for C, 0.8 for D and E) and the stop rule's 0.8 apply to the
+  pooled point estimate, and the per-Primary areas are reported beside it. D's temperature term is
+  fitted separately for each Primary.
 
 ## Fits (after the code review, with the manager's slot)
 
@@ -184,15 +205,27 @@ Design B (demand frozen off the gate) runs only if A passes the placebo and leav
 false-reverse rate above 5%. Designs D and E enter the fits only if their diagnostics pass and A
 and C fail. Designs F and G are not run.
 
+- **Gate decisions are printed before any fit.** Design A differs from S1c-ref only where the gate
+  is shut, so A at a hidden Primary whose gate is open is the same fit as S1c-ref and its result is
+  copied from S1c-ref (same seed), not refitted. A shut gate at D5 in the no-injection setting gives
+  zero false reverse by construction, which tests the gate and not the network, and the write-up
+  says so. A cannot lower the false-reverse rate at a Primary where the gate is open. A+H differs
+  from A only through the row gate H, and is fitted in full.
 - **Gate timing.** Design A's gate is computed once per Primary per refit from the folded readings
   in the training window (rows before the refit), using the real `u` and `k`, also in the
   shuffled-sky arm.
 - **Labels.** Design C's labels are computed once per Primary per refit from the training window
-  only. Rows on sunny days get a sign (reverse between the minima of a W day, forward otherwise);
-  rows on other days keep the folded likelihood with experiment 412's `u >= 0.3` gate.
-- **Compute.** At 29 to 83 seconds per fit, 24 to 32 fits take 1.5 to 5 hours on one GPU process
-  under 8 GB with one feeder core, run under `MemoryMax=8G`, stopping if available memory falls
-  below 12 GB. No stored forecast is reused, because experiment 412 read ENS inputs.
+  only. Only days whose W score exceeds the threshold are labelled: reverse between the two minima,
+  forward outside them. Labelled rows use the signed density at `y' = +-sqrt(max(r^2 - Q0^2, 0))`
+  with no folding. Every other row, including sunny days below the threshold, keeps the folded
+  likelihood with experiment 412's `u >= 0.3` gate, so moderate export is never taught `X > 0`.
+- **Compute.** Experiment 412 timed a fit at 29 to 83 seconds, 45 seconds to 3 minutes with the fold
+  build, so 32 fits take 25 minutes to 1.6 hours on one GPU process under 8 GB with one feeder
+  core, run as `systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue`, with `free -g`
+  checked before each launch and the run stopped if available memory falls below 12 GB (the
+  manager's limit for this experiment). Refits are monthly. No stored forecast is reused, because
+  experiment 412 read ENS inputs. State files go to `models/<arm>/` in this experiment's private
+  folder.
 
 ## Scoring
 
@@ -200,8 +233,24 @@ and C fail. Designs F and G are not run.
 0.3`) with `k` at least 0.7, a predicted reverse flow is `P(X < 0) > 0.5`, the false-reverse rate
 has as its denominator the sunny summer-midday half-hours with no injected and no real reverse flow,
 and every recall is reported with its half-hour count. The prior penalty's share of the capacity
-gradient is printed for every arm. The first three arms' numbers are interim (two months, one seed,
+gradient is printed for every arm. Tail calibration (coverage and pinball loss of the 0.01, 0.05, 0.95, and 0.99 signed quantiles) is
+reported per Primary beside the sign scores, and a signed-median-against-truth example is drawn at
+D5 and D10. The reference's absolute numbers may differ from experiment 412's, because the inputs
+differ. The first three arms' numbers are interim (two months, one seed,
 point estimates only).
+
+## Departures from the design note
+
+- **The H arm is A with H layered on top**, not H alone, and the D5 placebo "should still fail with
+  H alone" is not tested.
+- **Design C omits the note's CAMS filter that discards a minimum coinciding with a dip in CAMS
+  irradiance.** The day filter (`k` at least 0.7 across `t0 +- 5 h`) removes cloudy days instead.
+- **Design A reuses S1c-ref's fits** where the gate is open (see "Fits").
+- **Power factor 0.97 uses reactive power proportional to the Primary's own demand**, as experiment
+  366 did, with the 2-point floor kept.
+- **Designs B, D, and E run only as follow-ups after the stop decision.**
+- **Tail calibration and example plots follow `common.md`;** day-ahead and 14-day forecast graphs
+  are not drawn, because the experiment scores the sign.
 
 ## Risks
 
