@@ -270,11 +270,11 @@ the scalar, the clip, and `rho`. A PIT histogram of the net-demand mixture at th
 the calibration, in daylight and at night.
 
 **Two more reports.** C3 minus A0 is reported beside the main contrast, as the practical question
-(does the explicit solar term beat the same network given irradiance?). The share of the daylight variance that
-A0-noirr's demand module takes up from solar geometry, calendar, and the Primary embedding alone is
-reported too. Removing irradiance does not fully remove the identifiability problem, because cloud cover
-and temperature remain proxies for it, so capacity is identified only from the irradiance anomaly within
-each geometry-and-season cell.
+(does the explicit solar term beat the same network given irradiance?). The share of the daylight
+variance that A0-noirr's demand module takes up from solar geometry, calendar, and the Primary
+embedding alone is reported too. Removing irradiance does not fully remove the identifiability
+problem, because cloud cover and temperature remain proxies for it, so capacity is identified only
+from the irradiance anomaly within each geometry-and-season cell.
 
 ## Example charts
 
