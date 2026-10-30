@@ -147,6 +147,7 @@ def booster_parameters(*, arm: arms.Arm, columns: list[str], nthread: int) -> di
         **common.QUANTILE_PARAMETERS,
         "seed": arm.seed,
         "nthread": nthread,
+        "device": os.environ.get("E396_DEVICE", "cuda"),
         **arm.params,
     }
     constraint = monotone_string(arm=arm, columns=columns)
@@ -260,7 +261,10 @@ def predict_run(
             continue
         matrix = xgb.DMatrix(rows.select(columns).to_numpy().astype(np.float32))
         raw = booster.predict(
-            matrix, iteration_range=(0, iterations) if iterations is not None else (0, 0)
+            matrix,
+            iteration_range=(0, min(iterations, booster.num_boosted_rounds()))
+            if iterations is not None
+            else (0, 0),
         )
         row_keys = rows.select(*common.KEYS).unique(maintain_order=True)
         if arm.once:
