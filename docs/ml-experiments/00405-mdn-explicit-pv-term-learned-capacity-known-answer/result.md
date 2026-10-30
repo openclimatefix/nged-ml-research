@@ -258,6 +258,24 @@ q95, and q99, raw and at the 1.15 widening, against the widened reference. The c
 export limit uses `studies.node_curtailment` at f = 0.9. Learned capacity per Primary against the
 studies page, with intervals from seeds, and the capacity path with each sudden fall flagged.
 
+## Net-demand mixture variance, and extra reports (fourth review)
+
+**The solar variance is learned and bounded.** In the score arms the solar standard deviation is the
+ENS-spread response times a learned positive scalar (shared across Primaries), clipped at half the
+Primary's capacity so that no row can have a solar variance larger than its plausible output. The
+net-demand variance is `sigma_k^2 + s^2 - 2 rho sigma_k s`, where `rho` is a learned correlation between
+the solar error and the demand error, one value per arm, bounded to -0.5 to 0.5 and starting at 0.
+The known-answer fits (which do not score) use independence and the unscaled spread; the score arms add
+the scalar, the clip, and `rho`. A PIT histogram of the net-demand mixture at the signed-MW six checks
+the calibration, in daylight and at night.
+
+**Two more reports.** C3 minus A0 is reported beside the main contrast, as the practical question (does the
+explicit solar term beat the same network given irradiance?). The share of the daylight variance that
+A0-noirr's demand module takes up from solar geometry, calendar, and the Primary embedding alone is
+reported too. Removing irradiance does not fully remove the identifiability problem, because cloud cover
+and temperature remain proxies for it, so capacity is identified only from the irradiance anomaly within
+each geometry-and-season cell.
+
 ## Example charts
 
 **The write-up shows probabilistic forecasts against actuals.** For one signed-MW Primary and one
