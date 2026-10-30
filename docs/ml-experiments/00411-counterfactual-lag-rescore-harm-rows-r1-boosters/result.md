@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -43,15 +43,127 @@ row_set_id: fold_a_daily_gap_v1
 metric: >-
   Exact CRPS of the distribution linear between the 11 quantiles, in points of effective capacity
   (experiments 400 and 402); leads up to 240 hours (day 10).
+verdict: inconclusive
+best_arm: >-
+  none. Real lags scored 5.061 and clean lags 5.897 CRPS points on harm rows at the six signed-MW
+  Primaries (gain -0.836, 95% -2.578 to +1.226, 9 events).
+headline: >-
+  The scored sample holds 15 of 184 corrected events (9 of 78 at the six signed-MW Primaries), and
+  one event at one Primary decides the six-Primary result: without it the gain is +0.460 (95%
+  -0.102 to +1.631). The pre-registered rule, which reads only the point estimate, says skip
+  batches 1 and 2 of experiment 404, but this sample cannot support that decision.
+lessons:
+  - >-
+    The harness drops 169 of 184 events, 99 of them because the stage-1 median has gaps inside the
+    event, so a harm-row result from it describes a small, selected set of events.
+  - >-
+    Replacing the readings inside an event with the stage-1 median plus a bias made the forecast
+    worse on 4,654 of 8,595 harm rows against 3,917 better, so the replacement is not always a
+    cleaner input than the observed reading.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  We could not measure the most that a lag-trust method can gain, because the harness scores only 15
+  of 184 load-shift events. On those events, replacing the lags inside each event with clean values
+  made the forecast worse at the six signed-MW Primaries (a loss of 0.84 CRPS points, interval -2.58
+  to +1.23), and the result flips to a gain of 0.46 points when one event at one Primary is dropped.
+  The rule in the experiment 404 plan reads the point estimate and would skip batches 1 and 2, but
+  the interval includes both 0.1 and zero, so the maintainer should decide. Filling the gaps in the
+  stage-1 median would score many more events.
+advice:
+  - >-
+    Before skipping batches 1 and 2 of experiment 404, either accept a decision resting on 9 events
+    or widen the sample by filling the short gaps in the stage-1 median (99 events were lost to
+    gaps), then re-score.
+  - >-
+    Report the gain with and without the single largest event, because one Primary's one event
+    (1,629 rows, 30% of the harm rows at the six) decides its sign here.
+date: 2026-10-30
 code: ml-experiments/00411-counterfactual-lag-rescore-harm-rows-r1-boosters/
 ---
 
-**Take-home message (to be written when the result is known).**
-
-This page is the plan. It is committed before any score exists. It is batch 0 of the
+**Status: done. The scored sample is too small to settle batch 0.** The sections after "Results"
+are the plan, written before any score existed. This experiment is batch 0 of the
 [experiment 404 plan](../00404-mdn-lagless-and-calibration-module-trust-weights/result.md), run as
 its own experiment so that the experiment 404 session is not blocked. It needs no neural network,
 no GPU, and no fit.
+
+## Results
+
+**Real lags scored better than clean lags at the six signed-MW Primaries, but 9 events carry the
+result.** The gain is the mean CRPS with real lags minus the mean with clean lags, in points of
+effective capacity, so a positive gain would mean that cleaning the lags helps. Intervals are 95%
+event-cluster bootstraps (2,000 resamples).
+
+| Group | Harm rows | Events | CRPS real lags | CRPS clean lags | Gain | 95% interval |
+|---|---|---|---|---|---|---|
+| Six signed-MW | 5,354 | 9 | 5.061 | 5.897 | -0.836 | -2.578 to +1.226 |
+| Eight MVA-only | 3,241 | 6 | 6.514 | 6.489 | +0.024 | -0.574 to +1.529 |
+| All 14 | 8,595 | 15 | 5.609 | 6.120 | -0.512 | -1.804 to +0.909 |
+
+![Gain of the clean lags for each scored event](figure_1_gain_per_event.svg)
+
+- **By lead band at the six:** days 1 to 2 -0.773, days 3 to 5 -1.333, days 6 to 10 -0.463. Every
+  interval includes zero.
+- **By Primary at the six:** D5 -3.800 (1,629 rows, one event), D10 +0.190, D11 -0.031, D14 +1.957,
+  D16 -0.109. D9 has no scored event.
+- **Without D5's one event** the six give 3,725 rows, 8 events, a gain of +0.460, and an interval of
+  -0.102 to +1.631. The range over every leave-one-event-out gain at the six is -1.278 to +0.460, and
+  only dropping that event flips the sign.
+- **Clean lags win on fewer rows:** at the six, 2,284 rows score better with clean lags and 3,046
+  worse; at the eight, the counts are 1,633 and 1,608.
+
+**The decision rule in the experiment 404 plan says to skip batches 1 and 2, and the data does not
+support relying on it.** The point estimate at the six, -0.836, is under the 0.1 threshold. The
+interval runs from -2.578 to +1.226, so it includes the threshold, and one event decides the sign.
+The prediction (a gain of 0.02 to 0.15 at the six) is not met.
+
+## Why the sample is small
+
+**The harness scores 15 of the 184 corrected events.** Of the 78 events at the six, 9 are scored,
+and of the 88 at the eight, 6 are. The audit repeated the harness's filters for every event and
+refit month without predicting. The first filter that failed, over the 736 event and refit pairs,
+was:
+
+- **Gaps:** 396 pairs, because the stage-1 median or the observed power has a gap inside the event.
+  Counting events, 99 are never scored for this reason.
+- **No usable run:** 118 pairs, because no sampled run has lags inside the event and a target outside
+  every event.
+- **Sign:** 83 pairs, because the measured step has the opposite sign to the label.
+- **Share:** 72 pairs, because the measured step is under 25% of the labelled depth.
+- **Bias:** 47 pairs, because the pre-event bias exceeds half the step.
+
+Five Primaries (D9, D2, D4, D12, D19) have no scored event.
+
+## Checks
+
+- **Median minus mean forecast per site:** not computed. The boosters' mean forecast is not stored,
+  and this experiment scores the mixture quantiles only.
+- **Error of the mean or median forecast beside the quantile contrast:** not computed, for the same
+  reason.
+- **Triggers fired:** three of the seven.
+    - **Trigger 2 (the result contradicts its prediction):** the prediction was a gain of 0.02 to
+      0.15 and the gain is -0.836. No explanation was tested, so the page offers one as a caveat
+      only: the clean replacement may be a worse input than the observed reading at D5.
+    - **Trigger 4 (leaving one site out flips the sign):** dropping D5's one event flips the six-Primary
+      gain from -0.836 to +0.460.
+    - **Trigger 7 (a later design depends on the headline):** the experiment 404 plan skips batches 1
+      and 2 on this number.
+- **Audit:** a fresh Sonnet agent re-derived every number in the results table from the per-row
+  scores and agreed. It found no duplicated rows and no missing scores, ran the leave-one-out checks,
+  and counted the events lost to each filter. Its bootstrap, with a different seed, gave intervals
+  within 0.2 of the ones reported, the expected spread with 9 and 6 clusters. All its findings are
+  in the sections above, none rejected.
+
+## Caveats
+
+- **The booster, not the bundle.** The gain is for experiment 392's R1 lagged boosters. Experiment
+  402's stored tables use experiment 381's weekly bundle, which scores 5.119 with lags on its harm
+  rows at the six. This experiment's 5.061 is on a different, much smaller row set.
+- **The replacement is an estimate.** Clean lags are the stage-1 median plus a pre-event bias, so
+  they are not the true demand without the event. The negative gain at D5 may reflect a poor
+  replacement and not a useful signal in the real lags.
+- **Single seed and four refit months.** Every number is interim.
 
 ## Question
 
