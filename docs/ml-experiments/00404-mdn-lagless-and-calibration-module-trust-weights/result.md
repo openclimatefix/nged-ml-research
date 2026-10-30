@@ -64,7 +64,10 @@ decision_rule: >-
   so every number is labelled interim. Harm rows carry whole-event bootstrap intervals (95%,
   resampling events); rows outside events carry month-block bootstrap intervals with no 99% claim;
   the Bonferroni k is 24 (12 contrasts, 2 groups). A contrast counts as a gain when its interval
-  excludes zero and its sign agrees in at least 2 of 3 seeds. Inert rule: the trust head is inert
+  excludes zero and its sign agrees in at least 2 of 3 seeds. The inert rule and the batch 1 stop
+  rule apply to the signed-MW six only; the MVA-only eight is reported separately and is expected to
+  show an inert trust head (experiment 402 step 1, interim: 7.298 with lags against 7.297 for a flag
+  oracle). Inert rule: the trust head is inert
   if the mean trust weight inside events minus the mean outside events is under 0.2, whatever the
   score does; an inert arm is reported and stopped. Batch 1 stop rule: stop after batch 1 (A0,
   A0-inj, B0, B1, B2, B5) if B1 does not beat both B0 and A0-inj on harm rows by at least 0.1
