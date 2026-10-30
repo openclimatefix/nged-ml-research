@@ -57,7 +57,11 @@ def load_labels() -> list[dict]:
     out = []
     for r in csv.DictReader(LABELS.open()):
         start = datetime.strptime(r["onset_utc"], "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
-        end = datetime.strptime(r["end_utc"], "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
+        end = (
+            datetime.strptime(r["end_utc"], "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
+            if r["end_utc"]
+            else start + timedelta(hours=float(r["duration_hours"] or 12))
+        )
         out.append(
             {
                 "start": int(common.grid_index(times=start)),
