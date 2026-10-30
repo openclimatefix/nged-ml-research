@@ -64,11 +64,11 @@ def write_era5() -> str:
     for row in base.primaries().iter_rows(named=True):
         part = era5.filter(pl.col("time_series_id") == row["time_series_id"]).sort("valid_time")
         t_us = part["valid_time"].dt.epoch("us").to_numpy().astype(np.float64)
-        arrays = {}
+        arrays: dict[str, np.ndarray] = {}
         for name in ERA5_COLUMNS:
             v = part[name].to_numpy().astype(np.float64)
             arrays[name] = np.interp(mid, t_us, v, left=np.nan, right=np.nan).astype(np.float32)
-        np.savez(out_dir / f"{row['site']}.npz", **arrays)
+        np.savez(out_dir / f"{row['site']}.npz", **arrays)  # ty: ignore[invalid-argument-type]
         lines.append(f"{row['site']}: {len(part):,} hourly rows")
     return "; ".join(lines)
 

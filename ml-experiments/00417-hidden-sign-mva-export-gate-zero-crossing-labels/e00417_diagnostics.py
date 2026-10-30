@@ -29,7 +29,6 @@ from pathlib import Path
 from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
-import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00405_prep as prep405  # ty: ignore[unresolved-import]
 import e00417_inputs as inputs
 import numpy as np
@@ -81,17 +80,27 @@ def solar_noon_hour(*, site: str) -> float:
     return 12.0 - float(row["longitude"]) / 15.0
 
 
-def load_table(*, site: str, setting: inputs.Setting) -> Table:
-    """Return the Primary's unique half-hours before 2025-07-01 with the reading in points."""
+def load_table(
+    *, site: str, setting: inputs.Setting, start_us: int = 0, end_us: int = WINDOW_END_US
+) -> Table:
+    """Return the Primary's unique half-hours in `[start_us, end_us)` with the reading in points."""
     arr = inputs.site_arrays(site=site, fold=True, setting=setting)
-    keep = (arr.valid < WINDOW_END_US) & np.isfinite(arr.y) & np.isfinite(arr.y_truth)
+    keep = (
+        (arr.valid >= start_us)
+        & (arr.valid < end_us)
+        & np.isfinite(arr.y)
+        & np.isfinite(arr.y_truth)
+    )
     valid, first = np.unique(arr.valid[keep], return_index=True)
     index = np.flatnonzero(keep)[first]
     x = arr.x[index]
     u, k = inputs.cams_for_rows(site=site, valid_us=valid)
-    dow = np.argmax(
-        np.stack([x[:, prep405.col(name=f"dow_{d}")] for d in range(1, 8)], axis=1), axis=1
-    ) + 1
+    dow = (
+        np.argmax(
+            np.stack([x[:, prep405.col(name=f"dow_{d}")] for d in range(1, 8)], axis=1), axis=1
+        )
+        + 1
+    )
     return Table(
         site=site,
         start_us=valid - inputs.US_PER_HALF_HOUR,
@@ -124,15 +133,16 @@ class DayScores:
 def clear_days(*, t: Table) -> DayScores:
     """Return the W-shape score of every clear day of the table."""
     day_us = t.start_us // inputs.US_PER_DAY
-    order_of_day = {d: i for i, d in enumerate(np.unique(day_us).tolist())}
-    first_of_day: dict[int, int] = {}
-    for i, d in enumerate(day_us.tolist()):
-        first_of_day.setdefault(d, i)
+    unique_days = np.unique(day_us).tolist()
     days, scores, lefts, rights, noons = [], [], [], [], []
-    start_of_noon = int(round(t.noon_utc_hour * 2.0))
-    for d, i0 in first_of_day.items():
+    start_of_noon = round(t.noon_utc_hour * 2.0)
+    for d in unique_days:
         base_us = d * inputs.US_PER_DAY
-        want = base_us + (start_of_noon + np.arange(-HALF_HOURS_PER_SIDE, HALF_HOURS_PER_SIDE + 1)) * inputs.US_PER_HALF_HOUR
+        want = (
+            base_us
+            + (start_of_noon + np.arange(-HALF_HOURS_PER_SIDE, HALF_HOURS_PER_SIDE + 1))
+            * inputs.US_PER_HALF_HOUR
+        )
         pos = np.searchsorted(t.start_us, want)
         pos = np.clip(pos, 0, len(t.start_us) - 1)
         ok = t.start_us[pos] == want
@@ -154,7 +164,6 @@ def clear_days(*, t: Table) -> DayScores:
         lefts.append(int(pos[li]))
         rights.append(int(pos[ri]))
         noons.append(int(pos[centre]))
-    del order_of_day
     return DayScores(
         day=np.array(days),
         score=np.array(scores),
@@ -199,13 +208,13 @@ def pooled_auc_with_interval(
         n = [v[rng.integers(0, len(v), len(v))] for v in placebo.values() if len(v)]
         if p and n:
             draws.append(auc(positive=np.concatenate(p), negative=np.concatenate(n)))
-    lo, hi = (np.nanpercentile(draws, [2.5, 97.5]) if draws else (float("nan"),) * 2)
+    lo, hi = np.nanpercentile(draws, [2.5, 97.5]) if draws else (float("nan"),) * 2
     return {
         "auc": auc(positive=pos, negative=neg),
         "lo": float(lo),
         "hi": float(hi),
-        "n_injected": int(len(pos)),
-        "n_placebo": int(len(neg)),
+        "n_injected": len(pos),
+        "n_placebo": len(neg),
     }
 
 
@@ -221,8 +230,10 @@ def midday_mask(*, t: Table, lo: float = 10.0, hi: float = 14.0) -> np.ndarray:
 def day_means(*, t: Table, mask: np.ndarray, values: np.ndarray) -> dict[int, float]:
     """Return the mean of `values` over the masked rows of each day."""
     day = t.start_us // inputs.US_PER_DAY
-    frame = pl.DataFrame({"d": day[mask], "v": values[mask]}).group_by("d").agg(
-        pl.col("v").mean(), pl.len().alias("n")
+    frame = (
+        pl.DataFrame({"d": day[mask], "v": values[mask]})
+        .group_by("d")
+        .agg(pl.col("v").mean(), pl.len().alias("n"))
     )
     return {int(d): float(v) for d, v, n in frame.iter_rows() if n >= 6}
 
@@ -309,7 +320,7 @@ def run() -> dict:
         visible = np.concatenate([scores[(placebo_name, s)].score for s in VISIBLE_FOR_R1])
         threshold = float(np.percentile(visible, 99))
         entry["c_threshold_points"] = threshold
-        entry["c_n_visible_days"] = int(len(visible))
+        entry["c_n_visible_days"] = len(visible)
         c_inj = {s: scores[(name, s)].score for s in inputs.SIGNED_SIX}
         c_pla = {s: scores[(placebo_name, s)].score for s in PLACEBO_SITES}
         entry["C"] = {
@@ -333,8 +344,14 @@ def run() -> dict:
                 for s, v in d_inj.items()
             },
             "midday_positive_share": {
-                "injected": {s: float(np.mean(v["diff"] > 0)) if len(v["diff"]) else float("nan") for s, v in d_inj.items()},
-                "placebo": {s: float(np.mean(v["diff"] > 0)) if len(v["diff"]) else float("nan") for s, v in d_pla.items()},
+                "injected": {
+                    s: float(np.mean(v["diff"] > 0)) if len(v["diff"]) else float("nan")
+                    for s, v in d_inj.items()
+                },
+                "placebo": {
+                    s: float(np.mean(v["diff"] > 0)) if len(v["diff"]) else float("nan")
+                    for s, v in d_pla.items()
+                },
             },
             "per_primary": {
                 s: pooled_auc_with_interval(
@@ -344,8 +361,13 @@ def run() -> dict:
                 for s in inputs.SIGNED_SIX
             },
         }
-        e_inj = {s: np.array(list(cloud_slopes(t=tables[(name, s)]).values())) for s in inputs.SIGNED_SIX}
-        e_pla = {s: np.array(list(cloud_slopes(t=tables[(placebo_name, s)]).values())) for s in PLACEBO_SITES}
+        e_inj = {
+            s: np.array(list(cloud_slopes(t=tables[(name, s)]).values())) for s in inputs.SIGNED_SIX
+        }
+        e_pla = {
+            s: np.array(list(cloud_slopes(t=tables[(placebo_name, s)]).values()))
+            for s in PLACEBO_SITES
+        }
         entry["E"] = {
             "pooled": pooled_auc_with_interval(injected=e_inj, placebo=e_pla),
             "mean_slope_injected": {s: float(v.mean()) for s, v in e_inj.items()},
@@ -371,8 +393,10 @@ def run() -> dict:
                 truth = t.truth < 0
                 label[f"{s}_{tag}"] = {
                     "day_flag_rate": float(np.mean(sc.score > threshold)),
-                    "n_clear_days": int(len(sc.score)),
-                    "recall": float(mask[truth & on_clear].mean()) if (truth & on_clear).any() else float("nan"),
+                    "n_clear_days": len(sc.score),
+                    "recall": float(mask[truth & on_clear].mean())
+                    if (truth & on_clear).any()
+                    else float("nan"),
                     "n_reverse_half_hours": int((truth & on_clear).sum()),
                     "false_reverse": float(mask[~truth & on_clear].mean()),
                 }
@@ -382,7 +406,9 @@ def run() -> dict:
     cross = {}
     for s in inputs.SIGNED_SIX:
         t = tables[("L0", s)]
-        sw = inputs.era5_for_rows(site=s, valid_us=t.start_us + inputs.US_PER_HALF_HOUR, name="shortwave")
+        sw = inputs.era5_for_rows(
+            site=s, valid_us=t.start_us + inputs.US_PER_HALF_HOUR, name="shortwave"
+        )
         ok = (t.u > 0.01) & np.isfinite(sw)
         cross[s] = float(np.corrcoef(t.u[ok], sw[ok])[0, 1])
     results["cams_vs_era5_shortwave_correlation"] = cross
