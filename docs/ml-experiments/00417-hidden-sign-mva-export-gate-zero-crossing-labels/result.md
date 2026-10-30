@@ -156,15 +156,15 @@ All code is in `ml-experiments/00417-hidden-sign-mva-export-gate-zero-crossing-l
 
 **The diagnostics read the folded readings at the six signed-MW Primaries before any network is
 trained.** Rows are unique valid times before 2025-07-01 (the window that sets the injection level),
-with the minimum of `k` over `t0 +- 5 h` at least 0.7 on the day for C (a clear day) and `k` at
+with the minimum of `k` over `t0 ± 5 h` at least 0.7 on the day for C (a clear day) and `k` at
 least 0.7 at the half-hour for D and E. Settings:
 level 2.0 (reactive floor 2 points), level 1.0, level 2.0 at power factor 0.97, and no injection.
 The no-injection group is D5, D9, D11, D14, and D16, and D10 is reported on its own, because its 130
 real reverse half-hours make it no clean placebo.
 
 - **C, the W-shape score.** On each sunny day, with `t0` the solar noon: the left minimum is the
-  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to `t0
-  + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the smaller
+  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to
+  `t0 + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the smaller
   of the two differences (centre maximum minus each minimum), in points of capacity. It is positive
   when the reading crosses zero twice and negative on a day with one smooth midday dip. The area
   under the curve compares injected days with no-injection days, per Primary and pooled. The
@@ -246,7 +246,7 @@ differ from experiment 412's, because the inputs differ. The first three arms' n
 - **The H arm is A with H layered on top**, not H alone, and the D5 placebo "should still fail with
   H alone" is not tested.
 - **Design C omits the note's CAMS filter that discards a minimum coinciding with a dip in CAMS
-  irradiance.** The day filter (`k` at least 0.7 across `t0 +- 5 h`) removes cloudy days instead.
+  irradiance.** The day filter (`k` at least 0.7 across `t0 ± 5 h`) removes cloudy days instead.
 - **Design A reuses S1c-ref's fits** where the gate is open (see "Fits").
 - **Power factor 0.97 uses reactive power proportional to the Primary's own demand**, as experiment
   366 did, with the 2-point floor kept.
