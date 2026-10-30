@@ -136,7 +136,7 @@ def main() -> None:
         print(f"##### {name}")
         print_groups(rows=subset, rng=rng)
         for label, sites in (("six", SIX), ("eight", EIGHT)):
-            print(f"  {label}:", end="")
+            print(f"  {label} signed-MW" if label == "six" else f"  {label} MVA-only")
             leave_one_event_out(rows=subset, sites=sites)
 
 

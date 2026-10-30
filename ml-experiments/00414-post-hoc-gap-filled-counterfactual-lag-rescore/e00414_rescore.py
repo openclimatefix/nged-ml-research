@@ -159,6 +159,7 @@ def harm_rows_site(  # noqa: PLR0912, PLR0915
     in_any = np.zeros(size, dtype=bool)
     for r in events.iter_rows(named=True):
         in_any[r["onset_idx"] : r["end_idx"] + 1] = True
+    stage1 = median
     median = fill_median(median=median, power=arrays.power, in_any=in_any)
     out: list[pl.DataFrame] = []
     for refit, origins in origins_by_refit().items():
@@ -171,7 +172,7 @@ def harm_rows_site(  # noqa: PLR0912, PLR0915
             if lo < int(common.grid_index(times=refit)) <= hi:
                 continue
             before = slice(max(0, lo - PRE_EVENT_STEPS), lo)
-            gap = arrays.power[before] - median[before]
+            gap = arrays.power[before] - stage1[before]
             bias = float(np.nanmean(gap)) if np.isfinite(gap).any() else 0.0
             cf_power = arrays.power.copy()
             cf_power[lo : hi + 1] = median[lo : hi + 1] + bias

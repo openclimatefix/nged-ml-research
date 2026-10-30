@@ -66,6 +66,8 @@ Linear interpolation across gaps that long would invent a median, so the fill is
   every labelled event of the Primary. It is left missing when fewer than 2 of the 4 weeks qualify.
 - **Every reading used is older than the half-hour it fills,** so a lag never receives a value from
   after itself.
+- **The pre-event bias is computed on the unfilled median,** so the 15 original events keep the
+  bias that experiment 411 used and should reproduce its scores.
 - **Nothing else changes.** Events with missing observed power stay skipped (24 events). The
   pre-event bias, the 25% step filter, the sign filter, the bias filter, the run sample (at most 6 runs
   per event and refit month), and the scoring are the same as in experiment 411.
