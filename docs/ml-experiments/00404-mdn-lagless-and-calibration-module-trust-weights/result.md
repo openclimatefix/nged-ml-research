@@ -273,6 +273,12 @@ skips batches 1 and 2.
 
 **Batch 2** (runs straight away if the batch 1 stop rule does not fire):
 
+- **Carry-forward rule (maintainer, 2026-10-30).** B3 attends across the lag set that wins among
+  B4a, B4b, B4c, and B1's three lags, together with the XGBoost lag experiment 388 when its page
+  is available. The order of work therefore runs B4a, B4b, and B4c before B3. If B3 has already run
+  with the 3 lags, it is rerun with the winning set. The adopted set is named in the arm label (for
+  example B3-lags5), and the write-up says which earlier components were adopted and which were
+  not, with the reason.
 - **B3.** B1's lagless module and cross-fitted table, with an attention gate in place of the trust
   head and the product rule. The gate attends over 4 tokens: the 3 lag tokens (each the lag value
   with its age, missing flag, and trust inputs) and a lagless-forecast token. Its query is built
@@ -452,7 +458,7 @@ is granted is to time one fit of each kind and report K and the timed duration t
 Order of work once granted: batch 0 (the counterfactual re-score of the stored forecasts, which
 takes no fit); the cross-fitted lagless networks; the realism check; A0 (reused if
 experiment 397's rows match); A0-inj; B0; B1; B2; B5; the stop-rule check; then batch 2 if the
-stop rule passes, in the order B3, B6, B4a, B4b, B4c, B8a, B8b, B1-rw, B1-nn, B1m, then B7 and B9.
+stop rule passes, in the order B4a, B4b, B4c, B3, B6, B8a, B8b, B1-rw, B1-nn, B1m, then B7 and B9.
 Every arm
 is in scope over the weekend, gated only by the pre-registered stop rules.
 
