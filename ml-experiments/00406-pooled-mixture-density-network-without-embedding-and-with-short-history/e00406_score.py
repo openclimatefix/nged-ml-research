@@ -176,7 +176,7 @@ def main() -> None:
     table, scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
     for n, t in scored.items():
         labels = set(t["label"].unique().to_list())
-        if len(labels) != len(series.filter(pl.col("substation_type") == "Primary")):
+        if labels != {*SIGNED, *MVA_ONLY, *SHORT_HISTORY}:
             msg = f"arm {n} scores only {sorted(labels)}: a Primary has no forecast"
             raise ValueError(msg)
     crps = pl.concat(
@@ -238,7 +238,7 @@ def draw_examples(*, frames: dict, ctx: dict, series: pl.DataFrame) -> None:
     forecast = frames["pooled_emb"]
     ids = dict(zip(series["label"].to_list(), series["time_series_id"].to_list(), strict=True))
     for origin_text in EXAMPLE_ORIGINS:
-        origin = datetime.fromisoformat(origin_text).replace(tzinfo=UTC)
+        origin = datetime.fromisoformat(origin_text).replace(hour=9, tzinfo=UTC)
         for label, kind in EXAMPLES.items():
             one = forecast.filter(
                 pl.col("time_series_id") == ids[label], pl.col("power_fcst_init_time") == origin
