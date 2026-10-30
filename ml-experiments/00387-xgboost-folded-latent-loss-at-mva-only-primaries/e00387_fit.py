@@ -163,7 +163,6 @@ def training_frame(
 ) -> tuple[pl.DataFrame, common.SeriesArrays]:
     """Return a series' training rows with power and lags from the (synthetic) series."""
     fitted = arrays if synthetic is None else synthetic.arrays
-    config = fd.CONFIGS["n1h"]
     rows = fd.training_rows(row=row, arrays=fitted, frozen=False, a7=False)
     if synthetic is not None:
         index = np.asarray(common.grid_index(times=rows["valid_time"]))
@@ -171,7 +170,6 @@ def training_frame(
         rows = rows.with_columns(power=pl.Series(replaced).cast(pl.Float32)).filter(
             pl.col("power").is_finite()
         )
-    del config
     return rows, fitted
 
 

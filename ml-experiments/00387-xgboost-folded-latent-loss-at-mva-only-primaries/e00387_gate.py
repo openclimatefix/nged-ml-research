@@ -130,7 +130,6 @@ def main() -> None:
     pl.Config.set_tbl_cols(20)
     pl.Config.set_fmt_str_lengths(40)
     print(table.with_columns(pl.col(pl.Float64).round(3)))
-    table = table.filter(~pl.col("spec").str.starts_with("baseline_rule") | True)
     pooled = (
         table.group_by("spec")
         .agg(

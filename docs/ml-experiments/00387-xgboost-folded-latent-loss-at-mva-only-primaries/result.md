@@ -228,6 +228,15 @@ floor Q0.
   F0" is the cleaner contrast, with a weak reference. The "no gain" statement is confounded in this
   way. An Opus audit by the Discuss session confirmed the gradient (the finite-difference self-test
   passes) and these points, and its findings are triaged here.
+- **Code review (late).** A fresh Sonnet reviewer read the code after the fits, not before; this
+  step ran late. It found no leakage and no objective error. Triage: the 99.75% level (k = 4)
+  covers the confirmatory contrasts C1 and C3 at the pooled group and at D12, and every other
+  interval on this page is descriptive; the page now says so. C1 and "F0 minus plain" are not
+  pure loss contrasts, as the first bullet says. The latent's median column is read before
+  sorting and could differ from the sorted median where quantile levels cross; the latent is a
+  diagnostic only, and the crossing rate was not measured. Two reviewer findings were rejected:
+  no NaN reached the pooled gate means, and the real-data folders hold only the eight MVA-only
+  Primaries. Dead code was removed without changing a number.
 - **Median against the mean forecast.** The forecasts store 11 quantiles, not a mean, so the
   median-minus-mean check is replaced by the mean absolute error of the median, beside every CRPS
   contrast: plain 6.895, F0 7.028, F2 (Q0 = 2) 6.931 (mean over the eight Primaries). It agrees in
