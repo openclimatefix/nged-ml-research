@@ -9,6 +9,9 @@ included, with donor spread; 99% intervals). Without D8, the MVA-only gap is +0.
 This page is descriptive: it adopts nothing, and an adoption is decided by the [evaluation
 protocol](evaluation-protocol-demand.md) in an experiment.
 
+BG2's score here differs from experiment 379's by up to 0.006 points (3.78 against 3.788 at the MVA-
+only eight), because the shared half-hours differ slightly.
+
 The page scores every stored forecast on one shared set of half-hours, so progress is read from one
 table and never from a chain of contrasts on different rows. The script
 `scripts/scoreboard_demand_rows.py` scores the stored forecasts and
@@ -18,18 +21,18 @@ protocol version changes. No forecast is refitted.
 ## What is scored
 
 **Rows.** Two shared sets of half-hours are scored, because the stored forecasts do not all reach
-the same lead. Each is the set of half-hours that every forecast in it covers, scored under the
+the same lead. Each row set holds the half-hours that every forecast in it covers, scored under the
 protocol's fold regime `fold_a_daily_gap_v1` (292 daily runs, July 2025 to June 2026), at all 16
 Primaries.
 
 | Row set | Half-hours | Lead range | Forecasts |
 |---|---|---|---|
-| Leads to 240 hours | 2,041,640 | 0.5 to 240 hours | Every row of the tables except days 11 to 14 |
-| Leads to 336 hours | 2,824,844 | 0.5 to 336 hours | Stack without S, BG2, `manual_heuristic`, `climatology` (days 11 to 14 only) |
+| Leads to 240 hours | 2,041,640 | 0.5 to 240 hours | All eight forecasts in the first table, for days 1 to 10 and each lead band to day 10 |
+| Leads to 336 hours | 2,824,844 | 0.5 to 336 hours | Stack without S, BG2, `manual_heuristic`, `climatology` (scored to 336 hours; the tables read only days 11 to 14 from this set) |
 
 **Forecasts and where they are stored.** Every score is computed from the private forecast folders
-below. The protocol version is `demand-v1` for every row, and `demand-v2` changes no metric or row
-that this page uses.
+below. Every forecast was stored under `demand-v1` and is rescored here with the metrics of
+`studies.eval_protocol`. The floor check below is the per-Primary floor that `demand-v2` added.
 
 | Forecast | Stored in | Lead range stored | Notes |
 |---|---|---|---|
@@ -44,10 +47,12 @@ that this page uses.
 **D8 appears in two ways.** In the leads-to-240-hours rows every forecast uses the donor spread at
 D8, as experiment 378 did. In the leads-to-336-hours rows the stack without S uses D8's own-residual
 spread, which is the protocol's D8 row. The two sets of rows therefore disagree about D8 for that
-one forecast, and the MVA-only group carries the label "reactive power assumed zero" throughout.
+one forecast, so the days 11 to 14 cell of the stack without S in the MVA-only band table is not
+like-for-like with the other cells of its row. Separately, every number for the MVA-only group
+assumes reactive power is zero.
 
-**Rows that are not on the current rows.** None is mixed in. The following need a rerun before they
-can be added.
+**Forecasts that cannot be put on the current rows.** No such forecast is mixed in. Each needs a
+rerun before it can be added.
 
 - Primary demand research default 1, 2, and 3 at days 11 to 14. The stored arms stop at 240 hours.
 - Primary demand research default 3 at D8 with its own-residual spread. Experiment 378 scored D8
@@ -195,20 +200,20 @@ The same check for Primary demand research default 3, at each Primary:
 
 | Primary | Group | BG2 | `manual_heuristic` | Default 3 | Ratio to BG2 | Minus `manual_heuristic` |
 |---|---|---|---|---|---|---|
-| D12 | MVA-only | 6.75 | 7.92 | 7.47 | 1.11 **above 1.10** | -0.46 |
-| D19 | MVA-only | 3.18 | 3.79 | 3.28 | 1.03 | -0.51 |
 | D2 | MVA-only | 2.30 | 2.86 | 2.46 | 1.07 | -0.40 |
-| D21 | MVA-only | 2.38 | 2.77 | 2.34 | 0.99 | -0.42 |
-| D22 | MVA-only | 3.75 | 4.71 | 4.08 | 1.09 | -0.63 |
 | D3 | MVA-only | 1.75 | 2.11 | 1.66 | 0.95 | -0.45 |
 | D4 | MVA-only | 2.51 | 2.80 | 2.43 | 0.97 | -0.38 |
 | D8 | MVA-only | 7.64 | 8.54 | 11.61 | 1.52 **above 1.10** | +3.07 **worse** |
+| D12 | MVA-only | 6.75 | 7.92 | 7.47 | 1.11 **above 1.10** | -0.46 |
+| D19 | MVA-only | 3.18 | 3.79 | 3.28 | 1.03 | -0.51 |
+| D21 | MVA-only | 2.38 | 2.77 | 2.34 | 0.99 | -0.42 |
+| D22 | MVA-only | 3.75 | 4.71 | 4.08 | 1.09 | -0.63 |
+| D5 | signed-MW | 3.94 | 4.35 | 3.99 | 1.01 | -0.36 |
+| D9 | signed-MW | 2.51 | 2.92 | 2.45 | 0.98 | -0.47 |
 | D10 | signed-MW | 3.45 | 4.16 | 3.21 | 0.93 | -0.94 |
 | D11 | signed-MW | 2.57 | 3.41 | 2.41 | 0.94 | -1.00 |
 | D14 | signed-MW | 2.39 | 3.01 | 2.18 | 0.91 | -0.83 |
 | D16 | signed-MW | 3.24 | 3.80 | 3.15 | 0.97 | -0.66 |
-| D5 | signed-MW | 3.94 | 4.35 | 3.99 | 1.01 | -0.36 |
-| D9 | signed-MW | 2.51 | 2.92 | 2.45 | 0.98 | -0.47 |
 
 ## CRPS at every Primary, days 1 to 10
 
@@ -216,19 +221,19 @@ The same check for Primary demand research default 3, at each Primary:
 
 | Primary | Group | `climatology` | `manual_heuristic` | `xgboost_baseline` (production-style) | BG2 | Stack without S | Primary demand research default 1 | Primary demand research default 2 | Primary demand research default 3 |
 |---|---|---|---|---|---|---|---|---|---|
-| D12 | MVA-only | 8.83 | 7.92 | 14.90 | 6.75 | 7.52 | 7.52 | 7.52 | 7.47 |
-| D19 | MVA-only | 3.93 | 3.79 | 5.90 | 3.18 | 3.29 | 3.29 | 3.30 | 3.28 |
 | D2 | MVA-only | 2.93 | 2.86 | 4.64 | 2.30 | 2.47 | 2.47 | 2.48 | 2.46 |
-| D21 | MVA-only | 2.91 | 2.77 | 4.60 | 2.38 | 2.35 | 2.35 | 2.35 | 2.34 |
-| D22 | MVA-only | 5.47 | 4.71 | 9.00 | 3.75 | 4.10 | 4.10 | 4.11 | 4.08 |
 | D3 | MVA-only | 2.33 | 2.11 | 3.60 | 1.75 | 1.67 | 1.67 | 1.67 | 1.66 |
 | D4 | MVA-only | 2.83 | 2.80 | 4.34 | 2.51 | 2.45 | 2.45 | 2.45 | 2.43 |
 | D8 | MVA-only | 9.76 | 8.54 | 16.85 | 7.64 | 11.66 | 11.65 | 11.65 | 11.61 |
+| D12 | MVA-only | 8.83 | 7.92 | 14.90 | 6.75 | 7.52 | 7.52 | 7.52 | 7.47 |
+| D19 | MVA-only | 3.93 | 3.79 | 5.90 | 3.18 | 3.29 | 3.29 | 3.30 | 3.28 |
+| D21 | MVA-only | 2.91 | 2.77 | 4.60 | 2.38 | 2.35 | 2.35 | 2.35 | 2.34 |
+| D22 | MVA-only | 5.47 | 4.71 | 9.00 | 3.75 | 4.10 | 4.10 | 4.11 | 4.08 |
 | D15 | short-history | 46.20 | 22.59 | 62.90 | 13.35 | 12.85 | 13.05 | 13.21 | 13.67 |
 | D18 | short-history | 7.11 | 4.02 | 13.18 | 2.65 | 2.50 | 2.47 | 2.45 | 2.44 |
+| D5 | signed-MW | 4.48 | 4.35 | 7.51 | 3.94 | 4.08 | 4.04 | 4.02 | 3.99 |
+| D9 | signed-MW | 2.99 | 2.92 | 4.94 | 2.51 | 2.51 | 2.50 | 2.49 | 2.45 |
 | D10 | signed-MW | 4.31 | 4.16 | 7.57 | 3.45 | 3.27 | 3.25 | 3.23 | 3.21 |
 | D11 | signed-MW | 3.55 | 3.41 | 5.36 | 2.57 | 2.43 | 2.42 | 2.42 | 2.41 |
 | D14 | signed-MW | 3.47 | 3.01 | 5.05 | 2.39 | 2.21 | 2.20 | 2.19 | 2.18 |
 | D16 | signed-MW | 4.20 | 3.80 | 5.75 | 3.24 | 3.20 | 3.18 | 3.17 | 3.15 |
-| D5 | signed-MW | 4.48 | 4.35 | 7.51 | 3.94 | 4.08 | 4.04 | 4.02 | 3.99 |
-| D9 | signed-MW | 2.99 | 2.92 | 4.94 | 2.51 | 2.51 | 2.50 | 2.49 | 2.45 |

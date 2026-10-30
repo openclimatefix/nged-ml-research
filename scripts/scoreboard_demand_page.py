@@ -199,7 +199,7 @@ def per_primary(*, rows: pl.DataFrame) -> pl.DataFrame:
         .group_by("label", "group", "arm")
         .agg(pl.col("crps").mean())
         .pivot(on="arm", index=["label", "group"], values="crps")
-        .sort("group", "label")
+        .sort("group", pl.col("label").str.slice(1).cast(pl.Int32))
     )
 
 

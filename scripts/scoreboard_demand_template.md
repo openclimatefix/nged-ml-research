@@ -9,6 +9,8 @@ MVA-only eight (D8 included, with donor spread; 99% intervals). Without D8, the 
 {mva7_gap_text}. This page is descriptive: it adopts nothing, and an adoption is decided by the
 [evaluation protocol](evaluation-protocol-demand.md) in an experiment.
 
+BG2's score here differs from experiment 379's by up to 0.006 points (3.78 against 3.788 at the MVA-only eight), because the shared half-hours differ slightly.
+
 The page scores every stored forecast on one shared set of half-hours, so progress is read from one
 table and never from a chain of contrasts on different rows. The script
 `scripts/scoreboard_demand_rows.py` scores the stored forecasts and `scripts/scoreboard_demand_page.py`
@@ -18,18 +20,17 @@ refitted.
 ## What is scored
 
 **Rows.** Two shared sets of half-hours are scored, because the stored forecasts do not all reach
-the same lead. Each is the set of half-hours that every forecast in it covers, scored under the
+the same lead. Each row set holds the half-hours that every forecast in it covers, scored under the
 protocol's fold regime `fold_a_daily_gap_v1` (292 daily runs, July 2025 to June 2026), at all 16
 Primaries.
 
 | Row set | Half-hours | Lead range | Forecasts |
 |---|---|---|---|
-| Leads to 240 hours | {n_240} | 0.5 to 240 hours | Every row of the tables except days 11 to 14 |
-| Leads to 336 hours | {n_336} | 0.5 to 336 hours | Stack without S, BG2, `manual_heuristic`, `climatology` (days 11 to 14 only) |
+| Leads to 240 hours | {n_240} | 0.5 to 240 hours | All eight forecasts in the first table, for days 1 to 10 and each lead band to day 10 |
+| Leads to 336 hours | {n_336} | 0.5 to 336 hours | Stack without S, BG2, `manual_heuristic`, `climatology` (scored to 336 hours; the tables read only days 11 to 14 from this set) |
 
 **Forecasts and where they are stored.** Every score is computed from the private forecast folders
-below. The protocol version is `demand-v1` for every row, and `demand-v2` changes no metric or row
-that this page uses.
+below. Every forecast was stored under `demand-v1` and is rescored here with the metrics of `studies.eval_protocol`. The floor check below is the per-Primary floor that `demand-v2` added.
 
 | Forecast | Stored in | Lead range stored | Notes |
 |---|---|---|---|
@@ -44,10 +45,9 @@ that this page uses.
 **D8 appears in two ways.** In the leads-to-240-hours rows every forecast uses the donor spread at D8,
 as experiment 378 did. In the leads-to-336-hours rows the stack without S uses D8's own-residual
 spread, which is the protocol's D8 row. The two sets of rows therefore disagree about D8 for that
-one forecast, and the MVA-only group carries the label "reactive power assumed zero" throughout.
+one forecast, so the days 11 to 14 cell of the stack without S in the MVA-only band table is not like-for-like with the other cells of its row. Separately, every number for the MVA-only group assumes reactive power is zero.
 
-**Rows that are not on the current rows.** None is mixed in. The following need a rerun before they
-can be added.
+**Forecasts that cannot be put on the current rows.** No such forecast is mixed in. Each needs a rerun before it can be added.
 
 - Primary demand research default 1, 2, and 3 at days 11 to 14. The stored arms stop at 240 hours.
 - Primary demand research default 3 at D8 with its own-residual spread. Experiment 378 scored D8

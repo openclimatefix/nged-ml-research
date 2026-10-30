@@ -131,6 +131,7 @@ def score_row_set(
     )
     print(f"{name}: arms {list(forecasts)}; shared half-hours {table.height:,}", flush=True)
     WORK.mkdir(parents=True, exist_ok=True)
+    (WORK / "intervals.parquet").unlink(missing_ok=True)
     table.write_parquet(WORK / f"slice_table_{name}.parquet")
     pieces = []
     for arm, frame in forecasts.items():
