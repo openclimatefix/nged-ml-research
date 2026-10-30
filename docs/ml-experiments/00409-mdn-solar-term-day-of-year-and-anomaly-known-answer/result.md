@@ -8,7 +8,7 @@ theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - solar-disaggregation
   - hierarchy-and-pooling
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -51,12 +51,57 @@ row_set_id: fold_a_daily_gap_v1
 metric: >-
   Continuous ranked probability score from the 11 quantiles, in points of effective capacity, from
   `studies.eval_protocol`; leads 0.5 to 336 hours; the headline band is days 1 to 10.
+verdict: not supported
+best_arm: >-
+  None clearly. C2 (learned capacity under a prior, no adapter) has the lowest CRPS of the solar
+  arms, 3.380 points at the signed-MW six, against 3.457 for the same network with no solar term
+  (A0-noirr-doy) and 3.351 for pooled A0 with the free irradiance input (days 1 to 10, five test
+  months).
+headline: >-
+  C3 minus A0-noirr-doy is -0.064 CRPS points (99.29% interval -0.131 to +0.028, minimum detectable
+  effect 0.397) at the signed-MW six, so the explicit solar term did not lower the score reliably.
+  The point estimate lies inside the predicted range (-0.15 to 0.00). The anomaly known-answer test
+  could not be run: the injected anomaly's read-out was 0.03 to 0.05 MW against a seed spread of
+  about 0.35 MW.
+lessons:
+  - >-
+    A known-answer injection needs a signal larger than the network's seed noise: the farm's
+    day-to-day anomaly gave a read-out of 0.03 to 0.05 MW (3 to 5% of the 1 MW increment), against a
+    seed spread of about 0.35 MW in capacity, so the test could not be passed or failed.
+  - >-
+    The solar term recovers part of the 0.106-point cost of removing irradiance (C2: 0.077), and the
+    free irradiance input (A0) remains about as good (C2 minus A0 about +0.03), so the explicit term
+    shows no CRPS advantage over the plain input yet.
+  - >-
+    The learned capacities are 0.4 to 0.7 of the studies page at five of the six Primaries, with a
+    wide seed spread, so the capacity is not identified well enough to read as a physical number.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  Adding an explicit solar-power term to the neural network did not reliably lower the net-demand
+  error at the six signed-direction substations: the change was about -0.06 points of capacity
+  (about 2%), with an interval that includes zero. The pinball loss at q99 was
+  7% lower, and the test could not show that the network reads the sky,
+  because an injected solar signal was too small to see above seed noise. The free irradiance input
+  remains about as good as the explicit term.
+advice:
+  - >-
+    Do not rely on a known-answer injection of a day-to-day anomaly alone: inject a signal at least
+    about 20 times larger, or test the solar term on CRPS directly (anomaly read-out, noise check).
+  - >-
+    Keep the free irradiance input in the pooled network for now: the explicit solar term did not
+    beat it at the signed-MW six (C2 minus A0, C3 minus A0 in the contrasts).
+  - >-
+    Compare capacity-learning arms on at least 3 test months per slice: the sunny April to June slice
+    holds 2 test months here and its month-block interval is degenerate (audit).
 date: 2026-10-30
 code: ml-experiments/00409-mdn-solar-term-day-of-year-and-anomaly-known-answer/
 ---
 
-**Status: planned. Nothing has been fitted.** The plan follows the maintainer's request after
-experiment 405, whose placebo gate could not be met.
+**Status: done. The anomaly gate could not be tested, so the score arms ran ungated.** The sections
+below up to "Results" are the plan, written before any fit; the amendment was written after the
+noise check and before any score arm. The plan follows the maintainer's request after experiment 405,
+whose placebo gate could not be met.
 
 ## What is asked
 
@@ -289,6 +334,98 @@ difference of the contrast.
 - **Departed from:** experiment 129's divisor and five-year drift gate; the former is uninformative
   (experiment 405 audit, finding 4) and the latter does not fit a two-season-year window.
 
+## Results
+
+**Take-home message: the explicit solar term did not reliably lower the net-demand error, and the
+known-answer test could not show that the network reads the sky.** All numbers are CRPS in points of
+effective capacity at the signed-MW six (D5, D9, D10, D11, D14, D16), days 1 to 10, five test months
+(2025-10, 2025-12, 2026-01, 2026-03, 2026-06), monthly refits on a 730-day window, 3 seeds, so every
+interval is interim. Weather inputs are the ECMWF ensemble mean and spread, one pass; cleaned data;
+D15 and D18 cut before 2025-03-01 (report-only).
+
+![Contrasts](figure_1_contrasts.svg)
+
+![Learned solar output](figure_2_learned_solar_output.svg)
+
+![Learned capacity against the studies page](figure_3_learned_capacity.svg)
+
+![Day-ahead example forecasts at D10](figure_4_example_day_ahead.svg)
+
+![14-day example forecasts at D10](figure_5_example_14_day.svg)
+
+- **Verdict by the pre-registered rule: not supported.** C3 minus A0-noirr-doy is -0.064 (interval
+  -0.131 to +0.028; minimum detectable effect 0.397) in days 1 to 10, -0.053 (-0.750 to +0.207) in
+  the sunniest third, and +0.152 (+0.030 to +0.168) in sunny April to June. The rule reads the last
+  slice as harm. That slice holds only 2 test months (2026-03 and 2026-06), so its interval is the
+  range of two monthly values and is not a test. The verdict stands without it, because no other
+  slice has an interval that excludes zero. P1 held on the point estimate (-0.064 is in -0.15 to
+  0.00).
+- **Absolute CRPS, signed-MW six / MVA-only eight.** Pooled A0 (experiment 403) 3.351 / 3.791;
+  A0-noirr-doy 3.457 / 3.996; C1 3.406 / 4.062; C2 3.380 / 4.059; C3 3.393 / 4.052; C4 3.393 / 4.051;
+  C5a 3.404 / 4.051; C5b 3.395 / 4.053. The MVA-only eight have no solar term and lose 0.2 to 0.3
+  points against A0 because their irradiance inputs are removed (not contrasted).
+- **Other contrasts (days 1 to 10, none beyond its minimum detectable effect).** C2 minus
+  A0-noirr-doy -0.077 (-0.151 to +0.039); C3 minus C2 +0.013 (-0.012 to +0.037); C2 minus C1 -0.026
+  (-0.195 to +0.092); C4 minus C3 +0.001 (-0.019 to +0.026); C5a minus C3 +0.012 (-0.004 to +0.023);
+  C5b minus C3 +0.002 (-0.001 to +0.011). C3 minus A0, described only, is +0.041 (-0.080 to +0.154).
+  The adapter, the prior, and the capacity-path penalties made no measurable difference.
+- **Tails (days 1 to 10, signed-MW six, mean over Primaries; A0-noirr-doy / C3).** Pinball q95
+  1.127 / 1.096; pinball q99 0.461 / 0.427; coverage q95 0.835 / 0.840; coverage q99 0.924 / 0.931;
+  coverage q01 0.018 / 0.018; coverage q05 0.051 / 0.057; threshold-weighted CRPS 0.631 / 0.627.
+  The tail rule holds, and C2 has the lowest q99 pinball among the solar arms (0.415), but the
+  differences have no intervals here.
+- **Learned capacity (2025/26 season-year, mean over folds and seeds, MW) against the studies page.**
+  C2 is 1.38, 1.69, 1.98, 2.24 at D10, D11, D14, D16 against 3.06, 4.21, 4.14, 4.50, and is
+  2.64 at D5 against 2.19; C3 and C4 are similar, C4 (no prior) higher. The seed ranges are wide
+  (for example D5 1.8 to 3.5 for C2). The capacity is therefore weakly identified, as the profile
+  test below shows.
+- **Profile test (descriptive; 24 fits, 3 seeds).** Learned capacity increment as a multiple of the
+  least-squares read-out of the real farm series. With the day-of-year term, the real farm recovers
+  0.16 to 0.87 (median 0.47), the day-shuffled farm 0.11 to 0.48 (median 0.25), and a pure
+  ensemble profile 0.19 to 0.43. Without the term, the real farm recovers 0.45 to 1.09 (median
+  0.62), the shuffled farm 0.34 to 0.63 (median 0.47), and the pure profile 0.28 to 0.40. The
+  benchmark for the shuffled farm is 0.95 to 0.96, so no arm reads the profile fully. The
+  day-of-year term lowers the profile reading by about 0.2 and lowers the real recovery by about
+  the same, and the seed standard errors (0.03 to 0.42) are as large as these gaps.
+- **Anomaly gate: not testable.** The least-squares read-out of the injected anomaly is 0.03 to 0.05
+  MW at the signed-MW six, against an injected increment of about 1 MW and a seed spread of about
+  0.35 MW in capacity, so the expected standard deviation of the recovery ratio is 3.8 to 12.4
+  (limit 0.5). The gate is uninformative, not failed. The anomaly fits did not run.
+- **Compute and data.** 24 profile-test fits and 105 score fits, about 10 to 60 seconds each on one
+  GPU process; the flagged zero half-hours were dropped by experiment 397's matrices (count per
+  fold not recomputed here). Fitted networks are saved as `.pt` files in the experiment's
+  `work/seed_preds/<arm>/` folder; the solar outputs per half-hour are in the matching
+  `.solar.parquet` files.
+
+## Audit
+
+A fresh Sonnet agent re-derived the headline from the stored forecasts for all five months. The
+pooled absolute scores match the printed 3.457 and 3.393, and the mean of the monthly differences
+(-0.063) matches the printed -0.064. Triggers that fired:
+
+- **A slice with fewer than 3 test months.** Sunny April to June holds 2 months, so its bootstrap
+  interval is degenerate (the endpoints equal the two monthly differences).
+- **A month that is not April to June inside that slice.** The slice includes 2026-03 forecasts.
+  The slice is defined by the protocol's `sunny_april_june` flag, which this page does not
+  redefine; it is reported as defined, and the slice's membership is flagged for the protocol
+  owner.
+- **Every headline contrast is below its minimum detectable effect**, so none counts as a gain.
+- **Seed disagreement in the learned capacities** (above).
+- **Not run:** median minus mean forecast per site, and a comparison of the capacity seed ranges
+  with the studies page intervals.
+
+## What to try next
+
+- **Test the solar term on a target it can read.** Inject a signal about 20 times larger, or add the
+  solar term where the weather forecast has more skill (short leads), before asking about CRPS.
+- **Keep the free irradiance input** in the pooled network until an explicit term beats it.
+- **Look at the tails:** the lower q95 and q99 pinball loss of the solar arms is worth a calibration
+  experiment with intervals from more test months.
+
+## Problems caused by the move
+
+None, apart from needing seven experiment folders on `PYTHONPATH` to run the scripts.
+
 ## Reviews
 
 - **Design review (fresh Sonnet) found nine points.** Accepted 1 to 8: the noise check,
@@ -312,4 +449,6 @@ difference of the contrast.
   no sunny pass, defines harm, defines the tail rule (slice, relative tolerance, arm-to-arm
   coverage difference), names P1's slice, and states the 21-test family. The training-rows caveat for
   C3 minus A0 is added.
-- **To be filled in:** results review, write-up review.
+- **Results review and audit (fresh Sonnet).** Re-derived the headline from stored forecasts and
+  found the printed numbers consistent; the triggers that fired are listed under "Audit".
+- **To be filled in:** write-up review.
