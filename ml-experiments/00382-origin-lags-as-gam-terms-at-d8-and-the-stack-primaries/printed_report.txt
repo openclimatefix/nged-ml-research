@@ -1,0 +1,737 @@
+shared half-hours of the six arms: 2824844
+
+== crps, points, slice lead_days_1_10, per Primary and arm ==
+shape: (16, 9)
+┌───────┬───────────────┬───────────┬───────────┬─────────────┬──────────────────┬───────────┬───────────┬──────────────┐
+│ label ┆ group         ┆ default   ┆ bg2       ┆ climatology ┆ manual_heuristic ┆ spline    ┆ linear    ┆ spline_heavy │
+│ ---   ┆ ---           ┆ ---       ┆ ---       ┆ ---         ┆ ---              ┆ ---       ┆ ---       ┆ ---          │
+│ str   ┆ str           ┆ f64       ┆ f64       ┆ f64         ┆ f64              ┆ f64       ┆ f64       ┆ f64          │
+╞═══════╪═══════════════╪═══════════╪═══════════╪═════════════╪══════════════════╪═══════════╪═══════════╪══════════════╡
+│ D12   ┆ MVA-only      ┆ 7.51505   ┆ 6.751983  ┆ 8.830471    ┆ 7.924545         ┆ 7.514939  ┆ 7.519051  ┆ 7.519683     │
+│ D19   ┆ MVA-only      ┆ 3.29389   ┆ 3.17979   ┆ 3.932029    ┆ 3.789876         ┆ 3.278087  ┆ 3.276257  ┆ 3.273079     │
+│ D2    ┆ MVA-only      ┆ 2.473889  ┆ 2.297452  ┆ 2.931003    ┆ 2.856595         ┆ 2.47645   ┆ 2.477827  ┆ 2.476316     │
+│ D21   ┆ MVA-only      ┆ 2.353827  ┆ 2.375185  ┆ 2.905863    ┆ 2.766445         ┆ 2.35174   ┆ 2.352792  ┆ 2.352211     │
+│ D22   ┆ MVA-only      ┆ 4.104933  ┆ 3.747275  ┆ 5.467467    ┆ 4.706733         ┆ 4.2012    ┆ 4.144091  ┆ 4.14368      │
+│ D3    ┆ MVA-only      ┆ 1.672612  ┆ 1.749516  ┆ 2.334511    ┆ 2.110926         ┆ 1.665078  ┆ 1.659121  ┆ 1.660175     │
+│ D4    ┆ MVA-only      ┆ 2.4451    ┆ 2.509106  ┆ 2.830793    ┆ 2.803568         ┆ 2.397204  ┆ 2.398457  ┆ 2.389821     │
+│ D8    ┆ MVA-only      ┆ 9.227055  ┆ 7.614925  ┆ 9.63943     ┆ 8.312968         ┆ 9.672085  ┆ 9.315759  ┆ 9.307306     │
+│ D15   ┆ short-history ┆ 12.848078 ┆ 13.354408 ┆ 46.195172   ┆ 22.590297        ┆ 13.130858 ┆ 12.834823 ┆ 12.871308    │
+│ D18   ┆ short-history ┆ 2.498836  ┆ 2.646493  ┆ 7.114155    ┆ 4.015221         ┆ 2.51003   ┆ 2.512376  ┆ 2.51042      │
+│ D10   ┆ signed-MW     ┆ 3.268947  ┆ 3.448306  ┆ 4.309598    ┆ 4.155008         ┆ 3.270873  ┆ 3.279674  ┆ 3.267428     │
+│ D11   ┆ signed-MW     ┆ 2.429357  ┆ 2.572022  ┆ 3.545885    ┆ 3.411453         ┆ 2.42789   ┆ 2.43232   ┆ 2.432541     │
+│ D14   ┆ signed-MW     ┆ 2.20856   ┆ 2.385508  ┆ 3.468166    ┆ 3.005674         ┆ 2.160613  ┆ 2.165262  ┆ 2.163286     │
+│ D16   ┆ signed-MW     ┆ 3.201529  ┆ 3.244408  ┆ 4.203349    ┆ 3.803028         ┆ 3.162063  ┆ 3.144061  ┆ 3.134159     │
+│ D5    ┆ signed-MW     ┆ 4.082132  ┆ 3.943809  ┆ 4.478792    ┆ 4.346026         ┆ 4.068188  ┆ 4.049876  ┆ 4.046787     │
+│ D9    ┆ signed-MW     ┆ 2.513429  ┆ 2.514367  ┆ 2.99487     ┆ 2.922511         ┆ 2.49994   ┆ 2.502454  ┆ 2.498149     │
+└───────┴───────────────┴───────────┴───────────┴─────────────┴──────────────────┴───────────┴───────────┴──────────────┘
+
+== mae_median, points, slice lead_days_1_10, per Primary and arm ==
+shape: (16, 9)
+┌───────┬───────────────┬───────────┬───────────┬─────────────┬──────────────────┬───────────┬───────────┬──────────────┐
+│ label ┆ group         ┆ default   ┆ bg2       ┆ climatology ┆ manual_heuristic ┆ spline    ┆ linear    ┆ spline_heavy │
+│ ---   ┆ ---           ┆ ---       ┆ ---       ┆ ---         ┆ ---              ┆ ---       ┆ ---       ┆ ---          │
+│ str   ┆ str           ┆ f64       ┆ f64       ┆ f64         ┆ f64              ┆ f64       ┆ f64       ┆ f64          │
+╞═══════╪═══════════════╪═══════════╪═══════════╪═════════════╪══════════════════╪═══════════╪═══════════╪══════════════╡
+│ D12   ┆ MVA-only      ┆ 13.195939 ┆ 12.109264 ┆ 15.755407   ┆ 14.530445        ┆ 13.158439 ┆ 13.199291 ┆ 13.196244    │
+│ D19   ┆ MVA-only      ┆ 5.765862  ┆ 5.684323  ┆ 6.922905    ┆ 6.590311         ┆ 5.747279  ┆ 5.740001  ┆ 5.73524      │
+│ D2    ┆ MVA-only      ┆ 4.396041  ┆ 4.130394  ┆ 5.295266    ┆ 5.088048         ┆ 4.401598  ┆ 4.405461  ┆ 4.402305     │
+│ D21   ┆ MVA-only      ┆ 4.156227  ┆ 4.165498  ┆ 5.082452    ┆ 4.816766         ┆ 4.153882  ┆ 4.152528  ┆ 4.151501     │
+│ D22   ┆ MVA-only      ┆ 7.008993  ┆ 6.581037  ┆ 9.629097    ┆ 8.251877         ┆ 7.227754  ┆ 7.105257  ┆ 7.108022     │
+│ D3    ┆ MVA-only      ┆ 2.890114  ┆ 2.994172  ┆ 4.021411    ┆ 3.557132         ┆ 2.874862  ┆ 2.865891  ┆ 2.867521     │
+│ D4    ┆ MVA-only      ┆ 4.230474  ┆ 4.391658  ┆ 5.040826    ┆ 4.734219         ┆ 4.143356  ┆ 4.138068  ┆ 4.124376     │
+│ D8    ┆ MVA-only      ┆ 15.943789 ┆ 13.922368 ┆ 18.301579   ┆ 14.997632        ┆ 16.490337 ┆ 15.979568 ┆ 15.985351    │
+│ D15   ┆ short-history ┆ 21.269772 ┆ 24.26738  ┆ 68.93624    ┆ 43.672087        ┆ 21.728805 ┆ 21.23603  ┆ 21.285622    │
+│ D18   ┆ short-history ┆ 4.298888  ┆ 4.547686  ┆ 14.0381     ┆ 5.918439         ┆ 4.286696  ┆ 4.322085  ┆ 4.320453     │
+│ D10   ┆ signed-MW     ┆ 5.643981  ┆ 5.939313  ┆ 7.556135    ┆ 7.35342          ┆ 5.641953  ┆ 5.646465  ┆ 5.631505     │
+│ D11   ┆ signed-MW     ┆ 4.343706  ┆ 4.607949  ┆ 6.454858    ┆ 6.118242         ┆ 4.335386  ┆ 4.346231  ┆ 4.345417     │
+│ D14   ┆ signed-MW     ┆ 3.899974  ┆ 4.212491  ┆ 6.129932    ┆ 5.327023         ┆ 3.822837  ┆ 3.82543   ┆ 3.822686     │
+│ D16   ┆ signed-MW     ┆ 5.199256  ┆ 5.373871  ┆ 6.911918    ┆ 6.216424         ┆ 5.132302  ┆ 5.105756  ┆ 5.089564     │
+│ D5    ┆ signed-MW     ┆ 6.853289  ┆ 6.783562  ┆ 8.221567    ┆ 7.712032         ┆ 6.825742  ┆ 6.806717  ┆ 6.80316      │
+│ D9    ┆ signed-MW     ┆ 4.460859  ┆ 4.548593  ┆ 5.361012    ┆ 5.095399         ┆ 4.43222   ┆ 4.439993  ┆ 4.431496     │
+└───────┴───────────────┴───────────┴───────────┴─────────────┴──────────────────┴───────────┴───────────┴──────────────┘
+
+== twcrps, points, slice lead_days_1_10, per Primary and arm ==
+shape: (16, 9)
+┌───────┬───────────────┬──────────┬──────────┬─────────────┬──────────────────┬──────────┬──────────┬──────────────┐
+│ label ┆ group         ┆ default  ┆ bg2      ┆ climatology ┆ manual_heuristic ┆ spline   ┆ linear   ┆ spline_heavy │
+│ ---   ┆ ---           ┆ ---      ┆ ---      ┆ ---         ┆ ---              ┆ ---      ┆ ---      ┆ ---          │
+│ str   ┆ str           ┆ f64      ┆ f64      ┆ f64         ┆ f64              ┆ f64      ┆ f64      ┆ f64          │
+╞═══════╪═══════════════╪══════════╪══════════╪═════════════╪══════════════════╪══════════╪══════════╪══════════════╡
+│ D12   ┆ MVA-only      ┆ 0.238644 ┆ 0.201107 ┆ 0.239163    ┆ 0.234366         ┆ 0.239225 ┆ 0.239299 ┆ 0.239001     │
+│ D19   ┆ MVA-only      ┆ 0.315633 ┆ 0.302653 ┆ 0.363393    ┆ 0.355828         ┆ 0.315073 ┆ 0.314296 ┆ 0.314143     │
+│ D2    ┆ MVA-only      ┆ 0.203004 ┆ 0.219639 ┆ 0.319874    ┆ 0.304859         ┆ 0.203565 ┆ 0.202674 ┆ 0.202573     │
+│ D21   ┆ MVA-only      ┆ 0.14897  ┆ 0.159527 ┆ 0.212808    ┆ 0.213714         ┆ 0.15014  ┆ 0.149132 ┆ 0.149323     │
+│ D22   ┆ MVA-only      ┆ 0.324495 ┆ 0.256365 ┆ 0.281235    ┆ 0.287756         ┆ 0.336851 ┆ 0.322953 ┆ 0.322013     │
+│ D3    ┆ MVA-only      ┆ 0.069033 ┆ 0.080561 ┆ 0.12612     ┆ 0.11711          ┆ 0.069015 ┆ 0.069293 ┆ 0.069113     │
+│ D4    ┆ MVA-only      ┆ 0.237779 ┆ 0.296457 ┆ 0.326928    ┆ 0.338711         ┆ 0.232135 ┆ 0.234126 ┆ 0.233632     │
+│ D8    ┆ MVA-only      ┆ 0.270505 ┆ 0.041517 ┆ 0.076221    ┆ 0.053909         ┆ 0.320511 ┆ 0.257424 ┆ 0.25362      │
+│ D15   ┆ short-history ┆ null     ┆ null     ┆ null        ┆ null             ┆ null     ┆ null     ┆ null         │
+│ D18   ┆ short-history ┆ null     ┆ null     ┆ null        ┆ null             ┆ null     ┆ null     ┆ null         │
+│ D10   ┆ signed-MW     ┆ 0.294415 ┆ 0.340433 ┆ 0.400855    ┆ 0.403712         ┆ 0.297406 ┆ 0.297493 ┆ 0.295716     │
+│ D11   ┆ signed-MW     ┆ 0.143385 ┆ 0.15523  ┆ 0.211349    ┆ 0.208291         ┆ 0.142181 ┆ 0.143497 ┆ 0.14322      │
+│ D14   ┆ signed-MW     ┆ 0.26525  ┆ 0.330581 ┆ 0.567811    ┆ 0.488665         ┆ 0.260871 ┆ 0.259879 ┆ 0.259817     │
+│ D16   ┆ signed-MW     ┆ 0.617114 ┆ 0.638544 ┆ 0.729566    ┆ 0.708262         ┆ 0.598691 ┆ 0.600222 ┆ 0.593664     │
+│ D5    ┆ signed-MW     ┆ 0.443885 ┆ 0.443539 ┆ 0.400411    ┆ 0.418867         ┆ 0.43978  ┆ 0.436219 ┆ 0.43504      │
+│ D9    ┆ signed-MW     ┆ 0.199523 ┆ 0.22076  ┆ 0.263928    ┆ 0.251349         ┆ 0.198883 ┆ 0.199409 ┆ 0.198653     │
+└───────┴───────────────┴──────────┴──────────┴─────────────┴──────────────────┴──────────┴──────────┴──────────────┘
+
+== HEADLINE contrasts, spline minus default (99%, 20,000 resamples) ==
+days 1 to 10 | signed-MW six | crps        -0.019 (-0.052 to +0.008) [99%] n=826300, months=12
+days 1 to 10 | signed-MW six | mae_median  -0.035 (-0.087 to +0.009) [99%] n=826300, months=12
+days 1 to 10 | signed-MW six | twcrps      -0.004 (-0.015 to +0.002) [99%] n=826300, months=12
+days 1 to 10 | MVA-only eight with D8 | crps +0.055 (+0.012 to +0.125) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only eight with D8 | mae_median +0.071 (+0.006 to +0.177) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only eight with D8 | twcrps +0.007 (+0.001 to +0.015) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only seven without D8 | crps +0.004 (-0.022 to +0.027) [99%] n=965658, months=12
+days 1 to 10 | MVA-only seven without D8 | mae_median +0.009 (-0.032 to +0.047) [99%] n=965658, months=12
+days 1 to 10 | MVA-only seven without D8 | twcrps +0.001 (-0.002 to +0.005) [99%] n=965658, months=12
+days 1 to 10 | D8 alone | crps             +0.445 (+0.090 to +0.983) [99%] n=126430, months=11
+days 1 to 10 | D8 alone | mae_median       +0.547 (+0.066 to +1.285) [99%] n=126430, months=11
+days 1 to 10 | D8 alone | twcrps           +0.050 (+0.011 to +0.118) [99%] n=126430, months=11
+days 1 to 10 | D2 and D4 (placebos) | crps -0.023 (-0.066 to +0.007) [99%] n=275996, months=12
+days 1 to 10 | D2 and D4 (placebos) | mae_median -0.041 (-0.113 to +0.012) [99%] n=275996, months=12
+days 1 to 10 | D2 and D4 (placebos) | twcrps -0.003 (-0.007 to +0.001) [99%] n=275996, months=12
+days 1 to 10 | short-history (report only) | crps +0.120 (-0.038 to +0.323) [99%] n=111732, months=6
+days 1 to 10 | short-history (report only) | mae_median +0.176 (-0.105 to +0.540) [99%] n=111732, months=6
+days 1 to 2 | signed-MW six | crps         -0.043 (-0.061 to -0.028) [99%] n=167141, months=12
+days 1 to 2 | signed-MW six | mae_median   -0.084 (-0.112 to -0.058) [99%] n=167141, months=12
+days 1 to 2 | signed-MW six | twcrps       -0.007 (-0.013 to -0.002) [99%] n=167141, months=12
+days 1 to 2 | MVA-only eight with D8 | crps +0.002 (-0.020 to +0.026) [99%] n=220908, months=12
+days 1 to 2 | MVA-only eight with D8 | mae_median -0.010 (-0.046 to +0.022) [99%] n=220908, months=12
+days 1 to 2 | MVA-only eight with D8 | twcrps +0.000 (-0.003 to +0.004) [99%] n=220908, months=12
+days 1 to 2 | MVA-only seven without D8 | crps -0.011 (-0.035 to +0.011) [99%] n=195312, months=12
+days 1 to 2 | MVA-only seven without D8 | mae_median -0.025 (-0.069 to +0.014) [99%] n=195312, months=12
+days 1 to 2 | MVA-only seven without D8 | twcrps -0.001 (-0.004 to +0.002) [99%] n=195312, months=12
+days 1 to 2 | D8 alone | crps              +0.108 (-0.064 to +0.391) [99%] n=25596, months=11
+days 1 to 2 | D8 alone | mae_median        +0.105 (-0.120 to +0.463) [99%] n=25596, months=11
+days 1 to 2 | D8 alone | twcrps            +0.011 (+0.001 to +0.036) [99%] n=25596, months=11
+days 1 to 2 | D2 and D4 (placebos) | crps  -0.043 (-0.100 to +0.003) [99%] n=55820, months=12
+days 1 to 2 | D2 and D4 (placebos) | mae_median -0.076 (-0.175 to +0.003) [99%] n=55820, months=12
+days 1 to 2 | D2 and D4 (placebos) | twcrps -0.003 (-0.009 to +0.003) [99%] n=55820, months=12
+days 1 to 2 | short-history (report only) | crps -0.034 (-0.101 to +0.063) [99%] n=22992, months=6
+days 1 to 2 | short-history (report only) | mae_median -0.066 (-0.162 to +0.112) [99%] n=22992, months=6
+days 3 to 10 | signed-MW six | crps        -0.013 (-0.050 to +0.018) [99%] n=659159, months=12
+days 3 to 10 | signed-MW six | mae_median  -0.023 (-0.083 to +0.031) [99%] n=659159, months=12
+days 3 to 10 | signed-MW six | twcrps      -0.004 (-0.017 to +0.004) [99%] n=659159, months=12
+days 3 to 10 | MVA-only eight with D8 | crps +0.068 (+0.018 to +0.153) [99%] n=871180, months=12
+days 3 to 10 | MVA-only eight with D8 | mae_median +0.092 (+0.017 to +0.219) [99%] n=871180, months=12
+days 3 to 10 | MVA-only eight with D8 | twcrps +0.009 (+0.002 to +0.017) [99%] n=871180, months=12
+days 3 to 10 | MVA-only seven without D8 | crps +0.007 (-0.019 to +0.032) [99%] n=770346, months=12
+days 3 to 10 | MVA-only seven without D8 | mae_median +0.018 (-0.024 to +0.057) [99%] n=770346, months=12
+days 3 to 10 | MVA-only seven without D8 | twcrps +0.002 (-0.001 to +0.006) [99%] n=770346, months=12
+days 3 to 10 | D8 alone | crps             +0.531 (+0.115 to +1.184) [99%] n=100834, months=11
+days 3 to 10 | D8 alone | mae_median       +0.659 (+0.098 to +1.560) [99%] n=100834, months=11
+days 3 to 10 | D8 alone | twcrps           +0.060 (+0.014 to +0.139) [99%] n=100834, months=11
+days 3 to 10 | D2 and D4 (placebos) | crps -0.018 (-0.058 to +0.009) [99%] n=220176, months=12
+days 3 to 10 | D2 and D4 (placebos) | mae_median -0.032 (-0.097 to +0.014) [99%] n=220176, months=12
+days 3 to 10 | D2 and D4 (placebos) | twcrps -0.002 (-0.007 to +0.001) [99%] n=220176, months=12
+days 3 to 10 | short-history (report only) | crps +0.159 (-0.034 to +0.397) [99%] n=88740, months=6
+days 3 to 10 | short-history (report only) | mae_median +0.239 (-0.093 to +0.656) [99%] n=88740, months=6
+days 8 to 10 | signed-MW six | crps        +0.008 (-0.040 to +0.053) [99%] n=245343, months=12
+days 8 to 10 | signed-MW six | mae_median  +0.013 (-0.068 to +0.093) [99%] n=245343, months=12
+days 8 to 10 | signed-MW six | twcrps      -0.001 (-0.017 to +0.013) [99%] n=245343, months=12
+days 8 to 10 | MVA-only eight with D8 | crps +0.101 (+0.029 to +0.205) [99%] n=324248, months=12
+days 8 to 10 | MVA-only eight with D8 | mae_median +0.147 (+0.042 to +0.297) [99%] n=324248, months=12
+days 8 to 10 | MVA-only eight with D8 | twcrps +0.012 (+0.003 to +0.027) [99%] n=324248, months=12
+days 8 to 10 | MVA-only seven without D8 | crps +0.023 (-0.014 to +0.060) [99%] n=286740, months=12
+days 8 to 10 | MVA-only seven without D8 | mae_median +0.047 (-0.010 to +0.100) [99%] n=286740, months=12
+days 8 to 10 | MVA-only seven without D8 | twcrps +0.003 (-0.001 to +0.007) [99%] n=286740, months=12
+days 8 to 10 | D8 alone | crps             +0.695 (+0.162 to +1.489) [99%] n=37508, months=11
+days 8 to 10 | D8 alone | mae_median       +0.907 (+0.187 to +1.995) [99%] n=37508, months=11
+days 8 to 10 | D8 alone | twcrps           +0.086 (+0.018 to +0.219) [99%] n=37508, months=11
+days 8 to 10 | D2 and D4 (placebos) | crps +0.004 (-0.045 to +0.040) [99%] n=81956, months=12
+days 8 to 10 | D2 and D4 (placebos) | mae_median +0.010 (-0.069 to +0.071) [99%] n=81956, months=12
+days 8 to 10 | D2 and D4 (placebos) | twcrps -0.001 (-0.008 to +0.005) [99%] n=81956, months=12
+days 8 to 10 | short-history (report only) | crps +0.192 (-0.016 to +0.530) [99%] n=32652, months=6
+days 8 to 10 | short-history (report only) | mae_median +0.355 (-0.007 to +0.948) [99%] n=32652, months=6
+
+== HEADLINE contrasts, linear minus default (99%, 20,000 resamples) ==
+days 1 to 10 | signed-MW six | crps        -0.022 (-0.043 to -0.001) [99%] n=826300, months=12
+days 1 to 10 | signed-MW six | mae_median  -0.038 (-0.071 to -0.005) [99%] n=826300, months=12
+days 1 to 10 | signed-MW six | twcrps      -0.004 (-0.013 to +0.001) [99%] n=826300, months=12
+days 1 to 10 | MVA-only eight with D8 | crps +0.006 (-0.015 to +0.027) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only eight with D8 | mae_median -0.001 (-0.050 to +0.040) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only eight with D8 | twcrps -0.002 (-0.009 to +0.002) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only seven without D8 | crps -0.005 (-0.024 to +0.015) [99%] n=965658, months=12
+days 1 to 10 | MVA-only seven without D8 | mae_median -0.005 (-0.037 to +0.024) [99%] n=965658, months=12
+days 1 to 10 | MVA-only seven without D8 | twcrps -0.001 (-0.003 to +0.001) [99%] n=965658, months=12
+days 1 to 10 | D8 alone | crps             +0.089 (+0.004 to +0.162) [99%] n=126430, months=11
+days 1 to 10 | D8 alone | mae_median       +0.036 (-0.261 to +0.199) [99%] n=126430, months=11
+days 1 to 10 | D8 alone | twcrps           -0.013 (-0.067 to +0.016) [99%] n=126430, months=11
+days 1 to 10 | D2 and D4 (placebos) | crps -0.021 (-0.040 to -0.003) [99%] n=275996, months=12
+days 1 to 10 | D2 and D4 (placebos) | mae_median -0.041 (-0.072 to -0.010) [99%] n=275996, months=12
+days 1 to 10 | D2 and D4 (placebos) | twcrps -0.002 (-0.005 to +0.001) [99%] n=275996, months=12
+days 1 to 10 | short-history (report only) | crps +0.003 (-0.026 to +0.026) [99%] n=111732, months=6
+days 1 to 10 | short-history (report only) | mae_median +0.000 (-0.036 to +0.037) [99%] n=111732, months=6
+days 1 to 2 | signed-MW six | crps         -0.045 (-0.073 to -0.022) [99%] n=167141, months=12
+days 1 to 2 | signed-MW six | mae_median   -0.080 (-0.124 to -0.041) [99%] n=167141, months=12
+days 1 to 2 | signed-MW six | twcrps       -0.010 (-0.022 to -0.001) [99%] n=167141, months=12
+days 1 to 2 | MVA-only eight with D8 | crps -0.004 (-0.022 to +0.014) [99%] n=220908, months=12
+days 1 to 2 | MVA-only eight with D8 | mae_median -0.019 (-0.049 to +0.012) [99%] n=220908, months=12
+days 1 to 2 | MVA-only eight with D8 | twcrps -0.002 (-0.006 to +0.002) [99%] n=220908, months=12
+days 1 to 2 | MVA-only seven without D8 | crps -0.010 (-0.029 to +0.010) [99%] n=195312, months=12
+days 1 to 2 | MVA-only seven without D8 | mae_median -0.020 (-0.051 to +0.012) [99%] n=195312, months=12
+days 1 to 2 | MVA-only seven without D8 | twcrps -0.002 (-0.006 to +0.002) [99%] n=195312, months=12
+days 1 to 2 | D8 alone | crps              +0.036 (-0.028 to +0.099) [99%] n=25596, months=11
+days 1 to 2 | D8 alone | mae_median        -0.015 (-0.140 to +0.099) [99%] n=25596, months=11
+days 1 to 2 | D8 alone | twcrps            -0.004 (-0.020 to +0.006) [99%] n=25596, months=11
+days 1 to 2 | D2 and D4 (placebos) | crps  -0.039 (-0.082 to -0.001) [99%] n=55820, months=12
+days 1 to 2 | D2 and D4 (placebos) | mae_median -0.072 (-0.140 to -0.010) [99%] n=55820, months=12
+days 1 to 2 | D2 and D4 (placebos) | twcrps -0.003 (-0.011 to +0.004) [99%] n=55820, months=12
+days 1 to 2 | short-history (report only) | crps -0.032 (-0.075 to +0.024) [99%] n=22992, months=6
+days 1 to 2 | short-history (report only) | mae_median -0.052 (-0.132 to +0.047) [99%] n=22992, months=6
+days 3 to 10 | signed-MW six | crps        -0.016 (-0.036 to +0.007) [99%] n=659159, months=12
+days 3 to 10 | signed-MW six | mae_median  -0.028 (-0.061 to +0.011) [99%] n=659159, months=12
+days 3 to 10 | signed-MW six | twcrps      -0.003 (-0.011 to +0.002) [99%] n=659159, months=12
+days 3 to 10 | MVA-only eight with D8 | crps +0.009 (-0.016 to +0.033) [99%] n=871180, months=12
+days 3 to 10 | MVA-only eight with D8 | mae_median +0.004 (-0.052 to +0.049) [99%] n=871180, months=12
+days 3 to 10 | MVA-only eight with D8 | twcrps -0.002 (-0.010 to +0.003) [99%] n=871180, months=12
+days 3 to 10 | MVA-only seven without D8 | crps -0.003 (-0.024 to +0.018) [99%] n=770346, months=12
+days 3 to 10 | MVA-only seven without D8 | mae_median -0.002 (-0.036 to +0.031) [99%] n=770346, months=12
+days 3 to 10 | MVA-only seven without D8 | twcrps -0.000 (-0.002 to +0.001) [99%] n=770346, months=12
+days 3 to 10 | D8 alone | crps             +0.102 (-0.005 to +0.192) [99%] n=100834, months=11
+days 3 to 10 | D8 alone | mae_median       +0.049 (-0.295 to +0.237) [99%] n=100834, months=11
+days 3 to 10 | D8 alone | twcrps           -0.015 (-0.078 to +0.019) [99%] n=100834, months=11
+days 3 to 10 | D2 and D4 (placebos) | crps -0.017 (-0.033 to +0.001) [99%] n=220176, months=12
+days 3 to 10 | D2 and D4 (placebos) | mae_median -0.034 (-0.062 to -0.003) [99%] n=220176, months=12
+days 3 to 10 | D2 and D4 (placebos) | twcrps -0.002 (-0.005 to +0.001) [99%] n=220176, months=12
+days 3 to 10 | short-history (report only) | crps +0.012 (-0.021 to +0.044) [99%] n=88740, months=6
+days 3 to 10 | short-history (report only) | mae_median +0.014 (-0.028 to +0.049) [99%] n=88740, months=6
+days 8 to 10 | signed-MW six | crps        +0.001 (-0.014 to +0.023) [99%] n=245343, months=12
+days 8 to 10 | signed-MW six | mae_median  -0.002 (-0.034 to +0.041) [99%] n=245343, months=12
+days 8 to 10 | signed-MW six | twcrps      +0.002 (-0.001 to +0.008) [99%] n=245343, months=12
+days 8 to 10 | MVA-only eight with D8 | crps +0.023 (-0.003 to +0.051) [99%] n=324248, months=12
+days 8 to 10 | MVA-only eight with D8 | mae_median +0.030 (-0.031 to +0.080) [99%] n=324248, months=12
+days 8 to 10 | MVA-only eight with D8 | twcrps -0.002 (-0.010 to +0.004) [99%] n=324248, months=12
+days 8 to 10 | MVA-only seven without D8 | crps +0.007 (-0.017 to +0.030) [99%] n=286740, months=12
+days 8 to 10 | MVA-only seven without D8 | mae_median +0.017 (-0.023 to +0.052) [99%] n=286740, months=12
+days 8 to 10 | MVA-only seven without D8 | twcrps -0.000 (-0.003 to +0.002) [99%] n=286740, months=12
+days 8 to 10 | D8 alone | crps             +0.145 (-0.006 to +0.296) [99%] n=37508, months=11
+days 8 to 10 | D8 alone | mae_median       +0.126 (-0.298 to +0.385) [99%] n=37508, months=11
+days 8 to 10 | D8 alone | twcrps           -0.018 (-0.084 to +0.022) [99%] n=37508, months=11
+days 8 to 10 | D2 and D4 (placebos) | crps +0.005 (-0.006 to +0.016) [99%] n=81956, months=12
+days 8 to 10 | D2 and D4 (placebos) | mae_median +0.007 (-0.013 to +0.027) [99%] n=81956, months=12
+days 8 to 10 | D2 and D4 (placebos) | twcrps +0.000 (-0.003 to +0.003) [99%] n=81956, months=12
+days 8 to 10 | short-history (report only) | crps -0.006 (-0.053 to +0.040) [99%] n=32652, months=6
+days 8 to 10 | short-history (report only) | mae_median -0.011 (-0.072 to +0.039) [99%] n=32652, months=6
+
+== HEADLINE contrasts, spline_heavy minus default (99%, 20,000 resamples) ==
+days 1 to 10 | signed-MW six | crps        -0.027 (-0.056 to -0.004) [99%] n=826300, months=12
+days 1 to 10 | signed-MW six | mae_median  -0.046 (-0.088 to -0.011) [99%] n=826300, months=12
+days 1 to 10 | signed-MW six | twcrps      -0.006 (-0.019 to +0.000) [99%] n=826300, months=12
+days 1 to 10 | MVA-only eight with D8 | crps +0.004 (-0.018 to +0.023) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only eight with D8 | mae_median -0.003 (-0.053 to +0.036) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only eight with D8 | twcrps -0.003 (-0.010 to +0.002) [99%] n=1092088, months=12
+days 1 to 10 | MVA-only seven without D8 | crps -0.006 (-0.025 to +0.013) [99%] n=965658, months=12
+days 1 to 10 | MVA-only seven without D8 | mae_median -0.008 (-0.039 to +0.021) [99%] n=965658, months=12
+days 1 to 10 | MVA-only seven without D8 | twcrps -0.001 (-0.003 to +0.001) [99%] n=965658, months=12
+days 1 to 10 | D8 alone | crps             +0.080 (-0.012 to +0.154) [99%] n=126430, months=11
+days 1 to 10 | D8 alone | mae_median       +0.042 (-0.262 to +0.199) [99%] n=126430, months=11
+days 1 to 10 | D8 alone | twcrps           -0.017 (-0.077 to +0.015) [99%] n=126430, months=11
+days 1 to 10 | D2 and D4 (placebos) | crps -0.026 (-0.054 to -0.003) [99%] n=275996, months=12
+days 1 to 10 | D2 and D4 (placebos) | mae_median -0.050 (-0.094 to -0.011) [99%] n=275996, months=12
+days 1 to 10 | D2 and D4 (placebos) | twcrps -0.002 (-0.005 to +0.000) [99%] n=275996, months=12
+days 1 to 10 | short-history (report only) | crps +0.016 (-0.019 to +0.063) [99%] n=111732, months=6
+days 1 to 10 | short-history (report only) | mae_median +0.019 (-0.035 to +0.065) [99%] n=111732, months=6
+days 1 to 2 | signed-MW six | crps         -0.047 (-0.080 to -0.023) [99%] n=167141, months=12
+days 1 to 2 | signed-MW six | mae_median   -0.083 (-0.130 to -0.043) [99%] n=167141, months=12
+days 1 to 2 | signed-MW six | twcrps       -0.011 (-0.025 to -0.001) [99%] n=167141, months=12
+days 1 to 2 | MVA-only eight with D8 | crps -0.004 (-0.021 to +0.015) [99%] n=220908, months=12
+days 1 to 2 | MVA-only eight with D8 | mae_median -0.018 (-0.050 to +0.016) [99%] n=220908, months=12
+days 1 to 2 | MVA-only eight with D8 | twcrps -0.003 (-0.006 to +0.002) [99%] n=220908, months=12
+days 1 to 2 | MVA-only seven without D8 | crps -0.009 (-0.028 to +0.010) [99%] n=195312, months=12
+days 1 to 2 | MVA-only seven without D8 | mae_median -0.019 (-0.050 to +0.013) [99%] n=195312, months=12
+days 1 to 2 | MVA-only seven without D8 | twcrps -0.002 (-0.006 to +0.002) [99%] n=195312, months=12
+days 1 to 2 | D8 alone | crps              +0.035 (-0.033 to +0.100) [99%] n=25596, months=11
+days 1 to 2 | D8 alone | mae_median        -0.011 (-0.155 to +0.111) [99%] n=25596, months=11
+days 1 to 2 | D8 alone | twcrps            -0.005 (-0.023 to +0.006) [99%] n=25596, months=11
+days 1 to 2 | D2 and D4 (placebos) | crps  -0.041 (-0.086 to -0.002) [99%] n=55820, months=12
+days 1 to 2 | D2 and D4 (placebos) | mae_median -0.074 (-0.146 to -0.012) [99%] n=55820, months=12
+days 1 to 2 | D2 and D4 (placebos) | twcrps -0.003 (-0.011 to +0.004) [99%] n=55820, months=12
+days 1 to 2 | short-history (report only) | crps -0.026 (-0.063 to +0.025) [99%] n=22992, months=6
+days 1 to 2 | short-history (report only) | mae_median -0.038 (-0.112 to +0.056) [99%] n=22992, months=6
+days 3 to 10 | signed-MW six | crps        -0.022 (-0.051 to +0.003) [99%] n=659159, months=12
+days 3 to 10 | signed-MW six | mae_median  -0.037 (-0.081 to +0.004) [99%] n=659159, months=12
+days 3 to 10 | signed-MW six | twcrps      -0.005 (-0.017 to +0.002) [99%] n=659159, months=12
+days 3 to 10 | MVA-only eight with D8 | crps +0.006 (-0.020 to +0.027) [99%] n=871180, months=12
+days 3 to 10 | MVA-only eight with D8 | mae_median +0.001 (-0.056 to +0.044) [99%] n=871180, months=12
+days 3 to 10 | MVA-only eight with D8 | twcrps -0.003 (-0.011 to +0.002) [99%] n=871180, months=12
+days 3 to 10 | MVA-only seven without D8 | crps -0.006 (-0.025 to +0.015) [99%] n=770346, months=12
+days 3 to 10 | MVA-only seven without D8 | mae_median -0.006 (-0.039 to +0.027) [99%] n=770346, months=12
+days 3 to 10 | MVA-only seven without D8 | twcrps -0.001 (-0.003 to +0.001) [99%] n=770346, months=12
+days 3 to 10 | D8 alone | crps             +0.092 (-0.023 to +0.178) [99%] n=100834, months=11
+days 3 to 10 | D8 alone | mae_median       +0.055 (-0.291 to +0.228) [99%] n=100834, months=11
+days 3 to 10 | D8 alone | twcrps           -0.020 (-0.090 to +0.018) [99%] n=100834, months=11
+days 3 to 10 | D2 and D4 (placebos) | crps -0.023 (-0.047 to -0.001) [99%] n=220176, months=12
+days 3 to 10 | D2 and D4 (placebos) | mae_median -0.044 (-0.083 to -0.006) [99%] n=220176, months=12
+days 3 to 10 | D2 and D4 (placebos) | twcrps -0.002 (-0.004 to +0.000) [99%] n=220176, months=12
+days 3 to 10 | short-history (report only) | crps +0.027 (-0.025 to +0.090) [99%] n=88740, months=6
+days 3 to 10 | short-history (report only) | mae_median +0.034 (-0.034 to +0.102) [99%] n=88740, months=6
+days 8 to 10 | signed-MW six | crps        -0.004 (-0.026 to +0.021) [99%] n=245343, months=12
+days 8 to 10 | signed-MW six | mae_median  -0.011 (-0.054 to +0.039) [99%] n=245343, months=12
+days 8 to 10 | signed-MW six | twcrps      -0.000 (-0.004 to +0.004) [99%] n=245343, months=12
+days 8 to 10 | MVA-only eight with D8 | crps +0.018 (-0.009 to +0.043) [99%] n=324248, months=12
+days 8 to 10 | MVA-only eight with D8 | mae_median +0.022 (-0.039 to +0.069) [99%] n=324248, months=12
+days 8 to 10 | MVA-only eight with D8 | twcrps -0.004 (-0.013 to +0.003) [99%] n=324248, months=12
+days 8 to 10 | MVA-only seven without D8 | crps +0.003 (-0.019 to +0.024) [99%] n=286740, months=12
+days 8 to 10 | MVA-only seven without D8 | mae_median +0.009 (-0.027 to +0.043) [99%] n=286740, months=12
+days 8 to 10 | MVA-only seven without D8 | twcrps -0.001 (-0.004 to +0.001) [99%] n=286740, months=12
+days 8 to 10 | D8 alone | crps             +0.129 (-0.025 to +0.260) [99%] n=37508, months=11
+days 8 to 10 | D8 alone | mae_median       +0.119 (-0.309 to +0.369) [99%] n=37508, months=11
+days 8 to 10 | D8 alone | twcrps           -0.026 (-0.104 to +0.019) [99%] n=37508, months=11
+days 8 to 10 | D2 and D4 (placebos) | crps -0.005 (-0.023 to +0.011) [99%] n=81956, months=12
+days 8 to 10 | D2 and D4 (placebos) | mae_median -0.010 (-0.039 to +0.018) [99%] n=81956, months=12
+days 8 to 10 | D2 and D4 (placebos) | twcrps -0.001 (-0.002 to +0.000) [99%] n=81956, months=12
+days 8 to 10 | short-history (report only) | crps +0.023 (-0.045 to +0.115) [99%] n=32652, months=6
+days 8 to 10 | short-history (report only) | mae_median +0.031 (-0.056 to +0.135) [99%] n=32652, months=6
+
+== Per-Primary contrasts spline - default (95%, 2,000), CRPS ==
+days 1 to 10
+shape: (16, 8)
+┌────────────────┬───────┬────────────┬───────────┬───────────┬───────────────┬──────────────┬──────────┐
+│ time_series_id ┆ label ┆ difference ┆ lower     ┆ upper     ┆ level_percent ┆ n_half_hours ┆ n_months │
+│ ---            ┆ ---   ┆ ---        ┆ ---       ┆ ---       ┆ ---           ┆ ---          ┆ ---      │
+│ i64            ┆ str   ┆ f64        ┆ f64       ┆ f64       ┆ f64           ┆ i64          ┆ i64      │
+╞════════════════╪═══════╪════════════╪═══════════╪═══════════╪═══════════════╪══════════════╪══════════╡
+│ 10             ┆ D10   ┆ 0.001926   ┆ -0.049521 ┆ 0.058082  ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 8              ┆ D11   ┆ -0.001467  ┆ -0.016086 ┆ 0.016507  ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 14             ┆ D12   ┆ -0.000112  ┆ -0.067416 ┆ 0.05983   ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 16             ┆ D14   ┆ -0.047947  ┆ -0.073841 ┆ -0.019276 ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 12             ┆ D15   ┆ 0.28278    ┆ 0.019621  ┆ 0.654064  ┆ 95.0          ┆ 44582        ┆ 4        │
+│ 18             ┆ D16   ┆ -0.039466  ┆ -0.181391 ┆ 0.056615  ┆ 95.0          ┆ 137982       ┆ 12       │
+│ 13             ┆ D18   ┆ 0.011194   ┆ -0.034925 ┆ 0.037918  ┆ 95.0          ┆ 67150        ┆ 6        │
+│ 9              ┆ D19   ┆ -0.015803  ┆ -0.049765 ┆ 0.010884  ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 25             ┆ D2    ┆ 0.002562   ┆ -0.011262 ┆ 0.014058  ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 24             ┆ D21   ┆ -0.002088  ┆ -0.011509 ┆ 0.006778  ┆ 95.0          ┆ 137670       ┆ 12       │
+│ 15             ┆ D22   ┆ 0.096267   ┆ 0.037255  ┆ 0.159018  ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 3              ┆ D3    ┆ -0.007534  ┆ -0.024688 ┆ 0.010056  ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 11             ┆ D4    ┆ -0.047895  ┆ -0.095042 ┆ -0.010298 ┆ 95.0          ┆ 137998       ┆ 12       │
+│ 17             ┆ D5    ┆ -0.013943  ┆ -0.029314 ┆ 0.000851  ┆ 95.0          ┆ 136398       ┆ 12       │
+│ 26             ┆ D8    ┆ 0.44503    ┆ 0.127257  ┆ 0.838153  ┆ 95.0          ┆ 126430       ┆ 11       │
+│ 7              ┆ D9    ┆ -0.013489  ┆ -0.043935 ┆ 0.014723  ┆ 95.0          ┆ 137926       ┆ 12       │
+└────────────────┴───────┴────────────┴───────────┴───────────┴───────────────┴──────────────┴──────────┘
+days 1 to 2
+shape: (16, 8)
+┌────────────────┬───────┬────────────┬───────────┬───────────┬───────────────┬──────────────┬──────────┐
+│ time_series_id ┆ label ┆ difference ┆ lower     ┆ upper     ┆ level_percent ┆ n_half_hours ┆ n_months │
+│ ---            ┆ ---   ┆ ---        ┆ ---       ┆ ---       ┆ ---           ┆ ---          ┆ ---      │
+│ i64            ┆ str   ┆ f64        ┆ f64       ┆ f64       ┆ f64           ┆ i64          ┆ i64      │
+╞════════════════╪═══════╪════════════╪═══════════╪═══════════╪═══════════════╪══════════════╪══════════╡
+│ 10             ┆ D10   ┆ -0.039903  ┆ -0.096102 ┆ 0.010734  ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 8              ┆ D11   ┆ -0.003039  ┆ -0.023453 ┆ 0.021058  ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 14             ┆ D12   ┆ -0.010057  ┆ -0.067122 ┆ 0.046795  ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 16             ┆ D14   ┆ -0.067575  ┆ -0.106139 ┆ -0.026262 ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 12             ┆ D15   ┆ -0.036923  ┆ -0.199641 ┆ 0.130608  ┆ 95.0          ┆ 9239         ┆ 4        │
+│ 18             ┆ D16   ┆ -0.056141  ┆ -0.125151 ┆ -0.001422 ┆ 95.0          ┆ 27908        ┆ 12       │
+│ 13             ┆ D18   ┆ -0.032625  ┆ -0.082924 ┆ 0.0046    ┆ 95.0          ┆ 13753        ┆ 6        │
+│ 9              ┆ D19   ┆ -0.017875  ┆ -0.047161 ┆ 0.009575  ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 25             ┆ D2    ┆ -0.005864  ┆ -0.029982 ┆ 0.015377  ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 24             ┆ D21   ┆ -0.01265   ┆ -0.028682 ┆ 0.002516  ┆ 95.0          ┆ 27852        ┆ 12       │
+│ 15             ┆ D22   ┆ 0.077558   ┆ 0.042302  ┆ 0.115364  ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 3              ┆ D3    ┆ -0.031802  ┆ -0.064124 ┆ -0.000304 ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 11             ┆ D4    ┆ -0.079472  ┆ -0.140812 ┆ -0.023911 ┆ 95.0          ┆ 27910        ┆ 12       │
+│ 17             ┆ D5    ┆ -0.049379  ┆ -0.104075 ┆ -0.006245 ┆ 95.0          ┆ 27603        ┆ 12       │
+│ 26             ┆ D8    ┆ 0.107886   ┆ -0.032263 ┆ 0.300831  ┆ 95.0          ┆ 25596        ┆ 11       │
+│ 7              ┆ D9    ┆ -0.039073  ┆ -0.07772  ┆ -0.000833 ┆ 95.0          ┆ 27900        ┆ 12       │
+└────────────────┴───────┴────────────┴───────────┴───────────┴───────────────┴──────────────┴──────────┘
+days 3 to 10
+shape: (16, 8)
+┌────────────────┬───────┬────────────┬───────────┬───────────┬───────────────┬──────────────┬──────────┐
+│ time_series_id ┆ label ┆ difference ┆ lower     ┆ upper     ┆ level_percent ┆ n_half_hours ┆ n_months │
+│ ---            ┆ ---   ┆ ---        ┆ ---       ┆ ---       ┆ ---           ┆ ---          ┆ ---      │
+│ i64            ┆ str   ┆ f64        ┆ f64       ┆ f64       ┆ f64           ┆ i64          ┆ i64      │
+╞════════════════╪═══════╪════════════╪═══════════╪═══════════╪═══════════════╪══════════════╪══════════╡
+│ 10             ┆ D10   ┆ 0.012531   ┆ -0.049734 ┆ 0.084058  ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 8              ┆ D11   ┆ -0.001069  ┆ -0.017322 ┆ 0.016418  ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 14             ┆ D12   ┆ 0.00241    ┆ -0.069549 ┆ 0.063735  ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 16             ┆ D14   ┆ -0.04297   ┆ -0.069426 ┆ -0.015458 ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 12             ┆ D15   ┆ 0.366354   ┆ 0.040426  ┆ 0.795477  ┆ 95.0          ┆ 35343        ┆ 4        │
+│ 18             ┆ D16   ┆ -0.035238  ┆ -0.197665 ┆ 0.077854  ┆ 95.0          ┆ 110074       ┆ 12       │
+│ 13             ┆ D18   ┆ 0.02248    ┆ -0.022842 ┆ 0.047625  ┆ 95.0          ┆ 53397        ┆ 6        │
+│ 9              ┆ D19   ┆ -0.015278  ┆ -0.052108 ┆ 0.013181  ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 25             ┆ D2    ┆ 0.004698   ┆ -0.00683  ┆ 0.014014  ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 24             ┆ D21   ┆ 0.000591   ┆ -0.008732 ┆ 0.009745  ┆ 95.0          ┆ 109818       ┆ 12       │
+│ 15             ┆ D22   ┆ 0.10101    ┆ 0.030984  ┆ 0.176679  ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 3              ┆ D3    ┆ -0.001381  ┆ -0.017831 ┆ 0.015424  ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 11             ┆ D4    ┆ -0.03989   ┆ -0.084909 ┆ -0.004388 ┆ 95.0          ┆ 110088       ┆ 12       │
+│ 17             ┆ D5    ┆ -0.004952  ┆ -0.018234 ┆ 0.008129  ┆ 95.0          ┆ 108795       ┆ 12       │
+│ 26             ┆ D8    ┆ 0.530611   ┆ 0.159017  ┆ 1.00529   ┆ 95.0          ┆ 100834       ┆ 11       │
+│ 7              ┆ D9    ┆ -0.007001  ┆ -0.037177 ┆ 0.020797  ┆ 95.0          ┆ 110026       ┆ 12       │
+└────────────────┴───────┴────────────┴───────────┴───────────┴───────────────┴──────────────┴──────────┘
+
+== Leave-one-out spline - default (95%), days 1 to 10, CRPS ==
+signed-MW without D5                       -0.020 (-0.050 to +0.004) [95%] n=689902, months=12
+signed-MW without D9                       -0.020 (-0.050 to +0.005) [95%] n=688374, months=12
+signed-MW without D10                      -0.023 (-0.052 to -0.001) [95%] n=688302, months=12
+signed-MW without D11                      -0.023 (-0.053 to +0.003) [95%] n=688302, months=12
+signed-MW without D14                      -0.013 (-0.046 to +0.011) [95%] n=688302, months=12
+signed-MW without D16                      -0.015 (-0.027 to -0.003) [95%] n=688318, months=12
+MVA-only without D2                        +0.062 (+0.021 to +0.119) [95%] n=954090, months=12
+MVA-only without D3                        +0.064 (+0.022 to +0.122) [95%] n=954090, months=12
+MVA-only without D4                        +0.070 (+0.027 to +0.126) [95%] n=954090, months=12
+MVA-only without D8                        +0.004 (-0.017 to +0.021) [95%] n=965658, months=12
+MVA-only without D12                       +0.063 (+0.017 to +0.122) [95%] n=954090, months=12
+MVA-only without D19                       +0.065 (+0.023 to +0.121) [95%] n=954090, months=12
+MVA-only without D21                       +0.063 (+0.022 to +0.119) [95%] n=954418, months=12
+MVA-only without D22                       +0.049 (+0.009 to +0.103) [95%] n=954090, months=12
+all 14 counted without D2                  +0.025 (-0.003 to +0.056) [95%] n=1780390, months=12
+all 14 counted without D3                  +0.025 (-0.002 to +0.057) [95%] n=1780390, months=12
+all 14 counted without D4                  +0.028 (+0.001 to +0.060) [95%] n=1780390, months=12
+all 14 counted without D5                  +0.026 (-0.003 to +0.058) [95%] n=1781990, months=12
+all 14 counted without D8                  -0.007 (-0.023 to +0.009) [95%] n=1791958, months=12
+all 14 counted without D9                  +0.026 (-0.002 to +0.057) [95%] n=1780462, months=12
+all 14 counted without D10                 +0.025 (-0.002 to +0.057) [95%] n=1780390, months=12
+all 14 counted without D11                 +0.025 (-0.003 to +0.056) [95%] n=1780390, months=12
+all 14 counted without D12                 +0.025 (-0.005 to +0.058) [95%] n=1780390, months=12
+all 14 counted without D14                 +0.028 (-0.000 to +0.061) [95%] n=1780390, months=12
+all 14 counted without D16                 +0.028 (+0.005 to +0.059) [95%] n=1780406, months=12
+all 14 counted without D19                 +0.026 (-0.001 to +0.057) [95%] n=1780390, months=12
+all 14 counted without D21                 +0.025 (-0.003 to +0.056) [95%] n=1780718, months=12
+all 14 counted without D22                 +0.017 (-0.009 to +0.047) [95%] n=1780390, months=12
+
+== Primaries where spline beats default (days 1 to 10, counted 14) ==
+{'won': 10, 'lost': 4, 'tied': 0, 'scored_for_both': 14, 'not_fitted_treatment': 0, 'not_fitted_reference': 0, 'not_fitted_in_either': 0, 'other_unscored': 0}
+
+== Month-by-month CRPS difference spline - default, days 1 to 10 ==
+D8 [('2025-08', 15.033670953821664, 13.14007272944547, 1.8935982243761948), ('2025-09', 14.047290484379106, 12.587276046429512, 1.460014437949594), ('2025-10', 10.357468060246903, 9.861049128156743, 0.49641893209015997), ('2025-11', 8.87325015210539, 8.674011224652158, 0.1992389274532318), ('2025-12', 8.441370000371093, 8.124627588888295, 0.3167424114827977), ('2026-01', 11.65550363311221, 11.63005189670274, 0.02545173640946885), ('2026-02', 8.451350303407317, 8.349639510952844, 0.10171079245447245), ('2026-03', 7.570163489893899, 7.496466553836884, 0.073696936057015), ('2026-04', 7.113692717919888, 6.965197929938171, 0.14849478798171756), ('2026-05', 6.529253845343035, 6.49954245585315, 0.029711389489885498), ('2026-06', 7.790035031604499, 7.753402533094817, 0.03663249850968242)]
+D2 [('2025-07', 2.394966656611424, 2.39710542296565, -0.0021387663542258295), ('2025-08', 2.357504761787825, 2.3478510109884514, 0.009653750799373473), ('2025-09', 2.4334304749110602, 2.451594712148858, -0.01816423723779792), ('2025-10', 2.092609963298147, 2.0718518062623086, 0.020758157035838387), ('2025-11', 1.88516185746206, 1.8544983166243936, 0.030663540837666536), ('2025-12', 1.7454961978944272, 1.7347519746415385, 0.010744223252888707), ('2026-01', 2.0064788163087117, 2.0045758787184584, 0.0019029375902532841), ('2026-02', 2.550795760729824, 2.544467921925883, 0.006327838803941166), ('2026-03', 3.5791460776414086, 3.565414953071069, 0.013731124570339759), ('2026-04', 3.4320222091338057, 3.4878742270207543, -0.0558520178869486), ('2026-05', 2.69901932502936, 2.673573385636983, 0.02544593939237716), ('2026-06', 2.5835237021406745, 2.6023130262216547, -0.01878932408098022)]
+D4 [('2025-07', 1.2377154509642148, 1.2634662064705873, -0.025750755506372514), ('2025-08', 1.806445915740275, 1.8330085827056446, -0.026562666965369575), ('2025-09', 1.7159212162308004, 1.859426403734804, -0.14350518750400365), ('2025-10', 3.756715431049499, 3.8575350495790066, -0.1008196185295076), ('2025-11', 2.819029917577328, 2.8042435057373836, 0.014786411839944336), ('2025-12', 1.7781000968528373, 1.764012567104462, 0.01408752974837535), ('2026-01', 2.128761023736011, 2.131855109571344, -0.0030940858353329936), ('2026-02', 2.4336472569462644, 2.4604387409505084, -0.026791484004244026), ('2026-03', 3.185461769164398, 3.1779854784062724, 0.007476290758125614), ('2026-04', 3.3412923219198856, 3.5845579166776416, -0.243265594757756), ('2026-05', 2.677393168745056, 2.641931817335241, 0.03546135140981521), ('2026-06', 1.7241324065221086, 1.816290262948337, -0.09215785642622842)]
+
+== D8 leave-one-month-out spline - default (days 1 to 10 CRPS) ==
+2025-08 0.293
+2025-09 0.343
+2025-10 0.44
+2025-11 0.47
+2025-12 0.458
+2026-01 0.489
+2026-02 0.476
+2026-03 0.484
+2026-04 0.475
+2026-05 0.489
+2026-06 0.478
+
+== Tail measures per group and arm, slice lead_days_1_10 (mean over Primaries) ==
+default
+shape: (3, 10)
+┌───────────────┬──────────────┬─────────────┬──────────┬─────────────┬──────────────┬──────────────┬──────────────┬─────────────┬─────────────┐
+│ group         ┆ coverage_q01 ┆ pinball_q01 ┆ twcrps   ┆ pinball_q95 ┆ coverage_q05 ┆ coverage_q99 ┆ coverage_q95 ┆ pinball_q05 ┆ pinball_q99 │
+│ ---           ┆ ---          ┆ ---         ┆ ---      ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---         ┆ ---         │
+│ str           ┆ f64          ┆ f64         ┆ f64      ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64         ┆ f64         │
+╞═══════════════╪══════════════╪═════════════╪══════════╪═════════════╪══════════════╪══════════════╪══════════════╪═════════════╪═════════════╡
+│ MVA-only      ┆ 0.021222     ┆ 0.282059    ┆ 0.226008 ┆ 1.124337    ┆ 0.070333     ┆ 0.982298     ┆ 0.943843     ┆ 1.000536    ┆ 0.331463    │
+│ short-history ┆ 0.0341       ┆ 0.681438    ┆ null     ┆ 2.445173    ┆ 0.082544     ┆ 0.966673     ┆ 0.892767     ┆ 1.938875    ┆ 0.756326    │
+│ signed-MW     ┆ 0.021994     ┆ 0.255026    ┆ 0.327262 ┆ 0.814628    ┆ 0.06686      ┆ 0.981915     ┆ 0.945675     ┆ 0.772655    ┆ 0.269128    │
+└───────────────┴──────────────┴─────────────┴──────────┴─────────────┴──────────────┴──────────────┴──────────────┴─────────────┴─────────────┘
+shape: (3, 10)
+┌───────┬──────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ label ┆ twcrps   ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ pinball_q99 ┆ coverage_q01 ┆ coverage_q05 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---   ┆ ---      ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---          │
+│ str   ┆ f64      ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64          │
+╞═══════╪══════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════════╪══════════════╡
+│ D2    ┆ 0.203004 ┆ 0.152849    ┆ 0.578052    ┆ 0.641365    ┆ 0.185749    ┆ 0.012884     ┆ 0.062697     ┆ 0.943137     ┆ 0.984413     │
+│ D4    ┆ 0.237779 ┆ 0.172266    ┆ 0.59854     ┆ 0.669224    ┆ 0.210514    ┆ 0.027384     ┆ 0.077508     ┆ 0.937057     ┆ 0.979637     │
+│ D8    ┆ 0.270505 ┆ 0.574336    ┆ 2.147907    ┆ 2.591317    ┆ 0.786087    ┆ 0.018231     ┆ 0.058886     ┆ 0.933861     ┆ 0.969691     │
+└───────┴──────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+spline
+shape: (3, 10)
+┌───────────────┬──────────────┬──────────────┬─────────────┬─────────────┬─────────────┬──────────┬─────────────┬──────────────┬──────────────┐
+│ group         ┆ coverage_q99 ┆ coverage_q01 ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ twcrps   ┆ pinball_q99 ┆ coverage_q05 ┆ coverage_q95 │
+│ ---           ┆ ---          ┆ ---          ┆ ---         ┆ ---         ┆ ---         ┆ ---      ┆ ---         ┆ ---          ┆ ---          │
+│ str           ┆ f64          ┆ f64          ┆ f64         ┆ f64         ┆ f64         ┆ f64      ┆ f64         ┆ f64          ┆ f64          │
+╞═══════════════╪══════════════╪══════════════╪═════════════╪═════════════╪═════════════╪══════════╪═════════════╪══════════════╪══════════════╡
+│ MVA-only      ┆ 0.982099     ┆ 0.019353     ┆ 0.289911    ┆ 1.013786    ┆ 1.159062    ┆ 0.233314 ┆ 0.347975    ┆ 0.065677     ┆ 0.943861     │
+│ short-history ┆ 0.963178     ┆ 0.033132     ┆ 0.689495    ┆ 1.959019    ┆ 2.536529    ┆ null     ┆ 0.804387    ┆ 0.079601     ┆ 0.888637     │
+│ signed-MW     ┆ 0.980407     ┆ 0.018982     ┆ 0.246734    ┆ 0.75358     ┆ 0.82394     ┆ 0.322969 ┆ 0.27511     ┆ 0.059748     ┆ 0.942508     │
+└───────────────┴──────────────┴──────────────┴─────────────┴─────────────┴─────────────┴──────────┴─────────────┴──────────────┴──────────────┘
+shape: (3, 10)
+┌───────┬──────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ label ┆ twcrps   ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ pinball_q99 ┆ coverage_q01 ┆ coverage_q05 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---   ┆ ---      ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---          │
+│ str   ┆ f64      ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64          │
+╞═══════╪══════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════════╪══════════════╡
+│ D2    ┆ 0.203565 ┆ 0.152076    ┆ 0.575437    ┆ 0.645893    ┆ 0.189082    ┆ 0.012181     ┆ 0.05932      ┆ 0.943898     ┆ 0.985253     │
+│ D4    ┆ 0.232135 ┆ 0.164287    ┆ 0.58684     ┆ 0.657868    ┆ 0.202737    ┆ 0.023928     ┆ 0.0734       ┆ 0.94189      ┆ 0.980565     │
+│ D8    ┆ 0.320511 ┆ 0.656449    ┆ 2.300431    ┆ 2.797507    ┆ 0.8969      ┆ 0.018666     ┆ 0.058285     ┆ 0.932658     ┆ 0.968038     │
+└───────┴──────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+linear
+shape: (3, 10)
+┌───────────────┬──────────────┬──────────────┬──────────────┬──────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┐
+│ group         ┆ coverage_q95 ┆ coverage_q01 ┆ coverage_q05 ┆ twcrps   ┆ pinball_q99 ┆ pinball_q95 ┆ pinball_q05 ┆ pinball_q01 ┆ coverage_q99 │
+│ ---           ┆ ---          ┆ ---          ┆ ---          ┆ ---      ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          │
+│ str           ┆ f64          ┆ f64          ┆ f64          ┆ f64      ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          │
+╞═══════════════╪══════════════╪══════════════╪══════════════╪══════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╡
+│ MVA-only      ┆ 0.943391     ┆ 0.020324     ┆ 0.068024     ┆ 0.223649 ┆ 0.332273    ┆ 1.129467    ┆ 1.008251    ┆ 0.285607    ┆ 0.982204     │
+│ short-history ┆ 0.893559     ┆ 0.034141     ┆ 0.081839     ┆ null     ┆ 0.761745    ┆ 2.439026    ┆ 1.942582    ┆ 0.682418    ┆ 0.96669      │
+│ signed-MW     ┆ 0.945942     ┆ 0.021138     ┆ 0.064479     ┆ 0.322787 ┆ 0.26561     ┆ 0.807367    ┆ 0.76804     ┆ 0.255393    ┆ 0.98216      │
+└───────────────┴──────────────┴──────────────┴──────────────┴──────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┘
+shape: (3, 10)
+┌───────┬──────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ label ┆ twcrps   ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ pinball_q99 ┆ coverage_q01 ┆ coverage_q05 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---   ┆ ---      ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---          │
+│ str   ┆ f64      ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64          │
+╞═══════╪══════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════════╪══════════════╡
+│ D2    ┆ 0.202674 ┆ 0.152946    ┆ 0.578868    ┆ 0.641964    ┆ 0.185924    ┆ 0.012812     ┆ 0.06232      ┆ 0.942992     ┆ 0.984565     │
+│ D4    ┆ 0.234126 ┆ 0.174524    ┆ 0.598933    ┆ 0.65252     ┆ 0.202703    ┆ 0.026819     ┆ 0.076168     ┆ 0.938717     ┆ 0.980058     │
+│ D8    ┆ 0.257424 ┆ 0.599198    ┆ 2.207915    ┆ 2.642329    ┆ 0.794754    ┆ 0.016088     ┆ 0.05562      ┆ 0.932358     ┆ 0.969952     │
+└───────┴──────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+bg2
+shape: (3, 10)
+┌───────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────┬─────────────┬─────────────┬──────────────┬──────────────┐
+│ group         ┆ pinball_q95 ┆ pinball_q05 ┆ coverage_q05 ┆ coverage_q01 ┆ twcrps   ┆ pinball_q99 ┆ pinball_q01 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---           ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---      ┆ ---         ┆ ---         ┆ ---          ┆ ---          │
+│ str           ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64      ┆ f64         ┆ f64         ┆ f64          ┆ f64          │
+╞═══════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════╪═════════════╪═════════════╪══════════════╪══════════════╡
+│ MVA-only      ┆ 0.965754    ┆ 0.865284    ┆ 0.041962     ┆ 0.005362     ┆ 0.194728 ┆ 0.352149    ┆ 0.261458    ┆ 0.954709     ┆ 0.995109     │
+│ short-history ┆ 2.051537    ┆ 1.654797    ┆ 0.020174     ┆ 0.000594     ┆ null     ┆ 0.573554    ┆ 0.55453     ┆ 0.926848     ┆ 0.996217     │
+│ signed-MW     ┆ 0.881834    ┆ 0.685939    ┆ 0.044787     ┆ 0.009935     ┆ 0.354848 ┆ 0.323283    ┆ 0.221714    ┆ 0.931667     ┆ 0.97547      │
+└───────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────┴─────────────┴─────────────┴──────────────┴──────────────┘
+shape: (3, 10)
+┌───────┬──────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ label ┆ twcrps   ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ pinball_q99 ┆ coverage_q01 ┆ coverage_q05 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---   ┆ ---      ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---          │
+│ str   ┆ f64      ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64          │
+╞═══════╪══════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════════╪══════════════╡
+│ D2    ┆ 0.219639 ┆ 0.198702    ┆ 0.501036    ┆ 0.563579    ┆ 0.27929     ┆ 0.001783     ┆ 0.029624     ┆ 0.952811     ┆ 0.992746     │
+│ D4    ┆ 0.296457 ┆ 0.163231    ┆ 0.50623     ┆ 0.760977    ┆ 0.286034    ┆ 0.004602     ┆ 0.046849     ┆ 0.933347     ┆ 0.98892      │
+│ D8    ┆ 0.041517 ┆ 0.379535    ┆ 1.793564    ┆ 1.805735    ┆ 0.448574    ┆ 0.001835     ┆ 0.041114     ┆ 0.9392       ┆ 0.997461     │
+└───────┴──────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+manual_heuristic
+shape: (3, 10)
+┌───────────────┬─────────────┬─────────────┬──────────────┬──────────────┬─────────────┬─────────────┬──────────┬──────────────┬──────────────┐
+│ group         ┆ pinball_q95 ┆ pinball_q01 ┆ coverage_q99 ┆ coverage_q01 ┆ pinball_q05 ┆ pinball_q99 ┆ twcrps   ┆ coverage_q05 ┆ coverage_q95 │
+│ ---           ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---         ┆ ---         ┆ ---      ┆ ---          ┆ ---          │
+│ str           ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64         ┆ f64         ┆ f64      ┆ f64          ┆ f64          │
+╞═══════════════╪═════════════╪═════════════╪══════════════╪══════════════╪═════════════╪═════════════╪══════════╪══════════════╪══════════════╡
+│ MVA-only      ┆ 1.157076    ┆ 0.410369    ┆ 0.929527     ┆ 0.067151     ┆ 1.002115    ┆ 0.477144    ┆ 0.238282 ┆ 0.09306      ┆ 0.902613     │
+│ short-history ┆ 3.286781    ┆ 0.560431    ┆ 0.874133     ┆ 0.003477     ┆ 2.638454    ┆ 2.02578     ┆ null     ┆ 0.00554      ┆ 0.834449     │
+│ signed-MW     ┆ 1.011355    ┆ 0.279477    ┆ 0.920563     ┆ 0.049425     ┆ 0.792039    ┆ 0.457147    ┆ 0.413191 ┆ 0.069697     ┆ 0.891719     │
+└───────────────┴─────────────┴─────────────┴──────────────┴──────────────┴─────────────┴─────────────┴──────────┴──────────────┴──────────────┘
+shape: (3, 10)
+┌───────┬──────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ label ┆ twcrps   ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ pinball_q99 ┆ coverage_q01 ┆ coverage_q05 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---   ┆ ---      ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---          │
+│ str   ┆ f64      ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64          │
+╞═══════╪══════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════════╪══════════════╡
+│ D2    ┆ 0.304859 ┆ 0.174883    ┆ 0.578605    ┆ 0.801267    ┆ 0.367397    ┆ 0.03645      ┆ 0.052646     ┆ 0.861382     ┆ 0.898303     │
+│ D4    ┆ 0.338711 ┆ 0.196549    ┆ 0.534154    ┆ 0.981287    ┆ 0.525041    ┆ 0.068095     ┆ 0.09232      ┆ 0.872788     ┆ 0.90031      │
+│ D8    ┆ 0.053909 ┆ 0.994026    ┆ 2.079914    ┆ 1.873487    ┆ 0.629361    ┆ 0.08615      ┆ 0.121126     ┆ 0.931915     ┆ 0.95191      │
+└───────┴──────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+climatology
+shape: (3, 10)
+┌───────────────┬─────────────┬─────────────┬──────────┬──────────────┬──────────────┬─────────────┬─────────────┬──────────────┬──────────────┐
+│ group         ┆ pinball_q95 ┆ pinball_q99 ┆ twcrps   ┆ coverage_q99 ┆ coverage_q01 ┆ pinball_q05 ┆ pinball_q01 ┆ coverage_q05 ┆ coverage_q95 │
+│ ---           ┆ ---         ┆ ---         ┆ ---      ┆ ---          ┆ ---          ┆ ---         ┆ ---         ┆ ---          ┆ ---          │
+│ str           ┆ f64         ┆ f64         ┆ f64      ┆ f64          ┆ f64          ┆ f64         ┆ f64         ┆ f64          ┆ f64          │
+╞═══════════════╪═════════════╪═════════════╪══════════╪══════════════╪══════════════╪═════════════╪═════════════╪══════════════╪══════════════╡
+│ MVA-only      ┆ 1.182995    ┆ 0.346989    ┆ 0.243218 ┆ 0.967392     ┆ 0.045329     ┆ 1.165313    ┆ 0.382066    ┆ 0.085108     ┆ 0.927446     │
+│ short-history ┆ 13.820889   ┆ 9.360795    ┆ null     ┆ 0.663965     ┆ 0.000179     ┆ 2.996105    ┆ 0.670208    ┆ 0.001072     ┆ 0.528553     │
+│ signed-MW     ┆ 1.057136    ┆ 0.395976    ┆ 0.428987 ┆ 0.952084     ┆ 0.017766     ┆ 0.840493    ┆ 0.221788    ┆ 0.039929     ┆ 0.903512     │
+└───────────────┴─────────────┴─────────────┴──────────┴──────────────┴──────────────┴─────────────┴─────────────┴──────────────┴──────────────┘
+shape: (3, 10)
+┌───────┬──────────┬─────────────┬─────────────┬─────────────┬─────────────┬──────────────┬──────────────┬──────────────┬──────────────┐
+│ label ┆ twcrps   ┆ pinball_q01 ┆ pinball_q05 ┆ pinball_q95 ┆ pinball_q99 ┆ coverage_q01 ┆ coverage_q05 ┆ coverage_q95 ┆ coverage_q99 │
+│ ---   ┆ ---      ┆ ---         ┆ ---         ┆ ---         ┆ ---         ┆ ---          ┆ ---          ┆ ---          ┆ ---          │
+│ str   ┆ f64      ┆ f64         ┆ f64         ┆ f64         ┆ f64         ┆ f64          ┆ f64          ┆ f64          ┆ f64          │
+╞═══════╪══════════╪═════════════╪═════════════╪═════════════╪═════════════╪══════════════╪══════════════╪══════════════╪══════════════╡
+│ D2    ┆ 0.319874 ┆ 0.154286    ┆ 0.638397    ┆ 0.750198    ┆ 0.229417    ┆ 0.007225     ┆ 0.019203     ┆ 0.892404     ┆ 0.948753     │
+│ D4    ┆ 0.326928 ┆ 0.13322     ┆ 0.535708    ┆ 0.871012    ┆ 0.338079    ┆ 0.026493     ┆ 0.06474      ┆ 0.912057     ┆ 0.956463     │
+│ D8    ┆ 0.076221 ┆ 0.870144    ┆ 2.402813    ┆ 1.871873    ┆ 0.430915    ┆ 0.074784     ┆ 0.143803     ┆ 0.970766     ┆ 0.988294     │
+└───────┴──────────┴─────────────┴─────────────┴─────────────┴─────────────┴──────────────┴──────────────┴──────────────┴──────────────┘
+
+== Slice CRPS, spline vs default, pooled by group, days 1 to 10 ==
+sunny_unit_shape
+shape: (3, 4)
+┌───────────────┬──────────┬────────┬──────────┐
+│ group         ┆ spline   ┆ n      ┆ default  │
+│ ---           ┆ ---      ┆ ---    ┆ ---      │
+│ str           ┆ f64      ┆ u32    ┆ f64      │
+╞═══════════════╪══════════╪════════╪══════════╡
+│ MVA-only      ┆ 5.682901 ┆ 173517 ┆ 5.68053  │
+│ short-history ┆ 8.302069 ┆ 20065  ┆ 8.269203 │
+│ signed-MW     ┆ 4.363184 ┆ 131617 ┆ 4.489122 │
+└───────────────┴──────────┴────────┴──────────┘
+sunny_april_june
+shape: (3, 4)
+┌───────────────┬──────────┬───────┬──────────┐
+│ group         ┆ spline   ┆ n     ┆ default  │
+│ ---           ┆ ---      ┆ ---   ┆ ---      │
+│ str           ┆ f64      ┆ u32   ┆ f64      │
+╞═══════════════╪══════════╪═══════╪══════════╡
+│ MVA-only      ┆ 5.539279 ┆ 78836 ┆ 5.579977 │
+│ short-history ┆ 8.253061 ┆ 16290 ┆ 8.271035 │
+│ signed-MW     ┆ 4.290271 ┆ 58782 ┆ 4.381875 │
+└───────────────┴──────────┴───────┴──────────┘
+winter_nights
+shape: (3, 4)
+┌───────────────┬──────────┬────────┬──────────┐
+│ group         ┆ spline   ┆ n      ┆ default  │
+│ ---           ┆ ---      ┆ ---    ┆ ---      │
+│ str           ┆ f64      ┆ u32    ┆ f64      │
+╞═══════════════╪══════════╪════════╪══════════╡
+│ MVA-only      ┆ 3.258571 ┆ 164920 ┆ 3.243979 │
+│ short-history ┆ 1.763506 ┆ 11908  ┆ 1.71806  │
+│ signed-MW     ┆ 3.076449 ┆ 123688 ┆ 3.117561 │
+└───────────────┴──────────┴────────┴──────────┘
+cold_nights
+shape: (3, 4)
+┌───────────────┬──────────┬───────┬──────────┐
+│ group         ┆ spline   ┆ n     ┆ default  │
+│ ---           ┆ ---      ┆ ---   ┆ ---      │
+│ str           ┆ f64      ┆ u32   ┆ f64      │
+╞═══════════════╪══════════╪═══════╪══════════╡
+│ MVA-only      ┆ 3.295689 ┆ 37704 ┆ 3.302234 │
+│ short-history ┆ 4.369467 ┆ 3708  ┆ 4.244669 │
+│ signed-MW     ┆ 4.172125 ┆ 35496 ┆ 4.183056 │
+└───────────────┴──────────┴───────┴──────────┘
+economy_7_step
+shape: (3, 4)
+┌───────────────┬──────────┬────────┬──────────┐
+│ group         ┆ spline   ┆ n      ┆ default  │
+│ ---           ┆ ---      ┆ ---    ┆ ---      │
+│ str           ┆ f64      ┆ u32    ┆ f64      │
+╞═══════════════╪══════════╪════════╪══════════╡
+│ MVA-only      ┆ 3.088305 ┆ 136328 ┆ 2.997918 │
+│ short-history ┆ 5.978869 ┆ 13716  ┆ 5.891546 │
+│ signed-MW     ┆ 1.928829 ┆ 103144 ┆ 1.940066 │
+└───────────────┴──────────┴────────┴──────────┘
+christmas
+shape: (3, 4)
+┌───────────────┬──────────┬───────┬──────────┐
+│ group         ┆ spline   ┆ n     ┆ default  │
+│ ---           ┆ ---      ┆ ---   ┆ ---      │
+│ str           ┆ f64      ┆ u32   ┆ f64      │
+╞═══════════════╪══════════╪═══════╪══════════╡
+│ MVA-only      ┆ 3.423411 ┆ 27648 ┆ 3.414234 │
+│ short-history ┆ 3.45914  ┆ 30    ┆ 3.959825 │
+│ signed-MW     ┆ 4.313111 ┆ 20736 ┆ 4.375542 │
+└───────────────┴──────────┴───────┴──────────┘
+bank_holidays
+shape: (3, 4)
+┌───────────────┬──────────┬───────┬──────────┐
+│ group         ┆ spline   ┆ n     ┆ default  │
+│ ---           ┆ ---      ┆ ---   ┆ ---      │
+│ str           ┆ f64      ┆ u32   ┆ f64      │
+╞═══════════════╪══════════╪═══════╪══════════╡
+│ MVA-only      ┆ 4.463241 ┆ 52216 ┆ 4.409448 │
+│ short-history ┆ 7.145477 ┆ 4686  ┆ 6.906563 │
+│ signed-MW     ┆ 4.052772 ┆ 39168 ┆ 4.045331 │
+└───────────────┴──────────┴───────┴──────────┘
+event_rows
+shape: (3, 4)
+┌───────────────┬──────────┬───────┬──────────┐
+│ group         ┆ spline   ┆ n     ┆ default  │
+│ ---           ┆ ---      ┆ ---   ┆ ---      │
+│ str           ┆ f64      ┆ u32   ┆ f64      │
+╞═══════════════╪══════════╪═══════╪══════════╡
+│ MVA-only      ┆ 5.473666 ┆ 9416  ┆ 5.462048 │
+│ short-history ┆ 3.037042 ┆ 189   ┆ 3.279222 │
+│ signed-MW     ┆ 7.417746 ┆ 28120 ┆ 7.35047  │
+└───────────────┴──────────┴───────┴──────────┘
+event_following_7_days
+shape: (3, 4)
+┌───────────────┬──────────┬───────┬──────────┐
+│ group         ┆ spline   ┆ n     ┆ default  │
+│ ---           ┆ ---      ┆ ---   ┆ ---      │
+│ str           ┆ f64      ┆ u32   ┆ f64      │
+╞═══════════════╪══════════╪═══════╪══════════╡
+│ MVA-only      ┆ 3.016097 ┆ 26864 ┆ 2.980622 │
+│ short-history ┆ 2.523278 ┆ 1914  ┆ 2.817429 │
+│ signed-MW     ┆ 4.938244 ┆ 21496 ┆ 5.106069 │
+└───────────────┴──────────┴───────┴──────────┘
+cold_start_months
+shape: (0, 4)
+┌───────┬────────┬─────┬─────────┐
+│ group ┆ spline ┆ n   ┆ default │
+│ ---   ┆ ---    ┆ --- ┆ ---     │
+│ str   ┆ f64    ┆ u32 ┆ f64     │
+╞═══════╪════════╪═════╪═════════╡
+└───────┴────────┴─────┴─────────┘
+
+== D8: own-residual arm vs donor-spread arm, on shared rows, CRPS ==
+default [('lead_days_1_10', 126476, 9.227219757898585), ('lead_day_1', 12810, 8.527683025901247), ('lead_day_2', 12790, 8.558880315960307), ('all', 176007, 9.651545822889277)]
+default_donor [('lead_days_1_10', 126476, 11.58772933945673), ('lead_day_1', 12810, 11.124104635817101), ('lead_day_2', 12790, 10.934275018036521), ('all', 176007, 11.933906545593462)]
+spline [('lead_days_1_10', 126476, 9.672190038294882), ('lead_day_1', 12810, 8.618587146434457), ('lead_day_2', 12790, 8.684136763458993), ('all', 176007, 10.229836043538445)]
+spline_donor [('lead_days_1_10', 126476, 12.112249964513634), ('lead_day_1', 12810, 11.216265620389816), ('lead_day_2', 12790, 11.075153850920413), ('all', 176007, 12.629258082568375)]
+bg2 [('lead_days_1_10', 126476, 7.615747289959029), ('lead_day_1', 12810, 7.372150639625029), ('lead_day_2', 12790, 7.4364730017154255), ('all', 176007, 7.664735042445759)]
+
+== Nulled rows: width (q95-q05) and coverage of [q05, q95], spline, days 1 to 10 ==
+shape: (32, 5)
+┌──────┬─────────┬────────┬───────────┬─────────────┐
+│ site ┆ missing ┆ n      ┆ width     ┆ coverage_90 │
+│ ---  ┆ ---     ┆ ---    ┆ ---       ┆ ---         │
+│ str  ┆ bool    ┆ u32    ┆ f32       ┆ f64         │
+╞══════╪═════════╪════════╪═══════════╪═════════════╡
+│ D10  ┆ false   ┆ 172783 ┆ 29.392942 ┆ 0.928552    │
+│ D10  ┆ true    ┆ 19     ┆ 29.871338 ┆ 0.736842    │
+│ D11  ┆ false   ┆ 172783 ┆ 19.691286 ┆ 0.905303    │
+│ D11  ┆ true    ┆ 19     ┆ 18.87632  ┆ 0.894737    │
+│ D12  ┆ false   ┆ 172783 ┆ 54.203285 ┆ 0.865079    │
+│ D12  ┆ true    ┆ 19     ┆ 62.776096 ┆ 1.0         │
+│ D14  ┆ false   ┆ 172783 ┆ 15.980558 ┆ 0.892229    │
+│ D14  ┆ true    ┆ 19     ┆ 18.917067 ┆ 0.789474    │
+│ D15  ┆ false   ┆ 55178  ┆ 60.500103 ┆ 0.707075    │
+│ D15  ┆ true    ┆ 614    ┆ 53.884884 ┆ 0.579805    │
+│ D16  ┆ false   ┆ 172725 ┆ 17.32201  ┆ 0.823946    │
+│ D16  ┆ true    ┆ 57     ┆ 17.148783 ┆ 0.964912    │
+│ D18  ┆ false   ┆ 83527  ┆ 21.375244 ┆ 0.912424    │
+│ D18  ┆ true    ┆ 595    ┆ 17.423471 ┆ 0.961345    │
+│ D19  ┆ false   ┆ 172783 ┆ 22.93833  ┆ 0.871451    │
+│ D19  ┆ true    ┆ 19     ┆ 26.003532 ┆ 0.894737    │
+│ D2   ┆ false   ┆ 172783 ┆ 17.740105 ┆ 0.88452     │
+│ D2   ┆ true    ┆ 19     ┆ 21.729895 ┆ 0.736842    │
+│ D21  ┆ false   ┆ 170988 ┆ 16.068811 ┆ 0.877184    │
+│ D21  ┆ true    ┆ 1404   ┆ 16.231819 ┆ 0.880342    │
+│ D22  ┆ false   ┆ 172783 ┆ 34.373947 ┆ 0.893682    │
+│ D22  ┆ true    ┆ 19     ┆ 36.874058 ┆ 0.578947    │
+│ D3   ┆ false   ┆ 172783 ┆ 12.280574 ┆ 0.887946    │
+│ D3   ┆ true    ┆ 19     ┆ 13.215642 ┆ 0.842105    │
+│ D4   ┆ false   ┆ 172783 ┆ 16.962013 ┆ 0.868523    │
+│ D4   ┆ true    ┆ 19     ┆ 18.450258 ┆ 0.421053    │
+│ D5   ┆ false   ┆ 167576 ┆ 25.76396  ┆ 0.843301    │
+│ D5   ┆ true    ┆ 3226   ┆ 26.507133 ┆ 0.877867    │
+│ D8   ┆ false   ┆ 157740 ┆ 70.896698 ┆ 0.874477    │
+│ D8   ┆ true    ┆ 122    ┆ 70.803535 ┆ 0.901639    │
+│ D9   ┆ false   ┆ 172536 ┆ 18.579153 ┆ 0.895019    │
+│ D9   ┆ true    ┆ 176    ┆ 13.486325 ┆ 0.914773    │
+└──────┴─────────┴────────┴───────────┴─────────────┘
+
+== Median minus mean per site, points (spline), and mean-forecast error ==
+shape: (32, 5)
+┌─────────┬──────┬────────────────┬────────────────┬───────────┐
+│ arm     ┆ site ┆ q50_minus_mean ┆ mean_abs_error ┆ mean_bias │
+│ ---     ┆ ---  ┆ ---            ┆ ---            ┆ ---       │
+│ str     ┆ str  ┆ f32            ┆ f32            ┆ f32       │
+╞═════════╪══════╪════════════════╪════════════════╪═══════════╡
+│ default ┆ D10  ┆ 0.0            ┆ 5.653331       ┆ 0.592891  │
+│ spline  ┆ D10  ┆ 0.0            ┆ 5.62676        ┆ -0.007291 │
+│ default ┆ D11  ┆ 0.0            ┆ 4.350929       ┆ 0.444016  │
+│ spline  ┆ D11  ┆ 0.0            ┆ 4.376284       ┆ 0.249235  │
+│ default ┆ D12  ┆ 0.0            ┆ 13.216352      ┆ 0.291481  │
+│ spline  ┆ D12  ┆ 0.0            ┆ 13.204459      ┆ -0.402831 │
+│ default ┆ D14  ┆ 0.0            ┆ 3.903113       ┆ 0.269588  │
+│ spline  ┆ D14  ┆ 0.0            ┆ 3.831636       ┆ 0.001802  │
+│ default ┆ D15  ┆ 0.0            ┆ 21.171844      ┆ -3.167279 │
+│ spline  ┆ D15  ┆ 0.0            ┆ 21.616207      ┆ -4.06395  │
+│ default ┆ D16  ┆ 0.0            ┆ 5.210884       ┆ 0.302088  │
+│ spline  ┆ D16  ┆ 0.0            ┆ 5.155292       ┆ -0.383759 │
+│ default ┆ D18  ┆ 0.0            ┆ 4.312586       ┆ 0.189622  │
+│ spline  ┆ D18  ┆ 0.0            ┆ 4.30105        ┆ 0.303151  │
+│ default ┆ D19  ┆ 0.0            ┆ 5.766315       ┆ 0.38357   │
+│ spline  ┆ D19  ┆ 0.0            ┆ 5.746177       ┆ 0.267097  │
+│ default ┆ D2   ┆ 0.0            ┆ 4.39501        ┆ 0.165652  │
+│ spline  ┆ D2   ┆ 0.0            ┆ 4.398993       ┆ 0.051825  │
+│ default ┆ D21  ┆ 0.0            ┆ 4.158364       ┆ 0.424703  │
+│ spline  ┆ D21  ┆ 0.0            ┆ 4.15389        ┆ 0.305881  │
+│ default ┆ D22  ┆ 0.0            ┆ 7.034031       ┆ 0.045518  │
+│ spline  ┆ D22  ┆ 0.0            ┆ 7.242605       ┆ 0.054436  │
+│ default ┆ D3   ┆ 0.0            ┆ 2.891589       ┆ 0.30856   │
+│ spline  ┆ D3   ┆ 0.0            ┆ 2.86928        ┆ 0.062088  │
+│ default ┆ D4   ┆ 0.0            ┆ 4.229279       ┆ 0.034956  │
+│ spline  ┆ D4   ┆ 0.0            ┆ 4.140532       ┆ -0.003201 │
+│ default ┆ D5   ┆ 0.0            ┆ 6.867002       ┆ 0.419953  │
+│ spline  ┆ D5   ┆ 0.0            ┆ 6.843237       ┆ 0.127054  │
+│ default ┆ D8   ┆ 0.0            ┆ 15.929036      ┆ -1.030928 │
+│ spline  ┆ D8   ┆ 0.0            ┆ 16.470736      ┆ -0.858599 │
+│ default ┆ D9   ┆ 0.0            ┆ 4.469903       ┆ 0.48066   │
+│ spline  ┆ D9   ┆ 0.0            ┆ 4.44045        ┆ 0.309011  │
+└─────────┴──────┴────────────────┴────────────────┴───────────┘
