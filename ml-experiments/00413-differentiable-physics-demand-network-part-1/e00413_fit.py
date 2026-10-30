@@ -51,9 +51,9 @@ def make_model(*, arm: str, fold: prep.Fold, seed: int) -> torch.nn.Module:
     """Return an untrained network for an arm, with a fixed reference sample of training rows."""
     n_primaries = len(fold.target_mean)
     torch.manual_seed(seed)
-    if arm == "D0":
+    if arm in ("D0", "D0Y"):
         return models.PlainWrapper(
-            n_base=len(prep.NAMES),
+            n_base=len(prep.NAMES) + (models.N_YEARLY if arm == "D0Y" else 0),
             n_primaries=n_primaries,
             hidden=SETTING.hidden,
             layers=SETTING.layers,
@@ -288,29 +288,39 @@ def run_time(*, device: str) -> None:
         print(f"TIME D2 one epoch of {TIMING_ROWS:,} rows on {place}: {epoch_seconds:.1f} s")
 
 
-def run_screen(*, arms: list[str], seeds: list[int], device: str) -> None:
-    """Fit each arm on the fold, save the network and curves, and forecast the test month."""
-    fold = prep.build_fold(refit=base.refit_of(month=FOLD_MONTH))
-    print(f"fold {FOLD_MONTH}: {len(fold.x):,} rows; dropped targets: {fold.dropped}", flush=True)
-    for arm in arms:
-        for seed in seeds:
-            target = OUT_DIR / "seed_preds" / arm / f"{FOLD_MONTH}_s{seed}.parquet"
-            if target.exists():
-                continue
-            fitted, seconds = fit_arm(arm=arm, fold=fold, seed=seed, device=device)
-            folder = OUT_DIR / "models" / arm / FOLD_MONTH / f"s{seed}"
-            save_fit(fitted=fitted, fold=fold, target=folder)
-            export_interpretation(fitted=fitted, fold=fold, target=folder)
-            common.atomic_write(
-                frame=forecast_month(fitted=fitted, fold=fold, month=FOLD_MONTH, device=device),
-                target=target,
-            )
-            print(
-                f"{arm} {FOLD_MONTH} seed {seed}: {seconds:.0f} s, {fitted.epochs} epochs, "
-                f"validation NLL {fitted.val_nll:.4f}, peak GPU {peak_gpu_gb():.2f} GB, "
-                f"peak RSS {peak_rss_gb():.1f} GB",
-                flush=True,
-            )
+def run_screen(*, arms: list[str], seeds: list[int], months: list[str], device: str) -> None:
+    """Fit each arm on each fold, save the network and curves, and forecast the test month."""
+    for month in months:
+        fold = prep.build_fold(refit=base.refit_of(month=month))
+        print(f"fold {month}: {len(fold.x):,} rows; dropped targets: {fold.dropped}", flush=True)
+        for arm in arms:
+            for seed in seeds:
+                target = OUT_DIR / "seed_preds" / arm / f"{month}_s{seed}.parquet"
+                if target.exists():
+                    continue
+                fitted, seconds = fit_arm(arm=arm, fold=fold, seed=seed, device=device)
+                folder = OUT_DIR / "models" / arm / month / f"s{seed}"
+                save_fit(fitted=fitted, fold=fold, target=folder)
+                export_interpretation(fitted=fitted, fold=fold, target=folder)
+                common.atomic_write(
+                    frame=forecast_month(fitted=fitted, fold=fold, month=month, device=device),
+                    target=target,
+                )
+                print(
+                    f"{arm} {month} seed {seed}: {seconds:.0f} s, {fitted.epochs} epochs, "
+                    f"validation NLL {fitted.val_nll:.4f}, peak GPU {peak_gpu_gb():.2f} GB, "
+                    f"peak RSS {peak_rss_gb():.1f} GB, "
+                    f"available memory {available_memory_gb():.0f} GB",
+                    flush=True,
+                )
+
+
+def available_memory_gb() -> float:
+    """Return the host's available memory in gigabytes (the manager's stop line is 12 GB)."""
+    for line in Path("/proc/meminfo").read_text().splitlines():
+        if line.startswith("MemAvailable:"):
+            return int(line.split()[1]) / 1e6
+    return float("nan")
 
 
 def main() -> None:
@@ -319,12 +329,13 @@ def main() -> None:
     parser.add_argument("stage", choices=("time", "screen"))
     parser.add_argument("--arms", nargs="+", default=list(models.ARMS))
     parser.add_argument("--seeds", nargs="+", type=int, default=[0])
+    parser.add_argument("--months", nargs="+", default=list(base.SCREEN_MONTHS))
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
     if args.stage == "time":
         run_time(device=args.device)
     else:
-        run_screen(arms=args.arms, seeds=args.seeds, device=args.device)
+        run_screen(arms=args.arms, seeds=args.seeds, months=args.months, device=args.device)
 
 
 if __name__ == "__main__":

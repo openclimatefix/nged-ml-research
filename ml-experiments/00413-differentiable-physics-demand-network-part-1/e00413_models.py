@@ -18,7 +18,8 @@ import torch  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]
 
 N_YEARLY: Final[int] = 4
-ARMS: Final[tuple[str, ...]] = ("D0", "D1", "D2", "D3")
+ARMS: Final[tuple[str, ...]] = ("D0", "D0Y", "D1", "D2", "D3")
+"""D0Y is D0 plus the four yearly columns, the control for the yearly term of D1 to D3."""
 K_SHAPES: Final[int] = 8
 N_KNOTS: Final[int] = 16
 EMBEDDING: Final[int] = 8
