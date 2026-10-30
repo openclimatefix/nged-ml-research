@@ -81,7 +81,8 @@ test months, drop the clear losers, and send at most the three best to a full-ye
   that date. A fold "trained on the 24 months before its test month" can use 24 months only for
   2026-06. The plan uses all rows from 2024-04-01 up to a 24-month window, so the training windows
   are 18 months for 2025-10, 20 for 2025-12, 21 for 2026-01, 23 for 2026-03, and 24 for 2026-04 and
-  2026-06. Every fold keeps more than the 12 months the protocol requires.
+  2026-06. Every fold keeps more than the 12 months the protocol requires. D15 and D18 (report-only)
+  have readings only from 2025-02-06 and 2024-12-11, so their windows are shorter still.
 - **The four screen months hold almost no bank holidays.** England's bank holidays in the scored
   year fall on 25 August, 25 and 26 December, 1 January, 3 and 6 April, and 4 and 25 May. Of the
   four months in the brief (2026-06, 2026-01, 2025-10, 2026-03) only 2026-01 holds one (1 January).
@@ -107,6 +108,15 @@ test months, drop the clear losers, and send at most the three best to a full-ye
   from the screen's. The plan refits the control on every screen fold, and reports the stored
   control's score on the same months as a check that the window does not matter.
 
+## What the code checks so far
+
+The fit script has a `--dry` mode that builds every training and prediction matrix without fitting.
+It ran on all 16 Primaries and all six folds for the control, and on D5 and D2 for every arm that
+needs only data on disk. It confirmed 370,000 to 507,000 training rows per Primary and fold (except
+the short-history D15 and D18), no missing value in any added column, and that the trailing
+temperatures equal a plain rolling mean of the stored member trajectory inside the run. No model was
+fitted.
+
 ## Arms
 
 Every arm refits monthly, fits one XGBoost model per Primary per fold on the control member, keeps
@@ -117,7 +127,7 @@ one training parameter of the control. The spread factor is handled by scoring e
 | Tier | Arm | Change |
 |---|---|---|
 | A | C0, C1 | Control, seeds 0 and 1 (C1 gives the refit noise floor) |
-| A | E1 `es2` | One pass on the ensemble summary of temperature and shortwave (mean and standard deviation across 51 members, 4 columns instead of 2 weather columns), 11 quantiles taken directly from the booster, no pooling over members |
+| A | E1 `es2` | One pass on the ensemble summary of temperature and shortwave: mean and standard deviation across the 51 members replace the two control-member columns (4 columns), the other five weather variables stay the control member's in training and at prediction, and the 11 quantiles come directly from the booster with no pooling over members |
 | A | H0 `nocal` | Control without `hour_local` and `day_of_week_local` (calendar-memorisation control) |
 | A | H1 | Adds England bank-holiday flag, signed days to nearest bank holiday (clipped at ±7), and the day-before and day-after flags |
 | A | H1d | Adds only the signed days to the nearest bank holiday |
