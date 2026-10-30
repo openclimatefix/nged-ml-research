@@ -85,24 +85,24 @@ reads apparent power (MVA) only.
 say whether the flow is demand or solar generation pushing power back up the network.** Experiment
 412 trained a neural network to infer the direction from the sunshine. With the direction hidden at
 two Primaries where it is known, the network called reverse flow on 17% of the half-hours that had
-none, and on 18% to 47% of sunny half-hours when no solar farm was added at all. This experiment tests
-two constraints that decide the direction with information the network cannot fit from the same
-readings: one yes-or-no decision per Primary about whether it exports at all, and training labels
-from the two daily times at which the flow passes through zero.
+none, and on 18% to 47% of sunny half-hours when no solar farm was added at all. This experiment
+tests two constraints that decide the direction with information the network cannot fit from the
+same readings: one yes-or-no decision per Primary about whether it exports at all, and training
+labels from the two daily times at which the flow passes through zero.
 
 ## Evidence the plan follows
 
-- **Experiment 412 merged as not supported (pull request 69).** The capacity prior was inert: 13 nats
-  against a loss over 5.6 million rows moved the capacities by under 0.2 points, and a prior at full
-  weight pulled the capacity to the prior centre and removed the skill with the false calls
-  (balanced accuracy 0.54 to 0.61, within 0.04 of the shuffled sky). This plan adds no capacity prior
-  and keeps the registered, divided prior, whose gradient share the fit script prints in every arm
-  that has it.
+- **Experiment 412 merged as not supported (pull request 69).** The capacity prior was inert: 13
+  nats against a loss over 5.6 million rows moved the capacities by under 0.2 points, and a prior at
+  full weight pulled the capacity to the prior centre and removed the skill with the false calls
+  (balanced accuracy 0.54 to 0.61, within 0.04 of the shuffled sky). This plan adds no capacity
+  prior and keeps the registered, divided prior, whose gradient share the fit script prints in every
+  arm that has it.
 - **Experiment 408 is still a draft plan (pull request 64), with an interim block.** Its rule-only
-  diagnostics (refit 2026-01-01) show the rule's gate opening on real readings at D10 and D12 only, so
-  it stays closed at D5, and the rule's labels reaching recall 0.64 to 0.79 with a false-reverse rate
-  of 3.8% to 6.1% at level 2.0. Design A copies that rule, so P1's 5% bar sits inside the range the
-  rule already reaches, and the plan says so in the prediction.
+  diagnostics (refit 2026-01-01) show the rule's gate opening on real readings at D10 and D12 only,
+  so it stays closed at D5, and the rule's labels reaching recall 0.64 to 0.79 with a false-reverse
+  rate of 3.8% to 6.1% at level 2.0. Design A copies that rule, so P1's 5% bar sits inside the range
+  the rule already reaches, and the plan says so in the prediction.
 - **Experiment 416 is a draft plan (pull request 73).** It tests an explicit solar term inside the
   demand network at the signed Primaries and has no results. Nothing in this plan depends on it.
 - **Experiment 409's learned capacities were 0.40 to 0.50 of the studies page at five Primaries**
@@ -126,29 +126,30 @@ All code is in `ml-experiments/00417-hidden-sign-mva-export-gate-zero-crossing-l
 
 - `e00417_inputs.py` copies experiment 412's `site_arrays` and `build_fold`, and changes three
   things. The demand module's input columns are the irradiance-free columns of experiment 405 with
-  every ensemble mean and spread column removed and one ERA5 temperature column added
-  (standardised on the training rows). `Setting` gains a power factor with demand-driven reactive power, as in experiment 366: the reading
-  is `sqrt(P'^2 + (tan(phi) y)^2 + Q^2)`, with `y` the Primary's own signed power before the farm is
-  injected and `tan(phi)` from `studies.dp_operator.tan_phi_from_power_factor` (power factor 1 is
-  experiment 412's reading). The reactive term follows the demand, so it fills the midday dip, which
-  is what defeated experiment 366's rule. The lags use the same definition. The fold also
-  carries each row's valid time and `k`.
+  every ensemble mean and spread column removed and one ERA5 temperature column added (standardised
+  on the training rows). `Setting` gains a power factor with demand-driven reactive power, as in
+  experiment 366: the reading is `sqrt(P'^2 + (tan(phi) y)^2 + Q^2)`, with `y` the Primary's own
+  signed power before the farm is injected and `tan(phi)` from
+  `studies.dp_operator.tan_phi_from_power_factor` (power factor 1 is experiment 412's reading). The
+  reactive term follows the demand, so it fills the midday dip, which is what defeated experiment
+  366's rule. The lags use the same definition. The fold also carries each row's valid time and `k`.
 - `e00417_models.py` imports experiment 412's `SignedMdn`, mixture functions, and quantiles. It adds
   a negative log-likelihood with a per-row mask for where the folded density applies and an optional
   signed label for labelled rows.
 - `e00417_gates.py` holds the Primary-level gate (design A: experiment 366's rule as experiment 408
-  fits it, a Spearman correlation of the reading with `u` above +0.3 on sunny summer-midday
-  training rows, or a 1st percentile below 3 points of capacity, which is 1 point above the reactive floor, because every
-  folded reading is at least 2 points and only the correlation branch can fire. The +0.3 comes from
-  experiment 366's results on these same Primaries, so the gate is not a clean out-of-sample
-  choice) and the high-irradiance gate H
-  (`u_hi(h) = D_ref(h) / C_max` with `D_ref(h)` the median reading at UTC hour `h` on overcast summer
-  training rows (`k` below 0.3) and `C_max` the largest studies-page capacity (an external figure), in points, among the
-  four signed Primaries that are not hidden, never the hidden pair; the gate is `u >= max(0.3, u_hi(h))` with `u` the scaled shape).
+  fits it, a Spearman correlation of the reading with `u` above +0.3 on sunny summer-midday training
+  rows, or a 1st percentile below 3 points of capacity, which is 1 point above the reactive floor,
+  because every folded reading is at least 2 points and only the correlation branch can fire. The
+  +0.3 comes from experiment 366's results on these same Primaries, so the gate is not a clean
+  out-of-sample choice) and the high-irradiance gate H (`u_hi(h) = D_ref(h) / C_max` with `D_ref(h)`
+  the median reading at UTC hour `h` on overcast summer training rows (`k` below 0.3) and `C_max`
+  the largest studies-page capacity (an external figure), in points, among the four signed Primaries
+  that are not hidden, never the hidden pair; the gate is `u >= max(0.3, u_hi(h))` with `u` the
+  scaled shape).
 - `e00417_diagnostics.py` runs the zero-fit diagnostics of C, D, and E, and the zero-crossing
   labeller of design C.
-- `e00417_fit.py` fits and forecasts, `e00417_score.py` scores (copying experiment 412's metrics
-  and adding the capacity and the prior's gradient share), and `e00417_figures.py` draws the figures.
+- `e00417_fit.py` fits and forecasts, `e00417_score.py` scores (copying experiment 412's metrics and
+  adding the capacity and the prior's gradient share), and `e00417_figures.py` draws the figures.
 
 ## Zero-fit diagnostics (run first)
 
@@ -161,12 +162,12 @@ The no-injection group is D5, D9, D11, D14, and D16, and D10 is reported on its 
 real reverse half-hours make it no clean placebo.
 
 - **C, the W-shape score.** On each sunny day, with `t0` the solar noon: the left minimum is the
-  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to
-  `t0 + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the
-  smaller of the two differences (centre maximum minus each minimum), in points of capacity. It is
-  positive when the reading crosses zero twice and negative on a day with one smooth midday dip.
-  The area under the curve compares injected days with no-injection days, per Primary and pooled.
-  The labeller calls the half-hours between the two minima reverse flow on days whose score exceeds a
+  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to `t0
+  + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the smaller
+  of the two differences (centre maximum minus each minimum), in points of capacity. It is positive
+  when the reading crosses zero twice and negative on a day with one smooth midday dip. The area
+  under the curve compares injected days with no-injection days, per Primary and pooled. The
+  labeller calls the half-hours between the two minima reverse flow on days whose score exceeds a
   threshold, which is the 99th percentile of the score over the no-injection days of the four
   visible signed Primaries (D9, D11, D14, D16), so the threshold uses no information from the hidden
   pair. In a fit the threshold is recomputed per refit from the rows `build_fold` selects (up to the
@@ -233,11 +234,11 @@ and C fail. Designs F and G are not run.
 0.3`) with `k` at least 0.7, a predicted reverse flow is `P(X < 0) > 0.5`, the false-reverse rate
 has as its denominator the sunny summer-midday half-hours with no injected and no real reverse flow,
 and every recall is reported with its half-hour count. The prior penalty's share of the capacity
-gradient is printed for every arm. Tail calibration (coverage and pinball loss of the 0.01, 0.05, 0.95, and 0.99 signed quantiles) is
-reported per Primary beside the sign scores, and a signed-median-against-truth example is drawn at
-D5 and D10. The reference's absolute numbers may differ from experiment 412's, because the inputs
-differ. The first three arms' numbers are interim (two months, one seed,
-point estimates only).
+gradient is printed for every arm. Tail calibration (coverage and pinball loss of the 0.01, 0.05,
+0.95, and 0.99 signed quantiles) is reported per Primary beside the sign scores, and a
+signed-median-against-truth example is drawn at D5 and D10. The reference's absolute numbers may
+differ from experiment 412's, because the inputs differ. The first three arms' numbers are interim
+(two months, one seed, point estimates only).
 
 ## Departures from the design note
 
