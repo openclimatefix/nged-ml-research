@@ -49,6 +49,24 @@ TAIL_COLUMNS: Final[tuple[str, ...]] = ("coverage_q95", "coverage_q99")
 CONTROL: Final[str] = "C0"
 SECOND_SEED: Final[str] = "C1"
 WIDENING: Final[float] = 1.15
+CLEANED_POWER_DELTA: Final[str] = str(
+    ML_EXPERIMENTS_DATA_DIR.parent / "NGED" / "cleaned_power_time_series.delta"
+)
+"""The cleaned power Delta table, which keeps flagged half-hours with a `drop_reason`."""
+
+
+def flagged_keys() -> pl.DataFrame:
+    """Return the flagged half-hours (`drop_reason` set, such as `substation_zero`) of every series.
+
+    The cleaned power table keeps flagged rows with a reason; readers of cleaned power drop them.
+    The keys are `time_series_id` and `valid_time`, both on the table's period-ending stamps.
+    """
+    return (
+        pl.scan_delta(CLEANED_POWER_DELTA)
+        .filter(pl.col("drop_reason").is_not_null())
+        .select("time_series_id", valid_time=pl.col("time"))
+        .collect()
+    )
 
 
 def widen(*, frame: pl.DataFrame, factor: float) -> pl.DataFrame:
@@ -101,6 +119,20 @@ def fold_table(*, fold: str, arms: list[str], sites: list[str], ctx: dict, facto
     frames = {a: arm_frame(arm=a, fold=fold, sites=sites, series=chosen) for a in names}
     if factor != 1.0:
         frames = {a: widen(frame=f, factor=factor) for a, f in frames.items()}
+    flagged = ctx["flagged"].cast({"time_series_id": chosen.schema["time_series_id"]})
+    in_fold = (
+        frames[CONTROL]
+        .select("time_series_id", "valid_time")
+        .unique()
+        .join(flagged, on=["time_series_id", "valid_time"])
+        .join(chosen.select("time_series_id", "label"), on="time_series_id")
+    )
+    print(f"flagged half-hours dropped from the scored rows, {fold}: {in_fold.height}")
+    print(in_fold.group_by("label").len().sort("label").transpose(include_header=True))
+    ctx = {
+        **ctx,
+        "actuals": ctx["actuals"].join(flagged, on=["time_series_id", "valid_time"], how="anti"),
+    }
     table, _, rows = base_score.score_arms(arms=frames, series=chosen, ctx=ctx)
     print(f"\n=== fold {fold}, widening {factor}, sites {sites}, half-hours {table.height} ===")
     for gname, where in GROUPS.items():
@@ -139,6 +171,7 @@ def main() -> None:
     args = parser.parse_args()
     arms = args.arms or sorted(p.name for p in PRED_DIR.iterdir())
     ctx = base_score.build_context(series=adapter.series_table())
+    ctx["flagged"] = flagged_keys()
     for fold in args.folds:
         for factor in args.widening:
             fold_table(fold=fold, arms=arms, sites=args.sites, ctx=ctx, factor=factor)
