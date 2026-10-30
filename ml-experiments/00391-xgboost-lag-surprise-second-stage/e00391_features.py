@@ -73,6 +73,9 @@ def load_dense(*, directory: Path, site: str, size: int, first_time_index: np.nd
         site: The Primary's label.
         size: Number of grid half-hours.
         first_time_index: Grid index of each stage 1 table row's valid time, in file order.
+
+    Returns:
+        The surprise `u` and the residual `r_mw`, each a float32 array of length `size`.
     """
     table = pl.read_parquet(directory / f"{site}.parquet")
     u, r = np.full(size, np.nan, np.float32), np.full(size, np.nan, np.float32)
