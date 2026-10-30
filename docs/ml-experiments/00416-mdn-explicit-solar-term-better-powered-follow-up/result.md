@@ -226,8 +226,10 @@ they sit outside the family of six primary tests and are reported as secondary c
   start of training C3pa's penalty gradient is zero, because the capacity starts at the prior
   centre and the penalty acts only below it.
 - **Everything else** is C3: same inputs, adapter, folds, seeds (all 5 fitted new), and scoring.
-- **Reports.** For each arm, the prior's share of the log-capacity gradient at the start and end of
-  training (`e00416_prior_share.py --arm`), and the learned capacity beside the studies page per
+- **Reports.** For each arm, the prior's share of the log-capacity gradient at the end of training,
+  and at the start with the capacity shifted one prior standard deviation (0.7 log units) below the
+  prior centre, because the penalty's gradient is exactly zero at the centre where every arm starts
+  (`e00416_prior_share.py --arm`), and the learned capacity beside the studies page per
   Primary. Contrasts: C3p minus C3, C3pa minus C3, and each minus A0-doy, on sunny-midday and
   headline-band CRPS and q99 pinball loss, with the same intervals.
 - **Cost.** 2 arms x 5 seeds = 10 fits per test month: 50 fits on the first 5 months, and 10 on each

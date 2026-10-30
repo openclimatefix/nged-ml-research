@@ -29,6 +29,8 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 WORK_416 = (
     ML_EXPERIMENTS_DATA_DIR / "00416-mdn-explicit-solar-term-better-powered-follow-up" / "work"
 )
+SHIFT_LOG_UNITS = 0.7
+"""One prior standard deviation of the log-scale arms: the start is shifted by it to show the penalty."""
 MONTH = "2026-06"
 ARM = "C3"
 N_BATCHES = 10
@@ -78,6 +80,14 @@ def main() -> None:
     fold = prep.build_fold(refit=refit, irradiance_free=True, use_doy=True)
     model = models.make_model(arm=args.arm, fold=fold, table=base.primaries(), refit=refit, seed=0)
     print("start:", share(model=model, fold=fold, seed=0, arm=args.arm))
+    with torch.no_grad():
+        model.log_c -= SHIFT_LOG_UNITS
+    print(
+        f"start, capacity {SHIFT_LOG_UNITS} log units below the prior centre:",
+        share(model=model, fold=fold, seed=0, arm=args.arm),
+    )
+    with torch.no_grad():
+        model.log_c += SHIFT_LOG_UNITS
     name = f"{args.month}_s0.pt"
     stored = f9_work(arm=args.arm) / name
     model.load_state_dict(torch.load(stored, map_location="cpu"))

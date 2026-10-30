@@ -30,6 +30,7 @@ LOG_PRIOR_ARMS: Final[tuple[str, ...]] = ("C3p", "C3pa", "C3p-weak")
 STRENGTH: Final[dict[str, float]] = {"C3p": 1.0, "C3pa": 1.0, "C3p-weak": 0.1}
 """Multiplier of the penalty (1.0 is `penalty / BATCH_ROWS`, about 100 times C3's strength)."""
 
+# `LogPriorMdn.penalty` ignores `spec.prior`; the flag is False only to mark the base prior unused.
 m5.SPECS["C3p"] = replace(m5.SPECS["C3"], prior=False)
 m5.SPECS["C3pa"] = replace(m5.SPECS["C3"], prior=False)
 m5.SPECS["C3p-weak"] = replace(m5.SPECS["C3"], prior=False)
