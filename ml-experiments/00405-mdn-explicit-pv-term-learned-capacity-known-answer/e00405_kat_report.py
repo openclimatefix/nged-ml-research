@@ -55,7 +55,9 @@ def report(*, arm: str) -> dict:
                 for s in SEEDS
             ]
         )
-        placebo = np.array([recovery(arm=arm, condition="placebo", site=site, seed=s) for s in SEEDS])
+        placebo = np.array(
+            [recovery(arm=arm, condition="placebo", site=site, seed=s) for s in SEEDS]
+        )
         divided = held / divisors
         rows[site] = {
             "raw_held": float(held.mean()),
@@ -74,7 +76,9 @@ def report(*, arm: str) -> dict:
         "recovery_gate_pass": n_ok >= RECOVERY_SITES_NEEDED,
         "placebo_median": float(np.median(np.abs(ratios))),
         "placebo_max": float(np.max(np.abs(ratios))),
-        "placebo_gate_pass": bool(np.max(np.abs(ratios)) <= PLACEBO_LIMIT and np.median(np.abs(ratios)) <= PLACEBO_LIMIT),
+        "placebo_gate_pass": bool(
+            np.max(np.abs(ratios)) <= PLACEBO_LIMIT and np.median(np.abs(ratios)) <= PLACEBO_LIMIT
+        ),
     }
 
 
@@ -87,10 +91,14 @@ def main() -> None:
             continue
         out[arm] = report(arm=arm)
         r = out[arm]
-        print(f"{arm}: recovery gate {r['recovery_gate_sites']}/6 sites ({'pass' if r['recovery_gate_pass'] else 'FAIL'}); "
-              f"placebo median {r['placebo_median']:.2f}, max {r['placebo_max']:.2f} ({'pass' if r['placebo_gate_pass'] else 'FAIL'})")
+        print(
+            f"{arm}: recovery gate {r['recovery_gate_sites']}/6 sites ({'pass' if r['recovery_gate_pass'] else 'FAIL'}); "
+            f"placebo median {r['placebo_median']:.2f}, max {r['placebo_max']:.2f} ({'pass' if r['placebo_gate_pass'] else 'FAIL'})"
+        )
         for site, v in r["sites"].items():
-            print(f"  {site}: raw {v['raw_held']:.2f}, divisor {v['divisor']:.2f}, divided {v['divided']:.2f} (seed sd {v['divided_seed_sd']:.2f}), placebo/held {v['placebo_over_held']:.2f}")
+            print(
+                f"  {site}: raw {v['raw_held']:.2f}, divisor {v['divisor']:.2f}, divided {v['divided']:.2f} (seed sd {v['divided_seed_sd']:.2f}), placebo/held {v['placebo_over_held']:.2f}"
+            )
     (pv.WORK_DIR / "kat_gates.json").write_text(json.dumps(out, indent=1))
 
 

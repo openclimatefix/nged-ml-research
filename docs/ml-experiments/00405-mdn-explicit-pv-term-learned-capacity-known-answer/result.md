@@ -53,27 +53,30 @@ best_arm: >-
 headline: >-
   C2 recovered an injected farm's capacity increment at all 6 Primaries after experiment 129's
   divisor (0.87 to 0.95), but a farm whose days were shuffled within the month recovered 0.60 to 0.91
-  of the real-sky amount (limit 0.20), so the recovered capacity does not come from the sky.
+  of the real-sky amount (limit 0.20), so most of the recovered capacity does not need the correct sky.
 lessons:
   - >-
     The divided recovery gate is passed by almost any learned daylight dip, so it cannot tell a
     capacity read from the forecast sky apart from a read of the daylight shape.
   - >-
-    The network sees the ensemble forecast of irradiance at leads of 0.5 to 336 hours, which matches
-    the actual sky of the injected farm only weakly, so the placebo gate of experiment 129 (written
-    for observed irradiance) cannot be met at these leads.
+    A hypothesis, not measured here: the ensemble forecast of irradiance at leads of 0.5 to 336
+    hours may
+    match the actual sky of the injected farm only weakly, so the placebo gate of experiment 129
+    (written for observed irradiance) may not be reachable at these leads.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  A solar term with a learned capacity, fed by the ensemble weather forecast, cannot be shown to read
-  the capacity of unmetered solar. When we added a real solar farm's output to six Primaries, the
-  network's capacity rose by about the right share, but it rose almost as much when the farm's days
-  were shuffled, so it responds to the daylight shape and not to the cloud. The score arms were
-  therefore not run.
+  We could not show that a solar term with a learned capacity, fed by the ensemble weather forecast,
+  reads the capacity of unmetered solar, so we did not test whether it improves the forecast. On the
+  2026-06 fold, with 3 seeds and 6 Primaries, adding a real solar farm's output made the network's
+  capacity rise by about the right share. The capacity rose by 60 to 91% as much when the farm's days
+  were shuffled, so the rise is mostly a response to the daylight shape. The next step is to read the
+  capacity from observed irradiance, where a placebo test can be passed.
 advice:
   - >-
-    Do not fit solar capacity inside a forecast network that sees only forecast irradiance; read it
-    with observed or satellite irradiance, where experiment 129's placebo gate can be met (figure 1).
+    Try reading solar capacity with observed or satellite irradiance, where experiment 129's placebo
+    gate
+    was met, before fitting it inside a forecast network (figure 1; one fold, 3 seeds).
   - >-
     Add a placebo with shuffled days to every known-answer test of a solar term, because the
     recovery gate alone is passed without sky information (figure 1).
@@ -82,10 +85,9 @@ code: ml-experiments/00405-mdn-explicit-pv-term-learned-capacity-known-answer/
 ---
 
 **Status: done. The known-answer test failed its placebo gate, so no score arm ran.** The sections
-below
-are the plan, written before any fit; "Results" at the end reports what happened. The plan follows
-the Discuss session's weekend
-brief, its Opus-reviewed revision, and the Sonnet review's eight must-fix items.
+below are the plan, written before any fit; "Results" at the end reports what happened. The plan
+follows the Discuss session's weekend brief, its Opus-reviewed revision, and the Sonnet review's
+eight must-fix items.
 
 ## What is asked
 
@@ -237,7 +239,8 @@ because the trained capacities are read from the fitted network and no scoring i
 - **Held-out farm.** The solar module's shape is physical (fixed population values), so no farm
   defines it. The studies-page prior was calibrated on the six farms, so a prior centred on that
   page could pull the recovery towards the page's value. C4 has no prior and so removes that
-  circularity. Farm E (short history) is not used. The held-out farm is farm C. Farms A, B, and D
+  circularity. The one farm with a short history is not used. The held-out farm is a fixed one of
+  the others, and the three farms left are
   are
   the divisor farms: each is injected on its own into every Primary, in separate fits, and the
   divisor at a Primary is the median recovery of the three. A farm's label may appear in code and
@@ -365,10 +368,9 @@ which of the audit triggers fired.
 
 ## Results
 
-**Take-home message: the learned capacity responds to the daylight shape and not to the cloud, so
-the
-solar term cannot be shown to read the capacity of unmetered solar, and the score arms did not
-run.**
+**Take-home message: on the 2026-06 fold, with 3 seeds and 6 Primaries, the learned capacity rises
+mostly with the daylight shape and only partly with the cloud. The solar term therefore cannot be
+shown to read the capacity of unmetered solar, and the score arms did not run.**
 The known-answer test added one real farm's output, scaled to 50% of each Primary's studies-page
 capacity, to the six signed-MW Primaries (D5, D9, D10, D11, D14, D16), and fitted C2 and C4 with 3
 seeds each on the 2026-06 fold.
@@ -384,24 +386,39 @@ seeds each on the 2026-06 fold.
 - **Placebo gate: failed.** With the farm's days shuffled within each month, C2 recovers 0.60 to
   0.91
   of the real-sky amount (median 0.73, maximum 0.91, limit 0.20), and C4 recovers -1.88 to 1.23
-  (median absolute 0.43). The capacity therefore rises for any daylight-shaped drop in power, whether or not
-  the drop follows the sky.
-- **Drift: reported, not gating.** C2's recovery of the injected farm falls by 0.07 to 0.11 of the
-  injected capacity from the 2024/25 to the 2025/26 season-year (limit 0.10 as restated; D5, D9,
+  (median absolute 0.43). The C4 ratio is unstable where the held-out recovery is small: D5's -1.88
+  divides by a raw recovery of 0.14, so it is noise in a ratio and not evidence about C4. In this
+  one fold, with one shuffle and one held-out farm, most of the rise therefore
+  needs no match to the sky. The network may still see some of it, since 9 to 40% of the real-sky
+  rise is absent under the shuffle.
+- **Drift: reported, not gating.** C2's recovery of the injected farm falls by 0.04 to 0.11 of the
+  injected capacity (raw, before the divisor) from the 2024/25 to the 2025/26 season-year (limit
+  0.10 as restated; D9 exceeds it at 0.11 and D16 sits on it; D5, D9,
   D10,
   D11, D14, D16 fall by 0.07, 0.11, 0.05, 0.04, 0.07, 0.10). The 2025/26 cell holds only September
   to
   May of rows.
 - **Increment penalty: no effect.** C2 with experiment 129's increment penalty (0.1) recovers the
   same amounts as C2 (within 0.02 at every Primary).
-- **Why the gate failed (a reading, not a test).** The network sees the ensemble forecast of
-  irradiance at leads of 0.5 to 336 hours, which matches the observed sky of the injected farm only
-  weakly. The farm's seasonal and daily shape then carries most of the signal. Experiment 129 used
+- **Why the gate failed (a reading, not a test).** A hypothesis, since no run here measured it: the
+  network sees the ensemble forecast of
+  irradiance at leads of 0.5 to 336 hours, which may match the observed sky of the injected farm
+  only
+  weakly, so the farm's seasonal and daily shape may carry most of the signal. Experiment 129 used
   observed irradiance, so its placebo gate of 0.20 was reachable there.
-- **Experiment 387's lesson applies.** The recovery gate here is passed almost by construction, as
-  experiment 387 found for its shortwave-tilt gate, so only the placebo gate is informative.
+- **Experiment 387's lesson applies.** The recovery gate here is passed at 6 of 6 Primaries only
+  after the divisor
+  (0.38 to 0.93) lifts raw recoveries of 0.35 to 0.85. Experiment 387 found a known-answer gate that
+  was too easy
+  in the same way, so only the placebo gate is informative here.
 
-**What the next experiment should answer.** Can a solar capacity be read with a placebo that passes,
+**Predictions.** K1's first half held (C2 recovers within the tolerance at 6 of 6 Primaries). Its
+second half did not: C4's divided recovery (0.88 to 0.96) is as tight as C2's (0.87 to 0.95), so C4
+is not looser. Predictions P1 to P5 are untested because the score arms did not run. The verdict is
+`inconclusive` because the hypothesis about CRPS was never tested, and it is not a null result.
+
+**What the next experiment should answer.** Can a solar capacity be read with a placebo gate that
+the fit passes,
 by fitting it on observed or satellite irradiance and then passing the capacity to the network as a
 fixed input, with the network's learned part limited to the adapter?
 
@@ -412,4 +429,9 @@ separate checkout.
 
 ## Review of the write-up
 
-A fresh Sonnet agent reviewed the code before the first fit (above). The write-up review is below.
+A fresh Sonnet agent reviewed the code before the first fit (above). A second fresh Sonnet agent
+reviewed this write-up against the printed report and found nine points: the drift range, the
+take-home
+scope, a C4 placebo caveat, the unclosed predictions, the verdict wording, two untested readings
+stated
+as findings, the cross-experiment claim, wrapping, and the farm letters. All are applied.

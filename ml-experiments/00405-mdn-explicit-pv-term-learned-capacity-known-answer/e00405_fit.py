@@ -57,13 +57,16 @@ KAT_CONDITIONS: Final[dict[str, str]] = {
 KAT_ARMS: Final[tuple[str, ...]] = ("C2", "C4")
 
 
-def arm_tables(*, arm: str, fold: prep.Fold, table: pl.DataFrame, refit: datetime) -> dict[str, np.ndarray]:
+def arm_tables(
+    *, arm: str, fold: prep.Fold, table: pl.DataFrame, refit: datetime
+) -> dict[str, np.ndarray]:
     """Return the per-Primary, per-cell arrays that build a `PvMdn`.
 
     Args:
         arm: The arm name.
         fold: The fold (for the target standard deviation).
         table: The Primary table of experiment 397.
+        refit: The fold's refit time, which bounds the season-years a prior may use.
 
     Returns:
         `solar_mask`, `capacity_mw`, `prior_centre`, `prior_sd` (P, T) and `scale` (P,).
@@ -72,7 +75,14 @@ def arm_tables(*, arm: str, fold: prep.Fold, table: pl.DataFrame, refit: datetim
     n = len(table)
     n_cells = prep.N_MONTH_CELLS if spec.cells == "month" else prep.N_YEAR_CELLS
     month_year = [
-        int(np.clip((2024 + (3 + m) // 12 if (3 + m) % 12 + 1 >= 9 else 2024 + (3 + m) // 12 - 1) - 2023, 0, 2))
+        int(
+            np.clip(
+                (2024 + (3 + m) // 12 if (3 + m) % 12 + 1 >= 9 else 2024 + (3 + m) // 12 - 1)
+                - 2023,
+                0,
+                2,
+            )
+        )
         for m in range(prep.N_MONTH_CELLS)
     ]
     solar = np.zeros(n, dtype=bool)
@@ -106,14 +116,16 @@ def arm_tables(*, arm: str, fold: prep.Fold, table: pl.DataFrame, refit: datetim
     }
 
 
-def make_model(*, arm: str, fold: prep.Fold, table: pl.DataFrame, refit: datetime, seed: int) -> models.PvMdn:
+def make_model(
+    *, arm: str, fold: prep.Fold, table: pl.DataFrame, refit: datetime, seed: int
+) -> models.PvMdn:
     """Return an untrained network for an arm."""
     torch.manual_seed(seed)
     return models.PvMdn(
         spec=models.SPECS[arm],
         n_inputs=fold.x.shape[1],
         n_primaries=len(table),
-        **arm_tables(arm=arm, fold=fold, table=table, refit=refit),
+        **arm_tables(arm=arm, fold=fold, table=table, refit=refit),  # ty: ignore[invalid-argument-type]
     )
 
 
@@ -123,7 +135,13 @@ def cells_of(*, arm: str, fold: prep.Fold) -> np.ndarray:
 
 
 def train(
-    *, model: models.PvMdn, arm: str, fold: prep.Fold, seed: int, device: str, max_epochs: int = MAX_EPOCHS
+    *,
+    model: models.PvMdn,
+    arm: str,
+    fold: prep.Fold,
+    seed: int,
+    device: str,
+    max_epochs: int = MAX_EPOCHS,
 ) -> tuple[int, float]:
     """Train with weighted net-demand negative log-likelihood and early stopping."""
     torch.manual_seed(seed)
@@ -142,7 +160,11 @@ def train(
     val_idx = torch.nonzero(t["v"]).squeeze(1)
     n_eff = float(t["w"][train_idx].sum())
     groups = [
-        {"params": [p for n, p in model.named_parameters() if n != "log_c"], "lr": LR, "weight_decay": WEIGHT_DECAY}
+        {
+            "params": [p for n, p in model.named_parameters() if n != "log_c"],
+            "lr": LR,
+            "weight_decay": WEIGHT_DECAY,
+        }
     ]
     if models.SPECS[arm].learn_capacity:
         groups.append({"params": [model.log_c], "lr": LR_CAPACITY, "weight_decay": 0.0})
@@ -184,7 +206,11 @@ def train(
 def capacity_table(*, model: models.PvMdn, table: pl.DataFrame) -> dict[str, list[float]]:
     """Return each signed Primary's learned capacity (MW) by cell."""
     c = model.capacity().detach().cpu().numpy()
-    return {r["site"]: c[int(r["primary"])].tolist() for r in table.iter_rows(named=True) if r["site"] in pv.SIGNED_SITES}
+    return {
+        r["site"]: c[int(r["primary"])].tolist()
+        for r in table.iter_rows(named=True)
+        if r["site"] in pv.SIGNED_SITES
+    }
 
 
 # --- forecasting ---------------------------------------------------------------------------
@@ -215,7 +241,9 @@ def run_inputs(
             validate="1:1",
             maintain_order="left",
         )
-        keys = prepared.select(*common.KEYS, "lead_hours").unique(subset=list(common.KEYS), maintain_order=True)
+        keys = prepared.select(*common.KEYS, "lead_hours").unique(
+            subset=list(common.KEYS), maintain_order=True
+        )
         raw = base.feature_matrix(frame=prepared, scheme="summary")
         valid_us = prepared["valid_time"].dt.epoch("us").to_numpy()
         prep.mask_short_history_lags(x=raw, valid_us=valid_us, site=row["site"])
@@ -250,10 +278,14 @@ def forecast_month(
                         .cpu()
                         .numpy()
                     )
-            q = np.sort(np.concatenate(quantiles) * fold.target_std[p] + fold.target_mean[p], axis=1)
+            q = np.sort(
+                np.concatenate(quantiles) * fold.target_std[p] + fold.target_mean[p], axis=1
+            )
             pieces.append(
                 keys.drop("lead_hours").hstack(
-                    pl.DataFrame(q.astype(np.float32), schema=list(common.LEVEL_COLUMNS), orient="row")
+                    pl.DataFrame(
+                        q.astype(np.float32), schema=list(common.LEVEL_COLUMNS), orient="row"
+                    )
                 )
             )
     return pl.concat(pieces)
@@ -263,12 +295,20 @@ def forecast_month(
 
 
 def fit_one(
-    *, arm: str, fold: prep.Fold, refit: datetime, seed: int, device: str, max_epochs: int = MAX_EPOCHS
+    *,
+    arm: str,
+    fold: prep.Fold,
+    refit: datetime,
+    seed: int,
+    device: str,
+    max_epochs: int = MAX_EPOCHS,
 ) -> tuple[models.PvMdn, int, float]:
     """Fit one arm on a fold and return the network, its epochs, and its validation loss."""
     table = base.primaries()
     model = make_model(arm=arm, fold=fold, table=table, refit=refit, seed=seed)
-    epochs, val = train(model=model, arm=arm, fold=fold, seed=seed, device=device, max_epochs=max_epochs)
+    epochs, val = train(
+        model=model, arm=arm, fold=fold, seed=seed, device=device, max_epochs=max_epochs
+    )
     return model, epochs, val
 
 
@@ -278,8 +318,18 @@ def run_smoke(*, arm: str, device: str) -> None:
     fold = prep.build_fold(
         refit=base.refit_of(month=KAT_REFIT), irradiance_free=models.SPECS[arm].irradiance_free
     )
-    print(f"fold: {len(fold.x):,} rows x {fold.x.shape[1]} inputs ({time.monotonic() - started:.0f} s)", flush=True)
-    model, epochs, val = fit_one(arm=arm, fold=fold, refit=base.refit_of(month=KAT_REFIT), seed=0, device=device, max_epochs=2)
+    print(
+        f"fold: {len(fold.x):,} rows x {fold.x.shape[1]} inputs ({time.monotonic() - started:.0f} s)",
+        flush=True,
+    )
+    model, epochs, val = fit_one(
+        arm=arm,
+        fold=fold,
+        refit=base.refit_of(month=KAT_REFIT),
+        seed=0,
+        device=device,
+        max_epochs=2,
+    )
     cap = capacity_table(model=model, table=base.primaries())
     print(f"{arm}: {epochs} epochs, val nll {val:.4f}, {time.monotonic() - started:.0f} s")
     print({k: [round(x, 2) for x in v] for k, v in cap.items()})
@@ -298,12 +348,17 @@ def run_screen(*, arms: list[str], seeds: list[int], months: list[str], device: 
                 if target.exists():
                     continue
                 started = time.monotonic()
-                model, epochs, val = fit_one(arm=arm, fold=fold, refit=base.refit_of(month=month), seed=seed, device=device)
+                model, epochs, val = fit_one(
+                    arm=arm, fold=fold, refit=base.refit_of(month=month), seed=seed, device=device
+                )
                 frame = forecast_month(model=model, arm=arm, fold=fold, month=month, device=device)
                 common.atomic_write(frame=frame, target=target)
                 cap = capacity_table(model=model, table=base.primaries())
                 (target.with_suffix(".capacity.json")).write_text(json.dumps(cap))
-                print(f"{arm} {month} seed {seed}: {epochs} epochs, val {val:.4f}, {time.monotonic() - started:.0f} s", flush=True)
+                print(
+                    f"{arm} {month} seed {seed}: {epochs} epochs, val {val:.4f}, {time.monotonic() - started:.0f} s",
+                    flush=True,
+                )
             del fold
 
 
@@ -325,13 +380,25 @@ def run_kat(*, device: str, conditions: list[str], arms: list[str]) -> None:
                         injection=KAT_CONDITIONS[cond],
                     )
                 started = time.monotonic()
-                model, epochs, val = fit_one(arm=arm, fold=fold_for[cond], refit=refit, seed=seed, device=device)
+                model, epochs, val = fit_one(
+                    arm=arm, fold=fold_for[cond], refit=refit, seed=seed, device=device
+                )
                 cap = capacity_table(model=model, table=base.primaries())
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(
-                    json.dumps({"capacity_mw": cap, "epochs": epochs, "val_nll": val, "as_of_year_cell": fold_for[cond].as_of_year_cell})
+                    json.dumps(
+                        {
+                            "capacity_mw": cap,
+                            "epochs": epochs,
+                            "val_nll": val,
+                            "as_of_year_cell": fold_for[cond].as_of_year_cell,
+                        }
+                    )
                 )
-                print(f"kat {arm} {cond} seed {seed}: {epochs} epochs, val {val:.4f}, {time.monotonic() - started:.0f} s", flush=True)
+                print(
+                    f"kat {arm} {cond} seed {seed}: {epochs} epochs, val {val:.4f}, {time.monotonic() - started:.0f} s",
+                    flush=True,
+                )
 
 
 def main() -> None:

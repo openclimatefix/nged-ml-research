@@ -41,7 +41,10 @@ STUDIES_TABLE: Final[Path] = Path(__file__).resolve().parents[2] / (
     "docs/studies/assets/embedded_pv_capacity_table.csv"
 )
 E269_PATH: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00269-pv-capacity-gain-decomposition" / "work" / "real_capacities.parquet"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00269-pv-capacity-gain-decomposition"
+    / "work"
+    / "real_capacities.parquet"
 )
 SIGNED_SITES: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D15", "D16", "D18")
 """The Primaries metered in signed megawatts; the solar term runs only here."""
@@ -151,8 +154,8 @@ def studies_prior(*, site: str, n_cells: int, refit: datetime) -> tuple[np.ndarr
     table = pl.read_csv(STUDIES_TABLE).filter(pl.col("site") == site).sort("season_year")
     centre, sd = [], []
     cap = latest_complete_label(refit=refit)
-    for label in range(2023, 2023 + n_cells):
-        label = min(label, cap)
+    for cell_label in range(2023, 2023 + n_cells):
+        label = min(cell_label, cap)
         years = table["season_year"].to_numpy()
         nearest = int(years[np.argmin(np.abs(years - label))])
         r = table.filter(pl.col("season_year") == nearest).row(0, named=True)
@@ -178,8 +181,8 @@ def pinned_e269(*, site: str, n_cells: int, refit: datetime) -> np.ndarray:
     )
     out = []
     cap = latest_complete_label(refit=refit)
-    for label in range(2023, 2023 + n_cells):
-        label = min(label, cap)
+    for cell_label in range(2023, 2023 + n_cells):
+        label = min(cell_label, cap)
         years = table["season_year"].to_numpy()
         nearest = int(years[np.argmin(np.abs(years - label))])
         out.append(float(table.filter(pl.col("season_year") == nearest)["estimate_mw"][0]))

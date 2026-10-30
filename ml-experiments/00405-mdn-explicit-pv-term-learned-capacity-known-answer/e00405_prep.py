@@ -108,7 +108,13 @@ def extras_from_raw(*, x: np.ndarray, valid_us: np.ndarray) -> np.ndarray:
             c["std_temperature_2m"],
             c["mean_longwave"] / 100.0,
             c["std_longwave"] / 10.0,
-            np.where(c["cos_zenith"] > 0.05, np.clip(c["mean_shortwave"] / (1000.0 * np.maximum(c["cos_zenith"], 0.05)), 0.0, 1.5), 0.0),
+            np.where(
+                c["cos_zenith"] > 0.05,
+                np.clip(
+                    c["mean_shortwave"] / (1000.0 * np.maximum(c["cos_zenith"], 0.05)), 0.0, 1.5
+                ),
+                0.0,
+            ),
             sd / scale,
             np.sin(2 * np.pi * doy / 365.25),
             np.cos(2 * np.pi * doy / 365.25),
@@ -164,9 +170,13 @@ def farm_norm_series(*, farm: str) -> tuple[np.ndarray, np.ndarray]:
     experiment 129. A reading at or below zero while the irradiance exceeds 100 W/m2 is a dropout
     and returns NaN. Other negative readings are set to zero.
     """
-    everything = pl.read_parquet(FARM_FRAME).filter(pl.col("site") == farm, pl.col("kind") == "farm")
+    everything = pl.read_parquet(FARM_FRAME).filter(
+        pl.col("site") == farm, pl.col("kind") == "farm"
+    )
     daylight = everything.filter(pl.col("zenith") < FARM_MAX_ZENITH_DEG)
-    p99 = float(np.nanpercentile(daylight.filter(pl.col("power").is_not_null())["power"].to_numpy(), 99))
+    p99 = float(
+        np.nanpercentile(daylight.filter(pl.col("power").is_not_null())["power"].to_numpy(), 99)
+    )
     dropout = (pl.col("power") <= 0.0) & (pl.col("ghi_u") > FARM_DROPOUT_GHI)
     frame = everything.select(
         "time",
@@ -197,7 +207,9 @@ def placebo_day_map(*, days: np.ndarray) -> np.ndarray:
     return np.array([mapped[d] for d in days.tolist()])
 
 
-def farm_at(*, times_us: np.ndarray, series: tuple[np.ndarray, np.ndarray], placebo: bool) -> np.ndarray:
+def farm_at(
+    *, times_us: np.ndarray, series: tuple[np.ndarray, np.ndarray], placebo: bool
+) -> np.ndarray:
     """Return a farm's normalised power at the times; NaN in a dropout or a daytime gap, 0 at night.
 
     With `placebo`, each day takes the farm's output from another day of the same calendar month
@@ -225,7 +237,9 @@ def injection_tag(*, farm: str, share: float, placebo: bool) -> str:
 
 def studies_capacity_2025(*, site: str) -> float:
     """Return the studies page's capacity (MW) for the 2025/26 season-year."""
-    table = pl.read_csv(pv.STUDIES_TABLE).filter(pl.col("site") == site, pl.col("season_year") == 2025)
+    table = pl.read_csv(pv.STUDIES_TABLE).filter(
+        pl.col("site") == site, pl.col("season_year") == 2025
+    )
     return float(table["capacity_mw"][0])
 
 
@@ -264,7 +278,9 @@ def write_injection(*, site: str, farm: str, share: float, placebo: bool) -> str
     tmp = target.with_name(target.name + ".tmp.npz")
     np.savez(tmp, y=y.astype(np.float32), lags=lags, increment_points=increment)
     tmp.rename(target)
-    return f"{tag} {site}: increment {increment:.4f} of capacity, {int(np.isnan(y).sum()):,} dropouts"
+    return (
+        f"{tag} {site}: increment {increment:.4f} of capacity, {int(np.isnan(y).sum()):,} dropouts"
+    )
 
 
 # --- folds ---------------------------------------------------------------------------------
@@ -308,9 +324,7 @@ def _us(*, t: datetime) -> int:
     return int(t.timestamp() * 1_000_000)
 
 
-def build_fold(
-    *, refit: datetime, irradiance_free: bool, injection: str | None = None
-) -> Fold:
+def build_fold(*, refit: datetime, irradiance_free: bool, injection: str | None = None) -> Fold:
     """Return a fold's rows: experiment 397's rule, the short-history cut, and optional injection."""
     table = base.primaries()
     parts = []
@@ -353,7 +367,9 @@ def build_fold(
     origin_day = ((cat["origin"] - _us(t=base.FIRST_RUN)) // (86_400 * 1_000_000)).astype(np.int64)
     held, purged = base.held_out_weeks(origin_day=origin_day)
     train = ~held & ~purged
-    standardiser = base.Standardiser.fit(x=cat["x"][train], mask=base.feature_names(scheme="summary")[1])
+    standardiser = base.Standardiser.fit(
+        x=cat["x"][train], mask=base.feature_names(scheme="summary")[1]
+    )
     age_days = (_us(t=refit) - cat["valid"]) / (86_400 * 1_000_000)
     weight = 0.5 ** (age_days / common.SHORT_HALF_LIFE_DAYS)
     n = len(table)
@@ -381,7 +397,9 @@ def build_fold(
         keep=cols,
         target_mean=target_mean,
         target_std=target_std,
-        as_of_year_cell=int(np.clip(pv.season_year_index(valid_us=last_us)[0], 0, N_YEAR_CELLS - 1)),
+        as_of_year_cell=int(
+            np.clip(pv.season_year_index(valid_us=last_us)[0], 0, N_YEAR_CELLS - 1)
+        ),
         as_of_month_cell=int(np.clip(pv.month_index(valid_us=last_us)[0], 0, N_MONTH_CELLS - 1)),
     )
 
@@ -404,7 +422,10 @@ def main() -> None:
             print(write_extras(site=s), flush=True)
     else:
         for s in pv.SIGNED_SITES[: 2 if args.smoke else None]:
-            print(write_injection(site=s, farm=args.farm, share=args.share, placebo=args.placebo), flush=True)
+            print(
+                write_injection(site=s, farm=args.farm, share=args.share, placebo=args.placebo),
+                flush=True,
+            )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """The pooled plain mixture density network with an explicit solar term (405).
 
 The demand module is experiment 397's `PlainMdn` (pooled, Primary embedding, 3 components). The
@@ -58,6 +57,11 @@ SPECS: Final[dict[str, ArmSpec]] = {
 
 class PvMdn(nn.Module):
     """The demand mixture minus a physical solar term with learned capacity."""
+
+    solar_mask: torch.Tensor
+    scale: torch.Tensor
+    prior_centre: torch.Tensor
+    prior_sd: torch.Tensor
 
     def __init__(
         self,
@@ -122,7 +126,9 @@ class PvMdn(nn.Module):
         self, x: torch.Tensor, primary: torch.Tensor, e: torch.Tensor, cell: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Return the net-demand mixture as log weights, means, and standard deviations."""
-        log_w, mean, std = base.mixture_parts(out=self.demand(x, primary), components=self.components)
+        log_w, mean, std = base.mixture_parts(
+            out=self.demand(x, primary), components=self.components
+        )
         if not self.spec.solar:
             return log_w, mean, std
         u, u_sd = e[:, 0], e[:, 1]
@@ -151,10 +157,13 @@ class PvMdn(nn.Module):
             return total
         step = (c[:, 1:] - c[:, :-1]) / c[:, :-1]
         if spec.penalty == "persist":
-            total = total + (
-                0.5 * mask * (torch.relu(step) / RISE_SD) ** 2
-                + 0.5 * mask * (torch.relu(-step) / FALL_SD) ** 2
-            ).sum()
+            total = (
+                total
+                + (
+                    0.5 * mask * (torch.relu(step) / RISE_SD) ** 2
+                    + 0.5 * mask * (torch.relu(-step) / FALL_SD) ** 2
+                ).sum()
+            )
         elif spec.penalty == "smooth":
             total = total + (0.5 * mask * (step / MONTH_SMOOTH_SD) ** 2).sum()
         elif spec.penalty == "increment":

@@ -25,7 +25,9 @@ def main() -> None:
         for site, v in g["sites"].items():
             rows.append({"arm": arm, "site": site, "kind": "Real sky", "value": v["divided"]})
             placebo = v["placebo_over_held"] * v["divided"]
-            rows.append({"arm": arm, "site": site, "kind": "Shuffled sky (placebo)", "value": placebo})
+            rows.append(
+                {"arm": arm, "site": site, "kind": "Shuffled sky (placebo)", "value": placebo}
+            )
     data = pl.DataFrame(rows).to_pandas()
     colour = alt.Color(
         "kind:N",
@@ -40,7 +42,9 @@ def main() -> None:
         .mark_bar()
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("site:N", title=None, sort=list(pv.SIGNED_SIX)),
-            y=alt.Y("value:Q", title="Recovered share of the injected capacity (after the divisor)"),
+            y=alt.Y(
+                "value:Q", title="Recovered share of the injected capacity (after the divisor)"
+            ),
             color=colour,
             xOffset="kind:N",
         )
