@@ -9,7 +9,7 @@ also_relevant_to:
   - solar-disaggregation
   - differentiable-physics-embedded-generation
   - calibration-and-uncertainty
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -69,16 +69,56 @@ metric: >-
   operating characteristic curve.
 date: 2026-10-30
 code: ml-experiments/00417-hidden-sign-mva-export-gate-zero-crossing-labels/
+verdict: not supported
+best_arm: >-
+  none. The export gate (A) fixed the no-injection placebo by construction but kept 12.0% false
+  reverse flow at the injected pair, and neither the hard gate (A+H) nor the zero-crossing labels
+  (C) passed.
+headline: >-
+  With the sign hidden at D5 and D10, no arm reached pooled balanced accuracy 0.85 (S1c reference
+  0.832, A 0.826, A+H 0.668, C 0.823). The export gate removed the false reverse flow at the
+  no-injection D5 (0% against 86% for the reference) but called reverse flow on 12.0% of the other
+  half-hours at the injected pair. The zero-crossing labeller separated injected from placebo days
+  (area under the curve 0.96) but its labels did not improve the fits.
+lessons:
+  - >-
+    A gate that shuts a Primary's export branch on its own readings fixes the placebo by
+    construction, because a shut gate truncates the density at zero, and says nothing about the
+    Primaries where the gate opens (A, no-injection D5 against the injected pair).
+  - >-
+    The hard high-irradiance gate cut the false-reverse rate to 3.6% by also cutting recall from
+    0.77 to 0.37, so balanced accuracy fell to 0.67 (A+H).
+  - >-
+    The day-level diagnostics that look at the shape of the reading against the sun (design I,
+    with and without broken cloud) reached an area under the curve of 0.73 and recall 0.22 at
+    a 5% to 8% false-flag rate at D5 and D10, far from the registered 0.9 and 0.7.
 take_home_message: >-
-  Written when the experiment finishes.
+  Neither of the two constraints stopped the signed mixture density network from inventing
+  reverse flow at MVA-only Primaries. A Primary-level export gate left a placebo with no injected
+  farm clean, but the injected pair kept 12.0% false reverse flow, and training labels taken from
+  the zero crossings of the daily reading reached the same balanced accuracy (0.82) as the
+  unconstrained reference, with 85% false reverse flow at the no-injection D5. This is the eighth
+  treatment of the MVA problem that did not work, so the stop rule applies.
+advice:
+  - >-
+    Publish unsigned MVA forecasts at the eight Primaries and label D12 alone "inferred, heavy
+    reverse flow only". Add no further capacity priors (the registered stop rule).
+  - >-
+    Do not test a gate on a placebo alone: a shut gate passes by construction, so score it at the
+    Primaries where it opens (arm A).
+  - >-
+    Report the day-level diagnostic's area under the curve beside the false-flag rate at the
+    registered limit: the W-shape labeller reached 0.96 yet its labels did not lift the fits.
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Status: planned. No fit has run and no diagnostic score has been read.** This plan follows the
-Opus design note of 2026-10-30 (private folder: `briefs/neural_mva_new_ideas_answer.md`), which
-proposes eight constraints (A to H) against false reverse flow at the eight Primaries whose meter
-reads apparent power (MVA) only.
+**Status: done. The stop rule fired: A, A+H, and C all failed the bars on rotation r1, and the
+day-flip diagnostic (design I) missed its bar. The results sections at the end report the numbers.**
+The plan sections below were written before any fit. This plan follows the Opus design note of
+2026-10-30 (private folder: `briefs/neural_mva_new_ideas_answer.md`), which proposes eight
+constraints (A to H) against false reverse flow at the eight Primaries whose meter reads apparent
+power (MVA) only.
 
 ## Question and plan in plain words
 
@@ -328,6 +368,55 @@ arms runs last, only if the machine is idle (`e00417_fit.py run --only pf`).
   Level 1.0 is run in the diagnostics only.
 - **Unlogged load-shift events** may sit in the readings, as NGED says its logs are incomplete.
 
+## Results (interim: two test months, one seed, no intervals)
+
+![Pooled balanced accuracy of the four arms, real sky against shuffled sky](balanced_accuracy.svg)
+
+**No arm reached the 0.85 pooled balanced accuracy bar.** One fit per arm and setting, on rotation r1
+(D5 and D10 hidden), level 2.0, power factor 1, reactive floor 2 points.
+
+| Arm | Pooled BA | D5 BA | D10 BA | False reverse | D5 placebo, sunny middays | Margin over shuffled sky |
+|---|---|---|---|---|---|---|
+| S1c reference | 0.832 | 0.813 | 0.857 | 11.0% | 86% | 0.25 |
+| A: export gate | 0.826 | 0.801 | 0.858 | 12.0% | 0% (gate shut) | 0.25 |
+| A + H: hard gate | 0.668 | 0.638 | 0.703 | 3.6% | 0% (gate shut) | 0.13 |
+| C: zero-crossing labels | 0.823 | 0.801 | 0.854 | 13.9% | 85% | 0.15 |
+
+- **Design A passed the placebo by construction and failed the 5% bar.** The gate stays shut at D5
+  with no farm injected, so the density is truncated at zero and nothing reverses. With the farm
+  injected the gate opens on 31% of D5 rows, and the pair's false-reverse rate was 12.0%, as the
+  plan predicted.
+- **The hard gate H traded recall for precision.** Recall fell from 0.77 (A) to 0.37 and balanced
+  accuracy to 0.67, so A+H fails the 0.85 and the 0.70 per-Primary bars.
+- **Design C's labels gave the reference's balanced accuracy and its placebo fault.** D5 with no
+  farm still called reverse flow on 85% of sunny middays.
+- **The prior penalty stayed inert in every arm.** Its share of the gradient was 0.0001 to 0.0004
+  (the fit logs print it for every arm), so no result here comes from a capacity prior.
+- **Power-factor 0.97 (sensitivity only).** The reference kept 0.830, and design A's gate stayed
+  shut at the injected D5, giving balanced accuracy 0.50 there.
+
+![Areas under the curve of the zero-fit diagnostics](diagnostic_auc.svg)
+
+**Of the zero-fit diagnostics, only the W-shape labeller (C) cleared its bar, and the day-level V in
+the unit PV shape (design I) did not.** At level 2.0 the pooled area under the curve was 0.96
+(interval 0.95 to 0.98) for C, 0.59 for D, and 0.75 for E. At level 1.0 the area for C fell to
+0.58. Design I, with its regime split and the maintainer's broken-cloud amendment, reached 0.73
+against the 0.9 bar, with recall 0.22 against 0.7 and a false-flag rate of 5.5% at D5 and 8.2% at
+D10 against the 2% limit. The roughness split put about 99% of days in the broken-cloud class, so
+its smooth-day area is undefined and the amendment's regime comparison could not be made.
+
+## Checks
+
+- **Stop rule.** A (with or without H) and C both failed on rotation r1, so the signed-MW work stops
+  and the experiment counts as the eighth failed treatment.
+- **Nested-arm check.** A is the reference plus a gate, and its pooled balanced accuracy (0.826) did
+  not exceed the reference's (0.832), so the gate adds no skill where it opens.
+- **Audit triggers.** Failed controls (the reference and C failed the D5 placebo) and a result
+  against the prediction for C (labels passed the diagnostic and did not help the fits). No Opus
+  audit was requested, because the result is a stop rule firing on registered bars.
+- **Not done.** No intervals (one seed, two test months), rotations r2 and r3 not run, the AHI arm not
+  fitted because design I missed its bar, and no figure of signed-median examples was drawn.
+
 ## Problems caused by the move
 
-None so far.
+None.
