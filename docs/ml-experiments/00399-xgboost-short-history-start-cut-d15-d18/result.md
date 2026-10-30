@@ -50,17 +50,18 @@ best_arm: >-
   2.665 at D18 (N0 2.696), in points of capacity, seed 0.
 headline: >-
   Cutting both Primaries' training start to 2025-03-01 (NC) lowered the monthly XGBoost model's
-  CRPS by 1.3% at D15 (lower in all 4 scored months) and 1.2% at D18 (lower in 3 of 6 months). A
-  6-month cut (N6) lowered D15's CRPS by 4.4% in 2 of 4 months and raised D18's by 7.2%. Removing
-  near-zero readings made no difference at D18; at D15 it left the error unchanged (NCR) or raised
-  it by 1.3% against NC (NCZ).
+  continuous ranked probability score (CRPS) by 1.3% at D15 (lower in all 4 scored months) and 1.2%
+  at D18 (lower in 3 of 6 months). A 6-month cut (N6) lowered D15's CRPS by 4.4% in 2 of 4 months
+  and raised D18's by 7.2%. Removing near-zero readings made no difference at D18. At D15, removing
+  runs of near-zero readings (NCR) left the error unchanged, and removing every near-zero reading
+  (NCZ) raised it by 1.3% against NC.
 take_home_message: >-
   Dropping the noisy first weeks of D15 and D18 from the training rows helps the monthly XGBoost
   forecast only a little: about 1% lower error at both, mostly in the first scored months, when
   the history was shortest. Cutting 6 months is not safe, because it made D18 worse. The larger
   problem at D15 is a level error that no start cut fixes: the median forecast is about 21 points
-  of capacity too low, against 3 for the GAM stack, so the next experiment should look at D15's
-  level, not its start.
+  of capacity too low, against 3 for the generalised additive model (GAM) stack, so the next
+  experiment should look at D15's level, not its start.
 lessons:
   - >-
     The cut to 2025-03-01 (NC) and NCR were the only arms lower than N0 in every D15 month, and NC
@@ -101,16 +102,22 @@ about 1%, and cutting 6 months is not safe.** We asked whether leaving out the f
 readings, taken while a new substation's meter was being commissioned, gives a better forecast at
 D15 and D18, the two Primary substations whose history starts after the weather archive does. We
 refitted the XGBoost model of [experiment 381](../00381-simple-weekly-xgboost-demand-against-gam-stack/result.md)
-(refitted monthly, with the first months of each series dropped in six different ways) and scored
+(refitted monthly) with the first months of each series dropped in six different ways, and scored
 the forecasts for the months the protocol scores: January to June 2026 at D18, and March to June
-2026 at D15. The cut to 2025-03-01 (NC) lowered the error at both Primaries by about 1%. A 6-month
-cut lowered D15's error by 4.4% and raised D18's by 7.2%. The result says nothing about the other
-14 Primaries, which have history from before the weather archive starts.
+2026 at D15. Error is the continuous ranked probability score (CRPS) of the forecast's 11
+quantiles, in points of capacity. The control N0 keeps every row. The six cuts are N3 and N6 (drop
+the first 3 or 6 months), NS (drop up to the date at which production's settling rule treats the
+meter as settled), NC (drop every row before 2025-03-01), NCZ (NC, and also drop readings of
+0.009 MW or less), and NCR (NC, and also drop runs of 2 or more such readings). The cut to
+2025-03-01 (NC) lowered the error at both Primaries by about 1%. A 6-month cut lowered D15's error
+by 4.4% and raised D18's by 7.2%. The result says nothing about the other 14 Primaries, which have
+history from before the weather archive starts.
 
-**Verdict: partly supported.** The prediction that D18 gains 3% or more from NC failed (it gained
-1.2%). The prediction that no cut gains more than 2% at D15 also failed (N3 gained 2.4%, N6 4.4%). P3
-failed for NCZ at D15, which was 1.28% worse than NC (15.594 against 15.397); NCR (+0.34%) and both
-removals at D18 (within 0.2%) held.
+**Verdict: partly supported.** Prediction P1, that D18 gains 3% or more from NC, failed (NC gained
+1.2%). Prediction P2, that no cut gains more than 2% at D15, also failed (N3 gained 2.4%, N6 4.4%).
+Prediction P3 failed for NCZ at D15, which was 1.28% worse than NC (15.594 against 15.397); NCR
+(+0.34%) and both removals at D18 (within 0.2%) held.
+
 The decision rule asks for a lower CRPS in two thirds of the scored months and in the pooled
 figure. At D15 the arms N3, NS, NC, and NCR met it, and N6 and NCZ did not. At D18 no arm met it.
 The porting threshold is zero, because production already holds a cut date per Primary as the
@@ -160,16 +167,16 @@ little afterwards. N6 raises D18's CRPS by 0.45 points in March 2026 and 0.65 in
 At D15 the median forecast of every XGBoost arm is 15.9 to 20.9 points of capacity below the
 actual, averaged over days 1 to 10 (N0 -20.8, N3 -20.2, N6 -15.9, NC -20.5). The GAM stack's bias
 is -3.0 and BG2's is -13.1. At D18 the biases are small (N0 -0.66, N6 +1.00). Cutting 6 months
-removes about a quarter of D15's bias. D15's level stepped up in July 2025,
-September 2025, and March 2026, so a model trained on the earlier months learns a level that no
-longer holds, and a cut at one date cannot remove that.
+removes about a quarter of D15's bias. D15's level stepped up in July 2025, September 2025, and
+March 2026, so an XGBoost model trained on the earlier months learns a level that no longer holds,
+and a cut at one date cannot remove that.
 
-## What each cut costs in production
+## What each cut needs in production
 
 Every arm needs one cut date per Primary. NS needs the settling rule, which production already
 holds (D15 to 2025-03-20, D18 to 2025-03-04). N3 and N6 need the first reading's date plus a
 number of months. NC needs the single date 2025-03-01. NCZ and NCR also need a row filter on the
-power data and on the three origin lags, so they cost more and gain nothing.
+power data and on the three origin lags, so they need more work and gain nothing.
 
 ## Checks
 
