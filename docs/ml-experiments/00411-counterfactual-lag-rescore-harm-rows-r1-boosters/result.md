@@ -33,8 +33,8 @@ decision_rule: >-
   The gain at the six is read with a 95% event-cluster bootstrap interval (2,000 resamples of whole
   events). If the point estimate is under 0.1 points, batches 1 and 2 of experiment 404 are skipped,
   as that plan states. The threshold 0.1 is the one in the plan of experiment 404, chosen there as
-  the gain that justifies adding a trust head to a neural network; this experiment does not set it. If the
-  point estimate is at least 0.1 but the interval includes 0.1 or zero, the report says so and
+  the gain that justifies adding a trust head to a neural network; this experiment does not set it.
+  If the point estimate is at least 0.1 but the interval includes 0.1 or zero, the report says so and
   leaves the choice to the maintainer.
 benchmark: >-
   The same boosters with the observed lags (real), on the same rows. The stored CRPS of the weekly
@@ -83,10 +83,10 @@ code: ml-experiments/00411-counterfactual-lag-rescore-harm-rows-r1-boosters/
 ---
 
 **Status: done. The scored sample is too small to settle batch 0.** The sections from "Question"
-onward are the plan, written before any score existed. This experiment is batch 0 of the
-[experiment 404 plan](../00404-mdn-lagless-and-calibration-module-trust-weights/result.md), run as
-its own experiment so that the experiment 404 session is not blocked. This experiment needs no neural network,
-no GPU, and no fit.
+onward are the plan, written before any score existed. This experiment is batch 0 of the [experiment
+404 plan](../00404-mdn-lagless-and-calibration-module-trust-weights/result.md), run as its own
+experiment so that the experiment 404 session is not blocked. This experiment needs no neural
+network, no GPU, and no fit.
 
 ## Results
 
@@ -107,9 +107,9 @@ event-cluster bootstraps (2,000 resamples).
   interval includes zero.
 - **By Primary at the six:** D5 -3.800 (1,629 rows, one event), D10 +0.190, D11 -0.031, D14 +1.957,
   D16 -0.109. D9 has no scored event.
-- **Without D5's one event** the six give 3,725 rows, 8 events, a gain of +0.460, and an interval of
-  -0.102 to +1.631. The range over every leave-one-event-out gain at the six is -1.278 to +0.460, and
-  only dropping that event flips the sign.
+- **Without D5's one event** the six give 3,725 rows, 8 events, a gain of +0.460, and an interval
+  of -0.102 to +1.631. The range over every leave-one-event-out gain at the six is -1.278 to +0.460,
+  and only dropping that event flips the sign.
 - **Clean lags win on fewer rows:** at the six, 2,284 rows score better with clean lags, 3,046
   worse, and 24 tie; at the eight, the counts are 1,633 and 1,608.
 
@@ -128,8 +128,8 @@ was:
 
 - **Gaps:** 396 pairs, because the stage-1 median or the observed power has a gap inside the event.
   Counted by event rather than by pair, 99 events are never scored for this reason.
-- **No usable run:** 118 pairs, because no sampled run has lags inside the event and a target outside
-  every event.
+- **No usable run:** 118 pairs, because no sampled run has lags inside the event and a target
+  outside every event.
 - **Sign:** 83 pairs, because the measured step has the opposite sign to the label.
 - **Share:** 72 pairs, because the measured step is under 25% of the labelled depth.
 - **Bias:** 47 pairs, because the pre-event bias exceeds half the step.
@@ -152,33 +152,33 @@ event.
       caveat only: the clean replacement may be a worse input than the observed reading at D5.
     - **Trigger 4 (leaving one out flips the sign):** dropping D5's one event flips the six-Primary
       gain from -0.836 to +0.460.
-    - **Trigger 7 (a later design depends on the headline):** the experiment 404 plan skips batches 1
-      and 2 on this number.
+    - **Trigger 7 (a later design depends on the headline):** the experiment 404 plan skips
+      batches 1 and 2 on this number.
 - **Audit:** a fresh Sonnet agent re-derived every number in the results table from the per-row
-  scores and agreed. It found no duplicated rows and no missing scores, ran the leave-one-out checks,
-  and counted the events lost to each filter. Its bootstrap, with a different seed, gave intervals
-  within 0.2 of the ones reported, a spread that is unsurprising with 9 and 6 clusters. All its findings are
-  in the sections above, none rejected.
+  scores and agreed. It found no duplicated rows and no missing scores, ran the leave-one-out
+  checks, and counted the events lost to each filter. Its bootstrap, with a different seed, gave
+  intervals within 0.2 of the ones reported, a spread that is unsurprising with 9 and 6 clusters.
+  All its findings are in the sections above, none rejected.
 
 ## Caveats
 
 - **The booster, not the bundle.** The gain is for experiment 392's R1 lagged boosters. Experiment
-  402's stored tables use experiment 381's weekly-refit XGBoost bundle, which scores 5.119 with lags on its harm
-  rows at the six. This experiment's 5.061 is on a different, much smaller row set.
+  402's stored tables use experiment 381's weekly-refit XGBoost bundle, which scores 5.119 with lags
+  on its harm rows at the six. This experiment's 5.061 is on a different, much smaller row set.
 - **The replacement is an estimate.** Clean lags are the stage-1 median plus a pre-event bias, so
-  they are not the true demand without the event. Two explanations for the negative gain at D5 are untested. The replacement may be a poor estimate,
-  or the boosters, which were fit on real lags, may score worse on inputs they never saw in
-  training.
+  they are not the true demand without the event. Two explanations for the negative gain at D5 are
+  untested. The replacement may be a poor estimate, or the boosters, which were fit on real lags,
+  may score worse on inputs they never saw in training.
 - **Single seed and four refit months.** Every number is interim.
 
 ## Question
 
 **This experiment sets out to measure the most any lag-trust method can gain on harm rows.** A
-lag-trust method down-weights the lagged power readings that sit inside a load-shift event. If the readings inside the
-event were replaced by clean values, the forecast could not be misled by them, so the score gain
-from that replacement is an upper bound on the gain of any method that that changes no other input to
-the forecast. If the upper bound is under 0.1 points, a learned trust weight cannot be worth
-building.
+lag-trust method down-weights the lagged power readings that sit inside a load-shift event. If the
+readings inside the event were replaced by clean values, the forecast could not be misled by them,
+so the score gain from that replacement is an upper bound on the gain of any method that changes no
+other input to the forecast. If the upper bound is under 0.1 points, a learned trust weight cannot
+be worth building.
 
 ## Stored forecasts versus re-prediction
 
