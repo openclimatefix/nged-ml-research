@@ -1,12 +1,12 @@
-"""Refit the weekly XGBoost member of experiment 87 with ensemble spread columns (S1), or without (S0).
+"""Refit the XGBoost member of experiment 87 with ensemble spread columns (S1), or without (S0).
 
-Reuses experiment 87's fitter (`e00087_fit_demand`, read only) and adds four input columns when the
-environment variable `E389_SPREAD` is `1`: the mean and the standard deviation across the 51 ensemble
-members of `temperature_2m` and of `shortwave`, at the series' location and the row's valid time.
-Training rows (the control member only) and prediction rows (all 51 members) read the columns from
-the same ensemble store, so every member row of a run carries the same four numbers. The stores hold
-all 51 members for the 821 runs from 2024-04-01 to 2026-06-30; the training rows start on 2024-04-01,
-so no training row is dropped for lack of a spread value.
+Reuses experiment 87's fitter (`e00087_fit_demand`, read only) and adds four input columns when
+the environment variable `E389_SPREAD` is `1`: the mean and the standard deviation across the 51
+ensemble members of `temperature_2m` and of `shortwave`, at the series' location and the row's
+valid time. Training rows (the control member only) and prediction rows (all 51 members) read the
+columns from the same ensemble store, so every member row of a run carries the same four numbers.
+The stores hold all 51 members for the 821 runs from 2024-04-01 to 2026-06-30, and the training
+rows start on 2024-04-01, so no training row is dropped for lack of a spread value.
 
 - `s0`: the baseline configuration (`n1h`, weekly regime), columns off. It is the gate.
 - `s1`: the same with the four columns on.
@@ -24,9 +24,9 @@ import warnings
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from datetime import datetime
-from types import SimpleNamespace
 from pathlib import Path
-from typing import Final
+from types import SimpleNamespace
+from typing import Any, Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
@@ -129,11 +129,11 @@ def _save_boosters() -> None:
 
     def train_inputs(
         *, known: pl.DataFrame, row: dict, refit: datetime, config: fd.Config, offset: bool
-    ):
+    ) -> Any:
         _CONTEXT.update(site=row["site"], refit=refit, name=config.name + ("_o" if offset else ""))
         return real_inputs(known=known, row=row, refit=refit, config=config, offset=offset)
 
-    def train(params, dtrain, *args, **kwargs):
+    def train(params: Any, dtrain: Any, *args: Any, **kwargs: Any) -> Any:
         booster = real_train(params, dtrain, *args, **kwargs)
         folder = BOOSTER_DIR / str(_CONTEXT["name"])
         folder.mkdir(parents=True, exist_ok=True)
@@ -209,7 +209,7 @@ def main() -> None:
     config = fd.CONFIGS[args.config]
     series = common.series_table().filter(pl.col("substation_type") == "Primary")
     offset_sites = list(offsets.OFFSET_SITES)
-    default = [x for x in series["site"].to_list() if (x in offset_sites) == args.offset]
+    default = offset_sites if args.offset else series["site"].to_list()
     sites = args.sites or default
     jobs = fd.selected_jobs(
         config=config, regime=config.regime_names[0], origins=common.all_origins()

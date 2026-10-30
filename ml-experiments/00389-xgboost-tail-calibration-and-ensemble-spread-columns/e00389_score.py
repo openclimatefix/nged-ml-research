@@ -47,11 +47,28 @@ TAILS: Final[tuple[tuple[str, float], ...]] = (
     ("q95", 0.95),
     ("q99", 0.99),
 )
+CONTRASTS: Final[dict[str, tuple[str, ...]]] = {
+    "W_base": ("W_raw", "W_t2", "W_t3"),
+    "B_base": ("B_raw", "B_t2", "B_t3"),
+    "S0M_base": ("S0M_raw", "S0M_t2", "S0M_t3", "S1M_base"),
+    "S1M_base": ("S1M_raw", "S1M_t2", "S1M_t3"),
+    "S0M_raw": ("S1M_raw",),
+    "S0M_t2": ("S1M_t2",),
+    "S0M_t3": ("S1M_t3",),
+}
+"""Each reference arm and the arms scored minus it."""
 FAMILIES: Final[dict[str, tuple[str, ...]]] = {
     "W": ("W_raw", "W_t2", "W_t3"),
     "B": ("B_raw", "B_t2", "B_t3"),
+    "S0M": ("S0M_raw", "S0M_t2", "S0M_t3"),
+    "S1M": ("S1M_raw", "S1M_t2", "S1M_t3"),
 }
-BASES: Final[dict[str, str]] = {"W": "W_base", "B": "B_base"}
+BASES: Final[dict[str, str]] = {
+    "W": "W_base",
+    "B": "B_base",
+    "S0M": "S0M_base",
+    "S1M": "S1M_base",
+}
 N_BOOT: Final[int] = 20_000
 SLICES: Final[tuple[str, ...]] = ("cold_nights", "sunny_april_june")
 
@@ -115,7 +132,7 @@ def coverage_error_contrast(
     return t.sum() / n.sum(), r.sum() / n.sum(), float(point), float(lo), float(hi)
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912
     """Print the scores."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--extra", nargs="*", default=[])
@@ -219,9 +236,8 @@ def main() -> None:
     print(pl.concat(parts).sort("label", "arm"))
     if args.with_stack:
         return
-    for family, treat in FAMILIES.items():
-        ref = BASES[family]
-        for name in (*treat, *(e for e in args.extra if e.startswith(family) or family == "W")):
+    for ref, treat in CONTRASTS.items():
+        for name in treat:
             for gname, labels in GROUPS.items():
                 where = pl.col("label").is_in(list(labels))
                 c = metrics.headline_month_bootstrap_contrast(

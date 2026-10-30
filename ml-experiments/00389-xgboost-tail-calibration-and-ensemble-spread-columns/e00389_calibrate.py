@@ -20,14 +20,15 @@ Primaries' values.
         DATA_PATH_INTERNAL=... uv run --no-sync python ml-experiments/00389-*/e00389_calibrate.py
 """
 
+import argparse
 import dataclasses
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
 import e00087_assemble as asm  # ty: ignore[unresolved-import]
 import e00087_common as common  # ty: ignore[unresolved-import]
+import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -62,7 +63,6 @@ TAILS: Final[tuple[tuple[str, float], ...]] = (
     ("q95", 0.95),
     ("q99", 0.99),
 )
-N_REFITS: Final[int] = 52
 MEDIAN: Final[int] = common.MEDIAN
 
 
@@ -81,15 +81,22 @@ def band_of(*, lead: np.ndarray) -> np.ndarray:
     return np.searchsorted(np.asarray(BAND_EDGES[1:-1]), lead, side="right")
 
 
-def refit_index(*, origin: np.ndarray) -> np.ndarray:
+def refit_times(*, regime: str) -> np.ndarray:
+    """Return the refit times of a regime as naive microsecond datetimes."""
+    return np.array(
+        [t.replace(tzinfo=None) for t in regimes.REGIMES[regime]], dtype="datetime64[us]"
+    )
+
+
+def refit_index(*, origin: np.ndarray, times: np.ndarray) -> np.ndarray:
     """Return the weekly refit that forecasts each run: the refit date at or before the origin."""
-    days = (origin.astype("datetime64[D]") - np.datetime64(FIRST_REFIT.date())).astype(np.int64)
-    return np.minimum(days // 7, N_REFITS - 1)
+    return np.searchsorted(times, origin.astype("datetime64[us]"), side="right") - 1
 
 
-def calibrate_site(*, frame: dict[str, np.ndarray], n_refits: int) -> Table:
+def calibrate_site(*, frame: dict[str, np.ndarray], times: np.ndarray) -> Table:
     """Fit the factors and shifts of one Primary at every refit and lead band."""
     n_bands = len(BAND_EDGES) - 1
+    n_refits = len(times)
     table = Table(
         upper=np.full((n_refits, n_bands), BASE_FACTOR),
         lower=np.full((n_refits, n_bands), BASE_FACTOR),
@@ -105,7 +112,7 @@ def calibrate_site(*, frame: dict[str, np.ndarray], n_refits: int) -> Table:
     }
     day = valid.astype("datetime64[D]").astype(np.int64)
     for r in range(n_refits):
-        refit = np.datetime64(FIRST_REFIT.replace(tzinfo=None) + timedelta(days=7 * r), "us")
+        refit = times[r]
         newest = refit - np.timedelta64(int(LAST_VALID_AGE.total_seconds() * 1e6), "us")
         oldest = refit - np.timedelta64(int(WINDOW.total_seconds() * 1e6), "us")
         in_window = (valid <= newest) & (valid >= oldest) & np.isfinite(actual)
@@ -146,7 +153,13 @@ def _combined(*, ratios: list, levels: tuple[float, ...], upper: bool) -> float:
 
 
 def apply(
-    *, frame: pl.DataFrame, tables: dict[str, Table], donor: Table, arm: str, label: str
+    *,
+    frame: pl.DataFrame,
+    tables: dict[str, Table],
+    donor: Table,
+    arm: str,
+    label: str,
+    times: np.ndarray,
 ) -> np.ndarray:
     """Return an arm's sorted quantiles (fractions) for one Primary's rows."""
     quantiles = frame.select(Q).to_numpy().astype(np.float64)
@@ -156,7 +169,9 @@ def apply(
     wide = median + BASE_FACTOR * (quantiles - median)
     if arm == "base":
         return wide
-    r = refit_index(origin=frame["power_fcst_init_time"].dt.replace_time_zone(None).to_numpy())
+    r = refit_index(
+        origin=frame["power_fcst_init_time"].dt.replace_time_zone(None).to_numpy(), times=times
+    )
     b = band_of(lead=frame["lead_hours"].to_numpy())
     table = donor if label in ALWAYS_DONOR else tables[label]
     if arm == "t2":
@@ -183,7 +198,9 @@ def donor_table(*, tables: dict[str, Table]) -> Table:
     )
 
 
-def load_members() -> tuple[dict[str, pl.DataFrame], pl.DataFrame]:
+def load_members(
+    *, wanted: list[str] | None = None
+) -> tuple[dict[str, pl.DataFrame], pl.DataFrame]:
     """Return each member's raw quantiles joined to the actual, and the series label table."""
     stored = pl.read_parquet(STORED_BG2).select(*KEYS, "actual", "site", "capacity_mw")
     labels = stored.select("time_series_id", "site").unique()
@@ -197,16 +214,21 @@ def load_members() -> tuple[dict[str, pl.DataFrame], pl.DataFrame]:
         pl.col("time_series_id").is_in(ids), pl.col("power_fcst_init_time") >= FIRST_REFIT
     )
     members = {"W": w, "B": bundle}
-    s1_files = sorted((OUT / "anchor_preds" / "s1").glob("*.parquet"))
-    if os.environ.get("E389_INCLUDE_S1") == "1":
-        if len(s1_files) != N_REFITS * len(ids):
-            msg = f"S1 is incomplete: {len(s1_files)} files of {N_REFITS * len(ids)}"
-            raise FileNotFoundError(msg)
-        members["S1"] = pl.concat([pl.read_parquet(f) for f in s1_files]).filter(
-            pl.col("power_fcst_init_time") >= FIRST_REFIT
-        )
+    if wanted is not None and "S0M" in wanted:
+        members["S0M"] = asm.raw_member(ctx=ctx, member="M", offset="none", sites=primary)
+    for name in ("S1M",):
+        files = sorted((OUT / "anchor_preds" / name.lower()).glob("*.parquet"))
+        if wanted is not None and name in wanted:
+            if len(files) != len(regimes.REGIMES["monthly"]) * len(ids):
+                msg = f"{name} is incomplete: {len(files)} files"
+                raise FileNotFoundError(msg)
+            members[name] = pl.concat([pl.read_parquet(f) for f in files]).filter(
+                pl.col("power_fcst_init_time") >= FIRST_REFIT
+            )
     out = {}
     for name, raw in members.items():
+        if wanted is not None and name not in wanted:
+            continue
         joined = (
             raw.select(*KEYS, *Q)
             .with_columns(
@@ -225,11 +247,16 @@ def load_members() -> tuple[dict[str, pl.DataFrame], pl.DataFrame]:
 
 def main() -> None:
     """Build and write every arm."""
-    members, _ = load_members()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--members", nargs="+", default=["W", "B"], choices=["W", "B", "S0M", "S1M"]
+    )
+    args = parser.parse_args()
+    members, _ = load_members(wanted=args.members)
     (OUT / "arms").mkdir(parents=True, exist_ok=True)
-    n_refits = N_REFITS
     for name, frame in members.items():
         print(f"{name}: {frame.height:,} rows, {frame['site'].n_unique()} Primaries", flush=True)
+        times = refit_times(regime="monthly" if name in ("S0M", "S1M") else "weekly")
         tables = {}
         for label in sorted(frame["site"].unique().to_list()):
             part = frame.filter(pl.col("site") == label)
@@ -239,13 +266,13 @@ def main() -> None:
                 "actual": part["actual"].to_numpy().astype(np.float64),
                 **{q: part[q].to_numpy().astype(np.float64) for q in Q},
             }
-            tables[label] = calibrate_site(frame=arrays, n_refits=n_refits)
+            tables[label] = calibrate_site(frame=arrays, times=times)
         donor = donor_table(tables=tables)
         for arm in ("raw", "base", "t2", "t3"):
             pieces = []
             for label in sorted(tables):
                 part = frame.filter(pl.col("site") == label)
-                q = apply(frame=part, tables=tables, donor=donor, arm=arm, label=label)
+                q = apply(frame=part, tables=tables, donor=donor, arm=arm, label=label, times=times)
                 pieces.append(
                     part.select(*KEYS, "lead_hours").hstack(
                         pl.DataFrame(q.astype(np.float32), schema=list(Q))

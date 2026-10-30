@@ -57,7 +57,8 @@ def main() -> None:
         gaps.append(gap)
         crps_gaps.append(crps_gap)
         print(
-            f"{path.name}: {joined.height:,} rows, mean |gap| {gap:.5f} points, CRPS gap {crps_gap:+.5f}"
+            f"{path.name}: {joined.height:,} rows, mean |gap| {gap:.5f} points, "
+            f"CRPS gap {crps_gap:+.5f}"
         )
     print(
         f"overall: mean |gap| {np.mean(gaps):.5f} points (limit {MEAN_GAP_POINTS}), "
