@@ -8,7 +8,7 @@ Stages (each writes only under this experiment's private data folder):
   the test month.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<the private data folder>
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
 ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:\
 ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand:\
