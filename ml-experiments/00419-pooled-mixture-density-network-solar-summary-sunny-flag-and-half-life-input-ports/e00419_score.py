@@ -86,9 +86,10 @@ KEYS: Final[list[str]] = list(common.KEYS)
 
 
 def load_frames(*, series: pl.DataFrame) -> dict[str, pl.DataFrame]:
-    """Return the scored forecasts (MW, one row per key), each widened by 1.15, named `<arm>_w115`."""
+    """Return the scored forecasts (MW, one row per key); all but `per_primary_cut_406` are widened by 1.15."""
     dirs: dict[str, Path] = {f"{arm}_w115": s407.SEED_407 / arm for arm in STORED_407_ARMS}
     dirs.update({f"{arm}_w115": SEED_419 / arm for arm in NEW_ARMS})
+    dirs["per_primary_cut_406"] = s407.SEED_406 / "per_primary"
     found = {n: d for n, d in dirs.items() if s407.is_complete(arm_dir=d)}
     wanted = set(sys.argv[1:])
     if wanted:
@@ -99,7 +100,11 @@ def load_frames(*, series: pl.DataFrame) -> dict[str, pl.DataFrame]:
     print("arms found:", ", ".join(found))
     return {
         n: adapter.forecast_frame(
-            stored=s407.widen_global(frame=s407.seed_average(arm_dir=d)),
+            stored=(
+                s407.seed_average(arm_dir=d)
+                if n == "per_primary_cut_406"
+                else s407.widen_global(frame=s407.seed_average(arm_dir=d))
+            ),
             series=series,
             unit="fraction",
         )
@@ -138,8 +143,30 @@ def check_keys(*, frames: dict[str, pl.DataFrame]) -> None:
 
 
 def group_means(*, crps: pl.DataFrame, arm: str, members: tuple[str, ...]) -> float:
-    """Return the equal-weight mean over Primaries of an arm's headline CRPS."""
+    """Return the equal-weight mean over Primaries of an arm's headline value in a pivoted table."""
     return float(np.mean(crps.filter(pl.col("label").is_in(list(members)))[arm].to_numpy()))
+
+
+def headline_table(*, scored: dict[str, pl.DataFrame], metric: str) -> pl.DataFrame:
+    """Return one column per arm of a metric at the headline band, one row per Primary."""
+    return pl.concat(
+        [
+            t.filter(pl.col("metric") == metric, pl.col("slice") == HEADLINE).select(
+                "label", pl.lit(n).alias("arm"), "value"
+            )
+            for n, t in scored.items()
+        ]
+    ).pivot(on="arm", index="label", values="value")
+
+
+def draw_arm_examples(*, arm: str, frame: pl.DataFrame, ctx: dict, series: pl.DataFrame) -> None:
+    """Draw 407's example charts for one arm, with the arm name in each SVG filename."""
+    scratch = FIGURE_DIR / f"_scratch_{arm}"
+    s407.FIGURE_DIR = scratch  # ty: ignore[invalid-assignment]
+    s407.draw_examples(frame=frame, ctx=ctx, series=series)
+    for path in scratch.glob("figure_example_*.svg"):
+        path.replace(FIGURE_DIR / path.name.replace("figure_example_", f"figure_example_{arm}_", 1))
+    scratch.rmdir()
 
 
 def minimum_detectable_effect(*, rows: dict[str, pl.DataFrame]) -> None:
@@ -233,20 +260,17 @@ def main() -> None:
     frames = load_frames(series=series)
     check_keys(frames=frames)
     table, scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
-    crps = pl.concat(
-        [
-            t.filter(pl.col("metric") == "crps", pl.col("slice") == HEADLINE).select(
-                "label", pl.lit(n).alias("arm"), "value"
-            )
-            for n, t in scored.items()
-        ]
-    ).pivot(on="arm", index="label", values="value")
+    crps = headline_table(scored=scored, metric="crps")
+    mae = headline_table(scored=scored, metric="mae_median")
     with pl.Config(tbl_rows=40, tbl_cols=40):
         print("\n== CRPS days 1 to 10 per Primary (points of capacity) ==")
         print(crps.sort(pl.col("label").str.slice(1).cast(pl.Int32)))
     print("\n== group means of CRPS at days 1 to 10 (equal weight per Primary) ==")
     for group, members in SUBSETS.items():
         print(group, {a: round(group_means(crps=crps, arm=a, members=members), 3) for a in frames})
+    print("\n== group means of median MAE at days 1 to 10 (equal weight per Primary) ==")
+    for group, members in SUBSETS.items():
+        print(group, {a: round(group_means(crps=mae, arm=a, members=members), 3) for a in frames})
     if len(sys.argv) == 1 or "mde" in sys.argv[1:] or "ctrl_s3_w115" in frames:
         minimum_detectable_effect(rows=rows)
     slice_report(scored=scored)
@@ -263,22 +287,24 @@ def main() -> None:
                 where = pl.col("label").is_in(list(members)) & pl.col(HEADLINE)
                 if slice_name is not None:
                     where &= pl.col(slice_name)
-                r = metrics.month_bootstrap_contrast(
-                    treatment=rows[treatment],
-                    reference=rows[reference],
-                    metric="crps",
-                    where=where,
-                    level_percent=95.0,
-                    n_resamples=20_000,
-                    slice_table=table,
-                )
-                print(
-                    f"{name:52s} {slice_label:14s} {group:15s} {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f}) n={r['n_half_hours']}"
-                )
-    best = min(frames, key=lambda a: group_means(crps=crps, arm=a, members=SIGNED))
-    print(f"\nbest arm by signed-MW six CRPS: {best}")
-    s407.FIGURE_DIR = FIGURE_DIR  # ty: ignore[invalid-assignment]
-    s407.draw_examples(frame=frames[best], ctx=ctx, series=series)
+                for metric in ("crps", "mae_median"):
+                    r = metrics.month_bootstrap_contrast(
+                        treatment=rows[treatment],
+                        reference=rows[reference],
+                        metric=metric,
+                        where=where,
+                        level_percent=95.0,
+                        n_resamples=20_000,
+                        slice_table=table,
+                    )
+                    print(
+                        f"{name:52s} {slice_label:14s} {group:15s} {metric:10s} {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f}) n={r['n_half_hours']}"
+                    )
+    candidates = [a for a in (REFERENCE, *(f"{n}_w115" for n in NEW_ARMS)) if a in frames]
+    best = min(candidates, key=lambda a: group_means(crps=crps, arm=a, members=SIGNED))
+    print(f"\nbest arm by signed-MW six CRPS among the new arms and the reference: {best}")
+    FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+    draw_arm_examples(arm=best, frame=frames[best], ctx=ctx, series=series)
 
 
 if __name__ == "__main__":

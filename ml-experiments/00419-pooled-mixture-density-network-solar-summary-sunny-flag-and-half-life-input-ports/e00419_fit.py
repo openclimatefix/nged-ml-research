@@ -306,6 +306,10 @@ def run(*, arms: list[str], seeds: list[int] | None, months: list[str], device: 
         for name in ordered:
             spec = ARMS[name]
             wanted = seeds if seeds is not None else list(spec.seeds)
+            unregistered = sorted(set(wanted) - set(spec.seeds))
+            if unregistered:
+                msg = f"arm {name} is registered for seeds {list(spec.seeds)}, not {unregistered}"
+                raise ValueError(msg)
             todo = [
                 s
                 for s in wanted

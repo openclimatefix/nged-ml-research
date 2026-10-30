@@ -177,6 +177,16 @@ shortwave at the valid time, but not that daily summary and not a cloud-aware su
   `hl365` and experiment 381 already tested the 1-year half-life and the sunny flag alone, 413's
   physics network did not advance, and 396's arm W1 has not reported, so `temp` is left out.
 
+- **The first and last local day of every run are partial.** Every NWP run starts at 09:30 UTC and
+  lasts 14 days, so the first local day's daily mean covers only the afternoon and evening, and the
+  last local day holds one or two near-midnight steps. Training and inference build the columns the
+  same way, and experiment 381 did too, so the columns are consistent; the neural network sees a
+  different quantity at days 1 and 2 than later.
+- **The half-lives are exactly 0.25 and 1 year** (91.3125 and 365.25 days), against 91 and 365 days
+  in experiment 407, so the comparison with 407's `hl91` is close but not exact.
+- **The minimum detectable effect is noisy**, because it rests on 5 fold differences from one pair
+  of seed sets.
+
 ## Counting towards the demand-v2 stop rule
 
 **This experiment does not count.** It tests input changes on an existing model, not a new demand
