@@ -293,8 +293,15 @@ harm rows.
 - **Loss outside events** and the overall five-fold CRPS, per Primary.
 - **Tails.** Coverage and pinball loss at q01, q05, q95, and q99, raw and at the 1.15 widening,
   beside every headline score.
-- **Trust-weight plots** through a real event, a synthetic event, and a transient spike; for B3,
-  the per-lag attention weights through the same cases.
+- **Event time-series plots (maintainer rule, 2026-10-30).** At least 6 plots, covering both
+  metering groups (at least 3 from the signed-MW six and 3 from the MVA-only eight), each marking
+  when the event starts and ends and showing the actual power, the median forecast, the 90% band
+  (q05 to q95), and the trust weight of each of the 3 lags (for B3, the per-lag attention weights).
+  Each plot compares the reference arms (A0, A0-inj, B0) with B1 on the same event. The set
+  includes real events from the corrected label table, injected events, and at least one transient
+  spike, and each plot is labelled real or injected. The set also includes the failure cases: the
+  plots with the largest harm-row loss, not only favourable examples. Both groups of events use
+  anonymised labels only where a metered generator's series appears, and none does here.
 - **Checks.** The median minus the mean forecast per Primary, the error of the mean beside every
   quantile-score contrast, and which of the seven audit triggers of the `ml-experiment` skill fired.
 - **Folds, seeds, cadence.** The five screen folds of experiment 397, monthly refits, 3 seeds. More
