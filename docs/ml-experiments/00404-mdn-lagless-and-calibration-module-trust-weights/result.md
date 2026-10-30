@@ -21,18 +21,18 @@ hypothesis: >-
   One mixture density network, trained end to end on injected load-conserving events, that
   contains a lagless module and a calibration module outputting a continuous trust weight for each
   lagged power input, forecasts better than the pooled uniform network with the three origin lags
-  (arm A0) on rows whose target lies outside every load-shift event but whose lags lie inside one
+  (arm P0) on rows whose target lies outside every load-shift event but whose lags lie inside one
   (harm rows), and
   loses no more than 0.05 points of CRPS (continuous ranked probability score, in points of
   effective capacity) on rows outside events.
 prediction: >-
   Written before any score is read. P1. Arm B1 lowers CRPS on harm rows at the signed-MW six
-  Primaries by 0.1 to 0.4 points against A0. The interim XGBoost series (experiment 402,
+  Primaries by 0.1 to 0.4 points against P0. The interim XGBoost series (experiment 402,
   unaudited) found 0.40 for a flag oracle against a fitted constant mixture, and a learned weight
   with no labels should land below that oracle. P2. The CRPS loss on rows outside events is under
   0.05 points at each of the two groups, signed-MW six and MVA-only eight. P3. B1 beats B2 on harm
   rows at the signed-MW six (the maintainer's expectation); if B1's gain is positive, B2's gain is
-  under half of it. P4. At the MVA-only eight, the 95% interval of B1 minus A0 on harm rows includes
+  under half of it. P4. At the MVA-only eight, the 95% interval of B1 minus P0 on harm rows includes
   zero, because the XGBoost flag oracle was worse than the forecast with lags there (+0.19). P5. B3
   (the attention gate of experiment 397 arm A2 on the lag tokens) differs from B1 by under 0.05
   points on harm rows. P6. B4 (more weekly lags) changes CRPS outside events by under 0.05 points in
@@ -45,27 +45,33 @@ prediction: >-
   statistics; plus neighbour inputs) improves harm-row CRPS at each addition by at least 0.05
   points; an addition below that is reported as not earning its place. P10. Replacing the mean
   combining rule by the noisy-or rule (sensitivity arm B1n) changes harm-row CRPS by under 0.1
-  points.
+  points. P11. B6 (learned windows) differs from B1 by under 0.1 points on harm rows; a gain
+  above 0.1 would mean the hand-built statistics lose information. P12. B7 (7-day demand window)
+  does not lower harm-row CRPS against B1 by more than 0.05 points, because the window contains
+  the suspect readings.
 decision_rule: >-
   Contrasts, each registered before any score is read and read per group (signed-MW six; MVA-only
-  eight; D15 and D18 report-only) on CRPS at days 1 to 10. C1 B1 minus A0; C2 B2 minus A0; C3 B1
-  minus B2; C4 B3 minus B1; C5 B4 minus B1; C6 B5 minus B1; C7 B1n minus B1. Each is read on three
+  eight; D15 and D18 report-only) on CRPS at days 1 to 10. C1 B1 minus P0; C2 B2 minus P0; C3 B1
+  minus B2; C4 B3 minus B1; C5 B4 minus B1; C6 B5 minus B1; C7 B1n minus B1; C8 B6 minus B1; C9 B7
+  minus B1 (if run). Each is read on three
   row sets: the harm rows (target outside every event, at least one lag inside one; for the
   contrast the harm-row difference of the two arms is taken, and the clean-lag rows are reported
   beside it as a reference level), the rows outside events, and all rows. The screen has five test
   months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), so every number is labelled interim. Harm
   rows carry whole-event bootstrap intervals (95%, resampling events); rows outside events carry
-  month-block bootstrap intervals with Bonferroni k = 14 (7 contrasts, 2 groups) and no 99% claim.
+  month-block bootstrap intervals with Bonferroni k = 18 (9 contrasts, 2 groups) and no 99% claim.
   A contrast counts as a gain when its interval excludes zero and the sign agrees in at least 2 of
-  3 seeds. Stop rule (from the brief): stop after B1 and B2 if neither beats A0 on the harm rows
-  without a loss above 0.05 points on rows outside events; otherwise run B3, B4, and B5.
+  3 seeds. Stop rule (from the brief): stop after B1 and B2 if neither beats P0 on the harm rows
+  without a loss above 0.05 points on rows outside events; otherwise run B3, B6, B4, B5, and (if a
+  slot is spare) B7.
   The lenient rule of the load-shift series applies: stop a step only if it is very clear the path
   is not worth pursuing, and tell the manager first. The smallest gain worth porting is 0.1
   points on the harm rows, because the calibration module adds a second network head and
   injected-event generation to the training loop; a pooled harm-row gain under 0.1 is `small gain`.
 benchmark: >-
-  Arm A0 (pooled uniform neural network with the three origin lags; experiment 397 stage 2
-  predictions if the rows, seeds, and folds match, otherwise refitted here), and the stored
+  Arm P0 (the pooled plain mixture density network with the three origin lags, arm `plain_pooled`
+  of experiment 397 stage 2; its stored predictions if the rows, seeds, and folds match, otherwise
+  refitted here), and the stored
   forecasts, never refitted, in the private data folder `data/ml-experiments/`: monthly XGBoost
   arm S0M (`00389-xgboost-tail-calibration-and-ensemble-spread-columns/work/arm_preds`), the weekly
   bundle (`00381-simple-weekly-xgboost-demand-against-gam-stack/work`), BG2 (experiment 87), the GAM
@@ -167,16 +173,28 @@ them open.** Each is a stated choice; a different choice is a later experiment.
 
 ## Arms
 
-All arms use the pooled network of experiment 397 arm A0 as their base: one network for all 16
-Primaries, a learned Primary embedding, a 3-component Gaussian mixture head.
+All arms use the pooled plain mixture density network of experiment 397 (arm `plain_pooled`) as
+their base: one network for all 16 Primaries, a learned Primary embedding, a 3-component Gaussian
+mixture head. The maintainer's update of 2026-10-30 moved the base from the uniform-token arm A0 to
+the plain network, which scored 3.264 at the signed-MW six and 3.860 at the MVA-only eight against
+3.320 and 3.775 for A0 (interim and unaudited, from experiment 397). The lagless module and the
+calibration module each get the Primary embedding. The input scheme is the one-pass ensemble mean
+and spread. The group gate over input groups stays closed in every arm except B3's lag gate.
 
-- **A0.** Pooled uniform network with the three origin lags (the reference).
+- **P0.** The pooled plain network with the three origin lags (the reference).
 - **B1.** The architecture above, with the three origin lags.
-- **B2.** A0 with token-level lag dropout during training and no separate lagless module.
-- **B3.** B1 with the attention gate of experiment 397 arm A2 on the lag tokens.
+- **B2.** P0 with token-level lag dropout during training and no separate lagless module.
+- **B3.** B1 with attention over which lags to trust: a softmax gate (as in experiment 397 arm A2)
+  over the lag tokens, so the gate can learn to ignore suspicious lags.
 - **B4.** B1 with more lags: the same weekday and time from each of the last N = 1, 3, and 5 weeks,
   plus the median across the weeks and the median minus the latest week.
 - **B5.** B1 without `lag_origin`, the newest reading before the forecast origin.
+- **B6.** B1 with a 1D convolutional neural network over the surprise series in a window of 24
+  hours either side of each lag (half-hourly steps), in place of the hand-built window statistics.
+  The contrast is learned windows against hand-built statistics.
+- **B7 (low priority; runs only if a slot is spare).** B1 plus a 1D convolutional neural network
+  over the latest 7 days of actual demand up to the forecast origin, with the same trust inputs.
+  The network must learn how far to trust that window when the last week holds suspect readings.
 
 The maintainer's expectation (not a result): B1 beats B2.
 
@@ -239,8 +257,9 @@ than
 the brief's 16 GB, because of the machine's load).** No fit starts before the manager grants the
 slot. The workstation's load
 average was 36.7 and 51 GB of 61 GB memory were in use when this plan was written. Order of work
-once granted: the cross-fitted lagless table; A0 (reused if experiment 397's rows match); B1 and B2
-on five folds and three seeds; the stop-rule check; then B3, B4, and B5. Each fit is timed first.
+once granted: the cross-fitted lagless table; P0 (reused if experiment 397's rows match); B1 and B2
+on five folds and three seeds; the stop-rule check; then B3, B6, B4, B5, and B7. Each fit is timed
+first.
 
 ## Problems caused by the move
 
