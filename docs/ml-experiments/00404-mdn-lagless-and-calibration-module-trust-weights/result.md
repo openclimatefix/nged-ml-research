@@ -351,6 +351,15 @@ data. The write-up reports the fitted network's counterfactual lag response on i
 events as a diagnostic. Every arm is judged on real events as well as injected ones. The plan
 follows experiment 395 Part F (the full depth in the lag values) and not Part E.
 
+**Evidence on constant-step injection.** Experiment 402's redone step 2 (interim, unaudited) gave
+the median share of a step passed on by the R1 boosters as 0.133, 0.150, and 0.305 for real events
+with 1, 2, and 3 lags inside, against 0.146, 0.158, and 0.328 for a synthetic constant step (ratios
+1.05 to 1.10; 17, 14, and 6 events). The factor-of-2 rule does not fire, so a constant-step
+injection is realistic for those boosters, and experiment 402 repeats the check on its R0 lagged
+boosters. The two experiments measure different quantities: experiment 401 takes the forecast with
+lags minus the forecast without lags, and experiment 402 takes the share of the step passed on. The
+plan uses both as diagnostics on the fitted networks and does not tune the injection to either.
+
 **Harm-row results are a lower bound.** Because some events are unlogged, harm-row results are
 reported as a lower bound on harm. Our series are one per substation, not per transformer, so a
 transformer-level event that conserves load across a substation's transformers does not appear.
