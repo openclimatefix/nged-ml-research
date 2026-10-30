@@ -37,9 +37,11 @@ decision_rule: >-
   refits throughout, `colsample_bytree` and `colsample_bynode` fixed at 1.0 in every arm. Contrasts,
   registered before any score is read, all CRPS at days 1 to 10 in points of effective capacity,
   paired month-resampled bootstrap of `studies.eval_protocol`, 20,000 resamples. The level is
-  Bonferroni for k = 4 contrasts: 99.75% pooled per group, 95% per Primary. C1: arm A minus the
+  Bonferroni for k = 6 contrasts: 99.83% pooled per group, 95% per Primary. C1: arm A minus the
   baseline. C2: arm B minus the baseline. C3: arm C minus the baseline. C4: arm D (B plus C)
-  minus the baseline, fitted only if C2 and C3 each lie wholly below zero in some group. Each
+  minus the baseline, fitted only if C2 and C3 each lie wholly below zero in some group. C5: arm E
+  minus the baseline. C6: arm F minus the baseline. C7: arm F minus arm E (read once, not counted
+  in the Bonferroni level). Each
   contrast is read per group (signed-MW six, MVA-only eight with and without D8; D15 and D18 report
   only), per lead band (0 to 24, 24 to 72, 72 to 168, 168 to 240 h), and per Primary, with
   leave-one-out and the tail, cold-night, sunny, and load-shift slices beside it. An arm is a
@@ -93,6 +95,14 @@ is at least 3.5 hours older than the forecast origin; otherwise it is null.
   anomaly is the reading at the valid time minus 1 day minus the median reading at that half-hour
   and weekday over the previous 4 weeks, null when the one-day-earlier reading is not usable.
   The 4-week window is a choice, not a tested value.
+- **E, drop the newest reading** (maintainer, 2026-10-30). The baseline without `lag_origin`, which
+  is one noisy value that is the same for every valid time of a forecast origin. It keeps the
+  same-time latest-day and latest-week lags. Prediction that can fail: E beats the baseline beyond
+  24 hours and does not lose from 0 to 24 hours, so E is read by lead band before any pooled number.
+- **F, strict 24-hour lag** (maintainer, 2026-10-30). E with the day lag replaced by the power
+  exactly 24 hours before the valid time, null where that reading is not yet usable (leads beyond
+  about 20.5 hours). F is also read against E, which shows what the older latest-day values add at
+  long leads.
 - **D, B plus C.** Fitted only if C2 and C3 each help alone (see the decision rule).
 
 ## Change of cadence to monthly refits (decided before any arm was scored)

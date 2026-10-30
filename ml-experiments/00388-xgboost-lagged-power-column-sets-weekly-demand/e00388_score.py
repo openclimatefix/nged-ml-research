@@ -41,7 +41,7 @@ E381_WORK: Final[Path] = (
 )
 STORED_87: Final[Path] = DATA / "00087-bg2-best-guess-assembled-with-drop-one-ablations" / "work"
 E379_ARMS: Final[Path] = DATA / "00379-bg2-components-all-16-primaries-to-14-days" / "work" / "arms"
-CONTRAST_COUNT: Final[int] = 4
+CONTRAST_COUNT: Final[int] = 6
 LEVEL: Final[float] = 100 * (1 - 0.01 / CONTRAST_COUNT)
 RESAMPLES: Final[int] = 20_000
 HEADLINE: Final[str] = base.HEADLINE_BAND
@@ -281,12 +281,15 @@ def final(  # noqa: PLR0912, PLR0915
         .pivot(on="arm", index=["label", "group"], values="value")
         .sort("group", "label")
     )
-    for a in lag_arms:
-        print(f"\n===== {a} minus baseline (CRPS, points, level {LEVEL:.2f}%) =====")
+    pairs = [(a, "baseline") for a in lag_arms]
+    if "e" in lag_arms and "f" in lag_arms:
+        pairs.append(("f", "e"))
+    for a, ref_arm in pairs:
+        print(f"\n===== {a} minus {ref_arm} (CRPS, points, level {LEVEL:.2f}%) =====")
         for gname, where in GROUPS.items():
             r = metrics.month_bootstrap_contrast(
                 treatment=rows[a],
-                reference=rows["baseline"],
+                reference=rows[ref_arm],
                 metric="crps",
                 where=where & pl.col(HEADLINE),
                 level_percent=LEVEL,
@@ -300,7 +303,7 @@ def final(  # noqa: PLR0912, PLR0915
             for bname in LEAD_BANDS_HOURS:
                 r = metrics.month_bootstrap_contrast(
                     treatment=rows[a],
-                    reference=rows["baseline"],
+                    reference=rows[ref_arm],
                     metric="crps",
                     where=where & pl.col(HEADLINE) & band(bname),
                     level_percent=LEVEL,
@@ -315,7 +318,7 @@ def final(  # noqa: PLR0912, PLR0915
         print(
             metrics.reported_contrast_by_primary(
                 treatment=rows[a],
-                reference=rows["baseline"],
+                reference=rows[ref_arm],
                 metric="crps",
                 where=pl.col(HEADLINE),
                 slice_table=table,
@@ -327,7 +330,7 @@ def final(  # noqa: PLR0912, PLR0915
                 keep = pl.col("label").is_in([x for x in labels if x != left_out])
                 r = metrics.month_bootstrap_contrast(
                     treatment=rows[a],
-                    reference=rows["baseline"],
+                    reference=rows[ref_arm],
                     metric="crps",
                     where=keep & pl.col(HEADLINE),
                     slice_table=table,
@@ -340,7 +343,7 @@ def final(  # noqa: PLR0912, PLR0915
         for lab in ("D2", "D4", "D8"):
             r = metrics.month_bootstrap_contrast(
                 treatment=rows[a],
-                reference=rows["baseline"],
+                reference=rows[ref_arm],
                 metric="crps",
                 where=(pl.col("label") == lab) & pl.col(HEADLINE),
                 slice_table=table,
@@ -423,7 +426,7 @@ def main() -> None:
     pl.Config.set_tbl_width_chars(250)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("gate", "final"))
-    parser.add_argument("--arms", nargs="+", default=["a", "b", "c"])
+    parser.add_argument("--arms", nargs="+", default=["a", "b", "c", "e", "f"])
     parser.add_argument(
         "--drop-flagged",
         action="store_true",

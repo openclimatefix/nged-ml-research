@@ -17,6 +17,9 @@ forecast origin (`e00087_common.NEWEST_AGE`); otherwise it is null. Arms:
   median reading at the same half-hour and weekday over the 4 weeks before it. The 4-week window is
   a choice, not a tested value.
 - `d`: the columns of `b` and `c` together.
+- `e`: the baseline without `lag_origin` (the newest usable reading).
+- `f`: `e` with the day lag replaced by the power exactly 24 hours before the valid time, null
+  where that reading is not yet usable.
 
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations \
@@ -53,6 +56,9 @@ ANALOGUE_WEEKS: Final[tuple[int, ...]] = (1, 2, 3, 4, 5, 6)
 ANOMALY_WEEKS: Final[tuple[int, ...]] = (1, 2, 3, 4)
 ANALOGUE_COLUMNS: Final[tuple[str, ...]] = tuple(f"analogue_{w}w" for w in ANALOGUE_WEEKS)
 ANOMALY_COLUMNS: Final[tuple[str, ...]] = ("origin_anomaly", "day_ago_anomaly")
+EXACT_24H_COLUMN: Final[str] = "lag_exact_24h"
+DAY_LAG: Final[str] = "lag_same_time_latest_day"
+ORIGIN_LAG: Final[str] = "lag_origin"
 SMOKE_ROUNDS: Final[int] = 20
 ARMS: Final[dict[str, tuple[str, ...]]] = {
     "base": (),
@@ -60,7 +66,15 @@ ARMS: Final[dict[str, tuple[str, ...]]] = {
     "b": fd.A7_COLUMNS,
     "c": ANOMALY_COLUMNS,
     "d": (*fd.A7_COLUMNS, *ANOMALY_COLUMNS),
+    "e": (),
+    "f": (EXACT_24H_COLUMN,),
 }
+REMOVED: Final[dict[str, tuple[str, ...]]] = {
+    "e": (ORIGIN_LAG,),
+    "f": (ORIGIN_LAG, DAY_LAG),
+}
+"""Baseline columns an arm drops: E has no newest reading; F also swaps the day lag for the exact
+24-hour lag."""
 """Each arm's added columns, in matrix order."""
 
 
@@ -118,6 +132,11 @@ def lag_columns(
     if any(n in fd.A7_COLUMNS for n in names):
         summary = fd.a7_lags(power=power, target=target, origin=origin)
         built.update({n: summary[:, i] for i, n in enumerate(fd.A7_COLUMNS)})
+    if EXACT_24H_COLUMN in names:
+        exact = target - DAY_STEPS
+        built[EXACT_24H_COLUMN] = np.where(
+            exact <= newest, common.take(values=power, index=exact), np.nan
+        ).astype(np.float32)
     if "origin_anomaly" in names:
         built["origin_anomaly"] = _anomaly(power=power, reading=newest, usable=newest >= 0)
     if "day_ago_anomaly" in names:
@@ -139,7 +158,8 @@ def add_lag_columns(*, frame: pl.DataFrame, power: np.ndarray, arm: str) -> pl.D
 
 def columns_of(*, arm: str) -> list[str]:
     """Return all input columns of an arm in matrix order."""
-    return [*fd.input_columns(a7=False), *ARMS[arm]]
+    kept = [c for c in fd.input_columns(a7=False) if c not in REMOVED.get(arm, ())]
+    return [*kept, *ARMS[arm]]
 
 
 def run_job(
