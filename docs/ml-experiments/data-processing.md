@@ -156,6 +156,15 @@ output reduces the net flow and the apparent power cannot show its sign. The blu
 form the smooth evening and night curve that holds demand alone. The figure draws one Primary (D2)
 for two weeks of July 2025.
 
+**Do not let a loss on the absolute value of a latent power set the sign of the latent power
+(medium confidence, provisional).** A folded loss cannot tell a latent power from its negative, so
+the sign follows the start of the fit. At six signed-MW Primaries with no injected solar, a folded
+XGBoost model still reported negative power at sunny midday on 41% to 97% of half-hours. Applies to
+experiments. Evidence: [experiment
+387](00387-xgboost-folded-latent-loss-at-mva-only-primaries/result.md). The readings at D12, the
+Primary with known reverse flow, do not reach zero: the 0.1% quantile of its training readings is
+4.3 points of effective capacity.
+
 **Do not treat grid supply points or bulk supply points as clean demand (high confidence).** The
 grid supply points are dominated by generation: D1 is below 5 points of capacity on 75% of nights.
 The bulk supply points sum the trial Primaries: D17 reverses flow on 51% of May to August days at

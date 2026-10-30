@@ -50,15 +50,23 @@ one design would defensibly test the hypothesis, and whether the experiment span
 you could not name without searching. This repository holds no production serving path or
 degradation rule, so an experiment never touches either.
 
+- **Every size follows this order, and the code review comes before the first run.** Sonnet writes
+  the plan and the code. A fresh Sonnet agent that did not write the code reviews it before the first
+  fit or scoring run that produces numbers you will quote (leakage, the fit stopping at the fold's
+  `train_end`, the scoring, and a match with any recipe the code copies), and you fix the problems.
+  If the first review flagged many problems, a second fresh Sonnet agent reviews the fixed code.
+  Then run the code, review the results, write up, and review the write-up. A free re-score of
+  stored forecasts follows the same order.
 - **Simple** is a permutation of settings the pipeline already has (input-feature sets, a
-  hyperparameter, a loss), with no new data and no new method. Write the plan section, implement,
-  run, and write up. One Sonnet reviewer reads the code for leakage and for the fit stopping at the
-  fold's `train_end`, one Sonnet reviewer checks the write-up against the printed report, and one
-  Sonnet reviewer runs the prose review that "The write-up" describes.
-- **Anything else** gets the full process: Sonnet writes the plan, Opus reviews the plan, the
-  maintainer reviews the plan only if asked, Sonnet implements, Opus reviews the code, Sonnet runs
-  the code and writes up, Sonnet reviews the write-up against the printed report, and a second
-  Sonnet reviewer runs the prose review that "The write-up" describes.
+  hyperparameter, a loss), with no new data and no new method. It gets the order above with one
+  Sonnet code review, one Sonnet reviewer who checks the write-up against the printed report, and one
+  Sonnet reviewer who runs the prose review that "The write-up" describes.
+- **Anything else** adds a Sonnet review of the plan, and the maintainer reviews the plan only if
+  asked. It gets the same Sonnet code review before the first run, a Sonnet review of the write-up
+  against the printed report, and a second Sonnet reviewer who runs the prose review.
+- **Every review defaults to Sonnet.** Use Opus for a review only when the experiment is very
+  complex or the result is very surprising, because two Opus reviews per experiment cost too many
+  credits.
 
 Either size then runs the triggers in "Audit before merge", below, and gets an audit if one fires.
 
@@ -184,6 +192,39 @@ model trains or scores on it.
 
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
+
+## Standing practices for every new experiment
+
+**These practices come from the maintainer and apply unless the experiment's question is about the
+practice itself.** State in the plan which of them the experiment follows.
+
+- **Refit monthly in research and development.** Weekly refits belong to the cadence question and to
+  a gate that reproduces a stored weekly result.
+- **Use cleaned data everywhere.** Training rows, lag inputs, inference inputs, and scoring actuals
+  all drop the half-hours that the `substation_zero` rule flags. Report how many were dropped per
+  fold.
+- **Cut the noisy start of a short-history Primary.** Drop every D15 and D18 row before 2025-03-01,
+  in training, lags, inference inputs, and scoring actuals. Experiment 399 found this cut lowers
+  CRPS at both Primaries by 1% to 2% and that no longer cut helps both.
+- **Save every fitted model** (an XGBoost booster as `.ubj`, a neural network as its state file) in
+  the experiment's data folder, never in git, so a later experiment can run prediction-only checks.
+- **Reuse stored predictions** as controls and references before fitting anything, and say which
+  experiment's rows they are.
+- **Screen on a few folds first.** Rank a new intervention on four test months (one per season,
+  24-month training window), pre-register the advance rule, and label every screen number interim.
+  Only the full scored year can support a claim of benefit.
+- **Report the tails and the cost.** Show q01, q05, q95, and q99 coverage and pinball loss, cold
+  winter nights, and the avoidable-curtailment cost beside CRPS.
+- **Plot examples of the forecasts.** Every write-up that scores forecasts includes a day-ahead
+  forecast and the full 14-day horizon of one forecast, each against what happened, so the reader
+  sees whether the bands widen with horizon.
+- **Plot the load-shift events.** An experiment that scores performance during or after load-shift
+  events includes at least 6 time series plots, across both metering groups, that mark when each
+  event starts and ends and show how each forecast responds. State the unlogged-event caveat: NGED's
+  logs may miss events, so the clean-lag rows may hold events no label covers, the harm table is
+  optimistic, and the real-event slices undercount.
+- **Open every pull request as a draft**, run the local checks, and mark it ready only when the
+  reviews are triaged.
 
 ## Use the compute the slot gives you
 
@@ -448,9 +489,10 @@ conclusions. Three failed controls had been explained away instead of investigat
    exploratory series does not count on its own.
 
 **Who runs it, and when.** The manager, or the experiment's own session when no manager is running,
-starts a fresh Opus agent with the audit brief. The agent that wrote the experiment never audits it.
-The audit runs after the code and write-up reviews and before the prose review. Opus is justified
-here even when credits are short, because a wrong method poisons every experiment built on it. The
+starts a fresh Sonnet agent with the audit brief, or an Opus agent when the experiment is very
+complex or the result very surprising. The agent that wrote the experiment never audits it.
+The audit runs after the code and write-up reviews and before the prose review. An audit is worth
+its cost even when credits are short, because a wrong method poisons every experiment built on it. The
 audit brief differs from a review brief: the agent re-derives the headline contrasts from the raw
 stored predictions, by its own code, and tries to break them. It checks each method's assumptions,
 such as how quantiles are built, how a base margin enters, and how a held value is extrapolated. It
