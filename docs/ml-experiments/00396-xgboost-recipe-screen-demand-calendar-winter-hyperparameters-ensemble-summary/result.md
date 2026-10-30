@@ -139,6 +139,7 @@ one training parameter of the control. The spread factor is handled by scoring e
 | A | W3 | W1 plus W2 (always run, because the screen is cheaper than waiting on W1 and W2) |
 | A | W4 | Adds sine and cosine of day of year (the no-calendar control is H0) |
 | B | E2 `es7` | E1 with all 7 weather variables (needs the five-variable extraction) |
+| B | E6 `ensq` | Ensemble-quantile columns (the maintainer's "E2"; renamed E6 here because E2 already names the 7-variable summary arm). Added to the control member's columns, for temperature: mean, q10, q50, q90, interquartile range, and the shares of members below 0 °C and below 5 °C (7 columns); for shortwave: mean, q10, q50, q90, interquartile range, and the share of members with clear-sky index below 0.3 (6 columns); 13 columns in all. Built per valid time from the stored 51-member trajectories, identical for every member's row at prediction, and for training rows from the same 51-member statistics of the training run, so no column reads a time after the origin. Forecast as the control does (mixture of the 51 members). Comparators: C0 and C1, and experiment 389's stored S1M (mean and standard deviation). Whether the other five variables are added at no extra cost is decided after E2 reads experiment 397's summaries (which hold means and standard deviations only, so quantiles of those five would need the raw members and are not added) |
 | B | E3 `em_em` | Train on the ensemble mean of the 7 weather variables, apply to the ensemble mean only (one forecast per run) |
 | B | E4 `em_pool` | Train on the ensemble mean, apply to the 51 members, pool as the control does |
 | B | E5 `all51` | Train on 6 randomly drawn members per run and valid time (6 times the rows), apply to all 51, pool |
@@ -201,6 +202,13 @@ smoke fit confirms XGBoost accepts it; the plan will record the outcome.
   lag-set, tail-calibration, and mean/std-only arms. Fits saved: none of the 192 control fits
   (6 months × 2 seeds × 16 Primaries) can reuse 381's stored forecasts, because the window differs,
   but the stored control checks them.
+
+E6 is pre-registered as follows. It gains more than the mean-and-standard-deviation arm (S1M) in the
+split regime (25% to 75% of members below 5 °C on the week's coldest day) and in the top ensemble-
+spread tercile, gains no less where the members agree, keeps q95 coverage at or above S1M's 0.913,
+and does not harm the all-rows score. A bin with fewer than 100 origin days is descriptive, and E6
+is not dropped on the all-rows result alone. Cost: one fit set, which is 32 fits in round 1 and 32
+in round 2, about the cost of one hyperparameter setting.
 
 ## Pre-registered rules
 
