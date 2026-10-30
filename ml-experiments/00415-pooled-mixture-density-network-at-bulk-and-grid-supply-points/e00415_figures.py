@@ -115,13 +115,16 @@ def figure_example(*, node: str, month: str, run_day: str, horizon_hours: float,
 def main() -> None:
     """Draw every figure."""
     figure_one()
+    numbers = {("D13", 36): 2, ("D1", 36): 3, ("D13", 336): 4, ("D1", 336): 5}
     for node, month, run_day in EXAMPLES:
-        figure_example(
-            node=node, month=month, run_day=run_day, horizon_hours=36, name="figure_2_day_ahead"
-        )
-        figure_example(
-            node=node, month=month, run_day=run_day, horizon_hours=336, name="figure_3_14_day"
-        )
+        for hours, tag in ((36, "day_ahead"), (336, "14_day")):
+            figure_example(
+                node=node,
+                month=month,
+                run_day=run_day,
+                horizon_hours=hours,
+                name=f"figure_{numbers[(node, hours)]}_{tag}",
+            )
 
 
 if __name__ == "__main__":
