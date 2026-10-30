@@ -99,6 +99,13 @@ def store_of(*, site: str) -> dict[str, np.ndarray]:
 def attach_spread(*, frame: pl.DataFrame, site: str) -> pl.DataFrame:
     """Return the frame with the four spread columns, in the frame's row order.
 
+    Args:
+        frame: Rows with `power_fcst_init_time` and `valid_time`.
+        site: The Primary whose ensemble store supplies the columns.
+
+    Returns:
+        The input frame plus `ens_temp_mean`, `ens_temp_std`, `ens_sw_mean`, and `ens_sw_std`.
+
     Raises:
         ValueError: If a row's run or step is not in the site's store.
     """
