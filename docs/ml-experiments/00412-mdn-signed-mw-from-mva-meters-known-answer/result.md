@@ -159,7 +159,7 @@ If P1, P3, and P4 pass, the full run adds S1c over three rotations, four setting
 three seeds (72 fits, including the first test), S1c-shuffle at level 2.0 (18), the start check
 (12), S1c-u0 (6), S1e (36), and the score run of four refitted arms over five folds and three seeds
 (60), about 204 fits. At 50 to 200 seconds per fit on one GPU process under 8 GB with one feeder
-core, that is 3 to 11 hours. The timed figure replaces this estimate in the PR.
+core, that is 3 to 11 hours. A timed S1c fit on the 2026-06 fold took 29 s for 15 epochs (45 s with the fold build, 1.4 GB of GPU memory), so 204 fits take about 2.5 hours.
 
 ## Decision rules
 
