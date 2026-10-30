@@ -99,18 +99,25 @@ def children_of_nodes() -> dict[str, list[str]]:
 
 
 def rewired_children(*, children: dict[str, list[str]]) -> dict[str, list[str]]:
-    """Return a random set of Primaries of the same size for each node, never the true set."""
+    """Return a random set of Primaries of the same size for each node, never the true set.
+
+    The set is drawn from the Primaries outside the node's true set first, and filled from the true
+    set only if too few remain (a node with 9 of the 16 Primaries keeps at least 2). Nodes with the
+    same true set, a BSP and its GSP, get the same rewired set.
+    """
     primaries = [s for s in series20()["site"].to_list() if s not in NODES]
     rng = np.random.default_rng(REWIRE_SEED)
-    out: dict[str, list[str]] = {}
+    by_true: dict[tuple[str, ...], list[str]] = {}
     for node in NODES:
-        true = set(children[node])
-        while True:
-            pick = sorted(rng.choice(primaries, size=len(true), replace=False).tolist())
-            if set(pick) != true:
-                break
-        out[node] = sorted(pick, key=lambda s: int(s[1:]))
-    return out
+        true = tuple(children[node])
+        if true in by_true:
+            continue
+        outside = [s for s in primaries if s not in true]
+        take = min(len(true), len(outside))
+        pick = rng.choice(outside, size=take, replace=False).tolist()
+        pick += rng.choice(list(true), size=len(true) - take, replace=False).tolist()
+        by_true[true] = sorted(pick, key=lambda s: int(s[1:]))
+    return {node: by_true[tuple(children[node])] for node in NODES}
 
 
 # --- node ensemble summaries ----------------------------------------------------------------
@@ -196,9 +203,12 @@ def write_raw(*, site: str) -> str:
     if site in CUT_SITES:
         for tag in ("origin", "day", "week"):
             age_us = (
-                x[:, names.index(f"lag_{tag}_age")].astype(np.float64)
-                * base.LEAD_SCALE_HOURS
-                * 3_600
+                np.rint(
+                    x[:, names.index(f"lag_{tag}_age")].astype(np.float64)
+                    * base.LEAD_SCALE_HOURS
+                    * 2.0
+                )
+                * 1_800
                 * 1_000_000
             )
             stale = (valid - age_us) < _us(t=CUT_TIME)
@@ -221,35 +231,35 @@ def write_raw(*, site: str) -> str:
 def neighbour_columns(*, node: str, kids: list[str]) -> np.ndarray:
     """Return (rows, 6) neighbour columns for a node's raw rows: three means, three shares.
 
-    The mean of lag `l` is the average over the Primaries in `kids` that have a reading for `l` at
-    the same run and valid time (NaN where none has); the share is the fraction of `kids` with one.
-    Every lag is a fraction of the Primary's own effective capacity, read as of the run's origin.
+    The lags of each Primary in `kids` are read from its power grid as of the node row's origin
+    (`common.origin_lags`, experiment 87's rule), so a Primary whose reading at the valid time is
+    missing still contributes its lags. A short-history Primary's grid is blanked before the cut.
+    The mean of lag `l` is the average over the Primaries with a reading for `l` (NaN where none);
+    the share is the fraction of `kids` with one. Every lag is a fraction of the Primary's own
+    effective capacity.
     """
-    names, _, _ = base.feature_names(scheme="summary")
-    lag_index = [names.index(n) for n in LAG_NAMES]
-    pieces = []
-    for kid in kids:
-        z = np.load(RAW_DIR / f"{kid}.npz")
-        frame = pl.DataFrame(
-            {"origin": z["origin"], "valid": z["valid"]}
-            | {f"l{i}": z["x"][:, j].astype(np.float64) for i, j in enumerate(lag_index)}
-        ).with_columns(pl.col(f"l{i}").fill_nan(None) for i in range(3))
-        pieces.append(frame)
-    stacked = (
-        pl.concat(pieces)
-        .group_by("origin", "valid")
-        .agg(
-            *[pl.col(f"l{i}").mean().alias(f"m{i}") for i in range(3)],
-            *[(pl.col(f"l{i}").count() / len(kids)).alias(f"s{i}") for i in range(3)],
-        )
-    )
+    _, arrays = fd._series_and_arrays()
     z = np.load(RAW_DIR / f"{node}.npz")
-    keys = pl.DataFrame({"origin": z["origin"], "valid": z["valid"]})
-    joined = keys.join(stacked, on=["origin", "valid"], how="left", maintain_order="left")
-    out = np.empty((len(keys), 6), dtype=np.float32)
-    for i in range(3):
-        out[:, i] = joined[f"m{i}"].fill_null(float("nan")).to_numpy()
-        out[:, 3 + i] = joined[f"s{i}"].fill_null(0.0).to_numpy()
+    to_time = lambda us: pl.Series(us, dtype=pl.Int64).cast(pl.Datetime("us", "UTC"))  # noqa: E731
+    target = np.asarray(common.grid_index(times=to_time(z["valid"])))
+    origin = np.asarray(common.grid_index(times=to_time(z["origin"])))
+    grid_times = arrays[kids[0]].valid_time
+    before_cut = (grid_times < CUT_TIME).to_numpy()
+    stack = []
+    for kid in kids:
+        power = np.array(arrays[kid].power, dtype=np.float64)
+        if kid in CUT_SITES:
+            power[before_cut] = np.nan
+        stack.append(
+            common.origin_lags(power=power, target=target, origin=origin).astype(np.float64)
+        )
+    lags = np.stack(stack)  # (kids, rows, 3)
+    finite = np.isfinite(lags)
+    count = finite.sum(axis=0)
+    out = np.empty((lags.shape[1], 6), dtype=np.float32)
+    with np.errstate(invalid="ignore"):
+        out[:, :3] = np.where(count > 0, np.where(finite, lags, 0.0).sum(axis=0) / count, np.nan)
+    out[:, 3:] = count / len(kids)
     return out
 
 
@@ -270,6 +280,18 @@ def write_neighbours() -> list[str]:
             f"{node}: {len(children[node])} Primaries beneath, rewired set shares {overlap}"
         )
     return lines
+
+
+def set_node_embeddings_to_mean(*, model: object, fit_ids: list[int]) -> None:
+    """Set the embedding of every series outside `fit_ids` to the mean of those in `fit_ids`."""
+    import torch  # ty: ignore[unresolved-import]
+
+    embedding = model.embedding  # ty: ignore[unresolved-attribute]
+    with torch.no_grad():
+        mean = embedding.weight[fit_ids].mean(dim=0)
+        for i in range(embedding.weight.shape[0]):
+            if i not in fit_ids:
+                embedding.weight[i] = mean
 
 
 # --- folds ----------------------------------------------------------------------------------

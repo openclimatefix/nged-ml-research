@@ -15,6 +15,8 @@ every arm to the half-hours they share inside the fitted test months, and prints
 
 ```bash
 PYTHONPATH=ml-experiments/00386-bsp-gsp-demand-v1-top-down-bg2-gam-simple-xgboost:\
+ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand:\
+ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:\
 ml-experiments/00377-demand-v1-first-run-feasibility:\
 ml-experiments/00381-simple-weekly-xgboost-demand-against-gam-stack:\
 ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
@@ -23,11 +25,14 @@ uv run --no-sync python ml-experiments/00415-*/e00415_score.py
 ```
 """
 
+import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
+import e00377_adapter as adapter377  # ty: ignore[unresolved-import]
+import e00381_score as s381  # ty: ignore[unresolved-import]
 import e00386_adapter as adapter  # ty: ignore[unresolved-import]
 import e00386_common as common386  # ty: ignore[unresolved-import]
 import e00386_score_a as stage_a  # ty: ignore[unresolved-import]
@@ -50,9 +55,12 @@ CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("N2rw", "N1"),
     ("N2", "N2rw"),
     ("P0", "xgb_control_w"),
-    ("N1", "manual_heuristic"),
-    ("N1", "climatology"),
+    *[(arm, ref) for arm in prep.ARMS for ref in ("manual_heuristic", "climatology")],
 )
+COUNTABLE_EXCLUDED: Final[tuple[str, ...]] = ("D15", "D18")
+MIN_MONTHS_FOR_INTERVAL: Final[int] = 6
+ARMS_TO_SCORE: list[str] = list(prep.ARMS)
+"""The arms scored; `--arms` narrows it so that every arm is scored on the same months."""
 
 
 def seed_files(*, arm: str) -> dict[int, list[Path]]:
@@ -77,9 +85,19 @@ def seed_average(*, files: list[Path]) -> pl.DataFrame:
     )
 
 
+def checked_seed_files(*, arm: str) -> dict[int, list[Path]]:
+    """Return an arm's files by seed, requiring every seed to cover the same months."""
+    by_seed = seed_files(arm=arm)
+    months = {seed: sorted(f.stem.split("_s")[0] for f in fs) for seed, fs in by_seed.items()}
+    if len({tuple(m) for m in months.values()}) > 1:
+        msg = f"{arm}: seeds cover different months {months}"
+        raise ValueError(msg)
+    return by_seed
+
+
 def arm_frames(*, arm: str) -> dict[str, pl.DataFrame]:
     """Return an arm's seed-averaged forecast, and each seed's own forecast if there are several."""
-    by_seed = seed_files(arm=arm)
+    by_seed = checked_seed_files(arm=arm)
     if not by_seed:
         return {}
     out = {arm: seed_average(files=[f for fs in by_seed.values() for f in fs])}
@@ -87,6 +105,48 @@ def arm_frames(*, arm: str) -> dict[str, pl.DataFrame]:
         for seed, files in by_seed.items():
             out[f"{arm}_s{seed}"] = seed_average(files=files)
     return out
+
+
+def score_primaries() -> None:
+    """Print the contrast N1 minus P0 at the 14 countable Primaries (contrast C5, prediction P5)."""
+    series = adapter377.series_table()
+    ctx = s381.build_context(series=series)
+    ids = series["time_series_id"].to_list()
+    arms = {}
+    for arm in ("P0", "N1"):
+        frame = arm_frames(arm=arm).get(arm) if arm in ARMS_TO_SCORE else None
+        if frame is None:
+            return
+        arms[arm] = adapter377.forecast_frame(
+            stored=frame.filter(pl.col("time_series_id").is_in(ids)), series=series, unit="fraction"
+        )
+    table, _, rows = s381.score_arms(arms=arms, series=series, ctx=ctx)
+    countable = [lab for lab in series["label"].to_list() if lab not in COUNTABLE_EXCLUDED]
+    for name, labels in (
+        ("14 countable Primaries", countable),
+        ("D15 and D18", list(COUNTABLE_EXCLUDED)),
+    ):
+        r = metrics.month_bootstrap_contrast(
+            treatment=rows["N1"],
+            reference=rows["P0"],
+            metric="crps",
+            where=pl.col("label").is_in(labels) & pl.col(HEADLINE),
+            level_percent=95.0,
+            n_resamples=20_000,
+            slice_table=table,
+        )
+        print(
+            f"N1 - P0 at {name}: {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f}) n={r['n_half_hours']}"
+        )
+    print(
+        metrics.reported_contrast_by_primary(
+            treatment=rows["N1"],
+            reference=rows["P0"],
+            metric="crps",
+            where=pl.col(HEADLINE),
+            slice_table=table,
+        ).select("label", "difference", "lower", "upper", "n_months")
+    )
 
 
 def score_nodes() -> None:
@@ -117,7 +177,7 @@ def score_nodes() -> None:
     )
     node_ids = series["time_series_id"].to_list()
     mdn: dict[str, pl.DataFrame] = {}
-    for arm in prep.ARMS:
+    for arm in ARMS_TO_SCORE:
         for name, frame in arm_frames(arm=arm).items():
             kept = frame.filter(pl.col("time_series_id").is_in(node_ids))
             mdn[name] = adapter.forecast_frame(stored=kept, series=series, unit="fraction")
@@ -125,8 +185,14 @@ def score_nodes() -> None:
         msg = "no forecast files found"
         raise SystemExit(msg)
     months = sorted(
-        {f.stem.split("_s")[0] for a in prep.ARMS for f in (SEED_DIR / a).glob("*.parquet")}
+        {f.stem.split("_s")[0] for a in ARMS_TO_SCORE for f in (SEED_DIR / a).glob("*.parquet")}
     )
+    for arm in ARMS_TO_SCORE:
+        print(arm, {s: len(fs) for s, fs in seed_files(arm=arm).items()}, "files per seed")
+    if len(months) < MIN_MONTHS_FOR_INTERVAL:
+        print(
+            f"NOTE: {len(months)} test months; a month-block interval has too few distinct resamples to be informative"
+        )
     first = pl.col("power_fcst_init_time")
     in_months = pl.any_horizontal(*[first.dt.strftime("%Y-%m") == m for m in months])
     raw = {n: stage_d.xgboost_frame(arm=n, series=series) for n in stage_d.ARMS}
@@ -237,8 +303,13 @@ def score_nodes() -> None:
 
 
 def main() -> None:
-    """Score the nodes."""
+    """Score the nodes, then the Primaries."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--arms", nargs="+", default=list(prep.ARMS), choices=prep.ARMS)
+    ARMS_TO_SCORE[:] = parser.parse_args().arms
     score_nodes()
+    print("\n== Primaries ==")
+    score_primaries()
 
 
 if __name__ == "__main__":

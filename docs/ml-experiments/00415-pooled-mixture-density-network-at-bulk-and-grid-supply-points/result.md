@@ -143,5 +143,25 @@ load-shift label is involved.
 
 ## Compute
 
-Timed per fit before any scored run; the estimate and the memory per fit go here. One GPU process
-under 8 GB, one feeder core, `MemoryMax=8G`, until the manager raises them.
+- **Timed fit.** One N2 fit on the 2026-06 fold (7.18 million training rows, 55 inputs) took 32 s
+  and 23 epochs on the shared GPU, with a peak of 3.6 GiB of GPU memory; building the fold's
+  matrices took 35 s on one core. The 48 fits of stage 3 therefore take about 1 hour in all.
+- **Limits.** One GPU process under 8 GB, one feeder core, `MemoryMax=8G`, until the manager raises
+  them. Preparation (node ensemble summaries, 20 raw matrices, neighbour columns) is done.
+- **Reuse.** Stored forecasts of experiment 386 are the references; no network of experiment 397 is
+  reused, because the folds, series, and short-history cut differ.
+
+## Code review (fresh Sonnet reviewer, before any scored fit)
+
+- **Accepted and fixed.** The neighbour columns now read each Primary's lags from its power grid
+  as of the origin, so a Primary flagged at the target half-hour still counts; the rewired set is
+  drawn outside the true set first (minimum overlap: 0 of 7, 2 of 9) and a BSP and its GSP share
+  one set; the scorer scores the Primaries for C5 and every arm against the references for C6; the
+  scorer refuses seeds that cover different months and prints the months per arm; the node
+  embeddings of P0 are saved after the mean reset; the cut arithmetic is rounded to half-hours; the
+  PYTHONPATH in the scorer's command is complete.
+- **Accepted as caveats.** The 2026-06-30 run is missing from the 2026-06 fold, because the stored
+  rows end at the 2026-06-29 run. A month-block interval from 2 months has too few distinct
+  resamples to be informative, so the scorer says so.
+- **Rejected.** Blanking the flagged half-hours of D1 in the twCRPS thresholds (855 half-hours):
+  experiment 386 used the same history, the change touches only twCRPS, and the headline is CRPS.

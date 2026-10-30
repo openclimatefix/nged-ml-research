@@ -24,7 +24,6 @@ from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00397_fit as fit  # ty: ignore[unresolved-import]
-import e00397_models as models  # ty: ignore[unresolved-import]
 import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00415_prep as prep  # ty: ignore[unresolved-import]
 import numpy as np
@@ -41,16 +40,8 @@ def forecast_month(
 ) -> pl.DataFrame:
     """Return the test month's quantiles (fraction of capacity) for every series."""
     train = fold.train
-    model = fitted.model
     if arm == "P0":
-        assert isinstance(model, models.PlainMdn)
-        assert model.embedding is not None
-        with torch.no_grad():
-            weight = model.embedding.weight
-            mean = weight[fold.fit_ids].mean(dim=0)
-            for node_id in range(weight.shape[0]):
-                if node_id not in fold.fit_ids:
-                    weight[node_id] = mean
+        prep.set_node_embeddings_to_mean(model=fitted.model, fit_ids=fold.fit_ids)
     pieces = []
     for block in prep.test_rows(arm=arm, month=month, standardiser=train.standardiser):
         p = int(block["row"]["primary"])
@@ -83,6 +74,14 @@ def run(
     setting = fit.setting_by_name(name=SETTING_NAME)
     for month in months:
         for arm in arms:
+            wanted = [
+                s
+                for s in seeds
+                if time_only
+                or not (OUT_DIR / "seed_preds" / arm / f"{month}_s{s}.parquet").exists()
+            ]
+            if not wanted:
+                continue
             started = time.monotonic()
             fold = prep.build_fold(arm=arm, refit=base.refit_of(month=month))
             print(
@@ -90,7 +89,7 @@ def run(
                 f"{fold.train.x.shape[1]} inputs, built in {time.monotonic() - started:.0f} s",
                 flush=True,
             )
-            for seed in seeds:
+            for seed in wanted:
                 target = OUT_DIR / "seed_preds" / arm / f"{month}_s{seed}.parquet"
                 if target.exists() and not time_only:
                     continue
@@ -108,6 +107,8 @@ def run(
                         flush=True,
                     )
                     continue
+                if arm == "P0":  # the saved weights carry the mean node embeddings
+                    prep.set_node_embeddings_to_mean(model=fitted.model, fit_ids=fold.fit_ids)
                 fit.save_fits(
                     fits=fits, fold=fold.train, target=OUT_DIR / "models" / arm / month / f"s{seed}"
                 )
