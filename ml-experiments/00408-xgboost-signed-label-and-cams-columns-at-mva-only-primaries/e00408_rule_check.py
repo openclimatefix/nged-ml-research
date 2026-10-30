@@ -46,8 +46,10 @@ def main() -> None:
         usable = finite & (grid <= c.latest_valid(refit=REFIT)).to_numpy()
         rule = c.fit_rule(y_points=y, u=cams.u, k=cams.k, hour=hour, month=month, usable=usable)
         parts = [
-            f"{site} gate_open={rule.gate_open} spearman={rule.spearman:.2f} "
-            f"p1={rule.p1_points:.1f} C={rule.capacity:.1f}"
+            (
+                f"{site} gate_open={rule.gate_open} spearman={rule.spearman:.2f} "
+                f"p1={rule.p1_points:.1f} C={rule.capacity:.1f}"
+            )
         ]
         masks = {
             tau: c.reverse_mask(rule=rule, tau=tau, y_points=y, u=cams.u, k=cams.k, hour=hour)
