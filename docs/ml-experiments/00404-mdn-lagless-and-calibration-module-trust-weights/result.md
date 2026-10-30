@@ -33,12 +33,13 @@ prediction: >-
   between -0.05 and -0.3 points: the trust inputs add some gain over a constant weight, less than
   the architecture adds (experiment 400 found a fixed 50/50 mixture as good as a logistic gate).
   P3. The loss on rows outside events, B1 minus A0-inj, is under 0.05 points at the signed-MW six.
-  P4. On held-out real events at the signed-MW six, the mean combined weight (the product of the 3
-  trust weights) of B1 inside events is at least 0.2 below its mean outside events (the inert rule
-  does not fire), and the mean outside events stays above 0.7. P5. B1 beats B2 on harm rows at the
+  P4. On held-out real events at the signed-MW six, the mean combined trust (the geometric mean of
+  the 3 trust weights) of B1 outside events exceeds its mean inside events by at least 0.1 (the
+  inert rule does not fire), and the mean outside events stays above 0.7. P5. B1 beats B2 on harm
+  rows at the
   signed-MW six (the maintainer's expectation); if B1's gain over A0-inj is positive, B2's gain is
   under half of it. P6. At the MVA-only eight the trust head is inert (the same difference is under
-  0.2) and the 95% interval of B1 minus A0-inj on harm rows includes zero, because experiment 402
+  0.1) and the 95% interval of B1 minus A0-inj on harm rows includes zero, because experiment 402
   step 1 (interim) found a flag oracle scores 7.297 against 7.298 for the forecast with lags there.
   P7. A0-inj minus A0 on harm rows is below -0.1 points (training on injected events alone helps)
   and on rows outside events is under +0.05. P8. B5 (no `lag_origin`) changes CRPS outside events
@@ -51,28 +52,37 @@ prediction: >-
   (7-day demand window) lowers harm-row CRPS against B1 by under 0.05 points, because the window
   contains the suspect readings. P13. Replacing the product combining rule by the mean of the 3
   weights (sensitivity arm B1m) changes harm-row CRPS by under 0.1 points. P14. B8 minus B1 on harm
-  rows at the signed-MW six is at most -0.05 points (the probe improves the harm rows).
+  rows at the signed-MW six is at most -0.05 points (the probe improves the harm rows). P15.
+  B1-rw loses less than half of B1-nn's loss against B1 on harm rows (neighbours then only average
+  out noise). P16. B1 minus B3 on harm rows is between -0.05 and +0.05 points (the trust head and
+  attention over lags do about equally well).
 decision_rule: >-
   Contrasts, registered before any score is read and read per metering group (signed-MW six;
   MVA-only eight; D15 and D18 report-only) on CRPS at days 1 to 10, each on three row sets: harm
   rows, rows outside events, and all rows. Batch 1: C1 B1 minus A0-inj (the architecture); C2
   A0-inj minus A0 (the training data); C3 B1 minus B0 (the trust inputs); C4 B1 minus A0; C5 B1
   minus B2; C6 B5 minus B1. Batch 2: C7 B3 minus B2 (attention over lags); C8a, C8b, and C8c B4a,
-  B4b, and B4c minus B1; C9 B6 minus B1; C10 B7 minus B1; C11 B1m minus B1; C12 B8 minus B1. The
+  B4b, and B4c minus B1; C9 B6 minus B1; C10 B7 minus B1; C11 B1m minus B1; C12 B8 minus B1; C13 B1
+  minus B3; C14 B1 minus B1-rw; C15 B1 minus B1-nn; C16 B9 minus B1. The
   screen has five test months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), so every number is
   labelled interim. Harm rows carry whole-event bootstrap intervals (95%, resampling events); rows
-  outside events carry month-block bootstrap intervals with no 99% claim; the Bonferroni k is 28
-  (14 contrasts, 2 groups) for the reported contrasts, and none for the stop rules. A contrast
+  outside events carry month-block bootstrap intervals with no 99% claim; the Bonferroni k is 32
+  (16 contrasts, 2 groups) for the reported contrasts, and none for the stop rules. A contrast
   counts as a gain when its interval excludes zero and its sign agrees in at least 2 of 3 seeds.
-  Batch 1 stop rule, computed on harm rows at the signed-MW six with the whole-event bootstrap and a
-  95% interval: stop batch 2 if the upper bound of the interval of B1 minus A0-inj, or of B1 minus
-  B0, is above -0.1 CRPS points, or if the point estimate of B1 minus A0-inj on rows outside events
-  is above +0.05 points. The rule is stricter than the lenient rule of the load-shift series because
-  it gates the weekend's compute; the plan would relax a number only after telling the manager.
-  Inert rule: on held-out real events from the corrected label table at the signed-MW six, define
-  the combined weight as the product of the 3 per-lag weights; an arm among B1, B3, B6, and B8 is
-  inert if its mean combined weight inside events minus its mean outside events is under 0.2. A
-  fired rule stops that arm only, and the worker reports it. B0 has no input-dependent weight, so
+  Batch 1 stop rule, computed on harm rows at the signed-MW six with an event-cluster bootstrap
+  (resampling whole real events with their harm rows, 1,000 resamples) and a 95% interval, without
+  Bonferroni correction: run batch 2 only if, for both B1 minus A0-inj and B1 minus B0, the point
+  estimate is at or below -0.1 CRPS points and the upper bound of the interval is below zero, and
+  if the point estimate of B1 minus A0-inj on rows outside events is at or below +0.05 points.
+  Otherwise stop, write up, and release the slot. The threshold of -0.1 is a quarter of the oracle
+  gain of experiment 402 (the flag oracle minus the fitted constant mixture, -0.40), so a trust head
+  that recovers a quarter of the oracle's gain qualifies. Inert rule: define the combined trust as
+  the geometric mean of the 3 per-lag trust weights (for B3, the attention mass on the
+  lagless-forecast token). A half-hour is inside an event if any of its 3 lags lies inside a real
+  corrected event (unpadded). An arm is inert if its mean combined trust outside events minus its
+  mean inside events is under 0.1, on held-out real events at the signed-MW six. The rule applies to
+  B1, B3, B4a to B4c, B5, B6, B7, and B8. A fired rule stops that arm only, and the worker reports
+  it. B0 has no input-dependent weight, so
   the rule does not apply to it. The MVA-only eight is reported beside the six and neither rule
   applies to it. The smallest gain worth porting is 0.1 points on harm rows, because the trust head
   and injected-event generation add a network head and a generator to the training loop; a pooled
@@ -126,35 +136,45 @@ design replaces the detector with a continuous trust weight per lagged input, le
   quantiles. The weight on the lagged mixture is the product of the 3 per-lag trust weights, so one
   untrusted lag lowers it, and the lagless distribution takes the weight 1 minus that product.
   Arm B1m replaces the product by the mean of the 3 weights.
-- **Training.** The whole network trains end to end on the mixture negative log-likelihood of the
-  clean series, on injected events. No separate stage and no event label is used.
+- **Training scheme (a departure from fully end to end).** Cross-fitting makes the lagless forecast
+  a precomputed table. The lagless module trains on its own mixture negative log-likelihood, and
+  the rest of the network trains on the final mixture negative log-likelihood of the clean series,
+  on injected events, with the lagless forecast held fixed. No separate stage on event labels is
+  used. The fully joint version, in which the lagless module trains jointly with a stop-gradient
+  and no cross-fit, is arm B9, run last and labelled in-sample.
+- **Series.** Each Primary series is one series per substation.
 
 ## Design choices fixed by this plan
 
 **The smoother and the surprise source are fixed here because the brief leaves them open.** Each is
 a stated choice; a different choice is a later experiment.
 
-- **No output smoother.** The window statistics of the trust inputs already average over 1.5 to 24
-  hours around each lag, and events start suddenly, so a further smoother only adds delay. The
-  write-up reports how many half-hours the trust weight takes to cross 0.5 after an injected onset.
+- **Light causal smoother.** After the trust head, a causal moving average of 3 half-hours is
+  applied over the lag's valid times, so that weights do not jump between adjacent half-hours.
+  Events start suddenly, so the smoother is short. The write-up reports how many half-hours the
+  smoothed trust weight takes to cross 0.5 after an injected onset, beside the unsmoothed weight.
 - **Trust weights start at 0.5** with no regulariser. The write-up reports whether they stay near
   0.5.
 - **Stop-gradient.** The surprises and the gap between the lagged and lagless medians pass through
   a stop-gradient, so the lagless module cannot shape its own surprises through the trust head.
-- **Cross-fitted lagless forecast (leakage rule).** For each monthly refit, the training surprises
-  come from a cross-fitted lagless forecast that uses only months before the scored month, blocked
-  by month: the lagless forecast for each month of the training window comes from a lagless network
-  fitted on the months of the window before that month, and never on the scored month or later. The
-  first 6 months of the 24-month window have too little earlier history and serve only to fit
-  lagless networks, not as training rows of the trust arms. During training, both the calibration
-  module and the trust head take this cross-fitted lagless forecast as input. At test time both
-  take the lagless module's own forecast for the scored month, which is out of sample by
-  construction. The training surprises are somewhat larger than a fully fitted lagless forecast
-  would give, and the write-up lists this mismatch as a caveat.
+- **Cross-fitted lagless forecast (leakage rule).** For each monthly refit, the months before the
+  scored month in the training window are split into K = 6 contiguous blocks. For each block, a
+  lagless module is fitted on the other 5 blocks and forecasts the held-out block. The 6
+  cross-fitted forecasts form the table of out-of-sample lagless forecasts for the training rows.
+  One further lagless module is fitted on all months before the scored month, for the scored month
+  and for test-time inference. The table is shared across all arms and seeds, and is fitted once
+  per refit and seed. The calibration module and the trust head both take the table's lagless
+  mixture as input in training, and the further module's mixture at test time. A stop-gradient
+  on the lagless forecast stops the lagless module shaping its own surprises. Cross-fitting never
+  uses the scored month or later. The other blocks include later months than the held-out block,
+  which a live forecast would not have, so the training surprises are somewhat larger than a fully
+  fitted lagless forecast would give; the write-up lists this mismatch as a caveat. If the timed
+  fits show K = 6 is too expensive, the plan settles on a smaller K and tells the manager.
 - **Forecast origin and lead of the lagless forecast.** At a lag's valid time, the lagless
   forecast uses the ECMWF ENS (European Centre for Medium-Range Weather Forecasts ensemble) mean
-  and spread of the freshest run available at the forecast origin (leads 0 to 24 hours of that
-  run). That run exists at forecast time. ERA5 is not used. The training table applies the same
+  and spread of the freshest run available at the forecast origin (the latest run published by the
+  valid time, leads 9 to 33 hours). That run exists at forecast time. ERA5 is not used. The training
+  table applies the same
   freshest-run rule at every origin.
 - **One pass on the ensemble summary.** The network sees the ENS mean and spread of each weather
   variable once. The 51-member scheme runs only as a check on the best arm.
@@ -182,10 +202,11 @@ a stated choice; a different choice is a later experiment.
 
 All arms use the pooled plain mixture density network of experiment 397 (arm `plain_pooled`) as
 their base: one network for all 16 Primaries, a learned Primary embedding, a 3-component Gaussian
-mixture head. The maintainer's update of 2026-10-30 moved the base from the uniform-token arm A0
-of experiment 397 to the plain network. The interim scores of experiment 397 (unaudited) were
+mixture head. The maintainer's update of 2026-10-30 moved the base from the uniform-token arm of
+experiment 397, called U0 here, to the plain network. The interim scores of experiment 397
+(unaudited) were
 3.264 at the signed-MW six and 3.860 at the MVA-only eight for the plain network, against 3.320 and
-3.775 for the uniform-token arm, and the plain network's lead rests mainly on one fold, so this
+3.775 for U0, and the plain network's lead rests mainly on one fold, so this
 plan infers no ranking between them. Both modules get the Primary embedding. The group gate over
 input groups stays closed in every arm. Every arm trains on the injected data below, except A0.
 
@@ -199,30 +220,42 @@ input groups stays closed in every arm. Every arm trains on the injected data be
   lag that does not depend on the trust inputs (the control experiment 400 recommended). B1 minus
   B0 isolates the trust inputs.
 - **B1.** The architecture above, with the three lags.
-- **B2.** A0-inj with token-level lag dropout during training (rate 0.3, chosen so that most rows
-  keep at least one lag) and no lagless module.
+- **B2.** A0-inj with token-level lag dropout during training (each lag token zeroed with
+  probability 0.2 and flagged missing) and no lagless module.
 - **B5.** B1 without `lag_origin`.
 
 **Batch 2** (runs straight away if the batch 1 stop rule does not fire):
 
-- **B3.** The pooled plain network with a softmax attention gate over the 3 lag tokens, with the
-  trust inputs as the gate's query, and without the lagless module and the trust head. B3 minus B2
-  tests attention over lags, and B1 minus B2 tests the trust head.
+- **B3.** B1's lagless module and cross-fitted table, with an attention gate in place of the trust
+  head and the product rule. The gate attends over 4 tokens: the 3 lag tokens (each the lag value
+  with its age, missing flag, and trust inputs) and a lagless-forecast token. Its query is built
+  from the lead time, the Primary embedding, and the metering indicator. The output is the gated sum
+  of tokens fed to a 3-component mixture head. B3 minus B2 tests attention over lags, and B1 minus
+  B3 compares the trust head with attention.
 - **B6.** B1 with a 1D convolutional neural network over the surprise series in a window of 24
-  hours either side of each lag (half-hourly steps), in place of the hand-built window statistics.
-  Each window is truncated at the forecast origin.
+  hours either side of each lag (97 half-hourly steps), in place of the hand-built window
+  statistics. Each window is zero-padded and truncated at the forecast origin. The network has two
+  convolution layers (kernel 5, 16 channels) with global pooling.
 - **B4a, B4b, and B4c.** B1 with more lags: the same weekday and time from each of the last
   N = 1, 3, and 5 weeks, plus the median across the N weeks and the median minus the latest week.
   The three values of N are three separate arms.
-- **B8 (low priority; runs after B1 reads clean).** B1 plus an auxiliary probe head that reads the
+- **B8a and B8b (low priority; run after B1 reads clean).** B1 plus an auxiliary probe head that
+  reads the
   trust head's hidden layer and predicts, for each lagged timestep, whether the injected generator
   put it inside an event or a spike. The loss is binary cross-entropy at a weight of 0.1 of the
-  mixture loss, and 0.3 if 0.1 moves nothing. The probe trains only on the injected labels, which
+  mixture loss in B8a and 0.3 in B8b. The probe trains only on the injected labels, which
   are known truth and need no NGED label, and it is never used at forecast time. Real-event labels
   come from the 112-row corrected table, so the write-up reports the event count per metering
   group beside every area figure, and says plainly if the probe works on injected events and fails
   on real ones, which would mean the injection is unrealistic.
 - **B1m.** B1 with the mean of the 3 trust weights as the mixture weight.
+- **B1-rw and B1-nn (neighbour controls).** B1-rw replaces each Primary's neighbour inputs with
+  those of a degree-matched randomly chosen set of other Primaries (the graph rewired, with the
+  same number of neighbours). B1-nn removes the neighbour inputs. B1 minus B1-rw tests whether
+  neighbour identity matters in the trust head, and B1 minus B1-nn tests whether the neighbour
+  inputs matter at all. The cross-fitted tables are reused.
+- **B9 (last).** The fully joint version of B1: the lagless module trains jointly with a
+  stop-gradient and no cross-fit. It is labelled in-sample.
 - **B7 (lowest priority; runs last).** B1 plus a 1D convolutional neural network over the latest 7
   days of actual demand up to the forecast origin, with the same trust inputs.
 
@@ -239,9 +272,10 @@ spikes that are not load shifts are injected too. The targets stay clean, so a t
 inside an injected event. The loss is the mixture negative log-likelihood, which is a proper
 scoring rule like CRPS and is what experiment 397 used.
 
-**Injection rate.** 25% of training rows have at least one lag inside an injected event, against
-about 2.6% in real data. The rate is a stated choice and is varied in the sensitivity run if the
-batch 1 results are borderline.
+**Injection rate.** 20% of training rows have at least one lag inside an injected event or spike,
+against about 2.6% in real data. The rate is a stated default, and the worker states and justifies
+any change. The injection is fixed per refit and seed, saved to disk, and not resampled each epoch.
+The generator tunes its coverage on the real arrays until the realised share of rows reaches 20%.
 
 **Which experiment the injection follows.** Experiment 395 Parts E and F disagree on the share of a
 step that reaches the forecast (36.8% with all three lags affected in the synthetic sweep of Part
@@ -310,6 +344,9 @@ harm rows.
   anonymised labels only where a metered generator's series appears, and none does here.
 - **Checks.** The median minus the mean forecast per Primary, the error of the mean beside every
   quantile-score contrast, and which of the seven audit triggers of the `ml-experiment` skill fired.
+- **Saved outputs, per arm, fold, and seed:** per-row per-lag trust weights, the combined trust, the
+  event class of each row (inside, touching, or clean, unpadded), per-row CRPS, B3's attention
+  weights, the B8 probe scores, and the forecast quantiles q01 to q99.
 - **Folds, seeds, cadence.** The five screen folds of experiment 397, monthly refits, 3 seeds. More
   seeds only for a contrast within the seed noise.
 
@@ -319,17 +356,20 @@ harm rows.
 `MemoryMax=8G`,** a stricter slot than the brief's 16 GB, because of the machine's load. The
 manager asked for a request for more resources if a batch would take over 12 hours.
 
-**Fit counts.** Each fit is one arm on one refit with one seed.
+**Fit counts.** Each fit is one arm on one refit with one seed. The brief reports 50 to 200 seconds
+per fit and about 600 fits in all; the plan's own count follows, and the first task after the slot
+is granted is to time one fit of each kind and report K and the timed duration to the manager.
 
-- **Cross-fitted lagless networks.** One per month of the training window after the first 6, so
-  18 per refit, and 90 over the 5 refits (one seed). They are precomputed once per refit and shared
-  by every arm and seed.
+- **Cross-fitted lagless networks.** 6 block fits plus 1 final fit, so 7 per refit and seed, and 105
+  over the 5 refits and 3 seeds. They are precomputed once per refit and seed and shared by every
+  arm.
 - **Injected windows.** The injected series and every window statistic, neighbour input, and B6 or
   B7 window are precomputed once per refit, with a fixed injection seed, and shared by every arm and
   seed.
 - **Batch 1.** 6 arms times 5 refits times 3 seeds is 90 fits (A0 is read from experiment 397 if
   its rows match, which would remove 15).
-- **Batch 2.** B3, B6, B4a, B4b, B4c, B8, B1m, and B7 are 8 arms, 120 fits.
+- **Batch 2.** B3, B6, B4a, B4b, B4c, B8a, B8b, B1-rw, B1-nn, B1m, B7, and B9 are 12 arms, 180
+  fits.
 - **Memory per fit.** A pooled refit has about 7 million rows. With the trust inputs (about 150
   columns in float32) the host matrix is about 4 GB, which fits the 8 GB cap with the batch
   streamed to the GPU in blocks of 16,384 rows. B6 and B7 add window tensors that are built in
@@ -337,8 +377,9 @@ manager asked for a request for more resources if a batch would take over 12 hou
   task after the slot is granted is to time and measure one fit of each kind.
 
 Order of work once granted: the cross-fitted lagless networks; the realism check; A0 (reused if
-experiment 397's rows match); A0-inj; B0; B1; B2; B5; the stop-rule check; then batch 2 straight
-away if the stop rule does not fire, in the order B3, B6, B4a, B4b, B4c, B8, B1m, then B7. Every arm
+experiment 397's rows match); A0-inj; B0; B1; B2; B5; the stop-rule check; then batch 2 if the
+stop rule passes, in the order B3, B6, B4a, B4b, B4c, B8a, B8b, B1-rw, B1-nn, B1m, then B7 and B9.
+Every arm
 is in scope over the weekend, gated only by the pre-registered stop rules.
 
 ## Problems caused by the move
