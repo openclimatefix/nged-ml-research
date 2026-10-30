@@ -249,6 +249,9 @@ reports the real-event count per fold and excludes folds without label coverage 
   value.
 - Drop flagged exact-zero half-hours (`substation_zero`) from training, lags, inference, and scoring
   actuals.
+- For D15 and D18, drop every row before 2025-03-01 from training rows, lag inputs, inference
+  inputs, and scoring actuals (maintainer rule, 2026-10-30). This experiment does not test the cut.
+  Experiment 399 may later supply better per-Primary dates, and the plan then follows them.
 
 ## Scoring
 
