@@ -182,9 +182,7 @@ def run(
                         device=device,
                     )
                 if arm == "per_primary" and len(fits) != len(counts):
-                    msg = (
-                        f"{tag} {month}: networks for {sorted(fits)} but rows for {sorted(counts)}"
-                    )
+                    msg = f"{tag} {month}: networks for {len(fits)} Primaries but rows for {len(counts)}"
                     raise RuntimeError(msg)
                 fit.save_fits(
                     fits=fits, fold=fold, target=OUT_DIR / "models" / tag / month / f"s{seed}"
