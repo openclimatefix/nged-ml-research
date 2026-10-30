@@ -21,42 +21,55 @@ hypothesis: >-
   One mixture density network, trained end to end on injected load-conserving events, that
   contains a lagless module and a calibration module outputting a continuous trust weight for each
   lagged power input, forecasts better than the pooled uniform network with the three origin lags
-  (arm A0) on rows whose target lies outside every load-shift event but whose lags touch one, and
-  costs no more than 0.05 points of capacity outside events.
+  (arm A0) on rows whose target lies outside every load-shift event but whose lags lie inside one
+  (harm rows), and
+  loses no more than 0.05 points of CRPS (continuous ranked probability score, in points of
+  effective capacity) on rows outside events.
 prediction: >-
-  Written before any score is read. P1. Arm B1 lowers CRPS on harm rows (target outside every
-  event, at least one lag inside one) at the signed-MW six by 0.2 to 0.8 points of effective
-  capacity against A0. The interim XGBoost series found 0.40 for a flag oracle against a fitted
-  constant mixture (experiment 402, unaudited), so a learned weight with no labels should land
-  below that. P2. The cost outside events is under 0.05 points pooled. P3. B1 beats B2 on harm rows
-  (the maintainer's expectation); B2 lowers the harm-row CRPS by less than half of B1's gain. P4. At
-  the MVA-only eight, B1's harm-row gain is smaller than at the signed-MW six and can be zero,
-  because the XGBoost flag oracle was worse than the forecast with lags there (+0.19). P5. B3 (the
-  attention gate of experiment 397 arm A2 on the lag tokens) matches B1 within 0.05 points: the
-  trust weights already do the gating. P6. B4 (more weekly lags) lowers the CRPS outside events by
-  under 0.05 points and helps the harm rows by under 0.1. P7. B5 (no `lag_origin`) costs under 0.05
-  points outside events and changes harm-row CRPS by under 0.1 in either direction, because the
-  newest lag is mostly noise. P8. The trust weight on a lag inside a synthetic event falls below
-  0.3 within 4 half-hours of the onset in B1, and stays above 0.7 at lags outside events.
+  Written before any score is read. P1. Arm B1 lowers CRPS on harm rows at the signed-MW six
+  Primaries by 0.1 to 0.4 points against A0. The interim XGBoost series (experiment 402,
+  unaudited) found 0.40 for a flag oracle against a fitted constant mixture, and a learned weight
+  with no labels should land below that oracle. P2. The CRPS loss on rows outside events is under
+  0.05 points at each of the two groups, signed-MW six and MVA-only eight. P3. B1 beats B2 on harm
+  rows at the signed-MW six (the maintainer's expectation); if B1's gain is positive, B2's gain is
+  under half of it. P4. At the MVA-only eight, the 95% interval of B1 minus A0 on harm rows includes
+  zero, because the XGBoost flag oracle was worse than the forecast with lags there (+0.19). P5. B3
+  (the attention gate of experiment 397 arm A2 on the lag tokens) differs from B1 by under 0.05
+  points on harm rows. P6. B4 (more weekly lags) changes CRPS outside events by under 0.05 points in
+  either direction and the harm rows by under 0.1 in either direction. P7. B5 (no `lag_origin`)
+  changes CRPS outside events by under 0.03 points in either direction, because the experiment 395
+  Part E sweep found the newest lag moves the median by only 1.3% of a step. P8. In B1 on synthetic
+  events at the signed-MW six, the mean trust weight of a lag inside the event is below 0.3 from
+  the fourth half-hour after the onset on, and the mean trust weight of lags outside every event
+  stays above 0.7. P9. The nested-input ablation of B1 (single-step surprise only; plus window
+  statistics; plus neighbour inputs) improves harm-row CRPS at each addition by at least 0.05
+  points; an addition below that is reported as not earning its place. P10. Replacing the mean
+  combining rule by the noisy-or rule (sensitivity arm B1n) changes harm-row CRPS by under 0.1
+  points.
 decision_rule: >-
   Contrasts, each registered before any score is read and read per group (signed-MW six; MVA-only
   eight; D15 and D18 report-only) on CRPS at days 1 to 10. C1 B1 minus A0; C2 B2 minus A0; C3 B1
-  minus B2; C4 B3 minus B1; C5 B4 minus B1; C6 B5 minus B1, each on three row sets: the harm rows
-  (target outside every event, at least one lag inside one, minus the same Primaries' clean-lag
-  rows, by number of lags in the event), the rows outside events, and all rows. The screen has five
-  test months, so every number is labelled interim: event rows carry whole-event intervals (95%),
-  month-block intervals carry no 99% claim, and a contrast is reported as a gain only when the
-  seed spread also excludes zero. Stop rule (from the brief): stop after B1 and B2 if neither beats
-  A0 on the harm rows with a cost outside events above 0.05 points; otherwise run B3, B4, and B5.
+  minus B2; C4 B3 minus B1; C5 B4 minus B1; C6 B5 minus B1; C7 B1n minus B1. Each is read on three
+  row sets: the harm rows (target outside every event, at least one lag inside one; for the
+  contrast the harm-row difference of the two arms is taken, and the clean-lag rows are reported
+  beside it as a reference level), the rows outside events, and all rows. The screen has five test
+  months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), so every number is labelled interim. Harm
+  rows carry whole-event bootstrap intervals (95%, resampling events); rows outside events carry
+  month-block bootstrap intervals with Bonferroni k = 14 (7 contrasts, 2 groups) and no 99% claim.
+  A contrast counts as a gain when its interval excludes zero and the sign agrees in at least 2 of
+  3 seeds. Stop rule (from the brief): stop after B1 and B2 if neither beats A0 on the harm rows
+  without a loss above 0.05 points on rows outside events; otherwise run B3, B4, and B5.
   The lenient rule of the load-shift series applies: stop a step only if it is very clear the path
   is not worth pursuing, and tell the manager first. The smallest gain worth porting is 0.1
   points on the harm rows, because the calibration module adds a second network head and
   injected-event generation to the training loop; a pooled harm-row gain under 0.1 is `small gain`.
 benchmark: >-
-  Arm A0 (pooled uniform network with the three origin lags; experiment 397 stage 2 predictions
-  if the rows, seeds, and folds match, otherwise refitted here), the stored forecasts of monthly
-  XGBoost (S0M, experiment 389), the weekly bundle (experiment 381), BG2, and the GAM stack
-  (experiment 377), `manual_heuristic`, and `climatology`, never refitted.
+  Arm A0 (pooled uniform neural network with the three origin lags; experiment 397 stage 2
+  predictions if the rows, seeds, and folds match, otherwise refitted here), and the stored
+  forecasts, never refitted, in the private data folder `data/ml-experiments/`: monthly XGBoost
+  arm S0M (`00389-xgboost-tail-calibration-and-ensemble-spread-columns/work/arm_preds`), the weekly
+  bundle (`00381-simple-weekly-xgboost-demand-against-gam-stack/work`), BG2 (experiment 87), the GAM
+  stack (`00377-demand-v1-first-run-feasibility/work`), `manual_heuristic`, and `climatology`.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   CRPS from the 11 quantiles (as the protocol computes it) with the exact mixture CRPS beside it;
@@ -94,27 +107,38 @@ design replaces the detector with a continuous trust weight per lagged input, le
 **The combining rule, the smoother, and the surprise source are fixed here because the brief leaves
 them open.** Each is a stated choice; a different choice is a later experiment.
 
-- **Combining rule.** Each lag token is multiplied by its trust weight `t_i` before it enters the
-  lagged head, so a weight of 0 removes the lag's information. The weight on the lagged mixture is
-  `w = 1 - prod_i (1 - t_i)` (a noisy-or), so one trusted lag is enough to give the lagged mixture
-  weight. The final distribution is `w * lagged + (1 - w) * lagless`.
-- **Trust weight form.** `t_i = sigmoid(g_i(x))`, where `g_i` is a small network on the trust inputs,
+- **Combining rule.** Each lag token is mixed with a learned null token by its trust weight,
+  `t_i * token_i + (1 - t_i) * null`, so a weight of 0 removes the lag's information and does not
+  mean zero demand. The weight on the lagged mixture is the mean of the trust weights,
+  `w = mean_i t_i`. The final distribution is `w * lagged + (1 - w) * lagless`. Arm B1n (a
+  sensitivity arm, contrast C7) replaces the mean by a noisy-or, `w = 1 - prod_i (1 - t_i)`, which
+  saturates near 1 as lags are added and so would confound B4. Trust weights start at 0.5 by
+  initialisation with no regulariser; the write-up reports whether they stay near 0.5, which is
+  the failure experiment 400 found.
+- **Trust weight form.** `t_i = sigmoid(g_i(x))`, where `g_i` is a small network on the trust
+  inputs,
   the lead features, the Primary embedding, and a signed-MW or MVA-only indicator (experiment 402's
   interim finding is that one pooled weight does not transfer between metering units, so the two
   groups are scored separately).
-- **Smoother.** The logit `g_i` is smoothed along the forecast lead within a run by a causal
-  exponential moving average with a half-life of 2 half-hours (1 hour), applied to whole runs in
-  each training batch. The write-up reports the delay of the smoothed weight at an event onset
-  against the unsmoothed weight and calls the smoother a failure if the delay exceeds 4 half-hours.
+- **Smoother.** The trust weight is not smoothed at the output. The window statistics of the
+  trust inputs already average over 1.5 to 24 hours around each lag, and events start suddenly,
+  so a further smoother only adds delay. The write-up reports the trust weight's response at
+  event onsets, and the half-hours it takes to cross 0.5 after an injected onset.
 - **Surprise source (leakage rule).** The surprise of a lag is taken from an out-of-sample
   lagless forecast, not from the module being trained, because that module has seen the lag's
-  target. The plan builds a cross-fitted lagless table (a lagless network fitted on the other held
-  weeks of the training window, the `HELD_WEEK_PERIOD` scheme of experiment 397) and reads the
-  median and the 5-95% band width at each lag's valid time from it. The lagless module trained end
-  to end is a separate network that only forecasts the target.
+  target. The plan builds a cross-fitted lagless table: one lagless network per block of 12 weeks of
+  the training window, fitted on the rest of the window, and reads the median and the 5-95% band
+  width at each lag's valid time from it. The fits exclude the scored month and the 7 days
+  before, and the weeks of every labelled real event, so the real events stay out of training. The
+  other blocks include later weeks, which a live forecast would not have. The training surprises
+  are therefore somewhat cleaner than the surprises at test time, which come from a lagless
+  network fitted on the whole training window; the write-up lists this mismatch as a caveat.
+  The calibration module reads the lagless module's own forecast (end to end) for the gap input and
+  the cross-fitted table for the surprise inputs, and the write-up states which is which.
 - **Weather at lag times.** The cross-fitted lagless forecast at a past lag time uses the ECMWF ENS
   mean and spread of the freshest run available at the forecast origin (leads 0 to 24 hours of
-  that run), which exists at forecast time. ERA5 is not used.
+  that run), which exists at forecast time. ERA5 is not used. The training table applies the same
+  freshest-run rule at every origin.
 - **One pass on the ensemble summary.** The network sees the ENS mean and spread of each weather
   variable once, as in experiment 397's `summary` scheme. The 51-member scheme runs only as a check
   on the best arm.
@@ -124,16 +148,20 @@ them open.** Each is a stated choice; a different choice is a later experiment.
 - **Per lag.** The single-step surprise (the lag minus the cross-fitted lagless median at the lag's
   valid time) in capacity-normalised MW, kept signed, and the same value in units of the lagless
   band width. Both are given, because a clipped score loses magnitude.
-- **Per lag, window statistics** of the surprise over windows centred on the lag (half-widths 1.5, 3,
+- **Per lag, window statistics** of the surprise over windows centred on the lag (half-widths 1.5,
+  3,
   6, 12, and 24 hours, and 84 hours for the week lag only): mean, median, minimum, maximum,
   standard deviation, signed sum, count above the band, and a 12-hour triangular tent mean. The
   origin lag's windows are truncated at the telemetry cut-off.
-- **Neighbours.** The same quantities for neighbouring Primaries from `neighbours_nged.json`, with
-  the signed logic learned and never hand-coded. At scale the graph must come from the data
+- **Neighbours.** The same quantities for neighbouring Primaries from `neighbours_nged.json` (in
+  the folder of experiment 383), with the signed logic learned and never hand-coded. The neighbour
+  inputs are recomputed after injection, with the neighbours' injected series. Bulk supply points
+  are added if their stored series exist; if not, the write-up says they were left out. At scale the
+  graph must come from the data
   (for example the correlation of forecast residuals); the write-up states what that needs.
 - **Lag age and is-missing flag** for each lag, and the gap between the lagged and lagless medians.
 - **Experiment 402 finding to test.** The interim finding that the window statistics and the
-  neighbour inputs, not the single-step surprise, must earn their place gets a nested-input
+  neighbour inputs, not the single-step surprise, must improve CRPS gets a nested-input
   ablation of B1 (single-step surprise only; plus window statistics; plus neighbours), reported
   beside the arms, using the best seed count from the screen.
 
@@ -157,15 +185,18 @@ The maintainer's expectation (not a result): B1 beats B2.
 **Training uses injected, load-conserving events.** A drop at a donor Primary reappears at the
 connected recipients, with the depth as a share of the donor's trailing 30-day mean. Durations and
 depths follow the corrected label table `sw_block_detector_label_table_corrected.csv` in the folder
-of experiment 395 (the table's sign convention was wrong for 51 of 112 rows before the correction).
-30% of events have no observed recipient (a guess, varied as a sensitivity). Transient spikes that
-are not load shifts are injected too. The objective is to reconstruct the clean series, scored by
-the mixture negative log-likelihood. It is not a classification score.
+of experiment 395 (use the corrected signs).
+In 30% of events no recipient is observed (a guess, varied as a sensitivity). Transient spikes that
+are not load shifts are injected too. The training target is the clean series, so a target is never
+inside an injected event.
+The loss is the mixture negative log-likelihood, which is a proper scoring rule like CRPS and is
+what experiment 397 used. It is not a classification score.
 
-**Generator.** Experiment 402 (draft PR 56) is expected to supply the injected-event generator. At
-the time of this plan its branch holds the ceilings script and the counterfactual script only, so
-no generator exists yet. This experiment writes `e00404_inject.py` if the generator is still absent
-when fitting starts, and says so in the write-up. The fallback specification is the paragraph
+**Generator.** Experiment 402 (draft PR 56) is expected to supply the injected-event generator. The
+manager confirmed on 2026-10-30 that experiment 402 has none. Its branch holds only the ceilings
+script and the counterfactual script. This experiment therefore writes `e00404_inject.py`, and the
+write-up says so. If experiment 402 publishes a generator before fitting starts, this experiment
+switches to it. The fallback specification is the paragraph
 above, with depths and durations drawn by resampling the corrected table's 112 usable rows.
 
 **Real events are a held-out test only.** The label table's events never enter training. The four
@@ -175,7 +206,11 @@ scored months hold only 26 real events, so the write-up reports the counts.
 
 - Cut every training row whose valid time is on or after the first day of the scored month.
 - Truncate every lag window at the telemetry cut-off.
-- Take surprises only from the cross-fitted out-of-sample lagless forecast.
+- Take surprises only from the cross-fitted out-of-sample lagless forecast, recomputed against the
+  injected lag values after injection (surprises from the clean series would carry no event signal).
+- Truncate the trailing 30-day mean that scales injected depths at the forecast origin, and
+  inject the donor and its recipients together, so that the neighbour inputs never leak the clean
+  value. A truncated triangular tent is renormalised to sum to 1.
 - Drop flagged exact-zero half-hours (`substation_zero`) from training, lags, inference, and scoring
   actuals.
 
@@ -198,13 +233,17 @@ scored months hold only 26 real events, so the write-up reports the counts.
 
 ## Compute
 
-**Until the manager grants more, the slot is 1 GPU process under 8 GB of GPU memory, 1 feeder core,
-and `MemoryMax=8G`.** No fit starts before the manager grants the slot. The workstation's load
+**The slot the manager offers is 1 GPU process under 8 GB of GPU memory, 1 feeder core, and
+`MemoryMax=8G`, from about 16:30 UTC on 2026-10-30 if memory then exceeds 15 GB (a stricter slot
+than
+the brief's 16 GB, because of the machine's load).** No fit starts before the manager grants the
+slot. The workstation's load
 average was 36.7 and 51 GB of 61 GB memory were in use when this plan was written. Order of work
 once granted: the cross-fitted lagless table; A0 (reused if experiment 397's rows match); B1 and B2
 on five folds and three seeds; the stop-rule check; then B3, B4, and B5. Each fit is timed first.
 
 ## Problems caused by the move
 
-None so far. Experiment 397's modules live on an unmerged branch, so this experiment copies the
+(The move of the research code from the production repository to this one.) None so far. Experiment
+397's modules live on an unmerged branch, so this experiment copies the
 files it needs into its own folder.
