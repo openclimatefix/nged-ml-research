@@ -279,13 +279,28 @@ The generator tunes its coverage on the real arrays until the realised share of 
 
 **Which experiment the injection follows.** Experiment 395 Parts E and F disagree on the share of a
 step that reaches the forecast (36.8% with all three lags affected in the synthetic sweep of Part
-E, against a median share of 0.94 for real events in Part F). The injection writes the full event
+E, against a median share of 0.94 for real events in Part F; experiment 401 shows the 0.94 is not a
+lag effect). The injection writes the full event
 depth into the lag values, as a real event does, and does not set a share of the forecast. The
 share that reaches the forecast is then an output, measured by the lag-encroachment sweep.
 
-**Realism check before training.** The window statistics of injected surprises are compared with
-those of real events from the label table. The injection is redesigned if they differ by more than
-a factor of 2, as the lag-gate brief requires.
+**Realism check before training: calibrate the injected lag response to the real one.** In
+experiment 401's counterfactual (replace the lags inside each real event and re-predict), the real
+lag response of the forecast is about 0.03 of the event step, against 0.32 for synthetic events of
+the same kind (interim and unaudited). A forecast with no lags reads the same 0.95 median share, so
+the 0.94 of experiment 395 Part F is not a lag effect. Injected events may therefore overstate how
+strongly the lags move the forecast on real events. Before training, the plan measures the injected
+lag response with the same counterfactual (the code is on experiment 401's branch,
+`real-vs-synthetic-share-fixed-mixture`, PR 55; the plan reads it from `origin` and imports the
+merged folder once it lands). It then tunes the injected depth, duration, and rate until the
+injected
+response is within a factor of 2 of the real response. The window statistics of injected surprises
+are also compared with those of real events, with the same factor of 2, as the lag-gate brief
+requires. Every arm is judged on real events as well as injected ones.
+
+**Harm-row results are a lower bound.** Because some events are unlogged, harm-row results are
+reported as a lower bound on harm. Our series are one per substation, not per transformer, so a
+transformer-level event that conserves load across a substation's transformers does not appear.
 
 **Generator.** The manager confirmed on 2026-10-30 that experiment 402 (draft PR 56) has no
 injected-event generator yet; its branch holds only the ceilings script and the counterfactual
