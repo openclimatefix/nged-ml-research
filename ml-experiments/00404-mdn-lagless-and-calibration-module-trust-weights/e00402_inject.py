@@ -1,4 +1,4 @@
-# Copied unchanged from experiment 402 (PR 56, branch lag-gate-injected-load-shifts); replaces experiment 404's own generator.
+# Copied unchanged from experiment 402 (PR 56), commit bfc32045 of branch lag-gate-injected-load-shifts.
 """Injected load-conserving load shifts and transient spikes for experiment 402.
 
 The structure follows experiment 404's `e00404_inject.py` (nged-ml-research PR 58): an event pool

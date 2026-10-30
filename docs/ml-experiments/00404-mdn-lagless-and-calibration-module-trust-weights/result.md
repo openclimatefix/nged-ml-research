@@ -377,7 +377,10 @@ reported as a lower bound on harm. Our series are one per substation, not per tr
 transformer-level event that conserves load across a substation's transformers does not appear.
 
 **Generator.** This experiment uses experiment 402's generator (`e00402_inject.py`, draft PR 56),
-copied unchanged into this experiment's folder. Experiment 402 pushed it on 2026-10-30 after
+copied unchanged into this experiment's folder from commit `bfc32045` of branch
+`lag-gate-injected-load-shifts`. The copy is unreviewed until this experiment's Sonnet code review
+covers it or experiment 402's own review does, and it is re-copied if experiment 402's file changes
+after that review. Experiment 402 pushed it on 2026-10-30 after
 self-testing it, and it had not been code-reviewed then. It differs from the generator first
 written here in four ways: the donor change keeps the donor's shape (the donor is multiplied by
 `1 - f`), spikes are 4 to 20 times the stage-1 residual median absolute deviation, MVA-only
