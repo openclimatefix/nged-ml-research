@@ -135,6 +135,26 @@ minus R0. C5 R5 minus R2 (does surprise match the detector). C6 R1 minus Rc1. C7
 is read on four slices: outside events and the 48 hours after (harm), inside events, the 7 days
 after, and all rows.
 
+## Few-fold screen (manager's instruction, 2026-10-30; rule fixed before any score is read)
+
+All new fits first run on four monthly refits only: 2025-10 (autumn), 2026-01 (winter), 2026-03
+(spring), and 2026-06 (summer), each scoring the month to the next refit. **Deviation from the
+common brief's screen:** the training window stays experiment 87's `n1h` window (whole history),
+not 24 months, because experiment 381's stored control (R0 lagged) uses that window and reusing it
+saves its fits; the window is the same for every arm. R0 lagless, R1 and RC1 are fitted on the four
+refits; R2 and RC2 follow on the same four.
+
+- **Advance rule.** An arm advances to the other eight refits when, against its control on the same
+  folds, (a) pooled CRPS outside events and the 48 hours after is no worse than +0.02 points in at
+  least 3 of 4 folds, and (b) on rows inside events or the 7 days after, the lagless form follows
+  less of the labelled depth than R0 lagless in at least 3 of 4 folds. R1 is run on the full year
+  only when it beats RC1 on (b) in 3 of 4 folds; otherwise the control shows that the removal is
+  not the cause and the full year is not run for R1 or RC1.
+- **Noise floor.** A second seed of R0 lagless on the same four folds, at two Primaries (D2, D8).
+- **What the screen says.** Four months give wide intervals, so screen numbers are interim and carry
+  no 99% claim. Check 3 (injected transfers) and the sweep need only the saved boosters and run on
+  the four folds regardless of the advance rule.
+
 ## The four NRA checks (pre-registered)
 
 1. **No harm outside events:** arm minus R0, all 16 Primaries to 14 days, by lead band.

@@ -224,6 +224,9 @@ def main() -> None:
     parser.add_argument("--forms", nargs="+", default=list(FORM_NAMES), choices=FORM_NAMES)
     parser.add_argument("--sites", nargs="+", default=None, help="default: all 16 Primaries")
     parser.add_argument("--refits", type=int, default=None, help="only the first N refits")
+    parser.add_argument(
+        "--refit-dates", nargs="+", default=None, help="only these refits, as YYYY-MM-DD"
+    )
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--cores", type=int, default=1)
     parser.add_argument("--seed", type=int, default=common.SEED)
@@ -234,6 +237,8 @@ def main() -> None:
     sites = args.sites or series.filter(pl.col("substation_type") == "Primary")["site"].to_list()
     jobs = regimes.jobs_for(regime_names=("monthly",), origins=common.all_origins())
     jobs = dict(list(jobs.items())[: args.refits])
+    if args.refit_dates:
+        jobs = {r: runs for r, runs in jobs.items() if f"{r:%Y-%m-%d}" in args.refit_dates}
     rounds, out = common.N_ROUNDS, ARM_DIR
     if args.smoke:
         jobs = {r: runs[:3] for r, runs in list(jobs.items())[:2]}
