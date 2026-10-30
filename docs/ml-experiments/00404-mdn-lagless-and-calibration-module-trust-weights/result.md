@@ -180,7 +180,7 @@ of experiment 397 to the plain network. The interim scores of experiment 397 (un
 plan infers no ranking between them. Both modules get the Primary embedding. The group gate over
 input groups stays closed in every arm.
 
-**Batch 1** (the weekend scope):
+**Batch 1:**
 
 - **A0.** The pooled plain network with the three origin lags, trained on the plain clean data
   (the reference for the architecture alone).
@@ -194,7 +194,7 @@ input groups stays closed in every arm.
   rate is 0.3, chosen so that most rows keep at least one lag.
 - **B5.** B1 without `lag_origin`, the newest reading before the forecast origin.
 
-**Batch 2** (run only after reading the batch 1 stop rule):
+**Batch 2** (runs straight away if the batch 1 stop rule does not fire):
 
 - **B3.** The pooled plain network with a softmax attention gate over the 3 lag tokens, with the
   trust inputs as the gate's query, and without the lagless module and the trust head. B3 minus B2
@@ -293,7 +293,9 @@ exceeds 15 GB). Batch 1 is 6 arms times 5 folds times 3 seeds, 90 fits, plus abo
 cross-fitted lagless fits (about 9 blocks per fold). The first task after the slot is granted is to
 time one fit of each kind. Order of work once granted: the cross-fitted lagless table; the realism
 check; A0 (reused if experiment 397's rows match); A0-inj; B0; B1; B2; B5; the stop-rule check;
-then batch 2 in the order B3, B6, B4, B1p, B8, B7. The weekend scope is batch 1.
+then batch 2 straight away if the batch 1 stop rule does not fire, in the order B3, B6, B4, B8, B1p,
+then B7. Every arm is in scope over the weekend, gated only by the pre-registered stop rules. The
+manager is asked for more resources if a batch would take over 12 hours.
 
 ## Problems caused by the move
 
