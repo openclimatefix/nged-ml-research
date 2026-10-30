@@ -54,6 +54,15 @@ SUBSETS: Final[dict[str, tuple[str, ...]]] = {
     "D15 and D18": SHORT_HISTORY,
 }
 KEYS: Final[list[str]] = list(common.KEYS)
+OUT_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00403-pooled-versus-per-primary-mixture-density-network"
+)
+FIGURE_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2]
+    / "docs"
+    / "ml-experiments"
+    / "00403-pooled-versus-per-primary-mixture-density-network"
+)
 
 
 def month_origins(*, month: str) -> list[datetime]:
@@ -135,16 +144,18 @@ def main() -> None:
             f"{name:24s} {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f}) "
             f"n={r['n_half_hours']}"
         )
-    print("\n== per Primary, 95% (pooled A0 minus per-Primary plain) ==")
-    print(
-        metrics.reported_contrast_by_primary(
-            treatment=rows["pooled_A0"],
-            reference=rows["per_primary"],
-            metric="crps",
-            where=pl.col(HEADLINE),
-            slice_table=table,
-        )
+    per_primary = metrics.reported_contrast_by_primary(
+        treatment=rows["pooled_A0"],
+        reference=rows["per_primary"],
+        metric="crps",
+        where=pl.col(HEADLINE),
+        slice_table=table,
     )
+    with pl.Config(tbl_rows=40, tbl_cols=20):
+        print("\n== per Primary, 95% (pooled A0 minus per-Primary plain) ==")
+        print(per_primary.select("label", "difference", "lower", "upper", "n_months"))
+    per_primary.write_parquet(OUT_DIR / "per_primary_contrast.parquet")
+    draw_figure(contrast=per_primary)
     gains = crps.filter(~pl.col("label").is_in(list(SHORT_HISTORY)))["gain"].sort(descending=True)
     total = float(gains.sum())
     print(
@@ -155,6 +166,67 @@ def main() -> None:
     countable = crps.filter(~pl.col("label").is_in(list(SHORT_HISTORY)))
     r = np.corrcoef(countable["gain"].to_numpy(), countable["history_months"].to_numpy())[0, 1]
     print(f"Correlation of the gain with months of history (14 Primaries): {r:+.2f}")
+
+
+def draw_figure(*, contrast: pl.DataFrame) -> None:
+    """Draw the per-Primary contrast with 95% intervals; negative favours the pooled network."""
+    import altair as alt
+    from plotting import ocf_theme as theme
+
+    order = contrast.sort("difference")["label"].to_list()
+    group = pl.col("label").replace_strict(
+        {
+            **dict.fromkeys(SIGNED, "Signed-MW six"),
+            **dict.fromkeys(MVA_ONLY, "MVA-only eight"),
+            **dict.fromkeys(SHORT_HISTORY, "Short history"),
+        }
+    )
+    data = contrast.with_columns(group=group).to_pandas()
+    domain = ["Signed-MW six", "MVA-only eight", "Short history"]
+    colour = alt.Color(
+        "group:N",
+        scale=alt.Scale(
+            domain=domain, range=[theme.DATA_BLUE, theme.BRAND_ORANGE, theme.DATA_PURPLE]
+        ),
+        legend=alt.Legend(title=None, orient="top", direction="horizontal"),
+    )
+    y = alt.Y("label:N", sort=order, title=None)
+    bars = (
+        alt.Chart(data)
+        .mark_rule(strokeWidth=2)
+        .encode(
+            y=y,
+            x=alt.X(
+                "lower:Q",
+                title="Pooled network minus per-Primary network, CRPS at days 1 to 10 (points of capacity; below zero favours the pooled network)",
+            ),
+            x2="upper:Q",
+            color=colour,
+        )
+    )
+    dots = (
+        alt.Chart(data)
+        .mark_point(filled=True, size=70)
+        .encode(y=y, x="difference:Q", color=colour, shape=alt.Shape("group:N", legend=None))
+    )
+    zero = (
+        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+        .mark_rule(strokeDash=[4, 4], color="grey")
+        .encode(x="x:Q")
+    )
+    chart = (bars + dots + zero).properties(
+        width=560,
+        height=330,
+        title=alt.TitleParams(
+            [
+                "Pooling gain at each Primary, five screen months (interim)",
+                "Dot: estimate. Line: 95% interval from resampling whole months. Dashed rule: no difference.",
+            ],
+            anchor="start",
+        ),
+    )
+    chart.save(FIGURE_DIR / "figure_1_pooling_gain.svg")
+    chart.save(OUT_DIR / "figure_1_pooling_gain.png", scale_factor=2)
 
 
 def history_months(*, series: pl.DataFrame, ctx: dict) -> dict[str, float]:
