@@ -31,7 +31,8 @@ prediction: >-
   months and the other 15 at full history, the contrast of the pooled network with the embedding
   minus the per-Primary network (also trained on the cut history) is less than 0.10 points below
   the same contrast at full history, at both groups (experiment 403 found no correlation between
-  gain and months of history, -0.02). P4: the per-Primary network at 3 months is at least 0.10 points
+  gain and months of history, -0.02). P4: the per-Primary network at 3 months is at least 0.10
+  points
   above its own full-history value at the signed-MW six. P5: the D15 and D18 start cut lowers the
   CRPS at D15 and D18 together (cut minus uncut below zero) for both the per-Primary and the pooled
   network, and moves the signed-MW six and MVA-only eight by less than 0.03 points.
@@ -63,7 +64,8 @@ best_arm: >-
 headline: >-
   A pooled network with no Primary input scores 0.574 points worse than the per-Primary network at
   the signed-MW six (95% interval +0.428 to +0.738), and the embedding turns that into a gain of
-  0.216 (-0.296 to -0.129). With only one Primary's history cut to 3 months, the pooled gain grows to
+  0.216 (-0.296 to -0.129). With only one Primary's history cut to 3 months, the pooled gain grows
+  to
   1.151 at the signed-MW six (-1.932 to -0.461) and 0.660 at the MVA-only eight (-1.067 to -0.253).
 lessons: >-
   The Primary embedding, not shared parameters, carries the pooling gain, and the gain is largest
@@ -93,12 +95,14 @@ advice:
 code: ml-experiments/00406-pooled-mixture-density-network-without-embedding-and-with-short-history/
 ---
 
-**Take-home message: the Primary embedding is what makes pooling work, and a pooled network helps most
+**Take-home message: the Primary embedding is what makes pooling work, and a pooled network helps
+most
 where one Primary has little history.** One pooled network with no Primary input scores 0.574 points
 of capacity worse than one network per Primary at the six signed-MW Primaries (95% interval +0.428
 to +0.738), so sharing parameters alone gives no gain. Adding the 8-wide Primary embedding turns
 that into a gain of 0.216 points (−0.296 to −0.129). **The pooling gain grows as one Primary's
-history shortens:** with only that Primary cut to 3 months, the pooled network beats the per-Primary
+history shortens:** with that Primary cut to 3 months (and 3 other Primaries cut with it), the
+pooled network beats the per-Primary
 network by 1.151 points at the signed-MW six (−1.932 to −0.461) and by 0.660 points at the MVA-only
 eight (−1.067 to −0.253). The verdict is `not supported`: the hypothesis that the gain comes from
 shared parameters and does not grow with short history failed on both counts. Every number comes
@@ -108,7 +112,8 @@ from five test months, so all are interim.
 
 ## Results
 
-CRPS at days 1 to 10, mean over Primaries with equal weight, in points of capacity (smaller is
+Continuous ranked probability score (CRPS) at days 1 to 10, mean over Primaries with equal weight,
+in points of capacity (smaller is
 better). All arms except the last two columns use the D15 and D18 start cut.
 
 | Group | Per-Primary | Pooled, embedding | Pooled, no embedding | Uncut per-Primary (397) | Uncut pooled (397) |
@@ -137,13 +142,15 @@ CRPS when one Primary's history is cut, by length of that history (signed-MW six
   network loses 0.083 (3.621 against 3.538).
 - **D15 and D18.** The pooled network gains 1.125 points over the per-Primary network at the full
   window (−2.346 to −0.230) and 0.368 at 3 months (−1.423 to +0.782). The interval at 3 months
-  spans zero, so the larger gain at D15 and D18 is not established.
+  spans zero, so the claim that the pooled gain grows with short history is not established at D15
+  and D18.
 - **Correlation of the gain with months of history** across the Primaries is −0.15 at
   the full window, −0.03 at 3 months, −0.17 at 6 months, and −0.11 at 12 months: no useful
   relation, as in experiment 403.
 - **Start cut (cut minus uncut).** Per-Primary network: +0.002 at the signed-MW six, −0.000 at the
   MVA-only eight, −0.300 at D15 and D18 (interval −1.200 to +0.264). Pooled network: +0.027
-  (+0.006 to +0.050), −0.046 (−0.076 to −0.012), and −0.192 (−0.304 to −0.109).
+  (+0.006 to +0.050) at the signed-MW six, −0.046 (−0.076 to −0.012) at the MVA-only eight, and
+  −0.192 (−0.304 to −0.109) at D15 and D18.
 
 ## Example forecasts
 
@@ -162,12 +169,14 @@ Primary) and D4 (an MVA-only Primary), from the full-window fits.
 
 - **P1 failed.** The no-embedding network is 0.574 points worse than the per-Primary network, not
   0.161 points better.
-- **P2 failed.** At the MVA-only eight it is 0.693 points worse, not 0.047 better.
+- **P2 failed.** At the MVA-only eight the no-embedding network is 0.693 points worse than the
+  per-Primary network, not 0.047 better.
 - **P3 failed.** At 3 months the pooled gain is 0.935 points larger than at the full window at the
   signed-MW six, and 0.544 larger at the MVA-only eight, against a limit of 0.10.
 - **P4 held.** The per-Primary network at 3 months is 1.765 points above its full-window value at
   the signed-MW six.
-- **P5 partly held.** The start cut lowers D15 and D18 for both networks. It moves the signed-MW six
+- **P5 partly held.** The start cut lowers the CRPS at D15 and D18 for both networks. The start cut
+  moves the signed-MW six
   and the MVA-only eight by under 0.03 points for the per-Primary network, but moves the pooled
   network's MVA-only eight by −0.046.
 
@@ -175,11 +184,12 @@ Primary) and D4 (an MVA-only Primary), from the full-window fits.
 
 - **No Primary input means no scale.** The target is each Primary's power over capacity,
   standardised by that Primary's training mean and standard deviation, so the no-embedding network
-  predicts a standardised value without any Primary-specific level or spread. This probably explains
-  most of its loss, and it means the arm tests "no learned Primary identity", not a network that
-  could be given static covariates in its place (the follow-on experiment 1c).
-- **The history test cuts one quarter of the Primaries per fit**, so 12 other Primaries keep full
-  history, rather than one Primary at a time.
+  predicts a standardised value without any Primary-specific level or spread. The missing level and spread probably explain most of the
+  no-embedding network's loss. The arm therefore tests "no learned Primary identity" and does not
+  test a network given static covariates in its place (the follow-on experiment 1c).
+- **Each pooled fit cuts the history of 4 of the 16 Primaries.** The other 12 keep full history, so
+  "one Primary's history" in this page means one of those 4 cut Primaries, scored only on its own
+  half-hours, and the plan's "other 15 at full history" became 12.
 - **Interim.** Five test months give wide intervals, most of all at D15 and D18.
 - **Unlogged load-shift events.** NGED says load-shift events may be missing from its logs, so the
   training rows and the scoring rows can hold events no label covers.
@@ -189,7 +199,8 @@ Primary) and D4 (an MVA-only Primary), from the full-window fits.
 
 ### Question and design
 
-**We split the pooling gain into two parts and test whether it depends on history length.** [Campagne
+**We split the pooling gain into two parts and test whether it depends on history length.**
+[Campagne
 et al. (2026)](https://doi.org/10.48550/arXiv.2610.35074) separate the gain from sharing parameters
 across sites from the gain from graph edges. [Experiment
 403](../00403-pooled-versus-per-primary-mixture-density-network/result.md) found that one pooled
