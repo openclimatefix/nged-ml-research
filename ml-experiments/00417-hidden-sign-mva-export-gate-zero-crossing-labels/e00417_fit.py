@@ -65,6 +65,7 @@ ARMS: Final[dict[str, Arm]] = {
     "A": Arm(mode="primary"),
     "AH": Arm(mode="primary+hi"),
     "C": Arm(labels=True),
+    "AHI": Arm(mode="primary+hi+day"),
 }
 for _name in list(ARMS):
     ARMS[f"{_name}-shuffle"] = Arm(mode=ARMS[_name].mode, labels=ARMS[_name].labels, shuffle_u=True)
@@ -89,6 +90,7 @@ class Prepared:
     label: np.ndarray
     gates: dict
     thresholds: np.ndarray | None
+    day_gate: gates.DayGate | None
     info: dict
 
 
@@ -97,23 +99,35 @@ def prepare(*, arm: Arm, fold: inputs.Fold, refit) -> Prepared:  # noqa: ANN001
     gate_map = gates.primary_gates(fold=fold) if arm.mode != "none" else {}
     thresholds = (
         gates.high_irradiance_thresholds(fold=fold, refit=refit, pair=fold.pair)
-        if arm.mode == "primary+hi"
+        if arm.mode.startswith("primary+hi")
         else None
     )
+    day_gate = gates.fit_day_gate(fold=fold, refit=refit) if arm.mode == "primary+hi+day" else None
     open_row = gates.open_mask(
         fold=fold,
         primary=fold.primary,
         gate_u=fold.gate_u,
         valid_us=fold.valid,
-        mode=arm.mode,
+        mode=arm.mode.replace("+day", ""),
         gates=gate_map,
         thresholds=thresholds,
     )
+    if day_gate is not None:
+        names = base.primaries()["site"].to_list()
+        for p, site in enumerate(names):
+            if fold.folded[p]:
+                sel = np.flatnonzero(fold.primary == p)
+                open_row[sel] &= gates.day_open_rows(
+                    gate=day_gate, site=site, valid_us=fold.valid[sel]
+                )
     info: dict = {
+        "day_gate": None
+        if day_gate is None
+        else {"threshold": day_gate.threshold, "n_visible_days": day_gate.n_visible_days},
         "gates": {
             s: {"open": g.open, "spearman": g.spearman, "p1_points": g.p1_points, "n": g.n_rows}
             for s, g in gate_map.items()
-        }
+        },
     }
     if arm.labels:
         label, label_info = gates.labels_for_fold(fold=fold, refit=refit)
@@ -121,7 +135,13 @@ def prepare(*, arm: Arm, fold: inputs.Fold, refit) -> Prepared:  # noqa: ANN001
     else:
         label = np.zeros(len(fold.y), dtype=np.int8)
     return Prepared(
-        fold=fold, open_row=open_row, label=label, gates=gate_map, thresholds=thresholds, info=info
+        fold=fold,
+        open_row=open_row,
+        label=label,
+        gates=gate_map,
+        thresholds=thresholds,
+        day_gate=day_gate,
+        info=info,
     )
 
 
@@ -250,10 +270,12 @@ def forecast_pair(
             primary=np.full(len(valid), p),
             gate_u=np.nan_to_num(u_gate),
             valid_us=valid,
-            mode=arm.mode,
+            mode=arm.mode.replace("+day", ""),
             gates=prep.gates,
             thresholds=prep.thresholds,
         )
+        if prep.day_gate is not None:
+            row_open &= gates.day_open_rows(gate=prep.day_gate, site=site, valid_us=valid)
         p_neg, qs = [], []
         with torch.no_grad():
             for s in range(0, len(x), SCORE_CHUNK_ROWS):

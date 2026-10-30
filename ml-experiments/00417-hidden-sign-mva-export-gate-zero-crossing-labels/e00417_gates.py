@@ -25,6 +25,7 @@ from typing import Final
 import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00405_pv as pv  # ty: ignore[unresolved-import]
+import e00417_diag_flip as flip
 import e00417_diagnostics as diag
 import e00417_inputs as inputs
 import numpy as np
@@ -197,3 +198,69 @@ def labels_for_fold(*, fold: inputs.Fold, refit) -> tuple[np.ndarray, dict]:  # 
             "reverse_rows": int((lab < 0).sum()),
         }
     return label, info
+
+
+# --- the day-level gate (design I) ------------------------------------------------------------
+
+
+@dataclass
+class DayGate:
+    """The whole-day flip gate: a threshold fitted on the visible signed Primaries, and profiles."""
+
+    threshold: float
+    profiles: dict[str, dict[int, float]]
+    window_lo: int
+    window_hi: int
+    setting: inputs.Setting
+    n_visible_days: int
+
+
+def fit_day_gate(*, fold: inputs.Fold, refit) -> DayGate:  # noqa: ANN001
+    """Fit the day gate's threshold on the visible signed Primaries' no-injection training days.
+
+    The threshold is the 95th percentile of the flip score over those days, so no hidden Primary
+    enters it. Each folded Primary's demand profile comes from its own training window.
+    """
+    window_lo = int((refit - timedelta(days=base.WINDOW_DAYS)).timestamp() * 1_000_000)
+    window_hi = int((refit - regimes.REFIT_CUTOFF_AGE).timestamp() * 1_000_000) + 1
+    placebo = inputs.Setting(0.0, fold.setting.q_points, fold.setting.power_factor)
+    visible = [s for s in inputs.SIGNED_SIX if s not in fold.pair]
+    scores = np.concatenate(
+        [
+            flip.day_scores(
+                t=diag.load_table(site=s, setting=placebo, start_us=window_lo, end_us=window_hi)
+            )["score"]
+            for s in visible
+        ]
+    )
+    profiles = {}
+    for row in base.primaries().iter_rows(named=True):
+        if fold.folded[row["primary"]]:
+            t = diag.load_table(
+                site=row["site"], setting=fold.setting, start_us=window_lo, end_us=window_hi
+            )
+            profiles[row["site"]] = flip.build_profile(t=t)
+    return DayGate(
+        threshold=float(np.percentile(scores, flip.CALIBRATION_PERCENTILE)),
+        profiles=profiles,
+        window_lo=window_lo,
+        window_hi=window_hi,
+        setting=fold.setting,
+        n_visible_days=len(scores),
+    )
+
+
+def day_open_rows(*, gate: DayGate, site: str, valid_us: np.ndarray) -> np.ndarray:
+    """Return, per row of one Primary, whether its day is flagged and its `u` is above the flip point."""
+    lo, hi = int(valid_us.min()) - inputs.US_PER_DAY, int(valid_us.max()) + inputs.US_PER_DAY
+    t = diag.load_table(site=site, setting=gate.setting, start_us=lo, end_us=hi)
+    sc = flip.day_scores(t=t, profile=gate.profiles[site])
+    flagged = {
+        int(d): float(u)
+        for d, s, u in zip(sc["day"], sc["score"], sc["flip_u"], strict=True)
+        if s > gate.threshold
+    }
+    u_rows, _k = inputs.cams_for_rows(site=site, valid_us=valid_us)
+    day = (valid_us - inputs.US_PER_HALF_HOUR) // inputs.US_PER_DAY
+    flip_u = np.array([flagged.get(int(d), np.inf) for d in day])
+    return np.nan_to_num(u_rows) >= flip_u

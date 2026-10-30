@@ -116,10 +116,10 @@ labels from the two daily times at which the flow passes through zero.
   a departure).
 - **Weather inputs are CAMS and ERA5 only, realised, in laboratory conditions; no ECMWF ENS.** CAMS
   gives the unit PV shape `u` and the clear-sky index `k` as in experiment 412. ERA5 gives
-  temperature at each Primary (`era5_features.parquet` of the stage 1 pilot, stamped every 30 minutes to 2026-07-31,
-  interpolated linearly to the half-hour's midpoint), the demand module's only weather input. ERA5 shortwave
-  serves only as a cross-check of CAMS in the diagnostics. The day-ahead behaviour of every design
-  stays untested.
+  temperature at each Primary (`era5_features.parquet` of the stage 1 pilot, stamped every 30
+  minutes to 2026-07-31, interpolated linearly to the half-hour's midpoint), the demand module's
+  only weather input. ERA5 shortwave serves only as a cross-check of CAMS in the diagnostics. The
+  day-ahead behaviour of every design stays untested.
 
 ## Code
 
@@ -163,8 +163,8 @@ The no-injection group is D5, D9, D11, D14, and D16, and D10 is reported on its 
 real reverse half-hours make it no clean placebo.
 
 - **C, the W-shape score.** On each sunny day, with `t0` the solar noon: the left minimum is the
-  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to
-  `t0 + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the smaller
+  smallest reading in `t0 - 5 h` to `t0 - 1 h`, the right minimum the smallest in `t0 + 1 h` to `t0
+  + 5 h`, and the centre maximum the largest in `t0 - 1 h` to `t0 + 1 h`. The score is the smaller
   of the two differences (centre maximum minus each minimum), in points of capacity. It is positive
   when the reading crosses zero twice and negative on a day with one smooth midday dip. The area
   under the curve compares injected days with no-injection days, per Primary and pooled. The
@@ -253,6 +253,40 @@ training rows gets a shut gate by default, and the row count is stored beside th
 bootstrap resamples injected and no-injection days separately although they are paired, and D10
 enters the injected pool only; the 1st-percentile branch of the gate does fire (at D5, D8, and D10,
 whose readings sit at the 2-point floor), contrary to an earlier reading of the plan.
+
+## Amendment 1 (2026-10-30): a day-level diagnostic, designs I and C merged
+
+**The maintainer, through the neural Discuss session, added design I, and an Opus review refined it
+and merged it with design C into one day-level zero-fit diagnostic** (`e00417_day_flip.py`, run in
+the first batch beside D and E). Design I as first written (a slope against raw irradiance on
+sunny half-hours) is superseded, because its clear-sky row filter removes the clouds and ordering by
+raw irradiance confounds the flip with the time of day.
+
+- **The refined score.** Per April-to-September day, on UTC-hour means: regress on the CAMS unit PV
+  shape `u` (not raw irradiance), keep hours with `0.1 <= u < 0.95`, and work on `e = r^2 - D^2`,
+  where `D` is a demand profile (the median reading by hour over overcast days of the same 28-day
+  block and day type, plus an ERA5-temperature term fitted on those days). On the morning limb and
+  on the afternoon limb separately, the score is the drop in residual sum of squares from the best
+  non-increasing fit of `e` on `u` to the best two-piece line with a positive upper slope, divided
+  by the two-piece sum of squares. The day's score is the smaller limb score, and a day with a daily
+  maximum `u` below 0.6 is ineligible.
+- **Threshold and truth.** A day is flagged above the 98th percentile of the other five signed
+  Primaries' no-injection day scores (leave one Primary out; in a fit, the visible four only). A day
+  is positive when at least 2 of its half-hours have signed `P' < 0`.
+- **Arms.** Level 2.0 at Q = 2 and Q = 4 points, level 1.0, level 2.0 at power factor 0.97, the
+  no-injection placebo, the shuffled sky, and a clipping arm with the injected farm capped at 70% of
+  its own peak. Two baselines: a day score from its mean midday residual alone (the level baseline),
+  and the shuffled sky. The Haurwitz clear-sky arm and the 2026-03 and 2026-06 test-month reports
+  of the Opus note are not run.
+- **Bar for a neural fit** (level 2.0, both Q settings): area under the curve at least 0.9, recall
+  at least 0.7 within a 2% false-flag limit at each of D5, D9, D11, D14, and D16, area under the
+  curve above the shuffled sky by at least 0.15 and above the level baseline by at least 0.05, and
+  row labels (a flagged day, with `u` at or above the day's breakpoint minus 0.05) at balanced
+  accuracy 0.85 with false-reverse at most 5%. Level 1.0 and power factor 0.97 are reported and
+  expected to fail. If the bar is met, arm `AHI` (S1c with design A's gate and the day gate
+  together, in place of the separate A-plus-H arm; 6 fits plus 2 at power factor 0.97) is fitted,
+  with the day flag reading the test days' observed readings (hindsight, a laboratory condition) and
+  never the signed truth. A fresh Sonnet reviewer reads the new code before any gate uses it.
 
 ## Departures from the design note
 

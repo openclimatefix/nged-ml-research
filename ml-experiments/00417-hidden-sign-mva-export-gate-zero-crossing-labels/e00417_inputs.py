@@ -97,12 +97,15 @@ class Setting:
     level: float
     q_points: float
     power_factor: float = 1.0
+    farm_cap: float = 1.0
+    """The injected farm is capped at this fraction of its own peak (1.0 means no cap)."""
 
     @property
     def tag(self) -> str:
         """Return a file-name tag."""
         pf = "" if self.power_factor == 1.0 else f"_PF{self.power_factor:g}"
-        return f"L{self.level:g}_Q{self.q_points:g}{pf}"
+        cap = "" if self.farm_cap == 1.0 else f"_CAP{self.farm_cap:g}"
+        return f"L{self.level:g}_Q{self.q_points:g}{pf}{cap}"
 
     @property
     def tan_phi(self) -> float:
@@ -144,8 +147,12 @@ def site_arrays(*, site: str, fold: bool, setting: Setting | None) -> SiteArrays
         farm = prep405.farm_norm_series(farm=FARM_OF_SITE[site])
         others = [prep405.farm_norm_series(farm=f) for f in sorted(set(FARM_OF_SITE.values()))]
 
+        peak = float(np.nanmax(farm[1]))
+
         def injected(*, times: np.ndarray) -> np.ndarray:
             values = prep405.farm_at(times_us=times, series=farm, placebo=False)
+            if setting.farm_cap < 1.0:
+                values = np.minimum(values, setting.farm_cap * peak)
             gap = np.zeros(len(times), dtype=bool)
             for other in others:
                 gap |= np.isnan(prep405.farm_at(times_us=times, series=other, placebo=False))
