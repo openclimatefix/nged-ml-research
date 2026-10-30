@@ -279,28 +279,31 @@ def build_fold(
             [x_std, doy_hour_inputs(x_raw=cat["x"][keep], valid_us=cat["valid"][keep])], axis=1
         )
     last_us = np.array([p5._us(t=refit - timedelta(days=1))])
-    return Fold(
-        x=x_std,
-        y=cat["y"][keep],
-        primary=cat["primary"][keep],
-        weight=weight[keep].astype(np.float32),
-        is_val=held[keep],
-        lead=cat["lead"][keep],
-        extras=cat["e"][keep],
-        year_cell=np.clip(
+    fields = {
+        "x": x_std,
+        "y": cat["y"][keep],
+        "primary": cat["primary"][keep],
+        "weight": weight[keep].astype(np.float32),
+        "is_val": held[keep],
+        "lead": cat["lead"][keep],
+        "extras": cat["e"][keep],
+        "year_cell": np.clip(
             pv.season_year_index(valid_us=cat["valid"][keep]), 0, p5.N_YEAR_CELLS - 1
         ),
-        month_cell=np.clip(pv.month_index(valid_us=cat["valid"][keep]), 0, p5.N_MONTH_CELLS - 1),
-        standardiser=standardiser,
-        keep=cols,
-        target_mean=target_mean,
-        target_std=target_std,
-        as_of_year_cell=int(
+        "month_cell": np.clip(pv.month_index(valid_us=cat["valid"][keep]), 0, p5.N_MONTH_CELLS - 1),
+        "standardiser": standardiser,
+        "keep": cols,
+        "target_mean": target_mean,
+        "target_std": target_std,
+        "as_of_year_cell": int(
             np.clip(pv.season_year_index(valid_us=last_us)[0], 0, p5.N_YEAR_CELLS - 1)
         ),
-        as_of_month_cell=int(np.clip(pv.month_index(valid_us=last_us)[0], 0, p5.N_MONTH_CELLS - 1)),
-        valid=cat["valid"][keep],
-    )
+        "as_of_month_cell": int(
+            np.clip(pv.month_index(valid_us=last_us)[0], 0, p5.N_MONTH_CELLS - 1)
+        ),
+        "valid": cat["valid"][keep],
+    }
+    return Fold(**fields)
 
 
 def main() -> None:

@@ -23,6 +23,7 @@ import e00403_rescore as r3  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.eval_protocol import metrics
+from studies.eval_protocol.metrics import ContrastInterval
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK: Final[Path] = (
@@ -79,8 +80,8 @@ def arm_frame(*, arm: str, seeds: tuple[int, ...]) -> pl.DataFrame:
     )
 
 
-def contrast_text(*, rows: dict, table: pl.DataFrame, a: str, b: str, sl: str) -> dict:
-    """Return the 95% month-block contrast of arm `a` minus arm `b` at the signed-MW six."""
+def contrast_text(*, rows: dict, table: pl.DataFrame, a: str, b: str, sl: str) -> ContrastInterval:
+    """Return the Bonferroni-level month-block contrast of arm `a` minus arm `b` at the signed-MW six."""
     where = pl.col("label").is_in(list(SIGNED)) & pl.col(sl) & pl.col("lead_days_1_10")
     return metrics.month_bootstrap_contrast(
         treatment=rows[a],

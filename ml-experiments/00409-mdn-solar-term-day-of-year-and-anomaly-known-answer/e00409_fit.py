@@ -58,7 +58,7 @@ def uses_doy(*, arm: str) -> bool:
 
 def fit_one(
     *, arm: str, fold: prep.Fold, refit: datetime, seed: int, device: str
-) -> tuple[object, int, float]:
+) -> tuple[m5.PvMdn, int, float]:
     """Fit one arm on a fold; return the network, its epochs, and its validation loss."""
     model = f5.make_model(arm=arm, fold=fold, table=base.primaries(), refit=refit, seed=seed)
     epochs, val = f5.train(model=model, arm=arm, fold=fold, seed=seed, device=device)

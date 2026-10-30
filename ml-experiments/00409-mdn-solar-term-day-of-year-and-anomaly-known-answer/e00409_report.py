@@ -75,7 +75,7 @@ def figure_contrasts() -> None:
     bars = (
         alt.Chart(data)
         .mark_rule(strokeWidth=2)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=y,
             x=alt.X(
                 "lower:Q",
@@ -87,12 +87,12 @@ def figure_contrasts() -> None:
         )
     )  # ty: ignore[unresolved-attribute]
     dots = (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=60)
         .encode(y=y, x="difference:Q", color=colour, yOffset="slice:N")
-    )  # ty: ignore[unresolved-attribute]
+    )
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 4], color="grey")
         .encode(x="x:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -227,7 +227,7 @@ def figure_capacity() -> pl.DataFrame:
     bars = (
         alt.Chart(data)
         .mark_rule(strokeWidth=2)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=y,
             x=alt.X("lo:Q", title="Solar capacity, 2025/26 season-year (MW AC)"),
             x2="hi:Q",
@@ -236,7 +236,7 @@ def figure_capacity() -> pl.DataFrame:
         )
     )  # ty: ignore[unresolved-attribute]
     dots = (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=50)
         .encode(y=y, x="mean:Q", color=colour, yOffset="arm:N")
     )  # ty: ignore[unresolved-attribute]
@@ -294,7 +294,7 @@ def figure_examples() -> None:
         )
         d["origin_label"] = d["origin"].dt.strftime("%Y-%m-%d")
         base = alt.Chart(d).encode(x=alt.X("valid_time:T", title=None))
-        c90 = base.mark_area(opacity=0.25).encode(
+        c90 = base.mark_area(opacity=0.25).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title="Net demand (MW; negative is export)"),
             y2="q95:Q",
             color=alt.Color(

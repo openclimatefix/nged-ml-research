@@ -145,7 +145,8 @@ def noise_check(*, bench: dict) -> dict:
 
 
 def recovery(*, arm: str, cond: str, site: str, denominators: dict) -> tuple[float, float]:
-    """Return a condition's seed-mean learned increment over the control, divided by `denominators`, and its SE."""
+    """Return a condition's seed-mean increment over the control,
+    divided by `denominators`, and its SE."""
     d = prep.WORK / "kat" / arm
 
     def caps(c: str) -> np.ndarray:
