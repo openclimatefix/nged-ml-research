@@ -132,7 +132,7 @@ Primary on the fold's training rows, as a 3-component Gaussian mixture (the head
   curves unidentified.
 - **D1, shape library only.** `mu = level + A_s * sum_i a_i shape_i(t) + yearly`. The design note
   says "plain MDN residual" and does not say what it reads. Without a response library the residual
-  has no other route to temperature, so in D1 the mixture reads all of D0's inputs and `mu`. D1 is
+  has no other route to temperature, so in D1 the mixture reads all of D0's inputs, the Primary embedding, and `mu`. D1 is
   therefore D0 plus a shape-library mean, not a restricted network.
 - **D2, shape and response libraries with the Primary mix** (the main arm), as above.
 - **D3, D2 with one fleet-wide mix.** The Primary embedding is removed everywhere: one set of mixing
@@ -178,7 +178,20 @@ check in the five-fold stage does.
 - **Checks** (the skill's audit triggers): the median minus the mean forecast per group, the mean
   forecast's error beside the quantile score, and which of the seven triggers fired.
 
+## Code review
+
+**A fresh Sonnet reviewer read the code before any fit.** It found no leakage and no blocker. Six
+findings were triaged: D1's mixture now reads the Primary embedding as D0's does (so D1 is D0 plus a
+shape-library mean); the gate exponent is clamped to plus or minus 3; D0's initial weights are seeded;
+the scorer's mean check is labelled in MW and uses the stored quantile weights; a guard rejects a
+reference temperature outside the input clip range. The sixth finding is accepted as a caveat below.
+
 ## Caveats
+
+- **The monotonicity check cannot fail.** Each curve is monotone by construction, so P5 and its stop
+  rule test the code, not the design.
+- **Shapes and the gate are normalised on 4,096 sampled training rows**, not on a grid of ordinary
+  days.
 
 - **Yearly harmonics are in D1 to D3 and not in D0.** A gain or loss of D2 against D0 therefore
   mixes the effect of the library design with the effect of the yearly harmonics. If D2 advances,
