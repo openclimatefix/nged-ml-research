@@ -52,10 +52,56 @@ metric: >-
   336 hours; headline band days 1 to 10.
 code: ml-experiments/00386-bsp-gsp-demand-v1-top-down-bg2-gam-simple-xgboost/
 stage_d_summary: >-
-  Monthly-refit XGBoost scores level with BG2 at the BSPs (+0.04, -0.03 to +0.10) and 0.28 worse at
-  the GSPs (+0.02 to +0.63); 381's input changes add nothing (+0.005 and +0.013, intervals include
-  zero); the stored BG2 already carries the 1.15 widening; both XGBoost arms beat the stack by
-  about 1.0 (BSPs) and 1.7 (GSPs).
+  Monthly-refit XGBoost scores 0.04 to 0.06 worse than BG2 at the bulk supply points (raw +0.04,
+  -0.03 to +0.10; widened +0.06, +0.02 to +0.11) and 0.26 to 0.28 worse at the grid supply points;
+  experiment 381's input changes add nothing in the pooled groups (+0.005 and +0.013, intervals
+  include zero); the stored BG2 has the interval width of a control widened by 1.15; both XGBoost
+  arms beat the stack by about 1.0 (BSPs) and 1.7 (GSPs).
+production_status: not-for-production
+adopted_in: none
+verdict: refuted
+best_arm: >-
+  BG2 (the weekly-refitted XGBoost model alone): CRPS 4.68 (D13), 7.06 (D17), 14.06 (D1), and
+  13.68 (D6) at days 1 to 10
+headline: >-
+  GAM stack minus BG2, days 1 to 10, CRPS in points of effective capacity: BSPs +1.02 (99%
+  interval +0.68 to +1.43), GSPs +2.01 (+1.41 to +2.60). The decision rule's margin was +0.20, so
+  the hypothesis is refuted for both groups. The stack scores level with the manual heuristic and
+  climatology (-0.04 and -0.33 at the BSPs, -0.34 and -0.37 at the GSPs, all intervals including
+  zero).
+take_home_message: >-
+  At the two bulk supply points and two grid supply points, the GAM stack fitted on each aggregate
+  reading does much worse than BG2 (the weekly XGBoost model), by 1.0 points at the bulk supply
+  points and 2.0 at the grid supply points, and scores about level with the manual heuristic and
+  climatology. The gap is largest on day 1 and shrinks with lead, which is consistent with the
+  stack lacking the recent-power input that BG2 has; this explanation is untested. Both forecasts have
+  tail errors: BG2's 5% quantile covers 2.8% to 4.4% of readings (too wide), and the stack's covers
+  5.5% to 10.4% (too narrow, most clearly at D1).
+lessons:
+  - >-
+    Days 1 to 10 gap to BG2 is smallest at D13 (+0.55) and largest at D1 (+2.54); the lower end of
+    D13's 95% interval (+0.11) is the only one below the +0.20 margin.
+  - >-
+    The gap falls from day 1 (+0.9 at D13, +2.4 at D17, +4.9 at D1, +1.6 at D6) to days 8 to 10
+    (+0.4, +0.9, +0.5, +1.3; falls least at D6), which fits the stack lacking a way to use recent
+    power. This explanation was read from the lead pattern and not tested with a fit.
+advice:
+  - >-
+    Do not add the daily mean shortwave, sunny flag, or 1-year half-life of experiment 381 to the
+    XGBoost model at bulk and grid supply points: pooled over each group they change the score by
+    at most +0.02 points, with intervals that include zero (stage D, bundle minus control).
+  - >-
+    Refit the XGBoost model weekly, not monthly, when scoring the grid supply points D1 and D6:
+    over days 1 to 10 monthly refits score 0.26 to 0.28 points worse than the stored weekly BG2
+    (stage D, control minus BG2).
+  - >-
+    Use BG2 (the weekly XGBoost model alone) as the forecast to beat at bulk and grid supply
+    points, and do not port the Primary substation GAM stack of experiment 377 to these series (C1,
+    C2).
+  - >-
+    Test whether a recent-power input closes the GAM stack's gap to BG2 on day 1 (up to 4.9 points
+    at D1, the "By lead" bullet and the lead-band table); the lead pattern is consistent with that
+    explanation but has not been tested.
 production_status: not-for-production
 adopted_in: none
 verdict: refuted
@@ -166,24 +212,29 @@ at all four.
 
 ## Stage D: a simple XGBoost model, refitted monthly
 
-**A plain XGBoost model refitted monthly scores level with BG2 at the bulk supply points and 0.28
-points worse at the grid supply points, and the input changes of experiment 381 add nothing at
-these series.** The control is experiment 87's `n1h` recipe (the BG2 weekly member) refitted
-monthly on the whole history with a 0.5-year half-life and 500 rounds. The bundle adds the daily
-mean shortwave, the sunny flag, and a 1-year half-life, as experiment 381's best bundle does.
-Experiment 381 has no forecasts at these four series, so both arms were refitted here (12 monthly
-refits per series, 2025-07-01 to 2026-06-01; boosters saved as `.ubj` files under
-`work/boosters/monthly/` in this experiment's private data folder). BG2 is the stored weekly
-refit of experiment 87, so a gap between the control and BG2 mixes the cadence with nothing else.
+**A plain XGBoost model refitted monthly scores 0.04 to 0.06 points worse than BG2 at the bulk
+supply points and 0.26 to 0.28 points worse at the grid supply points, and the input changes of
+experiment 381 add nothing in the pooled groups.** The control is experiment 87's `n1h` recipe (the
+BG2 weekly member) refitted monthly on the whole history with a 0.5-year half-life and 500 rounds.
+The bundle adds the daily mean shortwave, the sunny flag, and a 1-year half-life, as experiment
+381's best bundle does. Experiment 381 has no forecasts at these four series, so both arms were
+refitted here (12 monthly refits per series, 2025-07-01 to 2026-06-01; boosters saved as `.ubj`
+files under `work/boosters/monthly/` in this experiment's private data folder). BG2 is the stored
+weekly refit of experiment 87, so the control is meant to differ from BG2 in refit cadence only; the
+training rows, parameters, and half-life are experiment 87's code, which was not diffed against the
+stored BG2 run.
 
-- **Widening.** The stored BG2 already carries the spread factor 1.15: its mean 90% interval width
-  (q95 minus q05) is 158.5 MW against 137.9 MW for the raw control and 158.6 MW for the control
-  widened by 1.15. Experiment 381's stored bundle forecasts have no widening. Every XGBoost arm is
-  therefore scored raw and widened by 1.15 about the median (`_w`), and the widened arms are the
-  like-for-like comparison with BG2.
+- **Widening.** The stored BG2 has the width of a control widened by 1.15: its mean 90% interval
+  width (q95 minus q05) is 158.5 MW against 137.9 MW for the raw control and 158.6 MW for the
+  control widened by 1.15, which multiplies the distance of every quantile from the median by 1.15.
+  Experiment 87's code applies this factor to its headline arms, and experiment 381's fit script
+  does not. Every XGBoost arm is therefore scored raw and widened by 1.15 about the median (`_w`),
+  and the widened arms are the like-for-like comparison with BG2.
 - **Control minus BG2 (CRPS, days 1 to 10, 99%).** Raw: BSPs +0.04 (-0.03 to +0.10), GSPs +0.28
-  (+0.02 to +0.63). Widened: BSPs +0.06 (+0.02 to +0.11), GSPs +0.26 (+0.05 to +0.49). Monthly
-  refitting costs little at the BSPs and 0.26 to 0.28 points at the GSPs.
+(+0.02 to +0.63). Widened: BSPs +0.06 (+0.02 to +0.11), GSPs +0.26 (+0.05 to +0.49). Monthly
+refitting lowers the score by 0.04 to 0.06 points at the bulk supply points and by 0.26 to 0.28
+points at the grid supply points, over days 1 to 10 (days 11 to 14: +0.13 at the grid supply points,
+interval -0.02 to +0.30).
 - **Bundle minus control.** Raw: BSPs +0.005 (-0.057 to +0.064), GSPs +0.013 (-0.190 to +0.298).
   Widened: BSPs +0.006 (-0.051 to +0.061), GSPs +0.018 (-0.173 to +0.292). The three input changes
   do not help here.
@@ -195,19 +246,19 @@ refit of experiment 87, so a gap between the control and BG2 mixes the cadence w
   13.91, 13.80.
 - **Tails (widened control; widened bundle).** Coverage at q05 is 0.031, 0.040, 0.044, 0.050
   (control) and 0.031, 0.042, 0.046, 0.044 (bundle) for D13, D17, D1, D6; coverage at q95 is 0.924,
-  0.959, 0.952, 0.933 and 0.922, 0.964, 0.948, 0.934. These are within 0.006 of BG2's coverage, so
-  the lower tail is a little too wide at D13 and D17, as it is for BG2.
+0.959, 0.952, 0.933 and 0.922, 0.964, 0.948, 0.934. These coverages are within 0.006 of BG2's. The
+5% quantile covers fewer than 5% of readings at D13, D17, and D1, so the lower tail is a little too
+wide, as BG2's lower tail is.
 - **Days 11 to 14 (descriptive).** Control minus BG2 is +0.005 (BSPs) and +0.130 (GSPs); the
   bundle's gain over the control is again zero within the intervals.
-- **Cadence.** The control is refitted monthly, as the research rule now requires, and BG2 is
-  refitted weekly. A candidate that wins at monthly refits is re-checked weekly before any release
-  claim.
+- **Cadence.** The control is refitted monthly and BG2 is refitted weekly. A release claim for
+  either XGBoost arm would need a weekly refit.
 
 ## Lead bands and reverse flow
 
-**The stack's gap to BG2 shrinks with lead at all four series, and absolute scores rise, not fall,
-with aggregation.** CRPS in points of effective capacity on the shared half-hours of the scored
-year (stack, BG2, manual heuristic, climatology):
+**The stack's gap to BG2 shrinks with lead at all four series, and absolute scores are higher at the
+grid supply points than at the bulk supply points.** CRPS in points of effective capacity on the
+shared half-hours of the scored year (stack, BG2, manual heuristic, climatology):
 
 | Series | 0 to 24 h | 24 to 72 h | 72 to 168 h | 168 to 240 h |
 |---|---|---|---|---|
@@ -218,11 +269,13 @@ year (stack, BG2, manual heuristic, climatology):
 
 - **Gap to BG2, 0 to 24 h against 168 to 240 h.** D13 0.90 to 0.42; D17 2.39 to 0.93; D1 4.94 to
   0.53; D6 1.64 to 1.33.
-- **Reverse flow, as a proxy for embedded generation.** The data of this experiment holds no
-  embedded generation capacity. The share of scored-year half-hours with a negative reading is 50%
-  at D1 (GSP), 16% at D6 (GSP), 10% at D17 (BSP), and 3% at D13 (BSP). The lowest reading is -94
-  to -101 points of capacity at D1, D6, and D17, and -36 at D13. Reverse flow is more common at the
-  GSPs, but the share is not a measure of embedded capacity.
+- **Reverse flow, as a proxy for generation connected to the electricity network below each node.**
+  This experiment's data holds no capacity of that generation. Taking a negative reading to mean
+  power flowing out of the node (the sign convention is assumed, not checked here), the share of
+  scored-year half-hours with a negative reading is 50% at D1 (GSP), 16% at D6 (GSP), 10% at D17
+  (BSP), and 3% at D13 (BSP). The lowest reading is -94 to -101 points of capacity at D1, D6, and
+  D17, and -36 at D13. Reverse flow is more common at the grid supply points, but the share is not a
+  measure of generation capacity.
 
 ## Checks
 
