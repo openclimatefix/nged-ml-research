@@ -132,8 +132,8 @@ Primary on the fold's training rows, as a 3-component Gaussian mixture (the head
   curves unidentified.
 - **D1, shape library only.** `mu = level + A_s * sum_i a_i shape_i(t) + yearly`. The design note
   says "plain MDN residual" and does not say what it reads. Without a response library the residual
-  has no other route to temperature, so in D1 the mixture reads all of D0's inputs, the Primary embedding, and `mu`. D1 is
-  therefore D0 plus a shape-library mean, not a restricted network.
+  has no other route to temperature, so in D1 the mixture reads all of D0's inputs, the Primary
+  embedding, and `mu`. D1 is therefore D0 plus a shape-library mean, not a restricted network.
 - **D2, shape and response libraries with the Primary mix** (the main arm), as above.
 - **D3, D2 with one fleet-wide mix.** The Primary embedding is removed everywhere: one set of mixing
   weights, amplitudes, gate, and level for all 16 Primaries.
