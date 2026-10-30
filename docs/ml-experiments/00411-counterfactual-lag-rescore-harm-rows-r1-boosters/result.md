@@ -54,9 +54,8 @@ headline: >-
   batches 1 and 2 of experiment 404, but this sample cannot support that decision.
 lessons:
   - >-
-    The harness scores 15 of 184 events: 129 lie outside the reach of the 4 test refit months,
-    and the gap, sign, step, and bias filters remove 30 of the 55 within reach, and 10 more of
-    the 25 that pass produce no harm rows, so a harm-row result from it describes a small,
+    The harness scores 15 of 184 events. Only 36 events have a lag that a test forecast origin
+    reads, and 18 of those pass the event filters. A harm-row result from it describes a small,
     filtered set of events.
   - >-
     Replacing the readings inside an event with the stage-1 median plus a bias scored worse
@@ -126,19 +125,17 @@ The prediction for the six (a gain of 0.02 to 0.15) is not met. The prediction f
 
 **The harness scores 15 of the 184 corrected events.** Of the 78 events at the six, 9 are scored,
 and of the 88 at the eight, 6 are. The other 18 corrected events belong to D15 (6) and D18 (12),
-which are in neither group; one event at each is scored. Five Primaries (D9, D2, D4, D12, D19) have
-no scored event.
+which are in neither group, and the script was not run for them. Seven Primaries (D9, D2, D4, D12,
+D19, D15, and D18) have no scored event.
 
-**Correction made after merging, from experiment 414.** This page first said that 99 events were
-lost to gaps in the stage-1 median or the observed power. That count took the gap filter before the
-others, so it also counted events that no test month could reach. Experiment 414 re-counted in the
-order of the sweep. Of the 184 events:
-
-- **129** lie outside the reach of the 4 test refit months (2025-10, 2026-01, 2026-03, 2026-06), so
-  no sampled run has their lags. Of these, 96 also have a gap in the stage-1 median.
-- **3** are within reach but have a gap in the observed power, which no fill can repair.
-- **12 / 8 / 7** are within reach and fail the sign, step-share, and bias filters.
-- **25** pass every event filter, and 15 of those produce harm rows in the sampled runs.
+**Only 36 of the 184 events have a lag that any test forecast origin reads,** as experiment 414's
+audit counted them. A forecast origin reads lags up to about 7.1 days older than itself, and the 123
+daily origins of the 4 test refit months (2025-10, 2026-01, 2026-03, 2026-06) read none of the other
+148 events: 129 lie outside the span from the first to the last origin, and 19 fall in the untested
+months between refits. Of the 99 events with a gap in the stage-1 median, 96 are among the 148. The
+36 events that are read divide into 2 with a gap in the observed power, 6 that fail the sign filter,
+7 that fail the step-share filter, 3 that fail the bias filter, and 18 that pass every event filter.
+The 15 scored events are among the 18.
 
 ## Checks
 
@@ -156,9 +153,10 @@ order of the sweep. Of the 184 events:
       batches 1 and 2 on this number.
 - **Audit:** a fresh Sonnet agent re-derived every number in the results table from the per-row
   scores and agreed. It found no duplicated rows and no missing scores, ran the leave-one-out
-  checks, and counted the events lost to each filter. Its bootstrap, with a different seed, gave
+  checks. Its bootstrap, with a different seed, gave
   intervals within 0.2 of the ones reported, a spread that is unsurprising with 9 and 6 clusters.
-  All its findings are in the sections above, none rejected.
+  Its findings are in the sections above. Its event counts were superseded by the lag-reach
+  count in "Why the sample is small".
 
 ## Caveats
 
