@@ -95,6 +95,23 @@ history is short.
 - **Controls without the cut.** Experiment 397's `plain_own` and `plain_pooled` forecasts, read
   and never written, give contrast C5. They are the same networks without the start cut.
 
+## Components adopted from earlier results
+
+- **Adopted.** One pooled network with a Primary embedding ([experiment
+  403](../00403-pooled-versus-per-primary-mixture-density-network/result.md): it scored lower than
+  per-Primary networks); the ensemble mean and spread passed through the network once ([experiment
+  397](../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md): within
+  0.05 points of 51 passes; [experiment
+  394](../00394-xgboost-ensemble-mean-and-std-columns-separately/result.md) found the mean carries
+  most of the gain); the half-life of 0.5 years and monthly refits of the XGBoost member; the
+  1.15 widening of experiments 389 and 397; and the D15 and D18 start cut of experiment 399. Every
+  arm of this experiment is therefore one-pass and cut, and the arm names say what changed.
+- **Not adopted.** Attention over input groups ([experiment
+  397](../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md): the gate
+  stayed within 0.01 of uniform), which survives only as the `a0` arm that redoes experiment 403's
+  contrast; and dropping the spread columns, which experiment 394 suggests is harmless but which no
+  arm here tests.
+
 ## Standing practices followed, and the deviation
 
 - **Followed.** Monthly refits; the D15 and D18 start cut; every fitted network saved in the
