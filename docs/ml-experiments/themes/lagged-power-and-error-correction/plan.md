@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 400 | Does a smooth blend of the forecast with power lags and the forecast without them, weighted by lag surprise, beat the forecast with lags around load shifts at no cost elsewhere? | High (maintainer approved 2026-10-30) | Nothing | Planned |
 
 ## Planned experiments
 
