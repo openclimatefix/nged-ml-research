@@ -23,7 +23,7 @@ from typing import Final
 import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00377_score as base  # ty: ignore[unresolved-import]
 import e00381_score as s381  # ty: ignore[unresolved-import]
-import e00400_blend as blend
+import e00400_blend as blend  # ty: ignore[unresolved-import]
 import e00400_report as r400  # ty: ignore[unresolved-import]
 import e00401_arms as arms
 import e00401_score as score

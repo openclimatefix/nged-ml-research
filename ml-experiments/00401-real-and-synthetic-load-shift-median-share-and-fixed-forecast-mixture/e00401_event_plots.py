@@ -23,7 +23,7 @@ from typing import Final
 
 import altair as alt
 import e00087_common as common  # ty: ignore[unresolved-import]
-import e00400_blend as blend
+import e00400_blend as blend  # ty: ignore[unresolved-import]
 import e00401_arms as arms
 import e00401_events as ev
 import plotting.ocf_theme as ocf

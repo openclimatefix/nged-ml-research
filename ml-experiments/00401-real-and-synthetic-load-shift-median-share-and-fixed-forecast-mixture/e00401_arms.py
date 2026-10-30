@@ -25,8 +25,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
-import e00400_blend as blend
-import e00400_mixture as mix
+import e00400_blend as blend  # ty: ignore[unresolved-import]
+import e00400_mixture as mix  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.eval_protocol.metrics import QUANTILE_COLUMNS

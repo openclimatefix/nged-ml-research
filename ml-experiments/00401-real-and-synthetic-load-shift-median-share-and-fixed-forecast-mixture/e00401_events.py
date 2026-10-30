@@ -14,7 +14,7 @@ import re
 from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
-import e00400_blend as blend
+import e00400_blend as blend  # ty: ignore[unresolved-import]
 import e00400_partf as pf  # ty: ignore[unresolved-import]
 import polars as pl
 
