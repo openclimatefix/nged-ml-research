@@ -93,9 +93,7 @@ def split_profile_anomaly(
     The mean ignores gaps (NaN). Each month's anomaly therefore has zero mean at every half-hour.
     """
     t, v = series
-    frame = _cell_keys(times_us=t).with_columns(
-        v=pl.Series(v, dtype=pl.Float64).fill_nan(None)
-    )
+    frame = _cell_keys(times_us=t).with_columns(v=pl.Series(v, dtype=pl.Float64).fill_nan(None))
     frame = frame.with_columns(profile=pl.col("v").mean().over(["ym", "hh"]))
     profile = frame["profile"].fill_null(0.0).to_numpy()
     anomaly = np.where(np.isnan(v), np.nan, v - profile)
@@ -234,7 +232,7 @@ def build_fold(
             continue
         x = z["x"][keep].copy()
         y = z["y"][keep].astype(np.float32).copy()
-        if injection is not None and injection != "control" and row["site"] in pv.SIGNED_SITES:
+        if injection is not None and row["site"] in pv.SIGNED_SITES:
             inj = np.load(INJ_DIR / injection / f"{row['site']}.npz")
             y = inj["y"][keep]
             for j, tag in enumerate(("origin", "day", "week")):
@@ -242,9 +240,6 @@ def build_fold(
                 x[np.isnan(x[:, p5.col(name=f"lag_{tag}")]), p5.col(name=f"lag_{tag}_missing")] = (
                     1.0
                 )
-        elif injection == "control" and row["site"] in pv.SIGNED_SITES:
-            inj = np.load(INJ_DIR / "control" / f"{row['site']}.npz")
-            y = inj["y"][keep]
         p5.mask_short_history_lags(x=x, valid_us=valid[keep], site=row["site"])
         usable = np.isfinite(y)
         e = np.load(p5.EXTRAS_DIR / f"{row['site']}.npz")["e"][keep]

@@ -235,4 +235,13 @@ the gate is declared uninformative (not failed) and the page says so.
   on the fit's rows, the lag route stated, one-factor contrasts, and descriptive rules. Point 9 is
   noted: the profile comes from the test period, which gives the network no information it could
   not learn.
-- **To be filled in:** code review before the first fit, results review, write-up review.
+- **Code review before the first fit (fresh Sonnet).** Found two high, two medium, four low points.
+  Fixed: the noise check read the wrong file names; the control fold kept raw lags while every
+  other condition had gap lags set to missing (the control now goes through the injection path);
+  the read-out included the early-stopping weeks (now excluded); the placebo benchmark now drops
+  gap rows as the real placebo does; the `pos_profile` rule uses the absolute value; each fold is
+  freed after use. Noted, not changed: the `pos_anomaly` control averages the ensemble unit shape
+  over origins, so its recovery at long lead may miss for reasons unrelated to the network (the
+  read-out uses the row's own shape, which partly corrects it); the score stage and its
+  day-of-year inference inputs are added only if the gate holds.
+- **To be filled in:** results review, write-up review.

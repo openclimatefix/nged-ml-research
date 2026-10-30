@@ -71,6 +71,7 @@ def compute_ls() -> dict:
                 (fold.primary == p)
                 & (fold.year_cell == fold.as_of_year_cell)
                 & (fold.extras[:, 0] > 0)
+                & ~fold.is_val
             )
             d = (control.y - fold.y)[sel] / 1.0
             est, se = ls_readout(
@@ -81,6 +82,7 @@ def compute_ls() -> dict:
                 day=fold.valid[sel] // prep.DAY_US,
             )
             out.setdefault(cond, {})[site] = {"ls_mw": est, "ls_se": se, "rows": int(sel.sum())}
+        del fold
     out["placebo_shuffles"] = shuffle_benchmarks(control=control, table=table)
     return out
 
@@ -101,6 +103,7 @@ def shuffle_benchmarks(*, control: prep.Fold, table: base.pl.DataFrame) -> dict:
                     (control.primary == p)
                     & (control.year_cell == control.as_of_year_cell)
                     & (control.extras[:, 0] > 0)
+                    & ~control.is_val
                 )
                 f = prep.series_at(times_us=control.valid[sel], series=series, shuffle_salt=salt)
                 inc = (
@@ -108,13 +111,14 @@ def shuffle_benchmarks(*, control: prep.Fold, table: base.pl.DataFrame) -> dict:
                     * p5.studies_capacity_2025(site=site)
                     / float(row["effective_capacity_mw"])
                 )
-                d = np.nan_to_num(f) * inc
+                ok = ~np.isnan(f)
+                d = f[ok] * inc
                 est, _ = ls_readout(
                     d=d,
-                    u=control.extras[sel, 0],
-                    w=control.weight[sel],
+                    u=control.extras[sel, 0][ok],
+                    w=control.weight[sel][ok],
                     eff=float(row["effective_capacity_mw"]),
-                    day=control.valid[sel] // prep.DAY_US,
+                    day=control.valid[sel][ok] // prep.DAY_US,
                 )
                 out.setdefault(kind, {}).setdefault(site, []).append(est)
     return out
@@ -129,7 +133,7 @@ def noise_check(*, bench: dict) -> dict:
             r = json.loads((OLD_KAT / f"{cond}_s{s}.json").read_text())
             return r["capacity_mw"][site][r["as_of_year_cell"]]
 
-        diffs = [cap("farmC_share050", s) - cap("farmC_share000", s) for s in range(3)]
+        diffs = [cap("held", s) - cap("control", s) for s in range(3)]
         sd_mw = float(np.std(diffs, ddof=1))
         ls = bench["held_anomaly"][site]["ls_mw"]
         out[site] = {
@@ -202,7 +206,7 @@ def gates(*, bench: dict) -> dict:
     }
     res["gates"] = {
         "K0_pos_anomaly_in_0.8_1.2_at_4": sum(0.8 <= v <= 1.2 for v in pos_a.values()) >= 4,
-        "K0_pos_profile_at_most_0.30_at_4": sum(v <= 0.30 for v in pos_p.values()) >= 4,
+        "K0_pos_profile_at_most_0.30_at_4": sum(abs(v) <= 0.30 for v in pos_p.values()) >= 4,
         "K1_band_at_4": sum(k1_band) >= 4,
         "K1_separation_at_4": sum(k1_sep) >= 4,
         "K2_median_excess_le_0.20": bool(np.median(excess) <= 0.20),
