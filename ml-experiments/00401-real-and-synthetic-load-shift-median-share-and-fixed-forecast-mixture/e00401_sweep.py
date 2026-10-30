@@ -1,17 +1,19 @@
 """Experiment 401, Job 1, synthetic arm: matched-event injection into clean runs, b0 boosters.
 
 Prediction only, as in experiment 395's Part E (copied: that experiment is unmerged). For each
-Primary and each monthly b0 booster of experiment 391 (refit months October, December, February, April, and June of the scored year), one
-clean forecast run (the 15th of the refit month) is predicted again with a step of each real event's
-corrected signed depth at that Primary (as a fraction of capacity) added to the `k` newest
-lagged-power inputs (k = 1, 2, 3). The actual reading is stored unshifted; the observed share
-(`(q50 shifted - actual) / depth`) is the Part H share for an actual reading shifted by the depth. Clean rows: finite actual, not flagged
-by experiment 391's event masks, no lag flagged; lead under 240 hours. Output per Primary: one row
-per (event, k, month, valid time) with the median shift and both share definitions.
+Primary and each monthly b0 booster of experiment 391 (refit months October, December, February,
+April, and June of the scored year), one clean forecast run (the 15th of the refit month) is
+predicted again with a step of each real event's corrected signed depth at that Primary (as a
+fraction of capacity) added to the `k` newest lagged-power inputs (k = 1, 2, 3). The actual reading
+is stored unshifted; the observed share (`(q50 shifted - actual) / depth`) is the Part H share for
+an actual reading shifted by the depth. Clean rows: finite actual, not flagged by experiment 391's
+event masks, no lag flagged; lead under 240 hours. Output per Primary: one row per (event, k, month,
+valid time) with the median shift and both share definitions.
 
 ```bash
-PYTHONPATH=<as in e00401_score.py> DATA_PATH_INTERNAL=... systemd-run --user --scope -p MemoryMax=6G \
-    -p OOMPolicy=continue uv run --no-sync python ml-experiments/00401-*/e00401_sweep.py run [D5 ...]
+PYTHONPATH=<as in e00401_score.py> DATA_PATH_INTERNAL=... \
+    systemd-run --user --scope -p MemoryMax=6G -p OOMPolicy=continue \
+    uv run --no-sync python ml-experiments/00401-*/e00401_sweep.py run [D5 ...]
 ```
 """
 # ruff: noqa: E501
