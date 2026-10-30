@@ -152,6 +152,11 @@ code: ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/
   reading, the median, and the 90% band of the forecast with lags, the forecast without lags, and
   each gate's blend. Plots follow the `dataviz` skill. Generators are not involved (demand series
   only), so no anonymisation is needed.
+- **Caveat: unlabelled events (relayed 2026-10-30).** NGED says load-shift events may be missing
+  from their logs (one on 2022-01-12 is not in the label table). Clean-lag rows and clean training
+  periods can therefore contain events that no label covers. The harm table's baseline (clean-lag
+  rows) is optimistic, and the real-event slices undercount events. Every write-up repeats this
+  caveat. Injected events stay the main training signal because they need no logs.
 - **Pre-registered contrasts (step 5).** Each of arms (c), (d), (e), and the logistic baseline
   minus the forecast with lags, minus the fitted constant mixture, and minus the forecast without
   lags, on (i) rows whose target is outside every event and whose lags touch one, by number of lags,
