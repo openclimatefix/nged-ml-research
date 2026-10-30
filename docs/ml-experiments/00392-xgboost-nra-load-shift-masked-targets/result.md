@@ -206,8 +206,12 @@ experiment 103's `rows.parquet`, which has no `drop_reason` filter, enters only 
 masks and the scoring actuals (experiment 377's `actuals_and_context`). About 622 flagged
 exact-zero Primary half-hours (the manager's figure, to be re-counted here) therefore sit in the
 scored actuals, identically for every arm, so contrasts between arms are like-for-like while
-absolute scores include them. The scorer may read experiment 87's observed power instead; the
-decision is awaited from the XGBoost Discuss session or the maintainer, and the merge waits for it.
+absolute scores include them. **The scorer takes the actuals source as a parameter and reports both:**
+the headline uses experiment 381's actuals (experiment 377's `actuals_and_context`), so the numbers
+stay comparable; the check column uses experiment 87's `observed.parquet`, with the flagged
+half-hours dropped from every arm (the same rows for all arms) and the count of dropped half-hours
+reported per fold and per Primary. Which source becomes the standard is the maintainer's choice, via
+the XGBoost Discuss session, and the merge waits for it.
 
 ## Open items
 
