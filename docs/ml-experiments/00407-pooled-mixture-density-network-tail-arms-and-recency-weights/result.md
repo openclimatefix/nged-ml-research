@@ -194,7 +194,8 @@ On sunny low-demand half-hours (15,151 per arm) the raw neural networks already 
 | uncut_pooled_plain | 0.009 | 0.051 | 0.977 | 0.997 | 0.161 | 0.608 | 0.871 | 0.237 |
 | pooled_plain_cut_406 | 0.009 | 0.048 | 0.980 | 0.997 | 0.164 | 0.625 | 0.876 | 0.238 |
 
-- **MVA-only eight and D15 and D18** show a smaller (MVA-only eight) or similar (D15 and D18) shortfall; their tables
+- **MVA-only eight and D15 and D18** show a smaller (MVA-only eight) or similar (D15 and D18) shortfall;
+  their tables
   are in the logs `rescore_a.log`, `rescore_b.log`, and `rescore_c.log` of the private data folder.
   For example,
   `ctrl_w115` covers 0.944 at q95 and 0.988 at q99 across the MVA-only eight.
