@@ -43,6 +43,11 @@ SEED_397: Final[Path] = (
     / "seed_preds"
     / "summary"
 )
+FLAGGED_KEYS: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00398-load-shift-event-rescore-without-flagged-zero-actuals"
+    / "flagged_keys.parquet"
+)
 MONTHS: Final[tuple[str, ...]] = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 HISTORIES: Final[tuple[int, ...]] = (3, 6, 12)
 N_SEEDS: Final[int] = 3
@@ -158,6 +163,10 @@ def main() -> None:
     """Print the absolute table, the contrasts, and the gain against history length."""
     series = adapter.series_table()
     ctx = s381.build_context(series=series)
+    flagged = pl.read_parquet(FLAGGED_KEYS).select("time_series_id", "valid_time")
+    before = ctx["actuals"].height
+    ctx["actuals"] = ctx["actuals"].join(flagged, on=["time_series_id", "valid_time"], how="anti")
+    print(f"scoring actuals dropped for a flagged exact zero: {before - ctx['actuals'].height}")
     available = {n: d for n, d in ARM_DIRS.items() if is_complete(arm_dir=d)}
     print("arms found:", ", ".join(available))
     frames = {

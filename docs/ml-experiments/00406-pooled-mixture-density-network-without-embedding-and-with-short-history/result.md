@@ -95,6 +95,18 @@ history is short.
 - **Controls without the cut.** Experiment 397's `plain_own` and `plain_pooled` forecasts, read
   and never written, give contrast C5. They are the same networks without the start cut.
 
+## Standing practices followed, and the deviation
+
+- **Followed.** Monthly refits; the D15 and D18 start cut; every fitted network saved in the
+  private data folder; stored forecasts reused as references and never refitted; a few-fold screen
+  with every number labelled interim; example forecast charts; a fresh Sonnet code review before
+  the first fit. The scorer drops the half-hours that the cleaned power table flags as exact zeros
+  (`substation_zero`) from the actuals of every arm, and prints how many.
+- **Departure: the training rows are not cleaned of flagged zeros.** The fits started before the
+  cleaning rule was issued, and these arms must share their rows with experiment 397's networks to
+  isolate the embedding and the history length. Experiment 398 found that dropping the flagged
+  half-hours moved the CRPS by at most 0.008 points in four earlier experiments.
+
 ## Fit counts, time, and memory
 
 - **Fits.** `pooled_noemb`, `pooled_emb`, and `per_primary` at the full window: 3 arms by 5 folds by
