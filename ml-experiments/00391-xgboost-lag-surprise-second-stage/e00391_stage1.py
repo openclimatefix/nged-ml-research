@@ -201,8 +201,7 @@ def run_job(*, version: str, site: str, nthread: int, rounds: int, seed: int, sm
         window = rows.filter((pl.col("valid_time") >= refit) & (pl.col("valid_time") < following))
         target = latest_origin_rows(rows=window)
         if known.height < HALF_HOURS_PER_MONTH_FLOOR or target.is_empty():
-            msg = f"{site} {version} {refit}: {known.height} known rows, {target.height} targets"
-            raise ValueError(msg)
+            continue  # a short-history Primary has no stage 1 fit yet; its surprise stays missing
         if (known["valid_time"].max() > refit) or (target["valid_time"].min() < refit):
             msg = "a stage 1 fit would see a row at or after its refit"
             raise ValueError(msg)
@@ -218,6 +217,9 @@ def run_job(*, version: str, site: str, nthread: int, rounds: int, seed: int, sm
                 seed=seed,
             )
         )
+    if not pieces:
+        msg = f"{site} {version}: no refit had enough training rows"
+        raise ValueError(msg)
     common.atomic_write(frame=pl.concat(pieces), target=target_path)
     half_hours = sum(p.height for p in pieces)
     return f"{version} {site}: {half_hours:,} half-hours, {time.monotonic() - started:.0f} s"
