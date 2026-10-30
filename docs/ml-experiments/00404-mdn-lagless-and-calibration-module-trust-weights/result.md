@@ -261,6 +261,12 @@ depths and durations come from the table's real events, so the test distribution
 generator's distributions even though the real events never enter training; the write-up states
 this.
 
+**Caveat on unlabelled events (carried into every write-up).** NGED says load-shift events may be
+missing from its logs. The clean-lag rows and the clean training periods can therefore contain
+events that no label covers. The harm table's clean-lag baseline is then optimistic, and the
+real-event slices undercount the rows whose lags lie inside an event. Injected events stay the main
+training signal because they need no logs.
+
 **Real events are a held-out test only.** The label table's events never enter training. The
 write-up reports the real-event count per fold and excludes folds without label coverage from the
 harm rows.
