@@ -348,10 +348,12 @@ harm rows.
 - **Loss outside events** and the overall five-fold CRPS, per Primary.
 - **Tails.** Coverage and pinball loss at q01, q05, q95, and q99, raw and at the 1.15 widening,
   beside every headline score.
-- **Example forecast plots (maintainer rule, 2026-10-30).** At least two plots of a probabilistic
-  forecast against the actuals: one day-ahead forecast, and one full 14-day horizon of a single
-  forecast, where the bands widen with the horizon. Each shows the actuals, the median, and the 90%
-  band for B1 and the reference arms.
+- **Example forecast plots (maintainer rule, 2026-10-30).** Example time series charts of
+  probabilistic forecasts against the actuals: one day-ahead forecast, and one full 14-day horizon
+  of a single forecast, with bands that widen with the horizon. Both are shown for one signed-MW
+  Primary and one MVA-only Primary (4 charts), and one further chart shows a real load-shift event.
+  Each shows the actuals, the median, and the 90% band for B1 and the reference arms. Substations
+  are not covered by the anonymisation rule, and no metered generator's series appears here.
 - **Event time-series plots (maintainer rule, 2026-10-30).** At least 6 plots, covering both
   metering groups (at least 3 from the signed-MW six and 3 from the MVA-only eight), each marking
   when the event starts and ends and showing the actual power, the median forecast, the 90% band
