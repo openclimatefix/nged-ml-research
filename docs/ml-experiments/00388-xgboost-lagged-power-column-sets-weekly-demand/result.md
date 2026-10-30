@@ -95,6 +95,17 @@ is at least 3.5 hours older than the forecast origin; otherwise it is null.
   The 4-week window is a choice, not a tested value.
 - **D, B plus C.** Fitted only if C2 and C3 each help alone (see the decision rule).
 
+## Change of cadence to monthly refits (decided before any arm was scored)
+
+The maintainer asked for monthly refits in most research. The headline contrasts are therefore
+monthly: arms a, b, and c refitted on the 1st of each month from 2025-07-01 to 2026-06-01 (192 fits
+per arm), against experiment 381's stored monthly control, which has experiment 87's `n1h`
+recipe with no changes (the same columns, 500 rounds, `eta` 0.05, half-life 0.5 years, column
+subsampling 1.0). The weekly baseline and weekly arm a (832 fits each) were finished first and give
+a descriptive cadence check beside the monthly contrast. Weekly arm b is partial (384 of 832 fits)
+and weekly arm c was not fitted, so neither is scored. Arm d is fitted only if b and c each help
+alone at monthly refits. The decision rule above applies to the monthly contrasts.
+
 ## Lag-encroachment sweep (requested by the manager, rule fixed before any score is read)
 
 After the main fits, the baseline and arms a, b, and c are refitted once more at the latest weekly

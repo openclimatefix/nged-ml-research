@@ -1,9 +1,10 @@
 """Refit experiment 87's weekly XGBoost demand member with extra lagged-power columns (388).
 
 Each arm refits the `n1h` configuration of experiment 87 (the BG2 weekly member) at the weekly
-refit times, for the chosen series, with experiment 87's training rows, parameters, and leakage
-checks (its `e00087_fit_demand` module). It writes the 11 quantiles per daily run to
-`work/arm_preds/weekly/<arm>/<site>_s<seed>_<refit>.parquet`. `colsample_bytree` and
+refit times (or the monthly refit times with `--regime monthly`), for the chosen series, with
+experiment 87's training rows, parameters, and leakage checks (its `e00087_fit_demand` module).
+It writes the 11 quantiles per daily run to
+`work/arm_preds/<regime>/<arm>/<site>_s<seed>_<refit>.parquet`. `colsample_bytree` and
 `colsample_bynode` stay at 1.0 in every arm.
 
 A lagged-power column is usable only when its meter reading is at least 3.5 hours older than the
@@ -223,6 +224,7 @@ def main() -> None:
     """Fit the requested arms at the weekly refits."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arms", nargs="+", required=True, choices=sorted(ARMS))
+    parser.add_argument("--regime", choices=("weekly", "monthly"), default="weekly")
     parser.add_argument("--sites", nargs="+", default=None, help="default: all Primaries")
     parser.add_argument(
         "--refit-stride", type=int, default=1, help="keep every n-th refit (the gate uses 13)"
@@ -234,13 +236,13 @@ def main() -> None:
     args = parser.parse_args()
     series = common.series_table()
     sites = args.sites or series.filter(pl.col("substation_type") == "Primary")["site"].to_list()
-    jobs = regimes.jobs_for(regime_names=("weekly",), origins=common.all_origins())
+    jobs = regimes.jobs_for(regime_names=(args.regime,), origins=common.all_origins())
     jobs = dict(sorted(jobs.items())[:: args.refit_stride])
-    rounds, out = common.N_ROUNDS, ARM_DIR / "weekly"
+    rounds, out = common.N_ROUNDS, ARM_DIR / args.regime
     if args.smoke:
         jobs = {r: runs[:3] for r, runs in list(jobs.items())[:2]}
         rounds = SMOKE_ROUNDS
-        out = WORK_DIR / "arm_preds_smoke" / "weekly"
+        out = WORK_DIR / "arm_preds_smoke" / args.regime
     nthread = max(1, args.cores // args.workers)
     started = time.monotonic()
     with ProcessPoolExecutor(
