@@ -121,7 +121,9 @@ class Profile:
 def build_profile(*, h: Hourly) -> Profile:
     """Return the overcast-day profile of a window."""
     daylight = h.u > 0.01
-    frame = pl.DataFrame({"d": h.day, "k": np.where(daylight, h.k, np.nan), "u": h.u})
+    frame = pl.DataFrame({"d": h.day, "k": np.where(daylight, h.k, np.nan), "u": h.u}).with_columns(
+        pl.col("k").fill_nan(None)
+    )
     daily = frame.group_by("d").agg(
         pl.col("k").mean().alias("mk"), (pl.col("u") > 0.01).sum().alias("nd")
     )
