@@ -197,6 +197,19 @@ per process, `MemoryMax=16G`, spawn start method. Fit counts: 5 arms (R0, R1, R2
 forms, each with 12 to 14 monthly refits at 16 Primaries, plus injected-transfer refits for 10
 Primaries. The manager sizes the slot from these counts.
 
+## Caveat: flagged exact-zero half-hours (manager, 2026-10-30)
+
+The scoring actuals of this experiment come from the feature cache, which is built from experiment
+103's `rows.parquet` without the `drop_reason` filter. About 622 flagged exact-zero Primary
+half-hours therefore sit in the scored year (figure from the manager; to be re-counted here). Every
+arm trains on experiment 87's own training rows, the same rows for all arms and for experiment 381's
+stored control, so contrasts between arms are like-for-like, but absolute scores include those
+half-hours. The training rows are not changed here, because that would break the reuse of 381's
+control as R0 lagged. Whether experiment 87's training frames carry the flagged rows is unresolved:
+experiment 388 says its training reads experiment 87's own frames, which differs from the finding
+above. The filtered file or rule is awaited from the XGBoost Discuss session or the maintainer; the
+merge of this experiment waits for it.
+
 ## Open items
 
 - A compute slot (3 threads), granted by the manager once the load falls. Until then only code and
