@@ -75,7 +75,7 @@ RESULTS_PATH: Final[Path] = WORK / "score_results.json"
 
 def seed_file(*, arm: str, month: str, seed: int) -> Path:
     """Return a seed's forecast file: experiment 409's for its reused seeds, else this experiment's."""
-    reused = arm in FROM_409 and seed in REUSED_SEEDS
+    reused = arm in FROM_409 and seed in REUSED_SEEDS and month in r3.MONTHS
     return (WORK_409 if reused else WORK) / "seed_preds" / arm / f"{month}_s{seed}.parquet"
 
 

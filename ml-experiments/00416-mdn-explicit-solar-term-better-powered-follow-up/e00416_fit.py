@@ -60,9 +60,13 @@ def fit_one(
     return model, epochs, val
 
 
-def seeds_to_fit(*, arm: str) -> tuple[int, ...]:
-    """Return the seeds this experiment fits for an arm (experiment 409's seeds are reused)."""
-    return tuple(s for s in SEEDS if arm not in FROM_409 or s not in REUSED_SEEDS)
+def seeds_to_fit(*, arm: str, month: str) -> tuple[int, ...]:
+    """Return the seeds this experiment fits for an arm in a month.
+
+    Experiment 409's seeds 0 to 2 are reused only for its own five months.
+    """
+    reused = arm in FROM_409 and month in base.SCREEN_MONTHS
+    return tuple(s for s in SEEDS if not reused or s not in REUSED_SEEDS)
 
 
 def run_screen(
@@ -79,7 +83,7 @@ def run_screen(
         folds: dict[bool, prep.Fold] = {}
         for arm in sorted(arms, key=lambda a: m5.SPECS[a].irradiance_free):
             irradiance_free = m5.SPECS[arm].irradiance_free
-            for seed in seeds or seeds_to_fit(arm=arm):
+            for seed in seeds or seeds_to_fit(arm=arm, month=month):
                 target = out_dir / arm / f"{month}_s{seed}.parquet"
                 if target.exists():
                     continue
