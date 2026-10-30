@@ -169,6 +169,11 @@ def training_frame(
     kept = (
         known.filter(pl.all_horizontal(pl.col(c).is_not_nan() for c in added)) if added else known
     )
+    print(
+        f"{row['site']} {refit:%Y-%m} {arm.name}: {known.height:,} rows, "
+        f"{known.height - kept.height:,} dropped for a missing added column",
+        flush=True,
+    )
     if kept.is_empty():
         msg = f"{row['site']} {refit:%Y-%m}: no training rows left for arm {arm.name}"
         raise ValueError(msg)

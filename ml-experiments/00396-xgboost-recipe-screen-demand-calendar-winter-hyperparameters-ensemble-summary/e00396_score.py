@@ -169,10 +169,12 @@ def main() -> None:
     parser.add_argument("--sites", nargs="+", required=True)
     parser.add_argument("--widening", type=float, nargs="+", default=[1.0, WIDENING])
     args = parser.parse_args()
-    arms = args.arms or sorted(p.name for p in PRED_DIR.iterdir())
     ctx = base_score.build_context(series=adapter.series_table())
     ctx["flagged"] = flagged_keys()
     for fold in args.folds:
+        arms = args.arms or sorted(
+            p.name for p in PRED_DIR.iterdir() if any((p / fold).glob("*.parquet"))
+        )
         for factor in args.widening:
             fold_table(fold=fold, arms=arms, sites=args.sites, ctx=ctx, factor=factor)
 

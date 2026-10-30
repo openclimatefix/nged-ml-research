@@ -12,7 +12,7 @@ import itertools
 import warnings
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from functools import cache
+from functools import cache, lru_cache
 from pathlib import Path
 from typing import Final
 
@@ -241,7 +241,7 @@ def calendar_columns(*, arm: Arm) -> list[str]:
     return out
 
 
-@cache
+@lru_cache(maxsize=1)
 def _ensemble_temperature(*, site: str) -> tuple[np.ndarray, np.ndarray]:
     """Return a Primary's run origins and temperature, shape (runs, members, 702), loaded once."""
     with np.load(ENS_STORE_FOLDERS[site] / f"{site}.npz") as stored:
@@ -261,12 +261,21 @@ def _trailing_tables(*, site: str) -> tuple[np.ndarray, dict[int, np.ndarray]]:
         The origins and `{hours: array (runs, members, MAX_LEAD_STEPS)}` in degrees Celsius.
     """
     origins, temperature = _ensemble_temperature(site=site)
+    if np.isnan(temperature).any():
+        msg = (
+            f"{site}: the stored temperature holds missing values, which the cumulative sum spreads"
+        )
+        raise ValueError(msg)
     runs, members, _ = temperature.shape
     gaps = np.diff(origins) // np.timedelta64(1, "h")
     if not (gaps == 24).all():
         msg = f"{site}: runs are not daily, so the past series cannot be stitched"
         raise ValueError(msg)
-    past = temperature[:, :, :STEPS_PER_RUN_DAY].transpose(1, 0, 2).reshape(members, -1)
+    # The past half of a window is the ensemble mean of the earlier runs' first day, the same for
+    # every member, so the control member's training rows and the 51 members' prediction rows see
+    # one past series. A member-by-member stitch would join unrelated perturbations at each seam.
+    past_mean = temperature[:, :, :STEPS_PER_RUN_DAY].mean(axis=1).reshape(-1)
+    past = np.broadcast_to(past_mean, (members, past_mean.size))
     longest = 2 * max(TRAILING_HOURS)
     tables = {
         h: np.full((runs, members, MAX_LEAD_STEPS), np.nan, np.float32) for h in TRAILING_HOURS
@@ -310,6 +319,7 @@ def add_trailing_temperature(*, frame: pl.DataFrame, site: str) -> pl.DataFrame:
         The frame with `trailing_columns()`; rows the store does not cover hold NaN.
     """
     if site not in _TRAILING:
+        _TRAILING.clear()
         _TRAILING[site] = _trailing_tables(site=site)
     origins, tables = _TRAILING[site]
     origin = frame["power_fcst_init_time"].dt.replace_time_zone(None).to_numpy()
@@ -343,7 +353,7 @@ SUMMARY_REPLACES: Final[tuple[str, ...]] = ("temperature_2m", "shortwave")
 """Arm E1 replaces these two control-member columns by the four summary columns."""
 
 
-@cache
+@lru_cache(maxsize=1)
 def _summary_tables(*, site: str) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """Return a Primary's origins and the mean and standard deviation over the 51 members.
 
