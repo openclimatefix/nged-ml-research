@@ -56,6 +56,8 @@ class SignedMdn(nn.Module):
         capacity_start: np.ndarray,
         prior_centre_points: float,
         u_forced_zero: bool = False,
+        capacity_mode: str = "learned",
+        prior_log_sd: float = PRIOR_LOG_SD,
         components: int = 3,
         hidden: int = 64,
         layers: int = 2,
@@ -72,13 +74,22 @@ class SignedMdn(nn.Module):
             capacity_start: (P,) starting capacity in points of effective capacity.
             prior_centre_points: The centre of the shared log-normal prior, in points.
             u_forced_zero: Fix `C_p` at zero, so `u` has no effect (the identifiability check).
+            capacity_mode: `learned` (every `C_p` free under the prior), `fixed` (every `C_p` held at
+                its start, the prior centre), or `known` (only Primaries whose target is not folded
+                set `C_p`; a folded Primary uses the geometric mean of those, with no gradient from
+                the folded rows).
+            prior_log_sd: The log standard deviation of the log-normal prior.
             components: Mixture components.
             hidden: Width of the demand module.
             layers: Hidden layers of the demand module.
             embedding: Whether the demand module sees the Primary embedding.
         """
         super().__init__()
+        if capacity_mode not in ("learned", "fixed", "known"):
+            msg = f"unknown capacity mode {capacity_mode!r}"
+            raise ValueError(msg)
         self.components, self.u_forced_zero = components, u_forced_zero
+        self.capacity_mode, self.prior_log_sd = capacity_mode, prior_log_sd
         self.demand = base.PlainMdn(
             n_inputs=n_inputs,
             hidden=hidden,
@@ -91,11 +102,17 @@ class SignedMdn(nn.Module):
         self.register_buffer("std_points", t(target_std) * 100.0)
         self.register_buffer("folded", torch.as_tensor(np.asarray(folded), dtype=torch.bool))
         self.register_buffer("prior_centre", torch.tensor(float(prior_centre_points)))
-        self.log_c = nn.Parameter(torch.log(t(capacity_start)), requires_grad=not u_forced_zero)
+        trainable = not u_forced_zero and capacity_mode != "fixed"
+        self.log_c = nn.Parameter(torch.log(t(capacity_start)), requires_grad=trainable)
 
     def capacity(self) -> torch.Tensor:
         """Return the (P,) capacity in points (zero when `u` is forced to zero)."""
-        c = torch.exp(self.log_c)
+        if self.capacity_mode == "known":
+            known = ~self.folded
+            shared = self.log_c[known].mean().detach()
+            c = torch.exp(torch.where(self.folded, shared, self.log_c))
+        else:
+            c = torch.exp(self.log_c)
         return torch.zeros_like(c) if self.u_forced_zero else c
 
     def parts(
@@ -109,9 +126,10 @@ class SignedMdn(nn.Module):
 
     def penalty(self) -> torch.Tensor:
         """Return the shared log-normal prior on the capacities, in nats."""
-        if self.u_forced_zero:
+        if self.u_forced_zero or self.capacity_mode == "fixed":
             return torch.zeros((), device=self.log_c.device)
-        return (0.5 * ((self.log_c - torch.log(self.prior_centre)) / PRIOR_LOG_SD) ** 2).sum()
+        z = 0.5 * ((self.log_c - torch.log(self.prior_centre)) / self.prior_log_sd) ** 2
+        return (z[~self.folded] if self.capacity_mode == "known" else z).sum()
 
 
 def _log_pdf(

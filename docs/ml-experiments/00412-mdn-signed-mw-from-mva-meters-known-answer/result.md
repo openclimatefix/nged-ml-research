@@ -221,6 +221,26 @@ second review follows if the first flags many problems. The timed fit is not sco
 fresh Sonnet re-derivation of the headline numbers and the audit triggers, and the write-up gets a
 Sonnet review of the numbers and of the prose.
 
+## Post hoc capacity variants (fixed before any variant score was read)
+
+**The maintainer's ruling of 2026-10-30 allows three labelled post hoc variants after the first test
+failed P1 and P4, then stops the experiment.** The registered first test stays reported as a failure.
+The variants test whether the placebo's invented reverse flow comes from fitting the capacity `C_p`
+on the rows it labels. All three use rotation r1, level 2.0 with Q = 2 points, one seed, and the
+two test months, and the P1 and P4 bars and the matched false-reverse comparison are unchanged.
+
+- **Variant (a), `cfix`.** Every `C_p` is held at the prior centre (33.5 points at the 2026-06
+  refit) and is not trained.
+- **Variant (b), `cknown`.** Only Primaries whose target is not folded set `C_p`. A folded Primary (the
+  MVA-only eight and the hidden pair) uses the geometric mean of the learned `C_p` of D9, D11, D14,
+  D15, D16, and D18, and the folded rows send no gradient to that mean. The prior applies to the six.
+- **Variant (c), `sd03`.** As S1c with the prior's log standard deviation cut from 0.7 to 0.3.
+- **Fits per variant.** The real-sky arm at (level 2.0, Q = 2) and with no injection, and the
+  shuffled-sky arm at (level 2.0, Q = 2), each on both test months: 6 fits, 18 in all.
+- **Decision.** If a variant passes P1 and P4, the result is labelled post hoc and reported beside
+  the failed registered test. If none passes, the page is written up as the sixth failed treatment of
+  the MVA problem, and S1e and the full run do not run.
+
 ## First test result (interim: two test months, one seed, no intervals, not yet re-derived)
 
 **The first test failed P1 and P4, so the full run does not start.** S1c reaches pooled balanced

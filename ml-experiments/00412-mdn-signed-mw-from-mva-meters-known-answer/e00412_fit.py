@@ -59,6 +59,8 @@ class Arm:
     u_forced_zero: bool = False
     start_scale: float = 1.0
     """The starting capacity as a multiple of the prior centre."""
+    capacity_mode: str = "learned"
+    prior_log_sd: float = models.PRIOR_LOG_SD
 
 
 ARMS: Final[dict[str, Arm]] = {
@@ -68,6 +70,17 @@ ARMS: Final[dict[str, Arm]] = {
     "S1c-start-low": Arm(start_scale=0.1 / 3.0),
     "S1c-start-high": Arm(start_scale=3.0),
 }
+VARIANTS: Final[dict[str, dict]] = {
+    "cfix": {"capacity_mode": "fixed"},
+    "cknown": {"capacity_mode": "known"},
+    "sd03": {"prior_log_sd": 0.3},
+}
+"""The post hoc capacity variants of the maintainer's ruling: `C_p` held at the prior centre,
+`C_p` set only by the Primaries whose target is not folded, and a prior log standard deviation of
+0.3. Each runs as a real-sky arm and a shuffled-sky arm."""
+for _name, _kw in VARIANTS.items():
+    ARMS[f"S1c-{_name}"] = Arm(**_kw)
+    ARMS[f"S1c-{_name}-shuffle"] = Arm(shuffle_u=True, **_kw)
 
 
 def prior_centre_points(*, refit: datetime) -> float:
@@ -101,6 +114,8 @@ def make_model(*, arm: Arm, fold: inputs.Fold, refit: datetime, seed: int) -> mo
         capacity_start=np.full(n, centre * arm.start_scale),
         prior_centre_points=centre,
         u_forced_zero=arm.u_forced_zero,
+        capacity_mode=arm.capacity_mode,
+        prior_log_sd=arm.prior_log_sd,
     )
 
 
@@ -134,7 +149,7 @@ def train(
             "weight_decay": WEIGHT_DECAY,
         }
     ]
-    if not model.u_forced_zero:
+    if model.log_c.requires_grad:
         groups.append({"params": [model.log_c], "lr": LR_CAPACITY, "weight_decay": 0.0})
     optimiser = torch.optim.AdamW(groups)
 
@@ -295,6 +310,9 @@ def run_first(*, arms: list[str], seed: int, device: str, months: list[str]) -> 
         "S1c-shuffle": [inputs.Setting(2.0, 2.0), inputs.Setting(2.0, 4.0)],
         "S1c-u0": [inputs.Setting(2.0, 2.0)],
     }
+    for name in VARIANTS:
+        settings[f"S1c-{name}"] = [inputs.Setting(2.0, 2.0), inputs.Setting(0.0, 2.0)]
+        settings[f"S1c-{name}-shuffle"] = [inputs.Setting(2.0, 2.0)]
     for month in months:
         for arm_name in arms:
             for setting in settings[arm_name]:
