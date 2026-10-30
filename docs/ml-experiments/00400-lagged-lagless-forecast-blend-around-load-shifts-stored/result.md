@@ -164,7 +164,7 @@ the private folder (`work/report.txt`, `work/curtailment.txt`). This page has no
 - **Weight.** The fitted weight on the forecast with lags has mean 0.615 outside events and 0.611,
   0.597 in the first 6 hours and after 24 hours of an event (arm B2). Its 5th to 95th percentile
   range is 0.56 to 0.68. The surprise coefficient is slightly negative: a larger surprise raises the
-  weight on the forecast with lags. Lead time moves the weight more than surprise does.
+  weight on the forecast with lags.
 - **Absolute CRPS, all 16 Primaries:** forecast with lags 3.867; forecast without lags 4.338; fixed
   mixture 3.938; mixture B1 3.898, B2 3.892, B3 3.886; quantile averages 3.907 to 3.968.
 - **Event-lag rows (1 to 3 lags in an event, target outside), minus the forecast with lags** (C1 to
@@ -185,15 +185,16 @@ the private folder (`work/report.txt`, `work/curtailment.txt`). This page has no
   exceeds the +0.05 tolerance. D15 (short history) carries +1.4 of the cost and D18 +0.15.
 - **Tails.** Mixture q95 coverage outside events is 0.936 (B2) against 0.922 for the forecast with
   lags, because the mixture is wider (90% width 28.4 against 25.2 points). Quantile averages keep
-  the width of the forecast with lags (26.1) and gain little coverage. During events the share of
-  readings inside the 1-99% band is about 0.65 (0 lags) and 0.40 (3 lags) for the mixtures against
-  0.62 and 0.40 for the forecast with lags.
+  the width of the forecast with lags (26.1) and gain little coverage. During events (0, 1 to 2,
+  and 3 lags in the event) the share of readings inside the 1-99% band is 0.88, 0.79, and 0.81 for
+  mixture B2 against 0.87, 0.78, and 0.82 for the forecast with lags, and inside the 5-95% band
+  0.65, 0.56, and 0.40 against 0.62, 0.53, and 0.40.
 - **Median share of the labelled depth** (corrected signs) missed by the median: 0.75 (forecast with
   lags), 0.56 (without lags), 0.59 (B2) with no lag in the event; 0.63, 0.57, and 0.66 with three
   lags in the event.
-- **Smoothness.** The blends do not step more than the pure forecasts. Median 95th-percentile
-  half-hour change of the median across onsets: 13.3 points (B2 mixture), 15.8 (forecast with
-  lags). The pure forecasts already change by several points at event edges.
+- **Smoothness.** The blends do not step more than the pure forecasts. Largest half-hour
+  change of the median across an onset: median 6.2 points and 95th percentile 13.3 (mixture B2)
+  against 6.7 and 15.8 (forecast with lags). The pure forecasts already change by several points at event edges.
 - **Avoidable curtailment** at the signed-MW six, limit 0.9 times the maximum, GBP, minus the
   forecast with lags: during events B2 mixture +61,000, fixed mixture +89,000, forecast without lags
   +1,164,000; in the 7 days after about -3,000 for every blend; all rows B2 mixture +40,000. The GAM
