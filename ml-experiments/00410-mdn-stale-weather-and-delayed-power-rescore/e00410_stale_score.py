@@ -67,7 +67,8 @@ def arm_forecast(*, network: str, arm: str, months: list[str]) -> pl.DataFrame:
     keys = list(common.KEYS)
     pieces = []
     for month in months:
-        files = [OUT_DIR / "preds" / network / arm / f"{month}_s{s}.parquet" for s in SEEDS]
+        seeds = (0,) if network == "xgb_s1m" else SEEDS
+        files = [OUT_DIR / "preds" / network / arm / f"{month}_s{s}.parquet" for s in seeds]
         stack = pl.concat([pl.read_parquet(f) for f in files])
         pieces.append(stack.group_by(keys).agg(*[pl.col(c).mean() for c in common.LEVEL_COLUMNS]))
     frame = pl.concat(pieces).sort(keys)
@@ -91,38 +92,73 @@ def widths(
     """Return the mean q05-to-q95 and q01-to-q99 widths in points of capacity, days 1 to 10."""
     label_of = {r[0]: r[1] for r in series.iter_rows()}
     scale_of = {r[0]: 100.0 / r[2] for r in series.iter_rows()}
+    headline = table.select(*metrics.KEY_COLUMNS, HEADLINE)
     kept = (
-        metrics.restrict_to_slice_table(forecast=frame, slice_table=table)
+        frame.join(headline, on=list(metrics.KEY_COLUMNS), how="inner")
+        .filter(pl.col(HEADLINE))
         .with_columns(
             label=pl.col("time_series_id").replace_strict(label_of),
             scale=pl.col("time_series_id").replace_strict(scale_of),
-            lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours(
-                fractional=True
-            ),
         )
-        .filter(pl.col("label").is_in(list(labels)), pl.col("lead_hours").is_between(24.0, 240.0))
+        .filter(pl.col("label").is_in(list(labels)))
+        .with_columns(
+            width_90=(pl.col("q95") - pl.col("q05")) * pl.col("scale"),
+            width_98=(pl.col("q99") - pl.col("q01")) * pl.col("scale"),
+        )
+        .group_by("label")
+        .agg(pl.col("width_90").mean(), pl.col("width_98").mean())
     )
-    return {
-        "width_90": float(((kept["q95"] - kept["q05"]) * kept["scale"]).mean()),
-        "width_98": float(((kept["q99"] - kept["q01"]) * kept["scale"]).mean()),
-    }
+    return {"width_90": float(kept["width_90"].mean()), "width_98": float(kept["width_98"].mean())}
+
+
+def decision_table(*, results: pl.DataFrame) -> None:
+    """Print each limit arm's pass or fail against the pre-registered rule, per group."""
+    rows = []
+    for record in results.filter(pl.col("arm").is_in(list(THRESHOLDS))).iter_rows(named=True):
+        if record["group"] not in ("signed-MW six", "MVA-only eight"):
+            continue
+        limit = THRESHOLDS[record["arm"]]
+        loss95 = record["coverage_q95_fresh"] - record["coverage_q95_arm"]
+        loss99 = record["coverage_q99_fresh"] - record["coverage_q99_arm"]
+        rows.append(
+            {
+                "arm": record["arm"],
+                "group": record["group"],
+                "limit": limit,
+                "loss": record["diff"],
+                "loss_upper95": record["upper"],
+                "crps_ok": record["diff"] < limit,
+                "crps_ok_upper": record["upper"] < limit,
+                "cov95_loss": loss95,
+                "cov99_loss": loss99,
+                "coverage_ok": max(loss95, loss99) < COVERAGE_LOSS_LIMIT,
+            }
+        )
+    table = pl.DataFrame(rows)
+    with pl.Config(tbl_rows=50, tbl_cols=20, tbl_width_chars=200):
+        print("\n== pre-registered rule: point estimate and 95% upper bound against the limit ==")
+        print(table)
+    ok = table.group_by("arm").agg((pl.col("crps_ok") & pl.col("coverage_ok")).all().alias("holds"))
+    print(f"Rule holds for every arm and both groups (point estimates): {bool(ok['holds'].all())}")
 
 
 def main() -> None:
     """Score every stale arm against the fresh arm and print the tables."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--network", default="pooled", choices=("pooled", "per_primary"))
+    parser.add_argument("--network", default="pooled", choices=("pooled", "per_primary", "xgb_s1m"))
     parser.add_argument("--months", nargs="+", default=list(prep.SCREEN_MONTHS))
     parser.add_argument("--arms", nargs="+", default=[a.name for a in ARMS if a.name != "FRESH"])
     args = parser.parse_args()
     series = adapter.series_table()
     ctx = s381.build_context(series=series)
     flagged = pl.read_parquet(FLAGGED_KEYS).select("time_series_id", "valid_time")
-    first = prep.test_origins(month=args.months[0])[0]
-    last = prep.test_origins(month=args.months[-1])[-1] + timedelta(days=15)
-    in_scope = flagged.filter(pl.col("valid_time").is_between(first, last))
-    dropped = ctx["actuals"].join(in_scope, on=["time_series_id", "valid_time"], how="semi")
-    print(f"flagged substation_zero half-hours dropped from the actuals (scope): {dropped.height}")
+    for month in args.months:
+        origins = prep.test_origins(month=month)
+        window = flagged.filter(
+            pl.col("valid_time").is_between(origins[0], origins[-1] + timedelta(days=15))
+        )
+        count = ctx["actuals"].join(window, on=["time_series_id", "valid_time"], how="semi").height
+        print(f"{month}: flagged substation_zero half-hours dropped from the actuals: {count}")
     ctx["actuals"] = ctx["actuals"].join(flagged, on=["time_series_id", "valid_time"], how="anti")
     fresh = widen(
         frame=adapter.forecast_frame(
@@ -208,6 +244,7 @@ def main() -> None:
                     "coverage_q99_arm",
                 )
             )
+    decision_table(results=out)
     print(
         f"\nPre-registered CRPS-loss limits (points): {THRESHOLDS}; "
         f"coverage loss < {COVERAGE_LOSS_LIMIT}"
