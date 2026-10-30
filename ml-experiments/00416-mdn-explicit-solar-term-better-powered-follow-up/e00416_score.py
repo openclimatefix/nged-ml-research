@@ -45,7 +45,7 @@ REFERENCE: Final[str] = "A0-doy"
 ARMS: Final[tuple[str, ...]] = ("A0-doy", "C3", "H1", "A0-noirr-doy")
 FROM_409: Final[tuple[str, ...]] = ("C3", "A0-noirr-doy")
 PRIMARY_ARMS: Final[tuple[str, ...]] = ("C3", "H1", "A0-noirr-doy")
-LOG_PRIOR_ARMS: Final[tuple[str, ...]] = ("C3p", "C3pa")
+LOG_PRIOR_ARMS: Final[tuple[str, ...]] = ("C3p", "C3pa", "C3p-weak")
 """Added after the inert-prior finding; post hoc, secondary, outside the family of six."""
 SECONDARY: Final[tuple[tuple[str, str], ...]] = (("C3", "A0-noirr-doy"), ("H1", "C3"))
 PRIMARY_METRICS: Final[tuple[str, ...]] = ("crps", "pinball_q99")

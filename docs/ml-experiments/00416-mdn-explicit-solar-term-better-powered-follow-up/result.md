@@ -236,6 +236,18 @@ they sit outside the family of six primary tests and are reported as secondary c
 - **Code review.** A fresh Sonnet reviewer reads `e00416_models.py` (the changed loss) before the
   first fit of these arms.
 
+## Amendment 5: a weaker strength for C3p (manager, 2026-10-30)
+
+Written before any of the arms in amendment 4 is fitted. The strength of the log-scale prior is a
+choice, not a Bayesian scale.
+
+- **C3p-weak:** C3p with the penalty 10 times weaker, so about 10 times stronger than C3's. C3p
+  and C3pa keep the 100-times strength. The gradient shares at the start and end of training decide
+  whether any strength is still too weak.
+- **Cost, replacing amendment 4's.** 3 arms x 5 seeds = 15 fits per test month: 75 fits on the first
+  5 months and 15 on each extension month (45 to 105 for 3 to 7 added months), 120 to 180 fits in
+  total, about 2.3 to 3.5 hours at about 70 seconds per fit.
+
 ## Reports
 
 - **Figures.** Contrasts with intervals first; sunny-midday CRPS and q99 pinball loss per Primary;

@@ -26,20 +26,23 @@ import torch  # ty: ignore[unresolved-import]
 LOG_SD: Final[float] = 0.7
 """Standard deviation of the prior on the natural logarithm of the capacity."""
 BATCH_ROWS: Final[int] = f5.BATCH
-LOG_PRIOR_ARMS: Final[tuple[str, ...]] = ("C3p", "C3pa")
+LOG_PRIOR_ARMS: Final[tuple[str, ...]] = ("C3p", "C3pa", "C3p-weak")
+STRENGTH: Final[dict[str, float]] = {"C3p": 1.0, "C3pa": 1.0, "C3p-weak": 0.1}
+"""Multiplier of the penalty (1.0 is `penalty / BATCH_ROWS`, about 100 times C3's strength)."""
 
 m5.SPECS["C3p"] = replace(m5.SPECS["C3"], prior=False)
 m5.SPECS["C3pa"] = replace(m5.SPECS["C3"], prior=False)
+m5.SPECS["C3p-weak"] = replace(m5.SPECS["C3"], prior=False)
 
 
 class LogPriorMdn(m5.PvMdn):
     """`PvMdn` whose capacity prior acts on the log capacity, against one batch's likelihood."""
 
-    def __init__(self, *, asymmetric: bool, n_eff: float, **kwargs: Any) -> None:
+    def __init__(self, *, asymmetric: bool, n_eff: float, strength: float, **kwargs: Any) -> None:
         """Build the network; `n_eff` is the training rows' summed weight."""
         super().__init__(**kwargs)
         self.asymmetric = asymmetric
-        self.penalty_weight = n_eff / BATCH_ROWS
+        self.penalty_weight = strength * n_eff / BATCH_ROWS
 
     def penalty(self) -> torch.Tensor:
         """Return the log-scale prior, multiplied by `n_eff / BATCH_ROWS` (see the module doc)."""
@@ -61,6 +64,7 @@ def make_model(
     return LogPriorMdn(
         asymmetric=arm == "C3pa",
         n_eff=n_eff,
+        strength=STRENGTH[arm],
         spec=m5.SPECS[arm],
         n_inputs=fold.x.shape[1],
         n_primaries=len(table),
