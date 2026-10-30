@@ -134,7 +134,10 @@ def main() -> None:
     }
     synth = synthetic_table()
     print(
-        "events with a corrected depth:", events.height, "| Primaries in the sweep:", synth.height
+        "events with a corrected depth:",
+        events.height,
+        "| events in the sweep:",
+        synth["event_id"].n_unique(),
     )
 
     print("\n== R1: real observed share, labelled depth (Part H convention), median over events ==")
@@ -152,7 +155,7 @@ def main() -> None:
         ids = pairs["monthly_control"][s]
         r = per_event(rows=mc, column="share").filter(pl.col("status") == s)
         sy = synth.filter(pl.col("status") == s, pl.col("event_id").is_in(list(ids)))
-        both = r.join(sy, left_on="target_event_id", right_on="event_id")
+        both = r.join(sy, left_on="target_event_id", right_on="event_id").sort("target_event_id")
         print(
             f"{s:12s} events with both arms {both.height} of {len(ids)}\n"
             f"   real observed share (monthly control): {median_ci(values=both['v'].to_numpy())}\n"
@@ -167,7 +170,10 @@ def main() -> None:
     )
     for name, rows in real.items():
         for col in ("share", "share_measured"):
-            pe = per_event(rows=rows.filter(pl.col("status") == STATUS[0]), column=col)
+            same = rows.filter(
+                pl.col("status") == STATUS[0], pl.col("share_measured").is_not_null()
+            )
+            pe = per_event(rows=same, column=col)
             print(f"{name:16s} {col:15s} {median_ci(values=pe['v'].to_numpy())}")
     ratio = events.filter(pl.col("measured_depth_mw").is_not_null()).with_columns(
         r=pl.col("measured_depth_mw") / pl.col("corrected_depth_mw")

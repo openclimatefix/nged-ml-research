@@ -90,6 +90,16 @@ def build_wide() -> None:
     ).write_parquet(WORK / "wide.parquet")
 
 
+def contrast(*, rows: pl.DataFrame, arm: str, ref: str, unit: str) -> str:
+    """Return arm minus ref CRPS with an interval from resampling `unit`, in a fixed unit order."""
+    d = rows.with_columns(diff=pl.col(f"crps_{arm}") - pl.col(f"crps_{ref}"))
+    by = d.group_by(unit).agg(s=pl.col("diff").sum(), n=pl.len()).sort(unit)
+    if by.height < 2:
+        return f"n/a ({by.height} units)"
+    interval = r400.event_interval(sums=by["s"].to_numpy(), counts=by["n"].to_numpy())
+    return f"{fmt(interval)} [{by.height} units, {d.height} rows]"
+
+
 def pair_for(*, arm: str) -> str:
     """Return the same-widening forecast with lags to compare an arm with."""
     return "lags_x115" if arm.endswith("_x115") else "lags"
@@ -141,9 +151,7 @@ def table(*, wide: pl.DataFrame, tag: str) -> None:
                 ref = pair_for(arm=arm)
                 if arm == ref:
                     continue
-                print(
-                    f"   {arm} minus {ref}: {r400.contrast(rows=sub, arm=arm, ref=ref, unit=unit)}"
-                )
+                print(f"   {arm} minus {ref}: {contrast(rows=sub, arm=arm, ref=ref, unit=unit)}")
             for arm in ARMS:
                 if (
                     arm in B2
@@ -153,13 +161,13 @@ def table(*, wide: pl.DataFrame, tag: str) -> None:
                 ):
                     continue
                 print(
-                    f"   {arm} minus mix_b2 (raw): {r400.contrast(rows=sub, arm=arm, ref='mix_b2', unit=unit)}"
+                    f"   {arm} minus mix_b2 (raw): {contrast(rows=sub, arm=arm, ref='mix_b2', unit=unit)}"
                 )
             print(
-                f"   mix_w50 minus avg_w50: {r400.contrast(rows=sub, arm='mix_w50', ref='avg_w50', unit=unit)}"
+                f"   mix_w50 minus avg_w50: {contrast(rows=sub, arm='mix_w50', ref='avg_w50', unit=unit)}"
             )
             print(
-                f"   mix_w50 minus lagless: {r400.contrast(rows=sub, arm='mix_w50', ref='lagless', unit=unit)}"
+                f"   mix_w50 minus lagless: {contrast(rows=sub, arm='mix_w50', ref='lagless', unit=unit)}"
             )
 
 
@@ -195,7 +203,7 @@ def headline_99(*, wide: pl.DataFrame) -> None:
             rows, unit = sets[key]
             sub = rows.filter(pl.col("label").is_in(labs))
             d = sub.with_columns(diff=pl.col(f"crps_{arm}") - pl.col(f"crps_{ref}"))
-            by = d.group_by(unit).agg(s=pl.col("diff").sum(), n=pl.len())
+            by = d.group_by(unit).agg(s=pl.col("diff").sum(), n=pl.len()).sort(unit)
             sums, counts = by["s"].to_numpy(), by["n"].to_numpy()
             draws = rng.integers(0, len(sums), size=(20000, len(sums)))
             means = sums[draws].sum(axis=1) / counts[draws].sum(axis=1)
@@ -243,7 +251,7 @@ def leave_one_out(*, wide: pl.DataFrame) -> None:
         sub = rows.filter(pl.col("label").is_in([x for x in SIX if x != left]))
         for arm, ref in (("mix_w50", "lags"), ("mix_w50", "mix_b2")):
             print(
-                f"LEAVE-ONE-OUT | six without {left} | {arm} minus {ref}: {r400.contrast(rows=sub, arm=arm, ref=ref, unit=unit)}"
+                f"LEAVE-ONE-OUT | six without {left} | {arm} minus {ref}: {contrast(rows=sub, arm=arm, ref=ref, unit=unit)}"
             )
 
 

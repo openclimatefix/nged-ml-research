@@ -75,7 +75,7 @@ headline: >-
   Job 1: in real events the weekly forecast with lags moves its median by 0.032 (-0.001 to 0.053)
   of the labelled step more than the forecast without lags at 3 lags in the event, against 0.32 in
   synthetic steps. Job 2: the w = 0.5 mixture minus the learned blend B2 is -0.15 (-0.49 to +0.04,
-  99.58%) points on event-lag rows at the six and +0.050 (-0.015 to +0.120, 99.58%) at the eight.
+  99.58%) points on event-lag rows at the six and +0.050 (-0.013 to +0.122, 99.58%) at the eight.
 take_home_message: >-
   The median share of a load-shift step that experiment 395 called "followed" (0.94 with 3 lags in
   the event) is mostly not a response to the lags: a forecast with no power lags at all reaches
@@ -185,12 +185,12 @@ dropped. Table labels (R1, S1, B1 to B5) name the tables printed by `e00401_shar
 - **The 0-lag share of 0.52 to 0.60 is the labelled step against the measured step.** A forecast
   blind to the event reads `1 - measured step / labelled step`. The measured step is 0.62 times the
   labelled step (median over 175 event-Primary pairs, none of opposite sign). With the measured step
-  in place of the labelled step the monthly control's 0-lag share falls from 0.604 to 0.244 (table
-  B1), and the lagless forecast's share (0.592) matches the monthly control's, so the lags
-  contribute nothing at 0 lags (table B2). Forecast noise does not move the median (the synthetic
-  0-lag share is -0.006, with an interquartile range over rows of 0.72, table B3). Events under a
-  day read 0.30 and events over 7 days read 0.97 at 0 lags (table B4), so the events' own length
-  matters: a long event is mostly inside the training window.
+  in place of the labelled step the monthly control's 0-lag share falls from 0.591 to 0.244, on the
+  51 events with a same-sign measured step (table B1), and the lagless forecast's share (0.592)
+  matches the monthly control's, so the lags contribute nothing at 0 lags (table B2). Forecast noise
+  does not move the median (the synthetic 0-lag share is -0.006, with an interquartile range over
+  rows of 0.72, table B3). Events under a day read 0.30 and events over 7 days read 0.97 at 0 lags
+  (table B4), so the events' own length matters: a long event is mostly inside the training window.
 - **The response to the lags in real events is about 0.03 of the step.** Weekly forecast with lags
   minus weekly forecast without lags, per row, then medians over events: -0.007 (-0.032 to +0.026)
   at 0 lags, +0.019 (-0.011 to +0.058) at 1 or 2, +0.032 (-0.001 to +0.053) at 3 (table B5). The
@@ -204,35 +204,35 @@ target outside; 20,327 rows (28 events) at the six, 20,911 (19 events) at the ei
 
 | CRPS minus forecast with lags (95% interval) | Six, event-lag rows | Eight, event-lag rows | Six, outside events | Eight, outside events |
 |---|---|---|---|---|
-| Mixture w = 0.3 | -0.99 (-2.45 to +0.06) | +0.28 (+0.01 to +0.55) | +0.027 (-0.027 to +0.083) | +0.059 (+0.023 to +0.096) |
-| Mixture w = 0.5 | -0.90 (-2.16 to -0.01) | +0.14 (-0.04 to +0.31) | -0.019 (-0.054 to +0.016) | +0.004 (-0.022 to +0.029) |
-| Mixture w = 0.7 | -0.66 (-1.56 to -0.03) | +0.05 (-0.05 to +0.14) | -0.034 (-0.055 to -0.014) | -0.021 (-0.038 to -0.005) |
-| Mixture, per-lead weight | -0.62 (-1.48 to -0.03) | +0.04 (-0.04 to +0.12) | -0.033 (-0.051 to -0.017) | -0.028 (-0.043 to -0.014) |
-| Quantile average w = 0.5 | -0.82 (-2.01 to +0.01) | +0.18 (-0.03 to +0.37) | -0.024 (-0.063 to +0.017) | +0.008 (-0.025 to +0.039) |
-| Learned blend B2 (experiment 400) | -0.75 (-1.78 to -0.03) | +0.09 (-0.04 to +0.22) | -0.029 (-0.056 to -0.003) | -0.013 (-0.033 to +0.007) |
+| Mixture w = 0.3 | -0.99 (-2.41 to +0.06) | +0.28 (+0.00 to +0.56) | +0.027 (-0.027 to +0.083) | +0.059 (+0.023 to +0.096) |
+| Mixture w = 0.5 | -0.90 (-2.15 to -0.01) | +0.14 (-0.04 to +0.32) | -0.019 (-0.054 to +0.016) | +0.004 (-0.022 to +0.029) |
+| Mixture w = 0.7 | -0.66 (-1.53 to -0.03) | +0.05 (-0.05 to +0.15) | -0.034 (-0.055 to -0.014) | -0.021 (-0.038 to -0.005) |
+| Mixture, per-lead weight | -0.62 (-1.45 to -0.03) | +0.04 (-0.04 to +0.12) | -0.033 (-0.051 to -0.017) | -0.028 (-0.043 to -0.014) |
+| Quantile average w = 0.5 | -0.82 (-2.00 to +0.02) | +0.18 (-0.03 to +0.38) | -0.024 (-0.063 to +0.017) | +0.008 (-0.025 to +0.039) |
+| Learned blend B2 (experiment 400) | -0.75 (-1.76 to -0.03) | +0.09 (-0.05 to +0.22) | -0.029 (-0.056 to -0.003) | -0.013 (-0.033 to +0.007) |
 
 - **Headline pair, 99.58% intervals (family level of 5%, k = 12 contrasts).** Mixture w = 0.5 minus
-  B2 on event-lag rows: -0.151 (-0.492 to +0.041) at the six, +0.050 (-0.015 to +0.120) at the
+  B2 on event-lag rows: -0.151 (-0.487 to +0.042) at the six, +0.050 (-0.013 to +0.122) at the
   eight. Outside events: +0.010 (-0.002 to +0.024) at the six, +0.017 (+0.008 to +0.027) at the
   eight. Mixture w = 0.5 minus the forecast with lags outside events: -0.019 (-0.071 to +0.032) at
   the six, +0.004 (-0.034 to +0.040) at the eight.
 - **The pre-registered decision rule is met at the six and not at the eight.** The rule asks for an
   upper interval end of at most +0.1 on event-lag rows and at most +0.05 outside events. At the six
-  the upper ends are +0.041 (mixture w = 0.5 minus B2, event-lag rows), +0.024 (the same arm outside
+  the upper ends are +0.042 (mixture w = 0.5 minus B2, event-lag rows), +0.024 (the same arm outside
   events), and +0.032 (minus the forecast with lags outside events). At the eight the event-lag
-  upper end is +0.120, over the +0.1 margin, although the interval includes zero. The claim is
+  upper end is +0.122, over the +0.1 margin, although the interval includes zero. The claim is
   interim until the maintainer reads the audit findings (see Checks).
 - **One event, at D16, drives the six's gain over the forecast with lags.** With each Primary left
   out in turn, mixture w = 0.5 minus the forecast with lags on event-lag rows stays between -0.90
-  and -1.73 except without D16, where it is -0.179 (-0.518 to +0.031). The contrast against B2
-  survives without D16 (-0.014, -0.079 to +0.033). D9 has no event-lag rows, so the six has five
+  and -1.73 except without D16, where it is -0.179 (-0.517 to +0.032). The contrast against B2
+  survives without D16 (-0.014, -0.076 to +0.033). D9 has no event-lag rows, so the six has five
   Primaries with event-lag rows.
 - **The per-lead weight on the forecast with lags falls from 0.90 at day 1 to 0.62 at day 10** (mean
   over months). The per-lead arm therefore gives no gain on event-lag rows (-0.62 against -0.90 for
   w = 0.5), and gains 0.001 (six) and 0.007 (eight) points over the best fixed weight on all rows
   (prediction P5).
 - **Mixing distributions beats averaging quantiles only slightly.** Mixture minus quantile average
-  at w = 0.5 is -0.079 (-0.165 to +0.004) at the six and -0.032 (-0.071 to +0.003) at the eight on
+  at w = 0.5 is -0.079 (-0.160 to +0.006) at the six and -0.032 (-0.071 to +0.004) at the eight on
   event-lag rows.
 - **Widening by 1.15 changes no sign on event-lag rows.** The widened arm is the raw arm with each
   quantile moved from the median by 1.15 times its distance. Differences against the widened
@@ -250,7 +250,7 @@ target outside; 20,327 rows (28 events) at the six, 20,911 (19 events) at the ei
   largest half-hour change of the median across an event onset, 95th percentile (points of
   capacity): forecast with lags 15.8, lagless 16.0, w = 0.5 mixture 12.9, B2 13.3 (384 onsets).
 - **On cold nights the mixture gains more at the six.** Event-lag rows, 538 rows in 10 events:
-  mixture w = 0.5 minus lags -1.71 (-3.05 to -0.06); eight: +0.24 (-0.10 to +0.47).
+  mixture w = 0.5 minus lags -1.71 (-3.08 to -0.06); eight: +0.24 (-0.09 to +0.49).
 - **The mixtures do not lower avoidable curtailment cost during events.** The totals are GBP over
   the six signed-MW Primaries, at a limit of 0.9 times the maximum. During events the w = 0.5
   mixture costs 89,000 GBP more than the forecast with lags (6.65 million against 6.56 million GBP)
@@ -310,9 +310,16 @@ target outside; 20,327 rows (28 events) at the six, 20,911 (19 events) at the ei
 - **The intervals at the eight are wide: they rest on 19 events,** and the per-Primary numbers from
   as few as 77 rows (D19, D4).
 - **Departures from the plan.** The synthetic rows use all clean rows of 5 runs (the 15th of
-  October, December, February, April, and June), not 5,000 rows per event; the exact CRPS of the
-  mixtures was not computed (CRPS comes from the 11 quantiles, as the protocol defines it); the rows
-  are not matched to the real rows' lead distribution.
+  October, December, February, April, and June, issued at 09:00), not 5,000 rows per event, and are
+  not matched to the real rows' lead distribution. The synthetic rows do not drop flagged
+  half-hours, which the real arm drops. The exact CRPS of the mixtures was not computed (CRPS comes
+  from the 11 quantiles, as the protocol defines it).
+- **The per-lead weight uses actuals up to the start of the scored month,** so a forecast issued up
+  to 10 days before the month, with a valid time inside it, gets a weight fitted on actuals that did
+  not yet exist at its issue time. Experiment 400's learned blend probably has the same convention.
+- **The curtailment totals use experiment 400's row convention:** valid times from 2025-10-01 over
+  all stored lead days (not only days 1 to 10), flagged half-hours included, and a scoring start of
+  2025-07-01. They are comparable with experiment 400's totals, not with the CRPS tables above.
 - **Not tested:** whether the lags matter at all in real events, because the real events in the
   scored months are few (52, 27, and 16 events by lag status).
 

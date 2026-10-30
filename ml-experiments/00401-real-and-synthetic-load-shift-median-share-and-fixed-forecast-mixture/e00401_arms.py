@@ -85,6 +85,9 @@ def per_lead_weights(
         best = []
         for day in range(LEAD_DAYS):
             eligible = np.flatnonzero((month_epoch < month) & usable & (lead_day == day))
+            if not len(eligible):
+                msg = f"no earlier rows at lead day {day} before {month_dt.date()}"
+                raise ValueError(msg)
             sample = np.sort(
                 rng.choice(eligible, size=min(N_PER_DAY, len(eligible)), replace=False)
             )
