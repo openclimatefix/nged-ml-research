@@ -258,7 +258,7 @@ def wrap_prose(*, text: str) -> str:
             blocks.append(block)
         else:
             blocks.append(textwrap.fill(" ".join(block.split("\n")), width=100))
-    return "\n\n".join(blocks)
+    return "\n\n".join(blocks).rstrip("\n") + "\n"
 
 
 def draw_figure(*, table: pl.DataFrame) -> None:

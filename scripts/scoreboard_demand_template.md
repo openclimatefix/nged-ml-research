@@ -9,13 +9,14 @@ MVA-only eight (D8 included, with donor spread; 99% intervals). Without D8, the 
 {mva7_gap_text}. This page is descriptive: it adopts nothing, and an adoption is decided by the
 [evaluation protocol](evaluation-protocol-demand.md) in an experiment.
 
-BG2's score here differs from experiment 379's by up to 0.006 points (3.78 against 3.788 at the MVA-only eight), because the shared half-hours differ slightly.
+BG2's score here differs from experiment 379's by up to 0.006 points (3.78 against 3.788 at the MVA-
+only eight), because the shared half-hours differ slightly.
 
 The page scores every stored forecast on one shared set of half-hours, so progress is read from one
 table and never from a chain of contrasts on different rows. The script
-`scripts/scoreboard_demand_rows.py` scores the stored forecasts and `scripts/scoreboard_demand_page.py`
-rebuilds this page from them. Run both again whenever the protocol version changes. No forecast is
-refitted.
+`scripts/scoreboard_demand_rows.py` scores the stored forecasts and
+`scripts/scoreboard_demand_page.py` rebuilds this page from them. Run both again whenever the
+protocol version changes. No forecast is refitted.
 
 ## What is scored
 
@@ -30,7 +31,8 @@ Primaries.
 | Leads to 336 hours | {n_336} | 0.5 to 336 hours | Stack without S, BG2, `manual_heuristic`, `climatology` (scored to 336 hours; the tables read only days 11 to 14 from this set) |
 
 **Forecasts and where they are stored.** Every score is computed from the private forecast folders
-below. Every forecast was stored under `demand-v1` and is rescored here with the metrics of `studies.eval_protocol`. The floor check below is the per-Primary floor that `demand-v2` added.
+below. Every forecast was stored under `demand-v1` and is rescored here with the metrics of
+`studies.eval_protocol`. The floor check below is the per-Primary floor that `demand-v2` added.
 
 | Forecast | Stored in | Lead range stored | Notes |
 |---|---|---|---|
@@ -42,12 +44,15 @@ below. Every forecast was stored under `demand-v1` and is rescored here with the
 | `manual_heuristic`, `climatology` | Experiment 87, `ref_*` | To 351 hours | The two fixed reference forecasts |
 | `xgboost_baseline` | Experiment 87, `ref_xgboost_baseline` | To 240 hours scored here | The production-style XGBoost model |
 
-**D8 appears in two ways.** In the leads-to-240-hours rows every forecast uses the donor spread at D8,
-as experiment 378 did. In the leads-to-336-hours rows the stack without S uses D8's own-residual
+**D8 appears in two ways.** In the leads-to-240-hours rows every forecast uses the donor spread at
+D8, as experiment 378 did. In the leads-to-336-hours rows the stack without S uses D8's own-residual
 spread, which is the protocol's D8 row. The two sets of rows therefore disagree about D8 for that
-one forecast, so the days 11 to 14 cell of the stack without S in the MVA-only band table is not like-for-like with the other cells of its row. Separately, every number for the MVA-only group assumes reactive power is zero.
+one forecast, so the days 11 to 14 cell of the stack without S in the MVA-only band table is not
+like-for-like with the other cells of its row. Separately, every number for the MVA-only group
+assumes reactive power is zero.
 
-**Forecasts that cannot be put on the current rows.** No such forecast is mixed in. Each needs a rerun before it can be added.
+**Forecasts that cannot be put on the current rows.** No such forecast is mixed in. Each needs a
+rerun before it can be added.
 
 - Primary demand research default 1, 2, and 3 at days 11 to 14. The stored arms stop at 240 hours.
 - Primary demand research default 3 at D8 with its own-residual spread. Experiment 378 scored D8
@@ -65,8 +70,8 @@ one forecast, so the days 11 to 14 cell of the stack without S in the MVA-only b
 **All forecasts, one table per group.** CRPS is the mean over the half-hours of the group. The
 "Minus BG2" column is the paired difference from BG2 on the same half-hours, as a 99% interval from
 20,000 resamples of whole months; the CRPS interval is 95% from 2,000 resamples. A negative
-difference means the forecast beats BG2. The contrast is not shown for the benchmarks, which are
-not candidates.
+difference means the forecast beats BG2. The contrast is not shown for the benchmarks, which are not
+candidates.
 
 ### Signed-MW six (D5, D9, D10, D11, D14, D16)
 
@@ -86,8 +91,8 @@ not candidates.
 
 ## CRPS by lead band
 
-**Each cell is the CRPS in points of effective capacity.** Days 1 to 10 are from the leads-to-240-hours
-rows. Days 11 to 14 are from the leads-to-336-hours rows and cover four forecasts only.
+**Each cell is the CRPS in points of effective capacity.** Days 1 to 10 are from the leads-
+to-240-hours rows. Days 11 to 14 are from the leads-to-336-hours rows and cover four forecasts only.
 
 ### Signed-MW six
 
@@ -108,8 +113,8 @@ rows. Days 11 to 14 are from the leads-to-336-hours rows and cover four forecast
 ## Floor check of the evaluation protocol
 
 **The floor asks for two things at each of the 14 signed-MW and MVA-only Primaries.** The CRPS over
-days 1 to 10 must not exceed the CRPS of `manual_heuristic`, and must stay within 1.10 times the CRPS
-of BG2. The check below uses point estimates, as the protocol does. D8 is judged with the donor
+days 1 to 10 must not exceed the CRPS of `manual_heuristic`, and must stay within 1.10 times the
+CRPS of BG2. The check below uses point estimates, as the protocol does. D8 is judged with the donor
 spread, which is the weaker arm, so its row is stricter than the protocol's.
 
 {floor_summary}

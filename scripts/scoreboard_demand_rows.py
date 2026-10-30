@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Score every stored Primary demand forecast on one shared set of half-hours, and store the rows.
 
 This is the first half of the scoreboard (`scoreboard_demand_page.py` is the second). It reads
@@ -7,8 +6,9 @@ not all reach the same lead:
 
 - `to_240h`: Primary demand research defaults 1, 2, and 3 (experiment 378's stored arms; default 2
   is default 1 with the two-number solar summary S in place of the stage-2 forecast above 168
-  hours), the stack without S (experiment 377's stage 2), BG2, `climatology`, `manual_heuristic`, and the production-style
-  `xgboost_baseline`. D8 uses the donor spread in every arm, as in experiment 378.
+  hours), the stack without S (experiment 377's stage 2), BG2, `climatology`,
+  `manual_heuristic`, and the production-style `xgboost_baseline`. D8 uses the donor spread in
+  every arm, as in experiment 378.
 - `to_336h`: the stack without S (experiment 377, D8 with its own-residual spread), BG2,
   `climatology`, and `manual_heuristic`, with leads to 336 hours so that days 11 to 14 are scored.
 
