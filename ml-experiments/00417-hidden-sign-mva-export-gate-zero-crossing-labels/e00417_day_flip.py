@@ -15,7 +15,7 @@ the afternoon limbs separately:
 - **Limb score.** On each limb (hours before and after solar noon), the drop in residual sum of
   squares from the best non-increasing fit of `e` on `u` (pool adjacent violators) to the best
   continuous two-piece line with a positive upper slope, divided by the two-piece sum of squares;
-  at least 3 hours either side of the breakpoint. The day's score is the smaller of the two limbs
+  with a negative lower slope as well (a V) and at least 3 hours either side of the breakpoint. The day's score is the smaller of the two limbs
   and its breakpoint is their mean. A day with a daily maximum `u` below 0.6 is ineligible.
 - **Threshold.** The 98th percentile of the score over the no-injection days of the other signed
   Primaries (leave one Primary out in the diagnostic; the visible four in a fit).
@@ -44,6 +44,7 @@ MIN_OVERCAST_HOURS: Final[int] = 3
 MIN_SIDE: Final[int] = 3
 THRESHOLD_PERCENTILE: Final[float] = 98.0
 BLOCK_DAYS: Final[int] = 28
+MAX_EARLIER_BLOCKS: Final[int] = 6
 SUMMER: Final[tuple[int, int]] = (4, 9)
 
 
@@ -151,7 +152,8 @@ def build_profile(*, h: Hourly) -> Profile:
 
 def expected(*, p: Profile, b: int, w: int, hh: int, temp: float) -> float:
     """Return the expected demand reading, widening day type and then block when a cell is empty."""
-    for bb, ww in ((b, w), (b, 1 - w), (b - 1, w), (b + 1, w), (b - 1, 1 - w), (b + 1, 1 - w)):
+    earlier = [(b - k, ww) for k in range(1, MAX_EARLIER_BLOCKS + 1) for ww in (w, 1 - w)]
+    for bb, ww in ((b, w), (b, 1 - w), *earlier, (b + 1, w), (b + 1, 1 - w)):
         if (bb, ww, hh) in p.median_r:
             return p.median_r[(bb, ww, hh)] + p.slope[hh] * (temp - p.median_t[(bb, ww, hh)])
     return float("nan")
@@ -179,11 +181,11 @@ def limb_score(*, u: np.ndarray, e: np.ndarray) -> tuple[float, float]:
         return 0.0, float("nan")
     iso = pav_decreasing_rss(y=e)
     best_rss, best_bp = np.inf, float("nan")
-    for k in range(MIN_SIDE, n - MIN_SIDE + 1):
+    for k in range(MIN_SIDE, n - MIN_SIDE):
         bp = u[k]
         design = np.stack([np.ones(n), u, np.maximum(u - bp, 0.0)], axis=1)
         coef, *_ = np.linalg.lstsq(design, e, rcond=None)
-        if coef[1] + coef[2] <= 0:
+        if coef[1] >= 0 or coef[1] + coef[2] <= 0:
             continue
         rss = float(np.sum((e - design @ coef) ** 2))
         if rss < best_rss:
@@ -227,8 +229,8 @@ def score_days(*, h: Hourly, profile: Profile) -> DayResult:
             ]
         )
         use = (h.u[sel] >= U_LOW) & (h.u[sel] < U_HIGH) & np.isfinite(e_all)
-        morning = use & (h.hod[sel] < h.noon_hod)
-        afternoon = use & (h.hod[sel] >= h.noon_hod)
+        morning = use & (h.hod[sel] + 0.5 < h.noon_hod)
+        afternoon = use & (h.hod[sel] + 0.5 >= h.noon_hod)
         if morning.sum() < 2 * MIN_SIDE or afternoon.sum() < 2 * MIN_SIDE:
             continue
         s_m, bp_m = limb_score(u=h.u[sel][morning], e=e_all[morning])
@@ -297,7 +299,7 @@ def run() -> dict:
         entry: dict = {"per_primary": {}}
         pos_scores, neg_scores, pos_level, neg_level = [], [], [], []
         paired_inj, paired_pla = [], []
-        recall_num = recall_den = 0
+        recall_num = recall_den = total_positive = 0
         for s in sites:
             d_inj, d_pla = days[(name, s)], days[(placebo_name, s)]
             t = tables[(name, s)]
@@ -323,6 +325,7 @@ def run() -> dict:
             neg_scores.append(d_inj.score[~positive])
             pos_level.append(d_inj.level[positive])
             neg_level.append(d_inj.level[~positive])
+            total_positive += int(sum(1 for c in neg_count.values() if c >= 2))
             recall_num += int((flagged_inj & positive).sum())
             recall_den += int(positive.sum())
             entry["per_primary"][s] = {
@@ -351,6 +354,11 @@ def run() -> dict:
             positive=np.concatenate(paired_inj), negative=np.concatenate(paired_pla)
         )
         entry["pooled_recall"] = recall_num / max(recall_den, 1)
+        entry["recall_all_positive"] = recall_num / max(total_positive, 1)
+        entry["n_positive_total"] = total_positive
+        entry["auc_per_primary"] = {
+            s: auc(positive=pos_scores[i], negative=neg_scores[i]) for i, s in enumerate(sites)
+        }
         entry["n_positive_days"] = recall_den
         results[name] = entry
     (diag.OUT_DIR / "day_flip.json").write_text(json.dumps(results, indent=1))
