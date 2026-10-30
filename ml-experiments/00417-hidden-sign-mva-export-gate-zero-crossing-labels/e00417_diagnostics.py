@@ -152,11 +152,11 @@ def clear_days(*, t: Table) -> DayScores:
             continue
         r = t.r[pos]
         centre = HALF_HOURS_PER_SIDE
-        left_slice = slice(0, centre - 1)
-        right_slice = slice(centre + 2, 2 * centre + 1)
-        centre_slice = slice(centre - 1, centre + 2)
+        left_slice = slice(0, centre - 2)
+        right_slice = slice(centre + 3, 2 * centre + 1)
+        centre_slice = slice(centre - 2, centre + 3)
         li = int(np.argmin(r[left_slice]))
-        ri = int(np.argmin(r[right_slice])) + centre + 2
+        ri = int(np.argmin(r[right_slice])) + centre + 3
         cmax = float(r[centre_slice].max())
         score = min(cmax - r[li], cmax - r[ri])
         days.append(d)

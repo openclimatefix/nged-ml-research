@@ -6,7 +6,7 @@ headline slice (real scaled CAMS unit shape at least 0.3 and clear-sky index at 
 balanced accuracy, recall, and false-reverse rate of the predicted sign (`P(X < 0) > 0.5`); the
 false-reverse rate on sunny summer middays with no injected and no real reverse flow; the pinball
 loss of the 11 signed quantiles; and the coverage and pinball loss at the 0.01, 0.05, 0.95, and
-0.99 quantiles. The pass bars are read from these numbers by `bars`.
+0.99 quantiles. `bars` reads the pass bars from these numbers.
 
 ```bash
 . env.sh && uv run --no-sync python ml-experiments/00417-*/e00417_score.py run
@@ -92,6 +92,46 @@ def score_frame(*, frame: pl.DataFrame) -> list[dict]:
     return out
 
 
+def bars(*, results: dict) -> dict[str, dict]:
+    """Read the registered bars for each arm from its injected, shuffled-sky, and placebo scores."""
+    out = {}
+    for key, entry in results.items():
+        arm, tag = key.split(" ", 1)
+        if arm.endswith("-shuffle") or not tag.startswith("L2_Q2_s"):
+            continue
+        by_site = {r["site"]: r for r in entry["scores"]}
+        pooled = by_site["pooled"]["model"]
+        shuffle = results.get(f"{arm}-shuffle {tag}")
+        placebo = results.get(f"{arm} L0_Q2_s{tag.rsplit('_s', 1)[1]}")
+        margin = (
+            pooled["balanced_accuracy"]
+            - next(r for r in shuffle["scores"] if r["site"] == "pooled")["model"][
+                "balanced_accuracy"
+            ]
+            if shuffle
+            else float("nan")
+        )
+        placebo_d5 = (
+            next(r for r in placebo["scores"] if r["site"] == "D5")["false_reverse_sunny_midday"]
+            if placebo
+            else float("nan")
+        )
+        sites = [r for r in entry["scores"] if r["site"] != "pooled"]
+        out[arm] = {
+            "pooled_ba": pooled["balanced_accuracy"],
+            "pooled_ba_pass": pooled["balanced_accuracy"] >= BARS["pooled_ba"],
+            "site_ba": {r["site"]: r["model"]["balanced_accuracy"] for r in sites},
+            "site_ba_pass": all(r["model"]["balanced_accuracy"] >= BARS["site_ba"] for r in sites),
+            "false_reverse": pooled["false_reverse"],
+            "false_reverse_pass": pooled["false_reverse"] <= BARS["false_reverse"],
+            "placebo_d5_false_reverse_sunny_midday": placebo_d5,
+            "placebo_pass": placebo_d5 <= BARS["placebo_false_reverse_d5"],
+            "margin_over_shuffle": margin,
+            "margin_pass": margin >= BARS["margin_over_shuffle"],
+        }
+    return out
+
+
 def run() -> dict:
     """Score every arm and setting over both months, and read the bars."""
     results: dict = {}
@@ -114,6 +154,7 @@ def run() -> dict:
                 "dropped": [sum(i["dropped"].values()) for i in infos],
             }
             results[f"{arm_dir.name} {key}"] = entry
+    results["_bars"] = bars(results=results)
     (OUT_DIR / "scores.json").write_text(json.dumps(results, indent=1))
     return results
 
@@ -124,6 +165,10 @@ def main() -> None:
     parser.add_argument("stage", choices=("run",))
     parser.parse_args()
     for key, entry in run().items():
+        if key == "_bars":
+            for arm, b in entry.items():
+                print(f"BARS {arm}: {json.dumps(b)}")
+            continue
         for r in entry["scores"]:
             m = r["model"]
             extra = (

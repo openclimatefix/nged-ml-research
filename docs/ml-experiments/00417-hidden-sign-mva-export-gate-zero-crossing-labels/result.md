@@ -116,8 +116,8 @@ labels from the two daily times at which the flow passes through zero.
   a departure).
 - **Weather inputs are CAMS and ERA5 only, realised, in laboratory conditions; no ECMWF ENS.** CAMS
   gives the unit PV shape `u` and the clear-sky index `k` as in experiment 412. ERA5 gives
-  temperature at each Primary (`era5_features.parquet` of the stage 1 pilot, hourly to 2026-07-31,
-  interpolated to the half-hour's midpoint), the demand module's only weather input. ERA5 shortwave
+  temperature at each Primary (`era5_features.parquet` of the stage 1 pilot, stamped every 30 minutes to 2026-07-31,
+  interpolated linearly to the half-hour's midpoint), the demand module's only weather input. ERA5 shortwave
   serves only as a cross-check of CAMS in the diagnostics. The day-ahead behaviour of every design
   stays untested.
 
@@ -240,6 +240,19 @@ gradient is printed for every arm. Tail calibration (coverage and pinball loss o
 signed-median-against-truth example is drawn at D5 and D10. The reference's absolute numbers may
 differ from experiment 412's, because the inputs differ. The first three arms' numbers are interim
 (two months, one seed, point estimates only).
+
+## Code review before the first fit
+
+A fresh Sonnet reviewer found no leakage and no blocking problem. Accepted: the W-score centre
+window was ±0.5 h and is now ±1 h as planned (the diagnostics were re-run); `bars` now scores the
+registered bars. Noted, not changed: the capacity prior centre is the median studies-page capacity
+of all six signed Primaries, the hidden pair included, as in experiment 412 (external information,
+not the hidden sign, and the prior is inert); the ERA5 file is stamped every 30 minutes, so the
+midpoint interpolation averages two samples; a Primary with fewer than 200 sunny summer-midday
+training rows gets a shut gate by default, and the row count is stored beside the decision; the
+bootstrap resamples injected and no-injection days separately although they are paired, and D10
+enters the injected pool only; the 1st-percentile branch of the gate does fire (at D5, D8, and D10,
+whose readings sit at the 2-point floor), contrary to an earlier reading of the plan.
 
 ## Departures from the design note
 
