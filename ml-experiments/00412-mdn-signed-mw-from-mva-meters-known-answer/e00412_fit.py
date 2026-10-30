@@ -15,7 +15,7 @@ ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generat
 ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand:\
 ml-experiments/00405-mdn-explicit-pv-term-learned-capacity-known-answer:\
 ml-experiments/00412-mdn-signed-mw-from-mva-meters-known-answer \
-DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data OMP_NUM_THREADS=1 \
+DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1 \
 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00412-*/e00412_fit.py time --device cuda
 ```
