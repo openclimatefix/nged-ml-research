@@ -50,15 +50,6 @@ FIRST_USABLE: Final[dict[str, datetime]] = {
     "D16": datetime(2021, 2, 1, tzinfo=UTC),
 }
 """First usable date after experiment 103's early-calibration cuts (copied from experiment 149)."""
-STATE_VARIABLES: Final[tuple[str, ...]] = (
-    "temperature_2m",
-    "dew_point_temperature_2m",
-    "pressure_surface",
-    "wind_speed_10m",
-)
-"""Interpolated linearly to the half-hour stamps, as the ENS upsampler does for point values."""
-HELD_VARIABLES: Final[tuple[str, ...]] = ("longwave", "precipitation")
-"""Hour-ending means held over both half-hours of the hour."""
 WEATHER: Final[tuple[str, ...]] = base.WEATHER
 CHUNK: Final[int] = 1_000_000
 
@@ -74,10 +65,10 @@ def _us(*, t: datetime) -> int:
 def dense_weather(*, series_id: int, site: str) -> np.ndarray:
     """Return a Primary's pretraining weather on the dense half-hourly grid, shape (grid, 7).
 
-    Columns follow `WEATHER`. State variables are linearly interpolated between the hourly ERA5
-    stamps; longwave and precipitation take the value of the hour ending at the stamp for both
-    half-hours of that hour; shortwave is CAMS global horizontal irradiance, held the same way
-    (experiment 14's convention: a CAMS stamp is the end of its hour).
+    The ERA5 file is already on the half-hourly grid (the pilot upsampled it), so its values sit at
+    their own stamps. Shortwave is CAMS global horizontal irradiance, which is hourly: both
+    half-hours of an hour take the value stamped at the end of that hour (experiment 14's
+    convention). Columns follow `WEATHER`.
     """
     size = common.grid_times().len()
     out = np.full((size, len(WEATHER)), np.nan, dtype=np.float32)
@@ -88,20 +79,11 @@ def dense_weather(*, series_id: int, site: str) -> np.ndarray:
     )
     index = np.asarray(common.grid_index(times=era5["valid_time"]))
     inside = (index >= 0) & (index < size)
-    index = index[inside]
     for name in WEATHER:
-        column = WEATHER.index(name)
-        if name == "shortwave":
-            continue
-        values = era5[name].to_numpy().astype(np.float64)[inside]
-        if name in STATE_VARIABLES:
-            good = np.isfinite(values)
-            grid = np.arange(index.min(), index.max() + 1)
-            out[grid, column] = np.interp(grid, index[good], values[good]).astype(np.float32)
-        else:
-            out[index, column] = values.astype(np.float32)
-            previous = index - 1
-            out[previous[previous >= 0], column] = values[previous >= 0].astype(np.float32)
+        if name != "shortwave":
+            out[index[inside], WEATHER.index(name)] = (
+                era5[name].to_numpy()[inside].astype(np.float32)
+            )
     cams = pl.read_parquet(CAMS_PATH).filter(pl.col("site") == site).sort("time")
     cams_index = np.asarray(common.grid_index(times=cams["time"]))
     ok = (cams_index > 0) & (cams_index < size)
@@ -442,6 +424,18 @@ def main() -> None:
         )
         del pre
     input_checks(fold=fold)
+    first = base.primaries().row(0, named=True)
+    era5 = (
+        pl.read_parquet(common.ERA5_PATH)
+        .filter(pl.col("time_series_id") == first["time_series_id"])
+        .sort("valid_time")
+        .row(1000, named=True)
+    )
+    dense = dense_weather(series_id=first["time_series_id"], site=first["site"])
+    stamp = int(common.grid_index(times=era5["valid_time"]))
+    for name in ("temperature_2m", "precipitation", "longwave"):
+        assert np.float32(era5[name]) == dense[stamp, WEATHER.index(name)], name
+    print("dense ERA5 weather equals the ERA5 row at the same stamp")
     day = np.arange(-5000, 5000)
     held, _ = base.held_out_weeks(origin_day=day)
     phase = (day // 7) % base.HELD_WEEK_PERIOD

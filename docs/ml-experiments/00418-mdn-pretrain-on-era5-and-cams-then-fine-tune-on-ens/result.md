@@ -99,13 +99,14 @@ the components, so a reader sees what each arm inherits:
 
 **Pretraining rows.** A pseudo-run starts every second day from 2019-09-01 at 00:00 UTC, with the
 origin 9 hours later (the publication delay of experiment 87). Each pseudo-run has one row per
-Primary and half-hour for leads 0.5 to 336 hours. Weather is the Primary's ERA5 hourly value
-(temperature, dew point, surface pressure, longwave, precipitation, 10 m wind speed) held over both
-half-hours, with CAMS global horizontal irradiance in place of the ERA5 shortwave. Power and the
-three origin lags come from the dense power grid with experiment 87's `origin_lags`, so the lags
-obey the same newest-usable-observation rule as an ENS row. Rows whose power is missing or flagged
-are dropped, as in experiment 397. The pretraining set holds an estimated 8 to 13 million rows
-depending on the fold; the build prints the count per fold.
+Primary and half-hour for leads 0.5 to 351 hours (the range of experiment 397's rows). Weather is
+the Primary's ERA5 value at the half-hour stamp (temperature, dew point, surface pressure, longwave,
+precipitation, 10 m wind speed; the file is already on the half-hourly grid), with CAMS global
+horizontal irradiance in place of the ERA5 shortwave. Power and the three origin lags come from the
+dense power grid with experiment 87's `origin_lags`, so the lags obey the same
+newest-usable-observation rule as an ENS row. Rows whose power is missing or flagged are dropped, as
+in experiment 397. The pretraining set holds an estimated 8 to 13 million rows depending on the
+fold; the build prints the count per fold.
 
 **Spread inputs for pretraining rows.** ERA5 has no ensemble spread, so the `std_*` input columns of
 a pretraining row take the median of the ENS `std_*` column at that lead band (24-hour bands) over
@@ -183,6 +184,15 @@ resource limits are one GPU process under 8 GB, one feeder core, `MemoryMax=8G`,
   the phase of the ENS rows.
 - **Pretraining row count:** each Primary's first usable power date is printed and the measured row
   count replaces the estimate of 8 to 13 million.
+
+## Known limits, registered before any fit
+
+- **Low-data check:** the fold's 24-month window limits the ENS rows, so the 2026-06 fold holds 4
+  months of ENS before 2024-10-01 and the other folds 6. The pretrained network has seen ERA5 and
+  CAMS rows up to the refit, including the months the fine-tuning drops, so C6 measures less ENS
+  rather than less data. Row counts are logged per fold.
+- **P3 noise:** the median spread by lead band pools all hours of the day, so shortwave noise is
+  non-zero at night. The write-up reports this as a limit of arm P3.
 
 ## Planned checks the write-up reports
 

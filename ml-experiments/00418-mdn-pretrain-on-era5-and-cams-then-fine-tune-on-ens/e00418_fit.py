@@ -143,6 +143,7 @@ def pretrain(
     del pre
     for seed in todo:
         started = time.monotonic()
+        torch.manual_seed(seed)
         model = new_model(fold=fold).to(device)
         epochs, best = train(model=model, setting=SETTING, t=t, seed=seed)
         target = pretrained_path(month=month, noisy=noisy, seed=seed)
@@ -165,6 +166,7 @@ def fine_tune(
     *, fold: prep.EnsFold, month: str, arm: str, seed: int, device: str, t: dict[str, torch.Tensor]
 ) -> fit397.Fitted:
     """Fine-tune a pretrained network (or train from scratch for `ens-only`) and return it."""
+    torch.manual_seed(seed)
     model = new_model(fold=fold).to(device)
     setting = SETTING
     if arm != "ens-only":

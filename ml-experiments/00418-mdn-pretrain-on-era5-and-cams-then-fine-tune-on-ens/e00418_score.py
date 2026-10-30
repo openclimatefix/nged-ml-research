@@ -26,6 +26,7 @@ import polars as pl
 
 REFERENCE: Final[str] = "ref_e397_pooled"
 MIN_GAIN: Final[float] = 0.03
+EXPECTED_SEEDS: Final[int] = 3
 SIX: Final[str] = "signed-MW six"
 EIGHT: Final[str] = "MVA-only eight"
 NOMINAL: Final[dict[str, float]] = {"coverage_q95": 0.95, "coverage_q99": 0.99}
@@ -44,6 +45,9 @@ def average_dir(*, folder: Path, months: list[str], seeds: list[int] | None = No
         )
         if not files:
             continue
+        if seeds is None and len(files) != EXPECTED_SEEDS:
+            msg = f"{folder.name} {month}: {len(files)} seed files, expected {EXPECTED_SEEDS}"
+            raise ValueError(msg)
         stack = pl.concat([pl.read_parquet(f) for f in files])
         pieces.append(
             stack.group_by(keys)
