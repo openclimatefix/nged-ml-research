@@ -1,6 +1,11 @@
 # Lagged power and error correction: research plan
 
-**No proposal in this theme is waiting.**
+**A lower number in the "Priority" column runs sooner.**
+
+## Priority
+
+| Id | Question | Priority | Waits for | State |
+|---|---|---|---|---|
 
 ## Planned experiments
 
