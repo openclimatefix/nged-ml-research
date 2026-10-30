@@ -55,27 +55,31 @@ best_arm: >-
   (D17), 14.41 (D1), and 14.26 (D6) at days 1 to 10, four test months
 headline: >-
   N1 minus BG2, days 1 to 10, CRPS in points of effective capacity: bulk supply points -0.47 (95%
-  interval -0.67 to -0.23), grid supply points -0.02 (-0.15 to +0.13). N1 minus the P0 network
-  fitted at the Primaries only: -4.1 (-5.7 to -3.1) and -15.2 (-23.2 to -10.6). Four test months,
-  so every interval is interim.
+  interval -0.67 to -0.23), grid supply points -0.02 (-0.15 to +0.13); N1 is a 3-seed average and
+  BG2 a single fit. N1 minus the P0 network fitted at the Primaries only: -4.1 (-5.7 to -3.1) and
+  -15.2 (-23.2 to -10.6), where P0's input scaling makes the grid figure unfair to P0. Four test
+  months, so every interval is interim.
 take_home_message: >-
-  A pooled neural network that is trained on the readings of two bulk supply points and two grid
-  supply points together with the 16 Primaries forecasts the bulk supply points a little better than
-  the weekly XGBoost forecast (0.47 points of capacity lower) and the grid supply points as well as
-  it. A network fitted at the Primaries alone fails at these points (4 to 15 points worse), so each
-  node's own history is needed. Giving the network the readings of the Primaries beneath a node did
-  not help.
+  A pooled neural network trained on the readings of two bulk supply points and two grid supply
+  points together with the 16 Primaries forecasts the bulk supply points a little better than the
+  weekly XGBoost forecast (0.47 points of capacity lower, in all four months) and the grid supply
+  points about as well, with very wide bands. A copy fitted at the Primaries alone fails at these
+  points, partly because of how its inputs were scaled. Giving the network the readings of the
+  Primaries beneath a node did not help.
 lessons:
   - >-
-    The network needs the nodes' own readings in its training rows: fitted at the Primaries only, it
-    scores 4.1 (bulk) and 15.2 (grid) points worse, with q95 coverage of 0.56 to 0.80.
+    A network fitted at the Primaries only scores 4.1 (bulk) and 15.2 (grid) points worse than one
+    that also trains on the nodes, with q95 coverage of 0.56 to 0.80; the grid figure is inflated
+    by P0's input scaling (audit finding 5), so the size of the benefit of node training is not
+    measured.
   - >-
-    The Primaries beneath a node add nothing as inputs: N2 minus N1 is +0.01 (bulk) and +0.32 (grid),
-    and randomly chosen Primaries (N2rw) score the same as the true ones.
+    The Primaries beneath a node add nothing as inputs: N2 minus N1 is +0.01 (bulk) and +0.32 (grid,
+    within refit noise), and randomly chosen Primaries (N2rw) score the same as N1.
 advice:
   - >-
     Fit the pooled plain network on the nodes' own readings together with the Primaries, and do not
-    apply a network fitted at the Primaries only to a bulk or grid supply point (C1).
+    apply a network fitted at the Primaries only to a bulk or grid supply point without scaling
+    the node's inputs by its own statistics (C1).
   - >-
     Do not add the lags of the Primaries beneath a node to the network at bulk or grid supply
     points, because neither the true nor a random set of Primaries lowered the score (C3, C4).
@@ -88,8 +92,9 @@ date: 2026-10-30
 ---
 
 **Take-home message: one pooled network, trained on the Primaries and on the four supply points
-themselves, forecasts the bulk supply points better than the weekly XGBoost model, and the grid
-supply points about as well; the Primaries beneath a node do not help as inputs.** We asked whether
+themselves, forecasts the bulk supply points better than the weekly XGBoost model and the grid supply
+points about as well, but at the grid supply points only with very wide bands; the Primaries beneath
+a node do not help as inputs.** We asked whether
 the pooled plain mixture density network of [experiment
 403](../00403-pooled-versus-per-primary-mixture-density-network/result.md) works at two bulk supply
 points (BSPs: D13, D17) and two grid supply points (GSPs: D1, D6), the nodes of
@@ -129,13 +134,23 @@ seeds, averaged in quantile space.
   control widened by 1.15 4.99, 7.39, 14.70, 14.33; GAM stack 5.66, 8.93, 17.77, 15.81;
   `manual_heuristic` 5.80, 8.82, 19.18, 15.92; `climatology` 6.06, 8.89, 18.29, 15.37.
 - **C1, N1 minus P0 (95%, month blocks):** BSPs -4.13 (-5.66 to -3.09); GSPs -15.17 (-23.16 to
-  -10.55). P0's q95 coverage is 0.56 to 0.80, so part of this gap is a badly calibrated transfer
-  and not the difference between two good networks.
+  -10.55). P0 is not a fair transfer: its lag inputs are scaled by the Primaries' statistics, and a
+  grid supply point's lags (net flow near zero, often negative) lie far outside them. At D1 P0's
+  median has a bias of +33 points and a correlation of -0.06 with the actual; its q95 coverage is
+  0.56 to 0.80. Treat -4.1 as the better bound on the benefit of node training and -15.2 as
+  inflated by an unknown share.
 - **C2, N1 minus the widened monthly XGBoost control:** BSPs -0.53 (-0.76 to -0.28); GSPs -0.18
-  (-0.68 to +0.23). N1 minus BG2: BSPs -0.47 (-0.67 to -0.23); GSPs -0.02 (-0.15 to +0.13). BG2 refits
-  weekly and N1 refits once per test month, so the BG2 contrast depends on cadence.
-- **C3, N2 minus N1:** BSPs +0.01 (-0.26 to +0.33); GSPs +0.32 (+0.19 to +0.44). Seed spread of
-  N1 alone is 0.04 to 0.14 at the BSPs and 0.44 to 0.80 at the GSPs.
+  (-0.68 to +0.23). N1 minus BG2: BSPs -0.47 (-0.67 to -0.23); GSPs -0.02 (-0.15 to +0.13). N1 is a
+  3-seed average and BG2 and the control are single fits. Single-seed N1 minus BG2 averages -0.39 at
+  the BSPs and +0.21 at the GSPs, so the BSP gain survives and the GSP parity does not depend on
+  more than the averaging. BG2 refits weekly and N1 refits once per test month, so the BG2
+  contrast depends on cadence. The BSP gain keeps its sign when either BSP is left out and in
+  each test month; the GSP contrast changes sign with the node left out (D6 +0.08, D1 -0.11).
+- **C3, N2 minus N1:** BSPs +0.01 (-0.26 to +0.33); GSPs +0.32 (+0.19 to +0.44). The interval
+  resamples test months only. Per seed the GSP difference is -0.04, +0.44, and +0.61 (standard
+  error about 0.20), and it rests on D6 (+0.54; D1 +0.09). A harm of about 0.3 at the GSPs is not
+  established. A likely reason for no gain is that the Primaries' lags barely track a grid supply
+  point (correlation -0.26 to +0.03 at D1 and D6, +0.59 to +0.87 at the BSPs).
 - **C4, N2 minus N2rw:** BSPs -0.06 (-0.22 to +0.09); GSPs +0.31 (+0.21 to +0.38). N2rw minus N1 is
   +0.07 (BSPs) and +0.02 (GSPs).
 - **C5, N1 minus P0 at the 14 countable Primaries:** -0.022 (-0.048 to +0.005); at D15 and D18 -0.46
@@ -157,7 +172,11 @@ seeds, averaged in quantile space.
   and q99 for N1 against BG2 at three of four nodes.
 - **Triggers fired.** Trigger 2 (a result contradicts a prediction: P1, P2, and P3 at the GSPs) and
   trigger 5 (N2 contains N1's inputs yet scores worse at the GSPs). A fresh Sonnet audit re-derived
-  the contrasts; its findings and their triage are in the PR. A separate Sonnet audit of the stage
+  every headline contrast to within 0.01 and found no leakage or missing-value fault in the
+  neighbour columns; its seven findings are triaged in the PR, and the first, second, third, fifth,
+  and sixth changed the wording above. The audit also found that N1 at the GSPs ties BG2 only with
+  bands about 100 points of capacity wide, and its median correlates 0.29 (D6) and 0.65 (D1) with
+  the actual, against 0.82 and 0.87 at the BSPs. A separate Sonnet audit of the stage
   1 numbers reproduced the printed CRPS and coverage to within 0.31 points and found the stored
   actuals equal to the cleaned readings.
 
@@ -184,6 +203,9 @@ seeds, averaged in quantile space.
 
 ## What to try next
 
+- A fair transfer arm, with the node's lags scaled by its own statistics, before quoting the value
+  of training on the nodes.
+- More seeds of N1 and N2 at D1 and D6, to settle whether the neighbour columns harm the GSPs.
 - A weekly-refit check of N1 at the GSPs, where it only ties BG2.
 - Widening or recalibrating the upper tail at D13.
 - Embedded generation and storage under each node as explicit inputs, which experiment 386 named
