@@ -130,7 +130,7 @@ def attach_spread(*, frame: pl.DataFrame, site: str) -> pl.DataFrame:
 
 
 def _save_boosters() -> None:
-    """Save every fitted booster as .ubj under work/boosters/<config>[_o]/<site>_<refit>.ubj."""
+    """Save every fitted booster as a .ubj file in work/boosters, named by config, site, and refit."""
     real_train = fd.xgb.train
     real_inputs = fd.train_inputs
 
