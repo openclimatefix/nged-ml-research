@@ -14,8 +14,8 @@ Arms (`--arms`), each fitted in a `lagged` form (three origin lags) and a `lagle
   hand-filtered mask by undoing its `CACHE_PADDING_STEPS` of padding on each side. Only events that
   ended before the refit are used.
 - `r2`: the same rule applied to half-hours marked by the detector; reads
-  `--mask-dir/<refit date>/<site>.npy` (a boolean array on experiment 87's grid, one file per series and refit, built only from data
-  before that refit).
+  `--mask-dir/<refit date>/<site>.npy` (a boolean array on experiment 87's grid, one file per
+  series and refit, built only from data before that refit).
 - `rc1`, `rc2`: drop as many training rows as `r1` and `r2` respectively, in random blocks of the
   same lengths (the control for a smaller training set).
 
