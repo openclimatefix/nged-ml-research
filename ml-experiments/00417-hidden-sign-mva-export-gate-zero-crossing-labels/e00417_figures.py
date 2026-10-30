@@ -48,7 +48,7 @@ def balanced_accuracy_chart() -> alt.Chart:
     bar = (
         alt.Chart(pl.DataFrame({"x": [0.85]}))
         .mark_rule(color=ORANGE, strokeDash=[4, 3])
-        .encode(x=alt.X("x:Q", scale=alt.Scale(domain=[0.4, 1.0])))
+        .encode(x=alt.X("x:Q", scale=alt.Scale(domain=[0.4, 1.0])))  # ty: ignore[unresolved-attribute]
     )
     return (base.mark_circle(size=90, aria=False) + bar).properties(
         width=WIDTH,
@@ -100,14 +100,14 @@ def auc_chart() -> alt.Chart:
         rows, schema={"name": pl.String, "auc": pl.Float64, "lo": pl.Float64, "hi": pl.Float64}
     )
     base = alt.Chart(frame).encode(y=alt.Y("name:N", title=None, sort=None))
-    dots = base.mark_circle(size=90, color=BLUE, aria=False).encode(
+    dots = base.mark_circle(size=90, color=BLUE, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "auc:Q",
             title="Area under the curve, injected against placebo days (larger is better)",
             scale=alt.Scale(domain=[0.4, 1.0]),
         )
     )
-    ci = base.mark_rule(color=BLUE).encode(
+    ci = base.mark_rule(color=BLUE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lo:Q", scale=alt.Scale(domain=[0.4, 1.0])), x2="hi:Q"
     )
     bars = (
@@ -115,7 +115,7 @@ def auc_chart() -> alt.Chart:
             pl.DataFrame({"x": [0.8, 0.9], "bar": ["0.8: stop-rule floor", "0.9: day-flip bar"]})
         )
         .mark_rule(strokeDash=[4, 3])
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=alt.Scale(domain=[0.4, 1.0])),
             color=alt.Color(
                 "bar:N",
