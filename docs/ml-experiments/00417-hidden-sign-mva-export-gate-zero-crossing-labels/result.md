@@ -47,14 +47,15 @@ prediction: >-
   above 0.8.
 decision_rule: >-
   The bars of P1 apply unchanged to A, A with H, and C, on rotation r1 only. Stop rule, registered:
-  stop the signed-MW work if A (with or without H) and C both fail the bars on rotation r1 (S1c-ref, A, and
-  C make about 20 fits; A with H and the power-factor fits bring the most to 32), or if every zero-fit diagnostic gives an area under
-  the curve below 0.8 between level-2.0 injected days and no-injection days. Stopping means: publish
-  unsigned MVA forecasts at the eight, label D12 alone "inferred, heavy reverse flow only", count
-  the result as the eighth failed treatment, and add no further capacity priors. Design B is a
-  follow-up, run only after the stop decision and only if A passes the placebo and leaves the pair
-  above 5%. Passing means running rotations r2 and r3 for the winning design as a follow-up experiment, not here. No porting
-  threshold applies, because the experiment is a lab test and nothing here ports to production.
+  stop the signed-MW work if A (with or without H) and C both fail the bars on rotation r1 (S1c-ref,
+  A, and C make about 20 fits; A with H and the power-factor fits bring the most to 32), or if every
+  zero-fit diagnostic gives an area under the curve below 0.8 between level-2.0 injected days and
+  no-injection days. Stopping means: publish unsigned MVA forecasts at the eight, label D12 alone
+  "inferred, heavy reverse flow only", count the result as the eighth failed treatment, and add no
+  further capacity priors. Design B is a follow-up, run only after the stop decision and only if A
+  passes the placebo and leaves the pair above 5%. Passing means running rotations r2 and r3 for the
+  winning design as a follow-up experiment, not here. No porting threshold applies, because the
+  experiment is a lab test and nothing here ports to production.
 benchmark: >-
   S1c refitted on the CAMS-and-ERA5 inputs (the reference of this experiment), S1c with the sky
   shuffled, and the no-injection placebo. Experiment 412's numbers are quoted for context only,
