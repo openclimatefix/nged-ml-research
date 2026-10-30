@@ -284,7 +284,12 @@ def score_nodes() -> None:
     pl.concat([t.with_columns(arm=pl.lit(n)) for n, t in scored.items()]).write_parquet(
         out / "node_scores.parquet"
     )
-    scored_per_series = table.group_by("label").len().sort("label")
+    scored_per_series = (
+        table.join(series.select("time_series_id", "label"), on="time_series_id")
+        .group_by("label")
+        .len()
+        .sort("label")
+    )
     bg2_per_series = (
         arms["bg2"]
         .join(series.select("time_series_id", "label"), on="time_series_id")
