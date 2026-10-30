@@ -79,9 +79,7 @@ def main() -> None:
         for site in sites:
             one = sel.filter(pl.col("site") == site)
             if not one.is_empty():
-                site_gain = float(one["crps_real"].mean() or 0.0) - float(
-                    one["crps_cf"].mean() or 0.0
-                )
+                site_gain = float(np.mean(one["crps_real"]) - np.mean(one["crps_cf"]))
                 print(f"  {site}: {one.height} rows, gain {site_gain:+.3f}")
 
 
