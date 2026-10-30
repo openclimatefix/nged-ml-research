@@ -38,6 +38,8 @@ FIGURE_DIR: Final[Path] = (
     / "00410-mdn-stale-weather-and-delayed-power-rescore"
 )
 ARM_ORDER: Final[list[str]] = ["P6", "P12", "P24", "W24", "W48", "W24_P12", "W24_P24", "DROP"]
+LOSS_ARMS: Final[list[str]] = [a for a in ARM_ORDER if a != "DROP"]
+"""Figure 1 leaves out DROP, whose loss of 4 to 10 points would flatten every other arm."""
 SIGNED_MVA: Final[tuple[str, ...]] = ("signed-MW six", "MVA-only eight")
 LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
     "day 1": (0.0, 24.0),
@@ -64,12 +66,12 @@ def figure_losses() -> None:
         if path.exists():
             frames.append(
                 pl.read_parquet(path)
-                .filter(pl.col("group").is_in(SIGNED_MVA), pl.col("arm").is_in(ARM_ORDER))
+                .filter(pl.col("group").is_in(SIGNED_MVA), pl.col("arm").is_in(LOSS_ARMS))
                 .with_columns(model=pl.lit(label))
             )
     data = pl.concat(frames).select("arm", "group", "model", "diff", "lower", "upper")
     base = alt.Chart(data.to_pandas())
-    y = alt.Y("arm:N", sort=ARM_ORDER, title=None)
+    y = alt.Y("arm:N", sort=LOSS_ARMS, title=None)
     colour = alt.Color(
         "model:N",
         scale=alt.Scale(
@@ -95,7 +97,7 @@ def figure_losses() -> None:
             title=alt.TitleParams(
                 [
                     "CRPS loss at days 1 to 10 when the inputs are stale (interim, five months)",
-                    "Dot: estimate. Line: 95% interval from resampling whole months.",
+                    "Dot: estimate. Line: 95% interval from resampling whole months. DROP (4 to 10 points) is left out.",
                 ],
                 anchor="start",
             )
@@ -107,9 +109,11 @@ def figure_losses() -> None:
 
 def actual_points(*, arrays: dict, site: str) -> pl.DataFrame:
     """Return a Primary's readings in points of capacity on the half-hourly grid."""
-    return pl.DataFrame(
-        {"valid_time": common.grid_times(), "actual": arrays[site].power * 100.0}
-    ).drop_nulls()
+    return (
+        pl.DataFrame({"valid_time": common.grid_times(), "actual": arrays[site].power * 100.0})
+        .drop_nans()
+        .drop_nulls()
+    )
 
 
 def figure_by_lead(*, network: str = "pooled") -> None:

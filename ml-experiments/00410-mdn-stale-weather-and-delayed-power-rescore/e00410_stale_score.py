@@ -83,7 +83,7 @@ def group_mean(*, scored: pl.DataFrame, metric: str, labels: tuple[str, ...]) ->
     table = scored.filter(
         pl.col("metric") == metric, pl.col("slice") == HEADLINE, pl.col("label").is_in(list(labels))
     )
-    return float(table["value"].mean())
+    return float(table["value"].to_numpy().mean())
 
 
 def widths(
@@ -108,7 +108,10 @@ def widths(
         .group_by("label")
         .agg(pl.col("width_90").mean(), pl.col("width_98").mean())
     )
-    return {"width_90": float(kept["width_90"].mean()), "width_98": float(kept["width_98"].mean())}
+    return {
+        "width_90": float(kept["width_90"].to_numpy().mean()),
+        "width_98": float(kept["width_98"].to_numpy().mean()),
+    }
 
 
 def decision_table(*, results: pl.DataFrame) -> None:
