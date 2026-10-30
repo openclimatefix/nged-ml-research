@@ -25,7 +25,8 @@ hypothesis: >-
   passed, and the solar term then lowers the net-demand CRPS at the six signed-direction Primaries
   against the same network given no solar term.
 prediction: >-
-  Written before any fit. K1 (anomaly variant): the learned capacity increment of C2 is 0.5 to 1.5
+  Written before any fit. K0 (controls): C2 recovers the ensemble's own anomaly at 0.8 to 1.2 and a pure profile
+  at most 0.30. K1 (anomaly variant): the learned capacity increment of C2 is 0.5 to 1.5
   of the least-squares read-out of the injected anomaly on the ensemble unit shape at 4 of the 6
   Primaries. K2 (anomaly placebo): the day-shuffled anomaly recovers at most the profile-only
   benchmark plus 0.20, where the benchmark is the same read-out on the shuffled series (expected
@@ -33,9 +34,9 @@ prediction: >-
   by more than 2 seed standard deviations at 4 of the 6 Primaries. P1: C3 minus A0-noirr-doy is
   between -0.15 and 0.00 CRPS points at the signed-MW six. P2: C2 minus A0-noirr-doy is negative by
   0.05 to 0.30 points. P3: C3 minus C2 is between -0.10 and 0.00 points with an interval that
-  includes zero. The score arms run only if K1 and K2 both hold.
+  includes zero. The score arms run only if K0, K1, and K2 hold.
 decision_rule: >-
-  See "Pre-registered rules". The known-answer gate is passed when K1 and K2 both hold on the
+  See "Pre-registered rules". The known-answer gate is passed when K0, K1, and K2 hold on the
   anomaly variant. A score contrast counts as a gain only if its 95% month-block interval,
   Bonferroni-corrected across the contrasts listed, excludes zero and the point estimate exceeds the
   contrast's minimum detectable effect (2 times the standard deviation of its seed-to-seed
@@ -135,40 +136,63 @@ capacity, subtracted from the target and the three lags, dropouts removed from e
 | placebo_profile | the real farm series with its days shuffled within the month (variant a) |
 | held_anomaly | the farm's day-to-day anomaly, its daylight profile removed (variant b) |
 | placebo_anomaly | the anomaly with its days shuffled within the month (variant b) |
+| pos_anomaly | the ensemble's own day-to-day anomaly of the unit shape, scaled to the same increment (positive control: perfectly readable) |
+| pos_profile | the ensemble's monthly daylight profile of the unit shape (negative control: should read near 0 once the day-of-year term exists) |
 
 The daylight profile is the farm's mean at each half-hour within each calendar month of each year,
 so each month's anomaly has zero mean at every half-hour and the shuffled anomaly keeps no profile.
-Arms: C2 (prior) and C4 (no prior, neutral 3 MW start), both with the day-of-year term, 3 seeds.
-That is 5 conditions x 2 arms x 3 seeds = 30 fits.
+The two controls use the ensemble unit shape `u` itself, so they say whether the network can read a
+perfectly forecastable anomaly, and whether it still puts a pure profile into the solar term.
+Arms: C2 (prior) with 5 seeds on every condition, C4 (no prior, neutral 3 MW start) with 3 seeds on
+the five farm conditions. That is 7 x 5 + 5 x 3 = 50 fits.
 
-**Recovery** is the seed-mean learned capacity increment (injected minus control, at the last
-season-year in the window) divided by `dC_LS` of the injected series on the same rows. The
-least-squares read-out is computed for every injected series, including each placebo, so the
-benchmark is measured on the same series as the fit.
+**Recovery, in common units.** Recovery is the seed-mean learned capacity increment (injected minus
+control, at the last season-year in the window) divided by `dC_LS(held_anomaly)` for every
+anomaly-variant condition, and by `dC_LS(held_profile)` for every profile-variant condition. Dividing
+the placebo by its own read-out (near 0) is what produced experiment 405's -1.88. `dC_LS` is
+computed on the fit's own rows and weights (all training rows of the as-of season-year with positive
+unit shape, with the fold's sample weights), in MW, with a standard error from a bootstrap over
+days. The placebo benchmark is the mean of `dC_LS` over 5 different shuffles divided by
+`dC_LS(held)`, so it is not one random draw. The lag route is part of the test: the injected series
+is subtracted from the three lags too, as in experiment 405. The 20 day-of-year inputs are not lag
+features.
+
+**Noise check before any gate is read.** From experiment 405's stored per-seed capacities and the
+new `dC_LS`, a script computes the expected seed standard deviation of the recovery ratio. If the
+expected standard deviation of the held-anomaly ratio exceeds 0.5 at more than 2 of the 6 Primaries,
+the gate is declared uninformative (not failed) and the page says so.
 
 ## Pre-registered rules
 
-1. **Gate K1 (recovery, anomaly variant).** C2's recovery on `held_anomaly` lies in 0.5 to 1.5 at 4
-   of the 6 Primaries. The band is wider than experiment 129's 0.75 to 1.25 because the anomaly is
-   only about one fifth of the farm's variance and the ensemble forecast correlates with it at about
-   0.37.
-2. **Gate K2 (placebo, anomaly variant).** C2's recovery on `placebo_anomaly` is at most
-   `dC_LS(placebo_anomaly) / dC_LS(held_anomaly) + 0.20`, in median and in maximum over the six. The
-   benchmark term is expected near 0 because the shuffle destroys the anomaly's link to the forecast.
-3. **Gates are on the anomaly variant, C2.** The profile variant (a) decides nothing. It reports K3
-   (real minus placebo recovery above 2 seed standard deviations at 4 of 6) and the same recovery
-   ratios against its own benchmark (0.84 to 0.97 by the audit of experiment 405), to show how much
-   of the profile the day-of-year term absorbs. C4 is reported beside C2, not gated.
-4. **If K1 or K2 fails**, the page reports the failure, with the profile variant and C4 beside it,
-   and the score arms do not run.
-5. **If K1 and K2 hold**, the score arms run: A0-noirr-doy, C1 (capacity pinned to the experiment
-   269 estimate), C2, C3, C4, C5a (monthly capacity path, smoothness penalty), and C5b (persistence
-   penalty), all with the day-of-year term, 3 seeds, 5 folds; A0 is read from experiment 403. The
-   contrasts at the signed-MW six, CRPS at days 1 to 10, month-block bootstrap at 95% with 20,000
-   resamples, Bonferroni across the nine: C3 minus A0-noirr-doy, C2 minus A0-noirr-doy, C2 minus A0,
-   C3 minus A0, C3 minus C2, C2 minus C1, C4 minus C3, C5a minus C3, C5b minus C3.
-   The MVA-only eight are reported, not contrasted.
-6. **Minimum detectable effect** and the gain rule are as in the decision rule above.
+1. **The test is informative only if both controls behave.** `pos_anomaly` recovery of C2 lies in
+   0.8 to 1.2 at 4 of the 6 Primaries, and `pos_profile` recovery (relative to its own read-out)
+   is at most 0.30 at 4 of the 6. If not, the page reports the known-answer test as uninformative
+   about the real farm, and the score arms do not run.
+2. **Gate K1 (recovery, anomaly variant).** C2's recovery on `held_anomaly` lies in 0.5 to 1.5 at 4
+   of the 6 Primaries, and exceeds `placebo_anomaly` recovery by more than 2 seed standard errors
+   at 4 of the 6. The band is wider than experiment 129's 0.75 to 1.25 because the anomaly is only
+   about one fifth of the farm's variance.
+3. **Gate K2 (placebo, anomaly variant).** C2's recovery on `placebo_anomaly` is at most the placebo
+   benchmark plus 0.20, in median and in maximum over the six.
+4. **K3, P1 to P3 and the profile variant are descriptive.** The profile variant (a) reports the
+   real-minus-placebo recovery and how much of the profile the day-of-year term absorbs (the
+   learned capacity increment on `pos_profile` with and without the term would show it; the
+   without-term fit is C2 on experiment 405's inputs, 3 seeds, 6 more fits). C4 is reported beside
+   C2.
+5. **If the controls, K1, or K2 fail**, the page reports it, with the profile variant and C4 beside
+   it, and the score arms do not run.
+6. **If all hold**, the score arms run: A0-noirr-doy, C1 (capacity pinned to the experiment 269
+   estimate), C2, C3, C4, C5a (monthly capacity path, smoothness penalty, built on C3), and C5b
+   (persistence penalty, built on C3), all with the day-of-year term, 3 seeds, 5 folds. A0 (without
+   the term, with irradiance) is read from experiment 403. Contrasts at the signed-MW six, CRPS at
+   days 1 to 10, month-block bootstrap at 95% with 20,000 resamples, Bonferroni across the seven,
+   each changing one factor: C3 minus A0-noirr-doy (solar term with adapter against none), C2 minus
+   A0-noirr-doy, C3 minus C2 (adapter), C2 minus C1 (learned against pinned capacity), C4 minus C3
+   (prior), C5a minus C3 (time variation), C5b minus C3 (persistence penalty). C3 minus A0 is
+   reported as the practical comparison and differs by the day-of-year term and the irradiance
+   inputs as well, so it is not a contrast. The MVA-only eight are reported.
+7. **A gain** needs both the Bonferroni interval excluding zero and the point estimate beyond the
+   minimum detectable effect. Both thresholds must hold.
 
 ## Reports
 
@@ -187,7 +211,7 @@ benchmark is measured on the same series as the fit.
 
 ## Compute and fits
 
-- **Known-answer test:** 30 fits at 50 to 200 seconds each, 0.5 to 2 hours.
+- **Known-answer test:** 56 fits (50 plus 6 for the without-term profile check) at 50 to 200 seconds each, 1 to 3 hours.
 - **Score arms (only if the gate holds):** 7 arms x 5 folds x 3 seeds = 105 fits, 1.5 to 6 hours.
 - **Stored predictions reused:** experiment 403's A0 forecasts, the XGBoost, BG2, and GAM-stack
   references. Experiment 405's `extras` and `u99` files are reused, which saves the unit-shape pass.
@@ -205,5 +229,9 @@ benchmark is measured on the same series as the fit.
 
 ## Reviews
 
-To be filled in: design review of this plan, code review before the first fit, results review,
-write-up review.
+- **Design review (fresh Sonnet) found nine points.** Accepted 1 to 8: the noise check,
+  common-unit recovery, positive and negative controls, the profile-absorption report, the read-out
+  on the fit's rows, the lag route stated, one-factor contrasts, and descriptive rules. Point 9 is
+  noted: the profile comes from the test period, which gives the network no information it could
+  not learn.
+- **To be filled in:** code review before the first fit, results review, write-up review.
