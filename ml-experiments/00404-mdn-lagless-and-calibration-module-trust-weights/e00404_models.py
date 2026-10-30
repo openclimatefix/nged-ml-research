@@ -284,7 +284,7 @@ class TrustMdn(nn.Module):
         tuple[torch.Tensor, torch.Tensor, torch.Tensor]
         | tuple[tuple[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
     ):
-        """Gate over 4 tokens: the 3 lag tokens and the lagless token, as the class docstring says."""
+        """Gate over 4 tokens: the 3 lag tokens and the lagless token."""
         view = lags.reshape(len(lags), N_LAGS, LAG_FEATURES)
         tokens = [
             torch.nn.functional.gelu(enc(torch.cat([view[:, i], trust[:, 0, :]], dim=-1)))
