@@ -109,7 +109,8 @@ alone at monthly refits. The decision rule above applies to the monthly contrast
 ## Lag-encroachment sweep (requested by the manager, rule fixed before any score is read)
 
 After the main fits, the baseline and arms a, b, and c are refitted once more at the latest weekly
-refit of the scored year (2026-06-23), with the boosters saved. A prediction-only sweep then adds a
+refit of the scored year (2026-06-23), with the boosters saved, for a four-Primary screen to save
+compute (D8 the target, D4 a placebo, D10 and D5 signed-MW; 16 fits in all). A prediction-only sweep then adds a
 synthetic step of depth D (plus and minus 2%, 5%, and 10% of capacity) to the lagged-power inputs:
 first the most recent lag only (k = 1), then the two most recent (k = 2), then all of them,
 including the weekly-analogue columns that lie inside the step. Per arm and lead band it reports
