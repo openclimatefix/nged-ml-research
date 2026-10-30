@@ -82,9 +82,9 @@ headline: >-
   (area under the curve 0.96) but its labels did not improve the fits.
 lessons:
   - >-
-    A gate that shuts a Primary's export branch on its own readings fixes the placebo by
-    construction, because a shut gate truncates the density at zero, and says nothing about the
-    Primaries where the gate opens (A, no-injection D5 against the injected pair).
+    An export gate that shuts on a Primary's own readings fixes the no-injection placebo by
+    construction, because a shut gate truncates the density at zero. The gate says nothing about
+    the Primaries where it opens, and the injected pair kept 12.0% false reverse flow (arm A).
   - >-
     The hard high-irradiance gate cut the false-reverse rate to 3.6% by also cutting recall from
     0.77 to 0.37, so balanced accuracy fell to 0.67 (A+H).
@@ -372,8 +372,8 @@ arms runs last, only if the machine is idle (`e00417_fit.py run --only pf`).
 
 ![Pooled balanced accuracy of the four arms, real sky against shuffled sky](balanced_accuracy.svg)
 
-**No arm reached the 0.85 pooled balanced accuracy bar.** One fit per arm and setting, on rotation r1
-(D5 and D10 hidden), level 2.0, power factor 1, reactive floor 2 points.
+**No arm reached the 0.85 pooled balanced accuracy bar.** One fit per arm and setting, on rotation
+r1 (D5 and D10 hidden), level 2.0, power factor 1, reactive floor 2 points.
 
 | Arm | Pooled BA | D5 BA | D10 BA | False reverse | D5 placebo, sunny middays | Margin over shuffled sky |
 |---|---|---|---|---|---|---|
@@ -382,40 +382,48 @@ arms runs last, only if the machine is idle (`e00417_fit.py run --only pf`).
 | A + H: hard gate | 0.668 | 0.638 | 0.703 | 3.6% | 0% (gate shut) | 0.13 |
 | C: zero-crossing labels | 0.823 | 0.801 | 0.854 | 13.9% | 85% | 0.15 |
 
-- **Design A passed the placebo by construction and failed the 5% bar.** The gate stays shut at D5
-  with no farm injected, so the density is truncated at zero and nothing reverses. With the farm
-  injected the gate opens on 31% of D5 rows, and the pair's false-reverse rate was 12.0%, as the
-  plan predicted.
+- **Design A passed the placebo by construction and failed the 5% bar, as the plan predicted.** The
+  export gate stays shut at D5 with no farm injected, so the density is truncated at zero and
+  nothing reverses. With the farm injected, the export gate opens at both D5 and D10, and the
+  false-reverse rate at the pair was 12.0% (11.0% for the reference).
 - **The hard gate H traded recall for precision.** Recall fell from 0.77 (A) to 0.37 and balanced
-  accuracy to 0.67, so A+H fails the 0.85 and the 0.70 per-Primary bars.
+  accuracy to 0.67, so A+H fails the 0.85 pooled balanced accuracy bar and, at D5 (0.638), the 0.70
+  per-Primary bar.
 - **Design C's labels gave the reference's balanced accuracy and its placebo fault.** D5 with no
   farm still called reverse flow on 85% of sunny middays.
-- **The prior penalty stayed inert in every arm.** Its share of the gradient was 0.0001 to 0.0004
-  (the fit logs print it for every arm), so no result here comes from a capacity prior.
-- **Power-factor 0.97 (sensitivity only).** The reference kept 0.830, and design A's gate stayed
-  shut at the injected D5, giving balanced accuracy 0.50 there.
+- **The prior penalty stayed inert in every real-sky arm.** The penalty's share of the gradient was
+  0.0001 to 0.0004 (0.002 to 0.005 in the shuffled-sky arms), so no result here comes from a
+  capacity prior.
+- **Power-factor 0.97 (sensitivity only).** The reference kept pooled balanced accuracy 0.830, and
+  design A's export gate stayed shut at the injected D5, giving balanced accuracy 0.50 there.
 
 ![Areas under the curve of the zero-fit diagnostics](diagnostic_auc.svg)
 
 **Of the zero-fit diagnostics, only the W-shape labeller (C) cleared its bar, and the day-level V in
 the unit PV shape (design I) did not.** At level 2.0 the pooled area under the curve was 0.96
-(interval 0.95 to 0.98) for C, 0.59 for D, and 0.75 for E. At level 1.0 the area for C fell to
-0.58. Design I, with its regime split and the maintainer's broken-cloud amendment, reached 0.73
-against the 0.9 bar, with recall 0.22 against 0.7 and a false-flag rate of 5.5% at D5 and 8.2% at
-D10 against the 2% limit. The roughness split put about 99% of days in the broken-cloud class, so
-its smooth-day area is undefined and the amendment's regime comparison could not be made.
+(interval 0.95 to 0.98) for C, 0.59 for D, and 0.75 for E. At level 1.0 the area for C fell to 0.58.
+The day-level diagnostic (design I), with its regime split and the broken-cloud amendment, reached
+0.73 against the 0.9 bar (0.70 when injected days are paired with their own placebo days). Its
+recall was 0.22 against 0.7. Its false-flag rate was 5.5% at D5 and 8.2% at D10, against the 2%
+limit. The roughness split put about 99% of days in the broken-cloud class, so the smooth-day area
+is undefined and the regime comparison could not be made. The registered prediction that one
+diagnostic stays at 0.8 or above at level 1.0 also failed: C fell to 0.58 and D was 0.59, and E gave
+an inverted 0.07.
 
 ## Checks
 
-- **Stop rule.** A (with or without H) and C both failed on rotation r1, so the signed-MW work stops
-  and the experiment counts as the eighth failed treatment.
-- **Nested-arm check.** A is the reference plus a gate, and its pooled balanced accuracy (0.826) did
-  not exceed the reference's (0.832), so the gate adds no skill where it opens.
-- **Audit triggers.** Failed controls (the reference and C failed the D5 placebo) and a result
-  against the prediction for C (labels passed the diagnostic and did not help the fits). No Opus
-  audit was requested, because the result is a stop rule firing on registered bars.
-- **Not done.** No intervals (one seed, two test months), rotations r2 and r3 not run, the AHI arm not
-  fitted because design I missed its bar, and no figure of signed-median examples was drawn.
+- **The stop rule fired.** A (with or without H) and C both failed on rotation r1, so the signed-MW
+  work stops and the experiment counts as the eighth failed treatment.
+- **The export gate showed no measured gain where it opens.** Arm A is the reference plus the gate,
+  and was refitted, not copied from the reference. Its pooled balanced accuracy (0.826) was 0.006
+  below the reference's (0.832), a gap within one seed's noise.
+- **Two audit triggers fired.** The reference and design C failed the D5 placebo (a failed control),
+  and design C's labels did not lift the fits although its diagnostic passed, against the prediction
+  (P3) that C passes all bars. No Opus audit was requested, because the result is a stop rule firing
+  on registered bars.
+- **Four checks were not done.** No intervals (one seed, two test months), rotations r2 and r3 not
+  run, the AHI arm not fitted because design I missed its bar, and no figure of signed-median
+  examples was drawn.
 
 ## Problems caused by the move
 
