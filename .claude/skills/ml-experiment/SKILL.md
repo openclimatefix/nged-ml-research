@@ -193,6 +193,39 @@ model trains or scores on it.
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
 
+## Standing practices for every new experiment
+
+**These practices come from the maintainer and apply unless the experiment's question is about the
+practice itself.** State in the plan which of them the experiment follows.
+
+- **Refit monthly in research and development.** Weekly refits belong to the cadence question and to
+  a gate that reproduces a stored weekly result.
+- **Use cleaned data everywhere.** Training rows, lag inputs, inference inputs, and scoring actuals
+  all drop the half-hours that the `substation_zero` rule flags. Report how many were dropped per
+  fold.
+- **Cut the noisy start of a short-history Primary.** Drop every D15 and D18 row before 2025-03-01,
+  in training, lags, inference inputs, and scoring actuals. Experiment 399 found this cut lowers
+  CRPS at both Primaries by 1% to 2% and that no longer cut helps both.
+- **Save every fitted model** (an XGBoost booster as `.ubj`, a neural network as its state file) in
+  the experiment's data folder, never in git, so a later experiment can run prediction-only checks.
+- **Reuse stored predictions** as controls and references before fitting anything, and say which
+  experiment's rows they are.
+- **Screen on a few folds first.** Rank a new intervention on four test months (one per season,
+  24-month training window), pre-register the advance rule, and label every screen number interim.
+  Only the full scored year can support a claim of benefit.
+- **Report the tails and the cost.** Show q01, q05, q95, and q99 coverage and pinball loss, cold
+  winter nights, and the avoidable-curtailment cost beside CRPS.
+- **Plot examples of the forecasts.** Every write-up that scores forecasts includes a day-ahead
+  forecast and the full 14-day horizon of one forecast, each against what happened, so the reader
+  sees whether the bands widen with horizon.
+- **Plot the load-shift events.** An experiment that scores performance during or after load-shift
+  events includes at least 6 time series plots, across both metering groups, that mark when each
+  event starts and ends and show how each forecast responds. State the unlogged-event caveat: NGED's
+  logs may miss events, so the clean-lag rows may hold events no label covers, the harm table is
+  optimistic, and the real-event slices undercount.
+- **Open every pull request as a draft**, run the local checks, and mark it ready only when the
+  reviews are triaged.
+
 ## Use the compute the slot gives you
 
 **Run independent work in parallel, up to the slot's budget of cores and GPU memory.** Series,
