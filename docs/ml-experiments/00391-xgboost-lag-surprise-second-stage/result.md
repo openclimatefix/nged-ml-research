@@ -58,9 +58,9 @@ metric: >-
 code: ml-experiments/00391-xgboost-lag-surprise-second-stage/
 verdict: not supported
 best_arm: >-
-  The monthly-refit control B0, without surprise or detector columns: continuous ranked probability
-  score 3.123 at the signed-MW six against 3.229 for N1 and 3.110 for the hand-label oracle O on all
-  rows, days 1 to 10 (points of effective capacity, seed 0).
+  No arm beat the monthly-refit control B0 on event-lag rows. On all rows, days 1 to 10, at the
+  signed-MW six (points of effective capacity, seed 0), B0 scored 3.123, N1 3.229, and the
+  hand-label oracle O 3.110, a difference of 0.013 between B0 and O.
 headline: >-
   Adding own and neighbour surprise (N1) to the monthly XGBoost demand model raised the CRPS on rows
   whose lags lie inside a labelled event by +0.110 points (99.29% interval -0.249 to +0.432) and on
@@ -69,21 +69,26 @@ headline: >-
   (N2, N3) was not fitted.
 take_home_message: >-
   A "surprise" input does not let the monthly XGBoost demand model handle load-shift events, and the
-  extra columns make the forecast slightly worse on the ordinary rows that make up 97% of the
-  test. The control model already does as well as an oracle that is told which lags are inside an
-  event, so these XGBoost lags offer little to recover. The detector that would have made the
+  extra columns make the forecast slightly worse on the ordinary rows that make up 95% of the
+  test. An oracle that is told which lags are inside an event did not beat the control either, and
+  so the hand-label flags show no sign that the lags have much to recover. The detector that would
+  have made the
   comparison failed its pre-registered check, so whether detector state adds to surprise stays
-  untested. The next step is to leave event handling out of the XGBoost lags and handle the event
-  in the demand-model structure, not in its inputs.
+  untested. One option for the next step is to handle the event outside the XGBoost lags, which this
+  experiment did not test.
 lessons:
   - >-
-    The oracle O, given the true event flags, scored +0.218 points worse than the control on event-lag
-    rows, so the ceiling for any lag-handling input is no better than the control.
+    The oracle O, given the true event flags, scored +0.218 points worse than the control on
+    event-lag
+    rows (interval -0.052 to +0.542 against seed 1), so the hand-label flags show no gain over the
+    control.
   - >-
-    Surprise columns cost +0.072 points on rows outside events (interval +0.006 to +0.145), three
-    times the +0.02 tolerance, and a second control seed moved the same slice by +0.001.
+    Surprise columns cost +0.072 points on rows outside events (interval +0.006 to +0.145), 3.6
+    times the +0.02 tolerance, but the interval's lower bound is below the tolerance, and a second
+    control seed moved the same slice by +0.001.
   - >-
-    The detector failed its pre-registered known-answer check (recall 0.42 against 0.55; veto dropped
+    The detector failed its pre-registered known-answer check (recall 0.42 against 0.55; veto
+    dropped
     0.33 of placebo alarms against 0.5), and found 0 of 7 labelled transfers at its tuned threshold.
 production_status: not-for-production
 adopted_in: none
@@ -93,8 +98,9 @@ advice:
     designs of that idea have now failed (Result, contrasts C8 to C11).
   - >-
     Report every lag-input contrast against two seeds of the control: the seed gap (+0.024 on
-    event-lag rows) is small enough to read the +0.110 as a real shift in mean, though the interval
-    includes zero (Result, noise floor).
+    event-lag rows) is small beside the +0.110, but the event-lag interval of N1 includes zero, so
+    read it as
+    no help (Result, noise floor).
   - >-
     Calibrate any detector threshold on transfers of the depth the labels hold (0.71 to 2.3 MW),
     not on shares of capacity, before tuning it (Detector gate).
@@ -113,10 +119,11 @@ labelled event, the surprise columns did not help (+0.110 points of CRPS, interv
 A Primary is one of the 16 primary substations scored here. CRPS is the continuous ranked
 probability score, in points of effective capacity.
 
-**The oracle was also worse than the control, so these lags leave little to recover.** The oracle O
+**The oracle did not beat the control either.** The oracle O
 gets hand-label flags for the target and each lag. On event-lag rows it scored +0.218 points worse
-than the control (all 16 Primaries). Whatever the surprise input would have recovered is bounded by
-that ceiling, which is no better than the control.
+than the control (all 16 Primaries). The interval against seed 1 is -0.052 to +0.542, so the result
+is "no gain" and not "harm".
+BG2 scores lower than B0 (3.016 against 3.123), so headroom exists elsewhere in the model.
 
 **The explicit detector failed its pre-registered check, so whether detector state adds to
 surprise is untested.** Arms N2, N2 without the veto, and N3 were not fitted: the manager held them
@@ -155,7 +162,7 @@ rows whose target lies outside an event but has a lag inside one.
 - **Own surprise alone (N0)** moved the event-lag rows by -0.038, an 18% cut of the 0.207 oracle
   gap, which meets prediction P1 in size but with an interval that includes zero. The neighbour
   columns undid it and more (N1 minus N0 +0.314), against prediction P2.
-- **The oracle gap on contaminated rows is the ceiling.** O minus B0 is +0.218 at all 16 Primaries,
+- **The oracle gap on contaminated rows.** O minus B0 is +0.218 at all 16 Primaries,
   +0.207 at the signed-MW six, and +0.332 at the MVA-only eight, so a hand-label flag also did
   not help at the MVA-only Primaries.
 - **Absolute scores (all rows, days 1 to 10, signed-MW six, seed 0):** B0 3.123, N1 3.229, O 3.110,
@@ -163,19 +170,22 @@ rows whose target lies outside an event but has a lag inside one.
   recipe, so they are not comparable to experiment 381's.
 - **ERA5-fed against ENS-driven surprise (C6):** N1-ERA5 is -0.020 (-0.064 to +0.008) on ordinary
   rows, so hindsight weather does not rescue the surprise columns.
-- **Avoidable curtailment cost** (GBP, all rows, signed-MW group, 7 Primaries): B0 12.65M, seed 1
+- **Avoidable curtailment cost** (GBP, all rows, signed-MW six): B0 12.65M, seed 1
   12.63M, N0 13.10M, N1 13.15M, N1-ERA5 12.80M, O 12.26M, `manual_heuristic` 12.66M, BG2 8.35M.
 
 ## The detector and its gate
 
 **The pre-registered known-answer gate failed.** Injected transfers at shares of capacity of 10%
 and 25%: recall at 25% and 2 days or more was 0.42 (gate 0.55); the veto kept 0.98 of plain hits
-(gate 0.95); the veto dropped 0.33 of placebo alarms (gate 0.5). At the tuned threshold (k = 2.3 ENS,
-2.35 ERA5-fed) the detector marked 0 of 7 labelled transfers in the ENS version, at 1.70 false
+(gate 0.95); the veto dropped 0.33 of placebo alarms (gate 0.5). At the tuned threshold (k = 2.3
+ENS,
+2.35 ERA5-fed) the detector marked 0 of 7 labelled transfers in the ENS version (1 of 7 in the
+ERA5-fed
+version), at 1.70 false
 alarms per Primary-year.
 
 **A post hoc gate in megawatts passed, and is labelled as such.** The label table holds transfers
-of 0.71, 1.1, and 2.3 MW at the quartiles, which are far below 10% of capacity at most Primaries.
+of 0.71, 1.1, and 2.3 MW at the quartiles, which are small shares of a Primary's capacity.
 Re-running the gate with those depths gave recall 0.63, veto keeps 0.98, and veto drops 0.91 of
 placebo alarms. This was chosen after seeing the failure, so it does not replace the pre-registered
 result. It suggests the detector works at the real transfer depths and failed the gate through the
@@ -189,7 +199,7 @@ choice of depths.
 - **Mean error beside the quantile contrasts.** The mean absolute error of the median moves with
   CRPS: N1 minus B0 +0.210 (-0.311 to +0.748) on event-lag rows, seed noise +0.025.
 - **Which audit triggers fired.** Two: the neighbour columns reversed the sign of prediction P2,
-  and O (the ceiling) came out worse than the control. A Sonnet audit of the scoring and
+  and O came out worse than the control. A Sonnet audit of the scoring and
   the oracle flags found no bug. The seed-1 control shows that seed noise
   (+0.001 outside events) is far smaller than the +0.072 harm outside events.
 - **Design target.** The sweep for the three median and tail tolerances was not run (see below).
@@ -201,7 +211,8 @@ choice of depths.
   correlation, and the code-review check for leakage were not run as separate steps.
 - **The detector's tuning window is shorter than the distillation's** (2024-11 to 2025-06, because
   stage 1 starts in 2024-10).
-- **The recipe is the 150-round screening recipe**, not experiment 87's 500 rounds, so scores are not
+- **The recipe is the 150-round screening recipe**, not experiment 87's 500 rounds, so scores are
+not
   comparable to experiment 381's.
 - **Two sets of Primaries.** B0, N1, and O ran at all 16; N0 and N1-ERA5 at 7 (the signed-MW six
   plus D8), so their contrasts use those 7.
@@ -212,11 +223,14 @@ choice of depths.
 - **Stop rule.** By the `verdict` in each page's front matter, experiments 89 and 90 (`refuted`) and
   383 (`not supported`) count on the idea "handle load-shift events inside the XGBoost lags", and
   this experiment is the fourth. Experiment 5 (`refuted`) tests lag placement, so the manager
-  decides whether it counts. Experiments 8, 18, 88, and 390 do not count.
+  decides whether it counts. Experiments 8, 18, and 88 (`inconclusive`) do not count; 390 (`partly
+  supported`) does not
+  count either, and the manager decides whether it tests the same idea.
 
 ## Data and reproduction
 
-- **Surprise tables for experiment 392:** `data/ml-experiments/00391-xgboost-lag-surprise-second-stage/surprise_tables/`.
+- **Surprise tables for experiment 392:**
+`data/ml-experiments/00391-xgboost-lag-surprise-second-stage/surprise_tables/`.
 - **Boosters:** `.../work/boosters/<arm>/` (12 monthly refits per Primary).
 - **Printed reports:** `.../work/scores_core/printed_report.txt` and
   `.../work/scores_subset/printed_report.txt`.
