@@ -10,6 +10,7 @@
 | 333 | Does a pre-trained time-series foundation model (Chronos-2), used zero-shot with or without weather covariates, come close to Primary demand research default 3? | Medium | Nothing | Planned |
 | 380 | Which stages of the GAM stack could go for a small, measured loss, and is its gap to BG2 larger at the Primaries with less regular demand? | High (maintainer asked) | Nothing | Planned |
 | 384 | What is special about the eight MVA-only Primaries that the GAM stack trails BG2 there? | High (maintainer asked 2026-10-28) | Nothing | Finished: no hypothesis shown; within the MVA-only group the gap follows the step rate |
+| 398 | Do the 38 flagged exact-zero half-hours change any published `demand-v1` score or ranking in experiments 379, 381, and 391? | High (maintainer approved 2026-10-30) | Nothing | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 
