@@ -103,12 +103,18 @@ labelled monthly; any winner is re-checked weekly before a release claim.
   391 has not merged when R2 is due, the file is copied into this folder with a note. The mask for
   a fold uses only half-hours before its `train_end`, and the detector's tuning months are fixed
   before any score is read.
-- **R5 shares 391's N1 forecasts and surprise tables**; the plan does not refit it. The tables
-  will be under `data/ml-experiments/00391-xgboost-lag-surprise-second-stage/surprise_tables/`
-  (not yet written). N1 keeps the three lags, so R5 exists in the lagged form only, and the
-  lagless contrast is R0 and R1's. Experiment 391 refits with no widening and scores raw and at
-  1.15, which this experiment copies. R5 enters the sweep only if 391 keeps N1's boosters; the
-  391 session is asked to keep one refit per quarter.
+- **R5 shares 391's N1 forecasts and surprise tables**; the plan does not refit it. The published
+  tables are in `data/ml-experiments/00391-xgboost-lag-surprise-second-stage/surprise_tables/`
+  (`half_hourly/<site>.parquet`: quantiles, `u`, `r_mw`, and the `refit` that predicted each row;
+  `origins/<site>.parquet`: `z`, `z_noise`, `r_sigma` per 6-hourly origin). Each row comes from a
+  monthly lagless fit that trained on no row at or after its refit. They cover all 16 Primaries from
+  2024-10-01 (D15 and D18 from 2025-03) to 2026-06-30, which spans the scored months 2025-07 to
+  2026-06. The same tables serve the R2 detector mask, which therefore starts in 2024-10: R2's
+  training masks for early refits rest on under a year of detector history, and the page says so.
+  N1 keeps the three lags, so R5 exists in the lagged form only. Experiment 391 refits with no
+  widening and scores raw and at 1.15, which this experiment copies. N1's forecasts will be under
+  its `work/arm_preds/monthly/n1/` and its boosters under `work/boosters/n1/`, which the sweep
+  reads.
 - **R0 lagged reuses experiment 381's monthly `control`** (`work/arm_preds/monthly/control/`, 192
   files, 16 Primaries by 12 refits, origins 2025-07-01 to 2026-06-01, no 1.15 widening), as the
   manager allowed. The recipe matches: 381's control uses `fd.input_columns(a7=False)` and
