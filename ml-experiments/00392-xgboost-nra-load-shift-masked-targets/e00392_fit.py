@@ -13,9 +13,9 @@ Arms (`--arms`), each fitted in a `lagged` form (three origin lags) and a `lagle
   `POST_EVENT_STEPS` after it ends. The unpadded event is recovered from the feature cache's
   hand-filtered mask by undoing its `CACHE_PADDING_STEPS` of padding on each side. Only events that
   ended before the refit are used.
-- `r2`: the same rule applied to half-hours marked by the detector; reads `--mask-dir/<site>.npy`
-  (a boolean array on experiment 87's grid, one file per series, built from data inside each
-  fold's training window).
+- `r2`: the same rule applied to half-hours marked by the detector; reads
+  `--mask-dir/<refit date>/<site>.npy` (a boolean array on experiment 87's grid, one file per series and refit, built only from data
+  before that refit).
 - `rc1`, `rc2`: drop as many training rows as `r1` and `r2` respectively, in random blocks of the
   same lengths (the control for a smaller training set).
 
@@ -57,13 +57,16 @@ POST_EVENT_STEPS: Final[int] = 96
 """Training rows within 48 hours after an event's end are dropped as well."""
 ARM_NAMES: Final[tuple[str, ...]] = ("r0", "r1", "r2", "rc1", "rc2")
 FORM_NAMES: Final[tuple[str, ...]] = ("lagged", "lagless")
+MAX_PLACEMENT_TRIES: Final[int] = 20
 
 
 def unpadded_runs(*, padded: np.ndarray) -> list[tuple[int, int]]:
     """Return the `[start, end)` grid steps of each event, with the cache's padding removed.
 
     A step belongs to an event when the padded mask holds over the `CACHE_PADDING_STEPS` before and
-    after it. Two events closer than twice the padding come out joined, which is conservative.
+    after it. Two events closer than twice the padding (96 half-hours) come out joined into one
+    run, so the gap between them counts as event time and the run's end can fall after a refit at
+    which the first event has already ended.
     """
     window = 2 * CACHE_PADDING_STEPS + 1
     csum = np.concatenate([[0], np.cumsum(padded.astype(np.int64))])
@@ -96,13 +99,28 @@ def drop_mask(*, runs: list[tuple[int, int]], refit_step: int, size: int) -> np.
 
 
 def random_blocks(*, true_mask: np.ndarray, first: int, last: int, seed_text: str) -> np.ndarray:
-    """Return a mask with `true_mask`'s block lengths, at random onsets in `[first, last)`."""
+    """Return a mask with `true_mask`'s block lengths, at random non-overlapping onsets.
+
+    `true_mask` is first clipped to `[first, last)`, the span that holds training rows, so a
+    post-event window that runs past the last training row does not add dropped rows the true mask
+    cannot drop. Each block is placed at a random onset inside `[first, last)`; a placement that
+    overlaps an earlier block is redrawn up to `MAX_PLACEMENT_TRIES` times, then the block is placed
+    anyway.
+    """
     generator = np.random.default_rng(zlib.crc32(seed_text.encode()))
+    clipped = true_mask.copy()
+    clipped[:first] = False
+    clipped[last:] = False
     mask = np.zeros(true_mask.size, dtype=bool)
-    for start, end in runs_of(mask=true_mask):
+    for start, end in runs_of(mask=clipped):
         length = end - start
-        onset = int(generator.integers(first, max(first + 1, last - length)))
-        mask[onset : onset + length] = True
+        high = max(first + 1, last - length)
+        onset = int(generator.integers(first, high))
+        for _ in range(MAX_PLACEMENT_TRIES):
+            if not mask[onset : onset + length].any():
+                break
+            onset = int(generator.integers(first, high))
+        mask[onset : min(onset + length, last)] = True
     return mask
 
 
@@ -112,9 +130,13 @@ def hand_runs(*, site: str) -> list[tuple[int, int]]:
     return unpadded_runs(padded=masks[site])
 
 
-def detector_mask(*, mask_dir: Path, site: str) -> np.ndarray:
-    """Return the detector's marked half-hours of one series on experiment 87's grid."""
-    return np.load(mask_dir / f"{site}.npy").astype(bool)
+def detector_mask(*, mask_dir: Path, site: str, refit: datetime) -> np.ndarray:
+    """Return the detector's marked half-hours of one series for one refit.
+
+    Reads `<mask_dir>/<refit date>/<site>.npy`, a boolean array on experiment 87's grid built only
+    from data before that refit, so that no mark rests on later data.
+    """
+    return np.load(mask_dir / f"{refit:%Y-%m-%d}" / f"{site}.npy").astype(bool)
 
 
 def training_drop(
@@ -131,7 +153,7 @@ def training_drop(
         if mask_dir is None:
             msg = f"arm {arm} needs --mask-dir"
             raise ValueError(msg)
-        runs = runs_of(mask=detector_mask(mask_dir=mask_dir, site=site))
+        runs = runs_of(mask=detector_mask(mask_dir=mask_dir, site=site, refit=refit))
     true_mask = drop_mask(runs=runs, refit_step=refit_step, size=size)
     if arm in ("r1", "r2"):
         return true_mask
@@ -189,7 +211,11 @@ def run_job(
             base.train_matrix(known=known, row=row, refit=refit, arm=arm),
             num_boost_round=rounds,
         )
-        path = BOOSTER_DIR / name / f"{site}_s{seed}_{refit:%Y%m%d}.ubj"
+        path = (
+            (BOOSTER_DIR if out_dir == ARM_DIR else out_dir.parent / "boosters_smoke")
+            / name
+            / f"{site}_s{seed}_{refit:%Y%m%d}.ubj"
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
         models[site].save_model(path)
         lines.append(
