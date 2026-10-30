@@ -73,8 +73,8 @@ headline: >-
   Per-Primary factors (T2) and per-Primary offsets (T3) move the share of outcomes below q95 at the
   signed-MW six from 0.923 to 0.932 (intervals include zero) and leave the CRPS unchanged. Spread
   columns lower the CRPS by 0.047 (99% interval -0.078 to -0.008) at the signed-MW six and 0.035
-  (-0.052 to -0.019) at the MVA-only eight, but do not improve the tail coverage (the share below q95 falls by 0.005 to 0.008). On cold nights
-  every arm covers only 0.72 to 0.80 (signed-MW six) of outcomes with its q95.
+  (-0.052 to -0.019) at the MVA-only eight, but do not improve the tail coverage (the share below
+  q95 falls by 0.005 to 0.008). On cold nights every arm covers only 0.72 to 0.80 (signed-MW six) of outcomes with its q95.
 lessons: >-
   The tails of the weekly XGBoost model are not a calibration-table problem that a trailing year of
   its own misses can fix: the correction is as large as its noise. The ensemble spread columns help
