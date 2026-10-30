@@ -184,7 +184,8 @@ Primary) and D4 (an MVA-only Primary), from the full-window fits.
 
 - **No Primary input means no scale.** The target is each Primary's power over capacity,
   standardised by that Primary's training mean and standard deviation, so the no-embedding network
-  predicts a standardised value without any Primary-specific level or spread. The missing level and spread probably explain most of the
+  predicts a standardised value without any Primary-specific level or spread. The missing level and
+  spread probably explain most of the
   no-embedding network's loss. The arm therefore tests "no learned Primary identity" and does not
   test a network given static covariates in its place (the follow-on experiment 1c).
 - **Each pooled fit cuts the history of 4 of the 16 Primaries.** The other 12 keep full history, so
