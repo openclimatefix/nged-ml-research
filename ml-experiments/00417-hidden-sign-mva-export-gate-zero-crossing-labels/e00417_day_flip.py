@@ -46,6 +46,9 @@ THRESHOLD_PERCENTILE: Final[float] = 98.0
 BLOCK_DAYS: Final[int] = 28
 MAX_EARLIER_BLOCKS: Final[int] = 6
 SUMMER: Final[tuple[int, int]] = (4, 9)
+BROKEN_U_STD: Final[float] = (
+    0.15  # within-day std of u (0.1 <= u < 0.95) above which a day is broken cloud
+)
 
 
 @dataclass
@@ -203,11 +206,12 @@ class DayResult:
     score: np.ndarray
     breakpoint: np.ndarray
     level: np.ndarray
+    broken: np.ndarray
 
 
 def score_days(*, h: Hourly, profile: Profile) -> DayResult:
     """Score every eligible summer day."""
-    days, scores, bps, levels = [], [], [], []
+    days, scores, bps, levels, broken_flags = [], [], [], [], []
     daily_max = (
         pl.DataFrame({"d": h.day, "u": h.u}).group_by("d").agg(pl.col("u").max()).iter_rows()
     )
@@ -229,22 +233,38 @@ def score_days(*, h: Hourly, profile: Profile) -> DayResult:
             ]
         )
         use = (h.u[sel] >= U_LOW) & (h.u[sel] < U_HIGH) & np.isfinite(e_all)
-        morning = use & (h.hod[sel] + 0.5 < h.noon_hod)
-        afternoon = use & (h.hod[sel] + 0.5 >= h.noon_hod)
-        if morning.sum() < 2 * MIN_SIDE or afternoon.sum() < 2 * MIN_SIDE:
-            continue
-        s_m, bp_m = limb_score(u=h.u[sel][morning], e=e_all[morning])
-        s_a, bp_a = limb_score(u=h.u[sel][afternoon], e=e_all[afternoon])
+        u_day = h.u[sel]
+        broken = bool(use.sum() >= 2 * MIN_SIDE and np.std(u_day[use]) > BROKEN_U_STD)
+        if broken:
+            # Broken cloud: a V in u over the whole day, with at least MIN_SIDE hours (6 half-hours)
+            # on each arm, whatever the time of day. Several crossings are repeat visits to one u*.
+            score, bp = limb_score(u=u_day[use], e=e_all[use])
+        else:
+            morning = use & (h.hod[sel] + 0.5 < h.noon_hod)
+            afternoon = use & (h.hod[sel] + 0.5 >= h.noon_hod)
+            if morning.sum() < 2 * MIN_SIDE or afternoon.sum() < 2 * MIN_SIDE:
+                continue
+            s_m, bp_m = limb_score(u=u_day[morning], e=e_all[morning])
+            s_a, bp_a = limb_score(u=u_day[afternoon], e=e_all[afternoon])
+            score = min(s_m, s_a)
+            bp = (
+                float(np.nanmean([bp_m, bp_a]))
+                if np.isfinite(bp_m) and np.isfinite(bp_a)
+                else float("nan")
+            )
         midday = (h.hod[sel] >= 10) & (h.hod[sel] < 14) & np.isfinite(e_all)
         days.append(int(d))
-        scores.append(min(s_m, s_a))
-        bps.append(
-            float(np.nanmean([bp_m, bp_a]))
-            if np.isfinite(bp_m) and np.isfinite(bp_a)
-            else float("nan")
-        )
+        scores.append(score)
+        bps.append(bp)
+        broken_flags.append(broken)
         levels.append(float(e_all[midday].mean()) if midday.any() else float("nan"))
-    return DayResult(np.array(days), np.array(scores), np.array(bps), np.array(levels))
+    return DayResult(
+        np.array(days),
+        np.array(scores),
+        np.array(bps),
+        np.array(levels),
+        np.array(broken_flags, dtype=bool),
+    )
 
 
 # --- the known-answer run ---------------------------------------------------------------------
@@ -299,6 +319,8 @@ def run() -> dict:
         entry: dict = {"per_primary": {}}
         pos_scores, neg_scores, pos_level, neg_level = [], [], [], []
         paired_inj, paired_pla = [], []
+        reg_pos: dict[str, list] = {"smooth": [], "broken": []}
+        reg_neg: dict[str, list] = {"smooth": [], "broken": []}
         recall_num = recall_den = total_positive = 0
         for s in sites:
             d_inj, d_pla = days[(name, s)], days[(placebo_name, s)]
@@ -321,6 +343,10 @@ def run() -> dict:
             common_days = np.intersect1d(d_inj.day, d_pla.day)
             paired_inj.append(d_inj.score[np.isin(d_inj.day, common_days)])
             paired_pla.append(d_pla.score[np.isin(d_pla.day, common_days)])
+            reg_pos["smooth"].append(d_inj.score[positive & ~d_inj.broken])
+            reg_neg["smooth"].append(d_inj.score[~positive & ~d_inj.broken])
+            reg_pos["broken"].append(d_inj.score[positive & d_inj.broken])
+            reg_neg["broken"].append(d_inj.score[~positive & d_inj.broken])
             pos_scores.append(d_inj.score[positive])
             neg_scores.append(d_inj.score[~positive])
             pos_level.append(d_inj.level[positive])
@@ -329,6 +355,13 @@ def run() -> dict:
             recall_num += int((flagged_inj & positive).sum())
             recall_den += int(positive.sum())
             entry["per_primary"][s] = {
+                "false_flag_placebo_smooth": float(flagged_pla[~d_pla.broken].mean())
+                if (~d_pla.broken).any()
+                else float("nan"),
+                "false_flag_placebo_broken": float(flagged_pla[d_pla.broken].mean())
+                if d_pla.broken.any()
+                else float("nan"),
+                "n_broken_injected": int(d_inj.broken.sum()),
                 "n_eligible_injected": len(d_inj.day),
                 "n_positive": int(positive.sum()),
                 "recall_at_threshold": float(flagged_inj[positive].mean())
@@ -347,6 +380,11 @@ def run() -> dict:
         entry["auc_positive_vs_negative_days"] = auc(
             positive=np.concatenate(pos_scores), negative=np.concatenate(neg_scores)
         )
+        for regime in ("smooth", "broken"):
+            entry[f"auc_{regime}_days"] = auc(
+                positive=np.concatenate(reg_pos[regime]), negative=np.concatenate(reg_neg[regime])
+            )
+            entry[f"n_positive_{regime}"] = int(sum(len(x) for x in reg_pos[regime]))
         entry["auc_level_baseline"] = auc(
             positive=np.concatenate(pos_level), negative=np.concatenate(neg_level)
         )
@@ -374,7 +412,9 @@ def main() -> None:
         print(
             f"\n== {name}: AUC {e['auc_positive_vs_negative_days']:.3f} (level baseline "
             f"{e['auc_level_baseline']:.3f}); paired AUC {e['paired_auc_pooled']:.3f}; recall "
-            f"{e['pooled_recall']:.2f} of {e['n_positive_days']} positive days"
+            f"{e['pooled_recall']:.2f} of {e['n_positive_days']} positive days; AUC smooth "
+            f"{e['auc_smooth_days']:.3f} (n_pos {e['n_positive_smooth']}), broken "
+            f"{e['auc_broken_days']:.3f} (n_pos {e['n_positive_broken']})"
         )
         for s, p in e["per_primary"].items():
             print(
