@@ -296,7 +296,7 @@ def auc(*, positive: np.ndarray, negative: np.ndarray) -> float:
     )
 
 
-def run() -> dict:
+def run() -> dict:  # noqa: PLR0915
     """Score the days of every setting, and read the bars."""
     sites = inputs.SIGNED_SIX
     tables = {
