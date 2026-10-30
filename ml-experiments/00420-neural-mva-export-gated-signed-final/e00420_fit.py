@@ -185,10 +185,11 @@ def prepare(*, arm: Arm, fold: inputs.Fold) -> Prepared:
         valid_us=fold.valid,
     )
     info = {
+        "forced_shut": arm.mode == "shut",
         "gates": {
             s: {"open": g.open, "spearman": g.spearman, "p1_points": g.p1_points, "n": g.n_rows}
             for s, g in gate_map.items()
-        }
+        },
     }
     return Prepared(
         fold=fold,

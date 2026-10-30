@@ -22,16 +22,14 @@ hypothesis: >-
   Experiment 417's arm A (a Primary-level export gate in front of the folded likelihood) gives a
   large gain in signed CRPS on reverse-flow rows over the plain network read as signed, and keeps
   the no-injection CRPS unchanged. Adding one shared variance term that grows with the fitted PV
-  term narrows the remaining gap, because the false calls sit next to zero crossings and the q01
+  term improves on A, because the false calls sit next to zero crossings and the q01
   coverage on reverse rows is about 0.05 against a nominal 0.01, so the signed distribution is too
   narrow where PV is large.
 prediction: >-
   Written before any fit. B1: A and AV beat P0 on reverse-flow rows by at least the minimum
   detectable effect, with the interval excluding zero, pooled and at each of the six hidden
   Primaries (on the stored r1 test months A scored 5.1 points against about 15 for the plain
-  network read as signed, so this should hold). B3: A beats the shuffled sky. B2: AV beats A by
-  less than the minimum detectable effect, so the AV against A contrast is reported as small or
-  underpowered. B4 is the bar most at risk: at an r2 or r3 placebo Primary the Primary-level gate
+  neural network read as signed, so this should hold). B3: A beats the shuffled sky. B2: AV beats A by at least the minimum detectable effect; this fails if the gain is smaller or if the contrast is underpowered. B4 is the bar most at risk: at an r2 or r3 placebo Primary the Primary-level gate
   may open wrongly, and the signed CRPS there worsens by more than the no-harm tolerance. B5 holds
   because the gate decision at the MVA-only eight is made on their own readings.
 decision_rule: >-
@@ -39,13 +37,11 @@ decision_rule: >-
   label the passing arm's signed output at the eight "inferred, laboratory, gated" and take it to a
   serving test with ENS inputs. If B4 fails at any placebo Primary, stop the signed-MW work for good:
   publish unsigned MVA forecasts at the eight and label D12 alone "inferred, heavy reverse flow
-  only". Add no further gates or capacity priors, because that would count as the ninth failed
-  treatment. Stage-1 stop rule, registered: if A fails B1 against P0 on rotation r1 at the new
+  only". Add no further gates or capacity priors, because that would count as the ninth failed treatment. B4 is judged per arm, and the label goes to AV only if B2 also passes, otherwise to A. B3 is measured on A, and AV inherits it. Any other result (for example B1, B3, or B5 failing while B4 passes) is reported as not shown, with no label and no further fits. Stage-1 stop rule, registered: if A fails B1 against P0 on rotation r1 at the new
   months, stop; otherwise run stage 2 after telling the manager. No porting threshold applies,
   because the experiment is a lab test and nothing here ports to production.
 benchmark: >-
-  P0, experiment 417's network with every folded Primary's gate forced shut (the plain network read
-  as signed), and A, experiment 417's arm A. Experiment 417's numbers are quoted for context only,
+  P0, experiment 417's network with every folded Primary's gate forced shut (the plain neural network read as signed), and A, experiment 417's arm A. Experiment 417's numbers are quoted for context only,
   because they cover two test months.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
@@ -74,7 +70,7 @@ realised CAMS irradiance and ERA5 temperature, so every result is a laboratory r
 
 ## Evidence the plan follows
 
-- **The audit found no defect whose correction turns a failed arm into a pass.** It did find four
+- **The audit found no defect whose correction turns a failed arm into a pass.** The audit did find four
   defects that change how earlier numbers read (table below), and it moved the pass bars from the
   sign of the flow to the signed CRPS. The audit's recomputed figures come from stored forecasts of
   experiments 412 and 417 and are approximate (CRPS as twice the mean pinball loss over 11 levels).
@@ -101,7 +97,7 @@ realised CAMS irradiance and ERA5 temperature, so every result is a laboratory r
 | Audit finding | What this experiment does |
 |---|---|
 | 1. The 5% false-reverse bar used every non-reverse half-hour of the headline slice, not the registered sunny summer-midday denominator | The sign bars become descriptive. `e00420_score.py` prints the false-reverse rate on both denominators and labels each (`false_reverse_slice`, `false_reverse_sunny_midday`). |
-| 2. One label covered two events (the no-injection D5 placebo and the hidden-pair crossing) | The two are reported under separate names; the placebo signed CRPS (B4) replaces the placebo false-reverse rate. |
+| 2. One label covered two events (the no-injection D5 placebo and the hidden-pair crossing) | The false-reverse rate is scored per setting and per Primary, so the no-injection D5 summer-midday rate is its own line; the placebo signed CRPS (B4) carries the no-harm bar. |
 | 3. No dead band at the reactive floor | A 2-point dead band is reported beside the plain rate (`false_reverse_dead_band_2pt`). |
 | 4. The decision rule `P(X < 0) > 0.5` scores calibration with ranking | The ROC area and the recall at a matched 5% false-reverse rate are reported. |
 | 5. Gate H divides a hidden Primary's median in its own points by a different Primary's capacity in that Primary's points | Gate H is not used, and `e00417_gates.high_irradiance_thresholds` is not imported. No corrected H is built, because the audit shows that any `u` gate stays open at the false calls. |
@@ -113,13 +109,11 @@ realised CAMS irradiance and ERA5 temperature, so every result is a laboratory r
 
 ## Step 0: design I's diagnostic with a corrected threshold
 
-**The corrected broken-cloud threshold is fixed at 0.0742 before any diagnostic score is read.** It is
-the 75th percentile of the mean absolute second difference of hourly `u` over the clear days of the
-six signed-MW Primaries (a clear day has hourly `k` of at least 0.8 in every daylight hour and a
+**The corrected broken-cloud threshold is fixed at 0.0742 before any diagnostic score is read.** The threshold is the 75th percentile of the mean absolute second difference of hourly `u` over the clear days of the
+six signed-MW Primaries, hidden pair included (a clear day has hourly `k` of at least 0.8 in every daylight hour and a
 daily maximum `u` of at least 0.6; 153 days in all, 23 to 29 per Primary). Between 83% and 97% of
 those clear days exceeded the old threshold of 0.05, which confirms the audit's finding. `u` and
-`k` come from CAMS and do not depend on the injection, so no signed truth enters the threshold. The
-step reruns experiment 417's `run` with the new threshold and writes its tables to this experiment's
+`k` come from CAMS and do not depend on the injection, so no signed truth enters the threshold. The note asks for the visible Primaries; the pool here is wider because the quantity read is a property of the sky, which the injection does not touch, and the wider pool gives more days. The step reruns experiment 417's `run` with the new threshold and writes its tables to this experiment's
 own folder, so experiment 417's stored files are not changed. It is reported with no bar and costs
 no fits.
 
@@ -152,12 +146,12 @@ Primary-months, 20,000 resamples), because each half-hour repeats in about 15 ru
 2.8 times the month-block bootstrap standard deviation of the null difference between A's two seeds
 on the reverse-flow slice (80% power at 5% two-sided). Stage 1 fits A's second seed on rotation r1 at
 level 2.0 so the figure exists before stage 1 is scored; the stage-2 figure uses all three rotations.
-Each figure is committed to this page before the matching contrast is run. If the figure exceeds 0.5
-points (about 10% of A's 5.1 on r1), the AV against A contrast is reported as underpowered.
+The same figure is applied at each Primary. It measures seed noise, which is a floor for the sampling noise of an arm-against-arm contrast, and it rests on few blocks (14 Primary-months on r1, 7 per Primary), so it is itself noisy. Each figure is committed to this page before the matching contrast is run. If the figure exceeds 0.5
+points (about 10% of A's 5.10 on r1), the AV against A contrast is reported as underpowered.
 
 - **B1 (gain over the plain reading).** AV's reverse-row CRPS is below P0's by at least the minimum
   detectable effect, with the interval excluding zero, pooled and at each of the six hidden Primaries
-  at level 2.0. The same test is read for A (stage 1 uses A on rotation r1).
+  at level 2.0. The same test is read for A. On rotation r1 (stage 1) the hidden pair is D5 (injected) and D10 (real reverse flow, no injection), so stage-1 B1 is pooled over D5 and D10 and at each of the two, and a failure at either stops the run.
 - **B2 (gain over the best earlier arm).** AV's reverse-row CRPS is below A's by at least the minimum
   detectable effect, pooled at level 2.0.
 - **B3 (the sky carries the gain).** A beats A-shuffle on the same slice by at least the minimum
@@ -196,7 +190,7 @@ stop: the stored r1 result did not survive more months. Otherwise tell the manag
 
 **Compute.** Experiment 412 timed a fit at 29 to 83 seconds including the fold build (a smoke test of
 this code took 26 to 36 seconds per fit on the 2025-07 fold). Each fold is built once per rotation,
-setting, and test month and shared across the arms and seeds. Stage 1 takes about 40 to 80 minutes
+setting, and test month and shared across the arms and seeds. Stage 1 (56 fits) takes about 45 to 95 minutes
 and the whole experiment 5 to 10.5 hours, on one GPU process using about 1.4 GB of GPU memory, one
 feeder core, `systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue`, with
 `OMP_NUM_THREADS=1`. The fit script reads `MemAvailable` before every fold and every fit and stops if
@@ -222,9 +216,10 @@ likelihood (`e00417_models.nll`), and the training loop (`e00417_fit.train`).
 ## Departures
 
 - **Avoidable-curtailment cost is not computed.** `studies.eval_protocol` needs real node and
-  generator tables, and the injected series have none. The q01 coverage and pinball loss on
+  generator tables (the function takes a series table and metered flows), and the injected series have none. The q01 coverage and pinball loss on
   reverse-flow rows stand in as the descriptive measure of under-forecast export.
 - **Stage 1 has 56 fits, not 49** (A's second seed, above).
+- **Seed asymmetry.** A and AV have two seeds and the other arms one, which lowers the noise of A and AV against the single-seed arms without biasing the contrasts.
 - **Seed averaging.** For the pooled bars A and AV are scored as the mean of the per-row CRPS of their
   two seeds; P0, A-shuffle, and ref have one seed. Stage 1 uses seed 0 for every arm. The minimum
   detectable effect comes from single seeds, so it is conservative for the two-seed means.
@@ -245,8 +240,25 @@ likelihood (`e00417_models.nll`), and the training loop (`e00417_fit.train`).
 
 ## Review log
 
-To be filled: the Sonnet plan review and the Sonnet code review, each with its findings and how each
-was triaged, before the first fit.
+**Plan review (fresh Sonnet agent, before any fit).** Ten findings, all triaged.
+
+- **Accepted:** the decision rule had no outcome for a failure of B1, B3, or B5 alone (a final
+  clause now says "not shown"; B4 is judged per arm; B3 is measured on A); the stage-1 stop rule
+  needed a definition for D5 and D10 only; the prediction for B2 contradicted the hypothesis; the
+  threshold pool for step 0 is a departure from the note and is now listed; the descriptive list had
+  no separate no-injection D5 line; the stage-1 time estimate was stale; the seed asymmetry is now a
+  departure; prose slips ("plain network", sentences opening with "It", 5.1 against 5.10).
+- **Kept as written:** the minimum detectable effect still uses A's two-seed null, because the audit
+  note specifies it. The page now says it is a noise floor resting on few blocks.
+- **Not changed:** the avoidable-curtailment cost stays out (the page states why).
+
+**Code review (fresh Sonnet agent, before any fit).** No blockers and no leakage. One important
+finding and seven minor ones, all accepted: B4 always failed because D10 returned a missing value
+(now only the five placebo Primaries are scored); the B4 interval ends were not swapped with the
+sign; the two minimum-detectable-effect figures now go to separate files that cannot be overwritten
+(stage 1 and full); `threshold.json` cannot be overwritten; P0's stored fit information says the
+gates were forced shut; the CRPS docstring says it approximates the CRPS; `read_arm` refuses a
+partial seed set. The seed-weight-decay note needs no change.
 
 ## Problems caused by the move
 

@@ -71,6 +71,9 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     path = OUT_DIR / "threshold.json"
     if args.stage == "threshold":
+        if path.exists():
+            msg = "threshold.json exists: the threshold is fixed once written"
+            raise SystemExit(msg)
         rough = clear_day_roughness()
         pooled = np.concatenate(list(rough.values()))
         result = {

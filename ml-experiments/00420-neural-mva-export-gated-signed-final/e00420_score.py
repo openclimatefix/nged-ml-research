@@ -3,15 +3,15 @@
 
 The primary contrast is the signed CRPS of the hidden pair's forecast on rows with reverse flow
 (signed truth below zero, injected or real), in points of effective capacity, days 1 to 10. CRPS is
-taken as twice the mean pinball loss over the 11 stored quantile levels. Intervals come from a paired
+taken as twice the unweighted mean pinball loss over the 11 stored quantile levels (spaced unequally, so it approximates the CRPS; paired contrasts are unaffected). Intervals come from a paired
 month-block bootstrap: each block is one hidden Primary in one test month, resampled with
 replacement, 20,000 times. Rows are not independent half-hours (each valid half-hour appears in
 about 15 runs), so every count states whether it counts rows or unique half-hours.
 
 ```bash
-. env.sh && uv run --no-sync python ml-experiments/00420-*/e00420_score.py mde      # before any arm contrast
-. env.sh && uv run --no-sync python ml-experiments/00420-*/e00420_score.py stage1   # stage 1 bars
-. env.sh && uv run --no-sync python ml-experiments/00420-*/e00420_score.py full     # all bars
+. env.sh && uv run --no-sync python ml-experiments/00420-*/e00420_score.py mde-stage1   # before any stage-1 arm contrast
+. env.sh && uv run --no-sync python ml-experiments/00420-*/e00420_score.py stage1       # stage 1 bars
+. env.sh && uv run --no-sync python ml-experiments/00420-*/e00420_score.py mde-full     # then: ... full
 ```
 """
 
@@ -83,6 +83,12 @@ def read_arm(
     if not pieces:
         return pl.DataFrame()
     cat = pl.concat(pieces, how="diagonal")
+    found = cat.group_by("rotation", "month").agg(pl.col("seed").n_unique().alias("n"))
+    if (found["n"] != len(seeds)).any():
+        msg = (
+            f"{arm} {setting}: some rotation-months lack seeds {seeds}; wait for the run to finish"
+        )
+        raise ValueError(msg)
     agg = [pl.col("crps").mean()] + [
         pl.col(c).first() for c in cat.columns if c not in (*KEY, "crps", "seed")
     ]
@@ -302,11 +308,16 @@ def bars(*, seeds_ab: tuple[int, ...], rotations: tuple[str, ...], mde: float) -
         placebo = read_arm(arm=name, setting="L0", seeds=seeds_ab, rotations=rotations)
         if len(placebo) and len(p0_placebo):
             five = pl.col("site").is_in(PLACEBO_PRIMARIES)
-            pooled_harm = contrast(reference=p0_placebo, candidate=placebo, rows=five)
-            single = per_site(reference=p0_placebo, candidate=placebo, rows=five)
-            # `contrast` is reference minus candidate, so harm (candidate worse) is its negative.
+            p0_five, cand_five = p0_placebo.filter(five), placebo.filter(five)
+            pooled_harm = contrast(reference=p0_five, candidate=cand_five)
+            single = per_site(reference=p0_five, candidate=cand_five, rows=None)
+            # `contrast` is reference minus candidate, so harm (candidate worse) is its negative
+            # and the interval ends swap.
             entry["b4_harm_pooled"] = {
-                k: -pooled_harm[k] if k == "mean" else pooled_harm[k] for k in pooled_harm
+                **pooled_harm,
+                "mean": -pooled_harm["mean"],
+                "lo": -pooled_harm["hi"],
+                "hi": -pooled_harm["lo"],
             }
             entry["b4_harm_by_primary"] = {s: -v["mean"] for s, v in single.items()}
             entry["b4_pass"] = bool(
@@ -369,14 +380,20 @@ def descriptive(*, rotations: tuple[str, ...]) -> dict:
 def main() -> None:
     """Score a stage and write `scores.json` (or `mde.json`)."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("mde", "stage1", "full"))
+    parser.add_argument("stage", choices=("mde-stage1", "mde-full", "stage1", "full"))
     args = parser.parse_args()
-    if args.stage == "mde":
-        result = minimum_detectable_effect()
-        (OUT_DIR / "mde.json").write_text(json.dumps(result, indent=1))
+    if args.stage.startswith("mde"):
+        rotations = ("r1",) if args.stage == "mde-stage1" else tuple(inputs.ROTATIONS)
+        result = minimum_detectable_effect(rotations=rotations)
+        path = OUT_DIR / f"{args.stage.replace('-', '_')}.json"
+        if path.exists():
+            msg = f"{path.name} exists: the figure is fixed once written"
+            raise SystemExit(msg)
+        path.write_text(json.dumps(result, indent=1))
         print(json.dumps(result, indent=1))
         return
-    mde = json.loads((OUT_DIR / "mde.json").read_text())["mde_points"]
+    mde_file = OUT_DIR / ("mde_stage1.json" if args.stage == "stage1" else "mde_full.json")
+    mde = json.loads(mde_file.read_text())["mde_points"]
     if args.stage == "stage1":
         result = {
             "bars": bars(seeds_ab=(0,), rotations=("r1",), mde=mde),
