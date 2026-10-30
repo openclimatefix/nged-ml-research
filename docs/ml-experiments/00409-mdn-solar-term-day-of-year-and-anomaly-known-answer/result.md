@@ -25,8 +25,8 @@ hypothesis: >-
   passed, and the solar term then lowers the net-demand CRPS at the six signed-direction Primaries
   against the same network given no solar term.
 prediction: >-
-  Written before any fit. K0 (controls): C2 recovers the ensemble's own anomaly at 0.8 to 1.2 and a pure profile
-  at most 0.30. K1 (anomaly variant): the learned capacity increment of C2 is 0.5 to 1.5
+  Written before any fit. K0 (controls): C2 recovers the ensemble's own anomaly at 0.8 to
+  1.2 and a pure profile at most 0.30. K1 (anomaly variant): the learned capacity increment of C2 is 0.5 to 1.5
   of the least-squares read-out of the injected anomaly on the ensemble unit shape at 4 of the 6
   Primaries. K2 (anomaly placebo): the day-shuffled anomaly recovers at most the profile-only
   benchmark plus 0.20, where the benchmark is the same read-out on the shuffled series (expected
@@ -211,7 +211,8 @@ the gate is declared uninformative (not failed) and the page says so.
 
 ## Compute and fits
 
-- **Known-answer test:** 56 fits (50 plus 6 for the without-term profile check) at 50 to 200 seconds each, 1 to 3 hours.
+- **Known-answer test:** 56 fits (50 plus 6 for the without-term profile check) at 50 to 200
+  seconds each, 1 to 3 hours.
 - **Score arms (only if the gate holds):** 7 arms x 5 folds x 3 seeds = 105 fits, 1.5 to 6 hours.
 - **Stored predictions reused:** experiment 403's A0 forecasts, the XGBoost, BG2, and GAM-stack
   references. Experiment 405's `extras` and `u99` files are reused, which saves the unit-shape pass.
