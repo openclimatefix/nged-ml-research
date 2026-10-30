@@ -101,12 +101,12 @@ def figure_example(*, node: str, month: str, run_day: str, horizon_hours: float,
         *[(pl.col(c) * cap).alias(c) for c in ("q05", "q25", "q50", "q75", "q95", "actual")],
     ).to_pandas()
     base = alt.Chart(pdf).encode(x=alt.X("valid_time:T", title="Valid time (UTC)"))
-    band90 = base.mark_area(opacity=0.2, color=theme.DATA_BLUE).encode(
+    band90 = base.mark_area(opacity=0.2, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("q05:Q", title="Demand (MW)"), y2="q95:Q"
     )
-    band50 = base.mark_area(opacity=0.35, color=theme.DATA_BLUE).encode(y="q25:Q", y2="q75:Q")
-    median = base.mark_line(color=theme.DATA_BLUE).encode(y="q50:Q")
-    actual = base.mark_line(color=theme.BRAND_ORANGE).encode(y="actual:Q")
+    band50 = base.mark_area(opacity=0.35, color=theme.DATA_BLUE).encode(y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+    median = base.mark_line(color=theme.DATA_BLUE).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
+    actual = base.mark_line(color=theme.BRAND_ORANGE).encode(y="actual:Q")  # ty: ignore[unresolved-attribute]
     title = f"{node}: forecast from {day} (N1, seed 0). Blue: median, 50% and 90% bands. Orange: actual."
     chart = (band90 + band50 + median + actual).properties(width=560, height=240, title=title)
     chart.save(DOCS_DIR / f"{name}_{node}.svg")
