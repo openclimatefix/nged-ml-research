@@ -213,6 +213,13 @@ half-hours dropped from every arm (the same rows for all arms) and the count of 
 reported per fold and per Primary. Which source becomes the standard is the maintainer's choice, via
 the XGBoost Discuss session, and the merge waits for it.
 
+**Flagged-count check column, measured by the scorer before any arm is read.** Of the half-hours
+in the four screen folds that are finite in the cache, 173 are null in `observed.parquet`: 170 at
+D18 in the 2025-10 fold, 3 at D8 in the 2026-03 fold, and none in the 2026-01 and 2026-06 folds. That
+is far below the manager's figure of about 622, which presumably spans more than these folds. The
+event masks still come from `dp_features` (experiment 103's rows); only the masks do, because the
+fits read training rows, lags, and inference inputs from experiment 87's own files.
+
 ## Open items
 
 - A compute slot (3 threads), granted by the manager once the load falls. Until then only code and
