@@ -19,67 +19,80 @@ size: >-
 hypothesis: >-
   Job 1. When a synthetic step of the corrected labelled depth is injected into clean periods at the
   same Primary and the same lag status as each real labelled event, the plain monthly control's
-  median still follows the step by much less than it follows the real event, so the gap between
-  36.8% (experiment 395 Part E) and 0.94 (Part F) is not an artefact of the depth or the rows. Job
-  2. A fixed-weight mixture of the weekly forecast with power lags and the forecast without them
-  scores within 0.1 points of effective capacity of experiment 400's learned blend B2 on rows with
-  lags in an event, at the six Primaries with signed readings. prediction: >- Written before any
-  score is read. P1. With depth, Primary, and lag status matched, the synthetic median share at 3
-  lags stays under 0.6 (it was 0.368 in Part E), so at least half of the gap to the real 0.94
-  remains. P2. The real 0-lag share of 0.52 sits within 0.15 of the share that a forecast blind to
-  the event would show, 1 minus the measured step over the labelled depth, taken from the lagless
-  forecast on the same rows. P3. The synthetic 0-lag share is within 0.05 of zero. P4. The fixed
-  mixture with w = 0.5 minus B2 on event-lag rows at the six Primaries is between -0.3 and +0.3
-  points, and w = 0.3 or 0.7 is worse than w = 0.5 on those rows by less than 0.3 points. P5. The
-  per-lead weight chosen on training months beats the best fixed weight on all rows by under 0.03
-  points. P6. The mixture of distributions beats the quantile average on rows with a lag in an event
-  by 0.05 to 0.4 points. decision_rule: >- Job 1 is descriptive: there is no verdict word beyond
-  what the pre-registered predictions say. The matched synthetic share and the real share are each a
-  median over events of the per-event median over rows (the Part H convention), with a 95% interval
-  from resampling events; the two-sided comparison is "the difference excludes zero". Job 2
-  contrasts (pre-registered, CRPS in points of effective capacity, scored on the months experiment
-  400 scores): for each of the three fixed weights and the per-lead weight, as a mixture of
-  distributions and as a quantile average, raw and widened by 1.15 (24 arms), minus the forecast
-  with lags (C1 to C24, rows with one to three lags inside an unpadded corrected event; whole-event
-  resampling), the same arms minus the forecast with lags outside events and outside the 7 days
-  after (C25 to C48; month resampling), and the arms minus B2 on both row sets (C49 to C96). 95%
-  intervals per contrast, 99% with k = 12 for the headline pair (w = 0.5 mixture minus B2 on
-  event-lag rows at the six Primaries, and the same arm minus the forecast with lags outside
-  events). "A fixed mixture does as well as B2" holds when the headline interval's upper end is at
-  or below +0.1 points on event-lag rows at the six and at or below +0.05 points outside events (the
-  protocol's per-Primary tolerance); the audit checks that claim before any adoption sentence. A
-  fixed mixture adds a second forecast to production, so a pooled gain on event-lag rows under 0.1
-  points is `small gain`. benchmark: >- Job 2: the forecast with lags (experiment 381's weekly
-  bundle), the forecast without lags (experiment 383's raw lagless arm), the learned blend B2 and
-  the w = 0.5 mixture (experiment 400), and the GAM stack (experiment 377), on experiment 395's Part
-  F rows. Job 1: experiment 381's monthly control and experiment 391's plain monthly control b0
-  boosters. row_set_id: fold_a_daily_gap_v1 metric: >- Job 1: the median share of the step followed,
-  1 minus (actual minus median forecast) over the signed depth (Part H), and the response share, the
-  change in the median forecast over the injected depth (Part E). Job 2: CRPS estimated from the 11
-  quantiles (not the exact mixture CRPS), q95 and q99 coverage, 5-95% width, the Part F harm table,
-  smoothness, cost outside events, rows on cold nights, and avoidable curtailment cost, in points of
-  effective capacity or GBP as the protocol defines them, from `studies.eval_protocol`. code:
-  ml-experiments/00401-real-and-synthetic-load-shift-median-share-and-fixed-forecast-mixture/
-  verdict: partly supported best_arm: >- Job 2: the fixed 50/50 mixture of distributions (w = 0.5)
-  scores 0.90 points of effective capacity better than the forecast with lags on event-lag rows at
-  the six Primaries with signed readings. headline: >- Job 1: in real events the weekly forecast
-  with lags moves its median by 0.032 (-0.001 to 0.053) of the labelled step more than the forecast
-  without lags at 3 lags in the event, against 0.32 in synthetic steps. Job 2: the w = 0.5 mixture
-  minus the learned blend B2 is -0.15 (-0.49 to +0.04, 99.58%) points on event-lag rows at the six
-  and +0.050 (-0.015 to +0.120, 99.58%) at the eight. take_home_message: >- The median share of a
-  load-shift step that experiment 395 called "followed" (0.94 with 3 lags in the event) is mostly
-  not a response to the lags: a forecast with no power lags at all reaches 0.95, and the forecast
-  with lags moves its median by only 0.03 more than the forecast without lags on the same rows. Real
-  events are far less visible to the lags than synthetic steps are, so the synthetic
-  lag-encroachment sweep overstates what a real event does to the forecast. A fixed 50/50 mixture of
-  the two forecasts does about as well as the learned blend at the six Primaries with signed
+  median still follows the step by much less than it follows the real event, so the gap between 36.8%
+  (experiment 395 Part E) and 0.94 (Part F) is not an artefact of the depth or the rows. Job 2. A
+  fixed-weight mixture of the weekly forecast with power lags and the forecast without them scores
+  within 0.1 points of effective capacity of experiment 400's learned blend B2 on rows with lags in
+  an event, at the six Primaries with signed readings.
+prediction: >-
+  Written before any score is read. P1. With depth, Primary, and lag status matched, the synthetic
+  median share at 3 lags stays under 0.6 (it was 0.368 in Part E), so at least half of the gap to
+  the real 0.94 remains. P2. The real 0-lag share of 0.52 sits within 0.15 of the share that a
+  forecast blind to the event would show, 1 minus the measured step over the labelled depth, taken
+  from the lagless forecast on the same rows. P3. The synthetic 0-lag share is within 0.05 of zero.
+  P4. The fixed mixture with w = 0.5 minus B2 on event-lag rows at the six Primaries is between -0.3
+  and +0.3 points, and w = 0.3 or 0.7 is worse than w = 0.5 on those rows by less than 0.3 points.
+  P5. The per-lead weight chosen on training months beats the best fixed weight on all rows by under
+  0.03 points. P6. The mixture of distributions beats the quantile average on rows with a lag in an
+  event by 0.05 to 0.4 points.
+decision_rule: >-
+  Job 1 is descriptive: there is no verdict word beyond what the pre-registered predictions say.
+  The matched synthetic share and the real share are each a median over events of the per-event
+  median over rows (the Part H convention), with a 95% interval from resampling events; the
+  two-sided comparison is "the difference excludes zero". Job 2 contrasts (pre-registered,
+  CRPS in points of effective capacity, scored on the months experiment 400 scores): for each of the
+  three fixed weights and the per-lead weight, as a mixture of distributions and as a quantile
+  average, raw and widened by 1.15 (24 arms), minus the forecast with lags (C1 to C24, rows with one
+  to three lags inside an unpadded corrected event; whole-event resampling), the same arms minus the
+  forecast with lags outside events and outside the 7 days after (C25 to C48; month resampling),
+  and the arms minus B2 on both row sets (C49 to C96). 95% intervals per contrast, 99% with k = 12
+  for the headline pair (w = 0.5 mixture minus B2 on event-lag rows at the six Primaries, and the
+  same arm minus the forecast with lags outside events). "A fixed mixture does as well as B2" holds
+  when the headline interval's upper end is at or below +0.1 points on event-lag rows at the six
+  and at or below +0.05 points outside events (the protocol's per-Primary tolerance); the audit
+  checks that claim before any adoption sentence. A fixed mixture adds a second forecast to
+  production, so a pooled gain on event-lag rows under 0.1 points is `small gain`.
+benchmark: >-
+  Job 2: the forecast with lags (experiment 381's weekly bundle), the forecast without lags
+  (experiment 383's raw lagless arm), the learned blend B2 and the w = 0.5 mixture (experiment 400),
+  and the GAM stack (experiment 377), on experiment 395's Part F rows. Job 1: experiment 381's
+  monthly control and experiment 391's plain monthly control b0 boosters.
+row_set_id: fold_a_daily_gap_v1
+metric: >-
+  Job 1: the median share of the step followed, 1 minus (actual minus median forecast) over the
+  signed depth (Part H), and the response share, the change in the median forecast over the injected
+  depth (Part E). Job 2: CRPS estimated from the 11 quantiles (not the exact mixture CRPS),
+  q95 and q99 coverage, 5-95% width, the Part F harm table, smoothness, cost outside events, rows
+  on cold nights, and avoidable curtailment cost, in points of effective capacity or GBP as the
+  protocol defines them, from `studies.eval_protocol`.
+code: ml-experiments/00401-real-and-synthetic-load-shift-median-share-and-fixed-forecast-mixture/
+verdict: partly supported
+best_arm: >-
+  Job 2: the fixed 50/50 mixture of distributions (w = 0.5) scores 0.90 points of effective
+  capacity better than the forecast with lags on event-lag rows at the six Primaries with signed
+  readings.
+headline: >-
+  Job 1: in real events the weekly forecast with lags moves its median by 0.032 (-0.001 to 0.053)
+  of the labelled step more than the forecast without lags at 3 lags in the event, against 0.32 in
+  synthetic steps. Job 2: the w = 0.5 mixture minus the learned blend B2 is -0.15 (-0.49 to +0.04,
+  99.58%) points on event-lag rows at the six and +0.050 (-0.015 to +0.120, 99.58%) at the eight.
+take_home_message: >-
+  The median share of a load-shift step that experiment 395 called "followed" (0.94 with 3 lags in
+  the event) is mostly not a response to the lags: a forecast with no power lags at all reaches
+  0.95, and the forecast with lags moves its median by at most about 0.03 more than the forecast
+  without lags on the same rows, which is at the noise floor of two different fitted forecasts.
+  Real events are far less visible to the lags than synthetic steps are, so the synthetic
+  lag-encroachment sweep overstates what a real event does to the forecast. A fixed 50/50 mixture
+  of the two forecasts does about as well as the learned blend at the six Primaries with signed
   readings, and not at the eight, where the interval allows it to score 0.12 points worse. At the
-  six, one event at D16 carries most of the gain over the forecast with lags. lessons: >- The share
-  of the step followed, 1 minus (actual minus median) over the labelled step, is 0 only when the
-  labelled step equals the step in the telemetry. The measured step is 0.62 of the labelled step
-  (median over events), and a forecast trained over long events has already absorbed them, so the
-  share cannot be read as a response to the lags. The response to the lags is the forecast with lags
-  minus the forecast without lags on the same rows. advice:
+  six, one event at D16 carries most of the gain over the forecast with lags.
+lessons: >-
+  The share of the step followed, 1 minus (actual minus median) over the labelled step, is 0 only
+  when the labelled step equals the step in the telemetry. The measured step is 0.62 of the
+  labelled step (median over events), and a forecast trained over long events has already absorbed
+  them, so the share cannot be read as a response to the lags. The response to the lags is the
+  forecast with lags minus the forecast without lags on the same rows.
+advice:
   - >-
     Measure a forecast's response to lags inside real load-shift events as the forecast with lags
     minus the forecast without lags on the same rows, never as 1 minus the residual over the
