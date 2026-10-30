@@ -72,11 +72,11 @@ predictions came first.
 
 ## Question
 
-**We test whether one neural network can learn how much to trust each lagged power reading, with
-no event labels.** A load-shift event moves demand between neighbouring Primaries for hours or
-weeks. The power the network sees at the same time yesterday or last week can then be abnormal,
-and a forecast that copies that power inherits the abnormality. NGED cannot supply event labels for about 1,300
-substations, and every binary event detector tried so far has scored poorly. The maintainer's
+**We test whether one neural network can learn how much to trust each lagged power reading, with no
+event labels.** A load-shift event moves demand between neighbouring Primaries for hours or weeks.
+The power the network sees at the same time yesterday or last week can then be abnormal, and a
+forecast that copies that power inherits the abnormality. NGED cannot supply event labels for about
+1,300 substations, and every binary event detector tried so far has scored poorly. The maintainer's
 design replaces the detector with a continuous trust weight per lagged input, learned end to end.
 
 - **Lagless module.** A mixture density network (three Gaussians) that sees weather, solar
