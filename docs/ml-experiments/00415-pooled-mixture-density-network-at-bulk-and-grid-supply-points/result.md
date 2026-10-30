@@ -30,9 +30,9 @@ prediction: >-
   minus the stored monthly XGBoost control (experiment 386 stage D, widened 1.15) is between -0.1
   and +0.6 points at the bulk supply points and between 0.0 and +1.5 at the grid supply points: the
   grid supply points aggregate wind, solar, and storage, as in experiment 386. P3. N2 minus N1 at
-  the two bulk supply points is between -0.15 and +0.05 points, and N2 minus N2-rw is no larger in
+  each group of nodes is between -0.15 and +0.05 points, and N2 minus N2-rw is no larger in
   size than N2 minus N1 (the neighbours act as a noise average). Experiments 161 and 204 found that
-  the children's forecasts added at most 0.04 points to a GAM at these two bulk supply points, so
+  the children's forecasts added at most 0.04 points to a GAM at the two bulk supply points, so
   the children's lags are unlikely to help more. P4. q95 coverage of N1 at the nodes is 0.84 to 0.92
   (experiment 397's Primary networks cover 0.84 to 0.86), and q05 coverage 0.06 to 0.10. P5. N1
   minus P0 at the 14 countable Primaries is within +-0.05 points (adding nodes does not hurt them).
@@ -78,11 +78,14 @@ same pooled network forecasts the four nodes, and whether the Primaries beneath 
   and no node).
 - **Experiment 411 and 405.** Neither bears on this plan: the lag-trust and solar-term networks are
   separate arms of other experiments, and this experiment keeps the plain network of 403.
-- **Gap in the brief.** The brief asks for the Primaries beneath each node. The repository records
-  them only for the BSPs (D13: D9, D10, D11; D17: D5, D14, D16; experiment 161). No record of the
-  Primaries beneath D1 and D6 exists, so the neighbour arms cover the two BSPs only, and the GSPs
-  get the neighbour columns as missing. The manager is asked to supply the GSP children if they
-  exist.
+- **Which Primaries sit beneath each node.** NGED's substation hierarchy file (received
+  2026-10-15, private) gives each substation's BSP and GSP. Each GSP has exactly one BSP, so a GSP's
+  Primaries are the Primaries of its BSP. The children among the 16 Primaries are 7 at D13 (BSP), 9
+  at D17 (BSP), 7 at D1 (GSP, the same 7 as D13), and 9 at D6 (GSP, the same 9 as D17). Experiment
+  161 used only 3 covered children per BSP (those with real-power readings and long history); this
+  experiment uses every Primary beneath the node, because the missing flag and the standardised
+  lag handle a child without a reading. Eight of the 16 Primaries report apparent power only; their
+  lags are magnitudes.
 
 ## Arms
 
@@ -95,10 +98,12 @@ of the fold's 24-month window, 3 seeds, one fit per fold.
   standard deviation), because an unseen scale would make the transfer meaningless.
 - **N1.** Fitted at the 16 Primaries and the 4 nodes, with its own embedding per series and a
   node-type input (Primary, BSP, GSP).
-- **N2.** N1 plus neighbour inputs: the mean over the children of each of the three origin lags in
-  capacity-normalised units, with a missing flag. At the GSPs and Primaries the columns are missing.
-- **N2-rw.** N2 with each BSP's children replaced by a degree-matched random set of three other
-  Primaries (fixed seed, never the BSP's own children).
+- **N2.** N1 plus neighbour inputs: for each of the three origin lags, the mean over the node's
+  Primaries (power over effective capacity) that have a reading, and the share of those Primaries
+  with a reading. At a Primary the columns are missing (zero share).
+- **N2-rw.** N2 with each node's Primaries replaced by a random set of the same size drawn from
+  the 16 Primaries (fixed seed, never the true set). A BSP with 9 children cannot avoid overlap
+  with its true set when drawing from 16, so the overlap is reported.
 - **Stored references:** BG2, monthly XGBoost control, GAM stack, `manual_heuristic`, `climatology`.
 
 ## Stop rule and decision rule
@@ -114,11 +119,12 @@ month-block bootstrap, interim.
 - **Stop B (nodes hurt the Primaries).** If N1 minus P0 at the 14 countable Primaries pooled exceeds
   +0.10 points in both stage 1 folds, skip the neighbour arms and write up P0 and N1 only.
 - **Stage 2.** N2 and N2-rw, the same two folds, seed 1 (4 fits).
-- **Stop C (neighbours do nothing).** If N2 minus N1 at the BSPs pooled is 0 or higher in both folds,
-  run no further seeds or folds of N2 or N2-rw, and report them as screened out.
+- **Stop C (neighbours do nothing).** If N2 minus N1 is 0 or higher in both folds at the BSPs and at
+  the GSPs, run no further seeds or folds of N2 or N2-rw, and report them as screened out. If one
+  group gains, only the arms' rows at that group are read, but all four nodes are still fitted.
 - **Stage 3.** Whatever survives, on all four folds with 3 seeds (at most 48 fits in all).
 - **Contrasts.** C1 N1 minus P0 at the nodes; C2 N1 minus the stored monthly XGBoost control and
-  minus BG2; C3 N2 minus N1 at the BSPs; C4 N2 minus N2-rw at the BSPs (neighbour identity);
+  minus BG2; C3 N2 minus N1 per group; C4 N2 minus N2-rw per group (neighbour identity);
   C5 N1 minus P0 at the Primaries; C6 each against `manual_heuristic` and `climatology`. The
   smallest gain worth acting on is any gain whose interval excludes zero, because the change adds
   rows and an input column to a network we would train anyway. The refit noise floor is the spread
