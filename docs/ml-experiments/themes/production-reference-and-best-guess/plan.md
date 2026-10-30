@@ -13,6 +13,7 @@
 | 397 | Does a plain mixture density network match the simple XGBoost model for Primary demand, and does attention over the inputs help it? | High (maintainer asked 2026-10-30) | Slot from the manager | Finished: the plain network matched XGBoost, attention did not help (gate inert) |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
+| 412 | Can a mixture density network that writes signed power as demand minus a learned capacity times the CAMS solar shape recover the sign of reverse flow from MVA readings, in lab conditions? | High (maintainer approved 2026-10-30) | First test (one rotation, level 2.0) gates the full run; experiment 408's page is read first | Planned |
 
 ## Planned experiments
 
