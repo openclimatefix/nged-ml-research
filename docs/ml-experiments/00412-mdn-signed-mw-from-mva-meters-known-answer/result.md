@@ -266,6 +266,13 @@ is fitted from the rows it labels.
 - **Identifiability check.** S1c with `C_p` fixed at zero scores 0.55 (March) and 0.74 (June)
   pooled, against 0.74 and 0.85 for S1c, so the demand module absorbs part of the sign from hour,
   month, temperature, and the Primary embedding, and the CAMS term adds about 0.1 to 0.2.
+- **Sunny summer middays.** On sunny summer-midday half-hours (UTC 10:00 to 14:00, April to
+  September) with no reverse flow, S1c calls reverse flow on 85% of them in June (245 half-hours) and
+  14% in March (147 half-hours; the March subset is small).
+- **Re-derivation.** A fresh Sonnet agent recomputed every number above except the matched
+  false-reverse comparison, the hour-and-month baseline, and the learned capacities, from the forecast
+  files with its own code. All matched within 0.005, and the files have no duplicate rows, no
+  origins outside the month, and a median sign that agrees with `P(X < 0)` on every row.
 - **Lab caveat.** S1c reads realised CAMS at every lead, so the day-ahead behaviour of the sign is
   untested until S1e.
 
