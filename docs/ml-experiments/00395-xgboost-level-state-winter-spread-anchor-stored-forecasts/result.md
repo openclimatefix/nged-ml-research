@@ -120,10 +120,12 @@ offset does not copy the filter.
 Primaries. The signed-MW six (D5, D9, D10, D11, D14, D16) are the Primaries whose readings are
 signed megawatts, and the MVA-only eight (D2, D3, D4, D8, D12, D19, D21, D22) report apparent power
 only. D15 and D18 have under a year of history and are reported separately. K0 to K4 are the Part A
-arms. S0M and S1M are experiment 389's arms (S1M adds the ensemble mean and standard deviation of
-temperature and shortwave radiation as columns; S0M does not). Economy 7 is a UK off-peak
-electricity tariff. An event's depth is its labelled change in load in megawatts, and the padded
-mask is experiment 390's mask, which extends each labelled event by 24 hours on each side.
+arms. Experiment 383's arm d is the plain weekly member, c1 drops the lags that lie inside an event,
+and c2 serves a lagless model on rows with a lag inside an event and arm d elsewhere. S0M and S1M
+are experiment 389's arms (S1M adds the ensemble mean and standard deviation of temperature and
+shortwave radiation as columns; S0M does not). Economy 7 is a UK off-peak electricity tariff. An
+event's depth is its labelled change in load in megawatts, and the padded mask is experiment 390's
+mask, which extends each labelled event by 24 hours on each side.
 
 **Nothing in this experiment is refitted.** Every number re-scores forecasts that earlier
 experiments stored, so the monthly-refit rule does not apply. The score is the continuous ranked
