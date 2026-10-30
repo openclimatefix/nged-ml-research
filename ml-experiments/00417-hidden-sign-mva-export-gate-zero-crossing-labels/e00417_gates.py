@@ -209,7 +209,8 @@ BREAKPOINT_MARGIN: Final[float] = 0.05
 class DayGate:
     """The whole-day gate: a threshold fitted on the visible signed Primaries, and profiles."""
 
-    threshold: float
+    threshold_smooth: float
+    threshold_broken: float
     profiles: dict[str, dayflip.Profile]
     window_lo: int
     window_hi: int
@@ -226,13 +227,15 @@ def fit_day_gate(*, fold: inputs.Fold, refit) -> DayGate:  # noqa: ANN001
     window_lo = int((refit - timedelta(days=base.WINDOW_DAYS)).timestamp() * 1_000_000)
     window_hi = int((refit - regimes.REFIT_CUTOFF_AGE).timestamp() * 1_000_000) + 1
     placebo = inputs.Setting(0.0, fold.setting.q_points, fold.setting.power_factor)
-    scores = []
+    scores, broken = [], []
     for s in (s for s in inputs.SIGNED_SIX if s not in fold.pair):
         h = dayflip.hourly(
             t=diag.load_table(site=s, setting=placebo, start_us=window_lo, end_us=window_hi)
         )
-        scores.append(dayflip.score_days(h=h, profile=dayflip.build_profile(h=h)).score)
-    all_scores = np.concatenate(scores)
+        res = dayflip.score_days(h=h, profile=dayflip.build_profile(h=h))
+        scores.append(res.score)
+        broken.append(res.broken)
+    all_scores, all_broken = np.concatenate(scores), np.concatenate(broken)
     profiles = {}
     for row in base.primaries().iter_rows(named=True):
         if fold.folded[row["primary"]]:
@@ -241,7 +244,10 @@ def fit_day_gate(*, fold: inputs.Fold, refit) -> DayGate:  # noqa: ANN001
             )
             profiles[row["site"]] = dayflip.build_profile(h=dayflip.hourly(t=t))
     return DayGate(
-        threshold=float(np.percentile(all_scores, dayflip.THRESHOLD_PERCENTILE)),
+        threshold_smooth=float(
+            np.percentile(all_scores[~all_broken], dayflip.THRESHOLD_PERCENTILE)
+        ),
+        threshold_broken=float(np.percentile(all_scores[all_broken], dayflip.THRESHOLD_PERCENTILE)),
         profiles=profiles,
         window_lo=window_lo,
         window_hi=window_hi,
@@ -273,8 +279,10 @@ def day_open_rows(
     result = dayflip.score_days(h=h, profile=gate.profiles[site])
     flagged = {
         int(d): float(bp)
-        for d, sc, bp in zip(result.day, result.score, result.breakpoint, strict=True)
-        if sc > gate.threshold and np.isfinite(bp)
+        for d, sc, bp, brk in zip(
+            result.day, result.score, result.breakpoint, result.broken, strict=True
+        )
+        if sc > (gate.threshold_broken if brk else gate.threshold_smooth) and np.isfinite(bp)
     }
     u_rows, _k = inputs.cams_for_rows(site=site, valid_us=valid_us)
     day = (valid_us - inputs.US_PER_HALF_HOUR) // inputs.US_PER_DAY

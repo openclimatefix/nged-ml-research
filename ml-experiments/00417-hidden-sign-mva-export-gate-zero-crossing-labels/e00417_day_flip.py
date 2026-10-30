@@ -46,9 +46,8 @@ THRESHOLD_PERCENTILE: Final[float] = 98.0
 BLOCK_DAYS: Final[int] = 28
 MAX_EARLIER_BLOCKS: Final[int] = 6
 SUMMER: Final[tuple[int, int]] = (4, 9)
-BROKEN_U_STD: Final[float] = (
-    0.15  # within-day std of u (0.1 <= u < 0.95) above which a day is broken cloud
-)
+# Mean absolute second difference of hourly u above which a day counts as broken cloud.
+BROKEN_ROUGHNESS: Final[float] = 0.05
 
 
 @dataclass
@@ -234,10 +233,14 @@ def score_days(*, h: Hourly, profile: Profile) -> DayResult:
         )
         use = (h.u[sel] >= U_LOW) & (h.u[sel] < U_HIGH) & np.isfinite(e_all)
         u_day = h.u[sel]
-        broken = bool(use.sum() >= 2 * MIN_SIDE and np.std(u_day[use]) > BROKEN_U_STD)
+        u_by_time = u_day[np.argsort(h.hod[sel])]
+        roughness = float(np.mean(np.abs(np.diff(u_by_time, n=2)))) if len(u_by_time) > 2 else 0.0
+        broken = roughness > BROKEN_ROUGHNESS
         if broken:
             # Broken cloud: a V in u over the whole day, with at least MIN_SIDE hours (6 half-hours)
             # on each arm, whatever the time of day. Several crossings are repeat visits to one u*.
+            if use.sum() < 2 * MIN_SIDE + 1:
+                continue
             score, bp = limb_score(u=u_day[use], e=e_all[use])
         else:
             morning = use & (h.hod[sel] + 0.5 < h.noon_hod)
@@ -336,10 +339,23 @@ def run() -> dict:  # noqa: PLR0915
             }
             positive = np.array([neg_count.get(int(d), 0) >= 2 for d in d_inj.day])
             # Leave one Primary out: the threshold is the 98th percentile of the others' placebo scores.
-            others = np.concatenate([days[(placebo_name, o)].score for o in sites if o != s])
-            threshold = float(np.percentile(others, THRESHOLD_PERCENTILE))
-            flagged_pla = d_pla.score > threshold
-            flagged_inj = d_inj.score > threshold
+            thr = {
+                b: float(
+                    np.percentile(
+                        np.concatenate(
+                            [
+                                days[(placebo_name, o)].score[days[(placebo_name, o)].broken == b]
+                                for o in sites
+                                if o != s
+                            ]
+                        ),
+                        THRESHOLD_PERCENTILE,
+                    )
+                )
+                for b in (False, True)
+            }
+            flagged_pla = d_pla.score > np.where(d_pla.broken, thr[True], thr[False])
+            flagged_inj = d_inj.score > np.where(d_inj.broken, thr[True], thr[False])
             common_days = np.intersect1d(d_inj.day, d_pla.day)
             paired_inj.append(d_inj.score[np.isin(d_inj.day, common_days)])
             paired_pla.append(d_pla.score[np.isin(d_pla.day, common_days)])
@@ -371,7 +387,8 @@ def run() -> dict:  # noqa: PLR0915
                 if len(flagged_pla)
                 else float("nan"),
                 "n_eligible_placebo": len(d_pla.day),
-                "threshold": threshold,
+                "threshold_smooth": thr[False],
+                "threshold_broken": thr[True],
                 "paired_auc": auc(
                     positive=d_inj.score[np.isin(d_inj.day, common_days)],
                     negative=d_pla.score[np.isin(d_pla.day, common_days)],
@@ -419,7 +436,9 @@ def main() -> None:
         for s, p in e["per_primary"].items():
             print(
                 f"  {s}: recall {p['recall_at_threshold']:.2f} (n_pos {p['n_positive']}), false flag "
-                f"{p['false_flag_placebo']:.3f} (n {p['n_eligible_placebo']}), paired AUC {p['paired_auc']:.2f}"
+                f"{p['false_flag_placebo']:.3f} (smooth {p['false_flag_placebo_smooth']:.3f}, broken "
+                f"{p['false_flag_placebo_broken']:.3f}; n {p['n_eligible_placebo']}, broken "
+                f"{p['n_broken_injected']} of {p['n_eligible_injected']} injected), paired AUC {p['paired_auc']:.2f}"
             )
 
 

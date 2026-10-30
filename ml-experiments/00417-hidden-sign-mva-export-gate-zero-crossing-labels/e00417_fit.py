@@ -123,7 +123,11 @@ def prepare(*, arm: Arm, fold: inputs.Fold, refit) -> Prepared:  # noqa: ANN001
     info: dict = {
         "day_gate": None
         if day_gate is None
-        else {"threshold": day_gate.threshold, "n_visible_days": day_gate.n_visible_days},
+        else {
+            "threshold_smooth": day_gate.threshold_smooth,
+            "threshold_broken": day_gate.threshold_broken,
+            "n_visible_days": day_gate.n_visible_days,
+        },
         "gates": {
             s: {"open": g.open, "spearman": g.spearman, "p1_points": g.p1_points, "n": g.n_rows}
             for s, g in gate_map.items()
