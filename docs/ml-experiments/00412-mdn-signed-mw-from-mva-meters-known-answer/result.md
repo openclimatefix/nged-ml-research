@@ -58,52 +58,50 @@ date: 2026-10-30
 code: ml-experiments/00412-mdn-signed-mw-from-mva-meters-known-answer/
 verdict: not supported
 best_arm: >-
-  none. The registered S1c failed P1 and P4, and none of the three post hoc capacity variants passed
+  none. The registered S1c failed P1 and P4, and none of the five post hoc capacity variants passed
   either.
 headline: >-
   With the sign hidden at D5 and D10, S1c reached pooled balanced accuracy 0.74 (March) and 0.85
   (June) but called reverse flow on 6.7% and 16.9% of reverse-free sunny half-hours, and invented
   reverse flow at D5 with no farm injected. Holding capacity fixed removed the false calls and the
-  skill together (balanced accuracy 0.54 to 0.61, no better than the shuffled-sky arm).
+  skill together (balanced accuracy 0.54 to 0.61, within 0.04 of the shuffled-sky arm). A prior at full
+  weight kept the capacity at 33.5 points and gave the same result.
 lessons:
   - >-
-    The network's sign skill came from a capacity fitted on the rows it labels: the same fit that
-    recovers an injected farm also reads a real midday dip at D5 as reverse flow.
+    The neural network's sign skill came from a capacity fitted on the rows it labels: the same fit
+    that recovers an injected farm also reads a real midday dip at D5 as reverse flow.
   - >-
-    A capacity prior added to the summed loss and divided by the row count has no effect with 5.6
-    million training rows, so the registered prior did not constrain the capacity.
+    The registered capacity prior, worth 13 nats against a loss summed over 5.6 million rows, left
+    the capacities within 0.2 points of the unconstrained fit. Added at full weight it pulled them to
+    the prior centre and the sign skill went with them (variants sd03, p07, and p03).
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  A neural network that writes signed power as demand minus a learned solar capacity times the CAMS
-  solar shape could not recover the sign of reverse flow without inventing it. With the sign hidden
-  at two Primaries, it found most injected reverse flow in June but also called reverse flow on 17%
-  of the half-hours that had none, and with no farm injected it called it on 18% to 47% of sunny
-  half-hours at D5. Fixing the capacity removed the false calls and the skill together, so this is
-  the sixth fold treatment of the MVA problem that did not work.
+  A mixture density network that writes signed power as demand minus a learned solar capacity times
+  the CAMS solar shape could not recover the sign of reverse flow without inventing it. With the sign
+  hidden at two Primaries, it found most injected reverse flow in June but also called reverse flow
+  on 17% of the half-hours that had none, and with no farm injected it called it on 18% to 47% of
+  sunny half-hours at D5. Fixing the capacity, or holding it near a prior, removed the false calls
+  and the skill together, so this is the seventh fold treatment of the MVA problem that did not
+  work.
 advice:
   - >-
     Do not fit a solar capacity on the same rows it labels when the sign is hidden; a placebo with no
     injected farm shows the capacity reading a real demand dip as reverse flow (placebo, first test).
   - >-
-    Scale a capacity prior by the row count before relying on it: added to the summed loss and divided
-    by millions of rows it is inert (variant sd03).
+    Weigh a capacity prior in nats against the loss in nats: 13 nats against 5.6 million rows left the
+    capacities unconstrained, so check the prior's share of the gradient before trusting an arm that
+    relies on it (variants sd03 and p07).
   - >-
     Report the false-reverse rate on sunny summer middays beside balanced accuracy, because accuracy
     alone hid an 85% false-call rate there in June (first test).
 ---
 
-**Status: done. The registered first test and three post hoc variants failed; see the take-home
-message above and "Results" at the end.** The sections below are the plan, written before any fit.
-At 8 of the 16 Primaries (the "MVA-only" eight: D2, D3, D4, D8, D12, D19, D21, D22) the meter
-records apparent power, so reverse flow from embedded solar looks like demand. Experiments 152, 372,
-374, 387, and the XGBoost experiment 408 tried fold treatments with a gradient-boosted model. This
-experiment asks the same question of a neural network, which can write signed power as an explicit
-sum of demand and a solar term and fold only the likelihood. The plan follows the Discuss session's
-weekend brief (experiment 6) and the Opus design `briefs/neural_mva_design_answer.md`, whose section
-7 (revised after a Sonnet review) replaces the brief's arms M0 to M3.
+**Status: done. The registered first test and five post hoc capacity variants all failed; the take-
+home message above summarises why.** The plan sections below were written before any fit, and the
+results sections follow them.
 
-## What changed since the brief
+## Evidence the plan follows
 
 - **Experiment 405 merged as inconclusive.** Its placebo gate, a day-shuffled farm, could not be
   passed, because a shuffled series keeps the monthly daylight profile, which carries 79% of its
@@ -132,7 +130,7 @@ weekend brief (experiment 6) and the Opus design `briefs/neural_mva_design_answe
   is permuted. The gate (`u >= 0.3`) keeps the real unit shape, so the shuffle arm is not handed a
   different set of folded half-hours, which would make the comparison easier to win.
 
-## Revisions after experiment 408's interim gate (design section 8)
+## Scoring rules from experiment 408's interim gate (design section 8)
 
 - **Matched false-reverse rate replaces the 0.03 margin.** The XGBoost experiment's threshold rule
   scored 0.86 to 0.88 per Primary but called reverse flow on 14 to 19% of half-hours with none, and it
@@ -149,17 +147,17 @@ weekend brief (experiment 6) and the Opus design `briefs/neural_mva_design_answe
 
 ## Design
 
-- **Network.** Experiment 397's pooled plain mixture density network with the Primary embedding is
-  `D`, fed the ECMWF ENS mean and spread once (the `summary` scheme). The irradiance columns and
-  solar geometry are removed from its inputs, as in experiment 405's C arms, so `D` cannot rebuild
-  the solar bell. Signed power is `X = D - C_p u` in points of effective capacity (percent). The
-  CAMS unit shape `u` is `studies.pv_physics.plant_power_mw` of the fleet plant driven by CAMS
-  hourly irradiance (the quantity `studies.dp_features.unit_pv_shape` computes), divided by one
-  constant, its 99th percentile over daylight half-hours pooled over the 16 Primaries (the shape
-  is clipped at the plant's inverter limit, so the constant is 1.0 and a capacity is in points at
-  plant clipping). `C_p >= 0`
-  is learned per Primary under a log-normal prior centred on the median studies-page capacity of the
-  six signed-MW Primaries (33.5 points at the 2026-06 refit), with a log standard deviation of 0.7.
+- **Neural network.** Experiment 397's pooled plain mixture density network with the Primary
+  embedding is `D`, fed the ECMWF ENS mean and spread once (the `summary` scheme). The irradiance
+  columns and solar geometry are removed from its inputs, as in experiment 405's C arms, so `D`
+  cannot rebuild the solar bell. Signed power is `X = D - C_p u` in points of effective capacity
+  (percent). The CAMS unit shape `u` is `studies.pv_physics.plant_power_mw` of the fleet plant
+  driven by CAMS hourly irradiance (the quantity `studies.dp_features.unit_pv_shape` computes),
+  divided by one constant, its 99th percentile over daylight half-hours pooled over the 16 Primaries
+  (the shape is clipped at the plant's inverter limit, so the constant is 1.0 and a capacity is in
+  points at plant clipping). `C_p >= 0` is learned per Primary under a log-normal prior centred on
+  the median studies-page capacity of the six signed-MW Primaries (33.5 points at the 2026-06
+  refit), with a log standard deviation of 0.7.
 - **Likelihood, in physical units.** Signed Primaries use the mixture density `f(x)`. A folded
   Primary reads `r = sqrt(P^2 + Q^2)`. Where `u >= 0.3` the likelihood is `f(y') + f(-y')` with `y' =
   sqrt(max(r^2 - Q0^2, 0))` and `Q0 = 2` points, and the censored probability `P(|X| <= Q0)` when
@@ -191,16 +189,16 @@ weekend brief (experiment 6) and the Opus design `briefs/neural_mva_design_answe
 
 | Arm | What it is |
 |---|---|
-| S1c | The structural network with CAMS `u` |
+| S1c | The structural neural network with CAMS `u` |
 | S1c-shuffle | S1c with `u` in the solar term permuted across days within year, month, and half-hour |
 | S1c-u0 | S1c with `C_p` fixed at 0 (the identifiability check; the loss gap to S1c is reported) |
 | S1c-start-low, S1c-start-high | S1c with `C_p` started at 0.1 and at 3 times the prior centre |
-| S1e | S1c with `u` from the ENS mean shortwave, as in experiment 405 (runs only if P1 passes) |
-| M0, M0c | Score run only: the plain network (stored experiment 397 forecasts) and the plain network with CAMS `u` and clear-sky index as inputs |
+| S1e | S1c with `u` from the ENS mean shortwave, as in experiment 405 (the version that could serve; runs only if P1 passes) |
+| M0, M0c | Score run only: the plain neural network (stored experiment 397 forecasts) and the plain neural network with CAMS `u` and clear-sky index as inputs |
 
 Settings at the hidden pair: level 2.0 with Q = 2 points and with Q = 4 points (main), level 2.0 at
 power factor 0.97 (reported only), level 1.0 (P2), and no injection (the placebo of P4, with
-D10's real reverse flow, 6.5% of its sunny-midday half-hours per experiment 387).
+D10's real reverse flow: 130 half-hours in the registered count, 140 in the scored slice).
 
 ## First test and fit counts
 
@@ -301,25 +299,25 @@ the effective row count times larger.
 
 ## Variant results (post hoc, one seed, two test months, interim)
 
-**No variant passed.** Fixing the capacity removed the false reverse-flow calls and the skill with
-them, and narrowing the prior changed nothing. Figure 1 shows every arm.
+**No variant passed.** Holding the capacity down removed the false reverse-flow calls and the skill with
+them, and narrowing the divided prior changed nothing. Figure 1 shows every arm.
 
 ![First test and variants](figure_1_first_test_and_variants.svg)
 
 - **`cfix` (capacity held at 33.5 points).** Pooled balanced accuracy 0.542 (March) and 0.612 (June),
   false-reverse rate 0.1% and 1.7%, no false reverse flow at D5 with no injection. Its shuffled-sky
   arm scores 0.583 and 0.575, so the real sky beats the shuffle by -0.04 and +0.04. The held capacity
-  is below the injected farm's size, so the network cannot explain the dip.
+  is below the injected farm's size, so the neural network cannot explain the dip.
 - **`cknown` (capacity set by the six Primaries whose target is not folded; the hidden pair uses their
   geometric mean, 27.6 to 29.5 points).** Balanced accuracy 0.551 and 0.574, false-reverse rate 0.5%
   and 1.4%, no false reverse flow at D5 with no injection. The shuffled-sky arm scores 0.553 and
   0.508. The pair's true capacity need not equal the six's mean, so part of the miss is a capacity
   mismatch.
-- **`sd03` (prior log standard deviation 0.3).** Identical to S1c to three decimals, with the same
-  learned capacities (71 to 78 points at D5). The prior is added to the summed loss and divided by
-  the effective row count of 5.6 million rows, so it moves the loss by far less than 1e-6 per row
-  against a loss near 3.3. The registered prior was inert, and the registered arm's capacity was
-  free.
+- **`sd03` (prior log standard deviation 0.3, divided by the row count).** Within 0.001 of S1c in
+  balanced accuracy, with the same learned capacities (71 to 78 points at D5). The prior is added to
+  the loss divided by the effective row count of 5.6 million rows. At the fitted capacities it is
+  worth 13 nats (S1c) or 70 nats (`sd03`) in the summed loss, which moved the capacities by under
+  0.2 points. The registered prior therefore did not constrain the capacity.
 - **Matched false-reverse rate.** At the threshold rule's false-reverse rate, `cfix` and `cknown`
   recall 0.98 to 1.00 of the reverse half-hours. At their own near-zero false-reverse rate the rule
   recalls 0.0 in March and 0.33 to 0.46 in June.
@@ -331,9 +329,38 @@ them, and narrowing the prior changed nothing. Figure 1 shows every arm.
   capacities "used"). A fresh Sonnet agent recomputed the first-test numbers, which matched. The
   variant numbers come from the same scoring code, and the write-up review follows.
 
-## First test result (interim: two test months, one seed, no intervals, not yet re-derived)
+## Second post hoc round: the prior at full weight (interim, same rotation and seed)
 
-**The first test failed P1 and P4, so the full run does not start.** S1c reaches pooled balanced
+**Giving the prior full weight held the capacity at the prior centre and reproduced `cfix`.** With
+the prior added to the mean loss undivided, the capacity at D5 reached 33.5 to 33.7 points (against
+71 to 78 without it), and the sign skill fell with it. The two arms scored within 0.003 of each other
+and of `cfix`.
+
+- **`p07` (log standard deviation 0.7) and `p03` (0.3).** Pooled balanced accuracy 0.543 and 0.541
+  (March), 0.611 and 0.613 (June). False-reverse rate 0.1% (March) and 1.7% to 1.8% (June). With no
+  injection, no false reverse flow at D5. The shuffled-sky arms score 0.583 and 0.586 (March) and
+  0.574 and 0.575 (June), so the real sky beats the shuffle by -0.04 and +0.04. P1 and P3 fail.
+- **Prior's share of the gradient on the log capacities.** The share is the norm of the prior's
+  gradient over the norm of the total gradient on one fixed batch of 16,384 training rows. It is 0
+  at the start, by construction, because the capacity starts at the prior centre. After the first
+  epoch it is 1.3 to 2.4 over all Primaries and 1.1 to 17.8 at D5, and at the best state it is 0.8 to
+  2.5 over all Primaries and 0.4 to 40 at D5. A share above 1 means the likelihood's gradient opposes
+  the prior's: the two nearly cancel at the capacity the fit reaches, so the likelihood pulls
+  upwards about as hard as the prior pulls down. The D5 share varies widely because the total
+  gradient there is close to zero.
+- **Reading.** The likelihood prefers a capacity of 70 to 80 points and the sign skill needs it. A
+  prior strong enough to keep the capacity near the 33.5-point centre of the six signed Primaries
+  removes the skill, so the capacity that reads the injected farm is also the capacity that reads a
+  real midday dip as reverse flow. Gradient clipping at a global norm of 1 includes the log
+  capacities, so the large prior gradient also rescales the demand module's gradients; Adam
+  absorbs most of that.
+- **Reviews.** A fresh Sonnet review of the changed loss found no must-fix. It noted that the extra
+  random draw for the gradient-share batch shifts the batch order, so the earlier arms would not
+  bit-reproduce on a rerun (the draw now uses its own generator).
+
+## First test result (interim: two test months, one seed, no intervals)
+
+**The first test failed P1 and P4, so the full run was not started.** S1c reaches pooled balanced
 accuracy 0.854 in 2026-06 but 0.741 in 2026-03, and its false-reverse rate on gate-open sunny
 half-hours is 16.9% (June) and 6.7% (March), against a 5% bar. The no-injection placebo invents
 reverse flow at D5 on 18% (March) and 47% (June) of those half-hours. The learned capacity at D5
@@ -359,13 +386,14 @@ is fitted from the rows it labels.
 - **Sunny summer middays.** On sunny summer-midday half-hours (UTC 10:00 to 14:00, April to
   September) with no reverse flow, S1c calls reverse flow on 85% of them in June (245 half-hours) and
   14% in March (147 half-hours; the March subset is small).
-- **Re-derivation.** A fresh Sonnet agent recomputed every number above except the matched
-  false-reverse comparison, the hour-and-month baseline, and the learned capacities, from the forecast
-  files with its own code. All matched within 0.005, and the files have no duplicate rows, no
-  origins outside the month, and a median sign that agrees with `P(X < 0)` on every row.
+- **Re-derivation.** A fresh Sonnet agent recomputed every number above, including the matched
+  false-reverse comparison and the learned capacities, from the forecast files with its own code.
+  All matched within 0.005, and the files have no duplicate rows, no origins outside the month, and
+  a median sign that agrees with `P(X < 0)` on every row.
 - **Lab caveat.** S1c reads realised CAMS at every lead, so the day-ahead behaviour of the sign is
   untested until S1e.
 
-Per the stop rule, the work ends here and the maintainer decides what follows, as the sixth fold
-treatment of the MVA problem. Fits: 12, 29 to 83 s each. The re-derivation of these numbers by a
-fresh Sonnet agent and the write-up review have not run.
+Per the stop rule, the work ends here as the seventh failed treatment of the MVA problem; the
+maintainer decides what follows. Fits: 12 in the first test, 18 in the first post hoc round, and 12
+in the second, each taking 29 to 83 s. A fresh Sonnet agent recomputed the numbers and reviewed the
+write-up; its findings are applied.

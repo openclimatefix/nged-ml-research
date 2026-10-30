@@ -25,6 +25,10 @@ ARMS: Final[tuple[str, ...]] = (
     "S1c-cknown-shuffle",
     "S1c-sd03",
     "S1c-sd03-shuffle",
+    "S1c-p07",
+    "S1c-p07-shuffle",
+    "S1c-p03",
+    "S1c-p03-shuffle",
 )
 MONTHS: Final[tuple[str, ...]] = ("2026-03", "2026-06")
 WIDTH: Final[int] = 600
@@ -52,7 +56,14 @@ def collect() -> pl.DataFrame:
             rows.append(
                 (arm, month, "False-reverse rate, sign hidden (pooled)", pooled["false_reverse"])
             )
-        if tag == "L0_Q2" and arm in ("S1c", "S1c-cfix", "S1c-cknown", "S1c-sd03"):
+        if tag == "L0_Q2" and arm in (
+            "S1c",
+            "S1c-cfix",
+            "S1c-cknown",
+            "S1c-sd03",
+            "S1c-p07",
+            "S1c-p03",
+        ):
             rows.append(
                 (
                     arm,
@@ -88,7 +99,10 @@ def main() -> None:
         ],
         "False-reverse rate, no injection (D5)": [
             "Placebo at D5, no farm injected (lower is better; dashed: 0.01 bar)",
-            "No true reverse flow at D5. cfix: capacity fixed; cknown: set by known Primaries.",
+            [
+                "No true reverse flow at D5. cfix: capacity fixed; cknown: set by known Primaries.",
+                "p07, p03: prior at full weight.",
+            ],
         ],
     }
     panels = []
