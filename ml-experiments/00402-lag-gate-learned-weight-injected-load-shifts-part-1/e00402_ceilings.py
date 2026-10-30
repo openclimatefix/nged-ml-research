@@ -99,73 +99,46 @@ def boot(
     return float(diff.mean()), *np.quantile(est, [0.025, 0.975]).tolist()
 
 
-def group_weights(
-    *, rows: np.ndarray, a: np.ndarray, b: np.ndarray, lead: np.ndarray, key: np.ndarray
-):
-    """Return `{(key value, lead day): w}` fitted on `rows`: `-sum(B) / (2 sum(A))`, clipped."""
-    out = {}
-    for kv in np.unique(key[rows]):
-        for d in range(1, 15):
-            m = rows & (key == kv) & (lead == d)
-            if m.any():
-                out[(kv, d)] = float(np.clip(-b[m].sum() / (2.0 * max(a[m].sum(), 1e-12)), 0, 1))
+def loeo(
+    *,
+    cell: np.ndarray,
+    fit_rows: np.ndarray,
+    a: np.ndarray,
+    b: np.ndarray,
+    c: np.ndarray,
+    lead: np.ndarray,
+    cluster: np.ndarray,
+    harm: np.ndarray,
+) -> np.ndarray:
+    """Return each harm row's CRPS under weights fitted per (cell, lead day) without its event.
+
+    The weight of a cell and lead day is `-sum(B) / (2 sum(A))` over `fit_rows` clipped to [0, 1];
+    all rows of the harm row's event (`cluster`) are removed from that sum first. Rows outside
+    `harm` get NaN.
+    """
+    n = int(cell.max()) + 1
+    idx = cell * 15 + lead
+    total_a = np.bincount(idx[fit_rows], weights=a[fit_rows], minlength=n * 15)
+    total_b = np.bincount(idx[fit_rows], weights=b[fit_rows], minlength=n * 15)
+    out = np.full(len(a), np.nan)
+    for cl in np.unique(cluster[harm]):
+        r = harm & (cluster == cl)
+        drop = r & fit_rows
+        sa = total_a - np.bincount(idx[drop], weights=a[drop], minlength=n * 15)
+        sb = total_b - np.bincount(idx[drop], weights=b[drop], minlength=n * 15)
+        w = np.clip(-sb / (2.0 * np.maximum(sa, 1e-12)), 0.0, 1.0)[idx[r]]
+        out[r] = a[r] * w**2 + b[r] * w + c[r]
     return out
 
 
-def contrast(*, use, a, b, lead, group, harm, clean, t):
-    """Return flag oracle per group minus constant per group on `use` harm rows, six group."""
-    scored = (harm | clean) & use
-    wc = group_weights(rows=scored, a=a, b=b, lead=lead, key=group)
-    wh = group_weights(rows=harm & use, a=a, b=b, lead=lead, key=group)
-    wl = group_weights(rows=clean & use, a=a, b=b, lead=lead, key=group)
-    m = harm & use & (group == "six")
-    idx = np.flatnonzero(m)
-    w_c = np.array([wc[(group[i], lead[i])] for i in idx])
-    w_f = np.array([wh[(group[i], lead[i])] for i in idx])
-    ab, bb, cb = a[idx], b[idx], t["C"].to_numpy()[idx]
-    f = lambda w: (ab * w**2 + bb * w + cb).mean()  # noqa: E731
-    return f(w_f) - f(w_c), int(m.sum())
-
-
-def extras(*, t, score, harm, clean, group, lead, month, a, b) -> None:
-    """Print leave-out contrasts, the median-gap feature oracle, and the event re-count."""
+def extras(*, t, score, harm, clean, group, lead, month, a, b) -> None:  # noqa: ANN001
+    """Print held-out (leave-one-event-out) ceilings, the median-gap oracle, and the event re-count."""
     label = t["label"].to_numpy()
     ev = pl.read_parquet(W400 / "events_corrected.parquet")
-    print("\n== flag oracle per group minus constant per group, six, harm rows, leaving out ==")
-    for name, excl in (
-        ("none", ()),
-        ("D16", ("D16",)),
-        ("D5", ("D5",)),
-        ("D16 and D5", ("D16", "D5")),
-    ):
-        d, n = contrast(
-            use=~np.isin(label, excl), a=a, b=b, lead=lead, group=group, harm=harm, clean=clean, t=t
-        )
-        print(f"  without {name}: {d:+.3f} ({n:,} rows)")
-    onset_day = dict(zip(ev["event_id"].to_list(), (ev["onset_idx"] // 48).to_list(), strict=True))
-    ids = t["lag_event_id"].to_numpy()
-    day = np.array([onset_day.get(int(i), -1) for i in ids])
-    six_harm = harm & (group == "six")
-    leave = []
-    for d in np.unique(day[six_harm]):
-        v, _ = contrast(
-            use=~(six_harm & (day == d)),
-            a=a,
-            b=b,
-            lead=lead,
-            group=group,
-            harm=harm,
-            clean=clean,
-            t=t,
-        )
-        leave.append((v, int(d), int((six_harm & (day == d)).sum())))
-    leave.sort()
-    print(
-        f"  leave one event-day out ({len(leave)} onset days): min {leave[0][0]:+.3f}, max {leave[-1][0]:+.3f}"
-    )
-    for v, d, n in leave[-3:]:
-        print(f"    least-gain leave-out: onset day {d}, {n:,} rows, contrast {v:+.3f}")
-    print("\n== median-gap feature oracle (cross-fitted by month), harm rows, six ==")
+    c = t["C"].to_numpy()
+    cluster = np.where(harm, t["lag_event_id"].to_numpy(), -1)
+    gid = np.where(group == "six", 0, np.where(group == "eight", 1, 2))
+    scored = (harm | clean) & (group != "report")
     q = {
         n: pl.read_parquet(W400 / f"arm_{n}.parquet", columns=[*KEYS, "q50"])
         for n in ("lags", "lagless")
@@ -176,27 +149,45 @@ def extras(*, t, score, harm, clean, group, lead, month, a, b) -> None:
         .join(q["lagless"], on=KEYS, how="left", maintain_order="left", suffix="_ll")
     )
     gap = np.abs(g["q50"].to_numpy() - g["q50_ll"].to_numpy()) / t["capacity_mw"].to_numpy()
-    edges = np.nanquantile(gap[harm | clean], np.linspace(0, 1, 11)[1:-1])
-    decile = np.searchsorted(edges, gap)
-    cell = group.astype(object) + "_" + decile.astype(str)
-    w_gap = np.full(t.height, 0.5)
-    w_cg = np.full(t.height, 0.5)
-    scored = harm | clean
-    for m in np.unique(month):
-        te = month == m
-        tr = scored & ~te
-        wg = group_weights(rows=tr, a=a, b=b, lead=lead, key=cell)
-        wc = group_weights(rows=tr, a=a, b=b, lead=lead, key=group)
-        for i in np.flatnonzero(te & scored):
-            w_gap[i] = wg.get((cell[i], lead[i]), 0.5)
-            w_cg[i] = wc.get((group[i], lead[i]), 0.5)
-    crps = lambda w: t["A"].to_numpy() * w**2 + t["B"].to_numpy() * w + t["C"].to_numpy()  # noqa: E731
-    for name in ("six", "eight"):
-        m = harm & (group == name)
+    edges = np.nanquantile(gap[scored], np.linspace(0, 1, 11)[1:-1])
+    gcell = gid * 10 + np.searchsorted(edges, gap)
+    kw = {"a": a, "b": b, "c": c, "lead": lead, "cluster": cluster, "harm": harm}
+    held = {
+        "constant per group (held out by event)": loeo(cell=gid, fit_rows=scored, **kw),
+        "flag oracle per group (held out by event)": loeo(
+            cell=gid, fit_rows=harm & (group != "report"), **kw
+        ),
+        "median-gap-decile constant per group (held out by event)": loeo(
+            cell=gcell, fit_rows=scored, **kw
+        ),
+    }
+    rng = np.random.default_rng(1)
+    print("\n== held-out (leave-one-event-out) CRPS on harm rows ==")
+    for name_g in ("six", "eight"):
+        m = harm & (group == name_g)
         print(
-            f"  {name}: CRPS constant per group {crps(w_cg)[m].mean():.3f}, gap-decile constant "
-            f"{crps(w_gap)[m].mean():.3f}, forecast with lags {score['forecast with lags (w = 1)'][m].mean():.3f}"
+            f"  {name_g}: forecast with lags {score['forecast with lags (w = 1)'][m].mean():.3f}, "
+            f"without lags {score['forecast without lags (w = 0)'][m].mean():.3f}"
         )
+        for k, v in held.items():
+            print(f"    {k}: {v[m].mean():.3f}")
+        ref = held["constant per group (held out by event)"]
+        for k in list(held)[1:]:
+            est, lo, hi = boot(diff=(held[k] - ref)[m], cluster=cluster[m], rng=rng)
+            print(f"    {k} minus constant per group: {est:+.3f} (95% {lo:+.3f} to {hi:+.3f})")
+        diff = (held["flag oracle per group (held out by event)"] - ref)[m]
+        per = (
+            pl.DataFrame({"c": cluster[m], "d": diff, "l": label[m]})
+            .group_by("c", "l")
+            .agg(s=pl.col("d").sum(), n=pl.len())
+            .sort("s")
+        )
+        total = float(diff.sum())
+        print(
+            "    largest contributions to the flag oracle's gain (cluster, Primary, rows, share of total):"
+        )
+        for r in per.head(3).iter_rows(named=True):
+            print(f"      event {r['c']} at {r['l']}: {r['n']:,} rows, {r['s'] / total:.0%}")
     print("\n== re-count of the corrected events (per-Primary rows) ==")
     for col in ("depth_share", "length_days"):
         print(
@@ -231,7 +222,9 @@ def main() -> None:
     lead = t["lead_day"].to_numpy()
     harm, clean = t["harm"].to_numpy(), t["clean"].to_numpy()
     lag_count = t["lag_count"].to_numpy()
-    scored = harm | clean
+    group0 = np.where(np.isin(t["label"].to_numpy(), SIX + EIGHT), "x", "report")
+    harm, clean = harm & (group0 != "report"), clean & (group0 != "report")
+    scored = (harm | clean) & (group0 != "report")
     const = fit_const(a=a[scored], b=b[scored], key=lead[scored])
     w_const = np.array([const[k] for k in lead])
     w_clean = fit_const(a=a[clean], b=b[clean], key=lead[clean])
@@ -250,9 +243,13 @@ def main() -> None:
         m = harm & (lag_count == c)
         flag_by_count[m] = [by_count[c].get(k, 0.5) for k in lead[m]]
     flag_by_count[~harm] = w_flag[~harm]
-    group = np.where(np.isin(t["label"].to_numpy(), SIX), "six", "eight")
-    w_const_g = np.empty(t.height)
-    w_flag_g = np.empty(t.height)
+    group = np.select(
+        [np.isin(t["label"].to_numpy(), SIX), np.isin(t["label"].to_numpy(), EIGHT)],
+        ["six", "eight"],
+        "report",
+    )
+    w_const_g = np.full(t.height, 1.0)
+    w_flag_g = np.full(t.height, 1.0)
     for g in ("six", "eight"):
         gm = group == g
         c = fit_const(a=a[scored & gm], b=b[scored & gm], key=lead[scored & gm])

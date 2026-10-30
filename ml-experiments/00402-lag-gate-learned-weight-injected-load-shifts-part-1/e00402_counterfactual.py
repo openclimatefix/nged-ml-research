@@ -48,10 +48,14 @@ EVENTS: Final[Path] = (
     / "events_corrected.parquet"
 )
 WORK: Final[Path] = DATA / "00402-lag-gate-learned-weight-injected-load-shifts-part-1" / "work"
-OUT: Final[Path] = WORK / "counterfactual"
+OUT: Final[Path] = WORK / "counterfactual_measured"
 REFITS: Final[tuple[datetime, ...]] = tuple(
     datetime(y, m, 1, tzinfo=UTC) for y, m in ((2025, 10), (2026, 1), (2026, 3), (2026, 6))
 )
+PRE_EVENT_STEPS: Final[int] = 7 * 48
+"""The stage-1 bias of each event is the mean reading minus median over the 7 days before it."""
+MIN_SHARE_OF_LABEL: Final[float] = 0.25
+"""Events whose measured deviation is under this share of the labelled depth are skipped."""
 MAX_RUNS_PER_EVENT_REFIT: Final[int] = 6
 """Runs predicted per event and refit month, spread evenly over the runs whose lags touch it."""
 DEPTHS: Final[tuple[float, ...]] = (0.02, 0.05, 0.10)
@@ -133,13 +137,21 @@ def real_site(*, site: str, threads: int) -> pl.DataFrame:
         model = load_model(site=site, refit=refit, threads=threads)
         for ev in events.iter_rows(named=True):
             lo, hi = ev["onset_idx"], ev["end_idx"]
-            shift = ev["depth_mw"] / capacity
+            label_shift = ev["depth_mw"] / capacity
             if np.isnan(median[lo : hi + 1]).any() or np.isnan(arrays.power[lo : hi + 1]).any():
                 continue
             if lo < int(common.grid_index(times=refit)) <= hi:
                 continue
+            before = slice(max(0, lo - PRE_EVENT_STEPS), lo)
+            gap = arrays.power[before] - median[before]
+            bias = float(np.nanmean(gap)) if np.isfinite(gap).any() else 0.0
             cf_power = arrays.power.copy()
-            cf_power[lo : hi + 1] = median[lo : hi + 1]
+            cf_power[lo : hi + 1] = median[lo : hi + 1] + bias
+            shift = float(np.mean(arrays.power[lo : hi + 1] - cf_power[lo : hi + 1]))
+            if shift * label_shift <= 0 or abs(shift) < MIN_SHARE_OF_LABEL * abs(label_shift):
+                continue
+            if abs(bias) > 0.5 * abs(shift):
+                continue
             syn_power = cf_power.copy()
             syn_power[lo : hi + 1] += shift
             variants = {
@@ -157,7 +169,8 @@ def real_site(*, site: str, threads: int) -> pl.DataFrame:
                     origin=np.full(target.shape, o),
                 ).astype(np.int64)
                 k = ((lag >= lo) & (lag <= hi)).sum(axis=1)
-                if (k > 0).any():
+                ok = (k > 0) & (band_of(lead=(target - o) * 0.5) >= 0)
+                if ok.any():
                     touching.append(origin)
             if not touching:
                 continue
@@ -192,7 +205,7 @@ def real_site(*, site: str, threads: int) -> pl.DataFrame:
                         out.append({
                             "site": site, "event_id": ev["event_id"], "refit": refit,
                             "origin": origin, "k": kk, "band": BANDS[b][0], "n": int(sel.sum()),
-                            "step": shift,
+                            "step": shift, "label_step": float(label_shift),
                             "share_real": float(((q["real"][sel, Q50] - q["cf"][sel, Q50]) / shift).mean()),
                             "share_syn": float(((q["syn"][sel, Q50] - q["cf"][sel, Q50]) / shift).mean()),
                             "w90_cf": float(w["cf"]), "w90_real": float(w["real"]), "w90_syn": float(w["syn"]),

@@ -19,6 +19,7 @@ KNOT_LEVELS: Final[np.ndarray] = np.concatenate([[0.0], LEVELS, [1.0]])
 def knots(*, quantiles: np.ndarray) -> np.ndarray:
     """Return the 13 sorted knots of each row: the 11 quantiles and the two extended ends."""
     q = np.sort(quantiles.astype(np.float64), axis=1)
+    q = np.maximum.accumulate(q + np.arange(q.shape[1]) * 1e-9, axis=1)  # separate tied quantiles
     low = q[:, 0] - (q[:, 1] - q[:, 0]) / (LEVELS[1] - LEVELS[0]) * LEVELS[0]
     high = q[:, -1] + (q[:, -1] - q[:, -2]) / (LEVELS[-1] - LEVELS[-2]) * (1.0 - LEVELS[-1])
     return np.concatenate([low[:, None], q, high[:, None]], axis=1)
