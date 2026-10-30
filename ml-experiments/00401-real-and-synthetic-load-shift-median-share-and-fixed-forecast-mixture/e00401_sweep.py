@@ -16,7 +16,6 @@ PYTHONPATH=<as in e00401_score.py> DATA_PATH_INTERNAL=... \
     uv run --no-sync python ml-experiments/00401-*/e00401_sweep.py run [D5 ...]
 ```
 """
-# ruff: noqa: E501
 
 import sys
 import time
