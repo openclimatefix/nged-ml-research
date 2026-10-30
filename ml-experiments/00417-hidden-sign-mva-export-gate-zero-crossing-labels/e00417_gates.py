@@ -136,6 +136,9 @@ def open_mask(
         mode: `none` (experiment 412's rule), `primary` (design A), or `primary+hi` (A with H).
         gates: The Primary gates (for `primary` and `primary+hi`).
         thresholds: The high-irradiance thresholds (for `primary+hi`).
+
+    Returns:
+        A boolean array, true where the folded density applies.
     """
     open_ = gate_u >= GATE_U
     if mode == "none":

@@ -92,13 +92,13 @@ class Setting:
         q_points: The reactive floor `Q`, in points of capacity.
         power_factor: The power factor of the Primary's own demand (1.0 means no proportional
             reactive power).
+        farm_cap: The injected farm is capped at this fraction of its own peak (1.0 means no cap).
     """
 
     level: float
     q_points: float
     power_factor: float = 1.0
     farm_cap: float = 1.0
-    """The injected farm is capped at this fraction of its own peak (1.0 means no cap)."""
 
     @property
     def tag(self) -> str:
