@@ -194,7 +194,8 @@ the private folder (`work/report.txt`, `work/curtailment.txt`). This page has no
   lags in the event.
 - **Smoothness.** The blends do not step more than the pure forecasts. Largest half-hour
   change of the median across an onset: median 6.2 points and 95th percentile 13.3 (mixture B2)
-  against 6.7 and 15.8 (forecast with lags). The pure forecasts already change by several points at event edges.
+  against 6.7 and 15.8 (forecast with lags). The pure forecasts already change by several points
+  at event edges.
 - **Avoidable curtailment** at the signed-MW six, limit 0.9 times the maximum, GBP, minus the
   forecast with lags: during events B2 mixture +61,000, fixed mixture +89,000, forecast without lags
   +1,164,000; in the 7 days after about -3,000 for every blend; all rows B2 mixture +40,000. The GAM
