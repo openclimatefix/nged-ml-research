@@ -25,16 +25,16 @@ hypothesis: >-
   passed, and the solar term then lowers the net-demand CRPS at the six signed-direction Primaries
   against the same network given no solar term.
 prediction: >-
-  Written before any fit. K0 (controls): C2 recovers the ensemble's own anomaly at 0.8 to
-  1.2 and a pure profile at most 0.30. K1 (anomaly variant): the learned capacity increment of C2 is
-  0.5 to 1.5 of the least-squares read-out of the injected anomaly on the ensemble unit shape at 4 of the 6
-  Primaries. K2 (anomaly placebo): the day-shuffled anomaly recovers at most the profile-only
-  benchmark plus 0.20, where the benchmark is the same read-out on the shuffled series (expected
-  near 0). K3 (profile variant): the real-farm increment recovers more than the day-shuffled farm
-  by more than 2 seed standard deviations at 4 of the 6 Primaries. P1: C3 minus A0-noirr-doy is
-  between -0.15 and 0.00 CRPS points at the signed-MW six. P2: C2 minus A0-noirr-doy is negative by
-  0.05 to 0.30 points. P3: C3 minus C2 is between -0.10 and 0.00 points with an interval that
-  includes zero. The score arms run only if K0, K1, and K2 hold.
+  Written before any fit. K0 (controls): C2 recovers the ensemble's own anomaly at 0.8 to 1.2 and
+  a pure profile at most 0.30. K1 (anomaly variant): the learned capacity increment of C2 is 0.5
+  to 1.5 of the least-squares read-out of the injected anomaly on the ensemble unit shape at 4 of
+  the 6 Primaries. K2 (anomaly placebo): the day-shuffled anomaly recovers at most the profile-
+  only benchmark plus 0.20, where the benchmark is the same read-out on the shuffled series
+  (expected near 0). K3 (profile variant): the real-farm increment recovers more than the day-
+  shuffled farm by more than 2 seed standard deviations at 4 of the 6 Primaries. P1: C3 minus
+  A0-noirr-doy is between -0.15 and 0.00 CRPS points at the signed-MW six. P2: C2 minus A0-noirr-
+  doy is negative by 0.05 to 0.30 points. P3: C3 minus C2 is between -0.10 and 0.00 points with an
+  interval that includes zero. The score arms run only if K0, K1, and K2 hold.
 decision_rule: >-
   See "Pre-registered rules". The known-answer gate is passed when K0, K1, and K2 hold on the
   anomaly variant. A score contrast counts as a gain only if its 95% month-block interval,
