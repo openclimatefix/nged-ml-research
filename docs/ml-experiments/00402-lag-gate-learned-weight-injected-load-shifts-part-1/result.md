@@ -157,6 +157,33 @@ code: ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/
   periods can therefore contain events that no label covers. The harm table's baseline (clean-lag
   rows) is optimistic, and the real-event slices undercount events. Every write-up repeats this
   caveat. Injected events stay the main training signal because they need no logs.
+- **Changes after the Opus plan review.**
+    - **Comparators.** Every stop rule and contrast uses the fitted constant mixture per group (one
+      weight per lead day and metering group) as its comparator, and also reports the forecast
+      without lags. The pooled constant is descriptive only. Step 1 also reports leave-one-Primary-out
+      and leave-one-event-out contrasts, and clusters the bootstrap by load-shift event (all Primaries
+      the event touched).
+    - **Non-inferiority margin.** The contrast over harm rows, clean rows, and the 7 days after each
+      event is pooled per group. Clean rows are 96% of rows at the six, so the clean-row margin at
+      the six is 0.005 points. At the eight the target is non-inferiority against the forecast with
+      lags (margin 0.01 points). The gate with the metering unit as an input and the gate per group
+      are the headline arms; the pooled gate is descriptive.
+    - **Arms.** Arm (b) gets the injected flags plus every feature of arm (d) and bounds it; the
+      flag-only version is a separate arm. A new arm (f) is the same gate trained on real, unmodified
+      rows (label w* needs only actual readings), so a gain is credited to the injection only if
+      (d) beats (f). Step 1 adds feature oracles (a constant per group, lead day, and decile of the
+      absolute gap between the two medians).
+    - **Folds.** Step 4 is true leave-one-month-out, cutting training rows whose valid time or lag
+      time is in the scored month and origins within 14 days before it. Step 5 is forward-only and
+      evaluates harm rows whose target is in the scored month; the 14-day rule applies to the
+      training events of the real-label arm. Constants are cross-fitted on the same folds.
+    - **Injection.** Step 2 adds a variant that scales the series by a fraction (the injection the
+      plan uses) beside the constant step, and repeats on the R0 lagged boosters. At the eight, only
+      windows whose reading stays above 20% of capacity receive an injection. Spike size is 4 to 20
+      times the stage-1 residual's median absolute deviation. A sensitivity arm chooses clean base
+      periods without labels.
+    - **Power.** Step 5 is an estimate with a leave-one-event-out table, not a test. Step 1 is
+      repeated on the R1 pair (using experiment 392's stored forecasts) and on the R0 pair.
 - **Pre-registered contrasts (step 5).** Each of arms (c), (d), (e), and the logistic baseline
   minus the forecast with lags, minus the fitted constant mixture, and minus the forecast without
   lags, on (i) rows whose target is outside every event and whose lags touch one, by number of lags,
