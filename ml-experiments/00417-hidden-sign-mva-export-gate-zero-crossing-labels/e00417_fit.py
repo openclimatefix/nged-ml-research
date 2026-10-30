@@ -345,8 +345,8 @@ def run_arms(
             for suffix, run_names in ARM_RUNS.items():
                 arm_name = f"{base_name}{suffix}"
                 for run_name in run_names:
-                    if only and run_name not in only:
-                        continue
+                    if (only and run_name not in only) or (not only and run_name == "pf"):
+                        continue  # the power-factor run is a sensitivity check, opt-in with --only pf
                     setting = SETTINGS[run_name]
                     target = OUT_DIR / "first" / arm_name / f"{setting.tag}_{month}_s{seed}.parquet"
                     if target.exists():

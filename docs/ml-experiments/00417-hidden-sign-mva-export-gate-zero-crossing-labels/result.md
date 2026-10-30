@@ -288,6 +288,18 @@ raw irradiance confounds the flip with the time of day.
   with the day flag reading the test days' observed readings (hindsight, a laboratory condition) and
   never the signed truth. A fresh Sonnet reviewer reads the new code before any gate uses it.
 
+## Amendment 2 (2026-10-30): power factor 1, with 0.97 only as a sensitivity check
+
+**The maintainer's assumption is power factor 1 plus the small reactive floor `Q`, not 0.97.** The
+farm output is injected at power factor 1 with the 2-point floor, and every fit and every pass or
+fail rule uses that reading. The two extra fits per arm at power factor 0.97 are dropped from the
+plan, and the power-factor rows above (prediction P4, the "+ 2" fits per arm, and the diagnostics
+at power factor 0.97) are sensitivity checks that no rule reads. The reference arm and arm A had
+already run their power-factor fits when this amendment arrived; those files are labelled
+sensitivity and no pass or fail rule uses them. The main fits (injected, no-injection, and shuffled
+sky) had all run at power factor 1, so nothing needs a rerun. A power-factor fit of the remaining
+arms runs last, only if the machine is idle (`e00417_fit.py run --only pf`).
+
 ## Departures from the design note
 
 - **The H arm is A with H layered on top**, not H alone, and the D5 placebo "should still fail with
