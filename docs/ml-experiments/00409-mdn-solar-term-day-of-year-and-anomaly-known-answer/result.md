@@ -223,27 +223,35 @@ C5a minus C3, and C5b minus C3. C3 minus A0 is reported and not tested. The mini
 effect of a contrast is 2 times the standard deviation over the 5 folds of the seed-to-seed
 difference of the contrast.
 
+- **Slices.** The headline band is days 1 to 10 at all signed-MW-six half-hours. The sunny slices
+  are `sunny_unit_shape` and `sunny_april_june`, each within days 1 to 10. The minimum detectable
+  effect is computed separately for each slice. Each contrast is tested in 3 slices, so the true
+  family is 21 tests; with 5 test months the month-block interval excludes zero only when about 4 or
+  5 months agree, and the write-up says so.
 - **Main question: C3 minus A0-noirr-doy** (the explicit solar term with the adapter, against the
-  same network with no solar term).
-    - *Supported:* the difference is below zero, its interval excludes zero, and its magnitude exceeds
-      the minimum detectable effect, in the headline band and in the sunny slice
-      (`sunny_unit_shape`), with no tail worse (see below).
-    - *Partly supported:* the same holds in the sunny slice (`sunny_unit_shape` or
-      `sunny_april_june`) but not in the headline band, or in the headline band with a point
-      estimate below the minimum detectable effect and an interval excluding zero.
-    - *Not supported:* the interval includes zero in every slice, or the difference is above zero with
-      an interval excluding zero.
-- **The prediction that can fail:** C3 minus A0-noirr-doy lies between -0.15 and 0.00 points
-  (P1). A difference below -0.15 or above 0.00 counts as the prediction failing, whatever the
-  verdict word.
-- **Tails:** a verdict of supported or partly supported also needs the pinball loss at q95 and q99
-  of C3 to be no more than 5% higher (relative) than A0-noirr-doy's, and
-  coverage at q95 and q99 within 0.02 of A0-noirr-doy's. If a tail is worse, the verdict is
-  downgraded one level and the page says why.
+  same network with no solar term). A slice "passes" when the difference is below zero, its
+  interval excludes zero, and its magnitude exceeds that slice's minimum detectable effect.
+    - *Supported:* the headline band passes and at least one sunny slice passes, and the tail rule
+      holds.
+    - *Partly supported:* the headline band passes and neither sunny slice passes, or a sunny slice
+      passes and the headline band does not, or the headline band has an interval excluding zero
+      with a magnitude below the minimum detectable effect; and the tail rule holds.
+    - *Not supported:* no slice has an interval excluding zero, or any slice has a positive
+      difference with an interval excluding zero (harm), whatever the other slices show.
+    - *Tail rule not met:* a result that is otherwise supported or partly supported is downgraded
+      one level.
+- **The prediction that can fail (P1):** C3 minus A0-noirr-doy lies between -0.15 and 0.00
+  points in the headline band. A difference outside that range counts as the prediction failing,
+  whatever the verdict word.
+- **Tail rule.** In the headline band at the signed-MW six, C3's pinball loss at q95 and at q99 is
+  no more than 5% higher (relative) than A0-noirr-doy's, and C3's coverage at q95 and at q99 differs
+  from A0-noirr-doy's by at most 0.02 (an arm-to-arm difference). The q01, q05, and threshold-weighted
+  CRPS are reported and do not enter the rule.
 - **Secondary contrasts** are reported with their intervals and called gains only on the same
   three-part rule (interval, minimum detectable effect, no worse tails). C3 minus A0 is the
-  practical comparison and is described, not judged, because it differs in the day-of-year term and
-  the irradiance inputs.
+  practical comparison and is described at the same level, not judged, because it differs in the
+  day-of-year term, the irradiance inputs, and possibly the training rows (experiment 397 may not
+  have applied the D15 and D18 start cut, which does not affect the scored rows).
 - **Learned capacity** is described against the studies page, with seed intervals. No capacity claim
   rests on a known-answer test.
 
@@ -297,4 +305,11 @@ difference of the contrast.
   over origins, so its recovery at long lead may miss for reasons unrelated to the network (the
   read-out uses the row's own shape, which partly corrects it); the score stage and its
   day-of-year inference inputs are added only if the gate holds.
+- **Code review of the score stage and the decision rule (fresh Sonnet, before any score arm).**
+  Found no crash and no leakage; five medium or low points on the rule and script. Fixed: the
+  script asserts every seed file exists; the minimum detectable effect is computed per slice; the
+  sunny slices are within days 1 to 10; the rule now has a fallback for a passing headline band with
+  no sunny pass, defines harm, defines the tail rule (slice, relative tolerance, arm-to-arm
+  coverage difference), names P1's slice, and states the 21-test family. The training-rows caveat for
+  C3 minus A0 is added.
 - **To be filled in:** results review, write-up review.

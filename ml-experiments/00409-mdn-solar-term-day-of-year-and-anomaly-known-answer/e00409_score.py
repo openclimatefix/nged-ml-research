@@ -66,7 +66,9 @@ def arm_frame(*, arm: str, seeds: tuple[int, ...]) -> pl.DataFrame:
     for month in MONTHS:
         folder = r3.SEED_DIR / "A0" if arm == "A0" else WORK / "seed_preds" / arm
         files = [folder / f"{month}_s{s}.parquet" for s in seeds]
-        stacked = pl.concat([pl.read_parquet(f) for f in files if f.exists()])
+        missing = [f for f in files if not f.exists()]
+        assert not missing, f"missing forecasts: {missing}"
+        stacked = pl.concat([pl.read_parquet(f) for f in files])
         pieces.append(
             stacked.group_by(r3.KEYS).agg(*[pl.col(c).mean() for c in common.LEVEL_COLUMNS])
         )
@@ -79,7 +81,7 @@ def arm_frame(*, arm: str, seeds: tuple[int, ...]) -> pl.DataFrame:
 
 def contrast_text(*, rows: dict, table: pl.DataFrame, a: str, b: str, sl: str) -> dict:
     """Return the 95% month-block contrast of arm `a` minus arm `b` at the signed-MW six."""
-    where = pl.col("label").is_in(list(SIGNED)) & pl.col(sl)
+    where = pl.col("label").is_in(list(SIGNED)) & pl.col(sl) & pl.col("lead_days_1_10")
     return metrics.month_bootstrap_contrast(
         treatment=rows[a],
         reference=rows[b],
@@ -91,16 +93,16 @@ def contrast_text(*, rows: dict, table: pl.DataFrame, a: str, b: str, sl: str) -
     )
 
 
-def monthly_signed_crps(*, rows: pl.DataFrame) -> dict:
-    """Return the signed-six mean CRPS at days 1 to 10 for each test month."""
-    kept = rows.filter(pl.col("label").is_in(list(SIGNED)), pl.col("lead_days_1_10")).with_columns(
-        month=pl.col("power_fcst_init_time").dt.strftime("%Y-%m")
-    )
+def monthly_signed_crps(*, rows: pl.DataFrame, sl: str) -> dict:
+    """Return the signed-six mean CRPS in a slice (within days 1 to 10) for each test month."""
+    kept = rows.filter(
+        pl.col("label").is_in(list(SIGNED)), pl.col(sl), pl.col("lead_days_1_10")
+    ).with_columns(month=pl.col("power_fcst_init_time").dt.strftime("%Y-%m"))
     return dict(kept.group_by("month").agg(pl.col("crps").mean()).iter_rows())
 
 
 def minimum_detectable_effect(
-    *, a: str, b: str, series: pl.DataFrame, ctx: dict, table: pl.DataFrame
+    *, a: str, b: str, sl: str, series: pl.DataFrame, ctx: dict, table: pl.DataFrame
 ) -> float:
     """Return 2 x the SD over folds of the seed-to-seed difference of the contrast `a - b`."""
     per_seed = {}
@@ -111,13 +113,14 @@ def minimum_detectable_effect(
             )
             kept = metrics.restrict_to_slice_table(forecast=frame, slice_table=table)
             per_seed[arm, s] = monthly_signed_crps(
+                sl=sl,
                 rows=metrics.scored_rows(
                     forecast=kept,
                     actuals=ctx["actuals"],
                     series=series,
                     thresholds=ctx["thresholds"],
                     slice_table=table,
-                )
+                ),
             )
     sds = []
     for s1, s2 in itertools.combinations(SEEDS, 2):
@@ -168,12 +171,12 @@ def main() -> None:
         f"\n== contrasts at the signed-MW six: difference (95% interval), Bonferroni level {LEVEL:.2f}% =="
     )
     for a, b in CONTRASTS:
-        mde = (
-            minimum_detectable_effect(a=a, b=b, series=series, ctx=ctx, table=table)
-            if b != "A0"
-            else float("nan")
-        )
         for sl in SLICES:
+            mde = (
+                minimum_detectable_effect(a=a, b=b, sl=sl, series=series, ctx=ctx, table=table)
+                if b != "A0"
+                else float("nan")
+            )
             r = contrast_text(rows=rows, table=table, a=a, b=b, sl=sl)
             print(
                 f"{a} minus {b} [{sl}]: {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f}) MDE {mde:.3f}"
