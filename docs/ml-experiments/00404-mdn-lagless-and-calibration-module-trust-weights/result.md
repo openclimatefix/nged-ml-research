@@ -372,11 +372,15 @@ plan uses both as diagnostics on the fitted networks and does not tune the injec
 reported as a lower bound on harm. Our series are one per substation, not per transformer, so a
 transformer-level event that conserves load across a substation's transformers does not appear.
 
-**Generator.** The manager confirmed on 2026-10-30 that experiment 402 (draft PR 56) has no
-injected-event generator yet; its branch holds only the ceilings script and the counterfactual
-script. This experiment therefore writes `e00404_inject.py`, and the write-up says so. If
-experiment 402 publishes a generator before fitting starts, this experiment switches to it. The
-depths and durations come from the table's real events, so the test distribution informs the
+**Generator.** This experiment uses experiment 402's generator (`e00402_inject.py`, draft PR 56),
+copied unchanged into this experiment's folder. Experiment 402 pushed it on 2026-10-30 after
+self-testing it, and it had not been code-reviewed then. It differs from the generator first
+written here in four ways: the donor change keeps the donor's shape (the donor is multiplied by
+`1 - f`), spikes are 4 to 20 times the stage-1 residual median absolute deviation, MVA-only
+Primaries receive events only where the reading stays above 20% of capacity, and base periods can
+exclude windows with a large stage-1 surprise. The signature takes the MVA-only set and each
+Primary's residual deviation in MW. The write-up says which version of the generator each fit used.
+The depths and durations come from the table's real events, so the test distribution informs the
 generator's distributions even though the real events never enter training; the write-up states
 this.
 
