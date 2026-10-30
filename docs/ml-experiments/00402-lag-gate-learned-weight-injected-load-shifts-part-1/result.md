@@ -146,6 +146,12 @@ code: ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/
 - **Why the MVA-only eight differ.** Step 1 reports, per Primary, whether the lags help the forecast
   with lags outside events, how many events each Primary has, and how deep and long they are
   relative to capacity.
+- **Event time-series plots (maintainer, relayed 2026-10-30).** The result page shows at least 6
+  time-series plots of real events from the corrected label table, covering both metering groups
+  (signed MW and MVA-only). Each plot marks when the event starts and ends and shows the actual
+  reading, the median, and the 90% band of the forecast with lags, the forecast without lags, and
+  each gate's blend. Plots follow the `dataviz` skill. Generators are not involved (demand series
+  only), so no anonymisation is needed.
 - **Pre-registered contrasts (step 5).** Each of arms (c), (d), (e), and the logistic baseline
   minus the forecast with lags, minus the fitted constant mixture, and minus the forecast without
   lags, on (i) rows whose target is outside every event and whose lags touch one, by number of lags,
