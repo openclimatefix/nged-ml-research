@@ -52,15 +52,22 @@ def seeds_to_fit(*, arm: str) -> tuple[int, ...]:
     return tuple(s for s in SEEDS if arm not in FROM_409 or s not in REUSED_SEEDS)
 
 
-def run_screen(*, device: str, arms: list[str], months: list[str], seeds: list[int] | None) -> None:
+def run_screen(
+    *,
+    device: str,
+    arms: list[str],
+    months: list[str],
+    seeds: list[int] | None,
+    out_dir: Path = SEED_DIR,
+) -> None:
     """Fit each arm on each screen month and seed; store forecasts, solar output, and networks."""
     for month in months:
         refit = base.refit_of(month=month)
         folds: dict[bool, prep.Fold] = {}
-        for arm in arms:
+        for arm in sorted(arms, key=lambda a: m5.SPECS[a].irradiance_free):
             irradiance_free = m5.SPECS[arm].irradiance_free
             for seed in seeds or seeds_to_fit(arm=arm):
-                target = SEED_DIR / arm / f"{month}_s{seed}.parquet"
+                target = out_dir / arm / f"{month}_s{seed}.parquet"
                 if target.exists():
                     continue
                 if irradiance_free not in folds:
@@ -99,8 +106,15 @@ def main() -> None:
     parser.add_argument("--months", nargs="+", default=list(base.SCREEN_MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=None)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--out-dir", type=Path, default=SEED_DIR)
     args = parser.parse_args()
-    run_screen(device=args.device, arms=args.arms, months=args.months, seeds=args.seeds)
+    run_screen(
+        device=args.device,
+        arms=args.arms,
+        months=args.months,
+        seeds=args.seeds,
+        out_dir=args.out_dir,
+    )
 
 
 if __name__ == "__main__":

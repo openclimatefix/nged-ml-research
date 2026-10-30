@@ -84,6 +84,8 @@ def arm_frame(*, arm: str, seeds: tuple[int, ...]) -> pl.DataFrame:
         missing = [f for f in files if not f.exists()]
         assert not missing, f"missing forecasts: {missing}"
         stacked = pl.concat([pl.read_parquet(f) for f in files])
+        counts = stacked.group_by(r3.KEYS).len()["len"].unique().to_list()
+        assert counts == [len(files)], f"{arm} {month}: keys are not in every seed file: {counts}"
         pieces.append(
             stacked.group_by(r3.KEYS).agg(*[pl.col(c).mean() for c in common.LEVEL_COLUMNS])
         )
@@ -121,7 +123,7 @@ def sunny_midday_flags(*, table: pl.DataFrame, series: pl.DataFrame) -> pl.DataF
         .join(cams, on=["label", "valid_time"], how="left")
         .with_columns(
             sunny_midday=(
-                (pl.col("csi") >= SUNNY_CSI)
+                (pl.col("csi").is_finite() & (pl.col("csi") >= SUNNY_CSI))
                 & (start.dt.hour() >= MIDDAY_START_HOUR)
                 & (start.dt.hour() < MIDDAY_END_HOUR)
             ).fill_null(value=False)
@@ -159,6 +161,33 @@ def monthly_mean(*, rows: pl.DataFrame, sl: str, metric: str) -> dict:
     return dict(kept.group_by("month").agg(pl.col(metric).mean()).iter_rows())
 
 
+_PER_SEED: dict = {}
+
+
+def per_seed_means(
+    *, arm: str, seed: int, series: pl.DataFrame, ctx: dict, table: pl.DataFrame
+) -> dict:
+    """Return one seed's signed-six monthly mean of each metric in each slice, scored once."""
+    if (arm, seed) not in _PER_SEED:
+        frame = adapter.forecast_frame(
+            stored=arm_frame(arm=arm, seeds=(seed,)), series=series, unit="fraction"
+        )
+        kept = metrics.restrict_to_slice_table(forecast=frame, slice_table=table)
+        rows = metrics.scored_rows(
+            forecast=kept,
+            actuals=ctx["actuals"],
+            series=series,
+            thresholds=ctx["thresholds"],
+            slice_table=table,
+        )
+        _PER_SEED[arm, seed] = {
+            (sl, metric): monthly_mean(rows=rows, sl=sl, metric=metric)
+            for sl in SLICES
+            for metric in PRIMARY_METRICS
+        }
+    return _PER_SEED[arm, seed]
+
+
 def minimum_detectable_effect(
     *,
     a: str,
@@ -169,26 +198,20 @@ def minimum_detectable_effect(
     series: pl.DataFrame,
     ctx: dict,
     table: pl.DataFrame,
-) -> float:
-    """Return 2 x the SD over folds of the seed-to-seed difference of the contrast `a - b`."""
-    per_seed = {}
-    for arm in (a, b):
-        for s in seeds:
-            frame = adapter.forecast_frame(
-                stored=arm_frame(arm=arm, seeds=(s,)), series=series, unit="fraction"
-            )
-            kept = metrics.restrict_to_slice_table(forecast=frame, slice_table=table)
-            per_seed[arm, s] = monthly_mean(
-                sl=sl,
-                metric=metric,
-                rows=metrics.scored_rows(
-                    forecast=kept,
-                    actuals=ctx["actuals"],
-                    series=series,
-                    thresholds=ctx["thresholds"],
-                    slice_table=table,
-                ),
-            )
+) -> tuple[float, float]:
+    """Return two minimum detectable effects of the contrast `a - b`.
+
+    The first is the pre-registered definition: 2 x the SD over folds of the difference between two
+    single seeds' contrasts. The second is for the contrast as scored, the seed-average of
+    `len(seeds)` seeds: the first divided by `sqrt(2 * len(seeds))`, because the SD of a difference
+    of two single-seed contrasts is `sqrt(2)` times one seed's SD and averaging divides by
+    `sqrt(len(seeds))`.
+    """
+    per_seed = {
+        (arm, s): per_seed_means(arm=arm, seed=s, series=series, ctx=ctx, table=table)[sl, metric]
+        for arm in (a, b)
+        for s in seeds
+    }
     sds = []
     for s1, s2 in itertools.combinations(seeds, 2):
         diff = [
@@ -196,7 +219,8 @@ def minimum_detectable_effect(
             for m in per_seed[a, s1]
         ]
         sds.append(float(np.std(diff, ddof=1)))
-    return 2.0 * float(np.mean(sds))
+    single = 2.0 * float(np.mean(sds))
+    return single, single / float(np.sqrt(2 * len(seeds)))
 
 
 def build(*, arms: tuple[str, ...], seeds: tuple[int, ...]) -> tuple:
@@ -226,7 +250,7 @@ def pre_fit() -> None:
     print(f"sunny-midday half-hours in the shared set: {int(table['sunny_midday'].sum())}")
     for sl in ("sunny_midday", "lead_days_1_10"):
         for metric in PRIMARY_METRICS:
-            mde = minimum_detectable_effect(
+            mde, mde_avg = minimum_detectable_effect(
                 a="C3",
                 b="A0-noirr-doy",
                 sl=sl,
@@ -236,7 +260,10 @@ def pre_fit() -> None:
                 ctx=ctx,
                 table=table,
             )
-            print(f"pre-fit MDE, C3 minus A0-noirr-doy [{sl}, {metric}], seeds 0-2: {mde:.3f}")
+            print(
+                f"pre-fit MDE, C3 minus A0-noirr-doy [{sl}, {metric}], seeds 0-2: "
+                f"single-seed definition {mde:.3f}, 3-seed average {mde_avg:.3f}"
+            )
 
 
 def main() -> None:
@@ -285,6 +312,7 @@ def main() -> None:
                 pl.col("pinball_q95").mean(),
                 pl.col("coverage_q99").mean(),
                 pl.col("coverage_q95").mean(),
+                pl.len().alias("n"),
             )
             .with_columns(arm=pl.lit(n))
             for n in ARMS
@@ -293,28 +321,79 @@ def main() -> None:
     with pl.Config(tbl_rows=100, tbl_cols=20):
         print(per_primary)
     out["per_primary_sunny_midday"] = per_primary.to_dicts()
-    print(f"\n== primary contrasts vs {REFERENCE} at the signed-MW six, level {LEVEL:.2f}% ==")
+    print("\n== sunny-midday means, signed-MW six, days 1 to 10 ==")
+    means = {}
+    for n in ARMS:
+        kept = rows[n].filter(
+            pl.col("label").is_in(list(SIGNED)), pl.col("sunny_midday"), pl.col("lead_days_1_10")
+        )
+        means[n] = {m: float(kept[m].mean()) for m in PRIMARY_METRICS} | {"n": kept.height}
+        out["sunny_midday_means"] = means
+        print(
+            f"{n:14s} CRPS {means[n]['crps']:.3f}  q99 pinball {means[n]['pinball_q99']:.3f}  n {kept.height}"
+        )
+    print(
+        f"\n== primary contrasts vs {REFERENCE}, sunny-midday slice, signed-MW six, level {LEVEL:.2f}% =="
+    )
+    print("MDE(1) is the pre-registered single-seed definition; MDE(5) is for the 5-seed average.")
     for arm in PRIMARY_ARMS:
         for metric in PRIMARY_METRICS:
-            for sl in ("sunny_midday", "lead_days_1_10"):
-                r = contrast(
-                    rows=rows, table=table, a=arm, b=REFERENCE, sl=sl, metric=metric, level=LEVEL
-                )
-                mde = minimum_detectable_effect(
-                    a=arm,
-                    b=REFERENCE,
-                    sl=sl,
-                    metric=metric,
-                    seeds=SEEDS,
-                    series=series,
-                    ctx=ctx,
-                    table=table,
-                )
-                key = f"{arm} minus {REFERENCE} [{sl}, {metric}]"
-                out["primary"][key] = {**r, "mde": mde}
-                print(
-                    f"{key}: {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f}) MDE {mde:.3f}"
-                )
+            r = contrast(
+                rows=rows,
+                table=table,
+                a=arm,
+                b=REFERENCE,
+                sl="sunny_midday",
+                metric=metric,
+                level=LEVEL,
+            )
+            mde1, mde5 = minimum_detectable_effect(
+                a=arm,
+                b=REFERENCE,
+                sl="sunny_midday",
+                metric=metric,
+                seeds=SEEDS,
+                series=series,
+                ctx=ctx,
+                table=table,
+            )
+            margin = (
+                NON_INFERIORITY_CRPS
+                if metric == "crps"
+                else NON_INFERIORITY_Q99_RELATIVE * means[REFERENCE]["pinball_q99"]
+            )
+            key = f"{arm} minus {REFERENCE} [sunny_midday, {metric}]"
+            verdict = {
+                "non_inferior": r["upper"] < margin,
+                "gain": r["upper"] < 0 and -r["difference"] > mde5,
+                "mde_below_margin": mde5 < margin,
+            }
+            out["primary"][key] = {
+                **r,
+                "mde_single": mde1,
+                "mde_avg": mde5,
+                "margin": margin,
+                **verdict,
+            }
+            print(
+                f"{key}: {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f}) "
+                f"MDE(1) {mde1:.3f} MDE(5) {mde5:.3f} margin {margin:.3f} {verdict}"
+            )
+    print("\n== headline-band contrasts vs the reference (secondary) ==")
+    for arm in PRIMARY_ARMS:
+        for metric in PRIMARY_METRICS:
+            r = contrast(
+                rows=rows,
+                table=table,
+                a=arm,
+                b=REFERENCE,
+                sl="lead_days_1_10",
+                metric=metric,
+                level=LEVEL,
+            )
+            key = f"{arm} minus {REFERENCE} [lead_days_1_10, {metric}]"
+            out["secondary"][key] = dict(r)
+            print(f"{key}: {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f})")
     print("\n== secondary contrasts ==")
     for a, b in SECONDARY:
         for metric in PRIMARY_METRICS:
