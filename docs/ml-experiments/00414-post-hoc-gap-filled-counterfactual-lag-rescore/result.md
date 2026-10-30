@@ -149,10 +149,12 @@ match experiment 411 exactly.
 ## The fill rule
 
 **The rule is fixed before any score is read.** Experiment 411 scored 15 of the 184 events, and 99
-events have a gap in the stage-1 median. The plan chose the fill rule because 46% of the event half-hours (14,184 of 30,832) have no stage-1 median. The gaps are median-only in 75 events and in both
-the median and the observed power in 24 events; the observed power alone is never missing. Of the 75
-median-only events, the longest gap is at most 12 half-hours in 8 events, at most 48 in 30 events,
-at most 96 in 39, and at most 336 in 70. Linear interpolation across gaps that long would invent a median, so the fill is different:
+events have a gap in the stage-1 median. The plan chose the fill rule because 46% of the event
+half-hours (14,184 of 30,832) have no stage-1 median. The gaps are median-only in 75 events and in
+both the median and the observed power in 24 events; the observed power alone is never missing. Of
+the 75 median-only events, the longest gap is at most 12 half-hours in 8 events, at most 48 in 30
+events, at most 96 in 39, and at most 336 in 70. Linear interpolation across gaps that long would
+invent a median, so the fill is different:
 
 - **Where the stage-1 median is missing, it is replaced by the mean observed reading at the same
   half-hour of the previous 4 weeks.** The mean uses only readings that are finite and outside
