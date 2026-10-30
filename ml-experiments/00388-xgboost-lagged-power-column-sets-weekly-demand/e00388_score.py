@@ -206,8 +206,42 @@ def band(name: str) -> pl.Expr:
     return (pl.col("lead_hours") > low) & (pl.col("lead_hours") <= high)
 
 
-def final(*, series: pl.DataFrame, ctx: dict, lag_arms: list[str], regime: str = "monthly") -> None:
-    """Print each lag arm against the stored weekly baseline and the references."""
+def flagged_half_hours(*, ctx: dict, series: pl.DataFrame) -> pl.DataFrame:
+    """Return scored-year half-hours that the shared cache reads but cleaned power lacks.
+
+    Cleaned power is experiment 87's `observed.parquet`. Prints the count per Primary.
+    """
+    observed = pl.read_parquet(
+        common.OBSERVED_PATH, columns=["time_series_id", "valid_time", "power"]
+    ).filter(pl.col("power").is_not_null())
+    flagged = (
+        ctx["actuals"]
+        .filter(pl.col("valid_time") >= base.SCORED_FIRST, pl.col("actual").is_finite())
+        .join(observed, on=["time_series_id", "valid_time"], how="anti")
+        .select("time_series_id", "valid_time")
+    )
+    print(f"flagged half-hours dropped in the scored year (fold_a_daily_gap_v1): {flagged.height}")
+    print(
+        flagged.join(series.select("time_series_id", "label"), on="time_series_id")
+        .group_by("label")
+        .len()
+        .sort("label")
+    )
+    return flagged
+
+
+def final(  # noqa: PLR0912, PLR0915
+    *,
+    series: pl.DataFrame,
+    ctx: dict,
+    lag_arms: list[str],
+    regime: str = "monthly",
+    drop_flagged: bool = False,
+) -> None:
+    """Print each lag arm against the baseline and the references.
+
+    With `drop_flagged`, half-hours that cleaned power lacks are removed first (the check column).
+    """
     refs = base.reference_frames(series=series)
     arms = {
         **{a: arm_frame(arm=a, series=series, regime=regime) for a in lag_arms},
@@ -220,11 +254,19 @@ def final(*, series: pl.DataFrame, ctx: dict, lag_arms: list[str], regime: str =
         "stack": base.stack_frames(series=series)["stack"],
         **refs,
     }
+    suffix = ""
+    if drop_flagged:
+        flagged = flagged_half_hours(ctx=ctx, series=series)
+        arms = {
+            n: f.join(flagged, on=["time_series_id", "valid_time"], how="anti")
+            for n, f in arms.items()
+        }
+        suffix = "_check"
     table, scored, rows = score_arms(arms=arms, series=series, ctx=ctx)
     out = WORK / "scores"
     out.mkdir(exist_ok=True)
     pl.concat([t.with_columns(arm=pl.lit(n)) for n, t in scored.items()]).write_parquet(
-        out / "final_scores.parquet"
+        out / f"final_scores_{regime}{suffix}.parquet"
     )
     print("\n== absolute CRPS, days 1 to 10, per Primary ==")
     print(
@@ -383,6 +425,11 @@ def main() -> None:
     parser.add_argument("mode", choices=("gate", "final"))
     parser.add_argument("--arms", nargs="+", default=["a", "b", "c"])
     parser.add_argument(
+        "--drop-flagged",
+        action="store_true",
+        help="the check column: drop half-hours that cleaned power lacks",
+    )
+    parser.add_argument(
         "--regime", choices=("monthly", "weekly"), default="monthly", help="refit cadence scored"
     )
     args = parser.parse_args()
@@ -391,7 +438,13 @@ def main() -> None:
     if args.mode == "gate":
         gate(series=series, ctx=ctx)
     else:
-        final(series=series, ctx=ctx, lag_arms=args.arms, regime=args.regime)
+        final(
+            series=series,
+            ctx=ctx,
+            lag_arms=args.arms,
+            regime=args.regime,
+            drop_flagged=args.drop_flagged,
+        )
 
 
 if __name__ == "__main__":
