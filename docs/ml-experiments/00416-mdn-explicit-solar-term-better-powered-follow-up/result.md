@@ -155,6 +155,25 @@ term through the free irradiance input.
    1 MW against seed spread about 0.35 MW), the adapter-free arm, the no-prior arm, and the
    capacity-path penalties.
 
+## Amendment 1: pre-fit minimum detectable effect (written before any new fit)
+
+Computed by `e00416_score.py --pre-fit` from experiment 409's stored seeds 0 to 2 of C3 and
+A0-noirr-doy (twice the standard deviation over the 5 folds of the seed-to-seed difference of the
+contrast, signed-MW six, days 1 to 10):
+
+| Contrast, C3 minus A0-noirr-doy | CRPS (points) | q99 pinball loss |
+|---|---|---|
+| Sunny-midday slice (138,776 shared half-hours) | 0.969 | 0.110 |
+| All half-hours | 0.397 (matches experiment 409) | 0.294 |
+
+- **The design is expected to be underpowered for non-inferiority on CRPS.** The single-seed
+  minimum detectable effect on sunny middays (0.97) is nearly 10 times the +0.10 margin. Scoring the
+  seed-average of 5 seeds shrinks the seed noise by roughly a factor of 2, which leaves about 0.4,
+  still about 4 times the margin. The page reports the post-fit value from the 5 seeds and applies
+  the "Inconclusive" verdict if it exceeds the margin.
+- **Only the month-to-month spread within a slice of 5 test months limits the interval.** More
+  seeds do not fix that, and more test months would.
+
 ## Reports
 
 - **Figures.** Contrasts with intervals first; sunny-midday CRPS and q99 pinball loss per Primary;
