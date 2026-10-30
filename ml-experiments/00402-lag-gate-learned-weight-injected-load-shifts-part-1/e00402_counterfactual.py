@@ -268,7 +268,12 @@ def main() -> None:
     parser.add_argument("--mode", choices=("real", "clean"), required=True)
     parser.add_argument("--sites", nargs="+", required=True)
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--arm", choices=("r1", "r0"), default="r1")
     args = parser.parse_args()
+    global BOOSTERS, OUT  # noqa: PLW0603
+    if args.arm == "r0":
+        BOOSTERS = WORK / "boosters" / "r0_lagged"
+        OUT = WORK / "counterfactual_measured_r0"
     out = OUT / args.mode
     out.mkdir(parents=True, exist_ok=True)
     for site in args.sites:
