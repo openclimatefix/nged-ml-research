@@ -5,7 +5,7 @@ theme: production-reference-and-best-guess
 also_relevant_to:
   - calibration-and-uncertainty
   - demand-inputs
-status: planned
+status: finished
 kind: other
 protocol: demand-v1
 size: >-
@@ -29,7 +29,8 @@ prediction: >-
   model read as if it were signed. P2. At D12 the plain model's median under-forecasts sunny
   half-hours by about 5 points (experiment 381); F2 cuts that bias to under 2.5 points. P3. F2
   moves the days 1 to 10 CRPS by -0.05 to -0.25 points at D12 and by -0.03 to +0.03 points at the
-  other MVA-only seven. P4. At the signed-MW six, the folded loss applied to the true signed series is
+  other MVA-only seven. P4. At the signed-MW six, the folded loss applied to the true signed
+  series is
   not used (those meters need no fold), and the folded model fed unsigned synthetic MVA scores
   within 0.10 points of the plain signed-meter model there. P5. F1 (folded squared loss, quantiles
   by residual scaling) recovers the sign about as well as F2 but its tails are 10% to 30% worse in
@@ -38,10 +39,13 @@ decision_rule: >-
   Pre-registered contrasts, all CRPS or sign accuracy on the shared rows of `fold_a_daily_gap_v1`.
   Gate G (known answer, read before any D12 or MVA-only number): an arm passes when its recovered
   sign accuracy on reverse-flow half-hours is at least 80% and its signed-power MAE is under half
-  that of the plain model read as signed, at injection level 1.0 and the first reactive setting (pf 1.0, Q = 0), with the best (kappa, Q0)
-  chosen on gate data; the other reactive settings are reported, not gated. An arm that fails G is not read at D12. If F1 and F2 both fail G, F3 (sign
+  that of the plain model read as signed, at injection level 1.0 and the first reactive setting
+  (pf 1.0, Q = 0), with the best (kappa, Q0)
+  chosen on gate data; the other reactive settings are reported, not gated. An arm that fails G
+  is not read at D12. If F1 and F2 both fail G, F3 (sign
   probability model, then magnitude model) is built, after the plan is amended and reviewed, and
-  nothing else is read. Contrasts after G: C1 (F2 minus plain weekly, CRPS days 1 to 10, MVA-only eight
+  nothing else is read. Contrasts after G: C1 (F2 minus plain weekly, CRPS days 1 to 10, MVA-
+  only eight
   pooled and D12 alone), C2 (F1 minus plain), C3 (F2 minus F0, the unfolded custom-objective
   control, to separate the fold from the custom objective), C4 (F2 minus plain at the signed-MW
   six, the harm check; the loss must not exceed the protocol's per-Primary tolerance),
@@ -66,160 +70,184 @@ code: ml-experiments/00387-xgboost-folded-latent-loss-at-mva-only-primaries/
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-29
+verdict: >-
+  not supported
+best_arm: >-
+  The plain weekly-style XGBoost model with the built-in quantile loss: CRPS 6.860 points of
+  capacity at D12 and a mean over the eight MVA-only Primaries about 0.05 lower than the folded
+  model F2.
+headline: >-
+  The folded loss (F2) scored 0.149 points of capacity worse than the plain model at D12 (99.75%
+  interval -0.061 to +0.378) and +0.052 (-0.083 to +0.203) over the eight MVA-only Primaries, and
+  left the sunny-half-hour bias at D12 at -5.07 points against -5.04 for plain. Its recovered
+  signed power is negative at sunny midday on 63% to 98% of half-hours at six Primaries with no
+  known reverse flow, so the sign follows the start tilt, not the readings.
+lessons: >-
+  The loss does not identify the sign of a latent power, so a signed MW forecast at an MVA meter
+  needs structure that fixes the sign. The known-answer gate was too easy because the injected
+  solar had the tilt's own form. A custom pinball objective scores worse than the built-in
+  quantile loss (+0.110 points, interval -0.026 to +0.253), which confounds any comparison with
+  the plain model.
+take_home_message: >-
+  Training the XGBoost model on a folded signed power did not improve the forecast at the eight
+  Primaries whose meters report unsigned apparent power, and it did not fix the under-forecast of
+  sunny half-hours at D12. The signed power it reports follows the start we gave it, not the
+  readings, so it cannot yet be shown to NGED as a forecast. A signed forecast needs a structural
+  way to fix the sign, such as demand minus a non-negative generation term.
+advice:
+  - >-
+    Do not read a signed latent power from a folded loss at an MVA meter; the sign follows the
+    start, not the readings (recovery table).
+  - >-
+    Give each arm of a custom-loss comparison the same number of rounds and a custom-loss
+    reference, because the built-in quantile loss scores about 0.11 points better than a custom
+    pinball loss (F0 minus plain).
+  - >-
+    Build a known-answer control whose injected signal does not share the form of the fix being
+    tested; the shortwave-tilt gate was passed by construction (gate).
 ---
 
-# A folded loss for one weekly XGBoost model at the MVA-only Primaries
+# A folded loss for one XGBoost model at the MVA-only Primaries
 
-**Plan (status `planned`).** Eight Primaries have meters that record apparent power (MVA), which
-has no sign, so reverse flow from embedded solar shows up as demand. A plain XGBoost model under-
-forecasts sunny half-hours at D12 by about 5 points (experiment 381). This experiment gives the
-model a signed latent power *l* (demand minus embedded generation) and scores |*l*| against the
-metered reading, so the V-shape can appear without telling the model where reverse flow happens.
-The prize is a signed MW forecast for MVA-metered substations (maintainer, 2026-10-29).
-Reactive power is assumed zero ("|P| as the working simplification"), and the loss carries a power
-factor so a reactive term can enter later.
+**Take-home.** The folded loss did not help. At D12, the one Primary known to have reverse flow, the
+folded model scored 0.149 points of capacity worse than the plain XGBoost model (99.75% interval
+-0.061 to +0.378), and it left the under-forecast of sunny half-hours where it was (-5.07 points
+against -5.04). Across the eight MVA-only Primaries the difference was +0.052 (-0.083 to +0.203), so
+we cannot tell it from zero. The signed power the model reports does not come from the readings. It
+follows the start we gave it: the recovered power is negative at midday on 63% to 98% of sunny
+half-hours at six Primaries where earlier experiments found no reverse flow. A folded loss therefore
+needs a structural way to fix the sign before it can give NGED a signed MW forecast, and a tilted
+start is not one. Verdict: not supported, with the caveat that the comparison with the plain model
+is confounded by the optimiser (see "Checks").
 
-## Setup
+**What we asked.** Eight Primaries have meters that record apparent power in MVA, which has no sign,
+so reverse flow from embedded solar looks like demand. We asked whether one XGBoost model per
+Primary, trained to predict a signed latent power and scored on its folded value against the metered
+reading, can learn the V-shape that reverse flow makes in the readings, and so give a signed MW
+forecast. The idea extends [experiment
+381](../00381-simple-weekly-xgboost-demand-against-gam-stack/result.md), which found that the plain
+model under-forecasts sunny half-hours at D12 by about 5 points. The fold of a signed quantity into
+a magnitude follows the known-answer device of [experiment
+365](../00365-mva-fold-readings-only-reverse-flow-rule/result.md) and [experiment
+366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md). Reactive power is
+assumed zero except where a floor Q0 is stated.
 
-- **Base recipe.** Experiment 87's `n1h` weekly member (ENS control member rows, whole history,
-  half-life 0.5 years, 500 rounds, eta 0.05, depth 6, `colsample` 1.0, the three recent-power lags,
-  `lead_hours`), copied from experiment 381's fitter. The plain refit must reproduce experiment 379's stored
-  `only_W` (and `only_M`) within 0.05 points before any new arm is read.
-- **Fold.** The fold is the smooth S(*l*) = sqrt(*l*² + Q0²) / pf. Q0 is the reactive-power floor,
-  because an MVA reading never reaches zero while some reactive power flows (maintainer, 2026-10-29);
-  pf = 1.0 is the working assumption (NGED recommends it). Q0 is fixed before any score is read, as
-  points of effective capacity, at three values common to all Primaries: 0 (the strict |*l*|
-  case), 2, and 4. Step 0 (below) set the values: D12's training readings have a minimum of 0.36
-  points, a 0.1% quantile of 4.3, and a 1% quantile of 6.2, only 3 half-hours below 1 point and 283
-  below 5, so the bottom of its V is rounded at about 4 to 6 points, not at zero. A Q0 taken from
-  each Primary's own lowest readings is rejected, because at D2 and D3 the lowest readings (22 and
-  18 points) are baseload demand, not reactive power. The sensitivity to Q0 is
-  reported. Inputs and lags are the metered series, folded or not.
-- **Identification of the sign.** The folded loss is symmetric in the sign of *l*, and a trial on
-  synthetic data (a V-shaped |*l*| against shortwave) showed that gradient descent from a positive start
-  fits the V on the positive branch and never crosses zero (sign accuracy 0.50). Sign recovery
-  needed two structural choices, both pre-registered here and both tested in gate G: a monotone
-  constraint (non-increasing) on every shortwave input, so that generation can only lower *l*, and a
-  start *l*0 = (the plain model's level) - kappa x shortwave, with kappa in {0, 0.5, 1.0} times
-  the 95th percentile of the training readings per 1000 W/m². kappa is chosen on the gate's synthetic
-  data only, never on D12 or any MVA-only score. The write-up says that the sign then comes from
-  this structure and not from the loss alone.
-- **F0 (control).** The same custom multi-quantile pinball objective with no fold (*l* unsigned),
-  unit hessian, started from the plain model's per-level fit. It separates the fold from the loss
-  implementation, because XGBoost's built-in `reg:quantileerror` also adjusts leaf values, which a custom
-  objective cannot.
-- **F1 (folded squared loss).** One model on the mean: loss (y - S(*l*))², gradient 2(S - y)·sign(*l*)/pf,
-  hessian 2/pf² (a Gauss-Newton step), started from a constant. Quantiles by residual scaling:
-  the empirical quantiles, by lead band and sunny flag, of y - S(*l̂*) over the last 13 weeks of the
-  training window, with a second fit that stops 13 weeks earlier supplying the residuals. Signed
-  quantiles are *l̂* plus the same residual quantiles (an assumption that the error is symmetric
-  about the latent, stated beside every signed number).
-- **F2 (folded pinball).** The 11-level pinball loss of y against S(*l*), one output per level,
-  gradient -(α - 1[y < S])·*l*/(S pf), hessian constant 1, started from the plain model's
-  per-level fit with the tilt. Quantiles are sorted at the end to avoid crossing. The 11
-  signed quantiles are the signed outputs *l*, not folded.
-- **F3 (sign then magnitude).** Built only if F1 and F2 both fail gate G.
-- **Weekly refits for the final arm; monthly refits for screening.** Seed, rows, runs, and scoring rows
-  are the plain model's.
+**How.** Each arm refits monthly on experiment 87's recipe (the ENS control member, a half-life of
+0.5 years, 500 rounds) and forecasts the 73 runs of `fold_a_every5d_v1` for days 1 to 14, scored
+under `demand-v1` for days 1 to 10. The arms were the plain XGBoost model (built-in quantile loss),
+F0 (a custom pinball loss with no fold), and F2 (the same loss on the folded value sqrt(l² + Q0²),
+with Q0 of 0, 2, and 4 points of capacity). F2 starts from the plain model's fit minus a tilt
+proportional to forecast shortwave. We did not run F1 (the folded squared loss), F3 (the
+sign-then-magnitude pipeline, which only the plan's gate failure would have triggered), or a weekly
+refit (no arm won). The plan is in the commit history of this page.
 
-## Step 0: how close the readings get to zero (maintainer's third note)
+## Figures
 
-Script `e00387_step0.py`, training period (before 2025-07-01) and the full record, readings in
-points of effective capacity. D12 (MVA): minimum 0.36, 0.1% quantile 4.3, 1% quantile 6.2, 5% 8.9;
-3 half-hours below 1 point, 4 below 2, 283 below 5 in training (5, 7, and 307 in the full record);
-the few readings below 2 points fall in July, September, and December near midday. D2 and D3
-(MVA, no reverse flow): minimum 22 and 18, no reading below 5. D5 and D10 (signed MW, absolute
-value taken): D10 touches 0.02 and has 66 half-hours below 1 point in training, almost all sunny
-middays from April to August; D5 has 12. Reading: D12 does not touch zero except in a handful
-of half-hours, so a sharp |*l*| fold is not appropriate there, and Q0 of 2 to 4 points is the
-range consistent with its floor. The objective is the smooth fold at Q0 in {0, 2, 4}.
+![D12's lowest readings stop at about 4 points; a signed meter reaches zero](figure_1_low_readings.svg)
 
-## Gate G: the known-answer test (read before any MVA-only number)
+![Known answer at D10: injected reverse flow recovered](figure_2_known_answer_d10.svg)
 
-At each of the six signed-MW Primaries (D5, D9, D10, D11, D14, D16), add a synthetic photovoltaic
-plant (the physics model of `studies.pv_physics`, two plants: east-west and south-west, as in
-experiment 110) to the signed series at levels 0, 1.0, and 2.0, sized so the injected output
-makes reverse flow common on sunny middays (the sizing of experiments 358 and 366). The result is a signed
-truth with real reverse flow. Convert the series to synthetic MVA S = sqrt(P² + Q²) at four reactive settings: pf 1.0 with Q = 0, pf 0.97
-(Q = P tan(arccos pf)), a constant Q of 2.0 points of effective capacity, and pf 0.97 with that constant Q (a constant Q of 4.0 points is also run)
-(sign discarded). Replace the training labels and the lags by that synthetic MVA, and train the folded models on
-it alone. Report, against the true signed series: mean absolute error in points of effective
-capacity, sign accuracy on reverse-flow half-hours, and the CRPS of the recovered signed
-quantiles, for F0 (read as signed), F1, and F2, at each reactive setting with the fold assuming pf 1.0
-and Q0 in {0, 2, 4}, plus pf 0.97 with the fold assuming 0.97, and for kappa in {0, 0.5, 1.0}, with and
-without the monotone constraint. No metered generator output enters, so nothing needs
-anonymising.
+![A sunny week at D12: the folded median and signed power](figure_3_d12_sunny_week.svg)
 
-### Gate stage A, read 2026-10-29 (before any MVA-only number)
+![CRPS differences by Primary](figure_4_contrasts.svg)
 
-Run on D5, D9, and D10 at three monthly refits (July, November, March), synthetic MVA at level 1.0
-with pf 1.0, Q = 0, fold Q0 = 0, over days 1 to 10. Choice of the sign mechanism, made on this
-synthetic data only: **kappa = 1.0 and no monotone constraint** (`f2:k1:m0`). Without the tilt
-(kappa = 0) the sign is not recovered (balanced accuracy 0.51, as the plain model and F0 give,
-0.50). The monotone constraint did not help (balanced accuracy 0.867 against 0.895 at kappa 1.0).
-At kappa 1.0 without the constraint, pooled over the three sites: balanced accuracy 0.895, recall on
-reverse-flow half-hours 0.918, false-reverse rate 0.128, and a signed MAE on reverse-flow
-half-hours of 6.3 points against 21.1 for the plain model read as signed. Over all half-hours
-the signed MAE is 9.9 against 7.5, because false reversals cost points on ordinary rows. The
-fitted threshold rule on ERA5 shortwave (optimistic) scores a balanced accuracy of 0.94 to 0.95
-and 5.5 to 8.9 points on reverse-flow half-hours, so the folded model does not beat a
-shortwave rule on the sign; its advantage, if any, shows in the folded CRPS at D12.
-Deviations from the plan to fit the compute: the reactive settings other than the first are run on
-D5, D9, and D10 at these three refits only, and Q0 in {2, 4} likewise. The gate's "signed MAE under
-half the plain model's" is read on reverse-flow half-hours, where the plain model cannot be right.
+## Headline numbers
 
-## Reading at the MVA-only Primaries
+All scores are the continuous ranked probability score (CRPS) in points of effective capacity, days
+1 to 10, monthly refits. Reactive power is assumed zero at every MVA-only number, apart from the
+floor Q0.
 
-- Per-Primary table, worst Primary, leave-one-out, tails, and the load-shift curtailment rows follow
-  `demand-v1` (curtailment cost is not defined for MVA-only meters; the label says so).
-- Sunny-half-hour bias (median minus actual) at D12 and D8, by lead band, for plain, F0, F1, and F2.
-- Time-series figures at D12 (a Primary, so it may be shown) for sunny weeks: observed MVA, the plain median,
-  the folded fit, and the recovered signed MW.
-- Recovery check at D12: the recovered latent against the rule-chosen fit and the signed fit of
-  experiments 366, 370, and 374 (capacity and reverse-flow estimates). D12 has no signed truth, so the page
-  says what is and is not validated.
-- Placebos D5 and D10. Tails (pinball and coverage at 0.01, 0.05, 0.95, 0.99) per group and Primary.
-  Interval width and coverage on half-hours whose lags are missing, with one simple widening rule if coverage falls short.
-  Reactive power assumed zero, stated beside every MVA-only number.
+- **Reference check.** The refitted plain model matches experiment 379's stored monthly member
+  (`only_M`) with a mean absolute median gap of 0.0065 MW over 409,968 rows.
+- **Absolute CRPS at D12.** Plain 6.860, F0 7.067, F2 with Q0 = 0, 2, and 4: 7.009, 7.009, and
+  7.003. The other seven Primaries are in the table below; F2 (Q0 = 2) is 0.01 to 0.10 better than
+  plain at D2, D3, D4, D19, and D21, 0.34 worse at D22, and 0.21 worse at D8.
+- **C1, F2 (Q0 = 2) minus plain, 99.75% interval.** MVA-only eight +0.052 (-0.083 to +0.203);
+  without D8 +0.029 (-0.120 to +0.155); D12 alone +0.149 (-0.061 to +0.378). On sunny half-hours:
+  -0.012 (-0.147 to +0.143) pooled, and +0.066 (-0.347 to +0.521) at D12. Leaving one Primary out
+  never moved the pooled difference outside -0.07 to +0.19 (95% intervals all include zero).
+- **C3, F2 (Q0 = 2) minus F0.** MVA-only eight -0.058 (-0.087 to -0.030); D12 alone -0.058 (-0.129
+  to +0.012). On sunny half-hours -0.287 (-0.467 to -0.161) pooled and +0.080 (-0.374 to +0.300) at
+  D12. The fold repairs part of what the custom loss lost, but not at D12.
+- **F0 minus plain.** +0.110 (-0.026 to +0.253): the custom loss alone scores worse than the
+  built-in quantile loss.
+- **Sensitivity to Q0.** Q0 = 0 against 2: +0.004 (-0.001 to +0.009) pooled. Q0 = 4 against 2:
+  -0.000 (-0.007 to +0.006). The floor does not matter at the precision of this experiment.
+- **Sunny-half-hour bias at D12 (median minus actual).** Plain -5.04 points, F0 -3.38, F2 -5.07. The
+  folded model does not remove the under-forecast. At D19 the bias is +6.2 for plain and +6.3 for
+  F2.
+- **Tails, mean over the eight Primaries.** Coverage at q01, q05, q95, and q99: plain 0.013, 0.071,
+  0.932, 0.991; F2 (Q0 = 2) 0.024, 0.090, 0.895, 0.965 (nominal 0.01, 0.05, 0.95, 0.99). Pinball
+  loss at q01, q05, q95, and q99: plain 0.248, 0.890, 0.986, 0.331; F2 0.265, 0.955, 1.042, 0.301.
+  The folded model's quantile band is too narrow at the inner tails and slightly better at q99. At
+  D12, q01 pinball is 0.305 for plain and 0.443 for F2. Threshold-weighted CRPS is 0.200 for plain
+  and 0.201 for F2.
+- **Nulled lags and load-shift rows.** These were not scored separately. The curtailment cost is not
+  defined at MVA-only meters.
 
-## Plan review triage (Sonnet reviewer, 2026-10-29)
+| Primary | Plain | F0 | F2, Q0 = 0 | F2, Q0 = 2 | F2, Q0 = 4 |
+|---|---|---|---|---|---|
+| D12 | 6.860 | 7.067 | 7.009 | 7.009 | 7.003 |
+| D8 | 7.763 | 8.218 | 7.987 | 7.976 | 7.995 |
+| D22 | 3.930 | 4.266 | 4.280 | 4.272 | 4.270 |
+| D19 | 3.290 | 3.285 | 3.223 | 3.226 | 3.216 |
+| D4 | 2.517 | 2.500 | 2.501 | 2.506 | 2.500 |
+| D21 | 2.407 | 2.387 | 2.338 | 2.328 | 2.326 |
+| D2 | 2.328 | 2.307 | 2.300 | 2.294 | 2.296 |
+| D3 | 1.759 | 1.702 | 1.663 | 1.657 | 1.659 |
 
-Accepted, and now part of the plan:
+## Does the signed power mean anything?
 
-- **Signed quantiles.** F2's 11 outputs are folded quantiles, so F2 reports a signed *point*
-  forecast only (the median latent). Signed-quantile CRPS is reported for F1 only, with the residual
-  multiplied by sign(*l̂*) so that it moves the signed value the right way.
-- **Does the fold act?** Report the share of training rows and of sunny middays with *l̂* < 0 at
-  the last round. If F2 equals F0 with no crossings, the hypothesis was not tested, and the page
-  says so. The mechanism is the function class plus the tilted start, not the loss alone.
-- **Details.** The smooth fold removes the kink at zero. The pinball hessian is 1/pf². Every
-  DMatrix (fit and predict) gets the explicit base margin, and `predict(output_margin=True)` returns
-  the latents. A finite-difference gradient test and a K = 3 smoke test run first. In the
-  known-answer test the start fit is the plain fit on synthetic MVA.
-- **Gate G.** Pooled over the six Primaries with no Primary under 60% sign accuracy. Reverse flow means
-  true P below -1 point of effective capacity, with at least 200 such half-hours per Primary. Sign
-  accuracy is reported as balanced accuracy with the false-reverse rate. Baselines: predict +|y|, and
-  a threshold rule on ENS shortwave fitted on the training window. The 80% gate is a threshold and the
-  85% in P1 is a prediction.
-- **Contrasts.** The confirmatory family is C1 and C2 at the MVA-only pooled group and D12 (k = 4);
-  C3, C4, and C5 are descriptive. Per-Primary 95% intervals are descriptive. Weekly intervals are
-  post-selection from monthly screening, and the page says so. An arm that passes G but shows no
-  C1 gain changes nothing.
-- **C4 and P4.** At the signed-MW six, F2 trains on |P| as MVA and is scored against |P| for both
-  arms, against the protocol's per-Primary tolerance of +0.05 points.
-- **Known-answer design.** Plant size comes from training-window data only. A constant-Q setting
-  (above) tests the floor. The page says injection is the easy case and that D12 stays unvalidated by it.
-- **F1 residuals.** The calibration window respects the protocol's embargo, and the sunny flag
-  uses ENS shortwave. Residuals are slightly wide because the final model sees more data.
-- **D12 recovery check.** Sign agreement on sunny middays and mean absolute difference in points
-  of effective capacity against the signed fits of experiments 366, 370, and 374, labelled a
-  consistency check, not validation.
-- **Code to read.** Experiment 365 and 366 rule code and experiment 358's known-answer code are
-  copied for the synthetic-MVA device. The 11 levels include 0.01 and 0.99 (checked in
-  `e00087_common.LEVELS`).
+- **Known-answer gate (passed, but too easy).** We took the six signed-MW Primaries, subtracted a
+  synthetic solar plant (a multiple of ERA5 shortwave, sized from the training window only) to make
+  reverse flow, discarded the sign (and added reactive power in four settings), and trained on the
+  unsigned series alone. With the start tilt at 1.0 (no monotone constraint), F2 recovered the sign
+  of the reverse-flow half-hours with balanced accuracy 0.89 to 0.92, recall 0.89 to 0.98, and a
+  false-reverse rate of 0.12 to 0.14, at every reactive setting and at Q0 of 0, 2, and 4. Without
+  the tilt the sign was not recovered (balanced accuracy 0.51, the same as the plain model). The
+  signed error on reverse-flow half-hours was 5.8 to 6.6 points against 21 to 25 for the plain
+  model. The gate was too easy: the injected solar has the same linear form in shortwave as the
+  tilt, and a rule that sets the plain median negative when ERA5 shortwave exceeds a fitted
+  threshold scored higher (balanced accuracy 0.94 to 0.98, false-reverse rate 0.04 to 0.07).
+- **Recovery at the MVA-only Primaries.** Earlier experiments
+  ([366](../00366-mva-fold-irradiance-correlation-reverse-flow-rule/result.md),
+  [370](../00370-mva-fold-pv-capacity-and-eight-primaries/result.md)) found reverse flow at D12 and
+  at none of the other seven, with no signed truth at any. F2's latent is negative at sunny midday
+  (ERA5 shortwave above 600 W/m², 10 to 14 UTC) on this share of half-hours: D2 0.74, D3 0.68, D4
+  0.07, D8 0.98, D12 0.17, D19 0.77, D21 0.70, D22 0.98. The share is highest where there is no
+  reverse flow and lowest at D12, so the readings did not set the sign.
+- **Placebo, no injection (signed-MW six).** PLACEBO_PLACEHOLDER
 
-## Constraints
+## Checks
 
-Sonnet only. At most 3 threads and `MemoryMax=16G` per job. The GPU is shared; a custom objective runs
-its gradient on the CPU, so the fits use `hist` on the CPU if the GPU transfer is the bottleneck. No
-metered generator series with its name or ID. Never touches production code.
+- **Optimiser confound.** The built-in quantile loss rewrites each leaf from the residuals, which a
+  custom objective cannot copy, and the custom objective's Hessian is a constant
+  (`e00387_fit.py:96`), so leaf values are a step rule, not a Newton step. F0 and F2 also start from
+  the plain model's in-sample predictions and then boost 500 more rounds, so they get 1,000 rounds
+  against the plain model's 500. "F2 minus plain" mixes the fold with a weaker optimiser; "F2 minus
+  F0" is the cleaner contrast, with a weak reference. The "no gain" statement is confounded in this
+  way. An Opus audit by the Discuss session confirmed the gradient (the finite-difference self-test
+  passes) and these points, and its findings are triaged here.
+- **Median against the mean forecast.** The forecasts store 11 quantiles, not a mean, so the
+  median-minus-mean check is replaced by the mean absolute error of the median, beside every CRPS
+  contrast: plain 6.895, F0 7.028, F2 (Q0 = 2) 6.931 (mean over the eight Primaries). It agrees in
+  direction with the CRPS contrasts (the plain model is best).
+- **Triggers fired.** A result that contradicts its prediction (trigger 2: we predicted -0.05 to
+  -0.25 at D12) with an explanation tested above, and an easy known-answer control (trigger 1). The
+  audit above is the response. Scoring uses the folded quantiles of the reading, which are valid
+  quantiles of the metered value; the signed latent is a diagnostic only and no score depends on it.
+- **Row set.** The fits forecast the 73 runs of `fold_a_every5d_v1`, not the 292 runs of
+  `fold_a_daily_gap_v1`, so no comparison with the GAM stack or BG2 is made here. The weekly refit
+  and the signed-MW harm check (C4) were not run, because no arm won; the placebo above covers false
+  reversal only.
+
+## What to try next
+
+- A signed MW forecast at the MVA-only Primaries needs the sign fixed by structure (for example a
+  latent built as demand minus a generation term that is non-negative and monotone in shortwave,
+  with the generation capacity estimated as in experiment 370), because neither the loss nor a
+  tilted start identifies it.
+- At D12 the plain model's under-forecast of sunny half-hours is not a loss-function problem: the
+  fold did not move it. Look at the ensemble's shortwave spread and at a sunny-day input instead.
+- Use XGBoost's built-in quantile loss as the reference in any further custom-loss experiment, and
+  give the arms equal numbers of rounds.
