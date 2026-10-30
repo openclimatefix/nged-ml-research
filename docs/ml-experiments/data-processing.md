@@ -128,6 +128,15 @@ removing the inputs across the 16 Primaries fell from 0.710 to 0.361 points. App
 and to any comparison of a model with and without recent power. A comparison that cuts the start for
 one arm must cut it for every arm.
 
+**Train D15 and D18 only on rows from 2025-03-01 on (medium confidence, provisional).** On the
+monthly XGBoost demand model, this cut lowered the days 1 to 10 CRPS by 1.3% at D15 and 1.2% at D18
+against training on every row, and was lower in all 4 scored months at D15 and 3 of 6 at D18
+([experiment 399](00399-xgboost-short-history-start-cut-d15-d18/result.md), 2026-01 to 2026-06).
+A longer cut is not safe: dropping 6 months raised D18's CRPS by 7.2%. Removing readings within
+0.009 MW of zero does not help, because at D15 most of them are real crossings of zero. Applies to
+experiments and to production. A cut does not fix D15's level error (median forecast 16 to 21
+points of capacity too low).
+
 ## Decide which rows are demand
 
 **Use a Primary metered in MVA for demand only on dark rows (high confidence).** An MVA reading

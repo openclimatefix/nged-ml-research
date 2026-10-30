@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [Experiment 399](../../00399-xgboost-short-history-start-cut-d15-d18/result.md) | Does cutting the first months of D15 and D18 improve the monthly XGBoost demand forecast? | 1 | The manager's compute slot (3 threads, 8 GB) | Planned; plan pushed, no fit run |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
 
 ## Planned experiments
