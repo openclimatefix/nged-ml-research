@@ -253,6 +253,14 @@ real events move the forecast by only 0.02 to 0.03 of the step, yet the forecast
 whole forecasts. If the counterfactual gain is under 0.1 CRPS points at the signed-MW six, the plan
 skips batches 1 and 2.
 
+**Deviation from the batch 0 rule.** Experiment 411 ran batch 0 and was inconclusive. The gain at
+the signed-MW six was -0.836 CRPS points (95% interval -2.578 to +1.226) on 9 events. One D5 event
+flips the sign: without it the gain is +0.460 (95% interval -0.102 to +1.631). At the eight MVA-only
+Primaries the gain was +0.024 (95% interval -0.574 to +1.529). The harness scored only 15 of the
+184 corrected events. The point estimate is under 0.1, so the rule as written would skip batches 1
+and 2, but the interval spans zero. The neural Discuss session therefore ruled that batches 1 and 2
+run. The batch 1 stop rule stays as written.
+
 **Batch 1:**
 
 - **L0 (free).** The lagless module's own forecast, scored on all rows and on harm rows. Experiment
