@@ -70,6 +70,11 @@ SUBSETS: Final[dict[str, tuple[str, ...]]] = {
 }
 KEYS: Final[list[str]] = list(common.KEYS)
 OUTER_LEVELS: Final[tuple[str, ...]] = ("q01", "q05", "q95", "q99")
+FLAGGED_KEYS: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00398-load-shift-event-rescore-without-flagged-zero-actuals"
+    / "flagged_keys.parquet"
+)
 GLOBAL_FACTOR: Final[float] = 1.15
 NEW_ARMS: Final[tuple[str, ...]] = ("ctrl", "k5", "skew", "qhead", "hl365", "hl91", "a0")
 REFERENCE: Final[str] = "ctrl_w115"
@@ -150,6 +155,48 @@ def load_frames(*, series: pl.DataFrame) -> dict[str, pl.DataFrame]:
     }
 
 
+EXTRA_SLICES: Final[tuple[str, ...]] = (
+    "cold_nights",
+    "winter_nights",
+    "sunny_unit_shape",
+    "economy_7_step",
+)
+
+
+def extra_slices(*, scored: dict[str, pl.DataFrame]) -> None:
+    """Print group means of CRPS on the cold-night and other slices, and the curtailment cost."""
+    one = next(iter(scored.values()))
+    print("\n== metrics available:", sorted(one["metric"].unique().to_list()))
+    print("== slices available:", sorted(one["slice"].unique().to_list()))
+    for slice_name in EXTRA_SLICES:
+        for group, members in SUBSETS.items():
+            means = {}
+            for arm, t in scored.items():
+                sub = t.filter(
+                    pl.col("metric") == "crps",
+                    pl.col("slice") == slice_name,
+                    pl.col("label").is_in(list(members)),
+                )
+                if sub.height:
+                    means[arm] = round(float(np.nanmean(sub["value"].to_numpy())), 3)
+            if means:
+                print(f"CRPS on {slice_name}, {group}: {means}")
+    for metric in sorted(one["metric"].unique().to_list()):
+        if "curtail" not in metric:
+            continue
+        for group, members in SUBSETS.items():
+            means = {}
+            for arm, t in scored.items():
+                sub = t.filter(
+                    pl.col("metric") == metric,
+                    pl.col("slice") == HEADLINE,
+                    pl.col("label").is_in(list(members)),
+                )
+                if sub.height:
+                    means[arm] = round(float(np.nanmean(sub["value"].to_numpy())), 3)
+            print(f"{metric} (days 1 to 10), {group}: {means}")
+
+
 def sunny_low_demand(*, table: pl.DataFrame, reference: pl.DataFrame) -> pl.DataFrame:
     """Return the keys of sunny half-hours whose reference median is in the lowest quarter.
 
@@ -207,6 +254,10 @@ def main() -> None:
     """Print the absolute table, the tails, the contrasts, and draw the example charts."""
     series = adapter.series_table()
     ctx = s381.build_context(series=series)
+    flagged = pl.read_parquet(FLAGGED_KEYS).select("time_series_id", "valid_time")
+    before = ctx["actuals"].height
+    ctx["actuals"] = ctx["actuals"].join(flagged, on=["time_series_id", "valid_time"], how="anti")
+    print(f"scoring actuals dropped for a flagged exact zero: {before - ctx['actuals'].height}")
     frames = load_frames(series=series)
     if REFERENCE not in frames:
         msg = f"the reference {REFERENCE} is missing"
@@ -227,6 +278,7 @@ def main() -> None:
     for group, members in SUBSETS.items():
         sub = crps.filter(pl.col("label").is_in(list(members)))
         print(group, {a: round(float(sub[a].mean()), 3) for a in frames})
+    extra_slices(scored=scored)
     low = sunny_low_demand(table=table, reference=frames[REFERENCE])
     print(f"\nsunny low-demand half-hours: {low.height}")
     tail_table(rows=rows, low=low)

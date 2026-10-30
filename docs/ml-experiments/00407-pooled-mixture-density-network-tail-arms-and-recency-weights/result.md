@@ -112,6 +112,30 @@ fix the tails and two row-weight half-lives.
 - **Input ports from XGBoost** (the solar summary column and sunny flag with a 1-year half-life,
   and trailing temperature means) are not in this experiment and follow as a separate experiment.
 
+## Standing practices followed, and the deviations
+
+**This experiment follows the standing practices of the `ml-experiment` skill and `common.md`, and
+departs from two.**
+
+- **Followed.** Monthly refits; the D15 and D18 start cut; every fitted network saved in the
+  private data folder; stored forecasts reused as references and never refitted; a few-fold screen
+  with every number labelled interim; tails and the avoidable-curtailment cost reported beside the
+  CRPS; example forecast charts; a fresh Sonnet code review before the first fit.
+- **Cleaned data.** Training rows drop every half-hour that the cleaned power table flags as an
+  exact zero (`substation_zero`), and every row whose lag reaches a flagged half-hour. The scorer
+  drops flagged half-hours from the actuals of every arm, including the references from experiments
+  397 and 406. The number of rows dropped is printed for each fold. A forecast row whose inference
+  input reaches a flagged lag half-hour is kept, because the flagged half-hours are rare
+  (experiment 398 found 38 in the scored Primary half-hours), and the same rows enter every arm.
+  The references from experiments 397 and 406 were trained without this cleaning.
+- **Departure: the widening is fitted on held-out weeks, not on a validation month.** The rule asks
+  for a validation month inside the refit. A validation month would need a second fit per refit.
+  The held-out weeks (one in every 12 across the 24-month window) are rows the network never
+  trains on, so they play the same part at no extra fit, but they are older on average than the
+  month before the refit.
+- **Departure: the load-shift event plots are not drawn**, because this experiment does not score
+  performance during or after load-shift events.
+
 ## Fit counts, time, and memory
 
 - **Fits.** `ctrl`, `k5`, `skew`, `qhead`, `hl365`, and `hl91`: 6 arms by 5 folds by 3 seeds, so 90

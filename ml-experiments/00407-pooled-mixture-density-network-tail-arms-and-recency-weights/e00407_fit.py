@@ -55,6 +55,12 @@ OUTER: Final[tuple[tuple[int, float], ...]] = ((0, 0.01), (1, 0.05), (9, 0.95), 
 BAND_EDGES_HOURS: Final[tuple[float, ...]] = (0.0, 24.0, 72.0, 168.0, 240.0, 337.0)
 """Lead bands of the widening: day 1, days 2 to 3, days 4 to 7, days 8 to 10, days 11 to 14."""
 FACTOR_RANGE: Final[tuple[float, float]] = (0.5, 4.0)
+FLAGGED_KEYS: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00398-load-shift-event-rescore-without-flagged-zero-actuals"
+    / "flagged_keys.parquet"
+)
+"""The half-hours that the cleaned power table flags as `substation_zero` (experiment 398)."""
 OUT_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
     / "00407-pooled-mixture-density-network-tail-arms-and-recency-weights"
@@ -92,12 +98,24 @@ def _us(*, t: datetime) -> int:
     return int(t.timestamp() * 1_000_000)
 
 
+def flagged_times() -> dict[int, np.ndarray]:
+    """Return each series' flagged exact-zero half-hours, as microseconds since the epoch."""
+    flagged = pl.read_parquet(FLAGGED_KEYS)
+    return {
+        int(i): np.sort(g["valid_time"].dt.epoch("us").to_numpy())
+        for (i,), g in flagged.group_by("time_series_id")
+    }
+
+
 def build_train(*, refit: datetime, half_life_days: float) -> prep.FoldTrain:
     """Return a fold's standardised training rows, as experiment 397's `build_train` but cut.
 
     The start cut drops a D15 or D18 row if its valid time, or the time of its oldest lag (the
-    weekly lag), is before 2025-03-01. Row weights halve every `half_life_days`.
+    weekly lag), is before 2025-03-01. It also drops a row if its own half-hour or the half-hour of
+    any of its three lags is a flagged exact zero. Row weights halve every `half_life_days`.
     """
+    flagged = flagged_times()
+    dropped = 0
     _, mask, layout = prep.feature_names(scheme=SCHEME)
     parts = []
     for row in prep.primaries().iter_rows(named=True):
@@ -111,6 +129,16 @@ def build_train(*, refit: datetime, half_life_days: float) -> prep.FoldTrain:
             week_lag_hours = prep.lag_ages_hours(lead_hours=z["lead"])[:, 2]
             week_lag_us = (week_lag_hours * 3_600 * 1_000_000).astype(np.int64)
             keep &= (z["valid"] - week_lag_us) >= _us(t=CUT)
+        bad = flagged.get(int(row["time_series_id"]))
+        if bad is not None:
+            lag_us = (prep.lag_ages_hours(lead_hours=z["lead"]) * 3_600 * 1_000_000).astype(
+                np.int64
+            )
+            hit = np.isin(z["valid"], bad)
+            for j in range(lag_us.shape[1]):
+                hit |= np.isin(z["valid"] - lag_us[:, j], bad)
+            dropped += int((keep & hit).sum())
+            keep &= ~hit
         if not keep.any():
             continue
         parts.append(
@@ -123,6 +151,9 @@ def build_train(*, refit: datetime, half_life_days: float) -> prep.FoldTrain:
                 "primary": np.full(int(keep.sum()), row["primary"], dtype=np.int64),
             }
         )
+    print(
+        f"  rows dropped for a flagged exact-zero target or lag half-hour: {dropped:,}", flush=True
+    )
     cat = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
     del parts
     origin_day = ((cat["origin"] - _us(t=prep.FIRST_RUN)) // US_PER_DAY).astype(np.int64)
