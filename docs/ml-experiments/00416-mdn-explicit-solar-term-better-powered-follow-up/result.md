@@ -208,6 +208,31 @@ million), as experiment 412's loss did.
 - **Consequence.** C3 and H1 behave as the explicit solar term with a free capacity. The page says
   so, and does not describe the capacity as "regularised towards the studies page".
 
+## Amendment 4: two log-scale prior arms, added after the inert-prior finding (manager, 2026-10-30)
+
+Written before either arm is fitted. **C3 and H1, as run in the first stage, are effectively an
+explicit solar term with a free capacity** (amendment 3). The two arms below are post hoc additions;
+they sit outside the family of six primary tests and are reported as secondary contrasts.
+
+- **C3p:** C3 with a Gaussian prior on the natural logarithm of the capacity, centred on the
+  studies page's capacity (the same centre as C3), with standard deviation 0.7 in log units
+  (a factor of 2 either way). The prior is set against one batch's summed log-likelihood rather
+  than the whole training set's: the penalty is divided by the batch size (16,384 rows) instead of
+  the effective row count (about 1.8 million), which makes it about 100 times stronger than in C3.
+- **C3pa:** C3p's penalty applied only when the capacity falls below the prior centre, so the
+  capacity is free to rise and penalised for falling (the maintainer's asymmetric form), same
+  scale.
+- **Everything else** is C3: same inputs, adapter, folds, seeds (all 5 fitted new), and scoring.
+- **Reports.** For each arm, the prior's share of the log-capacity gradient at the start and end of
+  training (`e00416_prior_share.py --arm`), and the learned capacity beside the studies page per
+  Primary. Contrasts: C3p minus C3, C3pa minus C3, and each minus A0-doy, on sunny-midday and
+  headline-band CRPS and q99 pinball loss, with the same intervals.
+- **Cost.** 2 arms x 5 seeds = 10 fits per test month: 50 fits on the first 5 months, and 10 on each
+  extension month (30 to 70 for 3 to 7 added months), 80 to 120 fits in total, about 1.5 to 2.3
+  hours at about 70 seconds per fit.
+- **Code review.** A fresh Sonnet reviewer reads `e00416_models.py` (the changed loss) before the
+  first fit of these arms.
+
 ## Reports
 
 - **Figures.** Contrasts with intervals first; sunny-midday CRPS and q99 pinball loss per Primary;

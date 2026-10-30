@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PLR0912, PLR0915
 """Score experiment 416's arms and print the pre-registered contrasts.
 
 Seed-averages each arm in quantile space, restricts every arm to the half-hours they share, adds a
@@ -37,13 +37,16 @@ WORK_409: Final[Path] = DATA / "00409-mdn-solar-term-day-of-year-and-anomaly-kno
 CAMS_FRAME_PATH: Final[Path] = (
     DATA / "00039-pv-disaggregation-cams-injection" / "work" / "frame.parquet"
 )
-MONTHS: Final = r3.MONTHS
+MONTHS: list[str] = list(r3.MONTHS)
+"""The test months scored; `main` replaces them when `--months` is given."""
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
 REUSED_SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 REFERENCE: Final[str] = "A0-doy"
 ARMS: Final[tuple[str, ...]] = ("A0-doy", "C3", "H1", "A0-noirr-doy")
 FROM_409: Final[tuple[str, ...]] = ("C3", "A0-noirr-doy")
 PRIMARY_ARMS: Final[tuple[str, ...]] = ("C3", "H1", "A0-noirr-doy")
+LOG_PRIOR_ARMS: Final[tuple[str, ...]] = ("C3p", "C3pa")
+"""Added after the inert-prior finding; post hoc, secondary, outside the family of six."""
 SECONDARY: Final[tuple[tuple[str, str], ...]] = (("C3", "A0-noirr-doy"), ("H1", "C3"))
 PRIMARY_METRICS: Final[tuple[str, ...]] = ("crps", "pinball_q99")
 N_PRIMARY_TESTS: Final[int] = 6
@@ -270,14 +273,20 @@ def main() -> None:
     """Print the absolute scores, tails, and contrasts, and store them for the report."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pre-fit", action="store_true")
+    parser.add_argument("--log-prior", action="store_true", help="also score C3p and C3pa")
+    parser.add_argument("--months", nargs="+", default=None)
     args = parser.parse_args()
     if args.pre_fit:
         pre_fit()
         return
-    series, ctx, table, scored, rows = build(arms=ARMS, seeds=SEEDS)
+    if args.months:
+        MONTHS[:] = args.months
+    arms = (*ARMS, *LOG_PRIOR_ARMS) if args.log_prior else ARMS
+    secondary = (*SECONDARY, *[(a, "C3") for a in LOG_PRIOR_ARMS if a in arms])
+    series, ctx, table, scored, rows = build(arms=arms, seeds=SEEDS)
     out: dict = {"absolute": {}, "tails": {}, "primary": {}, "secondary": {}}
     print("\n== absolute scores, signed-MW six / MVA-only eight (days 1 to 10; points) ==")
-    for n in ARMS:
+    for n in arms:
         t = scored[n].filter(pl.col("metric") == "crps", pl.col("slice") == "lead_days_1_10")
         signed = t.filter(pl.col("label").is_in(list(SIGNED)))["value"].mean()
         mva = t.filter(pl.col("label").is_in(list(r3.MVA_ONLY)))["value"].mean()
@@ -295,7 +304,7 @@ def main() -> None:
             .group_by("metric")
             .agg(pl.col("value").mean())
             .with_columns(arm=pl.lit(n))
-            for n in ARMS
+            for n in arms
         ]
     ).pivot(on="metric", index="arm", values="value")
     with pl.Config(tbl_cols=20, tbl_rows=20):
@@ -315,7 +324,7 @@ def main() -> None:
                 pl.len().alias("n"),
             )
             .with_columns(arm=pl.lit(n))
-            for n in ARMS
+            for n in arms
         ]
     ).sort("label", "arm")
     with pl.Config(tbl_rows=100, tbl_cols=20):
@@ -323,7 +332,7 @@ def main() -> None:
     out["per_primary_sunny_midday"] = per_primary.to_dicts()
     print("\n== sunny-midday means, signed-MW six, days 1 to 10 ==")
     means = {}
-    for n in ARMS:
+    for n in arms:
         kept = rows[n].filter(
             pl.col("label").is_in(list(SIGNED)), pl.col("sunny_midday"), pl.col("lead_days_1_10")
         )
@@ -394,8 +403,19 @@ def main() -> None:
             key = f"{arm} minus {REFERENCE} [lead_days_1_10, {metric}]"
             out["secondary"][key] = dict(r)
             print(f"{key}: {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f})")
+    for arm in [a for a in LOG_PRIOR_ARMS if a in arms]:
+        for metric in PRIMARY_METRICS:
+            for sl in ("sunny_midday", "lead_days_1_10"):
+                r = contrast(
+                    rows=rows, table=table, a=arm, b=REFERENCE, sl=sl, metric=metric, level=LEVEL
+                )
+                key = f"{arm} minus {REFERENCE} [{sl}, {metric}]"
+                out["secondary"][key] = dict(r)
+                print(
+                    f"{key} (post hoc): {r['difference']:+.3f} ({r['lower']:+.3f} to {r['upper']:+.3f})"
+                )
     print("\n== secondary contrasts ==")
-    for a, b in SECONDARY:
+    for a, b in secondary:
         for metric in PRIMARY_METRICS:
             for sl in ("sunny_midday", "lead_days_1_10"):
                 r = contrast(rows=rows, table=table, a=a, b=b, sl=sl, metric=metric, level=LEVEL)

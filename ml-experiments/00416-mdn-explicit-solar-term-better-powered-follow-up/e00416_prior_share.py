@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Print the capacity prior's share of the loss gradient for C3, at the start and end of training.
 
 The training loss is the weighted mean negative log-likelihood of a batch plus the capacity penalty
@@ -13,19 +14,27 @@ uv run --no-sync python ml-experiments/00416-*/e00416_prior_share.py
 ```
 """
 
+import argparse
+from pathlib import Path
+
 import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00405_fit as f5  # ty: ignore[unresolved-import]
 import e00405_models as m5  # ty: ignore[unresolved-import]
 import e00409_prep as prep  # ty: ignore[unresolved-import]
+import e00416_models as models  # ty: ignore[unresolved-import]
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
+WORK_416 = (
+    ML_EXPERIMENTS_DATA_DIR / "00416-mdn-explicit-solar-term-better-powered-follow-up" / "work"
+)
 MONTH = "2026-06"
 ARM = "C3"
 N_BATCHES = 10
 
 
-def share(*, model: m5.PvMdn, fold: prep.Fold, seed: int) -> dict[str, float]:
+def share(*, model: m5.PvMdn, fold: prep.Fold, seed: int, arm: str) -> dict[str, float]:
     """Return the gradient norms of the likelihood and the prior, and the prior's share."""
     z = (fold.y - fold.target_mean[fold.primary]) / fold.target_std[fold.primary]
     t = {
@@ -34,7 +43,7 @@ def share(*, model: m5.PvMdn, fold: prep.Fold, seed: int) -> dict[str, float]:
         "w": torch.from_numpy(fold.weight),
         "p": torch.from_numpy(fold.primary),
         "e": torch.from_numpy(fold.extras),
-        "c": torch.from_numpy(f5.cells_of(arm=ARM, fold=fold)),
+        "c": torch.from_numpy(f5.cells_of(arm=arm, fold=fold)),
     }
     train_idx = np.flatnonzero(~fold.is_val)
     n_eff = float(fold.weight[train_idx].sum())
@@ -60,21 +69,31 @@ def share(*, model: m5.PvMdn, fold: prep.Fold, seed: int) -> dict[str, float]:
 
 
 def main() -> None:
-    """Print the share at the start and the end of training."""
-    refit = base.refit_of(month=MONTH)
+    """Print the share at the start and the end of training of one arm."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--arm", default=ARM)
+    parser.add_argument("--month", default=MONTH)
+    args = parser.parse_args()
+    refit = base.refit_of(month=args.month)
     fold = prep.build_fold(refit=refit, irradiance_free=True, use_doy=True)
-    model = f5.make_model(arm=ARM, fold=fold, table=base.primaries(), refit=refit, seed=0)
-    print("start (capacity at the prior centre):", share(model=model, fold=fold, seed=0))
-    stored = prep.WORK / "seed_preds" / ARM / f"{MONTH}_s0.pt"
+    model = models.make_model(arm=args.arm, fold=fold, table=base.primaries(), refit=refit, seed=0)
+    print("start:", share(model=model, fold=fold, seed=0, arm=args.arm))
+    name = f"{args.month}_s0.pt"
+    stored = f9_work(arm=args.arm) / name
     model.load_state_dict(torch.load(stored, map_location="cpu"))
-    print("end (experiment 409's stored C3, seed 0):", share(model=model, fold=fold, seed=0))
+    print(f"end ({stored}):", share(model=model, fold=fold, seed=0, arm=args.arm))
     cap = model.capacity().detach()
-    centre = model.prior_centre
     mask = model.solar_mask[:, None].bool().expand_as(cap)
     print(
         "mean |capacity - prior centre| / prior sd at the end:",
-        float(((cap - centre).abs() / model.prior_sd)[mask].mean()),
+        float(((cap - model.prior_centre).abs() / model.prior_sd)[mask].mean()),
     )
+
+
+def f9_work(*, arm: str) -> Path:
+    """Return the folder of an arm's stored networks: experiment 409's for C3, else this experiment's."""
+    work = prep.WORK if arm == "C3" else WORK_416
+    return work / "seed_preds" / arm
 
 
 if __name__ == "__main__":

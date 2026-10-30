@@ -20,6 +20,7 @@ import argparse
 import json
 import time
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 from typing import Final
 
@@ -29,6 +30,7 @@ import e00405_fit as f5  # ty: ignore[unresolved-import]
 import e00405_models as m5  # ty: ignore[unresolved-import]
 import e00409_fit as f9  # ty: ignore[unresolved-import]
 import e00409_prep as prep  # ty: ignore[unresolved-import]
+import e00416_models as models  # ty: ignore[unresolved-import]
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -41,10 +43,21 @@ REUSED_SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 """Seeds of `C3` and `A0-noirr-doy` that experiment 409 already fitted with this recipe."""
 ARMS: Final[tuple[str, ...]] = ("A0-doy", "C3", "H1", "A0-noirr-doy")
 FROM_409: Final[tuple[str, ...]] = ("C3", "A0-noirr-doy")
+LOG_PRIOR_ARMS: Final[tuple[str, ...]] = models.LOG_PRIOR_ARMS
+"""Arms C3p and C3pa, added after the inert-prior finding; fitted with all 5 seeds."""
 
 m5.SPECS["A0-doy"] = m5.SPECS["A0"]
 m5.SPECS["H1"] = replace(m5.SPECS["C3"], irradiance_free=False)
 m5.SPECS["A0-noirr-doy"] = m5.SPECS["A0-noirr"]
+
+
+def fit_one(
+    *, arm: str, fold: prep.Fold, refit: datetime, seed: int, device: str
+) -> tuple[m5.PvMdn, int, float]:
+    """Fit one arm on a fold; return the network, its epochs, and its validation loss."""
+    model = models.make_model(arm=arm, fold=fold, table=base.primaries(), refit=refit, seed=seed)
+    epochs, val = f5.train(model=model, arm=arm, fold=fold, seed=seed, device=device)
+    return model, epochs, val
 
 
 def seeds_to_fit(*, arm: str) -> tuple[int, ...]:
@@ -77,7 +90,7 @@ def run_screen(
                     )
                 fold = folds[irradiance_free]
                 started = time.monotonic()
-                model, epochs, val = f9.fit_one(
+                model, epochs, val = fit_one(
                     arm=arm, fold=fold, refit=refit, seed=seed, device=device
                 )
                 frame, solar = f9.forecast_month(
