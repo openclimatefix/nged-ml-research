@@ -220,3 +220,35 @@ Sonnet writes the code. A fresh Sonnet agent reviews the code before the first s
 second review follows if the first flags many problems. The timed fit is not scored. Results get a
 fresh Sonnet re-derivation of the headline numbers and the audit triggers, and the write-up gets a
 Sonnet review of the numbers and of the prose.
+
+## First test result (interim: two test months, one seed, no intervals, not yet re-derived)
+
+**The first test failed P1 and P4, so the full run does not start.** S1c reaches pooled balanced
+accuracy 0.854 in 2026-06 but 0.741 in 2026-03, and its false-reverse rate on gate-open sunny
+half-hours is 16.9% (June) and 6.7% (March), against a 5% bar. The no-injection placebo invents
+reverse flow at D5 on 18% (March) and 47% (June) of those half-hours. The learned capacity at D5
+rises to 74 to 78 points without any injected farm, against a prior centre of 33.5, so the capacity
+is fitted from the rows it labels.
+
+- **P1 (level 2.0, Q = 2).** Fails. Pooled balanced accuracy 0.741 (March, 1,416 reverse
+  half-hours) and 0.854 (June, 3,460); D5 0.736 and 0.834, D10 0.757 and 0.872. False-reverse
+  rate 6.7% and 16.9%. Q = 4 gives the same numbers to within 0.003.
+- **Matched false-reverse rate.** At S1c's false-reverse rate the threshold rule's recall is 0.47 to
+  0.49 in March (S1c: 0.53 to 0.59) and 0.86 in June (S1c: 0.87 to 0.89). At the rule's false-reverse
+  rate (57% to 64% in March, 40% to 42% in June) S1c's recall is 0.98 to 1.00. The rule is a
+  laboratory reference that reads realised CAMS here.
+- **P3.** Passes. S1c exceeds S1c-shuffle by 0.18 (March) and 0.32 (June) balanced accuracy, and the
+  hour-and-month baseline by 0.20 and 0.09. The shuffle scores 0.53 to 0.56, near chance, so the
+  daylight profile alone does not carry the sign here.
+- **P4.** Fails. With no injection, D5 has no real reverse flow, yet S1c calls it on 18% (March) and
+  47% (June) of gate-open sunny half-hours. D10's recall of its real reverse flow is 0.06 on 140
+  half-hours in June (none are in the March slice); that recall is descriptive.
+- **Identifiability check.** S1c with `C_p` fixed at zero scores 0.55 (March) and 0.74 (June)
+  pooled, against 0.74 and 0.85 for S1c, so the demand module absorbs part of the sign from hour,
+  month, temperature, and the Primary embedding, and the CAMS term adds about 0.1 to 0.2.
+- **Lab caveat.** S1c reads realised CAMS at every lead, so the day-ahead behaviour of the sign is
+  untested until S1e.
+
+Per the stop rule, the work ends here and the maintainer decides what follows, as the sixth fold
+treatment of the MVA problem. Fits: 12, 29 to 83 s each. The re-derivation of these numbers by a
+fresh Sonnet agent and the write-up review have not run.
