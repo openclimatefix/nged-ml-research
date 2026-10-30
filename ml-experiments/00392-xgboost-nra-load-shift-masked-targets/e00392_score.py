@@ -35,7 +35,7 @@ onset wins. The label's depth `|depth_mw|` is the event's depth; rows with confi
 reported separately. For an unmatched event the depth is estimated as the absolute mean change of
 the actual (see below) and the event is reported separately as "estimated depth", which is not used
 by the screen rule. For every arm, every forecast origin, and every valid time `t` in the window
-`[start, end + 7 days)` at leads up to 240 hours, the movement is `q50(origin, t) - q50(origin,
+`[start, end + 48 hours)` at leads up to 240 hours, the movement is `q50(origin, t) - q50(origin,
 t - 7 days)`: the arm's own median for the same half-hour a week earlier from the same origin,
 which exists whenever that week-earlier half-hour is itself in the forecast. Rows whose
 week-earlier half-hour lies inside an event or within 48 hours after one are dropped. The actual
@@ -46,8 +46,11 @@ actual change are averaged over the rows, and the **share of the labelled depth 
 
 (the movement is oriented to the direction in which the actual moved, so a forecast that stays at
 the normal running arrangement level scores 0 and a forecast that follows the whole transfer scores
-1). The window is `both` (inside the event plus the 7 days after, used by the screen rule), or
-`inside` or `after` separately. Two further variants are printed: the unsigned share
+1). The window is `both` (inside the event plus the 48 hours after it, used by the screen rule),
+or `inside` (`[start, end)`) or `after` (`[end, end + 48 hours)`) separately. An unpadded run that
+contains more than one label-table onset of its Primary (an onset within `MATCH_TOLERANCE_HOURS`
+before the run's start, or inside it) is a merged event: it is listed separately with its count and
+excluded from every matched-depth share. Two further variants are printed: the unsigned share
 `|mean(movement)| / depth` and the share with the sign taken from the label table (`depth_mw` as
 written for the Primary named first in `pair`, the opposite sign for the others). A fold's value for
 an arm is the mean of the shares of its events. The median is unchanged by widening, so check 2
@@ -67,7 +70,7 @@ ml-experiments/00392-xgboost-nra-load-shift-masked-targets \
 
 import argparse
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal
 
@@ -304,7 +307,8 @@ def event_tables(*, series: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
 def match_labels(*, events: pl.DataFrame) -> pl.DataFrame:
     """Attach the label table's depth to each event (`depth_abs`, `convention_sign`, `kind`).
 
-    `kind` is `labelled`, `labelled low-confidence`, or `estimated depth` (no matching label).
+    `kind` is `labelled`, `labelled low-confidence`, `estimated depth` (no matching label), or
+    `merged event` (the run holds more than one label-table onset; no depth is matched).
     """
     table = pl.read_csv(LABEL_TABLE).with_columns(
         onset=pl.col("onset_utc").str.to_datetime("%Y-%m-%d %H:%M", time_zone="UTC", time_unit="us")
@@ -312,6 +316,17 @@ def match_labels(*, events: pl.DataFrame) -> pl.DataFrame:
     labels = table.to_dicts()
     out = []
     for event in events.iter_rows(named=True):
+        onsets = [
+            row["onset"]
+            for row in labels
+            if event["label"] in re.findall(r"D\d+", row["pair"])
+            and event["start"] - timedelta(hours=MATCH_TOLERANCE_HOURS)
+            <= row["onset"]
+            < event["end"]
+        ]
+        if len(onsets) > 1:
+            out.append((None, 0.0, "merged event", None))
+            continue
         best, best_gap = None, MATCH_TOLERANCE_HOURS
         for row in labels:
             names = re.findall(r"D\d+", row["pair"])
@@ -381,6 +396,7 @@ def event_moves(
 ) -> pl.DataFrame:
     """Return, per event, the mean movement and mean actual change in each window (check 2)."""
     week = pl.duration(days=7)
+    after_window = pl.duration(hours=48)
     keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
     current = forecast.filter(lead_expression() <= HEADLINE_LEAD_HOURS).select(*keys, "q50")
     previous = current.select(
@@ -410,7 +426,8 @@ def event_moves(
         )
         .join(events.select("time_series_id", "event", "start", "end"), on="time_series_id")
         .filter(
-            pl.col("valid_time") >= pl.col("start"), pl.col("valid_time") < pl.col("end") + week
+            pl.col("valid_time") >= pl.col("start"),
+            pl.col("valid_time") < pl.col("end") + after_window,
         )
         .with_columns(inside=pl.col("valid_time") < pl.col("end"))
     )
@@ -436,7 +453,9 @@ def event_shares(*, moves: pl.DataFrame, events: pl.DataFrame) -> pl.DataFrame:
         .then(pl.col("change").abs())
         .otherwise(pl.col("depth_abs"))
     )
-    return joined.filter(pl.col("n") >= MIN_ROWS_PER_EVENT).with_columns(
+    return joined.filter(
+        pl.col("n") >= MIN_ROWS_PER_EVENT, pl.col("kind") != "merged event"
+    ).with_columns(
         share_oriented=pl.col("move") * pl.col("change").sign() / depth,
         share_abs=pl.col("move").abs() / depth,
         share_conv=pl.when(pl.col("kind") == "estimated depth")
@@ -597,6 +616,11 @@ def print_check_4(*, rows: pl.DataFrame, arms: list[str]) -> None:
     print("-- 5% to 95% band coverage is coverage_q95 - coverage_q05; nominal 0.90")
 
 
+def _word(outcome: bool | None) -> str:
+    """Return `pass`, `fail`, or `not evaluable` for a rule outcome."""
+    return "not evaluable" if outcome is None else "pass" if outcome else "fail"
+
+
 def print_screen(*, rows: pl.DataFrame, shares: pl.DataFrame, arms: list[str]) -> None:
     """Print the advance rule of the plan for R1 and RC1."""
     print(
@@ -604,7 +628,7 @@ def print_screen(*, rows: pl.DataFrame, shares: pl.DataFrame, arms: list[str]) -
     )
     outcome_a: dict[str, bool | None] = {}
     for arm in ("r1", "rc1", "r2", "rc2"):
-        passes = []
+        passes: list[bool | None] = []
         for form in ("lagged", "lagless"):
             name = f"{arm}_{form}"
             if name not in arms or control_of(name) not in arms:
@@ -616,14 +640,15 @@ def print_screen(*, rows: pl.DataFrame, shares: pl.DataFrame, arms: list[str]) -
             ok = good >= FOLDS_NEEDED and len(diffs) == len(FOLD_NAMES)
             if len(diffs) < len(FOLD_NAMES):
                 print(
-                    f"{name}: only {len(diffs)} of {len(FOLD_NAMES)} folds present; rule not evaluable"
+                    f"{name}: only {len(diffs)} of {len(FOLD_NAMES)} folds present; not evaluable"
                 )
+                passes.append(None)
                 continue
             passes.append(ok)
             print(
                 f"{name}: per fold { ({FOLD_NAMES[i]: round(d, 4) for i, d in diffs.items()}) }; {good} of {len(diffs)} folds within +{CRPS_TOLERANCE}; {'pass' if ok else 'fail'}"
             )
-        outcome_a[arm] = all(passes) if passes else None
+        outcome_a[arm] = None if not passes or None in passes else all(passes)
     print(
         "\n== Screen rule (b): lagless form follows less of the labelled depth than R0 lagless in >= 3 of 4 folds =="
     )
@@ -651,7 +676,9 @@ def print_screen(*, rows: pl.DataFrame, shares: pl.DataFrame, arms: list[str]) -
         print(
             f"{name}: share per fold { ({FOLD_NAMES[f]: round(mine[f], 3) for f in folds}) } vs r0_lagless { ({FOLD_NAMES[f]: round(r0[f], 3) for f in folds}) }; less in {less} of {len(folds)} folds; {'pass' if outcome_b[arm] else 'fail'}"
         )
+    beats: dict[str, bool | None] = {}
     for treatment, control in (("r1", "rc1"), ("r2", "rc2")):
+        beats[treatment] = None
         a, b = f"{treatment}_lagless", f"{control}_lagless"
         if a in arms and b in arms:
             mine, other = (
@@ -660,16 +687,30 @@ def print_screen(*, rows: pl.DataFrame, shares: pl.DataFrame, arms: list[str]) -
             )
             folds = sorted(set(mine) & set(other))
             less = sum(mine[f] < other[f] for f in folds)
+            if len(folds) < len(FOLD_NAMES):
+                print(
+                    f"{treatment} beats {control} on (b): only {len(folds)} of {len(FOLD_NAMES)} folds present; not evaluable"
+                )
+                continue
+            beats[treatment] = less >= FOLDS_NEEDED
             print(
-                f"{treatment} beats {control} on (b) in {less} of {len(folds)} folds: {'yes' if less >= FOLDS_NEEDED else 'no'}"
+                f"{treatment} beats {control} on (b) in {less} of {len(folds)} folds: {'yes' if beats[treatment] else 'no'}"
             )
-    for arm in ("r1", "rc1", "r2", "rc2"):
-        if outcome_a.get(arm) is None or outcome_b.get(arm) is None:
-            print(f"{arm}: advance rule not evaluable (arm or fold missing)")
+    for arm in ("r1", "r2"):
+        parts = (outcome_a.get(arm), outcome_b.get(arm), beats.get(arm))
+        if arm == "r2" and all(p is None for p in parts):
+            continue
+        label = f"(a) {_word(parts[0])}, (b) vs R0 {_word(parts[1])}, beats {'RC1' if arm == 'r1' else 'RC2'} {_word(parts[2])}"
+        if None in parts:
+            print(f"{arm}: {label} -> advance rule not evaluable")
         else:
-            print(
-                f"{arm}: (a) {'pass' if outcome_a[arm] else 'fail'}, (b) {'pass' if outcome_b[arm] else 'fail'} -> {'ADVANCES' if outcome_a[arm] and outcome_b[arm] else 'does not advance'}"
-            )
+            print(f"{arm}: {label} -> {'ADVANCES' if all(parts) else 'does not advance'}")
+    for arm in ("rc1", "rc2"):
+        if outcome_a.get(arm) is None and outcome_b.get(arm) is None:
+            continue
+        print(
+            f"{arm} (no verdict, comparison arm): (a) {_word(outcome_a.get(arm))}, (b) vs R0 {_word(outcome_b.get(arm))}"
+        )
 
 
 def print_check_2(*, shares: pl.DataFrame, events: pl.DataFrame) -> None:
@@ -681,6 +722,10 @@ def print_check_2(*, shares: pl.DataFrame, events: pl.DataFrame) -> None:
             "event", "label", "start", "end", "kind", "confidence", "depth_abs"
         )
     )
+    merged = events.filter(pl.col("kind") == "merged event", pl.col("end") >= FOLD_STARTS[0])
+    print(f"\n== Check 2: merged events (excluded from the shares): {merged.height} ==")
+    if not merged.is_empty():
+        print(merged.select("event", "label", "start", "end"))
     if shares.is_empty():
         print("no event has enough rows in the scored folds")
         return
