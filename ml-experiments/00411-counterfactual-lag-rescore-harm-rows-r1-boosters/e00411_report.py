@@ -52,7 +52,11 @@ def gain_with_interval(
 def main() -> None:
     """Print the gain for the six, the eight, and each lead band."""
     frames = [pl.read_parquet(f) for f in sorted(ROWS.glob("*.parquet"))]
-    rows = pl.concat([f for f in frames if not f.is_empty()])
+    frames = [f for f in frames if not f.is_empty()]
+    if not frames:
+        print("no harm rows written")
+        return
+    rows = pl.concat(frames)
     rng = np.random.default_rng(SEED)
     groups = {"six signed-MW": SIX, "eight MVA-only": EIGHT, "all": SIX + EIGHT}
     for name, sites in groups.items():

@@ -59,6 +59,12 @@ MAX_RUNS_PER_EVENT_REFIT: Final[int] = 6
 """Runs predicted per event and refit month, spread evenly over the runs whose lags touch it."""
 MAX_LEAD_HOURS: Final[float] = 240.0
 """Harm rows are scored out to day 10, the headline band of the demand protocol."""
+SCHEMA: Final[dict[str, pl.DataType | type]] = {
+    "site": pl.String, "event_id": pl.Int64, "refit": pl.Datetime("us", "UTC"),
+    "origin": pl.Datetime("us", "UTC"), "valid_idx": pl.Int64, "k": pl.Int64,
+    "lead_hours": pl.Float64, "step": pl.Float64, "crps_real": pl.Float64, "crps_cf": pl.Float64,
+}  # fmt: skip
+"""Columns of a Primary's table, so that a Primary with no harm rows still writes a valid file."""
 POINTS: Final[float] = 100.0
 """CRPS is reported in points (hundredths) of effective capacity."""
 
@@ -212,6 +218,8 @@ def main() -> None:
         if target.exists():
             continue
         frame = harm_rows_site(site=site, threads=args.threads)
+        if frame.width == 0:
+            frame = pl.DataFrame(schema=SCHEMA)
         frame.write_parquet(target.with_suffix(".tmp"))
         target.with_suffix(".tmp").rename(target)
 
