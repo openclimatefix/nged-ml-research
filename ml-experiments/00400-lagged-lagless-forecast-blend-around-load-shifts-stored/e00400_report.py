@@ -55,7 +55,7 @@ def build_wide() -> None:
     weights = pl.read_parquet(
         WORK / "weights.parquet", columns=[*KEYS, "w_b1", "w_b2", "w_b3", "s_own", "s_nb"]
     )
-    wide = None
+    wide: pl.DataFrame | None = None
     for arm in ARMS:
         rows = pl.read_parquet(WORK / f"rows_{arm}.parquet").filter(
             pl.col("lead_hours") < HEADLINE_LEAD
@@ -78,6 +78,9 @@ def build_wide() -> None:
         else:
             wide = wide.join(part, on=KEYS, how="left", validate="1:1")
         print("wide", arm, wide.width, flush=True)
+    if wide is None:
+        msg = "no arms"
+        raise ValueError(msg)
     wide = (
         wide.join(tags, on=KEYS, how="left", validate="1:1")
         .join(slices, on=KEYS, how="left", validate="1:1")
@@ -414,7 +417,7 @@ def curtailment() -> None:
         wide = cost.pivot(on="arm", index="label", values="avoidable_cost_gbp").sort("label")
         print(f"\n== avoidable curtailment cost, GBP, limit 0.9 x max, {name} ==")
         print(wide)
-        totals = {c: wide[c].sum() for c in wide.columns if c != "label"}
+        totals = {c: float(wide[c].sum()) for c in wide.columns if c != "label"}
         print(
             "total:",
             {k: round(v) for k, v in totals.items()},

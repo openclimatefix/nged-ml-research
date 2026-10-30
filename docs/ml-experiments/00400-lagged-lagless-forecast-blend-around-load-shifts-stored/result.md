@@ -57,35 +57,32 @@ code: ml-experiments/00400-lagged-lagless-forecast-blend-around-load-shifts-stor
 verdict: not supported
 best_arm: >-
   None. Arm B3 (signed neighbour logic) scores best of the blends, 3.886 points of effective
-  capacity CRPS against 3.867 for the forecast with lags, so it does not beat the forecast with lags
+  capacity CRPS against 3.867 for the forecast with lags, so no blend beats the forecast with lags
 headline: >-
   The fitted weight on the forecast with lags stays near 0.6 whether or not a lag is inside an
-  event (0.61 with three lags in an event, 0.62 with none). Arm B2 minus the forecast with lags: -0.75
-  (95% -1.78 to -0.03) points on event-lag rows at the signed-MW six, +0.09 (-0.04 to +0.22) at the
-  MVA-only eight, and +0.03 (-0.01 to +0.08) outside events.
+  event (0.61 with three lags in an event, 0.62 with none). Arm B2 minus the forecast with lags:
+  -0.75 (95% -1.78 to -0.03) points on event-lag rows at the six Primaries with signed readings,
+  +0.09 (-0.04 to +0.22) at the eight with MVA-only readings, and +0.03 (-0.01 to +0.08) outside
+  events.
 take_home_message: >-
-  The lag surprise scores from experiment 391 did not tell a blend when to trust the power lags: the
-  fitted weight hardly moved around events, so every learned blend behaved like a fixed 60/40 mix.
-  That fixed mix helps at the six Primaries with signed readings when a lag sits in an event, and
-  loses a little everywhere else, so a smooth blend driven by these scores is not worth porting. The
-  next step is a learned blender trained on injected events, which gives the blend examples of
-  events that the real rows are too few to supply.
+  The lag surprise scores from experiment 391 did not tell a blend when to trust the power lags:
+  the fitted weight hardly moved around events, so every learned blend behaved like a mix of about
+  60% forecast with lags and 40% forecast without lags. A fixed 50/50 mix helps on event-lag rows at
+  the six Primaries with signed readings and costs a little elsewhere, so a smooth blend driven by
+  these scores is not worth porting. The next step is a learned blender trained on injected events,
+  which supplies the event examples that the real rows are too few to give.
 lessons: >-
-  Around 112 hand-labelled events the real rows hold too few event-lag rows (about 40,000 of
-  1,570,000) for a three-to-eight-parameter weight to learn a surprise response; the fit spends its
-  effort on the 97% of rows without an event, where the surprise scores point the other way
-  (large surprise slightly raises the weight on the forecast with lags).
+  Event-lag rows are 41,000 of 1,573,000 scored rows (2.6%), too few for a weight with three to
+  eight parameters to learn a surprise response. The fit is dominated by rows with no lag in an
+  event, where a larger surprise score slightly raises the weight on the forecast with lags.
 advice:
   - >-
     Do not fit a lag-surprise blend weight on real rows alone; train it on injected load-shift events
-    so event-lag rows are not 3% of the fit (C1 to C4, section Weight).
+    so event-lag rows are more than 3% of the fit (event-lag table, section Results).
   - >-
-    Treat a fixed mixture of the forecast with lags and the forecast without lags as the control for
-    any learned blender, because it beat every surprise-driven weight on event-lag rows at the
-    signed-MW six (C9).
-  - >-
-    Score a mixture with the exact CRPS as well as the 11-quantile score, because the 11-quantile
-    score understates a bimodal mixture (exact CRPS table).
+    Include a fitted constant-weight mixture (intercept and lead time only) beside the fixed 50/50
+    mixture as the control for any learned blender, because the fixed 50/50 mixture and the learned
+    weights differ in level as well as in surprise response (control comparison, section Results).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -97,17 +94,16 @@ adopted_in: none
 - **Question.** Can a smooth, threshold-free weight on a forecast without power lags, driven by how
   surprising the three lagged readings are, give a forecast that is better around load-shift events
   and no worse elsewhere? A binary detector reached recall 0.42 with 1.7 false alarms per
-  Primary-year (experiment 391), and a forecast that steps loses users' trust.
+  Primary-year (experiment 391). A forecast that steps loses the trust of NGED's operators.
 - **Forecast with lags.** Experiment 381's weekly bundle (`arm_preds/weekly/bundle_solar+sunny+hl1`),
   stored as fractions of effective capacity, unwidened. It is not experiment 383's plain weekly
   member (arm d, which is experiment 87's stored weekly member): that member has 64 stored files and
   cannot cover all rows.
 - **Forecast without lags.** Experiment 383's raw lagless arm (`work/arms/lagless.parquet`,
-  4,099,680 rows, 16 Primaries). It is not arm c2, which is this arm on rows with a lag inside an
-  event and arm d elsewhere.
+  4,099,680 rows, 16 Primaries). Arm c2 of experiment 383 is not used: it applies this arm only on
+  rows with a lag inside an event and arm d elsewhere.
 - **Widening.** Both forecasts are used raw (no 1.15 widening): experiment 381's bundle carries none
-  and the lagless arm is raw. A sensitivity run applies the same 1.15 factor about the median to
-  both forecasts and to the blend.
+  and the lagless arm is raw. The 1.15 sensitivity run planned here was not run (see Caveats).
 - **Row set.** The 2,824,844 rows of experiment 395's Part F `slice_table.parquet` (16 Primaries,
   valid times 2025-07-02 to 2026-06-30). The plan checks before scoring that both forecasts hold
   every key and reports any gap. Scoring actuals come from Part F's `actual_mw`; half-hours flagged
@@ -152,68 +148,102 @@ adopted_in: none
 - **Compute.** Stored forecasts only: no refit, no GPU, 2 cores, `MemoryMax=6G`. Chunks of one
   Primary and one month.
 - **Earlier advice followed.** Cleaned actuals; both forecasts and the weight named in full in every
-  table; the absolute score beside every contrast. No departures.
+  table; the absolute score beside every contrast. Departures are listed under Caveats.
 
 ## Results
 
-All numbers are days 1 to 10, valid times from 2025-10-01 (the fits' first scored month), flagged
-half-hours dropped (4 Primaries lose 96 half-hours in total), CRPS in points of effective capacity.
-Intervals resample whole events (event rows) or months (pooled rows). The full printed report is in
-the private folder (`work/report.txt`, `work/curtailment.txt`). This page has no figures.
+**The blend gives no usable gain, and the surprise scores do not drive the weight.** Every number
+below is for days 1 to 10, valid times from 2025-10-01 (the first scored month), CRPS (continuous
+ranked probability score) in points of effective capacity. The six Primaries with signed readings
+are D5, D9, D10, D11, D14, and D16. The eight with MVA-only readings are D2, D3, D4, D8, D12, D19,
+D21, and D22. Intervals resample whole events (event rows) or months (pooled rows) and are at 95%.
+The decision rule asked for 99% intervals at k = 12 and a pooled contrast on event-lag rows; neither
+was computed, so the verdict rests on the failed cost condition below and on the absence of any
+gain at the eight. The printed reports are in the private folder (`work/report.txt` and
+`work/curtailment.txt`). This page has no figures.
 
-- **Weight.** The fitted weight on the forecast with lags has mean 0.615 outside events and 0.611,
-  0.597 in the first 6 hours and after 24 hours of an event (arm B2). Its 5th to 95th percentile
-  range is 0.56 to 0.68. The surprise coefficient is slightly negative: a larger surprise raises the
-  weight on the forecast with lags.
-- **Absolute CRPS, all 16 Primaries:** forecast with lags 3.867; forecast without lags 4.338; fixed
-  mixture 3.938; mixture B1 3.898, B2 3.892, B3 3.886; quantile averages 3.907 to 3.968.
-- **Event-lag rows (1 to 3 lags in an event, target outside), minus the forecast with lags** (C1 to
+- **Flagged-zero handling.** Flagged exact-zero half-hours are dropped from the scoring actuals and
+  from the fits. The scored rows lose 96 half-hours (D12 8, D18 24, D22 40, D8 24).
+- **Widening.** Both forecasts are raw. Experiment 381's weekly bundle and experiment 383's raw
+  lagless arm carry no 1.15 widening.
+- **Label table.** The corrected table `sw_block_detector_label_table_corrected.csv` from nged-ml-research
+  PR 49: 112 labelled pairs of Primaries (51 with a corrected sign), expanded to 184 per-Primary
+  unpadded events. It is used only to evaluate, never as an input.
+- **The weight barely moves around events.** In arm B2 the mean weight on the forecast with lags is
+  0.615 outside events, 0.611 in the first 6 hours of an event, and 0.597 after 24 hours. Its 5th to
+  95th percentile range is 0.56 to 0.68. The fitted coefficients on surprise and on the log of lead
+  time are both negative, so a larger surprise and a longer lead each raise the weight on the
+  forecast with lags.
+- **Absolute CRPS, all 16 Primaries.** Forecast with lags 3.867; forecast without lags 4.338; fixed
+  50/50 mixture 3.938; mixture B1 3.898, B2 3.892, B3 3.886; quantile averages 3.907 to 3.968.
+- **Event-lag rows** (1 to 3 lags in an event, target outside), arm minus forecast with lags (C1 to
   C4):
 
-  | Arm | Signed-MW six | MVA-only eight |
+  | Arm | Six with signed readings | Eight with MVA-only readings |
   |---|---|---|
-  | Fixed mixture | -0.90 (-2.16 to -0.01) | +0.14 (-0.04 to +0.31) |
+  | Fixed 50/50 mixture | -0.90 (-2.16 to -0.01) | +0.14 (-0.04 to +0.31) |
   | Mixture B1 | -0.77 (-1.83 to -0.03) | +0.10 (-0.05 to +0.24) |
   | Mixture B2 | -0.75 (-1.78 to -0.03) | +0.09 (-0.04 to +0.22) |
   | Mixture B3 | -0.78 (-1.83 to -0.03) | +0.08 (-0.05 to +0.20) |
   | Forecast without lags | -0.93 (-2.49 to +0.26) | +0.59 (+0.14 to +1.04) |
 
-- **Surprise adds nothing over a fixed weight on the six** (C9): B2 minus the fixed mixture is +0.15
-  (-0.02 to +0.39); at the eight it is -0.05 (-0.10 to -0.01).
-- **Cost outside events** (C5 to C8, all 16, month resampling): fixed mixture +0.078 (+0.013 to
-  +0.138); B1 +0.038, B2 +0.033 (-0.013 to +0.076), B3 +0.027 (-0.018 to +0.070). The B2 upper end
-  exceeds the +0.05 tolerance. D15 (short history) carries +1.4 of the cost and D18 +0.15.
-- **Tails.** Mixture q95 coverage outside events is 0.936 (B2) against 0.922 for the forecast with
-  lags, because the mixture is wider (90% width 28.4 against 25.2 points). Quantile averages keep
-  the width of the forecast with lags (26.1) and gain little coverage. During events (0, 1 to 2,
-  and 3 lags in the event) the share of readings inside the 1-99% band is 0.88, 0.79, and 0.81 for
-  mixture B2 against 0.87, 0.78, and 0.82 for the forecast with lags, and inside the 5-95% band
-  0.65, 0.56, and 0.40 against 0.62, 0.53, and 0.40.
-- **Median share of the labelled depth** (corrected signs) missed by the median: 0.75 (forecast with
-  lags), 0.56 (without lags), 0.59 (B2) with no lag in the event; 0.63, 0.57, and 0.66 with three
-  lags in the event.
-- **Smoothness.** The blends do not step more than the pure forecasts. Largest half-hour
-  change of the median across an onset: median 6.2 points and 95th percentile 13.3 (mixture B2)
-  against 6.7 and 15.8 (forecast with lags). The pure forecasts already change by several points
-  at event edges.
-- **Avoidable curtailment** at the signed-MW six, limit 0.9 times the maximum, GBP, minus the
-  forecast with lags: during events B2 mixture +61,000, fixed mixture +89,000, forecast without lags
-  +1,164,000; in the 7 days after about -3,000 for every blend; all rows B2 mixture +40,000. The GAM
-  stack is lower than the forecast with lags by 3.7 million during events and 4.9 million over all
-  rows.
-- **Cold nights** (checks 1 and 2): outside events B2 minus the forecast with lags is +0.042 (-0.182
-  to +0.146); on event-lag rows at the six -1.43 (-2.57 to -0.06). The sample is 538 event-lag rows.
-- **Warm-up** (July to September 2025, w = 0.5): fixed mixture 2.883 against 2.864 for the forecast
-  with lags.
+- **Control comparison (C9).** The control is a fixed 50/50 mixture that was not fitted, and no
+  fitted constant-weight arm was run, so the weight level and the surprise response are not
+  separated. On event-lag rows, mixture B2 minus the fixed 50/50 mixture is +0.15 (-0.02 to +0.39) at
+  the six and -0.05 (-0.10 to -0.01) at the eight. Outside events it is -0.046 (-0.065 to -0.024)
+  over all 16 Primaries.
+- **Cost outside events** (C5 to C8, all 16 Primaries, month resampling): fixed 50/50 mixture +0.078
+  (+0.013 to +0.138); B1 +0.038, B2 +0.033 (-0.013 to +0.076), B3 +0.027 (-0.018 to +0.070). The B2
+  upper end exceeds the +0.05 tolerance, and the pooled cost is dominated by D15, which has a short
+  history: B2 minus the forecast with lags is +1.40 points at D15, +0.15 at D18, and +0.10 at D22,
+  with 9 of 16 Primaries below zero.
+- **Tails.** Mixture B2 has q95 coverage 0.936 outside events against 0.922 for the forecast with
+  lags, because the mixture is wider (90% width 28.4 against 25.2 points). The quantile averages
+  keep the width of the forecast with lags (26.1) and gain little coverage. During events with 0, 1
+  to 2, and 3 lags in the event, the share of readings inside the 1-99% band is 0.88, 0.79, and 0.81
+  for mixture B2 and 0.87, 0.78, and 0.82 for the forecast with lags. For the 5-95% band it is 0.65,
+  0.56, and 0.40 for mixture B2 and 0.62, 0.53, and 0.40 for the forecast with lags.
+- **Depth missed by the median.** The share of each event's labelled depth that the forecast median
+  misses, with the corrected signs, is 0.75 (forecast with lags), 0.56 (forecast without lags), and
+  0.59 (mixture B2) with no lag in the event. With three lags in the event it is 0.63, 0.57, and
+  0.66.
+- **Smoothness.** The blends do not step more than the pure forecasts. The typical (median over
+  events) largest half-hour change of the forecast median at an onset is 6.2 points for mixture B2
+  against 6.7 for the forecast with lags, and the 95th percentile is 13.3 against 15.8. The pure
+  forecasts already change by several points at event edges.
+- **Avoidable curtailment** (limit 0.9 times each Primary's maximum observed power), arm minus the
+  forecast with lags. Only four of the six Primaries with signed readings returned a cost during
+  events and in the 7 days after (D5, D10, D14, D16; D9 and D11 returned "no cost" from the
+  protocol function), and D16 supplies most of it. During events mixture B2 is +£61,000 and the fixed
+  50/50 mixture +£89,000, against a total of £6.56 million for the forecast with lags (about 1%,
+  within noise), and the forecast without lags is +£1.16 million. In the 7 days after events every
+  blend is between -£3,800 and -£3,000, and the GAM stack is +£112,000. Over all rows mixture B2 is
+  +£40,000. The GAM stack is £3.7 million below the forecast with lags during events and £4.9
+  million below it over all rows.
+- **Cold nights.** Outside events mixture B2 minus the forecast with lags is +0.042 (-0.182 to
+  +0.146). On event-lag rows at the six Primaries with signed readings it is -1.43 (-2.57 to -0.06),
+  from 538 rows.
+- **Warm-up** (July to September 2025, weight 0.5): fixed 50/50 mixture 2.883 against 2.864 for the
+  forecast with lags.
+
+## Predictions
+
+- **P1 (gain of 0.3 to 1.5 points on event-lag rows, growing with lags).** Met at the six only (B2
+  -0.75); not met at the eight (+0.09); the gain does not grow steadily with the number of lags.
+- **P2 (cost under 0.02 pooled and under 0.05 at every Primary).** Not met: +0.033 pooled, and D15,
+  D18, and D22 exceed 0.05.
+- **P3 (B3 beats B2 by under 0.2 points).** Met: -0.78 against -0.75 at the six.
+- **P4 (no larger step than the pure forecasts).** Met.
+- **P5 (mixture tails reach the event level more often).** Not tested as written; the band shares
+  above are the nearest measure and show 0.01 to 0.03 differences.
 
 ## Caveats and what to try next
 
 - **Leak check.** Each surprise value comes from a monthly stage 1 refit that trained on no row at or
   after its refit time, and every lag time is before the forecast origin, so no row leaks.
-- **Reused forecasts.** Experiment 381's weekly bundle (no widening) and experiment 383's raw lagless
-  arm (no widening); experiment 383's arm c2 is not used. The 1.15 widening sensitivity was not run,
-  because neither forecast carries the widening and the blend result does not depend on it.
-- **Corrected label table:** 112 rows (51 sign-corrected) from PR 49, merged to 184 unpadded events.
-- **Next.** A learned blender trained on injected load-shift events, as the plan describes.
-- **Code.** `ml-experiments/00400-lagged-lagless-forecast-blend-around-load-shifts-stored/`; it reuses
-  experiments 87, 377, 381, 383, 390, and 395 (copied as `e00400_partf.py`).
+- **Departures from the plan.** The 1.15 widening sensitivity run was not run, so the relative
+  result under widening is untested. The exact CRPS of each mixture was computed
+  (`work/exact_crps.parquet`) but is not tabulated here. The 99% intervals and the pooled
+  event-lag contrast were not computed.
+- **Next.** A learned blender trained on injected load-shift events, with a fitted constant-weight
+  mixture as its control.
