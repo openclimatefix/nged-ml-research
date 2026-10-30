@@ -25,30 +25,35 @@ hypothesis: >-
   D15 and D18 and on cold nights in experiment 407 does so again with new random seeds.
 prediction: >-
   Written before any score is read. The reference is `ctrl_w115`, the pooled plain network widened
-  by 1.15 about the median, stored by experiment 407 (CRPS 3.277 at the signed-MW six and 3.858 at
-  the MVA-only eight). S1: the solar summary (`sol`) lowers the CRPS at days 1 to 10 at the
-  signed-MW six by at least 0.02 points and lowers it on sunny April-to-June half-hours by at least
-  0.05 points. S2: the sunny flag alone (`sunny`) moves the CRPS by less than 0.02 points at both
-  groups (experiment 381 found -0.002). S3: `sol_sunny` is within 0.02 points of `sol` at both
-  groups. S4: the 0.25-year half-life retested with new seeds (`hl91r`) again lowers the CRPS at D15
-  and D18 by at least 0.10 points and on cold nights by at least 0.05 points, and raises it by no
-  more than 0.10 points at the signed-MW six (experiment 407 found -0.183, -0.162, and +0.073). S5:
-  `sol_hl91` lowers the CRPS at D15 and D18 by at least 0.10 points against `sol`. S6: `bundle`
-  (the solar summary, the sunny flag, and a 1-year half-life) is within 0.03 points of `sol_sunny`
-  at both groups (experiment 407 found +0.009 for the 1-year half-life alone).
+  by 1.15 about the median, stored by experiment 407 (seeds 0, 1, and 2; CRPS 3.277 at the
+  signed-MW six and 3.858 at the MVA-only eight), and `ctrl_s3` is the same network fitted again
+  with seeds 3, 4, and 5. S1: the solar summary (`sol`, seeds 0 to 2) lowers the CRPS at days 1 to
+  10 at the signed-MW six by at least the minimum detectable effect and by at least 0.02 points.
+  S2: `bundle` (the solar summary, the sunny flag, and a 1-year half-life; seeds 0 to 2) is within
+  0.03 points of `sol` at both groups, judged on the point estimate (experiment 381 found the sunny
+  flag worth -0.002 and experiment 407 found +0.009 for the 1-year half-life alone). S3: the
+  0.25-year half-life retested with seeds 3 to 5 (`hl91r`, against `ctrl_s3`) lowers the CRPS at
+  D15 and D18 and on cold nights, with the same sign as experiment 407 (-0.183 and -0.162), and
+  raises it by no more than 0.10 points at the signed-MW six (experiment 407 found +0.073). S4:
+  `sol_hl91` (seeds 0 to 2, against `sol`) lowers the CRPS at D15 and D18, with the same sign as S3.
+  The sunny April-to-June CRPS of `sol` against the reference is reported as a point estimate and
+  predicted to be at least 0.05 points lower; it rests on one scored month (2026-06) and decides
+  nothing.
 decision_rule: >-
   Each contrast is read per group (signed-MW six; MVA-only eight; D15 and D18, report-only) on CRPS
   at days 1 to 10, with the month-block bootstrap of `studies.eval_protocol` at 95% and 20,000
   resamples. A gain counts only if the interval lies wholly below zero and the point estimate is
-  below minus the minimum detectable effect, which is 2 times the standard deviation, across the 15
-  fold-and-seed pairs, of the difference between two fits of the same configuration with different
-  seeds (computed from the 407 `ctrl` fits and the 406 `pooled_emb` fits and written on this page
-  before any new arm is scored). The five screen months give wide intervals, so every number is
+  below minus the minimum detectable effect, which is 2 times the standard deviation, over the 5
+  folds, of the difference in the signed-MW six CRPS between `ctrl_w115` (seeds 0 to 2) and `ctrl_s3`
+  (seeds 3 to 5). That value is printed by the scorer and written on this page before any new arm
+  is scored. The verdict rests on the signed-MW six and the MVA-only eight only: D15 and D18 and the
+  cold-night slice are report-only. The five screen months give wide intervals, so every number is
   interim and a result ranks changes for further testing without supporting a claim of benefit. The
-  hypothesis is supported if S1 holds and counts as a gain; partly supported if S1 fails but S4
-  holds; not supported if both fail. An arm is carried forward if its prediction holds and its
-  interval does not lie wholly above zero. The trailing-temperature arm (`temp`) runs only if
-  experiment 396's arm W1 reports a gain that outlasts its noise floor.
+  hypothesis is supported if S1 holds and counts as a gain; partly supported if S1 fails and `hl91r`
+  lowers the signed-MW six or MVA-only eight CRPS against `ctrl_s3` as a counted gain; not supported
+  otherwise. An arm is carried forward if its prediction holds and its interval does not lie wholly
+  above zero. Experiment 381 and experiment 407 both picked their arms on months that include these
+  five, so a gain here is selected twice and the results rank arms without out-of-sample support.
 benchmark: >-
   The widened pooled plain network `ctrl_w115` and the 0.25-year half-life arm `hl91` of experiment
   407, the per-Primary network of experiment 406, and experiment 381's XGBoost bundle, all on the
@@ -81,27 +86,28 @@ shortwave at the valid time, but not that daily summary and not a cloud-aware su
   months 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06), refitted monthly, three seeds averaged in
   quantile space, with the same scoring rows. Every arm is widened by 1.15 about the median on q01,
   q05, q95, and q99, as the reference is.
-- **`ref`.** The reference `ctrl_w115` stored by experiment 407 (not refitted).
+- **`ref` and `ctrl_s3`.** The reference `ctrl_w115` stored by experiment 407 (seeds 0 to 2; not
+  refitted), and the same network fitted again with seeds 3 to 5, which gives the minimum
+  detectable effect and a seed-matched reference for `hl91r`.
 - **`sol`.** Adds `shortwave_day_mean` and `shortwave_prev_day_mean` (experiment 381's arm A2),
   computed from the ensemble-mean shortwave of the same NWP run over the local day of the valid
-  time and over the previous local day, and standardised like the other weather inputs.
-- **`sunny`.** Adds `sunny_flag` and `sunny_times_shortwave` (experiment 381's arm A4): the flag is
-  1 where the ensemble-mean shortwave exceeds 0.6 times the Haurwitz clear-sky irradiance.
-- **`sol_sunny`.** Adds both groups.
-- **`hl91r`.** The reference with row weights that halve every 0.25 years, fitted again with seeds
-  3, 4, and 5 (experiment 407's `hl91` used seeds 0, 1, and 2). The 0.25-year half-life is carried
-  from experiment 407.
+  time and over the previous local day, standardised on each fold's training rows like the other
+  weather inputs. A previous-day mean missing at the start of a run is replaced by the day's own
+  mean, and a daily mean cut short by the end of the 14-day horizon uses the steps available.
+- **`hl91r`.** The reference with row weights that halve every 0.25 years, with seeds 3 to 5. The
+  0.25-year half-life is carried from experiment 407, whose `hl91` used seeds 0 to 2.
 - **`sol_hl91`.** `sol` with the 0.25-year half-life carried from experiment 407.
-- **`bundle`.** `sol_sunny` with row weights that halve every 1 year: experiment 381's weekly
-  bundle, here refitted monthly.
-- **`temp`.** Adds the trailing means of the 2-metre temperature over 6, 24, 72, and 168 hours and
-  the matching heating degrees below 15.5 degrees Celsius (experiment 396's arm W1). It is
-  registered here and is fitted only if experiment 396 reports that W1 beats its noise floor.
+- **`bundle`.** `sol` plus the sunny flag and `sunny_times_shortwave` (experiment 381's arm A4: the
+  flag is 1 where the ensemble-mean shortwave exceeds 0.6 times the Haurwitz clear-sky irradiance)
+  with row weights that halve every 1 year: experiment 381's weekly bundle, refitted monthly.
+- **`temp`.** Adds trailing temperature means and heating degrees (experiment 396's arm W1). It is
+  not fitted here, and a separate experiment tests it if experiment 396 reports that W1 beats its
+  noise floor.
 - **The start cut.** D15 and D18 lose every training row before 2025-03-01, and every row whose
   weekly lag reaches back before that date (as in experiments 406 and 407). The scoring rows start
   in 2025-10, so no scoring actual or inference input is affected.
-- **Not in this experiment.** A 1-year half-life alone, because experiment 407's `hl365` already
-  tested it (+0.009 at the signed-MW six); an explicit solar term, which experiment 416 owns.
+- **Not in this experiment.** The sunny flag alone and a 1-year half-life alone, because experiment
+  381 (-0.002) and experiment 407's `hl365` (+0.009) already tested them.
 
 ## Components adopted from earlier results
 
@@ -133,11 +139,17 @@ shortwave at the valid time, but not that daily summary and not a cloud-aware su
 
 ## Fit counts, time, and memory
 
-- **Fits.** 6 arms by 5 folds by 3 seeds, so 90 fits, and 15 more for `temp` if it runs. The
-  widenings need no refit.
-- **Time.** About 40 to 50 seconds per fit on the GPU, so about 1.5 hours in total.
-- **Memory.** One GPU process with at most 8 GB of host memory and one feeder core. The scorer runs
-  in passes of a few arms each, because holding every arm's rows at once needs more than 14 GB.
+- **Fits.** `sol`, `hl91r`, `sol_hl91`, `bundle`, and `ctrl_s3`: 5 arms by 5 folds by 3 seeds, so 75
+  fits. The widening is the fixed factor 1.15, not a fitted factor.
+- **Time.** About 40 to 50 seconds per fit on the GPU, so about 1 hour in total.
+- **Run recipe.** One GPU process under `systemd-run --user --scope -p MemoryMax=8G -p
+  OOMPolicy=continue` with one feeder core. The scorer runs in passes of a few arms, because
+  holding every arm's rows at once needs more than 14 GB.
+- **Stored.** Forecasts per arm, fold, and seed (`time_series_id`, `power_fcst_init_time`,
+  `valid_time`, `lead_hours`, `q01` to `q99`) and every fitted network, in this experiment's private
+  folder. The scorer matches the scored keys and the row count of every arm to the reference and
+  prints the row counts per fold. The screen months are the five of experiment 407, so its stored
+  reference is reused.
 
 ## Checks the write-up reports
 
@@ -146,7 +158,13 @@ shortwave at the valid time, but not that daily summary and not a cloud-aware su
 - Coverage and pinball loss at the four outer levels, on all half-hours and on sunny low-demand
   half-hours (the sunny half-hours whose reference median is in the lowest quarter for the Primary).
 - The CRPS on sunny April-to-June half-hours, on cold nights, and on Economy 7 step hours.
-- The cost of avoidable curtailment at the scaled export limit, if the scorer prints it.
+- The cost of avoidable curtailment at the scaled export limit (`studies.node_curtailment`, 0.9 of
+  the limit, swept to 0.75 and 0.5), if the scorer offers it.
+- The CRPS on sunny April-to-June half-hours and on sunny low-demand half-hours, both defined from
+  experiment 381's flag and the reference's median for every arm, as in experiment 407.
+- The tails (coverage at q95 and q99) as a separate screen beside the CRPS.
+- Audit checks: the difference between the median's error and the mean's error beside each
+  contrast, and the results re-derived by a fresh Sonnet agent before the write-up.
 - Example forecasts for D10 (signed-MW) and D4 (MVA-only): a day-ahead forecast and a full 14-day
   forecast from one run, in winter (made in January) and summer (made in June), of the best arm.
 
@@ -155,8 +173,9 @@ shortwave at the valid time, but not that daily summary and not a cloud-aware su
 - **The solar summary is built from the ensemble mean.** Experiment 381 built it from the control
   member, so a difference from that experiment's effect may come from the mean.
 - **Experiment 381 chose its arms on the year it scored**, so its -0.051 is an upper bound.
-- **Experiment 416 is testing an explicit solar term** and found no gain at 5 months; a gain from
-  `sol` is not evidence about an explicit physical term.
+- **The plan was reviewed against the evidence since the programme brief:** experiment 407's
+  `hl365` and experiment 381 already tested the 1-year half-life and the sunny flag alone, 413's
+  physics network did not advance, and 396's arm W1 has not reported, so `temp` is left out.
 
 ## Counting towards the demand-v2 stop rule
 
