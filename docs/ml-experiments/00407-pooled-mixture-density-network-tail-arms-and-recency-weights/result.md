@@ -112,6 +112,24 @@ fix the tails and two row-weight half-lives.
 - **Input ports from XGBoost** (the solar summary column and sunny flag with a 1-year half-life,
   and trailing temperature means) are not in this experiment and follow as a separate experiment.
 
+## Components adopted from earlier results
+
+- **Adopted.** One pooled network with a Primary embedding ([experiment
+  403](../00403-pooled-versus-per-primary-mixture-density-network/result.md): it scored lower than
+  per-Primary networks); the ensemble mean and spread passed through the network once ([experiment
+  397](../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md): within
+  0.05 points of 51 passes; [experiment
+  394](../00394-xgboost-ensemble-mean-and-std-columns-separately/result.md) found the mean carries
+  most of the gain); the half-life of 0.5 years and monthly refits of the XGBoost member; the
+  1.15 widening of experiments 389 and 397; and the D15 and D18 start cut of experiment 399. Every
+  arm of this experiment is therefore pooled, one-pass, widened where stated, and cut, and the
+  arm names say what changed from that base.
+- **Not adopted.** Attention over input groups ([experiment
+  397](../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md): the gate
+  stayed within 0.01 of uniform), which survives only as the `a0` arm that redoes experiment 403's
+  contrast; and dropping the spread columns, which experiment 394 suggests is harmless but which no
+  arm here tests.
+
 ## Standing practices followed, and the deviations
 
 **This experiment follows the standing practices of the `ml-experiment` skill and `common.md`, and
