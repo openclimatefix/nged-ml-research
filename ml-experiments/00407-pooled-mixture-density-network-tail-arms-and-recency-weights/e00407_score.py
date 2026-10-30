@@ -21,6 +21,7 @@ uv run --no-sync python ml-experiments/00407-*/e00407_score.py
 ```
 """
 
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -123,7 +124,10 @@ def seed_average(*, arm_dir: Path) -> pl.DataFrame:
 def widen_global(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Return the quantiles with q01, q05, q95, and q99 widened by 1.15 about the median."""
     return frame.with_columns(
-        *[pl.col("q50") + GLOBAL_FACTOR * (pl.col(c) - pl.col("q50")) for c in OUTER_LEVELS]
+        *[
+            (pl.col("q50") + GLOBAL_FACTOR * (pl.col(c) - pl.col("q50"))).alias(c)
+            for c in OUTER_LEVELS
+        ]
     )
 
 
@@ -144,6 +148,9 @@ def load_frames(*, series: pl.DataFrame) -> dict[str, pl.DataFrame]:
     dirs["per_primary_cut"] = SEED_406 / "per_primary"
     dirs["pooled_plain_cut_406"] = SEED_406 / "pooled_emb"
     found = {n: d for n, d in dirs.items() if is_complete(arm_dir=d)}
+    wanted = set(sys.argv[1:])
+    if wanted:
+        found = {n: d for n, d in found.items() if n in wanted or n == "ctrl"}
     print("arms found:", ", ".join(found))
     stored = {n: seed_average(arm_dir=d) for n, d in found.items()}
     for arm in NEW_ARMS:
@@ -152,6 +159,7 @@ def load_frames(*, series: pl.DataFrame) -> dict[str, pl.DataFrame]:
     return {
         n: adapter.forecast_frame(stored=f, series=series, unit="fraction")
         for n, f in stored.items()
+        if not wanted or n in wanted or n == REFERENCE
     }
 
 
@@ -310,7 +318,7 @@ def draw_examples(*, frame: pl.DataFrame, ctx: dict, series: pl.DataFrame) -> No
     ids = dict(zip(series["label"].to_list(), series["time_series_id"].to_list(), strict=True))
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     for origin_text in EXAMPLE_ORIGINS:
-        origin = datetime.fromisoformat(origin_text).replace(tzinfo=UTC)
+        origin = datetime.fromisoformat(origin_text).replace(hour=9, tzinfo=UTC)
         for label, kind in EXAMPLES.items():
             one = (
                 frame.filter(
