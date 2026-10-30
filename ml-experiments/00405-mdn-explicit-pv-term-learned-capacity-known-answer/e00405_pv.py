@@ -135,17 +135,24 @@ def season_year_index(*, valid_us: np.ndarray) -> np.ndarray:
     return (label - 2023).to_numpy().astype(np.int64)
 
 
-def studies_prior(*, site: str, n_cells: int) -> tuple[np.ndarray, np.ndarray]:
+def latest_complete_label(*, refit: datetime) -> int:
+    """Return the latest September-to-August season-year label that ended before the refit."""
+    return refit.year - 1 if refit.month >= 9 else refit.year - 2
+
+
+def studies_prior(*, site: str, n_cells: int, refit: datetime) -> tuple[np.ndarray, np.ndarray]:
     """Return the prior centre and standard deviation (MW) per season-year cell (2023/24 onward).
 
     The centre is the studies page's capacity and the standard deviation is a quarter of its 95%
     interval. For a flagged season-year the page gives no capacity, so the centre is the middle of
-    the library range and the standard deviation is a quarter of the range. A season-year after the
-    page's last uses the last value.
+    the library range and the standard deviation is a quarter of the range. A cell whose season-year had not ended before the refit uses the latest completed
+    season-year's value, so no prior or pinned capacity uses data on or after the refit.
     """
     table = pl.read_csv(STUDIES_TABLE).filter(pl.col("site") == site).sort("season_year")
     centre, sd = [], []
+    cap = latest_complete_label(refit=refit)
     for label in range(2023, 2023 + n_cells):
+        label = min(label, cap)
         years = table["season_year"].to_numpy()
         nearest = int(years[np.argmin(np.abs(years - label))])
         r = table.filter(pl.col("season_year") == nearest).row(0, named=True)
@@ -158,7 +165,7 @@ def studies_prior(*, site: str, n_cells: int) -> tuple[np.ndarray, np.ndarray]:
     return np.array(centre), np.maximum(np.array(sd), 0.05)
 
 
-def pinned_e269(*, site: str, n_cells: int) -> np.ndarray:
+def pinned_e269(*, site: str, n_cells: int, refit: datetime) -> np.ndarray:
     """Return experiment 269's physical-shape estimate (MW) per Sep-Aug season-year cell.
 
     Experiment 269 labels season-years from July. The cell for September to August year Y takes the
@@ -170,7 +177,9 @@ def pinned_e269(*, site: str, n_cells: int) -> np.ndarray:
         .sort("season_year")
     )
     out = []
+    cap = latest_complete_label(refit=refit)
     for label in range(2023, 2023 + n_cells):
+        label = min(label, cap)
         years = table["season_year"].to_numpy()
         nearest = int(years[np.argmin(np.abs(years - label))])
         out.append(float(table.filter(pl.col("season_year") == nearest)["estimate_mw"][0]))

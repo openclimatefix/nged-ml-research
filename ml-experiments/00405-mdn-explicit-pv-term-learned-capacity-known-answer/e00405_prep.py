@@ -51,7 +51,7 @@ ADAPTER_COLUMNS: Final[tuple[str, ...]] = (
     "temperature_sd",
     "longwave",
     "longwave_sd",
-    "clear_sky_index",
+    "clearness_index",
     "unit_sd",
     "sin_doy",
     "cos_doy",
@@ -108,7 +108,7 @@ def extras_from_raw(*, x: np.ndarray, valid_us: np.ndarray) -> np.ndarray:
             c["std_temperature_2m"],
             c["mean_longwave"] / 100.0,
             c["std_longwave"] / 10.0,
-            mean / scale,
+            np.where(c["cos_zenith"] > 0.05, np.clip(c["mean_shortwave"] / (1000.0 * np.maximum(c["cos_zenith"], 0.05)), 0.0, 1.5), 0.0),
             sd / scale,
             np.sin(2 * np.pi * doy / 365.25),
             np.cos(2 * np.pi * doy / 365.25),
@@ -179,6 +179,24 @@ def farm_norm_series(*, farm: str) -> tuple[np.ndarray, np.ndarray]:
     return frame["time"].dt.epoch("us").to_numpy(), frame["norm"].to_numpy().astype(np.float64)
 
 
+def placebo_day_map(*, days: np.ndarray) -> np.ndarray:
+    """Map each day to another day of the same calendar month, by one fixed shuffle per month.
+
+    The map depends only on the calendar month, never on which times were asked for, so the target
+    and every lag see the same shuffled sky.
+    """
+    unique = np.unique(days)
+    months = pl.Series(unique * 86_400 * 1_000_000).cast(pl.Datetime("us")).dt.truncate("1mo")
+    mapped = {}
+    for m in months.unique().to_list():
+        first = int(pl.Series([m]).dt.epoch("us")[0]) // (86_400 * 1_000_000)
+        n = ((m.replace(day=28) + timedelta(days=4)).replace(day=1) - m).days
+        calendar = np.arange(first, first + n)
+        rng = np.random.default_rng(405 + first)
+        mapped.update(zip(calendar.tolist(), rng.permutation(calendar).tolist(), strict=True))
+    return np.array([mapped[d] for d in days.tolist()])
+
+
 def farm_at(*, times_us: np.ndarray, series: tuple[np.ndarray, np.ndarray], placebo: bool) -> np.ndarray:
     """Return a farm's normalised power at the times; NaN in a dropout or a daytime gap, 0 at night.
 
@@ -191,16 +209,7 @@ def farm_at(*, times_us: np.ndarray, series: tuple[np.ndarray, np.ndarray], plac
         day_us = 86_400 * 1_000_000
         day = query // day_us
         tod = query - day * day_us
-        month = pl.Series(day * day_us).cast(pl.Datetime("us")).dt.truncate("1mo").dt.epoch("us").to_numpy()
-        rng = np.random.default_rng(405)
-        mapped = day.copy()
-        for m in np.unique(month):
-            days = np.unique(day[month == m])
-            shuffled = rng.permutation(days)
-            lookup = dict(zip(days.tolist(), shuffled.tolist(), strict=True))
-            sel = month == m
-            mapped[sel] = np.array([lookup[d] for d in day[sel].tolist()])
-        query = mapped * day_us + tod
+        query = placebo_day_map(days=day) * day_us + tod
     pos = np.clip(np.searchsorted(t_all, query), 0, len(t_all) - 1)
     found = t_all[pos] == query
     out = np.where(found, v_all[pos], np.nan)
@@ -239,6 +248,7 @@ def write_injection(*, site: str, farm: str, share: float, placebo: bool) -> str
         gap = np.zeros(len(times), dtype=bool)
         for other in union:
             gap |= np.isnan(farm_at(times_us=times, series=other, placebo=False))
+            gap |= np.isnan(farm_at(times_us=times, series=other, placebo=True))
         return np.where(gap, np.nan, values)
 
     unique, inverse = np.unique(valid, return_inverse=True)

@@ -97,17 +97,21 @@ at forecast time.
 
 **Net-demand mixture.** The demand module is the pooled plain network and outputs a mixture over
 standardised demand `z` (power divided by effective capacity, then standardised per Primary, as in
-experiment 397). The solar module outputs a mean `m` and a standard deviation `s` of the solar output
+experiment 397). The solar module outputs a mean `m` and a standard deviation `s` of the solar
+output
 in the same units. The net-demand mixture keeps the weights of the demand mixture. Component `k` has
 mean `mu_k - m` and variance `sigma_k^2 + s^2`, on the assumption that demand and solar errors are
 independent. This is one pass of the network per run, and the spread of the solar output comes from
 the ENS spread input.
 
-**Solar module.** The unit shape is computed offline, outside the network, and is fixed. It is the AC
-output per MW of AC capacity of a plant with tilt 35 degrees, azimuth 180 (south), a DC to AC ratio of
+**Solar module.** The unit shape is computed offline, outside the network, and is fixed. It is the
+AC
+output per MW of AC capacity of a plant with tilt 35 degrees, azimuth 180 (south), a DC to AC ratio
+of
 1.15, and the existing 0.4% per degree derating, using the `studies.pv_physics` chain (the Erbs
 split, isotropic sky, inverter clip) from the ENS mean shortwave and 2 m temperature, at the
-Primary's latitude and longitude. These values are the population values of `briefs/dp_pv_design_note.md`
+Primary's latitude and longitude. These values are the population values of
+`briefs/dp_pv_design_note.md`
 (experiment 73 found that orientation is not identified at a Primary). The unit shape is evaluated
 at the ENS mean shortwave and at the mean plus and minus one ENS standard deviation (a 3-point
 quadrature), giving a mean `u` and a spread `u_sd` of the unit shape. The unit shape is scaled so
@@ -116,25 +120,37 @@ page.
 
 **Capacity and the prior.** The solar mean is `C[p, y] * u * g`, where `C[p, y]` is the capacity of
 Primary `p` in season-year `y`, and `g` is the adapter multiplier (1 in C1 and C2). The solar output
-is clipped at `C[p, y]`. The studies page table (`docs/studies/assets/embedded_pv_capacity_table.csv`)
+is clipped at `C[p, y]`. The studies page table
+(`docs/studies/assets/embedded_pv_capacity_table.csv`)
 gives a centre and a 95% interval for each Primary and season-year. The prior for `C[p, y]` is a
 Gaussian centred on the centre of that table with a standard deviation of one quarter of the 95%
-interval's width. For D5, whose season-years are flagged, the centre is the midpoint of the library
-range and the standard deviation is the range's width over four. The prior is added to the training
-loss as a penalty and scaled so that it carries the weight of one season-year's rows. At test time
+interval's width. The prior and the pinned capacity of C1 use only season-years that ended before
+the refit: a cell
+whose season-year has not ended takes the latest completed season-year's value (no hindsight). For
+D5,
+whose season-years are flagged, the centre is the midpoint of the library
+range and the standard deviation is the range's width over four. The prior is a Gaussian log-prior
+in
+nats, added to the summed loss, so that in the mean loss it is divided by the effective row count.
+It is weak by design: the data dominate wherever they are informative, and the C4 minus C3 contrast
+measures how much the prior matters at all. At test time
 the capacity is the as-of value of the last season-year in the training window, held flat across
 the scored month (experiment 129's advice: no hindsight capacity).
 
 **Adapter (C3, C4, C5).** A two-layer network of width 16 reads the ENS mean and spread of 2 m
-temperature, longwave radiation, the clear-sky index `u / u_clear`, the sine and cosine of the day of
-year, and the cosine of the zenith. It outputs `g = exp(0.5 * tanh(a))`, so `g` lies between 0.61 and
+temperature, longwave radiation, the clearness index (shortwave over 1000 W/m2 times the cosine of
+the zenith), the unit shape's
+spread, the sine and cosine of the day of
+year, and the cosine of the zenith. It outputs `g = exp(0.5 * tanh(a))`, so `g` lies between 0.61
+and
 1.65, and the solar output is clipped to lie between 0 and `C[p, y]`. The output layer starts at
 zero weights, so training starts from `g = 1`. The adapter shares its weights across Primaries.
 
 **Demand module in the C arms.** Irradiance and the solar summary are removed from the demand
 module's inputs. That means the mean and spread of shortwave radiation and the three solar-geometry
 columns (cosine of zenith, sine and cosine of azimuth), which together let a network rebuild the
-clear-sky solar bell. The matching control A0-noirr has the same removal and no solar module. Removing
+clear-sky solar bell. The matching control A0-noirr has the same removal and no solar module.
+Removing
 the geometry also removes the network's only season signal besides temperature, and A0-noirr pays
 that cost too, so the contrast of a C arm against A0-noirr is like for like. This choice is the
 plan's reading of "irradiance and the solar summary", and a reviewer may overrule it.
@@ -142,7 +158,8 @@ plan's reading of "irradiance and the solar summary", and a reviewer may overrul
 **The eight MVA-only Primaries.** The solar module does not run there, and they predict the observed
 magnitude directly, as in experiment 397. They are reported separately, and no C-arm contrast
 includes them, because A0-noirr removes irradiance there without a solar module to replace it. A
-neural signed model for them waits for the signed-label gate of `briefs/xgboost_mva_signed_label_cams_brief.md`.
+neural signed model for them waits for the signed-label gate of
+`briefs/xgboost_mva_signed_label_cams_brief.md`.
 
 ## Arms
 
@@ -153,15 +170,17 @@ neural signed model for them waits for the signed-label gate of `briefs/xgboost_
 | C1 | as A0-noirr | yes, no adapter | pinned to the experiment 269 estimate (`real_capacities.parquet`, `estimate_mw`, per site and season-year), not trained |
 | C2 | as A0-noirr | yes, no adapter | learned per Primary and season-year, with the Gaussian prior |
 | C3 | as A0-noirr | yes, with the adapter | as C2 |
-| C4 | as A0-noirr | as C3 | as C3 with no prior |
+| C4 | as A0-noirr | as C3 | as C3 with no prior, every capacity starting at a neutral 3 MW |
 | C5a | as A0-noirr | as C3 | monthly path (free in time), symmetric smoothness penalty on month-to-month changes; changes only the time variation |
 | C5b | as A0-noirr | as C3 | per season-year, with the persistence penalty (below); changes only the penalty |
 
 **C3's penalty and C5's.** C3 has one capacity per season-year with no penalty on year-to-year
 change beyond the Gaussian prior. C5b adds the persistence penalty
-`lambda_up * relu(C[y] - C[y-1])^2 + lambda_down * relu(C[y-1] - C[y])^2` with `lambda_down` 10
-times `lambda_up`, so a rise is cheap and a fall is dear. C5a replaces the season-year capacity
-with a monthly path and penalises the squared month-to-month change symmetrically. A full C5
+a Gaussian penalty on the relative step `r = (C[y] - C[y-1]) / C[y-1]`, with standard deviation 0.25
+for a rise and 0.25 / sqrt(10) for a fall (a fall costs 10 times a rise of the same size), so a rise
+is cheap and a fall is dear. C5a replaces the season-year capacity
+with a monthly path and penalises the relative month-to-month change with standard deviation 0.05,
+symmetrically. A full C5
 (monthly path and persistence penalty together) is run only if both C5a and C5b move the score by
 more than their minimum detectable effects. Every sudden fall of a learned capacity (more than 10%
 in one step) is reported as a candidate meter failure, together with the date, because NGED
@@ -183,13 +202,15 @@ because the trained capacities are read from the fitted network and no scoring i
 - **Held-out farm.** The solar module's shape is physical (fixed population values), so no farm
   defines it. The studies-page prior was calibrated on the six farms, so a prior centred on that
   page could pull the recovery towards the page's value. C4 has no prior and so removes that
-  circularity. Farm E (short history) is not used. The held-out farm is farm C. Farms A, B, and D are
+  circularity. Farm E (short history) is not used. The held-out farm is farm C. Farms A, B, and D
+  are
   the divisor farms: each is injected on its own into every Primary, in separate fits, and the
   divisor at a Primary is the median recovery of the three. A farm's label may appear in code and
   logs inside the private folder, and no published page carries a farm's series or name.
 - **Recovery** is the learned capacity increment (injected minus not injected, at the last
   season-year in the window) divided by `X`, then divided by the divisor.
-- **Gates, copied from experiment 129's page** (its "Gates" table): recovery after the divisor within
+- **Gates, copied from experiment 129's page** (its "Gates" table): recovery after the divisor
+  within
   0.75 to 1.25 at 5 of the 6 Primaries (experiment 129 used 4 of 5); the placebo difference of fits
   at most 0.20 of the real-sky recovery, median and maximum over Primaries (the placebo injects the
   held-out farm's output with its days shuffled within the month, so the cloud pattern is wrong and
@@ -197,13 +218,16 @@ because the trained capacities are read from the fitted network and no scoring i
 - **The drift gate cannot run as written.** Experiment 129's drift gate is under 0.05 per 5 years of
   constant-farm recovery, and the networks here train on a 730-day window with ensemble weather
   only from 2024-04, so there are 2 season-years, not 5 years, to measure drift on. The gate is
-  restated as: the recovery of the held-out farm differs between its two season-years by under 0.10 of
+  restated as: the recovery of the held-out farm differs between its two season-years by under 0.10
+  of
   `X`. This restatement is a post-hoc scaling, so it is reported and does not gate.
 - **Arms in the test.** C2 and C4, 3 seeds each, for these conditions: no injection, held-out farm,
   three divisor farms, and placebo (6 conditions per arm and seed), and C2 with experiment 129's
-  increment penalty (0.1) on the held-out farm. That is (6 + 1 + 6) x 3 seeds = 39 fits.
+  increment penalty (0.1) on the held-out farm. That is (6 + 6 + 2) x 3 seeds = 42 fits (each of C2
+  and C4 has 6 conditions; C2 with the increment penalty has a control and the held-out farm).
 - **Decision.** The score arms (C1, C3, C4, C5a, C5b, A0, A0-noirr) run only if C2 passes the
-  recovery gate and the placebo gate. If C2 fails, the page writes up the failure, with C4 beside it,
+  recovery gate and the placebo gate. If C2 fails, the page writes up the failure, with C4 beside
+  it,
   and the score arms stop. C1 and C2 can be scored if only the drift restatement fails.
 
 ## Pre-registered contrasts and rules
@@ -234,11 +258,32 @@ q95, and q99, raw and at the 1.15 widening, against the widened reference. The c
 export limit uses `studies.node_curtailment` at f = 0.9. Learned capacity per Primary against the
 studies page, with intervals from seeds, and the capacity path with each sudden fall flagged.
 
+## Example charts
+
+**The write-up shows probabilistic forecasts against actuals.** For one signed-MW Primary and one
+MVA-only Primary, it shows a day-ahead forecast and one full 14-day forecast from a single run, with
+the
+quantile bands (they should widen with the horizon) and the actual power. Charts of metered
+generators
+are anonymised.
+
+## Reviews
+
+The code was reviewed by a fresh Sonnet agent before any fit. It found two high-severity problems (a
+prior and a pinned capacity that used the whole season-year, including months after the refit, and a
+placebo shuffle that differed between the target and the lags) and five medium ones (the prior's
+weight
+differing from the plan, relative rather than absolute penalty steps, an adapter input that
+duplicated
+the unit shape, the no-prior arm starting at the studies value, and weight initialisation not
+seeded).
+All seven are fixed, and the plan text above now matches the code.
+
 ## Compute and fit counts
 
 - **Score arms.** 8 arms x 5 refits x 3 seeds = 120 fits. At 50 to 200 seconds per fit that is 2 to
   7 hours.
-- **Known-answer test.** 39 fits, 0.5 to 2.2 hours. Total 159 fits.
+- **Known-answer test.** 42 fits. Total 162 fits.
 - **Resources.** One GPU process under 8 GB, one feeder core, `MemoryMax=8G` (the manager's limit
   until it is raised), `OMP_NUM_THREADS=1`. The injected tables are written once per refit and read
   by every fit that needs them.
@@ -250,7 +295,8 @@ paths are listed in the write-up after the scoring script reads them, and nothin
 
 ## Earlier advice followed and departed from
 
-- **Followed.** Use an as-of capacity, never a hindsight capacity (experiment 129). Test a penalty on
+- **Followed.** Use an as-of capacity, never a hindsight capacity (experiment 129). Test a penalty
+  on
   jumps on a step-up injection before adopting it (experiment 129; the increment-penalty arm).
   Report absolute skill beside contrasts.
 - **Departed from.** Experiment 129's five-year drift gate is restated for a two-season-year window
