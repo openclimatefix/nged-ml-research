@@ -6,7 +6,7 @@ aliases of experiment 405 specs: `A0-noirr-doy` is `A0-noirr` and `C2-nodoy` is 
 the day-of-year inputs (every other arm has them).
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<the private data folder>
 export PYTHONPATH=ml-experiments/00087-...:ml-experiments/00397-...:ml-experiments/00405-...:ml-experiments/00409-...
 OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00409-*/e00409_fit.py kat --device cuda
