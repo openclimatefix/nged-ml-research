@@ -7,7 +7,7 @@ It scores arms D0 to D3 and the stored references on the same half-hours with
 - C1 per Primary;
 - coverage at q95 and q99 and pinball loss at q01, q05, q95, and q99 per group;
 - the checks: the error of the median forecast, and the gap between the median and the mean of the
-  11 quantiles (a trapezoid approximation of the mean forecast) per group.
+  11 quantiles (weighted by `common.ATOM_MASSES`) per group.
 
 One fold and one seed give no interval, so every number is interim.
 
@@ -25,7 +25,6 @@ import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00381_score as s381  # ty: ignore[unresolved-import]
 import e00397_score as score397  # ty: ignore[unresolved-import]
 import e00413_fit as fit  # ty: ignore[unresolved-import]
-import numpy as np
 import polars as pl
 
 HEADLINE: Final[str] = score397.HEADLINE
@@ -53,11 +52,9 @@ def arm_frame(*, arm: str, series: pl.DataFrame) -> pl.DataFrame:
 
 
 def approximate_mean(*, frame: pl.DataFrame) -> pl.Series:
-    """Return the trapezoid mean of the 11 quantiles (a mean forecast to a few per cent)."""
-    levels = np.array([float(c[1:]) / 100.0 for c in common.LEVEL_COLUMNS])
+    """Return the mean of the 11 quantiles weighted by `common.ATOM_MASSES` (MW, as the frames)."""
     values = frame.select(common.LEVEL_COLUMNS).to_numpy()
-    edges = np.concatenate([[0.0], (levels[:-1] + levels[1:]) / 2.0, [1.0]])
-    return pl.Series("mean", values @ np.diff(edges))
+    return pl.Series("mean", values @ common.ATOM_MASSES)
 
 
 def run() -> None:
@@ -131,7 +128,7 @@ def run() -> None:
             .pivot(on="metric", index=["arm", "group"], values="value")
             .sort("group", "arm")
         )
-    print("\n== checks: median minus approximate mean forecast, fraction of capacity ==")
+    print("\n== checks: median minus approximate mean forecast, MW ==")
     for name in ("D0", "D1", "D2", "D3"):
         frame = everything[name]
         gap = frame["q50"] - approximate_mean(frame=frame)

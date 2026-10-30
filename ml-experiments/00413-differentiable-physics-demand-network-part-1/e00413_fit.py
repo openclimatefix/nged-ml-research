@@ -50,6 +50,7 @@ TEMPERATURE_GRID_C: Final[np.ndarray] = np.linspace(-10.0, 35.0, 91)
 def make_model(*, arm: str, fold: prep.Fold, seed: int) -> torch.nn.Module:
     """Return an untrained network for an arm, with a fixed reference sample of training rows."""
     n_primaries = len(fold.target_mean)
+    torch.manual_seed(seed)
     if arm == "D0":
         return models.PlainWrapper(
             n_base=len(prep.NAMES),
@@ -62,7 +63,6 @@ def make_model(*, arm: str, fold: prep.Fold, seed: int) -> torch.nn.Module:
     chosen = np.random.default_rng(413 + seed).choice(
         train_rows, size=min(models.REFERENCE_ROWS, len(train_rows)), replace=False
     )
-    torch.manual_seed(seed)
     return models.PhysicsMdn(
         arm=arm,
         columns=fold.columns,

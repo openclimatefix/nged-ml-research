@@ -95,6 +95,10 @@ def columns_of(*, standardiser: base.Standardiser) -> models.Columns:
     n_base = len(NAMES)
     t = col(name="mean_temperature_2m")
     s = col(name="mean_shortwave")
+    reference = (REFERENCE_TEMPERATURE_C - standardiser.mean[t]) / standardiser.std[t]
+    if not -5.0 < reference < 5.0:
+        msg = f"reference temperature {reference:.2f} sd is outside the clip range"
+        raise ValueError(msg)
     return models.Columns(
         calendar_holidays=[col(name=n) for n in CALENDAR_HOLIDAYS],
         lags_lead_spread=[

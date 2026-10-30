@@ -27,7 +27,9 @@ REFERENCE_ROWS: Final[int] = 4096
 """Training rows whose shapes set each shape's mean and root-mean-square."""
 RMS_FLOOR: Final[float] = 1e-2
 GATE_LIMIT: Final[float] = 1.0
-"""The gate's exponent `c . shape` is bounded to plus or minus this by a tanh."""
+"""Each gate coefficient is bounded to plus or minus this by a tanh."""
+GATE_EXPONENT_LIMIT: Final[float] = 3.0
+"""The gate's exponent `c . shape` is clamped to plus or minus this."""
 
 
 @dataclass(frozen=True)
@@ -170,7 +172,7 @@ class PhysicsMdn(nn.Module):
             self.to_gate = nn.Linear(EMBEDDING, K_SHAPES)
             width = len(columns.lags_lead_spread) + 1
         else:
-            width = columns.n_base + 1
+            width = columns.n_base + 1 + EMBEDDING
         self.head = base.mlp(n_in=width, hidden=hidden, layers=layers, n_out=3 * components)
         base.init_head(head=self.head, components=components)
         nn.init.zeros_(self.to_shape_weights.weight)
@@ -222,13 +224,15 @@ class PhysicsMdn(nn.Module):
         if self.with_responses:
             b = torch.softmax(self.to_response_weights(mix), dim=-1)
             c = GATE_LIMIT * torch.tanh(self.to_gate(mix))
-            gate = torch.exp((c * shape).sum(-1))
+            gate = torch.exp((c * shape).sum(-1).clamp(-GATE_EXPONENT_LIMIT, GATE_EXPONENT_LIMIT))
             all_c = GATE_LIMIT * torch.tanh(
                 self.to_gate(
                     self.embedding(torch.arange(len(self.embedding.weight), device=x.device))
                 )
             )
-            norm = torch.exp(reference_shape @ all_c.T).mean(0)
+            norm = torch.exp(
+                (reference_shape @ all_c.T).clamp(-GATE_EXPONENT_LIMIT, GATE_EXPONENT_LIMIT)
+            ).mean(0)
             mu = mu + amplitude[:, 1] * (b * self.responses(x)).sum(-1) * gate / norm[index]
         return mu
 
@@ -238,7 +242,10 @@ class PhysicsMdn(nn.Module):
         if self.with_responses:
             head_in = torch.cat([x[:, self.cols.lags_lead_spread], mu[:, None]], dim=1)
         else:
-            head_in = torch.cat([x[:, : self.cols.n_base], mu[:, None]], dim=1)
+            index = torch.zeros_like(primary) if self.shared else primary
+            head_in = torch.cat(
+                [x[:, : self.cols.n_base], self.embedding(index), mu[:, None]], dim=1
+            )
         out = self.head(head_in)
         k = self.components
         return torch.cat([out[:, :k], out[:, k : 2 * k] + mu[:, None], out[:, 2 * k :]], dim=1)
