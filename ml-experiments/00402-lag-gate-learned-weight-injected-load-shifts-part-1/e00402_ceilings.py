@@ -130,6 +130,19 @@ def main() -> None:
         m = harm & (lag_count == c)
         flag_by_count[m] = [by_count[c].get(k, 0.5) for k in lead[m]]
     flag_by_count[~harm] = w_flag[~harm]
+    group = np.where(np.isin(t["label"].to_numpy(), SIX), "six", "eight")
+    w_const_g = np.empty(t.height)
+    w_flag_g = np.empty(t.height)
+    for g in ("six", "eight"):
+        gm = group == g
+        c = fit_const(a=a[scored & gm], b=b[scored & gm], key=lead[scored & gm])
+        wc = fit_const(a=a[clean & gm], b=b[clean & gm], key=lead[clean & gm])
+        wh = fit_const(a=a[harm & gm], b=b[harm & gm], key=lead[harm & gm])
+        w_const_g[gm] = [c.get(k, 0.5) for k in lead[gm]]
+        w_flag_g[gm] = np.where(
+            harm[gm], [wh.get(k, 0.5) for k in lead[gm]], [wc.get(k, 0.5) for k in lead[gm]]
+        )
+        print(g, "harm weights per lead day:", {k: round(v, 3) for k, v in wh.items()})
     w_oracle = np.clip(-b / (2.0 * np.maximum(a, 1e-12)), 0.0, 1.0)
     arms = {
         "forecast with lags (w = 1)": np.ones(t.height),
@@ -138,6 +151,8 @@ def main() -> None:
         "fitted constant mixture (per lead day)": w_const,
         "flag oracle (per lead day)": w_flag,
         "flag oracle by number of lags (per lead day)": flag_by_count,
+        "fitted constant mixture per group (per lead day)": w_const_g,
+        "flag oracle per group (per lead day)": w_flag_g,
         "per-row oracle weight": w_oracle,
     }
     score = {name: crps_at(t=t, w=w) for name, w in arms.items()}
@@ -154,11 +169,29 @@ def main() -> None:
             for name, s in score.items():
                 print(f"  CRPS {name}: {s[m].mean():.3f}")
             for name in list(score)[2:]:
-                for ref in ("forecast with lags (w = 1)", "fitted constant mixture (per lead day)"):
+                for ref in (
+                    "forecast with lags (w = 1)",
+                    "fitted constant mixture (per lead day)",
+                    "fitted constant mixture per group (per lead day)",
+                ):
                     if name == ref:
                         continue
                     est, lo, hi = boot(diff=(score[name] - score[ref])[m], cluster=cluster[m], rng=rng)
                     print(f"  {name} minus {ref}: {est:+.3f} (95% {lo:+.3f} to {hi:+.3f})")
+    print("\n== per Primary, harm rows: CRPS lags / without / const per group / flag per group; clean rows: lags / without")
+    ev = pl.read_parquet(W400 / "events_corrected.parquet")
+    for lab in SIX + EIGHT:
+        mh = harm & (label == lab)
+        mc = clean & (label == lab)
+        e = ev.filter(pl.col("label") == lab)
+        print(
+            f"  {lab}: harm n={int(mh.sum())} "
+            + " / ".join(f"{score[k][mh].mean():.2f}" for k in list(score)[:2] + list(score)[7:9])
+            + f" | clean "
+            + " / ".join(f"{score[k][mc].mean():.2f}" for k in list(score)[:2])
+            + f" | events {e.height}, median depth {e['depth_share'].median():.1f}% of capacity,"
+            f" median length {e['length_days'].median():.1f} days"
+        )
     print("\nfitted constant weights per lead day:", {k: round(v, 3) for k, v in const.items()})
     print("flag oracle harm weights:", {k: round(v, 3) for k, v in w_harm.items()})
 

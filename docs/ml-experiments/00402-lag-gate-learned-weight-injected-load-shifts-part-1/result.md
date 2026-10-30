@@ -138,6 +138,14 @@ code: ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/
        scanned events separately, with and without D8 and D5. Optional real-label arm, separate:
        it could not be repeated at scale, and 46 of the 112 labels were found by scanning the
        series the gate reads.
+- **Per-group splits (maintainer, relayed 2026-10-30).** Before steps 4 and 5, every gate arm in
+  step 4 is run three ways: one pooled gate, one gate with the metering unit (signed MW or MVA-only)
+  as an input, and a separate gate per group. The fitted constant mixture and the flag oracle get the
+  same split (one weight per group against one pooled weight), so that the upper bound is stated per
+  group. Every table reports per Primary as well as per group; D15 and D18 are report-only.
+- **Why the MVA-only eight differ.** Step 1 reports, per Primary, whether the lags help the forecast
+  with lags outside events, how many events each Primary has, and how deep and long they are
+  relative to capacity.
 - **Pre-registered contrasts (step 5).** Each of arms (c), (d), (e), and the logistic baseline
   minus the forecast with lags, minus the fitted constant mixture, and minus the forecast without
   lags, on (i) rows whose target is outside every event and whose lags touch one, by number of lags,
