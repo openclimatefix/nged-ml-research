@@ -26,7 +26,7 @@ hypothesis: >-
 prediction: >-
   Written before any score is read. P1. Outside events and the 48 hours after them, no masked arm
   differs from the unmasked control R0 by more than 0.02 points of effective capacity in CRPS
-  (experiment 75 found +0.004 for the GAM). P2. Inside events, the lagless forms of R1 and R2
+  (experiment 75 found +0.004, 98.33% interval -0.026 to +0.025, for the plain weekly-refitted XGBoost model). P2. Inside events, the lagless forms of R1 and R2
   follow under 25% of the labelled depth; the lagged form of R0 follows over 50%. P3. R2 recovers
   at least 75% of what R1 recovers in the injected-transfer check. P4. R5 follows under 50% of the
   depth in the lag-encroachment sweep at k = 3, between R0 and R2. P5. The random-block control
@@ -205,6 +205,6 @@ Primaries. The manager sizes the slot from these counts.
 
 ## Sources
 
-Builds on experiment 383's oracle-mask arms, experiment 75 and 44 (masking in the GAM), experiment
+Builds on experiment 383's oracle-mask arms, experiment 75 (a training-target mask in the weekly XGBoost model) and experiment 44 (the share of the best guess's score a perfect detector could gain), experiment
 100 (dropped half-hours in XGBoost), experiment 391's detector and surprise columns, and the
 `dp_nra` experiment's injected-transfer scoring.
