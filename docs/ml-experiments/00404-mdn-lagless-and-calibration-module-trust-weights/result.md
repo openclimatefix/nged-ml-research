@@ -257,7 +257,10 @@ skips batches 1 and 2.
 the signed-MW six was -0.836 CRPS points (95% interval -2.578 to +1.226) on 9 events. One D5 event
 flips the sign: without it the gain is +0.460 (95% interval -0.102 to +1.631). At the eight MVA-only
 Primaries the gain was +0.024 (95% interval -0.574 to +1.529). The harness scored only 15 of the
-184 corrected events. The point estimate is under 0.1, so the rule as written would skip batches 1
+184 corrected events. Experiments 411 and 414 reached only 9 signed-MW-six events. The 4 test months
+and the sign, step, and bias filters capped that count, not gaps: 129 of the 184 events lie outside
+the test months. The ceiling is therefore a thin figure from XGBoost models alone. Batch 1 runs
+regardless, with no 12-refit extension and no looser event filters on this experiment's account. The point estimate is under 0.1, so the rule as written would skip batches 1
 and 2, but the interval spans zero. The neural Discuss session therefore ruled that batches 1 and 2
 run. The batch 1 stop rule stays as written.
 
