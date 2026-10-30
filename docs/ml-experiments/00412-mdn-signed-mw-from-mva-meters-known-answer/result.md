@@ -9,7 +9,7 @@ also_relevant_to:
   - solar-disaggregation
   - differentiable-physics-embedded-generation
   - calibration-and-uncertainty
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -56,16 +56,52 @@ metric: >-
   `studies.eval_protocol`, days 1 to 10.
 date: 2026-10-30
 code: ml-experiments/00412-mdn-signed-mw-from-mva-meters-known-answer/
+verdict: not supported
+best_arm: >-
+  none. The registered S1c failed P1 and P4, and none of the three post hoc capacity variants passed
+  either.
+headline: >-
+  With the sign hidden at D5 and D10, S1c reached pooled balanced accuracy 0.74 (March) and 0.85
+  (June) but called reverse flow on 6.7% and 16.9% of reverse-free sunny half-hours, and invented
+  reverse flow at D5 with no farm injected. Holding capacity fixed removed the false calls and the
+  skill together (balanced accuracy 0.54 to 0.61, no better than the shuffled-sky arm).
+lessons:
+  - >-
+    The network's sign skill came from a capacity fitted on the rows it labels: the same fit that
+    recovers an injected farm also reads a real midday dip at D5 as reverse flow.
+  - >-
+    A capacity prior added to the summed loss and divided by the row count has no effect with 5.6
+    million training rows, so the registered prior did not constrain the capacity.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  A neural network that writes signed power as demand minus a learned solar capacity times the CAMS
+  solar shape could not recover the sign of reverse flow without inventing it. With the sign hidden
+  at two Primaries, it found most injected reverse flow in June but also called reverse flow on 17%
+  of the half-hours that had none, and with no farm injected it called it on 18% to 47% of sunny
+  half-hours at D5. Fixing the capacity removed the false calls and the skill together, so this is
+  the sixth fold treatment of the MVA problem that did not work.
+advice:
+  - >-
+    Do not fit a solar capacity on the same rows it labels when the sign is hidden; a placebo with no
+    injected farm shows the capacity reading a real demand dip as reverse flow (placebo, first test).
+  - >-
+    Scale a capacity prior by the row count before relying on it: added to the summed loss and divided
+    by millions of rows it is inert (variant sd03).
+  - >-
+    Report the false-reverse rate on sunny summer middays beside balanced accuracy, because accuracy
+    alone hid an 85% false-call rate there in June (first test).
 ---
 
-**Status: planned. Nothing has been scored.** At 8 of the 16 Primaries (the "MVA-only" eight: D2,
-D3, D4, D8, D12, D19, D21, D22) the meter records apparent power, so reverse flow from embedded
-solar looks like demand. Experiments 152, 372, 374, 387, and the XGBoost experiment 408 tried fold
-treatments with a gradient-boosted model. This experiment asks the same question of a neural
-network, which can write signed power as an explicit sum of demand and a solar term and fold only
-the likelihood. The plan follows the Discuss session's weekend brief (experiment 6) and the Opus
-design `briefs/neural_mva_design_answer.md`, whose section 7 (revised after a Sonnet review) replaces
-the brief's arms M0 to M3.
+**Status: done. The registered first test and three post hoc variants failed; see the take-home
+message above and "Results" at the end.** The sections below are the plan, written before any fit.
+At 8 of the 16 Primaries (the "MVA-only" eight: D2, D3, D4, D8, D12, D19, D21, D22) the meter
+records apparent power, so reverse flow from embedded solar looks like demand. Experiments 152, 372,
+374, 387, and the XGBoost experiment 408 tried fold treatments with a gradient-boosted model. This
+experiment asks the same question of a neural network, which can write signed power as an explicit
+sum of demand and a solar term and fold only the likelihood. The plan follows the Discuss session's
+weekend brief (experiment 6) and the Opus design `briefs/neural_mva_design_answer.md`, whose section
+7 (revised after a Sonnet review) replaces the brief's arms M0 to M3.
 
 ## What changed since the brief
 
@@ -240,6 +276,38 @@ two test months, and the P1 and P4 bars and the matched false-reverse comparison
 - **Decision.** If a variant passes P1 and P4, the result is labelled post hoc and reported beside
   the failed registered test. If none passes, the page is written up as the sixth failed treatment of
   the MVA problem, and S1e and the full run do not run.
+
+## Variant results (post hoc, one seed, two test months, interim)
+
+**No variant passed.** Fixing the capacity removed the false reverse-flow calls and the skill with
+them, and narrowing the prior changed nothing. Figure 1 shows every arm.
+
+![First test and variants](figure_1_first_test_and_variants.svg)
+
+- **`cfix` (capacity held at 33.5 points).** Pooled balanced accuracy 0.542 (March) and 0.612 (June),
+  false-reverse rate 0.1% and 1.7%, no false reverse flow at D5 with no injection. Its shuffled-sky
+  arm scores 0.583 and 0.575, so the real sky beats the shuffle by -0.04 and +0.04. The held capacity
+  is below the injected farm's size, so the network cannot explain the dip.
+- **`cknown` (capacity set by the six Primaries whose target is not folded; the hidden pair uses their
+  geometric mean, 27.6 to 29.5 points).** Balanced accuracy 0.551 and 0.574, false-reverse rate 0.5%
+  and 1.4%, no false reverse flow at D5 with no injection. The shuffled-sky arm scores 0.553 and
+  0.508. The pair's true capacity need not equal the six's mean, so part of the miss is a capacity
+  mismatch.
+- **`sd03` (prior log standard deviation 0.3).** Identical to S1c to three decimals, with the same
+  learned capacities (71 to 78 points at D5). The prior is added to the summed loss and divided by
+  the effective row count of 5.6 million rows, so it moves the loss by far less than 1e-6 per row
+  against a loss near 3.3. The registered prior was inert, and the registered arm's capacity was
+  free.
+- **Matched false-reverse rate.** At the threshold rule's false-reverse rate, `cfix` and `cknown`
+  recall 0.98 to 1.00 of the reverse half-hours. At their own near-zero false-reverse rate the rule
+  recalls 0.0 in March and 0.33 to 0.46 in June.
+- **Not produced.** The example forecast charts and event plots the standing rules ask for are not
+  drawn. The truth series of the hidden pair is the signed power minus a metered farm's output, and
+  publishing it would reveal that farm's series.
+- **Reviews.** The code review (fresh Sonnet) found no must-fix; a second fresh Sonnet review of the
+  variant code found no must-fix and one labelling fix (applied: the score output calls the
+  capacities "used"). A fresh Sonnet agent recomputed the first-test numbers, which matched. The
+  variant numbers come from the same scoring code, and the write-up review follows.
 
 ## First test result (interim: two test months, one seed, no intervals, not yet re-derived)
 

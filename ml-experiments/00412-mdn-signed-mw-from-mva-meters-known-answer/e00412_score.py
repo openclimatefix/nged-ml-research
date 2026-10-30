@@ -187,7 +187,7 @@ def run_first() -> None:
         results[key].append(
             {
                 "site": "capacity_points",
-                "learned": capacity,
+                "used": capacity,
                 "prior_centre": fit.prior_centre_points(refit=base.refit_of(month=month)),
             }
         )
