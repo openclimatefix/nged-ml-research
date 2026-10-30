@@ -93,6 +93,7 @@ def per_event(*, rows: pl.DataFrame, column: str) -> pl.DataFrame:
         rows.group_by("status", "target_event_id")
         .agg(v=pl.col(column).median(), n=pl.col(column).drop_nulls().len())
         .filter(pl.col("n") >= MIN_ROWS)
+        .sort("status", "target_event_id")
     )
 
 
@@ -108,12 +109,16 @@ def synthetic_table() -> pl.DataFrame:
         response=(pl.col("q50_shifted") - pl.col("q50_base")) / pl.col("depth"),
         observed=(pl.col("q50_shifted") - pl.col("actual")) / pl.col("depth"),
     )
-    return sweep.group_by("status", "event_id").agg(
-        response=pl.col("response").median(),
-        observed=pl.col("observed").median(),
-        observed_q25=pl.col("observed").quantile(0.25),
-        observed_q75=pl.col("observed").quantile(0.75),
-        n=pl.len(),
+    return (
+        sweep.group_by("status", "event_id")
+        .agg(
+            response=pl.col("response").median(),
+            observed=pl.col("observed").median(),
+            observed_q25=pl.col("observed").quantile(0.25),
+            observed_q75=pl.col("observed").quantile(0.75),
+            n=pl.len(),
+        )
+        .sort("status", "event_id")
     )
 
 

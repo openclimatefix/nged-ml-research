@@ -23,23 +23,23 @@ DOCS_DIR: Final[Path] = (
 STATUS: Final[list[str]] = ["0 lags", "1 or 2 lags", "3 lags"]
 # (series, lag status, median, lower, upper)
 OBSERVED: Final[tuple[tuple[str, str, float, float, float], ...]] = (
-    ("Real events: monthly forecast with lags", "0 lags", 0.604, 0.197, 0.786),
+    ("Real events: monthly forecast with lags", "0 lags", 0.604, 0.195, 0.786),
     ("Real events: monthly forecast with lags", "1 or 2 lags", 0.833, 0.584, 0.990),
-    ("Real events: monthly forecast with lags", "3 lags", 0.937, 0.626, 1.021),
-    ("Real events: forecast with no power lags at all", "0 lags", 0.592, 0.260, 0.766),
+    ("Real events: monthly forecast with lags", "3 lags", 0.937, 0.626, 1.011),
+    ("Real events: forecast with no power lags at all", "0 lags", 0.592, 0.216, 0.766),
     ("Real events: forecast with no power lags at all", "1 or 2 lags", 0.754, 0.453, 0.934),
     ("Real events: forecast with no power lags at all", "3 lags", 0.948, 0.426, 1.018),
-    ("Synthetic steps: monthly forecast with lags", "0 lags", -0.006, -0.023, 0.049),
+    ("Synthetic steps: monthly forecast with lags", "0 lags", -0.006, -0.028, 0.047),
     ("Synthetic steps: monthly forecast with lags", "1 or 2 lags", 0.016, 0.012, 0.072),
     ("Synthetic steps: monthly forecast with lags", "3 lags", 0.283, 0.111, 0.436),
 )  # fmt: skip
 RESPONSE: Final[tuple[tuple[str, str, float, float, float], ...]] = (
-    ("Real events: forecast with lags minus forecast without lags", "0 lags", -0.007, -0.029, 0.027),
+    ("Real events: forecast with lags minus forecast without lags", "0 lags", -0.007, -0.032, 0.026),
     ("Real events: forecast with lags minus forecast without lags", "1 or 2 lags", 0.019, -0.011, 0.058),
-    ("Real events: forecast with lags minus forecast without lags", "3 lags", 0.032, 0.000, 0.074),
+    ("Real events: forecast with lags minus forecast without lags", "3 lags", 0.032, -0.001, 0.053),
     ("Synthetic steps: change in the median when the lags are shifted", "0 lags", 0.000, 0.000, 0.000),
     ("Synthetic steps: change in the median when the lags are shifted", "1 or 2 lags", 0.014, 0.008, 0.022),
-    ("Synthetic steps: change in the median when the lags are shifted", "3 lags", 0.323, 0.139, 0.385),
+    ("Synthetic steps: change in the median when the lags are shifted", "3 lags", 0.323, 0.135, 0.385),
 )  # fmt: skip
 COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]
 
