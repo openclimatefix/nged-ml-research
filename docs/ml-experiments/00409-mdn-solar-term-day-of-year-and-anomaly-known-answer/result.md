@@ -194,11 +194,64 @@ the gate is declared uninformative (not failed) and the page says so.
 7. **A gain** needs both the Bonferroni interval excluding zero and the point estimate beyond the
    minimum detectable effect. Both thresholds must hold.
 
+## Amendment: the anomaly gate cannot be tested, so the score arms run without a gate
+
+**Written after the noise check and the profile test, and before any score arm was fitted or read.**
+
+- **The noise check failed.** The least-squares read-out of the injected anomaly is 0.03 to 0.05 MW
+  at the signed-MW six, against an injected increment of about 1 MW and a seed spread of about 0.35
+  MW in experiment 405's fits. The expected standard deviation of the recovery ratio is 3.8 to 12.4,
+  so the anomaly gate (K0, K1, K2) is uninformative, not failed. Making it testable would take an
+  injection of about 20 times the size. The anomaly fits did not run.
+- **The profile test ran (descriptive, 24 fits, 3 seeds).** C2 with and without the day-of-year term
+  on the control, real-farm, day-shuffled-farm, and pure-profile injections. The results are in
+  "Results". The day-of-year term stays in every C arm and in A0-noirr-doy.
+- **The maintainer wants the explicit solar term tested on CRPS**, so the score arms run ungated:
+  A0-noirr-doy, C1, C2, C3, C4, C5a, and C5b, 5 folds, 3 seeds, with A0 read from experiment 403.
+  A pass of the known-answer test therefore no longer licenses a claim about capacity. The page
+  reports learned capacities beside the studies page as description only.
+- **Dropped:** the cost at the scaled export limit (`studies.node_curtailment`), which needs a node
+  and its generators and so cannot be scored per Primary here. The tail report stays.
+
+### Pre-registered no-gate decision rule
+
+The contrasts, all at the signed-MW six, CRPS at days 1 to 10, in points of effective capacity,
+with the month-block bootstrap of `studies.eval_protocol` (20,000 resamples) at the
+Bonferroni-corrected level (family-wise 95% across the seven one-factor contrasts, so 99.29% per
+contrast): C3 minus A0-noirr-doy, C2 minus A0-noirr-doy, C3 minus C2, C2 minus C1, C4 minus C3,
+C5a minus C3, and C5b minus C3. C3 minus A0 is reported and not tested. The minimum detectable
+effect of a contrast is 2 times the standard deviation over the 5 folds of the seed-to-seed
+difference of the contrast.
+
+- **Main question: C3 minus A0-noirr-doy** (the explicit solar term with the adapter, against the
+  same network with no solar term).
+    - *Supported:* the difference is below zero, its interval excludes zero, and its magnitude exceeds
+      the minimum detectable effect, in the headline band and in the sunny slice
+      (`sunny_unit_shape`), with no tail worse (see below).
+    - *Partly supported:* the same holds in the sunny slice (`sunny_unit_shape` or
+      `sunny_april_june`) but not in the headline band, or in the headline band with a point
+      estimate below the minimum detectable effect and an interval excluding zero.
+    - *Not supported:* the interval includes zero in every slice, or the difference is above zero with
+      an interval excluding zero.
+- **The prediction that can fail:** C3 minus A0-noirr-doy lies between -0.15 and 0.00 points
+  (P1). A difference below -0.15 or above 0.00 counts as the prediction failing, whatever the
+  verdict word.
+- **Tails:** a verdict of supported or partly supported also needs the pinball loss at q95 and q99
+  of C3 to be no more than 5% higher (relative) than A0-noirr-doy's, and
+  coverage at q95 and q99 within 0.02 of A0-noirr-doy's. If a tail is worse, the verdict is
+  downgraded one level and the page says why.
+- **Secondary contrasts** are reported with their intervals and called gains only on the same
+  three-part rule (interval, minimum detectable effect, no worse tails). C3 minus A0 is the
+  practical comparison and is described, not judged, because it differs in the day-of-year term and
+  the irradiance inputs.
+- **Learned capacity** is described against the studies page, with seed intervals. No capacity claim
+  rests on a known-answer test.
+
 ## Reports
 
-- **Tails and cost.** Coverage and pinball loss at q01, q05, q95, and q99, raw and at the 1.15
-  widening; the cost at the scaled export limit (f = 0.9) with `studies.node_curtailment`; the
-  sunniest third of daylight half-hours and sunny April to June.
+- **Tails and slices.** Coverage and pinball loss at q01, q05, q95, and q99, raw (the 1.15
+  widening is not applied to the arms); the sunniest third of daylight half-hours and sunny April
+  to June. The curtailment cost is dropped (see the amendment).
 - **The solar contribution, readable on its own.** The learned solar output `m` in MW is stored per
   scored row. The page plots, for each of the six, the mean learned output by month and hour beside
   the physical clear-sky shape times the studies-page capacity, the learned capacity path with
