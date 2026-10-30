@@ -148,8 +148,9 @@ def studies_prior(*, site: str, n_cells: int, refit: datetime) -> tuple[np.ndarr
 
     The centre is the studies page's capacity and the standard deviation is a quarter of its 95%
     interval. For a flagged season-year the page gives no capacity, so the centre is the middle of
-    the library range and the standard deviation is a quarter of the range. A cell whose season-year had not ended before the refit uses the latest completed
-    season-year's value, so no prior or pinned capacity uses data on or after the refit.
+    the library range and the standard deviation is a quarter of the range. A cell whose
+    season-year had not ended before the refit uses the latest completed season-year's value, so
+    no prior or pinned capacity uses data on or after the refit.
     """
     table = pl.read_csv(STUDIES_TABLE).filter(pl.col("site") == site).sort("season_year")
     centre, sd = [], []
