@@ -100,17 +100,20 @@ def stored_n1h_frame(*, series: pl.DataFrame, stride: int = 1) -> pl.DataFrame:
     Only files at weekly refit times are read, because the monthly regime's files hold the same
     origins under a different refit. `stride` keeps every n-th weekly refit (the gate uses 13).
     """
-    refits = sorted(regimes.WEEKLY)[::stride]
-    sites = series["label"].to_list()
+    weekly = sorted(regimes.WEEKLY)
+    refits = weekly[::stride]
+    ends = {r: weekly[i + 1] if i + 1 < len(weekly) else None for i, r in enumerate(weekly)}
     folder = STORED_87 / "anchor_preds" / "n1h"
-    files = [
-        folder / f"{site}_s{common.SEED}_{refit:%Y%m%dT%H%M}.parquet"
-        for site in sites
-        for refit in refits
-    ]
-    stored = pl.concat([pl.read_parquet(f) for f in files]).filter(
-        pl.col("power_fcst_init_time") >= base.SCORED_FIRST
-    )
+    pieces = []
+    for site in series["label"].to_list():
+        for refit in refits:
+            frame = pl.read_parquet(folder / f"{site}_s{common.SEED}_{refit:%Y%m%dT%H%M}.parquet")
+            # The 2025-07-01 file also holds the monthly regime's origins; keep the weekly ones.
+            keep = pl.col("power_fcst_init_time") >= refit
+            if ends[refit] is not None:
+                keep &= pl.col("power_fcst_init_time") < ends[refit]
+            pieces.append(frame.filter(keep))
+    stored = pl.concat(pieces).filter(pl.col("power_fcst_init_time") >= base.SCORED_FIRST)
     return adapter.forecast_frame(stored=stored, series=series, unit="fraction")
 
 

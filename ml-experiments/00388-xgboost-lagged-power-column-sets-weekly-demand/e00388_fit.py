@@ -69,12 +69,12 @@ ARMS: Final[dict[str, tuple[str, ...]]] = {
     "e": (),
     "f": (EXACT_24H_COLUMN,),
 }
+# Baseline columns an arm drops: E has no newest reading; F also swaps the day lag for the exact
+# 24-hour lag.
 REMOVED: Final[dict[str, tuple[str, ...]]] = {
     "e": (ORIGIN_LAG,),
     "f": (ORIGIN_LAG, DAY_LAG),
 }
-"""Baseline columns an arm drops: E has no newest reading; F also swaps the day lag for the exact
-24-hour lag."""
 """Each arm's added columns, in matrix order."""
 
 

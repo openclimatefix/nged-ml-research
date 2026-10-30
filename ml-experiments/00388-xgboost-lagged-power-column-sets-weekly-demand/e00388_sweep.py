@@ -242,7 +242,6 @@ def summarise(*, records: list) -> pl.DataFrame:
         depth, q, q0 = rec["depth"], rec["quantiles"], rec["base"]
         median, median0 = q[:, Q["q50"]], q0[:, Q["q50"]]
         step_level = median0 + depth
-        sign = 1.0 if depth > 0 else -1.0
         reach95 = q[:, Q["q95"]] >= step_level if depth > 0 else q[:, Q["q05"]] <= step_level
         reach99 = q[:, Q["q99"]] >= step_level if depth > 0 else q[:, Q["q01"]] <= step_level
         valid = np.isfinite(rec["actual"])
@@ -281,10 +280,9 @@ def summarise(*, records: list) -> pl.DataFrame:
                     "q95_reaches": float(reach95[m].mean()),
                     "q99_reaches": float(reach99[m].mean()),
                     "crps_price_pts": float(np.nanmean(price[m]) * 100),
-                    "sign": sign,
                 }
             )
-    return pl.DataFrame(out).drop("sign")
+    return pl.DataFrame(out)
 
 
 def run_sweep(*, series: pl.DataFrame, sites: list[str]) -> None:
