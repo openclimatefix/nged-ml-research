@@ -46,6 +46,7 @@ SEED_397: Final[Path] = (
 MONTHS: Final[tuple[str, ...]] = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 HISTORIES: Final[tuple[int, ...]] = (3, 6, 12)
 N_SEEDS: Final[int] = 3
+N_GROUPS: Final[int] = 4
 HEADLINE: Final[str] = base.HEADLINE_BAND
 SIGNED: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16")
 MVA_ONLY: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
@@ -85,7 +86,28 @@ FIGURE_DIR: Final[Path] = (
 )
 
 
+def group_dirs(*, arm_dir: Path) -> list[Path]:
+    """Return the folders that hold an arm: its own, or its 4 groups for a pooled history arm."""
+    if arm_dir.name.startswith("pooled_emb_h"):
+        return [arm_dir.with_name(f"{arm_dir.name}_g{g}") for g in range(N_GROUPS)]
+    return [arm_dir]
+
+
+def is_complete(*, arm_dir: Path) -> bool:
+    """Return whether every folder of an arm holds every month and seed."""
+    return all(
+        len([f for f in d.glob("*_s*.parquet") if not f.stem.endswith("_gate")])
+        == N_SEEDS * len(MONTHS)
+        for d in group_dirs(arm_dir=arm_dir)
+    )
+
+
 def seed_average(*, arm_dir: Path) -> pl.DataFrame:
+    """Return an arm's forecast; a pooled history arm joins its 4 groups of cut Primaries."""
+    return pl.concat([_seed_average(arm_dir=d) for d in group_dirs(arm_dir=arm_dir)]).sort(KEYS)
+
+
+def _seed_average(*, arm_dir: Path) -> pl.DataFrame:
     """Return an arm's forecast (fraction of capacity) averaged over seeds, all five months."""
     pieces = []
     for month in MONTHS:
@@ -136,11 +158,7 @@ def main() -> None:
     """Print the absolute table, the contrasts, and the gain against history length."""
     series = adapter.series_table()
     ctx = s381.build_context(series=series)
-    available = {
-        n: d
-        for n, d in ARM_DIRS.items()
-        if len(list(d.glob("*_s*.parquet"))) == N_SEEDS * len(MONTHS)
-    }
+    available = {n: d for n, d in ARM_DIRS.items() if is_complete(arm_dir=d)}
     print("arms found:", ", ".join(available))
     frames = {
         n: adapter.forecast_frame(stored=seed_average(arm_dir=d), series=series, unit="fraction")

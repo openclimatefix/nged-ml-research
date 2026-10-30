@@ -22,15 +22,16 @@ hypothesis: >-
   (experiment 403) comes from sharing parameters, not from the learned Primary embedding, and the
   gain does not grow when each Primary's training history is cut to 3, 6, or 12 months.
 prediction: >-
-  Written before any score is read. P1: the pooled network with no embedding minus the per-Primary
-  network is at or below -0.123 points (two-thirds of experiment 403's -0.185) at the signed-MW six,
-  both fitted with the D15 and D18 start cut. P2: the embedding adds little: the pooled network with
-  the embedding minus the pooled network without it lies between -0.05 and +0.05 points at the
-  signed-MW six and at the MVA-only eight. P3: the pooled gain does not grow as history shortens:
-  the contrast of the pooled network with the embedding minus the per-Primary network at 3 months
-  is no more than 0.10 points below the same contrast at the full 24 months, at both groups
-  (experiment 403 found no correlation between gain and months of history, -0.02). P4: every
-  shortening of the history raises both networks' CRPS: at 3 months each is at least 0.10 points
+  Written before any score is read. P1: the pooled network with no embedding recovers at least
+  two-thirds of the gain of the pooled plain network over the per-Primary network in experiment 397
+  (-0.241 at the signed-MW six, so a difference from the per-Primary network of -0.161 or lower),
+  both fitted with the D15 and D18 start cut. P2: the same ratio at the MVA-only eight, where the
+  gain of the pooled plain network is -0.071, is at least two-thirds (-0.047 or lower). P3: the
+  pooled gain does not grow when one Primary's history is short. With only that Primary cut to 3
+  months and the other 15 at full history, the contrast of the pooled network with the embedding
+  minus the per-Primary network (also trained on the cut history) is less than 0.10 points below
+  the same contrast at full history, at both groups (experiment 403 found no correlation between
+  gain and months of history, -0.02). P4: the per-Primary network at 3 months is at least 0.10 points
   above its own full-history value at the signed-MW six. P5: the D15 and D18 start cut lowers the
   CRPS at D15 and D18 together (cut minus uncut below zero) for both the per-Primary and the pooled
   network, and moves the signed-MW six and MVA-only eight by less than 0.03 points.
@@ -39,12 +40,14 @@ decision_rule: >-
   at days 1 to 10, with the month-block bootstrap of `studies.eval_protocol` at 95% and 20,000
   resamples. The five screen months give wide intervals, so every number is interim and no claim of
   benefit rests on it. C1 pooled without embedding minus per-Primary; C2 pooled without embedding
-  minus pooled with embedding; C3 pooled with embedding minus per-Primary; C4 the C3 contrast at 3,
-  6, and 12 months of history; C5 each arm with the start cut minus the same arm from experiment 397
-  without it. The hypothesis is supported if P1, P2, and P3 all hold. It is partly supported if P1
-  holds and P3 fails, or if P3 holds and P1 fails. It is not supported if both fail. The smallest
-  gain worth acting on is any C1 or C3 gain whose interval excludes zero, because one pooled network
-  costs one fit instead of 16.
+  minus pooled with embedding; C3 pooled with embedding minus per-Primary; C4 the C3 contrast with
+  one Primary's history cut to 3, 6, and 12 months (the pooled network is trained with the cut
+  Primary and 12 others at full history, and the per-Primary network on the cut history); C5 each
+  arm with the start cut minus the same arm from experiment 397 without it. The hypothesis is
+  supported if P1, P2, and P3 all hold. It is partly supported if P1 and P2 hold and P3 fails, or if
+  P3 holds and P1 or P2 fails. It is not supported if P1 and P3 both fail. The smallest gain worth
+  acting on is any C1 or C3 gain whose interval excludes zero, because one pooled network costs one
+  fit instead of 16.
 benchmark: >-
   The per-Primary and pooled plain networks of experiment 397 (without the start cut), on the same
   half-hours.
@@ -77,8 +80,14 @@ history is short.
 - **Arms at the full 24-month window (with the D15 and D18 start cut).** `per_primary` (one network
   per Primary), `pooled_emb` (one network with an 8-wide Primary embedding), and `pooled_noemb` (one
   network with no Primary input).
-- **Arms at 3, 6, and 12 months.** `per_primary_h<H>` and `pooled_emb_h<H>`: each fold trains only
-  on each Primary's last `H` months of rows before the refit.
+- **Arms at 3, 6, and 12 months (the history test).** This mimics a new substation joining a pooled
+  network. `per_primary_h<H>` cuts every Primary to its last `H` months of rows before the refit;
+  each Primary's network sees only its own rows, so this equals cutting that Primary alone.
+  `pooled_emb_h<H>` is fitted four times per fold and seed, each time with a different quarter of
+  the Primaries (every fourth, by index) cut to `H` months and the other 12 at full history; each
+  fit is scored only on its cut quarter, and the four quarters are joined. Cutting four Primaries
+  at once instead of one is a deviation from a strict one-at-a-time test, made so that the test
+  needs 4 pooled fits per fold, seed, and length instead of 16.
 - **The start cut.** D15 and D18 lose every training row before 2025-03-01, and every row whose
   weekly lag reaches back before that date (maintainer's rule of 2026-10-30, from [experiment
   399](../00399-xgboost-short-history-start-cut-d15-d18/result.md)). The scoring rows start in
@@ -90,13 +99,19 @@ history is short.
 
 - **Fits.** `pooled_noemb`, `pooled_emb`, and `per_primary` at the full window: 3 arms by 5 folds by
   3 seeds, so 15 pooled fits for each of the two pooled arms and 15 sets of 16 per-Primary
-  networks. Three history lengths add 45 pooled fits and 45 sets of 16.
+  networks. Three history lengths add 180 pooled fits (4 quarters by 3 lengths by 5 folds by 3
+  seeds) and 45 sets of 16 per-Primary networks.
 - **Time.** Experiment 397 fitted one pooled plain network in about 50 s and one set of 16
   per-Primary networks in about 50 s on the GPU. Shorter histories train on fewer rows, so the
-  whole experiment is expected to take under 3 hours.
+  whole experiment is expected to take about 5 hours.
 - **Memory.** One GPU process with at most 8 GB of host memory (the 397 screen peaked at 7.9 GB for
   a 4.2-million-row fold), and one feeder core. A fold's raw rows are the per-Primary files that
   experiment 397 wrote once, so no table is rebuilt per arm.
+
+## Not in this experiment
+
+**Experiment 1c (leave-one-Primary-out with static covariates in place of the embedding) is a
+separate, optional experiment** that runs after this one if a slot is free.
 
 ## Checks the write-up reports
 

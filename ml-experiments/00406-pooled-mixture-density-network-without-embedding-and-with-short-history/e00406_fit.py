@@ -32,6 +32,7 @@ import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import e00397_fit as fit  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import numpy as np
+import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -41,6 +42,8 @@ ARMS: Final[tuple[str, ...]] = ("per_primary", "pooled_emb", "pooled_noemb")
 SHORT_HISTORY: Final[tuple[str, ...]] = ("D15", "D18")
 CUT: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
 DAYS_PER_MONTH: Final[float] = 30.44
+N_GROUPS: Final[int] = 4
+"""Primaries are cut in 4 interleaved groups of 4, so each fit leaves 12 at full history."""
 US_PER_DAY: Final[int] = 86_400 * 1_000_000
 OUT_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
@@ -54,16 +57,21 @@ def _us(*, t: datetime) -> int:
     return int(t.timestamp() * 1_000_000)
 
 
-def build_train(*, refit: datetime, history_months: int) -> prep.FoldTrain:
+def build_train(
+    *, refit: datetime, history_months: int, cut_primaries: frozenset[int] | None = None
+) -> prep.FoldTrain:
     """Return a fold's standardised training rows, as experiment 397's `build_train` but cut.
 
-    `history_months` of 0 keeps the whole 24-month window. The start cut drops a D15 or D18 row if
+    `history_months` of 0 keeps the whole 24-month window. Otherwise only the Primaries in
+    `cut_primaries` (all of them if `None`) are cut to their last `history_months` months, and
+    every other Primary keeps the whole window. The start cut drops a D15 or D18 row if
     its valid time, or the time of its oldest lag (the weekly lag), is before 2025-03-01.
     """
     _, mask, layout = prep.feature_names(scheme=SCHEME)
-    window_days = prep.WINDOW_DAYS if history_months == 0 else history_months * DAYS_PER_MONTH
     parts = []
     for row in prep.primaries().iter_rows(named=True):
+        is_cut = history_months > 0 and (cut_primaries is None or row["primary"] in cut_primaries)
+        window_days = history_months * DAYS_PER_MONTH if is_cut else prep.WINDOW_DAYS
         z = np.load(prep.RAW_DIR / SCHEME / f"{row['site']}.npz")
         keep = (
             (z["valid"] <= _us(t=refit - regimes.REFIT_CUTOFF_AGE))
@@ -148,24 +156,42 @@ def fit_pooled_without_embedding(
     }
 
 
-def tag_of(*, arm: str, history_months: int) -> str:
-    """Return the folder name of an arm at a history length (0 is the full window)."""
-    return arm if history_months == 0 else f"{arm}_h{history_months}"
+def tag_of(*, arm: str, history_months: int, group: int | None) -> str:
+    """Return the folder name of an arm at a history length (0 is the full window).
+
+    A pooled arm fitted with one group of Primaries cut ends in `_g<group>`.
+    """
+    tag = arm if history_months == 0 else f"{arm}_h{history_months}"
+    return tag if group is None else f"{tag}_g{group}"
 
 
 def run(
-    *, arms: list[str], history_months: int, seeds: list[int], months: list[str], device: str
+    *,
+    arms: list[str],
+    history_months: int,
+    group: int | None,
+    seeds: list[int],
+    months: list[str],
+    device: str,
 ) -> None:
-    """Fit each arm on each fold and seed, save the networks, forecast the test month."""
+    """Fit each arm on each fold and seed, save the networks, forecast the test month.
+
+    With `group`, only the Primaries whose index has that remainder modulo `N_GROUPS` are cut to
+    `history_months` and scored; the other Primaries keep the whole window. Without it, every
+    Primary is cut (or none, at 0 months) and every Primary is scored.
+    """
+    cut = None if group is None else frozenset(range(group, len(prep.primaries()), N_GROUPS))
     for month in months:
-        fold = build_train(refit=prep.refit_of(month=month), history_months=history_months)
+        fold = build_train(
+            refit=prep.refit_of(month=month), history_months=history_months, cut_primaries=cut
+        )
         counts = {int(p): int((fold.primary == p).sum()) for p in np.unique(fold.primary)}
         print(
             f"fold {month} history {history_months}: {len(fold.x):,} rows; per Primary {counts}",
             flush=True,
         )
         for arm in arms:
-            tag = tag_of(arm=arm, history_months=history_months)
+            tag = tag_of(arm=arm, history_months=history_months, group=group)
             for seed in seeds:
                 target = OUT_DIR / "seed_preds" / tag / f"{month}_s{seed}.parquet"
                 if target.exists():
@@ -182,7 +208,7 @@ def run(
                         device=device,
                     )
                 if arm == "per_primary" and len(fits) != len(counts):
-                    msg = f"{tag} {month}: networks for {len(fits)} Primaries but rows for {len(counts)}"
+                    msg = f"{tag} {month}: {len(fits)} networks for {len(counts)} Primaries"
                     raise RuntimeError(msg)
                 fit.save_fits(
                     fits=fits, fold=fold, target=OUT_DIR / "models" / tag / month / f"s{seed}"
@@ -190,6 +216,9 @@ def run(
                 q, _ = fit.forecast_month(
                     fits=fits, fold=fold, scheme=SCHEME, month=month, device=device
                 )
+                if cut is not None:
+                    keep_ids = prep.primaries().filter(pl.col("primary").is_in(sorted(cut)))
+                    q = q.filter(pl.col("time_series_id").is_in(keep_ids["time_series_id"]))
                 common.atomic_write(frame=q, target=target)
                 print(f"{tag} {month} seed {seed}: {time.monotonic() - started:.0f} s", flush=True)
 
@@ -199,6 +228,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arms", nargs="+", choices=ARMS, default=list(ARMS))
     parser.add_argument("--history-months", type=int, default=0)
+    parser.add_argument("--group", type=int, default=None, choices=range(N_GROUPS))
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--months", nargs="+", default=list(prep.SCREEN_MONTHS))
     parser.add_argument("--device", default="cuda")
@@ -206,6 +236,7 @@ def main() -> None:
     run(
         arms=args.arms,
         history_months=args.history_months,
+        group=args.group,
         seeds=args.seeds,
         months=args.months,
         device=args.device,
