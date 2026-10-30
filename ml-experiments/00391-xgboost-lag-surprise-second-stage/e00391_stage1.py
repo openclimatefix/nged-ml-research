@@ -202,7 +202,7 @@ def run_job(*, version: str, site: str, nthread: int, rounds: int, seed: int, sm
         target = latest_origin_rows(rows=window)
         if known.height < HALF_HOURS_PER_MONTH_FLOOR or target.is_empty():
             continue  # a short-history Primary has no stage 1 fit yet; its surprise stays missing
-        if (known["valid_time"].max() > refit) or (target["valid_time"].min() < refit):
+        if (known["valid_time"].max() > refit) or (target["valid_time"].min() < refit):  # ty: ignore[unsupported-operator]
             msg = "a stage 1 fit would see a row at or after its refit"
             raise ValueError(msg)
         pieces.append(

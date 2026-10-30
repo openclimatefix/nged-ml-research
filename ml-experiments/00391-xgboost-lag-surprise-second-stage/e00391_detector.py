@@ -46,6 +46,10 @@ AFTER: Final[timedelta] = timedelta(hours=72)
 SEED: Final[int] = 391
 DURATIONS_DAYS: Final[tuple[float, ...]] = (0.5, 1, 2, 3, 7, 14)
 SHARES: Final[tuple[float, ...]] = (0.10, 0.25)
+SHARES_MW: Final[tuple[float, ...]] = (0.71, 1.1, 2.3)
+"""Post hoc depths in MW: the quartiles of the label table's logged transfers."""
+DEPTH_MW: list[bool] = [False]
+"""Set by `--gate-mw`: `share` then means a depth in MW, not a share of the donor's level."""
 RECEIVERS: Final[tuple[int, ...]] = (1, 2, 3)
 GATE_RECALL: Final[float] = 0.55
 GATE_VETO_KEEP: Final[float] = 0.95
@@ -178,19 +182,20 @@ def inject(
     """
     u2, r2 = dict(u), dict(r)
     sites = [donor, *receivers]
+    donor_level = (
+        1.0
+        if DEPTH_MW[0]
+        else float(np.nanmedian(np.abs(tables[donor][1]["median_mw"].to_numpy())))
+    )
     for site in sites:
         index, table = tables[site]
-        level = float(np.nanmedian(np.abs(table["median_mw"].to_numpy())))
+        level = 1.0 if DEPTH_MW[0] else float(np.nanmedian(np.abs(table["median_mw"].to_numpy())))
         if placebo:
             delta = -share * level
         elif site == donor:
-            delta = -share * float(np.nanmedian(np.abs(tables[donor][1]["median_mw"].to_numpy())))
+            delta = -share * donor_level
         else:
-            delta = (
-                share
-                * float(np.nanmedian(np.abs(tables[donor][1]["median_mw"].to_numpy())))
-                / len(receivers)
-            )
+            delta = share * donor_level / len(receivers)
         inside = (index >= onset) & (index < onset + steps)
         quantiles = table.select(common.LEVEL_COLUMNS).to_numpy()
         actual = table["median_mw"].to_numpy() + table["r_mw"].to_numpy()
@@ -206,10 +211,11 @@ def gate(*, k: float, u: dict, r: dict, tables: dict, first: int, last: int) -> 
     """Run the known-answer gate on injected transfers and print recall and the placebo."""
     rng = np.random.default_rng(SEED)
     donors = [s for s in feats.ADJACENCY if len(feats.ADJACENCY[s]) >= 3][:10]
+    shares = SHARES_MW if DEPTH_MW[0] else SHARES
     rows = []
     for donor in donors:
         for days in DURATIONS_DAYS:
-            for share in SHARES:
+            for share in shares:
                 for n in RECEIVERS:
                     steps = int(days * common.STEPS_PER_DAY)
                     onset = int(
@@ -220,7 +226,7 @@ def gate(*, k: float, u: dict, r: dict, tables: dict, first: int, last: int) -> 
                     )
                     receivers = list(feats.ADJACENCY[donor][:n])
                     for placebo in (
-                        (False, True) if n == 2 and share == 0.25 and days >= 2 else (False,)
+                        (False, True) if n == 2 and share == shares[-1] and days >= 2 else (False,)
                     ):
                         u2, r2 = inject(
                             tables=tables,
@@ -254,7 +260,8 @@ def gate(*, k: float, u: dict, r: dict, tables: dict, first: int, last: int) -> 
         orient="row",
     )
     real = frame.filter(~pl.col("placebo"))
-    long25 = real.filter((pl.col("share") == 0.25) & (pl.col("days") >= 2))
+    shares = SHARES_MW if DEPTH_MW[0] else SHARES
+    long25 = real.filter((pl.col("share") == shares[-1]) & (pl.col("days") >= 2))
     print("\n== Known-answer gate ==")
     print(
         real.group_by("days", "share")
@@ -268,9 +275,9 @@ def gate(*, k: float, u: dict, r: dict, tables: dict, first: int, last: int) -> 
     )
     placebo = frame.filter(pl.col("placebo"))
     split = real.filter(pl.col("receivers") >= 2)
-    keep = split["veto"].sum() / max(1, split["plain"].sum())
-    drop = 1 - placebo["veto"].sum() / max(1, placebo["plain"].sum())
-    recall_long = float(long25["plain"].mean())
+    keep = float(split["veto"].sum()) / max(1, float(split["plain"].sum()))
+    drop = 1 - float(placebo["veto"].sum()) / max(1, float(placebo["plain"].sum()))
+    recall_long = float(long25["plain"].mean())  # ty: ignore[invalid-argument-type]
     print(f"recall (plain) at 25% and 2 days or more: {recall_long:.2f} (gate >= {GATE_RECALL})")
     print(f"veto keeps {keep:.2f} of plain hits on 2 and 3 receivers (gate >= {GATE_VETO_KEEP})")
     print(
@@ -287,10 +294,26 @@ def main() -> None:
     """Tune k per version, print the detector checks, and optionally run the gate."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gate", action="store_true")
+    parser.add_argument(
+        "--gate-mw", action="store_true", help="post hoc gate with depths in MW; reads k.json"
+    )
     args = parser.parse_args()
     labels = load_labels()
     first = int(common.grid_index(times=TUNE_START))
     last = int(common.grid_index(times=TUNE_END))
+    if args.gate_mw:
+        k = float(json.loads((OUT_DIR / "k.json").read_text())["ens"])
+        u, r, tables = load_stage1(version="ens")
+        base_stats.update(statistics(u=u, r=r))
+        sigma = {s: float(np.nanmedian(base_stats[s].r_sigma)) for s in base_stats}
+        print(
+            "noise scale (median r_sigma, MW) per Primary:",
+            {s: round(v, 2) for s, v in sigma.items()},
+        )
+        print("injected depths (MW):", SHARES_MW)
+        DEPTH_MW[0] = True
+        gate(k=k, u=u, r=r, tables=tables, first=first, last=last)
+        return
     ks: dict[str, float] = {}
     for version in stage1.VERSIONS:
         u, r, tables = load_stage1(version=version)

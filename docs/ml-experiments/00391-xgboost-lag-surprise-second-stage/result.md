@@ -5,7 +5,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 protocol: demand-v1
 size: >-
@@ -56,235 +56,169 @@ metric: >-
   capacity (cost in GBP), from `studies.eval_protocol`; leads 0.5 to 336 hours; headline band days
   1 to 10.
 code: ml-experiments/00391-xgboost-lag-surprise-second-stage/
+verdict: not supported
+best_arm: >-
+  The monthly-refit control B0, without surprise or detector columns: continuous ranked probability
+  score 3.123 at the signed-MW six against 3.229 for N1 and 3.110 for the hand-label oracle O on all
+  rows, days 1 to 10 (points of effective capacity, seed 0).
+headline: >-
+  Adding own and neighbour surprise (N1) to the monthly XGBoost demand model raised the CRPS on rows
+  whose lags lie inside a labelled event by +0.110 points (99.29% interval -0.249 to +0.432) and on
+  rows outside events by +0.072 (+0.006 to +0.145), against a seed noise floor of +0.024 and +0.001.
+  The oracle with hand labels (O) was also worse than the control, by +0.218. The detector state
+  (N2, N3) was not fitted.
+take_home_message: >-
+  A "surprise" input does not let the monthly XGBoost demand model handle load-shift events, and the
+  extra columns make the forecast slightly worse on the ordinary rows that make up 97% of the
+  test. The control model already does as well as an oracle that is told which lags are inside an
+  event, so these XGBoost lags offer little to recover. The detector that would have made the
+  comparison failed its pre-registered check, so whether detector state adds to surprise stays
+  untested. The next step is to leave event handling out of the XGBoost lags and handle the event
+  in the demand-model structure, not in its inputs.
+lessons:
+  - >-
+    The oracle O, given the true event flags, scored +0.218 points worse than the control on event-lag
+    rows, so the ceiling for any lag-handling input is no better than the control.
+  - >-
+    Surprise columns cost +0.072 points on rows outside events (interval +0.006 to +0.145), three
+    times the +0.02 tolerance, and a second control seed moved the same slice by +0.001.
+  - >-
+    The detector failed its pre-registered known-answer check (recall 0.42 against 0.55; veto dropped
+    0.33 of placebo alarms against 0.5), and found 0 of 7 labelled transfers at its tuned threshold.
 production_status: not-for-production
 adopted_in: none
+advice:
+  - >-
+    Do not add lag-surprise or hand-label event flags to the XGBoost demand model's inputs: several
+    designs of that idea have now failed (Result, contrasts C8 to C11).
+  - >-
+    Report every lag-input contrast against two seeds of the control: the seed gap (+0.024 on
+    event-lag rows) is small enough to read the +0.110 as a real shift in mean, though the interval
+    includes zero (Result, noise floor).
+  - >-
+    Calibrate any detector threshold on transfers of the depth the labels hold (0.71 to 2.3 MW),
+    not on shares of capacity, before tuning it (Detector gate).
+date: 2026-10-30
 ---
 
-# Does a "surprise" input let XGBoost tell when its lagged power is inside a load-shift event?
+# Does a "surprise" input let XGBoost handle load-shift events?
 
-**Status: planned.** No fit has run and no score has been read.
+**A "surprise" input does not let the monthly XGBoost demand model handle load-shift events, and it
+makes the forecast slightly worse on the ordinary rows.** A load shift moves demand between
+substations, so a lagged power reading inside one misleads the model. The surprise input is the
+normal score of each lagged reading's probability integral transform against a lagless forecast
+from a first-stage model, at the Primary and at its neighbours. On rows whose lag lies inside a
+labelled event, the surprise columns did not help (+0.110 points of CRPS, interval -0.249 to
++0.432). On rows outside events they cost +0.072 (+0.006 to +0.145), against a +0.02 tolerance.
+A Primary is one of the 16 primary substations scored here. CRPS is the continuous ranked
+probability score, in points of effective capacity.
 
-## Question, and what is new
+**The oracle was also worse than the control, so these lags leave little to recover.** The oracle O
+gets hand-label flags for the target and each lag. On event-lag rows it scored +0.218 points worse
+than the control (all 16 Primaries). Whatever the surprise input would have recovered is bounded by
+that ceiling, which is no better than the control.
 
-**We ask whether the weekly XGBoost demand model needs an explicit load-shift detector, or whether
-a measure of how surprising its own recent readings are, at its Primary and at the neighbouring
-Primaries, gives it the same help.** A load shift moves demand between substations, so a lagged
-reading that lies inside one misleads the model. The detector of
-[experiment 327](../00327-lsc-label-free-detect-mask-train-pipeline/result.md) and the
-distillation design flag such periods from the lagless forecast's residuals.
-A surprise input hands the model the same residuals without the state machine.
+**The explicit detector failed its pre-registered check, so whether detector state adds to
+surprise is untested.** Arms N2, N2 without the veto, and N3 were not fitted: the manager held them
+after the known-answer gate failed and the surprise arms came out worse than the control. This
+experiment therefore answers the question about surprise columns and leaves the detector-state
+half open.
 
-**Prior work (figures to be checked against the pages before the write-up relies on them).**
-Experiments 5 and 18 tried a staged chain with lag anomalies on old rows: in 18 the chain minus the
-single-stage model N1 was +0.08 (99.17% interval -0.11 to +0.25) over all leads and -0.27 (-0.62
-to +0.03) up to 48 hours, with no neighbours and no detector features. Experiment 8 found 24-hour
-summaries added nothing (-0.02) to a calibrator with raw lags. **New here:** the `demand-v1` rows
-at all 16 Primaries; a second-stage XGBoost model refitted monthly; neighbour surprise from NGED's
-own interconnection list; detector features from the distilled design; and scoring on labelled
-events with the avoidable-curtailment cost.
+![Each contrast against the seed noise floor](headline.svg)
 
-**Advice followed and departed from.** To be filled in after running the `advice` listing in the
-skill (read before the code step); departures are recorded here before any score is read.
+## Result
 
-## Design
+All numbers are CRPS differences in points of effective capacity (above 0 is worse), days 1 to 10,
+raw bands. Intervals are 99.29% (Bonferroni across the seven planned contrasts at a 95% family
+level), resampling whole events on event slices and calendar months elsewhere. "Event-lag rows" are
+rows whose target lies outside an event but has a lag inside one.
 
-**Cadence.** Every arm, the baseline control, and the stage 1 lagless model refit monthly on the
-rolling recipe of experiment 87's `n1h` configuration (half-life 0.5 years; see the recipe note
-below),
-`colsample_bytree` and `colsample_bynode` fixed at 1.0 in every arm, seed 0. Weekly refits are run
-only for the reproduction gate. A winning arm is re-checked weekly before any release claim, and
-that re-check is outside this experiment.
+| Contrast | Primaries | Event-lag rows | Rows outside events and 7 days after |
+|---|---|---|---|
+| Seed 1 minus seed 0 of the control (noise floor) | 16 | +0.024 (-0.017 to +0.097) | +0.001 (-0.002 to +0.006) |
+| N1 minus B0, seed 0 | 16 | +0.110 (-0.249 to +0.432) | +0.072 (+0.006 to +0.145) |
+| N1 minus B0, seed 1 | 16 | +0.086 (-0.251 to +0.404) | +0.071 (+0.006 to +0.143) |
+| O minus B0, seed 1 | 16 | +0.194 (-0.052 to +0.542) | +0.012 (+0.000 to +0.032) |
+| N0 minus B0 (own surprise only) | 7 | -0.038 (-0.649 to +0.578) | +0.055 (+0.015 to +0.103) |
+| N1 minus N0 (neighbours) | 7 | +0.314 (+0.062 to +0.749) | +0.028 (+0.007 to +0.054) |
+| N1-ERA5 minus N1 (hindsight weather) | 7 | -0.004 (-0.496 to +0.654) | -0.020 (-0.064 to +0.008) |
+| N1-ERA5 minus B0, seed 1 | 7 | +0.263 (+0.061 to +0.538) | +0.063 (+0.025 to +0.108) |
 
-**Widening.** The manager reports that experiment 381's stored bundle forecasts carry no 1.15
-widening of the band, while experiment 379's `only_W` member has it (mean q95 minus q50 of 0.1360
-against 0.1554; to be verified in the code step). **Every arm here, B0 included, is refitted by this
-experiment with no widening, so the contrasts compare like with like.** Every score table is given
-twice for every arm and reference row: raw, and with the band widened by 1.15 about the median. The
-stored references are labelled with the widening they carry, and a stored row is rescored both ways
-by undoing or applying the factor. The headline reads from the raw table; a contrast whose sign or
-verdict differs between the two tables is reported as widening-dependent.
+- **Against both control seeds** every contrast has the same sign and a similar size: N1 is +0.110
+  and +0.086, O is +0.218 and +0.194, and the control seeds differ by +0.024. The noise floor is
+  small beside the shifts but the event-lag intervals still include zero, so the event-lag result
+  is "no help" and not "harm".
+- **Signed-MW six and MVA-only eight, separately.** N1 minus B0 on event-lag rows is +0.277
+  (-0.508 to +1.002) at the signed-MW six and -0.068 (-0.314 to +0.084) at the MVA-only eight. The
+  pooled 16-Primary result is driven by D10 (+1.85) and D16 (+0.78) among the signed-MW six;
+  leaving D10 out gives +0.049.
+- **Own surprise alone (N0)** moved the event-lag rows by -0.038, an 18% cut of the 0.207 oracle
+  gap, which meets prediction P1 in size but with an interval that includes zero. The neighbour
+  columns undid it and more (N1 minus N0 +0.314), against prediction P2.
+- **The oracle gap on contaminated rows is the ceiling.** O minus B0 is +0.218 at all 16 Primaries,
+  +0.207 at the signed-MW six, and +0.332 at the MVA-only eight, so a hand-label flag also did
+  not help at the MVA-only Primaries.
+- **Absolute scores (all rows, days 1 to 10, signed-MW six, seed 0):** B0 3.123, N1 3.229, O 3.110,
+  BG2 3.016. These use the 150-round screening
+  recipe, so they are not comparable to experiment 381's.
+- **ERA5-fed against ENS-driven surprise (C6):** N1-ERA5 is -0.020 (-0.064 to +0.008) on ordinary
+  rows, so hindsight weather does not rescue the surprise columns.
+- **Avoidable curtailment cost** (GBP, all rows, signed-MW group, 7 Primaries): B0 12.65M, seed 1
+  12.63M, N0 13.10M, N1 13.15M, N1-ERA5 12.80M, O 12.26M, `manual_heuristic` 12.66M, BG2 8.35M.
 
-**Triage of the plan review (2026-10-29).** Accepted: stage 1 is fitted with no label filter
-(experiment 383's `lagless` arm filters event targets, which would build every surprise from
-hindsight labels; that filtered version is not run); N1 holds no detector state; the timing of
-"the origin" is defined below; rows without surprise are kept with missing values, not dropped; the
-Bonferroni and equivalence figures are corrected; the event counts, the signed-MW-six restriction of
-the curtailment cost, and the scope check of the past-weather pages are added. P1 to P3 are
-restated as absolute changes in points of CRPS, with the O minus B0 gap reported beside them.
+## The detector and its gate
 
-**Timing.** The telemetry delay is 3.5 hours. Z in N0 is the mean of u over the 24 half-hours ending
-at the origin minus 3.5 hours. The neighbour columns and the detector state come from the latest
-6-hourly detector origin (00, 06, 12, 18 UTC) at or before the origin minus 3.5 hours. Stage 1's
-quantiles for a half-hour come from the control member only: the training history holds one member
-per run, so one member is used everywhere, and the run for half-hour s is the one with the latest
-forecast origin before s (lead 0.5 to 24 hours; daily runs from 2024-04-01 cover every half-hour).
-The first stage 1 refit is 2024-10-01, with 6 months of training rows. The noise units for Z~
-use the expanding history up to the detector origin, so no row sees later medians. The threshold k
-and the known-answer gate use the 2024-04 to 2025-06 labels as the distillation specifies, so rows
-inside that span carry a labelled-tuning shortcut, reported in the write-up. The ERA5-fed stage 1
-uses the same monthly walk-forward as the ENS-driven one. The ENS run frames must hold steps at
-leads 5.5 to 29.5 hours; the code step checks this first and builds them from the ENS store if not.
+**The pre-registered known-answer gate failed.** Injected transfers at shares of capacity of 10%
+and 25%: recall at 25% and 2 days or more was 0.42 (gate 0.55); the veto kept 0.98 of plain hits
+(gate 0.95); the veto dropped 0.33 of placebo alarms (gate 0.5). At the tuned threshold (k = 2.3 ENS,
+2.35 ERA5-fed) the detector marked 0 of 7 labelled transfers in the ENS version, at 1.70 false
+alarms per Primary-year.
 
-**Recipe and compute cut (manager, 2026-10-29).** The machine is saturated, so every fit, stage 1
-and stage 2 alike, uses the screening recipe of the common brief (150 rounds, eta 0.15) instead of
-experiment 87's 500 rounds and eta 0.05. This differs from experiment 381's recipe, so absolute
-scores here are not comparable to experiment 381's. The control B0 is refitted at 150 rounds, so
-contrasts compare like with like, and no arm is widened (every table is also given at 1.15). The
-core arms B0, N1, N2, and O run at all 16 Primaries. The secondary arms N0, N3, N2 without the
-veto, and N1-ERA5 run at seven Primaries only (the signed-MW six D5, D9, D10, D11, D14, and D16,
-plus D8), so C1, C4, C6, and C7 are read at those seven. Fits run on the GPU as 3 single-thread
-processes (benchmark: 73 s for one 150-round fit at 1 thread on the GPU, 84 s at 3 CPU threads).
+**A post hoc gate in megawatts passed, and is labelled as such.** The label table holds transfers
+of 0.71, 1.1, and 2.3 MW at the quartiles, which are far below 10% of capacity at most Primaries.
+Re-running the gate with those depths gave recall 0.63, veto keeps 0.98, and veto drops 0.91 of
+placebo alarms. This was chosen after seeing the failure, so it does not replace the pre-registered
+result. It suggests the detector works at the real transfer depths and failed the gate through the
+choice of depths.
 
-**Reproduction gate (before any other arm is read).** Refit the baseline weekly at every fourth
-refit with experiment 383's gate (`d` arm) and reproduce the stored weekly member within that gate's
-tolerance. If the gate fails the experiment stops and reports the failure.
+## Checks
 
-**Stage 1: the lagless quantile model, built twice.** It is experiment 383's arm `lagless` (no
-origin lags, quantile output), refitted monthly. **ENS-driven (main, causal):** the same weather
-inputs as the baseline, taken from the ECMWF ensemble run that was latest when the half-hour
-happened. **ERA5-fed (labelled a hindsight ceiling):** ERA5 and CAMS weather for the half-hour
-itself, as in experiment 371. ERA5 arrives about 5 days late and CAMS radiation 1 day late, so the
-ERA5-fed arm cannot be served for the two recent lags.
+- **Median minus mean forecast per site (points, days 1 to 10).** B0 and N1 differ by less than 0.1
+  at most Primaries. The one sign change is at D22 (+0.098 for B0, -0.110 for N1). The full table is
+  in `work/scores_core/printed_report.txt`.
+- **Mean error beside the quantile contrasts.** The mean absolute error of the median moves with
+  CRPS: N1 minus B0 +0.210 (-0.311 to +0.748) on event-lag rows, seed noise +0.025.
+- **Which audit triggers fired.** Two: the neighbour columns reversed the sign of prediction P2,
+  and O (the ceiling) came out worse than the control. A Sonnet audit of the scoring and
+  the oracle flags found no bug. The seed-1 control shows that seed noise
+  (+0.001 outside events) is far smaller than the +0.072 harm outside events.
+- **Design target.** The sweep for the three median and tail tolerances was not run (see below).
 
-**What counts as surprise at serving time.** For a past half-hour s, the ENS-driven residual uses
-the latest ENS run with init time plus the 9-hour publication delay at or before s plus 3.5 hours
-(the telemetry delay): the newest lag is s = origin minus 3.5 hours, so this run is the latest one
-available at the earliest origin that uses s. The surprise table is therefore keyed by Primary and
-half-hour alone, and the same table serves training and test rows. **The experiment trains and tests
-surprise built the same way.** To be confirmed against experiment 87's run frames: the lead of s in
-that run is 5.5 to 29.5 hours.
+## Caveats and what to try next
 
-**Leakage rule for stage 1.** Surprise for half-hour s comes from the stage 1 refit with the latest
-train end at or before s, so no stage 1 fit has trained on s (walk-forward, no cross-fitting).
-Rows whose lags predate the first stage 1 refit plus one month keep missing surprise values in
-every arm; the write-up states the first stage 1 train end and the rows affected per Primary. The
-code review checks this rule,
-and the stage 1 fits' stopping at `train_end`.
+- **N2, N2 without the veto, N3 were not fitted.** The manager held them. Predictions P3 and the C3,
+  C4, C5, and C7 contrasts are therefore untested, and the lag-encroachment sweep, the P5
+  correlation, and the code-review check for leakage were not run as separate steps.
+- **The detector's tuning window is shorter than the distillation's** (2024-11 to 2025-06, because
+  stage 1 starts in 2024-10).
+- **The recipe is the 150-round screening recipe**, not experiment 87's 500 rounds, so scores are not
+  comparable to experiment 381's.
+- **Two sets of Primaries.** B0, N1, and O ran at all 16; N0 and N1-ERA5 at 7 (the signed-MW six
+  plus D8), so their contrasts use those 7.
+- **Event-lag rows are about 2.4% of the rows** (64,006 of 2.63M at 16 Primaries) and come from 27
+  events; every event-lag interval is wide.
+- **Scores were printed from saved rows at half precision** for the 16-Primary pass (float32
+  except the CRPS and error columns), after the full-precision pass ran out of memory.
+- **Stop rule.** By the `verdict` in each page's front matter, experiments 89 and 90 (`refuted`) and
+  383 (`not supported`) count on the idea "handle load-shift events inside the XGBoost lags", and
+  this experiment is the fourth. Experiment 5 (`refuted`) tests lag placement, so the manager
+  decides whether it counts. Experiments 8, 18, 88, and 390 do not count.
 
-**Surprise columns.** The normal score u is the probability integral transform (PIT) of the
-reading against stage 1's 11 quantiles, interpolated linearly, clipped to 0.005 to 0.995, then
-converted by the normal quantile function.
+## Data and reproduction
 
-- **N0, own surprise.** B0 plus u at each of the three origin lags, plus Z, the mean of u over the
-  24 half-hours before the origin (at least 18 present).
-- **N1, own plus neighbour surprise.** N0 plus three fixed columns summarising the neighbours'
-  Z~ at the origin, using `nged_neighbours()` of experiment 383: the largest |Z~| among metered
-  neighbours, the signed mean of Z~, and the number of neighbours with Z~ of the opposite sign and
-  |Z~| above 2. A Primary with no metered neighbour gets missing values in all three. Unmetered
-  interconnections have no series and enter only as a count column in the detector's veto
-  eligibility, not as surprise.
-- **N2, N1 plus the detector's open-alarm state.** The detector of
-  `briefs/opus_detector_distillation_answer.md`
-  (Z at 00, 06, 12, and 18 UTC, noise units Z~ by median and 1.4826 times the median absolute
-  deviation, alarm on two consecutive same-sign origins above k, end below k/2 at two origins,
-  14-day
-  cap with re-opening), built from the ENS-driven residuals, with the neighbour veto (experiment
-  315,
-  changed so a load split across several neighbours protects the alarm). Causal columns only: open
-  or closed, onset stamp, signed Z~, R (the mean residual in MW), the days since onset, and the veto
-  tag. An alarm's end stamp and final magnitude are never used. **N2 without the veto** is one extra
-  comparison row.
-- N2 also adds the count of neighbours with an open alarm of the opposite sign. The veto uses
-  experiment 298's neighbour list, as the distillation specifies, while N1 uses NGED's list; the
-  write-up reports where they differ. **N2 without the veto** uses the same k as N2.
-- **N3, detector features only.** B0 plus the N2 detector columns, with no surprise columns.
-- **O, oracle ceiling.** B0 plus a 0/1 flag for the target being inside a hand-labelled transfer
-  and one such flag per lag. Labelled
-  hindsight, never a candidate.
-- **N1-ERA5.** N1 with the ERA5-fed surprise, labelled a hindsight ceiling.
-- Threshold k: the smallest value on the grid 1.5 to 6.0 in steps of 0.05 giving at most 2.0 false
-  alarms per Primary-year after the veto, pooled over 2024-04 to 2025-06, on that period's labels
-  only. The noise-unit median and scale use the same months, which post-date some 2024 cuts; the
-  write-up reports that shortcut, as experiment 327 did.
-
-**Detector evidence (before any real score).** The known-answer gate of the distillation, section
-5, in full (injected transfers at the 10 Primaries of experiment 298's injection set, recall and
-veto and placebo thresholds); the experiment stops and reports the detector alone if it fails. The
-write-up reports the veto's false alarms removed and labelled transfers lost, and what the veto does
-at Primaries with no metered neighbour.
-
-**ENS against ERA5 for demand.** Per Primary, the correlation and the mean absolute difference
-between the ENS-driven and ERA5-fed surprise, and the CRPS of the two stage 1 forecasts on the
-same half-hours. If they agree closely (prediction P5) the ERA5-fed arm is called an equivalent
-version, otherwise it keeps the label "hindsight ceiling".
-
-**The surprise tables for experiment 392.** The ENS-driven stage 1 u, Z, and Z~ per Primary and
-half-hour, written to `data/ml-experiments/00391-xgboost-lag-surprise-second-stage/surprise_tables/`
-with a README stating how they were built and which stage 1 fits did not train on each row. The
-manager is told the path as soon as they exist.
-
-## Planned contrasts
-
-- C1 N0 minus B0 (own surprise).
-- C2 N1 minus N0 (neighbours).
-- C3 N2 minus N1 (does the detector state add beyond surprise). **Headline.**
-- C4 N3 minus N1.
-- C5 O minus N2 (room left).
-- C6 N1-ERA5 minus N1 (ENS-driven against ERA5-fed).
-- C7 N2 minus N2 without the veto.
-
-## Scoring
-
-All 16 Primaries to 14 days under `demand-v1`, by lead band (0 to 24 hours, 24 to 72, 72 to 168,
-168 to 240) and the days 1 to 10 headline. Slices: during labelled events and for 7 days after;
-rows whose lags lie inside an event; rows outside both (surprise columns must cost nothing there,
-and the detector's false alarms per Primary-year); per Primary, worst Primary, leave-one-out, per
-group (signed-MW six, MVA-only eight, D15 and D18 report-only), cold nights, sunny half-hours.
-D2 and D4 are the placebos. The avoidable-curtailment cost is reported in the three row sets
-(during each event, 7 days after, all rows) with experiment 383's definition (limit 0.9 of the
-earlier maximum, 12 to 36 hours leads; D9 and D11 have no event rows), copied into this folder.
-Tail calibration at q01, q05, q95, q99 and the interval width and coverage on nulled-or-not rows
-are reported beside CRPS. Importance of the surprise columns follows the `study` skill's recipe.
-
-## Checks, reviews, and compute
-
-Opus reviews the plan once; a Sonnet reviewer checks the code for leakage and the `train_end`
-stops; one Sonnet audit of the scored numbers; then the write-up and prose reviews. The run uses 3
-threads and `MemoryMax=16G` under `systemd-run --user --scope -p OOMPolicy=continue`.
-
-## Compute estimate
-
-Stage 1 refits monthly over the whole stage 2 training history for two versions (ENS-driven and
-ERA5-fed) at 16 Primaries; stage 2 then fits 8 arms (B0, N0, N1, N2, N2 without the veto, N3, O,
-N1-ERA5) at 16 Primaries for each test month. The exact fit count and wall-clock estimate are
-written
-here from the first timed fit, before the full run. Stage 1 predictions stream the daily run frames
-one at a time and are cached per Primary. Event counts per slice are reported in every table.
-
-## Design target and lag-encroachment sweep
-
-**NGED would like a normal-running-arrangement (NRA) forecast, and it may be enough that only the
-median is NRA while the outer quantiles span the NRA level and the abnormal level.** Each arm is
-judged on three properties together, because CRPS on event rows rewards a forecast that follows the
-event level and cannot tell the two apart. Tolerances, fixed before any score is read:
-
-- **Median is NRA:** the median's share of the step depth D in the sweep is at most 0.2 at every
-  encroachment level k (0 means NRA, 1 means the event level).
-- **Tails span both levels:** at least 90% of event-level readings (rows whose target is in an
-  event, and synthetic rows at the event level) lie inside the 1% to 99% band at k of 1 or more,
-  and q95 and q99 (q05 and q01 for a negative event) reach the event level.
-- **The price of spanning:** the 5% to 95% band on rows outside events and the 7 days after them
-  widens by at most 10%, and CRPS there changes by at most +0.02 points of effective capacity, at
-  all 16 Primaries.
-
-**The sweep is prediction-only.** The fitted boosters of every arm are saved (`.ubj`) at every
-monthly refit (12 per arm and Primary) under
-`data/ml-experiments/00391-xgboost-lag-surprise-second-stage/work/boosters/<arm>/`; the sweep uses
-all 12. Clean rows (target outside any event, all lags clean) get a step
-of depth D added to the k most recent lagged inputs, in order: the newest reading (origin minus
-3.5 hours), the same time on the latest day, the same time in the latest week. Levels: k of 0
-(control), 1, 2, and 3. Depths: 2%, 5%, and 10% of effective capacity, plus the label table's
-quartile depths (0.71, 1.1, and 2.3 MW) as shares of capacity, both signs. Two target cases are
-reported separately: the event is still under way (reading is the clean value plus D), and it ended
-before the valid time (reading is the clean value). For arms with surprise or detector columns,
-the shifted readings replace the stored readings at the lag times: `u` is recomputed from the
-stored stage 1 quantiles, the window mean and Z~ follow, the neighbours carry the opposite step
-(shared equally over the listed neighbours, so load is conserved), and the detector is re-run on
-the shifted statistics. Reported per arm and k, by lead band (0 to 24, 24 to 72, 72 to 168, 168 to
-240 hours), group, and Primary: the median shift and its share of D; the ratio of the 5% to 95% and
-1% to 99% band widths to their k of 0 values; the coverage of the clean and of the event-level
-value by the 5% to 95% band and their quantile positions; and the k at which the band first
-reaches the event level. The lagless stage 1 model is the control (share 0, no widening). A few
-real labelled events, chosen by a rule fixed before looking (the three longest events with a
-metered neighbour), are compared with the synthetic ones. The sweep is also run on experiment 392's
-request for arm N1 (its arm R5) at the same refits.
+- **Surprise tables for experiment 392:** `data/ml-experiments/00391-xgboost-lag-surprise-second-stage/surprise_tables/`.
+- **Boosters:** `.../work/boosters/<arm>/` (12 monthly refits per Primary).
+- **Printed reports:** `.../work/scores_core/printed_report.txt` and
+  `.../work/scores_subset/printed_report.txt`.
+- **Code:** `ml-experiments/00391-xgboost-lag-surprise-second-stage/`; run order is stage 1,
+  detector, fit, assemble, score, charts.

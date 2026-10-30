@@ -36,6 +36,7 @@ from typing import Final
 import e00379_adapter as adapter  # ty: ignore[unresolved-import]
 import e00379_score as ref379  # ty: ignore[unresolved-import]
 import e00391_assemble as assemble
+import e00391_fit as fit
 import numpy as np
 import polars as pl
 from studies.dp_features import default_input_paths, load_or_build_feature_cache
@@ -50,10 +51,15 @@ REFERENCE_ARMS: Final[tuple[str, ...]] = ("bg2", "manual_heuristic", "climatolog
 APPROX_UNWIDENED: Final[str] = "bg2_u"
 PLACEBOS: Final[tuple[str, ...]] = ("D2", "D4")
 N_CONTRASTS: Final[int] = 7
+"""C8 to C13 are descriptive and post hoc: C8 is n1 minus b0, C9 is the seed-1 control minus the
+seed-0 control (the noise floor), and C10 to C13 repeat the arm contrasts against the seed-1 control."""
 BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / N_CONTRASTS)
 CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
     ("C1", "n0", "b0"), ("C2", "n1", "n0"), ("C3", "n2", "n1"), ("C4", "n3", "n1"),
     ("C5", "o", "n2"), ("C6", "n1_era5", "n1"), ("C7", "n2", "n2_noveto"),
+    ("C8", "n1", "b0"),
+    ("C9", "b0s1", "b0"), ("C10", "o", "b0s1"), ("C11", "n1", "b0s1"), ("C12", "n0", "b0s1"),
+    ("C13", "n1_era5", "b0s1"),
 )  # fmt: skip
 FULL_METRICS: Final[tuple[str, ...]] = ("crps", "mae_median", "pinball_tail_up", "mean_err_abs")
 SHORT_METRICS: Final[tuple[str, ...]] = ("crps", "mean_err_abs")
@@ -546,18 +552,49 @@ def cost_report(
         print(cost.group_by("arm").agg(total_gbp=pl.col("avoidable_cost_gbp").sum()).sort("arm"))
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Print the scores."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--smoke", action="store_true", help="read arms_smoke, write scores_smoke")
+    parser.add_argument(
+        "--pass", dest="pass_name", choices=("core", "subset"), default="core",
+        help="core: arms run at all 16 Primaries; subset: every arm, on the seven Primaries they share",
+    )  # fmt: skip
+    parser.add_argument(
+        "--from-rows", action="store_true",
+        help="skip building the arms and read the saved rows.parquet (no cost report)",
+    )  # fmt: skip
     parser.add_argument("--resamples", type=int, default=5000, help="bootstrap resamples")
     args = parser.parse_args()
     arms_dir = assemble.SMOKE_OUT_DIR if args.smoke else assemble.OUT_DIR
-    out = WORK / ("scores_smoke" if args.smoke else "scores")
+    out = WORK / ("scores_smoke" if args.smoke else f"scores_{args.pass_name}")
     pl.Config.set_tbl_rows(400)
     pl.Config.set_tbl_cols(40)
     pl.Config.set_tbl_width_chars(260)
     out.mkdir(parents=True, exist_ok=True)
+    if args.from_rows:
+        keep_f64 = ["crps", "mae_median", "mean_err_abs", "pinball_tail_up", "median_minus_mean"]
+        saved = pl.scan_parquet(out / "rows.parquet")
+        names = saved.select(pl.col("arm").unique(maintain_order=True)).collect()["arm"].to_list()
+        rows = {
+            name: saved.filter(pl.col("arm") == name)
+            .drop("arm")
+            .with_columns(pl.col(pl.Float64).exclude(keep_f64).cast(pl.Float32))
+            .collect()
+            for name in names
+        }
+        slices = slice_definitions(columns=next(iter(rows.values())).columns)
+        labelled = sorted(
+            next(iter(rows.values())).filter(pl.col("event") >= 0)["label"].unique().to_list()
+        )
+        print(f"Primaries with a labelled event: {labelled}")
+        print_absolute_scores(rows=rows, slices=slices, reference_arm=next(iter(rows)))
+        print_site_median_minus_mean(rows=rows)
+        results = print_contrasts(rows=rows, slices=slices, resamples=args.resamples)
+        print_verdicts(results=results)
+        print_prediction_checks(rows=rows, labelled=labelled, slices=slices)
+        print_per_primary(rows=rows, slices=slices)
+        return
     series = adapter.series_table()
     cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=ref379.CACHE_DIR)
     actuals, context = adapter.actuals_and_context(
@@ -581,6 +618,9 @@ def main() -> None:
         history=actuals.rename({"actual": "power_mw"}), series=series, before=SCORED_FIRST
     )
     arms, references = load_arms(series=series, arms_dir=arms_dir)
+    if args.pass_name == "core":
+        secondary = {a for a, spec in fit.ARMS.items() if spec.subset}
+        arms = {n: f for n, f in arms.items() if n.removesuffix("_w") not in secondary}
     print(f"arms: {list(arms)}\nstored references (bg2 carries 1.15 already): {references}")
     table = metrics.shared_slice_table(
         forecasts=arms, actuals=actuals, context=context, events=all_events,

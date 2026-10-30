@@ -7,8 +7,10 @@ columns built from the stage 1 tables (`e00391_stage1.py`) and the detector (`e0
 `colsample_bytree` and `colsample_bynode` stay at 1.0, the seed is 0, and no arm widens its bands.
 It writes the 11 quantiles per daily run to `work/arm_preds/<arm>/<site>_s0_<refit>.parquet`.
 
-Arms (`ARMS`): `b0` (no extra columns, the control), `n0` (own surprise), `n1` (own plus neighbour
-surprise), `n2` (n1 plus the detector's open-alarm state, with the neighbour veto), `n2_noveto`,
+Arms (`ARMS`): `b0` (no extra columns, the control), `b0s1` (the control refitted with seed 1, a
+post hoc noise floor whose files are the `b0` seed-1 files renamed to seed 0), `n0` (own surprise),
+`n1` (own plus neighbour surprise), `n2` (n1 plus the detector's open-alarm state, with the
+neighbour veto), `n2_noveto`,
 `n3` (detector state only), `o` (hand-label flags, the oracle ceiling), and `n1_era5` (n1 built
 from the ERA5-fed stage 1, a hindsight ceiling).
 
@@ -94,6 +96,7 @@ class Arm:
 
 ARMS: Final[dict[str, Arm]] = {
     "b0": Arm("b0", ()),
+    "b0s1": Arm("b0s1", ()),
     "n0": Arm("n0", ("own",), subset=True),
     "n1": Arm("n1", ("own", "neighbour")),
     "n2": Arm("n2", ("own", "neighbour", "detector")),

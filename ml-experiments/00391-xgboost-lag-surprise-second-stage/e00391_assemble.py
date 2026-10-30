@@ -14,7 +14,8 @@ Arms written:
 - `b0`, `n0`, `n1`, `n2`, `n2_noveto`, `n3`, `o`, `n1_era5`: our monthly refits, no widening.
 - `<arm>_w`: the arm widened by the fixed factor 1.15 about the median on every row.
 
-Only rows (keys) that every written arm holds are kept, so all arms are scored on the same rows.
+Only rows (keys) that every core arm holds are kept; the secondary arms, which run at seven
+Primaries, keep their own rows, a subset of those.
 
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
@@ -164,15 +165,20 @@ def main() -> None:
         msg = f"no arm has files in {arm_dir}"
         raise ValueError(msg)
     keys = list(common.KEYS)
+    core = [n for n in arms if n == STORED_ARM or not fit.ARMS[n].subset]
     shared = None
-    for frame in arms.values():
+    for name in core:
+        frame = arms[name]
         shared = frame.select(keys) if shared is None else shared.join(frame.select(keys), on=keys)
+    assert shared is not None
     arms = {n: f.join(shared, on=keys, how="semi").sort(keys) for n, f in arms.items()}
-    first = next(iter(arms.values()))
-    for name, frame in arms.items():
-        if not first.select(keys).equals(frame.select(keys)):
+    first = arms[core[0]]
+    for name in core:
+        if not first.select(keys).equals(arms[name].select(keys)):
             msg = f"arm {name} keys differ after the join"
             raise ValueError(msg)
+    # The secondary arms (run at seven Primaries) keep only their own rows, a subset of the core
+    # rows; contrasts that involve them join on the keys they share.
     flags = contaminated_flags(frame=first, masks=masks).sort(keys)
     if not first.select(keys).equals(flags.select(keys)):
         msg = "contaminated-lag keys differ from the arm keys"
