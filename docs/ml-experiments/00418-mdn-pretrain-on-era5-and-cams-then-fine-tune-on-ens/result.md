@@ -50,7 +50,8 @@ decision_rule: >-
   training stage, two more weather sources to maintain, and a network refreshed on its own
   schedule. At the full folds, an arm is `supported` if its difference from the reference (C1, C2, or
   C3) has a 95% interval wholly below -0.03 at the signed-MW six; it is a `small gain` if the
-  interval lies wholly below zero but not below -0.03; otherwise it is `not supported`. No adoption is sought from this experiment.
+  interval lies wholly below zero but not below -0.03; otherwise it is
+  `not supported`. No adoption is sought from this experiment.
 benchmark: >-
   The pooled plain mixture density network of experiment 397 (summary scheme, setting g09, 8-wide
   Primary embedding, three seeds) on the same four folds; BG2, `manual_heuristic`, and
@@ -73,7 +74,9 @@ The status is `planned`. Nothing below has been run.
 the components, so a reader sees what each arm inherits:
 
 - `pooled-emb`: one network across the 16 Primaries with an 8-wide Primary embedding, because
-  [experiment 406][e406] found the embedding carries the pooling gain.
+  [experiment 406](
+  ../00406-pooled-mixture-density-network-without-embedding-and-with-short-history/result.md)
+  found the embedding carries the pooling gain.
 - `summary`: the inputs are the ensemble mean and ensemble standard deviation of each of the seven
   weather variables (experiment 397's summary scheme), so the network is applied once per run.
 - `g09`: 64 units, 2 hidden layers, 3 mixture components, dropout 0.1, the setting experiment 397
@@ -170,11 +173,10 @@ failed and the verdict is `failed` for that arm.
 
 - Follows [experiment 403](../00403-pooled-versus-per-primary-mixture-density-network/result.md) and
   experiment 406: one pooled network with a Primary embedding.
-- Follows [experiment 397][e397]: no attention gate, summary inputs, setting g09, and its tails flagged as the open problem.
+- Follows [experiment 397](
+  ../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md):
+  no attention gate, summary inputs, setting g09, and its tails flagged as the open problem.
 - Departs from the experiment 412 capacity-prior arms, which do not apply here because the
   pretraining target is the same signed-MW or MVA power as the fine-tuning target.
 - Experiment 413 (differentiable-physics network) did not advance, and experiment 406 found the
   pooled gain grows with short histories, which motivates the low-data check C6.
-
-[e397]: ../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md
-[e406]: ../00406-pooled-mixture-density-network-without-embedding-and-with-short-history/result.md
