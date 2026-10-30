@@ -222,6 +222,9 @@ they sit outside the family of six primary tests and are reported as secondary c
 - **C3pa:** C3p's penalty applied only when the capacity falls below the prior centre, so the
   capacity is free to rise and penalised for falling (the maintainer's asymmetric form), same
   scale.
+- **Label.** The prior is about 100 times stronger than C3's, not the Bayesian per-row scale. At the
+  start of training C3pa's penalty gradient is zero, because the capacity starts at the prior
+  centre and the penalty acts only below it.
 - **Everything else** is C3: same inputs, adapter, folds, seeds (all 5 fitted new), and scoring.
 - **Reports.** For each arm, the prior's share of the log-capacity gradient at the start and end of
   training (`e00416_prior_share.py --arm`), and the learned capacity beside the studies page per
