@@ -162,8 +162,8 @@ change beyond the Gaussian prior. C5b adds the persistence penalty
 `lambda_up * relu(C[y] - C[y-1])^2 + lambda_down * relu(C[y-1] - C[y])^2` with `lambda_down` 10
 times `lambda_up`, so a rise is cheap and a fall is dear. C5a replaces the season-year capacity
 with a monthly path and penalises the squared month-to-month change symmetrically. A full C5
-(monthly path and persistence penalty together) is run only if both C5a and C5b move the score by more than their
-minimum detectable effects. Every sudden fall of a learned capacity (more than 10% in one step) is
+(monthly path and persistence penalty together) is run only if both C5a and C5b move the score by
+more than their minimum detectable effects. Every sudden fall of a learned capacity (more than 10% in one step) is
 reported as a candidate meter failure, together with the date, because NGED subtracts metered solar
 from the Primary's demand and a failed meter changes the Primary's series.
 
