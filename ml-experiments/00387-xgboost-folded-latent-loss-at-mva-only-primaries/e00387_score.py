@@ -3,7 +3,7 @@
 The arms are the plain quantile model, F0 (unfolded custom objective), and F2 (folded pinball,
 kappa 1.0) at Q0 = 0, 2, and 4 points of capacity, refitted monthly, scored on the 73 runs of
 `fold_a_every5d_v1` (the runs the fits forecast). Prints the reference gate against the stored
-monthly member, the pre-registered contrasts (99.37% for k = 4, 20,000 resamples), per-Primary
+monthly member, the pre-registered contrasts (99.75% for k = 4, 20,000 resamples), per-Primary
 tables, tails, sunny bias, and the load-shift slices.
 
     PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility:\
