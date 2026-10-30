@@ -14,9 +14,11 @@ the afternoon limbs separately:
 - **Residual.** `e = r^2 - D^2` on hours with `0.1 <= u < 0.95`.
 - **Limb score.** On each limb (hours before and after solar noon), the drop in residual sum of
   squares from the best non-increasing fit of `e` on `u` (pool adjacent violators) to the best
-  continuous two-piece line with a positive upper slope, divided by the two-piece sum of squares;
-  with a negative lower slope as well (a V) and at least 3 hours either side of the breakpoint. The day's score is the smaller of the two limbs
-  and its breakpoint is their mean. A day with a daily maximum `u` below 0.6 is ineligible.
+  continuous two-piece V (negative lower slope, positive upper slope), divided by the two-piece
+  sum of squares, with at least 3 hours either side of the breakpoint. On a smooth-sun day the
+  day's score is the smaller of the two limbs and its breakpoint is their mean. On a broken-cloud
+  day (mean absolute second difference of hourly `u` above 0.05) one V is fitted in `u` over the
+  whole day. A day with a daily maximum `u` below 0.6 is ineligible.
 - **Threshold.** The 98th percentile of the score over the no-injection days of the other signed
   Primaries (leave one Primary out in the diagnostic; the visible four in a fit).
 
