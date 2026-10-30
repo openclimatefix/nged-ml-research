@@ -199,7 +199,7 @@ def headline_99(*, wide: pl.DataFrame) -> None:
             sums, counts = by["s"].to_numpy(), by["n"].to_numpy()
             draws = rng.integers(0, len(sums), size=(20000, len(sums)))
             means = sums[draws].sum(axis=1) / counts[draws].sum(axis=1)
-            lo, hi = np.percentile(means, [0.5 / 12 * 100, 100 - 0.5 / 12 * 100])
+            lo, hi = np.percentile(means, [2.5 / 12, 100 - 2.5 / 12])
             print(
                 f"HEADLINE 99.58% | {gname} | {key[:20]} | {arm} minus {ref}: "
                 f"{sums.sum() / counts.sum():+.3f} ({lo:+.3f} to {hi:+.3f}) [{by.height} units]"
@@ -233,6 +233,17 @@ def median_error_check() -> None:
             print(
                 f"MEDIAN CHECK | {gname} | event-lag rows | {arm} minus {ref}: CRPS {(j['crps_a'] - j['crps_b']).mean():+.3f}, "
                 f"median absolute error {(j['mae_a'] - j['mae_b']).mean():+.3f}, rows {j.height}"
+            )
+
+
+def leave_one_out(*, wide: pl.DataFrame) -> None:
+    """Print the six's event-lag contrasts with each Primary left out (audit trigger 4)."""
+    rows, unit = row_sets(wide=wide)["event-lag rows (1 to 3 lags in an event, target outside)"]
+    for left in (None, *SIX):
+        sub = rows.filter(pl.col("label").is_in([x for x in SIX if x != left]))
+        for arm, ref in (("mix_w50", "lags"), ("mix_w50", "mix_b2")):
+            print(
+                f"LEAVE-ONE-OUT | six without {left} | {arm} minus {ref}: {r400.contrast(rows=sub, arm=arm, ref=ref, unit=unit)}"
             )
 
 
@@ -297,6 +308,7 @@ def report() -> None:
     )
     wide = scored.filter(~pl.col("flagged"))
     headline_99(wide=wide)
+    leave_one_out(wide=wide)
     median_error_check()
     table(wide=wide, tag="all rows")
     table(wide=wide.filter(pl.col("cold_nights")), tag="cold nights")
