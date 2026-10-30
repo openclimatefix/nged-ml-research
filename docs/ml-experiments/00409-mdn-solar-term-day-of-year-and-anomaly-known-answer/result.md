@@ -26,8 +26,8 @@ hypothesis: >-
   against the same network given no solar term.
 prediction: >-
   Written before any fit. K0 (controls): C2 recovers the ensemble's own anomaly at 0.8 to
-  1.2 and a pure profile at most 0.30. K1 (anomaly variant): the learned capacity increment of C2 is 0.5 to 1.5
-  of the least-squares read-out of the injected anomaly on the ensemble unit shape at 4 of the 6
+  1.2 and a pure profile at most 0.30. K1 (anomaly variant): the learned capacity increment of C2 is
+  0.5 to 1.5 of the least-squares read-out of the injected anomaly on the ensemble unit shape at 4 of the 6
   Primaries. K2 (anomaly placebo): the day-shuffled anomaly recovers at most the profile-only
   benchmark plus 0.20, where the benchmark is the same read-out on the shuffled series (expected
   near 0). K3 (profile variant): the real-farm increment recovers more than the day-shuffled farm
