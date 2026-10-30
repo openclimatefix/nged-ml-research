@@ -75,7 +75,7 @@ benchmark: >-
 
 # Can the monthly XGBoost model infer signed MW from MVA readings, in lab conditions?
 
-**Plan only; no score has been read.** At 8 of the 16 Primaries ("MVA-only": D2, D3, D4, D8, D12,
+**The known-answer test failed (below); the CAMS-columns contrast is still running.** At 8 of the 16 Primaries ("MVA-only": D2, D3, D4, D8, D12,
 D19, D21, D22) the meter records apparent power, which has no sign, so reverse flow from embedded
 solar looks like demand. Experiments 152, 372, 374, and 387 each tried a different fold treatment
 and none gave a signed forecast that could be trusted. This experiment gives the monthly XGBoost
@@ -102,6 +102,46 @@ solar farm, so that the true answer is known.
   cache without the D15 and D18 cut. A0 is therefore refit here, as the brief says, and experiment
   381's stored forecasts serve only the code check (D5 and D12, within 0.05 CRPS).
 - **Scope unchanged.** The plan's contrasts, thresholds, and stop rules are the brief's.
+
+## Known-answer test at injection level 2.0: failed
+
+**Take-home: the registered rule found the sign of injected reverse flow correctly for about
+three half-hours in four, but not well enough to pass.** At the six Primaries whose meters record
+sign, we added a metered solar farm's output (twice the median sunny-midday reading), discarded the
+sign, and asked the model to recover it. The signed median had the right sign on 83.4% of the
+pooled balanced accuracy scale (the pass line is 85%), and it beat the plain model read as signed
+by a wide margin (signed mean absolute error 9.3 against 19.5 points of effective capacity). It did
+not beat a simple rule that flips the sign whenever the realised ERA5 shortwave irradiance exceeds
+a threshold fitted on the training years: that rule scored 0.86 to 0.88 per Primary, 3.6 points
+above the model, though it wrongly flipped 14% to 19% of the half-hours with no reverse flow
+against 2% to 5% for the model. The plan's stop rule applies: the A2 arms (the signed label at
+tau 0.7 and 0.5, off, shuffled) are not run, and level 1.0 is not run.
+
+- **Pass criteria and results (pooled over the six Primaries, 3 refit jobs of 12 monthly refits,
+  days 1 to 10, daylight half-hours).** Pooled balanced accuracy 0.834 (needs 0.85: fail). Lowest
+  Primary 0.788 (D5; needs 0.70: pass). False-reverse rate 3.6% (needs at most 5%: pass). Margin
+  over the shortwave rule -0.036 (needs +0.03: fail). Signed mean absolute error 9.3 against 19.5
+  for the plain model (pass). Per Primary balanced accuracy: D5 0.788, D9 0.841, D10 0.825,
+  D11 0.849, D14 0.846, D16 0.843; recall on reverse flow 0.60 to 0.75.
+- **The shortwave comparison favours the rule.** It reads realised ERA5 shortwave at the valid
+  time, so it knows the weather of the forecast day, which the 10-day forecast does not.
+  The registered test still counts it, so the gate fails as registered.
+- **Rule-only diagnostics (no model fit, refit 2026-01-01).** On the injected data the rule's labels
+  alone reach recall 0.64 to 0.79 and false-reverse 3.8% to 6.1% at tau 0.7 (level 2.0), and at
+  level 1.0 recall 0.66 to 0.98 with false-reverse 6.9% to 13.2%. So most of the model's loss of
+  accuracy is the rule's, not the fitting's.
+- **The rule's gate opens at two real Primaries.** On real readings read as apparent power, the
+  gate opens only at D10 (a signed-MW Primary with 130 real reverse half-hours) and at D12 (an
+  MVA-only Primary). At both, the rule labels 97% (D10) and 92% (D12) of sunny summer-midday
+  half-hours in the training window as reverse flow, because `C` is fitted from the same rows
+  that it then labels. It is therefore not evidence that D12 exports on 92% of sunny middays.
+- **Reproduce.** `e00408_fit.py --mode inj:2.0 --arms A0 A2_70`, then
+  `e00408_gate.py --mode inj:2.0`; the rule-only lines come from `e00408_rule_check.py` in the
+  modes `abs`, `inj:2.0`, and `inj:1.0`. Fits at 3 threads, monthly refits, cleaned data, D15 and
+  D18 cut (neither is in the known-answer set). A fresh Sonnet agent reviewed the code before the
+  fit and found no leakage; its findings on the pooled mean, the shortwave-rule training mask, and
+  file-write order were fixed before the run, and its note that the lab columns carry realised CAMS
+  values at all leads (so prediction P6 cannot be tested here) is accepted.
 
 ## Design
 
