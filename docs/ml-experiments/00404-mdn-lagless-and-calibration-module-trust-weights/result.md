@@ -152,6 +152,31 @@ design replaces the detector with a continuous trust weight per lagged input, le
   and no cross-fit, is arm B9, run last and labelled in-sample.
 - **Series.** Each Primary series is one series per substation.
 
+## Review against the latest evidence
+
+**The plan was reviewed against the pages merged since the brief was written** (experiments 387,
+398, 399, 401, and 403, and the standing practices of the `ml-experiment` skill, read from `main` on
+2026-10-30). Four changes follow; none alters the scope.
+
+- **Fixed-mixture control.** Experiment 401's advice is to use a fixed mixture with a weight of 0.3
+  to 0.5 on the forecast with lags as the control for any learned blend at the signed-MW Primaries.
+  The plan adds a free arm F0: a fixed mixture, with weight 0.4 on the lagged forecast of A0-inj
+  and 0.6 on L0, computed from stored forecasts. F0 is reported at the signed-MW six only, and not
+  at the MVA-only eight or at D15 and D18.
+- **How the lag response is measured.** The lag response is the forecast with lags minus the
+  forecast without lags on the same rows, and never 1 minus the residual over the labelled step.
+- **Standing practices followed.** Monthly refits; cleaned data, with the number of dropped
+  `substation_zero` half-hours reported per fold; the D15 and D18 cut at 2025-03-01; every fitted
+  network saved in the experiment's data folder; stored predictions reused as references; tails and
+  the avoidable-curtailment cost reported beside CRPS; example forecast plots and event plots;
+  draft pull request. The plan departs from the practice of four screen folds: it uses the five
+  screen folds of experiment 397, so that its scores sit on the same rows as experiments 397 and
+  403, and labels every number interim.
+- **Evidence that tempers the expected gain.** Experiment 401 found real events move the forecast
+  by 0.03 of the step or less, and that one event at D16 carries most of a fixed mixture's gain at
+  the six. Experiment 402's `ceilings3.txt` found the flag oracle's gain has an interval that
+  includes zero. The batch 0 and batch 1 stop rules already encode this.
+
 ## Design choices fixed by this plan
 
 **The smoother and the surprise source are fixed here because the brief leaves them open.** Each is
