@@ -194,7 +194,7 @@ def draw_figure(*, contrast: pl.DataFrame) -> None:
     bars = (
         alt.Chart(data)
         .mark_rule(strokeWidth=2)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=y,
             x=alt.X(
                 "lower:Q",
@@ -207,12 +207,16 @@ def draw_figure(*, contrast: pl.DataFrame) -> None:
     dots = (
         alt.Chart(data)
         .mark_point(filled=True, size=70)
-        .encode(y=y, x="difference:Q", color=colour, shape=alt.Shape("group:N", legend=None))
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=y, x="difference:Q", color=colour, shape=alt.Shape("group:N", legend=None)
+        )
     )
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
         .mark_rule(strokeDash=[4, 4], color="grey")
-        .encode(x="x:Q")
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="x:Q"
+        )
     )
     chart = (bars + dots + zero).properties(
         width=560,
