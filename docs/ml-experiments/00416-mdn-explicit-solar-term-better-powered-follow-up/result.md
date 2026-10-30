@@ -174,6 +174,26 @@ contrast, signed-MW six, days 1 to 10):
 - **Only the month-to-month spread within a slice of 5 test months limits the interval.** More
   seeds do not fix that, and more test months would.
 
+## Amendment 2: pre-registered second stage, more test months (manager, 2026-10-30)
+
+The first stage runs as planned (5 test months, 70 fits) with the margin unchanged. **If the
+post-fit minimum detectable effect exceeds the margin, the verdict is "inconclusive" until the
+extension below runs.** The extension does not start without the manager's word.
+
+- **Months available.** The ECMWF ensemble archive starts on 2024-04-01 and no valid time on or
+  after 2026-07-01 may be scored. With at least 12 months of training history, the test months run
+  from 2025-04 to 2026-06, 15 months. Ten are unused: 2025-04 to 2025-09, 2025-11, 2026-02,
+  2026-04, and 2026-05. Months before 2026-04 have a training window shorter than 730 days (12 to
+  23 months), which the page states as a caveat.
+- **Size.** 8 to 12 test months means adding 3 to 7 months. Each added month needs all 4 arms at 5
+  seeds, 20 fits, because experiment 409 stored no seeds there. That is 60 to 140 fits, about 1.7
+  to 4 hours at the first stage's rate.
+- **Priority order of added months.** 2025-07, 2025-08, 2025-05 (the sunny months, where the
+  sunny-midday slice has most rows), then 2025-09, 2026-04, 2026-05, 2025-06.
+- **Decision rule.** Unchanged, with the margin of +0.10 CRPS points and +5% q99 pinball loss, the
+  Bonferroni level for six tests, and the post-fit minimum detectable effect recomputed on all
+  months.
+
 ## Reports
 
 - **Figures.** Contrasts with intervals first; sunny-midday CRPS and q99 pinball loss per Primary;
