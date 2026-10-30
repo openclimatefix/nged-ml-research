@@ -199,16 +199,15 @@ Primaries. The manager sizes the slot from these counts.
 
 ## Caveat: flagged exact-zero half-hours (manager, 2026-10-30)
 
-The scoring actuals of this experiment come from the feature cache, which is built from experiment
-103's `rows.parquet` without the `drop_reason` filter. About 622 flagged exact-zero Primary
-half-hours therefore sit in the scored year (figure from the manager; to be re-counted here). Every
-arm trains on experiment 87's own training rows, the same rows for all arms and for experiment 381's
-stored control, so contrasts between arms are like-for-like, but absolute scores include those
-half-hours. The training rows are not changed here, because that would break the reuse of 381's
-control as R0 lagged. Whether experiment 87's training frames carry the flagged rows is unresolved:
-experiment 388 says its training reads experiment 87's own frames, which differs from the finding
-above. The filtered file or rule is awaited from the XGBoost Discuss session or the maintainer; the
-merge of this experiment waits for it.
+**The fits are clean; the scoring actuals are not yet.** The fits read training targets from
+`common.ENS_TRAIN_PATH` and lags from `common.load_series_arrays` (the ERA5 file and experiment
+87's own `inputs/observed.parquet`), where flagged half-hours are nulls. The feature cache from
+experiment 103's `rows.parquet`, which has no `drop_reason` filter, enters only the load-shift event
+masks and the scoring actuals (experiment 377's `actuals_and_context`). About 622 flagged
+exact-zero Primary half-hours (the manager's figure, to be re-counted here) therefore sit in the
+scored actuals, identically for every arm, so contrasts between arms are like-for-like while
+absolute scores include them. The scorer may read experiment 87's observed power instead; the
+decision is awaited from the XGBoost Discuss session or the maintainer, and the merge waits for it.
 
 ## Open items
 
