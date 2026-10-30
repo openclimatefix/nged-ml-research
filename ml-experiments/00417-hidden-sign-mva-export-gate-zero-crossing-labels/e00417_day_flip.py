@@ -235,7 +235,8 @@ def score_days(*, h: Hourly, profile: Profile) -> DayResult:
         )
         use = (h.u[sel] >= U_LOW) & (h.u[sel] < U_HIGH) & np.isfinite(e_all)
         u_day = h.u[sel]
-        u_by_time = u_day[np.argsort(h.hod[sel])]
+        daylight = u_day >= U_LOW
+        u_by_time = u_day[daylight][np.argsort(h.hod[sel][daylight])]
         roughness = float(np.mean(np.abs(np.diff(u_by_time, n=2)))) if len(u_by_time) > 2 else 0.0
         broken = roughness > BROKEN_ROUGHNESS
         if broken:
