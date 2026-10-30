@@ -188,7 +188,10 @@ def run_job(
             base.train_matrix(known=known, row=row, refit=refit, arm=arm),
             num_boost_round=rounds,
         )
-        path = BOOSTER_DIR / name / f"{site}_s{seed}_{refit:%Y%m%d}.ubj"
+        booster_dir = (
+            BOOSTER_DIR.with_name("boosters_smoke") if "smoke" in out_dir.name else BOOSTER_DIR
+        )
+        path = booster_dir / name / f"{site}_s{seed}_{refit:%Y%m%d}.ubj"
         path.parent.mkdir(parents=True, exist_ok=True)
         models[site].save_model(path)
         lines.append(

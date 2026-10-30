@@ -134,7 +134,9 @@ def real_site(*, site: str, threads: int) -> pl.DataFrame:
         for ev in events.iter_rows(named=True):
             lo, hi = ev["onset_idx"], ev["end_idx"]
             shift = ev["depth_mw"] / capacity
-            if np.isnan(median[lo : hi + 1]).any():
+            if np.isnan(median[lo : hi + 1]).any() or np.isnan(arrays.power[lo : hi + 1]).any():
+                continue
+            if lo < int(common.grid_index(times=refit)) <= hi:
                 continue
             cf_power = arrays.power.copy()
             cf_power[lo : hi + 1] = median[lo : hi + 1]
@@ -161,7 +163,10 @@ def real_site(*, site: str, threads: int) -> pl.DataFrame:
                 continue
             step = max(1, len(touching) // MAX_RUNS_PER_EVENT_REFIT)
             for origin in touching[::step][:MAX_RUNS_PER_EVENT_REFIT]:
-                prepared = {n: run_prepared(site_row=row, arrays=a, origin=origin) for n, a in variants.items()}
+                prepared = {
+                    n: run_prepared(site_row=row, arrays=a, origin=origin)
+                    for n, a in variants.items()
+                }
                 keys = prepared["real"].select(*common.KEYS).unique(maintain_order=True)
                 target = np.asarray(common.grid_index(times=keys["valid_time"]))
                 o = np.asarray(common.grid_index(times=keys["power_fcst_init_time"]))
@@ -169,9 +174,14 @@ def real_site(*, site: str, threads: int) -> pl.DataFrame:
                     power=np.arange(size, dtype=np.float32), target=target, origin=o
                 ).astype(np.int64)
                 k = ((lag >= lo) & (lag <= hi)).sum(axis=1)
-                lead = (keys["valid_time"] - keys["power_fcst_init_time"]).dt.total_minutes().to_numpy() / 60
+                lead = (
+                    keys["valid_time"] - keys["power_fcst_init_time"]
+                ).dt.total_minutes().to_numpy() / 60
                 band = band_of(lead=lead)
-                q = {n: quantiles(model=model, prepared=p, columns=columns) for n, p in prepared.items()}
+                q = {
+                    n: quantiles(model=model, prepared=p, columns=columns)
+                    for n, p in prepared.items()
+                }
                 keep = (k > 0) & ~in_any[target] & (band >= 0)
                 for kk in (1, 2, 3):
                     for b in range(len(BANDS)):
@@ -205,12 +215,16 @@ def clean_site(*, site: str, threads: int) -> pl.DataFrame:
         model = load_model(site=site, refit=refit, threads=threads)
         prepared = run_prepared(site_row=row, arrays=arrays, origin=origin)
         keys = prepared.select(*common.KEYS).unique(maintain_order=True)
-        lead = (keys["valid_time"] - keys["power_fcst_init_time"]).dt.total_minutes().to_numpy() / 60
+        lead = (
+            keys["valid_time"] - keys["power_fcst_init_time"]
+        ).dt.total_minutes().to_numpy() / 60
         band = band_of(lead=lead)
         members = prepared["ensemble_member"].n_unique()
         matrix = prepared.select(columns).to_numpy().astype(np.float32)
         base = common.mixture_quantiles(
-            member_quantiles=model.predict(xgb.DMatrix(matrix)).reshape(-1, members, len(common.LEVELS))
+            member_quantiles=model.predict(xgb.DMatrix(matrix)).reshape(
+                -1, members, len(common.LEVELS)
+            )
         )
         for sign in (1, -1):
             for depth in DEPTHS:
