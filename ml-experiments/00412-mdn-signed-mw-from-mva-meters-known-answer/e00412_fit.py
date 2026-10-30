@@ -126,7 +126,7 @@ def make_model(*, arm: Arm, fold: inputs.Fold, refit: datetime, seed: int) -> mo
     )
 
 
-def train(
+def train(  # noqa: PLR0915
     *,
     model: models.SignedMdn,
     fold: inputs.Fold,
@@ -137,7 +137,8 @@ def train(
     """Train with the weighted folded negative log-likelihood and early stopping on the held weeks.
 
     Returns the epochs, the best validation loss, and the share of the capacity gradient that the
-    prior carries on a fixed batch of 16,384 training rows at the start and at the best state.
+    prior carries on a fixed batch of 16,384 training rows at the start, after the first epoch, and at
+    the best state. The start share is zero when the capacity starts at the prior centre.
     """
     torch.manual_seed(seed)
     t = {
@@ -175,7 +176,8 @@ def train(
             gate_u=t["g"][b],
         )
 
-    diag_idx = train_idx[torch.randperm(len(train_idx), device=device)[:BATCH]]
+    diag_rng = torch.Generator(device=device).manual_seed(seed)
+    diag_idx = train_idx[torch.randperm(len(train_idx), device=device, generator=diag_rng)[:BATCH]]
     prior_divisor = 1.0 if model.prior_undivided else n_eff
 
     def prior_share() -> dict[str, float]:
@@ -197,6 +199,7 @@ def train(
 
     model.eval()
     share_start = prior_share()
+    share_epoch1: dict[str, float] = {}
     best, best_state, stale, epochs = float("inf"), None, 0, 0
     for epoch in range(max_epochs):
         model.train()
@@ -213,6 +216,8 @@ def train(
         with torch.no_grad():
             val = float(torch.cat([batch_nll(b) for b in val_idx.split(BATCH * 4)]).mean())
         epochs = epoch + 1
+        if epochs == 1:
+            share_epoch1 = prior_share()
         if val < best - 1e-5:
             best, stale = val, 0
             best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
@@ -223,7 +228,11 @@ def train(
     assert best_state is not None
     model.load_state_dict(best_state)
     model.eval()
-    return epochs, best, {"start": share_start, "end": prior_share()}  # ty: ignore[invalid-return-type]
+    return (
+        epochs,
+        best,
+        {"start": share_start, "epoch1": share_epoch1, "end": prior_share()},
+    )  # ty: ignore[invalid-return-type]
 
 
 def forecast_pair(
