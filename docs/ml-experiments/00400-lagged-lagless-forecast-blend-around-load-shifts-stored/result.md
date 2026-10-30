@@ -96,11 +96,16 @@ production_status: not-for-production
   of each sign, as five inputs, so a fit can learn the neighbour sign logic; the rule is not hand
   coded. Fixed-weight control: w = 0.5. Endpoints: the two pure forecasts. Each of B1 to B3 and the
   control is scored as a mixture and as a quantile average of the same weights.
-- **Fit.** CRPS of the mixture's 11 quantiles, minimised by Nelder–Mead on a fixed random
+- **Fit.** The exact CRPS of the mixture (the integral of the squared difference between the mixture
+  CDF and the step at the actual value, with the piecewise-linear CDFs below), plus a ridge penalty
+  of 1e-3 times the squared parameters, minimised by BFGS (at most 60 iterations) on a fixed random
   subsample of 200,000 training rows (seed 0), with an expanding window: the model for scored month
   m uses rows whose valid time is before the first of m. July to September 2025 is warm-up and
   uses w = 0.5; October 2025 to June 2026 is scored. Warm-up months are reported separately. The
   label table never enters a fit.
+- **Reported score.** The protocol's CRPS from the mixture's 11 quantiles, so every arm is scored as
+  every earlier experiment is. For a mixture of two well-separated forecasts the 11-quantile score
+  is lower than the exact CRPS, so the report also gives the exact CRPS of the mixture arms.
 - **Mixture quantiles.** Each forecast's CDF is linear between its 11 quantiles, with the end
   segments extended to levels 0 and 1 at the slope of the outer segment. The mixture CDF is
   w F1 + (1 - w) F2, inverted by bisection at the 11 levels.
