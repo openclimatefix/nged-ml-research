@@ -84,7 +84,7 @@ code: ml-experiments/00411-counterfactual-lag-rescore-harm-rows-r1-boosters/
 
 **Status: done. The scored sample is too small to settle batch 0.** The sections from "Question"
 onward are the plan, written before any score existed. This experiment is batch 0 of the [experiment
-404 plan](../00404-mdn-lagless-and-calibration-module-trust-weights/result.md), run as its own
+404 plan](https://github.com/openclimatefix/nged-ml-research/pull/58), run as its own
 experiment so that the experiment 404 session is not blocked. This experiment needs no neural
 network, no GPU, and no fit.
 
