@@ -23,6 +23,7 @@ PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations
 import argparse
 import csv
 import json
+import os
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -34,8 +35,11 @@ import e00391_stage1 as stage1
 import numpy as np
 import polars as pl
 
-LABELS: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/briefs/sw_block_detector_label_table.csv"
+LABELS: Final[Path] = (
+    Path(os.environ["DATA_PATH_INTERNAL"])
+    / "ml-experiments"
+    / "briefs"
+    / "sw_block_detector_label_table.csv"
 )
 OUT_DIR: Final[Path] = stage1.WORK_DIR / "detector"
 TUNE_START: Final[datetime] = datetime(2024, 11, 1, tzinfo=UTC)
