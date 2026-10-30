@@ -101,7 +101,9 @@ the brief's arms M0 to M3.
   the solar bell. Signed power is `X = D - C_p u` in points of effective capacity (percent). The
   CAMS unit shape `u` is `studies.pv_physics.plant_power_mw` of the fleet plant driven by CAMS
   hourly irradiance (the quantity `studies.dp_features.unit_pv_shape` computes), divided by one
-  constant, its 99th percentile over daylight half-hours pooled over the 16 Primaries. `C_p >= 0`
+  constant, its 99th percentile over daylight half-hours pooled over the 16 Primaries (the shape
+  is clipped at the plant's inverter limit, so the constant is 1.0 and a capacity is in points at
+  plant clipping). `C_p >= 0`
   is learned per Primary under a log-normal prior centred on the median studies-page capacity of the
   six signed-MW Primaries (33.5 points at the 2026-06 refit), with a log standard deviation of 0.7.
 - **Likelihood, in physical units.** Signed Primaries use the mixture density `f(x)`. A folded
@@ -120,7 +122,7 @@ the brief's arms M0 to M3.
   and D14; r3: D11 and D16) by replacing the reading with `sqrt(P'^2 + Q^2)`, where `P'` is the
   signed power minus the injected farm. The other four stay signed. Lags at the hidden pair are
   folded the same way. A half-hour where any of the three rotation farms has a gap leaves training
-  at every Primary and every setting, so the settings train on identical rows, and the dropped count
+  at the hidden pair in every setting, so the settings train on identical rows, and the dropped count
   is reported. The farm series stay in the private store, and no farm name, ID, or series is
   published.
 - **Scoring.** Gate-open half-hours (`u >= 0.3`) with CAMS clear-sky index at least 0.7 form the
@@ -174,6 +176,13 @@ core, that is 3 to 11 hours. The timed figure replaces this estimate in the PR.
 
 ## Risks
 
+- **The open-gate likelihood is not normalised.** The folded density already covers all `|X|`, and the
+  censored band for `r <= Q0` counts the band `|X| <= Q0` again. The extra term fires only on the rare
+  readings at or below `Q0`, and the design prescribes it. Reading Q = 4 as "floor exactly right" is
+  wrong: every reading is then at least 4 points, so the fit leans towards `|X| >= 3.5` on gate-open
+  rows. Only Q = 2 matches `Q0`.
+- **The prior centre uses all six signed-MW Primaries**, including the hidden pair, so their known
+  capacity enters slightly (a median of six, log standard deviation 0.7).
 - **The shuffle keeps the daylight profile**, so S1c-shuffle may score well above chance (experiment
   405). P3 is a margin, and the capacity learned under the shuffle is reported.
 - **`D` can absorb the PV shape** from hour of day, month, temperature, and the Primary embedding. If

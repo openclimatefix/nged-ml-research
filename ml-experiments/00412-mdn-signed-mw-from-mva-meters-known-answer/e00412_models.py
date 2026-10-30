@@ -179,7 +179,7 @@ def quantiles(
         scale = torch.ones_like(base_cdf)
     else:
         base_cdf = mixture_cdf(x=lower[:, None], log_w=log_w, mean=mean, std=std)
-        scale = 1.0 - base_cdf
+        scale = (1.0 - base_cdf).clamp_min(1e-6)
     target = base_cdf + levels[None, :] * scale
     lo = torch.full((len(mean), len(LEVELS)), -X_LIMIT_POINTS, dtype=mean.dtype, device=mean.device)
     hi = torch.full_like(lo, X_LIMIT_POINTS)
