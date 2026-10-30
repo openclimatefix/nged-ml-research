@@ -149,10 +149,13 @@ one training parameter of the control. The spread factor is handled by scoring e
 | C | P-sub | `subsample` 0.6 and 1.0 |
 | C | P-lambda | L2 `lambda` 10 |
 | C | P-hl | Recency half-life 0.25, 1, and 2 years |
+| A2 | W7 | Adds trailing means of shortwave over 3, 6, and 24 hours and the 3-hour change in shortwave, built like W1 from the stored ensemble trajectories (the ensemble shortwave goes through production's upsampler). Winners of W1 to W7 are refitted with the ensemble mean and standard deviation columns |
+| D | WS A1, A2, A3 | Window summaries of lag surprise, a light arm against experiment 391's B0 control (both seeds): A1 adds means of the surprise u over the previous 6, 12, 24, and 168 hours, A2 the same windows of the signed stage-1 residual, A3 both. No stage-1 refit: the stage-1 surprise tables of [experiment 391](../00391-xgboost-lag-surprise-second-stage/result.md) are read, and only stage 2 is fitted, monthly, at 150 rounds as in 391's screen. Runs after the two main folds report |
 | D | B4 | One booster per lead band (0.5–24 h, 24–72 h, 72–240 h, 240–336 h), `lead_hours` kept as an input |
 | D | W5 | Trailing wind speed over 24 and 72 hours times a cold hinge |
 | D | W6 | Below-2 °C flag times precipitation, and trailing 24-hour precipitation |
 
+The window-summary arm uses its own control (experiment 391's B0, not C0), so its scores are not comparable with the other arms'. It is reported as promising only if it beats B0 outside load-shift events and outside the 7 days after them, so that the harm of 391's columns is not repeated; the maintainer approved it as a fifth attempt on the lag-surprise idea, so the stop rule is satisfied.
 Tier A runs first, then B (once the extraction exists), then C, then D. A two-band split follows B4
 only if B4 passes. H2, H3, and H4 of the holiday brief are not run (see above). W0 and the post hoc
 level anchor are other jobs.
