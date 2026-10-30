@@ -194,6 +194,20 @@ extension below runs.** The extension does not start without the manager's word.
   Bonferroni level for six tests, and the post-fit minimum detectable effect recomputed on all
   months.
 
+## Amendment 3: the capacity prior is nearly inert (checked during the first fits)
+
+`e00416_prior_share.py` computes the gradient of the prior and of the likelihood with respect to
+the learned log-capacities of C3 on the 2026-06 fold (10 random batches of 16,384 training rows,
+seed 0). The training loss divides the prior by the effective number of training rows (1.76
+million), as experiment 412's loss did.
+
+- **At the start** (capacity at the prior centre) the prior's share of the gradient norm is
+  1.2e-9, because the prior's gradient is zero at its own centre.
+- **At the end** (experiment 409's stored C3, same fold and seed) the share is 2.5%, and the
+  learned capacities lie on average 4.1 prior standard deviations from the prior centre.
+- **Consequence.** C3 and H1 behave as the explicit solar term with a free capacity. The page says
+  so, and does not describe the capacity as "regularised towards the studies page".
+
 ## Reports
 
 - **Figures.** Contrasts with intervals first; sunny-midday CRPS and q99 pinball loss per Primary;
