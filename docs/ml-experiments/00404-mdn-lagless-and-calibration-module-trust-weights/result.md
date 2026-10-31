@@ -115,26 +115,27 @@ verdict: not supported
 best_arm: >-
   None. No arm beats B-mix, a fixed 50/50 mixture of the plain network and the lagless table, on
   real harm rows at the signed-MW six once the pooled difference is weighted by events. Attention
-  over the lags (B3) is 0.14 points of capacity ahead before weighting and 0.13 behind after it.
+  over the lags (B3) is 0.14 points of capacity ahead before weighting and 0.13 behind after it,
+  and the data cannot separate it from B-mix either way.
 headline: >-
-  Weighted by events, every trust network trails B-mix on real harm rows at the signed-MW six (B3
-  +0.13, B6 +0.15, B1 +0.31 points of capacity). The two months that made B3 and B6 look ahead each
-  hold a single real harm event. The five-month design can detect a difference of only about 0.3 to
-  1.0 points of capacity.
+  Weighted by events, no variant beats B-mix on real harm rows at the signed-MW six (B3 +0.13, B6
+  +0.15, B1 +0.31 points of capacity; the B3 and B6 ranges when one month is left out include zero).
+  The two months that made B3 and B6 look ahead each hold a single real harm event. The five-month
+  design can detect a difference of only about 0.3 to 1.0 points of capacity or more.
 lessons: >-
-  Giving B1 the true event flags (B1o) lowers its harm-row score by only 0.09 points and its trust
-  does not fall consistently inside events, so a plain trust head does not learn from event flags
-  here; the limit may lie in the calibration module, the lagless forecast, or the mixture rule.
+  Giving B1 the true event flags (B1o) points to a harm-row gain of only 0.09 points, an interval
+  that includes zero, and its trust does not fall consistently inside events; the limit may lie in
+  the calibration module, the lagless forecast, or the mixture rule.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  A fixed 50/50 mixture of the plain network and the lagless forecast (B-mix) is at least as good as
-  every trust network we trained, so the learned trust weights have not earned their complexity.
-  Weighted by events, no arm beats B-mix on real harm rows at the six substations that report signed
-  power. Attention over the lags looked 0.14 points of capacity ahead only because two months with a
-  single event each pulled the average. The five months can detect a difference of only about 0.3 to
-  1.0 points. Scored against NRA-corrected actuals, the sign of the result inside events is decided
-  by one event. Every number is interim and unaudited.
+  No variant we trained beats a fixed 50/50 mixture of the plain network and the lagless forecast
+  (B-mix) on real harm rows at the six substations that report signed power, so the learned trust
+  weights add complexity without a measured gain. Attention over the lags looked 0.14 points of
+  capacity ahead only because two months with a single event each pulled the average. The five
+  months can detect a difference of only about 0.3 to 1.0 points or more. Scored against
+  NRA-corrected actuals, the sign of the result inside events is decided by a single month. Every
+  number is interim and unaudited.
 advice:
   - >-
     Do not port a trust head to the live service on this evidence; use the fixed 50/50 mixture as the
@@ -143,24 +144,32 @@ advice:
 code: ml-experiments/00404-mdn-lagless-and-calibration-module-trust-weights/
 ---
 
-**Take-home message (interim and unaudited: 5 scored months, 1 to 3 seeds per month, no multiplicity
-correction): a fixed 50/50 mixture of the plain network and the lagless forecast (B-mix) is at least
-as good as every trust network we trained, so the learned trust weights have not earned their
-complexity.** Weighted by events, every trust network trails B-mix on real harm rows at the
-signed-MW six (B3 +0.13, B6 +0.15, B1 +0.31 points of capacity). The earlier reading, that attention
-over the lags (B3) and learned windows (B6) were 0.14 and 0.02 points ahead, comes from two months
-that each hold a single real harm event.
+**No variant we trained beats a fixed 50/50 mixture of the plain network and the lagless forecast
+(B-mix) on real harm rows at the signed-MW six, so the learned trust weights add complexity without
+a measured gain.** The numbers are interim and unaudited: five scored months, one to three seeds per
+month, and no correction for multiple comparisons. Weighted by events, B3 (attention over the
+lags) is +0.13 and B6 (learned windows) is +0.15 points of capacity behind B-mix on real harm rows,
+and the ranges when any one month is left out include zero. Before weighting, B3 and B6 looked 0.14
+and 0.02 points ahead, because two months that each hold a single real harm event pulled the
+average.
 
-- **The design is too small to see a difference below about 0.3 to 1.0 points of capacity.** That is
-  the smallest difference detectable with 80% power from the spread of the five monthly values, and
-  it exceeds most of the contrasts reported here.
-- **Inside real events, one event decides the sign.** Scored against NRA-corrected actuals, B0, B1,
-  and B6 beat B-mix at the signed-MW six by 0.5 to 0.6 points, and dropping the largest event turns
-  each of those into a loss of 0.2 to 0.3.
+- **The design is too small to see a difference below about 0.3 to 1.0 points of capacity.** The
+  smallest difference detectable with 80% power, from the spread of the five monthly values, exceeds
+  most of the contrasts reported here. With a t multiplier instead of a normal one, the range is
+  about 0.4 to 1.3.
+- **Inside real events, a single month decides the sign.** Scored against NRA-corrected actuals,
+  B0, B1, and B6 beat B-mix at the signed-MW six by 0.5 to 0.6 points. Dropping, in each month,
+  the event that contributes most to the difference turns each of those into a loss of 0.2 to 0.3.
 - **The trust weights are almost inert.** B1's mean trust is 0.91 outside real events and 0.94
   inside them. B1o, which receives the true event flags, shows no consistent drop inside events.
-- **The maintainer decides whether to carry B3 or B6 forward,** and the lag-trust evaluation is held
-  until several design iterations are done.
+
+**Terms.** NRA is the normal running arrangement, the electricity network as it is when no load
+transfer is active. An NRA-corrected actual is the metered actual with the load that experiment
+435 estimates a real event moved between Primaries removed. A Primary is a primary substation. A
+load-shift event is a period when load was transferred between Primaries. Points of capacity are
+the score (CRPS, the continuous ranked probability score, computed from 11 quantiles) as a
+percentage of the Primary's capacity. The signed-MW six are the Primaries (D5, D9, D10, D11,
+D14, D16) that report signed power; the MVA-only eight report apparent power only.
 
 **What was tested.** A trust head is a small neural network that outputs one weight per lagged power
 reading, saying how far to trust it. The experiment trained a mixture density network with a lagless
@@ -181,9 +190,10 @@ power plus events injected by experiment 428. It compared the variants below wit
 | S1 | Plain network plus the lag surprise at 3 lags |
 
 A harm row is a forecast target outside every real event whose day window lies inside one, so a
-trust head should discount the lag. A clean row has no real event near it. The signed-MW six are
-the six Primaries (D5, D9, D10, D11, D14, D16) that report signed power. Every contrast is the
-arm's score minus B-mix's, in points of capacity, so negative is better than B-mix.
+trust head should discount the lag. A clean row has no real event near it. The inert rule says
+a trust head is inert when its mean trust outside events minus inside events is under 0.1. Every
+contrast is the arm's score minus B-mix's, in points of capacity, so negative is better than
+B-mix. The arms B1g, B1m, B2, B4a, B4b, B5, and B1-rw are defined in the plan below.
 
 ![Each arm minus B-mix at the signed-MW six](figure_1_signed_mw_six.svg)
 
@@ -208,37 +218,39 @@ real-event clusters its rows touch (18 on harm rows, 25 inside events, 37 on cle
 | B6 | -0.02 | +0.15 | +0.20 | +0.25 | +0.10 |
 | S1 | +0.10 | +0.15 | +0.16 | +0.18 | +0.22 |
 
-**The two single-event months are 2025-12 and 2026-03.** On harm rows B3 scores -0.92 and -0.42
-there, and B6 -0.31 and -0.39. In the three multi-event months every arm trails B-mix. Rescoring
-with the 1.15 widening of experiment 428, or with table P factors refitted on each arm's own earlier
-months (clean real rows, per group and lead band), moves every entry by 0.03 or less, so the
-miscalibration of the tails does not explain the picture.
+**B3's and B6's lead comes from 2025-12 and 2026-03, which each hold one harm event.** On harm rows
+B3 scores -0.92 and -0.42 there, and B6 -0.31 and -0.39. Averaged over the three multi-event months,
+every arm trails B-mix. Rescoring with the 1.15 widening of experiment 428, or with table P factors
+refitted on each arm's own earlier months (clean real rows, per group and lead band), moves every
+entry of the table by 0.03 or less, so the miscalibration of the tails does not explain the
+difference between the arms.
 
 **The design can detect a difference of only about 0.3 to 1.0 points of capacity.** The minimum
-detectable effect, taken as 2.8 times the standard error of the five monthly differences, is 0.4 to
-1.0 on harm rows, 0.3 to 0.9 inside events, and 0.3 to 0.8 on clean rows, depending on the arm. It
-is a rough figure, because five values give a poor estimate of their own spread.
+detectable effect, taken as 2.8 times the standard error of the five monthly differences (a normal
+approximation for a two-sided 5% test at 80% power), is 0.4 to 1.0 on harm rows, 0.3 to 0.9 inside
+events, and 0.3 to 0.8 on clean rows, depending on the arm. With four degrees of freedom the
+multiplier is about 3.6, which makes each figure about 30% larger. The range is rough, because five
+values give a poor estimate of their own spread.
 
 **The event counts differ by definition, not by error.** In the five scored months 46 corrected
 events overlap the scored period (21 at the signed-MW six, 16 at the MVA-only eight, 9 at D15 and
 D18) and 42 padded event runs do (a run merges events that fall within the padding). Experiment
 445's 49 and experiment 435's 41 count the same events with different windows. The label table's
 112 is a row count, and 184 corrected events (170 padded runs) is the whole history. The bootstrap
-clusters used here are the events a row's lag windows touch, which is why they exceed the padded
-runs.
+clusters used here are the events a row's lag windows touch, so they can exceed the padded runs.
 
 **The lagless table's 90% band is too narrow.** It covers 79 to 82% of actuals on clean and harm
 rows in every lead band, and 48 to 52% inside events.
 
 ### Scoring inside events against NRA-corrected actuals
 
-**One event decides the sign of the result inside events.** Experiment 435 estimates the load that
-each event removed from or added to the Primary (a measured deviation for 34 of 184 events, the
+**A single month decides the sign of the result inside events.** Experiment 435 estimates the load
+that each event removed from or added to the Primary (a measured deviation for 34 of 184 events, the
 labelled depth for the other 150). Subtracting that from the metered actual gives a corrected
-actual. The rows below score the real-event rows against it at three depth factors, at the
-signed-MW six, arm minus B-mix, mean over months.
+actual. The rows below score the real-event rows against it at three depth factors, at the signed-MW
+six, arm minus B-mix, mean over months.
 
-| Arm | Depth 0.75 | Depth 1.0 | Depth 1.25 | Depth 1.0, largest event dropped | Metered actual |
+| Arm | Depth 0.75 | Depth 1.0 | Depth 1.25 | Depth 1.0, largest event of each month dropped | Metered actual |
 |---|---|---|---|---|---|
 | A0-inj | +0.34 | +0.35 | +0.36 | +0.20 | +0.12 |
 | B0 | -0.55 | -0.49 | -0.44 | +0.21 | +0.18 |
@@ -249,32 +261,33 @@ signed-MW six, arm minus B-mix, mean over months.
 | S1 | +0.37 | +0.42 | +0.47 | +0.26 | +0.13 |
 
 At the MVA-only eight every arm trails B-mix against the corrected actuals (+0.5 to +1.0 at depth
-1.0), with or without the largest event.
+1.0, and +0.27 to +0.91 with the largest event of each month dropped).
 
 ### Pooled over months, all leads
 
-The tables and figures 1 to 4 below read the pooled contrasts of `e00404_pool.py` (pushed with this
-page), on forecasts of every stored lead (up to 14.6 days), so they differ from the audit tables
-above, which keep leads of 0 to 240 hours. Each contrast is the mean over the arm's cells of the
-arm's score minus the reference arm's score on the same rows, in points of capacity (negative is
-better than the reference), with a 95% interval from resampling whole months (seeds within a month
-are averaged first, so the mean is a mean of month means). A cell is one scored month and one seed.
-B-mix, A0-inj, B0, B1, B1o, B3, and S1 have all 7 cells (2026-06 seeds 0 to 2; 2026-03, 2026-01,
-2025-12, and 2025-10, seed 0). B4c and B6 have 5 cells (the five months, seed 0). B7 has 1 cell
-(2026-06, seed 0). Every interval is wide because it rests on at most five months, the arms have
-different cells, only four cells hold a real-event row at the MVA-only eight, a bootstrap over five
-blocks under-covers, and no correction for multiple comparisons is applied.
+The tables and figures 1 to 4 below come from `e00404_pool.py`, on forecasts of every stored lead
+(up to 14.6 days), so they differ from the audit tables above, which keep leads of 0 to 240 hours.
+Each contrast is the mean over the arm's cells of the arm's score minus the reference arm's score on
+the same rows, in points of capacity (negative is better than the reference), with a 95% interval
+from resampling whole months (seeds within a month are averaged first, so the mean is a mean of
+month means). A cell is one scored month and one seed. B-mix, A0-inj, B0, B1, B1o, B3, and S1 have
+all 7 cells (2026-06 seeds 0 to 2; 2026-03, 2026-01, 2025-12, and 2025-10, seed 0). B4c and B6 have
+5 cells (the five months, seed 0). B7 has 1 cell (2026-06, seed 0). Every interval is wide because
+it rests on at most five months, the arms have different cells, only four cells hold a real-event
+row at the MVA-only eight, a bootstrap over five blocks under-covers, and no correction for multiple
+comparisons is applied.
 
-**No arm separates from B-mix at the signed-MW six, except that B1 (inside events), A0-inj, and S1
-(clean rows) are significantly worse.** B-mix is a fixed mixture of the saved A0-inj network's
-forecast and the cross-fitted lagless table's forecast, each with weight one half.
+**No arm separates from B-mix at the signed-MW six, except that four arms have 95% intervals that
+exclude zero on the wrong side (A0-inj on clean rows and inside events, S1 on clean rows, B1 inside
+events), with the caveats above.** B-mix is a fixed mixture of the saved A0-inj network's forecast
+and the cross-fitted lagless table's forecast, each with weight one half.
 
 | Arm | Real harm rows | Real clean rows | Rows inside real events |
 |---|---|---|---|
 | A0-inj | +0.19 [-0.05, +0.39] | +0.35 [+0.17, +0.60] | +0.20 [+0.03, +0.33] |
 | B0 | +0.06 [-0.57, +0.68] | +0.43 [-0.01, +1.05] | +0.27 [-0.18, +0.72] |
 | B1 | +0.09 [-0.26, +0.39] | +0.34 [-0.11, +0.90] | +0.49 [+0.21, +0.79] |
-| B1o | 0.00 [-0.49, +0.49] | +0.22 [-0.17, +0.75] | +0.24 [-0.17, +0.57] |
+| B1o | 0.00 [-0.49, +0.49] | +0.22 [-0.17, +0.73] | +0.24 [-0.17, +0.57] |
 | B3 | -0.16 [-0.63, +0.25] | +0.21 [-0.06, +0.68] | -0.06 [-0.47, +0.24] |
 | S1 | +0.19 [-0.13, +0.45] | +0.31 [+0.05, +0.61] | +0.16 [-0.26, +0.50] |
 | B4c (5 cells) | -0.12 [-0.69, +0.40] | +0.23 [-0.04, +0.49] | +0.17 [-0.20, +0.61] |
@@ -300,11 +313,11 @@ with a single real harm event (diamonds); the largest positive value does not.
 
 ![Absolute scores beside B-mix](figure_4_absolute_scores.svg)
 
-**B3 and B6 beat B1 on real harm rows and inside real events.** The contrast against B1 at the
-signed-MW six: B3 minus B1 is -0.24 [-0.52, +0.03] on harm rows and -0.56 [-0.75, -0.36] inside
-events (7 cells); B6 minus B1 is -0.16 [-0.26, -0.03] and -0.31 [-0.58, -0.02] (5 cells). B0 minus
-B1 is -0.03 [-0.35, +0.29] on harm rows, so B1's learned weights do no better than B0's constant
-weights.
+**B3 is ahead of B1 inside real events, and B6 is ahead of B1 on both row classes.** The contrast
+against B1 at the signed-MW six: B3 minus B1 is -0.24 [-0.52, +0.03] on harm rows and -0.56 [-0.75,
+-0.36] inside events (7 cells); B6 minus B1 is -0.16 [-0.26, -0.03] and -0.31 [-0.58, -0.02] (5
+cells). B0 minus B1 is -0.03 [-0.35, +0.29] on harm rows, so B1's learned weights do no better than
+B0's constant weights.
 
 **The trust weights are almost inert, even given the true event flags.** The mean over the 7 cells
 of the geometric mean of B1's three trust weights is 0.91 on real rows whose lags lie outside real
@@ -313,11 +326,11 @@ the padded flag. B1o gives 0.91 outside and 0.90 inside. B0's constant weight is
 
 **Reading of the oracle control.** B1o, with the true per-lag event flag as three extra trust-head
 inputs, scores 0.00 [-0.49, +0.49] against B-mix on real harm rows and +0.24 [-0.17, +0.57] inside
-real events, against B1's +0.09 and +0.49. Having the exact flags helps B1 by 0.09 on harm rows
-(-0.09 [-0.29, +0.10]) and by 0.26 inside events (-0.26 [-0.48, -0.05]) but still leaves B1o behind
-B-mix inside events. The flags help, but B1o stays behind B-mix inside events, so the limit may lie
-in the calibration module, the lagless forecast, or the mixture rule as well as in detecting events.
-Only the B1 version of the oracle exists; the attention version was dropped.
+real events, against B1's +0.09 and +0.49. The exact flags point to a gain of 0.09 on harm rows
+(-0.09 [-0.29, +0.10], an interval that includes zero) and of 0.26 inside events (-0.26 [-0.48,
+-0.05]), yet B1o stays behind B-mix inside events, so the limit may lie in the calibration module,
+the lagless forecast, or the mixture rule as well as in detecting events. Only the B1 version of the
+oracle exists.
 
 ![Primary D5, January 2026, day-ahead forecasts around a real event](figure_5_event_D5_2026-01_112321.svg)
 
