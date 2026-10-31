@@ -176,55 +176,52 @@ def predict(
 
 
 def crossfit_table(*, month: str, seed: int, device: str, folds: int = FOLDS) -> pl.DataFrame:
-    """Return the cross-fitted table for a scored month, and the further module's forecasts."""
+    """Return the cross-fitted table for a scored month, and the further module's forecasts.
+
+    Each fold fits its own input scaler and target mean and standard deviation on its training
+    blocks only, so the held-out block informs nothing about its own forecast.
+    """
     refit = prep.refit_of(month=month)
     end = int(common.grid_index(times=refit))
     start = max(data.FIRST_VALID_INDEX, end - WINDOW_STEPS)
     train = build_pool(lo=start, hi=end)
     after = build_pool(lo=end, hi=end + FURTHER_STEPS)
-    scaler = Scaler(x=train.x, site=train.site, y=train.y, n_primaries=16)
-    x_train, x_after = scaler.inputs(x=train.x), scaler.inputs(x=after.x)
-    z_train = scaler.target(y=train.y, site=train.site)
     age_days = (end - train.grid) / common.STEPS_PER_DAY
     weight = (0.5 ** (age_days / common.SHORT_HALF_LIFE_DAYS)).astype(np.float32)
-    observed = np.isfinite(z_train)
+    observed = np.isfinite(train.y)
     block = block_of(grid=train.grid, lo=start, hi=end, folds=folds)
 
-    def tensors(*, mask: np.ndarray) -> tuple[torch.Tensor, ...]:
-        return (
-            torch.tensor(x_train[mask], device=device),
-            torch.tensor(np.nan_to_num(z_train[mask]), device=device),
-            torch.tensor(train.site[mask], device=device),
-            torch.tensor(weight[mask], device=device),
+    def fit_and_predict(
+        *, fit_mask: np.ndarray, pool: Pool, rows: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, Scaler]:
+        """Fit a module and scaler on the training rows in `fit_mask`; forecast `pool[rows]`."""
+        scaler = Scaler(
+            x=train.x[fit_mask], site=train.site[fit_mask], y=train.y[fit_mask], n_primaries=16
         )
-
-    raw = np.zeros((len(x_train), 9), dtype=np.float32)
-    quant = np.zeros((len(x_train), 3), dtype=np.float32)
-    for k in range(folds):
-        fit_x, fit_z, fit_site, fit_w = tensors(mask=observed & (block != k))
-        module = fit_module(x=fit_x, z=fit_z, site=fit_site, weight=fit_w, seed=seed)
-        held = block == k
-        raw[held], quant[held] = predict(
+        z = scaler.target(y=train.y[fit_mask], site=train.site[fit_mask])
+        module = fit_module(
+            x=torch.tensor(scaler.inputs(x=train.x[fit_mask]), device=device),
+            z=torch.tensor(z, device=device),
+            site=torch.tensor(train.site[fit_mask], device=device),
+            weight=torch.tensor(weight[fit_mask], device=device),
+            seed=seed,
+        )
+        raw_out, quant_out = predict(
             module=module,
-            x=torch.tensor(x_train[held], device=device),
-            site=torch.tensor(train.site[held], device=device),
+            x=torch.tensor(scaler.inputs(x=pool.x[rows]), device=device),
+            site=torch.tensor(pool.site[rows], device=device),
         )
-    fit_x, fit_z, fit_site, fit_w = tensors(mask=observed)
-    further = fit_module(x=fit_x, z=fit_z, site=fit_site, weight=fit_w, seed=seed)
-    raw_after, quant_after = predict(
-        module=further,
-        x=torch.tensor(x_after, device=device),
-        site=torch.tensor(after.site, device=device),
-    )
+        return raw_out, quant_out, scaler
 
     def frame(
-        *, pool: Pool, raw_out: np.ndarray, quant_out: np.ndarray, source: str
-    ) -> pl.DataFrame:
-        site = pool.site
+        *, pool: Pool, rows: np.ndarray, raw_out: np.ndarray, quant_out: np.ndarray,
+        scaler: Scaler, source: str,
+    ) -> pl.DataFrame:  # fmt: skip
+        site = pool.site[rows]
         q = quant_out * scaler.y_std[site][:, None] + scaler.y_mean[site][:, None]
         columns = {
             "primary": site.astype(np.int16),
-            "grid": pool.grid.astype(np.int32),
+            "grid": pool.grid[rows].astype(np.int32),
             "source": np.full(len(site), source),
             **{f"raw_{i}": raw_out[:, i] for i in range(9)},
             "q05": q[:, 0].astype(np.float32),
@@ -235,12 +232,24 @@ def crossfit_table(*, month: str, seed: int, device: str, folds: int = FOLDS) ->
         }
         return pl.DataFrame(columns)
 
-    return pl.concat(
-        [
-            frame(pool=train, raw_out=raw, quant_out=quant, source="crossfit"),
-            frame(pool=after, raw_out=raw_after, quant_out=quant_after, source="further"),
-        ]
+    parts = []
+    for k in range(folds):
+        held = np.flatnonzero(block == k)
+        raw_out, quant_out, scaler = fit_and_predict(
+            fit_mask=observed & (block != k), pool=train, rows=held
+        )
+        parts.append(
+            frame(pool=train, rows=held, raw_out=raw_out, quant_out=quant_out, scaler=scaler,
+                  source="crossfit")
+        )  # fmt: skip
+    raw_out, quant_out, scaler = fit_and_predict(
+        fit_mask=observed, pool=after, rows=np.arange(len(after.grid))
     )
+    parts.append(
+        frame(pool=after, rows=np.arange(len(after.grid)), raw_out=raw_out, quant_out=quant_out,
+              scaler=scaler, source="further")
+    )  # fmt: skip
+    return pl.concat(parts)
 
 
 def table_path(*, month: str, seed: int) -> Path:

@@ -2,7 +2,7 @@
 
 The lagless module forecasts every half-hour of the dense grid from the freshest published
 ensemble summary: the run whose publication (run time plus 9 hours) is the latest at or before the
-valid time, so leads run from 9.5 to 33.5 hours. Its inputs are the ensemble mean and spread of the
+valid time, so leads run from 9.5 to 33.0 hours (from the run time). Its inputs are the ensemble mean and spread of the
 seven weather columns, the solar position, the calendar, and the holiday columns of experiment 397,
 and no lag and no lead.
 
@@ -24,8 +24,8 @@ import e00397_prep as prep  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 
-FIRST_VALID_INDEX: Final[int] = int((prep.FIRST_RUN - common.GRID_START) / common.STEP) + 18
-"""First grid index with a published run (the first run's valid times begin 9 hours after it)."""
+FIRST_VALID_INDEX: Final[int] = int((prep.FIRST_RUN - common.GRID_START) / common.STEP) + 19
+"""First grid index with a published run (the first run's valid times begin 9.5 hours after it)."""
 LAGLESS_GROUPS: Final[tuple[str, ...]] = ("weather", "solar", "calendar", "holidays")
 """The input groups of the lagless module; lags and lead are excluded."""
 
@@ -59,7 +59,7 @@ def freshest_run_rows(*, site_row: dict) -> pl.DataFrame:
 
     A summary's `power_fcst_init_time` is its run time plus the 9-hour publication delay. For each
     valid time the row comes from the latest such origin strictly before the valid time, which
-    gives leads from 9.5 to 33.5 hours.
+    gives leads from 9.5 to 33.0 hours (from the run time).
     """
     summary = prep.load_summary(series_id=site_row["time_series_id"])
     published = summary.with_columns(
