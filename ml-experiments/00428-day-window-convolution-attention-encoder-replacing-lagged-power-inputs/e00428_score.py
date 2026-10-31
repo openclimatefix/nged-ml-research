@@ -38,7 +38,7 @@ import polars as pl
 from studies.eval_protocol import metrics
 from studies.eval_protocol.slices import MVA_ONLY_LABELS, SIGNED_MW_LABELS
 
-ARMS: Final[tuple[str, ...]] = ("R", "R-inj", "L0", "Bmix", "E1", "E2", "E3")
+ARMS: Final[tuple[str, ...]] = ("R", "R-inj", "L0", "Bmix", "E1", "E2", "E3", "E3-surp")
 WORLD_SETS: Final[dict[str, tuple[int, ...]]] = {
     "real": (0,),
     "inj": (4, 5, 6),
@@ -63,6 +63,8 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C4 E3 - R-inj": ("E3", "R-inj"),
     "C5 E3 - Bmix": ("E3", "Bmix"),
     "C6 R-inj - R": ("R-inj", "R"),
+    "C7 E3-surp - E3": ("E3-surp", "E3"),
+    "C8 E3-surp - R-inj": ("E3-surp", "R-inj"),
 }
 TAILS: Final[tuple[str, ...]] = ("q01", "q05", "q95", "q99")
 LEVEL_OF: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
@@ -270,11 +272,17 @@ def main() -> None:
         contrasts.write_parquet(out / "contrasts.parquet")
         verdict = contrasts.join(mde, on=["row_set", "group"]).with_columns(
             folds_won=pl.struct("fold_differences", "mde").map_elements(
-                lambda r: sum(v < -_threshold(r["mde"]) for v in r["fold_differences"].values()),
+                lambda r: sum(
+                    v is not None and v < -_threshold(r["mde"])
+                    for v in r["fold_differences"].values()
+                ),
                 return_dtype=pl.Int64,
             ),
             folds_lost=pl.struct("fold_differences", "mde").map_elements(
-                lambda r: sum(v > _threshold(r["mde"]) for v in r["fold_differences"].values()),
+                lambda r: sum(
+                    v is not None and v > _threshold(r["mde"])
+                    for v in r["fold_differences"].values()
+                ),
                 return_dtype=pl.Int64,
             ),
         )

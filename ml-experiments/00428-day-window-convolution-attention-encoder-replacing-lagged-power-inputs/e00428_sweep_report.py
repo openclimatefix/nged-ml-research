@@ -1,4 +1,4 @@
-"""Summarise the encroachment sweep tables of experiment 428 (no fit).
+r"""Summarise the encroachment sweep tables of experiment 428 (no fit).
 
 For each arm, variant, k, step, lead band, group, and widening, pools the months, seeds, Primaries,
 and both signs, and prints: the median share of the step followed (from the pooled histogram of the

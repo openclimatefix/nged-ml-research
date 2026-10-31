@@ -262,6 +262,7 @@ def predict_month(*, arm_name: str, month: str, seed: int, device: str, power: t
         power=power, x=test.x, primary=test.primary, origin_idx=test.origin_idx,
         target_idx=test.target_idx, power_mean=loaded.power_mean, power_std=loaded.power_std,
         device=device,
+        surprise=fit.surprise_for(arm=loaded.arm, month=month, seed=seed, device=device),
     )  # fmt: skip
     actual = y_clean[test.primary, test.target_idx]
     lines = []

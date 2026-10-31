@@ -56,8 +56,8 @@ class DayEncoderMdn(nn.Module):
     """Convolution over day windows, then attention from the forecast half-hour, then the head.
 
     Inputs to `forward`: `x` (rows, n_inputs) the standardised non-lag inputs, `primary` (rows,),
-    `windows` (rows, days, 5, 48) the channels of each window (power already standardised, 0 where
-    unobserved, the observed flag in channel 1). `days` is 1, 2, or 3.
+    `windows` (rows, days, channels, 48) the channels of each window (power already standardised, 0
+    where unobserved, the observed flag in channel 1). `days` is 1, 2, or 3.
     """
 
     def __init__(
@@ -71,17 +71,18 @@ class DayEncoderMdn(nn.Module):
         components: int = 3,
         dropout: float = 0.1,
         embedding: int = 8,
+        channels: int = CHANNELS,
     ) -> None:
         """Build the encoder, the attention layer, and the head."""
         super().__init__()
         if days not in (1, 2, 3):
             msg = "days must be 1, 2, or 3"
             raise ValueError(msg)
-        self.days, self.components = days, components
+        self.days, self.components, self.channels = days, components, channels
         self.embedding = nn.Embedding(n_primaries, embedding)
         a, b, c = CONV_WIDTHS
         self.conv = nn.Sequential(
-            nn.Conv1d(CHANNELS, a, kernel_size=5, padding=2),
+            nn.Conv1d(channels, a, kernel_size=5, padding=2),
             nn.GELU(),
             nn.Conv1d(a, b, kernel_size=5, padding=2),
             nn.GELU(),
@@ -115,7 +116,7 @@ class DayEncoderMdn(nn.Module):
         token.
         """
         rows, days = windows.shape[0], windows.shape[1]
-        flat = windows.reshape(rows * days, CHANNELS, WINDOW)
+        flat = windows.reshape(rows * days, self.channels, WINDOW)
         encoded = self.conv(flat).reshape(rows, days, TOKEN, WINDOW).transpose(2, 3)
         encoded = encoded + self.day_embedding.weight[None, :days, None, :]
         observed = windows[:, :, 1, :] > 0.5

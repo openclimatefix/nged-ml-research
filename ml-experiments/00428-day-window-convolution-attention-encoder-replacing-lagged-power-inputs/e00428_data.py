@@ -56,6 +56,11 @@ def world_path(*, seed: int) -> Path:
     return WORLD_DIR / f"seed{seed}.npz"
 
 
+def grid_length() -> int:
+    """Return the number of half-hours on the dense grid."""
+    return len(common.grid_times())
+
+
 def sites() -> list[str]:
     """Return the 16 Primaries in the order of `prep.primaries()` (the Primary index)."""
     return prep.primaries()["site"].to_list()

@@ -195,6 +195,7 @@ def sweep_arm(*, arm_name: str, month: str, seed: int, device: str, power: torch
         power=power, x=test.x[keep], primary=test.primary[keep], origin_idx=test.origin_idx[keep],
         target_idx=test.target_idx[keep], power_mean=loaded.power_mean,
         power_std=loaded.power_std, device=device,
+        surprise=fit.surprise_for(arm=arm, month=month, seed=seed, device=device),
     )  # fmt: skip
     n_rows = int(keep.sum())
     lead = torch.from_numpy(test.lead[keep]).to(device)
