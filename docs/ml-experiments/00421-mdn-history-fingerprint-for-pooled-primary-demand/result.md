@@ -147,7 +147,7 @@ verdict is `not supported`. For a substation left out of training, the network w
 encoder scored best (4.318), and a placeholder label scored much worse (5.527). Every number comes
 from five test months, so all are interim.
 
-![Planned contrasts with their 99.7% intervals](figure_1_contrasts.svg)
+![Planned contrasts with their 99.72% intervals](figure_1_contrasts.svg)
 
 ## Results
 
@@ -167,6 +167,8 @@ and D18 start cut.
 | Experiment 406, no label (per-Primary scale) | no | no | yes | 4.112 | 4.638 | 11.968 |
 
 - **Contrasts (signed-MW six / MVA-only eight, 99.72% month-block intervals).**
+    - A negative contrast means the first arm has the lower (better) CRPS. The first value is for the
+      6 signed-MW Primaries and the second for the 8 MVA-only Primaries.
     - C1 E3g minus E406: -0.007 (-0.040 to +0.007) / +0.011 (-0.053 to +0.065).
     - C2 N3g minus E3g: +0.424 (+0.153 to +0.671) / +0.584 (+0.385 to +0.852).
     - C3 NH minus N3g: -0.099 (-0.245 to +0.222) / -0.304 (-0.392 to -0.249).
@@ -175,9 +177,11 @@ and D18 start cut.
     - C6 NH0 minus NH: +0.021 (-0.142 to +0.193) / +0.075 (-0.042 to +0.201).
     - C9 NH minus NHs: -0.088 (-0.300 to +0.133) / -0.263 (-0.388 to +0.015).
 - **The encoder helps clearly only at the MVA-only eight.** At the six, the interval of C3 spans
-  zero, and C3 is positive (+0.317) in the 2025-12 fold.
-- **The shuffled history (NHs) is a partial control.** NHs reads the next Primary's history, which
-  identifies that Primary as well as its own history does, so C9 measures what the Primary's own
+  zero, and in the 2025-12 fold the encoder made the CRPS worse (C3 is +0.317).
+- **The shuffled history (NHs) is a partial control.** NHs gives each origin the history of a
+  different Primary,
+  in a fixed pairing. That history identifies the other Primary as well as the true history
+  identifies the forecast Primary, so C9 measures what the Primary's own
   recent state adds beyond identity. NHs minus N3g, which measures identity taken from history, is
   -0.011 at the six and -0.041 at the eight, about zero.
 - **The probe.** Accuracy of a linear classifier on held-out weeks (chance 0.0625 for the Primary;
@@ -205,8 +209,8 @@ and D18 start cut.
 - **Held-out contrasts (99.72% intervals).** C7 NH minus E3g with the mean label: -0.735 (-2.695 to
   +0.562) at the six, -2.382 (-3.115 to -1.844) at the eight. C8 NH minus N3g: +0.474 (-0.095 to
   +1.099) at the six, +0.081 (-0.084 to +0.220) at the eight, +2.382 at D15 and D18 (+0.863 to
-  +3.865). Leaving a Primary out costs N3g 0.58 points at the six (3.739 with three seeds to 4.318
-  with two) and 0.89 at the eight (4.424 to 5.317).
+  +3.865). Leaving a Primary out raises N3g's CRPS by 0.58 points at the six (3.739 with three
+  seeds to 4.318 with two) and 0.89 at the eight (4.424 to 5.317).
 - **Tails (all leads; raw / widened by 1.15).** At the six, q95 coverage is 0.859 / 0.895 for E3g,
   0.903 / 0.931 for N3g, 0.885 / 0.913 for NH, and 0.866 / 0.900 for EH; q99 coverage is 0.941 /
   0.960, 0.972 / 0.982, 0.953 / 0.969, and 0.947 / 0.965. The encoder arms put too many outcomes
