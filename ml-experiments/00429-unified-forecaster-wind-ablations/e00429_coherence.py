@@ -73,7 +73,8 @@ def schaake_ranks(*, scored, hindcast, grid: np.ndarray) -> np.ndarray:  # noqa:
     ri = np.array([run_index[t] for t in hindcast["power_fcst_init_time"].to_list()])
     fi = np.array([farms[f] for f in hindcast["site"].to_list()])
     li = np.array([steps[float(h)] for h in hindcast["lead_hours"].to_numpy()])
-    table[ri, fi, li] = hindcast["actual_norm"].to_numpy()
+    usable = ~hindcast["masked"].to_numpy()
+    table[ri[usable], fi[usable], li[usable]] = hindcast["actual_norm"].to_numpy()[usable]
     fill = np.nanmedian(table, axis=0)
     table = np.where(np.isnan(table), fill[None], table)
     doy_h = np.array([t.timetuple().tm_yday for t in runs_h.to_list()])
@@ -141,6 +142,8 @@ def build_blocks(*, scored, grid: np.ndarray) -> tuple[list[np.ndarray], list[di
     blocks, info = [], []
     for run_i in range(len(runs)):
         present = (row_map[run_i] >= 0).all(axis=0)
+        if not (row_map[run_i] >= 0).any():
+            continue
         first_row = row_map[run_i][row_map[run_i] >= 0][0]
         day_of_lead = (grid // 24).astype(int)
         for day in np.unique(day_of_lead):
@@ -157,7 +160,7 @@ def build_blocks(*, scored, grid: np.ndarray) -> tuple[list[np.ndarray], list[di
 
 def main() -> None:
     """Score the named arms and print the tables."""
-    arms = sys.argv[1:] or ["one_pass_ms", "member_plain"]
+    arms = sys.argv[1:] or ["one_pass_ms", "one_pass_m", "member_plain"]
     scored = data347.scored_frame()
     hindcast = data347.hindcast_frame()
     weather, power = data.load(set_name="scored")
@@ -224,7 +227,7 @@ def main() -> None:
             )
     lines.append(
         "-- paired differences, first minus second (negative favours the first); relative change and 99% "
-        "month-block interval. The 5% coherence margin is the Opus note's proposal, not the maintainer's --"
+        "month-block interval. Pairs across arms mix in marginal differences, and `shifted` keeps the plant's own spread; only the member_plain ecc-versus-shifted pair isolates the path construction. The 5% coherence margin is the Opus note's proposal, not the maintainer's --"
     )
     pairs = {
         "member_plain shifted - one_pass_ms ecc": (
@@ -239,6 +242,7 @@ def main() -> None:
             ("one_pass_ms", "schaake"),
             ("one_pass_ms", "ecc"),
         ),
+        "one_pass_m ecc - one_pass_ms ecc": (("one_pass_m", "ecc"), ("one_pass_ms", "ecc")),
         "one_pass_ms ecc - one_pass_ms independent": (
             ("one_pass_ms", "ecc"),
             ("one_pass_ms", "independent"),

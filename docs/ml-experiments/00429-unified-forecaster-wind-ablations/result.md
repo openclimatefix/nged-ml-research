@@ -136,20 +136,21 @@ figures come from a separate script before the write-up.
 - **Coherence (A1).** NGED runs power-flow models one ensemble member at a time, so the forecast
   must give 51 members that are coherent across time and across the three farms. The script
   `e00429_coherence.py` scores the 51 member paths with the energy score and the variogram score
-  (order 0.5) across W1 to W3 jointly, in two kinds of block: one run and one calendar day (at
-  least 36 shared half-hours), and one run's every twelfth lead across all leads. Four path
-  constructions are compared: **ECC** (ensemble copula coupling: member k takes the arm's quantile
-  at the rank of its own 100 m wind speed among the 51 at that farm and valid time); the
-  **Schaake shuffle** (the 51 hindcast runs nearest in day of year supply observed paths, and one
-  historical date orders all three farms and all leads); **member-shifted** (member k keeps its own
-  stage-3 plant power and adds the arm's median minus the plant's median; this stands for the member
-  route using each member's own path); and **independent** (no coherence, the lower reference).
-  Experiment 304 found member forecasts correlate 0.95 to 0.97 across farms while errors correlate
-  0.54 to 0.78, so the Schaake shuffle may beat ECC. The design note's prediction is that the member
-  route beats ECC on the variogram score by at least 5% and on the marginal score by at least 0.10;
-  the 5% coherence margin is the Opus note's proposal, not the maintainer's. The member-shifted
-  construction is my reading of "the member route using each member's path", and the write-up says
-  so.
+  (order 0.5) across W1 to W3 jointly, in two kinds of block: one run and one calendar day (at least
+  36 shared half-hours), and one run's every twelfth lead across all leads. Four path constructions
+  are compared: **ECC** (ensemble copula coupling: member k takes the arm's quantile at the rank of
+  its own 100 m wind speed among the 51 at that farm and valid time); the **Schaake shuffle** (the
+  51 hindcast runs nearest in day of year supply observed paths, and one historical date orders all
+  three farms and all leads); **member-shifted** (member k keeps its own stage-3 plant power and
+  adds the arm's median minus the plant's median; this stands for the member route using each
+  member's own path); and **independent** (no coherence, the lower reference). Experiment 304 found
+  member forecasts correlate 0.95 to 0.97 across farms while errors correlate 0.54 to 0.78, so the
+  Schaake shuffle may beat ECC. The design note's prediction is that the member route beats ECC on
+  the variogram score by at least 5% and on the marginal score by at least 0.10; the 5% coherence
+  margin is the Opus note's proposal, not the maintainer's. The member-shifted construction keeps
+  the plant's own spread and uses no learned encoder, so comparisons across arms mix in marginal
+  differences. It is my reading of "the member route using each member's path", and the write-up
+  says so. The stored default 2 is not path-scored because its stored rows are marginal only.
 
 ## Pre-registered contrasts
 

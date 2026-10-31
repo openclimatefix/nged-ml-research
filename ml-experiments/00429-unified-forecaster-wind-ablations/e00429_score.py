@@ -5,7 +5,7 @@
     uv run --no-sync python ml-experiments/00429-*/e00429_score.py [--g0]
 
 `--g0` prints only the reproduction gate. Otherwise the report holds absolute scores, tails, the
-median-minus-mean check, the five pre-registered contrasts (99% month-block intervals, Bonferroni
+median-minus-mean check, the five pre-registered contrasts (99.8% month-block intervals, Bonferroni
 over five), reference contrasts, and each contrast's minimum detectable effect. Per-seed scores
 are averaged within each row before resampling, as experiment 00347 does.
 """
@@ -114,7 +114,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         "days_3_10": cases["lead_day"].is_between(3, 10).to_numpy(),
         "true_1_10": (~cases["masked"] & cases["lead_hours"].is_between(24, 240)).to_numpy(),
         "true_3_10": (~cases["masked"] & cases["lead_hours"].is_between(72, 240)).to_numpy(),
-        "h12_36": (~cases["masked"] & cases["lead_hours"].is_between(12, 36)).to_numpy(),
+        "h12_36": (
+            ~cases["masked"] & (cases["lead_hours"] >= 12) & (cases["lead_hours"] < 36)
+        ).to_numpy(),
         "true_1_14": (~cases["masked"] & cases["lead_hours"].is_between(24, 336)).to_numpy(),
     }
     sites = cases["site"].to_numpy()
@@ -230,7 +232,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         decisive = "true_3_10" if label.startswith("C1") else "true_1_10"
         d_low, d_high = entries[decisive][f"{LEVEL:.4f}"]
         point = entries[decisive]["mean"]
-        harm = max(abs(t) for t in tail.values()) > TAIL_LIMIT
+        harm = max(tail.values()) > TAIL_LIMIT
         upper = float(metrics[a]["above_q99"][0, keep].mean())
         if upper > UPPER_TAIL_LIMIT:
             lines.append(
@@ -240,6 +242,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             harm = True
         if d_high < 0 and abs(point) >= MARGIN and not harm:
             verdict = "KEPT for the first arm: interval below zero, beats the margin, no tail harm"
+        elif upper > UPPER_TAIL_LIMIT:
+            verdict = "BLOCKED: the first arm fails the upper-tail rule, whatever its score"
         elif d_low > 0 or harm:
             verdict = "first arm is worse, or tail harm blocks it"
         elif (d_high - d_low) / 2 > MARGIN:
@@ -248,7 +252,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             verdict = "NOT KEPT: no gain beyond the margin, and the interval is narrow"
         lines.append(f"{label} | verdict on {decisive}: {verdict}")
     lines.append(
-        "-- reference contrasts, first arm minus reference, true_1_10 and kept (95% / 99.75%) --"
+        "-- reference contrasts, first arm minus reference, true_1_10 and kept (95% / 99.8%) --"
     )
     for name in qs:  # noqa: PLC0206
         if name in REFERENCES:
