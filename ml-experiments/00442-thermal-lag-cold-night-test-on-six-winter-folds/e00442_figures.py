@@ -184,28 +184,33 @@ def figure_folds() -> None:
         for r in contrasts.iter_rows(named=True)
         for fold, value in json.loads(r["fold_differences"]).items()
     ]
-    chart = (
-        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=True, size=90, color=theme.BRAND_ORANGE)
-        .encode(
-            x=alt.X(
-                "difference:Q",
-                title="T minus R, CRPS (points of capacity; negative is better)",
-            ),
-            y=alt.Y("fold:N", title=None),
-            row=alt.Row("group:N", sort=list(SIX_EIGHT), title=None),
+    frame = pl.DataFrame(rows)
+    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    panels = []
+    for group in SIX_EIGHT:
+        dots = (
+            alt.Chart(frame.filter(pl.col("group") == group))  # ty: ignore[unresolved-attribute]
+            .mark_point(filled=True, size=90, color=theme.BRAND_ORANGE)
+            .encode(
+                x=alt.X(
+                    "difference:Q",
+                    title="T minus R, CRPS (points of capacity; negative is better)",
+                ),
+                y=alt.Y("fold:N", title=None),
+            )
         )
-        .properties(
-            width=WIDTH - 110,
-            height=130,
-            title=_title(
-                "Does T help on cold winter nights in every fold?",
-                "Folds with no cold winter nights (2025-10) are absent. Interim.",
-            ),
+        panels.append(
+            (zero + dots).properties(
+                width=WIDTH - 110, height=130, title=alt.TitleParams(group, anchor="start")
+            )
+        )
+    chart = alt.vconcat(*panels).properties(
+        title=_title(
+            "Does T help on cold winter nights in every fold?",
+            "Folds with no cold winter nights (2025-10) are absent. Interim.",
         )
     )
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
-    (chart + zero).save(DOCS_DIR / "figure_3_folds.svg")
+    chart.save(DOCS_DIR / "figure_3_folds.svg")
 
 
 def figure_absolute() -> None:
