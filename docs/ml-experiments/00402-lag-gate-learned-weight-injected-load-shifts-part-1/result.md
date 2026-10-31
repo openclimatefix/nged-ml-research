@@ -52,38 +52,49 @@ metric: >-
 code: ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/
 verdict: partly supported
 best_arm: >-
-  The gate with the metering group as an input or a separate gate per group, fed lag surprises,
-  window means, the gap between the two forecasts' medians, and neighbour surprises. It beats the
-  fitted constant mixture by about 1.4% of its CRPS at the six Primaries with signed readings on
-  injected load shifts, and by 0.5% to 1% on real events.
+  The gate that takes the metering group as an input (one gate for both groups of Primary
+  substations), fed the surprise of each lagged reading, window means of that surprise, the gap
+  between the two forecasts' medians, and the neighbour substations' surprise. Against the fitted
+  constant mixture per group it lowers the exact CRPS over all rows of the injected test world by
+  1.4% at the six Primaries with signed readings (4.306 to 4.247 points of effective capacity). On
+  real rows at the six the gain over the constant mixture fitted on real labels is 0.07% (4.210 to
+  4.207), and over the constant mixture fitted on injected events it is 0.9% on forecast R1.
 headline: >-
-  On injected load shifts a gate trained on injected events alone cuts the CRPS of the mixture on
-  rows whose lags touch an event from 4.34 (fixed 50/50 mixture) to 4.11 points of effective
-  capacity at the six Primaries with signed readings, and loses nothing on clean rows. On real
-  labelled events it gains 0.1 points at most on harm rows, and at the six it is worse than the
-  fixed 50/50 mixture when the target sits inside a labelled event (10.75 against 10.50).
+  A gate trained only on injected load shifts (demand transferred between substations in clean
+  history, with known truth) lowers the exact continuous ranked probability score (CRPS) of a
+  50/50 mixture of two XGBoost demand forecasts, one with power lags and one without, from 4.34 to
+  4.11 points of effective capacity (smaller is better) on injected rows whose lagged readings fall
+  inside a load shift, at the six Primary substations with signed-MW readings, and worsens no clean
+  row. On real labelled load shifts the gain over the 50/50 mixture is 0.10 points at most on such
+  rows, and when the forecast target itself sits inside a labelled event the gate scores 10.75
+  against 10.50 for the 50/50 mixture.
 take_home_message: >-
-  A gate trained only on injected load shifts, with no NGED labels, learns to cut the weight on
-  the forecast with power lags from about 0.5 to about 0.4 when a lag has been corrupted, and so
-  removes most of the harm that lags do in that case. The real-event gain is small (0.1 points on
-  harm rows), and the gate trusts the lags less than it should when the target is itself inside a
-  real event. The fitted constant mixture per group, or a fixed 50/50 mixture, remains the
-  simplest forecast to ship; a gate is worth a second look only if the maintainer wants the last
-  1% to 2% on event rows.
+  A gate trained only on injected load shifts, with no labels from National Grid Electricity
+  Distribution (NGED), learns to lower the weight on the forecast with power lags from 0.51 to 0.42
+  when a lagged reading falls inside a load shift, and so removes most of the harm that the lags do
+  in that case. The gain on real load shifts is small (0.10 points at most against the 50/50
+  mixture, and 0.04 or less against the constant mixture fitted on injected events), and the gate
+  scores worse than the 50/50 mixture when the target itself is inside a real labelled event. The
+  fitted constant mixture per group is a simpler forecast than the gate and comes within about 1.4%
+  of its exact CRPS on injected rows. Training the gate on real and injected events together is
+  untested.
 lessons: >-
-  The injected shift behaves like real events for the booster (the share of a step passed on
-  matches experiment 395 Part E within about 10%), but a gate trained on injected events learns a
-  lower lag weight around events than real events deserve, because a real event keeps its lags
-  useful for the next days. The headroom for any gate is small: the per-row oracle weight would
-  save 0.7 points, and most of that is knowledge of the outcome, not of the event.
+  The injected shift behaves like real events for the XGBoost forecast with lags, whose median
+  passes on about 15% to 32% of a real step (measured at one to three lags inside the event), and
+  the synthetic step gives 1.09 to 1.20 times those shares. The gate trained on injected events
+  lowers the lag weight to 0.38 on rows whose target is inside a real event, where a gate trained
+  on real labels does better (10.41 against 10.75); this experiment did not test why. The per-row
+  oracle weight would lower the exact CRPS by 0.7 points on harm rows at the six, but it uses the
+  outcome, so it is a bound and not a target.
 advice:
   - >-
-    Do not ship a learned gate yet; ship the fitted constant mixture per group, which the gate
-    beats by under 1.5% (table in Results).
+    The fitted constant mixture per group is the simpler forecast and the gate beats it by 1.4% on
+    injected rows and 0.07% to 0.9% on real rows (table in Results); a gate needs a larger gain
+    than that to justify a second forecast and a gate in the serving path.
   - >-
-    If a gate is wanted, train it on injected events and real events together and score it on
-    target-inside-event rows separately, because the injected-only gate lowers the lag weight
-    where real events still need it (target-inside-event table in Results).
+    If a gate is tried again, train it on injected and real events together and score it on the
+    rows whose target is inside a real event separately, because the injected-only gate scored worse
+    than the 50/50 mixture there (bullet "The gate scores worse" in Results).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -92,32 +103,51 @@ adopted_in: none
 
 ## Results
 
-**Caveat repeated in every table: NGED's logs miss some load-shift events.** The clean-lag baseline
-is optimistic and the real-event slices undercount events. Every number below is a mean exact CRPS,
-in points of effective capacity, over the rows named; smaller is better. "Forecast R1" is experiment
-392's lagged forecast trained with the labelled events removed (a ceiling); "the R0 pair" is the
-forecast with lags refitted here on plain targets, beside experiment 392's R0 forecast without lags.
-Step 4 scores forecast R1 leave-one-month-out over four months (2025-10, 2026-01, 2026-03, 2026-06);
-step 5 scores the R0 pair forward-only (2026-01, 2026-03, 2026-06).
+**The gate removes most of the harm from corrupted lags on injected load shifts and gains little on
+real ones.** Definitions used below. A load shift is demand moved from one substation to its
+neighbours. A harm row is a forecast row whose target is outside every event but whose lagged
+readings (the readings 1 day, 2 days, and 7 days before the forecast origin, at the same time of
+day) touch one. The six are the 6 Primary substations with signed-MW readings and the eight are the
+8 with MVA-only readings; two further Primaries (D15 and D18) are report-only. A gate is a small
+XGBoost model that sets the weight w of a mixture w times the forecast with lags plus (1 minus w)
+times the forecast without lags. Every score is a mean exact continuous ranked probability score
+(CRPS) of the mixture, in points of effective capacity (percentage points of a substation's
+effective capacity); smaller is better. "Forecast R1" is experiment 392's forecast with lags trained
+with the labelled events removed. "The R0 pair" is the forecast with lags refitted here on plain
+targets, beside experiment 392's forecast without lags. The scores come from two evaluations. Step 4
+scores forecast R1 leave-one-month-out over four months (2025-10, 2026-01, 2026-03, 2026-06). Step 5
+scores the R0 pair forward-only (2026-01, 2026-03, 2026-06).
 
-**Step 1 (analytic ceilings).** A perfect event flag has little headroom at the six Primaries with
-signed readings and none at the eight with MVA-only readings. Held out by event, the flag oracle
-beats the fitted constant mixture per group by about 0.14 points on harm rows at the six (the
-0.3-point bar in prediction P1 is not met, and the interval reaches -0.47 to +0.08), and the gain
-rests on one event (event 55 at D16). At the eight, the lags help outside events, so no mixture
-beats the forecast with lags on harm rows. The label-free median-gap-decile constant already takes
-most of the flag oracle's gain. The per-row oracle weight would save 0.7 points, and 0.41 of that is
-on clean rows, so it is mostly knowledge of the outcome.
+**Caveat that applies to every table below: NGED's logs miss some load-shift events.** The score on
+clean rows is therefore optimistic, and the real-event slices undercount events.
 
-**Step 2 (real-event counterfactual).** The share of a step that the lagged booster passes on is
-about 0.13 with one lag in the event, 0.15 with two, and 0.30 with three. That agrees with
-experiment 395 Part E (not Part F), and the synthetic step matches the real events within about 10%.
-The factor-of-2 rule (P2) does not fire, so the injection is not redesigned.
+**A perfect event flag would add little at the six and nothing at the eight (step 1, analytic
+ceilings).** The flag oracle is a gate that is told which rows have a lag inside an event. Held out
+by event, it beats the fitted constant mixture per group by about 0.14 points on harm rows at the
+six (95% interval -0.47 to +0.10). Prediction P1 asked for at least 0.3 points, so P1 is not met.
+One event (event 55 at D16) supplies more than the whole gain. At the eight, the forecast with lags
+beats every mixture on harm rows. A constant weight chosen by the decile of the gap between the two
+forecasts' medians needs no labels and captures most of the flag oracle's gain at the six. The
+per-row oracle weight would lower the score by 0.7 points on harm rows at the six, and separately by
+0.41 points on clean rows at the six, where there is no event to detect, so most of its gain comes
+from knowing the outcome.
 
-**Steps 4 and 5 (the gate).** Mean exact CRPS over all rows of the injected test world and of the
-real-event rows.
+**Injected shifts pass on a share of the step close to real events (step 2, real-event
+counterfactual).** Replacing the lags inside a labelled event by the stage-1 median, the median
+share of the step that the forecast with lags passes on is 0.15 with one lag inside the event
+(186 rows, 17 events), 0.17 with two (62 rows, 14 events), and 0.32 with three (17 rows, 6 events).
+The synthetic step of the same size gives 1.09, 1.11, and 1.20 times those shares. The shares differ
+by less than a factor of 2 (prediction P2), so the injection stays as designed. The three-lag
+estimate rests on 6 events. These shares agree with experiment 395 Part E, which found a median
+share of 0.368 with all three lags affected, and not with Part F, which found 0.94.
 
-| Rows | Forecast with lags | Forecast without lags | Fixed 50/50 | Constant mixture per group | Gate, full | Gate, flag (ceiling) |
+**The gate gains 0.6% to 2.3% on injected rows and under 0.5% on real rows (steps 4 and 5).** Mean
+exact CRPS over all rows of the injected test world (seed 2) and over all real-event rows. "Gate,
+full" is the gate with the metering group as an input, fed all features; "Gate, flag" also sees the
+true event flag and bounds it. The constant mixture is fitted per group on injected events for the
+injected rows and on real labels for the real rows.
+
+| Rows | Forecast with lags | Forecast without lags | 50/50 mixture | Constant mixture per group | Gate, full | Gate, flag |
 |---|---|---|---|---|---|---|
 | Injected, six, forecast R1 | 4.576 | 4.439 | 4.307 | 4.306 | 4.247 | 4.232 |
 | Injected, eight, forecast R1 | 5.449 | 5.522 | 5.297 | 5.312 | 5.278 | 5.246 |
@@ -128,34 +158,37 @@ real-event rows.
 | Real, six, R0 pair | 4.533 | 4.778 | 4.515 | 4.516 | 4.492 | not defined |
 | Real, eight, R0 pair | 5.191 | 5.414 | 5.202 | 5.169 | 5.198 | not defined |
 
-- **P3 holds at the six, and just holds at the eight.** The full gate captures 79% of the flag
-  gate's gain at the six and 52% at the eight (forecast R1), so the stop rule (under half) does not
-  fire. The single-step gate (lag surprise plus lead time) already captures 76% at the six, so the
-  window means, the median gap, and the neighbour features add little.
-- **P4 is only partly met.** On real harm rows at the six the full gate beats the fixed 50/50
-  mixture by 0.10 points (forecast R1; 0.08 for the R0 pair), meets the 0.1-point `small gain`
-  threshold only against the fixed mixture, and does not clearly beat the fitted constant mixture
-  (0.04 and -0.02 points). It costs under 0.05 points on clean rows.
-- **The gate does what it was built for on injected corruption.** On injected harm rows at the six
-  it lowers its mean weight on the forecast with lags from 0.51 (clean rows) to 0.42, and scores
-  4.11 against 4.34 for the fixed 50/50 mixture and 5.29 for the forecast with lags. At the eight it
-  matches the forecast without lags (5.55 against 5.51).
-- **It loses where the target is inside a real event.** On real rows at the six whose target is
-  inside a labelled event (about 8,000 rows) the injected-trained gate scores 10.75 against 10.50
-  for the fixed 50/50 mixture, because its mean weight on lags falls to 0.38. A gate trained on real
-  labels (not deployable at scale) scores 10.41.
-- **Real harm rows are too few for a firm contrast.** There are 11,000 such rows at the six and
-  6,600 at the eight, in a handful of events, so these gains are estimates, not tests.
-- **The metering-group split matters little.** One gate with the group as an input, and one gate per
-  group, differ from the pooled gate by under 0.5%.
+- **Prediction P3 holds at the six, and holds narrowly at the eight.** On forecast R1 the full gate
+  captures 79% of the flag gate's gain over the constant mixture per group at the six and 52% at the
+  eight (the R0 pair: 94% and 56%), so the stop rule (under half) does not fire. The gate that sees
+  only the lagged readings' surprise and the lead time captures 76% at the six and 81% at the eight,
+  so the window means, the median gap, and the neighbour features add little at the six and
+  nothing at the eight.
+- **Prediction P4 is only partly met.** On real harm rows at the six the full gate beats the 50/50
+  mixture by 0.10 points on forecast R1 (0.08 for the R0 pair). Against the constant mixture fitted
+  on injected events the gain is 0.04 points on forecast R1 and -0.02 on the R0 pair; against the
+  constant mixture fitted on real labels it is 0.11 on forecast R1. A gain under 0.1 points counts
+  as `small gain`, so the gain is small or borderline. On clean rows the gate scores no worse
+  than the 50/50 mixture.
+- **The gate does what it was built for on injected load shifts.** On injected harm rows at the six
+  its mean weight on the forecast with lags is 0.42, against 0.51 on clean rows, and it scores 4.11
+  against 4.34 for the 50/50 mixture and 5.29 for the forecast with lags. At the eight it scores
+  5.55, against 5.51 for the forecast without lags.
+- **The gate scores worse than the 50/50 mixture when the target is inside a real event.** On real
+  rows at the six whose target is inside a labelled event (7,960 rows) the gate scores 10.75
+  against 10.50, and its mean weight on the forecast with lags is 0.38. A gate trained on real
+  labels (not usable for substations without labels) scores 10.41 there. At the eight the gate
+  scores 11.92 against 11.82 for the 50/50 mixture.
+- **Real harm rows are few.** There are 11,194 at the six and 6,609 at the eight, drawn from the
+  11 labelled events in the test months, so these gains are estimates and not tests.
 
-**Event plots.** Figure 1 and Figure 2 show three labelled events at the Primaries with signed
-readings and three at the Primaries with MVA-only readings. At the six, the weight is low (about
-0.3) through the first two events at D5 and D16 and stays low for days after the second event ends,
-but rises above 0.5 inside the third event at D5, so the gate does not respond to the labelled event
-itself. At the eight, the weight falls from about 0.6 to about 0.4 inside the first two events at D8
-and does not move in the third. The plots show one forecast per day (issued at 09:00, shortest
-lead).
+**Event plots.** Figure 1 and Figure 2 show three labelled events at the six Primaries with signed
+readings (D5, D16, D5) and three at the eight with MVA-only readings (all D8), as forecast R1 saw
+them. In these six events the weight on the forecast with lags is low (about 0.3) through the first
+two events at the six and stays low for days after the second ends. It rises above 0.5 inside the
+third event at the six. At the eight it falls from about 0.6 to about 0.4 inside the first two
+events and does not move in the third. The plots show one forecast per day (issued at 09:00,
+shortest lead).
 
 ![Figure 1: three labelled events at the six Primaries with signed readings](figure_events_six.svg)
 
@@ -163,24 +196,24 @@ lead).
 
 ## Not run
 
-- The per-Primary contrast intervals, the smoothness and promptness measurements, the
-  lag-encroachment sweep, the avoidable-curtailment and cold-night tables, and the tail-coverage
-  tables from the plan were not produced. The slice report (`e00402_report.py`) gives the per-group
-  harm, event, and clean tables only. The result is a screen, and the maintainer decides whether
-  those tables are worth building.
-- Twelve monthly refits (against four) were not run.
-- A data-derived neighbour graph would need the connection list for each of about 1,300 substations.
-  The gate here used the NGED list for 16 Primaries.
+- **The first look is complete but narrow.** The per-Primary contrast intervals, the smoothness and
+  promptness measurements, the lag-encroachment sweep, the avoidable-curtailment table, the
+  cold-night table, and the tail-coverage tables (q95 and q99) in the plan were not produced. The
+  slice report (`e00402_report.py`) gives the per-group harm, event, and clean tables only.
+- **Four monthly forecast refits were scored, not twelve.**
+- **Neighbour graph at scale.** A data-derived neighbour graph would need a connection list for each
+  of about 1,300 substations. The gate here used NGED's list for 16 Primaries (the 14 scored and
+  the 2 report-only).
 
 ## Checks
 
-- Median minus mean forecast per site and the mean-forecast error beside each quantile-score
-  contrast were not computed; the contrasts above are scores of the 11-quantile mixture's exact CRPS
-  only.
-- Audit triggers fired: none that this experiment's change to production code could set off, because
-  it touches nothing under `src/` or `packages/`.
-- Protocol 11-quantile CRPS beside the exact CRPS was not tabulated; every score here is the exact
-  CRPS.
+- The planned comparison of the median forecast with the mean forecast per Primary was not
+  computed, so a bias between the two is untested. Every score here is the exact CRPS; the
+  protocol's 11-quantile CRPS was not tabulated.
+- No audit trigger applies to the production code, because the experiment changes nothing under
+  `src/` or `packages/`. Two triggers are met on the results: P1 is not met, and one event (event
+  55 at D16) supplies more than the whole step 1 gain. The page records each, and the manager
+  decides whether an audit follows.
 
 ## Plan
 
