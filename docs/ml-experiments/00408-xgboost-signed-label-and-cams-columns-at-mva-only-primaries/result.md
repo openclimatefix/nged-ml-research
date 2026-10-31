@@ -108,28 +108,29 @@ benchmark: >-
 
 # Can the monthly XGBoost model infer signed MW from MVA readings, in lab conditions?
 
-**Take-home: two satellite solar columns lowered the forecast error at 15 of the 16 Primaries, but
-only because the lab gives the model the realised sunshine, and the attempt to recover a signed MW
-forecast failed its known-answer test.** At the eight MVA-only Primaries (D2, D3, D4, D8, D12, D19,
-D21, and D22) the continuous ranked probability score (CRPS) fell by 0.359 points of effective
-capacity (99.67% interval -0.500 to -0.229) when the monthly XGBoost model received the CAMS solar
-columns, and by 0.772 (95% interval -1.037 to -0.521) at D12. In production the Copernicus
-Atmosphere Monitoring Service (CAMS) value arrives about a day late, so this gain is a ceiling, not
-a forecast of what production would see. The registered rule for labelling reverse flow recovered
-the sign of injected solar output with pooled balanced accuracy 0.834 against a pass line of 0.85,
-so the stop rule applied: the signed-label arms were not run and there is still no trusted signed
-forecast at the MVA-only Primaries. Verdict: partly supported.
+**Take-home: two satellite solar columns lowered the forecast error at 15 of the 16 Primary
+substations, but only because the lab gives the model the realised sunshine, and the attempt to
+recover a signed MW forecast failed its known-answer test.** At the eight Primaries whose meters
+record apparent power in megavolt-amperes (MVA-only: D2, D3, D4, D8, D12, D19, D21, and D22) the
+continuous ranked probability score (CRPS) fell by 0.359 points of effective capacity (99.67%
+interval -0.500 to -0.229) when the monthly XGBoost demand model received the CAMS solar columns,
+and by 0.772 (95% interval -1.037 to -0.521) at D12. In production the Copernicus Atmosphere
+Monitoring Service (CAMS) value arrives about a day late, so this gain is a ceiling, not a forecast
+of what production would see. The registered rule for labelling reverse flow recovered the sign of
+injected solar output with pooled balanced accuracy 0.834 against a pass line of 0.85, so the stop
+rule applied: the signed-label arms were not run and there is still no trusted signed forecast at
+the MVA-only Primaries. Verdict: partly supported.
 
 ![A1 minus A0, CRPS at days 1 to 10, per Primary and pooled](headline.svg)
 
 At the eight MVA-only Primaries the meter records apparent power in megavolt-amperes, which has no
 sign, so reverse flow from embedded solar looks like demand. D-codes are anonymised Primary
-substations of NGED, the electricity distribution network operator that supplies the data.
-Experiments 152, 372, 374, and 387 each tried a different fold treatment and none gave a trusted
-signed forecast. This experiment gave the monthly XGBoost model two CAMS columns and labelled
-reverse flow by a physics rule before training. It first tested that rule on six Primaries whose
-meters record sign, after adding the recorded output of a metered solar farm so that the true
-answer is known.
+substations of National Grid Electricity Distribution (NGED), the electricity distribution network
+operator that supplies the data. Experiments 152, 372, 374, and 387 each tried a different fold
+treatment and none gave a trusted signed forecast. This experiment gave the monthly XGBoost model
+two CAMS columns and labelled reverse flow by a physics rule before training. It first tested that
+rule on six Primaries whose meters record sign, after adding the recorded output of a metered solar
+farm so that the true answer is known.
 
 ## What changed since the brief was written
 
@@ -149,13 +150,13 @@ answer is known.
 **The registered rule recovered the sign of injected reverse flow for about three half-hours in
 four, which is short of the pass line.** At the six Primaries whose meters record sign, we added a
 metered solar farm's output (twice the median sunny-midday reading), discarded the sign, and asked
-the rule-labelled model (A2 at tau 0.7) to recover it. The signed median's pooled balanced accuracy
-(the mean of the share of reverse-flow half-hours it called and the share of other half-hours it
-left alone) was 0.834 against 0.85. Its signed mean absolute error was 9.3 points against 19.5 for
-the plain model read as signed. It did not beat a rule that flips the sign whenever realised ERA5
-shortwave irradiance exceeds a threshold fitted on the training years: that rule scored 0.86 to
-0.88 per Primary, 0.036 above the model, though it wrongly flipped 14% to 19% of the half-hours with
-no reverse flow against 2% to 5% for the model.
+the rule-labelled XGBoost model (A2 at tau 0.7) to recover it. The signed median's pooled balanced
+accuracy (the mean of the share of reverse-flow half-hours it called and the share of other
+half-hours it left alone) was 0.834 against 0.85. The signed median's mean absolute error was 9.3
+points against 19.5 for the plain model read as signed. It did not beat a rule that flips the sign
+whenever realised ERA5 shortwave irradiance exceeds a threshold fitted on the training years: that
+rule scored 0.86 to 0.88 per Primary, 0.036 above the model, though it wrongly flipped 14% to 19% of
+the half-hours with no reverse flow against 2% to 5% for the model.
 
 ![Balanced accuracy of the signed median and of the shortwave rule, per Primary](gate.svg)
 
@@ -165,9 +166,10 @@ no reverse flow against 2% to 5% for the model.
   +0.03: fail). Signed mean absolute error 9.3 against 19.5 (pass).
 - **Per Primary.** D5 0.788, D9 0.841, D10 0.825, D11 0.849, D14 0.846, D16 0.843, with recall on
   reverse flow 0.60 to 0.75.
-- **The shortwave comparison favours that rule.** It reads realised ERA5 shortwave at the valid time,
-  which a 10-day forecast does not know. The gate fails on pooled balanced accuracy alone, so
-  dropping the margin criterion would not change the verdict.
+- **The shortwave comparison favours that rule.** That rule reads realised ERA5 (the European Centre
+  for Medium-Range Weather Forecasts reanalysis) shortwave at the valid time, which a 10-day
+  forecast does not know. The gate fails on pooled balanced accuracy alone, so dropping the margin
+  criterion would not change the verdict.
 - **Most of the loss belongs to the rule.** Used alone on the injected data (no model fit), the
   rule's labels reach recall 0.64 to 0.79 with false-reverse 3.8% to 6.1% at level 2.0. A single-fit
   rule scores 0.74 to 0.85 per Primary, so the 0.85 pass line sits at the ceiling the rule's own
@@ -175,10 +177,10 @@ no reverse flow against 2% to 5% for the model.
 - **The miss is small but not noise.** A bootstrap over (Primary, refit) pairs gives a pooled
   balanced accuracy of 0.821 to 0.846 (5th to 95th percentile), so the miss is about 0.016.
 - **The rule's gate opens at two real Primaries.** Read as apparent power, real readings open the
-  gate only at D10 (a signed-MW Primary with 130 real reverse half-hours) and at D12. There the
-  rule labels 97% and 92% of sunny summer-midday training half-hours as reverse flow, because the
-  constant `C` is fitted from the same rows that it then labels. The 92% at D12 is therefore not
-  evidence that D12 exports on 92% of sunny middays.
+gate only at D10 (a signed-MW Primary with 130 real reverse half-hours) and at D12. At those two
+Primaries the rule labels 97% and 92% of sunny summer-midday training half-hours as reverse flow,
+because the constant `C` is fitted from the same rows that it then labels. The 92% at D12 is
+therefore not evidence that D12 exports on 92% of sunny middays.
 - **Stop rule.** The gate failed at level 2.0, so level 1.0 and the A2 arms (tau 0.7, tau 0.5,
   off, shuffled, and forced gate) were not run. This would be the fifth fold treatment after
   experiments 152, 372, 374, and 387, so the next step is the maintainer's decision.
@@ -232,11 +234,11 @@ Negative is better.
 
 ![An example 14-day forecast at D12, with and without the CAMS columns](example_14_day.svg)
 
-**The CAMS columns remove the sunny-half-hour under-forecast at D12 and overshoot it slightly.**
-The mean error of the median on `sunny_unit_shape` half-hours at D12 was -5.16 points for A0 (-2.06
-at day 1, -6.15 at days 8 to 10) and +2.14 for A1 at days 1 to 10 (+1.65 at day 1, +2.65 at days 8
-to 10). Experiment 381 found about -5 at D12. The lab's CAMS value is the realised weather at every
-lead, so A1's bias does not grow with lead the way A0's does. In production the columns would
+**The CAMS columns remove the sunny-half-hour under-forecast at D12 and leave a bias of the opposite
+sign.** The mean error of the median on `sunny_unit_shape` half-hours at D12 was -4.79 points for A0
+at days 1 to 10 (-2.06 at day 1, -6.15 at days 8 to 10) and +2.14 for A1 (+1.65 at day 1, +2.65 at
+days 8 to 10). Experiment 381 found about -5 at D12. The lab's CAMS value is the realised weather at
+every lead, so A1's bias does not grow with lead the way A0's does. In production the columns would
 describe only past half-hours, so the day-1 to day-10 pattern would look more like A0's.
 
 **Tails move little.** Coverage and pinball loss at the outer quantiles, days 1 to 10:
@@ -250,8 +252,8 @@ describe only past half-hours, so the day-1 to day-10 pattern would look more li
 | D8 | A0 | 0.0213 | 0.0876 | 0.9578 | 0.9945 | 0.375 | 0.430 |
 | D8 | A1 | 0.0212 | 0.0923 | 0.9604 | 0.9947 | 0.371 | 0.426 |
 
-At D12 the q05 coverage of 0.09 (nominal 0.05) for both arms is the largest departure from nominal,
-and the 15% widening brought it to 0.051 for A0 and 0.055 for A1.
+At D12 the q05 coverage of 0.09 (nominal 0.05) for both arms is the largest departure from nominal
+among D12's outer quantiles, and the 15% widening brought it to 0.051 for A0 and 0.055 for A1.
 
 **Avoidable curtailment cost (pounds, limit fraction 0.5) is defined only at the six signed-MW
 Primaries, and A1 is below A0 at all six.** The MVA-only meter has no sign, so the cost is null
@@ -276,7 +278,7 @@ At limit fraction 0.9 the cost at D5 is 425,948 (A0), 425,787 (A1), 392,146 (BG2
   D18 fall before those Primaries' first scored refits (2026-03-01 and 2026-01-01); within the
   scored windows D15 lost none and D18 lost three.
 - **Median minus mean forecast.** Per Primary, in megawatts, between about -0.19 and +0.01 for
-  both arms, and A1 is closer to zero at most Primaries (D12 -0.129 for A0, -0.118 for A1).
+  both arms, and A1 is closer to zero at most Primaries (D12 -0.167 for A0, -0.148 for A1).
 - **Lead band.** The headline `lead_days_1_10` band is lead above 0 and up to 240 hours.
 - **Audit triggers.** Trigger 1 (a known-answer test failed) fired. Trigger 2 (a result contradicts
   a prediction) fired: P3 predicted -0.05 to -0.20 at D12 and the result is -0.772. The explanation
@@ -287,10 +289,10 @@ At limit fraction 0.9 the cost at D5 is 425,948 (A0), 425,787 (A1), 392,146 (BG2
   traced to a difference in the row set), with no leakage and no Primary worse than +0.05.
 - **Audit of the gate.** A second fresh Sonnet agent rebuilt the injected truth and the scores from
   the stored files. Every per-Primary and pooled figure matches, the injection uses only data
-  before 2025-07-01, and "failed at level 2.0" is a sound reading. It also noted that the reverse
-  flow share is 17% to 26% of daylight half-hours, that `Q` is zero by construction (which favours
-  the model, so real meters would do no better), and that the 0.85 line was set without knowing the
-  rule's ceiling.
+before 2025-07-01, and "failed at level 2.0" is a sound reading. The gate auditor also noted that
+the reverse flow share is 17% to 26% of daylight half-hours, that `Q` is zero by construction (which
+favours the model, so real meters would do no better), and that the 0.85 line was set without
+knowing the rule's ceiling.
 - **Prediction outcomes.** P1 failed (0.834). P2 (placebos) was not run. P3 failed on D12 (-0.772
   against -0.05 to -0.20) and at the other seven (each moved by more than the predicted -0.03 to
   +0.03; D4's -0.053 is the smallest). P4 and P5 were not run. P6 cannot be tested in the lab,
