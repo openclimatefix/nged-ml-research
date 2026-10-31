@@ -28,6 +28,7 @@ import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path
 from typing import Final
 
@@ -96,15 +97,19 @@ def input_columns(*, arm: arms.Arm) -> list[str]:
     base = [c for c in fd.input_columns(a7=False) if c not in arm.drop]
     if "summary_temperature_shortwave" in arm.add:
         base = [c for c in base if c not in arms.SUMMARY_REPLACES]
+    if "summary7" in arm.add:
+        base = [c for c in base if c not in arms.SEVEN_VARIABLES]
     extra = [*arms.calendar_columns(arm=arm)]
     if "trailing_temperature" in arm.add:
         extra += arms.trailing_columns()
     if "summary_temperature_shortwave" in arm.add:
         extra += list(arms.SUMMARY_COLUMNS)
+    if "summary7" in arm.add:
+        extra += [*arms.MEAN7_COLUMNS, *arms.STD7_COLUMNS]
     return [*base, *extra]
 
 
-def checked_columns(*, arm: arms.Arm) -> list[str]:
+def checked_columns(*, arm: arms.Arm, training: bool = False) -> list[str]:
     """Return the added columns that must be finite on every row.
 
     The recipe's own columns keep their missing values (the origin lags are missing by design and
@@ -112,17 +117,33 @@ def checked_columns(*, arm: arms.Arm) -> list[str]:
     holiday.
     """
     recipe = set(fd.input_columns(a7=False))
-    return [c for c in input_columns(arm=arm) if c not in recipe and c != "holiday_type"]
+    added = [c for c in input_columns(arm=arm) if c not in recipe and c != "holiday_type"]
+    if "mean7" in arm.add or (training and "mean7_train" in arm.add):
+        added += list(arms.SEVEN_VARIABLES)
+    return added
 
 
-def add_arm_columns(*, frame: pl.DataFrame, arm: arms.Arm, site: str) -> pl.DataFrame:
+def add_arm_columns(
+    *, frame: pl.DataFrame, arm: arms.Arm, site: str, training: bool = False
+) -> pl.DataFrame:
     """Add every column the arm adds to a frame of training or prediction rows."""
     out = arms.add_calendar(frame=frame, arm=arm)
     if "trailing_temperature" in arm.add:
         out = arms.add_trailing_temperature(frame=out, site=site)
     if "summary_temperature_shortwave" in arm.add:
         out = arms.add_summary(frame=out, site=site)
+    if "summary7" in arm.add or "mean7" in arm.add or (training and "mean7_train" in arm.add):
+        out = arms.add_summary7(
+            frame=out, time_series_id=_series_id(site=site), replace="summary7" not in arm.add
+        )
     return out
+
+
+@cache
+def _series_id(*, site: str) -> int:
+    """Return the `time_series_id` of a Primary's label."""
+    table = common.series_table()
+    return int(table.filter(pl.col("site") == site)["time_series_id"].item())
 
 
 def monotone_string(*, arm: arms.Arm, columns: list[str]) -> str | None:
@@ -164,8 +185,8 @@ def training_frame(
     rows = fd._training_rows_cached(row=row, arrays=arrays, config=config)
     known = fd.known_rows(rows=rows, refit=refit, config=config)
     known = known.filter(pl.col("valid_time") >= window_start(refit=refit))
-    known = add_arm_columns(frame=known, arm=arm, site=row["site"])
-    added = checked_columns(arm=arm)
+    known = add_arm_columns(frame=known, arm=arm, site=row["site"], training=True)
+    added = checked_columns(arm=arm, training=True)
     kept = (
         known.filter(pl.all_horizontal(pl.col(c).is_not_nan() for c in added)) if added else known
     )

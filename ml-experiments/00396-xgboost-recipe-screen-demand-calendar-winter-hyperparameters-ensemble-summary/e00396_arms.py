@@ -72,7 +72,10 @@ class Arm:
         name: Folder name under `arm_preds/` and `boosters/`.
         tier: A, B, C, or D (the run order of the plan).
         add: Groups of columns the arm adds: `bank_holiday`, `distance`, `weekend`, `holiday_type`,
-            `trailing_temperature`, `day_of_year`, `summary_temperature_shortwave`.
+            `trailing_temperature`, `day_of_year`, `summary_temperature_shortwave`, `summary7` (the
+            mean and standard deviation of all seven weather variables replace them), `mean7` (the
+            seven are replaced by their ensemble mean, in training and prediction rows), and
+            `mean7_train` (replaced by the ensemble mean in training rows only).
         drop: Input columns the arm removes (the no-calendar control).
         params: XGBoost parameters that replace the control's.
         rounds: Boosting rounds fitted.
@@ -110,6 +113,9 @@ ARMS: Final[dict[str, Arm]] = {
         Arm("C0", "A"),
         Arm("C1", "A", seed=1),
         Arm("E1_es2", "A", add=("summary_temperature_shortwave",), once=True),
+        Arm("E2_es7", "B", add=("summary7",), once=True),
+        Arm("E3_em_em", "B", add=("mean7",), once=True),
+        Arm("E4_em_pool", "B", add=("mean7_train",)),
         Arm("H0_nocal", "A", drop=("hour_local", "day_of_week_local")),
         Arm("H1", "A", add=("bank_holiday", "distance")),
         Arm("H1d", "A", add=("distance",)),
@@ -343,6 +349,24 @@ def band_of(*, lead_hours: np.ndarray, band: tuple[float, float]) -> np.ndarray:
     return (lead_hours > band[0]) & (lead_hours <= band[1])
 
 
+SEVEN_VARIABLES: Final[tuple[str, ...]] = (
+    "shortwave",
+    "longwave",
+    "temperature_2m",
+    "dew_point_temperature_2m",
+    "pressure_surface",
+    "precipitation",
+    "wind_speed_10m",
+)
+"""The recipe's weather columns, named as in experiment 397's `ens_summary` files."""
+MEAN7_COLUMNS: Final[tuple[str, ...]] = tuple(f"mean_{v}" for v in SEVEN_VARIABLES)
+STD7_COLUMNS: Final[tuple[str, ...]] = tuple(f"std_{v}" for v in SEVEN_VARIABLES)
+SUMMARY7_FOLDER: Final[Path] = (
+    DATA / "00397-plain-and-attention-mixture-density-network-for-primary-demand"
+    / "work" / "ens_summary"
+)  # fmt: skip
+"""Experiment 397's per-run ensemble mean and standard deviation of the seven variables."""
+
 SUMMARY_COLUMNS: Final[tuple[str, ...]] = (
     "ens_temp_mean",
     "ens_temp_std",
@@ -387,3 +411,34 @@ def add_summary(*, frame: pl.DataFrame, site: str) -> pl.DataFrame:
         values[ok] = tables[name][run[ok], step[ok]]
         columns[name] = values
     return frame.with_columns(*[pl.Series(n, v) for n, v in columns.items()])
+
+
+@lru_cache(maxsize=1)
+def _summary7_table(*, time_series_id: int) -> pl.DataFrame:
+    """Return one Primary's 51-member mean and standard deviation of the seven variables."""
+    return (
+        pl.scan_parquet(SUMMARY7_FOLDER / "init=*.parquet")
+        .filter(pl.col("time_series_id") == time_series_id)
+        .select("power_fcst_init_time", "valid_time", *MEAN7_COLUMNS, *STD7_COLUMNS)
+        .collect()
+    )
+
+
+def add_summary7(*, frame: pl.DataFrame, time_series_id: int, replace: bool) -> pl.DataFrame:
+    """Add experiment 397's ensemble summary of the seven variables to a frame.
+
+    With `replace`, each weather column holds its ensemble mean and the summary columns are not
+    kept. Otherwise the frame gains `mean_<v>` and `std_<v>` for each variable. Rows the summaries
+    do not cover hold NaN.
+    """
+    joined = frame.join(
+        _summary7_table(time_series_id=time_series_id),
+        on=["power_fcst_init_time", "valid_time"],
+        how="left",
+        maintain_order="left",
+    ).with_columns(pl.col(*MEAN7_COLUMNS, *STD7_COLUMNS).fill_null(float("nan")))
+    if not replace:
+        return joined
+    return joined.with_columns(*[pl.col(f"mean_{v}").alias(v) for v in SEVEN_VARIABLES]).drop(
+        *MEAN7_COLUMNS, *STD7_COLUMNS
+    )
