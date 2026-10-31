@@ -42,8 +42,8 @@ decision_rule: >-
   If neither does, the limit is the lagged and lagless heads or the labelling, because the exact
   flags cannot make this pair of forecasts score better inside events. Labelling means rows inside
   events whose actuals are not normal running arrangement (NRA, the usual network configuration)
-  and events missing from the logs. The smallest gain worth reporting is zero, because the O-rule is a diagnostic
-  ceiling and is not ported. Interim; no 99% claim.
+  and events missing from the logs. The smallest gain worth reporting is zero, because the O-rule
+  is a diagnostic ceiling and is not ported. Interim; no 99% claim.
 benchmark: >-
   B-mix, experiment 404's fixed 50/50 mixture of A0-inj and the lagless table. S1, B1, B3, and B6
   (experiment 404's stored final forecasts) are reference rows, where stored for the cell.
