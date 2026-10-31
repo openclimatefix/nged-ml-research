@@ -3,8 +3,9 @@
 
 The primary contrast is the signed CRPS of the hidden pair's forecast on rows with reverse flow
 (signed truth below zero, injected or real), in points of effective capacity, days 1 to 10. CRPS is
-taken as twice the unweighted mean pinball loss over the 11 stored quantile levels (spaced unequally, so it approximates the CRPS; paired contrasts are unaffected). Intervals come from a paired
-month-block bootstrap: each block is one hidden Primary in one test month, resampled with
+taken as twice the unweighted mean pinball loss over the 11 stored quantile levels (spaced
+unequally, so it approximates the CRPS; paired contrasts are unaffected). Intervals come from a
+paired month-block bootstrap: each block is one hidden Primary in one test month, resampled with
 replacement, 20,000 times. Rows are not independent half-hours (each valid half-hour appears in
 about 15 runs), so every count states whether it counts rows or unique half-hours.
 
