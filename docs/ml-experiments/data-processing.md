@@ -524,6 +524,17 @@ and 0.062 points on the kept rows, intervals excluding zero), and worsened it by
 when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
 three farms, July 2025 to June 2026).
 
+**Treat the `low_wind_idle` flag of experiment 210's mask as an ERA5 wind rule, not as a finding that
+the farm was idle (provisional, medium confidence).** *Applies to: experiments.* The flag marks every
+half-hour with ERA5 100 m wind below the fitted threshold that lies outside an outage run, and it does
+not look at power. Of the 9,787 flagged half-hours in the scored year, 914 (9.3%) had power above the
+farm's idle band. To score idle half-hours as zero output, set the target to 0 only where the
+reading is also in the idle band, and drop the `outage_suspected` half-hours. Dropping the mask's rows
+raises the default's score by 0.515 points because the dropped half-hours are easy; random drops that
+match the wind-speed bin give the same rise, and random drops that match only farm, month, and hour
+give 0.12. Evidence: [experiment 432](00432-wind-cleaned-zero-rescore/result.md), three farms,
+July 2025 to June 2026.
+
 **Do not check a wind farm's capacity from half-hours at strong ERA5 wind alone (provisional, medium
 confidence).** *Applies to: experiments.* The half-hours with ERA5 100 m speed at least 2 m/s above
 the speed where the fitted power curve saturates hold 0.31% (W1), 1.12% (W2), and 0.18% (W3) of
@@ -1080,3 +1091,13 @@ begin with the scored period, so test months before 2025-07 have no inputs and a
 before writing a forecast ([experiment 416](00416-mdn-explicit-solar-term-better-powered-follow-up/result.md);
 the months 2025-05 and 2025-06 failed). The 12 months from 2025-07 to 2026-06 are the full set.
 Confidence: provisional, one family.
+
+**Compute a gate or threshold that needs one weather value per valid time from the shortest-lead
+forecast row, not the first row (high confidence).** *Applies to: experiments and production.* With
+recorded weather every forecast row of one valid time carries the same value, so "keep the first row
+per valid time" is harmless. With ensemble forecasts each row carries its own run's value, and the
+first row of the sorted frame is the longest-lead one (mean lead 333 hours at D5), whose irradiance is
+a blurred 6-hour mean. Experiment 417's Primary-level gate did this and shut at D8 and D12; on the
+shortest-lead row it opens at both, as with recorded weather
+([experiment 424](00424-neural-mva-export-gated-signed-ens-serving-test/result.md)). The entry is
+provisional until the experiment has had its reviews.
