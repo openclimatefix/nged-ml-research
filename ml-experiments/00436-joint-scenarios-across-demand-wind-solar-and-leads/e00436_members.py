@@ -2,8 +2,8 @@
 
 No fit. For each joint run (`work/runs/<date>.npz`), writes `work/members/<date>.npz` with
 `member_q` (9, 702, 51, 11): for the three wind farms (experiment 429 `memberwise`, seeds averaged)
-and the six solar farms (experiment 430 `a2_memberwise`, seeds 0 to 2 averaged), the 11 quantiles of the
-forecast that each ensemble member produces alone, in points of capacity, on the same 702 half-hour
+and the six solar farms (experiment 430 `a2_memberwise`, seeds 0 to 2 averaged), the 11
+quantiles of the forecast that each ensemble member produces alone, in points of capacity, on the same 702 half-hour
 grid as the run file. Half-hours a node has no row for hold zero.
 
 ```bash

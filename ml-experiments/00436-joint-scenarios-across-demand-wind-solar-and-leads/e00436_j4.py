@@ -66,7 +66,7 @@ def analysis_series() -> tuple[np.ndarray, datetime]:
         hourly.select("valid_time", "shortwave"),
     ]
     for farm in build.WIND_FARMS:
-        series.append(
+        series.append(  # noqa: PERF401
             frame.filter(pl.col("time_series_id") == wind_ids[farm])
             .select("valid_time", "wind_speed_100m")
             .sort("valid_time")
@@ -110,10 +110,10 @@ def member_state(
 
 def main() -> None:
     """Write the J4 scenarios of every joint run."""
-    import e00377_adapter as adapter  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 
     observed = np.load(score.WORK / "observed.npz")["observed"]
-    analysis, start = analysis_series()
+    analysis, _start = analysis_series()
     series = adapter.series_table()
     ids = series["time_series_id"].to_list()
     wind = data347.scored_frame().with_row_index("row")

@@ -148,7 +148,7 @@ def rank_instances(
     steps = np.arange(0, LEAD_STEPS, RANK_STRIDE)
     out: dict[str, list[tuple[int, int]]] = {b: [] for b in BLOCKS}
     for fam, name in enumerate(("demand", "wind", "solar")):
-        nodes = np.flatnonzero(KIND == fam)
+        nodes = np.flatnonzero(fam == KIND)
         for t in steps:
             ok = have[nodes, t]
             if ok.sum() >= score.MIN_SPATIAL[fam]:
@@ -158,7 +158,7 @@ def rank_instances(
     for t in steps:
         agg_x, agg_y, good = [], [], True
         for fam in range(3):
-            nodes = np.flatnonzero((KIND == fam) & have[:, t])
+            nodes = np.flatnonzero((fam == KIND) & have[:, t])
             if nodes.size == 0:
                 good = False
                 break
@@ -219,7 +219,7 @@ def corr_blocks(*, z: np.ndarray, ok: np.ndarray) -> dict[str, np.ndarray]:
     return out
 
 
-def main() -> None:  # noqa: PLR0914, PLR0915
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Write the four diagnostic tables."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -257,7 +257,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
                     np.abs(srt - np.nan_to_num(actual)[None]).mean(0) - (coeff * srt).sum(0) / M**2
                 )
                 for fam, name in enumerate(("demand", "wind", "solar")):
-                    nodes = np.flatnonzero(KIND == fam)
+                    nodes = np.flatnonzero(fam == KIND)
                     for day in range(10):
                         sl = slice(day * 48, (day + 1) * 48)
                         ok = have[nodes][:, sl]

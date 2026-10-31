@@ -189,8 +189,8 @@ def main() -> None:  # noqa: PLR0915
     np.savez_compressed(WORK_DIR / "observed.npz", observed=observed)
     wind, wind_q, wind_ws = wind_rows()
     solar, solar_q, solar_rank = solar_rows()
-    wind_runs = {t for t in wind["power_fcst_init_time"].unique().to_list()}
-    solar_inits = {t for t in solar["init_time"].unique().to_list()}
+    wind_runs = set(wind["power_fcst_init_time"].unique().to_list())
+    solar_inits = set(solar["init_time"].unique().to_list())
     demand_runs: set[datetime] = set()
     for month in s434.MONTHS:
         demand_runs |= set(

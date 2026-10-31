@@ -139,14 +139,14 @@ def weight_grid(*, table: dict[tuple[int, str], float]) -> np.ndarray:
         lo, hi = BANDS[band]
         lo = 0 if band == "h12_36" else lo  # leads under 12 h take the 12 to 36 hour weight
         hi = S if band == "h36_240" else hi  # leads past 240 h take the 36 to 240 hour weight
-        out[KIND == fam, lo:hi] = w
+        out[fam == KIND, lo:hi] = w
     return out
 
 
 def train_score(*, path: np.ndarray, actual: np.ndarray, fam: int, band: str) -> float:
     """Return the family's spatial plus temporal variogram score for one band (lower is better)."""
     lo, hi = BANDS[band]
-    nodes = np.flatnonzero(KIND == fam)
+    nodes = np.flatnonzero(fam == KIND)
     have = ~np.isnan(actual)
     y_all = np.nan_to_num(actual)
     steps = np.arange(lo, hi)
@@ -224,7 +224,7 @@ def j6_paths(*, j2: np.ndarray, member_q: np.ndarray, c: np.ndarray, median: boo
     return out
 
 
-def main() -> None:  # noqa: PLR0914
+def main() -> None:
     """Fit the copula leaving one month out and write J5, J6, and J6-median scenarios."""
     observed = np.load(score.WORK / "observed.npz")["observed"]  # noqa: F841
     files = sorted((score.WORK / "runs").glob("*.npz"))

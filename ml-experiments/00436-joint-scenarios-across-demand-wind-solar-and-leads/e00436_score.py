@@ -141,7 +141,7 @@ def make_ranks(
     raise ValueError(msg)
 
 
-def rows_for_run(
+def rows_for_run(  # noqa: PLR0912
     *, paths: dict[str, np.ndarray], actual: np.ndarray, kind: np.ndarray, init: datetime
 ) -> list[dict]:
     """Return the score rows of one run: every arm, block, window, and slice."""

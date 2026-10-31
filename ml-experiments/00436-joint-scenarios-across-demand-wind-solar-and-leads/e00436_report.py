@@ -42,7 +42,7 @@ def margin(*, ind: float, co: float) -> float:
 def bootstrap_relative(
     *, base: np.ndarray, other: np.ndarray, seed: int = 0
 ) -> tuple[float, float, float]:
-    """Return the relative difference of mean(other) against mean(base) and its month-block interval.
+    """Return the relative difference of mean(other) against mean(base), with a month-block interval.
 
     `base` and `other` hold one value per month, in the same month order.
     """
@@ -71,9 +71,7 @@ def main() -> None:
     )
     for metric in ("variogram", "energy"):
         table = monthly(scores=scores, metric=metric)
-        print(
-            f"\n=== {metric} score, relative difference against J0 (month-block {CONFIDENCE:.2%} interval) ==="
-        )
+        print(f"\n=== {metric} score, relative to J0 (month-block {CONFIDENCE:.2%} interval) ===")
         keys = (
             table.select("block", "window", "slice", "label")
             .unique()
@@ -94,7 +92,8 @@ def main() -> None:
                 else float("nan")
             )
             parts = [
-                f"{block:8s} {window:9s} {slice_name:8s} {label:7s} J0 {base.mean():.4f} margin {gap:.1%}"
+                f"{block:8s} {window:9s} {slice_name:8s} {label:7s} J0 {base.mean():.4f} "
+                f"margin {gap:.1%}"
             ]
             for arm in [c for c in wide.columns if c not in ("month", "J0")]:
                 point, low, high = bootstrap_relative(base=base, other=wide[arm].to_numpy())

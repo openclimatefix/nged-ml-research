@@ -47,9 +47,7 @@ def marginal() -> None:
 def ranks() -> None:
     """Print the share of observations in the end bins and middle bins of each rank histogram."""
     r = pl.read_parquet(W / "diag_rank.parquet")
-    print(
-        "\n=== rank histograms: share in the lowest+highest 10% of bins (flat 0.20), middle 20% (flat 0.20) ==="
-    )
+    print("\n=== rank histograms: share in the end 10% of bins and the middle 20% (flat: 0.20) ===")
     rows = []
     for (arm, block, kind), g in r.group_by("arm", "block", "kind"):
         c = g.sort("bin")["count"].to_numpy()
@@ -74,9 +72,7 @@ def ranks() -> None:
 def dependence() -> None:
     """Print the root-mean-square difference of the dependence matrices."""
     d = pl.read_parquet(W / "diag_dependence.parquet")
-    print(
-        "\n=== dependence check: rmsd of scenario against realised score correlations (scenario / observed means) ==="
-    )
+    print("\n=== dependence check: rmsd of scenario against realised score correlations ===")
     print(
         d.with_columns(
             pl.col("rmsd").round(3), pl.col("scenario").round(3), pl.col("observed").round(3)
@@ -95,9 +91,7 @@ def dependence() -> None:
 def proxies() -> None:
     """Print the proxy scores and their paired contrasts against J0 (month-block bootstrap)."""
     p = pl.read_parquet(W / "diag_proxy.parquet")
-    print(
-        "\n=== downstream proxies, mean over runs and groups, relative difference against J0 (month-block interval) ==="
-    )
+    print("\n=== downstream proxies, relative to J0 (month-block interval) ===")
     for metric in (
         "brier_two_over",
         "brier_export",
