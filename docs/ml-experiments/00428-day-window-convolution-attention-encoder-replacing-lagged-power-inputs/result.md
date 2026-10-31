@@ -231,15 +231,16 @@ origin of each test month, leads 0.5 to 240 hours.
 ## Compute
 
 **The fits are 6 arms by 4 folds by 3 seeds, 72 fits, plus a fifth fold if the screen advances.**
-Experiment 397 timed the plain network at about a minute. The encoder is heavier because it reads up
-to 144 positions per row; the first task is to time one E3 fit on the GPU and on one core, and
-to choose the GPU if it is faster. A first timing of E3 took about 3 minutes per pass over the 4.7 million training rows of the
-2026-01 fold, so every arm trains on a random 20% of the training rows in each epoch (up to 60
-epochs, patience 8), and early stopping reads a fixed random 200,000 of the held-out rows. One GPU process under 8 GB with
-one feeder core, `MemoryMax=8G`, `OMP_NUM_THREADS=1`, `free -g` checked before each launch
-(stop line 12 GB available). Fitted networks are saved under the experiment's data folder; no stored
-fit is reused, because R's recipe differs (the cut, the injected data). Stored forecasts of
-experiments 389, 87, and the baselines are read as references only.
+Experiment 397 timed the plain network at about a minute. The encoder is heavier because it reads
+up to 144 positions per row. A first timing of E3 on the GPU took about 3 minutes per pass over the
+4.7 million training rows of the 2026-01 fold, so every arm trains on a random 20% of the training
+rows in each epoch (up to 60 epochs, patience 8), and early stopping reads a fixed random 200,000
+of the held-out rows. A single CPU core was not timed, because the GPU epoch is already the
+cheaper route. One GPU process under 8 GB with one feeder core, `MemoryMax=8G`,
+`OMP_NUM_THREADS=1`, `free -g` checked before each launch (stop line 12 GB available). Fitted
+networks are saved under the experiment's data folder. No stored fit is reused, because R's recipe
+differs (the cut, the injected data). Stored forecasts of experiments 389, 87, and the baselines
+are read as references only.
 
 ## Design iterations
 
