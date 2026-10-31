@@ -96,7 +96,8 @@ where it is known, added a real solar farm's recorded output to some of them, an
 neural network with a Primary-level export gate (arm A) forecast reverse-flow half-hours much better
 than the same network with the gate shut. Arm A has three weaknesses: it finds only 52.4% of
 reverse-flow half-hours when the injected farm is the size of the Primary's typical sunny midday
-reading (level 1.0), its lower tail is too narrow (the 1% quantile covers 6.2% of reverse-flow rows),
+reading (level 1.0), its lower tail is too narrow (the 1% quantile covers 6.2% of reverse-flow
+rows),
 and it calls reverse flow on 66.8% of non-reverse sunny summer middays. This experiment tests two
 ideas against arm A: a labeller that reads a whole day of readings and gives each half-hour a
 probability of reverse flow, and separate input channels for measured MW and for MVA.
@@ -127,9 +128,11 @@ probability of reverse flow, and separate input channels for measured MW and for
   417](../00417-hidden-sign-mva-export-gate-zero-crossing-labels/result.md) counted eight earlier
   treatments of the hidden-sign problem that failed. Its hand-built zero-crossing labeller scored
   0.96 on injected against placebo days at level 2.0 and 0.58 at level 1.0, and its hard labels did
-  not lift the fits. The registered bar here is a probability on every gate-open row, not hard labels.
+  not lift the fits. The registered bar here is a probability on every gate-open row, not hard
+  labels.
 - **Standing rules followed:** monthly refits, cleaned data, the D15 and D18 cut on 2025-03-01 (not
-  used here: both are report-only), saved models, stored predictions reused (P0 and A from experiment
+  used here: both are report-only), saved models, stored predictions reused (P0 and A from
+  experiment
   420 after a row-key identity check), tails reported beside CRPS, example forecasts plotted, draft
   pull request. Advice from experiments 417 and 420 that the plan follows: score a gate where it
   opens, score against the ungated network as well as the shut one, add no shared PV-proportional
@@ -146,7 +149,9 @@ probability of reverse flow, and separate input channels for measured MW and for
   width-5 convolution feeding a two-layer bidirectional GRU of 32 units, or a dilated convolution
   stack of the same width; a pilot on the left-out visible Primaries (rotation r1, test months
   2025-09 and 2026-06, level 1.0) picks the one with the higher pooled area, and the choice is
-  written down before the 105 run. If the GRU fit takes over 5 minutes, the dilated stack is used. If step 0 passes, the first network stage runs L and TDL on rotation r1 only, and TDL-perm and the supplementary runs wait for a positive C2 there.
+  written down before the 105 run. If the GRU fit takes over 5 minutes, the dilated stack is used.
+  If step 0 passes, the first network stage runs L and TDL on rotation r1 only, and TDL-perm and the
+  supplementary runs wait for a positive C2 there.
 - **Training copies.** Each visible Primary-day is copied with a farm injected at power factor 1, at
   a level drawn from 0 to 2.5 (15% of copies at 0, the placebo days), with `Q` drawn from 0, 2, and
   4 points, capped at 70% of the farm's peak on 30% of copies, and cut at a random hour on 50% of
@@ -154,14 +159,16 @@ probability of reverse flow, and separate input channels for measured MW and for
   Every eighth week is held out for early stopping.
 - **No leakage from the hidden pair.** Each rotation injects only the farms its hidden pair does not
   use (r1: B and D; r2: A, C, and D; r3: B and D). A leave-one-out labeller also drops the left-out
-  Primary's own farm, so its level-1.0 score is clean. The hidden pair's signed truth is used only to
+  Primary's own farm, so its level-1.0 score is clean. The hidden pair's signed truth is used only
+  to
   score. Farms in one region share a sky, so the exclusion protects less than it appears to; the
   page reports the labeller's area against the correlation between injected and training farms.
   The pilot's test months overlap the network's, but the pilot uses visible Primaries only.
 - **Step 0 gate.** L1 and L2 above, measured on the hidden pair's test-month rows (the same rows as
   arm A) and, as a second report, on its training-window days. Values are pooled over rotations and
   months, with the Primary-month macro-average printed beside each. Rows are counted, not unique
-  half-hours. Leave-one-out scores of visible Primaries never enter L1. The page also reports the day-level area (a day's score is its largest `pi`
+  half-hours. Leave-one-out scores of visible Primaries never enter L1. The page also reports the
+  day-level area (a day's score is its largest `pi`
   on the sunny slice) beside design I's 0.702 and design C's 0.58, the area against the number of
   training Primaries and clean farms in a supplementary run, and the fit time.
 - **Network stage (338 fits, after the manager confirms).** Arms: P0 and A (stored, plus two refits
@@ -177,6 +184,14 @@ probability of reverse flow, and separate input channels for measured MW and for
 - **Compute.** One GPU process (about 1.4 GB of GPU memory), one feeder core, `MemoryMax=8G`,
   `OOMPolicy=continue`, `OMP_NUM_THREADS=1`; stop below 12 GiB in the `available` column of `free
   -g`. Each fit writes its own file atomically and the runs are resumable.
+
+## Pilot choice, written before the 105 labellers ran
+
+On the left-out visible Primaries of rotation r1 (test months 2025-09 and 2026-06, level 1.0, 8
+labellers per architecture), the GRU labeller scored an area of 0.945 and a recall of 0.633 at a 5%
+false-reverse rate; the dilated convolution scored 0.937 and 0.576. The GRU fit takes about 4
+seconds, so the GRU is the architecture for the 105 labellers. Both ran all 25 epochs without early
+stopping, so the labellers may be under-trained; the epoch count is not changed after the pilot.
 
 ## What the next experiment should answer
 
