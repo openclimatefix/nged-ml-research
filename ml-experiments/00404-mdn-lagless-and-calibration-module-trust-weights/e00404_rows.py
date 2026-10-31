@@ -27,8 +27,9 @@ import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 
-PAD: Final[int] = 400
-"""Unobserved half-hours between Primaries; more than the longest window half-width (168)."""
+PAD: Final[int] = 1300
+"""Unobserved half-hours between Primaries: a lag centre sits up to about 1000 half-hours before the
+lagless table starts, and the longest window half-width is 168."""
 SMOOTHING_STEPS: Final[int] = 3
 N_PER_LAG: Final[int] = len(trust.HALF_WIDTHS) * len(trust.STATS) + 2 + 1
 """Window statistics, the single-step surprise and band score, and the neighbours' mean."""
@@ -186,8 +187,8 @@ def selftest() -> None:
     )
     rows = 4
     primary = torch.tensor([1, 1, 1, 0])
-    origin = torch.tensor([1100, 2000, 3000, 2000])
-    target = torch.tensor([1200, 2100, 3100, 2100])
+    origin = torch.tensor([1010, 2000, 3000, 2000])
+    target = torch.tensor([1100, 2100, 3100, 2100])
     lags = torch.from_numpy(lag_grids(target=target.numpy(), origin=origin.numpy()))
     got = trust_inputs(stack=stack, primary=primary, lag_grid=lags, origin=origin, step=0)
     assert got.shape == (rows, N_TRUST), got.shape

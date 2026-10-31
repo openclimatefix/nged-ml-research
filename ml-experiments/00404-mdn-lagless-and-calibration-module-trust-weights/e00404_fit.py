@@ -44,7 +44,7 @@ MODEL_DIR: Final[Path] = WORK_DIR / "models"
 PRED_DIR: Final[Path] = WORK_DIR / "predictions"
 MVA_ONLY: Final[frozenset[str]] = frozenset({"D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22"})
 """The MVA-only eight; the other eight Primaries report signed MW (D15 and D18 are report-only)."""
-ARMS: Final[tuple[str, ...]] = ("A0", "A0-inj", "B2", "B0", "B1", "B1m", "B3")
+ARMS: Final[tuple[str, ...]] = ("A0", "A0-inj", "B2", "B0", "B1", "B1m", "B3", "B5")
 EPOCHS: Final[int] = 6
 BATCH: Final[int] = 4096
 LEARNING_RATE: Final[float] = 2e-3
@@ -57,7 +57,7 @@ CLIP_SD: Final[float] = 5.0
 
 def trust_arm(*, arm: str) -> str | None:
     """Return the `TrustMdn` arm name for a named arm, or None for the plain networks."""
-    return {"B0": "b0", "B1": "b1", "B1m": "b1m", "B3": "b3"}.get(arm)
+    return {"B0": "b0", "B1": "b1", "B1m": "b1m", "B3": "b3", "B5": "b1"}.get(arm)
 
 
 def world_power(*, seed: int | None) -> tuple[np.ndarray, np.ndarray]:
@@ -225,11 +225,13 @@ def _gather_rows(*, month: str, test: bool, stride: int) -> dict[str, np.ndarray
 
 
 def build_pools(
-    *, month: str, seed: int, device: str, stride: int
-) -> tuple[Pool, Pool, Scalers, TableArrays, np.ndarray]:
+    *, month: str, seed: int, device: str, stride: int, saved: dict | None = None
+) -> tuple[Pool | None, Pool, Scalers, TableArrays, np.ndarray]:
     """Return the training pool, the scored-month pool, the scalers, and the lagless table.
 
-    The last item is the standardiser's mean and standard deviation at the 3 lag columns.
+    The last item is the standardiser's mean and standard deviation at the 3 lag columns. With
+    `saved` (a saved network's file), the scalers come from it and no training pool is built, so
+    a forecast uses exactly the scalers the network trained with.
     """
     names, mask, layout = prep.feature_names(scheme="summary")
     refit = prep.refit_of(month=month)
@@ -239,16 +241,26 @@ def build_pools(
     lag_columns = layout.columns_of(groups=("lags",))[:3]
     lead_columns = [names.index("lead"), names.index("lead_sqrt")]
     pools = []
-    train_raw = _gather_rows(month=month, test=False, stride=stride)
-    standardiser = prep.Standardiser.fit(x=train_raw["x"], mask=mask)
-    target_mean, target_std = np.zeros(16), np.ones(16)
-    for p in range(16):
-        sel = train_raw["primary"] == p
-        if sel.any():
-            target_mean[p] = train_raw["y"][sel].mean()
-            target_std[p] = max(float(train_raw["y"][sel].std()), 1e-3)
+    if saved is None:
+        train_raw = _gather_rows(month=month, test=False, stride=stride)
+        standardiser = prep.Standardiser.fit(x=train_raw["x"], mask=mask)
+        target_mean, target_std = np.zeros(16), np.ones(16)
+        for p in range(16):
+            sel = train_raw["primary"] == p
+            if sel.any():
+                target_mean[p] = train_raw["y"][sel].mean()
+                target_std[p] = max(float(train_raw["y"][sel].std()), 1e-3)
+        sources = ((train_raw, False), (_gather_rows(month=month, test=True, stride=1), True))
+    else:
+        standardiser = prep.Standardiser(
+            mean=saved["standardiser_mean"],
+            std=saved["standardiser_std"],
+            mask=saved["standardiser_mask"],
+        )
+        target_mean, target_std = saved["target_mean"], saved["target_std"]
+        sources = ((_gather_rows(month=month, test=True, stride=1), True),)
     scalers = Scalers(standardiser=standardiser, target_mean=target_mean, target_std=target_std)
-    for raw, test in ((train_raw, False), (_gather_rows(month=month, test=True, stride=1), True)):
+    for raw, test in sources:
         ll, present = lagless_in_network_units(
             arrays=arrays,
             primary=raw["primary"],
@@ -278,7 +290,7 @@ def build_pools(
             )
         )
     lag_stats = np.stack([standardiser.mean[lag_columns], standardiser.std[lag_columns]])
-    return pools[0], pools[1], scalers, arrays, lag_stats
+    return (pools[0] if saved is None else None), pools[-1], scalers, arrays, lag_stats
 
 
 def lag_features(
@@ -335,11 +347,17 @@ def forward(
     scalers: Scalers,
     metered: torch.Tensor,
     details: bool = False,
+    mask_origin: bool = False,
 ) -> tuple:
     """Return the final mixture (log weights, means, stds) for the rows `idx`, with details."""
     primary = pool.primary[idx]
+    lag_rows = lags[idx]
+    if mask_origin:
+        # Arm B5: the newest lag is hidden (value 0, flagged missing), as is its trust block.
+        lag_rows = lag_rows.clone()
+        lag_rows[:, 0], lag_rows[:, 1] = 0.0, 1.0
     if isinstance(net, models.PlainLagMdn):
-        return net(pool.base[idx], lags[idx], primary)
+        return net(pool.base[idx], lag_rows, primary)
     trust = torch.stack(
         [
             rows_mod.trust_inputs(
@@ -354,12 +372,14 @@ def forward(
         dim=1,
     )
     trust = ((trust - scalers.trust_mean) / scalers.trust_std).clamp(-CLIP_SD, CLIP_SD)
+    if mask_origin:
+        trust[:, :, : rows_mod.N_PER_LAG] = 0.0
     band = torch.from_numpy(models.lead_band_of(lead_hours=pool.lead_hours[idx].cpu().numpy())).to(
         primary.device
     )
     return net(
         base=pool.base[idx],
-        lags=lags[idx],
+        lags=lag_rows,
         ll=pool.ll[idx],
         trust=trust,
         lead=pool.lead[idx],
@@ -422,7 +442,7 @@ def fit_arm(
             idx = order[start : start + BATCH]
             out = forward(
                 net=net, pool=train, idx=idx, lags=lags, stack=stack, lag_grid=lag_grid,
-                scalers=scalers, metered=metered,
+                scalers=scalers, metered=metered, mask_origin=arm == "B5",
             )  # fmt: skip
             log_w, mean, std = out[0] if isinstance(out[0], tuple) else out
             z = (train.y[idx] - tm[train.primary[idx]]) / ts[train.primary[idx]]

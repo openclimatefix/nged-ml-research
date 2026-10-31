@@ -207,7 +207,7 @@ class TrustMdn(nn.Module):
         self.calibration = mlp(n_in=shared, hidden=hidden, layers=layers, n_out=3 * COMPONENTS)
         init_head(head=self.calibration)
         if arm == "b0":
-            self.band_logits = nn.Parameter(0.02 * torch.randn(LEAD_BANDS, N_LAGS))
+            self.band_logits = nn.Parameter(0.02 * torch.randn(2, LEAD_BANDS, N_LAGS))
         else:
             self.trust_head = mlp(n_in=n_trust + n_lead + 8 + 1, hidden=32, layers=2, n_out=N_LAGS)
             last = self.trust_head[-1]
@@ -227,7 +227,7 @@ class TrustMdn(nn.Module):
     ) -> torch.Tensor:
         """Return the smoothed per-lag trust weights (rows, 3) in [0, 1]."""
         if self.arm == "b0":
-            return torch.sigmoid(self.band_logits[lead_band])
+            return torch.sigmoid(self.band_logits[metered[:, 0].long(), lead_band])
         rows, steps, _ = trust.shape
         side = torch.cat([lead, self.embedding(primary), metered], dim=-1)
         side = side[:, None, :].expand(rows, steps, side.shape[-1])
@@ -267,8 +267,11 @@ class TrustMdn(nn.Module):
         ll_lw, ll_mean, ll_std = mixture_parts(out=ll, components=COMPONENTS)
         t = self.trust_weights(trust, lead, primary, metered, lead_band)
         w = t.mean(dim=-1) if self.arm == "b1m" else t.prod(dim=-1)
-        w = w.clamp(1e-4, 1 - 1e-4)[:, None]
-        log_w = torch.cat([ll_lw + torch.log1p(-w), lag_lw + torch.log(w)], dim=-1)
+        w = w[:, None]
+        # The offsets keep both logs finite without a clamp, which would zero the gradient.
+        log_w = torch.cat(
+            [ll_lw + torch.log1p(-w * (1.0 - 1e-6)), lag_lw + torch.log(w + 1e-6)], dim=-1
+        )
         final = (log_w, torch.cat([ll_mean, lag_mean], -1), torch.cat([ll_std, lag_std], -1))
         return (final, t) if details else final
 

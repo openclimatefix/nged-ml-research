@@ -160,7 +160,7 @@ def forecast(
         arm="A0-inj" if arm == "B-mix" else arm, month=month, seed=seed, device=device
     )
     _train, test, scalers, _arrays, lag_stats = fit.build_pools(
-        month=month, seed=seed, device=device, stride=1
+        month=month, seed=seed, device=device, stride=1, saved=saved
     )
     scalers.trust_mean = saved["trust_mean"]
     scalers.trust_std = saved["trust_std"]
@@ -184,7 +184,7 @@ def forecast(
         idx = torch.arange(start, min(start + 16384, len(test)), device=device)
         out = fit.forward(
             net=net, pool=test, idx=idx, lags=lags, stack=stack, lag_grid=lag_grid,
-            scalers=scalers, metered=metered, details=True,
+            scalers=scalers, metered=metered, details=True, mask_origin=arm == "B5",
         )  # fmt: skip
         mixture, detail = out if isinstance(out[0], tuple) else (out, None)
         log_w, mean, std = mixture
@@ -228,12 +228,15 @@ def prediction_path(*, arm: str, month: str, seed: int, world: int) -> Path:
 
 
 def pinball_points(*, frame: pl.DataFrame) -> pl.Expr:
-    """Return the CRPS-like score in points of capacity (twice the mean pinball loss)."""
+    """Return the CRPS-like score in points of capacity (twice the mass-weighted pinball loss).
+
+    The levels are weighted by `common.ATOM_MASSES`, as `common.pinball_quantile_score` does.
+    """
     terms = []
-    for level, name in zip(models.LEVELS, LEVEL_NAMES, strict=True):
+    for level, name, mass in zip(models.LEVELS, LEVEL_NAMES, common.ATOM_MASSES, strict=True):
         diff = pl.col("actual") - pl.col(name)
-        terms.append(pl.max_horizontal(level * diff, (level - 1.0) * diff))
-    return 200.0 * pl.sum_horizontal(terms) / len(terms)
+        terms.append(float(mass) * pl.max_horizontal(level * diff, (level - 1.0) * diff))
+    return 200.0 * pl.sum_horizontal(terms)
 
 
 def main() -> None:

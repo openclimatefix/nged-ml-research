@@ -511,6 +511,22 @@ harm rows.
 - **Folds, seeds, cadence.** The five screen folds of experiment 397, monthly refits, 3 seeds. More
   seeds only for a contrast within the seed noise.
 
+## Code reviews
+
+**A fresh Sonnet review of the lagless builder ran before its first build.** It found no leakage of
+the scored month. It found that the cross-fit scaler used the held-out block's statistics, which
+the builder now avoids by fitting a scaler per fold, and an off-by-one in the first valid index.
+
+**A fresh Sonnet review of the training, scoring, and trust-input code ran before the first fit.**
+It found six defects, all fixed or recorded. The forecast rebuilt its scalers from all origin days
+instead of the saved training scalers (fixed). The padding between Primaries was too short for lag
+centres before the table start (fixed). The score weighted unevenly spaced quantile levels equally
+(fixed with the project's level weights). A clamp on the lagged weight zeroed its gradient (fixed).
+The product rule identifies only the product of the three trust weights, so the per-lag columns
+cannot be read as per-lag trust, and the write-up does not interpret them. The B3 gate takes the
+lead, the Primary embedding, and the metering indicator, not the trust inputs, as the plan says.
+B0 now learns one weight per metering group, lead band, and lag.
+
 ## Interfaces for the later evaluation experiment
 
 **A separate lag-trust evaluation experiment will run on this experiment's saved networks once
