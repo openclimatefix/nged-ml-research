@@ -2,7 +2,8 @@
 # Experiment 423: run all fits in one GPU process (one feeder core, 8 GB memory cap).
 # Usage: bash run_fits.sh   (from the worktree root). Resumable: finished seeds are skipped.
 set -euo pipefail
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+: "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
+export DATA_PATH_INTERNAL
 export NGED_S3_BUCKET_URL=x NGED_S3_BUCKET_ACCESS_KEY=x NGED_S3_BUCKET_SECRET=x
 export OMP_NUM_THREADS=1
 export PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand:ml-experiments/00407-pooled-mixture-density-network-tail-arms-and-recency-weights:ml-experiments/00419-pooled-mixture-density-network-solar-summary-sunny-flag-and-half-life-input-ports:ml-experiments/00423-pooled-mdn-shared-date-time-encoder
