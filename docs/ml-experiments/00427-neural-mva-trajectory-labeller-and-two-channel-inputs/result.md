@@ -193,6 +193,31 @@ false-reverse rate; the dilated convolution scored 0.937 and 0.576. The GRU fit 
 seconds, so the GRU is the architecture for the 105 labellers. Both ran all 25 epochs without early
 stopping, so the labellers may be under-trained; the epoch count is not changed after the pilot.
 
+## Step 0 result: the gate failed
+
+All 105 GRU labellers ran (about 4 seconds each). Rows are counted, not unique half-hours; areas and
+recalls are on the sunny slice of the hidden pair's test-month rows at level 1.0, with arm A scored
+on the identical rows. No interval is given: step 0 pools 21 labellers and the macro-average over
+Primary-months is the spread measure.
+
+| Measure | Labeller, pooled | Arm A, pooled | Labeller, macro | Arm A, macro |
+|---|---|---|---|---|
+| Area | 0.887 | 0.880 | 0.897 | 0.880 |
+| Recall at 5% false reverse | 0.223 | 0.211 | 0.517 | 0.457 |
+| Expected calibration error | 0.072 | 0.050 | 0.108 | 0.095 |
+
+- **L1 fails on recall.** The area (0.887) passes its bar and is no worse than arm A's. The recall at
+  5% false reverse is 0.223 pooled and 0.517 macro-averaged, both under the 0.60 bar. The pooled
+  figure is low because pooling Primaries with different base rates sets one threshold for all.
+- **L2 fails at D5.** With nothing injected, `pi > 0.5` falls on 64.1% of D5's sunny-midday
+  half-hours, and on 0% at D9, D11, D14, and D16 (arm A: 0% at all five). The labeller, trained on
+  D9, D11, D14, and D16, invents reverse flow at D5.
+- **Day-level area:** 0.903 for injected against placebo days at level 1.0 (325 and 1,001 days), against 0.702 for
+  design I and 0.58 for design C. The labeller reads a whole day better than the hand-made
+  diagnostics, but ranks rows no better than arm A.
+- **Decision (registered rule):** the labeller networks (L, TDL, TDL-perm) do not run. Only T, TD,
+  and the two refits of A (128 fits) remain, and the manager decides whether to run them.
+
 ## What the next experiment should answer
 
 To be written after the results.
