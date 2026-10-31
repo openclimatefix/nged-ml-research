@@ -59,6 +59,8 @@ BANDS: Final[dict[str, tuple[float, float]]] = {
     "72-168 h": (72.0, 168.0),
     "168-240 h": (168.0, 240.0),
 }
+MAX_LEAD_HOURS: Final[float] = 240.0
+"""The sweep covers leads to day 10, the headline range."""
 MODEL_DIR: Final[Path] = lagfit.WORK_DIR / "sweep_models"
 Q: Final[dict[str, int]] = {name: i for i, name in enumerate(common.LEVEL_COLUMNS)}
 
@@ -187,7 +189,7 @@ def sweep_one(
     """Return one series' per-row sweep records for one arm (a list of frames)."""
     booster = xgb.Booster()
     booster.load_model(MODEL_DIR / arm / f"{site}.ubj")
-    booster.set_param({"nthread": 1})
+    booster.set_param({"nthread": 1, "device": "cuda"})
     records = []
     for origin in origins:
         frame = pl.read_parquet(common.demand_frame_path(run=origin - common.PUBLICATION_DELAY))
@@ -198,6 +200,7 @@ def sweep_one(
             a7=False,
         )
         prepared = lagfit.add_lag_columns(frame=prepared, power=arrays.power, arm=arm)
+        prepared = prepared.filter(pl.col("lead_hours") <= MAX_LEAD_HOURS)
         keys = prepared.select(*common.KEYS).unique(maintain_order=True)
         members = prepared["ensemble_member"].n_unique()
         actual = common.take(
@@ -302,7 +305,7 @@ def run_sweep(*, series: pl.DataFrame, sites: list[str]) -> None:
                 arm=arm, site=site, row=rows_of[site], arrays=arrays[site], origins=origins
             )
         table = summarise(records=records)
-        print(f"\n===== arm {arm} =====")
+        print(f"\n===== arm {arm} =====", flush=True)
         print(
             table.group_by("k", "depth_pct", "band", maintain_order=True).agg(
                 pl.col("n").sum(),
