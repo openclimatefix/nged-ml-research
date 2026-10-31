@@ -62,23 +62,26 @@ best_arm: >-
 production_status: not-for-production
 adopted_in: none
 headline: >-
-  Adding thermal-lag columns lowered the CRPS on cold winter nights by 0.086 points of capacity at
-  the six signed-MW Primaries and by 0.014 at the eight MVA-only Primaries, pooled over five folds
-  (interim). Both intervals include zero, the six is worse in one fold by 0.205, and the minimum
-  detectable effect is 0.15 to 0.19, so the result shows no gain that the folds can resolve.
+  Adding thermal-lag columns lowered the continuous ranked probability score (CRPS) on cold winter
+  nights by 0.086 points of capacity at the six signed-MW Primary substations and by 0.014 at the
+  eight MVA-only Primary substations, pooled over five folds (interim). Both intervals include
+  zero, the signed-MW six is worse in one fold by 0.205, and the minimum detectable effect is 0.15
+  to 0.19, so the result shows no gain that the folds can resolve.
 lessons: >-
   The cold-night gain that experiment 441 saw at the MVA-only eight did not replicate on the two new
-  winter folds (November +0.116, February +0.146 at the eight). The six kept a small average gain
-  with a large spread between folds. Thermal lags are not shown to help on cold winter nights.
+  winter folds (November +0.116, February +0.146 at the eight; a positive difference is worse). The
+  signed-MW six kept a small average gain with a large spread between folds. Thermal lags are not
+  shown to help on cold winter nights.
 take_home_message: >-
-  Thermal-lag columns did not lower the neural network's error on cold winter nights by an amount
-  these six monthly folds can detect. The average change was a gain of 0.086 CRPS points at the six
-  signed-MW Primaries and 0.014 at the eight MVA-only Primaries, with intervals that include zero.
-  The earlier hint of a gain at the eight did not appear in the two new winter months, so thermal
-  lags stay out of the network.
+  Thermal-lag columns are not supported as a help on cold winter nights on these six monthly folds,
+  which is not the same as no effect. The average change was a gain of 0.086 points at the six
+  signed-MW Primary substations, but that gain depends mainly on one Primary substation (D16). It
+  was a gain of 0.014 at the eight MVA-only Primary substations, where the gain seen in experiment
+  441 did not replicate in the two new winter months. The folds cannot rule out a gain of 0.05,
+  because the smallest gain they could reliably detect is 0.15 to 0.19.
 advice:
   - >-
-    Leave the thermal-lag bundle out of the pooled plain network, because it did not meet the
+    Leave the thermal-lag bundle out of the pooled plain neural network, because it did not meet the
     cold-night rule at either metering group on six folds (decision table).
   - >-
     Judge any cold-night claim on at least 10 winter months, because six folds left a minimum
@@ -86,18 +89,19 @@ advice:
 code: ml-experiments/00442-thermal-lag-cold-night-test-on-six-winter-folds/
 ---
 
-**Take-home message: thermal-lag columns did not lower the neural network's error on cold winter
-nights by an amount six monthly folds can detect, and the gain that experiment 441 saw at the
-MVA-only eight did not appear in the two new winter months.** Pooled over five folds, `T` minus `R`
-on cold winter nights was -0.086 CRPS points of capacity at the signed-MW six and -0.014 at the
-MVA-only eight (a negative number is a gain). Both intervals include zero and the minimum detectable
-effect (0.15 to 0.19) is three times the 0.05 bar. All numbers are interim.
+**Take-home message: adding thermal-lag columns (bundle `T`) to the pooled neural network (control
+`R`) did not lower its error on cold winter nights by an amount six monthly folds can detect. The
+gain that experiment 441 saw at the eight MVA-only Primary substations did not appear in the two new
+winter months.** The error measure is the continuous ranked probability score (CRPS) in points of
+capacity, and a negative difference is a gain. Pooled over five folds, `T` minus `R` on cold winter
+nights was -0.086 at the six signed-MW Primary substations and -0.014 at the eight MVA-only ones.
+Both intervals include zero. The minimum detectable effect (0.15 to 0.19) is three to four times the
+0.05 bar. All numbers are interim.
 
 ## Question
 
-CRPS is the continuous ranked probability score, a single error number for a probabilistic
-forecast. The signed-MW six and the MVA-only eight are the two groups of Primary substations by
-metering.
+CRPS is a single error number for a probabilistic forecast. The signed-MW six and the MVA-only eight
+are the two groups of Primary substations by metering.
 
 **This experiment asks whether thermal-lag columns help the pooled neural network on cold winter
 nights.** Experiment 441 found a gain of at least 0.05 points there, but its intervals included
@@ -107,10 +111,10 @@ February 2026, so that the cold-night slice rests on five folds.
 
 ## Results
 
-**The registered rule was not met at either group.** The answer is: not shown. Adding two winter
-folds moved the pooled gain at the eight from the 0.05 or more of experiment 441 to 0.014, and the
-six stayed at a gain of 0.086 that one fold (February 2026, +0.205) contradicts. Arm key: `T` is
-experiment 437's thermal-lag network; `R` is its control.
+**The registered rule was not met at either group.** Adding two winter folds moved the pooled gain
+at the MVA-only eight from the 0.05 or more of experiment 441 to 0.014. At the signed-MW six, the
+gain stayed at 0.086, and one fold (February 2026, +0.205) contradicts it. `T` is experiment 437's
+thermal-lag neural network, and `R` is its control.
 
 ![T minus R on cold winter nights, with intervals](figure_1_cold_winter_nights.svg)
 
@@ -147,31 +151,31 @@ experiment 437's thermal-lag network; `R` is its control.
     | Signed-MW six | -0.086 | -0.241 to +0.141 | 4 of 5 | -0.195, -0.160 | does not advance |
     | MVA-only eight | -0.014 | -0.102 to +0.138 | 3 of 5 | -0.007, +0.002 | does not advance |
 
-- **Conditions that failed.** At the six: the interval is not wholly below zero, and the upper end
-  outside the slice is +0.033 against the allowed +0.02. At the eight: the gain is below 0.05, the
-  interval is not below zero, only 3 of 5 folds are negative, and the upper end outside the slice
-  is +0.080.
+- **Conditions that failed.** At the signed-MW six, two conditions failed: the interval is not
+  wholly below zero, and the upper end outside the slice is +0.033 against the allowed +0.02. At
+  the MVA-only eight, four failed: the gain is below 0.05, the interval is not below zero, only 3
+  of 5 folds are negative, and the upper end outside the slice is +0.080.
 - **Fold by fold at the six:** 2025-11 -0.059, 2025-12 -0.017, 2026-01 -0.256, 2026-02 +0.205,
-  2026-03 -0.165. **At the eight:** 2025-11 +0.116, 2025-12 -0.125, 2026-01 -0.014, 2026-02
-  +0.146, 2026-03 -0.019. The two new folds (November and February) are worse at the eight, and
-  February is worse at the six.
+  2026-03 -0.165. **At the eight:** 2025-11 +0.116, 2025-12 -0.125, 2026-01 -0.014, 2026-02 +0.146,
+  2026-03 -0.019. The two new folds (November and February) are worse at the eight. February is also
+  worse at the six.
 - **Rows outside the cold winter nights.** `T` minus `R` on all rows was -0.004 (-0.034 to +0.021)
   at the six and +0.013 (-0.034 to +0.081) at the eight. At the eight, November 2025 alone is
   +0.159 on all rows, so part of the eight's fold spread is not specific to cold nights.
 - **Absolute CRPS** (equal weight over Primaries): on cold winter nights `R` scores 5.137 and `T`
-  5.034 at the six, `R` 3.150 and `T` 3.135 at the eight. On all rows `R` scores 3.245 and `T`
-  3.242 at the six, `R` 3.841 and `T` 3.854 at the eight. References on cold winter nights, six and
-  eight: the XGBoost recipe 5.779 and 3.646, BG2 5.318 and 3.561, `manual_heuristic` 7.963 and
-  5.442, `climatology` 7.911 and 5.621.
+  5.034 at the six, `R` 3.150 and `T` 3.135 at the eight. On all rows `R` scores 3.245 and `T` 3.242
+  at the six, `R` 3.841 and `T` 3.854 at the eight. References on cold winter nights, six and eight:
+  the monthly XGBoost recipe 5.779 and 3.646, BG2 (the best-guess forecast of experiment 87) 5.318
+  and 3.561, `manual_heuristic` 7.963 and 5.442, `climatology` 7.911 and 5.621.
 - **Tails on cold winter nights, six:** coverage at q95 rises from 0.820 (`R`) to 0.829 (`T`) and at
   q99 from 0.877 to 0.895; pinball loss at q95 falls from 2.067 to 1.850 and at q99 from 1.226 to
   1.046. **Eight:** coverage at q95 0.948 to 0.960, at q99 0.994 to 0.997; pinball loss at q95
   0.717 to 0.709, at q99 0.187 to 0.189. Both networks undercover the tails at the six on these
   nights (q99 coverage 0.88 to 0.90).
-- **Descriptive slices** (fewer than 20 dates, or fewer than 3 folds): cold sunny days +0.003 (six)
+- **Descriptive slices** (not tested by the rule): cold sunny days +0.003 (six)
   and +0.023 (eight); cold overcast days -0.073 and -0.104 (3 folds, 12 and 10 dates); Christmas
   +0.120 and -0.268 (2 folds, 10 dates); other bank holidays +0.032 and +0.048 (1 fold, 4 dates).
-  Christmas at the eight is the largest gain in the table but rests on one December week.
+  Christmas at the eight is the largest gain in the table but rests on 10 dates in two folds.
 - **D15 and D18 (report only):** all rows -0.014 (-0.326 to +0.108); cold winter nights -0.170
   (-0.532 to +0.355).
 - **Predictions.** P1 (a gain of 0.05 to 0.30 at the eight) failed: -0.014. P1 at the six
@@ -188,7 +192,8 @@ experiment 437's thermal-lag network; `R` is its control.
   averaging, widening, and CRPS from the 11 quantiles) and reproduced every contrast and fold value
   to 3 decimals. Pooling is by row; the equal-weight mean over folds is -0.058 at the six and +0.021
   at the eight, so the sign at the eight depends on the weighting.
-- **Audit triggers fired: three of the seven.**
+- **Audit triggers fired: three of the seven** listed in the `ml-experiment` skill's "Audit before
+  merge".
     - **A registered prediction failed** (P1 at the eight).
     - **The sign of the CRPS contrast differs from the sign of the mean and median error.** At the
       eight on cold winter nights CRPS is -0.014, but the absolute error of the mean forecast is
@@ -200,12 +205,13 @@ experiment 437's thermal-lag network; `R` is its control.
       six Primaries' own values are D10 -0.113, D11 +0.067, D14 -0.118, D16 -0.996, D5 +0.448,
       D9 +0.095. At the eight, dropping D19, D8, or D22 moves -0.014 to between 0.000 and +0.008,
       and D12 (+0.31) and D4 (+0.14) are the worst Primaries.
-- **The six's gain rests on one Primary,** so it should not be read as a gain at the six.
+- **The gain at the signed-MW six depends mainly on one Primary substation (D16),** so the result is
+  not evidence of a gain at that group.
 - **Median minus mean forecast per Primary on cold winter nights** is within +-0.5 points of
   capacity at almost every Primary for both networks. The exceptions are D12 (-0.91 for `R`, -0.98
   for `T`), D8 (+0.94, +0.68), and the report-only D15 (-2.04, -3.13).
 - **Tails per fold.** At the six, the q95 and q99 pinball losses are lower for `T` in all 5 folds,
-  including February 2026 where CRPS is +0.204. At the eight, q95 and q99 are higher for `T` in 3
+  including February 2026 where CRPS is +0.205. At the eight, q95 and q99 are higher for `T` in 3
   of 5 folds.
 
 ### Caveats
@@ -223,8 +229,8 @@ experiment 437's thermal-lag network; `R` is its control.
 
 ### What to try next
 
-- **Leave thermal lags out of the pooled plain network** unless a test with at least 10 winter
-  months and an interval narrow enough to resolve 0.05 becomes possible.
+- **Leave thermal lags out of the pooled plain neural network** unless a test with at least 10
+  winter months and an interval narrow enough to resolve 0.05 becomes possible.
 
 ### Data used and where it lives
 
@@ -232,7 +238,8 @@ experiment 437's thermal-lag network; `R` is its control.
 - **Code.** `ml-experiments/00442-thermal-lag-cold-night-test-on-six-winter-folds/`; it imports
   experiments 11, 48, 87, 377, 381, 396, 397, 407, 418, 425, and 437, and its masks, scorer, and
   figures are copied from experiment 441.
-- **Saved networks and forecasts.** `$DATA_PATH_INTERNAL/ml-experiments/00442-thermal-lag-cold-night-test-on-six-winter-folds/work/`.
+- **Saved networks and forecasts.**
+  `$DATA_PATH_INTERNAL/ml-experiments/00442-thermal-lag-cold-night-test-on-six-winter-folds/work/`.
 
 ## Design
 
@@ -260,7 +267,7 @@ experiment 437's thermal-lag network; `R` is its control.
   cold winter nights (primary), cold sunny days, cold overcast days, Christmas, and other bank
   holidays; heat waves cannot be scored. Row and day counts per slice and fold are printed before
   scoring.
-- **Standing practices.** Monthly refits (stored networks); cleaned data (flagged exact zeros
+- **Standing practices.** Monthly refits (stored neural networks); cleaned data (flagged exact zeros
   dropped, count per fold printed); the D15 and D18 cut at 2025-03-01; tails reported;
   every number labelled interim.
 - **Figures.** Gain-with-interval chart for T on each slice; fold-by-fold table; example winter
@@ -276,7 +283,7 @@ The scorer's `pre` stage read only the control `R` (stored seeds 0 to 2 against 
   holds 16,185 scored half-hours on 35 local dates at the signed-MW six, and 22,459 half-hours on
   42 dates at the MVA-only eight. Both groups have rows in five folds: 2025-11 (7 dates at each
   group), 2025-12 (13), 2026-01 (15 at the six, 22 at the eight), 2026-02 (7), and 2026-03 (3).
-  2025-10 has none.
+  October 2025 has none.
 - **The minimum detectable effect of the pooled cold-night slice exceeds 0.05 at both groups.**
   Over 7-day valid-date blocks it is 0.19 at the six (15 blocks) and 0.15 at the eight (16 blocks).
   Over the five folds it is 0.063 at the six and 0.090 at the eight. A gain of 0.05 can therefore
@@ -297,6 +304,6 @@ The scorer's `pre` stage read only the control `R` (stored seeds 0 to 2 against 
 - **The in-slice month-block interval is nearly all-or-nothing.** It resamples 5 origin months, so
   an upper end below zero needs almost every fold to be negative, which is stricter than the
   "4 of 5" condition.
-- **The mask thresholds use runs up to the refit, whose later valid times pass it.** Only ENS
-  weather enters the thresholds, never a score or an actual, and experiment 441 used the same
-  window.
+- **The mask thresholds use runs up to the refit, whose later valid times pass it.** Only ECMWF
+  ensemble (ENS) weather enters the thresholds, never a score or an actual, and experiment 441 used
+  the same window.
