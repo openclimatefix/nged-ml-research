@@ -31,11 +31,11 @@ prediction: >-
   capacity at days 1 to 10, or shares of a step. P1. On clean rows, the one-day encoder (E1) minus
   the lagged reference trained on the same injected data (R-inj) lies between 0.00 and +0.15 at the
   signed-MW six, because E1 has no weekly lag; the three-day encoder (E3) minus R-inj lies between
-  -0.05 and +0.05. P2. On harm rows, E3 minus R-inj is at most -0.10 at the signed-MW six and
+  -0.05 and +0.05. P2. On harm rows, E3 minus R-inj lies between -0.30 and -0.10 at the signed-MW six and
   within +-0.10 at the MVA-only eight (experiment 402 found a flag oracle gains nothing there). P3.
-  In the encroachment sweep (step of 5% of capacity, 24 to 72 h leads, raw bands), R follows 0.10 to
-  0.35 of the step at three lags (the XGBoost model of experiment 392 followed 0.38 to 0.41), R-inj
-  follows 0.05 to 0.25, and E3 follows at most 0.05 of the step at every k, in both variants. P4.
+  In the encroachment sweep (step of 5% of capacity, 24 to 72 h leads, raw bands), R follows 0.15 to
+  0.45 of the step at three lags (the XGBoost model of experiment 392 followed 0.38 to 0.41; a
+  neural network may follow less), R-inj follows 0.05 to 0.30, and E3 follows at most 0.05 of the step at every k, in both variants. P4.
   The 5%-95% band of E3 is at least 1.10 times wider after the step than before at k = 3 (variant
   2). P5. The attention mass on the "no day" token rises by at least 0.15 on rows whose days contain
   the step, against the same rows without it. P6. E2 minus E1 on clean rows is between -0.10 and
@@ -53,16 +53,22 @@ decision_rule: >-
   lagged network). The smallest gain worth porting is 0.10 CRPS points on harm rows with a loss of
   at most 0.05 on clean rows, because the encoder adds a network module to the production training
   loop. A fold counts as a win for a contrast when the point estimate is below zero by more than
-  the minimum detectable effect. Advance to the fifth fold, and to experiment 404's trust inputs as
-  extra tokens, if E3 (or E2) beats R-inj on harm rows at the signed-MW six in at least 3 of 4
+  the minimum detectable effect. Harm rows here means the injected-world harm rows; the real harm rows are reported beside
+  them and do not decide. A fold is lost when the point estimate is above zero by more than the
+  minimum detectable effect. Advance to the fifth fold, and to experiment 404's trust inputs as
+  extra tokens, if E3 beats R-inj on harm rows at the signed-MW six in at least 3 of 4
   folds with a pooled gain of at least 0.10, loses at most 0.05 on clean rows, and in the sweep
   follows no more than half of R-inj's share at k = 3 in variant 2. Stop, and report which of the
-  three conditions failed, if E3 loses on harm rows in at least 3 of 4 folds. The sweep goal is a
+  three conditions failed, if E3 loses on harm rows in at least 3 of 4 folds. In every other case
+  (for example 2 wins and 2 losses) the page reports the screen as inconclusive and the maintainer
+  decides; E2 is reported but never decides. The sweep goal is a
   share near zero with wider bands: success is a median share of at most 0.05 at every k up to 3 in
   both variants, with a band-width ratio of at least 1.10 at k = 3. The minimum detectable effect
-  is computed before any contrast is read: for R-inj, the standard deviation over folds of each
-  seed's pooled signed-MW six CRPS about the fold's three-seed mean, divided by the square root of
-  3, times 1.96 times the square root of 2 (a lower bound, as in experiments 419 and 425). A
+  is computed before any contrast is read, separately for each row set and group: for R-inj, the
+  sample standard deviation (12 fold-by-seed values, each seed's CRPS minus the fold's three-seed
+  mean, 8 degrees of freedom) times 1.96 times the square root of 2 divided by the square root
+  of 3. It covers seed noise only, so it is a lower bound, as in experiments 419 and 425. No
+  multiplicity correction is applied to the screen. A
   contrast smaller than that is "inside the noise".
 benchmark: >-
   R (the pooled plain mixture density network with the three origin lags, experiment 397's
@@ -85,6 +91,10 @@ code: ml-experiments/00428-day-window-convolution-attention-encoder-replacing-la
 
 ## Question
 
+CRPS is the continuous ranked probability score. The signed-MW six and the MVA-only eight are
+the two groups of Primary substations by metering (signed megawatt readings, or unsigned
+megavolt-ampere magnitudes); D15 and D18 are two short-history Primaries.
+
 **We test whether a network that reads whole days of raw power can learn how much to trust them.**
 A load-shift event moves demand between neighbouring Primary substations for hours or weeks, so
 the power an hour, a day, or a week ago can be abnormal. Today's networks take three hand-made
@@ -103,11 +113,11 @@ as a sequence encoder).
 403, 421, 422, 424 and 426, and the open plans of experiments 404, 425, and 427, read on 2026-10-31).
 
 - **The reference is the pooled plain network.** Experiment 425's plan names the ENS-only pooled
-  plain network (R) as the reference; the same recipe is used here.
+  plain network (R) as the reference; and this plan uses the same recipe.
 - **Experiment 404's harness has not merged.** Its injected-event generator is in the draft PR 58. This
   plan uses experiment 402's generator (`e00402_inject.inject`), which is merged and which 404's
   generator follows. The scripts of experiment 404 are not imported.
-- **The sweep's k is redefined for whole days** (manager, 2026-10-31); see "Encroachment sweep".
+- **The sweep's k is defined for whole days** (manager, 2026-10-31); see "Encroachment sweep".
 - **Standing practices followed.** Monthly refits; cleaned data with the flagged and start-cut
   half-hours dropped (experiment 422's `cleaned_arrays`), reported per fold; the D15 and D18 cut at
   2025-03-01; every network saved in the data folder; stored forecasts reused as references; tails
@@ -152,8 +162,10 @@ draws, with equal probability, the clean series or one of three injected worlds 
 for the power in its windows (and for R-inj's lags); the target is always the clean series. Worlds
 come from `e00402_inject.inject` over 2024-05-01 to 2026-07-01 at 10% coverage (the generator of
 experiment 402 with `FIRST_DAY` moved earlier), with the label table's padded real events excluded as
-base periods. The event pool uses all labelled events including those after a fold's refit; the pool
-supplies only depths and durations, and this is listed as a caveat. Power windows are gathered on the
+base periods. The event pool uses all labelled events including those after a fold's refit, and each depth is
+a fraction of the donor's mean absolute power over its whole series; the pool supplies only depths
+and durations, and both are listed as caveats. Three quarters of the training rows are injected,
+which is more than real events, so clean-row contrasts partly measure that training mix. Power windows are gathered on the
 GPU from dense per-Primary arrays, so no window is stored.
 
 ## Arms
@@ -179,14 +191,17 @@ origin of each test month, leads 0.5 to 240 hours.
 
 - **Steps.** Add a step D to the affected half-hours, both signs, of 2.5% and 5% of effective
   capacity, and of 10% of the Primary's trailing 30-day mean power before the origin. MVA-only
-  readings are clipped at zero after the step.
+  readings are clipped at zero after the step, and rows where the clip changed any shifted value are
+  dropped from the share (for all arms alike).
 - **k for R, as in experiment 392.** k = 1 shifts `lag_origin`; k = 2 also `lag_same_time_latest_day`;
   k = 3 also `lag_same_time_latest_week`.
-- **k for the encoders, two variants.** k is the number of windows shifted (D1; D1 and D2; D1, D2,
-  and D3). Variant 1 shifts only the matching half-hour of each window: the half-hour at the
-  target's time of day in D1, and the centre half-hour in D2 and D3. Variant 2 shifts every
-  observed half-hour of each window. Variant 1 is the like-for-like counterpart of R's three single
-  lags; variant 2 is the event that fills a day.
+- **k for the encoders, two variants.** Variant 1 shifts single half-hours, in R's order: k = 1 the
+  newest observed half-hour of D1 (R's `lag_origin`); k = 2 also the half-hour of D1 at the
+  target's time of day (R's day lag); k = 3 also the centre half-hour of D2 (R's week lag); k = 4
+  (E3 only) also the centre half-hour of D3. Variant 1 is the like-for-like counterpart of R's three
+  single lags, and k up to 3 is compared with R. Variant 2 shifts every observed half-hour of whole
+  windows: k = 1 shifts D1; k = 2 also D2; k = 3 also D3. Variant 2 is the event that fills a day,
+  and R has no counterpart, so the comparison of variant 2 with R is harsher on the encoders.
 - **Raw and widened.** The headline is raw (experiment 392's headline); the same table is repeated
   with the 1.15 widening about the median.
 - **Lead bands.** 0-24, 24-72, 72-168, and 168-240 hours; the 24-72 hour band is the headline.
@@ -194,9 +209,10 @@ origin of each test month, leads 0.5 to 240 hours.
   sign); the ratio of the 5%-95% band width after the step to the width before; coverage of the
   clean reading and of the event-level reading (actual plus step) by the 5%-95% band; the attention
   mass on D1, D2, D3, and the "no day" token, for every k and variant. Three seeds per fold.
-- **Lag-masked control.** Every arm is also evaluated with all its recent-power inputs masked and
-  the step added to the masked values; the forecast must be identical (share exactly 0). A
-  nonzero result is a bug.
+- **Lag-masked control.** Every arm is also evaluated in evaluation mode (dropout off) with all
+  its recent-power inputs masked, the step added, and the mask applied after the step; the
+  forecast must equal the unshifted masked forecast to within 1e-6 (share 0). A larger difference
+  is a bug.
 
 ## Evaluation rows
 
