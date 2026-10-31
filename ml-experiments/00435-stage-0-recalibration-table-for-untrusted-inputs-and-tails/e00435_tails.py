@@ -22,6 +22,12 @@ import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00425_prep as prep  # ty: ignore[unresolved-import]
 import e00425_score as score425  # ty: ignore[unresolved-import]
 import polars as pl
+from e00435_tailcore import (  # ty: ignore[unresolved-import]
+    WIDENING,
+    lead_band_expr,
+    tail_table,
+    widen,
+)
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK_DIR: Final[Path] = (
@@ -29,29 +35,13 @@ WORK_DIR: Final[Path] = (
     / "00435-stage-0-recalibration-table-for-untrusted-inputs-and-tails"
     / "work"
 )
-TAIL_LEVELS: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
 GROUPS: Final[dict[str, tuple[str, ...]]] = score425.SUBSETS
-LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
-    "0-12h": (0.0, 12.0),
-    "12-36h": (12.0, 36.0),
-    "36-72h": (36.0, 72.0),
-    "days4-5": (72.0, 120.0),
-    "days6-10": (120.0, 240.0),
-}
-"""Lead bands in hours, lower bound inclusive, upper bound exclusive (the last includes 240)."""
-WIDENING: Final[float] = 1.15
 ARMS: Final[tuple[str, ...]] = ("R", "A")
 
 
 def with_group_and_band(*, frame: pl.DataFrame, series: pl.DataFrame) -> pl.DataFrame:
     """Add `label`, `group`, `lead_hours`, and `lead_band` columns."""
     group_of = {label: g for g, members in GROUPS.items() for label in members}
-    band = pl.lit(None, dtype=pl.String)
-    lead = pl.col("lead_hours")
-    for i, (name, (low, high)) in enumerate(LEAD_BANDS.items()):
-        last = i == len(LEAD_BANDS) - 1
-        inside = (lead >= low) & ((lead <= high) if last else (lead < high))
-        band = pl.when(inside).then(pl.lit(name)).otherwise(band)
     return (
         frame.join(series.select("time_series_id", "label"), on="time_series_id")
         .with_columns(
@@ -59,34 +49,8 @@ def with_group_and_band(*, frame: pl.DataFrame, series: pl.DataFrame) -> pl.Data
             lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes()
             / 60.0,
         )
-        .with_columns(lead_band=band)
+        .with_columns(lead_band=lead_band_expr())
     )
-
-
-def widen(*, frame: pl.DataFrame, factor: float) -> pl.DataFrame:
-    """Scale each quantile's distance from the median by `factor`."""
-    return frame.with_columns(
-        *[(pl.col("q50") + factor * (pl.col(q) - pl.col("q50"))).alias(q) for q in TAIL_LEVELS]
-    )
-
-
-def tail_table(*, frame: pl.DataFrame, by: tuple[str, ...]) -> pl.DataFrame:
-    """Return coverage and pinball loss at each tail quantile, with the row count, per `by` key.
-
-    `frame` must carry `actual` and the quantile columns. Pinball loss is in the frame's unit.
-    """
-    aggs: list[pl.Expr] = [pl.len().alias("n")]
-    for name, tau in TAIL_LEVELS.items():
-        error = pl.col("actual") - pl.col(name)
-        aggs.append((pl.col("actual") <= pl.col(name)).mean().alias(f"cov_{name}"))
-        aggs.append(
-            pl.when(error >= 0)
-            .then(tau * error)
-            .otherwise((tau - 1.0) * error)
-            .mean()
-            .alias(f"pin_{name}")
-        )
-    return frame.group_by(*by).agg(*aggs).sort(*by)
 
 
 def main() -> None:
