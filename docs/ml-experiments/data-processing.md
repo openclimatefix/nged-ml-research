@@ -128,6 +128,15 @@ removing the inputs across the 16 Primaries fell from 0.710 to 0.361 points. App
 and to any comparison of a model with and without recent power. A comparison that cuts the start for
 one arm must cut it for every arm.
 
+**Train D15 and D18 only on rows from 2025-03-01 on (medium confidence, provisional).** On the
+monthly XGBoost demand model, this cut lowered the days 1 to 10 CRPS by 1.3% at D15 and 1.2% at D18
+against training on every row, and was lower in all 4 scored months at D15 and 3 of 6 at D18
+([experiment 399](00399-xgboost-short-history-start-cut-d15-d18/result.md), 2026-01 to 2026-06).
+A longer cut is not safe: dropping 6 months raised D18's CRPS by 7.2%. Removing readings within
+0.009 MW of zero does not help, because at D15 most of them are real crossings of zero. Applies to
+experiments and to production. A cut does not fix D15's level error (median forecast 16 to 21
+points of capacity too low).
+
 ## Decide which rows are demand
 
 **Use a Primary metered in MVA for demand only on dark rows (high confidence).** An MVA reading
@@ -146,6 +155,15 @@ half-hours lack.** The grey daylight half-hours sit in the middle of each day, w
 output reduces the net flow and the apparent power cannot show its sign. The blue dark half-hours
 form the smooth evening and night curve that holds demand alone. The figure draws one Primary (D2)
 for two weeks of July 2025.
+
+**Do not let a loss on the absolute value of a latent power set the sign of the latent power
+(medium confidence, provisional).** A folded loss cannot tell a latent power from its negative, so
+the sign follows the start of the fit. At six signed-MW Primaries with no injected solar, a folded
+XGBoost model still reported negative power at sunny midday on 41% to 97% of half-hours. Applies to
+experiments. Evidence: [experiment
+387](00387-xgboost-folded-latent-loss-at-mva-only-primaries/result.md). The readings at D12, the
+Primary with known reverse flow, do not reach zero: the 0.1% quantile of its training readings is
+4.3 points of effective capacity.
 
 **Do not treat grid supply points or bulk supply points as clean demand (high confidence).** The
 grid supply points are dominated by generation: D1 is below 5 points of capacity on 75% of nights.
@@ -1055,3 +1073,10 @@ Experiment 201's median-correction network, retrained with 6 different seed sets
 score at 0.5 to 168 hours between 2.5787 and 2.6038, so one seed set carries 0.01 to 0.02 points of
 noise ([experiment 325](00325-primary-demand-default-3-sunshine-response-refit-and-restriction/result.md)).
 Confidence: provisional, one family, one scored year.
+
+**Score the pooled mixture density network only on valid times from 2025-07-01.** *Applies to:
+experiments.* The stored ensemble demand frames and summaries that experiments 397 to 409 read
+begin with the scored period, so test months before 2025-07 have no inputs and a fit for them stops
+before writing a forecast ([experiment 416](00416-mdn-explicit-solar-term-better-powered-follow-up/result.md);
+the months 2025-05 and 2025-06 failed). The 12 months from 2025-07 to 2026-06 are the full set.
+Confidence: provisional, one family.
