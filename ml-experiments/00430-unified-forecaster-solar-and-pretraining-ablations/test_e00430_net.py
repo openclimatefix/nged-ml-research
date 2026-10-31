@@ -1,5 +1,16 @@
-# ruff: noqa: D103
+# ruff: noqa: D103, E402
 """Check experiment 430's network: the likelihood sums to one and the quantiles stay in bounds."""
+
+import sys
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("torch")
+sys.path[:0] = [
+    str(Path(__file__).parent),
+    str(Path(__file__).parents[1] / "00310-metered-farm-long-lead-scoring"),
+]
 
 import e00430_common as common
 import e00430_net as net

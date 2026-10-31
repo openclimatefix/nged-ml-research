@@ -1,5 +1,16 @@
-# ruff: noqa: D103
+# ruff: noqa: D103, E402
 """Check experiment 430's coherence scores on cases with known answers."""
+
+import sys
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("torch")
+sys.path[:0] = [
+    str(Path(__file__).parent),
+    str(Path(__file__).parents[1] / "00310-metered-farm-long-lead-scoring"),
+]
 
 import e00430_coherence as coh
 import numpy as np

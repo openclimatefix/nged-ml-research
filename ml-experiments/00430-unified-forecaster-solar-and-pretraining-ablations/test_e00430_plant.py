@@ -1,5 +1,16 @@
-# ruff: noqa: D103
+# ruff: noqa: D103, E402
 """Check experiment 430's PyTorch plant against the NumPy and pvlib originals it copies."""
+
+import sys
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("torch")
+sys.path[:0] = [
+    str(Path(__file__).parent),
+    str(Path(__file__).parents[1] / "00310-metered-farm-long-lead-scoring"),
+]
 
 import e00310_common as c310  # ty: ignore[unresolved-import]
 import e00310_members as m310  # ty: ignore[unresolved-import]
