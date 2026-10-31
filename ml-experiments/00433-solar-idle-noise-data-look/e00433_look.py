@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd  # noqa: TID251  (pvlib and matplotlib take pandas indexes)
 import polars as pl
 import pvlib
-from studies.power import scan_power
+from studies.power import CLEANED_POWER_DELTA_URI
 from studies.pv_dataset import CAMS_PATH, METADATA_PATH, pv_sites
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -32,7 +32,9 @@ DAY_HOURS: Final[tuple[int, int]] = (10, 15)
 MIN_QUALIFYING_PER_DAY: Final[int] = 3
 IDLE_MARGIN_OF_CAPACITY: Final[float] = 0.02
 QUANT_MIN_SHARE: Final[float] = 0.01
-LATTICE_TOL_MW: Final[float] = 1e-6
+LATTICE_REL_TOL: Final[float] = 1e-3
+ROUND_DECIMALS: Final[int] = 6
+SAME_CELL_KM: Final[float] = 10.0
 N_BOOT: Final[int] = 2000
 SEED: Final[int] = 433
 GALLERY_DAYS: Final[int] = 10
@@ -57,7 +59,7 @@ def prepare(
     p = p.with_columns(
         elevation=pl.Series(sp["apparent_elevation"].to_numpy()),
         # A half-hour ending at T belongs to the hour ending at ceil(T).
-        hour_stamp=pl.col("time").dt.offset_by("-1ns").dt.truncate("1h").dt.offset_by("1h"),
+        hour_stamp=pl.col("time").dt.offset_by("-1m").dt.truncate("1h").dt.offset_by("1h"),
     )
     c = (
         cams.filter(pl.col("site") == site)
@@ -68,7 +70,16 @@ def prepare(
         )
         .with_columns(csi=pl.when(pl.col("cs") > 50).then(pl.col("csi")))
     )
-    return p.join(c.select("hour_stamp", "csi"), on="hour_stamp", how="left")
+    out = (
+        p.join(c.select("hour_stamp", "csi").unique("hour_stamp"), on="hour_stamp", how="left")
+        .sort("time")
+        .filter(pl.col("power").is_not_null())
+    )
+    gap = (out["hour_stamp"] - out["time"]).dt.total_minutes()
+    lo, hi = int(gap.min() or 0), int(gap.max() or 0)  # ty: ignore[invalid-argument-type]
+    assert lo >= 0, "hour_stamp must not precede time"
+    assert hi < 60, "hour_stamp must be within the hour after time"
+    return out
 
 
 def lattice_step(values: np.ndarray) -> float:
@@ -88,8 +99,10 @@ def lattice_share(values: np.ndarray, step: float) -> float:
     """Share of readings that are an integer multiple of the step."""
     if not np.isfinite(step) or step <= 0:
         return float("nan")
-    k = values / step
-    return float(np.mean(np.abs(k - np.round(k)) * step < LATTICE_TOL_MW))
+    if step <= 10 ** (-ROUND_DECIMALS) * 1.5:  # at the rounding grain: no visible lattice
+        return 0.0
+    k = np.round(values, ROUND_DECIMALS) / step
+    return float(np.mean(np.abs(k - np.round(k)) < LATTICE_REL_TOL))
 
 
 def night_stats(df: pl.DataFrame, cap: float) -> dict[str, float]:
@@ -187,7 +200,7 @@ def run_lengths(days: pl.DataFrame) -> pl.DataFrame:
     d = d.with_columns(
         idle_day=pl.col("idle") == pl.col("qualifying"),
     )
-    d = d.with_columns(run_break=(pl.col("idle_day") != pl.col("idle_day").shift()).cum_sum())
+    d = d.with_columns(run_break=pl.col("idle_day").rle_id())
     runs = (
         d.filter(pl.col("idle_day"))
         .group_by("run_break")
@@ -207,19 +220,28 @@ def half_hours_in_runs_over(runs: pl.DataFrame, hours: int) -> int:
     return int(runs.filter(pl.col("calendar_days") * 24 > hours)["half_hours"].sum() or 0)
 
 
+def _km(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Return the great-circle distance in kilometres between two latitude-longitude points."""
+    la1, lo1, la2, lo2 = map(np.radians, (*a, *b))
+    h = np.sin((la2 - la1) / 2) ** 2 + np.cos(la1) * np.cos(la2) * np.sin((lo2 - lo1) / 2) ** 2
+    return float(6371 * 2 * np.arcsin(np.sqrt(h)))
+
+
 def main() -> None:  # noqa: D103, PLR0915
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(SEED)
     sites = pv_sites().sort("site")
     meta = pl.read_parquet(METADATA_PATH).select("time_series_id", "units")
+    # The cleaned Delta table keeps every row and names the flagged ones in `drop_reason`; this
+    # look uses all rows, as raw power, and counts the rows the cleaning would drop.
     power = (
-        scan_power()
+        pl.scan_delta(CLEANED_POWER_DELTA_URI)
         .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))
         .collect()
     )
     cams = pl.read_parquet(CAMS_PATH)
-    summary, by_year, neg_hour, day_runs, season, daily_tables, csi_bins, wd_hour = (
+    summary, by_year, neg_hour, day_runs, season, daily_tables, csi_bins, wd_hour, run_bins = (
         [],
         [],
         [],
@@ -228,11 +250,17 @@ def main() -> None:  # noqa: D103, PLR0915
         {},
         [],
         [],
+        [],
     )
     verdicts = {}
     for row in sites.iter_rows(named=True):
         site, tsid, cap = row["site"], row["time_series_id"], float(row["effective_capacity_mw"])
         label = f"Solar {site}"
+        n_flagged = int(
+            power.filter(
+                (pl.col("time_series_id") == tsid) & pl.col("drop_reason").is_not_null()
+            ).height
+        )
         unit = meta.filter(pl.col("time_series_id") == tsid)["units"][0]
         df = prepare(
             tsid=tsid, lat=row["latitude"], lon=row["longitude"], site=site, power=power, cams=cams
@@ -248,8 +276,9 @@ def main() -> None:  # noqa: D103, PLR0915
         )
         night = df.filter(
             (pl.col("elevation") < NIGHT_ELEVATION_DEG) & (pl.col("prev_gap") == 30)
-        ).drop_nulls("prev_power")
-        st: dict[str, object] = dict(night_stats(night, cap))
+        ).drop_nulls(["power", "prev_power"])
+        night_stats_row = night_stats(night, cap)
+        st: dict[str, object] = dict(night_stats_row)
         ci = bootstrap(night, cap, rng)
         ratio = summer_winter_ratio(night, cap)
         label_verdict, failing = classify(night_stats(night, cap), ci, ratio)
@@ -258,7 +287,8 @@ def main() -> None:  # noqa: D103, PLR0915
         d = d.with_columns(
             diff_prev=pl.col("diff").shift(),
             ok=(pl.col("time") - pl.col("time").shift()).dt.total_minutes() == 30,
-        ).filter(pl.col("ok"))
+        )
+        d = d.with_columns(night_run=(~pl.col("ok")).cum_sum()).filter(pl.col("ok"))
         a, b = d["diff"].to_numpy(), d["diff_prev"].to_numpy()
         m = np.isfinite(a) & np.isfinite(b)
         ac1 = (
@@ -266,7 +296,9 @@ def main() -> None:  # noqa: D103, PLR0915
             if m.sum() > 2 and np.std(a[m]) > 0 and np.std(b[m]) > 0
             else float("nan")
         )
-        rsd = d.with_columns(rsd=pl.col("diff").rolling_std(6))["rsd"].drop_nulls()
+        rsd = d.with_columns(rsd=pl.col("diff").rolling_std(6).over("night_run"))[
+            "rsd"
+        ].drop_nulls()
         st.update(
             {
                 "lag1_autocorr_diff": ac1,
@@ -278,7 +310,15 @@ def main() -> None:  # noqa: D103, PLR0915
         )
         for k, (lo, hi) in ci.items():
             st[f"{k}_lo"], st[f"{k}_hi"] = lo, hi
-        st.update({"site": label, "units": str(unit), "label": label_verdict, "failing": failing})
+        st.update(
+            {
+                "site": label,
+                "units": str(unit),
+                "rows_flagged_by_cleaning": n_flagged,
+                "label": label_verdict,
+                "failing": failing,
+            }
+        )
         summary.append(st)
         verdicts[label] = label_verdict
         by_year.append(
@@ -336,7 +376,9 @@ def main() -> None:  # noqa: D103, PLR0915
                 "share_idle_in_runs_over_7d": half_hours_in_runs_over(runs, 24 * 7)
                 / max(total_idle, 1),
                 "n_runs": runs.height,
-                "longest_runs_days": sorted(runs["calendar_days"].to_list(), reverse=True)[:5],
+                "longest_runs_days": ", ".join(
+                    str(x) for x in sorted(runs["calendar_days"].to_list(), reverse=True)[:5]
+                ),
                 "median_run_days": float(np.median(runs["calendar_days"].to_numpy()))
                 if runs.height
                 else None,
@@ -350,6 +392,22 @@ def main() -> None:  # noqa: D103, PLR0915
             .filter(pl.col("qualifying") >= MIN_QUALIFYING_PER_DAY)
             .select("date", "idle_day")
         )
+        run_bins.append(
+            runs.with_columns(
+                bin=pl.when(pl.col("calendar_days") <= 1)
+                .then(pl.lit("1"))
+                .when(pl.col("calendar_days") <= 3)
+                .then(pl.lit("2-3"))
+                .when(pl.col("calendar_days") <= 7)
+                .then(pl.lit("4-7"))
+                .when(pl.col("calendar_days") <= 24)
+                .then(pl.lit("8-24"))
+                .otherwise(pl.lit("over 24"))
+            )
+            .group_by("bin")
+            .agg(runs=pl.len(), idle_half_hours=pl.col("half_hours").sum())
+            .with_columns(site=pl.lit(label))
+        )
         runs.with_columns(site=pl.lit(label)).write_parquet(DATA_DIR / f"runs_{site}.parquet")
         wd_hour.append(
             q.group_by("weekday", "hour")
@@ -359,7 +417,7 @@ def main() -> None:  # noqa: D103, PLR0915
         )
         # Idle share by clear-sky index bin over all daylight half-hours (CSI from 0.1).
         dl = df.filter((pl.col("elevation") > 10) & pl.col("csi").is_not_null()).with_columns(
-            csi_bin=(pl.col("csi").clip(0, 1.2) / 0.1).floor() * 0.1, idle=pl.col("power") < floor
+            csi_bin=(pl.col("csi").clip(0, 1.2) * 10).floor() / 10, idle=pl.col("power") < floor
         )
         csi_bins.append(
             dl.group_by("csi_bin")
@@ -370,10 +428,20 @@ def main() -> None:  # noqa: D103, PLR0915
         # Gallery (private): 10 sure-night days, 10 daytime days disagreeing with irradiance.
         _gallery(df=df, site=site, cap=cap, night=night, q=q, rng=rng)
         # Share of scored half-hours the noise would touch.
-        st["share_of_all_half_hours_night"] = night.height / df.height
-        st["share_of_daylight_half_hours_idle"] = day_runs[-1]["idle_share"]
+        noisy = label_verdict == "the same noise"
+        st["night_share_of_all_half_hours"] = night.height / df.height if noisy else None
+        st["night_share_of_daylight_half_hours"] = (
+            night.height / max(df.filter(pl.col("elevation") > 0).height, 1) if noisy else None
+        )
+        st["prediction_holds"] = bool(
+            abs(night_stats_row["median_frac_cap"]) < 0.001
+            and night_stats_row["nonzero_repeat_share"] < 0.20
+        )
     # Agreement between farms: Jaccard of idle days.
     agree = []
+    coords = {
+        f"Solar {r['site']}": (r["latitude"], r["longitude"]) for r in sites.iter_rows(named=True)
+    }
     labs = list(daily_tables)
     for i, x in enumerate(labs):
         for y in labs[i + 1 :]:
@@ -388,6 +456,7 @@ def main() -> None:  # noqa: D103, PLR0915
                 {
                     "farm_x": x,
                     "farm_y": y,
+                    "within_10km": _km(coords[x], coords[y]) <= SAME_CELL_KM,
                     "days_both": j.height,
                     "idle_both": both,
                     "idle_either": either,
@@ -404,11 +473,16 @@ def main() -> None:  # noqa: D103, PLR0915
         "daytime_runs": pl.DataFrame(day_runs),
         "daytime_weekday_hour": pl.concat(wd_hour),
         "idle_share_by_csi": pl.concat(csi_bins),
+        "daytime_run_bins": pl.concat(run_bins),
         "pair_agreement": pl.DataFrame(agree),
     }
     for name, frame in out.items():
         frame.write_csv(DATA_DIR / f"{name}.csv")
-        frame.write_csv(DOCS_DIR / f"{name}.csv")
+        frame.drop("step_mw", strict=False).write_csv(DOCS_DIR / f"{name}.csv")
+    n_same = sum(v == "the same noise" for v in verdicts.values())
+    n_not = sum(v == "not the same" for v in verdicts.values())
+    overall = "supported" if n_not >= 5 else "refuted" if n_same >= 3 else "partly supported"
+    verdicts["overall_verdict"] = overall
     (DATA_DIR / "verdicts.json").write_text(json.dumps(verdicts, indent=2))
     print(json.dumps(verdicts, indent=2))
 
