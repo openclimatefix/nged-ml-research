@@ -389,6 +389,14 @@ plan uses both as diagnostics on the fitted networks and does not tune the injec
 reported as a lower bound on harm. Our series are one per substation, not per transformer, so a
 transformer-level event that conserves load across a substation's transformers does not appear.
 
+**Frozen lagless table.** The cross-fitted lagless tables are frozen as built on 2026-10-31 by
+commit `63d3799f` of this branch: K = 6 contiguous blocks, a pooled module with a Primary
+embedding, 6 epochs, seeds 0 to 2, and scored months 2025-10, 2025-12, 2026-01, 2026-03, and
+2026-06. Experiment 428's surprise-channel arm and recent-history encoders read the same files, so
+no rebuild happens unless the experiment 428 worker and the manager agree first. In the 2026-06
+table the 90% band covers 0.81 of observed power for the cross-fitted rows, so the bands are
+somewhat narrow, and the write-up states this.
+
 **Generator.** This experiment imports experiment 402's generator (`e00402_inject.py`), merged to
 main in PR 56 under `ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/`.
 The merged file differs from the draft copy first used here: the donor change is computed from the
