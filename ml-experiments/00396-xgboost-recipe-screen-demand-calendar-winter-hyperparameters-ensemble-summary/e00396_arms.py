@@ -75,7 +75,8 @@ class Arm:
             `trailing_temperature`, `trailing_shortwave`, `day_of_year`,
             `summary_temperature_shortwave`, `summary7` (the mean and standard deviation of all
             seven weather variables replace them), `mean7` (the seven are replaced by their
-            ensemble mean, in training and prediction rows), and `mean7_train` (replaced by the ensemble mean in training rows only).
+            ensemble mean, in training and prediction rows), and `mean7_train` (replaced by the
+            ensemble mean in training rows only).
         drop: Input columns the arm removes (the no-calendar control).
         params: XGBoost parameters that replace the control's.
         rounds: Boosting rounds fitted.
