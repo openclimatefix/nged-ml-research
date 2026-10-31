@@ -272,6 +272,10 @@ def minimum_detectable_effect(
     three-seed means (C4). Contrasts of six-seed means (C1 to C3) use it divided by the square root
     of two. It ignores the interaction of folds with seed sets, so it is a lower bound.
 
+    Args:
+        rows: The scored rows of each arm, keyed by arm label (`R_s012_w115` and `R_s345_w115` are
+            read).
+
     Returns:
         For each (group, row set) with at least two folds: (three-seed figure, six-seed figure).
     """
