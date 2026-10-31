@@ -102,8 +102,9 @@ advice:
     lie inside a load shift: the band width stays within 1% of its width with no shifted lags at
     every level of shift (figure 3).
   - >-
-    Refit a second seed of the control before reading differences under 0.5 CRPS points in the 7
-    days after events: the random-block control (RC1) moved that slice by 1.5 points (figure 1).
+    Check each series' fit before reading lagless differences in the 7 days after events: one failed
+    fit (D18, 2026-01) produced the whole 1.5-point gap between the random-block control (RC1) and
+    the unmasked model (figure 1).
 ---
 
 # An NRA forecast from XGBoost trained with load-shift events removed from its targets
@@ -176,7 +177,7 @@ lagged power inputs did not move.
 - **The median moves by about 40% of the step when all three lags are shifted, and the band does not
   widen.** The lag-encroachment sweep (step of 5% of capacity added to the lag columns of clean
   half-hours; level k adds it to the origin lag, then also the day-earlier lag, then also the
-  week-earlier lag; both signs; leads 24 to 72 hours). The median moves, as a share of the step: k =
+  week-earlier lag; both signs; leads 0 to 240 hours). The median moves, as a share of the step: k =
   1, about 0 to 2%; k = 2, 15% to 20%; k = 3, 38% to 41%, for lagged R0, R1, and RC1 in both
   metering groups, and within one point of one another. Lagless forms move by exactly 0 at every k,
   which tests the code. The 5% to 95% band width stays within 1% of its width at k = 0. Coverage of
@@ -206,15 +207,22 @@ lagged power inputs did not move.
 
 - **Median minus mean forecast per site:** not computed. The stored forecasts hold quantiles only.
 - **Error of the median beside the quantile score:** printed by the scorer, not tabulated.
-- **Audit trigger 5 (a control arm that should change nothing changes a score) fires,** because the
-  random-block control moves the 7-day-after slice of the lagless form by 1.5 CRPS points (6.065
-  against 7.591 for the unmasked model) and RC1 lagless moved by -0.27 in the 2026-01 fold, although
-  RC1 should change nothing. This is evidence that fit-to-fit noise on small slices is large, and no
-  conclusion rests on those slices. A Sonnet audit re-derived the headline contrasts (Opus was not
-  used, per the maintainer's rule).
-- **Late reviews.** The code review (a fresh Sonnet agent) ran after the first fits had started, and
-  its findings were fixed before RC1 started; R1 and R0 lagless were fitted before the fixes, which
-  affect only the random-block control and events closer than 48 hours.
+- **Audit trigger 5 (a control arm that should change nothing changes a score) fires, and one
+  failed fit explains it.** The random-block control moves the 7-day-after slice of the lagless
+  form by 1.5 CRPS points (6.065 against 7.591 for the unmasked model). A second reviewer found that
+  the whole gap comes from D18 in the 2026-01 fold (2,149 half-hours): there the unmasked and R1
+  lagless medians sit near 0.27 of capacity against an actual of 0.81, and only RC1 lagless is
+  normal. Without D18 the lagless ordering outside events flips to 4.913 (R0), 4.920 (R1), and 4.947
+  (RC1). So the lagless differences between arms are not a random-block effect, and no conclusion
+  rests on them.
+- **A second reviewer re-derived the pooled scores, the sweep shares, and the row alignment from the
+  stored forecasts and found them correct.** It did not re-derive Check 2, the injected transfers,
+  the curtailment costs, or R5. It found no training row at or after a refit time.
+- **The code review ran after the first fits had started.** Its fixes touched only the random-block
+  control and events closer than 48 hours apart, and RC1 was fitted after them; R1 and the lagless
+  R0 were fitted before them.
+- **The k = 3 share varies by fold.** It ranges from 33% to 50% between folds, and 38% to 41% is the
+  pooled range by metering group.
 
 ## Caveats
 
