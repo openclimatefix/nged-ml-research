@@ -245,6 +245,80 @@ def per_cell(*, arm: str) -> None:
         print(f"{month} s{seed}: " + "; ".join(text))
 
 
+def by_count() -> None:
+    """Print each head's and B-mix's mean score by number of flagged lags, group, and world type."""
+    cells = POOLED_CELLS
+    worlds = [*score.SCORING_SEEDS, -1]
+    arms = ("A0-inj", "O-lagless", "B-mix", "O-hard", "O-soft", "O-floor")
+    parts = []
+    for arm in arms:
+        frames = [
+            load_cell(arm=arm, month=m, seed=s, worlds=worlds, cell=i)
+            for i, (m, s) in enumerate(cells)
+        ]
+        full = pl.concat([f for f in frames if f is not None], how="diagonal_relaxed")
+        if arm == "A0-inj":
+            counts_frame = full  # flag columns absent in stored A0-inj; taken from O-hard below
+            del counts_frame
+        parts.append(full.select("crps").rename({"crps": arm}))
+    ref = pl.concat(
+        [
+            load_cell(arm="O-hard", month=m, seed=s, worlds=worlds, cell=i)  # ty: ignore[invalid-argument-type]
+            for i, (m, s) in enumerate(cells)
+        ],
+        how="diagonal_relaxed",
+    ).select("group", "cls", "world", "n_flagged")
+    table = pl.concat([ref, *parts], how="horizontal")
+    table = table.with_columns(
+        kind=pl.when(pl.col("world") >= 0).then(pl.lit("injected")).otherwise(pl.lit("real"))
+    )
+    pl.Config.set_tbl_rows(100)
+    out = (
+        table.filter(pl.col("group") == "signed_six")
+        .group_by("kind", "cls", "n_flagged")
+        .agg(pl.len().alias("rows"), *[pl.col(a).mean().round(3) for a in arms])
+        .sort("kind", "cls", "n_flagged")
+    )
+    print("== mean score by flagged-lag count (signed six, pooled 5 months)")
+    print(out)
+    out.write_parquet(OUT_DIR / "by_count.parquet")
+
+
+def checks() -> None:
+    """Print the median error beside each arm's score, and median minus mean per site."""
+    cells = POOLED_CELLS
+    worlds = [-1]
+    sites = fit.prep.primaries()["site"].to_list()
+    rows = []
+    for arm in ("A0-inj", "O-lagless", "B-mix", "O-hard", "O-soft", "O-floor"):
+        frame = pl.concat(
+            [
+                f
+                for i, (m, s) in enumerate(cells)
+                if (f := load_cell(arm=arm, month=m, seed=s, worlds=worlds, cell=i)) is not None
+            ],
+            how="diagonal_relaxed",
+        )
+        frame = frame.with_columns(abs_err=(pl.col("actual") - pl.col("q50")).abs() * 100.0)
+        rows.append(
+            frame.filter(pl.col("group") == "signed_six")
+            .group_by("cls")
+            .agg(pl.col("abs_err").mean().alias("median_abs_err"), pl.col("crps").mean())
+            .with_columns(arm=pl.lit(arm))
+        )
+        if "mean" in frame.columns:
+            gap = (
+                frame.with_columns(gap=(pl.col("q50") - pl.col("mean")) * 100.0)
+                .group_by("primary")
+                .agg(pl.col("gap").mean())
+                .sort("primary")
+            )
+            print(arm, "median minus mean, points of capacity, per Primary:")
+            print({sites[p]: round(g, 3) for p, g in gap.iter_rows()})
+    pl.Config.set_tbl_rows(100)
+    print(pl.concat(rows).sort("cls", "arm"))
+
+
 def counts() -> None:
     """Reconcile the real event counts: corrected events, padded runs, and events per month."""
     events = pl.read_parquet(
@@ -288,10 +362,16 @@ def counts() -> None:
 def main() -> None:
     """Print the tables and save them."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("table", "counts"))
+    parser.add_argument("command", choices=("table", "counts", "by_count", "checks"))
     args = parser.parse_args()
     if args.command == "counts":
         counts()
+        return
+    if args.command == "checks":
+        checks()
+        return
+    if args.command == "by_count":
+        by_count()
         return
     result = run_table(cells=POOLED_CELLS, label="pooled 5 months, seed 0")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -302,7 +382,7 @@ def main() -> None:
         for cell in SEED_CELLS
     ]
     pl.concat(robust).write_parquet(OUT_DIR / "contrasts_seeds.parquet")
-    for arm in ("O-hard", "O-soft"):
+    for arm in ("O-hard", "O-soft", "O-floor"):
         per_cell(arm=arm)
     (OUT_DIR / "done.json").write_text(json.dumps({"ok": True}))
 

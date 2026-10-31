@@ -41,7 +41,7 @@ OUT_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00445-flag-oracle-o-rule-ceiling-for-lag-event-detectors" / "work"
 )
 PRED_DIR: Final[Path] = OUT_DIR / "predictions"
-ARMS: Final[tuple[str, ...]] = ("O-hard", "O-soft", "O-lagless")
+ARMS: Final[tuple[str, ...]] = ("O-hard", "O-soft", "O-lagless", "O-floor")
 CELLS: Final[tuple[tuple[str, int], ...]] = (
     ("2026-06", 0),
     ("2026-03", 0),
@@ -185,6 +185,20 @@ def lagged_head(
     )
 
 
+def floor_quantiles(*, heads: Heads, count: np.ndarray) -> np.ndarray:
+    """Return the post hoc `O-floor` quantiles: weight 0.5 + count / 6 on the lagless head.
+
+    With no flagged lag the forecast is B-mix's 50/50 mixture, and each flagged lag moves the weight
+    towards the lagless head, reaching 1 when all 3 lags are flagged.
+    """
+    out = np.zeros((len(count), len(LEVEL_NAMES)))
+    for n_flagged in (0, 1, 2, 3):
+        rows = np.flatnonzero(count == n_flagged)
+        if len(rows):
+            out[rows] = heads.mix(rows=rows, share=0.5 + n_flagged / 6.0)
+    return out
+
+
 def o_rule_quantiles(
     *, heads: Heads, stored: np.ndarray, lagless_all: np.ndarray, count: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -253,7 +267,9 @@ def build_cell(*, month: str, seed: int, real: np.ndarray, worlds: list[int]) ->
             "O-hard": np.where(count >= 1, lagless_mean, lagged_mean),
             "O-soft": (1.0 - share) * lagged_mean + share * lagless_mean,
             "O-lagless": lagless_mean,
+            "O-floor": (0.5 + count / 6.0) * lagless_mean + (0.5 - count / 6.0) * lagged_mean,
         }
+        floor = floor_quantiles(heads=heads, count=count)
         hard, soft = o_rule_quantiles(
             heads=heads, stored=q_lagged, lagless_all=lagless_all, count=count
         )
@@ -263,7 +279,12 @@ def build_cell(*, month: str, seed: int, real: np.ndarray, worlds: list[int]) ->
             flag_2=pl.Series(flags[:, 2]),
             n_flagged=pl.Series(count.astype(np.int8)),
         )
-        for arm, q in (("O-hard", hard), ("O-soft", soft), ("O-lagless", lagless_all)):
+        for arm, q in (
+            ("O-hard", hard),
+            ("O-soft", soft),
+            ("O-lagless", lagless_all),
+            ("O-floor", floor),
+        ):
             frame = out.with_columns(
                 mean=pl.Series(means[arm]).cast(pl.Float32),
                 **{n: pl.Series(q[:, i]).cast(pl.Float32) for i, n in enumerate(names)},
