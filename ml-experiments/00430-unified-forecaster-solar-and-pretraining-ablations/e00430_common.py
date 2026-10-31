@@ -118,12 +118,6 @@ class Config:
         return self.member_route or self.member_wise or self.plant != "none"
 
     @property
-    def writes_paths(self) -> bool:
-        return self.member_wise or self.member_route or self.pretrain == "none" and not (
-            self.clear_sky_input or self.plant != "none" or self.atoms
-        )
-
-    @property
     def fixed_stats(self) -> bool:
         return self.pretrain != "none"
 
@@ -134,6 +128,14 @@ class Config:
             cols.append("clear_sky")
         return tuple(cols)
 
+
+PATH_ARMS: Final[frozenset[str]] = frozenset(
+    {"g0_onepass", "a2_mean_only", "a2_member", "a2_memberwise"}
+)
+"""Arms whose job also stores 51-level quantiles (or member paths) for the coherence scores."""
+N_LEVELS: Final[int] = 51
+PATH_LEVELS: Final[tuple[float, ...]] = tuple((j + 0.5) / N_MEMBERS for j in range(N_MEMBERS))
+"""The 51 quantile levels that ensemble copula coupling and the member-wise route use."""
 
 ARMS: Final[dict[str, Config]] = {
     # Gate and A2: member handling.

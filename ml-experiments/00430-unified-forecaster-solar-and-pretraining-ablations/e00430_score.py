@@ -207,7 +207,7 @@ def main() -> None:
         table = contrast_table(arms=arms, pairs=[("g0_onepass", "e345")])
         print(table)
         print(absolute_table(arms=arms))
-        worst = table["pct_change"].abs().max()
+        worst = float(table["pct_change"].abs().max())  # ty: ignore[invalid-argument-type]
         overall = table.filter(pl.col("band") == "all")["pct_change"][0]
         print(
             f"gate: all-band change {overall:+.3f}%, worst band {worst:.3f}% (tolerance {GATE_TOLERANCE_PERCENT}%)"

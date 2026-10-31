@@ -47,6 +47,8 @@ class Batch:
     """Shape (rows, members or 1, 2): shortwave (W/m2) and temperature (degC). One member is repeated."""
     y: torch.Tensor
     ceiling: torch.Tensor
+    clear_sky: torch.Tensor | None = None
+    """Clear-sky shortwave (W/m2), used to recompute the clear-sky index of a single member."""
 
 
 class UnifiedNet(nn.Module):
@@ -160,36 +162,59 @@ class UnifiedNet(nn.Module):
         return -log_lik
 
 
+def bisect_gaussian_mixture(
+    *, w: torch.Tensor, mean: torch.Tensor, std: torch.Tensor, levels: torch.Tensor
+) -> torch.Tensor:
+    """Return the mixture's quantile at each level by bisection on its CDF over [-2, 2].
+
+    Args:
+        w: Component weights, shape (rows, components), float64.
+        mean: Component means, shape (rows, components).
+        std: Component standard deviations, shape (rows, components).
+        levels: Probability levels, shape (rows, levels) or (levels,).
+
+    Returns:
+        Shape (rows, levels), unclamped.
+    """
+    levels = levels if levels.dim() == 2 else levels[None, :].expand(len(w), -1)
+    lo = torch.full(levels.shape, -2.0, dtype=torch.float64, device=w.device)
+    hi = torch.full_like(lo, 2.0)
+    for _ in range(40):
+        mid = 0.5 * (lo + hi)
+        z = (mid[:, :, None] - mean[:, None, :]) / std[:, None, :]
+        cdf = (w[:, None, :] * torch.special.ndtr(z)).sum(dim=2)
+        below = cdf < levels
+        lo, hi = torch.where(below, mid, lo), torch.where(below, hi, mid)
+    return 0.5 * (lo + hi)
+
+
 @torch.no_grad()
-def quantiles(*, model: UnifiedNet, batch: Batch) -> torch.Tensor:
-    """Return the 11 quantiles per row by bisection on the mixture CDF, in [0, ceiling]."""
-    levels = LEVELS.to(batch.x.device)
+def quantiles(
+    *, model: UnifiedNet, batch: Batch, levels: torch.Tensor | None = None
+) -> torch.Tensor:
+    """Return the quantiles per row at `levels` (default the 11 levels), in [0, ceiling]."""
+    levels = (LEVELS if levels is None else levels.double()).to(batch.x.device)
     log_w, mean, std, atoms = model.parameters_of(batch)
     w, mean, std = log_w.exp().double(), mean.double(), std.double()
     c = batch.ceiling.double()
     if atoms is None:
-        lo = torch.full((len(w), levels.numel()), -2.0, dtype=torch.float64, device=w.device)
-        hi = torch.full_like(lo, 2.0)
-        target = levels[None, :].expand_as(lo)
-        base = torch.zeros_like(lo)
-        scale = torch.ones_like(lo)
-    else:
-        p0, p1 = atoms[:, 1].exp().double()[:, None], atoms[:, 2].exp().double()[:, None]
-        lower = (w * torch.special.ndtr(-mean / std)).sum(dim=1, keepdim=True)
-        upper = (w * torch.special.ndtr((c[:, None] - mean) / std)).sum(dim=1, keepdim=True)
-        scale = (upper - lower).clamp(min=1e-9)
-        base = lower
-        target = (levels[None, :] - p0) / (1.0 - p0 - p1).clamp(min=1e-9)
-        lo = torch.zeros((len(w), levels.numel()), dtype=torch.float64, device=w.device)
-        hi = c[:, None].expand_as(lo).clone()
+        result = bisect_gaussian_mixture(w=w, mean=mean, std=std, levels=levels)
+        return torch.minimum(result.clamp(min=0.0), c[:, None])
+    levels = levels if levels.dim() == 2 else levels[None, :].expand(len(w), -1)
+    p0, p1 = atoms[:, 1].exp().double()[:, None], atoms[:, 2].exp().double()[:, None]
+    lower = (w * torch.special.ndtr(-mean / std)).sum(dim=1, keepdim=True)
+    upper = (w * torch.special.ndtr((c[:, None] - mean) / std)).sum(dim=1, keepdim=True)
+    scale = (upper - lower).clamp(min=1e-9)
+    target = (levels - p0) / (1.0 - p0 - p1).clamp(min=1e-9)
+    lo = torch.zeros(levels.shape, dtype=torch.float64, device=w.device)
+    hi = c[:, None].expand_as(lo).clone()
     for _ in range(40):
         mid = 0.5 * (lo + hi)
         z = (mid[:, :, None] - mean[:, None, :]) / std[:, None, :]
-        cdf = ((w[:, None, :] * torch.special.ndtr(z)).sum(dim=2) - base) / scale
+        cdf = ((w[:, None, :] * torch.special.ndtr(z)).sum(dim=2) - lower) / scale
         below = cdf < target
         lo, hi = torch.where(below, mid, lo), torch.where(below, hi, mid)
     result = 0.5 * (lo + hi)
-    if atoms is not None:
-        result = torch.where(levels[None, :] <= p0, torch.zeros_like(result), result)
-        result = torch.where(levels[None, :] >= 1.0 - p1, c[:, None].expand_as(result), result)
+    result = torch.where(levels <= p0, torch.zeros_like(result), result)
+    result = torch.where(levels >= 1.0 - p1, c[:, None].expand_as(result), result)
     return torch.minimum(result.clamp(min=0.0), c[:, None])

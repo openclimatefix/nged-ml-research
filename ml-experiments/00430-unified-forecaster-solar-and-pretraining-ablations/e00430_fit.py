@@ -39,6 +39,11 @@ from studies.tail_calibration import level_column  # noqa: E402
 DEVICE: Final = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 REFITS: Final[tuple[datetime, ...]] = f310.REFIT_STARTS
 INFERENCE_CHUNK: Final[int] = 20_000
+PATH_LEVELS_T: Final = torch.tensor(common.PATH_LEVELS, dtype=torch.float64, device=DEVICE)
+MEMBER_LEVELS_T: Final = PATH_LEVELS_T[
+    torch.tensor(np.random.default_rng(2026).permutation(common.N_MEMBERS), device=DEVICE)
+]
+"""Member m's quantile level in the member-wise route: a fixed random order of the 51 levels."""
 ALL_COLUMNS: Final[tuple[str, ...]] = (*common.GATE_COLUMNS, "clear_sky")
 FLAGS: Final[tuple[str, ...]] = ("temp_missing",)
 PRETRAIN_LEAD_RANGE_HOURS: Final[tuple[float, float]] = (12.0, 252.0)
@@ -296,6 +301,46 @@ def to_batch(
         members=torch.tensor(members[sl], device=DEVICE),
         y=torch.tensor(piece.y[sl], device=DEVICE),
         ceiling=torch.tensor(piece.ceiling[sl], device=DEVICE),
+        clear_sky=torch.tensor(
+            piece.columns.get("clear_sky", np.ones(len(piece), np.float32))[sl], device=DEVICE
+        ),
+    )
+
+
+def with_member(
+    *, batch: net.Batch, member: torch.Tensor, columns: tuple[str, ...], stats: dict
+) -> net.Batch:
+    """Return the batch with its weather columns replaced by one member's values per row.
+
+    Shortwave, the beam and diffuse split, temperature, and the clear-sky index become the member's,
+    and the ensemble spread becomes zero, so the one-pass network reads a single member as if it
+    were a forecast with no spread.
+    """
+    rows = torch.arange(len(batch.x), device=batch.x.device)
+    ghi = batch.members[rows, member, 0]
+    temperature = batch.members[rows, member, 1]
+    dni, dhi = plant_module.erbs(ghi=ghi, zenith_deg=batch.geo[:, 0], doy=batch.geo[:, 2])
+    assert batch.clear_sky is not None
+    values = {
+        "ghi_mean": ghi,
+        "dni_mean": dni,
+        "dhi_mean": dhi,
+        "temperature": temperature,
+        "csi": (ghi / batch.clear_sky.clamp(min=1.0)).clamp(0.0, 1.5),
+        "ghi_std": torch.zeros_like(ghi),
+    }
+    x = batch.x.clone()
+    for j, c in enumerate(columns):
+        if c in values:
+            mean, std = stats[c]
+            x[:, j] = (values[c] - mean) / std
+    return net.Batch(
+        x=x,
+        geo=batch.geo,
+        members=batch.members,
+        y=batch.y,
+        ceiling=batch.ceiling,
+        clear_sky=batch.clear_sky,
     )
 
 
@@ -310,7 +355,7 @@ def train_network(
 ) -> net.UnifiedNet:
     """Fit one network on the pieces: AdamW, 20 epochs, the best epoch on the last 61 days."""
     columns = config.columns
-    need_members = config.member_route or config.plant != "none"
+    need_members = config.needs_members
     torch.manual_seed(seed)
     plant = build_plant(config=config, pieces=pieces)
     model = net.UnifiedNet(n_static=len(columns), config=config, plant=plant).to(DEVICE)
@@ -326,6 +371,7 @@ def train_network(
         members=torch.cat([b.members for b in parts]),
         y=torch.cat([b.y for b in parts]),
         ceiling=torch.cat([b.ceiling for b in parts]),
+        clear_sky=torch.cat([b.clear_sky for b in parts if b.clear_sky is not None]),
     )
     del parts
     is_val = np.concatenate([p.is_val for p in pieces])
@@ -344,13 +390,20 @@ def train_network(
     best, best_state = float("inf"), None
 
     def gather(index: torch.Tensor) -> net.Batch:
-        return net.Batch(
+        batch = net.Batch(
             x=all_batch.x[index],
             geo=all_batch.geo[index],
             members=all_batch.members[index],
             y=all_batch.y[index],
             ceiling=all_batch.ceiling[index],
+            clear_sky=all_batch.clear_sky[index] if all_batch.clear_sky is not None else None,
         )
+        if config.member_wise:
+            member = torch.randint(
+                batch.members.shape[1], (len(index),), generator=generator, device=DEVICE
+            )
+            return with_member(batch=batch, member=member, columns=columns, stats=stats)
+        return batch
 
     for _ in range(common.EPOCHS):
         model.train()
@@ -417,8 +470,10 @@ def predict_rows(
     arm: str,
 ) -> pl.DataFrame:
     """Return every farm and band's scored rows of the window with the model's 11 quantiles."""
-    need_members = config.member_route or config.plant != "none"
+    need_members = config.needs_members
     only_era5 = config.pretrain == "only"
+    write_paths = arm in common.PATH_ARMS
+    path_arrays: list[dict[str, np.ndarray]] = []
     frames = []
     for farm in c310.FARMS:
         for band in c310.BAND_ORDER:
@@ -447,6 +502,7 @@ def predict_rows(
                 ceiling=np.full(rows.height, farm_ceiling(farm, band, cutoff), dtype=np.float32),
             )
             out = np.empty((rows.height, len(c310.LEVELS)), dtype=np.float32)
+            extra = np.empty((rows.height, common.N_LEVELS), dtype=np.float32)
             for s in range(0, rows.height, INFERENCE_CHUNK):
                 batch = to_batch(
                     piece=piece,
@@ -455,7 +511,31 @@ def predict_rows(
                     need_members=need_members,
                     rows=slice(s, s + INFERENCE_CHUNK),
                 )
-                out[s : s + INFERENCE_CHUNK] = net.quantiles(model=model, batch=batch).cpu().numpy()
+                if config.member_wise:
+                    marginal, paths = member_wise_quantiles(
+                        model=model, batch=batch, columns=config.columns, stats=stats
+                    )
+                    out[s : s + INFERENCE_CHUNK] = marginal
+                    extra[s : s + INFERENCE_CHUNK] = paths
+                else:
+                    out[s : s + INFERENCE_CHUNK] = (
+                        net.quantiles(model=model, batch=batch).cpu().numpy()
+                    )
+                    if write_paths:
+                        extra[s : s + INFERENCE_CHUNK] = (
+                            net.quantiles(model=model, batch=batch, levels=PATH_LEVELS_T)
+                            .cpu()
+                            .numpy()
+                        )
+            if write_paths:
+                path_arrays.append(
+                    {
+                        "values": extra,
+                        "rank": np.argsort(
+                            np.argsort(members[:, :, 0], axis=1, kind="stable"), axis=1
+                        ).astype(np.uint8),
+                    }
+                )
             frames.append(
                 rows.select("time", "init_time", "lead_hours").with_columns(
                     time_series_id=pl.lit(farm),
@@ -470,7 +550,64 @@ def predict_rows(
                     },
                 )
             )
-    return pl.concat(frames)
+    table = pl.concat(frames)
+    if write_paths:
+        save_paths(arm=arm, seed=seed, start=start, arrays=path_arrays)
+    return table
+
+
+def member_wise_quantiles(
+    *, model: net.UnifiedNet, batch: net.Batch, columns: tuple[str, ...], stats: dict
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the equal-weight 51-member mixture's 11 quantiles and the 51 member paths of each row.
+
+    Each member alone goes through the network. Member m's path value is the quantile of that
+    member's own mixture at level `MEMBER_LEVELS[m]`, which is fixed for the member across rows.
+    """
+    n, k = len(batch.x), common.N_MEMBERS
+    weights, means, stds = [], [], []
+    with torch.no_grad():
+        for j in range(k):
+            member = torch.full((n,), j, dtype=torch.long, device=DEVICE)
+            log_w, mean, std, _ = model.parameters_of(
+                with_member(batch=batch, member=member, columns=columns, stats=stats)
+            )
+            weights.append(log_w.exp().double() / k)
+            means.append(mean.double())
+            stds.append(std.double())
+        w, mean, std = (torch.cat(t, dim=1) for t in (weights, means, stds))
+        ceiling = batch.ceiling.double()[:, None]
+        marginal = net.bisect_gaussian_mixture(
+            w=w, mean=mean, std=std, levels=net.LEVELS.to(DEVICE)
+        ).clamp(min=0.0)
+        marginal = torch.minimum(marginal, ceiling)
+        w3 = torch.stack(weights, dim=1) * k  # (n, k, 3), each member's own weights
+        m3, s3 = torch.stack(means, dim=1), torch.stack(stds, dim=1)
+        levels = MEMBER_LEVELS_T[None, :].expand(n, -1).reshape(n * k, 1)
+        paths = net.bisect_gaussian_mixture(
+            w=w3.reshape(n * k, 3),
+            mean=m3.reshape(n * k, 3),
+            std=s3.reshape(n * k, 3),
+            levels=levels,
+        ).reshape(n, k)
+        paths = torch.minimum(paths.clamp(min=0.0), ceiling)
+    return marginal.cpu().numpy(), paths.cpu().numpy()
+
+
+def save_paths(
+    *, arm: str, seed: int, start: datetime, arrays: list[dict[str, np.ndarray]]
+) -> None:
+    """Write the job's 51-level quantiles (or member paths) and member shortwave ranks, atomically."""
+    path = common.PRED_DIR / arm / f"paths_s{seed}_{start:%Y-%m}.npz"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with tmp.open("wb") as handle:
+        np.savez(
+            handle,
+            values=np.concatenate([a["values"] for a in arrays]),
+            rank=np.concatenate([a["rank"] for a in arrays]),
+        )
+    tmp.replace(path)
 
 
 def pred_path(*, arm: str, seed: int, start: datetime) -> Path:
@@ -485,7 +622,7 @@ def run_job(*, arm: str, config: common.Config, seed: int, start: datetime) -> s
         return f"{arm} s{seed} {start:%Y-%m} skipped"
     began = time.time()
     cutoff = start - timedelta(days=f310.REFIT_GAP_DAYS)
-    need_members = config.member_route or config.plant != "none"
+    need_members = config.needs_members
     pieces = [
         ens_piece(farm=f, band=b, cutoff=cutoff, need_members=need_members)
         for f in c310.FARMS

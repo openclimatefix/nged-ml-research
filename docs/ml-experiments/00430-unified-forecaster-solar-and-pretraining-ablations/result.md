@@ -161,10 +161,9 @@ page is extended in the same pull request before those fits start.
 
 ## Lead range
 
-**The tables reach day 10, so every contrast is read at days 1 to 10 and, beside it, in the 12 to
-36 hour band (day 1).** The maintainer also asked for results out to day 14 if possible. That needs
-experiment 310's tables and the member arrays rebuilt to day 14, which this plan leaves as a
-follow-up decision for the manager.
+**Every contrast is read at days 1 to 10 and, beside it, in the 12 to 36 hour band (day 1).** Days
+11 to 14 are not scored, because experiment 310's tables stop at day 10 and rebuilding them was
+judged not worth it for an optional extension.
 
 ## Recipe
 
