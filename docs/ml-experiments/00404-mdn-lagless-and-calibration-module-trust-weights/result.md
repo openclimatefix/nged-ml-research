@@ -1,12 +1,15 @@
 ---
 id: "00404"
 slug: mdn-lagless-and-calibration-module-trust-weights
+title: >-
+  Does a learned trust weight for each lagged power reading improve the mixture density network
+  forecast around load-shift events?
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
   - production-reference-and-best-guess
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -108,14 +111,162 @@ metric: >-
   CRPS from the 11 quantiles (as the protocol computes it) with the exact mixture CRPS beside it;
   coverage and pinball loss at q01, q05, q95, and q99, raw and at the 1.15 widening; 5-95% width;
   the lag-encroachment sweep of experiment 395 Part E; and the trust weights.
+verdict: not supported
+best_arm: >-
+  None separates from B-mix, a fixed 50/50 mixture of the plain network and the lagless table.
+  Attention over the lags (B3) and learned windows over the surprise series (B6) are nominally 0.16
+  and 0.12 points of capacity ahead of B-mix on real harm rows at the signed-MW six, with intervals
+  that include zero.
+headline: >-
+  B1 (a learned trust weight for each lag) minus B0 (a constant weight) on real harm rows at the
+  signed-MW six is +0.03 points of capacity, interval -0.29 to +0.35, across 5 months and 7 cells.
+  No trust network beats B-mix with an interval that excludes zero, and B1's trust weights are 0.92
+  outside real events and 0.94 inside them.
+lessons: >-
+  Giving B1 the true event flags (B1o) lowers its harm-row score by only 0.09 points and its trust
+  inside events does not fall, so the limit lies in the calibration module, the lagless forecast, or
+  the mixture rule, and not in detecting events.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  A fixed 50/50 mixture of the plain network and the lagless forecast scores as well as every trust
+  network we trained, so the learned trust weights do not yet earn their complexity. Across 5 test
+  months, no arm beats this mixture with an interval that excludes zero on real harm rows, real
+  clean rows, or rows inside real events at the six substations that report signed power. Attention
+  over the lags and learned windows are nominally 0.12 to 0.16 points of capacity ahead on harm
+  rows, with intervals that include zero. The trust weights are almost inert, even when given the
+  true event flags. Every number is interim and unaudited.
+advice:
+  - >-
+    Do not port a trust head to the live service on this evidence; if a later experiment tests
+    attention over the lags or learned windows, compare it with the fixed 50/50 mixture and report
+    the absolute score beside every contrast.
 code: ml-experiments/00404-mdn-lagless-and-calibration-module-trust-weights/
 ---
 
-**Take-home message (to be written when the result is known).**
+**Take-home message (interim and unaudited: 5 scored months, 1 to 3 seeds per month, no Bonferroni
+correction): a fixed 50/50 mixture of the plain network and the lagless forecast (B-mix) scores as
+well as every trust network we trained, so the learned trust weights do not yet earn their
+complexity.** No arm beats B-mix with a 95% interval that excludes zero on real harm rows, real
+clean rows, or rows inside real events at the signed-MW six. Attention over the lags (B3) and
+learned windows over the surprise series (B6) are nominally 0.16 and 0.12 points of capacity ahead
+of B-mix on real harm rows, with intervals that include zero. The trust weights themselves are
+almost inert: B1's mean combined trust is 0.92 outside real events and 0.94 inside them, and B1o,
+which is given the true event flags, shows no lower trust inside events either. The batch 1 stop
+rule did not fire (B1 minus B0 on harm rows is +0.03, interval -0.29 to +0.35), so the gain a trust
+head adds over a constant lag weight is not visible in this screen. The maintainer decides whether
+B3 or B6 is worth carrying into the lag-trust evaluation, which is held until several design
+iterations are done.
 
-This page is the plan. It is committed before any network is fitted, so the commit order proves the
-predictions came first. It follows the revised experiment 2 of the weekend programme brief
-(revised after Opus and Sonnet design reviews; the maintainer has not yet approved the revision).
+![Each arm minus B-mix at the signed-MW six](figure_1_signed_mw_six.svg)
+
+## Results
+
+The tables below read the pooled contrasts of `e00404_pool.py` (pushed with this page). Each
+contrast is the mean over the arm's cells of the arm's score minus the reference arm's score on the
+same rows, in points of capacity (negative is better than the reference), with a 95% interval from
+resampling whole months. A cell is one scored month and one seed. B-mix, A0-inj, B0, B1, B1o, B3, and
+S1 have all 7 cells (2026-06 seeds 0 to 2; 2026-03, 2026-01, 2025-12, and 2025-10, seed 0). B4c and
+B6 have 5 cells (the five months, seed 0). B7 has 1 cell (2026-06, seed 0). Every interval is wide
+because it rests on at most five months, so none of it is a claim.
+
+**No arm separates from B-mix at the signed-MW six.** B-mix is a fixed mixture of the saved A0-inj
+network's forecast and the cross-fitted lagless table's forecast, each with weight one half.
+
+| Arm | Real harm rows | Real clean rows | Rows inside real events |
+|---|---|---|---|
+| A0-inj | +0.19 [-0.02, +0.40] | +0.35 [+0.17, +0.60] | +0.20 [+0.03, +0.33] |
+| B0 | +0.06 [-0.57, +0.68] | +0.43 [-0.01, +1.05] | +0.27 [-0.18, +0.72] |
+| B1 | +0.09 [-0.26, +0.39] | +0.34 [-0.11, +0.90] | +0.49 [+0.21, +0.79] |
+| B1o | 0.00 [-0.49, +0.49] | +0.22 [-0.17, +0.75] | +0.24 [-0.17, +0.57] |
+| B3 | -0.16 [-0.63, +0.25] | +0.21 [-0.06, +0.68] | -0.06 [-0.47, +0.24] |
+| S1 | +0.19 [-0.13, +0.45] | +0.31 [+0.05, +0.61] | +0.16 [-0.26, +0.50] |
+| B4c (5 cells) | -0.12 [-0.69, +0.40] | +0.23 [-0.04, +0.49] | +0.17 [-0.20, +0.61] |
+| B6 (5 cells) | -0.12 [-0.50, +0.26] | +0.17 [-0.06, +0.46] | +0.16 [-0.18, +0.51] |
+| B7 (1 cell) | -0.03 | +0.04 | +0.98 |
+
+Score minus B-mix at the signed-MW six, in points of capacity. B-mix's own scores are 3.79 on real
+harm rows, 3.37 on real clean rows, and 5.03 inside real events (the values for the arms with 5
+cells are measured against B-mix on those 5 cells).
+
+![Each arm minus B-mix at the MVA-only eight](figure_2_mva_only_eight.svg)
+
+**B-mix is clearly ahead at the MVA-only eight.** Every arm is worse than B-mix on real clean rows
+there (B3 +0.14 [-0.05, +0.34], the best; B0 +0.48 [+0.30, +0.65]), and on real harm rows (B3 +0.29
+[-0.17, +0.85]; B4c +0.52 [+0.07, +1.32]). Three of the seven cells hold a single real harm event
+at the MVA-only eight.
+
+![Per-cell difference from B-mix on real harm rows](figure_3_per_cell_harm_rows.svg)
+
+**The pooled differences hide a large spread between cells.** B3's difference from B-mix on real
+harm rows runs from -1.09 to +0.53 across the 7 cells, and the cells with a single real harm event
+(diamonds) carry the largest values in both directions.
+
+![Absolute scores beside B-mix](figure_4_absolute_scores.svg)
+
+**B3 and B6 beat B1 on real harm rows and inside real events.** The contrast against B1 at the
+signed-MW six: B3 minus B1 is -0.24 [-0.52, +0.03] on harm rows and -0.56 [-0.75, -0.36] inside
+events (7 cells); B6 minus B1 is -0.16 [-0.26, -0.03] and -0.31 [-0.58, -0.02] (5 cells). B0 minus B1
+is -0.03 [-0.35, +0.29] on harm rows, so B1's learned weights do no better than B0's constant weights.
+
+**The trust weights are almost inert, even given the true event flags.** The mean over the 7 cells
+of the geometric mean of B1's three trust weights is 0.92 on real rows whose lags lie outside real
+events (padded) and 0.94 inside them, so the inert rule (outside minus inside under 0.1) fires. B1o
+gives 0.91 outside and 0.90 inside. B0's constant weight is 0.98 everywhere.
+
+**Reading of the oracle control.** B1o, with the true per-lag event flag as three extra trust-head
+inputs, scores 0.00 [-0.49, +0.49] against B-mix on real harm rows and +0.24 [-0.17, +0.57] inside
+real events, against B1's +0.09 and +0.49. Having the exact flags helps B1 by 0.09 on harm rows
+(-0.09 [-0.29, +0.10]) and by 0.26 inside events (-0.26 [-0.48, -0.05]) but still leaves B1o
+behind B-mix inside events. We read this as evidence that the limit is in the calibration module,
+the lagless forecast, or the mixture rule, and not in detecting events. Only the B1 version of the
+oracle exists; the attention version was dropped.
+
+![Primary D5, January 2026, day-ahead forecasts around a real event](figure_5_event_D5_2026-01_112321.svg)
+
+![Primary D5, January 2026, second real event](figure_6_event_D5_2026-01_111746.svg)
+
+![Primary D5, October 2025, real event](figure_7_event_D5_2025-10_107175.svg)
+
+![Primary D14, October 2025, real event](figure_8_event_D14_2025-10_106721.svg)
+
+![Primary D16, January 2026, real event](figure_9_event_D16_2026-01_112194.svg)
+
+![Primary D14, March 2026, real event](figure_10_event_D14_2026-03_114748.svg)
+
+**The encroachment sweep shows B1 and B0 follow a shifted lag more than A0-inj does.** A step of 5%
+of capacity added to the newest 3 lags moves the median of A0-inj by 0.12 of the step, of B1 by 0.22,
+and of B0 by 0.25 (lead band 0, 2026-06 seed 0). Band widths stay within 0.99 and 1.03 of their
+unshifted width for all arms, and the masked-lag control moves by 0.0 (about 1e-8) for B0 and B1.
+This is one month and one seed, and the sweep was not run for B3, B6, or S1.
+
+**Which pre-registered predictions held (signed-MW six, real harm rows unless stated).**
+
+| Prediction | Observed | Verdict |
+|---|---|---|
+| P1: B1 minus A0-inj between -0.05 and -0.2 | -0.10 [-0.40, +0.22] | holds, interval includes 0 |
+| P2: B1 minus B0 between -0.05 and -0.3 | +0.03 [-0.29, +0.35] | fails |
+| P3: B1 minus A0-inj on clean rows under 0.05 | -0.01 | holds |
+| P4: trust outside minus inside events at least 0.1 | -0.03 | fails (inert rule fires) |
+| P5: B1 beats B2 | B1 minus B2 -0.76 (one cell) | holds on 1 cell |
+| P7: A0-inj minus A0 below -0.1 on harm rows | +0.22 (one cell) | fails on 1 cell |
+| P8: B5 within 0.03 of B1 outside events | B5 minus B1 +0.12 (one cell) | fails on 1 cell |
+| P9: B3 beats B2 by under 0.1 | -0.74 on 2026-06 seed 0 | beats by more than predicted |
+| P10: B4a to B4c within 0.1 of B1 | B4c minus B1 -0.16 [-0.50, +0.18]; B4a -0.18; B4b +0.29 | fails |
+| P11: B6 within 0.1 of B1 | -0.16 [-0.26, -0.03] | fails: B6 gains |
+| P12: B7 lowers harm-row CRPS by under 0.05 | +0.13 (one cell) | fails on 1 cell |
+| P13: B1m within 0.1 of B1 | +0.06 (one cell) | holds on 1 cell |
+| P16: B1 minus B3 between -0.05 and +0.05 | +0.24 [-0.03, +0.52] | fails |
+
+P6 (the MVA-only eight is inert) and the batch 0 prediction P0 are not tested on this page. B8, B9,
+B1-rw, and B1-nn were not run, and neither were P14 and P15.
+
+**Deviations from the plan.** The batch 1 stop rule did not fire, and batch 2 ran on the manager's
+direction ("iterate rather than stop"). B-mix, S1, B1g (B1 plus the gap between the lagged and
+lagless means), B1o, and the encroachment sweep were added after the plan was written. B1g is
+indistinguishable from B1 (harm rows -0.17 and -0.16 against B-mix on 2026-06 seed 0). Training and
+scoring worlds come from experiment 428's injected worlds, and the lagless tables were cross-fitted
+with K=6 contiguous blocks.
 
 ## Question
 
