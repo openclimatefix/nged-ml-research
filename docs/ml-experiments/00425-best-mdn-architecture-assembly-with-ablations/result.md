@@ -51,11 +51,13 @@ decision_rule: >-
   MVA-only eight. C1 supports the hypothesis if its interval is wholly below -0.03 at the
   signed-MW six; it is partly supported if only the eight meets that bar or the point estimate
   passes with an interval reaching zero (experiment 418's six-Primary interval ended at -0.030, so
-  this is close to a coin flip); not supported otherwise. C2 and C3 are checks: if C2's interval reaches zero or C3 reverses sign, the page reports an audit trigger and does not claim the
+  this is close to a coin flip); not supported otherwise. C2 and C3 are checks: if C2's interval
+  reaches zero or C3 reverses sign, the page reports an audit trigger and does not claim the
   component helps. No adoption is sought.
 benchmark: >-
   R, the ENS-only pooled plain network refitted here under the standing D15 and D18 cut; S0M (the
-  monthly XGBoost recipe, experiment 389's stored arm S0M read through experiment 397's references, with its cut status and widening
+  monthly XGBoost recipe, experiment 389's stored arm S0M read through experiment 397's references,
+  with its cut status and widening
   stated on the page), BG2, `manual_heuristic`, and `climatology` as absolute-skill references,
   scored on the half-hours they share.
 row_set_id: fold_a_daily_gap_v1
@@ -126,5 +128,9 @@ solar-summary arm is dropped because 419 did not support it and it needs new pre
 
 ## Review log
 
-- **Plan review (Sonnet).** Accepted: refit all arms under the cut (418's forecasts lack it and the widening); cite 406's embedding cost; S0M source; decision-rule wording; drop the solar arm. 
-- **Code review (Sonnet).** No leakage or cut defect. Accepted: log writes made atomic, `--no-cut` needs explicit months and seeds, C2 trigger also fires when its interval reaches zero. Stated limits for the write-up: flagged zeros among the origin lags still reach the network at inference (as in experiment 407); contrast intervals pool half-hours while tables average over Primaries.
+- **Plan review (Sonnet).** Accepted: refit all arms under the cut (418's forecasts lack it and the
+  widening); cite 406's embedding cost; S0M source; decision-rule wording; drop the solar arm.
+- **Code review (Sonnet).** No leakage or cut defect. Accepted: log writes made atomic, `--no-cut`
+  needs explicit months and seeds, C2 trigger also fires when its interval reaches zero. Stated
+  limits for the write-up: flagged zeros among the origin lags still reach the network at inference
+  (as in experiment 407); contrast intervals pool half-hours while tables average over Primaries.
