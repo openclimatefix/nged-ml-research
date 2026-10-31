@@ -28,7 +28,10 @@ prediction: >-
   six, but its target was standardised with each Primary's own mean and standard deviation, which
   a network with no Primary input cannot invert. With one global target scale, E3g (embedding,
   three origin lags) lands within 0.05 points of experiment 406's pooled network with the
-  embedding (U0) at both groups. P2. The no-embedding network with three origin lags (N3g) loses
+  embedding (E406) at both groups (a failure of P1 on noise alone is possible, since stored pooled
+  scores differ
+  by 0.03 between experiments, and then P2 to P5 are still read against E3g, not E406). P2. The
+  no-embedding network with three origin lags (N3g) loses
   less than half of that 0.789 to E3g at the signed-MW six (N3g minus E3g at most +0.39) and less
   than half of 0.809 at the MVA-only eight (at most +0.40), because the lags carry the level.
   P3. The 7-day encoder (NH, no embedding, three origin lags plus the encoder) scores at least 0.15
@@ -36,8 +39,11 @@ prediction: >-
   encoder) at both groups. P5. EH is no more than 0.05 points below E3g at either group (once the
   identity is known, the 7 days add little). P6 (probe). A linear classifier on the encoder's
   32-wide output recovers the Primary of an origin with an accuracy of at least 0.90 on held-out
-  weeks, against at most 0.50 for the same classifier on the three origin lags, and recovers the
-  month of the year to within one month at least 0.60 of the time. P7. NH0 (no embedding, the
+  weeks, against at most 0.50 for the same classifier on the three origin lags, (chance 1 in 16),
+  and recovers the
+  month of the year to within one month at least 0.60 of the time (chance 3 in 12), a claim of
+  interpolation only, because held-out weeks come from months the probe trained on. P7. NH0 (no
+  embedding, the
   encoder but no origin lags) is within 0.05 points of NH at both groups, because experiment 388
   found that dropping the newest reading changes the days 1 to 10 score by -0.022 and +0.001. P8
   (held-out Primaries, run only if the advance rule below holds). For a Primary left out of
@@ -47,12 +53,21 @@ decision_rule: >-
   Each contrast is read per group (signed-MW six; MVA-only eight with and without D8; D15 and D18
   report-only) on CRPS at days 1 to 10 (days 11 to 14 descriptive), paired by fold and seed, with
   the month-block bootstrap of `studies.eval_protocol` at a 95% level Bonferroni-corrected across
-  the eight planned contrasts (99.375%), 20,000 resamples. Planned contrasts. C1 E3g minus U0. C2
+  the nine planned contrasts and two groups (99.72%), 20,000 resamples. Planned contrasts. C1 E3g
+  minus E406. C2
   N3g minus E3g. C3 NH minus N3g. C4 EH minus E3g. C5 NH minus EH. C6 NH0 minus NH. C7 (held-out
   Primaries, six and eight) NH minus E3g with the mean embedding. C8 (held-out Primaries) NH minus
-  N3g. The five screen months give wide intervals, so every number is interim and no claim of
-  benefit rests on it. The hypothesis is supported if P3 and P6 both hold, partly supported if
-  exactly one holds, and not supported if neither holds. The held-out stage (C7, C8) advances only
+  N3g. C9 NH minus NHs (shuffled history). The five screen months give wide intervals, so every
+  number is interim and no claim of
+  benefit rests on it. Each prediction is read on the point estimate of its contrast, and C3
+  must also have an interval wholly below zero. The hypothesis is supported if P3, P4, and P6 all
+  hold (the encoder helps the embedding-free network, nearly closes the gap to the embedding, and
+  carries the Primary's identity), partly supported if exactly two hold, and not supported
+  otherwise. P8 is reported separately and decides only the claim that the history serves a Primary
+  never seen. If the linear probe on the raw history scores as high as the probe on the encoder, the
+  page says the identity is in the data and the encoder did not create it. A shuffled-history arm
+  (NHs) guards against a gain from extra capacity: C9, NH minus NHs, must lie below zero for P3 to
+  count. The held-out stage (C7, C8) advances only
   if the probe recovers the Primary at accuracy 0.50 or higher on held-out weeks, or C3 is at most
   -0.10 points at the signed-MW six; otherwise it is skipped and the page says that no fingerprint
   was found. The smallest gain worth porting the encoder into a research default is 0.03 points at
@@ -60,7 +75,7 @@ decision_rule: >-
   module and a per-origin history table to the pipeline. No adoption is sought from this
   experiment.
 benchmark: >-
-  Experiment 406's pooled network with the embedding (U0, `pooled_emb`) and with no embedding
+  Experiment 406's pooled network with the embedding (E406, `pooled_emb`) and with no embedding
   (`pooled_noemb`), and its per-Primary network, on the same half-hours; BG2, `manual_heuristic`,
   and `climatology` as absolute-skill references; experiment 397's stored forecasts of the monthly
   XGBoost control.
@@ -120,20 +135,26 @@ origin lags (`lag_origin`, `lag_same_time_latest_day`, `lag_same_time_latest_wee
 age and missing flag), `H` is the 7-day encoder, `E` is the 8-wide Primary embedding, and `N` is no
 embedding.
 
-- **U0 (stored).** Experiment 406's pooled network with the embedding and per-Primary targets
+- **E406 (stored).** Experiment 406's pooled network with the embedding and per-Primary targets
   (`pooled_emb`). Zero fits; read with `experiment_store.read_predictions`.
 - **E3g.** Embedding, three origin lags, global target. The control for everything below.
 - **N3g.** No embedding, three origin lags, global target. Experiment 406's `pooled_noemb` made
   scale-fair.
 - **NH.** No embedding, three origin lags, and the 7-day encoder. The arm the hypothesis names.
 - **EH.** Embedding, three origin lags, and the 7-day encoder.
+- **NHs.** As NH, but each origin's history is that of a different Primary on the same run day (a
+  fixed derangement of the Primaries, the same for training and scoring). It has the encoder's
+  capacity without the Primary's own history, so NH minus NHs separates information from capacity.
 - **NH0.** No embedding, the 7-day encoder, and no origin lags. Tests whether the history makes the
   lags redundant, as experiment 388's arm E suggests.
 - **Held-out stage (advance rule above).** Arms N3g, NH, E3g, and EH, each fitted four times per
   fold and seed with one quarter of the Primaries (every fourth, by index) left out of training
   entirely, and scored only on that quarter. E3g and EH have no embedding for an unseen Primary and
-  receive the mean embedding of the Primaries they trained on (a placeholder, named in the
-  tables). Left-out Primaries are also scored against `climatology` and `manual_heuristic`.
+  receive the mean embedding of the Primaries they trained on (a placeholder), and a second
+  forecast from the same network uses the mean embedding within the left-out Primary's metering
+  group (a stronger placeholder). Both are named in the tables. The code prints which Primaries
+  fall in each quarter, and the tables say how many signed-MW and MVA-only Primaries each holds.
+  Left-out Primaries are also scored against `climatology` and `manual_heuristic`.
 
 **The probe.** After each fit of NH, EH, and NH0, a linear softmax classifier is trained on the
 frozen 32-wide encoder output of every training origin to predict the Primary (16 classes) and the
@@ -193,8 +214,9 @@ random initialisation. A chance level is printed beside each accuracy.
 
 ## Fit counts, time, and memory
 
-- **Main stage.** 5 new arms (E3g, N3g, NH, EH, NH0) by 5 folds by 3 seeds is 75 pooled fits, and
-  U0 adds none.
+- **Main stage.** 6 new arms (E3g, N3g, NH, NHs, EH, NH0) by 5 folds by 3 seeds is 90 pooled fits,
+and
+  E406 adds none.
 - **Held-out stage.** 4 arms by 4 quarters by 5 folds by 2 seeds is 160 pooled fits (seeds 0 and 1
   only, because each fit trains on 12 Primaries). It runs only if the advance rule holds.
 - **Probes.** 45 probe sets (3 encoder arms by 5 folds by 3 seeds), each a few seconds on the GPU.
@@ -212,7 +234,7 @@ random initialisation. A chance level is printed beside each accuracy.
 
 ## Checks the write-up reports
 
-- Absolute CRPS of every arm beside U0, experiment 406's per-Primary network, BG2,
+- Absolute CRPS of every arm beside E406, experiment 406's per-Primary network, BG2,
   `manual_heuristic`, and `climatology`, per group and per Primary.
 - The median forecast minus the mean forecast per Primary, the error of the mean forecast beside
   every quantile-score contrast, and which audit triggers fired.
