@@ -192,6 +192,46 @@ how well the re-ordered scenarios match the observed joint behaviour. We fit not
 - **Reviews.** Sonnet plan review; Sonnet code review before the first run; Sonnet results review
   (re-derives the headline numbers); two Sonnet write-up reviews.
 
+## Details registered after the plan review
+
+- **Leakage rules.** The copula correlation and the mixing weight are both re-selected inside each
+  held-out-month fit, from the other months only (nested). The Schaake pools (J3, J4) hold only dates
+  strictly earlier than the run date, at least 16 days earlier so that every path ends before the run
+  (J3) and at least 5 days earlier for ERA5 (J4). J4 matches member k's forecast weather to the past
+  observed ERA5; it never reads observed weather at the run date. A pool starts on 2025-03-01 and is
+  thin for the earliest runs (about 6 months, seasonally mismatched); if fewer than 51 dates qualify,
+  the nearest dates repeat cyclically, as in experiment 434, and the pool size per run is reported.
+- **Bootstrap.** The resampling unit is the calendar month, with each month's score the mean over its
+  runs; the number of runs per month is printed. With about 10 months the 98.75% interval is close to
+  the range of the resampled means, so "straddles the margin" is the likely outcome and the page says
+  so. A run-level block bootstrap (blocks of 2 weeks) is reported beside it as a sensitivity check.
+- **Margin.** Relative gap = (J1 score minus J0 score) divided by J0's score, per block at each lead
+  window (not per slice); margin = a quarter of it, bounded to 2% to 5%. The gap is computed from the
+  data before any contrast is read. J0 is the reference of every coherence contrast.
+- **Decision rule details.** A construction must first pass the coherence gate. "Within the margin of
+  the best" means the interval of the difference to the best includes no value beyond the margin.
+  "No worse on the exceedance Brier score" means the point estimate is not higher than the best's by
+  more than 5% of J0's score and the interval of the difference includes zero. "Rank histograms no
+  worse than J3's" means the average-rank histogram's distance from flat is below J3's in the
+  bootstrap's median. J6-median is a diagnostic and is not ranked.
+- **Expected sizes.** Demand: the J1-to-J0 gap on the joint block about 11% (experiment 434), so a
+  margin about 2.8%. Farms: Schaake against ECC 9% to 13% lower on the variogram score (experiments
+  429, 430), and J5 closing at least a third of that gap to J3. Spread-skill ratio of the
+  calibrated scenarios near 1; J6's between-member share of variance below 50%. The dependence-check
+  difference ranks J1 worst, then J2, and J3 or J5 best. P5's direction: the point estimate favours J3
+  or J5 over J0 on simultaneous exceedance.
+- **Per-family reporting.** C1 to C3 are also reported for demand, wind, and solar separately, as
+  descriptive results without Bonferroni correction; the verdicts use the pooled contrasts.
+  Expected outcome of tier 2: dropped (P1 predicts J4 ties J3 for demand); the gating block is the
+  joint block at days 1 to 10.
+- **Alignment.** 702 half-hours is lead 0.5 to 351 hours, the 14.6-day horizon of experiment 434. If a
+  family's run for a date used a different ensemble run, the builder aligns by valid time and flags
+  the date; the count is reported.
+- **Slices and proxy file.** Daylight is the local mid-day band and a cold night is the shared slice
+  table's flag, as in experiment 434. The group limit proxies are written to
+  `proxies.json` in the experiment's folder and committed before the first scoring run. Curtailment
+  volume is compared with the realised volume by absolute error per group and run.
+
 ## Results
 
 To be written after the run.
