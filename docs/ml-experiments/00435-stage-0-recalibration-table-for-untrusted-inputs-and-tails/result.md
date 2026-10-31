@@ -54,7 +54,10 @@ metric: >-
 **Plan only; no score has been read.** The steps follow the Stage 0 brief of 2026-10-31.
 
 - Step 1: build NRA-corrected actuals for the scored months of experiment 428's four folds and
-  2025-12, with the 0.75 and 1.25 depth variants and the count of dropped events.
+  2025-12. The step removed from each event is the measured deviation (experiment 402's
+  measurement and filters) where one exists, and the labelled depth otherwise. The 0.75 and 1.25
+  variants scale the used step, so they are centred on the measured deviation. The page reports
+  how many events have a measured deviation (34 of 184) and the count of dropped events (0).
 - Step 2: tail-coverage diagnostics on stored forecasts of experiments 425, 429, and 430.
 - Step 3: fit table P once the cross-fit table of experiment 404 is frozen (commit 63d3799f) and
   experiment 428 seeds 1 and 2 are scored; apply it to the stored forecasts of 410, 422, 425, 428,
@@ -62,3 +65,14 @@ metric: >-
 - Step 4: pool the three seeds of experiment 428 and report the band-width ratio and coverage on
   harm rows against clean rows.
 - Compute: no fits, one CPU core, `nice 19`, under 16 GB of memory.
+
+## Conditions from the load-shift review (2026-10-31)
+
+- **Event durations are checked.** The label table has a median duration of 48.2 hours, and 10.7%
+  of its 112 rows last longer than 7 days (0.125 of the 184 event rows), which matches the figures
+  the review quoted.
+- **The true rate of genuine level changes is unmeasured.** The write-up states this, and the
+  injected-rate sweep (2% and 5% of training rows) belongs to Brief B.
+- **Clean-row and harm-row results are lower bounds.** NGED's logs miss some events, so rows
+  labelled clean may hold unlogged events, and every coverage figure on the page is reported as a
+  lower bound on the shortfall.
