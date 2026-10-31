@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [446](../../00446-honest-bands-and-tail-calibration-on-the-s1-network/result.md) | Do scale-only bands trained on ambiguous jumps, and tail-calibrating changes, beat a recalibration table on the S1 network? | 1 | Experiment 435 (table P) for the "after P" rules; Brief B before Brief C | Planned; plan written, no code yet |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
