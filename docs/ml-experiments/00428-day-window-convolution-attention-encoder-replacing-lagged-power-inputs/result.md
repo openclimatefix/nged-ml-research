@@ -153,8 +153,8 @@ maps of the position vectors. A learned "no day" key and value token is always p
 window set that is entirely unobserved, or distrusted, can be ignored; the softmax runs over all
 positions of all windows shown plus the token. The context vector (width 32) is concatenated with
 the query inputs and passed to the same head as R (two hidden layers of 64, dropout 0.1, three
-Gaussians, g09), so the head is unchanged and only the input route differs. About 5,000 more
-parameters than R.
+Gaussians, g09), so the head is unchanged and only the input route differs. About 13,000 more
+parameters than R's 8,400.
 
 **Training.** Experiment 397's loop: weighted negative log-likelihood, AdamW, early stopping on a
 held-out week in every twelve (experiment 422's purge), monthly refits on the 24 months before the
@@ -233,12 +233,22 @@ origin of each test month, leads 0.5 to 240 hours.
 **The fits are 6 arms by 4 folds by 3 seeds, 72 fits, plus a fifth fold if the screen advances.**
 Experiment 397 timed the plain network at about a minute. The encoder is heavier because it reads up
 to 144 positions per row; the first task is to time one E3 fit on the GPU and on one core, and
-to choose the GPU if it is faster. If a fit exceeds 15 minutes, the plan halves the rows per epoch
-(a random half of the training rows each epoch) and says so. One GPU process under 8 GB with
+to choose the GPU if it is faster. A first timing of E3 took about 3 minutes per pass over the 4.7 million training rows of the
+2026-01 fold, so every arm trains on a random 20% of the training rows in each epoch (up to 60
+epochs, patience 8), and early stopping reads a fixed random 200,000 of the held-out rows. One GPU process under 8 GB with
 one feeder core, `MemoryMax=8G`, `OMP_NUM_THREADS=1`, `free -g` checked before each launch
 (stop line 12 GB available). Fitted networks are saved under the experiment's data folder; no stored
 fit is reused, because R's recipe differs (the cut, the injected data). Stored forecasts of
 experiments 389, 87, and the baselines are read as references only.
+
+## Design iterations
+
+The maintainer wants at least two design iterations of the tokens and the attention after the first
+screen, before any separate lag-trust evaluation runs on the saved networks. Each iteration is a
+change to the encoder (for example a second head, a window of a different length, a learned
+position code, or the trust inputs of experiment 404 as extra tokens), registered with its own
+prediction before its scores are read, and scored on the same folds and rows. This page records
+the first screen only; each iteration adds an arm and a dated section.
 
 ## Checks, reviews, and what the page will report
 
