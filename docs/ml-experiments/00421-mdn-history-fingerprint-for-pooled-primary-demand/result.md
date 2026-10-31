@@ -121,9 +121,9 @@ advice:
     embedding-free network by only 0.099 points at the signed-MW six (interval spanning zero) and
     raised the embedding network's score by 0.162 (C3, C4).
   - >-
-    Keep the Primary embedding in pooled networks that train on every Primary, because the network
-    with the embedding beat every embedding-free arm by 0.14 to 0.42 points at the signed-MW six
-    (C2, C5).
+    Keep the Primary embedding in pooled networks that train on every Primary, because E3g beat
+    the embedding-free arms by 0.33 to 0.42 points at the signed-MW six, and EH
+    beat them by 0.16 to 0.26 (C2, C5).
   - >-
     Allow more than 40 epochs, or check the stop, for embedding-free arms, because N3g reached the
     cap in 7 of 15 fits and may be under-trained.
@@ -152,7 +152,8 @@ from five test months, so all are interim.
 ## Results
 
 CRPS at days 1 to 10, mean over Primaries with equal weight, in points of capacity (smaller is
-better). Three seeds averaged in quantile space. All arms use the D15 and D18 start cut.
+better). Three seeds averaged in quantile space (two for the left-out tables). All arms use the D15
+and D18 start cut.
 
 | Arm | Label | Encoder | Origin lags | Signed-MW six | MVA-only eight | D15 and D18 |
 |---|---|---|---|---|---|---|
@@ -204,14 +205,14 @@ better). Three seeds averaged in quantile space. All arms use the D15 and D18 st
 - **Held-out contrasts (99.72% intervals).** C7 NH minus E3g with the mean label: -0.735 (-2.695 to
   +0.562) at the six, -2.382 (-3.115 to -1.844) at the eight. C8 NH minus N3g: +0.474 (-0.095 to
   +1.099) at the six, +0.081 (-0.084 to +0.220) at the eight, +2.382 at D15 and D18 (+0.863 to
-  +3.865). Leaving a Primary out costs N3g 0.58 points at the six (3.739 to 4.318) and 0.89 at the
-  eight (4.424 to 5.317).
+  +3.865). Leaving a Primary out costs N3g 0.58 points at the six (3.739 with three seeds to 4.318
+  with two) and 0.89 at the eight (4.424 to 5.317).
 - **Tails (all leads; raw / widened by 1.15).** At the six, q95 coverage is 0.859 / 0.895 for E3g,
   0.903 / 0.931 for N3g, 0.885 / 0.913 for NH, and 0.866 / 0.900 for EH; q99 coverage is 0.941 /
   0.960, 0.972 / 0.982, 0.953 / 0.969, and 0.947 / 0.965. The encoder arms put too many outcomes
-  below q01 (0.020 to 0.021 raw against 0.015 for E3g, nominal 0.010). The pinball losses are in
-  `report_main.log` in the private folder. The lower tail at sunny, low-demand half-hours and the
-  avoidable-curtailment cost were not computed in this experiment.
+  below q01 (0.020 to 0.028 raw across NH, EH, NH0, and NHs against 0.015 for E3g, nominal 0.010).
+  The pinball losses are in `report_main.log` in the private folder. The lower tail at sunny,
+  low-demand half-hours and the avoidable-curtailment cost were not computed in this experiment.
 
 ## Example forecasts
 
@@ -230,36 +231,41 @@ and D4 (an MVA-only Primary) in summer.
 
 - **P1 held.** E3g minus E406 is -0.007 and +0.011.
 - **P2 failed.** N3g minus E3g is +0.424 (limit +0.39) at the six and +0.584 (limit +0.40) at the
-  eight. Rescaling the target recovered about half of experiment 406's loss.
+  eight. Rescaling the target recovered 46% of experiment 406's loss at the six and 28% at the
+  eight.
 - **P3 failed.** NH minus N3g is -0.099 at the six (needed -0.15 or lower, and the interval spans
   zero).
 - **P4 failed.** NH minus EH is +0.162 at the six and +0.107 at the eight (limit +0.10).
-- **P5 held.** EH minus E3g is +0.162 and +0.173, so the encoder did not help the label network.
-- **P6 failed narrowly.** The Primary probe reaches 0.871 (needed 0.90) and the three-lag probe
-  0.280 (limit 0.50). The month probe reaches 0.719 within one month (needed 0.60), but the
-  untrained encoder already reaches 0.600.
+- **P5 held on its wording and failed on its intent.** The prediction said EH is no more than 0.05
+  below E3g. EH is 0.162 and 0.173 above E3g (worse), so the wording holds, but the intent was that
+  the 7 days add little, and they made the score worse.
+- **P6 failed narrowly.** The Primary probe on NH reaches 0.871 (needed 0.90; EH 0.853, NH0 0.899).
+  The three-lag probe stays at 0.280, which meets the limit of 0.50. The month probe reaches 0.719
+  within one month (needed 0.60), but the untrained encoder already reaches 0.600.
 - **P7 held at the six and failed at the eight.** NH0 minus NH is +0.021 and +0.075 (limit 0.05).
-- **P8 undecided.** NH minus E3g with the mean label is -0.735 at the six (needed -0.20 or lower),
-  but the interval spans zero.
+- **P8 held on the point estimate, with an interval that spans zero.** NH minus E3g with the mean
+  label is -0.735 at the six (needed -0.20 or lower; interval -2.695 to +0.562). The prediction
+  named only the six. At the eight the contrast is -2.382 (-3.115 to -1.844).
 
 ## Checks
 
 - **Median minus the mean of the 11 quantiles, per Primary.** Within 0.05 MW at 12 of 16 Primaries
-  for E3g, NH, and EH. D15 (-0.15 to -0.20 MW), D12 (-0.12 to -0.145), and D4 for E3g (-0.094) are
-  the exceptions. The mean of the stored quantiles stands in for the mean forecast, which the
-  networks do not store.
+  for E3g and 13 of 16 for NH and EH. D15 (-0.15 to -0.20 MW), D12 (-0.12 to -0.145), and D8 (-0.065
+  to -0.131; it is unproven whether the generator explains the steps and the gap) are exceptions for
+  all three arms, and D4 (-0.094) for E3g. The mean of the stored quantiles stands in for the mean
+  forecast, which the networks do not store.
 - **Error of the median beside CRPS (mean absolute error, points of capacity, six / eight).** E3g
   5.760 / 6.594, EH 6.175 / 6.762, NH 6.493 / 6.935, N3g 6.609 / 7.364. The order matches the CRPS
   order, so trigger 3 did not fire.
 - **Audit triggers.** Trigger 5 fired: EH, which contains E3g's inputs, scores 0.162 worse. Trigger
-  2 fired: P2, P3, P4, and P6 missed. A fresh Sonnet audit (`briefs/e421_audit_main.md`, private)
-  re-derived every printed score and contrast point estimate to three decimals and found no
-  leakage. EH minus E3g has the same sign in each of the three seeds (+0.155 to +0.206 at the
-  six), so the effect is not seed noise, but it flips sign in two of five folds. The encoder arms
-  stop after about 15 epochs against 33 for E3g, and EH has the worse validation loss too. The
-  audit did not test whether the encoder opens a channel for memorising each Primary's unique
-  history. Leaving out any one Primary flips no sign among C3, C4, C5, and C9, and C9 at the six
-  drops to -0.003 without D11.
+  2 fired: P2, P3, P4, and P6 missed, P5 missed in intent, and P7 missed at the eight. A fresh
+  Sonnet audit (`briefs/e421_audit_main.md`, private) re-derived every printed score and contrast
+  point estimate to three decimals and found no leakage. EH minus E3g has the same sign in each of
+  the three seeds (+0.155 to +0.206 at the six), so the effect is not seed noise, but it flips sign
+  in two of five folds. The encoder arms stop after about 15 epochs against 33 for E3g, and EH has
+  the worse validation loss too. The audit did not test whether the encoder opens a channel for
+  memorising each Primary's unique history. Leaving out any one Primary flips no sign among C3, C4,
+  C5, and C9, and C9 at the six drops to -0.003 without D11.
 - **Triage of the audit.** The audit found that the alignment check failed for D15 and D18 on 957
   rows whose history lies before the start cut. I fixed the check to compare flags only after the
   cut, and the check now passes for all 16 Primaries. The training and scores are unaffected, since
@@ -279,11 +285,22 @@ and D4 (an MVA-only Primary) in summer.
 - **Held-out stage.** Two seeds, quarters of four Primaries that mix metering groups, and D15 and
   D18 are report-only. The placeholder labels are a weak stand-in for a fitted label.
 
+## Departures from the plan
+
+- **Not reported.** The lower tail on sunny, low-demand half-hours, the avoidable-curtailment
+  cost, absolute scores beside BG2, `manual_heuristic`, and `climatology`, a per-Primary score
+  table, left-out Primaries scored against `climatology` and `manual_heuristic`, example forecasts
+  from E3g, and the share of origins whose history has a gap. The scoring scripts do not compute
+  them, and the verdict does not depend on them.
+- **Added after the plan.** The held-out stage also scored the mean embedding within the metering
+  group, and the plan's shuffled-history arm NHs was added after the plan review.
+
 ## What the next experiment should answer
 
 **Whether a label fitted from a few weeks of a new Primary's history beats the label-free network
-for onboarding.** The label-free network with three lags costs 0.58 points at the six when a
-Primary is left out, against 2.4 points for the mean-label placeholder. An experiment that fits only
+for onboarding.** The label-free network with three lags loses 0.58 points at the six when a
+Primary is left out, against 2.21 points for E3g given the mean-label placeholder (5.527 against
+3.315). An experiment that fits only
 the new Primary's label on its first 4 to 12 weeks, with the rest of the network frozen, would
 settle that. The maintainer has ranked onboarding low, so this is a proposal only.
 

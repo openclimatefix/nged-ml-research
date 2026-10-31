@@ -149,7 +149,7 @@ def draw_headline() -> None:
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
         .mark_rule(strokeDash=[4, 4], color="grey")
-        .encode(x="x:Q")
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )  # ty: ignore[unresolved-attribute]
     chart = (bars + dots + zero).properties(
         width=480,

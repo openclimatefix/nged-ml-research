@@ -262,6 +262,13 @@ def train_network(
 ) -> tuple[models.HistoryMdn, int, float, float]:
     """Train as `e00397_fit.train_network` does, plus the history gather; return the best network.
 
+    Args:
+        model: The untrained network.
+        fold: The fold's training rows.
+        arm: The arm, which says whether the network reads the history.
+        seed: The seed of the batch order.
+        device: The torch device.
+
     Returns:
         The network, the epochs run, the best validation negative log-likelihood, and the peak GPU
         memory in GB.
