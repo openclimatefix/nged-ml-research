@@ -1,24 +1,28 @@
 # ruff: noqa: E501
-"""Coherence of 51-member paths (experiment 00429, A1): energy and variogram scores.
+"""Coherence of 51-member paths across the three farms (experiment 00429, A1).
 
     source ml-experiments/00429-*/env.sh
     uv run --no-sync python ml-experiments/00429-*/e00429_coherence.py ARM [ARM ...]
 
-For each arm and seed, three path constructions give 51 member paths per valid time:
+For each arm and seed, four path constructions give 51 member values per farm, run, and lead:
 
-- `ecc`: member k takes the arm's quantile (11 levels, linear in between, clamped to q01 to q99)
-  at the level `(rank + 0.5) / 51`, where `rank` is the rank of the member's stage-3 plant power
-  among the 51 at that valid time (ties broken by a fixed random jitter);
-- `shifted`: member k keeps its stage-3 plant power and adds the arm's median minus the plant's
-  median, clamped to [0, 1];
-- `independent`: every member and valid time takes the quantile at its own random level.
+- `ecc`: ensemble copula coupling. Member k takes the arm's quantile (11 levels, linear in between,
+  clamped to q01 to q99) at the level `(rank + 0.5) / 51`, where `rank` is the rank of the member's
+  own 100 m wind speed among the 51 at that farm and valid time (ties broken by a fixed jitter);
+- `schaake`: the Schaake shuffle. For each scored run, the 51 hindcast runs nearest in day of year
+  supply observed paths; member k takes the arm's quantile at the rank of historical path k among
+  the 51 at that farm and lead, so one historical date orders all three farms and all leads;
+- `shifted`: member k keeps its own stage-3 plant power and adds the arm's median minus the
+  plant's median, clamped to [0, 1] (the member route's own paths);
+- `independent`: every member, farm, and lead takes its own random level (no coherence).
 
-A block is one farm, one run, and one calendar day of valid times, kept half-hours only, at least
-36 of them. The energy score is the mean over members of the root-mean-square distance of the path
-to the observed path, minus half the mean root-mean-square distance between two members' paths;
-the variogram score (order 0.5) is the mean over half-hour pairs of the squared difference
-between the observed and the ensemble-mean `|difference|^0.5`. Both are in points of capacity
-(percent of capacity), lower is better, and are averaged over seeds.
+Two kinds of block are scored, both across W1 to W3 jointly and over kept half-hours only. A *day
+block* is one run and one calendar day of valid times (at least 36 shared half-hours, three farms).
+A *run block* is one run's every twelfth lead (6-hourly) across all leads. The energy score is the
+mean over members of the root-mean-square distance of the path to the observed path minus half the
+mean root-mean-square distance between two members' paths. The variogram score (order 0.5) is the
+mean over pairs of path points of the squared difference between the observed and the ensemble-mean
+`|difference|^0.5`. Both are in points of capacity, lower is better, averaged over seeds.
 """
 
 import os
@@ -35,10 +39,13 @@ import numpy as np  # noqa: E402
 
 LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
 MEMBERS: Final[int] = 51
-MIN_BLOCK: Final[int] = 36
+MIN_DAY_BLOCK: Final[int] = 36
+RUN_STRIDE: Final[int] = 12
 SCALE: Final[float] = 100.0
-CONSTRUCTIONS: Final[tuple[str, ...]] = ("ecc", "shifted", "independent")
+CONSTRUCTIONS: Final[tuple[str, ...]] = ("ecc", "schaake", "shifted", "independent")
 RESAMPLES: Final[int] = 2_000
+WIND_100M: Final[int] = 1
+"""Column of the member weather array that holds the 100 m wind speed."""
 
 
 def quantile_at(*, quantiles: np.ndarray, level: np.ndarray) -> np.ndarray:
@@ -50,8 +57,49 @@ def quantile_at(*, quantiles: np.ndarray, level: np.ndarray) -> np.ndarray:
     return quantiles[rows, idx] * (1 - frac) + quantiles[rows, idx + 1] * frac
 
 
-def paths(
-    *, kind: str, quantiles: np.ndarray, power: np.ndarray, rng: np.random.Generator
+def ranks(values: np.ndarray, *, rng: np.random.Generator) -> np.ndarray:
+    """Return the rank (0 to 50) of each column within each row, ties broken at random."""
+    jitter = rng.uniform(0, 1e-9, values.shape)
+    return np.argsort(np.argsort(values + jitter, axis=1), axis=1)
+
+
+def schaake_ranks(*, scored, hindcast, grid: np.ndarray) -> np.ndarray:  # noqa: ANN001
+    """Return (scored rows, 51) ranks that follow 51 observed hindcast paths, one set per run."""
+    steps = {float(h): i for i, h in enumerate(grid)}
+    farms = {f: i for i, f in enumerate(data.FARMS)}
+    runs_h = hindcast["power_fcst_init_time"].unique().sort()
+    run_index = {t: i for i, t in enumerate(runs_h.to_list())}
+    table = np.full((len(runs_h), len(farms), len(grid)), np.nan)
+    ri = np.array([run_index[t] for t in hindcast["power_fcst_init_time"].to_list()])
+    fi = np.array([farms[f] for f in hindcast["site"].to_list()])
+    li = np.array([steps[float(h)] for h in hindcast["lead_hours"].to_numpy()])
+    table[ri, fi, li] = hindcast["actual_norm"].to_numpy()
+    fill = np.nanmedian(table, axis=0)
+    table = np.where(np.isnan(table), fill[None], table)
+    doy_h = np.array([t.timetuple().tm_yday for t in runs_h.to_list()])
+    out = np.empty((scored.height, MEMBERS), dtype=np.int16)
+    runs_s = scored["power_fcst_init_time"].to_numpy()
+    site_s = np.array([farms[f] for f in scored["site"].to_list()])
+    lead_s = np.array([steps[float(h)] for h in scored["lead_hours"].to_numpy()])
+    scored_doy = np.array([t.timetuple().tm_yday for t in scored["power_fcst_init_time"].to_list()])
+    for t in np.unique(runs_s):
+        rows = np.flatnonzero(runs_s == t)
+        dist = np.abs(doy_h - scored_doy[rows[0]])
+        dist = np.minimum(dist, 365 - dist)
+        chosen = np.argsort(dist, kind="stable")[:MEMBERS]
+        history = table[chosen][:, site_s[rows], lead_s[rows]].T
+        out[rows] = np.argsort(np.argsort(history, axis=1, kind="stable"), axis=1)
+    return out
+
+
+def member_values(
+    *,
+    kind: str,
+    quantiles: np.ndarray,
+    power: np.ndarray,
+    wind: np.ndarray,
+    shuffle: np.ndarray,
+    rng: np.random.Generator,
 ) -> np.ndarray:
     """Return the member values of every row: (rows, 51)."""
     if kind == "independent":
@@ -59,8 +107,7 @@ def paths(
     if kind == "shifted":
         shift = quantiles[:, 5] - np.median(power, axis=1)
         return np.clip(power + shift[:, None], 0.0, 1.0)
-    jitter = rng.uniform(0, 1e-9, power.shape)
-    rank = np.argsort(np.argsort(power + jitter, axis=1), axis=1)
+    rank = ranks(wind, rng=rng) if kind == "ecc" else shuffle
     return quantile_at(quantiles=quantiles, level=(rank + 0.5) / MEMBERS)
 
 
@@ -68,8 +115,10 @@ def block_scores(*, x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
     """Return (energy score, variogram score) of members `x` (51, n) against observed `y` (n,)."""
     n = x.shape[1]
     to_obs = np.sqrt(((x - y) ** 2).mean(axis=1)).mean()
-    spread = np.sqrt(((x[:, None, :] - x[None, :, :]) ** 2).mean(axis=2)).mean()
-    energy = to_obs - 0.5 * spread
+    gram = x @ x.T
+    sq = np.diag(gram)
+    dist2 = np.maximum(sq[:, None] + sq[None, :] - 2 * gram, 0.0) / n
+    energy = to_obs - 0.5 * np.sqrt(dist2).mean()
     obs = np.abs(y[:, None] - y[None, :]) ** 0.5
     ens = (np.abs(x[:, :, None] - x[:, None, :]) ** 0.5).mean(axis=0)
     upper = np.triu_indices(n, k=1)
@@ -77,32 +126,54 @@ def block_scores(*, x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
     return float(energy * SCALE), float(variogram * SCALE)
 
 
+def build_blocks(*, scored, grid: np.ndarray) -> tuple[list[np.ndarray], list[dict]]:  # noqa: ANN001
+    """Return the row-index arrays (3 farms, steps) of each block and its description."""
+    steps = {float(h): i for i, h in enumerate(grid)}
+    farms = {f: i for i, f in enumerate(data.FARMS)}
+    runs = {t: i for i, t in enumerate(sorted(set(scored["power_fcst_init_time"].to_list())))}
+    row_map = np.full((len(runs), len(farms), len(grid)), -1, dtype=np.int64)
+    kept = ~scored["masked"].to_numpy()
+    ri = np.array([runs[t] for t in scored["power_fcst_init_time"].to_list()])
+    fi = np.array([farms[f] for f in scored["site"].to_list()])
+    li = np.array([steps[float(h)] for h in scored["lead_hours"].to_numpy()])
+    row_map[ri[kept], fi[kept], li[kept]] = np.flatnonzero(kept)
+    month = scored["month"].to_numpy()
+    blocks, info = [], []
+    for run_i in range(len(runs)):
+        present = (row_map[run_i] >= 0).all(axis=0)
+        first_row = row_map[run_i][row_map[run_i] >= 0][0]
+        day_of_lead = (grid // 24).astype(int)
+        for day in np.unique(day_of_lead):
+            sel = np.flatnonzero(present & (day_of_lead == day))
+            if len(sel) >= MIN_DAY_BLOCK:
+                blocks.append(row_map[run_i][:, sel])
+                info.append({"kind": "day", "lead_day": int(day), "month": month[first_row]})
+        sel = np.flatnonzero(present)[::RUN_STRIDE]
+        if len(sel) >= MIN_DAY_BLOCK:
+            blocks.append(row_map[run_i][:, sel])
+            info.append({"kind": "run", "lead_day": -1, "month": month[first_row]})
+    return blocks, info
+
+
 def main() -> None:
-    """Score the named arms and print the table."""
+    """Score the named arms and print the tables."""
     arms = sys.argv[1:] or ["one_pass_ms", "member_plain"]
     scored = data347.scored_frame()
-    _, power = data.load(set_name="scored")
+    hindcast = data347.hindcast_frame()
+    weather, power = data.load(set_name="scored")
+    wind = weather[:, :, WIND_100M].astype(np.float64)
+    power = power.astype(np.float64)
     actual = scored["actual_norm"].to_numpy().astype(np.float64)
-    kept = ~scored["masked"].to_numpy()
-    key = (
-        scored["site"].cast(str)
-        + "|"
-        + scored["power_fcst_init_time"].dt.strftime("%Y%m%d%H")
-        + "|"
-        + scored["valid_time"].dt.strftime("%Y%m%d")
-    ).to_numpy()
-    month = scored["month"].to_numpy()
-    lead_day = scored["lead_hours"].to_numpy() // 24
-    blocks = []
-    order = np.argsort(key, kind="stable")
-    sorted_key = key[order]
-    starts = np.flatnonzero(np.r_[True, sorted_key[1:] != sorted_key[:-1]])
-    for a, b in zip(starts, np.r_[starts[1:], len(order)], strict=True):
-        rows = order[a:b]
-        rows = rows[kept[rows]]
-        if len(rows) >= MIN_BLOCK:
-            blocks.append(rows)
-    print(f"{len(blocks)} blocks of at least {MIN_BLOCK} kept half-hours", flush=True)
+    grid = np.sort(scored["lead_hours"].unique().to_numpy())
+    blocks, info = build_blocks(scored=scored, grid=grid)
+    kinds = np.array([i["kind"] for i in info])
+    lead_day = np.array([i["lead_day"] for i in info])
+    month = np.array([i["month"] for i in info])
+    print(
+        f"{int((kinds == 'day').sum())} day blocks, {int((kinds == 'run').sum())} run blocks",
+        flush=True,
+    )
+    shuffle = schaake_ranks(scored=scored, hindcast=hindcast, grid=grid)
     result: dict[tuple[str, str], np.ndarray] = {}
     for arm in arms:
         parts = np.stack([np.load(run.PARTS_DIR / f"{arm}_h{s}.npy") for s in run.SEEDS])
@@ -111,63 +182,80 @@ def main() -> None:
             for s in range(len(parts)):
                 q = np.asarray(parts[s], dtype=np.float64)
                 rng = np.random.default_rng(1000 + s)
-                member_values = paths(
-                    kind=kind, quantiles=q, power=power.astype(np.float64), rng=rng
+                x = member_values(
+                    kind=kind, quantiles=q, power=power, wind=wind, shuffle=shuffle, rng=rng
                 )
-                for i, rows in enumerate(blocks):
-                    values[i] += block_scores(x=member_values[rows].T, y=actual[rows])
+                for i, block in enumerate(blocks):
+                    rows = block.reshape(-1)
+                    values[i] += block_scores(x=x[rows].T, y=actual[rows])
             result[arm, kind] = values / len(parts)
-    block_month = np.array([month[r[0]] for r in blocks])
-    block_day = np.array([int(lead_day[r[0]]) for r in blocks])
-    months = np.unique(block_month)
-    rng = np.random.default_rng(0)
-    draws = rng.integers(0, len(months), size=(RESAMPLES, len(months)))
+            print(f"{arm} {kind} done", flush=True)
+    months = np.unique(month)
+    draw = np.random.default_rng(0).integers(0, len(months), size=(RESAMPLES, len(months)))
 
-    def interval(*, diff: np.ndarray) -> str:
-        sums = np.array([diff[block_month == m].sum(axis=0) for m in months])
-        counts = np.array([(block_month == m).sum() for m in months])
-        means = sums[draws].sum(axis=1) / counts[draws].sum(axis=1)[:, None]
+    def interval(*, diff: np.ndarray, base: np.ndarray, select: np.ndarray) -> str:
+        sums = np.array([diff[select & (month == m)].sum(axis=0) for m in months])
+        counts = np.array([(select & (month == m)).sum() for m in months])
+        means = sums[draw].sum(axis=1) / np.maximum(counts[draw].sum(axis=1), 1)[:, None]
         low, high = np.quantile(means, [0.005, 0.995], axis=0)
+        point = diff[select].mean(axis=0)
+        relative = point / base[select].mean(axis=0)
         return " ; ".join(
-            f"{name} {diff[:, k].mean():+.3f} (99% {low[k]:+.3f} to {high[k]:+.3f})"
+            f"{name} {point[k]:+.3f} ({relative[k]:+.1%}; 99% {low[k]:+.3f} to {high[k]:+.3f})"
             for k, name in enumerate(("energy", "variogram"))
         )
 
-    lines = ["-- coherence scores, mean over blocks (percent of capacity; lower is better) --"]
-    for (arm, kind), values in result.items():
-        lines.append(
-            f"{arm.ljust(16)}{kind.ljust(12)}energy {values[:, 0].mean():.3f}  variogram {values[:, 1].mean():.3f}"
-        )
-    lines.append("-- by lead day band (energy / variogram) --")
+    lines = [
+        "-- coherence scores across W1 to W3, mean over blocks (points of capacity; lower is better) --"
+    ]
+    for block_kind in ("day", "run"):
+        sel = kinds == block_kind
+        lines.append(f"[{block_kind} blocks, {int(sel.sum())}]")
+        for (arm, kind), values in result.items():
+            lines.append(
+                f"{arm.ljust(16)}{kind.ljust(12)}energy {values[sel, 0].mean():.3f}  variogram {values[sel, 1].mean():.3f}"
+            )
+    lines.append("-- day blocks by lead day (energy / variogram) --")
     for lo, hi in ((0, 1), (2, 3), (4, 6), (7, 10), (11, 14)):
-        sel = (block_day >= lo) & (block_day <= hi)
-        if not sel.any():
-            continue
+        sel = (kinds == "day") & (lead_day >= lo) & (lead_day <= hi)
         for (arm, kind), values in result.items():
             lines.append(
                 f"days {lo}-{hi} {arm.ljust(16)}{kind.ljust(12)}{values[sel, 0].mean():.3f} / {values[sel, 1].mean():.3f}  ({int(sel.sum())} blocks)"
             )
     lines.append(
-        "-- paired differences, first minus second (negative favours the first), month-block 99% --"
+        "-- paired differences, first minus second (negative favours the first); relative change and 99% "
+        "month-block interval. The 5% coherence margin is the Opus note's proposal, not the maintainer's --"
     )
-    if "one_pass_ms" in arms and "member_plain" in arms:
-        pairs = {
-            "one_pass_ms ecc - member_plain shifted": (
-                ("one_pass_ms", "ecc"),
-                ("member_plain", "shifted"),
-            ),
-            "one_pass_ms ecc - member_plain ecc": (("one_pass_ms", "ecc"), ("member_plain", "ecc")),
-            "member_plain shifted - member_plain ecc": (
-                ("member_plain", "shifted"),
-                ("member_plain", "ecc"),
-            ),
-            "one_pass_ms ecc - one_pass_ms independent": (
-                ("one_pass_ms", "ecc"),
-                ("one_pass_ms", "independent"),
-            ),
-        }
-        for label, (first, second) in pairs.items():
-            lines.append(f"{label}: {interval(diff=result[first] - result[second])}")
+    pairs = {
+        "member_plain shifted - one_pass_ms ecc": (
+            ("member_plain", "shifted"),
+            ("one_pass_ms", "ecc"),
+        ),
+        "member_plain shifted - one_pass_ms schaake": (
+            ("member_plain", "shifted"),
+            ("one_pass_ms", "schaake"),
+        ),
+        "one_pass_ms schaake - one_pass_ms ecc": (
+            ("one_pass_ms", "schaake"),
+            ("one_pass_ms", "ecc"),
+        ),
+        "one_pass_ms ecc - one_pass_ms independent": (
+            ("one_pass_ms", "ecc"),
+            ("one_pass_ms", "independent"),
+        ),
+        "member_plain ecc - member_plain shifted": (
+            ("member_plain", "ecc"),
+            ("member_plain", "shifted"),
+        ),
+    }
+    for label, (first, second) in pairs.items():
+        if first not in result or second not in result:
+            continue
+        for block_kind in ("day", "run"):
+            sel = kinds == block_kind
+            lines.append(
+                f"{label} | {block_kind}: {interval(diff=result[first] - result[second], base=result[second], select=sel)}"
+            )
     text = "\n".join(lines)
     print(text)
     (data.DATA_DIR / "coherence_report.txt").write_text(text + "\n")

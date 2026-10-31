@@ -40,13 +40,14 @@ prediction: >-
 decision_rule: >-
   Reproduction gate G0 first: the shared code's y2 repeat must land within 0.05 points of 347's
   11.081 on the kept rows over every lead, and within 0.05 of 10.518 at true days 1 to 10; if it
-  misses, stop and report. The maintainer agreed the margins on 2026-10-31: 0.10
-  points for wind, and no tail harm above 0.02. A difference is kept only if its 99% month-block interval (Bonferroni across the
-  planned contrasts) excludes zero and the point estimate beats the margin, and the pooled 0.01
-  and 0.99 pinball losses rise by no more than 0.02 points. A plant arm that only ties is dropped: the plain network is chosen
-  (maintainer, 2026-10-31). An arm with an upper-tail failure (more than 1.5% of observations above
-  q99 at true days 1 to 10) does not advance. Seeds: 5 per arm; a contrast smaller than the minimum detectable
-  effect printed in the report is called inconclusive, not null.
+  misses, stop and report. The maintainer agreed the margins on 2026-10-31: 0.10 points for wind,
+  and no tail harm above 0.02. A difference is kept only if its 99% month-block interval (Bonferroni
+  across the planned contrasts) excludes zero and the point estimate beats the margin, and the
+  pooled 0.01 and 0.99 pinball losses rise by no more than 0.02 points. A plant arm that only ties
+  is dropped, and the plain network is chosen (maintainer, 2026-10-31). An arm with an upper-tail
+  failure (more than 1.5% of observations above q99 at true days 1 to 10) does not advance. Seeds: 5
+  per arm; a contrast smaller than the minimum detectable effect printed in the report is called
+  inconclusive, not null.
 benchmark: >-
   Wind farms research default 2 (experiment 347's y2, stored rows), Wind farms research default 1
   (experiment 339's default), climatology (experiment 324's W0), and the frozen XGBoost on the
@@ -62,8 +63,6 @@ metric: >-
   coverage per farm.
 code: ml-experiments/00429-unified-forecaster-wind-ablations/
 ---
-
-# Experiment 429: ablations for one neural forecaster design, wind farms
 
 **Status: planned. No score exists yet.** This page is the plan, and the write-up replaces it.
 
@@ -100,13 +99,14 @@ repository use no lagged power in the 347 head, so none is added.
 | `ref_347_y2`, `ref_default`, `ref_clim` | stored rows | | |
 
 `one_pass_ms` is the demand design moved to wind. Arms without a plant centre the mixture on the
-mean fraction of the training cases, so C3 changes two things at once: the plant power as an
-encoder input and the plant median as the mixture's centre. A tie in C3 cannot say which of the two
-failed to help. The trainable plant in `member_e2e` learns at 2e-4 (the rest of the network at
-2e-3) and has no weight decay, so it starts from experiment 347's parameters. The member encoder is a 7-to-16-to-16 network
-applied to every member; the 51 outputs are pooled and fed to the trunk. The design note suggests
-training on one random member per row to match the one-pass cost, but pooled statistics need all 51
-members, so the member arms use all 51 on the GPU and the cost is stated in the write-up.
+mean fraction of the training cases, so C3 changes two things at once: the plant power as an encoder
+input and the plant median as the mixture's centre. A tie in C3 cannot say which of the two failed
+to help. The trainable plant in `member_e2e` learns at 2e-4 (the rest of the network at 2e-3) and
+has no weight decay, so it starts from experiment 347's parameters. The member encoder is a
+7-to-16-to-16 network applied to every member; the 51 outputs are pooled and fed to the trunk. The
+design note suggests training on one random member per row to match the one-pass cost, but pooled
+statistics need all 51 members, so the member arms use all 51 on the GPU and the cost is stated in
+the write-up.
 
 **The censored head** (A7) adds the exact likelihood of an observation at zero or at capacity:
 for an observed fraction at or below 0.001 the likelihood is the mixture's mass below zero, and at
@@ -133,18 +133,23 @@ figures come from a separate script before the write-up.
   to 14 (lead 24 to 336 hours, the part of the row set that exists) side by side.
 - **Training data.** Wind may use the one year of ENS hindcasts (experiment 303 argued against it;
   this experiment follows experiment 347 and uses it).
-- **Coherence (A1).** `e00429_coherence.py` scores the coherence of 51-member paths with the energy
-  score and the variogram score (order 0.5) over daily blocks of 48 half-hours, for each of the 53
-  runs and 3 farms, in points of capacity. Three path constructions are compared, each for the
-  one-pass arm and the member arm: **ECC**, where member k takes the arm's quantile at the rank of
-  that member's stage-3 plant power among the 51 at that valid time (ensemble copula coupling, 11
-  levels interpolated linearly and clamped between q01 and q99); **member-shifted**, where member k
-  keeps its own plant power and the arm's median minus the plant's median is added (so the
-  member's own path is kept and only the location is recalibrated, with no added spread); and
-  **independent**, where each member and valid time draws its own level (the no-coherence lower
-  reference). The comparison the maintainer asked for is ECC on the mean-and-spread route against
-  member-shifted paths on the member route. These constructions are my design, not the
-  maintainer's; the write-up says so.
+- **Coherence (A1).** NGED runs power-flow models one ensemble member at a time, so the forecast
+  must give 51 members that are coherent across time and across the three farms. The script
+  `e00429_coherence.py` scores the 51 member paths with the energy score and the variogram score
+  (order 0.5) across W1 to W3 jointly, in two kinds of block: one run and one calendar day (at
+  least 36 shared half-hours), and one run's every twelfth lead across all leads. Four path
+  constructions are compared: **ECC** (ensemble copula coupling: member k takes the arm's quantile
+  at the rank of its own 100 m wind speed among the 51 at that farm and valid time); the
+  **Schaake shuffle** (the 51 hindcast runs nearest in day of year supply observed paths, and one
+  historical date orders all three farms and all leads); **member-shifted** (member k keeps its own
+  stage-3 plant power and adds the arm's median minus the plant's median; this stands for the member
+  route using each member's own path); and **independent** (no coherence, the lower reference).
+  Experiment 304 found member forecasts correlate 0.95 to 0.97 across farms while errors correlate
+  0.54 to 0.78, so the Schaake shuffle may beat ECC. The design note's prediction is that the member
+  route beats ECC on the variogram score by at least 5% and on the marginal score by at least 0.10;
+  the 5% coherence margin is the Opus note's proposal, not the maintainer's. The member-shifted
+  construction is my reading of "the member route using each member's path", and the write-up says
+  so.
 
 ## Pre-registered contrasts
 
