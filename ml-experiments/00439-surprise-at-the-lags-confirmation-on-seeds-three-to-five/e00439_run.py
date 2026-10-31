@@ -9,7 +9,7 @@ the frozen ones); with `--lagless-mod3` S1 instead reads the
 table of seed `seed % 3`.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<path to the private data folder>
 source <paths>; PYTHONPATH=$PP:ml-experiments/00439-* OMP_NUM_THREADS=1 \
   systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
   uv run --no-sync python ml-experiments/00439-*/e00439_run.py fit --arms S1 R-inj --seeds 3
