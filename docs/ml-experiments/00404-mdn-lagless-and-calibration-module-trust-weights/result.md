@@ -282,6 +282,12 @@ run. The batch 1 stop rule stays as written.
 - **B2.** A0-inj with token-level lag dropout during training (each lag token zeroed with
   probability 0.2 and flagged missing) and no lagless module.
 - **B5.** B1 without `lag_origin`.
+- **B-mix (reference, free).** A fixed 50/50 mixture of A0-inj's lagged forecast and the lagless
+  module's forecast (the neural Discuss session's request, 2026-10-31). It is scored on the same
+  harm rows and event slices as every arm. Experiment 402 step 4 (interim, unaudited) found that a
+  simple mixture captured most of a lag-surprise gate's gain on injected shifts at the six
+  signed-MW Primaries (mean CRPS 4.307 for the mixture, 4.250 for the gate, 4.576 with lags, 4.439
+  without). Any trust head or attention over lags in this experiment must beat B-mix to count.
 
 **Batch 2** (runs straight away if the batch 1 stop rule does not fire):
 
