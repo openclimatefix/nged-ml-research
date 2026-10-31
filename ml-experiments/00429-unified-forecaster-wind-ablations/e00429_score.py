@@ -38,6 +38,12 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C4 member_e2e - member_frozen (A4)": ("member_e2e", "member_frozen"),
     "C6 memberwise pooled mixture - one_pass_ms (A1)": ("memberwise", "one_pass_ms"),
 }
+HP_CONTRASTS: Final[dict[str, tuple[str, str]]] = {
+    "H-P plant minus plain, trained on all rows": ("member_frozen_allrows", "member_plain_allrows"),
+    "H-P plant minus plain, trained with the 210 mask": ("member_frozen", "member_plain"),
+    "plain: all rows minus 210 mask": ("member_plain_allrows", "member_plain"),
+    "plant: all rows minus 210 mask": ("member_frozen_allrows", "member_frozen"),
+}
 CENSORED_CONTRAST: Final[str] = "C5 {arm}_censored - {arm} (A7)"
 LEVEL: Final[float] = 1 - 0.01 / 6
 SEEDS_EXPECTED: Final[int] = 5
@@ -298,6 +304,15 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         else:
             verdict = "NOT KEPT: no gain beyond the margin, and the interval is narrow"
         lines.append(f"{label} | verdict on {decisive}: {verdict}")
+    lines.append(
+        "-- H-P 2 x 2 (physics layer against plain network; informational, not corrected) --"
+    )
+    for label, (a, b) in HP_CONTRASTS.items():
+        if a not in qs or b not in qs:
+            continue
+        for subset in ("true_1_10", "idle210", "kept", "nomask_1_10"):
+            entry = resampler.read(values=qs[a] - qs[b], keep=flags[subset])
+            lines.append(f"{label} | {subset}: {fmt(entry)}")
     lines.append(
         "-- reference contrasts, first arm minus reference, true_1_10 and kept (95% / 99.8%) --"
     )

@@ -35,6 +35,8 @@ ARMS: Final[dict[str, model.Arm]] = {
     "member_plain": model.Arm(route="member"),
     "member_frozen": model.Arm(route="member", plant="frozen"),
     "member_e2e": model.Arm(route="member", plant="e2e"),
+    "member_plain_allrows": model.Arm(route="member", rows="all"),
+    "member_frozen_allrows": model.Arm(route="member", plant="frozen", rows="all"),
     "memberwise": model.Arm(route="memberwise"),
     "memberwise_frozen": model.Arm(route="memberwise", plant="frozen"),
     "member_plain_censored": model.Arm(route="member", head="censored"),

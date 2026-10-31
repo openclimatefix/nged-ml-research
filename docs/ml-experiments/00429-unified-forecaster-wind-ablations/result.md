@@ -97,6 +97,8 @@ repository use no lagged power in the 347 head, so none is added.
 | `member_e2e` | As `member_plain` | The stage-3 plant as an `nn.Module`, trained end to end from 347's parameters | Clipped |
 | `memberwise` | Shared network on each member alone; pooled forecast is the equal-weight mixture of the 51 member mixtures | none | Clipped |
 | `memberwise_frozen` | As `memberwise`, each member's mixture centred on its own stage-3 plant power | Frozen stage-3 plant | Clipped |
+| `member_plain_allrows` | As `member_plain`, trained and early-stopped on every hindcast case, idle band included | none | Clipped |
+| `member_frozen_allrows` | As `member_frozen`, trained on every hindcast case | Frozen stage-3 plant | Clipped |
 | `member_<best>_censored` | As the better of the three member arms | as that arm | Censored at 0 and 1 |
 | `ref_347_y2`, `ref_default`, `ref_clim` | stored rows | | |
 
@@ -135,6 +137,14 @@ figures come from a separate script before the write-up.
   to 14 (lead 24 to 336 hours, the part of the row set that exists) side by side.
 - **Training data.** Wind may use the one year of ENS hindcasts (experiment 303 argued against it;
   this experiment follows experiment 347 and uses it).
+- **Physics layer against idle noise (H-P, A4).** The maintainer put the idle-noise 2 x 2 inside
+  this experiment: {plain encoder, frozen plant channel} x {trained on all rows, trained without
+  experiment 210's idle band}. The cells are `member_plain_allrows`, `member_frozen_allrows`,
+  `member_plain`, and `member_frozen`. The prediction that can fail: trained on all rows, the plant
+  arm beats the plain arm by at least 0.10 points on the idle-band rows and 0.05 on the kept rows,
+  and the gap shrinks by at least half when both train without the idle band. All arms are also
+  scored with and without the idle-band mask; scores on the cleaned-zero rows are added when that
+  row set exists.
 - **Members as quantile forecasts (A1).** NGED's proposed deliverable is a 51-member power
   ensemble in which each member is itself a quantile forecast, and production can afford 51 passes.
   The `memberwise` arms give each member its own 11 quantiles, and the pooled forecast is the

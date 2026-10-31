@@ -13,6 +13,8 @@ Every arm is the same network with three switches (the design note's D1 to D3):
 - `route` `memberwise` runs the trunk on each member alone (its weather, and with `plant="frozen"`
   its own plant power, which is also the centre of its mixture), and the pooled forecast is the
   equal-weight mixture of the 51 member mixtures, trained on the pooled likelihood.
+- `rows`: `kept` trains and early-stops on the hindcast cases outside experiment 00210's idle band;
+  `all` uses every hindcast case with an observed power.
 - `head`: `clipped` fits the mixture by the plain likelihood and clamps the quantiles to [0, 1]
   (experiment 00347); `censored` fits the likelihood of an observation at or below 0.001 as the
   mixture's mass below zero and one at or above 0.999 as its mass above one.
@@ -61,6 +63,7 @@ class Arm:
     route: str
     plant: str = "none"
     head: str = "clipped"
+    rows: str = "kept"
 
 
 class Cases:
@@ -314,11 +317,16 @@ def train_and_predict(  # noqa: PLR0915
 ) -> tuple[dict[str, np.ndarray], nn.Module]:
     """Train one network on the hindcast and return the 11 quantiles of each target set.
 
-    Training rows are the unmasked hindcast cases whose run and valid time precede `cutoff`;
-    early stopping reads the unmasked cases of later runs, as experiment 00347's heads do.
+    Training rows are the hindcast cases whose run and valid time precede `cutoff` (unmasked ones
+    unless `arm.rows` is `all`); early stopping reads the same kind of cases from later runs, as
+    experiment 00347's heads do.
     """
     torch.manual_seed(seed)
-    usable = (~hindcast["masked"]).to_numpy()
+    usable = (
+        np.ones(len(hindcast), dtype=bool)
+        if arm.rows == "all"
+        else (~hindcast["masked"]).to_numpy()
+    )
     init, valid = hindcast["power_fcst_init_time"], hindcast["valid_time"]
     train = usable & ((init < cutoff) & (valid < cutoff)).to_numpy()
     stop = usable & (init >= cutoff).to_numpy()
