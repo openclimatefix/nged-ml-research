@@ -8,7 +8,7 @@ theme: retraining-and-training-history
 also_relevant_to:
   - hierarchy-and-pooling
   - weather-products-and-blending
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -66,11 +66,149 @@ metric: >-
   Continuous ranked probability score from the 11 quantiles, coverage and pinball loss at q01, q05,
   q95, and q99, and the avoidable-curtailment cost, in points of effective capacity, from
   `studies.eval_protocol`; leads 0.5 to 336 hours; the headline band is days 1 to 10.
+verdict: small gain
+best_arm: >-
+  P1, pretrain on ERA5 and CAMS then fine-tune all weights: CRPS 3.235 at the signed-MW six and
+  3.712 at the MVA-only eight (days 1 to 10, 12 monthly folds), against 3.320 and 3.845 for the
+  ENS-only network. P2 (second linear layer frozen) scores 3.225 and 3.715.
+headline: >-
+  P1 minus the ENS-only network is -0.085 (95% interval -0.171 to -0.016) at the signed-MW six and
+  -0.133 (-0.178 to -0.084) at the MVA-only eight, with 10 of 12 monthly folds better at the six.
+  The six-Primary interval does not lie wholly below the 0.03 threshold, so the verdict is small
+  gain. With only the first 6 months of ENS the gain is -1.277 (-2.612 to -0.445) at the six.
+lessons: >-
+  Years of ERA5 and CAMS weather before the ENS archive lower the pooled network's score, most
+  when the ENS history is short. How much of the network is fine-tuned, and forecast-like noise on
+  the pretraining weather, make no difference at the 0.03-point threshold.
+production_status: candidate
+adopted_in: none
+take_home_message: >-
+  Teaching the neural network first on six years of past weather and power, then on the forecast
+  archive, lowers its error by about 0.09 points of capacity (2.6%) at the six signed-direction
+  substations and 0.13 points (3.5%) at the eight apparent-power-only substations over twelve test
+  months. Changing how much of the network is retrained, or adding forecast-like noise, makes no
+  difference. The gain is much larger with only 6 months of forecast archive (about 1.3 points),
+  so pretraining matters most for new substations.
+advice:
+  - >-
+    Pretrain the pooled network on ERA5 and CAMS weather and the Primaries' own power before
+    fine-tuning on ENS, because it lowered CRPS by 0.085 at the signed-MW six and 0.133 at the
+    MVA-only eight over 12 folds (C1).
+  - >-
+    Fine-tune all weights and skip the noise, because freezing the second linear layer (C5) and adding
+    ENS-sized noise to the ERA5 inputs (C4) changed the score by under 0.015 points at both groups.
+  - >-
+    Use pretraining when the ENS history is under 12 months, because the gain grew from 0.08 to 1.28
+    points at the signed-MW six when fine-tuning used only the first 6 months of ENS (C6).
+  - >-
+    Compare noise sizes larger than the ENS spread before dismissing noisy pretraining, because the
+    spread is 1.2 to 3.3 times smaller than the ENS-mean-minus-ERA5 error at day 1 for temperature,
+    dew point, pressure, longwave, and wind (Input checks).
 code: ml-experiments/00418-mdn-pretrain-on-era5-and-cams-then-fine-tune-on-ens/
 ---
 
-**Plan: pretrain the pooled mixture density network on ERA5 and CAMS weather, fine-tune it on ENS.**
-The status is `planned`. Nothing below has been run.
+**Take-home message: pretraining on six years of ERA5 and CAMS weather lowers the pooled network's
+score by about 0.09 points, and most of all when the ENS history is short.** Pretraining then
+fine-tuning all weights (P1) scores a CRPS (days 1 to 10) of 3.235 points of capacity at the six
+signed-MW Primaries, against 3.320 for the same network trained on ENS rows only (difference -0.085,
+95% interval -0.171 to -0.016). At the eight MVA-only Primaries the scores are 3.712 and 3.845
+(-0.133, -0.178 to -0.084). **The verdict is `small gain`:** the six-Primary interval excludes zero
+but not the 0.03-point threshold. Freezing a layer (P2) and adding noise (P3) change the result by
+under 0.015 points. Every interval comes from 12 monthly test folds (2025-07 to 2026-06).
+
+![CRPS by lead band for the ENS-only network, the three pretrained arms, and the baselines](figure_1_crps_by_lead.svg)
+
+![Planned contrasts with 95% intervals](figure_2_contrasts.svg)
+
+![CRPS of each pretrained arm minus the ENS-only network, by test month](figure_3_gain_by_month.svg)
+
+![Gain from pretraining with 6 months of ENS and with the full window](figure_4_low_data.svg)
+
+## Results
+
+CRPS at days 1 to 10 over 12 monthly folds, equal weight per Primary, in points of capacity
+(smaller is better). The scoring restricts every arm to the half-hours they share.
+
+| Arm | Signed-MW six | MVA-only eight | D15 and D18 |
+|---|---|---|---|
+| ENS only (reference refit) | 3.320 | 3.845 | 10.317 |
+| P1 pretrain, tune all weights | 3.235 | 3.712 | 10.047 |
+| P2 pretrain, second linear layer frozen | 3.225 | 3.715 | 10.024 |
+| P3 pretrain with noise, tune all weights | 3.249 | 3.723 | 9.770 |
+| Stored forecasts of experiment 397 | 3.293 | 3.876 | 10.614 |
+| GAM stack | 3.258 | 4.152 | 7.866 |
+| BG2 | 3.429 | 3.941 | 8.602 |
+| `manual_heuristic` | 4.135 | 4.532 | 14.914 |
+| `climatology` | 4.393 | 5.082 | 27.136 |
+
+- **Contrasts (signed-MW six / MVA-only eight, 95% interval).** C1 P1 minus ENS only: -0.085
+  (-0.171 to -0.016) / -0.133 (-0.178 to -0.084). C2 P2 minus ENS only: -0.095 (-0.188 to -0.010) /
+  -0.130 (-0.188 to -0.073). C3 P3 minus ENS only: -0.071 (-0.154 to -0.008) / -0.122 (-0.152 to
+  -0.076). C4 P3 minus P1: +0.014 (-0.004 to +0.031) / +0.011 (-0.017 to +0.038). C5 P2 minus P1:
+  -0.010 (-0.034 to +0.008) / +0.003 (-0.018 to +0.024).
+- **Monthly folds.** P1 beats the ENS-only network in 10 of the 12 months at the signed-MW six
+  (2025-07 and 2025-10 are slightly worse). The largest gain is in 2026-01 (-0.23).
+- **D15 and D18 (report-only).** C1 is -0.214 (-0.726 to +0.112) and C3 is -0.443 (-0.828 to
+  -0.143). Noise helps these two short-history Primaries most (C4 -0.229, -0.407 to -0.074).
+- **Tails.** q95 coverage at the signed-MW six is 0.853 for ENS only and 0.857 to 0.862 for the
+  pretrained arms; q99 coverage is 0.936 against 0.945 to 0.951. All stay below nominal (0.95,
+  0.99), as in experiment 397.
+- **Low-data check (C6, four screen folds).** With fine-tuning limited to the first 6 months of ENS
+  (2024-04 to 2024-09), P1 minus the ENS-only network trained on the same rows is -1.277 (-2.612 to
+  -0.445) at the signed-MW six and -0.855 (-1.440 to -0.377) at the MVA-only eight. On the full
+  window the same contrast is -0.082 and -0.119. The difference of the two is -1.195 at the six.
+- **Screen.** On four screen folds (2025-10, 2026-01, 2026-03, 2026-06) all three arms passed the
+  advance rule against experiment 397's stored forecasts: P1 -0.061, P2 -0.059, P3 -0.053 at the
+  six (reference standard error over seeds 0.011), and about -0.14 at the eight.
+
+## Predictions
+
+- **P1 held at the six and failed at the eight.** The signed-MW six gain is -0.085, inside the
+  predicted -0.05 to -0.20. The prediction said the gain would be smaller at the eight, but it is
+  larger (-0.133).
+- **P2 held.** P2 minus P1 is -0.010 at the six and +0.003 at the eight, within 0.05.
+- **P3 failed.** P3 minus P1 is +0.014 at days 1 to 10, so noise did not help, and its q95 and q99
+  coverage are not closer to nominal than P1's.
+- **P4 held.** The gain with 6 months of ENS (-1.277) is far more than twice the full-window gain
+  (-0.082).
+
+## Input checks and cost
+
+- **Row counts.** The 2026-01 fold has 4,979,183 fine-tuning rows (520,330 held out) and 7,894,895
+  pretraining rows (753,275 held out); the 2025-10 fold has 4,185,108 and 7,503,492. Pretraining
+  rows start in 2019-09 and, for D15 and D18, as late as their data begins.
+- **Units.** ENS and ERA5 or CAMS inputs agree in mean for all seven variables (for example
+  temperature 11.44 against 11.74 degrees Celsius, shortwave 138 against 131 W/m²) on the 2026-01
+  fold. The spread of ERA5 precipitation is 3 times that of the ENS mean, as expected of a smooth
+  ensemble mean.
+- **Noise against spread.** The root-mean-square difference between the ENS mean and ERA5, divided by
+  the median ENS spread, is 1.2 to 3.3 at day 1 for temperature, dew point, pressure, longwave, and wind
+  (1.1 to 1.5 at day 4), and over 40 for shortwave, whose spread is near zero at night. The noise of
+  arm P3 equals the ENS spread, so it is smaller than the real forecast error at short lead.
+- **Production cost.** Pretraining one network takes 30 to 60 seconds of GPU time (40 epochs on 7 to
+  8 million rows), and one fine-tune takes 30 to 50 seconds. The raw pretraining matrices take about
+  2 seconds per Primary. The pipeline would need ERA5 and CAMS history kept up to date, a
+  pretraining step run rarely, and a monthly fine-tune.
+- **Memory.** The scoring script held 9 GB of memory while scoring 12 folds of 7 arms at once; the
+  fits peaked below 3 GB.
+
+## Limits
+
+- **Pretraining reaches the epoch limit.** Most pretraining runs stopped at 40 epochs, so a longer
+  schedule might help; this was not tried.
+- **The pretrained network sees ERA5 up to the refit in the low-data check.** The check therefore
+  measures less ENS, not less data. The 2026-06 fold has 4 months of ENS before 2024-10-01 and the
+  others 6.
+- **P3 noise is independent per row and constant over the day.** Real forecast errors are
+  correlated across lead times, and the median spread pools all hours of the day, so shortwave noise
+  is non-zero at night.
+- **One setting, one fine-tuning rate.** No hyperparameter of the fine-tuning stage was tuned.
+- **Low-data check at D15 and D18.** The ENS-only network trained on 6 months has too little data at
+  these two Primaries (difference -20.6 points), so that row is not read.
+- **Experiment 397's stored forecasts** score 3.293 at the six, 0.027 better than the refit
+  ENS-only network of this experiment (3.320), which gives a sense of the seed-to-seed spread.
+
+## Plan as committed before any fit
 
 ## Design note
 
