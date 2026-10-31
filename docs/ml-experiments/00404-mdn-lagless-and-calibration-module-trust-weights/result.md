@@ -493,6 +493,23 @@ harm rows.
 - **Folds, seeds, cadence.** The five screen folds of experiment 397, monthly refits, 3 seeds. More
   seeds only for a contrast within the seed noise.
 
+## Interfaces for the later evaluation experiment
+
+**A separate lag-trust evaluation experiment will run on this experiment's saved networks after
+batch 1** (manager, 2026-10-31; design in `briefs/lag_trust_evaluation_design_answer.md`, section
+4). This experiment therefore builds in five interfaces, and saves every fitted network:
+
+- A predict function that accepts modified lag values and recomputes every trust input from them
+  with the `e00404_trust.py` functions.
+- Per-row outputs: the trust weight of each lag, the combined trust, and the q01 to q99 quantiles
+  of the final, lagged, and lagless mixtures.
+- Inference overrides for the neighbour inputs: off, rewired, shuffled, and time-shifted.
+- A deterministic evaluation mode with dropout off, so the lag-masked control returns exactly 0.
+- Saved per-row tables keyed by Primary, origin, valid time, seed, and event class.
+
+The write-up says which event count each figure uses: experiment 402's label rows (133 rows, 112
+usable) or experiment 411's 184 corrected events. Experiment 392's one-lag figure is 0% to 2%.
+
 ## Compute
 
 **The concurrency limit is 1 GPU process under 8 GB of GPU memory, 1 feeder core, and
