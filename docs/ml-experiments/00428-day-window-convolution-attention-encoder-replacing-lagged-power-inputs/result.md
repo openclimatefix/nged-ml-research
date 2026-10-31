@@ -31,11 +31,12 @@ prediction: >-
   capacity at days 1 to 10, or shares of a step. P1. On clean rows, the one-day encoder (E1) minus
   the lagged reference trained on the same injected data (R-inj) lies between 0.00 and +0.15 at the
   signed-MW six, because E1 has no weekly lag; the three-day encoder (E3) minus R-inj lies between
-  -0.05 and +0.05. P2. On harm rows, E3 minus R-inj lies between -0.30 and -0.10 at the signed-MW six and
-  within +-0.10 at the MVA-only eight (experiment 402 found a flag oracle gains nothing there). P3.
+  -0.05 and +0.05. P2. On harm rows, E3 minus R-inj lies between -0.30 and -0.10 at the signed-MW
+  six and within +-0.10 at the MVA-only eight (experiment 402 found a flag oracle gains nothing there). P3.
   In the encroachment sweep (step of 5% of capacity, 24 to 72 h leads, raw bands), R follows 0.15 to
   0.45 of the step at three lags (the XGBoost model of experiment 392 followed 0.38 to 0.41; a
-  neural network may follow less), R-inj follows 0.05 to 0.30, and E3 follows at most 0.05 of the step at every k, in both variants. P4.
+  neural network may follow less), R-inj follows 0.05 to 0.30, and E3 follows at most 0.05 of the
+  step at every k, in both variants. P4.
   The 5%-95% band of E3 is at least 1.10 times wider after the step than before at k = 3 (variant
   2). P5. The attention mass on the "no day" token rises by at least 0.15 on rows whose days contain
   the step, against the same rows without it. P6. E2 minus E1 on clean rows is between -0.10 and
@@ -54,8 +55,8 @@ decision_rule: >-
   at most 0.05 on clean rows, because the encoder adds a network module to the production training
   loop. A fold counts as a win for a contrast when the point estimate is below zero by more than
   the minimum detectable effect. Harm rows here means the injected-world harm rows; the real harm
-  rows are reported beside them and do not decide. A fold is lost when the point estimate is above zero by more than the
-  minimum detectable effect. Advance to the fifth fold, and to experiment 404's trust inputs as
+  rows are reported beside them and do not decide. A fold is lost when the point estimate is above
+  zero by more than the minimum detectable effect. Advance to the fifth fold, and to experiment 404's trust inputs as
   extra tokens, if E3 beats R-inj on harm rows at the signed-MW six in at least 3 of 4
   folds with a pooled gain of at least 0.10, loses at most 0.05 on clean rows, and in the sweep
   follows no more than half of R-inj's share at k = 3 in variant 2. Stop, and report which of the
