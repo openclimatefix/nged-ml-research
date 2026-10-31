@@ -347,15 +347,17 @@ def forward(
     scalers: Scalers,
     metered: torch.Tensor,
     details: bool = False,
-    mask_origin: bool = False,
+    masked: tuple[int, ...] = (),
 ) -> tuple:
     """Return the final mixture (log weights, means, stds) for the rows `idx`, with details."""
     primary = pool.primary[idx]
     lag_rows = lags[idx]
-    if mask_origin:
-        # Arm B5: the newest lag is hidden (value 0, flagged missing), as is its trust block.
+    if masked:
+        # Masked lags are hidden: value 0, flagged missing (arm B5 hides the newest lag; the
+        # lag-masked control of the encroachment sweep hides all three).
         lag_rows = lag_rows.clone()
-        lag_rows[:, 0], lag_rows[:, 1] = 0.0, 1.0
+        for lag in masked:
+            lag_rows[:, 3 * lag], lag_rows[:, 3 * lag + 1] = 0.0, 1.0
     if isinstance(net, models.PlainLagMdn):
         return net(pool.base[idx], lag_rows, primary)
     trust = torch.stack(
@@ -372,8 +374,8 @@ def forward(
         dim=1,
     )
     trust = ((trust - scalers.trust_mean) / scalers.trust_std).clamp(-CLIP_SD, CLIP_SD)
-    if mask_origin:
-        trust[:, :, : rows_mod.N_PER_LAG] = 0.0
+    for lag in masked:
+        trust[:, :, lag * rows_mod.N_PER_LAG : (lag + 1) * rows_mod.N_PER_LAG] = 0.0
     band = torch.from_numpy(models.lead_band_of(lead_hours=pool.lead_hours[idx].cpu().numpy())).to(
         primary.device
     )
@@ -442,7 +444,7 @@ def fit_arm(
             idx = order[start : start + BATCH]
             out = forward(
                 net=net, pool=train, idx=idx, lags=lags, stack=stack, lag_grid=lag_grid,
-                scalers=scalers, metered=metered, mask_origin=arm == "B5",
+                scalers=scalers, metered=metered, masked=(0,) if arm == "B5" else (),
             )  # fmt: skip
             log_w, mean, std = out[0] if isinstance(out[0], tuple) else out
             z = (train.y[idx] - tm[train.primary[idx]]) / ts[train.primary[idx]]

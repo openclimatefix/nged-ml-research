@@ -184,7 +184,7 @@ def forecast(
         idx = torch.arange(start, min(start + 16384, len(test)), device=device)
         out = fit.forward(
             net=net, pool=test, idx=idx, lags=lags, stack=stack, lag_grid=lag_grid,
-            scalers=scalers, metered=metered, details=True, mask_origin=arm == "B5",
+            scalers=scalers, metered=metered, details=True, masked=(0,) if arm == "B5" else (),
         )  # fmt: skip
         mixture, detail = out if isinstance(out[0], tuple) else (out, None)
         log_w, mean, std = mixture

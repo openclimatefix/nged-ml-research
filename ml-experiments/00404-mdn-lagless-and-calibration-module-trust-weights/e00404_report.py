@@ -100,10 +100,24 @@ def cluster_ids(*, frame: pl.DataFrame, real: np.ndarray) -> np.ndarray:
 
 
 def contrast(
-    *, a: pl.DataFrame, b: pl.DataFrame, cluster: np.ndarray, seed: int = 0
+    *,
+    a: pl.DataFrame,
+    b: pl.DataFrame,
+    cluster: np.ndarray,
+    seed: int = 0,
+    drop_largest: bool = False,
 ) -> tuple[float, float, float]:
-    """Return mean(a.crps - b.crps) and its 95% event-cluster bootstrap interval (same rows)."""
+    """Return mean(a.crps - b.crps) and its 95% event-cluster bootstrap interval (same rows).
+
+    With `drop_largest`, the event whose rows contribute the largest absolute sum of differences
+    is removed first, to show how much one event decides the result.
+    """
     diff = a["crps"].to_numpy() - b["crps"].to_numpy()
+    if drop_largest:
+        codes_all, inverse_all = np.unique(cluster, return_inverse=True)
+        totals = np.abs(np.bincount(inverse_all, weights=diff, minlength=len(codes_all)))
+        keep = inverse_all != int(np.argmax(totals))
+        diff, cluster = diff[keep], cluster[keep]
     codes, inverse = np.unique(cluster, return_inverse=True)
     sums = np.bincount(inverse, weights=diff, minlength=len(codes))
     counts = np.bincount(inverse, minlength=len(codes)).astype(float)
@@ -117,7 +131,9 @@ def contrast(
     )
 
 
-def table(*, month: str, seed: int, arms: list[str], worlds: list[int]) -> None:
+def table(
+    *, month: str, seed: int, arms: list[str], worlds: list[int], reference: str | None = None
+) -> None:
     """Print mean score and 90% band coverage by arm, group, and row class, then contrasts."""
     real = score.real_event_mask()
     frames = {arm: load(arm=arm, month=month, seed=seed, worlds=worlds) for arm in arms}
@@ -136,7 +152,7 @@ def table(*, month: str, seed: int, arms: list[str], worlds: list[int]) -> None:
         ]
     )
     print(summary.sort("group", "cls", "arm"))
-    reference = "A0-inj" if "A0-inj" in frames else arms[0]
+    reference = reference or ("A0-inj" if "A0-inj" in frames else arms[0])
     clusters = cluster_ids(frame=frames[reference], real=real)
     for arm in arms:
         if arm == reference:
@@ -148,15 +164,18 @@ def table(*, month: str, seed: int, arms: list[str], worlds: list[int]) -> None:
                 ).to_numpy()
                 if mask.sum() == 0:
                     continue
-                point, low, high = contrast(
-                    a=frames[arm].filter(pl.Series(mask)),
-                    b=frames[reference].filter(pl.Series(mask)),
-                    cluster=clusters[mask],
-                )
-                print(
-                    f"{arm} minus {reference} | {group} | {cls}: "
-                    f"{point:+.3f} [{low:+.3f}, {high:+.3f}]"
-                )
+                for dropped in (False, True) if cls.endswith("_real") else (False,):
+                    point, low, high = contrast(
+                        a=frames[arm].filter(pl.Series(mask)),
+                        b=frames[reference].filter(pl.Series(mask)),
+                        cluster=clusters[mask],
+                        drop_largest=dropped,
+                    )
+                    note = " (largest event removed)" if dropped else ""
+                    print(
+                        f"{arm} minus {reference} | {group} | {cls}{note}: "
+                        f"{point:+.3f} [{low:+.3f}, {high:+.3f}]"
+                    )
 
 
 def main() -> None:
@@ -166,9 +185,16 @@ def main() -> None:
     parser.add_argument("--month", required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--arms", nargs="+", required=True)
+    parser.add_argument("--reference", default=None)
     parser.add_argument("--worlds", type=int, nargs="*", default=[*score.SCORING_SEEDS, -1])
     args = parser.parse_args()
-    table(month=args.month, seed=args.seed, arms=args.arms, worlds=args.worlds)
+    table(
+        month=args.month,
+        seed=args.seed,
+        arms=args.arms,
+        worlds=args.worlds,
+        reference=args.reference,
+    )
 
 
 if __name__ == "__main__":
