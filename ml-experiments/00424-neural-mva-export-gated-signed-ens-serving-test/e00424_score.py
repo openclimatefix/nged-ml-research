@@ -99,7 +99,7 @@ def bars(*, seeds_a: tuple[int, ...], rotations: tuple[str, ...], mde: float) ->
         name: s420.contrast(
             reference=p0,
             candidate=a,
-            rows=REVERSE & (LEAD_HOURS >= lo) & (LEAD_HOURS < hi),
+            rows=REVERSE & (lo <= LEAD_HOURS) & (hi > LEAD_HOURS),
         )
         for name, (lo, hi) in LEAD_BANDS.items()
     }
