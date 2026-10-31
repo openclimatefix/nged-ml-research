@@ -47,8 +47,8 @@ ROW_SETS: Final[dict[str, tuple[str, Callable[[dict[str, np.ndarray]], np.ndarra
     "clean": ("real", lambda f: ~f["win_real"] & ~f["tgt_post"]),
     "real_event": ("real", lambda f: f["tgt_real"]),
     "real_harm": ("real", lambda f: ~f["tgt_post"] & f["win_real"]),
-    "inj_clean": ("inj", lambda f: ~f["win_inj"] & ~f["win_real"] & ~f["tgt_post"]),
-    "inj_harm": ("inj", lambda f: f["win_inj"] & ~f["tgt_post"]),
+    "inj_clean": ("inj", lambda f: ~f["win_inj"] & ~f["win_real"] & ~f["tgt_post"] & ~f["tgt_inj"]),
+    "inj_harm": ("inj", lambda f: f["win_inj"] & ~f["tgt_post"] & ~f["tgt_inj"]),
 }
 """Row sets: the world set they are read from, and the flag rule."""
 GROUPS: Final[dict[str, tuple[str, ...]]] = {
@@ -71,11 +71,25 @@ POINTS: Final[float] = 100.0
 """Quantile scores are fractions of capacity; one point is 1%."""
 
 
-def read_arm(*, arm: str, month: str, world: int, seeds: tuple[int, ...]) -> pl.DataFrame:
+WIDENING: Final[float] = 1.15
+MEDIAN: Final[int] = 5
+
+
+def widened(*, q: np.ndarray, factor: float) -> np.ndarray:
+    """Return the sorted quantiles with every spread about the median multiplied by `factor`."""
+    median = q[:, [MEDIAN]]
+    return np.sort(median + factor * (q - median), axis=1)
+
+
+def read_arm(
+    *, arm: str, month: str, world: int, seeds: tuple[int, ...], factor: float
+) -> pl.DataFrame:
     """Return the seed-averaged quantiles, row flags, and keys of an arm, month, and world."""
-    frames = [
-        pl.read_parquet(pr.PRED_DIR / arm / f"{month}_s{seed}_w{world}.parquet") for seed in seeds
-    ]
+    frames = []
+    for seed in seeds:
+        f = pl.read_parquet(pr.PRED_DIR / arm / f"{month}_s{seed}_w{world}.parquet")
+        q = widened(q=f.select(list(pr.LEVEL_NAMES)).to_numpy(), factor=factor)
+        frames.append(f.with_columns([pl.Series(n, q[:, i]) for i, n in enumerate(pr.LEVEL_NAMES)]))
     keys = frames[0].select("primary", "origin_us", "valid_us", "lead", "actual", *_flags())
     for f in frames[1:]:
         assert f["valid_us"].equals(frames[0]["valid_us"]), "seed files differ in row order"
@@ -97,7 +111,7 @@ def read_arm(*, arm: str, month: str, world: int, seeds: tuple[int, ...]) -> pl.
 
 
 def _flags() -> list[str]:
-    return ["win_inj", "win_real", "tgt_real", "tgt_post"]
+    return ["win_inj", "win_real", "tgt_inj", "tgt_real", "tgt_post"]
 
 
 def row_mask(
@@ -114,14 +128,14 @@ def group_of(*, primary: np.ndarray) -> dict[str, np.ndarray]:
     return {g: np.isin(sites, labels) for g, labels in GROUPS.items()}
 
 
-def collect(*, months: list[str], seeds: tuple[int, ...]) -> pl.DataFrame:
+def collect(*, months: list[str], seeds: tuple[int, ...], factor: float) -> pl.DataFrame:
     """Return one long table: per arm, month, world set, row set, group, origin day, block sums."""
     records = []
     for month in months:
         for set_name, worlds in WORLD_SETS.items():
             for arm in ARMS:
                 for world in worlds:
-                    frame = read_arm(arm=arm, month=month, world=world, seeds=seeds)
+                    frame = read_arm(arm=arm, month=month, world=world, seeds=seeds, factor=factor)
                     day = (frame["origin_us"].to_numpy() // (86_400 * 1_000_000)).astype(int)
                     groups = group_of(primary=frame["primary"].to_numpy())
                     actual = frame["actual"].to_numpy()
@@ -231,9 +245,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--months", nargs="+", default=list(fit.SCREEN_MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(fit.SEEDS))
+    parser.add_argument("--raw", action="store_true", help="no 1.15 widening")
     args = parser.parse_args()
     seeds = tuple(args.seeds)
-    table = collect(months=args.months, seeds=seeds)
+    factor = 1.0 if args.raw else WIDENING
+    print(f"spread factor {factor}")
+    table = collect(months=args.months, seeds=seeds, factor=factor)
     out = data.WORK_DIR / "scores"
     out.mkdir(parents=True, exist_ok=True)
     table.write_parquet(out / "blocks.parquet")
@@ -246,7 +263,17 @@ def main() -> None:
         print(mde.sort("row_set", "group"))
         contrasts = contrast_table(table=table, rng=np.random.default_rng(0))
         contrasts.write_parquet(out / "contrasts.parquet")
-        print(contrasts.sort("contrast", "row_set", "group").drop("fold_differences"))
+        verdict = contrasts.join(mde, on=["row_set", "group"]).with_columns(
+            folds_won=pl.struct("fold_differences", "mde").map_elements(
+                lambda r: sum(v < -r["mde"] for v in r["fold_differences"].values()),
+                return_dtype=pl.Int64,
+            ),
+            folds_lost=pl.struct("fold_differences", "mde").map_elements(
+                lambda r: sum(v > r["mde"] for v in r["fold_differences"].values()),
+                return_dtype=pl.Int64,
+            ),
+        )
+        print(verdict.sort("contrast", "row_set", "group").drop("fold_differences", "seed_sd"))
 
 
 if __name__ == "__main__":

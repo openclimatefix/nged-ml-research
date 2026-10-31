@@ -155,9 +155,12 @@ def post_event_mask(*, padded: np.ndarray) -> np.ndarray:
 class Flags:
     """Row-class flags from the injected event codes and the padded real-event mask."""
 
-    def __init__(self, *, code: np.ndarray, real: np.ndarray, device: str) -> None:
+    def __init__(
+        self, *, code: np.ndarray, real: np.ndarray, power: np.ndarray, device: str
+    ) -> None:
         """Hold the masks on `device`: code (worlds, primaries, grid), real (primaries, grid)."""
         self.code = torch.from_numpy(code).to(device)
+        self.power = torch.from_numpy(power).to(device)
         self.real = torch.from_numpy(real).to(device)
         self.post = torch.from_numpy(np.stack([post_event_mask(padded=r) for r in real])).to(device)
 
@@ -172,9 +175,12 @@ class Flags:
         p = primary[:, None, None]
         injected = self.code[world[:, None, None], p, safe] != 0
         real = self.real[p, safe]
+        observed = torch.isfinite(self.power[world[:, None, None], p, safe])
+        inside = inside & observed
         return {
             "win_inj": (injected & inside).flatten(1).any(1),
             "win_real": (real & inside).flatten(1).any(1),
+            "tgt_inj": self.code[world, primary, target] != 0,
             "tgt_real": self.real[primary, target],
             "tgt_post": self.post[primary, target],
         }
@@ -310,7 +316,7 @@ def main() -> None:
     args = parser.parse_args()
     power_np, code = data.load_stack(include_eval=True)
     power = torch.from_numpy(power_np).to(args.device)
-    flags = Flags(code=code, real=data.real_event_mask(), device=args.device)
+    flags = Flags(code=code, real=data.real_event_mask(), power=power_np, device=args.device)
     for month in args.months:
         for seed in args.seeds:
             if "Bmix" in args.arms:

@@ -110,6 +110,9 @@ def shifter(*, arm: fit.Arm, variant: str, k: int, step: torch.Tensor, mva: torc
     changed = {"flag": None}
 
     def modify(raw: dict) -> None:
+        if arm.kind == "none":
+            changed["flag"] = None
+            return
         if arm.kind == "lags":
             target = raw["lags"]
             before = target.clone()
@@ -134,21 +137,30 @@ def shifter(*, arm: fit.Arm, variant: str, k: int, step: torch.Tensor, mva: torc
                 (2, torch.full((rows,), 24, device=values.device)),
             ][:k]
             flag = torch.zeros(rows, dtype=torch.bool, device=values.device)
+            sel = torch.arange(rows, device=values.device)
+            done: list[tuple[int, torch.Tensor]] = []
             for window, pos in positions:
                 if window >= values.shape[1]:
                     continue
-                sel = torch.arange(rows, device=values.device)
+                repeated = torch.zeros(rows, dtype=torch.bool, device=values.device)
+                for earlier_window, earlier_pos in done:
+                    if earlier_window == window:
+                        repeated |= earlier_pos == pos
+                done.append((window, pos))
                 old = values[sel, window, pos]
                 new = old + step
                 clipped = torch.where(mva, new.clamp(min=0.0), new)
-                flag |= (clipped != new) & torch.isfinite(old)
-                values[sel, window, pos] = clipped
+                # A position that is unobserved cannot carry the step, and one already shifted
+                # in this call is not shifted twice.
+                flag |= ((clipped != new) & ~repeated) | ~torch.isfinite(old)
+                values[sel, window, pos] = torch.where(repeated, old, clipped)
             changed["flag"] = flag
         else:
             new = values[:, :k, :] + step[:, None, None]
             clipped = torch.where(mva[:, None, None], new.clamp(min=0.0), new)
+            visible = raw["index"][:, :k, :] <= (raw["origin"] - win.NEWEST_AGE)[:, None, None]
             changed["flag"] = (
-                ((clipped != new) & torch.isfinite(values[:, :k, :])).flatten(1).any(1)
+                ((clipped != new) & torch.isfinite(values[:, :k, :]) & visible).flatten(1).any(1)
             )
             values[:, :k, :] = clipped
 
@@ -207,6 +219,7 @@ def sweep_arm(*, arm_name: str, month: str, seed: int, device: str, power: torch
         newest=inputs.origin[rows_all] - win.NEWEST_AGE,
     )
     out: list[dict] = []
+    ACCUMULATORS.clear()
     masked_gap = 0.0
     cfgs = configs(arm=arm)
     n_days = arm.days if arm.kind == "encoder" else 0
@@ -223,7 +236,7 @@ def sweep_arm(*, arm_name: str, month: str, seed: int, device: str, power: torch
             size = (
                 torch.full((len(rows),), 0.025 if step_name == "c025" else 0.05, device=device)
                 if step_name != "m10"
-                else 0.10 * trailing[start : start + CHUNK]
+                else 0.10 * trailing[start : start + CHUNK].abs()
             )
             valid_step = torch.isfinite(size) & (size > 0)
             for sign in SIGNS:
@@ -362,7 +375,7 @@ def main() -> None:
     args = parser.parse_args()
     power_np, code = data.load_stack(include_eval=False)
     power = torch.from_numpy(power_np).to(args.device)
-    flags = pr.Flags(code=code, real=data.real_event_mask(), device=args.device)
+    flags = pr.Flags(code=code, real=data.real_event_mask(), power=power_np, device=args.device)
     for month in args.months:
         for seed in args.seeds:
             for name in args.arms:

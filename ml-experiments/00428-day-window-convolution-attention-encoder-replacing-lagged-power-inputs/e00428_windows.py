@@ -32,7 +32,6 @@ WINDOW: Final[int] = 48
 CLIP_SD: Final[float] = 5.0
 AGE_UNIT: Final[float] = 2.0 * 336.0
 """Half-hours in 336 hours."""
-LAG_AGE_SCALE_HOURS: Final[float] = 336.0
 
 
 def ceil_div(*, a: torch.Tensor, b: int) -> torch.Tensor:

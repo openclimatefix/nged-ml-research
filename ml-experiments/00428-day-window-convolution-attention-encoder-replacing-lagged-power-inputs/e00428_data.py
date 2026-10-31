@@ -47,7 +47,8 @@ COVERAGE: Final[float] = 0.10
 N_TRAIN_WORLDS: Final[int] = len(TRAIN_WORLD_SEEDS)
 """Training draws from worlds 0 (clean) to `N_TRAIN_WORLDS` with equal probability."""
 HEADLINE_MAX_HOURS: Final[float] = 240.0
-EVENT_PADDING: Final[int] = 48
+HOLDOUT: Final[datetime] = common.HOLDOUT
+"""No experiment scores a valid time on or after 2026-07-01."""
 
 
 def world_path(*, seed: int) -> Path:
@@ -248,7 +249,12 @@ def build_test(*, month: str, standardiser: prep.Standardiser) -> TestRows:
     parts: list[dict[str, np.ndarray]] = []
     for row in prep.primaries().iter_rows(named=True):
         z = np.load(prep.RAW_DIR / "summary" / f"{row['site']}.npz")
-        keep = (z["origin"] >= start) & (z["origin"] < stop) & (z["lead"] <= HEADLINE_MAX_HOURS)
+        keep = (
+            (z["origin"] >= start)
+            & (z["origin"] < stop)
+            & (z["lead"] <= HEADLINE_MAX_HOURS)
+            & (z["valid"] < _us(t=HOLDOUT))
+        )
         if not keep.any():
             continue
         parts.append(

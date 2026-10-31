@@ -253,6 +253,15 @@ the first screen only; each iteration adds an arm and a dated section.
 
 ## Checks, reviews, and what the page will report
 
+- **Departures from experiment 397's recipe, found by the code review.** Every arm (R included)
+  trains on a random 20% of the rows per epoch with batch 8,192 (experiment 397: full epochs, batch
+  16,384, patience 6), and standardises the three lags with one pooled mean and standard deviation
+  of the cleaned targets (experiment 397: one per lag column). Scores use the 1.15 widening; CRPS
+  is the mean of the three seeds' scores, and the tail pinball and coverage are computed from the
+  seed-averaged quantiles. Rows with a valid time on or after 2026-07-01 are not scored.
+- **The avoidable-curtailment cost is not computed at the screen.** The harm-row sets have no node
+  table; it is computed for the clean rows if the screen advances.
+
 - **Reviews.** A fresh Sonnet reviews this plan and then the code before the first fit; a fresh
   Sonnet re-derives the headline numbers; a fresh Sonnet reviews the write-up and its prose. The PR
   body records what each found.
