@@ -196,6 +196,15 @@ with 95% month-block intervals. The stage-1 scores are in `work/scores_stage1.js
 - **B5, reading CRPS at the eight, against P0:** A is 0.058 worse (-0.030 to 0.200), just above the
   +0.05 limit, and AV is 0.009 worse (-0.021 to 0.044), inside it.
 
+## Minimum detectable effect, full run (written before the full scoring)
+
+**Over all three rotations the minimum detectable effect is 0.272 points of effective capacity.** The
+null difference between A's two seeds on reverse-flow rows at level 2.0 has a mean of -0.152 (95%
+interval -0.341 to 0.040; 42 Primary-month blocks, 79,399 rows) and a bootstrap standard deviation
+of 0.097, and 2.8 times 0.097 is 0.272. This is below the 0.5-point limit, so the AV against A
+contrast is not underpowered. The figure is stored in `work/mde_full.json`. All 378 fits finished
+before it was computed.
+
 ## Fits and stop rule
 
 | Batch | Fits |
