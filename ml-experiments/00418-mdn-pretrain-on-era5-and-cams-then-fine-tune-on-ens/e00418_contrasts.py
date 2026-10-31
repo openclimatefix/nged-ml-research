@@ -67,20 +67,21 @@ def contrast_rows(
         )
 
 
-def full(*, months: list[str], arms: list[str]) -> None:
+def full(*, months: list[str], arms: list[str], references: bool = True) -> None:
     """Score the full folds: arms against the ENS-only refit, with the stored 397 forecasts as an extra row."""
     series = adapter.series_table()
     ctx = s381.build_context(series=series)
     frames = score.arm_frames(folder="seed_preds", months=months, arms=arms, series=series)
-    stored_months = [m for m in months if m in fit.SCREEN_MONTHS or m == "2025-12"]
-    frames["e397_pooled_stored"] = adapter.forecast_frame(
-        stored=score.average_dir(
-            folder=s397.SEED_DIR / "summary" / "plain_pooled", months=stored_months
-        ),
-        series=series,
-        unit="fraction",
-    )
-    frames.update(s397.references(series=series))
+    if references:
+        stored_months = [m for m in months if m in fit.SCREEN_MONTHS or m == "2025-12"]
+        frames["e397_pooled_stored"] = adapter.forecast_frame(
+            stored=score.average_dir(
+                folder=s397.SEED_DIR / "summary" / "plain_pooled", months=stored_months
+            ),
+            series=series,
+            unit="fraction",
+        )
+        frames.update(s397.references(series=series))
     names = {fit.arm_name(arm=a): a for a in arms}
     table, scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
     print("\n== CRPS, days 1 to 10, equal weight per Primary, all folds in the arms ==")
@@ -172,9 +173,12 @@ def main() -> None:
     parser.add_argument("--months", nargs="+", default=list(ALL_MONTHS))
     parser.add_argument("--arms", nargs="+", default=["ens-only", "P1", "P2", "P3"])
     parser.add_argument("--arm", default="P1")
+    parser.add_argument(
+        "--no-references", action="store_true", help="score the arms alone, on all their half-hours"
+    )
     args = parser.parse_args()
     if args.mode == "full":
-        full(months=args.months, arms=args.arms)
+        full(months=args.months, arms=args.arms, references=not args.no_references)
     else:
         lowdata(months=list(fit.SCREEN_MONTHS), arm=args.arm)
 

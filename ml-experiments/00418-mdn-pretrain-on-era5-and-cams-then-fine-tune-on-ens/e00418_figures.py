@@ -93,6 +93,8 @@ def data() -> None:
                     )
     pl.DataFrame(out).write_parquet(TABLES / "bands.parquet")
     inverse = {a: n for n, a in names.items()}
+    arm_only = {k: v for k, v in frames.items() if k in inverse.values()}
+    table, _, rows = s381.score_arms(arms=arm_only, series=series, ctx=ctx)
     contrasts = []
     for label, (t, r) in con.CONTRASTS.items():
         for group, labels in con.LABELS.items():
@@ -194,7 +196,7 @@ def draw() -> None:
             width=560,
             height=150,
             title=[
-                "Pretraining lowers CRPS at days 1 to 10 and matches ENS only beyond;",
+                "Pretraining lowers CRPS in every lead band, most at day 1 and for the eight;",
                 "twelve monthly test folds, equal weight per Primary. Smaller is better.",
             ],
         )
