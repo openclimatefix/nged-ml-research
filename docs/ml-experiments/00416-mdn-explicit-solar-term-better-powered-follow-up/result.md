@@ -18,7 +18,7 @@ size: >-
   Callers: the code imports experiments 87, 129, 397, 405, and 409.
 hypothesis: >-
   The pooled plain mixture density network can keep its flexible irradiance input and gain an
-  interpretable explicit solar term at no cost in skill: on sunny-midday half-hours at the six
+  interpretable explicit solar term without losing skill: on sunny-midday half-hours at the six
   signed-direction Primaries, the network with the explicit solar term (C3), and the hybrid that
   also keeps the free irradiance input (H1), score within a stated margin of the network with the
   free irradiance input alone (A0), and they lower the 99th-percentile pinball loss.
@@ -63,8 +63,8 @@ lessons:
   - >-
     The explicit solar term is no better than the free irradiance input on the mean score and is
     nominally worse on sunny middays (+0.23, interval includes zero). Its learned capacity differs
-    from the studies page by a factor of 0.3 to 1.5, so the term is not yet an interpretable
-    physical quantity.
+    from the studies page: 0.4 to 0.7 of it at five of six Primaries and 1.5 times it at D5, so
+    the term is not yet an interpretable physical quantity.
   - >-
     A log-scale capacity prior 100 times stronger than the original prior gives the same forecast
     and the same capacities as no effective prior (C3p minus C3 is +0.003, interval -0.004 to
@@ -82,7 +82,7 @@ take_home_message: >-
 advice:
   - >-
     Keep the free irradiance input in the pooled network: the explicit solar term and the hybrid did
-    not beat it on any primary contrast over 12 test months (C3 minus A0-doy, Section "Results").
+    not beat it on any pre-registered contrast over 12 test months (C3 minus A0-doy, Section "Results").
   - >-
     Do not plan a non-inferiority test on sunny middays with a margin under about 0.3 CRPS points on
     12 monthly folds: the 5-seed minimum detectable effect is 0.28 to 0.37 (pre-registered rule 3).
@@ -91,22 +91,27 @@ advice:
     scale, to pin the learned solar capacity: it holds about 5% of the gradient (prior-share
     report).
   - >-
-    Check Primary D5 first when a solar-term contrast looks bad on sunny middays: it contributes
-    +0.70 of the +0.23 mean difference (leave-one-Primary-out check).
+    Check Primary D5 first when a solar-term contrast looks bad on sunny middays: its difference is
+    +0.70, against +0.23 over the six Primaries (leave-one-Primary-out check).
 date: 2026-10-30
 code: ml-experiments/00416-mdn-explicit-solar-term-better-powered-follow-up/
 ---
 
-**Status: done. The sections up to "Reports" are the plan, written before any fit; the amendments
-were written before the fits they concern.** The brief is
-`briefs/mdn_explicit_solar_followup2_brief.md`,
-which supersedes `briefs/mdn_explicit_solar_powered_brief.md` where they differ. The sections up to
-"Pre-registered rules" are the plan.
+**Status: done.** The sections up to "Pre-registered rules" are the plan, written before any fit.
+Each amendment was written before the fits it concerns. The manager's brief for this experiment
+(`briefs/mdn_explicit_solar_followup2_brief.md`) supersedes the earlier brief
+(`briefs/mdn_explicit_solar_powered_brief.md`) where they differ. In this page, a difference is the
+first arm minus the second, and the score is the continuous ranked probability score (CRPS), so a
+negative difference means the first arm scores better.
 
 ## What is asked
 
-**The question is whether the explicit solar term can replace the free irradiance input without
-losing skill, and whether it improves the tails.** [Experiment
+**The question is whether a neural network can use an explicit solar-power term, with a learned
+capacity, instead of reading the forecast irradiance as a free input, without losing skill.** The
+three network variants are A0 (free irradiance input, no solar term), C3 (explicit solar term, no
+irradiance input), and H1 (both). A sunny midday is a half-hour between 10:00 and 15:00 with a
+clear-sky index of at least 0.7, and the minimum detectable effect is the smallest difference this
+design can separate from seed noise. [Experiment
 409](../00409-mdn-solar-term-day-of-year-and-anomaly-known-answer/result.md)
 found the explicit solar term (C3) 0.064 CRPS points better than the same network with no
 irradiance (interval -0.131 to +0.028), but its minimum detectable effect was 0.397, so the test
@@ -125,9 +130,11 @@ measures where a solar term can show an effect: sunny middays.
   half-hours dropped and the count reported per fold, the D15 and D18 start cut at 2025-03-01
   (applied), monthly refits, saved models, tails per Primary, example forecast graphs, the
   seven-step review process, Sonnet reviews, draft pull request.
-- **Departure from the brief:** the brief names A0 as arm of "the same network ... day-of-year term
+- **Departure from the brief:** the brief defines A0 as "the same network ... with the day-of-year
+  term
   as in experiment 409". Experiment 403's stored A0 has no day-of-year term, so A0 is refitted
-  here with the term (A0-doy). That gives a matched reference at the cost of 25 fits.
+  here with the term (A0-doy). Refitting A0 with the term gives a matched reference at the price of
+25 extra fits.
 - **No change of scope.**
 
 ## Arms
@@ -150,7 +157,7 @@ term through the free irradiance input.
 
 - **Folds.** The five screen months of experiments 397 and 409: 2025-10, 2025-12, 2026-01,
   2026-03, 2026-06. Monthly refits on a 730-day window.
-- **Seeds.** 5 (0 to 4).
+- **Seeds.** The experiment uses five seeds, numbered 0 to 4.
 - **Rows.** Cleaned data, flagged `substation_zero` half-hours dropped (count per fold reported),
   D15 and D18 cut before 2025-03-01 and report-only, 16 Primaries trained pooled, the six
   signed-direction Primaries (D5, D9, D10, D11, D14, D16) scored in the primary contrasts, the
@@ -223,8 +230,8 @@ contrast, signed-MW six, days 1 to 10):
   seed-average of 5 seeds shrinks the seed noise by roughly a factor of 2, which leaves about 0.4,
   still about 4 times the margin. The page reports the post-fit value from the 5 seeds and applies
   the "Inconclusive" verdict if it exceeds the margin.
-- **Only the month-to-month spread within a slice of 5 test months limits the interval.** More
-  seeds do not fix that, and more test months would.
+- **In experiment 409's data, the month-to-month spread within a slice of 5 test months limited the
+  interval.** More seeds do not lower the single-seed definition.
 
 ## Amendment 2: pre-registered second stage, more test months (manager, 2026-10-30)
 
@@ -333,7 +340,7 @@ of 730 days or the history since 2024-04-01 (at least 15 months). The decision r
 
 - **Followed:** test the solar term on CRPS directly; compare on at least 3 test months per slice
   (the sunny-midday slice holds all 5 test months); report absolute skill beside contrasts.
-- **Departed from:** none.
+- **Departed from:** none of the earlier advice.
 
 ## Results
 
@@ -367,7 +374,8 @@ seven more; the earlier five give the same direction as the later seven.
 - **Absolute CRPS, signed-MW six / MVA-only eight (days 1 to 10).** A0-doy 2.966 / 3.844; C3 2.990 /
   3.936; H1 2.967 / 3.876; A0-noirr-doy 3.008 / 3.892; C3p 2.993 / 3.932; C3pa 2.993 / 3.935;
   C3p-weak 2.992 / 3.930. The MVA-only eight have no solar term and differ between arms only through
-  their inputs and training noise (0.05 to 0.09 points), the noise floor for networks that differ in
+  their inputs and training noise (0.03 to 0.09 points against A0-doy), the noise floor for networks
+that differ in
   nothing relevant to them.
 - **Sunny-midday slice (CAMS clear-sky index at least 0.7, 10:00 to 15:00 local time, 88,924
   half-hours).** Mean CRPS: A0-doy 4.288; C3 4.515; H1 4.515; A0-noirr-doy 4.398. Mean q99 pinball
@@ -422,20 +430,24 @@ seven more; the earlier five give the same direction as the later seven.
   for the five experiment 409 months (a refit of C3, seed 0, 2026-06 reproduced experiment 409's
   stored forecast to 4e-6). Fitted here: 390 fits (70 in the first stage, 75 log-prior fits on the
   first five months, and 245 in the extension); 30 fits were reused. Saved networks:
-  `data/ml-experiments/00416-mdn-explicit-solar-term-better-powered-follow-up/work/seed_preds/<arm>/<month>_s<seed>.pt`.
+`data/ml-experiments/00416-mdn-explicit-solar-term-better-powered-follow-up/work/seed_preds/<arm>/<month>_s<seed>.pt`.
 
 ## Checks
 
-- **Median minus mean of the 11 quantiles, per Primary (fraction of capacity).** All arms have a
-  median below the mean-of-quantiles by the same amount: for A0-doy -0.076 (D10), -0.003 (D11),
-  -0.023 (D14), -0.044 (D16), -0.035 (D5), -0.027 (D9). C3 is within 0.02 of A0-doy at each Primary,
+- **Median minus mean of the 11 quantiles, per Primary (MW, all lead times from 0.5 to 336 hours).**
+  All arms have a
+  median below the mean-of-quantiles by the same amount: for A0-doy -0.076 (D10), -0.002 (D11),
+  -0.023 (D14), -0.044 (D16), -0.034 (D5), -0.027 (D9). C3 is within 0.02 of A0-doy at each Primary,
   and the spread does not shift the arms differently.
-- **Error of the median forecast beside the quantile-score contrasts (fraction of capacity, signed
-  six, mean absolute error).** All half-hours: A0-doy 0.439, C3 0.442, H1 0.436, A0-noirr-doy 0.441.
+- **Error of the median forecast beside the quantile-score contrasts (MW, signed six, mean absolute
+  error, all lead times from 0.5 to 336 hours, so the sunny-midday slice holds 132,077 half-hours,
+  not the 88,924 of days 1 to 10).** All half-hours: A0-doy 0.439, C3 0.442, H1 0.436, A0-noirr-doy
+  0.441.
   Sunny middays: A0-doy 0.628, C3 0.670, H1 0.671, A0-noirr-doy 0.638. The median error points the
   same way as sunny-midday CRPS (A0-doy best) and the other way from the all-half-hour q99 pinball
   loss (C3 best).
-- **Leave-one-Primary-out, sunny-midday CRPS, C3 minus A0-doy.** All six +0.225; without D5 +0.129;
+- **Leave-one-Primary-out, sunny-midday CRPS, C3 minus A0-doy (mean of the six Primaries' own means,
+  so +0.225 here against +0.227 pooled in the headline).** All six +0.225; without D5 +0.129;
   without D9 +0.265; without D10 +0.232; without D11 +0.238; without D14 +0.231; without D16 +0.252.
   Per Primary: D5 +0.702, D14 +0.192, D10 +0.186, D11 +0.158, D16 +0.086, D9 +0.024. The sign never
   flips.
@@ -453,10 +465,9 @@ seven more; the earlier five give the same direction as the later seven.
 
 ## What to try next
 
-- **Keep the free irradiance input** in the pooled network. The explicit term would need either more
-  test months (the unused months are before 2025-07, for which no inputs are stored) or a design
-  that gives its sunny-midday contrast a smaller seed spread, before a non-inferiority claim becomes
-  possible.
+- **Keep the free irradiance input** in the pooled neural network. A non-inferiority claim for the
+  explicit term needs either a larger margin (about 0.3 CRPS points) or a design with a smaller seed
+  spread, because seven more test months did not lower the minimum detectable effect.
 - **Investigate D5**, where C3 is +0.70 worse on sunny middays and the learned capacity is 1.5 times
   the studies page.
 - **If an interpretable solar term is still wanted,** fix the capacity from the studies page (arm C1
@@ -475,7 +486,23 @@ seven more; the earlier five give the same direction as the later seven.
   gradient share is zero for every prior arm, so the shifted-start share is reported; the strength
   claim is worded as relative to C3; a comment on `prior=False`; the run recipe names the log-prior
   arms).
-- **Results check and write-up review.** To be recorded below when they have run.
+- **Results check (fresh Sonnet).** The agent re-derived the absolute CRPS, the sunny-midday and
+  all-half-hour contrasts, the q99 pinball contrasts, the median errors, and the leave-one-Primary-out
+  table from the stored forecasts with its own code. Everything reproduced. It found 7 points, all
+  accepted: the median-error and median-minus-mean checks are in MW over all lead times (labels
+  fixed), the leave-one-Primary-out table uses the mean of the Primaries' own means (labelled), the
+  D5 advice item now says D5's own difference is +0.70, the capacity range in the lessons is 0.4 to
+  1.5, the noise-floor range is 0.03 to 0.09, and two median-minus-mean values were rounded
+  differently. It did not re-derive intervals, minimum detectable effects, coverage, capacities, or
+  the prior shares.
+- **Write-up review (fresh Sonnet, prose).** 20 findings. Accepted and applied: the sign convention is
+  stated, the status paragraph is consistent, the lead of "What is asked" defines A0, C3, H1, sunny
+  midday, and minimum detectable effect, the contradictory "only the month-to-month spread" claim is
+  scoped to experiment 409, "no cost in skill" is reworded, "primary contrast" is "pre-registered
+  contrast", the "To be recorded" placeholder is replaced, the next-steps bullet no longer proposes
+  months that have no stored inputs, and several pronoun and fragment fixes. Not applied: linking every
+  earlier experiment mentioned, and rewriting every count as a word or numeral, because the
+  pre-registered plan text is kept as written.
 
 ## Problems caused by the move
 
