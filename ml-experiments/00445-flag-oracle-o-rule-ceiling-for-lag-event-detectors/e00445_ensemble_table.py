@@ -159,6 +159,8 @@ def part_two() -> None:
     for group in GROUPS:
         for cls in CLASSES:
             mask = ((ref["group"] == group) & (ref["cls"] == cls)).to_numpy()
+            if not mask.any():
+                continue
             for a, b in pairs:
                 for dropped in (False, True) if cls.endswith("_real") else (False,):
                     point, low, high = report.contrast(

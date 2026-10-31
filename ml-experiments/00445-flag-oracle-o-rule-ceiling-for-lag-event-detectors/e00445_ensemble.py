@@ -48,7 +48,7 @@ def name_of(*, kind: str, seeds: tuple[int, ...]) -> str:
     return f"E-{kind}-{''.join(str(s) for s in seeds)}"
 
 
-def mix_equal(*, heads: list[Head], primary: np.ndarray) -> np.ndarray:
+def mix_equal(*, heads: list[Head]) -> np.ndarray:
     """Return the 11 quantiles (rows, 11) of the equal-weight mixture of the heads."""
     k = len(heads)
     log_w = torch.cat([h[0] - float(np.log(k)) for h in heads], dim=1)
@@ -58,7 +58,6 @@ def mix_equal(*, heads: list[Head], primary: np.ndarray) -> np.ndarray:
     for start in range(0, len(log_w), orule.BATCH):
         sl = slice(start, start + orule.BATCH)
         out.append(models.mixture_quantiles(log_w=log_w[sl], mean=mean[sl], std=std[sl]))
-    del primary
     return torch.cat(out).numpy().astype(np.float64)
 
 
@@ -123,15 +122,14 @@ def build_month(*, month: str, worlds: list[int]) -> None:
     }
     q_ll = {}
     for seeds in LAGLESS_SETS:
-        q_ll[name_of(kind="ll", seeds=seeds)] = mix_equal(
-            heads=[ll[s] for s in seeds], primary=primary
-        )
+        q_ll[name_of(kind="ll", seeds=seeds)] = mix_equal(heads=[ll[s] for s in seeds])
     for s in SINGLE_LAGLESS:
-        q_ll[f"LL-s{s}"] = mix_equal(heads=[ll[s]], primary=primary)
+        q_ll[f"LL-s{s}"] = mix_equal(heads=[ll[s]])
     stored_o = pl.read_parquet(
         orule.prediction_path(arm="O-lagless", month=month, seed=0, world=-1)
     )
     err = np.abs(q_ll["LL-s0"] - stored_o[names].to_numpy()).max()
+    assert err < orule.CHECK_TOLERANCE, "lagless head differs from stored O-lagless"
     print(
         f"{month}: lagless head recomputed from the table vs O-lagless, max diff {err:.2e}",
         flush=True,
@@ -153,21 +151,22 @@ def build_month(*, month: str, worlds: list[int]) -> None:
         stored = pl.read_parquet(
             score.prediction_path(arm="A0-inj", month=month, seed=0, world=world)
         )
-        err = np.abs(mix_equal(heads=[lagged[0]], primary=primary) - stored[names].to_numpy()).max()
+        err = np.abs(mix_equal(heads=[lagged[0]]) - stored[names].to_numpy()).max()
+        assert err < orule.CHECK_TOLERANCE, "recomputed A0-inj differs from stored"
         print(
             f"  w{world}: lagged seed 0 recomputed vs stored A0-inj, max diff {err:.2e}", flush=True
         )
         for seeds in LAGGED_SETS:
-            q = mix_equal(heads=[lagged[s] for s in seeds], primary=primary)
+            q = mix_equal(heads=[lagged[s] for s in seeds])
             write_arm(
                 arm=name_of(kind="lag", seeds=seeds), base=base, q=q, month=month, world=world
             )
         i = 0  # seed-matched B-mix check on seed 0
         bm = pl.read_parquet(score.prediction_path(arm="B-mix", month=month, seed=i, world=world))
-        q = mix_equal(heads=[lagged[i], ll[i]], primary=primary)
+        q = mix_equal(heads=[lagged[i], ll[i]])
         err = np.abs(q - bm[names].to_numpy()).max()
+        assert err < orule.CHECK_TOLERANCE, "recomputed B-mix differs from stored"
         print(f"  w{world}: recomputed B-mix seed {i} vs stored, max diff {err:.2e}", flush=True)
-        break
 
 
 def main() -> None:
