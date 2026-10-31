@@ -52,6 +52,8 @@ CELLS: Final[tuple[tuple[str, int], ...]] = (
     ("2026-06", 2),
 )
 BATCH: Final[int] = 16384
+CHECK_TOLERANCE: Final[float] = 1e-4
+"""Largest accepted difference (capacity fraction) between recomputed and stored quantiles."""
 CHECK_ROWS: Final[int] = 20000
 """Rows per cell and world on which the recomputed 50/50 mixture is compared with stored B-mix."""
 LEVEL_NAMES: Final[tuple[str, ...]] = score.LEVEL_NAMES
@@ -139,6 +141,15 @@ class Heads:
         )  # fmt: skip
 
 
+def mixture_means(
+    *, parts: tuple[torch.Tensor, torch.Tensor, torch.Tensor], mu: torch.Tensor, sd: torch.Tensor,
+    primary: torch.Tensor,
+) -> np.ndarray:  # fmt: skip
+    """Return the mean of each row's mixture in capacity fractions."""
+    z = (parts[0].exp() * parts[1]).sum(1)
+    return (z * sd[primary] + mu[primary]).numpy().astype(np.float64)
+
+
 def load_a0_inj(*, month: str, seed: int) -> tuple[torch.nn.Module, dict]:
     """Load the saved A0-inj network on the CPU, in evaluation mode (dropout off)."""
     saved = torch.load(
@@ -199,6 +210,7 @@ def build_cell(*, month: str, seed: int, real: np.ndarray, worlds: list[int]) ->
     sd = torch.tensor(scalers.target_std, dtype=torch.float32)
     lagless = models.mixture_parts(out=test.ll, components=models.COMPONENTS)
     names = list(LEVEL_NAMES)
+    lagless_mean = mixture_means(parts=lagless, mu=mu, sd=sd, primary=test.primary)
     lagless_all = quantiles_of(
         log_w=lagless[0], mean=lagless[1], std=lagless[2], mu=mu, sd=sd, primary=test.primary
     ).astype(np.float64)
@@ -214,6 +226,8 @@ def build_cell(*, month: str, seed: int, real: np.ndarray, worlds: list[int]) ->
             rebuilt = getattr(test, key).numpy()
             assert np.array_equal(stored[key].to_numpy(), rebuilt), f"{key} differs from stored"
         flags = lag_flags(frame=stored, code=code, real=real, world=world)
+        stored_flag = stored["lag_inj" if world >= 0 else "lag_real"].to_numpy()
+        assert np.array_equal(flags.any(1), stored_flag), "per-lag flags disagree with stored"
         count = flags.sum(1)
         lagged = lagged_head(
             net=net, test=test, power=torch.tensor(power_np), scalers=scalers, lag_stats=lag_stats
@@ -223,12 +237,23 @@ def build_cell(*, month: str, seed: int, real: np.ndarray, worlds: list[int]) ->
         bmix = pl.read_parquet(
             score.prediction_path(arm="B-mix", month=month, seed=seed, world=world)
         )
+        for key in ("primary", "origin", "target"):
+            assert np.array_equal(bmix[key].to_numpy(), stored[key].to_numpy()), key
         lagged_err = np.abs(heads.mix(rows=check, share=0.0) - q_lagged[check]).max()
         bmix_err = np.abs(heads.mix(rows=check, share=0.5) - bmix[names].to_numpy()[check]).max()
         print(
             f"{month} s{seed} w{world}: max |recomputed - stored| A0-inj {lagged_err:.2e}, "
             f"B-mix {bmix_err:.2e} (capacity fractions)"
         )
+        assert lagged_err < CHECK_TOLERANCE, "recomputed A0-inj differs from stored"
+        assert bmix_err < CHECK_TOLERANCE, "recomputed B-mix differs from stored"
+        lagged_mean = mixture_means(parts=lagged, mu=mu, sd=sd, primary=test.primary)
+        share = count / 3.0
+        means = {
+            "O-hard": np.where(count >= 1, lagless_mean, lagged_mean),
+            "O-soft": (1.0 - share) * lagged_mean + share * lagless_mean,
+            "O-lagless": lagless_mean,
+        }
         hard, soft = o_rule_quantiles(
             heads=heads, stored=q_lagged, lagless_all=lagless_all, count=count
         )
@@ -239,7 +264,10 @@ def build_cell(*, month: str, seed: int, real: np.ndarray, worlds: list[int]) ->
             n_flagged=pl.Series(count.astype(np.int8)),
         )
         for arm, q in (("O-hard", hard), ("O-soft", soft), ("O-lagless", lagless_all)):
-            frame = out.with_columns(**{n: pl.Series(q[:, i]) for i, n in enumerate(names)})
+            frame = out.with_columns(
+                mean=pl.Series(means[arm]).cast(pl.Float32),
+                **{n: pl.Series(q[:, i]).cast(pl.Float32) for i, n in enumerate(names)},
+            )
             target = prediction_path(arm=arm, month=month, seed=seed, world=world)
             target.parent.mkdir(parents=True, exist_ok=True)
             frame.write_parquet(target)

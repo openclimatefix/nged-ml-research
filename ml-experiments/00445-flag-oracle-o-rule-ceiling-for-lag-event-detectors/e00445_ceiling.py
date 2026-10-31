@@ -87,7 +87,7 @@ def load_cell(
             }
         )
     injected = pl.col("world") >= 0
-    return frame.with_columns(
+    frame = frame.with_columns(
         cls=pl.when(injected & pl.col("tgt_inj"))
         .then(pl.lit("tgt_inj"))
         .when(injected & pl.col("win_inj"))
@@ -100,6 +100,8 @@ def load_cell(
         .then(pl.lit("harm_real"))
         .otherwise(pl.lit("clean_real"))
     )
+    assert frame["cls"].null_count() == 0
+    return frame
 
 
 def load_pool(
@@ -121,12 +123,30 @@ def load_pool(
     return pl.concat(parts, how="diagonal_relaxed")
 
 
+def cluster_ids(*, frame: pl.DataFrame, real: np.ndarray) -> np.ndarray:
+    """Return event cluster ids as experiment 404's, except for rows inside real events.
+
+    Experiment 404 clusters a real row by the event its lags fall in, which suits harm rows. A row
+    whose target is inside (or within 96 half-hours after) a padded real event is clustered by the
+    padded run it belongs to, the latest run that started at or before the target.
+    """
+    ids = report.cluster_ids(frame=frame, real=real)
+    target_rows = ((frame["world"] < 0) & (frame["cls"] == "tgt_real")).to_numpy()
+    primary = frame["primary"].to_numpy().astype(np.int64)
+    target = frame["target"].to_numpy().astype(np.int64)
+    for p in np.unique(primary[target_rows]):
+        run = np.cumsum(np.diff(np.concatenate([[0], real[p].astype(np.int8)])) == 1)
+        sel = np.flatnonzero(target_rows & (primary == p))
+        ids[sel] = -1 - (p * 10_000 + run[np.clip(target[sel], 0, real.shape[1] - 1)])
+    return ids
+
+
 def pooled_clusters(*, frame: pl.DataFrame, real: np.ndarray) -> np.ndarray:
     """Return event cluster ids, kept apart per cell."""
     out = np.zeros(frame.height, dtype=np.int64)
     for cell in frame["cell"].unique().to_list():
         sel = (frame["cell"] == cell).to_numpy()
-        ids = report.cluster_ids(frame=frame.filter(pl.Series(sel)), real=real)
+        ids = cluster_ids(frame=frame.filter(pl.Series(sel)), real=real)
         out[sel] = ids + cell * 10**12
     return out
 
@@ -212,7 +232,7 @@ def per_cell(*, arm: str) -> None:
         b = load_cell(arm=REFERENCE, month=month, seed=seed, worlds=worlds, cell=i)
         if a is None or b is None:
             continue
-        clusters = report.cluster_ids(frame=b, real=real)
+        clusters = cluster_ids(frame=b, real=real)
         text = []
         for cls in ("harm_real", "tgt_real", "harm_inj"):
             mask = ((b["group"] == "signed_six") & (b["cls"] == cls)).to_numpy()
@@ -258,7 +278,7 @@ def counts() -> None:
         )
         lo, hi = int(frame["target"].min()), int(frame["target"].max())  # ty: ignore[invalid-argument-type]
         overlapping = events.filter((pl.col("onset_idx") <= hi) & (pl.col("end_idx") >= lo))
-        in_class = frame.filter(pl.col("tgt_real"))
+        in_class = frame.filter(pl.col("tgt_real") | pl.col("tgt_post"))
         print(
             f"{month}: targets {lo}-{hi}; corrected events overlapping {overlapping.height}; "
             f"rows with target in a padded event {in_class.height:,}"
@@ -277,8 +297,11 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     result["summary"].write_parquet(OUT_DIR / "summary_pooled.parquet")
     result["contrasts"].write_parquet(OUT_DIR / "contrasts_pooled.parquet")
-    robust = run_table(cells=SEED_CELLS, label="2026-06 seeds 1 and 2 (robustness)")
-    robust["contrasts"].write_parquet(OUT_DIR / "contrasts_seeds.parquet")
+    robust = [
+        run_table(cells=(cell,), label=f"{cell[0]} seed {cell[1]} (robustness)")["contrasts"]
+        for cell in SEED_CELLS
+    ]
+    pl.concat(robust).write_parquet(OUT_DIR / "contrasts_seeds.parquet")
     for arm in ("O-hard", "O-soft"):
         per_cell(arm=arm)
     (OUT_DIR / "done.json").write_text(json.dumps({"ok": True}))
