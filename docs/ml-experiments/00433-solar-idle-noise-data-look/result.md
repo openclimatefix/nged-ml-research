@@ -7,7 +7,7 @@ title: >-
 theme: metered-solar-farms
 also_relevant_to:
 - generator-forecasting
-status: planned
+status: done
 kind: other
 size: >-
   simple. Stored: private tables and a private gallery under
@@ -50,34 +50,97 @@ row_set_id: none
 metric: >-
   night-time shares of exact zeros, repeats, negative readings, and lattice readings; floor level by
   year; lag-1 autocorrelation of first differences; daytime idle run lengths
+verdict: supported
+best_arm: none (data look, no fitting)
+headline: >-
+  Under the pre-registered rule five of six metered solar farms are "not the same" as the wind
+  farms: 95.8% to 99.9% of their night readings are exact zeros. Solar B alone meets the rule's
+  "the same noise" label, through 8.1% negative night readings (median -0.010 MW across all its negative readings) with a median of
+  zero, which the post hoc reading calls a small import, not a noisy floor.
+take_home_message: >-
+  The metered solar farms read exact zeros at night, unlike the wind farms' noisy floor, so solar
+  forecasts need no idle-noise detector and no cleaned-zero scoring. One farm (Solar B) shows small
+  negative night readings on 8% of night half-hours, and a few farms sit idle for 2 to 3 weeks on
+  clear days (Solar D and Solar E), which is an outage question, not a noise question.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Do not build a solar idle-noise detector or score solar forecasts against cleaned zeros; night
+    readings are 95.8% to 99.9% exact zeros at the six metered farms (summary.csv).
+  - >-
+    Treat negative night readings at Solar B (8.1% of night half-hours, median -0.010 MW) as a small
+    import, and keep them in scoring unless a later check finds a reason (Figure 2).
+  - >-
+    Test the outage question for Solar D and Solar E separately: their longest full idle days run 24
+    and 17 days on clear-sky days (daytime_runs.csv).
 ---
+**The six metered solar farms read exact zeros at night, so they do not show the wind farms' idle
+noise.** The question was whether the wind farms' noise while not generating, which the maintainer
+suspects is reactive power on an MVA meter, also appears at the metered solar farms. It does not. The
+metadata lists all six farms in MW, not MVA, and 95.8% to 99.9% of their night readings (solar
+elevation below -6 degrees) are exact zeros. The wind farms' idle floor in
+[experiment 210](../00210-wind-idle-noise-mva-artefact/result.md) held 19% to 41% exact zeros and a
+median above zero at the two MVA farms. This narrows the next step: no solar detector, and no
+cleaned-zero scoring for solar, unless the outage check below finds a reason.
 
-**This page is the plan; the write-up replaces it when the run finishes.**
+![Figure 1: composition of night readings per farm](figure_1.svg)
 
-## Plan
+**Solar B meets the pre-registered "the same noise" label, but the label is a flaw in the rule.**
+The rule counted exact zeros towards criterion 1, so any farm that is nearly all zeros passes it,
+and Solar B's 91.8% zeros also satisfy the "not the same" clause (at least 90% zeros). The rule
+listed "the same noise" first. Solar B's other readings are 8.1% negative (interval's upper end
+10.9%), and across all hours of the record its negative readings have a median of -0.010 MW and a minimum of -0.192 MW; its night median is zero.
+Read post hoc, that is a small import (station load), not a floor above zero. The year-by-year
+negative share moves between 0.1% in 2019 and 15.6% in 2023 (Figure 2), which a reactive-power floor
+would not do. Solar E shows the same pattern at 4.1% negative.
 
-- **Question.** The maintainer believes the wind farms' MVA meters read noise, probably reactive
-  power, while turbines are not generating. This experiment asks whether the six metered solar
-  farms (Solar A to Solar F) show the same texture when not generating, so that the same detector
-  and cleaned-zero scoring would apply.
-- **Data.** Cleaned-or-raw choice: raw power from `studies.power.scan_power` for the six farms of
-  `studies.pv_dataset.pv_sites`, because the cleaning flags drop the very zeros under study, and the
-  count of rows each flag would drop is reported. Clear-sky index from the CAMS site points,
-  hourly, paired with the half-hours ending at the hour's stamp and 30 minutes before. CAMS is a
-  satellite retrieval available after the event, not at forecast time, and this experiment makes no
-  forecast. Metering unit from the `units` column of the metadata table.
-- **Search first.** Experiments 179 and 218 and `docs/ml-experiments/data-processing.md` are read
-  for earlier statements on night-time and zero readings; experiment 179 found 0 to 30 night-time
-  half-hours above 2% of capacity per farm and 0 to 24 negative readings.
-- **Outputs.** Per-farm tables (night distribution, zeros and repeats, quantisation step, lag-1
-  autocorrelation and rolling standard deviation of first differences, floor by year, negative
-  readings by hour, summer versus winter floor, daytime idle run lengths, agreement
-  between farms that share a CAMS cell), a private gallery of 20 farm-days per farm (10 sure-night
-  days, 10 daytime days where the reading disagrees with the irradiance), and published figures that
-  show only normalised, aggregated shares.
-- **Standing practices.** Cut-off for short-history Primaries, cleaned-data, and retraining rules do
-  not apply: no demand series is used and nothing is fitted. Gallery stays in the private data
-  folder. Farms are cited by Solar A to F only, with no capacity in MW beside a label.
-- **Compute.** CPU only, one core, low priority, no GPU.
-- **Reviews.** Sonnet plan review, Sonnet code review before the first run, Sonnet results review,
-  Sonnet write-up and prose review.
+![Figure 2: negative night readings by year](figure_2.svg)
+
+**Idle runs on clear days are short, except at Solar D and Solar E.** Of the half-hours with CAMS
+clear-sky index at least 0.7 between 10:00 and 15:00, 2.8% to 14.4% read near the night floor (3.2%
+at Solar F). Whole idle days form runs of at most 4 days at Solar A, B, C, and F, 24 days at Solar D,
+and 17 days at Solar E. No farm has a run longer than 24 days, and no farm has the pre-registered
+outage class (at least 50% of idle half-hours in runs over 24 hours; the highest share is 41.6%, at
+Solar E). Most idle half-hours lie outside whole idle days.
+
+![Figure 3: idle half-hours in whole idle days, by run length](figure_3.svg)
+
+## Checks
+
+- **Prediction.** Night median under 0.1% of capacity and non-zero repeats under 20%: holds at all
+  six farms (prediction asked for five).
+- **Pre-registered labels.** Solar A, C, D, E, and F "not the same"; Solar B "the same noise"
+  (flawed rule, above). Overall verdict `supported` (five or more "not the same").
+- **Texture statistics** (`summary.csv`): non-zero repeats are 0.01% to 0.14% of night readings. The
+  quantisation step is 0.001 MW at Solar A, B, and E, 0.011 at C, 0.024 at F, and 0.035 at D, so each
+  farm reports on the meter's own lattice, zero included. Lag-1 autocorrelation of night first
+  differences is -0.51 to -0.03. Median rolling standard deviation of first differences is zero at
+  every farm.
+- **Season.** Summer and winter night medians are both zero at every farm, so the season criterion
+  holds trivially (`season.csv`). Zero shares differ by under 1 point between seasons.
+- **Flags.** The cleaning table flags 0 night half-hours at these six customer-metered series. The
+  night statistics use all rows.
+- **Share touched.** Where the label was "the same noise" (Solar B), night half-hours are 39.3% of
+  all half-hours and 71.9% of half-hours with the sun up; the negative ones are 8.1% of those.
+- **Daytime idle** (`daytime_runs.csv`, `daytime_run_bins.csv`): a day needs at least 3 qualifying
+  half-hours. The run test sees only whole idle days; partial-day idling is counted in the idle
+  share and not in a run.
+- **Agreement between farms** (`pair_agreement.csv`): of the three pairs within 10 km, Solar A and
+  Solar C share 5 idle days of 20 on either (Jaccard 0.25); the others share none. Idle days are
+  mostly farm-specific, not weather.
+- **Weekday profile** (`daytime_weekday_hour.csv`): a secondary table; it decides nothing.
+- **What the data cannot show.** No MVAr channel, outage log, or curtailment record exists, so idle
+  days cannot be told from curtailment or a station fault. CAMS clear-sky index is hourly and
+  satellite-derived, so cloud inside the hour can make a "clear" half-hour dark. Rolling statistics
+  are degenerate when readings are all zero. Gallery PNGs (20 farm-days per farm) are in the private
+  data folder, not published.
+- **Audit triggers:** the result contradicts nothing it predicted; the one flawed label (Solar B)
+  is reported as pre-registered and read post hoc. No control or leave-one-out check applies.
+
+## What to try next
+
+- Check Solar D's 24-day and Solar E's 17-day idle runs against NGED's records for outages or
+  export limits.
+- Decide Solar B's small negative readings with NGED (station import), only if the solar scores
+  show a farm-level bias at night.
