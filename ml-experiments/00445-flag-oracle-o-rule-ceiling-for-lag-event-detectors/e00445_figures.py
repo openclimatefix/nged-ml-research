@@ -133,7 +133,7 @@ def figure_by_count() -> None:
                 axis=alt.Axis(labelAngle=0),
             ),
             xOffset="arm:N",
-            y=alt.Y("score:Q", title="Mean score (points; smaller is better)"),
+            y=alt.Y("score:Q", title="Mean score"),
             color=colour,
         )
         .properties(width=WIDTH - 120, height=110)
@@ -146,7 +146,8 @@ def figure_by_count() -> None:
             title=alt.TitleParams(
                 [
                     "The lagless head barely beats the lagged head when lags are flagged (interim)",
-                    "Signed-MW six, five test months, fit seed 0. B-mix beats both heads in every group.",
+                    "Mean score in points of capacity (smaller is better), signed-MW six, five test months, fit seed 0.",
+                    "B-mix beats both heads in all groups except real events with 3 flagged lags.",
                 ],
                 anchor="start",
             )
@@ -196,7 +197,7 @@ def figure_examples(*, site: str) -> None:
                     width=WIDTH - 90,
                     height=170,
                     title=f"{month[:4]}-{month[5:]}: Primary {site}, forecast issued {times[origin]:%Y-%m-%d %H:%M}",
-                )  # fmt: skip
+                )
             )
         chart = alt.vconcat(*panels).properties(
             title=alt.TitleParams(
@@ -246,8 +247,8 @@ def pick_events(*, real: np.ndarray, per_group: int = 3) -> list[dict]:
                         }
                     )
     out = []
-    for group in found:
-        events = sorted(found[group], key=lambda e: e["end"] - e["start"], reverse=True)
+    for group, members in found.items():
+        events = sorted(members, key=lambda e: e["end"] - e["start"], reverse=True)
         seen: set[str] = set()
         for e in events:
             if e["site"] not in seen and len([o for o in out if o["group"] == group]) < per_group:
@@ -314,7 +315,7 @@ def figure_events() -> None:
                 width=WIDTH - 90,
                 height=130,
                 title=f"Event {i}: Primary {e['site']} ({group})",
-            )  # fmt: skip
+            )
         )
     chart = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
