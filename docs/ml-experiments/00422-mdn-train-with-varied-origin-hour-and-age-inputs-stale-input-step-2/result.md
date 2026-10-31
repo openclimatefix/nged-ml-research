@@ -93,9 +93,10 @@ delays, and checks whether the loss disappears.
   are late. No standing rule in `common.md` changed the brief's design. The brief and this plan
   agree except for four additions, each registered below: the delay of the newest reading is
   randomised, not only the origin hour (otherwise the age of the newest reading is a constant 3.5
-  hours and carries no information), the previous weather run is sometimes shown (otherwise the weather-age input never leaves its training range in the W24
-  arms), a control arm T0 is refitted under the current cleaning rules, and an arm T4 trains with
-  missing origin lags, which experiment 410 named as the next step.
+  hours and carries no information), the previous weather run is sometimes shown (otherwise the
+  weather-age input never leaves its training range in the W24 arms), a control arm T0 is refitted
+  under the current cleaning rules, and an arm T4 trains with missing origin lags, which experiment
+  410 named as the next step.
 - **The base network.** The pooled plain network of experiment 397 (`plain_pooled`, the same
   setting as its stored meta files, 3 Gaussian components, the Primary embedding, the ECMWF ENS mean
   and standard deviation passed through once), on the five screen folds (test months 2025-10,
