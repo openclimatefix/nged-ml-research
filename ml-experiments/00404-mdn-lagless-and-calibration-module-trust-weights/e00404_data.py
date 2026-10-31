@@ -2,9 +2,9 @@
 
 The lagless module forecasts every half-hour of the dense grid from the freshest published
 ensemble summary: the run whose publication (run time plus 9 hours) is the latest at or before the
-valid time, so leads run from 9.5 to 33.0 hours (from the run time). Its inputs are the ensemble mean and spread of the
-seven weather columns, the solar position, the calendar, and the holiday columns of experiment 397,
-and no lag and no lead.
+valid time, so leads from the run time run from 9.5 to 33.0 hours. Its inputs are the ensemble
+mean and spread of the seven weather columns, the solar position, the calendar, and the holiday
+columns of experiment 397, and no lag and no lead.
 
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\

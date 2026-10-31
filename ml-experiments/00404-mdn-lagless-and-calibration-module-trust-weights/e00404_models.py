@@ -185,7 +185,7 @@ class TrustMdn(nn.Module):
         layers: int = 2,
         token: int = 16,
     ) -> None:
-        """Build the modules; the trust logits start at 0, so each trust weight starts at 0.5."""
+        """Build the modules; each trust weight starts near 0.5."""
         super().__init__()
         if arm not in ("b1", "b1m", "b0", "b3"):
             msg = f"unknown arm {arm!r}"
@@ -207,12 +207,14 @@ class TrustMdn(nn.Module):
         self.calibration = mlp(n_in=shared, hidden=hidden, layers=layers, n_out=3 * COMPONENTS)
         init_head(head=self.calibration)
         if arm == "b0":
-            self.band_logits = nn.Parameter(torch.zeros(LEAD_BANDS, N_LAGS))
+            self.band_logits = nn.Parameter(0.02 * torch.randn(LEAD_BANDS, N_LAGS))
         else:
             self.trust_head = mlp(n_in=n_trust + n_lead + 8 + 1, hidden=32, layers=2, n_out=N_LAGS)
             last = self.trust_head[-1]
             assert isinstance(last, nn.Linear)
-            nn.init.zeros_(last.weight)
+            # Small random weights break the symmetry between the 3 lags: with zero weights the
+            # product rule gives every lag the same gradient, so the 3 weights would stay equal.
+            nn.init.normal_(last.weight, std=0.02)
             nn.init.zeros_(last.bias)
 
     def trust_weights(
@@ -334,7 +336,9 @@ def selftest() -> None:
         loss.backward()
         assert ll.grad is None or float(ll.grad.abs().sum()) == 0.0, "ll must be constant"
         if arm in ("b1", "b1m"):
-            assert torch.allclose(weights, torch.full_like(weights, 0.5)), "trust must start 0.5"
+            assert torch.allclose(weights, torch.full_like(weights, 0.5), atol=0.1), (
+                "trust must start near 0.5"
+            )
         print(
             arm,
             tuple(lw.shape),
