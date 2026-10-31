@@ -215,13 +215,15 @@ def main() -> None:  # noqa: PLR0915
         rng = np.random.default_rng(int(init.timestamp()) % (2**32))
         values = np.zeros((N_NODES, N_STEPS, N_MEMBERS))
         actual = np.full((N_NODES, N_STEPS), np.nan)
-        ecc = np.zeros((N_NODES, N_STEPS, N_MEMBERS), dtype=np.uint8)
+        ecc = np.broadcast_to(
+            np.arange(N_MEMBERS, dtype=np.uint8), (N_NODES, N_STEPS, N_MEMBERS)
+        ).copy()
         # demand
         quantiles = sub.select(common.LEVEL_COLUMNS).to_numpy().reshape(N_PRIMARIES, N_STEPS, 11)
         values[:N_PRIMARIES] = quantile_values(quantiles=quantiles) * 100.0
         t_member, sw_member = s434.run_weather(init=init, ids=ids)
         day = np.median(sw_member, axis=-1, keepdims=True) > DAYLIGHT_SHORTWAVE
-        key = np.where(day, sw_member, -t_member)
+        key = np.where(day, -sw_member, -t_member)
         ecc[:N_PRIMARIES] = ecc_ranks(key=key, rng=rng)
         i0 = grid_index(t=init) + 1
         actual[:N_PRIMARIES] = observed[:N_PRIMARIES, i0 : i0 + N_STEPS]
