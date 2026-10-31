@@ -34,7 +34,7 @@ uv run --no-sync python ml-experiments/00441-*/e00441_masks.py
 import argparse
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00437_features as feats  # ty: ignore[unresolved-import]
@@ -202,8 +202,12 @@ def thresholds_for(*, rows: pl.DataFrame, daily: pl.DataFrame, refit: datetime) 
         in_window & pl.col("local_month").is_in(SUMMER_MONTHS) & (pl.col("n_rows") >= MIN_DAY_ROWS)
     )
     return {
-        "winter_night_p10": float(nights["temperature"].quantile(WINTER_NIGHT_QUANTILE)),
-        "summer_daily_max_p95": float(summers["day_max_temperature"].quantile(HEAT_QUANTILE)),
+        "winter_night_p10": float(
+            cast("float", nights["temperature"].quantile(WINTER_NIGHT_QUANTILE))
+        ),
+        "summer_daily_max_p95": float(
+            cast("float", summers["day_max_temperature"].quantile(HEAT_QUANTILE))
+        ),
         "n_winter_night_rows": float(nights.height),
         "n_summer_days": float(summers.height),
     }
