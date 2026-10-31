@@ -1,7 +1,9 @@
 """Experiment 444: turn the bake-off's long tables into the gate, intervals, and census tables.
 
-    PYTHONPATH=ml-experiments/00431-wind-idle-data-look OMP_NUM_THREADS=1 \
-        uv run --no-sync python ml-experiments/00444-wind-idle-detectors-label-free-bake-off/e00444_summarise.py
+    PYTHONPATH=ml-experiments/00431-wind-idle-data-look \
+        OMP_NUM_THREADS=1 \
+        uv run --no-sync python \
+        ml-experiments/00444-wind-idle-detectors-label-free-bake-off/e00444_summarise.py
 
 Reads the tables that `e00444_bakeoff.py` wrote and writes published-safe summary tables (recall,
 false-drop rates, shares by wind bin, counts; no farm-day and no date) beside them. Every interval
@@ -15,7 +17,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from e00431_analysis import stratified_auc
+from e00431_analysis import stratified_auc  # ty: ignore[unresolved-import]
 
 OUT_DIR: Final[Path] = (
     Path(os.environ["DATA_PATH_INTERNAL"])
@@ -25,6 +27,7 @@ OUT_DIR: Final[Path] = (
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 N_BOOT: Final[int] = 2000
 MIN_BLOCKS_PER_FOLD: Final[int] = 10
+BLOCK_LENGTHS: Final[tuple[int, ...]] = (6, 24, 48, 96, 192)
 GATE_RECALL: Final[float] = 0.80
 GATE_FD: Final[float] = 0.05
 GATE_OVER_R0: Final[float] = 0.10
@@ -62,7 +65,7 @@ def recall_draws(
     for s, c in sums.values():
         num, den = weights @ s, weights @ c
         cell_draws.append(np.where(den > 0, num / np.maximum(den, 1e-9), np.nan))
-    return point, np.nanmean(np.stack(cell_draws), axis=0), pl.DataFrame(cell_rows)
+    return point, np.mean(np.stack(cell_draws), axis=0), pl.DataFrame(cell_rows)
 
 
 def fd_draws(
@@ -87,7 +90,7 @@ def fd_draws(
         draws[set_name] = np.where(den > 0, (weights @ f) / np.maximum(den, 1e-9), np.nan)
     present = [s for s in NEG_SETS if s in point]
     point["gate"] = float(np.mean([point[s] for s in present]))
-    draws["gate"] = np.nanmean(np.stack([draws[s] for s in present]), axis=0)
+    draws["gate"] = np.mean(np.stack([draws[s] for s in present]), axis=0)
     return point, draws
 
 
@@ -97,7 +100,7 @@ def interval(draws: np.ndarray) -> tuple[float, float]:
     return float(np.quantile(finite, 0.025)), float(np.quantile(finite, 0.975))
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Write the gate, cell, curve, pair, census, and agreement tables."""
     inj = pl.read_parquet(OUT_DIR / "inj.parquet")
     neg = pl.read_parquet(OUT_DIR / "neg.parquet")
@@ -106,19 +109,32 @@ def main() -> None:
     special = pl.read_parquet(OUT_DIR / "special.parquet")
     census = pl.read_parquet(OUT_DIR / "census.parquet")
     rng = np.random.default_rng(SEED)
-    gate_rows, cell_tables, pair_rows = [], [], []
+    gate_rows, cell_tables, pair_rows, thin_list, matched_rows = [], [], [], [], []
     for site in SITES:
         site_inj = inj.filter(pl.col("site") == site)
-        counts = (
+        base = (
             site_inj.filter(pl.col("cand") == "R0")
-            .group_by("length", "bin", "fold")
-            .agg(pl.len().alias("n"))
+            .select("length", "bin", "fold", "year", "start")
+            .unique()
+        )
+        counts = base.group_by("length", "bin", "fold").agg(pl.len().alias("n"))
+        grid = pl.DataFrame(
+            [
+                {"length": ln, "bin": bn, "fold": fo}
+                for ln in BLOCK_LENGTHS
+                for bn in ("moderate", "high")
+                for fo in (0, 1)
+            ]
+        )
+        counts = grid.join(counts, on=["length", "bin", "fold"], how="left").with_columns(
+            pl.col("n").fill_null(0)
         )
         thin = (
             counts.group_by("length", "bin")
-            .agg(pl.col("n").min().alias("min_fold"), pl.col("fold").n_unique().alias("folds"))
-            .filter((pl.col("min_fold") < MIN_BLOCKS_PER_FOLD) | (pl.col("folds") < 2))
+            .agg(pl.col("n").min().alias("min_fold"))
+            .filter(pl.col("min_fold") < MIN_BLOCKS_PER_FOLD)
         )
+        thin_list.extend({"site": site, **r} for r in thin.iter_rows(named=True))
         thin_cells = {(r["length"], r["bin"]) for r in thin.iter_rows(named=True)}
         keep = pl.Series(
             [
@@ -187,14 +203,37 @@ def main() -> None:
                 }
             )
             cell_tables.append(cells.with_columns(site=pl.lit(site), cand=pl.lit(cand)))
-        r0_recall = point_by["R0"][0]
+        r0_recall, r0_fd = point_by["R0"][0], point_by["R0"][2]["gate"]
+        curve = sorted(
+            (point_by[c][2]["gate"], point_by[c][0])
+            for c in ("D1_fd01", "D1_fd02", "D1", "D1_fd10")
+            if c in point_by
+        )
+        matched = float(np.interp(r0_fd, [x[0] for x in curve], [x[1] for x in curve]))
+        matched_rows.append(
+            {
+                "site": site,
+                "r0_fd_gate": r0_fd,
+                "r0_recall": r0_recall,
+                "d1_recall_at_r0_fd": matched,
+                "d1_curve_fd": [x[0] for x in curve],
+                "d1_curve_recall": [x[1] for x in curve],
+            }
+        )
         for row in gate_rows:
             if row["site"] == site:
                 row["gate_recall"] = row["recall"] >= GATE_RECALL
                 row["gate_fd"] = row["fd_gate"] <= GATE_FD
                 row["gate_over_r0"] = row["recall"] - r0_recall >= GATE_OVER_R0
-                row["gate_pass"] = bool(
-                    row["gate_recall"] and row["gate_fd"] and row["gate_over_r0"]
+                row["gate_over_r0_matched_fd"] = (
+                    (matched - r0_recall >= GATE_OVER_R0) if row["cand"] == "D1" else None
+                )
+                gated = row["cand"] in ("D1", "D4")
+                over = (
+                    row["gate_over_r0_matched_fd"] if row["cand"] == "D1" else row["gate_over_r0"]
+                )
+                row["gate_pass"] = (
+                    bool(row["gate_recall"] and row["gate_fd"] and over) if gated else None
                 )
         for a, b in (("D4", "D1"), ("D1", "R0"), ("D1a", "D1"), ("D1&D3", "D1"), ("D4", "R0")):
             if a in point_by and b in point_by:
@@ -220,6 +259,11 @@ def main() -> None:
     pl.DataFrame(gate_rows).write_parquet(OUT_DIR / "gate.parquet")
     pl.concat(cell_tables).write_parquet(OUT_DIR / "cells.parquet")
     pl.DataFrame(pair_rows).write_parquet(OUT_DIR / "pairs.parquet")
+    pl.DataFrame(matched_rows).write_parquet(OUT_DIR / "matched_fd.parquet")
+    pl.DataFrame(
+        thin_list,
+        schema={"site": pl.String, "length": pl.Int64, "bin": pl.String, "min_fold": pl.Int64},
+    ).write_parquet(OUT_DIR / "thin_cells.parquet")
     curve = (
         bins.group_by("site", "cand", "wind_bin")
         .agg(pl.col("n").sum(), pl.col("n_flag").sum())
@@ -248,7 +292,7 @@ def _auc_table() -> None:
         years = sorted(sub["year"].unique().to_list())
         by_year = {y: sub.filter(pl.col("year") == y) for y in years}
 
-        def matched(ys: list[int]) -> float:
+        def matched(ys: list[int], by_year: dict = by_year) -> float:
             parts = [by_year[y] for y in ys]
             sel = pl.concat(parts)
             if sel.height > 60000:
@@ -323,7 +367,7 @@ def _flag_census() -> None:
             )
         )
         eligible = days.filter(pl.col("n_high") >= 24)
-        prevalence = float((eligible["n_flag"] >= 6).mean())
+        prevalence = float(np.mean(eligible["n_flag"].to_numpy() >= 6))
         day_rows.append(
             {
                 "site": site,

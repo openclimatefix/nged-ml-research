@@ -1,8 +1,10 @@
 """Experiment 444: label-free bake-off of idle-half-hour detectors at three metered wind farms.
 
-    PYTHONPATH=ml-experiments/00431-wind-idle-data-look:ml-experiments/00210-wind-idle-noise-mva-artefact \
+    PYTHONPATH=\
+        ml-experiments/00431-wind-idle-data-look:ml-experiments/00210-wind-idle-noise-mva-artefact \
     OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue nice -n 19 \
-        uv run --no-sync python -I ml-experiments/00444-wind-idle-detectors-label-free-bake-off/e00444_bakeoff.py
+        uv run --no-sync python \
+        ml-experiments/00444-wind-idle-detectors-label-free-bake-off/e00444_bakeoff.py
 
 Reads experiment 210's `joined.parquet` and `report.json`, imports experiment 431's feature code and
 experiment 210's wind-threshold fit, and writes per-farm summary tables (published-safe: recall,
@@ -19,8 +21,8 @@ from typing import Any, Final
 
 import numpy as np
 import polars as pl
-from e00210_analysis import detector_rates
-from e00431_analysis import add_features, auc, stratified_auc
+from e00210_analysis import detector_rates  # ty: ignore[unresolved-import]
+from e00431_analysis import add_features, auc, stratified_auc  # ty: ignore[unresolved-import]
 from sklearn.linear_model import LogisticRegression
 
 DATA_ROOT: Final[Path] = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
@@ -53,7 +55,7 @@ D3_RATIOS: Final[tuple[float, ...]] = (0.10, 0.05, 0.20)
 D3_MIN_EXPECTED: Final[float] = 0.15
 MAX_TRAIN_PER_SET: Final[int] = 30000
 FEATURE_PREFIXES: Final[tuple[str, ...]] = ("sd_diff_", "ac1_", "ac2_", "repeat_share_")
-BIAS_GRID: Final[np.ndarray] = np.arange(-4.0, 4.01, 0.5)
+BIAS_GRID: Final[np.ndarray] = np.arange(-3.0, 4.01, 0.25)
 HALF_HOUR: Final[np.timedelta64] = np.timedelta64(30, "m")
 
 
@@ -147,6 +149,7 @@ class Farm:
     """One farm's arrays, true series, features, and the labels that do not depend on the fold."""
 
     def __init__(self, *, frame: pl.DataFrame, cut_in: float) -> None:
+        """Read the farm's rows and compute its labels-free arrays and features."""
         self.site = frame["site"][0]
         self.valid_time = frame["valid_time"]
         self.t = frame["valid_time"].dt.replace_time_zone(None).to_numpy()
@@ -204,7 +207,7 @@ def smooth(*, x: np.ndarray, width: int = 6) -> np.ndarray:
     return np.convolve(x, kernel, mode="same") / np.convolve(np.ones(len(x)), kernel, mode="same")
 
 
-def place_replicate(
+def place_replicate(  # noqa: PLR0915
     *, farm: Farm, ctx: dict[str, Any], parity: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[dict[str, Any]]]:
     """Build one modified series: injected idle blocks in test years, rescaled low-output runs.
@@ -279,7 +282,7 @@ def place_replicate(
                         "join_rows": [
                             int(s + k * PIECE + d)
                             for k in range(n_pieces)
-                            for d in (0, 1)
+                            for d in (-1, 0)
                             if k > 0 and s + k * PIECE + d < s + length
                         ],
                     }
@@ -421,7 +424,7 @@ def tune_biases(
     farm: Farm,
     ctx: dict[str, Any],
     fitted: dict[str, Any],
-    neg_frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    neg_frames: list[tuple[np.ndarray, np.ndarray, np.ndarray | None]],
 ) -> dict[float, float]:
     """Choose each stay probability's bias so the tune-year false-drop rate is closest to 5%."""
     out: dict[float, float] = {}
@@ -449,13 +452,13 @@ def tune_biases(
     return out
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Run both folds for the three farms and write the tables."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     report = json.loads((SRC_DIR / "report.json").read_text())
     joined = pl.read_parquet(SRC_DIR / "joined.parquet").sort("site", "valid_time")
     results: dict[str, list[dict[str, Any]]] = {
-        k: [] for k in ("inj", "neg", "bins", "high_year", "special", "census")
+        k: [] for k in ("inj", "neg", "bins", "high_year", "special", "census", "placed")
     }
     oof_flags: list[pl.DataFrame] = []
     auc_rows: list[pl.DataFrame] = []
@@ -533,7 +536,7 @@ def main() -> None:
             fitted["t_fa"] = weighted_threshold(scores=[sa, sg0a], fd=TARGET_FD)
             # --- D4 biases on the real series and the first three replicates
             neg_frames = [(farm.feats, sg & tune & ok_rows, None)] + [
-                (rep_feats[i], (reps[i][2] >= 0) & tune, None) for i in range(min(3, N_REPLICATES))
+                (rep_feats[i], (reps[i][2] >= 0) & tune, None) for i in range(min(5, N_REPLICATES))
             ]
             fitted["bias"] = tune_biases(farm=farm, ctx=ctx, fitted=fitted, neg_frames=neg_frames)
             thresholds.append(
@@ -655,6 +658,20 @@ def main() -> None:
             for r_i, ((power, inj, g0, blocks), feats) in enumerate(
                 zip(reps, rep_feats, strict=True)
             ):
+                g0_ids = np.unique(g0[g0 >= 0])
+                n_test_runs = sum(
+                    int(farm.year[np.flatnonzero(g0 == g)[0]] % 2 != parity) for g in g0_ids
+                )
+                results["placed"].append(
+                    {
+                        "site": site,
+                        "fold": parity,
+                        "rep": r_i,
+                        "g0s_test_runs": n_test_runs,
+                        "g0s_tune_runs": len(g0_ids) - n_test_runs,
+                        "inj_blocks": len(blocks),
+                    }
+                )
                 fl_all = all_flags(farm=farm, ctx=ctx, fitted=fitted, power=power, feats=feats)
                 for name, fl in fl_all.items():
                     for b in blocks:
@@ -670,6 +687,7 @@ def main() -> None:
                                 "fold": parity,
                                 "rep": r_i,
                                 "length": b["length"],
+                                "start": b["start"],
                                 "bin": b["bin"],
                                 "year": b["year"],
                                 "recall": float(fl[rows].mean()),
