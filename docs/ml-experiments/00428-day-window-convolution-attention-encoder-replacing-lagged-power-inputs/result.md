@@ -53,8 +53,8 @@ decision_rule: >-
   lagged network). The smallest gain worth porting is 0.10 CRPS points on harm rows with a loss of
   at most 0.05 on clean rows, because the encoder adds a network module to the production training
   loop. A fold counts as a win for a contrast when the point estimate is below zero by more than
-  the minimum detectable effect. Harm rows here means the injected-world harm rows; the real harm rows are reported beside
-  them and do not decide. A fold is lost when the point estimate is above zero by more than the
+  the minimum detectable effect. Harm rows here means the injected-world harm rows; the real harm
+  rows are reported beside them and do not decide. A fold is lost when the point estimate is above zero by more than the
   minimum detectable effect. Advance to the fifth fold, and to experiment 404's trust inputs as
   extra tokens, if E3 beats R-inj on harm rows at the signed-MW six in at least 3 of 4
   folds with a pooled gain of at least 0.10, loses at most 0.05 on clean rows, and in the sweep
@@ -162,11 +162,12 @@ draws, with equal probability, the clean series or one of three injected worlds 
 for the power in its windows (and for R-inj's lags); the target is always the clean series. Worlds
 come from `e00402_inject.inject` over 2024-05-01 to 2026-07-01 at 10% coverage (the generator of
 experiment 402 with `FIRST_DAY` moved earlier), with the label table's padded real events excluded as
-base periods. The event pool uses all labelled events including those after a fold's refit, and each depth is
-a fraction of the donor's mean absolute power over its whole series; the pool supplies only depths
-and durations, and both are listed as caveats. Three quarters of the training rows are injected,
-which is more than real events, so clean-row contrasts partly measure that training mix. Power windows are gathered on the
-GPU from dense per-Primary arrays, so no window is stored.
+base periods. The event pool uses all labelled events including those after a fold's refit, and
+each depth is a fraction of the donor's mean absolute power over its whole series; the pool
+supplies only depths and durations, and both are listed as caveats. Three quarters of the
+training rows are injected, which is more than real events, so clean-row contrasts partly measure
+that training mix. Power windows are gathered on the GPU from dense per-Primary arrays, so no
+window is stored.
 
 ## Arms
 
