@@ -170,6 +170,16 @@ each Primary-level gate decision with its Spearman statistic and 1st percentile;
 and `C_p`. Every count states whether it counts rows or unique half-hours. Level 1.0 is scored by the
 same rules and reported with no bar.
 
+## Minimum detectable effect, stage 1 (written before any arm-against-arm score)
+
+**On rotation r1, the minimum detectable effect is 0.404 points of effective capacity.** The null
+difference between A's two seeds on reverse-flow rows at level 2.0 is a mean of 0.197 (95% interval
+-0.057 to 0.504, 14 Primary-month blocks, 22,443 rows), with a bootstrap standard deviation of
+0.144; 2.8 times 0.144 is 0.404. This is below the 0.5-point limit, so the AV against A contrast
+is not flagged as underpowered at stage 1. The figure is computed by
+`e00420_score.py mde-stage1` and stored in `work/mde_stage1.json`, which the script refuses to
+overwrite. The stage-1 bars are scored after this commit.
+
 ## Fits and stop rule
 
 | Batch | Fits |
