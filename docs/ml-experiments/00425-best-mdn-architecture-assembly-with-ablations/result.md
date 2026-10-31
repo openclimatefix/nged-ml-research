@@ -348,8 +348,19 @@ over the 12 folds.
 
 ### Checks
 
-- **Median forecast minus mean forecast per site, and the median-forecast error beside the
-  contrasts, are not printed in the score report**, so this page does not report them.
+- **Independent re-derivation (a fresh Sonnet reviewer, own code).** CRPS of `R`, `A`, and
+  `A-noemb`, C1, and C2 reproduce the printed values to three decimals, with seeds paired in all 12
+  folds and no scored valid time after 2026-06-30.
+- **The median-forecast error agrees with the CRPS in sign.** C1 on the median's absolute error is
+  -0.007 MW at the signed-MW six and -0.020 MW at the MVA-only eight, and C2 is +0.107 MW at both.
+  The stored forecasts hold quantiles only, so the median stands in for the mean forecast.
+- **Median minus the mean of the 11 quantiles** is small and negative at every Primary of the six
+  (-0.014 to -0.091 MW for `A`), so the spread does not shift the forecast. `A` at D8 (-0.140 MW)
+  and D12 (-0.166 MW) are the largest.
+- **Leaving one Primary out keeps C1 negative.** At the signed-MW six the contrast stays between
+  -0.043 and -0.065 (D10 out: -0.059; D5 out: -0.065), and at the eight between -0.113 and -0.141.
+  The gain at the six rests on five Primaries: D5 alone is worse with pretraining (+0.023) and D10
+  is nearly flat (-0.007).
 - **Audit triggers.** C2's interval does not reach zero, so that trigger did not fire. C3 reverses
   sign at the MVA-only eight, so that trigger fired there: the page does not claim that the
   widening lowers the CRPS. No other trigger of the seven fired.
@@ -379,7 +390,7 @@ over the 12 folds.
 
 - **The maintainer has paused the assembly until more isolated improvements report.** Candidates
   to join `A` then are those that beat `R` on the same 12 folds.
-- **Origin-hour training (experiment 422) is a candidate robustness variant and was not run.**
+- **Origin-hour training ([experiment 422](../00422-mdn-train-with-varied-origin-hour-and-age-inputs-stale-input-step-2/result.md)) is a candidate robustness variant and was not run.**
 - **The export gate of [experiment 420](../00420-neural-mva-export-gated-signed-final/result.md)
   was not tested here.**
 
