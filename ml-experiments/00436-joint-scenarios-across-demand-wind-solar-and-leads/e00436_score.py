@@ -163,7 +163,7 @@ def rows_for_run(
                             int(keep.sum()),
                         )
                     )
-            # cross: the family means at each half-hour
+            # cross: the family means at each half-hour, daylight slice only (solar is zero at night)
             weights = np.zeros((3, N_NODES, sel.size))
             ok = np.ones(sel.size, dtype=bool)
             for fam in range(3):
@@ -171,7 +171,7 @@ def rows_for_run(
                 count = have[nodes][:, sel].sum(0)
                 ok &= count >= 1
                 weights[fam, nodes] = have[nodes][:, sel] / np.maximum(count, 1)
-            if ok.any():
+            if ok.any() and slice_name == "daylight":
                 cols = sel[ok]
                 w = weights[:, :, ok]
                 y = np.einsum("fns,ns->sf", w, y_all[:, cols])

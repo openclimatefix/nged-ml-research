@@ -67,6 +67,8 @@ GRID_END: Final[datetime] = datetime(2026, 9, 12, tzinfo=UTC)
 FIRST_RUN: Final[datetime] = datetime(2025, 9, 1, tzinfo=UTC)
 LAST_RUN: Final[datetime] = datetime(2026, 6, 30, 23, tzinfo=UTC)
 WIND_100M: Final[int] = 1
+NIGHT_PRESENCE: Final[float] = 0.3
+"""A solar farm slot present on fewer than this share of days is night: absent means zero output."""
 DAYLIGHT_SHORTWAVE: Final[float] = 20.0
 """Median member shortwave (W/m2) above which demand's ECC ranks follow shortwave, not temperature."""
 KIND: Final[np.ndarray] = np.array(
@@ -116,10 +118,20 @@ def observed_grid(*, series: pl.DataFrame, actuals: pl.DataFrame) -> np.ndarray:
         ok = (idx >= 0) & (idx < n)
         node = N_PRIMARIES + len(WIND_FARMS) + i
         out[node, idx[ok]] = sub["output"].to_numpy()[ok] * 100.0
-        # The farm table holds daylight half-hours only, so an absent half-hour is output zero.
+        # The farm table holds daylight half-hours only, so an absent night half-hour is output zero.
         first, last = int(idx[ok].min()), int(idx[ok].max())
         window = out[node, first : last + 1]
-        window[np.isnan(window)] = 0.0
+        # Night = a (month, half-hour of day) slot where the table has under 30% of its days.
+        times = [GRID_START + (first + j) * STEP for j in range(window.size)]
+        slot = np.array([(t.month, t.hour * 2 + t.minute // 30) for t in times])
+        present = ~np.isnan(window)
+        night = np.zeros(window.size, dtype=bool)
+        for month in range(1, 13):
+            for half in range(48):
+                sel = (slot[:, 0] == month) & (slot[:, 1] == half)
+                if sel.any() and present[sel].mean() < NIGHT_PRESENCE:
+                    night[sel] = True
+        window[np.isnan(window) & night] = 0.0
     return out
 
 
