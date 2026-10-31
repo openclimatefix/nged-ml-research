@@ -434,7 +434,8 @@ harm rows.
   target is inside a labelled real event. Experiment 402's slice tables (interim, unaudited) found
   that an injected-trained gate protects harm rows without losing on clean rows, but is worse than
   the fixed 50/50 mixture where the target is inside a real labelled event (signed-MW six: 10.75
-  and 11.42 MW against 10.50 and 11.25 MW), because it cuts the lag weight to about 0.4. Every
+  and 11.42 against 10.50 and 11.25, in points of effective capacity), because it cuts the lag weight
+  to about 0.4. All experiment 402 figures are interim until its page merges. Every
   arm, B-mix included, is scored on all three sets, with whole-event bootstrap intervals.
 - **The harm table** of the lag-gate brief: rows whose target is outside every event but whose lags
   lie inside one, minus the rows with clean lags, by number of lags inside the event. Each arm minus
