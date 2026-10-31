@@ -40,7 +40,9 @@ prediction: >-
   point's forecast built from the stored median forecasts of the 7 or 9 modelled Primaries beneath
   it (one fitted scale and offset) scores a mean absolute error at least 20% above experiment 415's
   N1, because the modelled Primaries carry about one third of a bulk supply point's mean demand
-  (27% at D13, 35% at D17) with a correlation near 0.7. The variant that adds the node's own three origin lags scores within 10% above N1's error but does not beat it. P4. If stage 1 runs, G1 minus A0 at the
+  (27% at D13, 35% at D17) with a correlation near 0.7. The variant that adds the node's own three
+  origin lags scores within 10% above N1's error but does not beat it. P4. If stage 1 runs, G1 minus
+  A0 at the
   signed-MW six is between -0.05 and +0.05 CRPS points (days 1 to 10), G1 minus G1-rw is between
   -0.03 and +0.03, and G1 minus S1 is between -0.03 and +0.03.
 decision_rule: >-
