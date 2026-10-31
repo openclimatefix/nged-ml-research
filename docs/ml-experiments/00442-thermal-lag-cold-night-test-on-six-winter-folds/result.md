@@ -112,6 +112,24 @@ February 2026, so that the cold-night slice rests on five folds.
 - **Reviews.** Draft pull request; plan review (fresh Sonnet); code review (fresh Sonnet) before
   the first fit; results review with the audit triggers; write-up review; prose review.
 
+## Counts and minimum detectable effect, printed before `T` was scored
+
+The scorer's `pre` stage read only the control `R` (stored seeds 0 to 2 against seeds 3 and 4).
+
+- **The pooled cold-winter-night slice is large enough to decide on but not to detect 0.05.** It
+  holds 16,185 scored half-hours on 35 local dates at the signed-MW six, and 22,459 half-hours on
+  42 dates at the MVA-only eight. Both groups have rows in five folds: 2025-11 (7 dates at each
+  group), 2025-12 (13), 2026-01 (15 at the six, 22 at the eight), 2026-02 (7), and 2026-03 (3).
+  2025-10 has none.
+- **The minimum detectable effect of the pooled cold-night slice exceeds 0.05 at both groups.**
+  Over 7-day valid-date blocks it is 0.19 at the six (15 blocks) and 0.15 at the eight (16 blocks).
+  Over the five folds it is 0.063 at the six and 0.090 at the eight. A gain of 0.05 can therefore
+  meet the decision rule only if the interval is unusually narrow, and a failure to meet it is not
+  evidence of no effect. The write-up reports the interval whatever the rule's reading.
+- **Cold sunny days** hold 40 dates at the six and 35 at the eight (minimum detectable effect 0.20
+  and 0.29 over blocks); **cold overcast days** 12 and 10 dates; **Christmas** 10 dates in two
+  folds; **other bank holidays** 4 dates in one fold. The last three are descriptive.
+
 ## Caveats registered before the fits
 
 - **Six folds, not eight,** for the reason above; the sign rule is scaled from 6 of 8 to 4 of 5.
