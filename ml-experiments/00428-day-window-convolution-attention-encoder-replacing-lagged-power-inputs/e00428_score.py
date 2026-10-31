@@ -48,6 +48,8 @@ ARMS: Final[tuple[str, ...]] = (
     "E3",
     "E3-surp",
     "E3-surp-w",
+    "S1",
+    "H-smooth",
     "DIAG-not-for-release-E3-surp-w-ev",
 )
 WORLD_SETS: Final[dict[str, tuple[int, ...]]] = {
@@ -76,6 +78,9 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C6 R-inj - R": ("R-inj", "R"),
     "C7 E3-surp - E3": ("E3-surp", "E3"),
     "C8 E3-surp - R-inj": ("E3-surp", "R-inj"),
+    "C12 S1 - R-inj": ("S1", "R-inj"),
+    "C13 H-smooth - S1": ("H-smooth", "S1"),
+    "C14 H-smooth - R-inj": ("H-smooth", "R-inj"),
     "C9 E3-surp-w - E3-surp": ("E3-surp-w", "E3-surp"),
     "C10 DIAG-not-for-release-E3-surp-w-ev - E3-surp-w": (
         "DIAG-not-for-release-E3-surp-w-ev",

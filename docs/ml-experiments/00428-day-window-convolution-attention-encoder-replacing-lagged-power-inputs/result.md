@@ -395,6 +395,13 @@ H-lvl screen do not run. The diagnosis does not separate memorisation from slow 
 of the rows per epoch, so the page claims only that three settings of H14-s did not reach R-inj's
 validation loss.
 
+**S1 and H-smooth result (four folds, three seeds, signed-MW six).** P4 failed: H-smooth minus S1 on
+injected harm rows is +0.066 [0.046, 0.088], where the prediction was at or below -0.03. P5 failed
+in the useful direction: S1 minus R-inj on clean rows is -0.083 [-0.096, -0.070], where the
+prediction was within plus or minus 0.03. On injected harm rows S1 minus R-inj is -0.060 [-0.076,
+-0.044]. The minimum detectable effects of R-inj are 0.077 on clean rows and 0.071 on injected harm
+rows. The learned smoothing of the surprise does not beat the surprise at the three origin lags.
+
 **Predictions, written before any score of these arms is read (signed-MW six unless stated; contrast
 = CRPS difference in the units of the other contrasts).**
 
