@@ -216,7 +216,7 @@ def nll(
 ) -> torch.Tensor:
     """Return the mean negative log likelihood of `y` under the mixture."""
     log_w, mean, std, centre = parts
-    if log_w.dim() == 3:  # noqa: PLR2004
+    if log_w.dim() == 3:
         if head != "clipped":
             msg = "member-wise arms use the clipped head"
             raise ValueError(msg)
