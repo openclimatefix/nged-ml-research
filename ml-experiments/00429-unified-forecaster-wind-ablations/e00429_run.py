@@ -35,6 +35,8 @@ ARMS: Final[dict[str, model.Arm]] = {
     "member_plain": model.Arm(route="member"),
     "member_frozen": model.Arm(route="member", plant="frozen"),
     "member_e2e": model.Arm(route="member", plant="e2e"),
+    "memberwise": model.Arm(route="memberwise"),
+    "memberwise_frozen": model.Arm(route="memberwise", plant="frozen"),
     "member_plain_censored": model.Arm(route="member", head="censored"),
     "member_frozen_censored": model.Arm(route="member", plant="frozen", head="censored"),
     "member_e2e_censored": model.Arm(route="member", plant="e2e", head="censored"),
@@ -104,6 +106,8 @@ def main() -> None:
                 seed=seed,
             )
             save(name=f"{name}_h{seed}", array=out["scored"])
+            if "scored_members" in out:
+                save(name=f"{name}_members_h{seed}", array=out["scored_members"])
             MODELS_DIR.mkdir(parents=True, exist_ok=True)
             torch.save(fitted.state_dict(), MODELS_DIR / f"{name}_h{seed}.pt")
             print(f"{name} seed {seed} done {time.time() - started:.0f} s", flush=True)

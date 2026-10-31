@@ -44,6 +44,7 @@ RUN_STRIDE: Final[int] = 12
 SCALE: Final[float] = 100.0
 CONSTRUCTIONS: Final[tuple[str, ...]] = ("ecc", "schaake", "shifted", "independent")
 RESAMPLES: Final[int] = 2_000
+MEDIAN_INDEX: Final[int] = 5
 WIND_100M: Final[int] = 1
 """Column of the member weather array that holds the 100 m wind speed."""
 
@@ -158,7 +159,7 @@ def build_blocks(*, scored, grid: np.ndarray) -> tuple[list[np.ndarray], list[di
     return blocks, info
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Score the named arms and print the tables."""
     arms = sys.argv[1:] or ["one_pass_ms", "one_pass_m", "member_plain"]
     scored = data347.scored_frame()
@@ -180,14 +181,21 @@ def main() -> None:
     result: dict[tuple[str, str], np.ndarray] = {}
     for arm in arms:
         parts = np.stack([np.load(run.PARTS_DIR / f"{arm}_h{s}.npy") for s in run.SEEDS])
-        for kind in CONSTRUCTIONS:
+        kinds_for_arm = (
+            (*CONSTRUCTIONS, "memberwise") if arm.startswith("memberwise") else CONSTRUCTIONS
+        )
+        for kind in kinds_for_arm:
             values = np.zeros((len(blocks), 2))
             for s in range(len(parts)):
                 q = np.asarray(parts[s], dtype=np.float64)
                 rng = np.random.default_rng(1000 + s)
-                x = member_values(
-                    kind=kind, quantiles=q, power=power, wind=wind, shuffle=shuffle, rng=rng
-                )
+                if kind == "memberwise":
+                    path = np.load(run.PARTS_DIR / f"{arm}_members_h{s}.npy", mmap_mode="r")
+                    x = np.asarray(path[:, :, MEDIAN_INDEX], dtype=np.float64)
+                else:
+                    x = member_values(
+                        kind=kind, quantiles=q, power=power, wind=wind, shuffle=shuffle, rng=rng
+                    )
                 for i, block in enumerate(blocks):
                     rows = block.reshape(-1)
                     values[i] += block_scores(x=x[rows].T, y=actual[rows])
@@ -241,6 +249,18 @@ def main() -> None:
         "one_pass_ms schaake - one_pass_ms ecc": (
             ("one_pass_ms", "schaake"),
             ("one_pass_ms", "ecc"),
+        ),
+        "memberwise memberwise - one_pass_ms ecc": (
+            ("memberwise", "memberwise"),
+            ("one_pass_ms", "ecc"),
+        ),
+        "memberwise memberwise - one_pass_ms schaake": (
+            ("memberwise", "memberwise"),
+            ("one_pass_ms", "schaake"),
+        ),
+        "memberwise memberwise - memberwise ecc": (
+            ("memberwise", "memberwise"),
+            ("memberwise", "ecc"),
         ),
         "one_pass_m ecc - one_pass_ms ecc": (("one_pass_m", "ecc"), ("one_pass_ms", "ecc")),
         "one_pass_ms ecc - one_pass_ms independent": (

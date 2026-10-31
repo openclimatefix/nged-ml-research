@@ -95,6 +95,8 @@ repository use no lagged power in the 347 head, so none is added.
 | `member_plain` | Shared encoder per member; mean, standard deviation, p10, p90 pooled | none | Clipped |
 | `member_frozen` | As `member_plain` | Frozen stage-3 plant power as an extra encoder input and as the mixture's centre | Clipped |
 | `member_e2e` | As `member_plain` | The stage-3 plant as an `nn.Module`, trained end to end from 347's parameters | Clipped |
+| `memberwise` | Shared network on each member alone; pooled forecast is the equal-weight mixture of the 51 member mixtures | none | Clipped |
+| `memberwise_frozen` | As `memberwise`, each member's mixture centred on its own stage-3 plant power | Frozen stage-3 plant | Clipped |
 | `member_<best>_censored` | As the better of the three member arms | as that arm | Censored at 0 and 1 |
 | `ref_347_y2`, `ref_default`, `ref_clim` | stored rows | | |
 
@@ -133,6 +135,13 @@ figures come from a separate script before the write-up.
   to 14 (lead 24 to 336 hours, the part of the row set that exists) side by side.
 - **Training data.** Wind may use the one year of ENS hindcasts (experiment 303 argued against it;
   this experiment follows experiment 347 and uses it).
+- **Members as quantile forecasts (A1).** NGED's proposed deliverable is a 51-member power
+  ensemble in which each member is itself a quantile forecast, and production can afford 51 passes.
+  The `memberwise` arms give each member its own 11 quantiles, and the pooled forecast is the
+  equal-weight mixture of the 51 member mixtures (trained on the pooled likelihood). The report
+  scores each member's quantiles against the observation (averaged over members) beside the pooled
+  mixture's score and the share of observations beyond a member's q01 and q99; the path
+  construction `memberwise` takes each member's own median as its path.
 - **Coherence (A1).** NGED runs power-flow models one ensemble member at a time, so the forecast
   must give 51 members that are coherent across time and across the three farms. The script
   `e00429_coherence.py` scores the 51 member paths with the energy score and the variogram score
@@ -156,13 +165,14 @@ figures come from a separate script before the write-up.
 
 Each is the difference in kept-row quantile score at true days 1 to 10 and, beside it, over every
 lead. All intervals are month-block bootstrap intervals (experiment 347's resampler), 99% level
-with a Bonferroni correction over these five (level 0.998).
+with a Bonferroni correction over these six (level 0.9983).
 
 1. **C1 (A1):** `member_plain` minus `one_pass_ms`.
 2. **C2 (A1):** `member_plain` minus `one_pass_m` (experiment 343's input choice).
 3. **C3 (A4):** `member_frozen` minus `member_plain`.
 4. **C4 (A4):** `member_e2e` minus `member_frozen`.
 5. **C5 (A7):** the censored arm minus the same arm clipped.
+6. **C6 (A1):** `memberwise` (pooled mixture) minus `one_pass_ms`.
 
 Reference contrasts, not corrected: each arm against `ref_347_y2` and `ref_default`.
 

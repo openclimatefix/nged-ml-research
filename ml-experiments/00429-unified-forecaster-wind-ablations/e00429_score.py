@@ -20,6 +20,7 @@ for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
 
 import e00303_score as score303  # noqa: E402  # isort: skip  # ty: ignore[unresolved-import]
 import e00326_score as score326  # noqa: E402  # isort: skip  # ty: ignore[unresolved-import]
+import e00303_common as c303  # noqa: E402  # isort: skip  # ty: ignore[unresolved-import]
 import e00347_s4_data as data347  # noqa: E402  # isort: skip  # ty: ignore[unresolved-import]
 import e00347_s4_score as score347  # noqa: E402  # isort: skip  # ty: ignore[unresolved-import]
 import e00429_data as data  # noqa: E402
@@ -35,9 +36,10 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C2 member_plain - one_pass_m (A1)": ("member_plain", "one_pass_m"),
     "C3 member_frozen - member_plain (A4)": ("member_frozen", "member_plain"),
     "C4 member_e2e - member_frozen (A4)": ("member_e2e", "member_frozen"),
+    "C6 memberwise pooled mixture - one_pass_ms (A1)": ("memberwise", "one_pass_ms"),
 }
 CENSORED_CONTRAST: Final[str] = "C5 {arm}_censored - {arm} (A7)"
-LEVEL: Final[float] = 1 - 0.01 / 5
+LEVEL: Final[float] = 1 - 0.01 / 6
 SEEDS_EXPECTED: Final[int] = 5
 MARGIN: Final[float] = 0.10
 """The maintainer agreed this margin for wind on 2026-10-31."""
@@ -193,6 +195,41 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     lines.append("-- check: error of the mean forecast, root mean square in points, kept rows --")
     for name, m in metrics.items():
         lines.append(f"{name.ljust(28)}{np.sqrt(m['mean_sq_error'][0, flags['kept']].mean()):.3f}")
+
+    member_arms = [n for n in run.ARMS if (run.PARTS_DIR / f"{n}_members_h0.npy").exists()]
+    if member_arms:
+        lines.append(
+            "-- per-member quantile forecasts: score of each member's 11 quantiles against the "
+            "observation, averaged over the 51 members; share of observations beyond a member's q01 "
+            "and q99, averaged over members --"
+        )
+    member_scores: dict[str, np.ndarray] = {}
+    for name in member_arms:
+        per_seed, below, above = [], [], []
+        for s in run.SEEDS:
+            mq = np.load(run.PARTS_DIR / f"{name}_members_h{s}.npy")
+            flat = mq.reshape(-1, mq.shape[2]).astype(np.float64)
+            rows_score = c303.quantile_score(quantiles=flat, actual=np.repeat(actual, mq.shape[1]))
+            per_seed.append(
+                rows_score.reshape(len(actual), -1).mean(axis=1) * c303.POINTS_PER_FRACTION
+            )
+            below.append((actual[:, None] < mq[:, :, 0]).mean(axis=1))
+            above.append((actual[:, None] > mq[:, :, 10]).mean(axis=1))
+        member_scores[name] = np.mean(per_seed, axis=0)
+        qs[f"{name}_member_mean"] = member_scores[name][None]
+        pooled = qs[name][0]
+        for label, keep in (
+            ("true_1_10", flags["true_1_10"]),
+            ("h12_36", flags["h12_36"]),
+            ("true_1_14", flags["true_1_14"]),
+            ("kept", flags["kept"]),
+        ):
+            lines.append(
+                f"{name} {label}: mean member score {member_scores[name][keep].mean():.3f}; "
+                f"pooled mixture {pooled[keep].mean():.3f}; share below member q01 "
+                f"{np.mean(below, axis=0)[keep].mean():.4f}; above member q99 "
+                f"{np.mean(above, axis=0)[keep].mean():.4f}"
+            )
 
     contrasts = dict(CONTRASTS)
     for base in ("one_pass_ms", "member_plain", "member_frozen", "member_e2e"):

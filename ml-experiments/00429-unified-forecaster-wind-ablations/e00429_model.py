@@ -48,6 +48,7 @@ LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75
 FARMS: Final[tuple[str, ...]] = common.FARMS
 ZERO: Final[float] = 0.001
 FULL: Final[float] = 0.999
+MEMBER_DIM: Final[int] = 2
 LOG_SQRT_2PI: Final[float] = float(np.log(2 * np.pi)) * 0.5
 
 
@@ -115,6 +116,8 @@ class Net(nn.Module):
                 nn.Linear(n_weather + extra, width), nn.GELU(), nn.Linear(width, width)
             )
             n_feature = 4 * width
+        elif arm.route == "memberwise":
+            n_feature = n_weather + (0 if arm.plant == "none" else 1)
         else:
             n_feature = {"summary": 6, "one_pass_ms": 2 * n_weather, "one_pass_m": n_weather}[
                 arm.route
@@ -161,6 +164,17 @@ class Net(nn.Module):
             power = cases.power[index]
         elif plant == "e2e":
             power = self.member_power(raw=raw, farm=cases.farm_index[index])
+        if route == "memberwise":
+            member_in = z if power is None else torch.cat([z, power[:, :, None]], dim=2)
+            tiled = aux[:, None, :].expand(-1, member_in.shape[1], -1)
+            out = self.trunk(torch.cat([member_in, tiled], dim=2))
+            centre = self.y_mean.expand(member_in.shape[:2]) if power is None else power
+            return (
+                torch.log_softmax(out[..., :COMPONENTS], dim=-1),
+                out[..., COMPONENTS : 2 * COMPONENTS],
+                torch.exp(out[..., 2 * COMPONENTS :].clamp(-6.0, 1.0)),
+                centre,
+            )
         if route == "summary":
             feature = summary
         elif route == "one_pass_ms":
@@ -197,6 +211,11 @@ def nll(
 ) -> torch.Tensor:
     """Return the mean negative log likelihood of `y` under the mixture."""
     log_w, mean, std, centre = parts
+    if centre.dim() == MEMBER_DIM:
+        z = (y[:, None] - centre)[..., None]
+        log_pdf = -0.5 * ((z - mean) / std) ** 2 - torch.log(std) - LOG_SQRT_2PI
+        pooled = torch.logsumexp((log_w + log_pdf).flatten(start_dim=1), dim=1)
+        return -(pooled - float(np.log(centre.shape[1]))).mean()
     z = (y - centre)[:, None]
     log_pdf = -0.5 * ((z - mean) / std) ** 2 - torch.log(std) - LOG_SQRT_2PI
     if head == "clipped":
@@ -225,6 +244,39 @@ def mixture_quantiles(*, parts: tuple[torch.Tensor, ...]) -> np.ndarray:
             lo, hi = np.where(below, mid, lo), np.where(below, hi, mid)
         out[:, k] = 0.5 * (lo + hi)
     return np.minimum(np.maximum(mu[:, None] + out, 0.0), 1.0)
+
+
+def memberwise_quantiles(*, parts: tuple[torch.Tensor, ...]) -> tuple[np.ndarray, np.ndarray]:
+    """Return (pooled (rows, 11), per-member (rows, 51, 11)) quantiles of member-wise mixtures.
+
+    The pooled forecast is the equal-weight mixture of the 51 member mixtures; each quantile is
+    found by bisection on the mixture's cumulative distribution, clamped to [0, 1].
+    """
+    log_w, mean, std, centre = parts
+    w = log_w.exp()
+    loc = centre[..., None] + mean
+
+    def cdf(x: torch.Tensor) -> torch.Tensor:
+        return (w * 0.5 * torch.erfc(-(x[..., None] - loc) / std / float(np.sqrt(2.0)))).sum(dim=-1)
+
+    pooled, members = [], []
+    for level in LEVELS:
+        lo = torch.full(centre.shape[:1], -2.0, device=centre.device)
+        hi = torch.full(centre.shape[:1], 3.0, device=centre.device)
+        mlo = torch.full(centre.shape, -2.0, device=centre.device)
+        mhi = torch.full(centre.shape, 3.0, device=centre.device)
+        for _ in range(40):
+            mid = 0.5 * (lo + hi)
+            below = cdf(mid[:, None].expand_as(centre)).mean(dim=1) < level
+            lo, hi = torch.where(below, mid, lo), torch.where(below, hi, mid)
+            mmid = 0.5 * (mlo + mhi)
+            mbelow = cdf(mmid) < level
+            mlo, mhi = torch.where(mbelow, mmid, mlo), torch.where(mbelow, mhi, mmid)
+        pooled.append(0.5 * (lo + hi))
+        members.append(0.5 * (mlo + mhi))
+    pooled_np = torch.stack(pooled, dim=1).clamp(0.0, 1.0).cpu().numpy()
+    members_np = torch.stack(members, dim=2).clamp(0.0, 1.0).cpu().numpy()
+    return pooled_np, members_np
 
 
 def build_plants() -> dict[str, plant_module.Plant]:
@@ -337,10 +389,22 @@ def train_and_predict(  # noqa: PLR0915
     for name, cases in targets.items():
         aux, summ = prepared(cases)
         result = np.empty((cases.size, len(LEVELS)), dtype=np.float32)
+        member_result = (
+            np.empty((cases.size, MEMBERS, len(LEVELS)), dtype=np.float32)
+            if arm.route == "memberwise"
+            else None
+        )
         with torch.no_grad():
             for s in range(0, cases.size, EVAL_BATCH):
                 index = torch.arange(s, min(s + EVAL_BATCH, cases.size), device=DEVICE)
                 parts = model(cases=cases, index=index, aux=aux[index], summary=summ[index])
-                result[s : s + len(index)] = mixture_quantiles(parts=parts)
+                if member_result is not None:
+                    pooled, members = memberwise_quantiles(parts=parts)
+                    result[s : s + len(index)] = pooled
+                    member_result[s : s + len(index)] = members
+                else:
+                    result[s : s + len(index)] = mixture_quantiles(parts=parts)
         out[name] = np.sort(result, axis=1)
+        if member_result is not None:
+            out[f"{name}_members"] = np.sort(member_result, axis=2)
     return out, model
