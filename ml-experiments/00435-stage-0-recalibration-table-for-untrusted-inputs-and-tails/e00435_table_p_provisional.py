@@ -69,6 +69,8 @@ GROUP_OF: Final[dict[str, str]] = {
     **dict.fromkeys(("D15", "D18"), "D15 and D18"),
 }
 UPPER: Final[tuple[str, ...]] = ("q95", "q99")
+MIN_FIT_ROWS: Final[int] = 200
+"""A cell with fewer fitting rows keeps the factor 1.0 (no factor row)."""
 
 
 def load(*, arm: str, month: str) -> pl.DataFrame:
@@ -112,6 +114,8 @@ def fit_factors(*, fit: pl.DataFrame) -> pl.DataFrame:
             else:
                 ratio, level = (pl.col("q50") - pl.col("actual")) / spread, 1.0 - tau
             use = part.filter(spread > 1e-6)
+            if use.height < MIN_FIT_ROWS:
+                continue
             rows.append(
                 {
                     "group": group,
@@ -121,7 +125,13 @@ def fit_factors(*, fit: pl.DataFrame) -> pl.DataFrame:
                     "n_fit": use.height,
                 }
             )
-    return pl.DataFrame(rows)
+    return pl.DataFrame(
+        rows,
+        schema={
+            "group": pl.String, "lead_band": pl.String, "tail": pl.String,
+            "factor": pl.Float64, "n_fit": pl.Int64,
+        },
+    )  # fmt: skip
 
 
 def apply_factors(*, frame: pl.DataFrame, factors: pl.DataFrame) -> pl.DataFrame:

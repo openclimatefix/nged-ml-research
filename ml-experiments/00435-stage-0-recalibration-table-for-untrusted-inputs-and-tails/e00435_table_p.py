@@ -2,7 +2,8 @@
 
 Every row of a stored forecast gets one condition class, assigned in this order:
 
-1. `real_event`: the target lies in a real load-shift event (`tgt_real`); scored only, never fitted;
+1. `real_event`: the target lies in a real load-shift event (`tgt_real`); scored only, never fitted,
+   and kept in world 0 only, because the target is the same in every world;
 2. `lag_missing`: one of the row's three lags (newest, same time yesterday, same time last week) is
    unobserved in the world;
 3. `surprise_gt4` and `surprise_2_4`: the largest of the three lags' absolute surprise (the world's
@@ -167,7 +168,7 @@ def load_arm(*, arm: str, month: str, powers: dict[int, np.ndarray]) -> pl.DataF
         mean = np.sort(np.mean([s.select(list(LEVELS)).to_numpy() for s in seeds], axis=0), axis=1)
         first = first.with_columns(*[pl.Series(c, mean[:, i]) for i, c in enumerate(LEVELS)])
         parts.append(add_classes(frame=first, power=powers[world], median=median, width=width))
-    frame = pl.concat(parts)
+    frame = pl.concat(parts).filter((pl.col("cls") != "real_event") | (pl.col("world") == 0))
     grid = grid_of(us=frame["valid_us"].to_numpy())
     frame = frame.with_columns(
         **{
