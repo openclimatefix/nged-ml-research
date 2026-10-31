@@ -104,8 +104,9 @@ def load_arms() -> dict[str, np.ndarray]:
         "head_x3": np.load(SOURCE_339 / "final" / "x3.npy"),
         "xgb_ens_mean_M": np.load(SOURCE_343 / "final" / "M.npy"),
     }
-    y2 = pl.read_parquet(SOURCE_347 / "predictions_y2.parquet")
-    arms["plant_head_y2"] = y2.select(c303.LEVEL_COLUMNS).to_numpy()[None]
+    arms["plant_head_y2"] = np.stack(
+        [np.load(SOURCE_347 / "parts" / f"y2_h{seed}.npy") for seed in range(5)]
+    )
     for other in (
         np.load(SOURCE_336 / "final" / "default.npy"),
         np.load(SOURCE_343 / "final" / "default.npy"),
@@ -120,7 +121,7 @@ def load_cases() -> pl.DataFrame:
     y2 = pl.read_parquet(SOURCE_347 / "predictions_y2.parquet").select(
         "site", "time_series_id", "valid_time", "lead_hours", "actual"
     )
-    rows_339 = pl.read_parquet(SOURCE_339 / "rows.parquet").select("lead_day", "month", "masked")
+    rows_339 = pl.read_parquet(SOURCE_339 / "rows.parquet").select("masked")
     rows_336 = pl.read_parquet(SOURCE_336 / "rows.parquet").select("site", "valid_time", "masked")
     rows_347 = pl.read_parquet(SOURCE_347 / "rows.parquet").select("site", "masked")
     if not (
@@ -133,11 +134,11 @@ def load_cases() -> pl.DataFrame:
         raise ValueError("the stored row tables of experiments 336, 339, and 347 are not aligned")
     mask = pl.read_parquet(SOURCE_210 / "mask.parquet")
     joined = pl.read_parquet(SOURCE_210 / "joined.parquet").select(
-        "time_series_id", "valid_time", "power", "wind_speed"
+        "time_series_id", "valid_time", "power", "wind_speed", "capacity_mw"
     )
     cases = (
         y2.with_row_index("row")
-        .hstack(rows_339.select("lead_day", "month"))
+        .with_columns(month=pl.col("valid_time").dt.strftime("%Y-%m"))
         .join(mask, on=["time_series_id", "valid_time"], how="left")
         .join(joined, on=["time_series_id", "valid_time"], how="left")
         .sort("row")
@@ -154,9 +155,11 @@ def load_cases() -> pl.DataFrame:
     )
     return cases.with_columns(
         in_mask=pl.col("drop_reason").is_not_null(),
-        idle_reading=(pl.col("drop_reason") == "low_wind_idle") & (pl.col("power") <= floor_mw),
-        idle=pl.col("drop_reason") == "low_wind_idle",
-        outage=pl.col("drop_reason") == "outage_suspected",
+        idle_reading=(
+            (pl.col("drop_reason") == "low_wind_idle") & (pl.col("power") <= floor_mw)
+        ).fill_null(False),
+        idle=(pl.col("drop_reason") == "low_wind_idle").fill_null(False),
+        outage=(pl.col("drop_reason") == "outage_suspected").fill_null(False),
         actual_cleaned_zero=pl.when(
             (pl.col("drop_reason") == "low_wind_idle") & (pl.col("power") <= floor_mw)
         )
@@ -186,6 +189,11 @@ def reproduction_gate(*, arms: dict[str, np.ndarray], cases: pl.DataFrame) -> di
         gaps[arm] = gap
         if gap > REPRODUCTION_TOLERANCE:
             raise ValueError(f"arm {arm} does not reproduce its stored per-row score: gap {gap}")
+    score_343 = json.loads((SOURCE_343 / "score.json").read_text())["scores"]["scored"]["M"]["all"]
+    mine = float(row_losses(quantiles=arms["xgb_ens_mean_M"], actual=actual)["qs"].mean())
+    gaps["xgb_ens_mean_M"] = abs(mine - float(score_343["qs"]))
+    if gaps["xgb_ens_mean_M"] > 1e-6:
+        raise ValueError(f"arm M does not reproduce experiment 343's score: {mine}")
     return gaps
 
 
@@ -248,6 +256,7 @@ def summarise(*, cases: pl.DataFrame, losses: dict[str, dict[str, np.ndarray]]) 
                 selection = in_band if farm == "pooled" else in_band & (farm_column == farm)
                 counts = np.bincount(month_index[selection], minlength=len(months)).astype(float)
                 if counts.min() == 0:
+                    print("skipped cell (a month has no rows):", row_set, band, farm, flush=True)
                     continue
                 reference = per_arm[REFERENCE_ARM]
                 for arm, arm_losses in per_arm.items():
@@ -399,6 +408,7 @@ def low_wind_slice(
     lead = cases["lead_hours"].to_numpy()
     selection = in_slice & (lead >= BANDS["days_1_to_10"][0]) & (lead <= BANDS["days_1_to_10"][1])
     counts = np.bincount(month_index[selection], minlength=len(months)).astype(float)
+    populated = counts > 0
     reference = row_losses(
         quantiles=losses["quantiles"][REFERENCE_ARM], actual=cases["actual"].to_numpy()
     )
@@ -406,7 +416,7 @@ def low_wind_slice(
     for arm, quantiles in losses["quantiles"].items():
         values = row_losses(quantiles=quantiles, actual=cases["actual"].to_numpy())["qs"]
         sums = np.bincount(month_index[selection], weights=values[selection], minlength=len(months))
-        mean, lo, hi = month_block_interval(sums=sums, counts=np.maximum(counts, 1.0), rng=rng)
+        mean, lo, hi = month_block_interval(sums=sums[populated], counts=counts[populated], rng=rng)
         record = {"arm": arm, "n": int(counts.sum()), "mean": mean, "lo": lo, "hi": hi}
         if arm != REFERENCE_ARM:
             diff = np.bincount(
@@ -415,7 +425,7 @@ def low_wind_slice(
                 minlength=len(months),
             )
             d_mean, d_lo, d_hi = month_block_interval(
-                sums=diff, counts=np.maximum(counts, 1.0), rng=rng
+                sums=diff[populated], counts=counts[populated], rng=rng
             )
             record |= {"diff": d_mean, "diff_lo": d_lo, "diff_hi": d_hi}
         records.append(record)
