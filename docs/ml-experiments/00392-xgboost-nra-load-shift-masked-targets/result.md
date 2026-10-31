@@ -6,11 +6,12 @@ also_relevant_to:
   - lagged-power-and-error-correction
   - calibration-and-uncertainty
   - curtailment-cost
-status: planned
+status: done
 kind: other
 protocol: demand-v1
 size: >-
-  complex. Stored: per-arm monthly forecasts, every fitted booster (about 27 MB each, under `work/boosters/<arm>_<form>/` in this experiment's private folder), mask tables
+  complex. Stored: per-arm monthly forecasts, every fitted booster (about 27 MB each, under
+  `work/boosters/<arm>_<form>/` in this experiment's private folder), mask tables
   and injected-transfer tables, all in this experiment's private folder; experiments 87, 379, 381,
   383, and 391 are read and never written. Designs: more than one defensible (which half-hours the
   detector marks, how long after an event to keep dropping rows, how injected transfers are built);
@@ -26,7 +27,8 @@ hypothesis: >-
 prediction: >-
   Written before any score is read. P1. Outside events and the 48 hours after them, no masked arm
   differs from the unmasked control R0 by more than 0.02 points of effective capacity in CRPS
-  (experiment 75 found +0.004, 98.33% interval -0.026 to +0.025, for the plain weekly-refitted XGBoost model). P2. Inside events, the lagless forms of R1 and R2
+  (experiment 75 found +0.004, 98.33% interval -0.026 to +0.025, for the plain weekly-refitted
+  XGBoost model). P2. Inside events, the lagless forms of R1 and R2
   follow under 25% of the labelled depth; the lagged form of R0 follows over 50%. P3. R2 recovers
   at least 75% of what R1 recovers in the injected-transfer check. P4. R5 follows under 50% of the
   depth in the lag-encroachment sweep at k = 3, between R0 and R2. P5. The random-block control
@@ -56,11 +58,162 @@ metric: >-
 code: ml-experiments/00392-xgboost-nra-load-shift-masked-targets/
 production_status: not-for-production
 adopted_in: none
+date: 2026-10-31
+verdict: not supported
+best_arm: >-
+  None. Removing labelled load-shift rows from the training targets (R1) scores 4.233 CRPS points
+  outside events against 4.214 for the unmasked model (R0) and 4.235 for a random-block control.
+headline: >-
+  Training the monthly XGBoost demand model without the labelled load-shift events (R1) does not
+  make its median follow a load shift in its lagged power inputs any less than the unmasked model
+  does, and R1 scores the same as a control that drops the same number of rows at random. When all
+  three lagged power inputs sit inside a synthetic event of 5% of capacity, the median of every
+  lagged arm moves by about 40% of the step; only the lagless form moves by 0.
+lessons: >-
+  Masking labelled events in the training targets does not repair the lagged forecast. The only
+  change that stopped the median following an event in the lags was dropping the lags (lagless
+  form), which costs about 0.7 CRPS points outside events. The 5% to 95% band does not widen when
+  a lag is inside an event, so a lagged forecast puts about 0.70 coverage on the event-level reading
+  at k = 0 and 0.78 to 0.82 at k = 3. Check 2 (share of labelled depth followed over the event
+  and 48 hours after it) cannot tell the arms apart, because at leads beyond a day the lags sit far
+  from the event half-hours.
+take_home_message: >-
+  Removing the labelled load-shift events from the XGBoost model's training targets does not make
+  its forecast ignore a load shift in its recent-power inputs. When all three inputs sit inside a
+  synthetic event, the median of the model still follows about 40% of the step, with or without the
+  mask, and the band does not widen. Only dropping the recent-power inputs removes the effect, at a
+  cost of about 0.7 CRPS points; a detector-built mask (arm R2) was not tested.
+advice:
+  - >-
+    Do not expect a training-target mask to give a normal-running-arrangement forecast from the
+    lagged XGBoost model; it scores the same as dropping random blocks and its median follows the
+    same 38% to 41% of a step at k = 3 (sweep, figure 2).
+  - >-
+    Judge an NRA forecast with the lag-encroachment sweep and not with the share of labelled depth
+    followed over real events, because the real-event measure is near 0 for every arm, including the
+    unmasked one (check 2).
+  - >-
+    Widen the band, or drop the lags, on rows whose lags may lie inside an event: the band ratio
+    stays within 1% of its k = 0 width at every k (sweep, figure 3).
+  - >-
+    Refit a second seed of the control before reading differences under 0.5 CRPS points in the
+    7 days after events: the random-block control moved that slice by 1.5 points (figure 1).
 ---
 
-# Planned: an NRA forecast from XGBoost trained with load-shift events removed from its targets
+# An NRA forecast from XGBoost trained with load-shift events removed from its targets
 
-**Status: plan only. No fit has run, and none starts until the manager grants a compute slot.**
+**Removing the labelled load-shift events from the training targets of the monthly XGBoost demand
+model does not stop its median from following a load shift in its recent-power inputs.** A load
+shift is a period when National Grid Electricity Distribution moves a substation's load onto its
+neighbours. A forecast of what the substation would draw without a load shift is called a
+normal-running-arrangement (NRA) forecast. We trained the XGBoost model with the half-hours of 66
+hand-labelled load shifts, and the 48 hours after each, left out of its training targets, and
+compared it with the same model trained on everything and with a model trained with the same number
+of half-hours left out at random. We then added a synthetic load shift of 5% of the substation's
+capacity to the recent-power inputs of clean half-hours and measured how far the forecast median
+moved. With all three recent-power inputs inside the synthetic event, the median moved by about 40%
+of the step in every arm that has those inputs, masked or not. Only a model without recent-power
+inputs did not move.
+
+![Pooled CRPS by arm](figure_1_headline.svg)
+
+![Median shift against encroachment level](figure_2_sweep_median.svg)
+
+![Band width against encroachment level](figure_3_sweep_band.svg)
+
+![Per-fold change in CRPS outside events](figure_4_screen_folds.svg)
+
+## Result
+
+- **Screen, not a full year.** Scores come from four monthly refits (2025-10, 2026-01, 2026-03,
+  2026-06), each scoring its month, 16 Primaries, leads to 336 hours, headline days 1 to 10. They
+  are
+  interim: four folds give wide intervals, so no interval or 99% claim is made. Refits are monthly,
+  `colsample` is 1.0, one seed, the training window is experiment 87's whole-history window.
+  Experiment 87's `n1h` recipe is used throughout; widening is raw unless stated.
+- **Arms.** R0 (unmasked; lagged form is experiment 381's stored monthly control, reproduced to
+  within 0.0011 of capacity at D2 and D8, and experiment 402's boosters of it are used for the
+  sweep), R1 (labelled events and the 48 hours after dropped from training targets), RC1 (as many
+  half-hours dropped at random, in blocks of the same lengths), R5 (experiment 391's N1, surprise
+  columns, not refitted, lagged only). Each arm except R5 has a lagged and a lagless form.
+- **R2 and RC2 were dropped.** They need the detector masks of experiment 391, which are on hold,
+  and R1 already gave a null result. Arms R3 and R4 were not run.
+- **CRPS, points of capacity (pooled, four folds).** Outside events and the 48 hours after (879,769
+  half-hours): lagged R0 4.214, R1 4.233, RC1 4.235, R5 4.278; lagless R0 4.950, R1 4.961, RC1
+  4.915. Inside events (13,494): lagged R0 25.25, R1 24.98, RC1 25.65, R5 25.50; lagless 26.45,
+  26.28, 26.64. In the 7 days after (46,176): lagged 5.298, 5.256, 5.376, 5.189 (R5); lagless 7.591,
+  7.449, 6.065. All rows (906,597): lagged 4.548, 4.563, 4.576, 4.614; lagless 5.310, 5.316, 5.259.
+- **Screen rule (a)** (no worse than +0.02 against the control in at least 3 of 4 folds): R1 lagged
+  passes 2 of 4 folds and R1 lagless 1 of 4 at raw widening, and 3 of 4 and 2 of 4 at 1.15
+  widening, so the verdict depends on the widening. Rule (b) cannot be decided (matched events fall
+  in 3 of 4 folds and every arm follows about 0 of the depth). R1 is indistinguishable from RC1 on
+  every pooled score, so the full year was not run.
+- **Band coverage inside events.** The 5% to 95% band covers 0.31 to 0.32 of readings for the lagged
+  arms (nominal 0.90) and 0.23 for the lagless arms; all arms under-cover during a load shift.
+- **Avoidable-curtailment cost** (signed-MW six, limit 0.9, GBP, dominated by D16): during events
+  lagged R0 8.71 million, R1 8.76 million, RC1 8.77 million, R5 8.88 million; lagless R0 9.02
+  million, R1 9.01 million, RC1 9.07 million. In the 7 days after: lagged 257 thousand, 256
+  thousand, 261 thousand, 260 thousand (R5); lagless 232 thousand, 234 thousand, 231 thousand.
+- **Lag-encroachment sweep** (step of 5% of capacity added to the lag columns of clean half-hours;
+  level k adds it to the origin lag, then also the day-earlier lag, then also the week-earlier lag;
+  both signs; leads 24 to 72 hours). The median moves, as a share of the step: k = 1, about 0 to
+  2%; k = 2, 15% to 20%; k = 3, 38% to 41%, for lagged R0, R1, and RC1 in both metering groups, and
+  within one point of one another. Lagless forms move by exactly 0 at every k, which tests the
+  code. The 5% to 95% band width stays within 1% of its width at k = 0. Coverage of the event-level
+  reading rises from 0.68 to 0.70 at k = 0 to 0.78 to 0.82 at k = 3, while coverage of the clean
+  reading falls from 0.86 to 0.88 to 0.81 to 0.85. Experiment 391's N1 (R5) was not swept, because
+  its surprise columns need recomputing from the shifted lags.
+- **Injected transfers in training** (4 Primaries, the 2026-01 fold, 15 to 18 synthetic events of
+  0.71, 1.1, or 2.3 MW per Primary added to the training targets and lags): the mean absolute
+  difference of the median from the clean-trained forecast is 0.79 points of capacity for the
+  unmasked lagged model and 0.87 for the masked one, and 0.42 and 0.59 for the lagless forms. Depth
+  recovered is -0.11 (lagged) and -0.40 (lagless). The lagless difference of 0.42 is a fit-noise
+  floor, so this check cannot show recovery either way.
+- **Check 2** (share of labelled depth followed, 9 matched events in 3 folds): 0.00 plus or minus
+  0.05 for every arm, including the unmasked one, because at leads beyond a day the lags sit far
+  from the event half-hours. One merged event (D5, 2025-12-05 to 2026-01-14) is excluded.
+- **Flagged-count check column.** Scoring on experiment 87's `observed.parquet` with flagged
+  half-hours dropped from every arm removes 173 half-hours (170 at D18 in the 2025-10 fold, 3 at D8
+  in the 2026-03 fold); the per-fold numbers of the rule check agree with the headline run.
+- **Event plots.** `figure_events_1.svg` to `figure_events_6.svg` draw six real labelled events
+  across both metering groups (two are report-only Primaries), marking the start and end of each and
+  showing the actuals, the median, and the 5% to 95% band of the unmasked lagged, unmasked lagless,
+  and masked lagged forecasts. Events not in the label table may also be present.
+  `figure_examples.svg` is a fan chart of one event.
+
+## Checks
+
+- **Median minus mean forecast per site:** not computed. The stored forecasts hold quantiles only.
+- **Error of the median beside the quantile score:** printed by the scorer, not tabulated.
+- **Audit triggers that fire:** trigger 5, because the random-block control moves the 7-day-after
+  slice of the lagless form by 1.5 CRPS points (6.065 against 7.591 for the unmasked model) and
+  RC1 lagless moved by -0.27 in the 2026-01 fold, although it should change nothing. This is
+  evidence that fit-to-fit noise on small slices is large, and no conclusion rests on those slices.
+  A Sonnet audit re-derived the headline contrasts (Opus was not used, per the maintainer's rule).
+- **Late reviews.** The code review (a fresh Sonnet agent) ran after the first fits had started, and
+  its findings were fixed before RC1 started; R1 and R0 lagless were fitted before the fixes, which
+  affect only the random-block control and events closer than 48 hours.
+
+## Caveats
+
+- **Flagged half-hours.** The feature cache comes from experiment 103's `rows.parquet` without the
+  `drop_reason` filter; it supplies the load-shift event masks and the headline scoring actuals.
+  The fits read experiment 87's own files, where flagged half-hours are nulls.
+- **Device.** One R0 lagless fit (D2, 2025-10) was fitted on CPU as a benchmark; all other fits
+  ran on the GPU.
+- **Four folds, one seed.** The monthly screen holds only four test months, and the matched events
+  are 27, of which 9 are matched with a depth.
+- **Weekly refits** are not used, so absolute and tail numbers are monthly-schedule numbers.
+
+## What the next experiment should answer
+
+Whether an NRA forecast needs a model that is told which lags to distrust, such as one trained on
+synthetic events injected into its lags and targets together (the sweep shows the lags carry about
+40% of a step into the median), or whether dropping the lags on suspect rows and widening the band
+is enough. The injected-transfer check here was too noisy to answer it; a second seed of the control
+would give its noise floor.
+
+## Plan (written before any result)
 
 ## What experiment 383 already settles
 
@@ -89,15 +242,15 @@ rows and parameters as R0. Each arm is fitted in a **lagged** form (three origin
 **lagless** form (no power lags). Weekly refits are not used, so every absolute and tail number is
 labelled monthly; any winner is re-checked weekly before a release claim.
 
-| Arm | Training rows dropped | Source of the mask | Role |
-|---|---|---|---|
-| R0 | none | none | control: lagged form is experiment 381's stored monthly `control` (see below); lagless form refitted here |
-| R1 | valid time inside a hand-labelled transfer, or within 48 h after it ends | the 66 hand labels, events that ended before the fold's `train_end` | ceiling, never a candidate |
-| R2 | same rule | the "deep and long" detector with the neighbour veto, built from data inside the fold's training window | candidate |
-| Rc1, Rc2 | as many rows as R1 and R2, in random blocks of the same lengths | random | control for the smaller training set |
-| R5 | none | none (surprise columns only) | stored: experiment 391's arm N1, not refitted |
-| R3 | train, detect, mask, refit; two passes | detector | optional, last; stop rule: second pass changes under 5% of marked half-hours |
-| R4 | as R2, plus experiment 391's neighbour surprise columns | detector | skipped unless 391 shows neighbour surprise helps |
+- **R0:** no rows dropped; the control.
+- **R1:** rows whose valid time lies inside a hand-labelled transfer, or within 48 hours after it
+  ends, are dropped, using only events that ended before the fold's `train_end`. A ceiling, never
+  a candidate.
+- **R2:** the same rule applied to half-hours the "deep and long" detector marks (not run).
+- **RC1, RC2:** as many rows as R1 and R2 drop, in random blocks of the same lengths, as a control
+  for the smaller training set (RC2 not run).
+- **R5:** no mask; experiment 391's arm N1 with surprise columns, stored and not refitted.
+- **R3, R4:** the train-detect-retrain loop and R2 with neighbour surprise columns (not run).
 
 - **Detector.** Taken from experiment 391's `e00391_detector.py` (plan PR 41, not yet merged); if
   391 has not merged when R2 is due, the file is copied into this folder with a note. The mask for
@@ -172,7 +325,8 @@ refits; R2 and RC2 follow on the same four.
 
 ## Lag-encroachment sweep
 
-Prediction-only, on the saved boosters of every refit (path in the front matter's size line). The three lags are
+Prediction-only, on the saved boosters of every refit (path in the front matter's size line). The
+three lags are
 ordered by recency: origin, day-earlier, week-earlier (the exact times come from experiment 87's
 `origin_lags`). Levels k = 0 to 3. A step of depth D (2%, 5%, 10% of capacity and the three
 quartile depths; both signs) is added to every lag inside the synthetic event. For R5 and R4 the
@@ -201,11 +355,8 @@ no metered generator's name or ID.
 
 ## Order and compute
 
-1. R0 (lagged, lagless), then R1, then Rc1 and R2, Rc2. 2. R5 scoring from 391's stored output.
-3. Checks 1, 2, 4. 4. Check 3 and the sweep. 5. R3 and R4 last. At most 3 threads, `OMP_NUM_THREADS=1`
-per process, `MemoryMax=16G`, spawn start method. Fit counts: 5 arms (R0, R1, R2, Rc1, Rc2) in 2
-forms, each with 12 to 14 monthly refits at 16 Primaries, plus injected-transfer refits for 10
-Primaries. The manager sizes the slot from these counts.
+R0 and R1 first, then RC1, then the checks, the sweep, and the injected-transfer fits. The fits ran
+as three single-thread GPU processes (the sweep on CPU), each under a 16 GB memory limit.
 
 ## Caveat: flagged exact-zero half-hours (manager, 2026-10-30)
 
@@ -216,7 +367,8 @@ experiment 103's `rows.parquet`, which has no `drop_reason` filter, enters only 
 masks and the scoring actuals (experiment 377's `actuals_and_context`). About 622 flagged
 exact-zero Primary half-hours (the manager's figure, to be re-counted here) therefore sit in the
 scored actuals, identically for every arm, so contrasts between arms are like-for-like while
-absolute scores include them. **The scorer takes the actuals source as a parameter and reports both:**
+absolute scores include them. **The scorer takes the actuals source as a parameter and reports
+both:**
 the headline uses experiment 381's actuals (experiment 377's `actuals_and_context`), so the numbers
 stay comparable; the check column uses experiment 87's `observed.parquet`, with the flagged
 half-hours dropped from every arm (the same rows for all arms) and the count of dropped half-hours
@@ -225,7 +377,8 @@ the XGBoost Discuss session, and the merge waits for it.
 
 **Flagged-count check column, measured by the scorer before any arm is read.** Of the half-hours
 in the four screen folds that are finite in the cache, 173 are null in `observed.parquet`: 170 at
-D18 in the 2025-10 fold, 3 at D8 in the 2026-03 fold, and none in the 2026-01 and 2026-06 folds. That
+D18 in the 2025-10 fold, 3 at D8 in the 2026-03 fold, and none in the 2026-01 and 2026-06 folds.
+That
 is far below the manager's figure of about 622, which presumably spans more than these folds. The
 event masks still come from `dp_features` (experiment 103's rows); only the masks do, because the
 fits read training rows, lags, and inference inputs from experiment 87's own files.
@@ -238,6 +391,8 @@ fits read training rows, lags, and inference inputs from experiment 87's own fil
 
 ## Sources
 
-Builds on experiment 383's oracle-mask arms, experiment 75 (a training-target mask in the weekly XGBoost model) and experiment 44 (the share of the best guess's score a perfect detector could gain), experiment
+Builds on experiment 383's oracle-mask arms, experiment 75 (a training-target mask in the weekly
+XGBoost model) and experiment 44 (the share of the best guess's score a perfect detector could
+gain), experiment
 100 (dropped half-hours in XGBoost), experiment 391's detector and surprise columns, and the
 `dp_nra` experiment's injected-transfer scoring.
