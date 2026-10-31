@@ -67,15 +67,15 @@ def step_masks(*, init: datetime) -> dict[str, np.ndarray]:
     return {"all": np.ones(N_STEPS, dtype=bool), "daylight": (hours >= low) & (hours < high)}
 
 
-def schaake_ranks(
+def schaake_pool(
     *, init: datetime, observed: np.ndarray, kind: np.ndarray
-) -> tuple[np.ndarray, int]:
-    """Return the Schaake ranks (25, 702, 51) and the number of qualifying dates.
+) -> list[tuple[int, datetime, np.ndarray]]:
+    """Return the qualifying past dates as (distance in day of year, date, filled path (25, 702)).
 
     Candidate dates start at the run's time of day, from 2025-03-01 to 16 days before the run, so
     every past path ends before the run. A date is dropped if any node misses more of its half-hours
-    than `MAX_MISSING` for its family; gaps are filled by linear interpolation along the path. The 51
-    dates nearest in day of year are used, repeated cyclically if fewer qualify.
+    than `MAX_MISSING` for its family; gaps are filled by linear interpolation along the path. The
+    list is sorted by distance in day of year, then by date.
     """
     last = init - SCHAAKE_BUFFER
     t0 = SCHAAKE_FIRST.replace(hour=init.hour, minute=init.minute)
@@ -93,17 +93,34 @@ def schaake_ranks(
         raise ValueError(msg)
     candidates.sort(key=lambda c: (c[0], c[1]))
     x = np.arange(N_STEPS)
-    pool = []
-    for k in range(N_MEMBERS):
-        out = candidates[k % len(candidates)][2].copy()
+    filled = []
+    for doy, date, path in candidates:
+        out = path.copy()
         for p in range(out.shape[0]):
             bad = np.isnan(out[p])
             if bad.any():
                 out[p, bad] = np.interp(x[bad], x[~bad], out[p, ~bad])
-        pool.append(out)
+        filled.append((doy, date, out))
+    return filled
+
+
+def ranks_of_paths(*, paths: list[np.ndarray], init: datetime) -> np.ndarray:
+    """Return, for 51 past paths (25, 702), the rank of each path at every node and half-hour."""
     rng = np.random.default_rng(int(hashlib.sha256(init.isoformat().encode()).hexdigest()[:8], 16))
-    stack = np.stack(pool).transpose(1, 2, 0)  # (node, step, 51)
-    return s434.ranks_by_key(key=stack, rng=rng), len(candidates)
+    stack = np.stack(paths).transpose(1, 2, 0)  # (node, step, 51)
+    return s434.ranks_by_key(key=stack, rng=rng)
+
+
+def schaake_ranks(
+    *, init: datetime, observed: np.ndarray, kind: np.ndarray
+) -> tuple[np.ndarray, int]:
+    """Return the Schaake ranks (25, 702, 51) and the number of qualifying dates.
+
+    The 51 dates nearest in day of year are used, repeated cyclically if fewer qualify.
+    """
+    pool = schaake_pool(init=init, observed=observed, kind=kind)
+    chosen = [pool[k % len(pool)][2] for k in range(N_MEMBERS)]
+    return ranks_of_paths(paths=chosen, init=init), len(pool)
 
 
 def make_ranks(

@@ -27,7 +27,7 @@ nice -n 19 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
 """
 
 import hashlib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import e00434_score as s434  # ty: ignore[unresolved-import]
@@ -50,13 +50,23 @@ FIT_STRIDE: Final[int] = 4
 """Every fourth step is used to fit `R` and `phi`, because neighbouring steps are nearly copies."""
 
 
-def pit_scores(*, values: np.ndarray, actual: np.ndarray) -> np.ndarray:
-    """Return the normal score of each actual under its 51 values (25, 702); NaN where no actual."""
+def pit_scores(*, values: np.ndarray, actual: np.ndarray, seed: int = 0) -> np.ndarray:
+    """Return the normal score of each actual under its 51 values (25, 702); NaN where no actual.
+
+    A tie between the actual and several of the 51 values draws the PIT at random within the tied levels.
+    """
+    rng = np.random.default_rng(seed)
     levels = np.arange(1, M + 1) / (M + 1)
     z = np.full(actual.shape, np.nan)
     for node in range(N):
         for step in np.flatnonzero(~np.isnan(actual[node])):
-            u = np.interp(actual[node, step], values[node, step], levels)
+            row = values[node, step]
+            lo = int(np.searchsorted(row, actual[node, step], side="left"))
+            hi = int(np.searchsorted(row, actual[node, step], side="right"))
+            if hi - lo >= 2:  # a tie among the values: randomise within the tied levels
+                u = rng.uniform(levels[lo], levels[hi - 1])
+            else:
+                u = np.interp(actual[node, step], row, levels)
             z[node, step] = norm.ppf(np.clip(u, 0.5 / (M + 1), 1 - 0.5 / (M + 1)))
     return z
 
@@ -127,6 +137,8 @@ def weight_grid(*, table: dict[tuple[int, str], float]) -> np.ndarray:
     out = np.ones((N, S))
     for (fam, band), w in table.items():
         lo, hi = BANDS[band]
+        lo = 0 if band == "h12_36" else lo  # leads under 12 h take the 12 to 36 hour weight
+        hi = S if band == "h36_240" else hi  # leads past 240 h take the 36 to 240 hour weight
         out[KIND == fam, lo:hi] = w
     return out
 
@@ -176,6 +188,9 @@ def choose_weights(
                     sums[(fam, band, w)] += train_score(
                         path=path, actual=actual, fam=fam, band=band
                     )
+    if not all(np.isfinite(v) for v in sums.values()):
+        msg = "a training score is not finite"
+        raise ValueError(msg)
     return {
         (fam, band): min(WEIGHTS, key=lambda w, f=fam, b=band: sums[(f, b, w)])
         for fam in range(3)
@@ -217,14 +232,25 @@ def main() -> None:  # noqa: PLR0914
     inits = [datetime.fromisoformat(f"{r['init']}+00:00").astimezone(UTC) for r in runs]
     months = sorted({f"{t:%Y-%m}" for t in inits})
     z_all = [
-        pit_scores(values=r["values"].astype(np.float64), actual=r["actual"].astype(np.float64))
-        for r in runs
+        pit_scores(
+            values=r["values"].astype(np.float64), actual=r["actual"].astype(np.float64), seed=k
+        )
+        for k, r in enumerate(runs)
     ]
     table_lines = ["month  w[demand h12_36, h36_240]  [wind ...]  [solar ...]"]
     for month in months:
-        train = [i for i, t in enumerate(inits) if f"{t:%Y-%m}" != month]
+        start = datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC)
+        train = [
+            i
+            for i, t in enumerate(inits)
+            if f"{t:%Y-%m}" != month and not (start - timedelta(days=15) < t < start)
+        ]  # a run that ends inside the held-out month is not training data
         test = [i for i, t in enumerate(inits) if f"{t:%Y-%m}" == month]
-        if all(score.scenario_path(arm="J6", init=inits[i]).exists() for i in test):
+        if all(
+            score.scenario_path(arm=arm, init=inits[i]).exists()
+            for i in test
+            for arm in ("J5", "J6", "J6-median")
+        ):
             continue
         chol, phi = fit_copula(z_runs=[z_all[i] for i in train])
         seed = int(hashlib.sha256(month.encode()).hexdigest()[:6], 16)
@@ -235,6 +261,8 @@ def main() -> None:  # noqa: PLR0914
             f"{month}  " + "  ".join(str([table[(fam, b)] for b in BANDS]) for fam in range(3))
         )
         print(table_lines[-1], flush=True)
+        with (score.WORK / "mixing_weights.txt").open("a") as handle:
+            handle.write(table_lines[-1] + "\n")
         weights = weight_grid(table=table)
         for i in test:
             run, init = runs[i], inits[i]
@@ -253,7 +281,6 @@ def main() -> None:  # noqa: PLR0914
                 file.parent.mkdir(parents=True, exist_ok=True)
                 np.save(file, path.astype(np.float32))
             print(f"{init:%Y-%m-%d} written", flush=True)
-    (score.WORK / "mixing_weights.txt").write_text("\n".join(table_lines) + "\n")
 
 
 if __name__ == "__main__":
