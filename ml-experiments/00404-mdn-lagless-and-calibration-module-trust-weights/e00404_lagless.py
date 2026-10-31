@@ -11,7 +11,7 @@ fit. The table is one parquet per scored month and seed.
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
 ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:\
 ml-experiments/00404-mdn-lagless-and-calibration-module-trust-weights \
-DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data OMP_NUM_THREADS=1 \
+DATA_PATH_INTERNAL=<the internal data folder> OMP_NUM_THREADS=1 \
     uv run --no-sync python ml-experiments/00404-*/e00404_lagless.py build --month 2026-06 \
     --seed 0 --device cuda
 ```
