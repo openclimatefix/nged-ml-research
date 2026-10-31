@@ -60,56 +60,57 @@ code: ml-experiments/00388-xgboost-lagged-power-column-sets-weekly-demand/
 verdict: not supported
 best_arm: >-
   the baseline itself (the three origin lags); no added column lowers the CRPS of days 1 to 10.
-  Baseline CRPS at the signed-MW six and the MVA-only eight is given in the bullets.
+  The baseline's CRPS per Primary is in `work/score_monthly_final.log` and summarised in Results.
 headline: >-
-  At monthly refits, arm A (six weekly analogues) raises the CRPS of days 1 to 10 by +0.137 points
-  (99.83% interval +0.069 to +0.195) at the signed-MW six and +0.047 (-0.104 to +0.125) at the
-  MVA-only eight. Arm B is +0.049 (+0.002 to +0.092) and +0.002 (-0.092 to +0.057); arm C is +0.008
-  and +0.002; arm E (without the newest reading) is -0.022 (-0.075 to +0.005) and +0.001; arm F
-  (strict 24-hour lag) is +0.044 (+0.022 to +0.069) and +0.096 (+0.052 to +0.146).
+  Arm minus baseline, CRPS of days 1 to 10 (positive is worse). At monthly refits, arm A (six
+  weekly analogues) raises the CRPS of days 1 to 10 by +0.137 points (99.83% interval +0.069 to
+  +0.195) at the signed-MW six and +0.047 (-0.104 to +0.125) at the MVA-only eight. Arm B is
+  +0.049 (+0.002 to +0.092) and +0.002 (-0.092 to +0.057); arm C is +0.008 and +0.002; arm E
+  (without the newest reading) is -0.022 (-0.075 to +0.005) and +0.001; arm F (strict 24-hour lag)
+  is +0.044 (+0.022 to +0.069) and +0.096 (+0.052 to +0.146).
 take_home_message: >-
-  Adding more lagged power to the simple XGBoost demand model does not improve the forecast: six
-  weekly analogues make it worse at 12 of the 16 Primaries, and replacing the day lag by an exact
-  24-hour lag is worse at 0 to 72 hours of lead. These five column sets gave no gain over the three
-  lags the model already has (the newest reading, the reading one day earlier, and the reading one
-  week earlier). Dropping the newest reading changes the score by almost nothing overall and loses
-  at 0 to 24 hours at the MVA-only Primaries. It scored better on the post hoc event-row slice,
-  which is worth a separate test.
+  In this test, none of five added lagged-power column sets lowered the CRPS of days 1 to 10 of the
+  simple XGBoost demand model. Six weekly analogues made the forecast worse at 12 of the 16
+  Primaries, and replacing the day lag by an exact 24-hour lag was worse at 0 to 72 hours of lead.
+  The model's existing three lags are the newest reading, the reading one day earlier, and the
+  reading one week earlier. Dropping the newest reading changed the score by almost nothing overall
+  and lost at 0 to 24 hours at the MVA-only Primaries. Arm E, which drops the newest reading,
+  scored better on the post hoc event-row and cold-night slices. Those slices carry no interval, so
+  a separate test is needed.
 lessons:
   - >-
-    The extra lags did not help, and arm A's loss is in
-    every lead band at the signed-MW six, and experiment 30's gain on older rows did not carry over
-    to the current recipe.
+    The extra lags did not help. Arm A's loss appears in every lead band at the signed-MW six.
+    Experiment 30's gain on older rows did not carry over to the current recipe.
   - >-
-    Dropping the newest reading costs nothing at days 1 to 10 (-0.022 and +0.001), but it loses
-    +0.029 (+0.009 to +0.048) at 0 to 24 hours at the MVA-only eight, so the newest reading helps
-    at short lead.
+    Dropping the newest reading does not change the score at days 1 to 10 (-0.022 and +0.001), but
+    it loses +0.029 (+0.009 to +0.048) at 0 to 24 hours at the MVA-only eight, so at those
+    Primaries the newest reading helps at short lead.
   - >-
-    A synthetic step in the lags barely moves the median and never widens the band in any arm, so
-    none of these column sets makes the forecast react to, or hedge against, a lag inside an event.
+    In the sweep, a step on every lag moved the median by 0.39 to 0.47 of the step, and no arm
+    widened its band by more than 5%, so none of these column sets hedges against a lag inside an
+    event.
 advice:
   - >-
     Keep the three origin lags as the lagged-power inputs of the simple weekly XGBoost demand model;
     no tested set of extra columns beats them (Figure 1).
   - >-
-    Do not add the six weekly analogues to the XGBoost model at the signed-MW Primaries: they cost
-    +0.137 points of CRPS (Figure 1).
+    Do not add the six weekly analogues to the XGBoost model at the signed-MW Primaries: they raise
+    the CRPS by 0.137 points (Figure 1).
   - >-
-    Test dropping the newest reading only on event rows (a post hoc slice), where arm E
-    scored 8.313 against 8.789 at the signed-MW six, and not as a general change (Checks).
+    A possible next test is dropping the newest reading on event rows only (experiment 383's row
+    set), where arm E scored 8.313 against the baseline's 8.789 at the signed-MW six in a post hoc
+    slice. Do not make it a general change (Checks).
   - >-
-    Look for a hedge against contaminated lags in the output (a widened band on affected rows), not
-    in more lag columns; the sweep shows no arm widens its band (Figure 4).
+    A hedge against contaminated lags would have to come from the output (a widened band on affected
+    rows), because in the sweep no arm widened its band by more than 5% (Figure 4).
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-31
 ---
 
-**Take-home message.** Giving the simple weekly-refitted XGBoost demand model more lagged-power
-columns does not improve its forecast. Six weekly analogues make the forecast worse at 12 of the
-16 Primaries, and the other column sets either change nothing or are worse. The model already uses
-the three lags that matter, so the search for better inputs should look elsewhere. The verdict is
-`not supported`.
+**Take-home message.** None of the five column sets lowered the CRPS of the simple XGBoost demand
+model. Six weekly analogues made the forecast worse at 12 of the 16 Primaries, and the other column
+sets either changed nothing or were worse. The verdict is `not supported`.
 
 We asked whether more columns of past power help an XGBoost model forecast Primary substation
 demand 1 to 10 days ahead. We refitted the model with each of five column sets on the 1st of each
@@ -138,23 +139,25 @@ for a step on the newest lag reading, the two newest, and every lag.*
 
 ## Results
 
-- **Arms and recipe.** The baseline is the three origin lags (the newest usable reading, the
-  reading at the latest earlier time of the same half-hour of day, and the reading at the latest
-  earlier time of the same weekday and half-hour). A is six weekly analogues (five new columns: the
-  one-week analogue equals the baseline's week lag up to about 6.9 days of lead). B is their mean and
-  median. C is two anomaly columns. E is the baseline without the newest reading. F is E with the
-  day lag replaced by the power exactly 24 hours before the valid time. All arms use
-  experiment 87's `n1h` recipe with monthly refits (192 fits each), column subsampling fixed at 1.0.
-  Arm D was not fitted, because B and C did not each help alone.
+- **Arms and recipe.** The baseline is the three origin lags (the newest usable reading, the reading
+  at the latest earlier time of the same half-hour of day, and the reading at the latest earlier
+  time of the same weekday and half-hour). A is six weekly analogues (five new columns: the one-week
+  analogue equals the baseline's week lag up to about 6.9 days of lead). B is their mean and median.
+  C is two anomaly columns. E is the baseline without the newest reading. F is E with the day lag
+  replaced by the power exactly 24 hours before the valid time. All arms use experiment 87's `n1h`
+  recipe with monthly refits (192 fits each), column subsampling fixed at 1.0. Arm D was not fitted,
+  because B and C did not each help alone.
 - **Row set and scoring.** `fold_a_daily_gap_v1`, protocol `demand-v1`, 16 Primaries, valid times
   from 2025-07-01 to 2026-06-30, CRPS in points of effective capacity, headline band days 1 to 10.
   The scorer reads actuals from the shared, unfiltered cache of experiment 103. The check column
   (below) drops the flagged half-hours.
 - **Baseline.** Experiment 381's stored monthly control. Its absolute CRPS at days 1 to 10 is in
-  `work/score_monthly_final.log`; per Primary it ranges from 1.75 at D3 to 7.65 at D8, with D15
-  (report only) at 15.60. BG2 is better than the baseline by +0.096 (+0.040 to +0.169) at the
-  signed-MW six and +0.042 (-0.011 to +0.120) at the MVA-only eight; the baseline beats
-  `manual_heuristic` by -0.494 and -0.588 and `climatology` by -0.720 and -1.029.
+  `work/score_monthly_final.log`; the highest
+  of the 14 scored Primaries is 7.65 at D8 and the lowest 1.75 at D3, and D15 (report only) is
+  15.60. Baseline minus reference, positive when the baseline is worse (signed-MW six; MVA-only
+  eight): BG2 +0.096 (+0.040 to +0.169) and +0.042 (-0.011 to +0.120); `manual_heuristic` -0.494
+  (-0.677 to -0.335) and -0.588 (-0.797 to -0.381); `climatology` -0.720 (-0.965 to -0.509) and
+  -1.029 (-1.348 to -0.727).
 - **Days 1 to 10, arm minus baseline, 99.83% intervals (signed-MW six; MVA-only eight).** A:
   +0.137 (+0.069 to +0.195); +0.047 (-0.104 to +0.125). B: +0.049 (+0.002 to +0.092); +0.002
   (-0.092 to +0.057). C: +0.008 (-0.016 to +0.041); +0.002 (-0.020 to +0.019). E: -0.022
@@ -164,11 +167,14 @@ for a step on the newest lag reading, the two newest, and every lag.*
   +0.131 at 168 to 240 hours). E gains nothing beyond 24 hours in the MVA-only group (-0.007 at 168
   to 240 hours) and loses +0.029 (+0.009 to +0.048) at 0 to 24 hours, so the prediction that E
   would help beyond 24 hours without losing below it failed. F is worse than the baseline at 0 to 24
-  hours by +0.136 (signed-MW six) and +0.165 (MVA-only eight).
-- **Per Primary (arm A, 95% intervals).** Worse at 12 Primaries with the interval above zero, and
-  better only at D8 (-0.171, -0.499 to +0.035) and D15 (-1.725, -2.775 to -0.513; report only,
-  4 scored months). Leaving out any one signed-MW Primary keeps the contrast between +0.111 and
-  +0.151. Placebos: D2 +0.077 and D4 +0.146, both worse, so the loss is not specific to D8.
+  hours by +0.136 (signed-MW six) and +0.165 (MVA-only eight), and at 24 to 72 hours by +0.108
+  (signed-MW six) and +0.179 (MVA-only eight). At 72 to 240 hours F's interval includes zero at the
+  signed-MW six (+0.013 and +0.011).
+- **Per Primary (arm A, 95% intervals).** Arm A is worse at 12 Primaries, with the interval above
+  zero. It is lower at D15 (-1.725, -2.775 to -0.513; report only, 4 scored months) and at D8
+  (-0.171, -0.499 to +0.035, an interval that includes zero). Leaving out any one signed-MW Primary
+  keeps the contrast between +0.111 and +0.151. Placebos: D2 +0.077 and D4 +0.146, both worse, so
+  the loss is not specific to D8.
 - **Tails (days 1 to 10, mean over Primaries; baseline against arm A).** At the signed-MW six the
   0.95 quantile pinball loss is 0.949 for the baseline and 1.011 for A, the 0.99 quantile pinball
   loss 0.386 and 0.404, and coverage of the 0.95 and 0.99 quantiles is 0.909 and 0.980 for the
@@ -179,30 +185,31 @@ for a step on the newest lag reading, the two newest, and every lag.*
   MVA-only eight, close to the monthly contrasts. Weekly arm B is partial (384 of 832 fits) and
   weekly arms C, E, and F were not fitted, so none is scored.
 - **Slices (CRPS, baseline against A, E, F).** On the event rows (experiment 383's row set) at the
-  signed-MW six: 8.789, 9.050, 8.313, 8.733. On cold nights at the signed-MW six: 4.933, 5.385,
-  4.703, 4.901. These slices are post hoc and carry no interval. Arm E is lower on both slices.
+  signed-MW six: baseline 8.789, A 9.050, E 8.313, F 8.733. On cold nights at the signed-MW six:
+  baseline 4.933, A 5.385, E 4.703, F 4.901. These slices are post hoc and carry no interval. Arm E
+  is lower on both slices.
 
 ## Sweep results
 
 A prediction-only sweep adds a synthetic step of plus or minus 2%, 5%, and 10% of capacity to the
-lagged-power inputs, then forecasts the 8 runs served by the refit of 2026-06-23 (the latest weekly
-refit of the scored year, a rule fixed before any score was read) at four Primaries (D8, D4, D10,
-D5), for the baseline and arms A, B, and C, to day 10. The refit for the sweep is a separate fit
-with the boosters saved.
+lagged-power inputs, then forecasts eight runs, at four Primaries (D8, D4, D10, and D5), for the
+baseline and arms A, B, and C, to day 10. The runs are served by the refit of 2026-06-23, the latest
+weekly refit of the scored year, a rule fixed before any score was read. The sweep uses a separate
+fit of that date, with the trained XGBoost models saved.
 
 - **The median follows only a fraction of the step.** For a step of 5% of capacity, the baseline's
   median shifts by 0.04 of the step when only the newest reading is shifted, 0.20 when the two
-  newest are, and 0.39 when every lag is shifted. Arm C follows more (0.12, 0.28, 0.47); arms A and B
-  follow 0.44 (A) and 0.39 (B) against the baseline's 0.39.
-- **No arm widens its band.** The width of the 1% to 99% band stays within 3% of its unshifted
-  width in every arm and lead band up to a step of 5% (arm C reaches 1.029), and within 5% at a step
-  of 10% (maximum 1.047, arm C).
+  newest are, and 0.39 when every lag is shifted. Arm C follows more (0.12, 0.28, 0.47). When every
+  lag is shifted, arm A follows 0.44 of the step, arm B 0.39, and the baseline 0.39.
+- **No arm widens its band much.** The width of the 1% to 99% band stays within 3% of its
+  unshifted width in every arm and lead band up to a step of 5% (arm C reaches 1.029), and within
+  5% at a step of 10% (maximum 1.047, arm C).
 - **The step level usually lies inside the bands.** At a step of 5% the level lies inside the 1% to
   99% band in 93% to 100% of rows, and q95 (q05 for a negative step) reaches it in 70% to 100%
-  of rows. At 2% the bands cover it in 96% to 100% of rows, because the bands are already wide
-  relative to a step that small.
-- **Shifted lags worsen the CRPS.** Against the observed power, shifting every lag by -5% raises
-  the CRPS by up to about 1.0 point (0.91 for A, 0.96 for B, 0.97 for C); the full tables are in `work/sweep_run.log`.
+  of rows. At a step of 2% the bands cover it in 96% to 100% of rows.
+- **Shifting every lag by -5% worsens the CRPS.** Against the observed power, the CRPS rises by up
+  to about 1.0 point (0.91 for A, 0.96 for B, 0.97 for C). The full tables are in
+  `work/sweep_run.log`.
 
 ## Checks
 
@@ -210,12 +217,12 @@ with the boosters saved.
   (+0.137) and held for B (+0.049, at the edge). P2 (largest gain at 72 to 168 h, near zero at 0 to
   24 h) failed: A is worst at 0 to 24 hours (+0.182). P3 (arm C within 0.05) held (+0.008). P4 (no
   placebo moves unless D8 does) failed: D2 (+0.077) and D4 (+0.146) moved while D8 did not.
-
-- **Median minus mean forecast, per site (points of capacity, baseline).** The gap is negative at
-  15 of 16 Primaries, between -3.04 (D15) and -0.14 (D18), with D22 at +0.03, so the forecasts are
-  right-skewed. No arm moves the gap at any Primary by more than 0.3 points except D8 (baseline
-  -0.58, A -0.87, B -0.99) and D15 (baseline -3.04, B -2.66, A -2.51); the full table is in
-  `work/checks.log`.
+- **Median minus mean forecast, per site (points of capacity, baseline).** This gap shows whether
+  an arm shifts the whole forecast distribution while leaving its median alone. The gap is negative
+  at 15 of 16 Primaries, between -3.04 (D15) and -0.14 (D18), with D22 at +0.03, so the forecasts
+  are right-skewed. No arm moves the gap at any Primary by more than 0.3 points except arm B at D8
+  (baseline -0.58, B -0.99) and arm B at D15 (baseline -3.04, B -2.66); arm A is just inside the
+  limit at D8 (-0.87). The full table is in `work/checks.log`.
 - **Error of the median beside each contrast.** The mean absolute error of the median is worse than
   the baseline's for arm A at 14 of 16 Primaries (better only at D8 and D15) and for arm F at 14 of
   16 (better only at D16 and D18), the same direction as the CRPS.
@@ -223,33 +230,38 @@ with the boosters saved.
   cleaned power lacks (all exact zeros: D18 389, D15 196, D21 13, D8 9, D22 5, D9 5, D12 4, D16 1).
   The headline uses the shared unfiltered cache; the check column drops those half-hours. The
   contrasts for arms A, B, C, E, and F are unchanged to within 0.001 (for example A: +0.137 at the
-  signed-MW six, +0.047 at the MVA-only eight). Experiment 388 scores one fold, so the count is
-  622 in that fold.
-- **Reproduction gate.** The weekly baseline refitted at 4 of 52 refits differs from experiment 87's
-  stored weekly member by at most 0.0045 CRPS points at 15 Primaries and by 0.0195 at D22, against
-  a gate of 0.01. No monthly baseline was refitted through the 388 script, so the monthly baseline
-  is experiment 381's control (same recipe, same code path through experiment 87's functions). The
-  gate's failure sets a noise floor of about 0.02 per Primary, small against A's +0.137 but not
-  against the +0.047 at the MVA-only eight.
-- **Triggers fired.** Trigger 2 (a result contradicts its prediction and an earlier experiment): a
-  fresh Sonnet audit found no bug and reproduced D10 (+0.1038 against +0.1031) and D4 (+0.1446
-  against +0.1455). Its findings, triaged: the gate caveat above (accepted, stated); `analogue_1w`
-  duplicates the week lag (accepted, stated); D8 and D15 improve under A (accepted, stated); any
-  mechanism for the loss is untested (accepted; one candidate, memorising the valid time from six
-  weekly values, is a hypothesis).
+  signed-MW six, +0.047 at the MVA-only eight).
+- **Reproduction gate (failed at one Primary).** The weekly baseline refitted at 4 of 52 refits
+  differs from experiment 87's stored weekly member by at most 0.0045 CRPS points at 15 Primaries
+  and by 0.0195 at D22, against a gate of 0.01. No monthly baseline was refitted through the 388
+  script, so the monthly baseline is experiment 381's control (same recipe, same code path through
+  experiment 87's functions). The 0.0195 gap at D22 suggests a noise floor of about 0.02 per
+  Primary. That floor is small against arm A's pooled +0.137 at the signed-MW six, and large against
+  its per-Primary effects at the MVA-only eight.
+- **Audit trigger.** The skill's second audit trigger fired: a result contradicts its own
+  prediction and an earlier experiment. A fresh Sonnet audit found no bug and reproduced D10
+  (+0.1038 against +0.1031) and D4 (+0.1446 against +0.1455). We accepted and stated all four of its
+  findings: the gate caveat above; `analogue_1w` duplicates the week lag; arm A scores lower at D15
+  and, with an interval that includes zero, at D8; and the mechanism of the loss is untested (one
+  candidate, memorising the valid time from six weekly values, is a hypothesis).
 - **Late steps.** The fresh Sonnet code review ran after the fits had started, not before the first
-  run. It found one bug in the scorer's stored-baseline loader (duplicated July origins, which
-  affected only the reference row), fixed before any score was read.
+  run. The review found one bug in the scorer's stored-baseline loader (duplicated July origins,
+  which affected only the reference row), fixed before any score was read.
 
 ## Caveats and next steps
 
-- **Lead range.** The headline is days 1 to 10 over 16 Primaries. The lag effects fall with lead, so
-  a result at 0 to 24 hours is reported beside it.
-- **One seed.** Each arm has one fit per refit.
+- **Monthly refits.** The scored headline uses monthly refits. The weekly check is descriptive and
+  covers arm A only.
+- **Post hoc slices.** The event-row and cold-night results carry no interval.
+- **Sweep scope.** The sweep covers four Primaries at one refit.
+- **Mechanism.** The cause of arm A's loss is untested.
+- **One seed.** Each arm has one fit per refit, and the gate gap suggests a noise floor of about
+  0.02 per Primary.
 - **Not tested.** Any arm that needs a second model or a blend; the 4-week anomaly window; a longer
   analogue window.
-- **Next step.** Test dropping the newest reading on events only, and look for a hedge in the output
-  (a wider band on rows whose lags lie in an event), not in more inputs.
+- **Possible next tests.** Dropping the newest reading on event rows only (experiment 383's row
+  set), and a hedge in the output (a wider band on rows whose lags lie in an event) rather than in
+  more inputs.
 
 ## Pre-registered arms and design
 

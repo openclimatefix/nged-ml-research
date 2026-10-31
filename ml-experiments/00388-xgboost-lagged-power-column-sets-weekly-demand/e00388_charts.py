@@ -70,10 +70,10 @@ def contrast_chart(*, data: pl.DataFrame, band: str, title: list[str]) -> alt.Ch
     x = alt.X(
         "difference:Q", title="CRPS minus the baseline's (points of capacity; below 0 is better)"
     )
-    rule = alt.Chart(pl.DataFrame({"zero": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="zero:Q")
+    rule = alt.Chart(pl.DataFrame({"zero": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="zero:Q")  # ty: ignore[unresolved-attribute]
     layer = (
-        base.mark_rule(strokeWidth=3).encode(x=alt.X("low:Q", title=X_TITLE), x2="high:Q")
-        + base.mark_point(filled=True, size=70).encode(x=x)
+        base.mark_rule(strokeWidth=3).encode(x=alt.X("low:Q", title=X_TITLE), x2="high:Q")  # ty: ignore[unresolved-attribute]
+        + base.mark_point(filled=True, size=70).encode(x=x)  # ty: ignore[unresolved-attribute]
         + rule
     )
     return (
@@ -106,7 +106,7 @@ def sweep_chart() -> alt.Chart:
         )
     )
     return (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X(
