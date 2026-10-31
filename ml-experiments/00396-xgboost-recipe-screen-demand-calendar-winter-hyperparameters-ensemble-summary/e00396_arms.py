@@ -263,12 +263,18 @@ def _trailing_tables(
 
     For run r with origin t0 and step s (valid time t0 + (s + 1) half-hours), the window of w hours
     holds the 2w half-hours ending at the valid time. A half-hour after t0 is read from run r's
-    own member trajectory. A half-hour at or before t0 is read from the same member's first day of
-    the latest earlier run that covers it, which is the forecast the service holds at the origin;
-    no analysis or ERA5 value enters. A window that reaches before the first run is NaN.
+    own member trajectory. A half-hour at or before t0 is read from the ensemble mean of the first
+    day of the latest earlier run that covers it, the same for every member, which is the forecast
+    the service holds at the origin; no analysis or ERA5 value enters. A window that reaches before
+    the first run is NaN.
+
+    Args:
+        site: The Primary label, which picks the ensemble store.
+        key: The stored variable, `temperature` or `shortwave`.
+        windows: The window lengths in hours.
 
     Returns:
-        The origins and `{hours: array (runs, members, MAX_LEAD_STEPS)}` in degrees Celsius.
+        The origins and `{hours: array (runs, members, MAX_LEAD_STEPS)}` in the variable's unit.
     """
     origins, temperature = _ensemble_variable(site=site, key=key)
     if np.isnan(temperature).any():
