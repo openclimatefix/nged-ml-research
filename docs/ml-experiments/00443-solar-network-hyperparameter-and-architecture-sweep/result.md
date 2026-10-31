@@ -2,9 +2,8 @@
 id: '00443'
 slug: solar-network-hyperparameter-and-architecture-sweep
 title: >-
-  Does any change to the size, depth, farm embedding, learning rate, weight decay, training length,
-  mixture components, dropout, or recency weighting of the pooled solar network beat the plain
-  network by 0.5%?
+  Does changing any one setting of the neural network for the six metered solar farms improve its
+  quantile score by 0.5%?
 theme: metered-solar-farms
 also_relevant_to:
 - generator-forecasting
@@ -27,10 +26,11 @@ hypothesis: >-
   number of epochs, number of mixture components, dropout, or row-recency weight lowers the quantile
   score by the margin.
 prediction: >-
-  Written before any fit and before any score is read. Scores are quantile scores in points of
+  Written before any fit and before any score is read. Scores are quantile scores (twice the mean
+  pinball loss over 11 quantile levels in points of
   capacity (twice the mean pinball loss over 11 levels; lower is better), farm-equal means over
   experiment 430's scored year, all day bands. Most levels change the score by less than 0.5%.
-  Because 25 levels are tested, one or two may pass by chance at the 99% level, and the
+  Because 25 levels are tested, about 0.25 are expected to pass by chance at the 99% level, and the
   confirmation on fresh seeds then removes them. The levels I think most likely to help are a wider
   network (128) and a small farm embedding (4 or 8), each by 0.3% to 0.8%; the levels most likely
   to hurt are one hidden layer, one mixture component, and 10 epochs. The prediction that could
@@ -64,60 +64,71 @@ metric: >-
 code: ml-experiments/00443-solar-network-hyperparameter-and-architecture-sweep/
 verdict: not supported
 best_arm: >-
-  The skeleton itself (experiment 430's `g0_onepass`): 6.842 points of capacity over all day bands
-  (three seeds). The best change, a learning rate of 4e-3, scores 6.810 (-0.47%, 99% interval
-  -1.41% to +0.08%) and -0.14% (-0.74% to +0.55%) on three fresh seeds.
+  The unchanged reference network (experiment 430's `g0_onepass`): 6.842 points of capacity over all
+  day bands (three seeds). The best change, a learning rate of 4e-3, scores 6.810 (a change of
+  -0.47%, 99% interval -1.41% to +0.08%), and changes by -0.14% (99% interval -0.74% to +0.55%) on
+  three fresh seeds.
 headline: >-
-  None of 25 single-setting changes beats the plain pooled solar network by the 0.5% margin. The
-  best, a learning rate of 4e-3, is 0.47% better on the screening seeds and 0.14% better on three
-  fresh seeds, with both intervals spanning zero. One mixture component is 3.15% worse, and every
-  other level is within 0.4% of the skeleton.
+  None of 25 single-setting changes improves the reference solar neural network by the 0.5% margin.
+  The best, a learning rate of 4e-3, is 0.47% better on the screening seeds and 0.14% better on
+  three
+  fresh seeds, with both intervals spanning zero. One mixture component is 3.15% worse, and besides
+  these two, every change is within 0.4% of the reference network.
 lessons: >-
-  The solar network overfits after two or three epochs, so training length, weight decay, and
-  learning rate barely matter, and its width, depth, farm embedding, and number of mixture
-  components (from two up) sit on a flat optimum. Any further gain has to come from the inputs, not
-  the network's settings.
+  The solar neural network stops improving after 2 or 3 training epochs, so epochs, weight decay,
+  and
+  learning rate barely matter. No single change to its width, depth, farm embedding, or number of
+  mixture components improves the score by 0.5%. Combinations of settings were not tested.
 take_home_message: >-
-  The plain solar network is already near the best score its settings can give: none of 25
-  one-at-a-time changes (width, depth, farm embedding, learning rate, weight decay, epochs, number
-  of mixture components, dropout, recency weighting) improves it by 0.5%. The network stops
-  improving after two or three training epochs, so the settings that control training length have
-  almost no effect. The next gain, if any, has to come from better inputs such as a better
-  irradiance product, not from tuning the network.
+  None of 25 one-at-a-time changes to the solar neural network (width, depth, farm embedding,
+  learning rate, weight decay, epochs, number of mixture components, dropout, recency weighting)
+  improves its forecast by 0.5%. The network stops improving after 2 or 3 training epochs, so
+  epochs,
+  learning rate, and weight decay have almost no effect. Combinations of settings were not tested,
+  and the next step to try is better inputs, such as a better irradiance product.
 advice:
 - >-
-  Keep the solar network at two hidden layers of 64, three mixture components, no farm embedding,
-  and learning rate 2e-3: no single change beat it by 0.5% (Results).
+  Keep the solar neural network at two hidden layers of 64, three mixture components, no farm
+  embedding, and learning rate 2e-3: no single change improved it by 0.5% (Results).
 - >-
   Do not use one mixture component for solar: the score is 3.15% worse and the 0.99 pinball loss
   0.077 points worse (Results, k1).
 - >-
   Do not run a random search over the solar network's settings: the one-factor stage found no
-  factor that moves the score (Results).
+  setting that moves the score (Results).
 - >-
-  Look for solar gains in the inputs, not in the network: the best epoch is the second or third,
-  so extra capacity or training length cannot help (Checks, best epoch).
+  Look for solar gains in the inputs before further tuning: the best epoch is the 2nd or 3rd, so
+  extra training length does not help (Results, training length).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**The plain pooled solar network is already near the best score its settings can give.** We asked
-whether changing one setting of the network that forecasts the six metered solar farms (labelled A
-to F, each farm's output as a share of its capacity) would improve its forecast. Experiment 430
-found that nothing added to the plain network helps, so we left its design alone and changed 25
-settings one at a time: width, depth, the width of a learned farm embedding, learning rate, weight
-decay, training epochs, number of mixture components, dropout, and a weight that favours recent
-training rows. The forecast is a 51-ensemble-member weather forecast turned into quantiles by a
-mixture of Gaussians. No change beat the plain network by the 0.5% margin, so the random search that
-would follow a positive result was not run. All numbers on this page come from the experiment's own
-scripts.
+**Changing any one setting of the neural network that forecasts solar output did not improve its
+forecast by the 0.5% margin we required.** One neural network is trained on all six metered solar
+farms at once (labelled A to F). For each half-hour it outputs a probability distribution of the
+farm's output, as a fraction of the farm's capacity, from the 51-member ensemble weather forecast of
+the European Centre for Medium-Range Weather Forecasts. Experiment 430 found that adding inputs or
+components to this network improved its score by 0.4% at most (a clear-sky column). We therefore
+left
+the design alone and changed 25 settings one at a time, comparing each against the unchanged
+network (the "reference network") on the quantile score, which measures how well the whole
+distribution matches the observed output (lower is better). The settings were the network's width,
+depth, farm embedding (a learned vector per farm), learning rate, weight decay, number of training
+epochs, number of Gaussian curves in the output distribution, dropout, and a weight that favours
+recent training rows. No change passed, so the random search that the plan reserved for a positive
+result was not run.
 
-**The best change, a learning rate of 4e-3, was a lucky draw of seeds.** It scored 0.47% better on
-the three screening seeds (99% interval −1.41% to +0.08%), and 0.14% better on three fresh seeds
-(−0.74% to +0.55%). That check was run after the results were read (post hoc), on one arm. The
-minimum detectable effect from seed noise is 0.40% at three seeds, so a screening gain of 0.47% sits
-at the noise floor. One mixture component is the only clear change, and it is worse: 3.15% worse
-(+1.43% to +5.52%), with a 0.99 pinball loss 0.077 points higher.
+**The best change, a learning rate of 4e-3, shrank from 0.47% to 0.14% on fresh seeds, and both
+intervals span zero.** The learning rate of 4e-3 scored 0.47% better on
+the three screening seeds (a seed fixes the starting weights and the batch order) (99% interval
+−1.41% to +0.08%), and 0.14% better on three fresh seeds
+(−0.74% to +0.55%). The fresh-seed check was run after the results were read (post hoc), on this one
+arm. The
+minimum detectable effect from seed noise is 0.40% at three seeds, so a screening gain of 0.47% is
+barely above the seed noise. One mixture component is the only clear change, and it is worse: 3.15%
+worse
+(+1.43% to +5.52%), with a 0.99 pinball loss (the loss at the quantile that 99% of outcomes fall
+below) 0.077 points higher.
 
 ![Each setting change against the skeleton with 99% intervals](headline.svg)
 
@@ -129,7 +140,8 @@ The dashed lines mark 0 and the −0.5% margin.*
 
 Scores are quantile scores in points of capacity (twice the mean pinball loss over 11 levels; lower
 is better), farm-equal means over experiment 430's scored year (2025-09 to 2026-08), 410,899 rows,
-all day bands, seeds 0 to 2 for every arm and for the skeleton. "Skeleton" is experiment 430's
+all day bands, seeds 0 to 2 for every arm and for the skeleton. The "skeleton" (the reference
+network) is experiment 430's
 `g0_onepass`, read from its stored predictions. The 0.01 and 0.99 pinball losses are row-pooled
 differences in points of capacity.
 
@@ -165,19 +177,23 @@ differences in points of capacity.
 - **No level passed the rule.** The rule needs a gain of at least 0.5%, a 99% interval that excludes
   zero on the favourable side, and no tail harm above 0.02 points. The lowest point estimate is
   −0.47% (learning rate 4e-3), and its interval reaches +0.08%.
-- **Two weight-decay arms have intervals that exclude zero, on a gain of 0.003% to 0.03%.** These
-  intervals are narrow because the arms barely differ from the skeleton, and the gain is far under
+- **Two weight-decay arms have intervals that exclude zero, on a gain of 0.003% to 0.03%.** The
+  weight-decay intervals are narrow because the arms barely differ from the skeleton, and the gain
+  is far under
   the margin.
 - **Training length changes nothing because the best epoch is early.** The 10-epoch and 40-epoch
   arms score the same as the 20-epoch skeleton to 13 decimal places. A rerun of the seed-0 skeleton
-  with a logged validation curve picked epoch 3 at three refits and epoch 2 at the fourth, out of 40
-  epochs, and the validation loss rises steadily afterwards (it is −0.72 at the best epoch and −0.48
-  at epoch 40 for the first refit). Weight decay at 1e-4 to 1e-2 and a learning rate under 4e-3
-  change little because the network stops after two or three epochs.
+  for 40 epochs with a logged validation curve picked epoch 3 at three refits and epoch 2 at the
+  fourth. The validation loss (the mean negative log-likelihood on the last 61 days of training
+  rows;
+  lower is better) then rises steadily: for the first refit it is −0.72 at the best epoch and −0.48
+  at epoch 40. Weight decay at 1e-4 to 1e-2 and a learning rate under 4e-3
+  change little because training stops improving after 2 or 3 epochs.
 - **The embedding arms are no better, and the per-farm arm is no better than the pooled one.** The
   per-farm networks score 0.18% better (−1.95% to +1.18%) with the widest interval of all arms.
-- **Tails are unchanged except for one mixture component.** Coverage of the 0.01 quantile is 5.2%
-  to 5.5% in every arm (target 1%), and coverage of the 0.99 quantile is 98.2% to 99.2%
+- **The lower tail is under-covered in every arm, and only one mixture component changes the
+  tails.** Coverage of the 0.01 quantile is 5.2%
+  to 5.5% in every arm (target 1%), and coverage of the 0.99 quantile is 98.1% to 99.2%
   (target 99%). Dropout 0.2 moves the 0.99 coverage to 99.2%.
 - **Example forecasts** of the skeleton are in Figures 2 and 3.
 
@@ -202,14 +218,23 @@ output.*
   the mean forecast is lower than the skeleton's at all six farms, as is the quantile score, so the
   two agree. For one mixture component, the mean absolute error is higher at five farms and the
   score is higher at all six.
-- **Audit triggers.** None fired. No control or placebo exists in this experiment. The result agrees
-  with its prediction and with experiment 430. The 10-epoch and 40-epoch arms match the skeleton,
-  and
-  the best-epoch curve above explains why. Every contrast has an interval of similar width to
-  experiment 430's contrasts of the same rows (a half-width of 0.5% to 1.5% for most arms). No
-  nested arm beats its
-  container. The leave-one-farm-out check was not run, because no contrast is a candidate for
-  adoption.
+- **Audit triggers.** Trigger 5 (a control that should change nothing moves the score by more than
+  its
+  own interval's half-width) fires weakly. The two weight-decay arms move by 0.003% and 0.03%, more
+  than their narrow half-widths of 0.003% and 0.02%, and the best-epoch curve above explains why
+  they differ at all. Width 32 and two mixture components score slightly better than the reference
+  network that contains them (−0.27% and −0.08%), with intervals that include zero. Trigger 6
+  (interval width against a sister experiment) is borderline: the embedding, per-farm, 4-layer, and
+  1-component arms have half-widths of 1.1% to 2.1%, against about 0.5% to 0.65% for the others,
+  because their forecasts differ more from the reference network. The other triggers did not fire.
+  No control or placebo exists. The result agrees with its prediction. A leave-one-farm-out check
+  was not run, because no contrast is a candidate for adoption. The numbers review (a fresh Sonnet
+  agent that re-derived the contrasts with its own code) matched every table row.
+- **Minimum detectable effect.** The plan took 0.40% at three seeds by scaling the spread of six
+  skeleton seeds. The spread of seeds 0 to 2 alone gives 0.52%. The best arm's gain of 0.47% is
+  below the margin under either value, so no verdict changes.
+- **Best-epoch script:** `e00443_best_epoch.py` produced the curve above, and its log is in the
+  experiment's private data folder.
 
 ### Caveats
 
@@ -228,16 +253,13 @@ output.*
   the
   experiment's private data folder.
 
-### Problems caused by the move
-
-None.
-
 ## What to try next
 
-**Look for solar gains in the inputs instead of the network.** The network stops improving after two
-or three epochs, so a larger network or longer training cannot help. The inputs that experiment 430
-found to help were a clear-sky column (0.4%) and nothing else; a better irradiance product is the
-remaining candidate.
+**Look for solar gains in the inputs next.** In this experiment the network stopped improving after
+2
+or 3 epochs and no single setting moved the score, although combinations of settings were not
+tested. Experiment 430 found a clear-sky column worth 0.4%. A better irradiance product is one input
+change that has not been tried.
 
 ## Design
 
@@ -265,9 +287,8 @@ supplies seeds 0 to 5.
 | Dropout (after each hidden layer) | 0 | 0.1, 0.2 |
 | Row-recency weight (half-life of the loss weight, by the row's age at the refit) | none | 0.5 year, 1 year |
 
-The brief also named "the loss weights that the design note lists". The note lists one loss weight
-for the demand networks, the row-recency half-life (0.5 year; 1 year and 0.25 year were no better),
-so that is the loss-weight factor. It lists no tail or pinball weight, so none is tested.
+The loss-weight factor is the row-recency half-life, the one loss weight the design note lists for
+demand networks; no tail or pinball weight is tested.
 
 **Stage 2 (run only if a factor moved) is a random search; it was not run.** 45 configurations are
 drawn at random from
@@ -278,9 +299,8 @@ seeds 3 to 5.
 **Compute.** Stage 1 was 300 jobs at 11 to 17 s each on the GPU, in one process under 8 GB with
 `MemoryMax=8G`, `OMP_NUM_THREADS=1`, and one feeder core: about 1.2 hours.
 
-**Standing practices.** Monthly refitting does not apply to a farm network, which follows
-experiment 345's quarterly refits so that the rows match. Cleaning and the D15/D18 start cut apply
-to demand only. The farm rows are experiment 310's, with its idle-band handling. The fitted networks
+**Standing practices.** The farm network follows experiment 345's quarterly refits so that the rows
+match. The farm rows are experiment 310's, with its idle-band handling. The fitted networks
 are not saved: a job's output is its quantile table, and the sweep's 700 networks are small enough
 to refit in minutes. Stored predictions reused: experiment 430's `g0_onepass` seeds 0 to 5, so the
 skeleton is not refitted; the gate (G0) refits one job to prove the new code reproduces it.
