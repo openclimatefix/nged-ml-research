@@ -75,6 +75,14 @@ code: ml-experiments/00423-pooled-mdn-shared-date-time-encoder/
 
 **Plan: can the pooled network learn how people use the calendar, instead of being handed it?**
 
+> **Caveat that governs the verdict.** The bank-holiday-week rows are 14 days of one Christmas and
+> New Year week and 2 days of Easter week, in three test months. The seed noise on those rows (the
+> minimum detectable effect for six-seed means at the signed-MW six) is 0.343 points of capacity,
+> against the 0.10 that prediction P1 needs. By the plan's own rule P1 is therefore untestable at
+> the five screen folds, and the page will report it as untestable whatever the point estimate.
+> The tested all-rows contrasts (C1, C2, C4) and the descriptive Christmas and Easter scores are
+> what this experiment can answer; the 2026-04 event fold adds 6 Easter days.
+
 ## Design note (Sonnet read of the docs sketches and experiment 396's holiday arms)
 
 - **The only encoder sketch is `TimeEncoder` in the production docs'
