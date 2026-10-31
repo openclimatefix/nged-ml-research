@@ -25,7 +25,7 @@ ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-dem
 ml-experiments/00407-pooled-mixture-density-network-tail-arms-and-recency-weights:\
 ml-experiments/00418-mdn-pretrain-on-era5-and-cams-then-fine-tune-on-ens:\
 ml-experiments/00425-best-mdn-architecture-assembly-with-ablations)
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<path to the private data folder>
 OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00425-*/e00425_fit.py --device cuda
 ```
