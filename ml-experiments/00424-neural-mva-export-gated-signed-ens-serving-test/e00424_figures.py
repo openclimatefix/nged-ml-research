@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Draw the figures of experiment 424: the gain by Primary (ENS against laboratory), the CRPS by arm, and example forecasts."""
+"""Draw the figures of experiment 424: gain by Primary, CRPS by arm, and example forecasts."""
 
 import json
 from pathlib import Path
