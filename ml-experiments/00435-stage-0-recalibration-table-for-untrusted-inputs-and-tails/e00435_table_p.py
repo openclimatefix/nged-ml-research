@@ -11,10 +11,12 @@ Every row of a stored forecast gets one condition class, assigned in this order:
 4. `inj_harm`: an injected event touches the lag window (`win_inj`);
 5. `clean`: every other row (world 0 and the injected worlds outside every event).
 
-Rows whose target is in a post-event week (`tgt_post`) or in an injected event (`tgt_inj`) are
-dropped, as in experiment 428's own scoring. The surprise classes are read from seed 0 of the frozen
-lagless table of experiment 404 (commit `63d3799f`). Seeds of an arm that has three are averaged in
-quantile space before fitting. Each scored fold is fitted on the earlier folds only, so 2025-10
+Rows whose target is in a post-event week (`tgt_post`, unless the row is a real event) or in an
+injected event (`tgt_inj`) are dropped, as in experiment 428's own scoring. `real_event` rows are
+scored three ways: against the metered actual, and against the NRA-corrected actual at depth
+factors 0.75, 1.0, and 1.25 (`basis` column). The surprise classes are read from seed 0 of
+the frozen lagless table of experiment 404 (commit `63d3799f`). Seeds of an arm that has three
+are averaged in quantile space before fitting. Each scored fold is fitted on the earlier folds only, so 2025-10
 (the first fold) is never scored.
 
 ```bash
@@ -144,6 +146,12 @@ def add_classes(
     )
 
 
+def nra_corrections() -> dict[float, np.ndarray]:
+    """Return the NRA correction (share of capacity, (16, grid)) for each depth factor."""
+    z = np.load(WORK_DIR / "nra_correction_share.npz")
+    return {f: z[f"f{f}"] for f in (0.75, 1.0, 1.25)}
+
+
 def load_arm(*, arm: str, month: str, powers: dict[int, np.ndarray]) -> pl.DataFrame:
     """Return one fold of one arm: seed-averaged quantiles, flags, classes, band, and group."""
     median, width = lagless_dense(month=month)
@@ -160,7 +168,18 @@ def load_arm(*, arm: str, month: str, powers: dict[int, np.ndarray]) -> pl.DataF
         first = first.with_columns(*[pl.Series(c, mean[:, i]) for i, c in enumerate(LEVELS)])
         parts.append(add_classes(frame=first, power=powers[world], median=median, width=width))
     frame = pl.concat(parts)
-    frame = frame.filter(~pl.col("tgt_post") & ~pl.col("tgt_inj") & pl.col("actual").is_finite())
+    grid = grid_of(us=frame["valid_us"].to_numpy())
+    frame = frame.with_columns(
+        **{
+            f"nra_{f}": pl.Series(c[frame["primary"].to_numpy().astype(np.int64), grid])
+            for f, c in nra_corrections().items()
+        }
+    )
+    frame = frame.filter(
+        (~pl.col("tgt_post") | pl.col("tgt_real"))
+        & ~pl.col("tgt_inj")
+        & pl.col("actual").is_finite()
+    )
     return (
         frame.with_columns(
             label=pl.col("primary").replace_strict(
@@ -197,19 +216,27 @@ def main() -> None:
                 factors_out.append(
                     factors.with_columns(arm=pl.lit(arm), month=pl.lit(month), cls=pl.lit(cls))
                 )
-                for variant, frame in {
-                    "raw": part_held,
-                    "w1.15": widen(frame=part_held, factor=WIDENING),
-                    "P": prov.apply_factors(frame=part_held, factors=factors),
-                }.items():
-                    results.append(
-                        tail_table(frame=frame, by=("group", "lead_band")).with_columns(
-                            arm=pl.lit(arm),
-                            month=pl.lit(month),
-                            cls=pl.lit(cls),
-                            variant=pl.lit(variant),
+                bases = {"metered": part_held}
+                if cls == "real_event":
+                    for f in (0.75, 1.0, 1.25):
+                        bases[f"nra_x{f}"] = part_held.with_columns(
+                            actual=pl.col("actual") - pl.col(f"nra_{f}")
                         )
-                    )
+                for basis, base in bases.items():
+                    for variant, frame in {
+                        "raw": base,
+                        "w1.15": widen(frame=base, factor=WIDENING),
+                        "P": prov.apply_factors(frame=base, factors=factors),
+                    }.items():
+                        results.append(
+                            tail_table(frame=frame, by=("group", "lead_band")).with_columns(
+                                arm=pl.lit(arm),
+                                month=pl.lit(month),
+                                cls=pl.lit(cls),
+                                variant=pl.lit(variant),
+                                basis=pl.lit(basis),
+                            )
+                        )
         print("done", arm, flush=True)
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     pl.concat(results).write_parquet(WORK_DIR / "table_p_428.parquet")
