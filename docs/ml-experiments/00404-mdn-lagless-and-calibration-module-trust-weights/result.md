@@ -382,17 +382,15 @@ plan uses both as diagnostics on the fitted networks and does not tune the injec
 reported as a lower bound on harm. Our series are one per substation, not per transformer, so a
 transformer-level event that conserves load across a substation's transformers does not appear.
 
-**Generator.** This experiment uses experiment 402's generator (`e00402_inject.py`, draft PR 56),
-copied unchanged into this experiment's folder from commit `bfc32045` of branch
-`lag-gate-injected-load-shifts`. The copy is unreviewed until this experiment's Sonnet code review
-covers it or experiment 402's own review does, and it is re-copied if experiment 402's file changes
-after that review. Experiment 402 pushed it on 2026-10-30 after
-self-testing it, and it had not been code-reviewed then. It differs from the generator first
-written here in four ways: the donor change keeps the donor's shape (the donor is multiplied by
-`1 - f`), spikes are 4 to 20 times the stage-1 residual median absolute deviation, MVA-only
-Primaries receive events only where the reading stays above 20% of capacity, and base periods can
-exclude windows with a large stage-1 surprise. The signature takes the MVA-only set and each
-Primary's residual deviation in MW. The write-up says which version of the generator each fit used.
+**Generator.** This experiment imports experiment 402's generator (`e00402_inject.py`), merged to
+main in PR 56 under `ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/`.
+The merged file differs from the draft copy first used here: the donor change is computed from the
+donor's mean over its whole series and keeps the donor's shape. It differs from the generator first
+written here in four ways: spikes are 4 to 20 times the stage-1 residual median absolute
+deviation, MVA-only Primaries receive events only where the reading stays above 20% of capacity,
+and base periods can exclude windows with a large stage-1 surprise. The signature takes the
+MVA-only set and each Primary's residual deviation in MW. The write-up says which commit of the
+generator each fit used.
 The depths and durations come from the table's real events, so the test distribution informs the
 generator's distributions even though the real events never enter training; the write-up states
 this.
@@ -437,6 +435,14 @@ harm rows.
   and 11.42 against 10.50 and 11.25, in points of effective capacity), because it cuts the lag weight
   to about 0.4. All experiment 402 figures are interim until its page merges. Every
   arm, B-mix included, is scored on all three sets, with whole-event bootstrap intervals.
+- **Dominant events and coverage (neural Discuss session, 2026-10-31).** Real-event gains rest on
+  very few events: in experiment 402 (interim, unaudited), one D16 event carried 110% of the step
+  1 flag-oracle gain and one D5 event carried 64% of the real-harm gain. The write-up lists the
+  events that dominate each real-event slice and reports each slice with and without its largest
+  event. It also reports the 95% quantile's coverage inside real events beside CRPS, because
+  every arm of experiment 402 covered only 0.65 to 0.68 of the targets there (target 0.95). The
+  signed-MW six and the MVA-only eight are scored separately everywhere, because at the eight the
+  gate beat the 50/50 mixture inside a real event and at the six it did not.
 - **The harm table** of the lag-gate brief: rows whose target is outside every event but whose lags
   lie inside one, minus the rows with clean lags, by number of lags inside the event. Each arm minus
   A0 on the harm rows, with whole-event bootstrap intervals.
