@@ -38,17 +38,56 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
 }
 CENSORED_CONTRAST: Final[str] = "C5 {arm}_censored - {arm} (A7)"
 LEVEL: Final[float] = 1 - 0.01 / 5
+SEEDS_EXPECTED: Final[int] = 5
 MARGIN: Final[float] = 0.10
-"""The design note's proposal for wind, not the maintainer's."""
+"""The maintainer agreed this margin for wind on 2026-10-31."""
+UPPER_TAIL_LIMIT: Final[float] = 0.015
+"""Share of observations above q99 at true days 1 to 10; an arm above it fails the upper tail."""
 TAIL_LIMIT: Final[float] = 0.02
-SUBSETS: Final[tuple[str, ...]] = ("kept", "true_1_10", "all", "days_1_2", "days_3_10")
+SUBSETS: Final[tuple[str, ...]] = (
+    "kept",
+    "true_1_10",
+    "true_3_10",
+    "h12_36",
+    "true_1_14",
+    "all",
+    "days_1_2",
+    "days_3_10",
+)
 REFERENCES: Final[tuple[str, ...]] = ("ref_347_y2", "ref_default", "ref_clim")
+
+
+class Intervals(score347.Intervals):
+    """The month resampler read at 95% and at the Bonferroni level for five contrasts."""
+
+    def read(self, *, values: np.ndarray, keep: np.ndarray) -> dict:
+        """Return the mean and the 95% and 99.8% intervals."""
+        picked, totals = self.draws(values=values, keep=keep)
+        means = picked / np.maximum(totals, 1)
+        out: dict = {"mean": float(values[:, keep].mean())}
+        for level in (0.95, LEVEL):
+            low, high = np.quantile(means, [(1 - level) / 2, 1 - (1 - level) / 2])
+            out[f"{level:.4f}"] = [float(low), float(high)]
+        return out
+
+
+def fmt(entry: dict) -> str:
+    """Return 'mean (95% low to high; 99.8% low to high)'."""
+    low, high = entry["0.9500"]
+    wide_low, wide_high = entry[f"{LEVEL:.4f}"]
+    return (
+        f"{entry['mean']:+.3f} (95% {low:+.3f} to {high:+.3f}; "
+        f"99.8% {wide_low:+.3f} to {wide_high:+.3f})"
+    )
 
 
 def load_parts(*, name: str) -> np.ndarray | None:
     """Return the stored quantiles of `name` for every seed on disk: (seeds, rows, 11)."""
     paths = [run.PARTS_DIR / f"{name}_h{s}.npy" for s in run.SEEDS]
     present = [np.load(p) for p in paths if p.exists()]
+    if present and len(present) != SEEDS_EXPECTED:
+        msg = f"{name}: {len(present)} seeds on disk, expected {SEEDS_EXPECTED}"
+        raise ValueError(msg)
     return np.stack(present) if present else None
 
 
@@ -74,9 +113,12 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         "days_1_2": cases["lead_day"].is_between(1, 2).to_numpy(),
         "days_3_10": cases["lead_day"].is_between(3, 10).to_numpy(),
         "true_1_10": (~cases["masked"] & cases["lead_hours"].is_between(24, 240)).to_numpy(),
+        "true_3_10": (~cases["masked"] & cases["lead_hours"].is_between(72, 240)).to_numpy(),
+        "h12_36": (~cases["masked"] & cases["lead_hours"].is_between(12, 36)).to_numpy(),
+        "true_1_14": (~cases["masked"] & cases["lead_hours"].is_between(24, 336)).to_numpy(),
     }
     sites = cases["site"].to_numpy()
-    resampler = score347.Intervals(month=cases["month"].to_numpy(), seeds=1)
+    resampler = Intervals(month=cases["month"].to_numpy(), seeds=1)
     metrics: dict[str, dict[str, np.ndarray]] = {}
     seed_sd: dict[str, dict[str, float]] = {}
     for name, q in arms.items():
@@ -127,6 +169,16 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             + f"  below_q01 {m['below_q01'][0, keep].mean():.4f}  above_q99 {m['above_q99'][0, keep].mean():.4f}"
         )
 
+    lines.append("-- tails per farm, true_1_10 --")
+    for name, m in metrics.items():
+        for farm in data.FARMS:
+            keep = flags["true_1_10"] & (sites == farm)
+            lines.append(
+                f"{name.ljust(28)}{farm}  "
+                + "  ".join(f"{k} {m[k][0, keep].mean():.3f}" for k in ("p01", "p05", "p95", "p99"))
+                + f"  below_q01 {m['below_q01'][0, keep].mean():.4f}"
+                f"  above_q99 {m['above_q99'][0, keep].mean():.4f}"
+            )
     lines.append("-- check: median minus mean forecast per farm, kept rows (points) --")
     for name, m in metrics.items():
         lines.append(
@@ -147,33 +199,54 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     report: dict = {"contrasts": {}}
     lines.append(
         f"-- pre-registered contrasts (negative favours the first arm); 99% Bonferroni level "
-        f"{LEVEL:.4f}; margin {MARGIN} is a proposal --"
+        f"{LEVEL:.4f}; margin {MARGIN} --"
     )
     for label, (a, b) in contrasts.items():
         if a not in qs or b not in qs:
             lines.append(f"{label}: arm missing")
             continue
-        for subset in ("true_1_10", "days_3_10", "kept"):
-            entry = resampler.read(values=qs[a] - qs[b], keep=flags[subset])
-            low, high = entry[f"{LEVEL:.4f}"]
-            report["contrasts"][f"{label} | {subset}"] = entry
-            lines.append(f"{label} | {subset}: {score347.fmt(entry)}")
+        entries = {}
+        for subset in ("true_1_10", "true_3_10", "kept"):
+            entries[subset] = resampler.read(values=qs[a] - qs[b], keep=flags[subset])
+            report["contrasts"][f"{label} | {subset}"] = entries[subset]
+            lines.append(f"{label} | {subset}: {fmt(entries[subset])}")
         keep = flags["true_1_10"]
         tail = {
             k: float((metrics[a][k][0, keep] - metrics[b][k][0, keep]).mean())
             for k in ("p01", "p99")
         }
+        relative = tail["p99"] / float(metrics[b]["p99"][0, keep].mean())
         lines.append(
             f"{label} | tail change at true_1_10: q01 {tail['p01']:+.3f}, q99 {tail['p99']:+.3f}"
-            f" (limit {TAIL_LIMIT}); q99 pinball relative change "
-            f"{tail['p99'] / float(metrics[b]['p99'][0, keep].mean()):+.1%}"
+            f" (limit {TAIL_LIMIT}); q99 pinball relative change {relative:+.1%}"
         )
+        low, high = entries["true_1_10"][f"{LEVEL:.4f}"]
         half_width = (high - low) / 2
         sds = [seed_sd[a]["true_1_10"], seed_sd[b]["true_1_10"]]
         lines.append(
             f"{label} | minimum detectable effect at true_1_10: interval half-width {half_width:.3f}"
             f"; seed sd of the two arms {sds[0]:.3f}, {sds[1]:.3f}"
         )
+        decisive = "true_3_10" if label.startswith("C1") else "true_1_10"
+        d_low, d_high = entries[decisive][f"{LEVEL:.4f}"]
+        point = entries[decisive]["mean"]
+        harm = max(abs(t) for t in tail.values()) > TAIL_LIMIT
+        upper = float(metrics[a]["above_q99"][0, keep].mean())
+        if upper > UPPER_TAIL_LIMIT:
+            lines.append(
+                f"{label} | UPPER-TAIL FAIL: {a} has {upper:.2%} of observations above q99 "
+                f"(limit {UPPER_TAIL_LIMIT:.1%}); it does not advance"
+            )
+            harm = True
+        if d_high < 0 and abs(point) >= MARGIN and not harm:
+            verdict = "KEPT for the first arm: interval below zero, beats the margin, no tail harm"
+        elif d_low > 0 or harm:
+            verdict = "first arm is worse, or tail harm blocks it"
+        elif (d_high - d_low) / 2 > MARGIN:
+            verdict = "INCONCLUSIVE: interval half-width exceeds the margin"
+        else:
+            verdict = "NOT KEPT: no gain beyond the margin, and the interval is narrow"
+        lines.append(f"{label} | verdict on {decisive}: {verdict}")
     lines.append(
         "-- reference contrasts, first arm minus reference, true_1_10 and kept (95% / 99.75%) --"
     )
@@ -183,7 +256,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         for ref in ("ref_347_y2", "ref_default"):
             for subset in ("true_1_10", "kept"):
                 entry = resampler.read(values=qs[name] - qs[ref], keep=flags[subset])
-                lines.append(f"{name} minus {ref} | {subset}: {score347.fmt(entry)}")
+                lines.append(f"{name} minus {ref} | {subset}: {fmt(entry)}")
     text = "\n".join(lines)
     print(text)
     (data.DATA_DIR / "report.txt").write_text(text + "\n")

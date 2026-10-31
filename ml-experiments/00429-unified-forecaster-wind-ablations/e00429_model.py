@@ -289,10 +289,10 @@ def train_and_predict(  # noqa: PLR0915
     aux_train, summ_train = prepared(train_cases)
     plant_params = [p for name, p in model.named_parameters() if name.startswith("plants.")]
     other = [p for name, p in model.named_parameters() if not name.startswith("plants.")]
-    groups = [{"params": other, "lr": LEARNING_RATE}]
+    groups = [{"params": other, "lr": LEARNING_RATE, "weight_decay": WEIGHT_DECAY}]
     if plant_params:
-        groups.append({"params": plant_params, "lr": PLANT_LEARNING_RATE})
-    optimiser = torch.optim.AdamW(groups, weight_decay=WEIGHT_DECAY)
+        groups.append({"params": plant_params, "lr": PLANT_LEARNING_RATE, "weight_decay": 0.0})
+    optimiser = torch.optim.AdamW(groups)
     train_i = torch.tensor(train_i_np, device=DEVICE)
     stop_i = torch.tensor(np.flatnonzero(stop), device=DEVICE)
     generator = torch.Generator().manual_seed(seed)

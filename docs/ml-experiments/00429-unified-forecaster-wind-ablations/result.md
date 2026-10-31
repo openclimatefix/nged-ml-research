@@ -40,11 +40,12 @@ prediction: >-
 decision_rule: >-
   Reproduction gate G0 first: the shared code's y2 repeat must land within 0.05 points of 347's
   11.081 on the kept rows over every lead, and within 0.05 of 10.518 at true days 1 to 10; if it
-  misses, stop and report. Margins are the design note's proposals, not the maintainer's: 0.10
-  points for wind. A difference is kept only if its 99% month-block interval (Bonferroni across the
+  misses, stop and report. The maintainer agreed the margins on 2026-10-31: 0.10
+  points for wind, and no tail harm above 0.02. A difference is kept only if its 99% month-block interval (Bonferroni across the
   planned contrasts) excludes zero and the point estimate beats the margin, and the pooled 0.01
-  and 0.99 pinball losses rise by no more than 0.02 points. A plant arm that only ties is dropped
-  (the maintainer can overrule). Seeds: 5 per arm; a contrast smaller than the minimum detectable
+  and 0.99 pinball losses rise by no more than 0.02 points. A plant arm that only ties is dropped: the plain network is chosen
+  (maintainer, 2026-10-31). An arm with an upper-tail failure (more than 1.5% of observations above
+  q99 at true days 1 to 10) does not advance. Seeds: 5 per arm; a contrast smaller than the minimum detectable
   effect printed in the report is called inconclusive, not null.
 benchmark: >-
   Wind farms research default 2 (experiment 347's y2, stored rows), Wind farms research default 1
@@ -98,7 +99,11 @@ repository use no lagged power in the 347 head, so none is added.
 | `member_<best>_censored` | As the better of the three member arms | as that arm | Censored at 0 and 1 |
 | `ref_347_y2`, `ref_default`, `ref_clim` | stored rows | | |
 
-`one_pass_ms` is the demand design moved to wind. The member encoder is a 7-to-16-to-16 network
+`one_pass_ms` is the demand design moved to wind. Arms without a plant centre the mixture on the
+mean fraction of the training cases, so C3 changes two things at once: the plant power as an
+encoder input and the plant median as the mixture's centre. A tie in C3 cannot say which of the two
+failed to help. The trainable plant in `member_e2e` learns at 2e-4 (the rest of the network at
+2e-3) and has no weight decay, so it starts from experiment 347's parameters. The member encoder is a 7-to-16-to-16 network
 applied to every member; the 51 outputs are pooled and fed to the trunk. The design note suggests
 training on one random member per row to match the one-pass cost, but pooled statistics need all 51
 members, so the member arms use all 51 on the GPU and the cost is stated in the write-up.
@@ -116,11 +121,36 @@ quantiles, as 347 does.
 `member_plain` (A1 fails), the A4 arms still run on the member route because a power curve needs
 members (experiment 242); the write-up labels this.
 
+Only the censored arm for the selected base is fitted, so there is one C5. C1 is judged on true
+days 3 to 10 (lead 72 to 240 hours, kept rows), where the design note's prediction sits; the other
+contrasts are judged on true days 1 to 10. The tail test is the change in the pooled 0.01 and 0.99
+pinball loss at true days 1 to 10. Per-farm tail tables are in the report; the example-forecast
+figures come from a separate script before the write-up.
+
+## Added by the maintainer's decisions of 2026-10-31
+
+- **Lead ranges.** Every table reports true days 1 to 10, the 12 to 36 hour band, and true days 1
+  to 14 (lead 24 to 336 hours, the part of the row set that exists) side by side.
+- **Training data.** Wind may use the one year of ENS hindcasts (experiment 303 argued against it;
+  this experiment follows experiment 347 and uses it).
+- **Coherence (A1).** `e00429_coherence.py` scores the coherence of 51-member paths with the energy
+  score and the variogram score (order 0.5) over daily blocks of 48 half-hours, for each of the 53
+  runs and 3 farms, in points of capacity. Three path constructions are compared, each for the
+  one-pass arm and the member arm: **ECC**, where member k takes the arm's quantile at the rank of
+  that member's stage-3 plant power among the 51 at that valid time (ensemble copula coupling, 11
+  levels interpolated linearly and clamped between q01 and q99); **member-shifted**, where member k
+  keeps its own plant power and the arm's median minus the plant's median is added (so the
+  member's own path is kept and only the location is recalibrated, with no added spread); and
+  **independent**, where each member and valid time draws its own level (the no-coherence lower
+  reference). The comparison the maintainer asked for is ECC on the mean-and-spread route against
+  member-shifted paths on the member route. These constructions are my design, not the
+  maintainer's; the write-up says so.
+
 ## Pre-registered contrasts
 
 Each is the difference in kept-row quantile score at true days 1 to 10 and, beside it, over every
 lead. All intervals are month-block bootstrap intervals (experiment 347's resampler), 99% level
-with a Bonferroni correction over these five.
+with a Bonferroni correction over these five (level 0.998).
 
 1. **C1 (A1):** `member_plain` minus `one_pass_ms`.
 2. **C2 (A1):** `member_plain` minus `one_pass_m` (experiment 343's input choice).

@@ -38,7 +38,6 @@ ARMS: Final[dict[str, model.Arm]] = {
     "member_plain_censored": model.Arm(route="member", head="censored"),
     "member_frozen_censored": model.Arm(route="member", plant="frozen", head="censored"),
     "member_e2e_censored": model.Arm(route="member", plant="e2e", head="censored"),
-    "one_pass_ms_censored": model.Arm(route="one_pass_ms", head="censored"),
 }
 SUMMARY_TOLERANCE: Final[float] = 1e-3
 
