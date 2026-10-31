@@ -554,7 +554,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("fit", "check", "check-pretraining"))
     parser.add_argument("--months", nargs="+", default=list(SCREEN_MONTHS))
-    parser.add_argument("--arms", nargs="+", default=["T", "S", "C", "F"])
+    parser.add_argument(
+        "--arms", nargs="+", default=["T", "S", "C", "C_tariff", "F", "T_pre", "S_pre", "F_pre"]
+    )
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS))
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--smoke", action="store_true", help="one epoch, outputs under work/smoke")
@@ -570,7 +572,8 @@ def main() -> None:
         OUT_DIR = feats.WORK_DIR / "work" / "smoke"
         fit397.MAX_EPOCHS = 1
     for arm in args.arms:
-        columns_of(arm=arm)
+        if is_pretrained(arm=arm) and set(columns_of(arm=arm)) & set(feats.BUNDLES["C"]):
+            parser.error(f"{arm}: the pretraining rows have no C columns")
     run_arms(months=args.months, arms=args.arms, seeds=args.seeds, device=args.device)
 
 

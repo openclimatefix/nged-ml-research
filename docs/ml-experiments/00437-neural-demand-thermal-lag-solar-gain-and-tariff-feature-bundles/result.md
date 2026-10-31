@@ -29,35 +29,42 @@ hypothesis: >-
 prediction: >-
   Written before any fit and before any score is read. Most single bundles will land inside the
   minimum detectable effect, so the registered predictions are directions with sizes that could
-  fail. P1. S lowers the CRPS on cold sunny days (ENS-mean temperature below 5 degrees C, clear-sky
-  index above 0.6, 09:00 to 14:30 local) by at least twice as much as on cold overcast days
-  (clear-sky index below 0.3), the maintainer's heating hypothesis; its overall gain is 0.01 to 0.05
+  fail. P1. S lowers the CRPS on cold sunny days (ensemble-mean temperature below 5 degrees C,
+  clear-sky index above 0.6, half-hours starting 09:00 to 14:30 local) by more than on cold overcast days (clear-sky
+  index below 0.3), the maintainer's heating hypothesis, with a difference of gains of at least
+  0.03 points; its overall gain is 0.01 to 0.05
   points at both groups. P2. T lowers the CRPS by 0.01 to 0.05 at both groups, and more on cold
   winter nights. P3. F lowers the CRPS by 0.01 to 0.05 at the MVA-only eight (the home-battery and
   pre-heating argument) and by less at the signed-MW six. P4. C lowers the CRPS on the Economy 7
   step half-hours by 0.02 to 0.10 and changes nothing elsewhere; its national-signal columns
   (price, Demand Flexibility Service flag, national demand, embedded generation of the previous
-  day) change the CRPS by under 0.01, as experiments 10 and 185 found for other models. P5. The
+  day) change the CRPS by under 0.01, as experiments 10 and 185 found for other models. P5
+  (descriptive, a difference of differences that four folds cannot resolve). The
   pretrained form (T, S, and F pretrained on ERA5 and CAMS history, then fine-tuned) gains at least
   as much over the pretrained control `A` as the ensemble-only form gains over `R`, because the
   pretraining rows hold 6 years of weather windows.
 decision_rule: >-
   CRPS at days 1 to 10 in points of effective capacity, per group (signed-MW six; MVA-only eight;
-  D15 and D18 report-only), widened by 1.15, paired by fold and seed, month-block bootstrap of
-  `studies.eval_protocol` with 20,000 resamples, over the four screen folds (2025-10, 2025-12,
-  2026-01, 2026-03) and three seeds (0 to 2). Seven bundle arms are tested (T, S, C, F against
-  `R`; T_pre, S_pre, F_pre against `A`), so the interval level is 99.29% (Bonferroni, alpha
-  0.0071). The smallest gain worth carrying into a full evaluation is 0.03 points, because each
-  bundle adds a pipeline step that must be built from forecast inputs at serving time. A bundle
-  advances if its interval lies wholly below -0.03 at the signed-MW six or the MVA-only eight, its
-  point estimate at the other group is below +0.03, and its increase in pinball loss at q95 and
-  q99 is at most 0.02 at both groups. Before any contrast is read the scorer prints the minimum
+  D15 and D18 report-only), widened by 1.15, paired by fold and seed, over the four screen folds
+  (2025-10, 2025-12, 2026-01, 2026-03) and three seeds (0 to 2). Eight arms are tested (T, S, C,
+  C_tariff, F against `R`; T_pre, S_pre, F_pre against `A`). The screen rule decides. A bundle
+  advances if it beats its control on pooled CRPS in at least 3 of the 4 folds, its pooled gain is
+  at least 0.03 points at the signed-MW six or the MVA-only eight, its point estimate at the other
+  group is below +0.03, and its increase in mean pinball loss at q95 and q99 (point estimate) is at
+  most 0.02 at both groups. It stops if it loses in at least 3 folds. The smallest gain worth
+  carrying into a full evaluation is 0.03 points, because each bundle adds a pipeline step that
+  must be built from forecast inputs at serving time. The month-block bootstrap of
+  `studies.eval_protocol` (20,000 resamples, Bonferroni level 99.69% over 16 tests) is printed as a
+  description only: with 4 month-blocks its interval spans roughly the range of the 4 fold values,
+  so no interval claim is made. C advances only on the Economy 7 step half-hours if it
+  does so at all (P4); C_tariff is tested separately so that its 2 columns are not diluted by the 12
+  school and national columns. Before any contrast is read, the scorer prints the minimum
   detectable effect: the standard deviation over the four folds of the signed-MW six CRPS
-  difference between the control's seeds 0 to 2 and seeds 3 and 4, divided by the square root of
-  two (a lower bound; experiment 425 found 0.0368 over 12 folds, and experiment 419 about 0.074 on
-  its convention). A contrast smaller than that is "inside the noise". This is a four-fold screen:
-  every number is interim, no 99% claim is made, and nothing here enters a research default.
-  Halves of a winning bundle and combinations are descriptive.
+  difference between the control's seeds 0 to 2 and its seeds 3 and 4 (both stored by experiment
+  425), divided by the square root of two. It is a lower bound (experiment 425 found 0.0368 over 12
+  folds, and experiment 419 about 0.074 on its convention), and a contrast smaller than it is
+  "inside the noise". Every number is interim, and nothing here enters a research default. Halves
+  of a winning bundle and combinations are descriptive.
 benchmark: >-
   `R` (experiment 425's ensemble-only pooled plain network, seeds 0 to 2, same rows) for the
   ensemble-only arms and `A` (experiment 425's pretrained network, seeds 0 to 2) for the pretrained
@@ -125,7 +132,8 @@ for them on 2026-10-31.
   covers them (leads of about 9 to 33 hours); after the origin it holds this run's own ensemble
   mean. ERA5 is not used, because it arrives about 5 days late and a column built from it could not
   be served. `e00437_features.py check` rebuilds sample runs with every later run deleted and
-  requires identical columns (it did, to 0.0). In the pretrained form the windows come from the
+  requires identical columns (the check script exists; its result goes in the results). In the
+  pretrained form the windows come from the
   dense ERA5-and-CAMS series, which is the same stand-in the pretraining rows use for the
   valid-time weather.
 - **Known mismatch in the pretrained form.** `check-pretraining` printed each column's standardised
@@ -148,6 +156,38 @@ for them on 2026-10-31.
   dropped, counts printed per fold); the D15 and D18 cut at 2025-03-01; every fitted network saved
   under `work/models/`; stored controls reused; tails, the avoidable-curtailment cost, and the
   example forecasts reported; four-fold screen with every number labelled interim.
+
+## Caveats registered before the fits
+
+- **Window seam at the origin.** The ensemble-mean summaries hold no half-hour at or before the run's
+  own origin, so half-hours between 00:00 and 09:00 on the origin day come from the previous run
+  (leads of about 9 to 33 hours). Trailing windows therefore mix two runs at 09:00.
+- **T is partly a look-ahead bundle.** The daily minimum and maximum temperature use the later hours
+  of the valid time's local day, which the run already forecasts. F isolates pure look-ahead.
+- **Publication latency of the previous-day signals.** The CAMS, Elexon price, and NESO demand
+  columns use the whole local or UTC day before the origin date. The brief states that CAMS arrives
+  at midnight UTC; the latency of the Elexon and NESO files at 09:00 UTC was not measured, and the
+  training values are the final revised ones. The write-up states both as open points for serving.
+- **Forward windows in the pretrained form** come from ERA5 and CAMS, which do not degrade with
+  lead, while the ensemble-mean forward windows do. The write-up reports this as a caveat for `F_pre`.
+- **Economy 7 is on the UTC clock, as the brief and experiments 121, 137, and 281 define it.** The
+  protocol's `economy_7_step` slice is on local half-hours, so during British Summer Time the two
+  differ by one hour. The write-up reports C on that slice and states the offset.
+- **Bundle C has no pretrained form.** The brief asks for the weather bundles in both forms; the
+  pretraining rows hold no school or national columns, so `C` runs ensemble-only.
+- **No summer fold.** The four folds are autumn, Christmas, winter, and spring; 2026-06 is not
+  included, so a solar-gain effect in summer cannot show.
+- **Data searched for bundle C.** On disk and used: Lincolnshire County Council term dates
+  (experiment 11, 2021-22 to 2025-26), Elexon market index prices (`p3-price-download`), NESO
+  historic demand and embedded generation (experiment 185), and Demand Flexibility Service
+  requirements (experiment 177). A school calendar for another county is not needed, because all 16
+  Primaries lie in Lincolnshire. No download is made.
+- **Reported beside CRPS:** the 12-to-36-hour band, tail calibration per group and per Primary, the
+  cold winter night slice, the avoidable-curtailment cost, and the dropped half-hours per fold.
+  Load-shift plots and load-shift row sets do not apply. Experiment 396 arm W7 has no result yet;
+  the write-up cites it if it lands.
+- **Process, in order.** Draft pull request; plan review (fresh Sonnet); code review (fresh Sonnet)
+  before the first fit; fits; results review with the audit triggers; write-up; prose review.
 
 ## Results
 

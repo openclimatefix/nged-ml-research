@@ -12,11 +12,11 @@ this experiment (cold sunny days, cold overcast days, shoulder seasons, morning 
 avoidable curtailment cost, the contrasts of each arm minus `R` with the decision rule applied,
 and the fold-by-fold table. Tables for the figures go to `work/figure_tables/`.
 
-The decision rule (registered in `result.md` before any score was read): an arm advances if its
-interval at the Bonferroni level over seven tested bundles lies wholly below -0.03 at the signed-MW
-six or at the MVA-only eight, its point estimate at the other group is below +0.03, and its
-increase in pinball loss at q95 and q99 is at most 0.02 at both groups. Arms that are halves of a
-bundle are descriptive.
+The decision rule (registered in `result.md` before any score was read): an arm advances if it
+beats its control in at least 3 of the 4 folds, its pooled gain is at least 0.03 at the signed-MW
+six or the MVA-only eight, its point estimate at the other group is below +0.03, and its increase
+in pinball loss at q95 and q99 is at most 0.02 at both groups. The bootstrap intervals are printed
+as a description only. Arms that are halves of a bundle are descriptive.
 
 ```bash
 # PYTHONPATH as in e00437_fit.py
@@ -43,13 +43,13 @@ import numpy as np
 import polars as pl
 from studies.eval_protocol import metrics
 
-SCREEN_ARMS: Final[tuple[str, ...]] = ("T", "S", "C", "F", "T_pre", "S_pre", "F_pre")
-"""The seven tested bundles; every other arm is a descriptive half or a combination.
+SCREEN_ARMS: Final[tuple[str, ...]] = ("T", "S", "C", "C_tariff", "F", "T_pre", "S_pre", "F_pre")
+"""The eight tested arms; every other arm is a descriptive half or a combination.
 
 A `_pre` arm is compared with experiment 425's pretrained network `A`; every other arm with `R`.
 """
 N_TESTED: Final[int] = len(SCREEN_ARMS)
-BONFERRONI_LEVEL_PERCENT: Final[float] = 100.0 - 5.0 / N_TESTED
+BONFERRONI_LEVEL_PERCENT: Final[float] = 100.0 - 5.0 / (2 * N_TESTED)
 CONTROLS: Final[tuple[str, ...]] = ("R", "A")
 HEADLINE: Final[str] = sc.HEADLINE
 SUBSETS: Final[dict[str, tuple[str, ...]]] = sc.SUBSETS
@@ -57,6 +57,8 @@ SIX: Final[str] = sc.SIX
 EIGHT: Final[str] = sc.EIGHT
 MIN_GAIN: Final[float] = 0.03
 MAX_HARM: Final[float] = 0.03
+MIN_FOLDS: Final[int] = 3
+"""Folds out of four in which a bundle must beat its control."""
 MAX_TAIL_HARM: Final[float] = 0.02
 COLD_C: Final[float] = 5.0
 SUNNY_INDEX: Final[float] = 0.6
@@ -159,7 +161,7 @@ def diagnostics(*, months: tuple[str, ...]) -> pl.DataFrame:
     daytime = hour.is_between(9.0, 14.5)
     return pl.concat(parts).with_columns(
         cold_day=(pl.col("diag_temperature") < COLD_C) & daytime,
-        sunny_day=pl.col("diag_csi") > SUNNY_INDEX,
+        sunny_day=pl.col("diag_csi").is_not_nan() & (pl.col("diag_csi") > SUNNY_INDEX),
         overcast_day=pl.col("diag_csi") < OVERCAST_INDEX,
         shoulder=start_local.dt.month().is_in(list(SHOULDER_MONTHS)),
         morning_ramp=hour.is_between(6.0, 9.0, closed="left"),
@@ -305,6 +307,7 @@ def decisions(
             )
             if figures is not None:
                 found[group] = figures
+        negative = {}
         for group in (SIX, EIGHT):
             gap = sc.per_label_fold(rows=rows[f"{arm}_w115"], members=SUBSETS[group]).join(
                 sc.per_label_fold(rows=rows[f"{control_of(arm=arm)}_w115"], members=SUBSETS[group]),
@@ -312,19 +315,28 @@ def decisions(
                 suffix="_reference",
             )
             difference = (gap["crps"] - gap["crps_reference"]).to_numpy()
+            negative[group] = int((difference < 0).sum())
             print(
                 f"   {arm}, {group}: fold differences {dict(zip(gap['fold'].to_list(), [round(float(v), 3) for v in difference], strict=True))}"
             )
         harm = tail_harm(rows=rows, arm=arm)
         print(
-            f"   {arm}: increase in pinball loss over R at q95 and q99 by group: "
+            f"   {arm}: increase in pinball loss over the control at q95 and q99 by group: "
             + str({g: {k: round(v, 4) for k, v in h.items()} for g, h in harm.items()})
         )
         if arm not in SCREEN_ARMS or SIX not in found or EIGHT not in found:
             print(f"   {arm}: descriptive, no advance decision")
             continue
-        wins_six = found[SIX]["upper"] < -MIN_GAIN and found[EIGHT]["difference"] < MAX_HARM
-        wins_eight = found[EIGHT]["upper"] < -MIN_GAIN and found[SIX]["difference"] < MAX_HARM
+        wins_six = (
+            found[SIX]["difference"] <= -MIN_GAIN
+            and negative[SIX] >= MIN_FOLDS
+            and found[EIGHT]["difference"] < MAX_HARM
+        )
+        wins_eight = (
+            found[EIGHT]["difference"] <= -MIN_GAIN
+            and negative[EIGHT] >= MIN_FOLDS
+            and found[SIX]["difference"] < MAX_HARM
+        )
         tail_ok = all(v <= MAX_TAIL_HARM for g in (SIX, EIGHT) for v in harm[g].values())
         reading = "ADVANCES" if (wins_six or wins_eight) and tail_ok else "does not advance"
         note = "" if tail_ok else " (tail harm above 0.02)"

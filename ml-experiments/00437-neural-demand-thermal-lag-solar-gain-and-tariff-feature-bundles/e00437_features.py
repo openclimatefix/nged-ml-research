@@ -35,8 +35,8 @@ Columns (the bundle each belongs to is in `BUNDLES`):
   CAMS irradiance of the last complete UTC day before `O` (`cams_prev_day_mean` in W/m2 and
   `cams_prev_day_csi`, its ratio to the CAMS clear-sky irradiance), which is constant within a
   run and which production could read, because CAMS publishes the previous day at midnight UTC;
-- C, calendar, tariff, and national signals: `economy_7`, 1 on the half-hours that start in 00:30
-  to 07:30 UTC (the stamp is the period end, so 01:00 to 07:30), and `economy_7_cold`, that flag
+- C, calendar, tariff, and national signals: `economy_7`, 1 on the half-hours that start from 00:30
+  to 07:00 UTC (the stamp is the period end, so 01:00 to 07:30), and `economy_7_cold`, that flag
   times `max(15.5 - temperature, 0)`; five Lincolnshire school-term columns of the valid time's
   local date from experiment 11's calendar (`school_term_flag`; the signed days to the nearest term
   start and end divided by 13 and the signed days from the year's first working day divided by 14,
@@ -476,12 +476,16 @@ def site_table(*, row: dict, local_date: np.ndarray, daily: dict) -> pl.DataFram
     first, dense = daily["national"]
     previous_codes = local_date[oi] - 1
     for name, values in dense.items():
-        filled = np.where(np.isfinite(values), values, np.nan)
-        out[name] = lookup(first=first, dense=filled, codes=previous_codes)
+        out[name] = lookup(first=first, dense=values, codes=previous_codes)
     return pl.DataFrame(
         {"origin_us": origin_us, "valid_us": valid_us}
         | {c: v.astype(np.float32) for c, v in out.items()}
     )
+
+
+def shifted(a: np.ndarray, steps: int) -> np.ndarray:
+    """Return `a` delayed by `steps`, NaN for the first `steps` positions (no wrap-around)."""
+    return np.concatenate([np.full(steps, np.nan), a[:-steps]])
 
 
 def dense_arrays(*, row: dict, local_date: np.ndarray) -> dict[str, np.ndarray]:
@@ -503,7 +507,7 @@ def dense_arrays(*, row: dict, local_date: np.ndarray) -> dict[str, np.ndarray]:
         out[f"t_mean_{name}"], _ = trailing_mean(a=temperature, n=n_steps, at=positions)
         out[f"sw_mean_{name}"], _ = trailing_mean(a=shortwave, n=n_steps, at=positions)
     for steps, name in ((6, "3h"), (12, "6h")):
-        out[f"t_change_{name}"] = np.nan_to_num(temperature - np.roll(temperature, steps), nan=0.0)
+        out[f"t_change_{name}"] = np.nan_to_num(temperature - shifted(temperature, steps), nan=0.0)
     new_day = np.r_[False, local_date[1:] != local_date[:-1]]
     group_starts = np.flatnonzero(np.r_[True, new_day[1:]])
     group = np.cumsum(new_day)
@@ -520,7 +524,7 @@ def dense_arrays(*, row: dict, local_date: np.ndarray) -> dict[str, np.ndarray]:
         np.nan,
     )
     held = csi[np.maximum.accumulate(np.where(np.isfinite(csi), positions, 0))]
-    out["csi_change_3h"] = np.nan_to_num(held - np.roll(held, 6), nan=0.0)
+    out["csi_change_3h"] = np.nan_to_num(held - shifted(held, 6), nan=0.0)
     for name, series in (("t", temperature), ("s", shortwave)):
         finite = np.isfinite(series)
         out[f"forward_sum_{name}"] = np.concatenate(
