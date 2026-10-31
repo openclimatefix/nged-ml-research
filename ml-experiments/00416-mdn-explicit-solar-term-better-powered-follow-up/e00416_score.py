@@ -45,6 +45,11 @@ REFERENCE: Final[str] = "A0-doy"
 ARMS: Final[tuple[str, ...]] = ("A0-doy", "C3", "H1", "A0-noirr-doy")
 FROM_409: Final[tuple[str, ...]] = ("C3", "A0-noirr-doy")
 PRIMARY_ARMS: Final[tuple[str, ...]] = ("C3", "H1", "A0-noirr-doy")
+TEST_MONTHS_12: Final[tuple[str, ...]] = (
+    "2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12",
+    "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+)  # fmt: skip
+"""The 12 test months of the final scoring: the five of experiment 409 and seven more."""
 LOG_PRIOR_ARMS: Final[tuple[str, ...]] = ("C3p", "C3pa", "C3p-weak")
 """Added after the inert-prior finding; post hoc, secondary, outside the family of six."""
 SECONDARY: Final[tuple[tuple[str, str], ...]] = (("C3", "A0-noirr-doy"), ("H1", "C3"))

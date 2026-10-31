@@ -347,6 +347,7 @@ def figure_per_primary() -> None:
 
 
 if __name__ == "__main__":
+    sc.MONTHS[:] = sc.TEST_MONTHS_12
     todo = sys.argv[1:] or ["contrasts", "solar", "capacity", "examples", "per_primary"]
     if "contrasts" in todo:
         figure_contrasts()
