@@ -194,8 +194,9 @@ and "plant plus head" is experiment 347's y2. Scores are the quantile score of e
 | Head on all half-hours | +0.021 | +0.012 | +0.028 | +0.037 |
 | XGBoost on ensemble mean | +0.100 | +0.081 | +0.080 | +0.082 |
 
-Every interval for these rows includes zero. Dropping the mask's rows raises the default's score
-by 0.515 points and the heads' by about 0.33, which is how the heads' lead grows to 0.23 on the masked rows.
+Every interval for these rows includes zero. Dropping the mask's rows raises the default's score by
+0.515 points and the heads' by about 0.33, which is how the heads' lead grows to 0.23 on the masked
+rows.
 
 **The default forecasts zero on idle half-hours and the mixture heads do not.**
 
