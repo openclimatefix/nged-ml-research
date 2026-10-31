@@ -117,9 +117,18 @@ def real_tags(*, d: pl.DataFrame) -> pl.DataFrame:
     )  # fmt: skip
 
 
-def cut_train(*, d: pl.DataFrame, month) -> pl.DataFrame:  # noqa: ANN001
-    """Return rows whose origin is at least `CUT_DAYS` before the scored month or after its end."""
+def cut_train(*, d: pl.DataFrame, month, forward: bool = False) -> pl.DataFrame:  # noqa: ANN001
+    """Return rows whose origin is at least `CUT_DAYS` before the scored month or after its end.
+
+    With `forward`, only the rows before the scored month are kept, as in live use.
+    """
     start = month
+    if forward:
+        return d.filter(
+            (pl.col("power_fcst_init_time") < start - timedelta(days=CUT_DAYS))
+            & (pl.col("valid_time") < start)
+            & (pl.col("group") != "report")
+        )
     end = (start + timedelta(days=32)).replace(day=1)
     origin, valid = pl.col("power_fcst_init_time"), pl.col("valid_time")
     return d.filter(
@@ -234,6 +243,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arm", choices=("r1", "r0"), default="r1")
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument("--forward", action="store_true", help="train on earlier months only")
     args = parser.parse_args()
     inj = pl.concat(
         [
@@ -257,8 +267,14 @@ def main() -> None:
         "C",
     ]
     for month in months:
-        train_inj = cut_train(d=inj.filter(pl.col("seed").is_in(list(TRAIN_SEEDS))), month=month)
-        train_real = cut_train(d=real, month=month)
+        train_inj = cut_train(
+            d=inj.filter(pl.col("seed").is_in(list(TRAIN_SEEDS))),
+            month=month,
+            forward=args.forward,
+        )
+        train_real = cut_train(d=real, month=month, forward=args.forward)
+        if args.forward and train_inj.is_empty():
+            continue
         test_inj = inj.filter(
             (pl.col("seed") == TEST_SEED)
             & (pl.col("month") == month)
@@ -303,7 +319,9 @@ def main() -> None:
         )
         scored_rows.append(frame)
         print(month.date(), both.height, "rows", len(weights), "arms", flush=True)
-    pl.concat(scored_rows, how="diagonal").write_parquet(WORK / f"gate_scores_{args.arm}.parquet")
+    pl.concat(scored_rows, how="diagonal").write_parquet(
+        WORK / f"gate_scores_{args.arm}{'_forward' if args.forward else ''}.parquet"
+    )
 
 
 if __name__ == "__main__":
