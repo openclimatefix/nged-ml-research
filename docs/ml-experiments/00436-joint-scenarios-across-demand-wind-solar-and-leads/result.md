@@ -224,8 +224,8 @@ how well the re-ordered scenarios match the observed joint behaviour. We fit not
   descriptive results without Bonferroni correction; the verdicts use the pooled contrasts.
   Expected outcome of tier 2: dropped (P1 predicts J4 ties J3 for demand); the gating block is the
   joint block at days 1 to 10.
-- **Alignment.** 702 half-hours is lead 0.5 to 351 hours, the 14.6-day horizon of experiment 434. If a
-  family's run for a date used a different ensemble run, the builder aligns by valid time and flags
+- **Alignment.** 702 half-hours is lead 0.5 to 351 hours, the 14.6-day horizon of experiment 434.
+  If a family's run for a date used a different ensemble run, the builder aligns by valid time and flags
   the date; the count is reported.
 - **Slices and proxy file.** Daylight is the local mid-day band and a cold night is the shared slice
   table's flag, as in experiment 434. The group limit proxies are written to
