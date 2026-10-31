@@ -9,7 +9,7 @@ theme: hierarchy-and-pooling
 also_relevant_to:
   - lagged-power-and-error-correction
   - lsc-detectors
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -58,221 +58,152 @@ metric: >-
   capacity, from `studies.eval_protocol`; leads 0.5 to 336 hours; headline band days 1 to 10 and
   days 1 to 2; q01, q05, q95, and q99 coverage and pinball loss beside it.
 code: ml-experiments/00426-mdn-neighbouring-primaries-graph-and-bottom-up-design/
+verdict: not supported
+best_arm: >-
+  No neighbour arm beat the own-lags-only control. Stage 0 stopped the experiment, so no network was
+  fitted.
+headline: >-
+  At the signed-MW six the interconnected graph's mean lagged residual correlation is between -0.08
+  and +0.04 in all 5 test months, against -0.02 to +0.06 for random graphs with the same degrees
+  (0 of 5 months pass the gate). Adding true neighbours' lag residuals changes the held-out squared
+  error of the day-ahead residual by +0.01% (95% interval -3.05 to +2.61) on all rows and by -3.06%
+  (-4.40 to -1.91, a rise in error) on rows outside labelled events.
+take_home_message: >-
+  The recent forecast errors of a Primary's interconnected neighbours tell us almost nothing about
+  its own day-ahead error, and they make a simple regression slightly worse on ordinary rows, so a
+  graph network over the Primaries is not worth fitting. A bulk supply point cannot be forecast
+  from the Primaries beneath it either: that route scored 34% to 60% higher error than the
+  network that sees the bulk supply point's own readings. Neighbours carry some signal only inside
+  labelled load-shift events, which experiment 404 is designed to use.
+lessons:
+  - >-
+    Neighbours' lagged residuals are uncorrelated with a Primary's day-ahead residual, so the
+    information a graph could pass is not in the lags (stage 0a).
+  - >-
+    The small gain of the neighbour regression on all rows disappears outside labelled events and
+    becomes a 3.1% rise in error, so any neighbour signal is tied to events (stage 0b).
+  - >-
+    The modelled Primaries beneath a bulk supply point sum to 128% (D13) and 171% (D17) of its mean
+    demand, because the node's net flow includes embedded generation, so a sum of their forecasts is
+    the wrong size and only correlates 0.7 with the node (stage 0c).
+advice:
+  - >-
+    Do not fit a graph network over the 16 Primaries for demand forecasting: the interconnected
+    graph's lagged residual correlation is no larger than a random graph's (stage 0a, figure 1).
+  - >-
+    Do not build a bulk supply point forecast from the forecasts of the Primaries beneath it; fit the
+    node on its own readings, as in experiment 415 (stage 0c, figure 3).
+  - >-
+    Test neighbour information only through experiment 404's injected load-shift events and its
+    B1-nn and B1-rw arms, not through plain lag residuals (stage 0b).
+production_status: not-for-production
+adopted_in: none
 date: 2026-10-31
 ---
 
-**Take-home message to be written when the experiment finishes.** This page is the design note that
-the weekend programme asks for. It decides which of the maintainer's three neighbour ideas deserves
-a fit, and the answer is at most one, after a stage that fits nothing.
+**Take-home message: the recent forecast errors of a Primary's interconnected neighbours tell us
+almost nothing about its own day-ahead error.** A graph network over the Primaries therefore has
+nothing to pass along, and no network was fitted. The Primaries beneath a bulk supply point do not
+give its forecast either.
 
-## The three ideas, and what the earlier experiments already say
+We asked whether three ideas for using neighbouring substations are worth a neural-network fit. The
+ideas are a graph network over the 16 Primaries, a forecast for a bulk supply point (BSP) built from
+the Primaries beneath it, and spotting outliers and load-shift events by comparing neighbours. A
+Primary is a primary substation. The first stage fitted nothing. It used the stored day-ahead
+forecasts of experiment 397's pooled network and asked whether a neighbour's recent forecast error
+predicts a Primary's own error. The answer was no. Stage 1 (75 fits) therefore did not run, and the
+verdict is `not supported`. Experiment 404's neighbour arms stay the test of idea 3.
 
-We name three ideas from the weekend programme and judge each against what experiments 117, 195,
-391, 392, 402, 404, and 415 already found. A Primary is one of the 16 primary substations of
-`demand-v2`. A bulk supply point (BSP) connects the 132 kV to the 33 kV electricity network. A grid
-supply point (GSP) connects the transmission network to the 132 kV network. The four nodes are D13
-and D17 (bulk supply points) and D1 and D6 (grid supply points) of [experiment
-415](../00415-pooled-mixture-density-network-at-bulk-and-grid-supply-points/result.md).
+![Figure 1: lagged residual correlation by graph](figure_1_lagged_correlation.svg)
 
-- **Idea 1, a graph neural network over the Primaries.** NGED's interconnection file joins 25
-  pairs among the 16 modelled Primaries. The graph is small and sparse: 15 Primaries have between 1
-  and 5 neighbours, and 1 has none. [Campagne et al.
-  (2026)](https://doi.org/10.48550/arXiv.2610.35074) separate the gain from sharing parameters
-  from the gain from graph edges, and [experiment
-  403](../00403-pooled-versus-per-primary-mixture-density-network/result.md) already measured the
-  sharing gain. Three earlier results suggest the edges add little. [Experiment
-  117](../00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/result.md) found
-  that tying the parameters of interconnected substations worsened the scored-year score by 0.020
-  points with an interval spanning zero (the replicate year gave -0.021, a gain), on a graph of 14
-  substations rather than this one.
-  [Experiment 391](../00391-xgboost-lag-surprise-second-stage/result.md) found that neighbour
-  surprise columns raised the XGBoost error at 7 Primaries on rows whose lags sit inside an event
-  (+0.314, interval +0.062 to +0.749; +0.028 on other rows). [Experiment
-  402](../00402-lag-gate-learned-weight-injected-load-shifts-part-1/result.md) found that the
-  window means, the median gap, and the neighbour features add little at the signed-MW six and
-  nothing at the MVA-only eight. The edge control of experiment 404 (B1-rw and B1-nn) is a
-  batch-2 arm that runs only if batch 1 passes its stop rule, which its plan expects not to
-  happen.
+![Figure 2: squared-error change from neighbour lags](figure_2_neighbour_lag_ridge.svg)
 
-- **Idea 2, a bulk supply point forecast from the Primaries beneath it.** A preliminary look at the
-  cleaned panel from 2025-03-01 (unverified until stage 0c commits its script) shows that the 7
-  modelled Primaries beneath D13 and the 9 beneath D17 carry 27% and 35% of the bulk supply
-  point's mean demand, with a half-hourly correlation of 0.71 and 0.69 with its demand. At the grid
-  supply points D1 and D6 the correlation is -0.21 and +0.15. Experiment 415's N2 arm, which fed the
-  beneath-Primaries' lags to the network, scored the same as N1 at the bulk supply points (+0.01)
-  and worse at the grid supply points (+0.32). At the bulk supply points a random set of the same
-  size scored the same as the true set (N2 minus N2rw -0.06), and at the grid supply points the
-  true set scored worse (+0.31). The unmodelled children, embedded generation, and storage dominate
-  the node, so a sum of the modelled Primaries' forecasts is unlikely to be the forecast.
-- **Idea 3, spotting outliers and load-shift events by comparing neighbours.** Three detectors
-  already compare a substation with its neighbours: the refit-offset neighbour-count detector
-  (RO-NC), [experiment 195](../00195-switching-neural-plus-detector-features/result.md)'s learned
-  score (22 to 24 of 35 real transfers found, against 18 or 19 for RO-NC), and the neighbour veto
-  of the "deep and long" detector in experiment 392. Experiment 402's injection sweep assumes 30%
-  of events have no observed recipient (31 of the 112 labelled rows name one Primary), and a
-  neighbour comparison cannot see an event with no recipient. A separate fit would need injected
-  events as training data, which is experiment 404's generator and training scheme. This note
-  therefore plans no separate fit for idea 3. Experiment 404's B1 minus B1-nn and B1 minus B1-rw
-  are the direct comparison with simple neighbour statistics for this idea. Both arms are in 404's
-  batch 2, which runs only if batch 1 passes its stop rule, and the plan (draft PR 58) expects
-  batch 1 to stop, so the comparison may never run. Stage 1 therefore also scores experiment 404's
-  harm rows and real-event rows as slices.
+![Figure 3: bottom-up bulk supply point forecast](figure_3_bottom_up_node.svg)
 
-## What would make a fit worthwhile
+## Results
 
-**A neighbour can add information only through its recent residual, so the first stage measures
-that residual and fits nothing.** A Primary's weather forecast already reaches the pooled network
-through the ensemble mean and spread, so a neighbour's weather forecast adds nothing. A neighbour's
-recent power can add what the network cannot see in its own inputs: the weather error that has
-already happened nearby. A neighbour close in distance carries the same weather error whether or not
-an interconnection joins the two. The interconnection graph must therefore beat a graph matched on
-degree and edge length, not only a random one. The usable quantity is the neighbour's residual at
-the lag time, which lies before the forecast origin. A residual at the target's own valid time is
-unknown when the forecast is made.
+CRPS is not used here, because stage 0 fits no network. The residual is the actual minus the median
+forecast, divided by the Primary's effective capacity. Test months are the five folds of
+experiment 397. Intervals resample the five test months (2,000 draws), so they are coarse.
 
-## Stage 0: residual structure from stored forecasts (no fits)
+- **Gate 0a (lagged correlation, signed-MW six, lead 12 to 36 hours).** The interconnected graph's
+  mean correlation, over the newest reading before the origin and the same time yesterday, is 0.001,
+  -0.002, -0.078, 0.036, and -0.001 in 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06. Random
+  graphs with the same degrees give -0.016, 0.008, -0.016, 0.055, and -0.001. The excess over random
+  graphs is +0.017, -0.010, -0.062, -0.018, and 0.000, against the 0.10 the gate requires, so 0 of
+  5 months pass. At leads 120 to 240 hours the excess lies between -0.031 and +0.011. At the MVA-only
+  eight the graph's means (0.008 to 0.045) are also within 0.06 of random graphs' (not gated).
+- **Gate 0b (ridge on neighbour lags, signed-MW six).** The true neighbours lowered the held-out
+  squared error of the day-ahead residual by 0.01% (-3.05 to +2.61) against own lags only, by 1.28%
+  (-0.68 to +3.67) against random neighbours, and by 1.46% (-0.75 to +3.79) against shortest-edge
+  random neighbours. Outside labelled events the same three contrasts are -3.06% (-4.40 to -1.91),
+  -0.87% (-1.75 to +0.41), and -0.69% (-1.61 to +0.65), so the neighbour features raise the error on
+  ordinary rows. The gate asked for 2%, 1%, and 1%, with and without events, and failed. At the
+  MVA-only eight the all-rows contrasts are -0.33% (-1.15 to +0.57) against own lags, +0.38% (+0.08
+  to +0.71) against random neighbours, and +0.43% (+0.12 to +0.77) against shortest-edge neighbours,
+  and all three are within 0.1% of zero outside events. D15 and D18 are within 0.3% of zero.
+- **0c (bottom-up bulk supply point, median only).** The modelled Primaries beneath D13 and D17 sum
+  to 128% and 171% of the node's mean demand (the node's net flow includes embedded generation),
+  with a half-hourly correlation of 0.73 and 0.71. The 27% and 35% in the registered prediction
+  came from a preliminary look that scaled the cleaned readings by capacity twice, and its
+  rationale was wrong; the 0.7 correlation was right. At D6 the correlation is 0.18 and at D1 it is
+  -0.23. The mean absolute error of the median (points of node capacity, average of 4 months) is
+  8.32 (D13), 12.45 (D17), 27.03 (D1), and 25.43 (D6) for the network of experiment 415; 9.02,
+  13.30, 27.80, and 25.56 for the monthly XGBoost control; 13.35, 18.33, 38.47, and 31.54 for the
+  bottom-up median; and 11.39, 16.64, 35.08, and 29.42 for the bottom-up median plus the node's own
+  three lags. The bottom-up median is worse than the network in every month at every node. It beats
+  the XGBoost control in 1 of 16 node-months (D13 in 2026-01 with the node's lags, by 0.03).
+- **Idea 3.** The label table names one Primary in 31 of its 112 rows, so a neighbour comparison
+  cannot see the other 81 events directly. The only place the neighbour regression gains is inside
+  labelled events (gate 0b: +1.3% against random neighbours on all rows, then -0.9% outside events).
+- **Predictions.** P1 held: the interconnected graph's excess over random graphs was under 0.10 (and
+  under 0.05 against shortest-edge graphs) at lead 12 to 36 hours. P2 held in part: the gain over own
+  lags was under 2% and under 1% against random neighbours only on all rows, and outside events it
+  was a loss. P3 held in its first clause (bottom-up median 60% and 47% above N1 at D13 and D17 for
+  the first variant) and failed in its second: the variant with the node's own lags scored 37% and
+  34% above N1, not within 10%. P4 was not tested.
 
-- **Inputs.** Experiment 397's stored `plain_pooled` forecasts (`work/seed_preds/summary/plain_pooled`,
-  five folds, 3 seeds, 16 Primaries) and experiment 87's cleaned panel for the actuals. The
-  residual is the actual minus the q50 forecast, divided by the Primary's effective capacity. D15
-  and D18 rows before 2025-03-01 and flagged `substation_zero` half-hours are dropped, and the
-  count is reported per fold. The residual at a lag time comes from the stored forecast with the
-  shortest lead for that valid time (a lead under 24 hours). The first days of a test month have lag
-  times in the previous month, where no stored forecast exists, so those rows are dropped and the
-  count reported.
-- **Graphs compared, all with 25 edges and the interconnected graph's degree sequence.** The 25
-  interconnected pairs (NGED's interconnection file, restricted to the 16 modelled Primaries); 1,000
-  random graphs; and 1,000 graphs matched on degree and on the edge-length distribution (edge
-  length is the distance between the Primaries' coordinates in `TimeSeriesMetadata`).
-- **0a, lagged cross-correlation.** For each edge, the correlation between one Primary's residual at
-  the lag time (the newest reading before the origin, and the same time yesterday) and the other's
-  residual at the target, at lead 12 to 36 hours and at lead 120 to 240 hours. The report gives each
-  graph's mean, the interconnected graph's excess over each control, and the null spread (the
-  standard deviation across the control graphs, and across the five months).
-- **0b, ceiling of neighbour lags.** For each Primary, a ridge regression of the day-ahead residual
-  at the target on its own residuals at the two lag times and the mean, minimum, and maximum of its
-  neighbours' residuals at the same lag times. The ridge penalty is chosen by leave-one-month-out
-  inside the four training months. The regression is fitted on four test months and scored on the
-  fifth, so a fit may use later months to predict an earlier one; that is acceptable for a
-  diagnostic ceiling and is not a forecast. Arms: own lags only, true neighbours, random
-  neighbours, length-matched neighbours. The score is the held-out squared error, reported with and
-  without the half-hours inside labelled events, at the signed-MW six and the MVA-only eight
-  separately.
-- **0c, bottom-up bulk supply point.** Restricted to the four test months and the shared half-hours of
-  experiment 415 (2025-10, 2026-01, 2026-03, and 2026-06; 2025-12 is absent there). The median of
-  each node is a scale and offset times the sum of the stored median forecasts of the modelled
-  Primaries beneath it, with the scale and offset fitted on the months before the scored month.
-  A second variant adds the node's own three origin lags in a small ridge, because experiment
-  415's N1 sees the node's own lags and the first variant does not. Both are scored on mean absolute
-  error against N1 and the stored monthly XGBoost control. Only the median is scored, because
-  summing quantiles does not give the quantile of a sum. The table also reports the share of each
-  node's mean demand that its modelled children carry, and re-counts the share of labelled events
-  that name a recipient Primary.
-- **Cost.** 0 fits. One CPU process on one core, under 8 GB of memory, about 1.5 hours including
-  the 2,000 random graphs.
+## Checks
 
-## Stage 1 (runs only if stage 0 advances it): does a graph network beat simple statistics?
+- **Median minus mean forecast.** Not computed, because the stored forecasts hold quantiles only.
+- **Mean-forecast error.** Not applicable: stage 0 scores the median residual and its squared error.
+- **Triggers fired.** One: the second clause of P3 failed. A likely reason is that the variant was
+  fitted on the children's actual sums and applied to their forecast sums, which makes the child
+  term look more reliable than it is. The reason was not tested. No other trigger fired, and no audit
+  was run.
+- **Cleaned data.** Forecast rows with no cleaned actual, per fold (2025-10, 2025-12, 2026-01,
+  2026-03, 2026-06): 1,520, 719, 0, 248, and 1,349 of about 348,000, of which 1,520, 629, 0, 28,
+  and 264 are D15 and D18 rows before 2025-03-01 or other missing readings. Target rows (lead 12 to
+  36 hours) lacking one of the two own lag residuals, because the lag falls in a month with no stored
+  forecast: 1,337, 1,314, 496, 1,267, and 1,304 of about 23,700.
 
-**Arms.** All arms are the pooled plain mixture density network of experiment 397 with the Primary
-embedding, the ensemble mean and spread as weather inputs, one fit per monthly refit on the months
-before the scored month, 3 seeds, and the five folds of experiment 397. The layer sizes, the
-embedding width, and the dropout are copied from the code that produced `plain_pooled`, and the
-write-up states them.
+## Setup and caveats
 
-- **A0:** the pooled plain network with the three origin lags and no neighbour input, refitted in
-  the new code path with the D15 and D18 start cut applied to training, lags, and scoring. Experiment
-  397 predates that cut, so its stored forecasts are used only as a check on the refit, and the
-  refit's score at the other Primaries is compared with them.
-- **S1:** A0 plus hand-built neighbour statistics: the mean, minimum, and maximum, across the
-  neighbours, of each of the three origin lags (capacity-normalised), and the share of neighbours
-  with a reading. This follows experiment 415's N2 and experiment 402's gate features, which are
-  the simple neighbour-statistic features that exist. S1 is the comparator for idea 1 only.
-- **S1-rw:** S1 with a random set of Primaries of the same size as neighbours.
-- **G1:** one round of message passing over the interconnection graph. Each Primary's three origin
-  lags are encoded by a shared layer, and the neighbours' encodings are aggregated along the fixed
-  graph by their mean, minimum, and maximum (the same three statistics as S1, so the comparison
-  with S1 isolates the learned encoding) and concatenated to the Primary's own encoding before the
-  mixture head. The graph is fixed because 25 edges cannot identify a learned adjacency. A
-  neighbour without a reading, including D15 or D18 before 2025-03-01, counts as missing and not
-  as zero, and a Primary without neighbours receives a missing flag. A neighbour's ensemble weather
-  is not passed, so the test stays on neighbours' power.
-- **G1-rw:** G1 on a random graph with the same degree sequence. Each rewired arm uses three
-  random graphs, one per seed, drawn from a recorded seed, and the write-up reports the spread
-  across them.
+- **Design.** Lagged residuals come from the stored forecast with the shortest lead (under 24 hours)
+  for the lag time. Controls are 1,000 degree-preserving random graphs (swap chain, 10 discarded
+  draws, 100 swap attempts between draws) and 1,000 shortest-edge random graphs, chosen from 20,000
+  draws as the closest in mean edge length. The shortest-edge graphs still have edges up to 1.77
+  times as long as the interconnected graph's (random graphs: 2.05 times), so the distance control
+  is only partial. Gate 0b used 30 evenly spaced draws of each control and a ridge penalty chosen by
+  leave-one-month-out inside the four training months. The ridge is fitted on four test months and
+  scored on the fifth, so it may use later months to predict an earlier one. Event rows are
+  excluded when the target or a lag time falls inside a labelled event that names the Primary.
+- **0c fitting.** The scale, offset, and ridge of the bottom-up variants are fitted on actual
+  readings before the scored month, because no earlier child forecasts exist.
+- **Code.** `ml-experiments/00426-*/e00426_stage0.py` and `e00426_figures.py`. Tables are in this
+  experiment's private data folder, `stage0/`. A fresh Sonnet agent reviewed the code before the run
+  and found three blockers (a unit mismatch, an integer-type mismatch in a join, and an unmixed
+  graph sampler), all fixed before the run.
+- **Not covered.** No network was fitted, so there are no CRPS, tail, curtailment, or example
+  forecast results, and the mixture density network's own lags were not tested with neighbours.
 
-The contrast S1 minus A0 tests simple neighbour statistics. G1 minus S1 tests whether learned
-message passing beats the simple statistics. G1 minus G1-rw tests whether neighbour identity
-matters, and S1 minus S1-rw does the same for the statistics (the two readings of the edge test in
-Campagne et al.).
+## What to try next
 
-**Slices.** Days 1 to 10 and days 1 to 2 (the leads at which lags matter), the signed-MW six and
-the MVA-only eight separately (D15 and D18 report-only), harm rows and real-event rows of
-experiment 404's definitions with the event count per metering group, rows outside events, the
-sunny low-demand half-hours, and the tails (q01, q05, q95, q99 coverage and pinball loss, raw and
-at the 1.15 widening). The write-up includes the two example forecast charts that the standing rules
-ask for (one day-ahead forecast and one 14-day horizon, at one signed-MW Primary and one MVA-only
-Primary) and the curtailment-cost table if the studies code can score the months.
-
-**Fits.** 5 arms (A0, S1, S1-rw, G1, G1-rw) times 5 folds times 3 seeds is 75 fits. No cross-fit
-table is needed, because the arms use lags and not surprises. The timed cost is unknown: the
-estimate is about 100 seconds for each A0 and S fit and about 250 seconds for each G fit (a graph
-sample holds all 16 Primaries at one origin and lead), so about 1.2 plus 2.1 hours, near 3.5 hours
-of GPU time and 4.5 hours of wall time with data preparation. The first task after the slot is
-granted is to time one fit of each kind and report it. Memory: one process on the GPU under 8 GB,
-one feeder core, host memory under 16 GB (`systemd-run --user --scope -p MemoryMax=16G -p
-OOMPolicy=continue`), after `free -g` shows more than 12 GB available. The job stops if the
-available column falls to 12 GB.
-
-## Stop rule and decision rule
-
-We register these rules before any score is read.
-
-- **Stage 0 advances to stage 1** only if both gates pass at the signed-MW six. Gate 0a: at lead 12
-  to 36 hours the interconnected graph's mean lagged cross-correlation exceeds the random graphs'
-  by at least 0.10 and the length-matched graphs' by at least 0.05, and each excess is at least 2
-  null standard deviations, in at least 3 of the 5 test months. Gate 0b: the true neighbours lower
-  the held-out squared error by at least 2% against the own-lag-only ridge and by at least 1%
-  against both controls, with and without event half-hours.
-- **Otherwise the experiment stops after stage 0.** The write-up says that no neighbour idea is
-  worth a fit, and which of the stage-0 measurements decided it. If 0a passes and 0b fails, the
-  write-up reports that neighbours correlate but add nothing a Primary's own lags lack.
-- **Idea 2 is not fitted either way.** Stage 0c settles it: if either 0c variant beats experiment
-  415's N1 and the monthly XGBoost control on mean absolute error at either bulk supply point,
-  the write-up says so and proposes a follow-up; otherwise it records the failure.
-- **Stage 1 decision.** G1 counts as worth carrying forward only if all of these hold at the
-  signed-MW six on days 1 to 10: G1 minus A0 is at most -0.05 CRPS points with a Bonferroni-corrected
-  month-block interval below zero (the family is the five contrasts S1 minus A0, G1 minus A0, G1
-  minus S1, G1 minus G1-rw, and S1 minus S1-rw); G1 minus G1-rw is at most -0.03; G1 minus S1 is at
-  most -0.03; and G1 is no worse than A0 by more than 0.03 at the MVA-only eight, on harm rows,
-  on the sunny low-demand half-hours, and in q95 and q99 pinball loss. The smallest gain worth
-  porting is 0.05 points, because a graph network adds a model and a stored graph file that
-  production has not got. The minimum detectable effect of a contrast is 2 times the standard
-  deviation of the contrast across the 15 fold-and-seed pairs, and a gain below it is reported as
-  inconclusive. If S1 beats A0 by the same test but G1 does not beat S1, the write-up recommends
-  the simple statistics only.
-- **Expected path.** P1 to P3 predict that the experiment stops after stage 0, so P4 is tested only
-  if stage 0 surprises us.
-- **Checks.** The median forecast minus the mean forecast is not computed (the networks store
-  quantiles only), the mean-forecast error is reported beside each quantile-score contrast, and the
-  audit triggers of the skill are run on the results.
-
-## Standing practices
-
-- **Cadence and data.** Monthly refits. Cleaned data everywhere, with the count of dropped
-  half-hours per fold. D15 and D18 rows before 2025-03-01 are dropped, in training, lags,
-  inference, and scoring.
-- **Stored forecasts.** Experiment 397's `plain_pooled` forecasts (stage 0 and the A0 check),
-  experiment 415's N1 forecasts, and experiment 386's stored monthly XGBoost control (stage 0c) are
-  reused and never refitted. Stage 1 saves each fitted network (`.pt`) in this experiment's
-  private data folder, one per arm, fold, and seed.
-- **Advice followed.** Experiment 415's advice not to add the beneath-Primaries' lags at nodes (C3,
-  C4) is why stage 0c is a no-fit measurement. Experiments 391 and 402 are why the simple
-  statistics are an arm and not an assumption.
-- **Process.** The pull request is a draft. This PR holds no code and no fit. A fresh Sonnet agent
-  reviewed this plan. The code is written afterwards and reviewed by a second fresh Sonnet agent
-  before stage 0 runs, and the manager agrees the design before any fit slot is requested.
-- **Anonymisation.** Demand series only. No metered generator's series appears.
+- Read experiment 404's B1 minus B1-nn and B1 minus B1-rw if its batch 2 runs: they test neighbour
+  information inside injected load-shift events, the one place the signal appeared.
+- A regional weather-error input (not a graph) is the other way a neighbour's recent error could
+  help, and stage 0a gives it no support at the day-ahead lead.
 
 ## Problems caused by the move
 
-None so far.
+None.

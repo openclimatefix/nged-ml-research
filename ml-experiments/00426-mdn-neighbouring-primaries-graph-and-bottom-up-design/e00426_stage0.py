@@ -51,7 +51,9 @@ CUT_TIME: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
 STEP: Final[timedelta] = timedelta(minutes=30)
 N_GRAPHS: Final[int] = 1000
 N_GRAPHS_RIDGE: Final[int] = 30
-MAX_ATTEMPTS: Final[int] = 200_000
+SWAPS_PER_DRAW: Final[int] = 100
+BURN_IN_DRAWS: Final[int] = 10
+"""Each kept graph follows 100 swap attempts; the first 10 draws (1,000 attempts) are discarded."""
 RIDGE_GRID: Final[tuple[float, ...]] = (0.1, 1.0, 10.0, 100.0, 1000.0)
 BANDS: Final[dict[str, tuple[float, float]]] = {"d1": (12.0, 36.0), "d5_10": (120.0, 240.0)}
 RNG_SEED: Final[int] = 426
@@ -67,12 +69,18 @@ def series_info() -> pl.DataFrame:
     return common.series_table().sort("site").with_row_index("idx")
 
 
-def observed_mw_free(*, info: pl.DataFrame) -> pl.DataFrame:
-    """Return cleaned capacity-normalised power with the D15 and D18 start cut applied."""
+def observed_normalised(*, info: pl.DataFrame) -> pl.DataFrame:
+    """Return cleaned power over effective capacity, with the D15 and D18 start cut applied."""
     obs = (
         pl.read_parquet(common.OBSERVED_PATH, columns=["time_series_id", "valid_time", "power"])
-        .join(info.select("time_series_id", "site"), on="time_series_id", validate="m:1")
+        .join(
+            info.select("time_series_id", "site", "effective_capacity_mw"),
+            on="time_series_id",
+            validate="m:1",
+        )
         .drop_nulls("power")
+        .with_columns(power=pl.col("power") / pl.col("effective_capacity_mw"))
+        .drop("effective_capacity_mw")
     )
     return obs.filter(~(pl.col("site").is_in(CUT_SITES) & (pl.col("valid_time") < CUT_TIME)))
 
@@ -193,21 +201,22 @@ def random_graphs(
     length_matched: bool,
     count: int,
     rng: np.random.Generator,
-) -> tuple[list[list[tuple[int, int]]], int]:
-    """Return degree-preserving random graphs by double edge swaps, and the attempts used.
+) -> tuple[list[list[tuple[int, int]]], float]:
+    """Return degree-preserving random graphs by double edge swaps, and a match diagnostic.
 
-    With `length_matched`, a graph is kept only if its mean edge length is within 10% and its
-    median edge length within 15% of the interconnected graph's.
+    A degree-preserving random graph has far longer edges than the interconnected graph, which joins
+    nearby Primaries, so a tolerance filter accepts nothing. With `length_matched`, the chain is run
+    for 20 times `count` draws and the `count` graphs whose mean edge length is closest to the
+    interconnected graph's are kept. The diagnostic is the largest ratio of a kept graph's mean edge
+    length to the interconnected graph's (0.0 when `length_matched` is false).
     """
-    true_len = [lengths[a, b] for a, b in edges]
-    mean_t, med_t = float(np.mean(true_len)), float(np.median(true_len))
+    mean_t = float(np.mean([lengths[a, b] for a, b in edges]))
     current = [list(e) for e in edges]
     present = {tuple(e) for e in edges}
-    out: list[list[tuple[int, int]]] = []
-    attempts = 0
-    while len(out) < count and attempts < MAX_ATTEMPTS:
-        attempts += 1
-        for _ in range(10):
+    draws: list[list[tuple[int, int]]] = []
+    wanted = (20 if length_matched else 1) * count + BURN_IN_DRAWS
+    while len(draws) < wanted:
+        for _ in range(SWAPS_PER_DRAW):
             i, j = rng.choice(len(current), size=2, replace=False)
             a, b = current[i]
             c, d = current[j]
@@ -219,15 +228,13 @@ def random_graphs(
             present -= {tuple(current[i]), tuple(current[j])}
             present |= {new1, new2}
             current[i], current[j] = list(new1), list(new2)
-        if length_matched:
-            lens = [lengths[a, b] for a, b in current]
-            if (
-                abs(np.mean(lens) - mean_t) > 0.10 * mean_t
-                or abs(np.median(lens) - med_t) > 0.15 * med_t
-            ):
-                continue
-        out.append([(a, b) for a, b in current])
-    return out, attempts
+        draws.append([(a, b) for a, b in current])
+    draws = draws[BURN_IN_DRAWS:]
+    if not length_matched:
+        return draws, 0.0
+    ratio = np.array([np.mean([lengths[a, b] for a, b in g]) / mean_t for g in draws])
+    keep = np.argsort(np.abs(ratio - 1.0))[:count]
+    return [draws[k] for k in keep], float(ratio[keep].max())
 
 
 def adjacency(*, graphs: Sequence[Sequence[tuple[int, int]]], n: int) -> np.ndarray:
@@ -265,7 +272,8 @@ def graph_means(*, corr: np.ndarray, adj: np.ndarray, targets: np.ndarray) -> np
     """Return the mean correlation over ordered edges whose target is in `targets`."""
     weight = adj & targets[None, :, None] & np.isfinite(corr)[None]
     total = np.where(weight, np.nan_to_num(corr)[None], 0.0).sum(axis=(1, 2))
-    return total / np.maximum(weight.sum(axis=(1, 2)), 1)
+    count = weight.sum(axis=(1, 2))
+    return np.where(count > 0, total / np.maximum(count, 1), np.nan)
 
 
 def lag_average(
@@ -313,12 +321,12 @@ def stage_0a(
                         "month": month,
                         "group": group,
                         "true": true_v,
-                        "random_mean": float(rand_v.mean()),
-                        "random_sd": float(rand_v.std()),
-                        "length_mean": float(len_v.mean()),
-                        "length_sd": float(len_v.std()),
-                        "excess_random": true_v - float(rand_v.mean()),
-                        "excess_length": true_v - float(len_v.mean()),
+                        "random_mean": float(np.nanmean(rand_v)),
+                        "random_sd": float(np.nanstd(rand_v)),
+                        "length_mean": float(np.nanmean(len_v)),
+                        "length_sd": float(np.nanstd(len_v)),
+                        "excess_random": true_v - float(np.nanmean(rand_v)),
+                        "excess_length": true_v - float(np.nanmean(len_v)),
                     }
                 )
     table = pl.DataFrame(records)
@@ -401,7 +409,7 @@ def design(
         n2 = neighbour_features(
             grid=grid, idx=rows["idx"].to_numpy(), s=s2, adj_row=adj_row, own=own
         )
-        feats += [n1[:, :3], n2[:, :3], np.maximum(n1[:, 3], n2[:, 3])[:, None]]
+        feats += [n1[:, :3], n2[:, :3], n1[:, 3:4], n2[:, 3:4]]
     x = np.column_stack(feats)
     return x, y, keep
 
@@ -497,8 +505,8 @@ def stage_0b(
     arms: dict[str, list[np.ndarray | None]] = {
         "own": [None],
         "true": [adj_true[0]],
-        "random": list(adj_rand[:N_GRAPHS_RIDGE]),
-        "length": list(adj_len[:N_GRAPHS_RIDGE]),
+        "random": list(adj_rand[:: max(1, len(adj_rand) // N_GRAPHS_RIDGE)][:N_GRAPHS_RIDGE]),
+        "length": list(adj_len[:: max(1, len(adj_len) // N_GRAPHS_RIDGE)][:N_GRAPHS_RIDGE]),
     }
     records = []
     rows_all = target_rows(res=res, band=BANDS["d1"])
@@ -585,7 +593,9 @@ def summarise_0b(*, table: pl.DataFrame, rng: np.random.Generator) -> pl.DataFra
 def children_of_nodes(*, info: pl.DataFrame) -> dict[str, list[str]]:
     """Return the modelled Primaries beneath each node (private hierarchy file; labels only)."""
     numbers = pl.read_parquet(METADATA_PATH, columns=["time_series_id", "substation_number"])
-    lab = info.join(numbers, on="time_series_id", validate="1:1")
+    lab = info.join(numbers, on="time_series_id", validate="1:1").with_columns(
+        pl.col("substation_number").cast(pl.Int64)
+    )
     hier = pl.read_csv(HIERARCHY_DIR / "Substations.csv").join(
         lab.select("site", "substation_type", "substation_number"), on="substation_number"
     )
@@ -619,7 +629,7 @@ def _read_preds(*, paths: Sequence[Path], extra: str | None = None) -> pl.DataFr
     )
 
 
-def stage_0c(*, info: pl.DataFrame, obs: pl.DataFrame, res_pooled: pl.DataFrame) -> pl.DataFrame:
+def stage_0c(*, info: pl.DataFrame, obs: pl.DataFrame) -> pl.DataFrame:
     """Return node MAE (points of capacity) for N1, the XGBoost control, and bottom-up variants."""
     kids = children_of_nodes(info=info)
     cap = dict(zip(info["site"], info["effective_capacity_mw"], strict=True))
@@ -818,7 +828,7 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(RNG_SEED)
     info = series_info()
-    obs = observed_mw_free(info=info)
+    obs = observed_normalised(info=info)
     res, drops = load_pooled(info=info, obs=obs)
     drops.write_csv(OUT_DIR / "dropped_rows.csv")
     print("rows without a cleaned actual, by fold:\n", drops)
@@ -829,15 +839,18 @@ def main() -> None:
     lengths = np.array(
         [[haversine_km(lat=lat, lon=lon, a=a, b=b) for b in range(n)] for a in range(n)]
     )
-    rand, att_r = random_graphs(
+    rand, _ = random_graphs(
         edges=edges, lengths=lengths, length_matched=False, count=N_GRAPHS, rng=rng
     )
-    matched, att_l = random_graphs(
+    matched, worst_ratio = random_graphs(
         edges=edges, lengths=lengths, length_matched=True, count=N_GRAPHS, rng=rng
     )
+    mean_true = np.mean([lengths[x, y] for x, y in edges])
+    mean_rand = np.mean([np.mean([lengths[x, y] for x, y in g]) for g in rand]) / mean_true
     print(
-        f"edges {len(edges)}; random graphs {len(rand)} ({att_r} attempts); "
-        f"length-matched {len(matched)} ({att_l} attempts)"
+        f"edges {len(edges)}; random graphs {len(rand)}; length-matched {len(matched)}; "
+        f"worst mean-edge-length ratio of a length-matched graph {worst_ratio:.2f}; "
+        f"mean ratio of the random graphs {mean_rand:.2f}"
     )
     adj_true = adjacency(graphs=[edges], n=n)
     adj_rand = adjacency(graphs=rand, n=n)
@@ -849,6 +862,21 @@ def main() -> None:
     six_d1 = table_a.filter((pl.col("group") == "six") & (pl.col("band") == "d1"))
     gate_a = int(six_d1["pass_month"].sum())
     print(table_a)
+    d1_rows = target_rows(res=res, band=BANDS["d1"])
+    own_ok = np.isfinite(grid[d1_rows["idx"].to_numpy(), d1_rows["s1"].to_numpy()]) & np.isfinite(
+        grid[d1_rows["idx"].to_numpy(), d1_rows["s2"].to_numpy()]
+    )
+    lag_drops = (
+        d1_rows.with_columns(own_lags_found=pl.Series(own_ok))
+        .group_by("month")
+        .agg(
+            pl.len().alias("target_rows"),
+            (~pl.col("own_lags_found")).sum().alias("no_lag_residual"),
+        )
+        .sort("month")
+    )
+    lag_drops.write_csv(OUT_DIR / "lag_residual_drops.csv")
+    print("target rows (lead 12 to 36 h) without both own lag residuals, by fold:\n", lag_drops)
     table_b = stage_0b(
         res=res, grid=grid, adj_true=adj_true, adj_rand=adj_rand, adj_len=adj_len, info=info
     )
@@ -859,7 +887,7 @@ def main() -> None:
     share = children_share(info=info, obs=obs)
     share.write_csv(OUT_DIR / "stage0c_share.csv")
     print(share)
-    table_c = stage_0c(info=info, obs=obs, res_pooled=res)
+    table_c = stage_0c(info=info, obs=obs)
     table_c.write_csv(OUT_DIR / "stage0c.csv")
     print(table_c.group_by("node", "arm").agg(pl.col("mae_points").mean()).sort("node", "arm"))
     one, total = recipient_share()
