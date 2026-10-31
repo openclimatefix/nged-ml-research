@@ -115,15 +115,14 @@ def duration_check(*, table: Path = LABEL_TABLE) -> dict[str, float]:
 
 
 def draw_events(
-    *, ranges: LabelRanges, n_primaries: int, grid: int, rate: float, seed: int
+    *, ranges: LabelRanges, observed: np.ndarray, rate: float, seed: int
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return `(shift, onset)` of random non-overlapping level changes covering `rate` of the grid.
+    """Return `(shift, onset)` of random non-overlapping level changes covering `rate` of the data.
 
     Args:
         ranges: The label table's paired depths and durations.
-        n_primaries: Number of Primaries.
-        grid: Length of the dense half-hourly grid.
-        rate: Share of half-hours (per Primary) inside an event.
+        observed: (primaries, grid) bool, True where the Primary has a clean observation.
+        rate: Share of each Primary's observed half-hours inside an event.
         seed: Seed of the draw.
 
     Returns:
@@ -131,10 +130,11 @@ def draw_events(
         (primaries, grid) int32, the grid index of the event's first half-hour (-1 outside).
     """
     rng = np.random.default_rng(seed)
+    n_primaries, grid = observed.shape
     shift = np.zeros((n_primaries, grid), dtype=np.float32)
     onset = np.full((n_primaries, grid), -1, dtype=np.int32)
-    wanted = int(rate * grid)
     for p in range(n_primaries):
+        wanted = int(rate * observed[p].sum())
         covered = 0
         for _ in range(MAX_DRAWS):
             if covered >= wanted:
@@ -147,7 +147,7 @@ def draw_events(
             sign = 1.0 if rng.random() < 0.5 else -1.0
             shift[p, start:end] = sign * ranges.depth[i]
             onset[p, start:end] = start
-            covered += end - start
+            covered += int(observed[p, start:end].sum())
     return shift, onset
 
 
@@ -185,20 +185,20 @@ def load_shift(*, rate: float, trimmed: bool, seed: int) -> tuple[np.ndarray, np
     return z["shift"], z["onset"]
 
 
-def build_one(*, ranges: LabelRanges, n_primaries: int, grid: int, rate: float, trimmed: bool,
+def build_one(*, ranges: LabelRanges, observed: np.ndarray, rate: float, trimmed: bool,
               seed: int) -> str:  # fmt: skip
     """Draw and store one world unless it exists; return a progress line."""
     path = world_file(rate=rate, trimmed=trimmed, seed=seed)
     if path.exists():
         return f"{path.name}: exists"
-    shift, onset = draw_events(
-        ranges=ranges, n_primaries=n_primaries, grid=grid, rate=rate, seed=seed
-    )
+    shift, onset = draw_events(ranges=ranges, observed=observed, rate=rate, seed=seed)
     WORLD_DIR.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp.npz")
     np.savez(temporary, shift=shift, onset=onset)
     temporary.rename(path)
-    return f"{path.name}: {(onset >= 0).mean():.3%} of half-hours inside an event"
+    share = ((onset >= 0) & observed).sum(axis=1) / observed.sum(axis=1)
+    shares = " ".join(f"{v:.2%}" for v in share)
+    return f"{path.name}: share of observed half-hours inside an event per Primary: {shares}"
 
 
 def build_all() -> list[str]:
@@ -208,20 +208,20 @@ def build_all() -> list[str]:
     import e00428_data as data  # ty: ignore[unresolved-import]
 
     ctx = worlds402.load_context()
-    grid, n = len(common.grid_times()), len(data.sites())
+    stack, _ = data.load_stack(include_eval=False)
+    observed = np.isfinite(stack[0])
+    assert observed.shape == (len(data.sites()), len(common.grid_times())), observed.shape
     lines = []
     for trimmed in (False, True):
         ranges = label_ranges(capacity=ctx.capacity, trimmed=trimmed)
         for rate in RATES:
             lines += [
-                build_one(
-                    ranges=ranges, n_primaries=n, grid=grid, rate=rate, trimmed=trimmed, seed=s
-                )
+                build_one(ranges=ranges, observed=observed, rate=rate, trimmed=trimmed, seed=s)
                 for s in TRAIN_SEEDS
             ]
     full = label_ranges(capacity=ctx.capacity, trimmed=False)
     lines += [
-        build_one(ranges=full, n_primaries=n, grid=grid, rate=HELD_OUT_RATE, trimmed=False, seed=s)
+        build_one(ranges=full, observed=observed, rate=HELD_OUT_RATE, trimmed=False, seed=s)
         for s in HELD_OUT_SEEDS
     ]
     return lines
@@ -230,8 +230,10 @@ def build_all() -> list[str]:
 def selftest() -> None:
     """Check the draw and the shift on a toy grid (no data needed)."""
     ranges = LabelRanges(depth=np.array([0.1, 0.3]), steps=np.array([10, 40]))
-    shift, onset = draw_events(ranges=ranges, n_primaries=3, grid=2_000, rate=0.05, seed=1)
-    covered = (onset >= 0).mean(axis=1)
+    observed = np.ones((3, 2_000), dtype=bool)
+    observed[1, :1_000] = False  # half of Primary 1's grid is unobserved
+    shift, onset = draw_events(ranges=ranges, observed=observed, rate=0.05, seed=1)
+    covered = ((onset >= 0) & observed).sum(axis=1) / observed.sum(axis=1)
     assert (covered >= 0.05).all() and (covered < 0.12).all(), covered
     assert ((shift != 0) == (onset >= 0)).all(), "shift and onset must cover the same half-hours"
     assert {round(float(v), 3) for v in np.unique(np.abs(shift[shift != 0]))} <= {0.1, 0.3}

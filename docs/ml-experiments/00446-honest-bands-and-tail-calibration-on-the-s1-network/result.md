@@ -13,9 +13,11 @@ kind: other
 protocol: demand-v2
 date: 2026-10-31
 size: >-
-  complex (Brief B and Brief C in one batch). Stored: 128 fitted neural networks, plus 12 for U1n with
+  complex (Brief B and Brief C in one batch). Stored: 128 fitted neural networks, plus 12 for U1n
+  with
   trimmed durations at 2% (24 with the 5% rate), 12 for U4 if its stop rule did not fire, and up to
-  36 for 5% U2, U2i, and U2c only if U1n at 5% matches held-out coverage better, their forecasts, and sweep tables in this experiment's private folder only;
+  36 for 5% U2, U2i, and U2c only if U1n at 5% matches held-out coverage better, their forecasts,
+  and sweep tables in this experiment's private folder only;
   experiment 428's, 439's, and 404's folders are read and never written. More than one design would
   test the hypothesis (how the training worlds are built, how the scale path is wired, which tail
   change), so each choice is fixed in this plan before any score is read. Production serving path:
@@ -68,7 +70,8 @@ decision_rule: >-
   0.02 points of the base. A method that fixes the overall tails and leaves cold nights below
   target does not pass. The tail limit of +0.02 on clean rows is measured against S1 as well as
   against the base. An arm whose q99 pinball on real harm rows exceeds R-inj's by more than 0.02 is
-  reported as failing that rule; rule (d) can veto it and cannot pass an arm alone. The smallest gain worth porting is the pass rule itself for T2 and T5, which
+  reported as failing that rule; rule (d) can veto it and cannot pass an arm alone. The smallest
+  gain worth porting is the pass rule itself for T2 and T5, which
   change only the loss and cost nothing to port; U1n, U2, U2i, and U2c add a training-world
   generator and a scale path to the training loop, and T1 and T3 add a component family and a
   fine-tune stage, so each of those must pass the rule in full. Intervals are month-and-day block
@@ -119,6 +122,11 @@ events added to clean power; real harm rows hold logged ones). A real event row 
 inside a logged event. A cold winter night is defined as in experiment 441: solar elevation below
 0, local month November to March, and ENS-mean 2 m temperature at or below the Primary's 10th
 percentile of winter-night ENS temperatures in the 730 days before the fold's refit.
+
+**The cold-winter-night slice is read on fewer folds than every fold.** Experiment 441's mask table
+has cold-winter-night rows only for 2025-12, 2026-01, and 2026-03. It has none for 2025-10 or
+2026-06, and 2025-12 is not a test fold of experiment 428. Every rule that reads the
+cold-winter-night slice is therefore judged on the folds that have rows, not on all folds.
 
 ## Decisions already made
 
@@ -185,13 +193,19 @@ hours, in one GPU process under 8 GB plus one feeder core, and Brief B comes fir
   arms; P2 and the "closer to the held-out world's coverage" rule read it. The write-up states that
   the true rate of genuine level changes is unmeasured.
 - **Duration.** The load-shift session reported a median event duration near 48 hours and about
-  10% of events above 7 days (unverified). The code checks both figures against the corrected label table
+  10% of events above 7 days (unverified). The code checks both figures against the corrected label
+  table
   (`sw_block_detector_label_table_corrected.csv`; the sign was wrong for 51 of 112 rows before the
   correction) before the first fit. For U1n only, the duration distribution is swept (the label
   table's own, and a version with the upper tail trimmed) beside the rate.
-- **U2's scale path.** The surprise magnitude, lag ages, missing flags, weather age, and lead feed a
-  factor 1 + softplus(g), initialised at 1, with a penalty on the mean log factor on clean rows.
-  The location path never sees the surprise magnitude.
+- **U2's scale path.** The surprise magnitude, lag ages, missing flags, and lead feed a factor
+  1 + softplus(g), initialised at 1, with a penalty on the mean log factor on clean rows. The
+  stored inputs hold no weather-age column, so the scale path has 11 inputs: 3 absolute surprises,
+  3 lag ages, 3 missing flags, and the 2 lead columns (`lead` and `lead_sqrt`, in place). The scale
+  path adds its own inputs; the location path is S1's network, unchanged (it takes the signed
+  surprise directly), and receives no gradient from the scale-only loss terms. U2i and U2c compute
+  their interval-score and coverage-penalty terms with the mixture weights, means, and base spread
+  detached, so only the factor g receives gradient from them.
 - **U2-clean.** This arm is experiment 428's planned scale-only arm: the U2 network on worlds
   without U1n's genuine level changes. Running it beside U2 makes the training worlds the only
   difference. Experiment 428's earlier widening path (E3-surp-w) learned no widening on the clean
@@ -245,7 +259,8 @@ hours, in one GPU process under 8 GB plus one feeder core, and Brief B comes fir
   changes (new connections, a generator curtailed for days) is unmeasured.
 - **Rate and duration.** A genuine level change and a load-shift event cannot be told apart at the
   start of a jump, so the band width that U2 learns depends on the injected rate and duration.
-  The write-up reports the 2% and 5% rates side by side, and both duration distributions for U1n only.
+  The write-up reports the 2% and 5% rates side by side, and both duration distributions for U1n
+  only.
 
 ## What can only be evaluated after table P
 

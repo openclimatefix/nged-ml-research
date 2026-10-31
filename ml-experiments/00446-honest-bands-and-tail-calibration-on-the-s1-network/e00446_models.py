@@ -12,8 +12,12 @@ each lag (3), the lag ages (3), the missing flags (3), and the two lead columns 
 component is multiplied by `1 + softplus(g)`. The last layer starts at zero weights with bias
 `SCALE_INIT`, so every factor starts within 0.01 of 1 and the factor can only widen. The path
 touches only the log standard deviation outputs: the mixture weights and means come from the
-location path alone, whose parameters receive no gradient from the scale path (checked in the
-selftest, along with the scale features' gradient).
+location path alone. The scale path adds its own inputs; the location path is S1's network,
+unchanged (it takes the signed surprise directly), and receives no gradient from the scale-only loss
+terms. The interval-score and coverage-penalty terms of arms U2i and U2c are computed with
+`scale_only_parts`, which detaches the mixture weights, means, and base spread so that only the
+factor `g` receives gradient from them (checked in the selftest, along with the scale features'
+gradient). The log-likelihood and the factor penalty are the same for every scale arm.
 
 **Loss terms.** `interval_score` is the interval score of the central interval between two
 quantiles (Gneiting and Raftery's interval score). `tail_quantiles_st` returns the mixture's 1%, 5%,
@@ -119,6 +123,22 @@ class ScaleMdn(nn.Module):
     ) -> torch.Tensor:
         """Return the raw mixture outputs (same layout as experiment 397's networks)."""
         return self.forward_parts(x, primary, scale_x)[0]
+
+
+def scale_only_parts(
+    *, out: torch.Tensor, factor: torch.Tensor, components: int
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Return log weights, means, and standard deviations with only `factor` carrying gradient.
+
+    The mixture weights, means, and base spread (the spread output before the factor) are detached.
+    """
+    k = components
+    log_factor = torch.log(factor)
+    base_spread = (out[:, 2 * k :] - log_factor).detach()
+    spread = base_spread + log_factor
+    return base.mixture_parts(
+        out=torch.cat([out[:, : 2 * k].detach(), spread], dim=-1), components=k
+    )
 
 
 def tail_quantiles_st(
@@ -239,6 +259,24 @@ def selftest() -> None:
     out_b, _ = perturbed.forward_parts(x, primary)
     assert torch.equal(out_a[:, : 2 * k], reference[:, : 2 * k]), "location differs from base"
     assert torch.equal(out_a[:, : 2 * k], out_b[:, : 2 * k]), "scale path leaked into location"
+    # Scale-only terms: loss built from `scale_only_parts` reaches only the scale path.
+    model.zero_grad()
+    out, factor = model.forward_parts(x, primary)
+    log_w, mean, std = scale_only_parts(out=out, factor=factor, components=k)
+    quantiles = tail_quantiles_st(log_w=log_w, mean=mean, std=std)
+    y = torch.randn(rows)
+    flagged = torch.ones(rows, dtype=torch.bool)
+    scale_loss = interval_loss(quantiles=quantiles, y=y, rows=flagged) + coverage_penalty(
+        quantiles=quantiles, y=y, rows=flagged
+    )
+    scale_loss.backward()
+    scale_grad = max(
+        float(p.grad.abs().max()) for p in model.scale_net.parameters() if p.grad is not None
+    )
+    assert scale_grad > 0.0, "scale-only terms must reach the scale path"
+    assert all(
+        p.grad is None or float(p.grad.abs().max()) == 0.0 for p in model.location.parameters()
+    ), "scale-only terms must give the location path no gradient"
     # Interval score on a toy interval [-1, 1] at alpha 0.1.
     lo, hi = torch.tensor([-1.0, -1.0, -1.0]), torch.tensor([1.0, 1.0, 1.0])
     score = interval_score(lower=lo, upper=hi, y=torch.tensor([0.0, 2.0, -3.0]), alpha=0.1)

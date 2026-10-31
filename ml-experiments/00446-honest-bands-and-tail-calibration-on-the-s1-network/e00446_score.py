@@ -363,10 +363,42 @@ def load_frames(
             if (f := read_arm(arm=arm, month=month, world=w, seeds=seeds, factor=factor))
             is not None
         ]
-        out[month] = context.tag(frame=pl.concat(parts, how="diagonal")).with_columns(
-            month=pl.lit(month)
-        )
+        out[month] = context.tag(frame=with_gen_columns(frame=pl.concat(parts, how="diagonal")))
+        out[month] = out[month].with_columns(month=pl.lit(month))
     return out
+
+
+def with_gen_columns(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add null `shift_*` and `days_since` columns when an arm has no worlds 7 to 9 (Bmix, R)."""
+    missing = {
+        "shift_lag": pl.lit(None, dtype=pl.Boolean),
+        "shift_tgt": pl.lit(None, dtype=pl.Boolean),
+        "days_since": pl.lit(None, dtype=pl.Float64),
+    }
+    return frame.with_columns([e.alias(n) for n, e in missing.items() if n not in frame.columns])
+
+
+ROW_KEY: Final[list[str]] = ["primary", "origin_us", "valid_us"]
+
+
+def check_row_identity(
+    *, arm: str, frames: dict[str, pl.DataFrame], reference: dict[str, pl.DataFrame]
+) -> None:
+    """Raise unless the arm's rows per month equal the reference's `(primary, origin_us, valid_us)`.
+
+    The contrast join on blocks would otherwise drop unmatched blocks without a message.
+    `reference` is filled from the first arm checked.
+    """
+    for month, frame in frames.items():
+        keys = frame.select(ROW_KEY).unique().sort(ROW_KEY)
+        if month not in reference:
+            reference[month] = keys
+        elif not keys.equals(reference[month]):
+            msg = (
+                f"arm {arm}, month {month}: rows differ from the first arm's "
+                f"({keys.height} vs {reference[month].height} distinct (primary, origin, valid))"
+            )
+            raise ValueError(msg)
 
 
 def fit_factors(*, fit_rows: pl.DataFrame) -> pl.DataFrame:
@@ -508,7 +540,7 @@ def aggregate(
             records.append(
                 table.with_columns(arm=pl.lit(arm), month=pl.lit(month), row_set=pl.lit(rs.name))
             )
-    return pl.concat(records, how="diagonal")
+    return pl.concat(records, how="diagonal") if records else pl.DataFrame()
 
 
 def collect(
@@ -518,8 +550,10 @@ def collect(
     sets = row_sets()
     factor = {"raw": 1.0, "w1.15": score428.WIDENING, "P": 1.0}[variant]
     tables = []
+    reference: dict[str, pl.DataFrame] = {}
     for arm in arms:
         frames = load_frames(arm=arm, months=months, seeds=seeds, factor=factor, context=context)
+        check_row_identity(arm=arm, frames=frames, reference=reference)
         if variant == "P":
             frames = apply_p(frames=frames, sets=sets)
         tables.append(aggregate(arm=arm, frames=frames, sets=sets, seeds=seeds))
@@ -855,7 +889,7 @@ def main() -> None:
         report(table=table, variant=variant, seeds=seeds, months=used)
 
 
-def selftest() -> None:
+def selftest() -> None:  # noqa: PLR0915
     """Check the tail sums, the width ratio, the event segments, table P, and the bootstrap on toys."""
     rng = np.random.default_rng(0)
     # Tail sums on a toy frame: quantiles 0..10 for every row, actual 5.5 (between q50 and q60).
@@ -925,6 +959,24 @@ def selftest() -> None:
     )
     mean, low, high = bootstrap(blocks=blocks, value="v", rng=rng)
     assert low < mean < high and high - low < 0.5
+    # An arm without worlds 7 to 9 still evaluates the gen_* row sets (empty).
+    bare = with_gen_columns(frame=frame.drop("win_real")).with_columns(win_real=pl.lit(False))
+    assert bare["shift_lag"].null_count() == n
+    gen_sets = [s for s in row_sets() if s.name.startswith("gen_")]
+    empty = aggregate(arm="toy", frames={"2026-01": bare}, sets=gen_sets, seeds=(0,))
+    assert empty.is_empty(), empty
+    # Row identity: equal rows pass, a dropped row raises.
+    keyed = pl.DataFrame({"primary": [0, 0, 1], "origin_us": [1, 2, 3], "valid_us": [4, 5, 6]})
+    ref: dict[str, pl.DataFrame] = {}
+    check_row_identity(arm="a", frames={"m": keyed}, reference=ref)
+    check_row_identity(arm="b", frames={"m": keyed.reverse()}, reference=ref)
+    try:
+        check_row_identity(arm="c", frames={"m": keyed.head(2)}, reference=ref)
+    except ValueError as error:
+        assert "arm c" in str(error)
+    else:
+        msg = "check_row_identity must fail on differing rows"
+        raise AssertionError(msg)
     # Missing inputs fail with a message that names them.
     try:
         require(

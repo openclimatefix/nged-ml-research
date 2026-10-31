@@ -25,7 +25,8 @@ tables; seeds 0 to 2 read 404's tables for the same seed).
 
 **Corrupted and clean rows in training.** A row is corrupted when, after token dropout, a shown lag
 differs from the unshifted clean series at the same grid index; every other row is clean. The
-location path never sees a quantity the scale path adds (see `e00446_models`).
+scale path adds its own inputs; the location path is S1's network, unchanged, and receives no
+gradient from the scale-only loss terms (see `e00446_models`).
 
 **Prediction.** For each arm, month, and seed one parquet per world, as in experiment 428
 (`predictions/<arm>/<month>_s<seed>_w<world>.parquet`), for worlds 0, 4, 5, 6 (experiment 428's)
@@ -301,7 +302,7 @@ def train(
                     factor=factor, rows=~bad
                 )
                 if spec.interval or spec.coverage:
-                    log_w, mean, std = base.mixture_parts(out=out, components=k)
+                    log_w, mean, std = models.scale_only_parts(out=out, factor=factor, components=k)
                     quantiles = models.tail_quantiles_st(log_w=log_w, mean=mean, std=std)
                     if spec.interval:
                         loss = loss + INTERVAL_WEIGHT * models.interval_loss(
@@ -375,6 +376,9 @@ def fit_one(
     cell = Cell(kind="fit", arm=arm_name, month=month, seed=seed)
     if not cell.held:
         return f"{arm_name} {month} s{seed}: locked by another process"
+    if (target / "meta.json").exists():
+        cell.release()
+        return f"{arm_name} {month} s{seed}: exists"
     try:
         spec, arm = ARMS446[arm_name], fit.ARMS[arm_name]
         started = time.monotonic()
@@ -548,6 +552,14 @@ def predict_month(
     cell = Cell(kind="predict", arm=arm_name, month=month, seed=seed)
     if not cell.held:
         return [f"{arm_name} {month} s{seed}: locked by another process"]
+    missing = [
+        w
+        for w in worlds_todo
+        if not (PRED_DIR / arm_name / f"{month}_s{seed}_w{w}.parquet").exists()
+    ]
+    if not missing:
+        cell.release()
+        return [f"{arm_name} {month} s{seed}: exists"]
     try:
         use_models(arm_name=source)
         loaded = pr.load(arm_name=source, month=month, seed=seed, device=device)
