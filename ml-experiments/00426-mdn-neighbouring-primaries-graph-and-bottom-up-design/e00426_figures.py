@@ -55,7 +55,12 @@ def figure_one() -> None:
     scale = alt.Scale(domain=order, range=[theme.BRAND_ORANGE, theme.DATA_BLUE, theme.DATA_PURPLE])
     base = alt.Chart(long).encode(
         x=alt.X("month:N", title="Test month"),
-        color=alt.Color("graph:N", scale=scale, sort=order, legend=alt.Legend(orient="top")),
+        color=alt.Color(
+            "graph:N",
+            scale=scale,
+            sort=order,
+            legend=alt.Legend(orient="top", labelLimit=400, columns=1),
+        ),
         xOffset="graph:N",
     )
     chart = (
@@ -84,14 +89,14 @@ def figure_two() -> None:
     ).to_pandas()
     order = list(names.values())
     base = alt.Chart(data).encode(
-        y=alt.Y("control:N", sort=order, title="Compared with"),
+        y=alt.Y("control:N", sort=order, title="Compared with", axis=alt.Axis(labelLimit=400)),
         color=alt.Color(
             "rows:N",
             scale=alt.Scale(
                 domain=["All rows", "Rows outside labelled events"],
                 range=[theme.BRAND_ORANGE, theme.DATA_BLUE],
             ),
-            legend=alt.Legend(orient="top", title=None),
+            legend=alt.Legend(orient="top", title=None, labelLimit=400),
         ),
         yOffset="rows:N",
     )
@@ -123,7 +128,7 @@ def figure_three() -> None:
         alt.Chart(data)
         .mark_point(filled=True, size=90)
         .encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("arm_name:N", sort=order, title=None),
+            y=alt.Y("arm_name:N", sort=order, title=None, axis=alt.Axis(labelLimit=400)),
             x=alt.X("mae_points:Q", title="Mean absolute error, median (points of node capacity)"),
             color=alt.Color(
                 "arm_name:N",
