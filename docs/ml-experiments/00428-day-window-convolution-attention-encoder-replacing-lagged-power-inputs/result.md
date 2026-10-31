@@ -242,6 +242,18 @@ networks are saved under the experiment's data folder. No stored fit is reused, 
 differs (the cut, the injected data). Stored forecasts of experiments 389, 87, and the baselines
 are read as references only.
 
+## Second screen: a surprise channel
+
+**Arm E3-surp gives the encoder a sixth channel, the surprise.** The surprise of a half-hour is
+its observed power minus the median of the cross-fitted lagless forecast for the same half-hour
+(experiment 404's table, K = 6 blocks, never an in-sample lagless forecast), divided by the width
+of that forecast's 5%-95% band, clipped at 5, and 0 where either is unobserved. The windows
+otherwise match E3. It runs as a second screen when experiment 404's table exists, on the same
+four folds, rows, and seeds, with the prediction written before any score is read: E3-surp minus
+E3 on harm rows at the signed-MW six lies between -0.20 and -0.03 CRPS points, and E3-surp follows
+at most half of E3's share of the step in the sweep at k = 3. The table must cover each refit
+without the scored month; if it does not, the arm waits.
+
 ## Design iterations
 
 The maintainer wants at least two design iterations of the tokens and the attention after the first
