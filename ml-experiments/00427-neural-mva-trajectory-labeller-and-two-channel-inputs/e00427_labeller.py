@@ -388,7 +388,7 @@ class Trained:
 
 
 def held_out_rows(*, primaries: list[PrimaryDays]) -> np.ndarray:
-    """Return a boolean per stacked day: every eighth ISO week is held out for early stopping."""
+    """Return a boolean per stacked day: every eighth block of seven days since the epoch is held out for early stopping."""
     day = np.concatenate([p.day for p in primaries])
     return (day // 7) % 8 == 0
 
@@ -454,11 +454,20 @@ def train_labeller(
 
 
 def window_us(*, month: str) -> tuple[int, int]:
-    """Return the labeller's training window `(start, end]` for a test month's refit."""
+    """Return the labeller's whole-day training window `[start, end]` for a test month's refit."""
     refit = f412.refit_time(month=month)
     end = i412._us(t=refit - regimes.REFIT_CUTOFF_AGE)
     start = i412._us(t=refit - timedelta(days=base.WINDOW_DAYS))
+    start = -(-start // US_PER_DAY) * US_PER_DAY
+    end = end - end % US_PER_DAY
     return start, end
+
+
+def test_window_us(*, month: str) -> tuple[int, int]:
+    """Return `[start, end)` of a test month in microseconds (valid times of its rows)."""
+    year, mon = (int(x) for x in month.split("-"))
+    following = f"{year + (mon == 12)}-{mon % 12 + 1:02d}"
+    return i412._us(t=f412.refit_time(month=month)), i412._us(t=f412.refit_time(month=following))
 
 
 def predict_table(*, model: Labeller, t: diag.Table, device: torch.device) -> pl.DataFrame:
@@ -499,15 +508,27 @@ def predict_table(*, model: Labeller, t: diag.Table, device: torch.device) -> pl
 
 
 def score_primary(
-    *, model: Labeller, site: str, level: float, month: str, device: torch.device
+    *, model: Labeller, site: str, level: float, month: str, window: str, device: torch.device
 ) -> pl.DataFrame:
-    """Score a Primary at an injection level (its own farm, `Q = 2`) inside a month's window."""
-    start, end = window_us(month=month)
+    """Score a Primary at an injection level (its own farm, `Q = 2`) in the `train` or `test` window.
+
+    The `train` window is the labeller's whole training days. The `test` window is the test month:
+    the table spans 15 days either side so that the retrospective demand reference has neighbours,
+    and the rows are cut back to the month afterwards. The reference is a laboratory choice for
+    this diagnostic; the network stage uses trailing days only.
+    """
+    if window == "train":
+        start, end = window_us(month=month)
+        keep_lo, keep_hi = start, end + 1
+    else:
+        keep_lo, keep_hi = test_window_us(month=month)
+        start, end = keep_lo - 15 * US_PER_DAY, keep_hi + 15 * US_PER_DAY
     t = diag.load_table(
         site=site, setting=inputs.Setting(level, 2.0), start_us=start, end_us=end + 1
     )
     frame = predict_table(model=model, t=t, device=device)
-    return frame.with_columns(level=pl.lit(level))
+    frame = frame.filter((pl.col("valid") > keep_lo) & (pl.col("valid") <= keep_hi))
+    return frame.with_columns(level=pl.lit(level), window=pl.lit(window))
 
 
 # --- statistics ---------------------------------------------------------------------------------
@@ -546,6 +567,7 @@ def slice_metrics(*, frame: pl.DataFrame) -> dict:
 
 def placebo_rate(*, frame: pl.DataFrame) -> dict:
     """Return the share of sunny-midday half-hours with `pi > 0.5` when nothing is injected."""
+    frame = frame.filter((pl.col("level") == 0.0) & (pl.col("truth_points") >= 0.0))
     valid = frame["valid"].to_numpy()
     mid = inputs.is_midday(valid_us=valid)
     sel = mid & (frame["u_gate"].to_numpy() >= GATE_U) & (frame["k"].to_numpy() >= SUNNY_K)
@@ -571,7 +593,7 @@ def day_level_auc(*, injected: pl.DataFrame, placebo: pl.DataFrame) -> dict:
 
     a, b = per_day(injected), per_day(placebo)
     pos = a.filter(pl.col("reverse"))["score"].to_numpy()
-    neg = b["score"].to_numpy()
+    neg = b.filter(~pl.col("reverse"))["score"].to_numpy()
     return {
         "auc": auc(positive=pos, negative=neg),
         "n_positive_days": len(pos),
@@ -628,15 +650,19 @@ def window_days(*, p: PrimaryDays, month: str) -> PrimaryDays:
     """Return the Primary restricted to the days that lie wholly inside a month's training window."""
     start, end = window_us(month=month)
     keep = (p.valid_us[:, 0] - US_PER_HALF_HOUR >= start) & (p.valid_us[:, -1] <= end)
+    truth, k, daytype = p.truth[keep], p.k[keep], p.daytype[keep]
+    reference = demand_reference(
+        reading=np.sqrt(truth**2 + Q0_POINTS**2), k=k, daytype=daytype, mask=np.isfinite(truth)
+    )
     return PrimaryDays(
         site=p.site,
         day=p.day[keep],
-        truth=p.truth[keep],
+        truth=truth,
         u=p.u[keep],
-        k=p.k[keep],
+        k=k,
         temp=p.temp[keep],
-        daytype=p.daytype[keep],
-        reference=p.reference[keep],
+        daytype=daytype,
+        reference=reference,
         farm={f: v[keep] for f, v in p.farm.items()},
         gap=p.gap[keep],
         increment=p.increment,
@@ -664,7 +690,6 @@ def run_job(
     trained = train_labeller(
         primaries=primaries, farms=farms, arch=job.arch, seed=job.seed, device=device
     )
-    scored = {}
     if job.left_out == "none":
         targets = list(ROTATIONS[job.rotation])
         levels = (2.0, 1.0, 0.0)
@@ -672,9 +697,12 @@ def run_job(
         targets = [job.left_out]
         levels = (1.0, 0.0)
     frames = [
-        score_primary(model=trained.model, site=s, level=lv, month=job.month, device=device)
+        score_primary(
+            model=trained.model, site=s, level=lv, month=job.month, window=w, device=device
+        )
         for s in targets
         for lv in levels
+        for w in (("train", "test") if job.left_out == "none" else ("train",))
     ]
     frame = pl.concat(frames)
     write_frame(frame=frame, path=out_dir / f"{job.stem}.parquet")
@@ -737,23 +765,132 @@ def pilot_report(*, out_dir: Path) -> dict:
     return report
 
 
+A_FITS: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00420-neural-mva-export-gated-signed-final" / "work" / "fits" / "A"
+)
+
+
+def ece(*, p: np.ndarray, truth: np.ndarray, bins: int = 10) -> float:
+    """Return the expected calibration error of probabilities `p` of the boolean `truth`."""
+    edges = np.minimum((p * bins).astype(int), bins - 1)
+    total = 0.0
+    for b in range(bins):
+        sel = edges == b
+        if sel.any():
+            total += sel.mean() * abs(float(p[sel].mean()) - float(truth[sel].mean()))
+    return total
+
+
+def with_arm_a(*, frame: pl.DataFrame, rotation: str, month: str, level: float) -> pl.DataFrame:
+    """Join experiment 420's arm A (seed 0) probability to the labeller's rows on (site, valid).
+
+    Arm A's file holds one row per run, so a valid time appears about 15 times; the join keeps
+    every such row, which makes the labeller and arm A score the identical rows.
+    """
+    tag = inputs.Setting(level, 2.0).tag
+    a = pl.read_parquet(A_FITS / f"{tag}_{rotation}_{month}_s0.parquet").select(
+        "site", "valid", "p_negative"
+    )
+    lab = frame.filter((pl.col("level") == level) & (pl.col("window") == "test"))
+    return a.join(lab, on=["site", "valid"], how="inner", validate="m:1")
+
+
+def metrics_with_ece(*, frame: pl.DataFrame, column: str) -> dict:
+    """Return area, recall at 5% false reverse, and calibration error on the sunny slice."""
+    s = frame.filter((pl.col("u_gate") >= GATE_U) & (pl.col("k") >= SUNNY_K))
+    truth = s["truth_points"].to_numpy() < 0.0
+    p = s[column].to_numpy().astype(np.float64)
+    threshold = float(np.percentile(p[~truth], 95.0)) if (~truth).any() else float("nan")
+    return {
+        "rows": len(s),
+        "rows_reverse": int(truth.sum()),
+        "auc": auc(positive=p[truth], negative=p[~truth]),
+        "recall_at_5pc_false_reverse": float((p[truth] > threshold).mean())
+        if truth.any()
+        else float("nan"),
+        "ece": ece(p=p, truth=truth),
+    }
+
+
+def gate_report(*, out_dir: Path, arch: str) -> dict:
+    """Return the step 0 gate: L1 and L2 pooled and as a Primary-month macro-average, beside arm A."""
+    pooled: dict[str, list[pl.DataFrame]] = {"l1": [], "l2_placebo": []}
+    per_block: list[dict] = []
+    day_pos, day_neg = [], []
+    for job in full_jobs(arch=arch):
+        if job.left_out != "none":
+            continue
+        frame = pl.read_parquet(out_dir / f"{job.stem}.parquet")
+        l1 = with_arm_a(frame=frame, rotation=job.rotation, month=job.month, level=1.0)
+        pooled["l1"].append(l1)
+        for site in ROTATIONS[job.rotation]:
+            block = l1.filter(pl.col("site") == site)
+            per_block.append(
+                {
+                    "site": site,
+                    "month": job.month,
+                    "labeller": metrics_with_ece(frame=block, column="pi"),
+                    "arm_a": metrics_with_ece(frame=block, column="p_negative"),
+                }
+            )
+        pooled["l2_placebo"].append(
+            with_arm_a(frame=frame, rotation=job.rotation, month=job.month, level=0.0)
+        )
+        day_pos.append(frame.filter((pl.col("level") == 1.0) & (pl.col("window") == "test")))
+        day_neg.append(frame.filter((pl.col("level") == 0.0) & (pl.col("window") == "test")))
+    l1_all = pl.concat(pooled["l1"])
+    report = {
+        "l1_pooled": {
+            "labeller": metrics_with_ece(frame=l1_all, column="pi"),
+            "arm_a": metrics_with_ece(frame=l1_all, column="p_negative"),
+        },
+        "l1_macro": {
+            who: {
+                key: float(np.nanmean([b[who][key] for b in per_block]))
+                for key in ("auc", "recall_at_5pc_false_reverse", "ece")
+            }
+            for who in ("labeller", "arm_a")
+        },
+        "day_level_l1": day_level_auc(injected=pl.concat(day_pos), placebo=pl.concat(day_neg)),
+        "l2": {},
+    }
+    placebo = pl.concat(pooled["l2_placebo"]).filter(pl.col("truth_points") >= 0.0)
+    for site in ("D5", "D9", "D11", "D14", "D16"):
+        s = placebo.filter(pl.col("site") == site)
+        mid = inputs.is_midday(valid_us=s["valid"].to_numpy())
+        sel = mid & (s["u_gate"].to_numpy() >= GATE_U) & (s["k"].to_numpy() >= SUNNY_K)
+        report["l2"][site] = {
+            "n_rows": int(sel.sum()),
+            "labeller_share_above_half": float((s["pi"].to_numpy()[sel] > 0.5).mean())
+            if sel.any()
+            else None,
+            "arm_a_share_above_half": float((s["p_negative"].to_numpy()[sel] > 0.5).mean())
+            if sel.any()
+            else None,
+        }
+    return report
+
+
 def main() -> None:
     """Run the pilot or the 105 labellers."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("pilot", "pilot-report", "run"))
+    parser.add_argument("stage", choices=("pilot", "pilot-report", "run", "gate-report"))
     parser.add_argument("--arch", choices=("gru", "conv"), default=None)
     args = parser.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    out_dir = WORK_DIR / ("pilot" if args.stage.startswith("pilot") else "full")
+    out_dir = WORK_DIR / ("pilot" if args.stage.startswith("pilot") else f"full_{args.arch}")
     out_dir.mkdir(parents=True, exist_ok=True)
+    if args.stage == "gate-report":
+        print(json.dumps(gate_report(out_dir=out_dir, arch=args.arch), indent=1))
+        return
     if args.stage == "pilot-report":
         print(json.dumps(pilot_report(out_dir=out_dir), indent=1))
         return
-    cache = load_cache()
-    jobs = pilot_jobs() if args.stage == "pilot" else full_jobs(arch=args.arch)
     if args.stage == "run" and args.arch is None:
         msg = "pass --arch (the pilot's choice)"
         raise SystemExit(msg)
+    cache = load_cache()
+    jobs = pilot_jobs() if args.stage == "pilot" else full_jobs(arch=args.arch)
     for i, job in enumerate(jobs):
         r = run_job(job=job, cache=cache, device=device, out_dir=out_dir)
         print(

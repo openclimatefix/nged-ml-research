@@ -29,17 +29,24 @@ hypothesis: >-
   network treat the hidden Primaries and the visible Primaries as the same kind of input. Together
   (arm TDL) the two ideas lower the signed CRPS on reverse-flow half-hours below arm A's.
 prediction: >-
-  Written before any fit. Step 0 (labeller only, no mixture density network fit). L1. At level 1.0,
-  on the sunny slice of the hidden pair, the labeller's row-level area is at least 0.85 and its
-  recall at a matched 5% false-reverse rate is at least 0.60 (arm A's row-level ranking area is
-  0.930 and its recall at that rate is 0.623, so the labeller is predicted to match A's ranking,
-  and the new information is a probability that is calibrated per row). L2. With no injection,
-  `pi > 0.5` falls on at most 2% of sunny-midday half-hours at each of D5, D9, D11, D14, and D16.
-  Network stage. S1. TDL beats A on reverse-flow rows by at least the minimum detectable effect at
-  level 1.0 or 2.0. S2. TDL's q01 coverage on reverse-flow rows is closer to the nominal 0.01 than
-  A's 0.062. S3. TDL's false-reverse rate on non-reverse sunny summer middays is below A's 66.8%. The
-  prediction most at risk is S1 at level 2.0, where A already scores 7.05 points; the largest
-  expected gain is at level 1.0, where A's recall is 0.524.
+  Written before any fit. Step 0 (labeller only, no mixture density network fit). L1. On the sunny
+  slice of the hidden pair's test-month rows at level 1.0, the labeller's row-level area is at least
+  0.85 and no more than 0.05 below arm A's area on the identical rows, its recall at a matched 5%
+  false-reverse rate is at least 0.60 and no more than 0.05 below A's, and its expected calibration
+  error on those rows (ten equal-width bins of `pi`) is at most 0.10. Arm A's stored figures at
+  level 2.0 are an area of 0.930 and a recall of 0.623, and its figures at level 1.0 are recomputed
+  from the stored forecasts. The bars exclude a useless labeller; they do not claim that the
+  labeller out-ranks A. L2. With no injection, `pi > 0.5` falls on at most 2% of sunny-midday
+  half-hours at each of D5, D9, D11, D14, and D16 (A's rate at the same half-hours is reported
+  beside it, and the gate needs all five). Network stage. S1. TDL beats A on reverse-flow rows by
+  0.5 to 1.5 points at level 1.0 and by 0.2 to 0.7 points at level 2.0 (A scores 7.05 points at
+  level 2.0). The attribution is read from T against A (two channels), L against A (labeller), and
+  TDL against TD (labeller on top of masking). S2. TDL's q01 coverage on reverse-flow rows is closer
+  to the nominal 0.01 than A's 0.062. S3. TDL's false-reverse rate at level 2.0 (probability of a
+  negative value above 0.5) on non-reverse sunny summer-midday rows is below A's 66.8%; the other
+  denominator, all non-reverse sunny-slice rows, is reported beside A's 15.5%. The prediction most
+  at risk is S1 at level 2.0, where A already scores 7.05 points; the largest expected gain is at
+  level 1.0, where A's recall is 0.524.
 decision_rule: >-
   Step 0 gate, registered: the networks that use the labeller (L, TDL, TDL-perm) run only if L1 and
   L2 both hold. If either fails, run only T, TD, and the A refits (128 fits) and report that the
@@ -94,7 +101,7 @@ and it calls reverse flow on 66.8% of non-reverse sunny summer middays. This exp
 ideas against arm A: a labeller that reads a whole day of readings and gives each half-hour a
 probability of reverse flow, and separate input channels for measured MW and for MVA.
 
-## Changes after reading the latest evidence
+## Evidence behind the plan
 
 - **The 0.70 area belongs to the hand-made day-flip diagnostic, not to arm A.** The day-flip
   diagnostic scored 0.702 in step 0 of experiment 420 and 0.73 in experiment 417. Arm A's own
@@ -139,7 +146,7 @@ probability of reverse flow, and separate input channels for measured MW and for
   width-5 convolution feeding a two-layer bidirectional GRU of 32 units, or a dilated convolution
   stack of the same width; a pilot on the left-out visible Primaries (rotation r1, test months
   2025-09 and 2026-06, level 1.0) picks the one with the higher pooled area, and the choice is
-  written down before the 105 run. If the GRU fit takes over 5 minutes, the dilated stack is used.
+  written down before the 105 run. If the GRU fit takes over 5 minutes, the dilated stack is used. If step 0 passes, the first network stage runs L and TDL on rotation r1 only, and TDL-perm and the supplementary runs wait for a positive C2 there.
 - **Training copies.** Each visible Primary-day is copied with a farm injected at power factor 1, at
   a level drawn from 0 to 2.5 (15% of copies at 0, the placebo days), with `Q` drawn from 0, 2, and
   4 points, capped at 70% of the farm's peak on 30% of copies, and cut at a random hour on 50% of
@@ -148,9 +155,13 @@ probability of reverse flow, and separate input channels for measured MW and for
 - **No leakage from the hidden pair.** Each rotation injects only the farms its hidden pair does not
   use (r1: B and D; r2: A, C, and D; r3: B and D). A leave-one-out labeller also drops the left-out
   Primary's own farm, so its level-1.0 score is clean. The hidden pair's signed truth is used only to
-  score.
-- **Step 0 gate.** L1 and L2 above, measured on the hidden pair's training-window days, pooled over
-  rotations and months. The page also reports the day-level area (a day's score is its largest `pi`
+  score. Farms in one region share a sky, so the exclusion protects less than it appears to; the
+  page reports the labeller's area against the correlation between injected and training farms.
+  The pilot's test months overlap the network's, but the pilot uses visible Primaries only.
+- **Step 0 gate.** L1 and L2 above, measured on the hidden pair's test-month rows (the same rows as
+  arm A) and, as a second report, on its training-window days. Values are pooled over rotations and
+  months, with the Primary-month macro-average printed beside each. Rows are counted, not unique
+  half-hours. Leave-one-out scores of visible Primaries never enter L1. The page also reports the day-level area (a day's score is its largest `pi`
   on the sunny slice) beside design I's 0.702 and design C's 0.58, the area against the number of
   training Primaries and clean farms in a supplementary run, and the fit time.
 - **Network stage (338 fits, after the manager confirms).** Arms: P0 and A (stored, plus two refits
@@ -158,9 +169,11 @@ probability of reverse flow, and separate input channels for measured MW and for
   (A with the labeller's soft labels in the likelihood and its probabilities as inputs), TDL (the
   candidate, two seeds), and TDL-perm (TDL with `pi` permuted across days within a Primary-month, at
   level 1.0). The soft-label likelihood is `log[pi f(-y') + (1 - pi) f(y')]` with `pi` clipped to
-  0.02 to 0.98, and `pi = 0.5` recovers the folded density, so A is nested. `pi` enters the network
-  only from readings at or before the run's newest usable observation, asserted as `origin_lags`
-  asserts its lags.
+  0.02 to 0.98, and `pi = 0.5` recovers the folded density, so A is nested. `pi` as a network input
+  comes only from lag days that end at or before the run's newest usable observation, asserted as
+  `origin_lags` asserts its lags, with a trailing-days demand reference. On visible Primaries the
+  network always receives the leave-one-out `pi`, never the in-sample one. In the likelihood, the
+  soft label of a training row may use that row's own day, because it acts as a label.
 - **Compute.** One GPU process (about 1.4 GB of GPU memory), one feeder core, `MemoryMax=8G`,
   `OOMPolicy=continue`, `OMP_NUM_THREADS=1`; stop below 12 GiB in the `available` column of `free
   -g`. Each fit writes its own file atomically and the runs are resumable.
