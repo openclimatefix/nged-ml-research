@@ -27,23 +27,33 @@ hypothesis: >-
   laboratory gain comes from letting the forecast go below zero, which does not depend on weather
   accuracy.
 prediction: >-
-  Written before any score is read. S1: A beats P0 on reverse-flow rows by at least the minimum
-  detectable effect with the interval excluding zero, pooled and at each of the six hidden
-  Primaries, and the pooled gain is at least 10 points of effective capacity (about half the
-  laboratory gain of 19.2). This fails if the pooled gain falls below 10 or if any Primary's interval
-  includes zero. S2: no harm at the no-injection Primaries (the experiment 420 tolerance of +0.05
-  pooled and +0.20 single). S3: no reading harm at the MVA-only eight (+0.05 pooled). The gate
-  decisions are descriptive: with ENS inputs the Primary-level gate may open at fewer of the MVA-only
-  eight than the four it opened at in experiment 420.
+  Written before any score is read. Scores are signed continuous ranked probability scores (CRPS)
+  in points of effective capacity; A is the export-gated network and P0 the same network with its
+  gate shut, both on ENS inputs. S1: A beats P0 on reverse-flow rows by at least the minimum
+  detectable effect, with the interval excluding zero, pooled and at each of the six hidden
+  Primaries, and the pooled gain is at least 10 points over the three rotations (about half the
+  laboratory gain of 19.2) and at least 4 points on rotation r1 (about half the laboratory gain of
+  8.29 at D5 and D10). This fails if a pooled gain falls below its floor or if any Primary's
+  interval includes zero. S2: no harm at the no-injection Primaries (experiment 420's tolerance of
+  +0.05 points pooled and +0.20 at a single Primary, read on the point estimate). S3: no reading
+  harm at the MVA-only eight (+0.05 points pooled, point estimate). The Primary-level gate is shut
+  Gate decisions are descriptive: on the shortest-lead rows the gate opens at D5, D8, D10, and D12
+  in the one training fold built before scoring, as in experiment 420.
 decision_rule: >-
-  S1, S2, and S3 all pass for A: label the signed output at the eight "inferred, ensemble-tested,
-  gated" and take the serving question to the next step (a live-service port is a separate decision
-  for the maintainer). S1 passes and S2 or S3 fails: the label stays "inferred, laboratory, gated"
-  and the page says which bar failed. S1 fails: the laboratory result does not survive ensemble
+  S1, S2, and S3 all pass for A, with S1's pooled floor met: label the signed output "inferred,
+  ensemble-tested, gated" at those of the eight Primaries whose gate opened in the fits, and
+  "inferred, laboratory, gated" at the rest (if the gate is shut at all eight, no label is
+  upgraded, and the page says so). A live-service port is a separate decision for the maintainer.
+  S1 passes its interval and minimum-detectable-effect conditions but misses the pooled floor: the
+  verdict is small gain and the label stays "inferred, laboratory, gated". S1 passes and S2 or S3
+  fails: the label stays "inferred, laboratory, gated" and the page says which bar failed. S1 fails
+  (an interval includes zero at any hidden Primary): the laboratory result does not survive ensemble
   weather, the signed output at the eight is not shown to NGED, and the unsigned forecast stays the
-  published one. No porting threshold applies, because nothing here ports to production. Stage-1 stop
-  rule: if A fails S1 on rotation r1 (pooled over D5 and D10, and at each), stop and tell the
-  manager; otherwise tell the manager and run stage 2.
+  published one. No porting threshold applies, because nothing here ports to production. Stage-1
+  stop rule: if A fails S1 on rotation r1 (pooled over D5 and D10 with a floor of 4 points, and at
+  each of the two with the interval excluding zero), stop and tell the manager; otherwise tell the
+  manager and run stage 2. Stage 1 reads S2 at D5 only, so S2 stays untested at the other four
+  placebo Primaries until the full run.
 benchmark: >-
   P0 on ENS inputs (experiment 420's network with every gate forced shut, the plain neural network
   read as signed). Experiment 420's A, ref, and P0 on CAMS and ERA5 inputs are reported only, paired
@@ -112,7 +122,8 @@ biases. A network applied without retraining is reported as a diagnostic (arm A-
 **What changes in the inputs.** Experiment 417's fold is reused unchanged except for three series:
 
 - **PV term and Primary gate.** The scaled CAMS unit shape `u` and clear-sky index `k` become the
-  ENS-mean unit shape (from the ENS mean shortwave irradiance, divided by the same `u99`) and the ENS
+  ENS-mean unit shape (from the ENS mean shortwave irradiance, divided by the same `u99`) and the
+ENS
   clearness index, taken from experiment 405's `extras` arrays row by row.
 - **Temperature.** ERA5 temperature becomes the ENS mean temperature.
 - **Spread.** Three standardised input columns are added to the demand module: the temperature
@@ -129,9 +140,16 @@ the same rows as experiment 420's, so experiment 420's stored forecasts pair wit
 **Settings.** Level 2.0 (main) and the no-injection placebo. Level 1.0 is not run, because the
 question is whether the main result survives ensemble weather.
 
-**Weather availability at forecast time.** ENS runs are usable 9 hours after their start time, and
-each row's ENS values come from the run available at its forecast origin, so no lag-time weather is
-recorded weather. The lags in the demand module are power lags, as in experiment 420.
+**Weather availability at forecast time.** ENS runs are usable 9 hours after their start time (the
+`NWP_PUBLICATION_DELAY_HOURS` constant), and each row's ENS values come from the 00Z-run summary
+that
+experiment 397 attaches to the row's forecast origin, so no lag-time weather is recorded weather.
+Before 2025-07-01 experiment 397 builds the ENS mean and spread from the archive (only the control
+member is stored); from 2025-07-01 it uses the stored 51-member frames. Both arms see this source
+change, and the month-by-month table shows whether it matters. Rows with missing ENS values stay in
+both arms with the missing inputs set to zero after standardisation, so the rows match experiment
+420's; the count of such rows per fit is stored. The lags in the demand module are power lags, as in
+experiment 420.
 
 ## Scoring and pass bars
 
@@ -147,18 +165,30 @@ the figure exists first; the full-run figure uses all three rotations. Each figu
 this page before the matching contrast is read. A figure above 0.5 points marks the contrast as
 underpowered.
 
-- **S1 (gain over P0).** A's reverse-row CRPS is below P0's by at least the minimum detectable effect,
+- **S1 (gain over P0).** A's reverse-row CRPS is below P0's by at least the minimum detectable
+  effect,
   with the interval excluding zero, pooled and at each hidden Primary at level 2.0. On rotation r1,
-  stage 1 pools D5 and D10 and reads each of the two. The prediction adds that the pooled gain is at
-  least 10 points.
-- **S2 (no harm where there is no export).** In the placebo setting, signed CRPS on all rows of D5,
+  stage 1 pools D5 and D10 and reads each of the two. S1 also needs a pooled floor, 10 points over
+  the three rotations and 4 points on rotation r1, because experiment 420's minimum detectable
+  effect (0.27 to 0.40 points) is far below every laboratory gain and cannot fail alone. The floors
+  are about half the laboratory gains. A gain above the minimum detectable effect but below its
+floor
+  is a small gain, not a pass. The minimum detectable effect governs only the contrasts it can
+  resolve (A against A-applied, and A on ENS against A on laboratory inputs); a figure above 0.5
+  points marks those contrasts, and S1 if it is that large, as underpowered.
+- **S2 (no harm where there is no export).** Read on the point estimate, with the interval end
+  reported. In the placebo setting, signed CRPS on all rows of D5,
   D9, D11, D14, and D16 is within +0.05 points of P0 pooled, with no single Primary above +0.20.
   D10 is left out because it has real reverse flow.
-- **S3 (the MVA-only eight).** Reading CRPS at the eight, from the same fits, is within +0.05 points
+- **S3 (the MVA-only eight).** Read on the point estimate. At a Primary whose gate is shut, A's
+  reading forecast equals P0's by construction, so S3 can fail only through the Primaries whose gate
+  opens. Reading CRPS at the eight, from the same fits, is within +0.05 points
   of P0 pooled.
 
-**Reported with no bar:** the gain by lead band (days 1 to 2, 3 to 5, 6 to 10; headline days 1 to
-10); experiment 420's laboratory A, ref, and P0 beside the ENS arms, and the paired difference of A
+**Reported with no bar:** the gain by lead band (days 1 to 2, days 3 to 6 up to a lead of 144 hours,
+and days 6 to 10 above
+144 hours, where the ENS stamps change from 3-hourly to 6-hourly; headline days 1 to 10); experiment
+420's laboratory A, ref, and P0 beside the ENS arms, and the paired difference of A
 on ENS inputs against A on laboratory inputs; A-applied against P0 and against A; q01 and q99
 coverage and pinball loss on reverse-flow rows; sign balanced accuracy, recall, ROC area, and the
 false-reverse rate at `P(X < 0) > 0.5` on both denominators of experiment 420; each Primary-level
@@ -167,11 +197,18 @@ gate decision with its Spearman statistic, with the decisions at the eight set b
 Experiment 420's caveat is kept in the write-up: most of the gain over P0 is being allowed to go
 below zero, and the gate matters at the D5 placebo.
 
-**Observation made before scoring.** Building the stage-1 training fold for the 2025-07 refit (no
-fit, no score) shows the Primary-level gate shut at D8 and D12 on ENS inputs, where experiment 420's
-gate opened at both on CAMS inputs. The gate decision is made on training rows only, so this is an
-input-side fact and not a score. It means the gate decisions at the eight are a result to report,
-not a prediction.
+**Observation made before scoring, and a correction to the gate input.** Building the stage-1
+training
+fold for the 2025-07 refit (no fit, no score) first gave a gate shut at D8 and D12. The cause was
+experiment 417's gate code, which keeps the first row of each valid time. With CAMS every row of a
+valid time has the same weather, but each ENS row has its own run, and the first row is the
+longest-lead one (mean lead 333 hours at D5), whose irradiance is a blurred 6-hour mean. The plan
+therefore computes the Primary-level gate on each valid time's shortest-lead row
+(`e00424_inputs.primary_gates`), which is a design choice made before any score. On those rows the
+gate opens at D5, D8, D10, and D12 in that fold, as in experiment 420. The ENS clearness index is
+the
+ENS mean shortwave over `1000 * cos(zenith)`, not a CAMS clear-sky index, so the gate's `k >= 0.7`
+selects a different, sparser set of rows; the number of rows behind each gate decision is stored.
 
 ## Fits, compute, and stop rule
 
@@ -211,7 +248,15 @@ All code is in `ml-experiments/00424-neural-mva-export-gated-signed-ens-serving-
   series have no node and generator tables. The q01 coverage and pinball loss on reverse-flow rows
   stand in.
 - **Seed asymmetry.** A has two seeds and P0 one, so A's mean over two seeds meets P0's single seed,
-  which lowers A's noise without biasing the contrast.
+  which lowers A's noise without biasing the contrast. The minimum detectable effect comes from
+  single seeds, so it is conservative for the two-seed mean.
+- **No climatology row.** The target is a signed series with an injected farm, for which no
+  month-by-half-hour climatology forecaster exists in this repository; experiment 420 had none.
+- **No multiplicity correction.** S1 to S3 are conjunctive pass bars, each read at 95%; the decision
+  rule needs all three, so the family-wise error of a joint pass is below the level of any one.
+- **Figures.** The write-up carries a day-ahead example and a 10-day example at D5 with a farm
+  injected, from experiment 420's figure script adapted to these files, and q01, q05, q95, and q99
+  coverage and pinball loss on reverse-flow rows.
 
 ## Risks
 
@@ -221,5 +266,11 @@ All code is in `ml-experiments/00424-neural-mva-export-gated-signed-ens-serving-
 - **A wrong Primary-level gate decision makes a whole Primary's forecast wrong.** The gate decisions
   are stored for every fit and reported.
 - **ENS irradiance after lead 144 hours is a 6-hour mean,** so the unit shape is blurred at days 6
-  to 10. The lead-band table shows whether the gain falls there.
+  to 10. Experiment 397's summaries do not treat the two stamp spacings differently, and this plan
+  does not change that. The lead-band table, split at 144 hours, shows whether the gain falls there.
+- **A single scale constant `u99`, fixed on one Primary's daylight rows over the whole record,**
+  also
+  covers the test months. It is a scalar shared by both arms and is accepted as negligible.
+- **Calibration of ENS shifts by season, lead band, and hour band** (experiment 111) may exceed what
+  one retrained network with a lead input learns. The lead-band and month tables show it.
 - **Unlogged load-shift events** may sit in the readings, as NGED says its logs are incomplete.

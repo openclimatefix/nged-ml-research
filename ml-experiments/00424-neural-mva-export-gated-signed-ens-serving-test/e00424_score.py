@@ -30,10 +30,13 @@ FITS: Final[Path] = OUT_DIR / "fits"
 FITS_420: Final[Path] = s420.FITS
 KEY: Final[list[str]] = s420.KEY
 REVERSE: Final[pl.Expr] = s420.REVERSE
+R1_POOLED_FLOOR: Final[float] = 4.0
+FULL_POOLED_FLOOR: Final[float] = 10.0
+"""S1 floors in points: about half the laboratory gain on r1 (8.29) and on all rotations (19.2)."""
 LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
     "days 1 to 2": (0.0, 48.0),
-    "days 3 to 5": (48.0, 120.0),
-    "days 6 to 10": (120.0, 240.01),
+    "days 3 to 6 (lead up to 144 hours)": (48.0, 144.0),
+    "days 6 to 10 (lead above 144 hours)": (144.0, 240.01),
 }
 """Lead bands in hours; the headline is all leads up to 240 hours (days 1 to 10)."""
 
@@ -102,12 +105,15 @@ def bars(*, seeds_a: tuple[int, ...], rotations: tuple[str, ...], mde: float) ->
         "A": s420.mean_crps(frame=a, rows=REVERSE),
         "P0": s420.mean_crps(frame=p0, rows=REVERSE),
     }
-    out["s1_pass"] = bool(
-        s1["mean"] >= max(mde, s420.NO_HARM_POOLED)
+    floor = R1_POOLED_FLOOR if tuple(rotations) == ("r1",) else FULL_POOLED_FLOOR
+    out["s1_pooled_floor_points"] = floor
+    out["s1_interval_pass"] = bool(
+        s1["mean"] >= mde
         and s1["lo"] > 0.0
         and all(v["mean"] >= mde and v["lo"] > 0.0 for v in by_primary.values())
     )
-    out["s1_pooled_gain_at_least_10"] = bool(s1["lo"] >= 10.0)
+    out["s1_floor_met"] = bool(s1["mean"] >= floor)
+    out["s1_pass"] = out["s1_interval_pass"] and out["s1_floor_met"]
     p0_placebo = read_arm(arm="P0", setting="L0", seeds=(0,), rotations=rotations)
     placebo = read_arm(arm="A", setting="L0", seeds=(0,), rotations=rotations)
     if len(p0_placebo) and len(placebo):
@@ -140,13 +146,12 @@ def reported_only(
         if len(frame):
             out[f"crps_reverse_rows_{name}"] = s420.mean_crps(frame=frame, rows=REVERSE)
     if len(lab_a):
+        diff = s420.contrast(reference=lab_a, candidate=a, rows=REVERSE)
         out["ens_A_minus_lab_A_reverse"] = {
             "note": "positive when ENS inputs score worse than the laboratory inputs",
-            **{
-                k: -v
-                for k, v in s420.contrast(reference=lab_a, candidate=a, rows=REVERSE).items()
-                if k == "mean"
-            },
+            "mean": -diff["mean"],
+            "lo": -diff["hi"],
+            "hi": -diff["lo"],
         }
     applied = read_arm(arm=fit.APPLIED, setting="L2", seeds=(0,), rotations=rotations)
     if len(applied):

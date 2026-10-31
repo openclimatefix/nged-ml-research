@@ -22,8 +22,8 @@ unit-shape spread. The PV term sees the ENS unit-shape mean. The Primary gate an
 the ENS unit-shape mean and clearness index, because those are what a live service would hold.
 """
 
-from dataclasses import dataclass
-from datetime import timedelta
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Final
 
@@ -32,6 +32,7 @@ import e00087_regimes as regimes  # ty: ignore[unresolved-import]
 import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00405_prep as prep405  # ty: ignore[unresolved-import]
 import e00412_inputs as i412  # ty: ignore[unresolved-import]
+import e00417_gates as g417  # ty: ignore[unresolved-import]
 import e00417_inputs as i417  # ty: ignore[unresolved-import]
 import numpy as np
 
@@ -44,6 +45,32 @@ N_ENS_COLUMNS: Final[int] = 3
 """Temperature mean, temperature spread, unit-shape spread."""
 INPUT_CLIP_SD: Final[float] = base.INPUT_CLIP_SD
 US_PER_DAY: Final[int] = i417.US_PER_DAY
+
+
+@dataclass
+class EnsFold(i417.Fold):
+    """Experiment 417's fold plus each row's lead in hours, which the Primary gate needs."""
+
+    lead: np.ndarray
+
+
+def primary_gates(*, fold: EnsFold) -> dict[str, g417.PrimaryGate]:
+    """Return the Primary gates on each valid time's shortest-lead row.
+
+    Experiment 417's gate keeps the first row of each valid time, which is the longest-lead row
+    when the weather differs per run (ENS) and so blurs the unit shape. This keeps the shortest-lead
+    row instead, so the gate statistic uses the ENS forecast closest to the valid time.
+    """
+    order = np.lexsort((fold.lead, fold.valid, fold.primary))
+    reduced = replace(
+        fold,
+        primary=fold.primary[order],
+        valid=fold.valid[order],
+        y=fold.y[order],
+        gate_u=fold.gate_u[order],
+        k=fold.k[order],
+    )
+    return g417.primary_gates(fold=reduced)
 
 
 @lru_cache(maxsize=4)
@@ -95,7 +122,12 @@ def model_inputs(
     )
 
 
-def build_fold(*, refit, pair: tuple[str, ...], setting: i417.Setting) -> i417.Fold:  # noqa: ANN001
+def build_fold(
+    *,
+    refit: datetime,
+    pair: tuple[str, ...],
+    setting: i417.Setting,
+) -> tuple[EnsFold, dict[str, int]]:
     """Return a refit's training rows, as experiment 417's `build_fold` but with ENS weather.
 
     Row selection, standardisation of the experiment 397 columns, weights, targets, and held-out
@@ -105,6 +137,7 @@ def build_fold(*, refit, pair: tuple[str, ...], setting: i417.Setting) -> i417.F
     table = base.primaries()
     parts = []
     dropped: dict[str, int] = {}
+    missing: dict[str, int] = {}
     for row in table.iter_rows(named=True):
         site = row["site"]
         arr = i417.site_arrays(site=site, fold=site in pair, setting=setting)
@@ -124,11 +157,13 @@ def build_fold(*, refit, pair: tuple[str, ...], setting: i417.Setting) -> i417.F
         if not usable.any():
             continue
         u = ens["u"][usable]
+        missing[site] = int(np.isnan(u).sum())
         parts.append(
             {
                 "x": arr.x[usable],
                 "y": arr.y[usable],
                 "origin": arr.origin[usable],
+                "lead": arr.lead[usable],
                 "valid": arr.valid[usable],
                 "primary": np.full(int(usable.sum()), row["primary"], dtype=np.int64),
                 "u": np.nan_to_num(u, nan=0.0).astype(np.float32),
@@ -164,7 +199,7 @@ def build_fold(*, refit, pair: tuple[str, ...], setting: i417.Setting) -> i417.F
         scaler=scaler,
         cols=cols,
     )
-    return i417.Fold(
+    return EnsFold(
         x=x,
         y=cat["y"][keep_rows],
         primary=cat["primary"][keep_rows],
@@ -183,4 +218,5 @@ def build_fold(*, refit, pair: tuple[str, ...], setting: i417.Setting) -> i417.F
         setting=setting,
         pair=pair,
         n_dropped=dropped,
-    )
+        lead=cat["lead"][keep_rows],
+    ), missing

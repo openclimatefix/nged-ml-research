@@ -212,12 +212,39 @@ def write_outputs(
     tmp_json.rename(target.with_suffix(".json"))
 
 
-def run_job(*, job: Job, fold: i417.Fold, device: str) -> None:
+def prepare(*, arm: f420.Arm, fold: ens.EnsFold) -> f420.Prepared:
+    """Return experiment 420's prepared fold with the gates computed on the shortest-lead rows."""
+    gate_map = ens.primary_gates(fold=fold) if arm.mode != "none" else {}
+    open_row = f420.row_open(
+        arm=arm,
+        fold=fold,
+        gate_map=gate_map,
+        primary=fold.primary,
+        gate_u=fold.gate_u,
+        valid_us=fold.valid,
+    )
+    info = {
+        "forced_shut": arm.mode == "shut",
+        "gates": {
+            s: {"open": g.open, "spearman": g.spearman, "p1_points": g.p1_points, "n": g.n_rows}
+            for s, g in gate_map.items()
+        },
+    }
+    return f420.Prepared(
+        fold=fold,
+        open_row=open_row,
+        label=np.zeros(len(fold.y), dtype=np.int8),
+        gates=gate_map,
+        info=info,
+    )
+
+
+def run_job(*, job: Job, fold: ens.EnsFold, missing: dict[str, int], device: str) -> None:
     """Fit one job on a shared ENS fold, forecast, and write its files atomically."""
     arm = ARMS[job.arm]
     started = time.monotonic()
     refit = f412.refit_time(month=job.month)
-    prep = f420.prepare(arm=arm, fold=fold)
+    prep = prepare(arm=arm, fold=fold)
     print(f"  gates: {json.dumps(prep.info['gates'])}", flush=True)
     model = f420.make_model(arm=arm, fold=fold, refit=refit, seed=job.seed)
     epochs, val, shares = f417.train(model=model, prep=prep, seed=job.seed, device=device)  # ty: ignore[invalid-argument-type]
@@ -240,6 +267,7 @@ def run_job(*, job: Job, fold: i417.Fold, device: str) -> None:
         "prior_gradient_share": shares,
         "capacity_points": model.capacity().detach().cpu().numpy().tolist(),
         "dropped": fold.n_dropped,
+        "missing_ens_training_rows": missing,
         **prep.info,
     }
     write_outputs(job=job, pair_frame=pair_frame, eight_frame=eight_frame, info=info)
@@ -298,14 +326,14 @@ def run(*, jobs: list[Job], device: str) -> None:
             groups.setdefault((job.rotation, job.setting, job.month), []).append(job)
     for (rotation, setting, month), group in groups.items():
         stop_if_low_memory()
-        fold = ens.build_fold(
+        fold, missing = ens.build_fold(
             refit=f412.refit_time(month=month),
             pair=i417.ROTATIONS[rotation],
             setting=SETTINGS[setting],
         )
         for job in group:
             stop_if_low_memory()
-            run_job(job=job, fold=fold, device=device)
+            run_job(job=job, fold=fold, missing=missing, device=device)
         del fold
     for job in todo:
         if job.arm == APPLIED:
