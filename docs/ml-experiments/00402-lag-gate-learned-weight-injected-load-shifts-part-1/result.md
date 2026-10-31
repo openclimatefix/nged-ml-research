@@ -52,7 +52,8 @@ metric: >-
 code: ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/
 verdict: partly supported
 best_arm: >-
-  The gate fitted separately for each metering group (two gates, one per group of Primary substations), fed the surprise of each lagged reading, window means of that surprise, the gap
+  The gate fitted separately for each metering group (two gates, one per group of Primary
+  substations), fed the surprise of each lagged reading, window means of that surprise, the gap
   between the two forecasts' medians, and the neighbour substations' surprise. Against the fitted
   constant mixture per group it lowers the exact CRPS over all rows of the injected test world by
   1.4% at the six Primaries with signed readings (4.306 to 4.247 points of effective capacity). On
@@ -125,7 +126,8 @@ clean rows is therefore optimistic, and the real-event slices undercount events.
 ceilings).** The flag oracle is a gate that is told which rows have a lag inside an event. Held out
 by event, it beats the fitted constant mixture per group by about 0.14 points on harm rows at the
 six (95% interval -0.47 to +0.10). Prediction P1 asked for at least 0.3 points, so P1 is not met.
-One event (event 55 at D16) supplies 110% of the gain: with that event left out the gain is +0.016 points, so the sign flips. At the eight, the forecast with lags
+One event (event 55 at D16) supplies 110% of the gain: with that event left out the gain is +0.016
+points, so the sign flips. At the eight, the forecast with lags
 beats every mixture on harm rows. A constant weight chosen by the decile of the gap between the two
 forecasts' medians needs no labels and captures most of the flag oracle's gain at the six. The
 per-row oracle weight would lower the score by 0.7 points on harm rows at the six, and separately by
@@ -143,7 +145,8 @@ share of 0.368 with all three lags affected, and not with Part F, which found 0.
 
 **The gate gains 0.6% to 2.3% on injected rows and under 0.5% on real rows (steps 4 and 5).** Mean
 exact CRPS over all rows of the injected test world (seed 2) and over all real-event rows. "Gate,
-full" is the gate fitted separately for each metering group, fed all features; "Gate, flag" also sees the
+full" is the gate fitted separately for each metering group, fed all features; "Gate, flag" also
+sees the
 true event flag and bounds it. The constant mixture is fitted per group on injected events for the
 injected rows and on real labels for the real rows.
 
@@ -331,7 +334,8 @@ shortest lead).
        series the gate reads.
 - **Per-group splits (maintainer, relayed 2026-10-30).** Before steps 4 and 5, every gate arm in
   step 4 is run three ways: one pooled gate, one gate with the metering unit (signed MW or MVA-only)
-  as an input, and a separate gate per group. The fitted constant mixture and the flag oracle get the
+  as an input, and a separate gate per group. The fitted constant mixture and the flag oracle get
+  the
   same split (one weight per group against one pooled weight), so that the upper bound is stated per
   group. Every table reports per Primary as well as per group; D15 and D18 are report-only.
 - **Why the MVA-only eight differ.** Step 1 reports, per Primary, whether the lags help the forecast
@@ -351,8 +355,10 @@ shortest lead).
 - **Changes after the Opus plan review.**
     - **Comparators.** Every stop rule and contrast uses the fitted constant mixture per group (one
       weight per lead day and metering group) as its comparator, and also reports the forecast
-      without lags. The pooled constant is descriptive only. Step 1 also reports leave-one-Primary-out
-      and leave-one-event-out contrasts, and clusters the bootstrap by load-shift event (all Primaries
+      without lags. The pooled constant is descriptive only. Step 1 also reports
+      leave-one-Primary-out
+      and leave-one-event-out contrasts, and clusters the bootstrap by load-shift event (all
+      Primaries
       the event touched).
     - **Non-inferiority margin.** The contrast over harm rows, clean rows, and the 7 days after each
       event is pooled per group. Clean rows are 96% of rows at the six, so the clean-row margin at
@@ -360,7 +366,8 @@ shortest lead).
       lags (margin 0.01 points). The gate with the metering unit as an input and the gate per group
       are the headline arms; the pooled gate is descriptive.
     - **Arms.** Arm (b) gets the injected flags plus every feature of arm (d) and bounds it; the
-      flag-only version is a separate arm. A new arm (f) is the same gate trained on real, unmodified
+      flag-only version is a separate arm. A new arm (f) is the same gate trained on real,
+      unmodified
       rows (label w* needs only actual readings), so a gain is credited to the injection only if
       (d) beats (f). Step 1 adds feature oracles (a constant per group, lead day, and decile of the
       absolute gap between the two medians).
