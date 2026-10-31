@@ -10,10 +10,10 @@ import e00087_common as common  # ty: ignore[unresolved-import]
 import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00381_score as s381  # ty: ignore[unresolved-import]
 import e00421_score as sc  # ty: ignore[unresolved-import]
-import numpy as np
 import polars as pl
-from studies import tail_calibration
 from studies.eval_protocol import metrics
+
+from studies import tail_calibration
 
 ARMS: Final[tuple[str, ...]] = ("E406", "E3g", "N3g", "NH", "NHs", "EH", "NH0")
 WIDEN: Final[float] = 1.15
@@ -133,7 +133,7 @@ def draw_headline() -> None:
             yOffset=off,
             x=alt.X(
                 "lower:Q",
-                title="Treatment minus reference, CRPS days 1 to 10 (points of capacity; below zero favours the treatment)",
+                title="Treatment minus reference, CRPS days 1 to 10 (points of capacity; below zero is better)",
             ),
             x2="upper:Q",
             color=colour,
