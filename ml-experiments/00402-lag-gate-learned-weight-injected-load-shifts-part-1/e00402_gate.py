@@ -28,6 +28,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
+import e00087_common as common  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import xgboost as xgb
@@ -84,8 +85,6 @@ def load(*, pattern: str) -> pl.DataFrame:
 
 def real_tags(*, d: pl.DataFrame) -> pl.DataFrame:
     """Add `lags_real`, `target_real`, and `after_real` from the unpadded corrected events."""
-    import e00087_common as common  # noqa: PLC0415  # ty: ignore[unresolved-import]
-
     size = common.grid_times().len()
     ev = pl.read_parquet(EVENTS)
     lags_real = np.zeros(d.height, dtype=np.int8)
@@ -122,10 +121,10 @@ def cut_train(*, d: pl.DataFrame, month) -> pl.DataFrame:  # noqa: ANN001
     """Return rows whose origin is at least `CUT_DAYS` before the scored month or after its end."""
     start = month
     end = (start + timedelta(days=32)).replace(day=1)
-    origin = pl.col("power_fcst_init_time")
+    origin, valid = pl.col("power_fcst_init_time"), pl.col("valid_time")
     return d.filter(
         (origin < start - timedelta(days=CUT_DAYS)) | (origin >= end + timedelta(days=CUT_DAYS))
-    ).filter(pl.col("group") != "report")
+    ).filter(((valid < start) | (valid >= end)) & (pl.col("group") != "report"))
 
 
 def label_weight(*, d: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
@@ -142,7 +141,9 @@ def fit_gate(
     if train.height > MAX_TRAIN_ROWS:
         train = train.sample(n=MAX_TRAIN_ROWS, seed=seed)
     w, a = label_weight(d=train)
-    matrix = xgb.DMatrix(train.select(columns).to_numpy().astype(np.float32), label=w, weight=a)
+    matrix = xgb.DMatrix(
+        train.select(columns).to_numpy().astype(np.float32), label=w, weight=np.maximum(a, 0.0)
+    )
     params = {
         "objective": "reg:squarederror", "max_depth": 3, "eta": 0.1, "subsample": 0.8,
         "nthread": threads, "seed": seed, "tree_method": "hist",
@@ -171,7 +172,9 @@ def const_weights(*, train: pl.DataFrame, test: pl.DataFrame, by_group: bool) ->
         .agg(a=pl.col("A").sum(), b=pl.col("B").sum())
         .with_columns(w=(-pl.col("b") / (2 * pl.col("a").clip(1e-12))).clip(0, 1))
     )
-    out = test.with_columns(k=key(test)).join(table.select("k", "w"), on="k", how="left")
+    out = test.with_columns(k=key(test)).join(
+        table.select("k", "w"), on="k", how="left", maintain_order="left"
+    )
     return out["w"].fill_null(0.5).to_numpy()
 
 
@@ -202,7 +205,7 @@ def weights_for_month(
     }
     for arm, columns in FEATURES.items():
         train = sources[arm]
-        if train.height == 0 or any(c not in test.columns for c in columns):
+        if train.height == 0:
             continue
         for variant in VARIANTS:
             name = f"gate {arm} ({variant})"
@@ -241,37 +244,65 @@ def main() -> None:
     real = real_tags(d=load(pattern=f"real_{args.arm}_*.parquet"))
     months = sorted(inj["month"].unique().to_list())
     scored_rows = []
+    model_columns = sorted({c for cols in FEATURES.values() for c in cols} | {"unit"})
+    keep = [
+        "site",
+        "group",
+        "power_fcst_init_time",
+        "valid_time",
+        "lead_hours",
+        "month",
+        "A",
+        "B",
+        "C",
+    ]
     for month in months:
         train_inj = cut_train(d=inj.filter(pl.col("seed").is_in(list(TRAIN_SEEDS))), month=month)
         train_real = cut_train(d=real, month=month)
-        for kind, test in (
-            (
-                "injected",
-                inj.filter(
-                    (pl.col("seed") == TEST_SEED)
-                    & (pl.col("month") == month)
-                    & (pl.col("group") != "report")
-                ),
-            ),
-            ("real", real.filter(pl.col("month") == month)),
-        ):
-            if test.is_empty():
-                continue
-            if kind == "real":
-                test = test.drop(FLAGS)
-            weights = weights_for_month(
-                train_inj=train_inj, train_real=train_real, test=test, threads=args.threads
-            )
-            frame = test.select(
-                "site", "group", "power_fcst_init_time", "valid_time", "lead_hours", "month",
-                *(["lags_in_event", "event_kind", "target_in_event"] if kind == "injected" else ["lags_real", "target_real", "after_real", "cluster"]),
-            ).with_columns(kind=pl.lit(kind))  # fmt: skip
-            frame = frame.with_columns(
-                **{f"w::{k}": pl.Series(v) for k, v in weights.items()},
-                **{f"crps::{k}": pl.Series(exact_crps(d=test, w=v)) for k, v in weights.items()},
-            )
-            scored_rows.append(frame)
-            print(month.date(), kind, test.height, "rows", len(weights), "arms", flush=True)
+        test_inj = inj.filter(
+            (pl.col("seed") == TEST_SEED)
+            & (pl.col("month") == month)
+            & (pl.col("group") != "report")
+        )
+        test_real = real.filter((pl.col("month") == month) & (pl.col("group") != "report"))
+        if test_inj.is_empty() and test_real.is_empty():
+            continue
+        test_real_cols = test_real.with_columns(
+            lags_in_event=pl.lit(None, dtype=pl.Int8), event_kind=pl.lit(None, dtype=pl.Int8)
+        )
+        both = pl.concat(
+            [
+                test_inj.select(*keep, *model_columns).with_columns(kind=pl.lit("injected")),
+                test_real_cols.select(*keep, *model_columns).with_columns(kind=pl.lit("real")),
+            ]
+        )
+        weights = weights_for_month(
+            train_inj=train_inj, train_real=train_real, test=both, threads=args.threads
+        )
+        is_real = (both["kind"] == "real").to_numpy()
+        for name in list(weights):
+            if name.startswith("gate flag"):
+                weights[name] = np.where(is_real, np.nan, weights[name])
+        tags_inj = test_inj.select("lags_in_event", "event_kind", "target_in_event").with_columns(
+            lags_real=pl.lit(None, dtype=pl.Int8),
+            target_real=pl.lit(None, dtype=pl.Boolean),
+            after_real=pl.lit(None, dtype=pl.Boolean),
+            cluster=pl.lit(None, dtype=pl.Int64),
+        )
+        tags_real = test_real.select(
+            "lags_real", "target_real", "after_real", "cluster"
+        ).with_columns(
+            lags_in_event=pl.lit(None, dtype=pl.Int8),
+            event_kind=pl.lit(None, dtype=pl.Int8),
+            target_in_event=pl.lit(None, dtype=pl.Boolean),
+        )
+        tags = pl.concat([tags_inj, tags_real.select(tags_inj.columns)])
+        frame = pl.concat([both.select("kind", *keep[:6]), tags], how="horizontal").with_columns(
+            **{f"w::{k}": pl.Series(v) for k, v in weights.items()},
+            **{f"crps::{k}": pl.Series(exact_crps(d=both, w=v)) for k, v in weights.items()},
+        )
+        scored_rows.append(frame)
+        print(month.date(), both.height, "rows", len(weights), "arms", flush=True)
     pl.concat(scored_rows, how="diagonal").write_parquet(WORK / f"gate_scores_{args.arm}.parquet")
 
 
