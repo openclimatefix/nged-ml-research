@@ -40,7 +40,7 @@ def link() -> None:
         for source in (data.WORK_DIR / "predictions" / arm).glob("*.parquet"):
             if int(source.stem.split("_s")[1].split("_")[0]) < run.FROZEN_SEEDS:
                 link_path = target / source.name
-                if not link_path.exists():
+                if not link_path.is_symlink():
                     link_path.symlink_to(source)
 
 
@@ -62,6 +62,13 @@ def main() -> None:
     factor = 1.0 if args.raw else score.WIDENING
     for name, seeds in SEED_SETS.items():
         table = score.collect(months=args.months, seeds=seeds, factor=factor)
+        counts = table.group_by("arm", "month", "world", "row_set", "group").agg(pl.col("n").sum())
+        assert (
+            counts.group_by("month", "world", "row_set", "group")
+            .agg(pl.col("n").n_unique())["n"]
+            .max()
+            == 1
+        ), "S1 and R-inj are scored on different rows"
         tag = name.replace(" ", "_")
         table.write_parquet(out / f"blocks_{tag}.parquet")
         with pl.Config(tbl_rows=300, tbl_cols=20, fmt_str_lengths=60):
@@ -74,7 +81,16 @@ def main() -> None:
             print(mde.sort("row_set", "group"))
             contrasts = score.contrast_table(table=table, rng=np.random.default_rng(0))
             contrasts.write_parquet(out / f"contrasts_{tag}.parquet")
-            folds = contrasts.join(mde, on=["row_set", "group"]).sort("row_set", "group")
+            folds = (
+                contrasts.join(mde, on=["row_set", "group"])
+                .with_columns(
+                    folds_negative=pl.col("fold_differences").map_elements(
+                        lambda d: sum(v is not None and v < 0 for v in d.values()),
+                        return_dtype=pl.Int64,
+                    )
+                )
+                .sort("row_set", "group")
+            )
             print(folds)
             for seed in seeds:
                 single = score.collect(months=args.months, seeds=(seed,), factor=factor)
