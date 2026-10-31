@@ -81,6 +81,14 @@ def solar_columns(
     A previous-day mean that is missing (the first local day of a run) is replaced by the day's own
     mean.
 
+    Args:
+        origin_us: The run's origin time of each row, in microseconds.
+        valid_us: The valid time of each row, in microseconds.
+        daily: The daily shortwave means per run and local date.
+
+    Returns:
+        The two solar-summary columns of each row, as a float32 array.
+
     Raises:
         ValueError: If a row's run and local date are not in `daily`.
     """
