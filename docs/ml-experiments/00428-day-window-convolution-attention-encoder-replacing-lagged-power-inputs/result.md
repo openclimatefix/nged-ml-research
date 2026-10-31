@@ -21,56 +21,56 @@ size: >-
   folders of experiments 87, 397, 402, 422, and 392 and the `studies` evaluation code.
 hypothesis: >-
   A pooled mixture density network that has no hand-made lagged power input and instead reads the
-  raw half-hourly power of whole recent days through a one-dimensional convolutional network and an
-  attention layer (whose query is the half-hour being forecast) forecasts as well as the pooled
+  raw half-hourly power of whole recent days through a one-dimensional convolutional network and
+  an attention layer (whose query is the half-hour being forecast) forecasts as well as the pooled
   plain network with the three origin lags on rows outside load-shift events, forecasts better on
   harm rows (rows whose target is outside every event but whose recent days are inside one), and
   follows a step added to the recent days by a much smaller share of the step, with wider bands.
 prediction: >-
   Written before any fit and before any score is read. All numbers are CRPS in points of effective
   capacity at days 1 to 10, or shares of a step. P1. On clean rows, the one-day encoder (E1) minus
-  the lagged reference trained on the same injected data (R-inj) lies between 0.00 and +0.15 at the
-  signed-MW six, because E1 has no weekly lag; the three-day encoder (E3) minus R-inj lies between
-  -0.05 and +0.05. P2. On harm rows, E3 minus R-inj lies between -0.30 and -0.10 at the signed-MW
-  six and within +-0.10 at the MVA-only eight (experiment 402 found a flag oracle gains nothing there). P3.
-  In the encroachment sweep (step of 5% of capacity, 24 to 72 h leads, raw bands), R follows 0.15 to
-  0.45 of the step at three lags (the XGBoost model of experiment 392 followed 0.38 to 0.41; a
-  neural network may follow less), R-inj follows 0.05 to 0.30, and E3 follows at most 0.05 of the
-  step at every k, in both variants. P4.
-  The 5%-95% band of E3 is at least 1.10 times wider after the step than before at k = 3 (variant
-  2). P5. The attention mass on the "no day" token rises by at least 0.15 on rows whose days contain
-  the step, against the same rows without it. P6. E2 minus E1 on clean rows is between -0.10 and
-  -0.02 (the day of the week matching the target carries the weekly pattern); E3 minus E2 lies
-  within +-0.03. P7. The lag-masked control follows exactly 0 (a check of the pipeline, not a
-  result). P8. B-mix (the fixed 50/50 mixture of the lagged and lagless networks) follows about half
-  of R's share and loses 0.05 to 0.20 CRPS points on clean rows against R.
+  the lagged reference trained on the same injected data (R-inj) lies between 0.00 and +0.15 at
+  the signed-MW six, because E1 has no weekly lag; the three-day encoder (E3) minus R-inj lies
+  between -0.05 and +0.05. P2. On harm rows, E3 minus R-inj lies between -0.30 and -0.10 at the
+  signed-MW six and within +-0.10 at the MVA-only eight (experiment 402 found a flag oracle gains
+  nothing there). P3. In the encroachment sweep (step of 5% of capacity, 24 to 72 h leads, raw
+  bands), R follows 0.15 to 0.45 of the step at three lags (the XGBoost model of experiment 392
+  followed 0.38 to 0.41; a neural network may follow less), R-inj follows 0.05 to 0.30, and E3
+  follows at most 0.05 of the step at every k, in both variants. P4. The 5%-95% band of E3 is at
+  least 1.10 times wider after the step than before at k = 3 (variant 2). P5. The attention mass
+  on the "no day" token rises by at least 0.15 on rows whose days contain the step, against the
+  same rows without it. P6. E2 minus E1 on clean rows is between -0.10 and -0.02 (the day of the
+  week matching the target carries the weekly pattern); E3 minus E2 lies within +-0.03. P7. The
+  lag-masked control follows exactly 0 (a check of the pipeline, not a result). P8. B-mix (the
+  fixed 50/50 mixture of the lagged and lagless networks) follows about half of R's share and
+  loses 0.05 to 0.20 CRPS points on clean rows against R.
 decision_rule: >-
   Screen, four folds (test months 2026-06, 2026-01, 2025-10, 2026-03), then five (adding 2025-12),
   three seeds (0, 1, 2) per fold, monthly refits only. Every number is interim and carries no 99%
-  claim. Contrasts, each read per group (signed-MW six; MVA-only eight; D15 and D18 report-only) on
-  CRPS at days 1 to 10 at the 1.15 widening, on three row sets (clean rows, harm rows, rows whose
-  target is inside a labelled event): C1 E1 minus R-inj; C2 E2 minus E1; C3 E3 minus E2; C4 E3 minus
-  R-inj; C5 E3 minus B-mix; C6 R-inj minus R (does training on injected events alone help the
-  lagged network). The smallest gain worth porting is 0.10 CRPS points on harm rows with a loss of
-  at most 0.05 on clean rows, because the encoder adds a network module to the production training
-  loop. A fold counts as a win for a contrast when the point estimate is below zero by more than
-  the minimum detectable effect. Harm rows here means the injected-world harm rows; the real harm
-  rows are reported beside them and do not decide. A fold is lost when the point estimate is above
-  zero by more than the minimum detectable effect. Advance to the fifth fold, and to experiment 404's trust inputs as
-  extra tokens, if E3 beats R-inj on harm rows at the signed-MW six in at least 3 of 4
-  folds with a pooled gain of at least 0.10, loses at most 0.05 on clean rows, and in the sweep
-  follows no more than half of R-inj's share at k = 3 in variant 2. Stop, and report which of the
-  three conditions failed, if E3 loses on harm rows in at least 3 of 4 folds. In every other case
-  (for example 2 wins and 2 losses) the page reports the screen as inconclusive and the maintainer
-  decides; E2 is reported but never decides. The sweep goal is a
-  share near zero with wider bands: success is a median share of at most 0.05 at every k up to 3 in
-  both variants, with a band-width ratio of at least 1.10 at k = 3. The minimum detectable effect
-  is computed before any contrast is read, separately for each row set and group: for R-inj, the
-  sample standard deviation (12 fold-by-seed values, each seed's CRPS minus the fold's three-seed
-  mean, 8 degrees of freedom) times 1.96 times the square root of 2 divided by the square root
-  of 3. It covers seed noise only, so it is a lower bound, as in experiments 419 and 425. No
-  multiplicity correction is applied to the screen. A
-  contrast smaller than that is "inside the noise".
+  claim. Contrasts, each read per group (signed-MW six; MVA-only eight; D15 and D18 report-only)
+  on CRPS at days 1 to 10 at the 1.15 widening, on three row sets (clean rows, harm rows, rows
+  whose target is inside a labelled event): C1 E1 minus R-inj; C2 E2 minus E1; C3 E3 minus E2; C4
+  E3 minus R-inj; C5 E3 minus B-mix; C6 R-inj minus R (does training on injected events alone help
+  the lagged network). The smallest gain worth porting is 0.10 CRPS points on harm rows with a
+  loss of at most 0.05 on clean rows, because the encoder adds a network module to the production
+  training loop. A fold counts as a win for a contrast when the point estimate is below zero by
+  more than the minimum detectable effect. Harm rows here means the injected-world harm rows; the
+  real harm rows are reported beside them and do not decide. A fold is lost when the point
+  estimate is above zero by more than the minimum detectable effect. Advance to the fifth fold,
+  and to experiment 404's trust inputs as extra tokens, if E3 beats R-inj on harm rows at the
+  signed-MW six in at least 3 of 4 folds with a pooled gain of at least 0.10, loses at most 0.05
+  on clean rows, and in the sweep follows no more than half of R-inj's share at k = 3 in variant
+  2. Stop, and report which of the three conditions failed, if E3 loses on harm rows in at least 3
+  of 4 folds. In every other case (for example 2 wins and 2 losses) the page reports the screen as
+  inconclusive and the maintainer decides; E2 is reported but never decides. The sweep goal is a
+  share near zero with wider bands: success is a median share of at most 0.05 at every k up to 3
+  in both variants, with a band-width ratio of at least 1.10 at k = 3. The minimum detectable
+  effect is computed before any contrast is read, separately for each row set and group: for
+  R-inj, the sample standard deviation (12 fold-by-seed values, each seed's CRPS minus the fold's
+  three-seed mean, 8 degrees of freedom) times 1.96 times the square root of 2 divided by the
+  square root of 3. It covers seed noise only, so it is a lower bound, as in experiments 419 and
+  425. No multiplicity correction is applied to the screen. A contrast smaller than that is
+  "inside the noise".
 benchmark: >-
   R (the pooled plain mixture density network with the three origin lags, experiment 397's
   `plain_pooled` recipe at setting g09, with the Primary embedding, the ensemble mean and spread
