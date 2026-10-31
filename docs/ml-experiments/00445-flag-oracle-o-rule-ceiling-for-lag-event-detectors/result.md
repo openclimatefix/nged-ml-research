@@ -103,15 +103,16 @@ the average of the two beats both. This rules out a better detector as the way t
 of forecasts. It narrows the search to making the lagged forecast itself ignore the flagged lags,
 which is experiment O-mask.
 
-**How to read the numbers.** Every number is interim and unaudited. The score is the
-continuous ranked probability score (CRPS) in points of capacity, from 11 quantiles (smaller is
-better), pooled over five test months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06) at fit seed 0.
-A contrast is the arm minus B-mix on the same rows, so a positive number favours B-mix. Intervals
-resample whole events (95%). "Inside real events" are rows whose valid time lies inside a padded
-real event or in the 96 half-hours after it. "Real harm" rows lie outside every event but have a
-day window of recent power that touches one. The lagged head is the A0-inj network of experiment 404
-and the lagless head is its frozen cross-fitted forecast, so B-mix is exactly experiment 404's arm.
-The signed-MW six are the Primaries metered in signed megawatts, the MVA-only eight the others.
+**How to read the numbers.** Every number is interim and unaudited. The score is the continuous
+ranked probability score (CRPS) in points of capacity, from 11 quantiles (smaller is better), pooled
+over five test months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06) at fit seed 0. A contrast is the
+arm minus B-mix on the same rows, so a positive number favours B-mix. Intervals resample whole
+events (95%). "Inside real events" are rows whose valid time lies inside a padded real event or in
+the 96 half-hours after it. "Real harm" rows lie outside every event but have a day window of recent
+power that touches an event. The lagged head is the A0-inj network of experiment 404 and the lagless
+head is its frozen cross-fitted forecast (each month's lagless forecast comes from a fit that did
+not see that month), so B-mix is exactly experiment 404's arm. The signed-MW six are the Primaries
+metered in signed megawatts, and the MVA-only eight are the remaining Primaries.
 
 ![Figure 1: arm minus B-mix](figure_1_contrasts.svg)
 
@@ -126,8 +127,8 @@ The signed-MW six are the Primaries metered in signed megawatts, the MVA-only ei
 ## Headline numbers
 
 - **Arms.** O-hard, O-soft, O-lagless (the lagless head alone), and O-floor (post hoc). O-floor puts
-  weight 0.5 + (flagged lags) / 6 on the lagless head, so it equals B-mix when no lag is flagged. The
-  stored experiment 404 arms A0-inj, B1, and B3 are reference rows. B6 and S1 are not stored for
+  weight 0.5 + (flagged lags) / 6 on the lagless head, so it equals B-mix when no lag is flagged.
+  The stored experiment 404 arms A0-inj, B1, and B3 are reference rows. B6 and S1 are not stored for
   all five months, so they are not scored.
 - **Inside real events, signed-MW six, minus B-mix (20 events):** O-hard +0.465 (+0.198 to +0.644),
   and +0.374 (+0.154 to +0.592) without the largest event; O-soft +0.429 (+0.180 to +0.607);
@@ -141,25 +142,28 @@ The signed-MW six are the Primaries metered in signed megawatts, the MVA-only ei
   O-floor +0.029 (+0.010 to +0.050). B-mix scores 3.987.
 - **Clean rows:** O-hard equals A0-inj, which is 0.390 worse than B-mix on real clean rows at the
   six (3.959 against 3.569). O-floor equals B-mix exactly on clean rows (control passed).
-- **Number of flagged lags (six, pooled):** on injected harm rows with 3 flagged lags the lagged
-  head scores 4.10, the lagless head 4.03, and B-mix 3.49. Inside real events with 3 flagged lags
-  they score 9.48, 10.19, and 9.51.
-- **Every cell.** O-hard minus B-mix inside real events is positive in all 7 cells (2026-06 seeds 0
-  to 2 and the four other months): +0.21 to +0.70 at the six.
+- **Number of flagged lags (six, pooled):** on injected harm rows with three flagged lags the lagged
+  head scores 4.10, the lagless head 4.03, and B-mix 3.49. Inside real events with three flagged
+  lags the lagged head scores 9.48, the lagless head 10.19, and B-mix 9.51.
+- **Every month and seed.** O-hard minus B-mix inside real events is positive in all seven
+  month-and-seed combinations (2026-06 seeds 0 to 2 and the four other months): +0.21 to +0.70 at
+  the six.
 - **Tails, six, inside real events** (pinball loss; share of actuals below the quantile): B-mix q01
   0.600 (7.9%), q99 2.307 (71.8% below); O-hard q01 0.806 (9.0%), q99 2.794 (69.1%); O-floor q01
   0.807, q99 2.694. The upper tail is where flags hurt most: O-hard's q99 loss is 0.487 above
   B-mix's.
 - **Event counts.** `events_corrected.parquet` holds 184 corrected events: 78 at the six, 88 at the
   eight, and 18 at the report-only D15 and D18. Neighbouring events on one Primary merge into 170
-  padded runs. The five scored months overlap 49 corrected events (2, 4, 15, 10, and 18; an event
-  straddling a month boundary counts in both). The earlier brief's 112 matches none of these counts.
+  padded runs. The five scored months overlap 49 corrected events (2026-06 has 2, 2026-03 has 4,
+  2026-01 has 15, 2025-12 has 10, and 2025-10 has 18; an event straddling a month boundary counts in
+  both). A padded run is an event with 48 half-hours of padding on each side, merged with any
+  neighbouring event that the padding touches.
 - **Cadence and data.** No fit: forward passes of experiment 404's saved A0-inj networks (monthly
-  refits, cross-fitted lagless tables) on one CPU core. Cleaned power with the D15 and D18 cut as
-  in experiment 404. Copies of experiment 404's modules at PR 58 commit `1ddeab7e`
-  (`e00445_*.py`, code-identical after renaming). A0-inj and B-mix are unaffected by the later
-  commits of PR 58.
-- **Stored forecasts.** `data/ml-experiments/00445-flag-oracle-o-rule-ceiling-for-lag-event-detectors/work/predictions/<arm>/`.
+  refits, cross-fitted lagless tables) on one CPU core. Cleaned power with the D15 and D18 cut as in
+  experiment 404. Copies of experiment 404's modules at PR 58 commit `1ddeab7e` (`e00445_*.py`,
+  code-identical after renaming).
+- **Stored forecasts.**
+  `data/ml-experiments/00445-flag-oracle-o-rule-ceiling-for-lag-event-detectors/work/predictions/<arm>/`.
 
 ## Checks
 
@@ -168,34 +172,37 @@ The signed-MW six are the Primaries metered in signed megawatts, the MVA-only ei
   (-1.75 at D12 to +0.29 at D18). No Primary has a gap of more than 2.6 points (O-soft at D15).
 - **Error of the median beside each contrast.** The mean absolute error of q50 inside real events at
   the six is 9.81 for B-mix, 10.06 for A0-inj, 10.06 for O-lagless, 10.19 for O-hard, 10.17 for
-  O-soft, and 9.99 for O-floor, so the median agrees in direction with every quantile-score
-  contrast (trigger 3 did not fire).
+  O-soft, and 9.99 for O-floor, so the median agrees in direction with every quantile-score contrast
+  (trigger 3, a disagreement in direction, did not fire).
 - **Numbers review.** A fresh Sonnet agent re-derived every pooled mean, by-count mean, point
-  contrast, and identity check from the stored forecasts with its own code and found no wrong number.
-  Its own clustering gave O-floor's inside-event interval a lower endpoint of +0.02 to +0.03 against
-  -0.004 here, so O-floor's gap to B-mix inside real events is marginal. Its point estimates agreed.
-- **Triggers.** Trigger 2 fired: the result contradicts predictions P1 (O-rules beat B-mix on
-  injected harm rows: they lose by 0.29 and 0.24) and P2 (hard minus B-mix between -0.4 and +0.2
-  inside real events: it is +0.465). The explanation, tested in this experiment, is that the 50/50
-  average gains from averaging two forecasts that score alike (Figure 2) and that O-floor, which
-  keeps the average, removes most of the loss on injected rows (+0.029). Trigger 4 did not fire:
-  removing the largest event leaves every inside-event contrast positive. Triggers 1, 5, 6, and 7
-  did not fire (the control O-floor equals B-mix on clean rows). P3 held: O-hard equals A0-inj on
-  clean rows.
+  contrast, and identity check from the stored forecasts with its own code and found no wrong
+  number. The reviewer's own clustering gave O-floor's inside-event interval a lower endpoint of
+  +0.02 to +0.03 against -0.004 here, so O-floor's gap to B-mix inside real events is marginal. The
+  reviewer's point estimates agreed.
+- **Triggers.** Trigger 2 (a result contradicts its own prediction) fired: the result contradicts
+  predictions P1 (O-rules beat B-mix on injected harm rows: they lose by 0.29 and 0.24) and P2 (hard
+  minus B-mix between -0.4 and +0.2 inside real events: it is +0.465). The explanation, tested in
+  this experiment, is that the 50/50 average gains from averaging two forecasts that score alike
+  (Figure 2). O-floor keeps the average and removes most of the loss on injected rows (+0.029).
+  Trigger 4 (leaving out one site or event flips a verdict) did not fire: removing the largest event
+  leaves every inside-event contrast positive. Triggers 1, 5, 6, and 7 (a failed control, a nested
+  arm beating its container, an interval twice or half as wide as a sister experiment's, and an
+  unreplicated headline that a later experiment depends on) did not fire; the control O-floor equals
+  B-mix on clean rows. P3 held: O-hard equals A0-inj on clean rows.
 
 ## Caveats
 
 - **Interim.** One fit seed per month, five months, 20 events at the six. 2026-06 seeds 1 and 2 give
   the same sign (+0.34 and +0.28 for O-hard inside real events), scored separately.
-- **Unlogged events.** NGED says load-shift events may be missing from their logs. Clean rows can
-  therefore hold unlogged events, a harm table measured on clean rows is optimistic, and real-event
-  slices undercount.
+- **Unlogged events.** NGED (the electricity distribution network operator that supplies the data)
+  says load-shift events may be missing from their logs. Clean rows can therefore hold unlogged
+  events, a harm table measured on clean rows is optimistic, and real-event slices undercount.
 - **Flags are exact only on the simulated worlds.** On real data the flag is the padded
   hand-labelled event, so labels that miss an event, or rows inside an event whose actuals are not
   the normal running arrangement, would make the real-event result worse than the oracle name
   suggests.
-- **Avoidable-curtailment cost not computed.** The measure needs node and generator forecasts that
-  experiment 404 does not store.
+- **Avoidable-curtailment cost not computed.** The measure needs forecasts for each grid supply node
+  and its generators, which experiment 404 does not store.
 - **O-floor is post hoc.** Its weights were chosen after the first scores. Its rows, rule, and
   intervals were not tuned on the scored rows.
 
@@ -204,37 +211,40 @@ The signed-MW six are the Primaries metered in signed megawatts, the MVA-only ei
 - **Run O-mask.** Train S1 and score it with each flagged lag replaced by "missing". If the lagged
   head improves inside events once it cannot see the flagged lags, the gain comes from the head and
   not from a switch.
-- **Make the lagless head better inside events.** Inside real events with 3 flagged lags the
+- **Make the lagless head better inside events.** Inside real events with three flagged lags the
   lagless head is 0.71 points worse than the lagged head, so the lagless forecast also misses the
   events.
 
 ## Addendum: ensembling control (pre-registered 2026-10-31, before any ensemble score was read)
 
-Question: is B-mix's edge over a single head an ensembling gain (averaging two forecasts) or a
-gain from combining a lagged and a lagless forecast? No new fits; forward passes of experiment
-404's saved A0-inj networks and its stored lagless tables, and stored S1 forecasts.
+Question: is B-mix's edge over a single head an ensembling gain (averaging two forecasts) or a gain
+from combining a lagged and a lagless forecast? No new fits; forward passes of experiment 404's
+saved A0-inj networks and its stored lagless tables, and stored S1 forecasts.
 
 - **Arms.** Equal-weight density mixtures of two lagged heads (A0-inj seeds i and j, the 404
   equivalent of R-inj); of two lagless heads (tables of seeds i and j); a 3-way mixture of lagged
   heads (seeds 0 to 2), a 3-way and a 5-way mixture of lagless heads (seeds 0 to 2 and 0 to 4); and
-  the stored S1 seeds i and j mixed from their stored quantiles (approximate, validated against
-  the exact mixture of A0-inj and the lagless head before use). Reference rows: B-mix (A0-inj seed
-  i with the lagless table of seed i), each single head, and the post hoc O-floor rule.
+  the stored S1 seeds i and j mixed from their stored quantiles (approximate, validated against the
+  exact mixture of A0-inj and the lagless head before use). Reference rows: B-mix (A0-inj seed i
+  with the lagless table of seed i), each single head, and the post hoc O-floor rule.
 - **Cells.** Lagged-head ensembles and S1 ensembles exist only for 2026-06, where 3 seeds are
   stored. Lagless-head ensembles exist for all 5 months (6 table seeds each). Other months have one
   lagged seed, so only B-mix and the lagless ensembles are scored there.
 - **Rows.** The tables of this page: clean, injected harm, real harm, inside real events, signed-MW
   six and MVA-only eight, with and without the largest event.
 - **Reading rule.** Let G_B be the single lagged head's score minus B-mix's, and G_E the single
-  lagged head's score minus the lagged-plus-lagged mixture's, both averaged over the 3 seeds
-  (pairs for G_E), on real clean rows at the six in 2026-06. If G_E / G_B is at least 0.5, B-mix
-  beats single heads mostly through ensembling, and the next step is to compare every trust arm
-  with a seed-matched ensemble of its base. If it is at most 0.25, the lagged and lagless
-  diversity does the work. Between those values the result is mixed and reported as such.
-  Inside real events the same ratio is reported as a second reading.
+  lagged head's score minus the lagged-plus-lagged mixture's, both averaged over the 3 seeds (pairs
+  for G_E), on real clean rows at the six in 2026-06. If G_E / G_B is at least 0.5, B-mix beats
+  single heads mostly through ensembling, and the next step is to compare every trust arm with a
+  seed-matched ensemble of its base. If it is at most 0.25, the lagged and lagless diversity does
+  the work. Between those values the result is mixed and reported as such. Inside real events the
+  same ratio is reported as a second reading.
 
 ## Reuse and credit
 
 The lagged head, lagless table, row classes, scoring, and event-cluster bootstrap come from
-experiment 404 (PR 58, copied as `e00445_*.py`). The row classes and flag construction follow
-experiment 428, and the flag oracle idea follows experiment 402.
+[experiment 404](https://github.com/openclimatefix/nged-ml-research/pull/58) (copied as
+`e00445_*.py`). The row classes and flag construction follow [experiment
+428](../00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/result.md), and
+the flag oracle idea follows [experiment
+402](../00402-lag-gate-learned-weight-injected-load-shifts-part-1/result.md).
