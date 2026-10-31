@@ -151,6 +151,8 @@ def main() -> None:
         nargs="+",
         default=[a.name for a in predict422.TEST_ARMS if a.name != "FRESH"],
     )
+    parser.add_argument("--tag", default="")
+    parser.add_argument("--no-old", action="store_true")
     args = parser.parse_args()
     series = adapter.series_table()
     ctx = s381.build_context(series=series)
@@ -173,7 +175,7 @@ def main() -> None:
         return cache[source, test_arm]
 
     records: list[dict] = []
-    for source in [*args.train_arms, *OLD_REFERENCES]:
+    for source in [*args.train_arms, *([] if args.no_old else OLD_REFERENCES)]:
         for test_arm in args.test_arms:
             try:
                 trt = get(source, test_arm)
@@ -209,7 +211,7 @@ def main() -> None:
             ]
             print(f"C2/C3 {source} {test_arm}", flush=True)
     out = pl.DataFrame(records)
-    target = predict422.OUT_DIR / "scores" / "contrasts.parquet"
+    target = predict422.OUT_DIR / "scores" / f"contrasts{args.tag}.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
     out.write_parquet(target)
     with pl.Config(tbl_rows=400, tbl_cols=12, tbl_width_chars=220):
