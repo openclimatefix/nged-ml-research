@@ -69,7 +69,7 @@ def attach_masks(*, rows: pl.DataFrame, masks: pl.DataFrame) -> pl.DataFrame:
     Returns:
         The rows with the `MASK_NAMES` columns, `fold`, `local_date`, and `block` (a 7-day label).
     """
-    joined = rows.join(
+    joined = rows.drop([m for m in masks_module.MASK_NAMES if m in rows.columns]).join(
         masks.select(
             "label", "power_fcst_init_time", "valid_time", "local_date", *masks_module.MASK_NAMES
         ),
@@ -78,6 +78,10 @@ def attach_masks(*, rows: pl.DataFrame, masks: pl.DataFrame) -> pl.DataFrame:
         validate="m:1",
         maintain_order="left",
     )
+    unmasked = joined.filter(pl.col(HEADLINE) & pl.col("local_date").is_null()).height
+    if unmasked:
+        msg = f"{unmasked} headline-band rows have no mask row"
+        raise ValueError(msg)
     first_day = joined["local_date"].min()
     return joined.with_columns(
         *[pl.col(m).fill_null(False) for m in masks_module.MASK_NAMES],
@@ -587,8 +591,7 @@ def gate_against_437(*, paired_by_arm: dict[str, pl.DataFrame]) -> None:
         here = []
         for group in (SIX, EIGHT):
             part = frame.filter(cell_filter(mask=None, group=group, outside=False))
-            per_primary = part.group_by("label").agg(pl.col("d_crps").mean())
-            here.append(round(float(cast("float", per_primary["d_crps"].mean())), 3))
+            here.append(round(float(cast("float", part["d_crps"].mean())), 3))
         print(f"{arm:9s} here {tuple(here)}  published {published[arm]}")
 
 

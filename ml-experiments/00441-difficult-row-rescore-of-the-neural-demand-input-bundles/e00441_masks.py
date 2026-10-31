@@ -21,7 +21,7 @@ origin, and valid time. The masks are:
   when the day before or after in the same run is also at or above it.
 
 A local day counts as complete when the run holds at least 46 of its half-hours, so the origin day
-(30 half-hours) and the last day of a run (1 half-hour) never enter a daily statistic. The mask
+(28 half-hours) and the last day of a run (20 half-hours) never enter a daily statistic. The mask
 table covers the lead band (0, 240] hours, the protocol's headline band, for the origins of the four
 screen folds of experiment 437.
 
@@ -136,6 +136,9 @@ def site_rows(*, site: str, latitude: float, longitude: float) -> pl.DataFrame:
         temperature=pl.col("diag_temperature").cast(pl.Float64),
         csi=pl.col("diag_csi").cast(pl.Float64),
     )
+    if table["temperature"].is_nan().any() or table["temperature"].is_null().any():
+        msg = f"{site}: the ENS temperature holds a NaN or null"
+        raise ValueError(msg)
     stamps = table.select("valid_time").unique().sort("valid_time")
     zenith = solar.zenith(
         stamps=stamps["valid_time"].dt.offset_by("-15m"), latitude=latitude, longitude=longitude

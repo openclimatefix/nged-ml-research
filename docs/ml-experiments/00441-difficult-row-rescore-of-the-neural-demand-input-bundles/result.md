@@ -46,7 +46,7 @@ decision_rule: >-
   cell is descriptive. The tests the counts allow were fixed after reading the row and day counts
   and before reading any score: a slice with fewer than 20 distinct valid dates in a group is
   descriptive only, which leaves cold sunny days at the eight (19 dates), cold overcast days (6),
-  Christmas (9), other bank holidays (4, one fold), and heat waves (none, because no fold holds a
+  Christmas (10), other bank holidays (4, one fold), and heat waves (none, because no fold holds a
   summer month) descriptive. An arm advances to a focused follow-up at a group if, on its primary
   slice, (1) the CRPS difference is at most -0.05, (2) the month-block bootstrap interval (resampling
   whole origin months, 20,000 resamples, level 99.5%) lies wholly below zero, (3) the difference is
@@ -115,7 +115,7 @@ slices of difficult rows.
   | Cold winter nights | 11,793 rows, 21 days | 16,958 rows, 28 days | 3 (2025-12, 2026-01, 2026-03) |
   | Cold sunny days | 7,005 rows, 24 days | 8,340 rows, 19 days | 3 |
   | Cold overcast days | 971 rows, 6 days | 1,011 rows, 5 days | 1 (2026-01) |
-  | Christmas | 20,736 rows, 9 days | 27,648 rows, 9 days | 2 |
+  | Christmas | 23,040 rows, 10 days | 30,720 rows, 10 days | 2 |
   | Other bank holidays | 5,664 rows, 4 days | 7,552 rows, 4 days | 1 (2026-03) |
   | Heat-wave days | 0 | 0 | 0 |
 
@@ -136,13 +136,13 @@ slices of difficult rows.
 - **Figures.** Per slice, a gain-with-interval chart for every arm; example winter-night week of
   forecast, actual, control, and best arm; the sunny-minus-overcast gap of S and S_pre; a day-ahead
   and a 14-day example forecast.
-- **Reviews.** Draft pull request; fresh Sonnet code review before the arms are scored; results
+- **Reviews.** Draft pull request; fresh Sonnet code review before the arms are scored (it found that the protocol's own `christmas` column overrode the registered mask, now fixed, which moved the Christmas count from 9 to 10 dates; the six tested cells were unaffected); results
   review with the audit triggers; write-up; prose review.
 
 ## Caveats registered before scoring
 
 - **The folds hold no summer month,** so heat waves cannot be scored at all.
-- **Christmas, other bank holidays, and cold overcast days have under 10 dates and one or two
+- **Christmas, other bank holidays, and cold overcast days have 10 dates or fewer and one or two
   folds,** so they are descriptive.
 - **Winter nights come mostly from two folds** (2025-12 and 2026-01), with 3 dates in 2026-03.
 - **The first fold's percentile window is 18 months,** not 24, because ENS runs are stored from
