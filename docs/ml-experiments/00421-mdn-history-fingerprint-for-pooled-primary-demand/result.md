@@ -159,8 +159,8 @@ embedding.
 **The probe.** After each fit of NH, EH, and NH0, a linear softmax classifier is trained on the
 frozen 32-wide encoder output of every training origin to predict the Primary (16 classes) and the
 month of the year (12 classes), and scored on the held-out early-stopping weeks (purged exactly as
-in experiment 397, so no probe row sits within 14 days before or 7 days after a held-out week). It
-is also scored on the origins of the test month for the Primary label. Reference probes use (a) the
+in experiment 397, so no probe row sits within 14 days before or 7 days after a held-out week).
+Reference probes use (a) the
 three origin lags with their missing flags, (b) the raw 336-value history, and (c) the encoder at
 random initialisation. A chance level is printed beside each accuracy.
 
@@ -238,8 +238,8 @@ and
   `manual_heuristic`, and `climatology`, per group and per Primary.
 - The median forecast minus the mean forecast per Primary, the error of the mean forecast beside
   every quantile-score contrast, and which audit triggers fired.
-- The probe accuracies with chance levels, a confusion table of the Primaries the probe confuses,
-  and the share of origins whose history has a gap.
+- The probe accuracies with chance levels (1 in 16 for the Primary, 3 in 12 for a month within
+  one), run for NH, EH, and NH0 only.
 - Example forecasts: one day-ahead forecast and one 14-day forecast for one signed-MW Primary and
   one MVA-only Primary, from NH and from E3g.
 - **Unlogged load-shift events.** NGED says load-shift events may be missing from its logs. The

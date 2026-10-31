@@ -1,14 +1,11 @@
 # ruff: noqa: E501
 """Score the history-fingerprint arms of experiment 421.
 
-Reads the per-seed forecasts that `e00406_fit.py` wrote (and, for the contrasts against the uncut
-forecasts, experiment 397's), averages the seeds in quantile space, restricts every arm to the
-half-hours all arms share, and prints:
-
-- the absolute CRPS at days 1 to 10 per group, per arm, at every history length;
-- the contrasts of `PLAN` (month-block bootstrap of `studies.eval_protocol`, 95%, 20,000 resamples);
-- how the pooled gain over the per-Primary network varies with the history length, per group and
-  per Primary.
+Reads the per-seed forecasts that `e00421_fit.py` wrote and experiment 406's `pooled_emb` and
+`pooled_noemb`, averages the seeds in quantile space, restricts every arm to the half-hours all arms
+share, and prints the absolute CRPS per group, the planned contrasts (month-block bootstrap of
+`studies.eval_protocol`, Bonferroni level, 20,000 resamples), the probe accuracies, and the
+held-out-Primary stage.
 
 ```bash
 PYTHONPATH=ml-experiments/00377-demand-v1-first-run-feasibility:\
@@ -75,8 +72,8 @@ PLAN: Final[dict[str, tuple[str, str]]] = {
 }
 HELD_OUT_PLAN: Final[dict[str, tuple[str, str]]] = {
     "C7 NH minus E3g (mean embedding)": ("NH_ho", "E3g_ho"),
-    "C7 NH minus E3g (metering-group mean embedding)": ("NH_ho", "E3g_ho_gm"),
-    "C7 NH minus EH (mean embedding)": ("NH_ho", "EH_ho"),
+    "descriptive: NH minus E3g (metering-group mean embedding)": ("NH_ho", "E3g_ho_gm"),
+    "descriptive: NH minus EH (mean embedding)": ("NH_ho", "EH_ho"),
     "C8 NH minus N3g": ("NH_ho", "N3g_ho"),
 }
 OUT_DIR: Final[Path] = ROOT_421
@@ -148,7 +145,7 @@ def contrast(*, name: str, rows: dict, table: pl.DataFrame, pair: tuple[str, str
 
 def print_probes() -> None:
     """Print the mean probe accuracies of each encoder arm over folds and seeds."""
-    for arm in ("NH", "NHs", "EH", "NH0"):
+    for arm in ("NH", "EH", "NH0"):
         records = [
             json.loads(f.read_text())["probe"]
             for f in sorted((ROOT_421 / "work/info" / arm).glob("*.json"))

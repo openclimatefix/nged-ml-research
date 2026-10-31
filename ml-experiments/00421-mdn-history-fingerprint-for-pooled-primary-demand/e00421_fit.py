@@ -88,7 +88,7 @@ ARMS: Final[dict[str, Arm]] = {
         Arm("NH0", embedding=False, history=True, lags=False),
     )
 }
-"""The five new arms; experiment 406's `pooled_emb` is the stored U0."""
+"""The six new arms; experiment 406's `pooled_emb` is the stored E406."""
 
 
 def available_gb() -> float:
@@ -443,7 +443,16 @@ def probe(
     first_day = max(0, last_day - prep.WINDOW_DAYS)
     days = np.arange(first_day, last_day)
     seen = fold.seen
-    pairs = np.array([(p, d) for p in seen for d in days])
+    sites = prep.primaries()["site"].to_list()
+    cut_day = (fit406.CUT - prep.FIRST_RUN).days + models.HISTORY_STEPS // 48
+    pairs = np.array(
+        [
+            (p, d)
+            for p in seen
+            for d in days
+            if sites[int(p)] not in fit406.SHORT_HISTORY or d >= cut_day
+        ]
+    )
     primary_of = pairs[:, 0]
     day_of = pairs[:, 1]
     month = np.array(
@@ -556,7 +565,10 @@ def run(
             tag = tag_of(arm=arm_name, group=group)
             for seed in seeds:
                 target = OUT_DIR / "seed_preds" / tag / f"{month}_s{seed}.parquet"
-                if target.exists():
+                info_path = OUT_DIR / "info" / tag / f"{month}_s{seed}.json"
+                alt_path = OUT_DIR / "seed_preds" / f"{tag}_gm" / f"{month}_s{seed}.parquet"
+                needs_alt = group is not None and arm.embedding
+                if info_path.exists() and (alt_path.exists() or not needs_alt):
                     continue
                 if available_gb() <= MIN_AVAILABLE_GB:
                     print(f"stop line: {available_gb():.1f} GB available", flush=True)
@@ -569,6 +581,7 @@ def run(
                     if left_out:
                         names = prep.primaries()["site"].to_list()
                         print("left out:", [names[p] for p in sorted(left_out)], flush=True)
+                torch.manual_seed(seed)
                 model = make_network(
                     arm=arm, n_inputs=fold.x.shape[1], n_primaries=len(prep.primaries())
                 ).to(device)
@@ -600,8 +613,7 @@ def run(
                         score_primaries=score_set,
                         device=device,
                     )
-                    alt = OUT_DIR / "seed_preds" / f"{tag}_gm" / f"{month}_s{seed}.parquet"
-                    common.atomic_write(frame=q2, target=alt)
+                    common.atomic_write(frame=q2, target=alt_path)
                 info: dict[str, object] = {
                     "epochs": epochs,
                     "val_nll": val,
@@ -610,13 +622,12 @@ def run(
                     "scale_mean": fold.scale_mean,
                     "scale_std": fold.scale_std,
                 }
-                if arm.history and group is None:
+                if arm.history and not arm.shuffled and group is None:
                     info["probe"] = probe(
                         model=model, fold=fold, arm=arm, refit=refit, device=device, table=table
                     )
-                probe_path = OUT_DIR / "info" / tag / f"{month}_s{seed}.json"
-                probe_path.parent.mkdir(parents=True, exist_ok=True)
-                probe_path.write_text(json.dumps(info))
+                info_path.parent.mkdir(parents=True, exist_ok=True)
+                info_path.write_text(json.dumps(info))
                 print(
                     f"{tag} {month} seed {seed}: {info['seconds']:.0f} s, {epochs} epochs, "
                     f"peak GPU {peak:.1f} GB",
@@ -639,8 +650,10 @@ def check_alignment() -> None:
         same = np.isnan(last) == np.isnan(lag)
         both = ~np.isnan(last) & ~np.isnan(lag)
         close = np.isclose(last[both], lag[both], atol=1e-4)
-        keep_all_short = row["site"] in fit406.SHORT_HISTORY
-        if not same.all() and not keep_all_short:
+        if row["site"] in fit406.SHORT_HISTORY:
+            after_cut = z["valid"][ok] >= fit406._us(t=fit406.CUT) + 8 * fit406.US_PER_DAY
+            same = same | ~after_cut
+        if not same.all():
             msg = f"{row['site']}: missing flags differ from lag_origin on {(~same).sum()} rows"
             raise AssertionError(msg)
         if not close.all():
@@ -659,10 +672,12 @@ def main() -> None:
     f = sub.add_parser("fit")
     f.add_argument("--arms", nargs="+", choices=list(ARMS), default=list(ARMS))
     f.add_argument("--held-out-group", type=int, default=None, choices=range(N_GROUPS))
-    f.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
+    f.add_argument("--seeds", nargs="+", type=int, default=None)
     f.add_argument("--months", nargs="+", default=list(prep.SCREEN_MONTHS))
     f.add_argument("--device", default="cuda")
     args = parser.parse_args()
+    if args.command == "fit" and args.seeds is None:
+        args.seeds = [0, 1] if args.held_out_group is not None else [0, 1, 2]
     if args.command == "check":
         check_alignment()
     elif args.command == "history":
