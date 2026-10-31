@@ -179,7 +179,13 @@ def figure_examples(*, month: str, site: str) -> None:
             scale=alt.Scale(domain=arms, range=colours),
             legend=alt.Legend(title=None, orient="top"),
         )
-        x = alt.X("time:T", title="Valid time (UTC)", axis=alt.Axis(format="%a %d %b %H:%M" if name == "day_ahead" else "%a %d %b", labelOverlap=True))
+        x = alt.X(
+            "time:T",
+            title="Valid time (UTC)",
+            axis=alt.Axis(
+                format="%a %d %b %H:%M" if name == "day_ahead" else "%a %d %b", labelOverlap=True
+            ),
+        )
         pdata = d.to_pandas()
         band = (
             alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
@@ -282,7 +288,12 @@ def figure_events() -> None:
             scale=alt.Scale(domain=arms, range=colours),
             legend=alt.Legend(title=None, orient="top") if i == 1 else None,
         )
-        x = alt.X("time:T", title=None, scale=alt.Scale(domain=[t0, t1]), axis=alt.Axis(format="%a %d %b", labelOverlap=True, tickCount="day"))
+        x = alt.X(
+            "time:T",
+            title=None,
+            scale=alt.Scale(domain=[t0, t1]),
+            axis=alt.Axis(format="%a %d %b", labelOverlap=True, tickCount="day"),
+        )
         pdata = d.to_pandas()
         shade = (
             alt.Chart(  # ty: ignore[unresolved-attribute]
