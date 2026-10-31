@@ -262,7 +262,7 @@ def by_count() -> None:
             del counts_frame
         parts.append(full.select("crps").rename({"crps": arm}))
     ref = pl.concat(
-        [
+        [  # ty: ignore[invalid-argument-type]
             load_cell(arm="O-hard", month=m, seed=s, worlds=worlds, cell=i)  # ty: ignore[invalid-argument-type]
             for i, (m, s) in enumerate(cells)
         ],

@@ -124,7 +124,7 @@ def figure_by_count() -> None:
         legend=alt.Legend(title=None, orient="top"),
     )
     chart = (
-        alt.Chart(long.to_pandas())
+        alt.Chart(long.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X(
@@ -182,13 +182,13 @@ def figure_examples(*, site: str) -> None:
                 x=x, y=alt.Y("q05:Q", title="Power (points of capacity)", scale=alt.Scale(zero=False)), y2="q95:Q"
             )  # fmt: skip
             inner = (
-                alt.Chart(pdata)
+                alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
                 .mark_area(opacity=0.3, color=BLUE)
                 .encode(x=x, y="q25:Q", y2="q75:Q")
             )  # ty: ignore[unresolved-attribute]
             median = alt.Chart(pdata).mark_line(color=BLUE).encode(x=x, y="q50:Q")  # ty: ignore[unresolved-attribute]
             truth = (
-                alt.Chart(pdata)
+                alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
                 .mark_line(color="#333", strokeDash=[2, 2])
                 .encode(x=x, y="actual:Q")
             )  # ty: ignore[unresolved-attribute]
@@ -293,13 +293,13 @@ def figure_events() -> None:
             legend=alt.Legend(title=None, orient="top") if i == 1 else None,
         )
         shade = (
-            alt.Chart(pl.DataFrame({"a": [lo], "b": [hi]}).to_pandas())
+            alt.Chart(pl.DataFrame({"a": [lo], "b": [hi]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rect(opacity=0.12, color="#888")
             .encode(x="a:T", x2="b:T")
         )  # ty: ignore[unresolved-attribute]
         mix = d.filter(pl.col("arm") == "B-mix").to_pandas()
         band = (
-            alt.Chart(mix)
+            alt.Chart(mix)  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.12, color=GREEN)
             .encode(
                 x=x,
