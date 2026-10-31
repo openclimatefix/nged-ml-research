@@ -30,6 +30,9 @@ WINDOWS: Final[dict[str, int]] = {"3h": 6, "24h": 48}
 N_BOOT: Final[int] = 2000
 MAX_PER_CLASS_YEAR: Final[int] = 3000
 SEED: Final[int] = 431
+LEVEL_BIN: Final[float] = 0.005
+LEVEL_PREFIXES: Final[tuple[str, ...]] = ("zero_share_", "amp_")
+LEVEL_NAMES: Final[tuple[str, ...]] = ("is_zero",)
 DAY_HOURS: Final[tuple[int, int]] = (8, 17)
 FEATURE_PREFIXES: Final[tuple[str, ...]] = (
     "sd_diff_",
@@ -46,7 +49,9 @@ def add_features(*, frame: pl.DataFrame, idle_p95: dict[str, float]) -> pl.DataF
     Rolling windows never cross a gap of more than 30 minutes: each unbroken stretch is a segment.
     """
     frame = frame.sort("site", "valid_time").with_columns(
-        gap=pl.col("valid_time").diff().over("site") != pl.duration(minutes=30)
+        gap=(pl.col("valid_time").diff().over("site") != pl.duration(minutes=30)).fill_null(
+            value=True
+        )
     )
     frame = frame.with_columns(seg=pl.col("gap").cum_sum().over("site"))
     by = ["site", "seg"]
@@ -57,8 +62,6 @@ def add_features(*, frame: pl.DataFrame, idle_p95: dict[str, float]) -> pl.DataF
     ).with_columns(
         is_zero=(pl.col("power") == 0).cast(pl.Float64),
         is_repeat=(pl.col("d") == 0).cast(pl.Float64),
-        d1=pl.col("d").shift(1).over(by),
-        d2=pl.col("d").shift(2).over(by),
         amp_idle_p95=pl.col("power").abs() / p95,
         amp_capacity=pl.col("power").abs() / pl.col("capacity_mw"),
     )
@@ -67,14 +70,30 @@ def add_features(*, frame: pl.DataFrame, idle_p95: dict[str, float]) -> pl.DataF
         for mode, centre in (("trail", False), ("centre", True)):
             tag = f"{label}_{mode}"
             kw: dict[str, Any] = {"window_size": size, "min_samples": size // 2, "center": centre}
+
             exprs += [
                 pl.col("d").rolling_std(**kw).over(by).alias(f"sd_diff_{tag}"),
-                pl.rolling_corr("d", "d1", **kw).over(by).alias(f"ac1_{tag}"),
-                pl.rolling_corr("d", "d2", **kw).over(by).alias(f"ac2_{tag}"),
+                _windowed_corr(lag=1, size=size, centre=centre).alias(f"ac1_{tag}"),
+                _windowed_corr(lag=2, size=size, centre=centre).alias(f"ac2_{tag}"),
                 pl.col("is_zero").rolling_mean(**kw).over(by).alias(f"zero_share_{tag}"),
                 pl.col("is_repeat").rolling_mean(**kw).over(by).alias(f"repeat_share_{tag}"),
             ]
     return frame.with_columns(exprs)
+
+
+def _windowed_corr(*, lag: int, size: int, centre: bool) -> pl.Expr:
+    """Correlation of the first difference with itself `lag` steps earlier, within a segment.
+
+    `pl.rolling_corr` has no `center` argument, so a centred window is the trailing window shifted
+    back by half its width. A constant window (all zeros, all repeats) has an undefined correlation
+    and counts as 0, so the most idle-like stretches are scored and not dropped.
+    """
+    by = ["site", "seg"]
+    lagged = pl.col("d").shift(lag).over(by)
+    corr = pl.rolling_corr(pl.col("d"), lagged, window_size=size, min_samples=size // 2).over(by)
+    if centre:
+        corr = corr.shift(-(size // 2)).over(by)
+    return corr.fill_nan(0.0)
 
 
 def auc(*, score: np.ndarray, label: np.ndarray) -> float:
@@ -112,15 +131,39 @@ def sure_sets(*, frame: pl.DataFrame, bands: dict[str, tuple[float, float]]) -> 
     )
 
 
+def stratified_auc(*, score: np.ndarray, label: np.ndarray, level: np.ndarray) -> float:
+    """Return the AUC within bins of `level`, averaged with weight (idle count x generating count).
+
+    Bins hold power as a share of capacity, so a statistic that only reads the power level scores
+    0.5. A bin with only one class adds nothing; the result is NaN when no bin holds both classes.
+    """
+    bins = np.floor(level / LEVEL_BIN).astype(int)
+    total = 0.0
+    weight = 0.0
+    for b in np.unique(bins):
+        sel = bins == b
+        n_pos = int(label[sel].sum())
+        n_neg = int(sel.sum()) - n_pos
+        if n_pos == 0 or n_neg == 0:
+            continue
+        total += auc(score=score[sel], label=label[sel]) * n_pos * n_neg
+        weight += n_pos * n_neg
+    return total / weight if weight else float("nan")
+
+
 def auc_table(*, sure: pl.DataFrame, features: list[str]) -> pl.DataFrame:
-    """Return the folded AUC and its year-block bootstrap interval, per farm and statistic."""
+    """Return the AUC of each statistic, raw and level-matched, with year-block bootstrap intervals.
+
+    The sign of each statistic is fixed once on the full sample (the larger of AUC and 1 - AUC), and
+    the bootstrap resamples the signed AUC, so the intervals can fall below 0.5.
+    """
     rng = np.random.default_rng(SEED)
     rows = []
     for site in SITES:
         sub = sure.filter((pl.col("site") == site) & pl.col("sure").is_not_null()).with_columns(
-            year=pl.col("valid_time").dt.year()
+            year=pl.col("valid_time").dt.year(), level=pl.col("power") / pl.col("capacity_mw")
         )
-        # Cap each class-year so the bootstrap stays fast; the cap is seeded and recorded.
+        # Cap each class-year so the bootstrap stays fast; the cap is seeded.
         parts = [
             grp.sample(MAX_PER_CLASS_YEAR, seed=SEED) if grp.height > MAX_PER_CLASS_YEAR else grp
             for _, grp in sub.group_by("sure", "year")
@@ -133,29 +176,58 @@ def auc_table(*, sure: pl.DataFrame, features: list[str]) -> pl.DataFrame:
                 y: (
                     g[feat].fill_null(np.nan).to_numpy().astype(float),
                     (g["sure"] == "idle").to_numpy().astype(int),
+                    g["level"].to_numpy().astype(float),
                 )
                 for y, g in by_year.items()
             }
 
-            def stat(ys: list[int], feat_data: dict = data) -> float:
+            def pooled(ys: list[int], feat_data: dict = data) -> tuple[np.ndarray, ...]:
                 score = np.concatenate([feat_data[y][0] for y in ys])
                 label = np.concatenate([feat_data[y][1] for y in ys])
+                level = np.concatenate([feat_data[y][2] for y in ys])
                 ok = np.isfinite(score)
-                return folded(value=auc(score=score[ok], label=label[ok]))
+                return score[ok], label[ok], level[ok]
+
+            score, label, _ = pooled(years)
+            raw_point = auc(score=score, label=label)
+            sign = 1.0 if not np.isfinite(raw_point) or raw_point >= 0.5 else -1.0
+
+            def signed(ys: list[int], sgn: float = sign, pool: Any = pooled) -> tuple[float, float]:
+                sc, lb, lv = pool(ys)
+                raw = auc(score=sgn * sc, label=lb)
+                matched = stratified_auc(score=sgn * sc, label=lb, level=lv)
+                return raw, matched
 
             boots = np.array(
-                [stat(list(rng.choice(years, size=len(years)))) for _ in range(N_BOOT)]
+                [signed(list(rng.choice(years, size=len(years)))) for _ in range(N_BOOT)]
             )
-            boots = boots[np.isfinite(boots)]
+            point_raw, point_matched = signed(years)
+
+            def interval(column: np.ndarray) -> tuple[float, float]:
+                finite = column[np.isfinite(column)]
+                if not len(finite):
+                    return float("nan"), float("nan")
+                return float(np.quantile(finite, 0.025)), float(np.quantile(finite, 0.975))
+
+            raw_lo, raw_hi = interval(boots[:, 0])
+            m_lo, m_hi = interval(boots[:, 1])
             rows.append(
                 {
                     "site": site,
                     "statistic": feat,
-                    "auc": stat(years),
-                    "lo": float(np.quantile(boots, 0.025)) if len(boots) else np.nan,
-                    "hi": float(np.quantile(boots, 0.975)) if len(boots) else np.nan,
-                    "n_idle": int(sum(v[1].sum() for v in data.values())),
-                    "n_gen": int(sum((1 - v[1]).sum() for v in data.values())),
+                    "gate_statistic": not feat.startswith(LEVEL_PREFIXES)
+                    and feat not in LEVEL_NAMES,
+                    "sign": sign,
+                    "auc_raw": point_raw,
+                    "raw_lo": raw_lo,
+                    "raw_hi": raw_hi,
+                    "auc_level_matched": point_matched,
+                    "matched_lo": m_lo,
+                    "matched_hi": m_hi,
+                    # Rows actually scored (finite statistic), not rows before the filter.
+                    "n_idle": int(label.sum()),
+                    "n_gen": int(len(label) - label.sum()),
+                    "dropped_share": 1.0 - len(label) / sum(len(v[1]) for v in data.values()),
                 }
             )
     return pl.DataFrame(rows)
@@ -307,9 +379,13 @@ def main() -> None:
     )
     sets.write_parquet(OUT_DIR / "sure_set_sizes.parquet")
     auc_table(sure=frame, features=features).write_parquet(OUT_DIR / "auc.parquet")
-    hi = high_wind_idle(frame=frame, cut_in=cut_in)
-    hi.write_parquet(OUT_DIR / "high_wind_idle.parquet")
-    maintenance_ratio(hi=hi).write_parquet(OUT_DIR / "maintenance_ratio.parquet")
+    empirical = {s: float(report[s]["cut_in_empirical"]) for s in SITES}
+    ratios = []
+    for kind, speeds in (("used (pre-registered)", cut_in), ("empirical (sensitivity)", empirical)):
+        hi = high_wind_idle(frame=frame, cut_in=speeds)
+        hi.write_parquet(OUT_DIR / f"high_wind_idle_{kind.split()[0]}.parquet")
+        ratios.append(maintenance_ratio(hi=hi).with_columns(cut_in=pl.lit(kind)))
+    pl.concat(ratios).write_parquet(OUT_DIR / "maintenance_ratio.parquet")
     floor_by_year(frame=frame).write_parquet(OUT_DIR / "floor_by_year.parquet")
     farm_b_negatives_by_hour(frame=frame).write_parquet(
         OUT_DIR / "farm_b_negatives_by_hour.parquet"
@@ -322,13 +398,14 @@ def main() -> None:
             zero=pl.col("is_zero").mean(),
             repeat=pl.col("is_repeat").mean(),
             # Quantisation step: smallest non-zero absolute first difference.
-            step=pl.col("d").abs().filter(pl.col("d").abs() > 0).min(),
+            step_share_of_capacity=(pl.col("d").abs() / pl.col("capacity_mw"))
+            .filter(pl.col("d").abs() > 0)
+            .min(),
             sd24=pl.col("sd_diff_24h_centre").median(),
         )
         .sort("site", "sure")
     )
     texture.write_parquet(OUT_DIR / "texture_by_set.parquet")
-    print(texture)
 
 
 if __name__ == "__main__":

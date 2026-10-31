@@ -38,7 +38,19 @@ decision_rule: >-
   is inside the idle band, "weekday daytime" is Monday to Friday 08:00 to 17:59 UTC, and "weekend or
   night" is all other hours. Keep the whole-farm outage class I2 and the weekday covariate if the
   ratio of the two idle shares is at least 1.5 at any farm (interval reported); otherwise merge I2
-  into "unexplained outage". The two sure sets are defined by the same wind speed as the 210 mask,
+  into "unexplained outage".
+  Amendment before any number was read (code review): the sure-generating set has power of at
+  least 3% of capacity and the sure-idle set sits inside the idle band, so the level of power alone
+  separates them at some farms. The gate therefore applies only to level-free statistics (the
+  rolling standard deviation of first differences, the lag-1 and lag-2 autocorrelations, the
+  repeat-of-previous-value flag and its rolling share), and to each of them as a level-matched
+  AUC: the AUC within bins of 0.5% of capacity, averaged with weight equal to the product of the
+  two class counts. The exact-zero flag, its rolling share, and the two amplitude statistics are
+  level statistics: they are reported raw and never gate D1. A farm whose two sets share no
+  power bin cannot test D1; that is reported as untestable and does not count as an AUC below
+  0.65. The sign of each statistic is fixed once on the full sample, and the bootstrap resamples
+  the signed AUC. A constant window's autocorrelation counts as 0. The high-wind speed for H2 also
+  has a sensitivity run with the empirical cut-in of experiment 210. The two sure sets are defined by the same wind speed as the 210 mask,
   so the gate tests texture, not the mask. No threshold on forecast gain is set, because no forecast
   is fitted.
 benchmark: >-
