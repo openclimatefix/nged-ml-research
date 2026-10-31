@@ -240,6 +240,11 @@ def minimum_detectable_effect(*, table: pl.DataFrame, seeds: tuple[int, ...]) ->
     return pl.DataFrame(records)
 
 
+def _threshold(mde: float | None) -> float:
+    """Return the minimum detectable effect, or 0 when one seed gives no seed spread."""
+    return 0.0 if mde is None or math.isnan(mde) else mde
+
+
 def main() -> None:
     """Print the absolute scores, the contrasts, and the minimum detectable effect."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -265,11 +270,11 @@ def main() -> None:
         contrasts.write_parquet(out / "contrasts.parquet")
         verdict = contrasts.join(mde, on=["row_set", "group"]).with_columns(
             folds_won=pl.struct("fold_differences", "mde").map_elements(
-                lambda r: sum(v < -r["mde"] for v in r["fold_differences"].values()),
+                lambda r: sum(v < -_threshold(r["mde"]) for v in r["fold_differences"].values()),
                 return_dtype=pl.Int64,
             ),
             folds_lost=pl.struct("fold_differences", "mde").map_elements(
-                lambda r: sum(v > r["mde"] for v in r["fold_differences"].values()),
+                lambda r: sum(v > _threshold(r["mde"]) for v in r["fold_differences"].values()),
                 return_dtype=pl.Int64,
             ),
         )
