@@ -52,8 +52,7 @@ metric: >-
 code: ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1/
 verdict: partly supported
 best_arm: >-
-  The gate that takes the metering group as an input (one gate for both groups of Primary
-  substations), fed the surprise of each lagged reading, window means of that surprise, the gap
+  The gate fitted separately for each metering group (two gates, one per group of Primary substations), fed the surprise of each lagged reading, window means of that surprise, the gap
   between the two forecasts' medians, and the neighbour substations' surprise. Against the fitted
   constant mixture per group it lowers the exact CRPS over all rows of the injected test world by
   1.4% at the six Primaries with signed readings (4.306 to 4.247 points of effective capacity). On
@@ -65,16 +64,17 @@ headline: >-
   50/50 mixture of two XGBoost demand forecasts, one with power lags and one without, from 4.34 to
   4.11 points of effective capacity (smaller is better) on injected rows whose lagged readings fall
   inside a load shift, at the six Primary substations with signed-MW readings, and worsens no clean
-  row. On real labelled load shifts the gain over the 50/50 mixture is 0.10 points at most on such
-  rows, and when the forecast target itself sits inside a labelled event the gate scores 10.75
-  against 10.50 for the 50/50 mixture.
+  row there. On real labelled load shifts the gain over the 50/50 mixture is 0.10 points at most on
+  such rows (95% interval -0.26 to +0.02), and when the forecast target itself sits inside a
+  labelled event at the six the gate scores 10.75 against 10.50 for the 50/50 mixture.
 take_home_message: >-
   A gate trained only on injected load shifts, with no labels from National Grid Electricity
   Distribution (NGED), learns to lower the weight on the forecast with power lags from 0.51 to 0.42
   when a lagged reading falls inside a load shift, and so removes most of the harm that the lags do
   in that case. The gain on real load shifts is small (0.10 points at most against the 50/50
   mixture, and 0.04 or less against the constant mixture fitted on injected events), and the gate
-  scores worse than the 50/50 mixture when the target itself is inside a real labelled event. The
+  scores worse than the 50/50 mixture when the target itself is inside a real labelled event at the
+  six Primaries. The
   fitted constant mixture per group is a simpler forecast than the gate and comes within about 1.4%
   of its exact CRPS on injected rows. Training the gate on real and injected events together is
   untested.
@@ -125,7 +125,7 @@ clean rows is therefore optimistic, and the real-event slices undercount events.
 ceilings).** The flag oracle is a gate that is told which rows have a lag inside an event. Held out
 by event, it beats the fitted constant mixture per group by about 0.14 points on harm rows at the
 six (95% interval -0.47 to +0.10). Prediction P1 asked for at least 0.3 points, so P1 is not met.
-One event (event 55 at D16) supplies more than the whole gain. At the eight, the forecast with lags
+One event (event 55 at D16) supplies 110% of the gain: with that event left out the gain is +0.016 points, so the sign flips. At the eight, the forecast with lags
 beats every mixture on harm rows. A constant weight chosen by the decile of the gap between the two
 forecasts' medians needs no labels and captures most of the flag oracle's gain at the six. The
 per-row oracle weight would lower the score by 0.7 points on harm rows at the six, and separately by
@@ -143,7 +143,7 @@ share of 0.368 with all three lags affected, and not with Part F, which found 0.
 
 **The gate gains 0.6% to 2.3% on injected rows and under 0.5% on real rows (steps 4 and 5).** Mean
 exact CRPS over all rows of the injected test world (seed 2) and over all real-event rows. "Gate,
-full" is the gate with the metering group as an input, fed all features; "Gate, flag" also sees the
+full" is the gate fitted separately for each metering group, fed all features; "Gate, flag" also sees the
 true event flag and bounds it. The constant mixture is fitted per group on injected events for the
 injected rows and on real labels for the real rows.
 
@@ -158,29 +158,41 @@ injected rows and on real labels for the real rows.
 | Real, six, R0 pair | 4.533 | 4.778 | 4.515 | 4.516 | 4.492 | not defined |
 | Real, eight, R0 pair | 5.191 | 5.414 | 5.202 | 5.169 | 5.198 | not defined |
 
-- **Prediction P3 holds at the six, and holds narrowly at the eight.** On forecast R1 the full gate
-  captures 79% of the flag gate's gain over the constant mixture per group at the six and 52% at the
-  eight (the R0 pair: 94% and 56%), so the stop rule (under half) does not fire. The gate that sees
-  only the lagged readings' surprise and the lead time captures 76% at the six and 81% at the eight,
-  so the window means, the median gap, and the neighbour features add little at the six and
-  nothing at the eight.
-- **Prediction P4 is only partly met.** On real harm rows at the six the full gate beats the 50/50
-  mixture by 0.10 points on forecast R1 (0.08 for the R0 pair). Against the constant mixture fitted
-  on injected events the gain is 0.04 points on forecast R1 and -0.02 on the R0 pair; against the
-  constant mixture fitted on real labels it is 0.11 on forecast R1. A gain under 0.1 points counts
-  as `small gain`, so the gain is small or borderline. On clean rows the gate scores no worse
-  than the 50/50 mixture.
-- **The gate does what it was built for on injected load shifts.** On injected harm rows at the six
-  its mean weight on the forecast with lags is 0.42, against 0.51 on clean rows, and it scores 4.11
-  against 4.34 for the 50/50 mixture and 5.29 for the forecast with lags. At the eight it scores
-  5.55, against 5.51 for the forecast without lags.
-- **The gate scores worse than the 50/50 mixture when the target is inside a real event.** On real
-  rows at the six whose target is inside a labelled event (7,960 rows) the gate scores 10.75
-  against 10.50, and its mean weight on the forecast with lags is 0.38. A gate trained on real
-  labels (not usable for substations without labels) scores 10.41 there. At the eight the gate
-  scores 11.92 against 11.82 for the 50/50 mixture.
-- **Real harm rows are few.** There are 11,194 at the six and 6,609 at the eight, drawn from the
-  11 labelled events in the test months, so these gains are estimates and not tests.
+- **Prediction P3 holds at the six, and holds narrowly at the eight for one of three gate
+  variants.** On forecast R1 the full gate captures 79% of the flag gate's gain over the constant
+  mixture per group at the six and 52% at the eight when one gate is fitted per metering group. The
+  pooled gate (one gate for both groups) captures 73% and 46%, and the gate with the metering group
+  as an input captures 75% and 48%. At the eight the stop rule (under half) therefore fires for two
+  of the three variants, and the series is not stopped only because the maintainer's lenient rule
+  applies. On the R0 pair the per-group full gate captures 94% and 56% (pooled 87% and 73%). The
+  gate that sees only the lagged readings' surprise and the lead time captures 69% to 76% at the six
+  and 69% to 81% at the eight, so the window means, the median gap, and the neighbour features add
+  little at the six and nothing at the eight.
+- **Prediction P4 is only partly met, and its intervals include zero.** On real harm rows at the six
+  the full gate beats the 50/50 mixture by 0.10 points on forecast R1 (95% interval -0.26 to +0.02,
+  event 146 at D5 supplying 64% of it) and by 0.08 for the R0 pair (-0.25 to +0.07, event 146
+  supplying 96%). Against the constant mixture fitted on injected events the gain is 0.04 points on
+  forecast R1 (-0.17 to +0.04) and -0.02 on the R0 pair (-0.26 to +0.20), where one event (149 at
+  D5) decides the sign; against the constant mixture fitted on real labels it is 0.11 on forecast
+  R1. A gain under 0.1 points counts as `small gain`, so the gain is small or borderline. Over all
+  real rows at the six the gate and the constant mixture fitted on real labels differ by 0.003
+  points, which is zero within noise. At the six the gate scores no worse on clean rows than the
+  50/50 mixture. At the eight the clean-row score is 0.003 worse.
+- **The gate does what it was built for on injected load shifts, though the simpler options come
+  close.** On injected harm rows at the six its mean weight on the forecast with lags is 0.42,
+  against 0.51 on clean rows, and it scores 4.11 against 4.34 for the 50/50 mixture, 4.23 for the
+  constant mixture per group, 4.14 for the forecast without lags, and 5.29 for the forecast with
+  lags. At the eight it scores 5.55, against 5.51 for the forecast without lags.
+- **At the six the gate scores worse than the 50/50 mixture when the target is inside a real
+  event.** On real rows at the six whose target is inside a labelled event (7,960 rows, 11 events)
+  the gate scores 10.75 against 10.50, and its mean weight on the forecast with lags is 0.38.
+  Dropping any single Primary leaves the sign unchanged. A gate trained on real labels (not usable
+  for substations without labels) scores 10.41 there. At the eight (4,278 rows) the gate scores
+  better than the 50/50 mixture, 11.92 against 12.08.
+- **Real harm rows are few, and the eight are unstable.** There are 11,194 harm rows at the six and
+  6,609 at the eight, drawn from the 11 labelled events in the test months. These gains are
+  estimates and not tests. At the eight, dropping D3 or D8 flips the sign of the gate's contrast
+  against the forecast with lags.
 
 **Upper-tail coverage is 0.65 to 0.68 inside real events at the six, for every arm (forecast R1,
 real rows).** Coverage is the share of actual readings at or below the forecast's quantile, so the
