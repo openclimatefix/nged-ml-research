@@ -48,8 +48,13 @@ decision_rule: >-
   5% of the coherence score. C1 ECC-T against IND, C2 SCH against IND, C3 SCH against ECC-T, C4
   ECC-SW against ECC-T. An ordering counts as coherent if its joint variogram interval lies wholly
   below -5% against IND. C3 or C4 count as a difference only if the interval lies wholly beyond 5%.
-  The marginal CRPS needs no contrast. The comonotone ordering (CO, all paths ranked alike) is an
-  upper bound on dependence that checks the scores can see coherence. No verdict is sought on the
+  The gating block is the joint variogram score; the spatial and temporal blocks, the energy score,
+  and the 12 to 36 hour band are reported beside it as secondary and interim, without a verdict.
+  If an interval straddles -5% or +5%, the page says "no difference at the margin" and gives the
+  direction of the point estimate; P3 and P4 are directional predictions that fail unless their
+  interval lies wholly beyond the margin. The marginal CRPS needs no contrast. The comonotone ordering (CO, all paths ranked alike) checks that the scores can see coherence:
+  if CO and IND score within 5% of each other on the joint variogram, the scores are blind and the
+  page says so. No verdict is sought on the
   member-wise route, which is step 2.
 benchmark: >-
   IND, the independent random draw, scored on the same half-hours; the stored 11-quantile CRPS of
@@ -77,15 +82,30 @@ experiment 425's arm A, with no fit. The write-up replaces this section when the
 - **What is read besides.** The 51-member weather frames of the daily runs (2-metre temperature and
   shortwave radiation at each Primary's H3 cell, `demand_frame_path` of experiment 87) and the
   cleaned actuals of experiment 381's scoring context, minus the flagged exact zeros.
-- **The 51 values.** The 11 quantiles are interpolated linearly in the level to the 51 levels k/52
-  (k = 1 to 51). Levels beyond q01 and q99 are not needed, because 1/52 = 0.0192.
+- **The 51 values.** The widened 11 quantiles are interpolated linearly in the level to the 51
+  levels k/52 (k = 1 to 51). All 51 levels lie inside q01 to q99 (1/52 = 0.0192), so nothing is
+  extrapolated, but the two extreme values are pinned near q01 and q99 and understate the tails
+  beyond them. If the 51-value CRPS differs from the stored CRPS by more than 0.03, P1 fails for
+  that reason, which the page reports as a discretisation loss and not as an effect of ordering.
 - **Orderings.** ECC-T gives the coldest member the highest value (demand falls as temperature
   rises in Great Britain, where cooling is rare). ECC-SW gives the member with the least shortwave
   radiation the highest value. SCH ranks the 51 values by the ranks of 51 past observed paths: the
   dates nearest in day of year to the run, from 2025-03-01 (the D15 and D18 cut, so that all 16
-  Primaries have data) to 15 days before the run, with a date dropped if any Primary lacks more than
-  5% of its half-hours, and gaps linearly interpolated. IND is a seeded random permutation per
+  Primaries have data) to 16 days before the run (so every path of up to 14.6 days ends before the run), with a date dropped if any Primary lacks more than
+  5% of its half-hours, and gaps linearly interpolated. The pool size per fold is reported; if fewer than 51 dates qualify, all of them are used and the
+  rest of the 51 paths repeat dates cyclically. Ties in any rank (shortwave radiation is zero for
+  all members at night, so ECC-SW equals IND in expectation then) are broken by a seeded random
+  draw. Each lead is ranked independently. IND is a seeded random permutation per
   Primary and half-hour. CO ranks every path alike.
+- **Scoring vectors.** Values and actuals are in points of capacity before any score. Where a
+  component of a block has no actual, it is dropped from that block for every ordering alike, and
+  the number of complete and partial blocks per fold is reported. Scores are divided by the square
+  root of the block's dimension (energy) or the number of pairs (variogram). The energy score is
+  dominated by the marginal part, so the variogram score carries the dependence question.
+- **Step 2.** Step 2 reuses these 51 values, orderings, and seeds, so its scores are comparable. The
+  design note's gate (a route worse than 5% on the coherence score does not advance) is applied in
+  step 2, not here. The contrasts are on days 1 to 10; no empirical check of the temperature sign
+  is possible, because no observation exists per member.
 - **Follows the standing practices.** Cleaned data with the D15 and D18 cut; no fit, so no cadence,
   seeds beyond arm A's, or model files; stored predictions reused; the tails reported as the share of
   actuals beyond the smallest and largest of the 51 values; examples of the paths drawn from one run.
