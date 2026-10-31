@@ -387,6 +387,14 @@ H14-s at that setting is justified; if every diagnostic fit is worse than R-inj 
 the 14-day convolutional line stops, and the page says that the window memorised each Primary's
 history.
 
+**Diagnosis result.** The three diagnostic fits ended at validation negative log-likelihoods of
+0.5347 (`H14-s-diag1`), 0.5399 (`H14-s-diag2`), and 0.5650 (`H14-s-diag3`), each more than 0.03
+worse than R-inj's 0.4777, and all three used the 60-epoch limit with the loss still falling slowly.
+By the rule written above, the 14-day convolutional line stops: H14-s, H14-s-ow, and the four-fold
+H-lvl screen do not run. The diagnosis does not separate memorisation from slow training at a tenth
+of the rows per epoch, so the page claims only that three settings of H14-s did not reach R-inj's
+validation loss.
+
 **Predictions, written before any score of these arms is read (signed-MW six unless stated; contrast
 = CRPS difference in the units of the other contrasts).**
 
