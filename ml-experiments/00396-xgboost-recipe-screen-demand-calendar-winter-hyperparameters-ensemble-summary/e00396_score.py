@@ -107,14 +107,21 @@ def available_sites(*, arms: list[str], fold: str, sites: list[str]) -> list[str
     ]
 
 
-def fold_table(*, fold: str, arms: list[str], sites: list[str], ctx: dict, factor: float) -> None:
-    """Print the arm table of one fold: headline CRPS difference, floor, slices, and tails."""
+def fold_table(
+    *, fold: str, arms: list[str], sites: list[str], ctx: dict, factor: float
+) -> list[dict]:
+    """Print the arm table of one fold and return it as one record per arm and group.
+
+    The records hold the headline CRPS difference from C0, the slice differences, both tail
+    coverages, the C0 CRPS, the noise floor, and the number of scored half-hours.
+    """
+    records: list[dict] = []
     series = adapter.series_table()
     names = [CONTROL, SECOND_SEED, *[a for a in arms if a not in (CONTROL, SECOND_SEED)]]
     sites = available_sites(arms=names, fold=fold, sites=sites)
     if not sites:
         print(f"{fold}: no site has every arm yet")
-        return
+        return records
     chosen = series.filter(pl.col("label").is_in(sites))
     frames = {a: arm_frame(arm=a, fold=fold, sites=sites, series=chosen) for a in names}
     if factor != 1.0:
@@ -158,7 +165,20 @@ def fold_table(*, fold: str, arms: list[str], sites: list[str], ctx: dict, facto
             for tail in TAIL_COLUMNS:
                 line[tail] = round(rows[arm].filter(cond)[tail].mean(), 3)
             out.append(line)
+            records.append(
+                {
+                    "fold": fold,
+                    "group": gname,
+                    "widening": factor,
+                    "sites": len(sites),
+                    "half_hours": int(table.height),
+                    "control_crps": round(control["crps"].mean(), 4),
+                    "noise_floor": round(abs(floor), 4),
+                    **line,
+                }
+            )
         print(pl.DataFrame(out).sort("all"))
+    return records
 
 
 def main() -> None:
@@ -168,15 +188,20 @@ def main() -> None:
     parser.add_argument("--arms", nargs="*", default=None, help="default: every arm on disk")
     parser.add_argument("--sites", nargs="+", required=True)
     parser.add_argument("--widening", type=float, nargs="+", default=[1.0, WIDENING])
+    parser.add_argument("--out", type=Path, default=None, help="write the records to this CSV")
     args = parser.parse_args()
     ctx = base_score.build_context(series=adapter.series_table())
     ctx["flagged"] = flagged_keys()
+    records: list[dict] = []
     for fold in args.folds:
         arms = args.arms or sorted(
             p.name for p in PRED_DIR.iterdir() if any((p / fold).glob("*.parquet"))
         )
         for factor in args.widening:
-            fold_table(fold=fold, arms=arms, sites=args.sites, ctx=ctx, factor=factor)
+            records += fold_table(fold=fold, arms=arms, sites=args.sites, ctx=ctx, factor=factor)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        pl.DataFrame(records).write_csv(args.out)
 
 
 if __name__ == "__main__":
