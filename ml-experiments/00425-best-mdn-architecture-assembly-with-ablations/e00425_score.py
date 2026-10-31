@@ -440,7 +440,7 @@ def verdicts(*, found: dict[tuple[str, str], dict[str, float]]) -> None:
             reading = "not supported"
         print(f"\nC1 reading against the decision rule: {reading}")
     c2 = found.get(("C2", SIX))
-    if c2 is not None and c2["difference"] <= 0:
+    if c2 is not None and (c2["difference"] <= 0 or c2["lower"] <= 0):
         print("AUDIT TRIGGER: C2 (A-noemb minus A) is not worse than zero at the signed-MW six")
     c3 = found.get(("C3", SIX))
     if c3 is not None and c3["difference"] < 0:

@@ -252,7 +252,10 @@ def run_arms(
         refit = base.refit_of(month=month)
         fold = prep.build_ens_fold(refit=refit, cut=cut)
         log_path = OUT_DIR / "logs" / f"{month}{'' if cut else '_nocut'}.json"
-        log: dict = json.loads(log_path.read_text()) if log_path.exists() else {}
+        try:
+            log: dict = json.loads(log_path.read_text()) if log_path.exists() else {}
+        except json.JSONDecodeError:
+            log = {}
         log |= {
             "month": month,
             "cut": cut,
@@ -311,7 +314,9 @@ def run_arms(
                 flush=True,
             )
             log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_path.write_text(json.dumps(log, indent=1))
+            tmp = log_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(log, indent=1))
+            tmp.replace(log_path)
         del t
         torch.cuda.empty_cache()
 
@@ -330,6 +335,8 @@ def main() -> None:
         help="skip both cuts; only for the 3-fit cross-check (seed 0, three months)",
     )
     args = parser.parse_args()
+    if args.no_cut and (args.seeds == list(DEFAULT_SEEDS) or args.months == list(prep.MONTHS)):
+        parser.error("--no-cut needs explicit --months and --seeds (seed 0, three months)")
     if args.smoke:
         global OUT_DIR  # noqa: PLW0603
         OUT_DIR = prep.WORK_DIR / "work" / "smoke"
