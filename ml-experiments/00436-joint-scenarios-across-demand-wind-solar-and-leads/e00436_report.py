@@ -42,7 +42,7 @@ def margin(*, ind: float, co: float) -> float:
 def bootstrap_relative(
     *, base: np.ndarray, other: np.ndarray, seed: int = 0
 ) -> tuple[float, float, float]:
-    """Return the relative difference of mean(other) against mean(base), with a month-block interval.
+    """Return the relative difference of mean(other) against mean(base), with an interval.
 
     `base` and `other` hold one value per month, in the same month order.
     """
@@ -87,14 +87,12 @@ def main() -> None:
                 continue
             base = wide["J0"].to_numpy()
             gap = (
-                margin(ind=base.mean(), co=wide["J1"].mean())
+                margin(ind=base.mean(), co=float(wide["J1"].to_numpy().mean()))
                 if "J1" in wide.columns
                 else float("nan")
             )
-            parts = [
-                f"{block:8s} {window:9s} {slice_name:8s} {label:7s} J0 {base.mean():.4f} "
-                f"margin {gap:.1%}"
-            ]
+            head = f"{block:8s} {window:9s} {slice_name:8s} {label:7s}"
+            parts = [f"{head} J0 {base.mean():.4f} margin {gap:.1%}"]
             for arm in [c for c in wide.columns if c not in ("month", "J0")]:
                 point, low, high = bootstrap_relative(base=base, other=wide[arm].to_numpy())
                 parts.append(f"{arm} {point:+.1%} ({low:+.1%} to {high:+.1%})")
