@@ -14,6 +14,9 @@ For each arm and seed, four path constructions give 51 member values per farm, r
   the 51 at that farm and lead, so one historical date orders all three farms and all leads;
 - `shifted`: member k keeps its own stage-3 plant power and adds the arm's median minus the
   plant's median, clamped to [0, 1] (the member route's own paths);
+- `memberwise`: member k takes its *own* 11-quantile forecast at the level `(rank + 0.5) / 51` of
+  its own 100 m wind speed (the arm must be a `memberwise` arm); `memberwise_median` takes each
+  member's own median instead, which is a point forecast and so under-dispersed;
 - `independent`: every member, farm, and lead takes its own random level (no coherence).
 
 Two kinds of block are scored, both across W1 to W3 jointly and over kept half-hours only. A *day
@@ -182,16 +185,31 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     for arm in arms:
         parts = np.stack([np.load(run.PARTS_DIR / f"{arm}_h{s}.npy") for s in run.SEEDS])
         kinds_for_arm = (
-            (*CONSTRUCTIONS, "memberwise") if arm.startswith("memberwise") else CONSTRUCTIONS
+            (*CONSTRUCTIONS, "memberwise", "memberwise_median")
+            if arm.startswith("memberwise")
+            else CONSTRUCTIONS
         )
         for kind in kinds_for_arm:
             values = np.zeros((len(blocks), 2))
             for s in range(len(parts)):
                 q = np.asarray(parts[s], dtype=np.float64)
                 rng = np.random.default_rng(1000 + s)
-                if kind == "memberwise":
+                if kind == "memberwise_median":
                     path = np.load(run.PARTS_DIR / f"{arm}_members_h{s}.npy", mmap_mode="r")
                     x = np.asarray(path[:, :, MEDIAN_INDEX], dtype=np.float64)
+                elif kind == "memberwise":
+                    path = np.load(run.PARTS_DIR / f"{arm}_members_h{s}.npy", mmap_mode="r")
+                    level = (ranks(wind, rng=rng) + 0.5) / MEMBERS
+                    x = np.stack(
+                        [
+                            quantile_at(
+                                quantiles=np.asarray(path[:, k, :], dtype=np.float64),
+                                level=level[:, k : k + 1],
+                            )[:, 0]
+                            for k in range(MEMBERS)
+                        ],
+                        axis=1,
+                    )
                 else:
                     x = member_values(
                         kind=kind, quantiles=q, power=power, wind=wind, shuffle=shuffle, rng=rng

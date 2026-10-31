@@ -10,6 +10,9 @@ Every arm is the same network with three switches (the design note's D1 to D3):
 - `plant` (physics layer, `member` route only): `none`; `frozen` adds the stage-3 plant's power for
   each member to the encoder input and centres the mixture on the plant's median power; `e2e` does
   the same with the plant held as a trainable `nn.Module` that starts from the stage-3 parameters.
+- `route` `memberwise` runs the trunk on each member alone (its weather, and with `plant="frozen"`
+  its own plant power, which is also the centre of its mixture), and the pooled forecast is the
+  equal-weight mixture of the 51 member mixtures, trained on the pooled likelihood.
 - `head`: `clipped` fits the mixture by the plain likelihood and clamps the quantiles to [0, 1]
   (experiment 00347); `censored` fits the likelihood of an observation at or below 0.001 as the
   mixture's mass below zero and one at or above 0.999 as its mass above one.
@@ -48,7 +51,6 @@ LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75
 FARMS: Final[tuple[str, ...]] = common.FARMS
 ZERO: Final[float] = 0.001
 FULL: Final[float] = 0.999
-MEMBER_DIM: Final[int] = 2
 LOG_SQRT_2PI: Final[float] = float(np.log(2 * np.pi)) * 0.5
 
 
@@ -105,6 +107,9 @@ class Net(nn.Module):
         """Build the encoder (member route) and the trunk."""
         super().__init__()
         self.arm = arm
+        if arm.route == "memberwise" and (arm.head != "clipped" or arm.plant == "e2e"):
+            msg = "member-wise arms support the clipped head and no trainable plant"
+            raise ValueError(msg)
         for key, value in stats.items():
             self.register_buffer(key, value)
         self.plants = nn.ModuleDict(plants or {})
@@ -211,7 +216,10 @@ def nll(
 ) -> torch.Tensor:
     """Return the mean negative log likelihood of `y` under the mixture."""
     log_w, mean, std, centre = parts
-    if centre.dim() == MEMBER_DIM:
+    if log_w.dim() == 3:  # noqa: PLR2004
+        if head != "clipped":
+            msg = "member-wise arms use the clipped head"
+            raise ValueError(msg)
         z = (y[:, None] - centre)[..., None]
         log_pdf = -0.5 * ((z - mean) / std) ** 2 - torch.log(std) - LOG_SQRT_2PI
         pooled = torch.logsumexp((log_w + log_pdf).flatten(start_dim=1), dim=1)

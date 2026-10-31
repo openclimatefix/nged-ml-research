@@ -196,7 +196,11 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     for name, m in metrics.items():
         lines.append(f"{name.ljust(28)}{np.sqrt(m['mean_sq_error'][0, flags['kept']].mean()):.3f}")
 
-    member_arms = [n for n in run.ARMS if (run.PARTS_DIR / f"{n}_members_h0.npy").exists()]
+    member_arms = [
+        n
+        for n in run.ARMS
+        if all((run.PARTS_DIR / f"{n}_members_h{s}.npy").exists() for s in run.SEEDS)
+    ]
     if member_arms:
         lines.append(
             "-- per-member quantile forecasts: score of each member's 11 quantiles against the "
