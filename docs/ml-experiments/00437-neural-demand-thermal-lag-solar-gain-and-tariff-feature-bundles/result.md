@@ -61,10 +61,10 @@ decision_rule: >-
   school and national columns. Before any contrast is read, the scorer prints the minimum
   detectable effect: the standard deviation over the four folds of the signed-MW six CRPS
   difference between the control's seeds 0 to 2 and its seeds 3 and 4 (both stored by experiment
-  425), divided by the square root of two. It is a lower bound (experiment 425 found 0.0368 over 12
-  folds, and experiment 419 about 0.074 on its convention), and a contrast smaller than it is
-  "inside the noise". Every number is interim, and nothing here enters a research default. Halves
-  of a winning bundle and combinations are descriptive.
+  425), divided by the square root of two. The minimum detectable effect is a lower bound
+  (experiment 425 found 0.0368 over 12 folds, and experiment 419 about 0.074 on its convention),
+  and a contrast smaller than it is "inside the noise". Every number is interim, and nothing here
+  enters a research default. Halves of a winning bundle and combinations are descriptive.
 benchmark: >-
   `R` (experiment 425's ensemble-only pooled plain network, seeds 0 to 2, same rows) for the
   ensemble-only arms and `A` (experiment 425's pretrained network, seeds 0 to 2) for the pretrained
@@ -74,23 +74,23 @@ verdict: not supported
 best_arm: >-
   None. No arm met the registered bar. The closest were `T` (thermal lag), 0.022 points of capacity
   lower CRPS than `R` at the MVA-only eight, and `T_pre`, 0.029 lower than `A` at the same group.
-  Both fell short of 0.03 and lowered the CRPS in only 2 of 4 folds.
+  Both arms fell short of 0.03 and lowered the CRPS in only 2 of 4 folds.
 headline: >-
   None of the eight bundle arms lowered the CRPS of the pooled plain neural network by the
-  registered 0.03 points of capacity in 3 of 4 folds, at days 1 to 10. Five of the eight arms were
+  registered 0.03 points of capacity in 3 of 4 folds, at days 1 to 10. Seven of the eight arms were
   worse than their control at the signed-MW six, by 0.016 to 0.059 points. The screen could not
-  detect an effect smaller than about 0.06 points, so the result shows that no large gain exists, not
-  that the bundles do nothing.
+  detect an effect smaller than 0.045 to 0.064 points, so the result shows that no large gain
+  exists, not that the bundles do nothing.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   Adding thermal-lag, solar-gain, look-ahead, calendar, tariff, or national-signal columns to the
   pooled plain mixture density network did not lower its continuous ranked probability score (CRPS)
   by the registered 0.03 points of capacity, in either the ensemble-only or the pretrained form.
-  Five of the eight arms were worse than their control at the six signed-MW Primaries, by 0.016 to
+  Seven of the eight arms were worse than their control at the six signed-MW Primaries, by 0.016 to
   0.059 points. The thermal-lag bundle lowered the CRPS at the eight MVA-only Primaries (by 0.022
-  and 0.029) in 2 of 4 folds, which is too weak to act on. The screen could not detect effects
-  below about 0.06 points, so the bundles are left out, not ruled out.
+  and 0.029) in only 2 of 4 folds, which is too weak a result to act on. The screen could not detect
+  effects below 0.045 to 0.064 points, so the bundles are left out, not ruled out.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Continuous ranked probability score from the 11 quantiles, coverage and pinball loss at q01, q05,
@@ -100,7 +100,7 @@ metric: >-
 code: ml-experiments/00437-neural-demand-thermal-lag-solar-gain-and-tariff-feature-bundles/
 ---
 
-**This plan tests, on four folds, whether windows of weather and a few calendar and national
+**This experiment tests, on four folds, whether windows of weather and a few calendar and national
 signals lower the error of the pooled neural network that experiments 397 to 425 built.** The
 network predicts 11 quantiles of Primary substation demand from the ECMWF ensemble mean and spread
 at one valid time. Experiment 419 gave it a centred daily mean of shortwave and found
@@ -153,7 +153,7 @@ for them on 2026-10-31.
   covers them (leads of about 9 to 33 hours); after the origin it holds this run's own ensemble
   mean. ERA5 is not used, because it arrives about 5 days late and a column built from it could not
   be served. `e00437_features.py check` rebuilds sample runs with every later run deleted and
-  requires identical columns (the check script exists; its result goes in the results). In the
+  requires identical columns. In the
   pretrained form the windows come from the
   dense ERA5-and-CAMS series, which is the same stand-in the pretraining rows use for the
   valid-time weather.
@@ -212,10 +212,16 @@ for them on 2026-10-31.
 
 ## Results
 
-**No bundle lowered the CRPS by the registered bar, so no dismantling or S1 confirmation is
+**No bundle lowered the CRPS by the registered bar, so no dismantling or confirmation run is
 planned.** The best arms lowered the CRPS at only one group, by less than 0.03 points, in 2 of 4
 folds. The next step is to leave these bundles out of the pooled plain network and, if the question
-returns, to test the thermal-lag bundle T on more folds.
+returns, to test the thermal-lag bundle `T` on more folds.
+
+Arm key. `R` is the ensemble-only pooled plain network, and `A` is its pretrained form; both are
+the controls. `T` adds thermal-lag columns, `S` solar-gain columns, `F` look-ahead columns, and `C`
+calendar, tariff, and national-signal columns (`C_tariff` adds only the 2 tariff columns of `C`).
+A `_pre` suffix marks the pretrained form of a bundle, whose control is `A`. "The six" and "the
+eight" are the 6 signed-MW Primaries and the 8 MVA-only Primaries.
 
 ![Each arm minus its control, CRPS at days 1 to 10](figure_1_headline.svg)
 
@@ -237,25 +243,28 @@ range; the decision rests on the fold counts.
 | `S_pre` (`A`) | -0.016 (-0.086 to +0.078) | +0.011 (-0.115 to +0.107) | below the bar |
 | `F_pre` (`A`) | +0.026 (-0.041 to +0.084) | +0.020 (-0.002 to +0.036) | tail harm at q95 |
 
-Controls: `R` scores 3.404 and `A` 3.341 at the six, 3.917 and 3.764 at the eight. The D15 and D18
-group is report-only; every arm except `T_pre` (-0.176) is worse than its control there, by 0.14
-to 0.66 points.
+Controls: `R` scores 3.404 and `A` 3.341 at the six, 3.917 and 3.764 at the eight. The group of
+Primaries D15 and D18 is report-only; every arm except `T_pre` (-0.176) is worse than its control
+there, by 0.14 to 0.66 points.
 
 ### Predictions
 
-- **P1 (S helps most on cold sunny days) is not supported.** `S` was worse than `R` on cold sunny
-  days (+0.308 at the six) and better on cold overcast days (-0.236), the opposite order.
-- **P2 (T helps at both groups, most on cold winter nights) is not supported.** `T` was worse at
-  the six (+0.016). Its small gain at the eight came from the 2025-12 fold (-0.071); 7 of 8
-  Primaries improved.
-- **P3 (F helps at the eight) is not supported.** `F` changed the CRPS at the eight by -0.000.
-- **P4 (C helps on the Economy 7 step) is not supported.** `C` was worse on that slice at the six
-  (2.985 against 2.805 for `R`).
-- **P5 (pretrained form gains at least as much) is not supported.** The pretrained form did better
-  than the ensemble-only form at one group and worse at the other, for each bundle: `S_pre` against
-  `S` was 0.059 better at the six and 0.009 worse at the eight, and `F_pre` against `F` was 0.016
-  better at the six and 0.020 worse at the eight. `T_pre` was 0.009 worse at the six and 0.007
-  better at the eight.
+- **P1 (solar gain `S` helps most on cold sunny days) is not supported.** `S` was worse than `R`
+  on cold sunny days (+0.308 at the six) and better on cold overcast days (-0.236), the opposite
+  order.
+- **P2 (thermal lag `T` helps at both groups, most on cold winter nights) is not supported.** `T`
+  was worse at the six (+0.016). The small gain of `T` at the eight came from two folds, 2025-12
+  (-0.071) and 2026-01 (-0.025); 7 of 8 Primaries improved.
+- **P3 (look-ahead `F` helps at the eight) is not supported.** `F` changed the CRPS at the eight by
+  -0.000.
+- **P4 (calendar, tariff, and national signals `C` help on the Economy 7 step) is not supported.**
+  `C` was worse on that slice at the six (2.985 against 2.805 for `R`).
+- **P5 (the pretrained form gains at least as much over its control) is not supported.** For each
+  bundle, the gain over the control of the pretrained form beat that of the ensemble-only form at
+  one group and lost at the other. The gain of `S_pre` over `A` beat the gain of `S` over `R` by
+  0.059 at the six and lost by 0.009 at the eight. For `F_pre` against `F`, the figures are 0.016
+  better at the six and 0.020 worse at the eight. For `T_pre` against `T`, they are 0.009 worse at
+  the six and 0.007 better at the eight.
 
 ### Checks
 
@@ -265,10 +274,11 @@ to 0.66 points.
 - A fresh reviewer re-derived the pooled CRPS of `R`, `A`, `T`, and `S_pre` from the raw forecast
   files and matched the scorer to three decimals. The median-error and CRPS contrasts agree in sign
   in all 16 arm-and-group pairs. Leaving out any one Primary flips no verdict.
-- The new columns are not degenerate: standardised spread near 1, used by the first layer, and the
-  ensemble-only fold without extras equals experiment 425's bit for bit.
-- `C_tariff` (2 columns) beat `C` (which contains them) by 0.012 at the six. Both are inside the
-  noise.
+- The new columns are not degenerate: their standardised spread is near 1 and the first layer of
+  the neural network uses them. The ensemble-only fold without extra columns equals experiment 425's
+  fold bit for bit.
+- `C_tariff` (2 columns) beat `C` (which contains them) by 0.012 at the six. Both differences from
+  the control are inside the noise.
 
 ![CRPS by lead day](figure_2_crps_by_lead.svg)
 
@@ -291,8 +301,8 @@ to 0.66 points.
 ### Caveats
 
 - **The screen is too coarse to show "no effect".** The minimum detectable effect is 0.064 points
-  against `R` and 0.045 against `A`, about twice the 0.03 bar, and fold-to-fold differences swing
-  by more than the bar.
+  against `R` and 0.045 against `A`, which is 1.5 to 2 times the 0.03 bar, and
+  fold-to-fold differences swing by more than the bar.
 - **The four folds hold no summer month,** so the second example is spring and `S` cannot be judged
   in summer.
 - **The hyperparameters were tuned at 46 inputs** and reused at 48 to 60. Extra inputs at fixed
@@ -303,8 +313,8 @@ to 0.66 points.
 
 ### What to try next
 
-- **Test bundle T on more folds,** since it is the only bundle that leans the right way at both
-  control settings.
+- **Test bundle `T` on more folds,** since it is the only bundle that lowered the CRPS at the eight
+  with both controls (`R` and `A`).
 
 ### Data used and where it lives
 
