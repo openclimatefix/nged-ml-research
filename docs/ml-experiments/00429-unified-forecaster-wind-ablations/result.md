@@ -199,7 +199,7 @@ true-days-1-to-10 score with a per-quantile gap against the stored rows of 0.000
   and no arm needed them to improve the score.
 - **Coherence.** Scores use the 51 member paths across W1 to W3 jointly over one run and one
   calendar day (529 blocks). The Schaake shuffle beats ensemble copula coupling (ECC) from
-  `one_pass_ms` by 9.3% on the [variogram score](https://doi.org/10.1175/MWR-D-15-0269.1) (99%
+  `one_pass_ms` by 9.3% on the [variogram score](https://doi.org/10.1175/MWR-D-14-00269.1) (99%
   interval -0.491 to -0.256) and by 0.8% on the [energy
   score](https://doi.org/10.1198/016214506000001437). The member route's own plant paths are 5.9%
   worse than ECC paths from the same arm on the variogram score. Member-wise quantiles taken at ECC
