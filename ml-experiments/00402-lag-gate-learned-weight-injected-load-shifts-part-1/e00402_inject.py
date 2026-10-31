@@ -1,4 +1,4 @@
-# Copied unchanged from experiment 402 (PR 56), commit bfc32045 of branch lag-gate-injected-load-shifts.
+# ruff: noqa: PLR0912
 """Injected load-conserving load shifts and transient spikes for experiment 402.
 
 The structure follows experiment 404's `e00404_inject.py` (nged-ml-research PR 58): an event pool
@@ -7,7 +7,7 @@ recipients, events cut at `last`, and no overlap. Four differences:
 
 - The donor changes by a fraction `f` of its own series, so the daily shape survives. A recipient
   gains the donor's change in MW, shared equally. `f` is the table's signed depth divided by the
-  mean of the donor over the 30 days before the event.
+  mean absolute power of the donor over its whole series.
 - A spike has a constant size of 4 to 20 times the Primary's stage-1 residual median absolute
   deviation (MW), either sign, for 1 to 12 half-hours.
 - At a Primary with magnitude-only (MVA) readings, an event enters only a window in which every
@@ -111,6 +111,9 @@ def inject(  # noqa: PLR0915
         seed: Seed of the generator.
         no_recipient_share: Share of load shifts with no observed recipient.
         allowed: Optional boolean grid per site; an event touching a False half-hour is skipped.
+
+    Returns:
+        The injected power per site, the mask of codes per half-hour, and the event table.
     """
     rng = np.random.default_rng(seed)
     sites = sorted(power)
@@ -134,8 +137,7 @@ def inject(  # noqa: PLR0915
         n = min(n, span)
         start = int(rng.integers(first, last - n + 1))
         window = slice(start, start + n)
-        mean = trailing_mean(power=power[donor], start=start)
-        if not np.isfinite(mean) or not np.isfinite(power[donor][window]).all():
+        if not np.isfinite(power[donor][window]).all():
             continue
         touched = [donor]
         recipients: list[str] = []
@@ -167,6 +169,16 @@ def inject(  # noqa: PLR0915
             )
         if donor in magnitude_only and (power[donor][window] + delta <= MAGNITUDE_FLOOR / 2).any():
             continue
+        gains = {
+            r: -delta * capacity_mw[donor] / len(recipients) / capacity_mw[r] for r in recipients
+        }
+        if any(
+            (r in magnitude_only and (power[r][window] + g <= MAGNITUDE_FLOOR / 2).any())
+            or (power[r][window] + g < 0).any()
+            or covered[r] >= coverage * span * 1.5
+            for r, g in gains.items()
+        ):
+            continue
         out[donor][window] += delta
         mask[donor][window] = SPIKE if spike else DONOR
         covered[donor] += n
@@ -175,7 +187,7 @@ def inject(  # noqa: PLR0915
              "stop": start + n, "mean_delta_mw": float(delta.mean() * capacity_mw[donor])}
         )  # fmt: skip
         for r in recipients:
-            gain = -delta * capacity_mw[donor] / len(recipients) / capacity_mw[r]
+            gain = gains[r]
             out[r][window] += gain
             mask[r][window] = RECIPIENT
             covered[r] += n
@@ -183,6 +195,9 @@ def inject(  # noqa: PLR0915
                 {"site": r, "role": "recipient", "start": start, "stop": start + n,
                  "mean_delta_mw": float(gain.mean() * capacity_mw[r])}
             )  # fmt: skip
+    short = [s for s in sites if covered[s] < coverage * span]
+    if short:
+        print(f"warning: sites below the coverage target after {attempts} attempts: {short}")
     events = pl.DataFrame(
         rows,
         schema={"site": pl.String, "role": pl.String, "start": pl.Int64, "stop": pl.Int64,
