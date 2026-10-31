@@ -33,6 +33,8 @@ REVERSE: Final[pl.Expr] = s420.REVERSE
 R1_POOLED_FLOOR: Final[float] = 4.0
 FULL_POOLED_FLOOR: Final[float] = 10.0
 """S1 floors in points: about half the laboratory gain on r1 (8.29) and on all rotations (19.2)."""
+LEAD_HOURS: Final[pl.Expr] = (pl.col("valid") - pl.col("origin")) / 3_600_000_000.0
+"""Lead in hours from the join keys (the contrast frame does not carry the `lead` column)."""
 LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
     "days 1 to 2": (0.0, 48.0),
     "days 3 to 6 (lead up to 144 hours)": (48.0, 144.0),
@@ -97,7 +99,7 @@ def bars(*, seeds_a: tuple[int, ...], rotations: tuple[str, ...], mde: float) ->
         name: s420.contrast(
             reference=p0,
             candidate=a,
-            rows=REVERSE & (pl.col("lead") >= lo) & (pl.col("lead") < hi),
+            rows=REVERSE & (LEAD_HOURS >= lo) & (LEAD_HOURS < hi),
         )
         for name, (lo, hi) in LEAD_BANDS.items()
     }
