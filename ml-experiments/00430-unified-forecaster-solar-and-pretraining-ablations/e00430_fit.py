@@ -39,6 +39,8 @@ from studies.tail_calibration import level_column  # noqa: E402
 DEVICE: Final = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 REFITS: Final[tuple[datetime, ...]] = f310.REFIT_STARTS
 INFERENCE_CHUNK: Final[int] = 20_000
+ANGLE_LEARNING_RATE: Final[float] = 0.1
+"""Learning rate of the plant's tilt and azimuth, which are in degrees (about 600 steps per 60 degrees)."""
 PATH_LEVELS_T: Final = torch.tensor(common.PATH_LEVELS, dtype=torch.float64, device=DEVICE)
 MEMBER_LEVELS_T: Final = PATH_LEVELS_T[
     torch.tensor(np.random.default_rng(2026).permutation(common.N_MEMBERS), device=DEVICE)
@@ -377,12 +379,23 @@ def train_network(
     is_val = np.concatenate([p.is_val for p in pieces])
     fit_rows = torch.tensor(np.flatnonzero(~is_val), device=DEVICE)
     val_rows = torch.tensor(np.flatnonzero(is_val), device=DEVICE)
-    plant_params = [p for n, p in model.named_parameters() if n.startswith("plant.")]
+    if init_state is not None and plant is not None and config.plant == "frozen":
+        # Keep the scale and clip fitted on this refit's rows, not the ERA5 values in the weights.
+        assert model.plant is not None
+        model.plant.log_scale.copy_(plant.log_scale.to(DEVICE))
+        model.plant.clip.copy_(plant.clip.to(DEVICE))
+    angle_params = [p for n, p in model.named_parameters() if n in ("plant.tilt", "plant.azimuth")]
+    plant_params = [
+        p
+        for n, p in model.named_parameters()
+        if n.startswith("plant.") and n not in ("plant.tilt", "plant.azimuth")
+    ]
     other = [p for n, p in model.named_parameters() if not n.startswith("plant.")]
     optimiser = torch.optim.AdamW(
         [
             {"params": other, "weight_decay": common.WEIGHT_DECAY},
             {"params": plant_params, "weight_decay": 0.0},
+            {"params": angle_params, "weight_decay": 0.0, "lr": ANGLE_LEARNING_RATE},
         ],
         lr=learning_rate,
     )

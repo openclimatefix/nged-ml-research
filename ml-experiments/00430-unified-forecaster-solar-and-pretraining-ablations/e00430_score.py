@@ -39,9 +39,13 @@ GATE_TOLERANCE_PERCENT: Final[float] = 0.5
 """The reproduction gate: experiment 345's solar-only pooled network, within 0.5% (the design note)."""
 
 
+SEEDS: tuple[int, ...] = common.SEEDS_ABLATION
+"""Seeds averaged for every arm of a contrast; the same set on both sides (set with `--seeds`)."""
+
+
 def load_mine(*, arm: str) -> pl.DataFrame:
     """Return one arm's predictions with the seeds averaged quantile by quantile."""
-    files = sorted((common.PRED_DIR / arm).glob("s*.parquet"))
+    files = sorted(f for s in SEEDS for f in (common.PRED_DIR / arm).glob(f"s{s}_*.parquet"))
     if not files:
         msg = f"no predictions for {arm}"
         raise FileNotFoundError(msg)
@@ -53,7 +57,7 @@ def load_reference(*, name: str) -> pl.DataFrame:
     if name == "e345":
         files = sorted(common.E345_PRED_DIR.glob("*/own_history/solar_pooled_s*.parquet"))
     else:
-        files = sorted(c310.PRED_DIR.glob("*/own_history/blend_*.parquet"))
+        files = sorted(c310.PRED_DIR.glob("*/own_history/blend_s*.parquet"))
     frame = pl.concat([pl.read_parquet(f) for f in files])
     return average_seeds(frame=frame, arm=name)
 
@@ -61,6 +65,11 @@ def load_reference(*, name: str) -> pl.DataFrame:
 def average_seeds(*, frame: pl.DataFrame, arm: str) -> pl.DataFrame:
     """Return the frame with seeds averaged per row (a row with any non-finite quantile is dropped)."""
     frame = frame.filter(pl.all_horizontal([pl.col(c).is_finite() for c in QCOLS]))
+    frame = (
+        frame.join(frame.group_by(KEYS).agg(pl.col("seed").n_unique().alias("_n")), on=KEYS)
+        .filter(pl.col("_n") == pl.col("_n").max())
+        .drop("_n")
+    )
     return (
         frame.group_by(KEYS, maintain_order=True)
         .agg(
@@ -129,6 +138,8 @@ def contrast_table(*, arms: dict[str, pl.DataFrame], pairs: list[tuple[str, str]
                     "band": band,
                     "score_arm": float(va.mean()),
                     "score_ref": float(vb.mean()),
+                    "pin01_diff": float(a["pin01"].mean()) - float(b["pin01"].mean())  # ty: ignore[invalid-argument-type],
+                    "pin99_diff": float(a["pin99"].mean()) - float(b["pin99"].mean())  # ty: ignore[invalid-argument-type],
                     "pct_change": point,
                     "lo99": lo,
                     "hi99": hi,
@@ -201,6 +212,11 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     pl.Config.set_tbl_rows(80)
     pl.Config.set_tbl_cols(12)
+    global SEEDS  # noqa: PLW0603
+    if "--seeds" in sys.argv:
+        i = sys.argv.index("--seeds")
+        SEEDS = tuple(int(x) for x in sys.argv[i + 1].split(","))
+        del sys.argv[i : i + 2]
     mode = sys.argv[1]
     if mode == "gate":
         arms = {"g0_onepass": load_mine(arm="g0_onepass"), "e345": load_reference(name="e345")}

@@ -191,7 +191,7 @@ def bootstrap_change(
 def score_arm(*, arm: str, seeds: tuple[int, ...]) -> pl.DataFrame:
     """Return every route's group scores for the arm, averaged over the seeds, with a route column."""
     frames = []
-    routes = ("memberwise",) if arm == "a2_memberwise" else ROUTES[:-1]
+    routes = ("memberwise", "independent") if arm == "a2_memberwise" else ROUTES[:-1]
     for route in routes:
         per_seed = []
         for seed in seeds:
