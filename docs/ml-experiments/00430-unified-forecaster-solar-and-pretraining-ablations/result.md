@@ -71,35 +71,39 @@ metric: >-
 code: ml-experiments/00430-unified-forecaster-solar-and-pretraining-ablations/
 verdict: refuted
 best_arm: >-
-  The plain pooled mixture-density network with one pass on the ensemble mean and spread and the
+  The one-pass pooled mixture-density network with one pass on the ensemble mean and spread and the
   clear-sky irradiance as an extra input column (`a5_plain`): 6.80 points of capacity over all
-  bands and 5.33 at day 1, against 6.84 and 5.35 for experiment 345's network without the column.
+  bands and 5.33 at day 1, against 6.84 and 5.35 for the one-pass network without the column (three
+  seeds each).
 headline: >-
   None of the four design differences is worth adding to the pooled solar network. Passing the 51
   members through an encoder scores 0.22% better at days 3 to 10 over six seeds, with an interval
   that spans zero. The plant model scores 0.4% worse at days 6 to 10. Pretraining on ERA5 and CAMS
-  ties the network without it, and point masses at zero and capacity tie the clipped mixture.
-  Only the clear-sky irradiance column helps, by 0.4% to 0.7%, under the 1% margin.
+  scores 0.30% worse than no pretraining, and point masses at zero and capacity score 0.002% worse
+  than the clipped mixture, both with intervals wider than the 1% margin. Only the clear-sky
+  irradiance column helps, by 0.4% to 0.7%, under the 1% margin.
 lessons: >-
-  At the six metered solar farms, a network that sees the ensemble mean and spread scores within
-  0.6% of every richer design in this experiment, so the first production solar forecast can be
-  the plain network. The Schaake shuffle gives member paths a 13% lower variogram score than
-  ensemble copula coupling on the same marginals, and passing the 51 members through the network
-  one at a time gives paths that score 11% worse on the energy score.
+  At the six metered solar farms, no richer design beats a network that sees the ensemble mean and
+  spread by the 1% margin, and two (the plant model and member-wise passes) score worse, so the
+  first production solar forecast can be the one-pass network. The Schaake shuffle gives member paths
+  a 13% lower variogram score than ensemble copula coupling on the same marginals, and passing the
+  51 members through the network one at a time gives paths that score 11% worse on the energy score.
 take_home_message: >-
-  One pass of a plain neural network on the ensemble mean and spread is enough for the six solar
+  One pass of a neural network on the ensemble mean and spread is enough for the six solar
   farms: none of the four richer designs we tested beats it by the 1% margin. For the 51 coherent
-  member paths that NGED's power-flow modelling needs, reorder the plain network's 51 quantiles
+  member paths that NGED's power-flow modelling needs, reorder the one-pass network's 51 quantiles
   with a Schaake shuffle, which scores 13% better than ensemble copula coupling on the variogram
   score of the paths and the same on the energy score. Passing each member through the network
-  alone gives paths that score 11% worse on the energy score and 1% worse on the quantile score.
+  alone gives paths that score 11% worse on the energy score and a marginal quantile score 1.5%
+  worse.
 advice:
 - >-
   Train the solar network with one pass on the ensemble mean and spread, with no plant model and
   no pretraining: none of the four additions beats it by the 1% margin (Results).
 - >-
   Add the clear-sky irradiance as an input column only if a 0.4% gain at days 6 to 10 is wanted:
-  it is the one input difference with an interval excluding zero, and it is below the 1% margin
+  it is the only difference with an interval excluding zero on the favourable side, and it is below
+  the 1% margin
   (Results, A5).
 - >-
   Build 51 member paths by ranking the 51 quantiles of each half-hour with a Schaake shuffle: it
@@ -115,130 +119,150 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**One pass of a plain neural network on the ensemble mean and spread is as good as every richer
-design we tested for the six metered solar farms.** None of the four design differences beats the
-plain network by the agreed 1% margin. The 51-member encoder is 0.22% better at days 3 to 10 over
-six seeds (99% interval −0.60% to +0.18%). A plant model inside the network is 0.4% worse at days 6
-to 10. Pretraining on ERA5 and CAMS ties the network without it (+0.30%, interval −1.21% to +2.32%),
-and point masses at zero and capacity tie the clipped mixture (+0.002%). The one arm with an
-interval that excludes zero is the clear-sky irradiance column, which improves the score by 0.42% at
-days 6 to 10 over six seeds (interval −0.88% to −0.03%). That gain is under the margin.
+**A one-pass neural network on the ensemble mean and spread is not beaten by any richer design we
+tested for the six metered solar farms.** National Grid Electricity Distribution (NGED) meters the
+farms, which are labelled A to F here. A 51-member ensemble weather forecast ("the ensemble") drives
+every network. We tested four design differences, each against its reference: passing the 51
+ensemble members through an encoder (stage A2), adding a plant model inside the network (A5),
+pretraining on estimates of past weather from the ERA5 reanalysis and the CAMS irradiance product
+(A6), and adding point masses at zero and at capacity to the output (A7). G0 is the check that the
+shared code reproduces experiment 345's network. The encoder is 0.22% better at days 3 to 10 over
+six seeds (99% interval −0.60% to +0.18%), which is inside the seed noise. The plant model is 0.4%
+worse at days 6 to 10. Pretraining followed by fine-tuning is 0.30% worse (−1.21% to +2.32%), and
+point masses are 0.002% worse (−1.03% to +1.80%). The A6 and A7 intervals are wider than the 1%
+margin, so the pre-registered rule selects the one-pass network without either addition. The only
+difference with an interval that excludes zero on the favourable side is the clear-sky irradiance
+input column: it improves the score by 0.42% at days 6 to 10 over six seeds (−0.88% to −0.03%),
+under the margin.
 
-**For coherent member paths, a Schaake shuffle of the plain network's quantiles beats ensemble
+**For coherent member paths, a Schaake shuffle of the one-pass network's quantiles beats ensemble
 copula coupling on the variogram score.** NGED's power-flow modelling needs 51 member paths that are
-coherent across time and across the six farms (labelled A to F here). Ranking the 51 quantiles of
-each half-hour with 51 observed paths from a year earlier lowers the variogram score by 13.0%
-(interval −15.9% to −9.5%) and leaves the energy score unchanged (−0.08%, interval −0.22% to
-+0.10%). Passing each ensemble member through the network alone gives paths whose energy score is
-11.3% worse and whose variogram score is 20.3% worse, and a marginal quantile score that is 1.1%
-worse.
+coherent across time and across the six farms. The Schaake shuffle ranks the 51 quantiles of each
+half-hour by 51 observed paths from about a year earlier. It lowers the variogram score by 13.0%
+(−15.9% to −9.5%) against ensemble copula coupling (ECC, which ranks the quantiles by each member's
+shortwave radiation), and leaves the energy score over the whole 10 days unchanged (−0.08%, −0.22%
+to +0.10%). Passing each ensemble member through the network alone gives paths whose energy score is
+11.3% worse and whose variogram score is 20.3% worse. Its marginal quantile score is 1.5% worse over
+all bands (+0.38% to +2.80%).
 
-Absolute scores are quantile scores in points of capacity (lower is better), on experiment 310's
-scored year, farm-equal means. The reproduction gate passed with no difference: `g0_onepass` matches
-experiment 345's `solar_pooled` network to machine precision in every band, because the shared code
-with all switches off runs the same recipe with the same seeds.
+**Scores are quantile scores in points of capacity (lower is better), farm-equal means over
+experiment 310's scored year.** The G0 check passed: `g0_onepass` matches experiment 345's
+`solar_pooled` network to machine precision in every band (differences below 1e-13%), because the
+shared code with every addition switched off runs the same recipe with the same seeds.
 
 ## Results
 
-### Quantile score by arm (points of capacity; three seeds unless stated)
+### Quantile score by arm
+
+Three seeds, except `g0_onepass` (five seeds in its G0 check; the A2, A5, and A7 contrasts use seeds
+0 to 2 unless stated).
 
 | Arm | All bands | Day 1 | Days 3 to 10 |
 |---|---|---|---|
 | `g0_onepass` (one pass; experiment 345's recipe) | 6.842 | 5.350 | 7.182 |
-| `a2_mean_only` (spread dropped) | 6.841 | 5.372 | 7.175 |
-| `a2_member` (pooled 51-member encoder) | 6.810 | 5.356 | 7.141 |
+| `a2_mean_only` (spread input dropped) | 6.841 | 5.372 | 7.175 |
+| `a2_member` (51-member encoder) | 6.810 | 5.356 | 7.141 |
 | `a2_memberwise` (members passed one at a time) | 6.945 | 5.561 | 7.259 |
-| `a5_plain` (one pass plus clear-sky column) | 6.798 | 5.329 | — |
-| `a5_frozen` (plain plus frozen plant channel) | 6.833 | 5.368 | — |
-| `a5_e2e` (plain plus trained plant channel) | 6.834 | 5.369 | — |
-| `a6_ens_only` (fixed standardiser) | 6.850 | 5.356 | — |
-| `a6_finetune` (pretrain then fine-tune) | 6.870 | 5.389 | — |
-| `a6_pretrain_only` (ERA5 and CAMS only) | 7.534 | 5.751 | — |
-| `a7_atoms` (point masses) | 6.843 | 5.362 | — |
-| Experiment 310's blend (reference; six-seed `g0_onepass` is 6.830) | 6.799 | — | — |
+| `a5_plain` (one pass plus clear-sky input column) | 6.798 | 5.329 | not computed |
+| `a5_frozen` (`a5_plain` plus frozen plant channel) | 6.833 | 5.368 | not computed |
+| `a5_e2e` (`a5_plain` plus trained plant channel) | 6.834 | 5.369 | not computed |
+| `a6_ens_only` (ensemble only, fixed standardiser) | 6.850 | 5.356 | not computed |
+| `a6_finetune` (pretrain, then fine-tune) | 6.870 | 5.389 | not computed |
+| `a6_pretrain_only` (ERA5 and CAMS only) | 7.534 | 5.751 | not computed |
+| `a7_atoms` (point masses) | 6.843 | 5.362 | not computed |
 
-The six-seed one-pass network scores 0.5% above experiment 310's blend over all bands (6.830 against
-6.799). We computed no interval for that difference, so it is a point comparison only.
+"Day 1" is the 12 to 36 hour band, and "all bands" is days 1 to 10. Over six seeds, `g0_onepass`
+scores 6.830 over all bands, against 6.799 for experiment 310's blend: the difference is +0.45%
+(−1.03% to +2.15%).
 
 ![Each ablation against its reference with 99% intervals](headline.svg)
 
 *Figure 1. Percentage change in quantile score for each ablation against its reference, with 99%
-month-block intervals. The row set is the stage's own (days 3 to 10 for A2, days 6 to 10 for A5, all
-bands for A6 and A7). The dashed lines mark 0 and the 1% margin; negative is better.*
+month-block intervals, at three seeds. The row set is the stage's own (days 3 to 10 for A2, days 6
+to 10 for A5, all bands for A6 and A7). The dashed lines mark 0 and the 1% margin; negative is
+better.*
 
-### Predictions
+### Each prediction against its result
 
 - **G0 passed.** The difference to experiment 345 is below 1e-13% in every band.
-- **A2 failed.** The member route beat one pass by 0.57% at days 3 to 10 on three seeds (interval
-  −1.14% to +0.13%) and 0.22% on six seeds (−0.60% to +0.18%), against a predicted 2%. The
-  seed-spread minimum detectable effect is 0.58% for this arm. Dropping the spread input
+- **A2 failed.** The encoder beat one pass by 0.57% at days 3 to 10 on three seeds (−1.14% to
+  +0.13%) and by 0.22% on six seeds (−0.60% to +0.18%), against a predicted 2%. The six-seed minimum
+  detectable effect (from the spread between seeds) is 0.58% for this arm. Dropping the spread input
   (`a2_mean_only`) changes the score by −0.10% (−0.56% to +0.34%). The member-wise arm is 1.07%
   worse at days 3 to 10 (+0.08% to +2.14%) and 3.9% worse at day 1.
 - **A6 failed.** Pretraining followed by fine-tuning is 0.30% worse than the ensemble-only arm over
-  all bands (−1.21% to +2.32%), against a predicted 1% better. The three fine-tuned seeds spread
-  widely (standard deviation 0.092 points), so the minimum detectable effect is 2.1%, and a gain
-  below that cannot be ruled out. The ERA5-and-CAMS-only arm is 9.99% worse (+5.78% to +13.58%) over
-  all bands and 7.4% worse at day 1.
-- **A5 failed.** The frozen plant channel is 0.40% worse than the plain arm at days 6 to 10 (+0.004%
-  to +0.76%) and 0.74% worse at day 1 (−0.11% to +1.55%). The trained plant is 0.41% worse at days 6
-  to 10 (+0.02% to +0.76%), the same as the frozen plant. Experiment 313 found a 3.4% gain from a
-  plant at days 8 to 10; the explanation we tested is in the next paragraph.
-- **A7 failed on its coverage clause and passed on its tail-harm clause.** The 0.99 pinball loss is
-  0.010 points higher (limit 0.02) and the 0.01 pinball loss is 0.006 lower. The coverage of the
-  0.99 quantile rises from 0.9834 to 0.9887 (target 0.99). The coverage of the 0.01 quantile is
-  0.0513 against 0.0532; the target is 0.01. Both are near 5%, which we did not investigate.
+  all bands (−1.21% to +2.32%), against a predicted gain of at least 1%. The three fine-tuned seeds
+  spread widely (standard deviation 0.092 points), so the minimum detectable effect is 2.1% (0.18%
+  for the ensemble-only arm and 0.14% for the ERA5-and-CAMS-only arm), and a gain below 2.1% cannot
+  be ruled out. The ERA5-and-CAMS-only arm is 9.99% worse (+5.78% to +13.58%) over all bands and
+  7.4% worse at day 1.
+- **A5 failed.** The frozen plant channel is 0.40% worse than `a5_plain` at days 6 to 10 (+0.004% to
+  +0.76%) and 0.74% worse at day 1 (−0.11% to +1.55%). The trained plant is 0.41% worse at days 6 to
+  10 (+0.02% to +0.76%), the same as the frozen plant.
+- **A7 met its tail-harm limit and did not move the coverage.** Against `g0_onepass`, the 0.01
+  pinball loss is 0.017 points lower and the 0.99 pinball loss is 0.008 points higher (the limit is
+  0.02 points). The coverage of the 0.99 quantile rises from 0.9834 to 0.9887 (target 0.99). The
+  coverage of the 0.01 quantile moves from 0.0532 to 0.0513 (target 0.01), so that quantile still
+  covers about 5% of observations. The score is unchanged.
 
-**The plant result is probably not comparable with experiment 313's.** The plain arm adds the
-clear-sky irradiance as an input column so that the plant arms differ from it only by the plant
-channel. The column alone improves on the one-pass network by 0.71% at days 6 to 10 on three seeds
-(−1.31% to −0.14%) and by 0.42% on six seeds (−0.88% to −0.03%). The six-seed minimum detectable
-effect is 0.37%, so the estimate is just above seed noise. The audit found that experiment 430 uses
-experiment 345's columns, which have none of experiment 313's plant, plant-spread, or lag columns,
-and that its plant has one pooled scale at tilt 20 degrees where experiment 310's has a scale per
-farm at tilt 35 degrees. The audit also found that the plant is nearly a function of inputs the
-network already has: its error is only 1% to 3% below that of the ensemble shortwave alone. We did
-not re-run experiment 313's design, so we cannot say why the gains differ. We also did not record
-the learned tilt, azimuth, scale, and clip of the trained plant, so whether the network ignores the
-plant channel is untested.
+**The clear-sky column improves the one-pass network by a little.** The `a5_plain` arm adds the
+clear-sky irradiance (the radiation under a cloudless sky, from the sun's position) as an input
+column so that the plant arms differ from it only by the plant channel. The column alone improves on
+the one-pass network by 0.71% at days 6 to 10 on three seeds (−1.31% to −0.14%) and by 0.42% on six
+seeds (−0.88% to −0.03%). The six-seed minimum detectable effect is 0.37%, so the estimate is just
+above seed noise.
+
+**The plant result may not be comparable with experiment 313's.** Experiment 313 found a 3.4% gain
+from a plant at days 8 to 10. The audit found two differences. Experiment 430 uses experiment 345's
+input columns, which have none of experiment 313's plant, plant-spread, or lag columns. Its plant
+also has one pooled scale at tilt 20 degrees, where experiment 310's has a scale per farm at tilt 35
+degrees. The audit also found that the plant is nearly a function of inputs the network already has:
+the plant's error is only 1% to 3% below that of the ensemble shortwave radiation alone. We did not
+re-run experiment 313's design, so we cannot say why the gains differ.
 
 ### Coherence of the 51 member paths
 
-**The Schaake shuffle is the only route that lowers a score the others cannot match.** The reference
-is the one-pass network with ensemble copula coupling (ECC). The energy score barely separates the
-routes, because it is dominated by the marginal accuracy. The variogram score separates them
-clearly.
+**The Schaake shuffle lowers the variogram score by 13% on both the one-pass and the encoder
+marginals.** The reference is the one-pass network with ECC. The energy score separates the routes
+little, because the marginal accuracy dominates it. The variogram score separates them clearly. The
+energy score is the mean distance of the 51 member paths to the observed path, minus half the mean
+distance between members. The variogram score compares the observed and the ensemble-mean
+differences between pairs of half-hours at the same farm up to 6 hours apart, and between farms at
+the same time.
 
 | Arm and route | Energy score vs reference | Variogram score vs reference |
 |---|---|---|
 | One pass, ECC (reference) | 0 | 0 |
 | One pass, Schaake shuffle | −0.08% (−0.22% to +0.10%) | −13.0% (−15.9% to −9.5%) |
 | One pass, independent draws | +0.26% (+0.11% to +0.47%) | +14.3% (+4.8% to +27.7%) |
-| Member encoder, ECC | −0.40% (−1.03% to +0.15%) | +0.5% (−0.1% to +1.2%) |
-| Member encoder, Schaake shuffle | −0.48% (−1.08% to +0.12%) | −13.0% (−15.9% to −9.5%) |
+| Encoder, ECC | −0.40% (−1.03% to +0.15%) | +0.5% (−0.1% to +1.2%) |
+| Encoder, Schaake shuffle | −0.48% (−1.08% to +0.12%) | −13.0% (−15.9% to −9.5%) |
 | Member-wise, own paths | +11.25% (+10.43% to +12.21%) | +20.3% (+16.3% to +23.9%) |
 | Member-wise, independent draws | +1.58% (+0.50% to +2.75%) | +16.8% (+6.5% to +32.5%) |
+
+Rows cover the six farms and 10 days jointly. In each separate day band, the Schaake shuffle lowers
+the energy score too: by 0.89% at day 1 (−1.06% to −0.73%).
 
 ![Energy and variogram score of each route](coherence.svg)
 
 *Figure 2. Energy score (with 99% intervals) and variogram score of each route against one pass with
-ECC, over six farms and 10 days jointly. Negative is better. Variogram intervals are in the table.*
+ECC, over six farms and 10 days jointly. Negative is better. The variogram intervals are in the
+table.*
 
-- **The member-wise paths are worse than the independent floor on both scores.** Keeping each
-  member's identity through the network does not produce coherent paths, because each member is
-  drawn at one fixed quantile level, so a member's path is a single level of the member's own
-  distribution and not a coherent trajectory.
-- **The member route does not change the coherence ranking.** Its marginal gain of 0.4% to 0.5% in
-  energy score is inside the intervals.
-- **The Schaake shuffle's history is partly random for farm E.** Farm E has no observed power a year
-  earlier, so its ranks come from random draws, and the shuffle's gain comes from the five farms
-  that have history.
+- **The member-wise paths score worse than independent draws on the energy score.** The energy score
+  is 11.25% worse for the member-wise paths and 1.58% worse for independent draws of the same
+  marginal. On the variogram score the two intervals overlap. Each member is drawn at one fixed
+  quantile level, so a member's path is one level of that member's own distribution and not a
+  coherent trajectory.
+- **The encoder does not change the coherence ranking.** Its energy-score gain of 0.4% to 0.5% is
+  inside the intervals.
 
 ### Per-member quantiles
 
-**Each member's own quantiles are almost as good as the pooled mixture of the 51 members.** NGED's
-proposed deliverable is a 51-member power ensemble in which each member is a quantile forecast. We
-scored each member's 11 quantiles alone against the observation, and the equal-weight mixture of the
-51 members.
+**Each member's own quantiles score almost as well as the equal-weight mixture of the 51 members.**
+NGED's proposed deliverable is a 51-member power ensemble in which each member is a quantile
+forecast. We scored each member's 11 quantiles alone against the observation, and the mixture of the
+51 members, for the member-wise arm.
 
 | Level | Coverage, one member | Coverage, mixture | Pinball loss, one member | Pinball loss, mixture |
 |---|---|---|---|---|
@@ -250,16 +274,19 @@ scored each member's 11 quantiles alone against the observation, and the equal-w
 | 0.95 | 0.9411 | 0.9433 | 1.382 | 1.375 |
 | 0.99 | 0.9855 | 0.9864 | 0.323 | 0.322 |
 
-Pinball loss is in points of capacity. A single member's quantiles score within 0.5% of the mixture
-at each level, so the spread of the 51 members adds little to the single member's own distribution.
-This follows from the member-wise training: the network sees one random member and zero spread, so
-each member's distribution already carries the ensemble spread. It also means the member-wise route
-counts the spread twice, which we did not correct for.
+Pinball loss is in points of capacity, a row-weighted mean over seeds 0 to 2 (the Tails table below
+uses farm-equal means, so the two tables differ). A single member's quantiles score within 0.6% of
+the mixture at every level. The member-wise training is the likely cause: the network sees one
+random member with the spread input set to zero, so each member's distribution already carries the
+ensemble spread. We did not test this.
 
-### Tails
+### Tail quantiles
 
-**No arm changes the tails by more than the 0.02-point limit.** The 0.01 and 0.99 coverage of every
-arm is between 0.051 and 0.067 and between 0.963 and 0.989.
+**The 0.01 quantile covers 5% to 7% of observations in every arm, against a target of 1%.** The
+tail-harm limit of 0.02 points holds against each arm's own reference, except for the
+ERA5-and-CAMS-only arm, which is 0.11 points worse at the 0.01 pinball loss and 0.16 points worse at
+the 0.99 pinball loss than the ensemble-only arm. The coverage of the 0.99 quantile is between 0.963
+and 0.989.
 
 | Arm | 0.01 pinball | 0.99 pinball | Coverage of 0.01 | Coverage of 0.99 | Median minus mean (points) |
 |---|---|---|---|---|---|
@@ -270,6 +297,8 @@ arm is between 0.051 and 0.067 and between 0.963 and 0.989.
 | `a6_pretrain_only` | 0.456 | 0.493 | 0.0667 | 0.9632 | +0.061 |
 | `a5_plain` | 0.337 | 0.335 | 0.0524 | 0.9850 | −0.071 |
 | `a7_atoms` | 0.326 | 0.344 | 0.0513 | 0.9887 | +0.108 |
+
+Farm-equal means over all bands, three seeds. The `a6_ens_only` reference has 0.345 and 0.335.
 
 ### Example forecasts
 
@@ -285,63 +314,63 @@ Bands show the 25% to 75% and 5% to 95% quantiles; the dots are the observed out
 ### Checks
 
 - **Median minus mean forecast, per farm.** Averaged over all rows, the median forecast sits 0.39 to
-  0.83 points of capacity above the mean forecast at each farm for the one-pass, member-encoder,
-  plain, and point-mass arms. Averaged by month, the difference runs from −3.4 to +3.9 points for
-  the one-pass arm, with the sign set by the season, so the farm-equal month-equal mean in the Tails
-  table is near zero. The point-mass arm moves the difference from −0.03 to +0.11 points.
+  0.83 points of capacity above the mean forecast at each farm, for the one-pass, encoder,
+  `a5_plain`, and point-mass arms. Averaged by month, the difference for the one-pass arm runs from
+  −3.4 to +3.9 points, with the sign set by the season, so the farm-equal, month-equal mean in the
+  Tail quantiles table is near zero.
 - **Mean-forecast error beside the quantile-score contrasts.** The mean absolute error of the mean
-  forecast moves in the same direction as the quantile score for the member encoder and the plain
-  arm, farm by farm (`scores/checks.csv`).
-- **Triggers fired.** Trigger 2 fired, because every A-stage prediction failed and the plant result
-  differs from experiment 313's. Triggers 1, 3, 4, 5, and 6 did not fire, and trigger 7 does not
-  apply. The Audit section gives the findings.
+  forecast moves in the same direction as the quantile score for the encoder and for `a5_plain`,
+  farm by farm (`scores/checks.csv`). One farm moves the other way for one arm, by an amount inside
+  the seed noise.
+- **Triggers fired.** Of the seven audit triggers in the `ml-experiment` skill, trigger 2 fired,
+  because every A-stage prediction failed and the plant result differs from experiment 313's.
+  Triggers 1, 3, 4, 5, and 6 did not fire, and trigger 7 does not apply. The next section gives the
+  audit findings.
 
 ### Audit
 
 A fresh Sonnet agent re-derived the headline contrasts from the stored forecasts with its own code
 and tried to break the method.
 
-- **Re-derivation:** all seven headline contrasts match `scores/headline.csv` to four decimals, and
-  the gate is bit-identical to experiment 345 on all 410,899 rows. Accepted, no change.
+- **Re-derivation:** the seven contrasts it re-derived match `scores/headline.csv` to four decimals,
+  and the G0 check is bit-identical to experiment 345 on all 410,899 rows. Accepted, no change.
 - **Seed noise is the main risk.** Per-seed A2 contrasts run from −0.87% to +0.94%, and per-seed A5
-  contrasts from −1.31% to +0.36%. This is why the second seed set was run, and the six-seed
-  figures shrink both effects. Accepted; the page reports six-seed figures for these two arms.
-- **No leakage, misalignment, or clipping fault:** training rows end one day before the refit,
-  the standardiser matches a recompute on data before 2025-08-31, the validation window is the last
-  61 days, ERA5 and CAMS rows stop before 2024-04-01, and all quantiles lie within the farm's
-  ceiling.
+  contrasts from −1.31% to +0.36%. The second seed set was run for this reason, and the six-seed
+  figures shrink both effects. Accepted: the page reports six-seed figures for these two arms.
+- **No leakage, misalignment, or clipping fault:** training rows end one day before the refit, the
+  standardiser matches a recompute on data before 2025-08-31, the validation window is the last 61
+  days, ERA5 and CAMS rows stop before 2024-04-01, and all quantiles lie within the farm's ceiling.
 - **Plant:** it matches experiment 310's NumPy plant at tilt 35 degrees, and a mirrored azimuth
-  scores clearly worse. The plant adds little over the shortwave input. Whether the trained plant's
-  parameters moved is untested (Caveats).
+  scores clearly worse. The plant adds little over the shortwave input.
 - **Leave-one-farm-out:** no sign flips for A2 or A5. Farms C and E carry most of the A2 gain.
 - **Mean-forecast error:** no disagreement with the quantile score that matters, so trigger 3 did
   not fire.
-- **Coherence:** the pair set, the energy score, and the variogram score match for ECC on one
-  month. The Schaake score differs by 0.016 in energy, from the random fill of about 5% of the
-  missing history, and the Schaake history is at least 340 days old.
+- **Coherence:** the pair set, the energy score, and the variogram score match for ECC on one month.
+  The Schaake score differs by 0.016 in energy, from the random fill of about 5% of the missing
+  history, and the Schaake history is at least 340 days old.
 - **Not checked by the audit:** the other three coherence months, the bootstrap intervals, and
   experiment 313.
-- **Cosmetic, fixed:** `headline.csv` listed the two A6 contrasts twice under `all`.
 
 ### Caveats
 
-- **The member-wise route double-counts spread.** The network is trained with the spread input set
-  to zero on one member, and the marginal is then the mixture of 51 member distributions, so the
-  spread enters twice.
-- **The Schaake shuffle is partly random for farm E.** See Coherence.
+- **The member-wise route counts the spread twice.** The network is trained with the spread input
+  set to zero on one member, and the marginal is then the mixture of 51 member distributions, so the
+  spread enters the forecast twice.
+- **The Schaake shuffle's history is partly random for farm E.** Farm E has no observed power a year
+  earlier, so its ranks come from random draws, and the shuffle's gain comes from the five farms
+  that have history.
 - **The variogram uses pairs up to 6 hours apart at one farm**, which misses the gap between one day
   and the next at night, so it scores the daytime structure only.
 - **The `a6_*` arms have ERA5 rows with a single member.** The pretrained network sees no spread
-  there, and its fine-tuning rows are the only ones with a spread.
+  there, and the fine-tuning rows are the only ones with a spread.
 - **Seed averaging differs between scores.** The marginal score averages the quantiles of the seeds,
   and the coherence scores average the scores of the seeds' paths.
 - **The second seed set covers three arms** (`g0_onepass`, `a2_member`, `a5_plain`). The other
-  contrasts use three seeds and their minimum detectable effects (0.14% to 2.1%) are in the text.
-- **The trained plant's parameters were not logged**, so the finding that the plant adds nothing
-  does not show whether the network used the channel.
-- **A6 for wind was not run.** Experiment 429's merged code has no pretraining arm, and the manager
-  deferred it. The solar A6 tie (+0.30%) and the finding that the wind default already trains on
-  ERA5 argue against urgency.
+  contrasts use three seeds, and their minimum detectable effects run from 0.14% to 2.1%.
+- **The trained plant's parameters (tilt, azimuth, scale, and clip) were not logged**, so we cannot
+  say whether the network used the plant channel.
+- **The A6 arms for wind were not run.** Experiment 429's merged code has no pretraining arm, and
+  the manager deferred them.
 
 ### Problems caused by the move
 
