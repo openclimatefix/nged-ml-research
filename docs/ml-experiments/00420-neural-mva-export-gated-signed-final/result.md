@@ -180,6 +180,22 @@ is not flagged as underpowered at stage 1. The figure is computed by
 `e00420_score.py mde-stage1` and stored in `work/mde_stage1.json`, which the script refuses to
 overwrite. The stage-1 bars are scored after this commit.
 
+## Stage 1 result (interim: rotation r1, seed 0, seven test months, no multiple-comparison correction)
+
+**A passes the stage-1 stop rule, so stage 2 follows.** Values are points of effective capacity,
+with 95% month-block intervals. The stage-1 scores are in `work/scores_stage1.json`.
+
+- **B1, A against P0 on reverse-flow rows:** a gain of 8.29 (5.98 to 10.63), 4.66 at D5 and 12.26
+  at D10, far above the 0.404 minimum detectable effect. A scores 4.98 on those rows against 13.27
+  for P0.
+- **B3, A against A-shuffle:** a gain of 4.20 (2.74 to 5.81).
+- **B2, AV against A:** AV is worse by 0.12 (-0.33 to +0.06), so B2 fails at stage 1. AV's own gain over P0 is 8.17.
+- **B4 at D5, no injection:** A's signed CRPS is 0.021 above P0 (0.003 to 0.043) and AV's 0.024
+  (0.014 to 0.033), inside the +0.05 limit. The untested placebo Primaries of rotations r2 and r3 are
+  the open risk.
+- **B5, reading CRPS at the eight, against P0:** A is 0.058 worse (-0.030 to 0.200), just above the
+  +0.05 limit, and AV is 0.009 worse (-0.021 to 0.044), inside it.
+
 ## Fits and stop rule
 
 | Batch | Fits |
