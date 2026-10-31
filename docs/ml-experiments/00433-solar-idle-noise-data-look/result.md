@@ -28,16 +28,14 @@ prediction: >-
 decision_rule: >-
   Definitions fixed before any number is read. Night: solar elevation below -6 degrees at the
   mid-point of the half-hour (pvlib, the farm's coordinates). Repeat: a reading equal to the
-  previous half-hour's reading. Quantisation step: the smallest positive difference between two
-  night readings that at least 1% of night readings share, reported with the share of night readings
-  that are an integer multiple of it. Floor: the median of night readings. Texture signature
+  previous half-hour's reading. Quantisation step: order the distinct night readings (rounded to 1e-6 MW), take the gaps between adjacent distinct readings, and choose the smallest gap such that readings above gaps no larger than it make up at least 1% of night readings; the lattice share is the share of night readings that are an integer multiple of that step. Night rows need the previous half-hour present, so repeats are defined. Floor: the median of night readings. Texture signature
   present at a farm when all four hold, each with a year-block bootstrap 90% interval (blocks are
   calendar years, 2,000 resamples) lying wholly on the stated side: (1) exact zeros plus non-zero
   repeats are at least 20% of night readings; (2) at least 80% of night readings sit on a lattice
   of the quantisation step; (3) the night median is at least 0.1% of capacity, or at least 5% of
   night readings are negative; (4) the summer (May to August) night median is within a factor of
   two of the winter (November to February) night median, so the floor does not follow the season.
-  Report "the same noise" at a farm only when the signature is present. Report "not the same" when
+  Report "the same noise" at a farm only when the signature is present. Report "not the same" (on point estimates) when
   at least 90% of night readings are exact zeros, or when fewer than 20% are zeros or repeats and
   no lattice of 80% exists. Anything else is "mixed", with the failing criterion named. Overall
   verdict `supported` (H0) if "not the same" holds at five or more farms, `refuted` if "the same
