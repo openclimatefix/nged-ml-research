@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Arm J4 of experiment 436: the member-anchored Schaake shuffle.
 
 No fit. For each joint run, scenario k takes the observed path of the past date whose weather best
