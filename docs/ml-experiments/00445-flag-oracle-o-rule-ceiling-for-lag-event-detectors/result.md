@@ -170,6 +170,10 @@ The signed-MW six are the Primaries metered in signed megawatts, the MVA-only ei
   the six is 9.81 for B-mix, 10.06 for A0-inj, 10.06 for O-lagless, 10.19 for O-hard, 10.17 for
   O-soft, and 9.99 for O-floor, so the median agrees in direction with every quantile-score
   contrast (trigger 3 did not fire).
+- **Numbers review.** A fresh Sonnet agent re-derived every pooled mean, by-count mean, point
+  contrast, and identity check from the stored forecasts with its own code and found no wrong number.
+  Its own clustering gave O-floor's inside-event interval a lower endpoint of +0.02 to +0.03 against
+  -0.004 here, so O-floor's gap to B-mix inside real events is marginal. Its point estimates agreed.
 - **Triggers.** Trigger 2 fired: the result contradicts predictions P1 (O-rules beat B-mix on
   injected harm rows: they lose by 0.29 and 0.24) and P2 (hard minus B-mix between -0.4 and +0.2
   inside real events: it is +0.465). The explanation, tested in this experiment, is that the 50/50
