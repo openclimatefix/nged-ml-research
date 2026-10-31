@@ -8,7 +8,7 @@ theme: production-reference-and-best-guess
 also_relevant_to:
   - solar-disaggregation
   - calibration-and-uncertainty
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -83,9 +83,61 @@ metric: >-
   0.7).
 date: 2026-10-31
 code: ml-experiments/00427-neural-mva-trajectory-labeller-and-two-channel-inputs/
+verdict: not supported
+best_arm: >-
+  none. The labeller ranked reverse-flow rows as well as arm A (area 0.887 against 0.880 at level
+  1.0) but missed its recall bar and invented reverse flow at D5, so no network was fitted.
+headline: >-
+  A whole-day labeller trained on four visible Primaries ranked reverse-flow half-hours as well as
+  experiment 420's arm A (area 0.887 against 0.880), but its recall at a 5% false-reverse rate was
+  0.22 pooled and 0.52 macro-averaged against a 0.60 bar, and with nothing injected it called
+  reverse flow on 61.7% of D5's sunny-midday half-hours (64.1% of arm A's rows) against 0% at D9,
+  D11, D14, and D16.
+lessons:
+  - >-
+    A labeller trained on high-demand Primaries does not transfer to low-demand ones: D5 and D10,
+    the hidden pair of rotation r1, have a mean sunny-midday reading near 19 points of capacity
+    against 44 to 58 at the four visible Primaries, and the labeller flagged reverse flow on 61.7%
+    of D5's and 22.6% of D10's sunny-midday half-hours with nothing injected.
+  - >-
+    Reading a whole day does help the day-level call (area 0.903 for injected against placebo days,
+    against 0.702 for the hand-made day-flip diagnostic), but arm A already ranks rows equally well.
+  - >-
+    Pooling Primary-months sets one threshold for all of them and cuts the recall at a 5%
+    false-reverse rate to 0.22 from 0.52 macro-averaged, so a recall bar needs a stated pooling.
+take_home_message: >-
+  A small neural network that reads a whole day of meter readings and marks each half-hour as
+  reverse flow or not ranks the half-hours about as well as the gated forecast network of
+  experiment 420, but no better, and it wrongly marks about three in five of D5's sunny middays as
+  reverse flow
+  when no solar farm was added. The labeller was trained on four higher-demand Primaries, so the
+  next step is to train a sign labeller on a mix that includes low-demand Primaries, or to accept
+  arm A as the candidate and test it on ensemble weather.
+advice:
+  - >-
+    Do not add a whole-day sign labeller to arm A as it stands: it ranks rows no better (area 0.887
+    against 0.880) and invents reverse flow at D5 (step 0 result).
+  - >-
+    Score a sign labeller on a Primary whose demand level lies outside its training Primaries before
+    trusting it, because the labeller failed at D5 and D10, whose readings are a third of the
+    training Primaries' (step 0 result, D5 and D10).
+  - >-
+    Print the recall at a fixed false-reverse rate per Primary-month beside the pooled value,
+    because pooling moved it from 0.52 to 0.22 (step 0 table).
+production_status: not-for-production
+adopted_in: none
 ---
-**Status: planned. Nothing has been fitted. This page records the plan and the changes made to it
-after reading the latest results.**
+**Take-home: a whole-day sign labeller ranks reverse-flow half-hours about as well as experiment
+420's export-gated network (arm A) but no better, and it invents reverse flow at D5, so the
+network stage did not run. The result is not supported.** The labeller marks 61.7% of D5's sunny-
+midday
+half-hours as reverse flow when nothing was added (64.1% of the rows that arm A is scored on,
+because the row set repeats each half-hour once per forecast run), against 0% at D9, D11, D14, and
+D16. Its recall at a 5%
+false-reverse rate is 0.22 pooled and 0.52 macro-averaged, against a bar of 0.60 and arm A's 0.21
+and 0.46. D5 and D10 have a mean sunny-midday reading near 19 points of capacity against 44 to 58
+at the four Primaries the labeller trained on, which is the likely cause (not tested by a retrained
+labeller).
 
 **This experiment asks whether the export-gated neural network of experiment 420 can be improved
 where it is weakest.** Eight Primary substations report only the size of the power that flows, not
@@ -200,24 +252,40 @@ recalls are on the sunny slice of the hidden pair's test-month rows at level 1.0
 on the identical rows. No interval is given: step 0 pools 21 labellers and the macro-average over
 Primary-months is the spread measure.
 
+![The share of sunny-midday half-hours with a probability of reverse flow above 0.5 when nothing is injected, by Primary](false_reverse.svg)
+
 | Measure | Labeller, pooled | Arm A, pooled | Labeller, macro | Arm A, macro |
 |---|---|---|---|---|
 | Area | 0.887 | 0.880 | 0.897 | 0.880 |
 | Recall at 5% false reverse | 0.223 | 0.211 | 0.517 | 0.457 |
 | Expected calibration error | 0.072 | 0.050 | 0.108 | 0.095 |
 
-- **L1 fails on recall.** The area (0.887) passes its bar and is no worse than arm A's. The recall at
+- **L1 fails on recall.** The area (0.887) passes its bar and is no worse than arm A's. The recall
+at
   5% false reverse is 0.223 pooled and 0.517 macro-averaged, both under the 0.60 bar. The pooled
   figure is low because pooling Primaries with different base rates sets one threshold for all.
-- **L2 fails at D5.** With nothing injected, `pi > 0.5` falls on 64.1% of D5's sunny-midday
-  half-hours, and on 0% at D9, D11, D14, and D16 (arm A: 0% at all five). The labeller, trained on
+- **L2 fails at D5.** With nothing injected, `pi > 0.5` falls on 64.1% of D5's sunny-midday rows
+  (61.7% of its unique half-hours; the rows repeat each half-hour once per forecast run), and on 0%
+  at D9, D11, D14, and D16 (arm A: 0% at all five). The labeller, trained on
   D9, D11, D14, and D16, invents reverse flow at D5.
-- **Day-level area:** 0.903 for injected against placebo days at level 1.0 (325 and 1,001 days), against 0.702 for
+- **Day-level area:** 0.903 for injected against placebo days at level 1.0 (325 and 1,001 days),
+against 0.702 for
   design I and 0.58 for design C. The labeller reads a whole day better than the hand-made
   diagnostics, but ranks rows no better than arm A.
-- **Decision (registered rule):** the labeller networks (L, TDL, TDL-perm) do not run. Only T, TD,
-  and the two refits of A (128 fits) remain, and the manager decides whether to run them.
+- **Decision (registered rule):** the labeller networks (L, TDL, TDL-perm) do not run. The manager
+  also decided not to run T, TD, and the two refits of A (128 fits).
+
+## Checks
+
+- **Median minus mean forecast:** not applicable; step 0 fitted no forecast.
+- **Mean-forecast error beside the quantile score:** not applicable, for the same reason.
+- **Triggers fired:** trigger 1 (a placebo control fails: D5 at no injection) and trigger 2 (the
+  result contradicts the prediction that L1 and L2 would pass). A fresh Sonnet audit ran; its
+  findings are triaged in the pull request.
 
 ## What the next experiment should answer
 
-To be written after the results.
+Train the sign labeller on a mix of Primaries that spans the demand levels of the hidden ones, and
+test that against arm A first on D5 and D10 with nothing injected. If that also fails, keep arm A as
+the candidate and run its ensemble-weather test with the laboratory-trained network applied to
+ensemble inputs beside the retrained one.
