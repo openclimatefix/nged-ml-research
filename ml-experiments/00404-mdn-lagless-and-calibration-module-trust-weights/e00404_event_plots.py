@@ -84,24 +84,24 @@ def figure(*, site: str, month: str, onset: int, end: int, number: int) -> None:
         day=(pl.col("target") - onset) / 48.0
     )
     band = mix.with_columns(day=(pl.col("target") - onset) / 48.0)
-    day_range = [float(lines["day"].min()), float(lines["day"].max())]
+    day_range = [float(lines["day"].min()), float(lines["day"].max())]  # ty: ignore[invalid-argument-type]
     x = alt.X(
         "day:Q",
         title="Days since the event began (shaded: the event)",
         scale=alt.Scale(domain=day_range),
     )
     shade = (
-        alt.Chart(pl.DataFrame({"a": [0.0], "b": [(end - onset) / 48.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"a": [0.0], "b": [(end - onset) / 48.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rect(color=theme.GREY_3, opacity=0.35)
         .encode(x="a:Q", x2="b:Q")
     )
     area = (
-        alt.Chart(band.to_pandas())
+        alt.Chart(band.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_area(color=theme.BRAND_ORANGE, opacity=0.18)
         .encode(x=x, y=alt.Y("low:Q", title="Power (% of capacity)"), y2="high:Q")
     )
     line = (
-        alt.Chart(lines.to_pandas())
+        alt.Chart(lines.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_line(aria=False)
         .encode(
             x=x,

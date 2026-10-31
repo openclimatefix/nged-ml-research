@@ -500,7 +500,7 @@ def forward(
     trust = torch.stack(
         [
             rows_mod.trust_inputs(
-                stack=stack,
+                stack=stack,  # ty: ignore[invalid-argument-type]
                 primary=primary,
                 lag_grid=lag_grid[idx],
                 origin=pool.origin[idx],
@@ -510,7 +510,7 @@ def forward(
         ],
         dim=1,
     )
-    trust = ((trust - scalers.trust_mean) / scalers.trust_std).clamp(-CLIP_SD, CLIP_SD)
+    trust = ((trust - scalers.trust_mean) / scalers.trust_std).clamp(-CLIP_SD, CLIP_SD)  # ty: ignore[unsupported-operator]
     for lag in masked:
         trust[:, :, lag * rows_mod.N_PER_LAG : (lag + 1) * rows_mod.N_PER_LAG] = 0.0
     window = None
@@ -518,7 +518,7 @@ def forward(
         window = torch.stack(
             [
                 rows_mod.window_input(
-                    stack=stack,
+                    stack=stack,  # ty: ignore[invalid-argument-type]
                     primary=primary,
                     lag_grid=lag_grid[idx],
                     origin=pool.origin[idx],
@@ -575,7 +575,7 @@ def fit_arm(
         device=device,
     )
     lags, lag_grid = lag_features(
-        pool=train,
+        pool=train,  # ty: ignore[invalid-argument-type]
         power=power,
         lag_stats=lag_stats,
         device=device,
@@ -584,16 +584,16 @@ def fit_arm(
     )
     metered = torch.tensor(metered_indicator(), device=device)
     torch.manual_seed(seed)
-    net = build_network(arm=arm, n_base=train.base.shape[1], n_trust=rows_mod.N_TRUST).to(device)
+    net = build_network(arm=arm, n_base=train.base.shape[1], n_trust=rows_mod.N_TRUST).to(device)  # ty: ignore[unresolved-attribute]
     if trust_arm(arm=arm) is not None:
-        sample = torch.randperm(len(train), device=device)[:TRUST_SAMPLE]
+        sample = torch.randperm(len(train), device=device)[:TRUST_SAMPLE]  # ty: ignore[invalid-argument-type]
         stats = torch.stack(
             [
                 rows_mod.trust_inputs(
                     stack=stack,
-                    primary=train.primary[sample],
+                    primary=train.primary[sample],  # ty: ignore[unresolved-attribute]
                     lag_grid=lag_grid[sample],
-                    origin=train.origin[sample],
+                    origin=train.origin[sample],  # ty: ignore[unresolved-attribute]
                     step=0,
                 )
             ]
@@ -603,7 +603,7 @@ def fit_arm(
     optimiser = torch.optim.Adam(net.parameters(), lr=LEARNING_RATE)
     tm = torch.tensor(scalers.target_mean, dtype=torch.float32, device=device)
     ts = torch.tensor(scalers.target_std, dtype=torch.float32, device=device)
-    n = len(train)
+    n = len(train)  # ty: ignore[invalid-argument-type]
     losses = []
     for epoch in range(epochs):
         net.train()
@@ -612,15 +612,15 @@ def fit_arm(
         for start in range(0, n, BATCH):
             idx = order[start : start + BATCH]
             out = forward(
-                net=net, pool=train, idx=idx, lags=lags, stack=stack, lag_grid=lag_grid,
+                net=net, pool=train, idx=idx, lags=lags, stack=stack, lag_grid=lag_grid,  # ty: ignore[invalid-argument-type]
                 scalers=scalers, metered=metered, masked=(0,) if arm == "B5" else (),
                 event_mask=event_mask,
                 power=power,
             )  # fmt: skip
             log_w, mean, std = out[0] if isinstance(out[0], tuple) else out
-            z = (train.y[idx] - tm[train.primary[idx]]) / ts[train.primary[idx]]
+            z = (train.y[idx] - tm[train.primary[idx]]) / ts[train.primary[idx]]  # ty: ignore[unresolved-attribute]
             nll = models.mixture_nll_parts(log_w=log_w, mean=mean, std=std, z=z)
-            w = train.weight[idx]
+            w = train.weight[idx]  # ty: ignore[unresolved-attribute]
             loss = (nll * w).sum() / w.sum()
             optimiser.zero_grad()
             loss.backward()
@@ -636,7 +636,7 @@ def fit_arm(
             "arm": arm,
             "month": month,
             "seed": seed,
-            "n_base": train.base.shape[1],
+            "n_base": train.base.shape[1],  # ty: ignore[unresolved-attribute]
             "target_mean": scalers.target_mean,
             "target_std": scalers.target_std,
             "standardiser_mean": scalers.standardiser.mean,

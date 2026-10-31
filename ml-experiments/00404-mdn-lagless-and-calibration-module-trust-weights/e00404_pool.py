@@ -71,7 +71,7 @@ def pool(*, arms: list[str], reference: str) -> tuple[pl.DataFrame, pl.DataFrame
                             "cls": cls,
                             "month": month,
                             "seed": seed,
-                            "score": float(frames[arm].filter(pl.Series(mask))["crps"].mean()),
+                            "score": float(frames[arm].filter(pl.Series(mask))["crps"].mean()),  # ty: ignore[invalid-argument-type]
                         }
                     )
             if arm == reference:
@@ -140,7 +140,7 @@ def main() -> None:
                 "arm": arm,
                 "cells": len(part),
                 "months": part["month"].n_unique(),
-                "absolute": float(score_part["score"].mean()),
+                "absolute": float(score_part["score"].mean()),  # ty: ignore[invalid-argument-type]
                 "minus_ref": mean,
                 "low": low,
                 "high": high,
@@ -160,7 +160,7 @@ def main() -> None:
             & (pl.col("group") == row["group"])
             & (pl.col("cls") == row["cls"])
         ).join(arm_cells, on=["month", "seed"])
-        ref_rows.append(float(ref_part["score"].mean()))
+        ref_rows.append(float(ref_part["score"].mean()))  # ty: ignore[invalid-argument-type]
     summary = pl.DataFrame(lines).with_columns(reference_absolute=pl.Series(ref_rows))
     summary = summary.sort("group", "cls", "arm")
     summary.write_csv(fit.WORK_DIR / f"pooled_summary_vs_{args.reference}.csv", float_precision=3)

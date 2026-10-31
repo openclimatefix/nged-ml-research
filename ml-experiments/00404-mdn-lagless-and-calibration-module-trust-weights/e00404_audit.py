@@ -135,8 +135,8 @@ def cells(*, arms: list[str], reference: str) -> None:
                                 "variant": variant, "arm": arm, "group": group, "cls": cls,
                                 "month": month, "seed": seed, "rows": int(mask.sum()),
                                 "events": len(np.unique(cl)),
-                                "arm_score": float(a["crps"].mean()),
-                                "ref_score": float(b["crps"].mean()),
+                                "arm_score": float(a["crps"].mean()),  # ty: ignore[invalid-argument-type]
+                                "ref_score": float(b["crps"].mean()),  # ty: ignore[invalid-argument-type]
                                 "diff": point, "low": low, "high": high, "diff_drop_largest": drop,
                             }
                         )  # fmt: skip
@@ -166,7 +166,7 @@ def pool() -> None:
                 "mean_of_months": float(d.mean()),
                 "event_weighted": float((d * w).sum() / w.sum()),
                 "multi_event_months": multi.height,
-                "multi_event_mean": float(multi["diff"].mean()) if multi.height else float("nan"),
+                "multi_event_mean": float(multi["diff"].mean()) if multi.height else float("nan"),  # ty: ignore[invalid-argument-type]
                 "single_event_months": single.height,
                 "single_event_values": ", ".join(
                     f"{m}:{v:+.2f}" for m, v in zip(single["month"], single["diff"], strict=True)
@@ -197,7 +197,7 @@ def events() -> None:
     rows = []
     for month in MONTHS:
         ref0 = real_frame(arm="B-mix", month=month, seed=0)
-        lo, hi = int(ref0["target"].min()), int(ref0["target"].max())
+        lo, hi = int(ref0["target"].min()), int(ref0["target"].max())  # ty: ignore[invalid-argument-type]
         clusters = report.cluster_ids(frame=ref0, real=real)
         for group in GROUP_NAME:
             padded_runs = 0
@@ -257,7 +257,7 @@ def nra(*, arms: list[str], reference: str) -> None:
                             "arm": arm, "group": group, "month": month, "seed": seed,
                             "depth": str(depth), "rows": int(mask.sum()),
                             "events": len(np.unique(cl)),
-                            "score": float(scored["crps"].mean()),
+                            "score": float(scored["crps"].mean()),  # ty: ignore[invalid-argument-type]
                             "crps": scored["crps"].to_numpy(), "cluster": cl,
                         }
                     )  # fmt: skip
@@ -273,7 +273,7 @@ def nra(*, arms: list[str], reference: str) -> None:
         if r["arm"] == reference:
             continue
         ref = refs[(r["group"], r["month"], r["seed"], r["depth"])]
-        diff = r["crps"] - ref["crps"]
+        diff = r["crps"] - ref["crps"]  # ty: ignore[unsupported-operator]
         codes, inverse = np.unique(r["cluster"], return_inverse=True)
         totals = np.abs(np.bincount(inverse, weights=diff, minlength=len(codes)))
         keep = inverse != int(np.argmax(totals))

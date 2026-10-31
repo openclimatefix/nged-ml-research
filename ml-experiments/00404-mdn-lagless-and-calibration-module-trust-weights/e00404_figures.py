@@ -99,7 +99,7 @@ def figure_contrast(*, group: str, group_name: str, number: int, file_stem: str)
     dots = base.mark_point(filled=True, size=60, aria=False).encode(  # ty: ignore[unresolved-attribute]
         y=y, x="minus_ref:Q", color=colour
     )
-    zero = base.mark_rule(color=theme.GREY_2, strokeDash=[4, 3]).encode(x=alt.datum(0))
+    zero = base.mark_rule(color=theme.GREY_2, strokeDash=[4, 3]).encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
     chart = (
         alt.layer(zero, rules, dots, data=data.to_pandas())
         .properties(width=WIDTH - 250, height=190)
@@ -143,7 +143,7 @@ def figure_cells() -> None:
     )
     labels = [ARM_LABELS[a] for a in ARM_ORDER if a in {"B0", "B1", "B3", "B6", "B4c"}]
     chart = (
-        alt.Chart(data.to_pandas())
+        alt.Chart(data.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=60, aria=False)
         .encode(
             y=alt.Y("label:N", sort=labels, title=None),
@@ -172,7 +172,7 @@ def figure_cells() -> None:
         )
     )
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color=theme.GREY_2, strokeDash=[4, 3])
         .encode(x="x:Q")
     )
@@ -196,7 +196,7 @@ def figure_absolute() -> None:
     )
     labels = [ARM_LABELS[a] for a in ARM_ORDER]
     chart = (
-        alt.Chart(long.to_pandas())
+        alt.Chart(long.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70, aria=False)
         .encode(
             y=alt.Y("label:N", sort=labels, title=None),
