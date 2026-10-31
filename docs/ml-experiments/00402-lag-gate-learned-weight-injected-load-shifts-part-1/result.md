@@ -182,6 +182,23 @@ injected rows and on real labels for the real rows.
 - **Real harm rows are few.** There are 11,194 at the six and 6,609 at the eight, drawn from the
   11 labelled events in the test months, so these gains are estimates and not tests.
 
+**Upper-tail coverage is 0.65 to 0.68 inside real events at the six, for every arm (forecast R1,
+real rows).** Coverage is the share of actual readings at or below the forecast's quantile, so the
+target is 0.95 for q95 and 0.99 for q99. The gate leaves tail coverage where the 50/50 mixture has
+it: at the six on harm rows its q95 coverage is 0.883 against 0.880 for the 50/50 mixture and 0.857
+for the forecast with lags, and inside events all arms miss the target by about 0.28 at q95 and
+0.22 at q99. The 50/50 mixture, the constant mixture, and the gate raise q95 coverage over the
+forecast with lags on clean rows by about 0.015.
+
+| Rows | Forecast with lags | Forecast without lags | 50/50 mixture | Gate, full |
+|---|---|---|---|---|
+| Six, harm rows (11,194): q95 / q99 coverage | 0.857 / 0.957 | 0.813 / 0.964 | 0.880 / 0.966 | 0.883 / 0.968 |
+| Six, target inside an event (7,960): q95 / q99 | 0.652 / 0.776 | 0.651 / 0.768 | 0.675 / 0.780 | 0.674 / 0.774 |
+| Six, clean rows (148,539): q95 / q99 | 0.903 / 0.979 | 0.877 / 0.978 | 0.919 / 0.981 | 0.919 / 0.980 |
+| Eight, harm rows (6,609): q95 / q99 | 0.905 / 0.982 | 0.921 / 0.983 | 0.933 / 0.983 | 0.932 / 0.984 |
+| Eight, target inside an event (4,278): q95 / q99 | 0.920 / 0.979 | 0.953 / 0.984 | 0.954 / 0.983 | 0.955 / 0.984 |
+| Eight, clean rows (217,827): q95 / q99 | 0.917 / 0.983 | 0.911 / 0.982 | 0.930 / 0.983 | 0.930 / 0.983 |
+
 **Event plots.** Figure 1 and Figure 2 show three labelled events at the six Primaries with signed
 readings (D5, D16, D5) and three at the eight with MVA-only readings (all D8), as forecast R1 saw
 them. In these six events the weight on the forecast with lags is low (about 0.3) through the first
@@ -197,8 +214,9 @@ shortest lead).
 ## Not run
 
 - **The first look is complete but narrow.** The per-Primary contrast intervals, the smoothness and
-  promptness measurements, the lag-encroachment sweep, the avoidable-curtailment table, the
-  cold-night table, and the tail-coverage tables (q95 and q99) in the plan were not produced. The
+  promptness measurements, the lag-encroachment sweep, the avoidable-curtailment table, and the
+  cold-night table in the plan were not produced. Tail coverage (q95 and q99) is reported for
+  forecast R1 on real rows only, from `e00402_tails.py`, and not for the R0 pair. The
   slice report (`e00402_report.py`) gives the per-group harm, event, and clean tables only.
 - **Four monthly forecast refits were scored, not twelve.**
 - **Neighbour graph at scale.** A data-derived neighbour graph would need a connection list for each
