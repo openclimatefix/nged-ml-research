@@ -272,6 +272,13 @@ def _trailing_tables(
     """
     origins, temperature = _ensemble_variable(site=site, key=key)
     if np.isnan(temperature).any():
+        # A few stored values are missing (6 of 29 million at D9, D11, and D21, all in one run).
+        # Each takes the mean of the other members at the same run and step.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            member_mean = np.nanmean(temperature, axis=1, keepdims=True)
+        temperature = np.where(np.isnan(temperature), member_mean, temperature)
+    if np.isnan(temperature).any():
         msg = f"{site}: the stored {key} holds missing values, which the cumulative sum spreads"
         raise ValueError(msg)
     runs, members, _ = temperature.shape
