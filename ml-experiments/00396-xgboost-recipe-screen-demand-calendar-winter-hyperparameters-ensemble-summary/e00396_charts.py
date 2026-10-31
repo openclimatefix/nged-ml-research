@@ -168,7 +168,7 @@ def holiday_chart(*, results: pl.DataFrame) -> None:
         )
     chart = alt.vconcat(*panels).properties(
         title=_title(
-            text="Holiday columns lower the error on the Easter bank holidays, not at Christmas",
+            text="Holiday columns lower the error on the Easter bank holidays; Christmas is mixed",
             subtitle=(
                 "Change in CRPS at days 1 to 10 against the control (C0), on the days of each "
                 "slice only. Negative is better. Bank-holiday days fall in 2025-12, 2026-01, "
