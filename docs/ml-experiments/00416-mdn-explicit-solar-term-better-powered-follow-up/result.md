@@ -250,6 +250,15 @@ choice, not a Bayesian scale.
   5 months and 15 on each extension month (45 to 105 for 3 to 7 added months), 120 to 180 fits in
   total, about 2.3 to 3.5 hours at about 70 seconds per fit.
 
+## Amendment 6: only 12 test months exist, from 2025-07 (found when the extension ran)
+
+The extension's first plan named 15 available months from 2025-04, but the stored forecast inputs
+(the ensemble demand frames and summaries) start with the scored period of 2025-07-01, so the runs
+for 2025-05 and 2025-06 had no inputs and stopped before writing any file. The available test
+months are the 12 from 2025-07 to 2026-06. The extension therefore adds 2025-07, 2025-08, 2025-09,
+2025-11, 2026-02, 2026-04, and 2026-05 to the first five, 12 in total, each with a training window
+of 730 days or the history since 2024-04-01 (at least 15 months). The decision rule is unchanged.
+
 ## Reports
 
 - **Figures.** Contrasts with intervals first; sunny-midday CRPS and q99 pinball loss per Primary;
