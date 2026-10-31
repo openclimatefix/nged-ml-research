@@ -292,8 +292,8 @@ At limit fraction 0.9 the cost at D5 is 425,948 (A0), 425,787 (A1), 392,146 (BG2
   the model, so real meters would do no better), and that the 0.85 line was set without knowing the
   rule's ceiling.
 - **Prediction outcomes.** P1 failed (0.834). P2 (placebos) was not run. P3 failed on D12 (-0.772
-  against -0.05 to -0.20) and failed at the other
-  seven (each moved by more than the predicted -0.03 to +0.03; D4's -0.053 is the smallest). P4 and P5 were not run. P6 cannot be tested in the lab,
+  against -0.05 to -0.20) and at the other seven (each moved by more than the predicted -0.03 to
+  +0.03; D4's -0.053 is the smallest). P4 and P5 were not run. P6 cannot be tested in the lab,
   because the columns carry realised CAMS values at every lead.
 - **Cadence.** Monthly refits only, as the brief required.
 - **Saved models and data.** Fitted boosters are `.ubj` files, one per Primary per refit, in the
