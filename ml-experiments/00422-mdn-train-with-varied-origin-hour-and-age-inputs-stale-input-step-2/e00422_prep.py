@@ -27,7 +27,7 @@ AGE_COLUMNS: Final[tuple[str, ...]] = ("weather_age", "power_age")
 AGE_SCALE_HOURS: Final[float] = 48.0
 US_PER_HOUR: Final[int] = 3_600_000_000
 STEP_US: Final[int] = 1_800_000_000
-PUBLICATION_HOURS: Final[float] = 9.0
+PUBLICATION_HOURS: Final[float] = common.PUBLICATION_DELAY.total_seconds() / 3600.0
 NEWEST_AGE_HOURS: Final[float] = 3.5
 GRID_START_US: Final[int] = int(common.GRID_START.timestamp() * 1e6)
 OFFSETS_VARIED: Final[tuple[float, ...]] = (9.0, 12.0, 15.0, 18.0, 21.0, 24.0, 27.0, 30.0)
@@ -172,7 +172,11 @@ def augmented_primary(
     target_index = ((valid_us - GRID_START_US) // STEP_US).astype(np.int64)
     origin_index = ((new_origin_us - GRID_START_US) // STEP_US).astype(np.int64)
     effective_origin = origin_index - np.rint(2.0 * delay).astype(np.int64)
+    if offset.min() < PUBLICATION_HOURS:
+        msg = "a drawn origin precedes the run's publication"
+        raise ValueError(msg)
     y = common.take(values=power, index=target_index)
+    flagged_or_missing = int((usable & ~np.isfinite(y)).sum())
     usable &= np.isfinite(y)
     if not usable.any():
         return None
@@ -208,6 +212,7 @@ def augmented_primary(
         "origin": base_origin_us,
         "lead": lead.astype(np.float32),
         "delay": delay.astype(np.float32),
+        "dropped": np.array([flagged_or_missing]),
     }
 
 
@@ -224,6 +229,7 @@ def build_train(
     table = prep.primaries()
     rng = np.random.default_rng(seed + 7919 * int(refit.timestamp() // 86_400))
     parts = []
+    dropped = 0
     for row in table.iter_rows(named=True):
         z = np.load(prep.RAW_DIR / "summary" / f"{row['site']}.npz")
         keep = (
@@ -243,10 +249,14 @@ def build_train(
         )
         if built is None:
             continue
+        dropped += int(built.pop("dropped")[0])
         built["primary"] = np.full(len(built["y"]), row["primary"], dtype=np.int64)
         parts.append(built)
     cat = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
     del parts
+    print(
+        f"{arm.name} {refit:%Y-%m}: {dropped:,} half-hours dropped (flagged, start cut, unobserved)"
+    )
     origin_day = ((cat["origin"] - prep._us(t=prep.FIRST_RUN)) // (86_400 * 1_000_000)).astype(
         np.int64
     )
