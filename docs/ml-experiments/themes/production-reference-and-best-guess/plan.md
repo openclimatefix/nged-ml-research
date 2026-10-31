@@ -12,6 +12,7 @@
 | 384 | What is special about the eight MVA-only Primaries that the GAM stack trails BG2 there? | High (maintainer asked 2026-10-28) | Nothing | Finished: no hypothesis shown; within the MVA-only group the gap follows the step rate |
 | 397 | Does a plain mixture density network match the simple XGBoost model for Primary demand, and does attention over the inputs help it? | High (maintainer asked 2026-10-30) | Slot from the manager | Finished: the plain network matched XGBoost, attention did not help (gate inert) |
 | 419 | Do the solar summary, the sunny flag, and a different row-weight half-life, which helped the XGBoost model, also help the pooled mixture density network? | High (maintainer asked 2026-10-30) | Slot from the manager | Planned |
+| 434 | Which re-ordering of arm A's 51 sample paths makes them coherent across the 16 Primaries and across leads, with no fit? | High (maintainer asked 2026-10-31) | Nothing | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 
