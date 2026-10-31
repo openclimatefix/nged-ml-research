@@ -457,7 +457,14 @@ harm rows.
   experiment by the maintainer, 2026-10-31): add a step of 5% of capacity to the lags of clean rows
   for k = 1, 2, and 3 lags, and report the median's shift as a share of the step, the band width
   ratio, and where the probability mass sits, for every arm. The code path and protocol come from
-  the merged experiment 392 scripts on main and from the load-shift Discuss session.
+  the merged experiment 392 scripts on main (`e00392_sweep.py`: `shifted_matrix`, `clean_rows`,
+  `sweep_site`, `widen`, `with_ratios`). The protocol adds D (5% of capacity, and 2.5% for neural
+  networks, both signs) to the 1, 2, then 3 most recent lag columns of clean rows, over the lead
+  bands from 24 to 72 hours and the others, on the four screen folds, with an origin stride of 3
+  and the 1.15 widening. It reports the median shift as a share of D, the band-width ratio, and
+  the coverage of clean and event-level readings. Experiment 404's network needs a
+  predict-on-modified-lags interface for it. The sweep also includes a lag-masked control, whose
+  shift must be exactly 0, the trust weight of each lag at each k, and 3 seeds.
 - **Probe (B8).** The precision-recall area of the probe on held-out real events from the corrected
   label table, per metering group.
 - **Loss outside events** and the overall five-fold CRPS, per Primary.
