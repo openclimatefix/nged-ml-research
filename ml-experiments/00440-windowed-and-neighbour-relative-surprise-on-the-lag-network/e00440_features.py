@@ -56,6 +56,7 @@ def neighbour_matrix(*, sites: list[str], path: Path) -> np.ndarray:
     graph = json.loads(path.read_text())
     index = {s: i for i, s in enumerate(sites)}
     rows = [[index[n] for n in graph.get(s, []) if n in index] for s in sites]
+    assert sum(len(r) for r in rows) > 0, "no neighbour of any Primary was found"
     out = np.full((len(sites), max(1, *(len(r) for r in rows))), -1, dtype=np.int64)
     for i, r in enumerate(rows):
         out[i, : len(r)] = r
@@ -90,8 +91,8 @@ class WorldStack:
         actual[pos] = power[p, g] / half[p, g]
         centre[pos] = median[p, g] / half[p, g]
         self.series = trust.build_series(
-            first=0, actual=actual, median=centre, q05=np.full(total, -1.0),
-            q95=np.full(total, 1.0), device=device,
+            first=0, actual=actual, median=centre, q05=centre - 1.0,
+            q95=centre + 1.0, device=device,
         )  # fmt: skip
 
     def flat(self, *, primary: torch.Tensor, grid: torch.Tensor) -> torch.Tensor:
@@ -230,6 +231,10 @@ def selftest() -> None:
             got = s2[r, lag * N_STATS : (lag + 1) * N_STATS]
             assert abs(float(got[0]) - z.mean()) < 1e-3, ("mean", r, lag)
             assert abs(float(got[3]) - min(z.min(), FEATURE_CLIP)) < 1e-3, ("min", r, lag)
+            above = float((z > 1).sum()) / WINDOW_STEPS
+            below = float((z < -1).sum()) / WINDOW_STEPS
+            assert abs(float(got[trust.STATS.index("above")]) - above) < 1e-3, ("above", r, lag)
+            assert abs(float(got[trust.STATS.index("below")]) - below) < 1e-3, ("below", r, lag)
     # Primary 0 has +5 band units on 1500..1599; Primary 1 does not, so a row of Primary 1 at a
     # lag inside that span sees the neighbour mean rise while its own mean stays near 0.
     centre = torch.tensor([1550])
