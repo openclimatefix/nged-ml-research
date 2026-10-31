@@ -106,6 +106,26 @@ decision_rule: >-
   and not an ERA5 error or a partly available farm. A hand-labelled sample is the only route to
   those, and the page says what it would add. No gain threshold applies, because no forecast is
   scored.
+  **Amendment after the plan review, before any code or score exists.** (1) Injected floor pieces
+  come from the opposite-parity years (the floor drifts across years, so this is a transfer test),
+  and recall on injected blocks is a sanity floor, not evidence of separation: R1 and I2 recall
+  them by construction. (2) The false-drop gate uses three negative sets with equal weight: SG, SGm
+  (real rows with ERA5 from 1.5 times cut-in to 6 m/s and power 3% to 8% of capacity), and G0s;
+  it is a calibration and transfer check, and the verdict rests on SGm and G0s as well as SG. SG
+  false drop is also reported excluding rows that D3 flags. (3) Gate (c) is read at matched false
+  drop: R0's false-drop rate is reported, and D1's recall is also read at R0's false-drop rate.
+  (4) The gated candidates are D1 with the defaults above and D4 with stay probability 0.95, each
+  judged on its own per farm; sweeps (D3 0.05 and 0.20, D4 0.90 and 0.98, D4 posterior thresholds
+  0.3, 0.5, 0.7) are sensitivity only; D1&D3 is reported and does not enter the verdict. There is
+  one gate (the strict one); the 0.08 figure is reported descriptively. The family verdict counts
+  farms where D1 passes, and separately where D4 passes. (5) Cells with fewer than 10 placed blocks
+  per fold are dropped from the recall denominator, and the dropped cells are listed. (6) Recall
+  intervals resample calendar-year blocks, because replicates reuse source locations. (7) The idle
+  band is refitted on the tune years only in each fold; D3's power curve uses the tune years only;
+  scoring drops rows within 24 hours of a calendar-year boundary. (8) Recall is also reported
+  without the half-hours adjacent to a pasted join. (9) The D1 stop rule and the I2 weekday test
+  were run in experiment 431 and are not repeated; the D1 and D3 disagreement slice (G4) is
+  reported.
 benchmark: >-
   The experiment 210 mask (R0) and the level-only rule (R1), on the same pseudo-labels. No
   forecast is scored.
