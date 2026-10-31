@@ -1,8 +1,12 @@
 # ruff: noqa: E501
 """Tables and figures of experiment 443 from the stored predictions.
 
-PYTHONPATH=ml-experiments/00310-metered-farm-long-lead-scoring:ml-experiments/00430-unified-forecaster-solar-and-pretraining-ablations:ml-experiments/00443-solar-network-hyperparameter-and-architecture-sweep \
+Run it from the repository root:
+
+    PYTHONPATH=ml-experiments/00310-metered-farm-long-lead-scoring:ml-experiments/00430-unified-forecaster-solar-and-pretraining-ablations:ml-experiments/00443-solar-network-hyperparameter-and-architecture-sweep \
         uv run --no-sync python ml-experiments/00443-*/e00443_report.py
+
+The second line of the command continues the first.
 """
 
 from pathlib import Path

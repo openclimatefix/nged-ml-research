@@ -1,8 +1,12 @@
 # ruff: noqa: E501
 """Log the validation curve of the skeleton over 40 epochs (seed 0, all four refits) to find the best epoch.
 
-PYTHONPATH=ml-experiments/00310-metered-farm-long-lead-scoring:ml-experiments/00430-unified-forecaster-solar-and-pretraining-ablations:ml-experiments/00443-solar-network-hyperparameter-and-architecture-sweep \
+Run it from the repository root:
+
+    PYTHONPATH=ml-experiments/00310-metered-farm-long-lead-scoring:ml-experiments/00430-unified-forecaster-solar-and-pretraining-ablations:ml-experiments/00443-solar-network-hyperparameter-and-architecture-sweep \
         uv run --no-sync python ml-experiments/00443-*/e00443_best_epoch.py
+
+The second line of the command continues the first.
 """
 
 from datetime import timedelta
