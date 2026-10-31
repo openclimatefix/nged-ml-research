@@ -70,14 +70,14 @@ headline: >-
 take_home_message: >-
   Adding more lagged power to the simple XGBoost demand model does not improve the forecast: six
   weekly analogues make it worse at 12 of the 16 Primaries, and replacing the day lag by an exact
-  24-hour lag is worse at every lead. The three lags the model already has (the newest reading, the
-  reading one day earlier, and the reading one week earlier) are the useful set, so the search for
-  better inputs should leave lagged power alone. Dropping the newest reading changes the score by
-  almost nothing overall, but it scored better on half-hours inside hand-labelled load-shift
-  events, which is worth testing on its own.
+  24-hour lag is worse at 0 to 72 hours of lead. These five column sets gave no gain over the three
+  lags the model already has (the newest reading, the reading one day earlier, and the reading one
+  week earlier). Dropping the newest reading changes the score by almost nothing overall and loses
+  at 0 to 24 hours at the MVA-only Primaries. It scored better on the post hoc event-row slice,
+  which is worth a separate test.
 lessons:
   - >-
-    The extra lags carry information the forecast already has or noise it fits: arm A's loss is in
+    The extra lags did not help, and arm A's loss is in
     every lead band at the signed-MW six, and experiment 30's gain on older rows did not carry over
     to the current recipe.
   - >-
@@ -95,7 +95,7 @@ advice:
     Do not add the six weekly analogues to the XGBoost model at the signed-MW Primaries: they cost
     +0.137 points of CRPS (Figure 1).
   - >-
-    Test dropping the newest reading only on half-hours inside load-shift events, where arm E
+    Test dropping the newest reading only on event rows (a post hoc slice), where arm E
     scored 8.313 against 8.789 at the signed-MW six, and not as a general change (Checks).
   - >-
     Look for a hedge against contaminated lags in the output (a widened band on affected rows), not
@@ -115,7 +115,8 @@ We asked whether more columns of past power help an XGBoost model forecast Prima
 demand 1 to 10 days ahead. We refitted the model with each of five column sets on the 1st of each
 month, scored the forecasts on a year of held-out data, and subtracted the scores of the current
 model (experiment 381's stored monthly control). A positive difference means the extra columns
-made the forecast worse. The pre-registered prediction, a gain for the weekly analogues, failed.
+made the forecast worse. The pre-registered prediction for the weekly analogues (a change between
+-0.10 and +0.05 points) failed for arm A.
 
 ![Each column set minus the baseline, CRPS of days 1 to 10, with 99.83% intervals](contrast_days_1_10.svg)
 
@@ -140,7 +141,7 @@ for a step on the newest lag reading, the two newest, and every lag.*
 - **Arms and recipe.** The baseline is the three origin lags (the newest usable reading, the
   reading at the latest earlier time of the same half-hour of day, and the reading at the latest
   earlier time of the same weekday and half-hour). A is six weekly analogues (five new columns: the
-  one-week analogue equals the baseline's week lag up to 160 hours of lead). B is their mean and
+  one-week analogue equals the baseline's week lag up to about 6.9 days of lead). B is their mean and
   median. C is two anomaly columns. E is the baseline without the newest reading. F is E with the
   day lag replaced by the power exactly 24 hours before the valid time. All arms use
   experiment 87's `n1h` recipe with monthly refits (192 fits each), column subsampling fixed at 1.0.
@@ -171,15 +172,15 @@ for a step on the newest lag reading, the two newest, and every lag.*
 - **Tails (days 1 to 10, mean over Primaries; baseline against arm A).** At the signed-MW six the
   0.95 quantile pinball loss is 0.949 for the baseline and 1.011 for A, the 0.99 quantile pinball
   loss 0.386 and 0.404, and coverage of the 0.95 and 0.99 quantiles is 0.909 and 0.980 for the
-  baseline against 0.898 and 0.977. Arms B, C, E, and F are within 0.02 of the baseline's tail
-  numbers.
+  baseline against 0.898 and 0.977. Arms C, E, and F are within 0.02 of the baseline's tail
+  numbers; arm B's 0.95 quantile pinball loss is 0.972.
 - **Weekly cadence check (descriptive).** Refitted weekly with the same code, arm A minus the weekly
   baseline is +0.145 (+0.069 to +0.231) at the signed-MW six and +0.066 (-0.058 to +0.138) at the
   MVA-only eight, close to the monthly contrasts. Weekly arm B is partial (384 of 832 fits) and
   weekly arms C, E, and F were not fitted, so none is scored.
-- **Slices (CRPS, baseline against A, E, F).** On half-hours inside hand-labelled load-shift
-  events at the signed-MW six: 8.789, 9.050, 8.313, 8.733. On cold nights at the signed-MW six:
-  4.933, 5.385, 4.703, 4.901. These slices are post hoc and carry no interval.
+- **Slices (CRPS, baseline against A, E, F).** On the event rows (experiment 383's row set) at the
+  signed-MW six: 8.789, 9.050, 8.313, 8.733. On cold nights at the signed-MW six: 4.933, 5.385,
+  4.703, 4.901. These slices are post hoc and carry no interval. Arm E is lower on both slices.
 
 ## Sweep results
 
@@ -191,23 +192,29 @@ with the boosters saved.
 
 - **The median follows only a fraction of the step.** For a step of 5% of capacity, the baseline's
   median shifts by 0.04 of the step when only the newest reading is shifted, 0.20 when the two
-  newest are, and 0.39 when every lag is shifted. Arm C follows more (0.12, 0.28, 0.46); arms A and B
-  follow about as much as the baseline.
+  newest are, and 0.39 when every lag is shifted. Arm C follows more (0.12, 0.28, 0.47); arms A and B
+  follow 0.44 (A) and 0.39 (B) against the baseline's 0.39.
 - **No arm widens its band.** The width of the 1% to 99% band stays within 3% of its unshifted
-  width in every arm, step size, and lead band.
+  width in every arm and lead band up to a step of 5% (arm C reaches 1.029), and within 5% at a step
+  of 10% (maximum 1.047, arm C).
 - **The step level usually lies inside the bands.** At a step of 5% the level lies inside the 1% to
   99% band in 93% to 100% of rows, and q95 (q05 for a negative step) reaches it in 70% to 100%
   of rows. At 2% the bands cover it in 96% to 100% of rows, because the bands are already wide
   relative to a step that small.
 - **Shifted lags worsen the CRPS.** Against the observed power, shifting every lag by -5% raises
-  the CRPS by up to about 0.9 points; the full tables are in `work/sweep_run.log`.
+  the CRPS by up to about 1.0 point (0.91 for A, 0.96 for B, 0.97 for C); the full tables are in `work/sweep_run.log`.
 
 ## Checks
+
+- **Pre-registered predictions.** P1 (arms A and B move the score by -0.10 to +0.05) failed for A
+  (+0.137) and held for B (+0.049, at the edge). P2 (largest gain at 72 to 168 h, near zero at 0 to
+  24 h) failed: A is worst at 0 to 24 hours (+0.182). P3 (arm C within 0.05) held (+0.008). P4 (no
+  placebo moves unless D8 does) failed: D2 (+0.077) and D4 (+0.146) moved while D8 did not.
 
 - **Median minus mean forecast, per site (points of capacity, baseline).** The gap is negative at
   15 of 16 Primaries, between -3.04 (D15) and -0.14 (D18), with D22 at +0.03, so the forecasts are
   right-skewed. No arm moves the gap at any Primary by more than 0.3 points except D8 (baseline
-  -0.58, A -0.87, B -0.99) and D15 (baseline -3.04, A -2.51, F -3.29); the full table is in
+  -0.58, A -0.87, B -0.99) and D15 (baseline -3.04, B -2.66, A -2.51); the full table is in
   `work/checks.log`.
 - **Error of the median beside each contrast.** The mean absolute error of the median is worse than
   the baseline's for arm A at 14 of 16 Primaries (better only at D8 and D15) and for arm F at 14 of
@@ -215,7 +222,7 @@ with the boosters saved.
 - **Flagged half-hours (check column).** The shared cache holds 622 scored-year half-hours that
   cleaned power lacks (all exact zeros: D18 389, D15 196, D21 13, D8 9, D22 5, D9 5, D12 4, D16 1).
   The headline uses the shared unfiltered cache; the check column drops those half-hours. The
-  contrasts for arms A, B, C, and E are unchanged to three decimals (for example A: +0.137 at the
+  contrasts for arms A, B, C, E, and F are unchanged to within 0.001 (for example A: +0.137 at the
   signed-MW six, +0.047 at the MVA-only eight). Experiment 388 scores one fold, so the count is
   622 in that fold.
 - **Reproduction gate.** The weekly baseline refitted at 4 of 52 refits differs from experiment 87's
