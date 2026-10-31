@@ -153,6 +153,37 @@ def trust_inputs(
     return torch.cat(out, dim=1)
 
 
+WINDOW_HALF: Final[int] = 48
+"""Half-hours either side of a lag's valid time in the learned window (24 hours, 97 steps)."""
+
+
+def window_input(
+    *,
+    stack: Stack,
+    primary: torch.Tensor,
+    lag_grid: torch.Tensor,
+    origin: torch.Tensor,
+    step: int,
+) -> torch.Tensor:
+    """Return each lag's window of the surprise series, (rows, 3 lags, 2 channels, 97).
+
+    Channel 0 is the surprise in units of 5% of capacity, clipped at 5; channel 1 is 1 where the
+    half-hour is observed. Both are 0 beyond the newest usable reading before the origin.
+    """
+    series = stack.series
+    end = stack.flat(primary=primary, grid=origin - common.NEWEST_AGE)
+    offsets = torch.arange(-WINDOW_HALF, WINDOW_HALF + 1, device=primary.device)
+    out = []
+    for lag in range(3):
+        centre = stack.flat(primary=primary, grid=lag_grid[:, lag] - step)
+        pos = centre[:, None] + offsets[None, :]
+        valid = ((pos >= 0) & (pos < len(series.s)) & (pos <= end[:, None])).float()
+        safe = pos.clamp(0, len(series.s) - 1)
+        surprise = (series.s[safe] * 20.0).clamp(-5.0, 5.0) * valid
+        out.append(torch.stack([surprise, series.obs[safe] * valid], dim=1))
+    return torch.stack(out, dim=1)
+
+
 def lag_grids(*, target: np.ndarray, origin: np.ndarray) -> np.ndarray:
     """Return the grid index of each row's 3 lags (newest, same time yesterday, last week)."""
     newest = origin - common.NEWEST_AGE

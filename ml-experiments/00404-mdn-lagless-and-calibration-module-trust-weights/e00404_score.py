@@ -175,16 +175,28 @@ def forecast(
         ),
         device=device,
     )
-    lags, lag_grid = fit.lag_features(pool=test, power=power, lag_stats=lag_stats, device=device)
+    lags, lag_grid = fit.lag_features(
+        pool=test,
+        power=power,
+        lag_stats=lag_stats,
+        device=device,
+        weeks=fit.WEEKS.get(arm, 0),
+        surprise=fit.surprise_array(power=power_np, table=table)
+        if arm == fit.SURPRISE_ARM
+        else None,
+    )
     metered = torch.tensor(fit.metered_indicator(), device=device)
     mu = torch.tensor(scalers.target_mean, dtype=torch.float32, device=device)
     sd = torch.tensor(scalers.target_std, dtype=torch.float32, device=device)
+    event_mask = fit.event_mask_of(code=code, real=real, device=device)
     quantiles, weights = [], []
     for start in range(0, len(test), 16384):
         idx = torch.arange(start, min(start + 16384, len(test)), device=device)
         out = fit.forward(
             net=net, pool=test, idx=idx, lags=lags, stack=stack, lag_grid=lag_grid,
             scalers=scalers, metered=metered, details=True, masked=(0,) if arm == "B5" else (),
+            event_mask=event_mask,
+            power=power,
         )  # fmt: skip
         mixture, detail = out if isinstance(out[0], tuple) else (out, None)
         log_w, mean, std = mixture
@@ -201,7 +213,17 @@ def forecast(
                 log_w=log_w, mean=mean, std=std, mu=mu[primary], sd=sd[primary]
             ).cpu()
         )
-        if detail is not None and arm in ("B0", "B1", "B1m"):
+        if detail is not None and arm in (
+            "B0",
+            "B1",
+            "B1m",
+            "B1g",
+            "B1o",
+            "B6",
+            "B4a",
+            "B4b",
+            "B4c",
+        ):
             weights.append(detail.cpu())
     q = torch.cat(quantiles).numpy()
     flags = Flags(code=code, real=real, power=power_np, device=device).of(

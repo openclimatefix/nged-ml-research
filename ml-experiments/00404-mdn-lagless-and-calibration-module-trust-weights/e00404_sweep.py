@@ -96,7 +96,7 @@ def run(*, month: str, seed: int, arms: list[str], device: str) -> pl.DataFrame:
     chosen = (day % ORIGIN_STRIDE == 0) & ~(
         clean["tgt_real"].to_numpy() | clean["tgt_post"].to_numpy() | clean["win_real"].to_numpy()
     )
-    row_ids = clean["row"].to_numpy()[chosen]
+    row_ids = clean["row"].to_numpy().astype(np.int64)[chosen]
     saved_by_arm = {
         a: score.load_network(arm=a, month=month, seed=seed, device=device) for a in arms
     }

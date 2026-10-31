@@ -31,11 +31,17 @@ Z_LIMIT: Final[float] = 40.0
 BISECTION_STEPS: Final[int] = 40
 COMPONENTS: Final[int] = 3
 N_LAGS: Final[int] = 3
+CNN_CHANNELS: Final[int] = 16
+HISTORY_STEPS: Final[int] = 336
+"""Half-hours of actual demand (7 days) that arm b7 reads up to the newest usable reading."""
+KEPT_PER_LAG: Final[int] = 3
+"""Columns kept per lag when the learned windows replace the statistics: single-step surprise,
+band score, and neighbour mean."""
 LAG_FEATURES: Final[int] = 3
 """Value, is-missing flag, and age of each lag."""
 LEAD_BANDS: Final[int] = 3
 SMOOTHING_STEPS: Final[int] = 3
-ARMS: Final[tuple[str, ...]] = ("plain", "b1", "b1m", "b0", "b3")
+ARMS: Final[tuple[str, ...]] = ("plain", "b1", "b1m", "b1g", "b1o", "b6", "b7", "b0", "b3")
 
 
 def mixture_parts(
@@ -102,6 +108,28 @@ def causal_average(*, weights: torch.Tensor) -> torch.Tensor:
     return weights.mean(dim=1)
 
 
+def _gap_features(
+    ll_lw: torch.Tensor,
+    ll_mean: torch.Tensor,
+    ll_std: torch.Tensor,
+    lag_lw: torch.Tensor,
+    lag_mean: torch.Tensor,
+    lag_std: torch.Tensor,
+) -> torch.Tensor:
+    """Return the gap between the lagged and the lagless mixture means, and the gap over the spread.
+
+    The gradient is stopped, so the trust head reads the gap but cannot move either forecast to
+    change it.
+    """
+    del lag_std
+    w_ll, w_lag = ll_lw.exp(), lag_lw.exp()
+    mean_ll = (w_ll * ll_mean).sum(-1)
+    mean_lag = (w_lag * lag_mean).sum(-1)
+    spread = ((w_ll * (ll_std**2 + ll_mean**2)).sum(-1) - mean_ll**2).clamp(min=1e-4).sqrt()
+    gap = (mean_lag - mean_ll).detach()
+    return torch.stack([gap, gap / spread.detach().clamp(min=0.05)], dim=-1)
+
+
 class LaglessModule(nn.Module):
     """A mixture density network on the base inputs and the Primary embedding, with no power lag."""
 
@@ -132,12 +160,16 @@ class PlainLagMdn(nn.Module):
         hidden: int = 64,
         layers: int = 2,
         lag_dropout: float = 0.0,
+        n_extra: int = 0,
     ) -> None:
-        """Build the network; the output layer starts at zero weights."""
+        """Build the network; the output layer starts at zero weights.
+
+        `n_extra` counts columns after the 9 lag columns (arm S1: the surprise at each lag).
+        """
         super().__init__()
         self.lag_dropout = lag_dropout
         self.embedding = nn.Embedding(n_primaries, 8)
-        n_in = n_base + N_LAGS * LAG_FEATURES + 8
+        n_in = n_base + N_LAGS * LAG_FEATURES + n_extra + 8
         self.net = mlp(n_in=n_in, hidden=hidden, layers=layers, n_out=3 * COMPONENTS)
         init_head(head=self.net)
 
@@ -184,15 +216,27 @@ class TrustMdn(nn.Module):
         hidden: int = 64,
         layers: int = 2,
         token: int = 16,
+        n_extra: int = 0,
     ) -> None:
-        """Build the modules; each trust weight starts near 0.5."""
+        """Build the modules; each trust weight starts near 0.5.
+
+        `n_extra` counts extra weekly-lag columns that follow the 9 lag columns (arms B4a-c).
+        """
         super().__init__()
-        if arm not in ("b1", "b1m", "b0", "b3"):
+        if arm not in ("b1", "b1m", "b1g", "b1o", "b6", "b7", "b0", "b3"):
             msg = f"unknown arm {arm!r}"
             raise ValueError(msg)
         self.arm, self.n_lead = arm, n_lead
         self.embedding = nn.Embedding(n_primaries, 8)
-        shared = 3 * COMPONENTS + N_LAGS * LAG_FEATURES + 8 + 1 + n_lead
+        shared = 3 * COMPONENTS + N_LAGS * LAG_FEATURES + n_extra + 8 + 1 + n_lead
+        if arm == "b7":
+            shared += CNN_CHANNELS
+            self.history_cnn = nn.Sequential(
+                nn.Conv1d(2, CNN_CHANNELS, kernel_size=5, stride=2, padding=2),
+                nn.GELU(),
+                nn.Conv1d(CNN_CHANNELS, CNN_CHANNELS, kernel_size=5, stride=2, padding=2),
+                nn.GELU(),
+            )
         if arm == "b3":
             self.lag_encoders = nn.ModuleList(
                 [nn.Linear(LAG_FEATURES + n_trust, token) for _ in range(N_LAGS)]
@@ -209,7 +253,19 @@ class TrustMdn(nn.Module):
         if arm == "b0":
             self.band_logits = nn.Parameter(0.02 * torch.randn(2, LEAD_BANDS, N_LAGS))
         else:
-            self.trust_head = mlp(n_in=n_trust + n_lead + 8 + 1, hidden=32, layers=2, n_out=N_LAGS)
+            n_gap = {"b1g": 2, "b1o": N_LAGS}.get(arm, 0)
+            n_trust_in = n_trust
+            if arm == "b6":
+                self.cnn = nn.Sequential(
+                    nn.Conv1d(2, CNN_CHANNELS, kernel_size=5, padding=2),
+                    nn.GELU(),
+                    nn.Conv1d(CNN_CHANNELS, CNN_CHANNELS, kernel_size=5, padding=2),
+                    nn.GELU(),
+                )
+                n_trust_in = N_LAGS * (CNN_CHANNELS + KEPT_PER_LAG)
+            self.trust_head = mlp(
+                n_in=n_trust_in + n_lead + 8 + 1 + n_gap, hidden=32, layers=2, n_out=N_LAGS
+            )
             last = self.trust_head[-1]
             assert isinstance(last, nn.Linear)
             # Small random weights break the symmetry between the 3 lags: with zero weights the
@@ -224,15 +280,39 @@ class TrustMdn(nn.Module):
         primary: torch.Tensor,
         metered: torch.Tensor,
         lead_band: torch.Tensor,
+        gap: torch.Tensor | None = None,
+        window: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Return the smoothed per-lag trust weights (rows, 3) in [0, 1]."""
+        """Return the smoothed per-lag trust weights (rows, 3) in [0, 1].
+
+        `gap` (rows, 2), used by arm `b1g`, is the lagged minus the lagless mean and the same in
+        units of the lagless spread, both with the gradient stopped.
+        """
         if self.arm == "b0":
             return torch.sigmoid(self.band_logits[metered[:, 0].long(), lead_band])
         rows, steps, _ = trust.shape
+        if self.arm == "b6":
+            trust = self._learned_windows(trust=trust, window=window)
         side = torch.cat([lead, self.embedding(primary), metered], dim=-1)
+        if gap is not None:
+            side = torch.cat([side, gap], dim=-1)
         side = side[:, None, :].expand(rows, steps, side.shape[-1])
         logits = self.trust_head(torch.cat([trust, side], dim=-1).reshape(rows * steps, -1))
         return causal_average(weights=torch.sigmoid(logits.reshape(rows, steps, N_LAGS)))
+
+    def _learned_windows(self, *, trust: torch.Tensor, window: torch.Tensor | None) -> torch.Tensor:
+        """Replace each lag's hand-built window statistics by pooled convolution outputs.
+
+        `window` is (rows, steps, 3 lags, 2 channels, 97): the surprise and an observed flag. The
+        three columns after the statistics (single-step surprise, band score, neighbour mean) are
+        kept for every lag.
+        """
+        assert window is not None
+        rows, steps = trust.shape[:2]
+        features = self.cnn(window.reshape(rows * steps * N_LAGS, 2, -1)).mean(-1)
+        features = features.reshape(rows, steps, N_LAGS, CNN_CHANNELS)
+        kept = trust.reshape(rows, steps, N_LAGS, -1)[..., -KEPT_PER_LAG:]
+        return torch.cat([features, kept], dim=-1).reshape(rows, steps, -1)
 
     def forward(
         self,
@@ -246,6 +326,9 @@ class TrustMdn(nn.Module):
         metered: torch.Tensor,
         lead_band: torch.Tensor,
         details: bool = False,
+        oracle: torch.Tensor | None = None,
+        window: torch.Tensor | None = None,
+        history: torch.Tensor | None = None,
     ) -> (
         tuple[torch.Tensor, torch.Tensor, torch.Tensor]
         | tuple[tuple[torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]
@@ -253,7 +336,8 @@ class TrustMdn(nn.Module):
         """Return the final mixture (log weights, means, stds); with `details`, also the weights.
 
         `base` is accepted for a uniform call signature; the trust arms do not use it because the
-        lagless forecast `ll` already carries the base inputs.
+        lagless forecast `ll` already carries the base inputs. `oracle` (rows, 3) holds the true
+        event flag at each lag's valid time; only the positive-control arm `b1o` reads it.
         """
         del base
         ll = ll.detach()
@@ -262,10 +346,19 @@ class TrustMdn(nn.Module):
             return self._attention(
                 lags=lags, ll=ll, trust=trust, lead=lead, emb=emb, metered=metered, details=details
             )
-        out = self.calibration(torch.cat([ll, lags, emb, metered, lead], dim=-1))
+        inputs = [ll, lags, emb, metered, lead]
+        if self.arm == "b7":
+            assert history is not None
+            inputs.append(self.history_cnn(history).mean(-1))
+        out = self.calibration(torch.cat(inputs, dim=-1))
         lag_lw, lag_mean, lag_std = mixture_parts(out=out, components=COMPONENTS)
         ll_lw, ll_mean, ll_std = mixture_parts(out=ll, components=COMPONENTS)
-        t = self.trust_weights(trust, lead, primary, metered, lead_band)
+        gap = None
+        if self.arm == "b1o":
+            gap = oracle
+        if self.arm == "b1g":
+            gap = _gap_features(ll_lw, ll_mean, ll_std, lag_lw, lag_mean, lag_std)
+        t = self.trust_weights(trust, lead, primary, metered, lead_band, gap, window)
         w = t.mean(dim=-1) if self.arm == "b1m" else t.prod(dim=-1)
         w = w[:, None]
         # The offsets keep both logs finite without a clamp, which would zero the gradient.
@@ -317,7 +410,7 @@ def lead_band_of(*, lead_hours: Sequence[float] | np.ndarray) -> np.ndarray:
 def selftest() -> None:
     """Check shapes, the trust weight at initialisation, and that `ll` receives no gradient."""
     torch.manual_seed(0)
-    rows, n_base, n_trust, n_primaries = 32, 20, 40, 4
+    rows, n_base, n_trust, n_primaries = 32, 20, 3 * (KEPT_PER_LAG + 14), 4
     base = torch.randn(rows, n_base)
     lags = torch.randn(rows, 9)
     ll = torch.randn(rows, 9, requires_grad=True)
@@ -327,11 +420,14 @@ def selftest() -> None:
     metered = torch.randint(0, 2, (rows, 1)).float()
     band = torch.randint(0, LEAD_BANDS, (rows,))
     z = torch.randn(rows)
-    for arm in ("b1", "b1m", "b0", "b3"):
+    for arm in ("b1", "b1m", "b1g", "b1o", "b6", "b7", "b0", "b3"):
         model = TrustMdn(arm=arm, n_base=n_base, n_trust=n_trust, n_primaries=n_primaries)
         (lw, mean, std), weights = model(
             base=base, lags=lags, ll=ll, trust=trust, lead=lead, primary=primary,
             metered=metered, lead_band=band, details=True,
+            oracle=torch.zeros(rows, N_LAGS),
+            window=torch.randn(rows, SMOOTHING_STEPS, N_LAGS, 2, 97),
+            history=torch.randn(rows, 2, HISTORY_STEPS),
         )  # fmt: skip
         assert lw.shape[0] == rows
         assert mean.shape == std.shape == lw.shape
