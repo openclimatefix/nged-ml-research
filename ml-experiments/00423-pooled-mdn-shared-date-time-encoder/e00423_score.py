@@ -83,6 +83,7 @@ ROW_SETS: Final[dict[str, pl.Expr | None]] = {
 }
 """The row sets of the plan, as filters on rows that `add_row_sets` has widened."""
 REPORT_ONLY_GROUP: Final[str] = "D15 and D18"
+"""The group that is reported and never tested."""
 
 
 @dataclass(frozen=True)
@@ -123,13 +124,13 @@ ARM_DEFS: Final[tuple[ArmDef, ...]] = (
 )
 RAW_TAIL_ARMS: Final[tuple[str, ...]] = ("R", "E0", "E1n", "E1", "E2", "E3")
 """The arms whose raw (unwidened) forecasts are also scored, for the tails table."""
-CONTRASTS: Final[dict[str, tuple[str, str, str]]] = {
-    "C1 E1 minus R": ("E1", "R", "all rows"),
-    "C2 E2 minus R": ("E2", "R", "all rows"),
-    "C3 E1 minus E1n": ("E1", "E1n", "bank-holiday weeks"),
-    "C4 E2 minus E0 (seeds 0-2 both)": ("E2_s012", "E0", "all rows"),
+CONTRASTS: Final[dict[str, tuple[str, str, str, int]]] = {
+    "C1 E1 minus R": ("E1", "R", "all rows", 6),
+    "C2 E2 minus R": ("E2", "R", "all rows", 6),
+    "C3 E1 minus E1n": ("E1", "E1n", "bank-holiday weeks", 6),
+    "C4 E2 minus E0 (seeds 0-2 both)": ("E2_s012", "E0", "all rows", 3),
 }
-"""The four tested contrasts: label, (treatment, reference, row set)."""
+"""The four tested contrasts: label, (treatment, reference, row set, seeds per mean)."""
 DESCRIPTIVE_CONTRASTS: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("E1 minus R, Christmas set", "E1", "R", "Christmas set"),
     ("E1 minus R, Easter set", "E1", "R", "Easter set"),
@@ -149,7 +150,15 @@ def seed_average(*, arm: ArmDef) -> pl.DataFrame:
         files = [
             folder / f"{month}_s{seed}.parquet" for folder, seeds in arm.sources for seed in seeds
         ]
-        stacked = pl.concat([pl.read_parquet(f) for f in files])
+        seeds = [pl.read_parquet(f) for f in files]
+        for f, frame in zip(files, seeds, strict=True):
+            same = frame.height == seeds[0].height and frame.select(KEYS).sort(KEYS).equals(
+                seeds[0].select(KEYS).sort(KEYS)
+            )
+            if not same:
+                msg = f"{f} differs in height or keys from {files[0]}"
+                raise ValueError(msg)
+        stacked = pl.concat(seeds)
         pieces.append(stacked.group_by(KEYS).agg(*[pl.col(c).mean() for c in common.LEVEL_COLUMNS]))
     frame = pl.concat(pieces).sort(KEYS)
     values = np.sort(frame.select(common.LEVEL_COLUMNS).to_numpy(), axis=1)
@@ -219,11 +228,17 @@ def group_crps(*, rows: pl.DataFrame, members: tuple[str, ...], where: pl.Expr |
     return float("nan") if per_label.is_empty() else float(np.mean(per_label["crps"].to_numpy()))
 
 
-def fold_gap(*, first: pl.DataFrame, second: pl.DataFrame, where: pl.Expr | None) -> pl.DataFrame:
-    """Return, per fold with rows, the signed-MW six CRPS of two fits and their difference."""
+def fold_gap(
+    *,
+    first: pl.DataFrame,
+    second: pl.DataFrame,
+    where: pl.Expr | None,
+    members: tuple[str, ...] = SIGNED,
+) -> pl.DataFrame:
+    """Return, per fold with rows, the group's CRPS of two fits and their difference."""
     parts = []
     for name, rows in (("first", first), ("second", second)):
-        keep = pl.col("label").is_in(list(SIGNED)) & pl.col(HEADLINE)
+        keep = pl.col("label").is_in(list(members)) & pl.col(HEADLINE)
         if where is not None:
             keep &= where
         parts.append(
@@ -242,31 +257,61 @@ def fold_gap(*, first: pl.DataFrame, second: pl.DataFrame, where: pl.Expr | None
     )
 
 
-def minimum_detectable_effect(*, rows: dict[str, pl.DataFrame]) -> dict[str, float]:
-    """Print and return the minimum detectable effect on all rows and on bank-holiday-week rows.
+P1_MDE_LIMIT: Final[float] = 0.10
+"""P1 is read only if the minimum detectable effect on bank-holiday-week rows is at most this."""
+MIN_FOLDS_FOR_SD: Final[int] = 4
 
-    The effect is 2 times the standard deviation over folds of the signed-MW six CRPS difference
-    between `ctrl` (seeds 0 to 2) and `ctrl_s3` (seeds 3 to 5), divided by the square root of two
-    for six-seed means. It ignores the interaction of folds with seed sets, so it is a lower bound.
+
+def minimum_detectable_effect(
+    *, rows: dict[str, pl.DataFrame]
+) -> dict[tuple[str, str], tuple[float, float]]:
+    """Print and return the minimum detectable effect per group and row set.
+
+    The effect is 2 times the standard deviation over folds of the group's CRPS difference between
+    `ctrl` (seeds 0 to 2) and `ctrl_s3` (seeds 3 to 5). That figure holds for contrasts of
+    three-seed means (C4). Contrasts of six-seed means (C1 to C3) use it divided by the square root
+    of two. It ignores the interaction of folds with seed sets, so it is a lower bound.
+
+    Returns:
+        For each (group, row set) with at least two folds: (three-seed figure, six-seed figure).
     """
-    print("\n== minimum detectable effect, signed-MW six, days 1 to 10 (before any contrast) ==")
-    out: dict[str, float] = {}
+    print(
+        "\n== minimum detectable effect per group and row set, days 1 to 10 (before any contrast) =="
+    )
+    out: dict[tuple[str, str], tuple[float, float]] = {}
     if "R_s012_w115" not in rows or "R_s345_w115" not in rows:
         print("not computed: R_s012 or R_s345 is not in this pass")
         return out
-    for label in ("all rows", "bank-holiday weeks"):
-        gap = fold_gap(first=rows["R_s012_w115"], second=rows["R_s345_w115"], where=ROW_SETS[label])
-        n = gap.height
-        print(f"\n{label}: {n} folds with rows")
-        print(gap)
-        if n < 2:
-            print("fewer than two folds: the minimum detectable effect cannot be estimated")
-            continue
-        sd = float(np.std(gap["difference"].to_numpy(), ddof=1))
-        out[label] = 2 * sd / np.sqrt(2)
+    for set_name in ("all rows", "bank-holiday weeks"):
+        for group, members in SUBSETS.items():
+            gap = fold_gap(
+                first=rows["R_s012_w115"],
+                second=rows["R_s345_w115"],
+                where=ROW_SETS[set_name],
+                members=members,
+            )
+            n = gap.height
+            if n < 2:
+                print(f"{set_name}, {group}: {n} folds with rows; cannot be estimated")
+                continue
+            sd = float(np.std(gap["difference"].to_numpy(), ddof=1))
+            out[group, set_name] = (2 * sd, 2 * sd / np.sqrt(2))
+            caveat = (
+                f" CAVEAT: the SD rests on only {n - 1} degrees of freedom."
+                if n < MIN_FOLDS_FOR_SD
+                else ""
+            )
+            print(
+                f"{set_name}, {group}: {n} folds, SD {sd:.4f}; 2 x SD (three-seed means, C4) "
+                f"{2 * sd:.4f}; divided by sqrt(2) (six-seed means, C1 to C3) "
+                f"{2 * sd / np.sqrt(2):.4f}.{caveat}"
+            )
+    bank = out.get(("signed-MW six", "bank-holiday weeks"))
+    if bank is not None:
+        testable = "yes" if bank[1] <= P1_MDE_LIMIT else "no"
         print(
-            f"SD over folds {sd:.4f}; 2 x SD (three-seed means) {2 * sd:.4f}; "
-            f"divided by sqrt(2) (six-seed means) {out[label]:.4f}"
+            f"\nP1 testable: {testable} (MDE {bank[1]:.3f} vs {P1_MDE_LIMIT:.2f}, signed-MW six, "
+            "bank-holiday-week rows, six-seed means)"
         )
     return out
 
@@ -283,6 +328,8 @@ def interval_line(
 ) -> None:
     """Print one contrast: difference, interval, half-hour count, and a verdict against the MDE."""
     members = SUBSETS[group]
+    if group == REPORT_ONLY_GROUP:
+        group = f"{group} (report-only)"
     keep = pl.col("label").is_in(list(members)) & pl.col(HEADLINE)
     if where is not None:
         keep &= where
@@ -367,18 +414,23 @@ def tails_table(*, rows: dict[str, pl.DataFrame]) -> None:
             print(pl.DataFrame(out).sort("group", "arm"))
 
 
-def tested_contrasts(*, rows: dict[str, pl.DataFrame], mde: dict[str, float]) -> None:
+def tested_contrasts(
+    *, rows: dict[str, pl.DataFrame], mde: dict[tuple[str, str], tuple[float, float]]
+) -> None:
     """Print C1 to C4 per group at the Bonferroni-corrected level, and C3's sign per fold."""
     print(
         f"\n== tested contrasts C1 to C4 (treatment minus reference, CRPS days 1 to 10, "
         f"month-block bootstrap, {N_RESAMPLES:,} resamples, level {BONFERRONI_LEVEL_PERCENT:.2f}%; "
-        "D15 and D18 report-only; the five screen folds are interim) =="
+        "D15 and D18 report-only; the five screen folds are interim) ==\n"
+        "Note: month-block bootstrap intervals with 3 to 5 blocks (folds) are close to the minimum "
+        "and maximum of the fold differences, so read them as a range, not a 95% interval."
     )
-    for label, (treatment, reference, set_name) in CONTRASTS.items():
+    for label, (treatment, reference, set_name, n_seeds) in CONTRASTS.items():
         if f"{treatment}_w115" not in rows or f"{reference}_w115" not in rows:
             print(f"{label}: skipped, an arm is not complete")
             continue
         for group in SUBSETS:
+            figures = mde.get((group, set_name))
             interval_line(
                 label=label + f" [{set_name}]",
                 group=group,
@@ -386,7 +438,7 @@ def tested_contrasts(*, rows: dict[str, pl.DataFrame], mde: dict[str, float]) ->
                 reference=rows[f"{reference}_w115"],
                 where=ROW_SETS[set_name],
                 level_percent=BONFERRONI_LEVEL_PERCENT,
-                mde=mde.get(set_name),
+                mde=None if figures is None else figures[0 if n_seeds == 3 else 1],
             )
     if "E1_w115" in rows and "E1n_w115" in rows:
         gap = fold_gap(
@@ -421,16 +473,17 @@ def median_minus_mean_check(
 ) -> None:
     """Print, per site, the median's mean absolute error minus the mean forecast's, in points.
 
-    The mean of a forecast distribution is the sum of its 11 quantiles weighted by the probability
-    each stands for (`LEVEL_MASSES`). A negative value means the median forecast is the better
-    point forecast; the audit reads it beside each contrast.
+    This is a check defined here, not a stored statistic. The mean of a forecast distribution is
+    approximated by the sum of its 11 raw (unwidened) quantiles weighted by the probability each
+    stands for (`LEVEL_MASSES`). A negative value means the median forecast is the better point
+    forecast; the audit reads it beside each contrast.
     """
     print(
         "\n== audit check: MAE of the median minus MAE of the mean forecast, days 1 to 10, points =="
     )
     weights = pl.Series(LEVEL_MASSES.tolist())
     out = []
-    for name in ("R_w115", "E1_w115", "E2_w115"):
+    for name in ("R_raw", "E0_raw", "E1n_raw", "E1_raw", "E2_raw", "E3_raw"):
         if name not in rows:
             continue
         quantiles = frames[name].select(*KEYS, *common.LEVEL_COLUMNS)
@@ -474,8 +527,8 @@ def r0_check(*, series: pl.DataFrame, ctx: dict) -> None:
         ArmDef("ctrl_s1", ((STORED_CTRL, (1,)),), months=months),
     )
     frames = load_frames(series=series, arm_defs=defs, raw_arms=())
-    _, scored, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
-    del scored
+    check_keys(frames=frames, reference="R0_w115")
+    _, _, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
     for group, members in SUBSETS.items():
         values = {
             n: round(group_crps(rows=r, members=members, where=None), 3) for n, r in rows.items()
@@ -489,7 +542,9 @@ def r0_check(*, series: pl.DataFrame, ctx: dict) -> None:
 
 def event_fold(*, series: pl.DataFrame, ctx: dict) -> None:
     """Print point estimates on the Easter fold 2026-04, with R0 as the reference."""
-    print(f"\n== event fold {EVENT_MONTH} (point estimates only; reference is R0, one seed) ==")
+    print(
+        f"\n== event fold {EVENT_MONTH} (point estimates only; reference is R0, one seed vs the encoder arms' seed means) =="
+    )
     months = (EVENT_MONTH,)
     defs = (
         ArmDef("R0", ((SEED_423 / "R0", (0,)),), months=months),
@@ -504,6 +559,7 @@ def event_fold(*, series: pl.DataFrame, ctx: dict) -> None:
         print(f"no encoder arm is fitted for {EVENT_MONTH}: skipped")
         return
     frames = load_frames(series=series, arm_defs=present, raw_arms=())
+    check_keys(frames=frames, reference="R0_w115")
     _, _, rows = s381.score_arms(arms=frames, series=series, ctx=ctx)
     rows = {n: feats.add_row_sets(frame=r) for n, r in rows.items()}
     for set_name, where in ROW_SETS.items():

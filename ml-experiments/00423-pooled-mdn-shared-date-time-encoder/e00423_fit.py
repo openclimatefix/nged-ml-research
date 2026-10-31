@@ -35,6 +35,7 @@ OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=contin
 
 import argparse
 import json
+import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -345,13 +346,27 @@ def forecast_month(
     return pl.concat(raw)
 
 
+def write_text_atomically(*, path: Path, text: str) -> None:
+    """Write a text file through a temporary name so an interrupted write leaves no partial file."""
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(text)
+    temporary.replace(path)
+
+
+def save_state_atomically(*, model: torch.nn.Module, path: Path) -> None:
+    """Save a network's state dict through a temporary name, then rename it into place."""
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    torch.save(model.state_dict(), temporary)
+    temporary.replace(path)
+
+
 def record_dropped(*, month: str, dropped: int) -> None:
     """Write a fold's flagged-row count to `dropped_rows.json` (the scorer prints it)."""
     path = OUT_DIR / "dropped_rows.json"
     table = json.loads(path.read_text()) if path.exists() else {}
     table[month] = dropped
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(table, indent=1))
+    write_text_atomically(path=path, text=json.dumps(table, indent=1))
 
 
 def usable_months(*, months: list[str]) -> list[str]:
@@ -408,9 +423,10 @@ def run(*, arms: list[str], seeds: list[int] | None, months: list[str], device: 
                 names, _, _ = prep.feature_names(scheme=f407.SCHEME)
                 folder = OUT_DIR / "models" / name / month
                 folder.mkdir(parents=True, exist_ok=True)
-                torch.save(model.state_dict(), folder / f"s{seed}.pt")
-                (folder / f"s{seed}.json").write_text(
-                    json.dumps(
+                save_state_atomically(model=model, path=folder / f"s{seed}.pt")
+                write_text_atomically(
+                    path=folder / f"s{seed}.json",
+                    text=json.dumps(
                         {
                             "arm": name,
                             "epochs": epochs,
@@ -426,7 +442,7 @@ def run(*, arms: list[str], seeds: list[int] | None, months: list[str], device: 
                             "target_mean": fold.target_mean.tolist(),
                             "target_std": fold.target_std.tolist(),
                         }
-                    )
+                    ),
                 )
                 raw = forecast_month(model=model, spec=spec, fold=fold, month=month, device=device)
                 common.atomic_write(

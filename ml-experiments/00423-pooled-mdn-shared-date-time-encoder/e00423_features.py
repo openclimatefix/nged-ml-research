@@ -4,10 +4,11 @@ The shared calendar encoder reads five integer indices per row, all computed fro
 alone (never from the observed power), so the training rows and the forecast rows use the same
 function:
 
-- `half_hour`: the local half-hour of the day, 0 to 47. The valid time is the end of the half-hour,
-  so the index is taken from `valid_time - 30 minutes` in Europe/London, as
-  `e00396_arms.add_calendar` does. The two days a year with a clock change share the indices of
-  the other days;
+- `half_hour`: the local half-hour of the day, 0 to 47, from the valid time (the stamp at the end
+  of the half-hour) in Europe/London, with no 30-minute shift. This is the convention of the
+  hand-made columns of experiment 87, so only the encoding differs from R. The two days a year
+  with a clock change share the indices of the other days. The row sets below take the local date
+  of `valid_time - 30 minutes` instead, as `e00396_arms.add_calendar` does;
 - `weekday`: Monday 0 to Sunday 6;
 - `day_of_month`: 0 to 30;
 - `day_of_year`: the ordinal day minus one, 0 to 365 (so 1 March has index 59 in a common year and
@@ -188,15 +189,24 @@ def day_table() -> pl.DataFrame:
     )
 
 
-def _local_time(*, valid_time: pl.Expr) -> pl.Expr:
-    """Return the Europe/London time of the start of the half-hour ending at `valid_time`."""
-    return valid_time.dt.offset_by("-30m").dt.convert_time_zone("Europe/London")
+def _local_time(*, valid_time: pl.Expr, shift_to_start: bool) -> pl.Expr:
+    """Return the Europe/London time of `valid_time`, or of the start of the half-hour it ends.
+
+    The model-input indices use the period-end stamp's own local time (`shift_to_start=False`), the
+    convention of the hand-made columns of experiment 87 (`derived_columns`), so that only the
+    encoding differs between R and the encoder arms. The row sets used for scoring take the local
+    date of the half-hour's start (`shift_to_start=True`), as `e00396_arms.add_calendar` does.
+    """
+    shifted = valid_time.dt.offset_by("-30m") if shift_to_start else valid_time
+    return shifted.dt.convert_time_zone("Europe/London")
 
 
-def _with_local_date(*, frame: pl.DataFrame) -> pl.DataFrame:
+def _with_local_date(*, frame: pl.DataFrame, shift_to_start: bool) -> pl.DataFrame:
     """Return `frame` with the day-table columns joined on the local date of `valid_time`."""
     dated = frame.with_columns(
-        local_date=_local_time(valid_time=pl.col("valid_time")).dt.date(),
+        local_date=_local_time(
+            valid_time=pl.col("valid_time"), shift_to_start=shift_to_start
+        ).dt.date(),
     )
     joined = dated.join(
         day_table(), on="local_date", how="left", validate="m:1", maintain_order="left"
@@ -216,7 +226,7 @@ def add_row_sets(*, frame: pl.DataFrame) -> pl.DataFrame:
     Returns:
         The frame with `local_date` and the columns of `ROW_SET_COLUMNS`.
     """
-    return _with_local_date(frame=frame).drop("holiday_name")
+    return _with_local_date(frame=frame, shift_to_start=True).drop("holiday_name")
 
 
 def calendar_indices(*, valid_us: np.ndarray) -> np.ndarray:
@@ -232,8 +242,8 @@ def calendar_indices(*, valid_us: np.ndarray) -> np.ndarray:
     frame = pl.DataFrame({"valid_time": valid_us}).with_columns(
         pl.col("valid_time").cast(pl.Datetime("us", "UTC"))
     )
-    local = _local_time(valid_time=pl.col("valid_time"))
-    joined = _with_local_date(frame=frame).with_columns(
+    local = _local_time(valid_time=pl.col("valid_time"), shift_to_start=False)
+    joined = _with_local_date(frame=frame, shift_to_start=False).with_columns(
         half_hour=local.dt.hour().cast(pl.Int64) * 2 + local.dt.minute().cast(pl.Int64) // 30,
         weekday=local.dt.weekday().cast(pl.Int64) - 1,
         day_of_month=local.dt.day().cast(pl.Int64) - 1,
