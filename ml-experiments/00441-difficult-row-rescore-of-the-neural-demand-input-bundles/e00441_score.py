@@ -13,7 +13,7 @@ experiment 437's. The slice masks come from `e00441_masks.py`.
 
 ```bash
 source <(printf 'export PYTHONPATH=%s\n' "$(cat ml-experiments/00441-*/pythonpath.txt)")
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data OMP_NUM_THREADS=1
+export DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1
 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
   uv run --no-sync python ml-experiments/00441-*/e00441_score.py pre
 ```
