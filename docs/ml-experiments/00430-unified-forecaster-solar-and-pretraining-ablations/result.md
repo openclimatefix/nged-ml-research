@@ -188,13 +188,18 @@ bands for A6 and A7). The dashed lines mark 0 and the 1% margin; negative is bet
   0.99 quantile rises from 0.9834 to 0.9887 (target 0.99). The coverage of the 0.01 quantile is
   0.0513 against 0.0532; the target is 0.01. Both are near 5%, which we did not investigate.
 
-**The clear-sky column accounts for part of what experiment 313 attributed to a plant.** The plain
-arm adds the clear-sky irradiance as an input column so that the plant arms differ from it only by
-the plant channel. The column alone improves on the one-pass network by 0.71% at days 6 to 10 on
-three seeds (−1.31% to −0.14%) and by 0.42% on six seeds (−0.88% to −0.03%). The six-seed minimum
-detectable effect is 0.37%, so the estimate is just above seed noise. We did not test whether
-experiment 313's plant gain disappears when its baseline also has the clear-sky column, so the
-contradiction is only partly explained.
+**The plant result is probably not comparable with experiment 313's.** The plain arm adds the
+clear-sky irradiance as an input column so that the plant arms differ from it only by the plant
+channel. The column alone improves on the one-pass network by 0.71% at days 6 to 10 on three seeds
+(−1.31% to −0.14%) and by 0.42% on six seeds (−0.88% to −0.03%). The six-seed minimum detectable
+effect is 0.37%, so the estimate is just above seed noise. The audit found that experiment 430 uses
+experiment 345's columns, which have none of experiment 313's plant, plant-spread, or lag columns,
+and that its plant has one pooled scale at tilt 20 degrees where experiment 310's has a scale per
+farm at tilt 35 degrees. The audit also found that the plant is nearly a function of inputs the
+network already has: its error is only 1% to 3% below that of the ensemble shortwave alone. We did
+not re-run experiment 313's design, so we cannot say why the gains differ. We also did not record
+the learned tilt, azimuth, scale, and clip of the trained plant, so whether the network ignores the
+plant channel is untested.
 
 ### Coherence of the 51 member paths
 
@@ -287,8 +292,36 @@ Bands show the 25% to 75% and 5% to 95% quantiles; the dots are the observed out
 - **Mean-forecast error beside the quantile-score contrasts.** The mean absolute error of the mean
   forecast moves in the same direction as the quantile score for the member encoder and the plain
   arm, farm by farm (`scores/checks.csv`).
-- **Triggers fired.** Trigger 2 fired: every A-stage prediction failed, and the plant result
-  contradicts experiment 313. Audit findings: see the Audit section.
+- **Triggers fired.** Trigger 2 fired, because every A-stage prediction failed and the plant result
+  differs from experiment 313's. Triggers 1, 3, 4, 5, and 6 did not fire, and trigger 7 does not
+  apply. The Audit section gives the findings.
+
+### Audit
+
+A fresh Sonnet agent re-derived the headline contrasts from the stored forecasts with its own code
+and tried to break the method.
+
+- **Re-derivation:** all seven headline contrasts match `scores/headline.csv` to four decimals, and
+  the gate is bit-identical to experiment 345 on all 410,899 rows. Accepted, no change.
+- **Seed noise is the main risk.** Per-seed A2 contrasts run from −0.87% to +0.94%, and per-seed A5
+  contrasts from −1.31% to +0.36%. This is why the second seed set was run, and the six-seed
+  figures shrink both effects. Accepted; the page reports six-seed figures for these two arms.
+- **No leakage, misalignment, or clipping fault:** training rows end one day before the refit,
+  the standardiser matches a recompute on data before 2025-08-31, the validation window is the last
+  61 days, ERA5 and CAMS rows stop before 2024-04-01, and all quantiles lie within the farm's
+  ceiling.
+- **Plant:** it matches experiment 310's NumPy plant at tilt 35 degrees, and a mirrored azimuth
+  scores clearly worse. The plant adds little over the shortwave input. Whether the trained plant's
+  parameters moved is untested (Caveats).
+- **Leave-one-farm-out:** no sign flips for A2 or A5. Farms C and E carry most of the A2 gain.
+- **Mean-forecast error:** no disagreement with the quantile score that matters, so trigger 3 did
+  not fire.
+- **Coherence:** the pair set, the energy score, and the variogram score match for ECC on one
+  month. The Schaake score differs by 0.016 in energy, from the random fill of about 5% of the
+  missing history, and the Schaake history is at least 340 days old.
+- **Not checked by the audit:** the other three coherence months, the bootstrap intervals, and
+  experiment 313.
+- **Cosmetic, fixed:** `headline.csv` listed the two A6 contrasts twice under `all`.
 
 ### Caveats
 
@@ -304,6 +337,8 @@ Bands show the 25% to 75% and 5% to 95% quantiles; the dots are the observed out
   and the coherence scores average the scores of the seeds' paths.
 - **The second seed set covers three arms** (`g0_onepass`, `a2_member`, `a5_plain`). The other
   contrasts use three seeds and their minimum detectable effects (0.14% to 2.1%) are in the text.
+- **The trained plant's parameters were not logged**, so the finding that the plant adds nothing
+  does not show whether the network used the channel.
 - **A6 for wind was not run.** Experiment 429's merged code has no pretraining arm, and the manager
   deferred it. The solar A6 tie (+0.30%) and the finding that the wind default already trains on
   ERA5 argue against urgency.

@@ -49,7 +49,7 @@ def headline() -> pl.DataFrame:
     for label, arm, ref, band in HEADLINE:
         arms = {n: sc.load_mine(arm=n) for n in {arm, ref}}
         table = sc.contrast_table(arms=arms, pairs=[(arm, ref)])
-        for chosen in (band, "d1", "all"):
+        for chosen in dict.fromkeys((band, "d1", "all")):
             r = table.filter(pl.col("band") == chosen).row(0, named=True)
             rows.append(
                 {
