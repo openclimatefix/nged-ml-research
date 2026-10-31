@@ -55,32 +55,35 @@ benchmark: >-
 row_set_id: >-
   fold_a_tuesdays_v1 (53 Tuesday runs, 2025-07 to 2026-06; kept rows by experiment 210's mask are
   the headline). Training: the daily ENS hindcast 2024-04-01 to 2025-04-15, early stopping on
-  2025-04-16 to 2025-06-16, exactly as experiment 347 (so the sixth-month-wide replicate is not
+  2025-04-16 to 2025-06-16, exactly as experiment 347 (so the six-month replicate is not
   repeated).
 metric: >-
   Quantile score over 11 levels, in points of capacity, over every lead in the row set and at true
   days 1 to 10 (lead 24 to 240 hours), kept rows. Tail: 0.01, 0.05, 0.95, 0.99 pinball loss and
   coverage per farm.
 code: ml-experiments/00429-unified-forecaster-wind-ablations/
-verdict: not supported
+verdict: partly supported
 best_arm: >-
-  none. No design beats Wind farms research default 2 (experiment 347's frozen plant plus mixture
-  head) by the 0.10-point margin. The plain member route (member_plain) ties it at 10.533 against
-  10.518 points at true days 1 to 10, so it is the simplest design that matches the default.
+  none advances under the upper-tail rule, which Wind farms research default 2 (2.15% above q99)
+  and research default 1 (1.66%) also fail. On score alone, the plain member route (member_plain)
+  ties default 2 at 10.533 against 10.518 points at true days 1 to 10, so it is the simplest design
+  that matches the default, and no ablation beats the default by the 0.10-point margin.
 headline: >-
   A pooled neural wind forecaster with no physics layer matches Wind farms research default 2
   (member_plain 10.533 points, default 2 10.518, kept rows, true days 1 to 10). Passing each member
   through the network, adding a physics power curve, training the curve end to end, and censoring
-  the head at zero and capacity each change the score by 0.03 points or less (intervals include
-  zero, except one of +0.018 that is worse). Every arm leaves 2.2% to 2.5% of observations above
-  q99, against the 1.5% limit, so no arm advances.
+  the head at zero and capacity each change the score by 0.03 points or less (all 99.8% intervals
+  include zero; the censored head is +0.018, worse). Every arm leaves 2.2% to 2.8% of observations
+  above q99, against the 1.5% limit, so no arm advances.
 lessons: >-
   The Primary-demand design (one pass on the mean and spread of the ensemble) is already within
   0.05 points of the wind default, so wind does not need member passes or a physics layer to reach
-  that level. The upper-tail failure comes from under-forecasting windy half-hours, not from the
-  capacity cap: only 502 of 1,466 exceedances of member_plain's q99 are at 99.9% of capacity or
-  above, and the mean overshoot is 7.3 points. A censored head therefore cannot fix it. Training on
-  the idle band raises the kept-row score by 0.16 points, and a plant layer does not rescue it.
+  that level. The upper-tail failure comes from under-forecasting windy half-hours, mostly
+  not from the capacity cap: in an ad hoc check (not in the stored report), only 502 of 1,466
+  exceedances of member_plain's q99 are at 99.9% of capacity or above, and the mean overshoot is 7.3
+  points. A censored head did not fix the tail in the arm tested. Training on the idle band raises
+  the score at true days 1 to 10 by 0.16 points (plain) to 0.20 (plant), and the plant did not
+  recover that loss.
   For coherent paths across the three farms, the Schaake shuffle beats ensemble copula coupling on
   the variogram score by 9.3%.
 take_home_message: >-
@@ -88,8 +91,8 @@ take_home_message: >-
   members ties Wind farms research default 2 (10.533 against 10.518 points), and neither passing
   members through the network (-0.008 against the one-pass design), a power-curve layer (+0.000),
   nor a censored head (+0.018, worse) changes the score by the 0.10-point margin. The weakness all
-  arms share is the upper tail: 2.2% to 2.5% of observations exceed q99, because the forecasts
-  under-predict windy half-hours, and censoring does not touch that. The plain network is the
+  arms share is the upper tail: 2.2% to 2.8% of observations exceed q99, because the forecasts
+  under-predict windy half-hours, and censoring did not fix it. The plain network is the
   design to carry forward; the next wind work should fix the upper tail, not the architecture.
 production_status: not-for-production
 adopted_in: none
@@ -111,14 +114,14 @@ advice:
 **Take-home: a plain pooled neural network ties Wind farms research default 2, and none of the
 extra parts earns its place.** At true days 1 to 10 on the kept rows, `member_plain` scores 10.533
 points of capacity against 10.518 for the default (difference +0.015, 99.8% interval -0.068 to
-+0.099). No design beats the default by the 0.10-point margin. Every arm leaves 2.2% to 2.5% of
++0.099). No design beats the default by the 0.10-point margin. Every arm leaves 2.2% to 2.8% of
 observations above its q99 against the 1.5% limit, so under the maintainer's rule no arm advances.
 
 The three farms are W1 to W3. Each arm is a pooled mixture-density network, trained five times
-(seeds 0 to 4) on the daily ensemble hindcast, and scored on 53 Tuesday runs of 2025-07 to
-2026-06. Margins (0.10 points, tail harm at most 0.02) were agreed by the maintainer on 2026-10-31.
-The reproduction gate passed: the shared code reproduces the default's 11.081 kept-row score and
-10.518 true-days-1-to-10 score with a per-quantile gap of at most 2e-6.
+(seeds 0 to 4) on the daily ensemble hindcast, and scored on 53 Tuesday runs of 2025-07 to 2026-06.
+Margins (0.10 points, tail harm at most 0.02) were agreed by the maintainer on 2026-10-31. The
+reproduction gate passed: the shared code reproduces the default's 11.081 kept-row score and 10.518
+true-days-1-to-10 score with a per-quantile gap against the stored rows of 0.000 at three decimals.
 
 ![Each arm's quantile score minus Wind farms research default 2's, with the 0.10-point margin](headline.svg)
 
@@ -143,53 +146,55 @@ The reproduction gate passed: the shared code reproduces the default's 11.081 ke
   default 1: 10.752 (11.352); climatology: 13.860 (13.842). Seed standard deviations are 0.02 to
   0.08 points.
 - **A1, member handling: no gain.** `member_plain` minus `one_pass_ms` is -0.008 points at true
-  days 1 to 10 (99.8% interval -0.093 to +0.076) and -0.002 at true days 3 to 10; the prediction of
-  0.10 points did not hold. Against `one_pass_m` it is -0.031 (-0.115 to +0.051). The member-wise
+  days 1 to 10 (99.8% interval -0.093 to +0.076) and -0.002 at true days 3 to 10; both halves of
+  the prediction failed: no gain of 0.10 points, and the q99 pinball loss rose 0.6% instead of
+  falling 5%. Against `one_pass_m` it is -0.031 (-0.115 to +0.051). The member-wise
   arm's pooled mixture is -0.026 against `one_pass_ms` (-0.092 to +0.071). The minimum detectable
-  effect is about 0.08 points.
+  effect is about 0.08 points, so smaller differences are inconclusive, not null.
 - **A4, physics layer: a tie.** `member_frozen` minus `member_plain` is +0.000 (-0.071 to +0.073);
-  `member_e2e` minus `member_frozen` is -0.004 (95% -0.008 to -0.001), too small to matter. The
-  plain network is chosen, as the maintainer's rule says.
-- **A7, censored head: slightly worse, and the tail is unchanged.** `member_plain_censored` minus
-  `member_plain` is +0.018 (95% +0.004 to +0.031). The q99 pinball loss falls 0.6% and the share of
-  observations above q99 goes from 2.46% to 2.35%. The prediction of 1.5% or less failed, and the
-  explanation was tested: only 502 of 1,466 exceedances of `member_plain`'s q99 are at 99.9% of
-  capacity or above, with a mean overshoot of 7.3 points at a mean q99 of 0.80 of capacity.
+  `member_e2e` minus `member_frozen` is -0.004 (95% -0.008 to -0.001, within seed noise of 0.05).
+  The plain network is chosen, as the maintainer's rule says.
+- **A7, censored head: no better, and the tail is nearly unchanged.** `member_plain_censored` minus
+  `member_plain` is +0.018 (95% +0.004 to +0.031; 99.8% -0.005 to +0.039). The q99 pinball loss
+  falls 0.6% and the share of observations above q99 goes from 2.46% to 2.35%. The prediction of
+  1.5% or less failed, and an ad hoc check, not in the stored report, found only 502 of 1,466
+  exceedances of `member_plain`'s q99 at 99.9% of capacity or above, with a mean overshoot of 7.3
+  points at a mean q99 of 0.80 of capacity. Censoring was tested on one base arm only.
 - **Tails.** Observations beyond q99 at true days 1 to 10: 2.15% for the reproduced default, 2.17%
   to 2.78% for the arms, 1.66% for research default 1 (an XGBoost model), 4.74% for climatology.
   Beyond q01: 0.6% to 1.25% for the arms.
 - **Idle-band results.** Scored with and without experiment 210's idle-band mask: training on all
-  rows scores 0.16 points worse on the kept rows (plain, +0.161, 99.8% +0.043 to +0.290) and 1.74
-  points better on the idle-band rows (-1.740), and ties on all rows with the idle half-hours
+  rows scores 0.16 points worse at true days 1 to 10 (plain, +0.161, 99.8% +0.043 to +0.290) and
+  1.74 points better on the idle-band rows (-1.740), and ties on all rows with the idle half-hours
   scored as zero (plain +0.011 at true days 1 to 10). The scores on cleaned zeros (idle-band
   observations set to zero, the experiment 210 mask only) are 10.383 for `member_plain` and 10.374
-  for the default at true days 1 to 10, so cleaned zeros change no ranking among the member arms.
-  The mask's false-keep and false-drop rates need labelled idle periods, which this experiment does
-  not have; experiment 210's own rates are a false-drop rate capped at 5% and misses of 51% to 69%
-  out of sample. In the H-P 2 x 2, trained on all rows, the frozen plant is 0.039 points worse than
-  plain at true days 1 to 10 (99.8% +0.003 to +0.074), 0.038 better on idle-band rows
-  (interval includes zero), and 0.022 worse on cleaned zeros. Trained with the mask, it ties on
-  kept rows (+0.000) and is 0.151 worse on idle-band rows. The prediction that the plant helps on
-  the idle band, and that the gap halves with the mask, failed. The soft cut-in ramp variant and
-  the detector-rule cells are not run.
+  for the default at true days 1 to 10, and the all-rows arms move ahead of `member_plain` on
+  cleaned zeros (`member_plain_allrows` 10.352). The mask's false-keep and false-drop rates need
+  labelled idle periods, which this experiment does not have; experiment 210's own rates are a
+  false-drop rate capped at 5% and misses of 51% to 69% out of sample. In the H-P 2 x 2, trained on
+  all rows, the frozen plant is 0.039 points worse than plain at true days 1 to 10 (99.8% +0.003 to
+  +0.074), 0.038 better on idle-band rows (interval includes zero), and 0.022 worse on cleaned
+  zeros. Trained with the mask, it ties on kept rows (+0.000) and is 0.151 worse on idle-band rows.
+  The prediction that the plant helps on the idle band, and that the gap halves with the mask,
+  failed. The soft cut-in ramp variant and the detector-rule cells are not run.
 - **Members as quantile forecasts.** The member-wise arm gives each member its own 11 quantiles.
   The mean score of one member's quantiles against the observation is 14.27 points, against 10.52
   for the pooled mixture, and 9.8% of observations fall below, and 14.4% above, a member's own q01
-  and q99. A single member's quantiles are therefore far too narrow to stand alone; the pooled
-  mixture is the calibrated forecast. Running 51 passes per forecast is affordable in production,
+  and q99. One member's quantiles are therefore narrower than the pooled mixture, whose own tails
+  are also too narrow (2.17% above q99). Running 51 passes per forecast is affordable in production,
   but no arm needs it for score.
 - **Coherence.** Scores use the 51 member paths across W1 to W3 jointly over one run and one
   calendar day (529 blocks). The Schaake shuffle beats ensemble copula coupling (ECC) from
   `one_pass_ms` by 9.3% on the [variogram score](https://doi.org/10.1175/MWR-D-15-0269.1) (99%
   interval -0.491 to -0.256) and by 0.8% on the [energy
-  score](https://doi.org/10.1198/016214506000001437). The member route using each member's own
-  plant path is 6.3% worse than ECC on the variogram score. Member-wise quantiles taken at ECC ranks
-  are 5.6% better than ECC on the variogram score but 4.2% worse than the Schaake shuffle. The
+  score](https://doi.org/10.1198/016214506000001437). The member route's own plant paths are 5.9%
+  worse than ECC paths from the same arm on the variogram score. Member-wise quantiles taken at ECC
+  ranks are 5.6% better than ECC on the variogram score but 4.2% worse than the Schaake shuffle. The
   design note's prediction (member route beats ECC by 5% on the variogram score) failed; the 5%
   margin is the Opus note's proposal, not the maintainer's. ECC beats independent draws by 1.3% on
-  the energy score over a day. Methods: [Schaake shuffle
-  (Clark et al. 2004)][clark], [ECC
-  (Schefzik et al. 2013)](https://doi.org/10.1214/13-STS443).
+  the energy score over a day, but not on the variogram score, and independent draws score better in
+  days 0 to 1. Methods: [Schaake shuffle (Clark et al. 2004)][clark], [ECC (Schefzik et al.
+  2013)](https://doi.org/10.1214/13-STS443).
 - **Compute.** The member route runs 51 network passes per forecast, against one for `one_pass_ms`.
   The maintainer has said production can afford 51 passes (2026-10-31).
 - **Possible follow-up (not agreed).** A soft cut-in ramp on the plant, and the detector-rule
@@ -198,7 +203,7 @@ The reproduction gate passed: the shared code reproduces the default's 11.081 ke
 ## Checks
 
 - **Reproduction gate (G0):** passed. Kept 11.081 against stored 11.081; true days 1 to 10 10.518
-  against 10.518; per-quantile gap at most 2e-6, same seeds.
+  against 10.518, same seeds.
 - **Fresh Sonnet reviews:** three code reviews before the first fit (they found a missing
   upper-tail verdict, a half-open lead band, a weight-decay slip on the plant, and the member-wise
   path construction, all fixed). The results, write-up, and prose reviews are recorded in the pull
@@ -211,7 +216,7 @@ The reproduction gate passed: the shared code reproduces the default's 11.081 ke
 
 ## Caveats
 
-- Seed standard deviations of 0.03 to 0.08 points make differences below 0.08 inconclusive, not
+- Seed standard deviations of 0.02 to 0.08 points make differences below 0.08 inconclusive, not
   null.
 - The member-shifted coherence path keeps the plant's own spread; its comparisons mix in marginal
   differences.
