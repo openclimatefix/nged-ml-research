@@ -252,7 +252,7 @@ recalls are on the sunny slice of the hidden pair's test-month rows at level 1.0
 on the identical rows. No interval is given: step 0 pools 21 labellers and the macro-average over
 Primary-months is the spread measure.
 
-![The share of sunny-midday half-hours with a probability of reverse flow above 0.5 when nothing is injected, by Primary](false_reverse.svg)
+![Share of sunny-midday half-hours called reverse flow, no injection](false_reverse.svg)
 
 | Measure | Labeller, pooled | Arm A, pooled | Labeller, macro | Arm A, macro |
 |---|---|---|---|---|
