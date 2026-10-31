@@ -14,7 +14,7 @@ unchanged. This module redirects 428's output folders to this experiment's work 
 an input class that adds the columns and a network with the wider input.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<path to the private data folder>
 source <paths>; PYTHONPATH=$PP:ml-experiments/00440-* OMP_NUM_THREADS=1 \
   systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
   uv run --no-sync python ml-experiments/00440-*/e00440_run.py fit --arms S2 --months 2026-01 --seeds 0
