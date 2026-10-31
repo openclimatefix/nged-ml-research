@@ -1073,3 +1073,10 @@ Experiment 201's median-correction network, retrained with 6 different seed sets
 score at 0.5 to 168 hours between 2.5787 and 2.6038, so one seed set carries 0.01 to 0.02 points of
 noise ([experiment 325](00325-primary-demand-default-3-sunshine-response-refit-and-restriction/result.md)).
 Confidence: provisional, one family, one scored year.
+
+**Score the pooled mixture density network only on valid times from 2025-07-01.** *Applies to:
+experiments.* The stored ensemble demand frames and summaries that experiments 397 to 409 read
+begin with the scored period, so test months before 2025-07 have no inputs and a fit for them stops
+before writing a forecast ([experiment 416](00416-mdn-explicit-solar-term-better-powered-follow-up/result.md);
+the months 2025-05 and 2025-06 failed). The 12 months from 2025-07 to 2026-06 are the full set.
+Confidence: provisional, one family.
