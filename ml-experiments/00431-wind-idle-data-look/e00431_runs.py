@@ -136,7 +136,7 @@ def main() -> None:
             )
         # Reference: spells of ERA5 wind below the cut-in (the idle that low wind could explain).
         cut = pl.col("site").replace_strict(speeds, return_dtype=pl.Float64)
-        calm_runs = runs_of(frame=frame, flag=pl.col("wind_speed") < cut)
+        calm_runs = runs_of(frame=frame, flag=pl.col("wind_speed") < cut, max_gap=max_gap)
         for site in SITES:
             sub = calm_runs.filter(pl.col("site") == site)
             calm.append(

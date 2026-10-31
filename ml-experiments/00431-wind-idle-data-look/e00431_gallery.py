@@ -7,10 +7,11 @@ Writes one PNG per farm and category (20 farm-days each) under
 `data/ml-experiments/00431-wind-idle-data-look/gallery_private/`. The gallery shows raw farm-days
 and is never published, never copied into `docs/`, and never named in a pull request.
 
-A day (UTC) is "sure-idle" when at least 80% of its half-hours are in the sure-idle set,
-"sure-generating" when at least 50% of its half-hours are in the sure-generating set (the set is
-rarer), and a "disagreement" day when the 210 mask and the texture rule disagree on at least 40% of
-its half-hours. The texture rule calls a half-hour idle when the 24-hour centred share of repeated
+A day (UTC) is "sure-idle" when at least 50% of all its half-hours are in the sure-idle set,
+"sure-generating" when at least 25% of all its half-hours are in the sure-generating set (the set
+is rarer), and a "disagreement" day when the 210 mask and the texture rule disagree on at least
+40% of its half-hours. Fewer than 20 days may qualify at a farm.
+The texture rule calls a half-hour idle when the 24-hour centred share of repeated
 values is above the midpoint of that statistic's median in the two sure sets.
 """
 
@@ -30,6 +31,8 @@ OUT_DIR: Final[Path] = DATA_ROOT / "00431-wind-idle-data-look"
 GALLERY_DIR: Final[Path] = OUT_DIR / "gallery_private"
 SITES: Final[dict[str, str]] = {"W1": "Farm A", "W2": "Farm B", "W3": "Farm C"}
 N_DAYS: Final[int] = 20
+IDLE_DAY_SHARE: Final[float] = 0.5
+GEN_DAY_SHARE: Final[float] = 0.25
 MIN_HALF_HOURS: Final[int] = 40
 SEED: Final[int] = 431
 TEXTURE_STAT: Final[str] = "repeat_share_24h_centre"
@@ -42,8 +45,8 @@ def day_table(*, frame: pl.DataFrame) -> pl.DataFrame:
         .group_by("site", "day")
         .agg(
             n=pl.len(),
-            idle_share=(pl.col("sure") == "idle").mean(),
-            gen_share=(pl.col("sure") == "gen").mean(),
+            idle_share=(pl.col("sure") == "idle").fill_null(value=False).mean(),
+            gen_share=(pl.col("sure") == "gen").fill_null(value=False).mean(),
             disagree=(pl.col("masked") != pl.col("texture_idle")).mean(),
         )
         .filter(pl.col("n") >= MIN_HALF_HOURS)
@@ -54,9 +57,9 @@ def pick(*, days: pl.DataFrame, site: str, category: str) -> pl.DataFrame:
     """Pick up to `N_DAYS` days of one category for one farm, at random with a fixed seed."""
     sub = days.filter(pl.col("site") == site)
     if category == "sure_idle":
-        sub = sub.filter(pl.col("idle_share") >= 0.8)
+        sub = sub.filter(pl.col("idle_share") >= IDLE_DAY_SHARE)
     elif category == "sure_generating_low":
-        sub = sub.filter(pl.col("gen_share") >= 0.5)
+        sub = sub.filter(pl.col("gen_share") >= GEN_DAY_SHARE)
     else:
         sub = sub.filter(pl.col("disagree") >= 0.4)
     return sub.sample(min(N_DAYS, sub.height), seed=SEED).sort("day")

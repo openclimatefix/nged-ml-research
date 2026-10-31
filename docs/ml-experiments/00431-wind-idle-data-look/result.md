@@ -88,7 +88,8 @@ headline: >-
 lessons: >-
   Without level matching, the gate would have passed on power level alone (raw AUC 0.95 at Farm A,
   1.0 for the amplitude statistics), so any later texture detector must be scored within power
-  bins. Farm B's negative readings do not depend on the hour of day, and began in 2020 or 2021.
+  bins. Farm B's negative readings began in 2020 and are rarer in the afternoon (22% to 33% of
+  sure-idle readings at 12:00 to 18:59 UTC) than overnight (47% to 61%).
 take_home_message: >-
   A cheap rule that looks at how jumpy a wind farm's recent readings are can tell idle readings
   from genuine low output at the same power level at two of the three farms, so the texture
@@ -102,7 +103,8 @@ advice:
     Score any idle-versus-low-output detector within bins of power as a share of capacity, because
     the unmatched AUC reaches 0.95 at Farm A on level alone (AUC table).
   - >-
-    Keep the whole-farm outage class I2 for Farm C (idle runs of up to 5 days at high wind, longer
+    Keep the whole-farm outage class I2 for Farm C (weakly supported, and only at the
+    1.5-times-cut-in speed) (idle runs of up to 5 days at high wind, longer
     than low wind explains), treat I2 as weak at Farm A and Farm B, and make the weekday covariate
     optional (Run lengths, Weekday and hour).
   - >-
@@ -123,9 +125,10 @@ and none of 7 days or more at any farm in the stored series. The Farm C result h
 1.5-times-cut-in speed only: with the empirical cut-in no run exceeds 44 hours. Verdict: `partly
 supported`.
 
-**The comparison uses two narrow sets of clear cases and fits nothing.** We looked at the three
-metered wind farms (Farm A and Farm C metered in megavolt-amperes, Farm B in megawatts) with no fit.
-The "sure-idle" set is half-hours with ERA5 100 m wind below 2 m/s and power inside the idle band of
+**The comparison uses two narrow sets of clear cases and fits nothing. The gate for the whole-farm
+outage class I2 was changed after the weekday result had been read.** We looked at the three metered
+wind farms (Farm A and Farm C metered in megavolt-amperes, Farm B in megawatts) with no fit. The
+"sure-idle" set is half-hours with ERA5 100 m wind below 2 m/s and power inside the idle band of
 experiment 210 (5% to 95% of power at ERA5 wind below 2 m/s, per farm). ERA5 is the European Centre
 for Medium-Range Weather Forecasts fifth-generation reanalysis, and the cut-in is the wind speed at
 which turbines start generating. The "sure-generating low-output" set is half-hours with ERA5 wind
@@ -169,13 +172,16 @@ in](figure_7_idle_run_lengths.svg)
 - **Run lengths (I2 gate):** with the pre-registered definition (power in the idle band, ERA5 wind
   above 1.5 times the used cut-in, no gaps), the longest run is 24 hours at Farm A, 28.5 hours at
   Farm B, and 49 hours at Farm C; 0, 3, and 21 runs exceed 24 hours; none exceeds 7 days. Farm C's
-  longest run is just above the longest spell of ERA5 wind below the cut-in (47.5 hours). With the
-  post hoc definition (power at or below the top of the idle band, gaps of up to 3 half-hours), 1,
-  6, and 81 runs exceed 24 hours. The longest run is 36, 55, and 120.5 hours. The share of high-wind
-  idle half-hours in runs of 1 to 7 days is 6%, 3%, and 19%, and none reaches 7 days. With the
-  empirical cut-in as the high-wind speed, no run exceeds 44 hours. So multi-day runs that low wind
-  cannot explain appear at Farm C at the 1.5-times-used-cut-in speed only, marginally at Farm B, and
-  not at Farm A. No multi-week run is visible in these series.
+  longest run is just above the longest spell of ERA5 wind below the cut-in (47.5 hours), a margin
+  of 1.5 hours, and only 1 of its 21 runs over 24 hours exceeds that spell. With the post hoc
+  definition (power at or below the top of the idle band, gaps of up to 3 half-hours), 1, 6, and 81
+  runs exceed 24 hours. The longest run is 36, 55, and 120.5 hours. The share of high-wind idle
+  half-hours in runs of 1 to 7 days is 6%, 3%, and 19%, and none reaches 7 days. The reference
+  spells with the same gap tolerance are 111, 66, and 66 hours at Farm A, B, and C, so only Farm C's
+  longest post hoc run (120.5 hours) exceeds its reference. With the empirical cut-in as the
+  high-wind speed, no run exceeds 44 hours. So multi-day runs that low wind cannot explain appear at
+  Farm C at the 1.5-times-used-cut-in speed only (marginal under the strict definition, clear under
+  the post hoc one), and not at Farm A or Farm B. No multi-week run is visible in these series.
 - **Weekday and hour (secondary check on H2):** the idle share of high-wind half-hours on weekday
   daytimes (08:00 to 17:59 UTC), over the share at other hours, is 1.01 (0.67 to 1.35) at Farm A,
   0.77 (0.70 to 0.83) at Farm B, and 0.82 (0.77 to 0.86) at Farm C. The ratio never reaches 1.5, so
@@ -183,19 +189,22 @@ in](figure_7_idle_run_lengths.svg)
   settle I2 (see run lengths). With the empirical cut-in of experiment 210 as the high-wind speed
   the ratios are 1.01, 0.91 (0.55 to 1.42), and 0.72 (0.65 to 1.47), all with intervals that include
   1 and none reaching 1.5.
-- **Floor by year:** the share of exact zeros in the idle floor falls from over 80% in 2019 to about
-  10% in 2026 at all three farms, and the median floor rises from 0 to about 1.6% (Farm A), 0.7%
-  (Farm B), and 2.5% (Farm C) of capacity. The floor level is not stable across years.
-- **Farm B negatives:** none before 2020. From 2021 on, 33% to 53% of sure-idle readings are
-  negative, with no pattern by hour of day (36% to 55% in every hour).
+- **Floor by year:** the share of exact zeros in the idle floor falls from over 80% in 2019 to 10%
+  in 2026 at Farm A, 7% at Farm C, and 1% at Farm B, and the median floor rises from 0 to about 1.6%
+  (Farm A), 0.7% (Farm B), and 2.5% (Farm C) of capacity. The floor level is not stable across
+  years.
+- **Farm B negatives:** none before 2020. From 2021 on, 32% to 53% of sure-idle readings are
+  negative. The share is 47% to 61% in the hours 21:00 to 09:59 UTC and 22% to 33% in the hours
+  12:00 to 18:59, so the negative readings are not a constant offset. The data cannot say why.
 - **Farm B against Farm C:** at high wind, 10,368 half-hours read idle at both farms, 2,634 only at
   Farm B, and 20,018 only at Farm C. Of Farm B's idle half-hours at high wind, 80% are also idle at
   Farm C. A shared ERA5 error or a shared cause (for example a grid event) fits this, and so would
   an idle band that is wide at Farm C. The data cannot say which.
-- **Gallery:** 60 farm-days per farm (20 sure-idle, 20 sure-generating low-output, 20 where the
-  experiment 210 mask and the texture rule disagree), kept private under the experiment's data
-  folder and not published. The disagreement days show flat zero runs at moderate wind that the mask
-  does not cover, and low, noisy readings at low wind inside the mask.
+- **Gallery:** up to 60 farm-days per farm (20 sure-idle, 12 at Farm B and 16 at Farm C because
+  fewer days qualify, 20 sure-generating low-output, 20 where the experiment 210 mask and the
+  texture rule disagree), kept private under the experiment's data folder and not published. The
+  disagreement days show flat zero runs at moderate wind that the mask does not cover, and low,
+  noisy readings at low wind inside the mask.
 - **Checks:** no forecast is scored, so the median-minus-mean, tail, and curtailment checks do not
   apply. Audit triggers: none fired.
 
