@@ -341,9 +341,10 @@ gain (the second claim failed), and the gating joint block saw no difference at 
   No construction beats independent draws by the 2.3% margin.
 - **Across the three families in daylight, days 1 to 10:** J2 -9.8%, J3 -10.5%, J4 -10.5%, J5
   -10.5% (-17.9% to -3.3%), J6 -6.7% (-15.1% to +1.0%), J1 +8.0%. The margin is 2.0% and J2 to J5
-  all lie below it. The shortwave radiation that drives both net demand and solar output couples the
-  families, and any ordering that includes it captures the dependence (the prediction that J2 or J4
-  beat J3 here failed: all four tie).
+  all lie below it. The audit showed that this gain is entirely within-family: shuffling the
+  scenario order of each family separately gave -9.4% to -10.1%, against -9.8% to -10.5% unshuffled.
+  The block therefore cannot test cross-family dependence, and the failure of P3 says nothing about
+  shortwave-driven coupling between demand and solar.
 - **Across leads.** Every construction except J1 and J6-median stays within 5% of J0 for each node
   except demand D4, where J3 scored -17.1% (-28.8% to -6.6%) and J4 -14.0% (-23.8% to -5.5%). J6's
   member-wise quantiles score 1.6% to 4.0% worse than J0 across leads for every solar farm (for
@@ -380,12 +381,13 @@ gain (the second claim failed), and the gating joint block saw no difference at 
 - **Marginal tails limit the group-sum result.** The 51 values are too narrow in the upper tail
   (7.6% to 8.8% of actuals above q95), so the group-sum exceedances below partly show the marginals,
   not only the ordering.
-- **Tails.** The scenarios' q95 and q99 exceedance shares are given in the marginal check. For the
-  sum over a group, the share of actuals above the q95 of the scenario sums was 13.9% for J0, 26.4%
-  for J1, 2.6% for J2, 6.6% for J3, 7.2% for J4, 7.9% for J5, and 2.4% for J6; above q99 it was
-  8.1%, 18.9%, 0.6%, 2.7%, 3.0%, 3.2%, and 0.5%. J0 and J1 exceed far more often than 5%, J2 and J6
-  far less, and J3 to J5 sit closest to the nominal 5% and 1%. The audit is asked to re-derive these
-  sums.
+- **Tails.** The scenarios' q95 and q99 exceedance shares are given in the marginal check. The
+  group proxy is the net flow of a group (demand minus wind). The share of actuals above the q95 of
+  the scenario net flows was 13.9% for J0, 26.4% for J1, 2.6% for J2, 6.6% for J3, 7.2% for J4,
+  7.9% for J5, and 2.4% for J6; above q99 it was 8.1%, 18.9%, 0.6%, 2.7%, 3.0%, 3.2%, and 0.5%. J1
+  is narrow on net flow because comonotone ranks cancel the demand variation against the wind
+  variation. Demand-only and wind-only sums were not scored, and the audit found J1 widest on
+  demand-only sums (0.1% above q95 in group A).
 - **Not run.** Tier 2 (12 demand fits) was not run, because neither J4 nor J6 beat J3 for demand
   (across Primaries J4 scored +0.4% and J6 +6.8% against J0, J3 +0.4%). The run-level block
   bootstrap sensitivity check registered in the plan was not run.
@@ -407,5 +409,11 @@ gain (the second claim failed), and the gating joint block saw no difference at 
   failed: J3 scored worse than J2 on the joint block (+1.9% against -0.0% against J0), J5 only tied
   J2 there, and J6 was 8.3% worse than J5 across solar farms (+1.5% to +19.1%) instead of tying it.
   Triggers 1 (J1 control moves the score as expected, and J5 at weight 1 reproduces J2 exactly), 3,
-  5, 6, and 7 did not fire. Trigger 4 (leave-one-site-out) was not run, and the farm contrasts rest
-  on only three wind farms. The audit is pending and is described in the pull request.
+  5, 6, and 7 did not fire. Trigger 4 was checked for the spatial wind and solar blocks (days 1 to
+  10) by leaving out each farm in turn: no sign flips for J3 or J5 against J0 (wind -22% to -31% for
+  J3 and -24% to -31% for J5; solar -36% to -45% for J3 and -38% to -47% for J5). The J2 wind gain
+  depends on W1: it falls from -18% to -1%, with an interval spanning zero, when W1 is left out. The
+  audit found no leakage, and J0 to J5 hold identical 51 values in all 44 runs. One low-severity
+  overlap remains: training runs in the first 9 days after a held-out month share actuals with that
+  month's last runs. With 10 calendar months the 98.75% intervals undercover, so read each interval
+  as optimistic. The audit's report is in the private `briefs/` folder.
