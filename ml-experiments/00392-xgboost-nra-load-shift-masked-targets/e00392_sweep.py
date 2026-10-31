@@ -298,6 +298,12 @@ def run_job(
 ) -> tuple[pl.DataFrame, list[str]]:
     """Sweep every available booster of one arm form at one refit.
 
+    Args:
+        arm_form: The arm and form, such as `r0_lagged`, whose boosters are swept.
+        refit: The refit time whose boosters are loaded.
+        origins: The forecast origins whose demand frames are scored.
+        sites: The Primaries to sweep.
+
     Returns:
         A tidy frame with one row per site, lead band, k, share, sign and widening, holding the
         `METRICS` sums, and the labels of the sites whose booster file is missing.

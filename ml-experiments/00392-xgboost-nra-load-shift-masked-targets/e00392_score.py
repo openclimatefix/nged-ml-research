@@ -58,14 +58,12 @@ does not depend on the widening factor.
 
 Everything is scored raw and with each quantile's distance from the median multiplied by 1.15.
 
-```bash
-PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
-ml-experiments/00379-bg2-components-all-16-primaries-to-14-days:\
-ml-experiments/00383-load-shift-xgboost-oracle-first-part-1:\
-ml-experiments/00392-xgboost-nra-load-shift-masked-targets \
-    DATA_PATH_INTERNAL=... uv run --no-sync python ml-experiments/00392-*/e00392_score.py \
-    --actuals cache
-```
+    PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
+    ml-experiments/00379-bg2-components-all-16-primaries-to-14-days:\
+    ml-experiments/00383-load-shift-xgboost-oracle-first-part-1:\
+    ml-experiments/00392-xgboost-nra-load-shift-masked-targets \
+        DATA_PATH_INTERNAL=... uv run --no-sync python ml-experiments/00392-*/e00392_score.py \
+        --actuals cache
 """
 
 import argparse
