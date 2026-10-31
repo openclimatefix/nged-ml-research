@@ -8,8 +8,8 @@ SVG, in the experiment's docs folder; optimise each with `npx svgo@4 --multipass
 
 1. `figure_1_<slice>.svg`: CRPS difference of each arm from its control inside one slice, with the
    bootstrap interval, one panel for the signed-MW six and one for the MVA-only eight;
-2. `figure_2_outside_<slice>.svg`: the same difference on all rows outside cold winter nights and outside cold sunny days (the
-   no-harm-elsewhere check);
+2. `figure_2_outside_<slice>.svg`: the same difference on all rows outside cold winter nights and
+   outside cold sunny days (the no-harm-elsewhere check);
 3. `figure_3_folds.svg`: the CRPS difference of T from R on cold winter nights in each fold;
 4. `figure_4_absolute.svg`: the absolute CRPS of the controls and references on each slice;
 5. `figure_5_tails.svg`: coverage at q01, q05, q95, and q99 of the controls and arms on cold winter

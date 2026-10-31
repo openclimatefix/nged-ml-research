@@ -10,7 +10,7 @@ missing.
 
 ```bash
 source <(printf 'export PYTHONPATH=%s\n' "$(cat ml-experiments/00442-*/pythonpath.txt)")
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data OMP_NUM_THREADS=1
+export DATA_PATH_INTERNAL=<path to the private data folder> OMP_NUM_THREADS=1
 uv run --no-sync python ml-experiments/00442-*/e00442_fit.py plan
 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00442-*/e00442_fit.py fit --device cuda

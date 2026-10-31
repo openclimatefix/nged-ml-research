@@ -13,7 +13,7 @@ Copied and adapted from `ml-experiments/00441-difficult-row-rescore-of-the-neura
 
 ```bash
 source <(printf 'export PYTHONPATH=%s\n' "$(cat ml-experiments/00442-*/pythonpath.txt)")
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data OMP_NUM_THREADS=1
+export DATA_PATH_INTERNAL=<path to the private data folder> OMP_NUM_THREADS=1
 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
   uv run --no-sync python ml-experiments/00442-*/e00442_score.py pre
 ```
@@ -567,7 +567,7 @@ def absolute_table(*, rows: dict[str, pl.DataFrame]) -> pl.DataFrame:
 
 
 def gate_against_437() -> None:
-    """Rebuild experiment 437's T-minus-R contrast (four folds, seeds 0 to 2) and print it beside the published one."""
+    """Rebuild experiment 437's T-minus-R contrast (four folds, seeds 0 to 2) and compare it."""
     rows = build_rows(with_arm=True, months=fit.OLD_MONTHS, seeds=fit.OLD_SEEDS)
     frame = paired(rows=rows, arm=fit.ARM)
     here = tuple(
