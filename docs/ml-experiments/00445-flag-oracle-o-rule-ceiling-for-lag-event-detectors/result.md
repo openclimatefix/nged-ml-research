@@ -54,54 +54,77 @@ metric: >-
 verdict: refuted
 best_arm: >-
   None beat B-mix. The closest is O-floor (post hoc: weight 0.5 + share of flagged lags / 2 on the
-  lagless head), +0.326 (-0.004 to +0.540) points against B-mix inside real events at the signed-MW
-  six.
+  lagless forecast), +0.326 (-0.004 to +0.540) points of capacity against B-mix inside real events
+  at the six Primary substations metered in signed megawatts.
 headline: >-
-  Giving a mixture of the lagged and lagless forecasts the exact record of which lags lie inside a
-  load-shift event did not make it score better than the fixed 50/50 mixture B-mix. Inside real
-  events at the six Primaries metered in signed megawatts the hard rule scored 0.465 points of
-  capacity worse than B-mix (95% interval 0.198 to 0.644, 20 events), and the soft rule 0.429 worse.
+  Giving a mixture of the lagged forecast and the lagless forecast an exact record of which recent
+  power readings lie inside a load-shift event did not make the mixture score better than B-mix, a
+  fixed 50/50 mixture of the same two forecasts. Inside real events at the six Primary substations
+  metered in signed megawatts the hard rule scored 0.465 percentage points of capacity worse than
+  B-mix (95% interval 0.198 to 0.644, 20 real events) and the soft rule 0.429 worse. A control
+  built from stored forecasts found that averaging two lagged forecasts from different fit seeds
+  recovers 0.29 of B-mix's gain over a single lagged forecast on real clean rows.
 lessons: >-
-  Detection is not the bottleneck for the mixture rule. The lagged head and the lagless head score
-  alike even when all 3 lags are flagged, and a 50/50 average of the two beats either alone in every
-  row set, so picking one head with a perfect flag throws that averaging gain away.
+  In these data, detection was not the bottleneck for the mixture rule. The lagged forecast and the
+  lagless forecast score alike when all three readings are flagged on injected events (4.10 and
+  4.03) and the lagless forecast is worse inside real events (10.19 against 9.48), while an equal
+  average of the two beats either alone in most row sets. About a quarter to a third of B-mix's
+  gain over a single lagged forecast is ensembling; the rest comes from combining a lagged and a
+  lagless forecast.
 take_home_message: >-
-  A perfect record of which recent power readings lie inside a load-shift event did not help:
-  choosing the lagless forecast (or weighting it by the share of flagged readings) scored worse than
-  simply averaging the lagged and lagless forecasts 50/50, inside real events (0.465 points of
-  capacity worse, 95% interval 0.198 to 0.644) and on simulated events. The two forecasts are about
-  equally good even when all three readings are flagged, and their average beats both, so a better
-  event detector cannot lift this pair of forecasts. All numbers are interim and unaudited.
+  A perfect record of which recent power readings lie inside a load-shift event did not help the
+  mixture of the lagged and the lagless forecast: choosing the lagless forecast (or weighting it by
+  the share of flagged readings) scored worse than averaging the two 50/50, inside real events (0.465
+  percentage points of capacity worse, 95% interval 0.198 to 0.644) and on simulated events. A
+  control found that averaging two lagged forecasts from different fit seeds recovers only about
+  0.29 of the 50/50 mixture's gain over one lagged forecast, so most of the gain comes from combining
+  a lagged and a lagless forecast. All numbers are interim and unaudited.
 advice:
   - >-
     Do not build a lag-event detector to drive a hard or soft switch between the lagged and the
-    lagless forecast, because with exact flags the switch scores 0.465 (0.198 to 0.644) points worse
-    than the fixed 50/50 mixture inside real events at the signed-MW six (O-hard, Figure 1).
+    lagless forecast of experiment 404 until the lagged forecast itself improves, because with exact
+    flags the switch scores 0.465 (0.198 to 0.644) percentage points of capacity worse than the fixed
+    50/50 mixture inside real events at the six Primary substations metered in signed megawatts
+    (O-hard, Figure 1).
   - >-
-    Keep a fixed 50/50 mixture of the lagged and lagless forecasts as the reference for any rule
-    that reweights the two, because it beat both forecasts alone in every row set (Figure 2).
+    Keep a fixed 50/50 mixture of a lagged and a lagless forecast as the reference for any rule that
+    reweights the two, because it beat both forecasts alone in most row sets (Figure 2).
   - >-
-    Test whether hiding the flagged lags from the lagged network (experiment O-mask) improves the
-    lagged head itself, because the heads, not the detector, limit this rule (Figure 2).
+    Compare every lag-trust neural network with a seed-matched average of its base network as well as
+    with a single base network, because an average of two lagged networks from different fit seeds
+    already recovers 0.29 of the 50/50 mixture's gain on real clean rows (Ensembling control).
+  - >-
+    Test whether hiding the flagged readings from the lagged network during training improves the
+    lagged forecast itself, because the two forecasts, not the detector, limit the mixture (Figure
+    2).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00445-flag-oracle-o-rule-ceiling-for-lag-event-detectors/
 ---
 
-**Take-home message: telling the forecast exactly which of its three recent power readings lie
-inside a load-shift event does not beat simply averaging the lagged and lagless forecasts 50/50, so
-the limit is the two forecasts and not the detector. The hypothesis is refuted.**
+**Take-home message: telling a mixture of two forecasts exactly which recent power readings lie
+inside a load-shift event did not make the mixture better than simply averaging the two forecasts
+50/50, so in these data the limit is the two forecasts and not the event detector. The hypothesis
+that exact event flags would improve the mixture is refuted.**
 
-We asked how much a perfect event detector could gain. The lagged forecast sees recent power
-readings (lags) and the lagless forecast does not. B-mix averages the two with equal weight. We
-replaced the equal weight with rules that use an exact record of which of the 3 lags lie inside an
-event: the hard rule uses the lagless forecast whenever any lag is flagged, and the soft rule
-weights the lagless forecast by the share of flagged lags. Neither rule beat B-mix, in real events
-or in simulated ones. The reason is in Figure 2: even with all 3 lags flagged, the lagless forecast
-is barely better than the lagged forecast on simulated events, and worse inside real events, while
-the average of the two beats both. This rules out a better detector as the way to improve this pair
-of forecasts. It narrows the search to making the lagged forecast itself ignore the flagged lags,
-which is experiment O-mask.
+We forecast the power drawn at NGED's Primary substations (the substations that step down from the
+high-voltage network), up to 14 days ahead. A load-shift event is a period in which the network
+operator moved load between substations, so recent power readings do not show normal demand. The
+lagged forecast uses the recent readings (lags) of the substation's own power, and the lagless
+forecast does not. B-mix averages the two with equal weight. We replaced the equal weight with rules
+that use an exact record of which of the three lags lie inside an event. The hard rule uses the
+lagless forecast whenever any lag is flagged (marked as inside an event), and the soft rule weights
+the lagless forecast by the share of flagged lags. Both rules scored worse than B-mix, in real
+events and in events we added to otherwise normal data. We re-scored forecasts that experiment 404
+had stored, so no model was fitted.
+
+Figure 2 shows why. With all three lags flagged, the lagless forecast is barely better than the
+lagged forecast on the added events, and worse inside real events, while the average of the two is
+better than either in most row sets. An equal average of two lagged forecasts from different fit
+seeds (the control at the end of this page) recovers 0.29 of B-mix's gain over a single lagged
+forecast on real clean rows, so most of B-mix's gain comes from combining a lagged and a lagless
+forecast. These results rule out a better detector as the way to improve this pair of forecasts. The
+next experiment to run is O-mask, which hides the flagged readings from the lagged forecast.
 
 **How to read the numbers.** Every number is interim and unaudited. The score is the continuous
 ranked probability score (CRPS) in points of capacity, from 11 quantiles (smaller is better), pooled
@@ -123,6 +146,8 @@ metered in signed megawatts, and the MVA-only eight are the remaining Primaries.
 ![Figure 4: 14-day example](figure_4_example_14_day.svg)
 
 ![Figure 5: six real events](figure_5_real_events.svg)
+
+![Figure 6: ensembling control](figure_6_ensembling.svg)
 
 ## Headline numbers
 
@@ -239,6 +264,38 @@ saved A0-inj networks and its stored lagless tables, and stored S1 forecasts.
   seed-matched ensemble of its base. If it is at most 0.25, the lagged and lagless diversity does
   the work. Between those values the result is mixed and reported as such. Inside real events the
   same ratio is reported as a second reading.
+
+### Results of the ensembling control
+
+- **Question and reading.** Does averaging forecasts of one kind recover B-mix's gain over a single
+  forecast? The pre-registered ratio is G_E / G_B, the gain of an average of two lagged forecasts
+  over a single lagged forecast, divided by the gain of B-mix over a single lagged forecast (Figure
+  6). At least 0.5 means ensembling, at most 0.25 means diversity, and in between is mixed.
+- **Reading: mixed, leaning towards diversity.** At the six Primaries in 2026-06 the ratio is 0.29
+  on real clean rows (the primary reading), 0.23 inside real events, 0.25 on injected clean rows,
+  and 0.25 on injected harm rows. With a three-way average of lagged forecasts the ratios are 0.39,
+  0.31, 0.33, and 0.34.
+- **Scores on real clean rows, six, 2026-06.** The single lagged forecast scores 3.239. Relative to
+  it, B-mix is -0.267 (-0.361 to -0.183), the average of two lagged forecasts -0.078 (-0.090 to
+  -0.069), and the three-way average -0.104 (-0.119 to -0.092). B-mix minus the three-way average is
+  -0.164 (-0.246 to -0.086), so B-mix is better than three lagged forecasts averaged.
+- **S1.** S1 is the network with the surprise at each lag as an extra input. Its stored forecasts
+  were averaged from their quantiles, which is approximate (it differed from the exact mixture by
+  0.0001 points on 60,000 validation rows). The average of two S1 seeds is -0.069 (-0.084 to -0.057)
+  against a single S1, and B-mix minus that average is -0.119 (-0.261 to +0.010).
+- **Averaging lagless forecasts.** Averaging lagless tables from different seeds gains less than
+  B-mix does over a single lagless table, but a five-way average is about as good as B-mix. Pooled
+  over five months at fit seed 0 at the six, inside real events the five-way average scores 7.795
+  against 7.855 for B-mix (B-mix minus it +0.060, -0.259 to +0.322), and on real clean rows B-mix
+  minus it is -0.127 (-0.472 to +0.116). At the MVA-only eight inside real events the five-way
+  average scores 8.418 against 8.664. B-mix is still better on injected harm rows (-0.101, -0.147 to
+  -0.057).
+- **O-floor beside it (post hoc).** In 2026-06, O-floor minus B-mix is -0.021 (-0.062 to +0.049) on
+  real clean rows and +0.098 (+0.035 to +0.162) inside real events.
+- **Cells.** Lagged and S1 averages exist for 2026-06 only (three fit seeds). Averages of lagless
+  tables exist for all five months (tables of seeds 0 to 4).
+- **Caveat.** Inside real events at 2026-06 the intervals rest on two events at the six, so the
+  second reading is weak.
 
 ## Reuse and credit
 

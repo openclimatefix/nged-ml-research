@@ -65,6 +65,8 @@ def families(*, ref: pl.DataFrame) -> dict[str, np.ndarray]:
         "lagless x3": averaged(arms=[("E-ll-012", 0)], ref=ref),
         "lagless x5": averaged(arms=[("E-ll-01234", 0)], ref=ref),
         "O-floor (post hoc)": averaged(arms=[("O-floor", 0)], ref=ref),
+        "single S1": averaged(arms=[("S1", s) for s in SEEDS], ref=ref),
+        "S1 x2 (approximate)": averaged(arms=[(f"E-s1-{p}", 0) for p in pairs], ref=ref),
     }
 
 
@@ -96,6 +98,10 @@ def part_one() -> None:
         ("lagless x5", "single lagless"),
         ("B-mix (seed-matched)", "lagless x2"),
         ("O-floor (post hoc)", "B-mix (seed-matched)"),
+        ("S1 x2 (approximate)", "single S1"),
+        ("B-mix (seed-matched)", "single S1"),
+        ("single S1", "single lagged (A0-inj)"),
+        ("B-mix (seed-matched)", "S1 x2 (approximate)"),
     ]
     out = []
     for group in GROUPS:

@@ -330,6 +330,52 @@ def figure_events() -> None:
     chart.save(FIGURE_DIR / "figure_5_real_events.svg")
 
 
+def figure_ensembling() -> None:
+    """Figure 6: gain of averaged heads over a single head, 2026-06, signed-MW six."""
+    c = pl.read_parquet(orule.OUT_DIR / "ensemble_part1.parquet").filter(
+        pl.col("group") == "signed_six",
+        ~pl.col("largest_removed"),
+        pl.col("cls").is_in(["clean_real", "tgt_real", "harm_inj"]),
+        pl.col("a").is_in(["B-mix (seed-matched)", "lagged x2", "lagged x3"]),
+        pl.col("b") == "single lagged (A0-inj)",
+    )
+    c = c.with_columns(
+        row=pl.col("cls").replace_strict(ceiling.CLASS_LABEL),
+        arm=pl.col("a").str.replace(" \\(seed-matched\\)", ""),
+    )
+    order = ["B-mix", "lagged x2", "lagged x3"]
+    base = alt.Chart(c.to_pandas())
+    y = alt.Y("arm:N", sort=order, title=None)
+    colour = alt.Color(
+        "arm:N", scale=alt.Scale(domain=order, range=[GREEN, ORANGE, BLUE]), legend=None
+    )
+    rules = base.mark_rule(strokeWidth=1.5).encode(  # ty: ignore[unresolved-attribute]
+        y=y, x=alt.X("low:Q", title="Mean score minus the single lagged forecast's (points; negative is better)"),
+        x2="high:Q", color=colour,
+    )  # fmt: skip
+    dots = base.mark_point(filled=True, size=40).encode(y=y, x="contrast:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    zero = base.mark_rule(color="#888", strokeDash=[3, 3]).encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
+    chart = (
+        (zero + rules + dots)
+        .properties(width=WIDTH - 150, height=70)
+        .facet(
+            row=alt.Row(
+                "row:N", title=None, sort=["real clean", "inside real events", "injected harm"]
+            )
+        )
+        .properties(
+            title=alt.TitleParams(
+                [
+                    "Averaging two lagged forecasts from different seeds recovers under a third of B-mix's gain (interim)",
+                    "Dot: estimate. Line: 95% interval from resampling whole events. 2026-06, fit seeds 0 to 2, six Primaries.",
+                ],
+                anchor="start",
+            )
+        )
+    )
+    chart.save(FIGURE_DIR / "figure_6_ensembling.svg")
+
+
 def main() -> None:
     """Draw every figure."""
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
@@ -337,6 +383,7 @@ def main() -> None:
     figure_by_count()
     figure_examples(site="D5")
     figure_events()
+    figure_ensembling()
 
 
 if __name__ == "__main__":
