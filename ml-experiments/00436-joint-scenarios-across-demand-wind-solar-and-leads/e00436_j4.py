@@ -8,7 +8,8 @@ ordered by those 51 paths (as in the Schaake shuffle `J3`). Writes `work/paths/J
 - Weather state of member k: the daily means over days 1 to 10 of five series: the 2 m temperature
   and the shortwave radiation averaged over the 16 Primaries (the demand frames), and the 100 m wind
   speed of each of the three wind farms (the stored member weather of experiment 429). Each series
-  is centred (over the 51 members, and over the candidate dates) and standardised by its standard deviation over the candidate dates.
+  is centred (over the 51 members, and over the candidate dates) and standardised by its
+  standard deviation over the candidate dates.
 - Weather state of a past date: the same five series from the stored analysis table of the nine
   generator sites (ERA5 weather with CAMS shortwave), with the temperature and shortwave averaged
   over the nine sites and the 100 m wind taken at the three wind farms. This is a regional proxy

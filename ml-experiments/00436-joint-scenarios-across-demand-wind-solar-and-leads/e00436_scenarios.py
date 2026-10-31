@@ -14,7 +14,8 @@ scenarios of each arm to `work/paths/<arm>/<date>.npy` as float32 (51, 25, 702).
   `c_t = phi c_{t-1} + sqrt(1 - phi^2) L eps_t`, so each node has unit variance at every half-hour.
 - `J5`: scenario m takes, at each node and half-hour, the rank of `sqrt(w) g + sqrt(1 - w) c` among
   the 51 scenarios, where `g` is the normal score of the member's ECC rank (the `J2` ordering) and
-  `w` is chosen per family and lead band (12 to 36 hours, 36 to 240 hours) from {0, 0.25, 0.5, 0.75, 1}
+  `w` is chosen per family and lead band (12 to 36 hours, 36 to 240 hours) from
+  {0, 0.25, 0.5, 0.75, 1}
   by the within-family spatial plus temporal variogram score on the training runs.
 - `J6`: for wind and solar, scenario k is ensemble member k's own conditional quantile function at
   the level `Phi(c_k)`; demand follows `J2`. `J6-median` takes each member's median instead.
