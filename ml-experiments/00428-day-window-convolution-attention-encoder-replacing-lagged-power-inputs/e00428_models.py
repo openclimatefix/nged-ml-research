@@ -64,6 +64,9 @@ class DayEncoderMdn(nn.Module):
     where unobserved, the observed flag in channel 1). `days` is 1, 2, or 3.
     """
 
+    takes_windows = True
+    attends = True
+
     def __init__(
         self,
         *,

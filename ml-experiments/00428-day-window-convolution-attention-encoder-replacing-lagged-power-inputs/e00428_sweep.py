@@ -69,6 +69,8 @@ CHUNK: Final[int] = 4_096
 
 def configs(*, arm: fit.Arm) -> list[tuple[str, int]]:
     """Return the (variant, k) pairs swept for an arm."""
+    if arm.history:
+        return [("hist", k) for k in (1, 2, 3)]
     if arm.kind == "lags":
         return [("lag", k) for k in (1, 2, 3)]
     if arm.kind == "none":
@@ -105,11 +107,39 @@ def trailing_mean(
     return torch.where(count > 0, total / count.clamp(min=1), torch.full_like(total, float("nan")))
 
 
+def shift_history(*, raw: dict, k: int, step: torch.Tensor, mva: torch.Tensor, changed: dict):
+    """Add `step` to the last `k` whole days of the history window and to the lags inside them.
+
+    A lag whose grid index falls inside the shifted days moves with them, so the step is one event
+    seen consistently by every input. Rows where a negative step is clipped at zero (MVA-only
+    Primaries) are flagged and dropped from the sweep.
+    """
+    newest = raw["origin"] - win.NEWEST_AGE
+    flag = torch.zeros(len(newest), dtype=torch.bool, device=newest.device)
+
+    def move(values: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+        inside = index > (newest - win.STEPS_PER_DAY * k)[:, None] if values.dim() == 2 else None
+        inside = inside & (index <= newest[:, None]) & torch.isfinite(values)
+        new = values + step[:, None]
+        clipped = torch.where(mva[:, None], new.clamp(min=0.0), new)
+        nonlocal flag
+        flag = flag | ((clipped != new) & inside).any(1)
+        return torch.where(inside, clipped, values)
+
+    raw["hist"] = move(raw["hist"], raw["hindex"])
+    if "lags" in raw:
+        raw["lags"] = move(raw["lags"], win.lag_indices(origin=raw["origin"], target=raw["target"]))
+    changed["flag"] = flag
+
+
 def shifter(*, arm: fit.Arm, variant: str, k: int, step: torch.Tensor, mva: torch.Tensor):
     """Return a function that adds `step` (rows,) to the recent power of `raw` and the clip flag."""
     changed = {"flag": None}
 
     def modify(raw: dict) -> None:
+        if arm.history:
+            shift_history(raw=raw, k=k, step=step, mva=mva, changed=changed)
+            return
         if arm.kind == "none":
             changed["flag"] = None
             return
@@ -197,6 +227,9 @@ def sweep_arm(*, arm_name: str, month: str, seed: int, device: str, power: torch
         power_std=loaded.power_std, device=device,
         surprise=fit.surprise_for(arm=arm, month=month, seed=seed, device=device),
     )  # fmt: skip
+    inputs.target_stats = fit.target_stats(
+        mean=loaded.target_mean, std=loaded.target_std, device=device
+    )
     n_rows = int(keep.sum())
     lead = torch.from_numpy(test.lead[keep]).to(device)
     band_of = torch.full((n_rows,), -1, dtype=torch.long, device=device)
@@ -223,7 +256,7 @@ def sweep_arm(*, arm_name: str, month: str, seed: int, device: str, power: torch
     ACCUMULATORS.clear()
     masked_gap = 0.0
     cfgs = configs(arm=arm)
-    n_days = arm.days if arm.kind == "encoder" else 0
+    n_days = arm.days if arm.kind == "encoder" else 3 if arm.history in ("h14s", "h14s_ow") else 0
     for start in range(0, len(rows_all), CHUNK):
         rows = rows_all[start : start + CHUNK]
         world = torch.zeros(len(rows), dtype=torch.long, device=device)

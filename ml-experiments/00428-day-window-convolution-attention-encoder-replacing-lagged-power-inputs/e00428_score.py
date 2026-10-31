@@ -269,12 +269,18 @@ def main() -> None:
     parser.add_argument("--months", nargs="+", default=list(fit.SCREEN_MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(fit.SEEDS))
     parser.add_argument("--raw", action="store_true", help="no 1.15 widening")
+    parser.add_argument("--arms", nargs="+", default=None, help="score only these arms")
+    parser.add_argument("--out", default="scores", help="folder under work/ for the tables")
     args = parser.parse_args()
+    if args.arms is not None:
+        global ARMS, CONTRASTS  # noqa: PLW0603
+        ARMS = tuple(a for a in ARMS if a in args.arms)
+        CONTRASTS = {n: ab for n, ab in CONTRASTS.items() if set(ab) <= set(args.arms)}
     seeds = tuple(args.seeds)
     factor = 1.0 if args.raw else WIDENING
     print(f"spread factor {factor}")
     table = collect(months=args.months, seeds=seeds, factor=factor)
-    out = data.WORK_DIR / "scores"
+    out = data.WORK_DIR / args.out
     out.mkdir(parents=True, exist_ok=True)
     table.write_parquet(out / "blocks.parquet")
     with pl.Config(tbl_rows=200, tbl_cols=20, fmt_str_lengths=60):

@@ -27,6 +27,7 @@ import e00397_fit as fit397  # ty: ignore[unresolved-import]
 import e00397_models as base  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00428_data as data  # ty: ignore[unresolved-import]
+import e00428_history as hist  # ty: ignore[unresolved-import]
 import e00428_models as models  # ty: ignore[unresolved-import]
 import e00428_windows as win  # ty: ignore[unresolved-import]
 import numpy as np
@@ -34,6 +35,8 @@ import polars as pl
 import torch  # ty: ignore[unresolved-import]
 
 BATCH: Final[int] = 8_192
+CNN_BATCH: Final[int] = 2_048
+"""Batch of the arms that run the 14-day convolutional encoder (memory under 8 GB)."""
 MAX_EPOCHS: Final[int] = 60
 PATIENCE: Final[int] = 8
 ROW_FRACTION: Final[float] = 0.2
@@ -62,6 +65,8 @@ class Arm:
     mixed: bool
     surprise: bool = False
     widen: bool = False
+    history: str = ""
+    """Which 14-day history arm this is (see `e00428_history`); empty for the other arms."""
     event_target: bool = False
     """Train on the injected world's power where the target half-hour lies in an injected event."""
     """Append the surprise channel (experiment 404's cross-fitted lagless forecast)."""
@@ -75,6 +80,11 @@ ARMS: Final[dict[str, Arm]] = {
     "E2": Arm("E2", "encoder", 2, True),
     "E3": Arm("E3", "encoder", 3, True),
     "E3-surp": Arm("E3-surp", "encoder", 3, True, surprise=True),
+    "S1": Arm("S1", "lags", 0, True, surprise=True, history="s1"),
+    "H-smooth": Arm("H-smooth", "lags", 0, True, surprise=True, history="hsmooth"),
+    "H-lvl": Arm("H-lvl", "lags", 0, True, surprise=True, history="hlvl"),
+    "H14-s": Arm("H14-s", "history", 0, True, surprise=True, history="h14s"),
+    "H14-s-ow": Arm("H14-s-ow", "history", 0, True, surprise=True, history="h14s_ow"),
     "E3-surp-w": Arm("E3-surp-w", "encoder", 3, True, surprise=True, widen=True),
     "DIAG-not-for-release-E3-surp-w-ev": Arm(
         "DIAG-not-for-release-E3-surp-w-ev",
@@ -102,7 +112,18 @@ def make_model(*, arm: Arm, n_inputs: int, n_primaries: int) -> torch.nn.Module:
             channels=models.CHANNELS + int(arm.surprise),
             widen_path=arm.widen,
         )
-    extra = 9 if arm.kind == "lags" else 0
+    head = {
+        "hidden": SETTING.hidden,
+        "layers": SETTING.layers,
+        "components": SETTING.components,
+        "dropout": SETTING.dropout,
+    }
+    if arm.history in ("hsmooth", "hlvl"):
+        cls = hist.HSmoothMdn if arm.history == "hsmooth" else hist.HLevelMdn
+        return cls(n_inputs=n_inputs + 9, n_primaries=n_primaries, **head)
+    if arm.history in ("h14s", "h14s_ow"):
+        return hist.H14sMdn(n_inputs=n_inputs, n_primaries=n_primaries, **head)
+    extra = 9 + (3 if arm.history == "s1" else 0) if arm.kind == "lags" else 0
     return models.LaggedMdn(
         n_inputs=n_inputs + extra,
         n_primaries=n_primaries,
@@ -145,7 +166,12 @@ class Inputs:
             out["lags"] = win.origin_lags(
                 power=self.power, world=world, primary=primary, origin=origin, target=target
             )
-        elif arm.kind == "encoder":
+        if arm.history:
+            shift = hist.OTHER_WEEK_SHIFT if arm.history == "h14s_ow" else 0
+            hindex = hist.history_indices(origin=origin, shift=shift)
+            out["hindex"] = hindex
+            out["hist"] = win.take(power=self.power, world=world, primary=primary, index=hindex)
+        if arm.kind == "encoder":
             index = win.window_indices(origin=origin, target=target, days=arm.days)
             out["index"] = index
             out["raw"] = win.take(power=self.power, world=world, primary=primary, index=index)
@@ -166,7 +192,15 @@ class Inputs:
                 power_mean=self.power_mean,
                 power_std=self.power_std,
             )
-            return torch.cat([x, columns], dim=1), primary, None
+            if not arm.history:
+                return torch.cat([x, columns], dim=1), primary, None
+            if arm.history == "s1":
+                columns = torch.cat([columns, self.lag_surprise(raw=raw, lags=lags)], dim=1)
+                return torch.cat([x, columns], dim=1), primary, None
+            window = self.history_window(raw=raw, masked=masked)
+            return torch.cat([x, columns], dim=1), primary, window
+        if arm.kind == "history":
+            return x, primary, self.history_window(raw=raw, masked=masked)
         values = torch.full_like(raw["raw"], float("nan")) if masked else raw["raw"]
         windows = win.build_windows(
             raw=values, index=raw["index"], origin=raw["origin"], newest_limit=True
@@ -177,6 +211,36 @@ class Inputs:
         if self.surprise is not None:
             windows = self.add_surprise(windows=windows, values=values, raw=raw)
         return x, primary, windows
+
+    def history_window(self, *, raw: dict, masked: bool) -> dict:
+        """Return the 14-day window dict of `raw` (see `e00428_history.build_history`)."""
+        assert self.surprise is not None
+        assert self.target_stats is not None
+        median, half = self.surprise
+        index, primary = raw["hindex"], raw["primary"]
+        zero = torch.zeros_like(primary)
+        values = torch.full_like(raw["hist"], float("nan")) if masked else raw["hist"]
+        return hist.build_history(
+            raw=values, index=index,
+            median=win.take(power=median[None], world=zero, primary=primary, index=index),
+            half=win.take(power=half[None], world=zero, primary=primary, index=index),
+            power_mean=self.power_mean, power_std=self.power_std, origin=raw["origin"],
+            target=raw["target"], primary=primary, target_std=self.target_stats[1],
+        )  # fmt: skip
+
+    def lag_surprise(self, *, raw: dict, lags: torch.Tensor) -> torch.Tensor:
+        """Return the single-step surprise at each of the three origin lags: (rows, 3)."""
+        assert self.surprise is not None
+        median, half = self.surprise
+        index = win.lag_indices(origin=raw["origin"], target=raw["target"])
+        primary = raw["primary"]
+        zero = torch.zeros_like(primary)
+        z, _ = hist.surprise_at(
+            power=lags,
+            median=win.take(power=median[None], world=zero, primary=primary, index=index),
+            half=win.take(power=half[None], world=zero, primary=primary, index=index),
+        )
+        return z
 
     def add_surprise(
         self, *, windows: torch.Tensor, values: torch.Tensor, raw: dict
@@ -226,7 +290,7 @@ def surprise_for(
     The table is the cross-fitted forecast for the refit of `month` and the same seed (frozen at
     experiment 404 commit 63d3799f). NaN marks a half-hour without a forecast.
     """
-    if not arm.surprise:
+    if not (arm.surprise or arm.history):
         return None
     key = (month, seed, device)
     if key not in _SURPRISE_CACHE:
@@ -245,9 +309,17 @@ def surprise_for(
     return _SURPRISE_CACHE[key]
 
 
+def target_stats(*, mean: np.ndarray, std: np.ndarray, device: str):  # noqa: ANN201
+    """Return the per-Primary target mean and standard deviation as float32 tensors."""
+    return (
+        torch.from_numpy(mean.astype(np.float32)).to(device),
+        torch.from_numpy(std.astype(np.float32)).to(device),
+    )
+
+
 def forward(*, model: torch.nn.Module, x, primary, windows):  # noqa: ANN001, ANN201
     """Return the raw mixture outputs of any network."""
-    if isinstance(model, models.DayEncoderMdn):
+    if getattr(model, "takes_windows", False) or isinstance(model, models.DayEncoderMdn):
         return model(x, primary, windows)
     return model(x, primary)
 
@@ -271,12 +343,13 @@ def train(
     )
     best, best_state, stale, epochs = float("inf"), None, 0, 0
     k = SETTING.components
+    batch_size = CNN_BATCH if arm.history in ("hlvl", "h14s", "h14s_ow") else BATCH
     for epoch in range(MAX_EPOCHS):
         model.train()
         order = train_idx[torch.randperm(len(train_idx), device=device)]
         order = order[: int(ROW_FRACTION * len(order))]
-        for start in range(0, len(order), BATCH):
-            b = order[start : start + BATCH]
+        for start in range(0, len(order), batch_size):
+            b = order[start : start + batch_size]
             world = (
                 torch.randint(0, data.N_TRAIN_WORLDS + 1, (len(b),), device=device)
                 if arm.mixed
@@ -297,7 +370,7 @@ def train(
         with torch.no_grad():
             losses = []
             for chunk, chunk_world in zip(
-                val_idx.split(BATCH * 2), val_world.split(BATCH * 2), strict=True
+                val_idx.split(batch_size * 2), val_world.split(batch_size * 2), strict=True
             ):
                 x, primary, windows = inputs.batch(arm=arm, rows=chunk, world=chunk_world)
                 out = forward(model=model, x=x, primary=primary, windows=windows)
@@ -343,10 +416,7 @@ def fit_one(
         target_idx=rows.target_idx, power_mean=rows.power_mean, power_std=rows.power_std,
         device=device, surprise=surprise_for(arm=arm, month=month, seed=seed, device=device),
     )  # fmt: skip
-    inputs.target_stats = (
-        torch.from_numpy(rows.target_mean.astype(np.float32)).to(device),
-        torch.from_numpy(rows.target_std.astype(np.float32)).to(device),
-    )
+    inputs.target_stats = target_stats(mean=rows.target_mean, std=rows.target_std, device=device)
     z = torch.from_numpy(
         ((rows.y - rows.target_mean[rows.primary]) / rows.target_std[rows.primary]).astype(
             np.float32

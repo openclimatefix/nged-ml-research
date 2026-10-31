@@ -130,7 +130,9 @@ def forecast_rows(
             modify(raw)
         x, primary, windows = inputs.assemble(arm=loaded.arm, raw=raw, masked=masked)
         result: dict[str, torch.Tensor] = {}
-        if isinstance(loaded.model, models.DayEncoderMdn):
+        if getattr(loaded.model, "attends", False) or isinstance(
+            loaded.model, models.DayEncoderMdn
+        ):
             out, mass = loaded.model(x, primary, windows, details=True)
             result["mass"] = mass
         else:
@@ -264,6 +266,9 @@ def predict_month(*, arm_name: str, month: str, seed: int, device: str, power: t
         device=device,
         surprise=fit.surprise_for(arm=loaded.arm, month=month, seed=seed, device=device),
     )  # fmt: skip
+    inputs.target_stats = fit.target_stats(
+        mean=loaded.target_mean, std=loaded.target_std, device=device
+    )
     actual = y_clean[test.primary, test.target_idx]
     lines = []
     for w in EVAL_WORLDS:

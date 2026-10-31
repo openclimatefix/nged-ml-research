@@ -352,7 +352,7 @@ section records the arms, the departures, and the predictions.
   without recency).
 
 **Departures from the design note, stated before any score.** The bank-holiday channel is omitted
-(no holiday table is loaded in this harness), so seven channels carry H14-s. Experiment 404's
+(no holiday table is loaded in this harness), so eight channels carry H14-s. Experiment 404's
 hand-built window statistics (arm S404) are not run in this screen, so aim (b) is decided against S1
 only and the comparison with S404 stays open. Window encoding is per row, not per origin: each batch
 is 2,048 rows and the convolution blocks use gradient checkpointing to stay under 8 GB. The sweep
