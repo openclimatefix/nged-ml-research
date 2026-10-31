@@ -12,5 +12,5 @@ free -g | sed -n 2p
 $FIT --arms R0 --months 2025-12
 # 2. The five screen folds, 6 seeds (E0: 3 seeds).
 $FIT --arms E1 E1n E2 E0
-# 3. Event fold 2026-04: R0 (reference) and the encoder arms.
-$FIT --arms R0 E1 E1n E2 E0 --months 2026-04
+# 3 (run only after telling the manager; pass "event" as the first argument). Event fold 2026-04: R0 (reference) and the encoder arms.
+[ "${1:-}" = event ] && $FIT --arms R0 E1 E1n E2 E0 --months 2026-04 || true

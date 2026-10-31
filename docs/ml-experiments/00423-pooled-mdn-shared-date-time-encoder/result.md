@@ -7,7 +7,7 @@ title: >-
 theme: demand-inputs
 also_relevant_to:
   - hierarchy-and-pooling
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -71,6 +71,40 @@ metric: >-
   q95, and q99, raw and at the 1.15 widening, in points of effective capacity, from
   `studies.eval_protocol`; leads 0.5 to 336 hours; the headline band is days 1 to 10.
 code: ml-experiments/00423-pooled-mdn-shared-date-time-encoder/
+verdict: not supported
+best_arm: >-
+  R, the hand-made calendar columns: 3.269 points of capacity at the signed-MW six and 3.817 at the
+  MVA-only eight (CRPS, days 1 to 10); no encoder arm beat it at the six.
+headline: >-
+  The encoder with holiday names and dates (E1) scored 0.27 points worse than the hand-made columns
+  at the signed-MW six (+0.096 to +0.425) and 0.26 worse at the MVA-only eight; dates alone (E2)
+  were 0.37 and 0.27 worse. The prediction on bank-holiday weeks could not be tested.
+lessons: >-
+  Day-of-year and day-of-month embeddings fitted on 24 months of data hurt, and the holiday name
+  added nothing on top of the holiday flags the hand-made columns already hold. Calendar structure
+  that the hand-made columns already encode is not worth learning from two years of data.
+take_home_message: >-
+  A small calendar encoder shared by all 16 substations did not forecast better than the hand-made
+  calendar columns: the version with holiday names was 0.27 points of capacity worse at the six
+  signed-direction substations (about 8%), and a version with dates only was 0.37 worse. The
+  likely reason is that each day of the year appears only once or twice in the training window, so
+  the encoder fits those days instead of learning how people use the calendar. The test of
+  bank-holiday weeks could not resolve a difference, because seed noise there is 0.34 points. All
+  five test months are interim.
+advice:
+  - >-
+    Do not add day-of-year or day-of-month embeddings to the pooled network with a 24-month
+    training window; they raised the error by 0.2 to 0.4 points in every fold (C1, C2, C4).
+  - >-
+    Keep the hand-made holiday and Christmas columns in the pooled network; an encoder with half-hour
+    and weekday only (E0) was 0.10 points worse at the signed-MW six than R, mainly in the December
+    fold (E0 against R).
+  - >-
+    Judge any holiday change on at least three Christmas and Easter weeks before expecting a
+    result; the five screen folds hold one Christmas and give a detectable effect of 0.34 points
+    on bank-holiday weeks.
+production_status: not-for-production
+adopted_in: none
 ---
 
 **Plan: can the pooled network learn how people use the calendar, instead of being handed it?**
@@ -193,4 +227,123 @@ set (Monday of Holy Week to Easter Monday).
 
 ## Results
 
-Not yet run.
+**Take-home.** The calendar encoder did not help. The hand-made columns (R) beat every encoder
+arm at the signed-MW six, and the encoder with dates (E1 and E2) was worse by 0.2 to 0.4 points of
+capacity in every fold. The arm with no dates (E0 and E1n) was within the noise of R at the
+MVA-only eight and 0.10 worse at the six. The prediction about bank-holiday weeks could not be
+tested.
+
+We asked whether the pooled neural network forecasts better if it learns how people use the
+calendar, instead of being given 18 hand-made calendar columns. We replaced the 18 columns by a
+small learned encoder, shared by all 16 substations, and compared four versions with the
+columns on five test months. This builds on experiments
+[397](../00397-plain-and-attention-mixture-density-network-for-primary-demand/result.md),
+[407](../00407-pooled-mixture-density-network-tail-arms-and-recency-weights/result.md), and
+[419](../00419-pooled-mixture-density-network-solar-summary-sunny-flag-and-half-life-input-ports/result.md),
+whose code and stored forecasts are reused, and on the encoder sketch in the production docs'
+[encoders page](https://openclimatefix.github.io/nged-substation-forecast/techniques/encoders/).
+
+**Verdict: not supported.** The hypothesis needed the encoder to help in holiday weeks and to be
+no worse elsewhere. It was clearly worse elsewhere.
+
+![CRPS per arm](figure_1_crps_days_1_to_10.svg)
+
+![Difference to the hand-made columns, by fold](figure_2_crps_difference_by_fold.svg)
+
+![CRPS by lead day](figure_3_crps_by_lead_day.svg)
+
+![Bank-holiday weeks](figure_4_bank_holiday_weeks.svg)
+
+![Day-ahead example forecast](figure_5a_day_ahead.svg)
+
+![Fourteen-day example forecast](figure_5b_14_day.svg)
+
+The example forecasts start on 2025-12-24 and cover D5 (signed-MW) and D2 (MVA-only), both
+Primaries. At D5 the actuals fall below every arm's median from 30 December, which looks like a
+level shift in the actuals and not an effect of any arm.
+
+## Numbers
+
+- **Arms and row set.** R is the stored `ctrl` network (experiment 407, seeds 0 to 2; experiment
+  419, seeds 3 to 5). E0, E1n, E1, and E2 are as in the plan above; E0 has three seeds and the others
+  six. Five screen folds, monthly refits, cleaned data (flagged exact-zero training rows dropped
+  per fold: 2,155, 2,846, 2,886, 2,899, 2,925; 1,179 scoring half-hours dropped), D15 and D18 cut
+  before 2025-03-01 (report-only). Widened by 1.15. Fitted networks are in this experiment's
+  private `work/models` folder.
+- **CRPS, days 1 to 10 (points of capacity), all rows, signed-MW six / MVA-only eight / D15 and
+  D18:** R 3.269 / 3.817 / 8.565; E0 3.375 / 3.762 / 8.744; E1n 3.373 / 3.778 / 8.971; E1 3.539 /
+  4.075 / 9.026; E2 3.635 / 4.090 / 9.002.
+- **Seed noise.** The minimum detectable effect for six-seed means (twice the standard deviation
+  over folds of `ctrl` against `ctrl_s3`, divided by the square root of two) is 0.052 at the six and
+  0.047 at the eight; for three-seed means 0.074 and 0.066. On the bank-holiday-week rows it is
+  0.343 at the six (three folds, two degrees of freedom) and 0.103 at the eight.
+- **Tested contrasts** (treatment minus reference, interval at 98.75%, month-block bootstrap over
+  3 to 5 blocks, so read as a range): C1 E1 minus R, all rows: +0.270 (+0.096 to +0.425) at the
+  six, +0.258 (+0.202 to +0.387) at the eight. C2 E2 minus R: +0.366 (+0.167 to +0.596) and +0.273
+  (+0.200 to +0.399). C3 E1 minus E1n on bank-holiday weeks: +0.353 (+0.020 to +0.384) at the six,
+  +0.390 at the eight; positive in all three folds (+0.384, +0.020, +0.337). C4 E2 minus E0, seeds
+  0 to 2 both: +0.303 (+0.159 to +0.429) and +0.384 (+0.282 to +0.537).
+- **P1 (holiday names help on bank-holiday weeks by 0.10):** untestable, the detectable effect is
+  0.343; the point estimate went the other way (+0.353).
+- **P2:** failed for E1 and E2, which are outside the noise at both groups; E0 and E1n are 0.10
+  worse at the six (outside the six-seed noise of 0.052) and about the size of the noise at
+  the eight, where they are better (-0.055 and -0.039 against 0.047).
+- **P3 (E2 no better than E0):** held, E2 is 0.26 to 0.30 worse.
+- **P4 (does not help the eight):** held, no arm beats R at the eight by more than the noise.
+- **Christmas set, signed-MW six (one Christmas, descriptive):** R 3.676, E0 5.316, E1n 4.238, E1
+  4.724, E2 5.336. **Easter set, signed-MW six (2 days in March):** R 3.781, E0 3.935, E1n 4.089,
+  E1 4.437, E2 4.765.
+- **Event fold 2026-04 (one-seed R0 against encoder seed means; point estimates only):** signed-MW
+  six: R0 2.687, E0 2.652, E1n 2.613, E1 3.042, E2 2.932. MVA-only eight: R0 4.161, E0 4.244,
+  E1n 4.102, E1 4.605, E2 4.569. Easter set, signed-MW six: R0 2.937, E1n 2.887, E1 3.284, E2
+  3.967. The same ordering as the screen folds.
+- **Tails (widened by 1.15), coverage at q95 and q99 and pinball loss at q99, signed-MW six:** R
+  0.894, 0.961, 0.350; E1n 0.885, 0.953, 0.371; E1 0.907, 0.971, 0.314; E2 0.905, 0.973, 0.295.
+  MVA-only eight: R 0.947, 0.989, 0.255; E1 0.945, 0.987, 0.315; E2 0.946, 0.987, 0.317. The
+  encoders with dates (E1, E2) have a lower q99 pinball loss at the six and a higher one at the
+  eight. Lower-tail coverage at q01 and q05 and the sunny low-demand check are in the scorer's
+  printed report.
+
+## Checks
+
+- **Median minus mean forecast, per site (MAE of the median minus MAE of the mean):** within
+  +/-0.17 points at every Primary for every arm except D8 (-0.68 to -0.93) and D15 (+0.82 to
+  +1.66). R shows the same two exceptions (D8 -0.68, D15 +0.82), so the encoder does not introduce
+  a shift of the forecast.
+- **Error of the mean or median forecast beside the quantile contrast:** this run did not print the
+  MAE of the median or of the mean on its own, only their difference above, so trigger 3 was not
+  checked directly. The audit's re-derivation of the CRPS contrasts agrees in sign with the
+  scorer's.
+- **Audit.** Two triggers fired: a result contradicting its prediction (E1 and E2 worse than R) and a
+  nested arm doing worse than the arm it contains (E1 against E1n, E2 against E0). A fresh
+  Sonnet audit re-derived the contrasts from the stored forecasts with its own CRPS code and agreed
+  within 0.01 (E1 minus R +0.266, E2 minus R +0.360 at the six). It looked for a bug and found none:
+  training and inference build the calendar indices the same way, the encoder weights train, and the
+  row drops are identical across arms. The held-out validation loss agrees with the test CRPS: E1
+  and E2 end 0.12 to 0.17 nats worse than E1n and stop after about 10 epochs, against 25 to 35 for
+  the other arms.
+- **Triage.** The memorisation explanation is consistent with these numbers but untested: the
+  366-row day-of-year table stays close to its random start, so the encoder may be passing noise
+  into the network, and a zero-initialised or shuffled-bucket placebo would separate the two
+  readings. Accepted, and worded as "consistent with" here. The day-of-year index is the
+  per-year ordinal, so dates after February 2024 sit one bucket later than in 2025 and 2026; this
+  touches only folds 2025-10 and 2025-12 and does not explain the other three folds. Accepted as a
+  caveat. `dropped_rows.json` holds one value per fold and not per arm; the fit log holds the
+  per-arm counts. No finding changed a number.
+
+## Caveats
+
+- **The training window holds one or two examples of each named holiday** (design note above), so the
+  question of whether names can tie holidays together was tested on little data.
+- **Five screen folds are interim.** The month-block intervals rest on three to five blocks.
+- **Experiment 396's holiday columns helped only the signed-MW group** (XGBoost, January,
+  unaudited); here no encoder arm helps either group on all rows.
+- **Not run:** the per-Primary encoder (E3), because its condition (C1 below zero or C3 at most
+  -0.05) did not hold; a placebo for the memorisation explanation; and the lead-hours bands 11 to 14.
+
+## What to try next
+
+- **Keep the hand-made calendar columns.** The question the experiment leaves open is whether a
+  pooled network with a longer history (the pretraining of experiment 418) can use date embeddings,
+  and a placebo (zero-initialised or shuffled day-of-year) would show whether the dates carry any
+  signal at all.
