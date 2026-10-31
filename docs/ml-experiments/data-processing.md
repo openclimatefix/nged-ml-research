@@ -524,6 +524,17 @@ and 0.062 points on the kept rows, intervals excluding zero), and worsened it by
 when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
 three farms, July 2025 to June 2026).
 
+**Treat the `low_wind_idle` flag of experiment 210's mask as an ERA5 wind rule, not as a finding that
+the farm was idle (provisional, medium confidence).** *Applies to: experiments.* The flag marks every
+half-hour with ERA5 100 m wind below the fitted threshold that lies outside an outage run, and it does
+not look at power. Of the 9,787 flagged half-hours in the scored year, 914 (9.3%) had power above the
+farm's idle band. To score idle half-hours as zero output, set the target to 0 only where the
+reading is also in the idle band, and drop the `outage_suspected` half-hours. Dropping the mask's rows
+raises the default's score by 0.515 points because the dropped half-hours are easy; random drops that
+match the wind-speed bin give the same rise, and random drops that match only farm, month, and hour
+give 0.12. Evidence: [experiment 432](00432-wind-cleaned-zero-rescore/result.md), three farms,
+July 2025 to June 2026.
+
 **Do not check a wind farm's capacity from half-hours at strong ERA5 wind alone (provisional, medium
 confidence).** *Applies to: experiments.* The half-hours with ERA5 100 m speed at least 2 m/s above
 the speed where the fitted power curve saturates hold 0.31% (W1), 1.12% (W2), and 0.18% (W3) of
