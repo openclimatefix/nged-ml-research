@@ -1080,3 +1080,14 @@ begin with the scored period, so test months before 2025-07 have no inputs and a
 before writing a forecast ([experiment 416](00416-mdn-explicit-solar-term-better-powered-follow-up/result.md);
 the months 2025-05 and 2025-06 failed). The 12 months from 2025-07 to 2026-06 are the full set.
 Confidence: provisional, one family.
+
+**Compute a gate or threshold that needs one weather value per valid time from the shortest-lead
+forecast row, not the first row (high confidence).** *Applies to: experiments and production.* With
+recorded weather every forecast row of one valid time carries the same value, so "keep the first row
+per valid time" is harmless. With ensemble forecasts each row carries its own run's value, and the
+first row of the sorted frame is the longest-lead one (mean lead 333 hours at D5), whose irradiance is
+a blurred 6-hour mean. Experiment 417's Primary-level gate did this and shut at D8 and D12; on the
+shortest-lead row it opens at both, as with recorded weather
+([experiment 424](00424-neural-mva-export-gated-signed-ens-serving-test/result.md)). The entry is
+provisional until the experiment has had its reviews.
+

@@ -157,7 +157,7 @@ def reported_only(
         }
     applied = read_arm(arm=fit.APPLIED, setting="L2", seeds=(0,), rotations=rotations)
     if len(applied):
-        a0 = read_arm(arm="A", setting="L2", seeds=(0,), rotations=rotations)
+        a0 = read_arm(arm="A", setting="L2", seeds=seeds_a, rotations=rotations)
         out["applied_vs_p0"] = s420.contrast(reference=p0, candidate=applied, rows=REVERSE)
         out["applied_vs_trained_A"] = s420.contrast(reference=a0, candidate=applied, rows=REVERSE)
         out["crps_reverse_rows_applied"] = s420.mean_crps(frame=applied, rows=REVERSE)
