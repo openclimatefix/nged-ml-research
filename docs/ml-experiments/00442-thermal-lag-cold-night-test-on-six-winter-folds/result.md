@@ -218,8 +218,8 @@ experiment 437's thermal-lag network; `R` is its control.
   over folds), so a failure to meet the rule is not evidence of no effect.
 - **The in-slice interval resamples 5 months** and is nearly all-or-nothing.
 - **The hyperparameters were tuned at 46 inputs** and reused at 54, as in experiment 437.
-- **Seeds come from two experiments.** `T` seeds 0 to 2 on four folds come from experiment 437; seeds 3 and 4 there and
-  all five seeds on the new folds were fitted here.
+- **Seeds come from two experiments.** `T` seeds 0 to 2 on four folds come from experiment 437.
+  Seeds 3 and 4 on those folds, and all five seeds on the new folds, were fitted here.
 
 ### What to try next
 
