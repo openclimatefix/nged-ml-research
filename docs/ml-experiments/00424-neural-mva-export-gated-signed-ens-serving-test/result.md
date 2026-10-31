@@ -284,3 +284,13 @@ deviation of 0.324; 2.8 times 0.324 is 0.907. The figure is above the 0.5-point 
 of that size or smaller (A against A-applied, A on ENS against A on laboratory inputs) are reported
 as underpowered. S1 is not weakened by this, because its floors (4 and 10 points) sit far above the
 figure. The figure is in `work/mde_stage1.json`, which the script refuses to overwrite.
+
+## Minimum detectable effect, full run (written before the full scoring)
+
+**Over all three rotations the minimum detectable effect is 1.735 points of effective capacity.**
+All 105 fits and 42 forecast-only runs finished. The null difference between A's two seeds on
+reverse-flow rows at level 2.0 has a mean of 2.09 (95% interval 0.88 to 3.29; 42 Primary-month
+blocks, 79,399 rows) and a bootstrap standard deviation of 0.620; 2.8 times 0.620 is 1.735. The two
+seeds of A therefore differ by a mean of 2.09 points on these rows, so seed noise is large next to
+the 10-point S1 floor, and contrasts under about 2 points are underpowered. The figure is in
+`work/mde_full.json`.
