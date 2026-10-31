@@ -76,3 +76,15 @@ metric: >-
 - **Clean-row and harm-row results are lower bounds.** NGED's logs miss some events, so rows
   labelled clean may hold unlogged events, and every coverage figure on the page is reported as a
   lower bound on the shortfall.
+
+## Cold winter night slice (2026-10-31)
+
+- **Slice.** Experiment 441's `cold_winter_night` mask, read from its stored mask table, is a named
+  slice and an extra input condition of the table. Targets on the slice, per metering group: q95
+  coverage at least 0.92 and q99 coverage at least 0.975. The page states the slice's rows, days, and
+  minimum detectable effect first, and reports it per fold.
+- **Scored folds.** The mask covers four folds (2025-10, 2025-12, 2026-01, 2026-03), and only the
+  last three hold cold nights, so the slice is fitted leave-one-fold-out on experiment 425's arms
+  `R` and `A`. That is a departure from the earlier-folds-only rule of the main table.
+- **Interval.** Three folds are too few for a month-block interval, so intervals resample whole
+  local days.
