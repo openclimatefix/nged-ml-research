@@ -38,7 +38,7 @@ ARM_COLOURS: Final[dict[str, str]] = {
     "J6": theme.DATA_GREEN,
 }
 ROWS: Final[list[tuple[str, str, str, str]]] = [
-    ("Both (all 25 nodes, coarse leads)", "joint", "all", "all"),
+    ("Joint: all 25 nodes, 6-hourly leads", "joint", "all", "all"),
     ("Across Primaries (demand)", "spatial", "all", "demand"),
     ("Across wind farms", "spatial", "all", "wind"),
     ("Across solar farms", "spatial", "all", "solar"),
@@ -65,7 +65,9 @@ def figure_contrasts() -> None:
             slice_name=slice_name,
             label=label,
         )
-        margin = report.margin(ind=float(wide["J0"].mean()), co=float(wide["J1"].mean()))
+        margin = report.margin(
+            ind=float(wide["J0"].to_numpy().mean()), co=float(wide["J1"].to_numpy().mean())
+        )
         for arm in ARM_COLOURS:
             point, lo, hi = report.bootstrap_relative(
                 base=wide["J0"].to_numpy(), other=wide[arm].to_numpy()
@@ -76,6 +78,7 @@ def figure_contrasts() -> None:
             )  # fmt: skip
     data = pl.DataFrame(rows).to_pandas()  # ty: ignore[unresolved-attribute]
     order = [r[0] for r in ROWS]
+    margins = {r["row"]: r["margin"] for r in rows}
     base = alt.Chart(data).encode(
         y=alt.Y("row:N", sort=order, title=None, axis=alt.Axis(labelLimit=260)),
         yOffset=alt.YOffset("arm:N", sort=list(ARM_COLOURS)),
@@ -97,14 +100,23 @@ def figure_contrasts() -> None:
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="#1A1A1A").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
-    chart = (zero + bars + points).properties(
+    ticks = (
+        alt.Chart(
+            pl.DataFrame(
+                [{"row": r, "x": s * m} for r, m in margins.items() for s in (-1, 1)]
+            ).to_pandas()  # ty: ignore[unresolved-attribute]
+        )
+        .mark_tick(color="#8A8A8A", size=26, thickness=2)
+        .encode(x="x:Q", y=alt.Y("row:N", sort=order))
+    )
+    chart = (zero + ticks + bars + points).properties(
         width=WIDTH,
         height=330,
         title=alt.TitleParams(
             [
                 "Most constructions beat independent draws across wind and solar farms,",
                 "none beats them on the joint block. Days 1 to 10. Points: mean over 10 months.",
-                "Lines: 98.75% month-block intervals. Margin: 2.0% to 5.0%, set per row.",
+                "Lines: 98.75% month-block intervals. Grey ticks: the margin of each row.",
             ],
             anchor="start",
         ),
@@ -157,8 +169,8 @@ def figure_dependence() -> None:
         height=260,
         title=alt.TitleParams(
             [
-                "J5 (copula) lands closest to the realised correlations; J1 and J2 overshoot.",
-                "Black tick: realised. Dots: the 51 scenarios, mean over 44 runs.",
+                "J2 overshoots the realised correlation in most pairs; the nearest construction differs by pair.",
+                "Black tick: realised. Dots: each construction, mean over 44 runs.",
             ],
             anchor="start",
         ),
@@ -235,7 +247,7 @@ def figure_examples() -> None:
                 for node, name in EXAMPLE_NODES:
                     for k in range(12):
                         for t in range(lo, hi):
-                            rows.append(
+                            rows.append(  # noqa: PERF401
                                 (
                                     arm,
                                     name,
@@ -273,9 +285,9 @@ def figure_examples() -> None:
                             scen.filter(
                                 (pl.col("arm") == arm) & (pl.col("node") == name)
                             ).to_pandas()
-                        )  # ty: ignore[unresolved-attribute]
+                        )
                         .mark_line(strokeWidth=0.8, opacity=0.6, color=theme.DATA_BLUE, aria=False)
-                        .encode(
+                        .encode(  # ty: ignore[unresolved-attribute]
                             x=alt.X(
                                 "x:Q",
                                 axis=xaxis,

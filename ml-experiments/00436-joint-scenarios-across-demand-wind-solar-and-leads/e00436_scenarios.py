@@ -124,6 +124,9 @@ def j5_paths(
         ecc: Each member's ECC rank, (25, 702, 51), the member index being the last axis.
         c: Copula latent paths, (51, 25, 702).
         weights: Mixing weight `w` per node and step, (25, 702).
+
+    Returns:
+        The 51 scenarios, (51, 25, 702).
     """
     g = norm.ppf((ecc.astype(np.float64) + 0.5) / M).transpose(2, 0, 1)
     w = weights[None]

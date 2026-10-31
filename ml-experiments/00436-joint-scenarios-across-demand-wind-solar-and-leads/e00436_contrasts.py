@@ -56,15 +56,17 @@ def main() -> None:
             )
             if wide.height < 3:
                 continue
-            margin = report.margin(ind=float(wide["J0"].mean()), co=float(wide["J1"].mean()))
+            margin = report.margin(
+                ind=float(wide["J0"].to_numpy().mean()), co=float(wide["J1"].to_numpy().mean())
+            )
             row = [f"{block}/{label:6s} margin {margin:.1%}"]
             for name, other, base in (("C1", "J4", "J3"), ("C2", "J5", "J2")):
                 p, lo, hi = report.bootstrap_relative(
                     base=wide[base].to_numpy(), other=wide[other].to_numpy()
                 )
                 row.append(f"{name} {other}/{base} {p:+.1%} ({lo:+.1%} to {hi:+.1%})")
-            means = {a: float(wide[a].mean()) for a in ("J2", "J3", "J4", "J5")}
-            best = min(means, key=means.get)
+            means = {a: float(wide[a].to_numpy().mean()) for a in ("J2", "J3", "J4", "J5")}
+            best = min(means, key=lambda a: means[a])
             p, lo, hi = report.bootstrap_relative(
                 base=wide[best].to_numpy(), other=wide["J6"].to_numpy()
             )
@@ -78,13 +80,13 @@ def main() -> None:
         .drop_nulls()
         .sort("month")
     )
-    means = {a: float(monthly[a].mean()) for a in ("J2", "J3", "J4", "J5", "J6")}
-    best = min(means, key=means.get)
+    means = {a: float(monthly[a].to_numpy().mean()) for a in ("J2", "J3", "J4", "J5", "J6")}
+    best = min(means, key=lambda a: means[a])
     p, lo, hi = report.bootstrap_relative(
         base=monthly["J0"].to_numpy(), other=monthly[best].to_numpy()
     )
     print(f"\nC4 {best}/J0 two-over Brier {p:+.1%} ({lo:+.1%} to {hi:+.1%})")
-    print(np.round(list(means.values()), 4), "J0", round(float(monthly["J0"].mean()), 4))
+    print(np.round(list(means.values()), 4), "J0", round(float(monthly["J0"].to_numpy().mean()), 4))
 
 
 if __name__ == "__main__":

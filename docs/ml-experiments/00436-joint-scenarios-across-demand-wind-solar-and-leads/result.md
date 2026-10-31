@@ -98,22 +98,25 @@ lessons: >-
 take_home_message: >-
   To give NGED scenarios that are coherent across wind farms and solar farms, use a Schaake shuffle
   from past observed paths (J3) or the copula-corrected ensemble ranks (J5): both scored 28% to 43%
-  lower than independent draws across the farms. Across the 16 Primaries nothing beat independent
-  draws, and tying scenario k to ensemble member k (J4) scored the same as J3, so it did not earn
-  its complexity. Whether the farms' gain carries into a power-flow study is untested.
+  lower than independent draws across the farms, although J3 gave no wind gain at 12 to 36 hours.
+  Across the 16 Primaries nothing beat independent draws, and tying scenario k to ensemble member k
+  (J4) scored the same as J3, so it did not earn its complexity. Ramps scored 14% better under J3
+  to J5, but the other downstream proxies showed no gain, and the intervals are optimistic because
+  they rest on 10 calendar months.
 advice:
   - >-
     Use the single Schaake shuffle (J3) as the default for wind farms and solar farms, because J5
     scored within 3% of it (wind -29.3% against -28.3%, solar -42.7% against -40.2%) and J3 needs no
-    fit, except for wind farms at 12 to 36 hours, where J3 gave no gain (+2.5%) and J5 gained 3.9%
-    (C2).
+    fit, except for wind farms at 12 to 36 hours, where J3 gave no gain (+2.5%) and J5's -3.9%
+    had an interval (-9.2% to +2.4%) that straddles zero (C2).
   - >-
-    Leave the demand scenarios independent, or use J3 or J5, because the demand variogram score
-    moved by 0.7% or less for J3, J4, and J5 and rose 6.8% for ECC (J2) (C2).
+    Treat the Primaries' coupling as undecided, because independent draws, J3, J4, and J5 scored
+    within 0.7% of each other across Primaries, while ensemble ranks (J2) scored 6.8% worse. The
+    cross-family block could not test the coupling between demand and the farms (C2).
   - >-
     Do not tie scenario k to ensemble member k, because J4 scored the same as J3 across Primaries
-    and wind farms (+4.3% across solar farms, -0.6% to +9.5%), and its joint gain of 1.9% (-2.7% to
-    -1.1%) stayed below the 2.6% margin (C1).
+    and wind farms (+4.3% across solar farms, -0.6% to +9.5%). Its joint score was 1.9% below J3
+    (-2.7% to -1.1%) only because J3 was 1.9% worse than independent draws (C1).
   - >-
     Score a scenario set on the within-family blocks as well as the joint block, because the joint
     block hid a 28% to 43% difference across the farms behind 16 Primaries that gained nothing.
@@ -122,10 +125,10 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**A single Schaake shuffle or the copula-corrected ensemble ranks make the wind-farm and solar-farm
-scenarios 28% to 43% more coherent than independent draws, but nothing helped across the 16
-Primaries and no construction passed the registered gate on the joint block.** The question is how
-to turn the calibrated marginal forecasts of the Primaries (substations feeding the distribution
+**A single Schaake shuffle or the copula-corrected ensemble ranks give the wind-farm and solar-farm
+scenarios a variogram score 28% to 43% lower than independent draws, but nothing helped across the
+16 Primaries and no construction passed the registered gate on the joint block.** The question is
+how to turn the stored marginal forecasts of the Primaries (substations feeding the distribution
 network from the transmission network), wind farms, and solar farms into 51 scenarios that a
 power-flow study can use, each scenario being one coherent realisation across substations, across
 demand, wind, and solar, and across time. We took the stored 51 values per node and lead, re-ordered
@@ -136,11 +139,30 @@ differences between pairs of nodes or half-hours. The registered verdict is `par
 coupling beat ensemble ranks for the farms (the first claim), tying scenario k to member k gave no
 gain (the second claim failed), and the gating joint block saw no difference at the margin.
 
+Terms used below, defined where the page first needs them:
+
+- **J0 to J6** are the eight constructions of the Arms table in the Design section: J0 independent
+  draws, J1 comonotone (every node at the same rank), J2 ensemble copula coupling (ranks from the
+  weather members), J3 a Schaake shuffle (ranks copied from one past observed path), J4 a
+  member-anchored Schaake shuffle, J5 ensemble ranks mixed with a Gaussian copula of forecast
+  errors, J6 member-wise quantiles with the same copula.
+- **Gaussian scores** are probability-integral-transform values (where each actual falls in its
+  forecast distribution) converted to normal scores, so that correlations can be compared.
+- **A Brier score** is the mean squared error of a forecast probability of an event.
+- **The registered contrasts C1 to C4 and the predictions P1 to P5** are defined in the front
+  matter. The margin is a quarter of the gap between J1 and J0, bounded to 2% to 5%.
+- **Figures 1 to 3** compare constructions; figure 4 shows 12 of the 51 scenarios of one run, with
+  the observation in black, times in UTC.
+
 ![Variogram score of each construction relative to independent draws, per block](figure_1_variogram_contrasts.svg)
 
 ![Mean correlation of Gaussian scores of each construction against the realised correlation](figure_2_dependence.svg)
 
 ![Average-rank histograms of the wind-farm block and the joint block](figure_3_rank_histograms.svg)
+
+Figure 4 (four images): in each panel, scenarios that move together across a family look like
+one shape (J2, J5), and independent scenarios look like noise (J0). J3, the recommended default,
+is not drawn. Solar farm A has no forecast beyond about day 10.
 
 ![Day-ahead scenarios in winter](figure_4_example_winter_day-ahead.svg)
 
@@ -343,8 +365,8 @@ gain (the second claim failed), and the gating joint block saw no difference at 
   -10.5% (-17.9% to -3.3%), J6 -6.7% (-15.1% to +1.0%), J1 +8.0%. The margin is 2.0% and J2 to J5
   all lie below it. The audit showed that this gain is entirely within-family: shuffling the
   scenario order of each family separately gave -9.4% to -10.1%, against -9.8% to -10.5% unshuffled.
-  The block therefore cannot test cross-family dependence, and the failure of P3 says nothing about
-  shortwave-driven coupling between demand and solar.
+  The block therefore cannot test cross-family dependence, and P3 is untested by this block, which
+  says nothing about shortwave-driven coupling between demand and solar.
 - **Across leads.** Every construction except J1 and J6-median stays within 5% of J0 for each node
   except demand D4, where J3 scored -17.1% (-28.8% to -6.6%) and J4 -14.0% (-23.8% to -5.5%). J6's
   member-wise quantiles score 1.6% to 4.0% worse than J0 across leads for every solar farm (for

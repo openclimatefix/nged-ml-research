@@ -127,6 +127,9 @@ def pre_ranks(*, x: np.ndarray, y: np.ndarray, rng: np.random.Generator) -> tupl
         x: Scenarios, (51, d).
         y: Observation, (d,).
         rng: Breaks ties in the final rank.
+
+    Returns:
+        The average-rank and band-depth pre-ranks.
     """
     full = np.concatenate([x, y[None]], axis=0)  # (52, d)
     jitter = rng.random(full.shape) * 1e-9
