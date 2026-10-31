@@ -295,6 +295,14 @@ the new path. The arm is otherwise E3-surp (same rows, folds, seeds, and trainin
   E3-surp at step c050; 1.027 against 1.026 at m10), P-I1b held (median share 0.225 in both arms),
   and P-I1c held (the CRPS of E3-surp-w is lower than E3-surp's by 0.005 to 0.014 on every row set
   at the signed-MW six). The widening path did not learn to widen after a jump.
+- **Diagnostic, not for release (seed 0, four folds, signed-MW six).** The arm
+  `DIAG-not-for-release-E3-surp-w-ev` (E3-surp-w trained on the injected value wherever the target
+  lies in an injected event) learned to widen only a little more after a step: at step c050 (24 to
+  72 hours, day variant, k = 3) the band-width ratio is 1.069 (E3-surp-w: 1.019) and the median
+  share is 0.325 (0.225). It also widened every band: the 95% quantile covers 0.957 of clean
+  readings (E3-surp-w: 0.900) and the 99% quantile covers 1.000, and the CRPS on clean rows is 0.055
+  higher (3.035 against 2.980). The scale path can learn widening when the objective rewards it, and
+  with this objective it learns to widen everywhere.
 - **The fallback objective is on hold.** The fallback named in the plan (train on the injected
   world's value where the target lies in an injected event) rewards persistence of the jump, which
   is the opposite of forecasting the normal running arrangement. It stays unfitted until the

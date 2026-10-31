@@ -48,6 +48,7 @@ ARMS: Final[tuple[str, ...]] = (
     "E3",
     "E3-surp",
     "E3-surp-w",
+    "DIAG-not-for-release-E3-surp-w-ev",
 )
 WORLD_SETS: Final[dict[str, tuple[int, ...]]] = {
     "real": (0,),
@@ -76,6 +77,10 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C7 E3-surp - E3": ("E3-surp", "E3"),
     "C8 E3-surp - R-inj": ("E3-surp", "R-inj"),
     "C9 E3-surp-w - E3-surp": ("E3-surp-w", "E3-surp"),
+    "C10 DIAG-not-for-release-E3-surp-w-ev - E3-surp-w": (
+        "DIAG-not-for-release-E3-surp-w-ev",
+        "E3-surp-w",
+    ),
 }
 TAILS: Final[tuple[str, ...]] = ("q01", "q05", "q95", "q99")
 LEVEL_OF: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}

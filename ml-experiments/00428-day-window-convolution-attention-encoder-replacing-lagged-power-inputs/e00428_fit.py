@@ -76,6 +76,15 @@ ARMS: Final[dict[str, Arm]] = {
     "E3": Arm("E3", "encoder", 3, True),
     "E3-surp": Arm("E3-surp", "encoder", 3, True, surprise=True),
     "E3-surp-w": Arm("E3-surp-w", "encoder", 3, True, surprise=True, widen=True),
+    "DIAG-not-for-release-E3-surp-w-ev": Arm(
+        "DIAG-not-for-release-E3-surp-w-ev",
+        "encoder",
+        3,
+        True,
+        surprise=True,
+        widen=True,
+        event_target=True,
+    ),
 }
 
 
