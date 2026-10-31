@@ -17,7 +17,7 @@ per-lag flags `flag_0` to `flag_2`, and q01 to q99.
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
 ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:\
 <experiment 404 folder> \
-DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data OMP_NUM_THREADS=1 \
+DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1 \
     uv run --no-sync python ml-experiments/00445-*/e00445_orule.py build --month 2026-06 --seed 0
 ```
 """
