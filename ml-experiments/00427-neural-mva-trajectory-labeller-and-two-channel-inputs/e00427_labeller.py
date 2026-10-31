@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Step 0 of experiment 427: a whole-day sign labeller for folded MVA readings. No mixture density network is fitted.
+"""Step 0 of experiment 427: a whole-day sign labeller for folded MVA readings.
+
+No mixture density network is fitted.
 
 The labeller reads one UTC day of 48 half-hourly readings and outputs, per half-hour, the probability
 `pi` that the signed power `P'` is negative (reverse flow). It is trained on whole days of the
@@ -388,7 +390,10 @@ class Trained:
 
 
 def held_out_rows(*, primaries: list[PrimaryDays]) -> np.ndarray:
-    """Return a boolean per stacked day: every eighth block of seven days since the epoch is held out for early stopping."""
+    """Return a boolean per stacked day, true for every eighth block of seven epoch days.
+
+    Those days are held out for early stopping.
+    """
     day = np.concatenate([p.day for p in primaries])
     return (day // 7) % 8 == 0
 

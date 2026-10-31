@@ -42,14 +42,19 @@ def false_reverse_chart() -> alt.Chart:
         )
         rows.append({"site": site, "share": float((f["pi"].to_numpy()[sel] > 0.5).mean()) * 100.0})
     base = alt.Chart(pl.DataFrame(rows))
-    bars = base.mark_bar(color=BLUE, aria=False).encode(
-        x=alt.X("site:N", title=None, axis=alt.Axis(labelAngle=0), sort=["D5", "D10", "D9", "D14", "D11", "D16"]),
+    bars = base.mark_bar(color=BLUE, aria=False).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X(
+            "site:N",
+            title=None,
+            axis=alt.Axis(labelAngle=0),
+            sort=["D5", "D10", "D9", "D14", "D11", "D16"],
+        ),
         y=alt.Y("share:Q", title="Share of half-hours (%)"),
     )
     limit = (
         alt.Chart(pl.DataFrame({"y": [2.0]}))
         .mark_rule(color=ORANGE, strokeDash=[4, 3])
-        .encode(y="y:Q")
+        .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     )
     print(rows)
     return (bars + limit).properties(
