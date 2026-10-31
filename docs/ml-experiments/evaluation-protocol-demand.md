@@ -1,17 +1,20 @@
-# Evaluation protocol for Primary demand, version 1
+# Evaluation protocol for Primary demand, version 2
 
 **This page fixes how every experiment on Primary substation demand is scored, so that results from
-different experiments can be compared.** An experiment records `protocol: demand-v1` in its front
-matter. A change to any metric, fold, series list, slice, interval, or tolerance on this page makes
-a new version. The superseded text moves to `evaluation-protocol-archive/` as `demand-v1.md`, and
-the table of versions below gains a row. The protocols for [solar](evaluation-protocol-solar.md) and
-[wind](evaluation-protocol-wind.md) have their own version numbers, so a change here does not move
-theirs. The [research default rule](research-default.md) defines the research default and the log of
-its versions. This page defines how a change to it is scored and when the change is adopted.
+different experiments can be compared.** An experiment records `protocol: demand-v2` in its front
+matter. A change to any metric, fold, series list, slice, interval, tolerance, or adoption condition
+on this page makes a new version. The superseded text moves to `evaluation-protocol-archive/`, where
+`demand-v1.md` already holds version 1, and the table of versions below gains a row. An experiment
+whose plan was written before version 2 merged finishes under `demand-v1`. The protocols for
+[solar](evaluation-protocol-solar.md) and [wind](evaluation-protocol-wind.md) have their own version
+numbers, so a change here does not move theirs. The [research default rule](research-default.md)
+defines the research default and the log of its versions. This page defines how a change to it is
+scored and when the change is adopted.
 
 | Version | Date | Change |
 |---|---|---|
 | `demand-v1` | 2026-10-28 | First version |
+| `demand-v2` | 2026-10-29 | Per-Primary floor against the benchmarks, stop rule for blind alleys, and the replicate rule for ENS-trained arms |
 
 ## What is scored
 
@@ -179,7 +182,7 @@ A slice with few half-hours is labelled "thin", as the substation cards do.
 inside hand-filtered events, so the scores during the events and in the 7 days after each event
 ends are reported separately. Seven logged transfers are too few for an interval, per [experiment
 277](00277-lsc-curtailment-metric-on-existing-forecasts/result.md). The length of 7 days is a choice
-of `demand-v1`, which the maintainer may change in a later version. The event list is the
+of `demand-v2`, which the maintainer may change in a later version. The event list is the
 hand-filtered list and never the output of a detector.
 
 **The tolerance for "sunny daylight half-hours" applies to the sunny-by-clear-sky-index slice.** The
@@ -223,7 +226,7 @@ statistic across Primaries states the number of Primaries, because a correlation
 sites is weak evidence.
 
 **The write-up names the research default's version and the protocol version.** For example,
-"default plus x versus Primary demand research default 3, scored under `demand-v1`". The
+"default plus x versus Primary demand research default 3, scored under `demand-v2`". The
 `result.md` take-home stays at one or two paragraphs with figures, and the full metric table sits in
 a collapsed section.
 
@@ -246,20 +249,34 @@ arms, the interval is read at the level 1 − 0.01/k. The short-history group ta
 within the tolerance of its headline, with D8 and without D8, and is not required to show a gain.
 Each protected slice stays within its tolerance in each group, judged by a one-sided 95%
 non-inferiority bound. A breach at a group makes the verdict `rejected`.
-3. **No harm to a Primary.** A Primary whose point estimate is worse than 0.05 points makes the
-   verdict `needs-human`, with the Primary named. The interval is not tested at each Primary,
-   because 16 one-sided tests would breach by chance more often than not.
-4. **Replication.** An arm trained on ENS forecasts can be replicated only over 2025-04 to
-   2025-06 at 13 Primaries. An adoption that rests on that weak replicate has the outcome
-`needs-human` and is never `adopted` automatically. The gain has the same sign in the replicate
-period at the Primaries that have one, and the replicate estimate is at least half of the smaller of
-the main estimate and the minimum gain. Where the minimum gain is zero, the condition reduces to the
-same sign. Leaving out one series at a time is a check for changes tuned on one series and does not
-stand in for a second period: a change with no second period stays a candidate. A change that fails
-replication is not retried on the same replicate period with a changed x, unless the change is
-pre-registered as a new experiment and the failed attempt is counted. A change that meets this
-condition satisfies audit trigger 7, and a candidate that fails it never becomes a base for later
-work.
+3. **No harm to a Primary, and a floor against the benchmarks.** A Primary whose point estimate is
+   more than 0.05 points worse than the previous default makes the verdict `needs-human`, with the
+   Primary named. The floor applies to the 14 Primaries of the signed-MW and MVA-only groups. The
+   candidate's CRPS over days 1 to 10 must be less than or equal to the CRPS of `manual_heuristic`
+   at each of them, and no more than 1.10 times the CRPS of BG2 (both scores are non-negative, in
+   points of effective capacity, on the same Primaries, folds, and leads, and a BG2 score of zero is
+   a breach). D8 is judged with its own-residual arm, against the one D8 row of each benchmark. Both
+   comparisons use the point estimate. A Primary at which the previous default already breaches the
+   floor does not block a candidate, provided the candidate's ratio there is no higher than the
+   previous default's. A breach gives the verdict `needs-human`, with the worst Primary named. The
+   floor is not a tolerance. The interval is not tested at each Primary, because 16 one-sided tests
+   would breach by chance more often than not. The ratio of 1.10 is a starting value read from one
+   table of [experiment
+   378](00378-primary-demand-default-3-at-all-16-primaries-under-demand-v1/result.md), where default
+   3 passed at 13 of 14 Primaries, and the maintainer may revise it.
+4. **Replication.** An arm trained on ENS forecasts can be replicated only over 2025-04 to 2025-06,
+   at 13 Primaries. That replicate is reported and labelled "weak replicate", and the weak replicate
+   alone does not make the verdict `needs-human`. A release is judged on the one scored year plus
+   the holdout (July to October 2026), which the `release-model` skill reads once, and the holdout
+   confirms the sign only. The gain has the same sign in the replicate period at the Primaries that
+   have one, and the replicate estimate is at least half of the smaller of the main estimate and the
+   minimum gain. If that test fails, the verdict is `needs-human`. Where the minimum gain is zero,
+   the condition reduces to the same sign. Leaving out one series at a time is a check for changes
+   tuned on one series and does not stand in for a second period: a change with no second period
+   stays a candidate. A change that fails replication is not retried on the same replicate period
+   with a changed x, unless the change is pre-registered as a new experiment and the failed attempt
+   is counted. A change that meets this condition satisfies audit trigger 7, and a candidate that
+   fails it never becomes a base for later work.
 5. **Controls.** The experiment's own controls passed, the placebos did not fail, and no audit
    trigger in the `ml-experiment` skill is unresolved. The audit's findings are triaged in the pull
    request before the adoption.
@@ -303,9 +320,9 @@ The per-Primary rule is a flag because 16 such tests would breach by chance far 
 
 **When the metrics disagree, the verdict is decided in this order.** A breach of condition 2 makes
 the verdict `rejected`, unless the change targets a different slice and the maintainer overrules.
-A Primary breach of condition 3 makes the verdict `needs-human`. A CRPS gain with the median error
-moving the other way beyond tolerance gives `needs-human`. `needs-human` is also the fallback for
-any case this list does not cover.
+A Primary breach or a floor breach of condition 3 makes the verdict `needs-human`, naming the worst
+Primary. A CRPS gain with the median error moving the other way beyond tolerance gives
+`needs-human`. `needs-human` is also the fallback for any case this list does not cover.
 
 **The first experiment under this protocol rescoring the references.** Experiments 374 and 376 used
 one fixed fit and a tuning month, not monthly folds, so their scores are not comparable with scores
@@ -375,9 +392,8 @@ holdout once per release, on the sign of the effect only, and a month may confir
 
 **The holdout holds under four months and no winter on 2026-10-23.** It covers July to October 2026,
 and the months from November to February arrive by about March 2027. Until then, a change that acts
-in winter (the heating curve, cold nights, the Economy 7 step) is adopted on the replicate year
-alone, and its log entry reads "winter-unconfirmed". The holdout confirms its sign in March 2027 or
-later.
+in winter (the heating curve, cold nights, the Economy 7 step) is adopted on the scored year alone,
+and its log entry reads "winter-unconfirmed". The holdout confirms its sign in March 2027 or later.
 
 **The same-months shrinkage check pauses a family's adoptions only on evidence of shrinkage.** The
 check compares the holdout months with the same calendar months of the scored year (July to October
@@ -388,6 +404,18 @@ holdout rolls forward as new months arrive. In a simulation of a 12-month scored
 4-month holdout, the check paused the family after 29% of false adoptions, 7% of adoptions with a
 true gain of 2 standard errors, and 3% of adoptions with a true gain of 3 standard errors. The
 check understates the chance of a pause for a change whose effect is seasonal.
+
+## Stop rule for blind alleys
+
+**After three experiments with the verdict `not supported` or `refuted` on one idea, the next
+experiment on it needs the maintainer's approval and is scored at every Primary.** Only those two
+verdicts in the `result.md` front matter count. `partly supported`, `inconclusive`, `small gain`,
+and `supported` do not count, and a `supported` or `small gain` result on the idea resets the count
+to zero. The count runs across protocol versions. The manager decides which experiments share an
+idea by their `theme` and by what they test, and lists the counted experiments in the next brief.
+The scored-at-every-Primary requirement replaces any screening arm for that experiment. The approval
+is recorded in the brief, and an experiment that the maintainer asks for by name, in chat or through
+a Discuss session, counts as that approval.
 
 ## Retraining
 

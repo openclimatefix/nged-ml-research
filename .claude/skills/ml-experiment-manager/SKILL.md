@@ -113,6 +113,12 @@ number, and confirm the PR adds the log row. Four cases need the maintainer's ap
 source, a cost above £30 or a recurring production cost, a change that would need a serving-path
 change to port, and a change whose code must enter `src/studies`.
 
+**Count the failed experiments on an idea before starting a brief, and apply the stop rule of the
+demand protocol after three.** Count the verdicts `not supported` and `refuted` on the brief's theme
+and idea (read the Experiments table), reset the count at a `supported` or `small gain` result, and
+list the counted experiments in the brief. From the fourth, record the maintainer's approval in the
+brief, or note that the maintainer asked for the experiment by name, and score it at every Primary.
+
 ## Starting a session
 
 **Put the instructions in a brief file, and keep the prompt to two lines that point at the files.**
