@@ -516,6 +516,12 @@ def predict_rows(
             )
             out = np.empty((rows.height, len(c310.LEVELS)), dtype=np.float32)
             extra = np.empty((rows.height, common.N_LEVELS), dtype=np.float32)
+            member_q_all = np.empty(
+                (rows.height, common.N_MEMBERS, len(c310.LEVELS))
+                if config.member_wise
+                else (0, 0, 0),
+                dtype=np.float16,
+            )
             for s in range(0, rows.height, INFERENCE_CHUNK):
                 batch = to_batch(
                     piece=piece,
@@ -525,11 +531,12 @@ def predict_rows(
                     rows=slice(s, s + INFERENCE_CHUNK),
                 )
                 if config.member_wise:
-                    marginal, paths = member_wise_quantiles(
+                    marginal, paths, member_q = member_wise_quantiles(
                         model=model, batch=batch, columns=config.columns, stats=stats
                     )
                     out[s : s + INFERENCE_CHUNK] = marginal
                     extra[s : s + INFERENCE_CHUNK] = paths
+                    member_q_all[s : s + INFERENCE_CHUNK] = member_q
                 else:
                     out[s : s + INFERENCE_CHUNK] = (
                         net.quantiles(model=model, batch=batch).cpu().numpy()
@@ -544,6 +551,7 @@ def predict_rows(
                 path_arrays.append(
                     {
                         "values": extra,
+                        "member_q": member_q_all,
                         "rank": np.argsort(
                             np.argsort(members[:, :, 0], axis=1, kind="stable"), axis=1
                         ).astype(np.uint8),
@@ -571,8 +579,8 @@ def predict_rows(
 
 def member_wise_quantiles(
     *, model: net.UnifiedNet, batch: net.Batch, columns: tuple[str, ...], stats: dict
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return the equal-weight 51-member mixture's 11 quantiles and the 51 member paths of each row.
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return the 51-member mixture's 11 quantiles, the 51 member paths, and each member's 11 quantiles.
 
     Each member alone goes through the network. Member m's path value is the quantile of that
     member's own mixture at level `MEMBER_LEVELS[m]`, which is fixed for the member across rows.
@@ -604,7 +612,15 @@ def member_wise_quantiles(
             levels=levels,
         ).reshape(n, k)
         paths = torch.minimum(paths.clamp(min=0.0), ceiling)
-    return marginal.cpu().numpy(), paths.cpu().numpy()
+        eleven = net.LEVELS.to(DEVICE)[None, :].expand(n * k, -1)
+        member_q = net.bisect_gaussian_mixture(
+            w=w3.reshape(n * k, 3),
+            mean=m3.reshape(n * k, 3),
+            std=s3.reshape(n * k, 3),
+            levels=eleven,
+        ).reshape(n, k, -1)
+        member_q = torch.minimum(member_q.clamp(min=0.0), ceiling[:, :, None])
+    return marginal.cpu().numpy(), paths.cpu().numpy(), member_q.cpu().numpy()
 
 
 def save_paths(
@@ -619,6 +635,7 @@ def save_paths(
             handle,
             values=np.concatenate([a["values"] for a in arrays]),
             rank=np.concatenate([a["rank"] for a in arrays]),
+            member_q=np.concatenate([a["member_q"] for a in arrays]),
         )
     tmp.replace(path)
 
