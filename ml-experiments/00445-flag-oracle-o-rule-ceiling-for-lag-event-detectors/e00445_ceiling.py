@@ -54,7 +54,7 @@ OUT_DIR: Final[Path] = orule.OUT_DIR
 
 def arm_path(*, arm: str, month: str, seed: int, world: int) -> Path:
     """Return where an arm's forecast frame lives: this experiment's folder or experiment 404's."""
-    if arm in orule.ARMS:
+    if arm in orule.ARMS or arm.startswith(("E-", "LL-")):
         return orule.prediction_path(arm=arm, month=month, seed=seed, world=world)
     return score.prediction_path(arm=arm, month=month, seed=seed, world=world)
 
