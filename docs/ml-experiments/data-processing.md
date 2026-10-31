@@ -1090,4 +1090,3 @@ a blurred 6-hour mean. Experiment 417's Primary-level gate did this and shut at 
 shortest-lead row it opens at both, as with recorded weather
 ([experiment 424](00424-neural-mva-export-gated-signed-ens-serving-test/result.md)). The entry is
 provisional until the experiment has had its reviews.
-
