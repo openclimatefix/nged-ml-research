@@ -58,9 +58,10 @@ decision_rule: >-
   report-only) on CRPS at days 1 to 10, with the month-block bootstrap of `studies.eval_protocol` at
   95% and 20,000 resamples, on the half-hours that the arm and its reference share. Planned
   contrasts. C1: each stale arm minus the same network's fresh case (the experiment 410 contrast).
-  C2: each of T1 to T4 minus T0 in the same stale arm, which measures what the training change
-  gained. C3: the fresh case of each of T1 to T4 minus T0's fresh case, which measures what the
-  training change cost. The hypothesis is supported if the primary arm, T3 (T2 and T4 are read the
+  C2: each of T1 to T4 minus T0 in the same stale arm, which measures how much the training change
+  helped. C3: the fresh case of each of T1 to T4 minus T0's fresh case, which measures what the
+  fresh-case score got worse. The hypothesis is supported if the main arm, T3 (T2 and T4 are read
+  the
   same way and named if one of them meets the limits when T3 does not), meets every experiment 410
   limit at both groups (CRPS loss under 0.05 for P6 and P12, under 0.10 for W24, P24, W24+P12, and
   W24+P24, q95 and q99 coverage fall under 0.02) and C3 is under +0.03 points at both groups; partly
@@ -90,11 +91,13 @@ best_arm: >-
 headline: >-
   Training with the forecast origin at eight hours of the day cuts the loss from readings 12 hours
   late from 0.18 to 0.04 points at the signed-MW six and from 0.13 to 0.02 at the MVA-only eight.
-  The two age inputs and the random delays add nothing measurable, and varied-origin training costs
-  0.04 to 0.11 points on fresh inputs at the MVA-only eight.
+  The two age inputs and the random delays do not help, and at one stale-weather arm they raise the
+  loss. Varied-origin training raised the CRPS on fresh inputs by 0.04 to 0.11 points at the
+  MVA-only eight.
 lessons: >-
   The loss from 12-hour-late readings was a time-of-day mismatch, which origin-hour training
-  removes. The age inputs are redundant with the lead and the lag ages, and the weather-age input
+  removes. The age inputs are redundant with the forecast lead time and the ages of the power lags,
+  and the weather-age input
   worsens the 24-hour-old-weather arm at the signed-MW six.
 production_status: candidate
 adopted_in: none
@@ -103,46 +106,54 @@ take_home_message: >-
   removes almost all of its extra error when the newest power reading is 12 hours late (0.18 down to
   0.04 points at the six signed substations). The two extra age inputs did not help, so the simplest
   recipe is enough. Training this way raised the error on fresh inputs by 0.04 to 0.11 points at the
-  eight MVA-only substations, which is about the size of the seed-to-seed noise, and training with
+  eight MVA-only substations, which is within the range that seed-to-seed noise could produce for
+  the lower values, and training with
   some readings missing cut the missing-readings error from 2.4 to 0.3 points. These are five test
   months, so every number is interim.
 advice:
   - >-
-    Train the pooled network with the forecast origin at several hours of the day, because readings
-    12 hours late then cost 0.04 points instead of 0.18 at the signed-MW six (C2, T1).
+    Train the pooled neural network with the forecast origin at several hours of the day, because
+    readings
+    12 hours late then raise the CRPS by 0.04 points instead of 0.18 at the six signed-meter
+    substations.
   - >-
-    Do not add the age of the weather forecast or of the newest reading as inputs, because T2n
-    without them matches T2 and T2 loses more at W24 at the signed-MW six (0.054 against 0.025).
+    Do not add the age of the weather forecast or of the newest reading as inputs, because the arm
+    without them (T2n) matches the arm with them (T2), and T2 loses more at W24 at the signed-MW
+    six (0.054 against 0.025).
   - >-
-    Train with the three origin lags sometimes missing before relying on the network when readings
+    Train with the three origin lags sometimes missing before relying on the neural network when
+    readings
     can be absent, because T4 loses 0.30 points in DROP against 1.7 to 2.4 for T0 to T3.
   - >-
-    Do not read an unmodified pooled network's DROP loss as a stable number: the D15 and D18 start
-    cut changed it from 9.1 to 2.4 points through the share of all-lags-missing training rows.
+    Do not read an unmodified pooled network's DROP loss as a stable number: removing the D15 and
+    D18 data before 2025-03-01 changed it from 9.1 to 2.4 points through the share of
+    all-lags-missing training rows.
   - >-
     Check the fresh-case score at the MVA-only eight when adopting varied-origin training, because
-    it rose by 0.04 to 0.11 points there and no five-month screen can separate that from seed noise.
+    it rose by 0.04 to 0.11 points there, and the 5-month screen cannot separate a rise that small
+    from seed noise (minimum detectable effect about 0.07 points).
 code: ml-experiments/00422-mdn-train-with-varied-origin-hour-and-age-inputs-stale-input-step-2/
 ---
-
-**Take-home message: the pooled network's loss from stale readings was a time-of-day mismatch, and
-training with the forecast origin at many hours of the day removes it.** We asked whether the pooled
-mixture density network (one neural network for all substations, from experiment 397) can be trained
-to cope with a weather forecast that is a day old and with power readings that arrive late. Each
-change to the inputs is an "arm" (keys below). Experiment 410 found that readings 12 hours late
-raised the continuous ranked probability score (CRPS, days 1 to 10, points of effective capacity,
-where one point is 1% of capacity) by 0.18 points at the six primary substations with signed meters
-(the signed six) and by 0.13 at the eight with apparent-power meters (the MVA-only eight). When the
-network is trained with the origin at eight hours of the day, those losses fall to 0.04 and 0.02
-points (arm T1). **The pre-registered rule gives "partly supported".** Every experiment 410 limit
-holds at both groups for the primary arm T3, but T3's score on fresh inputs is 0.078 points worse at
-the MVA-only eight, above the +0.03 the rule allows. The age inputs add nothing: T2n, the same
-training without them, does as well as T2.
+ **Take-home message: the pooled network's loss from stale readings was a time-of-day mismatch, and
+training with the forecast origin at many hours of the day removes most of it.** We asked whether
+the pooled mixture density network (a neural network that outputs a probability distribution; one
+network for all substations, from experiment 397) can be trained to cope with a weather forecast
+that is a day old and with power readings that arrive late. Each change to the inputs is an "arm"
+(key below). Experiment 410 found that the newest power readings arriving 12 hours late raised the
+continuous ranked probability score (CRPS, lead times of days 1 to 10, points of effective capacity,
+where one point is 1% of capacity) by 0.20 and 0.15 points; the refit here (T0) gives 0.18 points at
+the six primary substations with signed meters (the signed six) and by 0.13 at the eight with
+apparent-power meters (the MVA-only eight). When the network is trained with the origin at eight
+hours of the day, those losses fall to 0.04 and 0.02 points (arm T1). **The pre-registered rule
+gives "partly supported".** Every experiment 410 limit holds at both groups for the main arm T3, but
+T3's score on fresh inputs is 0.078 points worse at the MVA-only eight, above the +0.03 the
+pre-registered rule allows for the fresh-case score. The age inputs do not help: T2n, the same
+training without them, does as well as T2 (and better at one stale-weather arm).
 
 ![CRPS loss against the fresh case, per stale arm and training arm](figure_1_loss_by_arm.svg)
 
-**Key to the arms.** Training arms (offsets in hours after the 00:00 UTC run start; draws are made
-once per training row and seed):
+**Key to the arms.** Training arms (offsets in hours after the 00:00 UTC weather run; each random
+draw is made once per training row and seed):
 
 | Arm | Origin offset h | Reading delay d | Previous weather run | Origin lags missing | Age inputs |
 |---|---|---|---|---|---|
@@ -153,16 +164,16 @@ once per training row and seed):
 | T3 | as T1 | as T2 | probability 0.25 | as in the data | yes |
 | T4 | as T1 | as T2 | probability 0.25 | all three, probability 0.10 | yes |
 
-- **Test arms** are experiment 410's: FRESH, W24 and W48 (the weather forecast from the run one or
+- **Test arms** are experiment 410's: FRESH, W24, and W48 (the weather forecast from the run one or
   two days earlier), P*n* (readings delayed by *n* hours: P6, P12, P24), both at once (W24_P12,
-  W24_P24), and DROP (the three origin lags missing). New are P30, P36, and P48, which put the newest
-  reading at the same hour of day as P6, P12, and P24 a day further back (23:30, 17:30, 05:30), and
-  P10, which lies off the 3-hour training grid.
+  W24_P24), and DROP (the three origin lags missing). Four test arms are new. P30, P36, and P48 put
+  the newest reading at the same hour of day as P6, P12, and P24, a day further back (23:30, 17:30,
+  05:30). P10 lies off the 3-hour training grid.
 - **Reference columns.** S397 is experiment 410's stored pooled network (trained at 09:00 on power
   with no cleaning rules). S1M is experiment 410's XGBoost model, which is not refitted.
-- **The age inputs** are the hours since the weather run and the hours since the newest reading
-  (3.5 plus *d*), each over 48. The reading age is a linear function of two existing inputs (the lag
-  ages and the lead), so it is redundant by construction; arm T2n tests that.
+- **The age inputs** are the hours since the weather run and the hours since the newest reading (3.5
+  plus *d*), each divided by 48. The reading age is a linear function of two existing inputs (the
+  lag ages and the lead), so it is redundant by construction; arm T2n tests that.
 
 ## Results
 
@@ -207,26 +218,27 @@ MVA-only eight:
 | W24_P24 | 0.076 | 0.080 | 0.077 | 0.067 | 0.076 | 0.067 | 0.058 | 0.072 |
 | DROP | 6.504 | 1.899 | 1.700 | 1.822 | 1.667 | 1.831 | 0.318 | 3.684 |
 
-- **Time of day explains the loss.** P12 falls from 0.183 (T0) to 0.039 (T1) at the signed six
-  (T1 minus T0: -0.149, interval -0.233 to -0.072) and from 0.130 to 0.020 at the MVA-only eight
+- **Time of day explains the loss.** P12 falls from 0.183 (T0) to 0.039 (T1) at the signed six (T1
+  minus T0: -0.149, interval -0.233 to -0.072) and from 0.130 to 0.020 at the MVA-only eight
   (-0.066, interval -0.120 to -0.007). P36, which hits the same 17:30 hour, falls from 0.226 to
   0.091.
-- **The delay itself costs little where the network was trained.** In T2 and T3 the loss grows by
-  0.04 points from P6 to P30, P12 to P36, and P24 to P48 at the signed six, so each day of extra
-  delay at a constant hour of day costs about 0.04 points. P10, off the training grid, loses 0.024,
-  between P6 (0.013) and P12 (0.032).
+- **The delay itself adds little loss where the network was trained.** In T2 and T3 the loss grows
+  by 0.04 points from P6 to P30, P12 to P36, and P24 to P48 at the signed six, so each day of extra
+  delay at a constant hour of day raises the loss by about 0.04 points. P10, off the training grid,
+  loses 0.024, between P6 (0.013) and P12 (0.032).
 - **The age inputs do not help.** T2 and T2n agree at P6, P12, and P24 (within 0.008 at the signed
-  six). T2 loses more than T2n at W24 (0.054 against 0.025) and W24_P24 (0.098 against 0.066) at
-  the signed six, and less at the MVA-only eight. In absolute terms the two networks score alike
-  at W24 (3.347 against 3.353); T2 only gains 0.035 on fresh inputs, and the gain does not carry to
-  W24. Feeding T2 a weather age of 9 hours reproduces T2n; clipping the age to 30 hours changes
-  nothing (audit).
+  six). T2 loses more than T2n at W24 (0.054 against 0.025) and W24_P24 (0.098 against 0.066) at the
+  signed six, and less at the MVA-only eight. In absolute terms the two networks score alike at W24
+  (3.347 against 3.353); T2 improves the fresh-case CRPS by only 0.035, and the improvement does not
+  carry to W24. Feeding T2 a weather age of 9 hours reproduces T2n. Clipping the age to 30 hours
+  changes nothing (both found by the audit described under Checks).
 - **Missing readings.** T4 loses 0.30 (signed six) and 0.32 (MVA-only eight) points in DROP, against
-  1.7 to 2.4 and 1.7 to 1.9 for T0 to T3. Its 90% interval is 1.07 and 1.09 times as wide as for
-  fresh inputs, and its q95 coverage falls by 0.015 and 0.008 (T3: 0.163 and 0.124).
-- **Against the XGBoost S1M model.** T3 loses less than S1M at P12 (0.032 against 0.306) and
-  W24_P12 (0.077 against 0.338) at the signed six, and at the MVA-only eight (0.021 and 0.056
-  against 0.098 and 0.130).
+  1.7 to 2.4 and 1.7 to 1.9 for T0 to T3. T4's 90% prediction interval is 1.07 and 1.09 times as
+  wide as for fresh inputs, and its coverage of the 95th-percentile quantile (q95) falls by 0.015
+  and 0.008 (T3: 0.163 and 0.124).
+- **Against the XGBoost S1M model.** T3 loses less than S1M at P12 (0.032 against 0.306) and W24_P12
+  (0.077 against 0.338) at the signed six, and at the MVA-only eight (0.021 and 0.056 against 0.098
+  and 0.130).
 
 ![Loss against the delay of the newest reading](figure_2_loss_by_delay.svg)
 
@@ -240,68 +252,76 @@ MVA-only eight:
 
 ![Summer 14-day forecast](figure_7_example_summer_14_day.svg)
 
-## Tails and cost on fresh inputs
+## Tails and fresh-input score
 
 - **Tail coverage holds.** At both groups, q95 and q99 coverage fall by at most 0.006 and 0.002 in
   every arm except DROP, P30, P36, P48, and W48, for every training arm. Fresh-case q95 coverage
   is 0.892 to 0.896 at the signed six and 0.945 to 0.949 at the MVA-only eight, q99 coverage
   0.960 to 0.962 and 0.988 to 0.990.
-- **Cost on fresh inputs.** At the signed six, T1 to T4 score within 0.031 of T0 (T3 minus T0:
+- **Score on fresh inputs.** At the signed six, T1 to T4 score within 0.031 of T0 (T3 minus T0:
   -0.006, interval -0.045 to +0.037). At the MVA-only eight they score worse by +0.044 (T1),
   +0.085 (T2), +0.046 (T2n), +0.078 (T3), and +0.109 (T4); only T3 (interval +0.011 to +0.140) and
   T4 (+0.043 to +0.212) exclude zero. Per-seed fresh means agree (T0 3.905, T2n 3.959, T3 3.989,
   T4 4.047). The q95 and q99 pinball losses rise by under 0.03 and 0.01 at the MVA-only eight.
 - **Seed spread.** The standard deviation across the three seeds of one arm's fresh CRPS is 0.01
-  to 0.05 points. A contrast of two three-seed averages therefore carries a seed noise of about
-  0.03 to 0.04, which the month-block intervals do not include, so a minimum detectable effect on
-  a fresh-case contrast is about 0.07 points.
+  to 0.05 points. The month-block intervals do not include seed noise. A contrast of two 3-seed
+  averages therefore carries about 0.03 to 0.04 points of extra noise, so the minimum detectable
+  fresh-case contrast is about 0.07 points.
 
 ## Design, data, and caveats
 
-- **Recipe.** Experiment 397's pooled plain network (setting `g09`, 3 Gaussian components, Primary
-  embedding, ensemble mean and standard deviation of seven weather variables) with its training
-  loop, early stopping on every twelfth week, and 1.15 widening; monthly refits on the 24 months
-  before the refit; the five screen months and three seeds per arm; 90 fits at 15 to 45 seconds each
+- **Recipe.** The recipe is experiment 397's pooled plain network (setting `g09`, three Gaussian
+  components, Primary embedding, ensemble mean and standard deviation of seven weather variables),
+  trained with its training loop, early stopping on every twelfth week (held out), and a 1.15
+  widening of the outer quantiles about the median. Fits are monthly refits on the 24 months before
+  the refit, for the 5 screen months and three seeds per arm. The 90 fits took 14 to 75 seconds each
   on the GPU. Code reused from experiments 87, 397, and 410 is imported, not copied.
 - **Cleaned data.** Flagged `substation_zero` half-hours are missing in lags and dropped from
-  targets and scoring actuals: 153, 11, 0, 3, and 0 in the five test months, and about 52,000 to
-  53,000 half-hours per fold from training (flagged, D15 and D18 before 2025-03-01, unobserved).
+  targets and scoring actuals. The numbers of flagged half-hours in the 5 test months are 153, 11,
+  0, 3, and 0. In training, 51,600 to 53,200 half-hours per fold are missing: the flagged
+  half-hours, all half-hours before 2025-03-01 at substations D15 and D18, and unobserved
+  half-hours.
 - **Rows.** Held-out weeks purge 15 days before and 9 days after, because a delay of 24 hours moves
-  a lag a day back. Draws are once per row and seed, not per epoch.
+  a lag a day back. Each random draw (origin hour, delay, weather run, missing lags) is made once
+  per training row and seed, not once per epoch.
 - **Reproduction gate.** T0's fresh CRPS is 3.324 (signed six) and 3.832 (MVA-only eight) against
   the stored network's 3.270 and 3.873. The audit could not explain the 0.054 gap at the signed six
   (1.5 standard errors of a three-seed difference; the MVA-only eight shows the opposite sign).
   Every contrast here uses T0 and so does not depend on it.
 - **Checks.** The median forecast minus the mean forecast is -0.23 to -0.27 points at the signed six
-  and -0.39 to -0.47 at the MVA-only eight in every training arm. The error of the median
-  forecast moves with the quantile score: T0 P12 raises the median's mean absolute error by 0.33
-  points at the signed six (5.81 to 6.14), against 0.05 for T3. Triggers fired: a nested arm beats
-  the arm that contains it (T2 against T2n at W24), a control moves more than expected (T0's DROP
-  loss is 2.4 points against 9.7 for the stored network), and the results contradict predictions P2,
-  P3, and P5. A fresh Sonnet audit re-derived the CRPS of T0, T2, T2n, and T3 in four arms by its own
-  code (largest difference 0.0002), found no leakage, and explained the two anomalies.
-- **Audit finding on DROP.** The D15 and D18 start cut leaves 9 times as many training rows with
-  all three lags missing in T0 (0.20%) as in experiment 397's rows (0.022%). A refit of T0 without
-  the cut loses 9.1 and 6.4 points in DROP, like the stored network. T0's DROP loss is therefore
-  an accidental result of the start cut, and T4's 0.30 should be read against 2.4 (with the cut)
-  and 9.1 (without).
-- **Prediction outcomes.** P1 held for P12 (0.039 and 0.020) and P6, and failed for P24 at the signed
-  six (0.053 against 0.05). P2 failed at W24 (T2's loss is 0.029 above T0's) and held for the delay
-  arms, W24_P12 (0.088), and W24_P24 (0.098). P2n failed at W24, W24_P12, and W24_P24 at the signed
-  six. P3 held for W24 (0.044) and W48 above W24, and failed for W24_P12 (0.077) and W24_P24
-  (0.088). P4 held at the signed six (0.042, 0.042, 0.040 in T2) and failed at the MVA-only eight
-  (0.034, 0.028, 0.016). P5 held at the signed six and failed at the MVA-only eight. P6 held. P7
-  held. P8 held. P9 held (P10 within 0.002 of the interpolation).
+  and -0.39 to -0.47 at the MVA-only eight in every training arm. The error of the median forecast
+  moves with the quantile score: T0 P12 raises the median's mean absolute error by 0.33 points at
+  the signed six (5.81 to 6.14), against 0.05 for T3. Triggers fired: a nested arm beats the arm
+  that contains it (T2 against T2n at W24), a control moves more than expected (T0's DROP loss is
+  2.4 points against 9.7 for the stored network), and the results contradict Predictions 2, 3, and
+  5. A fresh Sonnet audit re-derived the CRPS of T0, T2, T2n, and T3 in four arms by its own code
+  (largest difference 0.0002), found no leakage in the training-row and scoring code it read, and
+  explained the two anomalies.
+- **Audit finding on DROP.** The D15 and D18 start cut leaves 9 times as many training rows with all
+  three lags missing in T0 (0.20%) as in experiment 397's rows (0.022%). A refit of T0 without the
+  cut loses 9.1 and 6.4 points in DROP, like the stored network. T0's DROP loss is therefore a side
+  effect of the start cut, and T4's 0.30 should be read against 2.4 (with the cut) and 9.1
+  (without).
+- **Prediction outcomes.** Prediction 1 held for P12 (0.039 and 0.020) and P6, and failed for P24 at
+  the signed six (0.053 against 0.05). Prediction 2 failed at W24 (T2's loss is 0.029 above T0's)
+  and held for the delay arms, W24_P12 (0.088), and W24_P24 (0.098). Prediction 2n failed at W24,
+  W24_P12, W24_P24, W48, and DROP at the signed six, and at W48 and DROP at the MVA-only eight.
+  Prediction 3 held for W24 (0.044) and W48 above W24, and failed for W24_P12 (0.077) and W24_P24
+  (0.088). Prediction 4 held at the signed six (0.043, 0.043, 0.040 in T2) and failed at the
+  MVA-only eight (0.029, 0.029, 0.024). Prediction 5 held at the signed six and failed at the
+  MVA-only eight. Predictions 6, 7, and 8 held. Prediction 9 held (P10 within 0.004 of the
+  interpolation).
 - **Decision rule.** T3 meets every experiment 410 limit at both groups on point estimates; its
-  W24_P24 upper bound at the signed six is 0.109, above 0.10. The fresh-case cost at the MVA-only
-  eight (+0.078) exceeds +0.03, so the verdict is "partly supported". T1, T2n, T2, and T4 also meet
-  the limits. The experiment 410 limits were proposed without evidence, and the numbers are given
-  beside them for the maintainer to judge.
-- **Caveats.** Five test months give wide intervals; the audit's mechanism for T2's W24 result
-  (age and origin hour are tied in training and decoupled at test) is inferred, not tested. The
-  lead range is days 1 to 10 for substations; NGED's horizon is 1 to 10 days. No XGBoost model was
-  refitted, and P30, P36, P48, and P10 were scored for the neural networks only.
-- **What to try next.** Test T1 with the full scored year, and check the fresh-case score at the
-  MVA-only eight with more seeds. Train with the three lags sometimes missing (T4) before the
-  network faces absent readings. Decouple the weather age from the origin hour in training before
-  using the age input again. Fits and forecasts: `data/ml-experiments/00422-*/work/` (not in git).
+  W24_P24 upper bound at the signed six is 0.109, above 0.10. The fresh-case score rise at the
+  MVA-only eight (+0.078) exceeds +0.03, so the verdict is "partly supported". T1, T2n, T2, and T4
+  also meet the limits. The experiment 410 limits were proposed without evidence, and the numbers
+  are given beside them for the maintainer to judge.
+- **Caveats.** 5 test months give wide intervals. The audit's mechanism for T2's W24 result (age and
+  origin hour are tied in training and decoupled at test) is inferred, not tested. The scored lead
+  range, days 1 to 10, matches NGED's horizon. No XGBoost model was refitted, and P30, P36, P48, and
+  P10 were scored for the neural networks only.
+- **Untested next steps.** T1 could be tested over the full scored year, and the fresh-case score at
+  the MVA-only eight with more seeds. Training with the three lags sometimes missing (T4) would
+  prepare the neural network for absent readings in production. The weather age could be decoupled
+  from the origin hour in training before the age input is used again. Fits and forecasts:
+  `data/ml-experiments/00422-*/work/` (not in git).
