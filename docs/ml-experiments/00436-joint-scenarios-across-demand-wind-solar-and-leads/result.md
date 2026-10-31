@@ -27,7 +27,7 @@ hypothesis: >-
   Primaries, the three wind farms, the six solar farms, and the leads, without changing any
   marginal. A single historical ordering (a Schaake shuffle, J3) or an ensemble ordering corrected
   by a fitted error copula (J5) matches the observed joint behaviour better than the ensemble's own
-  member ranks (J2) do. Tying scenario k to ensemble member k (J4) costs no coherence for demand,
+  member ranks (J2) do. Tying scenario k to ensemble member k (J4) loses no coherence for demand,
   and helps for wind and solar.
 prediction: >-
   Written before any score is read. P1. For demand, J3 or J5 beats J2 on the within-family spatial
@@ -93,16 +93,18 @@ lessons: >-
   which is consistent with the ensemble's shared weather members being more alike than the forecast
   errors are. The Schaake shuffle (J3, J4) and the fitted copula (J5) land nearer the realised
   correlations. The joint block over 25 nodes at 6-hourly leads cannot tell constructions apart
-  (within 2%, except the comonotone J1 at +10.6%), because the 16 Primaries dominate the block and
+  (within 3%, except the comonotone J1 at +10.6%), because the 16 Primaries dominate the block and
   gain nothing.
 take_home_message: >-
   To give NGED scenarios that are coherent across wind farms and solar farms, use a Schaake shuffle
   from past observed paths (J3) or the copula-corrected ensemble ranks (J5): both scored 28% to 43%
   lower than independent draws across the farms, although J3 gave no wind gain at 12 to 36 hours.
   Across the 16 Primaries nothing beat independent draws, and tying scenario k to ensemble member k
-  (J4) scored the same as J3, so it did not earn its complexity. Ramps scored 14% better under J3
-  to J5, but the other downstream proxies showed no gain, and the intervals are optimistic because
-  they rest on 10 calendar months.
+  (J4) scored the same as J3 across Primaries and wind farms, so it brought no gain for its extra
+  complexity. Ramps scored 14% better under J3 to J5 (9% under ensemble ranks, J2), and group-sum
+  CRPS 1% to 2% better, but the other proxies showed no gain. The 51 values themselves are too
+  narrow in the tails (q95 exceeded by 7.6% to 8.8% of actuals), and the intervals are optimistic
+  because they rest on 10 calendar months. Four of the five registered predictions (P1 to P4) failed.
 advice:
   - >-
     Use the single Schaake shuffle (J3) as the default for wind farms and solar farms, because J5
