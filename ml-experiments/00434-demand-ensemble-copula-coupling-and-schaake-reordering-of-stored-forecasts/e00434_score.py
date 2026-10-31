@@ -179,6 +179,9 @@ def run_weather(*, init: datetime, ids: list[int]) -> tuple[np.ndarray, np.ndarr
         msg = f"{init}: weather frame has {frame.height} rows, expected {len(ids) * N_STEPS * N_MEMBERS}"
         raise ValueError(msg)
     shape = (len(ids), N_STEPS, N_MEMBERS)
+    if frame["temperature_2m"].is_null().any() or frame["shortwave"].is_null().any():
+        msg = f"{init}: a member has a missing temperature or shortwave value"
+        raise ValueError(msg)
     return (
         frame["temperature_2m"].to_numpy().reshape(shape).astype(np.float64),
         frame["shortwave"].to_numpy().reshape(shape).astype(np.float64),
@@ -243,6 +246,9 @@ def energy_score(*, x: np.ndarray, y: np.ndarray, mask: np.ndarray) -> np.ndarra
         x: Paths, shape (B, 51, d).
         y: Observed vector, shape (B, d), with any value where `mask` is false.
         mask: Components used, shape (B, d).
+
+    Returns:
+        The score of each batch item, shape (B,).
     """
     m = mask[:, None, :]
     to_obs = np.sqrt((((x - y[:, None, :]) * m) ** 2).sum(-1)).mean(-1)
@@ -291,7 +297,12 @@ def coherence_rows(
     labels: list[str],
     init: datetime,
 ) -> list[dict]:
-    """Return one row per arm, block, window, slice (and Primary, for the temporal block)."""
+    """Return one row per arm, block, window, slice (and Primary, for the temporal block).
+
+    `n_dim` is the number of half-hours scored for the spatial block, and the number of vector
+    components for the temporal and joint blocks. The spatial `daylight` and `cold_nights` slices
+    keep the half-hours where at least half of the Primaries with an actual are flagged.
+    """
     rows: list[dict] = []
     have = ~np.isnan(actual)
     for window in WINDOWS:
@@ -447,8 +458,15 @@ def process_month(  # noqa: PLR0915
             "IND": assign(values=values, ranks=rng.permuted(identity, axis=-1)),
             "CO": assign(values=values, ranks=identity),
         }
+        reference = np.sort(paths["CO"], axis=0)
+        for arm, path in paths.items():
+            if not np.array_equal(np.sort(path, axis=0), reference):
+                msg = f"{init}: arm {arm} is not a re-ordering of the same 51 values"
+                raise ValueError(msg)
         i0 = grid.index(t=init) + 1
-        actual = grid.values[:, i0 : i0 + N_STEPS].copy()
+        actual = np.full((len(ids), N_STEPS), np.nan)
+        part = grid.values[:, i0 : i0 + N_STEPS]
+        actual[:, : part.shape[1]] = part
         tbl = table.filter(pl.col("power_fcst_init_time") == init)
         flags = {}
         for name in ("time_midday", "cold_nights"):

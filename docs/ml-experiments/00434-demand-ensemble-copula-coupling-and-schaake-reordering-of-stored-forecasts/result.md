@@ -8,7 +8,7 @@ theme: production-reference-and-best-guess
 also_relevant_to:
   - calibration-and-uncertainty
   - hierarchy-and-pooling
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 date: 2026-10-31
@@ -66,52 +66,140 @@ metric: >-
   the 51 paths in three blocks, daylight and cold-night slices, and the share of actuals beyond the
   smallest and largest of the 51 values, in points of effective capacity; leads 12 to 36 hours and
   days 1 to 10.
+verdict: not supported
+best_arm: >-
+  None. No ordering of the 51 values beat independent draws by the 5% margin on the joint variogram
+  score (days 1 to 10): the Schaake shuffle (SCH) scored 1.7669 and ECC-T 1.7752 against 1.7657 for
+  independent draws (IND), and the comonotone ordering (CO) 1.9667. The ordering that helped most
+  was SCH across leads (1.5757 against 1.6335 for IND).
+headline: >-
+  Ranking the 51 values by each member's temperature (ECC-T) made them 6.7% less coherent across
+  the 16 Primaries (variogram, +4.7% to +9.1%) and 12.9% more coherent across leads at 12 to 36
+  hours (-17.0% to -9.0%), so the joint score moved by +0.5% (+0.3% to +0.8%). The Schaake shuffle
+  matched independent draws across Primaries (-0.4%, -1.7% to +1.0%) and beat them across leads
+  (-3.5%, -6.3% to -0.9% at days 1 to 10; -15.3%, -20.9% to -9.2% at 12 to 36 hours).
+lessons: >-
+  The 16 Primaries' forecast errors are close to independent once each Primary has its own
+  quantiles, so imposing the members' shared temperature order across Primaries adds dependence the
+  observations do not show. Across leads the observed errors are persistent, and both temperature
+  ranks and past paths capture that. A joint score of 640 components is dominated by the spatial
+  and temporal parts cancelling, so it cannot tell the orderings apart (all within 1%) although it
+  does tell the comonotone ordering from independent draws (+11.4%). Ranking by shortwave radiation
+  adds nothing, because the radiation is zero for every member at night.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  Re-ordering the stored demand forecast's 51 values by member temperature or by past observed
+  paths does not give clearly better sample paths overall. Ordering by temperature made the paths
+  about 7% less coherent across the 16 Primaries and 13% more coherent across leads at 12 to 36
+  hours, and the two effects cancel in the combined score. A Schaake shuffle from past paths was no
+  worse than independent draws across Primaries and 3% to 15% better across leads, so it is the
+  reference to beat when step 2 runs the 51 members through the network.
+advice:
+  - >-
+    Use the Schaake shuffle, not temperature-rank coupling, as the coherence reference for the
+    member-wise comparison, because it matched independent draws across Primaries (-0.4%) and beat
+    them across leads (-3.5% at days 1 to 10), while temperature ranks added 6.7% to the variogram
+    score across Primaries (C1, C2).
+  - >-
+    Gate any member-route comparison on the spatial and temporal variogram scores separately, because
+    the joint score of 640 components moved by less than 1% between every ordering except the
+    comonotone one (C1 to C4).
+  - >-
+    Do not rank members by shortwave radiation, because the radiation is zero for every member
+    at night and the daylight gain over temperature was -0.2% to -0.8% (C4).
+  - >-
+    Score the 51 values with the energy form of the CRPS, and do not compare the result with the
+    11-level CRPS of earlier experiments, because on one run the two estimators differed by 31% on
+    the same quantiles (the estimator check).
 code: ml-experiments/00434-demand-ensemble-copula-coupling-and-schaake-reordering-of-stored-forecasts/
 ---
 
-**Plan only.** This page holds the pre-registered plan for experiment 434, step 1 of the
-member-handling ablation A3 (experiment 13's design note): re-ordering the stored forecasts of
-experiment 425's arm A, with no fit. The write-up replaces this section when the scores exist.
+**Re-ordering the 51 values by temperature or by past paths does not make the paths clearly more
+coherent overall, because ordering by temperature helps across leads and hurts across Primaries.**
+The stored forecast of experiment 425's arm A gives 11 quantiles per Primary and half-hour. This
+experiment drew 51 values from them and assigned the values to 51 sample paths in five ways, then
+scored how well the paths match the observed dependence, with no fit. The 16 Primaries are
+substations, so they are named freely. The joint variogram score (the headline block) moved by 1%
+or less between independent draws, temperature ranks, shortwave ranks, and the Schaake shuffle. It
+moved by 11.4% for the comonotone ordering, so the score can see dependence. The registered
+verdict is `not supported`: P2, P3, and P4 failed and P1 failed in its second half.
 
-- **Stored forecasts used.** Experiment 425's arm A, seeds 0 to 4 averaged in quantile space, 12
-  monthly folds, 16 Primaries, widened by 1.15 about the median (experiment 425's headline form).
-- **What the stored forecasts hold.** Eleven quantile levels (q01 to q99) of the pooled mixture,
-  from one pass on the ensemble mean and spread. They do not hold per-member quantiles, because arm
-  A never ran the 51 members through the network. The per-member comparison is therefore not scored
-  here and waits for step 2.
-- **What is read besides.** The 51-member weather frames of the daily runs (2-metre temperature and
-  shortwave radiation at each Primary's H3 cell, `demand_frame_path` of experiment 87) and the
-  cleaned actuals of experiment 381's scoring context, minus the flagged exact zeros.
-- **The 51 values.** The widened 11 quantiles are interpolated linearly in the level to the 51
-  levels k/52 (k = 1 to 51). All 51 levels lie inside q01 to q99 (1/52 = 0.0192), so nothing is
-  extrapolated, but the two extreme values are pinned near q01 and q99 and understate the tails
-  beyond them. If the 51-value CRPS differs from the stored CRPS by more than 0.03, P1 fails for
-  that reason, which the page reports as a discretisation loss and not as an effect of ordering.
-- **Orderings.** ECC-T gives the coldest member the highest value (demand falls as temperature
-  rises in Great Britain, where cooling is rare). ECC-SW gives the member with the least shortwave
-  radiation the highest value. SCH ranks the 51 values by the ranks of 51 past observed paths: the
-  dates nearest in day of year to the run, from 2025-03-01 (the D15 and D18 cut, so that all 16
-  Primaries have data) to 16 days before the run (so every path of up to 14.6 days ends before the
-  run), with a date dropped if any Primary lacks more than 5% of its half-hours, and gaps linearly
-  interpolated. The pool size per fold is reported; if fewer than 51 dates qualify, all of them are
-  used and the rest of the 51 paths repeat dates cyclically. Ties in any rank (shortwave radiation
-  is zero for all members at night, so ECC-SW equals IND in expectation then) are broken by a seeded
-  random draw. Each lead is ranked independently. IND is a seeded random permutation per Primary and
-  half-hour. CO ranks every path alike.
-- **Scoring vectors.** Values and actuals are in points of capacity before any score. Where a
-  component of a block has no actual, it is dropped from that block for every ordering alike, and
-  the number of complete and partial blocks per fold is reported. Scores are divided by the square
-  root of the block's dimension (energy) or the number of pairs (variogram). The energy score is
-  dominated by the marginal part, so the variogram score carries the dependence question.
-- **Step 2.** Step 2 reuses these 51 values, orderings, and seeds, so its scores are comparable. The
-  design note's gate (a route worse than 5% on the coherence score does not advance) is applied in
-  step 2, not here. The contrasts are on days 1 to 10; no empirical check of the temperature sign
-  is possible, because no observation exists per member.
-- **Follows the standing practices.** Cleaned data with the D15 and D18 cut; no fit, so no cadence,
-  seeds beyond arm A's, or model files; stored predictions reused; the tails reported as the share
-  of actuals beyond the smallest and largest of the 51 values; examples of the paths drawn from one
-  run. Does not apply: load-shift event plots, because the question is the dependence of the paths,
-  not the response to events; the avoidable-curtailment cost, because it needs the node and its
-  generators and the stored forecasts hold neither.
-- **Earlier advice followed.** Compare against experiment 425's arm A on the same 12 folds; read
-  the D15 and D18 columns apart.
+![Variogram score of each ordering relative to independent draws, per block and lead window](figure_1_variogram_contrasts.svg)
+
+![Twelve of the 51 sample paths of one Primary under three orderings](figure_3_paths.svg)
+
+![Day-ahead forecast of one Primary in winter](figure_2_example_winter_day-ahead.svg)
+
+![Fourteen-day forecast of one Primary in winter](figure_2_example_winter_14_days.svg)
+
+![Day-ahead forecast of one Primary in summer](figure_2_example_summer_day-ahead.svg)
+
+![Fourteen-day forecast of one Primary in summer](figure_2_example_summer_14_days.svg)
+
+- **Arms.** ECC-T (coldest member gets the highest value), ECC-SW (darkest member), SCH (Schaake
+  shuffle from the 51 past observed paths nearest in day of year), IND (independent draws), and CO
+  (comonotone). Every arm holds the same 51 values at each Primary, half-hour, and run.
+- **Rows.** 12 monthly folds (2025-07 to 2026-06), 16 Primaries, daily runs at 09:00 UTC, scored on
+  the half-hours with a cleaned actual (4,004,653 rows); 1,179 flagged exact-zero actuals are
+  dropped from the whole scoring cache. Forecast: experiment 425's arm A, seeds 0 to 4 averaged in
+  quantile space and widened by 1.15, stored in
+  `data/ml-experiments/00425-best-mdn-architecture-assembly-with-ablations/work/seed_preds/A/`.
+  Code reused by copying: experiments 87, 377, and 381 (scoring context); the page's scripts import
+  those three folders.
+- **Joint variogram score, days 1 to 10** (mean of 12 folds, points of capacity): IND 1.7657, ECC-T
+  1.7752, ECC-SW 1.7679, SCH 1.7669, CO 1.9667. Against IND: ECC-T +0.5% (+0.3% to +0.8%), SCH
+  +0.1% (-0.3% to +0.5%), CO +11.4% (+10.4% to +12.2%). At 12 to 36 hours the joint contrasts
+  were +0.7% (-0.0% to +1.4%) for ECC-T, -0.4% (-1.0% to +0.1%) for SCH, and +7.0% (+5.9% to
+  +7.9%) for CO. No ordering other than CO is within reach of the 5% margin.
+- **Across Primaries (spatial), days 1 to 10:** IND 1.6045, ECC-T 1.7115, ECC-SW 1.6694, SCH
+  1.5984, CO 1.7440. ECC-T against IND +6.7% (+4.7% to +9.1%), so it lies beyond the margin only
+  in its point estimate. SCH against IND -0.4% (-1.7% to +1.0%); SCH against ECC-T -6.6% (-7.6% to
+  -5.5%), beyond the margin. The energy score agrees (ECC-T +6.2%, +5.5% to +6.8%).
+- **Across leads (temporal), days 1 to 10:** IND 1.6335, ECC-T 1.6050, ECC-SW 1.6268, SCH 1.5757,
+  CO 2.1539. ECC-T -1.7% (-2.8% to -0.7%), SCH -3.5% (-6.3% to -0.9%), and neither reaches the
+  margin. At 12 to 36 hours: IND 1.3914, ECC-T 1.2122, ECC-SW 1.3278, SCH 1.1778; ECC-T -12.9%
+  (-17.0% to -9.0%), SCH -15.3% (-20.9% to -9.2%), SCH against ECC-T -2.8% (-5.7% to +0.2%).
+- **Shortwave ranks (C4).** ECC-SW against ECC-T: -0.4% (-0.6% to -0.2%) jointly, -2.5% (-4.3% to
+  -1.1%) across Primaries, and +1.4% (+0.5% to +2.3%) across leads at days 1 to 10. In the
+  half-hours scored as daylight, ECC-SW beat ECC-T by -0.2% (-0.7% to +0.2%) across Primaries and
+  -0.8% (-1.6% to +0.0%) across leads. In cold-night half-hours across Primaries ECC-SW beat ECC-T
+  by -6.4% (-8.4% to -3.6%), the opposite of P4, because the radiation is zero at night and the
+  ranks there are random, which is independent draws.
+- **Marginal check.** The 51 values give the same CRPS for every ordering, so the marginal contrast
+  is zero by construction and the 0.03-point margin applies only in step 2. The CRPS of the 51
+  values was 3.597, 4.608, and 10.604 at the signed-MW six, the MVA-only eight, and D15 and D18
+  (days 1 to 10), against 2.829, 3.598, and 8.431 from experiment 425's 11-level estimator, so the
+  second half of P1 failed. The gap is the estimator: on one run (2025-10, fourth run) the same
+  11 quantiles scored 3.487 with the 11-level formula and 4.558 with 51 even levels
+  (`e00434_estimator_check.py`). The two numbers are not comparable, and the page makes no claim
+  about discretisation loss beyond that.
+- **Tails.** The share of actuals above the largest of the 51 values (days 1 to 10) was 2.43%, 0.90%,
+  and 3.66% at the signed-MW six, the MVA-only eight, and D15 and D18; below the smallest it was
+  0.70%, 0.69%, and 0.30% (a calibrated 51-value ensemble gives 1.92% each way). The ordering does
+  not change these shares.
+- **Slices.** The cold-night slice has actuals in only 5 to 7 of the 12 folds (the other months have
+  no cold nights), so those contrasts are interim. The spatial daylight and cold-night slices keep
+  the half-hours where at least half of the Primaries with an actual are flagged; the temporal
+  slices use each Primary's own flags. Daylight is the local mid-day band, not the sun's elevation.
+- **Caveats.** The Schaake pool starts on 2025-03-01 (so that D15 and D18 have data), holds 89 to
+  346 dates per run, and uses the 51 dates nearest in day of year, which are mostly consecutive
+  days. Experiment 425 gave the 2025-07 fold only March to mid-June dates. A past path of 14.6 days
+  overlaps its neighbours, so the 51 paths are less varied than 51 independent years would be. The
+  Primaries are scored together, not by group. The temperature sign (colder member, higher demand)
+  was fixed in the plan and could not be checked against an observation per member. No per-member
+  quantiles exist in the stored forecasts: arm A ran one pass on the ensemble mean and spread, so the
+  member-wise comparison is not scored here.
+- **Checks.** No model was fitted, so median-minus-mean and mean-error checks do not apply. Every
+  arm was verified to hold the same 51 values at every run (the script stops otherwise), and the
+  score code matches a brute-force version on random inputs. One audit trigger fired in spirit: the
+  second half of P1 failed because the estimators differ, which the estimator check explains.
+- **What to try next (the manager decides).** Step 2 runs the 51 members through the network. Compare
+  it against SCH and ECC-T on the spatial and temporal variogram scores, because the joint score
+  cannot separate them. A longer Schaake pool would need Primary data from before 2025-03-01 for D15
+  and D18, or the pool could use the 14 Primaries with long histories.
+- **Problems caused by the move.** None so far.
+- **Reviews.** One Sonnet plan review (10 findings; the tails, verdict rules, pool, ties,
+  missing-actuals rule, and scaling were added to the plan), one Sonnet code review before the first
+  run (no score-changing bugs; NaN and permutation checks added, wording of the spatial slice and
+  `n_dim` documented). Results and write-up reviews: see the pull request.
