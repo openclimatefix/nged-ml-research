@@ -9,7 +9,7 @@ also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
   - production-reference-and-best-guess
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -85,10 +85,131 @@ metric: >-
   loss at q01, q05, q95, and q99, the avoidable-curtailment cost, raw and at the 1.15 widening; the
   encroachment sweep of experiment 392 (median shift as a share of the step, 5%-95% band-width
   ratio, coverage of clean and event-level readings); the attention weights per day.
+verdict: not supported
+best_arm: >-
+  S1 (the three lagged readings plus the surprise at each lag): -0.083 (-0.096 to -0.070) CRPS points
+  against R-inj on clean rows at the signed-MW six.
+headline: >-
+  The network over whole days of raw power (E3) scored worse than the lagged network on clean rows
+  (+0.050) and on injected harm rows (+0.042), and no arm followed less of a step in the recent
+  power or widened its bands. Adding the surprise at the three lags (S1) lowered the CRPS by 0.083
+  on clean rows and 0.060 on injected harm rows.
+lessons: >-
+  The route by which the lagless forecast's surprise enters the network matters more than how many
+  days the network reads: the surprise as three lagged scalars (S1) beat the same surprise as a
+  channel of day windows (E3-surp), and learned smoothing over 14 days (H-smooth) did not beat S1.
+  A clean-target objective gives a widening path nothing to learn, and an objective that rewards
+  widening widens every band.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  A network that reads whole days of raw power did not stop the forecast following load-shift events
+  and scored worse than the lagged network (+0.050 on clean rows). Adding the surprise at the three
+  lags (S1) lowered the error by 0.083 points of capacity on clean rows, only just above the 0.077
+  minimum detectable effect, and by 0.060 on injected harm rows. No arm followed a smaller share of a
+  step in the recent power or widened its bands. All numbers are interim, from four test months.
+advice:
+  - >-
+    Carry S1's surprise at the three lags into the fixed-lag base of later arms, because S1 minus
+    R-inj is -0.083 (-0.096 to -0.070) on clean rows and -0.060 (-0.076 to -0.044) on injected harm
+    rows at the signed-MW six (S1 section).
+  - >-
+    Report S1 beside E3-surp as the headline pair for the surprise inputs, because the two take the
+    same lagless table and E3-surp ties R-inj (-0.011, -0.033 to +0.010 on clean rows).
+  - >-
+    Do not train a widening path on the clean target, because E3-surp-w learned no widening after a
+    step (band ratio 1.019 against 1.018), and do not train on the injected value, because that
+    widened every band (95% quantile covers 0.957 of clean readings).
+  - >-
+    Do not fit a 14-day convolutional encoder over raw power without a stronger prior, because three
+    settings of H14-s ended 0.057 to 0.087 negative log-likelihood worse than R-inj on the 2026-01
+    fold (design iteration 2).
+  - >-
+    Give each "k" of a sweep the same inputs in every arm being compared, because the S1 and
+    H-smooth sweep moves the newest and the daily lag together at k = 1 where R-inj's moves one.
 code: ml-experiments/00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/
 ---
 
-*Status: planned. No fit has run and no score has been read.*
+**Take-home message: reading whole days of raw power did not stop the forecast following load-shift
+events, but giving the lagged inputs a "surprise" lowered the error on clean, injected harm, and
+real event rows, and that change is the one to carry forward.**
+
+A load-shift event moves demand between neighbouring Primary substations for hours or weeks, so
+the power an hour, a day, or a week ago can be abnormal, and a forecast that copies it goes wrong.
+This experiment asked whether a small neural network that reads the raw half-hourly power of whole
+recent days could learn how far to trust it, in place of the three hand-made lagged readings that
+today's mixture density network takes. It could not. Every number is the continuous ranked
+probability score (CRPS) in points of capacity at days 1 to 10 (smaller is better), pooled over
+four test months (2025-10, 2026-01, 2026-03, 2026-06), three seeds, and the six Primaries measured
+in signed megawatts, and so is interim. R-inj (the plain network with the three lags, trained on
+clean and injected power) is the reference; it scores 2.947 on clean rows and 2.956 on injected
+harm rows. A "harm row" is a row whose target is outside every event but whose recent power is
+inside one. The minimum detectable effect (twice the seed-to-seed spread) is 0.077 on clean rows
+and 0.071 on injected harm rows.
+
+**The day-window network (E3) is worse than the lagged network on every row set.** E3 minus R-inj
+is +0.050 (+0.034 to +0.066) on clean rows (2.997 against 2.947) and +0.042 (+0.029 to +0.056) on
+injected harm rows (2.998 against 2.956). The experiment predicted a gain of 0.10 to 0.30 on harm
+rows, so the hypothesis is not supported.
+
+**No arm learned to follow a step in the recent power by less, or to widen its bands.** In the
+encroachment sweep (a step of 5% of capacity added to the recent power, 24 to 72 hours ahead, raw
+bands), R-inj and E3 both followed a median 0.125 of the step at three lags or days (bin width
+0.05), and every arm's 5%-95% band was 1.00 to 1.01 times as wide after the step as before. E3-surp
+(E3 plus the surprise channel) followed more, 0.225. The lag-masked control moved no forecast.
+A path that could only widen the bands (E3-surp-w) learned nothing under the clean-target
+objective (band ratio 1.019 against 1.018 for E3-surp). A diagnostic arm trained on the injected
+value did widen after a step (1.069) but widened every band, so its 95% quantile covered 0.957 of
+clean readings and its clean CRPS rose by 0.055; it is not a release candidate.
+
+**The surprise at the lags (S1) is the useful result.** The surprise of a power reading is its
+difference from the median of the lagless forecast for the same half-hour (experiment 404's
+cross-fitted table), divided by half the width of that forecast's 5%-95% band. S1 is R-inj plus the
+surprise at each of its three lags. S1 minus R-inj is -0.083 (-0.096 to -0.070) on clean rows
+(2.865 against 2.947), -0.060 (-0.076 to -0.044) on injected harm rows (2.897 against 2.956),
+-0.170 (-0.267 to -0.059) on real event rows (5.687 against 5.857), and -0.007 (-0.035 to +0.024)
+on real harm rows. The clean gain is only just above the minimum detectable effect of 0.077, and the
+harm gain is below 0.071, so both are interim. S1 follows the step no less than R-inj (0.125 in both
+at three lags), and its quantile coverage and tail pinball loss match R-inj's (clean 95% quantile
+covers 0.915 against 0.914). The S1 variant of the sweep moves the newest lag and the daily lag at
+k = 1 where R-inj's moves one, so its k = 1 and k = 2 shares are not like for like.
+
+**E3-surp, the same lagless table entering the encoder as a channel, ties R-inj.** E3-surp minus
+R-inj is -0.011 (-0.033 to +0.010) on clean rows and -0.023 (-0.039 to -0.006) on injected harm
+rows, and +0.260 (+0.178 to +0.340) on real event rows (6.118 against 5.857). S1 and E3-surp are
+the headline pair of this experiment: the same surprise, entering as three lagged scalars or as a
+channel of three day windows.
+
+**Smoothing the surprise over 14 days (H-smooth) did not beat S1.** H-smooth minus S1 is +0.062
+(+0.044 to +0.082) on clean rows and +0.066 (+0.046 to +0.088) on injected harm rows. H-smooth
+minus R-inj is -0.020 (-0.033 to -0.008) on clean rows, so the arm is documented as refuted.
+
+**The 14-day convolutional line stopped.** On the 2026-01 fold the validation negative
+log-likelihood of H14-s (a convolutional encoder over 14 days with attention, no lags) was 0.5498
+against 0.4777 for R-inj, and three diagnostic fits (position dropout 0.1, 0.3, 0.5) ended at 0.5347,
+0.5399, and 0.5650. The pre-registered rule stopped the line. The diagnosis does not separate
+memorising each Primary's history from slow training.
+
+**Not done.** The avoidable-curtailment cost is not computed, because the injected-world harm rows
+have no node table. The absolute-skill references (the monthly XGBoost recipe, BG2,
+`manual_heuristic`, and `climatology`) are not drawn. The real-event rows are few, and NGED may have
+events missing from its logs, so the real-event contrasts undercount.
+
+![CRPS of E3, E3-surp, S1, and H-smooth minus R-inj](figure_1_contrasts.svg)
+
+![Share of a 5% step followed by each arm](figure_2_sweep_share.svg)
+
+![CRPS by lead day](figure_3_crps_by_lead.svg)
+
+![Day-ahead example forecast](figure_4_example_day_ahead.svg)
+
+![Ten-day example forecast](figure_5_example_10_day.svg)
+
+![Forecasts made the day before six labelled events](figure_6_real_events.svg)
+
+## Plan, as registered before any fit
+
+*The sections below are the plan and the dated design iterations, kept as written.*
 
 ## Question
 
