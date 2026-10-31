@@ -164,6 +164,17 @@ Reference probes use (a) the
 three origin lags with their missing flags, (b) the raw 336-value history, and (c) the encoder at
 random initialisation. A chance level is printed beside each accuracy.
 
+## What the held-out result would change
+
+- **Held-out stage gate (maintainer's rank).** The held-out arm is a test of onboarding a new
+  Primary, which the maintainer has ranked low, so it adds no arm beyond N3g, NH, E3g, and EH.
+  Only two seeds are fitted, and a contrast is read as undecided if its interval spans zero.
+- **If NH beats both placeholders in C7 (point estimate at least 0.20 below at the signed-MW six).**
+  The history encoder becomes the first candidate route for onboarding a substation with no
+  embedding, and a later experiment can compare it with static covariates (experiment 1c).
+- **If NH does not beat the placeholders.** The embedding-free route is closed for now, and a new
+  Primary would need a fitted embedding from a short history, as experiment 406 suggested.
+
 ## Components adopted from earlier results, and not adopted
 
 - **Adopted.** Pooled network with an 8-wide embedding and the ensemble mean and spread passed
