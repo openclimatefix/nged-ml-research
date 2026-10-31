@@ -247,3 +247,35 @@ that did not run as "not run", never as a negative result.
 Plan and code first; no fit before the manager grants the slot (3 GPU single-thread processes,
 `MemoryMax=16G`). Sonnet only, including reviewers. Messages to the manager: plan PR open, screen
 fits started, screen result (arm table, labelled interim), full fits started, PR merged.
+
+## Run record and changes since the plan
+
+**Fits ran mostly on CPU, with 4 threads per process.** The graphics processor was about three times
+slower than the CPU for these fits while other sessions shared it. The 2026-01 fold for the first
+six Primaries (D2, D3, D4, D5, D8, D9) was fitted on the graphics processor, except W1 and W3,
+which were refitted on the CPU; every other fit ran on the CPU. Both devices use the same histogram algorithm, so the arm differences are comparable, but
+the 2026-01 controls for the first six Primaries were fitted on the graphics processor while W1 and
+W3 there were fitted on the CPU.
+
+**The first 8 Primaries (D2, D3, D4, D8, D5, D9, D10, D11) ran first on both main folds, then the
+other 8.** The order let the interim arm table appear after a fraction of the compute.
+
+**The code review came after the first fits.** A fresh Sonnet review of the arm code ran after the
+first Tier A fits instead of before them, which breaks the order the experiment skill asks for. It
+found that the past half of the trailing temperature windows (W1, W3) stitched the earlier runs
+together member by member, so the past temperature differed between the 51 members of one run. The
+past half is now the ensemble mean of the earlier runs' first day, identical for all members. The W1
+and W3 fits made before the change were moved aside and refitted; no result in this page uses them.
+
+**Tier C is cut to eight settings:** `P_rounds` (a 1000-round fit scored at 200, 500, and 1000
+rounds), `P_eta010`, `P_depth8`, `P_depth4`, `P_mcw10`, `P_sub06`, `P_lambda10`, and `P_hl1`.
+
+**Cleaned data.** The scorer drops half-hours flagged `substation_zero` in the cleaned power table
+from the actuals. It prints the number of dropped half-hours per fold. The main folds 2026-01 and
+2026-06 drop 0 half-hours for the 16 Primaries, because the flagged half-hours of the first 8
+Primaries end before 2023-07 and the others have none in those months.
+
+**Window-surprise arms** (`e00396_surprise.py`) reuse experiment 391's stage 2 code, stage-1 tables,
+refit months, and `b0` control, at 150 rounds on the seven Primaries of 391's secondary arms.
+
+**Problems caused by the move:** none so far.
