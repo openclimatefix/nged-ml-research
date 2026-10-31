@@ -651,7 +651,7 @@ def check_alignment() -> None:
         both = ~np.isnan(last) & ~np.isnan(lag)
         close = np.isclose(last[both], lag[both], atol=1e-4)
         if row["site"] in fit406.SHORT_HISTORY:
-            after_cut = z["valid"][ok] >= fit406._us(t=fit406.CUT) + 8 * fit406.US_PER_DAY
+            after_cut = z["origin"][ok] >= fit406._us(t=fit406.CUT) + 8 * fit406.US_PER_DAY
             same = same | ~after_cut
         if not same.all():
             msg = f"{row['site']}: missing flags differ from lag_origin on {(~same).sum()} rows"
