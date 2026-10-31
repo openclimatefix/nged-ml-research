@@ -120,12 +120,12 @@ def interval_panels(*, table: pl.DataFrame, groups: tuple[str, ...]) -> alt.VCon
             y=alt.Y("row:N", sort=order, title=None, axis=alt.Axis(labelLimit=200))
         )
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}))
+            alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black", strokeDash=[4, 3])
             .encode(x="x:Q")
         )
         colour = _family_color(drop=(FAMILY_CONTROL, FAMILY_REFERENCE))
-        bars = base.mark_rule(strokeWidth=3).encode(
+        bars = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "lower:Q",
                 title="CRPS difference from the control (points of capacity; negative is better)",
@@ -133,7 +133,7 @@ def interval_panels(*, table: pl.DataFrame, groups: tuple[str, ...]) -> alt.VCon
             x2="upper:Q",
             color=colour,
         )
-        dots = base.mark_point(filled=True, size=70, opacity=1).encode(x="mean:Q", color=colour)
+        dots = base.mark_point(filled=True, size=70, opacity=1).encode(x="mean:Q", color=colour)  # ty: ignore[unresolved-attribute]
         panels.append(
             (zero + bars + dots).properties(
                 width=WIDTH - 110, height=190, title=alt.TitleParams(group, anchor="start")
@@ -184,7 +184,7 @@ def figure_gap() -> None:
         ]
     ).drop_nans("value")
     chart = (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=80)
         .encode(
             x=alt.X(
@@ -230,7 +230,7 @@ def figure_absolute() -> None:
         family=pl.col("forecast").map_elements(lambda a: _family(arm=a), return_dtype=pl.String)
     )
     chart = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=80)
         .encode(
             x=alt.X(
@@ -281,11 +281,11 @@ def figure_tails() -> None:
         family=pl.col("forecast").map_elements(lambda a: _family(arm=a), return_dtype=pl.String)
     )
     base = alt.Chart(frame).encode(y=alt.Y("forecast:N", sort=["R", "A", *ARMS], title=None))
-    dots = base.mark_point(filled=True, size=70).encode(
+    dots = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("coverage:Q", title="Share of actuals at or below the quantile"),
         color=_family_color(drop=(FAMILY_REFERENCE,)),
     )
-    marks = base.mark_tick(color="black", thickness=2, size=14).encode(x="nominal:Q")
+    marks = base.mark_tick(color="black", thickness=2, size=14).encode(x="nominal:Q")  # ty: ignore[unresolved-attribute]
     chart = (
         (marks + dots)
         .properties(width=130, height=190)
@@ -395,21 +395,21 @@ def figure_examples() -> None:
         )
         x = alt.X("valid_time:T", title="Valid time (UTC)")
         base = alt.Chart(both).encode(x=x)
-        band = base.mark_area(opacity=0.12, clip=True, aria=False).encode(
+        band = base.mark_area(opacity=0.12, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title="Power (MW)", scale=alt.Scale(zero=False)),
             y2="q95:Q",
             color=colour,
         )
-        median = base.mark_line(strokeWidth=1.6, clip=True, aria=False).encode(
+        median = base.mark_line(strokeWidth=1.6, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
             y="q50:Q", color=colour
         )
         actual_line = (
-            alt.Chart(both.filter(pl.col("arm") == control))
+            alt.Chart(both.filter(pl.col("arm") == control))  # ty: ignore[unresolved-attribute]
             .mark_line(color="black", strokeWidth=1.4, aria=False)
             .encode(x=x, y="actual:Q")
         )
         night = (
-            alt.Chart(
+            alt.Chart(  # ty: ignore[unresolved-attribute]
                 both.filter(
                     (pl.col("arm") == control) & pl.col("cold_winter_night").fill_null(False)
                 )
@@ -452,13 +452,13 @@ def figure_examples() -> None:
         )
         b2 = alt.Chart(long_run).encode(x=xd)
         (
-            b2.mark_area(opacity=0.12, clip=True, aria=False).encode(
+            b2.mark_area(opacity=0.12, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
                 y=alt.Y("q05:Q", title="Power (MW)", scale=alt.Scale(zero=False)),
                 y2="q95:Q",
                 color=colour,
             )
-            + b2.mark_line(strokeWidth=1.6, clip=True, aria=False).encode(y="q50:Q", color=colour)
-            + alt.Chart(long_run.filter(pl.col("arm") == control))
+            + b2.mark_line(strokeWidth=1.6, clip=True, aria=False).encode(y="q50:Q", color=colour)  # ty: ignore[unresolved-attribute]
+            + alt.Chart(long_run.filter(pl.col("arm") == control))  # ty: ignore[unresolved-attribute]
             .mark_line(color="black", strokeWidth=1.4, aria=False)
             .encode(x=xd, y="actual:Q")
         ).properties(

@@ -75,8 +75,9 @@ best_arm: >-
 headline: >-
   On cold winter nights, cold sunny days, Christmas, and bank holidays, none of the eight input
   bundles of experiment 437 lowered the CRPS of the neural network with an interval clear of zero,
-  and none met the registered rule. The two slices with enough dates to test, cold winter nights and cold sunny days, had minimum detectable effects of 0.12 to 0.26
-  points, so the slices could not detect the 0.05-point bar, and heat waves had no rows.
+  and none met the registered rule. The two slices with enough dates to test, cold winter nights
+  and cold sunny days, had minimum detectable effects of 0.12 to 0.26 points,
+  so the slices could not detect the 0.05-point bar, and heat waves had no rows.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
@@ -90,8 +91,8 @@ take_home_message: >-
 advice:
   - >-
     Test the thermal-lag bundle (T) on cold winter nights over many more winter months before
-    judging it, because four test months give a minimum detectable effect of 0.12 to 0.23 on that slice (the
-    results section, Table 1).
+    judging it, because four test months give a minimum detectable effect of 0.12 to 0.23 on that
+    slice (the minimum detectable effect table).
   - >-
     Add winter and summer test months before asking about heat waves or Christmas, because the four
     screen folds hold no summer month and only 10 Christmas dates (the counts table).
