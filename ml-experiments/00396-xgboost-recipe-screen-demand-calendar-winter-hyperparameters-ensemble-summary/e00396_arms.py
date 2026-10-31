@@ -72,10 +72,10 @@ class Arm:
         name: Folder name under `arm_preds/` and `boosters/`.
         tier: A, B, C, or D (the run order of the plan).
         add: Groups of columns the arm adds: `bank_holiday`, `distance`, `weekend`, `holiday_type`,
-            `trailing_temperature`, `day_of_year`, `summary_temperature_shortwave`, `summary7` (the
-            mean and standard deviation of all seven weather variables replace them), `mean7` (the
-            seven are replaced by their ensemble mean, in training and prediction rows), and
-            `mean7_train` (replaced by the ensemble mean in training rows only).
+            `trailing_temperature`, `trailing_shortwave`, `day_of_year`,
+            `summary_temperature_shortwave`, `summary7` (the mean and standard deviation of all
+            seven weather variables replace them), `mean7` (the seven are replaced by their
+            ensemble mean, in training and prediction rows), and `mean7_train` (replaced by the ensemble mean in training rows only).
         drop: Input columns the arm removes (the no-calendar control).
         params: XGBoost parameters that replace the control's.
         rounds: Boosting rounds fitted.
@@ -131,6 +131,7 @@ ARMS: Final[dict[str, Arm]] = {
             monotone=(("temperature_2m", -1), ("ttemp", -1), ("heating", 1)),
         ),
         Arm("W4", "A", add=("day_of_year",)),
+        Arm("W7", "A2", add=("trailing_shortwave",)),
         Arm("P_rounds", "C", rounds=1000, scored_rounds=(200, 500, 1000)),
         Arm("P_eta003", "C", params={"eta": 0.03}),
         Arm("P_eta010", "C", params={"eta": 0.1}),
@@ -248,14 +249,16 @@ def calendar_columns(*, arm: Arm) -> list[str]:
 
 
 @lru_cache(maxsize=1)
-def _ensemble_temperature(*, site: str) -> tuple[np.ndarray, np.ndarray]:
-    """Return a Primary's run origins and temperature, shape (runs, members, 702), loaded once."""
+def _ensemble_variable(*, site: str, key: str) -> tuple[np.ndarray, np.ndarray]:
+    """Return a Primary's run origins and one stored variable, shape (runs, members, 702)."""
     with np.load(ENS_STORE_FOLDERS[site] / f"{site}.npz") as stored:
-        return stored["origins"], stored["temperature"].astype(np.float32)
+        return stored["origins"], stored[key].astype(np.float32)
 
 
-def _trailing_tables(*, site: str) -> tuple[np.ndarray, dict[int, np.ndarray]]:
-    """Return the origins and, per window, the trailing mean temperature at every run and step.
+def _trailing_tables(
+    *, site: str, key: str = "temperature", windows: tuple[int, ...] = TRAILING_HOURS
+) -> tuple[np.ndarray, dict[int, np.ndarray]]:
+    """Return the origins and, per window, the trailing mean of a variable at every run and step.
 
     For run r with origin t0 and step s (valid time t0 + (s + 1) half-hours), the window of w hours
     holds the 2w half-hours ending at the valid time. A half-hour after t0 is read from run r's
@@ -266,11 +269,9 @@ def _trailing_tables(*, site: str) -> tuple[np.ndarray, dict[int, np.ndarray]]:
     Returns:
         The origins and `{hours: array (runs, members, MAX_LEAD_STEPS)}` in degrees Celsius.
     """
-    origins, temperature = _ensemble_temperature(site=site)
+    origins, temperature = _ensemble_variable(site=site, key=key)
     if np.isnan(temperature).any():
-        msg = (
-            f"{site}: the stored temperature holds missing values, which the cumulative sum spreads"
-        )
+        msg = f"{site}: the stored {key} holds missing values, which the cumulative sum spreads"
         raise ValueError(msg)
     runs, members, _ = temperature.shape
     gaps = np.diff(origins) // np.timedelta64(1, "h")
@@ -282,10 +283,8 @@ def _trailing_tables(*, site: str) -> tuple[np.ndarray, dict[int, np.ndarray]]:
     # one past series. A member-by-member stitch would join unrelated perturbations at each seam.
     past_mean = temperature[:, :, :STEPS_PER_RUN_DAY].mean(axis=1).reshape(-1)
     past = np.broadcast_to(past_mean, (members, past_mean.size))
-    longest = 2 * max(TRAILING_HOURS)
-    tables = {
-        h: np.full((runs, members, MAX_LEAD_STEPS), np.nan, np.float32) for h in TRAILING_HOURS
-    }
+    longest = 2 * max(windows)
+    tables = {h: np.full((runs, members, MAX_LEAD_STEPS), np.nan, np.float32) for h in windows}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         for r in range(longest // STEPS_PER_RUN_DAY, runs):
@@ -295,7 +294,7 @@ def _trailing_tables(*, site: str) -> tuple[np.ndarray, dict[int, np.ndarray]]:
                 [np.zeros((members, 1)), np.cumsum(combined.astype(np.float64), axis=1)], axis=1
             )
             positions = longest + np.arange(MAX_LEAD_STEPS) + 1
-            for hours in TRAILING_HOURS:
+            for hours in windows:
                 width = 2 * hours
                 tables[hours][r] = (
                     (cumulative[:, positions] - cumulative[:, positions - width]) / width
@@ -441,4 +440,79 @@ def add_summary7(*, frame: pl.DataFrame, time_series_id: int, replace: bool) -> 
         return joined
     return joined.with_columns(*[pl.col(f"mean_{v}").alias(v) for v in SEVEN_VARIABLES]).drop(
         *MEAN7_COLUMNS, *STD7_COLUMNS
+    )
+
+
+SHORTWAVE_HOURS: Final[tuple[int, ...]] = (3, 6, 24)
+"""The trailing windows of arm W7's shortwave means; the 6-hour mean gives the earlier 3 hours."""
+SHORTWAVE_COLUMNS: Final[tuple[str, ...]] = (
+    *(f"sw_mean_{h}h" for h in SHORTWAVE_HOURS),
+    "csi_change_3h",
+)
+MIN_CLEAR_SKY_W_M2: Final[float] = 20.0
+"""A 3-hour window with a mean clear-sky shortwave below this (dawn, dusk, night) has no clear-sky
+index, and the change in clear-sky index is then 0."""
+_SHORTWAVE: dict[str, tuple[np.ndarray, dict[int, np.ndarray]]] = {}
+
+
+def _clear_sky_grid(*, site: str, first: np.datetime64, size: int) -> np.ndarray:
+    """Return Haurwitz clear-sky shortwave (W m-2) on `size` half-hours starting at `first`."""
+    import e00087_common as common  # ty: ignore[unresolved-import]
+
+    series = common.series_table().filter(pl.col("site") == site)
+    stamps = pl.Series(first + np.arange(1, size + 1) * HALF_HOUR).dt.replace_time_zone("UTC")
+    zenith_deg = common.derived_columns(
+        valid_time=stamps,
+        latitude=float(series["latitude"].item()),
+        longitude=float(series["longitude"].item()),
+    )["solar_zenith"].to_numpy()
+    cosine = np.cos(np.radians(zenith_deg))
+    with np.errstate(divide="ignore", over="ignore"):
+        clear = 1098.0 * cosine * np.exp(-0.057 / np.where(cosine > 0, cosine, 1.0))
+    return np.where(cosine > 0, clear, 0.0)
+
+
+def add_trailing_shortwave(*, frame: pl.DataFrame, site: str) -> pl.DataFrame:
+    """Add arm W7's trailing shortwave means and the 3-hour change in clear-sky index.
+
+    The windows end at the valid time and are built as for W1, from the stored ensemble shortwave:
+    a half-hour after the origin comes from the row's own member, an earlier half-hour from the
+    ensemble mean of the earlier runs' first day. `csi_change_3h` is the clear-sky index (shortwave
+    over Haurwitz clear-sky shortwave) of the 3 hours ending at the valid time, minus that of the 3
+    hours before them; it is 0 where either window's mean clear-sky shortwave is below
+    `MIN_CLEAR_SKY_W_M2`. Rows the store does not cover hold NaN.
+    """
+    if site not in _SHORTWAVE:
+        _SHORTWAVE.clear()
+        _SHORTWAVE[site] = _trailing_tables(site=site, key="shortwave", windows=SHORTWAVE_HOURS)
+    origins, tables = _SHORTWAVE[site]
+    origin = frame["power_fcst_init_time"].dt.replace_time_zone(None).to_numpy()
+    valid = frame["valid_time"].dt.replace_time_zone(None).to_numpy()
+    run = np.searchsorted(origins, origin)
+    run_ok = (run < len(origins)) & (origins[np.minimum(run, len(origins) - 1)] == origin)
+    step = ((valid - origin) // HALF_HOUR).astype(np.int64) - 1
+    member = frame["ensemble_member"].to_numpy().astype(np.int64)
+    ok = run_ok & (step >= 0) & (step < MAX_LEAD_STEPS)
+    means = {}
+    for hours in SHORTWAVE_HOURS:
+        values = np.full(frame.height, np.nan, np.float32)
+        values[ok] = tables[hours][run[ok], member[ok], step[ok]]
+        means[hours] = values
+    first = origins[0] - np.timedelta64(2, "D")
+    last = origins[-1] + np.timedelta64(MAX_LEAD_STEPS * 30, "m")
+    size = int((last - first) // HALF_HOUR) + 1
+    clear = _clear_sky_grid(site=site, first=first, size=size)
+    cumulative = np.concatenate([[0.0], np.cumsum(clear)])
+    index = np.clip(((valid - first) // HALF_HOUR).astype(np.int64), 12, size - 1)
+    now_clear = (cumulative[index] - cumulative[index - 6]) / 6.0
+    earlier_clear = (cumulative[index - 6] - cumulative[index - 12]) / 6.0
+    earlier_sw = 2.0 * means[6] - means[3]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        change = means[3] / now_clear - earlier_sw / earlier_clear
+    daylight = (now_clear >= MIN_CLEAR_SKY_W_M2) & (earlier_clear >= MIN_CLEAR_SKY_W_M2)
+    column = np.where(daylight, change, 0.0)
+    column = np.where(np.isnan(means[3]) | np.isnan(means[6]), np.nan, column).astype(np.float32)
+    return frame.with_columns(
+        *[pl.Series(f"sw_mean_{h}h", means[h]) for h in SHORTWAVE_HOURS],
+        pl.Series("csi_change_3h", column),
     )

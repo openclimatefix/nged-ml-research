@@ -104,6 +104,8 @@ def input_columns(*, arm: arms.Arm) -> list[str]:
         extra += arms.trailing_columns()
     if "summary_temperature_shortwave" in arm.add:
         extra += list(arms.SUMMARY_COLUMNS)
+    if "trailing_shortwave" in arm.add:
+        extra += list(arms.SHORTWAVE_COLUMNS)
     if "summary7" in arm.add:
         extra += [*arms.MEAN7_COLUMNS, *arms.STD7_COLUMNS]
     return [*base, *extra]
@@ -132,6 +134,8 @@ def add_arm_columns(
         out = arms.add_trailing_temperature(frame=out, site=site)
     if "summary_temperature_shortwave" in arm.add:
         out = arms.add_summary(frame=out, site=site)
+    if "trailing_shortwave" in arm.add:
+        out = arms.add_trailing_shortwave(frame=out, site=site)
     if "summary7" in arm.add or "mean7" in arm.add or (training and "mean7_train" in arm.add):
         out = arms.add_summary7(
             frame=out, time_series_id=_series_id(site=site), replace="summary7" not in arm.add
