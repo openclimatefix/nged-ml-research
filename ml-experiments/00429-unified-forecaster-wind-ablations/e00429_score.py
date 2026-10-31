@@ -141,6 +141,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         raw = {
             **score303.row_metrics(quantiles=q, actual=actual),
             **score326.extra_metrics(quantiles=q, actual=actual),
+            **score347.squared_errors(quantiles=q, actual=actual),
         }
         metrics[name] = {k: v.mean(axis=0, keepdims=True) for k, v in raw.items()}
         seed_sd[name] = {
@@ -174,6 +175,29 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             f"{name.ljust(28)}{row}  {seed_sd[name]['kept']:.3f} / {seed_sd[name]['true_1_10']:.3f}"
         )
 
+    # Cleaned zeros: the idle-band observations (experiment 210's mask) are set to zero.
+    clean_actual = np.where(cases["masked"].to_numpy(), 0.0, actual)
+    clean_qs = {
+        name: score303.row_metrics(quantiles=q, actual=clean_actual)["qs"].mean(
+            axis=0, keepdims=True
+        )
+        for name, q in arms.items()
+    }
+    lines.append(
+        "-- cleaned-zero scores (all rows, idle-band observations set to zero), beside the raw "
+        "scores above --"
+    )
+    clean_subsets = ("nomask_1_10", "nomask_h12_36", "all")
+    lines.append("arm".ljust(28) + "".join(sub.rjust(15) for sub in clean_subsets))
+    for name, value in clean_qs.items():
+        lines.append(
+            name.ljust(28)
+            + "".join(f"{value[0, flags[sub]].mean():15.3f}" for sub in clean_subsets)
+        )
+    for label, (a, b) in HP_CONTRASTS.items():
+        if a in clean_qs and b in clean_qs:
+            entry = resampler.read(values=clean_qs[a] - clean_qs[b], keep=flags["nomask_1_10"])
+            lines.append(f"cleaned zeros, {label} | nomask_1_10: {fmt(entry)}")
     lines.append(
         "-- tails, kept rows at true days 1 to 10: pinball at q01, q05, q95, q99; share beyond q01, q99 --"
     )
