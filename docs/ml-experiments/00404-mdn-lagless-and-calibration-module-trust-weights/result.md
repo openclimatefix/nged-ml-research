@@ -389,6 +389,16 @@ plan uses both as diagnostics on the fitted networks and does not tune the injec
 reported as a lower bound on harm. Our series are one per substation, not per transformer, so a
 transformer-level event that conserves load across a substation's transformers does not appear.
 
+**Shared injected worlds and B-mix (agreed with experiment 428, 2026-10-31).** Both experiments
+read experiment 428's world files `seed{N}.npz` (power over capacity, shape [16, grid], and the
+event code, shape [16, grid]; the data folder of experiment 428, `work/worlds/`), built by
+experiment 402's `inject` on experiment 422's cleaned power with 10% coverage over 2024-05-01 to
+2026-07-01. Training uses seeds 100 to 102 and scoring uses the held-out seeds 200 to 202, so the
+scored months contain injected events and harm rows. Row classes come from experiment 428's
+`e00428_predict.Flags`. B-mix halves the weights of the lagged forecast's components and of the
+frozen lagless table's components and pools them on the capacity scale. Experiment 404 therefore
+does not run its own injection.
+
 **Frozen lagless table.** The cross-fitted lagless tables are frozen as built on 2026-10-31 by
 commit `63d3799f` of this branch: K = 6 contiguous blocks, a pooled module with a Primary
 embedding, 6 epochs, seeds 0 to 2, and scored months 2025-10, 2025-12, 2026-01, 2026-03, and
