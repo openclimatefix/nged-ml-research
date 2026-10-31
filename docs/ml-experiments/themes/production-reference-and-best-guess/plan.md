@@ -10,6 +10,7 @@
 | 333 | Does a pre-trained time-series foundation model (Chronos-2), used zero-shot with or without weather covariates, come close to Primary demand research default 3? | Medium | Nothing | Planned |
 | 380 | Which stages of the GAM stack could go for a small, measured loss, and is its gap to BG2 larger at the Primaries with less regular demand? | High (maintainer asked) | Nothing | Planned |
 | 384 | What is special about the eight MVA-only Primaries that the GAM stack trails BG2 there? | High (maintainer asked 2026-10-28) | Nothing | Finished: no hypothesis shown; within the MVA-only group the gap follows the step rate |
+| 427 | Does a whole-day sign labeller with separate MW and MVA input channels beat the export-gated network of experiment 420 on reverse-flow half-hours? | High (maintainer asked 2026-10-31) | Nothing | Planned |
 | 397 | Does a plain mixture density network match the simple XGBoost model for Primary demand, and does attention over the inputs help it? | High (maintainer asked 2026-10-30) | Slot from the manager | Finished: the plain network matched XGBoost, attention did not help (gate inert) |
 | 419 | Do the solar summary, the sunny flag, and a different row-weight half-life, which helped the XGBoost model, also help the pooled mixture density network? | High (maintainer asked 2026-10-30) | Slot from the manager | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
