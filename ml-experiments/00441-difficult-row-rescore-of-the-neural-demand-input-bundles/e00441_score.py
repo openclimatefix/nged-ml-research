@@ -20,6 +20,7 @@ systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
 """
 
 import argparse
+import json
 from pathlib import Path
 from typing import Final, cast
 
@@ -383,7 +384,9 @@ def contrast_table(*, paired_by_arm: dict[str, pl.DataFrame]) -> pl.DataFrame:
                         "slice": name,
                         "side": side,
                         **interval,
-                        "fold_differences": {f: round(float(v), 4) for f, v in by_fold.iter_rows()},
+                        "fold_differences": json.dumps(
+                            {f: round(float(v), 4) for f, v in by_fold.iter_rows()}
+                        ),
                         "n_negative_folds": int((by_fold["d_crps"] < 0).sum())
                         if part.height
                         else 0,

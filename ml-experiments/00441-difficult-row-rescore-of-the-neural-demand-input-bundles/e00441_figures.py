@@ -152,9 +152,9 @@ def figure_slices() -> None:
         kind = inside["block_kind"].unique().to_list()
         chart = interval_panels(table=inside, groups=SIX_EIGHT).properties(
             title=_title(
-                f"CRPS at days 1 to 10 on {name}, each arm minus its control (R; A for a pretrained arm). 4 folds, interim.",
-                "Dot: estimate. Line: 99.5% bootstrap interval, resampling whole months where 3 or more months hold rows,",
-                f"otherwise 7-day blocks (here: {', '.join(kind)}). Dashed line: same as the control.",
+                f"CRPS on {name}, each arm minus its control (A for _pre arms).",
+                "Days 1 to 10, 4 folds, interim. Dot: estimate.",
+                f"Line: 99.5% interval, resampling {', '.join(kind)} blocks.",
             )
         )
         chart.save(DOCS_DIR / f"figure_1_{stem}.svg")
@@ -165,8 +165,9 @@ def figure_slices() -> None:
         outside = contrasts.filter((pl.col("slice") == name) & (pl.col("side") == "outside"))
         chart = interval_panels(table=outside, groups=SIX_EIGHT).properties(
             title=_title(
-                f"CRPS at days 1 to 10 on all rows outside {name}, each arm minus its control.",
-                "Dot: estimate. Line: 99.5% month-block bootstrap interval. The decision rule allows an upper end of +0.02.",
+                f"CRPS on all rows outside {name}, arm minus control.",
+                "Dot: estimate. Line: 99.5% month-block interval.",
+                "The decision rule allows an upper end of +0.02.",
             )
         )
         chart.save(DOCS_DIR / f"figure_2_outside_{stem}.svg")
@@ -206,8 +207,8 @@ def figure_gap() -> None:
             width=WIDTH - 110,
             height=170,
             title=_title(
-                "Heating hypothesis: does solar gain help more on cold sunny days than on cold overcast days?",
-                "Overcast days exist in one fold only (6 dates), so the gap is descriptive.",
+                "Does solar gain help more on cold sunny than on cold overcast days?",
+                "Overcast days exist in one fold only (6 dates): descriptive.",
             ),
         )
     )
@@ -420,8 +421,9 @@ def figure_examples() -> None:
             width=WIDTH,
             height=200,
             title=_title(
-                f"{shown}, week of {week_start:%d %B %Y}: day-ahead forecasts (24 to 48 hours ahead), {control} against {best_arm}.",
-                "Coloured lines: median. Shaded: 5% to 95%. Black line: what happened. Purple ticks: cold winter night half-hours.",
+                f"{shown}, week of {week_start:%d %B %Y}: forecasts made 24 to 48 hours ahead.",
+                f"{control} against {best_arm}. Lines: median. Shaded: 5% to 95%.",
+                "Black: what happened. Purple ticks: cold winter night half-hours.",
             ),
         ).save(DOCS_DIR / f"figure_6_example_week_{'six' if group == score.SIX else 'eight'}.svg")
 
@@ -463,8 +465,9 @@ def figure_examples() -> None:
             width=WIDTH,
             height=200,
             title=_title(
-                f"{shown}, 14-day forecast made at 09:00 UTC on {origin:%d %B %Y}: {control} against {best_arm}.",
-                "Coloured lines: median. Shaded: 5% to 95%. Black line: what happened.",
+                f"{shown}, 14-day forecast made at 09:00 UTC on {origin:%d %B %Y}.",
+                f"{control} against {best_arm}. Lines: median. Shaded: 5% to 95%.",
+                "Black: what happened.",
             ),
         ).save(
             DOCS_DIR / f"figure_6_example_14_days_{'six' if group == score.SIX else 'eight'}.svg"
