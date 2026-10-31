@@ -252,10 +252,10 @@ fits started, screen result (arm table, labelled interim), full fits started, PR
 
 **Fits ran mostly on CPU, with 4 threads per process.** The graphics processor was about three times
 slower than the CPU for these fits while other sessions shared it. The 2026-01 fold for the first
-six Primaries (D2, D3, D4, D5, D8, D9) was fitted on the graphics processor, except W1 and W3,
-which were refitted on the CPU; every other fit ran on the CPU. Both devices use the same histogram algorithm, so the arm differences are comparable, but
-the 2026-01 controls for the first six Primaries were fitted on the graphics processor while W1 and
-W3 there were fitted on the CPU.
+six Primaries (D2, D3, D4, D5, D8, D9) was fitted on the graphics processor, except W1 and W3, which
+were refitted on the CPU. Every other fit ran on the CPU. For those six Primaries, W1 and W3 are
+therefore compared with a control fitted on a different device. The seed-to-seed difference between
+C0 and C1 is at most 0.015 points of CRPS, and the two devices were not compared directly.
 
 **The first 8 Primaries (D2, D3, D4, D8, D5, D9, D10, D11) ran first on both main folds, then the
 other 8.** The order let the interim arm table appear after a fraction of the compute.
