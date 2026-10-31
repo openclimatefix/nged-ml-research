@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 436 | Which construction of 51 scenarios, joint over the Primaries, wind farms, solar farms, and leads, matches the observed joint behaviour, and does tying scenario k to ensemble member k help? | 1 | Experiment 434 (reported) | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
