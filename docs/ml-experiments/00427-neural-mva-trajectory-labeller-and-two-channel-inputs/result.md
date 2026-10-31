@@ -96,8 +96,8 @@ headline: >-
 lessons:
   - >-
     A labeller trained on high-demand Primaries does not transfer to low-demand ones: D5 and D10,
-    the hidden pair of rotation r1, have a mean sunny-midday reading near 19 points of capacity
-    against 44 to 58 at the four visible Primaries, and the labeller flagged reverse flow on 61.7%
+    the hidden pair of rotation r1, have a mean sunny-midday reading of 12 to 16 points of capacity
+    against 38 to 53 at the four visible Primaries, and the labeller flagged reverse flow on 61.7%
     of D5's and 22.6% of D10's sunny-midday half-hours with nothing injected.
   - >-
     Reading a whole day does help the day-level call (area 0.903 for injected against placebo days,
@@ -135,7 +135,8 @@ half-hours as reverse flow when nothing was added (64.1% of the rows that arm A 
 because the row set repeats each half-hour once per forecast run), against 0% at D9, D11, D14, and
 D16. Its recall at a 5%
 false-reverse rate is 0.22 pooled and 0.52 macro-averaged, against a bar of 0.60 and arm A's 0.21
-and 0.46. D5 and D10 have a mean sunny-midday reading near 19 points of capacity against 44 to 58
+and 0.46. D5 and D10 have a mean sunny-midday reading of 12 to 16 points of capacity against 38 to
+53
 at the four Primaries the labeller trained on, which is the likely cause (not tested by a retrained
 labeller).
 
@@ -280,8 +281,13 @@ against 0.702 for
 - **Median minus mean forecast:** not applicable; step 0 fitted no forecast.
 - **Mean-forecast error beside the quantile score:** not applicable, for the same reason.
 - **Triggers fired:** trigger 1 (a placebo control fails: D5 at no injection) and trigger 2 (the
-  result contradicts the prediction that L1 and L2 would pass). A fresh Sonnet audit ran; its
-  findings are triaged in the pull request.
+  result contradicts the prediction that L1 and L2 would pass). A fresh Sonnet audit re-derived
+  every table figure from the stored tables (within 0.005, except the D5 and D10 shares quoted
+  earlier in the draft, which used a wider slice and are corrected). It found no leakage and no join
+  or window artefact: D5 has no real reverse flow, and its rate is 63.0% in the training window and
+  61.7% in the test window. Without D5 the pooled recall is 0.656, so D5 causes both failures, but
+  D5
+  is a hidden test Primary and L2 needs all five.
 
 ## What the next experiment should answer
 
