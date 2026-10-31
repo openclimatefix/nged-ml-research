@@ -92,6 +92,12 @@ def is_pretrained(*, arm: str) -> bool:
 def columns_of(*, arm: str) -> tuple[str, ...]:
     """Return the extra columns of an arm named by `+`-joined components, in order, without repeats.
 
+    Args:
+        arm: The arm name, optionally ending in the pretrained suffix.
+
+    Returns:
+        The extra column names, each once, in component order.
+
     Raises:
         ValueError: If a component is unknown.
     """
