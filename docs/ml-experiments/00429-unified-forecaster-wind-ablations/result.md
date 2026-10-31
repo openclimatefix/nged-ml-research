@@ -66,8 +66,9 @@ verdict: partly supported
 best_arm: >-
   none advances under the upper-tail rule, which Wind farms research default 2 (2.15% above q99)
   and research default 1 (1.66%) also fail. On score alone, the plain member route (member_plain)
-  ties default 2 at 10.533 against 10.518 points at true days 1 to 10, so it is the simplest design
-  that matches the default, and no ablation beats the default by the 0.10-point margin.
+  ties default 2 at 10.533 against 10.518 points at true days 1 to 10, so it is the simplest of the
+  designs tested that matches the default, and no ablation beats the default by the 0.10-point
+  margin.
 headline: >-
   A pooled neural wind forecaster with no physics layer matches Wind farms research default 2
   (member_plain 10.533 points, default 2 10.518, kept rows, true days 1 to 10). Passing each member
@@ -81,11 +82,10 @@ lessons: >-
   that level. The upper-tail failure comes from under-forecasting windy half-hours, mostly
   not from the capacity cap: in an ad hoc check (not in the stored report), only 502 of 1,466
   exceedances of member_plain's q99 are at 99.9% of capacity or above, and the mean overshoot is 7.3
-  points. A censored head did not fix the tail in the arm tested. Training on the idle band raises
-  the score at true days 1 to 10 by 0.16 points (plain) to 0.20 (plant), and the plant did not
-  recover that loss.
-  For coherent paths across the three farms, the Schaake shuffle beats ensemble copula coupling on
-  the variogram score by 9.3%.
+  points. A censored head did not fix the tail in the arm tested. Training on the idle band makes
+  the score at true days 1 to 10 worse (higher) by 0.16 points (plain) to 0.20 (plant), and the
+  plant did not remove that increase. For coherent paths across the three farms, the Schaake shuffle
+  beats ensemble copula coupling on the variogram score by 9.3%.
 take_home_message: >-
   Neural wind forecasts do not need the extra machinery. A plain pooled network fed the ensemble
   members ties Wind farms research default 2 (10.533 against 10.518 points), and neither passing
@@ -93,31 +93,44 @@ take_home_message: >-
   nor a censored head (+0.018, worse) changes the score by the 0.10-point margin. The weakness all
   arms share is the upper tail: 2.2% to 2.8% of observations exceed q99, because the forecasts
   under-predict windy half-hours, and censoring did not fix it. The plain network is the
-  design to carry forward; the next wind work should fix the upper tail, not the architecture.
+  design that matches the default; the upper tail is the open problem, and the architecture
+  comparison does not explain it.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Choose the plain pooled network over a physics layer for wind: the frozen plant ties it
-    (+0.000, 99.8% interval -0.071 to +0.073) and the trained plant ties the frozen one (-0.004).
+    The plain pooled network was enough for wind: the frozen physics power curve tied it (+0.000,
+    99.8% interval -0.071 to +0.073) and the trained curve tied the frozen one (-0.004), so under
+    the maintainer's rule the plain network is chosen.
   - >-
-    Do not train a wind network on the idle band: all rows raise the kept-row score by 0.16 to 0.25
-    points (plain and plant) and gain at most 0.03 on cleaned zeros.
+    Training on the idle band made the kept-row quantile score worse (higher) by 0.16 to 0.20 points
+    at true days 1 to 10 (plain and with the curve), and improved the cleaned-zero score by at most
+    0.03.
   - >-
-    Build 51 coherent member paths with the Schaake shuffle rather than ensemble copula coupling:
-    the variogram score drops 9.3% (99% interval -0.491 to -0.256 points) over one calendar day.
+    The Schaake shuffle (reordering sampled values to follow the rank pattern of past observations)
+    gave more coherent 51-member paths than ensemble copula coupling: the variogram score fell 9.3%
+    (99% interval -0.491 to -0.256 points) over one calendar day.
   - >-
-    Look for the upper-tail failure in the windy half-hours, not at the capacity cap: report the
-    share above q99 by wind-speed band in the next wind experiment.
+    The open problem is the upper tail. A next wind experiment could report the share above q99 by
+    wind-speed band, because the failure sits in windy half-hours, not at the capacity cap.
 ---
 
 **Take-home: a plain pooled neural network ties Wind farms research default 2, and none of the
-extra parts earns its place.** At true days 1 to 10 on the kept rows, `member_plain` scores 10.533
-points of capacity against 10.518 for the default (difference +0.015, 99.8% interval -0.068 to
-+0.099). No design beats the default by the 0.10-point margin. Every arm leaves 2.2% to 2.8% of
-observations above its q99 against the 1.5% limit, so under the maintainer's rule no arm advances.
+extra parts earns its place.** Default 2 runs a power curve trained on ERA5 weather on each of the
+51 ensemble members, then a mixture-density head. "True days 1 to 10" means forecast lead times of
+24 to 240 hours, and "kept rows" are the half-hours left after experiment 210's idle-band mask
+removes those where a farm is idle at low wind. On the kept rows at true days 1 to 10,
+`member_plain` scores 10.533 points of capacity against 10.518 for default 2 (difference +0.015,
+99.8% interval -0.068 to +0.099). No design beats default 2 by the 0.10-point margin. The 1.5% limit
+is the share of observations allowed above an arm's q99 (the 0.99 quantile forecast). Every arm
+leaves 2.2% to 2.8% above it, and the maintainer's rule is that an arm must meet the limit to
+advance, so no arm advances.
 
-The three farms are W1 to W3. Each arm is a pooled mixture-density network, trained five times
+The three farms are W1 to W3. An arm is one design variant: how the ensemble enters the network,
+whether a physics power curve (the plant) is present, and which head is used. The arms are grouped
+as A1 (member handling), A4 (physics layer), and A7 (head). The 2 x 2 of plain network against
+plant, each trained with or without the idle band, is called H-P. Each arm is a pooled
+mixture-density network, trained five times
 (seeds 0 to 4) on the daily ensemble hindcast, and scored on 53 Tuesday runs of 2025-07 to 2026-06.
 Margins (0.10 points, tail harm at most 0.02) were agreed by the maintainer on 2026-10-31. The
 reproduction gate passed: the shared code reproduces the default's 11.081 kept-row score and 10.518
@@ -177,12 +190,13 @@ true-days-1-to-10 score with a per-quantile gap against the stored rows of 0.000
   zeros. Trained with the mask, it ties on kept rows (+0.000) and is 0.151 worse on idle-band rows.
   The prediction that the plant helps on the idle band, and that the gap halves with the mask,
   failed. The soft cut-in ramp variant and the detector-rule cells are not run.
-- **Members as quantile forecasts.** The member-wise arm gives each member its own 11 quantiles.
-  The mean score of one member's quantiles against the observation is 14.27 points, against 10.52
-  for the pooled mixture, and 9.8% of observations fall below, and 14.4% above, a member's own q01
-  and q99. One member's quantiles are therefore narrower than the pooled mixture, whose own tails
-  are also too narrow (2.17% above q99). Running 51 passes per forecast is affordable in production,
-  but no arm needs it for score.
+- **Members as quantile forecasts.** The memberwise arm gives each member its own 11 quantiles, and
+  the forecast is the equal-weight mixture of the 51 members' distributions. The mean score of one
+  member's quantiles against the observation is 14.27 points, against 10.52 for the pooled mixture,
+  and 9.8% of observations fall below, and 14.4% above, a member's own q01 and q99. One member's
+  quantiles are therefore narrower than the pooled mixture, whose own tails are also too narrow
+  (2.17% above q99). The maintainer has said production can afford 51 network passes per forecast,
+  and no arm needed them to improve the score.
 - **Coherence.** Scores use the 51 member paths across W1 to W3 jointly over one run and one
   calendar day (529 blocks). The Schaake shuffle beats ensemble copula coupling (ECC) from
   `one_pass_ms` by 9.3% on the [variogram score](https://doi.org/10.1175/MWR-D-15-0269.1) (99%
@@ -191,10 +205,10 @@ true-days-1-to-10 score with a per-quantile gap against the stored rows of 0.000
   worse than ECC paths from the same arm on the variogram score. Member-wise quantiles taken at ECC
   ranks are 5.6% better than ECC on the variogram score but 4.2% worse than the Schaake shuffle. The
   design note's prediction (member route beats ECC by 5% on the variogram score) failed; the 5%
-  margin is the Opus note's proposal, not the maintainer's. ECC beats independent draws by 1.3% on
-  the energy score over a day, but not on the variogram score, and independent draws score better in
-  days 0 to 1. Methods: [Schaake shuffle (Clark et al. 2004)][clark], [ECC (Schefzik et al.
-  2013)](https://doi.org/10.1214/13-STS443).
+  margin came from the design note, and the maintainer has not agreed it. ECC beats independent
+  draws by 1.3% on the energy score over a day. It does not beat them on the variogram score.
+  Independent draws score better within the first day of the forecast. Methods: [Schaake shuffle
+  (Clark et al. 2004)][clark], [ECC (Schefzik et al. 2013)](https://doi.org/10.1214/13-STS443).
 - **Compute.** The member route runs 51 network passes per forecast, against one for `one_pass_ms`.
   The maintainer has said production can afford 51 passes (2026-10-31).
 - **Possible follow-up (not agreed).** A soft cut-in ramp on the plant, and the detector-rule
@@ -205,10 +219,10 @@ true-days-1-to-10 score with a per-quantile gap against the stored rows of 0.000
 - **Reproduction gate (G0):** passed. Kept 11.081 against stored 11.081; true days 1 to 10 10.518
   against 10.518, same seeds.
 - **Fresh Sonnet reviews:** three code reviews before the first fit (they found a missing
-  upper-tail verdict, a half-open lead band, a weight-decay slip on the plant, and the member-wise
-  path construction, all fixed). The results, write-up, and prose reviews are recorded in the pull
-  request.
-- **Audit triggers:** trigger 2 (a result contradicts its own prediction) fired for A1, A7, and
+  upper-tail verdict, a lead band that excluded its upper end, a wrong weight-decay setting on the
+  plant, and a wrong member-wise path construction, all fixed). The results, write-up, and prose
+  reviews are recorded in the pull request.
+- **Audit triggers:** audit rule 2 (a result contradicts its own prediction) applied to A1, A7, and
   H-P. The A7 explanation (exceedances come from windy half-hours, not the cap) was tested with
   the exceedance diagnostic. The A1 and H-P explanations are untested.
 - **Not applicable:** monthly refits and avoidable-curtailment cost (the wind protocol has none),
