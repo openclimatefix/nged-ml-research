@@ -36,9 +36,9 @@ prediction: >-
   8.29 at D5 and D10). This fails if a pooled gain falls below its floor or if any Primary's
   interval includes zero. S2: no harm at the no-injection Primaries (experiment 420's tolerance of
   +0.05 points pooled and +0.20 at a single Primary, read on the point estimate). S3: no reading
-  harm at the MVA-only eight (+0.05 points pooled, point estimate). The Primary-level gate is shut
-  Gate decisions are descriptive: on the shortest-lead rows the gate opens at D5, D8, D10, and D12
-  in the one training fold built before scoring, as in experiment 420.
+  harm at the MVA-only eight (+0.05 points pooled, point estimate). The Primary-level gate decisions
+  are descriptive: on the shortest-lead rows the gate opens at D5, D8, D10, and D12 in the one
+  training fold built before scoring, as in experiment 420.
 decision_rule: >-
   S1, S2, and S3 all pass for A, with S1's pooled floor met: label the signed output "inferred,
   ensemble-tested, gated" at those of the eight Primaries whose gate opened in the fits, and
@@ -69,82 +69,208 @@ best_arm: >-
   a gain of 15.72 (95% interval 13.85 to 17.42), against 19.2 in the laboratory test. The
   laboratory-trained network applied unchanged to ENS inputs scored 8.76 (unplanned diagnostic).
 headline: >-
-  With ensemble weather in place of recorded weather, the export-gated network (A) still cut the
-  signed CRPS on reverse-flow half-hours from 29.97 to 14.26 points of capacity against the gate-shut
-  network (P0), at every one of the six hidden Primaries, with no harm at the no-injection Primaries
-  (+0.009 pooled, +0.051 at D9) or at the MVA-only eight (-0.005). The gain is 3.5 points smaller than
-  in the laboratory test, and the network trained on recorded weather and applied to ensemble weather
-  scored 5.50 better (4.35 to 6.61) than the network retrained on ensemble weather.
+  With ensemble weather forecasts in place of recorded weather, the export-gated neural network (A)
+  still cut the signed CRPS on reverse-flow half-hours from 29.97 to 14.26 points of effective
+  capacity against the same network with its gate shut (P0), at every one of the six hidden primary
+  substations. The harm at the no-injection substations was +0.009 points pooled and +0.051 at D9,
+  and at the eight MVA-only substations -0.005. The gain is 3.5 points smaller than with recorded
+  weather. Unplanned: the network trained on recorded weather and applied to ensemble weather scored
+  5.50 points better (4.35 to 6.61) than the network retrained on ensemble weather.
 lessons:
   - >-
     The export gate and the permission to go below zero survive ensemble weather: the gain over the
-    gate-shut network is 15.7 points (13.8 to 17.4), at least 5.7 points at every hidden Primary,
-    and roughly equal in all three lead bands (16.2, 15.9, and 15.3 points).
+    gate-shut network is 15.7 points (13.8 to 17.4), a point estimate of at least 5.7 points at every
+    hidden primary substation, and about the same in all three lead bands (16.2, 15.9, and 15.3
+    points).
   - >-
-    Ensemble inputs cost accuracy: A scores 7.20 points worse (5.85 to 8.54) than the same network on
-    recorded weather, and its sign calls are much weaker (balanced accuracy 0.60 against 0.85, seed 0).
+    Ensemble inputs make the forecast less accurate: A scores 7.20 points worse (5.85 to 8.54) than
+    on recorded weather, and its calls of the sign of the flow are weaker (balanced accuracy 0.60
+    against 0.85, seed 0).
   - >-
-    Unplanned: the laboratory-trained network applied to ensemble inputs (8.76) beat the network
-    retrained on them (14.26) by 5.50 points (4.35 to 6.61). The retrained network learned a smaller
-    and less stable solar term (learned capacity 39 to 106 points of capacity by fit at D9, against 98
-    to 107 in the laboratory), and its two seeds differ by 2.09 points on average. The cause is not
-    tested.
-  - >-
-    The Primary-level gate opened at D8 and D12 in all 21 fits and stayed shut at the other six
-    MVA-only Primaries, as in the laboratory test, once the gate statistic uses each valid time's
-    shortest-lead ensemble row.
+    Unplanned: the network trained on recorded weather and applied to ensemble inputs (8.76) beat
+    the network retrained on them (14.26) by 5.50 points (4.35 to 6.61). The retrained network's
+    fitted solar coefficient was lower and varied more between fits (39 to 88 points of capacity at
+    D9 in seed 0, against 98 to 107 with recorded weather), and its two seeds differ by 2.09 points
+    on average. The cause is not tested.
 take_home_message: >-
-  With forecast weather instead of recorded weather, the neural network with the export gate still
-  forecasts signed power on reverse-flow half-hours much better than the same network with the gate
-  shut (a gain of 15.7 points of capacity, 13.8 to 17.4, against 19.2 in the laboratory test), and it
-  does no harm where nothing is exported. The gate opened at the same two Primaries as before, D8 and
-  D12. An unplanned finding is that the network trained on recorded weather and applied unchanged to
-  forecast weather scored 5.5 points better (4.3 to 6.6) than the network retrained on forecast
-  weather, so the next step is a training recipe that keeps the solar term stable, not a longer fit.
+  With ensemble weather forecasts instead of recorded weather, the neural network with the export gate
+  still forecasts signed power on reverse-flow half-hours much better than the same network with the
+  gate shut (a gain of 15.7 points of capacity, 95% interval 13.8 to 17.4, against 19.2 with recorded
+  weather), and it harms the forecast by no more than 0.05 points where no solar farm exports. The
+  gate opened at the same two of the eight apparent-power-only substations as before. An unplanned
+  finding is that the network trained on recorded weather and applied unchanged to ensemble weather
+  scored 5.5 points better (95% interval 4.4 to 6.6) than the network retrained on ensemble weather,
+  so how to train on ensemble weather is the open question.
 advice:
   - >-
     Label the signed output at D8 and D12 "inferred, ensemble-tested, gated" and keep "inferred,
-    laboratory, gated" for the other six MVA-only Primaries, whose gate stayed shut (S1 to S3, gate
-    table).
+    laboratory, gated" for the other six MVA-only primary substations, whose gate stayed shut
+    (Results, pass-bar table and gate bullet).
   - >-
-    Compute a Primary-level gate on each valid time's shortest-lead ensemble row, because keeping the
-    first row per valid time keeps the longest-lead row and shut the gate at D8 and D12 (design).
+    Compute a primary-level gate on each half-hour's shortest-lead ensemble row, because keeping the
+    longest-lead row shut the gate at D8 and D12 (Plan as registered, observation before scoring).
   - >-
     Before retraining a solar-term network on ensemble inputs, score the network trained on recorded
-    weather applied to ensemble inputs beside it, because it scored 5.5 points better here (A-applied
-    against A).
+    weather and applied to ensemble inputs as well, because that network scored 5.5 points better
+    than the retrained one here (Results, unplanned finding).
   - >-
-    Fit two seeds before reading a contrast of a retrained solar-term network on ensemble inputs:
-    the null difference between seeds is 2.09 points and the minimum detectable effect 1.73 (minimum
-    detectable effect, full run).
+    Fit two seeds before reading a contrast between retrained solar-term networks on ensemble
+    inputs: the mean difference between two seeds of the same network is 2.09 points and the minimum
+    detectable effect 1.73 (Plan as registered, full-run minimum detectable effect).
 production_status: candidate
 adopted_in: none
 date: 2026-10-31
 code: ml-experiments/00424-neural-mva-export-gated-signed-ens-serving-test/
 ---
-**Take-home: the export-gated network still forecasts signed power on reverse-flow half-hours much
-better than the gate-shut network when it sees ensemble weather forecasts, and does no harm
-elsewhere,
-but ensemble weather costs accuracy.** The gain over the gate-shut network is 15.7 points of
-effective capacity (95% interval 13.8 to 17.4), against 19.2 in the laboratory test. The gate opened
-at D8 and D12, as before. **An unplanned finding:** the network trained on recorded weather and
-applied unchanged to ensemble weather scored 5.5 points better (4.3 to 6.6) than the network
+**Take-home: with ensemble weather forecasts in place of recorded weather, the neural network with
+an
+export gate still forecasts signed power on reverse-flow half-hours much better than the same neural
+network with the gate shut, although the ensemble forecasts make it less accurate.** Signed power is
+positive for demand and negative for reverse flow, where solar generation exports power up the
+electricity network. The score is the continuous ranked probability score (CRPS), in points of
+effective capacity (1 point is 1% of a substation's effective capacity), and lower is better. The
+gate-shut network scores 29.97 and the export-gated network 14.26, a gain of 15.7 points (95%
+interval 13.8 to 17.4), against 19.2 with recorded weather. The test covers six primary substations
+with one real solar farm's output added, in spring, summer, and autumn months only.
+
+**An unplanned finding:** the neural network trained on recorded weather and applied unchanged to
+ensemble weather scored 5.5 points better (95% interval 4.4 to 6.6) than the neural network
 retrained
-on ensemble weather. The registered bars did not test this comparison, and no prediction covered it.
+on ensemble weather. The pass bars written down before scoring did not test this comparison, and no
+prediction covered it.
 
 **This experiment asks whether the signed forecast of the export-gated neural network survives the
-step from recorded weather to forecast weather.** Eight Primary substations report only the size of
-the power that flows, not its direction (signed power is positive for demand and negative for
-reverse flow, where solar generation exports power up the electricity network). [Experiment
-420](../00420-neural-mva-export-gated-signed-final/result.md) hid the direction at six Primaries
-where it is known, added a real solar farm's recorded output to some of them, and found that a
-neural network with a gate that decides once per Primary whether it exports forecasts the signed
-power far better than the same network with the gate shut (7.1 against 26.3 points of capacity on
-reverse-flow half-hours). The weather in that test was recorded CAMS irradiance and ERA5
-temperature, which a live service does not have at forecast time. This experiment repeats the test
-with the ECMWF ensemble (ENS) mean and spread of the same weather variables, trains the network on
-them, and scores it on the same rows. The result: the gate still helps a great deal, though less
-than with recorded weather.
+step from recorded weather to ensemble weather forecasts.** Eight primary substations (the
+"MVA-only"
+eight) report only the size of the power that flows, not its direction.
+[Experiment 420](../00420-neural-mva-export-gated-signed-final/result.md) hid the direction at six
+primary substations where it is known (D5, D9, D10, D11, D14, and D16 are anonymised labels) and
+added
+a real solar farm's recorded output to some of them. It found that a neural network with an export
+gate, set once per substation to open or shut from a statistic of the substation's readings,
+forecasts the signed power far better than the same neural network with the gate shut (7.1 against
+26.3 points on reverse-flow half-hours). The weather in that test was recorded CAMS irradiance and
+ERA5 temperature, which a live service does not have at forecast time. This experiment repeats the
+test with the ensemble (ENS) forecast of the European Centre for Medium-Range Weather Forecasts: the
+mean and spread across its 51 members of the same weather variables. It trains the neural network on
+them and scores it on the same rows, in three rotations of which two substations are hidden at a
+time. The gate still helps a great deal, though less than with recorded weather.
+
+## Results
+
+![Gain over the gate-shut network by hidden primary substation](gain_by_primary.svg)
+
+**S1, S2, and S3 pass for A, and the pooled floor is met.** All 105 fits and 42 forecast-only runs
+finished. Values are points of effective capacity (1 point is 1% of a substation's effective
+capacity) of the signed continuous ranked probability score (CRPS), level 2.0 unless stated, with
+95% Primary-month block intervals; A is the mean of two seeds and the other arms use seed 0. The
+minimum detectable effect, written before scoring, was 1.735. All scores are in
+`work/scores_full.json`. "Hidden" substations are the six whose direction of flow was hidden from
+the neural network, and "no-injection" is the setting with no farm added.
+
+| Bar | Result | Passes? |
+|---|---|---|
+| S1, gain of A over P0 on reverse-flow rows, pooled | 15.72 (13.85 to 17.41), floor 10 | Yes |
+| S1 by substation | D5 5.75, D9 20.67, D10 10.01, D11 16.67, D14 17.84, D16 19.80; every interval excludes zero and clears 1.735 | Yes |
+| S2, harm at the no-injection substations, pooled | +0.009 (-0.003 to 0.023); D9 +0.051, others -0.004 to +0.003 | Yes (limits +0.05 pooled, +0.20 single) |
+| S3, reading harm at the MVA-only eight, pooled | -0.005 (-0.036 to 0.020) | Yes (limit +0.05) |
+
+The prediction was met on every clause: pooled floors, every hidden substation's interval, S2, S3,
+and the gate decisions. The label scope in the decision rule gives "inferred, ensemble-tested,
+gated" at D8 and D12. That label rests on the gate opening in all 21 fits and on the reading check
+(S3), because those two substations have no signed truth to score.
+
+![Mean CRPS on reverse-flow rows by arm](crps_by_arm.svg)
+
+**Unplanned: the network trained on recorded weather and applied to ensemble inputs beat the
+retrained network.** A-applied scored 5.50 points better than A (4.35 to 6.61; 8.76 against 14.26,
+A as the mean of two seeds), and 21.22 better than P0 (18.42 to 23.77). The plan called A-applied a
+diagnostic. No bar or prediction covered it, and it contradicts the plan's reason for retraining
+(a network that has seen ensemble inputs should cope with their bias). A likely explanation, which
+the stored fits support but no test confirms, is noise in the ensemble inputs. Noise in an input
+shrinks the fitted coefficient on it. The fitted solar coefficient (the multiple of the unit shape
+subtracted from demand) was lower and less stable when trained on ensemble inputs: at D9 in seed 0
+it ran from 39 to 88 points of capacity across the seven fits, against 98 to 107 with recorded
+weather. The two seeds of A differ by 2.09 points (0.88 to 3.29) on average, so seed noise is large
+next to every contrast except S1.
+
+- **Absolute scores on reverse-flow rows:** P0 29.97, A 14.26, and for reference the
+  recorded-weather
+  arms of experiment 420: P0 26.26, A 7.05, ref (no gate) 6.99. A-applied scored 8.76.
+- **Lead bands (gain of A over P0):** days 1 to 2 16.18 (14.25 to 17.90), days 3 to 6 15.86 (13.97
+  to
+  17.61), days 7 to 10 15.35 (13.50 to 17.03). The point estimates fall by 0.8 points from the first
+  band to the last, less than the minimum detectable effect, and the intervals overlap. No paired
+  lead-band contrast was computed.
+- **Ensemble against recorded weather for A:** worse by 7.20 (5.85 to 8.54).
+- **Primary-level gates:** open at D8 and D12 in all 21 fits and shut at D2, D3, D4, D19, D21, and
+  D22 in all 21, as with recorded weather. The six hidden substations' gates opened in all seven of
+  their fits each.
+- **Rotation r1 (stage 1) before the full run:** gain 7.79 (6.39 to 9.12) against 8.29 with recorded
+  weather at D5 and D10, floor 4, minimum detectable effect 0.907. Stage 1 passed.
+- **Cleaned data:** each refit drops 57,531 to 94,724 training rows (summed over the 16 trial-area
+  substations: the six hidden, the eight MVA-only, D15, and D18) that have no usable power reading,
+  including the half-hours the `substation_zero` rule flags; the counts per fit are in each fit's
+  JSON file. No training row has a missing ensemble unit shape.
+
+![A day-ahead and a 10-day forecast at D5 with a farm injected](example_forecast.svg)
+
+**With ensemble inputs the sign is called much less well, and the lower tail is too narrow.** The
+numbers are descriptive, level 2.0, seed 0, on the half-hours with the recorded CAMS unit shape at
+least 0.3 and clear-sky index at least 0.7 (115,040 rows), for every arm.
+
+| Measure | A (ensemble) | A-applied | A (recorded weather, experiment 420) |
+|---|---|---|---|
+| Balanced accuracy at `P(X < 0) > 0.5` | 0.600 | 0.781 | 0.852 |
+| Recall of reverse flow | 0.235 | 0.676 | 0.859 |
+| False-reverse rate, every non-reverse slice row | 3.6% | 11.5% | 15.5% |
+| Area under the receiver operating characteristic curve | 0.876 | 0.891 | 0.930 |
+| q01 coverage on reverse-flow rows (nominal 0.01) | 0.091 | 0.118 | 0.062 |
+| q05 coverage (nominal 0.05) | 0.308 | 0.254 | not recorded here |
+| q95 coverage (nominal 0.95) | 1.000 | 0.987 | not recorded here |
+| q99 coverage (nominal 0.99) | 1.000 | 0.998 | 0.998 |
+
+- **Tail pinball losses (A, ensemble):** q01 0.82, q05 3.37, q95 3.11, q99 0.74; P0: 19.20, 20.20,
+  3.40, 0.79.
+
+## Checks
+
+- **Median forecast minus the mean implied by the quantiles, on reverse-flow rows, pooled**
+  (trapezoid
+  integration of the 11 quantiles, a rough check): P0 -1.87 points (negative at every substation), A
+  +0.04 (-1.31 at D5 to +0.95 at D11), A-applied -0.10, recorded-weather A -0.14. The spread does
+  not shift A's forecast.
+- **Error of the median forecast beside the CRPS contrast** (mean absolute error of the median on
+  reverse-flow rows): P0 39.83, A 26.99, A-applied 15.05, recorded-weather A 12.24. The error of the
+  median forecast points the same way as every CRPS contrast, so audit trigger 3 (the two disagree)
+  did not fire.
+- **Leave-one-substation-out for A-applied against A:** A-applied stays better when any one of the
+  six hidden substations is left out (4.55 when D9 is left out, up to 6.31 when D5 is). D9 carries
+  the most weight. Trigger 4 (leaving one site out flips a contrast) did not fire.
+- **Triggers that fired.** Trigger 2 (a result contradicts its own plan) fired in part: A-applied
+  contradicts the plan's reason for retraining, and the explanation is descriptive, not tested. No
+  audit was run, because the S1 to S3 verdicts do not depend on A-applied and the page states the
+  cause as untested. Trigger 5 (a nested arm beats its container) does not apply, because A-applied
+  is not nested in A. Trigger 7 (a later design depends on an unreplicated headline) is met: a
+  live-service port would depend on the 15.7-point headline, which replicates the recorded-weather
+  result on the same injected series. The placebo control held (S2).
+- **Mixed seed counts.** A is the mean of two seeds in S1, S3, and the A-applied contrast; P0 and
+  A-applied use seed 0. Against seed 0 of A alone the A-applied gain is 6.54 (5.09 to 8.00), and
+  against seed 1 alone 4.45, so the size depends on which seed is read and the sign never changes.
+- **S2 pooled excludes D10** (real reverse flow); D10's A-minus-P0 harm is -0.043.
+- **Caveats.** The reverse-flow rows come from six substations in one rotation each, so rotation and
+  substation are confounded, with 42 blocks. The injected farm is real recorded output added to real
+  demand. The test months are 2025-07 to 2025-09 and 2026-03 to 2026-06, so no winter month is
+  scored. The scored lead range is 0 to 240 hours (days 1 to 10). The 2025-07 refit trains on 15
+  months, not 24. NGED says load-shift events may be missing from its logs, so unlogged events may
+  sit in the readings.
+- **Not done.** Avoidable-curtailment cost (see Departures), a climatology row, a winter example
+  forecast, and a pretrain-then-fine-tune arm (experiment 418's recipe).
+
+## Plan as registered
+
+The sections below were written before any fit or score, and the two minimum-detectable-effect
+sections were committed before the matching contrasts were read.
 
 ## Evidence the plan follows
 
@@ -253,7 +379,7 @@ floor
   of P0 pooled.
 
 **Reported with no bar:** the gain by lead band (days 1 to 2, days 3 to 6 up to a lead of 144 hours,
-and days 6 to 10 above
+and days 7 to 10 above
 144 hours, where the ENS stamps change from 3-hourly to 6-hourly; headline days 1 to 10); experiment
 420's laboratory A, ref, and P0 beside the ENS arms, and the paired difference of A
 on ENS inputs against A on laboratory inputs; A-applied against P0 and against A; q01 and q99
@@ -288,7 +414,7 @@ selects a different, sparser set of rows; the number of rows behind each gate de
 **Stage 1 runs rotation r1 only.** If A fails S1 on r1, stop. Otherwise tell the manager and run the
 remaining rotations (70 fits). Experiment 420 timed a fit at 26 to 83 seconds including the fold
 build, so stage 1 takes about 30 to 60 minutes and the full run about 1.5 to 3 hours, on one GPU
-process using about 1.4 GB of GPU memory, one feeder core, `systemd-run --user --scope -p
+process using about 1.4 GB of GPU memory, one CPU core, `systemd-run --user --scope -p
 MemoryMax=8G -p OOMPolicy=continue`, with `OMP_NUM_THREADS=1`. The fit script reads `MemAvailable`
 before every fold and every fit and stops if it falls below 12 GiB (the `available` column of
 `free -g`). A fit is skipped when its JSON file exists, so a stopped run resumes. Experiment 420's
@@ -335,10 +461,10 @@ All code is in `ml-experiments/00424-neural-mva-export-gated-signed-ens-serving-
 - **ENS irradiance after lead 144 hours is a 6-hour mean,** so the unit shape is blurred at days 6
   to 10. Experiment 397's summaries do not treat the two stamp spacings differently, and this plan
   does not change that. The lead-band table, split at 144 hours, shows whether the gain falls there.
-- **A single scale constant `u99`, fixed on one Primary's daylight rows over the whole record,**
-  also
-  covers the test months. It is a scalar shared by both arms and is accepted as negligible.
-- **Calibration of ENS shifts by season, lead band, and hour band** (experiment 111) may exceed what
+- **The scale constant `u99` is fixed on one Primary's daylight rows over the whole record,** so it
+  also covers the test months. Both arms share the scalar, and it is accepted as negligible.
+- **ENS forecast errors that differ by season, lead band, and hour band** (experiment 111) may
+  exceed what
   one retrained network with a lead input learns. The lead-band and month tables show it.
 - **Unlogged load-shift events** may sit in the readings, as NGED says its logs are incomplete.
 
@@ -349,8 +475,8 @@ difference between A's two seeds (ENS inputs) on reverse-flow rows at level 2.0 
 (95% interval -0.725 to 0.549; 14 Primary-month blocks, 22,443 rows) and a bootstrap standard
 deviation of 0.324; 2.8 times 0.324 is 0.907. The figure is above the 0.5-point limit, so contrasts
 of that size or smaller (A against A-applied, A on ENS against A on laboratory inputs) are reported
-as underpowered. S1 is not weakened by this, because its floors (4 and 10 points) sit far above the
-figure. The figure is in `work/mde_stage1.json`, which the script refuses to overwrite.
+as underpowered. The figure does not weaken S1, because its floors (4 and 10 points) sit far above
+it. The figure is in `work/mde_stage1.json`, which the script refuses to overwrite.
 
 ## Minimum detectable effect, full run (written before the full scoring)
 
@@ -358,150 +484,52 @@ figure. The figure is in `work/mde_stage1.json`, which the script refuses to ove
 All 105 fits and 42 forecast-only runs finished. The null difference between A's two seeds on
 reverse-flow rows at level 2.0 has a mean of 2.09 (95% interval 0.88 to 3.29; 42 Primary-month
 blocks, 79,399 rows) and a bootstrap standard deviation of 0.620; 2.8 times 0.620 is 1.735. The two
-seeds of A therefore differ by a mean of 2.09 points on these rows, so seed noise is large next to
-the 10-point S1 floor, and contrasts under about 2 points are underpowered. The figure is in
+seeds of A therefore differ by a mean of 2.09 points on these rows, and contrasts under about 2
+points are underpowered. The 10-point S1 floor is far above that noise. The figure is in
 `work/mde_full.json`.
-
-## Results
-
-![Gain over the gate-shut network by hidden Primary](gain_by_primary.svg)
-
-**S1, S2, and S3 pass for A, and the pooled floor is met.** All 105 fits and 42 forecast-only runs
-finished. Values are points of effective capacity, level 2.0 unless stated, with 95% Primary-month
-block intervals; A is the mean of two seeds and the other arms use seed 0. The minimum detectable
-effect, written before scoring, was 1.735. All scores are in `work/scores_full.json`.
-
-| Bar | Result | Passes? |
-|---|---|---|
-| S1, gain of A over P0 on reverse-flow rows, pooled | 15.72 (13.85 to 17.42), floor 10 | Yes |
-| S1 by Primary | D5 5.75, D9 20.67, D10 10.01, D11 16.67, D14 17.84, D16 19.80; every interval excludes zero and clears 1.735 | Yes |
-| S2, harm at the no-injection Primaries, pooled | +0.009 (-0.003 to 0.023); D9 +0.051, others -0.004 to +0.003 | Yes (limits +0.05 pooled, +0.20 single) |
-| S3, reading harm at the MVA-only eight, pooled | -0.005 (-0.036 to 0.020) | Yes (limit +0.05) |
-
-- **Absolute scores on reverse-flow rows:** P0 29.97, A 14.26, and for reference experiment 420's
-  recorded-weather arms P0 26.26, A 7.05, ref (no gate) 6.99. The laboratory-trained network applied
-to
-  ensemble inputs scored 8.76.
-- **Lead bands (gain of A over P0):** days 1 to 2 16.18 (14.24 to 17.90), days 3 to 6 15.86 (13.93
-  to
-  17.57), days 6 to 10 15.35 (13.49 to 17.00). The gain does not fall after the ensemble's
-  irradiance becomes a 6-hour mean at 144 hours.
-- **Ensemble against recorded weather for A:** worse by 7.20 (5.85 to 8.54).
-- **Rotation r1 (stage 1) before the full run:** gain 7.79 (6.39 to 9.12) against 8.29 in the
-  laboratory test at D5 and D10, floor 4, minimum detectable effect 0.907; stage 1 passed.
-
-![Mean CRPS on reverse-flow rows by arm](crps_by_arm.svg)
-
-**Unplanned: the laboratory-trained network applied to ensemble inputs beat the retrained network.**
-A-applied scored 5.50 points better than A (4.35 to 6.61; 8.76 against 14.26, A as the mean of two
-seeds), and 21.22 better than
-P0 (18.40 to 23.77). The plan called A-applied a diagnostic. No bar or prediction covered it, and
-the
-result contradicts the plan's reason for retraining (a network that has seen ensemble inputs should
-cope with their bias). A likely explanation, supported by the stored fits but not tested: the
-learned capacity of the solar term (the multiple of the unit shape subtracted from demand) is lower
-and unstable when trained on ensemble inputs, for example 39 to 106 points of capacity by fit at D9
-against 98 to 107 with recorded weather, which fits a noisy regressor shrinking the fitted
-coefficient. The two seeds of A differ by 2.09 points (0.88 to 3.29) on average, so the seed noise
-is
-large next to every other contrast except S1.
-
-**The sign is called much less well with ensemble inputs, and the lower tail is too narrow.** The
-numbers are descriptive, level 2.0, seed 0, on the half-hours with the CAMS unit shape at least 0.3
-and clear-sky index at least 0.7 (115,040 rows). The slice is defined by the recorded CAMS values,
-as
-in experiment 420, for every arm.
-
-| Measure | A (ENS) | A-applied | A (recorded, experiment 420) |
-|---|---|---|---|
-| Balanced accuracy at `P(X < 0) > 0.5` | 0.600 | 0.781 | 0.852 |
-| Recall of reverse flow | 0.235 | 0.676 | 0.859 |
-| False-reverse rate, every non-reverse slice row | 3.6% | 11.5% | 15.5% |
-| Area under the receiver operating characteristic curve | 0.876 | 0.891 | 0.930 |
-| q01 coverage on reverse-flow rows (nominal 0.01) | 0.091 | 0.118 | 0.062 |
-| q05 coverage (nominal 0.05) | 0.308 | 0.254 | not recorded here |
-| q95 coverage (nominal 0.95) | 1.000 | 0.987 | not recorded here |
-| q99 coverage (nominal 0.99) | 1.000 | 0.998 | 0.998 |
-
-- **Tail pinball losses (A, ENS):** q01 0.82, q05 3.37, q95 3.11, q99 0.74; P0: 19.20, 20.20, 3.40,
-  0.79. The signed lower tail is too narrow, as in experiment 420.
-- **Primary-level gates:** open at D8 and D12 in all 21 fits and shut at D2, D3, D4, D19, D21, and
-  D22 in all 21, as in experiment 420. All six hidden Primaries' gates opened in every fit
-  (7 fits each).
-- **Cleaned data:** each refit drops 57,531 to 94,724 training rows (summed over the 16 Primaries)
-  that have no usable power reading, which includes the half-hours the `substation_zero` rule
-  flags; the counts per fit are in each fit's JSON file. No training row has a missing ensemble
-  unit shape (0 in every fold).
-
-![A day-ahead and a 10-day forecast at D5 with a farm injected](example_forecast.svg)
-
-## Checks
-
-- **Median forecast minus the mean implied by the quantiles, on reverse-flow rows, pooled**
-  (trapezoid
-  integration of the 11 quantiles, a rough check): P0 -1.87 points (negative at every Primary), A
-  +0.04 (-1.31 at D5 to +0.95 at D11), A-applied -0.10, recorded-weather A -0.14. The spread does
-  not shift A's forecast.
-- **Error of the median forecast beside the CRPS contrast** (mean absolute error of q50 on
-  reverse-flow rows): P0 39.83, A 26.99, A-applied 15.05, recorded-weather A 12.24. It points the
-  same way as every CRPS contrast. Audit trigger 3 did not fire.
-- **Leave-one-Primary-out for A-applied against A:** A-applied stays better when any one of the six
-  hidden Primaries is left out (4.55 when D9 is left out, up to 6.31 when D5 is). D9 carries the
-  most weight. Trigger 4 did not fire.
-- **Which triggers fired.** Trigger 2 fired in part: the A-applied result contradicts the plan's
-  reason for retraining, and the explanation (lower, unstable learned capacity) is descriptive, not
-  tested. No audit was run, because the S1 to S3 verdicts do not depend on it and the page states
-  the cause as untested. Trigger 5 does not apply (A-applied is not nested in A). Trigger 7 is
-  met: a live-service port would depend on the 15.7-point headline, which is a single replication of
-  the laboratory result on the same injected series. Controls: S2 at the placebo Primaries held.
-- **Mixed seed counts.** A is the mean of two seeds in S1, S3, and the A-applied contrast; P0 and
-  A-applied use seed 0. The seed-0-only A-applied contrast is 6.54 (5.09 to 8.00) and the
-seed-1-only
-  contrast 4.45, so the A-applied contrast depends on which A seed is read; the sign never changes.
-- **S2 pooled excludes D10** (real reverse flow); D10's A-minus-P0 harm is -0.043.
-- **Caveats.** The reverse-flow rows come from six Primaries in one rotation each, so rotation and
-  Primary are confounded and there are 42 blocks. The injected farm is real recorded output on top
-  of real demand, and the test months are 2025-07 to 2025-09 and 2026-03 to 2026-06, so no winter
-  month is scored. The scored lead range is 0 to 240 hours (days 1 to 10). The 2025-07 refit trains
-  on 15 months, not 24. Unlogged load-shift events may sit in the readings.
-- **Not done.** Avoidable-curtailment cost (see Departures), a climatology row, a second example
-  forecast in winter, and a pretrain-then-fine-tune arm (experiment 418's recipe).
 
 ## Problems caused by the move
 
 - **The docstrings of experiments 412, 417, and 420 tell the reader to source an `env.sh`, which
   does
-  not exist in this repository.** I assembled `PYTHONPATH` and `DATA_PATH_INTERNAL` by hand (the
-  script header of `e00424_fit.py` lists them). Command that showed it: `ls env.sh`.
-- **`pgrep -f` patterns in a wait loop match the loop's own shell** unless one letter is in
-  brackets;
-  not a move problem, noted for the next worker.
+  not exist in this repository.** `PYTHONPATH` and `DATA_PATH_INTERNAL` were assembled by hand; the
+  header of `e00424_fit.py` lists them. Command that showed it: `ls env.sh`.
 
 ## Review log
 
-**Plan review (fresh Sonnet agent, before any fit).** 12 findings, all triaged. Accepted: a numeric
-S1 floor in the bars and an outcome for a gain between the minimum detectable effect and the floor;
-the label covers only the Primaries whose gate opened; S2 and S3 read on point estimates and stage 1
-tests S2 at D5 only; missing-ensemble rows are kept and counted; the 9-hour delay, the archive
-switch
-on 2025-07-01, the `u99` constant, and the 6-hour-mean limit are stated; lead bands split at 144
-hours; departures for climatology and multiplicity; prose fixes. Not changed: the draft-PR timing,
-because the brief asks for a draft plan PR.
+**Plan review (fresh Sonnet agent, before any fit).** The review gave 12 findings. Accepted: a
+numeric S1 floor and an outcome for a gain between the minimum detectable effect and the floor; the
+label covers only the substations whose gate opened; S2 and S3 read on point estimates, with stage 1
+testing S2 at D5 only; missing-ensemble rows kept and counted; the 9-hour delay, the archive switch
+on 2025-07-01, the `u99` constant, and the 6-hour-mean limit stated; lead bands split at 144 hours;
+departures for the climatology row and multiplicity. Not changed: the draft-PR timing, because the
+brief asks for a draft plan PR.
 
 **Code review (fresh Sonnet agent, before any fit).** No leakage and no crash on first use. One
 important finding, accepted and fixed: experiment 417's gate keeps each valid time's longest-lead
 row,
-which with ensemble inputs gave a gate shut at D8 and D12 (the gate now uses the shortest-lead row).
-Minor, accepted: S1 code stricter than the plan; the ensemble-minus-laboratory interval was dropped;
-the ensemble clearness index is not a clear-sky index (stated). Not changed: the applied-only fold
-is rebuilt per job (efficiency only).
+which gave a gate shut at D8 and D12 with ensemble inputs; the gate now uses the shortest-lead row.
+Minor, accepted: the S1 code was stricter than the plan; the ensemble-minus-recorded interval was
+dropped; the ensemble clearness index is not a clear-sky index (stated). Not changed: the
+applied-only
+fold is rebuilt per job (efficiency only).
 
 **Results review (fresh Sonnet agent, from the stored forecasts).** Every headline number was
-reproduced (reverse-row CRPS of all six arms, the pooled and per-Primary gains with intervals, S2
-and
-S3, and identical key sets across arms). One discrepancy, accepted: the A-applied contrast used A's
-seed 0 (6.54) while every other figure used A's two-seed mean (5.50); the page and the scoring
-script
-now use the two-seed mean. The checks above come from this review.
+reproduced. One discrepancy, accepted: the A-applied contrast used A's seed 0 (6.54) while every
+other figure used A's two-seed mean (5.50); the page and the scoring script now use the two-seed
+mean. The Checks above come from this review.
 
-**Write-up review and prose review:** pending.
+**Write-up numbers review (fresh Sonnet agent, against the stored scores).** Accepted: four interval
+ends and one rounding corrected, the claim that the gain "does not fall" across lead bands replaced
+by the measured 0.8-point fall, "at least 5.7" scoped as a point estimate, the learned-coefficient
+ranges put on one basis (seed 0), a truncated sentence in the prediction repaired, and a statement
+that the prediction was met added.
+
+**Prose review (fresh Sonnet agent).** Accepted: terms defined at first use (primary substation,
+points of effective capacity, CRPS, hidden, no-injection), the take-home rewritten to be
+self-contained and scoped, "costs accuracy" replaced, the seed-noise sentence corrected, the lead
+bands renamed to days 7 to 10, "feeder core" replaced, the results moved above the plan, the
+audit triggers described, first-person and process-history lines removed from the move section.
+Not changed: duplication between the headline, lessons, and advice (each must stand alone in the
+generated tables), the registered-form plan prose, and a split of the long registered sentences in
+the plan, which would alter the pre-registered wording.

@@ -38,7 +38,7 @@ LEAD_HOURS: Final[pl.Expr] = (pl.col("valid") - pl.col("origin")) / 3_600_000_00
 LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
     "days 1 to 2": (0.0, 48.0),
     "days 3 to 6 (lead up to 144 hours)": (48.0, 144.0),
-    "days 6 to 10 (lead above 144 hours)": (144.0, 240.01),
+    "days 7 to 10 (lead above 144 hours)": (144.0, 240.01),
 }
 """Lead bands in hours; the headline is all leads up to 240 hours (days 1 to 10)."""
 
