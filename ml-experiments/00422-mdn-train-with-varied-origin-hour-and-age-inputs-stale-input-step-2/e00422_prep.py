@@ -114,6 +114,13 @@ def swap_previous_weather(
 
     A row takes the previous run's values at its valid time only if that run's row is in `x`.
 
+    Args:
+        x: Feature matrix, one row per training row; modified in place.
+        names: Column names of `x`.
+        origin_us: Forecast origin of each row, in microseconds.
+        valid_us: Valid time of each row, in microseconds.
+        use: Rows that should take the previous run's weather.
+
     Returns:
         A boolean mask of the rows that were swapped.
     """
