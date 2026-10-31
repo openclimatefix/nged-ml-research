@@ -107,7 +107,7 @@ def figure_contrasts() -> None:
             ).to_pandas()  # ty: ignore[unresolved-attribute]
         )
         .mark_tick(color="#8A8A8A", size=26, thickness=2)
-        .encode(x="x:Q", y=alt.Y("row:N", sort=order))
+        .encode(x="x:Q", y=alt.Y("row:N", sort=order))  # ty: ignore[unresolved-attribute]
     )
     chart = (zero + ticks + bars + points).properties(
         width=WIDTH,
