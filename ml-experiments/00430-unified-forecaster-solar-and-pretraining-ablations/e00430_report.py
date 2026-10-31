@@ -157,12 +157,12 @@ def headline_figure(table: pl.DataFrame) -> None:
     base = alt.Chart(alt.Data(values=frame)).encode(
         y=alt.Y("label:N", sort=[h[0] for h in HEADLINE], title=None, axis=alt.Axis(labelLimit=330))
     )
-    bars = base.mark_rule(strokeWidth=3, color=ocf.DATA_BLUE).encode(
+    bars = base.mark_rule(strokeWidth=3, color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lo99:Q", title="Change in quantile score (%, negative is better)"), x2="hi99:Q"
     )
-    points = base.mark_point(filled=True, size=70, color=ocf.BRAND_ORANGE).encode(x="pct_change:Q")
+    points = base.mark_point(filled=True, size=70, color=ocf.BRAND_ORANGE).encode(x="pct_change:Q")  # ty: ignore[unresolved-attribute]
     zero = (
-        alt.Chart(alt.Data(values=[{"x": 0}, {"x": -1}, {"x": 1}]))
+        alt.Chart(alt.Data(values=[{"x": 0}, {"x": -1}, {"x": 1}]))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color="#999999")
         .encode(x="x:Q")
     )
@@ -212,12 +212,12 @@ def coherence_figure() -> None:
             legend=alt.Legend(title=None, orient="bottom"),
         ),
     )
-    points = base.mark_point(filled=True, size=60).encode(
+    points = base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("change:Q", title="Change against one pass with ECC (%, negative is better)"),
         yOffset="metric:N",
     )
     bars = (
-        base.transform_filter("datum.lo != null")
+        base.transform_filter("datum.lo != null")  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeWidth=2)
         .encode(x="lo:Q", x2="hi:Q", yOffset="metric:N")
     )
@@ -249,18 +249,18 @@ def example_figures() -> None:
         base = alt.Chart(alt.Data(values=d.to_dicts())).encode(
             x=alt.X("hours:Q", title="Hours since the run")
         )
-        band90 = base.mark_area(opacity=0.25, color=ocf.DATA_BLUE).encode(
+        band90 = base.mark_area(opacity=0.25, color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title="Output (share of capacity)"), y2="q95:Q"
         )
-        band50 = base.mark_area(opacity=0.35, color=ocf.DATA_BLUE).encode(y="q25:Q", y2="q75:Q")
-        median = base.mark_line(color=ocf.DATA_BLUE).encode(y="q50:Q")
-        actual = base.mark_point(size=12, color=ocf.BRAND_ORANGE, filled=True).encode(y="actual:Q")
+        band50 = base.mark_area(opacity=0.35, color=ocf.DATA_BLUE).encode(y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+        median = base.mark_line(color=ocf.DATA_BLUE).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
+        actual = base.mark_point(size=12, color=ocf.BRAND_ORANGE, filled=True).encode(y="actual:Q")  # ty: ignore[unresolved-attribute]
         chart = (
             alt.layer(band90, band50, median, actual)
             .properties(width=WIDTH, height=150)
             .facet(row=alt.Row("season:N", title=None), title=title)
         )
-        save(chart, name)
+        save(chart, name)  # ty: ignore[invalid-argument-type]
 
 
 def main() -> None:
