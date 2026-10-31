@@ -164,7 +164,7 @@ def forecast(
     )
     scalers.trust_mean = saved["trust_mean"]
     scalers.trust_std = saved["trust_std"]
-    power_np, code = fit.world_power(seed=world)
+    power_np, code = fit.world_power(seed=None if world < 0 else world)
     power = torch.tensor(power_np, device=device)
     table = pl.read_parquet(lagless.table_path(month=month, seed=seed))
     stack = rows_mod.build_stack(
