@@ -123,7 +123,9 @@ def fig_headline(*, cases: pl.DataFrame, qs: dict[str, np.ndarray]) -> alt.TopLe
         ),
         x2="high:Q",
         color=alt.Color(
-            "group:N", scale=colour_scale(), legend=alt.Legend(orient="top", title=None, columns=2, labelLimit=400)
+            "group:N",
+            scale=colour_scale(),
+            legend=alt.Legend(orient="top", title=None, columns=2, labelLimit=400),
         ),
     )
     narrow = base.mark_rule(strokeWidth=4, aria=False).encode(  # ty: ignore[unresolved-attribute]
