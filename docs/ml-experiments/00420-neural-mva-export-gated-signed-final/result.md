@@ -15,46 +15,43 @@ protocol: demand-v2
 size: >-
   complex. Stored: fitted networks (state files), per-row forecasts of the hidden pair and of the
   MVA-only eight, and the step-0 diagnostic tables, all in this experiment's private folder.
-  Designs:
-  more than one is defensible (the Opus audit weighs a corrected gate H, labels, and a variance
-  term,
-  and this plan fixes the choice before any fit). Callers: the code imports experiments 87, 397,
-  405,
-  412, and 417. Serving path and degradation rule: not touched (this repository holds neither).
+  Designs: more than one is defensible (the Opus audit weighs a corrected gate H, labels, and a
+  variance term, and this plan fixes the choice before any fit). Callers: the code imports
+  experiments 87, 397, 405, 412, and 417. Serving path and degradation rule: not touched (this
+  repository holds neither).
 hypothesis: >-
   Experiment 417's arm A (a Primary-level export gate in front of the folded likelihood) gives a
   large gain in signed CRPS on reverse-flow rows over the plain network read as signed, and keeps
   the no-injection CRPS unchanged. Adding one shared variance term that grows with the fitted PV
-  term improves on A, because the false calls sit next to zero crossings and the q01
-  coverage on reverse rows is about 0.05 against a nominal 0.01, so the signed distribution is too
-  narrow where PV is large.
+  term improves on A, because the false calls sit next to zero crossings and the q01 coverage on
+  reverse rows is about 0.05 against a nominal 0.01, so the signed distribution is too narrow where
+  PV is large.
 prediction: >-
   Written before any fit. B1: A and AV beat P0 on reverse-flow rows by at least the minimum
   detectable effect, with the interval excluding zero, pooled and at each of the six hidden
-  Primaries (on the stored r1 test months A scored 5.1 points against about 15 for the plain
-  neural network read as signed, so this should hold). B3: A beats the shuffled sky. B2: AV beats A
-  by at least the minimum detectable effect; this fails if the gain is smaller or if the contrast is
+  Primaries (on the stored r1 test months A scored 5.1 points against about 15 for the plain neural
+  network read as signed, so this should hold). B3: A beats the shuffled sky. B2: AV beats A by at
+  least the minimum detectable effect; this fails if the gain is smaller or if the contrast is
   underpowered. B4 is the bar most at risk: at an r2 or r3 placebo Primary the Primary-level gate
   may open wrongly, and the signed CRPS there worsens by more than the no-harm tolerance. B5 holds
   because the gate decision at the MVA-only eight is made on their own readings.
 decision_rule: >-
-  Final decision, registered. If B1, B3, B4, and B5 pass for AV, or for A with AV failing B2,
-  label the passing arm's signed output at the eight "inferred, laboratory, gated" and take it to a
-  serving test with ENS inputs. If B4 fails at any placebo Primary, stop the signed-MW work for
-  good:
-  publish unsigned MVA forecasts at the eight and label D12 alone "inferred, heavy reverse flow
-  only". Add no further gates or capacity priors, because that would count as the ninth failed
-  treatment. B4 is judged per arm, and the label goes to AV only if B2 also passes, otherwise to A.
-  B3 is measured on A, and AV inherits it. Any other result (for example B1, B3, or B5 failing while
-  B4 passes) is reported as not shown, with no label and no further fits. Stage-1 stop rule,
+  Final decision, registered. If B1, B3, B4, and B5 pass for AV, or for A with AV failing B2, label
+  the passing arm's signed output at the eight "inferred, laboratory, gated" and take it to a
+  serving test with ensemble (ENS) weather forecasts. If B4 fails at any placebo Primary, stop the
+  signed-MW work for good: publish unsigned MVA forecasts at the eight and label D12 alone
+  "inferred, heavy reverse flow only". Add no further gates or capacity priors, because that would
+  count as the ninth failed treatment. B4 is judged per arm, and the label goes to AV only if B2
+  also passes, otherwise to A. B3 is measured on A, and AV inherits it. Any other result (for
+  example B1, B3, or B5 failing while B4 passes) is reported as not shown, with no label and no
+  further fits. Stage-1 stop rule,
   registered: if A fails B1 against P0 on rotation r1 at the new
   months, stop; otherwise run stage 2 after telling the manager. No porting threshold applies,
   because the experiment is a lab test and nothing here ports to production.
 benchmark: >-
   P0, experiment 417's network with every folded Primary's gate forced shut (the plain neural
   network read as signed), and A, experiment 417's arm A. Experiment 417's numbers are quoted for
-  context only,
-  because they cover two test months.
+  context only, because they cover two test months.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Signed CRPS (twice the mean pinball loss over the 11 quantile levels) in points of effective
@@ -65,46 +62,47 @@ code: ml-experiments/00420-neural-mva-export-gated-signed-final/
 verdict: partly supported
 best_arm: >-
   A, experiment 417's export-gated network: reverse-flow signed CRPS 7.05 points against 26.26 for
-  the plain neural network read as signed, a gain of 19.2 (95% interval 16.5 to 21.6).
+  the plain neural network read as signed, a gain of 19.2 (95% interval 16.5 to 21.5).
 headline: >-
   On all three rotations and seven test months, the export-gated network (A) cut the signed CRPS on
   reverse-flow half-hours from 26.3 to 7.1 points of capacity against the plain neural network read
   as signed, did no harm at the no-injection Primaries (+0.03 at D5, none elsewhere), and beat a
   shuffled sky by 9.1. The shared PV-proportional variance (AV) did not help: it was worse than A by
-  0.23 (0.16 to 0.30).
+  0.23 (0.15 to 0.30).
 lessons:
   - >-
     A neural network that is allowed to go below zero forecasts reverse flow far better than one
-    forced to stay above zero. The ungated reference scores the same as A on reverse-flow rows
-    (6.99 against 6.98 at seed 0), so the gain over the plain network says the forecast must be
+    forced to stay above zero. The ungated reference scores the same as A on reverse-flow rows (6.99
+    against 6.98 at seed 0), so the gain over the plain neural network says the forecast must be
     allowed to go negative, not that the gate adds skill there.
   - >-
-    The gate earns its place at the no-injection Primary D5, where the ungated reference is worse
-    than the plain network by 1.21 points and A by 0.03. At D9, D11, D14, and D16 even the ungated
-    reference did no harm, so those placebos could not separate the arms.
+    The gate reduces harm at the no-injection Primary D5, where the ungated reference is worse than
+    the plain neural network by 1.21 points, and A by 0.03 points. At D9, D11, D14, and D16 even the
+    ungated reference did no harm, so those placebos could not separate the arms.
   - >-
-    The sign is still often wrong. At 0.5 on the probability of reverse flow, A calls reverse flow
-    on
-    15.5% of the non-reverse sunny half-hours (66.8% of the non-reverse sunny summer middays),
-    although the area under the ranking curve is 0.93.
+    The sign is still often wrong. When A calls reverse flow whenever its probability of reverse
+    flow exceeds 0.5, it calls reverse flow on 15.5% of the non-reverse sunny half-hour rows (66.8%
+    of the non-reverse sunny summer-midday rows), although the area under the receiver operating
+    characteristic curve (a ranking measure) is 0.93.
   - >-
     A variance that grows with the fitted PV term did not narrow the gap. AV was worse than A at
     level 2.0 (0.23) and no better at level 1.0 (0.05, interval -0.06 to 0.16).
 take_home_message: >-
-  A neural network with a once-per-Primary export gate forecasts signed power much better than the
-  plain network read as signed on the half-hours with reverse flow (7.1 against 26.3 points of
-  capacity) and does no harm where no solar farm exports. Most of that gain comes from letting the
-  forecast go below zero at all, because the ungated network scores the same on reverse-flow
+  A neural network with a gate that decides once per Primary substation whether it exports power
+  forecasts signed power much better than the same network with the gate shut on the half-hours with
+  reverse flow (7.1 against 26.3 points of capacity) and does no harm beyond the registered
+  tolerance (+0.03 points at D5) where no solar farm exports. Most of that gain comes from letting
+  the forecast go below zero at all, because the ungated network scores the same on reverse-flow
   half-hours, and the gate's job is to stop invented reverse flow where there is none. Adding a
   PV-proportional variance did not help, so the next step is a serving test with real ensemble
   forecasts, not a further change to the network.
 advice:
   - >-
     Label a signed forecast at an MVA-only Primary "inferred, laboratory, gated" and test it with
-    ENS inputs before showing it to NGED (A against P0, B1 and B4).
+    ensemble (ENS) weather forecasts before showing it to NGED (A against P0, B1 and B4).
   - >-
     Score a signed forecast against the ungated network as well as against a network forced above
-    zero, because the second reference is easy to beat (A against ref, lessons).
+    zero, because the network forced above zero is easy to beat (A against ref, lessons).
   - >-
     Do not add the shared PV-proportional variance to the signed network (AV against A, B2).
   - >-
@@ -113,36 +111,42 @@ advice:
 production_status: candidate
 adopted_in: none
 ---
-**An export-gated neural network forecast signed power at Primaries whose meter hides the sign far
-better than the plain neural network read as signed, on half-hours with reverse flow: a signed CRPS
-of 7.1 points of capacity against 26.3, in a laboratory test with the sign hidden at six
-Primaries.** We tested this by adding a real solar farm's recorded output to the demand of six
-Primaries whose meters do show the sign, hiding the sign from the network, and scoring its signed
-forecast on three rotations of the hidden Primaries and seven test months. The gate did no harm at
-the Primaries with no added farm. A second change, a variance that grows with the fitted solar term,
-made the forecast slightly worse. The plan below was written before any fit and follows the Opus
-audit and design note of 2026-10-30 (private folder: `briefs/neural_mva_final_audit_answer.md`).
+**A neural network with a gate that decides, once per Primary substation, whether the Primary
+exports power forecast the signed power far better than the same network with the gate shut, on the
+half-hours when power flowed back up the electricity network.** Signed power is positive for demand
+and negative for reverse flow, where solar or wind generation exports power up the network. The
+score is the continuous ranked probability score (CRPS), which is lower when a probabilistic
+forecast is better: 7.1 points of effective capacity with the gate against 26.3 with the gate shut.
+The test was a laboratory test. We took six Primaries whose meters do show the sign, added a real
+farm's recorded output to each Primary's demand, hid the sign from the network, and scored its
+forecast on 7 test months, with 2 Primaries hidden at a time over 3 rotations. The gate did no harm
+beyond the registered tolerance at the Primaries with no added farm (+0.03 points at D5). A second
+change, a forecast spread that grows with the network's estimate of solar output, made the forecast
+worse by 0.23 points. The plan below was written before any fit and follows the Opus audit and
+design note of 2026-10-30 (private folder: `briefs/neural_mva_final_audit_answer.md`).
 
 ## Question and plan in plain words
 
-**Eight Primary substations report only the size of the power flowing, not its direction, so a
-forecast cannot say whether a half-hour is demand or solar generation pushing power back up the
-electricity network.** Experiments 412 and 417 hid the direction at two Primaries where it is known,
-by adding a real solar farm's recorded output to the Primary's demand, and asked a neural network to
-recover the direction from the sunshine. The earlier bars asked for a correct sign. This experiment
-asks the question the maintainer cares about: **is the signed forecast better than the plain reading
-read as signed, at the Primaries with reverse flow, with no harm elsewhere?** It runs the neural
-network of experiment 417's arm A and a new arm AV on all three rotations of the hidden pair, seven
-test months, and scores signed CRPS on the half-hours with reverse flow. The weather inputs are
-realised CAMS irradiance and ERA5 temperature, so every result is a laboratory result.
+**Eight Primary substations report only the size of the power flowing (megavolt-amperes, MVA), not
+its direction, so a forecast cannot say whether a half-hour is demand or solar generation pushing
+power back up the electricity network.** Experiments 412 and 417 hid the direction at two Primaries
+where it is known, by adding a real solar farm's recorded output to the Primary's demand, and asked
+a neural network to recover the direction from the sunshine. The earlier pass criteria asked for a
+correct sign. Codes such as D5 and D10 are anonymised Primary labels. This experiment asks the
+question the maintainer cares about: **is the signed forecast better than the forecast of the same
+neural network with its gate shut (P0), at the Primaries with reverse flow, with no harm
+elsewhere?** It runs the neural network of experiment 417's arm A and a new arm AV on all three
+rotations of the hidden pair, seven test months, and scores signed CRPS on the half-hours with
+reverse flow. The weather inputs are realised CAMS irradiance and ERA5 temperature, so every result
+is a laboratory result.
 
 ## Evidence the plan follows
 
 - **The audit found no defect whose correction turns a failed arm into a pass.** The audit did find
-  four defects that change how earlier numbers read (table below), and it moved the pass bars from
-  the sign of the flow to the signed CRPS. The audit's recomputed figures come from stored forecasts
-  of experiments 412 and 417 and are approximate (CRPS as twice the mean pinball loss over 11
-  levels).
+  11 findings (table below), of which four change how earlier numbers read, and it moved the pass
+  bars from the sign of the flow to the signed CRPS. The audit's recomputed figures come from stored
+  forecasts of experiments 412 and 417 and are approximate (CRPS as twice the mean pinball loss over
+  11 levels).
 - **Experiment 417 (merged, pull request 74) stopped the signed-MW work on sign bars.** The export
   gate fixed the no-injection placebo by construction and kept 12.0% false reverse flow at the
   injected pair. On the new bar, the audit recomputed arm A's reverse-row CRPS as 5.10 points
@@ -187,8 +191,8 @@ the audit's finding. `u` and `k` come from CAMS and do not depend on the injecti
 truth enters the threshold. The note asks for the visible Primaries; the pool here is wider because
 the quantity read is a property of the sky, which the injection does not touch, and the wider pool
 gives more days. The step reruns experiment 417's `run` with the new threshold and writes its tables
-to this experiment's own folder, so experiment 417's stored files are not changed. It is reported
-with no bar and costs no fits.
+to this experiment's own folder, so experiment 417's stored files are not changed. Step 0 has no
+pass bar and needs no fits.
 
 ## Arms, settings, and rotations
 
@@ -196,7 +200,7 @@ with no bar and costs no fits.
 |---|---|---|
 | P0 | Experiment 417's network with every folded Primary's gate forced shut (`X >= 0` at every row) | Reference 1: the plain neural network on the reading, read as signed, with the same inputs |
 | A | Experiment 417's arm A, unchanged | Reference 2: the best earlier arm on the new bar |
-| AV | A plus the shared PV-proportional variance, `std^2 + (s * C_p * u)^2`, one `s >= 0` for all 16 Primaries (starting value 0.1) | The candidate |
+| AV | A plus the shared PV-proportional variance, `std^2 + (s * C_p * u)^2`, one `s >= 0` for all 16 trial-area Primaries (starting value 0.1) | The candidate |
 | A-shuffle | A with `u` permuted across days within year, month, and half-hour (the gate keeps the real `u`) | Control: the gain must come from the CAMS sky |
 | ref | Experiment 417's reference, with no Primary gate | Reported only: the harm the gate prevents |
 
@@ -219,14 +223,15 @@ Primary-months, 20,000 resamples), because each half-hour repeats in about 15 ru
 2.8 times the month-block bootstrap standard deviation of the null difference between A's two seeds
 on the reverse-flow slice (80% power at 5% two-sided). Stage 1 fits A's second seed on rotation r1
 at level 2.0 so the figure exists before stage 1 is scored; the stage-2 figure uses all three
-rotations. The same figure is applied at each Primary. It measures seed noise, which is a floor for
-the sampling noise of an arm-against-arm contrast, and it rests on few blocks (14 Primary-months on
-r1, 7 per Primary), so it is itself noisy. Each figure is committed to this page before the matching
-contrast is run. If the figure exceeds 0.5 points (about 10% of A's 5.10 on r1), the AV against A
-contrast is reported as underpowered.
+rotations. The same figure is applied at each Primary. The minimum detectable effect measures seed
+noise, which is a floor for the sampling noise of an arm-against-arm contrast. The minimum
+detectable effect also rests on few blocks (14 Primary-months on r1, 7 per Primary), so the figure
+is itself noisy. Each figure is committed to this page before the matching contrast is run. If the
+figure exceeds 0.5 points (about 10% of A's 5.10 on r1), the AV against A contrast is reported as
+underpowered.
 
-- **B1 (gain over the plain reading).** AV's reverse-row CRPS is below P0's by at least the minimum
-  detectable effect, with the interval excluding zero, pooled and at each of the six hidden
+- **B1 (gain over P0, the gate-shut network).** AV's reverse-row CRPS is below P0's by at least the
+  minimum detectable effect, with the interval excluding zero, pooled and at each of the six hidden
   Primaries at level 2.0. The same test is read for A. On rotation r1 (stage 1) the hidden pair is
   D5 (injected) and D10 (real reverse flow, no injection), so stage-1 B1 is pooled over D5 and D10
   and at each of the two, and a failure at either stops the run.
@@ -239,7 +244,8 @@ contrast is reported as underpowered.
   +0.20. The signed CRPS carries this guard, because the reading CRPS cannot: a folded reading
   forecast does not change when the sign is wrong. D10 is left out because it has real reverse flow.
 - **B5 (the MVA-only eight).** Reading CRPS at the eight, from the same fits, is within +0.05 of P0
-  pooled. No extra fits are needed, because each fit trains all 16 Primaries.
+  pooled. No extra fits are needed, because each fit trains all 16 trial-area Primaries (the six
+  signed-MW Primaries, the eight MVA-only Primaries, and the report-only D15 and D18).
 
 **Descriptive, with no bar:** q01 and q99 pinball loss and coverage on reverse-flow rows; sign
 balanced accuracy, recall, and false-reverse rate at `P(X < 0) > 0.5` on both denominators; the ROC
@@ -253,10 +259,10 @@ the same rules and reported with no bar.
 **On rotation r1, the minimum detectable effect is 0.404 points of effective capacity.** The null
 difference between A's two seeds on reverse-flow rows at level 2.0 is a mean of 0.197 (95% interval
 -0.057 to 0.504, 14 Primary-month blocks, 22,443 rows), with a bootstrap standard deviation of
-0.144; 2.8 times 0.144 is 0.404. This is below the 0.5-point limit, so the AV against A contrast is
-not flagged as underpowered at stage 1. The figure is computed by `e00420_score.py mde-stage1` and
-stored in `work/mde_stage1.json`, which the script refuses to overwrite. The stage-1 bars are scored
-after this commit.
+0.144; 2.8 times 0.144 is 0.404. The minimum detectable effect of 0.404 points is below the
+0.5-point limit, so the AV against A contrast is not flagged as underpowered at stage 1. The figure
+is computed by `e00420_score.py mde-stage1` and stored in `work/mde_stage1.json`, which the script
+refuses to overwrite. The stage-1 bars are scored after this commit.
 
 ## Stage 1 result (interim: rotation r1, seed 0, seven test months, no multiple-comparison correction)
 
@@ -280,9 +286,9 @@ with 95% month-block intervals. The stage-1 scores are in `work/scores_stage1.js
 **Over all three rotations the minimum detectable effect is 0.272 points of effective capacity.**
 The null difference between A's two seeds on reverse-flow rows at level 2.0 has a mean of -0.152
 (95% interval -0.341 to 0.040; 42 Primary-month blocks, 79,399 rows) and a bootstrap standard
-deviation of 0.097, and 2.8 times 0.097 is 0.272. This is below the 0.5-point limit, so the AV
-against A contrast is not underpowered. The figure is stored in `work/mde_full.json`. All 378 fits
-finished before it was computed.
+deviation of 0.097, and 2.8 times 0.097 is 0.272. The minimum detectable effect of 0.272 points is
+below the 0.5-point limit, so the AV against A contrast is not underpowered. The figure is stored in
+`work/mde_full.json`. All 378 fits finished before it was computed.
 
 ## Fits and stop rule
 
@@ -339,17 +345,17 @@ likelihood (`e00417_models.nll`), and the training loop (`e00417_fit.train`).
 - **Seed averaging.** For the pooled bars A and AV are scored as the mean of the per-row CRPS of
   their two seeds; P0, A-shuffle, and ref have one seed. Stage 1 uses seed 0 for every arm. The
   minimum detectable effect comes from single seeds, so it is conservative for the two-seed means.
-- **No day-ahead and 14-day example plot of a forecast against truth is drawn** at the six hidden
-  Primaries with an injected farm; the write-up shows example reverse-flow days instead.
+- **The example plot shows one day-ahead and one 10-day forecast at D5 only,** not at all six hidden
+  Primaries.
 
 ## Risks
 
 - **The shuffled sky keeps the daylight profile**, so A-shuffle may score above chance; B3 asks for
   a margin of the minimum detectable effect, not for chance.
-- **A Primary-level gate decides once, so a wrong decision costs the whole Primary.** The gate
-  decisions are stored for every fit and reported.
-- **P0 is not a separately tuned plain network.** It is the same network with its gates shut, so the
-  gain over P0 is the gain from the gate, not from a differently fitted baseline.
+- **A Primary-level gate decides once, so a wrong decision makes the whole Primary's forecast
+  wrong.** The gate decisions are stored for every fit and reported.
+- **P0 is not a separately tuned plain neural network.** It is the same network with its gates shut,
+  so the gain over P0 is the gain from the gate, not from a differently fitted baseline.
 - **Weather is realised** (ERA5 about 5 days late, CAMS about 1 day late), so every result is a
   laboratory result.
 - **Unlogged load-shift events** may sit in the readings, as NGED says its logs are incomplete.
@@ -373,7 +379,7 @@ and AV are means over two seeds, and the other arms use one seed. All scores are
 | B5, reading harm at the MVA-only eight | 0.021 (-0.009 to 0.059) | 0.009 (-0.024 to 0.043) | A and AV: yes (limit +0.05) |
 
 - **B1 by Primary (A):** D5 4.66, D9 25.45, D10 12.47, D11 21.12, D14 23.12, D16 23.74. Every
-  interval excludes zero and clears 0.272. AV's gains are within 0.3 of these.
+  interval excludes zero and clears 0.272. AV's gains are within 0.31 of these.
 - **B4 by Primary (A, harm against P0 at no injection):** D5 +0.031, D9 -0.040, D11 +0.001, D14
   -0.007, D16 -0.036. The r1 gate had been the open risk at stage 1. At rotations r2 and r3 the gate
   did not open wrongly: no placebo Primary was harmed by more than 0.04.
@@ -386,14 +392,15 @@ and AV are means over two seeds, and the other arms use one seed. All scores are
 ![CRPS by arm on rows with reverse flow](crps_by_arm.svg)
 
 **The ungated reference scores the same as A on reverse-flow rows, so the gain over P0 measures how
-much it helps to let the forecast go below zero.** A against ref is -0.061 (-0.149 to 0.024). The
-gate matters where there is no export: with no farm injected, the ungated reference is worse than P0
-at D5 by 1.21 points (+0.23 pooled over the five placebo Primaries, interval 0.07 to 0.43), and A is
-worse by 0.03.
+much it helps to let the forecast go below zero.** A against ref is -0.061 (-0.149 to 0.024): A is
+worse by 0.06, and the interval includes zero (ref has one seed and A two; at seed 0 alone A is
+slightly better, 6.98 against 6.99). The gate matters where there is no export: with no farm
+injected, the ungated reference is worse than P0 at D5 by 1.21 points (+0.23 pooled over the five
+placebo Primaries, interval 0.07 to 0.42), and A is worse by 0.03.
 
-**The sign is still often wrong, so the forecast needs its wide bands.** The numbers below are
-descriptive, at level 2.0, for A, on the half-hours with the CAMS unit shape at least 0.3 and
-clear-sky index at least 0.7 (115,040 rows, 12,526 unique half-hours).
+**The sign is still often wrong, and the lower tail is too narrow.** The numbers below are
+descriptive, at level 2.0 and seed 0, for A, on the half-hours with the CAMS unit shape at least 0.3
+and clear-sky index at least 0.7 (115,040 rows, 12,526 unique half-hours).
 
 | Measure | Value |
 |---|---|
@@ -407,10 +414,11 @@ clear-sky index at least 0.7 (115,040 rows, 12,526 unique half-hours).
 | q01 coverage on reverse-flow rows (nominal 0.01) | 0.062 |
 | q99 coverage on reverse-flow rows (nominal 0.99) | 0.998 |
 
-- **The Primary-level gate opened in every fit at the six hidden Primaries and at D8 and D12, and
-  stayed shut at D2, D3, D4, D19, D21, and D22.** This is why A and ref score alike at level 2.0.
-- **Level 1.0 (moderate export):** A's gain over P0 is 5.64 (4.62 to 6.40) and AV's 5.69 (4.61 to
-  6.53). AV against A is +0.05 (-0.06 to 0.16). A's balanced accuracy at level 1.0 is 0.716, with
+- **In every fit with an injected farm, the Primary-level gate opened at the six hidden Primaries
+  and at D8 and D12, and stayed shut at D2, D3, D4, D19, D21, and D22.** This is why A and ref score
+  alike at level 2.0.
+- **Level 1.0 (moderate export):** A's gain over P0 is 5.64 (4.61 to 6.41) and AV's 5.69 (4.60 to
+  6.52). AV against A is +0.05 (-0.06 to 0.16). A's balanced accuracy at level 1.0 is 0.716, with
   recall 0.524.
 - **The shared variance scale `s` learned 0.071 on average at level 2.0 (range 0.027 to 0.145), from
   a start of 0.1.** The tails did not improve: AV's q01 coverage was 0.060 against A's 0.062.
@@ -423,12 +431,14 @@ clear-sky index at least 0.7 (115,040 rows, 12,526 unique half-hours).
   zero, so B1 is a low bar. The ungated reference scores the same as A on reverse-flow rows, as the
   results section reports.
 - **Median forecast against the mean forecast.** Not computed, because the stored forecasts hold
-  quantiles and no mean. The error of the median forecast on reverse-flow rows points the same way
-  as the CRPS: P0 31.98, A 12.19, AV 12.79 points. Audit trigger 3 did not fire.
-- **Audit triggers.** Trigger 5 fired: AV contains A (its added variance can shrink to zero) and
-  scored 0.225 worse (interval 0.155 to 0.300), beyond the null difference between A's two seeds
-  (-0.341 to 0.040). The cause is not settled; AV is not carried forward, so no audit was requested.
-  Trigger 7 applies: the planned serving test with ENS inputs depends on A's gain, which this
+  quantiles and no mean. The error of the median forecast on reverse-flow rows (seed 0) points the
+  same way as the CRPS: P0 31.98, A 12.19, AV 12.79 points. Audit trigger 3 did not fire.
+- **Audit triggers** (the numbered conditions in the `ml-experiment` skill's "Audit before merge"
+  section)**.** Trigger 5 (a nested arm beats the arm that contains it) fired: AV contains A (its
+  added variance can shrink to zero) and scored 0.225 worse (interval 0.155 to 0.300), beyond the
+  null difference between A's two seeds (-0.341 to 0.040). The cause is not settled; AV is not
+  carried forward, so no audit was requested. Trigger 7 (a later design depends on an unreplicated
+  headline) applies: the planned serving test with ENS inputs depends on A's gain, which this
   experiment has replicated over three rotations and seven months but only in the laboratory. The
   controls passed: the shuffled sky is 9.13 worse than A, and no placebo Primary was harmed by more
   than 0.04. Leaving one Primary out cannot flip B1, because the gain is positive at every Primary.
@@ -448,7 +458,7 @@ clear-sky index at least 0.7 (115,040 rows, 12,526 unique half-hours).
 
 ## Review log
 
-**Plan review (fresh Sonnet agent, before any fit).** Ten findings, all triaged.
+**Plan review (fresh Sonnet agent, before any fit).** 10 findings, all triaged.
 
 - **Accepted:** the decision rule had no outcome for a failure of B1, B3, or B5 alone (a final
   clause now says "not shown"; B4 is judged per arm; B3 is measured on A); the stage-1 stop rule
@@ -467,6 +477,21 @@ sign; the two minimum-detectable-effect figures now go to separate files that ca
 (stage 1 and full); `threshold.json` cannot be overwritten; P0's stored fit information says the
 gates were forced shut; the CRPS docstring says it approximates the CRPS; `read_arm` refuses a
 partial seed set. The seed-weight-decay note needs no change.
+
+**Write-up review (fresh Sonnet agent, against the stored scores).** No high or medium findings, and
+nine low findings, all accepted: four interval ends rounded wrongly, a "within 0.3" that should read
+0.31, the sign and tail tables and the median-error line labelled seed 0, "rows" named in the lesson
+about false-reverse rates, the direction and seed difference of A against ref stated, and "no harm"
+qualified as "beyond the registered tolerance".
+
+**Prose review (fresh Sonnet agent).** 35 findings. Accepted: the opening paragraph now defines
+"signed", "reverse flow", the CRPS, the gate, and the rotations, and gives units and direction; MVA,
+the anonymised Primary codes, and the 16 trial-area Primaries are defined once; the contradiction
+between the Departures and the example figure is fixed; the gate-opening claim is scoped to fits
+with an injected farm; the lead about the lower tail now matches the coverage table; the audit
+triggers are named; money metaphors, bare pronouns, and the count slip ("Ten") are fixed. Not
+changed: the pre-registered hypothesis and prediction wording, which keeps the arm names P0, A, and
+AV that the plan defines, and the title.
 
 ## Problems caused by the move
 
