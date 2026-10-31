@@ -105,6 +105,13 @@ ARMS: Final[dict[str, ArmSpec]] = {
 def input_columns(*, spec: ArmSpec) -> tuple[list[int], list[str]]:
     """Return the matrix columns an arm keeps and the names of the 18-column group it replaces.
 
+    Args:
+        spec: The arm.
+
+    Returns:
+        The kept column indices of the 46-column matrix, and the replaced group's names (empty
+        for an arm with no encoder).
+
     Raises:
         ValueError: If the layout's `calendar` and `holidays` groups are not the 18 hand-made
             columns of `e00423_features.HAND_MADE_COLUMNS`.
