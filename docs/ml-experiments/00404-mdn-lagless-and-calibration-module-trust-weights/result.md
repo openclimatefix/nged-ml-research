@@ -289,6 +289,13 @@ run. The batch 1 stop rule stays as written.
   signed-MW Primaries (mean CRPS 4.307 for the mixture, 4.250 for the gate, 4.576 with lags, 4.439
   without). Any trust head or attention over lags in this experiment must beat B-mix to count.
 
+**Design iterations after batch 1 (maintainer, 2026-10-31).** The maintainer expects several design
+iterations (tokens and attention) and is optimistic about the idea, so a null at batch 1 does not
+end this experiment. The plan allows at least two design iterations after batch 1 before concluding.
+The batch 1 stop rule still decides whether the full batch 2 grid runs. If it fires, each iteration
+changes the trust head or the attention over tokens, is scored on the same rows against B-mix, and
+is reported as one more named arm. The manager is asked before the total passes 12 hours.
+
 **Batch 2** (runs straight away if the batch 1 stop rule does not fire):
 
 - **Carry-forward rule (maintainer, 2026-10-30).** B3 attends across the lag set that wins among
@@ -446,9 +453,11 @@ harm rows.
 - **The harm table** of the lag-gate brief: rows whose target is outside every event but whose lags
   lie inside one, minus the rows with clean lags, by number of lags inside the event. Each arm minus
   A0 on the harm rows, with whole-event bootstrap intervals.
-- **The lag-encroachment sweep** (experiment 395 Part E harness): the median's share of a synthetic
-  step by the number of lags inside the event, the band width ratio, and where the probability mass
-  sits.
+- **The lag-encroachment sweep** (experiment 392's protocol, required of every load-shift
+  experiment by the maintainer, 2026-10-31): add a step of 5% of capacity to the lags of clean rows
+  for k = 1, 2, and 3 lags, and report the median's shift as a share of the step, the band width
+  ratio, and where the probability mass sits, for every arm. The code path and protocol come from
+  the merged experiment 392 scripts on main and from the load-shift Discuss session.
 - **Probe (B8).** The precision-recall area of the probe on held-out real events from the corrected
   label table, per metering group.
 - **Loss outside events** and the overall five-fold CRPS, per Primary.
