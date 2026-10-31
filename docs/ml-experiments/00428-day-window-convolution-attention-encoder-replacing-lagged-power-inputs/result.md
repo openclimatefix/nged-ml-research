@@ -319,6 +319,74 @@ pilot, its leakage check, and its pre-registered rules are those of the Opus des
 experiment 404's table (frozen at commit 63d3799f, one table per month and seed) as the lagless
 forecast. They run after E3-surp-w is scored.
 
+### Design iteration 2 (2026-10-31): a 14-day history window
+
+**The question is what level a Primary sits at now, and how to pool the noisy surprise, not which
+Primary this is.** Experiment 421 asked the identity question. This iteration keeps the Primary
+embedding and gives the network 14 days of history (672 half-hours ending at the newest usable
+reading, origin minus 3.5 hours) so that it can estimate the Primary's current level against the
+lagless forecast (aim a) and pool the surprise with learned weights (aim b). The full design,
+reasoning, and diagnostics are in the design note `recent_history_encoder_design_answer.md`; this
+section records the arms, the departures, and the predictions.
+
+**Arms, all trained on the injected worlds, on the four screen folds and three seeds.**
+
+- **S1:** R-inj plus the single-step surprise at each of its three origin lags (reference for aim b).
+- **H-smooth:** R-inj plus four learned smoothed surprises of the 14-day surprise series. The
+  weights of position j for a target at T are a softmax over the observed positions of
+  a(L) cos(time of day of j minus T) + c(L) cos(day of week of j minus T) minus b(L) times the age
+  of j in days, with a, c, b learned per lead band (days 0 to 2, 2 to 5, 5 to 10, and 10 or more)
+  and b at least 0. The weights never read the surprise values. The observed share of the window joins the
+  inputs. (Aim b.)
+- **H-lvl:** R-inj plus a level offset and a 4-way soft regime vector per origin. A dilated
+  convolutional network encodes the window, one attention pooling (query: Primary embedding and the
+  origin's time of day) gives a summary, and a second pooling gives the level offset, the weighted
+  mean of power minus lagless median. The three mixture means shift by g(L) times the offset, with g
+  in [0, 1] learned per lead band. The regime vector joins the head. (Aim a.)
+- **H14-s:** no lags. The same dilated convolutional network encodes the window (eight channels:
+  power, observed flag, lagless median, surprise, sine and cosine of time of day and of day of
+  week), and one attention head with a null token reads it. The score of position j adds three terms
+  to the dot product: a(cos of the time-of-day difference), c(cos of the day-of-week difference), and
+  minus b times the age.
+- **H14-s-ow:** H14-s with the window read from 28 days earlier (control: identity and season
+  without recency).
+
+**Departures from the design note, stated before any score.** The bank-holiday channel is omitted
+(no holiday table is loaded in this harness), so seven channels carry H14-s. Experiment 404's
+hand-built window statistics (arm S404) are not run in this screen, so aim (b) is decided against S1
+only and the comparison with S404 stays open. Window encoding is per row, not per origin: each batch
+is 2,048 rows and the convolution blocks use gradient checkpointing to stay under 8 GB. The sweep
+runs the lag variant for the arms that keep R-inj's lags and the whole-day variant on the history
+(shift the last k days of the history by the step, and any lag that falls in those days), k = 1, 2,
+3, for every arm of this iteration, plus the masked control. Experiment 404's lagless table is used
+for the lagless median and the surprise, one table per month and seed.
+
+**Predictions, written before any score of these arms is read (signed-MW six unless stated; contrast
+= CRPS difference in the units of the other contrasts).**
+
+- **P1:** H14-s minus R-inj on clean rows lies between -0.05 and +0.05.
+- **P2:** H14-s minus R-inj on injected harm rows lies between -0.30 and -0.05.
+- **P3:** H14-s minus the better of E3 and E3-surp lies within plus or minus 0.05 on harm rows and on
+  clean rows.
+- **P4 (aim b):** H-smooth minus S1 on injected harm rows is at or below -0.03.
+- **P5:** S1 minus R-inj on clean rows lies within plus or minus 0.03.
+- **P6 (aim a):** H-lvl minus R-inj on clean rows, 12 to 36 hours ahead, is at or below -0.03, and the
+  learned g falls with lead (days 6 to 10 at least 0.2 below days 1 to 2).
+- **P6c:** H-smooth's kernels put at least half their weight within 3 hours of the target's time of
+  day, and their effective number of positions lies between 6 and 100.
+- **P7:** H14-s-ow minus H14-s on clean rows, 12 to 36 hours ahead, is at least +0.05.
+- **P8:** on injected harm rows, the mean null-token mass of H14-s is at least 0.15 higher than on the
+  same rows in the clean world.
+- **P9:** in the whole-day sweep, H14-s follows at most 0.05 of a 5% step at k = 1, 2, and 3, with a
+  band-width ratio of at least 1.10 at k = 3.
+
+**Rules.** The advance rule, the two aim rules, the choice between the 14-day window and the day
+windows, the inert and collapse rules, and the stop rules are those of sections 5 of the design
+note; the screen reports them after scoring. The pilot (one fold, seed 0) runs first and stops the
+screen if the masked control moves the forecast by more than 1e-6, if a visibility assertion fails,
+if the attention of H14-s is uniform or sits wholly on the null token, or if its validation negative
+log-likelihood is worse than R-inj's by more than 0.05.
+
 ## Checks, reviews, and what the page will report
 
 - **Departures from experiment 397's recipe, found by the code review.** Every arm (R included)
