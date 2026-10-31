@@ -59,17 +59,21 @@ DELAY_HOURS: Final[dict[str, int]] = {
 }
 SOURCES: Final[list[str]] = ["T0", "T1", "T2", "T2n", "T3", "T4"]
 SOURCE_COLOURS: Final[list[str]] = [
-    theme.DATA_BLUE,
-    theme.BRAND_ORANGE,
-    theme.DATA_GREEN,
-    theme.DATA_PURPLE,
+    theme.DATA_COLOURS[0],
+    theme.DATA_COLOURS[1],
+    theme.DATA_COLOURS[2],
+    theme.DATA_COLOURS[3],
     theme.DATA_COLOURS[4],
-    theme.DATA_COLOURS[5],
+    "#7F7F7F",
 ]
 EXAMPLE_SITE: Final[str] = "D5"
 EXAMPLES: Final[dict[str, str]] = {"winter": "2026-01", "summer": "2026-06"}
 EXAMPLE_CURVES: Final[tuple[tuple[str, str], ...]] = (("T0", "FRESH"), ("T0", "P12"), ("T3", "P12"))
-CURVE_COLOURS: Final[list[str]] = [theme.DATA_BLUE, theme.BRAND_ORANGE, theme.DATA_GREEN]
+CURVE_COLOURS: Final[list[str]] = [
+    theme.DATA_COLOURS[0],
+    theme.DATA_COLOURS[2],
+    theme.DATA_COLOURS[4],
+]
 
 
 def contrasts() -> pl.DataFrame:

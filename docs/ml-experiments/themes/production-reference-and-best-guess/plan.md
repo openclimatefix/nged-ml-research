@@ -11,7 +11,6 @@
 | 380 | Which stages of the GAM stack could go for a small, measured loss, and is its gap to BG2 larger at the Primaries with less regular demand? | High (maintainer asked) | Nothing | Planned |
 | 384 | What is special about the eight MVA-only Primaries that the GAM stack trails BG2 there? | High (maintainer asked 2026-10-28) | Nothing | Finished: no hypothesis shown; within the MVA-only group the gap follows the step rate |
 | 397 | Does a plain mixture density network match the simple XGBoost model for Primary demand, and does attention over the inputs help it? | High (maintainer asked 2026-10-30) | Slot from the manager | Finished: the plain network matched XGBoost, attention did not help (gate inert) |
-| 422 | Does training the pooled mixture density network at many origin hours, with the age of the weather forecast and of the newest reading as inputs, remove its loss from stale inputs? | High (maintainer asked 2026-10-31) | Slot from the manager | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 
