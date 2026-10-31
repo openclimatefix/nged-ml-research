@@ -26,31 +26,41 @@ hypothesis: >-
 prediction: >-
   Written before any fit and before any score is read. P1. The encoder with holiday names (E1)
   lowers the CRPS at days 1 to 10 on the bank-holiday-week rows by at least 0.10 points of capacity
-  against the encoder with dates only (E2), at the signed-MW six. P2. Over all rows, E1 and E2 are
-  each within the minimum detectable effect of the hand-made columns (R) at both groups, and the
-  page says so rather than claiming equality. P3. Christmas and Easter weeks are reported per
-  set and not tested, because the five screen folds hold one Christmas and a two-day sliver of
-  Easter week. P4 (only if E1 or P1 is promising). A per-Primary encoder (E3) is worse than E1 on
-  every row set, because each encoder then sees one sixteenth of the holiday days.
+  against the same encoder without the name (E1n), at the signed-MW six; P1 is read only if the
+  printed minimum detectable effect on those rows is at most 0.10, and is otherwise reported as
+  untestable. P2. Over all rows, E1, E1n, and E2 are each within the minimum detectable effect of
+  the hand-made columns (R) at both groups; the page says "inside the noise" and does not claim
+  equality. P3. E2 (day of year and day of month, no holiday information) is no better than E0
+  (half-hour and weekday only) over all rows, because a day-of-year bucket seen once or twice can
+  only be memorised. P4. The encoder does not help the MVA-only eight. P5 (only if C3 is at most
+  -0.05 or C1 is below zero). A per-Primary encoder (E3) is worse than E1 on every row set.
 decision_rule: >-
-  CRPS at days 1 to 10 in points of effective capacity, read per group (signed-MW six; MVA-only
-  eight; D15 and D18 report-only), paired by fold and seed, with the month-block bootstrap of
-  `studies.eval_protocol`, 20,000 resamples, at a 95% level Bonferroni-corrected over the planned
-  contrasts. Planned contrasts. C1 E1 minus R, all rows. C2 E2 minus R, all rows. C3 E1 minus E2,
-  bank-holiday-week rows. C4 E1 minus R on the Christmas set and on the Easter set (descriptive).
-  C5 E3 minus E1 (run only if C3 is at most -0.05 or C1 is below zero). Seed noise is large
-  (experiment 419: seeds 0 to 2 against 3 to 5 moved the MVA-only eight by -0.047), so every arm is
-  fitted with seeds 0 to 5 and the reference R reuses the stored seeds 0 to 2 (experiment 407
-  `ctrl`) and 3 to 5 (experiment 419 `ctrl_s3`). The minimum detectable effect is printed by the
-  scorer before any contrast is read, as twice the standard deviation over the folds of the
-  difference in the signed-MW six CRPS between `ctrl` and `ctrl_s3`, divided by the square root of
-  two for six-seed means (experiment 419 found 0.0738 for three-seed means). A contrast smaller
-  than the minimum detectable effect is reported as inside the noise. The hypothesis is supported
-  if P1 holds with an interval wholly below zero and C1 is not above the minimum detectable
-  effect; partly supported if P1 holds on its point estimate only; not supported otherwise. The
-  encoder adds a module and a calendar table to the pipeline, so the smallest gain worth porting
-  it is 0.03 points at the signed-MW six over all rows or 0.10 on the bank-holiday-week rows. No
-  adoption is sought. The five screen folds are interim.
+  CRPS at days 1 to 10 in points of effective capacity, the 1.15-widened quantiles as in
+  experiment 419's scorer (its aggregation of seeds is copied), read per group (signed-MW six;
+  MVA-only eight; D15 and D18 report-only), paired by fold and seed index, with the month-block
+  bootstrap of `studies.eval_protocol`, 20,000 resamples, at a 95% level Bonferroni-corrected over
+  the four tested contrasts. Tested contrasts. C1 E1 minus R, all rows. C2 E2 minus R, all rows.
+  C3 E1 minus E1n, bank-holiday-week rows. C4 E2 minus E0, all rows (the memorisation control).
+  Not tested, reported with intervals: E1 minus R on the Christmas set and on the Easter set; E3
+  minus E1 (run only if C3 is at most -0.05 or C1 is below zero). Seed noise is large (experiment
+  419: seeds 0 to 2 against 3 to 5 moved the MVA-only eight by -0.047), so E1, E1n, and E2 are
+  fitted with seeds 0 to 5, E0 with seeds 0 to 2, and R reuses the stored seeds 0 to 2 (experiment
+  407 `ctrl`) and 3 to 5 (experiment 419 `ctrl_s3`). The scorer prints, before any contrast is
+  read, the minimum detectable effect on all rows and on the bank-holiday-week rows: twice the
+  standard deviation over the folds of the difference in the signed-MW six CRPS between `ctrl` and
+  `ctrl_s3`, divided by the square root of two for six-seed means. Experiment 419 found 0.0738 for
+  three-seed means; the divided figure (about 0.052) is a lower bound, because it ignores the
+  interaction of folds with seed sets, and it rests on five fold differences. A contrast smaller
+  than the minimum detectable effect is reported as inside the noise. P1 holds only if the point
+  estimate is at most -0.10 and the interval's upper end is below zero. The hypothesis is
+  supported if P1 holds and C1 is not above the minimum detectable effect; partly supported if P1
+  holds on its point estimate only; not supported otherwise. The bank-holiday-week rows are 14
+  days of one Christmas and New Year week and a 2-day sliver of Easter week, in three test months,
+  so the page says that a verdict on P1 is a one-Christmas result, and reports the sign of C3 in
+  each of the three months. The encoder adds a module and a calendar table to the pipeline, so the
+  smallest gain worth porting it is 0.03 points at the signed-MW six over all rows or 0.10 on the
+  bank-holiday-week rows; the first cannot be shown with the minimum detectable effect above it, and
+  the page says so. No adoption is sought. The five screen folds are interim.
 benchmark: >-
   The pooled plain network `ctrl` of experiment 407 (seeds 0 to 2) and `ctrl_s3` of experiment 419
   (seeds 3 to 5), on the same half-hours; BG2, `manual_heuristic`, and `climatology` as
@@ -106,19 +116,29 @@ code: ml-experiments/00423-pooled-mdn-shared-date-time-encoder/
 
 ## Arms
 
-All arms keep the weather, solar, lag, and `covid` inputs and the 8-wide Primary embedding of
-experiment 397's plain network (`PlainMdn`, setting `g09`, summary scheme, 3 Gaussian components).
+All arms keep the weather, solar, lag, and `covid` inputs, the 8-wide Primary embedding, the
+standardiser (fitted on the training rows; the encoder's integer indices bypass it), the trunk
+width and depth, the optimiser, the held-out-weeks early stopping grouped by origin day
+(experiment 397's `held_out_weeks`), and the row drops of experiments 407 and 419
+(`e00419_fit.build_train`). Only the 18 calendar columns change.
 
 - **R (reference).** The 18 hand-made calendar columns; stored forecasts of experiments 407 and
-  419, not refitted.
-- **E1.** A 16-wide vector replaces the calendar columns. Inputs: local half-hour 0 to 47 (8-wide
-  embedding), weekday (4), day of month (4), day of year (366 buckets, 4), holiday name (12
-  categories, 4), and the two distance columns; then Linear 32, GELU, Linear 16. 3,440 parameters.
-  The hour index uses the local half-hour, so the clock changes land on the same index.
-- **E2.** E1 without the holiday name or distance columns. 3,200 parameters.
-- **E3 (conditional, C5).** One E1 per Primary. 55,040 parameters.
+  419, not refitted on the five screen folds. R0 is a check: R refitted through the new code path
+  (seed 0, fold 2025-12, and on 2026-04), which must reproduce the stored R within seed noise.
+- **E0 (memorisation control).** Local half-hour (8-wide embedding) and weekday (4-wide) only; then
+  Linear 32, GELU, Linear 16. Seeds 0 to 2.
+- **E1n.** E0 plus the two distance columns (`nearest_days`, `nearest_inside`) and a bank-holiday
+  flag, with no holiday name.
+- **E1.** E1n plus the holiday name (12 categories: none, New Year's Day, Good Friday, Easter
+  Monday, early May, spring, summer, Christmas Day, Boxing Day, other bank holiday, substitute
+  day, 24 to 31 December non-holiday; the code lists them from the `holidays` package) as a
+  4-wide embedding, and day of month (4-wide) and day of year (366 buckets, 4-wide).
+- **E2.** The dates only: E0 plus day of month and day of year, with no holiday information of any
+  kind. E2 minus E0 isolates the date columns, and E1 minus E1n isolates the holiday name.
+- **E3 (conditional).** One E1 per Primary.
 
-The encoder trains end to end on the same loss, optimiser, early stopping, and seeds as R.
+Each encoder outputs 16 wide and trains end to end on the same loss. The hour index is the local
+half-hour, so the clock changes land on the same index.
 
 ## Row sets and folds
 
@@ -143,20 +163,25 @@ set (Monday of Holy Week to Easter Monday).
 - **Monthly refits** on the 24-month window of experiment 397's folds; **cleaned data** (flagged
   exact-zero half-hours dropped, counts printed per fold); **D15 and D18 cut before 2025-03-01**;
   **ENS mean and spread passed once**; **fitted networks saved** under this experiment's private
-  folder; **stored forecasts reused** (R) and the fits saved are the reason the cost is 60 fits,
-  not 90.
-- **Cost.** E1 and E2 times 5 folds times 6 seeds is 60 fits of 50 to 200 seconds each; the event
-  fold adds 12 for E1 and E2 and 6 for R; E3 adds 30 if it runs. One GPU process under 8 GB, one
-  feeder core, `MemoryMax=8G`, `OMP_NUM_THREADS=1`. The encoder indices are integers, precomputed
-  once per refit.
+  folder; **stored forecasts reused** (R), which saves 30 fits.
+- **Cost.** E1, E1n, and E2 times 5 folds times 6 seeds is 90 fits and E0 adds 15, each of 50 to
+  200 seconds. The 2026-04 event fold adds 21 and R0 adds 6; E3 adds 30 if it runs. One GPU
+  process under 8 GB, one feeder core, `MemoryMax=8G`, `OMP_NUM_THREADS=1`. The encoder indices
+  are integers, precomputed once per refit.
 - **Earlier experiments adopted.** Experiment 419: none of its input changes won, so the reference
   stays `ctrl`. Experiment 410: training at other origin hours is experiment 422's subject and is
   not adopted here. Experiments 406 and 403: the Primary embedding and pooling are kept.
 - **Plan reviewed against the latest evidence** (`origin/main`, 2026-10-31): experiment 419 showed
   that seed noise moves the six by about 0.011 and the MVA-only eight by 0.047, so the plan uses
   six seeds and prints the minimum detectable effect; the planned experiments 418, 421, and 422
-  change the training data or inputs of the same network; from their plan titles none changes the calendar
-  columns, and a later experiment must merge with them.
+  change the training data or inputs of the same network. Their plans do not mention the calendar
+  columns, except one calendar term in 422's. This experiment's code is merged with theirs after
+  they land.
+- **Changes after the Sonnet plan review.** Added E0 (a control for calendar memorisation) and E1n
+  (so that E1 minus E1n isolates the holiday name); required the minimum detectable effect on the
+  bank-holiday-week rows; stated that a verdict on P1 is a one-Christmas result; dropped the
+  "no worse" claim in favour of "inside the noise"; added R0, a refit of R through the new code
+  path, to prove the reference matches; kept the descriptive contrasts outside the correction.
 
 ## Results
 
