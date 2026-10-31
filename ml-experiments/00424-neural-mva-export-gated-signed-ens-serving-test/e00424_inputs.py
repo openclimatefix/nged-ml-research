@@ -48,9 +48,27 @@ US_PER_DAY: Final[int] = i417.US_PER_DAY
 
 
 @dataclass
-class EnsFold(i417.Fold):
-    """Experiment 417's fold plus each row's lead in hours, which the Primary gate needs."""
+class EnsFold:
+    """Experiment 417's fold (same fields) plus each row's lead in hours, which the gate needs."""
 
+    x: np.ndarray
+    y: np.ndarray
+    primary: np.ndarray
+    weight: np.ndarray
+    is_val: np.ndarray
+    u: np.ndarray
+    gate_u: np.ndarray
+    k: np.ndarray
+    valid: np.ndarray
+    standardiser: base.Standardiser
+    scaler: EnsScaler
+    cols: np.ndarray
+    target_mean: np.ndarray
+    target_std: np.ndarray
+    folded: np.ndarray
+    setting: i417.Setting
+    pair: tuple[str, ...]
+    n_dropped: dict[str, int]
     lead: np.ndarray
 
 
@@ -210,7 +228,7 @@ def build_fold(
         k=cat["k"][keep_rows],
         valid=cat["valid"][keep_rows],
         standardiser=standardiser,
-        scaler=scaler,  # ty: ignore[invalid-argument-type]
+        scaler=scaler,
         cols=cols,
         target_mean=target_mean,
         target_std=target_std,

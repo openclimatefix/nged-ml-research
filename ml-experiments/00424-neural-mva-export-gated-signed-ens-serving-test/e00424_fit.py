@@ -16,7 +16,7 @@ forecast, with the ENS unit shape and clearness index the network saw (`u_ens`, 
 realised CAMS values (`u_gate`, `k`) that define the scoring slices, as in experiment 420.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=...  # the private data folder (see the repository README)
 export PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:ml-experiments/00397-plain-and-attention-mixture-density-network-for-primary-demand:ml-experiments/00405-mdn-explicit-pv-term-learned-capacity-known-answer:ml-experiments/00412-mdn-signed-mw-from-mva-meters-known-answer:ml-experiments/00417-hidden-sign-mva-export-gate-zero-crossing-labels:ml-experiments/00420-neural-mva-export-gated-signed-final:ml-experiments/00424-neural-mva-export-gated-signed-ens-serving-test
 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue -p CPUQuota=100% \
     env OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00424-*/e00424_fit.py run --stage 1
