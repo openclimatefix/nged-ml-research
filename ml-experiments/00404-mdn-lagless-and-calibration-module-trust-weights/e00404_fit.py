@@ -154,6 +154,9 @@ def lagless_in_network_units(
         grid: Grid index of the row's valid time.
         mean: The network's per-Primary target mean (fraction of capacity).
         std: The network's per-Primary target standard deviation.
+
+    Returns:
+        The mixture in z units and the presence mask.
     """
     pos = grid - arrays.g0
     inside = (pos >= 0) & (pos < arrays.raw.shape[1])
