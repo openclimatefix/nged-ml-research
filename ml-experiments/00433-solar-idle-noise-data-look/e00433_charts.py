@@ -1,4 +1,4 @@
-"""Draw the anonymised figures for experiment 433 from the aggregated tables `e00433_look.py` wrote."""
+"""Draw the anonymised figures for experiment 433 from the tables `e00433_look.py` wrote."""
 
 from pathlib import Path
 from typing import Final
