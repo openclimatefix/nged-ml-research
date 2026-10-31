@@ -85,7 +85,7 @@ def crps_chart() -> alt.Chart:
     return (
         alt.Chart(pl.DataFrame(rows))
         .mark_circle(size=80, aria=False)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("arm:N", title=None, sort=order),
             x=alt.X(
                 "crps:Q",
@@ -112,7 +112,7 @@ def crps_chart() -> alt.Chart:
     )
 
 
-def example_chart() -> alt.Chart:
+def example_chart() -> alt.VConcatChart:
     """Draw one forecast run at D5 (level 2.0): the day ahead and the full 10 days, for P0 and A."""
     arms = {"P0": ORANGE, "A": BLUE}
     frames = {
@@ -156,7 +156,7 @@ def example_chart() -> alt.Chart:
                 .select(pl.col("lead").alias("hours"), "truth_points")
             )
             .mark_line(color="black", clip=True, aria=False)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "hours:Q",
                     title="Hours after the forecast origin",
