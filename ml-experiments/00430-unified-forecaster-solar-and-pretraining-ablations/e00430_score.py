@@ -138,8 +138,8 @@ def contrast_table(*, arms: dict[str, pl.DataFrame], pairs: list[tuple[str, str]
                     "band": band,
                     "score_arm": float(va.mean()),
                     "score_ref": float(vb.mean()),
-                    "pin01_diff": float(a["pin01"].mean()) - float(b["pin01"].mean())  # ty: ignore[invalid-argument-type],
-                    "pin99_diff": float(a["pin99"].mean()) - float(b["pin99"].mean())  # ty: ignore[invalid-argument-type],
+                    "pin01_diff": float(a["pin01"].mean()) - float(b["pin01"].mean()),  # ty: ignore[invalid-argument-type]
+                    "pin99_diff": float(a["pin99"].mean()) - float(b["pin99"].mean()),  # ty: ignore[invalid-argument-type]
                     "pct_change": point,
                     "lo99": lo,
                     "hi99": hi,
