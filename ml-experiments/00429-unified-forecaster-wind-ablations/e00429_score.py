@@ -52,6 +52,9 @@ SUBSETS: Final[tuple[str, ...]] = (
     "true_3_10",
     "h12_36",
     "true_1_14",
+    "idle210",
+    "nomask_1_10",
+    "nomask_h12_36",
     "all",
     "days_1_2",
     "days_3_10",
@@ -119,6 +122,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         "h12_36": (
             ~cases["masked"] & (cases["lead_hours"] >= 12) & (cases["lead_hours"] < 36)
         ).to_numpy(),
+        "idle210": cases["masked"].to_numpy(),
+        "nomask_1_10": cases["lead_hours"].is_between(24, 240).to_numpy(),
+        "nomask_h12_36": ((cases["lead_hours"] >= 12) & (cases["lead_hours"] < 36)).to_numpy(),
         "true_1_14": (~cases["masked"] & cases["lead_hours"].is_between(24, 336)).to_numpy(),
     }
     sites = cases["site"].to_numpy()
