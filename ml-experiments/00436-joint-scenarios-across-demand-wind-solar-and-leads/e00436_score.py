@@ -253,12 +253,45 @@ def load_run(*, path: Path) -> dict:
     return {k: z[k] for k in z.files}
 
 
+def scenario_path(*, arm: str, init: datetime) -> Path:
+    """Return the file that holds an arm's scenarios (51, 25, 702) for a run."""
+    return WORK / "paths" / arm / f"{init:%Y-%m-%d}.npy"
+
+
+def arm_paths(
+    *,
+    arm: str,
+    run: dict,
+    init: datetime,
+    observed: np.ndarray,
+    rng: np.random.Generator,
+    save: bool,
+) -> np.ndarray:
+    """Return an arm's scenarios (51, 25, 702): read from `work/paths` if present, else build.
+
+    J0 to J3 are re-orderings of the run's 51 values; J4 to J6 are written by their own scripts.
+    """
+    file = scenario_path(arm=arm, init=init)
+    if file.exists():
+        return np.load(file).astype(np.float64)
+    if arm not in ("J0", "J1", "J2", "J3"):
+        msg = f"{arm}: no scenario file for {init:%Y-%m-%d}; run its script first"
+        raise FileNotFoundError(msg)
+    ranks = make_ranks(arm=arm, run=run, init=init, observed=observed, rng=rng)
+    path = s434.assign(values=run["values"].astype(np.float64), ranks=ranks)
+    if save:
+        file.parent.mkdir(parents=True, exist_ok=True)
+        np.save(file, path.astype(np.float32))
+    return path
+
+
 def main() -> None:
-    """Score the requested arms on every joint run and write `scores_tier0.parquet`."""
+    """Score the requested arms on every joint run and write `<out>.parquet`."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arms", nargs="+", default=["J0", "J1", "J2", "J3"])
     parser.add_argument("--max-runs", type=int, default=None)
     parser.add_argument("--out", default="scores_tier0")
+    parser.add_argument("--save-paths", action="store_true")
     args = parser.parse_args()
     observed = np.load(WORK / "observed.npz")["observed"]
     files = sorted((WORK / "runs").glob("*.npz"))[: args.max_runs]
@@ -273,11 +306,15 @@ def main() -> None:
         values = run["values"].astype(np.float64)
         paths = {}
         for arm in args.arms:
-            ranks = make_ranks(arm=arm, run=run, init=init, observed=observed, rng=rng)
-            paths[arm] = s434.assign(values=values, ranks=ranks)
-        reference = np.sort(paths[args.arms[0]], axis=0)
+            # The generator is drawn from for every arm in order, so J0 gets the same draws as before.
+            paths[arm] = arm_paths(
+                arm=arm, run=run, init=init, observed=observed, rng=rng, save=args.save_paths
+            )
+        reference = values.transpose(2, 0, 1)
         for arm, path in paths.items():
-            if not np.array_equal(np.sort(path, axis=0), reference):
+            if arm in ("J0", "J1", "J2", "J3") and not np.array_equal(
+                np.sort(path, axis=0), reference
+            ):
                 msg = f"{init}: arm {arm} is not a re-ordering of the same 51 values"
                 raise ValueError(msg)
         actual = run["actual"].astype(np.float64)
