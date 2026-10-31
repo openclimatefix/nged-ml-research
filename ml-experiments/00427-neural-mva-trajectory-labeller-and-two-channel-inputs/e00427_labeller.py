@@ -17,7 +17,7 @@ reference of a scored Primary is made from the scored reading itself: a farm's o
 an overcast day, so the two agree to within the floor.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=...  # the private data folder
 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
     env OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00427-*/e00427_labeller.py pilot
 ```
@@ -44,7 +44,7 @@ import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from scipy.stats import rankdata
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 SLUG: Final[str] = "neural-mva-trajectory-labeller-and-two-channel-inputs"
 WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"00427-{SLUG}" / "work" / "labeller"
