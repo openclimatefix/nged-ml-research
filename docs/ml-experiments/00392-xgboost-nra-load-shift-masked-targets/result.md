@@ -383,12 +383,6 @@ is far below the manager's figure of about 622, which presumably spans more than
 event masks still come from `dp_features` (experiment 103's rows); only the masks do, because the
 fits read training rows, lags, and inference inputs from experiment 87's own files.
 
-## Open items
-
-- A compute slot (3 threads), granted by the manager once the load falls. Until then only code and
-  a 1-core smoke test run.
-- Experiment 391's surprise tables and N1 boosters (above).
-
 ## Sources
 
 Builds on experiment 383's oracle-mask arms, experiment 75 (a training-target mask in the weekly
