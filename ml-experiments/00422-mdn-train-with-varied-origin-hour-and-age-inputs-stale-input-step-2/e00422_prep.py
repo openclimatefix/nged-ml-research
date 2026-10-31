@@ -129,7 +129,7 @@ def swap_previous_weather(
     return found
 
 
-def augmented_primary(
+def augmented_primary(  # noqa: PLR0915
     *,
     z: dict[str, np.ndarray],
     keep: np.ndarray,
