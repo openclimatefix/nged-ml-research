@@ -37,7 +37,10 @@ DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR
 WORK: Final[Path] = DATA / "00402-lag-gate-learned-weight-injected-load-shifts-part-1" / "work"
 WORLDS: Final[Path] = WORK / "worlds"
 EVENTS: Final[Path] = (
-    DATA / "00400-lagged-lagless-forecast-blend-around-load-shifts-stored" / "work" / "events_corrected.parquet"
+    DATA
+    / "00400-lagged-lagless-forecast-blend-around-load-shifts-stored"
+    / "work"
+    / "events_corrected.parquet"
 )
 SIX: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16")
 EIGHT: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
@@ -101,7 +104,11 @@ def real_tags(*, d: pl.DataFrame) -> pl.DataFrame:
         m = sites == s
         inside = cell[lag[m]] >= 0
         lags_real[m] = inside.sum(axis=1)
-        first = np.where(inside[:, 0], cell[lag[m]][:, 0], np.where(inside[:, 1], cell[lag[m]][:, 1], cell[lag[m]][:, 2]))
+        first = np.where(
+            inside[:, 0],
+            cell[lag[m]][:, 0],
+            np.where(inside[:, 1], cell[lag[m]][:, 1], cell[lag[m]][:, 2]),
+        )
         cluster[m] = np.where(inside.any(axis=1), first, -1)
         target_real[m] = cell[target[m]] >= 0
         after_real[m] = after[target[m]] & ~target_real[m]
@@ -128,7 +135,9 @@ def label_weight(*, d: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return w, a
 
 
-def fit_gate(*, train: pl.DataFrame, columns: list[str], threads: int, seed: int = 0) -> xgb.Booster:
+def fit_gate(
+    *, train: pl.DataFrame, columns: list[str], threads: int, seed: int = 0
+) -> xgb.Booster:
     """Fit the shallow squared-error gate on the training rows."""
     if train.height > MAX_TRAIN_ROWS:
         train = train.sample(n=MAX_TRAIN_ROWS, seed=seed)
@@ -149,9 +158,12 @@ def predict_weight(*, model: xgb.Booster, d: pl.DataFrame, columns: list[str]) -
 
 def const_weights(*, train: pl.DataFrame, test: pl.DataFrame, by_group: bool) -> np.ndarray:
     """Return the fitted constant weight per (group, lead day) on the test rows."""
+
     def key(d: pl.DataFrame) -> pl.Series:
         day = (d["lead_hours"] / 24.0).ceil().clip(1, 14).cast(pl.Int64)
-        return (d["group"] if by_group else pl.Series(["all"] * d.height)) + "_" + day.cast(pl.String)
+        return (
+            (d["group"] if by_group else pl.Series(["all"] * d.height)) + "_" + day.cast(pl.String)
+        )
 
     table = (
         train.with_columns(k=key(train))
@@ -181,7 +193,13 @@ def weights_for_month(
     }
     if train_real.height:
         out["const (real, per group)"] = const_weights(train=train_real, test=test, by_group=True)
-    sources = {"single": train_inj, "own": train_inj, "full": train_inj, "flag": train_inj, "real": train_real}
+    sources = {
+        "single": train_inj,
+        "own": train_inj,
+        "full": train_inj,
+        "flag": train_inj,
+        "real": train_real,
+    }
     for arm, columns in FEATURES.items():
         train = sources[arm]
         if train.height == 0 or any(c not in test.columns for c in columns):
@@ -195,8 +213,12 @@ def weights_for_month(
                     tm = (train["group"] == g).to_numpy()
                     sm = (test["group"] == g).to_numpy()
                     if tm.any() and sm.any():
-                        model = fit_gate(train=train.filter(pl.Series(tm)), columns=cols, threads=threads)
-                        w[sm] = predict_weight(model=model, d=test.filter(pl.Series(sm)), columns=cols)
+                        model = fit_gate(
+                            train=train.filter(pl.Series(tm)), columns=cols, threads=threads
+                        )
+                        w[sm] = predict_weight(
+                            model=model, d=test.filter(pl.Series(sm)), columns=cols
+                        )
                 out[name] = np.where(np.isnan(w), 0.5, w)
             else:
                 model = fit_gate(train=train, columns=cols, threads=threads)
@@ -210,7 +232,12 @@ def main() -> None:
     parser.add_argument("--arm", choices=("r1", "r0"), default="r1")
     parser.add_argument("--threads", type=int, default=4)
     args = parser.parse_args()
-    inj = pl.concat([load(pattern=f"world{s}_{args.arm}_*.parquet").with_columns(seed=pl.lit(s)) for s in (*TRAIN_SEEDS, TEST_SEED)])
+    inj = pl.concat(
+        [
+            load(pattern=f"world{s}_{args.arm}_*.parquet").with_columns(seed=pl.lit(s))
+            for s in (*TRAIN_SEEDS, TEST_SEED)
+        ]
+    )
     real = real_tags(d=load(pattern=f"real_{args.arm}_*.parquet"))
     months = sorted(inj["month"].unique().to_list())
     scored_rows = []
@@ -218,14 +245,23 @@ def main() -> None:
         train_inj = cut_train(d=inj.filter(pl.col("seed").is_in(list(TRAIN_SEEDS))), month=month)
         train_real = cut_train(d=real, month=month)
         for kind, test in (
-            ("injected", inj.filter((pl.col("seed") == TEST_SEED) & (pl.col("month") == month) & (pl.col("group") != "report"))),
+            (
+                "injected",
+                inj.filter(
+                    (pl.col("seed") == TEST_SEED)
+                    & (pl.col("month") == month)
+                    & (pl.col("group") != "report")
+                ),
+            ),
             ("real", real.filter(pl.col("month") == month)),
         ):
             if test.is_empty():
                 continue
             if kind == "real":
                 test = test.drop(FLAGS)
-            weights = weights_for_month(train_inj=train_inj, train_real=train_real, test=test, threads=args.threads)
+            weights = weights_for_month(
+                train_inj=train_inj, train_real=train_real, test=test, threads=args.threads
+            )
             frame = test.select(
                 "site", "group", "power_fcst_init_time", "valid_time", "lead_hours", "month",
                 *(["lags_in_event", "event_kind", "target_in_event"] if kind == "injected" else ["lags_real", "target_real", "after_real", "cluster"]),

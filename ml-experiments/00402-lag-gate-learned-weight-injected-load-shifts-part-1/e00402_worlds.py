@@ -46,7 +46,9 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR
 WORK: Final[Path] = cf.WORK
 OUT: Final[Path] = WORK / "worlds"
-ARM_PREDS_392: Final[Path] = DATA / "00392-xgboost-nra-load-shift-masked-targets" / "work" / "arm_preds"
+ARM_PREDS_392: Final[Path] = (
+    DATA / "00392-xgboost-nra-load-shift-masked-targets" / "work" / "arm_preds"
+)
 LABELS: Final[Path] = blend400.WORK / "label_table_corrected.csv"
 FIRST_DAY: Final[datetime] = datetime(2025, 9, 15, tzinfo=UTC)
 END_DAY: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
@@ -145,7 +147,9 @@ def surprise_series(*, ctx: Context, power: dict[str, np.ndarray]) -> tuple[dict
     """Return per Primary the stage-1 normal score `u` and the residual (fraction) on the grid."""
     u, r = {}, {}
     for s in ctx.labels:
-        u[s] = stage1.pit_normal_score(quantiles=ctx.stage1_q[s].astype(np.float64), actual=power[s])
+        u[s] = stage1.pit_normal_score(
+            quantiles=ctx.stage1_q[s].astype(np.float64), actual=power[s]
+        )
         r[s] = power[s] - ctx.stage1_q[s][:, common.LEVEL_COLUMNS.index("q50")]
     return u, r
 
@@ -194,8 +198,12 @@ def gate_features(
             out[f"r_mean{h}_{j}"] = window_mean(cum=cum_r, centre=lag[:, j], half=h, newest=newest)
         v = nb_u[:, j, :]
         finite = np.isfinite(v).any(axis=1)
-        out[f"nb_max_{j}"] = np.where(finite, np.nanmax(np.where(np.isfinite(v), v, -np.inf), axis=1), np.nan)
-        out[f"nb_min_{j}"] = np.where(finite, np.nanmin(np.where(np.isfinite(v), v, np.inf), axis=1), np.nan)
+        out[f"nb_max_{j}"] = np.where(
+            finite, np.nanmax(np.where(np.isfinite(v), v, -np.inf), axis=1), np.nan
+        )
+        out[f"nb_min_{j}"] = np.where(
+            finite, np.nanmin(np.where(np.isfinite(v), v, np.inf), axis=1), np.nan
+        )
         out[f"nb_up_{j}"] = (v > 1).sum(axis=1).astype(float)
         out[f"nb_down_{j}"] = (v < -1).sum(axis=1).astype(float)
     out["lead_days"] = (target - origin) * 0.5 / 24.0
@@ -203,7 +211,9 @@ def gate_features(
     return out
 
 
-def world_rows(*, ctx: Context, site: str, power: dict, mask: dict | None, arm: str) -> pl.DataFrame:
+def world_rows(
+    *, ctx: Context, site: str, power: dict, mask: dict | None, arm: str
+) -> pl.DataFrame:
     """Return the rows of one Primary: both forecasts, the clean truth, `A`, `B`, `C`, and features."""
     arrays = ctx.arrays[site]
     injected = dataclasses.replace(arrays, power=power[site].astype(arrays.power.dtype))
@@ -223,7 +233,8 @@ def world_rows(*, ctx: Context, site: str, power: dict, mask: dict | None, arm: 
                 **{f"qa_{c}": pl.Series(q_lags[:, i]) for i, c in enumerate(common.LEVEL_COLUMNS)}
             ).join(
                 lagless.select(
-                    "power_fcst_init_time", "valid_time",
+                    "power_fcst_init_time",
+                    "valid_time",
                     **{f"qb_{c}": pl.col(c) for c in common.LEVEL_COLUMNS},
                 ),  # fmt: skip
                 on=["power_fcst_init_time", "valid_time"],
@@ -251,7 +262,9 @@ def world_rows(*, ctx: Context, site: str, power: dict, mask: dict | None, arm: 
         code = mask[site][lag_idx]
     own_event = ((code != inj.NONE).sum(axis=1)).astype(np.int8)
     kind = np.where(own_event > 0, code.max(axis=1), 0).astype(np.int8)
-    target_event = (mask[site][target[finite]] != inj.NONE) if mask is not None else np.zeros(n, bool)
+    target_event = (
+        (mask[site][target[finite]] != inj.NONE) if mask is not None else np.zeros(n, bool)
+    )
     out = {
         "site": np.full(n, site),
         "power_fcst_init_time": rows["power_fcst_init_time"].to_numpy()[finite],
@@ -264,7 +277,7 @@ def world_rows(*, ctx: Context, site: str, power: dict, mask: dict | None, arm: 
         "lags_in_event": own_event,
         "event_kind": kind,
         "target_in_event": target_event,
-        "median_gap": np.abs(qa[finite, 5] - qb[finite, 5]),
+        "median_gap": np.abs(qa[finite, cf.Q50] - qb[finite, cf.Q50]),
         "lag_0_idx": lag_idx[:, 0],
         "lag_1_idx": lag_idx[:, 1],
         "lag_2_idx": lag_idx[:, 2],
@@ -272,7 +285,7 @@ def world_rows(*, ctx: Context, site: str, power: dict, mask: dict | None, arm: 
     }
     df = pl.DataFrame(out)
     return df.with_columns(
-        qa5=pl.Series(qa[finite, 5]), qb5=pl.Series(qb[finite, 5]),
+        qa5=pl.Series(qa[finite, cf.Q50]), qb5=pl.Series(qb[finite, cf.Q50]),
         lead_hours=pl.col("lead_days") * 24.0,
     )  # fmt: skip
 
@@ -295,7 +308,12 @@ def main() -> None:
     else:
         world = build_world(ctx=ctx, seed=args.seed, no_recipient_share=args.no_recipient_share)
         power, mask = world.power, world.mask
-        name = f"world{args.seed}_{args.arm}"
+        tag = (
+            ""
+            if args.no_recipient_share == inj.NO_RECIPIENT_SHARE
+            else f"_nr{args.no_recipient_share:g}"
+        )
+        name = f"world{args.seed}{tag}_{args.arm}"
     OUT.mkdir(parents=True, exist_ok=True)
     for site in args.sites:
         target = OUT / f"{name}_{site}.parquet"
