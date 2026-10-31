@@ -115,6 +115,8 @@ are not saved: a job's output is its quantile table, and the sweep's 700 network
 to refit in minutes. Stored predictions reused: experiment 430's `g0_onepass` seeds 0 to 5, so the
 skeleton is not refitted; the gate (G0) refits one job to prove the new code reproduces it.
 
+**Scoring details.** The 0.01 and 0.99 pinball differences are row-pooled means in 100 times the raw pinball loss, as in experiment 430. The per-farm arm fits one network per farm, but its input standardiser is still computed over all six farms' rows before the refit cutoff. The "embedding" factor includes the per-farm arm, so it counts as moved if the per-farm arm passes.
+
 **Gate G0.** The new code with every factor at its skeleton level must reproduce the stored
 `g0_onepass` forecasts for seed 0 and all four refits to within 1e-4 points of capacity. If it
 misses, the run stops and reports.

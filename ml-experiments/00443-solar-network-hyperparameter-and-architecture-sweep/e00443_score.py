@@ -30,6 +30,9 @@ def load(*, root: Path, arm: str, seeds: tuple[int, ...], name: str | None = Non
     if not files:
         msg = f"no predictions for {arm} seeds {seeds}"
         raise FileNotFoundError(msg)
+    if len(files) != 4 * len(seeds):
+        msg = f"{arm}: {len(files)} job files, expected {4 * len(seeds)} (seeds {seeds} x 4 refits)"
+        raise FileNotFoundError(msg)
     return s430.average_seeds(frame=pl.concat([pl.read_parquet(f) for f in files]), arm=name or arm)
 
 
@@ -69,6 +72,7 @@ def summarise(*, arms: list[str], seeds: tuple[int, ...], out: str) -> pl.DataFr
                 "arm": arm,
                 "score": allrow["score_arm"],
                 "skeleton_score": allrow["score_ref"],
+                "rows": allrow["rows"],
                 "pct_change": allrow["pct_change"],
                 "lo99": allrow["lo99"],
                 "hi99": allrow["hi99"],
