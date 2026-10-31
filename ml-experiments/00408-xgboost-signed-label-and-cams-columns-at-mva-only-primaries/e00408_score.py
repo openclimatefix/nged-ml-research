@@ -141,12 +141,12 @@ def print_sunny_bias(
         for flag in [*sunny, "cams_sunny"]:
             sel = joined.filter(pl.col(flag))
             by = {
-                b: float(sel.filter(pl.col(b))["bias"].mean())
+                b: float(sel.filter(pl.col(b))["bias"].mean())  # ty: ignore[invalid-argument-type]
                 for b in bands
                 if sel.filter(pl.col(b)).height
             }
             print(
-                f"{name} D12 sunny={flag}: n={sel.height} mean bias {float(sel['bias'].mean()):+.2f}; by lead band { ({k: round(v, 2) for k, v in by.items()}) }"
+                f"{name} D12 sunny={flag}: n={sel.height} mean bias {float(sel['bias'].mean()):+.2f}; by lead band { ({k: round(v, 2) for k, v in by.items()}) }"  # ty: ignore[invalid-argument-type]
             )
 
 

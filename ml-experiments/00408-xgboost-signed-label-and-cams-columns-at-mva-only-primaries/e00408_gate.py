@@ -165,11 +165,11 @@ def verdict(*, table: pl.DataFrame, arm: str) -> dict[str, object]:
     rule = table.filter(pl.col("estimate").str.starts_with("shortwave_rule"))
     checks = {
         "pooled_ba": pooled_ba(frame=mine),
-        "min_site_ba": float(mine["balanced_accuracy"].min()),
+        "min_site_ba": float(mine["balanced_accuracy"].min()),  # ty: ignore[invalid-argument-type]
         "false_reverse": pooled(frame=mine, column="false_reverse"),
         "margin_over_rule": pooled_ba(frame=mine) - pooled_ba(frame=rule),
-        "signed_mae": float(mine["signed_mae_points"].mean()),
-        "plain_signed_mae": float(plain["signed_mae_points"].mean()),
+        "signed_mae": float(mine["signed_mae_points"].mean()),  # ty: ignore[invalid-argument-type]
+        "plain_signed_mae": float(plain["signed_mae_points"].mean()),  # ty: ignore[invalid-argument-type]
     }
     checks["pass"] = bool(
         checks["pooled_ba"] >= PASS_POOLED_BA

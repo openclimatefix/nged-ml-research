@@ -28,6 +28,7 @@ ml-experiments/00381-simple-weekly-xgboost-demand-against-gam-stack \
 """
 
 import argparse
+import dataclasses
 import json
 import multiprocessing
 import os
@@ -128,7 +129,7 @@ def rule_for(
         y_points=g["y"], u=g["u"], k=k, hour=g["hour"], month=g["month"], usable=usable
     )
     if arm.force_gate:
-        rule = c.SignedRule(**{**rule.__dict__, "gate_open": True})
+        rule = dataclasses.replace(rule, gate_open=True)
     return rule, k
 
 
