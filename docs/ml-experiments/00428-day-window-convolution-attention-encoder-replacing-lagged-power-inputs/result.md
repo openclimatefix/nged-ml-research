@@ -336,8 +336,8 @@ section records the arms, the departures, and the predictions.
   weights of position j for a target at T are a softmax over the observed positions of
   a(L) cos(time of day of j minus T) + c(L) cos(day of week of j minus T) minus b(L) times the age
   of j in days, with a, c, b learned per lead band (days 0 to 2, 2 to 5, 5 to 10, and 10 or more)
-  and b at least 0. The weights never read the surprise values. The observed share of the window joins the
-  inputs. (Aim b.)
+  and b at least 0. The weights never read the surprise values. The observed share of the window
+  joins the inputs. (Aim b.)
 - **H-lvl:** R-inj plus a level offset and a 4-way soft regime vector per origin. A dilated
   convolutional network encodes the window, one attention pooling (query: Primary embedding and the
   origin's time of day) gives a summary, and a second pooling gives the level offset, the weighted
