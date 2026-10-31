@@ -182,21 +182,22 @@ def build_ens_fold(*, refit: datetime, cut: bool = True) -> EnsFold:
             target_mean[p] = cat["y"][sel].mean()
             target_std[p] = max(float(cat["y"][sel].std()), 1e-3)
     keep = train | held
-    return EnsFold(
-        x=standardiser.apply(x=cat["x"][keep]),
-        y=cat["y"][keep],
-        primary=cat["primary"][keep],
-        weight=weight[keep].astype(np.float32),
-        is_val=held[keep],
-        lead=cat["lead"][keep],
-        origin_day=origin_day[keep],
-        standardiser=standardiser,
-        target_mean=target_mean,
-        target_std=target_std,
-        layout=layout,
-        valid=cat["valid"][keep],
-        dropped=dropped,
-    )
+    fields = {
+        "x": standardiser.apply(x=cat["x"][keep]),
+        "y": cat["y"][keep],
+        "primary": cat["primary"][keep],
+        "weight": weight[keep].astype(np.float32),
+        "is_val": held[keep],
+        "lead": cat["lead"][keep],
+        "origin_day": origin_day[keep],
+        "standardiser": standardiser,
+        "target_mean": target_mean,
+        "target_std": target_std,
+        "layout": layout,
+        "valid": cat["valid"][keep],
+        "dropped": dropped,
+    }
+    return EnsFold(**fields)
 
 
 def fold_pretrain(
