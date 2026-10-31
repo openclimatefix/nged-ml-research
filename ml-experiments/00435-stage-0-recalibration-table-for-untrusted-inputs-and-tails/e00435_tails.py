@@ -66,6 +66,9 @@ def main() -> None:
     frames = score425.load_frames(series=series, months=months, with_references=False)
     out: list[pl.DataFrame] = []
     for arm in ARMS:
+        if f"{arm}_raw" not in frames:
+            msg = f"arm {arm} has missing seed files in experiment 425's seed_preds"
+            raise ValueError(msg)
         raw = frames[f"{arm}_raw"]
         for variant, frame in (("raw", raw), ("w1.15", widen(frame=raw, factor=WIDENING))):
             scored = with_group_and_band(

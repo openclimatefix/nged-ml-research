@@ -85,11 +85,15 @@ def main() -> None:
     per_month: dict[str, dict[str, int]] = {}
     for month in SCORED_MONTHS:
         s = month_slice(month=month)
-        a = arrays[1.0][:, s]
+        covered = np.zeros((N_PRIMARIES, s.stop - s.start), dtype=bool)
+        for row in kept.iter_rows(named=True):
+            lo, hi = max(row["onset_idx"], s.start), min(row["end_idx"] + 1, s.stop)
+            if lo < hi:
+                covered[labels.index(row["label"]), lo - s.start : hi - s.start] = True
         overlap = kept.filter((pl.col("onset_idx") < s.stop) & (pl.col("end_idx") >= s.start))
         per_month[month] = {
             "events_overlapping": overlap.height,
-            "primary_half_hours_corrected": int((a != 0).sum()),
+            "primary_half_hours_corrected": int(covered.sum()),
         }
     report = {
         "events_total": events.height,

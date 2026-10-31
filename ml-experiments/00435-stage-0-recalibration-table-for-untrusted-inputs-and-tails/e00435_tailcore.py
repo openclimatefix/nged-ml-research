@@ -45,6 +45,12 @@ def tail_table(*, frame: pl.DataFrame, by: tuple[str, ...]) -> pl.DataFrame:
 
     `frame` must carry `actual` and the quantile columns. Pinball loss is in the frame's unit.
     """
+    complete = pl.all_horizontal(
+        pl.col("actual").is_finite(),
+        *[pl.col(q).is_finite() for q in TAIL_LEVELS],
+        pl.col("q50").is_finite(),
+    )
+    frame = frame.filter(complete)
     aggs: list[pl.Expr] = [pl.len().alias("n")]
     for name, tau in TAIL_LEVELS.items():
         error = pl.col("actual") - pl.col(name)
