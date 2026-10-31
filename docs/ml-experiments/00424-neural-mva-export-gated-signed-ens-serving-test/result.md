@@ -274,3 +274,13 @@ All code is in `ml-experiments/00424-neural-mva-export-gated-signed-ens-serving-
 - **Calibration of ENS shifts by season, lead band, and hour band** (experiment 111) may exceed what
   one retrained network with a lead input learns. The lead-band and month tables show it.
 - **Unlogged load-shift events** may sit in the readings, as NGED says its logs are incomplete.
+
+## Minimum detectable effect, stage 1 (written before any arm-against-arm score)
+
+**On rotation r1 the minimum detectable effect is 0.907 points of effective capacity.** The null
+difference between A's two seeds (ENS inputs) on reverse-flow rows at level 2.0 has a mean of -0.024
+(95% interval -0.725 to 0.549; 14 Primary-month blocks, 22,443 rows) and a bootstrap standard
+deviation of 0.324; 2.8 times 0.324 is 0.907. The figure is above the 0.5-point limit, so contrasts
+of that size or smaller (A against A-applied, A on ENS against A on laboratory inputs) are reported
+as underpowered. S1 is not weakened by this, because its floors (4 and 10 points) sit far above the
+figure. The figure is in `work/mde_stage1.json`, which the script refuses to overwrite.
