@@ -54,7 +54,7 @@ def link() -> None:
     target.mkdir(parents=True, exist_ok=True)
     for arm in REFERENCES:
         source = data.WORK_DIR / "predictions" / arm
-        if not (target / arm).exists():
+        if not (target / arm).is_symlink():
             (target / arm).symlink_to(source, target_is_directory=True)
 
 
@@ -110,11 +110,12 @@ def extra_flags(*, frame: pl.DataFrame, big: tuple[int, int, int]) -> pl.DataFra
     return frame.with_columns(big_tgt=pl.Series(big_tgt), big_win=pl.Series(big_win))
 
 
-def collect(
+def collect(  # noqa: PLR0912
     *, months: list[str], seeds: tuple[int, ...], factor: float, big: tuple[int, int, int]
 ) -> pl.DataFrame:
     """Return per arm, month, world, row set, group, and origin day: row count and score sums."""
     records = []
+    reference: dict = {}
     flag_names = [*score._flags(), *EXTRA_FLAGS]
     for month in months:
         for set_name, worlds in score.WORLD_SETS.items():
@@ -124,6 +125,15 @@ def collect(
                         arm=arm, month=month, world=world, seeds=seeds, factor=factor
                     )
                     frame = extra_flags(frame=frame, big=big)
+                    if arm == ARMS[0]:
+                        reference[(month, world)] = frame
+                    else:
+                        base = reference[(month, world)]
+                        for key in ("primary", "origin_us", "valid_us"):
+                            assert frame[key].equals(base[key]), f"{arm} rows differ in {key}"
+                        assert np.array_equal(
+                            frame["actual"].to_numpy(), base["actual"].to_numpy(), equal_nan=True
+                        ), f"{arm} actuals differ"
                     day = (frame["origin_us"].to_numpy() // (86_400 * 1_000_000)).astype(int)
                     groups = score.group_of(primary=frame["primary"].to_numpy())
                     actual = frame["actual"].to_numpy()
@@ -195,7 +205,11 @@ def main() -> None:
         print(mde.sort("row_set", "group"))
         contrasts = score.contrast_table(table=table, rng=np.random.default_rng(0))
         contrasts.write_parquet(out / "contrasts.parquet")
-        print(contrasts.sort("contrast", "row_set", "group").drop("fold_differences"))
+        print(
+            contrasts.join(mde, on=["row_set", "group"])
+            .sort("contrast", "row_set", "group")
+            .drop("fold_differences", "seed_sd")
+        )
 
 
 if __name__ == "__main__":

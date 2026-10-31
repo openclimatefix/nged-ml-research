@@ -13,7 +13,7 @@ modules' output folders to this experiment's own work folder and swaps in a netw
 class that carry the extra channel. Experiment 428's own folder is only read.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<path to the private data folder>
 source <paths>; PYTHONPATH=$PP:ml-experiments/00438-* OMP_NUM_THREADS=1 \
   systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
   uv run --no-sync python ml-experiments/00438-*/e00438_run.py fit --months 2026-01 --seeds 0
