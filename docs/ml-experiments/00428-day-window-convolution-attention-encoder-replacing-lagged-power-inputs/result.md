@@ -169,10 +169,11 @@ surprise at each of its three lags. S1 minus R-inj is -0.083 (-0.096 to -0.070) 
 (2.865 against 2.947), -0.060 (-0.076 to -0.044) on injected harm rows (2.897 against 2.956),
 -0.170 (-0.267 to -0.059) on real event rows (5.687 against 5.857), and -0.007 (-0.035 to +0.024)
 on real harm rows. The clean gain is only just above the minimum detectable effect of 0.077, and the
-harm gain is below 0.071, so both are interim. S1 follows the step no less than R-inj (0.125 in both
-at three lags), and its quantile coverage and tail pinball loss match R-inj's (clean 95% quantile
-covers 0.915 against 0.914). The S1 variant of the sweep moves the newest lag and the daily lag at
-k = 1 where R-inj's moves one, so its k = 1 and k = 2 shares are not like for like.
+harm gain is below 0.071, so both are interim. S1 follows more of the step than R-inj does: at the like-for-like cell (R-inj at k = 2, S1 at any
+k, because S1's sweep moves the newest and the daily lag together and never the weekly lag) the
+mean share is 0.141 for S1 against 0.055 for R-inj. That extra exposure is the price of S1's
+clean-row gain. Its quantile coverage and tail pinball loss match R-inj's (the clean 95% quantile
+covers 0.915 against 0.914).
 
 **E3-surp, the same lagless table entering the encoder as a channel, ties R-inj.** E3-surp minus
 R-inj is -0.011 (-0.033 to +0.010) on clean rows and -0.023 (-0.039 to -0.006) on injected harm
@@ -579,3 +580,25 @@ Four months give wide intervals: the screen can stop the idea or rank it for the
 support a claim of benefit. The injected worlds are synthetic; the real-event rows are few. The
 encoder sees days of raw power at the forecast origin only, so it uses nothing a live service
 would lack (CAMS and ERA5 are not used at all).
+
+## Audit
+
+**A fresh Sonnet auditor re-derived the headline numbers from the stored forecasts and found no
+fault that changes one.** Triggers that fired: results contradicting the predictions, nested arms
+doing worse than the arm they extend (E3-surp against E3, S1 against R-inj), and the lag-masked
+control. The auditor matched every CRPS and contrast to 5e-5, found no overlap of the evaluation
+worlds with the training worlds, and found that the frozen lagless table's cross-fitted rows lie
+before each refit. The lag-masked gap is exactly 0 in all 84 sweep files, by construction. Four
+points stay open:
+
+- **S1 clears the minimum detectable effect by 0.006 on clean rows.** Three of four folds clear it
+  and the 2026-06 fold (-0.053) does not. On injected harm rows S1's -0.060 is inside 0.071.
+- **The row-set flags cover the three day windows, not H-smooth's 14-day history.** A real event in
+  days 4 to 14 can sit in H-smooth's clean rows.
+- **Training rows take the surprise from cross-fitted lagless forecasts and test rows from the
+  later-fitted lagless forecast,** a mild distribution shift that is not a leak.
+- **The widening of 1.15 is applied about the median to all 11 quantiles.**
+
+**Checks not run at this screen.** The median forecast minus the mean forecast per site, and the
+error of the mean forecast beside each quantile contrast, were not computed. The avoidable-curtailment
+cost was not computed either.
