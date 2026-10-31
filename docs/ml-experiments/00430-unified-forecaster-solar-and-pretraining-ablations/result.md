@@ -122,6 +122,13 @@ temperature, the clear-sky index, the lead in hours, and eight further ensemble 
   of order 0.5 (over same-farm half-hour pairs up to 6 hours apart and same-time pairs across farms)
   of the 51 paths against the observed path, for the six farms and all leads of one run jointly, and
   for each day band alone.
+- **Per-member quantiles (A2).** NGED's proposed deliverable is a 51-member power ensemble in which
+  each member is a quantile forecast (for example the 0.99, 0.95, and 0.90 quantiles). For the
+  member-wise route the experiment therefore also stores each member's own 11 quantiles and scores
+  them two ways: the pooled equal-weight mixture of the 51 members (the marginal forecast, already
+  scored) and each member's quantiles alone against the observation (pinball loss and coverage per
+  level, averaged over members), to show how much of the spread comes from the members and how much
+  from each member's own distribution. Production can afford 51 passes (maintainer, 2026-10-31).
 - **Point masses (A7).** The head adds two point masses, at zero and at the farm's output ceiling
   (the 0.995 quantile of its training output, as experiment 310), and truncates the Gaussians to the
   interval between them. The likelihood is exact, and quantiles invert the truncated mixture.
