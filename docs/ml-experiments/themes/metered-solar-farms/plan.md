@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [300](../../00300-metered-farm-best-guess-assembly/result.md) | How good is the assembled best-guess day-ahead forecast for the six metered farms, and what does a new farm with no history get? | 1 | Nothing | Planned |
+| [433](../../00433-solar-idle-noise-data-look/result.md) | Do the six metered solar farms show the wind farms' idle-noise texture when they are not generating? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
