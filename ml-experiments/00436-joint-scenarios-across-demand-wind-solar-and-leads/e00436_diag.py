@@ -112,11 +112,9 @@ def proxies(*, observed: np.ndarray, members: dict[str, list[int]], capacity: np
     for name, nodes in members.items():
         demand = [n for n in nodes if n < build.N_PRIMARIES]
         wind = [n for n in nodes if n >= build.N_PRIMARIES]
-        net = (
-            np.nansum(mw[demand], axis=0) - np.nansum(mw[wind], axis=0)
-            if wind
-            else np.nansum(mw[demand], axis=0)
-        )
+        complete = ~np.isnan(mw[demand + wind]).any(axis=0)  # every node of the group present
+        net = np.sum(mw[demand], axis=0) - (np.sum(mw[wind], axis=0) if wind else 0.0)
+        net = net[complete]
         out["group_export_q05_mw"][name] = float(np.nanpercentile(net, 5))
     (score.WORK / "proxies.json").write_text(json.dumps(out, indent=2))
     return out
@@ -185,9 +183,12 @@ def rank_instances(
     return out
 
 
-def gauss_scores(*, path: np.ndarray) -> np.ndarray:
-    """Return the normal score of each scenario's rank among the 51 at every node and half-hour."""
-    rank = np.argsort(np.argsort(path, axis=0, kind="stable"), axis=0)
+def gauss_scores(*, path: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Return the normal score of each scenario's rank among the 51 at every node and half-hour.
+
+    Ties between scenario values are broken at random, so that tied cells do not look dependent.
+    """
+    rank = np.argsort(np.argsort(path + rng.random(path.shape) * 1e-9, axis=0), axis=0)
     return norm.ppf((rank + 0.5) / M)
 
 
@@ -281,7 +282,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
                     rank_hist[arm][block][0, a] += 1
                     rank_hist[arm][block][1, d] += 1
             # dependence matrices (scenario Gaussian scores of ranks)
-            zs = gauss_scores(path=path)
+            zs = gauss_scores(path=path, rng=rng)
             for key, value in corr_blocks(z=zs, ok=have).items():
                 corr_scen[arm].setdefault(key, []).append(value)
             # proxies
