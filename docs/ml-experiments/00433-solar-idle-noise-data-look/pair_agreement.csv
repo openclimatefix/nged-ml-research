@@ -1,0 +1,16 @@
+farm_x,farm_y,within_10km,days_both,idle_both,idle_either,idle_only_x,idle_only_y,jaccard
+Solar A,Solar B,false,1203,0,20,15,5,0.0
+Solar A,Solar C,true,1267,5,20,13,2,0.25
+Solar A,Solar D,false,1047,0,25,9,16,0.0
+Solar A,Solar E,true,396,0,28,3,25,0.0
+Solar A,Solar F,false,1153,0,21,15,6,0.0
+Solar B,Solar C,false,1219,0,12,6,6,0.0
+Solar B,Solar D,true,1088,3,21,2,16,0.14285714285714285
+Solar B,Solar E,false,369,0,22,0,22,0.0
+Solar B,Solar F,false,1192,0,13,6,7,0.0
+Solar C,Solar D,false,1053,0,23,6,17,0.0
+Solar C,Solar E,true,395,0,26,2,24,0.0
+Solar C,Solar F,false,1168,2,10,3,5,0.2
+Solar D,Solar E,false,361,0,23,2,21,0.0
+Solar D,Solar F,false,1090,0,23,17,6,0.0
+Solar E,Solar F,false,350,0,21,19,2,0.0
