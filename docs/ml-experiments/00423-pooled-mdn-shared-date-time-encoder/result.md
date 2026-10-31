@@ -98,6 +98,12 @@ code: ml-experiments/00423-pooled-mdn-shared-date-time-encoder/
   cannot follow Easter between years. Any Easter result rests on two days, so the expected gain is
   small and sits in E1 against E2, and in shared against per-Primary encoders.
 
+- **Experiment 396's holiday columns helped one metering group only.** In January they lowered
+  the XGBoost CRPS by 0.046 points at the signed-MW group (interim, unaudited) and raised it at the
+  MVA-only group. The plan therefore scores E1 and E2 separately for the signed-MW six and the
+  MVA-only eight in every contrast, and does not expect the holiday-aware encoder to help the
+  eight.
+
 ## Arms
 
 All arms keep the weather, solar, lag, and `covid` inputs and the 8-wide Primary embedding of
