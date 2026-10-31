@@ -138,3 +138,9 @@ The scorer's `pre` stage read only the control `R` (stored seeds 0 to 2 against 
   result.
 - **Seeds 3 and 4 of `T` on the old folds are fitted after experiment 441's result was read.**
   They fix the number of seeds, not the design.
+- **The in-slice month-block interval is nearly all-or-nothing.** It resamples 5 origin months, so
+  an upper end below zero needs almost every fold to be negative, which is stricter than the
+  "4 of 5" condition.
+- **The mask thresholds use runs up to the refit, whose later valid times pass it.** Only ENS
+  weather enters the thresholds, never a score or an actual, and experiment 441 used the same
+  window.

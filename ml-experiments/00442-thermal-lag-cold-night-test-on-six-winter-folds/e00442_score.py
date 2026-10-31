@@ -230,7 +230,7 @@ def seed_spread(
 
     Args:
         rows: Scored rows keyed by name, holding `{control}_s012_w115` and `{control}_s34_w115`.
-        control: `R` or `A`.
+        control: `R`.
         mask: The slice's mask expression.
         group: The metering group.
 
@@ -318,7 +318,7 @@ def paired(*, rows: dict[str, pl.DataFrame], arm: str) -> pl.DataFrame:
 
     Args:
         rows: Scored rows keyed by name, holding `{arm}_w115` and its control's.
-        arm: A bundle arm.
+        arm: The arm, `T`.
 
     Returns:
         One row per shared scored half-hour with `d_<metric>` columns (arm minus control).
@@ -594,7 +594,7 @@ def gate_against_437() -> None:
 
 
 def score() -> None:
-    """Score the eight arms on the slices and write the figure tables."""
+    """Score T against R on the slices and write the figure tables."""
     rows = build_rows(with_arm=True)
     FIGURE_TABLE_DIR.mkdir(parents=True, exist_ok=True)
     missing = [a for a in SCREEN_ARMS if f"{a}_w115" not in rows]

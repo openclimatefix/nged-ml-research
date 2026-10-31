@@ -40,12 +40,11 @@ import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00437_features as feats  # ty: ignore[unresolved-import]
 import e00442_fit as fit  # ty: ignore[unresolved-import]
 import polars as pl
-from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 from studies import solar
 
-EXPERIMENT_DIR_NAME: Final[str] = "00442-difficult-row-rescore-of-the-neural-demand-input-bundles"
-WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / EXPERIMENT_DIR_NAME / "work"
+EXPERIMENT_DIR_NAME: Final[str] = fit.EXPERIMENT_DIR_NAME
+WORK_DIR: Final[Path] = fit.OUT_DIR
 MASK_PATH: Final[Path] = WORK_DIR / "masks.parquet"
 THRESHOLD_PATH: Final[Path] = WORK_DIR / "thresholds.parquet"
 MASK_NAMES: Final[tuple[str, ...]] = (
