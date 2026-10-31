@@ -3,7 +3,8 @@
 For each arm, row class, and Primary group, the table lists the score difference against the
 reference arm in every scored month and seed where both arms have forecasts, then the mean of those
 differences. A cell whose real class holds a single event has no meaningful interval, so the cell is
-marked `*`. The mean weights every cell equally.
+marked `*`. Seeds within a month are averaged first, so the pooled mean is a mean of month means
+(`e00404_audit.py` adds the event-weighted pooling).
 
 ```bash
 PYTHONPATH=<as e00404_fit.py shows> \
