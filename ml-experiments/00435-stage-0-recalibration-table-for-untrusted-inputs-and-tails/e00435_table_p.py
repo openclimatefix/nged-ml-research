@@ -16,8 +16,8 @@ injected event (`tgt_inj`) are dropped, as in experiment 428's own scoring. `rea
 scored three ways: against the metered actual, and against the NRA-corrected actual at depth
 factors 0.75, 1.0, and 1.25 (`basis` column). The surprise classes are read from seed 0 of
 the frozen lagless table of experiment 404 (commit `63d3799f`). Seeds of an arm that has three
-are averaged in quantile space before fitting. Each scored fold is fitted on the earlier folds only, so 2025-10
-(the first fold) is never scored.
+are averaged in quantile space before fitting. Each scored fold is fitted on the earlier folds
+only, so 2025-10 (the first fold) is never scored.
 
 ```bash
 # PYTHONPATH: experiments 87, 48, 404, 422 and their imports, plus this folder
