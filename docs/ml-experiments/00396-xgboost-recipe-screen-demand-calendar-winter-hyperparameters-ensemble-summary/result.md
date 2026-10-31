@@ -44,13 +44,15 @@ decision_rule: >-
   See "Pre-registered rules" below. In short: round 1 drops an arm that is worse than the control by
   more than the noise floor in both of its round-1 folds at both groups; an arm goes to the full
   evaluation if it wins in at least 3 of its 4 folds and its pooled gain exceeds the noise floor at
-  the signed-MW six or the MVA-only eight. Every change costs nothing or little in production, so
+  the signed-MW six or the MVA-only eight. Every change uses little or no extra compute
+  in production, so
   the threshold for porting is any gain whose full-year interval excludes zero. A screen supports no
   such claim.
 benchmark: >-
   The weekly member of experiment 87 (`n1h`, 500 rounds), refitted monthly, here called the
-  control, fitted on each screen fold. Reference rows: experiment 381's stored `monthly/control`
-  (whole-history window), BG2, `manual_heuristic`, and `climatology`.
+  control, fitted on each screen fold. The page reports only C0's absolute CRPS beside each
+  arm's difference. The stored reference rows (experiment 381's `monthly/control`, BG2,
+  `manual_heuristic`, and `climatology`) were not scored in this screen.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Continuous ranked probability score from the 11 quantiles, mean absolute error of the median,
@@ -70,20 +72,23 @@ best_arm: >-
 headline: >-
   Of the changes screened, only the ensemble-input arms (E4_em_pool, E1_es2, E2_es7) and the
   shortwave-trend arm W7 lowered CRPS in both main test months at both metering groups, by 0.005 to
-  0.120 points (0.4% to 2.7% of the control's CRPS). Holiday columns lowered Easter bank-holiday
-  CRPS by about 0.5 points and raised all-rows CRPS, winter columns were neutral to worse, and the
+  0.120 points (0.1% to 2.7% of the control's CRPS). Holiday columns lowered Easter bank-holiday
+  CRPS by about 0.5 points and raised all-rows CRPS in January and at the signed-MW six at Easter
+  (they lowered it in June), winter columns were neutral to worse, and the
   window-summary arms raised CRPS by 0.04 to 0.28.
 lessons: >-
   The weather inputs, not the calendar or hyperparameter columns, are where the recipe has room to
-  improve, and the gain is 0.4% to 2.7% of CRPS, measured on two test months against a noise floor
-  of at most 0.015 points. The control's 95% upper quantile covers only 78% at the signed-MW six in
+  improve, and the gain of E1_es2 and E4_em_pool is 0.4% to 2.7% of CRPS, measured on two test
+  months against a noise floor of at most 0.015 points. The control's 95% upper quantile covers
+  only 78% at the signed-MW six in
   January, and no arm repairs that. Half of the planned arms did not run, so the screen is not a
   full ranking.
 take_home_message: >-
   Giving the weekly XGBoost demand model the ensemble's view of the weather, either its mean and
   spread or a model trained on the ensemble mean, lowered the error by 0.4% to 2.7% in both test
-  months, and nothing else we tried did. Holiday columns help on Easter bank holidays but cost
-  accuracy on other days, and winter weather columns do not help, so a full-year test should
+  months, and no other change we tried did so as clearly. Holiday columns help on Easter bank
+  holidays but raised the error on all days in January and at the signed-MW six at Easter, and
+  winter weather columns do not help, so a full-year test should
   start with the ensemble-input arms.
 advice:
   - >-
@@ -111,15 +116,16 @@ adopted_in: none
 ---
 
 **Take-home: giving the weekly XGBoost demand model the ensemble's view of the weather lowered the
-forecast error a little in every test month and metering group we scored, with three arms (E1_es2,
-E2_es7, and E4_em_pool). Only the shortwave-trend arm W7 did so too, by less, and no other change
-did.** The two arms that did best trained on the ensemble mean (E4_em_pool, which lowered the
-continuous ranked probability score, CRPS, by 0.015 to 0.120 points of effective capacity against
-the control) or added the ensemble's mean and spread of temperature and shortwave radiation (E1_es2,
-0.026 to 0.072 points). Those gains are 0.4% to 2.7% of the control's CRPS, measured in two main
-test months, so they justify a full-year test and nothing more. Holiday columns lowered the error on
-the Easter bank holidays by about 0.5 points but raised it on all days at the Primaries with signed
-meters. The winter weather columns were neutral to worse, 200 boosting rounds was clearly worse than
+forecast error a little in both main test months and at both metering groups, and no other change
+did so as clearly.** Two ways of giving the model that view did best. The first trains the model on
+the mean of the 51 ensemble members and then applies it to each member (arm E4_em_pool). The second
+adds the ensemble's mean and spread of temperature and shortwave radiation (arm E1_es2). They
+lowered
+the continuous ranked probability score (CRPS) by 0.015 to 0.120 points and by 0.026 to 0.072 points
+of effective capacity, which is 0.4% to 2.7% of the control's CRPS. Two main test months cannot
+support more than a full-year test. Holiday columns lowered the error on the Easter bank holidays by
+about 0.5 points, but raised it on all days in January and at the Primaries with signed meters at
+Easter. The winter weather columns were neutral to worse, 200 boosting rounds was clearly worse than
 500, and the window-summary arms of the lag-surprise idea all raised the error. Verdict: partly
 supported. A screen supports no 99% claim: every number here is a point difference from the control,
 set against a noise floor from refitting with another seed, in a few test months.
@@ -167,26 +173,31 @@ second control fitted with another seed (C1).
 
 - **Ensemble-summary arms lowered the error most consistently.** E1_es2 (the ensemble's mean and
   standard deviation of temperature and shortwave radiation replace the control member's two
-  columns) is the only Tier A arm below C0 in both main months and both groups. It gained 0.7% to
-  1.7% of C0's CRPS. E4_em_pool (train on the ensemble mean of the 7 weather variables, then apply
-  to the 51 members and pool them) is the best Tier B arm, and beats E1_es2 clearly only in January
-  (second figure below). E2_es7 (E1_es2's summary for all 7 variables) is also below C0 in all four
+  columns) is the only arm of the first screening tier, other than W7, below C0 in both main
+  months and both groups. E1_es2 gained 0.7% to 1.7% of C0's CRPS. E4_em_pool (train on the ensemble
+  mean of the seven weather variables, then
+  apply to the 51 members and pool them) is the best Tier B arm, and beats E1_es2 clearly only in
+  January
+  (second figure below). E2_es7 (E1_es2's summary for all seven variables) is also below C0 in all
+  four
   cells, but gains less than E1_es2 in 2026-01 at the signed-MW six, although it holds more inputs.
 - **W7 is a small gain.** W7 (trailing means of shortwave radiation and the 3-hour change in the
   clear-sky index) is below C0 in all four cells, by 0.005 to 0.028 points. Each gap exceeds that
-cell's noise floor, but one gap (0.005 points) is under 0.01.
-- **Holiday columns help on bank-holiday days and cost on all days.** At Easter (2026-04) H1 lowered
+  cell's noise floor, but one gap (0.005 points) is under 0.01.
+- **Holiday columns help on bank-holiday days and raise the error on all days in January and at
+  the signed-MW six at Easter.** At Easter (2026-04) H1 lowered
   CRPS on the bank-holiday days by 0.592 points at the signed-MW six and 0.523 at the MVA-only
   eight. The same arm raised all-rows CRPS by 0.039 at the signed-MW six in 2026-04, and raised the
   Christmas-slice CRPS by 0.065 and 0.594 points in 2025-12 and 2026-01 at the signed-MW six. H1d
-(only the signed days to the nearest bank holiday) lowered Easter CRPS by 0.209 and 0.344 points and
-the Christmas slice by about 0.05 at the signed-MW six, with all-rows changes of -0.024 to +0.048.
-HW did nothing, and HT and HWT raised the Christmas-slice CRPS by up to 0.49 points (third figure
-below).
+  (only the signed days to the nearest bank holiday) lowered Easter CRPS by 0.209 at the signed-MW
+  six and 0.344 at the MVA-only eight, and the Christmas slice by about 0.05 at the signed-MW six.
+  Its all-rows changes range from -0.024 to +0.048. In 2026-06, which holds no bank holiday, H1 and
+  H1d lowered all-rows CRPS by 0.014 to 0.020 points; this screen does not explain why. HW did
+  nothing, and HT and HWT raised the Christmas-slice CRPS by up to 0.49 points (third figure below).
 - **Winter weather columns are neutral to worse.** W1, W3, and W4 raised CRPS in at least three of
   the four main cells, and W4 (sine and cosine of the day of year) raised it by 0.176 and 0.388
-  points in January. W2 (the monotone constraint on temperature) helped only in 2025-12, by 0.026
-  and 0.016 points.
+  points in January. W2 (the monotone constraint on temperature) helped beyond the noise floor
+  only in 2025-12, by 0.026 and 0.016 points.
 - **Boosting rounds.** 200 rounds is clearly worse than 500 in every cell (+0.117 to +0.237). 1000
   rounds helps in June (-0.045 and -0.009) and hurts in January (+0.096 and +0.021). A half-life of
   1 year (P_hl1) lowers CRPS in 3 of 4 cells, by up to 0.035 points.
@@ -194,17 +205,17 @@ below).
   (H0_nocal) raised CRPS by 0.064 to 0.139 points, so those columns carry real information.
 - **Tails.** The control's 95% upper quantile covers 78% of readings at the signed-MW six and 90.5%
   at the MVA-only eight in January (nominal 95%). No arm repairs that. 1000 rounds lowers coverage
-  further, from 0.781 to 0.749 and from 0.922 to 0.881 at the signed-MW six in January and June. A
-  noise floor of at most 0.015 points applies in every fold and group.
+  further, from 0.781 to 0.749 and from 0.922 to 0.881 at the signed-MW six in January and June.
 
-![Tier B and Tier C arms minus E1_es2](versus_e1.svg)
+![Dot plot of the CRPS of the ensemble-input, W7, P_hl1, and rounds arms minus that of E1_es2](versus_e1.svg)
 
-![Holiday arms on bank-holiday days and Christmas to New Year](holiday_slices.svg)
+![Dot plot of the holiday arms' CRPS change on Easter and Christmas days](holiday_slices.svg)
 
 **Window-summary arms hurt.** The arms WS A1 to A3 (window summaries of the lag surprise of
 [experiment 391](../00391-xgboost-lag-surprise-second-stage/result.md)) were scored against that
-experiment's `b0` control on 7 Primaries (the signed-MW six and D8), over 1,681,386 shared
-half-hours. All rows, change in CRPS from `b0` (`b0`'s CRPS in brackets): at the signed-MW six
+experiment's `b0` control on 7 Primaries (the signed-MW six and D8), over 1,034,930 scored
+half-hours at the signed-MW six and 172,780 at D8. All rows, change in CRPS from `b0` (`b0`'s CRPS
+in brackets): at the signed-MW six
 +0.100, +0.106, and +0.111 for A1, A2, and A3 (3.123); at D8 +0.134, +0.041, and +0.121 (7.684). The
 second `b0` seed differs by at most 0.001 on all rows and 0.010 on the 21,601 event-lag rows outside
 events, where A1 to A3 raised CRPS by +0.114, +0.250, and +0.275 (`b0` 4.957). None of the three
@@ -236,9 +247,9 @@ half-hours flagged `substation_zero` in 2025-12 and none in the other three fold
   0.039 points, and raised the Christmas-slice CRPS.
 - **P4 (W4 does not help): confirmed.** W4 was worse in 5 of the 6 cells in which it was scored, and
   clearly worse in January.
-- **P5 (at most 3 of 13 hyperparameter settings pass): not tested.** Only 3 of the 13 settings ran
-  (P_rounds, scored at 200, 500, and 1000 rounds, counts as one fit; P_hl1), and the go rule needs 4
-  folds.
+- **P5 (at most 3 of 13 hyperparameter settings pass): not tested.** Of the 13 settings, 2 ran: the
+  number of boosting rounds (one 1000-round fit scored at 200, 500, and 1000 rounds) and the 1-year
+  half-life. The other 11 did not run, and the go rule needs 4 folds.
 - **P6 (four-band split moves CRPS by under 0.03 and shows a jump at a band edge): not tested.** The
   lead-band split was not run.
 
@@ -267,11 +278,14 @@ None of the following is a negative result.
 - **Round 2 and stage 2**: the folds 2025-10 and 2026-03 and the full-year evaluation of the best
   three arms were not run, because the manager cut the scope to "write up what exists". The
   pre-registered go rule (a win in at least 3 of 4 base folds) is therefore not applied. The drop
-  rule can be read on the two main folds: W4 and P_rounds_r200 are worse than C0 by more than the
-  noise floor in all four main cells, so the rule drops them. The screen-level reading is that
+  rule can be read on the two main folds: W4, P_rounds_r200, and H0_nocal are worse than C0 by
+  more than the noise floor in all four main cells. The rule drops W4 and P_rounds_r200; H0_nocal
+  is a deliberate ablation of the control's hour and weekday columns, not a candidate. The
+  screen-level reading is that
   E4_em_pool, E1_es2, E2_es7, and W7 improve all four main cells.
-- **The winter arms W1 to W4** ran on 2025-12 and the main folds, and the holiday arms on all four
-  folds. The ensemble arms ran on the main folds only.
+- **Fold coverage.** The winter arms W1 to W4 ran on 2025-12 and the main folds, and the holiday
+  arms on all four folds. The ensemble arms, W7, P_hl1, and the rounds fits ran on the main folds
+  only.
 
 ## Method
 
@@ -290,14 +304,15 @@ weather variables, the solar zenith and azimuth, local hour, local weekday, a lo
 | A | W1 | Trailing means of temperature over 6, 24, 72, and 168 hours and the degrees below 15.5 °C of each |
 | A | W2, W3, W4 | Monotone constraint on temperature; W1 plus W2; sine and cosine of day of year |
 | A2 | W7 | Trailing means of shortwave over 3, 6, and 24 hours and the 3-hour change in the clear-sky index |
-| B | E2_es7, E3_em_em, E4_em_pool | E1_es2 with all 7 variables; train and apply on the ensemble mean; train on the mean, apply to the 51 members and pool |
+| B | E2_es7, E3_em_em, E4_em_pool | E1_es2 with all seven variables; train and apply on the ensemble mean; train on the mean, apply to the 51 members and pool |
 | C | P_rounds, P_hl1 | One 1000-round fit scored at 200, 500, and 1000 rounds; recency half-life of 1 year |
-| D | WS A1 to A3 | Window summaries of the lag surprise, scored against experiment 391's `b0` |
+| Separate | WS A1 to A3 | Window summaries of the lag surprise, scored against experiment 391's `b0` |
 
 **Pre-registered rules.** An arm is dropped if its days 1 to 10 CRPS exceeds C0's by more than the
 noise floor in both main folds at both groups. An arm goes to the full evaluation if it beats C0 in
 at least 3 of its 4 base folds and its pooled gain exceeds the noise floor at either group. Every
-change here costs little or nothing in production, so any gain whose full-year interval excludes
+change here uses little or no extra compute in production, so any gain whose full-year interval
+excludes
 zero would be worth porting, and a screen supports no such claim. The committed table holds raw
 scores only, with no widened (factor 1.15) score.
 
