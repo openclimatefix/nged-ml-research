@@ -91,9 +91,9 @@ delays, and checks whether the loss disappears.
   found no page since experiment 410 that stresses a neural network with them. Experiment 388,
   merged on 2026-10-31, asks which lags the XGBoost model needs, not what happens when the readings
   are late. No standing rule in `common.md` changed the brief's design. The brief and this plan
-  agree except for four additions, each registered below: the delay of the newest reading is randomised, not only the origin hour (otherwise the age of the
-  newest reading is a constant 3.5 hours and carries no information), the previous weather run is
-  sometimes shown (otherwise the weather-age input never leaves its training range in the W24
+  agree except for four additions, each registered below: the delay of the newest reading is
+  randomised, not only the origin hour (otherwise the age of the newest reading is a constant 3.5
+  hours and carries no information), the previous weather run is sometimes shown (otherwise the weather-age input never leaves its training range in the W24
   arms), a control arm T0 is refitted under the current cleaning rules, and an arm T4 trains with
   missing origin lags, which experiment 410 named as the next step.
 - **The base network.** The pooled plain network of experiment 397 (`plain_pooled`, the same
