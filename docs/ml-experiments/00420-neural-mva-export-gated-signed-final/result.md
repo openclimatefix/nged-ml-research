@@ -153,9 +153,11 @@ is a laboratory result.
   against 15.38 for A's own distribution folded to `|X|`, with the D5 placebo CRPS unchanged (2.74).
 - **Experiment 412 (merged, pull request 69) found the capacity prior inert.** This plan adds no
   capacity prior.
-- **Experiment 408 is still a draft plan (pull request 64) and has no merged page.** Its signed mean
-  absolute error (9.3 against 19.5 for the plain XGBoost model read as signed) is quoted from the
-  draft by the audit, with no reverse-flow CRPS, so the new bar cannot be read for it.
+- **Experiment 408 (merged, pull request 64) failed its known-answer test for a signed XGBoost
+  label.** Its registered rule reached a pooled balanced accuracy of 0.834 against the 0.85 bar. The
+  audit read a signed mean absolute error of 9.3 against 19.5 for the plain XGBoost model read as
+  signed from the page's earlier draft, with no reverse-flow CRPS, so the new bar cannot be read for
+  it.
 - **Earlier advice followed.** Leave the eight MVA-only Primaries out of a capacity estimate: the
   capacity here is fitted at the six signed-MW Primaries and transferred. Do not read the lack of an
   interval in [experiment 56](../00056-mva-only-primaries-skill-against-mw-primaries/result.md) as
