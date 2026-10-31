@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0912, PT017, PT018
+# ruff: noqa: E501, PLR0912, PT017, PLR0915, PT018
 """Score the Brief B arms of experiment 446 against the stored reference forecasts (no fit).
 
 **Arms.** The new arms (`e00446_run.ARMS446`, `U3`) are read from this experiment's predictions
@@ -24,6 +24,10 @@ folder. The references `R-inj`, `S1`, and `Bmix` (and `L0`, `R` as secondary ref
   against the world's actual (the target moves with the jump when the jump is still in force).
   `gen_jump_d0`, `gen_jump_d1_3`, and `gen_jump_d3p` split `gen_jump` by days since the onset of the
   level change in force at the newest lag (under 1, 1 to under 3, 3 or more).
+
+**Brief C arms** (`T1` to `T5`, or `T2-on-U2` and so on for another base) are read like any other
+arm. `clean_warm` is `clean` off the cold winter nights, and `brief_c_rules` applies the plan's pass
+rule for Brief C arms to a variant's table (see its docstring for each reading of the plan).
 
 Groups: the signed-MW six, the MVA-only eight, and D15 and D18 (report-only). Lead bands are
 experiment 435's (`0-12h`, `12-36h`, `36-72h`, `days4-5`, `days6-10`).
@@ -52,7 +56,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import e00428_data as data  # ty: ignore[unresolved-import]
 import e00428_fit as fit  # ty: ignore[unresolved-import]
@@ -111,6 +115,18 @@ P_CLASSES: Final[dict[str, str]] = {
 """Class whose table P factors a row set takes (experiment 435 gives real events the `inj_harm` ones)."""
 P_FIT_SETS: Final[tuple[str, ...]] = ("clean", "inj_clean", "inj_harm")
 MIN_COLD_DAYS: Final[int] = 20
+CELL_RANGES: Final[dict[str, tuple[float, float]]] = {
+    "q95": (0.93, 0.97), "q99": (0.98, 0.995), "q05": (0.03, 0.07), "q01": (0.005, 0.02),
+}  # fmt: skip
+"""Brief C coverage cells: the tail and the range its coverage on clean rows must lie in."""
+CELL_WINDOWS: Final[dict[str, str | None]] = {"days1-10": None, "12-36h": "12-36h"}
+"""Brief C lead windows: all lead bands (days 1 to 10), and the 12 to 36 hour band."""
+COLD_TARGETS: Final[dict[str, float]] = {"coverage_q95": 0.92, "coverage_q99": 0.975}
+PRIMARY_Q95_FLOOR: Final[float] = 0.90
+SEPARATE_PRIMARIES: Final[tuple[str, ...]] = ("D14", "D15", "D18")
+CRPS_LIMIT: Final[float] = 0.03
+TAIL_LIMIT: Final[float] = 0.02
+OTHER_ROWS_LIMIT: Final[float] = 0.02
 
 
 @dataclass(frozen=True)
@@ -134,6 +150,7 @@ def row_sets() -> list[RowSet]:
     sets = [
         RowSet("clean", (0,), lambda: plain),
         RowSet("clean_cold", (0,), lambda: plain & _f("cold")),
+        RowSet("clean_warm", (0,), lambda: plain & ~_f("cold")),
         RowSet("real_event", (0,), lambda: _f("tgt_real"), cluster=True),
         RowSet("real_harm", (0,), lambda: ~_f("tgt_post") & _f("win_real"), cluster=True),
         RowSet("inj_clean", (4, 5, 6), lambda: ~_f("win_inj") & plain & ~_f("tgt_inj")),
@@ -177,6 +194,19 @@ def row_sets() -> list[RowSet]:
             )
         )
     return sets
+
+
+def new_arms(*, table: pl.DataFrame) -> list[str]:
+    """Return the arms in a table that are not references, in `NEW_ARMS` order then alphabetical."""
+    present = set(table["arm"].unique().to_list()) - set(REFERENCES)
+    return [a for a in NEW_ARMS if a in present] + sorted(present - set(NEW_ARMS))
+
+
+def tail_base_of(*, arm: str) -> str | None:
+    """Return the base arm of a Brief C arm name (`T2` is on S1, `T2-on-U2` on U2), else None."""
+    if not (len(arm) >= 2 and arm[0] == "T" and arm[1] in "12345"):
+        return None
+    return arm.split("-on-", 1)[1] if "-on-" in arm else run.DEFAULT_BASE
 
 
 def require(path: Path, what: str) -> Path:
@@ -543,10 +573,40 @@ def aggregate(
     return pl.concat(records, how="diagonal") if records else pl.DataFrame()
 
 
-def collect(
-    *, arms: list[str], months: list[str], seeds: tuple[int, ...], variant: str, context: Context
+def primary_coverage(
+    *, arm: str, frames: dict[str, pl.DataFrame], sets: list[RowSet]
 ) -> pl.DataFrame:
-    """Return the long block table of every arm for a variant (`raw`, `w1.15`, or `P`)."""
+    """Return per-Primary clean-row rows and q95 hits of an arm, summed over the frames' months."""
+    clean = next(s for s in sets if s.name == "clean")
+    parts = []
+    for frame in frames.values():
+        sub = frame.filter(
+            pl.col("world").is_in(list(clean.worlds))
+            & clean.rule()
+            & pl.col("actual").is_finite()
+            & pl.col("lead_band").is_not_null()
+        )
+        parts.append(
+            sub.group_by("label").agg(
+                pl.len().alias("n"), (pl.col("actual") <= pl.col("q95")).sum().alias("hits_q95")
+            )
+        )
+    return (
+        pl.concat(parts)
+        .group_by("label")
+        .agg(pl.col("n").sum(), pl.col("hits_q95").sum())
+        .with_columns(arm=pl.lit(arm), coverage_q95=pl.col("hits_q95") / pl.col("n"))
+    )
+
+
+def collect(
+    *, arms: list[str], months: list[str], seeds: tuple[int, ...], variant: str, context: Context,
+    primaries: list[pl.DataFrame] | None = None,
+) -> pl.DataFrame:  # fmt: skip
+    """Return the long block table of every arm for a variant (`raw`, `w1.15`, or `P`).
+
+    With `primaries` given, each arm's per-Primary clean-row q95 coverage is appended to it.
+    """
     sets = row_sets()
     factor = {"raw": 1.0, "w1.15": score428.WIDENING, "P": 1.0}[variant]
     tables = []
@@ -557,6 +617,8 @@ def collect(
         if variant == "P":
             frames = apply_p(frames=frames, sets=sets)
         tables.append(aggregate(arm=arm, frames=frames, sets=sets, seeds=seeds))
+        if primaries is not None:
+            primaries.append(primary_coverage(arm=arm, frames=frames, sets=sets))
         print(f"  {variant}: {arm} done", flush=True)
     return pl.concat(tables, how="diagonal")
 
@@ -709,7 +771,7 @@ def checks(*, table: pl.DataFrame, label: str) -> pl.DataFrame:
             a: clean.filter((pl.col("arm") == a) & (pl.col("group") == group))
             for a in ("R-inj", "S1")
         }
-        for arm in NEW_ARMS:
+        for arm in new_arms(table=table):
             rows = clean.filter((pl.col("arm") == arm) & (pl.col("group") == group))
             if rows.is_empty():
                 continue
@@ -758,7 +820,147 @@ def checks(*, table: pl.DataFrame, label: str) -> pl.DataFrame:
     return pl.DataFrame(records, infer_schema_length=None)
 
 
-def report(*, table: pl.DataFrame, variant: str, seeds: tuple[int, ...], months: list[str]) -> None:
+def _one(frame: pl.DataFrame, **keys: str) -> dict | None:
+    """Return the single row of `frame` matching `keys`, or None."""
+    hit = frame.filter(pl.all_horizontal([pl.col(k) == v for k, v in keys.items()]))
+    return None if hit.is_empty() else hit.row(0, named=True)
+
+
+def cells_met(*, row_by_window: dict[str, dict | None]) -> int:
+    """Return how many of the eight Brief C coverage cells (4 tails x 2 windows) a set of rows meets."""
+    count = 0
+    for row in row_by_window.values():
+        if row is None:
+            continue
+        for tail, (low, high) in CELL_RANGES.items():
+            count += int(low <= row[f"coverage_{tail}"] <= high)
+    return count
+
+
+def brief_c_rules(
+    *, table: pl.DataFrame, primaries: pl.DataFrame | None, label: str
+) -> pl.DataFrame:
+    """Return the plan's Brief C pass rule for every tail arm, per metering group.
+
+    The rule is the one in the plan's `decision_rule`, read on the table of one variant (`raw`,
+    `w1.15`, or `P`; under `P` the factors were fitted on the arm's own earlier folds, which are its
+    validation months). Readings the plan leaves open:
+
+    - The coverage cells are read on clean rows. "Days 1 to 10" is every lead band from 0 to 240
+      hours, and the other window is the 12 to 36 hour band, so there are 8 cells (4 tails x 2
+      windows) per group. The arm passes the cell rule when all 8 are in range and it meets more
+      cells than its base on the same variant.
+    - "Lower-tail pinball" is the larger of the q01 and q05 pinball differences from the base, on
+      clean rows over all leads, and "clean-row tail pinball" on cold nights is the largest of the
+      four tails' differences.
+    - "CRPS on all other rows" is the `clean_warm` row set, the clean rows off the cold nights.
+    - The Primary rule is the lowest per-Primary clean-row q95 coverage over the Primaries outside
+      `SEPARATE_PRIMARIES`; the coverage of those three is reported as `q95_<label>`.
+    - The limit against S1 is the same pair of limits (CRPS and lower-tail pinball) against S1.
+    - The cold-night rule reads only the folds that have cold-night rows. An arm with no cold-night
+      rows has `cold_ok` null and does not pass.
+    - Real harm rows: the arm's q99 pinball minus R-inj's and minus S1's (the plan's veto limit is
+      0.02 against R-inj); the column is reported and does not enter `pass_brief_c`.
+    """
+    clean = summarise(table=table.filter(pl.col("row_set") == "clean"), by=["arm", "group"])
+    clean_lb = summarise(
+        table=table.filter(pl.col("row_set") == "clean"), by=["arm", "group", "lead_band"]
+    )
+    cold = summarise(table=table.filter(pl.col("row_set") == "clean_cold"), by=["arm", "group"])
+    warm = summarise(table=table.filter(pl.col("row_set") == "clean_warm"), by=["arm", "group"])
+    harm = summarise(table=table.filter(pl.col("row_set") == "real_harm"), by=["arm", "group"])
+    records = []
+    arms = [a for a in new_arms(table=table) if tail_base_of(arm=a) is not None]
+    for arm in arms:
+        base_name = tail_base_of(arm=arm)
+        assert base_name is not None
+        for group in GROUP_NAMES:
+            rec: dict = {"variant": label, "arm": arm, "base": base_name, "group": group}
+
+            def windows(name: str, group: str = group) -> dict[str, dict | None]:
+                return {
+                    w: _one(clean if band is None else clean_lb, arm=name, group=group,
+                            **({} if band is None else {"lead_band": band}))
+                    for w, band in CELL_WINDOWS.items()
+                }  # fmt: skip
+
+            mine, theirs = (
+                cells_met(row_by_window=windows(arm)),
+                cells_met(row_by_window=windows(base_name)),
+            )
+            rec["cells_met"], rec["cells_met_by_base"] = mine, theirs
+            rec["cells_ok"] = mine == len(CELL_RANGES) * len(CELL_WINDOWS)
+            rec["more_cells_than_base"] = mine > theirs
+            row = _one(clean, arm=arm, group=group)
+            limits = []
+            for ref in (base_name, "S1"):
+                r = _one(clean, arm=ref, group=group)
+                if row is None or r is None:
+                    continue
+                crps = row["crps"] - r["crps"]
+                lower = max(
+                    row["pinball_q01"] - r["pinball_q01"], row["pinball_q05"] - r["pinball_q05"]
+                )
+                rec[f"crps_vs_{ref}"], rec[f"lower_tail_vs_{ref}"] = crps, lower
+                limits.append(crps <= CRPS_LIMIT and lower <= TAIL_LIMIT)
+            rec["limits_ok"] = bool(limits) and all(limits)
+            c_arm, c_base = _one(cold, arm=arm, group=group), _one(cold, arm=base_name, group=group)
+            w_arm, w_base = _one(warm, arm=arm, group=group), _one(warm, arm=base_name, group=group)
+            if c_arm is None or c_base is None or w_arm is None or w_base is None or row is None:
+                rec["cold_ok"] = None
+            else:
+                base_clean = _one(clean, arm=base_name, group=group)
+                assert base_clean is not None
+                tails = max(row[f"pinball_{t}"] - base_clean[f"pinball_{t}"] for t in TAILS)
+                rec["cold_coverage_q95"], rec["cold_coverage_q99"] = (
+                    c_arm["coverage_q95"],
+                    c_arm["coverage_q99"],
+                )
+                rec["other_rows_crps_vs_base"], rec["clean_tail_vs_base"] = (
+                    w_arm["crps"] - w_base["crps"],
+                    tails,
+                )
+                rec["cold_ok"] = bool(
+                    all(c_arm[k] >= v for k, v in COLD_TARGETS.items())
+                    and rec["other_rows_crps_vs_base"] <= OTHER_ROWS_LIMIT
+                    and tails <= OTHER_ROWS_LIMIT
+                )  # fmt: skip
+            if primaries is not None:
+                mine_p = primaries.filter(pl.col("arm") == arm).filter(
+                    pl.col("label").replace_strict(GROUP_OF, default=None) == group
+                )
+                if not mine_p.is_empty():
+                    ruled = mine_p.filter(~pl.col("label").is_in(SEPARATE_PRIMARIES))
+                    rec["min_primary_q95"] = (
+                        float(cast("float", ruled["coverage_q95"].min()))
+                        if not ruled.is_empty()
+                        else None
+                    )
+                    rec["primary_ok"] = (
+                        bool(rec["min_primary_q95"] >= PRIMARY_Q95_FLOOR)
+                        if rec["min_primary_q95"] is not None
+                        else None
+                    )
+                    for lab in SEPARATE_PRIMARIES:
+                        hit = mine_p.filter(pl.col("label") == lab)
+                        if not hit.is_empty():
+                            rec[f"q95_{lab}"] = float(hit["coverage_q95"][0])
+            for ref in ("R-inj", "S1"):
+                h, h_ref = _one(harm, arm=arm, group=group), _one(harm, arm=ref, group=group)
+                if h is not None and h_ref is not None:
+                    rec[f"real_harm_q99_pinball_vs_{ref}"] = h["pinball_q99"] - h_ref["pinball_q99"]
+            rec["pass_brief_c"] = bool(
+                rec["cells_ok"] and rec["more_cells_than_base"] and rec["limits_ok"]
+                and rec.get("primary_ok") and rec["cold_ok"]
+            )  # fmt: skip
+            records.append(rec)
+    return pl.DataFrame(records, infer_schema_length=None)
+
+
+def report(
+    *, table: pl.DataFrame, variant: str, seeds: tuple[int, ...], months: list[str],
+    primaries: pl.DataFrame | None = None,
+) -> None:  # fmt: skip
     """Print and store the tables of one variant."""
     out = SCORE_DIR / variant.replace(".", "_")
     out.mkdir(parents=True, exist_ok=True)
@@ -814,7 +1016,7 @@ def report(*, table: pl.DataFrame, variant: str, seeds: tuple[int, ...], months:
                 print(mde.sort("row_set", "group"))
         pairs = [
             (a, b)
-            for a in (*NEW_ARMS, "S1")
+            for a in (*new_arms(table=table), "S1")
             for b in ("R-inj", "S1")
             if a != b and a in table["arm"].unique().to_list()
         ]
@@ -823,6 +1025,7 @@ def report(*, table: pl.DataFrame, variant: str, seeds: tuple[int, ...], months:
             for s in (
                 "clean",
                 "clean_cold",
+                "clean_warm",
                 "inj_harm",
                 "gen_jump",
                 "real_harm",
@@ -840,6 +1043,11 @@ def report(*, table: pl.DataFrame, variant: str, seeds: tuple[int, ...], months:
         rules = checks(table=table, label=variant)
         rules.write_parquet(out / "checks.parquet")
         print(rules)
+        tail_rules = brief_c_rules(table=table, primaries=primaries, label=variant)
+        if not tail_rules.is_empty():
+            tail_rules.write_parquet(out / "brief_c.parquet")
+            print("Brief C pass rule (interim unless the variant is P):")
+            print(tail_rules)
 
 
 def cross_check_table_p() -> None:
@@ -861,6 +1069,9 @@ def main() -> None:
     parser.add_argument("--seeds", nargs="+", type=int, default=list(fit.SEEDS))
     parser.add_argument("--arms", nargs="+", default=[*REFERENCES, *NEW_ARMS])
     parser.add_argument(
+        "--base", default=run.DEFAULT_BASE, help="base of the Brief C arms named T1 to T5"
+    )
+    parser.add_argument(
         "--skip-missing",
         action="store_true",
         help="omit cold nights and NRA rows if their inputs are absent",
@@ -879,17 +1090,25 @@ def main() -> None:
     context = Context(need_cold=need_cold, need_nra=need_nra)
     months = sorted(args.months)
     seeds = tuple(args.seeds)
-    arms = [a for a in args.arms if (pr.PRED_DIR / a).exists()]
-    skipped = sorted(set(args.arms) - set(arms))
+    requested = run.resolve_arms(names=args.arms, base_name=args.base)
+    arms = [a for a in requested if (pr.PRED_DIR / a).exists()]
+    skipped = sorted(set(requested) - set(arms))
     if skipped:
         print(f"arms with no forecasts yet (skipped): {', '.join(skipped)}")
     for variant in args.variants:
         used = months[1:] if variant == "P" else months
-        table = collect(arms=arms, months=months, seeds=seeds, variant=variant, context=context)
-        report(table=table, variant=variant, seeds=seeds, months=used)
+        primaries: list[pl.DataFrame] = []
+        table = collect(
+            arms=arms, months=months, seeds=seeds, variant=variant, context=context,
+            primaries=primaries,
+        )  # fmt: skip
+        report(
+            table=table, variant=variant, seeds=seeds, months=used,
+            primaries=pl.concat(primaries) if primaries else None,
+        )  # fmt: skip
 
 
-def selftest() -> None:  # noqa: PLR0915
+def selftest() -> None:
     """Check the tail sums, the width ratio, the event segments, table P, and the bootstrap on toys."""
     rng = np.random.default_rng(0)
     # Tail sums on a toy frame: quantiles 0..10 for every row, actual 5.5 (between q50 and q60).
@@ -977,6 +1196,57 @@ def selftest() -> None:  # noqa: PLR0915
     else:
         msg = "check_row_identity must fail on differing rows"
         raise AssertionError(msg)
+    # Brief C rule on a toy: both arms cover the same, so no arm meets more cells than its base.
+    labelled = frame.with_columns(label=pl.lit("D1"))
+    toy_sets = [
+        s for s in row_sets() if s.name in ("clean", "clean_cold", "clean_warm", "real_harm")
+    ]
+    toy = pl.concat(
+        [
+            aggregate(arm=a, frames={"2026-01": labelled}, sets=toy_sets, seeds=(0,))
+            for a in ("S1", "T2")
+        ]
+    )
+    toy_primaries = pl.concat(
+        [primary_coverage(arm=a, frames={"2026-01": labelled}, sets=toy_sets) for a in ("S1", "T2")]
+    )
+    assert tail_base_of(arm="T2") == "S1" and tail_base_of(arm="T3-on-U2") == "U2"
+    assert tail_base_of(arm="U2") is None and tail_base_of(arm="S1") is None
+    rules = brief_c_rules(table=toy, primaries=toy_primaries, label="toy")
+    six = rules.filter((pl.col("arm") == "T2") & (pl.col("group") == "signed-MW six")).row(
+        0, named=True
+    )
+    # Toy quantiles are 0..10 and the actual 5.5: q95 and q99 cover every row, q01 and q05 none.
+    assert six["cells_met"] == 0 and not six["more_cells_than_base"] and not six["pass_brief_c"], (
+        six
+    )
+    assert six["cold_ok"] is None, "no cold-night rows: the cold rule cannot pass"
+    assert (
+        cells_met(
+            row_by_window={
+                "all": {
+                    "coverage_q95": 0.95,
+                    "coverage_q99": 0.99,
+                    "coverage_q05": 0.05,
+                    "coverage_q01": 0.01,
+                }
+            }
+        )
+        == 4
+    )
+    assert (
+        cells_met(
+            row_by_window={
+                "all": {
+                    "coverage_q95": 0.92,
+                    "coverage_q99": 0.99,
+                    "coverage_q05": 0.05,
+                    "coverage_q01": 0.03,
+                }
+            }
+        )
+        == 2
+    )
     # Missing inputs fail with a message that names them.
     try:
         require(

@@ -37,7 +37,9 @@ import sys
 from typing import Final
 
 import e00397_models as base  # ty: ignore[unresolved-import]
+import numpy as np
 import torch  # ty: ignore[unresolved-import]
+from scipy.special import gammaln, stdtr, stdtrit
 from torch import nn  # ty: ignore[unresolved-import]
 
 SCALE_INIT: Final[float] = -5.0
@@ -54,6 +56,11 @@ INTERVAL_ALPHAS: Final[tuple[tuple[float, float, float], ...]] = (
 )
 """The 90% and the 98% central intervals: lower level, upper level, and alpha."""
 SQRT2: Final[float] = math.sqrt(2.0)
+DF_MIN: Final[float] = 2.5
+"""Smallest degrees of freedom a Student-t component can take (arm T1)."""
+DF_MAX: Final[float] = 1_000.0
+DF_INIT: Final[float] = 30.0
+MAX_NEWTON_STEPS: Final[int] = 100
 
 
 def lead_columns() -> tuple[int, int]:
@@ -212,6 +219,203 @@ def log_factor_penalty(*, factor: torch.Tensor, rows: torch.Tensor) -> torch.Ten
     return torch.log(factor).mean(dim=1)[rows].mean()
 
 
+class StudentMdn(nn.Module):
+    """S1's location network with Student-t mixture components (arm T1).
+
+    The output row is `[logits (K) | means (K) | log scales (K) | raw degrees of freedom (K)]`. The
+    first `3 K` columns are read exactly as in experiment 397's Gaussian head (`base.mixture_parts`),
+    with the third block a scale rather than a standard deviation. The degrees of freedom of each
+    component are `DF_MIN + softplus(raw)`, so they cannot fall below `DF_MIN`; they start at
+    `DF_INIT`, where the density is within a few percent of Gaussian.
+    """
+
+    def __init__(
+        self,
+        *,
+        n_inputs: int,
+        n_primaries: int,
+        hidden: int = 64,
+        layers: int = 2,
+        components: int = 3,
+        dropout: float = 0.1,
+    ) -> None:
+        """Build S1's network (over `n_inputs` non-lag columns plus 12) with a wider output layer."""
+        super().__init__()
+        self.components = components
+        self.location = base.PlainMdn(
+            n_inputs=n_inputs + LAG_COLUMNS,
+            hidden=hidden,
+            layers=layers,
+            components=components,
+            dropout=dropout,
+            n_primaries=n_primaries,
+        )
+        last = nn.Linear(hidden, 4 * components)
+        nn.init.zeros_(last.weight)
+        with torch.no_grad():
+            last.bias.copy_(
+                torch.tensor(
+                    [
+                        *base.mixture_head_bias(components=components),
+                        *([_raw_df(df=DF_INIT)] * components),
+                    ]
+                )
+            )
+        self.location.net[-1] = last
+
+    def forward(self, x: torch.Tensor, primary: torch.Tensor) -> torch.Tensor:
+        """Return the raw outputs, shape (rows, 4 K)."""
+        return self.location(x, primary)
+
+
+def _raw_df(*, df: float) -> float:
+    """Return the raw output whose degrees of freedom are `df` (the inverse of `student_parts`)."""
+    return math.log(math.expm1(df - DF_MIN))
+
+
+def student_parts(
+    *, out: torch.Tensor, components: int
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Split raw outputs (..., 4 K) into log weights, means, scales, and degrees of freedom."""
+    k = components
+    log_w, mean, scale = base.mixture_parts(out=out[..., : 3 * k], components=k)
+    df = (DF_MIN + nn.functional.softplus(out[..., 3 * k :])).clamp(max=DF_MAX)
+    return log_w, mean, scale, df
+
+
+def student_log_pdf(*, z: torch.Tensor, df: torch.Tensor) -> torch.Tensor:
+    """Return the log density of the standard Student-t distribution at `z` (same shape as `z`)."""
+    half = 0.5 * (df + 1.0)
+    return (
+        torch.lgamma(half)
+        - torch.lgamma(0.5 * df)
+        - 0.5 * torch.log(df * math.pi)
+        - half * torch.log1p(z**2 / df)
+    )
+
+
+def student_mixture_nll(*, out: torch.Tensor, z: torch.Tensor, components: int) -> torch.Tensor:
+    """Return the negative log-likelihood of `z` under the Student-t mixture, for each row."""
+    log_w, mean, scale, df = student_parts(out=out, components=components)
+    log_pdf = student_log_pdf(z=(z[..., None] - mean) / scale, df=df) - torch.log(scale)
+    return -torch.logsumexp(log_w + log_pdf, dim=-1)
+
+
+def student_mixture_quantiles(
+    *,
+    log_w: torch.Tensor,
+    mean: torch.Tensor,
+    scale: torch.Tensor,
+    df: torch.Tensor,
+    tolerance: float = 1e-9,
+) -> torch.Tensor:
+    """Return the 11 quantiles (rows, 11) of Student-t mixtures (rows, components); no gradient.
+
+    The mixture CDF is evaluated on the CPU with `scipy.special.stdtr`. A mixture's quantile lies
+    between the smallest and the largest of its components' quantiles, which gives the starting
+    bracket. Each quantile is then found by Newton steps that fall back to bisection whenever a step
+    leaves the bracket, and only the quantiles whose CDF is still more than `tolerance` from its
+    level are iterated.
+    """
+    device = mean.device
+    n_rows = log_w.shape[0]
+    levels = np.asarray(base.LEVELS, dtype=np.float64)
+    n_levels = len(levels)
+    w = log_w.detach().double().exp().cpu().numpy()
+    m = mean.detach().double().cpu().numpy()
+    s = scale.detach().double().cpu().numpy()
+    v = df.detach().double().cpu().numpy()
+    component_q = m[:, None, :] + s[:, None, :] * stdtrit(v[:, None, :], levels[None, :, None])
+    lo, hi = component_q.min(-1).ravel(), component_q.max(-1).ravel()
+    x = (w[:, None, :] * component_q).sum(-1).ravel()
+    level = np.tile(levels, n_rows)
+    row = np.repeat(np.arange(n_rows), n_levels)
+    log_norm = gammaln(0.5 * (v + 1.0)) - gammaln(0.5 * v) - 0.5 * np.log(v * np.pi)
+    active = np.arange(len(x))
+    for _ in range(MAX_NEWTON_STEPS):
+        r = row[active]
+        wa, ma, sa, va, na = w[r], m[r], s[r], v[r], log_norm[r]
+        z = (x[active, None] - ma) / sa
+        err = (wa * stdtr(va, z)).sum(-1) - level[active]
+        pdf = (wa * np.exp(na - 0.5 * (va + 1.0) * np.log1p(z**2 / va)) / sa).sum(-1)
+        below = err < 0.0
+        lo[active] = np.where(below, x[active], lo[active])
+        hi[active] = np.where(below, hi[active], x[active])
+        step = x[active] - err / np.maximum(pdf, 1e-300)
+        inside = (step > lo[active]) & (step < hi[active])
+        x[active] = np.where(inside, step, 0.5 * (lo[active] + hi[active]))
+        active = active[np.abs(err) >= tolerance]
+        if len(active) == 0:
+            break
+    return torch.from_numpy(x.reshape(n_rows, n_levels)).to(device=device, dtype=mean.dtype)
+
+
+def pinball(*, quantile: torch.Tensor, y: torch.Tensor, level: float) -> torch.Tensor:
+    """Return the pinball loss per row of a forecast quantile at `level`."""
+    err = y - quantile
+    return torch.maximum(level * err, (level - 1.0) * err)
+
+
+def tail_pinball(*, quantiles: dict[float, torch.Tensor], y: torch.Tensor) -> torch.Tensor:
+    """Return, per row, the sum of the pinball losses at the four tail levels (q01, q05, q95, q99)."""
+    return sum(
+        (pinball(quantile=quantiles[lv], y=y, level=lv) for lv in TAIL_LEVELS),
+        start=torch.zeros_like(y),
+    )
+
+
+def tail_weights(
+    *, cold: torch.Tensor | None, weight: float, slope: float, like: torch.Tensor
+) -> torch.Tensor:
+    """Return the per-row weight of the tail term: `weight * (1 + slope * cold)`.
+
+    With `cold` unset (arm T2) every row gets `weight`.
+    """
+    if cold is None:
+        return torch.full_like(like, weight)
+    return weight * (1.0 + slope * cold.to(like.dtype))
+
+
+def output_layer(*, model: nn.Module) -> nn.Linear:
+    """Return the final linear layer (the mixture head) of S1's network or any arm built on it."""
+    plain = model.location if hasattr(model, "location") else model.net  # ty: ignore[unresolved-attribute]
+    assert isinstance(plain, base.PlainMdn)
+    last = plain.net[-1]
+    assert isinstance(last, nn.Linear)
+    return last
+
+
+def freeze_trunk(*, model: nn.Module) -> list[nn.Parameter]:
+    """Stop gradients to every parameter except the mixture head's; return the head's parameters.
+
+    The trunk is the Primary embedding and the hidden layers (and, for arms with a scale path, the
+    scale path). The head is the final linear layer that maps the hidden features to the mixture
+    parameters.
+    """
+    for p in model.parameters():
+        p.requires_grad_(False)
+    head = list(output_layer(model=model).parameters())
+    for p in head:
+        p.requires_grad_(True)
+    return head
+
+
+def pool_mixtures(
+    *, pieces: list[tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Pool mixtures (log weights, means, standard deviations) with equal weight.
+
+    Each model's components are kept and its log weights are shifted by `-log(n)`, so the pooled
+    CDF is the average of the models' CDFs. Pooling copies of one mixture reproduces that mixture.
+    """
+    shift = math.log(len(pieces))
+    return (
+        torch.cat([p[0] - shift for p in pieces], dim=1),
+        torch.cat([p[1] for p in pieces], dim=1),
+        torch.cat([p[2] for p in pieces], dim=1),
+    )
+
+
 def count_parameters(*, model: nn.Module) -> int:
     """Return the number of trainable parameters."""
     return base.count_parameters(model=model)
@@ -303,7 +507,107 @@ def selftest() -> None:
     f = torch.tensor([[math.e, math.e], [1.0, 1.0], [math.e**2, math.e**2]])
     mask = torch.tensor([True, True, False])
     assert abs(float(log_factor_penalty(factor=f, rows=mask)) - 0.5) < 1e-6
+    selftest_brief_c()
     print("selftest passed")
+
+
+def selftest_brief_c() -> None:
+    """Check the Student-t density and quantiles, the pinball term, the frozen trunk, and pooling."""
+    from scipy import stats
+
+    torch.manual_seed(1)
+    # Density against scipy.stats.t, including a location and a scale.
+    z = torch.linspace(-9.0, 9.0, 41, dtype=torch.float64)
+    for df_value in (2.5, 4.0, 17.3, 400.0):
+        df = torch.full_like(z, df_value)
+        ours = student_log_pdf(z=z, df=df).numpy()
+        assert np.allclose(ours, stats.t.logpdf(z.numpy(), df_value), atol=1e-10), df_value
+    out = torch.zeros(1, 4, dtype=torch.float64)  # one component, location 0.4, scale 1.7, df 6.2
+    out[0, 1], out[0, 2] = 0.4, math.log(1.7)
+    out[0, 3] = _raw_df(df=6.2)
+    y = torch.tensor([1.3], dtype=torch.float64)
+    nll = student_mixture_nll(out=out, z=y, components=1)
+    expected = -stats.t.logpdf(1.3, 6.2, loc=0.4, scale=1.7)
+    assert abs(float(nll) - expected) < 1e-10, (float(nll), expected)
+    log_w, mean, scale, df = student_parts(out=out, components=1)
+    assert abs(float(df) - 6.2) < 1e-9 and float(df) >= DF_MIN
+    assert float(student_parts(out=torch.full((1, 4), -50.0), components=1)[3]) >= DF_MIN
+    # Quantile function against scipy.stats.t.ppf (one component, then the CDF of a mixture).
+    q = student_mixture_quantiles(log_w=log_w, mean=mean, scale=scale, df=df)
+    ref = stats.t.ppf(base.LEVELS, 6.2, loc=0.4, scale=1.7)
+    assert np.allclose(q.numpy()[0], ref, atol=1e-7), (q.numpy()[0], ref)
+    w2 = torch.tensor([[0.7, 0.3]], dtype=torch.float64)
+    m2 = torch.tensor([[-0.5, 1.5]], dtype=torch.float64)
+    s2 = torch.tensor([[0.8, 2.5]], dtype=torch.float64)
+    v2 = torch.tensor([[3.0, 9.0]], dtype=torch.float64)
+    q2 = student_mixture_quantiles(log_w=w2.log(), mean=m2, scale=s2, df=v2).numpy()[0]
+    cdf = 0.7 * stats.t.cdf(q2, 3.0, loc=-0.5, scale=0.8) + 0.3 * stats.t.cdf(
+        q2, 9.0, loc=1.5, scale=2.5
+    )
+    assert np.allclose(cdf, base.LEVELS, atol=1e-8), cdf
+    # Initial head: within a few percent of Gaussian in the 1% to 99% quantiles.
+    head = StudentMdn(n_inputs=6, n_primaries=4, components=3)
+    x0 = torch.randn(8, 6 + LAG_COLUMNS)
+    out0 = head(x0, torch.randint(0, 4, (8,))).double()
+    lw0, m0, s0, v0 = student_parts(out=out0, components=3)
+    assert float((v0 - DF_INIT).abs().max()) < 1e-3 and out0.shape == (8, 12)
+    qt = student_mixture_quantiles(log_w=lw0, mean=m0, scale=s0, df=v0)
+    qg = base.mixture_quantiles(log_w=lw0, mean=m0, std=s0)
+    assert float(((qt - qg).abs() / qg.abs().clamp(min=1.0)).max()) < 0.08
+    # Pinball loss, numerically: level 0.95, quantile 1, y 3 gives 0.95 * 2; y -1 gives 0.05 * 2.
+    one = torch.tensor([1.0, 1.0])
+    pin = pinball(quantile=one, y=torch.tensor([3.0, -1.0]), level=0.95)
+    assert torch.allclose(pin, torch.tensor([1.9, 0.1])), pin
+    flat = {lv: torch.zeros(2) for lv in TAIL_LEVELS}
+    total = tail_pinball(quantiles=flat, y=torch.tensor([2.0, -2.0]))
+    assert torch.allclose(total, torch.full((2,), 4.0)), total
+    # Tail weights: 0.2 off the cold nights, 0.2 * (1 + slope) on them.
+    cold = torch.tensor([False, True, False, True])
+    weights = tail_weights(cold=cold, weight=0.2, slope=1.0, like=torch.zeros(4))
+    assert torch.allclose(weights, torch.tensor([0.2, 0.4, 0.2, 0.4])), weights
+    flat_w = tail_weights(cold=None, weight=0.2, slope=1.0, like=torch.zeros(4))
+    assert torch.allclose(flat_w, torch.full((4,), 0.2))
+    # Frozen trunk: only the final linear layer receives gradient, for both network classes.
+    rows = 32
+    x = torch.randn(rows, 6 + LAG_COLUMNS)
+    primary = torch.randint(0, 4, (rows,))
+    y = torch.randn(rows)
+    for model in (
+        ScaleMdn(n_inputs=6, n_primaries=4, lead_cols=(2, 3), components=3),
+        StudentMdn(n_inputs=6, n_primaries=4, components=3),
+    ):
+        head_parameters = freeze_trunk(model=model)
+        out = model(x, primary)
+        lw, mu, sd = base.mixture_parts(out=out[:, :9], components=3)
+        loss = tail_pinball(quantiles=tail_quantiles_st(log_w=lw, mean=mu, std=sd), y=y).mean()
+        loss.backward()
+        head_ids = {id(p) for p in head_parameters}
+        for p in model.parameters():
+            if id(p) in head_ids:
+                assert p.grad is not None and float(p.grad.abs().max()) > 0.0, "head gets gradient"
+            else:
+                assert p.grad is None or float(p.grad.abs().max()) == 0.0, "trunk got gradient"
+    # Pinball term reaches the mixture weights, means, and spreads (not only the scale path).
+    model = ScaleMdn(n_inputs=6, n_primaries=4, lead_cols=(2, 3), components=3)
+    out, _ = model.forward_parts(x, primary)
+    lw, mu, sd = base.mixture_parts(out=out, components=3)
+    tail_pinball(quantiles=tail_quantiles_st(log_w=lw, mean=mu, std=sd), y=y).mean().backward()
+    head_grad = output_layer(model=model).weight.grad
+    assert head_grad is not None and float(head_grad.abs().max()) > 0.0
+    # Pooling copies of one forecast reproduces that forecast's quantiles.
+    lw1, mu1, sd1 = (
+        torch.log_softmax(torch.randn(16, 3), dim=-1).double(),
+        torch.randn(16, 3).double(),
+        torch.rand(16, 3).double() + 0.3,
+    )
+    single = base.mixture_quantiles(log_w=lw1, mean=mu1, std=sd1)
+    pooled = base.mixture_quantiles(
+        log_w=pool_mixtures(pieces=[(lw1, mu1, sd1)] * 5)[0],
+        mean=pool_mixtures(pieces=[(lw1, mu1, sd1)] * 5)[1],
+        std=pool_mixtures(pieces=[(lw1, mu1, sd1)] * 5)[2],
+    )
+    assert torch.allclose(single, pooled, atol=1e-9), (single - pooled).abs().max()
+    print("selftest brief C passed")
 
 
 if __name__ == "__main__":
