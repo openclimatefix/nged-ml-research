@@ -61,6 +61,7 @@ class Arm:
     days: int
     mixed: bool
     surprise: bool = False
+    widen: bool = False
     """Append the surprise channel (experiment 404's cross-fitted lagless forecast)."""
 
 
@@ -72,6 +73,7 @@ ARMS: Final[dict[str, Arm]] = {
     "E2": Arm("E2", "encoder", 2, True),
     "E3": Arm("E3", "encoder", 3, True),
     "E3-surp": Arm("E3-surp", "encoder", 3, True, surprise=True),
+    "E3-surp-w": Arm("E3-surp-w", "encoder", 3, True, surprise=True, widen=True),
 }
 
 
@@ -87,6 +89,7 @@ def make_model(*, arm: Arm, n_inputs: int, n_primaries: int) -> torch.nn.Module:
             components=SETTING.components,
             dropout=SETTING.dropout,
             channels=models.CHANNELS + int(arm.surprise),
+            widen_path=arm.widen,
         )
     extra = 9 if arm.kind == "lags" else 0
     return models.LaggedMdn(

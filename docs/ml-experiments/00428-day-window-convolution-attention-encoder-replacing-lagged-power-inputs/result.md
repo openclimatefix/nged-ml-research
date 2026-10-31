@@ -263,6 +263,44 @@ position code, or the trust inputs of experiment 404 as extra tokens), registere
 prediction before its scores are read, and scored on the same folds and rows. This page records
 the first screen only; each iteration adds an arm and a dated section.
 
+### Design iteration 1 (2026-10-31): a widening-only path, then a 14-day history window
+
+**First-screen and second-screen findings set the target of this iteration.** In the sweep at step
+c050 (24 to 72 hours, signed-MW six, raw bands) no arm widens its 5%-95% band after a step in the
+recent power: the width ratio is 1.00 for every arm except E3-surp (1.018 at c050, 1.026 at m10).
+E3-surp, whose surprise channel moves with the shifted power, follows more of the step (median share
+0.225 at k = 3, against 0.125 for E3 and R-inj). The goal of the programme is a share near zero with
+wider bands. A wider band lowers the training loss only on rows whose window holds an injected jump,
+and the network already learns to follow about a fifth of the step there, so the reward for widening
+is weak.
+
+**Arm E3-surp-w adds a path that can only widen the bands.** The path takes three numbers from the
+newest day window (D1): the largest absolute surprise in its last 12 half-hours, its mean absolute
+surprise, and its largest absolute surprise. Non-negative weights (the softplus of raw parameters
+that start at -10, so the path starts near zero) map them to one additive term per mixture
+component. The term is never negative, so the path can only widen. The term is added to the log
+standard deviations of the mixture. The location outputs and the mixture weights are untouched by
+the new path. The arm is otherwise E3-surp (same rows, folds, seeds, and training worlds).
+
+**Predictions, written before any E3-surp-w score is read.**
+
+- **P-I1a (bands):** E3-surp-w, pooled over the four screen folds and seed 0, at step c050 (and
+  m10), 24 to 72 hours, signed-MW six, day variant, k = 3, raw bands: band-width ratio of at least
+  1.05 (E3-surp: 1.018 at c050). We put this at about one chance in three, for the reason above.
+- **P-I1b (share):** in the same cell, the median share is no larger than E3-surp's (0.225).
+- **P-I1c (cost):** contrast C9 (E3-surp-w minus E3-surp), CRPS in the units of the other contrasts,
+  on the `clean` and `inj_harm` row sets at the signed-MW six, pooled over the four folds: the upper
+  end of the interval is at most +0.02.
+- **If P-I1a fails:** the next arm trains the target on the injected world for rows whose target
+  lies in an injected event (the harness knows these rows), so that widening is rewarded. This
+  changes the training objective, and it is written here so that it is not chosen after the scores.
+
+**The 14-day history window (the brief `recent_history_encoder_brief.md`) follows as its own dated
+section.** Its arms (S1, S404, H-smooth, H-lvl, H14-s, and the other-week control H14-s-ow), its
+pilot, its leakage check, and its pre-registered rules are those of the Opus design note, with
+experiment 404's table (frozen at commit 63d3799f, one table per month and seed) as the lagless
+forecast. They run after E3-surp-w is scored.
+
 ## Checks, reviews, and what the page will report
 
 - **Departures from experiment 397's recipe, found by the code review.** Every arm (R included)

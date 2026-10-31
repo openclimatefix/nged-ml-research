@@ -8,6 +8,7 @@ reads the position vectors of every window shown plus a learned "no day" token. 
 same mixture head as experiment 397 (`mlp`, `init_head`, `mixture_*`).
 """
 
+import math
 from typing import Final
 
 import e00397_models as base  # ty: ignore[unresolved-import]
@@ -19,6 +20,10 @@ WINDOW: Final[int] = 48
 CHANNELS: Final[int] = 5
 """Power, observed flag, sin and cos of the UTC time of day, age before the origin."""
 TOKEN: Final[int] = 32
+WIDEN_STATS: Final[int] = 3
+WIDEN_INIT: Final[float] = -10.0
+"""Start of the raw widening weights: their softplus is about 5e-5, so the path starts near zero."""
+"""Numbers the widening-only path reads: three summaries of the newest day's |surprise|."""
 CONV_WIDTHS: Final[tuple[int, int, int]] = (16, 32, TOKEN)
 
 
@@ -72,6 +77,7 @@ class DayEncoderMdn(nn.Module):
         dropout: float = 0.1,
         embedding: int = 8,
         channels: int = CHANNELS,
+        widen_path: bool = False,
     ) -> None:
         """Build the encoder, the attention layer, and the head."""
         super().__init__()
@@ -101,6 +107,17 @@ class DayEncoderMdn(nn.Module):
             dropout=dropout,
         )  # fmt: skip
         base.init_head(head=self.head, components=components)
+        self.widen_raw = (
+            nn.Parameter(torch.full((components, WIDEN_STATS), WIDEN_INIT)) if widen_path else None
+        )
+
+    def widen_stats(self, windows: torch.Tensor) -> torch.Tensor:
+        """Return (rows, 3): the newest-12 maximum, mean, and maximum of D1's absolute surprise."""
+        surprise = windows[:, 0, 5, :].abs()
+        observed = windows[:, 0, 1, :]
+        newest = (surprise * observed)[:, -12:].amax(dim=1)
+        mean = (surprise * observed).sum(1) / observed.sum(1).clamp(min=1.0)
+        return torch.stack([newest, mean, (surprise * observed).amax(dim=1)], dim=1)
 
     def forward(
         self,
@@ -132,6 +149,10 @@ class DayEncoderMdn(nn.Module):
         flat_values = values.reshape(rows, days * WINDOW, TOKEN)
         context = (weights[:, :-1, None] * flat_values).sum(1) + weights[:, -1:] * self.null_value
         out = self.head(torch.cat([context_in, context], dim=-1))
+        if self.widen_raw is not None:
+            k = self.components
+            term = self.widen_stats(windows) @ nn.functional.softplus(self.widen_raw).T
+            out = torch.cat([out[:, : 2 * k], out[:, 2 * k :] + term], dim=-1)
         if details:
             mass = weights[:, :-1].reshape(rows, days, WINDOW).sum(-1)
             return out, torch.cat([mass, weights[:, -1:]], dim=-1)

@@ -38,7 +38,17 @@ import polars as pl
 from studies.eval_protocol import metrics
 from studies.eval_protocol.slices import MVA_ONLY_LABELS, SIGNED_MW_LABELS
 
-ARMS: Final[tuple[str, ...]] = ("R", "R-inj", "L0", "Bmix", "E1", "E2", "E3", "E3-surp")
+ARMS: Final[tuple[str, ...]] = (
+    "R",
+    "R-inj",
+    "L0",
+    "Bmix",
+    "E1",
+    "E2",
+    "E3",
+    "E3-surp",
+    "E3-surp-w",
+)
 WORLD_SETS: Final[dict[str, tuple[int, ...]]] = {
     "real": (0,),
     "inj": (4, 5, 6),
@@ -65,6 +75,7 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C6 R-inj - R": ("R-inj", "R"),
     "C7 E3-surp - E3": ("E3-surp", "E3"),
     "C8 E3-surp - R-inj": ("E3-surp", "R-inj"),
+    "C9 E3-surp-w - E3-surp": ("E3-surp-w", "E3-surp"),
 }
 TAILS: Final[tuple[str, ...]] = ("q01", "q05", "q95", "q99")
 LEVEL_OF: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
