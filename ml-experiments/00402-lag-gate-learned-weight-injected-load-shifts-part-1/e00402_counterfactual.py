@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0912, PLR0915
 """Experiment 402, step 2: real-event counterfactual and synthetic sweep on the R1 lagged boosters.
 
 Prediction only, on experiment 392's arm R1 lagged boosters (`00392-.../work/boosters/r1_lagged`),
@@ -37,7 +38,7 @@ import xgboost as xgb
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR
-BOOSTERS: Final[Path] = (
+BOOSTERS: Path = (
     DATA / "00392-xgboost-nra-load-shift-masked-targets" / "work" / "boosters" / "r1_lagged"
 )
 STAGE1: Final[Path] = DATA / "00391-xgboost-lag-surprise-second-stage" / "work" / "stage1" / "ens"
@@ -48,7 +49,7 @@ EVENTS: Final[Path] = (
     / "events_corrected.parquet"
 )
 WORK: Final[Path] = DATA / "00402-lag-gate-learned-weight-injected-load-shifts-part-1" / "work"
-OUT: Final[Path] = WORK / "counterfactual_measured"
+OUT: Path = WORK / "counterfactual_measured"
 REFITS: Final[tuple[datetime, ...]] = tuple(
     datetime(y, m, 1, tzinfo=UTC) for y, m in ((2025, 10), (2026, 1), (2026, 3), (2026, 6))
 )
@@ -256,7 +257,7 @@ def clean_site(*, site: str, threads: int) -> pl.DataFrame:
                             "site": site, "refit": refit, "sign": sign, "depth": depth, "k": k,
                             "band": BANDS[b][0], "n": int(sel.sum()),
                             "share": float(((quant[sel, Q50] - base[sel, Q50]) / (sign * depth)).mean()),
-                            "w90_ratio": float(((quant[sel, Q95] - quant[sel, Q05]).mean() / (base[sel, Q95] - base[sel, Q05]).mean())),
+                            "w90_ratio": float((quant[sel, Q95] - quant[sel, Q05]).mean() / (base[sel, Q95] - base[sel, Q05]).mean()),
                         })  # fmt: skip
         print(site, refit.date(), "clean done", flush=True)
     return pl.DataFrame(out)

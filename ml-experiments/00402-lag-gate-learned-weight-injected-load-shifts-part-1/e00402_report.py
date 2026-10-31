@@ -58,9 +58,9 @@ def main() -> None:
             for name, expr in slices.items():
                 s = g.filter(expr)
                 arms = [a for a in ARMS if s[f"crps::{a}"].null_count() < s.height]
-                row = {a: round(float(s[f"crps::{a}"].mean()), 3) for a in arms}
+                row = {a: round(float(s[f"crps::{a}"].mean()), 3) for a in arms}  # ty: ignore[invalid-argument-type]
                 w = {
-                    a: round(float(s[f"w::{a}"].mean()), 2)
+                    a: round(float(s[f"w::{a}"].mean()), 2)  # ty: ignore[invalid-argument-type]
                     for a in arms
                     if f"w::{a}" in s.columns and a.startswith("gate")
                 }

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0915
 """Experiment 402, step 1: analytic ceilings of a gate between two stored forecasts.
 
 For each row the CRPS of the mixture `w F1 + (1 - w) F2` is exactly `A w^2 + B w + C`, with `F1`
@@ -317,7 +318,7 @@ def main() -> None:
         print(
             f"  {lab}: harm n={int(mh.sum())} "
             + " / ".join(f"{score[k][mh].mean():.2f}" for k in list(score)[:2] + list(score)[6:8])
-            + f" | clean "
+            + " | clean "
             + " / ".join(f"{score[k][mc].mean():.2f}" for k in list(score)[:2])
             + f" | events {e.height}, median depth {e['depth_share'].median():.1f}% of capacity,"
             f" median length {e['length_days'].median():.1f} days"

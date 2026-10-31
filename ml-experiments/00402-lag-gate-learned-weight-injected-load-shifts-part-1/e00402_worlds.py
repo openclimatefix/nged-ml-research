@@ -1,3 +1,4 @@
+# ruff: noqa: ANN201, E501, RUF028, SIM108
 """Experiment 402, step 4 data: injected worlds, the forecasts re-predicted on them, gate features.
 
 For one injection seed (a "world") and one Primary, the script:

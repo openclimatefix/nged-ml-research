@@ -1,3 +1,4 @@
+# ruff: noqa: PLR0912
 """Injected load-conserving load shifts and transient spikes for experiment 402.
 
 The structure follows experiment 404's `e00404_inject.py` (nged-ml-research PR 58): an event pool
@@ -110,6 +111,9 @@ def inject(  # noqa: PLR0915
         seed: Seed of the generator.
         no_recipient_share: Share of load shifts with no observed recipient.
         allowed: Optional boolean grid per site; an event touching a False half-hour is skipped.
+
+    Returns:
+        The injected power per site, the mask of codes per half-hour, and the event table.
     """
     rng = np.random.default_rng(seed)
     sites = sorted(power)

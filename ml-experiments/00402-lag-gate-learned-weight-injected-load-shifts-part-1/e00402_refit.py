@@ -1,4 +1,6 @@
-r"""Refit experiment 87's XGBoost member at the monthly refits for experiment 402 (a copy of experiment 392's `e00392_fit.py` that writes under experiment 402's folder).
+r"""Refit experiment 87's XGBoost member at the monthly refits for experiment 402.
+
+This file is a copy of experiment 392's `e00392_fit.py` that writes under experiment 402's folder.
 
 Each arm refits the `n1h` configuration of experiment 87 at the monthly refit times, with experiment
 87's training rows, parameters, and leakage checks, and writes the 11 quantiles per daily run to

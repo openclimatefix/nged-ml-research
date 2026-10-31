@@ -1,4 +1,6 @@
-"""Copy of experiment 400's `e00400_mixture.py`: mixture of two quantile forecasts: the CDF algebra, the exact CRPS, and the 11 quantiles.
+"""Mixture of two quantile forecasts: the CDF algebra, the exact CRPS, and the 11 quantiles.
+
+This file is a copy of experiment 400's `e00400_mixture.py`.
 
 Each forecast is a cumulative distribution function (CDF) that is linear between its 11 stored
 quantiles (levels 0.01 to 0.99). The two end segments are extended to levels 0 and 1 at the slope of
