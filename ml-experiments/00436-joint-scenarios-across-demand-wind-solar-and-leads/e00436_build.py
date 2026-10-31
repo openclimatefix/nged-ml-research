@@ -36,7 +36,6 @@ import e00087_common as common  # noqa: E402  # ty: ignore[unresolved-import]
 import e00310_features as feats310  # noqa: E402  # ty: ignore[unresolved-import]
 import e00347_s4_data as data347  # noqa: E402  # ty: ignore[unresolved-import]
 import e00377_adapter as adapter  # noqa: E402  # ty: ignore[unresolved-import]
-import e00381_score as s381  # noqa: E402  # ty: ignore[unresolved-import]
 import e00429_data as data429  # noqa: E402  # ty: ignore[unresolved-import]
 import e00434_score as s434  # noqa: E402  # ty: ignore[unresolved-import]
 import numpy as np  # noqa: E402
@@ -115,7 +114,12 @@ def observed_grid(*, series: pl.DataFrame, actuals: pl.DataFrame) -> np.ndarray:
         sub = feats310.output_series(farm)
         idx = ((sub["time"] - GRID_START).dt.total_minutes() // 30).to_numpy()
         ok = (idx >= 0) & (idx < n)
-        out[N_PRIMARIES + len(WIND_FARMS) + i, idx[ok]] = sub["output"].to_numpy()[ok] * 100.0
+        node = N_PRIMARIES + len(WIND_FARMS) + i
+        out[node, idx[ok]] = sub["output"].to_numpy()[ok] * 100.0
+        # The farm table holds daylight half-hours only, so an absent half-hour is output zero.
+        first, last = int(idx[ok].min()), int(idx[ok].max())
+        window = out[node, first : last + 1]
+        window[np.isnan(window)] = 0.0
     return out
 
 
