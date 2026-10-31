@@ -159,6 +159,9 @@ def build_fold(*, refit: datetime, clean: np.ndarray) -> Rows:
     Args:
         refit: 00:00 UTC on the first day of the test month.
         clean: Cleaned power over capacity (primaries, grid), NaN where flagged or cut.
+
+    Returns:
+        The training and early-stopping rows.
     """
     keep_cols, columns, mask = non_lag_layout()
     table = prep.primaries()

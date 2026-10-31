@@ -56,17 +56,18 @@ def report(*, table: pl.DataFrame, step: str, band: str, widened: bool) -> pl.Da
     mass_columns = [c for c in sub.columns if c.startswith("mass") and c.endswith("_after_sum")]
     for key, part in sub.group_by([c for c in KEYS if c not in ("step", "band", "widened")]):
         hist = np.sum(np.array(part["hist"].to_list()), axis=0)
-        n = part["n"].sum()
+        n = int(part["n"].sum())
         record = dict(
             zip([c for c in KEYS if c not in ("step", "band", "widened")], key, strict=True)
         )
         record.update(
             n=int(n),
             median_share=median_of(hist=hist),
-            mean_share=part["shift_sum"].sum() / n,
-            width_ratio=part["width_after_sum"].sum() / part["width_before_sum"].sum(),
-            cover_clean=part["cover_clean_sum"].sum() / n,
-            cover_event=part["cover_event_sum"].sum() / n,
+            mean_share=float(part["shift_sum"].sum()) / n,
+            width_ratio=float(part["width_after_sum"].sum())
+            / float(part["width_before_sum"].sum()),
+            cover_clean=float(part["cover_clean_sum"].sum()) / n,
+            cover_event=float(part["cover_event_sum"].sum()) / n,
             masked_gap=part["masked_max_gap"].max(),
         )
         for column in mass_columns:

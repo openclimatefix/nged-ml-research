@@ -119,7 +119,7 @@ def shift_history(*, raw: dict, k: int, step: torch.Tensor, mva: torch.Tensor, c
 
     def move(values: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         inside = index > (newest - win.STEPS_PER_DAY * k)[:, None] if values.dim() == 2 else None
-        inside = inside & (index <= newest[:, None]) & torch.isfinite(values)
+        inside = inside & (index <= newest[:, None]) & torch.isfinite(values)  # ty: ignore[unsupported-operator]
         new = values + step[:, None]
         clipped = torch.where(mva[:, None], new.clamp(min=0.0), new)
         nonlocal flag

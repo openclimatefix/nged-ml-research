@@ -84,6 +84,9 @@ def build_history(
         target: (rows,) grid index of the target.
         primary: (rows,) Primary number.
         target_std: (primaries,) standard deviation of each Primary's target.
+
+    Returns:
+        The window dict (power, surprise, and mask tensors) the history networks read.
     """
     assert bool((index[:, -1] <= origin - win.NEWEST_AGE).all()), (
         "history reads after the newest reading"
@@ -201,7 +204,9 @@ class HSmoothMdn(nn.Module):
         self.c = nn.Parameter(torch.randn(LEAD_BANDS, KERNELS) * 0.1)
         self.b = nn.Parameter(torch.full((LEAD_BANDS, KERNELS), -1.0))
         self.core = models.LaggedMdn(
-            n_inputs=n_inputs + EXTRA_SMOOTH, n_primaries=n_primaries, **head
+            n_inputs=n_inputs + EXTRA_SMOOTH,
+            n_primaries=n_primaries,
+            **head,  # ty: ignore[invalid-argument-type]
         )
 
     def smoothed(self, window: dict) -> torch.Tensor:
@@ -232,7 +237,7 @@ class HLevelMdn(nn.Module):
         self.level_score = nn.Linear(WIDTH, 1)
         self.regime = nn.Linear(WIDTH, REGIMES)
         self.persistence = nn.Parameter(torch.zeros(LEAD_BANDS))
-        self.core = models.LaggedMdn(n_inputs=n_inputs + REGIMES, n_primaries=n_primaries, **head)
+        self.core = models.LaggedMdn(n_inputs=n_inputs + REGIMES, n_primaries=n_primaries, **head)  # ty: ignore[invalid-argument-type]
 
     def forward(self, x: torch.Tensor, primary: torch.Tensor, window: dict) -> torch.Tensor:
         """Return the raw mixture outputs; the three means shift by g(L) times the level."""

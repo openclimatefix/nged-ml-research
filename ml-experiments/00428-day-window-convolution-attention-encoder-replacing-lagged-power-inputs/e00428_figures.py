@@ -190,7 +190,7 @@ def figure_examples(*, month: str, site: str) -> None:
         x = alt.X("time:T", title="Valid time (UTC)")
         pdata = d.to_pandas()
         band = (
-            alt.Chart(pdata)
+            alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.12)
             .encode(
                 x=x,
@@ -201,7 +201,7 @@ def figure_examples(*, month: str, site: str) -> None:
         )  # ty: ignore[unresolved-attribute]
         median = alt.Chart(pdata).mark_line().encode(x=x, y="q50:Q", color=colour)  # ty: ignore[unresolved-attribute]
         truth = (
-            alt.Chart(d.filter(pl.col("arm") == "R-inj").to_pandas())
+            alt.Chart(d.filter(pl.col("arm") == "R-inj").to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_line(color="#333", strokeDash=[2, 2])
             .encode(x=x, y="actual:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -232,7 +232,7 @@ def real_events(*, count: int = 3) -> list[dict]:
                 np.nonzero(edges == 1)[0], np.nonzero(edges == -1)[0], strict=True
             ):
                 found.append({"group": label, "site": site, "start": int(start), "end": int(end)})
-        found.sort(key=lambda e: e["end"] - e["start"], reverse=True)
+        found.sort(key=lambda e: e["end"] - e["start"], reverse=True)  # ty: ignore[unsupported-operator]
         chosen += found[: count * 4]
     return chosen
 
@@ -292,7 +292,7 @@ def figure_events() -> None:
         x = alt.X("time:T", title=None, scale=alt.Scale(domain=[t0, t1]))
         pdata = d.to_pandas()
         shade = (
-            alt.Chart(
+            alt.Chart(  # ty: ignore[unresolved-attribute]
                 pl.DataFrame(
                     {"a": [times[e["start"]]], "b": [times[min(e["end"], len(times) - 1)]]}
                 ).to_pandas()
@@ -301,7 +301,7 @@ def figure_events() -> None:
             .encode(x="a:T", x2="b:T")
         )  # ty: ignore[unresolved-attribute]
         band = (
-            alt.Chart(pdata)
+            alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.12)
             .encode(
                 x=x,

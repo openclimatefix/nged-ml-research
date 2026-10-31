@@ -66,6 +66,9 @@ def take(*, power: torch.Tensor, world: torch.Tensor, primary: torch.Tensor, ind
         world: (rows,) int64.
         primary: (rows,) int64.
         index: (rows, ...) int64 grid indices.
+
+    Returns:
+        The gathered values, NaN where the index is off the grid.
     """
     size = power.shape[-1]
     inside = (index >= 0) & (index < size)
@@ -105,6 +108,9 @@ def build_windows(
         origin: (rows,) grid index of the origin.
         newest_limit: Mask positions after the newest usable reading (always True in production
             use; the argument exists so a self-test can show the mask matters).
+
+    Returns:
+        The (rows, days, 5, 48) channel tensor.
     """
     observed = torch.isfinite(raw)
     if newest_limit:

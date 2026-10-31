@@ -279,8 +279,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.arms is not None:
         global ARMS, CONTRASTS  # noqa: PLW0603
-        ARMS = tuple(a for a in ARMS if a in args.arms)
-        CONTRASTS = {n: ab for n, ab in CONTRASTS.items() if set(ab) <= set(args.arms)}
+        ARMS = tuple(a for a in ARMS if a in args.arms)  # ty: ignore[invalid-assignment]
+        CONTRASTS = {n: ab for n, ab in CONTRASTS.items() if set(ab) <= set(args.arms)}  # ty: ignore[invalid-assignment]
     seeds = tuple(args.seeds)
     factor = 1.0 if args.raw else WIDENING
     print(f"spread factor {factor}")
