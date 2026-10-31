@@ -30,8 +30,8 @@ prediction: >-
   Written before any fit and before any score is read. Most single bundles will land inside the
   minimum detectable effect, so the registered predictions are directions with sizes that could
   fail. P1. S lowers the CRPS on cold sunny days (ensemble-mean temperature below 5 degrees C,
-  clear-sky index above 0.6, half-hours starting 09:00 to 14:30 local) by more than on cold overcast days (clear-sky
-  index below 0.3), the maintainer's heating hypothesis, with a difference of gains of at least
+  clear-sky index above 0.6, half-hours starting 09:00 to 14:30 local) by more than on cold
+  overcast days (clear-sky index below 0.3), the maintainer's heating hypothesis, with a difference of gains of at least
   0.03 points; its overall gain is 0.01 to 0.05
   points at both groups. P2. T lowers the CRPS by 0.01 to 0.05 at both groups, and more on cold
   winter nights. P3. F lowers the CRPS by 0.01 to 0.05 at the MVA-only eight (the home-battery and
