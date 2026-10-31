@@ -133,7 +133,7 @@ def draw_headline() -> None:
             yOffset=off,
             x=alt.X(
                 "lower:Q",
-                title="Treatment minus reference, CRPS days 1 to 10 (points of capacity; below zero is better)",
+                title="Treatment minus reference, CRPS days 1 to 10 (points of capacity)",
             ),
             x2="upper:Q",
             color=colour,
