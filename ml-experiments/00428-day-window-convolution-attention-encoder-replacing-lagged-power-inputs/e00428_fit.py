@@ -62,6 +62,8 @@ class Arm:
     mixed: bool
     surprise: bool = False
     widen: bool = False
+    event_target: bool = False
+    """Train on the injected world's power where the target half-hour lies in an injected event."""
     """Append the surprise channel (experiment 404's cross-fitted lagless forecast)."""
 
 
@@ -118,6 +120,7 @@ class Inputs:
         self.target = torch.from_numpy(target_idx).to(device)
         self.power_mean, self.power_std = power_mean, power_std
         self.surprise = surprise
+        self.target_stats: tuple[torch.Tensor, torch.Tensor] | None = None
 
     def raw(self, *, arm: Arm, rows: torch.Tensor, world: torch.Tensor) -> dict:
         """Return the raw (unstandardised) recent power of `rows` read from `world`.
@@ -184,6 +187,19 @@ class Inputs:
         usable = (windows[:, :, 1, :] > 0.5) & torch.isfinite(z)
         z = torch.where(usable, z, torch.zeros_like(z))
         return torch.cat([windows, z[:, :, None, :]], dim=2)
+
+    def event_targets(
+        self, *, rows: torch.Tensor, world: torch.Tensor, z: torch.Tensor
+    ) -> torch.Tensor:
+        """Return `z` with the injected world's value wherever the target lies in an injected event."""
+        assert self.target_stats is not None
+        mean, std = self.target_stats
+        primary, target = self.primary[rows], self.target[rows]
+        zero = torch.zeros_like(world)
+        injected = win.take(power=self.power, world=world, primary=primary, index=target)
+        clean = win.take(power=self.power, world=zero, primary=primary, index=target)
+        hit = (world > 0) & torch.isfinite(injected) & torch.isfinite(clean) & (injected != clean)
+        return torch.where(hit, (injected - mean[primary]) / std[primary], z)
 
     def batch(self, *, arm: Arm, rows: torch.Tensor, world: torch.Tensor) -> tuple:
         """Return `(x_in, primary, windows)` for `rows` read from `world` (one id per row)."""
@@ -260,7 +276,7 @@ def train(
             x, primary, windows = inputs.batch(arm=arm, rows=b, world=world)
             nll = base.mixture_nll(
                 out=forward(model=model, x=x, primary=primary, windows=windows),
-                z=z[b],
+                z=inputs.event_targets(rows=b, world=world, z=z[b]) if arm.event_target else z[b],
                 components=k,
             )
             loss = (w[b] * nll).sum() / w[b].sum()
@@ -318,6 +334,10 @@ def fit_one(
         target_idx=rows.target_idx, power_mean=rows.power_mean, power_std=rows.power_std,
         device=device, surprise=surprise_for(arm=arm, month=month, seed=seed, device=device),
     )  # fmt: skip
+    inputs.target_stats = (
+        torch.from_numpy(rows.target_mean.astype(np.float32)).to(device),
+        torch.from_numpy(rows.target_std.astype(np.float32)).to(device),
+    )
     z = torch.from_numpy(
         ((rows.y - rows.target_mean[rows.primary]) / rows.target_std[rows.primary]).astype(
             np.float32

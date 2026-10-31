@@ -8,7 +8,6 @@ reads the position vectors of every window shown plus a learned "no day" token. 
 same mixture head as experiment 397 (`mlp`, `init_head`, `mixture_*`).
 """
 
-import math
 from typing import Final
 
 import e00397_models as base  # ty: ignore[unresolved-import]

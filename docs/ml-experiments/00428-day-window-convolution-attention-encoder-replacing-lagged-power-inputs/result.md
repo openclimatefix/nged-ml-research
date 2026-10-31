@@ -291,9 +291,19 @@ the new path. The arm is otherwise E3-surp (same rows, folds, seeds, and trainin
 - **P-I1c (cost):** contrast C9 (E3-surp-w minus E3-surp), CRPS in the units of the other contrasts,
   on the `clean` and `inj_harm` row sets at the signed-MW six, pooled over the four folds: the upper
   end of the interval is at most +0.02.
-- **If P-I1a fails:** the next arm trains the target on the injected world for rows whose target
-  lies in an injected event (the harness knows these rows), so that widening is rewarded. This
-  changes the training objective, and it is written here so that it is not chosen after the scores.
+- **Result of E3-surp-w (seed 0, four folds):** P-I1a failed (width ratio 1.019 against 1.018 for
+  E3-surp at step c050; 1.027 against 1.026 at m10), P-I1b held (median share 0.225 in both arms),
+  and P-I1c held (the CRPS of E3-surp-w is lower than E3-surp's by 0.005 to 0.014 on every row set
+  at the signed-MW six). The widening path did not learn to widen after a jump.
+- **The fallback objective is on hold.** The fallback named in the plan (train on the injected
+  world's value where the target lies in an injected event) rewards persistence of the jump, which
+  is the opposite of forecasting the normal running arrangement. It stays unfitted until the
+  maintainer's design session decides. It differs from arm U2 of the uncertainty programme as
+  follows: the fallback keeps the existing transient injected events and lets the target take their
+  value, whereas U2 trains on worlds whose genuine level changes enter the lags and the target
+  together, and keeps the location path blind to the surprise magnitude; U2 also feeds lag ages,
+  missing flags, weather age, and lead into its scale factor and penalises the factor on clean rows.
+  The widening path of E3-surp-w is the clean-target version of U2's scale path.
 
 **The 14-day history window (the brief `recent_history_encoder_brief.md`) follows as its own dated
 section.** Its arms (S1, S404, H-smooth, H-lvl, H14-s, and the other-week control H14-s-ow), its
