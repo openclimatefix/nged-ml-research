@@ -495,9 +495,11 @@ harm rows.
 
 ## Interfaces for the later evaluation experiment
 
-**A separate lag-trust evaluation experiment will run on this experiment's saved networks after
-batch 1** (manager, 2026-10-31; design in `briefs/lag_trust_evaluation_design_answer.md`, section
-4). This experiment therefore builds in five interfaces, and saves every fitted network:
+**A separate lag-trust evaluation experiment will run on this experiment's saved networks once
+the maintainer releases it** (manager, 2026-10-31; design in `briefs/lag_trust_evaluation_design_answer.md`,
+section 4). The maintainer holds it until experiments 404 and 428 have each had several design iterations
+and a design is picked, so batch 1 does not trigger it. This experiment therefore builds in five
+interfaces, and saves every fitted network:
 
 - A predict function that accepts modified lag values and recomputes every trust input from them
   with the `e00404_trust.py` functions.
