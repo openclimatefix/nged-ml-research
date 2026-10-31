@@ -361,6 +361,20 @@ runs the lag variant for the arms that keep R-inj's lags and the whole-day varia
 3, for every arm of this iteration, plus the masked control. Experiment 404's lagless table is used
 for the lagless median and the surprise, one table per month and seed.
 
+**More departures, found by the plan and code review.** The convolution blocks use a group
+normalisation (one group) after each convolution, not the layer normalisation of the design note.
+The three arms that run the convolutional encoder (H-lvl, H14-s, H14-s-ow) take four times as many
+optimiser steps per epoch as R-inj (batches of 2,048 rows against 8,192, at a fifth of the rows per
+epoch), so their contrasts with R-inj mix architecture and step count. The sweep has one combined
+variant, "hist": it shifts the last k whole days of the history and any lag inside them, so at k = 1
+both the newest lag and the daily lag move, whereas R-inj's lag sweep at k = 1 moves only the newest
+lag. The contrasts with R-inj's lag sweep at the same k are therefore not like for like. The design
+note's P5 comparison with S404, P6b (level offset against real events), the second clause of P8, and
+P10 are not run in this screen, and sweep variants 1, 2, and 4 are not run. The observed share that
+H-smooth reads is the share of usable positions (observed power and a lagless forecast). For
+H14-s-ow the attention class for the newest 6 hours is empty by construction, because the window
+ends 28 days earlier. The level offset is clipped at 5 standard deviations of the Primary's target.
+
 **Predictions, written before any score of these arms is read (signed-MW six unless stated; contrast
 = CRPS difference in the units of the other contrasts).**
 

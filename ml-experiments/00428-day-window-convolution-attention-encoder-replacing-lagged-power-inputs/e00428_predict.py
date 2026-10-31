@@ -287,7 +287,7 @@ def predict_month(*, arm_name: str, month: str, seed: int, device: str, power: t
             for i, name in enumerate(LEVEL_NAMES):
                 add(name, res["q"][:, i].float())
             if "mass" in res:
-                for d in range(loaded.arm.days):
+                for d in range(res["mass"].shape[1] - 1):
                     add(f"mass_d{d + 1}", res["mass"][:, d])
                 add("mass_null", res["mass"][:, -1])
                 masked = forecast_rows(

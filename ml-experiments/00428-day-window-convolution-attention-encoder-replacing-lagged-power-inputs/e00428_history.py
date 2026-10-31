@@ -54,7 +54,7 @@ def lead_band(*, origin: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     """Return the lead band (0 to 3: under 2, 2 to 5, 5 to 10, and over 10 days) of each row."""
     lead_days = (target - origin).to(torch.float32) / win.STEPS_PER_DAY
     edges = torch.tensor(LEAD_EDGES_DAYS, device=origin.device)
-    return torch.bucketize(lead_days, edges)
+    return torch.bucketize(lead_days, edges, right=True)
 
 
 def surprise_at(
@@ -85,6 +85,9 @@ def build_history(
         primary: (rows,) Primary number.
         target_std: (primaries,) standard deviation of each Primary's target.
     """
+    assert bool((index[:, -1] <= origin - win.NEWEST_AGE).all()), (
+        "history reads after the newest reading"
+    )
     observed = torch.isfinite(raw) & (index <= (origin - win.NEWEST_AGE)[:, None])
     power = torch.where(
         observed, ((raw - power_mean) / power_std).clamp(-CLIP_SD, CLIP_SD), torch.zeros_like(raw)
@@ -112,7 +115,7 @@ def build_history(
         "observed": observed,
         "usable": usable,
         "surprise": surprise,
-        "level": level / target_std[primary][:, None].clamp(min=1e-6),
+        "level": (level / target_std[primary][:, None].clamp(min=1e-6)).clamp(-CLIP_SD, CLIP_SD),
         "origin": origin,
         "target": target,
         "band": lead_band(origin=origin, target=target),
@@ -152,7 +155,7 @@ def drop_positions(*, window: dict, probability: float) -> dict:
     keep = torch.rand_like(window["chan"][:, 0, :]) >= probability
     observed = window["observed"] & keep
     chan = window["chan"].clone()
-    for c in (0, 2, 3):
+    for c in (0, 3):
         chan[:, c, :] = torch.where(observed, chan[:, c, :], torch.zeros_like(chan[:, c, :]))
     chan[:, 1, :] = observed.to(torch.float32)
     out = dict(window)
