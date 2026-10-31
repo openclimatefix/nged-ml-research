@@ -375,6 +375,18 @@ H-smooth reads is the share of usable positions (observed power and a lagless fo
 H14-s-ow the attention class for the newest 6 hours is empty by construction, because the window
 ends 28 days earlier. The level offset is clipped at 5 standard deviations of the Primary's target.
 
+**Pilot result and the H14-s diagnosis (fold 2026-01, seed 0).** On the mixed validation worlds the
+validation negative log-likelihoods were: R-inj 0.4777, E3-surp 0.4591, H-smooth 0.4523 (59 epochs,
+286 s), H-lvl 0.4993 (19 epochs, 1,415 s), and H14-s 0.5498 (16 epochs, 1,485 s). The stage-0 rule
+fires for H14-s (worse than R-inj by more than 0.05), so H14-s and H14-s-ow stop. Before any further
+convolutional fit, three diagnostic fits of H14-s on this fold read a tenth of the rows per epoch
+(patience 30): `H14-s-diag1` (position dropout 0.1), `H14-s-diag2` (0.3), and `H14-s-diag3` (0.5).
+**Pre-registered reading, before the diagnostic scores:** if the best diagnostic fit reaches a
+validation negative log-likelihood within +0.01 of R-inj's (at most 0.4877), a four-fold screen of
+H14-s at that setting is justified; if every diagnostic fit is worse than R-inj by more than 0.03,
+the 14-day convolutional line stops, and the page says that the window memorised each Primary's
+history.
+
 **Predictions, written before any score of these arms is read (signed-MW six unless stated; contrast
 = CRPS difference in the units of the other contrasts).**
 

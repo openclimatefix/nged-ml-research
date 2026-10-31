@@ -271,10 +271,11 @@ class H14sMdn(nn.Module):
 
     def __init__(
         self, *, n_inputs: int, n_primaries: int, hidden: int = 64, layers: int = 2,
-        components: int = 3, dropout: float = 0.1,
+        components: int = 3, dropout: float = 0.1, position_dropout: float = POSITION_DROPOUT,
     ) -> None:  # fmt: skip
         """Build the encoder, the attention, and R's mixture head."""
         super().__init__()
+        self.position_dropout = position_dropout
         self.components = components
         self.encoder = CnnEncoder()
         self.embedding = nn.Embedding(n_primaries, 8)
@@ -299,7 +300,7 @@ class H14sMdn(nn.Module):
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Return the raw mixture outputs; with `details`, the attention mass by class."""
         if self.training:
-            window = drop_positions(window=window, probability=POSITION_DROPOUT)
+            window = drop_positions(window=window, probability=self.position_dropout)
         encoded = self.encoder(window["chan"])
         context_in = torch.cat([x, self.embedding(primary)], dim=-1)
         query = self.query(context_in)

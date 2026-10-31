@@ -67,6 +67,9 @@ class Arm:
     widen: bool = False
     history: str = ""
     """Which 14-day history arm this is (see `e00428_history`); empty for the other arms."""
+    row_fraction: float = ROW_FRACTION
+    patience: int = PATIENCE
+    position_dropout: float = 0.1
     event_target: bool = False
     """Train on the injected world's power where the target half-hour lies in an injected event."""
     """Append the surprise channel (experiment 404's cross-fitted lagless forecast)."""
@@ -85,6 +88,38 @@ ARMS: Final[dict[str, Arm]] = {
     "H-lvl": Arm("H-lvl", "lags", 0, True, surprise=True, history="hlvl"),
     "H14-s": Arm("H14-s", "history", 0, True, surprise=True, history="h14s"),
     "H14-s-ow": Arm("H14-s-ow", "history", 0, True, surprise=True, history="h14s_ow"),
+    "H14-s-diag1": Arm(
+        "H14-s-diag1",
+        "history",
+        0,
+        True,
+        surprise=True,
+        history="h14s",
+        row_fraction=0.02,
+        patience=30,
+    ),
+    "H14-s-diag2": Arm(
+        "H14-s-diag2",
+        "history",
+        0,
+        True,
+        surprise=True,
+        history="h14s",
+        row_fraction=0.02,
+        patience=30,
+        position_dropout=0.3,
+    ),
+    "H14-s-diag3": Arm(
+        "H14-s-diag3",
+        "history",
+        0,
+        True,
+        surprise=True,
+        history="h14s",
+        row_fraction=0.02,
+        patience=30,
+        position_dropout=0.5,
+    ),
     "E3-surp-w": Arm("E3-surp-w", "encoder", 3, True, surprise=True, widen=True),
     "DIAG-not-for-release-E3-surp-w-ev": Arm(
         "DIAG-not-for-release-E3-surp-w-ev",
@@ -122,7 +157,12 @@ def make_model(*, arm: Arm, n_inputs: int, n_primaries: int) -> torch.nn.Module:
         cls = hist.HSmoothMdn if arm.history == "hsmooth" else hist.HLevelMdn
         return cls(n_inputs=n_inputs + 9, n_primaries=n_primaries, **head)
     if arm.history in ("h14s", "h14s_ow"):
-        return hist.H14sMdn(n_inputs=n_inputs, n_primaries=n_primaries, **head)
+        return hist.H14sMdn(
+            n_inputs=n_inputs,
+            n_primaries=n_primaries,
+            position_dropout=arm.position_dropout,
+            **head,
+        )
     extra = 9 + (3 if arm.history == "s1" else 0) if arm.kind == "lags" else 0
     return models.LaggedMdn(
         n_inputs=n_inputs + extra,
@@ -347,7 +387,7 @@ def train(
     for epoch in range(MAX_EPOCHS):
         model.train()
         order = train_idx[torch.randperm(len(train_idx), device=device)]
-        order = order[: int(ROW_FRACTION * len(order))]
+        order = order[: int(arm.row_fraction * len(order))]
         for start in range(0, len(order), batch_size):
             b = order[start : start + batch_size]
             world = (
@@ -383,7 +423,7 @@ def train(
             best_state = {a: v.detach().clone() for a, v in model.state_dict().items()}
         else:
             stale += 1
-            if stale >= PATIENCE:
+            if stale >= arm.patience:
                 break
     assert best_state is not None
     model.load_state_dict(best_state)
