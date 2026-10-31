@@ -212,20 +212,20 @@ def draw() -> None:
         color=alt.value(theme.DATA_BLUE),
     )
     rule = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color="#888888")
         .encode(x="x:Q")
     )
     f2 = (
         (
-            base.mark_rule().encode(
+            base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "lo:Q",
                     title="Difference in CRPS (points of capacity; more negative favours the first arm)",
                 ),
                 x2="hi:Q",
             )
-            + base.mark_point(filled=True, size=70).encode(x="diff:Q")
+            + base.mark_point(filled=True, size=70).encode(x="diff:Q")  # ty: ignore[unresolved-attribute]
             + rule
         )
         .properties(width=560, height=130)
@@ -271,7 +271,7 @@ def draw() -> None:
         )
     )
     zero = (
-        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color="#888888")
         .encode(y="y:Q")
     )
@@ -285,14 +285,14 @@ def draw() -> None:
     )
     f4 = (
         (
-            lb.mark_rule().encode(
+            lb.mark_rule().encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "lo:Q",
                     title="Pretrain-and-tune-all minus ENS only (CRPS points; negative is better)",
                 ),
                 x2="hi:Q",
             )
-            + lb.mark_point(filled=True, size=70).encode(x="diff:Q")
+            + lb.mark_point(filled=True, size=70).encode(x="diff:Q")  # ty: ignore[unresolved-attribute]
             + rule
         )
         .properties(width=560, height=90)
