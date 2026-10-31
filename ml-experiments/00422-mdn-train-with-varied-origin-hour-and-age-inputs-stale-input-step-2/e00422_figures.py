@@ -181,8 +181,8 @@ def figure_cost(*, data: pl.DataFrame) -> None:
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
         .mark_rule(strokeDash=[3, 3])
-        .encode(x="x:Q")
-    )  # ty: ignore[unresolved-attribute]
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
     chart = (
         (rule + dot + zero)
         .properties(width=330, height=170)
