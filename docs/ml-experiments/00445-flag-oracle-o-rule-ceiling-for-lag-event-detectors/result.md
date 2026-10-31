@@ -208,6 +208,31 @@ The signed-MW six are the Primaries metered in signed megawatts, the MVA-only ei
   lagless head is 0.71 points worse than the lagged head, so the lagless forecast also misses the
   events.
 
+## Addendum: ensembling control (pre-registered 2026-10-31, before any ensemble score was read)
+
+Question: is B-mix's edge over a single head an ensembling gain (averaging two forecasts) or a
+gain from combining a lagged and a lagless forecast? No new fits; forward passes of experiment
+404's saved A0-inj networks and its stored lagless tables, and stored S1 forecasts.
+
+- **Arms.** Equal-weight density mixtures of two lagged heads (A0-inj seeds i and j, the 404
+  equivalent of R-inj); of two lagless heads (tables of seeds i and j); a 3-way mixture of lagged
+  heads (seeds 0 to 2), a 3-way and a 5-way mixture of lagless heads (seeds 0 to 2 and 0 to 4); and
+  the stored S1 seeds i and j mixed from their stored quantiles (approximate, validated against
+  the exact mixture of A0-inj and the lagless head before use). Reference rows: B-mix (A0-inj seed
+  i with the lagless table of seed i), each single head, and the post hoc O-floor rule.
+- **Cells.** Lagged-head ensembles and S1 ensembles exist only for 2026-06, where 3 seeds are
+  stored. Lagless-head ensembles exist for all 5 months (6 table seeds each). Other months have one
+  lagged seed, so only B-mix and the lagless ensembles are scored there.
+- **Rows.** The tables of this page: clean, injected harm, real harm, inside real events, signed-MW
+  six and MVA-only eight, with and without the largest event.
+- **Reading rule.** Let G_B be the single lagged head's score minus B-mix's, and G_E the single
+  lagged head's score minus the lagged-plus-lagged mixture's, both averaged over the 3 seeds
+  (pairs for G_E), on real clean rows at the six in 2026-06. If G_E / G_B is at least 0.5, B-mix
+  beats single heads mostly through ensembling, and the next step is to compare every trust arm
+  with a seed-matched ensemble of its base. If it is at most 0.25, the lagged and lagless
+  diversity does the work. Between those values the result is mixed and reported as such.
+  Inside real events the same ratio is reported as a second reading.
+
 ## Reuse and credit
 
 The lagged head, lagless table, row classes, scoring, and event-cluster bootstrap come from
