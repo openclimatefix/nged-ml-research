@@ -1,4 +1,4 @@
-# ruff: noqa: E501, C408, PERF401, ISC004
+# ruff: noqa: E501, C408
 """Experiment 468, Part A: time-series graphs of the best wind and solar forecasters.
 
 Reads experiment 461's stored, un-adjusted rows (`work/rows_*.parquet`: quantiles and actuals in MW,

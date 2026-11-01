@@ -1,4 +1,4 @@
-# ruff: noqa: E501, C408, PERF401, ISC004
+# ruff: noqa: E501, C408
 """Experiment 468, Part A: solar contrasts against the stored references, on the same rows.
 
 Joins the table-P rows of experiment 461's solar arms (Solar A and B, old capacity rule) from

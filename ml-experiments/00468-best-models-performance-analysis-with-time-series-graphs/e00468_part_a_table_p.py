@@ -1,4 +1,4 @@
-# ruff: noqa: E501, C408, PERF401, ISC004
+# ruff: noqa: E501
 """Experiment 468, Part A: what table P and the capacity rule change, month by month.
 
 Reads experiment 461's `work/cells.parquet` (one row per technology, arm, series, month, and
