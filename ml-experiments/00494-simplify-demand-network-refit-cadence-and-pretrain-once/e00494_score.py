@@ -67,6 +67,7 @@ def configure(*, comparison: str) -> None:
     heads470.WORK_DIR = WORK_DIR
     score470.MONTHS = months
     curtailment470.MONTHS = months
+    build454.MONTHS = months
     score470.SCORE_DIR = WORK_DIR / "scores" / comparison
     score470.CANDIDATES = (arm,)
     score470.CONTROLS = ("K2",)
@@ -139,8 +140,10 @@ def mde_two_seeds(*, table: pl.DataFrame) -> pl.DataFrame:
     mean; the effect scales as `1.96 * sqrt(2) * sd / sqrt(2)`, the scorer's formula at k = 2.
     """
     records = []
-    for label, group in {"eight": "mva_eight", "six (all rows)": "signed_six"}.items():
+    for label, group in {"eight": "mva_eight", "six_clean": "signed_six"}.items():
         part = table.filter((pl.col("group") == group) & pl.col("main16"))
+        if group == "signed_six":
+            part = part.filter(pl.col("cls") == "clean")
         values = np.array(
             [
                 [part.filter(pl.col("month") == m)[f"A-s{s}__crps"].mean() for s in SEEDS]
@@ -158,7 +161,8 @@ def mde_two_seeds(*, table: pl.DataFrame) -> pl.DataFrame:
 
 def baseline() -> None:
     """Print the two-seed minimum detectable effect before any contrast."""
-    score470.rows_command()
+    if not all((score470.SCORE_DIR / f"rows_{m}.parquet").exists() for m in score470.MONTHS):
+        score470.rows_command()
     minimum = mde_two_seeds(table=score470.load_rows())
     score470.SCORE_DIR.mkdir(parents=True, exist_ok=True)
     minimum.write_csv(score470.SCORE_DIR / "mde_k2.csv")

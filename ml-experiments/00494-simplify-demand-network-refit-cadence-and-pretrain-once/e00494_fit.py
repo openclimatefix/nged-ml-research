@@ -30,6 +30,7 @@ import e00397_prep as base  # ty: ignore[unresolved-import]
 import e00425_fit as fit425  # ty: ignore[unresolved-import]
 import e00425_prep as prep425  # ty: ignore[unresolved-import]
 import numpy as np
+import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -58,9 +59,23 @@ def shift_month(*, month: str, by: int) -> str:
 def refits(*, device: str) -> None:
     """Fit arm A (pretrain and fine-tune) at the cuts that experiment 425 did not store."""
     fit425.OUT_DIR = WORK_DIR
-    fit425.run_arms(
-        months=list(NEW_CUTS), arms=[fit425.ARMS["A"]], seeds=list(SEEDS), cut=True, device=device
-    )
+    original = fit397.forecast_month
+
+    def no_forecast(**_: object) -> tuple[pl.DataFrame, None]:
+        """Skip the test-month forecast: the cut months have no scored origins (only the fits matter)."""
+        return pl.DataFrame({"time_series_id": []}), None
+
+    fit397.forecast_month = no_forecast  # ty: ignore[invalid-assignment]
+    try:
+        fit425.run_arms(
+            months=list(NEW_CUTS),
+            arms=[fit425.ARMS["A"]],
+            seeds=list(SEEDS),
+            cut=True,
+            device=device,
+        )
+    finally:
+        fit397.forecast_month = original
 
 
 def pretrain_once(*, device: str) -> None:
@@ -157,7 +172,11 @@ def stale(*, ages: list[int], device: str) -> None:
                     continue
                 fits, fold = load_stored(folder=folder, device=device)
                 q, _ = fit397.forecast_month(
-                    fits=fits, fold=fold, scheme="summary", month=month, device=device
+                    fits=fits,
+                    fold=fold,  # ty: ignore[invalid-argument-type]
+                    scheme="summary",
+                    month=month,
+                    device=device,
                 )
                 common.atomic_write(frame=q, target=target)
                 print(f"{arm} {month} seed {seed} from cut {cut_month}", flush=True)
