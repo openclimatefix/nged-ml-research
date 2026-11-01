@@ -218,6 +218,10 @@ class Family:
 def run_curves(*, fam: Family, extra_combo_metrics: bool = True) -> tuple[pl.DataFrame, dict]:
     """Score every K over its subsets and widenings.
 
+    Args:
+        fam: The family of seeds to score.
+        extra_combo_metrics: Whether to score the extra row combinations as well.
+
     Returns:
         A long table of one score per K, subset, widening, combination, and metric, and a dict of
         the per-row mean CRPS over subsets at the primary widening for each K.
