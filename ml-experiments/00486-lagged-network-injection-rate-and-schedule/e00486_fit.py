@@ -114,9 +114,7 @@ def lag_event_share(*, pool, code: np.ndarray, device: str) -> float:  # noqa: A
     return float(((code[primary[:, None], safe] != 0).any(axis=1)).mean())
 
 
-def fit_schedule(
-    *, arm: str, month: str, seed: int, device: str, stride: int
-) -> Path:
+def fit_schedule(*, arm: str, month: str, seed: int, device: str, stride: int) -> Path:
     """Fit the A0-inj network with the arm's world in each epoch; save it; return the path."""
     started = time.monotonic()
     train, _test, scalers, _arrays, lag_stats = fit.build_pools(
