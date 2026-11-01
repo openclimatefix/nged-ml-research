@@ -63,7 +63,7 @@ def figure_score_by_arm() -> None:
     for name in ("eight", "six_clean"):
         part = absolute.filter(pl.col("slice") == name).to_pandas()  # ty: ignore[unresolved-attribute]
         panels.append(
-            alt.Chart(part)
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=70, color=theme.BRAND_ORANGE)
             .encode(
                 x=alt.X("crps:Q", title="CRPS (points of capacity)", scale=alt.Scale(zero=False)),
@@ -95,11 +95,11 @@ def figure_closure() -> None:
     for name in ("eight", "six_clean"):
         part = closure.filter(pl.col("slice") == name).to_pandas()  # ty: ignore[unresolved-attribute]
         base = alt.Chart(part).encode(y=alt.Y("arm:N", sort=ARM_ORDER, title=None))
-        bars = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=3).encode(
+        bars = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low:Q", title="Share of the gap closed", scale=alt.Scale(domain=[-0.2, 1.3])),
             x2="high:Q",
         )
-        dots = base.mark_point(filled=True, size=70, color=theme.BRAND_ORANGE).encode(
+        dots = base.mark_point(filled=True, size=70, color=theme.BRAND_ORANGE).encode(  # ty: ignore[unresolved-attribute]
             x="closure_share:Q"
         )
         rule = (
@@ -145,11 +145,11 @@ def figure_contrasts() -> None:
             ),
             yOffset="contrast:N",
         )
-        bars = base.mark_rule(strokeWidth=3).encode(
+        bars = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low_bonferroni:Q", title="Change in CRPS (points; negative is better)"),
             x2="high_bonferroni:Q",
         )
-        dots = base.mark_point(filled=True, size=60).encode(x="difference:Q")
+        dots = base.mark_point(filled=True, size=60).encode(x="difference:Q")  # ty: ignore[unresolved-attribute]
         zero = (
             alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#1A1A1A")
@@ -215,12 +215,12 @@ def figure_examples() -> None:
         part = table.filter(pl.col("lead_hours").is_between(*hours)).to_pandas()  # ty: ignore[unresolved-attribute]
         x = alt.X("valid_time:T", title=None)
         band = (
-            alt.Chart(part[part["arm"] == "EMA"])
+            alt.Chart(part[part["arm"] == "EMA"])  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.2, color=theme.DATA_BLUE)
             .encode(x=x, y=alt.Y("q05:Q", title="Power (MW)"), y2="q95:Q")
         )
         lines = (
-            alt.Chart(part)
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
             .mark_line(strokeWidth=1.5)
             .encode(
                 x=x,
@@ -236,7 +236,7 @@ def figure_examples() -> None:
             )
         )
         actual = (
-            alt.Chart(part[part["arm"] == "S0"])
+            alt.Chart(part[part["arm"] == "S0"])  # ty: ignore[unresolved-attribute]
             .mark_line(color="#1A1A1A", strokeWidth=2)
             .encode(x=x, y="actual:Q")
         )
