@@ -40,14 +40,14 @@ decision_rule: >-
   and intervals at the Bonferroni level 1 - 0.05/108 (99.954%). A method gains at a farm if the
   interval excludes zero on the negative side and the point estimate is below -1%. Group means of
   {Solar A, B, D} and {Solar C, E, F} are descriptive. The minimum detectable effect is the
-  half-width of these intervals, reported first; where it exceeds 1% the arm cannot support a gain.
-  The 1% margin is the maintainer's solar margin (the brief of 2026-11-01); it sits above zero
-  because the serving path would need 112 days of delivered power and a stored expected power. The
-  whole line stops if no primary arm gains at any single farm. If Solar C, E, or F also moves by
-  more than 1% (point estimate), the part of the prediction that the other farms are unchanged
-  fails, and the page says the drift is not specific to A, B, and D. The tails count as harmed at a
-  farm if its 0.01 or 0.99 pinball loss rises by more than 0.02 points (the unscaled loss is
-  reported beside it).
+  half-width of these intervals, reported first; where an interval's lower bound is below -1% it
+  cannot rule out a 1% gain. The 1% margin is the maintainer's solar margin (the brief of
+  2026-11-01); it sits above zero because the serving path would need 112 days of delivered power
+  and a stored expected power. The whole line stops if no primary arm gains at any single farm. If
+  Solar C, E, or F also moves by more than 1% (point estimate), the part of the prediction that the
+  other farms are unchanged fails, and the page says the drift is not specific to A, B, and D. The
+  tails count as harmed at a farm if its 0.01 or 0.99 pinball loss rises by more than 0.02 points
+  (the unscaled loss is reported beside it).
 benchmark: >-
   The unscaled `a2_member` and `g0_onepass` forecasts of experiment 430 (seeds 0 to 2, averaged),
   same rows.
@@ -77,8 +77,8 @@ take_home_message: >-
   the observed weather should have produced) did not lower the quantile score at any of the six
   farms, including the three whose output level changed between years. The best of 18 methods moved
   one farm by -0.46% and made the others worse, so slow efficiency change is not the error that
-  limits the solar forecast. The later stages, which feed the ratio to the network, have no evidence
-  behind them and stop.
+  limits the solar forecast. This was tested on the stored a2_member forecasts only. The later
+  stages, which feed the ratio to the network, have no evidence behind them and stop.
 advice:
   - >-
     Do not run stages 1 to 4 of the solar efficiency-history line, which put the trailing efficiency
@@ -87,31 +87,44 @@ advice:
     Look for the solar forecast's remaining error in the weather forecast, not in farm efficiency;
     the monthly forecast bias is uncorrelated with the trailing efficiency (figure 3, +0.04).
   - >-
-    Treat the 12-month block bootstrap of one farm's score as able to resolve only about 2% to 8% at
-    a Bonferroni level of 108 contrasts; plan a smaller family or more months before pre-registering
-    a 1% margin per farm (the table of half-widths).
+    Treat the 12-month block bootstrap of one farm's score as able to resolve only 1.4% to 8.4% at a
+    Bonferroni level of 108 contrasts; plan a smaller family or more months before pre-registering a
+    1% margin per farm (the table of half-widths).
 production_status: not-for-production
 adopted_in: none
 ---
 
 **Scaling the stored solar forecasts by each farm's recent efficiency did not lower the score at any
-farm, so slow efficiency change is not what limits the forecast.** The best of 18 scaling methods
-lowered Solar C's mean quantile score by 0.46% and raised Solar A, B, and D by 0.3% to 2.0%. The
-efficiency itself does vary: the 56-day trailing ratio at Solar A fell to about 0.8 of its earlier
-average for several months and then recovered (figure 2). Those swings do not line up with the
-forecast's monthly bias (correlation +0.04, figure 3). What this narrows: the remaining error is
-mostly weather error, and a long history of the ratio is unlikely to add to it.
+farm, so slow efficiency change is not what limits the forecast.** The test used the stored
+`a2_member` forecasts of experiment 430 only. The best of 18 scaling methods lowered Solar C's mean
+quantile score by 0.46% and raised Solar A, B, and D by 0.3% to 2.0%. The efficiency itself does
+vary: the 56-day trailing ratio at Solar A fell to about 0.8 of its earlier average for several
+months and then recovered (figure 2). The ratio's swings do not line up with the forecast's monthly
+bias (correlation +0.04, figure 3). What this narrows: the remaining error is mostly weather error,
+and a long history of the ratio is unlikely to add to it.
 
 **Question and method.** National Grid Electricity Distribution (NGED) meters six solar farms,
 labelled Solar A to Solar F here. Efficiency is the farm's actual power divided by the power the
-observed weather should have produced. Each day gets one ratio, and a trailing median, an
-exponentially weighted level, or a Kalman filter turns the days into one multiplier at the forecast
-origin. The experiment multiplied the quantiles of
+observed weather should have produced. This page reports stage 0 of a four-stage line that would
+feed the efficiency to the neural network as an input (stages 1 to 4); stage 0 asks the cheapest
+version of the question. Each day gets one ratio, and a trailing median, an exponentially weighted
+level, or a Kalman filter turns the days into one multiplier at the forecast origin. The multiplier
+is normalised: it is divided by the farm's median ratio over all days before the refit, because the
+stored neural network already learned the farm's average efficiency. A raw multiplier skips that
+division. The experiment multiplied the quantiles of
 [experiment 430's](../00430-unified-forecaster-solar-and-pretraining-ablations/result.md) stored
-`a2_member` forecast by that multiplier (no networks refitted) and compared the quantile score with
-the unscaled forecast over the 12 scored months. Three sources of expected power were used: (a) a
-weather model that saw the scored quarter, (b) a clear-sky proxy, and (c) a weather model trained on
-earlier quarters only.
+`a2_member` forecast by the multiplier (no neural network refitted) and compared the quantile score
+with the unscaled forecast over the 12 scored months. The quantile score is twice the mean pinball
+loss over 11 quantile levels, in points of capacity; lower is better.
+
+Three sources of expected power were used. Source (a) is an XGBoost model of power on observed
+weather that saw the scored quarter, so it is not causal. Source (b) is a clear-sky proxy: the
+farm's clear-sky power times a constant. Source (c) is the same XGBoost model trained on earlier
+quarters only. Sources (b) and (c) are causal. Arm names read
+`network|source|method|multiplier|lag`: for example `a2_member|c|med14|norm|lag2` is the 14-day
+trailing median of source (c), normalised, with the newest day two days before the origin. `ew14` is
+an exponentially weighted level with a 14-day half-life, `kalman` is the filter, and `g0_onepass` is
+experiment 430's other stored forecast, used as a replication.
 
 ![Change in score of every primary method, per farm](figure_1_contrasts.svg)
 
@@ -123,43 +136,48 @@ earlier quarters only.
 
 ## Results
 
-- **Verdict: not supported.** A gain means an interval below zero and a point estimate below -1%.
-  The prediction (a gain of more than 1% at Solar A, B, and D, and under 1% elsewhere) failed. By
-  the stop rule the line stops: no primary arm gains at any farm.
-- **Primary arms (a2_member, sources b and c, 2-day lag, normalised).** Lowest change in the mean
-  quantile score per farm over days 1 to 10: Solar A +0.34%, Solar B +0.54%, Solar C -0.46%, Solar D
-  +0.08%, Solar E -0.01%, and Solar F -0.03%. The lowest group means are {Solar A, B, D} +0.85%
-  (`c|ew14`) and {Solar C, E, F} +0.28% (`c|med112`). Source (b), the clear-sky proxy, is worse at
-  every farm (+2.6% to +24%).
-- **Why the intervals are wide.** Two consecutive scored months at Solar A change by -18.5% and
-  +18.8% when scaled, and the 12 months are resampled as blocks, so Solar A's interval swings by
-  about 9 points. Solar C has one month of -8.6%. These are month-level outliers of the multiplier,
-  not a code fault.
-- **Minimum detectable effect.** The Bonferroni intervals (108 contrasts) are wide: half-widths of
-  8.4%, 2.8%, 3.0%, 1.9%, 2.4%, and 1.4% for Solar A to F on `c|med14`. Only Solar F and Solar D can
-  rule out a 1% gain; at Solar A, B, C, and E a gain of 1% is inside the interval, so the verdict
-  rests on every point estimate being at or above zero, not on intervals.
-- **Secondary arms.** The 6-day lag, source (a), the raw multiplier, and the `g0_onepass` network
-  give the same picture: the lowest changes are -0.05%, -0.18%, -0.33%, and -0.73% (Solar C on
+- **The prediction failed and the line stops.** A gain means an interval below zero and a point
+  estimate below -1% against the unscaled forecast. The prediction was a gain of more than 1% at
+  Solar A, B, and D and under 1% elsewhere. No primary arm gains significantly at any farm, so the
+  verdict is not supported.
+- **Every point estimate is above -1%.** Lowest change in the mean quantile score per farm over days
+  1 to 10 for the 18 primary arms (`a2_member`, sources (b) and (c), 2-day lag, normalised): Solar A
+  +0.34%, Solar B +0.54%, Solar C -0.46%, Solar D +0.08%, Solar E -0.01%, and Solar F -0.03%. The
+  lowest group means are {Solar A, B, D} +0.85% (`c|ew14`) and {Solar C, E, F} +0.28% (`c|med112`).
+  Source (b), the clear-sky proxy, is worse at every farm: +0.4% to +4.6% at the best method per
+  farm, and up to +24% at the worst.
+- **The intervals are wide because single months dominate.** Two consecutive scored months at Solar
+  A change by -18.5% and +18.8% when scaled. The 12 months are resampled as blocks, so Solar A's
+  interval swings by about 9 points. Solar C has one month of -8.6%. Both are month-level outliers
+  of the multiplier, not a code fault.
+- **Only Solar B, D, and F rule out a 1% gain.** The Bonferroni intervals are widened so that all
+  108 contrasts hold together at 95%. On `c|med14` their half-widths are 8.4%, 2.7%, 3.0%, 1.9%,
+  2.3%, and 1.4% for Solar A to F. An interval rules out a 1% gain when its lower bound is above
+  -1%: Solar B (-0.46%), Solar D (-0.94%), and Solar F (-0.40%). At Solar A, C, and E the interval
+  is too wide to rule it out, so the verdict rests on every point estimate being above -1%.
+- **Secondary arms give the same picture.** The 6-day lag, source (a), the raw multiplier, and the
+  `g0_onepass` forecast have lowest changes of -0.05%, -0.18%, -0.33%, and -0.73% (Solar C on
   `g0_onepass|c|med14`).
-- **Day 1 (12 to 36 hours).** The lowest point estimates are at Solar A (-4.8% for `c|med14`), with
-  an interval of -25% to +3%. Not a primary contrast and not a finding; it is the one place a later
-  stage could look.
-- **Tails.** On `a2_member|c|med14`, the 0.99 pinball loss rises at every farm (+0.002 to +0.127
-  points; +0.127 at Solar A, +0.035 at Solar C, +0.057 at Solar D, +0.054 at Solar E, all above the
-  0.02 limit), and the 0.99 coverage falls from 97.5% to 95.7% at Solar A and from 99.3% to 97.5% at
-  Solar C.
+- **Day 1 (12 to 36 hours) is the one place a later stage could look.** The lowest point estimate is
+  at Solar A (-4.8% for `c|med14`), with an interval of -25% to +3%. Day 1 is not a primary contrast
+  and is not a finding.
+- **The 0.99 quantile gets worse.** On `a2_member|c|med14` the 0.99 pinball loss rises at every farm
+  (+0.012 to +0.127 points). It exceeds the 0.02 limit at Solar A (+0.127), Solar C (+0.035), Solar
+  D (+0.057), and Solar E (+0.054). The 0.99 coverage falls from 97.5% to 95.7% at Solar A and from
+  99.4% to 97.6% at Solar C.
 
 ## Checks
 
 - **Missing multipliers.** Source (c) is missing at 0% to 3% of origins at Solar A to D and F and
-  20.8% at Solar E. Source (b) is missing at 25% to 27% of origins at Solar A to D and F and 41% at
-  Solar E, which biases it toward no effect but cannot explain +2.6% to +24%.
+  20.8% at Solar E. Source (b), averaged over the nine methods, is missing at 25% to 27% of origins
+  at Solar A to D and F and 41% at Solar E, and at 48% to 55% (76% at Solar E) for the longest
+  window. Missing multipliers bias source (b) toward no effect but cannot explain a loss of up to
+  24%.
 - **Clipping.** 1% to 11% of scaled 0.99 quantiles hit the cap (the largest q99 of that farm and
   refit).
 - **Mean-forecast error beside the quantile score** (`a2_member|c|med14`, mean absolute error in
-  points of capacity, unscaled to scaled): Solar A 12.61 to 12.83, B 13.22 to 13.22, C 12.17 to
-  12.25, D 14.78 to 14.71, E 14.44 to 14.46, F 12.64 to 12.69.
+  points of capacity, unscaled to scaled): Solar A 12.61 to 12.84, B 13.22 to 13.23, C 12.17 to
+  12.25, D 14.78 to 14.71, E 14.44 to 14.47, F 12.64 to 12.69.
 - **Seeds.** Three seeds, averaged quantile by quantile, in every arm.
 - **Cleaning.** Stuck runs, daylight zeros, spikes above 1.5 of capacity, and curtailment-flat days
   are dropped from the ratio; days whose ratio was exactly 0 are treated as missing.
@@ -167,8 +185,8 @@ earlier quarters only.
 ## Caveats
 
 - Source (a) saw the scored quarter's power, so it is not causal; sources (b) and (c) are.
-- Source (c)'s regressor for a farm's first four year-quarters is leave-one-quarter-out within that
-  year.
+- Source (c)'s XGBoost model for a farm's first four year-quarters is leave-one-quarter-out within
+  that year.
 - Source (b) takes its ratio from near-clear half-hours and applies it to all-sky forecasts.
 - The multiplier assumes observed weather and power reach the service two days after the day ends;
   ERA5 arrives about 5 days late, and the 6-day lag arms are within 0.05% of the best.
@@ -184,13 +202,15 @@ earlier quarters only.
 
 ## Process
 
-- Plan review: a fresh Sonnet agent found 13 points; all accepted or folded in (forward-only source
-  (c), per-farm primary contrasts, Bonferroni 108, 6-day lag arms, defined Kalman multiplier).
+- Plan review: a fresh Sonnet agent made 13 review comments; all were accepted or folded in
+  (forward-only source (c), per-farm primary contrasts, Bonferroni correction over 108 contrasts,
+  6-day lag arms, defined Kalman multiplier).
 - Code review: a fresh Sonnet agent found two critical bugs (zero daily ratios made the exponential
   and Kalman methods NaN at four farms; a duplicate `band` column in the aggregation) and five
-  lower-severity points; all fixed before the scoring run.
+  lower-severity points; all were fixed before the scoring run.
 - Results review: a fresh Sonnet agent re-derived the headline numbers from the raw forecasts with
   its own code. It averaged six seeds where this page averages three, so per-farm changes differ by
-  up to 0.5 points (Solar A +0.9% against +0.3%) and the sign of Solar C (-0.6%) and Solar E (+0.9%)
-  agree with the page. It found no lookahead and no clipped multiplier, and asked that "no arm
-  gains" read "no arm gains significantly", which the verdict line now states.
+  up to 0.5 points (Solar A +0.9% against +0.3%), and the signs agree for Solar C (-0.6%) and Solar
+  E (+0.9%). It found no lookahead and no clipped multiplier.
+- Write-up review: a fresh Sonnet agent corrected eight numbers and one logic error (which farms'
+  intervals rule out a 1% gain), and asked for terms to be defined earlier; all were applied.

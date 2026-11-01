@@ -9,7 +9,6 @@
 | [300](../../00300-metered-farm-best-guess-assembly/result.md) | How good is the assembled best-guess day-ahead forecast for the six metered farms, and what does a new farm with no history get? | 1 | Nothing | Planned |
 | [430](../../00430-unified-forecaster-solar-and-pretraining-ablations/result.md) | Which of ensemble members passed one by one, a PyTorch plant, ERA5 and CAMS pretraining, and point masses at zero and capacity does a pooled mixture-density network for the six metered solar farms need, and which routes give coherent ensemble member paths? | High (maintainer, 2026-10-31) | Nothing | Finished: none of the four beats the plain network; the A6 wind arms are deferred |
 | [433](../../00433-solar-idle-noise-data-look/result.md) | Do the six metered solar farms show the wind farms' idle-noise texture when they are not generating? | 1 | Nothing | Planned |
-| [464](../../00464-solar-efficiency-history-stage-0-post-hoc-scaling/result.md) | Does multiplying the stored solar forecasts by each farm's recent efficiency lower the quantile score, and does it help Solar A, B, and D most? | 2 | Nothing | Planned |
 
 ## Planned experiments
 
