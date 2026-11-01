@@ -735,3 +735,80 @@ error of the median beside each quantile contrast, and which triggers fired.
   yet, so every "after P" rule is deferred.
 - The 5% rate and the duration sweep multiply fits only for U1n; whether the scale-only arms are
   also run at 5% is decided by the rule in the design choices above.
+
+## Addendum: the rules that waited for table P, read on the final experiment 435 recipe
+
+**Take-home: with the recalibration table as the baseline, no Brief B arm and no Brief C arm passes,
+so no verdict above changes to a pass on these months.** Two readings differ from the 1.15 widening.
+After table P, the injected-level-change arms (U1n-2, U2, U2i, U2c, U2-clean, U3) lose real-event
+q95 coverage against R-inj at the signed-MW six, and cold-night coverage of the MVA-only eight stays
+at target only for U1n-5. All numbers are interim and unaudited, and cover the three months scored
+with table P (2026-01, 2026-03, 2026-06).
+
+- **Method.** No forecast was read and nothing was fitted. The stored `P` score tables of this
+  experiment already refit experiment 435's recipe (one factor per metering group, lead band, tail,
+  and class, on the arm's own earlier folds). Experiment 435 of this research series applies no clip
+  to demand, because demand in signed MW has no common bound. R-inj's clean-row q95 and q99 coverage
+  at the signed-MW six is 0.910 and 0.963 here, against 0.904 and 0.961 in experiment 435, whose
+  clean class leaves out lag-missing and large-surprise rows. This refit has no 200-row floor per
+  cell, and judges only the clean, injected-harm, generated level-change, real-harm, and real-event
+  classes.
+- **Scored set.** Months 2026-01, 2026-03, and 2026-06 (the first fold fits only). Signed-MW six and
+  MVA-only eight are separate; D15 and D18 are not judged. Code: `e00446_table_p_rules.py`.
+  Intervals are event-cluster bootstrap intervals over 5 to 11 events per set (signed-MW six: 11
+  harm, 10 harm without the largest, 10 NRA-corrected, 9 NRA-corrected without the largest; MVA-only
+  eight: 10, 9, 6, 5).
+- **"Without the largest event".** The stored `*_wo_largest` row sets of the main analysis drop
+  nothing, because the longest event lies outside the scored rows. The addendum drops the event with
+  the most scored R-inj rows instead.
+
+| After P (clean rows) | CRPS | q95 | q99 | q05 | q01 |
+|---|---|---|---|---|---|
+| R-inj, signed-MW six | 3.115 | 0.910 | 0.963 | 0.043 | 0.008 |
+| S1, signed-MW six | 3.029 | 0.904 | 0.963 | 0.041 | 0.007 |
+| R-inj, MVA-only eight | 3.742 | 0.925 | 0.983 | 0.037 | 0.008 |
+| S1, MVA-only eight | 3.681 | 0.918 | 0.980 | 0.041 | 0.009 |
+
+Table 4: absolute clean-row scores with table P (CRPS in MW or MVA; coverage as a share). Clean-row
+q95 stays below 0.93 at the signed-MW six for every arm (0.894 to 0.910) and at the MVA-only eight
+for every arm (0.912 to 0.925).
+
+**Brief B, rule by rule (after P).**
+
+- **(a) Class tolerances.** R-inj itself fails the tolerance on the generated level-change rows and
+  on NRA-corrected real events at both groups, so an arm must meet both tolerances. Only U1n-5 at
+  the MVA-only eight meets the generated-level-change tolerance, and no arm meets the real-event
+  tolerance. Rule (a) fails for every arm.
+- **(b) Clean-row cost against R-inj.** At the signed-MW six every U arm fails the tail-pinball
+  limit (worst tail +0.039 for U1n-5, +0.062 for U2-clean, +0.125 to +0.147 for the others). At the
+  MVA-only eight, six arms stay inside it (CRPS -0.004 to -0.057) and U1n-5 fails (+0.034).
+- **(c) Band width.** All arms stay within the 1.05 ratio except U1n-5 at the signed-MW six (1.070).
+- **(d) Real-event q95 coverage against R-inj.** After P, the interval for arm minus R-inj lies
+  wholly below zero on at least one of the four sets (harm and NRA-corrected events, with and
+  without the largest event) for U1n-2, U2, U2i, U2c, U2-clean, and U3 at the signed-MW six, and for
+  every U arm and S1 at the MVA-only eight. U1n-5 at the six is not vetoed (+0.005 on NRA-corrected
+  events). The 1.15 widening vetoed only S1 and U2-clean at the MVA-only eight. Intervals rest on 5
+  to 11 events and are wide, and the veto needs only one of the four sets.
+- **(e) Cold winter nights (pooled 2026-01 and 2026-03).** At the signed-MW six R-inj reaches 0.830
+  (q95) and 0.922 (q99), and every U arm is lower (q95 0.709 to 0.780). At the MVA-only eight only
+  U1n-5 reaches the targets (0.947, 0.998), and it fails (b). Under the 1.15 widening, every arm at
+  the eight reached them, so P lowers cold-night coverage.
+- **Extra limits.** The mean scale factor on clean rows is at most 1.03 for the four arms that carry
+  one (U2, U2i, U2c, U2-clean). The q99 pinball on real harm rows exceeds R-inj's by more than 0.02
+  for S1, U1n-2, U2, U2i, U2c, U2-clean, and U3 at the six, and for U1n-5 at the eight.
+
+**Brief C (after P, base S1).**
+
+- **Cells and limits.** Every T arm meets the same number of coverage cells as S1 at the signed-MW
+  six (4), one more at the eight for T1, T2, T4, and T5 (6 against 5; T3 meets 5), and T4 meets one
+  fewer at D15 and D18 (3 against 4). `pass_brief_c` is false for every arm and group, because no
+  arm clears the coverage-cell rule and the per-Primary q95 rule.
+- **P6 fails.** T5's pooled cold-night q95 at the signed-MW six is 0.784 against 0.776 for S1
+  (+0.008; the prediction needed +0.05).
+- **P7 holds** at the signed-MW six: no arm reaches q95 0.92 and q99 0.975 on cold winter nights in
+  each of 2026-01 and 2026-03. At the MVA-only eight, T4 pools to q95 0.923 and q99 0.990 on
+  2026-01, but its 2026-03 q95 is 0.915.
+
+**Which verdicts change.** None changes to a pass. Two readings differ from the 1.15 widening: rule
+(d) vetoes 6 of 7 injected-level-change arms at the signed-MW six, and 7 of 7 plus S1 at the
+MVA-only eight, and the cold-night targets at the MVA-only eight hold only for U1n-5.
