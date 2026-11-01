@@ -162,25 +162,35 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     pl.concat([t.with_columns(arm=pl.lit(n)) for n, t in scored.items()]).write_parquet(
         WORK / "scores" / "scores.parquet"
     )
+    core = {n: arms[n] for n in ("a0", "a1", "stored_control")}
+    print("\n-- core row set: A0, A1, and the stored control only (all 16 Primaries) --")
+    table_c, _, rows_c = s381.score_arms(arms=core, series=series, ctx=ctx)
+    flag_c = flag_frame
+    rows_c = {n: r.join(flag_c, on=keys, how="left") for n, r in rows_c.items()}
+    table_c = table_c.join(flag_c, on=keys, how="left")
     print(f"\nlevel {LEVEL:.2f}%, {RESAMPLES} resamples; days 1 to 10 unless stated")
     print("\n== code check: A0 minus stored control (CRPS) at D5 and D12 ==")
     for lab in ("D5", "D12"):
         r = safe_contrast(
-            rows=rows, table=table, where=pl.col("label") == lab, treat="a0", ref="stored_control"
+            rows=rows_c,
+            table=table_c,
+            where=pl.col("label") == lab,
+            treat="a0",
+            ref="stored_control",
         )
         print(f"{lab}: {r}")
     print("\n== C1 and no-harm: A1 minus A0 ==")
     for name, where in GROUPS.items():
-        r = safe_contrast(rows=rows, table=table, where=where, treat="a1", ref="a0")
+        r = safe_contrast(rows=rows_c, table=table_c, where=where, treat="a1", ref="a0")
         print(f"{name:24s} {r}")
     print("\n== A1 minus A0 by slice (99.67%) ==")
     for sl in SLICES:
-        if sl not in rows["a0"].columns:
+        if sl not in rows_c["a0"].columns:
             print(f"(slice {sl} not in the rows)")
             continue
         for name in ("MVA-only eight", "signed-MW six", "D12"):
             r = safe_contrast(
-                rows=rows, table=table, where=GROUPS[name] & pl.col(sl), treat="a1", ref="a0"
+                rows=rows_c, table=table_c, where=GROUPS[name] & pl.col(sl), treat="a1", ref="a0"
             )
             print(f"{sl:24s} {name:16s} {r}")
     print("\n== A1 minus A0 by lead band (99.67%) ==")
@@ -189,13 +199,13 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             try:
                 r = fmt(
                     metrics.month_bootstrap_contrast(
-                        treatment=rows["a1"],
-                        reference=rows["a0"],
+                        treatment=rows_c["a1"],
+                        reference=rows_c["a0"],
                         metric="crps",
                         where=GROUPS[name] & pl.col(band),
                         level_percent=LEVEL,
                         n_resamples=RESAMPLES,
-                        slice_table=table,
+                        slice_table=table_c,
                     )
                 )
             except ValueError as error:
@@ -204,8 +214,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     print("\n== per Primary, A1 minus A0, 95% ==")
     print(
         metrics.reported_contrast_by_primary(
-            treatment=rows["a1"], reference=rows["a0"], metric="crps",
-            where=pl.col(HEADLINE), slice_table=table,
+            treatment=rows_c["a1"], reference=rows_c["a0"], metric="crps",
+            where=pl.col(HEADLINE), slice_table=table_c,
         ).with_columns(marked=pl.col("label").is_in(MARKED))
     )  # fmt: skip
     print("\n== absolute CRPS, days 1 to 10, per Primary ==")
@@ -248,7 +258,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         print(name)
         print(t.pivot(on="metric", index="label", values="value").sort("label"))
     print("\n== D12 and D8 bias of the median on sunny half-hours, points, by lead band ==")
-    flags = table.select(
+    flags = table_c.select(
         "time_series_id", "power_fcst_init_time", "valid_time", *metrics.LEAD_BAND_SLICES,
         "sunny_unit_shape", "sunny_cams_index_07", "sunny_cams_index_09",
     )  # fmt: skip
