@@ -79,12 +79,10 @@ headline: >-
   Adding genuine level changes to the training worlds did not teach S3-amb to use a neighbour
   mirror in a way that beat the same network given random neighbours. The gain on injected level
   changes with no mirror (-0.055 at the MVA-only eight, +0.006 at the signed-MW six) lies inside the
-  minimum detectable effect, the paired sweep shows no lower share followed with a mirror (the gap
-  is
-  -0.003 to -0.011, the wrong sign, and its random-neighbour control shows -0.003), and the
-  Bayes-optimal gap in these worlds is only 0.054 to
-  0.075. The pair contrasts are inconclusive by design, and restated pass (b) fails on the sweep,
-  which could have detected it.
+  minimum detectable effect. The paired sweep shows no lower share followed with a mirror: the gap
+  is -0.003 to -0.011 (the wrong sign), and the random-neighbour control shows -0.003. The
+  Bayes-optimal gap in these worlds is only 0.054 to 0.075. The pair contrasts are inconclusive by
+  design, and restated pass (b) fails on the sweep, which could have detected it.
 lessons: >-
   At a 2% genuine share, a forecaster that knows the training worlds exactly follows only 0.028 to
   0.043 of a step with a mirror and 0.081 to 0.118 without one, so the mirror carries little
@@ -98,8 +96,8 @@ take_home_message: >-
   0.05 to 0.08 more of a step without a mirror than with one. The result is inconclusive by design.
   S3-amb passes the real-row checks against U1n-2, so it is not harmful, and it shows no gain that
   would justify adopting it. A 5% genuine share, which raises the Bayes-optimal gap, is the
-  follow-up
-  that could still show the effect. All numbers are interim, from four test months and two seeds.
+  follow-up that could still show the effect. All numbers are interim, from four test months and
+  two seeds.
 advice:
   - >-
     Do not fit the attention arm (S3-attn-amb) on these worlds, because the pair did not separate by
@@ -145,6 +143,15 @@ mirror when the training world makes the mirror informative. It would not be evi
 Primaries, since no labelled genuine level change exists in the real data.
 
 ## How to read the numbers
+
+**The arms.** S1 is the lag network: a neural network given three earlier readings of a Primary's
+power and the surprise at each reading. U1n-2 is S1 trained on the same ambiguous worlds as
+S3-amb and S3-rw-amb (experiment 446). R-inj is the lag network of experiment 428 that S1 improved
+on, and B-mix is the fixed mixture of two networks' forecast distributions from experiment 404.
+BG2 is the weekly-refitted XGBoost forecast of experiment 87, and `manual_heuristic` is the naive
+baseline forecast. A Primary is a primary substation, and NRA is the normal running arrangement of
+the electricity network (the switching state that the forecast targets). The Bayes-optimal share is
+the share of a step that a forecaster who knows the training worlds exactly should follow.
 
 **Unless a column says otherwise, every number is a score at days 1 to 10 after the 1.15 widening of
 the bands, in points of effective capacity, and a negative contrast favours the first arm.**
@@ -238,22 +245,23 @@ whether the newest lag has a mirror should follow the shares below (target moved
 **The optimal gap is small because few jumps in the training worlds are genuine.** A genuine level
 change covers about 2% of a Primary's half-hours, and most mirrors in these worlds are coincident
 load shifts of experiment 428's worlds at neighbours, not mirrors of a genuine change. A perfect
-learner would therefore follow only 0.054 to 0.075 more of a step without a mirror. **The registered
-predictions.** P1 fails (S3-amb gains 0.006 in the wrong direction against the 0.03 asked, at the
-signed-MW six). P2 fails (the share followed is not lower with a mirror). P3 is half right: the
-shares without a mirror lie below 0.5, but the shares with a mirror are 0.028 to 0.043, below the
-0.05 predicted. P4 fails: S3-amb does not cost 0.03 against U1n-2.
+learner would therefore follow only 0.054 to 0.075 more of a step without a mirror.
+
+**Predictions P1, P2, and P4 fail, and P3 is half right.** P1 fails (S3-amb gains 0.006 in the wrong
+direction against the 0.03 asked, at the signed-MW six). P2 fails (the share followed is not lower
+with a mirror). P3 is half right: the shares without a mirror lie below 0.5, but the shares with a
+mirror are 0.028 to 0.043, below the 0.05 predicted. P4 fails: S3-amb does not cost 0.03 against
+U1n-2.
 
 ## Paired encroachment sweep
 
 **The sweep shows no lower share followed with a mirror for S3-amb, and a small gap of the wrong
-sign
-that its random-neighbour control shares.** The sweep adds a step of 5% of the Primary's effective
-capacity to the first k lags of every row with no labelled event (k = 1, 2, 3: the newest reading,
-then the daily lag, then the weekly lag), once without a mirror and once with the load-conserving
-mirror at the Primary's first neighbour, and measures the share of the step that the median follows.
-The gap is the share without a mirror minus the share with one. The interval resamples the 8 (month,
-seed) blocks, so it is crude.
+sign that its random-neighbour control shares.** The sweep adds a step of 5% of the Primary's
+effective capacity to the first k lags of every row with no labelled event (k = 1, 2, 3: the newest
+reading, then the daily lag, then the weekly lag), once without a mirror and once with the
+load-conserving mirror at the Primary's first neighbour, and measures the share of the step that the
+median follows. The gap is the share without a mirror minus the share with one. The interval
+resamples the 8 (month, seed) blocks, so it is crude.
 
 | Arm | k | No mirror | With mirror | Gap (95% interval) |
 |---|---|---|---|---|
@@ -269,16 +277,15 @@ seed) blocks, so it is crude.
 ![Share of a 5% step that the median follows, with and without a mirror, beside the Bayes-optimal shares](figure_2_sweep_shares.svg)
 
 **Pass (b) fails on a measure that could have detected it.** Restated pass (b) needs a gap above
-0.03
-with an interval above zero, and the Bayes-optimal gap is 0.054 to 0.075. The sweep's block-to-block
-spread of S3-amb's gap is about 0.01 (individual blocks range from -0.026 to +0.014), so a learned
-gap of the optimal size would have shown. S3-amb's gap averages -0.011, -0.007, and -0.003 at k = 1,
-2, and 3. S3-rw-amb, which a mirror cannot move in principle, shows -0.003 in every block, so about
--0.003 is a floor from the sweep itself (possibly random neighbours that include the first
-neighbour). S3-amb's gaps at k = 2 and 3 are about that size. The part of (b) that asks each learned
-share to lie within 0.15 of its Bayes-optimal value holds but is nearly vacuous, since every learned
-share is between 0.01 and 0.23. The sweep steps only the first neighbour's window statistics and
-surprise and keeps the standard deviation and counts unchanged, so it may not reproduce the full
+0.03 with an interval above zero, and the Bayes-optimal gap is 0.054 to 0.075. The sweep's
+block-to-block spread of S3-amb's gap is about 0.01 (individual blocks range from -0.026 to +0.014),
+so a learned gap of the optimal size would have shown. S3-amb's gap averages -0.011, -0.007, and
+-0.003 at k = 1, 2, and 3. S3-rw-amb, which a mirror cannot move in principle, shows -0.003 in every
+block, so about -0.003 is a floor from the sweep itself (possibly random neighbours that include the
+first neighbour). S3-amb's gaps at k = 2 and 3 are about that size. The part of (b) that asks each
+learned share to lie within 0.15 of its Bayes-optimal value holds but is nearly vacuous, since every
+learned share is between 0.01 and 0.23. The sweep steps only the first neighbour's window statistics
+and surprise and keeps the standard deviation and counts unchanged, so it may not reproduce the full
 neighbour pattern of the held-out worlds. We did not test that.
 
 ## Real-row checks
@@ -413,8 +420,7 @@ by hand and some real events are not logged.
   mirror, and is the one change that could separate S3-amb from S3-rw-amb. It needs the maintainer's
   approval and 16 more fits.
 - **Fit the attention arm only after a 5% pair separates.** Attention has little chance to show a
-gain
-  while the optimal gap is only 0.054 to 0.075.
+gain while the optimal gap is only 0.054 to 0.075.
 - **B-mix, or its row-3 successor, stays the production candidate for jump handling.** No
   learned-trust arm passed.
 
