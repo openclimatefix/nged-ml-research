@@ -4,7 +4,8 @@ r"""Draw the figures of experiment 447 from the stored scores and forecasts, and
 - Figure 1: each arm minus S1 (CRPS points, 95% intervals) on clean rows, pooled 14, with the margin.
 - Figure 2: the same on injected harm and real harm rows.
 - Figure 3: each arm's gain in each of the three folds, clean pooled rows.
-- Figures 4 and 5: a day-ahead and a 10-day forecast of one Primary, S1 and the widest network.
+- Figure 4: width 256's gain in each of the five confirmation folds.
+- Figures 5 and 6: a day-ahead and a 10-day forecast of one Primary, S1 and the widest network.
 - Checks: the error of the median forecast and the median minus mean forecast, S1 and the widest arm.
 
 ```bash
@@ -39,7 +40,7 @@ COLOURS: Final[list[str]] = ["#306BFF", "#FF4901"]
 def figure_contrasts(*, stage: str) -> None:
     """Figures 1 and 2: arm minus S1 with 95% intervals."""
     c = pl.read_parquet(SCORES / stage / "decisions.parquet").drop("fold_differences")
-    margin = float(c["margin"].max())
+    margin = float(c["margin"].max())  # ty: ignore[invalid-argument-type]
     for number, row_sets, name in (
         (1, ["clean"], "clean"), (2, ["inj_harm", "real_harm"], "harm"),
     ):  # fmt: skip
@@ -54,15 +55,15 @@ def figure_contrasts(*, stage: str) -> None:
         base = alt.Chart(d.to_pandas())
         y = alt.Y("arm:N", sort=order, title=None)
         colour = alt.Color("group:N", legend=alt.Legend(title=None, orient="top"))
-        points = base.mark_point(filled=True, size=40).encode(
+        points = base.mark_point(filled=True, size=40).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("gain:Q", title="Gain over S1 (CRPS points; positive is better)"),
             y=y, color=colour, yOffset="group:N",
         )  # fmt: skip
-        rules = base.mark_rule().encode(
+        rules = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x="gain_low:Q", x2="gain_high:Q", y=y, color=colour, yOffset="group:N"
         )  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0, margin]}).to_pandas())
+            alt.Chart(pl.DataFrame({"x": [0.0, margin]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(strokeDash=[3, 3], color="#333")
             .encode(x="x:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -83,7 +84,7 @@ def figure_folds(*, stage: str, name: str) -> None:
         for m, v in r["fold_differences"].items()
     ]
     chart = (
-        alt.Chart(pl.DataFrame(rows).to_pandas())
+        alt.Chart(pl.DataFrame(rows).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=50)
         .encode(
             x=alt.X("gain:Q", title="Gain over S1 (CRPS points; positive is better)"),
@@ -94,7 +95,7 @@ def figure_folds(*, stage: str, name: str) -> None:
 
 
 def figure_examples(*, month: str, site: str, seeds: tuple[int, ...]) -> None:
-    """Figures 4 and 5: a day-ahead and a 10-day forecast from one origin."""
+    """Figures 5 and 6: a day-ahead and a 10-day forecast from one origin."""
     primary = data.sites().index(site)
     frames = [
         score.read_arm(arm=a, month=month, world=0, seeds=seeds, factor=score.WIDENING)
@@ -105,7 +106,7 @@ def figure_examples(*, month: str, site: str, seeds: tuple[int, ...]) -> None:
     f = pl.concat(frames)
     origins = sorted(f["origin_us"].unique().to_list())
     one = f.filter(pl.col("origin_us") == origins[len(origins) // 2])
-    for number, name, hours in ((4, "day_ahead", 48.0), (5, "10_day", 240.0)):
+    for number, name, hours in ((5, "day_ahead", 48.0), (6, "10_day", 240.0)):
         d = one.filter(pl.col("lead") <= hours).with_columns(
             time=pl.from_epoch("valid_us", time_unit="us"),
             q05=pl.col("q05") * POINTS, q50=pl.col("q50") * POINTS, q95=pl.col("q95") * POINTS,
@@ -182,7 +183,7 @@ def main() -> None:
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     figure_contrasts(stage="screen")
     figure_folds(stage="screen", name="figure_3_folds.svg")
-    figure_folds(stage="confirm", name="figure_6_confirmation_folds.svg")
+    figure_folds(stage="confirm", name="figure_4_confirmation_folds.svg")
     figure_examples(month="2026-01", site=score.SIGNED_MW_LABELS[0], seeds=common.SCREEN_SEEDS)
     checks(months=common.SCREEN_FOLDS, seeds=common.SCREEN_SEEDS, arms=["S1", "X-w256"])
 
