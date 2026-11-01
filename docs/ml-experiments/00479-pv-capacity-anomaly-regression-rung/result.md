@@ -14,17 +14,19 @@ size: >-
 hypothesis: >-
   A capacity estimate that regresses the within-month anomaly of net demand on the within-month
   anomaly of the physics PV shape, with the temperature response fitted jointly, recovers an
-  injected metered farm at least as well as experiment 474's convex GAM-side rungs, and its
-  placebo passes. A placebo that passes here is a property of the construction. The estimator is
+  injected metered farm (raw recovery of 0.85 or more), and its placebo passes. A placebo that
+  passes here is a property of the construction. The estimator is
   useful only if it also recovers the injected farm (the removed means did not erase the signal)
   and its 80% interval covers the injected capacity when the load follows the clouds.
 prediction: >-
-  Written before any fit. (1) The post-removal signal share of the PV shape is 0.20 to 0.26 at
-  every Primary (stage 0 measured 0.23 to 0.25 at 15 Primaries, 0.21 at D18). (2) The
+  Written before any fit. (1) The post-removal signal share of the PV shape stays between 0.15 and 0.30
+  at every Primary (stage 0, below, measures it). (2) The
   within-month day-shuffle placebo of the irradiance anomaly recovers under 0.20 of the real
   capacity at every signed-MW Primary, by construction. (3) The profile-aware placebo (the farm's
   day-of-year profile kept, its anomaly shuffled; experiment 474's placebo) also falls under
-  0.20, because the profile is removed with the group means. (4) Raw recovery of the 2 MW and
+  0.20 (the group means remove the profile except its within-month ramp; experiment 474's
+  residual of 0.25 to 0.40 is the quantity under test, so a pass is expected but not guaranteed).
+  (4) Raw recovery of the 2 MW and
   4 MW injections is 0.75 to 0.95 without cloud terms in the easy world. (5) With a
   cloud-following load and no cloud term the 80% interval covers the injection in under 30% of
   injections; with the two cloud terms it covers 70% or more in the load of experiment 129's
@@ -36,11 +38,18 @@ decision_rule: >-
   Primary passes the placebo when the 95th percentile of the profile-aware placebo's recovery,
   over 20 shuffles and the five farms, is under 0.20. It passes the known answer when the median
   recovery of the 2 MW and 4 MW injections is at least 0.85 and the nominal 80% interval covers
-  the injected capacity in at least 70% of injections in the easy world. The estimator is useful
-  if it passes both at a majority (4 or more) of the 6 signed-MW Primaries, in the easy world and
-  in the cloud-load world, with or without the cloud terms (state which). Where it passes, its
-  capacity enters the NGED table marked validated. Where it fails, the table keeps experiment
-  474's estimate marked unvalidated. A pass or fail is reported either way. The 15-fit forecast
+  the injected capacity in at least 70% of injections in the easy world. Each cell is one estimator
+  variant (without or with the two cloud terms) in one world; the cells gated are the easy world and
+  the linear cloud-load world, so four gated cells, each judged on its own. The squared
+  cloud-load world is reported only. The coverage gate uses the interval widened by 1.28 standard
+  deviations of the recovery over the five farms (experiment 474's definition), compared on the
+  recovery scale where the injected truth is 1. A variant is useful if its gated cells pass the
+  placebo and the known answer at 4 or more of the 6 signed-MW Primaries. Only a signed-MW
+  Primary that individually passes all gates of a useful variant is marked validated in the NGED
+  table. The 8 MVA-only Primaries, D5, D18, and any signed-MW Primary that fails are marked
+  unvalidated (the MVA-only ones add the power-factor caveat), and keep experiment 474's estimate
+  beside this one. The comparison with experiment 474's recovery on the same farms is reported,
+  not gated. A pass or fail is reported either way. The 15-fit forecast
   step is dropped.
 benchmark: >-
   Experiment 474's rungs C0 to R5 (raw recovery 0.75 to 0.94, profile-aware placebo 0.25 to 0.40,
@@ -66,7 +75,7 @@ metric: >-
 ## Plan
 
 - **Estimator.** For each Primary, remove from the reading (megawatts) and from every regressor the
-  mean of the same calendar month, local hour of day, and weekday class (Monday to Friday,
+  mean of the same calendar year-month, local hour of day, and weekday class (Monday to Friday,
   Saturday, Sunday). Regress the reading's anomaly on the physics PV shape's anomaly: tilt 35
   degrees, DC to AC ratio 1.15 as in experiment 405, with the temperature derate, one capacity
   coefficient per season-year (July to June). The coefficient is the negative of the capacity in
@@ -83,17 +92,19 @@ metric: >-
   percentiles of AC capacity. DC capacity is AC capacity times 1.25, with 1.1 and 1.5 as a
   post-hoc rescaling (experiment 73 found the ratio not identified, and the AC capacity does not
   change).
-- **Known-answer worlds** (experiment 474's harness, same farms and injection sizes). The
-  injected series is subtracted from the reading before the group means are removed. The easy
-  world injects 2 MW and 4 MW of Solar A to F's output (five farms, E left out for its short
-  history). The cloud-load world adds experiment 129's cloud-following load (the 2 MW-equivalent,
-  linear in the day's mean cloud response). A third world adds a load that follows the squared
-  day-mean cloud response, scaled to the same mean, to test a load the cloud terms do not match
-  exactly. Each world runs with and without the cloud terms.
+- **Known-answer worlds** (experiment 474's harness, same farms and injection sizes). The injected
+  series is subtracted from the reading (so the reading's anomaly falls by the series' anomaly)
+  before the group means are removed. The easy world, with no load that follows the clouds, injects
+  2 MW and 4 MW of Solar A to F's output (five farms, E left out for its short history). The
+  cloud-load world adds experiment 129's cloud-following load (a load whose mean equals 2 MW of
+  capacity, linear in the day's mean cloud response). A third world adds a load that follows the
+  squared day-mean cloud response, scaled to the same mean, to test a load the cloud terms do not
+  match exactly. Each world runs with and without the cloud terms.
 - **Placebos.** (a) The profile-aware placebo of experiment 474: the farm's day-of-year profile
   plus the anomaly of another day of the same month, injected at 2 MW. The group-mean removal
   deletes the profile, so this placebo can pass trivially. (b) The irradiance-shuffle placebo: the
-  PV shape's days are permuted within each calendar month and the real reading is refitted, and
+  PV shape's days and the two cloud columns' days are permuted together, by one
+  permutation within each calendar year-month, and the real reading is refitted, and
   the placebo capacity is reported as a share of the real capacity. This placebo is true by
   construction. Both use 20 shuffles. The page states plainly that a placebo that passes by
   construction can hide a real signal that was removed together with the means, so the known
@@ -103,17 +114,17 @@ metric: >-
   increment (injected-world capacity minus base capacity, same draw), reported alone and widened
   by 1.28 times the standard deviation of the point recoveries over the five farms (experiment
   474's definition).
-- **Scope.** Six signed-MW Primaries run the known answer. The eight MVA-only Primaries (D2, D3,
-  D4, D8, D12, D19, D21, D22) are fitted to the apparent-power reading with reactive power assumed
-  zero, by experiment 366's rule and experiment 420's export gate: the rule fails at a power factor
-  of 0.97, so these capacities carry that caveat. D5 (export limit; the clip-free solar term does
-  not represent it), D12 (reverse flow), D15 (generator case, not run), and D18 (history only from
-  2025-03-01, report-only) are marked. The six and the eight are reported separately, never
-  pooled.
+- **Scope.** Six signed-MW Primaries run the known answer. The eight MVA-only Primaries (D2, D3, D4,
+  D8, D12, D19, D21, D22) are fitted to the apparent-power reading with reactive power assumed zero,
+  by experiment 366's rule and experiment 420's export gate: the rule fails at a power factor of
+  0.97, so these capacities carry that caveat. D5 (export limit; the clip-free solar term does not
+  represent it), D12 (reverse flow), D15 (generator case, not run), and D18 (history only from
+  2025-03-01, report-only) are marked. The 6 signed-MW Primaries and the 8 MVA-only Primaries are
+  reported separately, never pooled.
 - **Not applicable.** No forecast is scored, so the avoidable-curtailment cost, tail calibration
-  (the 5% q99 rule), and the forecast-use step do not apply. The tails reported are the 5th and
-  95th percentiles of the bootstrap capacity. Experiment 474's forecast-use step repeats
-  experiments 405, 409, 416, and 477 and is dropped.
+  (including the rule that q99 coverage must stay within 5%), and the forecast-use step do not
+  apply. The tails reported are the 5th and 95th percentiles of the bootstrap capacity. Experiment
+  474's forecast-use step repeats experiments 405, 409, 416, and 477 and is dropped.
 - **Anonymisation.** Solar A to F by letter; no nearest-farm names; distance bands only
   ("under 15 km", "15 to 30 km", "30 km or more"). Rows with no labelled event: NGED's event
   labels are incomplete, so the readings may hold unlabelled events.
@@ -124,16 +135,18 @@ Ordinary-least-squares standard errors on the real reading (no injection, no pla
 latest season-year (July 2025 to June 2026). The standard error assumes independent rows, so it is
 a lower bound (rows within a day are strongly correlated); the bootstrap interval will be wider.
 
-- **Post-removal signal share:** 0.23 to 0.25 of the PV shape's variance at every Primary except
-  D18 (0.21). Experiment 405 found 0.21 on its farm. About one quarter of the shape's variance
-  survives the group-mean removal.
-- **Variance inflation factor of the capacity column** against the temperature columns: 1.02 to
-  1.05 without the cloud terms, 1.35 to 1.65 with them, 2.4 for D18. Temperature does not explain
-  the PV anomaly; the cloud terms do, as expected (cloud and irradiance are one signal).
+- **Post-removal signal share:** 0.23 to 0.25 of the PV shape's variance at each of the 14
+  Primaries, and 0.21 at D18. Experiment 405 found 0.21 on its farm. About one quarter of the
+  shape's variance survives the group-mean removal.
+- **Variance inflation factor of the latest season-year's capacity column** against all other
+  columns: 1.02 to
+  1.05 without the cloud terms, 1.35 to 1.65 with them, 2.4 for D18.
 - **Minimum detectable capacity** (80% power, two-sided level 0.05 divided by the
   Bonferroni count of 36 tests: 6 signed-MW Primaries, 2 estimators, 3 gates): 0.05 to 0.35 MW
-  AC without the cloud terms and 0.06 to 0.40 MW with them (D8 is widest, D21 narrowest). A
-  capacity difference under those figures cannot be told from zero by this estimator.
+  AC without the cloud terms and 0.06 to 0.40 MW with them (D8 is widest, D21 narrowest). The count
+  suits the 6 signed-MW Primaries only, and the figure tests a capacity against zero, which none of
+  the gates does, so it is indicative. A capacity under those figures cannot be told from zero by
+  this estimator.
 - **Bonferroni count:** 36.
 
 The full table is in the private file `work/stage0_signal.json`.
