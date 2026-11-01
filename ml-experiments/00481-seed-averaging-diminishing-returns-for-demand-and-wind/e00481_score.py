@@ -24,6 +24,7 @@ uv run --no-sync python ml-experiments/00481-*/e00481_score.py s1
 # the assembled report (needs only numpy and polars)
 uv run --no-sync python ml-experiments/00481-*/e00481_score.py report
 ```
+
 Each family writes its text to `work/report_parts/<family>.txt` and its tables to
 `work/figure_tables/`; `report` joins them into `score_report.txt`, the minimum detectable effects
 and the Bonferroni count first.

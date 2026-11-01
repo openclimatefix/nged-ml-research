@@ -11,6 +11,7 @@ export PYTHONPATH=<the 425 PYTHONPATH of e00425_fit.py>:$E/00481-seed-averaging-
 DATA_PATH_INTERNAL=... OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00481-*/e00481_fit.py demand --seeds 5 6 7 8 9
 ```
+
 Wind needs the 429 `PYTHONPATH` (`00429/env.sh`) instead; S1 needs 454's (`e00404_fit.py`).
 """
 
