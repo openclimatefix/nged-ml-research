@@ -45,8 +45,10 @@ decision_rule: >-
   cost (signed-MW six, f = 0.9, 0.75, 0.5), because K2-S1 needs no cross-fit table in production.
   The gate is hard to reach (K2-S1 is -0.121 against B-mix, P1 is below -0.06); the run is a
   diagnostic. Intervals. Months are the resampling unit (5 months, 4 degrees of freedom). The 95%
-  interval is reported with the Bonferroni interval beside it; the Bonferroni count and the minimum
-  detectable effect are stated as numbers beside every contrast. The paired contrast G1-trust-12
+  interval is reported with the Bonferroni interval beside it; the Bonferroni count is 24 (three contrasts, G1-trust-12 against B-mix, against G1-trust, and
+  against K2-S1, on four slices, which are rows with no labelled event, harm rows, NRA-corrected
+  real-event rows, and metered real-event rows, at both substation groups), and the minimum
+  detectable effect is stated as a number beside every contrast. The paired contrast G1-trust-12
   minus G1-trust (6 folds, experiment 463) is the direct answer to the question, with its own
   minimum detectable effect.
 benchmark: >-
