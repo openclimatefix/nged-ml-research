@@ -51,7 +51,8 @@ decision_rule: >-
   and enter no count. The curtailment clause uses the Bonferroni block-bootstrap interval of the
   candidate's contrast with the best candidate. At the six the minimum detectable effect for a
   single-seed pool is about 0.07, above 0.03, so P2 and P4 can only be conclusive if the gap
-  exceeds the minimum detectable effect; otherwise they are stated as inconclusive. The minimum detectable effect (experiment 428's formula on the seed-to-seed
+  exceeds the minimum detectable effect; otherwise they are stated as inconclusive. The minimum
+  detectable effect (experiment 428's formula on the seed-to-seed
   spread of arm A's five single seeds at the eight and the six; the three cells of each mixture
   construct for the mixtures) is printed before any contrast is read. A contrast inside the
   minimum detectable effect is inconclusive. Rule for the first release: among candidates whose
@@ -63,9 +64,11 @@ decision_rule: >-
   contrast with the best candidate is inconclusive (inside the minimum detectable effect) or
   conclusive but under 0.03; if every candidate is admissible at the six, the six decides nothing
   and the choice rests on the eight and the simplicity rule. Serving cost counts the networks per
-  forecast at the stated serving seed count (A-pool 5, K2-S1 4, K2-425A 4, K2-425A+S1 4, A-gam-in 5),
+  forecast at the stated serving seed count (A-pool 5, K2-S1 4, K2-425A 4, K2-425A+S1 4, A-gam-in
+  5),
   and counts the GAM, the lagless table, and its store of past lagless forecasts as extra serving
-  cost; A-pool at 1 network is reported as a sensitivity, not a candidate. If A-pool and K2-S1 tie at the eight and the six, the lag design adds
+  cost; A-pool at 1 network is reported as a sensitivity, not a candidate. If A-pool and K2-S1 tie
+  at the eight and the six, the lag design adds
   nothing over pretraining and A-pool is the recommendation. The smallest gain worth porting is
   0.03 points, because a mixture doubles the networks run per forecast and adds the lagless table
   and its store of past lagless forecasts. Every score is selection-biased, because the five folds
@@ -108,7 +111,8 @@ write-up replaces this section.*
   parameters, which no earlier experiment stored (it wrote quantiles only). They come from a
   forward pass of the saved arm A networks (`work/models/A/<month>/s<seed>`, seeds 0 to 4) on the
   scored rows, with experiment 454's frozen lagless tables (`00404.../work/lagless`) and S1 heads
-  (experiment 454's `work/heads/S`). A forward pass is not a fit. It runs only on the intersection rows (the lagless head requires every
+  (experiment 454's `work/heads/S`). A forward pass is not a fit. It runs only on the intersection
+  rows (the lagless head requires every
   row present), uses the saved standardiser and target statistics, and is checked by recomputing
   A-pool's quantiles and requiring a maximum difference under 5e-4 against `seed_preds/A` as
   `check_against_stored` does in experiment 454. The scorer also checks that a forecast origin means
@@ -116,7 +120,8 @@ write-up replaces this section.*
   0 to 2; the mixtures use the pairs (0,1), (0,2), (1,2) as experiment 454 does). The lagless tables
   are cross-fitted, so no leakage arises.
 - **Rows.** All candidates are scored on the intersection of (Primary, forecast origin, target
-  half-hour) over the five folds (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), after the cleaned-data
+  half-hour) over the five folds (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), after the cleaned-
+  data
   drops and the D15 and D18 start cut. Experiments 425 and 454 key the same rows differently
   (`time_series_id`, `power_fcst_init_time`, `valid_time` against `primary`, `origin`, `target`), so
   the scorer first maps one key to the other and checks the mapping on the shared rows. The scorer
@@ -156,7 +161,8 @@ write-up replaces this section.*
   skill fires.
 - **Further standing rules.** Run scripts under `systemd-run --user --scope -p MemoryMax=16G -p
   OOMPolicy=continue`. Report threshold-weighted CRPS beside the tails, per-Primary tables, the
-  avoidable-curtailment cost during events, in the 7 days after, and across all rows, with the saving
+  avoidable-curtailment cost during events, in the 7 days after, and across all rows, with the
+  saving
   against `manual_heuristic` in GBP per MW per day, interval width and coverage on rows where a lag
   is nulled, and the "Checks" bullets (median minus mean forecast per site, mean-forecast error
   beside each contrast, which audit triggers fired). `take_home_message` is written in the finished
