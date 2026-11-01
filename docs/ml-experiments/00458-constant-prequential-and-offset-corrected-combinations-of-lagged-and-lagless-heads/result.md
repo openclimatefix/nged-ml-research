@@ -95,8 +95,8 @@ advice:
   - >-
     Do not run the 50-fit weight-per-lead-band experiment: the fitted weights are unstable across
     months and score no better held out (experiment 458).
-code:
-ml-experiments/00458-constant-prequential-and-offset-corrected-combinations-of-lagged-and-lagless-heads/
+code: >-
+  ml-experiments/00458-constant-prequential-and-offset-corrected-combinations-of-lagged-and-lagless-heads/
 ---
 
 **No combination rule beat the fixed 50/50 mixture of the lagged and lagless forecasts (B-mix).**

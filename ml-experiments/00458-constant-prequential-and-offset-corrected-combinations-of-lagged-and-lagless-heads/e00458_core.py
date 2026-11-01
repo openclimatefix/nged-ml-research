@@ -144,7 +144,16 @@ class Cell:
 def load_cell(*, month: str, seed: int) -> Cell:
     """Read the four heads of one cell on identical rows with leads of 0 to 240 hours."""
     heads = {"B-mix": "B-mix", "A0": "A0-inj", "S1": "S1", "Z": "lagless"}
-    cols = [*KEY, "lead_hours", "actual", "win_real", "lag_real", "tgt_real", "tgt_post", *LEVEL_NAMES]
+    cols = [
+        *KEY,
+        "lead_hours",
+        "actual",
+        "win_real",
+        "lag_real",
+        "tgt_real",
+        "tgt_post",
+        *LEVEL_NAMES,
+    ]
     frames = {
         k: pl.read_parquet(_path(head=v, month=month, seed=seed), columns=cols)
         for k, v in heads.items()
@@ -187,8 +196,15 @@ def integrals(*, lagged: np.ndarray, lagless: np.ndarray, actual: np.ndarray) ->
         u0, u1 = (pair.f1 - pair.f2)[:, :-1], (pair.f1 - pair.f2)[:, 1:]
         v0, v1 = pair.f2[:, :-1] - h, pair.f2[:, 1:] - h
 
-        def seg(a0: np.ndarray, a1: np.ndarray, b0: np.ndarray, b1: np.ndarray) -> np.ndarray:
-            return (dx * (2 * a0 * b0 + a0 * b1 + a1 * b0 + 2 * a1 * b1) / 6.0).sum(axis=1)
+        def seg(
+            a0: np.ndarray,
+            a1: np.ndarray,
+            b0: np.ndarray,
+            b1: np.ndarray,
+            *,
+            width: np.ndarray = dx,
+        ) -> np.ndarray:
+            return (width * (2 * a0 * b0 + a0 * b1 + a1 * b0 + 2 * a1 * b1) / 6.0).sum(axis=1)
 
         out[sl, 0] = seg(u0, u1, u0, u1)
         out[sl, 1] = seg(u0, u1, v0, v1)
@@ -251,14 +267,16 @@ def window_features(*, cell: Cell, series: dict[str, np.ndarray]) -> dict[str, n
         if ok.sum() < MIN_USABLE:
             short[i] = True
             continue
-        for h in diff:
-            diff[h][i] = np.nanmean(series[h][p, w_lo + 1 : hi + 1][ok]) - zl[ok].mean()
+        for h, values in diff.items():
+            values[i] = np.nanmean(series[h][p, w_lo + 1 : hi + 1][ok]) - zl[ok].mean()
         r = series["resid"][p, hi - OFFSET_STEPS + 1 : hi + 1]
         r = r[np.isfinite(r)]
         if len(r) >= OFFSET_STEPS // 2:
             offset[i] = np.median(r)
     index = {(int(p), int(o)): i for i, (p, o) in enumerate(pairs)}
-    row = np.array([index[(int(p), int(o))] for p, o in zip(cell.primary, cell.origin, strict=True)])
+    row = np.array(
+        [index[(int(p), int(o))] for p, o in zip(cell.primary, cell.origin, strict=True)]
+    )
     return {
         "d_A0": diff["A0"][row],
         "d_S1": diff["S1"][row],

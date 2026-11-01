@@ -1,9 +1,9 @@
-"""Experiment 458: fit the combination rules on earlier months and score every arm (no fit of a network).
+"""Experiment 458: fit the combination rules on earlier months and score every arm (no network fit).
 
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
 ml-experiments/00402-lag-gate-learned-weight-injected-load-shifts-part-1:\
-ml-experiments/00458-constant-prequential-and-offset-corrected-combinations-of-lagged-and-lagless-heads \
+ml-experiments/00458-constant-prequential-and-offset-corrected-combinations-of-lagged-and-lagless-heads\
 DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1 \
     uv run --no-sync python ml-experiments/00458-*/e00458_run.py [--check]
 ```
@@ -84,7 +84,9 @@ def fit_params(*, train: list[tuple[Stash, np.ndarray]]) -> dict:
                 )
                 params["n"][g, b] = int(s2.sum())
             loss = [
-                core.exact_crps(abc=abc[sel], w=core.prequential_weight(d=d[sel], temperature=t)).sum()
+                core.exact_crps(
+                    abc=abc[sel], w=core.prequential_weight(d=d[sel], temperature=t)
+                ).sum()
                 for t in TEMPERATURES
             ]
             params["T"][pair, g] = float(TEMPERATURES[int(np.argmin(loss))])
@@ -137,7 +139,7 @@ def row_weights(*, stash: Stash, params: dict) -> dict[tuple[str, str], np.ndarr
 
 
 def table_p(*, train: list[tuple[Stash, np.ndarray]], arm: str) -> dict:
-    """Fit experiment 435's per-group, per-band tail factors on earlier rows with no labelled event."""
+    """Fit experiment 435's per-group, per-band tail factors on earlier no-label rows."""
     out: dict = {}
     if not train:
         return out
@@ -186,7 +188,7 @@ def tail_stats(*, q: np.ndarray, actual: np.ndarray) -> dict[str, float]:
 
 
 def event_clusters(*, cell: core.Cell, mask: np.ndarray) -> np.ndarray:
-    """Return an event cluster id (Primary and run of consecutive event half-hours) for `mask` rows."""
+    """Return an event cluster id (Primary and event run) for `mask` rows."""
     ids = np.full(len(mask), -1, dtype=np.int64)
     p, t = cell.primary[mask], cell.target[mask]
     out = np.empty(len(p), dtype=np.int64)
@@ -200,7 +202,11 @@ def event_clusters(*, cell: core.Cell, mask: np.ndarray) -> np.ndarray:
 
 
 def score_cell(
-    *, stash: Stash, arms: dict[str, np.ndarray], train: list[tuple[Stash, np.ndarray]], shares: dict
+    *,
+    stash: Stash,
+    arms: dict[str, np.ndarray],
+    train: list[tuple[Stash, np.ndarray]],
+    shares: dict,
 ) -> tuple[list[dict], list[pl.DataFrame]]:
     """Return summary rows (raw and after table P) and the event-row table of one cell."""
     cell = stash.cell
@@ -209,7 +215,7 @@ def score_cell(
     cluster = event_clusters(cell=cell, mask=event_mask)
     event_frames: list[pl.DataFrame] = []
     grid = cell.target
-    assert grid.max() < core.GRID_SIZE  # noqa: S101
+    assert grid.max() < core.GRID_SIZE
     for arm, q in arms.items():
         factors = table_p(train=train, arm=arm)
         qp = apply_p(q=q, factors=factors, group=cell.group, band=cell.band)
@@ -222,14 +228,23 @@ def score_cell(
             for setname in ("all", "nolabel", "harm", "event", "post"):
                 base = (cell.group == g) & cell.rowset(name=setname)
                 for bname in ("all", *core.BAND_NAMES):
-                    sel = base if bname == "all" else base & (cell.band == core.BAND_NAMES.index(bname))
+                    sel = (
+                        base
+                        if bname == "all"
+                        else base & (cell.band == core.BAND_NAMES.index(bname))
+                    )
                     if not sel.any():
                         continue
                     row = {
-                        "arm": arm, "month": cell.month, "seed": cell.seed, "group": gname,
-                        "rowset": setname, "band": bname, "n": int(sel.sum()),
+                        "arm": arm,
+                        "month": cell.month,
+                        "seed": cell.seed,
+                        "group": gname,
+                        "rowset": setname,
+                        "band": bname,
+                        "n": int(sel.sum()),
                         "crps": float(crps[sel].mean()),
-                    }  # fmt: skip
+                    }
                     if setname in ("event", "post"):
                         for d in DEPTHS:
                             row[f"crps_nra{d}"] = float(nra[d][sel].mean())
@@ -241,14 +256,19 @@ def score_cell(
             event_frames.append(
                 pl.DataFrame(
                     {
-                        "arm": arm, "month": cell.month, "seed": cell.seed,
-                        "group": cell.group[event_mask], "cluster": cluster[event_mask],
-                        "primary": cell.primary[event_mask], "target": cell.target[event_mask],
-                        "origin": cell.origin[event_mask], "band": cell.band[event_mask],
+                        "arm": arm,
+                        "month": cell.month,
+                        "seed": cell.seed,
+                        "group": cell.group[event_mask],
+                        "cluster": cluster[event_mask],
+                        "primary": cell.primary[event_mask],
+                        "target": cell.target[event_mask],
+                        "origin": cell.origin[event_mask],
+                        "band": cell.band[event_mask],
                         "crps": crps[event_mask].astype(np.float32),
                         **{f"crps_nra{d}": nra[d][event_mask].astype(np.float32) for d in DEPTHS},
                     }
-                )  # fmt: skip
+                )
             )
         if cell.seed == 0:
             stash.arm_q[arm] = q.astype(np.float32)
@@ -257,9 +277,12 @@ def score_cell(
                 folder.mkdir(parents=True, exist_ok=True)
                 pl.DataFrame(
                     {
-                        "primary": cell.primary.astype(np.int16), "origin": cell.origin.astype(np.int32),
-                        "target": cell.target.astype(np.int32), "actual": cell.actual.astype(np.float32),
-                        "tgt_real": cell.flags["tgt_real"], "tgt_post": cell.flags["tgt_post"],
+                        "primary": cell.primary.astype(np.int16),
+                        "origin": cell.origin.astype(np.int32),
+                        "target": cell.target.astype(np.int32),
+                        "actual": cell.actual.astype(np.float32),
+                        "tgt_real": cell.flags["tgt_real"],
+                        "tgt_post": cell.flags["tgt_post"],
                         **{n: q[:, i].astype(np.float32) for i, n in enumerate(core.LEVEL_NAMES)},
                     }
                 ).write_parquet(folder / f"{cell.month}.parquet")
@@ -271,15 +294,21 @@ def arms_of(*, stash: Stash, params: dict) -> dict[str, np.ndarray]:
     cell = stash.cell
     weights = row_weights(stash=stash, params=params)
     arms: dict[str, np.ndarray] = {
-        "B-mix": cell.q["B-mix"], "lagged-A0": cell.q["A0"], "lagged-S1": cell.q["S1"],
+        "B-mix": cell.q["B-mix"],
+        "lagged-A0": cell.q["A0"],
+        "lagged-S1": cell.q["S1"],
         "lagless": cell.q["Z"],
-    }  # fmt: skip
+    }
     for pair in PAIRS:
         names = {f"{r}-{pair}": weights[r, pair] for r in ("b", "b2", "b3", "c")}
         names[f"half-{pair}"] = np.full(len(cell.actual), 0.5)
         got = core.mixture_quantiles(lagged=cell.q[pair], lagless=cell.q["Z"], weights=names)
         arms.update(got)
-    k = np.array([[params["k"][g, b] for b in range(5)] for g in range(3)])[cell.group, cell.band] if params else 0.0
+    k = (
+        np.array([[params["k"][g, b] for b in range(5)] for g in range(3)])[cell.group, cell.band]
+        if params
+        else 0.0
+    )
     arms["d"] = cell.q["Z"] + (k * stash.feat["offset"])[:, None] if params else cell.q["B-mix"]
     return arms
 
@@ -320,26 +349,74 @@ def main() -> None:
             if seed == 0:
                 stash.append(st)
                 for key, value in params.get("b", {}).items():
-                    weight_rows.append({"month": month, "seed": 0, "rule": f"b-{key[0]}", "group": key[1], "band": key[2], "value": value})
+                    weight_rows.append(
+                        {
+                            "month": month,
+                            "seed": 0,
+                            "rule": f"b-{key[0]}",
+                            "group": key[1],
+                            "band": key[2],
+                            "value": value,
+                        }
+                    )
                 for key, value in params.get("b2", {}).items():
-                    weight_rows.append({"month": month, "seed": 0, "rule": f"b2-{key[0]}", "group": key[1], "band": -1, "value": value})
+                    weight_rows.append(
+                        {
+                            "month": month,
+                            "seed": 0,
+                            "rule": f"b2-{key[0]}",
+                            "group": key[1],
+                            "band": -1,
+                            "value": value,
+                        }
+                    )
                 for key, value in params.get("T", {}).items():
-                    weight_rows.append({"month": month, "seed": 0, "rule": f"T-{key[0]}", "group": key[1], "band": -1, "value": value})
+                    weight_rows.append(
+                        {
+                            "month": month,
+                            "seed": 0,
+                            "rule": f"T-{key[0]}",
+                            "group": key[1],
+                            "band": -1,
+                            "value": value,
+                        }
+                    )
                 for key, value in params.get("k", {}).items():
-                    weight_rows.append({"month": month, "seed": 0, "rule": "k", "group": key[0], "band": key[1], "value": value})
+                    weight_rows.append(
+                        {
+                            "month": month,
+                            "seed": 0,
+                            "rule": "k",
+                            "group": key[0],
+                            "band": key[1],
+                            "value": value,
+                        }
+                    )
             w = row_weights(stash=st, params=params)
             for pair in PAIRS:
                 wc = w["c", pair]
                 for g in range(3):
                     sel = st.cell.group == g
-                    weight_rows.append({
-                        "month": month, "seed": seed, "rule": f"c-share-within-0.05-{pair}", "group": g, "band": -1,
-                        "value": float((np.abs(wc[sel] - 0.5) <= 0.05).mean()),
-                    })  # fmt: skip
-            weight_rows.append({
-                "month": month, "seed": seed, "rule": "short-window-share", "group": -1, "band": -1,
-                "value": float(st.feat["short_window"].mean()),
-            })  # fmt: skip
+                    weight_rows.append(
+                        {
+                            "month": month,
+                            "seed": seed,
+                            "rule": f"c-share-within-0.05-{pair}",
+                            "group": g,
+                            "band": -1,
+                            "value": float((np.abs(wc[sel] - 0.5) <= 0.05).mean()),
+                        }
+                    )
+            weight_rows.append(
+                {
+                    "month": month,
+                    "seed": seed,
+                    "rule": "short-window-share",
+                    "group": -1,
+                    "band": -1,
+                    "value": float(st.feat["short_window"].mean()),
+                }
+            )
             print(f"{month} seed {seed} done at {time.time() - t0:.0f}s", flush=True)
     pl.DataFrame(summary).write_parquet(core.OUT_DIR / "summary.parquet")
     pl.concat(events).write_parquet(core.OUT_DIR / "events.parquet")
