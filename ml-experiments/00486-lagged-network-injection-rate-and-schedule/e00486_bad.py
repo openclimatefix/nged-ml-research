@@ -157,6 +157,7 @@ def main() -> None:
     out = score486.fit486.WORK_DIR / "bad" / f"{args.month}_s{args.seed}.parquet"
     out.parent.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(out)
+    frame = frame.filter(pl.col("shift").is_finite() & pl.col("corruption").is_finite())
     summary = frame.group_by("arm", "variant").agg(
         pl.len().alias("rows"),
         (

@@ -88,10 +88,15 @@ def figure_contrasts() -> None:
 
 def figure_sweep() -> None:
     """Figure 2: median shift as a share of a 5% step, by arm and number of lags stepped."""
-    frames = [pl.read_parquet(p) for p in sorted((WORK / "sweep").glob("*.parquet"))]
+    frames = [
+        pl.read_parquet(p).with_columns(month=pl.lit(p.name[:7]))
+        for p in sorted((WORK / "sweep").glob("*.parquet"))
+    ]
     data = (
         pl.concat(frames)
         .filter(~pl.col("arm").str.ends_with("masked") & (pl.col("lead_band") == 0))
+        .group_by("arm", "k", "month")
+        .agg(pl.col("shift").mean())
         .group_by("arm", "k")
         .agg(pl.col("shift").mean().alias("share"))
         .with_columns(lags=pl.col("k").cast(pl.Utf8))
@@ -101,7 +106,11 @@ def figure_sweep() -> None:
         alt.Chart(data)
         .mark_bar()
         .encode(
-            x=alt.X("lags:N", title="Lags inside the 5%-of-capacity step (1, 2, or 3)"),
+            x=alt.X(
+                "lags:N",
+                title="Lags inside the 5%-of-capacity step (1, 2, or 3)",
+                axis=alt.Axis(labelAngle=0),
+            ),
             xOffset=alt.XOffset("arm:N", sort=order),
             y=alt.Y("share:Q", title="Median shift as a share of the step (smaller is better)"),
             color=alt.Color(
@@ -118,7 +127,7 @@ def figure_sweep() -> None:
                 "How far the median follows a step in the lags",
                 subtitle=[
                     "Mean over both signs, leads under 48 h, rows with no labelled event,",
-                    "every cell swept. The lagless head follows 0.",
+                    "mean of the 5 months. The lagless head follows 0.",
                 ],
             ),
         )
