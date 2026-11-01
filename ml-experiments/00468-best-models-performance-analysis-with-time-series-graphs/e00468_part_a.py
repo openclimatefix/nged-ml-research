@@ -1,3 +1,4 @@
+# ruff: noqa: E501, C408, PERF401, ISC004
 """Experiment 468, Part A: time-series graphs of the best wind and solar forecasters.
 
 Reads experiment 461's stored, un-adjusted rows (`work/rows_*.parquet`: quantiles and actuals in MW,
@@ -28,7 +29,9 @@ WORK461: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00461-wind-and-solar-retrain-with-p99-9-effective-capacity" / "work"
 )
 OUT: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00468-best-models-performance-analysis-with-time-series-graphs" / "part_a"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00468-best-models-performance-analysis-with-time-series-graphs"
+    / "part_a"
 )
 LEVELS: Final[tuple[str, ...]] = (
     "q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99",
@@ -47,15 +50,7 @@ ARMS: Final[dict[str, list[tuple[str, str]]]] = {
     "wind": [("member_plain", "p999")],
     "solar": [("a2_member", "old"), ("g0_onepass", "old")],
 }
-NINE: Final[np.ndarray] = LEVEL_VALUES[1:10]
-NINE_MASSES: Final[np.ndarray] = np.diff(np.concatenate([[0.0], (NINE[:-1] + NINE[1:]) / 2, [1.0]]))
 WIDTH: Final[int] = 640
-
-
-def quantile_score(*, q: np.ndarray, actual: np.ndarray) -> np.ndarray:
-    """Return experiment 33's score per row: twice the mass-weighted pinball loss of nine levels."""
-    d = actual[:, None] - q[:, 1:10]
-    return 2.0 * (np.where(d >= 0, NINE * d, (NINE - 1) * d) * NINE_MASSES).sum(axis=1)
 
 
 def fit_factors(*, fit: pl.DataFrame) -> dict[tuple[str, str, str], float]:
@@ -109,16 +104,18 @@ def table_p_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
         held = frame.filter(pl.col("month") == month)
         cap_now = {
             r["site"]: float(r["c"])
-            for r in held.group_by("site").agg(pl.col("cap_mw").max().alias("c")).iter_rows(named=True)
+            for r in held.group_by("site")
+            .agg(pl.col("cap_mw").max().alias("c"))
+            .iter_rows(named=True)
         }
         earlier_max = {
             r["site"]: float(r["m"])
-            for r in earlier.group_by("site").agg(pl.col("actual").max().alias("m")).iter_rows(named=True)
+            for r in earlier.group_by("site")
+            .agg(pl.col("actual").max().alias("m"))
+            .iter_rows(named=True)
         }
         upper = {s: max(cap_now[s], earlier_max.get(s, 0.0)) for s in cap_now}
-        parts.append(
-            apply_table_p(rows=held, factors=fit_factors(fit=earlier), upper=upper)
-        )
+        parts.append(apply_table_p(rows=held, factors=fit_factors(fit=earlier), upper=upper))
     return pl.concat(parts)
 
 
@@ -131,7 +128,8 @@ def load(*, tech: str) -> pl.DataFrame:
         )
         frames.append(
             table_p_rows(frame=raw).with_columns(
-                valid=pl.col("init") + pl.duration(minutes=(pl.col("lead_hours") * 60).cast(pl.Int64))
+                valid=pl.col("init")
+                + pl.duration(minutes=(pl.col("lead_hours") * 60).cast(pl.Int64))
             )
         )
     return pl.concat(frames)
@@ -154,6 +152,9 @@ def band_chart(
     *, frame: pl.DataFrame, x_hours: str, title: list[str], height: int = 200, cap: float
 ) -> alt.LayerChart:
     """Return median, 50% band, 90% band, and actual against hours since the first row."""
+    frame = frame.sort(x_hours).with_columns(
+        seg=(pl.col(x_hours).diff().fill_null(0.0) > 1.01).cum_sum()
+    )
     base = alt.Chart(frame)
     x = alt.X(
         f"{x_hours}:Q",
@@ -165,8 +166,12 @@ def band_chart(
         x=x, y=alt.Y("q05:Q", title="Power (MW)", scale=alt.Scale(domain=[0, cap])), y2="q95:Q"
     )
     mid = base.mark_area(opacity=0.35, color=ocf.DATA_BLUE).encode(x=x, y="q25:Q", y2="q75:Q")
-    med = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.6).encode(x=x, y="q50:Q")
-    act = base.mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.4).encode(x=x, y="actual:Q")
+    med = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.6).encode(
+        x=x, y="q50:Q", detail="seg:N"
+    )
+    act = base.mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.4).encode(
+        x=x, y="actual:Q", detail="seg:N"
+    )
     del y
     return (wide + mid + med + act).properties(
         width=WIDTH - 90, height=height, title=chart_title(lines=title)
@@ -204,27 +209,36 @@ def run_charts(*, rows: pl.DataFrame, tech: str, arm: str) -> list[dict]:
                     ((part["actual"] >= part["q05"]) & (part["actual"] <= part["q95"])).mean()
                 )
                 title = [
-                    f"{site}: one {kind.replace('_', '-')} 9-day forecast run (days 2 to 10 ahead).",
-                    f"Mean output {m * 100:.0f}% of capacity; median error {mae:.1f} points;",
+                    f"{site}: one {kind.replace('_', '-')} forecast run, 24 to 240 hours ahead.",
+                    f"Mean output {m * 100:.0f}% of capacity; error of the median forecast {mae:.1f} points;",
                     f"{cov * 100:.0f}% of actuals inside the 90% band ({part.height} half-hours).",
                 ]
                 save(
-                    chart=band_chart(
-                        frame=part, x_hours="hours", title=title, cap=cap * 1.05
-                    ),
+                    chart=band_chart(frame=part, x_hours="hours", title=title, cap=cap * 1.05),
                     name=f"run_{kind}_{site.replace(' ', '_')}",
                 )
-                notes.append(dict(site=site, kind=kind, mean_cf=m, mae_pts=mae, cov90=cov, n=part.height))
+                notes.append(
+                    dict(site=site, kind=kind, mean_cf=m, mae_pts=mae, cov90=cov, n=part.height)
+                )
         else:
             near = s.filter(pl.col("lead_hours") < 48).with_columns(
                 day=pl.col("valid").dt.truncate("1d")
             )
+            full = (
+                near.with_columns(week=pl.col("valid").dt.truncate("1w"))
+                .group_by("week")
+                .len()["len"]
+                .max()
+            )
+            wk_floor = int(0.95 * full)
             wk = (
-                near.with_columns(week=pl.col("valid").dt.truncate("1w"), month=pl.col("valid").dt.month())
+                near.with_columns(
+                    week=pl.col("valid").dt.truncate("1w"), month=pl.col("valid").dt.month()
+                )
                 .filter(pl.col("month").is_between(4, 8))
                 .group_by("week")
-                .agg(mean=pl.col("actual").sum(), n=pl.len())
-                .filter(pl.col("n") > 7 * 20)
+                .agg(mean=pl.col("actual").mean(), n=pl.len())
+                .filter(pl.col("n") >= wk_floor)
             )
             picks = {
                 "clear_sky": wk.sort("mean").tail(1)["week"][0],
@@ -239,7 +253,7 @@ def run_charts(*, rows: pl.DataFrame, tech: str, arm: str) -> list[dict]:
                 mae = float((part["q50"] - part["actual"]).abs().mean()) / cap * 100
                 title = [
                     f"{site}: a {kind.replace('_', ' ')} week, day-ahead forecast (24 to 48 hours).",
-                    f"Median error {mae:.1f} points of capacity over {part.height} daylight",
+                    f"Error of the median forecast {mae:.1f} points of capacity over {part.height} daylight",
                     "half-hours scored (the stored rows hold the half-hours the scoring kept).",
                 ]
                 save(
@@ -261,7 +275,7 @@ def coverage_table(*, rows: pl.DataFrame) -> pl.DataFrame:
                 f"below_{t}": (
                     (pl.col("actual") > pl.col(t)).mean() * 100
                     if t in UPPER
-                    else (pl.col("actual") <= pl.col(t)).mean() * 100
+                    else (pl.col("actual") < pl.col(t)).mean() * 100
                 )
                 for t in TAILS
             },
@@ -273,8 +287,13 @@ def coverage_table(*, rows: pl.DataFrame) -> pl.DataFrame:
 def coverage_chart(*, table: pl.DataFrame, tech: str, arm: str) -> None:
     """Draw below-quantile shares by month for the four tail levels."""
     long = (
-        table.filter((pl.col("arm") == arm))
-        .unpivot(index=["site", "month", "n"], on=[f"below_{t}" for t in TAILS], variable_name="level", value_name="share")
+        table.filter(pl.col("arm") == arm)
+        .unpivot(
+            index=["site", "month", "n"],
+            on=[f"below_{t}" for t in TAILS],
+            variable_name="level",
+            value_name="share",
+        )
         .with_columns(
             level=pl.col("level").str.replace("below_", ""),
         )
@@ -287,19 +306,28 @@ def coverage_chart(*, table: pl.DataFrame, tech: str, arm: str) -> None:
             alt.Chart(d)
             .mark_line(point=True)
             .encode(
-                x=alt.X("month:O", title="Month scored" if level == "q99" else None,
-                        axis=alt.Axis(labelAngle=-45)),
+                x=alt.X(
+                    "month:O",
+                    title="Month scored" if level == "q99" else None,
+                    axis=alt.Axis(labelAngle=-45),
+                ),
                 y=alt.Y(
                     "share:Q",
                     title=f"% above {level}" if level in UPPER else f"% at or below {level}",
                     scale=alt.Scale(domain=[0, max(6.0, float(d["share"].max()) * 1.1)]),
                 ),
-                color=alt.Color("site:N", title=None, legend=alt.Legend(orient="top"),
-                                scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN])),
+                color=alt.Color(
+                    "site:N",
+                    title=None,
+                    legend=alt.Legend(orient="top"),
+                    scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN]),
+                ),
             )
         )
         nominal = (1 - tau) * 100 if level in UPPER else tau * 100
-        rule = alt.Chart(pl.DataFrame({"y": [nominal]})).mark_rule(strokeDash=[4, 3]).encode(y="y:Q")
+        rule = (
+            alt.Chart(pl.DataFrame({"y": [nominal]})).mark_rule(strokeDash=[4, 3]).encode(y="y:Q")
+        )
         charts.append((line + rule).properties(width=WIDTH - 90, height=110))
     save(
         chart=alt.vconcat(*charts).properties(
@@ -331,8 +359,13 @@ def lead_chart(*, rows: pl.DataFrame, tech: str) -> None:
         alt.Chart(d)
         .mark_line(point=True)
         .encode(
-            x=alt.X("day:Q", title="Lead time (days ahead)", axis=alt.Axis(values=list(range(0, 11, 2)))),
-            y=alt.Y("mae:Q", title="Median error (% of capacity; smaller is better)"),
+            x=alt.X(
+                "day:Q", title="Lead time (days ahead)", axis=alt.Axis(values=list(range(0, 11, 2)))
+            ),
+            y=alt.Y(
+                "mae:Q",
+                title="Mean absolute error of the median forecast (% of capacity; smaller is better)",
+            ),
             color=alt.Color("site:N", title=None, legend=alt.Legend(orient="top")),
             strokeDash=alt.StrokeDash("arm:N", title=None),
         )
@@ -341,7 +374,7 @@ def lead_chart(*, rows: pl.DataFrame, tech: str) -> None:
             height=200,
             title=chart_title(
                 lines=[
-                    f"{tech.capitalize()}: median absolute error by lead time, per series, after table P.",
+                    f"{tech.capitalize()}: mean absolute error of the median forecast by lead time, per series, after table P.",
                     "Each point averages that lead day's half-hours (see the CSV for counts).",
                 ]
             ),
@@ -389,7 +422,11 @@ def main() -> None:
         w = worst_tail_table(rows=rows, tech=tech, arm=arm)
         w.write_csv(OUT / f"worst_20_{tech}.csv")
         print(tech, "rows", rows.height)
-        print(w.group_by("site", "level").agg(pl.col("run").n_unique().alias("runs_months"), pl.col("pin_cf").mean()))
+        print(
+            w.group_by("site", "level").agg(
+                pl.col("run").n_unique().alias("runs_months"), pl.col("pin_cf").mean()
+            )
+        )
     pl.DataFrame(notes, strict=False).write_csv(OUT / "chart_notes.csv")
     print(pl.DataFrame(notes, strict=False))
 

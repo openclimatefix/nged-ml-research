@@ -1,3 +1,4 @@
+# ruff: noqa: E501, C408, PERF401, ISC004
 """Experiment 468, Part B (real events): demand forecasts around labelled and scan-found events.
 
 For each event, draws the actual readings, the day-ahead (12 to 36 hours ahead) median of the
@@ -65,10 +66,12 @@ MAX_SCAN_EVENTS: Final[int] = 10
 
 
 def month_bounds() -> dict[str, tuple[int, int]]:
-    """Return the first and last target grid index each month's stored frames cover."""
+    """Return the first and last day-ahead (12 to under 36 hours) target grid index per month."""
     out = {}
     for m in MONTHS:
-        d = pl.read_parquet(PRED / "K2-S1" / f"{m}_s0_w-1.parquet", columns=["target"])
+        d = pl.read_parquet(
+            PRED / "K2-S1" / f"{m}_s0_w-1.parquet", columns=["target", "lead_hours"]
+        ).filter((pl.col("lead_hours") >= LEAD[0]) & (pl.col("lead_hours") < LEAD[1]))
         out[m] = (int(d["target"].min()), int(d["target"].max()))
     return out
 
@@ -122,7 +125,8 @@ def day_ahead(*, arm: str, month: str, primary: int, lo: int, hi: int) -> pl.Dat
     """Return an arm's day-ahead rows for one Primary between two grid indices."""
     d = pl.read_parquet(PRED / arm / f"{month}_s0_w-1.parquet").filter(
         (pl.col("primary") == primary)
-        & pl.col("lead_hours").is_between(*LEAD)
+        & (pl.col("lead_hours") >= LEAD[0])
+        & (pl.col("lead_hours") < LEAD[1])
         & pl.col("target").is_between(lo, hi)
     )
     return d.unique(subset="target", keep="first").sort("target")
@@ -136,15 +140,9 @@ def figure(*, number: int, ev: dict, sites: list[str], bounds: dict[str, tuple[i
     lo, hi = onset - MARGIN, end + MARGIN
     frames = {a: day_ahead(arm=a, month=month, primary=primary, lo=lo, hi=hi) for a in ARMS}
     base = frames["K2-S1"]
-    lines = [
-        base.select(
-            "target", median=pl.col("actual") * 100, series=pl.lit("Actual")
-        )
-    ]
+    lines = [base.select("target", median=pl.col("actual") * 100, series=pl.lit("Actual"))]
     for a, label in ARMS.items():
-        lines.append(
-            frames[a].select("target", median=pl.col("q50") * 100, series=pl.lit(label))
-        )
+        lines.append(frames[a].select("target", median=pl.col("q50") * 100, series=pl.lit(label)))
     lines_df = pl.concat(lines).with_columns(day=(pl.col("target") - onset) / 48.0)
     band = base.select(
         "target", low=pl.col("q05") * 100, high=pl.col("q95") * 100, lag_real="lag_real"
@@ -198,12 +196,12 @@ def figure(*, number: int, ev: dict, sites: list[str], bounds: dict[str, tuple[i
     title = alt.TitleParams(
         [
             f"Primary {site}, {ev['source']}: day-ahead forecasts (12 to 36 hours ahead), {month} fit.",
-            f"Median error during the event, points of capacity: lagless {err['LL']:.1f}, S1 {err['S1']:.1f}, "
+            f"Mean absolute error of the median forecast during the event, points of capacity: lagless {err['LL']:.1f}, S1 {err['S1']:.1f}, "
             f"B-mix {err['B-mix']:.1f}, K2-S1 {err['K2-S1']:.1f}.",
             "Orange band: K2-S1 90% interval. The event may be a load shift, a level change, or neither."
             if nonmirror
             else "Orange band: K2-S1 90% interval. Real readings.",
-            "Grey strip under the plot: forecasts whose lags fall inside a labelled event.",
+            "Grey strip under the plot: lags inside a labelled event (empty for scan-found events, which have no label).",
         ],
         anchor="start",
     )

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, C408, PERF401, ISC004
 """Experiment 468, Part A: solar contrasts against the stored references, on the same rows.
 
 Joins the table-P rows of experiment 461's solar arms (Solar A and B, old capacity rule) from
@@ -14,6 +15,7 @@ uv run --no-sync python ml-experiments/00468-*/e00468_part_a_refs.py
 """
 
 from pathlib import Path
+from statistics import NormalDist
 from typing import Final
 
 import altair as alt
@@ -23,9 +25,13 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 OUT: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00468-best-models-performance-analysis-with-time-series-graphs" / "part_a"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00468-best-models-performance-analysis-with-time-series-graphs"
+    / "part_a"
 )
-R310: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00310-metered-farm-long-lead-scoring" / "row_losses.parquet"
+R310: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00310-metered-farm-long-lead-scoring" / "row_losses.parquet"
+)
 NAMES: Final[dict[str, str]] = {
     "blend": "Metered solar research default 1 (experiment 310 blend)",
     "xgb": "XGBoost alone (experiment 310)",
@@ -70,17 +76,17 @@ def joined() -> pl.DataFrame:
 
 def block_bootstrap(*, d: pl.DataFrame, ref: str, rng: np.random.Generator, level: float) -> dict:
     """Return the contrast (mine minus `ref`), its month-block interval, and the detectable effect."""
-    by = d.group_by("month").agg(
-        s=(pl.col("mine") - pl.col(ref)).sum(), n=pl.len()
-    ).sort("month")
+    by = d.group_by("month").agg(s=(pl.col("mine") - pl.col(ref)).sum(), n=pl.len()).sort("month")
     s, n = by["s"].to_numpy(), by["n"].to_numpy().astype(float)
     draws = np.empty(DRAWS)
     for i in range(DRAWS):
         pick = rng.integers(0, len(n), size=len(n))
         draws[i] = s[pick].sum() / n[pick].sum()
     lo, hi = np.percentile(draws, [100 * (1 - level) / 2, 100 * (1 + level) / 2])
-    # minimum detectable effect: 2.8 standard errors (80% power at the 5% level)
-    mde = 2.8 * float(draws.std())
+    # minimum detectable effect: (z at the interval level + z for 80% power) standard errors
+    mde = float(NormalDist().inv_cdf(1 - (1 - level) / 2) + NormalDist().inv_cdf(0.8)) * float(
+        draws.std()
+    )
     return dict(
         reference=ref, contrast_points=float(s.sum() / n.sum()), low=float(lo), high=float(hi),
         mde_points=mde, n_rows=int(n.sum()), n_months=len(n),
@@ -107,10 +113,16 @@ def main() -> None:
         alt.Chart(long)
         .mark_line(point=True)
         .encode(
-            x=alt.X("day:Q", title="Lead time (days ahead)", axis=alt.Axis(values=list(range(0, 11, 2)))),
-            y=alt.Y("mae:Q", title="Median error (% of capacity; smaller is better)"),
+            x=alt.X(
+                "day:Q", title="Lead time (days ahead)", axis=alt.Axis(values=list(range(0, 11, 2)))
+            ),
+            y=alt.Y(
+                "mae:Q",
+                title="Mean absolute error of the median forecast (% of capacity; smaller is better)",
+            ),
             color=alt.Color(
-                "label:N", title=None,
+                "label:N",
+                title=None,
                 scale=alt.Scale(domain=list(COLOURS), range=list(COLOURS.values())),
                 legend=alt.Legend(orient="top", columns=2),
             ),
@@ -120,8 +132,8 @@ def main() -> None:
             height=220,
             title=alt.TitleParams(
                 [
-                    "Solar A and B: median absolute error by lead day on the same half-hours for every",
-                    f"approach ({d.height} half-hours, equal weight to the two farms by row count).",
+                    "Solar A and B: mean absolute error of the median forecast by lead day, same half-hours",
+                    f"for every approach ({d.height} half-hours; the two farms weigh equally in each day's mean).",
                 ],
                 anchor="start",
             ),
@@ -136,7 +148,7 @@ def main() -> None:
     pl.DataFrame(rows).write_csv(OUT / "solar_contrasts.csv")
     print(f"interval level {level:.4f} (Bonferroni count {len(NAMES)})")
     print(pl.DataFrame(rows))
-    print("12 to 36 hour band only:")
+    print("24 to 36 hour band only (the stored rows start at 24 hours):")
     band = d.filter(pl.col("lead_hours") <= 36)
     print(pl.DataFrame([block_bootstrap(d=band, ref=k, rng=rng, level=level) for k in NAMES]))
 

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, C408, PERF401, ISC004
 """Experiment 468, Part A: what table P and the capacity rule change, month by month.
 
 Reads experiment 461's `work/cells.parquet` (one row per technology, arm, series, month, and
@@ -27,7 +28,9 @@ CELLS: Final[Path] = (
     / "cells.parquet"
 )
 OUT: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00468-best-models-performance-analysis-with-time-series-graphs" / "part_a"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00468-best-models-performance-analysis-with-time-series-graphs"
+    / "part_a"
 )
 SHOWN: Final[dict[str, tuple[str, str, list[str]]]] = {
     "wind": ("member_plain", "p999", ["Farm A", "Farm B", "Farm C"]),
@@ -74,7 +77,8 @@ def main() -> None:
                 x=alt.X("month:O", title="Month scored", axis=alt.Axis(labelAngle=-45)),
                 y=alt.Y(f"{column}:Q", title=title),
                 color=alt.Color(
-                    "when:N", title=None,
+                    "when:N",
+                    title=None,
                     scale=alt.Scale(
                         domain=["Before table P", "After table P"],
                         range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE],
@@ -85,7 +89,11 @@ def main() -> None:
             )
             layer = base.mark_line(point=True)
             if nominal is not None:
-                layer += alt.Chart(pl.DataFrame({"y": [nominal]})).mark_rule(strokeDash=[4, 3]).encode(y="y:Q")
+                layer += (
+                    alt.Chart(pl.DataFrame({"y": [nominal]}))
+                    .mark_rule(strokeDash=[4, 3])
+                    .encode(y="y:Q")
+                )
             panels.append(layer.properties(width=WIDTH - 110, height=140))
         chart = alt.vconcat(*panels).properties(
             title=alt.TitleParams(
