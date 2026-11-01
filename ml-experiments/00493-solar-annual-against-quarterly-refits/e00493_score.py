@@ -139,9 +139,8 @@ def main() -> None:
             .select(*s430.KEYS, a=pl.col("score"))
             .join(first[quarterly].select(*s430.KEYS, b=pl.col("score")), on=s430.KEYS)
         )
-        print(
-            f"control max |row score difference| {float((merged['a'] - merged['b']).abs().max()):.6f}"
-        )
+        max_diff = float((merged["a"] - merged["b"]).abs().max())  # ty: ignore[invalid-argument-type]
+        print(f"control max |row score difference| {max_diff:.6f}")
         print(f"CONTROL {annual} vs {quarterly}, first quarter: {c['pct']:+.5f}% {status}")
 
     out = []
@@ -175,7 +174,7 @@ def main() -> None:
     head = table.filter(pl.col("cut") == "bands_all")
     farms = table.filter(pl.col("cut").str.starts_with("farm_"))
     for r in head.iter_rows(named=True):
-        worst = farms.filter(pl.col("id") == r["id"])["pct"].max()
+        worst = float(farms.filter(pl.col("id") == r["id"])["pct"].max())  # ty: ignore[invalid-argument-type]
         equivalent = r["hi"] < limit and worst <= FARM_LIMIT_PERCENT
         verdict = (
             "equivalent"
