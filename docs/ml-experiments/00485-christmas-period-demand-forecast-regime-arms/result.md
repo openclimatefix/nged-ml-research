@@ -92,9 +92,9 @@ production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Do not add a Christmas weight, an ERA5 replay, or a Christmas-weighted pretraining to the first
-    release: H2, H4, and P each exceed the 0.02-point gate outside the window at the eight (Results,
-    first bullet).
+    Do not add the tested Christmas weight with ERA5 replay, or the Christmas-weighted pretraining,
+    to the first release: H2, H4, and P each exceed the 0.02-point gate outside the window at the
+    eight (Results, first bullet).
   - >-
     Do not add a same-day-type lag store for the holiday: H3 raises CRPS on real-event rows and cold
     nights at the six by about 0.3 points (Results, real-event and cold-night bullets).
@@ -174,9 +174,36 @@ detectable effect reflects seed spread only, so it does not prove equivalence.
   unused. NGED's event labels are incomplete: "rows with no labelled event" may hold events.
 - Reference H0 is experiment 425's stored fits; the reproduction fit matched the stored fit.
 
+## Audit (fresh Sonnet agent, from the raw stored forecasts)
+
+- **Trigger:** three pre-registered predictions failed (P1, P3, P4) with no tested explanation.
+- **Numbers reproduce:** the audit re-derived H2 +0.081, H4 +0.077, P +0.047, H1 -0.004, and H3 -0.002
+  at the eight outside the window, and H3 +0.301 on real-event rows at the six. Every H2 and H4 seed
+  loses to the matching H0 seed, and all arms are scored on the same 1,145,256 rows. It found no
+  leakage in the day-type vote, the replay rows, or the lag substitution.
+- **Accepted: the H2, H4, and P loss sits in two winter folds and is not specific to Christmas.**
+  The loss at the eight is +0.139 (H2) and +0.172 (P) in fold 2025-12, and +0.195 (H2) and +0.132 (P)
+  in fold 2026-01, against at most +0.05 elsewhere. In fold 2025-12 H2 loses +0.112 on 1 to 16
+  December, more than five days before the window. P has neither the weight nor the replay and
+  shares the loss, so a factor common to the winter folds may explain part of it. H2 bundles the
+  weight with the replay (each replay row is seen about 70 times in a 10-epoch fit), so the
+  experiment cannot say which component hurts. The advice below therefore rejects the bundles as
+  tested, not the ideas separately.
+- **Accepted: the H3 real-event harm rests on one episode.** The six's real-event rows are mostly
+  two Primaries and one long episode. In fold 2026-01 the harm is +0.725 on targets from 3 to 16
+  January that have a substituted lag, and -0.005 elsewhere, which fits the substituted lag
+  removing event state. In fold 2025-12 the harm is +0.405 on rows with no substituted lag, so the
+  +0.30 mixes substitution and a changed fit. Excluding 3 to 13 January the figure is +0.113.
+- **Accepted: the gate slice includes targets up to about 16 January,** which H3 and H4 affect,
+  because long leads carry a lag back into the window. The gate numbers keep that definition.
+- **Not run:** a weight-only arm, a replay-only arm, and H0r in folds 2025-12 and 2026-01. The
+  H0r run in 2026-06 matches the stored fit to 1e-8.
+
 ## What to try next
 
 - Score Christmas 2026 with H0 and H1, the arm that passes the gate.
+- Run a weight-only arm and a replay-only arm, and H0r in folds 2025-12 and 2026-01, before ruling
+  out either idea.
 - Hold out December 2024 as a second scored Christmas before spending more on the question.
 
 ## Question and what the data can say
