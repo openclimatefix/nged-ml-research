@@ -12,10 +12,11 @@ cross-fitted lagless table) is experiment 404's `fit_arm`.
 """
 
 import argparse
+from typing import Final
 
 import e00404_fit as fit  # ty: ignore[unresolved-import]
 
-TRAINING_WORLDS: int = 3
+TRAINING_WORLDS: Final[int] = 3
 
 
 def main() -> None:
