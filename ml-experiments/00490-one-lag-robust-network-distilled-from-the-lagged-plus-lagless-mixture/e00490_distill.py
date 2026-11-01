@@ -98,7 +98,9 @@ def lagged_head(
     `arm` is `A0-inj` or `S1`; S1 reads the surprise at each lag against the lagless median of its
     own seed's table.
     """
-    saved = torch.load(STORED_MODEL_DIR / arm / f"{month}_s{seed}.pt", weights_only=False)
+    saved = torch.load(
+        STORED_MODEL_DIR / arm / f"{month}_s{seed}.pt", map_location=device, weights_only=False
+    )
     _check_same_scalers(saved=saved, scalers=scalers, lag_stats=lag_stats)
     net = fit.build_network(arm=arm, n_base=saved["n_base"], n_trust=rows_mod.N_TRUST).to(device)
     net.load_state_dict(saved["state"])
@@ -206,6 +208,7 @@ def teacher_term(
 
 def fit_student(*, arm: str, month: str, seed: int, device: str, stride: int = 2) -> Path:
     """Fit one student arm on one scored month and seed; save it; return the file."""
+    assert arm in ("D-Bmix", "D-0") or seed < len(PAIRS), "K2-S1 cells exist for seeds 0 to 2"
     started = time.monotonic()
     use_student_folders()
     train, _test, scalers, arrays, lag_stats = fit.build_pools(
@@ -296,8 +299,10 @@ def _oracle_any(
     *, event_mask: torch.Tensor, primary: torch.Tensor, lag_grid: torch.Tensor
 ) -> torch.Tensor:
     """Return True for rows where any of the three lags lies in an event."""
-    safe = lag_grid.clamp(0, event_mask.shape[1] - 1)
-    return event_mask[primary[:, None], safe].any(dim=1)
+    size = event_mask.shape[1]
+    inside = (lag_grid >= 0) & (lag_grid < size)
+    safe = lag_grid.clamp(0, size - 1)
+    return (event_mask[primary[:, None], safe] & inside).any(dim=1)
 
 
 def predict(*, arm: str, month: str, seed: int, worlds: list[int], device: str) -> None:
