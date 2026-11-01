@@ -13,6 +13,7 @@
 | 396 | Which of about 35 changes to the weekly XGBoost demand recipe (holiday columns, winter weather columns, hyperparameters, ensemble-summary inputs, a split by lead) survive a few-fold screen? | High (maintainer asked 2026-10-30) | The manager's fit slot; five-variable ensemble extraction for tier B | Planned |
 | 397 | Does a plain mixture density network match the simple XGBoost model for Primary demand, and does attention over the inputs help it? | High (maintainer asked 2026-10-30) | Slot from the manager | Finished: the plain network matched XGBoost, attention did not help (gate inert) |
 | 419 | Do the solar summary, the sunny flag, and a different row-weight half-life, which helped the XGBoost model, also help the pooled mixture density network? | High (maintainer asked 2026-10-30) | Slot from the manager | Planned |
+| 448 | Do pretraining, the B-mix output, and a five-seed pool, added one at a time and together, lower the S1 network's CRPS, and does the assembly beat its parts and the references? | High (maintainer asked 2026-11-01) | The manager's fit slot; table P (experiment 435) only for its last stage | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 
