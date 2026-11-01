@@ -110,7 +110,10 @@ take_home_message: >-
   Pretraining the S1 network on past-weather estimates helps once the pretraining rows carry real
   recent-power inputs: the S1 neural network pretrained this way scores 0.08 points better than S1
   at the signed-MW six and 0.07 at the
-  MVA-only eight, and 0.13 and 0.11 better than the earlier masked pretraining. Most of the gain at the six comes from one test month, and experiment 425's simpler recipe (no surprise inputs, five seeds averaged) is ahead of the pooled network at the hardest substations (D15 and D18) and over all 16 Primaries. BG2 is still ahead at D15 and D18 and on cold winter nights at the six.
+  MVA-only eight, and 0.13 and 0.11 better than the earlier masked pretraining. Most of the gain
+  at the six comes from one test month, and experiment 425's simpler recipe (no surprise inputs,
+  five seeds averaged) is ahead of the pooled network at the hardest substations (D15 and D18) and
+  over all 16 Primaries. BG2 is still ahead at D15 and D18 and on cold winter nights at the six.
   All numbers are interim, from four test months.
 advice:
   - >-
