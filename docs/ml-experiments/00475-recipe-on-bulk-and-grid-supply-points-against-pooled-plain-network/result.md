@@ -57,7 +57,8 @@ take_home_message: >-
   the plain pooled network at the two bulk supply points: it is better at D17 (-0.14) and worse at
   D13 (+0.09), both inside the noise. At the two grid supply points the recipe is about 0.5 points of
   capacity better than the plain network, which is close to the size of the refit noise (about
-  0.4). Against BG2 the recipe is better at all four nodes, with the largest gain at the grid supply points.
+  0.4). Against BG2 the recipe is better at all four nodes, with the largest gain at the grid
+  supply points.
 ---
 
 **Take-home message: the first-release recipe does not clearly beat the plain pooled network at the
@@ -123,7 +124,8 @@ so every node result is a case study with n = 4, and a pooled-by-type network wo
 
 Registered before any score is read.
 
-- Minimum detectable effect: the seed spread of 415's N1 at the grid supply points (per-seed spread of 415's N1: 0.44 at D1 and 0.79 at D6; about 0.4 is the low end),
+- Minimum detectable effect: the seed spread of 415's N1 at the grid supply points (per-seed spread
+  of 415's N1: 0.44 at D1 and 0.79 at D6; about 0.4 is the low end),
   stated before any contrast.
 - The recipe is a candidate for the nodes if its point estimate beats 415's N1 at both bulk supply
   points and does not lose at the grid supply points, with q99 pinball loss within 5%.
@@ -143,7 +145,8 @@ Registered before any score is read.
 ## Results
 
 CRPS at days 1 to 10 in points of effective capacity, four test months (2025-10, 2026-01, 2026-03,
-2026-06), equal-row set of 62,419 half-hours per node across all leads, then restricted to days 1 to 10 (shared with experiment 386; 2,747 of 65,166
+2026-06), equal-row set of 62,419 half-hours per node across all leads, then restricted to days 1 to
+10 (shared with experiment 386; 2,747 of 65,166
 not scored). A and N1 are 3-seed averages; BG2 is a single weekly fit.
 
 | Node | A | 415's N1 | BG2 (weekly-refit XGBoost best guess) | Monthly XGBoost, bands widened by 1.15 | `manual_heuristic` | `climatology` |
