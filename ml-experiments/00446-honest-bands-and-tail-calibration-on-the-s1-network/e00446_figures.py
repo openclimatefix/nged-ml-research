@@ -196,12 +196,12 @@ def figure_coverage() -> None:
                 .encode(x=alt.X("low:Q", scale=dom), x2="high:Q")
             )
             nominal = (
-                alt.Chart(pl.DataFrame({"v": [0.95 if tail_name == "q95" else 0.99]}).to_pandas())
+                alt.Chart(pl.DataFrame({"v": [0.95 if tail_name == "q95" else 0.99]}).to_pandas())  # ty: ignore[unresolved-attribute]
                 .mark_rule(color="#333", strokeDash=[3, 3])
                 .encode(x=alt.X("v:Q", scale=dom))
             )  # ty: ignore[unresolved-attribute]
             dots = (
-                alt.Chart(
+                alt.Chart(  # ty: ignore[unresolved-attribute]
                     rows.filter(
                         pl.col("tail_name") == tail_name, pl.col("row") == row_name
                     ).to_pandas()
@@ -215,7 +215,7 @@ def figure_coverage() -> None:
             )
             column.append(
                 titled(
-                    chart=alt.layer(shade, nominal, dots).properties(
+                    chart=alt.layer(shade, nominal, dots).properties(  # ty: ignore[invalid-argument-type]
                         width=(WIDTH - 130) // 2, height=130
                     ),
                     title=f"{row_name}" if tail_name == "q95" else "",
@@ -274,14 +274,14 @@ def figure_width_ratio() -> None:
     arms = ["S1", "U1n-2", "U2", "U2-clean"]
     colours = ["#306BFF", "#FF4901", "#B701FF", "#17E58F"]
     one = (
-        alt.Chart(pl.DataFrame({"v": [1.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"v": [1.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#333", strokeDash=[3, 3])
         .encode(y="v:Q")
     )  # ty: ignore[unresolved-attribute]
     by_lead = alt.vconcat(
         *[
             titled(
-                chart=alt.layer(
+                chart=alt.layer(  # ty: ignore[invalid-argument-type]
                     one,
                     alt.Chart(t.filter(pl.col("comparison") == label).to_pandas())  # ty: ignore[unresolved-attribute]
                     .mark_line(point=True)
@@ -362,10 +362,10 @@ def figure_contrasts() -> None:
         d = alt.Chart(sub)
         one_row = alt.Chart(sub.head(1))
         return titled(
-            chart=alt.layer(
+            chart=alt.layer(  # ty: ignore[invalid-argument-type]
                 one_row.mark_rect(opacity=0.15, color="#888").encode(x="neg_mde:Q", x2="mde:Q"),  # ty: ignore[unresolved-attribute]
                 one_row.mark_rule(color="#333", strokeDash=[3, 3]).encode(x=alt.datum(0)),  # ty: ignore[unresolved-attribute]
-                d.mark_rule(strokeWidth=1.5).encode(
+                d.mark_rule(strokeWidth=1.5).encode(  # ty: ignore[unresolved-attribute]
                     y=y,
                     x=alt.X("low:Q", title="Arm minus S1, CRPS (points; negative is better)"),
                     x2="high:Q",
@@ -402,7 +402,7 @@ def figure_scale_factor() -> None:
     arms = ["U2", "U2i", "U2c", "U2-clean"]
     colours = ["#B701FF", "#D57AFF", "#10C5F7", "#17E58F"]
     limit = (
-        alt.Chart(pl.DataFrame({"v": [1.03]}).to_pandas())
+        alt.Chart(pl.DataFrame({"v": [1.03]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#FF4901", strokeDash=[4, 3])
         .encode(x="v:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -423,7 +423,7 @@ def figure_scale_factor() -> None:
             )
         )
         return titled(
-            chart=alt.layer(bars, one, limit).properties(width=WIDTH - 220, height=70),
+            chart=alt.layer(bars, one, limit).properties(width=WIDTH - 220, height=70),  # ty: ignore[invalid-argument-type]
             title=row_name,
         )
 
@@ -474,7 +474,7 @@ def figure_cold_nights() -> None:
     panels = []
     for tail_name in ("q95", "q99"):
         rule = (
-            alt.Chart(targets.filter(pl.col("tail_name") == tail_name).to_pandas())
+            alt.Chart(targets.filter(pl.col("tail_name") == tail_name).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#FF4901", strokeDash=[4, 3])
             .encode(x=alt.X("target:Q", scale=alt.Scale(domain=[0.75, 1.0])))
         )  # ty: ignore[unresolved-attribute]
@@ -483,9 +483,9 @@ def figure_cold_nights() -> None:
             alt.vconcat(
                 *[
                     titled(
-                        chart=alt.layer(
+                        chart=alt.layer(  # ty: ignore[invalid-argument-type]
                             rule,
-                            alt.Chart(
+                            alt.Chart(  # ty: ignore[unresolved-attribute]
                                 t.filter(
                                     pl.col("tail_name") == tail_name, pl.col("label") == lab
                                 ).to_pandas()
@@ -558,9 +558,9 @@ def figure_cells(*, group: str, name: str) -> None:
             d = alt.Chart(sub.filter(pl.col("window") == window).to_pandas())  # ty: ignore[unresolved-attribute]
             stack.append(
                 titled(
-                    chart=alt.layer(
+                    chart=alt.layer(  # ty: ignore[invalid-argument-type]
                         shade,
-                        d.mark_point(filled=True, size=60).encode(
+                        d.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
                             y=alt.Y("arm:N", sort=ARMS_C, title=None),
                             x=alt.X(
                                 "coverage:Q",
@@ -686,7 +686,7 @@ def figure_examples(*, month: str = "2026-01") -> None:
             )
             pdata = sub.to_pandas()
             outer = (
-                alt.Chart(pdata)
+                alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
                 .mark_area(opacity=0.12, color=EXAMPLE_COLOURS[arm_i])
                 .encode(
                     x=x,
@@ -695,13 +695,13 @@ def figure_examples(*, month: str = "2026-01") -> None:
                 )
             )  # ty: ignore[unresolved-attribute]
             inner = (
-                alt.Chart(pdata)
+                alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
                 .mark_area(opacity=0.28, color=EXAMPLE_COLOURS[arm_i])
                 .encode(x=x, y="q05:Q", y2="q95:Q")
             )  # ty: ignore[unresolved-attribute]
             median = alt.Chart(pdata).mark_line(color=EXAMPLE_COLOURS[arm_i]).encode(x=x, y="q50:Q")  # ty: ignore[unresolved-attribute]
             truth = (
-                alt.Chart(pdata)
+                alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
                 .mark_line(color="#333", strokeDash=[2, 2])
                 .encode(x=x, y="actual:Q")
             )  # ty: ignore[unresolved-attribute]
@@ -806,7 +806,7 @@ def figure_events() -> None:
         x = alt.X("time:T", title=None, scale=alt.Scale(domain=[t0, t1]))
         pdata = d.to_pandas()
         shade = (
-            alt.Chart(
+            alt.Chart(  # ty: ignore[unresolved-attribute]
                 pl.DataFrame(
                     {"a": [times[e["start"]]], "b": [times[min(e["end"], len(times) - 1)]]}
                 ).to_pandas()
@@ -815,7 +815,7 @@ def figure_events() -> None:
             .encode(x="a:T", x2="b:T")
         )
         band = (
-            alt.Chart(pdata)
+            alt.Chart(pdata)  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.14)
             .encode(
                 x=x,
