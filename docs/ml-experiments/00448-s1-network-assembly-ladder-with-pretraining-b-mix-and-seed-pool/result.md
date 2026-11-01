@@ -66,6 +66,14 @@ decision_rule: >-
   seeds, adding 2025-12) runs once, on the advancing components only, against every stored
   reference, and is not used to tune. The winning configuration of the experiment 447 sweep, if it
   has reported, is confirmed inside the assembled network at the end as one extra arm.
+  Pre-registered before S1-w256 is scored (added 2026-11-01 at the neural Discuss session's
+  request): the named arm S1-w256 is S1 with hidden width 256 and otherwise the S1 recipe
+  (experiment 447's post hoc, interim, unaudited finding: +0.087 clean CRPS in 5 of 5 folds,
+  carried by fold 2025-12, with worse real events). It is not the default. It advances to one
+  assembled-network variant at width 256 in the final test only if (a) its clean-row CRPS gain
+  against S1 holds on the four screen folds, which exclude 2025-12, at both metering groups, and
+  (b) on real event rows its CRPS is no worse than +0.03 and its q99 pinball loss no worse than
+  +0.02 against S1. The page reports the real-event and cold-winter-night rows beside it.
 benchmark: >-
   S1 seeds 0 to 5 from experiments 428 and 439 (raw forecasts, 1.15); R-inj; the monthly XGBoost
   recipe, BG2, `manual_heuristic`, and `climatology` as read by experiment 425. Table P of
@@ -138,6 +146,8 @@ references.
 | LOO-surprise | PT network with R-inj inputs | 428: +0.106 | 40 |
 | LOO-PT | S1 with pool5 | as C1 | 0 |
 | LOO-Bmix | PT+pool5 | as C2 | 0 |
+| S1-w256 | S1 with hidden width 256 | 447 (post hoc, interim): +0.087 clean CRPS, worse real events | 20 |
+| S1PT-fullLR | S1PT, fine-tuned at the full learning rate (post hoc check) | this plan | 20 |
 | Event-tail | U1n-2 as stored, seeds 0 to 2 | 446: q99 on level changes 0.909 to 0.983, +0.076 CRPS | 0 |
 
 ## Compute
@@ -145,6 +155,7 @@ references.
 | Stage | Fits |
 |---|---|
 | Screen: PT (20 pretrain + 20 fine-tune), L0 seeds 1 to 4, LOO-embedding, LOO-surprise | 136 |
+| Screen, added: S1-w256 and the post hoc S1PT-fullLR | 40 |
 | Final test, fold 2025-12 only (seeds 0 to 4): S1, L0, PT, and the advancing leave-one-out arms | up to 40 |
 | Final test, sweep-winner arm from experiment 447, 5 folds by 3 seeds, if it has reported | up to 32 |
 

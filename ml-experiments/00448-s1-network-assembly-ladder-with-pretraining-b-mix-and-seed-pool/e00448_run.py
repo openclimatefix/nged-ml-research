@@ -58,6 +58,8 @@ MODEL_ROOTS: Final[tuple[Path, ...]] = (
 FINE_TUNE_LR: Final[float] = 2e-4
 """Experiment 425's fine-tuning learning rate."""
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
+WIDE_ARMS: Final[tuple[str, ...]] = ("S1-w256",)
+"""Arms with hidden width 256 (experiment 447's post hoc finding), otherwise the S1 recipe."""
 PT_ARMS: Final[tuple[str, ...]] = ("S1PT", "S1PT-noemb", "RinjPT", "S1PT-fullLR")
 PRETRAIN_EPOCH_ROWS: Final[float] = 0.2
 """The pretraining pass draws this share of the rows per epoch, as the fit loop does."""
@@ -65,15 +67,22 @@ PRETRAIN_EPOCH_ROWS: Final[float] = 0.2
 fit.ARMS["S1PT"] = fit.Arm("S1PT", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["S1PT-noemb"] = fit.Arm("S1PT-noemb", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["S1PT-fullLR"] = fit.Arm("S1PT-fullLR", "lags", 0, True, surprise=True, history="s1")
+fit.ARMS["S1-w256"] = fit.Arm("S1-w256", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["RinjPT"] = fit.Arm("RinjPT", "lags", 0, True)
 _ORIGINAL_MAKE_MODEL = fit.make_model
 
 
 def _make_model(*, arm: fit.Arm, n_inputs: int, n_primaries: int) -> torch.nn.Module:
     """Return the arm's network; an arm named `*-noemb` has no Primary embedding."""
-    return _ORIGINAL_MAKE_MODEL(
-        arm=arm, n_inputs=n_inputs, n_primaries=0 if arm.name.endswith("noemb") else n_primaries
-    )
+    original = fit.SETTING
+    if arm.name in WIDE_ARMS:
+        fit.SETTING = replace(original, hidden=256)
+    try:
+        return _ORIGINAL_MAKE_MODEL(
+            arm=arm, n_inputs=n_inputs, n_primaries=0 if arm.name.endswith("noemb") else n_primaries
+        )
+    finally:
+        fit.SETTING = original
 
 
 def install() -> None:
