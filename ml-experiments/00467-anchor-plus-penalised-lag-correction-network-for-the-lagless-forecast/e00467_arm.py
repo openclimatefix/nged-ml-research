@@ -35,7 +35,7 @@ WORK_DIR: Final[Path] = (
     / "work"
 )
 MODEL_DIR: Final[Path] = WORK_DIR / "models"
-PENALTIES: Final[tuple[str, ...]] = ("1e-3", "1e-2", "1e-1")
+PENALTIES: Final[tuple[str, ...]] = ("1e-3", "1e-2", "1e-1", "1")
 HIDDEN: Final[int] = 32
 INPUTS: Final[int] = 9 + 3 + 2
 """Three lags of (value, is-missing flag, age), the surprise at each lag, and two lead features."""
@@ -43,9 +43,9 @@ ZERO_SHIFT_CAPACITY: Final[float] = 0.01
 """A shift below this fraction of capacity counts as zero in the stop rule."""
 
 
-def arm_name(*, penalty: str) -> str:
-    """Return the arm name that prediction files carry."""
-    return f"C{penalty}"
+def arm_name(*, penalty: str, zero_lags: bool = False) -> str:
+    """Return the arm name that prediction files carry (Z for the lag-free control)."""
+    return f"{'Z' if zero_lags else 'C'}{penalty}"
 
 
 class AnchorCorrection(nn.Module):
@@ -69,7 +69,9 @@ class AnchorCorrection(nn.Module):
         return (log_w, mean + out[:, :1], std * torch.exp(out[:, 1:2])), out
 
 
-def fit_one(*, penalty: str, month: str, seed: int, device: str, stride: int = 2) -> Path:
+def fit_one(
+    *, penalty: str, month: str, seed: int, device: str, zero_lags: bool = False, stride: int = 2
+) -> Path:
     """Fit the correction on one scored month and seed; save it; return the path."""
     started = time.monotonic()
     lam = float(penalty)
@@ -86,6 +88,8 @@ def fit_one(*, penalty: str, month: str, seed: int, device: str, stride: int = 2
         device=device,
         surprise=fit.surprise_array(power=power_np, table=table),
     )
+    if zero_lags:
+        lags = torch.zeros_like(lags)
     torch.manual_seed(seed)
     net = AnchorCorrection().to(device)
     optimiser = torch.optim.Adam(net.parameters(), lr=fit.LEARNING_RATE)
@@ -109,8 +113,9 @@ def fit_one(*, penalty: str, month: str, seed: int, device: str, stride: int = 2
             optimiser.step()
             total += float(loss.detach()) * len(idx)
         losses.append(total / n)
-        print(f"C{penalty} {month} s{seed} epoch {epoch}: loss {losses[-1]:.4f}", flush=True)
-    path = MODEL_DIR / arm_name(penalty=penalty) / f"{month}_s{seed}.pt"
+        name = arm_name(penalty=penalty, zero_lags=zero_lags)
+        print(f"{name} {month} s{seed} epoch {epoch}: loss {losses[-1]:.4f}", flush=True)
+    path = MODEL_DIR / arm_name(penalty=penalty, zero_lags=zero_lags) / f"{month}_s{seed}.pt"
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
@@ -131,17 +136,26 @@ def fit_one(*, penalty: str, month: str, seed: int, device: str, stride: int = 2
         },
         path,
     )
-    print(f"C{penalty} {month} s{seed}: {n:,} rows, {time.monotonic() - started:.0f} s -> {path}")
+    name = arm_name(penalty=penalty, zero_lags=zero_lags)
+    print(f"{name} {month} s{seed}: {n:,} rows, {time.monotonic() - started:.0f} s -> {path}")
     return path
 
 
 @torch.no_grad()
 def forecast(
-    *, penalty: str, month: str, seed: int, world: int, device: str, real: np.ndarray
+    *,
+    penalty: str,
+    month: str,
+    seed: int,
+    world: int,
+    device: str,
+    real: np.ndarray,
+    zero_lags: bool = False,
 ) -> pl.DataFrame:
     """Forecast the scored month's rows on a scoring world with a saved correction network."""
     saved = torch.load(
-        MODEL_DIR / arm_name(penalty=penalty) / f"{month}_s{seed}.pt", weights_only=False
+        MODEL_DIR / arm_name(penalty=penalty, zero_lags=zero_lags) / f"{month}_s{seed}.pt",
+        weights_only=False,
     )
     net = AnchorCorrection().to(device)
     net.load_state_dict(saved["state"])
@@ -156,6 +170,8 @@ def forecast(
         pool=test, power=power, lag_stats=lag_stats, device=device,
         surprise=fit.surprise_array(power=power_np, table=table),
     )  # fmt: skip
+    if zero_lags:
+        lags = torch.zeros_like(lags)
     mu = torch.tensor(scalers.target_mean, dtype=torch.float32, device=device)
     sd = torch.tensor(scalers.target_std, dtype=torch.float32, device=device)
     quantiles, shifts = [], []
@@ -197,18 +213,25 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--worlds", type=int, nargs="*", default=[-1, *score.SCORING_SEEDS])
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--zero-lags", action="store_true")
     args = parser.parse_args()
     if args.command == "fit":
-        fit_one(penalty=args.penalty, month=args.month, seed=args.seed, device=args.device)
+        fit_one(
+            penalty=args.penalty, month=args.month, seed=args.seed, device=args.device,
+            zero_lags=args.zero_lags,
+        )  # fmt: skip
         return
     real = score.real_event_mask()
     for world in args.worlds:
         frame = forecast(
             penalty=args.penalty, month=args.month, seed=args.seed, world=world,
-            device=args.device, real=real,
+            device=args.device, real=real, zero_lags=args.zero_lags,
         )  # fmt: skip
         target = score.prediction_path(
-            arm=arm_name(penalty=args.penalty), month=args.month, seed=args.seed, world=world
+            arm=arm_name(penalty=args.penalty, zero_lags=args.zero_lags),
+            month=args.month,
+            seed=args.seed,
+            world=world,
         )
         target.parent.mkdir(parents=True, exist_ok=True)
         frame.write_parquet(target)
