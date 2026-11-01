@@ -20,13 +20,15 @@ from typing import Final
 
 from studies.sources import ML_EXPERIMENTS_DATA_DIR  # ty: ignore[unresolved-import]
 
-OWN_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00481-seed-averaging-diminishing-returns-for-demand-and-wind"
+OWN_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00481-seed-averaging-diminishing-returns-for-demand-and-wind"
+)
 MONTHS: Final[list[str]] = ["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"]
 
 
 def demand(*, seeds: list[int]) -> None:
     """Fit arm A of experiment 425 for the five months, writing under this experiment's folder."""
-    import e00425_fit as fit  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    import e00425_fit as fit  # ty: ignore[unresolved-import]
 
     fit.OUT_DIR = OWN_DIR / "work"
     fit.run_arms(months=MONTHS, arms=[fit.ARMS["A"]], seeds=seeds, cut=True, device="cuda")
@@ -34,7 +36,7 @@ def demand(*, seeds: list[int]) -> None:
 
 def wind(*, seeds: list[int]) -> None:
     """Fit `member_plain` of experiment 429, writing under this experiment's folder."""
-    import e00429_run as run  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    import e00429_run as run  # ty: ignore[unresolved-import]
 
     assert min(seeds) >= 5, "seeds 0 to 4 are stored in experiment 429's folder"
 
@@ -46,9 +48,11 @@ def wind(*, seeds: list[int]) -> None:
 
 def s1(*, seeds: list[int]) -> None:
     """Fit S1 of experiment 404 for extra seeds (experiment 454's mapping of training worlds)."""
-    import e00454_fit as fit  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    import e00454_fit as fit  # ty: ignore[unresolved-import]
 
-    assert set(seeds) <= {5}, "experiment 404 stores the cross-fitted lagless tables for seeds 0 to 5 only"
+    assert set(seeds) <= {5}, (
+        "experiment 404 stores the cross-fitted lagless tables for seeds 0 to 5 only"
+    )
 
     sys.argv = [sys.argv[0], "--arms", "S1", "--seeds", *map(str, seeds)]
     fit.main()
