@@ -29,11 +29,10 @@ RESAMPLES: Final[int] = 20_000
 ARMS: Final[tuple[str, ...]] = ("A-pool", "K2-S1", "K2-425A", "K2-425A+S1", "A-gam-in", "B-mix")
 REFERENCES: Final[tuple[str, ...]] = ("BG2", "manual_heuristic")
 LEVELS: Final[tuple[str, ...]] = build470.LEVELS
+CANDIDATES: Final[tuple[str, ...]] = ("A-pool", "K2-S1", "K2-425A", "K2-425A+S1", "A-gam-in")
 COMPARISONS: Final[tuple[tuple[str, str], ...]] = (
-    ("K2-S1", "A-pool"), ("K2-425A", "A-pool"), ("K2-425A+S1", "A-pool"), ("A-gam-in", "A-pool"),
-    ("K2-425A", "K2-S1"), ("K2-425A+S1", "K2-S1"),
-    ("A-pool", "BG2"), ("K2-S1", "BG2"), ("K2-425A", "BG2"), ("K2-425A+S1", "BG2"),
-    ("A-pool", "manual_heuristic"), ("K2-S1", "manual_heuristic"), ("K2-425A", "manual_heuristic"),
+    *[(a, b) for i, a in enumerate(CANDIDATES) for b in CANDIDATES[:i]],
+    *[(a, ref) for a in CANDIDATES for ref in REFERENCES],
 )  # fmt: skip
 
 _BASES: dict[str, pl.DataFrame] = {}
