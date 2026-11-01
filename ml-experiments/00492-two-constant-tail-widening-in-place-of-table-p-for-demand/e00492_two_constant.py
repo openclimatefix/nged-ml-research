@@ -21,14 +21,17 @@ systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
 from pathlib import Path
 from typing import Final
 
-import e00483_tails as tails  # ty: ignore[unresolved-import]
 import e00435_table_p_provisional as prov  # ty: ignore[unresolved-import]
+import e00470_score as score470  # ty: ignore[unresolved-import]
+import e00483_tails as tails  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00492-two-constant-tail-widening-in-place-of-table-p-for-demand" / "work"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00492-two-constant-tail-widening-in-place-of-table-p-for-demand"
+    / "work"
 )
 ARMS: Final[tuple[str, ...]] = ("A-pool", "A-gam-in", "K2-425A")
 GROUPS: Final[tuple[str, ...]] = ("mva_eight", "signed_six", "report_only")
@@ -74,7 +77,9 @@ def fit_constants(*, fit: pl.DataFrame) -> dict[str, tuple[float, float]]:
     }
 
 
-def apply_constants(*, frame: pl.DataFrame, constants: dict[str, tuple[float, float]]) -> pl.DataFrame:
+def apply_constants(
+    *, frame: pl.DataFrame, constants: dict[str, tuple[float, float]]
+) -> pl.DataFrame:
     """Scale the lower and upper tail quantiles' distance from the median by the group's factors."""
     lo = pl.col("group").replace_strict({g: v[0] for g, v in constants.items()}, default=1.0)
     up = pl.col("group").replace_strict({g: v[1] for g, v in constants.items()}, default=1.0)
@@ -111,17 +116,14 @@ def scheme_frames(*, arm: str, scheme: str) -> tuple[dict[str, pl.DataFrame], di
 
 
 def row_values(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Return per-row coverage and pinball loss (points) at each tail quantile."""
-    y = frame["actual"].to_numpy().astype(np.float64)
-    cols = {}
-    for name, tau in TAU.items():
-        q = frame[name].to_numpy().astype(np.float64)
-        cols[f"cov_{name}"] = (y <= q).astype(np.float64)
-        cols[f"pin_{name}"] = pinball(y=y, q=q, tau=tau)
-    return pl.DataFrame(cols)
+    """Return per-row CRPS, coverage, and pinball loss (points) as experiment 483 scores them."""
+    m = score470.row_metrics(frame=frame)
+    return pl.DataFrame({k: v for k, v in m.items() if k == "crps" or k[:3] in ("cov", "pin")})
 
 
-def interval(*, diff: np.ndarray, blocks: np.ndarray, level: float, rng: np.random.Generator) -> tuple[float, float]:
+def interval(
+    *, diff: np.ndarray, blocks: np.ndarray, level: float, rng: np.random.Generator
+) -> tuple[float, float]:
     """Bound the mean of `diff` by a block bootstrap over `blocks` at `level` percent."""
     ids, inv = np.unique(blocks, return_inverse=True)
     sums = np.bincount(inv, weights=diff, minlength=len(ids))
@@ -146,7 +148,14 @@ def main() -> None:
             for month, per_group in constants.items():
                 for g, (lo, up) in per_group.items():
                     const_rows.append(
-                        {"arm": arm, "scheme": scheme, "month": month, "group": g, "lower": lo, "upper": up}
+                        {
+                            "arm": arm,
+                            "scheme": scheme,
+                            "month": month,
+                            "group": g,
+                            "lower": lo,
+                            "upper": up,
+                        }
                     )
             for variant, frame in frames.items():
                 for name, part in tails.slices(frame=frame).items():
@@ -175,13 +184,18 @@ def main() -> None:
                     for col in va.columns:
                         diff = va[col].to_numpy() - vb[col].to_numpy()
                         low, high = interval(diff=diff, blocks=blocks, level=level, rng=rng)
+                        relative = (
+                            float(diff.mean() / vb[col].to_numpy().mean())
+                            if col.startswith("pin") or col == "crps"
+                            else None
+                        )
                         contrasts.append(
                             {
                                 "arm": arm, "scheme": scheme, "slice": slice_name, "group": g,
-                                "metric": col, "two_constant": float(va[col].mean()),
-                                "table_p": float(vb[col].mean()), "diff": float(diff.mean()),
+                                "metric": col, "two_constant": float(va[col].to_numpy().mean()),
+                                "table_p": float(vb[col].to_numpy().mean()), "diff": float(diff.mean()),
                                 "low": low, "high": high, "n": a.height,
-                                "relative": float(diff.mean() / vb[col].mean()) if col.startswith("pin") else None,
+                                "relative": relative,
                             }
                         )  # fmt: skip
             print("done", arm, scheme, flush=True)
