@@ -7,8 +7,8 @@ The fit loop is experiment 461's (`e00461_solar_fit`: experiment 430's loop with
 weights are rescaled to a mean of 1 over the rows the loss sees. Early stopping is unweighted, as in
 experiment 443. Arm labels are `<base>_<half-life label>`, such as `g0_onepass_hl2`. Predictions go
 to this experiment's `solar_predictions/<arm>/`, in units of the new capacity, and the capacity
-table to `solar_capacity.json`. `--gate` fits the base arm with all weights 1, to compare with
-experiment 461's stored forecasts.
+table to `solar_capacity.json`. The label `none` fits the base arm with all weights 1, a gate
+against experiment 461's stored forecasts; `ind49` is the Cycle 49r1 indicator, equal weights.
 
     PYTHONPATH=<310>:<430>:<461>:<466 folders> OMP_NUM_THREADS=1 systemd-run --user --scope \
         -p MemoryMax=8G -p OOMPolicy=continue \
@@ -85,6 +85,7 @@ def train_network(
     """Experiment 430's `train_network` for a plain fit, with a recency weight on the loss."""
     assert init_state is None
     assert config.pretrain == "none"
+    assert not config.member_wise
     half_life = _JOB["half_life"]
     columns = config.columns
     need_members = config.needs_members
@@ -197,7 +198,7 @@ def main() -> None:
     fit430.FLAGS = (*fit430.FLAGS, "cycle49")  # a 0/1 input is not standardised
     base = common430.ARMS[args.base]
     for label in args.labels:
-        half_life = common.SOLAR_HALF_LIVES_YEARS.get(label)
+        half_life = None if label in ("none", "ind49") else common.SOLAR_HALF_LIVES_YEARS[label]
         config = IndicatorConfig(**vars(base)) if label == "ind49" else base
         arm = f"{args.base}_{label}"
         for seed in seeds:
