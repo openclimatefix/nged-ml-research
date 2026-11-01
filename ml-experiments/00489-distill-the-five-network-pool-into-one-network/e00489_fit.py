@@ -297,6 +297,9 @@ def run_month(*, month: str, arms: list[Arm], seeds: list[int], device: str) -> 
         return
     refit = base.refit_of(month=month)
     fold = prep.build_ens_fold(refit=refit)
+    stored = json.loads((fit425.OUT_DIR / "logs" / f"{month}.json").read_text())
+    assert len(fold.x) == stored["fine_tune_rows"], "fold rows differ from experiment 425's"
+    assert int(fold.is_val.sum()) == stored["fine_tune_val_rows"], "held-out weeks differ"
     nets = list(teacher_networks(month=month, fold=fold))
     for n in nets:
         n.model.to(device)
@@ -331,6 +334,7 @@ def run_month(*, month: str, arms: list[Arm], seeds: list[int], device: str) -> 
     log_path = WORK_DIR / "logs" / f"{month}.json"
     log: dict = json.loads(log_path.read_text()) if log_path.exists() else {}
     val_rows = torch.nonzero(t["v"]).squeeze(1)
+    torch.manual_seed(0)
     train_rows = torch.nonzero(~t["v"]).squeeze(1)
     train_rows = train_rows[torch.randperm(len(train_rows), device=device)[:400_000]]
     k = nets[0].setting.components
@@ -344,7 +348,8 @@ def run_month(*, month: str, arms: list[Arm], seeds: list[int], device: str) -> 
         model = fit425.new_model(arm=fit425.ARMS["A"], fold=fold).to(device)
         model.load_state_dict(
             torch.load(
-                fit425.pretrained_path(arm=fit425.ARMS["A"], cut=True, month=month, seed=seed)
+                fit425.pretrained_path(arm=fit425.ARMS["A"], cut=True, month=month, seed=seed),
+                map_location=device,
             )
         )
         setting = replace(fit425.SETTING, lr=FINE_TUNE_LR)
