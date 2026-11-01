@@ -10,11 +10,9 @@ those and writes the contrasts of each student against K2-S1 and against B-mix, 
 bootstrap interval at the Bonferroni level of the 18 contrasts the plan fixes (2 student arms times
 9 tests), plus the minimum detectable effect from the seed spread of B-mix.
 
-```bash
-PYTHONPATH=<as e00454_score.py shows, plus ml-experiments/00454-*:ml-experiments/00435-*:\
-ml-experiments/00490-*> DATA_PATH_INTERNAL=... uv run --no-sync python \
-    ml-experiments/00490-*/e00490_score.py cells
-```
+    PYTHONPATH=<as e00454_score.py shows, plus ml-experiments/00454-*:ml-experiments/00435-*:\
+    ml-experiments/00490-*> DATA_PATH_INTERNAL=... uv run --no-sync python \
+        ml-experiments/00490-*/e00490_score.py cells
 """
 
 import argparse

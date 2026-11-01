@@ -24,14 +24,12 @@ own training rows and world. The teacher networks are in sample on those rows; o
 table is cross-fitted. A separate random generator draws the teacher samples, so the main sequence
 (initialisation, batch order) matches experiment 404's A0-inj fit of the same seed.
 
-```bash
-PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
-ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:\
-ml-experiments/00404-mdn-lagless-and-calibration-module-trust-weights \
-DATA_PATH_INTERNAL=<the internal data folder> OMP_NUM_THREADS=1 \
-    uv run --no-sync python ml-experiments/00490-*/e00490_distill.py fit --arm D-K2 \
-    --month 2026-06 --seed 0
-```
+    PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
+    ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:\
+    ml-experiments/00404-mdn-lagless-and-calibration-module-trust-weights \
+    DATA_PATH_INTERNAL=<the internal data folder> OMP_NUM_THREADS=1 \
+        uv run --no-sync python ml-experiments/00490-*/e00490_distill.py fit --arm D-K2 \
+        --month 2026-06 --seed 0
 """
 
 import argparse
