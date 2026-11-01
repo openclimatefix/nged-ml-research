@@ -202,25 +202,25 @@ Sonnet reviews this plan, the code before the first fit, the results, and the wr
 
 ## Bayes-optimal shares of the training worlds (printed before any fit)
 
-**A forecaster that knows only whether the newest lag has a mirror should follow 0.05 to 0.13 of a
-step, and the mirror moves that share by only 0.05 to 0.06.** The table counts, in 400,000 sampled
+**A forecaster that knows only whether the newest lag has a mirror should follow 0.03 to 0.12 of a
+step, and the mirror moves that share by only 0.05 to 0.08.** The table counts, in 400,000 sampled
 fold rows per training world, the rows whose first k lags all lie in a jump and the share of them
-whose target also moved (`e00462_run.py rates`, month 2026-01, Bayes share = target moved / rows).
+whose newest lag lies in a genuine level change that the target still carries (`e00462_run.py rates`, month 2026-01, Bayes share = target moved / rows).
 A mirror here means any neighbour differs from the clean series at the newest lag's time, so load
 shifts of experiment 428's worlds that happen to overlap in time count as mirrors.
 
 | Lags in a jump (k) | Mirror | Rows | Target moved | Bayes-optimal share followed |
 |---|---|---|---|---|
-| 1 | no | 83,995 | 7,739 | 0.092 |
-| 1 | yes | 122,377 | 5,500 | 0.045 |
-| 2 | no | 61,467 | 6,849 | 0.111 |
-| 2 | yes | 88,383 | 4,586 | 0.052 |
-| 3 | no | 32,396 | 4,094 | 0.126 |
-| 3 | yes | 43,366 | 2,774 | 0.064 |
+| 1 | no | 83,995 | 6,841 | 0.081 |
+| 1 | yes | 122,377 | 3,411 | 0.028 |
+| 2 | no | 61,467 | 6,265 | 0.102 |
+| 2 | yes | 88,383 | 3,064 | 0.035 |
+| 3 | no | 32,396 | 3,816 | 0.118 |
+| 3 | yes | 43,366 | 1,874 | 0.043 |
 
-The gap between the two shares (0.047, 0.060, 0.062 at k = 1, 2, 3) is below the 0.1 that the
+The gap between the two shares (0.054, 0.067, 0.075 at k = 1, 2, 3) is below the 0.1 that the
 registered pass (b) asks of the learned shares, so (b) cannot pass at the 2% genuine share: even a
-perfect learner would show a gap of about 0.06.
+perfect learner would show a gap of about 0.07.
 
 ## Restated pass (b), registered before any fit (neural Discuss session, 2026-11-01)
 
@@ -234,3 +234,5 @@ perfect learner would show a gap of about 0.06.
   follow-up; it is not run here.
 - **Most mirrors in these worlds are coincident load shifts of experiment 428's worlds at
   neighbours,** not mirrors of a genuine change, which is why the optimal gap is small.
+
+*Correction before any fit: a code review found that the first version of this table counted any target inside a genuine event; the table above counts only rows whose newest lag and target carry the same genuine step. The mirror flag is coarser than what the network sees (any neighbour differing, whatever its sign or size). The share of mirror steps clipped at MVA-only recipients is not reported.*

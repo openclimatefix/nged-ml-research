@@ -117,7 +117,6 @@ def add_mirrors(
     shift = own_shift.astype(np.float64).copy()
     code = np.zeros(own_shift.shape, dtype=np.int8)
     events = events_of(shift=own_shift, onset=onset)
-    mirrored = np.zeros(len(events.primary), dtype=bool)
     for i in range(len(events.primary)):
         p, a, b, step = (
             int(events.primary[i]), int(events.start[i]), int(events.stop[i]), events.step[i],
@@ -130,7 +129,6 @@ def add_mirrors(
         k = int(rng.integers(1, min(MAX_RECIPIENTS, len(candidates)) + 1))
         recipients = rng.choice(candidates, size=k, replace=False)
         code[p, a:b] = OWN_MIRRORED
-        mirrored[i] = True
         for q in recipients:
             shift[int(q), a:b] += -step * capacity[p] / k / capacity[int(q)]
             free = code[int(q), a:b] == NONE
@@ -169,6 +167,10 @@ def build_one(
     """Draw and store one world unless it exists; return a progress line."""
     path = world_file(seed=seed)
     if path.exists():
+        stored = np.load(path)
+        assert float(stored["probability"]) == probability and float(stored["rate"]) == rate, (
+            f"{path.name} was built with other settings: delete it and rebuild"
+        )
         return f"{path.name}: exists"
     own, onset = worlds446.draw_events(ranges=ranges, observed=observed, rate=rate, seed=seed)
     shift, code = add_mirrors(
@@ -177,7 +179,7 @@ def build_one(
     )  # fmt: skip
     WORLD_DIR.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp.npz")
-    np.savez(temporary, shift=shift, onset=onset, code=code)
+    np.savez(temporary, shift=shift, onset=onset, code=code, probability=probability, rate=rate)
     temporary.rename(path)
     inside = (shift != 0) & observed
     share = inside.sum(axis=1) / observed.sum(axis=1)
@@ -302,7 +304,7 @@ def selftest() -> None:
         q for q in neighbours[p] if (own[q, a:b] == 0).all() and (code[q, a:b] == RECEIVED).all()
     ]
     assert lone, "the toy draw must give a recipient with no event of its own"
-    assert all(np.sign(shift[q, a:b]).max() == -np.sign(s) for q in lone[:1]) or lone
+    assert all((np.sign(shift[q, a:b]) == -np.sign(s)).all() for q in lone)
     # The half-hours that no event touches have code 0 and shift 0; mirror-only half-hours are 3.
     assert (shift[code == NONE] == 0).all() and (code[(own == 0) & (shift != 0)] == RECEIVED).all()
     # Probability 0 is experiment 446's world: no mirror and the same shift.

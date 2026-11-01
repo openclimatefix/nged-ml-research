@@ -166,6 +166,9 @@ def fit_one(
     cell = run446.Cell(kind="fit", arm=arm_name, month=month, seed=seed)
     if not cell.held:
         return f"{arm_name} {month} s{seed}: locked by another process"
+    if (target / "meta.json").exists():
+        cell.release()
+        return f"{arm_name} {month} s{seed}: exists"
     try:
         spec = run446.ARMS446["U1n-2"]
         arm = fit.ARMS[arm_name]
@@ -375,10 +378,13 @@ def rates(*, month: str = "2026-01", per_world: int = 400_000, seed: int = 0) ->
     For a sample of fold rows read from each training world 0 to 3, a *jump at a lag* is a lag whose
     power differs from the clean series (a load-shift donor or recipient, or a genuine level
     change). A row has a *mirror* if any neighbour of its Primary differs from the clean series at
-    the newest lag's time. The target moved if the genuine level change is non-zero at the target.
+    the newest lag's time. The target moved if the newest lag lies in a genuine level change and the target carries the same
+    step (a load-shift jump never counts). The mirror is coarser than what the network sees: any neighbour
+    differing from the clean series counts, whatever its sign or size, so the bound is not the
+    best a network with the sign-agreement columns could reach.
     For k = 1, 2, 3 (the first k lags all in a jump), the share of such rows whose target moved is
     the share of a step that a forecaster with no other information should follow, with and
-    without a mirror. It is split by whether the target lies inside the genuine event.
+    without a mirror.
     """
     stack, _ = data.load_stack(include_eval=False)
     clean = stack[0]
@@ -402,7 +408,9 @@ def rates(*, month: str = "2026-01", per_world: int = 400_000, seed: int = 0) ->
         ok = ((lags >= 0) & (lags < size)).all(axis=1)
         safe = np.clip(lags, 0, size - 1)
         jump = injected[primary[:, None], safe] != 0
-        moved = genuine[primary, np.clip(rows.target_idx[pick], 0, size - 1)] != 0
+        at_lag = genuine[primary, safe[:, 0]]
+        at_target = genuine[primary, np.clip(rows.target_idx[pick], 0, size - 1)]
+        moved = (at_lag != 0) & (at_target == at_lag)
         mirror = neighbour_jump[primary, safe[:, 0]]
         for k in (1, 2, 3):
             in_jump = ok & jump[:, :k].all(axis=1)
