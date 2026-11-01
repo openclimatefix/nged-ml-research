@@ -183,10 +183,12 @@ default 2.
   before the first stage 1 fit.
 - Step 1 gives 11 scored months to resample and step 2 gives 12; the per-farm intervals include
   1.5%.
-- Table P comes from the merged page of [experiment 435](../00435-stage-0-recalibration-table-for-
-untrusted-inputs-and-tails/result.md); this experiment re-implements the fit in `e00450_step1.py`
-from the code at commit `552c3f87` with the clip added, as the merged code does.
-- Every number is interim and unaudited; the results review has not run yet.
+- Table P comes from the merged
+  [experiment 435 page](../00435-stage-0-recalibration-table-for-untrusted-inputs-and-tails/result.md).
+  This experiment re-implements the fit in `e00450_step1.py` from the code at commit `552c3f87`, with
+  the clip added as in the merged code.
+- Every number is interim until the maintainer has read this page; a fresh reviewer reproduced the
+  headline numbers.
 
 ## Problems caused by the move
 
