@@ -58,8 +58,7 @@ metric: >-
   Mass-weighted pinball loss (CRPS-like) in points of effective capacity from the 11 quantiles of
   each forecast, as in experiment 404's report, on the real-data world (world -1) with leads of 0
   to 240 hours (lead days 1 to 10).
-code:
-ml-experiments/00463-lag-trust-cross-fitted-trust-fit-seed-zero/
+code: ml-experiments/00463-lag-trust-cross-fitted-trust-fit-seed-zero/
 ---
 
 **Plan only: no score has been read.** The question is whether the learned trust weight of
