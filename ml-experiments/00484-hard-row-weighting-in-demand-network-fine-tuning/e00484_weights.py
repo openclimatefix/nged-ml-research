@@ -47,6 +47,9 @@ FLAGS_FILE: Final[str] = "cold_night_flags.parquet"
 def cold_flags(*, work_dir: Path) -> pl.DataFrame:
     """Return `time_series_id`, `valid_us`, `cold` for every half-hour of every series (cached).
 
+    The cache is not invalidated: delete `cold_night_flags.parquet` if the scorer's slice
+    constants or the scoring context change.
+
     `cold` is the scorer's `cold_nights` rule on the ERA5 temperature and the sun's elevation.
     """
     target = work_dir / FLAGS_FILE
@@ -103,6 +106,9 @@ def row_multiplier(
             how="left",
             maintain_order="left",
         )
+        unmatched = float(joined["cold"].is_null().mean())  # ty: ignore[invalid-argument-type]
+        print(f"  W-cold: {unmatched:.4%} of rows have no flag (treated as not cold)", flush=True)
+        assert unmatched < 0.01, f"too many rows without a cold-night flag: {unmatched:.2%}"
         cold = joined["cold"].fill_null(value=False).to_numpy()
         out[cold] = COLD_WEIGHT
     elif arm == "W-curt":
@@ -114,6 +120,10 @@ def row_multiplier(
             if limit <= 0:
                 continue
             out[sel & (y >= limit)] = 1.0 + CURT_EXTRA
+            print(
+                f"  W-curt: Primary {p}: {(sel & (y >= limit)).sum()} of {sel.sum()} rows",
+                flush=True,
+            )
     elif arm == "W-season":
         local = (
             pl.Series(valid_us).cast(pl.Datetime("us")).dt.replace_time_zone("UTC")
