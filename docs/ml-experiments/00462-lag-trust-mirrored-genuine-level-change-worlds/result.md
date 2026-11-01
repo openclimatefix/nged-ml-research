@@ -25,9 +25,10 @@ hypothesis: >-
   Every training world so far (experiments 402, 404, 440, and 446) keeps a clean target under every
   injected jump, so discounting every jump is optimal and a neighbour mirror carries no information.
   When the training worlds also contain genuine level changes (the lags and the target move
-  together), whose target follows and whose neighbours show no mirror (a mirror in the training worlds always
-  means a load shift with a clean target, as in experiment 402), a lag network given the neighbours' surprise (S3) can use the mirror, and a network
-  given randomised neighbours (S3-rw) cannot. A pass would show only that a network can use a mirror
+  together) that carry no mirror at the neighbours (a mirror in the training worlds always means a
+  load shift with a clean target, as in experiment 402), a lag network given the neighbours'
+  surprise (S3) can use the mirror, and a network given randomised neighbours (S3-rw) cannot. A pass
+  would show only that a network can use a mirror
   when the training world makes the mirror informative. It would not be evidence about real
   Primaries, because no labelled genuine level change exists in the real data.
 prediction: >-
