@@ -73,13 +73,13 @@ lessons: >-
   applies the corrected target, so a later label-free recipe has only that correction to replace.
 take_home_message: >-
   Mixing real labelled load-shift events into training, with their targets corrected to the normal
-  running arrangement, leaves the lagged network where it was: every score is within the minimum
-  detectable effect of the network trained on injected events alone. Fine-tuning the injected-event
-  network on the real events makes four of the five row classes worse (by about 1 point of effective capacity),
-  although it scores better on rows inside real events against the corrected actuals (by an amount
-  that is not statistically significant). Real labels, which NGED will not supply at about 1,300
-  substations, therefore add nothing detectable beyond what the injected events give, and the 50/50
-  mixture with the lagless forecast stays ahead.
+  running arrangement, leaves the lagged network where it was: every RealMix score is within the
+  minimum detectable effect of the network trained on injected events alone. Fine-tuning the
+  injected-event network on the real events makes four of the five row classes worse (by about 1
+  point of effective capacity), although it scores better on rows inside real events against the
+  corrected actuals (by an amount that is not statistically significant). Real labels, which NGED
+  has said it does not plan to supply at about 1,300 substations, therefore add nothing detectable
+  beyond what the injected events give, and the 50/50 mixture with the lagless forecast stays ahead.
 production_status: not-for-production
 adopted_in: none
 advice:
