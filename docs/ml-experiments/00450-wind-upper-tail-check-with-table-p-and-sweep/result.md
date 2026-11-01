@@ -7,7 +7,7 @@ title: >-
 theme: generator-forecasting
 also_relevant_to:
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 protocol: wind-v1
 date: 2026-11-01
@@ -70,70 +70,85 @@ row_set_id: fold_a_tuesdays_v1
 metric: >-
   Quantile score over 11 levels in points of capacity, kept rows, true days 1 to 10; coverage and
   pinball loss at 0.01, 0.05, 0.95, and 0.99 per farm, with and without the idle-band mask.
+verdict: not supported
+best_arm: >-
+  none. The plain network (`member_plain`, 10.533 points) is not beaten by any setting; the nearest
+  are depth 1 (10.521, -0.012) and 2 mixture components (10.522, -0.011).
+headline: >-
+  After table P, 1.39% to 1.50% of observations fall above q99 for the 10 neural arms of
+  experiment 429 pooled over the three farms (Wind farms research default 2: 1.64%), but Farm A
+  stays at 1.7% to 2.1%. None of 9 changes to the plain wind network (hidden width, depth, encoder
+  width, mixture components, ERA5 pretraining) lowers its quantile score by the 0.10-point margin,
+  and none fixes Farm A.
+lessons: >-
+  The wind network is insensitive to its size and to ERA5 pretraining, as the demand network was in
+  experiment 447. The upper-tail failure at Farm A is not a size or pretraining problem and a
+  per-farm table P does not remove it. A rescaled quantile must be clipped to the capacity range
+  before coverage is counted; without the clip the same table appeared to pass every farm.
+take_home_message: >-
+  Table P nearly meets the wind upper-tail limit when the three farms are pooled (1.4% of
+  observations above q99, limit 1.5%) but not at Farm A (1.8%), and no change to the size of the
+  plain wind network or ERA5 pretraining moves its score by the 0.10-point margin or fixes Farm A.
+  The wind network is at its plateau on these inputs, so the open problem is Farm A's windy
+  half-hours, not the network.
+advice:
+  - >-
+    Clip every rescaled or widened quantile to the capacity range [0, 1] before counting coverage
+    (experiment 435's table P code does not).
+  - >-
+    Keep the plain `member_plain` wind network at its experiment 429 size; the sweep found no
+    better setting.
+  - >-
+    Look at Farm A's windy half-hours directly, for example the share above q99 by forecast
+    wind-speed band, before trying more network settings.
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00450-wind-upper-tail-check-with-table-p-and-sweep/
 ---
 
-**Take-home (interim, unaudited): table P brings the pooled share above q99 down to the 1.5% limit
-only narrowly, and Farm A misses it for every arm.** Pooled over the three farms, the 10 neural
-arms of experiment 429 reach 1.39% to 1.50% after table P, while Wind farms research default 2
-stays at 1.64%. Farm A is at 1.7% to 2.1% for every arm.
+**Take-home (interim, unaudited): the plain wind network is at a plateau, and Farm A's upper tail is
+the open problem.** After table P, 1.39% to 1.50% of observations fall above q99 for the 10 neural
+arms of experiment 429 pooled over the three farms (limit 1.5%; Wind farms research default 2:
+1.64%), but Farm A stays at 1.7% to 2.1% in every arm and setting. None of 9 changes to the plain
+network lowers its quantile score by the 0.10-point margin, so the stop rule ended the sweep after
+stage 1 (45 fits plus 5 pretraining fits).
 
-**This is the plan page.** Step 1 (no fits) has run; step 2 (the sweep) waits for the code review.
+![Quantile score of each setting minus the base network's, with 99.4% month-block intervals](figure_1_contrasts.svg)
 
-## Question
+![Share of observations above q99 after table P, by farm and setting](figure_2_upper_tail_by_farm.svg)
 
-Experiment 429 found that the wind upper tail fails for every arm: 2.2% to 2.8% of observations
-exceed q99, against a limit of 1.5%. Experiment 435's table P rescales each quantile's distance from
-the median per farm and lead band, using only earlier months. This experiment checks whether that
-table meets the limit and, if it does, sweeps the settings of the plain wind network.
+## Results
 
-## Results (interim, unaudited; step 1 only)
+- **Step 1, table P (kept rows, true days 1 to 10, after clipping to [0, 1]).** Pooled share above
+  q99: 1.39% to 1.50% for the 10 neural arms (`member_plain` 1.41%, 95% month-block interval 0.85%
+  to 1.97%), 1.64% for default 2 (0.98% to 2.29%), against 2.1% to 2.4% before table P. Farm A:
+  `member_plain` 1.76% (0.85% to 2.78%), default 2 2.07%; Farm B 1.13%; Farm C 1.31%. All rows:
+  1.33% to 1.49% and 1.64%. q01 and q05 coverage are not harmed. An earlier run without the clip
+  gave 0.7% to 1.1%; observations between 1.0 and 1.09 of capacity counted as covered by a q99
+  above 1. Experiment 435's table P code has the same missing clip.
+- **Step 2, stage 1 (kept rows, true days 1 to 10; score and difference to `member_plain`,
+  99.4% interval).** `member_plain` 10.533. Hidden width 32: -0.001 (-0.046 to +0.062); width 128:
+  +0.034; depth 1: -0.012 (-0.046 to +0.033); depth 3: +0.061 (+0.007 to +0.112); encoder width 8:
+  +0.077; encoder width 32: +0.003; 2 mixture components: -0.011; 5: +0.007; ERA5 pretraining:
+  +0.039 (-0.020 to +0.137). Positive is worse. No setting reaches -0.10.
+- **Tails of the settings.** The q99 pinball loss rises by 0.067 points (2 components) and 0.063
+  (ERA5 pretraining), above the 0.02 allowance, and by 0.022 (encoder width 8); the share above q99
+  after table P is 1.36% to 1.55% pooled. Farm A is at 1.69% (encoder width 32) to 1.88% (2
+  components) in every setting.
+- **Seed spread.** The `member_plain` seed standard deviation is 0.027 points, a seed-only minimum
+  detectable effect of 0.034 for 5 seeds; the month-block intervals above are wider.
+- **Cost.** 50 fits of about 56 to 69 seconds each, about 0.8 GPU-hours, one process of 5.5 GB.
+  Stage 2 and the confirmation did not run, because no setting moved the network.
 
-- **Table P brings the pooled share above q99 to the limit, narrowly.** Share of observations above
-  q99 at true days 1 to 10, pooled over Farm A, Farm B, and Farm C, kept rows, after table P and
-  after clipping every quantile to [0, 1] as the raw quantiles are: 1.39% to 1.50% for the 10
-  neural arms (`member_plain` 1.41%, 95% month-block interval 0.85% to 1.97%), 1.64% for Wind farms
-  research default 2 (0.98% to 2.29%), against 2.1% to 2.4% unrecalibrated. By experiment 429's
-  point-estimate rule the 10 neural arms pass and default 2 fails. All rows: 1.33% to 1.49% and
-  1.64%.
-- **Farm A fails for every arm.** Farm A is at 1.7% to 2.1% (`member_plain` 1.76%, interval 0.85%
-  to 2.78%); Farm B (`member_plain` 1.13%) and Farm C (1.31%) are under 1.5%. The pooled pass comes
-  from Farm B and Farm C.
-- **Clipping matters.** An earlier run that did not clip the rescaled q99 to 1 gave 0.7% to 1.1%,
-  because observations between 1.0 and 1.09 of capacity counted as covered by a q99 above 1. That
-  run was wrong; the numbers above replace it.
-- **Lower tail.** q01 and q05 coverage stay within 0.02 of the unrecalibrated arm's distance from
-  nominal in every arm, with and without the mask.
-- **Dependency.** Table P is code-reviewed in experiment 435 (commit `552c3f87`), but its page is
-  not merged yet; this page cites that commit.
+## Caveats
 
-## Plan for step 2
-
-- **Base.** `member_plain`: member route, no plant, clipped head, kept rows, hidden width 64, depth
-  2, encoder width 16, 3 mixture components (the plain network that experiment 429 chose).
-- **Stage 1, 9 arms of 5 seeds.** Hidden width 32 and 128; depth 1 and 3; encoder width 8 and 32
-  (the member encoder, the only embedding in the network); mixture components 2 and 5; and the
-  pretraining arm (experiment 430's A6),
-  which starts from weights pretrained on ERA5 weather and observed power before 2024-04-01 (all
-  51 members set to the ERA5 value, random lead 12 to 252 hours) and fine-tunes at half the
-  learning rate on the ensemble hindcast, as experiment 430 did for solar. Experiment 429 already
-  covers the 2 x 2 of plant against plain network, trained with or without
-  the idle band, so it is not repeated. Pretraining uses ERA5 power rows before 2024-04-01 with a
-  60-day early-stopping split inside that window, standardisation from the ensemble hindcast
-  training rows, and one pretraining fit per seed; ERA5 is an estimate of past weather.
-- **Fits and cost.** One fit takes 56 seconds on the GPU (measured; `base` seed 0 matches 429's
-  `member_plain` seed 0 exactly). Stage 1: 45 fits plus 5 ERA5 pretraining fits (the base arm reuses
-  429's seeds 0 to 4), about 0.9
-  GPU-hours if the pretraining fits take as long as an ordinary fit; the first one is timed. If a
-  factor moves: stage 2 adds at most 100 fits (1.6 GPU-hours) and confirmation 15
-  fits (0.25 GPU-hours). Upper bound 165 fits, about 2.8 GPU-hours; one GPU process under 8 GB.
-- **Minimum detectable effect.** The seed standard deviation of `member_plain`'s score is 0.027
-  points over seeds 0 to 4, so seeds alone give a minimum detectable effect of 0.034 points with 5
-  seeds (95%, half power; indicative, since other arms may be noisier); the month blocks make it
-  larger (experiment 429 quoted about 0.08). Both figures are below the 0.10-point margin.
-- **Reported every time:** with and without experiment 210's mask, per farm, and with the tail
-  table (q01, q05, q95, q99 pinball loss and coverage), raw and after table P.
+- Step 1 was run before its rule was written; the rule is post hoc. The step 2 rule was fixed
+  before the first stage 1 fit.
+- The scored year gives 12 months to resample; per-farm intervals include 1.5%.
+- Table P's page (experiment 435) is not merged; this page cites its code at commit `552c3f87` and
+  adds the clip.
+- Every number is interim and unaudited; the results review has not run yet.
 
 ## Problems caused by the move
 
-None so far.
+None.
