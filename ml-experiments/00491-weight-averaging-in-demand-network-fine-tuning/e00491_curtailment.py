@@ -11,13 +11,20 @@ uv run --no-sync python ml-experiments/00491-*/e00491_curtailment.py
 ```
 """
 
+import sys
+
 import e00449_curtailment as c449  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]
 import e00470_curtailment as c470  # ty: ignore[unresolved-import]
 import e00470_score as score470  # ty: ignore[unresolved-import]
 import e00491_score as score491  # ty: ignore[unresolved-import]
+import polars as pl
 
-ARMS = ("S0", "S0f", "EMA", "SWA", "Pool2", "Pool3", "Pool5", "PoolEMA3")
+LOGICAL_ARMS = ("S0", "S0f", "EMA", "SWA", "Pool2", "Pool3", "Pool5", "PoolEMA3")
+CELLS = score491.CELLS
+ARMS = tuple(f"{a}@{c}" if a in CELLS else a for a in LOGICAL_ARMS for c in range(CELLS.get(a, 1)))
+"""Each seed cell is costed on its own (`arm@cell`), then the costs are averaged over cells, because
+averaging the cells' quantiles would turn a three-cell arm into a three-seed pool."""
 REFERENCES = ("manual_heuristic",)
 COMPARISONS = (
     ("EMA", "S0f"), ("SWA", "S0f"), ("EMA", "Pool2"), ("SWA", "Pool2"), ("EMA", "Pool5"),
@@ -26,23 +33,34 @@ COMPARISONS = (
 )  # fmt: skip
 
 
+def cell_path(*, arm: str, month: str, cell: int):  # noqa: ANN201
+    """Return the stored cell of `arm` or of `arm@k` (cell k of a multi-cell arm)."""
+    name, _, k = arm.partition("@")
+    return score491.pred_path(arm=name, month=month, cell=int(k) if k else cell)
+
+
 def main() -> None:
     """Write and print the per-cell costs and the bootstrap table."""
-    build470.prediction_path = score491.pred_path  # ty: ignore[invalid-assignment]
-    score470.arm_cells = score491.cells_of  # ty: ignore[invalid-assignment]
+    build470.prediction_path = cell_path  # ty: ignore[invalid-assignment]
+    score470.arm_cells = lambda *, arm: 1  # ty: ignore[invalid-assignment]
     c470.ARMS = ARMS
     c470.REFERENCES = REFERENCES
-    c449.ARMS = ARMS  # ty: ignore[invalid-assignment]
+    c449.ARMS = LOGICAL_ARMS  # ty: ignore[invalid-assignment]
     c449.REFERENCES = REFERENCES  # ty: ignore[invalid-assignment]
     c449.COMPARISONS = COMPARISONS  # ty: ignore[invalid-assignment]
     c449.RESAMPLES = c470.RESAMPLES  # ty: ignore[invalid-assignment]
-    cost = c470.build()
+    cached = score491.SCORE_DIR / "curtailment_cells.parquet"
+    cost = pl.read_parquet(cached) if cached.exists() and "--cached" in sys.argv else c470.build()
+
+    cost = (
+        cost.with_columns(arm=pl.col("arm").str.split("@").list.first())
+        .group_by([c for c in cost.columns if c not in ("arm", "avoidable_cost_gbp")] + ["arm"])
+        .agg(pl.col("avoidable_cost_gbp").mean())
+    )
     score491.SCORE_DIR.mkdir(parents=True, exist_ok=True)
     cost.write_parquet(score491.SCORE_DIR / "curtailment_cells.parquet")
     table = c449.bootstrap(cost=cost)
     table.write_csv(score491.SCORE_DIR / "curtailment_bootstrap.csv")
-    import polars as pl
-
     with pl.Config(tbl_rows=100, tbl_width_chars=140):
         print(table.with_columns(pl.col("estimate", "low", "high").round(3)))
 
