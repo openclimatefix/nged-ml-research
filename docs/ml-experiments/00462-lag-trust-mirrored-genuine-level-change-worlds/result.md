@@ -221,3 +221,16 @@ shifts of experiment 428's worlds that happen to overlap in time count as mirror
 The gap between the two shares (0.047, 0.060, 0.062 at k = 1, 2, 3) is below the 0.1 that the
 registered pass (b) asks of the learned shares, so (b) cannot pass at the 2% genuine share: even a
 perfect learner would show a gap of about 0.06.
+
+## Restated pass (b), registered before any fit (neural Discuss session, 2026-11-01)
+
+- **Pass (b) is now:** the learned share followed without a mirror minus the share with a mirror
+  exceeds 0.03, with a month-block interval above zero, and each learned share lies within 0.15 of
+  its Bayes-optimal value in the table above. Pass (a) and the real-row gate are unchanged.
+- **A perfect learner shows a gap of only 0.047 to 0.062, which may sit below the seed noise.** If
+  the contrast of S3-amb against S3-rw-amb and the learned gap both lie inside the minimum
+  detectable effect, the page reports the result as inconclusive by design and not as a refutation
+  of attention over the lags. A 5% genuine share would raise the Bayes-optimal gap and is the
+  follow-up; it is not run here.
+- **Most mirrors in these worlds are coincident load shifts of experiment 428's worlds at
+  neighbours,** not mirrors of a genuine change, which is why the optimal gap is small.
