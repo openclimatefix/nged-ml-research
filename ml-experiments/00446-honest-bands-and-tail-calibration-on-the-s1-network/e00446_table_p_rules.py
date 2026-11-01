@@ -32,7 +32,6 @@ WORK_DIR: Final[Path] = (
 OUT_DIR: Final[Path] = WORK_DIR / "table_p_rules"
 GROUPS: Final[tuple[str, ...]] = ("signed-MW six", "MVA-only eight")
 U_ARMS: Final[tuple[str, ...]] = ("U1n-2", "U1n-5", "U2", "U2i", "U2c", "U2-clean", "U3")
-T_ARMS: Final[tuple[str, ...]] = ("T1", "T2", "T3", "T4", "T5")
 HARM_CLASSES: Final[tuple[str, ...]] = ("inj_harm", "gen_jump", "real_harm", "real_event_nra100")
 Q95_TOLERANCE: Final[float] = 0.03
 Q99_TOLERANCE: Final[float] = 0.015
@@ -138,7 +137,15 @@ def pooled_cold(*, cold: pl.DataFrame, arm: str, group: str) -> dict[str, float]
 
 
 def brief_b(*, variant: str) -> pl.DataFrame:
-    """Return one row per (arm, group) with every Brief B rule read on the given variant."""
+    """Return one row per (arm, group) with every Brief B rule read on the given variant.
+
+    Conventions: rule (a) uses only the two coverage tolerances of experiment 435; rule (c) is the arm's
+    mean 90% width over R-inj's on the same rows, on classes where R-inj passes (and clean rows);
+    rule (d) vetoes when the upper end of the event-cluster 95% interval of arm minus R-inj q95
+    coverage is below zero on any of the four sets (harm and NRA-corrected event, with and without the
+    event with the most scored R-inj rows; 446's stored `*_wo_largest` sets drop nothing), and
+    `rule_d_point_below` flags a negative point estimate; rule (e) pools folds by rows.
+    """
     absolute = read(folder="scores_s012", variant=variant, name="absolute")
     contrasts = read(folder="scores_s012", variant=variant, name="contrasts")
     cold = read(folder="scores_s012", variant=variant, name="cold_nights")
@@ -154,7 +161,7 @@ def brief_b(*, variant: str) -> pl.DataFrame:
             for cls, ok in passes.items():
                 record[f"tolerance_{cls}"] = ok
             record |= {f"in_range_{k}": v for k, v in ranges.items()}
-            record["rule_a"] = all(passes[c] for c in passes if not base_pass.get(c, True))
+            record["rule_a"] = all(passes.get(c, False) for c in base_pass if not base_pass[c])
             if arm != "R-inj":
                 ct = contrasts.filter(
                     (pl.col("contrast") == f"{arm} - R-inj")
@@ -215,8 +222,19 @@ def brief_b(*, variant: str) -> pl.DataFrame:
                     record[f"q95_diff_{tag}_low"] = lo
                     record[f"q95_diff_{tag}_high"] = hi
                     record[f"events_{tag}"] = k
-                record["rule_d_veto"] = (
-                    record["q95_diff_harm"] < 0 or record["q95_diff_event_nra"] < 0
+                tags = ("harm", "harm_wo_largest", "event_nra", "event_nra_wo_largest")
+                record["rule_d_point_below"] = any(record[f"q95_diff_{t}"] < 0 for t in tags)
+                record["rule_d_veto"] = any(record[f"q95_diff_{t}_high"] < 0 for t in tags)
+                scale = absolute.filter(
+                    (pl.col("arm") == arm)
+                    & (pl.col("group") == group)
+                    & (pl.col("row_set") == "clean")
+                )["scale_f_mean"][0]
+                record["scale_f_clean"] = scale
+                record["scale_ok"] = scale is None or scale <= 1.03
+                record["real_harm_q99_ok"] = (
+                    record["real_harm_q99_pinball_vs_R_inj"] is not None
+                    and record["real_harm_q99_pinball_vs_R_inj"] <= TAIL_LIMIT
                 )
             cold_arm = pooled_cold(cold=cold, arm=arm, group=group)
             record |= {f"cold_{k}": v for k, v in cold_arm.items()}
@@ -234,7 +252,12 @@ def brief_b(*, variant: str) -> pl.DataFrame:
                 )
                 record[f"clean_{key}"] = clean[key][0]
             rows.append(record)
-    return pl.DataFrame(rows, infer_schema_length=None)
+    table = pl.DataFrame(rows, infer_schema_length=None)
+    both = table.group_by("arm").agg(
+        pl.col("rule_b").all().alias("rule_b_both_groups"),
+        pl.col("rule_e").all().alias("rule_e_both_groups"),
+    )
+    return table.join(both, on="arm")
 
 
 def main() -> None:
