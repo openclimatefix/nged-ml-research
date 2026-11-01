@@ -49,7 +49,9 @@ decision_rule: >-
   groups (18 tests). C1 PT1 minus S1. C2 PT1-full minus S1. C3 PT2 minus S1. C4 PT1 minus PT0 (the
   effect of showing the lags to the pretraining stage). C5 PT2 minus PT1. C6 PT0 minus S1 (the
   reproduction of experiment 448). C7 PT1b minus S1. C8 PT1 minus PT1b (the effect of the surprise
-  inputs in pretraining). C9 PT1-full minus PT1. Pretraining adds a stage to the pipeline, so the
+  inputs in pretraining). C9 PT1-full minus PT1. C-pool the pool contrasts above. All contrasts are
+  read at both groups, on the four screen folds and on the five folds including 2025-12. Pretraining
+  adds a stage to the pipeline, so the
   smallest gain worth porting is 0.03 points. A PT arm advances if its pooled point gain against S1
   is at least 0.03 points and the interval of that contrast lies wholly below zero (the brief's
   rule), at the signed-MW six or at the MVA-only eight, the point gain is negative in at least 3 of
@@ -59,8 +61,11 @@ decision_rule: >-
   effect is computed per group from the paired fold-by-seed differences of S1 seeds 0 to 2 and
   printed before any contrast is read. Real-event rows are reported with and without the largest
   event, and so is the cold-winter-night slice. The encroachment sweep of experiment 392 runs
-  prediction-only on the saved networks of any arm that advances. The experiment ends at this
-  screen; the full scored year is a later experiment.
+  prediction-only on the saved networks of any arm that advances. Reported beside the all-rows
+  result for every arm: the Christmas and bank-holiday slice (22 to 31 December, fold 2025-12), the
+  cold-winter-night slice, D15 and D18, and all 16 Primaries together. Experiment 425's arm A
+  (stored seeds 0 to 4, widened by 1.15) and BG2 are reference rows on the same half-hours. The
+  experiment ends at this screen; the full scored year is a later experiment.
 benchmark: >-
   S1 seeds 0 to 2 from experiment 428 (raw forecasts, 1.15 widening); PT0 is experiment 448's S1PT
   (seeds 0 to 2); the monthly XGBoost recipe, BG2, `manual_heuristic`, and `climatology` as read by
@@ -103,6 +108,20 @@ shorter ensemble history could not recover it.
   four folds, worlds, and row set, so no S1 or PT0 network is refitted. One PT0 fold-seed is
   refitted
   as a reproduction check, and its validation loss must equal the stored value.
+- **Experiment 425 pretrained with real lags (Opus audit of experiment 448).** Experiment 425's
+  pretraining rows carried real lagged power, so its pretraining gained 0.044 points at the
+  signed-MW
+  six and 0.107 at the MVA-only eight on experiment 448's rows, while experiment 448's masked-lag
+  pretraining lost. 425's single-seed arm A (no surprise inputs, no pool) ties the five-seed S1 pool
+  at the six (2.809) and is 0.069 better at the eight. PT1 is therefore 425's arm A with the S1
+  surprise inputs added: pretrained with real lags and the cross-fitted lagless surprise. The
+  prediction P1 below uses 425's gains as the expected size.
+- **Fifth fold for the holiday slice.** The Christmas and bank-holiday slice (22 to 31 December,
+  where
+  BG2 leads) lies in the 2025-12 fold, which is not one of the four screen folds. Every arm is
+  therefore also fitted for 2025-12 (experiment 448 stored S1 for it; PT0 is refitted there). The
+  advance rule reads the four screen folds only. The fifth fold is read for the Christmas slice and
+  for the five-fold table.
 - **Standing practices followed.** Monthly refits; cleaned data (flagged and start-cut half-hours
   dropped, counted per fold); the D15 and D18 cut at 2025-03-01 applied; every network saved in the
   data folder; tails, cold nights, and avoidable-curtailment cost reported; example forecasts and
@@ -125,10 +144,18 @@ shorter ensemble history could not recover it.
 | PT1 | ERA5 and CAMS, lags and surprise live | lr 2e-4 | 12 + 12 |
 | PT1-full | the PT1 pretrained network | lr 2e-3 | 12 |
 | PT1b | ERA5 and CAMS, lags live, surprise masked (zero) | lr 2e-4 | 12 + 12 |
+| PT-pool5 | five seeds of the best of PT1, PT1-full, and PT2 (fixed before reading C-pool) | as the arm | 5 networks per refit |
 | PT2 | ERA5 and CAMS, each lag masked with probability 0.3 | lr 2e-4 | 12 + 12 |
 
-PT1b is a diagnostic that needs no lagless table: it separates the effect of the lags from the
-effect of the surprise. Each lag token (the lag value, its missing flag, its age, and its surprise)
+**The best PT arm** is the one among PT1, PT1-full, and PT2 with the lowest mean of its point
+differences against S1 at the signed-MW six and the MVA-only eight over the four screen folds, fixed
+before any pool contrast is read. Its seeds 3 and 4 are fitted in a second stage (with the lagless
+tables for those seeds) and pooled with seeds 0 to 2 by experiment 448's equal-weight mixture pool.
+C-pool is the PT-pool5 minus S1-pool5 (experiment 448's five-seed pool of S1) and PT-pool5 minus
+PT0-pool5 (experiment 448's S1PT-pool5), at both groups. PT1b is a diagnostic that needs no lagless
+table: it separates the effect of the lags from the
+effect of the surprise. Each lag token (the lag value, its missing flag, and its surprise; the age
+column stays)
 is masked as a unit in PT2,
 so the network keeps a pathway that works without the lags. Fine-tuning shows all lags. PT1 and
 PT1-full share one pretrained network per fold and seed.
@@ -151,6 +178,8 @@ on ERA5 and CAMS weather, by the method of experiment 404's table:
   no lead. Experiment 404's ensemble spread columns are dropped because ERA5 has no spread. Rows
   have
   equal weights.
+- **Early cut.** Targets before experiment 418's first-usable date of D11, D10, D5, D14, and D16 are
+  left out of the fits, as in the pretraining targets.
 - **Target.** Cleaned power over capacity (world 0), with flagged half-hours and the D15 and D18
   start
   cut as missing and left out of the fits.
@@ -161,7 +190,8 @@ on ERA5 and CAMS weather, by the method of experiment 404's table:
   is therefore multiplied, per Primary, by the ratio of the two surprise standard deviations over
   the half-hours before the refit where both tables exist (the ensemble years), so the pretraining
   surprise has the scale the network sees in fine-tuning. The ratio uses no data at or after the
-  refit. The ratios are printed per fold and Primary; a ratio outside 0.5 to 2 stops the run.
+  refit. The ratios are printed per fold and Primary; a ratio outside 0.3 to 3 stops the run (the
+  first smoke check, fold 2026-01 seed 0, gave 0.61 to 2.31 across the 16 Primaries).
 - **Overlap years.** Pretraining rows after 2024-04 use the ERA5 table in pretraining and the
   ensemble table in fine-tuning, for the same half-hours.
 - **Non-causal and unpurged.** A module forecasting a block is trained on later blocks too, as in
@@ -186,8 +216,13 @@ on ERA5 and CAMS weather, by the method of experiment 404's table:
 | Lagless tables: 4 folds by 3 seeds by 6 blocks | 72 small modules |
 | Pretraining: PT1, PT1b, and PT2, 4 folds by 3 seeds each | 36 |
 | Fine-tuning: PT1, PT1-full, PT1b, PT2 | 48 |
+| Fifth fold (2025-12): lagless tables 3 seeds, pretraining PT1, PT1b, PT2, and PT0 (12), fine-tuning PT0, PT1, PT1-full, PT1b, PT2 (15) | 3 tables, 27 networks |
+| Second stage: best PT arm, seeds 3 and 4, five folds (tables 10, pretraining 10, fine-tuning 10 to 20) | 30 to 40 networks |
 | Reproduction of one PT0 fold and seed | 1 |
 
+- **Production cost.** A pool of five is five fitted networks per monthly refit and five forward
+  passes per row, because the network takes the ensemble mean and spread once. A single network is
+  one fit and one pass. The page reports both.
 - **Time.** Experiment 448's pretraining took under a minute per network and its fine-tuning 10 to
   60
   seconds. The first fit is timed, and the GPU-hour estimate is corrected in the PR.

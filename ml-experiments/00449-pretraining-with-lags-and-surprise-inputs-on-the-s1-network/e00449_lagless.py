@@ -34,7 +34,9 @@ import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00449-pretraining-with-lags-and-surprise-inputs-on-the-s1-network" / "work"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00449-pretraining-with-lags-and-surprise-inputs-on-the-s1-network"
+    / "work"
 )
 TABLE_DIR: Final[Path] = WORK_DIR / "lagless_era5"
 FOLDS: Final[int] = lag.FOLDS
@@ -73,6 +75,14 @@ def dense_era5_inputs(*, site_row: dict) -> tuple[int, np.ndarray, np.ndarray]:
     return first, raw[:, keep], valid.astype(np.int8)
 
 
+def cut_early(*, site: str, grid: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Return `y` with the targets before experiment 418's `FIRST_USABLE` date of the site missing."""
+    cut = prep418.FIRST_USABLE.get(site)
+    if cut is None:
+        return y
+    return np.where(grid >= int(common.grid_index(times=cut)), y, np.nan)
+
+
 def build_pool(*, lo: int, hi: int, clean: np.ndarray) -> lag.Pool:
     """Return the dense rows of every Primary with grid index in `[lo, hi)` and finite weather.
 
@@ -88,7 +98,7 @@ def build_pool(*, lo: int, hi: int, clean: np.ndarray) -> lag.Pool:
                 site=np.full(int(keep.sum()), row["primary"], dtype=np.int64),
                 grid=grid[keep],
                 x=x[keep],
-                y=clean[row["primary"]][grid[keep]],
+                y=cut_early(site=row["site"], grid=grid[keep], y=clean[row["primary"]][grid[keep]]),
             )
         )
     return lag.Pool(
@@ -112,10 +122,14 @@ def crossfit_table(*, month: str, seed: int, device: str, clean: np.ndarray) -> 
     for k in range(FOLDS):
         held = np.flatnonzero(block == k)
         fit_mask = observed & (block != k)
-        scaler = lag.Scaler(x=pool.x[fit_mask], site=pool.site[fit_mask], y=pool.y[fit_mask], n_primaries=16)
+        scaler = lag.Scaler(
+            x=pool.x[fit_mask], site=pool.site[fit_mask], y=pool.y[fit_mask], n_primaries=16
+        )
         module = lag.fit_module(
             x=torch.tensor(scaler.inputs(x=pool.x[fit_mask]), device=device),
-            z=torch.tensor(scaler.target(y=pool.y[fit_mask], site=pool.site[fit_mask]), device=device),
+            z=torch.tensor(
+                scaler.target(y=pool.y[fit_mask], site=pool.site[fit_mask]), device=device
+            ),
             site=torch.tensor(pool.site[fit_mask], device=device),
             weight=torch.ones(int(fit_mask.sum()), dtype=torch.float32, device=device),
             seed=seed,
@@ -137,7 +151,67 @@ def crossfit_table(*, month: str, seed: int, device: str, clean: np.ndarray) -> 
                 }
             )
         )  # fmt: skip
-    return pl.concat(parts)
+    table = pl.concat(parts)
+    return table.join(half_scales(month=month, seed=seed, table=table, clean=clean), on="primary")
+
+
+def surprise_sd(
+    *, median: np.ndarray, half: np.ndarray, clean: np.ndarray, lo: int, hi: int
+) -> np.ndarray:
+    """Return each Primary's surprise standard deviation over grid `[lo, hi)`, NaN where no overlap."""
+    z = (clean[:, lo:hi] - median[:, lo:hi]) / half[:, lo:hi]
+    out = np.full(len(z), np.nan)
+    for p in range(len(z)):
+        ok = np.isfinite(z[p])
+        if ok.sum() > 1000:
+            out[p] = z[p][ok].std()
+    return out
+
+
+def half_scales(*, month: str, seed: int, table: pl.DataFrame, clean: np.ndarray) -> pl.DataFrame:
+    """Return the per-Primary factor that gives the ERA5 surprise the ensemble table's spread.
+
+    Over the half-hours before the refit where both tables exist, the factor is the ERA5 surprise
+    standard deviation over the ensemble one. A factor outside 0.3 to 3 raises.
+    """
+    median = np.full((len(data.sites()), data.grid_length()), np.nan, dtype=np.float32)
+    half = np.full_like(median, np.nan)
+    p, g = table["primary"].to_numpy(), table["grid"].to_numpy()
+    median[p, g] = table["q50"].to_numpy()
+    half[p, g] = np.maximum((table["q95"] - table["q05"]).to_numpy() / 2.0, 1e-3)
+    ens = pl.read_parquet(fit_lagless_dir() / f"month={month}" / f"seed={seed}.parquet").filter(
+        pl.col("source") == "crossfit"
+    )
+    e_median = np.full_like(median, np.nan)
+    e_half = np.full_like(median, np.nan)
+    e_median[ens["primary"].to_numpy(), ens["grid"].to_numpy()] = ens["q50"].to_numpy()
+    e_half[ens["primary"].to_numpy(), ens["grid"].to_numpy()] = np.maximum(
+        (ens["q95"] - ens["q05"]).to_numpy() / 2.0, 1e-3
+    )
+    both = np.isfinite(median) & np.isfinite(e_median)
+    # Compare on the same half-hours: blank both tables outside the overlap.
+    for m in (median, half, e_median, e_half):
+        m[~both] = np.nan
+    end = int(common.grid_index(times=prep.refit_of(month=month)))
+    sd_era5 = surprise_sd(median=median, half=half, clean=clean, lo=0, hi=end)
+    sd_ens = surprise_sd(median=e_median, half=e_half, clean=clean, lo=0, hi=end)
+    ratio = sd_era5 / sd_ens
+    print(
+        f"  {month} s{seed} half-width factors: " + " ".join(f"{r:.2f}" for r in ratio), flush=True
+    )
+    if not ((ratio > 0.3) & (ratio < 3.0)).all():
+        msg = f"{month} s{seed}: a half-width factor is outside 0.3 to 3: {ratio}"
+        raise ValueError(msg)
+    return pl.DataFrame(
+        {"primary": np.arange(len(ratio), dtype=np.int16), "half_scale": ratio.astype(np.float32)}
+    )
+
+
+def fit_lagless_dir() -> Path:
+    """Return the folder of experiment 404's ensemble-based tables (read by experiment 428)."""
+    import e00428_fit as fit  # ty: ignore[unresolved-import]
+
+    return fit.LAGLESS_DIR
 
 
 def table_path(*, month: str, seed: int) -> Path:
@@ -152,7 +226,9 @@ def surprise_tables(*, month: str, seed: int, device: str) -> tuple[torch.Tensor
     half = np.full_like(median, np.nan)
     p, g = table["primary"].to_numpy(), table["grid"].to_numpy()
     median[p, g] = table["q50"].to_numpy()
-    half[p, g] = np.maximum((table["q95"] - table["q05"]).to_numpy() / 2.0, 1e-3)
+    half[p, g] = np.maximum(
+        (table["q95"] - table["q05"]).to_numpy() / 2.0 * table["half_scale"].to_numpy(), 1e-3
+    )
     return torch.from_numpy(median).to(device), torch.from_numpy(half).to(device)
 
 
@@ -173,8 +249,8 @@ def build(*, month: str, seed: int, device: str, clean: np.ndarray) -> str:
 def smoke(*, device: str) -> None:
     """Check input width, no use of the refit or later, and the surprise spread by source."""
     stack, _ = data.load_stack(include_eval=False)
-    names, keep = lagless_keep()
-    first, x, valid = dense_era5_inputs(site_row=next(prep.primaries().iter_rows(named=True)))
+    names, _ = lagless_keep()
+    first, _, valid = dense_era5_inputs(site_row=next(prep.primaries().iter_rows(named=True)))
     ens_names = lag.data.lagless_columns()
     print("ERA5 lagless columns", len(names), "ensemble lagless columns", len(ens_names))
     assert [n for n in ens_names if not n.startswith("std_")] == names
@@ -190,13 +266,15 @@ def smoke(*, device: str) -> None:
         sl = slice(int(common.grid_index(times=prep.refit_of(month="2025-01"))), end)
         z = ((torch.from_numpy(stack[0]).to(device)[:, sl] - m[:, sl]) / h[:, sl]).flatten()
         z = z[torch.isfinite(z)]
-        print(f"{label}: surprise sd {float(z.std()):.3f}, mean {float(z.mean()):.3f}, n {len(z):,}")
+        print(
+            f"{label}: surprise sd {float(z.std()):.3f}, mean {float(z.mean()):.3f}, n {len(z):,}"
+        )
     print("smoke passed")
 
 
 def lagless_ens_tables(*, month: str, seed: int, device: str) -> tuple[torch.Tensor, torch.Tensor]:
     """Return experiment 428's ensemble-based tables for comparison in the smoke check."""
-    import e00428_fit as fit  # ty: ignore[unresolved-import]  # noqa: PLC0415
+    import e00428_fit as fit  # ty: ignore[unresolved-import]
 
     table = pl.read_parquet(fit.LAGLESS_DIR / f"month={month}" / f"seed={seed}.parquet")
     median = np.full((len(data.sites()), data.grid_length()), np.nan, dtype=np.float32)
@@ -211,7 +289,9 @@ def main() -> None:
     """Build tables or run the smoke check."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("build", "smoke"))
-    parser.add_argument("--months", nargs="+", default=["2026-06", "2026-01", "2025-10", "2026-03"])
+    parser.add_argument(
+        "--months", nargs="+", default=["2026-06", "2026-01", "2025-10", "2026-03", "2025-12"]
+    )
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
