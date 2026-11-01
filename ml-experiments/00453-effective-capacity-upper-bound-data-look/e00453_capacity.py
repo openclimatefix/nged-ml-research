@@ -56,12 +56,12 @@ def wind_rows() -> pl.DataFrame:
         & pl.col("actual_norm").is_finite()
     ).join(caps, on="site")  # fmt: skip
     return frame.select(
+        *LEVEL_NAMES,
         site=pl.col("site").replace_strict(WIND_LABEL),
         month=pl.col("month"),
         lead_hours=pl.col("lead_hours"),
         cap=pl.col("cap").cast(pl.Float64),
         actual=pl.col("actual_norm"),
-        *LEVEL_NAMES,
     )
 
 
@@ -78,12 +78,12 @@ def solar_rows() -> pl.DataFrame:
         pl.col("lead_hours").is_between(LEAD_MIN_H, LEAD_MAX_H) & pl.col("actual").is_finite()
     )
     return mean.select(
+        *LEVEL_NAMES,
         site="Solar " + pl.col("time_series_id"),
         month=pl.col("time").dt.strftime("%Y-%m"),
         lead_hours=pl.col("lead_hours"),
         cap=pl.col("time_series_id").replace_strict(cap, return_dtype=pl.Float64),
         actual=pl.col("actual"),
-        *LEVEL_NAMES,
     )
 
 

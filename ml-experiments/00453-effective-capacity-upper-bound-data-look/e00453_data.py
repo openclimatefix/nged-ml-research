@@ -1,8 +1,9 @@
 """Experiment 453: load the nine metered series, their power, capacity, and weather proxies.
 
-Writes `work/series.parquet` (columns `site`, `tech`, `time`, `power`, `cap`, `wind`, `clear`) under
-`DATA_DIR`. `wind` is ERA5 100 m wind speed in m/s (wind farms only) and `clear` is the Haurwitz
-clear-sky global horizontal irradiance in W/m2 (solar series only). Coordinates stay in this process.
+Writes `series.parquet` (columns `site`, `tech`, `time`, `power`, `cap`, `wind`, `clear`) in
+`WORK_DIR`. `wind` is ERA5 100 m wind speed in m/s (wind farms only) and `clear` is the Haurwitz
+clear-sky global horizontal irradiance in W/m2 (solar series only). Coordinates stay in this
+process.
 
 ```bash
 export DATA_PATH_INTERNAL=...; source ml-experiments/00451-*/env.sh

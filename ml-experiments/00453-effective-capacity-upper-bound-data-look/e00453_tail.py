@@ -1,13 +1,12 @@
-"""Experiment 453, steps 1 and 2: describe each series' upper tail and classify half-hours above p99.
+"""Experiment 453, steps 1 and 2: describe the upper tail and classify half-hours above p99.
 
 Power is divided by the stored effective capacity (the 99th percentile of the whole cleaned record),
 so 1.0 is the current p99. A half-hour above 1.0 is flagged: `spike` (above both neighbours by more
 than `SPIKE_JUMP`), `stuck` (part of a run of `STUCK_RUN` or more equal readings), `step` (the
 half-hour's calendar month is a high-level month: the 90th percentile of the series' output in the
 month, among half-hours with strong wind or strong clear-sky irradiance, exceeds the median of all
-such monthly values by more than `STEP_JUMP`, so the farm's capacity was higher then), and `weather_off`
-(wind: ERA5 100 m wind speed, where it exists, below the speed at which the farm's median output reaches 0.5 of
-capacity; solar: Haurwitz clear-sky irradiance below half of its 99th percentile over daylight).
+such monthly values by more than `STEP_JUMP`), and `weather_off` (wind: ERA5 100 m wind speed,
+where it exists, below the speed at which the farm's median output reaches 0.5 of capacity; solar: Haurwitz clear-sky irradiance below half of its 99th percentile over daylight).
 It is `implausible` if any of the four flags holds, otherwise `plausible`. Output:
 `work/tail_summary.parquet`, `work/high_halfhours.parquet`.
 
@@ -41,17 +40,15 @@ def prepare(*, frame: pl.DataFrame) -> pl.DataFrame:
     site = frame
     start, end = site["time"].min(), site["time"].max()
     grid = pl.DataFrame({"time": pl.datetime_range(start, end, "30m", eager=True)})
-    full = grid.join(site, on="time", how="left").with_columns(
+    return grid.join(site, on="time", how="left").with_columns(
         x=pl.col("power") / pl.col("cap"), site=pl.col("site").forward_fill().backward_fill()
     )
-    return full
 
 
 def flags(*, full: pl.DataFrame) -> pl.DataFrame:
     """Return `full` with the spike and stuck flags and the neighbouring values."""
     x = full["x"].to_numpy()
     power = full["power"].to_numpy()
-    n = len(x)
     prev_x = np.concatenate([[np.nan], x[:-1]])
     next_x = np.concatenate([x[1:], [np.nan]])
     spike = ((x - prev_x) > SPIKE_JUMP) & ((x - next_x) > SPIKE_JUMP)
@@ -69,7 +66,7 @@ def flags(*, full: pl.DataFrame) -> pl.DataFrame:
 
 
 def high_level_months(*, part: pl.DataFrame, tech: str) -> pl.DataFrame:
-    """Return the months whose strong-resource output level exceeds the series median by STEP_JUMP."""
+    """Return each month's strong-resource output level and whether it is a high-level month."""
     if tech == "wind":
         strong = part.filter(pl.col("wind") >= STRONG_WIND_M_S)
     else:

@@ -144,36 +144,39 @@ def _summary(*, rows: pl.DataFrame) -> pl.DataFrame:
     )  # fmt: skip
 
 
+def _change_vs_p99(*, per: pl.DataFrame, sites: list[str], rule: str, sample: list[str]) -> float:
+    """Return the mean over sites of the percentage change in MW score of `rule` against p99."""
+    weight = pl.DataFrame({"month": sample}).group_by("month").len()
+    changes = []
+    for site in sites:
+        rows = (
+            per.filter(pl.col("site") == site)
+            .join(weight, on="month")
+            .with_columns(score=pl.col("score_mw_sum") * pl.col("len"))
+        )
+        value = rows.filter(pl.col("rule") == rule)["score"].sum()
+        base = rows.filter(pl.col("rule") == "p99")["score"].sum()
+        changes.append(value / base - 1.0)
+    return float(np.mean(changes)) * 100
+
+
 def score_ratios(*, rows: pl.DataFrame) -> None:
-    """Print each rule's MW score over the p99 rule's, per technology, with a month-block interval."""
+    """Print each rule's MW score against p99's, per technology, with a month-block interval."""
     rng = np.random.default_rng(0)
     for tech, sites in (("wind", SITES[:3]), ("solar", SITES[3:])):
         part = rows.filter(pl.col("site").is_in(sites) & (pl.col("variant") == "P"))
         months = sorted(part["month"].unique())
-        # per site: score_mw_sum / n by month and rule, then average the sites' relative changes
-        per = part.group_by("site", "month", "rule").agg(
-            pl.col("score_mw_sum").sum(), pl.col("n").sum()
-        )
+        per = part.group_by("site", "month", "rule").agg(pl.col("score_mw_sum").sum())
         for rule in ("p99.9", "p99.99", "max"):
-
-            def stat(sample: list[str]) -> float:
-                changes = []
-                for site in sites:
-                    a = b = 0.0
-                    for m in sample:
-                        r = per.filter((pl.col("site") == site) & (pl.col("month") == m))
-                        a += r.filter(pl.col("rule") == rule)["score_mw_sum"].sum()
-                        b += r.filter(pl.col("rule") == "p99")["score_mw_sum"].sum()
-                    changes.append(a / b - 1.0)
-                return float(np.mean(changes)) * 100
-
-            point = stat(months)
+            point = _change_vs_p99(per=per, sites=sites, rule=rule, sample=months)
             boots = [
-                stat(list(rng.choice(months, size=len(months)))) for _ in range(BOOTSTRAPS // 10)
+                _change_vs_p99(
+                    per=per, sites=sites, rule=rule, sample=list(rng.choice(months, len(months)))
+                )
+                for _ in range(BOOTSTRAPS // 10)
             ]
-            print(
-                f"{tech} {rule}: MW score vs p99 {point:+.2f}% (95% {np.percentile(boots, 2.5):+.2f} to {np.percentile(boots, 97.5):+.2f})"
-            )
+            low, high = np.percentile(boots, [2.5, 97.5])
+            print(f"{tech} {rule}: MW score vs p99 {point:+.2f}% (95% {low:+.2f} to {high:+.2f})")
 
 
 def plausibility_by_threshold(*, high: pl.DataFrame, summary: pl.DataFrame) -> None:
