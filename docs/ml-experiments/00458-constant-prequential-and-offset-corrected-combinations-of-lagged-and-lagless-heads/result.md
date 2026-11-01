@@ -29,7 +29,8 @@ prediction: >-
   signed-MW six, the fitted lagged weight of arm (b) is above 0.5 in the 0-12 h band and below 0.5
   in days 6-10, and (b) beats B-mix on rows with no labelled event by at most 0.05 points
   (experiment 402 step 5 found a fitted constant scoring 4.637 against 4.605 for 50/50, so the
-  stop rule per band may still fire if a band weight lies within 0.05 of 0.5). P2. The prequential weights of arm (c) stay within 0.05 of
+  stop rule per band may still fire if a band weight lies within 0.05 of 0.5). P2. The prequential
+  weights of arm (c) stay within 0.05 of
   0.5 on at least 90% of rows, because the two heads' 7-day losses differ little. P3. The shrunk
   offset k of arm (d) lies below 0.3, and (d) scores worse than B-mix on rows with no labelled event
   by more than 0.1, because a lagless forecast alone trails B-mix by about 0.3 there. P4. No
@@ -135,7 +136,8 @@ every real-event slice undercounts.
   best other arm at one real labelled event at the six and one stretch with no labelled event.
 - **Deviation from the addendum.** The XGBoost R0 pair of experiments 392 and 402 and the
   encroachment sweep are not part of this plan, which cuts the addendum's 12 contrasts to the
-  neural pair's 20 above (a different family); they need the actuals and event masks joined to those forecasts and are a
+  neural pair's 20 above (a different family); they need the actuals and event masks joined to
+  those forecasts and are a
   follow-up if this plan finds headroom.
 
 ## Results
