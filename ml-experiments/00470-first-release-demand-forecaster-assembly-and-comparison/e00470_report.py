@@ -23,11 +23,22 @@ import polars as pl
 
 SCORES = scoring.SCORE_DIR
 CANDIDATES: Final[tuple[str, ...]] = scoring.CANDIDATES
-NETWORKS: Final[dict[str, int]] = {"A-pool": 5, "K2-S1": 4, "K2-425A": 4, "K2-425A+S1": 4, "A-gam-in": 5}
+NETWORKS: Final[dict[str, int]] = {
+    "A-pool": 5,
+    "K2-S1": 4,
+    "K2-425A": 4,
+    "K2-425A+S1": 4,
+    "A-gam-in": 5,
+}
 MDE: Final[dict[str, float]] = {"eight": 0.0645, "six_clean": 0.0999}
 """Experiment 428's minimum detectable effect of arm A's five single seeds (`mde.csv`), per group."""
 TOLERANCE: Final[float] = 0.03
 Q99_TOLERANCE: Final[float] = 0.02
+
+
+def mean_of(series: pl.Series, /) -> float:
+    """Return the mean of a series as a float."""
+    return float(np.nanmean(series.to_numpy()))
 
 
 def decision() -> pl.DataFrame:
@@ -38,15 +49,19 @@ def decision() -> pl.DataFrame:
     mean_crps = {}
     for sname in ("eight", "six_clean"):
         part, _ = scoring.slice_filter(table=table, name=sname)
-        mean_crps[sname] = {a: float(part[f"{a}__crps"].mean()) for a in CANDIDATES}
+        mean_crps[sname] = {a: mean_of(part[f"{a}__crps"]) for a in CANDIDATES}
     best = {s: min(v, key=v.get) for s, v in mean_crps.items()}  # ty: ignore[no-matching-overload]
     q99 = {}
     for sname in ("eight", "six_clean"):
         part, _ = scoring.slice_filter(table=table, name=sname)
-        q99[sname] = {a: float(part[f"{a}__pin_q99"].mean()) for a in CANDIDATES}
+        q99[sname] = {a: mean_of(part[f"{a}__pin_q99"]) for a in CANDIDATES}
     cur = pl.read_csv(SCORES / "curtailment_bootstrap.csv").filter(pl.col("fraction") == 0.9)
     for arm in CANDIDATES:
-        row: dict = {"arm": arm, "serving_networks": NETWORKS[arm], "gam_in_serving": arm == "A-gam-in"}
+        row: dict = {
+            "arm": arm,
+            "serving_networks": NETWORKS[arm],
+            "gam_in_serving": arm == "A-gam-in",
+        }
         admissible = True
         for sname in ("eight", "six_clean"):
             gap = mean_crps[sname][arm] - mean_crps[sname][best[sname]]
@@ -54,16 +69,22 @@ def decision() -> pl.DataFrame:
             row[f"gap_to_best_{sname}"] = gap
             if arm != best[sname]:
                 part, _ = scoring.slice_filter(table=table, name=sname)
-                diff = part.select("month", "day", d=pl.col(f"{arm}__crps") - pl.col(f"{best[sname]}__crps"))
+                diff = part.select(
+                    "month", "day", d=pl.col(f"{arm}__crps") - pl.col(f"{best[sname]}__crps")
+                )
                 ci = scoring.block_bootstrap(diff=diff, rng=rng)
-                conclusive = abs(ci["difference"]) > MDE[sname] and (ci["low_bonferroni"] > 0 or ci["high_bonferroni"] < 0)
+                conclusive = abs(ci["difference"]) > MDE[sname] and (
+                    ci["low_bonferroni"] > 0 or ci["high_bonferroni"] < 0
+                )
                 row[f"conclusive_{sname}"] = conclusive
                 admissible &= (not conclusive) or gap < TOLERANCE
             row[f"q99_{sname}"] = q99[sname][arm]
             row[f"q99_excess_{sname}"] = q99[sname][arm] - min(q99[sname].values())
         for sname in ("six_nra", "cold_eight", "cold_six"):
             part, prefix = scoring.slice_filter(table=table, name=sname)
-            row[f"vs_K2S1_{sname}"] = float(part[f"{arm}__{prefix}crps"].mean() - part[f"K2-S1__{prefix}crps"].mean())
+            row[f"vs_K2S1_{sname}"] = float(
+                mean_of(part[f"{arm}__{prefix}crps"]) - mean_of(part[f"K2-S1__{prefix}crps"])
+            )
         row["curtailment_f09_millions"] = float(cur.filter(pl.col("item") == arm)["estimate"][0])
         costs = cur.filter(pl.col("item").is_in(list(CANDIDATES)))
         best_cost = costs.sort("estimate").row(0, named=True)["item"]
@@ -79,8 +100,12 @@ def decision() -> pl.DataFrame:
         row["curtailment_f09_vs_best_low"], row["curtailment_f09_vs_best_high"] = low, high
         row["passes_curtailment"] = low <= 0.0
         row["admissible_crps"] = admissible
-        row["passes_events_cold"] = all(row[f"vs_K2S1_{s}"] <= TOLERANCE for s in ("six_nra", "cold_eight", "cold_six"))
-        row["passes_q99"] = all(row[f"q99_excess_{s}"] <= Q99_TOLERANCE for s in ("eight", "six_clean"))
+        row["passes_events_cold"] = all(
+            row[f"vs_K2S1_{s}"] <= TOLERANCE for s in ("six_nra", "cold_eight", "cold_six")
+        )
+        row["passes_q99"] = all(
+            row[f"q99_excess_{s}"] <= Q99_TOLERANCE for s in ("eight", "six_clean")
+        )
         records.append(row)
     out = pl.DataFrame(records)
     out.write_csv(SCORES / "decision.csv")
@@ -95,7 +120,11 @@ def tails() -> pl.DataFrame:
     cols = [c for c in cells.columns if c.startswith(("cov_", "pin_"))]
     out = (
         cells.group_by("arm", "variant", "group")
-        .agg(pl.col("n").sum(), *[((pl.col(c) * pl.col("n")).sum() / pl.col("n").sum()).alias(c) for c in cols], ((pl.col("crps") * pl.col("n")).sum() / pl.col("n").sum()).alias("crps"))
+        .agg(
+            pl.col("n").sum(),
+            *[((pl.col(c) * pl.col("n")).sum() / pl.col("n").sum()).alias(c) for c in cols],
+            ((pl.col("crps") * pl.col("n")).sum() / pl.col("n").sum()).alias("crps"),
+        )
         .sort("group", "arm", "variant")
     )
     out.write_csv(SCORES / "tails_summary.csv")
@@ -104,34 +133,68 @@ def tails() -> pl.DataFrame:
 
 def checks() -> pl.DataFrame:
     """Return the median minus the mean forecast per Primary, and the mean-forecast absolute error."""
-    table = scoring.load_rows().filter(pl.col("gam14")).select("month", "primary", "origin", "target", "group", "cls")
+    table = (
+        scoring.load_rows()
+        .filter(pl.col("gam14"))
+        .select("month", "primary", "origin", "target", "group", "cls")
+    )
     levels = build.LEVELS
     records = []
     for arm in CANDIDATES:
         parts = []
         for month in build.MONTHS:
             keys = table.filter(pl.col("month") == month).select(*build.KEYS, "group", "cls")
-            cells = [pl.read_parquet(build.prediction_path(arm=arm, month=month, cell=c)) for c in range(scoring.arm_cells(arm=arm))]
-            q = np.mean([c.select(list(levels)).to_numpy().astype(np.float64) for c in cells], axis=0)
-            frame = cells[0].select(*build.KEYS).hstack(pl.DataFrame(q, schema=list(levels), orient="row"))
+            cells = [
+                pl.read_parquet(build.prediction_path(arm=arm, month=month, cell=c))
+                for c in range(scoring.arm_cells(arm=arm))
+            ]
+            q = np.mean(
+                [c.select(list(levels)).to_numpy().astype(np.float64) for c in cells], axis=0
+            )
+            frame = (
+                cells[0]
+                .select(*build.KEYS)
+                .hstack(pl.DataFrame(q, schema=list(levels), orient="row"))
+            )
             actual = scoring.score454.month_base(month=month).select(*build.KEYS, "actual")
             joined = keys.join(frame, on=build.KEYS).join(actual, on=build.KEYS)
             qs = joined.select(list(levels)).to_numpy()
             mean_forecast = (qs * common.ATOM_MASSES[None, :]).sum(axis=1)
-            parts.append(joined.select("primary", "group", "cls", "actual", "q50").with_columns(mean=pl.Series(mean_forecast)))
+            parts.append(
+                joined.select("primary", "group", "cls", "actual", "q50").with_columns(
+                    mean=pl.Series(mean_forecast)
+                )
+            )
         data = pl.concat(parts).with_columns(
             gap=(pl.col("q50") - pl.col("mean")) * 100.0,
             mae_mean=(pl.col("mean") - pl.col("actual")).abs() * 100.0,
             mae_median=(pl.col("q50") - pl.col("actual")).abs() * 100.0,
         )
         for (group, primary), part in data.group_by("group", "primary"):
-            records.append({"arm": arm, "group": group, "primary": primary, "median_minus_mean_points": float(part["gap"].mean()), "n": part.height})
+            records.append(
+                {
+                    "arm": arm,
+                    "group": group,
+                    "primary": primary,
+                    "median_minus_mean_points": mean_of(part["gap"]),
+                    "n": part.height,
+                }
+            )
         for sname in ("eight", "six_clean"):
             g, kind = scoring.SLICES[sname]
             part = data.filter(pl.col("group") == g)
             if kind == "clean":
                 part = part.filter(pl.col("cls") == "clean")
-            records.append({"arm": arm, "group": sname, "primary": -1, "mae_mean_points": float(part["mae_mean"].mean()), "mae_median_points": float(part["mae_median"].mean()), "n": part.height})
+            records.append(
+                {
+                    "arm": arm,
+                    "group": sname,
+                    "primary": -1,
+                    "mae_mean_points": mean_of(part["mae_mean"]),
+                    "mae_median_points": mean_of(part["mae_median"]),
+                    "n": part.height,
+                }
+            )
     out = pl.DataFrame(records)
     out.write_csv(SCORES / "checks.csv")
     return out
@@ -144,26 +207,92 @@ def leave_one_out() -> pl.DataFrame:
     for a, b in scoring.CONTRASTS:
         for sname in ("eight", "six_clean"):
             part, _ = scoring.slice_filter(table=table, name=sname)
-            full = float((part[f"{a}__crps"] - part[f"{b}__crps"]).mean())
+            full = mean_of(part[f"{a}__crps"] - part[f"{b}__crps"])
             for primary in sorted(part["primary"].unique().to_list()):
                 rest = part.filter(pl.col("primary") != primary)
-                records.append({"contrast": f"{a} - {b}", "slice": sname, "left_out": primary, "full": full, "without": float((rest[f"{a}__crps"] - rest[f"{b}__crps"]).mean())})
+                records.append(
+                    {
+                        "contrast": f"{a} - {b}",
+                        "slice": sname,
+                        "left_out": primary,
+                        "full": full,
+                        "without": mean_of(rest[f"{a}__crps"] - rest[f"{b}__crps"]),
+                    }
+                )
     out = pl.DataFrame(records)
     out.write_csv(SCORES / "leave_one_out.csv")
+    return out
+
+
+def curtailment_per_mw_day() -> pl.DataFrame:
+    """Return each candidate's saving against `manual_heuristic` in pounds per MW per day (negative saves)."""
+    import e00448_refs as refs448  # ty: ignore[unresolved-import]
+
+    sites = refs448.sites_table().filter(pl.col("group") == "signed-MW six")
+    capacity = float(sites["capacity_mw"].sum())
+    days = 0
+    import e00470_curtailment as cur  # ty: ignore[unresolved-import]
+
+    for month in build.MONTHS:
+        days += cur.month_base(month=month)["valid_time"].dt.date().n_unique()
+    table = pl.read_csv(SCORES / "curtailment_bootstrap.csv")
+    scale = 1e6 / (capacity * days)
+    out = (
+        table.filter(pl.col("item").str.ends_with(" minus manual_heuristic"))
+        .with_columns(pl.col("estimate", "low", "high") * scale)
+        .rename(
+            {"estimate": "pounds_per_mw_day", "low": "low_per_mw_day", "high": "high_per_mw_day"}
+        )
+        .with_columns(six_capacity_mw=capacity, scored_days=days)
+    )
+    out.write_csv(SCORES / "curtailment_per_mw_day.csv")
     return out
 
 
 def main() -> None:
     """Print the decision table, tails, checks, and leave-one-out summary."""
     with pl.Config(tbl_rows=200, tbl_width_chars=250, tbl_cols=40):
-        print(decision().with_columns(pl.col(pl.Float64).round(3)).transpose(include_header=True, header_name="field", column_names=CANDIDATES))
+        print(
+            decision()
+            .with_columns(pl.col(pl.Float64).round(3))
+            .transpose(include_header=True, header_name="field", column_names=CANDIDATES)
+        )
         t = tails()
-        print(t.filter(pl.col("variant").is_in(["raw", "w1.15", "P"])).with_columns(pl.col(pl.Float64).round(3)))
+        print(
+            t.filter(pl.col("variant").is_in(["raw", "w1.15", "P"])).with_columns(
+                pl.col(pl.Float64).round(3)
+            )
+        )
         c = checks()
         print(c.filter(pl.col("primary") == -1).with_columns(pl.col(pl.Float64).round(3)))
-        print(c.filter(pl.col("primary") >= 0).group_by("arm", "group").agg(pl.col("median_minus_mean_points").min().alias("min"), pl.col("median_minus_mean_points").max().alias("max")).sort("group", "arm").with_columns(pl.col(pl.Float64).round(3)))
+        print(
+            c.filter(pl.col("primary") >= 0)
+            .group_by("arm", "group")
+            .agg(
+                pl.col("median_minus_mean_points").min().alias("min"),
+                pl.col("median_minus_mean_points").max().alias("max"),
+            )
+            .sort("group", "arm")
+            .with_columns(pl.col(pl.Float64).round(3))
+        )
+        print(curtailment_per_mw_day().with_columns(pl.col(pl.Float64).round(2)))
+        print(
+            pl.read_csv(SCORES / "curtailment_bootstrap.csv")
+            .filter(~pl.col("item").str.contains("minus"))
+            .with_columns(pl.col(pl.Float64).round(3))
+        )
         loo = leave_one_out()
-        flips = loo.with_columns(flip=(pl.col("full") * pl.col("without") < 0)).group_by("contrast", "slice").agg(pl.col("flip").sum().alias("flips"), pl.col("without").min().alias("min_without"), pl.col("without").max().alias("max_without"), pl.col("full").first()).sort("contrast", "slice")
+        flips = (
+            loo.with_columns(flip=(pl.col("full") * pl.col("without") < 0))
+            .group_by("contrast", "slice")
+            .agg(
+                pl.col("flip").sum().alias("flips"),
+                pl.col("without").min().alias("min_without"),
+                pl.col("without").max().alias("max_without"),
+                pl.col("full").first(),
+            )
+            .sort("contrast", "slice")
+        )
         print(flips.with_columns(pl.col(pl.Float64).round(3)))
 
 

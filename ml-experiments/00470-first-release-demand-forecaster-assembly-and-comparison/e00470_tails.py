@@ -32,13 +32,15 @@ def main() -> None:
         base = score470.month_context(month=month, sites=sites, ctx=ctx)
         keep = rows.filter((pl.col("month") == month) & pl.col("gam14")).select(build470.KEYS)
         bases[month] = base.join(keep, on=build470.KEYS, how="semi")
+
     # score454.load_cell reads this experiment's stored cells instead of experiment 454's.
     def load_cell(*, base: pl.DataFrame, arm: str, month: str, cell: int) -> pl.DataFrame:
         frame = pl.read_parquet(build470.prediction_path(arm=arm, month=month, cell=cell))
         joined = base.join(
             frame.select(*build470.KEYS, *score.LEVEL_NAMES), on=build470.KEYS, how="left"
         )
-        assert joined.height == base.height and joined["q50"].null_count() == 0, "rows differ"
+        assert joined.height == base.height, "rows differ"
+        assert joined["q50"].null_count() == 0, "rows differ"
         return joined.with_columns(pl.col("actual", *score.LEVEL_NAMES).cast(pl.Float64))
 
     score454.load_cell = load_cell  # ty: ignore[invalid-assignment]

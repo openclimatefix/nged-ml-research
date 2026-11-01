@@ -1,5 +1,7 @@
-"""Score experiment 470's candidates on common rows: the minimum detectable effect, absolute scores,
-paired contrasts with month-block bootstrap intervals, and the tail and widening tables.
+"""Score experiment 470's candidates on common rows.
+
+The outputs are the minimum detectable effect, absolute scores, paired contrasts with month-block
+bootstrap intervals, and the tail and widening tables.
 
 Row sets (all within experiment 454's rows, 0 to 240 hours, after the cleaned-data drops):
 
@@ -9,9 +11,10 @@ Row sets (all within experiment 454's rows, 0 to 240 hours, after the cleaned-da
 - `ref14`: `gam14` rows that BG2, `manual_heuristic`, climatology, and the XGBoost forecast also
   hold (BG2 stops at 168 hours, so days 8 to 10 drop out).
 
-Slices: `eight`, `six_clean` (rows with no labelled event), `six_nra` (real-event rows scored against
-normal-running-arrangement actuals), `cold_eight`, `cold_six`, `band_eight` and `band_six` (12 to 36
-hours), `xmas_eight` and `xmas_six` (22 to 31 December, report-only), and `report` (D15 and D18).
+Slices: `eight`, `six_clean` (rows with no labelled event), `six_nra` (real-event rows scored
+against normal-running-arrangement actuals), `cold_eight`, `cold_six`, `band_eight` and `band_six`
+(12 to 36 hours), `xmas_eight` and `xmas_six` (22 to 31 December, report-only), and `report`
+(D15 and D18).
 All scores are selection-biased: the five folds that choose the candidate also score it.
 
 ```bash
@@ -44,11 +47,20 @@ KEYS: Final[list[str]] = build470.KEYS
 SCORE_DIR = heads470.WORK_DIR / "scores"
 CANDIDATES: Final[tuple[str, ...]] = ("A-pool", "K2-S1", "K2-425A", "K2-425A+S1", "A-gam-in")
 CONTROLS: Final[tuple[str, ...]] = ("A-ens2", "B-mix", "S1-ens3")
+DESCRIPTIVE: Final[tuple[str, ...]] = ("AvgAnchor",)
+"""Experiment 472's AvgAnchor: unreplicated, scored beside the candidates and outside the rule."""
 SINGLES: Final[tuple[str, ...]] = tuple(f"A-s{s}" for s in build470.POOL_SEEDS)
 REFERENCES: Final[tuple[str, ...]] = ("BG2", "manual_heuristic", "climatology", "XGB-monthly")
 NOT_WIDENED: Final[tuple[str, ...]] = ("BG2", "manual_heuristic", "climatology")
 MAIN_ARMS: Final[tuple[str, ...]] = tuple(a for a in (*CANDIDATES, *CONTROLS) if a != "A-gam-in")
-CELLS: Final[dict[str, int]] = {"B-mix": 3, "K2-S1": 3, "K2-425A": 3, "K2-425A+S1": 3, "A-ens2": 3}
+CELLS: Final[dict[str, int]] = {
+    "B-mix": 3,
+    "K2-S1": 3,
+    "K2-425A": 3,
+    "K2-425A+S1": 3,
+    "A-ens2": 3,
+    "AvgAnchor": 3,
+}
 WIDEN_SWEEP: Final[tuple[float, ...]] = (1.05, 1.10, 1.15)
 HEADLINE: Final[float] = 1.15
 TESTS: Final[int] = 54
@@ -89,7 +101,7 @@ def read_cell(*, arm: str, month: str, cell: int) -> pl.DataFrame:
 
 
 def month_context(*, month: str, sites: pl.DataFrame, ctx: dict) -> pl.DataFrame:
-    """Return a month's base rows with the group, class, lead band, NRA correction, and slice flags."""
+    """Return a month's base rows with group, class, lead band, NRA correction, and slice flags."""
     base = score454.month_base(month=month)
     grid = common.grid_times()
     base = base.with_columns(
@@ -151,22 +163,28 @@ def masks(*, wide: pl.DataFrame) -> dict[str, pl.Series]:
 
 def month_rows(*, month: str, base: pl.DataFrame) -> pl.DataFrame:
     """Return a month's row-level metrics of every arm (headline widening, cells averaged)."""
-    arms = (*CANDIDATES, *CONTROLS, *SINGLES, *REFERENCES)
+    arms = (*CANDIDATES, *CONTROLS, *DESCRIPTIVE, *SINGLES, *REFERENCES)
     wide = base.select(*KEYS)
     cols: dict[str, np.ndarray] = {}
     for arm in arms:
         cells = []
         for cell in range(arm_cells(arm=arm)):
             frame = base.select(*KEYS, "actual", "nra", "tgt_real").join(
-                read_cell(arm=arm, month=month, cell=cell), on=KEYS, how="left", maintain_order="left"
+                read_cell(arm=arm, month=month, cell=cell),
+                on=KEYS,
+                how="left",
+                maintain_order="left",
             )
             frame = widen_arm(arm=arm, frame=frame, factor=HEADLINE)
             ok = frame["q50"].is_not_null().to_numpy() & np.isfinite(frame["q50"].to_numpy())
             frame = frame.with_columns(*[pl.col(c).fill_null(0.0) for c in LEVELS])
             metered = row_metrics(frame=frame)
-            nra = row_metrics(frame=frame.with_columns(actual_nra=pl.col("actual") - pl.col("nra")), actual="actual_nra")
-            cells.append(({k: np.where(ok, v, np.nan) for k, v in metered.items()},
-                          {k: np.where(ok, v, np.nan) for k, v in nra.items()}, ok, frame["q50"].to_numpy()))  # fmt: skip
+            nra = row_metrics(
+                frame=frame.with_columns(actual_nra=pl.col("actual") - pl.col("nra")),
+                actual="actual_nra",
+            )
+            masked = [{k: np.where(ok, v, np.nan) for k, v in m.items()} for m in (metered, nra)]
+            cells.append((masked[0], masked[1], ok, frame["q50"].to_numpy()))
         for metric in cells[0][0]:
             cols[f"{arm}__{metric}"] = np.mean([c[0][metric] for c in cells], axis=0)
             cols[f"{arm}__nra_{metric}"] = np.mean([c[1][metric] for c in cells], axis=0)
@@ -179,7 +197,11 @@ def month_rows(*, month: str, base: pl.DataFrame) -> pl.DataFrame:
     out = wide.hstack(pl.DataFrame({k: pl.Series(k, v, dtype=pl.Float32) for k, v in cols.items()}))
     masks_ = masks(wide=out.with_columns(base["group"]))
     return (
-        out.hstack(base.select("group", "cls", "lead_hours", "lead_band", "tgt_real", "cold", "xmas", "band", "day"))
+        out.hstack(
+            base.select(
+                "group", "cls", "lead_hours", "lead_band", "tgt_real", "cold", "xmas", "band", "day"
+            )
+        )
         .hstack(pl.DataFrame(dict(masks_.items())))
         .with_columns(month=pl.lit(month))
     )
@@ -204,7 +226,9 @@ def load_rows() -> pl.DataFrame:
     return pl.concat([pl.read_parquet(SCORE_DIR / f"rows_{m}.parquet") for m in MONTHS])
 
 
-def slice_filter(*, table: pl.DataFrame, name: str, basis: str = "metered") -> tuple[pl.DataFrame, str]:
+def slice_filter(
+    *, table: pl.DataFrame, name: str, basis: str = "metered"
+) -> tuple[pl.DataFrame, str]:
     """Return the rows of a slice and the metric prefix (`nra_` for the real-event basis)."""
     group, kind = SLICES[name]
     part = table.filter(pl.col("group") == group)
@@ -243,12 +267,14 @@ def block_bootstrap(*, diff: pl.DataFrame, rng: np.random.Generator) -> dict:
         "low": float(np.percentile(boot, 2.5)), "high": float(np.percentile(boot, 97.5)),
         "low_bonferroni": float(np.percentile(boot, alpha)),
         "high_bonferroni": float(np.percentile(boot, 100.0 - alpha)),
-        "by_month": json.dumps({r["month"]: round(r["d"], 4) for r in by_month.iter_rows(named=True)}),
+        "by_month": json.dumps(
+            {r["month"]: round(r["d"], 4) for r in by_month.iter_rows(named=True)}
+        ),
     }  # fmt: skip
 
 
 def mde(*, table: pl.DataFrame) -> pl.DataFrame:
-    """Return experiment 428's minimum detectable effect: arm A's five single seeds, and the cells."""
+    """Return experiment 428's minimum detectable effect: arm A's five seeds, and the cells."""
     records = []
     sets = {
         "eight": "mva_eight", "six (all rows)": "signed_six", "D15 and D18": "report_only",
@@ -286,7 +312,7 @@ def stats_command() -> None:
     absolute = []
     for sname in SLICES:
         for rowset in ("gam14", "main16", "ref14"):
-            for arm in (*CANDIDATES, *CONTROLS, *REFERENCES):
+            for arm in (*CANDIDATES, *CONTROLS, *DESCRIPTIVE, *REFERENCES):
                 if arm in REFERENCES and rowset != "ref14":
                     continue
                 part, prefix = slice_filter(table=table, name=sname)
@@ -302,15 +328,28 @@ def stats_command() -> None:
     records = []
     for a, b in CONTRASTS:
         rowset = rowset_for(a=a, b=b)
-        for sname in GATING_CRPS + ("xmas_eight", "xmas_six", "report"):
-            for metric in ("crps", *([f"pin_{t}" for t in TAIL_LEVELS] if sname in ("eight", "six_clean", "report") else [])):
+        for sname in (*GATING_CRPS, "xmas_eight", "xmas_six", "report"):
+            for metric in (
+                "crps",
+                *(
+                    [f"pin_{t}" for t in TAIL_LEVELS]
+                    if sname in ("eight", "six_clean", "report")
+                    else []
+                ),
+            ):
                 if sname == "report" and "A-gam-in" in (a, b):
                     continue
                 part, prefix = slice_filter(table=table, name=sname)
                 part = part.filter(pl.col(rowset))
-                diff = part.select(
-                    "month", "day", d=pl.col(f"{a}__{prefix}{metric}") - pl.col(f"{b}__{prefix}{metric}")
-                ).drop_nulls().drop_nans()
+                diff = (
+                    part.select(
+                        "month",
+                        "day",
+                        d=pl.col(f"{a}__{prefix}{metric}") - pl.col(f"{b}__{prefix}{metric}"),
+                    )
+                    .drop_nulls()
+                    .drop_nans()
+                )
                 if diff.height == 0:
                     continue
                 records.append(
@@ -323,7 +362,11 @@ def stats_command() -> None:
     contrasts.write_csv(SCORE_DIR / "contrasts.csv")
     print(f"counted tests: {int(contrasts['counted'].sum())} (pre-registered {TESTS})")
     with pl.Config(tbl_rows=200, tbl_width_chars=200):
-        print(contrasts.filter(pl.col("metric") == "crps").drop("by_month").with_columns(pl.col(pl.Float64).round(3)))
+        print(
+            contrasts.filter(pl.col("metric") == "crps")
+            .drop("by_month")
+            .with_columns(pl.col(pl.Float64).round(3))
+        )
 
 
 def main() -> None:

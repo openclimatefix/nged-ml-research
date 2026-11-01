@@ -40,7 +40,7 @@ _CONTEXT: dict = {}
 
 
 def month_base(*, month: str) -> pl.DataFrame:
-    """Return a month's `gam14` rows with no labelled event, keyed by series, init, and valid time."""
+    """Return a month's `gam14` rows with no labelled event, keyed by series, init, and valid."""
     if month not in _BASES:
         if not _CONTEXT:
             _CONTEXT.update(prep425.cleaned_scoring_context(series=adapter.series_table()))
@@ -62,7 +62,9 @@ def read_construct_rows(
         for c in range(score470.arm_cells(arm=arm))
     ]
     q = np.mean([f.select(list(LEVELS)).to_numpy().astype(np.float64) for f in frames], axis=0)
-    mean = frames[0].select(build470.KEYS).hstack(pl.DataFrame(q, schema=list(LEVELS), orient="row"))
+    mean = (
+        frames[0].select(build470.KEYS).hstack(pl.DataFrame(q, schema=list(LEVELS), orient="row"))
+    )
     out = rows.select(*build470.KEYS, "time_series_id", "power_fcst_init_time", "valid_time").join(
         widen(frame=mean, factor=factor), on=build470.KEYS, how="inner"
     )

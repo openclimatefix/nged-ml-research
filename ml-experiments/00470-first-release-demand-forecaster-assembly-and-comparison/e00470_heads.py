@@ -33,7 +33,9 @@ E425: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00425-best-mdn-architecture-assembly-with-ablations" / "work"
 )
 WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00470-first-release-demand-forecaster-assembly-and-comparison" / "work"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00470-first-release-demand-forecaster-assembly-and-comparison"
+    / "work"
 )
 GRID_START_US: Final[int] = int(common.GRID_START.timestamp() * 1_000_000)
 STEP_US: Final[int] = 1_800_000_000
@@ -47,8 +49,10 @@ def head_path(*, month: str, seed: int) -> Path:
     return WORK_DIR / "heads" / "A" / f"{month}_s{seed}.parquet"
 
 
-def load_network(*, month: str, seed: int) -> tuple[fit397.Fitted, prep.Standardiser, np.ndarray, np.ndarray]:
-    """Return arm A's pooled network, its standardiser, and its target mean and standard deviation."""
+def load_network(
+    *, month: str, seed: int
+) -> tuple[fit397.Fitted, prep.Standardiser, np.ndarray, np.ndarray]:
+    """Return arm A's pooled network, its standardiser, and the target mean and deviation."""
     folder = E425 / "models" / "A" / month / f"s{seed}"
     meta = json.loads((folder / "meta.json").read_text())
     setting = fit397.Setting(**meta["setting"])
@@ -72,12 +76,14 @@ def load_network(*, month: str, seed: int) -> tuple[fit397.Fitted, prep.Standard
 
 @torch.no_grad()
 def forecast_heads(*, month: str, seed: int) -> pl.DataFrame:
-    """Return the month's keys and 3-component mixture (capacity fractions), one row per valid time."""
+    """Return the month's keys and 3-component mixture (capacity fractions), per valid time."""
     fitted, standardiser, t_mean, t_std = load_network(month=month, seed=seed)
     k = fitted.setting.components
     pieces = []
     for origin in prep.test_origins(month=month):
-        for row, keys, x in prep.run_inputs(origin=origin, scheme="summary", standardiser=standardiser):
+        for row, keys, x in prep.run_inputs(
+            origin=origin, scheme="summary", standardiser=standardiser
+        ):
             p = int(row["primary"])
             parts = []
             for start in range(0, len(x), CHUNK):
@@ -90,9 +96,9 @@ def forecast_heads(*, month: str, seed: int) -> pl.DataFrame:
             raw[:, k : 2 * k] = raw[:, k : 2 * k] * t_std[p] + t_mean[p]
             raw[:, 2 * k :] = raw[:, 2 * k :] * t_std[p]
             names = [f"{n}{i}" for n in ("lw", "mu", "sd") for i in range(k)]
-            frame = keys.select("time_series_id", "power_fcst_init_time", "valid_time").with_columns(
-                primary=pl.lit(p, dtype=pl.Int16)
-            )
+            frame = keys.select(
+                "time_series_id", "power_fcst_init_time", "valid_time"
+            ).with_columns(primary=pl.lit(p, dtype=pl.Int16))
             pieces.append(frame.hstack(pl.DataFrame(raw, schema=names, orient="row")))
     out = pl.concat(pieces)
     us = lambda c: ((pl.col(c).dt.epoch("us") - GRID_START_US) // STEP_US).cast(pl.Int32)  # noqa: E731

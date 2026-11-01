@@ -1,10 +1,10 @@
 """Put every candidate and reference of experiment 470 on experiment 454's rows.
 
-Rows are experiment 454's scored rows (`primary`, `origin`, `target` on experiment 404's grid), which
-are a subset of experiment 425's rows. Each arm is written to
+Rows are experiment 454's scored rows (`primary`, `origin`, `target` on experiment 404's grid),
+which are a subset of experiment 425's rows. Each arm is written to
 `work/predictions/<arm>/<month>_c<cell>.parquet` with the keys and the 11 quantiles in capacity
-fractions, raw (the scorer applies the 1.15 widening). An arm with several cells (seeds or seed pairs)
-is scored cell by cell and averaged by row.
+fractions, raw (the scorer applies the 1.15 widening). An arm with several cells (seeds or seed
+pairs) is scored cell by cell and averaged by row.
 
 Arms: `B-mix`, `K2-S1`, `S1-ens3` (copied from experiment 454); `A-pool` (arm A of experiment 425,
 five-seed quantile average); `A-gam-in` (experiment 457's `Gin`, five-seed quantile average, the 14
@@ -88,7 +88,7 @@ def on_rows(*, rows: pl.DataFrame, frame: pl.DataFrame) -> pl.DataFrame:
 def pool_stored(
     *, folder: Path, month: str, sites: pl.DataFrame, seeds: tuple[int, ...] = POOL_SEEDS
 ) -> pl.DataFrame:
-    """Return the quantile average over `seeds` of an experiment 425-layout arm, keyed on the grid."""
+    """Return the quantile average over `seeds` of an experiment 425-layout arm on the grid."""
     parts = [
         pl.read_parquet(folder / f"{month}_s{s}.parquet").join(
             pl.read_parquet(folder / f"{month}_s{seeds[0]}.parquet").select(
@@ -109,13 +109,17 @@ def pool_stored(
     )
     mean = stacked.astype(np.float64).mean(axis=0)
     frame = base.hstack(pl.DataFrame(mean, schema=list(LEVELS), orient="row"))
-    return grid_keys(frame=frame.join(sites.select("time_series_id", "primary"), on="time_series_id"))
+    return grid_keys(
+        frame=frame.join(sites.select("time_series_id", "primary"), on="time_series_id")
+    )
 
 
 def a_heads(*, month: str, keys: dict[str, np.ndarray]) -> dict[int, Head]:
     """Return arm A's heads (seeds 0 to 2) aligned to the 454 row order."""
     base = pl.DataFrame({k: keys[k].astype(np.int64) for k in KEYS}).with_columns(
-        pl.col("primary").cast(pl.Int16), pl.col("origin").cast(pl.Int32), pl.col("target").cast(pl.Int32)
+        pl.col("primary").cast(pl.Int16),
+        pl.col("origin").cast(pl.Int32),
+        pl.col("target").cast(pl.Int32),
     )
     out: dict[int, Head] = {}
     for seed in build454.CELL_SEEDS:
@@ -123,13 +127,17 @@ def a_heads(*, month: str, keys: dict[str, np.ndarray]) -> dict[int, Head]:
         joined = base.join(frame, on=KEYS, how="left", maintain_order="left")
         assert joined.height == base.height, f"arm A s{seed} {month}: duplicated keys"
         assert joined["lw0"].null_count() == 0, f"arm A s{seed} {month} misses 454 rows"
-        t = torch.tensor(joined.select([f"{n}{i}" for n in ("lw", "mu", "sd") for i in range(3)]).to_numpy())
+        t = torch.tensor(
+            joined.select([f"{n}{i}" for n in ("lw", "mu", "sd") for i in range(3)]).to_numpy()
+        )
         out[seed] = (t[:, :3], t[:, 3:6], t[:, 6:9])
     return out
 
 
-def mixtures(*, heads: dict[str, dict[int, Head]], a: dict[int, Head]) -> dict[str, list[list[Head]]]:
-    """Return the cells of the arm A mixtures (equal weights); cell `c` of `K2-425A+S1` uses seed c."""
+def mixtures(
+    *, heads: dict[str, dict[int, Head]], a: dict[int, Head]
+) -> dict[str, list[list[Head]]]:
+    """Return the cells of the arm A mixtures (equal weights); `K2-425A+S1` cell `c` uses seed c."""
     s, ll = heads["S"], heads["L"]
     pairs = build454.PAIRS
     return {
@@ -139,6 +147,23 @@ def mixtures(*, heads: dict[str, dict[int, Head]], a: dict[int, Head]) -> dict[s
     }
 
 
+def copy_descriptive(*, month: str) -> None:
+    """Copy experiment 472's AvgAnchor cells (real world, seeds 0 to 2) onto 454's rows."""
+    heads, keys = build454.load_heads(month=month)
+    del heads
+    rows = pl.DataFrame({k: keys[k] for k in KEYS})
+    folder = (
+        ML_EXPERIMENTS_DATA_DIR
+        / "00472-anchor-plus-correction-with-a-strong-penalty-and-a-seed-averaged-anchor"
+        / "work"
+        / "predictions"
+        / "AvgAnchor"
+    )
+    for cell in build454.CELL_SEEDS:
+        stored = pl.read_parquet(folder / f"{month}_s{cell}_w-1.parquet")
+        write_arm(arm="AvgAnchor", month=month, cell=cell, frame=on_rows(rows=rows, frame=stored))
+
+
 def build_singles(*, month: str) -> None:
     """Write arm A's five single seeds, which give the minimum detectable effect."""
     sites = site_map()
@@ -146,7 +171,9 @@ def build_singles(*, month: str) -> None:
     del heads
     rows = pl.DataFrame({k: keys[k] for k in KEYS})
     for seed in POOL_SEEDS:
-        frame = pool_stored(folder=E425 / "seed_preds" / "A", month=month, sites=sites, seeds=(seed,))
+        frame = pool_stored(
+            folder=E425 / "seed_preds" / "A", month=month, sites=sites, seeds=(seed,)
+        )
         write_arm(arm=f"A-s{seed}", month=month, cell=0, frame=on_rows(rows=rows, frame=frame))
 
 
@@ -169,10 +196,9 @@ def build_month(*, month: str) -> None:
             frame = rows.hstack(pl.DataFrame(q, schema=list(LEVELS), orient="row"))
             write_arm(arm=arm, month=month, cell=cell, frame=frame)
     # Stored five-seed pools.
-    write_arm(arm="A-pool", month=month, cell=0, frame=on_rows(
-        rows=rows, frame=pool_stored(folder=E425 / "seed_preds" / "A", month=month, sites=sites)))  # fmt: skip
-    write_arm(arm="A-gam-in", month=month, cell=0, frame=on_rows(
-        rows=rows, frame=pool_stored(folder=E457 / "Gin", month=month, sites=sites)))  # fmt: skip
+    for arm, folder in (("A-pool", E425 / "seed_preds" / "A"), ("A-gam-in", E457 / "Gin")):
+        pooled = pool_stored(folder=folder, month=month, sites=sites)
+        write_arm(arm=arm, month=month, cell=0, frame=on_rows(rows=rows, frame=pooled))
     # References (MW over capacity).
     series = adapter.series_table()
     for name, frame in refs448.reference_frames(series=series).items():
@@ -189,10 +215,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--month", required=True, choices=MONTHS)
     parser.add_argument("--singles-only", action="store_true")
+    parser.add_argument("--descriptive-only", action="store_true")
     args = parser.parse_args()
     torch.set_num_threads(1)
     _ = models
-    if args.singles_only:
+    if args.descriptive_only:
+        copy_descriptive(month=args.month)
+    elif args.singles_only:
         build_singles(month=args.month)
     else:
         build_month(month=args.month)
