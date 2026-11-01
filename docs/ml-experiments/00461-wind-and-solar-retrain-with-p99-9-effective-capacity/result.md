@@ -81,8 +81,8 @@ metric: >-
 - **Contrasts in MW**, because the divisor changes: new minus old quantile score in MW, per series
   and pooled over the series of a technology, month-block bootstrap (1,000 draws). Absolute scores in
   MW and in points of the old capacity sit beside every contrast. The minimum detectable effect is
-  stated first, from the spread between two disjoint seed sets of the old arm (wind seeds 0 to 2 against 3
-  and 4; solar one seed against the mean of the other two).
+  stated first, from the spread between two disjoint seed sets of the old arm (wind seeds 0 to 2
+  against 3 and 4; solar one seed against the mean of the other two).
 - **Bonferroni count.** Eleven intervals are reported (2 pooled plus 3 wind plus 6 solar series for
   the headline arm); the adjusted level is 99.55%. The decision rule uses the 2 pooled contrasts.
 - **Tails.** Coverage and pinball loss at q01, q05, q95, and q99, raw and after table P, per series;
