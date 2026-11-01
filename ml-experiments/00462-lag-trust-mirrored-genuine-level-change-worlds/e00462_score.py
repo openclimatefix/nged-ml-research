@@ -42,7 +42,7 @@ import e00462_run as run
 import numpy as np
 import polars as pl
 
-ARMS: Final[tuple[str, ...]] = ("R-inj", "S1", "U1n-2", "Bmix", "S3", "S3-rw", *run.ARM_NAMES)
+ARMS: Final[tuple[str, ...]] = ("R-inj", "S1", "U1n-2", "S3", "S3-rw", *run.ARM_NAMES)
 NEW: Final[tuple[str, ...]] = (*run.ARM_NAMES, "S3-attn-amb")
 MISSING_OK: Final[tuple[str, ...]] = ("Bmix", "R", "S3", "S3-rw")
 """Arms with stored forecasts on worlds 0, 4, 5, and 6 only (no forecasts on the new held-out worlds)."""

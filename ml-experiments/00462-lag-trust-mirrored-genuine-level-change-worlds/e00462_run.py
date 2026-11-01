@@ -81,6 +81,79 @@ def lag_of_column() -> torch.Tensor:
     return torch.tensor(own + neighbour)
 
 
+def row_features_mirror(
+    *, stack: feat.WorldStack, primary: torch.Tensor, lag_grid: torch.Tensor, origin: torch.Tensor,
+    shift: torch.Tensor, mirror_shift: torch.Tensor, recipient: torch.Tensor,
+    neighbours: torch.Tensor, weights: torch.Tensor,
+) -> torch.Tensor:  # fmt: skip
+    """Return experiment 440's S3 features (rows, 54) with a mirror at one neighbour of each row.
+
+    This is `e00440_features.row_features` for S3 with one addition: in the neighbour slot that
+    holds the row's `recipient`, the neighbour's window statistics and surprise at each lag move by
+    `mirror_shift` (rows, 3), a step in the recipient's own band units at the lag's time. A row
+    whose neighbour list does not hold the recipient (arm S3-rw-amb) shows no mirror. With
+    `mirror_shift` zero the result equals `row_features`.
+    """
+    series = stack.series
+    trust = feat.trust
+    end = stack.flat(primary=primary, grid=origin - feat.trust_newest_age())
+    own_parts, extra_parts = [], []
+    rows = neighbours[primary]
+    for lag in range(3):
+        grid = lag_grid[:, lag]
+        centre = stack.flat(primary=primary, grid=grid)
+        raw = trust.window_statistics(
+            series=series, centre=centre, end=end, half_width=feat.HALF_WIDTH
+        )
+        own_parts.append(feat.shift_stats(stats=feat.clean_stats(stats=raw), shift=shift[:, lag]))
+        z_own = (trust.single_step(series=series, at=centre)[:, 1] + shift[:, lag]).clamp(
+            -feat.SURPRISE_CLIP, feat.SURPRISE_CLIP
+        )
+        total = torch.zeros(len(primary), feat.N_STATS, device=primary.device)
+        z_total = torch.zeros(len(primary), device=primary.device)
+        agree = torch.zeros_like(z_total)
+        weight = torch.zeros_like(z_total)
+        for j in range(rows.shape[1]):
+            who = rows[:, j]
+            present = who >= 0
+            safe = who.clamp(min=0)
+            w = torch.where(present, weights[safe], torch.zeros_like(z_total))
+            nb_centre = stack.flat(primary=safe, grid=grid)
+            nb_end = stack.flat(primary=safe, grid=origin - feat.trust_newest_age())
+            step = torch.where(
+                present & (who == recipient), mirror_shift[:, lag], torch.zeros_like(z_total)
+            )
+            nb = feat.shift_stats(
+                stats=feat.clean_stats(
+                    stats=trust.window_statistics(
+                        series=series, centre=nb_centre, end=nb_end, half_width=feat.HALF_WIDTH
+                    )
+                ),
+                shift=step,
+            )
+            z_nb = (trust.single_step(series=series, at=nb_centre)[:, 1] + step).clamp(
+                -feat.SURPRISE_CLIP, feat.SURPRISE_CLIP
+            )
+            total += w[:, None] * nb
+            z_total += w * z_nb
+            agree += w * torch.sign(z_own) * torch.sign(z_nb)
+            weight += w
+        scale = weight.clamp(min=1e-9)
+        has = weight > 0
+        relative = torch.where(has, z_own - z_total / scale, torch.zeros_like(z_own))
+        extra_parts.append(
+            torch.cat(
+                [
+                    total / scale[:, None],
+                    relative.clamp(-feat.SURPRISE_CLIP, feat.SURPRISE_CLIP)[:, None],
+                    torch.where(has, agree / scale, torch.zeros_like(agree))[:, None],
+                ],
+                dim=1,
+            )
+        )
+    return torch.cat([*own_parts, *extra_parts], dim=1)
+
+
 class AmbInputs(run440.WindowInputs, run446.Inputs446):
     """Experiment 440's window and neighbour columns on experiment 446's ambiguous-world training.
 
@@ -114,6 +187,14 @@ class AmbInputs(run440.WindowInputs, run446.Inputs446):
             shift = torch.nan_to_num(step / half, nan=0.0)
             for w in torch.unique(raw["world"]).tolist():
                 sel = raw["world"] == w
+                if "mirror_shift" in raw:
+                    extra[sel] = row_features_mirror(
+                        stack=self.stack(world=int(w)), primary=primary[sel],
+                        lag_grid=lag_grid[sel], origin=raw["origin"][sel], shift=shift[sel],
+                        mirror_shift=raw["mirror_shift"][sel], recipient=raw["recipient"][sel],
+                        neighbours=self._neighbours[arm.name], weights=self._weights,
+                    )  # fmt: skip
+                    continue
                 extra[sel] = feat.row_features(
                     stack=self.stack(world=int(w)), primary=primary[sel], lag_grid=lag_grid[sel],
                     origin=raw["origin"][sel], shift=shift[sel],
