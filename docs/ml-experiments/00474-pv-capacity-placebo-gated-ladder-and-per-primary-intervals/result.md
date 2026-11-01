@@ -49,42 +49,65 @@ metric: >-
 
 # PV capacity: a placebo-gated ladder and a per-Primary table with intervals
 
-**Plan only; no fit has run.** The maintainer set this line high priority on 2026-11-01. NGED wants
-a rough installed-PV estimate for every Primary, so the work gives every Primary a row and marks how
-far to trust it. This first pull request covers the GAM side (stage 0) and the per-Primary table
-(stage 1) on CPU. The neural-network side and the explicit PV forecast (stage 2) wait for the
-manager's go.
+**Take-home message (GAM side, interim): the pooled plant table finds 0.87 of an injected farm, no
+solar shape passes the placebo gate, and a cloud-load nuisance term is what makes the capacity
+intervals honest.** Recovery is the share of an injected metered farm's output that the convex fit
+finds again (1 is all of it). Every rung finds 0.75 to 0.94 of the injected farm. The placebo (the
+farm's day-of-year profile plus the anomaly of another day of the same month) recovers 0.24 to 0.38
+at the 95th percentile, above the 0.20 limit, because the season and the time of day alone give 0.13
+to 0.26. A cloud-following load drops the 80% interval's coverage of the injected capacity to 0% at
+every rung; adding two smooth cloud terms to the fit (day-mean and half-hour cloud response)
+restores it to 73% to 93%. The per-Primary table below therefore uses the rung with the best
+coverage in both worlds, and marks the failed gate on every row.
 
-## Plan
+## Figures
 
-- **Base.** Experiment 269's pooled empirical plant table (the mean learned response of the other
-  farms, read at the Primary's CAMS irradiance), fitted with experiment 129's convex model on rows
-  before 2026-07-01. This is rung C0, reproduced from stored code and checked against 269's
-  stored `result_D*.parquet`.
-- **Placebo, calibrated as in experiment 409.** The farm's series is split into a day-of-year
-  profile and an anomaly. The placebo injects the profile plus the anomaly of another day shuffled
-  within the same month. A profile-only benchmark (anomaly set to zero) states how much recovery
-  the season and time of day give alone. Shuffling within month and clear-sky class is not used,
-  because it keeps the sky link.
-- **Known answer.** Metered farms A to F by letter (E only where its history allows) are injected
-  at 2 MW and 4 MW AC (1 MW is below seed noise). Raw recovery and interval coverage are read per
-  rung.
-- **Ladder.** C1: the physics chain from `studies.pv_physics` (tilt centred near 20 degrees,
-  temperature derate, clip at the AC rating). C2: a fixed DC-to-AC ratio of 1.25 (range 1.1 to
-  1.5), applied after the fit, so the DC interval carries that spread. C3: a post-hoc asymmetric
-  penalty on the capacity increments (a rise is cheap, a fall is dear). C4 and C5 (nearby-farm shape;
-  CAMS with ERA5 temperature) are experiments 238, 267 and 269, whose stored results are cited, not
-  re-run. Every rung is reported, including failures.
-- **Stage 1 table.** Per Primary and season-year: AC and DC capacity at the 10th, 50th and 90th
-  percentiles from a month-block bootstrap of the chosen rung, a recovery column from the known
-  answer, the method and rung, and a status column (D5 export limit, D9 and D16 pin, D12 reverse
-  flow, D15 and D18 history only from 2025-03-01, report-only). The MVA-only Primaries reuse
-  experiment 366's rule and 420's export gate at reactive power zero, with the power-factor-0.97
-  failure reported.
-- **Coverage.** The known-answer coverage test includes the cloud-following load case (code in
-  experiments 129, 235 and 241).
-- **Privacy.** No metered generator's series is shown with a name or ID; distance bands replace any
-  farm-to-Primary pairing. The table carries no generator data.
-- **Compute.** CPU only, at most 4 cores, under 12 GB. Fits cost about 0.5 s each.
-- **Reviews.** A fresh Sonnet agent reviews the code before the first scored run; results, write-up
-  and prose reviews follow, with findings recorded in the PR.
+![Estimated unmetered solar capacity at each Primary](figure_01_capacity_overview.svg)
+
+![Capacity by season-year at each Primary](figure_01_capacity_panels.svg)
+
+## Ladder results (raw recovery, 5 Primaries, 5 farms, 2 and 4 MW; placebo and coverage as defined
+in the plan)
+
+Numbers are in the private file `work/rung_summary.parquet`; the main rows follow.
+
+- **C0, pooled plant table (CAMS sky):** recovery 0.874, placebo 95th percentile 0.36 (maximum over
+  Primaries), coverage 27% (bootstrap alone) and 80% (bootstrap plus recovery spread); with a cloud-
+  following load 0% and 7%.
+- **C1, physics shape, tilt 20 degrees:** 0.823, placebo 0.28, coverage 75%; cloud load 0%.
+- **C1b, physics shape, tilt 35 degrees:** 0.752, placebo 0.25, coverage 75%; cloud load 0%.
+- **R1, nearest farm's recorded output as the shape (instead of CAMS):** 0.876, placebo 0.35,
+  coverage 79%; cloud load 24%.
+- **R2, nearest farm's learned plant response:** 0.881, placebo 0.36, coverage 86%.
+- **R3, pooled table plus nearest farm's output (as well as CAMS):** 0.938, placebo 0.37, coverage
+  79%.
+- **R4, pooled table driven by the mean of ERA5 and CAMS irradiance:** 0.940, placebo 0.40, coverage
+  85%; cloud load 3%.
+- **R5, pooled table driven by ERA5 alone:** 0.814, placebo 0.40, coverage 77%.
+- **With the cloud terms:** C0 0.882 (placebo 0.49, coverage 77%, cloud load 73%); C1 1.030 (0.51,
+  80%, 80%); R4 0.868 (0.51, 93%, 93%).
+
+## Table for NGED
+
+The table is in [nged_table.md](nged_table.md) (latest season-year) and in the private file
+`work/nged_table.parquet` (every season-year). It uses rung R4 with the cloud terms. DC capacity is
+AC capacity times an assumed ratio between 1.1 and 1.5 (centre 1.25), because experiment 73 found
+that the ratio cannot be fitted.
+
+## Neural scores and pros and cons (to be filled by the neural worker)
+
+TODO: explicit PV module inside the demand network (demand part given no irradiance); absolute CRPS,
+sunny-midday and cold-night slices, tails, and curtailment cost against arm A, S1, K2-S1, BG2, the
+GAM stack, the manual heuristic, and climatology; pros and cons of forecasting unmetered PV
+explicitly.
+
+## Caveats
+
+- No rung passes the placebo gate, so every capacity carries a "gate failed" note.
+- D12 uses the physical fleet shape and the fit through the meter; D15 is a generator case with no
+  estimate; D18 has data only from 2025-03-01.
+- MVA-only Primaries are fitted to apparent power with reactive power assumed zero, which experiment
+  370 found fails at a power factor of 0.97.
+- The cloud-load test uses one form of load (experiment 129's), and the cloud terms match that form
+  exactly, so the restored coverage is an optimistic figure.
+- NGED's event labels are incomplete, so the readings may hold unlabelled events.
