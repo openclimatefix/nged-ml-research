@@ -173,6 +173,7 @@ def teacher_mixture(
         return lagless_head(month=month, seed=seed, pool=pool, scalers=scalers, device=device)
 
     if teacher == "K2-S1":
+        assert seed < len(PAIRS), "K2-S1 cells exist for seeds 0 to 2"
         pair = PAIRS[seed]
         heads = [lagged(arm="S1", seed=s) for s in pair] + [lagless_of(s) for s in pair]
     else:
@@ -208,7 +209,6 @@ def teacher_term(
 
 def fit_student(*, arm: str, month: str, seed: int, device: str, stride: int = 2) -> Path:
     """Fit one student arm on one scored month and seed; save it; return the file."""
-    assert arm in ("D-Bmix", "D-0") or seed < len(PAIRS), "K2-S1 cells exist for seeds 0 to 2"
     started = time.monotonic()
     use_student_folders()
     train, _test, scalers, arrays, lag_stats = fit.build_pools(
