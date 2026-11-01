@@ -61,7 +61,7 @@ def clean_tails() -> alt.TopLevelMixin:
         )
     )
     return (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70)
         .encode(
             x=alt.X(
@@ -105,7 +105,7 @@ def cold_nights() -> alt.TopLevelMixin:
         color=alt.Color("variant:N", sort=list(VARIANT_LABELS.values()), title=None),
         column=alt.Column("tail:N", title=None),
     )
-    return (base.mark_line(point=True)).properties(
+    return (base.mark_line(point=True)).properties(  # ty: ignore[unresolved-attribute]
         width=WIDTH // 2,
         height=220,
         title="Cold winter nights at the signed-MW six: targets are q95 at least 0.92 and q99 at least 0.975",
@@ -126,7 +126,7 @@ def real_events() -> alt.TopLevelMixin:
         .unpivot(index="basis", variable_name="tail", value_name="coverage")
     )
     return (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X("basis:N", title="Actual used for the real-event rows"),

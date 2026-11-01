@@ -102,7 +102,7 @@ def fit_factor(*, fit: pl.DataFrame, name: str) -> float:
         ratio, level = (use["actual"] - use["q50"]) / spread, tau
     else:
         ratio, level = (use["q50"] - use["actual"]) / spread, 1.0 - tau
-    return float(ratio.quantile(level))
+    return float(ratio.quantile(level))  # ty: ignore[invalid-argument-type]
 
 
 def apply(*, frame: pl.DataFrame, factors: dict[tuple[str, str, str], float]) -> pl.DataFrame:
@@ -160,7 +160,7 @@ def main() -> None:
             for variant, frame in (("raw", part), ("w1.15", widen(frame=part, factor=WIDENING))):
                 for name in UPPER:
                     low, high = day_bootstrap(frame=frame, name=name, rng=rng)
-                    p = float((frame["actual"] <= frame[name]).mean())
+                    p = float((frame["actual"] <= frame[name]).mean())  # ty: ignore[invalid-argument-type]
                     intervals.append(
                         {
                             "arm": arm, "group": group[0], "variant": variant, "tail": name,
@@ -201,7 +201,7 @@ def main() -> None:
                                 "qs": quantile_score(frame=frame),
                             }  # fmt: skip
                             for name in TAIL_LEVELS:
-                                row[f"cov_{name}"] = float((frame["actual"] <= frame[name]).mean())
+                                row[f"cov_{name}"] = float((frame["actual"] <= frame[name]).mean())  # ty: ignore[invalid-argument-type]
                             rows.append(row)
         print("done", arm, flush=True)
     WORK_DIR.mkdir(parents=True, exist_ok=True)

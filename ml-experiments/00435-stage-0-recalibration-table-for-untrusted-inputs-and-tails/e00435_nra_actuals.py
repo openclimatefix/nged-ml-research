@@ -101,11 +101,11 @@ def duration_check(*, events: pl.DataFrame) -> dict[str, float]:
     """Return the median duration and the share above 7 days, per event row and per label row."""
     labels = pl.read_csv(LABEL_TABLE)
     return {
-        "event_rows_median_hours": float(events["length_days"].median() * 24.0),
-        "event_rows_share_above_7_days": float((events["length_days"] > 7).mean()),
+        "event_rows_median_hours": float(events["length_days"].median() * 24.0),  # ty: ignore[unsupported-operator]
+        "event_rows_share_above_7_days": float((events["length_days"] > 7).mean()),  # ty: ignore[invalid-argument-type]
         "label_table_rows": labels.height,
-        "label_table_median_hours": float(labels["duration_hours"].median()),
-        "label_table_share_above_7_days": float((labels["duration_hours"] > 168).mean()),
+        "label_table_median_hours": float(labels["duration_hours"].median()),  # ty: ignore[invalid-argument-type]
+        "label_table_share_above_7_days": float((labels["duration_hours"] > 168).mean()),  # ty: ignore[invalid-argument-type]
     }
 
 
@@ -138,7 +138,7 @@ def main() -> None:
             step = measured.get(int(row["event_id"]), row["depth_mw"] / row["capacity_mw"])
             arrays[f][p, row["onset_idx"] : row["end_idx"] + 1] += f * step
     WORK_DIR.mkdir(parents=True, exist_ok=True)
-    np.savez(WORK_DIR / "nra_correction_share.npz", **{f"f{f}": a for f, a in arrays.items()})
+    np.savez(WORK_DIR / "nra_correction_share.npz", **{f"f{f}": a for f, a in arrays.items()})  # ty: ignore[invalid-argument-type]
     per_month: dict[str, dict[str, int]] = {}
     for month in SCORED_MONTHS:
         s = month_slice(month=month)

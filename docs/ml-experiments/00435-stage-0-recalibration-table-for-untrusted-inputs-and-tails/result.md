@@ -63,7 +63,7 @@ take_home_message: >-
   and pulls demand tails most of the way up, but it does not reach the accepted 0.93 floor on clean
   rows, so the 1.15 widening is not yet replaceable. Harm rows are no wider a problem than clean
   rows. Cold winter nights remain under-covered.
-production_status: not adopted
+production_status: not-for-production
 adopted_in: none
 advice: >-
   Keep the 1.15 widening in production for now. Run Brief B in full. Rescale wind and solar
