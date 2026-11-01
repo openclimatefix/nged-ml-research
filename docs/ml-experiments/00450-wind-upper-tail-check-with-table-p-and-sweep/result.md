@@ -73,6 +73,11 @@ metric: >-
 code: ml-experiments/00450-wind-upper-tail-check-with-table-p-and-sweep/
 ---
 
+**Take-home (interim, unaudited): table P brings the pooled share above q99 down to the 1.5% limit
+only narrowly, and Farm A misses it for every arm.** Pooled over the three farms, the 10 neural
+arms of experiment 429 reach 1.39% to 1.50% after table P, while Wind farms research default 2
+stays at 1.64%. Farm A is at 1.7% to 2.1% for every arm.
+
 **This is the plan page.** Step 1 (no fits) has run; step 2 (the sweep) waits for the code review.
 
 ## Question
