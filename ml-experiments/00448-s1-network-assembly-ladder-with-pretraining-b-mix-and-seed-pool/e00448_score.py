@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Score the ladder arms of experiment 448 (no fit).
 
 Stored forecasts are linked into this experiment's predictions folder: S1 seeds 0 to 2 and L0 seed 0
