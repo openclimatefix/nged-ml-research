@@ -74,14 +74,16 @@ headline: >-
 lessons: >-
   The best weight on the lagged head falls with lead time (about 0.75 at 0 to 12 hours, about 0.5 at
   days 6 to 10), but it swings by 0.2 or more between months, so a weight fitted on earlier months
-  scores no better on a new month than 50/50. The offset rule is the one cheap rule that helps on
-  rows with no labelled event (-0.23, interval -0.58 to +0.09), and it loses 1.21 points inside real
+  scores no better on a new month than 50/50. The offset rule is the one cheap rule that may help on
+  rows with no labelled event (-0.23, interval -0.58 to +0.09, not significant), and it loses 1.21
+  points inside real
   events, because it follows the level shift.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   No simple rule for combining the lagged and lagless forecasts beats the fixed 50/50 mixture, so
-  keep 50/50 and do not spend 50 network fits on a weight per lead band. The weight that fits best
+  keep 50/50 and do not spend 50 neural-network fits on a weight per lead band. The weight that fits
+  best
   falls from about 0.75 on the lagged forecast at short leads to about 0.5 at days 6 to 10, but it
   moves by 0.2 or more from month to month. A shrunk recent-level offset on the lagless forecast
   helps on rows with no labelled event at the six (-0.23 points, not significant) and costs 1.21
@@ -93,7 +95,8 @@ advice:
   - >-
     Do not run the 50-fit weight-per-lead-band experiment: the fitted weights are unstable across
     months and score no better held out (experiment 458).
-code: ml-experiments/00458-constant-prequential-and-offset-corrected-combinations-of-lagged-and-lagless-heads/
+code:
+ml-experiments/00458-constant-prequential-and-offset-corrected-combinations-of-lagged-and-lagless-heads/
 ---
 
 **No combination rule beat the fixed 50/50 mixture of the lagged and lagless forecasts (B-mix).**
@@ -102,7 +105,7 @@ between months, so weights fitted on earlier months do not generalise. A shrunk 
 on the lagless forecast (arm d) is better on rows with no labelled event and much worse inside real
 events. NGED's event labels are incomplete, so "rows with no labelled event" may hold real events
 that nobody logged, and every real-event slice undercounts. Every number is interim and unaudited.
-It bears on the forecast scores and, through the inside-event rows, on robustness to bad inputs.
+The scores bear on forecast quality, and the inside-event rows bear on robustness to bad inputs.
 
 ![Each combination minus 50/50 at both groups](figure_1_contrasts.svg)
 
@@ -124,7 +127,8 @@ months; seeds averaged within 2026-06; the warm-up month 2025-10 is excluded for
 Intervals are 95% month-block intervals; the Bonferroni interval for 20 contrasts is in the tables
 of the experiment's private folder and in the figure.
 
-- **Arms.** (a) B-mix. (b) one lagged weight per group and lead band, fitted by minimum exact CRPS on
+- **Arms.** (a) B-mix. (b) one lagged weight per group and lead band, fitted by minimum exact CRPS
+  on
   earlier months. (c) prequential weight from each head's 7-day loss, floor 0.2, softmax temperature
   fitted on earlier months. (d) lagless forecast plus k times its median residual over the last 24
   hours of delivered actuals. Lagged heads: A0-inj and S1 of experiment 404; lagless head: the
@@ -134,7 +138,9 @@ of the experiment's private folder and in the figure.
   B-mix, so contrasts use the recomputed 50/50 (same algebra). Contrasts against the stored B-mix
   are in `contrasts.csv`.
 - **Signed-MW six, inside real events (NRA depth 1.0; 50/50 scores 14.262 with A0-inj, 14.267 with
-  S1; minimum detectable effect 0.51 and 0.63).** (b) A0-inj +0.006 [-0.005, +0.023]; (b) S1
+  S1; minimum detectable effect 0.51 and 0.63; the seed-to-seed spread of B-mix in 2026-06 is 2.931
+  to 2.957 at the signed-MW six on rows with no labelled event).** (b) A0-inj +0.006 [-0.005,
+  +0.023]; (b) S1
   +0.043 [-0.000, +0.119]; (c) A0-inj +0.085 [-0.009, +0.267]; (c) S1 +0.069 [-0.004, +0.142]; (d)
   +1.210 [+0.145, +2.276]. A0-inj alone is +0.396 and the lagless head alone +0.120.
 - **Signed-MW six, rows with no labelled event (50/50 scores 3.680 and 3.638; minimum detectable
@@ -148,19 +154,22 @@ of the experiment's private folder and in the figure.
 - **Candidate rule.** No arm is a candidate: none lowers the inside-event score by more than the
   larger of 0.03 and the minimum detectable effect (0.51 at the six). (b) is also 0.054 and 0.072
   worse than 50/50 on rows with no labelled event, over the 0.03 allowance.
-- **Stop rules.** The fitted weights of (b) at the six lie between 0.36 and 0.95 (within 0.05 of 0.5
-  in none of the lead bands in every month), so the "50/50 is near-optimal" rule does not fire
+- **Stop rules.** The fitted weights of (b) at the six lie between 0.41 and 0.86 (within 0.05 of 0.5
+  in 1 of 40 cells), so the "50/50 is near-optimal" rule does not fire
   literally. Held out, however, they score no better than 50/50. The prequential weights stay
-  within 0.05 of 0.5 on 18% to 82% of rows at the six (below 90%). k in (d) is 0.5 to 0.95 at the
+  within 0.05 of 0.5 on 18% to 82% of rows at the six (below 90%). k in (d) is 0.2 to 0.95 at the
   six (not near 0), so the lagless forecast does not already do the work.
 - **Weight stability.** Arm (b) at the six: 0-12 h weight 0.68 to 0.81 and days 6-10 weight 0.43 to
-  0.62 across the four fitted months; the same lead band moves by 0.2 or more between 2025-12 and
-  2026-01 (figure 2). Rows in 2025-12 are fitted on 2025-10 alone, so that fit is thin.
+  0.62 across the four fitted months; some lead bands move by 0.2 or more between 2025-12 and
+  2026-01, and most move by 0.2 or more across the four months (figure 2). Rows in 2025-12 are
+  fitted on 2025-10 alone, so that fit is thin.
 - **Tails at the six, rows with no labelled event.** q95 coverage is 0.860 for B-mix and 0.863 and
   0.863 for (b) and (c); table P lifts it to about 0.944. q99 coverage 0.952, then 0.985 to 0.986
   after table P. Arm (d) covers q01 at 0.017 and q05 at 0.060 raw, above the nominal 0.01 and 0.05.
-  Inside real events q99 coverage is 0.84 for 50/50, (b), and (c), and 0.866 for (d); q99 pinball
-  loss differs from 50/50 by under 0.001 for (b) and (c).
+  Inside real events (row-weighted) q99 coverage is 0.706 for 50/50, 0.705 for (b), 0.707 for (c),
+  and 0.781 for (d). The q99 pinball loss is 0.0227 for 50/50 and differs by under 0.001 for (b) and
+  (c). Arm (d) has the lower q99 pinball loss inside events, 0.0182, although its CRPS is 1.21
+  points worse.
 - **Production cost.** Arm (d) needs only the lagless head and 24 hours of delivered actuals, so it
   costs less than two neural networks; it does not match 50/50 inside real events.
 - **Checks.** A recomputed 50/50 reproduces the stored B-mix score to 0.001 (2026-06) and about 0.01
@@ -169,14 +178,21 @@ of the experiment's private folder and in the figure.
   3.484, and 4.100, so the gain is a persistent bias of the lagless table, and it is not uniform
   (worse than B-mix in 2025-12 and 2026-06). Rows already omit half-hours that the cleaned power
   table lacks, so flagged zeros are dropped; experiment 399's start cut falls before every scored
-  month. No new forecast is a trained model, so the median-minus-mean check does not apply.
+  month. The check of median minus mean forecast does not apply, because every arm is a mixture or a
+  shift of stored quantiles with no mean forecast.
 - **Predictions.** P1 partly holds: the weight falls from about 0.75 at 0-12 h to about 0.5 at days
   6-10, but (b) is 0.054 worse than 50/50 on rows with no labelled event, not better. P2 fails (18%
-  to 82% of rows within 0.05). P3 fails: k is 0.5 to 0.95, and (d) is better, not worse, on rows
+  to 82% of rows within 0.05). P3 fails: k is 0.2 to 0.95 (below 0.3 in one cell), and (d) is
+  better, not worse, on rows
   with no labelled event. P4 holds.
 
 ## Caveats
 
+- **Four months cannot separate a difference of 0.09 from zero.** Arms (b) and (c) match 50/50
+  inside
+  events within 0.09 points, so the hypothesis holds in part: they match, and none beats 50/50. The
+  advice
+  to skip the 50-fit experiment rests on four scored months.
 - **Four scored months and 3 to 4 months with events**, so the minimum detectable effect is 0.4 to
   0.6 points at the six and the Bonferroni intervals are nearly the range of the monthly values.
 - **Unlogged events.** Rows with no labelled event may hold unlabelled real events, so the (d) gain

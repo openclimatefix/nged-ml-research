@@ -78,7 +78,7 @@ def contrasts(*, summary: pl.DataFrame, reference: str = REFERENCE) -> pl.DataFr
                         "bmix_score": float(ref.mean()), "reference": reference, "diff": float(d.mean()),
                         "low95": lo, "high95": hi, "low_bonf": lob, "high_bonf": hib,
                         "negative_months": int((d < 0).sum()), "loo_min": min(loo), "loo_max": max(loo),
-                        "mde": float(mde), "candidate": arm in CANDIDATES,
+                        "mde": float(mde), "candidate_arm": arm in CANDIDATES,
                     }
                 )  # fmt: skip
     return pl.DataFrame(rows)
