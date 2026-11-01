@@ -53,6 +53,7 @@ PRETRAIN_MAX_EPOCHS: Final[int] = 150
 FINE_TUNE_LR: Final[float] = 2e-4
 """Experiment 425's fine-tuning learning rate."""
 SEEDS5: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
+MONTHS5: Final[tuple[str, ...]] = ("2026-06", "2026-01", "2025-10", "2026-03", "2025-12")
 NEW_ARMS: Final[tuple[str, ...]] = ("AS1L", "AL")
 AVG_ARMS: Final[tuple[str, ...]] = ("AS1L", "AL", "PT1")
 
@@ -74,7 +75,8 @@ FINE_TUNE_MAX_EPOCHS: Final[int] = fit.MAX_EPOCHS
 def locate_predictions(*, arm: str) -> Path:
     """Return the folder holding an arm's per-seed forecasts (experiment 449's for `PT1`)."""
     own = WORK_DIR / "predictions" / arm
-    return own if own.exists() else lagless.SOURCE_449 / "predictions" / arm
+    complete = all((own / f"{m}_s{s}_w0.parquet").exists() for m in MONTHS5 for s in SEEDS5)
+    return own if complete else lagless.SOURCE_449 / "predictions" / arm
 
 
 def spread_table(*, rows: data.Rows) -> tuple[np.ndarray, np.ndarray]:
@@ -317,10 +319,10 @@ def quantile_average(*, arm_name: str, source_dir: Path, month: str) -> list[str
             continue
         frames = [pl.read_parquet(source_dir / f"{month}_s{s}_w{w}.parquet") for s in SEEDS5]
         keys = ["primary", "origin_us", "valid_us", "lead"]
+        levels = list(pr.LEVEL_NAMES)
         for frame in frames[1:]:
             assert frame.select(keys).equals(frames[0].select(keys)), "seeds cover different rows"
-            assert frame["actual"].equals(frames[0]["actual"]), "seeds disagree on the actual"
-        levels = list(pr.LEVEL_NAMES)
+            assert frame.drop(levels).equals(frames[0].drop(levels)), "seeds disagree off-quantile"
         mean = frames[0].with_columns(
             [
                 pl.mean_horizontal(*[f[level] for f in frames]).cast(pl.Float32).alias(level)
@@ -351,7 +353,7 @@ def smoke(*, device: str) -> None:
     era5 = lagless.surprise_tables(month=month, seed=0, device=device)
     sample = np.sort(np.random.default_rng(0).choice(len(pre.x), 20_000, replace=False))
     small = data.Rows(
-        **{
+        **{  # ty: ignore[invalid-argument-type]
             **pre.__dict__,
             "x": pre.x[sample],
             "primary": pre.primary[sample],

@@ -1,4 +1,4 @@
-"""Score the arms of experiment 449 beside the references on the same half-hours (no fit).
+"""Score the arms of experiment 452 beside the references on the same half-hours (no fit).
 
 Wraps experiment 448's `e00448_refs` (its row set, slices, tail metrics, and curtailment cost) and
 redirects it to this experiment's predictions folder. Added here: experiment 425's arm A, as a
@@ -9,8 +9,8 @@ experiment's predictions folder by `e00452_score.py link`.
 
 ```bash
 source /tmp/e452_env.sh
-uv run --no-sync python ml-experiments/00449-*/e00452_refs.py --tag four_months
-uv run --no-sync python ml-experiments/00449-*/e00452_refs.py --months 2025-12 --tag december
+uv run --no-sync python ml-experiments/00452-*/e00452_refs.py --tag four_months
+uv run --no-sync python ml-experiments/00452-*/e00452_refs.py --months 2025-12 --tag december
 ```
 """
 
@@ -21,12 +21,10 @@ import e00448_refs as base  # ty: ignore[unresolved-import]
 import e00452_run as run  # ty: ignore[unresolved-import]
 import polars as pl
 
-ARMS = (
-    "S1", "S1-pool5", "S1PT-pool5", "PT0", "PT1", "PT1-full", "PT1b", "PT2",
-    "PT1-pool3", "PT1-pool5",
-)  # fmt: skip
+ARMS = ("S1", "PT1", "PT1-avg5", "AS1L", "AS1L-avg5", "AL", "AL-avg5")
+FIVE_MONTH_ARMS = ("PT1", "PT1-avg5", "AS1L", "AS1L-avg5", "AL", "AL-avg5")
 A_FOLDER = "A"
-CURTAILMENT_ARMS = ("S1", "S1-pool5", "PT1", "PT1-pool5")
+CURTAILMENT_ARMS = ARMS
 _BASE_REFERENCE_FRAMES = base.reference_frames
 """Experiment 448's reference builder, kept before `main` replaces the module attribute."""
 
@@ -56,7 +54,8 @@ def main() -> None:
     base.TABLE_DIR = run.WORK_DIR / "figure_tables"
     base.LADDER_ARMS = ARMS
     base.REFERENCES = (*base.REFERENCES, "425-A-s0", "425-A-avg5")
-    base.SEEDS = (0, 1, 2)
+    base.SEEDS = (0, 1, 2, 3, 4)
+    base.FIVE_MONTH_ARMS = FIVE_MONTH_ARMS
     original_curtailment = base.curtailment
 
     def curtailment_with_pt_arms(**kwargs):  # noqa: ANN003, ANN202

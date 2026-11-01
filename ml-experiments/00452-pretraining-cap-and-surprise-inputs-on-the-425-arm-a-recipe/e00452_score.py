@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Score the arms of experiment 449 (no fit).
+"""Score the arms of experiment 452 (no fit).
 
 Stored forecasts are linked into this experiment's predictions folder: S1 seeds 0 to 2 from
 experiment 428 and `PT0`, which is experiment 448's `S1PT` (seeds 0 to 2). Rows, row sets, groups,
@@ -8,8 +8,8 @@ the 1.15 widening, the block bootstrap, and the minimum detectable effect are ex
 
 ```bash
 source /tmp/e452_env.sh
-uv run --no-sync python ml-experiments/00449-*/e00452_score.py link
-uv run --no-sync python ml-experiments/00449-*/e00452_score.py score
+uv run --no-sync python ml-experiments/00452-*/e00452_score.py link
+uv run --no-sync python ml-experiments/00452-*/e00452_score.py score
 ```
 """
 
@@ -18,7 +18,6 @@ import math
 from pathlib import Path
 from typing import Final
 
-import e00428_data as data  # ty: ignore[unresolved-import]
 import e00428_fit as fit  # ty: ignore[unresolved-import]
 import e00428_predict as pr  # ty: ignore[unresolved-import]
 import e00428_score as score  # ty: ignore[unresolved-import]
@@ -27,32 +26,22 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-ARMS: Final[tuple[str, ...]] = (
-    "S1", "PT0", "PT1", "PT1-full", "PT1b", "PT2", "S1-pool5", "S1PT-pool5", "PT1-pool3", "PT1-pool5",
-)  # fmt: skip
+ARMS: Final[tuple[str, ...]] = ("S1", "PT1", "AS1L", "AL", "PT1-avg5", "AS1L-avg5", "AL-avg5")
 TESTS: Final[int] = 26
-"""Bonferroni count: 13 contrasts at 2 groups."""
+"""Bonferroni count of the 449 audit, kept so the intervals are comparable."""
 RESAMPLES: Final[int] = 20_000
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
-    "C1 PT1 - S1": ("PT1", "S1"),
-    "C2 PT1-full - S1": ("PT1-full", "S1"),
-    "C3 PT2 - S1": ("PT2", "S1"),
-    "C4 PT1 - PT0": ("PT1", "PT0"),
-    "C5 PT2 - PT1": ("PT2", "PT1"),
-    "C6 PT0 - S1": ("PT0", "S1"),
-    "C7 PT1b - S1": ("PT1b", "S1"),
-    "C8 PT1 - PT1b": ("PT1", "PT1b"),
-    "C9 PT1-full - PT1": ("PT1-full", "PT1"),
-    "P1 PT1-pool5 - S1-pool5": ("PT1-pool5", "S1-pool5"),
-    "P2 PT1-pool5 - S1PT-pool5": ("PT1-pool5", "S1PT-pool5"),
-    "P3 PT1-pool5 - PT1": ("PT1-pool5", "PT1"),
-    "P4 S1-pool5 - S1": ("S1-pool5", "S1"),
+    "C1 AS1L - PT1 (cap only)": ("AS1L", "PT1"),
+    "C2 AL - PT1 (surprise inputs and cap)": ("AL", "PT1"),
+    "C3 AS1L - AL (surprise inputs)": ("AS1L", "AL"),
+    "C4 PT1 - S1": ("PT1", "S1"),
+    "C5 AS1L-avg5 - PT1-avg5 (cap only)": ("AS1L-avg5", "PT1-avg5"),
+    "C6 AL-avg5 - PT1-avg5": ("AL-avg5", "PT1-avg5"),
+    "C7 AS1L-avg5 - AL-avg5": ("AS1L-avg5", "AL-avg5"),
 }
-SEED_SETS: Final[dict[str, tuple[int, ...]]] = {"seeds 0-2": (0, 1, 2)}
-PT0_SOURCE: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00448-s1-network-assembly-ladder-with-pretraining-b-mix-and-seed-pool/work/predictions/S1PT"
-)
+"""Contrasts scored here; contrasts against the stored references are scored by `e00452_refs`."""
+SEED_SETS: Final[dict[str, tuple[int, ...]]] = {"seeds 0-4": (0, 1, 2, 3, 4)}
+S1_439: Final[str] = "00439-surprise-at-the-lags-confirmation-on-seeds-three-to-five"
 
 
 def contrast_table(*, table: pl.DataFrame, rng: np.random.Generator) -> pl.DataFrame:
@@ -121,18 +110,16 @@ def minimum_detectable_effect(*, table: pl.DataFrame, seeds: tuple[int, ...]) ->
 
 
 def link() -> None:
-    """Link stored S1 (experiment 428) and PT0 (experiment 448's S1PT) forecasts, seeds 0 to 2."""
+    """Link stored forecasts into this experiment's folder: `PT1` (449) and `S1` (439), seeds 0 to 4."""
     sources = {
-        "S1": [data.WORK_DIR / "predictions" / "S1", PT0_SOURCE.parent / "S1"],
-        "PT0": [PT0_SOURCE],
-        "S1-pool5": [PT0_SOURCE.parent / "S1-pool5"],
-        "S1PT-pool5": [PT0_SOURCE.parent / "S1PT-pool5"],
+        "PT1": [run.lagless.SOURCE_449 / "predictions" / "PT1"],
+        "S1": [ML_EXPERIMENTS_DATA_DIR / S1_439 / "work" / "predictions" / "S1"],
     }
     for arm, folders in sources.items():
         target = run.WORK_DIR / "predictions" / arm
         target.mkdir(parents=True, exist_ok=True)
         for source in (f for folder in folders for f in Path(folder).glob("*.parquet")):
-            if int(source.stem.split("_s")[1].split("_")[0]) in (0, 1, 2):
+            if int(source.stem.split("_s")[1].split("_")[0]) in (0, 1, 2, 3, 4):
                 link_path = target / source.name
                 if not link_path.is_symlink():
                     link_path.symlink_to(source)

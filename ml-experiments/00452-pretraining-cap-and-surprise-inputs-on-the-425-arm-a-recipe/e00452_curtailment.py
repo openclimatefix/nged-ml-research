@@ -7,26 +7,27 @@ four-month total of `e00452_refs.py`.
 
 ```bash
 source /tmp/e452_env.sh
-uv run --no-sync python ml-experiments/00449-*/e00452_curtailment.py
+uv run --no-sync python ml-experiments/00452-*/e00452_curtailment.py
 ```
 """
 
 import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00425_prep as prep425  # ty: ignore[unresolved-import]
 import e00448_refs as base  # ty: ignore[unresolved-import]
-import e00452_refs as refs449  # ty: ignore[unresolved-import]
+import e00452_refs as refs452  # ty: ignore[unresolved-import]
 import e00452_run as run  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 
 _ORIGINAL_COST = base.metrics.avoidable_curtailment_cost
 MONTHS = ("2026-06", "2026-01", "2025-10", "2026-03")
-ARMS = ("S1", "S1-pool5", "PT1", "PT1-pool5")
+ARMS = ("S1", "PT1-avg5", "AS1L-avg5", "AL-avg5")
 REFERENCES = ("425-A-avg5", "BG2", "manual_heuristic")
 RESAMPLES = 20_000
 COMPARISONS = (
-    ("PT1-pool5", "BG2"), ("PT1-pool5", "425-A-avg5"), ("PT1-pool5", "S1-pool5"),
-    ("PT1", "BG2"), ("425-A-avg5", "BG2"), ("S1", "BG2"), ("425-A-avg5", "S1"),
+    ("AS1L-avg5", "PT1-avg5"), ("AL-avg5", "PT1-avg5"), ("AS1L-avg5", "AL-avg5"),
+    ("AS1L-avg5", "425-A-avg5"), ("AL-avg5", "425-A-avg5"), ("PT1-avg5", "425-A-avg5"),
+    ("AS1L-avg5", "BG2"), ("AL-avg5", "BG2"), ("425-A-avg5", "BG2"),
 )  # fmt: skip
 
 
@@ -46,12 +47,12 @@ def per_series_cost(**kwargs: object) -> pl.DataFrame:
 
 def build() -> pl.DataFrame:
     """Return the cost per month, arm, series, and fraction."""
-    base.run = run
+    base.run = run  # ty: ignore[invalid-assignment]
     base.SEEDS = (0, 1, 2)
     base.metrics.avoidable_curtailment_cost = per_series_cost  # ty: ignore[invalid-assignment]
     series = adapter.series_table()
     ctx = prep425.cleaned_scoring_context(series=series)
-    refs = refs449.reference_frames(series=series)
+    refs = refs452.reference_frames(series=series)
     refs = {name: refs[name] for name in REFERENCES}
     parts = []
     for month in MONTHS:
