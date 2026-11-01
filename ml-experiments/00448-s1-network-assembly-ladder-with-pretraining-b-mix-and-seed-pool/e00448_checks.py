@@ -6,8 +6,8 @@ approximated by integrating the quantile function: each quantile carries the pro
 between the midpoints to its neighbours (the outer two carry the tails down to 0 and up to 1). The
 approximation is the same for every arm, so it ranks arms, but the tails make its level
 approximate; `validate` compares it with the exact mixture mean of S1 seed 0 on one month. The
-script reads the raw (unwidened) quantiles and keeps only rows with a finite actual. For each arm, group, and Primary the script prints, in points of capacity (one point
-is 1%), on clean real-world rows, days 1 to 10, averaged over seeds 0 to 4: the median minus the
+script reads the raw (unwidened) quantiles and keeps only rows with a finite actual. For each
+arm, group, and Primary the script prints, in points of capacity (one point is 1%), on clean real-world rows, days 1 to 10, averaged over seeds 0 to 4: the median minus the
 approximate mean, the mean-forecast error (bias and mean absolute error), and the median's
 absolute error.
 
