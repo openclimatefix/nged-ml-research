@@ -13,7 +13,8 @@ D18) and then `z_gam` is 0.
 - `Gbase` (A-gam-base): the network does not read the columns. Its mixture means are
   `inner_mean + (1 - miss) * (z_gam - m0)`, where `m0` is the mean of the frozen pretrained
   network's whole mixture. At the start of fine-tuning the mixture's mean is the GAM forecast
-  and its component offsets, weights, and spreads are the pretrained network's. Rows with `miss = 1` are the pretrained network unchanged.
+  and its component offsets, weights, and spreads are the pretrained network's. Rows with
+  `miss = 1` are the pretrained network unchanged.
 
 ```bash
 export PYTHONPATH=<as e00425_fit.py, plus ml-experiments/00457-*>
