@@ -121,6 +121,7 @@ def a_heads(*, month: str, keys: dict[str, np.ndarray]) -> dict[int, Head]:
     for seed in build454.CELL_SEEDS:
         frame = pl.read_parquet(heads470.head_path(month=month, seed=seed))
         joined = base.join(frame, on=KEYS, how="left", maintain_order="left")
+        assert joined.height == base.height, f"arm A s{seed} {month}: duplicated keys"
         assert joined["lw0"].null_count() == 0, f"arm A s{seed} {month} misses 454 rows"
         t = torch.tensor(joined.select([f"{n}{i}" for n in ("lw", "mu", "sd") for i in range(3)]).to_numpy())
         out[seed] = (t[:, :3], t[:, 3:6], t[:, 6:9])

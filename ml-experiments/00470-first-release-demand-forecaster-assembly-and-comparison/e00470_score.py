@@ -170,7 +170,8 @@ def month_rows(*, month: str, base: pl.DataFrame) -> pl.DataFrame:
         for metric in cells[0][0]:
             cols[f"{arm}__{metric}"] = np.mean([c[0][metric] for c in cells], axis=0)
             cols[f"{arm}__nra_{metric}"] = np.mean([c[1][metric] for c in cells], axis=0)
-        cols[f"{arm}__q50"] = np.where(cells[0][2], np.mean([c[3] for c in cells], axis=0), np.nan)
+        every = np.logical_and.reduce([c[2] for c in cells])
+        cols[f"{arm}__q50"] = np.where(every, np.mean([c[3] for c in cells], axis=0), np.nan)
         # Per-cell CRPS gives the seed spread of the constructs.
         if arm_cells(arm=arm) > 1:
             for i, c in enumerate(cells):
@@ -286,6 +287,8 @@ def stats_command() -> None:
     for sname in SLICES:
         for rowset in ("gam14", "main16", "ref14"):
             for arm in (*CANDIDATES, *CONTROLS, *REFERENCES):
+                if arm in REFERENCES and rowset != "ref14":
+                    continue
                 part, prefix = slice_filter(table=table, name=sname)
                 part = part.filter(pl.col(rowset))
                 if part.height == 0 or part[f"{arm}__{prefix}crps"].null_count() == part.height:
@@ -301,13 +304,13 @@ def stats_command() -> None:
         rowset = rowset_for(a=a, b=b)
         for sname in GATING_CRPS + ("xmas_eight", "xmas_six", "report"):
             for metric in ("crps", *([f"pin_{t}" for t in TAIL_LEVELS] if sname in ("eight", "six_clean", "report") else [])):
-                part, prefix = slice_filter(table=table, name=sname)
-                part = part.filter(pl.col(rowset) if sname != "report" or "A-gam-in" not in (a, b) else pl.col("main16"))
                 if sname == "report" and "A-gam-in" in (a, b):
                     continue
+                part, prefix = slice_filter(table=table, name=sname)
+                part = part.filter(pl.col(rowset))
                 diff = part.select(
                     "month", "day", d=pl.col(f"{a}__{prefix}{metric}") - pl.col(f"{b}__{prefix}{metric}")
-                ).drop_nulls()
+                ).drop_nulls().drop_nans()
                 if diff.height == 0:
                     continue
                 records.append(

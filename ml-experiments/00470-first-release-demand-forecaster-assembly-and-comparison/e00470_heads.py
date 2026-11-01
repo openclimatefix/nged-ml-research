@@ -5,7 +5,7 @@ networks needs the Gaussian mixture itself. This script loads each saved arm A n
 plain network, summary scheme), forecasts every test origin of a month exactly as experiment 425's
 `fit397.forecast_month` did, and keeps the 3-component mixture in capacity fractions. It then
 checks the recomputed 11 quantiles against `seed_preds/A` (maximum difference under 5e-4) and
-writes `work/heads/A/<month>_s<seed>.pt` under this experiment's private folder: the row keys
+writes `work/heads/A/<month>_s<seed>.parquet` under this experiment's private folder: the row keys
 (`primary`, `origin`, `target` on experiment 404's grid) and the mixture.
 
 ```bash
