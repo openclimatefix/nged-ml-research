@@ -2,7 +2,8 @@
 id: "00489"
 slug: distill-the-five-network-pool-into-one-network
 title: >-
-  Can one neural network, trained to match the five-network pool, forecast Primary demand as well as the pool?
+  Can one neural network, trained to match the five-network pool, forecast Primary demand as well as
+  the pool?
 theme: production-reference-and-best-guess
 also_relevant_to:
   - calibration-and-uncertainty
@@ -61,8 +62,8 @@ lessons: >-
 take_home_message: >-
   One network trained to copy the five-network pool forecasts no better than a single network
   trained normally, so the pool's gain cannot be moved into training with this recipe. The student
-  matches a single teacher network's tail coverage but not the pool's accuracy, probably because the teacher is in sample on every
-  row it teaches from. Serving the pool (5 networks) stays the way to get that gain.
+  matches a single teacher network's tail coverage but not the pool's accuracy, probably because
+  the teacher is in sample on every row it teaches from. Serving the pool (5 networks) stays the way to get that gain.
 advice:
   - >-
     Do not distil the five-network pool into one network with a loss on the teacher's in-sample
@@ -78,10 +79,11 @@ adopted_in: none
 ## Take-home message
 
 **One network trained to copy the five-network pool scores like a single seed, not like the pool.**
-At the eight MVA-only Primaries the single seed is 0.084 CRPS points worse than the pool, and at the eight every
-student sits within 0.006 points of the single seed. At the six the students are worse than the
-single seed by 0.012 (`Dpool50`) to 0.045 (`Dpool80`) points. The under-40% rule applies: under this recipe the
-pool's gain is not learnable by one network. The students match the tail coverage of a single teacher network.
+At the eight MVA-only Primaries the single seed is 0.084 CRPS points worse than the pool, and at the
+eight every student sits within 0.006 points of the single seed. At the six the students are worse
+than the single seed by 0.012 (`Dpool50`) to 0.045 (`Dpool80`) points. The under-40% rule applies:
+under this recipe the pool's gain is not learnable by one network. The students match the tail
+coverage of a single teacher network.
 
 ## Question and answer
 
@@ -113,19 +115,20 @@ explanation is a likely cause, not a tested one.
   upper 0.135 at the six) and DpoolERA5 (+0.085, upper 0.109; +0.106, upper 0.128) fail at both. No
   student passes both.
 - **q99 pinball loss** (the +0.02 bound): the upper Bonferroni bound of student minus pool is 0.008
-  to 0.015 points for every student, so the bound holds. Coverage at q95 is 0.945 to 0.948 at the eight against
-  the pool's 0.952.
+  to 0.015 points for every student, so the bound holds. Coverage at q95 is 0.945 to 0.948 at the
+  eight against the pool's 0.952.
 - **Gap closed** (descriptive): Dpool50 about 2% and Dpool80 and DpoolERA5 below 0% at the eight;
   the under-40% rule applies.
-- **Held-out-week coverage** (mean over folds and seeds) of the students at q05, q95, q99:
-  0.045 to 0.046, 0.949 to 0.950, 0.991 to 0.992, against the teacher's single network 0.049, 0.950,
-  0.991. On training rows the coverage is sharper (q05 0.034 to 0.035, against the teacher's 0.036), as
-  the in-sample teacher is.
+- **Held-out-week coverage** (mean over folds and seeds) of the students at q05, q95, q99: 0.045 to
+  0.046, 0.949 to 0.950, 0.991 to 0.992, against the teacher's single network 0.049, 0.950, 0.991.
+  On training rows the coverage is sharper (q05 0.034 to 0.035, against the teacher's 0.036), as the
+  in-sample teacher is.
 - **Avoidable-curtailment cost at the six, f = 0.9** (in the cost units of experiment 470's
-  curtailment table, 95% intervals): pool 1.89 (0.18 to 4.98), single seed 1.87, Dpool50 1.91, Dpool80 2.00, DpoolERA5
-  1.94, manual heuristic 2.02. Student minus pool is +0.019 (-0.032 to 0.093) for Dpool50. At f = 0.75
-  Dpool80 is +0.38 (0.08 to 0.75) above the pool. At f = 0.5 Dpool80 is +0.79 (0.34 to 1.35),
-  DpoolERA5 +0.49 (0.19 to 0.89), and Dpool50 +0.15 (-0.20 to 0.44) above the pool.
+  curtailment table, 95% intervals): pool 1.89 (0.18 to 4.98), single seed 1.87, Dpool50 1.91,
+  Dpool80 2.00, DpoolERA5 1.94, manual heuristic 2.02. Student minus pool is +0.019 (-0.032 to
+  0.093) for Dpool50. At f = 0.75 Dpool80 is +0.38 (0.08 to 0.75) above the pool. At f = 0.5 Dpool80
+  is +0.79 (0.34 to 1.35), DpoolERA5 +0.49 (0.19 to 0.89), and Dpool50 +0.15 (-0.20 to 0.44) above
+  the pool.
 - **Epochs**: Dpool50 11.5, Dpool80 13.5, DpoolERA5 17.3 on average.
 
 ## Serving table
@@ -144,8 +147,8 @@ which serves just as cheaply, so the student offers no gain over a single seed t
 - **Recipe**: monthly refits of experiment 425's folds (2025-10, 2025-12, 2026-01, 2026-03,
   2026-06); the D15 and D18 start cut and the flagged exact-zero drop apply; the teacher is the
   same-month pool, so no scored actuals reach the student; the students start from the stored
-  pretrained weights of the same seed, so student seed s shares its initialisation with teacher
-  s. Code reviewed by one fresh Sonnet agent before the first fit (no bugs, three small fixes).
+  pretrained weights of the same seed, so student seed s shares its initialisation with teacher s.
+  Code reviewed by one fresh Sonnet agent before the first fit (no bugs, three small fixes).
 - **Design change from the brief**: pinball loss against the teacher's quantile distribution, not
   against one value, because the point-target form made the timing fit's tails too wide (q05
   coverage 0.027 against 0.049).
@@ -159,8 +162,8 @@ which serves just as cheaply, so the student offers no gain over a single seed t
   advantage over a single seed is 0.231 points at the eight and 0.141 at the six in Christmas week.
   It is 0.454 points at D15 and D18.
 - The cold-night minimum detectable effect is not estimated, so cold-night contrasts are
-  descriptive. On rows with real events scored against normal-running-arrangement actuals (`six_nra`),
-  the students score slightly better than the pool; the slice is in the contrasts file.
+  descriptive. On rows with real events scored against normal-running-arrangement actuals
+  (`six_nra`), the students score slightly better than the pool; the slice is in the contrasts file.
 
 ## What to try next
 
