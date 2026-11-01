@@ -65,7 +65,9 @@ def resolve(*, name: str) -> tuple[model.Arm, bool]:
     if name.startswith("cfg:"):
         config = json.loads((DATA_DIR / "work" / "configs.json").read_text())[name[4:]]
         pretrain = bool(config.pop("a6", False))
-        return model.Arm(route="member", **config), pretrain
+        arm = model.Arm(route="member", **config)
+        assert not pretrain or arm == BASE, "pretrained weights are stored for the base shape only"
+        return arm, pretrain
     return ARMS[name], name == "a6"
 
 

@@ -10,6 +10,9 @@ fit uses the same row set as the scoring (all rows, or only unmasked rows). Vari
 `w1.15` (experiment 435's fixed widening), and `P`. Intervals are 95% month-block bootstrap
 intervals (11 scored months, 2,000 resamples), because the row set spans one year.
 
+Quantiles after widening or table P are clipped to [0, 1], as the raw quantiles are, and the
+fit uses only the rows scored (lead 24 hours or more).
+
 Output: `work/step1_cells.parquet` (hits and rows per arm, row set, variant, farm, month, tail).
 
 ```bash
@@ -103,9 +106,9 @@ def apply_factors(
         out = (
             out.join(lookup, on=["site", "lead_band"], how="left")
             .with_columns(
-                (
-                    pl.col("q50") + pl.col("factor").fill_null(1.0) * (pl.col(name) - pl.col("q50"))
-                ).alias(name)
+                (pl.col("q50") + pl.col("factor").fill_null(1.0) * (pl.col(name) - pl.col("q50")))
+                .clip(0.0, 1.0)
+                .alias(name)
             )
             .drop("factor")
         )
@@ -115,7 +118,10 @@ def apply_factors(
 def widen(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Scale each tail quantile's distance from the median by the fixed factor."""
     return frame.with_columns(
-        *[(pl.col("q50") + WIDENING * (pl.col(q) - pl.col("q50"))).alias(q) for q in TAILS]
+        *[
+            (pl.col("q50") + WIDENING * (pl.col(q) - pl.col("q50"))).clip(0.0, 1.0).alias(q)
+            for q in TAILS
+        ]
     )
 
 
@@ -158,7 +164,9 @@ def main() -> None:
         for rowset, keep in (("all rows", pl.lit(True)), ("kept rows", ~pl.col("masked"))):
             sub = frame.filter(keep)
             for i, month in enumerate(months[1:], start=1):
-                earlier = sub.filter(pl.col("month").is_in(months[:i]))
+                earlier = sub.filter(
+                    pl.col("month").is_in(months[:i]) & (pl.col("lead_hours") >= 24.0)
+                )
                 held = sub.filter(pl.col("month") == month)
                 factors = fit_factors(fit=earlier)
                 for variant, f in (
