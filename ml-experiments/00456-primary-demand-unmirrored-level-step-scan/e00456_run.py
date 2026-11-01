@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLC0206
 """Experiment 456, step 3: run the scan, its sensitivity grid, and the three validations.
 
 Reads `residuals_b.parquet` (step 1), the corrected event table of experiment 400, and the 25
@@ -12,8 +13,8 @@ PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations
 """
 
 import time
-from datetime import UTC, datetime
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -381,27 +382,76 @@ def injection(
     return pl.DataFrame(rows)
 
 
+def phase_randomised(*, levels: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Return a surrogate with the same power spectrum as the gap-filled series and no steps.
+
+    The Fourier phases are replaced by random ones, so slow drift and seasonal swings keep their
+    strength but abrupt level changes are spread into the noise.
+    """
+    days = np.arange(len(levels))
+    ok = np.isfinite(levels)
+    filled = np.interp(days, days[ok], levels[ok])[ok.argmax() : len(levels) - ok[::-1].argmax()]
+    spectrum = np.fft.rfft(filled - filled.mean())
+    phases = rng.uniform(0, 2 * np.pi, len(spectrum))
+    phases[0] = 0.0
+    return np.fft.irfft(np.abs(spectrum) * np.exp(1j * phases), n=len(filled)) + filled.mean()
+
+
 def false_alarms(*, levels: dict[str, np.ndarray], capacity: dict[str, float]) -> pl.DataFrame:
-    """Return steps per Primary-year found in block-bootstrap surrogates of each residual."""
+    """Return steps per Primary-year found in phase-randomised surrogates of each residual."""
     rng = np.random.default_rng(SEED + 1)
     rows = []
     for site, lv in levels.items():
-        valid = lv[np.isfinite(lv)]
-        n_blocks = len(valid) // BLOCK_DAYS
-        if n_blocks < 6:
-            continue
-        blocks = valid[: n_blocks * BLOCK_DAYS].reshape(n_blocks, BLOCK_DAYS)
+        spread, sigma = scan.spread_of(levels=lv), scan.noise_sigma(levels=lv)
         counts = []
         for _ in range(N_BOOTSTRAP):
-            sur = blocks[rng.integers(0, n_blocks, n_blocks)].ravel()
+            sur = phase_randomised(levels=lv, rng=rng)
             found, _ = scan.detect(
                 site=site, levels=sur, capacity_mw=capacity[site], params=BASE,
-                spread=scan.spread_of(levels=lv), sigma=scan.noise_sigma(levels=lv),
+                spread=spread, sigma=sigma,
             )  # fmt: skip
             counts.append(len(found))
         rows.append(
-            {"site": site, "years": len(sur) / 365.25, "false_alarms_per_year": float(np.mean(counts)) / (len(sur) / 365.25)}
+            {
+                "site": site, "years": len(sur) / 365.25,
+                "false_alarms_per_year": float(np.mean(counts)) / (len(sur) / 365.25),
+            }
         )  # fmt: skip
+    return pl.DataFrame(rows)
+
+
+def chance_mirror(
+    *,
+    table: pl.DataFrame,
+    levels: dict[str, np.ndarray],
+    capacity: dict[str, float],
+    graph: dict[str, set[str]],
+) -> pl.DataFrame:
+    """Return the share of steps that a neighbour 'mirrors' when the neighbours are read elsewhere.
+
+    The step's start is moved by +-30, 45, 60, and 90 days before the mirror test, so a match
+    there is chance coincidence. The neighbour sets are the table pairs and all 15 other Primaries.
+    """
+    rows = []
+    steps = table.filter(pl.col("class").is_in(["mirrored", "unmirrored", "temporary"]))
+    for name, all_pairs in (("table pairs", False), ("all 15", True)):
+        for offset in (0, -90, -60, -45, -30, 30, 45, 60, 90):
+            hits = 0
+            for row in steps.iter_rows(named=True):
+                step = scan.Step(
+                    site=row["site"], start_day=row["start_day"] + offset,
+                    end_day=row["end_day"], points=row["points"], mw=row["mw"],
+                )  # fmt: skip
+                neighbours = set(levels) - {step.site} if all_pairs else graph.get(step.site, set())
+                cls, _, _ = scan.classify(
+                    step=step, levels_of=levels, capacity_of=capacity, neighbours=neighbours,
+                    params=BASE,
+                )  # fmt: skip
+                hits += cls == "mirrored"
+            rows.append(
+                {"neighbours": name, "start_offset_days": offset, "steps": steps.height,
+                 "mirrored_share": hits / steps.height}
+            )  # fmt: skip
     return pl.DataFrame(rows)
 
 
@@ -489,7 +539,7 @@ def main() -> None:
         "all 15 neighbours": {"all_pairs": True},
         "mirror start 3 d": {"all_pairs": False, "start_days": 3},
         "sum rule": {"all_pairs": False, "sum_rule": True},
-        "sum rule, 3 d, all 15": {"all_pairs": True, "sum_rule": True, "start_days": 3},
+        "sum rule 3 d all 15": {"all_pairs": True, "sum_rule": True, "start_days": 3},
     }.items():
         table, _ = run_scan(levels=levels, capacity=capacity, params=BASE, graph=graph, **kwargs)  # ty: ignore[invalid-argument-type]
         table = match_labels(table=table, events=events)
@@ -522,7 +572,9 @@ def main() -> None:
         {
             "site": sites,
             "valid_half_hours": [int(np.isfinite(levels[s]).sum()) * 48 for s in sites],
-            "quiet_half_hours": [int(quiet[s].sum()) * 48 for s in sites],
+            "quiet_half_hours": [
+                int((quiet[s] & np.isfinite(levels[s])).sum()) * 48 for s in sites
+            ],
         }
     ).write_csv(WORK_DIR / "quiet_windows.csv")
     for quiet_only, label in ((True, "quiet"), (False, "random")):
@@ -531,6 +583,9 @@ def main() -> None:
             quiet_only=quiet_only,
         ).write_csv(WORK_DIR / f"injection_{label}.csv")  # fmt: skip
     false_alarms(levels=levels, capacity=capacity).write_csv(WORK_DIR / "false_alarms.csv")
+    chance_mirror(
+        table=tables["baseline"], levels=levels, capacity=capacity, graph=graph
+    ).write_csv(WORK_DIR / "chance_mirror.csv")
     method_a_comparison(levels=levels, sites=sites).write_csv(WORK_DIR / "method_a_months.csv")
     print(f"done in {time.time() - started:.0f} s", flush=True)
 

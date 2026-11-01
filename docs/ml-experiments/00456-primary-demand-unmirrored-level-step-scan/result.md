@@ -6,7 +6,7 @@ title: >-
 theme: lsc-detectors
 also_relevant_to:
   - lagged-power-and-error-correction
-status: planned
+status: finished
 kind: other
 date: 2026-11-01
 size: >-
@@ -31,8 +31,8 @@ prediction: >-
   injected steps of 3 times the spread lasting 14 days or more are recalled at 0.8 or higher.
 decision_rule: >-
   Descriptive, no verdict on a model. The scan is trusted for the row 4 rate if injected steps of
-  1.5 times the detection threshold lasting 14 days (a size the baseline thresholds can detect) are recalled at
-  0.7 or higher and the false-alarm rate on block-bootstrap surrogates is under 0.2 per
+  1.5 times the detection threshold lasting 14 days (a size the baseline thresholds can detect) are
+  recalled at 0.7 or higher and the false-alarm rate on block-bootstrap surrogates is under 0.2 per
   Primary-year. If not, the unmirrored count is reported as
   an upper bound (false alarms dominate) or a lower bound (recall is low), and the page says which.
 benchmark: >-
@@ -43,159 +43,159 @@ row_set_id: >-
 metric: >-
   Steps per Primary-year by class, recall and false-alarm rate of the scan, and the share of
   half-hours inside an unmirrored step.
+verdict: not supported
+best_arm: >-
+  None. The baseline scan (3 times the spread, 2 points, 7 days) finds 166 steps in 93.6
+  Primary-years: 36 mirrored, 70 unmirrored, and 60 temporary.
+headline: >-
+  A Primary's daily demand residual shows 1.77 sustained steps per Primary-year. The scan's own
+  surrogates with no steps show 1.74 per Primary-year, and the mirror test passes at shifted dates
+  as often as at the true dates, so the scan cannot yet tell genuine level changes from noise.
+lessons: >-
+  A step scan on a daily weather-corrected residual finds large injected steps reliably (recall
+  0.98 at 1.5 times the detection threshold) and finds few labelled events (7 of 13 lasting 7
+  days or more). The residual's slow drift makes false alarms as common as detections at two
+  Primaries (D4 and D9), and the mirror rule has too loose a tolerance to carry meaning.
+take_home_message: >-
+  The scan cannot yet give row 4 a rate of genuine level changes: it finds 1.77 steps per
+  Primary-year, but step-free surrogates give 1.74, and its mirror test passes about as often at
+  shifted dates (0.18) as at the true dates (0.22). On the 5 stored forecast months, the 15% of
+  rows inside an unlabelled scan step lose little of B-mix's lead (0.55 against 0.64 on step-free
+  rows), so the scan does not point to rows where B-mix fails.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Read the 0.75 unmirrored steps per Primary-year as an upper bound that is mostly noise, and do
+    not set row 4's placeholder rate from it (headline, figure 4).
+  - >-
+    Test any mirror rule against start dates shifted by 30 to 90 days before calling a step a
+    load-shift candidate (figure 3).
+  - >-
+    Use a residual with less slow drift (a fit on the same year's weather, or a Kalman level) before
+    repeating the scan at D4 and D9 (figure 4).
 code: ml-experiments/00456-primary-demand-unmirrored-level-step-scan/
 ---
 
-**Plan (written before any result exists).** This page is committed as `planned`; the finished
-write-up replaces it.
+**Take-home: the label-free scan cannot yet tell genuine level changes from noise.** It finds 166
+sustained steps in 93.6 Primary-years (1.77 per Primary-year), but step-free surrogates of the same
+residuals give 1.74 per Primary-year, and the mirror test passes about as often at the wrong dates
+as at the true dates. The unmirrored rate (0.75 per Primary-year) is therefore an upper bound that
+the data do not separate from noise, and row 4 should keep its 2% and 5% placeholders. For the
+forecast, rows inside an unlabelled scan step keep most of B-mix's lead over the lagged head, so
+the scan does not find rows where B-mix fails.
 
-## Question
+![B-mix lead over the lagged head by row set](figure_1_forecast_impact.svg)
 
-How often does a Primary's demand series show a sustained step (a new level lasting days to
-months) that no neighbouring Primary mirrors with an opposite-sign step, and how large are such
-steps? A mirrored step is a load-shift candidate. An unmirrored step is a candidate genuine level
-change. The answer sets the rate of genuine level changes in the training worlds of row 4 of the
-lag-trust design, where 2% and 5% are placeholders.
+![Recall of injected steps by size and duration](figure_2_injection_recall.svg)
 
-## Data and tightened definitions
+![Share of steps called mirrored at the true and at shifted start dates](figure_3_chance_mirror.svg)
 
-- **Series.** The 16 Primaries of experiment 87's loader (`observed.parquet`, flagged exact-zero
-  half-hours already null), from 2019-09-01 to 2026-07-31, divided by effective capacity. D15 and
-  D18 drop every row before 2025-03-01 (the standing cut). The number of null half-hours inside
-  each Primary's active span is reported.
-- **Level.** The daily median of the residual, in points of effective capacity (1 point is 1% of
-  effective capacity), over days with at least 24 valid half-hours. Two residuals are compared.
-  Method (a) is the series minus the mean over the five seeds of the stored cross-fitted lagless
-  `q50` of experiment 449 (25 tables, five months: 2025-10, 2025-12, 2026-01, 2026-03, 2026-06; a
-  single month is too short to hold a 7-day step reliably away from its edges, so method (a) is a
-  cross-check on those months only). Method (b), used for the full history, is the series minus a
-  lagless XGBoost median forecast (13 calendar and ERA5 features of experiment 5, absolute-error
-  objective, 300 rounds, depth 6, eta 0.1), cross-fitted in 6-month blocks: each block is
-  predicted by a model trained on all other blocks of that Primary. Blocks have no time feature,
-  so a step that lasts more than one block is partly absorbed; candidate steps that start within 3
-  days of a block boundary are flagged as a possible artefact. ERA5 is the weather at all times
-  (a lab condition: ERA5 arrives about 5 days late, so the scan is a retrospective finder, not a
-  live input).
-- **Spread.** The median absolute deviation (unscaled) of each Primary's daily residual about its
-  median, per method.
-- **Change points.** Optimal partitioning of the daily residual with a squared-error cost, a
-  minimum segment length of 7 days, and a penalty of 3 times `log(n)` times the robust noise
-  variance (from the median absolute successive difference), so the penalty is set by the data and
-  not by a threshold of ours. The scan builds its own dynamic programme (the `ruptures` package is
-  not installed). A step is the difference in mean level between two adjacent segments, and it
-  counts if it is at least 3 times the Primary's spread and at least 2 points. Persistence is
-  therefore at least 7 days by construction.
-- **Sensitivity grid.** Spread multiple 2, 3, and 4; size floor 1, 2, and 4 points; minimum segment
-  14 days against 7 (the 3-day variant of the brief is dropped because a segment under 7 days
-  would be reported by the penalty alone). The grid is one factor at a time around the baseline.
-- **Temporary step.** A step followed by an opposite-sign step of similar size (within 50%) after
-  fewer than 30 days. Both are reported apart, as one temporary event.
-- **Mirror.** A step at another Primary is a mirror if it has the opposite sign, a magnitude in MW
-  within 50% of the first step's magnitude in MW, and a start within 1 day. Magnitudes are compared
-  in MW because load moves in MW. The primary rule uses a single mirroring step. A sensitivity rule
-  also accepts the sum of coincident opposite-sign steps at several neighbours, and a start within
-  3 days. The neighbour sets are the pairs named in the corrected label table of experiment 395
-  (`sw_block_detector_label_table_corrected.csv`); the second test uses all 15 other Primaries. A
-  step whose neighbours have no data on its dates is reported as unassessable, not as unmirrored.
-- **Classes.** Mirrored (load-shift candidate), unmirrored (genuine level-change candidate),
-  temporary (reverses within 30 days), unassessable.
+![Steps found per Primary-year, in the real series and in surrogates with no steps](figure_4_false_alarms.svg)
 
-## Validation
+![An unmirrored step](figure_5_unmirrored_example.svg)
 
-- **Known answer from injection.** Steps of 1, 1.5, and 2 times the detection threshold
-  `max(3 x spread, 2 points)` (not 1, 2, and 3 times the spread, which sit below or on the
-  threshold by construction; the spread and noise scale are fixed at the un-injected series'
-  values) lasting 7, 14, 30, and 90 days
-  are added to the daily residual, alone and with an opposite-sign mirror of the same MW at one
-  neighbour, only into windows (the duration plus 30 days either side) in which the scan finds no
-  change point and no labelled event overlaps. The number of half-hours that the step-free rule
-  excludes is reported. Recall is the share of injected steps detected within 2 days of their start
-  with a size within 50%, per Primary and per cell of the 3 by 3 grid. Injection is done on the
-  daily residual (the cross-fitted model is not refitted), which is a lab shortcut: a refitted
-  model would partly absorb a long injected step.
-- **False alarms.** The surrogate is built without the scan: each Primary's daily residual is
-  resampled in blocks of 14 days (block bootstrap, 20 draws), which keeps short-range
-  autocorrelation and destroys the order of any long step. The scan is re-run on each draw, and
-  every detected step is a false alarm, reported per Primary-year. Real steps remain inside the
-  blocks, so the rate is a floor.
-- **Recall on labelled events.** The share of event-by-Primary rows of experiment 400's corrected
-  table (184 rows) found by the scan as a mirrored step within 2 days of the label, in all and in
-  the subset lasting 7 days or more. The brief says 78 events; the table holds 184 event-by-Primary
-  rows and the plan reports against the table. NGED's logs are incomplete, so this recall is a
-  lower bound on recall and says nothing about unlabelled events.
-- **Look at the candidates.** A chart of each unmirrored step (the Primary's residual, its
-  neighbours', the segment means) and a second Sonnet reviewer who classifies each as plausible
-  level change, weather or calendar artefact, outage or data fault, or unclear. No cause is claimed.
+![A second unmirrored step](figure_6_unmirrored_example.svg)
 
-## Pre-registered parameters (added after the plan review, before any result)
+![A mirrored step and its neighbour](figure_7_mirrored_example.svg)
 
-- **Penalty.** `3 * ln(n) * sigma^2`, with `n` the Primary's number of valid days and `sigma` the
-  median absolute difference of the daily residual at lag 7, times 1.4826, divided by `sqrt(2)`
-  (lag 7 limits the understatement from autocorrelation). Sensitivity: multipliers 2 and 5. The
-  dynamic programme is O(n^2) for about 2,600 days per Primary and is timed on one Primary first.
-- **Mirror test.** Symmetric: the ratio of the two steps' magnitudes in MW lies between 0.5 and 2,
-  with MW = points * effective capacity / 100. The neighbour's step is its raw change in segment
-  mean across the same dates, and it need not pass the neighbour's own thresholds. The report also
-  gives the share of unmirrored steps that become mirrored under the 3-day start rule and under the
-  sum rule. The unmirrored count under the 1-day rule is an upper bound. Neighbour set for the
-  headline: experiment 395's label-table pairs, because that table is the corrected one. A
-  temporary event is tested for a mirror first, and counts as temporary only if unmirrored.
-- **Found.** An injected or labelled step counts as detected if a step of the same sign starts
-  within 2 days of it, with a size within 50%.
-- **Windows.** Injection windows are chosen with a looser scan (penalty multiplier 2, spread
-  multiple 2, floor 1 point) that finds no change point, no labelled event, and no mirrored
-  candidate at any Primary. Recall is reported on these windows and on random windows as a control.
-  Recall is conditional on scan-quiet windows.
-- **Long steps.** Injected durations are 7, 14, 30, and 90 days. The headline covers steps of 7 to
-  60 days. Longer steps are partly absorbed by the 6-month cross-fit, so their count is a lower
-  bound. One Primary and 30-day steps are also injected into the half-hourly series and refitted
-  to measure the difference from daily injection.
-- **Bases of the numeric thresholds.** The false-alarm limit of 0.2 per Primary-year and the P2
-  limit of 1 per Primary-year are judgement calls, chosen so that false alarms stay below a
-  tenth of the expected real steps.
-- **Method disagreement.** Steps in the five months found by both methods, by one only, are
-  tabulated.
-- **Share of half-hours inside an unmirrored step.** The half-hours of the segment between an
-  unmirrored step and the next step, within the step's persistence, divided by all valid
-  half-hours.
-- **Recall per event.** Also reported (an event is found if any of its rows is found).
+## Setup
 
-## Deviations from the brief
+- **Data.** The 16 Primaries of experiment 87's loader, 2019-09 to 2026-07, flagged exact-zero
+  half-hours already removed. 4,717 half-hours are missing between the first and last reading of
+  the 16 Primaries (flagged zeros and any other gaps). D15 and
+  D18 drop rows before 2025-03-01. 93.6 Primary-years of valid daily levels.
+- **Residual.** Method (b): a lagless XGBoost median forecast (13 calendar and ERA5 features,
+  absolute-error objective, 300 rounds), cross-fitted in 6-month blocks, boosters saved as `.ubj`
+  under the experiment's data folder. Method (a), the stored cross-fitted lagless tables of
+  experiment 449, agrees with method (b) on the five stored months (median daily-level correlation
+  0.90, 80 Primary-months; the lowest is -0.28). ERA5 weather is a lab condition, not available at
+  forecast time. Cadence: not applicable.
+- **Scan.** Optimal partitioning of the daily level (squared-error cost, penalty 3 times
+  `ln(n)` times a lag-7 noise variance, segments of 7 days or more). A step counts at 3 times the
+  Primary's spread and 2 points. The scan on one Primary takes 0.05 s; the whole experiment took
+  about 5 minutes after the block fits (about 13 minutes).
+- **Compute.** CPU only, 2 threads. Reviews: Sonnet plan review, Sonnet code review before the first
+  run (its findings changed the injection sizes and the surrogate scan), Sonnet results review
+  (re-derived the headline numbers; no discrepancy), prose reviews as the PR body records.
 
-- Injected sizes are multiples of the detection threshold, not of the spread (code review
-  finding: sizes of 1 to 3 times the spread are undetectable or on the threshold by construction).
-  The block-bootstrap surrogate is scanned with the real series' spread and noise scale. The sum
-  rule ignores neighbour changes under a quarter of the step. Method (a) is compared with method
-  (b) by daily level (correlation) on the five months, because a 30-day month cannot hold a
-  7-day-persistence step away from its edges.
-- A step is flagged `near_block_boundary` when it starts within 3 days of a 6-month block
-  boundary, and rates are also given without those steps.
-- The 3-day minimum-persistence variant is replaced by 14 days (the penalty alone would report
-  segments under 7 days).
-- Recall is measured against 184 event-by-Primary rows, not 78 events.
-- Method (b) is a 6-month-block cross-fitted XGBoost, not a monthly-refit model.
-- Injection is into the daily residual, with one refit check.
-- The share of training rows is replaced by the share of half-hours.
+## Results
 
-## Outputs
+- **Counts (baseline).** 36 mirrored, 70 unmirrored, 60 temporary, 0 unassessable. Rates per
+  Primary-year: 0.39, 0.75, and 0.64. 66 of the 70 unmirrored steps match no labelled event, so
+  0.71 per Primary-year are unlabelled. The median step is 14.6 points of effective capacity
+  (1.1 MW). Dropping 5 unmirrored steps that start within 3 days of a block boundary gives 0.69.
+- **Sensitivity of the unmirrored rate.** Spread multiple 2: 1.27; 4: 0.43. Floor of 1 or 4
+  points: 0.75 (the spread sets the threshold at every Primary). Segment of 14 days: 0.52.
+  Penalty 2 times or 5 times: 0.80 and 0.74. Mirror start within 3 days: 0.69. All 15 other
+  Primaries as neighbours: 0.49. The rate moves by a factor of three across the grid.
+- **Share of days inside an unmirrored step** (first 60 days of each): 5.1% at baseline, 2.7% at
+  4 times the spread. P2 (under 2%) failed at baseline.
+- **False alarms.** Phase-randomised surrogates keep each residual's power spectrum and remove
+  abrupt steps. The scan finds 1.74 steps per Primary-year in them, from 0.0 at D3 and D15 to 8.8
+  at D4 and 16.8 at D9. At D4 and D9 the surrogates produce more steps than the real series
+  (4.8 and 4.1 per Primary-year). Excluding D4 and D9 the pooled rate is 0.63. Neither meets the
+  0.2 limit. Nine Primaries (D2, D3, D8, D10, D11, D12, D14, D19, D21) have under 0.7 false alarms
+  per Primary-year.
+- **Mirror at chance.** With the table pairs, 0.217 of the 166 steps are called mirrored at their
+  true start and 0.163 to 0.223 when the start is shifted by 30 to 90 days. With all 15 other
+  Primaries it is 0.554 against 0.518 to 0.614. The tolerance (opposite sign, MW within a factor of
+  2, start within 1 day, at any neighbour) is too loose, so the mirrored class is not evidence of
+  load shifting.
+- **Injection (quiet windows, daily residual).** Steps of 1.0, 1.5, and 2.0 times the detection
+  threshold are recalled at 0.48, 0.98, and 1.00 (random windows 0.43, 0.91, 0.97), flat in
+  duration from 7 to 90 days. With a mirror injected at a neighbour, 0.91 to 0.97 of detected
+  steps are classed mirrored at 1.5 times; for unmirrored injections about 10% are called mirrored
+  by chance. A refit of D2 with a 30-day step of 1.5 times the threshold injected into the
+  half-hourly power (two windows) recovered 11.4 and 11.8 of the injected 11.8 points, so the
+  cross-fit did not absorb it. Recall is high only for large steps; steps of 3 times the spread
+  (1.0 times the threshold at the typical Primary) are recalled at under 0.5, so P3 failed.
+- **Quiet windows.** The step-free rule leaves a median 41,500 of 120,000 half-hours per Primary
+  as injection windows (D18 keeps 3,900 of 24,400) (`quiet_windows.csv`).
+- **Recall on labelled events** (experiment 400's corrected table, 184 event-by-Primary rows in 93
+  events). 11 rows and 10 events are found (a same-sign step starts within 2 days of the onset);
+  of events lasting 7 days or more, 7 of 13 events and 7 of 23 rows. This is a lower bound on
+  recall and says nothing about unlabelled events.
+- **What the scan changes for the stored forecasts** (experiment 404, A0-inj against B-mix, 5
+  months, 1,649,447 rows; a row is "in a scan step" if its origin day or target day lies in the
+  first 60 days of any detected step at its Primary, mirrored, unmirrored, or temporary).
 
-- A table of candidate steps (Primary, start, end, size in MW and in points, class, the nearest
-  neighbour's change at the same time).
-- Counts and rates per Primary-year by class, with the sensitivity grid, and the share of
-  half-hours inside an unmirrored step, before and after removing steps that match a labelled
-  event. The rate is a lower bound if the scan misses steps shorter than 7 days.
-- The mirrored steps that match no labelled event, per Primary-year, listed for the maintainer as
-  candidate unlabelled load-shift events.
-- At least two charts of unmirrored steps and one of a mirrored step.
-- A plain statement of what the scan cannot tell: a genuine level change that a neighbour mirrors
-  by coincidence, a step shorter than 7 days, and any cause. Candidates are reviewed knowing that
-  NGED's labels are incomplete, so an unlabelled candidate may be a real event.
+| Row set | Share of rows | B-mix lead (lagged minus B-mix, points) |
+|---|---|---|
+| Step-free | 66% | 0.64 [0.55, 0.75] |
+| In a scan step, unlabelled | 14% | 0.55 [0.45, 0.67] |
+| Labelled event only | 14% | 0.37 [0.24, 0.49] |
+| Labelled event and scan step | 5% | 0.23 [0.05, 0.40] |
 
-## Standing practices
+- **Reading the table.** Removing the unlabelled scan-step rows would cut 18% of the rows not
+  labelled as events and move B-mix's lead on the rest from 0.63 to 0.64, so the scan would not
+  change a score. The intervals of the first two rows overlap. The row sets differ by Primary
+  (the scan flags 58% of Primary 3's rows and none of three Primaries), so this is not a matched
+  comparison.
+- **Candidate list.** `candidate_steps.csv` beside this page lists every step (Primary, start day,
+  start date, end day, size in points and MW, class, nearest neighbour and its change, labelled,
+  near a block boundary). 26 mirrored steps match no labelled event (0.28 per Primary-year); given
+  the chance rate, most of them are coincidences. It is a robustness report only for the nine
+  Primaries with low false-alarm rates.
 
-- Cleaned data: flagged zeros are nulls throughout. Fitted boosters are saved as `.ubj` under the
-  experiment's data folder. No forecast is scored, so tail calibration, curtailment cost, and
-  example-forecast plots do not apply. Parallel pools use `spawn`, one thread per process.
-  Cadence: not applicable (cross-fit, not refit).
-- Review order: Sonnet writes the code, a fresh Sonnet reviews it before the first run, results
-  review, write-up reviews. All interim numbers are unaudited.
+## Caveats
+
+- **NGED's event labels are incomplete.** The 184 label rows are a lower bound on events, so the
+  recall is a lower bound on recall, and an unlabelled candidate may be a real event. Clean rows
+  may hold unlogged events.
+- **The scan cannot tell** a genuine level change that a neighbour mirrors by coincidence, a step
+  shorter than 7 days, or any cause. Mirrors at BSPs, GSPs, or unmetered Primaries are not seen.
+- **Injection is into the daily residual** with the spread and noise scale fixed at the real
+  series' values (a lab shortcut, checked by one refit).
+- **Neighbour sets** are the pairs in the corrected label table of experiment 395.
+- **Post-run change.** The first false-alarm surrogate (14-day block bootstrap) created steps at
+  the block joins (5 per Primary-year, three times the real count), so it was replaced by phase
+  randomisation after the first run. Injection sizes (multiples of the threshold) and the
+  surrogate's spread were fixed after the code review and before the numbers were read.
+
+## What to try next
+
+- **Repeat at the nine low-false-alarm Primaries** with a stricter mirror rule: a mirror must
+  beat its own shifted-date distribution.
+- **Use a residual with less drift** (a level state or an annual refit) at D4 and D9.
+- **Keep row 4's 2% and 5% placeholders** until a repeat separates the unmirrored steps from noise.

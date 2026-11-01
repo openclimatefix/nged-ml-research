@@ -5,6 +5,7 @@ Pure functions on daily residual levels (points of effective capacity), plus `ma
 for the definitions; every parameter is pre-registered there.
 """
 
+import itertools
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -203,7 +204,7 @@ def mark_temporary(*, steps: list[Step], classes: dict[tuple[str, int], str]) ->
         by_site.setdefault(s.site, []).append(s)
     for site_steps in by_site.values():
         site_steps.sort(key=lambda s: s.start_day)
-        for a, b in zip(site_steps, site_steps[1:], strict=False):
+        for a, b in itertools.pairwise(site_steps):
             if (
                 b.start_day - a.start_day < 30
                 and a.points * b.points < 0
