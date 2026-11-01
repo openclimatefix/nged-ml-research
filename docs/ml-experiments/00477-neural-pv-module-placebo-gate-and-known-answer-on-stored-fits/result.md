@@ -186,8 +186,7 @@ The capacities do not pass, so the PV module is not recommended for production o
 - **Capacity.** Neural medians (season-year 2025) against the GAM: D5 3.19 against 3.15 MW, D9 0.93
   against 2.15, D10 2.06 against 2.89, D11 2.33 against 3.19, D14 2.65 against 3.74, D16 2.76
   against 3.08, D18 1.82 against 1.82. D15 has no GAM estimate. See the
-  [experiment 474 page](../00474-pv-capacity-placebo-gated-ladder-and-per-primary-
-  intervals/result.md).
+  [experiment 474 page][e474].
 
 ## Pros and cons of explicit PV for net demand
 
@@ -362,3 +361,5 @@ The PV term needs a capacity table per Primary, refreshed at each monthly refit,
 (irradiance and temperature from the ensemble to plane-of-array power) at forecast time. The write-
 up
 reports this beside the score.
+
+[e474]: ../00474-pv-capacity-placebo-gated-ladder-and-per-primary-intervals/result.md
