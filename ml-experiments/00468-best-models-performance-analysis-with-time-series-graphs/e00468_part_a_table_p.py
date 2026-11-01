@@ -8,7 +8,7 @@ version, in percent of capacity) before and after, for the headline arms of expe
 Part A. Private charts: no calendar dates, months only.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<the private data folder>
 uv run --no-sync python ml-experiments/00468-*/e00468_part_a_table_p.py
 ```
 """

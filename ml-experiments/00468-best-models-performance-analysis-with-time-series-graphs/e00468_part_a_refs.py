@@ -9,7 +9,7 @@ month-block bootstrap of each contrast of 461's `a2_member` minus each reference
 capacity (median error) with the minimum detectable effect beside it.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<the private data folder>
 uv run --no-sync python ml-experiments/00468-*/e00468_part_a_refs.py
 ```
 """

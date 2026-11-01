@@ -9,7 +9,7 @@ rule, because experiment 461 did not adopt p99.9 for Solar A). The x-axes count 
 calendar date. Charts are private: they carry megawatts of an anonymised generator.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<the private data folder>
 uv run --no-sync python ml-experiments/00468-*/e00468_part_a.py
 ```
 

@@ -10,7 +10,7 @@ month. NGED's event labels are incomplete, so a scan-found event is not proven t
 Primaries are substations, so no anonymisation applies.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<the private data folder>
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations \
     uv run --no-sync python ml-experiments/00468-*/e00468_part_b_real.py
 ```
