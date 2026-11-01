@@ -42,11 +42,22 @@ def main() -> None:
     base = alt.Chart(frame).encode(y=alt.Y("setting:N", sort=None, title=None))
     chart = (
         base.mark_rule(color=ocf.DATA_BLUE).encode(
-            x=alt.X("lo:Q", title="Quantile score minus the base network's (points of capacity)"),
+            x=alt.X(
+                "lo:Q",
+                title=[
+                    "Score minus the base network's (points of capacity; positive is worse;",
+                    "bars are 99.4% month-block intervals)",
+                ],
+            ),
             x2="hi:Q",
         )
         + base.mark_point(color=ocf.DATA_BLUE, filled=True, size=60).encode(x="d:Q")
-        + alt.Chart(pl.DataFrame({"x": [-0.10, 0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")
+        + alt.Chart(pl.DataFrame({"x": [-0.10, 0.0], "label": ["margin -0.10", "base"]}))
+        .mark_rule(strokeDash=[4, 3])
+        .encode(x="x:Q")
+        + alt.Chart(pl.DataFrame({"x": [-0.10], "label": ["margin -0.10"]}))
+        .mark_text(align="left", dx=3, dy=-4, baseline="bottom")
+        .encode(x="x:Q", text="label:N", y=alt.value(0))
     ).properties(
         width=440,
         title="No setting lowers the plain wind network's score by the 0.10-point margin",
@@ -67,7 +78,14 @@ def main() -> None:
             color=alt.Color("farm:N", title=None),
         )
     )
-    limit = alt.Chart(pl.DataFrame({"x": [1.5]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")
+    limit = (
+        alt.Chart(pl.DataFrame({"x": [1.5], "label": ["1.5% limit"]}))
+        .mark_rule(strokeDash=[4, 3])
+        .encode(x="x:Q")
+    )
+    limit = limit + alt.Chart(pl.DataFrame({"x": [1.5], "label": ["1.5% limit"]})).mark_text(
+        align="left", dx=3, baseline="bottom"
+    ).encode(x="x:Q", text="label:N", y=alt.value(0))
     (bars + limit).properties(
         width=440, title="Farm A stays above the 1.5% limit in every setting"
     ).save(DOCS / "figure_2_upper_tail_by_farm.svg")
