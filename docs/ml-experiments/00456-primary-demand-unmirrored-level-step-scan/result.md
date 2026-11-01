@@ -31,7 +31,7 @@ prediction: >-
   injected steps of 3 times the spread lasting 14 days or more are recalled at 0.8 or higher.
 decision_rule: >-
   Descriptive, no verdict on a model. The scan is trusted for the row 4 rate if injected steps of
-  3 times the spread lasting 14 days (the cell the baseline thresholds can detect) are recalled at
+  1.5 times the detection threshold lasting 14 days (a size the baseline thresholds can detect) are recalled at
   0.7 or higher and the false-alarm rate on block-bootstrap surrogates is under 0.2 per
   Primary-year. If not, the unmirrored count is reported as
   an upper bound (false alarms dominate) or a lower bound (recall is low), and the page says which.
@@ -102,7 +102,10 @@ lag-trust design, where 2% and 5% are placeholders.
 
 ## Validation
 
-- **Known answer from injection.** Steps of 1, 2, and 3 times the spread lasting 7, 14, and 30 days
+- **Known answer from injection.** Steps of 1, 1.5, and 2 times the detection threshold
+  `max(3 x spread, 2 points)` (not 1, 2, and 3 times the spread, which sit below or on the
+  threshold by construction; the spread and noise scale are fixed at the un-injected series'
+  values) lasting 7, 14, 30, and 90 days
   are added to the daily residual, alone and with an opposite-sign mirror of the same MW at one
   neighbour, only into windows (the duration plus 30 days either side) in which the scan finds no
   change point and no labelled event overlaps. The number of half-hours that the step-free rule
@@ -159,6 +162,14 @@ lag-trust design, where 2% and 5% are placeholders.
 
 ## Deviations from the brief
 
+- Injected sizes are multiples of the detection threshold, not of the spread (code review
+  finding: sizes of 1 to 3 times the spread are undetectable or on the threshold by construction).
+  The block-bootstrap surrogate is scanned with the real series' spread and noise scale. The sum
+  rule ignores neighbour changes under a quarter of the step. Method (a) is compared with method
+  (b) by daily level (correlation) on the five months, because a 30-day month cannot hold a
+  7-day-persistence step away from its edges.
+- A step is flagged `near_block_boundary` when it starts within 3 days of a 6-month block
+  boundary, and rates are also given without those steps.
 - The 3-day minimum-persistence variant is replaced by 14 days (the penalty alone would report
   segments under 7 days).
 - Recall is measured against 184 event-by-Primary rows, not 78 events.
