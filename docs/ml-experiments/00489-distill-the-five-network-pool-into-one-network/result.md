@@ -63,7 +63,8 @@ take_home_message: >-
   One network trained to copy the five-network pool forecasts no better than a single network
   trained normally, so the pool's gain cannot be moved into training with this recipe. The student
   matches a single teacher network's tail coverage but not the pool's accuracy, probably because
-  the teacher is in sample on every row it teaches from. Serving the pool (5 networks) stays the way to get that gain.
+  the teacher is in sample on every row it teaches from. Serving the pool of 5 networks stays the
+  way to get that gain.
 advice:
   - >-
     Do not distil the five-network pool into one network with a loss on the teacher's in-sample
