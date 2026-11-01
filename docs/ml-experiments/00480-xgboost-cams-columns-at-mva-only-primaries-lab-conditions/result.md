@@ -99,7 +99,8 @@ do not start without the maintainer's word.
   `cams_clear_sky_index`, the CAMS global horizontal irradiance of that half-hour (the hour's
   value spread over its two half-hours by the cosine of the zenith, `studies.pv_physics.half_hour_sun_and_sky`)
   divided by the Haurwitz clear-sky irradiance at the half-hour's midpoint, set to 0 where the
-  clear-sky irradiance is below 1 W/m2. Both are the half-hour's own realised values and are the
+  clear-sky irradiance is below 1 W/m2 and capped at 1.5 (near sunrise and sunset the ratio of two
+  small irradiances is unbounded; the uncapped maximum was 10.9). Both are the half-hour's own realised values and are the
   same for every ensemble member, and they enter training rows, prediction rows, and nothing else.
 - **CAMS source and delay.** The CAMS radiation service's satellite retrieval at each site's
   coordinates (`CAMS_PATH` in `studies.dp_features`, hourly, 2019-09 to 2026-09). The service
@@ -148,6 +149,14 @@ do not start without the maintainer's word.
    A1, because experiment 381's bias of -4.92 points at D12 is mostly selection on realised sunshine.
 6. **Six and eight apart.** The six signed-MW Primaries and the eight MVA-only Primaries are
    reported separately, with and without D8 in the MVA-only group, and never pooled into one figure.
+
+## Minimum detectable effect (computed before any A0 or A1 score)
+
+- **Eight MVA-only Primaries:** the 99.67% interval of experiment 381's `solar` arm minus its
+  `control` arm is -0.016 (-0.046 to +0.017) points, so the half-width is 0.032 points. A C1 point
+  estimate smaller than 0.032 points in size cannot be told from zero.
+- **D12 alone:** -0.060 (-0.170 to +0.040), a half-width of 0.105 points.
+- **Prediction P1** (0.03 to 0.10 points) therefore starts at the edge of what the eight can resolve.
 
 ## Known failures and risks
 
