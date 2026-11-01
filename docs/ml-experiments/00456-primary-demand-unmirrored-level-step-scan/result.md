@@ -59,7 +59,7 @@ lessons: >-
 take_home_message: >-
   The scan cannot yet give row 4 a rate of genuine level changes: it finds 1.77 steps per
   Primary-year, but step-free surrogates give 1.74, and its mirror test passes about as often at
-  shifted dates (0.18) as at the true dates (0.22). On the 5 stored forecast months, the 15% of
+  shifted dates (0.18) as at the true dates (0.22). On the 5 stored forecast months, the 14% of
   rows inside an unlabelled scan step lose little of B-mix's lead (0.55 against 0.64 on step-free
   rows), so the scan does not point to rows where B-mix fails.
 production_status: not-for-production
@@ -77,13 +77,18 @@ advice:
 code: ml-experiments/00456-primary-demand-unmirrored-level-step-scan/
 ---
 
-**Take-home: the label-free scan cannot yet tell genuine level changes from noise.** It finds 166
-sustained steps in 93.6 Primary-years (1.77 per Primary-year), but step-free surrogates of the same
-residuals give 1.74 per Primary-year, and the mirror test passes about as often at the wrong dates
-as at the true dates. The unmirrored rate (0.75 per Primary-year) is therefore an upper bound that
-the data do not separate from noise, and row 4 should keep its 2% and 5% placeholders. For the
-forecast, rows inside an unlabelled scan step keep most of B-mix's lead over the lagged head, so
-the scan does not find rows where B-mix fails.
+**Take-home: a scan of Primary substations' daily demand for level steps cannot yet separate
+genuine level changes from noise.** The scan runs on each Primary's daily weather-corrected demand
+residual and looks for steps: new levels that last 7 days or more. It finds 166 steps in 93.6
+Primary-years (one Primary substation observed for one year), or 1.77 per Primary-year. Synthetic
+copies of the same residuals, which keep their slow drift but have no abrupt steps, give 1.74 per
+Primary-year, so the data do not separate the two. The mirror test (does a neighbouring Primary
+show an opposite-sign step of similar size within 1 day?) passes about as often at the wrong dates
+as at the true dates. The 0.75 unmirrored steps per Primary-year are therefore an upper bound, and
+row 4 of the lag-trust design (a test of genuine level changes in the training data) should keep
+its placeholder rates of 2% and 5% of training rows. For the forecast, rows inside a scan step that
+no NGED event label covers keep most of the 50/50 mixture of a lagged and a lagless neural-network
+forecast (B-mix) over the lagged forecast alone, so the scan does not find rows where B-mix fails.
 
 ![B-mix lead over the lagged head by row set](figure_1_forecast_impact.svg)
 
@@ -136,7 +141,9 @@ the scan does not find rows where B-mix fails.
   at D4 and 16.8 at D9. At D4 and D9 the surrogates produce more steps than the real series
   (4.8 and 4.1 per Primary-year). Excluding D4 and D9 the pooled rate is 0.63. Neither meets the
   0.2 limit. Nine Primaries (D2, D3, D8, D10, D11, D12, D14, D19, D21) have under 0.7 false alarms
-  per Primary-year.
+  per Primary-year (D15 also, but over 1.4 years only). At the 14 Primaries other than D4 and D9
+  the real series gives 1.44 steps per Primary-year against 0.63 in the surrogates, so about 44%
+  of the steps there could be false alarms; D4 and D9 drive the pooled match.
 - **Mirror at chance.** With the table pairs, 0.217 of the 166 steps are called mirrored at their
   true start and 0.163 to 0.223 when the start is shifted by 30 to 90 days. With all 15 other
   Primaries it is 0.554 against 0.518 to 0.614. The tolerance (opposite sign, MW within a factor of
@@ -144,8 +151,8 @@ the scan does not find rows where B-mix fails.
   load shifting.
 - **Injection (quiet windows, daily residual).** Steps of 1.0, 1.5, and 2.0 times the detection
   threshold are recalled at 0.48, 0.98, and 1.00 (random windows 0.43, 0.91, 0.97), flat in
-  duration from 7 to 90 days. With a mirror injected at a neighbour, 0.91 to 0.97 of detected
-  steps are classed mirrored at 1.5 times; for unmirrored injections about 10% are called mirrored
+  duration at 1.5 times the threshold or more. With a mirror injected at a neighbour, 0.98 of detected steps are
+  classed mirrored at 1.5 times (quiet and random windows alike); for unmirrored injections about 10% are called mirrored
   by chance. A refit of D2 with a 30-day step of 1.5 times the threshold injected into the
   half-hourly power (two windows) recovered 11.4 and 11.8 of the injected 11.8 points, so the
   cross-fit did not absorb it. Recall is high only for large steps; steps of 3 times the spread
