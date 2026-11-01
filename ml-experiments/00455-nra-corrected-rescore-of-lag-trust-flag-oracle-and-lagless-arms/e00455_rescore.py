@@ -10,7 +10,8 @@ metered actual and with the NRA-corrected actual at depth factors 0.75, 1.0, and
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\
 ml-experiments/00048-weekly-retraining-confirmation-and-extension-demand-generators:\
-ml-experiments/00404-mdn-lagless-and-calibration-module-trust-weights \
+ml-experiments/00404-mdn-lagless-and-calibration-module-trust-weights:\
+ml-experiments/00435-stage-0-recalibration-table-for-untrusted-inputs-and-tails \
 DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1 \
     uv run --no-sync python ml-experiments/00455-*/e00455_rescore.py cells
 uv run --no-sync python ml-experiments/00455-*/e00455_rescore.py pool
@@ -23,6 +24,7 @@ from typing import Final
 
 import e00404_report as report  # ty: ignore[unresolved-import]
 import e00404_score as score  # ty: ignore[unresolved-import]
+import e00435_tailcore as tailcore  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -79,6 +81,7 @@ def load_arm(*, arm: str, month: str, seed: int) -> pl.DataFrame:
     """Return the arm's real-world forecasts for a cell, scored, with its group."""
     folder, name = ARM_DIRS[arm]
     frame = pl.read_parquet(folder / name / f"{month}_s{seed}_w-1.parquet")
+    frame = frame.filter(tailcore.lead_band_expr().is_not_null())  # leads 0 to 240 h, as in 404
     return frame.with_columns(crps=score.pinball_points(frame=frame))
 
 
@@ -98,6 +101,8 @@ def cell_scores(*, month: str, seed: int, real: np.ndarray, shares: dict[str, np
         grid = np.clip(ref["target"].to_numpy()[mask].astype(np.int64), 0, 121247)
         keys = ref.filter(pl.Series(mask)).select("primary", "origin", "target")
         for arm in ARM_DIRS:
+            if not (ARM_DIRS[arm][0] / ARM_DIRS[arm][1] / f"{month}_s{seed}_w-1.parquet").exists():
+                continue  # B6 has fit seed 0 only
             frame = load_arm(arm=arm, month=month, seed=seed).filter(pl.Series(mask))
             if not frame.select("primary", "origin", "target").equals(keys):
                 msg = f"{arm} rows differ from {REFERENCE} in {month} seed {seed}"
@@ -149,6 +154,8 @@ def cells() -> None:
 
 def month_bootstrap(*, values: np.ndarray, level: float, seed: int = 0) -> tuple[float, float]:
     """Return the percentile interval of the mean of month values, resampling months."""
+    if len(values) < 2:
+        return float("nan"), float("nan")
     rng = np.random.default_rng(seed)
     draws = rng.integers(0, len(values), size=(RESAMPLES, len(values)))
     means = values[draws].mean(1)
