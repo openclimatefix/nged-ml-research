@@ -16,6 +16,7 @@
 | 447 | Does changing any one setting of the S1 demand network (width, depth, embedding, components, dropout, weight decay, learning rate and schedule, batch size, optimiser), or a random search over the three most influential, lower its quantile score by the agreed margin? | High (neural Discuss session, 2026-11-01) | Nothing | Done (not supported: no single setting beats S1; see experiment 447) |
 | 459 | Is the sum over a load-shift donor and its recipient Primaries unchanged by the event, so that a forecast of the group sum split by a slowly changing share could work? | High (load-shift Discuss session, 2026-11-01) | Nothing | Finished: refuted, see experiment 459 |
 | 458 | Can a weight per lead band, a prequential weight, or a shrunk level offset on the lagless forecast beat the fixed 50/50 mixture of the lagged and lagless forecasts (zero fits)? | High (neural Discuss session, 2026-11-01) | Nothing | Finished: not supported, see experiment 458 |
+| 465 | Do the median of the last 7 same-time-of-day readings and of the last 3 same-time-of-week readings, in place of the day and week power lags, make the XGBoost demand forecast far less sensitive to a load-shift event that lasts under 7 days? | High (load-shift Discuss session, 2026-11-01) | Nothing | Planned (arm (c) only, 64 CPU fits) |
 
 ## Planned experiments
 
