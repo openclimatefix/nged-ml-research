@@ -13,7 +13,8 @@ in units of the new capacity, is written atomically and skipped when it exists.
 
     source ml-experiments/00429-*/env.sh   # then add the 00461 and 00466 folders to PYTHONPATH
     OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00466-*/e00466_wind_fit.py [ARM ...] [--seeds 0 1 2 3 4]
+        uv run --no-sync python ml-experiments/00466-*/e00466_wind_fit.py \
+        [ARM ...] [--seeds 0 1 2 3 4]
 """
 
 import argparse

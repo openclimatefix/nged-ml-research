@@ -23,7 +23,7 @@ WIND_HALF_LIVES_YEARS: Final[dict[str, float | None]] = {
     "hl4_5m": 0.375,
 }
 SOLAR_HALF_LIVES_YEARS: Final[dict[str, float]] = {"hl05": 0.5, "hl1": 1.0, "hl2": 2.0, "hl3": 3.0}
-"""Half-life in years of each solar weighting arm. `g0_onepass` runs all four; `a2_member` runs 2 and 3."""
+"""Half-life in years of each solar arm; `g0_onepass` runs all four and `a2_member` 2 and 3."""
 
 
 def row_weights(*, age_days: np.ndarray, half_life_years: float | None) -> np.ndarray:

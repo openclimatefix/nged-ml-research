@@ -1,4 +1,3 @@
-# ruff: noqa: PLR0915
 """Fit experiment 430's `g0_onepass` and `a2_member` solar networks with a recency weight.
 
 The fit loop is experiment 461's (`e00461_solar_fit`: experiment 430's loop with `output` and
@@ -41,7 +40,7 @@ PRED_DIR: Final = common.DATA_DIR / "solar_predictions" / "p999"
 CAPACITY_FILE: Final[str] = "solar_capacity.json"
 CYCLE_49R1: Final[datetime] = datetime(2024, 11, 12, tzinfo=UTC)
 """First day of ECMWF's IFS Cycle 49r1 ensemble (the indicator diagnostic's switch)."""
-_COLUMNS: Final = fit430._columns  # noqa: SLF001
+_COLUMNS: Final = fit430._columns
 _JOB: dict[str, object] = {}
 """The half-life and cutoff of the job being fitted, read by `train_network`."""
 
@@ -51,7 +50,7 @@ class IndicatorConfig(common430.Config):
     """The base arm with one more 0/1 input: 1 for ensemble runs initialised from Cycle 49r1 on."""
 
     @property
-    def columns(self) -> tuple[str, ...]:
+    def columns(self) -> tuple[str, ...]:  # noqa: D102
         return (*super().columns, "cycle49")
 
 
@@ -165,13 +164,13 @@ def train_network(
 
 
 def set_ratios(*, start: datetime) -> None:
-    """Set the per-series p99.9 ratio for the refit starting at `start` and record the capacities."""
+    """Set each series' p99.9 ratio for the refit starting at `start` and record the capacities."""
     cutoff = start - timedelta(days=f310.REFIT_GAP_DAYS)
     table = {}
     for site in c310.FARMS:
         row = common461.capacity(site=f"Solar {site}", cutoff=cutoff)
         table[site] = row
-        solar461._RATIO[site] = float(row["ratio"])  # noqa: SLF001
+        solar461._RATIO[site] = float(row["ratio"])
     fit430.solar_base.cache_clear()  # these two caches hold values in the previous refit's units
     fit430.farm_ceiling.cache_clear()
     path = common.DATA_DIR / CAPACITY_FILE
@@ -194,7 +193,7 @@ def main() -> None:
     solar461.feats.load_band_farm = solar461.load_band_farm
     common430.PRED_DIR = PRED_DIR
     fit430.train_network = train_network
-    fit430._columns = columns_with_cycle  # noqa: SLF001
+    fit430._columns = columns_with_cycle
     fit430.FLAGS = (*fit430.FLAGS, "cycle49")  # a 0/1 input is not standardised
     base = common430.ARMS[args.base]
     for label in args.labels:
