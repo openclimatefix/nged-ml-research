@@ -25,8 +25,8 @@ hypothesis: >-
   Every training world so far (experiments 402, 404, 440, and 446) keeps a clean target under every
   injected jump, so discounting every jump is optimal and a neighbour mirror carries no information.
   When the training worlds also contain genuine level changes (the lags and the target move
-  together), some with the load-conserving mirror at 1 or 2 neighbours that a load shift leaves and
-  some without, a lag network given the neighbours' surprise (S3) can use the mirror, and a network
+  together), whose target follows and whose neighbours show no mirror (a mirror in the training worlds always
+  means a load shift with a clean target, as in experiment 402), a lag network given the neighbours' surprise (S3) can use the mirror, and a network
   given randomised neighbours (S3-rw) cannot. A pass would show only that a network can use a mirror
   when the training world makes the mirror informative. It would not be evidence about real
   Primaries, because no labelled genuine level change exists in the real data.
@@ -163,3 +163,38 @@ Monthly refits (not weekly); cleaned data; the D15 and D18 cut; saved networks; 
 reused as references; screen not used (a mechanism test with four folds); tails reported at q01,
 q05, q95, q99; example forecasts and event plots on the page; draft pull request. Reviews: a fresh
 Sonnet reviews this plan, the code before the first fit, the results, and the write-up.
+
+## Amendments after the neural Discuss session's answers and the plan review (2026-11-01, before any fit)
+
+- **Training worlds.** Genuine changes carry no mirror in training (probability 0), so the own events
+  and the worlds are exactly those of U1n-2 and S1-amb is U1n-2 with no approximation. Every mirrored
+  jump in training is a load shift with a clean target, as in experiment 402. This replaces the
+  "mirror on half the genuine changes" text above and removes the exact-S1 question.
+- **Held-out worlds.** Genuine changes are mirrored with probability 0.5 (the load-conserving
+  signature at 1 or 2 neighbours). Mirrored genuine changes are labelled indistinguishable from load
+  shifts by their neighbours and scored apart from unmirrored genuine changes. Donor rows and
+  recipient rows are scored separately. Mirror steps that would take an MVA-only recipient below zero
+  are clipped in lags and target alike (a stated departure from load conservation); the generator's
+  test reports the clipped share.
+- **Sweep thresholds restated, not kept.** Before any score, the analytic Bayes-optimal share followed
+  with and without a mirror, at k = 1, 2, 3, per lag and for a target inside or outside the event, is
+  computed from the training worlds and committed (`e00462_worlds.py rates`). The registered pass is:
+  (a) S3-amb beats S3-rw-amb on held-out level-change rows by the larger of 0.03 and the minimum
+  detectable effect, and (b) the learned share followed without a mirror minus the share with a mirror
+  exceeds 0.1 with a month-block interval above zero, and (c) each learned share lies within 0.15 of
+  its Bayes-optimal value. The real-row adoption gate stays (no loss above 0.03 on rows with no
+  labelled event, none above 0.02 on tail pinball).
+- **Go/no-go on power.** If the Bayes-optimal gap between a forecast that sees the mirror and one that
+  does not is below the larger of 0.03 and the minimum detectable effect, the page says the
+  experiment could not test the hypothesis and does not read (a).
+- **Bonferroni count.** 6 contrasts without S3-attn-amb (a: two row classes; b: clean-row CRPS and q99
+  pinball for each of S3-amb and S3-rw-amb against U1n-2) and 9 with it. The minimum detectable effect
+  comes from the seed-0 against seed-1 differences of S3-amb and S3-rw-amb, by month-block bootstrap,
+  before any contrast is read; if it exceeds 0.03 the larger value is the margin.
+- **Also reported.** Absolute scores beside every contrast, q01 and q05 coverage, q99 pinball against
+  both U1n-2 and S1, the avoidable-curtailment cost at the signed-MW six (eight separately) with block
+  intervals, the equal-row set (key `primary`, `origin_us`, `valid_us`, asserted across all arms), and
+  the attention weights split by mirror for the attention arm. Mirrored worlds rebuild the neighbour
+  surprise stacks from the shifted neighbour series while the lagless tables stay frozen.
+- **Compute gate.** 16 fits (about 4 GPU-hours, timed on one fit first). Fits start only after the
+  code review.
