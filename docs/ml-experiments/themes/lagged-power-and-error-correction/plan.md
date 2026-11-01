@@ -13,7 +13,7 @@
 | 414 | Post hoc: does filling the gaps in the stage-1 median, so that more load-shift events are scored, change the counterfactual-lag gain on harm rows? | High (manager, after experiment 411) | Nothing | Planned |
 | 428 | Can a convolutional network over whole days of recent power, read by attention, replace the hand-made lagged power inputs and stop the forecast following load-shift events? | High (maintainer, 2026-10-31) | Nothing | Done (S1, the surprise at the three lags, carries forward) |
 | 445 | If a detector knew exactly which recent lags lie inside a load-shift event, how much would a lagged and lagless forecast mixture gain (the O-rule ceiling, no fits)? | High (neural Discuss session, 2026-10-31) | Experiment 404 merged | Planned |
-| 463 | Does fitting the trust weight on out-of-fold lagged heads (35 fits, seed 0) close the gap between the learned trust weight and the fixed 50/50 mixture? | High (neural Discuss session, 2026-11-01) | Nothing | Planned |
+| 463 | Does fitting the trust weight on out-of-fold lagged heads (40 fits, seed 0) close the gap between the learned trust weight and the fixed 50/50 mixture? | High (neural Discuss session, 2026-11-01) | Nothing | Planned |
 | 447 | Does changing any one setting of the S1 demand network (width, depth, embedding, components, dropout, weight decay, learning rate and schedule, batch size, optimiser), or a random search over the three most influential, lower its quantile score by the agreed margin? | High (neural Discuss session, 2026-11-01) | Nothing | Done (not supported: no single setting beats S1; see experiment 447) |
 
 ## Planned experiments
