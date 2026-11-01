@@ -2,7 +2,7 @@
 id: "00447"
 slug: demand-network-hyperparameter-sweep-on-the-s1-skeleton
 title: >-
-  Does changing any one setting of the S1 demand network, or a random search over the three most
+  Does changing any one setting of the S1 demand neural network, or a random search over the three most
   influential settings, lower its quantile score by the agreed margin?
 theme: lagged-power-and-error-correction
 also_relevant_to:
@@ -29,8 +29,8 @@ prediction: >-
   to 10, 1.15 widening, pooled over the signed-MW six and the MVA-only eight, clean rows. P1. Most
   of the 22 one-factor arms change the pooled clean CRPS by less than the minimum detectable
   effect (0.064 points at two seeds, from S1's six stored seeds). P2. A wider network (128 or 256)
-  and a Primary embedding of 16 are the likeliest to help, each by 0.03 to 0.10 points; one
-  mixture component is not tested, and 2 components lose 0.02 to 0.10 points. P3. SGD and a hidden width of 32
+  and a Primary embedding of 16 are the likeliest to help, each by 0.03 to 0.10 points; the levels are 2, 3, and 5
+  components, and 2 components lose 0.02 to 0.10 points. P3. SGD and a hidden width of 32
   are the likeliest to hurt. P4. The cosine and one-cycle
   schedules change the score by under 0.05 points because early stopping already ends training.
   P5. No change lowers the q95 or q99 pinball loss on real harm rows by more than the seed
@@ -43,19 +43,36 @@ decision_rule: >-
   for the arm's setting). The reference is S1 itself (experiment 428's stored forecasts, same folds
   and seeds). Contrast = arm minus S1 in CRPS points on the pooled 14 Primaries (signed-MW six and
   MVA-only eight added block by block, reported separately too), clean rows, with a month-and-day
-  block bootstrap 95% interval. Margin = the larger of 0.03 points (the agreed demand margin) and
-  the seed minimum detectable effect (1.96 x sqrt(2) x seed sd / sqrt(seeds), the sd from S1's six
-  stored seeds on the same folds). A one-factor arm moves when its gain is at least the margin on
-  clean pooled rows, it improves at least 2 of the 3 folds, and no q95 or q99 pinball loss rises by
-  more than 0.02 points on clean, real harm, or injected harm rows. If no arm moves, the experiment
-  stops and says so. Otherwise the three factors with the largest best-level gain are searched:
-  20 configurations drawn at random (seed 447) from their levels and S1's level, screened on the
-  same folds and seeds, and the top 2 by pooled clean CRPS plus S1 are confirmed on five folds
-  (the four above plus 2025-12) by seeds 0 to 2, with the same margin and tail rule applied to the
-  confirmation alone. A configuration is reported as beating S1 only if it passes on the
-  confirmation. No arm is adopted by this experiment; the winner's configuration is handed to the
-  assembly worker. The smallest gain worth porting is the margin, because every setting is a
-  constant in the training script and costs nothing in production. Interim; no 99% claim.
+  block bootstrap 95% interval. Minimum detectable effect = 1.96 x sqrt(2) x sd / sqrt(2 seeds),
+  where sd is the residual standard deviation of S1's six stored seeds (0 to 5) about each fold's
+  mean, on the three screen folds, computed on pooled 14 clean rows (0.064 points); it covers seed
+  noise only, so it is a lower bound. Margin = the larger of 0.03 points (the agreed demand margin)
+  and that minimum detectable effect, so the screen margin is the minimum detectable effect. A
+  screen at two seeds detects a gain of 0.064 points about half the time and a gain of about 0.09
+  points 80% of the time, so a gain between 0.03 and 0.064 is reported as undetectable and is not
+  evidence of a flat optimum. A one-factor arm moves when its pooled clean gain is at least the
+  margin, it improves at least 2 of the 3 folds, and no pooled q95 or q99 pinball loss (mean over
+  the three folds, points of capacity, seed-averaged quantiles) rises by more than 0.02 points on
+  clean, real harm, or injected harm rows (six cells; a real harm cell fails only if its rise also
+  exceeds that cell's seed spread). If no arm moves, the experiment stops and says so. Otherwise the
+  search factors are the three factors, among those whose best level has a positive pooled clean
+  gain, with the largest best-level gain (ties broken by the larger mean fold gain, then the lower
+  absolute CRPS); if fewer than 3 factors have a positive gain, only those are searched. The optimiser
+  levels are bundles that fix their own learning rate and weight decay, so a draw that uses a
+  non-AdamW optimiser keeps S1's schedule, and the learning rate, weight decay, and schedule
+  factors cannot be searched in the same draw. The search samples up to 20 distinct configurations
+  uniformly from the product of the searched factors' levels and S1's level, excluding S1 itself
+  and the single-factor arms, with seed 447; each is screened on the same folds and seeds. The top
+  2 by pooled clean CRPS that also meet the screen margin and tail rule are confirmed with S1 on 5
+  folds (2026-06, 2026-01, 2025-10, 2026-03, 2025-12) by seeds 0 to 2. A configuration passes the
+  confirmation if its pooled clean gain is at least the screen margin, its 95% block-bootstrap
+  interval excludes zero, it improves at least 3 of the 5 folds, and the tail rule holds. The
+  confirmation shares 3 folds and 2 seeds with the screen, so the gain on the two new folds
+  (2026-03, 2025-12) is reported separately beside it. A configuration is reported as beating S1
+  only if it passes the confirmation. No arm is adopted by this experiment; the winner's
+  configuration is handed to the assembly worker. The smallest gain worth porting is the margin,
+  because every setting is a constant in the training script and costs nothing in production.
+  Interim; no 99% claim.
 benchmark: >-
   S1 of experiment 428 (seeds 0 to 2) and experiment 439 (seeds 3 to 5), stored forecasts, as the
   reference of every contrast.
@@ -75,30 +92,38 @@ code: ml-experiments/00447-demand-network-hyperparameter-sweep-on-the-s1-skeleto
 
 ## Question
 
-Does any single setting of the S1 demand network matter more than the seed noise, and if one does,
+Does any single setting of the S1 demand neural network matter more than the seed noise, and if one does,
 does a combination of the influential settings help further?
 
 ## Plan
 
+**Every change is made to S1 one at a time, and the order of the stages is set by the stop rule.**
+
 - **Base.** S1 of experiment 428: hidden width 64, 2 hidden layers, Primary embedding 8, 3 mixture
   components, dropout 0.1, AdamW with weight decay 1e-3 and learning rate 5e-4, constant schedule,
-  batch 8,192, up to 60 epochs with early stopping (patience 8).
+  batch 8,192, gradient clip 1.0, training on clean and injected worlds, up to 60 epochs with early
+  stopping (patience 8). All of these except the setting under test carry over to every arm.
 - **Levels (22 one-factor arms).** Hidden width 32, 128, 256. Depth 3, 4. Embedding 4, 16.
   Components 2, 5. Dropout 0, 0.2. Weight decay 1e-4, 1e-2. Learning rate 2.5e-4, 1e-3. Schedule
-  cosine, one-cycle (peak 2 x 5e-4). Batch 4,096, 16,384. Optimiser Adam (no decay), Lion (learning
-  rate 1.5e-4, weight decay 1e-2), SGD with Nesterov momentum 0.9 (learning rate 5e-2, weight decay
+  cosine over the 60-epoch cap, one-cycle (peak 2 x 5e-4, 60 epochs of steps; S1 runs all 60 epochs,
+  so the schedules complete). Batch 4,096, 16,384. Optimiser Adam (no decay), Lion (learning rate
+  1.5e-4, weight decay 1e-2), SGD with Nesterov momentum 0.9 (learning rate 5e-2, weight decay
   1e-3). The optimiser arms use each optimiser's customary learning-rate scale, so they test a
   recipe, not the optimiser alone.
-- **Screen.** 3 folds by 2 seeds, 6 fits per arm, 132 fits. S1's forecasts are stored, so the
-  reference costs no fits.
-- **Gate.** One refit of S1 (2026-01, seed 0) under this experiment's training loop must match
-  experiment 428's stored validation loss and forecasts, before any arm is read.
-- **Random search.** Up to 20 configurations, 6 fits each (120 fits).
-- **Confirmation.** The top 2 configurations and S1 on 5 folds by 3 seeds: 30 fits plus 3 S1 refits
-  (the fifth fold, 2025-12, has no stored S1 forecast).
-- **Compute.** About 0.25 GPU-hours per fit (experiment 439: 24 fits in about 6 GPU-hours), so the
-  screen is about 33 GPU-hours, the random search about 30, and the confirmation about 8 (33 fits).
-- **Cleaned data and the short-history cut.** Experiment 428's rows are used unchanged.
+- **Stages.** Stage 1a runs hidden width, depth, embedding width, and mixture components (9 arms).
+  The other factors (dropout, weight decay, learning rate, schedule, batch size, optimiser; 13 arms)
+  run only if a stage 1a arm moves S1; if none does, the page says the neural network is
+  insensitive to these settings and stops.
+- **Fits.** 6 fits per arm (3 folds by 2 seeds): 54 for stage 1a, 78 for the rest, up to 120 for
+  the random search, and 33 for the confirmation (2 configurations by 5 folds by 3 seeds, plus 3 S1
+  refits for 2025-12, which has no stored S1 forecast; the refits stand in as S1 for that fold).
+- **Compute.** One fit of S1 took 38 seconds on the GPU (2026-11-01), so the full programme of up to
+  285 fits is about 3 GPU-hours plus scoring; width 256, depth 4, and small batches are slower.
+- **Gate.** The refit of S1 (2026-01, seed 0) under this experiment's training loop reproduced
+  experiment 428's stored validation loss exactly (0.43363991, 60 epochs). Any later disagreement
+  beyond 1e-3 in validation loss stops the sweep.
+- **Seeds.** Seeds 0 to 5 of S1 each have their own cross-fitted lagless table (experiments 404 and
+  439), so the six stored seeds are independent draws.
 - **Reports.** Absolute CRPS beside every contrast, the signed-MW six and the MVA-only eight
   separately, clean, injected harm, real harm, and real event rows as in experiment 439, tail
   pinball and coverage, and the seed spread.

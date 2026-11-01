@@ -37,8 +37,18 @@ def link() -> None:
     """Link experiments 428's and 439's stored S1 forecasts into this predictions folder."""
     target = common.WORK_DIR / "predictions" / common.REFERENCE
     target.mkdir(parents=True, exist_ok=True)
-    for source_dir in (common.E428_WORK, common.E439_WORK):
+    for source_dir in (common.E428_WORK, common.E439_WORK):  # 428 holds seeds 0-2, 439 holds 3-5
         for source in (source_dir / "predictions" / common.REFERENCE).glob("*.parquet"):
+            link_path = target / source.name
+            if not link_path.is_symlink():
+                link_path.symlink_to(source)
+
+
+def link_refit_reference() -> None:
+    """Link the refitted reference (`X-ref`) forecasts of months without a stored S1 as S1's."""
+    target = common.WORK_DIR / "predictions" / common.REFERENCE
+    for source in (common.WORK_DIR / "predictions" / "X-ref").glob("*.parquet"):
+        if source.name.split("_s")[0] not in common.STORED_MONTHS:
             link_path = target / source.name
             if not link_path.is_symlink():
                 link_path.symlink_to(source)
@@ -60,6 +70,7 @@ def collect(*, months: tuple[str, ...], seeds: tuple[int, ...], arms: list[str])
 
 def minimum_detectable_effect(*, months: tuple[str, ...], n_seeds: int) -> pl.DataFrame:
     """Return the seed spread and minimum detectable effect from S1's six stored seeds."""
+    months = tuple(m for m in months if m in common.STORED_MONTHS)  # six stored seeds exist there
     table = collect(months=months, seeds=STORED_SEEDS, arms=[common.REFERENCE])
     records = []
     for (row_set, group), part in table.group_by("row_set", "group"):
@@ -116,7 +127,7 @@ def decisions(
     )
 
 
-def verdicts(*, frame: pl.DataFrame) -> pl.DataFrame:
+def verdicts(*, frame: pl.DataFrame, min_folds: int) -> pl.DataFrame:
     """Return per arm: does the clean pooled gain pass the margin, and do the tail guards hold."""
     clean = frame.filter((pl.col("row_set") == "clean") & (pl.col("group") == POOLED)).select(
         "arm", "gain", "gain_low", "gain_high", "margin", "mde", "folds_improved"
@@ -133,7 +144,7 @@ def verdicts(*, frame: pl.DataFrame) -> pl.DataFrame:
         .with_columns(
             tails_ok=(pl.col("worst_q95") <= common.TAIL_HARM_LIMIT)
             & (pl.col("worst_q99") <= common.TAIL_HARM_LIMIT),
-            moved=(pl.col("gain") >= pl.col("margin")) & (pl.col("folds_improved") >= 2),
+            moved=(pl.col("gain") >= pl.col("margin")) & (pl.col("folds_improved") >= min_folds),
             inside_mde=pl.col("gain").abs() < pl.col("mde"),
         )
         .with_columns(passes=pl.col("moved") & pl.col("tails_ok"))
@@ -151,12 +162,14 @@ def main() -> None:
     score.pr.PRED_DIR = run.WORK_DIR / "predictions"
     if args.command == "link":
         link()
+        link_refit_reference()
         return
     months = common.SCREEN_FOLDS if args.stage == "screen" else common.CONFIRM_FOLDS
     seeds = common.SCREEN_SEEDS if args.stage == "screen" else common.CONFIRM_SEEDS
     names = args.arms or [
         p.name.removeprefix(common.ARM_PREFIX)
         for p in sorted((run.WORK_DIR / "predictions").glob(f"{common.ARM_PREFIX}*"))
+        if p.name != common.ARM_PREFIX + "ref"
     ]
     arms = [common.ARM_PREFIX + n for n in names]
     out = run.WORK_DIR / "scores" / args.stage
@@ -167,6 +180,13 @@ def main() -> None:
         counts.group_by("month", "world", "row_set", "group").agg(pl.col("n").n_unique())["n"].max()
         == 1
     ), "an arm is scored on different rows from S1"
+    days = table.group_by("arm", "month", "world", "row_set", "group").agg(pl.col("day").n_unique())
+    assert (
+        days.group_by("month", "world", "row_set", "group")
+        .agg(pl.col("day").n_unique())["day"]
+        .max()
+        == 1
+    ), "an arm is scored on different days from S1"
     mde = minimum_detectable_effect(months=months, n_seeds=len(seeds))
     frame = decisions(table=table, arms=arms, mde=mde, rng=np.random.default_rng(0))
     table.write_parquet(out / "blocks.parquet")
@@ -174,7 +194,7 @@ def main() -> None:
     frame.write_parquet(out / "decisions.parquet")
     absolute = score.summarise(table=table, seeds=seeds)
     absolute.write_parquet(out / "absolute.parquet")
-    verdict = verdicts(frame=frame)
+    verdict = verdicts(frame=frame, min_folds=2 if args.stage == "screen" else 3)
     verdict.write_parquet(out / "verdicts.parquet")
     with pl.Config(tbl_rows=300, tbl_cols=20, fmt_str_lengths=40):
         print(mde.sort("row_set", "group"))

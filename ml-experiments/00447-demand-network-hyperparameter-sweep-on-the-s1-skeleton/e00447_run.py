@@ -82,15 +82,17 @@ def install_config(*, config: common.Config) -> None:
 
 def make_model(*, arm: fit.Arm, n_inputs: int, n_primaries: int) -> torch.nn.Module:
     """Return the S1 network with the Primary embedding width of the current config."""
-    model = _ORIGINAL_MAKE_MODEL(arm=arm, n_inputs=n_inputs, n_primaries=n_primaries)
     embedding = _CURRENT["config"].embedding
-    if embedding != 8:
-        assert isinstance(model, models.LaggedMdn)
-        s = fit.SETTING
-        model.net = base.PlainMdn(
-            n_inputs=n_inputs + 12, n_primaries=n_primaries, hidden=s.hidden, layers=s.layers,
-            components=s.components, dropout=s.dropout, embedding=embedding,
-        )  # fmt: skip
+    if embedding == 8:
+        return _ORIGINAL_MAKE_MODEL(arm=arm, n_inputs=n_inputs, n_primaries=n_primaries)
+    s = fit.SETTING
+    extra = 12  # S1 adds 9 lag columns and 3 surprise columns
+    model = models.LaggedMdn(n_inputs=n_inputs + extra, n_primaries=n_primaries, hidden=s.hidden,
+                             layers=s.layers, components=s.components, dropout=s.dropout)  # fmt: skip
+    model.net = base.PlainMdn(
+        n_inputs=n_inputs + extra, n_primaries=n_primaries, hidden=s.hidden, layers=s.layers,
+        components=s.components, dropout=s.dropout, embedding=embedding,
+    )  # fmt: skip
     return model
 
 
