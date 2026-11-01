@@ -31,15 +31,16 @@ prediction: >-
   Solar E near 2.4% still above the limit, and the score in MW 0.3% lower. Refitting changes the
   score in MW by less than the margin against experiment 453's re-scoring.
 decision_rule: >-
-  Adopt the p99.9 rule for a family if its pooled score in MW does not worsen by more than the
-  margin (wind 0.10 points of the old capacity, which is about 0.10 points times the capacity in
-  MW; solar 1%) and its pooled share above q99 after table P is at most 1.5%. Each series is
-  reported against the 1.5% limit and against the margin separately, and a failing series is
-  reported. If refitting moves the score in MW by more than the margin against experiment 453's
-  re-scoring, say the capacity enters the training target and the re-scoring mis-stated the
-  effect. The margins are the ones experiments 450 and 443 set; a change that costs nothing to port
-  (the rule is one number per series) would be worth porting at any gain, so the margin is a
-  non-inferiority bound, not a gain threshold.
+  Pooled means the mean quantile score in MW over all scored half-hours of a technology's series,
+  so each series weighs by its capacity. Adopt the p99.9 rule for a family if the upper bound of
+  the 95% month-block interval of (new minus old) pooled score in MW lies below the margin (wind
+  0.10 points of the old capacity, applied per series as 0.10 percent times its capacity in MW;
+  solar 1% of the old pooled score), and its pooled share above q99 after table P is at most 1.5%
+  as a point estimate (the interval is reported). If the minimum detectable effect exceeds the
+  margin, the verdict is inconclusive on the score. Each series is also reported against the 1.5%
+  limit and the margin, and a failing series is reported. The margins are the ones experiments 450
+  and 443 set. They are non-inferiority bounds, because the rule costs one number per series to
+  port. Experiment 453's re-scoring is a descriptive comparison, not a tested contrast.
 benchmark: >-
   The same networks under the old capacity rule: experiment 429's stored `member_plain` forecasts
   (5 seeds) and experiment 430's stored `a2_member`, `g0_onepass`, and `a5_plain` forecasts (3
@@ -66,25 +67,31 @@ metric: >-
   percentile of the series' cleaned power before the end of that fit's training (wind: before
   2025-04-16; solar: before each refit's cutoff, the refit start minus experiment 310's refit gap).
   It is one number per fit, not per scored month, so old and new differ in the training-target
-  scale as well as in the divisor. The page states the capacity of Farm A to C and Solar A to F as
+  scale as well as in the divisor, and the old capacity (p99 of the whole record) also used data
+  after the fit while the new capacity does not. The page says so and prints, per refit, each
+  capacity and the length of earlier history behind it. The page states the capacity of Farm A to C and Solar A to F as
   fractions of the old capacity.
 - **Table P.** Fitted per (series, lead band) on earlier scored months only, as in experiment 450,
-  with experiment 451's upper clip (the series' largest earlier power over the divisor), recomputed
-  under each divisor, for both arms.
+  with experiment 451's upper clip (the series' largest earlier power over the divisor). The clip is
+  the same power in MW under either divisor, and a check confirms it. The network head clips its
+  quantiles to 0 to 1 of the capacity in use, so the new arm's head reaches the new capacity.
 
 ## Scoring
 
 - **Rows.** True days 1 to 10 (lead 24 to 240 hours). Wind: the kept rows of experiment 210's mask,
   as experiments 450 and 453 scored (so 453's 0.85% is a direct prior), plus a second row set under
-  experiment 432's cleaned-zero rule. Solar: the rows experiment 430 scored. Row counts are equal
+  experiment 432's cleaned-zero rule (exploratory, dropped if the stored old forecasts do not
+  cover those rows). Solar: the rows experiment 430 scored. Row counts are equal
   across arms and printed.
 - **Contrasts in MW**, because the divisor changes: new minus old quantile score in MW, per series
   and pooled over the series of a technology, month-block bootstrap (1,000 draws). Absolute scores in
   MW and in points of the old capacity sit beside every contrast. The minimum detectable effect is
-  stated first, from the spread between two disjoint seed sets of the old arm (wind seeds 0 to 2
-  against 3 and 4; solar one seed against the mean of the other two).
+  stated first, from the spread of single-seed scores of the old arm over all seed pairs. The
+  month-block bootstrap is conditional on the fitted seeds (it resamples months only), and the new
+  and old seeds are not paired fits, so fit-to-fit spread is also reported.
 - **Bonferroni count.** Eleven intervals are reported (2 pooled plus 3 wind plus 6 solar series for
-  the headline arm); the adjusted level is 99.55%. The decision rule uses the 2 pooled contrasts.
+  the headline arm); the adjusted level is 99.55%. The decision rule uses the 2 pooled contrasts. The `g0_onepass` and
+  `a5_plain` arms and the cleaned-zero row set are exploratory and outside that count.
 - **Tails.** Coverage and pinball loss at q01, q05, q95, and q99, raw and after table P, per series;
   the headline is the share of actuals above q99 after table P, flagged where above 1.5%
   (experiment 453 found Solar B at 1.53% and Solar E at 2.45% under p99.9).
