@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Avoidable-curtailment cost of experiment 462's arms per test month and series (no fit).
 
 Experiment 449's script (`e00449_curtailment`), pointed at this experiment's forecasts: experiment
