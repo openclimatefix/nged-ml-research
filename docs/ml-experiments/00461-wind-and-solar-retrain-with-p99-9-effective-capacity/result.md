@@ -69,7 +69,8 @@ metric: >-
   It is one number per fit, not per scored month, so old and new differ in the training-target
   scale as well as in the divisor, and the old capacity (p99 of the whole record) also used data
   after the fit while the new capacity does not. The page says so and prints, per refit, each
-  capacity and the length of earlier history behind it. The page states the capacity of Farm A to C and Solar A to F as
+  capacity and the length of earlier history behind it. The page states the capacity of Farm A to C
+  and Solar A to F as
   fractions of the old capacity.
 - **Table P.** Fitted per (series, lead band) on earlier scored months only, as in experiment 450,
   with experiment 451's upper clip (the series' largest earlier power over the divisor). The clip is
@@ -90,7 +91,8 @@ metric: >-
   month-block bootstrap is conditional on the fitted seeds (it resamples months only), and the new
   and old seeds are not paired fits, so fit-to-fit spread is also reported.
 - **Bonferroni count.** Eleven intervals are reported (2 pooled plus 3 wind plus 6 solar series for
-  the headline arm); the adjusted level is 99.55%. The decision rule uses the 2 pooled contrasts. The `g0_onepass` and
+  the headline arm); the adjusted level is 99.55%. The decision rule uses the 2 pooled contrasts.
+  The `g0_onepass` and
   `a5_plain` arms and the cleaned-zero row set are exploratory and outside that count.
 - **Tails.** Coverage and pinball loss at q01, q05, q95, and q99, raw and after table P, per series;
   the headline is the share of actuals above q99 after table P, flagged where above 1.5%
