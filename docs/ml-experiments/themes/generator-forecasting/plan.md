@@ -15,6 +15,7 @@
 | 453 | Do the metered wind and solar series hold implausibly high values, and which percentile should set effective capacity? | 1 | nothing | Finished (partly supported); p99.9 of the earlier power |
 | 461 | Does retraining the wind and solar networks with effective capacity at p99.9 of earlier power keep their score and bring the upper tail inside 1.5%? | 1 | 453 | Finished (partly supported); p99.9 helps wind, marginal for solar |
 | 466 | Does weighting recent training rows more raise the quantile score of the wind and solar networks? | 1 | 461 | Finished (not supported); no half-life helps, line closed |
+| 473 | What makes Generators X, Y, and Z hard to forecast, and can any of them be forecast from weather and calendar? | 1 | nothing | Finished (refuted); stage 2 for Generator X, and Generator Y only with folds before mid-2024, awaits the manager |
 
 ## Planned experiments
 
