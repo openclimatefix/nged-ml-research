@@ -125,7 +125,14 @@ def lagless_head(*, month: str, seed: int, primary: np.ndarray, target: np.ndarr
 
 
 def lag_inputs(
-    *, arm: str, month: str, seed: int, world: int, test: fit.Pool, lag_stats: np.ndarray, device: str
+    *,
+    arm: str,
+    month: str,
+    seed: int,
+    world: int,
+    test: fit.Pool,
+    lag_stats: np.ndarray,
+    device: str,
 ) -> tuple[torch.Tensor, np.ndarray, np.ndarray]:
     """Return the lag tensor of a world for the rows, the world's power, and its event codes."""
     power_np, code = fit.world_power(seed=None if world < 0 else world)
@@ -199,7 +206,9 @@ def score_cell(*, month: str, seed: int, device: str, real: np.ndarray) -> dict[
     return keys
 
 
-def cache_reference_heads(*, month: str, seed: int, keys: dict[str, np.ndarray], device: str) -> None:
+def cache_reference_heads(
+    *, month: str, seed: int, keys: dict[str, np.ndarray], device: str
+) -> None:
     """Cache the stored A0-inj and S1 heads and the lagless head of a cell (real world)."""
     for kind, arm in (("A", "A0-inj"), ("S", "S1")):
         net, saved = load_net(arm=arm, month=month, seed=seed, device=device)

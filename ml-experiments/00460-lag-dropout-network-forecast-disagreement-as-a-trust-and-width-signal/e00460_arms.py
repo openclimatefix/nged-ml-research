@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0915, B023
 """Build the arms of experiment 460 from the cached heads, with arms c and d fitted on earlier months.
 
 Arms (real world only; forecast tables in experiment 404's layout under `work/predictions/<arm>/`):
@@ -66,7 +67,9 @@ def prediction_path(*, arm: str, month: str, cell: int) -> Path:
 def load_head(*, kind: str, month: str, seed: int) -> Head:
     """Return a cached head ("S", "A", "L") or the S1d "all" or "none" pass ("Sd:all")."""
     if kind.startswith("Sd:"):
-        saved = torch.load(heads_mod.heads_path(kind="Sd", month=month, seed=seed))
+        saved = torch.load(
+            heads_mod.heads_path(kind="Sd", month=month, seed=seed), weights_only=False
+        )
         return tuple(saved[kind[3:]])  # ty: ignore[invalid-return-type]
     saved = torch.load(heads_mod.heads_path(kind=kind, month=month, seed=seed), weights_only=False)
     return tuple(saved["head"])  # ty: ignore[invalid-return-type]
@@ -81,7 +84,7 @@ def mix(*, heads: list[Head], weights: list[torch.Tensor] | None = None, device:
     logs = [
         torch.full((len(h[0]), 1), -float(np.log(k)), dtype=torch.float64)
         if weights is None
-        else torch.log(w.double().clamp(1e-9, 1.0))[:, None]
+        else torch.log(w.double().clamp(1e-9, 1.0))[:, None]  # ty: ignore[unresolved-attribute]
         for h, w in zip(heads, weights or [None] * k, strict=True)  # ty: ignore[invalid-argument-type]
     ]
     log_w = torch.cat([h[0] + extra for h, extra in zip(heads, logs, strict=True)], dim=1)
@@ -156,10 +159,14 @@ def monotone(*, factors: pl.DataFrame, n_bins: int) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
-def fit_widening(*, fit_rows: pl.DataFrame, edges: dict[str, np.ndarray], n_bins: int) -> pl.DataFrame:
+def fit_widening(
+    *, fit_rows: pl.DataFrame, edges: dict[str, np.ndarray], n_bins: int
+) -> pl.DataFrame:
     """Return the monotone table P factors per (group, bin, lead band, tail)."""
     binned = fit_rows.with_columns(
-        bin=pl.Series(bin_of(frame=fit_rows, edges=edges) if n_bins > 1 else np.zeros(fit_rows.height, int))
+        bin=pl.Series(
+            bin_of(frame=fit_rows, edges=edges) if n_bins > 1 else np.zeros(fit_rows.height, int)
+        )
     ).with_columns(group=pl.col("group") + "|" + pl.col("bin").cast(pl.String))
     raw = prov.fit_factors(fit=binned)
     return monotone(factors=raw, n_bins=n_bins)
@@ -170,9 +177,7 @@ def apply_widening(
 ) -> pl.DataFrame:
     """Widen the tail quantiles of a table by the factors of each row's group, bin, and band."""
     bins = bin_of(frame=frame, edges=edges) if n_bins > 1 else np.zeros(frame.height, dtype=int)
-    keyed = frame.with_columns(
-        group_key=pl.col("group") + "|" + pl.Series(bins.astype(str))
-    )
+    keyed = frame.with_columns(group_key=pl.col("group") + "|" + pl.Series(bins.astype(str)))
     typed = keyed.cast(dict.fromkeys(("q50", *tailcore.TAIL_LEVELS), pl.Float64)).with_columns(
         group=pl.col("group_key")
     )
@@ -187,20 +192,25 @@ def fit_weights(
     rng = np.random.default_rng(seed)
     pools: dict[str, list[tuple[Head, Head, np.ndarray, np.ndarray]]] = {}
     for month, s in fits:
-        frame = with_groups(frame=pl.read_parquet(passes_for(month=month, seed=s)))
-        frame = frame.with_row_index("row")
+        frame = with_groups(
+            frame=pl.read_parquet(passes_for(month=month, seed=s)).with_row_index("row")
+        )
         h_all = load_head(kind="Sd:all", month=month, seed=s)
         h_none = load_head(kind="Sd:none", month=month, seed=s)
         for (g,), part in frame.group_by("group"):
-            rows = part["row"].to_numpy()
+            rows = part["row"].to_numpy().astype(np.int64)
             if len(rows) > FIT_SUBSAMPLE:
                 rows = np.sort(rng.choice(rows, size=FIT_SUBSAMPLE, replace=False))
             sel = torch.from_numpy(rows)
             take = lambda h: tuple(t[sel] for t in h)  # noqa: E731
-            sub = frame[rows]
+            sub = frame.filter(pl.col("row").is_in(rows.tolist())).sort("row")
             pools.setdefault(str(g), []).append(
-                (take(h_all), take(h_none), sub["actual"].to_numpy().astype(np.float64),  # ty: ignore[invalid-argument-type]
-                 bin_of(frame=sub, edges=edges))  # fmt: skip
+                (
+                    take(h_all),
+                    take(h_none),
+                    sub["actual"].to_numpy().astype(np.float64),  # ty: ignore[invalid-argument-type]
+                    bin_of(frame=sub, edges=edges),
+                )
             )
     chosen: dict[tuple[str, int], float] = {}
     for g, items in pools.items():
@@ -283,30 +293,24 @@ def build_month(*, month: str, device: str) -> None:
         write_arm(arm="B-mix", month=month, cell=cell, base=base, q=q_bmix)
         write_arm(arm="S1d", month=month, cell=cell, base=base,
                   q=base_full.select(list(score.LEVEL_NAMES)).to_numpy().astype(np.float64))  # fmt: skip
-        widened = with_groups(frame=pl.read_parquet(prediction_path(arm="S1", month=month, cell=cell)))
         widened = tailcore.widen(
-            frame=widened.cast(dict.fromkeys(("q50", *tailcore.TAIL_LEVELS), pl.Float64)),
+            frame=pl.read_parquet(prediction_path(arm="S1", month=month, cell=cell)).cast(
+                dict.fromkeys(("q50", *tailcore.TAIL_LEVELS), pl.Float64)
+            ),
             factor=tailcore.WIDENING,
-        ).drop("group", "lead_band")
+        )
         path = prediction_path(arm="S1w", month=month, cell=cell)
         path.parent.mkdir(parents=True, exist_ok=True)
-        widened.cast(
-            dict.fromkeys(("q50", *tailcore.TAIL_LEVELS), pl.Float32)
-        ).write_parquet(path)
+        widened.cast(dict.fromkeys(score.LEVEL_NAMES, pl.Float32)).write_parquet(path)
         if not earlier:
             print(f"{month} s{cell}: no earlier months, arms c, c0, d skipped", flush=True)
             continue
         fits = [(m, cell) for m in earlier]
         fit_rows = pl.concat(
-            [
-                with_groups(frame=pl.read_parquet(passes_for(month=m, seed=s)))
-                for m, s in fits
-            ]
+            [with_groups(frame=pl.read_parquet(passes_for(month=m, seed=s))) for m, s in fits]
         ).cast(dict.fromkeys(("actual", "q50", SPREAD, *tailcore.TAIL_LEVELS), pl.Float64))
         edges = bin_edges(fit_rows=fit_rows)
-        test = with_groups(frame=base_full.select([*keep, *score.LEVEL_NAMES]).filter(pl.lit(True)))
-        assert test.height == base.height or True  # rows outside 0 to 240 h are dropped below
-        test_full = base_full.select([*keep, *score.LEVEL_NAMES])
+        test_full = base_full.select(keep)
         for arm, n_bins in (("S1d-c", N_BINS), ("S1d-c0", 1)):
             factors = fit_widening(fit_rows=fit_rows, edges=edges, n_bins=n_bins)
             out = apply_widening(
@@ -317,7 +321,9 @@ def build_month(*, month: str, device: str) -> None:
             )  # fmt: skip
             full = test_full.join(
                 out.select(*heads_mod.KEY_COLUMNS, *tailcore.TAIL_LEVELS),
-                on=list(heads_mod.KEY_COLUMNS), how="left", suffix="_w",
+                on=list(heads_mod.KEY_COLUMNS),
+                how="left",
+                suffix="_w",
             )
             for n in tailcore.TAIL_LEVELS:
                 full = full.with_columns(pl.coalesce(f"{n}_w", n).alias(n)).drop(f"{n}_w")
@@ -326,18 +332,22 @@ def build_month(*, month: str, device: str) -> None:
             full.cast(dict.fromkeys(score.LEVEL_NAMES, pl.Float32)).write_parquet(path)
             factors.write_csv(WORK_DIR / "checks" / f"factors_{arm}_{month}_s{cell}.csv")
         weights = fit_weights(fits=fits, edges=edges, seed=cell, device=device)
-        grouped = with_groups(frame=base_full.select([*keep]))  # drops rows outside 0 to 240 h
-        del grouped
         full_groups = base_full.select(keep).with_columns(
             group=pl.Series(
-                [GROUP_NAME[g] for g in report.group_of(
-                    sites=report.fit.prep.primaries()["site"].to_list()
-                )[base_full["primary"].to_numpy()]]
+                [
+                    GROUP_NAME[g]
+                    for g in report.group_of(sites=report.fit.prep.primaries()["site"].to_list())[
+                        base_full["primary"].to_numpy()
+                    ]
+                ]
             )
         )
         bins = bin_of(frame=full_groups, edges=edges)
         w = np.array(
-            [weights.get((g, b), 0.0) for g, b in zip(full_groups["group"].to_list(), bins, strict=True)]
+            [
+                weights.get((g, b), 0.0)
+                for g, b in zip(full_groups["group"].to_list(), bins, strict=True)
+            ]
         )
         q_d = mix(
             heads=[d_all, d_none],
@@ -350,6 +360,12 @@ def build_month(*, month: str, device: str) -> None:
         ).write_csv(WORK_DIR / "checks" / f"weights_{month}_s{cell}.csv")
         print(f"{month} s{cell}: arms c, c0, d written", flush=True)
     heads = [load_head(kind="S", month=month, seed=c) for c in SEEDS]
+    for c in SEEDS:
+        saved = torch.load(heads_mod.heads_path(kind="S", month=month, seed=c), weights_only=False)
+        assert np.array_equal(
+            saved["keys"]["target"],
+            pl.read_parquet(passes_for(month=month, seed=0))["target"].to_numpy(),
+        )
     base = pl.read_parquet(passes_for(month=month, seed=0))
     base = base.select([c for c in base.columns if not c.startswith("med_")])
     write_arm(arm="S1-ens3", month=month, cell=0, base=base, q=mix(heads=heads, device=device))

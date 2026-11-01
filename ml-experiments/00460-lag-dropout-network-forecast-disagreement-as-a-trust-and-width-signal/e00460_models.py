@@ -48,6 +48,8 @@ def mask_lags(*, lags: torch.Tensor, hidden: torch.Tensor) -> torch.Tensor:
         ],
         dim=-1,
     ).reshape(len(lags), LAG_COLUMNS)
+    if lags.shape[1] == LAG_COLUMNS:
+        return masked
     return torch.cat([masked, lags[:, LAG_COLUMNS:] * keep], dim=1)
 
 
