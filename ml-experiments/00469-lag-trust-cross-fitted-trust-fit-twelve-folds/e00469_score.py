@@ -109,7 +109,9 @@ def weights() -> None:
     with pl.Config(tbl_rows=100):
         print(
             out.group_by("arm", "group", "band")
-            .agg(mean=pl.col("weight").mean(), swing=pl.col("weight").max() - pl.col("weight").min())
+            .agg(
+                mean=pl.col("weight").mean(), swing=pl.col("weight").max() - pl.col("weight").min()
+            )
             .sort("arm", "group", "band")
         )
         print(out.group_by("arm", "month").agg(mean=pl.col("weight").mean()).sort("arm", "month"))
@@ -139,7 +141,11 @@ def median() -> None:
                     )  # fmt: skip
     out = pl.DataFrame(rows)
     out.write_csv(OUT_DIR / "median_error.csv", float_precision=4)
-    print(out.group_by("arm", "group", "set").agg(pl.col("n").sum(), pl.col("mae_median_diff_vs_bmix").mean()))
+    print(
+        out.group_by("arm", "group", "set").agg(
+            pl.col("n").sum(), pl.col("mae_median_diff_vs_bmix").mean()
+        )
+    )
 
 
 def main() -> None:

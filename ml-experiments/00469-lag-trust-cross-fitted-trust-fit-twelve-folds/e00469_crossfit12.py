@@ -65,7 +65,8 @@ def build_lagless(*, month: str, seed: int, device: str) -> None:
     temporary = target.with_name(target.name + ".tmp")
     table.write_parquet(temporary)
     temporary.rename(target)
-    print(f"{month} seed {seed}: {table.height:,} rows, {time.monotonic() - started:.0f} s -> {target}")
+    seconds = time.monotonic() - started
+    print(f"{month} seed {seed}: {table.height:,} rows, {seconds:.0f} s -> {target}")
 
 
 def time_fold(*, month: str, seed: int, device: str) -> None:
@@ -75,7 +76,8 @@ def time_fold(*, month: str, seed: int, device: str) -> None:
     mean, std = base.target_scalers(train=ctx.train, mask=fit_mask)
     started = time.monotonic()
     base.fit_plain(ctx=ctx, mask=fit_mask, mean=mean, std=std, seed=seed, device=device)
-    print(f"{month}: one fold fit on {int(fit_mask.sum()):,} rows in {time.monotonic() - started:.1f} s")
+    seconds = time.monotonic() - started
+    print(f"{month}: one fold fit on {int(fit_mask.sum()):,} rows in {seconds:.1f} s")
 
 
 def run_month(*, month: str, seed: int, device: str) -> None:
