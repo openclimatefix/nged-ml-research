@@ -174,9 +174,33 @@ def recovery() -> None:
 def main() -> None:
     """Run a stage."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("gate", "recovery"))
+    parser.add_argument("stage", choices=("gate", "recovery", "gate-table"))
     args = parser.parse_args()
-    gate() if args.stage == "gate" else recovery()
+    {"gate": gate, "recovery": recovery, "gate-table": gate_table}[args.stage]()
+
+
+def gate_table() -> None:
+    """Print the pre-registered gate per Primary for `C3` and `C3-nolag` (farm C, 4 MW)."""
+    rec = json.loads(RECOVERY_PATH.read_text())
+    rows = []
+    for arm, placebo_cond in (("C3", "placebo_C_mw4"), ("C3-nolag", None)):
+        for site in SIX:
+            held = rec[f"{arm}|held_C_mw4|{site}"]
+            if placebo_cond is None:
+                continue
+            plc = rec[f"{arm}|{placebo_cond}|{site}"]
+            sd = float(np.hypot(held["equivalent_ratio_sd"], plc["equivalent_ratio_sd"]))
+            gap = held["equivalent_ratio_mean"] - plc["equivalent_ratio_mean"]
+            sdc = float(np.hypot(held["capacity_ratio_sd"], plc["capacity_ratio_sd"]))
+            gapc = held["capacity_ratio_mean"] - plc["capacity_ratio_mean"]
+            first = plc["equivalent_ratio_mean"] <= held["gate_limit"] + GATE_MARGIN
+            second = gap > 2 * sd
+            rows.append((site, gap, 2 * sd, first, second, gapc, 2 * sdc))
+            print(
+                f"{arm} {site}: placebo<=limit+0.2 {first}; held-placebo equivalent {gap:+.3f} (2 SD {2 * sd:.3f}) "
+                f"pass {second}; capacity gap {gapc:+.3f} (2 SD {2 * sdc:.3f})"
+            )
+    print(f"gate passes at {sum(r[3] and r[4] for r in rows)} of {len(rows)} Primaries")
 
 
 if __name__ == "__main__":
