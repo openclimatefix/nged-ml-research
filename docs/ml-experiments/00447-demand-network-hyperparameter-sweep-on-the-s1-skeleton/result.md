@@ -28,9 +28,9 @@ prediction: >-
   Written before any fit and before any score is read. CRPS in points of effective capacity, days 1
   to 10, 1.15 widening, pooled over the signed-MW six and the MVA-only eight, clean rows. P1. Most
   of the 22 one-factor arms change the pooled clean CRPS by less than the minimum detectable
-  effect (0.064 points at two seeds, from S1's six stored seeds). P2. A wider network (128 or 256)
-  and a Primary embedding of 16 are the likeliest to help, each by 0.03 to 0.10 points; the levels are 2, 3, and 5
-  components, and 2 components lose 0.02 to 0.10 points. P3. SGD and a hidden width of 32
+  effect (0.064 points at two seeds, from S1's six stored seeds). P2. A wider neural network (128
+  or 256) and a Primary embedding of 16 are the likeliest to help, each by 0.03 to 0.10 points; the
+  levels are 2, 3, and 5 components, and 2 components lose 0.02 to 0.10 points. P3. SGD and a hidden width of 32
   are the likeliest to hurt. P4. The cosine and one-cycle
   schedules change the score by under 0.05 points because early stopping already ends training.
   P5. No change lowers the q95 or q99 pinball loss on real harm rows by more than the seed
