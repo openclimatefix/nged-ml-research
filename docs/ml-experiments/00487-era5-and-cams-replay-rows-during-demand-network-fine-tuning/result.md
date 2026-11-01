@@ -7,7 +7,7 @@ title: >-
 theme: retraining-and-training-history
 also_relevant_to:
   - production-reference-and-best-guess
-status: planned
+status: finished
 kind: other
 date: 2026-11-01
 size: >-
@@ -69,98 +69,159 @@ row_set_id: >-
 metric: >-
   CRPS in points of effective capacity, q01, q05, q95, and q99 coverage and pinball loss, and
   avoidable-curtailment cost at f = 0.9, 0.75, and 0.5 at the six, per metering group and slice.
+verdict: inconclusive
+best_arm: >-
+  None. R25 (25% of each step's loss weight on ERA5-and-CAMS rows) scores 3.441 CRPS points at the
+  signed-MW six on rows with no labelled event, against 3.517 for R0, but the gain is below the
+  0.112 minimum detectable effect and comes mostly from one fold.
+headline: >-
+  Replaying ERA5-and-CAMS rows did not lower cold-night CRPS at the eight (R25 -0.012, R50 +0.026,
+  Rcold +0.047 points; cold-night minimum detectable effect 0.169). At the six, R25 and R50 lower
+  CRPS on rows with no labelled event by 0.075 and 0.088 points, 3 to 4 times the single-seed
+  spread but below the minimum detectable effect of 0.112, and 2026-01 alone supplies about half of
+  it. No arm raises q99 pinball loss by more than 0.003 points.
+lessons: >-
+  Replay of ERA5-and-CAMS rows is not a fix for cold nights at the eight. At the six it brings a
+  three-seed fine-tune to about the level of a five-seed pool, which suggests replay acts as a
+  regulariser. A cold-night-only replay pool (Rcold) is worse than a plain one.
+take_home_message: >-
+  Mixing ERA5-and-CAMS rows back into the fine-tuning batches does not help the cold winter nights
+  at the eight MVA-only Primaries, and replaying only cold nights makes the eight slightly worse.
+  At the signed-MW six, plain replay lowers CRPS by about 2.5% (to the level of a five-seed pool),
+  but the gain is below the noise floor of three seeds and one fold supplies half of it. Cold nights
+  stay badly under-covered at the six whatever the replay.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Do not add cold-night-only replay rows to the fine-tuning: Rcold raised CRPS at the eight by
+    0.037 points (Bonferroni interval 0.013 to 0.065) and did not lower it on cold nights (Figure 1).
+  - >-
+    Test plain 25% replay again on more seeds and on folds other than 2026-01 before using it at
+    the six: its 0.075-point gain is below the 0.112 minimum detectable effect and 2026-01 supplies
+    0.237 of it (Figure 2).
+  - >-
+    Compare any replay or weighting arm with a five-seed pool as well as the three-seed reference,
+    because R25 and R50 at the six land at A-pool's level (3.441 and 3.429 against 3.451).
+  - >-
+    Expect cold nights at the six to stay under-covered (q95 coverage 0.79 to 0.80, target 0.95)
+    under every fine-tuning regime tried here; fix them in the recalibration, not in the fine-tune
+    (absolute table).
 ---
 
-**Plan only: no fit has produced a score yet.** This page is the plan of experiment 487, committed
-before any replay arm is scored.
+---
 
-**Question.** Fine-tuning on the ENS rows alone could let the network forget rare cold winter nights
-that the ERA5-and-CAMS pretraining rows hold in larger numbers. The experiment mixes pretraining
-rows back into the fine-tuning batches and asks whether the hard rows improve.
+**Replaying ERA5-and-CAMS rows does not fix cold winter nights at the eight, and its small gain at
+the six is within the noise.** Fine-tuning experiment 425's arm A with 25% or 50% of each step's
+loss on ERA5-and-CAMS pretraining rows left CRPS at the eight MVA-only Primaries unchanged, and
+replaying only cold-night rows (Rcold) made the eight slightly worse. At the signed-MW six, plain
+replay lowered CRPS on rows with no labelled event by 0.075 to 0.088 points (about 2.5%), which
+brings a three-seed fine-tune to the level of a five-seed pool. That gain is below the 0.112-point
+minimum detectable effect and 2026-01 supplies about half of it, so this experiment is inconclusive
+and no arm is a candidate. All scores are selection-biased, because the five folds that choose the
+candidate also score it. July 2026 is unused.
 
-**Arms** (all fine-tune experiment 425's arm A from its stored pretrained weights
-`work/pretrained/A/<month>_s<seed>.pt`, learning rate 2e-4, five folds of experiment 449: 2025-10,
-2025-12, 2026-01, 2026-03, 2026-06; seeds 0 to 2):
+**Question and answer.** The question was whether the network forgets rare cold nights during
+fine-tuning on the ensemble (ENS) rows, which start in 2024-04. The answer at the eight is no sign
+of forgetting. The experiment narrows replay to a possible regulariser at the six and rules out
+cold-night-only replay.
 
-- **R0:** no replay. This is experiment 425's stored fit (`seed_preds/A`, `models/A`), not
-  refitted. One fit (2026-01, seed 0) is refitted with the new loop to prove it reproduces within
-  noise.
-- **R25:** replay rows carry 25% of each step's loss weight.
-- **R50:** replay rows carry 50% of each step's loss weight.
-- **Rcold:** as R25, but replay rows are drawn only from cold nights (sun more than 5 degrees below
-  the horizon, 2 m temperature of 3 degrees Celsius or below).
+![CRPS change against R0 with Bonferroni intervals](figure_1_crps_contrasts_against_r0.svg)
 
-**Definitions fixed before any score is read.**
+Figure 1 shows each replay arm minus R0 on the seven CRPS row sets, with 27-test Bonferroni
+intervals. Below zero is better.
 
-- **Cold nights (deviation from the brief).** The brief defined cold nights as the lowest
-temperature decile, December to
-  February, sun below -6 degrees. This plan uses the scorer's definition (experiment 470's
-  `cold_nights` slice, from `studies.eval_protocol.slices`: sun more than 5 degrees below the
-  horizon and temperature of 3 degrees Celsius or below), so the replay rows and the scored slice
-  match. The slice is called "cold nights" throughout, because it covers every month. In the 2026-01
-  fold 332,535 of 7,122,133 replay training rows (4.7%) are cold nights.
-- **Replay rows.** The fold's ERA5-and-CAMS pretraining rows from `e00425_prep.fold_pretrain`, with
-  the held-out weeks and their purge excluded and both standing cuts applied (the D15 and D18
-  start cut and the flagged exact-zero drop). Replay rows carry the same 46 input columns as the
-  ENS rows, including the three origin lags with their missing flags and ages. The ENS-spread
-  columns (`std_*`) are filled with the fold's median ENS spread by lead band, as in the
-  pretraining stage. Replay rows are not recency weighted (the pretraining used equal weights).
-  ERA5 rows after 2024-04 share valid times with the ENS rows; both sets are kept.
-- **Epoch and batch.** An epoch is one pass over the ENS training rows in batches of 16,384 ENS
-  rows, the same steps per epoch as R0. Each step adds `round(16384 * r / (1 - r))` replay rows
-  (5,461 for R25 and Rcold, 16,384 for R50), drawn uniformly with replacement. R25 therefore sees
-  about 1.33 times and R50 about 2 times the rows per epoch that R0 sees.
-- **Loss (deviation from the brief's batch-share wording).** The brief asked for 25% of each batch.
-The loss share equals r by construction, while the recency weights shrink the ENS rows' effective
-weight inside their share. `(1 - r) * ENS loss + r * replay loss`. The ENS loss is the
-recency-weighted mean
-  negative log-likelihood of experiment 425  (weight `0.5 ** (age_days / SHORT_HALF_LIFE_DAYS)`).
-  The replay loss is the unweighted mean. Early stopping reads the
-  unweighted mean negative log-likelihood of the ENS held-out weeks only, as R0 does; replay rows
-  never enter the validation. Patience 6 and the 40-epoch cap are unchanged.
-- **Memory plan.** The fold's 4.9 million ENS rows (0.9 GB) and 7.9 million replay rows (1.5 GB)
-  sit on the GPU for the whole month, 2.9 GB peak measured on one fit. The host builds both arrays
-  once per month (about 6 GB resident) and frees them after the copy. One GPU process, one feeder
-  core, `MemoryMax=14G`.
-- **Past-weather caveat.** The replay rows use ERA5-and-CAMS weather, which is not available at
-  forecast time. The ERA5-and-CAMS weather enters training only, as in the pretraining; scoring
-  inputs are ensemble forecasts.
+![CRPS change by fold](figure_2_crps_change_by_fold.svg)
 
-**Scoring.** Experiment 470's rows and slices (the eight, the six on rows with no labelled event,
-the
-six against normal-running-arrangement actuals, cold nights, the 12 to 36 hour band, and the
-report-only
-Christmas week and D15 and D18), each replay arm against R0 with the same seeds, and A-pool as
-context. Tails (q01, q05, q95, q99 coverage and pinball loss, raw and with the 1.00 to 1.15 widening
-sweep) and avoidable-curtailment cost at f = 0.9, 0.75, and 0.5 at the six are descriptive. Every
-score is selection-biased, because the five folds that choose the candidate also score it. July 2026
-stays unused. Flagged exact-zero half-hours are dropped; the start cut for D15 and D18 applies.
-Rows with no labelled event are the clean rows; NGED's event labels are incomplete.
+Figure 2 shows the same differences by fold for the eight and the six on rows with no labelled
+event. The six's gain comes mainly from the 2026-01 fold.
 
-**Other deviations.** Avoidable-curtailment cost is descriptive, not a gating row, so that the test
-count stays 27. The q99 rule is +0.02 absolute, as the edits of 2026-11-01 require, not the brief's
-5% relative. No climatology row is scored: every contrast is between two fine-tunings of the same
-network, and A-pool is the context. Rcold draws about 5,461 rows per step from a pool of roughly 0.3
-million cold-night rows, so each cold row is seen several times per epoch; the draws per cold row
-are reported. Peak memory of R50 and Rcold is measured on their first fits.
+**Arms and design.**
 
-**Reproduction check.** The one R0 refit (2026-01, seed 0) passes if its CRPS at the eight and at
-the six differs from the stored fit by less than the printed single-seed standard deviation. If it
-fails, every contrast is labelled "against a non-reproducing reference" and the 15 R0 fits are
-refitted.
+- **Arms:** all fine-tune the stored arm A pretrained weights of experiment 425 (learning rate
+  2e-4, seeds 0 to 2, folds 2025-10, 2025-12, 2026-01, 2026-03, 2026-06). R0 is experiment 425's
+  stored fit. R25 and R50 put 25% and 50% of each step's loss weight on ERA5-and-CAMS rows. Rcold
+  does as R25 but draws replay rows only from cold nights (sun more than 5 degrees below the
+  horizon, 2 m temperature of 3 degrees Celsius or below; about 4.7% of the replay rows). This is a
+  deviation from the brief's decile definition, chosen to match the scored slice. The slice is
+  called "cold nights" because it covers every month.
+- **Step and loss:** an epoch is one pass over the ENS training rows in batches of 16,384 ENS rows
+  (R0's steps). Each step adds 5,461 (R25, Rcold) or 16,384 (R50) replay rows, drawn with
+  replacement. Step loss is `(1 - r)` times the recency-weighted ENS loss plus `r` times the
+  unweighted replay loss. Early stopping reads the unweighted ENS held-out weeks only. This is a
+  loss share, not the brief's row share per batch.
+- **Replay rows:** the fold's pretraining rows with the held-out weeks and purge excluded and both
+  standing cuts applied; the same 46 inputs, with the `std_*` columns set to the fold's median ENS
+  spread by lead band. ERA5-and-CAMS weather is not available at forecast time; it enters training
+  only.
+- **Fits and cost:** 45 fits plus one reproduction fit, about 65 minutes with one GPU process
+  (peak 3.2 GB, one feeder core). Predictions, weights and logs are in the experiment's private
+  folder `work/`. Code reused from experiments 397, 418, 425, 454, and 470.
+- **Reproduction check:** the R0 refit (2026-01, seed 0) matches the stored fit: largest quantile
+  difference 1e-5, 10 epochs each, CRPS 4.5462 at the eight and 4.8854 at the six for both.
+  Passed.
+- **Production cost:** serving is unchanged. The monthly refit needs the ERA5-and-CAMS table and
+  1.33 times (R25) or 2 times (R50) the rows per epoch.
 
-**Production cost.** One serving pass runs the same single network (or the five-seed pool) as arm A.
-Replay changes only the monthly refit: it needs the ERA5-and-CAMS pretraining table at refit time
-and
-adds about 1.3 times (R25) or 2 times (R50) the fine-tuning steps' rows. The serving path is
-unchanged.
+**Minimum detectable effect** (printed before any contrast; points of capacity). Five single seeds
+of arm A give a seed standard deviation of 0.052 (eight), 0.070 (six, no labelled event), 0.105
+(cold nights, eight), and 0.147 (cold nights, six). For two arms of three seeds each the minimum
+detectable effect is 0.083, 0.112, 0.169, and 0.236.
 
-**Compute.** 45 fits (3 arms times 5 folds times 3 seeds) plus one reproduction fit. Measured on one
-R25 fit: 22 seconds of training, 55 seconds of forecasting, 2.9 GB peak GPU. About 65 minutes of
-wall time, under 1 GPU-hour.
+**Headline numbers** (CRPS in points of effective capacity, 1.15 widening; difference against R0
+with the 27-test Bonferroni interval; Bonferroni count 27).
 
-**Stored predictions reused.** R0 is experiment 425's `seed_preds/A` (copied through experiment
-470's
-`A-s0`, `A-s1`, `A-s2`, the same fits on the same rows); A-pool, `A-s3` and `A-s4` are experiment
-470's.
-Experiment 470 applied the 1.15 widening in its scorer and so does this plan.
+| Row set | R0 | R25 − R0 | R50 − R0 | Rcold − R0 |
+|---|---|---|---|---|
+| Eight, all rows | 4.764 | +0.006 (−0.023, 0.037) | +0.031 (−0.012, 0.078) | +0.037 (0.013, 0.065) |
+| Six, no labelled event | 3.517 | −0.075 (−0.106, −0.048) | −0.088 (−0.133, −0.048) | −0.049 (−0.083, −0.017) |
+| Six, real events (NRA) | n/a | +0.053 (−0.030, 0.132) | +0.034 (−0.081, 0.139) | +0.042 (−0.126, 0.206) |
+| Eight, cold nights | 4.286 | −0.012 (−0.068, 0.046) | +0.026 (−0.058, 0.107) | +0.047 (−0.024, 0.120) |
+| Six, cold nights | 5.955 | −0.100 (−0.190, 0.002) | −0.112 (−0.237, 0.016) | −0.025 (−0.128, 0.063) |
+| Eight, 12 to 36 h | n/a | −0.019 (−0.064, 0.028) | +0.013 (−0.058, 0.091) | +0.012 (−0.025, 0.053) |
+| Six, 12 to 36 h | n/a | −0.083 (−0.127, −0.040) | −0.104 (−0.169, −0.042) | −0.025 (−0.068, 0.017) |
+
+- **Context:** A-pool (five-seed average) scores 4.680 (eight), 3.451 (six), 4.161 and 5.931 (cold
+  nights, eight and six). R25 and R50 at the six (3.441, 3.429) match A-pool.
+- **Predictions:** P1 (Rcold lowers cold-night CRPS by 0.05 at both) failed at the eight (+0.047)
+  and is inconclusive at the six. P2 holds at the eight (R25 and R50 intervals lie inside ±0.083)
+  and fails at the six (an improvement, so not equivalence). P3 holds: q99 pinball loss changes
+  by at most +0.003 points (eight) and −0.012 (six).
+- **Stop rule:** not met, because the cold-night minimum detectable effect (0.169 and 0.236) is
+  above 0.05. The idea is not closed; the cold-night result is inconclusive.
+- **Candidates:** none. Rcold fails the +0.02 non-inferiority gate at the eight (upper bound
+  0.065); R25 and R50 do not lower cold-night CRPS with an interval excluding zero at both groups.
+- **Validation loss:** replay lowers the ENS held-out negative log-likelihood (2026-01: R25 0.355,
+  R0 0.364 to 0.369) but not CRPS at the eight.
+
+**Tails** (raw coverage of the 1.15-widened bands, targets q95 0.95, q99 0.99, q05 0.05, q01 0.01).
+At the eight, R0 has q95 0.945 and q99 0.989; the replay arms move by at most 0.007. At the six,
+q95 rises from 0.918 (R0) to 0.925 to 0.928 (R25, R50). On cold nights at the six every arm stays
+far below target (q95 0.787 to 0.804, q99 0.871 to 0.877), and Rcold raises cold-night q01 coverage
+at the eight to 0.009 and at the six to 0.068 (target 0.01), so its lower tail worsens. Full
+tables are in `work/scores/absolute.csv`.
+
+**Avoidable-curtailment cost** at the six, in GBP million summed over the five scored folds, rows
+with no labelled event, scaled limit f. R0: 1.87 (f = 0.9), 7.07 (0.75), 21.70 (0.5); manual
+heuristic at f = 0.75 is 12.88. Paired difference against R0 with a 95% (not Bonferroni) interval:
+at f = 0.9, R25 −0.29, R50 −0.41, Rcold −0.39, each statistically significant at the 5% level; at
+f = 0.75 and 0.5 the intervals mostly include zero (f = 0.5: R25 −1.38, significant). The totals
+carry wide intervals (R0 at f = 0.9: 0.18 to 4.90), as in experiment 470.
+
+**Checks.**
+
+- **Audit triggers:** two fired. Trigger 4: the six's CRPS gain comes mostly from 2026-01 (R25
+  −0.237, R50 −0.326 in that fold; the other four folds average about −0.04 for both), so leaving
+  that fold out probably removes the interval. Trigger 2: P1 failed with no tested explanation
+  beyond the cold-night noise floor. No headline verdict rests on the six's gain.
+- **Not run:** the median-minus-mean check and the mean-forecast error contrast, the load-shift
+  event plots (no event contrast is claimed), and the example probabilistic forecast plots (the
+  forecasts are fine-tunes of experiment 425's arm A, whose examples are on its page).
+- **Caveats:** NGED's event labels are incomplete, so rows with no labelled event may hold
+  unlabelled events. Three seeds and five folds give wide seed noise. The block bootstrap does not
+  include seed variance. Rcold draws about 4 rows per cold-night row per epoch, so memorisation of
+  the pool is possible and is not visible to the ENS-only early stopping.
+
+**What to try next.** Repeat plain 25% replay with five seeds on a second set of folds before using
+it at the six. Do not pursue cold-night-only replay. Leave the cold-night under-coverage at the six
+to recalibration.
