@@ -71,6 +71,10 @@ def main() -> None:
     d12_latest = table.filter(pl.col("site") == "D12")
     latest = pl.concat([latest, d12_latest], how="diagonal").unique(subset="site", keep="first")
     lines = [
+        "# Unmetered solar capacity at each Primary (NGED table)",
+        "",
+        "Season-year July 2025 to June 2026, in megawatts. Capacities come from experiment 474's R4 rung with cloud terms; D12 uses the fit through the meter.",
+        "",
         "| Primary | Status | AC capacity, MW (10th / 50th / 90th) | DC capacity, MW (10th / 50th / 90th) | Confidence |",
         "|---|---|---|---|---|",
     ]

@@ -1,3 +1,7 @@
+# Unmetered solar capacity at each Primary (NGED table)
+
+Season-year July 2025 to June 2026, in megawatts. Capacities come from experiment 474's R4 rung with cloud terms; D12 uses the fit through the meter.
+
 | Primary | Status | AC capacity, MW (10th / 50th / 90th) | DC capacity, MW (10th / 50th / 90th) | Confidence |
 |---|---|---|---|---|
 | D2 | MVA-only: fit to the apparent-power reading, reactive power assumed zero | 6.7 / 6.9 / 7.9 | 8.2 / 9.0 / 10.3 | placebo gate failed (95th percentile 0.51, limit 0.20); 80% interval covered 93% of injections, 93% with a cloud-following load |
