@@ -1,14 +1,14 @@
 # ruff: noqa: E501, PTH123, SIM115
 """Score experiment 471's heuristic variants against the faithful heuristic (no fit).
 
-Rows come from experiment 452's `PT1` clean world-0 half-hours through experiment 448's row builder
-(the row set of experiment 457, `fold_a_daily_gap_v1`), which ends at 168 hours, so 168 to 240 hours is
-not scored. Two passes: `main` keeps only half-hours that every reference holds, BG2 and the stored
-arm A included; `long` drops BG2 and arm A and scores the same half-hours. Contrasts are paired
-month-by-origin-day block bootstraps (experiment 457's code). The Bonferroni count `TESTS` covers only
-the gating cells (CRPS, all rows, 0-240 h label, per variant and group). Every other cell is secondary,
-and its interval is uncorrected for the wider family. The minimum detectable effect of a contrast is
-the half-width of its Bonferroni interval.
+Rows come from experiment 452's `PT1` clean world-0 half-hours through experiment 448's row
+builder (the row set of experiment 457, `fold_a_daily_gap_v1`), which ends at 168 hours, so 168 to
+240 hours is not scored. Two passes: `main` keeps only half-hours that every reference holds, BG2
+and the stored arm A included; `long` drops BG2 and arm A and scores the same half-hours.
+Contrasts are paired month-by-origin-day block bootstraps (experiment 457's code). The Bonferroni
+count `TESTS` covers only the gating cells (CRPS, all rows, 0-240 h label, per variant and group).
+Every other cell is secondary, and its interval is uncorrected for the wider family. The minimum
+detectable effect of a contrast is the half-width of its Bonferroni interval.
 
 ```bash
 source /tmp/e471_env.sh
