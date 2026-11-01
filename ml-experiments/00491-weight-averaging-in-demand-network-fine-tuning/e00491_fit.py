@@ -62,11 +62,13 @@ WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / EXPERIMENT_DIR_NAME / "work"
 FOLDS: Final[tuple[str, ...]] = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 """The five folds of experiment 449."""
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
-FINE_TUNE_EPOCHS: Final[int] = 10
-"""The median of the 25 stored fine-tune lengths of experiment 425's arm A (five folds, five seeds)."""
-PRETRAIN_EPOCHS: Final[int] = 38
-"""The median of the 25 stored pretraining lengths of experiment 425's arm A."""
+FINE_TUNE_EPOCHS: Final[int] = 4
+"""The median best epoch of experiment 425's 25 stored arm A fine-tunes: stored epochs run minus the early-stopping patience of 6 (the median length is 10)."""
+PRETRAIN_EPOCHS: Final[int] = 32
+"""The median best epoch of experiment 425's 25 stored arm A pretrainings (median length 38 minus the patience of 6)."""
 EMA_DECAY: Final[float] = 0.999
+FAST_EMA_DECAY: Final[float] = 0.99
+"""A descriptive second average with a memory of about 100 steps."""
 SWA_FRACTION: Final[float] = 0.25
 SWA_PRE_FOLD: Final[str] = "2026-01"
 A_ARM: Final[fit425.Arm] = fit425.ARMS["A"]
@@ -80,6 +82,7 @@ class Averager:
         """Start both averages at zero; SWA begins after `swa_start_step` optimiser steps."""
         self.live = list(model.state_dict().values())
         self.ema = [torch.zeros_like(v) for v in self.live]
+        self.fast = [torch.zeros_like(v) for v in self.live]
         self.swa = [torch.zeros_like(v) for v in self.live]
         self.swa_start_step = swa_start_step
         self.step = 0
@@ -90,6 +93,8 @@ class Averager:
         self.step += 1
         torch._foreach_mul_(self.ema, EMA_DECAY)
         torch._foreach_add_(self.ema, self.live, alpha=1.0 - EMA_DECAY)
+        torch._foreach_mul_(self.fast, FAST_EMA_DECAY)
+        torch._foreach_add_(self.fast, self.live, alpha=1.0 - FAST_EMA_DECAY)
         if self.step > self.swa_start_step:
             self.swa_count += 1
             torch._foreach_lerp_(self.swa, self.live, 1.0 / self.swa_count)
@@ -98,6 +103,11 @@ class Averager:
         """Return the debiased EMA weights."""
         scale = 1.0 - EMA_DECAY**self.step
         return [v / scale for v in self.ema]
+
+    def fast_state(self) -> list[torch.Tensor]:
+        """Return the debiased fast EMA weights."""
+        scale = 1.0 - FAST_EMA_DECAY**self.step
+        return [v / scale for v in self.fast]
 
 
 def load_weights(*, model: torch.nn.Module, weights: list[torch.Tensor]) -> None:
@@ -171,7 +181,12 @@ def train_averaged(
         load_weights(model=model, weights=averager.ema_state())
         val_ema.append(validation_nll(model=model, setting=setting, t=t))
         load_weights(model=model, weights=final)
-    states = {"final": final, "EMA": averager.ema_state(), "SWA": list(averager.swa)}
+    states = {
+        "final": final,
+        "EMA": averager.ema_state(),
+        "EMA99": averager.fast_state(),
+        "SWA": list(averager.swa),
+    }
     info = {
         "epochs": epochs,
         "steps_per_epoch": steps_per_epoch,
@@ -207,6 +222,15 @@ def forecast_and_store(
     target = final_path(arm=arm, month=month, seed=seed)
     target.parent.mkdir(parents=True, exist_ok=True)
     common.atomic_write(frame=q, target=target)
+
+
+def stored_weights(
+    *, month: str, seed: int, fold: prep425.EnsFold, device: str
+) -> list[torch.Tensor]:
+    """Load experiment 425's pretrained weights by name into a network; return them in order."""
+    model = fit425.new_model(arm=A_ARM, fold=fold).to(device)
+    model.load_state_dict(torch.load(pretrained_path(month=month, seed=seed)))
+    return snapshot(model=model)
 
 
 def pretrained_path(*, month: str, seed: int) -> Path:
@@ -291,10 +315,9 @@ def run(*, months: list[str], seeds: list[int], swa_pre: bool, device: str) -> N
         )  # fmt: skip
         for seed in seeds:
             if not swa_pre:
-                stored = torch.load(pretrained_path(month=month, seed=seed))
                 fine_tune_arms(
-                    names={"stored": {"final": "S0f", "EMA": "EMA", "SWA": "SWA"}},
-                    start={"stored": list(stored.values())},
+                    names={"stored": {"final": "S0f", "EMA": "EMA", "EMA99": "EMA99", "SWA": "SWA"}},
+                    start={"stored": stored_weights(month=month, seed=seed, fold=fold, device=device)},
                     fold=fold, t=t, month=month, seed=seed, device=device, log=log,
                 )  # fmt: skip
                 write_log(path=log_path, log=log)
@@ -323,6 +346,9 @@ def pretrain_averaged(
 ) -> dict[str, list[torch.Tensor]]:
     """Pretrain from scratch for the fixed budget; return the final and SWA weights."""
     started = time.monotonic()
+    saved = {k: WORK / "pretrained" / k / f"{month}_s{seed}.pt" for k in ("final", "SWA")}
+    if all(p.exists() for p in saved.values()):
+        return {k: list(torch.load(p, map_location=device).values()) for k, p in saved.items()}
     pre, _ = prep425.fold_pretrain(fold=fold, refit=refit, cut=True)
     t = fit425.tensors(
         x=pre.x, y=pre.y, primary=pre.primary, weight=np.ones(len(pre.y), dtype=np.float32),
@@ -334,6 +360,10 @@ def pretrain_averaged(
     states, info = train_averaged(
         model=model, setting=fit425.SETTING, t=t, seed=seed, epochs=PRETRAIN_EPOCHS
     )
+    for k, path in saved.items():
+        model = fit425.new_model(arm=A_ARM, fold=fold).to(device)
+        load_weights(model=model, weights=states[k])
+        fit425.atomic_save(state=model.state_dict(), target=path)
     seconds = round(time.monotonic() - started)
     log[f"pretrain_s{seed}"] = info | {"seconds": seconds}
     print(
@@ -365,6 +395,13 @@ def repro(*, month: str, seed: int, device: str) -> None:
     q, _ = fit397.forecast_month(
         fits={None: fitted}, fold=fold, scheme="summary", month=month, device=device
     )
+    best_epoch = epochs - 6
+    probe = fit425.new_model(arm=A_ARM, fold=fold).to(device)
+    probe.load_state_dict(torch.load(pretrained_path(month=month, seed=seed)))
+    _, info = train_averaged(model=probe, setting=FINE_TUNE_SETTING, t=t, seed=seed, epochs=epochs)
+    gap = abs(info["val_nll_raw"][best_epoch - 1] - best)
+    print(f"averaged loop: epoch {best_epoch} val NLL differs from the stored best by {gap:.2e}")
+    assert gap < 1e-6, "train_averaged does not follow experiment 397's trajectory"
     target = WORK / "repro" / f"{month}_s{seed}.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
     common.atomic_write(frame=q, target=target)
