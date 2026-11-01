@@ -30,6 +30,8 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "W3 S3 - S3-rw": ("S3", "S3-rw"),
     "W4 S3 - S1": ("S3", "S1"),
     "W5 S3-rw - S2": ("S3-rw", "S2"),
+    "H1 H-lvl - R-inj": ("H-lvl", "R-inj"),
+    "H2 H-lvl - S1": ("H-lvl", "S1"),
 }
 
 
@@ -54,7 +56,7 @@ def main() -> None:
     if args.command == "link":
         link()
         return
-    arms = (*REFERENCES, *run.ARM_NAMES)
+    arms = (*REFERENCES, *run.ARM_NAMES, "H-lvl")
     score.ARMS = arms  # ty: ignore[invalid-assignment]
     score.CONTRASTS = CONTRASTS  # ty: ignore[invalid-assignment]
     out = run.WORK_DIR / "scores"
