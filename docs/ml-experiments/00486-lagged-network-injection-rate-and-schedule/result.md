@@ -86,7 +86,8 @@ worlds saved to disk, one per rate and seed. Only the world in each epoch change
 | Cur-up | 4.9%, then 27.8%, then 49.3% | epochs 1 to 2, 3 to 4, 5 to 6 |
 
 - **Rate definition.** Spikes count as events, and the shares are for 2026-06 seed 0 (the
-  write-up reports the share in every cell). The share counts training rows with at least one of the three origin lags
+  write-up reports the share in every cell). The share counts training rows with at least one of
+  the three origin lags
   inside an injected event, measured on the 2026-06 training pool at seed 0 (`e00486_fit.py share`).
   The brief's 5%, 20%, and 50% are the labels; the stored world measures 27.8% by this definition.
   The new worlds use experiment 428's injection with the event coverage changed to 0.016 (R05) and
