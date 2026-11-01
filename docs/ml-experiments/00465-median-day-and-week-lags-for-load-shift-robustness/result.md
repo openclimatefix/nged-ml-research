@@ -99,7 +99,8 @@ gone at 7 days. A stuck meter is shielded almost completely, but a dropout to ze
 not. The clean-row loss against the original lags is +0.050 points of capacity at the six Primaries
 metered in signed megawatts. Two fits of the original lags differ by 0.06, so the loss is not
 separable from fit-to-fit noise. NGED's event labels are incomplete, so "rows with no labelled
-event" may hold unlogged events, and every real-event slice undercounts. Every number is interim and unaudited.
+event" may hold unlogged events, and every real-event slice undercounts.
+Every number is interim and unaudited.
 
 ![Each arm minus each control, by row set](figure_1_contrasts.svg)
 
