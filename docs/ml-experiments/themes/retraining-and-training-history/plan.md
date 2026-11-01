@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 494 | Can the Primary demand network be refitted every 3 or 6 months, or pretrained once and only fine-tuned at each refit, without losing skill? | 1 | Nothing | Planned |
 | 487 | Does mixing ERA5-and-CAMS rows into the fine-tuning batches improve the demand network on cold winter nights and in the tails? | 1 | Nothing | Finished: plain replay does not help cold nights at the eight; gain at the six is below the seed-noise minimum detectable effect |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
 
