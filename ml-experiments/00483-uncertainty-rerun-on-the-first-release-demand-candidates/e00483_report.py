@@ -204,12 +204,12 @@ def figures() -> None:
             ),
         ),
     )
-    points = base.mark_point(filled=True, size=50).encode(x=alt.X("mean:Q", title="Coverage"))
-    bars = base.mark_rule().encode(x="low:Q", x2="high:Q")
+    points = base.mark_point(filled=True, size=50).encode(x=alt.X("mean:Q", title="Coverage"))  # ty: ignore[unresolved-attribute]
+    bars = base.mark_rule().encode(x="low:Q", x2="high:Q")  # ty: ignore[unresolved-attribute]
     band = (
         alt.Chart(head)
         .mark_rect(opacity=0.15, color=theme.DATA_GREEN)
-        .encode(x="low_t:Q", x2="high_t:Q")
+        .encode(x="low_t:Q", x2="high_t:Q")  # ty: ignore[unresolved-attribute]
     )
     chart = (
         alt.layer(band, bars, points)
@@ -223,7 +223,7 @@ def figures() -> None:
     )
     alt.Chart(beyond.with_columns(widening=pl.col("widening").cast(pl.String))).mark_line(
         point=True
-    ).encode(
+    ).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("month:N", title="Fold"),
         y=alt.Y("above_q99:Q", title="Share of actuals above q99"),
         color=alt.Color("arm:N", title=None),
@@ -236,7 +236,7 @@ def figures() -> None:
     )
     alt.Chart(worst.with_columns(rank=pl.int_range(pl.len()) + 1)).mark_bar(
         color=theme.BRAND_ORANGE
-    ).encode(
+    ).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("rank:O", title="Rank by q99 pinball loss"),
         y=alt.Y("pin_q99:Q", title="q99 pinball loss (points)"),
         tooltip=["month", "lead_hours", "actual"],
@@ -262,23 +262,23 @@ def context_charts(*, worst: pl.DataFrame) -> None:
         band = (
             alt.Chart(pdata)
             .mark_area(opacity=0.25, color=theme.DATA_BLUE)
-            .encode(x=x, y="q05:Q", y2="q95:Q")
+            .encode(x=x, y="q05:Q", y2="q95:Q")  # ty: ignore[unresolved-attribute]
         )
-        line = alt.Chart(pdata).mark_line(color=theme.DATA_BLUE).encode(x=x, y="q50:Q")
+        line = alt.Chart(pdata).mark_line(color=theme.DATA_BLUE).encode(x=x, y="q50:Q")  # ty: ignore[unresolved-attribute]
         q99 = (
             alt.Chart(pdata)
             .mark_line(color=theme.DATA_BLUE, strokeDash=[3, 3])
-            .encode(x=x, y="q99:Q")
+            .encode(x=x, y="q99:Q")  # ty: ignore[unresolved-attribute]
         )
         act = (
             alt.Chart(pdata)
             .mark_line(color=theme.BLACK_1)
-            .encode(x=x, y=alt.Y("actual:Q", title="% of capacity"))
+            .encode(x=x, y=alt.Y("actual:Q", title="% of capacity"))  # ty: ignore[unresolved-attribute]
         )
         mark = (
             alt.Chart(pl.DataFrame({"t": [row["valid_time"]]}))
             .mark_rule(color=theme.BRAND_ORANGE)
-            .encode(x="t:T")
+            .encode(x="t:T")  # ty: ignore[unresolved-attribute]
         )
         panels.append(
             alt.layer(band, q99, line, act, mark).properties(
