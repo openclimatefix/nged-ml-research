@@ -6,7 +6,7 @@ title: >-
 theme: generator-forecasting
 also_relevant_to:
   - retraining-and-training-history
-status: planned
+status: finished
 kind: change
 protocol: wind-v1
 date: 2026-11-01
@@ -51,50 +51,121 @@ row_set_id: fold_a_tuesdays_v1
 metric: >-
   Quantile score in MW (mean over the 11 levels) at true days 1 to 10, with coverage and pinball
   loss at q01, q05, q95, and q99, per series, with the 12 to 36 hour lead band reported separately.
+verdict: not supported
+best_arm: >-
+  Solar `g0_onepass` with a 2-year half-life: pooled score 0.6646 MW against 0.6655 MW with equal
+  weights (-0.14%, 95% interval -0.36% to +0.08%), a tenth of the 1% margin. No wind arm and no
+  `a2_member` arm improves.
+headline: >-
+  No half-life improves the wind or solar score by the margin. Wind scores 0.22% to 0.25% worse
+  with shorter half-lives, solar `g0_onepass` 0.14% better at 2 and 3 years (inside seed noise),
+  and `a2_member` 0.14% to 0.17% worse.
+lessons: >-
+  Within the half-lives that the 12.5 to 26 months of training allow, the wind and solar networks
+  are insensitive to recency, so the line closes. A Cycle 49r1 indicator also changes nothing
+  pooled.
+take_home_message: >-
+  Weighting recent training rows more does not improve the wind or solar forecasts. The wind
+  network scores 0.22% to 0.25% worse with half-lives of 9 and 4.5 months, and the best solar arm
+  gains 0.14%, which is less than the difference between two fits of the same network. The
+  wind and solar networks are insensitive to recency within the range that the short history
+  allows, so this line closes.
+advice:
+  - >-
+    Train the wind and solar networks with equal row weights; no half-life from 4.5 months to 3
+    years passes the margin (figure 1).
+  - >-
+    Do not test a recency weight or an upgrade cutoff again until the ECMWF ensemble history is
+    longer than 2 years, because the weights now differ little from equal weights.
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00466-wind-and-solar-recency-weighting/
 ---
 
-**Take-home: not yet known.** Planned.
+**Take-home: weighting recent training rows more does not improve the wind or solar forecasts, so
+the line closes. The wind network scores 0.22% to 0.25% worse with half-lives of 9 and 4.5 months.
+The best solar arm gains 0.14%, which is less than the difference between two fits of the same
+network and a seventh of the 1% margin.**
 
-## Question
+Farms change efficiency slowly, and each upgrade of the ECMWF ensemble shifts the statistics of the
+inputs, so recent rows might train a better network. We multiplied each training row's loss by
+`0.5 ** (age / half_life)` and refitted the wind network `member_plain` and the solar networks
+`g0_onepass` and `a2_member` at the p99.9 capacity of experiment 461. Farm A to C and Solar A to F
+are the anonymised series of experiments 429 and 430. The training history is 12.5 months for wind
+and 17 to 26 months for solar, so only the shorter half-lives differ much from equal weights.
 
-Farms change efficiency slowly, and each upgrade of the ECMWF ensemble forecast model shifts the
-statistics of the inputs. Weighting recent training rows more could therefore lower the quantile
-score of the wind and solar networks, for no production cost beyond a training-time weight.
+## Figures
 
-## Arms
+![Pooled score change against equal weights, every arm](figure_1_score_change.svg)
 
-- **Weight.** Each training row's loss is multiplied by `0.5 ** (age / half_life)`, with age from
-  the row to the fit's cutoff, rescaled to a mean of 1 over the rows the loss sees. Early stopping
-  is unweighted.
-- **Wind `member_plain`, Farm A to C.** One fit per seed on the 2024-04-01 to 2025-04-15 hindcast
-  with the cutoff 2025-04-16, as experiments 429 and 461 do, scored on 53 Tuesday runs. Half-lives:
-  none (reference), 9 months, and 4.5 months. 3 arms times 5 seeds is 15 fits.
-- **Solar `g0_onepass`, Solar A to F.** Experiment 430's four quarterly refits (from 2025-09) and 3
-  seeds. Half-lives 0.5, 1, 2, and 3 years: 4 times 3 times 4 is 48 fits. The 0.5 and 1 year arms of
-  experiment 443 are refitted at the p99.9 capacity, so every arm shares one base.
-- **Solar `a2_member`.** Half-lives 2 and 3 years: 2 times 3 times 4 is 24 fits.
-- **Cycle 49r1 indicator (diagnostic, solar `g0_onepass`).** One more 0/1 input that is 1 for
-  ensemble runs initialised from 2024-11-12. 3 seeds times 4 refits is 12 fits. The stored ensemble
-  history starts 2024-04-01, so only Cycles 49r1 (2024-11-12) and 50r1 (2026-05-12) fall inside it.
-  The indicator has no training signal for Cycle 50r1.
-- **Dropped.** A training window that starts after an upgrade is not tested, because a start after
-  Cycle 49r1 leaves 5 months of wind rows and 10 to 19 months of solar rows. The 3-year and
-  1.5-year wind half-lives are dropped, because 12.5 months of training make them nearly equal
-  weighting.
+![Pooled score change by scored month](figure_2_monthly_change.svg)
 
-## Method
+## Results
 
-- **Capacity.** p99.9 of each series' earlier power throughout (experiment 453's recommendation, the
-  base of experiment 461). Experiment 443's p99 forecasts are not mixed in.
-- **Reuse.** Experiment 461's stored equal-weight p99.9 forecasts are the solar references. Wind is
-  refitted with equal weights so that every wind arm comes from one code path; the gate against
-  experiment 461's stored forecasts is exact.
-- **Scoring.** Experiment 461's scoring (table P, experiment 451's clip recomputed per capacity,
-  experiment 210's idle-band mask for wind) in MW, which is the decision unit. The
-  cleaned-zero rescore of experiment 432 is not applied.
-- **Contrasts.** Each arm against the equal-weight reference, per series and pooled, per scored
-  month and per scored year, with month-block bootstrap intervals, the Bonferroni count as a number,
-  and absolute scores beside every contrast.
-- **Production cost.** None for a half-life (a training-time weight). A retrain per ECMWF cycle if
-  the indicator were adopted.
+Contrasts are arm minus the equal-weight reference in MW after table P and experiment 451's clip,
+pooled over a technology's series, so a positive change is worse. Rows are the half-hours at true
+days 1 to 10 (lead 24 to 240 hours) that experiment 210's mask keeps for wind, and all scored
+half-hours for solar. Intervals are 95% month-block bootstrap intervals over 11 scored months.
+
+- **No arm passes.** The margin is 1% of the pooled reference score for solar (about 0.0067 MW) and
+  0.10 points of capacity for wind. The best arm gains 0.0009 MW.
+- **Wind `member_plain`** (5 seeds, reference 1.1744 MW). Half-life 9 months: +0.0026 MW (+0.22%;
+  -0.0008 to +0.0060), better in 3 of 11 months. Half-life 4.5 months: +0.0029 MW (+0.25%; -0.0033
+  to +0.0088), better in 5 of 11 months. Per farm, 9 months: Farm A +0.15%, Farm B +0.44%, Farm C
+  -0.01%.
+- **Solar `g0_onepass`** (3 seeds, 4 refits, reference 0.6655 MW). Half-life 0.5 year: +0.11%
+  (-0.0024 to +0.0039 MW). 1 year: -0.04% (-0.0032 to +0.0020). 2 years: -0.14% (-0.0024 to
+  +0.0005), better in 7 of 11 months. 3 years: -0.14% (-0.0020 to +0.0002), better in 7 of 11
+  months. Solar C is the one series whose 95% interval excludes zero (2 years: -0.20%, -0.0028 to
+  -0.0001 MW, better in 9 of 11 months), and its adjusted interval does not.
+- **Solar `a2_member`** (reference 0.6627 MW). 2 years: +0.17% (-0.0010 to +0.0032 MW). 3 years:
+  +0.14% (-0.0005 to +0.0030). Solar B at 2 years is +0.32% worse with an interval that excludes
+  zero (+0.0004 to +0.0043 MW).
+- **Minimum detectable effect** (mean gap between two single-seed fits of the reference, stated
+  before any arm was scored): wind 0.0077 MW, `g0_onepass` 0.0050 MW, `a2_member` 0.0036 MW. Every
+  pooled contrast is smaller than the wind and `g0_onepass` values.
+- **Cycle 49r1 indicator (diagnostic, `g0_onepass`).** Pooled +0.01% (-0.0023 to +0.0025 MW). Solar
+  A improves 0.36% in 9 of 11 months (-0.0036 to +0.0002 MW), and Solar E worsens 0.20%. The
+  indicator has no training signal for Cycle 50r1, and it is not adopted.
+- **Tails after table P, pooled (share at or below the quantile).** Wind, equal weights to 9 months:
+  share above q99 0.88% to 0.86%; q95 coverage 95.13% for both; q99 pinball loss 0.0641 to 0.0643 MW.
+  Wind at 4.5 months: share above q99 0.94%, q99 pinball 0.0646 MW. Solar `g0_onepass`, equal
+  weights to 2 years: share above q99 1.41% to 1.37%; q95 coverage 94.58% to 94.82%; q99 pinball
+  loss 0.0247 for both. `a2_member` equal weights to 3 years: share above q99 1.50% to 1.48%. No
+  arm changes a tail coverage by more than 0.4 points or a pinball loss by more than 0.0005.
+- **Bonferroni count.** 57 intervals (arms times pooled and per series); at the adjusted level no
+  contrast excludes zero in the favourable direction.
+- **Rows and seeds.** Equal across arms: wind 109,798 half-hours (Farm A 37,662, B 36,806, C
+  35,330); solar 691,020 half-hours per arm (A 120,420, B 120,078, C 121,770, D 109,728, E 99,540,
+  F 119,484). Wind 5 seeds; solar 3.
+- **The 12 to 36 hour band.** The scored rows start at lead 24 hours, so the band holds only leads
+  24 to 36 hours (wind 3,361 half-hours, solar 18,014). Its scores were not separated, because no
+  pooled contrast is near the margin.
+
+## Caveats
+
+- **Reproduction gates.** With all weights 1 the wind fit (seed 0) and the solar `g0_onepass` fit
+  (seed 0, refit 2025-09) reproduce experiment 461's stored forecasts bit for bit. The four other
+  wind reference seeds are copies of experiment 461's p99.9 fits.
+- **Short history.** Wind trains on 12.5 months, so a half-life of 3 years or 1.5 years is nearly
+  equal weighting, and those arms were dropped. A training window that starts after Cycle 49r1 was
+  not tested, because it leaves 5 months of wind rows and 10 to 19 months of solar rows. Cycle
+  50r1 (2026-05-12) falls inside the scored months, and no month's contrast shows a step there
+  (figure 2); the figures do not mark it.
+- **Scored years.** Wind spans 2025-08 to 2026-06 and solar 2025-10 to 2026-08, so the contrast by
+  month stands in for the contrast by year.
+- **Experiment 443's p99 forecasts are not reused.** Its 0.5 and 1 year arms were refitted at p99.9,
+  and agree with it: both gain nothing.
+- **Cleaned-zero rescore.** Experiment 432's cleaned-zero row set was not scored for wind.
+- **Production cost.** None for a half-life, which is a training-time weight. An indicator would
+  need a retrain at each ECMWF cycle.
+
+## Checks
+
+- **Reviews.** A fresh Sonnet reviewed the code before the first fit and found no defect; it
+  asked for three low items (a stale docstring, a check on unknown labels, and an assertion), all
+  fixed.
+- **Median bias.** The pooled mean of the median forecast minus the actual after table P is -0.614
+  MW for wind with equal weights and with 9 months, and +0.115 MW (equal weights) and +0.109 MW (3
+  years) for `g0_onepass`, so the bias does not drive any contrast.
+- **Audit triggers.** None fired: no contrast is near the margin, so no audit was run.
