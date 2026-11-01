@@ -298,7 +298,9 @@ def selftest() -> None:
     first = int(np.nonzero(events.primary == 0)[0][0])
     p, a, b, s = (int(events.primary[first]), int(events.start[first]), int(events.stop[first]),
                   events.step[first])  # fmt: skip
-    lone = [q for q in neighbours[p] if (own[q, a:b] == 0).all() and (code[q, a:b] == RECEIVED).all()]
+    lone = [
+        q for q in neighbours[p] if (own[q, a:b] == 0).all() and (code[q, a:b] == RECEIVED).all()
+    ]
     assert lone, "the toy draw must give a recipient with no event of its own"
     assert all(np.sign(shift[q, a:b]).max() == -np.sign(s) for q in lone[:1]) or lone
     # The half-hours that no event touches have code 0 and shift 0; mirror-only half-hours are 3.
@@ -315,7 +317,10 @@ def selftest() -> None:
     )  # fmt: skip
     mirrorable = [i for i, q in enumerate(events.primary) if neighbours[int(q)]]
     mirrored = np.array(
-        [half_code[int(events.primary[i]), int(events.start[i])] == OWN_MIRRORED for i in mirrorable]
+        [
+            half_code[int(events.primary[i]), int(events.start[i])] == OWN_MIRRORED
+            for i in mirrorable
+        ]
     )
     assert 0.3 < mirrored.mean() < 0.7, mirrored.mean()
     again, _ = add_mirrors(
