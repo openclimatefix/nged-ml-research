@@ -26,6 +26,7 @@ ARMS = (
     "PT1-pool3", "PT1-pool5",
 )  # fmt: skip
 A_FOLDER = "A"
+CURTAILMENT_ARMS = ("S1", "S1-pool5", "PT1", "PT1-pool5")
 _BASE_REFERENCE_FRAMES = base.reference_frames
 """Experiment 448's reference builder, kept before `main` replaces the module attribute."""
 
@@ -56,6 +57,14 @@ def main() -> None:
     base.LADDER_ARMS = ARMS
     base.REFERENCES = (*base.REFERENCES, "425-A-s0", "425-A-avg5")
     base.SEEDS = (0, 1, 2)
+    original_curtailment = base.curtailment
+
+    def curtailment_with_pt_arms(**kwargs):  # noqa: ANN003, ANN202
+        """Cost the S1 and PT1 arms and their pools, as well as the references."""
+        kwargs["arms"] = tuple(a for a in CURTAILMENT_ARMS if a in kwargs["arms"] or a in ARMS)
+        return original_curtailment(**kwargs)
+
+    base.curtailment = curtailment_with_pt_arms  # ty: ignore[invalid-assignment]
     base.main()
 
 
