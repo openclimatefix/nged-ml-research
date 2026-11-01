@@ -19,13 +19,15 @@ Variants (`--variants`):
   L = 6 h, 24 h, 48 h, 3 days, 5 days, and 7 days (both signs; shares 5% and 2.5%).
 - `column_k1`: add the step to `lag_origin` only (experiment 392's column-level sweep with k = 1);
   arm `a` and `c`.
-- `stuck`: the readings of the last 24 hours repeat the reading 24 hours before the origin.
-- `dropout`: the readings of the last 6 hours are zero.
-- `spike`: the readings of the last 4 half-hours rise by 4 and by 20 times the series' median
+- `stuck`: the 48 newest usable readings (the 24 hours before `origin - NEWEST_AGE`) repeat the
+  reading just before them.
+- `dropout`: the 12 newest usable readings (6 hours) are zero.
+- `spike`: the 4 newest usable readings rise by 4 and by 20 times the series' median
   absolute change between a half-hour and the same half-hour a week earlier (a stand-in for the
   stage-1 residual spread, which this experiment does not refit).
 - `level`: a step of 5% of capacity (both signs) starts at the first run's origin and lasts the
-  whole refit month; each daily run's origin has seen the step for 0, 1, 2, ... days.
+  whole refit month; `day` counts the days since the step began (a multiple of 6, because only
+  every sixth run is swept).
 
 Rows are the clean rows of experiment 392's sweep (`clean_rows`: finite actual, no event or
 post-event window, no lag inside an event, every original lag finite) at leads up to 240 hours,
@@ -151,11 +153,14 @@ def modified_readings(
     if kind == "step":
         out[origin - size : origin + 1] += np.float32(depth)
     elif kind == "stuck":
-        out[origin - STUCK_STEPS + 1 : origin + 1] = power[origin - STUCK_STEPS]
+        end = origin - common.NEWEST_AGE
+        out[end - STUCK_STEPS + 1 : end + 1] = power[end - STUCK_STEPS]
     elif kind == "dropout":
-        out[origin - DROPOUT_STEPS + 1 : origin + 1] = 0.0
+        end = origin - common.NEWEST_AGE
+        out[end - DROPOUT_STEPS + 1 : end + 1] = 0.0
     elif kind == "spike":
-        out[origin - SPIKE_STEPS + 1 : origin + 1] += np.float32(depth)
+        end = origin - common.NEWEST_AGE
+        out[end - SPIKE_STEPS + 1 : end + 1] += np.float32(depth)
     elif kind == "level":
         out[first_origin : origin + 1] += np.float32(depth)
     return out
@@ -219,7 +224,7 @@ def variants(*, power: np.ndarray, origin: int, first_origin: int) -> list[tuple
             out.append(("column_k1", "origin", sign, sign * share, 0, share))
     out += [("stuck", "24h", 1, 0.0, 0, 0.0), ("dropout", "6h", 1, 0.0, 0, 0.0)]
     spread = week_spread(power=power, end=origin - common.NEWEST_AGE)
-    out += [("spike", f"x{int(m)}", 1, m * spread, 0, m * spread) for m in SPIKE_MULTIPLES]
+    out += [("spike", f"x{int(m)}", 1, m * spread, 0, m) for m in SPIKE_MULTIPLES]
     out += [("level", "5pct", sign, sign * LEVEL_SHARE, 0, LEVEL_SHARE) for sign in SIGNS]
     return out
 
@@ -294,7 +299,9 @@ def sweep_site(
             day = 0
             if kind == "level":
                 day = (origin - first_origin) // common.STEPS_PER_DAY
-            event_level = actual + (sign * share if kind in ("step", "column_k1", "level") else 0.0)
+            event_level = actual + (
+                depth if kind in ("step", "column_k1", "level", "spike") else 0.0
+            )
             accumulate(
                 sums=sums,
                 key=(kind, name, sign, share, day),
