@@ -8,6 +8,7 @@
 |---|---|---|---|---|
 | [300](../../00300-metered-farm-best-guess-assembly/result.md) | How good is the assembled best-guess day-ahead forecast for the six metered farms, and what does a new farm with no history get? | 1 | Nothing | Planned |
 | [430](../../00430-unified-forecaster-solar-and-pretraining-ablations/result.md) | Which of ensemble members passed one by one, a PyTorch plant, ERA5 and CAMS pretraining, and point masses at zero and capacity does a pooled mixture-density network for the six metered solar farms need, and which routes give coherent ensemble member paths? | High (maintainer, 2026-10-31) | Nothing | Finished: none of the four beats the plain network; the A6 wind arms are deferred |
+| [493](../../00493-solar-annual-against-quarterly-refits/result.md) | Can the pooled solar network be refitted once a year instead of every quarter without losing more than 1% of its quantile score? | 1 | Nothing | Planned |
 | [433](../../00433-solar-idle-noise-data-look/result.md) | Do the six metered solar farms show the wind farms' idle-noise texture when they are not generating? | 1 | Nothing | Planned |
 
 ## Planned experiments
