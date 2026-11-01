@@ -57,14 +57,14 @@ def figure_contrasts() -> None:
     )
     chart = (
         (
-            base.mark_rule().encode(
+            base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "low:Q", title="Arm minus reference (points of capacity; negative is better)"
                 ),
                 x2="high:Q",
             )
-            + base.mark_point(filled=True, size=70).encode(x="minus_ref:Q")
-            + alt.Chart(pl.DataFrame({"z": [0.0]}))
+            + base.mark_point(filled=True, size=70).encode(x="minus_ref:Q")  # ty: ignore[unresolved-attribute]
+            + alt.Chart(pl.DataFrame({"z": [0.0]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#888", strokeDash=[4, 3])
             .encode(x="z:Q")
         )
@@ -103,7 +103,7 @@ def figure_sweep() -> None:
     )
     order = ["A0-inj", *ARMS]
     chart = (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X(
@@ -173,12 +173,12 @@ def figure_examples(*, best: str) -> None:
                 legend=alt.Legend(orient="top", title=None),
             ),
         )
-        band = line.mark_area(opacity=0.12).encode(
+        band = line.mark_area(opacity=0.12).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title="Power (% of capacity)"), y2="q95:Q"
         )
-        median = line.mark_line().encode(y="q50:Q")
+        median = line.mark_line().encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
         actual = (
-            alt.Chart(part)
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
             .mark_line(color="black", strokeDash=[2, 2])
             .encode(x="days:Q", y="actual:Q", detail="arm:N")
         )
@@ -237,17 +237,17 @@ def figure_events(*, best: str) -> None:
                         ),
                     )
                     shade = (
-                        alt.Chart(span)
+                        alt.Chart(span)  # ty: ignore[unresolved-attribute]
                         .mark_rect(color="#FC9700", opacity=0.15)
                         .encode(x="start:Q", x2="end:Q")
                     )
                     panel = (
                         shade
-                        + line.mark_area(opacity=0.1).encode(
+                        + line.mark_area(opacity=0.1).encode(  # ty: ignore[unresolved-attribute]
                             y=alt.Y("q05:Q", title="% of capacity"), y2="q95:Q"
                         )
-                        + line.mark_line().encode(y="q50:Q")
-                        + alt.Chart(data)
+                        + line.mark_line().encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
+                        + alt.Chart(data)  # ty: ignore[unresolved-attribute]
                         .mark_line(color="black", strokeDash=[2, 2])
                         .encode(x="days:Q", y="actual:Q", detail="arm:N")
                     ).properties(

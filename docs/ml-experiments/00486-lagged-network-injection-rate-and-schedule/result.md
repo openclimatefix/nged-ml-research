@@ -59,61 +59,75 @@ metric: >-
   experiment 404 on every arm; avoidable curtailment at f = 0.9, 0.75, and 0.5.
 verdict: not supported
 best_arm: >-
-  None. R05 (4.9% of training rows with a lag inside an injected event) scores 0.10 points of
-  capacity better than A0-inj on rows with no labelled event (interval -0.144 to -0.048, better in
-  7 of 7 cells), which is within the 0.14 seed spread, and it follows a step in its lags more
-  (0.224 against 0.100 of the step at 3 lags).
+  None. R05 (4.9% of training rows with a lag inside an injected event) scores 0.101 points of
+  capacity better than A0-inj on rows with no labelled event (interval -0.144 to -0.048 before the
+  Bonferroni correction, better in 7 of 7 cells), less than the 0.144 seed spread, and the median
+  forecast follows more of a step in its lags (0.224 of the step against 0.100).
 headline: >-
-  The rate sets the leak but not the score on injected harm rows. At 3 lags the median follows
-  0.224 of a 5% step under R05, 0.100 under A0-inj, and 0.058 under R50. All four new arms score
-  0.06 to 0.07 points worse than A0-inj on injected harm rows, and every network alone stays 0.25 to
-  0.47 points behind B-mix on rows with no labelled event.
+  The share of injected training rows sets how much of a step in the lags the median forecast
+  follows. At 3 lags, leads under 48 hours, the median follows 0.224 of a step of 5% of capacity
+  under R05, 0.100 under A0-inj, and 0.058 under R50. R05 and Cur-down score 0.07 points worse
+  than A0-inj on injected harm rows (intervals exclude zero); for R50 and Cur-up the intervals
+  include zero. Every neural network alone stays 0.25 to 0.47 points behind B-mix on rows with no
+  labelled event.
 lessons: >-
-  A higher share of corrupted rows shrinks the leak and costs score on rows with no labelled event;
-  a lower share does the reverse. The share in the last third of training decides the leak, so a
-  schedule is no better than the constant rate it ends at.
+  In the 3 rates tried, a higher share of injected rows lowered how much of a lag step the
+  forecast follows and raised the error on rows with no labelled event. The rate of the last third
+  of training sets most of the following: Cur-down, which ends at 4.9%, follows 0.177 of the step,
+  against 0.224 for constant R05.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  How many training rows carry a corrupted lag trades the leak against clean-row score: 50% leaks
-  less than half as much as 5% but scores 0.2 points worse on rows with no labelled event. No rate
-  or schedule beats the fixed 50/50 mixture of the network and the lagless table, so the way to
-  stop the forecast following a level change in its lags is not found in the rate. All numbers are
-  interim, from five months.
+  The share of training rows with an artificial load-shift event in their lags trades how much the
+  forecast follows a step in its recent readings against its error on ordinary rows: 50% follows
+  about a quarter as much of the step as 5% does (0.058 against 0.224) but raises the error on
+  rows with no labelled event by 0.2 points of capacity. None of the 3 rates and 2 schedules tried
+  beat the fixed 50/50 average of the network and a forecast built without lags (B-mix) when the
+  network is used alone, so this experiment did not find a rate that removes the following. All
+  numbers are interim, from five months.
 advice:
   - >-
-    Do not try to remove the lag leak by changing the share of injected rows or its schedule; the
-    share only trades leak against clean-row score (sweep table, contrasts C1 to C8).
+    Do not try to remove the following of lag steps by changing the share of injected rows or its
+    schedule; in the 3 rates tried the share only moved the following against the error on rows
+    with no labelled event (sweep table, contrasts C1 to C8).
   - >-
-    Keep the fixed 50/50 mixture with the lagless table as the reference, because no rate or
-    schedule of injected rows closed the 0.25 to 0.47 point gap to it (contrasts C5 to C8).
+    Keep the fixed 50/50 average with the lagless forecast as the reference, because no neural
+    network alone closed the 0.25 to 0.47 point gap to it (contrasts C5 to C8).
 code: ml-experiments/00486-lagged-network-injection-rate-and-schedule/
 ---
- **How many training rows carry a corrupted lag trades the leak against the score on ordinary rows;
-it does not remove the leak for free.** We trained the same neural network, which forecasts a
-substation's power from its recent readings (its lags), on worlds in which readings had been
-corrupted by injected load shifts, with 5%, 28%, and 50% of training rows holding a corrupted lag.
-We then added a step to the lags and measured how much of the step the forecast followed. At 5% the
-forecast followed 22% of a step in all three lags, at 28% it followed 10%, and at 50% it followed
-6%. The 50% arm scored 0.12 points of capacity worse than the 28% arm on rows with no labelled
-event, and the 5% arm scored 0.10 better. Changing the rate during training did not help: the share
-of the step the forecast follows tracks the rate of the last third of training. No arm beat the
-fixed 50/50 mixture with the lagless table (B-mix).
+**Training with more artificial load-shift events in the lags makes the forecast follow a step in
+its recent readings less, and raises its error on ordinary rows; none of the shares or schedules
+tried removes the following for free.** We asked whether the share of training rows that hold an
+artificial event, and how that share changes during training, alters how far a neural network's
+median forecast follows a sudden step in its recent power readings (its 3 lags: the newest usable
+reading, the reading at the same time of day on an earlier day, and the reading at the same time of
+day and weekday on an earlier week). We trained the same neural network on copies of the training
+data (called worlds) in which artificial load-shift events had been inserted into the readings, so
+that 5% (arm R05), 28% (arm A0-inj, the reference), or 50% (arm R50) of the training rows had at
+least one lag inside an inserted event. Two further arms started at 50% and ended at 5% (Cur-down),
+or the reverse (Cur-up). We then added a step of 5% of the Primary substation's capacity to all 3
+lags and measured the share of the step that appeared in the median forecast. That share was 0.224
+for R05, 0.100 for A0-inj, and 0.058 for R50. R50 scored 0.119 points of capacity worse than A0-inj,
+and R05 0.101 better, on rows outside every event that NGED (the electricity distribution network
+operator) has labelled. No neural network alone beat the fixed 50/50 average of A0-inj and a
+forecast built without lags (B-mix).
 
-**Verdict: not supported.** The hypothesis was that a schedule from a high rate to a low rate
-(Cur-down) reaches the lower leak without the lost score. Cur-down follows 18% of the step, more
-than the 10% of A0-inj, and none of the four new arms improves on A0-inj on injected harm rows. All
-numbers are interim (five months, one to three seeds, no 99% claim), the sweep and the bad-data
-injections cover leads under 48 hours, and NGED's logs may miss events, so rows with no labelled
-event may hold events.
+**Verdict: not supported.** The hypothesis was that Cur-down would reach the low following of a high
+share without its loss of score. Cur-down follows 0.177 of the step, more than the 0.100 of A0-inj,
+and no arm improves on A0-inj on injected harm rows. The hypothesis text described a lower following
+for a schedule that ends at a low share, which the sweep shows is the wrong way round. All numbers
+are interim: they come from five months and one to three seeds, and no interval is adjusted for the
+16 contrasts. The sweep and the bad-data injections cover leads under 48 hours. NGED's logs may miss
+events, so rows with no labelled event may hold events.
 
-**Terms.** A lag is a reading of the substation's power from an earlier time (the same half-hour a
-day and a week before the newest usable reading). A harm row is a forecast target outside every
-event whose lags lie inside one, so a forecast that trusts its lags is misled. Injected harm rows
-are harm rows in the injected scoring worlds (w200 to w202), where many events exist. Points of
-capacity are the continuous ranked probability score (CRPS, from 11 quantiles) as a percentage of
-the Primary's capacity. The signed-MW six are the Primaries that report signed power. B-mix is the
-50/50 mixture of the stored A0-inj forecast and the lagless forecast.
+**Terms.** A lag is one of those 3 readings of the substation's power from an earlier time. A harm
+row is a forecast target outside every event whose lags lie inside one, so a forecast that trusts
+its lags is misled. Injected harm rows are harm rows in the injected scoring worlds (w200 to w202),
+where events are many. Points of capacity are the continuous ranked probability score (CRPS,
+computed from 11 quantiles) as a percentage of the Primary's capacity. The signed-MW six are the 6
+Primary substations that report signed power. B-mix is the 50/50 mixture of the stored A0-inj
+forecast and the lagless forecast, which is built without any lag. The lagless table holds that
+forecast for every half-hour.
 
 ![Each new arm minus A0-inj and minus B-mix](figure_1_contrasts.svg)
 
@@ -125,20 +139,22 @@ the Primary's capacity. The signed-MW six are the Primaries that report signed p
 
 ## Results
 
-- **Arms and rates.** All arms are experiment 404's A0-inj network, trained on one injected world
-  per epoch (6 epochs). The share of training rows with at least one of the 3 lags inside an
-  injected event, at 2026-06 seed 0: R05 4.9%, A0-inj 27.8% (experiment 404 called it 20%), R50
-  49.3%. Cur-down uses 49.3%, then 27.8%, then 4.9% for 2 epochs each; Cur-up uses the reverse. The
-  shares in the other cells are 4.4% to 5.7%, 25.9% to 28.8%, and 45.4% to 49.6%.
+- **Arms and rates.** Every arm is experiment 404's A0-inj neural network, trained for 6 epochs on
+  one injected world per epoch. The share of training rows with at least one of the 3 lags inside an
+  injected event, at 2026-06 seed 0, is 4.9% for R05, 27.8% for A0-inj (experiment 404 called it
+  20%), and 49.3% for R50. Cur-down uses 49.3%, then 27.8%, then 4.9%, for 2 epochs each; Cur-up
+  uses the reverse. In the other cells the shares are 4.4% to 5.7%, 25.9% to 28.8%, and 45.4% to
+  49.6%.
 - **Reproduction.** The re-fitted A0-inj at 2026-06 seed 0 matches the stored forecasts to at most
   1.4e-4 of capacity at every quantile.
 - **Minimum detectable effect.** From the seed spread of the stored A0-inj at 2026-06 (seeds 0 to
   2), 2.8 standard deviations: 0.144 on rows with no labelled event and 0.155 on injected harm rows.
-  Experiment 404's month-to-month spread (0.3 to 1.0 points) is larger; experiment 439's clean-row
-  bar is 0.061.
-- **Contrasts at the signed-MW six (k = 16 for the injected harm rows and rows with no labelled
-  event; points of capacity, negative is better; 95% interval resampling months; cells better of
-  7).**
+  Experiment 404's month-to-month spread (0.3 to 1.0 points) is larger. The clean-row equivalence
+  limit of experiment 439 is 0.061.
+- **Contrasts at the signed-MW six** (points of capacity, negative is better; unadjusted 95%
+  intervals from resampling months; the number after the interval is the cells better than the
+  reference, of 7). The pre-registered Bonferroni level for k = 16 is stricter, and only the
+  interval for R05 on rows with no labelled event (-0.144 to -0.048) would plausibly survive it.
 
 | Arm | Absolute, no labelled event | Minus A0-inj | Minus B-mix | Absolute, injected harm | Minus A0-inj | Minus B-mix |
 |---|---|---|---|---|---|---|
@@ -148,79 +164,85 @@ the Primary's capacity. The signed-MW six are the Primaries that report signed p
 | Cur-down | 3.676 | -0.009 (-0.087 to 0.081), 5 | +0.342 (0.151 to 0.609) | 4.065 | +0.071 (0.012 to 0.130), 2 | +0.436 (0.257 to 0.662) |
 | Cur-up | 3.768 | +0.092 (-0.001 to 0.186), 3 | +0.443 (0.233 to 0.745) | 4.056 | +0.061 (-0.021 to 0.152), 3 | +0.427 (0.233 to 0.691) |
 
-- **Predictions.** P1 partly holds: at 3 lags and leads under 48 hours R05 follows 0.124 more of the
-  step than A0-inj (0.224 against 0.100), but R50 follows only 0.042 less (0.058), below the 0.05
-  asked; at leads of 48 to 120 hours R50 is 0.037 less than A0-inj (0.054 against 0.091) at 3 lags,
-  so the second half of P1 also misses there, by a smaller margin of 0.013. P2 fails: R50 costs
-  0.119 on rows with no labelled event, above the 0.061 bar, though inside the 0.144 seed spread. P3
-  holds as an equivalence check: Cur-down is within 0.09 of R05 and 0.001 of A0-inj on rows with no
-  labelled event, and within 0.005 of R05 on injected harm rows. P4 holds: every network alone is
-  0.25 to 0.47 behind B-mix on rows with no labelled event, and R05 narrows the gap from 0.35 to
-  0.25.
-- **Stop rule.** It does not fire: R05 and R50 differ from A0-inj on the sweep share by more than
-  0.05 at 3 lags.
+- **P1 partly holds.** At 3 lags and leads under 48 hours, R05 follows 0.124 more of the step than
+  A0-inj (0.224 against 0.100). R50 follows 0.042 less (0.058), which is 0.008 short of the 0.05
+  that P1 asked for. At leads of 48 to 120 hours, R50 follows 0.037 less (0.054 against 0.091),
+  which is 0.013 short.
+- **P2 fails.** R50 scores 0.119 worse than A0-inj on rows with no labelled event (0.006 to 0.220),
+  against the 0.05 predicted. The gap is inside the 0.144 seed spread and above the 0.061 clean-row
+  limit of experiment 439.
+- **P3 holds as an equivalence check.** Cur-down is 0.092 behind R05 on rows with no labelled event,
+  inside the 0.144 seed spread. It is 0.009 better than A0-inj there, and 0.005 behind R05 on
+  injected harm rows.
+- **P4 holds.** Every neural network alone is 0.25 to 0.47 behind B-mix on rows with no labelled
+  event, and R05 narrows the gap from 0.35 to 0.25.
+- **Stop rule.** The stop rule does not fire, because R05 differs from A0-inj on the sweep share by
+  0.124, more than 0.05. R50 differs by 0.042, so the rate is shown to matter below 28% and not
+  shown to matter above it.
 - **Mixtures (descriptive, not in k).** Mixed with the lagless table, R05 is 0.073 better than B-mix
   on rows with no labelled event (-0.094 to -0.048, better in 7 of 7 cells) and 0.030 better on
-  injected harm rows (-0.060 to 0.000). R50, Cur-down, and Cur-up mixed are within 0.06 of B-mix.
-- **Sweep, median shift as a share of a 5% step at 3 lags, leads under 48 hours (mean of 5 months;
-  range of months).** A0-inj 0.100 (0.084 to 0.128); R05 0.224 (0.161 to 0.268); R50 0.058 (0.052 to
-  0.070); Cur-down 0.177 (0.152 to 0.213); Cur-up 0.067 (0.050 to 0.085). The band-width ratio stays
-  within 1.006 for every arm. The control that hides all three lags was not run (experiment 404's
-  sweep builds it only for its own arms starting with "B"); the lagless head follows 0 by
-  construction, so the mixture follows about half of the network's share.
-- **Bad-data injections (median shift as a share of the corruption, mean of 5 months).** Stuck 24
-  hours: A0-inj 0.056, R05 0.102, R50 0.028, Cur-down 0.086, Cur-up 0.030. Dropout to zero for 6
-  hours: 0.024, 0.032, 0.019, 0.051, 0.017. Spike of 4 times the week-on-week change: 0.024, 0.032,
-  0.023, 0.036, 0.022. Spike of 20 times: 0.004, 0.014, 0.010, 0.013, 0.011. The corruption
-  definitions are experiment 465's (unmerged at the time), copied with the change that the size is
-  measured over the corrupted readings only.
-- **Tails, signed-MW six, rows with no labelled event, raw (coverage of q01, q05, q95, q99; q99
-  pinball in points of capacity).** A0-inj 0.011, 0.043, 0.813, 0.915; 0.349. B-mix 0.005, 0.025,
-  0.856, 0.950; 0.259. R05 0.011, 0.043, 0.822, 0.928; 0.305. R50 0.011, 0.041, 0.796, 0.901; 0.415.
-  Every network alone is under-covered at q95 and q99 and its q99 pinball loss is 0.046 (R05) to
-  0.156 (R50) above B-mix's, beyond the +0.02 limit; the mixtures with the lagless table are within
-  0.016 of B-mix. The full table, including injected harm rows and the 12 to 36 hour band, is in
+  injected harm rows (-0.060 to 0.000). The mixed R50, Cur-down, and Cur-up are within 0.06 of
+  B-mix.
+- **Sweep.** Median shift as a share of a step of 5% of capacity at 3 lags, leads under 48 hours
+  (mean of 5 months; lowest to highest month): A0-inj 0.100 (0.084 to 0.128); R05 0.224 (0.161 to
+  0.268); R50 0.058 (0.052 to 0.070); Cur-down 0.177 (0.152 to 0.213); Cur-up 0.067 (0.050 to
+  0.085). The ratio of band width to its width without the step stays within 1.006 for every arm.
+  The control that hides all three lags was not run, because experiment 404's sweep builds it only
+  for arms whose names start with "B". The lagless forecast follows 0 by construction, so the
+  mixture follows about half of the neural network's share.
+- **Bad-data injections.** Median shift as a share of the corruption, mean of 5 months, in the order
+  A0-inj, R05, R50, Cur-down, Cur-up. A stuck reading for 24 hours: 0.056, 0.102, 0.028, 0.086,
+  0.030. A dropout to zero for 6 hours: 0.024, 0.032, 0.019, 0.051, 0.017. A spike of 4 times the
+  week-on-week change: 0.024, 0.032, 0.023, 0.036, 0.022. A spike of 20 times: 0.004, 0.014, 0.010,
+  0.013, 0.011. The corruption definitions are experiment 465's, with the size measured over the
+  corrupted readings only.
+- **Tails** (signed-MW six, rows with no labelled event, raw quantiles; coverage of q01, q05, q95,
+  and q99, then q99 pinball loss in points of capacity). A0-inj: 0.011, 0.043, 0.813, 0.915; 0.349.
+  B-mix: 0.005, 0.025, 0.856, 0.950; 0.259. R05: 0.011, 0.043, 0.822, 0.928; 0.305. R50: 0.011,
+  0.041, 0.796, 0.901; 0.415. Every neural network alone is under-covered at q95 and q99. Its q99
+  pinball loss is 0.046 (R05) to 0.156 (R50) above B-mix's, beyond the +0.02 limit. The four
+  mixtures with the lagless table are within 0.018 of B-mix on rows with no labelled event, and
+  within 0.022 on injected harm rows. The full table, including the 12 to 36 hour band, is in
   `work/scores/tails.csv`.
-- **Avoidable curtailment (signed-MW six; million pounds summed over the cells of the five months,
-  95% interval resampling cells).** At f = 0.9, R05 minus A0-inj is -0.09 (-0.44 to 0.17) and R50 is
+- **Avoidable curtailment** (signed-MW six; million pounds summed over the cells of the five months;
+  95% interval resampling cells). At f = 0.9, R05 minus A0-inj is -0.09 (-0.44 to 0.17) and R50 is
   -0.06 (-0.35 to 0.14). At f = 0.75, R50 is +1.58 (0.25 to 3.32) and Cur-up +1.21 (0.23 to 2.42).
   At f = 0.5, R05 is -3.12 (-7.94 to 0.37), R50 +4.78 (1.46 to 8.82), and Cur-up +3.31 (0.49 to
-  6.57). A0-inj minus B-mix is +0.19, +0.90, and +2.69 at f = 0.9, 0.75, and 0.5, all intervals
-  including zero.
-- **Serving cost.** Each arm serves one network per pass, no table to refresh, no detector or gate,
-  and the regime costs nothing at serving. B-mix serves two networks (the lagged network and the
-  lagless head), the cross-fitted lagless table, and a mixture step. The price of removing that
-  complexity is the gap to B-mix: +0.25 (R05) to +0.47 (R50) on rows with no labelled event and
-  +0.43 to +0.44 on injected harm rows.
-- **What the regime would change, for an operator.** A forecast trained with a higher share of
-  corrupted readings follows a sudden step in the last few days of power readings less, and is a
-  little less accurate on ordinary days. The regime needs no event labels.
-- **Row counts, signed-MW six, summed over the 7 cells:** 626,771 rows with no labelled event and
+  6.57). A0-inj minus B-mix is +0.19, +0.90, and +2.69 at f = 0.9, 0.75, and 0.5, with every
+  interval including zero.
+- **Serving cost.** Each arm serves one neural network per pass, with no table to refresh and no
+  detector or gate, and the share and schedule of injected rows add nothing at serving. B-mix serves
+  two neural networks (the lagged network and the lagless one), the cross-fitted lagless table, and
+  a mixture step. Removing that complexity leaves a gap to B-mix of +0.25 (R05) to +0.47 (R50) on
+  rows with no labelled event and +0.43 to +0.44 on injected harm rows.
+- **What the share would change for an operator.** A forecast trained with a higher share of
+  artificial events follows a sudden step in the last few days of power readings less, and is a
+  little less accurate on ordinary days. The share needs no event labels.
+- **Row counts** (signed-MW six, summed over the 7 cells): 626,771 rows with no labelled event and
   1,138,838 injected harm rows. Rows inside real events, rows after events, and cold-night rows were
-  not scored separately in this experiment.
+  not scored separately.
 
 ## Checks
 
-- **Median minus mean forecast per site and the error of the mean forecast.** Not computed: the
-  stored forecasts hold 11 quantiles and not the mixture's mean, so neither check could be run, and
-  no audit was run.
-- **Triggers.** None fired by the criteria of the `ml-experiment` skill that could be checked: no
-  control failed, no nested arm beat the arm that contains it, and the headline intervals are of the
-  same order as experiment 404's. The R50 half of P1 missed its threshold by 0.008, which is a
-  contradiction of the prediction that this page explains by the small size of the miss.
+- **Median minus mean forecast per site, and the error of the mean forecast.** Neither was computed:
+  the stored forecasts hold 11 quantiles and not the mean of the mixture.
+- **Audit triggers.** No control failed, no nested arm beat the arm that contains it, and the
+  headline intervals are of the same order as experiment 404's. The prediction for R50 in P1 missed
+  by 0.008 at leads under 48 hours; the miss is small, and no audit was run.
 - **Reviews.** One Sonnet review of the plan and code before the first fit, one Sonnet review of the
-  scoring scripts before the numbers were quoted; each finding was triaged in the pull request. The
-  numbers review and the prose review follow.
+  scoring scripts before the numbers were quoted, one Sonnet check of the numbers against the stored
+  tables, and one Sonnet prose review. Each finding was triaged in the pull request.
 
 ## What to try next
 
-- **Do not tune the rate further.** The rate trades leak against clean-row score; the 5% to 50%
-  range spans the whole trade, and the best-scoring arm (R05) leaks the most.
-- **Stage the difficulty of events** (the brief's follow-up) only if the maintainer wants the leak
-  lower at constant score; this experiment gives no evidence for it.
-- **Stored artefacts.** Fitted networks:
-  `data/ml-experiments/00486-lagged-network-injection-rate-and-schedule/work/models/`; forecasts
-  under `work/predictions/`; tables under `work/scores/`.
+- **Do not tune the share further.** The 3 rates between 5% and 50% show one trade-off between the
+  following and the error on ordinary rows; other rates were not tested, and the best-scoring arm
+  (R05) follows the most.
+- **Stage the difficulty of events** (the follow-up named for this experiment) only if the leak must
+  fall at constant score; this experiment gives no evidence for it.
+- **Stored artefacts.** Fitted neural networks are in
+  `data/ml-experiments/00486-lagged-network-injection-rate-and-schedule/work/models/`, forecasts
+  under `work/predictions/`, and tables under `work/scores/`.
 
 ## Plan (written before any score was read)
 
