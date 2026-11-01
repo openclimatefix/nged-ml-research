@@ -64,6 +64,20 @@ take_home_message: >-
 bulk supply points, but it gains about 0.5 points of capacity at the grid supply points.** The
 registered rule needs a win at both bulk supply points, so the verdict is `not supported`. The
 recipe lowers CRPS below BG2 at all four nodes.
+Only four nodes have a usable series (two bulk and two grid supply points), so every node result is
+a case study with n = 4, and four test months make every interval interim.
+
+![Figure 1: A minus N1 and A minus BG2 per group, with 95% intervals](figure_1_contrasts.svg)
+
+![Figure 2: CRPS per node and arm](figure_2_crps_per_node.svg)
+
+![Figure 3: day-ahead forecast of A at a bulk supply point](figure_3_day_ahead_D13.svg)
+
+![Figure 4: day-ahead forecast of A at a grid supply point](figure_4_day_ahead_D1.svg)
+
+![Figure 5: 14-day forecast of A at a bulk supply point](figure_5_14_day_D13.svg)
+
+![Figure 6: 14-day forecast of A at a grid supply point](figure_6_14_day_D1.svg)
 
 ## Question and what experiment 415 already answered
 
@@ -170,11 +184,13 @@ not scored). A and N1 are 3-seed averages; BG2 is a single weekly fit.
 - **Not like for like with 425.** The standardiser and the ensemble-spread table are fitted on all
   20 series; experiment 425 used the 16 Primaries. No early-history cut was set for the nodes (their
   data start 2019-09-17, D17 in 2022-07).
-- **Not done:** S1 (experiment 428's loop; needs new code), the per-type pooled arm, the
-  generators-as-children arm, curtailment cost (does not apply at nodes), load-shift plots, example
-  forecast plots, and the results and write-up reviews. A fresh Sonnet agent reviewed the code
-  before the first fit (no bugs; the findings on node early-history cuts and flagged-zero keys were
-  checked and needed no change).
+- **Not run:** S1 (experiment 428's loop; it needs new code), the per-type pooled arm, and the
+  generators-as-children arm. Curtailment cost does not apply at nodes, and no load-shift plots are
+  drawn because no load-shift label is used. Nodes are substations, so no generator is named.
+- **Reviews:** a fresh Sonnet agent reviewed the code before the first fit (no bugs; its findings on
+  node early-history cuts and flagged-zero keys were checked and needed no change), and a second
+  reviewed the numbers and prose; the fixes are applied. The figures were not rendered for a visual
+  check in this session (no browser available).
 - **Interim.** Four test months; NGED's event labels are incomplete, so clean rows may hold
   unlabelled events.
 

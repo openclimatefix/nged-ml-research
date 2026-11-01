@@ -32,7 +32,8 @@ def _seed_files(*, arm: str) -> dict[int, list[Path]]:
 
 def main() -> None:
     """Score the nodes."""
-    s415.seed_files = _seed_files
+    s415.seed_files = _seed_files  # ty: ignore[invalid-assignment]
+    s415.prep.WORK_DIR = prep.WORK_DIR  # write the scores here, never into experiment 415's folder
     s415.prep.ARMS = ("N1", "A")
     s415.CONTRASTS = (
         ("A", "N1"),
