@@ -34,8 +34,9 @@ decision_rule: >-
   inconclusive, not equivalent. Where the rule does not replace table P, table P is kept. The limits
   sit at or below the minimum detectable effect of the stored forecasts (below), so a result inside
   the limits with an interval that crosses one is reported as inconclusive. The cost of keeping
-  table P in production is a table of 40 factors and its clip rule; the two-constant rule is four
-  numbers, so any pass is worth porting at zero further gain.
+  table P in production is a table of 20 factors per metering group and its clip rule; the two-constant
+  rule is two numbers per metering group, so any pass is worth porting even if the score does not
+  improve.
 benchmark: >-
   Table P fitted on the same folds (leave-one-fold-out and earlier-folds-only), the raw forecasts,
   the symmetric 1.15 widening, and the upper-tail-only 1.15 widening, all from experiment 483.
@@ -49,55 +50,65 @@ best_arm: >-
   A-pool's clean-row coverage is q01 0.007, q05 0.040, q95 0.947, and q99 0.991, within 0.005 of
   table P's at every tail.
 headline: >-
-  At the eight, two constants (lower factor 0.95 to 0.98, upper factor 1.10 to 1.24) match table P
-  within 0.005 of coverage and 1.3% of pinball loss at every tail, for A-pool and A-gam-in alike.
-  At the signed-MW six the same rule is 0.011 to 0.013 below table P on q95 coverage, which is
-  outside the 0.01 limit.
+  At the eight MVA-only Primaries, two constants fitted on earlier months match table P's coverage
+  within 0.006 and its pinball loss within 1.3% at q01, q05, q95, and q99, for A-pool and A-gam-in
+  alike. At the six signed-MW Primaries, the constants leave q95 coverage 0.011 (A-pool) to 0.013
+  (A-gam-in) below table P's, against a limit of 0.01 on that difference.
 lessons: >-
-  The eight needs only an upper-tail widening and a lower factor close to 1, so table P's 40 factors
-  per metering group are not needed there. The six needs a larger upper factor than the constant
-  gives, which table P's lead-band factors supply.
+  At the eight, q01 and q05 coverage are already in range, so a lower factor near 1 and an upper
+  factor of 1.10 to 1.24 suffice. At the six, one upper constant leaves q95 coverage below table P's.
+  This experiment did not test whether table P's lead-band factors are the reason.
 take_home_message: >-
-  At the eight MVA-only Primaries, two numbers per candidate (one for each tail) recalibrate the
-  demand forecast as well as the table of 40 factors does, so the table can be dropped there. At the
-  six signed-MW Primaries, two numbers leave the upper tail about 0.012 less covered than the table,
-  so the table stays. Wind and solar were not tested.
+  At the eight MVA-only Primaries, one lower constant and one upper constant per metering group,
+  fitted on earlier months, recalibrate the demand forecast as well as table P (20 factors per
+  metering group) does, so table P can be dropped there. At the six signed-MW Primaries, the
+  constants leave q95 coverage 0.011 to 0.013 below table P's, so table P stays. Wind and solar
+  were not tested.
 production_status: candidate
 adopted_in: none
 advice:
   - >-
     Recalibrate the eight MVA-only Primaries with one lower and one upper constant per metering
-    group, fitted on earlier months, instead of table P (headline table, figures 1 and 2).
+    group, fitted on earlier months, instead of table P (the Results table, Figures 1 and 2).
   - >-
-    Keep table P (or a per-lead-band upper factor) for the signed-MW six, because one constant
-    leaves q95 coverage 0.011 to 0.013 under table P's (figure 1).
+    Keep table P for the signed-MW six, because one constant leaves q95 coverage 0.011 to 0.013
+    below table P's (Figure 1).
   - >-
     Do not read the leave-one-fold-out comparison as an equivalence at the eight: q95 coverage
-    differs by 0.009 to 0.010 and the interval crosses the 0.01 limit (lofo bullet).
+    differs by 0.009 to 0.010 and the interval crosses the 0.01 limit (the leave-one-fold-out
+    bullet in Results).
 ---
 
-**Two numbers recalibrate the demand forecast at the eight MVA-only Primaries as well as table P
-does, and they do not at the signed-MW six.** The first-release demand forecasts are too wide on the
-lower tail and too narrow on the upper tail. [Experiment
-483](../00483-uncertainty-rerun-on-the-first-release-demand-candidates/result.md) fixed that with
-table P, a table of 40 factors per metering group (one per lead band and tail quantile). This
-experiment asked whether one lower constant (applied to q01 and q05) and one upper constant
-(applied to q95 and q99) can replace the table. Each constant was fitted on earlier months only and
-compared with table P on the same held-out rows. At the eight the constants match table P; at the
-six the upper tail stays about 0.012 less covered than with table P. Wind and solar were not tested,
-because their stored forecasts sit in other experiments' folders and the manager asked for demand
-first.
+**Two constants recalibrate the demand forecast as well as table P does at the eight Primaries whose
+series are in megavolt-amperes (MVA) only, but not at the six whose series are in signed
+megawatts (MW).** A Primary is a primary substation. Table P is the recalibration from [experiment
+483](../00483-uncertainty-rerun-on-the-first-release-demand-candidates/result.md). It holds 20
+widening factors per metering group (the eight, the six, or the two short-history Primaries), one
+for each of 5 lead bands (ranges of hours ahead) and 4 tail quantiles (q01, q05, q95, and q99, the
+1%, 5%, 95%, and 99% points of the forecast distribution). At the eight, the first-release demand
+forecasts (A-pool, five seeds of one neural network averaged, and A-gam-in, the same network with an
+additive-model input) have upper quantiles that sit too close to the median and lower quantiles
+that are already in range. At the six, the lower quantiles sit too far below the median as well.
+This experiment asked whether one lower constant (scaling q01 and q05) and one upper constant
+(scaling q95 and q99) per metering group can replace the table. Each constant was fitted on earlier
+months only and compared with table P on the same held-out forecast rows. At the eight the
+constants match table P. At the six, q95 coverage (the share of actuals at or below q95) is 0.011
+to 0.013 lower than with table P. Wind and solar were not tested, because their stored forecasts sit
+in other experiments' folders; this experiment covered demand only.
 
 ![Coverage difference](figure_1_coverage_difference.svg)
 
 Figure 1 shows the coverage of the two-constant rule minus table P's, with 99.8% Bonferroni
-intervals (24 tests), against the 0.01 limit (green band). Earlier-folds-only fit.
+intervals (24 tests), against the 0.01 limit (green band). The fit uses earlier folds only.
 
 ![Pinball difference](figure_2_pinball_difference.svg)
 
 Figure 2 shows the same difference in pinball loss as a share of table P's, against the 5% limit.
 
-## Results (clean rows; four scored folds 2025-12 to 2026-06; earlier-folds-only fit)
+## Results
+
+The tables use clean rows and four scored folds (2025-12 to 2026-06), fitted on earlier folds only.
+A fold is one test month of origin times.
 
 | Group | Candidate | Variant | q01 | q05 | q95 | q99 | CRPS |
 |---|---|---|---|---|---|---|---|
@@ -114,31 +125,36 @@ Coverage targets: q01 0.005 to 0.02, q05 0.03 to 0.07, q95 0.93 to 0.97, q99 0.9
 eight has 393,820 rows and the six 268,145 rows per candidate.
 
 - **Decision rule at the eight (A-pool and A-gam-in, earlier-folds-only):** passes. Coverage
-  differences from table P are -0.003 (q01), -0.005 (q05), -0.001 to -0.002 (q95), and -0.001
+  differences from table P are -0.003 (q01), -0.005 to -0.006 (q05), -0.001 to -0.002 (q95), and -0.001
   (q99), every Bonferroni interval inside +/-0.01. Pinball loss differs by at most 1.3% at any
   tail (A-pool q95 +0.7%, interval 0.1% to 1.3%; q99 -1.0%), inside the 5% limit. CRPS differs by
   -0.0001 (interval -0.0008 to +0.0007) points, the minimum detectable effect being 0.044.
-- **Decision rule at the six (A-pool and A-gam-in):** fails on q95 coverage. The difference from
-  table P is -0.011 (interval -0.013 to -0.009) for A-pool and -0.013 (-0.015 to -0.011) for
-  A-gam-in, against a limit of 0.01. Pinball loss is within 5% (q99 is 2.1% better than table P),
-  and CRPS is 0.003 points worse (0.002 to 0.004). Two-constant q95 coverage is 0.916 against the
-  0.93 floor; table P also misses it, at 0.927.
+- **Decision rule at the six (A-pool and A-gam-in):** does not pass on q95 coverage, so table P
+  stays. A-gam-in is clearly outside the limit; A-pool's interval spans it, so it is inconclusive.
+  The difference from table P is -0.011 (interval -0.013 to -0.009) for A-pool and -0.013 (-0.015 to
+  -0.011) for A-gam-in, against a limit of 0.01. Pinball loss is within 5% (q99 is 2.1% better than
+  table P), and CRPS is 0.003 points worse (0.002 to 0.004). Two-constant q95 coverage is 0.916
+  against the 0.93 floor; table P is also below it, at 0.927.
 - **Fitted constants:** the lower factor is 0.95 to 0.98 at the eight (so the lower tail is left
   almost untouched), 0.77 to 0.88 at the six. The upper factor is 1.10 to 1.24 at the eight and
-  1.03 to 1.26 at the six, and it varies by fold.
+  1.03 to 1.26 at the six, and the upper factor varies by fold.
 - **Leave-one-fold-out fit** (comparable to experiment 483's headline table, optimistic because it
   uses later folds): at the eight q95 coverage is 0.009 to 0.010 below table P's, and the interval
   crosses the 0.01 limit (A-pool -0.0088, interval -0.0106 to -0.0070), so equivalence is
   inconclusive there. The other coverage and pinball limits at the eight hold; the six fails q95
   coverage as above (-0.013).
-- **12 to 36 hours:** the pattern is the same. At the eight A-pool's q95 coverage is 0.958 with
-  the constants and 0.946 with table P. At the six it is 0.922 against 0.938.
-- **Cold winter nights (rows with no labelled event):** at the eight q95 coverage is 0.927
-  (constants) and 0.929 (table P), both under the 0.93 floor, against 0.874 raw. At the six it is
+- **Lead times of 12 to 36 hours (not a gating slice):** the constants do worse here than over all
+  leads, in both directions. At the eight A-pool's q95 coverage is 0.958 with the constants against 0.946
+  with table P (+0.012, interval +0.008 to +0.017), and q05 is 0.033 against 0.051 (-0.018,
+  interval -0.023 to -0.014), both outside the 0.01 limit. At the six q95 is 0.922 against 0.938
+  (-0.017). One pair of constants per metering group does not match table P's lead-band factors
+  within this band.
+- **Cold winter nights:** at the eight A-pool's q95 coverage is 0.930 (constants) and 0.929
+  (table P), against 0.874 raw. A-gam-in's is 0.927 and 0.926. At the six it is
   0.867 and 0.879, against 0.835 raw. Cold nights stay under-covered under both rules.
-- **Serving table.** Table P: 40 factors per metering group, a lead-band lookup, and a clip rule.
-  Two constants: 2 numbers per metering group, refitted on the earlier months at training time.
-  No other serving cost changes. The eight can use the constants; the six keeps table P.
+- **Serving table.** Table P: 20 factors per metering group, a lead-band lookup, and a clip rule.
+  Two constants: two numbers per metering group, refitted on the earlier months at training time.
+  No other part of the serving path changes. The eight can use the constants; the six keeps table P.
 - **Not tested:** wind and solar. [Experiment
   481](../00481-seed-averaging-diminishing-returns-for-demand-and-wind/result.md) found a constant
   widening of 1.10 best for wind at every number of seeds, which suggests the rule may fit wind, but
@@ -178,15 +194,13 @@ eight has 393,820 rows and the six 268,145 rows per candidate.
 - **Mean or median error beside the contrast:** not computed; the contrast is a calibration
   difference between two recalibrations of the same median, so the median is unchanged.
 - **Audit triggers:** none fired. The prediction missed in one respect (the six fails on q95
-  coverage, not on the q05 and q99 pinball clauses the plan named), which is recorded below.
-- **Reviews:** one fresh Sonnet code review before the first run (found that the first draft scored
-  pinball loss in fractions rather than points and did not sort the quantiles; both fixed by
-  calling `row_metrics`; the other findings were confirmed correct). The results review and the two
-  write-up reviews are recorded in the PR body.
+  coverage, not on the q05 and q99 pinball clauses the plan named).
+- **Reviews:** the code review, the numbers review, and the prose review are recorded in the PR
+  body.
 - **Prediction outcome:** P1 held (earlier-folds-only). P2 held in direction (the six fails) but
-  for q95 coverage. P3 held for the upper factor (above 1 at the eight); the lower factor is 0.95
-  to 0.98, close to 1 rather than clearly below. P4 held at the six and is marginal at the eight
-  (0.927 against a floor of 0.93).
+  for q95 coverage. P3 held (upper factor 1.10 to 1.24, lower factor 0.95 to 0.98 at the eight).
+  P4 held at the six and is marginal at the eight (0.926 to 0.930 under both rules, against a
+  floor of 0.93).
 
 ## Caveats and next steps
 

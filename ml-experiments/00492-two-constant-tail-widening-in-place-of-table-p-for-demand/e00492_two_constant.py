@@ -193,7 +193,8 @@ def main() -> None:
                             {
                                 "arm": arm, "scheme": scheme, "slice": slice_name, "group": g,
                                 "metric": col, "two_constant": float(va[col].to_numpy().mean()),
-                                "table_p": float(vb[col].to_numpy().mean()), "diff": float(diff.mean()),
+                                "table_p": float(vb[col].to_numpy().mean()),
+                                "diff": float(diff.mean()),
                                 "low": low, "high": high, "n": a.height,
                                 "relative": relative,
                             }
