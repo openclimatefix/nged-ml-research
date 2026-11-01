@@ -58,10 +58,10 @@ best_arm: >-
   is 0.101 against 0.217 for arm (a) (lead 0-240 h, a step of 5% of capacity).
 headline: >-
   Replacing the day and week power lags by medians cuts the leak of a short step in recent power
-  roughly in half (0.07 to 0.15 of the step for events up to 3 days, against 0.17 to 0.25), but the
-  gain disappears at 7 days (0.37 to 0.40 against 0.39 to 0.43). Clean-row CRPS is +0.050 at the
-  six, inside the noise floor of a repeated fit (0.06), and harm rows show no gain. Interim and
-  unaudited.
+  by 20% to 50% for events up to 3 days (0.08 to 0.15 of the step against 0.17 to 0.19 at 24 to 72
+  hour leads, six Primaries), but the gain is gone at 7 days (0.38 against 0.43). Clean-row CRPS is
+  +0.050 at the six, and a repeated fit of the original lags differs by 0.06, so that loss may be
+  as large as +0.11. Harm rows show no gain. Interim and unaudited.
 lessons: >-
   A median of recent same-time readings shields the forecast from a stuck meter and from events
   shorter than the median window, and nothing else. A dropout to zero and a spike still move it, and
@@ -71,19 +71,21 @@ adopted_in: none
 take_home_message: >-
   Median day and week lags make the forecast more robust to short events and stuck readings, not
   more accurate, and the manager decides whether that is worth porting. A step of 5% of capacity in
-  the last 48 hours moves the median forecast by 0.10 of the step at the six Primaries metered in
-  signed megawatts, against 0.22 for the original lags. The shielding fades at 7 days, a dropout and
-  a spike are not shielded, and the loss on rows with no labelled event (+0.050) is within the
-  repeat-fit noise (0.06). Interim and unaudited, four scored months.
+  the last 48 hours moves the median forecast by 0.11 of the step at the six Primaries metered in
+  signed megawatts, against 0.19 for the original lags (leads of 24 to 72 hours). The shielding
+  fades at 7 days, a dropout and a spike are not shielded, and the loss on rows with no labelled
+  event (+0.050) is of the same size as the 0.06 difference between two fits of the original lags.
+  Interim and unaudited, four scored months.
 advice:
   - >-
-    Treat median lags as a robustness option, not an accuracy gain. They halve the leak of events
-    up to 3 days and fully shield a stuck meter, at a clean-row loss of +0.050 that four scored
-    months cannot separate from zero (experiment 465).
+    Treat median lags as a robustness option, not an accuracy gain. Median lags cut the leak of
+    events up to 3 days by 20% to 50% and almost fully shield a stuck meter, at a clean-row loss of
+    +0.050 (possibly +0.11) that four scored months cannot separate from zero (experiment 465).
   - >-
-    Keep the 50/50 mixture with the lagless forecast as the main protection. The mixture of arm (c)
-    and the lagless forecast does not beat the mixture of arm (a) and the lagless forecast on harm
-    rows (experiment 465).
+    Keep the 50/50 mixture of arm (a) and the lagless forecast as the main protection. The mixture
+    of arm (c) and the lagless forecast is worse than arm (a) on harm rows at the six (+0.588,
+    3 of 3 months worse) and better at the MVA-only eight (-1.423), so it does not replace it
+    (experiment 465).
   - >-
     If median lags are ported, clean dropouts and spikes upstream, since the median does not
     shield them, and decide how the served model treats a missing or stale day (experiment 465).
@@ -91,19 +93,23 @@ code: >-
   ml-experiments/00465-median-day-and-week-lags-for-load-shift-robustness/
 ---
 
-**Median day and week lags make the median forecast about half as sensitive to a step in the last
-2 to 3 days of power, but not more accurate.** The shielding shrinks as the event lengthens and is
+**Median day and week lags make the median forecast 20% to 50% less sensitive to a step in the last
+1 to 3 days of power, but not more accurate.** The shielding shrinks as the event lengthens and is
 gone at 7 days. A stuck meter is shielded almost completely, but a dropout to zero and a spike are
 not. The clean-row loss against the original lags is +0.050 points of capacity at the six Primaries
-metered in signed megawatts, which is inside the 0.06 difference between two fits of the same
-recipe. NGED's event labels are incomplete, so "rows with no labelled event" may hold unlogged
-events, and every real-event slice undercounts. Every number is interim and unaudited.
+metered in signed megawatts. Two fits of the original lags differ by 0.06, so the loss is not
+separable from fit-to-fit noise. NGED's event labels are incomplete, so "rows with no labelled
+event" may hold unlogged events, and every real-event slice undercounts. Every number is interim and unaudited.
 
 ![Each arm minus each control, by row set](figure_1_contrasts.svg)
 
 ![Share of a step that reaches the median forecast, by event length](figure_2_sweep_share.svg)
 
 ![Response to a 30-day level change](figure_3_level_change.svg)
+
+Figures 4 and 5 show a day-ahead and a fourteen-day forecast with no labelled event, and figures 6
+to 9 show forecasts issued 12 hours or more before a labelled event (labels D3, D12, D14, and D19
+are anonymised Primary labels).
 
 ![Day-ahead forecast at D5, winter](figure_4_day_ahead_winter.svg)
 
@@ -122,21 +128,23 @@ events, and every real-event slice undercounts. Every number is interim and unau
 Scores are CRPS-like pinball loss in points of effective capacity; a contrast is the first arm minus
 the second, so negative favours the first. Arms: (a) the original lags (experiment 402), (b) the
 lagless forecast (experiment 392), (c) the median lags, (e) the 50/50 mixture of the probability
-distributions of (c) and (b), (f) the 50/50 mixture of (a) and (b). Months are the resampling unit
-(4 scored months, 3 with labelled events). Intervals are 95% month-block intervals; the 99.72%
-Bonferroni intervals for the 18 pre-registered contrasts are in `contrasts.csv`.
+distributions of (c) and (b), (f) the 50/50 mixture of (a) and (b). The signed-MW six
+are the 6 Primaries metered in signed megawatts (D5, D10, D11, D14, D16, D9); the MVA-only eight are
+the 8 metered only in megavolt-amperes. Months are the resampling unit (4 scored months, 3 with
+labelled events). Every interval below is a month-block interval at the Bonferroni level of 99.72%
+for the 18 pre-registered contrasts (a 95% level would be narrower); all are in `contrasts.csv`.
 
 - **Speed.** The 64 fits of arm (c) took 6,442 s on 6 CPU cores, including the median feature build.
-- **Sweep share, signed-MW six, lead 0-240 h, step 5% of capacity.** For an event of 24, 48, and
-  72 hours, arm (c) moves the median forecast by 0.068, 0.101, and 0.147 of the step, against 0.172,
-  0.217, and 0.241 for (a). At 5 and 7 days the shares are 0.276 and 0.366 for (c), 0.311 and 0.408
-  for (a). At the MVA-only eight the shares are 0.097, 0.131, and 0.174 for (c) against 0.201, 0.240,
-  and 0.259. The lagless control moves by exactly 0. A step of 2.5% gives the same shares to within
-  0.02.
-- **Short events leak slightly more.** At an event of 6 hours, (c) leaks 0.042 against 0.021 for (a)
-  at the six, because the origin lag, which the median leaves single, carries more weight in (c).
-  Moving the origin lag alone by 5% moves the median by 0.038 of the step in (c) against -0.013 in
-  (a) at the six, and 0.068 against 0.023 at the MVA-only eight.
+- **Sweep share at 24-72 h leads, step 5% of capacity (figure 2).** At the signed-MW six, for an
+  event of 24, 48, and 72 hours, arm (c) moves the median forecast by 0.081, 0.109, and 0.153 of the
+  step, against 0.171, 0.192, and 0.192 for (a). At 5 and 7 days the shares are 0.289 and 0.384 for
+  (c), 0.308 and 0.427 for (a). At the MVA-only eight the shares for 24, 48, and 72 hours are 0.113,
+  0.144, and 0.184 for (c) against 0.213, 0.236, and 0.236, and at 7 days 0.403 against 0.422. The
+  lagless control moves by exactly 0. A step of 2.5% gives shares within 0.02 of these.
+- **Very short events leak more.** At an event of 6 hours, (c) leaks 0.058 against 0.036 for (a) at
+  the six, because the origin lag, which the median leaves single, carries more weight in (c).
+  Moving the origin lag alone by 5% moves the median by 0.054 of the step in (c) against 0.006 in
+  (a) at the six, and 0.087 against 0.043 at the MVA-only eight.
 - **Band width and coverage.** The 5% to 95% band width does not change with the injected step in
   any arm (ratio 0.996 to 1.003). Clean-row coverage of the 5-95 band is 0.853 for (c) and 0.863 for
   (a) at the six for an event of 48 hours, and 0.898 and 0.906 at a widening of 1.15. Event-row
@@ -153,9 +161,11 @@ Bonferroni intervals for the 18 pre-registered contrasts are in `contrasts.csv`.
   minus (f) is +0.082 [-0.002, +0.220]. (e) minus (f) is +0.014 [-0.008, +0.045]. The early stop
   rule (clean-row loss of 0.10 or more) does not fire.
 - **Noise floor.** Refitting arm (a) on CPU with this experiment's settings and scoring it against
-  experiment 402's stored forecast on the 2026-01 refit month gives a difference of -0.060 at the
-  six and +0.002 at the MVA-only eight. The +0.050 clean-row loss of (c) is therefore inside the
-  noise of a single refit at the six.
+  experiment 402's stored forecast on the 2026-01 refit month, over all rows, gives a difference of
+  -0.060 at the six and +0.002 at the MVA-only eight. The CPU refit of (a) scored better than the
+  stored (a), so a contrast of (c) against a CPU-fitted (a) could be about +0.11 at the six, which
+  is at the stop limit of 0.10. This is one month and one refit, so it indicates the size of the
+  noise and does not bound it.
 - **Harm rows (during a labelled event), signed-MW six.** (c) minus (a) is -0.207 [-0.219, +0.827],
   1 of 3 months worse. (c) minus (f) is -0.769 [-1.001, +0.304]. (e) minus (a) is +0.588 [+0.575,
   +0.971], 3 of 3 months worse. No arm beats (a) with an interval that excludes zero (the
@@ -173,27 +183,29 @@ Bonferroni intervals for the 18 pre-registered contrasts are in `contrasts.csv`.
   harm rows -0.188 [-0.221, +0.814], after the event +0.371 [+0.019, +0.713]. MVA-only eight: clean
   rows +0.015 [-0.040, +0.063], harm rows +0.789 [-0.039, +1.114]. The signs match the 0-240 h
   band.
-- **Predictions.** P1 holds: the share for events up to 48 hours is 0.068 to 0.101 at 24 to 72 hour
-  leads (under 0.15), and rises towards (a)'s share at 7 days (0.366 against 0.408). P2 holds
-  narrowly: +0.0498 against the limit of +0.05, inside the noise. P3 fails: harm rows show no gain
-  with an interval excluding zero at the six, and (c) is worse at the MVA-only eight. P4 fails: the
-  origin lag alone moves arm (c) by 0.054 at 24 to 72 h at the six (predicted 0.01 to 0.05) and 0.087
-  at the MVA-only eight.
+- **Predictions.** P1 holds for the leak of events up to 48 hours: 0.081 to 0.109 at 24 to 72 hour
+  leads, under 0.15, rising to 0.384 at 7 days. The plan's baseline for (a) of 0.38 to 0.41 came
+  from experiment 392's column-level sweep (a step in all three lags) and matches only (a)'s share at
+  7 days (0.427); for events up to 48 hours, (a) leaks 0.17 to 0.19. P2 holds on the rounding edge:
+  +0.0498 against the limit of +0.05, and the noise-floor control suggests the fair figure may be
+  nearer +0.11. P3 fails: harm rows show no gain with an interval excluding zero at the six, and (c)
+  is worse at the MVA-only eight. P4 narrowly fails: the origin lag alone moves arm (c) by 0.054 at
+  24 to 72 h at the six (predicted 0.01 to 0.05), and by 0.087 at the MVA-only eight.
 - **Checks.** Median minus mean forecast per site was not computed, because the stored tables hold
   quantiles and no mean forecast. The robust lags assert the leakage rule of `origin_lags`. The
-  noise-floor difference (-0.060 at the six) exceeds the half-width of the clean-row interval, so
-  the clean-row loss is reported as inside the noise. The harm-row contrast changes sign between
+  noise-floor difference (-0.060 at the six) is of the same size as the clean-row loss, so the
+  clean-row loss is reported as not separable from noise. The harm-row contrast changes sign between
   the two groups, so no pooled claim is made. The leave-one-Primary-out check was not run.
 
 ## Caveats
 
 - **Events longer than 7 days defeat any 7-day median.** At 7 days the share is 0.37 to 0.40.
-- **The median follows a genuine level change more slowly early.** It reaches 0.31 of a persistent
-  step by day 6 against 0.37 for (a), then overtakes it.
+- **The median follows a genuine level change more slowly early.** Arm (c) reaches 0.31 of a
+  persistent step by day 6 against 0.37 for (a), then overtakes (a) (figure 3).
 - **Unlogged events.** NGED's event labels are incomplete, so rows with no labelled event may hold
   events, and harm-row counts are lower bounds.
 - **CPU against GPU.** The fits ran on CPU and experiment 402's on CUDA. The noise-floor control
-  bounds the difference at 0.06 at the six, one month only.
+  differs by 0.06 at the six, from one month and one refit.
 - **Three event months and 18 contrasts.** The Bonferroni family is 18 contrasts. The (c) minus (e)
   contrasts are descriptive.
 - **Not run.** Arm (d) (robust plus original lags, demoted by the brief), the cold-night rows, the
