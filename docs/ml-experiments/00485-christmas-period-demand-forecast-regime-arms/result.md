@@ -7,7 +7,7 @@ title: >-
 theme: production-reference-and-best-guess
 also_relevant_to:
   - lagged-power-and-error-correction
-status: planned
+status: finished
 kind: change
 date: 2026-11-01
 size: >-
@@ -62,10 +62,122 @@ row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity, q01 to q99 pinball loss and coverage, and avoidable
   curtailment cost at f = 0.9, 0.75, and 0.5.
+verdict: not supported
+best_arm: >-
+  None. H2 (Christmas weight 5 with ERA5 replay) has the lowest Christmas CRPS at the eight MVA-only
+  Primaries (difference from H0 -0.222 on 22 to 31 December 2025), below the Christmas minimum
+  detectable effect of 0.271, and it fails the gate elsewhere (+0.081 at the eight).
+headline: >-
+  No arm lowers Christmas CRPS by more than the minimum detectable effect (0.27 at the eight MVA-only
+  Primaries, 0.26 at the signed-MW six, one scored Christmas), so no gain was detectable. H2, H4, and
+  P lose 0.05 to 0.08 points at the eight outside the window, more than the 0.02 gate. H1 passes the
+  gate and changes nothing. H3 lowers the six's CRPS slightly on rows with no labelled event (-0.018,
+  inside the noise) and raises it on real-event and cold-night rows (+0.30 and +0.31).
+lessons:
+  - >-
+    No treatment gained over Christmas by more than the experiment can detect; that is not proof of
+    equivalence. P comes within 0.012 of BG2 at the six over Christmas (4.002 against 3.990), so the
+    six's gap to BG2 is within the noise of one holiday.
+  - >-
+    Emphasising Christmas rows, by weight and ERA5 replay or by weighted pretraining, costs skill at
+    the eight outside the window for a Christmas gain that stays inside the noise.
+  - >-
+    Replacing a lag that falls in the holiday by a same-day-type lag lowers the six's CRPS slightly
+    on rows with no labelled event and raises it on real-event and cold-night rows.
+take_home_message: >-
+  None of the five ways of treating 22 December to 2 January as its own regime lowered Christmas
+  CRPS by more than one Christmas can detect. The three that moved the Christmas days at all also
+  made the other days worse at the eight MVA-only Primaries. The next check is Christmas 2026.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Do not add a Christmas weight, an ERA5 replay, or a Christmas-weighted pretraining to the first
+    release: H2, H4, and P each exceed the 0.02-point gate outside the window at the eight (Results,
+    first bullet).
+  - >-
+    Do not add a same-day-type lag store for the holiday: H3 raises CRPS on real-event rows and cold
+    nights at the six by about 0.3 points (Results, real-event and cold-night bullets).
+  - >-
+    Score Christmas 2026 as the second Christmas before any further holiday work, because one
+    holiday cannot separate a 0.2-point gain from noise (Figure 2).
 ---
 
-**Plan (no result yet).** This page is committed before any fit so that the commit order proves the
-hypothesis came first. The write-up replaces it when the fits finish.
+**No arm gained more over Christmas than one holiday can detect, and three cost skill on other
+days.** The experiment tested five treatments of 22 December to 2 January (H1 a day-type input, H2
+a Christmas weight with ERA5 replay, H3 a lag substitute, H4 all three, P a Christmas-weighted
+pretraining) against H0, experiment 425's arm A. The eight are the eight MVA-only Primaries, and the
+six are the six signed-MW Primaries. The Christmas minimum detectable effect is 0.27 CRPS points at
+the eight and 0.26 at the six, from the three-seed spread of the stored fits on 22 to 31 December
+2025. The largest Christmas differences (H2 -0.222 at the eight, P -0.190 at the six) lie below
+those values, so the pre-registered stop rule applies and no gain was detected. The minimum
+detectable effect reflects seed spread only, so it does not prove equivalence.
+
+![Each arm minus H0, Bonferroni intervals](figure_1_contrasts.svg)
+
+![CRPS by valid date over the holiday](figure_2_crps_by_date.svg)
+
+![Day-ahead forecast of one Primary, H0 and H2](figure_3_example_day_ahead.svg)
+
+![14-day forecast of one Primary, H0 and H2](figure_4_example_fourteen_day.svg)
+
+## Results (CRPS in points of effective capacity, 1.15 widening, difference from H0)
+
+- **Row sets:** differences and intervals use rows that H0 and all five arms hold. Levels such as
+  H0's 4.777 use the smaller set that BG2, `manual_heuristic`, and climatology also hold, so a level
+  can differ from a difference by up to 0.005.
+- **Gate, days outside the window, eight:** H1 -0.004, H3 -0.002, P +0.047, H4 +0.077, H2 +0.081.
+  H0's own score is 4.777. The gate allows +0.02, so H2, H4, and P fail. The minimum detectable
+  effect at the eight is 0.054.
+- **Gate, six on rows with no labelled event:** H3 -0.018, H1 -0.001, H4 +0.009, P +0.018, H2
+  +0.037. H0 scores 3.563. H2's point estimate exceeds the 0.02 gate, but its Bonferroni interval
+  (-0.009 to 0.089) spans zero. The minimum detectable effect is 0.122, so every arm is inside it.
+- **q99 pinball loss on the gate rows:** H2 +0.009 and H4 +0.008 at the eight (Bonferroni intervals
+  exclude zero), everything else within 0.003. The +0.02 absolute rule is met by all arms.
+- **Cold winter nights, outside the window:** at the six H3 is +0.309 (outside the minimum
+  detectable effect of 0.26), P +0.210 and H4 +0.127 (inside it), and H2 -0.124; at the eight P is
+  +0.213, H4 +0.255, and H2 +0.178, all outside the minimum detectable effect of 0.15.
+- **Real-event rows at the six (normal-running-arrangement actuals):** H3 +0.301, H4 +0.226, P
+  +0.222. H3's lag substitute therefore hurts when an event is present.
+- **Christmas, 22 to 31 December 2025 (suggestive, one holiday, day-block bootstrap, no count):** at
+  the eight H2 -0.222 (uncorrected 95% interval -0.312 to -0.131; Bonferroni with 45 tests -0.367 to
+  -0.077), H4 -0.180, P -0.050, H3 -0.037, H1 +0.033; at the six P -0.190, H2 -0.097, H3 -0.017, H4
+  -0.015, H1 +0.014. H0 scores 4.604 (eight) and 4.199 (six); BG2 scores 5.173 and 3.990;
+  `manual_heuristic` 5.783 and 6.801; climatology 6.929 and 7.133.
+- **Days either side (17 to 21 December, 3 to 6 January):** H2, H3, H4, and P are worse than H0 at
+  both groups (+0.07 to +0.31); H1 is slightly better (-0.04, -0.06).
+- **1 and 2 January of fold 2026-01 (report-only, lag leakage):** H3, H4, and P are worse (+0.2 to
+  +0.9) at the six.
+- **Tails on Christmas:** q95 coverage at the eight is 0.968 for H0 and 0.949 to 0.971 for the
+  others; at the six it is 0.873 for H0 and 0.832 to 0.875 for the others (below 0.95 for all).
+- **Pre-registered predictions:** P1 (H3 gains by more than the minimum detectable effect) failed.
+  P2 (H1 helps least) held. P3 (H4 gains and passes the gate) failed on both counts. P4 (H2 and P
+  stay inside the minimum detectable effect elsewhere) failed for H2 and H4 (+0.081 and +0.077
+  against 0.054) and for P (+0.047, inside 0.054 only narrowly).
+- **Compute:** 1 reproduction fit (H0r, 2026-06 seed 0: 15 epochs, val NLL 0.3641, the stored
+  value), 75 fine-tunes of 36 to 70 seconds, and 15 P pretrainings; about 1.3 GPU-hours.
+
+## Caveats
+
+- The experiment did not score avoidable-curtailment cost at f = 0.9, 0.75, and 0.5, the "Checks"
+  bullets (median minus mean forecast, mean-forecast error beside each score), the load-shift event
+  time-series plots, or a second scored Christmas (December 2024 held out). Figures 3 and 4 show one
+  Primary and one run.
+- The Christmas and either-side slices come from one holiday, so every number there is suggestive.
+- H2 and H4 take 1.33 times the optimiser steps per epoch, so their loss differs from H0's in the
+  batch mix and the step count as well as in the weight. Their gate losses cannot be separated from
+  that.
+- The voted day type uses only earlier Christmases, so fold 2025-12 has years 2019 to 2024 for the
+  Primaries with that history and none for D15 and D18; for such dates the day type is the
+  weekday's.
+- Every score is selection-biased: the five folds that choose the arm also score it. July 2026 is
+  unused. NGED's event labels are incomplete: "rows with no labelled event" may hold events.
+- Reference H0 is experiment 425's stored fits; the reproduction fit matched the stored fit.
+
+## What to try next
+
+- Score Christmas 2026 with H0 and H1, the arm that passes the gate.
+- Hold out December 2024 as a second scored Christmas before spending more on the question.
 
 ## Question and what the data can say
 
@@ -80,7 +192,7 @@ hypothesis came first. The write-up replaces it when the fits finish.
   usual gates. A second scored Christmas (December 2024 held out) needs a new fold cut and is not
   run.
 
-## Arms (all fine-tune experiment 425's stored arm A pretraining, three seeds, five folds)
+## Design (all fine-tune experiment 425's stored arm A pretraining, three seeds, five folds)
 
 - **Folds:** 2025-10, 2025-12, 2026-01, 2026-03, 2026-06 (experiment 449's), one refit per fold,
   monthly cadence as in 425. The experiment 399 start cut for D15 and D18 and the flagged exact-zero
@@ -115,21 +227,3 @@ hypothesis came first. The write-up replaces it when the fits finish.
   network with the window rows weighted 5 over Christmas 2019 to 2024 (pretraining cap and patience
   as 425), then the plain 425 fine-tune. It separates "Christmas skill from pretraining on all six
   Christmases" from "fine-tune emphasis" (H2).
-
-## Scoring (experiment 470's rows, slices, and widening)
-
-- Minimum detectable effect from H0's three-seed spread, printed first (all slices, cold nights,
-  Christmas).
-- Christmas days (22 to 31 December 2025) and the days either side (17 to 21 December, 3 to 6
-  January), at the six and the eight separately: CRPS, q01, q05, q95, q99 coverage and pinball loss,
-  avoidable curtailment at f = 0.9, 0.75, and 0.5 at the six, day-by-day fan charts for two
-  Primaries per group, with BG2, `manual_heuristic`, and climatology as reference rows.
-- Gate rows: all folds' days outside the window, rows with no labelled event, plus cold winter
-  nights.
-- Every score is selection-biased; July 2026 stays unused. Production cost: whether the serving path
-  needs the voted day-type table, a store of past same-type lags, and the three extra inputs.
-
-## Cost
-
-About 1.3 GPU-hours: 76 fine-tunes at 30 to 70 seconds, 15 pretrainings at about 1 minute, plus fold
-building. The timing of one fit is reported to the manager before the remaining fits.
