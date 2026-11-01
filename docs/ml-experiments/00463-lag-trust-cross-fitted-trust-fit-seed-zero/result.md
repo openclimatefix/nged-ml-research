@@ -113,7 +113,10 @@ nobody logged, and every real-event slice undercounts. Every number will be inte
 - **Check before the grid.** A fold-free refit of the lagged head with this script's code (same
   seed, origin stride 2) must reproduce experiment 404's stored final-epoch A0-inj training loss
   within 0.005; the scored-month rows of every new arm must have the same keys as B-mix.
-- **Approximations.** Lag input values near a block boundary come from power inside the held-out
+- **Approximations.** Each fold network trains on 5/6 of the rows and so is weaker than the
+  full-data network used at test time; the fitted trust may under-weight the lags for that reason
+  as well as for in-sample over-confidence. The log records the lagged head's negative
+  log-likelihood out of fold and in sample to show the size of the effect. Lag input values near a block boundary come from power inside the held-out
   block, as for the lagless table. The trust head is fitted on the injected world (seed 100) and
   scored on the real-data world, as B1 is.
 

@@ -95,11 +95,11 @@ def build_context(*, month: str, seed: int, device: str) -> Context:
     )
     end = int(common.grid_index(times=prep.refit_of(month=month)))
     start = max(lagless.data.FIRST_VALID_INDEX, end - lagless.WINDOW_STEPS)
-    block = np.clip(
-        lagless.block_of(grid=train.target.cpu().numpy(), lo=start, hi=end, folds=FOLDS),
-        0,
-        FOLDS - 1,
-    )
+    grid = train.target.cpu().numpy()
+    if not ((grid >= start) & (grid < end)).all():
+        msg = f"{month}: training targets fall outside the lagless table's blocks"
+        raise ValueError(msg)
+    block = lagless.block_of(grid=grid, lo=start, hi=end, folds=FOLDS)
     return Context(
         train=train,
         scalers=scalers,
@@ -259,18 +259,24 @@ def trust_batch(
     return t.prod(dim=-1)
 
 
-def fit_trust(
-    *, ctx: Context, oof: torch.Tensor, seed: int, device: str
-) -> tuple[models.TrustMdn, list[float]]:
-    """Fit the trust head on the training rows with both heads frozen."""
-    train, scalers = ctx.train, ctx.scalers
+def set_trust_statistics(*, ctx: Context, seed: int, device: str) -> None:
+    """Set the trust-input mean and standard deviation from 100,000 sampled training rows."""
+    train = ctx.train
+    torch.manual_seed(seed)
     sample = torch.randperm(len(train), device=device)[: fit.TRUST_SAMPLE]
     stats = rows_mod.trust_inputs(
         stack=ctx.stack, primary=train.primary[sample], lag_grid=ctx.lag_grid[sample],
         origin=train.origin[sample], step=0,
     )  # fmt: skip
-    scalers.trust_mean = stats.mean(0)
-    scalers.trust_std = stats.std(0).clamp(min=1e-3)
+    ctx.scalers.trust_mean = stats.mean(0)
+    ctx.scalers.trust_std = stats.std(0).clamp(min=1e-3)
+
+
+def fit_trust(
+    *, ctx: Context, oof: torch.Tensor, seed: int, device: str
+) -> tuple[models.TrustMdn, list[float]]:
+    """Fit the trust head on the training rows with both heads frozen."""
+    train, scalers = ctx.train, ctx.scalers
     torch.manual_seed(seed)
     net = models.TrustMdn(
         arm="b1", n_base=train.base.shape[1], n_trust=rows_mod.N_TRUST, n_primaries=16
@@ -392,6 +398,22 @@ def check_keys(*, month: str, seed: int, frame: pl.DataFrame) -> None:
         raise ValueError(msg)
 
 
+def check_test_rows(*, month: str, seed: int, ctx: Context, device: str) -> None:
+    """Raise before any fit if the scored month's rows differ from experiment 404's B-mix rows."""
+    saved = torch.load(fit.MODEL_DIR / "A0-inj" / f"{month}_s{seed}.pt", weights_only=False)
+    _train, test, _s, _a, _l = fit.build_pools(
+        month=month, seed=seed, device=device, stride=1, saved=saved
+    )
+    keys = pl.DataFrame(
+        {
+            "primary": test.primary.cpu().numpy().astype(np.int16),
+            "origin": test.origin.cpu().numpy().astype(np.int32),
+            "target": test.target.cpu().numpy().astype(np.int32),
+        }
+    )
+    check_keys(month=month, seed=seed, frame=keys)
+
+
 def run_month(*, month: str, seed: int, device: str) -> None:
     """Fit the 6 fold networks and the trust head for a month, and write the forecast."""
     started = time.monotonic()
@@ -399,11 +421,20 @@ def run_month(*, month: str, seed: int, device: str) -> None:
     print(
         f"{month}: {len(ctx.train):,} training rows, context in {time.monotonic() - started:.0f} s"
     )
-    oof, fold_log = out_of_fold_heads(ctx=ctx, seed=seed, device=device)
+    check_test_rows(month=month, seed=seed, ctx=ctx, device=device)
+    OOF_DIR.mkdir(parents=True, exist_ok=True)
+    cache = OOF_DIR / f"oof_{month}_s{seed}.npy"
+    if cache.exists():
+        oof = torch.tensor(np.load(cache), device=device)
+        fold_log = json.loads((OOF_DIR / f"oof_{month}_s{seed}.json").read_text())
+    else:
+        oof, fold_log = out_of_fold_heads(ctx=ctx, seed=seed, device=device)
+        np.save(cache, oof.cpu().numpy().astype(np.float32))
+        (OOF_DIR / f"oof_{month}_s{seed}.json").write_text(json.dumps(fold_log))
+    set_trust_statistics(ctx=ctx, seed=seed, device=device)
     trust_started = time.monotonic()
     trust_net, trust_losses = fit_trust(ctx=ctx, oof=oof, seed=seed, device=device)
     trust_seconds = time.monotonic() - trust_started
-    stats = {"G1-trust": (ctx.scalers.trust_mean, ctx.scalers.trust_std)}
     saved = torch.load(fit.MODEL_DIR / "A0-inj" / f"{month}_s{seed}.pt", weights_only=False)
     full_net = fit.build_network(arm="A0-inj", n_base=saved["n_base"], n_trust=rows_mod.N_TRUST)
     full_net.load_state_dict(saved["state"])
@@ -416,25 +447,24 @@ def run_month(*, month: str, seed: int, device: str) -> None:
     insample_started = time.monotonic()
     insample_net, insample_losses = fit_trust(ctx=ctx, oof=in_sample, seed=seed, device=device)
     insample_seconds = time.monotonic() - insample_started
-    stats["G1-insample"] = (ctx.scalers.trust_mean, ctx.scalers.trust_std)
+    lw, lm, ls = models.mixture_parts(out=ctx.train.ll, components=models.COMPONENTS)
+    lagless_mixture = torch.cat([lw, lm, ls], dim=1)
     diagnostics = {
         "month": month, "seed": seed, "rows": len(ctx.train), "folds": fold_log,
         "trust_losses": trust_losses, "trust_seconds": trust_seconds,
         "insample_losses": insample_losses, "insample_seconds": insample_seconds,
         "nll_lagged_out_of_fold": mean_nll(ctx=ctx, mixture=oof, device=device),
         "nll_lagged_in_sample": mean_nll(ctx=ctx, mixture=in_sample, device=device),
-        "nll_lagless_cross_fitted": mean_nll(ctx=ctx, mixture=ctx.train.ll, device=device),
+        "nll_lagless_cross_fitted": mean_nll(ctx=ctx, mixture=lagless_mixture, device=device),
     }  # fmt: skip
     OOF_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     for arm, net in (("G1-trust", trust_net), ("G1-insample", insample_net)):
-        ctx.scalers.trust_mean, ctx.scalers.trust_std = stats[arm]
         frame = forecast_month(month=month, seed=seed, trust_net=net, ctx=ctx, device=device)
         check_keys(month=month, seed=seed, frame=frame)
         (PRED_DIR / arm).mkdir(parents=True, exist_ok=True)
         frame.write_parquet(PRED_DIR / arm / f"{month}_s{seed}_w-1.parquet")
         torch.save(net.state_dict(), OOF_DIR / f"{arm}_{month}_s{seed}.pt")
-    np.save(OOF_DIR / f"oof_{month}_s{seed}.npy", oof.cpu().numpy().astype(np.float32))
     diagnostics["seconds"] = time.monotonic() - started
     (LOG_DIR / f"{month}_s{seed}.json").write_text(json.dumps(diagnostics, indent=2))
     print(json.dumps({k: v for k, v in diagnostics.items() if k != "folds"}, indent=2))
