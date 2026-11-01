@@ -88,6 +88,14 @@ def median_of_recent(
 def robust_lags(*, power: np.ndarray, target: np.ndarray, origin: np.ndarray) -> np.ndarray:
     """Return `ROBUST_COLUMNS` for each case: the origin lag and the day and week medians.
 
+    Args:
+        power: The half-hourly power series on the common grid.
+        target: Grid index of each case's valid time.
+        origin: Grid index of each case's forecast initialisation time.
+
+    Returns:
+        A float32 array of shape (cases, 3): the origin lag, the day median, and the week median.
+
     Raises:
         ValueError: If a case's valid time is not after its origin, or an analogue is younger than
             the newest usable observation.
