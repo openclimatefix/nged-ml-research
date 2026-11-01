@@ -280,12 +280,89 @@ def weights() -> None:
     print(swing.sort("arm", "group", "band"))
 
 
+def checks() -> None:
+    """Write the median-error contrasts and the leave-one-Primary-out event contrast.
+
+    The harness stores quantiles only, so the mean forecast is not available; the error of the
+    median (q50) forecast stands in for it (audit trigger 3). The leave-one-Primary-out rows
+    (trigger 4) are rows-pooled over the five months, at the signed-MW six.
+    """
+    npz = np.load(NRA_SHARES)
+    share = npz["f1.0"]
+    groups = report.group_of(sites=report.fit.prep.primaries()["site"].to_list())
+    median_rows, loo_rows = [], []
+    pooled: dict[str, list] = {a: [] for a in ("G1-trust", "B-mix")}
+    for month in MONTHS:
+        frames = {a: load_arm(arm=a, month=month) for a in pooled}
+        ref = frames["B-mix"]
+        primary = ref["primary"].to_numpy().astype(np.int64)
+        target = ref["target"].to_numpy().astype(np.int64)
+        actual = ref["actual"].to_numpy().astype(np.float64)
+        for setname in ("nolabel", "harm", "event"):
+            mask = row_set(frame=ref, name=setname)
+            for g in GROUPS:
+                sel = mask & (groups[primary] == g)
+                if not sel.any():
+                    continue
+                err = {
+                    a: np.abs(f["q50"].to_numpy().astype(np.float64) - actual)[sel]
+                    for a, f in frames.items()
+                }
+                median_rows.append(
+                    {
+                        "month": month, "group": g, "set": setname, "n": int(sel.sum()),
+                        "mae_median_diff": float((err["G1-trust"] - err["B-mix"]).mean()),
+                        "mae_median_bmix": float(err["B-mix"].mean()),
+                    }
+                )  # fmt: skip
+        event = row_set(frame=ref, name="event") & (groups[primary] == "signed_six")
+        a1 = actual - share[primary, target]
+        for a, f in frames.items():
+            q = f.select(LEVEL_NAMES).to_numpy().astype(np.float64)
+            pooled[a].append(
+                pl.DataFrame(
+                    {
+                        "month": month,
+                        "primary": primary[event],
+                        "crps": pinball_points(q=q[event], actual=a1[event]),
+                    }
+                )
+            )
+    out = pl.DataFrame(median_rows)
+    out.write_csv(OUT_DIR / "median_error.csv", float_precision=4)
+    diff = pooled["G1-trust"][0]
+    both = pl.concat(
+        [
+            pl.concat(pooled["G1-trust"]).rename({"crps": "g1"}),
+            pl.concat(pooled["B-mix"]).select(pl.col("crps").alias("bmix")),
+        ],
+        how="horizontal",
+    ).with_columns(d=pl.col("g1") - pl.col("bmix"))
+    del diff
+    loo_rows.append({"left_out": "none", "rows": both.height, "diff": float(both["d"].mean())})  # ty: ignore[invalid-argument-type]
+    for p in sorted(both["primary"].unique().to_list()):
+        rest = both.filter(pl.col("primary") != p)
+        loo_rows.append(
+            {"left_out": int(p), "rows": rest.height, "diff": float(rest["d"].mean())}  # ty: ignore[invalid-argument-type]
+        )
+    loo = pl.DataFrame(loo_rows)
+    loo.write_csv(OUT_DIR / "leave_one_primary_out.csv", float_precision=4)
+    pl.Config.set_tbl_rows(100)
+    print(loo)
+    print(
+        out.group_by("group", "set").agg(
+            n=pl.col("n").sum(), mae_diff=pl.col("mae_median_diff").mean(),
+            mae_bmix=pl.col("mae_median_bmix").mean(),
+        )
+    )  # fmt: skip
+
+
 def main() -> None:
     """Run one step."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("cells", "pool", "weights"))
+    parser.add_argument("command", choices=("cells", "pool", "weights", "checks"))
     args = parser.parse_args()
-    {"cells": cells, "pool": pool, "weights": weights}[args.command]()
+    {"cells": cells, "pool": pool, "weights": weights, "checks": checks}[args.command]()
 
 
 if __name__ == "__main__":
