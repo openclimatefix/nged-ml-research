@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0915
 """Experiment 446 addendum: the rules that waited for table P, read from the stored P scores.
 
 No forecast is read or fitted. The stored score tables of experiment 446 (`scores_s012`, `scores_C`)
@@ -128,11 +129,11 @@ def coverage_difference(
 def pooled_cold(*, cold: pl.DataFrame, arm: str, group: str) -> dict[str, float]:
     """Return cold-winter-night coverage pooled over folds, weighted by rows, and the row count."""
     part = cold.filter((pl.col("arm") == arm) & (pl.col("group") == group))
-    n = part["n"].sum()
+    n = float(part["n"].sum())
     return {
         "n": float(n),
-        "q95": float((part["coverage_q95"] * part["n"]).sum() / n),
-        "q99": float((part["coverage_q99"] * part["n"]).sum() / n),
+        "q95": float((part["coverage_q95"] * part["n"]).sum()) / n,
+        "q99": float((part["coverage_q99"] * part["n"]).sum()) / n,
     }
 
 
@@ -187,7 +188,7 @@ def brief_b(*, variant: str) -> pl.DataFrame:
                     rh["difference"][0] if not rh.is_empty() else None
                 )
                 widths = {}
-                for cls in HARM_CLASSES + ("clean",):
+                for cls in (*HARM_CLASSES, "clean"):
                     a = absolute.filter(
                         (pl.col("arm") == arm)
                         & (pl.col("group") == group)
@@ -284,7 +285,7 @@ def main() -> None:
                 "clean_coverage_q95",
                 "clean_coverage_q99",
                 "clean_crps",
-            )  # fmt: skip
+            )
         )
     brief_c = read(folder="scores_C", variant="P", name="brief_c")
     brief_c.write_parquet(OUT_DIR / "brief_c_P.parquet")
