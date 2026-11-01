@@ -26,7 +26,6 @@ import e00486_fit as fit486  # ty: ignore[unresolved-import]
 NETWORK_ARMS: Final[frozenset[str]] = frozenset(fit486.SCHEDULES)
 STORED_ARMS: Final[tuple[str, ...]] = ("A0-inj", "B-mix")
 PRED_DIR: Final[Path] = fit486.WORK_DIR / "predictions"
-SWEEP_DIR: Final[Path] = fit486.WORK_DIR / "sweep"
 _ORIGINAL_BUILD = fit.build_network
 _STORED_MODELS: Final[Path] = fit.MODEL_DIR
 _STORED_PREDICTIONS: Final[Path] = fit.PRED_DIR
@@ -61,7 +60,7 @@ def main() -> None:
     """Forecast a scored month for each arm, alone and mixed with the lagless table."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("predict",))
-    parser.add_argument("--arms", nargs="+", required=True)
+    parser.add_argument("--arms", nargs="+", required=True, choices=sorted(NETWORK_ARMS))
     parser.add_argument("--month", required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--worlds", type=int, nargs="*", default=[*score.SCORING_SEEDS, -1])

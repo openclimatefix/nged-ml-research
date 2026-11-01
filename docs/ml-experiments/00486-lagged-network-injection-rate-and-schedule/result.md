@@ -59,8 +59,8 @@ metric: >-
   experiment 404 on every arm; avoidable curtailment at f = 0.9, 0.75, and 0.5.
 ---
 
-**Plan only: no fit has run for the four new arms.** The first sentence of the finished page will
-state the take-home message.
+**Plan only: no fit of the four new arms has run.** The world shares and the reproduction check below
+come from `e00486_fit.py share` and from re-fitting A0-inj at 2026-06 seed 0 (arm `A0-repro`).
 
 ## What this experiment asks
 
@@ -85,7 +85,8 @@ worlds saved to disk, one per rate and seed. Only the world in each epoch change
 | Cur-down | 49.3%, then 27.8%, then 4.9% | epochs 1 to 2, 3 to 4, 5 to 6 |
 | Cur-up | 4.9%, then 27.8%, then 49.3% | epochs 1 to 2, 3 to 4, 5 to 6 |
 
-- **Rate definition.** The share counts training rows with at least one of the three origin lags
+- **Rate definition.** Spikes count as events, and the shares are for 2026-06 seed 0 (the
+  write-up reports the share in every cell). The share counts training rows with at least one of the three origin lags
   inside an injected event, measured on the 2026-06 training pool at seed 0 (`e00486_fit.py share`).
   The brief's 5%, 20%, and 50% are the labels; the stored world measures 27.8% by this definition.
   The new worlds use experiment 428's injection with the event coverage changed to 0.016 (R05) and
@@ -94,18 +95,48 @@ worlds saved to disk, one per rate and seed. Only the world in each epoch change
 - **Worlds are per seed and new for each rate.** Training seeds 100 to 102; the scoring worlds w200
   to w202 and the clean world w-1 are experiment 404's, unchanged, so every arm is comparable with
   the stored A0-inj and B-mix.
-- **Reproduction.** `A0-repro` re-fitted A0-inj for 2026-06 seed 0: its forecasts match the stored
-  A0-inj to 1e-4 of capacity at every quantile, so the pipeline and the stored reference agree. This
-  is the free noise floor; no other cell is refitted.
+- **Reproduction.** `A0-repro` re-fitted A0-inj for 2026-06 seed 0: on world w200 its quantiles
+  differ from the stored A0-inj by at most 1.4e-4 of capacity. The check passes if every arm-level
+  score matches the stored one within the minimum detectable effect; it is also the noise floor.
+  No other cell is refitted.
 - **Mixtures.** Each new arm is also scored as the fixed 50/50 mixture with the cross-fitted lagless
   table (`X+lagless`), read alone and in the mixture; the mixture contrasts are descriptive.
+
+## Minimum detectable effect, row sets, and the stop rule
+
+- **Minimum detectable effect (MDE).** Computed from the stored A0-inj and B-mix before any new arm
+  is read, and printed first. Source 1: the seed spread at 2026-06 (seeds 0 to 2). Source 2:
+  experiment 404's month-to-month spread (0.4 to 1.0 points on harm rows, 0.3 to 0.9 inside events,
+  0.3 to 0.8 on clean rows). Clean-row equivalence uses experiment 439's bar of 0.061. For the sweep
+  share, equivalence means within 0.05 of A0-inj.
+- **Row sets of the 16 contrasts.** Signed-MW six only (the MVA-only eight apart, never pooled).
+  Rows with no labelled event: the clean real world w-1. Injected harm rows: pooled over w200 to
+  w202. Contrasts use the five months at seed 0; seeds 1 and 2 at 2026-06 give the MDE and
+  descriptive rows. Intervals are month-block bootstraps with the sign count over the five months
+  beside each; event slices use whole-event intervals.
+- **Stop rule.** Evaluated after the seed-0 cells of R05 and R50. If it fires, Cur-down and Cur-up
+  still run on those cells, but 2026-06 seeds 1 and 2 are not fitted for any arm.
+- **References.** The gain is read against A0-inj; q99 pinball loss within +0.02 is against B-mix;
+  no loss on rows with no labelled event is judged against the 0.061 bar.
+
+## What the write-up will state
+
+- One sentence an operator could read on what the regime changes in the forecast; that the regime
+  needs no event labels.
+- Serving cost per arm and per reference: networks per pass (one for an arm, two for B-mix), tables
+  stored and refreshed (none, against the lagless table), detector or gate (none), and the score gap
+  to B-mix on rows with no labelled event, harm rows, and injected harm rows.
+- q01, q05, q95, and q99 coverage and pinball loss, the 12 to 36 h lead band, raw and after table P
+  with the 1.15 widening; row counts per row class (including rows inside real events, after events,
+  and cold nights); avoidable curtailment at f = 0.9, 0.75, and 0.5.
+- The readings-level sweep and the bad-data injections of experiment 465 (copied from its branch
+  with credit, since it is unmerged), the time series plots, and the `dataviz` skill's rules.
 
 ## Compute
 
 - **Fits:** 4 arms × 7 cells (five scored months at seed 0; 2026-06 at seeds 0 to 2) = 28 fits at
   about 26 s each on the GPU, about 0.2 GPU-hours, one GPU process under 8 GB and one feeder core.
-- **Reused:** the stored A0-inj and B-mix forecasts on all 7 cells, saving 14 fits; one
-  reproduction fit.
+- **Reused:** the stored A0-inj and B-mix forecasts on all 7 cells; one reproduction fit.
 - **Scoring:** forecasts on w200 to w202 and w-1 for 8 arms (four networks alone and mixed), the
   sweep, the corruption injections, curtailment, and the bootstrap dominate the wall time.
 
