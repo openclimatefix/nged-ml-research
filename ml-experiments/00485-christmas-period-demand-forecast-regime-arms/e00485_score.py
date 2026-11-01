@@ -9,7 +9,7 @@ December to 2 January by UTC valid date); the Christmas slices are the window da
 of fold 2026-01 (1 and 2 January; report-only because that fold trains on Christmas 2025).
 
 ```bash
-source /home/jack/e485env.sh
+source .e485env.sh
 uv run --no-sync python ml-experiments/00485-*/e00485_score.py rows
 uv run --no-sync python ml-experiments/00485-*/e00485_score.py stats
 ```

@@ -6,7 +6,7 @@ Figure 2: CRPS by valid date, 17 December to 6 January, at the eight and the six
 Figures 3 and 4: a day-ahead and a 14-day forecast of one Primary (H0 and H2) over Christmas.
 
 ```bash
-source /home/jack/e485env.sh
+source .e485env.sh
 uv run --no-sync python ml-experiments/00485-*/e00485_figures.py
 ```
 """

@@ -6,14 +6,12 @@ and fine-tunes at a learning rate of 2e-4 on experiment 425's fine-tuning rows. 
 widened by three zero-initialised input columns (`e00485_regime.N_EXTRA`) in every arm, so the
 network is the same shape throughout; an arm that does not use a column leaves it at zero.
 
-| arm | day-type columns | lag substitution | window weight 5 | ERA5 replay 25% | pretraining |
-|---|---|---|---|---|---|
-| `H0r` | no | no | no | no | stored |
-| `H1` | yes | no | no | no | stored |
-| `H2` | no | no | yes | yes | stored |
-| `H3` | no | yes | no | no | stored |
-| `H4` | yes | yes | yes | yes | stored |
-| `P` | no | no | no | no | window rows weighted 5 (new pretraining) |
+- `H0r`: no new input, no weight, no replay, stored pretraining;
+- `H1`: day-type columns;
+- `H2`: window weight 5 and 25% ERA5 replay;
+- `H3`: lag substitution and its flag;
+- `H4`: H1 plus H2 plus H3;
+- `P`: stored fine-tune recipe from a new pretraining that weights the window rows 5.
 
 The stored reference H0 is experiment 425's own fits; `H0r` refits one (month, seed) to show the
 widened network reproduces them within noise. Row weights multiply the recency weight
@@ -21,7 +19,7 @@ widened network reproduces them within noise. Row weights multiply the recency w
 negative log-likelihood, never replay rows. Replay rows have the fold's mean recency weight (so their loss share is about 25%) and are drawn with replacement.
 
 ```bash
-source /home/jack/e485env.sh
+source .e485env.sh
 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00485-*/e00485_fit.py --arms H1 --months 2026-06 --seeds 0
 ```
