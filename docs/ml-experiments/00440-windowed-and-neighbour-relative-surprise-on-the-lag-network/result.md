@@ -168,7 +168,8 @@ S2), H1 (-0.569), and H2 (-0.400). W5 numerically meets the gain rule, because -
 0.153 and its interval excludes zero. W5 comes almost entirely from one test month, however: W5 on
 real event rows is -0.504 in 2026-01 against -0.050, -0.017, and +0.032 in the other three months.
 For the related contrast of S3-rw with S3 (W3), the audit found that 41 of 93 event-days favour
-S3-rw and that 91% of the gain comes from 2026-01 and from a single Primary (see Checks). None of the four decides whether S2 or S3 advances: W3
+S3-rw and that 91% of the gain comes from 2026-01 and from a single Primary (see Checks). None of
+the four decides whether S2 or S3 advances: W3
 and W5 involve the control with random neighbours, and H1 and H2 involve H-lvl. The attention
 version of S3 did not run, because its condition (W2 a gain on clean or injected harm rows) failed.
 

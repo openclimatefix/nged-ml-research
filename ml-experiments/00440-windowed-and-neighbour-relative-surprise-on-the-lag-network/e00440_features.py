@@ -135,6 +135,9 @@ def row_features(
         shift: Step added to each lag, in band units at the lag's time (rows, 3); 0 for none.
         neighbours: (primaries, widest degree) neighbour matrix, -1 padded; None for S2.
         weights: Per-Primary weight of a neighbour (its effective capacity).
+
+    Returns:
+        The feature matrix: (rows, 24) for S2, or (rows, 54) for S3.
     """
     series = stack.series
     end = stack.flat(primary=primary, grid=origin - trust_newest_age())
