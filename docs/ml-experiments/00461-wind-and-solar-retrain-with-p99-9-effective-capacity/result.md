@@ -56,8 +56,9 @@ best_arm: >-
   0.4% worse.
 headline: >-
   Retraining the wind network with capacity at p99.9 of earlier power keeps its score and brings
-  all three farms under the 1.5% limit. For solar the pooled result meets the rule by a hair, Solar
-  A's score is 2.3% worse, and Solar E stays over the limit.
+  all three farms under the 1.5% limit. For solar the pooled result meets the rule by a hair and
+  does not survive dropping any one series, Solar A's score is 2.3% worse, and Solar E stays over
+  the limit.
 lessons: >-
   The p99.9 capacity helps wind and is neutral to slightly harmful for solar. Refitting moved the
   solar score the other way from the re-scoring of experiment 453 (+0.4% against -0.3%), so the
@@ -66,8 +67,8 @@ take_home_message: >-
   Setting each wind farm's capacity to the 99.9th percentile of its earlier power and retraining
   keeps the forecast as accurate and cuts the share of actuals above the 99% quantile from 0.96% to
   0.88%, with all three farms under 1.5%. For solar the same change meets the pre-registered rule
-  only by a hair (share 1.50%, score 0.4% worse), makes Solar A's score 2.3% worse, and leaves Solar
-  E at 2.4%.
+  only by a hair (share 1.50%, score 0.4% worse), fails it if any one series is dropped, makes Solar
+  A's score 2.3% worse, and leaves Solar E at 2.4%.
 advice:
   - >-
     Adopt the p99.9 capacity rule for wind, recomputed at each refit from earlier power.
@@ -80,8 +81,8 @@ adopted_in: none
 code: ml-experiments/00461-wind-and-solar-retrain-with-p99-9-effective-capacity/
 ---
 
-**Take-home: p99.9 capacity is safe and slightly helpful for wind, and a marginal pooled pass for
-solar that hurts Solar A.** Retraining `member_plain` with capacity at the 99.9th percentile of each
+**Take-home: p99.9 capacity is safe and slightly helpful for wind, and a marginal, fragile pooled
+pass for solar that hurts Solar A.** Retraining `member_plain` with capacity at the 99.9th percentile of each
 farm's earlier power leaves the score in MW unchanged and lowers the pooled share of actuals above
 q99 (after table P) from 0.96% to 0.88%, with Farm A at 0.95% (1.17% before). For solar's
 `a2_member`, the pooled share falls from 1.57% to 1.50% and the pooled score is 0.4% worse, so both
@@ -112,7 +113,8 @@ network is `a2_member` (3 seeds, 4 quarterly refits). Rows are true days 1 to 10
   score change is 0.0000 MW against a margin of about 0.011 MW, and the pooled share is 0.88%.
   Solar `a2_member` passes on both counts by a hair: the upper bound is +0.0064 MW (+0.97% of the old
   score, against 1%), and the pooled share is 1.496% (against 1.5%). Both solar numbers sit on their
-  thresholds, so the solar verdict is not robust. The solar change is the opposite sign to the
+  thresholds, so the solar verdict is not robust: over six bootstrap seeds the upper bound ranges
+  from 0.96% to 1.01%, and dropping any one of the six series fails the rule (below). The solar change is the opposite sign to the
   prediction (predicted 0.3% better, measured 0.4% worse, within noise).
 - **Wind score.** Pooled 1.1765 MW (old) and 1.1744 MW (new), a change of -0.0020 MW (-0.17%; 95%
   interval -0.0040 to -0.0000 MW). Farm A -0.23%, Farm B -0.13%, Farm C +0.15%, all inside the
@@ -144,9 +146,13 @@ network is `a2_member` (3 seeds, 4 quarterly refits). Rows are true days 1 to 10
   four refits: A 1.135 to 1.142, B 1.095 to 1.103, C 1.059 to 1.060, D 1.076 to 1.079, E 1.051 to
   1.057, F 1.054 to 1.056. Solar E's earlier history holds only 21,852 to 31,278 half-hours
   (the others 83,000 to 110,000), so its p99.9 is the noisiest.
-- **Rows and seeds.** Rows are equal across arms: wind 109,798 half-hours (Farm A 37,662, B
-  36,806, C 35,330); solar 691,020. Seeds: 5 wind, 3 solar. The bootstrap resamples months and is
+- **Rows and seeds.** Rows are equal across arms: wind 54,899 half-hours (Farm A 18,831, B
+  18,403, C 17,665); solar 345,510 (A 60,210, B 60,039, C 60,885, D 54,864, E 49,770, F 59,742). Seeds: 5 wind, 3 solar. The bootstrap resamples months and is
   conditional on the fitted seeds, and the old and new seeds are not paired fits.
+- **Leave-one-out on solar `a2_member`.** Dropping one series at a time (score change, upper 95%
+  bound, new share): A +0.09%, +0.68%, 1.505%; B +0.45%, +1.11%, 1.503%; C +0.48%, +1.08%, 1.563%;
+  D +0.39%, +0.99%, 1.568%; E +0.67%, +1.18%, 1.343%; F +0.33%, +0.97%, 1.501%. No drop changes the
+  sign of the score change, and every drop fails the rule on the share, the bound, or both.
 - **Bonferroni count.** 11 intervals are reported for the headline arms (2 pooled, 3 wind, 6 solar
   series); the adjusted level is 99.55%. At that level only Solar A's score change excludes zero
   (+0.0011 to +0.0217 MW).
@@ -176,9 +182,18 @@ network is `a2_member` (3 seeds, 4 quarterly refits). Rows are true days 1 to 10
   fit (no defect; two minor points accepted: serial fits, a dead call removed). A fresh Sonnet
   re-derived the headline numbers from the stored predictions and ran the audit triggers (below).
 - **Median minus actual per series (not mean forecast).** Pooled mean of q50 minus actual after table
-  P: wind -0.64 MW (old) and -0.61 MW (new); solar `a2_member` +0.089 MW and +0.078 MW. The
-  stored forecasts hold quantiles only, so no mean forecast error is available.
-- **Audit triggers.** Recorded below after the results review.
+  P: wind -0.64 MW (old) and -0.61 MW (new); solar `a2_member` +0.089 MW and +0.078 MW. The stored
+  forecasts hold quantiles only, so no mean forecast error is available. The wind bias and score
+  move together. For solar the signed bias shrinks while the score worsens, but the median's mean
+  absolute error also worsens (0.9662 to 0.9687 MW, +0.26%), so the two agree.
+- **Results review and audit.** A fresh Sonnet re-derived every headline number above from the
+  stored predictions with its own code and found no mismatch and no unit error. This page's first
+  draft doubled the row counts by summing the raw and table-P variants, which that review caught.
+- **Audit triggers.** Trigger 1 (a control fails): the ratio-1 gates passed bit for bit. Trigger 2
+  fires for solar: the score moved the opposite way from the prediction and from experiment 453's
+  re-scoring, and the explanation that the capacity enters the training target is not tested here.
+  Trigger 4 fires: the leave-one-out result above. Trigger 7 may apply to wind, which the advice
+  recommends adopting without replication. Triggers 3, 5, and 6 do not fire.
 
 ## Next steps
 
