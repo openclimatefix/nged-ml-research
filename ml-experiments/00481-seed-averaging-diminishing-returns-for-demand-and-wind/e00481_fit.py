@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 r"""Fit the extra seeds of experiment 481: arm A (425), wind `member_plain` (429), and S1 (454).
 
-Arm A and wind seeds go to this experiment's own data folder; S1 seeds go to experiment 404's
+Arm A and wind seeds go to this experiment's own data folder; S1 seed 5 goes to experiment 404's
 model folder, as experiment 454 did, because experiment 404's scorer reads them there. Every
 writer skips an output that already exists, so no stored file is overwritten.
 
@@ -36,6 +36,8 @@ def wind(*, seeds: list[int]) -> None:
     """Fit `member_plain` of experiment 429, writing under this experiment's folder."""
     import e00429_run as run  # noqa: PLC0415  # ty: ignore[unresolved-import]
 
+    assert min(seeds) >= 5, "seeds 0 to 4 are stored in experiment 429's folder"
+
     run.PARTS_DIR = OWN_DIR / "wind" / "parts"
     run.MODELS_DIR = OWN_DIR / "wind" / "models"
     sys.argv = [sys.argv[0], "member_plain", "--seeds", *map(str, seeds)]
@@ -45,6 +47,8 @@ def wind(*, seeds: list[int]) -> None:
 def s1(*, seeds: list[int]) -> None:
     """Fit S1 of experiment 404 for extra seeds (experiment 454's mapping of training worlds)."""
     import e00454_fit as fit  # noqa: PLC0415  # ty: ignore[unresolved-import]
+
+    assert set(seeds) <= {5}, "experiment 404 stores the cross-fitted lagless tables for seeds 0 to 5 only"
 
     sys.argv = [sys.argv[0], "--arms", "S1", "--seeds", *map(str, seeds)]
     fit.main()

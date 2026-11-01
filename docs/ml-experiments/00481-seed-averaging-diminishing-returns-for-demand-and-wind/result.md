@@ -75,9 +75,9 @@ allows, with no new fits.
 
 - **Reuse.** Arm A seeds 0 to 4 for the five months (experiment 425 `work/seed_preds/A`); wind
   `member_plain` seeds 0 to 4 (experiment 429 `parts/`); S1 seeds 0 to 4 (experiment 454).
-- **New fits (70).** Arm A seeds 5 to 9 on five months: 25 pretrains and 25 fine-tunes (pretraining
-  is per seed and month). Wind `member_plain` seeds 5 to 9: 5 fits. S1 seeds 5 to 7 on five months:
-  15 fits, so the S1 pool reaches K = 6 to 8. Seeds 3 and later of S1 share training worlds with
+- **New fits (60).** Arm A seeds 5 to 9 on five months: 25 pretrains and 25 fine-tunes (pretraining
+  is per seed and month). Wind `member_plain` seeds 5 to 9: 5 fits. S1 seed 5 on five months:
+  5 fits, so the S1 pool reaches K = 6 (experiment 404 stores the lagless tables for seeds 0 to 5 only). Seeds 3 to 5 of S1 share training worlds with
   seed `seed % 3` (experiment 454's caveat), so S1 curves past K = 3 are lower-bound on diversity
   and the page says so.
 - **Cadence.** Monthly refits; five of the twelve months. No weekly refits.
