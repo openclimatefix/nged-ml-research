@@ -33,9 +33,9 @@ def main() -> None:
         ).group_by("site", "farm", "mw"):
             cloud_cells[(site, farm, mw)] = g.sort("b")["value"].to_numpy()
 
-        def coverage(items: dict) -> tuple[float, float]:
+        def coverage(items: dict, cells: dict = cells) -> tuple[float, float]:
             boot, wide = [], []
-            for (site, farm, mw), v in items.items():
+            for (site, _farm, _mw), v in items.items():
                 others = np.array([c[0] for k, c in cells.items() if k[0] != site])
                 if not len(others):
                     continue
@@ -53,11 +53,11 @@ def main() -> None:
                 "n_real": len(real),
                 "recovery_median": float(np.median(real)),
                 "recovery_min": float(real.min()),
-                "placebo_p95_median_over_primaries": float(p95_by_site.median()),
-                "placebo_p95_max": float(p95_by_site.max()),
-                "profile_only": float(profile),
+                "placebo_p95_median_over_primaries": float(p95_by_site.median()),  # ty: ignore[invalid-argument-type]
+                "placebo_p95_max": float(p95_by_site.max()),  # ty: ignore[invalid-argument-type]
+                "profile_only": float(profile),  # ty: ignore[invalid-argument-type]
                 "passes_recovery": bool(np.median(real) >= common.PASS_RECOVERY),
-                "passes_placebo": bool(p95_by_site.max() < common.GATE_LIMIT),
+                "passes_placebo": bool(p95_by_site.max() < common.GATE_LIMIT),  # ty: ignore[unsupported-operator]
                 "coverage_boot": boot,
                 "coverage_boot_plus_recovery_spread": wide,
                 "cloud_cov_boot": cboot,

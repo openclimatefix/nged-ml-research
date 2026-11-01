@@ -14,17 +14,17 @@ census fits.
 """
 
 import argparse
-import json
 from typing import Final
 
-import e00269_common as c269
-import e00269_fit as f269
+import e00269_common as c269  # ty: ignore[unresolved-import]
+import e00269_fit as f269  # ty: ignore[unresolved-import]
 import e00474_common as common
 import e00474_fit as fit
 import numpy as np
 import polars as pl
 import torch
-from studies.dp_gam import GamSpec, penalty_matrix, prepare_fit
+from studies.dp_features import FeatureCache
+from studies.dp_gam import GamSpec, prepare_fit
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -56,7 +56,7 @@ def divisor_draws(*, ladder: pl.DataFrame, rung: str, site: str) -> np.ndarray:
 
 
 def fitted_paths(
-    *, cache, site: str, shape: np.ndarray, n_resamples: int, cloud_terms: bool
+    *, cache: FeatureCache, site: str, shape: np.ndarray, n_resamples: int, cloud_terms: bool
 ) -> tuple[np.ndarray, int]:
     """Return bootstrap cumulative capacity paths (B+1, n_seasons) for the real reading."""
     reading = cache.sites[site].y

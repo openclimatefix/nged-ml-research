@@ -73,9 +73,13 @@ def main() -> None:
     lines = [
         "# Unmetered solar capacity at each Primary (NGED table)",
         "",
-        "Season-year July 2025 to June 2026, in megawatts. Capacities come from experiment 474's R4 rung\nwith cloud terms; D12 uses the fit through the meter.",
+        "Season-year July 2025 to June 2026, in megawatts. Capacities come from experiment 474's",
+        "R4 rung with cloud terms; D12 uses the fit through the meter.",
         "",
-        "| Primary | Status | AC capacity, MW (10th / 50th / 90th) | DC capacity, MW (10th / 50th / 90th) | Confidence |",
+        (
+            "| Primary | Status | AC capacity, MW (10th / 50th / 90th) "
+            "| DC capacity, MW (10th / 50th / 90th) | Confidence |"
+        ),
         "|---|---|---|---|---|",
     ]
     for row in latest.sort(pl.col("site").str.slice(1).cast(pl.Int64)).iter_rows(named=True):
@@ -86,7 +90,8 @@ def main() -> None:
             f"{row['coverage_cloud_load']:.0%} with a cloud-following load"
         )
         lines.append(
-            f"| {row['site']} | {status} | {row['ac_p10']:.1f} / {row['ac_p50']:.1f} / {row['ac_p90']:.1f} "
+            f"| {row['site']} | {status} "
+            f"| {row['ac_p10']:.1f} / {row['ac_p50']:.1f} / {row['ac_p90']:.1f} "
             f"| {row['dc_p10']:.1f} / {row['dc_p50']:.1f} / {row['dc_p90']:.1f} | {conf} |"
         )
     (charts.DOCS_DIR / "nged_table.md").write_text("\n".join(lines) + "\n")

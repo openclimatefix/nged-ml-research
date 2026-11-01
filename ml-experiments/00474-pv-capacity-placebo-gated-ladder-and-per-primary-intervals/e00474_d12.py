@@ -14,7 +14,7 @@ from dataclasses import replace
 
 import e00110_arms as arms  # ty: ignore[unresolved-import]
 import e00110_common as common110  # ty: ignore[unresolved-import]
-import e00269_fit as f269
+import e00269_fit as f269  # ty: ignore[unresolved-import]
 import e00358_known_answer as known  # ty: ignore[unresolved-import]
 import e00474_common as common
 import numpy as np

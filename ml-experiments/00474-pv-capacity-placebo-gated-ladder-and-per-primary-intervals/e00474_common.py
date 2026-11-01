@@ -15,15 +15,14 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Final
 
-import e00129_common as common129
-import e00269_common as c269
+import e00129_common as common129  # ty: ignore[unresolved-import]
+import e00269_common as c269  # ty: ignore[unresolved-import]
 import numpy as np
-from studies.dp_features import FeatureCache, SiteFeatures
+import polars as pl
+from studies.dp_features import FeatureCache, SiteFeatures, default_input_paths, unit_pv_shape
 from studies.pv_dataset import pv_sites
 from studies.pv_physics import PlantParameters
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
-from studies.dp_features import unit_pv_shape, default_input_paths
-import polars as pl
 
 EXPERIMENT_ID: Final[int] = 474
 SLUG: Final[str] = "pv-capacity-placebo-gated-ladder-and-per-primary-intervals"
@@ -32,7 +31,7 @@ WORK_DIR: Final[Path] = DATA_DIR / "work"
 """Small result files; private and never committed."""
 
 INJECTION_MW: Final[tuple[float, ...]] = (2.0, 4.0)
-"""Injected AC capacity in megawatts. 1 MW is below seed noise on the network base, so is dropped."""
+"""Injected AC capacity in megawatts. 1 MW is below seed noise on the network base."""
 N_PLACEBO_SHUFFLES: Final[int] = 20
 """Within-month day shuffles per placebo at a rung."""
 PROFILE_HALF_WINDOW_DAYS: Final[int] = 7
@@ -74,11 +73,11 @@ def points_from_mw(*, cache: FeatureCache, site: str, mw: float) -> float:
 
 
 def era5_ghi(*, cache: FeatureCache, site: str) -> np.ndarray:
-    """Return ERA5 shortwave irradiance at the Primary on the cache's grid (valid time = grid stamp)."""
-    tid = cache.sites[site].table.time_series_id
+    """Return ERA5 shortwave irradiance at the Primary on the cache's grid."""
+    series_id = cache.sites[site].table.time_series_id
     table = (
         pl.scan_parquet(default_input_paths().era5)
-        .filter(pl.col("time_series_id") == tid)
+        .filter(pl.col("time_series_id") == series_id)
         .select("valid_time", "shortwave")
         .collect()
     )
@@ -88,7 +87,7 @@ def era5_ghi(*, cache: FeatureCache, site: str) -> np.ndarray:
 
 
 def nearest_farm(*, cache: FeatureCache, site: str, injected: str | None) -> str | None:
-    """Return the Primary's nearest farm other than `injected`, within 30 km of it and of `injected`."""
+    """Return the Primary's nearest farm other than `injected`, within 30 km of both."""
     table = cache.sites[site].table
     farms = {row["site"]: row for row in pv_sites().to_dicts()}
     best = None
@@ -141,7 +140,7 @@ def pooled_shape(
             _RESPONSE_CACHE[key] = c269.learned_response(cache=cache, site=site, farm=farm)
         table = _RESPONSE_CACHE[key]
         shapes.append(
-            table.predict(
+            table.predict(  # ty: ignore[unresolved-attribute]
                 irradiance_w_m2=np.nan_to_num(sky),
                 elevation_deg=features.elevation_deg,
             )
@@ -166,7 +165,9 @@ def physics_shape(*, cache: FeatureCache, site: str, tilt_deg: float) -> np.ndar
     )
 
 
-def rung_shape(*, cache: FeatureCache, site: str, rung: str, farm: str | None) -> np.ndarray:
+def rung_shape(  # noqa: PLR0911
+    *, cache: FeatureCache, site: str, rung: str, farm: str | None
+) -> np.ndarray:
     """Return a rung's unit shape; the pooled table leaves out the injected `farm` when given."""
     if rung == "C0_pooled_table":
         farms = tuple(f for f in c269.ALL_FARMS if f != farm)
@@ -199,7 +200,7 @@ def cloud_regressors(*, cache: FeatureCache, site: str) -> np.ndarray:
     Both are `1 - GHI / clear-sky GHI` clipped to 0 to 1 at daylight half-hours (experiment 129's
     definition) and zero at night. The day-mean column is constant within a day.
     """
-    sky = common129._half_hour_clear_sky(cache=cache, site=site)  # noqa: SLF001
+    sky = common129._half_hour_clear_sky(cache=cache, site=site)
     daylight = sky["clear"] > common129.DAYLIGHT_CLEAR_SKY_W_M2
     cloud = np.where(daylight, np.clip(1.0 - sky["ghi"] / np.maximum(sky["clear"], 1e-9), 0, 1), 0)
     cloud = np.nan_to_num(cloud, nan=0.0)
@@ -223,7 +224,7 @@ def with_shape(*, cache: FeatureCache, site: str, shape: np.ndarray, y: np.ndarr
 
 
 def day_slot(*, cache: FeatureCache) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return per-half-hour day number (days since epoch), day of year, and half-hour slot (0-47)."""
+    """Return per-half-hour day number (since epoch), day of year, and half-hour slot (0-47)."""
     start = cache.end_times - np.timedelta64(30, "m")
     day = start.astype("datetime64[D]")
     day_number = day.astype(np.int64)

@@ -49,6 +49,13 @@ metric: >-
 
 # PV capacity: a placebo-gated ladder and a per-Primary table with intervals
 
+**How to read the NGED table.** Each row is one Primary. The capacity columns give the 10th, 50th,
+and 90th percentile of the estimate in megawatts of solar panels behind that substation's meter. AC
+capacity is what the inverters can export, and DC capacity is the panels' rating, assumed to be 1.1
+to 1.5 times the AC capacity. A narrow range does not mean a certain estimate: the Confidence column
+says how well the method found an injected metered farm in tests, and every row's placebo gate
+failed. Rows marked MVA-only, reverse flow, or report-only need extra care (see Status).
+
 **Take-home message (GAM side, interim): the pooled plant table finds 0.87 of an injected farm, no
 solar shape passes the placebo gate, and a cloud-load nuisance term is what makes the capacity
 intervals honest.** Recovery is the share of an injected metered farm's output that the convex fit
@@ -94,12 +101,14 @@ The table is in [nged_table.md](nged_table.md) (latest season-year) and in the p
 AC capacity times an assumed ratio between 1.1 and 1.5 (centre 1.25), because experiment 73 found
 that the ratio cannot be fitted.
 
-## Neural scores and pros and cons (to be filled by the neural worker)
+## Neural estimate and pros and cons
 
-TODO: explicit PV module inside the demand network (demand part given no irradiance); absolute CRPS,
-sunny-midday and cold-night slices, tails, and curtailment cost against arm A, S1, K2-S1, BG2, the
-GAM stack, the manual heuristic, and climatology; pros and cons of forecasting unmetered PV
-explicitly.
+The neural estimate and the pros-and-cons scores are on the page of experiment 477, which also holds
+the side-by-side plot of neural and GAM capacities. It reads this experiment's files: the table
+`nged_table.md` (latest season-year), and the private files `work/nged_table.parquet` (every
+season-year, with the columns `ac_p10`, `ac_p50`, `ac_p90`, `dc_p10`, `dc_p50`, `dc_p90`,
+`pinned_mw`, `status`) and `work/rung_summary.parquet`, under
+`data/ml-experiments/00474-pv-capacity-placebo-gated-ladder-and-per-primary-intervals/`.
 
 ## Caveats
 

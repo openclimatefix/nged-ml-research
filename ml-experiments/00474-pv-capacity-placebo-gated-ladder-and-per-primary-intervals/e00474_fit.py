@@ -15,13 +15,15 @@ month-block bootstrap. The plan is in
 import argparse
 from typing import Final
 
-import e00269_common as c269
-import e00269_fit as f269
+import e00269_common as c269  # ty: ignore[unresolved-import]
+import e00269_fit as f269  # ty: ignore[unresolved-import]
 import e00474_common as common
 import numpy as np
 import polars as pl
 import torch
+from studies.dp_features import FeatureCache
 from studies.dp_gam import (
+    GamLayout,
     GamSpec,
     derated_unit_shape,
     design_matrix,
@@ -37,14 +39,14 @@ READ_OUT_INDEX: Final[int] = c269.READ_OUT_COLUMNS - 1
 
 def solve_targets(
     *,
-    cache,
+    cache: FeatureCache,
     site: str,
     shape: np.ndarray,
     y_rows: np.ndarray,
     targets: np.ndarray,
     weights_by_target: list[np.ndarray],
     cloud_terms: bool = False,
-):
+) -> tuple[list[np.ndarray], np.ndarray, GamLayout, np.ndarray]:
     """Return per-target cumulative capacity paths, one array (B_t, n_seasons) per target.
 
     Args:
@@ -54,6 +56,7 @@ def solve_targets(
         y_rows: The Primary's reading with `NaN` where a row is not trained on.
         targets: The target series, shape (T, grid), `NaN` where a row is not trained on.
         weights_by_target: Month weights for each target, shape (B_t, M).
+        cloud_terms: Whether to add the two nuisance cloud columns to the fit.
 
     Returns:
         `(paths, index, layout)`.
@@ -112,7 +115,9 @@ def solve_targets(
     return paths, index, layout, months
 
 
-def recovery_factor(*, shaped_cache, site: str, index: np.ndarray, series: np.ndarray) -> float:
+def recovery_factor(
+    *, shaped_cache: FeatureCache, site: str, index: np.ndarray, series: np.ndarray
+) -> float:
     """Return experiment 269's ratio-of-99th-percentiles unit factor for one injected series."""
     features = shaped_cache.sites[site]
     derated = derated_unit_shape(features=features, index=index)
@@ -123,7 +128,7 @@ def recovery_factor(*, shaped_cache, site: str, index: np.ndarray, series: np.nd
 
 def run_cell(
     *,
-    cache,
+    cache: FeatureCache,
     site: str,
     farm: str,
     rung: str,
@@ -144,8 +149,7 @@ def run_cell(
     # (kind, mw, shuffle, injected series in unit of the farm's norm, extra additive load in points)
     zeros = np.zeros(len(norm))
     series.append(("base", 0.0, 0, zeros, zeros))
-    for mw in common.INJECTION_MW:
-        series.append(("real", mw, 0, norm, zeros))
+    series.extend(("real", mw, 0, norm, zeros) for mw in common.INJECTION_MW)
     mw0 = common.INJECTION_MW[0]
     pts0 = common.points_from_mw(cache=cache, site=site, mw=mw0)
     series.append(("cloud", mw0, 0, norm, common.cloud_load(cache=cache, site=site, points=pts0)))
@@ -166,7 +170,7 @@ def run_cell(
     targets = np.where(np.isfinite(norm)[None], targets, np.nan)
     # Month weights: bootstrap for base and real kinds, the point fit for the rest.
     probe = common.with_shape(cache=cache, site=site, shape=shape, y=y_rows)
-    layout, index = prepare_fit(
+    _layout, index = prepare_fit(
         cache=probe,
         site=site,
         spec=GamSpec(ridge=c269.RIDGE, capacity="fitted"),
@@ -186,7 +190,7 @@ def run_cell(
     )
     point = np.ones((1, len(months)))
     weights = [counts if kind in ("base", "real", "cloud") else point for kind, *_ in series]
-    paths, index, layout, months = solve_targets(
+    paths, index, _layout, _months = solve_targets(
         cache=cache,
         site=site,
         shape=shape,
@@ -210,7 +214,7 @@ def run_cell(
             "value": float(len(index)),
         }
     ]
-    for t, (kind, mw, k, s, _) in enumerate(series):
+    for t, (kind, mw, k, _s, _) in enumerate(series):
         if kind == "base":
             continue
         pts = common.points_from_mw(cache=cache, site=site, mw=mw)

@@ -65,16 +65,16 @@ def overview(*, table: pl.DataFrame, title: str) -> alt.Chart:
         yOffset=alt.YOffset("kind:N"),
         color=alt.Color("kind:N", scale=scale, legend=alt.Legend(orient="top", title=None)),
     )
-    bars = base.mark_rule(strokeWidth=4, aria=False).encode(
+    bars = base.mark_rule(strokeWidth=4, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("low:Q", title="Estimated unmetered solar capacity (MW)"), x2="high:Q"
     )
-    dots = base.mark_point(filled=True, size=50, aria=False).encode(x="mid:Q")
+    dots = base.mark_point(filled=True, size=50, aria=False).encode(x="mid:Q")  # ty: ignore[unresolved-attribute]
     pinned = (
-        alt.Chart(year.filter(pl.col("pinned_mw").is_not_null()))
+        alt.Chart(year.filter(pl.col("pinned_mw").is_not_null()))  # ty: ignore[unresolved-attribute]
         .mark_tick(color="#606060", thickness=2, size=18, aria=False)
         .encode(y=alt.Y("site:N", sort=order), x="pinned_mw:Q")
     )
-    return alt.layer(bars, dots, pinned).properties(
+    return alt.layer(bars, dots, pinned).properties(  # ty: ignore[invalid-return-type]
         width=WIDTH - 90,
         height=26 * len(order) + 30,
         title=alt.TitleParams(
@@ -98,7 +98,7 @@ def panels(*, table: pl.DataFrame, title: str) -> alt.Chart:
     base = alt.Chart(data).encode(x=alt.X("season_year:Q"))
 
     def layer(prefix: str, colour: str) -> alt.LayerChart:
-        band = base.mark_area(opacity=0.25, color=colour, aria=False).encode(
+        band = base.mark_area(opacity=0.25, color=colour, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "season_year:Q",
                 title="Season-year (starts July)",
@@ -107,7 +107,7 @@ def panels(*, table: pl.DataFrame, title: str) -> alt.Chart:
             y=alt.Y(f"{prefix}_p10:Q", title="MW"),
             y2=f"{prefix}_p90:Q",
         )
-        line = base.mark_line(color=colour, aria=False).encode(
+        line = base.mark_line(color=colour, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x="season_year:Q", y=f"{prefix}_p50:Q"
         )
         return band + line
@@ -121,7 +121,7 @@ def panels(*, table: pl.DataFrame, title: str) -> alt.Chart:
             title=alt.TitleParams(
                 text=title,
                 subtitle=[
-                    "Orange: AC capacity. Blue: DC capacity (AC times an assumed ratio of 1.1 to 1.5).",
+                    "Orange: AC capacity. Blue: DC capacity (AC times an assumed ratio of 1.1 to 1.5).",  # noqa: E501
                     "Line: median. Band: 10th to 90th percentile. Fits use rows before 2026-07-01;",
                     "D18 has data only from 2025-03-01 and is report-only.",
                 ],
