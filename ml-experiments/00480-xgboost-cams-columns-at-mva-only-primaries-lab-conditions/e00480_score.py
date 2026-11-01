@@ -24,7 +24,9 @@ from typing import Final
 
 import e00377_adapter as adapter  # ty: ignore[unresolved-import]
 import e00377_score as base  # ty: ignore[unresolved-import]
+import e00087_common as common  # ty: ignore[unresolved-import]
 import e00381_score as s381  # ty: ignore[unresolved-import]
+import e00480_fit as fit480  # ty: ignore[unresolved-import]
 import polars as pl
 from studies.eval_protocol import metrics
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -48,7 +50,8 @@ GROUPS: Final[dict[str, pl.Expr]] = {
 }
 SLICES: Final[tuple[str, ...]] = (
     "sunny_unit_shape",
-    "sunny_clear_sky_index",
+    "sunny_cams_index_07",
+    "sunny_cams_index_09",
     "sunny_april_june",
     "winter_nights",
     "cold_nights",
@@ -60,6 +63,8 @@ TAILS: Final[list[str]] = [
     "pinball_q01", "pinball_q05", "pinball_q95", "pinball_q99",
     "coverage_q01", "coverage_q05", "coverage_q95", "coverage_q99", "twcrps",
 ]  # fmt: skip
+SUNNY_LOW: Final[float] = 0.7
+SUNNY_HIGH: Final[float] = 0.9
 MARKED: Final[tuple[str, ...]] = ("D5", "D12", "D15", "D18")
 
 
@@ -73,6 +78,35 @@ def own_arm(*, name: str, series: pl.DataFrame) -> pl.DataFrame:
         pl.col("power_fcst_init_time") >= base.SCORED_FIRST
     )
     return adapter.forecast_frame(stored=stored, series=series, unit="fraction")
+
+
+def cams_flags(*, series: pl.DataFrame) -> pl.DataFrame:
+    """Return the two sunny flags from the realised CAMS clear-sky index of each Primary."""
+    coordinates = common.series_table()
+    pieces = []
+    for row in coordinates.iter_rows(named=True):
+        index = fit480.cams_columns(
+            site=row["site"], latitude=row["latitude"], longitude=row["longitude"]
+        )
+        pieces.append(
+            index.select(
+                pl.lit(row["time_series_id"]).alias("time_series_id"),
+                "valid_time",
+                sunny_cams_index_07=pl.col("cams_clear_sky_index") >= SUNNY_LOW,
+                sunny_cams_index_09=pl.col("cams_clear_sky_index") >= SUNNY_HIGH,
+            )
+        )
+    return pl.concat(pieces).with_columns(
+        pl.col("time_series_id").cast(series.schema["time_series_id"])
+    )
+
+
+def safe_contrast(*, rows: dict, table: pl.DataFrame, where: pl.Expr, treat: str, ref: str) -> str:
+    """Return the formatted contrast, or a note when the filter shares no half-hour."""
+    try:
+        return fmt(contrast(rows=rows, table=table, where=where, treat=treat, ref=ref))
+    except ValueError as error:
+        return f"not scored: {error}"
 
 
 def contrast(
@@ -98,7 +132,7 @@ def fmt(r: metrics.ContrastInterval) -> str:
     )
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Print the report."""
     pl.Config.set_tbl_rows(200)
     pl.Config.set_tbl_cols(30)
@@ -113,6 +147,16 @@ def main() -> None:  # noqa: PLR0915
         **base.reference_frames(series=series),
     }
     table, scored, rows = s381.score_arms(arms=arms, series=series, ctx=ctx)
+    flag_frame = cams_flags(series=series)
+    keys = ["time_series_id", "valid_time"]
+    rows = {n: r.join(flag_frame, on=keys, how="left") for n, r in rows.items()}
+    table = table.join(flag_frame, on=keys, how="left")
+    missing = (
+        ctx["actuals"]
+        .join(table.select(keys).unique(), on=keys)
+        .filter(pl.col("actual").is_null() | pl.col("actual").is_nan())
+    )
+    print(f"scored half-hours with a missing actual (flagged or absent readings): {missing.height}")
     WORK.mkdir(exist_ok=True)
     (WORK / "scores").mkdir(exist_ok=True)
     pl.concat([t.with_columns(arm=pl.lit(n)) for n, t in scored.items()]).write_parquet(
@@ -121,34 +165,42 @@ def main() -> None:  # noqa: PLR0915
     print(f"\nlevel {LEVEL:.2f}%, {RESAMPLES} resamples; days 1 to 10 unless stated")
     print("\n== code check: A0 minus stored control (CRPS) at D5 and D12 ==")
     for lab in ("D5", "D12"):
-        r = contrast(
+        r = safe_contrast(
             rows=rows, table=table, where=pl.col("label") == lab, treat="a0", ref="stored_control"
         )
-        print(f"{lab}: {fmt(r)}")
+        print(f"{lab}: {r}")
     print("\n== C1 and no-harm: A1 minus A0 ==")
     for name, where in GROUPS.items():
-        print(
-            f"{name:24s} {fmt(contrast(rows=rows, table=table, where=where, treat='a1', ref='a0'))}"
-        )
+        r = safe_contrast(rows=rows, table=table, where=where, treat="a1", ref="a0")
+        print(f"{name:24s} {r}")
     print("\n== A1 minus A0 by slice (99.67%) ==")
     for sl in SLICES:
         if sl not in rows["a0"].columns:
             print(f"(slice {sl} not in the rows)")
             continue
         for name in ("MVA-only eight", "signed-MW six", "D12"):
-            r = contrast(
+            r = safe_contrast(
                 rows=rows, table=table, where=GROUPS[name] & pl.col(sl), treat="a1", ref="a0"
             )
-            print(f"{sl:24s} {name:16s} {fmt(r)}")
+            print(f"{sl:24s} {name:16s} {r}")
     print("\n== A1 minus A0 by lead band (99.67%) ==")
     for band in metrics.LEAD_BAND_SLICES:
         for name in ("MVA-only eight", "signed-MW six", "D12"):
-            r = metrics.month_bootstrap_contrast(
-                treatment=rows["a1"], reference=rows["a0"], metric="crps",
-                where=GROUPS[name] & pl.col(band), level_percent=LEVEL,
-                n_resamples=RESAMPLES, slice_table=table,
-            )  # fmt: skip
-            print(f"{band:24s} {name:16s} {fmt(r)}")
+            try:
+                r = fmt(
+                    metrics.month_bootstrap_contrast(
+                        treatment=rows["a1"],
+                        reference=rows["a0"],
+                        metric="crps",
+                        where=GROUPS[name] & pl.col(band),
+                        level_percent=LEVEL,
+                        n_resamples=RESAMPLES,
+                        slice_table=table,
+                    )
+                )
+            except ValueError as error:
+                r = f"not scored: {error}"
+            print(f"{band:24s} {name:16s} {r}")
     print("\n== per Primary, A1 minus A0, 95% ==")
     print(
         metrics.reported_contrast_by_primary(
@@ -198,9 +250,9 @@ def main() -> None:  # noqa: PLR0915
     print("\n== D12 and D8 bias of the median on sunny half-hours, points, by lead band ==")
     flags = table.select(
         "time_series_id", "power_fcst_init_time", "valid_time", *metrics.LEAD_BAND_SLICES,
-        "sunny_unit_shape", "sunny_clear_sky_index",
+        "sunny_unit_shape", "sunny_cams_index_07", "sunny_cams_index_09",
     )  # fmt: skip
-    for sunny in ("sunny_unit_shape", "sunny_clear_sky_index"):
+    for sunny in ("sunny_unit_shape", "sunny_cams_index_07", "sunny_cams_index_09"):
         parts = []
         for name in ("a0", "a1"):
             joined = (
@@ -228,13 +280,33 @@ def main() -> None:  # noqa: PLR0915
         for n in ("a0", "a1", "stack", "manual_heuristic")
     }
     signed = series.filter(pl.col("label").is_in(list(SIGNED)))
-    for fraction in (0.5, 0.9):
-        cost = metrics.avoidable_curtailment_cost(
-            forecasts=cost_forecasts, series=signed, flows=flows,
-            scored_start=base.SCORED_FIRST, fraction=fraction,
-        )  # fmt: skip
-        print(f"limit fraction {fraction}")
-        print(cost.pivot(on="arm", index="label", values="avoidable_cost_gbp").sort("label"))
+    key = ["time_series_id", "power_fcst_init_time", "valid_time"]
+    row_sets = {
+        "all rows": None,
+        "during a labelled event": "event_rows",
+        "7 days after a labelled event": "event_following_7_days",
+    }
+    for set_name, flag in row_sets.items():
+        subset = (
+            cost_forecasts
+            if flag is None
+            else {
+                n: f.join(table.filter(pl.col(flag)).select(key), on=key)
+                for n, f in cost_forecasts.items()
+            }
+        )
+        for fraction in (0.5, 0.9):
+            print(f"{set_name}, limit fraction {fraction}")
+            try:
+                cost = metrics.avoidable_curtailment_cost(
+                    forecasts=subset, series=signed, flows=flows,
+                    scored_start=base.SCORED_FIRST, fraction=fraction,
+                )  # fmt: skip
+                print(
+                    cost.pivot(on="arm", index="label", values="avoidable_cost_gbp").sort("label")
+                )
+            except ValueError as error:
+                print(f"not scored: {error}")
 
 
 if __name__ == "__main__":
