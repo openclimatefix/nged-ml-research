@@ -122,6 +122,10 @@ stored by experiment 416, so this experiment reuses them and fits only what is n
 6. **Expected result:** close to experiment 416, which is not new evidence by itself. The 0.02 loss
    limit is untestable at the sunny-midday minimum detectable effect of 0.28 to 0.37 (overall 0.057).
 
+## Gate limit (written after the `A0-doy` fits and before any `C3` placebo score was read)
+
+**The limit is non-binding: `A0-doy` recovers 0.91 to 0.97 of the injected megawatts from the placebo, and 0.84 to 0.89 from the profile alone.** The free-irradiance network absorbs the farm's monthly daylight profile through its hour and day-of-year inputs, and the profile is most of the injected signal. Limits per Primary (placebo recovery, the larger of the two): D5 0.973, D9 0.924, D10 0.921, D11 0.914, D14 0.941, D16 0.944. Rule 3 stands as written, so the first clause (`C3` placebo recovery at most the limit plus 0.20) can only fail above about 1.1, and the discriminating clause is the second one: the held farm must exceed the placebo by more than 2 seed standard deviations. The read-out uses rows inside the fold's own training window, so it measures how much of the injection the fitted network attributes to the sky and the profile, not out-of-sample skill.
+
 ## Production cost of the PV term
 
 The PV term needs a capacity table per Primary, refreshed at each monthly refit, and a physics chain
