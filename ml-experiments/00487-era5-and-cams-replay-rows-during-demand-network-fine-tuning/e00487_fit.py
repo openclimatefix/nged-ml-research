@@ -30,8 +30,7 @@ targets and indices. The host builds the arrays once per month (peak resident me
 and frees them after the copy.
 
 ```bash
-source .e_replay_env.sh   # DATA_PATH_INTERNAL and dummy S3 variables
-export PYTHONPATH=<the ml-experiments folders listed in e00425_fit.py>:ml-experiments/00425-...:ml-experiments/00487-...
+source .e_replay_env.sh   # DATA_PATH_INTERNAL, dummy S3 variables, and PYTHONPATH (run from the repo root)
 systemd-run --user --scope -q -p MemoryMax=12G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00487-*/e00487_fit.py --arms R25 R50 Rcold
 ```
@@ -127,6 +126,14 @@ def build_replay(*, fold: prep.EnsFold, pre: prep418.PretrainSet, device: str) -
     train = ~pre.is_val
     z = (pre.y - fold.target_mean[pre.primary]) / fold.target_std[pre.primary]
     cold = cold_night_mask(x=pre.x, fold=fold)
+    names, _, _ = base.feature_names(scheme="summary")
+    i = names.index("mean_temperature_2m")
+    celsius = pre.x[::100, i] * fold.standardiser.std[i] + fold.standardiser.mean[i]
+    print(
+        f"  replay 2 m temperature (min, median, max): {celsius.min():.1f}, "
+        f"{np.median(celsius):.1f}, {celsius.max():.1f}",
+        flush=True,
+    )
     return Replay(
         x=torch.from_numpy(pre.x).to(device),
         z=torch.from_numpy(z.astype(np.float32)).to(device),
@@ -213,6 +220,11 @@ def train_with_replay(
     model.load_state_dict(best_state)
     model.eval()
     return epochs, best
+
+
+def peak_gpu_gb() -> float:
+    """Return the peak GPU memory allocated in gigabytes (0 on a CPU run)."""
+    return torch.cuda.max_memory_allocated() / 1e9 if torch.cuda.is_available() else 0.0
 
 
 def seed_pred_path(*, arm: str, month: str, seed: int) -> Path:
@@ -309,12 +321,12 @@ def run(*, months: list[str], arms: list[Arm], seeds: list[int], device: str, sm
                 "val_nll": best,
                 "fit_seconds": round(fit_seconds),
                 "seconds": seconds,
-                "peak_gpu_gb": round(torch.cuda.max_memory_allocated() / 1e9, 2),
+                "peak_gpu_gb": round(peak_gpu_gb(), 2),
             }
             print(
                 f"{arm.name} {month} seed {seed}: {epochs} epochs, val NLL {best:.4f}, "
                 f"fit {fit_seconds:.0f} s, with forecast {seconds} s, "
-                f"peak GPU {torch.cuda.max_memory_allocated() / 1e9:.2f} GB",
+                f"peak GPU {peak_gpu_gb():.2f} GB",
                 flush=True,
             )
             log_path.parent.mkdir(parents=True, exist_ok=True)

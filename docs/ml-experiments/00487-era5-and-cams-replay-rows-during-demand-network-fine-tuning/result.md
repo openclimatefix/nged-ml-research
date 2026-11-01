@@ -22,16 +22,19 @@ size: >-
 hypothesis: >-
   Fine-tuning experiment 425's arm A on the ensemble (ENS) rows alone may make the network forget
   what its ERA5-and-CAMS pretraining taught it about rare cold winter nights, which the ENS history
-  (from 2024-04) holds few of. Replaying ERA5-and-CAMS rows during fine-tuning, especially cold-night
+  (from 2024-04) holds few of. Replaying ERA5-and-CAMS rows during fine-tuning, especially
+  cold-night
   rows, lowers the CRPS on cold winter nights.
 prediction: >-
   Written before any score is read. P1: Rcold lowers cold-night CRPS by at least 0.05 points of
   effective capacity at the eight and at the six; because the cold-night minimum detectable effect
   is likely above 0.05, a gap below the printed cold-night minimum detectable effect is called
-  inconclusive. P2: R25 and R50 leave CRPS on all gating rows (the eight, and the six on rows with no
-  labelled event) equivalent to R0, meaning the Bonferroni interval of the contrast lies inside the
-  minimum detectable effect printed before any contrast (this replaces the earlier "moves CRPS by
-  less than 0.03", which is below the noise and cannot fail). P3: no arm raises q99 pinball loss by
+  inconclusive. P2: R25 and R50 leave CRPS at the eight and at the six on rows with no labelled
+  event equivalent to R0, meaning the 27-test Bonferroni interval of the contrast lies inside plus
+  or minus the minimum detectable effect for three-seed means (0.065 at the eight and 0.100 at the
+  six in experiment 470, recomputed and printed before any contrast). P2 is reported, never a gate:
+  the interval may be too wide to satisfy it, and failing equivalence is not evidence of an effect .
+  P3: no arm raises q99 pinball loss by
   more than 0.02 points at the eight or at the six on rows with no labelled event. Experiment 452
   found that a longer pretraining did not help, so the null is the likely outcome.
 decision_rule: >-
@@ -45,11 +48,16 @@ decision_rule: >-
   and D18, the other tail quantiles, the widening sweep, and curtailment are descriptive and enter
   no count. The minimum detectable effect (experiment 428's formula on the seed spread of arm A's
   five single seeds) is printed first, at the eight, the six, and on cold nights at each. An arm is
-  a candidate if it meets its prediction and loses at most 0.02 points at the eight and at the six on
-  rows with no labelled event. Stop rule: if no replay arm lowers cold-night CRPS by 0.05 points at
-  both the eight and the six, report that the network is not forgetting the rare rows and close the
-  idea. The smallest gain worth porting is 0.05 points on cold nights without loss elsewhere:
-  replay needs the ERA5-and-CAMS rows at every monthly refit, so it adds a stored table and
+  a candidate if (a) the Bonferroni interval of its cold-night CRPS change excludes zero in the
+  improving direction at both the eight and the six, with a point estimate of at least 0.05 points,
+  and (b) the upper end of the Bonferroni interval of its CRPS change at the eight and at the six on
+  rows with no labelled event is at most +0.02. Equivalence (P2) never makes an arm a candidate.
+  Stop rule, judged on Rcold only: close the idea (the network is not forgetting the rare rows) only
+  if the printed cold-night minimum detectable effect is at most 0.05 and the upper end of the
+  Bonferroni interval of Rcold's cold-night CRPS change is above -0.05 at both the eight and the
+  six; otherwise report the result as inconclusive and do not close it The smallest gain worth
+  porting is 0.05 points on cold nights without loss elsewhere:
+  replay needs the ERA5-and-CAMS rows at every monthly refit, so replay adds a stored table and
   roughly 1.3 to 2 times the fine-tuning time.
 benchmark: >-
   R0, which is experiment 425's stored arm A fit at seeds 0 to 2 on the same folds (not refitted
@@ -84,11 +92,13 @@ rows back into the fine-tuning batches and asks whether the hard rows improve.
 
 **Definitions fixed before any score is read.**
 
-- **Cold nights.** The brief defined cold nights as the lowest temperature decile, December to
+- **Cold nights (deviation from the brief).** The brief defined cold nights as the lowest
+temperature decile, December to
   February, sun below -6 degrees. This plan uses the scorer's definition (experiment 470's
   `cold_nights` slice, from `studies.eval_protocol.slices`: sun more than 5 degrees below the
   horizon and temperature of 3 degrees Celsius or below), so the replay rows and the scored slice
-  match. In the 2026-01 fold 332,535 of 7,122,133 replay training rows (4.7%) are cold nights.
+  match. The slice is called "cold nights" throughout, because it covers every month. In the 2026-01
+  fold 332,535 of 7,122,133 replay training rows (4.7%) are cold nights.
 - **Replay rows.** The fold's ERA5-and-CAMS pretraining rows from `e00425_prep.fold_pretrain`, with
   the held-out weeks and their purge excluded and both standing cuts applied (the D15 and D18
   start cut and the flagged exact-zero drop). Replay rows carry the same 46 input columns as the
@@ -100,9 +110,12 @@ rows back into the fine-tuning batches and asks whether the hard rows improve.
   rows, the same steps per epoch as R0. Each step adds `round(16384 * r / (1 - r))` replay rows
   (5,461 for R25 and Rcold, 16,384 for R50), drawn uniformly with replacement. R25 therefore sees
   about 1.33 times and R50 about 2 times the rows per epoch that R0 sees.
-- **Loss.** `(1 - r) * ENS loss + r * replay loss`. The ENS loss is the recency-weighted mean
-  negative log-likelihood of experiment 425 (weight `0.5 ** (age_days / SHORT_HALF_LIFE_DAYS)`,
-  multiplied by nothing new). The replay loss is the unweighted mean. Early stopping reads the
+- **Loss (deviation from the brief's batch-share wording).** The brief asked for 25% of each batch.
+The loss share equals r by construction, while the recency weights shrink the ENS rows' effective
+weight inside their share. `(1 - r) * ENS loss + r * replay loss`. The ENS loss is the
+recency-weighted mean
+  negative log-likelihood of experiment 425  (weight `0.5 ** (age_days / SHORT_HALF_LIFE_DAYS)`).
+  The replay loss is the unweighted mean. Early stopping reads the
   unweighted mean negative log-likelihood of the ENS held-out weeks only, as R0 does; replay rows
   never enter the validation. Patience 6 and the 40-epoch cap are unchanged.
 - **Memory plan.** The fold's 4.9 million ENS rows (0.9 GB) and 7.9 million replay rows (1.5 GB)
@@ -110,10 +123,13 @@ rows back into the fine-tuning batches and asks whether the hard rows improve.
   once per month (about 6 GB resident) and frees them after the copy. One GPU process, one feeder
   core, `MemoryMax=14G`.
 - **Past-weather caveat.** The replay rows use ERA5-and-CAMS weather, which is not available at
-  forecast time. It enters training only, as in the pretraining; scoring inputs are ensemble forecasts.
+  forecast time. The ERA5-and-CAMS weather enters training only, as in the pretraining; scoring
+  inputs are ensemble forecasts.
 
-**Scoring.** Experiment 470's rows and slices (the eight, the six on rows with no labelled event, the
-six against normal-running-arrangement actuals, cold nights, the 12 to 36 hour band, and the report-only
+**Scoring.** Experiment 470's rows and slices (the eight, the six on rows with no labelled event,
+the
+six against normal-running-arrangement actuals, cold nights, the 12 to 36 hour band, and the
+report-only
 Christmas week and D15 and D18), each replay arm against R0 with the same seeds, and A-pool as
 context. Tails (q01, q05, q95, q99 coverage and pinball loss, raw and with the 1.00 to 1.15 widening
 sweep) and avoidable-curtailment cost at f = 0.9, 0.75, and 0.5 at the six are descriptive. Every
@@ -121,14 +137,30 @@ score is selection-biased, because the five folds that choose the candidate also
 stays unused. Flagged exact-zero half-hours are dropped; the start cut for D15 and D18 applies.
 Rows with no labelled event are the clean rows; NGED's event labels are incomplete.
 
+**Other deviations.** Avoidable-curtailment cost is descriptive, not a gating row, so that the test
+count stays 27. The q99 rule is +0.02 absolute, as the edits of 2026-11-01 require, not the brief's
+5% relative. No climatology row is scored: every contrast is between two fine-tunings of the same
+network, and A-pool is the context. Rcold draws about 5,461 rows per step from a pool of roughly 0.3
+million cold-night rows, so each cold row is seen several times per epoch; the draws per cold row
+are reported. Peak memory of R50 and Rcold is measured on their first fits.
+
+**Reproduction check.** The one R0 refit (2026-01, seed 0) passes if its CRPS at the eight and at
+the six differs from the stored fit by less than the printed single-seed standard deviation. If it
+fails, every contrast is labelled "against a non-reproducing reference" and the 15 R0 fits are
+refitted.
+
 **Production cost.** One serving pass runs the same single network (or the five-seed pool) as arm A.
-Replay changes only the monthly refit: it needs the ERA5-and-CAMS pretraining table at refit time and
-adds about 1.3 times (R25) or 2 times (R50) the fine-tuning steps' rows. The serving path is unchanged.
+Replay changes only the monthly refit: it needs the ERA5-and-CAMS pretraining table at refit time
+and
+adds about 1.3 times (R25) or 2 times (R50) the fine-tuning steps' rows. The serving path is
+unchanged.
 
 **Compute.** 45 fits (3 arms times 5 folds times 3 seeds) plus one reproduction fit. Measured on one
 R25 fit: 22 seconds of training, 55 seconds of forecasting, 2.9 GB peak GPU. About 65 minutes of
 wall time, under 1 GPU-hour.
 
-**Stored predictions reused.** R0 is experiment 425's `seed_preds/A` (copied through experiment 470's
-`A-s0`, `A-s1`, `A-s2`, the same fits on the same rows); A-pool, `A-s3` and `A-s4` are experiment 470's.
+**Stored predictions reused.** R0 is experiment 425's `seed_preds/A` (copied through experiment
+470's
+`A-s0`, `A-s1`, `A-s2`, the same fits on the same rows); A-pool, `A-s3` and `A-s4` are experiment
+470's.
 Experiment 470 applied the 1.15 widening in its scorer and so does this plan.

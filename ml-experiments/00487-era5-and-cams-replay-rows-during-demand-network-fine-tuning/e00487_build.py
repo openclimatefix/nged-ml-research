@@ -12,7 +12,7 @@ written to `work/predictions/<arm>/<month>_c<cell>.parquet`, where the cell is t
   copied from experiment 470; `A-s0` is `R0` cell 0.
 
 ```bash
-source .e_replay_env.sh   # and the PYTHONPATH of e00487_fit.py
+source .e_replay_env.sh   (sets PYTHONPATH; run from the repo root)
 uv run --no-sync python ml-experiments/00487-*/e00487_build.py
 ```
 """

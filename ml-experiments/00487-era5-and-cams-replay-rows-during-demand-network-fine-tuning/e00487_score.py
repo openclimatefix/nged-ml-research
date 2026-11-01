@@ -17,7 +17,7 @@ pinball loss at the eight and at the six on rows with no labelled event) = 27 Bo
 fixed before any score was read.
 
 ```bash
-source .e_replay_env.sh   # and the PYTHONPATH of e00487_fit.py
+source .e_replay_env.sh   (sets PYTHONPATH; run from the repo root)
 uv run --no-sync python ml-experiments/00487-*/e00487_score.py rows
 uv run --no-sync python ml-experiments/00487-*/e00487_score.py stats
 ```
@@ -128,6 +128,10 @@ def rows_command() -> None:
         base = score470.month_context(month=month, sites=sites, ctx=ctx)
         flags = rows470.filter((pl.col("month") == month) & pl.col("main16")).drop("month")
         table = month_rows(month=month, base=base, flags=flags)
+        for arm in (*ARMS, *CONTEXT):
+            held = table.filter(pl.col("main16"))[column(arm=arm, metric="crps")]
+            assert held.is_not_null().all(), f"{arm} {month}: missing rows"
+            assert held.is_finite().all(), f"{arm} {month}: non-finite scores"
         table.write_parquet(SCORE_DIR / f"rows_{month}.parquet")
         print(
             f"{month}: base {base.height}, main16 {int(table['main16'].sum())}, gam14 {int(table['gam14'].sum())}",
@@ -268,12 +272,48 @@ def stats_command() -> None:
         )
 
 
+def repro_command() -> None:
+    """Compare the R0 refit (2026-01, seed 0) with experiment 425's stored fit.
+
+    Prints the largest quantile difference (capacity fraction) and the epochs and validation
+    negative log-likelihood of both fits. The pass rule of the plan (CRPS within the printed
+    single-seed standard deviation) is read from `repro_crps` below and `mde.csv`.
+    """
+    month, seed = "2026-01", 0
+    new = pl.read_parquet(fit.seed_pred_path(arm="R0", month=month, seed=seed))
+    old = pl.read_parquet(fit.E425_WORK / "seed_preds" / "A" / f"{month}_s{seed}.parquet")
+    keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
+    joined = new.join(old, on=keys, suffix="_old")
+    diff = max(float((joined[q] - joined[f"{q}_old"]).abs().max()) for q in LEVELS)  # ty: ignore[invalid-argument-type]
+    print(f"rows {new.height} vs {old.height}; max abs quantile difference {diff:.5f}")
+    new_log = json.loads((fit.WORK_DIR / "logs" / f"{month}.json").read_text())[f"R0_s{seed}"]
+    old_log = json.loads((fit.E425_WORK / "logs" / f"{month}.json").read_text())[f"A_s{seed}"]
+    print("refit", new_log, "stored", old_log)
+    # CRPS of both fits, 1.15 widening, on the eight and the six (all rows of the month).
+    series = adapter.series_table()
+    ctx = prep425.cleaned_scoring_context(series=series)
+    base = score470.month_context(month=month, sites=build470.site_map(), ctx=ctx)
+    for label, frame in (("refit", new), ("stored", old)):
+        grid = build470.grid_keys(
+            frame=frame.join(
+                build470.site_map().select("time_series_id", "primary"), on="time_series_id"
+            )
+        )
+        rows = base.select(*KEYS, "actual", "group").join(
+            grid.select(*KEYS, *LEVELS), on=KEYS, how="inner"
+        )
+        scored = score470.row_metrics(frame=widen(frame=rows, factor=HEADLINE))
+        for group in ("mva_eight", "signed_six"):
+            mask = (rows["group"] == group).to_numpy()
+            print(f"repro_crps {label} {group}: {scored['crps'][mask].mean():.4f}")
+
+
 def main() -> None:
     """Run a command."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("rows", "stats"))
+    parser.add_argument("command", choices=("rows", "stats", "repro"))
     args = parser.parse_args()
-    {"rows": rows_command, "stats": stats_command}[args.command]()
+    {"rows": rows_command, "stats": stats_command, "repro": repro_command}[args.command]()
 
 
 if __name__ == "__main__":
