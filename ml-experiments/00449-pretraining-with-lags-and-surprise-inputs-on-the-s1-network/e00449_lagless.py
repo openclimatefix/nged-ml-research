@@ -259,7 +259,7 @@ def smoke(*, device: str) -> None:
     print(build(month=month, seed=0, device=device, clean=stack[0]))
     table = pl.read_parquet(table_path(month=month, seed=0))
     end = int(common.grid_index(times=prep.refit_of(month=month)))
-    assert table["grid"].max() < end
+    assert table["grid"].max() < end  # ty: ignore[unsupported-operator]
     median, half = surprise_tables(month=month, seed=0, device=device)
     ens_median, ens_half = lagless_ens_tables(month=month, seed=0, device=device)
     for label, (m, h) in (("ERA5", (median, half)), ("ensemble", (ens_median, ens_half))):

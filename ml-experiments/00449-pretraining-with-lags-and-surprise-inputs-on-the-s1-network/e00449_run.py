@@ -467,7 +467,7 @@ def smoke(*, device: str) -> None:
         assert fit.models.count_parameters(model=model) == 8585
         model.train()
         inputs = pretrain_inputs(
-            kind=PRETRAIN_OF[name], pre=data.Rows(**{**pre.__dict__, "x": pre.x[sample], "primary": pre.primary[sample], "origin_idx": pre.origin_idx[sample], "target_idx": pre.target_idx[sample]}),
+            kind=PRETRAIN_OF[name], pre=data.Rows(**{**pre.__dict__, "x": pre.x[sample], "primary": pre.primary[sample], "origin_idx": pre.origin_idx[sample], "target_idx": pre.target_idx[sample]}),  # ty: ignore[invalid-argument-type]
             rows=rows, power=power, surprise=era5, model=model.to(device), device=device,
         )  # fmt: skip
         x_in, _, _ = inputs.batch(arm=arm, rows=idx, world=world)

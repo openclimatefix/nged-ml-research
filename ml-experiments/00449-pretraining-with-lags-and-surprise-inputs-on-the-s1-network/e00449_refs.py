@@ -50,8 +50,8 @@ def reference_frames(*, series: pl.DataFrame) -> dict[str, pl.DataFrame]:
 
 def main() -> None:
     """Run experiment 448's scorer on this experiment's arms."""
-    base.reference_frames = reference_frames
-    base.run = run
+    base.reference_frames = reference_frames  # ty: ignore[invalid-assignment]
+    base.run = run  # ty: ignore[invalid-assignment]
     base.TABLE_DIR = run.WORK_DIR / "figure_tables"
     base.LADDER_ARMS = ARMS
     base.REFERENCES = (*base.REFERENCES, "425-A-s0", "425-A-avg5")
