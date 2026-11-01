@@ -73,7 +73,8 @@ take_home_message: >-
   Pretraining for longer did not help: 150 epochs against 60 moved CRPS by less than the
   fit-to-fit noise at the eight and the six, and the surprise inputs added 0.042 points only at the
   signed-MW six, again below the noise. Experiment 425's arm A (no surprise inputs, five-seed
-  quantile average) stays the pretrained demand candidate on this evidence. The comparison with arm A is confounded with the fit loop (experiment 397's against 428's).
+  quantile average) stays the pretrained demand candidate on this evidence. The comparison with
+  arm A is confounded with the fit loop (experiment 397's against 428's).
 ---
 
 ## Take-home
@@ -88,7 +89,8 @@ the fit loop. A-ref (experiment 397's loop) and the new arms (experiment 428's l
 than the cap.
 
 Pretraining stopped on patience in 47 of the 50 runs (median 104 epochs, range 78 to 150), so
-150 epochs bound in 3 runs, all A-S1-long. The 60-epoch cap of experiment 449 did bind in every run. The timed fit (2026-06, seed 0)
+150 epochs bound in 3 runs, all A-S1-long. The 60-epoch cap of experiment 449 did bind in every
+run. The timed fit (2026-06, seed 0)
 lowered pretraining validation loss from 0.2722 to 0.2533, and the fine-tuned scores still differ by
 less than the noise.
 
@@ -132,7 +134,8 @@ The horizon of every stored forecast is 10 days (240 hours), so the "full horizo
 | BG2 | 2.845 | 3.543 | 7.687 | 3.746 |
 
 - **Minimum detectable effects (single-seed arms, printed before any contrast was read):** 0.057 at
-  the six, 0.056 at the eight, 0.76 at D15 and D18 (scorer's clean row set, 83,458 rows, 62,738 of them shared with the
+  the six, 0.056 at the eight, 0.76 at D15 and D18 (scorer's clean row set, 83,458 rows, 62,738 of
+  them shared with the
   references; the plan quoted 1.18 from experiment 449's real-row set, and 1.05 applies to
   real-event rows).
   Five-fold contrasts at the six have a minimum detectable effect of 0.34 and are not read.
