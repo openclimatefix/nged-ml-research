@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018
+# ruff: noqa: E501, PLR0912, PT018
 """Pretrain the S1 network with the lags and surprise inputs live, fine-tune it, and forecast.
 
 Reuses experiment 428's rows, fit loop, and forecast code. The pretraining rows, spread table, and
@@ -30,6 +30,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Final
 
+import e00397_models as base  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00418_prep as prep418  # ty: ignore[unresolved-import]
 import e00422_prep as prep422  # ty: ignore[unresolved-import]
@@ -38,6 +39,7 @@ import e00428_fit as fit  # ty: ignore[unresolved-import]
 import e00428_predict as pr  # ty: ignore[unresolved-import]
 import e00449_lagless as lagless  # ty: ignore[unresolved-import]
 import numpy as np
+import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -342,6 +344,107 @@ def fit_pt(
     )
 
 
+SEEDS5: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
+
+
+def combos() -> dict[str, tuple[list[tuple[str, int]], list[tuple[str, int]], float]]:
+    """Return the pools: equal-weight mixtures of seeds, no lagless head (weight 1.0)."""
+    return {
+        "PT1-pool3": ([("PT1", s) for s in (0, 1, 2)], [], 1.0),
+        "PT1-pool5": ([("PT1", s) for s in SEEDS5], [], 1.0),
+    }
+
+
+def forecast_combo(
+    *, month: str, name: str, spec: tuple[list, list, float], seed_files: tuple[int, ...],
+    device: str, power: torch.Tensor, flags: pr.Flags, y_clean: np.ndarray,
+) -> list[str]:  # fmt: skip
+    """Forecast an equal-weight pool of lagged members, optionally blended 50/50 with a lagless pool.
+
+    The mixtures are pooled on the capacity scale: each member's components are converted from z
+    space with its own network's target statistics, member log weights are shifted by
+    `-log(members)`, and a group's log weights are shifted by the log of the group weight. The same
+    frame is written to each file in `seed_files`.
+    """
+    lagged, lagless, weight = spec
+    targets = {
+        w: pr.PRED_DIR / name / f"{month}_s{s}_w{w}.parquet"
+        for s in seed_files
+        for w in pr.EVAL_WORLDS
+    }
+    if all(t.exists() for t in targets.values()):
+        return [f"{name} {month}: exists"]
+    members = [(a, s, weight / len(lagged)) for a, s in lagged]
+    members += [(a, s, (1.0 - weight) / len(lagless)) for a, s in lagless]
+    loaded = [
+        (load_from(folder=locate(arm=a, month=month, seed=s), arm_name=a, device=device), s, g)
+        for a, s, g in members
+    ]
+    first = loaded[0][0]
+    test = data.build_test(month=month, standardiser=first.standardiser)
+    for member, _, _ in loaded:
+        assert np.array_equal(member.standardiser.mean, first.standardiser.mean) and np.array_equal(
+            member.standardiser.std, first.standardiser.std
+        ), "pooled networks must share the fold's standardiser"
+    inputs = [
+        fit.Inputs(
+            power=power, x=test.x, primary=test.primary, origin_idx=test.origin_idx,
+            target_idx=test.target_idx, power_mean=m.power_mean, power_std=m.power_std,
+            device=device, surprise=fit.surprise_for(arm=m.arm, month=month, seed=s, device=device),
+        )
+        for m, s, _ in loaded
+    ]  # fmt: skip
+    for inp, (m, _, _) in zip(inputs, loaded, strict=True):
+        inp.target_stats = fit.target_stats(mean=m.target_mean, std=m.target_std, device=device)
+    lines = []
+    for w in pr.EVAL_WORLDS:
+        if all(
+            pr.PRED_DIR.joinpath(name, f"{month}_s{s}_w{w}.parquet").exists() for s in seed_files
+        ):
+            continue
+        columns: dict[str, list[np.ndarray]] = {n: [] for n in pr.LEVEL_NAMES}
+        flag_columns: dict[str, list[np.ndarray]] = {}
+        for start in range(0, len(test.x), pr.CHUNK):
+            rows = torch.arange(start, min(start + pr.CHUNK, len(test.x)), device=device)
+            world = torch.full((len(rows),), w, dtype=torch.long, device=device)
+            pieces = []
+            for (m, _, g), inp in zip(loaded, inputs, strict=True):
+                res = pr.forecast_rows(loaded=m, inputs=inp, rows=rows, world=world)
+                primary = inp.primary[rows]
+                mu = torch.from_numpy(m.target_mean).to(device)[primary][:, None]
+                sd = torch.from_numpy(m.target_std).to(device)[primary][:, None]
+                pieces.append(
+                    (res["log_w"] + float(np.log(g)), res["mean"] * sd + mu, res["std"] * sd)
+                )
+            with torch.no_grad():
+                q = base.mixture_quantiles(
+                    log_w=torch.cat([p[0] for p in pieces], dim=1),
+                    mean=torch.cat([p[1] for p in pieces], dim=1),
+                    std=torch.cat([p[2] for p in pieces], dim=1),
+                )
+                q = torch.sort(q, dim=1).values
+            for i, level in enumerate(pr.LEVEL_NAMES):
+                columns[level].append(q[:, i].float().cpu().numpy())
+            for key, value in flags.of(inputs=inputs[0], rows=rows, world=world).items():
+                flag_columns.setdefault(key, []).append(value.cpu().numpy())
+        frame = pl.DataFrame(
+            {
+                "primary": test.primary, "origin_us": test.origin, "valid_us": test.valid,
+                "lead": test.lead, "actual": y_clean[test.primary, test.target_idx],
+                **{k: np.concatenate(v) for k, v in columns.items()},
+                **{k: np.concatenate(v) for k, v in flag_columns.items()},
+            }
+        )  # fmt: skip
+        for s in seed_files:
+            target = pr.PRED_DIR / name / f"{month}_s{s}_w{w}.parquet"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_name(target.name + ".tmp")
+            frame.write_parquet(temporary)
+            temporary.rename(target)
+        lines.append(f"{name} {month} w{w}: {frame.height:,} rows")
+    return lines
+
+
 def smoke(*, device: str) -> None:
     """Check the pretraining views: live lags, zero or live surprise, dropout, and the width."""
     stack, _ = data.load_stack(include_eval=False)
@@ -389,7 +492,7 @@ def smoke(*, device: str) -> None:
 def main() -> None:
     """Fit, forecast, or run the smoke test."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("fit", "predict", "smoke"))
+    parser.add_argument("command", choices=("fit", "predict", "combo", "smoke"))
     parser.add_argument("--arms", nargs="+", default=list(PT_ARMS))
     parser.add_argument("--months", nargs="+", default=[*fit.SCREEN_MONTHS, fit.FIFTH_MONTH])
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS))
@@ -412,6 +515,13 @@ def main() -> None:
     power_np, code = data.load_stack(include_eval=True)
     power = torch.from_numpy(power_np).to(args.device)
     flags = pr.Flags(code=code, real=data.real_event_mask(), power=power_np, device=args.device)
+    if args.command == "combo":
+        for month in args.months:
+            for name, spec in combos().items():
+                for line in forecast_combo(month=month, name=name, spec=spec, seed_files=SEEDS5, device=args.device,
+                                           power=power, flags=flags, y_clean=power_np[0]):  # fmt: skip
+                    print(line, flush=True)
+        return
     for month in args.months:
         for seed in args.seeds:
             for name in args.arms:
