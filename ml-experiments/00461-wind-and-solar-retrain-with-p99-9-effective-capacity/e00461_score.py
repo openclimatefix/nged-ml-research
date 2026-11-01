@@ -56,7 +56,7 @@ def _finish(*, frame: pl.DataFrame, tech: str, arm: str, rule: str) -> pl.DataFr
         .with_columns(lead_band=step1.lead_band_expr(), tech=pl.lit(tech), arm=pl.lit(arm),
                       rule=pl.lit(rule))
         .filter(pl.col("lead_band").is_not_null() & pl.col("actual").is_finite())
-        .select("tech", "arm", "rule", "site", "month", "lead_hours", "lead_band", "cap_mw",
+        .select("tech", "arm", "rule", "site", "month", "init", "lead_hours", "lead_band", "cap_mw",
                 "actual", *LEVELS)
     )  # fmt: skip
 
@@ -77,7 +77,14 @@ def wind_frame(*, rule: str) -> pl.DataFrame:
     q = np.mean(np.stack(tables), axis=0)
     frame = (
         data347.scored_frame()
-        .select("site", "month", "masked", "lead_hours", "actual_norm")
+        .select(
+            "site",
+            "month",
+            "masked",
+            "lead_hours",
+            "actual_norm",
+            init=pl.col("power_fcst_init_time"),
+        )
         .with_columns(*[pl.Series(c, q[:, i]) for i, c in enumerate(LEVELS)])
         .filter(~pl.col("masked") & pl.col("actual_norm").is_finite())
     )
@@ -127,7 +134,9 @@ def solar_frame(*, arm: str, rule: str) -> pl.DataFrame:
         .sort(keys)
     )
     mean = mean.with_columns(
-        site="Solar " + pl.col("time_series_id"), month=pl.col("time").dt.strftime("%Y-%m")
+        init=pl.col("init_time"),
+        site="Solar " + pl.col("time_series_id"),
+        month=pl.col("time").dt.strftime("%Y-%m"),
     )
     return _finish(frame=mean, tech="solar", arm=arm, rule=rule)
 
@@ -162,7 +171,7 @@ def cells(*, frame: pl.DataFrame) -> list[dict]:
     for i, month in enumerate(months[1:], start=1):
         earlier = frame.filter(pl.col("month").is_in(months[:i]))
         held = frame.filter(pl.col("month") == month)
-        factors = step1.fit_factors(fit=earlier.rename({"actual": "actual"}))
+        factors = step1.fit_factors(fit=earlier)
         cap_now = {r["site"]: float(r["c"]) for r in held.group_by("site").agg(
             pl.col("cap_mw").max().alias("c")).iter_rows(named=True)}  # fmt: skip
         earlier_max = {r["site"]: float(r["m"]) for r in earlier.group_by("site").agg(
@@ -179,7 +188,8 @@ def cells(*, frame: pl.DataFrame) -> list[dict]:
                 row = {
                     "tech": tech, "arm": arm, "rule": rule, "site": site[0], "month": month,
                     "variant": variant, "n": len(a), "score_mw_sum": float(score.sum()),
-                    "cap_mw": float(part["cap_mw"].to_numpy().mean()), "mean_q50_minus_mean_actual": float(
+                    "cap_mw": float(part["cap_mw"].to_numpy().mean()),
+                    "mean_q50_minus_mean_actual": float(
                         (q[:, LEVELS.index("q50")] - a).sum()),
                     "n_gt_1": int((a > part["cap_mw"].to_numpy()).sum()),
                 }  # fmt: skip
@@ -217,11 +227,16 @@ def bootstrap(*, table: pl.DataFrame, sites: list[str], rng: np.random.Generator
 
 
 def seed_spread() -> dict[str, float | list[float]]:
-    """Return the old wind arm's single-seed pooled raw scores (MW) and their mean pair gap."""
+    """Return single-seed pooled raw scores (MW) and mean pair gaps (wind old/new, solar old)."""
+    out: dict[str, float | list[float]] = {}
     full = data347.scored_frame()
     old_cap = {
         r["site"]: float(r["effective_capacity_mw"])
         for r in c230.site_table().iter_rows(named=True)
+    }
+    new_cap = {
+        f: float(v["new_mw"])
+        for f, v in json.loads((common.DATA_DIR / "wind_capacity.json").read_text()).items()
     }
     sel = (
         (
@@ -231,15 +246,55 @@ def seed_spread() -> dict[str, float | list[float]]:
         )
         .to_numpy()
     )  # fmt: skip
-    cap = full["site"].replace_strict(old_cap, return_dtype=pl.Float64).to_numpy()[sel]
-    actual = np.clip(full["actual_norm"].to_numpy()[sel], 0.0, None)
-    tables = score450.load_seed_tables(name="base", seeds=wind_fit.SEEDS)
-    scores = [
-        float(np.mean(c230.quantile_score(quantiles=np.sort(t[sel], axis=1), actual=actual) * cap))
-        for t in tables
-    ]
+    actual_mw = (
+        np.clip(full["actual_norm"].to_numpy()[sel], 0.0, None)
+        * (full["site"].replace_strict(old_cap, return_dtype=pl.Float64).to_numpy()[sel])
+    )
+    for tag, tables in (
+        ("old", score450.load_seed_tables(name="base", seeds=wind_fit.SEEDS)),
+        (
+            "new",
+            [np.load(wind_fit.PARTS_DIR / f"member_plain_p999_h{s}.npy") for s in wind_fit.SEEDS],
+        ),
+    ):
+        cap = full["site"].replace_strict(
+            old_cap if tag == "old" else new_cap, return_dtype=pl.Float64
+        )
+        cap_sel = cap.to_numpy()[sel]
+        scores = [
+            float(
+                np.mean(
+                    c230.quantile_score(
+                        quantiles=np.sort(t[sel], axis=1) * cap_sel[:, None], actual=actual_mw
+                    )
+                )
+            )
+            for t in tables
+        ]
+        gaps = [abs(a - b) for a, b in combinations(scores, 2)]
+        out[f"wind_{tag}_mean_pair_gap_mw"] = float(np.mean(gaps))
+        out[f"wind_{tag}_seed_scores_mw"] = scores
+    # solar a2_member: old arm single-seed pooled raw score
+    labels = data453.labels().filter(pl.col("tech") == "solar")
+    cap_s = {r["site"].removeprefix("Solar "): r["cap"] for r in labels.iter_rows(named=True)}
+    scores = []
+    for seed in (0, 1, 2):
+        frame = pl.concat(
+            [
+                pl.read_parquet(f)
+                for f in sorted((SOLAR_OLD / "a2_member").glob(f"s{seed}_*.parquet"))
+            ]
+        ).filter(
+            pl.col("lead_hours").is_between(LEAD_MIN_H, LEAD_MAX_H) & pl.col("actual").is_finite()
+        )
+        q = np.sort(frame.select(list(LEVELS)).to_numpy(), axis=1)
+        cap = frame["time_series_id"].replace_strict(cap_s, return_dtype=pl.Float64).to_numpy()
+        a = np.clip(frame["actual"].to_numpy(), 0.0, None)
+        scores.append(float(np.mean(c230.quantile_score(quantiles=q, actual=a) * cap)))
     gaps = [abs(a - b) for a, b in combinations(scores, 2)]
-    return {"wind_mean_abs_pair_gap_mw": float(np.mean(gaps)), "wind_seed_scores_mw": scores}
+    out["solar_old_a2_member_mean_pair_gap_mw"] = float(np.mean(gaps))
+    out["solar_old_a2_member_seed_scores_mw"] = scores
+    return out
 
 
 def tail_line(*, piece: pl.DataFrame) -> str:
@@ -252,7 +307,7 @@ def tail_line(*, piece: pl.DataFrame) -> str:
     )
     bias = float(piece["mean_q50_minus_mean_actual"].sum()) / n
     return (
-        f"above q99 {(1 - total['hit_q99'] / n) * 100:.2f}% {tails} mean(q50-actual) {bias:+.4f} MW"
+        f"above q99 {(1 - total['hit_q99'] / n) * 100:.3f}% {tails} mean(q50-actual) {bias:+.4f} MW"
     )
 
 
@@ -271,7 +326,7 @@ def main() -> None:
         frame.write_parquet(WORK_DIR / f"rows_{frame['arm'][0]}_{frame['rule'][0]}.parquet")
     rng = np.random.default_rng(0)
     lines: list[str] = []
-    lines.append(f"seed spread (old wind arm): {seed_spread()}")
+    lines.append(f"seed spread: {seed_spread()}")
     for arm in ("member_plain", *SOLAR_ARMS):
         sub = table.filter(pl.col("arm") == arm)
         tech = sub["tech"][0]
