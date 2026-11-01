@@ -186,6 +186,32 @@ rows with no labelled event and 0.38 inside events.
   the control with the lag inputs zeroed (Z1e-2) and for a penalty that binds (C1), both added and
   labelled post hoc.
 
+## Checks
+
+- **Triggers.** Trigger 2 fired: the result contradicts the prediction that C1e-2 stays behind
+  B-mix on rows with no labelled event. Triggers 3 and 4 did not fire. An audit by a fresh Sonnet
+  agent re-derived the headline from the stored forecasts, and each finding is triaged below.
+- **Median and mean forecast error beside the quantile score** (signed-MW six, rows with no
+  labelled event, C1e-2 minus reference, points of capacity; the audit averaged all 3 stored seeds
+  of LL and B-mix, so its CRPS differs from this page's by up to 0.05). Against LL: CRPS -0.55,
+  median error -0.77, mean error -0.74. Against B-mix: CRPS -0.30, median error -0.35, mean error
+  -0.43. The signs agree in every month against LL and in every month except 2025-10 and 2025-12
+  against B-mix, where C1e-2 trails slightly on all three measures.
+- **Median minus mean forecast per Primary.** C1e-2 tracks LL within 0.06 points at every one of
+  the six Primaries, so the correction does not shift the median away from the mean. B-mix differs
+  at D11 (-0.75 against +0.14 to +0.17) and D5 (-0.38 against -0.16 to -0.21).
+- **Bias.** The mean of actual minus median is positive at five of the six Primaries for every arm
+  (the forecasts are low). C1e-2 roughly halves the mean absolute bias (1.30 points against 2.55 for
+  LL and 2.50 for B-mix), and Z1e-2 only reduces it to 2.17. Much of the lag gain is therefore a
+  level correction.
+- **Leave one Primary out** keeps the sign: C1e-2 minus LL stays between -0.38 and -0.66, and C1e-2
+  minus B-mix between -0.11 (D14 left out) and -0.46. D14 carries most of the gain over B-mix, and
+  without it the margin falls below the minimum detectable effect of 0.24. D11 is the one Primary
+  where C1e-2 is worse than B-mix (+0.40), and the gap grows with lead time.
+- **By lead band and hour.** C1e-2 beats B-mix in each lead band pooled (-0.25 to -0.39) and in all
+  24 hours of the day. It trails B-mix in three month-by-band cells: 2025-12 at 36 to 120 hours
+  (+0.06) and at 120 to 240 hours (+0.36), and 2025-10 at 120 to 240 hours (+0.14).
+
 ## Caveats and next steps
 
 - **The penalty sweep is uninformative.** At 1e-3 to 1 the L2 penalty shrinks the outputs by under
