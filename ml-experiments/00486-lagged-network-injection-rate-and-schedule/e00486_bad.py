@@ -13,6 +13,7 @@ script reuses its three definitions and experiment 404's sweep machinery (rows, 
 The response is the shift of the median forecast, and the mean change of the corrupted readings
 only, both as fractions of capacity. The report sums the shift (signed to follow the
 corruption) over rows and divides by the summed size of the corruption.
+
 ```bash
 PYTHONPATH=<as e00486_fit.py shows> \
     uv run --no-sync python ml-experiments/00486-*/e00486_bad.py run --month 2026-06 --seed 0 \
