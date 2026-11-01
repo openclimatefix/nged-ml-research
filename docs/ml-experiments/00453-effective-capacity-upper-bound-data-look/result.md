@@ -43,12 +43,14 @@ headline: >-
   percentile is safe for wind. For solar the maximum is not safe, but the 99.9th percentile is.
 lessons: >-
   A percentile higher than p99 lowers every farm's share above q99. The maximum is unsafe for solar
-  because of one two-half-hour spike and because three series produced more in 2021 to 2023 than now.
+  because of one two-half-hour spike and because three series produced more in 2021 to 2023 than
+  now.
 take_home_message: >-
   The wind farms hold almost no implausible high values: 98% to 100% of half-hours above p99.9 are
   plausible, so a capacity at p99.9 or higher is safe, and p99.9 takes the pooled share of actuals
   above q99 from 1.41% under the current rule to 0.85% (Farm A 1.76% to 1.05%).
-  The solar series hold a two-half-hour spike on the second day of Solar E's record and months at an earlier, higher output level, so the
+  The solar series hold a two-half-hour spike on the second day of Solar E's record and months at an
+  earlier, higher output level, so the
   maximum is unsafe, but p99.9 takes the pooled share above q99 from 3.42% under the current rule
   to 1.48%. Recommend p99.9
   of the earlier power for wind and solar.
