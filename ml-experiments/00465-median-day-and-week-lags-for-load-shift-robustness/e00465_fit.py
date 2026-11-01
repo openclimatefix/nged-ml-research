@@ -30,6 +30,7 @@ ml-experiments/00383-load-shift-xgboost-oracle-first-part-1 DATA_PATH_INTERNAL=.
 
 import argparse
 import multiprocessing
+import os
 import time
 import warnings
 from concurrent.futures import ProcessPoolExecutor
@@ -50,7 +51,10 @@ WORK_DIR: Final[Path] = (
 )
 ARM_DIR: Final[Path] = WORK_DIR / "arm_preds"
 BOOSTER_DIR: Final[Path] = WORK_DIR / "boosters"
-ARM_NAME: Final[str] = "c_robust"
+ORIGINAL_LAGS: Final[bool] = os.environ.get("E465_ORIGINAL_LAGS") == "1"
+"""Set `E465_ORIGINAL_LAGS=1` to refit experiment 402's arm (a) recipe with this script's CPU
+settings, the noise-floor control: the three original lags, written under `a_cpu_control`."""
+ARM_NAME: Final[str] = "a_cpu_control" if ORIGINAL_LAGS else "c_robust"
 ROBUST_COLUMNS: Final[tuple[str, ...]] = ("lag_origin", "lag_day_med7", "lag_week_med3")
 DAY_COUNT: Final[int] = 7
 WEEK_COUNT: Final[int] = 3
@@ -112,6 +116,8 @@ def robust_lags(*, power: np.ndarray, target: np.ndarray, origin: np.ndarray) ->
 
 def with_robust_lags(*, frame: pl.DataFrame, power: np.ndarray) -> pl.DataFrame:
     """Replace the three original lag columns of `frame` with the robust lags."""
+    if ORIGINAL_LAGS:
+        return frame
     target = np.asarray(common.grid_index(times=frame["valid_time"]))
     origin = np.asarray(common.grid_index(times=frame["power_fcst_init_time"]))
     robust = pl.DataFrame(
@@ -124,6 +130,8 @@ def with_robust_lags(*, frame: pl.DataFrame, power: np.ndarray) -> pl.DataFrame:
 
 def columns() -> list[str]:
     """Return the input columns in matrix order, with the robust lags in place of the originals."""
+    if ORIGINAL_LAGS:
+        return fd.input_columns(a7=False)
     return [
         *common.feature_columns(),
         *common.N1_EXTRA_COLUMNS,

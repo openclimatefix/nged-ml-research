@@ -182,7 +182,7 @@ def matrix_for(
     else:
         rebuilt = fit.with_robust_lags(frame=prepared, power=power)
     if origin_shift:
-        rebuilt = rebuilt.with_columns(lag_origin=pl.col("lag_origin") + np.float32(origin_shift))
+        rebuilt = rebuilt.with_columns(lag_origin=pl.col("lag_origin") + float(origin_shift))
     return rebuilt.select(columns).to_numpy().astype(np.float32)
 
 
