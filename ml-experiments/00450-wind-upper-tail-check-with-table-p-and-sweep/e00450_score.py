@@ -13,6 +13,7 @@ at the stated level. Tails: coverage and pinball loss at q01, q05, q95, q99 raw 
 export DATA_PATH_INTERNAL=...; source ml-experiments/00450-*/env.sh
 uv run --no-sync python ml-experiments/00450-*/e00450_score.py <arm> ... [--level 0.99]
 ```
+
 Output: `work/score_<tag>.json` for each call's arm list, and a printed table.
 """
 
