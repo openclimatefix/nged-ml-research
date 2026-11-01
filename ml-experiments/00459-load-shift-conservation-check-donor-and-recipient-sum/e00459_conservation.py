@@ -79,7 +79,7 @@ class Grid:
             .select("time_series_id", "time", "power")
             .collect()
         )
-        self.t0 = power["time"].min().replace(minute=0, second=0, microsecond=0)  # ty: ignore[unresolved-attribute]
+        self.t0 = power["time"].min().replace(minute=0, second=0, microsecond=0)  # ty: ignore[unresolved-attribute]  # ty: ignore[missing-argument, no-matching-overload, unknown-argument]
         t_max = power["time"].max()
         self.n = int((t_max - self.t0).total_seconds() // 1800) + 1  # ty: ignore[unsupported-operator]
         self.x = np.full((self.n, len(self.labels)), np.nan)
@@ -272,10 +272,11 @@ def run_events(*, grid: Grid, events: list[dict], forbidden: np.ndarray) -> pl.D
                 | {
                     "kind": "placebo",
                     "draw": found,
-                    "onset_utc": (grid.t0 + np.timedelta64(onset * 30, "m")).strftime(
+                    "baseline_overlaps_other_event": False,
+                    "onset_utc": (grid.t0 + np.timedelta64(onset * 30, "m")).strftime(  # ty: ignore[unsupported-operator]
                         "%Y-%m-%d %H:%M"
                     ),
-                    "end_utc": (grid.t0 + np.timedelta64((onset + length) * 30, "m")).strftime(
+                    "end_utc": (grid.t0 + np.timedelta64((onset + length) * 30, "m")).strftime(  # ty: ignore[unsupported-operator]
                         "%Y-%m-%d %H:%M"
                     ),
                 }
@@ -379,9 +380,9 @@ def allocation(
     """Return per-(group, member) share stability and the monthly share table."""
     groups = {tuple(sorted(e["g1"])) for e in events if e["usable"] and e["observed"]}
     groups |= {tuple(sorted(e["g2"])) for e in events if e["usable"] and not e["observed"]}
-    stamps = pl.datetime_range(
+    stamps = pl.datetime_range(  # ty: ignore[no-matching-overload]
         grid.t0,
-        grid.t0 + np.timedelta64((grid.n - 1) * 30, "m"),
+        grid.t0 + np.timedelta64((grid.n - 1) * 30, "m"),  # ty: ignore[unsupported-operator]
         interval="30m",
         time_zone="UTC",
         eager=True,
@@ -453,22 +454,22 @@ def allocation(
                     if pts.size
                     else np.nan,
                     "harm_rows": harm.height,
-                    "harm_oracle_median_abs_pts": float(harm["oracle_any_abs_pts"].median())
+                    "harm_oracle_median_abs_pts": float(harm["oracle_any_abs_pts"].median())  # ty: ignore[invalid-argument-type]
                     if harm.height
                     else np.nan,
-                    "harm_r0_median_abs_pts": float(harm["r0_abs_pts"].median())
+                    "harm_r0_median_abs_pts": float(harm["r0_abs_pts"].median())  # ty: ignore[invalid-argument-type]
                     if harm.height
                     else np.nan,
                     "harm_paired_gain_median_pts": float(
-                        (harm["r0_abs_pts"] - harm["oracle_any_abs_pts"]).median()
+                        (harm["r0_abs_pts"] - harm["oracle_any_abs_pts"]).median()  # ty: ignore[invalid-argument-type]
                     )
                     if harm.height
                     else np.nan,
                     "r0_rows": ref.height,
-                    "oracle_median_abs_pts_on_r0_rows": float(ref["oracle_abs_pts"].median())
+                    "oracle_median_abs_pts_on_r0_rows": float(ref["oracle_abs_pts"].median())  # ty: ignore[invalid-argument-type]
                     if ref.height
                     else np.nan,
-                    "r0_median_abs_pts": float(ref["r0_abs_pts"].median())
+                    "r0_median_abs_pts": float(ref["r0_abs_pts"].median())  # ty: ignore[invalid-argument-type]
                     if ref.height
                     else np.nan,
                 }

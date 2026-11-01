@@ -86,7 +86,7 @@ def main() -> None:
         share_unobserved=(~pl.col("observed")).mean(),
     )
     print("share of unobserved recipients, all 112 events by donor group:\n", unobs)
-    print("overall", float((~events["observed"]).mean()))
+    print("overall", float((~events["observed"]).mean()))  # ty: ignore[invalid-argument-type]
 
     print("\n== MDE from the placebo spread (stated before the headline) ==")
     for metering in ("six", "eight"):
@@ -225,10 +225,10 @@ def main() -> None:
             ratio = part["oracle_median_abs_pts_on_r0_rows"] / part["r0_median_abs_pts"]
             print(
                 metering, "pairs", part.height,
-                "median oracle", float(part["oracle_median_abs_pts_on_r0_rows"].median()),
-                "median R0", float(part["r0_median_abs_pts"].median()),
-                "median ratio", float(ratio.median()),
-                "share of pairs with ratio < 0.5", float((ratio < 0.5).mean()),
+                "median oracle", float(part["oracle_median_abs_pts_on_r0_rows"].median()),  # ty: ignore[invalid-argument-type]
+                "median R0", float(part["r0_median_abs_pts"].median()),  # ty: ignore[invalid-argument-type]
+                "median ratio", float(ratio.median()),  # ty: ignore[invalid-argument-type]
+                "share of pairs with ratio < 0.5", float((ratio < 0.5).mean()),  # ty: ignore[invalid-argument-type]
             )  # fmt: skip
             harm = part.filter(pl.col("harm_rows") > 0)
             if harm.is_empty():
@@ -236,9 +236,9 @@ def main() -> None:
                 continue
             print(
                 metering, "HARM ROWS: pairs", harm.height,
-                "median oracle", float(harm["harm_oracle_median_abs_pts"].median()),
-                "median R0", float(harm["harm_r0_median_abs_pts"].median()),
-                "median paired gain (R0 minus oracle, points)", float(harm["harm_paired_gain_median_pts"].median()),
+                "median oracle", float(harm["harm_oracle_median_abs_pts"].median()),  # ty: ignore[invalid-argument-type]
+                "median R0", float(harm["harm_r0_median_abs_pts"].median()),  # ty: ignore[invalid-argument-type]
+                "median paired gain (R0 minus oracle, points)", float(harm["harm_paired_gain_median_pts"].median()),  # ty: ignore[invalid-argument-type]
                 "total harm rows", int(harm["harm_rows"].sum()),
             )  # fmt: skip
             print(

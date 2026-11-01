@@ -199,9 +199,9 @@ def share_figure(*, grid: cons.Grid, events: list[dict]) -> None:
             counts[key] = counts.get(key, 0) + 1
     top = [k for k, _ in sorted(counts.items(), key=lambda kv: -kv[1])[:3]]
     forbidden = cons.forbidden_mask(grid=grid, events=events)
-    stamps = pl.datetime_range(
+    stamps = pl.datetime_range(  # ty: ignore[no-matching-overload]
         grid.t0,
-        grid.t0 + np.timedelta64((grid.n - 1) * 30, "m"),
+        grid.t0 + np.timedelta64((grid.n - 1) * 30, "m"),  # ty: ignore[unsupported-operator]
         interval="30m",
         time_zone="UTC",
         eager=True,
