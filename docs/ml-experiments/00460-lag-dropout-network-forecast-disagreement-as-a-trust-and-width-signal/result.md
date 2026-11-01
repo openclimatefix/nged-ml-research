@@ -66,7 +66,7 @@ decision_rule: >-
   months beside them. The Bonferroni count is 42 (7 contrasts, 2 groups, 3 row classes). The
   minimum detectable effect is read from the seed-to-seed spread of B-mix before any contrast is
   read. Leave-one-month-out and drop-largest-event intervals are given; leave-one-Primary-out is
-  infeasible (21 events at the six). Interim; no claim is made at the 99% level.
+  infeasible (21 events at the six). A candidate (rule 2) is only considered if rule 1 holds, and must also beat controls f, g, and c0 (contrasts C4 to C6 below, interval excluding zero). Rule 2 sets a non-inferiority bar; a gain of 0.03 or more against B-mix on rows with no labelled event is what would justify porting. The q99 coverage in rule 2 is on NRA-corrected actuals over all real events; metered actuals and the drop-largest-event version are secondary. The AUC is computed per seed on the real rows of all scored months pooled, averaged over the three seeds; its interval resamples months, and an event-cluster interval is reported beside it because five blocks give a coarse interval. The contrasts are C1 b minus a, C2 c minus e, C3 d minus e, C4 c minus f, C5 d minus g, C6 c minus c0, C7 g minus e. AUC tests and the later step-scan row set are not counted in the Bonferroni count. Interim; no claim is made at the 99% level.
 benchmark: >-
   B-mix, experiment 404's fixed 50/50 mixture of the A0-inj network and the frozen cross-fitted
   lagless table, recomputed for fit seeds 0 to 2 and checked against the stored seed 0 forecasts.
@@ -95,8 +95,10 @@ Planned; the write-up follows the results.
   with random lag dropout: for each training row each of the three lags is masked independently
   with probability 0.3. A masked lag has its value, age, and surprise set to 0 and its missing flag
   set to 1; the missing flag is the mask flag, so a lag that is really missing and a lag that is
-  masked look the same to the network. Retained code: experiment 404's `PlainLagMdn` and
-  `fit_arm`, with the dropout in a subclass in this folder.
+  masked look the same to the network. Experiment 404's `PlainLagMdn` and `fit_arm` are reused,
+  but its `drop_lags` cannot handle the 12 columns of S1, so a subclass in this folder has new
+  masking code (`mask_lags`). Training and the five passes call the same function, so the
+  single-lag and no-lags passes are not off-distribution.
 - **Passes.** The saved network is scored five times per row: all lags, each single lag alone
   (the other two masked), and no lags. One network, five passes per serving call.
 - **Arms.** (a) the stored S1 network; (b) the lag-dropout network with all lags; (c) arm b with
@@ -113,7 +115,16 @@ Planned; the write-up follows the results.
   non-decreasing in the bin with a running maximum. Arm d: the same four bins per group; within
   each bin, the weight on the no-lags pass from the grid 0, 0.1, ..., 1 that minimises the fitting
   rows' mean CRPS (a subsample of up to 60,000 rows per group per earlier month), made
-  non-decreasing in the bin with a running maximum. Nothing in the fit uses an event label.
+  non-decreasing in the bin with a running maximum. Nothing in the fit uses an event label. The fitting rows of each earlier month are that month's
+  own out-of-sample forecasts (made by the network trained before that month), so the fit is not
+  on rows the scoring network trained on; the earlier months cover other seasons, which limits
+  the fit for the summer month. Arm d is a density mixture (log weights shifted by log of the
+  weight, as in B-mix), and its fitting CRPS is computed on the mixture's quantiles. Control c0
+  uses the same procedure and rows as arm c with one bin, not experiment 435's table.
+- **Confounds of the spread.** Lag age grows with lead, and the no-lags pass is seen in only 2.7%
+  of training rows. The AUC is therefore also reported within each lead band (mean of the band
+  AUCs) and beside a lead-only score (the lead in hours as the signal), and the 12 to 36 hour
+  band's CRPS is reported separately.
 - **Row classes.** Experiment 404's `report.load` classes with the window flags of experiment 428:
   a harm row has its target outside every padded real event (and outside the 96 half-hours after
   one) and an observed half-hour of its three day-windows inside a padded event; rows inside real
