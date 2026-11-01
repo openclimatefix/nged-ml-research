@@ -72,7 +72,7 @@ def month_bounds() -> dict[str, tuple[int, int]]:
         d = pl.read_parquet(
             PRED / "K2-S1" / f"{m}_s0_w-1.parquet", columns=["target", "lead_hours"]
         ).filter((pl.col("lead_hours") >= LEAD[0]) & (pl.col("lead_hours") < LEAD[1]))
-        out[m] = (int(d["target"].min()), int(d["target"].max()))
+        out[m] = (int(d["target"].min()), int(d["target"].max()))  # ty: ignore[invalid-argument-type]
     return out
 
 
@@ -147,24 +147,24 @@ def figure(*, number: int, ev: dict, sites: list[str], bounds: dict[str, tuple[i
     band = base.select(
         "target", low=pl.col("q05") * 100, high=pl.col("q95") * 100, lag_real="lag_real"
     ).with_columns(day=(pl.col("target") - onset) / 48.0)
-    x_domain = [float(band["day"].min()), float(band["day"].max())]
+    x_domain = [float(band["day"].min()), float(band["day"].max())]  # ty: ignore[invalid-argument-type]
     x = alt.X(
         "day:Q",
         title="Days since the event (or step) began; shaded: the event",
         scale=alt.Scale(domain=x_domain),
     )
     shade = (
-        alt.Chart(pl.DataFrame({"a": [0.0], "b": [min(end - onset, hi - onset) / 48.0]}))
+        alt.Chart(pl.DataFrame({"a": [0.0], "b": [min(end - onset, hi - onset) / 48.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rect(color=ocf.GREY_3, opacity=0.35, clip=True)
         .encode(x="a:Q", x2="b:Q")
     )
     area = (
-        alt.Chart(band)
+        alt.Chart(band)  # ty: ignore[unresolved-attribute]
         .mark_area(color=ocf.BRAND_ORANGE, opacity=0.18)
         .encode(x=x, y=alt.Y("low:Q", title="Power (% of capacity)"), y2="high:Q")
     )
     line = (
-        alt.Chart(lines_df)
+        alt.Chart(lines_df)  # ty: ignore[unresolved-attribute]
         .mark_line(aria=False)
         .encode(
             x=x,
@@ -180,7 +180,7 @@ def figure(*, number: int, ev: dict, sites: list[str], bounds: dict[str, tuple[i
     top = (shade + area + line).properties(width=WIDTH - 110, height=190)
     flagged = band.filter(pl.col("lag_real")).with_columns(day2=pl.col("day") + 1.0 / 48.0)
     strip = (
-        alt.Chart(flagged if flagged.height else band.head(0).with_columns(day2=pl.col("day")))
+        alt.Chart(flagged if flagged.height else band.head(0).with_columns(day2=pl.col("day")))  # ty: ignore[unresolved-attribute]
         .mark_rect(color=ocf.GREY_1, clip=True)
         .encode(
             x=alt.X("day:Q", title=None, axis=None, scale=alt.Scale(domain=x_domain)),
@@ -191,7 +191,7 @@ def figure(*, number: int, ev: dict, sites: list[str], bounds: dict[str, tuple[i
     err = {}
     for a in ARMS:
         f = frames[a].filter((pl.col("target") >= onset) & (pl.col("target") <= end))
-        err[a] = float((f["q50"] - f["actual"]).abs().mean() * 100) if f.height else float("nan")
+        err[a] = float((f["q50"] - f["actual"]).abs().mean() * 100) if f.height else float("nan")  # ty: ignore[unsupported-operator]
     nonmirror = ev["source"].startswith("scan")
     title = alt.TitleParams(
         [

@@ -90,11 +90,11 @@ def main() -> None:
             layer = base.mark_line(point=True)
             if nominal is not None:
                 layer += (
-                    alt.Chart(pl.DataFrame({"y": [nominal]}))
+                    alt.Chart(pl.DataFrame({"y": [nominal]}))  # ty: ignore[unresolved-attribute]
                     .mark_rule(strokeDash=[4, 3])
                     .encode(y="y:Q")
                 )
-            panels.append(layer.properties(width=WIDTH - 110, height=140))
+            panels.append(layer.properties(width=WIDTH - 110, height=140))  # ty: ignore[unresolved-attribute]
         chart = alt.vconcat(*panels).properties(
             title=alt.TitleParams(
                 [

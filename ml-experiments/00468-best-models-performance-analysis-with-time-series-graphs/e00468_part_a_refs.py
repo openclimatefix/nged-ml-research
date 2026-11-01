@@ -90,7 +90,7 @@ def block_bootstrap(*, d: pl.DataFrame, ref: str, rng: np.random.Generator, leve
     return dict(
         reference=ref, contrast_points=float(s.sum() / n.sum()), low=float(lo), high=float(hi),
         mde_points=mde, n_rows=int(n.sum()), n_months=len(n),
-        mine_mae=float(d["mine"].mean()), ref_mae=float(d[ref].mean()),
+        mine_mae=float(d["mine"].mean()), ref_mae=float(d[ref].mean()),  # ty: ignore[invalid-argument-type]
     )  # fmt: skip
 
 
@@ -110,7 +110,7 @@ def main() -> None:
     )
     long.write_csv(OUT / "solar_error_by_lead_with_references.csv")
     chart = (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
             x=alt.X(

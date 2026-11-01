@@ -162,14 +162,14 @@ def band_chart(
         axis=alt.Axis(values=list(range(0, 24 * 15, 24)), labelExpr="datum.value / 24 + 1"),
     )
     y = alt.Y("y:Q", title="Power (MW)", scale=alt.Scale(domain=[0, cap]))
-    wide = base.mark_area(opacity=0.25, color=ocf.DATA_BLUE).encode(
+    wide = base.mark_area(opacity=0.25, color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         x=x, y=alt.Y("q05:Q", title="Power (MW)", scale=alt.Scale(domain=[0, cap])), y2="q95:Q"
     )
-    mid = base.mark_area(opacity=0.35, color=ocf.DATA_BLUE).encode(x=x, y="q25:Q", y2="q75:Q")
-    med = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.6).encode(
+    mid = base.mark_area(opacity=0.35, color=ocf.DATA_BLUE).encode(x=x, y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+    med = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.6).encode(  # ty: ignore[unresolved-attribute]
         x=x, y="q50:Q", detail="seg:N"
     )
-    act = base.mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.4).encode(
+    act = base.mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.4).encode(  # ty: ignore[unresolved-attribute]
         x=x, y="actual:Q", detail="seg:N"
     )
     del y
@@ -183,7 +183,7 @@ def run_charts(*, rows: pl.DataFrame, tech: str, arm: str) -> list[dict]:
     notes = []
     for site in SITES[tech]:
         s = rows.filter((pl.col("site") == site) & (pl.col("arm") == arm)).sort("valid")
-        cap = float(s["cap_mw"].max())
+        cap = float(s["cap_mw"].max())  # ty: ignore[invalid-argument-type]
         if tech == "wind":
             runs = (
                 s.group_by("init")
@@ -203,10 +203,10 @@ def run_charts(*, rows: pl.DataFrame, tech: str, arm: str) -> list[dict]:
                 part = s.filter(pl.col("init") == init).with_columns(
                     hours=(pl.col("lead_hours") - 24.0)
                 )
-                m = float(part["actual"].mean()) / cap
-                mae = float((part["q50"] - part["actual"]).abs().mean()) / cap * 100
+                m = float(part["actual"].mean()) / cap  # ty: ignore[invalid-argument-type]
+                mae = float((part["q50"] - part["actual"]).abs().mean()) / cap * 100  # ty: ignore[invalid-argument-type]
                 cov = float(
-                    ((part["actual"] >= part["q05"]) & (part["actual"] <= part["q95"])).mean()
+                    ((part["actual"] >= part["q05"]) & (part["actual"] <= part["q95"])).mean()  # ty: ignore[invalid-argument-type]
                 )
                 title = [
                     f"{site}: one {kind.replace('_', '-')} forecast run, 24 to 240 hours ahead.",
@@ -230,7 +230,7 @@ def run_charts(*, rows: pl.DataFrame, tech: str, arm: str) -> list[dict]:
                 .len()["len"]
                 .max()
             )
-            wk_floor = int(0.95 * full)
+            wk_floor = int(0.95 * full)  # ty: ignore[unsupported-operator]
             wk = (
                 near.with_columns(
                     week=pl.col("valid").dt.truncate("1w"), month=pl.col("valid").dt.month()
@@ -250,7 +250,7 @@ def run_charts(*, rows: pl.DataFrame, tech: str, arm: str) -> list[dict]:
                 part = part.with_columns(
                     hours=((pl.col("valid") - t0).dt.total_minutes() / 60.0)
                 ).sort("valid")
-                mae = float((part["q50"] - part["actual"]).abs().mean()) / cap * 100
+                mae = float((part["q50"] - part["actual"]).abs().mean()) / cap * 100  # ty: ignore[invalid-argument-type]
                 title = [
                     f"{site}: a {kind.replace('_', ' ')} week, day-ahead forecast (24 to 48 hours).",
                     f"Error of the median forecast {mae:.1f} points of capacity over {part.height} daylight",
@@ -303,7 +303,7 @@ def coverage_chart(*, table: pl.DataFrame, tech: str, arm: str) -> None:
     for level, tau in TAILS.items():
         d = long.filter(pl.col("level") == level)
         line = (
-            alt.Chart(d)
+            alt.Chart(d)  # ty: ignore[unresolved-attribute]
             .mark_line(point=True)
             .encode(
                 x=alt.X(
@@ -314,7 +314,7 @@ def coverage_chart(*, table: pl.DataFrame, tech: str, arm: str) -> None:
                 y=alt.Y(
                     "share:Q",
                     title=f"% above {level}" if level in UPPER else f"% at or below {level}",
-                    scale=alt.Scale(domain=[0, max(6.0, float(d["share"].max()) * 1.1)]),
+                    scale=alt.Scale(domain=[0, max(6.0, float(d["share"].max()) * 1.1)]),  # ty: ignore[invalid-argument-type]
                 ),
                 color=alt.Color(
                     "site:N",
@@ -326,7 +326,7 @@ def coverage_chart(*, table: pl.DataFrame, tech: str, arm: str) -> None:
         )
         nominal = (1 - tau) * 100 if level in UPPER else tau * 100
         rule = (
-            alt.Chart(pl.DataFrame({"y": [nominal]})).mark_rule(strokeDash=[4, 3]).encode(y="y:Q")
+            alt.Chart(pl.DataFrame({"y": [nominal]})).mark_rule(strokeDash=[4, 3]).encode(y="y:Q")  # ty: ignore[unresolved-attribute]
         )
         charts.append((line + rule).properties(width=WIDTH - 90, height=110))
     save(
@@ -356,7 +356,7 @@ def lead_chart(*, rows: pl.DataFrame, tech: str) -> None:
     )
     d.write_csv(OUT / f"error_by_lead_{tech}.csv")
     chart = (
-        alt.Chart(d)
+        alt.Chart(d)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
             x=alt.X(

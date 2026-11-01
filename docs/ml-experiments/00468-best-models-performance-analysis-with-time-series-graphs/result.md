@@ -49,51 +49,64 @@ metric: >-
 code: ml-experiments/00468-best-models-performance-analysis-with-time-series-graphs/
 verdict: partly supported
 best_arm: >-
-  Not an arm contest. Wind `member_plain` (p99.9 capacity) pools to 0.95%, 0.79%, and 0.90% of
-  actuals above q99 at Farm A, B, and C; solar `a2_member` is level with experiment 310's blend
-  (+0.23 points of capacity, interval -0.18 to +0.74).
+  Not an arm contest. Wind `member_plain` (p99.9 capacity) has 0.95%, 0.79%, and 0.90% of actuals
+  above q99 at Farm A, B, and C over the year; solar `a2_member` is level with experiment 310's
+  blend (+0.23 points of capacity, interval -0.18 to +0.74).
 headline: >-
-  Pooled over a year the wind and solar tails are close to nominal after table P, but single
-  months are not: monthly q05 shares reach 14% to 16% for wind and the share above q99 reaches 2.1%
-  to 3.1%. Demand forecasts do not react to a load shift by following the shifted power, and the
-  lagless network is as good as the lagged networks in 4 of 7 real events.
+  Over a year the wind and solar tails are close to nominal after table P, but single months miss:
+  the share below q05 reaches 10% to 16% at the wind farms in their worst month, and the share above
+  q99 reaches 2.1% to 3.1%. In 7 real demand events, S1 (a lagged forecast) was less accurate than
+  the lagless forecast in 3, and K2-S1 was more accurate in 6.
 lessons: >-
-  Report tail calibration per month and not only pooled, because the pooled share hides bad months.
-  Real events differ in size by a factor of six in error, so one pooled event mean hides them.
+  Report tail calibration month by month and not only pooled, because the pooled share hides bad
+  months. Event errors differ by a factor of six between events, so one pooled event mean hides them.
 take_home_message: >-
-  The wind and solar tails look calibrated over a whole year, but individual months miss by a
-  factor of two or three, so a service that relies on one month's tail should widen its bands.
-  In the 7 real load-shift or level-step events we could plot, the networks that read lagged power
-  were no better than the lagless network in 4, so lagged power helps in some events and hurts in
-  others. The injected-shift scenarios and the wind reference contrasts are not done yet.
+  The wind and solar forecasts keep their tails close to nominal over a year, but single months miss
+  by a factor of two or three, so a service that relies on one month's tails should widen its bands.
+  In seven real demand events, the forecast that reads lagged power (S1) was less accurate than the
+  forecast that does not in three, and the mixture K2-S1 was more accurate in six, so lagged power
+  helps in some events and hurts in others. The injected-shift scenarios and the wind reference
+  contrasts are not done yet.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
     Check tail calibration month by month for wind and solar, not only pooled over the year
-    (figures 1 and 2).
+    (wind and solar tail coverage figures).
   - >-
     Cut solar reference contrasts to the stored half-hours of experiment 310 and report the
-    minimum detectable effect beside each (solar contrast table).
+    minimum detectable effect beside each (solar contrasts bullet).
   - >-
-    Plot real demand events with the lagless forecast beside the lagged forecasts, because the
-    lagless network matched them in 4 of 7 events (figures 7 to 10).
+    Plot real demand events with the lagless forecast beside the lagged forecasts, because S1 was
+    less accurate than the lagless forecast in 3 of 7 events (Part B table).
 ---
 
-**Take-home.** Over a year the best wind and solar forecasts have tails close to the nominal
-shares, but single months miss badly, and the demand networks that read lagged power are not
-reliably better than the lagless network during real events. This page covers Part A (wind and
-solar) and the real-event half of Part B. It does not cover the injected-shift scenarios, the wind
-reference contrasts, the NRA-corrected actuals, or the surprise inputs, which are still to do.
+**Take-home.** Over a year, the wind and solar forecasts that experiment 461 selected have tails
+close to the shares expected of a perfectly calibrated forecast. Single months miss, and the demand
+forecasts that read lagged power are not reliably better than the forecast that does not during
+real events.
 
-We asked where the best wind, solar, and demand forecasters fail, by plotting stored forecasts
-against what happened. Nothing was fitted. Wind uses experiment 461's `member_plain` (capacity at
-the 99.9th percentile of earlier power) at Farm A, B, and C. Solar uses experiment 461's
-`a2_member` at the old capacity rule at Solar A and B, because experiment 461 did not adopt p99.9
-for Solar A. Demand uses experiment 454's stored S1, B-mix, K2-S1, and lagless forecasts. The
-time-series charts of Farm A to C and Solar A and B carry megawatts of metered generators and stay
-in the private store (`data/ml-experiments/00468-.../part_a/`); this page shows only charts that
-carry no generator time series.
+We asked where the selected wind, solar, and demand forecasts fail, by plotting stored forecasts
+against what happened. Nothing was fitted. Part A covers wind and solar. Part B covers Primary
+substation demand during real events, where an event is a labelled load shift or a level step found
+by a scan. The injected-shift half of Part B is not done.
+
+**Part A uses experiment 461's stored forecasts.** Wind is `member_plain`, a neural network whose
+effective capacity is the 99.9th percentile of earlier power, at the three metered wind farms Farm A,
+B, and C. Solar is `a2_member` at the two metered solar farms Solar A and B, at the old capacity rule
+(the 99th percentile of the whole power record). Experiment 461 did not adopt the new capacity rule
+for Solar A. Table P is a table of factors, one per farm, lead band, and tail level, that moves the
+tail quantiles towards or away from the median. The factors are fitted on earlier months only. The
+time-series charts of these generators carry megawatts and stay in the private store
+(`data/ml-experiments/00468-.../part_a/`). This page shows only charts without a generator time
+series.
+
+**Part B uses experiment 454's stored demand forecasts.** All four are neural networks. The lagless
+forecast does not read recent power. S1 reads three lagged power readings and their distance from the
+lagless forecast. B-mix is a fixed 50/50 mixture of a lagged forecast and a lagless forecast. K2-S1
+mixes two S1 forecasts with two lagless forecasts. Quantile names such as q99 mean the forecast
+quantile at that level; the share above q99 is the share of actuals above it, and 1% is the share a
+calibrated forecast gives.
 
 ## Part A: wind and solar
 
@@ -103,66 +116,90 @@ carry no generator time series.
 
 ![Wind error of the median forecast by lead time](figure_3_wind_error_by_lead.svg)
 
-![Solar error by lead time with the stored references](figure_4_solar_error_by_lead_with_references.svg)
+![Solar error by lead time, with experiment 310's blend, XGBoost model, climatology, and manual heuristic](figure_4_solar_error_by_lead_with_references.svg)
 
 ![Effect of table P, wind](figure_5_table_p_wind.svg)
 
 ![Effect of table P, solar](figure_6_table_p_solar.svg)
 
-- **Pooled tails (after table P).** Share above q99: Farm A 0.95%, Farm B 0.79%, Farm C 0.90%,
-  Solar A 1.69%, Solar B 1.42%. Share below q01: 0.31%, 1.41%, 0.86%, 0.65%, 1.10%.
-- **Single months miss.** The worst month's share below q05 is 14.1%, 10.3%, and 16.3% at the three
-  farms (nominal 5%), and the worst month's share above q99 is 2.6%, 2.1%, and 3.1% (nominal 1%).
-  Solar A's worst month above q99 is 12.3%. Prediction P1 (within 3 points each month) did not
-  hold; only the pooled share above q99 stayed under 1.5% at the wind farms.
-- **Error by lead.** The mean absolute error of the median forecast rises from about 9% of
-  capacity at day 1 to 17% to 21% at days 9 to 10 for wind, and from 9% to 10% to 15% for solar.
-- **Solar contrasts** (`a2_member` minus reference, points of capacity, 98.75% month-block interval,
-  Bonferroni count 4, 11 scored months, 120,249 half-hours; the minimum detectable effect is in
-  brackets): blend +0.23 (-0.18 to +0.74; 0.60); XGBoost alone -0.56 (-1.05 to -0.03; 0.69);
-  climatology -3.71 (-4.29 to -2.94; 0.92); manual heuristic -3.32 (-4.23 to -2.34; 1.27).
-  Absolute errors: `a2_member` 12.7%, blend 12.5%, XGBoost 13.3%, climatology 16.4%, manual
-  heuristic 16.1%. The `a2_member` gain over XGBoost is under the minimum detectable effect.
-- **Table P.** It cuts the share above q99 at the wind farms (Farm A 2.10% to 0.95%) and leaves
-  the score within 0.1% (see the table P figures).
-- **Worst half-hours.** The 20 worst q99 half-hours at each wind farm come from 5 to 7 different
-  months, so they are scattered, not one storm. Prediction P2 did not hold at month level; the
-  day-level check was not run. The CSVs are private.
-- **Not done:** wind reference contrasts (research defaults 1 and 2, climatology, manual
-  heuristic), because the stored wind references load through code that needs PyTorch, which this
-  CPU-only session does not install; the 14-day wind chart (experiment 429 holds one); the solar
-  q01 contrast against references; a curtailment week (no label exists for wind or solar).
+- **Pooled over the year the tails are near nominal.** After table P, the share above q99 is 0.95%
+  at Farm A, 0.79% at Farm B, 0.90% at Farm C, 1.69% at Solar A, and 1.42% at Solar B. The share
+  below q01 is 0.31%, 1.41%, 0.86%, 0.65%, and 1.10% in the same order.
+- **Single months miss.** In the worst month the share below q05 is 14.1%, 10.3%, and 16.3% at the
+  three wind farms (nominal 5%), and the share above q99 is 2.6%, 2.1%, and 3.1% (nominal 1%).
+  Solar A's worst month above q99 is 12.3%.
+- **Prediction P1 did not hold.** It said the q05 and q95 shares would sit within 3 points of
+  nominal in every month, and that the share above q99 would stay under 1.5% in every month. Only
+  the pooled share above q99 at the wind farms stayed under 1.5%.
+- **Error rises with lead time.** For wind, the mean absolute error of the median forecast rises
+  from about 9% of capacity at day 1 to 17% to 21% at days 9 to 10 at Farm A and B and to 19% at
+  Farm C. For solar, it rises from 9% to 10% at day 1 to 15% at days 9 to 10.
+- **Solar contrasts.** Each is `a2_member` minus a reference, in points of capacity (negative
+  means `a2_member` has the smaller error). The interval is a month-block bootstrap at 98.75% (a
+  Bonferroni correction for 4 contrasts) over 11 scored months and 120,249 half-hours of Solar A and
+  B together. The minimum detectable effect is in brackets. Blend +0.23 (-0.18 to +0.74; 0.60).
+  XGBoost model alone -0.56 (-1.05 to -0.03; 0.69). Climatology -3.71 (-4.29 to -2.94; 0.92).
+  Manual heuristic -3.32 (-4.23 to -2.34; 1.27). Absolute errors: `a2_member` 12.7% of capacity,
+  blend 12.5%, XGBoost 13.3%, climatology 16.4%, manual heuristic 16.1%. The gain over the XGBoost
+  model is smaller than its minimum detectable effect.
+- **Table P cuts the share above q99 at the wind farms without changing the score.** At Farm A the
+  share falls from 2.10% to 0.95%, and the score changes by under 0.1% of its value at every wind
+  farm.
+- **Prediction P2 (the worst half-hours sit in a few storm days) is not tested.** The 20 worst q99
+  half-hours at each wind farm fall in 5, 7, and 6 different months at Farm A, B, and C, and 12 of
+  Farm A's fall in two months. The stored table records months, not days, so a day-level check was
+  not run. The tables are private.
 
 ## Part B: demand in real events
 
-![D5, a labelled event with the largest error](figure_event_02_D5_111746.svg)
+![D5 (a labelled event, event 2)](figure_event_02_D5_111746.svg)
 
-![D5, a labelled event](figure_event_03_D5_107175.svg)
+![D5 (a labelled event, event 3)](figure_event_03_D5_107175.svg)
 
-![D14, a labelled event](figure_event_06_D14_114748.svg)
+![D14 (a labelled event, event 6)](figure_event_06_D14_114748.svg)
 
-![D12, an event found by the scan with no NGED label](figure_event_07_D12_109920.svg)
+![D12 (event 7, found by the scan, no NGED label)](figure_event_07_D12_109920.svg)
 
-- **Events.** 7 events whose day-ahead rows (12 to under 36 hours ahead) fit inside one stored
-  month: 6 labelled events from experiment 404 and 1 scan-found event from experiment 456 (the scan
-  found 6 more that did not fit). NGED's labels are incomplete, so a scan-found event may be a load
-  shift, a level change, or neither.
-- **Mean absolute error of the median forecast during each event** (points of capacity: lagless,
-  S1, B-mix, K2-S1): D5 3.9, 5.2, 3.7, 3.7; D5 16.0, 16.1, 15.5, 15.2; D5 5.3, 4.2, 4.8, 3.9; D14
-  24.8, 26.8, 26.3, 25.8; D16 4.0, 3.4, 3.7, 3.5; D14 13.6, 10.0, 12.6, 12.0; D12 (scan) 21.2,
-  14.7, 17.1, 15.8.
-- **Lagged against lagless.** S1's error is above the lagless error in 3 of 7 events, and K2-S1's
-  is below it in 6 of 7. Prediction P3 (lagged forecasts worse in at least half the events) did
-  not hold. Two events (D5 at 16.0 and D14 at 24.8) are large for every network, so the lags do not
-  explain them.
-- **Not done:** the NRA-corrected actual, the surprise inputs, injected shifts, and the
-  avoidable-curtailment cost. With 7 events no interval is reported; these numbers are interim and
-  unaudited.
+**Seven events fit inside one stored month.** Six are labelled events from experiment 404. One is
+a step that experiment 456's scan for level steps found and that NGED has not labelled; the scan
+found six more that did not fit. NGED's labels are incomplete, so the scan-found event may be a load
+shift, a level step, or neither. The columns of the table give the mean absolute error of the
+day-ahead median forecast (12 to under 36 hours ahead) during the event, in points of effective
+capacity. D5, D12, D14, and D16 are Primary substations.
+
+| Event | Substation | Lagless | S1 | B-mix | K2-S1 |
+|---|---|---|---|---|---|
+| 1 | D5 | 3.9 | 5.2 | 3.7 | 3.7 |
+| 2 | D5 | 16.0 | 16.1 | 15.5 | 15.2 |
+| 3 | D5 | 5.3 | 4.2 | 4.8 | 3.9 |
+| 4 | D14 | 24.8 | 26.8 | 26.3 | 25.8 |
+| 5 | D16 | 4.0 | 3.4 | 3.7 | 3.5 |
+| 6 | D14 | 13.6 | 10.0 | 12.6 | 12.0 |
+| 7 | D12 (scan) | 21.2 | 14.7 | 17.1 | 15.8 |
+
+- **S1 was less accurate than the lagless forecast in 3 of 7 events, and K2-S1 was more accurate
+  in 6 of 7.** Prediction P3 said the lagged forecasts would be worse in at least half the
+  events. That did not hold. P3 also said the lagged forecasts would follow the shifted power
+  within one day, and that the lagless forecast would stay near the pre-event level. Neither delay
+  nor pre-event level was computed, so those two parts are not tested.
+- **Two events are large for every forecast.** Events 2 and 4 have errors of 15 to 27 points for all
+  four forecasts, so the lagged power does not explain them.
+- **These numbers are interim and unaudited.** With 7 events no interval is reported.
+
+## Not done
+
+- Wind reference contrasts against research defaults 1 and 2, climatology, and the manual heuristic.
+  The stored wind references load through code that needs PyTorch, which this CPU-only session does
+  not install.
+- The 14-day wind chart. Experiment 429 holds one.
+- The solar q01 contrast, and a curtailment week (no label exists for wind or solar).
+- For demand: the normal-running-arrangement (NRA) corrected actual, the surprise inputs, the
+  injected-shift scenarios, and the avoidable-curtailment cost.
 
 ## Checks
 
-- **Median minus mean forecast:** not computed; this page scores no mean forecast.
-- **Triggers:** none fired; no control or nested arm exists. Code review (one fresh Sonnet agent)
-  found no numerical bug, and its row-selection and wording findings were applied.
+- **Median minus mean forecast:** not computed, because this page scores no mean forecast.
+- **Triggers fired:** none. No control or nested arm exists.
+- **Reviews:** one fresh Sonnet agent reviewed the code, and its findings were applied.
 - **Caveats:** NGED's event labels are incomplete, so rows with no labelled event may hold events.
   The wind rows cover true days 1 to 10 only. Solar `a2_member` is at the old capacity rule.
