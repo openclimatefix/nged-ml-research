@@ -187,8 +187,8 @@ def pool() -> None:
         rows.append(
             {
                 "arm": key[0], "group": key[1], "depth": key[2], "months": len(d),
-                "events_total": int(w.sum()), "arm_score": float(part["score"].mean()),
-                "bmix_score": float(part["ref_score"].mean()),
+                "events_total": int(w.sum()), "arm_score": float(part["score"].mean()),  # ty: ignore[invalid-argument-type]
+                "bmix_score": float(part["ref_score"].mean()),  # ty: ignore[invalid-argument-type]
                 "mean_of_months": float(d.mean()),
                 "event_weighted": float((d * w).sum() / w.sum()),
                 "low95": lo95, "high95": hi95, "low_bonf": lob, "high_bonf": hib,
