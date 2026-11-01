@@ -101,7 +101,7 @@ take_home_message: >-
 advice:
   - >-
     Clip every rescaled or widened quantile to the capacity range [0, 1] before counting coverage
-    (experiment 435's table P code does not).
+    (an earlier version of experiment 435's table P code did not, and the merged version does).
   - >-
     Keep the plain `member_plain` wind network at its experiment 429 size; the sweep found no
     better setting.
@@ -144,7 +144,8 @@ default 2.
   1.32% to 1.48% and 1.63%. q01 and q05 coverage are not harmed. Without the clip, the share
   above q99 would read 0.7% to 1.1%; observations between 1.0 and 1.09 of capacity count as covered
   by a q99
-  above 1. Experiment 435's table P code has the same missing clip.
+  above 1. An earlier version of experiment 435's table P code had the same missing clip; the merged
+  version clips, and this experiment's own copy of the table P logic (`e00450_step1.py`) clips too.
 - **Step 2, stage 1 (kept rows, true days 1 to 10; score and difference to `member_plain`,
   99.4% interval).** `member_plain` 10.533. Hidden width 32: -0.001 (-0.046 to +0.062); width 128:
   +0.034; depth 1: -0.012 (-0.046 to +0.033); depth 3: +0.061 (+0.007 to +0.112); encoder width 8:
@@ -182,8 +183,9 @@ default 2.
   before the first stage 1 fit.
 - Step 1 gives 11 scored months to resample and step 2 gives 12; the per-farm intervals include
   1.5%.
-- Table P's page (experiment 435) is not merged; this page cites its code at commit `552c3f87` and
-  this page applies the same code with the clip added.
+- Table P comes from the merged page of [experiment 435](../00435-stage-0-recalibration-table-for-
+untrusted-inputs-and-tails/result.md); this experiment re-implements the fit in `e00450_step1.py`
+from the code at commit `552c3f87` with the clip added, as the merged code does.
 - Every number is interim and unaudited; the results review has not run yet.
 
 ## Problems caused by the move
