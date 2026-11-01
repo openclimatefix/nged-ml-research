@@ -156,7 +156,7 @@ def _change_vs_p99(*, per: pl.DataFrame, sites: list[str], rule: str, sample: li
         )
         value = rows.filter(pl.col("rule") == rule)["score"].sum()
         base = rows.filter(pl.col("rule") == "p99")["score"].sum()
-        changes.append(value / base - 1.0)
+        changes.append(float(value) / float(base) - 1.0)
     return float(np.mean(changes)) * 100
 
 

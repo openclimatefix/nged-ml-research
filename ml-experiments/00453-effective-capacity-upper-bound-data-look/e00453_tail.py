@@ -40,7 +40,8 @@ def prepare(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Return one site's rows on a complete half-hourly grid (gaps become null), with `x`."""
     site = frame
     start, end = site["time"].min(), site["time"].max()
-    grid = pl.DataFrame({"time": pl.datetime_range(start, end, "30m", eager=True)})
+    times = pl.datetime_range(start, end, "30m", eager=True)  # ty: ignore[no-matching-overload]
+    grid = pl.DataFrame({"time": times})
     return grid.join(site, on="time", how="left").with_columns(
         x=pl.col("power") / pl.col("cap"), site=pl.col("site").forward_fill().backward_fill()
     )
@@ -79,7 +80,7 @@ def high_level_months(*, part: pl.DataFrame, tech: str) -> pl.DataFrame:
         .agg(pl.col("x").quantile(0.9).alias("level"), pl.len().alias("n"))
         .filter(pl.col("n") >= MIN_MONTH_ROWS)
     )
-    median = float(monthly["level"].median())
+    median = float(monthly["level"].median())  # ty: ignore[invalid-argument-type]
     return monthly.with_columns(step=pl.col("level") > median + STEP_JUMP).select(
         "month", "level", "step"
     )
