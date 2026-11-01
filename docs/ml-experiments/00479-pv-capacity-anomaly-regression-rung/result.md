@@ -72,20 +72,22 @@ best_arm: >-
   0.83 (median 0.77) at the 6 signed-MW Primaries, against the 0.85 gate; no gated cell passes at
   any Primary.
 headline: >-
-  The anomaly regression passes both placebos but recovers only 0.62 to 0.83 of an injected farm,
-  so no Primary's capacity is validated. At the 6 signed-MW Primaries its capacity agrees with
+  The anomaly regression passes the irradiance-shuffle placebo, and the profile-aware placebo at
+  6 of 6 Primaries without cloud terms but only 4 of 6 with them. It recovers only 0.62 to 0.83 of
+  an injected farm, so no Primary's capacity is validated. At the 6 signed-MW Primaries its capacity
+  agrees with
   experiment 474 within 5% at 4 of 6 and differs by 12% and 16% at the other 2.
 take_home_message: >-
-  Using only day-to-day weather within a month gives a solar capacity estimate that cannot be
-  fooled by season, and the estimate lands close to the earlier method's at most Primaries with a
-  signed reading. It still finds only about two thirds to four fifths of a solar farm we added
-  as a test, so it cannot validate any Primary's capacity, and the earlier estimates stay
-  unvalidated. A load that follows the clouds fakes 0.2 to 0.3 of a 2 MW farm unless the cloud
-  terms are fitted.
+  An estimate of solar capacity built only from day-to-day weather within a month cannot be fooled
+  by the season, and it lands close to experiment 474's estimate at most Primaries with a signed
+  reading. It still finds only 0.62 to 0.83 of a solar farm we added as a test, so it cannot
+  validate any Primary's capacity, and experiment 474's estimates stay unvalidated. A load that
+  follows the clouds produces a spurious capacity of 0.2 to 0.3 of a 2 MW farm, unless the
+  estimate also fits two cloud-response columns.
 lessons: >-
-  A placebo that passes by construction says nothing about whether the signal survived the mean
-  removal, and here the known answer shows that about a quarter to a third of it did not. Fitting
-  the two cloud terms removes the cloud-following load and costs recovery in every world.
+  A placebo that passes by construction cannot show whether the mean removal erased the signal.
+  The known answer shows that about a quarter to a third of the signal was erased. Fitting the two
+  cloud terms removes the spurious cloud-following capacity but lowers recovery in every world.
 production_status: not-for-production
 adopted_in: none
 advice:
@@ -96,39 +98,51 @@ advice:
     Fit the cloud terms whenever the estimator sees a load that follows the clouds, because
     without them 0.2 to 0.3 of a 2 MW farm appears from the load alone (figure 3).
   - >-
-    Use a placebo that keeps the profile and breaks the day-to-day link only together with the
-    known answer, because the anomaly regression passes the placebo by construction (figure 2).
+    Always run the known-answer injection beside the placebos, because the irradiance-shuffle
+    placebo passes by construction and the profile-aware placebo can pass trivially once the group
+    means remove the profile (figure 2).
   - >-
     Treat the MVA-only capacities at D3 and D8 as unresolved: the two methods differ by 1.3 MW and
     5.4 MW (figure 4).
 ---
 
-# PV capacity: an anomaly-regression rung on experiment 474's ladder
+# PV capacity: a new solar-capacity estimator compared with experiment 474's
 
-**Take-home message: a capacity estimate built only from day-to-day weather within a month passes
-its placebos but is biased low, so it validates nothing.** The anomaly regression removes the mean
-of each calendar year-month, hour of day, and weekday class from the reading and from the physics
-solar shape, so the season and the time of day cannot fake a capacity. At the 6 signed-MW
-Primaries it recovers 0.62 to 0.72 of a metered solar farm that we injected as a test (0.73 to
-0.83 with the two cloud terms), against a gate of 0.85. No gated cell passes at any Primary. The
-estimates still land close to experiment 474's at 4 of the 6 signed-MW Primaries, which is some
-independent support for those numbers. The estimator fails badly at D12 (reverse flow gives a
-negative capacity), and it disagrees with experiment 474 by 1.3 MW at D3 and 5.4 MW at D8.
+**Take-home message: an estimate of solar capacity built only from day-to-day weather within a
+month cannot be fooled by season, but it finds only 0.62 to 0.83 of a solar farm we added as a test,
+so it validates no Primary's capacity.** The estimator (the anomaly regression) removes from the
+reading and from the physics solar shape the mean of the same calendar year-month, hour of day,
+and weekday class. A placebo is a deliberately wrong input that the estimate should not respond
+to, and this estimator passes the irradiance-shuffle placebo by construction. At the 6 Primaries
+whose reading is signed megawatts (signed-MW Primaries), it recovers 0.62 to 0.72 of the injected
+farm (0.73 to 0.83 with two cloud terms), against a gate of 0.85, and no Primary passes in any
+gated combination of world and estimator variant. Its capacities land within 5% of experiment
+474's at 4 of the 6 signed-MW Primaries. The two methods use the same readings and the same
+physics solar shape, so this agreement is weak support. The estimator gives a negative capacity at
+D12 (reverse flow), and it differs from experiment 474 by 1.3 MW at D3 and 5.4 MW at D8.
 
-The question was whether a placebo-robust construction could validate the capacities that
-experiment 477's placebo gate rejected. The placebo passes by construction, so it cannot say
-whether the means removed the signal as well. The known answer says they did: the injected farm is
-recovered at about 0.67 without the cloud terms. The result narrows the search for a validated
-capacity to methods that keep more of the signal than a group-mean anomaly does, or that correct
-for the recovery measured here.
+The question was whether an estimate that the season and time of day cannot fake could validate
+the capacities that experiment 477's placebo gate rejected. The known-answer test shows that
+passing the placebo is not enough: the injected farm is recovered at about 0.67 without the cloud
+terms, so the mean removal erased about a third of the signal. One way to try next is a method
+that keeps more of the signal than a group-mean anomaly does, or that corrects for the recovery
+measured here.
 
 ## Figures
 
+*Figure 1. Recovery of an injected farm by Primary, world, and estimator variant.*
+
 ![Recovery of an injected farm](figure_01_recovery.svg)
+
+*Figure 2. The 95th percentile of both placebos by Primary.*
 
 ![Both placebos](figure_02_placebos.svg)
 
+*Figure 3. Capacity found when only a cloud-following load is added.*
+
 ![Cloud-following load with no farm](figure_03_cloud_load_without_farm.svg)
+
+*Figure 4. Capacity at each Primary against experiment 474's.*
 
 ![Capacity against experiment 474](figure_04_capacity.svg)
 
@@ -142,13 +156,17 @@ for the recovery measured here.
 - **Row set.** Experiment 474's: default rows with a finite reading and CAMS shape before
   2026-07-01; D18 from 2025-03-01 only; D15 not run (generator case). The injection test used
   Solar A, B, C, D, and F at D5, D9, D10, D11, D14, and D16, with the rows each farm has.
-- **Recovery (easy world, 2 MW and 4 MW alike).** Without cloud terms 0.62 to 0.72 (median 0.67).
-  With cloud terms 0.73 to 0.83 (median 0.77). The gate is 0.85, so no Primary passes in the easy
-  world. Experiment 474's rungs recovered 0.75 to 0.94 without cloud terms.
+- **Recovery (easy world: no load follows the clouds).** The median over five farms is 0.62 to 0.72
+  per Primary without cloud terms (median 0.67) and 0.73 to 0.83 with them (median 0.77). The gate
+  is 0.85, so no Primary passes. The 2 MW and 4 MW injections give identical recovery, because the
+  fit is linear, so the 4 MW injection adds no information. Experiment 474's rungs recovered 0.75 to
+  0.94 without cloud terms. The cloud terms raise recovery in the easy world and lower it in both
+  cloud-load worlds.
 - **Cloud-following load, linear form.** Without cloud terms recovery rises to 0.84 to 0.92,
   because the load adds about 0.2 of spurious capacity (figure 3) on top of the shortfall. With
   cloud terms 0.73 to 0.83. The widened 80% interval covers the injected capacity in 0% to 60% of
-  injections without cloud terms, and 0% with them. No cell passes the 70% coverage gate.
+  the injections (one injection is one farm at one size at one Primary) without cloud terms, and 0%
+  with them. No cell passes the 70% coverage gate.
 - **Cloud-following load, squared form (report only).** Without cloud terms recovery is 0.94 to
   1.01 and the interval covers in 60% to 100% of injections. This coverage comes from the
   spurious load (0.29 to 0.31 of a 2 MW farm, figure 3) cancelling the shortfall, not from a sound
@@ -157,7 +175,8 @@ for the recovery measured here.
   2 MW farm and the squared load 0.29 to 0.31. With cloud terms the linear load invents 0.000006
   (the terms match its form exactly, so this figure is optimistic) and the squared load -0.03.
 - **Profile-aware placebo (a), 95th percentile over 20 shuffles and 5 farms.** 0.09 to 0.12
-  without cloud terms (passes at 6 of 6). With cloud terms 0.187 to 0.206 (passes at 4 of 6; D5
+  without cloud terms (passes at 6 of the 6 signed-MW Primaries). With cloud terms 0.187 to 0.206
+  (passes at 4 of the 6; D5
   and D16 exceed 0.20). Experiment 474's rungs reached 0.25 to 0.51.
 - **Irradiance-shuffle placebo (b), share of the real capacity.** 95th percentile 0.06 to 0.10
   without cloud terms and 0.08 to 0.12 with them. This placebo passes by construction.
@@ -167,45 +186,46 @@ for the recovery measured here.
 - **Capacity at the 6 signed-MW Primaries, July 2025 to June 2026, with cloud terms** (AC, MW,
   median; experiment 474 in brackets): D5 3.2 (3.1), D9 2.2 (2.2), D10 2.5 (2.9), D11 3.2 (3.2),
   D14 3.7 (3.7), D16 3.6 (3.1). The recovery of 0.73 to 0.83 suggests the true capacity is higher.
-  No bias correction is applied. The full table, with DC capacity at 1.25 (1.1 and 1.5 are a
-  rescaling of the AC capacity), is in [nged_table.md](nged_table.md).
+  No bias correction is applied. The full table, with DC capacity at an assumed DC-to-AC ratio of
+  1.25 (the AC capacity times 1.25; other ratios rescale it the same way), is in [nged_table.md](nged_table.md).
 - **8 MVA-only Primaries.** The estimates are fitted to apparent power with reactive power assumed
   zero, which experiment 366 found fails at a power factor of 0.97. D2 7.0 (6.9), D3 2.9 (4.2),
   D4 1.1 (0.8), D8 3.2 (8.6), D19 1.7 (1.8), D21 1.5 (2.0), D22 1.7 (1.5); D12 is -3.0 (reverse
   flow; the estimate is not a capacity). D18 (report-only, history from 2025-03-01) is 2.0 (1.8).
   None is validated.
-- **Signal share and detectability (stage 0).** About 0.24 of the shape's variance survives the
-  mean removal (0.21 at D18). The bootstrap standard deviation of the capacity at the 6 signed-MW
-  Primaries is 0.05 to 0.10 MW, comparable to the stage 0 ordinary-least-squares standard errors
-  (0.02 to 0.05 MW), so the indicative minimum detectable capacity of 0.05 to 0.35 MW was about
-  right. The binding limit is the bias, not the noise.
-- **Capacity-rises prior.** Clipping at zero and taking the running maximum changes the
-  read-out season-year little: D10's median goes from 2.41 to 2.41 MW in the latest year and
-  1.95 to 2.01 MW in 2024. Both versions are in `work/real_<site>.parquet`.
-- **Tails.** The 5th and 95th percentiles of the bootstrap are in `work/capacity_table.parquet`.
-  No forecast is scored, so tail calibration, the avoidable-curtailment cost, the equal-rows
-  check, and the forecast-use step do not apply.
-- **Rows with no labelled event.** NGED's event labels are incomplete, so the readings may hold
-  unlabelled events.
-- **Weather source.** CAMS irradiance and ERA5 temperature, both past-weather estimates. This
-  rung estimates capacity from history, so no forecast-time availability is needed.
-- **Anonymisation.** Solar A to F by letter; no pairing with a Primary is named.
-- **Checks.** No forecast is scored, so the median-minus-mean and mean-forecast-error checks do
-  not apply. Triggers fired: none that apply to a capacity estimate.
+- **Signal share and detectability (stage 0).** About 0.24 of the shape's variance survives the mean
+  removal (0.21 at D18). At the 6 signed-MW Primaries the indicative minimum detectable capacity
+  from the ordinary-least-squares error is 0.08 to 0.19 MW (0.09 to 0.22 MW with cloud terms), and
+  0.05 to 0.35 MW across all 14 Primaries without them. The bootstrap standard deviation of the
+  capacity at the 6 signed-MW Primaries is 0.05 to 0.10 MW without cloud terms, which is 2 to 5
+  times the ordinary-least-squares error, so the stage 0 figure understates the noise by that
+  factor. The bias in recovery is larger than either.
+- **Capacity-rises prior.** Clipping at zero and taking the running maximum over season-years
+  changes the latest season-year's median by at most 0.011 MW at the 6 signed-MW Primaries. At D3
+  and D4 it changes by 0.03 to 0.06 MW, and at D12 it replaces the negative capacity with zero. At
+  D10 without cloud terms, season-year 2024 moves from 1.95 to 2.01 MW. Both versions are in
+  `work/real_<site>.parquet`.
+- **Not applicable.** No forecast is scored, so tail calibration, the avoidable-curtailment cost,
+  the equal-rows check, and the forecast-use step do not apply. The 5th and 95th percentiles of the
+  bootstrap capacity are in `work/capacity_table.parquet`. The weather inputs are CAMS irradiance
+  and ERA5 temperature, both estimates of past weather. Solar A to F are named by letter only, and
+  no farm is paired with a Primary.
 
 ## Deviations and caveats
 
-- Prediction 4 (recovery 0.75 to 0.95 without cloud terms in the easy world) failed: the range was
-  0.62 to 0.72.
-- The cloud terms match experiment 129's linear load exactly, so the linear cloud-load result with
-  cloud terms is optimistic.
-- The group mean uses calendar year-month in local time; a first draft used the UTC month and the
-  code review caught the edge case before any scored run.
-- The minimum number of rows for a season-year's capacity column is 4,000 half-hours in at least 3
-  months (the code review of the first draft found 2,000 too lax; the smoke run used 2,000).
-- Compute: CPU only, 4 processes, about 3 minutes in total.
-- Problems caused by the move: the 474 modules import `torch`, so the worktree needs
-  `uv sync --all-packages --group gpu`.
+- **Failed predictions.** Prediction 3 failed with cloud terms at D5 and D16 (placebo 0.205 and
+  0.206). Prediction 4 failed: easy-world recovery was 0.62 to 0.72. Prediction 5 failed: coverage
+  with cloud terms was 0%.
+- **Optimistic cloud-load result.** The cloud terms match experiment 129's linear load exactly, so
+  the linear cloud-load result with cloud terms is optimistic.
+- **Unresolved MVA-only Primaries.** D3 and D8 show the largest gaps from experiment 474 (1.3 MW
+  and 5.4 MW). D4, D21, and D22 differ by 15% to 45%, and the two methods leave all five unresolved.
+- **Definitions.** The group mean is the mean of the same calendar year-month in local time, the
+  same local hour of day, and the same weekday class. A season-year gets its own capacity column
+  with 4,000 half-hours in at least 3 months.
+- **Labels.** NGED's event labels are incomplete, so the readings may hold unlabelled events.
+- **Compute.** CPU only, 4 processes, about 3 minutes. Running the scripts needs
+  `uv sync --all-packages --group gpu`, because experiment 474's modules import `torch`.
 
 ## Pre-registered plan
 
