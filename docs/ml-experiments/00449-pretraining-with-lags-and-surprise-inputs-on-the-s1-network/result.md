@@ -82,22 +82,25 @@ best_arm: >-
   PT1-pool5, a five-seed pool of S1 pretrained on ERA5 and CAMS rows that carry real origin lags and
   the cross-fitted surprise: CRPS 2.740 at the signed-MW six and 3.416 at the MVA-only eight (days 1
   to 10, four screen folds, the 579,044 half-hours that every arm and reference shares, 1.15
-  widening), against 2.857 and 3.556 for one fit of S1. It is not the best pretrained demand
+  widening), against 2.857 and 3.556 for one fit of S1. PT1-pool5 is not the best pretrained demand
   network: experiment 425's arm A averaged over five seeds scores 2.763 and 3.373 and is ahead over
   all 16 Primaries.
 headline: >-
   Pretraining with real lags and the cross-fitted surprise reversed experiment 448's loss: PT1 beat
   S1 by 0.082 points at the signed-MW six and 0.068 at the MVA-only eight, and beat the masked-lag
-  pretraining by 0.129 and 0.110. The gain at the six rests on one fold: without 2026-01 it is
-  0.036, below the minimum detectable effect of 0.065. Experiment 425's arm A, averaged over five
-  seeds, is ahead of PT1-pool5 at the eight (0.043), at D15 and D18 (0.58), and over all 16
-  Primaries (0.078, Bonferroni interval above zero), and level at the six. PT1-pool5 is ahead of BG2
+  pretraining by 0.129 and 0.110. Most of the gain at the six comes from one fold: without 2026-01
+  it falls from 0.082 to 0.036, below the minimum detectable effect of 0.065. Experiment 425's arm
+  A, averaged over five
+  seeds, is ahead of PT1-pool5 at D15 and D18 (0.58) and over all 16 Primaries (0.078, Bonferroni
+  interval above zero), 0.043 ahead at the eight (interval spans zero), and 0.023 behind it at the
+  six (interval spans zero, all from 2026-01). PT1-pool5 is ahead of BG2
   at the six and the eight, ties it over all 16 Primaries, and is behind it at D15 and D18 (by about
   1.2 points) and on cold winter nights at the six. The evidence does not support PT1-pool5 as the
   first-release demand candidate.
 lessons: >-
   Showing live lags to the pretraining stage removed the harm of experiment 448 (PT1 against PT0
-  -0.129 and -0.110). Showing the surprise inputs added 0.042 at the six (PT1 against PT1b) and
+  -0.129 and -0.110). Showing the surprise inputs lowered CRPS by 0.042 at the six (PT1 against
+  PT1b) and
   0.016 at the eight (interval spans zero). Token dropout on the lags (PT2) was slightly worse at
   the six and slightly better at the eight, and the full fine-tuning learning rate (PT1-full) was
   slightly worse at the six; the effects are small but their Bonferroni intervals exclude zero.
@@ -105,20 +108,18 @@ lessons: >-
   PT2 pretraining runs stopped at the 60-epoch cap, so pretraining may be too short.
 take_home_message: >-
   Pretraining the S1 network on past-weather estimates helps once the pretraining rows carry real
-  recent-power inputs: it scores 0.08 points better than S1 at the signed-MW six and 0.07 at the
-  MVA-only eight, and 0.13 and 0.11 better than the earlier masked pretraining. The gain at the six
-  comes from one test month, and experiment 425's simpler recipe (no surprise inputs, five seeds
-  averaged) is ahead of the pooled network at the eight, at the hardest substations (D15 and D18),
-  and over all 16 Primaries. BG2 is still ahead at D15 and D18 and on cold winter nights at the six.
+  recent-power inputs: the S1 neural network pretrained this way scores 0.08 points better than S1
+  at the signed-MW six and 0.07 at the
+  MVA-only eight, and 0.13 and 0.11 better than the earlier masked pretraining. Most of the gain at the six comes from one test month, and experiment 425's simpler recipe (no surprise inputs, five seeds averaged) is ahead of the pooled network at the hardest substations (D15 and D18) and over all 16 Primaries. BG2 is still ahead at D15 and D18 and on cold winter nights at the six.
   All numbers are interim, from four test months.
 advice:
   - >-
-    Pretrain demand networks on ERA5 and CAMS rows that carry real origin lags. Masking the lags
-    in pretraining cost 0.13 and 0.11 points against live lags (C4).
+    Pretrain demand networks on ERA5 and CAMS rows that carry real origin lags. Masking the lags in
+    pretraining worsened CRPS by 0.13 and 0.11 points against live lags (C4).
   - >-
-    Do not add the surprise inputs to pretraining for the first release: they add 0.042 at the six
-    and 0.016 at the eight (C8), and experiment 425's arm A, which has none, is ahead of
-    PT1-pool5 over all 16 Primaries.
+    The surprise inputs lowered CRPS by 0.042 at the six and 0.016 at the eight (C8), but they are
+    not shown to be necessary: experiment 425's arm A, which has none, is ahead of PT1-pool5 over
+    all 16 Primaries, although the two recipes differ in more than the surprise inputs.
   - >-
     Do not adopt PT1-pool5 as the first-release demand candidate. The candidates the evidence
     supports are 425's arm A, its pool of five, and S1. A first-release choice also needs the
@@ -145,8 +146,10 @@ unless a row says "real rows" (83,458 at D15 and D18). D15 and D18 are headlined
 injected-row figure follows, labelled.
 
 **The minimum detectable effect is 0.065 points at the six, 0.080 at the eight, and 0.98 (injected
-rows) to 1.18 (real rows) at D15 and D18.** It comes from the seed spread of S1, for two single-seed
-arms. For a pool against a pool or a fixed reference it is a loose upper bound. The Bonferroni
+rows) to 1.18 (real rows) at D15 and D18.** The minimum detectable effect comes from the seed spread
+of S1, for two single-seed
+arms. For a pool against a pool or a fixed reference the minimum detectable effect is a loose upper
+bound. The Bonferroni
 intervals count 26 tests (13 contrasts at the six and the eight); D15 and D18 are outside that
 count.
 
@@ -168,15 +171,16 @@ count.
 
 Days 1 to 10 CRPS in points of effective capacity, 1.15 widening. The 425 arm A row averages the
 quantiles of five seeds and used experiment 397's fit loop; PT1-pool5 mixes the distributions of
-five seeds. The two differ in more than the surprise inputs.
+five seeds. The two recipes differ in more than the surprise inputs.
 
 **Contrasts (injected-world clean rows, month-block bootstrap, 95% interval, Bonferroni interval in
 brackets):**
 
 - **C1 PT1 minus S1.** Six -0.082 (-0.108 to -0.057; -0.124 to -0.044). Eight -0.068 (-0.103 to
   -0.035; -0.124 to -0.018). D15 and D18 on real rows -0.044 (Bonferroni -0.191 to +0.113; by fold
-  +0.917, +0.082, -0.158, -0.264). On 9,567 injected rows D15 and D18 is -0.169 (-0.357 to +0.029).
-  Both D15 and D18 figures are far below the minimum detectable effect of about 1.0.
+  +0.917, +0.082, -0.158, -0.264). On 9,567 injected rows D15 and D18 is -0.169 (95% -0.287 to
+  -0.047; Bonferroni -0.357 to +0.029). Both D15 and D18 figures are far smaller in magnitude than
+  the minimum detectable effect of about 1.0.
 - **C4 PT1 minus PT0.** Six -0.129, eight -0.110, D15 and D18 on real rows -0.742. Every Bonferroni
   interval lies wholly below zero.
 - **C6 PT0 minus S1.** Six +0.048 and eight +0.042, which reproduces experiment 448's loss. The
@@ -184,13 +188,16 @@ brackets):**
   result is not stored, so this page does not claim it.
 - **C8 PT1 minus PT1b.** Six -0.042 (-0.063 to -0.022 Bonferroni), eight -0.016 (interval spans
   zero).
-- **C3 PT2 minus S1.** Six -0.057, eight -0.086.
+- **C3 PT2 minus S1.** Six -0.057, eight -0.086, D15 and D18 on real rows +0.102 (Bonferroni -0.047
+  to +0.280).
 - **C5 PT2 minus PT1.** Six +0.025 (Bonferroni +0.009 to +0.041) and eight -0.018 (-0.030 to
-  -0.005): PT2 is slightly worse at the six and slightly better at the eight.
+  -0.005), D15 and D18 on real rows +0.146 (-0.035 to +0.321): PT2 is slightly worse at the six and
+  slightly better at the eight.
 - **C9 PT1-full minus PT1.** Six +0.011 (Bonferroni +0.003 to +0.019), eight +0.001, D15 and D18 on
   real rows +0.113 (+0.061 to +0.170): the full learning rate is slightly worse.
-- **P1 PT1-pool5 minus S1-pool5.** Six -0.058, eight -0.058, D15 and D18 -0.210 injected rows
-  (-0.052 on real rows). **P3 PT1-pool5 minus PT1.** Six -0.035, eight -0.037.
+- **Pool contrast 1, PT1-pool5 minus S1-pool5.** Six -0.058, eight -0.058, D15 and D18 -0.052 on
+  real rows (-0.210 on injected rows). **Pool contrast 3, PT1-pool5 minus PT1.** Six -0.035, eight
+  -0.037.
 
 **By fold at the six, the gain of PT1 over S1 is -0.281 in 2026-01 and -0.004, -0.047, and -0.047 in
 the other three folds.** Leaving 2026-01 out, the four-fold gain is -0.036, below the minimum
@@ -224,62 +231,83 @@ six, the eight, D15 and D18, and all 16 Primaries:**
   (-0.082 to +0.131). On five folds the six is -0.118 (-0.206 to -0.027) and all 16 Primaries tie.
   BG2 leads on cold winter nights at the six by 0.10 to 0.13 (interval spans zero).
 - **Monthly XGBoost (1.15 widening).** -0.286, -0.204, +0.013 (-0.376 to +0.360), -0.210.
-- **Experiment 448's S1PT-pool5.** -0.122, -0.129, -0.957, -0.216. `manual_heuristic` and
-  `climatology` are beaten everywhere by 0.8 to 14 points.
+- **Experiment 448's S1PT-pool5.** -0.121, -0.129, -0.957, -0.216. `manual_heuristic` and
+  `climatology` are beaten everywhere by 0.76 to 14 points.
 
-**Avoidable-curtailment cost favours BG2 at the scaled limit f = 0.9 and the PT arms at the lower
-limits.** Over the four folds, signed-MW six, lead 12 to 36 hours, in millions of pounds, with no
-interval:
+**Avoidable-curtailment cost: no candidate wins at every limit, so the maintainer must choose the
+threshold f.** The table gives the cost over the four folds, signed-MW six, lead 12 to 36 hours, in
+millions of pounds, with a 95% interval from resampling the 24 cells (6 series by 4 test months)
+with replacement 20,000 times. Each cost is the energy-proxy cost of the forecast minus that of a
+perfect forecast on the same half-hours. The intervals on totals are wide because a few cells
+dominate; the paired differences below are narrower.
 
 | Arm | f = 0.9 | f = 0.75 | f = 0.5 |
 |---|---|---|---|
-| BG2 | 1.281 | 6.398 | 19.314 |
-| PT1 | 1.327 | 4.817 | 16.466 |
-| PT1-pool5 | 1.345 | 4.856 | 16.316 |
-| 425 arm A, five seeds | 1.698 | 5.814 | 17.376 |
-| S1 | 1.763 | 6.272 | 18.975 |
-| S1-pool5 | 1.764 | 5.818 | 18.009 |
-| `manual_heuristic` | 1.827 | 10.277 | 29.915 |
+| BG2 | 1.28 (0.09 to 3.47) | 6.40 (2.21 to 12.35) | 19.31 (13.46 to 26.19) |
+| PT1 | 1.33 (0.07 to 3.69) | 4.82 (1.77 to 9.48) | 16.47 (11.33 to 22.93) |
+| PT1-pool5 | 1.35 (0.08 to 3.73) | 4.86 (1.79 to 9.55) | 16.32 (11.29 to 22.52) |
+| 425 arm A, five seeds | 1.70 (0.08 to 4.74) | 5.81 (1.63 to 12.55) | 17.38 (10.97 to 26.26) |
+| S1 | 1.76 (0.07 to 5.02) | 6.27 (1.87 to 13.52) | 18.98 (11.92 to 29.32) |
+| S1-pool5 | 1.76 (0.07 to 5.01) | 5.82 (1.86 to 12.23) | 18.01 (11.67 to 26.87) |
+| `manual_heuristic` | 1.83 (0.14 to 4.97) | 10.28 (3.35 to 20.77) | 29.92 (19.12 to 44.80) |
 
-**Tails and calibration.** On clean rows q95 and q99 pinball loss of PT1 is at or below S1's at the
+- **PT1-pool5 minus BG2.** +0.07 at f = 0.9 (-0.11 to +0.33), -1.54 at f = 0.75 (-3.26 to -0.29),
+  and -3.00 at f = 0.5 (-4.52 to -1.75). PT1-pool5 is cheaper than BG2 at the two lower limits and
+  level at f = 0.9.
+- **PT1-pool5 minus 425 arm A.** -0.35 (-1.02 to +0.00), -0.96 (-3.08 to +0.30), and -1.06 (-4.04 to
+  +0.78): not separable.
+- **425 arm A minus S1.** -0.07 (-0.36 to +0.13), -0.46 (-1.19 to +0.17), and -1.60 (-3.37 to
+  -0.09).
+- **BG2 against 425 arm A and S1.** BG2 is cheaper at f = 0.9 (S1 minus BG2 +0.48, interval -0.15 to
+  +1.64; 425 arm A minus BG2 +0.42, -0.02 to +1.28), and dearer at f = 0.5 (S1 minus BG2 -0.34, 425
+  arm A minus BG2 -1.94), with every one of those intervals spanning zero.
+
+**PT1 has lower q95 and q99 pinball loss than S1 at the six, and the lower tail is over-wide for
+every S1-family arm.** On clean rows q95 and q99 pinball loss of PT1 is at or below S1's at the
 six (0.676 and 0.184 against 0.718 and 0.191). The lower tail is over-wide for every S1-family arm
 (q05 coverage 0.010 to 0.013 at the six, against 0.05 nominal). At D15 and D18 PT1b has a poor q95
-pinball loss (2.739 against 2.261 for S1) and is the one arm to avoid there.
+pinball loss (2.739 against 2.261 for S1) and is the one pretrained arm to avoid there.
 
-**Raw forecasts and the widening sweep.** PT1 minus S1 at the six is -0.089 raw, -0.086 at 1.05,
--0.084 at 1.10, and -0.082 at 1.15. The pool contrast P1 is -0.062, -0.061, -0.059, and -0.058. The
+**Raw forecasts, and widening of 1.05 and 1.10, leave the contrasts unchanged.** PT1 minus S1 at the
+six is -0.089 raw, -0.086 at 1.05,
+-0.084 at 1.10, and -0.082 at 1.15. The pool contrast 1 is -0.062, -0.061, -0.059, and -0.058. The
 1.15 widening is slightly too wide for a pool: PT1-pool5 at the six scores 2.8096 raw, 2.8052 at
 1.05 and at 1.10, and 2.8090 at 1.15, and at D15 and D18 7.753 raw against 7.840 at 1.15.
 
 **The advance rule is met by PT1 against S1 on injected rows.** Point gain at least 0.03 with the
 interval wholly below zero (six and eight), negative in at least 3 of 4 folds, the other group not
-above +0.02, and the tails within +0.02. The rule does not compare with 425's arm A, and that
-comparison is where the evidence is weakest. PT1 was chosen as the best arm for the pool by a near
+above +0.02, and the clean-row tails within +0.02 at the six and the eight (D15 and D18 q99 is
++0.030). The rule does not compare with 425's arm A, and the comparison with 425's arm A is where
+the evidence is weakest. PT1 was chosen as the best arm for the pool by a near
 tie (mean gain 0.075 against 0.072 for PT2 on injected rows). The encroachment sweep of experiment
 392, required of an advancing arm, has not been run.
 
 ### What the evidence supports
 
-- **Supported.** Live lags in pretraining reverse experiment 448's harm. PT1 beats S1 on four folds
-  at the six and the eight. PT1-pool5 beats BG2 at the six and the eight on four and five folds.
+- **Supported.** Live lags in pretraining reverse experiment 448's harm. PT1 beats S1 on 3 of 4
+  folds at the eight and on 4 of 4 (injected rows) or 3 of 4 (real rows) at the six. PT1-pool5 beats
+  BG2 at the six and the eight on four and five folds.
 - **Not supported.** PT1-pool5 as the first-release demand candidate, because 425's arm A is ahead
   over all 16 Primaries. Any claim at D15 and D18, where BG2 leads PT1-pool5 by about 1.2 points.
   Any claim on cold winter nights at the six, where BG2 leads by 0.10 to 0.13. A tie with BG2 over
   all 16 Primaries is all that is shown (+0.022 on four folds, -0.020 on five).
-- **Production cost.** Serving a pool of five needs 5 networks, 5 forward passes, and five
+- **Production cost.** Serving a pool of five needs five networks, five forward passes, and five
   ensemble-weather lagless modules (experiment 404's further module, one per seed), because each
   member reads its own seed's table. The ERA5 lagless modules are used in training only. A monthly
-  refit needs about 75 fits against 8 for S1: 5 ERA5 tables of 6 modules (30), 5 ensemble tables of
-  6 cross-fit modules plus 1 further module (35), 5 pretraining runs of 60 epochs on about 7.4
-  million rows, and 5 fine-tunes. Sharing one lagless table across the members is untested. Training
+  refit needs about 75 fits against eight for S1: 5 ERA5 tables of 6 modules (30), 5 ensemble tables
+  of
+  6 cross-fit modules plus 1 further module (35), five pretraining runs of 60 epochs on about 7.4
+  million rows, and five fine-tunes. Sharing one lagless table across the members is untested.
+  Training
   also needs an ERA5 and CAMS feed.
 
 ### Checks
 
 - **Mean-forecast checks.** Median minus mean, mean bias, and mean absolute error per group are in
-  `figure_tables/mean_forecast_checks.csv`. They rank the arms as CRPS does (PT1 4.923 against S1
+  `figure_tables/mean_forecast_checks.csv`. They rank the arms as CRPS does at the six and the eight
+  (PT1 4.923 against S1
   5.072 at the six; PT1-pool5 4.931 against S1-pool5 5.056). Every arm under-forecasts the mean:
-  about -1.7 points at the six and -8.0 to -9.6 at D15 and D18. No audit trigger 3 signal. The
+  about -1.7 points at the six and -8.0 to -11.2 at D15 and D18. No audit trigger 3 signal. The
   checks omit 425's arm A and BG2.
 - **Pretraining length.** All 55 PT1, PT1b, and PT2 pretraining runs stopped at the 60-epoch cap, so
   pretraining may be too short.
@@ -305,16 +333,15 @@ shorter ensemble history could not recover it.
 
 ## Context
 
-- **Merged since the brief was written (2026-11-01).** Experiments 440, 446, and 447 (the
-  hyperparameter sweep) are merged. None changes the S1 recipe this plan uses. Experiment 447's
-  width-256 finding is interim and unaudited, so the S1 reference keeps hidden width 64.
+- **S1 recipe.** Experiment 447's width-256 finding is interim and unaudited, so the S1 reference
+  keeps hidden width 64.
 - **Reused stored forecasts.** Only seeds 0 to 2 of S1 and PT0 are used (both are stored to seed 4);
   the minimum detectable effect comes from S1's seeds, so the PT arms' own seed spread is read from
   the result. S1 seeds 0 to 2 (experiment 428) and PT0, which is experiment 448's
   S1PT (stored networks and forecasts in experiment 448's private folder). Their rows are the same
-  four folds, worlds, and row set, so no S1 or PT0 network is refitted. One PT0 fold-seed is
-  refitted
-  as a reproduction check, and its validation loss must equal the stored value.
+  four folds, worlds, and row set, so no S1 network is refitted and PT0 is refitted for 2025-12
+  only. The reproduction check (a refit of one PT0 fold and seed with a validation loss equal to the
+  stored value) was run only for 2025-12, and its result is not stored.
 - **Experiment 425 pretrained with real lags (Opus audit of experiment 448).** Experiment 425's
   pretraining rows carried real lagged power, so its pretraining gained 0.044 points at the
   signed-MW
@@ -322,7 +349,7 @@ shorter ensemble history could not recover it.
   pretraining lost. 425's single-seed arm A (no surprise inputs, no pool) ties the five-seed S1 pool
   at the six (2.809) and is 0.069 better at the eight. PT1 is therefore 425's arm A with the S1
   surprise inputs added: pretrained with real lags and the cross-fitted lagless surprise. The
-  prediction P1 below uses 425's gains as the expected size.
+  prediction P1 used 425's gains (-0.050 and -0.124 on its own rows) as the expected size.
 - **Fifth fold for the holiday slice.** The Christmas and bank-holiday slice (22 to 31 December,
   where
   BG2 leads) lies in the 2025-12 fold, which is not one of the four screen folds. Every arm is
@@ -330,21 +357,13 @@ shorter ensemble history could not recover it.
   advance rule reads the four screen folds only. The fifth fold is read for the Christmas slice and
   for the five-fold table.
 - **Standing practices followed.** Monthly refits; cleaned data (flagged and start-cut half-hours
-  dropped, counted per fold); the D15 and D18 cut at 2025-03-01 applied; every network saved in the
-  data folder; tails, cold nights, and avoidable-curtailment cost reported; example forecasts and
-  event plots in the write-up; draft PR; Sonnet for every review. Process: Sonnet writes the code; a
-  fresh Sonnet agent reviews it before the first fit; a fresh Sonnet agent reviews the results and
-  re-derives the headline numbers; the write-up carries the "Checks" bullets (median minus mean
-  forecast per site, mean-forecast error beside each quantile contrast, which audit triggers fired);
-  a fresh Sonnet agent reviews the write-up. Nulled inputs: for PT2 the page reports interval width
-  and coverage on rows whose lags are missing against rows with live lags. Avoidable-curtailment
-  cost is reported during events, in the 7 days after, and across all rows, per group and per
-  Primary, headlined at the scaled limit (f = 0.9, sweep 0.75 and 0.5) against `manual_heuristic` in
-  GBP per MW per day with an interval. Pools start with the spawn method.
+  dropped); the D15 and D18 cut at 2025-03-01 applied; every network saved in the data folder; draft
+  PR; Sonnet for every review (code before the first fit, results, and write-up) and one Opus audit.
+  Pools used the spawn method.
 
 ## Arms
 
-| Arm | Pretraining stage | Fine-tuning stage | New networks |
+| Arm | Pretraining stage | Fine-tuning stage | New neural networks |
 |---|---|---|---|
 | S1 | none | ensemble rows, lr 2e-3 | 0 (stored) |
 | PT0 | ERA5 and CAMS, lags and surprise masked | lr 2e-4 | 0 (experiment 448's S1PT) |
@@ -419,5 +438,5 @@ on ERA5 and CAMS weather, by the method of experiment 404's table:
 
 ## Compute
 
-About 145 networks were fitted (lagless tables, pretraining, and fine-tuning over five folds and up
+131 networks were fitted (lagless tables, pretraining, and fine-tuning over five folds and up
 to five seeds), on up to three GPU processes under 8 GB each.
