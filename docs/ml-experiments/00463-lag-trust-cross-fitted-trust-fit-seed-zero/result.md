@@ -8,7 +8,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
 date: 2026-11-01
 kind: other
 protocol: demand-v2
@@ -67,95 +67,173 @@ metric: >-
   Mass-weighted pinball loss (CRPS-like) in points of effective capacity from the 11 quantiles of
   each forecast, as in experiment 404's report, on the real-data world (world -1) with leads of 0
   to 240 hours (lead days 1 to 10).
+verdict: not supported
+best_arm: >-
+  No learned trust beat the 50/50 mixture. At the signed-MW six on rows with no labelled event,
+  G1-trust scores 3.492 against 3.513 for 50/50 (-0.021, 95% interval -0.061 to +0.015); inside real
+  events (NRA-corrected actuals, depth factor 1.0) it scores 13.198 against 13.139 (+0.059, 95%
+  interval +0.027 to +0.102, minimum detectable effect 0.38).
+headline: >-
+  Fitting the trust weight on out-of-fold lagged forecasts closes the gap between a learned trust
+  weight and the fixed 50/50 mixture on rows with no labelled event (+0.14 for the same trust fitted
+  in sample, -0.02 out of fold), but the learned weight never beats 50/50: it is 0.06 points worse
+  inside real events at the signed-MW six and 0.05 to 0.13 worse at the MVA-only eight. Interim and
+  unaudited.
+lessons: >-
+  The experiment 404 learned trust lost to 50/50 mainly because the lagged forecast was fitted on
+  the rows where the trust was fitted, so the trust saw a lagged forecast that was far better on
+  those rows than on new months. Removing that mismatch removes the loss on rows with no labelled
+  event and leaves a learned weight (about 0.4) that is no better than the fixed 0.5. The remaining
+  gap inside events is small, and the stored data cannot say whether a better-matched lagged head
+  would close it.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  The learned trust weight of experiment 404 lost to the fixed 50/50 mixture largely because the
+  lagged forecast was fitted on the same rows as the weight. When the weight is fitted on lagged
+  forecasts from networks that did not see those rows, it matches 50/50 on rows with no labelled
+  event (-0.02 points at the signed-MW six) but still does not beat it inside real events (+0.06),
+  so keep the fixed 50/50 mixture. Interim and unaudited: five scored months, one seed, and NGED's
+  event labels are incomplete.
+advice:
+  - >-
+    Keep the fixed 50/50 mixture as the reference for combining lagged and lagless forecasts; a
+    trust weight fitted out of fold only matches it (experiment 463).
+  - >-
+    Fit any learned combination weight on out-of-fold forecasts of both heads, never on a lagged
+    head fitted on the same rows: the in-sample version scored 0.14 to 0.19 points worse on rows
+    with no labelled event (experiment 463, G1-trust against G1-insample).
+  - >-
+    Do not run seed 1 of the cross-fitted trust fit: the learned weight swings by 0.18 to 0.24
+    between months, above the 0.1 rule (experiment 463).
+  - >-
+    A lagged head trained on 5/6 of the rows is much weaker than the full-data head used at test
+    time (negative log-likelihood 0.9 against 0.2 in sample), so the learned weight sits below the
+    best test-month constant; test a finer fold split before trusting any weight curve (experiment
+    463 audit).
 code: ml-experiments/00463-lag-trust-cross-fitted-trust-fit-seed-zero/
 ---
 
-**Plan only: no score has been read.** The question is whether the learned trust weight of
-experiment 404 loses to the fixed 50/50 mixture because it was fitted on unequal footing.
-NGED's event labels are incomplete, so "rows with no labelled event" may hold real events that
-nobody logged, and every real-event slice undercounts. Every number will be interim and unaudited.
+**The fixed 50/50 mixture of the lagged and lagless forecasts stays the reference: a trust weight
+fitted on out-of-fold lagged forecasts matches it and does not beat it.** We asked whether the
+learned trust weight of experiment 404 lost to 50/50 because the weight was fitted on the same rows
+as the lagged forecast it weighs. We trained 6 lag networks per scored month, each leaving out one
+block of the training window, so that every training row has a lagged forecast from a network that
+did not see it. We then fitted the trust weight on those forecasts and on the lagless table's own
+out-of-block forecasts, and scored it on five new months. A copy of the fit on in-sample lagged
+forecasts (G1-insample) shows what the mismatch costs. The mismatch explains the earlier loss. It
+does not turn the learned weight into an improvement. NGED's event labels are incomplete, so rows
+with no labelled event may hold unlogged events and the real-event rows undercount. Every number is
+interim and unaudited: five scored months, one seed.
 
-## Design
+**Verdict, then what it rules out.** The experiment fails its adoption rule: inside real events the
+learned weight is worse than 50/50, not better. The mechanism holds: fitting out of fold gains 0.16
+points over fitting in sample on rows with no labelled event at the signed-MW six, and 0.19 at the
+MVA-only eight. The search narrows to a better-matched lagged head (a finer fold split, so the
+out-of-fold network is nearer the full-data network) or to keeping 50/50.
 
-- **Harness.** Experiment 404's, seed 0, five scored months (2025-10, 2025-12, 2026-01, 2026-03,
-  2026-06). Each month's training window, injected world (seed 100), recency weights, and
-  cross-fitted lagless table (`FOLDS = 6` blocks of target time) are experiment 404's, read and not
-  rewritten.
-- **Out-of-fold lagged heads.** For each month, 6 plain lag networks (experiment 404's A0-inj
-  recipe: 3 lags, no lag dropout, 6 epochs, Adam at 2e-3, batch 4096) are each fitted on the
-  training rows whose target lies outside one of the 6 blocks, and forecast the rows inside that
-  block. The block of a row is the lagless table's block of its target time, so each row has an
-  out-of-fold lagged head and a cross-fitted lagless head from the same fold. Each fold refits the
-  per-Primary target mean and standard deviation on its fitting rows only. The input standardiser
-  is experiment 404's, fitted on all training rows (it uses no target); this is a small
-  approximation, stated here.
-- **Trust fit.** A custom loop instantiates experiment 404's `TrustMdn(arm="b1")` and calls only
-  its `trust_weights` (the trust head and the Primary embedding are the only parameters given to
-  Adam; the calibration module is unused). The three per-lag weights are combined by their product
-  and smoothed over three half-hours, as in B1. Both heads are constants: the out-of-fold lagged
-  mixture and the cross-fitted lagless mixture, in the units of the full training window (each
-  fold's lagged output is converted through capacity fractions). The loss is the 6-component
-  mixture negative log-likelihood with experiment 404's recency weights, 6 epochs, Adam at 2e-3,
-  batch 4096. The trust inputs are built as in `fit.forward`; their mean and standard deviation are
-  recomputed from 100,000 sampled training rows (as in B1's fit) and reused at test time.
-- **In-sample control (G1-insample).** The same frozen-head trust fit, but the lagged head is
-  experiment 404's stored full-data A0-inj network evaluated on the training rows (in sample). B1
-  differs from G1-trust in three ways at once (joint training, a calibration module that sees the
-  lagless mixture, and in-sample fitting), so G1-trust against B1 is a combined contrast and
-  G1-trust against G1-insample is the clean test of M11.
-- **Test-time forecast.** The lagged head is experiment 404's stored full-data A0-inj network of
-  the same month and seed, the lagless head is the table's further module, and the trust head is
-  the one just fitted. Nothing from the scored month or later enters any fit.
-- **Fit count.** 5 months x 6 folds = 30 lagged-head fits, plus 5 G1-trust fits and 5
-  G1-insample fits = 40 fits (seed 0 only); the brief's 35 plus the 5 control fits. The count and the time of one fit are reported to the manager before the remaining fits.
-- **Arms.** B-mix (reference); B1 (stored joint in-sample learned trust); G1-insample; G1-trust. A0-inj and the
-  lagless head alone are reported for absolute scores.
-- **Check before the grid.** A fold-free refit of the lagged head with this script's code (same
-  seed, origin stride 2) must reproduce experiment 404's stored final-epoch A0-inj training loss
-  within 0.005; the scored-month rows of every new arm must have the same keys as B-mix.
-- **Approximations.** Each fold network trains on 5/6 of the rows and so is weaker than the
-  full-data network used at test time; the fitted trust may under-weight the lags for that reason
-  as well as for in-sample over-confidence. The log records the lagged head's negative
-  log-likelihood out of fold and in sample to show the size of the effect. Lag input values near a block boundary come from power inside the held-out
-  block, as for the lagless table. The trust head is fitted on the injected world (seed 100) and
-  scored on the real-data world, as B1 is.
+![G1-trust minus each reference, by group and row set](figure_1_contrasts.svg)
 
-## Standing practices
+![Learned lagged weight by lead band, month, and arm](figure_2_learned_weights.svg)
 
-- **Retraining.** Monthly (one fit per scored month); the contrast is about a weight fitted on a
-  training window, not about the cadence.
-- **Cleaned data and the short-history cut.** Inherited from experiment 404's rows and tables
-  (`substation_zero` half-hours dropped; D15 and D18 before 2025-03-01 dropped).
-- **Reuse.** The lagless table, the A0-inj full-data networks, the trust inputs, the worlds, and the
-  B-mix and B1 forecasts are experiment 404's; the lagless table is not refitted.
-- **Compute.** One GPU process under 8 GB (`MemoryMax=8G`), `OMP_NUM_THREADS=1`, one feeder core.
-  The GPU is used because the lagged heads are single large networks.
-- **Past-weather caveat.** Weather at lag times is as in experiment 404 (it is available at
-  forecast time in that harness).
+![Day-ahead forecast across a real event at D5](figure_3_day_ahead_event.svg)
 
-## Scoring
+![Ten-day forecast, same event and origin](figure_4_ten_day_event.svg)
 
-- Signed-MW six and MVA-only eight separately; D15 and D18 are report-only.
-- Row sets as in experiments 455 and 458: no-label rows (no labelled event in the day windows, lags
-  or target), harm rows (a day window inside an event, target outside), real-event rows (target
-  inside a padded event or in the 96 half-hours after one). Real-event rows are scored against
-  NRA-corrected actuals at depth factor 1.0 (headline; 0.75 and 1.25 as sensitivity) and against
-  metered actuals.
-- Leads 0 to 240 hours; drop-largest-event and leave-one-month-out intervals; the Bonferroni count
-  is 20 (G1-trust against B-mix on no-label, harm, event with NRA-corrected actuals, and event with
-  metered actuals, at both groups = 8; G1-trust against B1 and against G1-insample on the first
-  three row sets at both groups = 12); MDE beside each contrast; absolute scores beside contrasts.
-- Tail calibration: coverage and pinball loss at q01, q05, q95, q99. Curtailment cost does not
-  apply in the 404 harness.
-- The learned lagged weight is read by lead band (0-12 h, 12-36 h, 36-72 h, days 4-5, days 6-10) and
-  by month, beside the stored B1 weight.
-- Figures: contrasts with intervals (headline first), learned weight by lead band and month, a
-  day-ahead and a 10-day forecast across a real event at D5, and the same on rows with no labelled
-  event.
+![Ten-day forecast across a real event, second signed-MW Primary](figure_7_ten_day_event_signed_b.svg)
 
-## Advice followed and departed from
+![Ten-day forecast across a real event, third signed-MW Primary](figure_8_ten_day_event_signed_c.svg)
 
-- Follows experiment 458: keep B-mix as the reference; do not adopt a learned weight unless it
-  clearly passes.
-- Departs from experiment 458 only in scoring five months (no warm-up month is lost), because the
-  trust is fitted inside each month's own training window.
+![Ten-day forecast across a real event, first MVA-only Primary](figure_9_ten_day_event_mva_a.svg)
+
+![Ten-day forecast across a real event, second MVA-only Primary](figure_10_ten_day_event_mva_b.svg)
+
+![Day-ahead forecast at D5 with no labelled event nearby](figure_5_day_ahead_no_label.svg)
+
+![Ten-day forecast at D5, same origin](figure_6_ten_day_no_label.svg)
+
+## Results
+
+Scores are points of effective capacity (200 times the mass-weighted pinball loss over 11 quantiles;
+leads of 0 to 240 hours, lead days 1 to 10; real-data world). A contrast is the first arm minus the
+second on the same rows, so negative is better. The unit of resampling is the month: 5 scored months
+(2025-10, 2025-12, 2026-01, 2026-03, 2026-06), 4 where a group has no event. Intervals are 95%
+month-resampled intervals; the Bonferroni interval for 20 contrasts is in the experiment's private
+folder and in figure 1.
+
+- **Arms.** B-mix (50/50 of A0-inj and the lagless table); B1 (experiment 404's trust learned
+  jointly with the lagged head, in sample); G1-insample (the trust head fitted with both heads
+  frozen, the lagged head being experiment 404's full-data A0-inj network evaluated on its own
+  training rows); G1-trust (the same frozen-head fit on out-of-fold lagged forecasts). The
+  G1-insample control was added to the brief's design because B1 differs from G1-trust in three
+  ways at once; the neural Discuss session is informed here.
+- **Signed-MW six, absolute scores (no label / harm / real event with NRA depth 1.0 / real event
+  metered).** B-mix 3.513 / 3.680 / 13.139 / 5.955; B1 3.788 / 3.780 / 12.507 / 6.470; G1-insample
+  3.650 / 3.651 / 13.351 / 5.962; G1-trust 3.492 / 3.614 / 13.198 / 6.006; A0-inj alone 3.824 /
+  3.811 / 13.487 / 6.078; lagless alone 3.763 / 3.933 / 13.243 / 6.284.
+- **Signed-MW six, G1-trust minus B-mix (minimum detectable effect 0.32 / 0.42 / 0.38 / 0.26).** No
+  label: -0.021 [-0.061, +0.015]. Harm: -0.066 [-0.136, +0.003]. Real event, NRA depth 1.0: +0.059
+  [+0.027, +0.102] (depth 0.75: +0.061; depth 1.25: +0.060; drop the largest event: +0.015). Real
+  event, metered: +0.051 [-0.004, +0.106].
+- **Signed-MW six, G1-trust minus G1-insample.** No label: -0.158 [-0.332, -0.004] (Bonferroni
+  interval -0.421 to +0.045). Harm: -0.037. Real event, NRA depth 1.0: -0.153 [-0.420, +0.008].
+- **Signed-MW six, G1-trust minus B1.** No label: -0.296 [-0.781, +0.160]. Real event, NRA depth
+  1.0: +0.691 [-0.311, +2.336]; B1 is the only arm better than 50/50 there (-0.632 [-2.281,
+  +0.359], 3 of 5 months negative), and its interval spans zero.
+- **MVA-only eight, G1-trust minus B-mix.** No label +0.051 [+0.027, +0.071]; harm +0.125 [+0.056,
+  +0.195]; real event with NRA depth 1.0 +0.105 [+0.029, +0.181] (4 months). G1-trust minus
+  G1-insample: -0.193 [-0.277, -0.118], -0.380 [-0.787, -0.083], -0.788 [-1.003, -0.573].
+- **Learned lagged weight (mean over scored months).** Signed-MW six: G1-trust 0.41 at 0-12 h, 0.43,
+  0.43, 0.39, then 0.36 at days 6-10; G1-insample 0.93 falling to 0.82; B1 0.73 rising to 0.80. The
+  range over months within a lead band is 0.18 to 0.24 for G1-trust (0.31 to 0.55 at 0-12 h), above
+  the 0.1 stability rule, so seed 1 was not run. MVA-only eight: G1-trust 0.52 falling to 0.45.
+- **Training-row diagnostic.** The lagged head's weighted negative log-likelihood on the training
+  rows is 0.83 to 0.92 out of fold and 0.19 to 0.24 in sample, against 0.71 to 0.97 for the
+  cross-fitted lagless head. An out-of-fold fit is therefore a much weaker head than the full-data
+  head that scores the test month.
+- **Tails, signed-MW six, no label (coverage at q01 / q05 / q95 / q99; q99 pinball loss).**
+  G1-trust 0.006 / 0.029 / 0.845 / 0.943; 0.0027. B-mix 0.006 / 0.028 / 0.855 / 0.949; 0.0026. Inside
+  real events: G1-trust 0.805 at q99 against 0.807 for B-mix. Every arm under-covers the upper tail
+  (nominal 0.95 and 0.99) on these rows, and G1-trust is no different from B-mix. Curtailment cost
+  does not apply in the 404 harness.
+- **Fit count and time.** 40 fits (30 out-of-fold lagged-head fits at about 14 s each, 10 trust fits
+  at about 7 to 12 minutes each), about 1 hour 50 minutes in total on one GPU process under 8 GB.
+- **Where things are.** Code in `ml-experiments/00463-lag-trust-cross-fitted-trust-fit-seed-zero/`,
+  reusing experiment 404's modules (and 87, 48, 397's) and 455's and 458's scoring pattern.
+  Forecasts and trust networks in the experiment's private data folder; the 30 out-of-fold networks
+  are not kept (their out-of-fold forecasts are, as `oof_<month>_s0.npy`). Retraining: monthly.
+  Cleaned data and the D15 and D18 cut: inherited from experiment 404's rows.
+
+## Checks
+
+- **Median forecast minus mean forecast per site.** Not available: the 404 harness stores 11
+  quantiles and no mean forecast. The error of the median forecast is reported instead (below).
+- **Error of the median beside the score contrasts.** G1-trust minus B-mix, mean absolute error of
+  the q50 forecast (fraction of capacity): +0.0002 (no label), -0.0011 (harm), +0.0005 (real event)
+  at the signed-MW six, and +0.0008, +0.0019, -0.0008 at the MVA-only eight; all far below the
+  score differences' scale. The no-label score contrast is negative (-0.021) while the median error
+  is slightly positive (+0.02 points); both lie inside their noise.
+- **Triggers.** Trigger 2 fired: the learned weight (0.41 falling to 0.36) contradicts the
+  prediction (0.75 falling to 0.5) and experiment 458's fitted weights. A fresh Sonnet audit
+  re-derived every headline contrast from the stored forecasts and found no difference to three
+  decimals, found no leakage, and found the low weight consistent with a weaker out-of-fold lagged
+  head. It qualified the explanation: the best constant weight on the test months is 0.6 falling to
+  0.4 at the six, above the learned weights, and the cost of that gap is 0.03 to 0.08 points; "5/6
+  of the rows" is only one of three candidate causes (the fold also removes a four-month season;
+  the full network memorises its training rows). Triggers 1, 3, 4, 5, 6, and 7 did not fire.
+  Leaving D5 out of the signed-MW six real-event contrast reduces it from +0.076 to +0.011 (rows
+  pooled) and does not change its sign or the verdict.
+- **Caveats the audit adds.** The lagless head has the same cross-fitted-against-full mismatch,
+  untested; the trust trains on the injected world (4.6% of half-hours carry an injected event) and
+  is scored on real power; the weight is fitted by negative log-likelihood and scored by pinball
+  loss, so it need not be the score-optimal weight.
+
+## What it rules out and what to try next
+
+- **Ruled out.** Fitting the trust on in-sample lagged forecasts (the experiment 404 design) as the
+  reason a learned trust cannot reach 50/50 on rows with no labelled event; and a learned
+  combination weight as an improvement over 50/50 at this harness.
+- **Next.** If a learned weight is still wanted, fit it with a finer fold split (12 folds or
+  interleaved weeks, so each fold network is nearer the full-data network) and a lagged head
+  evaluated on the test month, and pre-register whether the aim is a gain inside events (B1's
+  NRA-corrected result, -0.63 with a wide interval, is the only sign of one). Otherwise keep 50/50.

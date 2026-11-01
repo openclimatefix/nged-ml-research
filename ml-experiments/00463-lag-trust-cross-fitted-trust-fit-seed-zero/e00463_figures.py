@@ -32,9 +32,9 @@ SIGNED_SIX_INDEX: Final[tuple[int, ...]] = (3, 5, 6, 7, 9, 11)
 """Indices in `SITES` of D5, D9, D10, D11, D14, and D16."""
 WIDTH: Final[int] = 430
 PAIR_LABELS: Final[dict[str, str]] = {
-    "B-mix": "G1-trust minus 50/50 mixture (B-mix)",
-    "G1-insample": "G1-trust minus G1-insample (the M11 test)",
-    "B1": "G1-trust minus B1 (stored joint in-sample trust)",
+    "B-mix": "vs 50/50 mixture (B-mix)",
+    "G1-insample": "vs G1-insample (in-sample test)",
+    "B1": "vs B1 (joint, in sample)",
 }
 SET_LABELS: Final[dict[tuple[str, str], str]] = {
     ("nolabel", "metered"): "rows with no labelled event",
@@ -80,7 +80,16 @@ def contrast_figure() -> None:
         alt.layer(zero, thin, thick, dots, data=data.to_pandas())
         .properties(width=WIDTH, height=110)
         .facet(
-            row=alt.Row("panel:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left"))
+            row=alt.Row(
+                "panel:N",
+                title=None,
+                sort=[
+                    f"{GROUP_LABELS[g]}, {label}"
+                    for g in GROUP_LABELS
+                    for label in SET_LABELS.values()
+                ],
+                header=alt.Header(labelAngle=0, labelAlign="left"),
+            )
         )
         .properties(
             title=alt.TitleParams(
@@ -199,36 +208,53 @@ def series_figure(
     ).save(FIGURE_DIR / f"{name}.svg")
 
 
-def main() -> None:
-    """Draw every figure."""
-    FIGURE_DIR.mkdir(parents=True, exist_ok=True)
-    contrast_figure()
-    weights_figure()
-    best = None
-    for month in ("2026-06", "2026-03", "2026-01", "2025-12"):
+def best_events(*, primaries: list[int]) -> list[tuple[str, int, int, int]]:
+    """Return one (month, Primary, origin, event rows in the first day) per Primary, best first."""
+    found: dict[int, tuple[str, int, int, int]] = {}
+    for month in ("2026-06", "2026-03", "2026-01", "2025-12", "2025-10"):
         frame = pl.read_parquet(DATA_404 / "B-mix" / f"{month}_s0_w-1.parquet").filter(
-            pl.col("primary").is_in(
-                [SITES.index(s) for s in ("D5", "D9", "D10", "D11", "D14", "D16")]
-            )
+            pl.col("primary").is_in(primaries)
             & ((pl.col("target") - pl.col("origin")) <= 48)
             & (pl.col("tgt_real") | pl.col("tgt_post"))
         )
         if frame.is_empty():
             continue
-        top = frame.group_by("primary", "origin").len().sort("len", descending=True)[0]
-        if best is None or top["len"][0] > best[2]:
-            best = (month, top, int(top["len"][0]))
-    if best is not None:
-        month, top, _ = best
-        primary, origin = int(top["primary"][0]), int(top["origin"][0])
+        top = frame.group_by("primary", "origin").len().sort("len", descending=True)
+        for row in top.iter_rows(named=True):
+            p = int(row["primary"])
+            if p not in found or row["len"] > found[p][3]:
+                found[p] = (month, p, int(row["origin"]), int(row["len"]))
+    return sorted(found.values(), key=lambda x: -x[3])
+
+
+def main() -> None:
+    """Draw every figure."""
+    FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+    contrast_figure()
+    weights_figure()
+    signed = [SITES.index(x) for x in ("D5", "D9", "D10", "D11", "D14", "D16")]
+    mva = [SITES.index(x) for x in ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")]
+    chosen = {"signed": best_events(primaries=signed), "mva": best_events(primaries=mva)}
+    month, primary, origin, _ = chosen["signed"][0]
+    series_figure(
+        name="figure_3_day_ahead_event", primary=primary, origin=origin, month=month,
+        horizon_steps=48,
+        title=f"Day ahead, {SITES[primary]}, {month}: real labelled event rows shaded grey",
+    )  # fmt: skip
+    series_figure(
+        name="figure_4_ten_day_event", primary=primary, origin=origin, month=month,
+        horizon_steps=480, title=f"Ten days, {SITES[primary]}, {month}, same origin",
+    )  # fmt: skip
+    extra = [
+        ("figure_7_ten_day_event_signed_b", chosen["signed"][1]),
+        ("figure_8_ten_day_event_signed_c", chosen["signed"][2]),
+        ("figure_9_ten_day_event_mva_a", chosen["mva"][0]),
+        ("figure_10_ten_day_event_mva_b", chosen["mva"][1]),
+    ]
+    for name, (month, primary, origin, _) in extra:
         series_figure(
-            name="figure_3_day_ahead_event", primary=primary, origin=origin, month=month,
-            horizon_steps=48,
-            title=f"Day ahead, {SITES[primary]}, {month}: real labelled event rows shaded grey",
-        )  # fmt: skip
-        series_figure(
-            name="figure_4_ten_day_event", primary=primary, origin=origin, month=month,
-            horizon_steps=480, title=f"Ten days, {SITES[primary]}, {month}, same origin",
+            name=name, primary=primary, origin=origin, month=month, horizon_steps=480,
+            title=f"Ten days, {SITES[primary]}, {month}: real labelled event rows shaded grey",
         )  # fmt: skip
     d5 = SITES.index("D5")
     q = pl.read_parquet(DATA_404 / "B-mix" / "2026-06_s0_w-1.parquet").filter(
