@@ -235,6 +235,9 @@ def main() -> None:
     parser.add_argument("--refit-dates", nargs="+", default=list(REFIT_DATES))
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--cores", type=int, default=1)
+    parser.add_argument(
+        "--chunks", type=int, default=1, help="split each refit's sites into this many jobs"
+    )
     parser.add_argument("--seed", type=int, default=common.SEED)
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cpu")
     parser.add_argument("--smoke", action="store_true", help="2 refits, 3 runs, 20 rounds")
@@ -258,7 +261,7 @@ def main() -> None:
                 run_job,
                 refit=r,
                 origins=runs,
-                sites=sites,
+                sites=chunk,
                 nthread=nthread,
                 rounds=rounds,
                 seed=args.seed,
@@ -266,6 +269,7 @@ def main() -> None:
                 device=args.device,
             )
             for r, runs in jobs.items()
+            for chunk in (sites[i :: args.chunks] for i in range(args.chunks))
         ]
         for done, future in enumerate(futures, start=1):
             for line in future.result():
