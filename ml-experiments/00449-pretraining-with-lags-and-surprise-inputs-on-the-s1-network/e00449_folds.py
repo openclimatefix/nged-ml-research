@@ -76,6 +76,7 @@ def per_fold(*, blocks: pl.DataFrame) -> None:
 
 def christmas() -> None:
     """Print days 1 to 10 CRPS of 22 to 31 December 2025 for the arms and references, by group."""
+    base.run = run
     series = adapter.series_table()
     refs = refs449.reference_frames(series=series)
     tables, _, _ = base.build_month(month="2025-12", arms=ARMS, refs=refs, seeds=(0, 1, 2))
