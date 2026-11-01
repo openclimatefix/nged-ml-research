@@ -459,10 +459,10 @@ def rates(*, month: str = "2026-01", per_world: int = 400_000, seed: int = 0) ->
     For a sample of fold rows read from each training world 0 to 3, a *jump at a lag* is a lag whose
     power differs from the clean series (a load-shift donor or recipient, or a genuine level
     change). A row has a *mirror* if any neighbour of its Primary differs from the clean series at
-    the newest lag's time. The target moved if the newest lag lies in a genuine level change and the target carries the same
-    step (a load-shift jump never counts). The mirror is coarser than what the network sees: any neighbour
-    differing from the clean series counts, whatever its sign or size, so the bound is not the
-    best a network with the sign-agreement columns could reach.
+    the newest lag's time. The target moved if the newest lag lies in a genuine level change and the
+    target carries the same step (a load-shift jump never counts). The mirror is coarser than what
+    the network sees: any neighbour differing from the clean series counts, whatever its sign or
+    size, so the bound is not the best a network with the sign-agreement columns could reach.
     For k = 1, 2, 3 (the first k lags all in a jump), the share of such rows whose target moved is
     the share of a step that a forecaster with no other information should follow, with and
     without a mirror.

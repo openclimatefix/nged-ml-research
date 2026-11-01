@@ -215,7 +215,7 @@ def figure_sweep() -> None:
 
 
 def jump_origin(*, month: str) -> tuple[int, str, int]:
-    """Return the world, signed-MW Primary, and origin with the largest unmirrored level change at the newest lag."""
+    """Return the world, signed-MW Primary, and origin of the largest unmirrored level change."""
     best: tuple[float, int, str, int] | None = None
     for world in run.GEN_WORLDS:
         f = f446.example_origin(arm="S3-amb", month=month, world=world)
