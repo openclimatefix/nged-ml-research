@@ -9,7 +9,7 @@ table P fitted the same way, and `lofo` (leave-one-fold-out) against table P lea
 Reads `data/ml-experiments/00483-*/work/cache`; writes `data/ml-experiments/00492-*/work/`.
 
 ```bash
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<the private data folder>
 PYTHONPATH=ml-experiments/00483-uncertainty-rerun-on-the-first-release-demand-candidates:\
 ml-experiments/00435-stage-0-recalibration-table-for-untrusted-inputs-and-tails:\
 ml-experiments/00470-first-release-demand-forecaster-assembly-and-comparison \
