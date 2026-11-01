@@ -1,13 +1,14 @@
-"""Experiment 451: where Farm A's upper-tail exceedances sit, and a Farm A-specific table P.
+"""Experiment 451: where Farm A's upper-tail exceedances sit, and finer or looser table P variants.
 
 Step 1 compares, for each farm, the share of observations above q99 (kept rows, true days 1 to 10,
-11 scored months) under four recalibrations of `member_plain`: none, experiment 450's table P
-(farm x lead band), P_med (farm x lead band x band of the forecast median), and P_fine (farm x lead
-band x half of the year is not possible with one year of data, so farm x lead band x wind-speed
-tercile of the ensemble-mean 100 m wind). Every rescaled quantile is clipped to [0, 1]; each cell is
-fitted on earlier months only. Step 2 splits Farm A's exceedances of the table P q99 by month, hour
-of day, ensemble-mean 100 m wind speed bin, and experiment 341's capacity state at the valid time.
-Output: `work/step1.parquet`, `work/step2_<split>.parquet`, and a printed report.
+11 scored months) under five versions of `member_plain`'s forecast: none; experiment 450's table P
+(farm x lead band); P_med (also by band of the forecast median); P_wind (also by tercile of the
+ensemble-mean 100 m wind speed, with edges from all scored months since they only label rows); and
+table P with the upper clip raised to the farm's largest earlier power over capacity. Every
+rescaled quantile is clipped, and every cell and bound is fitted on earlier months only. Step 2
+splits Farm A's exceedances of the table P q99 by month, hour, wind-speed bin, forecast-median
+band, lead band, and experiment 341's capacity state, and counts those where q99 is at the clip
+(0.999 or more). Output: `work/step1.parquet`, `work/step2_<split>.parquet`.
 
 ```bash
 export DATA_PATH_INTERNAL=...; source ml-experiments/00451-*/env.sh
@@ -39,6 +40,8 @@ CAPACITY_STATE: Final[Path] = (
 )
 MEDIAN_BANDS: Final[tuple[float, float, float]] = (0.1, 0.4, 0.7)
 """Edges of the forecast-median bands as shares of capacity, as in experiment 435."""
+AT_CLIP: Final[float] = 0.999
+"""A q99 at or above this value counts as clipped at 1.0."""
 WIND_BINS: Final[tuple[float, ...]] = (4.0, 8.0, 12.0, 16.0)
 """Edges of the ensemble-mean 100 m wind speed bins in m/s."""
 
@@ -214,6 +217,15 @@ def main() -> None:
         "; at/above 0.95 of capacity:",
         int(a.filter(pl.col("over"))["at_cap"].sum()),
     )
+    at_clip = pl.col("q99") >= AT_CLIP
+    clip_split = a.select(
+        (at_clip.mean() * 100).alias("pct_rows_q99_at_clip"),
+        ((pl.col("over") & at_clip).mean() * 100).alias("points_exceed_q99_at_clip"),
+        ((pl.col("over") & ~at_clip).mean() * 100).alias("points_exceed_q99_below_clip"),
+        (pl.col("actual") > 1.0).mean().mul(100).alias("pct_rows_actual_above_1"),
+    )
+    clip_split.write_parquet(WORK_DIR / "step2_clip_split.parquet")
+    print(clip_split)
     for split in ("month", "hour", "wind_bin", "state", "median_band", "lead_band"):
         t = (
             a.group_by(split)
