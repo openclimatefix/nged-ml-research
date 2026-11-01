@@ -81,24 +81,26 @@ headline: >-
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  Training one lagged network to imitate the four-network mixture does not remove the need for the
-  lagless forecast. The imitation network scores 0.28 points of capacity worse than the simple
-  50/50 mixture on ordinary rows at the six metered-in-megawatts Primaries, and 0.15 worse at the
-  eight MVA-only Primaries, both beyond the noise. It only recovers a small part of what the
-  lagless forecast adds, because the lagless forecast carries information that the three raw
-  lags cannot supply. Keep the lagless forecast in the live service, and look for gains elsewhere.
+  Training one neural network to imitate the four-network mixture K2-S1 did not remove the need for
+  the lagless forecast. On rows with no labelled event the imitation network scores 0.28 points of
+  capacity worse than B-mix (a 50/50 mixture of a lagged network and a lagless forecast) at the 6
+  Primaries metered in signed megawatts, beyond the minimum detectable effect, and 0.15 worse at
+  the 8 Primaries metered in megavolt-amperes, where the interval just reaches zero. It recovers
+  only a small part of the gap to K2-S1, so the lagless forecast probably carries information that
+  the 3 raw power readings do not. Keep the lagless forecast in the live service.
 lessons: >-
   Corrupted-lag training worlds and a mixture teacher do not teach a three-lag network the lagless
-  forecast's information. The teacher term on every row helps slightly more than the term on
-  corrupted rows only. Distilling from the weaker B-mix teacher scored the same as K2-S1.
+  forecast's information. The teacher term on every row and the term on
+  corrupted rows only are indistinguishable (3.79 against 3.82 at the six, far inside the minimum
+  detectable effect). D-Bmix (teacher B-mix) scored 3.84 against 3.79 for D-K2 (teacher K2-S1).
 advice:
   - >-
     Keep the lagless table in any lagged mixture, because a three-lag network trained towards the
     K2-S1 forecast on injected worlds stays 0.28 points of capacity behind B-mix on rows with no
     labelled event at the six (C1).
   - >-
-    Do not repeat this distillation with more teacher weight or more epochs without a new input,
-    because D-K2 and D-Bmix score within 0.05 of each other and both sit near A0-inj (C1, C3).
+    Treat the teacher weight of 0.5 with 6 epochs as not helpful: D-K2 and D-Bmix score within
+    0.05 of each other and both sit near A0-inj. Larger weights were not tried (C1, C3).
   - >-
     Test the distilled network inside real events once more events are labelled, because D-K2
     scores 0.12 better than B-mix there at the six with a wide interval (-0.90 to +0.24) (C3).
@@ -106,18 +108,31 @@ advice:
 
 ## What this experiment found
 
-**One lagged network cannot absorb the lagless forecast by imitating it.** We asked whether a
-neural network that reads only the Primary's measured power at three earlier times can be trained
-to forecast as well as K2-S1, a mixture of four networks and lagless forecasts, so that the live
-service would run one network and store no lagless table. We trained the network on experiment
-404's injected worlds, with the K2-S1 forecast (or the simpler B-mix forecast) as an extra training
-target at weight 0.5 on every row. We scored it on the same five test months as experiment 454.
+**Imitating the four-network mixture did not teach one neural network what the lagless forecast
+adds.** We asked whether one neural network, whose demand inputs are the Primary substation's
+measured power at 3 earlier times, can be trained to forecast as well as K2-S1. K2-S1 is the
+equal-weight mixture of 2 such networks (given extra inputs) and 2 forecasts made without any recent
+power readings (the lagless forecast, read from a stored table). If so, the live service could run
+1 network and store no table. We trained the network on injected worlds (experiment 404's copies of
+the real power series with artificial level shifts added), with the K2-S1 forecast, or the simpler
+B-mix forecast (a 50/50 mixture of 1 such network and the lagless forecast), as an extra training
+target at weight 0.5 on every row. We scored it on the same 5 test months as experiment 454.
 
-On rows with no labelled event the imitation network scores 3.79 points of capacity at the
-signed-MW six, against 3.85 for the same network without a teacher, 3.51 for B-mix, and 3.39 for
-K2-S1. The gap to B-mix, 0.28, is larger than the minimum detectable effect of this experiment's
-own seed spread (0.24) and of experiment 470 (0.10). The pre-registered stop rule therefore
-applies, and the idea closes. The verdict is not supported.
+On rows with no labelled event, the imitation network (D-K2) scores 3.79 points of capacity at the
+6 Primaries metered in signed megawatts, against 3.85 for A0-inj (the same network trained without
+a teacher), 3.51 for B-mix, and 3.39 for K2-S1. A point of capacity is 1% of a Primary's effective
+capacity. The gap to B-mix, 0.28, is larger than the minimum detectable effect from this
+experiment's seed spread (0.24) and from experiment 470 (0.10). The plan's stop rule is: if the
+student is worse than B-mix on rows with no labelled event by more than the minimum detectable
+effect, one network cannot absorb the lagless forecast and the idea closes. The point estimates
+meet that rule by a small margin: the interval for the gap to B-mix at the 8 Primaries metered in
+megavolt-amperes just reaches zero. The verdict is not supported, because D-K2 is also 0.40 behind
+K2-S1, so the plan's recommendation rule fails on its first clause.
+
+**Glossary.** "The six" and "the eight" are the 6 Primaries metered in signed megawatts and the 8
+metered in megavolt-amperes. "Better in n of 5 months" counts the test months in which the arm
+scores lower (better) than the reference. "Bonferroni 95% interval" is a month-block bootstrap
+interval at the family level the plan fixes (18 contrasts).
 
 ## Figure
 
@@ -141,11 +156,12 @@ applies, and the idea closes. The verdict is not supported.
 - **D-K2 minus B-mix.** +0.283 at the six (0.033 to 0.622, 0 of 5); +0.150 at the eight.
 - **Gap closed (descriptive only).** D-K2 recovers 12% of the gap between A0-inj and K2-S1 at the
   six and 40% at the eight.
-- **Minimum detectable effect, printed before reading contrasts.** 0.237 at the six and 0.125 at
+- **Minimum detectable effect.** 0.237 at the six and 0.125 at
   the eight from the seed spread of B-mix in this harness; 0.100 and 0.065 from experiment 470's
   single seeds.
 - **Tails (clean rows, raw).** The q99 pinball loss is 0.0024 for D-K2 against 0.0022 for K2-S1 at
-  the six (+0.02 points of capacity, at the +0.02 limit) and 0.0026 against 0.0025 at the eight.
+  the six (+0.02 points of capacity if the stored fraction is scaled by 100, so at the +0.02 limit;
+  with the 1.15 widening 0.0022 against 0.0020) and 0.0026 against 0.0025 at the eight.
   The q95 coverage is 0.880 (D-K2) and 0.875 (K2-S1) at the six, below the nominal 0.95 for both;
   the 1.15 widening lifts both to about 0.91. The student is no more overconfident than its teacher
   on the five held-out months.
@@ -170,23 +186,34 @@ applies, and the idea closes. The verdict is not supported.
 | D-K2 | 1 (raw lags only) | nothing | 5 (the 4 teacher fits, then the student) | 3.79 |
 
 Removing the lagless module costs 0.28 points of capacity against B-mix and 0.40 against K2-S1 at
-the six. The student reads raw lags only: no lagless table and no surprise input.
+the six. The student reads raw lags only: no lagless table and no input derived from the lagless forecast.
 
 ## Caveats
 
-- **Not run, because the stop rule had already applied:** cold winter nights, the 12 to 36 hour
-  band, avoidable-curtailment cost, the encroachment sweep, the bad-data injections, the example
-  forecast and real-event plots, the NRA-actual event contrast, table P, and the K2-S1 forecast on
-  the injected worlds. None of them can reverse the clean-row gap, but the write-up makes no claim
-  about them.
+- **Not run, because the stop rule had already applied:** cold winter nights (so no cold-night
+  minimum detectable effect was printed), the 12 to 36 hour band, avoidable-curtailment cost, the
+  encroachment sweep, the bad-data injections, the example forecast and real-event plots, and the
+  K2-S1 forecast on the injected worlds. None of them can reverse the clean-row gap, but the
+  write-up makes no claim about them.
+- **Scored but not discussed:** the NRA-actual event rows and the table P variant are in
+  `contrasts.csv`. On NRA actuals at the six, D-K2 minus B-mix is -0.028 (interval -0.327 to
+  +0.186, better in 2 of 5 months) and D-K2 minus K2-S1 is +0.006 (-0.251 to +0.273). Prediction
+  P2 (no worse than K2-S1 by more than the minimum detectable effect on event rows and injected
+  harm rows) holds on the event rows at the six; it cannot be checked on injected harm rows
+  because K2-S1 has no forecast there.
 - The teacher networks are in sample on the student's training rows; only the lagless table is
-  cross-fitted. The lagless head is clamped twice (as in experiment 404's B-mix scoring), so
-  D-Bmix is a self-distillation of its own A0-inj twin.
-- Five scored months, three seeds, and NGED's event labels are incomplete, so rows with no labelled
+  cross-fitted. The lagless forecast's standard deviation is limited to a fixed range twice (as in
+  experiment 404's B-mix scoring). D-Bmix distils from A0-inj of the same fit seed, so it partly
+  imitates a network with the same initialisation and batch order. The teacher's in-sample
+  sharpness did not show up as overconfidence on the 5 test months (q95 coverage above).
+- 5 scored months, 3 seeds, and NGED's event labels are incomplete, so rows with no labelled
   event may hold unlogged events. Every score is selection-biased, and July 2026 stays unused.
-- The Bonferroni family is 18, but the intervals shown are for the contrasts above only.
-- Reviews: one fresh Sonnet code review before the first fit (it found no blocking bug; three crash
-  guards applied). No Sonnet write-up review has run yet.
+- Every interval quoted is a month-block bootstrap interval at the Bonferroni level of the 18
+  contrasts the plan fixes. The stop rule rests on point estimates, and the interval for D-K2
+  minus B-mix at the 8 runs from -0.0002 to +0.339.
+- Reviews: one fresh Sonnet language-model code review before the first fit (it found no blocking
+  bug; three crash guards applied). One Sonnet write-up review checked the numbers and prose; its
+  10 findings were applied.
 
 ## Checks
 
