@@ -52,7 +52,18 @@ INTERVAL: Final[tuple[float, float]] = (0.1, 0.9)
 SIGNED_SITES: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16")
 FARMS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "F")
 """E is left out: its history is too short for the read-out season-year (experiment 269)."""
-RUNGS: Final[tuple[str, ...]] = ("C0_pooled_table", "C1_physics_tilt20", "C1b_physics_tilt35")
+RUNGS: Final[tuple[str, ...]] = (
+    "C0_pooled_table",
+    "C1_physics_tilt20",
+    "C1b_physics_tilt35",
+    "R1_nearest_farm_output",
+    "R2_nearest_farm_plant",
+    "R3_pooled_table_plus_nearest_output",
+    "R4_pooled_table_era5_cams_mean",
+    "R5_pooled_table_era5",
+)
+"""C: the first pass. R: the rungs added on the manager's request (metered sites as the shape source
+instead of and as well as CAMS, ERA5 and CAMS combinations, nearest-farm against pooled shapes)."""
 
 _RESPONSE_CACHE: dict[tuple[str, str], object] = {}
 
@@ -62,9 +73,67 @@ def points_from_mw(*, cache: FeatureCache, site: str, mw: float) -> float:
     return mw / cache.sites[site].table.effective_capacity_mw * 100.0
 
 
-def pooled_shape(*, cache: FeatureCache, site: str, farms: tuple[str, ...]) -> np.ndarray:
-    """Return experiment 269's pooled empirical shape of `farms`, with fits cached by (site, farm)."""
+def era5_ghi(*, cache: FeatureCache, site: str) -> np.ndarray:
+    """Return ERA5 shortwave irradiance at the Primary on the cache's grid (valid time = grid stamp)."""
+    tid = cache.sites[site].table.time_series_id
+    table = (
+        pl.scan_parquet(default_input_paths().era5)
+        .filter(pl.col("time_series_id") == tid)
+        .select("valid_time", "shortwave")
+        .collect()
+    )
+    grid = pl.DataFrame({"t": cache.times_series()})
+    joined = grid.join(table, left_on="t", right_on="valid_time", how="left", maintain_order="left")
+    return joined["shortwave"].to_numpy().astype(np.float64)
+
+
+def nearest_farm(*, cache: FeatureCache, site: str, injected: str | None) -> str | None:
+    """Return the Primary's nearest farm other than `injected`, within 30 km of it and of `injected`."""
+    table = cache.sites[site].table
+    farms = {row["site"]: row for row in pv_sites().to_dicts()}
+    best = None
+    for label in c269.FARMS:
+        if label == injected:
+            continue
+        row = farms[label]
+        d = c269.distance_km(
+            lat_a=table.latitude,
+            lon_a=table.longitude,
+            lat_b=row["latitude"],
+            lon_b=row["longitude"],
+        )
+        if d > c269.MAX_DISTANCE_KM:
+            continue
+        if injected is not None:
+            o = farms[injected]
+            if (
+                c269.distance_km(
+                    lat_a=o["latitude"],
+                    lon_a=o["longitude"],
+                    lat_b=row["latitude"],
+                    lon_b=row["longitude"],
+                )
+                > c269.MAX_DISTANCE_KM
+            ):
+                continue
+        if best is None or d < best[0]:
+            best = (d, label)
+    return None if best is None else best[1]
+
+
+def pooled_shape(
+    *,
+    cache: FeatureCache,
+    site: str,
+    farms: tuple[str, ...],
+    ghi: np.ndarray | None = None,
+) -> np.ndarray:
+    """Return experiment 269's pooled empirical shape of `farms`, with fits cached by (site, farm).
+
+    `ghi` replaces the Primary's CAMS irradiance as the table's input when given.
+    """
     features = cache.sites[site]
+    sky = features.ghi_w_m2 if ghi is None else ghi
     shapes = []
     for farm in farms:
         key = (site, farm)
@@ -73,13 +142,13 @@ def pooled_shape(*, cache: FeatureCache, site: str, farms: tuple[str, ...]) -> n
         table = _RESPONSE_CACHE[key]
         shapes.append(
             table.predict(
-                irradiance_w_m2=np.nan_to_num(features.ghi_w_m2),
+                irradiance_w_m2=np.nan_to_num(sky),
                 elevation_deg=features.elevation_deg,
             )
         )
     shape = np.mean(shapes, axis=0)
     shape[features.elevation_deg <= c269.RESPONSE_MIN_ELEVATION_DEG] = 0.0
-    shape[~np.isfinite(features.ghi_w_m2)] = np.nan
+    shape[~np.isfinite(sky)] = np.nan
     return shape
 
 
@@ -106,7 +175,42 @@ def rung_shape(*, cache: FeatureCache, site: str, rung: str, farm: str | None) -
         return physics_shape(cache=cache, site=site, tilt_deg=TILT_PHYSICS_DEG)
     if rung == "C1b_physics_tilt35":
         return cache.sites[site].pv_unit_shape
+    all_farms = tuple(f for f in c269.ALL_FARMS if f != farm)
+    if rung in ("R4_pooled_table_era5_cams_mean", "R5_pooled_table_era5"):
+        era5 = era5_ghi(cache=cache, site=site)
+        sky = era5 if rung == "R5_pooled_table_era5" else (era5 + cache.sites[site].ghi_w_m2) / 2
+        return pooled_shape(cache=cache, site=site, farms=all_farms, ghi=sky)
+    reference = nearest_farm(cache=cache, site=site, injected=farm)
+    if reference is None:
+        return np.full(len(cache.sites[site].y), np.nan)
+    if rung == "R2_nearest_farm_plant":
+        return pooled_shape(cache=cache, site=site, farms=(reference,))
+    output = c269.reference_unit_shape(cache=cache, site=site, reference=reference)
+    if rung == "R1_nearest_farm_output":
+        return output
+    if rung == "R3_pooled_table_plus_nearest_output":
+        return (pooled_shape(cache=cache, site=site, farms=all_farms) + output) / 2
     raise ValueError(rung)
+
+
+def cloud_regressors(*, cache: FeatureCache, site: str) -> np.ndarray:
+    """Return two nuisance columns, shape (grid, 2): the day-mean and half-hour cloud response.
+
+    Both are `1 - GHI / clear-sky GHI` clipped to 0 to 1 at daylight half-hours (experiment 129's
+    definition) and zero at night. The day-mean column is constant within a day.
+    """
+    sky = common129._half_hour_clear_sky(cache=cache, site=site)  # noqa: SLF001
+    daylight = sky["clear"] > common129.DAYLIGHT_CLEAR_SKY_W_M2
+    cloud = np.where(daylight, np.clip(1.0 - sky["ghi"] / np.maximum(sky["clear"], 1e-9), 0, 1), 0)
+    cloud = np.nan_to_num(cloud, nan=0.0)
+    day = (cache.end_times - np.timedelta64(30, "m")).astype("datetime64[D]")
+    frame = pl.DataFrame({"day": day, "cloud": cloud, "daylight": daylight})
+    day_mean = (
+        frame.with_columns(m=pl.col("cloud").filter(pl.col("daylight")).mean().over("day"))["m"]
+        .fill_null(0.0)
+        .to_numpy()
+    )
+    return np.stack([np.where(daylight, day_mean, 0.0), cloud], axis=1)
 
 
 def with_shape(*, cache: FeatureCache, site: str, shape: np.ndarray, y: np.ndarray) -> FeatureCache:

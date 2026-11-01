@@ -55,27 +55,33 @@ def divisor_draws(*, ladder: pl.DataFrame, rung: str, site: str) -> np.ndarray:
     return own if len(own) else real["value"].to_numpy()
 
 
-def fitted_paths(*, cache, site: str, shape: np.ndarray, n_resamples: int) -> tuple:
+def fitted_paths(
+    *, cache, site: str, shape: np.ndarray, n_resamples: int, cloud_terms: bool
+) -> tuple[np.ndarray, int]:
     """Return bootstrap cumulative capacity paths (B+1, n_seasons) for the real reading."""
-    shaped = fit.common.with_shape(cache=cache, site=site, shape=shape, y=cache.sites[site].y)
-    layout, index = prepare_fit(
-        cache=shaped,
+    reading = cache.sites[site].y
+    probe = fit.common.with_shape(cache=cache, site=site, shape=shape, y=reading)
+    _, index = prepare_fit(
+        cache=probe,
         site=site,
         spec=GamSpec(ridge=c269.RIDGE, capacity="fitted"),
         cut=c269.CUT,
         window=c269.TRAINING_WINDOW,
         season_years=c269.SEASON_YEARS,
     )
-    zeros = np.zeros(len(shaped.sites[site].y))
-    stats = f269.monthly_stats(
-        cache=shaped, site=site, layout=layout, index=index, output=zeros, norm=zeros
+    rows = f269.row_months(cache=probe, rows=index)
+    months = np.arange(rows.min(), rows.max() + 1)
+    counts = f269.month_block_counts(months=months, n_resamples=n_resamples, seed=4242)
+    paths, index, _, _ = fit.solve_targets(
+        cache=cache,
+        site=site,
+        shape=shape,
+        y_rows=reading,
+        targets=reading[None],
+        weights_by_target=[counts],
+        cloud_terms=cloud_terms,
     )
-    counts = f269.month_block_counts(months=stats.months, n_resamples=n_resamples, seed=4242)
-    penalty, cost = penalty_matrix(layout=layout, n_rows=len(index))
-    theta, _, _, _ = f269.full_fit(
-        stats=stats, layout=layout, weights=counts, spec_cost=(penalty, cost)
-    )
-    return np.cumsum(theta[:, layout.slices["capacity"]], axis=1), len(index)
+    return paths[0], len(index)
 
 
 def main() -> None:
@@ -83,8 +89,26 @@ def main() -> None:
     torch.set_num_threads(1)
     parser = argparse.ArgumentParser()
     parser.add_argument("--rung", default="C0_pooled_table")
+    parser.add_argument("--cloud-terms", action="store_true")
     parser.add_argument(
-        "--sites", nargs="+", default=["D5", "D9", "D10", "D11", "D14", "D16", "D18"]
+        "--sites",
+        nargs="+",
+        default=[
+            "D5",
+            "D9",
+            "D10",
+            "D11",
+            "D14",
+            "D16",
+            "D18",
+            "D2",
+            "D3",
+            "D4",
+            "D8",
+            "D19",
+            "D21",
+            "D22",
+        ],
     )
     arguments = parser.parse_args()
     ladder = pl.concat(
@@ -97,13 +121,26 @@ def main() -> None:
         table = cache.sites[site].table
         try:
             shape = common.rung_shape(cache=cache, site=site, rung=arguments.rung, farm=None)
-            paths, n_rows = fitted_paths(cache=cache, site=site, shape=shape, n_resamples=200)
+            paths, n_rows = fitted_paths(
+                cache=cache,
+                site=site,
+                shape=shape,
+                n_resamples=200,
+                cloud_terms=arguments.cloud_terms,
+            )
         except (ValueError, IndexError) as error:
             rows.append({"site": site, "season_year": None, "status": f"fit failed: {error}"})
             continue
-        divisors = divisor_draws(ladder=ladder, rung=arguments.rung, site=site)
+        ladder_rung = arguments.rung + ("+cloudterm" if arguments.cloud_terms else "")
+        divisors = divisor_draws(ladder=ladder, rung=ladder_rung, site=site)
         scale = table.effective_capacity_mw / 100.0
-        pinned = pinned_capacity(vintages=read_vintages(), table=table, cut=c269.CUT)
+        try:
+            pinned_mw = (
+                pinned_capacity(vintages=read_vintages(), table=table, cut=c269.CUT).held_points
+                * scale
+            )
+        except ValueError, KeyError, IndexError:
+            pinned_mw = None
         for k, year in enumerate(c269.SEASON_YEARS):
             ac = np.array(
                 [paths[b % len(paths), k] * scale / rng.choice(divisors) for b in range(N_DRAWS)]
@@ -123,31 +160,32 @@ def main() -> None:
                     "dc_p50": float(np.percentile(dc, 50)),
                     "dc_p90": float(np.percentile(dc, 90)),
                     "point_ac": float(paths[0, k] * scale / np.median(divisors)),
-                    "pinned_mw": float(pinned.held_points * scale),
+                    "pinned_mw": pinned_mw,
                     "n_rows": n_rows,
                     "recovery_ratio_median": float(np.median(divisors)),
-                    "rung": arguments.rung,
-                    "status": STATUS.get(site, ""),
+                    "rung": ladder_rung,
+                    "status": STATUS.get(
+                        site,
+                        "MVA-only: fit to the apparent-power reading, reactive power assumed zero"
+                        if site in MVA_ONLY
+                        else "",
+                    ),
                 }
             )
         print(f"{site} done", flush=True)
-    for site in MVA_ONLY:
-        scored = json.loads((CENSUS_DIR / f"{site}_scored.json").read_text())
-        chosen = scored["capacity_l0"] if scored["chosen"] == "l0" else scored["capacity_n"]
-        scale = cache.sites[site].table.effective_capacity_mw / 100.0
-        rows.append(
-            {
-                "site": site,
-                "season_year": 2024,
-                "point_ac": float(chosen) * scale,
-                "rung": f"experiment 370 rule choice: {scored['chosen']}",
-                "status": STATUS.get(site, "MVA-only; reactive power assumed zero")
-                + "; no bootstrap interval",
-            }
-        )
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
+    ladder_name = arguments.rung + ("_cloudterm" if arguments.cloud_terms else "")
+    summary = pl.read_parquet(common.WORK_DIR / "rung_summary.parquet").select(
+        "rung",
+        "placebo_p95_max",
+        coverage_easy=pl.col("coverage_boot_plus_recovery_spread"),
+        coverage_cloud_load=pl.col("cloud_cov_boot_plus_spread"),
+    )
+    rows = (
+        pl.DataFrame(rows, infer_schema_length=None).join(summary, on="rung", how="left").to_dicts()
+    )
     pl.DataFrame(rows, infer_schema_length=None).write_parquet(
-        common.WORK_DIR / f"table_{arguments.rung}.parquet"
+        common.WORK_DIR / f"table_{ladder_name}.parquet"
     )
 
 

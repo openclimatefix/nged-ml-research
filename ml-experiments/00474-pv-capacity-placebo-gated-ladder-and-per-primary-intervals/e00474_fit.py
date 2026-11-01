@@ -43,6 +43,7 @@ def solve_targets(
     y_rows: np.ndarray,
     targets: np.ndarray,
     weights_by_target: list[np.ndarray],
+    cloud_terms: bool = False,
 ):
     """Return per-target cumulative capacity paths, one array (B_t, n_seasons) per target.
 
@@ -71,7 +72,8 @@ def solve_targets(
     months_of_rows = f269.row_months(cache=shaped, rows=index)
     months = np.arange(months_of_rows.min(), months_of_rows.max() + 1)
     slot = months_of_rows - months[0]
-    p = layout.n_columns
+    p = layout.n_columns + (2 if cloud_terms else 0)
+    z = common.cloud_regressors(cache=cache, site=site) if cloud_terms else None
     n_targets = targets.shape[0]
     gram = torch.zeros((len(months), p, p), dtype=torch.float64)
     rhs = torch.zeros((len(months), n_targets, p), dtype=torch.float64)
@@ -81,6 +83,8 @@ def solve_targets(
             design_matrix(cache=shaped, features=features, layout=layout, index=rows),
             dtype=torch.float64,
         )
+        if z is not None:
+            x = torch.cat([x, torch.as_tensor(z[rows], dtype=torch.float64)], dim=1)
         yt = torch.as_tensor(targets[:, rows], dtype=torch.float64)
         for month in np.unique(slot[chunk]):
             members = torch.as_tensor(np.flatnonzero(slot[chunk] == month))
@@ -88,8 +92,14 @@ def solve_targets(
             gram[month] += xm.T @ xm
             rhs[month] += yt[:, members] @ xm
     penalty, cost = penalty_matrix(layout=layout, n_rows=len(index))
-    penalty_t = torch.as_tensor(penalty, dtype=torch.float64)
-    shift = 0.5 * torch.as_tensor(cost, dtype=torch.float64)
+    extra = p - layout.n_columns
+    penalty_t = torch.zeros((p, p), dtype=torch.float64)
+    penalty_t[: layout.n_columns, : layout.n_columns] = torch.as_tensor(penalty)
+    shift = torch.zeros(p, dtype=torch.float64)
+    shift[: layout.n_columns] = 0.5 * torch.as_tensor(cost, dtype=torch.float64)
+    if extra:
+        penalty_t[layout.n_columns :, layout.n_columns :] += c269.RIDGE * torch.eye(extra)
+    constrained = np.concatenate([layout.constrained, np.zeros(extra, dtype=bool)])
     capacity = layout.slices["capacity"]
     paths = []
     for t in range(n_targets):
@@ -97,7 +107,7 @@ def solve_targets(
         w = torch.as_tensor(weights, dtype=torch.float64)
         g = torch.einsum("bm,mpq->bpq", w, gram) + penalty_t[None]
         r = torch.einsum("bm,mp->bp", w, rhs[:, t]) - shift[None]
-        theta = f269.solve_in_batches(matrix=g, rhs=r, constrained=layout.constrained)
+        theta = f269.solve_in_batches(matrix=g, rhs=r, constrained=constrained)
         paths.append(np.cumsum(theta[:, capacity], axis=1))
     return paths, index, layout, months
 
@@ -119,6 +129,7 @@ def run_cell(
     rung: str,
     n_bootstrap: int,
     n_shuffles: int,
+    cloud_terms: bool = False,
 ) -> list[dict]:
     """Return result rows for one Primary, injected farm and rung."""
     features = cache.sites[site]
@@ -182,6 +193,7 @@ def run_cell(
         y_rows=y_rows,
         targets=targets,
         weights_by_target=weights,
+        cloud_terms=cloud_terms,
     )
     shaped = common.with_shape(cache=cache, site=site, shape=shape, y=y_rows)
     base_path = paths[0]
@@ -189,7 +201,7 @@ def run_cell(
         {
             "site": site,
             "farm": farm,
-            "rung": rung,
+            "rung": rung + ("+cloudterm" if cloud_terms else ""),
             "kind": "meta",
             "mw": 0.0,
             "shuffle": 0,
@@ -215,7 +227,7 @@ def run_cell(
                     {
                         "site": site,
                         "farm": farm,
-                        "rung": rung,
+                        "rung": rung + ("+cloudterm" if cloud_terms else ""),
                         "kind": kind,
                         "mw": mw,
                         "shuffle": k,
@@ -237,6 +249,7 @@ def main() -> None:
     parser.add_argument("--bootstrap", type=int, default=N_BOOTSTRAP)
     parser.add_argument("--shuffles", type=int, default=common.N_PLACEBO_SHUFFLES)
     parser.add_argument("--suffix", default="")
+    parser.add_argument("--cloud-terms", action="store_true")
     arguments = parser.parse_args()
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     cache = c269.load_cache()
@@ -244,14 +257,20 @@ def main() -> None:
         results: list[dict] = []
         for farm in arguments.farms:
             for rung in arguments.rungs:
-                results += run_cell(
-                    cache=cache,
-                    site=site,
-                    farm=farm,
-                    rung=rung,
-                    n_bootstrap=arguments.bootstrap,
-                    n_shuffles=arguments.shuffles,
-                )
+                try:
+                    cell = run_cell(
+                        cache=cache,
+                        site=site,
+                        farm=farm,
+                        rung=rung,
+                        n_bootstrap=arguments.bootstrap,
+                        n_shuffles=arguments.shuffles,
+                        cloud_terms=arguments.cloud_terms,
+                    )
+                except (ValueError, IndexError) as error:
+                    print(f"{site} farm {farm} {rung}: skipped ({error})", flush=True)
+                    continue
+                results += cell
                 print(f"{site} farm {farm} {rung}: {len(results)} rows", flush=True)
         pl.DataFrame(results).write_parquet(
             common.WORK_DIR / f"ladder_{site}{arguments.suffix}.parquet"
