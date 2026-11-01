@@ -17,6 +17,7 @@
 | 459 | Is the sum over a load-shift donor and its recipient Primaries unchanged by the event, so that a forecast of the group sum split by a slowly changing share could work? | High (load-shift Discuss session, 2026-11-01) | Nothing | Finished: refuted, see experiment 459 |
 | 458 | Can a weight per lead band, a prequential weight, or a shrunk level offset on the lagless forecast beat the fixed 50/50 mixture of the lagged and lagless forecasts (zero fits)? | High (neural Discuss session, 2026-11-01) | Nothing | Finished: not supported, see experiment 458 |
 | 462 | Can a lag network that sees the neighbours learn to follow a level change that no neighbour mirrors, when its training worlds contain genuine level changes with and without a mirror (row 4 of the experiment 404 review, G3)? | High (neural Discuss session, 2026-11-01) | Row 3 reported; NRA final list | Done (inconclusive by design: the optimal mirror gap is 0.054 to 0.075, below the seed noise; see experiment 462) |
+| 490 | Can one lagged network, trained on injected worlds with the K2-S1 mixture as an extra target, forecast as well as that mixture of four networks and a lagless table, so serving needs one network? | High (neural Discuss session, 2026-11-01) | Distillation order: runs after the five-network-pool distillation | Planned |
 
 ## Planned experiments
 
