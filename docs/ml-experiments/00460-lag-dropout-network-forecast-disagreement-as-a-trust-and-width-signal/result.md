@@ -54,8 +54,7 @@ decision_rule: >-
   divided by the same width, is a secondary signal and does not decide. (2) Arm c or arm d is a
   candidate if, against B-mix, it is no worse than +0.03 points on rows with no labelled event, its
   q99 coverage inside real events is 0.98 or above, and its q99 pinball loss on rows with no
-  labelled event is no more than +0.02 worse, each at the six. (3) Stop and close the idea if the
-  lower bound of the AUC interval is not above 0.5, or if the lag-dropout network (arm b) loses more
+  labelled event is no more than +0.02 worse, each at the six. (3) Stop and close the idea if the lag-dropout network (arm b) loses more
   than 0.03 points against S1 (arm a) on rows with no labelled event at the six. Arms c and d are
   fitted on earlier months only and never see event labels (their fit rows are all real rows of
   earlier months), so 2025-10 has no arm c or arm d and their contrasts use four months; every
@@ -66,8 +65,10 @@ decision_rule: >-
   months beside them. The Bonferroni count is 42 (7 contrasts, 2 groups, 3 row classes). The
   minimum detectable effect is read from the seed-to-seed spread of B-mix before any contrast is
   read. Leave-one-month-out and drop-largest-event intervals are given; leave-one-Primary-out is
-  infeasible (21 events at the six). A candidate (rule 2) is only considered if rule 1 holds, and
-  must also beat controls f, g, and c0 (contrasts C4 to C6 below, interval excluding zero). Rule 2
+  infeasible (21 events at the six). The AUC (rule 1) is a diagnostic: following the
+  maintainer's aim of 2026-11-01, an adoption decision rests on forecast scores, explainability,
+  or robustness to bad inputs, so rule 2 is not gated on rule 1 and the AUC is reported beside
+  its effect on forecast scores. A candidate (rule 2) must also beat controls f, g, and c0 (contrasts C4 to C6 below, interval excluding zero). Rule 2
   sets a non-inferiority bar; a gain of 0.03 or more against B-mix on rows with no labelled event is
   what would justify porting. The q99 coverage in rule 2 is on NRA-corrected actuals over all real
   events; metered actuals and the drop-largest-event version are secondary. The AUC is computed per
