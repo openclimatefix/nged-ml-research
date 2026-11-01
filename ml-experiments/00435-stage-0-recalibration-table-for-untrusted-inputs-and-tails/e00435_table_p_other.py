@@ -22,6 +22,7 @@ from typing import Final
 import e00435_table_p_provisional as prov  # ty: ignore[unresolved-import]
 import polars as pl
 from e00435_tailcore import WIDENING, tail_table, widen
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK_DIR: Final[Path] = prov.WORK_DIR
 
@@ -159,12 +160,74 @@ def solar_430() -> pl.DataFrame:
     return pl.concat(out)
 
 
+def stale(*, source: str) -> pl.DataFrame:
+    """Score every arm of experiment 422's network `T<k>` (as `422:T0`) or of experiment 410.
+
+    The stored quantiles are fractions of capacity; the adapter converts them to MW.
+    """
+    import e00377_adapter as adapter  # ty: ignore[unresolved-import]
+    import e00425_prep as prep  # ty: ignore[unresolved-import]
+    import e00435_tails as tails  # ty: ignore[unresolved-import]
+    import numpy as np
+
+    root = ML_EXPERIMENTS_DATA_DIR
+    if source.startswith("422:"):
+        folder = (
+            root
+            / "00422-mdn-train-with-varied-origin-hour-and-age-inputs-stale-input-step-2"
+            / "work"
+            / "preds"
+            / source[4:]
+        )
+    else:
+        folder = (
+            root / "00410-mdn-stale-weather-and-delayed-power-rescore" / "work" / "preds" / "pooled"
+        )
+    series = adapter.series_table()
+    actuals = prep.cleaned_scoring_context(series=series)["actuals"].filter(
+        pl.col("actual").is_finite()
+    )
+    levels = ["q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99"]
+    out: list[pl.DataFrame] = []
+    for arm_dir in sorted(p for p in folder.iterdir() if p.is_dir()):
+        parts: list[pl.DataFrame] = []
+        for month in ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06"):
+            seeds = [
+                pl.read_parquet(f).sort("time_series_id", "power_fcst_init_time", "valid_time")
+                for f in sorted(arm_dir.glob(f"{month}_s*.parquet"))
+            ]
+            if not seeds:
+                continue
+            mean = np.sort(np.mean([s.select(levels).to_numpy() for s in seeds], axis=0), axis=1)
+            stored = (
+                seeds[0]
+                .select("time_series_id", "power_fcst_init_time", "valid_time")
+                .with_columns(*[pl.Series(c, mean[:, i]) for i, c in enumerate(levels)])
+            )
+            parts.append(
+                adapter.forecast_frame(stored=stored, series=series, unit="fraction").with_columns(
+                    month=pl.lit(month)
+                )
+            )
+        frame = pl.concat(parts).join(actuals, on=["time_series_id", "valid_time"])
+        scored = tails.with_group_and_band(frame=frame, series=series).filter(
+            pl.col("group").is_not_null() & pl.col("lead_band").is_not_null()
+        )
+        scored = scored.with_columns(
+            report_group=pl.col("group"), site_report=pl.col("label")
+        ).with_columns(*[pl.col(c).cast(pl.Float64) for c in ("actual", *levels)])
+        out.append(run(frame=scored, source=source, arm=arm_dir.name, cells={"P": "group"}))
+        print(source, arm_dir.name, flush=True)
+    return pl.concat(out)
+
+
 def main() -> None:
     """Run one source named on the command line."""
     source = sys.argv[1]
-    result = {"425": demand_425, "429": wind_429, "430": solar_430}[source]()
+    simple = {"425": demand_425, "429": wind_429, "430": solar_430}
+    result = simple[source]() if source in simple else stale(source=source)
     WORK_DIR.mkdir(parents=True, exist_ok=True)
-    result.write_parquet(WORK_DIR / f"table_p_{source}.parquet")
+    result.write_parquet(WORK_DIR / f"table_p_{source.replace(':', '_')}.parquet")
     print(source, result.height)
 
 
