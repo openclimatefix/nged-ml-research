@@ -49,8 +49,10 @@ metric: >-
   404's report; no widening beyond what the stored forecasts carry.
 verdict: refuted
 best_arm: >-
-  None beat B-mix inside real events at the signed-MW six. The closest is O-floor (exact flags, lagless
-  weight 0.5 plus half the flagged share) at +0.01 (Bonferroni interval -0.23 to +0.26) at depth 1.0.
+  No arm beat B-mix with an interval excluding zero inside real events at the signed-MW six. B6 is
+  ahead by 0.58 at depth 1.0 (95% interval -1.70 to +0.23, minimum detectable effect 1.64). The
+  closest oracle arm is O-floor (exact flags, lagless weight 0.5 plus half the flagged share) at
+  +0.01 (Bonferroni interval -0.23 to +0.26).
 headline: >-
   Scored against NRA-corrected actuals instead of metered actuals, a mixture that switches to the
   lagless forecast whenever an exact flag says a lag lies in a load-shift event (O-hard) is still
@@ -73,36 +75,54 @@ take_home_message: >-
 advice:
   - >-
     Keep the fixed 50/50 mixture as the reference for any lag-trust test, and score inside-event rows
-    against NRA-corrected actuals as well as metered actuals (this page).
+    against NRA-corrected actuals as well as metered actuals (experiment 455).
   - >-
     Do not build an event detector for the mixture rule on the argument that metered actuals mislead:
-    exact flags lose to B-mix under the NRA target too (this page, O-hard).
+    exact flags lose to B-mix under the NRA target too (experiment 455, O-hard).
 code: ml-experiments/00455-nra-corrected-rescore-of-lag-trust-flag-oracle-and-lagless-arms/
 ---
 
 **Knowing exactly which recent readings lie inside a load-shift event still does not make a mixture
 beat B-mix, even when forecasts are scored against the normal running arrangement (NRA).** B-mix is
-the fixed 50/50 mixture of the plain network and the lagless forecast. At the six Primaries metered
-in signed megawatts (the signed-MW six), O-hard (which switches to the lagless forecast whenever an
-exact flag marks a lag) scores 0.16 to 0.19 points of capacity worse than B-mix at the three depth
-factors of experiment 435's NRA correction, against 0.38 worse on metered actuals. The numbers are
-interim and unaudited.
+the fixed 50/50 mixture of the plain lagged neural-network forecast (A0-inj) and the lagless
+forecast. At the six primary substations (Primaries) metered in signed megawatts (the signed-MW
+six), O-hard switches to the lagless forecast whenever an exact flag marks a lag. It scores 0.16 to
+0.19 points of capacity worse than B-mix at the three depth factors of experiment 435's NRA
+correction, against 0.38 worse on metered actuals. Event detection is therefore not a blocker for
+the lag-trust line. The numbers are interim and unaudited.
+
+![Each arm minus B-mix inside real events at the signed-MW six](figure_1_signed_six.svg)
+
+![Each arm minus B-mix inside real events at the MVA-only eight](figure_2_mva_eight.svg)
+
+![The same at the signed-MW six with the largest event of each month dropped](figure_3_signed_six_drop.svg)
+
+## Scope and definitions
 
 This experiment fits nothing. It rescores forecasts stored by experiments 404 and 445 on the rows
-inside real events, adding the lagless head and the three flag-oracle mixtures of experiment 445 to
+inside real events. It adds the lagless head and the three flag-oracle mixtures of experiment 445 to
 the rescore that experiment 404's audit ran for its own arms.
 
-- **Row 1 of the review is answered by experiment 404's audit**, not here: `e00404_audit.py` and the
-  files `cells.parquet`, `pooled_event_weighted.csv`, and `event_counts.csv` in 404's `work/audit/`
-  folder. It found B3 and B6 behind B-mix when months are weighted by events (+0.13 and +0.15), and
-  that the 1.15 widening and table P move every entry by 0.03 or less, so B-mix minus A0-inj on
-  clean rows stays near +0.29.
+- **Row 1 of the lag-trust review (the audit re-pool of experiment 404) is answered by experiment
+  404's audit**, not here: `e00404_audit.py` and the files `cells.parquet`,
+  `pooled_event_weighted.csv`, and `event_counts.csv` in 404's `work/audit/` folder. Experiment
+  404's audit found B3 and B6 behind B-mix when months are weighted by events (+0.13 and +0.15). It
+  also found that the 1.15 widening and table P (experiment 435's recalibration of the tail
+  quantiles) move every entry by 0.03 or less, so A0-inj minus B-mix on clean rows stays near +0.29.
+- **Arms.** A0-inj is the plain lagged neural network trained on injected events, S1 is A0-inj plus
+  the lag surprise, B3 is attention over the lags, and B6 is learned windows over the surprise
+  series. The lagless head scores on its own. O-hard, O-soft, and O-floor mix the lagged and lagless
+  forecasts using the exact flags: O-hard switches to the lagless forecast when any lag is flagged,
+  O-soft puts weight (flagged lags / 3) on it, and O-floor puts 0.5 plus half the flagged share on
+  it. Scores are the continuous ranked probability score (CRPS) in points of capacity.
+- **Groups.** The MVA-only eight are the eight Primaries that report apparent power in megavolt
+  amperes (MVA) only, so their sign is unknown. D15 and D18 are the two short-history Primaries.
 - **Harm row.** The scoring code (experiment 428's window flags) calls a row a harm row when its
-  target lies outside every padded real event and outside the 96 half-hours after one, but any
-  observed half-hour of the three day-windows of its lags lies inside a padded event. The 404 plan
-  wrote the definition on the three origin lags only. A clean row has no real event near it. A row
-  "inside real events" has its target inside a padded event or in the 96 half-hours after one; this
-  page scores those rows.
+  target lies outside every padded real event and outside the 96 half-hours after one. It also
+  requires that any observed half-hour of the three day-windows of its lags lies inside a padded
+  event. Experiment 404's plan defined a harm row on the three origin lags only. A clean row has no
+  real event near it. A row "inside real events" has its target inside a padded event or in the 96
+  half-hours after one; experiment 455 scores those rows.
 - **Event counts.** The five scored months overlap 46 corrected events (21 at the signed-MW six, 16
   at the MVA-only eight, 9 at D15 and D18) and 42 padded runs. Experiment 445 counts 49 and
   experiment 435 counts 41 with different windows. At the six the bootstrap clusters are 18 on harm
@@ -112,12 +132,6 @@ the rescore that experiment 404's audit ran for its own arms.
   are a lower bound, so rows called clean may hold unlabelled real events, and the harm and
   inside-event rows undercount. The NRA-corrected actuals correct only labelled events (a measured
   deviation for 34 of 184, the labelled depth for the other 150).
-
-![Each arm minus B-mix inside real events at the signed-MW six](figure_1_signed_six.svg)
-
-![Each arm minus B-mix inside real events at the MVA-only eight](figure_2_mva_eight.svg)
-
-![The same at the signed-MW six with the largest event of each month dropped](figure_3_signed_six_drop.svg)
 
 ## Results
 
@@ -133,7 +147,8 @@ the rescore that experiment 404's audit ran for its own arms.
   MVA-only eight, which has no 2026-06 real-event rows) cannot resolve the Bonferroni tail beyond
   the smallest and largest resampled mean, so a Bonferroni interval is nearly the range of the
   monthly values and is conservative. The minimum detectable effect (2.8 times the standard error of
-  the monthly differences) is in the last column.
+  the monthly differences) is in the last column. The Bonferroni tails come from 20,000 resamples of
+  4 or 5 months and can move by a few hundredths between runs.
 
 Signed-MW six, depth factor 1.0, inside real events (25 events, 5 months):
 
@@ -169,11 +184,12 @@ MVA-only eight, depth factor 1.0 (26 events, 4 months):
 - **Metered actuals** give O-hard +0.38 [+0.21, +0.62] at the six. The NRA correction therefore
   removes about half of the gap but not the sign.
 - **At the MVA-only eight** O-hard is +0.50 to +0.55 behind at the three depths (Bonferroni
-  intervals include zero for O-hard and exclude it for A0-inj, S1, and B6). The lagless head and
-  O-floor are the only arms ahead of B-mix there (-0.12 to -0.22 and -0.07 to -0.12), and no
-  interval excludes zero.
+  intervals include zero for O-hard and exclude it for A0-inj, S1, and B6). The lagless head
+  is ahead of B-mix at depth factors 1.0 and 1.25 (-0.12 and -0.22) and level at 0.75 (+0.01).
+  O-floor is ahead at all three (-0.02 to -0.12). Only O-floor at depth 1.25 has a 95% interval that
+  excludes zero (-0.31 to -0.00), and no Bonferroni interval does.
 - **Against the predictions.** P1 holds (the O-hard contrast stays above zero, moving from +0.38 to
-  +0.16 to +0.19). P2 holds at the six (the lagless head is +0.08 to +0.11 behind at every depth,
+  +0.16 to +0.19). P2 holds at the six (the lagless head is +0.09 to +0.11 behind at every depth,
   with intervals that include zero). P3 fails: dropping the largest event of each month never
   changes the sign of an O-hard contrast.
 - **Checks.** No new forecast is written, so the median-minus-mean and mean-forecast-error checks do
@@ -183,11 +199,11 @@ MVA-only eight, depth factor 1.0 (26 events, 4 months):
 ## Caveats
 
 - **Few months and events.** Five months and 25 events at the six cannot detect a difference below
-  about 0.2 points of capacity for the oracle arms and 0.4 or more for the others, and the MVA-only
-  eight has four months.
-- **Depth.** The NRA correction uses the labelled depth for 150 of 184 events, so its error is
-  repeated by the three depth factors, which scale the same correction.
-- **Tails.** This page scores CRPS only. The tails and the avoidable-curtailment cost are not
+  about 0.2 points of capacity for the oracle arms and 0.26 to 1.64 for the others (0.38 to 0.40 for
+  A0-inj, S1, and B3), and the MVA-only eight has four months.
+- **Depth.** The NRA correction uses the labelled depth for 150 of 184 events, so the correction's
+  error is repeated at all three depth factors, which scale the same correction.
+- **Tails.** Experiment 455 scores CRPS only. The tails and the avoidable-curtailment cost are not
   rescored; experiment 445 found B-mix's q99 covers 71.8% inside real events at the six.
 - **Row set.** Rows with leads above 240 hours are excluded to match 404's audit; experiment 445's
   +0.465 includes them, which is why the metered figure here is +0.38.
@@ -197,5 +213,5 @@ MVA-only eight, depth factor 1.0 (26 events, 4 months):
 
 - **Stop work on event detection for the mixture rule.** Exact flags lose to B-mix under both
   targets.
-- **Row 3 of the review** (a mixture and ensemble family) and the ambiguous-world test are the live
-  lines; this page changes neither.
+- **Row 3 of the lag-trust review** (a mixture and ensemble family) and the ambiguous-world test
+  are the live lines; experiment 455 changes neither.
