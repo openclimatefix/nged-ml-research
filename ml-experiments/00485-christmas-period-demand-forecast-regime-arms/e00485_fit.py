@@ -16,7 +16,8 @@ network is the same shape throughout; an arm that does not use a column leaves i
 The stored reference H0 is experiment 425's own fits; `H0r` refits one (month, seed) to show the
 widened network reproduces them within noise. Row weights multiply the recency weight
 `0.5 ** (age_days / SHORT_HALF_LIFE_DAYS)`. Early stopping sees the held-out weeks' unweighted
-negative log-likelihood, never replay rows. Replay rows have the fold's mean recency weight (so their loss share is about 25%) and are drawn with replacement.
+negative log-likelihood, never replay rows. Replay rows have the fold's mean recency weight
+(so their loss share is about 25%) and are drawn with replacement.
 
 ```bash
 source .e485env.sh
