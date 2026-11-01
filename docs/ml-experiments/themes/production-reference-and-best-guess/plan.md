@@ -15,6 +15,7 @@
 | 419 | Do the solar summary, the sunny flag, and a different row-weight half-life, which helped the XGBoost model, also help the pooled mixture density network? | High (maintainer asked 2026-10-30) | Slot from the manager | Planned |
 | 457 | Does giving 425's arm A the out-of-fold GAM stage-1 forecast, as an input or an additive base, lower CRPS at the eight MVA-only Primaries? | High (maintainer asked 2026-11-01) | Nothing | Finished: the GAM as an input lowers CRPS by 0.036 at the eight (equal to the minimum detectable effect); as an additive base it raises CRPS by 0.291 |
 | 468 | How do the best wind, solar, and demand forecasters behave hour by hour and event by event, and where do they fail? | High (maintainer asked 2026-11-01) | Nothing | Finished: Part A, real events, and the injected grid (experiment 482) |
+| 484 | Does weighting the fine-tuning rows toward cold winter nights, high-flow half-hours at the signed-MW six, or winter improve the demand network on those rows without losing elsewhere? | High (maintainer approved 2026-11-01) | Nothing | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 
