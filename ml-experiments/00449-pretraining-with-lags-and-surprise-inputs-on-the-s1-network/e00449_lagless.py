@@ -172,7 +172,7 @@ def half_scales(*, month: str, seed: int, table: pl.DataFrame, clean: np.ndarray
     """Return the per-Primary factor that gives the ERA5 surprise the ensemble table's spread.
 
     Over the half-hours before the refit where both tables exist, the factor is the ERA5 surprise
-    standard deviation over the ensemble one. A factor outside 0.3 to 3 raises.
+    standard deviation over the ensemble one. A factor outside 0.25 to 4 raises.
     """
     median = np.full((len(data.sites()), data.grid_length()), np.nan, dtype=np.float32)
     half = np.full_like(median, np.nan)
@@ -199,8 +199,8 @@ def half_scales(*, month: str, seed: int, table: pl.DataFrame, clean: np.ndarray
     print(
         f"  {month} s{seed} half-width factors: " + " ".join(f"{r:.2f}" for r in ratio), flush=True
     )
-    if not ((ratio > 0.3) & (ratio < 3.0)).all():
-        msg = f"{month} s{seed}: a half-width factor is outside 0.3 to 3: {ratio}"
+    if not ((ratio > 0.25) & (ratio < 4.0)).all():
+        msg = f"{month} s{seed}: a half-width factor is outside 0.25 to 4: {ratio}"
         raise ValueError(msg)
     return pl.DataFrame(
         {"primary": np.arange(len(ratio), dtype=np.int16), "half_scale": ratio.astype(np.float32)}

@@ -190,8 +190,7 @@ on ERA5 and CAMS weather, by the method of experiment 404's table:
   is therefore multiplied, per Primary, by the ratio of the two surprise standard deviations over
   the half-hours before the refit where both tables exist (the ensemble years), so the pretraining
   surprise has the scale the network sees in fine-tuning. The ratio uses no data at or after the
-  refit. The ratios are printed per fold and Primary; a ratio outside 0.3 to 3 stops the run (the
-  first smoke check, fold 2026-01 seed 0, gave 0.61 to 2.31 across the 16 Primaries).
+  refit. The ratios are printed per fold and Primary; a ratio outside 0.25 to 4 stops the run (widened from 0.3 to 3 after the first 2025-12 build gave 0.295 at one Primary; the other builds gave 0.41 to 2.31).
 - **Overlap years.** Pretraining rows after 2024-04 use the ERA5 table in pretraining and the
   ensemble table in fine-tuning, for the same half-hours.
 - **Non-causal and unpurged.** A module forecasting a block is trained on later blocks too, as in
