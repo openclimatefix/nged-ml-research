@@ -10,7 +10,7 @@ encroachment sweep read all arms from one place.
 
 ```bash
 PYTHONPATH=<as e00495_fit.py shows> \
-    uv run --no-sync python ml-experiments/00495-*/e00495_score.py predict --arms R05 R50 \
+    uv run --no-sync python ml-experiments/00495-*/e00495_score.py predict --arms HN \
     --month 2026-06 --seed 0 --device cuda
 ```
 """

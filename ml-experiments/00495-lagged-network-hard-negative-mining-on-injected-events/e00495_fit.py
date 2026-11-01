@@ -29,6 +29,7 @@ DATA_PATH_INTERNAL=<the internal data folder> OMP_NUM_THREADS=1 \
 
 import argparse
 import time
+from functools import partial
 from pathlib import Path
 from typing import Final
 
@@ -78,18 +79,18 @@ def load_world(*, seed: int) -> tuple[np.ndarray, np.ndarray]:
 
 def _quantiles(
     *,
-    net,
-    pool,
-    idx,
-    lags,
-    stack,
-    lag_grid,
-    scalers,
-    metered,
-    mask,
-    power,
-    mu,
-    sd,  # noqa: ANN001
+    net: torch.nn.Module,
+    pool: fit.Pool,
+    idx: torch.Tensor,
+    lags: torch.Tensor,
+    stack: rows_mod.Stack,
+    lag_grid: torch.Tensor,
+    scalers: fit.Scalers,
+    metered: torch.Tensor,
+    mask: torch.Tensor,
+    power: torch.Tensor,
+    mu: torch.Tensor,
+    sd: torch.Tensor,
 ) -> torch.Tensor:
     """Return the 11 quantiles in capacity fractions for the rows `idx`."""
     out = fit.forward(
@@ -103,17 +104,17 @@ def _quantiles(
 
 
 @torch.no_grad()
-def mine(  # noqa: PLR0913
+def mine(
     *,
-    net,
-    train,
-    injected,
-    clean,
-    code,
-    scalers,
-    metered,
-    mask,
-    device: str,  # noqa: ANN001
+    net: torch.nn.Module,
+    train: fit.Pool,
+    injected: tuple,
+    clean: tuple,
+    code: np.ndarray,
+    scalers: fit.Scalers,
+    metered: torch.Tensor,
+    mask: torch.Tensor,
+    device: str,
 ) -> pl.DataFrame:
     """Score every training row once and return one row per training row with the hard flags.
 
@@ -136,7 +137,8 @@ def mine(  # noqa: PLR0913
     corrupted = (code_t[train.primary[:, None], safe] != 0).any(dim=1)
     diff = power_i[train.primary[:, None], safe] - power_c[train.primary[:, None], safe]
     step = torch.nan_to_num(diff, nan=0.0).mean(dim=1)
-    common_kwargs = dict(  # noqa: C408
+    quantiles = partial(
+        _quantiles,
         net=net,
         pool=train,
         lag_grid=grid,
@@ -150,17 +152,17 @@ def mine(  # noqa: PLR0913
     follow = torch.full((n,), float("nan"), device=device)
     for start in range(0, n, fit.BATCH):
         idx = torch.arange(start, min(start + fit.BATCH, n), device=device)
-        q_i = _quantiles(idx=idx, lags=lags_i, stack=stack_i, power=power_i, **common_kwargs)
+        q_i = quantiles(idx=idx, lags=lags_i, stack=stack_i, power=power_i)
         err = train.y[idx][:, None] - q_i
         loss[idx] = torch.maximum(levels * err, (levels - 1.0) * err).mean(dim=1)
         usable = corrupted[idx] & (step[idx].abs() >= STEP_FLOOR)
         if bool(usable.any()):
             sub = idx[usable]
-            q_c = _quantiles(idx=sub, lags=lags_c, stack=stack_c, power=power_c, **common_kwargs)
+            q_c = quantiles(idx=sub, lags=lags_c, stack=stack_c, power=power_c)
             follow[sub] = (q_i[usable][:, 5] - q_c[:, 5]) / step[sub]
     loss_np, corrupted_np = loss.cpu().numpy(), corrupted.cpu().numpy()
     limits = {
-        flag: float(np.quantile(loss_np[corrupted_np == flag], LOSS_QUANTILE))
+        flag: float(np.nanquantile(loss_np[corrupted_np == flag], LOSS_QUANTILE))
         for flag in (True, False)
     }
     limit_row = np.where(corrupted_np, limits[True], limits[False])
@@ -182,7 +184,7 @@ def mine(  # noqa: PLR0913
     )
 
 
-def fit_hn(*, month: str, seed: int, device: str, stride: int) -> Path:
+def fit_hn(*, month: str, seed: int, device: str, stride: int) -> Path:  # noqa: PLR0915
     """Fit arm HN for a month and seed; save the epoch-3 checkpoint and the final network."""
     started = time.monotonic()
     train, _test, scalers, _arrays, lag_stats = fit.build_pools(
@@ -279,9 +281,14 @@ def fit_hn(*, month: str, seed: int, device: str, stride: int) -> Path:
         losses.append(total / len(order))
         print(f"HN {month} s{seed} epoch {epoch}: loss {losses[-1]:.4f}", flush=True)
     torch.save(
-        {"state": net.state_dict(), **saved, "losses": losses, "seconds": time.monotonic() - started},
+        {
+            "state": net.state_dict(),
+            **saved,
+            "losses": losses,
+            "seconds": time.monotonic() - started,
+        },
         path,
-    )  # fmt: skip
+    )
     print(f"HN {month} s{seed}: {n:,} rows, {time.monotonic() - started:.0f} s -> {path}")
     return path
 
