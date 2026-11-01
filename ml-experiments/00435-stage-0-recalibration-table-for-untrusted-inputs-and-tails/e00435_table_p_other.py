@@ -32,18 +32,25 @@ def with_cell(*, frame: pl.DataFrame, cell: str) -> pl.DataFrame:
     return frame.with_columns(group=pl.col(cell).cast(pl.String))
 
 
-def run(*, frame: pl.DataFrame, source: str, arm: str, cells: dict[str, str]) -> pl.DataFrame:
+def run(
+    *,
+    frame: pl.DataFrame,
+    source: str,
+    arm: str,
+    cells: dict[str, str],
+    bounds: tuple[float, float] | None = None,
+) -> pl.DataFrame:
     """Score each month after the first with P fitted on the earlier months, per cell choice."""
     months = sorted(frame["month"].unique())
     out: list[pl.DataFrame] = []
     for i, month in enumerate(months[1:], start=1):
         earlier = frame.filter(pl.col("month").is_in(months[:i]))
         held = frame.filter(pl.col("month") == month)
-        variants = {"raw": held, "w1.15": widen(frame=held, factor=WIDENING)}
+        variants = {"raw": held, "w1.15": widen(frame=held, factor=WIDENING, bounds=bounds)}
         for name, cell in cells.items():
             factors = prov.fit_factors(fit=with_cell(frame=earlier, cell=cell))
             variants[name] = prov.apply_factors(
-                frame=with_cell(frame=held, cell=cell), factors=factors
+                frame=with_cell(frame=held, cell=cell), factors=factors, bounds=bounds
             )
         for variant, variant_frame in variants.items():
             reported = variant_frame.with_columns(group=pl.col("report_group"))
@@ -126,7 +133,13 @@ def wind_429() -> pl.DataFrame:
             cell_med=pl.col("site") + pl.col("median_band"),
         )
         out.append(
-            run(frame=frame, source="429", arm=name, cells={"P": "site", "P_med": "cell_med"})
+            run(
+                frame=frame,
+                source="429",
+                arm=name,
+                cells={"P": "site", "P_med": "cell_med"},
+                bounds=(0.0, 1.0),
+            )
         )
     return pl.concat(out)
 
@@ -156,7 +169,15 @@ def solar_430() -> pl.DataFrame:
             )
             .filter(pl.col("lead_band").is_not_null())
         )
-        out.append(run(frame=mean, source="430", arm=arm_dir.name, cells={"P": "time_series_id"}))
+        out.append(
+            run(
+                frame=mean,
+                source="430",
+                arm=arm_dir.name,
+                cells={"P": "time_series_id"},
+                bounds=(0.0, 1.0),
+            )
+        )
     return pl.concat(out)
 
 

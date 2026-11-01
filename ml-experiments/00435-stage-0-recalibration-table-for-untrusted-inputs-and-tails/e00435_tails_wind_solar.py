@@ -59,14 +59,22 @@ def median_band_expr() -> pl.Expr:
 
 
 def score_frame(
-    *, frame: pl.DataFrame, source: str, arm: str, by_sets: list[list[str]]
+    *,
+    frame: pl.DataFrame,
+    source: str,
+    arm: str,
+    by_sets: list[list[str]],
+    bounds: tuple[float, float] | None = (0.0, 1.0),
 ) -> pl.DataFrame:
     """Return the raw and widened tail tables of one arm for each key set in `by_sets`."""
     out: list[pl.DataFrame] = []
     scored = frame.filter(pl.col("actual").is_not_nan() & pl.col("actual").is_not_null())
     scored = scored.with_columns(lead_band=lead_band_expr(), median_band=median_band_expr())
     scored = scored.filter(pl.col("lead_band").is_not_null())
-    for variant, f in (("raw", scored), ("w1.15", widen(frame=scored, factor=WIDENING))):
+    for variant, f in (
+        ("raw", scored),
+        ("w1.15", widen(frame=scored, factor=WIDENING, bounds=bounds)),
+    ):
         for by in by_sets:
             table = tail_table(frame=f, by=tuple(by))
             out.append(

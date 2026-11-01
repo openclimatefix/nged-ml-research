@@ -33,10 +33,26 @@ def lead_band_expr(*, column: str = "lead_hours") -> pl.Expr:
     return band
 
 
-def widen(*, frame: pl.DataFrame, factor: float) -> pl.DataFrame:
-    """Scale each quantile's distance from the median by `factor`."""
+def clip_to(*, expr: pl.Expr, bounds: tuple[float, float] | None) -> pl.Expr:
+    """Clip `expr` to `bounds` (the physical range of the target), or leave it unchanged."""
+    return expr if bounds is None else expr.clip(*bounds)
+
+
+def widen(
+    *, frame: pl.DataFrame, factor: float, bounds: tuple[float, float] | None = None
+) -> pl.DataFrame:
+    """Scale each quantile's distance from the median by `factor`, then clip to `bounds`.
+
+    Wind and solar targets are shares of capacity, so `bounds` is (0, 1) for them. Demand in MW has
+    no bound that is the same for every series, so demand callers leave `bounds` as None.
+    """
     return frame.with_columns(
-        *[(pl.col("q50") + factor * (pl.col(q) - pl.col("q50"))).alias(q) for q in TAIL_LEVELS]
+        *[
+            clip_to(expr=pl.col("q50") + factor * (pl.col(q) - pl.col("q50")), bounds=bounds).alias(
+                q
+            )
+            for q in TAIL_LEVELS
+        ]
     )
 
 

@@ -26,6 +26,7 @@ import polars as pl
 from e00435_tailcore import (  # ty: ignore[unresolved-import]
     TAIL_LEVELS,
     WIDENING,
+    clip_to,
     lead_band_expr,
     tail_table,
     widen,
@@ -134,16 +135,23 @@ def fit_factors(*, fit: pl.DataFrame) -> pl.DataFrame:
     )  # fmt: skip
 
 
-def apply_factors(*, frame: pl.DataFrame, factors: pl.DataFrame) -> pl.DataFrame:
-    """Scale each tail quantile's distance from the median by its fitted factor."""
+def apply_factors(
+    *,
+    frame: pl.DataFrame,
+    factors: pl.DataFrame,
+    bounds: tuple[float, float] | None = None,
+) -> pl.DataFrame:
+    """Scale each tail quantile's distance from the median by its fitted factor, then clip."""
     out = frame
     for name in TAIL_LEVELS:
         f = factors.filter(pl.col("tail") == name).select("group", "lead_band", "factor")
         out = (
             out.join(f, on=["group", "lead_band"], how="left")
             .with_columns(
-                (
-                    pl.col("q50") + pl.col("factor").fill_null(1.0) * (pl.col(name) - pl.col("q50"))
+                clip_to(
+                    expr=pl.col("q50")
+                    + pl.col("factor").fill_null(1.0) * (pl.col(name) - pl.col("q50")),
+                    bounds=bounds,
                 ).alias(name)
             )
             .drop("factor")
