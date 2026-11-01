@@ -41,7 +41,7 @@ def main() -> None:
     frame = pl.DataFrame(rows)
     base = alt.Chart(frame).encode(y=alt.Y("setting:N", sort=None, title=None))
     chart = (
-        base.mark_rule(color=ocf.DATA_BLUE).encode(
+        base.mark_rule(color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "lo:Q",
                 title=[
@@ -51,11 +51,11 @@ def main() -> None:
             ),
             x2="hi:Q",
         )
-        + base.mark_point(color=ocf.DATA_BLUE, filled=True, size=60).encode(x="d:Q")
-        + alt.Chart(pl.DataFrame({"x": [-0.10, 0.0], "label": ["margin -0.10", "base"]}))
+        + base.mark_point(color=ocf.DATA_BLUE, filled=True, size=60).encode(x="d:Q")  # ty: ignore[unresolved-attribute]
+        + alt.Chart(pl.DataFrame({"x": [-0.10, 0.0], "label": ["margin -0.10", "base"]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3])
         .encode(x="x:Q")
-        + alt.Chart(pl.DataFrame({"x": [-0.10], "label": ["margin -0.10"]}))
+        + alt.Chart(pl.DataFrame({"x": [-0.10], "label": ["margin -0.10"]}))  # ty: ignore[unresolved-attribute]
         .mark_text(align="left", dx=3, dy=-4, baseline="bottom")
         .encode(x="x:Q", text="label:N", y=alt.value(0))
     ).properties(
@@ -70,7 +70,7 @@ def main() -> None:
         ]
     )  # fmt: skip
     bars = (
-        alt.Chart(farms)
+        alt.Chart(farms)  # ty: ignore[unresolved-attribute]
         .mark_circle(size=70)
         .encode(
             x=alt.X("share:Q", title="Share of observations above q99 after table P (%)"),
@@ -79,11 +79,11 @@ def main() -> None:
         )
     )
     limit = (
-        alt.Chart(pl.DataFrame({"x": [1.5], "label": ["1.5% limit"]}))
+        alt.Chart(pl.DataFrame({"x": [1.5], "label": ["1.5% limit"]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3])
         .encode(x="x:Q")
     )
-    limit = limit + alt.Chart(pl.DataFrame({"x": [1.5], "label": ["1.5% limit"]})).mark_text(
+    limit = limit + alt.Chart(pl.DataFrame({"x": [1.5], "label": ["1.5% limit"]})).mark_text(  # ty: ignore[unresolved-attribute]
         align="left", dx=3, baseline="bottom"
     ).encode(x="x:Q", text="label:N", y=alt.value(0))
     (bars + limit).properties(
