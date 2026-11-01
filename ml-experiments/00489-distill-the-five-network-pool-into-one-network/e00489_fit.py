@@ -54,7 +54,7 @@ import numpy as np
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK_DIR: Final[Path] = (
+WORK_DIR: Path = (
     ML_EXPERIMENTS_DATA_DIR / "00489-distill-the-five-network-pool-into-one-network" / "work"
 )
 TEACHER_SEEDS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
