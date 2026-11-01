@@ -8,7 +8,7 @@ theme: production-reference-and-best-guess
 also_relevant_to:
   - calibration-and-uncertainty
   - curtailment-cost
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -17,7 +17,8 @@ size: >-
   curtailment weight (which fraction f, which flow), so the plan fixes it before any fit. 45
   fine-tunes of a stored pretrained network, about 0.8 GPU-hours on one GPU process under 8 GB and
   one feeder core. Production serving path: not touched (this repository holds none). Degradation
-  rule: not touched. Dependencies: the scripts import experiments 87, 397, 404, 418, 425, 448, 454, and
+  rule: not touched. Dependencies: the scripts import experiments 87, 397, 404, 418, 425, 448,
+  454, and
   470, whose callers sit in those folders.
 hypothesis: >-
   Experiments 435 and 470 left cold nights worse than the tail target, and avoidable
@@ -25,17 +26,22 @@ hypothesis: >-
   with larger weights on the rows that decide NGED's costs lowers the error on those rows without
   raising it elsewhere.
 prediction: >-
-  Written before any fit. P1 (W-cold): CRPS on cold nights (the scorer's `cold_nights` slice) falls by at least the larger of
+  Written before any fit. P1 (W-cold): CRPS on cold nights (the scorer's `cold_nights` slice)
+  falls by at least the larger of
   0.05 points and the cold-night minimum detectable effect, at the eight and at the six, relative to
   experiment 425's stored fit. A smaller contrast is inconclusive. P2 (all-row equivalence): the
   all-row CRPS of W-cold, W-curt, and W-season differs from the stored fit by less than the minimum
   detectable effect of the all-row slice (0.065 at the eight and 0.100 at the six for one seed in
   experiment 470; recomputed here for the mean of three seeds), so the weighting does not trade away
-  the other rows. P3 (W-curt): avoidable-curtailment cost at f = 0.75 at the signed-MW six falls by at
-  least 0.1 million pounds, with the q99 pinball loss at the eight and the six rising by at most 0.02
-  points. P3 holds only if the cell-bootstrap interval of the f = 0.75 difference from the stored fit lies
+  the other rows. P3 (W-curt): avoidable-curtailment cost at f = 0.75 at the signed-MW six falls
+  by at
+  least 0.1 million pounds, with the q99 pinball loss at the eight and the six rising by at most
+  0.02
+  points. P3 holds only if the cell-bootstrap interval of the f = 0.75 difference from the stored
+  fit lies
   entirely below -0.1 million pounds. W-season is descriptive: it enters no prediction, but its nine
-  tests stay in the count of 27 so that the intervals stay conservative. Experiment 447 found the demand network insensitive to the settings it varied, so
+  tests stay in the count of 27 so that the intervals stay conservative. Experiment 447 found the
+  demand network insensitive to the settings it varied, so
   the null is likely.
 decision_rule: >-
   Arms are W-cold, W-curt, and W-season, each fine-tuned from the stored pretrained weights of
@@ -52,7 +58,8 @@ decision_rule: >-
   labelled event; (3) CRPS at the six on real-event rows against normal-running-arrangement
   actuals; (4) and (5) CRPS on cold nights at the eight and at the six; (6) and (7) CRPS in the 12
   to 36 hour band at the eight and at the six; (8) and (9) q99 pinball loss at the eight and at the
-  six on rows with no labelled event). Christmas week, D15 and D18, the other tails, and avoidable-curtailment
+  six on rows with no labelled event). Christmas week, D15 and D18, the other tails, and
+  avoidable-curtailment
   cost at f = 0.9, 0.75, and 0.5 (cell bootstrap, as experiment 470) are descriptive and enter no
   count, except that P3 reads the f = 0.75 interval. The minimum detectable effect (experiment 428's
   formula on the seed spread of the stored arm A single seeds, for the mean of three seeds,
@@ -73,38 +80,107 @@ metric: >-
   CRPS from the 11 quantiles in points of effective capacity; coverage and pinball loss at q01, q05,
   q95, and q99 raw and with the 1.0 to 1.15 widening sweep; avoidable-curtailment cost at f = 0.9,
   0.75, and 0.5 at the signed-MW six with cell-bootstrap intervals; per group and per Primary.
+verdict: not supported
+best_arm: >-
+  None clears its prediction. W-curt lowers CRPS by 0.096 points at the six on rows with no
+  labelled event, but raises it by 0.328 on real-event rows.
+headline: >-
+  Weighting the fine-tuning rows toward cold nights, high-flow half-hours, or winter did not move
+  the rows NGED cares about by more than the noise floor, and avoidable-curtailment cost at the six
+  did not change (W-curt minus the stored fit at f = 0.75: -0.065 million pounds, 95% interval
+  -0.46 to +0.31).
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  Making the network pay more attention to cold nights, to high-flow half-hours at the six
+  signed-MW Primaries, or to winter did not improve the forecasts that matter to NGED. Cold-night
+  error at the eight fell by 0.068 points under W-cold, which is inside the noise floor of 0.17, and
+  avoidable-curtailment cost did not change. Weighting winter (W-season) made the forecast worse.
+  The hard rows are limited by the inputs, not by how the fine-tune weighs them, so the next step is
+  a different input or model, not another weighting.
+lessons: >-
+  A weight of 3 on 2% to 25% of the rows changes the fit by less than the seed-to-seed noise, except
+  where it removes useful signal (W-season) or trades one row set for another (W-curt).
+advice:
+  - >-
+    Do not weight fine-tuning rows toward cold nights or winter to improve cold-night CRPS; the
+    gains are inside the noise floor and winter weighting raises CRPS at the eight (Results).
+  - >-
+    Do not weight high-flow half-hours to lower avoidable-curtailment cost; the cost did not move,
+    and CRPS on real-event rows rose by 0.328 points (Results).
 ---
 
-## Does weighting the fine-tuning rows toward the rows NGED cares about help?
+## Weighting the fine-tuning rows toward hard rows did not help
 
-**Plan only; the write-up replaces this section when the fits finish.**
+**Take-home message.** The weights did not improve the forecast on the rows NGED cares about by
+more than the noise floor, and winter weighting made it worse. The rows are limited by the inputs,
+so the next experiment should change an input or the model, not the weights.
 
-### Arms and weights
+We fine-tuned experiment 425's pretrained demand network (five folds, three seeds each) with a
+weight of 3 on cold nights (W-cold), on half-hours at or above 0.75 times a Primary's maximum flow
+at the signed-MW six (W-curt), and on December to February (W-season). The reference W0 is
+experiment 425's own stored fit: a W0 refit of 2026-01, seed 0 reproduced it exactly. Scores are
+CRPS in points of effective capacity on experiment 470's rows, 1.15 widening, month-block
+bootstrap with Bonferroni intervals (count 27). All scores are selection-biased, because the five
+folds that choose also score.
 
-- **Reference W0.** Experiment 425's stored arm A fits, seeds 0 to 2 (`seed_preds/A/{month}_s{0-2}.parquet`
-  in its data folder). Pretrained weights: `00425-.../work/pretrained/A/{month}_s{0-4}.pt`.
-- **W-cold.** Weight 3 on a half-hour whose sun is below -5 degrees and whose ERA5 temperature is
-  3 degrees Celsius or lower. This is the scorer's `cold_nights` rule (`studies.eval_protocol.slices`),
-  not a per-Primary temperature decile, so the weighted rows and the scored rows are the same kind of
-  row. 1 elsewhere.
-- **W-curt.** Weight 3 (1 plus 2) on a half-hour of one of the signed-MW six (D5, D9, D10, D11, D14,
-  D16) whose flow is at least 0.75 times that Primary's maximum flow in the fold's fine-tuning
-  window (the scaled limit of `studies.node_curtailment` at f = 0.75). The scorer takes the maximum over
-  the whole history before the scored year, so the weighted rows are near each fold's window
-  maximum, not exactly the scorer's near-limit rows; the fit logs the share per Primary. 1 elsewhere. No forecast is
-  needed.
-- **W-season.** Weight 3 on every half-hour in local December, January, or February (the ENS rows start in 2024-04, so the
-  fold windows hold one or two winters).
-- **W-both** (the product of W-cold and W-curt, capped at 6) is not run.
+![Weighted arms minus the stored fit on the gating slices, with Bonferroni 95% intervals](figure1_contrasts.svg)
 
-### Compute and reuse
+### Arms
 
-- 45 fine-tunes (3 arms times 5 folds times 3 seeds), each about 1 minute, one GPU process under
-  8 GB with one feeder core, about 0.8 GPU-hours. One W0 refit (2026-01, seed 0) is kept as the
-  reproduction check; the reference is experiment 425's stored fits.
-- Reused: experiment 425's pretrained weights and stored arm A forecasts (seeds 0 to 2), experiment
-  470's row context and scorer. Fitted: the 45 weighted fine-tunes.
-- Monthly refits, cleaned data, and the D15 and D18 start cut come from experiment 425's fold
-  builder unchanged.
-- Production cost: no extra serving network; the change is a training-loop weight, so the monthly
-  refit costs the same number of fits.
+- **W0.** Experiment 425's stored arm A fits, seeds 0 to 2 (pretrained weights
+  `00425-.../work/pretrained/A/{month}_s{0-2}.pt`).
+- **W-cold.** Weight 3 on night half-hours (sun below -5 degrees) with ERA5 temperature at or below
+  3 degrees Celsius.
+- **W-curt.** Weight 3 on half-hours at the signed-MW six (D5, D9, D10, D11, D14, D16) whose flow is
+  at least 0.75 times that Primary's maximum flow in the fold's window.
+- **W-season.** Weight 3 on local December, January, and February.
+- **Compute.** 45 fine-tunes, about 35 s each, one GPU process.
+
+### Results
+
+- **Minimum detectable effect (printed before any contrast; three-seed mean).** 0.083 at the
+  eight, 0.112 at the six on rows with no labelled event, 0.169 on cold nights at the eight, and
+  0.236 on cold nights at the six.
+- **W-cold fails P1.** Cold-night CRPS at the eight fell by 0.068 [-0.104, -0.031], inside the 0.169
+  minimum detectable effect, so the contrast is inconclusive. At the six it rose by 0.031
+  [-0.008, +0.060]. All-row CRPS changed by -0.005 at the eight and the six.
+- **W-curt fails P3.** Avoidable-curtailment cost at f = 0.75 changed by -0.065 million pounds
+  [-0.46, +0.31] against a required -0.1 with an interval below it. At f = 0.9 it rose by 0.079
+  [-0.03, +0.27] and at f = 0.5 it changed by -0.073 [-0.78, +0.57]. Its CRPS fell by 0.096
+  [-0.122, -0.072] at the six on rows with no labelled event (inside the 0.112 minimum detectable
+  effect) and by 0.093 on cold nights at the six, but rose by 0.328 [+0.245, +0.402] on real-event
+  rows scored against normal-running-arrangement actuals. The all-row loss bound of 0.02 at the six
+  is therefore not met on that slice.
+- **W-season is worse.** CRPS rose by 0.070 [+0.048, +0.094] at the eight, by 0.081 on cold nights
+  at the eight, and by 0.133 on cold nights at the six.
+- **Absolute CRPS (W0, all arms on identical rows).** Eight 4.764 (W-cold 4.759, W-curt 4.765,
+  W-season 4.834); six, no labelled event 3.517 (3.512, 3.421, 3.543); cold nights at the eight
+  4.286 (4.218, 4.278, 4.367); cold nights at the six 5.955 (5.985, 5.862, 6.087).
+- **Tails.** q99 pinball loss rose by at most 0.005 points (W-season at the eight), inside the +0.02
+  rule. Cold-night q99 coverage at the six is 0.872 for W0 against a 0.99 target, and no arm moved
+  it by more than 0.01 (W-cold 0.863, W-curt 0.878, W-season 0.863).
+
+### Rows, cost, and caveats
+
+- **Weighted rows.** The share of training rows up-weighted at 2026-01 was 4.1% (W-cold), 2.4%
+  (W-curt), and 20.3% (W-season); the fit logs give the per-fold and per-Primary shares.
+- **Early stopping.** The held-out-week loss is unweighted for every arm, and every weight
+  multiplies the recency weight that experiment 425 already applies.
+- **Production cost.** None: a weight adds no serving network and no refit.
+- **Not done.** The example-forecast plots, the load-shift event plots, and the audit-trigger
+  checks (median minus mean forecast, mean-forecast error) were not produced, because the verdict
+  is a null on the contrasts above; a follow-up that builds on a weighted arm would need them.
+- **Cold-night rule.** The weight uses the scorer's `cold_nights` rule (sun below -5 degrees and ERA5
+  temperature at or below 3 degrees Celsius), not the brief's per-Primary decile, so the weighted
+  and scored rows match.
+- **Curtailment weight.** The scorer fixes the limit from the whole history before the scored year;
+  the weight uses each fold's window maximum, so the weighted rows are near, not equal to, the
+  scorer's near-limit rows.
+- **Label gaps.** NGED's event labels are incomplete, so rows with no labelled event may hold
+  events.
+- **Reviews.** A fresh Sonnet agent reviewed the plan and code before the fits, and another
+  reviewed the scorer before its numbers were read; neither found a bug.
+- **Files.** Fitted networks and forecasts are in the experiment's private `work/` folder.
+- **What to try next.** Change an input (for example an explicit cold-night or load-shift signal)
+  rather than the weights.
