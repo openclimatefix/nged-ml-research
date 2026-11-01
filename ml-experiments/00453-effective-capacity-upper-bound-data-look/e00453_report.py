@@ -27,7 +27,7 @@ RULE_ORDER: Final[list[str]] = ["p99", "p99.9", "p99.99", "max"]
 SITES: Final[list[str]] = [
     "Farm A", "Farm B", "Farm C", "Solar A", "Solar B", "Solar C", "Solar D", "Solar E", "Solar F",
 ]  # fmt: skip
-BOOTSTRAPS: Final[int] = 2000
+BOOTSTRAPS: Final[int] = 1000
 
 
 def fig_sorted_tail(*, series: pl.DataFrame) -> None:
@@ -173,23 +173,28 @@ def score_ratios(*, rows: pl.DataFrame) -> None:
                 _change_vs_p99(
                     per=per, sites=sites, rule=rule, sample=list(rng.choice(months, len(months)))
                 )
-                for _ in range(BOOTSTRAPS // 10)
+                for _ in range(BOOTSTRAPS)
             ]
             low, high = np.percentile(boots, [2.5, 97.5])
             print(f"{tech} {rule}: MW score vs p99 {point:+.2f}% (95% {low:+.2f} to {high:+.2f})")
 
 
 def plausibility_by_threshold(*, high: pl.DataFrame, summary: pl.DataFrame) -> None:
-    """Print, per series and threshold, the half-hours above it and the share that is plausible."""
+    """Print, per series and threshold, the half-hours at or above it and the plausible share.
+
+    `all flags` counts spike, stuck, level-shift, and weather flags; `no level` leaves the
+    level-shift flag out, because a high-level month is real output at an earlier capacity.
+    """
     for site in SITES:
         row = summary.filter(pl.col("site") == site).row(0, named=True)
         part = high.filter(pl.col("site") == site)
         cells = []
-        for name in ("max", "p99.99", "p99.9", "p99"):
-            above = part.filter(pl.col("x") > row[name]) if name != "p99" else part
-            n = above.height
-            plausible = int((~above["implausible"]).sum()) if n else 0
-            cells.append(f"{name}: {n} half-hours, {plausible} plausible")
+        for name in ("max", "p99.99", "p99.9"):
+            above = part.filter(pl.col("x") >= row[name])
+            no_level = above.filter(~(pl.col("spike") | pl.col("stuck") | pl.col("weather_off")))
+            plausible = int((~above["implausible"]).sum())
+            cells.append(f"{name}: {above.height} half-hours, {plausible} plausible "
+                         f"({no_level.height} with level shift ignored)")  # fmt: skip
         print(site, "; ".join(cells))
     wind = high.filter(pl.col("tech") == "wind")
     print(
