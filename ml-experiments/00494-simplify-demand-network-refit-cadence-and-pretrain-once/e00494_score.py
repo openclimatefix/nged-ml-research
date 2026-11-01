@@ -24,6 +24,7 @@ uv run --no-sync python ml-experiments/00494-*/e00494_score.py rows --comparison
 """
 
 import argparse
+import math
 from pathlib import Path
 from typing import Final
 
@@ -33,6 +34,7 @@ import e00470_curtailment as curtailment470  # ty: ignore[unresolved-import]
 import e00470_heads as heads470  # ty: ignore[unresolved-import]
 import e00470_score as score470  # ty: ignore[unresolved-import]
 import e00470_tails as tails470  # ty: ignore[unresolved-import]
+import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -64,6 +66,7 @@ def configure(*, comparison: str) -> None:
     arm, months = COMPARISONS[comparison]
     heads470.WORK_DIR = WORK_DIR
     score470.MONTHS = months
+    curtailment470.MONTHS = months
     score470.SCORE_DIR = WORK_DIR / "scores" / comparison
     score470.CANDIDATES = (arm,)
     score470.CONTROLS = ("K2",)
@@ -129,10 +132,37 @@ def build() -> None:
             print("wrote", arm, month, joined.height, flush=True)
 
 
+def mde_two_seeds(*, table: pl.DataFrame) -> pl.DataFrame:
+    """Return experiment 428's minimum detectable effect for a pool of 2 seeds (k = 2).
+
+    The seed spread is the spread of the single-seed scores `A-s0` and `A-s1` around their fold
+    mean; the effect scales as `1.96 * sqrt(2) * sd / sqrt(2)`, the scorer's formula at k = 2.
+    """
+    records = []
+    for label, group in {"eight": "mva_eight", "six (all rows)": "signed_six"}.items():
+        part = table.filter((pl.col("group") == group) & pl.col("main16"))
+        values = np.array(
+            [
+                [part.filter(pl.col("month") == m)[f"A-s{s}__crps"].mean() for s in SEEDS]
+                for m in score470.MONTHS
+            ]
+        )
+        resid = values - values.mean(axis=1, keepdims=True)
+        sd = math.sqrt((resid**2).sum() / (len(values) * (len(SEEDS) - 1)))
+        records.append(
+            {"group": label, "folds": len(values), "seed_sd": sd,
+             "mde": 1.96 * math.sqrt(2.0) * sd / math.sqrt(len(SEEDS))}
+        )  # fmt: skip
+    return pl.DataFrame(records)
+
+
 def baseline() -> None:
-    """Print the minimum detectable effect (experiment 428's definition) before any contrast."""
+    """Print the two-seed minimum detectable effect before any contrast."""
     score470.rows_command()
-    print(score470.mde(table=score470.load_rows()))
+    minimum = mde_two_seeds(table=score470.load_rows())
+    score470.SCORE_DIR.mkdir(parents=True, exist_ok=True)
+    minimum.write_csv(score470.SCORE_DIR / "mde_k2.csv")
+    print(minimum)
 
 
 def main() -> None:

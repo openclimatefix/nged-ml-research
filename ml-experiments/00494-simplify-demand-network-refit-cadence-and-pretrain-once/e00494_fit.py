@@ -13,7 +13,7 @@ Commands (all use experiment 425's loop unchanged; outputs go under this experim
 
 ```bash
 source <paths>   # PYTHONPATH of every folder under ml-experiments/, DATA_PATH_INTERNAL
-OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
+OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00494-*/e00494_fit.py refits
 ```
 """
@@ -41,6 +41,8 @@ WORK_DIR: Final[Path] = (
 E425_WORK: Final[Path] = prep425.WORK_DIR / "work"
 SCORED_MONTHS: Final[tuple[str, ...]] = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 SEEDS: Final[tuple[int, ...]] = (0, 1)
+STALE_MONTHS: Final[dict[int, tuple[str, ...]]] = {11: ("2026-06",)}
+"""Stale11 is the single fold 2026-06 from the stored 2025-07 networks."""
 NEW_CUTS: Final[tuple[str, ...]] = ("2025-04", "2025-06")
 FIRST_STORED_CUT: Final[str] = "2025-07"
 PRETRAIN_ONCE: Final[fit425.Arm] = fit425.Arm("PO", embedding=True, pretrained=True)
@@ -69,12 +71,16 @@ def pretrain_once(*, device: str) -> None:
     def fixed(*, arm: fit425.Arm, cut: bool, month: str, seed: int) -> Path:
         """Return experiment 425's stored 2025-07 pretrained weights, whatever the month."""
         del arm, cut, month
-        return E425_WORK / "pretrained" / "A" / f"{FIRST_STORED_CUT}_s{seed}.pt"
+        path = E425_WORK / "pretrained" / "A" / f"{FIRST_STORED_CUT}_s{seed}.pt"
+        if not path.exists():
+            raise FileNotFoundError(path)
+        return path
 
     fit425.pretrained_path = fixed  # ty: ignore[invalid-assignment]
     try:
         for month in SCORED_MONTHS:
-            assert fixed(arm=PRETRAIN_ONCE, cut=True, month=month, seed=0).exists()
+            for seed in SEEDS:
+                fixed(arm=PRETRAIN_ONCE, cut=True, month=month, seed=seed)
         fit425.run_arms(
             months=list(SCORED_MONTHS),
             arms=[PRETRAIN_ONCE],
@@ -138,7 +144,7 @@ def stale(*, ages: list[int], device: str) -> None:
     """Forecast each scored month with the networks refitted `age` months earlier."""
     for age in ages:
         arm = f"Stale{age}"
-        for month in SCORED_MONTHS:
+        for month in STALE_MONTHS.get(age, SCORED_MONTHS):
             cut_month = shift_month(month=month, by=-age)
             for seed in SEEDS:
                 target = WORK_DIR / "seed_preds" / arm / f"{month}_s{seed}.parquet"
