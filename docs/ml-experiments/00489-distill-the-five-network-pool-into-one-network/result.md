@@ -63,8 +63,9 @@ Status `planned`. The sections below are filled in as the experiment runs.
   397's loop (batch 16,384, at most 40 epochs, patience 6, gradient clip 1.0). The cuts of
   experiments 399 and 425 apply (the D15 and D18 start cut, the flagged exact-zero drop).
 - **Loss.** For a row, in standardised units:
-  `NLL(y) + alpha * P(q_s, teacher) + (1 - alpha) * P(q_s, y)`, multiplied by the fold's recency weight `0.5 ** (age_days / SHORT_HALF_LIFE_DAYS)` and normalised
-  by the batch's weight sum. `NLL` is the student's own mixture likelihood. `P` is the pinball loss
+  `NLL(y) + alpha * P(q_s, teacher) + (1 - alpha) * P(q_s, y)`, multiplied
+  by the fold's recency weight `0.5 ** (age_days / SHORT_HALF_LIFE_DAYS)` and normalised by the
+  batch's weight sum. `NLL` is the student's own mixture likelihood. `P` is the pinball loss
   summed over the 11 levels. Against the teacher it is the expected pinball loss over the teacher's
   quantiles as atoms (the scorers' level masses), because a pinball loss against one teacher value
   is asymmetric and widened the student's tail quantiles in the timing fit (q05 coverage 0.027
