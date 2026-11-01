@@ -141,7 +141,8 @@ def bin_of(*, frame: pl.DataFrame, edges: dict[str, np.ndarray]) -> np.ndarray:
 def monotone(*, factors: pl.DataFrame, n_bins: int) -> pl.DataFrame:
     """Make table P factors non-decreasing in the bin; a missing bin takes the running maximum.
 
-    `factors` has the keys `group` ("<group>|<bin>"), `lead_band`, `tail`, and `factor`.
+    `factors` has the keys `group` (the group name, a bar, then the bin), `lead_band`, `tail`, and
+    `factor`.
     """
     split = factors.with_columns(
         base=pl.col("group").str.split("|").list.get(0),
