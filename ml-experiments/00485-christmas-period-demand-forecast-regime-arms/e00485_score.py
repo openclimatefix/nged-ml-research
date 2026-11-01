@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, E731, PERF401, RUF034
 r"""Score experiment 485's arms on experiment 470's rows, slices, and 1.15 widening.
 
 H0 is experiment 425's arm A seeds 0 to 2 (experiment 470's stored `A-s0` to `A-s2`, the same

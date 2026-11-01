@@ -58,18 +58,18 @@ def figure_contrasts() -> None:
         scale=alt.Scale(domain=list(COLOURS)[1:6], range=list(COLOURS.values())[1:6]),
         legend=alt.Legend(title=None, orient="top", columns=5),
     )
-    bars = base.mark_rule().encode(
+    bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
         y=y,
         x=alt.X("low_bonferroni:Q", title="Arm minus H0 (CRPS points; below zero is better)"),
         x2="high_bonferroni:Q",
         color=colour,
         yOffset="arm:N",
     )
-    dots = base.mark_point(filled=True, size=40).encode(
+    dots = base.mark_point(filled=True, size=40).encode(  # ty: ignore[unresolved-attribute]
         y=y, x="difference:Q", color=colour, yOffset="arm:N"
     )
     zero = (
-        alt.Chart(pl.DataFrame({"z": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"z": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[3, 3], color=theme.BLACK_1)
         .encode(x="z:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -115,7 +115,7 @@ def figure_by_day() -> None:
     ):
         d = long.filter(pl.col("group") == group)
         panels.append(
-            alt.Chart(d.to_pandas())
+            alt.Chart(d.to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_line()
             .encode(
                 x=alt.X("date:T", title="Valid date (UTC)"),
@@ -174,7 +174,7 @@ def figure_examples(*, site: str = "D4") -> None:
             legend=alt.Legend(title=None, orient="top"),
         )
         band90 = (
-            alt.Chart(d.to_pandas())
+            alt.Chart(d.to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.15)
             .encode(
                 x=x,
@@ -184,13 +184,13 @@ def figure_examples(*, site: str = "D4") -> None:
             )
         )  # ty: ignore[unresolved-attribute]
         band50 = (
-            alt.Chart(d.to_pandas())
+            alt.Chart(d.to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.3)
             .encode(x=x, y="q25:Q", y2="q75:Q", color=col)
         )  # ty: ignore[unresolved-attribute]
         med = alt.Chart(d.to_pandas()).mark_line().encode(x=x, y="q50:Q", color=col)  # ty: ignore[unresolved-attribute]
         act = (
-            alt.Chart(d.filter(pl.col("arm") == "H0").to_pandas())
+            alt.Chart(d.filter(pl.col("arm") == "H0").to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_line(color="#333", strokeDash=[2, 2])
             .encode(x=x, y="actual:Q")
         )  # ty: ignore[unresolved-attribute]

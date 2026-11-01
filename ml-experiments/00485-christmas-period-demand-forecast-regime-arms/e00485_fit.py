@@ -381,8 +381,8 @@ def run(*, months: list[str], arms: list[Arm], seeds: list[int], device: str) ->
             replay_pre, replay_valid, _ = pretrain_rows(fold=fold, refit=refit, window_only=True)
             print(f"  replay rows {len(replay_pre.x):,}", flush=True)
             log["replay_rows"] = len(replay_pre.x)
-        cache: dict[tuple[bool, bool], dict[str, torch.Tensor]] = {}
-        replay_cache: dict[tuple[bool, bool], dict[str, torch.Tensor]] = {}
+        cache: dict[tuple[bool, bool, bool], dict[str, torch.Tensor]] = {}
+        replay_cache: dict[tuple[bool, bool, bool], dict[str, torch.Tensor]] = {}
         for arm, seed in todo:
             started = time.monotonic()
             key = (arm.day_type, arm.substitute, arm.weight)

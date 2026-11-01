@@ -86,7 +86,7 @@ def class_map(
     """
     day0, mean = daily_means(power=power)
     refit_day = int(refit.timestamp() // 86_400)
-    votes: dict[tuple[int, int], list[int]] = {}
+    votes: dict[tuple[int, int], list[tuple[int, int]]] = {}
     for year in range(2019, refit.year + 1):
         start = int(datetime(year, 12, 22, tzinfo=UTC).timestamp() // 86_400)
         end = start + 11
