@@ -182,7 +182,7 @@ def main() -> None:
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--device", default="cuda")
     parser.add_argument(
-        "--time-only", action="store_true", help="fit and print the time; no output"
+        "--time-only", action="store_true", help="fit and print the time; writes pretrained weights and the log only"
     )
     args = parser.parse_args()
     run(months=args.months, seeds=args.seeds, device=args.device, time_only=args.time_only)
