@@ -141,4 +141,10 @@ metrics](https://openclimatefix.github.io/nged-substation-forecast/roadmap/cost-
   substations, against 0.104 for the mean of the single-seed scores (exp 201, 220; 6 substations,
   one year; provisional).
 
+- **Score a joint scenario set per family as well as jointly.** The joint variogram score over 16
+  Primaries, 3 wind farms, and 6 solar farms moved by 2% or less between constructions, while the
+  same score across the farms moved by 28% to 43%. The cross-family block holds the same gain
+  whether or not the families are coupled, so it cannot test cross-family dependence (exp 436; 44
+  Tuesday runs, 10 months; provisional).
+
 Last checked against experiment 321.
