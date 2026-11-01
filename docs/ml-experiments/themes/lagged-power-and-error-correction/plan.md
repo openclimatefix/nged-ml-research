@@ -14,6 +14,7 @@
 | 428 | Can a convolutional network over whole days of recent power, read by attention, replace the hand-made lagged power inputs and stop the forecast following load-shift events? | High (maintainer, 2026-10-31) | Nothing | Done (S1, the surprise at the three lags, carries forward) |
 | 445 | If a detector knew exactly which recent lags lie inside a load-shift event, how much would a lagged and lagless forecast mixture gain (the O-rule ceiling, no fits)? | High (neural Discuss session, 2026-10-31) | Experiment 404 merged | Planned |
 | 447 | Does changing any one setting of the S1 demand network (width, depth, embedding, components, dropout, weight decay, learning rate and schedule, batch size, optimiser), or a random search over the three most influential, lower its quantile score by the agreed margin? | High (neural Discuss session, 2026-11-01) | Nothing | Done (not supported: no single setting beats S1; see experiment 447) |
+| 459 | Is the sum over a load-shift donor and its recipient Primaries unchanged by the event, so that a forecast of the group sum split by a slowly changing share could work? | High (load-shift Discuss session, 2026-11-01) | Nothing | Finished: refuted, see experiment 459 |
 | 458 | Can a weight per lead band, a prequential weight, or a shrunk level offset on the lagless forecast beat the fixed 50/50 mixture of the lagged and lagless forecasts (zero fits)? | High (neural Discuss session, 2026-11-01) | Nothing | Finished: not supported, see experiment 458 |
 
 ## Planned experiments
