@@ -84,9 +84,11 @@ def widened(*, frame: pl.DataFrame) -> pl.DataFrame:
 
 def tail_row(*, frame: pl.DataFrame, prefix: str) -> dict[str, float]:
     """Return coverage and pinball loss at the four tail quantiles, prefixed."""
-    table = tailcore.tail_table(frame=frame.cast({"actual": pl.Float64}), by=())
+    table = tailcore.tail_table(
+        frame=frame.cast({"actual": pl.Float64}).with_columns(all=pl.lit(1)), by=("all",)
+    )
     row = table.row(0, named=True)
-    return {f"{prefix}{k}": v for k, v in row.items() if k != "n"}
+    return {f"{prefix}{k}": v for k, v in row.items() if k not in {"n", "all"}}
 
 
 def cell_rows(*, arm: str, ref: str, month: str, seed: int, real: np.ndarray) -> list[dict]:

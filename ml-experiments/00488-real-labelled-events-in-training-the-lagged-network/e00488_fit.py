@@ -32,7 +32,7 @@ DATA_PATH_INTERNAL=<the internal data folder> OMP_NUM_THREADS=1 \
 import argparse
 import contextlib
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
 from typing import Final
 
@@ -204,7 +204,12 @@ def fit_arm(*, arm: str, month: str, seed: int, device: str = "cuda") -> Path:  
     share_file = np.load(SHARE_PATH)
     share = share_file[DEPTH_KEY.get(arm, "f1.0")].astype(np.float32)
     span = event_span_mask(events=events, shape=shape)
-    padded = score.real_event_mask()
+    padded = np.zeros(shape, dtype=bool)  # padded available events only (forward-only)
+    for e in events.iter_rows(named=True):
+        padded[
+            e["primary"],
+            max(0, e["onset_idx"] - score.EVENT_PADDING) : e["end_idx"] + 1 + score.EVENT_PADDING,
+        ] = True
     kw = {"pool": train, "lag_stats": lag_stats, "device": device}
     lags_world, lag_grid = fit.lag_features(power=torch.tensor(world, device=device), **kw)
     n = len(train)
@@ -259,11 +264,13 @@ def fit_arm(*, arm: str, month: str, seed: int, device: str = "cuda") -> Path:  
             new = np.flatnonzero((primary_np == p) & (target_np >= s) & (target_np < s + length))
             if own and len(new):
                 picks.append(new[rng.integers(0, len(new), size=round(own * factor))])
+        assert picks, "no shuffled period placed"
         add = torch.from_numpy(np.concatenate(picks)).to(device)
         ridx = torch.cat([keep, add])
         y = torch.cat([train.y[keep], train.y[add]])
         lags = torch.cat([lags_world[keep], lags_shuf[add]])
         info["event_rows_added"] = len(add)
+        info["event_rows_target"] = round(factor * len(unique))
         epochs, lr = fit.EPOCHS, fit.LEARNING_RATE
     elif arm == "PT-FT":
         saved = torch.load(STORED_DIR / "A0-inj" / f"{month}_s{seed}.pt", weights_only=False)
@@ -287,6 +294,7 @@ def fit_arm(*, arm: str, month: str, seed: int, device: str = "cuda") -> Path:  
         y = torch.cat([y_corr, train.y[clean]])
         lags = torch.cat([lags_obs[unique], lags_world[clean]])
         info["finetune_clean_rows"] = len(clean)
+        assert len(clean) > 0, "no clean rows for fine-tuning"
         epochs, lr = FT_EPOCHS, fit.LEARNING_RATE * FT_LR_FACTOR
     else:
         raise ValueError(arm)
@@ -312,7 +320,7 @@ def fit_arm(*, arm: str, month: str, seed: int, device: str = "cuda") -> Path:  
 
 
 @contextlib.contextmanager
-def mixture_source(*, arm: str) -> Iterator[None]:
+def mixture_source(*, arm: str) -> Generator[None]:
     """Make `score.forecast(arm="B-mix")` mix the lagless table with `arm`'s network."""
     original = score.load_network
 
