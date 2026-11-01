@@ -58,12 +58,13 @@ MODEL_ROOTS: Final[tuple[Path, ...]] = (
 FINE_TUNE_LR: Final[float] = 2e-4
 """Experiment 425's fine-tuning learning rate."""
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
-PT_ARMS: Final[tuple[str, ...]] = ("S1PT", "S1PT-noemb", "RinjPT")
+PT_ARMS: Final[tuple[str, ...]] = ("S1PT", "S1PT-noemb", "RinjPT", "S1PT-fullLR")
 PRETRAIN_EPOCH_ROWS: Final[float] = 0.2
 """The pretraining pass draws this share of the rows per epoch, as the fit loop does."""
 
 fit.ARMS["S1PT"] = fit.Arm("S1PT", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["S1PT-noemb"] = fit.Arm("S1PT-noemb", "lags", 0, True, surprise=True, history="s1")
+fit.ARMS["S1PT-fullLR"] = fit.Arm("S1PT-fullLR", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["RinjPT"] = fit.Arm("RinjPT", "lags", 0, True)
 _ORIGINAL_MAKE_MODEL = fit.make_model
 
@@ -203,7 +204,7 @@ def fit_pt(
     rows: data.Rows = cache[month]
     surprise = fit.surprise_for(arm=arm, month=month, seed=seed, device=device)
     n_primaries = len(rows.target_mean)
-    pre_path = WORK_DIR / "pretrained" / arm_name / f"{month}_s{seed}.pt"
+    pre_path = WORK_DIR / "pretrained" / arm_name.replace("-fullLR", "") / f"{month}_s{seed}.pt"
     torch.manual_seed(seed)
     model = fit.make_model(arm=arm, n_inputs=rows.x.shape[1], n_primaries=n_primaries).to(device)
     pre_epochs = pre_best = pre_rows = 0
@@ -246,7 +247,7 @@ def fit_pt(
     )
     z, w, is_val = tensors(rows=rows, device=device)
     original = fit.SETTING
-    fit.SETTING = replace(original, lr=FINE_TUNE_LR)
+    fit.SETTING = original if arm_name.endswith("fullLR") else replace(original, lr=FINE_TUNE_LR)
     try:
         epochs, best = fit.train(
             arm=arm, model=model, inputs=inputs, z=z, w=w, is_val=is_val, seed=seed, device=device

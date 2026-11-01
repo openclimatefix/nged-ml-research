@@ -26,11 +26,12 @@ import numpy as np
 import polars as pl
 
 ARMS: Final[tuple[str, ...]] = (
-    "S1", "S1PT", "S1-Bmix", "S1-pool3", "S1-pool5", "S1PT-pool5", "S1-pool5-Bmix",
+    "S1", "S1PT", "S1PT-fullLR", "S1-Bmix", "S1-pool3", "S1-pool5", "S1PT-pool5", "S1-pool5-Bmix",
     "S1PT-pool5-Bmix", "S1PT-noemb-pool5", "RinjPT-pool5",
 )  # fmt: skip
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C1 S1PT - S1": ("S1PT", "S1"),
+    "C1b S1PT-fullLR - S1": ("S1PT-fullLR", "S1"),
     "C2 S1-Bmix - S1": ("S1-Bmix", "S1"),
     "C3 S1-pool5 - S1": ("S1-pool5", "S1"),
     "C3b S1-pool3 - S1": ("S1-pool3", "S1"),
