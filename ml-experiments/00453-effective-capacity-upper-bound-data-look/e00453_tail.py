@@ -6,7 +6,8 @@ than `SPIKE_JUMP`), `stuck` (part of a run of `STUCK_RUN` or more equal readings
 half-hour's calendar month is a high-level month: the 90th percentile of the series' output in the
 month, among half-hours with strong wind or strong clear-sky irradiance, exceeds the median of all
 such monthly values by more than `STEP_JUMP`), and `weather_off` (wind: ERA5 100 m wind speed,
-where it exists, below the speed at which the farm's median output reaches 0.5 of capacity; solar: Haurwitz clear-sky irradiance below half of its 99th percentile over daylight).
+where it exists, below the speed at which the farm's median output reaches 0.5 of capacity; solar:
+Haurwitz clear-sky irradiance below half of its 99th percentile over daylight).
 It is `implausible` if any of the four flags holds, otherwise `plausible`. Output:
 `work/tail_summary.parquet`, `work/high_halfhours.parquet`.
 
