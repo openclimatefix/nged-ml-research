@@ -66,9 +66,9 @@ coverage in both worlds, and marks the failed gate on every row.
 
 ![Capacity by season-year at each Primary](figure_01_capacity_panels.svg)
 
-## Ladder results (raw recovery, 5 Primaries, 5 farms, 2 and 4 MW; placebo and coverage as defined
-in the plan)
+## Ladder results
 
+Raw recovery over 5 Primaries, 5 farms, and injections of 2 and 4 MW.
 Numbers are in the private file `work/rung_summary.parquet`; the main rows follow.
 
 - **C0, pooled plant table (CAMS sky):** recovery 0.874, placebo 95th percentile 0.36 (maximum over
