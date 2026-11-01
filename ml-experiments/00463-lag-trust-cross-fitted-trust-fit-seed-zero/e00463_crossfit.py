@@ -439,7 +439,7 @@ def run_month(*, month: str, seed: int, device: str) -> None:
     full_net = fit.build_network(arm="A0-inj", n_base=saved["n_base"], n_trust=rows_mod.N_TRUST)
     full_net.load_state_dict(saved["state"])
     full_net = full_net.to(device)
-    in_sample = predict_plain(
+    in_sample = predict_plain(  # ty: ignore[invalid-argument-type]
         net=full_net, ctx=ctx, rows=np.arange(len(ctx.train)),
         from_units=(ctx.scalers.target_mean, ctx.scalers.target_std),
         to_units=(ctx.scalers.target_mean, ctx.scalers.target_std), device=device,
