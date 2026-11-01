@@ -82,5 +82,9 @@ the injected-event worlds of experiment 404, so the correction sees corrupted la
   half-hours are dropped, as in experiment 404.
 - **Fits.** 30 (3 penalties, 2 seeds, 5 months), 28 s each, about 15 to 20 minutes on one GPU
   process under 8 GB.
-- **Stored forecasts reused.** The anchor (the lagless table) and B-mix, A0-inj, and S1 from
-  experiments 404 and 454; nothing is refitted.
+- **Stored forecasts reused.** The anchor (the lagless table), and B-mix and A0-inj at fit seeds 0
+  and 1 from experiment 454. S1 is stored only at seed 0 (all five months) in experiment 404, so it
+  is a seed-0 reference only. Nothing is refitted.
+- **Loss.** The negative log-likelihood with experiment 404's recency weights, plus the penalty
+  times the unweighted batch mean of the squared outputs (the shift in standardised units and the
+  log-scale change together). Like A0-inj, the correction is trained without lag dropout.
