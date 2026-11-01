@@ -12,7 +12,9 @@ import e00474_common as common
 import numpy as np
 import polars as pl
 
-D12_STATUS = "reverse flow; fit through the meter (physical fleet shape), bootstrap of 60 resamples"
+D12_STATUS = (
+    "reverse flow; fit through the meter (physical fleet shape), bootstrap of about 30 resamples"
+)
 
 
 def d12_row(*, ladder: pl.DataFrame) -> dict | None:
