@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915
+# ruff: noqa: E501, PLR0912, PT018
 """Fit and forecast S3-amb and S3-rw-amb: experiment 440's S3 network on experiment 446's ambiguous worlds.
 
 **Arms.**
@@ -319,7 +319,7 @@ def predict_month(
                 for name, value in flags.of(inputs=inputs, rows=rows, world=world).items():
                     pieces.setdefault(name, []).append(value.cpu().numpy())
             if mine and hasattr(inputs, "_stacks"):
-                inputs._stacks.clear()  # noqa: SLF001
+                inputs._stacks.clear()
             extra: dict[str, np.ndarray] = {}
             if gen:
                 g = w - GEN_WORLDS[0]
@@ -412,14 +412,13 @@ def rates(*, month: str = "2026-01", per_world: int = 400_000, seed: int = 0) ->
                     {"world": w, "k": k, "mirror": has_mirror, "rows": int(sel.sum()),
                      "target_moved": int((sel & moved).sum())}
                 )  # fmt: skip
-    table = (
+    return (
         pl.DataFrame(records)
         .group_by("k", "mirror")
         .agg(pl.col("rows").sum(), pl.col("target_moved").sum())
         .with_columns(bayes_share=pl.col("target_moved") / pl.col("rows"))
         .sort("k", "mirror")
     )
-    return table
 
 
 def check(*, month: str = "2026-01", device: str = "cuda") -> None:

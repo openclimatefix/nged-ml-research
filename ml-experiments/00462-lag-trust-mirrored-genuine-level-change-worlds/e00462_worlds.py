@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915
+# ruff: noqa: E501, PT018
 """Training and held-out worlds with genuine level changes that a neighbour does and does not mirror.
 
 **What the world holds.** Experiment 446's genuine level change adds one step to a Primary's lags
@@ -233,7 +233,7 @@ def base_rates() -> list[str]:
     """
     import e00428_data as data  # ty: ignore[unresolved-import]
 
-    sites, _, neighbours, _, _ = context()
+    _, _, neighbours, _, _ = context()
     stack, _ = data.load_stack(include_eval=False)
     clean = stack[0]
     out = []
