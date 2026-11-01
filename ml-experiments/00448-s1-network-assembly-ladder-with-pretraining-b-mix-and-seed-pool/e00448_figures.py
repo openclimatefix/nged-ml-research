@@ -181,7 +181,7 @@ def figure_lead() -> None:
     chart2 = alt.vconcat(*panels).properties(
         title=titled(
             title="Pretraining, B-mix, and the surprise inputs each add 0.0 to 0.2 points of CRPS to S1-pool5 at every lead, so none of them helps",
-            subtitle="Each arm's CRPS minus S1-pool5's by lead day (negative is better), clean half-hours, 4 test months, 5 seeds. The dashed line is S1-pool5 (no pretraining). S1PT-pool5 adds pretraining, S1PT-pool5-Bmix adds pretraining and B-mix, RinjPT-pool5 adds pretraining and drops the surprise inputs. S1PT-noemb-pool5 (pretraining, no Primary embedding) is 0.6 to 0.9 points above S1-pool5 and is left off to keep the scale.",
+            subtitle="Each arm's CRPS minus S1-pool5's by lead day (negative is better), clean half-hours, 4 test months, 5 seeds. The dashed line is S1-pool5 (no pretraining). S1PT-pool5 adds pretraining, S1PT-pool5-Bmix adds pretraining and B-mix, RinjPT-pool5 adds pretraining and drops the surprise inputs. S1 (grey) is one fit without pretraining. S1PT-noemb-pool5 (pretraining, no Primary embedding) is 0.6 to 0.9 points above S1-pool5 and is left off to keep the scale.",
         )
     )
     save(chart=chart2, name="figure_2_loo_by_lead.svg")
@@ -189,9 +189,21 @@ def figure_lead() -> None:
 
 def figure_ladder() -> None:
     """Figure 3: each ladder arm minus S1, per group, with 95% intervals."""
+    scores_dir = run.WORK_DIR / "scores"
+    # The three-seed pool is compared with S1's seeds 0 to 2, so its contrast comes from the
+    # seeds-0-to-2 table; every other contrast uses all five seeds.
+    contrasts = pl.concat(
+        [
+            pl.read_parquet(scores_dir / "contrasts_seeds_0-4.parquet").filter(
+                ~pl.col("contrast").str.starts_with("C3b")
+            ),
+            pl.read_parquet(scores_dir / "contrasts_seeds_0-2.parquet").filter(
+                pl.col("contrast").str.starts_with("C3b")
+            ),
+        ]
+    )
     c = (
-        pl.read_parquet(run.WORK_DIR / "scores" / "contrasts_seeds_0-4.parquet")
-        .filter(
+        contrasts.filter(
             pl.col("row_set") == "clean",
             pl.col("contrast").is_in(list(LADDER_CONTRASTS)),
             pl.col("group").is_in(list(GROUP_ORDER)),
@@ -220,7 +232,7 @@ def figure_ladder() -> None:
         width=WIDTH - 150, height=240,
         title=titled(
             title="Pretraining and B-mix raise CRPS; the 5-seed pool and the wider network lower it",
-            subtitle="Dot: estimate. Line: 95% interval from resampling origin days (interim: 4 months). Clean half-hours, 5 seeds, 1.15 widening. Each arm minus the single-network S1; the dashed line is S1.",
+            subtitle="Dot: estimate. Line: 95% interval from resampling origin days (interim: 4 months). Clean half-hours, 5 seeds, 1.15 widening. Each arm minus the single-network S1; the dashed line is S1. The 3-seed pool is compared with seeds 0 to 2 of S1, every other arm with all 5 seeds.",
         ),
     )  # fmt: skip
     save(chart=chart, name="figure_3_ladder_contrasts.svg")
@@ -457,7 +469,7 @@ def figure_events() -> None:
             pieces.append(f.filter(pl.col("origin_us") == origin).with_columns(arm=pl.lit(arm)))
         fc = pl.concat(pieces).with_columns(
             time=pl.from_epoch("valid_us", time_unit="us").dt.replace_time_zone("UTC"),
-            **{c: pl.col(c) * capacity[site] for c in ["q05", "q50", "q95", "actual"]},
+            **{c: pl.col(c) * capacity[site] for c in [*refs.LEVEL_NAMES, "actual"]},
         ).filter(pl.col("time").is_between(t0, t1))  # fmt: skip
         actual = (
             cache["S1", month].filter(pl.col("primary") == index[site])

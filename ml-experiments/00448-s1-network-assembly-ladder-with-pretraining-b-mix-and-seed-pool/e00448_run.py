@@ -60,7 +60,7 @@ FINE_TUNE_LR: Final[float] = 2e-4
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
 WIDE_ARMS: Final[tuple[str, ...]] = ("S1-w256",)
 """Arms with hidden width 256 (experiment 447's post hoc finding), otherwise the S1 recipe."""
-PT_ARMS: Final[tuple[str, ...]] = ("S1PT", "S1PT-noemb", "RinjPT", "S1PT-fullLR")
+PT_ARMS: Final[tuple[str, ...]] = ("S1PT", "S1PT-noemb", "RinjPT", "S1PT-fullLR", "L0PT")
 PRETRAIN_EPOCH_ROWS: Final[float] = 0.2
 """The pretraining pass draws this share of the rows per epoch, as the fit loop does."""
 
@@ -68,6 +68,7 @@ fit.ARMS["S1PT"] = fit.Arm("S1PT", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["S1PT-noemb"] = fit.Arm("S1PT-noemb", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["S1PT-fullLR"] = fit.Arm("S1PT-fullLR", "lags", 0, True, surprise=True, history="s1")
 fit.ARMS["S1-w256"] = fit.Arm("S1-w256", "lags", 0, True, surprise=True, history="s1")
+fit.ARMS["L0PT"] = fit.Arm("L0PT", "none", 0, False)
 fit.ARMS["RinjPT"] = fit.Arm("RinjPT", "lags", 0, True)
 _ORIGINAL_MAKE_MODEL = fit.make_model
 
@@ -330,6 +331,9 @@ def combos() -> dict[str, tuple[list[tuple[str, int]], list[tuple[str, int]], fl
         ("RinjPT", "RinjPT"),
     ):
         out[f"{name}-pool5"] = ([(arm, s) for s in SEEDS5], [], 1.0)
+    out["S1-w256-pool5"] = ([("S1-w256", s) for s in SEEDS5], [], 1.0)
+    for arm in ("R-inj", "L0", "L0PT"):
+        out[f"{arm}-pool5"] = ([(arm, s) for s in SEEDS5], [], 1.0)
     out["S1-pool3"] = ([("S1", s) for s in (0, 1, 2)], [], 1.0)
     out["S1PT-pool3"] = ([("S1PT", s) for s in (0, 1, 2)], [], 1.0)
     out["S1-pool5-Bmix"] = ([("S1", s) for s in SEEDS5], [("L0", s) for s in SEEDS5], 0.5)

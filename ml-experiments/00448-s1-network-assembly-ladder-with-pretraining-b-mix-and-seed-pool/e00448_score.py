@@ -27,13 +27,18 @@ import numpy as np
 import polars as pl
 
 ARMS: Final[tuple[str, ...]] = (
-    "S1", "S1PT", "S1PT-fullLR", "S1-w256", "S1-Bmix", "S1-pool3", "S1-pool5", "S1PT-pool5", "S1-pool5-Bmix",
+    "S1", "R-inj", "L0", "L0PT", "R-inj-pool5", "L0-pool5", "L0PT-pool5", "S1PT", "S1PT-fullLR", "S1-w256", "S1-Bmix", "S1-pool3", "S1-pool5", "S1-w256-pool5", "S1PT-pool5", "S1-pool5-Bmix",
     "S1PT-pool5-Bmix", "S1PT-noemb-pool5", "RinjPT-pool5",
 )  # fmt: skip
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C1 S1PT - S1": ("S1PT", "S1"),
     "C1b S1PT-fullLR - S1": ("S1PT-fullLR", "S1"),
     "C5 S1-w256 - S1": ("S1-w256", "S1"),
+    "D1 L0PT - L0": ("L0PT", "L0"),
+    "D2 S1 - R-inj": ("S1", "R-inj"),
+    "D3 S1-pool5 - R-inj-pool5": ("S1-pool5", "R-inj-pool5"),
+    "D4 L0PT-pool5 - L0-pool5": ("L0PT-pool5", "L0-pool5"),
+    "D5 S1-w256-pool5 - S1-pool5": ("S1-w256-pool5", "S1-pool5"),
     "C2 S1-Bmix - S1": ("S1-Bmix", "S1"),
     "C3 S1-pool5 - S1": ("S1-pool5", "S1"),
     "C3b S1-pool3 - S1": ("S1-pool3", "S1"),
@@ -44,7 +49,10 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "LOO-surprise RinjPT-pool5 - S1PT-pool5": ("RinjPT-pool5", "S1PT-pool5"),
     "Bmix on pool S1-pool5-Bmix - S1-pool5": ("S1-pool5-Bmix", "S1-pool5"),
 }
-SEED_SETS: Final[dict[str, tuple[int, ...]]] = {"seeds 0-4": (0, 1, 2, 3, 4)}
+SEED_SETS: Final[dict[str, tuple[int, ...]]] = {
+    "seeds 0-4": (0, 1, 2, 3, 4),
+    "seeds 0-2": (0, 1, 2),
+}
 
 
 def minimum_detectable_effect(*, table: pl.DataFrame, seeds: tuple[int, ...]) -> pl.DataFrame:
@@ -77,7 +85,10 @@ def link() -> None:
             (data.WORK_DIR / "predictions" / "S1", range(3)),
             (run.MODEL_ROOTS[1].parent / "predictions" / "S1", range(3, 6)),
         ],
-        "L0": [(data.WORK_DIR / "predictions" / "L0", range(1))],
+        "R-inj": [
+            (data.WORK_DIR / "predictions" / "R-inj", range(3)),
+            (run.MODEL_ROOTS[1].parent / "predictions" / "R-inj", range(3, 6)),
+        ],
     }
     for arm, folders in sources.items():
         target = run.WORK_DIR / "predictions" / arm
@@ -86,7 +97,7 @@ def link() -> None:
             for source in Path(folder).glob("*.parquet"):
                 if int(source.stem.split("_s")[1].split("_")[0]) in seeds:
                     link_path = target / source.name
-                    if not link_path.is_symlink():
+                    if not link_path.exists() and not link_path.is_symlink():
                         link_path.symlink_to(source)
 
 
