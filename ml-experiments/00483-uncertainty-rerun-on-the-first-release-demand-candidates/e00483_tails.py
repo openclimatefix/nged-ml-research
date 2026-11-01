@@ -279,12 +279,34 @@ def strict() -> None:
     pl.concat(results, how="diagonal").write_parquet(WORK / "strict_tails.parquet")
 
 
+def upper() -> None:
+    """Widen only q95 and q99 (distance from the median times 1.10 or 1.15) and score clean rows."""
+    parts: list[pl.DataFrame] = []
+    for arm in ARMS:
+        frame = load(arm=arm).filter(pl.col("cls") == "clean")
+        for factor in (1.10, 1.15):
+            wide = frame.with_columns(
+                [
+                    (pl.col("q50") + factor * (pl.col(q) - pl.col("q50"))).alias(q)
+                    for q in ("q95", "q99")
+                ]
+            )
+            parts.append(
+                summarise(frame=wide, by=["group"]).with_columns(
+                    arm=pl.lit(arm), variant=pl.lit(f"upper{factor:.2f}")
+                )
+            )
+    pl.concat(parts).write_parquet(WORK / "upper_tails.parquet")
+
+
 def main() -> None:
     """Run a command."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("cache", "free", "tablep", "strict"))
+    parser.add_argument("command", choices=("cache", "free", "tablep", "strict", "upper"))
     args = parser.parse_args()
-    {"cache": cache, "free": free, "tablep": tablep, "strict": strict}[args.command]()
+    {"cache": cache, "free": free, "tablep": tablep, "strict": strict, "upper": upper}[
+        args.command
+    ]()
 
 
 if __name__ == "__main__":

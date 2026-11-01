@@ -40,7 +40,7 @@ row_set_id: >-
 metric: >-
   Coverage and pinball loss at q01, q05, q95, and q99, and CRPS in points of effective capacity,
   per metering group, lead band, and condition.
-verdict: refuted
+verdict: partly supported
 best_arm: >-
   Table P (a factor on each tail quantile's distance from the median, per metering group and lead
   band) fitted on the other four folds: at the eight MVA-only Primaries it brings A-pool's
@@ -48,24 +48,28 @@ best_arm: >-
 headline: >-
   At the eight, a symmetric 1.15 widening lifts A-pool's clean-row q95 coverage from 0.922 to 0.949
   but pushes q05 down to 0.019 and q01 to 0.002, below the 0.03 and 0.005 floors. Table P gives q95
-  0.950, q99 0.989, q05 0.051, and q01 0.010, and passes every pre-registered clause at the eight.
-  At the signed-MW six it fails the 5% q99 pinball clause (+6.1% against the widening).
+  0.950, q99 0.989, q05 0.051, and q01 0.010 and passes every clause at the eight. So does a
+  widening of the upper tail only (q95 0.949, q99 0.991, q05 0.036, q01 0.005). At the signed-MW
+  six, table P fails the 5% q99 pinball clause (+6.2%) and the upper-tail widening fails q95
+  (0.923).
 lessons: >-
   A-pool and A-gam-in are too narrow on the upper tail and too wide on the lower tail, so one
-  symmetric widening cannot fix both. A factor per tail can. The leave-one-fold-out fit uses later
+  widening of both tails cannot fix both. A widening of the upper tail only fixes the eight as well as
+  table P does; the six needs table P's lower-tail narrowing too. The leave-one-fold-out fit uses later
   folds, so its numbers are optimistic: fitted on earlier folds only, the six falls to q95 0.927.
 take_home_message: >-
   The first-release demand candidates are too wide on the lower tail and too narrow on the upper
-  tail, so a single widening makes the lower tail worse while it repairs the upper one. A
-  recalibration table with one factor per tail fixes both at the eight MVA-only Primaries, for
-  A-pool and A-gam-in alike. At the signed-MW six the same table narrowly misses its pass rules,
-  and cold winter nights stay under-covered there.
+  tail, so a widening of both tails makes the lower tail worse while it repairs the upper one.
+  Widening only the upper tail, or applying one factor per tail, fixes the eight MVA-only Primaries
+  for A-pool and A-gam-in alike. At the signed-MW six, one factor per tail narrowly misses its pass
+  rules, and cold winter nights stay under-covered there.
 production_status: candidate
 adopted_in: none
 advice:
   - >-
-    Recalibrate the tails of the eight MVA-only Primaries with a factor per tail, not a symmetric
-    widening, because the lower tail is already too wide (Figure 1, headline table).
+    Recalibrate the eight MVA-only Primaries with an upper-tail widening of 1.15 or a factor per
+    tail, not a symmetric widening, because the lower tail is already in range (Figure 1, headline
+    table, upper-tail bullet).
   - >-
     Do not widen the signed-MW six by 1.15 as the default tail fix: q05 falls to 0.010 and q01 to
     0.001 (headline table).
@@ -82,19 +86,20 @@ advice:
     pinball loss by 0.011 against A-pool and table P by 0.002 (Figure 3 and the contrasts bullet).
 ---
 
-**The candidates' bands are too wide on the lower tail and too narrow on the upper tail, and one
-factor per tail fixes both at the eight.** The bands of A-pool and A-gam-in (the first-release
-demand candidates of [experiment
+**The candidates' bands are too narrow on the upper tail, and widening only that tail fixes the
+eight.** The bands of A-pool and A-gam-in (the first-release demand candidates of [experiment
 470](../00470-first-release-demand-forecaster-assembly-and-comparison/result.md)) are too wide on
-the lower tail and too narrow on the upper tail. A symmetric 1.15 widening (every tail quantile's
-distance from the median times 1.15) therefore repairs the upper tail while it damages the lower
-one. Table P, which multiplies each tail quantile's distance from the median by its own factor,
-brings all four tails into range at the eight MVA-only Primaries, for both candidates. It does not
-at the signed-MW six, where it misses by a narrow margin, and cold winter nights stay under-covered
-at the six. Experiment 435 found that table P failed on clean rows. Table P passes at the eight
-here. Its factors are fitted on the other four folds, including folds later in time than the one
-scored, so its coverage is optimistic. The strict fit, which uses earlier folds only, is the figure
-to plan on.
+the lower tail and too narrow on the upper tail. A widening of both tails by 1.15 (every tail
+quantile's distance from the median times 1.15) therefore repairs the upper tail while it damages
+the lower one. Widening only the upper tail brings the eight into range as well. Table P, which
+multiplies each tail quantile's distance from the median by its own factor, brings all four tails
+into range at the eight MVA-only Primaries, for both candidates. It does not at the signed-MW six,
+where it misses by a narrow margin, and cold winter nights stay under-covered at the six. Experiment
+435 found that table P failed on clean rows, but it recalibrated a different forecaster (experiment
+428's arm R-inj, whose raw q95 was 0.851 at the six and 0.904 at the eight), so the two results are
+not a like-for-like contradiction. Table P passes at the eight here. Its factors are fitted on the
+other four folds, including folds later in time than the one scored, so its coverage is optimistic.
+The strict fit, which uses earlier folds only, is the figure to plan on.
 
 **Terms.**
 
@@ -156,17 +161,17 @@ target half-hour marked in orange.
   0.044 points, q95 coverage 0.010, q99 coverage 0.003, and q99 pinball loss 0.0095 points; at the
   six, CRPS 0.087 points, q95 coverage 0.014, q99 coverage 0.008, and q99 pinball loss 0.018 points.
 - **Limits on the claims:** (1) The raw lower tail at the eight (q05 0.036, q01 0.005) is already
-  inside its target range, so only the symmetric widening breaks it. An upper-tail-only widening
-  was not run, so "one symmetric widening cannot fix both" is untested against that cheaper option.
-  (2) The K2-425A contrast after table P (+0.002) has no interval, because only the raw and widened
-  contrasts were counted. (3) Table P's pooled coverage hides fold-level misses: for A-pool at the
-  eight, 2025-10 has q05 0.072 and q99 0.979, and 2025-12 has q05 0.027 and q95 0.966. (4) Table P's
-  CRPS gain over the widening (0.004 points) is a tenth of the minimum detectable effect (0.044),
-  and the six's q99 pinball difference (0.011) is below its minimum detectable effect (0.018). At
-  the six, the Bonferroni interval for that difference spans about 4.8% to 7.4%. (5) The 20 worst
-  half-hours are 20 rows in one fold, probably one event; the 2025-12 fold's raw exceedance share
-  is the lowest of the five. (6) Curtailment intervals are wide: no candidate variant is
-  distinguishable from BG2, and table P at f = 0.9 (1.79) is above BG2 (1.37).
+  inside its target range, so only a widening of both tails breaks it. The upper-tail widening above
+  is as good as table P at the eight, so table P is needed only at the six. (2) The K2-425A contrast
+  after table P (+0.002) has no interval, because only the raw and widened contrasts were counted.
+  (3) Table P's pooled coverage hides fold-level misses: for A-pool at the eight, 2025-10 has q05
+  0.072 and q99 0.979, and 2025-12 has q05 0.027 and q95 0.966. (4) Table P's CRPS gain over the
+  widening (0.004 points) is a tenth of the minimum detectable effect (0.044), and the six's q99
+  pinball difference (0.011) is below its minimum detectable effect (0.018). At the six, the
+  Bonferroni interval for that difference spans about 4.8% to 7.4%. (5) The 20 worst half-hours are
+  20 rows in one fold, probably one event; the 2025-12 fold's raw exceedance share is the lowest of
+  the five. (6) Curtailment intervals are wide: no candidate variant is distinguishable from BG2,
+  and table P at f = 0.9 (1.79) is above BG2 (1.37).
 - **Selection bias:** every score is selection-biased, because the same five folds choose the
   candidates and score them.
 - **Cadence:** the stored forecasts come from monthly refits. This experiment fits only table P's
@@ -201,6 +206,12 @@ Targets: q01 0.005 to 0.02, q05 0.03 to 0.07, q95 0.93 to 0.97, q99 0.98 to 0.99
 - **Decision rule at the six (A-pool):** the four coverages pass, but q99 pinball loss is +0.0110
   (0.0087 to 0.0135) against the widening, which is +6.1% and above the 5% limit. The six fails the
   pinball-loss clause.
+- **Widening the upper tail only (q95 and q99 distance from the median times 1.15):** at the eight,
+  A-pool gives q01 0.005, q05 0.036, q95 0.949, q99 0.991, q99 pinball loss 0.235, and CRPS 4.243,
+  and A-gam-in gives q95 0.946, q99 0.990, and q05 0.038. Both are inside every target range, so
+  this widening passes the decision rule at the eight as table P does. At the six it gives q95 0.923
+  (below the 0.93 floor) and q05 0.019 (below its 0.03 floor), so the six needs table P's lower-tail
+  narrowing as well, and table P lifts q05 to 0.044.
 - **K2-425A's q99 failure:** the widening raises K2-425A's q99 pinball loss. Against A-pool, K2-425A
   is -0.0022 (-0.0145 to 0.0074) raw, +0.0110 (0.0021 to 0.0177) widened, and about +0.002 after
   table P (0.238 against 0.236). Table P repairs K2-425A's q99 loss. K2-425A's raw q95 coverage
@@ -238,11 +249,18 @@ Targets: q01 0.005 to 0.02, q05 0.03 to 0.07, q95 0.93 to 0.97, q99 0.98 to 0.99
   prediction, and the explanation tested is the fit (leave-one-fold-out against earlier-only,
   above). The maintainer's choice of first-release candidate also depends on this result. A
   comparison with the mean forecast was not made, because the stored forecasts hold quantiles only.
-- **Prediction outcome:** P1 held. P2 held on its wording (table P matches the best widening on q95:
-  0.950 against 0.949), but the widening breaks the lower tail, which P2 did not anticipate. P3 held
-  for the six and failed for the eight (the cold class lifts cold-night q95 to 0.940). P4 failed
-  (table P repairs K2-425A, not a widening). P5 held for q95 (D15/D18 stay under 0.93 after table
-  P).
+  A fresh Sonnet audit (briefed with the PR number alone) confirmed that the fit uses none of the
+  scored fold's actuals, that the row sets are identical, that clean rows hold no real-event rows,
+  and that the six's +6.05% is correct. Three findings: the folds are origin months and targets run
+  up to 10 days ahead, so 5% of 2025-12 half-hours also sit in 2026-01 (dropping them from the fit
+  moves q95 by at most 0.0004); the six's +6% differs by fold (+1.6% to +9.0%) and by Primary (-0.4%
+  to +13.9%); and experiment 435 recalibrated a weaker forecaster, so it is not a contradiction. The
+  audit also asked for the upper-tail widening, which is the new bullet above.
+- **Prediction outcome:** P1 held. P2 held (table P matches the best widening on q95: 0.950 against
+  0.949, and an upper-tail widening matches it on every tail at the eight). P3 held for the six and
+  failed for the eight (the cold class lifts cold-night q95 to 0.940). P4 failed (table P repairs
+  K2-425A's q99 loss; the 1.15 widening of both tails does not). P5 held for q95 (D15/D18 stay under
+  0.93 after table P).
 
 ## Caveats and next steps
 
