@@ -98,7 +98,9 @@ take_home_message: >-
   points of capacity on rows with no labelled event, against 3.62 for the averaged lagless
   forecast, 3.39 for K2-S1, and 3.51 for B-mix, and AvgAnchor serves four neural networks, like
   K2-S1. Inside real load-shift events it is not shown to be safe (0.30 points worse than its
-  anchor on corrected actuals, inconclusive). The results are interim, over five scored months.
+  anchor on corrected actuals, inconclusive). It fails the coverage clause of the tail gate as
+  written and is unreplicated, so it is a candidate for the demand assembly's held-out test and
+  not an adopted design. The results are interim, over five scored months.
 advice:
   - >-
     Do not tune the L2 penalty on the lag correction any further: 100 keeps 18% of the gain and
@@ -173,36 +175,42 @@ inconclusive. Nothing here is claimed at the 99.8% level that 27 contrasts need.
   K2-S1 -0.167 (-0.297 to -0.054); P100 minus LL -0.064 (-0.083 to -0.040).
 - **Gate 1 (diagnostic): the contrast against B-mix by Primary, with D14 and D11 removed.** The
   minimum detectable effect is 0.237 with all six, 0.218 without D14, and 0.176 without both.
-    - AvgAnchor minus B-mix: -0.414 (all), -0.238 (-0.548 to +0.102, no D14, inconclusive), -0.611
-      (no D11), -0.406 (-0.771 to -0.067, no D14 and D11).
+    - AvgAnchor minus B-mix, with absolute scores (AvgAnchor against B-mix): -0.414 (3.094 against
+      3.508, all six), -0.238 (-0.548 to +0.102; 3.142 against 3.380, no D14, inconclusive), -0.611
+      (2.876 against 3.487, no D11), -0.406 (-0.771 to -0.067; 2.856 against 3.262, no D14 and D11).
     - AvgAnchor beats B-mix at five of the six signed Primaries (D11 is the exception, 4.08 against
       3.67)
       and at all eight MVA-only Primaries. D14 carries the largest share (2.83 against 4.04).
     - Against LL-ens3 the gain stays above the minimum detectable effect without D14 (-0.36, -0.60
       to -0.23) and without both (-0.33, -0.64 to +0.02).
-    - P100 minus B-mix is +0.155 (-0.231 to +0.737) and +0.006 without D14 and D11: P100 is no
-      better than B-mix.
+    - P100 minus B-mix is +0.155 (-0.231 to +0.737; 3.664 against 3.508) and +0.006 without D14 and
+      D11 (3.268 against 3.262): P100 is no better than B-mix.
 - **Gate 2, held-out injected load shifts (worlds 200 to 202), signed-MW six, against the anchor.**
-  AvgAnchor minus LL-ens3: -0.303 on target rows (-0.497 to -0.156), -0.393 on harm rows (-0.693 to
-  -0.120), -0.442 on clean rows. P100 minus LL: -0.074, -0.078, -0.080 (all intervals exclude zero).
+  AvgAnchor minus LL-ens3, with absolute scores (AvgAnchor against LL-ens3): -0.303 on target rows
+  (-0.497 to -0.156; 3.104 against 3.406), -0.393 on harm rows (-0.693 to -0.120; 3.619 against
+  4.012), -0.442 on clean rows (4.083 against 4.525). P100 minus LL (P100 against LL): -0.074 (3.479
+  against 3.553), -0.078 (4.075 against 4.152), -0.080 (4.593 against 4.673), all intervals
+  excluding zero.
   Both arms pass the 0.03 limit on injected rows. The neural networks trained on injected worlds of
   the
   same kind, so the comparison measures robustness to the injected load shifts and not to every real
   event.
 - **Real events (gate 2 reading, inconclusive).** The resolution of the real-event rows is about
   0.38 at the six, so none of these contrasts can test a 0.03 limit.
-    - Month-block, NRA-corrected actuals, six: AvgAnchor minus LL-ens3 +0.295 (-0.426 to +1.720);
-      P100 minus LL -0.003 (-0.099 to +0.143). On metered actuals: AvgAnchor -0.654 (-1.628 to
-      +0.045); P100 -0.095 (-0.152 to -0.014).
-    - Event-cluster pooling (rows, 5,000 resamples of events), NRA: AvgAnchor minus LL-ens3 +0.662
+    - Month-block, NRA-corrected actuals, six: AvgAnchor minus LL-ens3 +0.295 (-0.426 to +1.720;
+      14.943 against 14.647); P100 minus LL -0.003 (-0.099 to +0.143; 14.793 against 14.796). On
+      metered actuals: AvgAnchor -0.654 (-1.628 to +0.045; 5.285 against 5.939); P100 -0.095 (-0.152
+      to -0.014; 5.995 against 6.091).
+    - Event-cluster pooling (rows, 5,000 resamples of events; contrasts only, the absolute scores
+      are the month-block ones above), NRA: AvgAnchor minus LL-ens3 +0.662
       (+0.045 to +1.088) over all events and +0.473 (-0.028 to +1.182) with the largest event
       removed. P100 minus LL +0.034 (-0.039 to +0.086) and +0.013 (-0.050 to +0.098). The two
       poolings give the same sign and different sizes.
     - MVA-only eight (the eight Primaries metered in MVA only), NRA: AvgAnchor minus LL-ens3 -0.140
-      (-0.276 to +0.109); P100 minus LL -0.041
-      (-0.075 to -0.008).
+      (-0.276 to +0.109; 10.005 against 10.145); P100 minus LL -0.041 (-0.075 to -0.008; 10.377
+      against 10.418).
     - AvgAnchor on harm rows (lags touch an event, metered): -0.470 against LL-ens3 (-1.051 to
-      +0.015).
+      +0.015; 3.100 against 3.571).
 - **Definition of the gain.** The gain of a correction is its score subtracted from the score of the
   single-seed lagless head LL on the same rows: 0.549 for C1e-2 (seeds 0 and 1, interval -0.976 to
   -0.204) and 0.098 for P100, which is 18% (about 9% to 27% from the interval of P100's gain).
@@ -291,12 +299,15 @@ inconclusive. Nothing here is claimed at the 99.8% level that 27 contrasts need.
 
 ## Caveats and next steps
 
+- **AvgAnchor is a candidate for the assembly's held-out test and not an adopted design.** AvgAnchor
+  fails the coverage clause of gate 3 as written and the result is unreplicated, so the demand
+  assembly treats it as one unreplicated candidate.
 - **Real-event safety of AvgAnchor is unproven.** The point estimate on NRA-corrected actuals is
   0.30 to 0.66 points worse than its anchor, and the evidence is mixed: the month-block interval
   includes zero, and the event-cluster pooling over all events excludes zero (+0.66, +0.05 to
   +1.09).
 - **The coverage limit of gate 3 fails as written, so AvgAnchor does not meet the pre-registered
-  rule for a candidate, and its status is the maintainer's call,** because the anchor under-covers.
+  rule for a candidate as written,** because the anchor under-covers.
   A coverage
   limit relative to the nominal level would pass.
 - **AvgAnchor and C1e-2 differ in more than the anchor:** C1e-2 has seeds 0 and 1 only, and the
@@ -304,6 +315,7 @@ inconclusive. Nothing here is claimed at the 99.8% level that 27 contrasts need.
   clean test.
 - **Unlogged events.** Clean rows may hold events no label covers, so the harm contrasts are
   optimistic and the real-event slices undercount.
-- **Next step.** AvgAnchor goes into the demand assembly as a further candidate. A test of a
+- **Next step.** AvgAnchor goes into the demand assembly's held-out test as a further candidate. A
+  test of a
   correction that ignores the lags inside events (a gate on the surprise) would address the
   real-event reading.
