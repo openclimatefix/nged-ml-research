@@ -51,13 +51,15 @@ def main() -> None:
         yOffset="Arm:N",
         color=alt.Color("Arm:N", title="Arm"),
     )
-    points = base.mark_point(filled=True, size=40).encode(
+    points = base.mark_point(filled=True, size=40).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "difference:Q", title="CRPS minus stored fit (points of capacity; below 0 is better)"
         )
     )
-    bars = base.mark_rule().encode(x="low_bonferroni:Q", x2="high_bonferroni:Q")
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")
+    bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+        x="low_bonferroni:Q", x2="high_bonferroni:Q"
+    )
+    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     chart = (zero + bars + points).properties(width=520, height=300)
     chart.save(FIGURE_DIR / "figure1_contrasts.svg")
 

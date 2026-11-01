@@ -44,10 +44,10 @@ def main() -> None:
     )
     c470.MONTHS = score484.MONTHS
     c470.ARMS = ARMS
-    c449.ARMS = ARMS
-    c449.REFERENCES = REFERENCES
-    c449.COMPARISONS = COMPARISONS
-    c449.RESAMPLES = c470.RESAMPLES
+    c449.ARMS = ARMS  # ty: ignore[invalid-assignment]
+    c449.REFERENCES = REFERENCES  # ty: ignore[invalid-assignment]
+    c449.COMPARISONS = COMPARISONS  # ty: ignore[invalid-assignment]
+    c449.RESAMPLES = c470.RESAMPLES  # ty: ignore[invalid-assignment]
     cost = c470.build()
     out = score484.SCORE_DIR
     cost.write_parquet(out / "curtailment_cells.parquet")
