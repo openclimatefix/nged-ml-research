@@ -12,15 +12,65 @@ status: planned
 kind: other
 protocol: demand-v2
 size: >-
-  complex. Stored: 156 new fitted neural networks for the screen and 72 more for the final test (table under Compute), their forecasts, and the score tables, in this experiment's private folder only; experiments 404, 425, 428, 439, 446 are read and never written. More than one design is defensible (which components enter the ladder, which leave-one-out arms get fits, how pretraining treats the lag inputs), so this plan fixes each choice before any score is read. Production serving path: not touched (this repository holds none). Degradation rule: not touched. Callers: the scripts import the folders of experiments 425, 428, 439, 446, and the `studies` evaluation code.
+  complex. Stored: 156 new fitted neural networks for the screen and 72 more for the final test
+  (table under Compute), their forecasts, and the score tables, in this experiment's private
+  folder only; experiments 404, 425, 428, 439, 446 are read and never written. More than one
+  design is defensible (which components enter the ladder, which leave-one-out arms get fits, how
+  pretraining treats the lag inputs), so this plan fixes each choice before any score is read.
+  Production serving path: not touched (this repository holds none). Degradation rule: not
+  touched. Callers: the scripts import the folders of experiments 425, 428, 439, 446, and the
+  `studies` evaluation code.
 hypothesis: >-
-  The S1 network (pooled plain mixture density network, Primary embedding, ensemble mean and spread once, hand-made calendar columns, monthly refits, three origin lags plus the surprise at each lag) improves with each of three components added one at a time (ERA5-and-CAMS pretraining then ensemble fine-tuning; the fixed 50/50 B-mix of the S1 and lagless output distributions; a five-seed pool), and the network with pretraining and the pool together scores lower CRPS at days 1 to 10 than every one of its parts and than the monthly XGBoost recipe.
+  The S1 network (pooled plain mixture density network, Primary embedding, ensemble mean and
+  spread once, hand-made calendar columns, monthly refits, three origin lags plus the surprise at
+  each lag) improves with each of three components added one at a time (ERA5-and-CAMS pretraining
+  then ensemble fine-tuning; the fixed 50/50 B-mix of the S1 and lagless output distributions; a
+  five-seed pool), and the network with pretraining and the pool together scores lower CRPS at
+  days 1 to 10 than every one of its parts and than the monthly XGBoost recipe.
 prediction: >-
-  Written before any fit and before any score is read. P1. Pretraining lowers S1's CRPS by 0.03 to 0.10 points at the signed-MW six and by 0.08 to 0.20 at the MVA-only eight (experiment 425, a network with no lag inputs: -0.050 and -0.124). P2. B-mix lowers CRPS on clean-lag rows by under 0.03 and lowers q99 pinball loss on rows with a lag jump (experiment 404 found B-mix the strongest lag-trust design), so it passes only through its harm-row rule. P3. The five-seed pool lowers CRPS by 0.04 to 0.07 (experiment 446 T4: -0.056; the three-seed pool of S1 gave -0.042), mostly by ensembling. P4. The assembly PT+pool5 beats S1-pool5 by 0.02 to 0.08. P5. Removing the Primary embedding from the assembled network raises CRPS by 0.5 to 1.0 points (experiment 425: +0.851 and +0.837); removing the surprise inputs raises it by 0.05 to 0.15 (experiment 428's S1 against R-inj: -0.106); removing pretraining raises it by the size of P1. P6. The assembled network beats the monthly XGBoost recipe at both groups.
+  Written before any fit and before any score is read. P1. Pretraining lowers S1's CRPS by 0.03 to
+  0.10 points at the signed-MW six and by 0.08 to 0.20 at the MVA-only eight (experiment 425, a
+  network with no lag inputs: -0.050 and -0.124). P2. B-mix lowers CRPS on clean-lag rows by under
+  0.03 and lowers q99 pinball loss on rows with a lag jump (experiment 404 found B-mix the
+  strongest lag-trust design), so it passes only through its harm-row rule. P3. The five-seed pool
+  lowers CRPS by 0.04 to 0.07 (experiment 446 T4: -0.056; the three-seed pool of S1 gave -0.042),
+  mostly by ensembling. P4. The assembly PT+pool5 beats S1-pool5 by 0.02 to 0.08. P5. Removing the
+  Primary embedding from the assembled network raises CRPS by 0.5 to 1.0 points (experiment 425:
+  +0.851 and +0.837); removing the surprise inputs raises it by 0.05 to 0.15 (experiment 428's S1
+  against R-inj: -0.106); removing pretraining raises it by the size of P1. P6. The assembled
+  network beats the monthly XGBoost recipe at both groups.
 decision_rule: >-
-  Four screen folds (test months 2026-06, 2026-01, 2025-10, 2026-03), seeds 0 to 4, monthly refits, 1.15 widening unless stated, CRPS at days 1 to 10 in points of effective capacity (a negative difference is a gain), per metering group (signed-MW six; MVA-only eight; D15 and D18 report-only) and per Primary. Every screen number is interim and carries no 99% claim. Contrasts are paired by fold and seed with the month-block bootstrap of `studies.eval_protocol`, at a level Bonferroni-corrected over the contrasts. C1 pretrained S1 minus S1. C2 B-mix minus S1. C3 pool of 5 seeds minus a single S1 seed (reported beside the pool of 3 seeds, so that ensembling is separated from the component). C4 the assembly minus the single best component, where the best component is fixed from the C1 to C3 point estimates at the signed-MW six before C4 is read, and held for the final test. Pretraining and B-mix each add a stage to the pipeline, so the smallest gain worth porting is 0.03 points at the signed-MW six (experiment 425's threshold); the pool adds no model and its threshold is zero, with its production cost reported. Pretraining advances if its C1 interval lies wholly below -0.03 at the signed-MW six or at the MVA-only eight, and is not above +0.02 CRPS at the other group. B-mix advances only through harm rows: on real lag-jump rows (event-cluster interval, with and without the largest event) its q99 pinball loss is lower than S1's with an interval wholly below zero, and its clean-row CRPS is no more than +0.03 above S1's; it is a named option, not a default, whatever it scores. The pool advances if C3 is wholly below zero. Tail check units: pinball loss at q95 and q99 in points of effective capacity, clean rows, no more than +0.02 above S1. The three leave-one-out arms (embedding, surprise inputs, pretraining) and LOO-Bmix are read as checks: a component whose removal does not raise CRPS is reported as not supported inside the assembly. The minimum detectable effect is computed per contrast from the variance of the paired fold-by-seed differences (S1 seeds 0 to 5), printed before any contrast is read. The final test (5 folds by 3 seeds, adding 2025-12) runs once, on the advancing components only, against every stored reference, and is not used to tune. The winning configuration of the experiment 447 sweep, if it has reported, is confirmed inside the assembled network at the end as one extra arm.
+  Four screen folds (test months 2026-06, 2026-01, 2025-10, 2026-03), seeds 0 to 4, monthly
+  refits, 1.15 widening unless stated, CRPS at days 1 to 10 in points of effective capacity (a
+  negative difference is a gain), per metering group (signed-MW six; MVA-only eight; D15 and D18
+  report-only) and per Primary. Every screen number is interim and carries no 99% claim. Contrasts
+  are paired by fold and seed with the month-block bootstrap of `studies.eval_protocol`, at a
+  level Bonferroni-corrected over the contrasts. C1 pretrained S1 minus S1. C2 B-mix minus S1. C3
+  pool of 5 seeds minus a single S1 seed (reported beside the pool of 3 seeds, so that ensembling
+  is separated from the component). C4 the assembly minus the single best component, where the
+  best component is fixed from the C1 to C3 point estimates at the signed-MW six before C4 is
+  read, and held for the final test. Pretraining and B-mix each add a stage to the pipeline, so
+  the smallest gain worth porting is 0.03 points at the signed-MW six (experiment 425's
+  threshold); the pool adds no model and its threshold is zero, with its production cost reported.
+  Pretraining advances if its C1 interval lies wholly below -0.03 at the signed-MW six or at the
+  MVA-only eight, and is not above +0.02 CRPS at the other group. B-mix advances only through harm
+  rows: on real lag-jump rows (event-cluster interval, with and without the largest event) its q99
+  pinball loss is lower than S1's with an interval wholly below zero, and its clean-row CRPS is no
+  more than +0.03 above S1's; it is a named option, not a default, whatever it scores. The pool
+  advances if C3 is wholly below zero. Tail check units: pinball loss at q95 and q99 in points of
+  effective capacity, clean rows, no more than +0.02 above S1. The three leave-one-out arms
+  (embedding, surprise inputs, pretraining) and LOO-Bmix are read as checks: a component whose
+  removal does not raise CRPS is reported as not supported inside the assembly. The minimum
+  detectable effect is computed per contrast from the variance of the paired fold-by-seed
+  differences (S1 seeds 0 to 5), printed before any contrast is read. The final test (5 folds by 3
+  seeds, adding 2025-12) runs once, on the advancing components only, against every stored
+  reference, and is not used to tune. The winning configuration of the experiment 447 sweep, if it
+  has reported, is confirmed inside the assembled network at the end as one extra arm.
 benchmark: >-
-  S1 seeds 0 to 5 from experiments 428 and 439 (raw forecasts, 1.15); R-inj; the monthly XGBoost recipe, BG2, `manual_heuristic`, and `climatology` as read by experiment 425. Table P of experiment 435 is a last stage run only if the 435 page has merged when the screen finishes; if it has not, the page says so and reports raw and 1.15-widened scores only.
+  S1 seeds 0 to 5 from experiments 428 and 439 (raw forecasts, 1.15); R-inj; the monthly XGBoost
+  recipe, BG2, `manual_heuristic`, and `climatology` as read by experiment 425. Table P of
+  experiment 435 is a last stage run only if the 435 page has merged when the screen finishes; if
+  it has not, the page says so and reports raw and 1.15-widened scores only.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   CRPS from the 11 quantiles at days 1 to 10; coverage and pinball loss at q01, q05, q95, q99;
@@ -57,7 +107,8 @@ references.
   fine-tuned on ensemble rows with the lag and surprise columns live. A smoke test checks that the
   pretrained and fine-tuned S1 has the stored S1's input width and parameter count (8,585).
 - **B-mix.** Mixture of S1's output distribution and the lagless network L0's, 50/50 as in
-  experiment 446. L0 is stored for seed 0 only, so L0 is fitted for seeds 1 to 4 (16 fits). Experiment
+  experiment 446. L0 is stored for seed 0 only, so L0 is fitted for seeds 1 to 4 (16 fits).
+  Experiment
   404's cross-fitted lagless tables are not used, because they cover training-period rows only.
   B-mix is a named option; the maintainer has not approved it for the first release.
 - **Export gate (420, 424).** The gate is a trained component scored on signed output, and this
