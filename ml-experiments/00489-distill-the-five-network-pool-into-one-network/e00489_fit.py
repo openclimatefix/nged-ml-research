@@ -12,9 +12,7 @@ Each student starts from the stored pretrained arm A network of the same seed
 (`00425-*/work/pretrained/A/<month>_s<seed>.pt`) and is fine-tuned at 2e-4 on the ENS rows of
 experiment 425's fold, with experiment 397's loop shape (batch 16,384, at most 40 epochs, patience
 6, gradient clip 1.0). The loss of a row is, in standardised units,
-
-    w * [NLL(y) + alpha * P(q_student, q_teacher) + (1 - alpha) * P(q_student, y)]
-
+`w * [NLL(y) + alpha * P(q_student, q_teacher) + (1 - alpha) * P(q_student, y)]`,
 where `w` is the recency weight `0.5 ** (age_days / SHORT_HALF_LIFE_DAYS)` of the fold, `NLL` is the
 student's own mixture likelihood on the true target, and `P` is the pinball loss summed over the 11
 levels (against the teacher's 11 quantiles as atoms of the scorers' level masses in the first term,
@@ -169,7 +167,7 @@ def row_loss(
     levels: torch.Tensor,
     masses: torch.Tensor,
 ) -> torch.Tensor:
-    """Return NLL(y) + alpha * pinball(q, teacher) + (1 - alpha) * pinball(q, y) per row."""
+    """Return the likelihood loss plus the weighted teacher and true-target pinball losses per row."""
     nll = models.mixture_nll(out=out, z=z, components=components)
     q = student_quantiles(out=out, components=components)
     return (
