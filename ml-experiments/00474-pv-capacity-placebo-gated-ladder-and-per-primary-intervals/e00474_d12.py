@@ -19,7 +19,7 @@ import e00358_known_answer as known  # ty: ignore[unresolved-import]
 import e00474_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_gam import prepare_fit
 from studies.dp_meter import fit_gam_through_meter
 
