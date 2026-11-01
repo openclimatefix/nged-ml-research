@@ -157,6 +157,7 @@ def pretrain_rows(*, rows: data.Rows, refit, clean: np.ndarray) -> data.Rows:  #
             }
         )  # fmt: skip
     cat = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
+    del parts
     return data.Rows(
         x=cat["x"], y=cat["y"], primary=cat["primary"], origin_idx=cat["origin_idx"],
         target_idx=cat["target_idx"], lead=cat["lead"],
@@ -209,7 +210,9 @@ def fit_pt(
     if pre_path.exists():
         model.load_state_dict(torch.load(pre_path, map_location=device))
     else:
-        pre = pretrain_rows(rows=rows, refit=refit, clean=stack[0])
+        if ("pre", month) not in cache:
+            cache[("pre", month)] = pretrain_rows(rows=rows, refit=refit, clean=stack[0])
+        pre = cache[("pre", month)]
         pre_rows = len(pre.x)
         pre_inputs = MaskedInputs(
             power=power, x=pre.x, primary=pre.primary, origin_idx=pre.origin_idx,
@@ -357,9 +360,9 @@ def forecast_combo(
     first = loaded[0][0]
     test = data.build_test(month=month, standardiser=first.standardiser)
     for member, _, _ in loaded:
-        assert np.array_equal(member.standardiser.mean, first.standardiser.mean), (
-            "pooled networks must share the fold's standardiser"
-        )
+        assert np.array_equal(member.standardiser.mean, first.standardiser.mean) and np.array_equal(
+            member.standardiser.std, first.standardiser.std
+        ), "pooled networks must share the fold's standardiser"
     inputs = [
         fit.Inputs(
             power=power, x=test.x, primary=test.primary, origin_idx=test.origin_idx,
@@ -427,6 +430,9 @@ def smoke(*, device: str) -> None:
     refit = prep.refit_of(month=month)
     rows = data.build_fold(refit=refit, clean=stack[0])
     pre = pretrain_rows(rows=rows, refit=refit, clean=stack[0])
+    site = prep.primaries().row(0, named=True)["site"]
+    full_width = len(prep.feature_names(scheme="summary")[0])
+    assert np.load(prep418.RAW_DIR / f"{site}.npz")["x"].shape[1] == full_width
     assert pre.x.shape[1] == rows.x.shape[1], "pretraining and fine-tuning rows differ in width"
     assert np.isfinite(pre.x).all() and np.isfinite(pre.y).all()
     assert pre.is_val.any() and (~pre.is_val).any()
@@ -468,7 +474,7 @@ def main() -> None:
     """Fit, forecast, or run the smoke test."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("fit", "predict", "combo", "smoke"))
-    parser.add_argument("--arms", nargs="+", default=["S1PT"])
+    parser.add_argument("--arms", nargs="+", default=None)
     parser.add_argument("--months", nargs="+", default=list(fit.SCREEN_MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS))
     parser.add_argument("--device", default="cuda")
@@ -483,7 +489,7 @@ def main() -> None:
         cache: dict = {}
         for month in args.months:
             for seed in args.seeds:
-                for name in args.arms:
+                for name in args.arms or ["S1PT"]:
                     if name in PT_ARMS:
                         print(fit_pt(arm_name=name, month=month, seed=seed, power=power, stack=stack,
                                      device=args.device, cache=cache), flush=True)  # fmt: skip
@@ -497,7 +503,7 @@ def main() -> None:
     if args.command == "predict":
         for month in args.months:
             for seed in args.seeds:
-                for name in args.arms:
+                for name in args.arms or ["S1PT"]:
                     # The loader reads this experiment's folder first, then 439's and 428's.
                     fit.MODELS_DIR = locate(arm=name, month=month, seed=seed).parents[2]
                     for line in pr.predict_month(arm_name=name, month=month, seed=seed, device=args.device,
@@ -507,14 +513,14 @@ def main() -> None:
     specs = combos()
     for month in args.months:
         for name, spec in specs.items():
-            if args.arms != ["S1PT"] and name not in args.arms:
+            if args.arms is not None and name not in args.arms:
                 continue
             for line in forecast_combo(month=month, name=name, spec=spec, seed_files=SEEDS5, device=args.device,
                                        power=power, flags=flags, y_clean=power_np[0]):  # fmt: skip
                 print(line, flush=True)
-        for arm in ("S1", "S1PT"):
+        for arm in ("S1",):
             name = f"{arm}-Bmix"
-            if args.arms != ["S1PT"] and name not in args.arms:
+            if args.arms is not None and name not in args.arms:
                 continue
             for seed in SEEDS5:
                 for line in forecast_combo(month=month, name=name, spec=single_bmix(arm=arm, seed=seed),

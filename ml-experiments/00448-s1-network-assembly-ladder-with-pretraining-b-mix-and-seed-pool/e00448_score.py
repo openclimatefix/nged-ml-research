@@ -13,6 +13,7 @@ source <paths>; PYTHONPATH=$PP:ml-experiments/00448-* DATA_PATH_INTERNAL=... \
 """
 
 import argparse
+import math
 from pathlib import Path
 from typing import Final
 
@@ -41,6 +42,29 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "Bmix on pool S1-pool5-Bmix - S1-pool5": ("S1-pool5-Bmix", "S1-pool5"),
 }
 SEED_SETS: Final[dict[str, tuple[int, ...]]] = {"seeds 0-4": (0, 1, 2, 3, 4)}
+
+
+def minimum_detectable_effect(*, table: pl.DataFrame, seeds: tuple[int, ...]) -> pl.DataFrame:
+    """Return the minimum detectable effect from S1's seed spread (experiment 428's formula)."""
+    records = []
+    for (row_set, group), part in table.filter(pl.col("arm") == "S1").group_by("row_set", "group"):
+        per_fold = part.group_by("month").agg(
+            pl.col("n").sum(), *[pl.col(f"score_s{s}").sum() for s in seeds]
+        )
+        values = np.array(
+            [
+                [r[f"score_s{s}"] / r["n"] * score.POINTS for s in seeds]
+                for r in per_fold.iter_rows(named=True)
+            ]
+        )
+        folds, n_seeds = values.shape
+        residual = values - values.mean(axis=1, keepdims=True)
+        sd = math.sqrt((residual**2).sum() / (folds * (n_seeds - 1)))
+        records.append(
+            {"row_set": row_set, "group": group, "seed_sd": sd,
+             "mde": 1.96 * math.sqrt(2.0) * sd / math.sqrt(n_seeds)}
+        )  # fmt: skip
+    return pl.DataFrame(records)
 
 
 def link() -> None:
@@ -95,7 +119,7 @@ def main() -> None:
             absolute = score.summarise(table=table, seeds=seeds)
             absolute.write_parquet(out / f"absolute_{tag}.parquet")
             print(absolute.sort("row_set", "group", "arm"))
-            mde = score.minimum_detectable_effect(table=table, seeds=seeds)
+            mde = minimum_detectable_effect(table=table, seeds=seeds)
             mde.write_parquet(out / f"mde_{tag}.parquet")
             print(mde.sort("row_set", "group"))
             contrasts = score.contrast_table(table=table, rng=np.random.default_rng(0))
