@@ -14,7 +14,8 @@ date: 2026-11-01
 size: >-
   simple. No fit and no stored model: the scripts re-score the stored forecasts of experiment 429's
   `member_plain` and read experiment 341's capacity-state table. Serving path: not touched. The
-  scripts import the folders of experiments 230, 303, 310, 326, 336, 347, 429, and 450 and `studies.*`. Sonnet only:
+  scripts import the folders of experiments 230, 303, 310, 326, 336, 347, 429, and 450 and
+  `studies.*`. Sonnet only:
   one code and numbers review, one write-up review.
 hypothesis: >-
   Farm A's share of observations above q99 after table P (1.76%, experiment 450) comes either from

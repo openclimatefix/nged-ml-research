@@ -15,6 +15,7 @@ uv run --no-sync python ml-experiments/00451-*/e00451_exceedances.py
 ```
 """
 
+from itertools import pairwise
 from pathlib import Path
 from typing import Final
 
@@ -42,6 +43,23 @@ WIND_BINS: Final[tuple[float, ...]] = (4.0, 8.0, 12.0, 16.0)
 """Edges of the ensemble-mean 100 m wind speed bins in m/s."""
 
 
+def wind_bin_expr() -> pl.Expr:
+    """Return the label of the ensemble-mean wind-speed bin, such as `(4, 8]`."""
+    edges = [None, *WIND_BINS, None]
+    expr = pl.lit(None, dtype=pl.String)
+    for low, high in pairwise(edges):
+        label = (
+            f"({'-inf' if low is None else f'{low:g}'}, {'inf' if high is None else f'{high:g}'}]"
+        )
+        inside = pl.lit(value=True)
+        if low is not None:
+            inside = inside & (pl.col("wind") > low)
+        if high is not None:
+            inside = inside & (pl.col("wind") <= high)
+        expr = pl.when(inside).then(pl.lit(label)).otherwise(expr)
+    return expr
+
+
 def frame_with_extras() -> pl.DataFrame:
     """Return `member_plain`'s scored rows with quantiles, bands, wind speed, and capacity state."""
     cases = data347.scored_frame()
@@ -62,7 +80,7 @@ def frame_with_extras() -> pl.DataFrame:
         .when(med < MEDIAN_BANDS[1]).then(pl.lit("m1"))
         .when(med < MEDIAN_BANDS[2]).then(pl.lit("m2"))
         .otherwise(pl.lit("m3")),
-        wind_bin=pl.col("wind").cut(list(WIND_BINS)).cast(pl.String),
+        wind_bin=wind_bin_expr(),
         hour=pl.col("valid_time").dt.hour(),
     )  # fmt: skip
     state = pl.read_parquet(CAPACITY_STATE).select("site", "valid_time", "state", "reduced_share")
