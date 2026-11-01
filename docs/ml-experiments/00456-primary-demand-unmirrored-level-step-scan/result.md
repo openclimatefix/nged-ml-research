@@ -66,8 +66,8 @@ production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Read the 0.75 unmirrored steps per Primary-year as an upper bound that is mostly noise, and do
-    not set row 4's placeholder rate from it (headline, figure 4).
+    Read the 0.75 unmirrored steps per Primary-year as an upper bound that noise may largely
+    explain, and do not set row 4's placeholder rate from it (headline, figure 4).
   - >-
     Test any mirror rule against start dates shifted by 30 to 90 days before calling a step a
     load-shift candidate (figure 3).
@@ -150,19 +150,21 @@ forecast (B-mix) over the lagged forecast alone, so the scan does not find rows 
   2, start within 1 day, at any neighbour) is too loose, so the mirrored class is not evidence of
   load shifting.
 - **Injection (quiet windows, daily residual).** Steps of 1.0, 1.5, and 2.0 times the detection
-  threshold are recalled at 0.48, 0.98, and 1.00 (random windows 0.43, 0.91, 0.97), flat in
-  duration at 1.5 times the threshold or more. With a mirror injected at a neighbour, 0.98 of detected steps are
-  classed mirrored at 1.5 times (quiet and random windows alike); for unmirrored injections about 10% are called mirrored
-  by chance. A refit of D2 with a 30-day step of 1.5 times the threshold injected into the
-  half-hourly power (two windows) recovered 11.4 and 11.8 of the injected 11.8 points, so the
-  cross-fit did not absorb it. Recall is high only for large steps; steps of 3 times the spread
-  (1.0 times the threshold at the typical Primary) are recalled at under 0.5, so P3 failed.
+  threshold are recalled at 0.48, 0.98, and 1.00 (random windows 0.43, 0.91, 0.97), flat in duration
+  at 1.5 times the threshold or more. With a mirror injected at a neighbour, 0.98 of detected steps
+  are classed mirrored at 1.5 times (quiet and random windows alike); for unmirrored injections
+  about 10% are called mirrored by chance. A refit of D2 with a 30-day step of 1.5 times the
+  threshold injected into the half-hourly power (two windows) recovered 11.4 and 11.8 of the
+  injected 11.8 points, so the cross-fit did not absorb it. Recall is high only for large steps;
+  steps of 3 times the spread (1.0 times the threshold at the typical Primary) are recalled at under
+  0.5, so P3 failed.
 - **Quiet windows.** The step-free rule leaves a median 41,500 of 120,000 half-hours per Primary
   as injection windows (D18 keeps 3,900 of 24,400) (`quiet_windows.csv`).
 - **Recall on labelled events** (experiment 400's corrected table, 184 event-by-Primary rows in 93
-  events). 11 rows and 10 events are found (a same-sign step starts within 2 days of the onset);
-  of events lasting 7 days or more, 7 of 13 events and 7 of 23 rows. This is a lower bound on
-  recall and says nothing about unlabelled events.
+  events). 11 rows and 10 events are found (a same-sign step starts within 2 days of the onset); of
+  events lasting 7 days or more, 7 of 13 events and 7 of 23 rows. P1 held for events lasting 7 days
+  or more (7 of 13 is above half). This is a lower bound on recall and says nothing about unlabelled
+  events.
 - **What the scan changes for the stored forecasts** (experiment 404, A0-inj against B-mix, 5
   months, 1,649,447 rows; a row is "in a scan step" if its origin day or target day lies in the
   first 60 days of any detected step at its Primary, mirrored, unmirrored, or temporary).
@@ -176,22 +178,24 @@ forecast (B-mix) over the lagged forecast alone, so the scan does not find rows 
 
 - **Reading the table.** Removing the unlabelled scan-step rows would cut 18% of the rows not
   labelled as events and move B-mix's lead on the rest from 0.63 to 0.64, so the scan would not
-  change a score. The intervals of the first two rows overlap. The row sets differ by Primary
-  (the scan flags 58% of Primary 3's rows and none of three Primaries), so this is not a matched
-  comparison.
+  change a score. The intervals of the first two rows overlap. The row sets differ by Primary (the
+  scan flags 58% of the rows of one Primary and none of the rows of three others), so the four row
+  sets are not a matched comparison.
 - **Candidate list.** `candidate_steps.csv` beside this page lists every step (Primary, start day,
   start date, end day, size in points and MW, class, nearest neighbour and its change, labelled,
   near a block boundary). 26 mirrored steps match no labelled event (0.28 per Primary-year); given
-  the chance rate, most of them are coincidences. It is a robustness report only for the nine
+  the chance rate, most of them are coincidences. The list is reliable only for the nine
   Primaries with low false-alarm rates.
 
 ## Caveats
 
 - **NGED's event labels are incomplete.** The 184 label rows are a lower bound on events, so the
-  recall is a lower bound on recall, and an unlabelled candidate may be a real event. Clean rows
-  may hold unlogged events.
-- **The scan cannot tell** a genuine level change that a neighbour mirrors by coincidence, a step
-  shorter than 7 days, or any cause. Mirrors at BSPs, GSPs, or unmetered Primaries are not seen.
+  measured recall is a lower bound on the true recall, and an unlabelled candidate may be a real
+  event. Clean rows may hold unlogged events.
+- **The scan cannot tell three kinds of case.** It cannot recognise a genuine level change that a
+  neighbour mirrors by coincidence, it cannot see a step shorter than 7 days, and it cannot say what
+  caused a step. It does not see mirrors at bulk supply points, grid supply points, or unmetered
+  Primaries.
 - **Injection is into the daily residual** with the spread and noise scale fixed at the real
   series' values (a lab shortcut, checked by one refit).
 - **Neighbour sets** are the pairs in the corrected label table of experiment 395.
