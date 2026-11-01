@@ -38,8 +38,10 @@ FIT_START_D15_D18: Final[np.datetime64] = np.datetime64("2025-03-01")
 READ_OUT_SEASON_YEAR: Final[int] = c269.READ_OUT_SEASON_YEAR
 """The season-year (July 2024 to June 2025) at which injection recovery is read."""
 CLOUD_LOAD_SHAPES: Final[tuple[str, ...]] = ("linear", "squared")
-MIN_ROWS_PER_SEASON_YEAR: Final[int] = 2000
+MIN_ROWS_PER_SEASON_YEAR: Final[int] = 4000
 """A season-year needs this many fitted half-hours to get its own capacity column."""
+MIN_MONTHS_PER_SEASON_YEAR: Final[int] = 3
+"""... and rows in at least this many calendar months."""
 
 
 @dataclass(frozen=True)
@@ -87,7 +89,7 @@ def prepare(*, cache: FeatureCache, site: str) -> Prepared:
     days = cal.local_date.astype("datetime64[D]").astype(np.int64)
     weekday = (days + 3) % 7
     day_class = np.where(weekday < 5, 0, weekday - 4)
-    month = start.astype("datetime64[M]").astype(np.int64)
+    month = cal.local_date.astype("datetime64[M]").astype(np.int64)
     key = (month - month.min()) * 144 + hour * 3 + day_class
     group = np.unique(key, return_inverse=True)[1]
     t = f.temperature_c
@@ -166,6 +168,7 @@ def build_design(
     mask: np.ndarray,
     cloud_terms: bool,
     shape_override: np.ndarray | None = None,
+    cloud_override: np.ndarray | None = None,
 ) -> Design:
     """Return the anomaly design on the rows in `mask` (a subset of `prepared.usable`)."""
     p = prepared
@@ -174,11 +177,20 @@ def build_design(
     shape_anomaly = group_demean(values=np.nan_to_num(shape, nan=0.0), group=p.group, rows=mask)
     nuisance = group_demean(values=p.raw_columns, group=p.group, rows=mask)
     if cloud_terms:
-        cloud = group_demean(values=p.cloud_columns, group=p.group, rows=mask)
+        raw_cloud = p.cloud_columns if cloud_override is None else cloud_override
+        cloud = group_demean(values=raw_cloud, group=p.group, rows=mask)
         nuisance = np.concatenate([nuisance, cloud], axis=1)
     sy = p.season_year[rows]
     candidates = np.unique(sy)
-    years = np.array([k for k in candidates if (sy == k).sum() >= MIN_ROWS_PER_SEASON_YEAR])
+    row_month = p.month[rows]
+    years = np.array(
+        [
+            k
+            for k in candidates
+            if (sy == k).sum() >= MIN_ROWS_PER_SEASON_YEAR
+            and len(np.unique(row_month[sy == k])) >= MIN_MONTHS_PER_SEASON_YEAR
+        ]
+    )
     capacity = np.zeros((len(rows), len(years)))
     for j, k in enumerate(years):
         capacity[:, j] = np.where(sy == k, shape_anomaly[rows], 0.0)
@@ -186,6 +198,9 @@ def build_design(
     keep_rows = np.isin(sy, years)
     months = np.unique(p.month[rows[keep_rows]])
     month_slot = np.searchsorted(months, p.month[rows])
+    kept_slot = month_slot[keep_rows]
+    if not np.array_equal(months[kept_slot], p.month[rows][keep_rows]):
+        raise ValueError("a kept row has a month outside the fitted months")
     y_anomaly = group_demean(values=np.nan_to_num(p.y_mw, nan=0.0), group=p.group, rows=mask)
     return Design(
         rows=rows[keep_rows],
@@ -309,7 +324,7 @@ def shuffle_within_month(*, cache: FeatureCache, series: np.ndarray, seed: int) 
         members = np.flatnonzero(day_month == value)
         mapping[members] = rng.permutation(members)
     shuffled = table[mapping[day_number - first], slot]
-    return np.where(np.isfinite(shuffled), shuffled, series)
+    return np.where(np.isfinite(series), shuffled, np.nan)
 
 
 def recovery_factor(*, prepared: Prepared, design: Design, norm: np.ndarray) -> float:

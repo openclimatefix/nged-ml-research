@@ -88,8 +88,21 @@ def real_rows(*, cache: FeatureCache, prepared: anomaly.Prepared, seed: int) -> 
                 cache=cache, series=prepared.shape, seed=500 + 13 * k
             )
             shuffled = np.where(np.isfinite(prepared.shape), shuffled, np.nan)
+            cloud_shuffled = np.stack(
+                [
+                    anomaly.shuffle_within_month(
+                        cache=cache, series=prepared.cloud_columns[:, c], seed=500 + 13 * k
+                    )
+                    for c in range(prepared.cloud_columns.shape[1])
+                ],
+                axis=1,
+            )
             d2 = anomaly.build_design(
-                prepared=prepared, mask=prepared.usable, cloud_terms=cloud, shape_override=shuffled
+                prepared=prepared,
+                mask=prepared.usable,
+                cloud_terms=cloud,
+                shape_override=shuffled,
+                cloud_override=np.nan_to_num(cloud_shuffled, nan=0.0),
             )
             g2, r2 = anomaly.monthly_normal_equations(design=d2)
             one = np.ones((1, len(d2.months)))
@@ -144,6 +157,10 @@ def known_rows(*, cache: FeatureCache, prepared: anomaly.Prepared, seed: int) ->
             design = anomaly.build_design(prepared=prepared, mask=mask, cloud_terms=cloud)
             col = anomaly.readout_column(design=design, season_year=anomaly.READ_OUT_SEASON_YEAR)
             if col < 0:
+                print(f"{prepared.site} farm {farm} cloud={cloud}: no read-out column", flush=True)
+                rows.append(
+                    {"site": prepared.site, "farm": farm, "cloud": cloud, "kind": "missing"}
+                )
                 continue
             gram, rhs = anomaly.monthly_normal_equations(design=design, extra_targets=extra)
             counts = anomaly.month_counts(
