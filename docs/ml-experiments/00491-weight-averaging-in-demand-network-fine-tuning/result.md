@@ -110,8 +110,8 @@ take_home_message: >-
 lessons: >-
   Early stopping on the held-out week is not worth much here: the fixed 4-epoch network (S0f) scores
   within 0.007 points of the early-stopped network (S0) at the eight and the six, though 0.14 points
-  better on the six's real-event rows. Weight averaging lowers the held-out-week loss at epoch 4 in only 7 of 15 fits, so the
-  averaged weights are no better than the raw weights at the end of a short run. The best tail
+  better on the six's real-event rows. Weight averaging lowers the held-out-week loss at epoch 4 in
+  only 7 of 15 fits, so the averaged weights are no better than the raw weights at the end of a short run. The best tail
   widening is 1.05 at the eight and 1.05 to 1.10 at the six for every arm, so averaging seeds does
   not change the widening.
 advice:
