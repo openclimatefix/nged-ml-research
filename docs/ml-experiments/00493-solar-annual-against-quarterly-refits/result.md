@@ -33,9 +33,9 @@ prediction: >-
   in the last quarter; the last quarter alone may exceed 1%. Each prediction can fail.
 decision_rule: >-
   Annual refits are called equivalent to quarterly refits for a contrast when the upper end of its
-  98.33% month-block interval (12 scored months, 10,000 draws, Bonferroni count 3 for C1 to C3, family
-  level 5%) lies below the limit, and no one farm's point estimate exceeds +1%. The limit is 1%, or
-  the minimum detectable effect from the seed spread if that is larger (printed first). An equivalence
+  two-sided 98.33% month-block interval (12 scored months, 10,000 draws, Bonferroni count 3 for C1
+  to C3, family level 5%) lies below the limit, and no one farm's point estimate exceeds +1%. The limit is 1%, or
+  the minimum detectable effect from the seed spread if that is larger (printed first; the largest of the four arms' seed-spread values). An equivalence
   claim at the minimum detectable effect cannot show a loss smaller than the minimum detectable
   effect. A point estimate inside the limit with an interval that crosses it is inconclusive, not
   equivalent. If a contrast fails, the quarterly schedule stays for that network. Control: on the

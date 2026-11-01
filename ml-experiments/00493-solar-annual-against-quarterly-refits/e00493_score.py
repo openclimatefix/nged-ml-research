@@ -22,8 +22,9 @@ import polars as pl
 BONFERRONI_COUNT: Final[int] = 3
 FAMILY_ALPHA: Final[float] = 0.05
 LEVEL_PCT: Final[float] = 100.0 * (1.0 - FAMILY_ALPHA / BONFERRONI_COUNT)
-LO_PCT, HI_PCT = 100.0 - LEVEL_PCT, LEVEL_PCT
-"""Percentiles of the 98.33% interval."""
+LO_PCT = (100.0 - LEVEL_PCT) / 2.0
+HI_PCT = 100.0 - LO_PCT
+"""Percentiles of the two-sided 98.33% interval (0.833 and 99.167)."""
 LIMIT_PERCENT: Final[float] = 1.0
 CONTROL_TOLERANCE_PERCENT: Final[float] = 0.01
 FARM_LIMIT_PERCENT: Final[float] = 1.0
@@ -44,6 +45,8 @@ def load(*, name: str) -> pl.DataFrame:
     else:
         folder = common.E430_PRED_DIR / name.removeprefix("q_")
     files = sorted(f for s in common.SEEDS for f in folder.glob(f"s{s}_*.parquet"))
+    per_seed = 1 if name.startswith("annual_") else 4
+    assert len(files) == per_seed * len(common.SEEDS), (name, len(files))
     return s430.average_seeds(frame=pl.concat([pl.read_parquet(f) for f in files]), arm=name)
 
 
@@ -131,6 +134,14 @@ def main() -> None:
         }
         c = contrast(a=first[annual], b=first[quarterly])
         status = "PASSED" if abs(c["pct"]) <= CONTROL_TOLERANCE_PERCENT else "MISSED"
+        merged = (
+            first[annual]
+            .select(*s430.KEYS, a=pl.col("score"))
+            .join(first[quarterly].select(*s430.KEYS, b=pl.col("score")), on=s430.KEYS)
+        )
+        print(
+            f"control max |row score difference| {float((merged['a'] - merged['b']).abs().max()):.6f}"
+        )
         print(f"CONTROL {annual} vs {quarterly}, first quarter: {c['pct']:+.5f}% {status}")
 
     out = []
@@ -149,6 +160,7 @@ def main() -> None:
             )
             out.append({"id": cid, "a": a, "b": b, "cut": f"farm_{farm}", **c})
         months = sorted(rows[a]["init_month"].unique().to_list())
+        assert len(months) == 12, months
         for k in range(4):
             quarter = months[3 * k : 3 * k + 3]
             c = contrast(
