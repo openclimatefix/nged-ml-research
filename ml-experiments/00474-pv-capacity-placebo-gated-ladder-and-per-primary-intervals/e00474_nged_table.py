@@ -73,8 +73,9 @@ def main() -> None:
     lines = [
         "# Unmetered solar capacity at each Primary (NGED table)",
         "",
-        "Season-year July 2025 to June 2026, in megawatts. Capacities come from experiment 474's",
-        "R4 rung with cloud terms; D12 uses the fit through the meter.",
+        "Season-year July 2025 to June 2026, in megawatts. Capacities come from the",
+        "pooled solar-shape model driven by the mean of ERA5 and CAMS irradiance, with two",
+        "cloud terms; D12 uses the fit through the meter.",
         "",
         (
             "| Primary | Status | AC capacity, MW (10th / 50th / 90th) "
@@ -84,16 +85,24 @@ def main() -> None:
     ]
     for row in latest.sort(pl.col("site").str.slice(1).cast(pl.Int64)).iter_rows(named=True):
         status = row["status"] or "signed MW reading"
-        conf = (
-            f"placebo gate failed (95th percentile {row['placebo_p95_max']:.2f}, limit 0.20); "
-            f"80% interval covered {row['coverage_easy']:.0%} of injections, "
-            f"{row['coverage_cloud_load']:.0%} with a cloud-following load"
-        )
+        note = "" if row["site"] != "D12" else "recovery tests used the physical fleet shape; "
         lines.append(
             f"| {row['site']} | {status} "
             f"| {row['ac_p10']:.1f} / {row['ac_p50']:.1f} / {row['ac_p90']:.1f} "
-            f"| {row['dc_p10']:.1f} / {row['dc_p50']:.1f} / {row['dc_p90']:.1f} | {conf} |"
+            f"| {row['dc_p10']:.1f} / {row['dc_p50']:.1f} / {row['dc_p90']:.1f} "
+            f"| {note}coverage {row['coverage_easy']:.0%} / {row['coverage_cloud_load']:.0%}, "
+            f"placebo {row['placebo_p95_max']:.2f} |"
         )
+    lines += [
+        "",
+        "**Confidence column.** Coverage is the share of injected metered-farm capacities that the",
+        "80% interval contained in tests, first without and then with a cloud-following load.",
+        "Placebo is the 95th percentile of the share of a fake farm (a day-of-year profile with",
+        "another day's anomaly) that the fit found. The placebo test fails when it exceeds 0.20, so",  # noqa: E501
+        "it failed on every row. Status terms: MVA-only means the reading is apparent power with no",  # noqa: E501
+        "sign; the other Primaries have signed readings. D12 shows its season-year 2024 value",
+        "(July 2024 to June 2025), the latest the fit through the meter was run for.",
+    ]
     (charts.DOCS_DIR / "nged_table.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
