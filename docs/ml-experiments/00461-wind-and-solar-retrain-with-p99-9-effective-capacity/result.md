@@ -73,9 +73,10 @@ metric: >-
   and Solar A to F as
   fractions of the old capacity.
 - **Table P.** Fitted per (series, lead band) on earlier scored months only, as in experiment 450,
-  with experiment 451's upper clip (the series' largest earlier power over the divisor). The clip is
-  the same power in MW under either divisor, and a check confirms it. The network head clips its
-  quantiles to 0 to 1 of the capacity in use, so the new arm's head reaches the new capacity.
+  with experiment 451's upper clip as coded: the larger of 1.0 and the series' largest actual in
+  the earlier scored months, in each arm's own units. The floor of 1.0 is the capacity in use, so it
+  differs by arm (old p99, new p99.9). The network head clips its quantiles to 0 to 1 of the capacity
+  in use, so the new arm's head reaches the new capacity.
 
 ## Scoring
 
