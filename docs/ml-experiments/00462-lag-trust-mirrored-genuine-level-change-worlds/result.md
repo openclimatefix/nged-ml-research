@@ -205,7 +205,8 @@ Sonnet reviews this plan, the code before the first fit, the results, and the wr
 **A forecaster that knows only whether the newest lag has a mirror should follow 0.03 to 0.12 of a
 step, and the mirror moves that share by only 0.05 to 0.08.** The table counts, in 400,000 sampled
 fold rows per training world, the rows whose first k lags all lie in a jump and the share of them
-whose newest lag lies in a genuine level change that the target still carries (`e00462_run.py rates`, month 2026-01, Bayes share = target moved / rows).
+whose newest lag lies in a genuine level change that the target still carries
+(`e00462_run.py rates`, month 2026-01, Bayes share = target moved / rows).
 A mirror here means any neighbour differs from the clean series at the newest lag's time, so load
 shifts of experiment 428's worlds that happen to overlap in time count as mirrors.
 
@@ -227,7 +228,7 @@ perfect learner would show a gap of about 0.07.
 - **Pass (b) is now:** the learned share followed without a mirror minus the share with a mirror
   exceeds 0.03, with a month-block interval above zero, and each learned share lies within 0.15 of
   its Bayes-optimal value in the table above. Pass (a) and the real-row gate are unchanged.
-- **A perfect learner shows a gap of only 0.047 to 0.062, which may sit below the seed noise.** If
+- **A perfect learner shows a gap of only 0.054 to 0.075, which may sit below the seed noise.** If
   the contrast of S3-amb against S3-rw-amb and the learned gap both lie inside the minimum
   detectable effect, the page reports the result as inconclusive by design and not as a refutation
   of attention over the lags. A 5% genuine share would raise the Bayes-optimal gap and is the
@@ -235,4 +236,8 @@ perfect learner would show a gap of about 0.07.
 - **Most mirrors in these worlds are coincident load shifts of experiment 428's worlds at
   neighbours,** not mirrors of a genuine change, which is why the optimal gap is small.
 
-*Correction before any fit: a code review found that the first version of this table counted any target inside a genuine event; the table above counts only rows whose newest lag and target carry the same genuine step. The mirror flag is coarser than what the network sees (any neighbour differing, whatever its sign or size). The share of mirror steps clipped at MVA-only recipients is not reported.*
+*Correction before any fit: a code review found that the first version of this table counted any
+target inside a genuine event; the table above counts only rows whose newest lag and target carry
+the same genuine step. The mirror flag is coarser than what the network sees (any neighbour
+differing, whatever its sign or size). The share of mirror steps clipped at MVA-only recipients is
+not reported.*
