@@ -31,8 +31,9 @@ prediction: >-
   injected steps of 3 times the spread lasting 14 days or more are recalled at 0.8 or higher.
 decision_rule: >-
   Descriptive, no verdict on a model. The scan is trusted for the row 4 rate if injected steps of
-  2 times the spread lasting 14 days are recalled at 0.7 or higher and the false-alarm rate on
-  step-free surrogates is under 0.2 per Primary-year. If not, the unmirrored count is reported as
+  3 times the spread lasting 14 days (the cell the baseline thresholds can detect) are recalled at
+  0.7 or higher and the false-alarm rate on block-bootstrap surrogates is under 0.2 per
+  Primary-year. If not, the unmirrored count is reported as
   an upper bound (false alarms dominate) or a lower bound (recall is low), and the page says which.
 benchmark: >-
   NGED's labelled events (experiments 392, 395, 401, and 435) for recall, and injection into
@@ -109,9 +110,11 @@ lag-trust design, where 2% and 5% are placeholders.
   with a size within 50%, per Primary and per cell of the 3 by 3 grid. Injection is done on the
   daily residual (the cross-fitted model is not refitted), which is a lab shortcut: a refitted
   model would partly absorb a long injected step.
-- **False alarms.** A step-free surrogate replaces each Primary's segment means by its global
-  median, keeping the within-segment noise. The scan is re-run on it, and every detected step is a
-  false alarm, reported per Primary-year.
+- **False alarms.** The surrogate is built without the scan: each Primary's daily residual is
+  resampled in blocks of 14 days (block bootstrap, 20 draws), which keeps short-range
+  autocorrelation and destroys the order of any long step. The scan is re-run on each draw, and
+  every detected step is a false alarm, reported per Primary-year. Real steps remain inside the
+  blocks, so the rate is a floor.
 - **Recall on labelled events.** The share of event-by-Primary rows of experiment 400's corrected
   table (184 rows) found by the scan as a mirrored step within 2 days of the label, in all and in
   the subset lasting 7 days or more. The brief says 78 events; the table holds 184 event-by-Primary
@@ -120,6 +123,48 @@ lag-trust design, where 2% and 5% are placeholders.
 - **Look at the candidates.** A chart of each unmirrored step (the Primary's residual, its
   neighbours', the segment means) and a second Sonnet reviewer who classifies each as plausible
   level change, weather or calendar artefact, outage or data fault, or unclear. No cause is claimed.
+
+## Pre-registered parameters (added after the plan review, before any result)
+
+- **Penalty.** `3 * ln(n) * sigma^2`, with `n` the Primary's number of valid days and `sigma` the
+  median absolute difference of the daily residual at lag 7, times 1.4826, divided by `sqrt(2)`
+  (lag 7 limits the understatement from autocorrelation). Sensitivity: multipliers 2 and 5. The
+  dynamic programme is O(n^2) for about 2,600 days per Primary and is timed on one Primary first.
+- **Mirror test.** Symmetric: the ratio of the two steps' magnitudes in MW lies between 0.5 and 2,
+  with MW = points * effective capacity / 100. The neighbour's step is its raw change in segment
+  mean across the same dates, and it need not pass the neighbour's own thresholds. The report also
+  gives the share of unmirrored steps that become mirrored under the 3-day start rule and under the
+  sum rule. The unmirrored count under the 1-day rule is an upper bound. Neighbour set for the
+  headline: experiment 395's label-table pairs, because that table is the corrected one. A
+  temporary event is tested for a mirror first, and counts as temporary only if unmirrored.
+- **Found.** An injected or labelled step counts as detected if a step of the same sign starts
+  within 2 days of it, with a size within 50%.
+- **Windows.** Injection windows are chosen with a looser scan (penalty multiplier 2, spread
+  multiple 2, floor 1 point) that finds no change point, no labelled event, and no mirrored
+  candidate at any Primary. Recall is reported on these windows and on random windows as a control.
+  Recall is conditional on scan-quiet windows.
+- **Long steps.** Injected durations are 7, 14, 30, and 90 days. The headline covers steps of 7 to
+  60 days. Longer steps are partly absorbed by the 6-month cross-fit, so their count is a lower
+  bound. One Primary and 30-day steps are also injected into the half-hourly series and refitted
+  to measure the difference from daily injection.
+- **Bases of the numeric thresholds.** The false-alarm limit of 0.2 per Primary-year and the P2
+  limit of 1 per Primary-year are judgement calls, chosen so that false alarms stay below a
+  tenth of the expected real steps.
+- **Method disagreement.** Steps in the five months found by both methods, by one only, are
+  tabulated.
+- **Share of half-hours inside an unmirrored step.** The half-hours of the segment between an
+  unmirrored step and the next step, within the step's persistence, divided by all valid
+  half-hours.
+- **Recall per event.** Also reported (an event is found if any of its rows is found).
+
+## Deviations from the brief
+
+- The 3-day minimum-persistence variant is replaced by 14 days (the penalty alone would report
+  segments under 7 days).
+- Recall is measured against 184 event-by-Primary rows, not 78 events.
+- Method (b) is a 6-month-block cross-fitted XGBoost, not a monthly-refit model.
+- Injection is into the daily residual, with one refit check.
+- The share of training rows is replaced by the share of half-hours.
 
 ## Outputs
 
@@ -131,6 +176,9 @@ lag-trust design, where 2% and 5% are placeholders.
 - The mirrored steps that match no labelled event, per Primary-year, listed for the maintainer as
   candidate unlabelled load-shift events.
 - At least two charts of unmirrored steps and one of a mirrored step.
+- A plain statement of what the scan cannot tell: a genuine level change that a neighbour mirrors
+  by coincidence, a step shorter than 7 days, and any cause. Candidates are reviewed knowing that
+  NGED's labels are incomplete, so an unlabelled candidate may be a real event.
 
 ## Standing practices
 
