@@ -16,7 +16,6 @@
 | 447 | Does changing any one setting of the S1 demand network (width, depth, embedding, components, dropout, weight decay, learning rate and schedule, batch size, optimiser), or a random search over the three most influential, lower its quantile score by the agreed margin? | High (neural Discuss session, 2026-11-01) | Nothing | Done (not supported: no single setting beats S1; see experiment 447) |
 | 459 | Is the sum over a load-shift donor and its recipient Primaries unchanged by the event, so that a forecast of the group sum split by a slowly changing share could work? | High (load-shift Discuss session, 2026-11-01) | Nothing | Finished: refuted, see experiment 459 |
 | 458 | Can a weight per lead band, a prequential weight, or a shrunk level offset on the lagless forecast beat the fixed 50/50 mixture of the lagged and lagless forecasts (zero fits)? | High (neural Discuss session, 2026-11-01) | Nothing | Finished: not supported, see experiment 458 |
-| 472 | Can a penalty of 100, or an anchor averaged over three lagless seeds, keep the gain of the lagless-anchor-plus-lag-correction forecaster on rows with no labelled event and remove its loss inside real events? | High (neural Discuss session, 2026-11-01) | Experiment 467 merged | Planned |
 
 ## Planned experiments
 
