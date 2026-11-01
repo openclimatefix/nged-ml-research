@@ -139,7 +139,7 @@ def build(*, months: tuple[str, ...], arms: tuple[str, ...]) -> tuple:
 def mean_in(*, rows: pl.DataFrame, where: pl.Expr, metric: str) -> float:
     """Return the signed-MW-six mean of a row metric over a row set."""
     kept = rows.filter(pl.col("label").is_in(SIGNED), where)
-    return float(kept[metric].mean()) if kept.height else float("nan")
+    return float(kept[metric].mean()) if kept.height else float("nan")  # ty: ignore[invalid-argument-type]
 
 
 def band_36(*, rows: pl.DataFrame) -> pl.Expr:
@@ -202,9 +202,19 @@ def main() -> None:
                     rows=rows, table=table, a=a, b=b, sl=sl, metric=metric, level=s416.LEVEL
                 )
                 seeds = (0, 1, 2) if "C3-nolag" in (a, b) else s416.SEEDS
-                mde1, mde_avg = s416.minimum_detectable_effect(
-                    a=a, b=b, sl=sl, metric=metric, seeds=seeds, series=series, ctx=ctx, table=table
-                )
+                if sl in s416.SLICES:
+                    mde1, mde_avg = s416.minimum_detectable_effect(
+                        a=a,
+                        b=b,
+                        sl=sl,
+                        metric=metric,
+                        seeds=seeds,
+                        series=series,
+                        ctx=ctx,
+                        table=table,
+                    )
+                else:
+                    mde1 = mde_avg = float("nan")
                 key = f"{a} minus {b} [{sl}, {metric}]"
                 out["contrasts"][key] = {**dict(r), "mde_single": mde1, "mde_avg": mde_avg}
                 print(

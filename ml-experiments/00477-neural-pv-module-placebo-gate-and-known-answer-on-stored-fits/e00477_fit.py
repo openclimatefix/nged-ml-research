@@ -186,7 +186,7 @@ def run_kat(*, device: str, arms: list[str], conditions: list[str] | None) -> No
 def run_screen(*, device: str, months: list[str], seeds: list[int]) -> None:
     """Fit `C3-nolag` on each screen month and seed; store forecasts, solar output, and networks."""
     original = f9.run_inputs
-    f9.run_inputs = masked_run_inputs(original)
+    f9.run_inputs = masked_run_inputs(original)  # ty: ignore[invalid-assignment]
     try:
         for month in months:
             refit = base.refit_of(month=month)
