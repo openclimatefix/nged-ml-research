@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | 483 | Does a widening or table P make the tails of the first-release demand candidates honest? | 1 | Experiment 470 | Planned |
+| 492 | Can two constants per metering group replace table P for the first-release demand candidates? | 2 | Experiment 483 | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
