@@ -12,6 +12,7 @@
 | 444 | Which label-free detectors find idle half-hours at the three metered wind farms at any wind speed, without flagging genuine low output? | 1 | nothing | Finished (not supported); hand labels are the next step |
 | 450 | Does table P meet the wind upper-tail rule, and does changing any one setting of the plain wind network, or ERA5 pretraining, lower its score by 0.10 points? | 1 | nothing | Finished (not supported); Farm A upper tail is next |
 | 451 | Why does Farm A's upper tail stay above the 1.5% limit after table P? | 1 | nothing | Finished (partly supported); clip at the farm's largest output |
+| 453 | Do the metered wind and solar series hold implausibly high values, and which percentile should set effective capacity? | 1 | nothing | Finished (partly supported); p99.9 of the earlier power |
 
 ## Planned experiments
 
