@@ -121,7 +121,10 @@ def n_inputs(*, arm: Arm, mr: c.MonthRows) -> int:
 def train_one_epoch(
     *, model: torch.nn.Module, t: dict[str, torch.Tensor], seed: int, device: str
 ) -> float:
-    """Warm-start step: one epoch (20% of the training rows) at the fine-tune rate, fresh optimiser, no early stopping."""
+    """Warm-start step: one epoch (20% of the rows) at the fine-tune rate, fresh optimiser.
+
+    There is no early stopping.
+    """
     torch.manual_seed(seed)
     train_idx = torch.nonzero(~t["v"]).squeeze(1)
     order = train_idx[torch.randperm(len(train_idx), device=device)]
@@ -440,7 +443,9 @@ def pretrain_mix(*, device: str) -> None:
 def train_mix(
     *, model: torch.nn.Module, era: dict, ens: dict, seed: int, device: str
 ) -> tuple[int, float]:
-    """Pretrain with half of every batch from each source; validate on the mean of the two sources' held-out NLL.
+    """Pretrain with half of every batch from each source.
+
+    Early stopping uses the mean of the two sources' held-out NLL.
 
     One epoch draws `ROW_FRACTION` of the ERA5 and CAMS training rows from each source (so the fewer
     ENS rows are seen several times per epoch).

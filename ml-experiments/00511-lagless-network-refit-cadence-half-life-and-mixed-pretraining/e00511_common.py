@@ -55,7 +55,10 @@ def window_of(*, month: str, cadence: str, index: int) -> tuple[int, int]:
 
 
 def build_month(*, month: str, clean: np.ndarray) -> c.MonthRows:
-    """Return the month's rows extended to the last daily cutoff (experiment 510's `build_month` stops at day 29)."""
+    """Return the month's rows extended to the last daily cutoff.
+
+    Experiment 510's `build_month` stops at day 29.
+    """
     refit = c.month_start(month=month)
     rows = data.build_fold(refit=refit, clean=clean)
     last = cutoffs(month=month, cadence="d")[-1]

@@ -1,11 +1,12 @@
 # ruff: noqa: E501
 """Staleness curve and injected-shift leak of experiment 511 (free: reads fitted forecasts only).
 
-- `curve`: CRPS (points of effective capacity) by model age, for each arm. Each origin day is scored by
-  the model whose cutoff is the latest at least `age` days earlier (`e00511_fit.py stale`). Rows are
-  those scored by every age 0 to 7 of every listed arm, rows with no labelled event, at the eight and
-  the signed-MW six.
-- `leak`: the injected-shift leak of experiment 510's definition for L-1d (by block age) and L-Ww-30.
+- `curve`: CRPS (points of effective capacity) by model age, for each arm. Each origin day is
+  scored by the model whose cutoff is the latest at least `age` days earlier
+  (`e00511_fit.py stale`). Rows are those scored by every age 0 to 7 of every listed arm, rows
+  with no labelled event, at the eight and the signed-MW six.
+- `leak`: the injected-shift leak of experiment 510's definition for L-1d (by block age) and
+  L-Ww-30.
 """
 
 import argparse

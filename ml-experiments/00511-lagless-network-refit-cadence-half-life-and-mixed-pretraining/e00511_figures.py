@@ -4,7 +4,8 @@
 Figures (SVG, in the experiment's docs folder; optimise each with `npx svgo@4 --multipass
 --precision=1 --final-newline`):
 
-1. `figure_1_headline.svg`: each refitted arm's CRPS minus L-Ww at the eight and the six, Bonferroni interval;
+1. `figure_1_headline.svg`: each refitted arm's CRPS minus L-Ww at the eight and the six, with
+   the Bonferroni interval;
 2. `figure_2_staleness.svg`: CRPS by the age of the model that scores each origin;
 3. `figure_3_horizon.svg`: L-3d and L-1d minus L-Ww by horizon band;
 4. `figure_4_stress_leak.svg`: the injected-shift leak of L-1d by block age and of L-Ww-30;
