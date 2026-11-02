@@ -245,6 +245,9 @@ class DenseWindows:
         Args:
             origin_idx: The grid index of each row's run origin (09:00 UTC).
             valid_idx: The grid index of each row's valid time.
+
+        Returns:
+            The window columns as a float32 array of shape (rows, 9).
         """
         cut = origin_idx - INIT_TO_ORIGIN_STEPS + FINE_GRID_STEPS
         out = {}
