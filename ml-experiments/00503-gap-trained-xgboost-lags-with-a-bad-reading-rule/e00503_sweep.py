@@ -130,7 +130,10 @@ def predict(
     Two rule sets that leave the matrix identical share one prediction, kept in `cache`.
     """
     ruled = rules.apply_rules(
-        matrix=matrix, lag_positions=positions, flags=flags, rules=rules.rules_to_apply(name=rule_set)
+        matrix=matrix,
+        lag_positions=positions,
+        flags=flags,
+        rules=rules.rules_to_apply(name=rule_set),
     )
     key = hash(ruled.tobytes())
     if key not in cache:
@@ -369,9 +372,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=OUT_DIR / "sweep.parquet")
     parser.add_argument("--max-origins", type=int, default=None, help="smoke test")
     args = parser.parse_args()
-    sites = args.sites or sorted(
-        fit.SIGNED_MW_LABELS, key=lambda s: int(s[1:])
-    )
+    sites = args.sites or sorted(fit.SIGNED_MW_LABELS, key=lambda s: int(s[1:]))
     jobs = regimes.jobs_for(regime_names=("monthly",), origins=common.all_origins())
     jobs = {
         refit: runs[:: sweep465.ORIGIN_STRIDE][: args.max_origins]

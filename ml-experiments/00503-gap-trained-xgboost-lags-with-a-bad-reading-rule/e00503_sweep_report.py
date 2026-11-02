@@ -59,7 +59,9 @@ def main() -> None:
     for band in ("0-24 h", "24-72 h", "72-168 h"):
         print(f"\n== shift of the median as a share of the corruption, lead {band} ==")
         print(
-            table.filter((pl.col("band") == band) & pl.col("kind").is_in(["stuck", "dropout", "spike"]))
+            table.filter(
+                (pl.col("band") == band) & pl.col("kind").is_in(["stuck", "dropout", "spike"])
+            )
             .with_columns(case=pl.col("kind") + " " + pl.col("variant"))
             .pivot(on="arm", index="case", values="share")
             .sort("case")
@@ -71,12 +73,15 @@ def main() -> None:
             (pl.col("band") == "0-240 h")
             & (pl.col("arm") == "G-B")
             & pl.col("kind").is_in(["stuck", "dropout", "spike"])
-        ).select("kind", "variant", "fire_zero_new", "fire_far_new", "fire_stuck_new", "corrupted_rows")
+        ).select(
+            "kind", "variant", "fire_zero_new", "fire_far_new", "fire_stuck_new", "corrupted_rows"
+        )
     )
     print("\n== real rows (clean variant), share of lag values each rule sets to missing ==")
     print(
-        table.filter((pl.col("kind") == "clean") & (pl.col("band") == "0-240 h") & (pl.col("arm") == "G-B"))
-        .select("n", "cells", "share_zero", "share_far", "share_stuck", "share_gap")
+        table.filter(
+            (pl.col("kind") == "clean") & (pl.col("band") == "0-240 h") & (pl.col("arm") == "G-B")
+        ).select("n", "cells", "share_zero", "share_far", "share_stuck", "share_gap")
     )
     steps = table.filter((pl.col("kind") == "step") & (pl.col("band") == "24-72 h"))
     print("\n== genuine 5% step, lead 24-72 h: |shift| / step (5% of capacity) ==")

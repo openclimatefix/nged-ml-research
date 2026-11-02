@@ -151,24 +151,32 @@ def harm_contrast(*, treatment: pl.DataFrame, reference: pl.DataFrame, level: fl
         on=list(s392.KEY_COLUMNS),
         validate="1:1",
     )
-    per = joined.with_columns(diff=pl.col("crps") - pl.col("reference")).group_by(
-        "lag_event_id", "label"
-    ).agg(s=pl.col("diff").sum(), n=pl.len())
+    per = (
+        joined.with_columns(diff=pl.col("crps") - pl.col("reference"))
+        .group_by("lag_event_id", "label")
+        .agg(s=pl.col("diff").sum(), n=pl.len())
+    )
     result = event_interval(sums=per["s"].to_numpy(), counts=per["n"].to_numpy(), level=level)
     leave_out = [
-        float(sub["s"].sum() / sub["n"].sum())
+        float(sub["s"].sum()) / float(sub["n"].sum())
         for label in per["label"].unique().to_list()
         if (sub := per.filter(pl.col("label") != label)).height
     ]
     largest = per.sort("n", descending=True).slice(1)
-    return result, (min(leave_out), max(leave_out)), float(largest["s"].sum() / largest["n"].sum())
+    return (
+        result,
+        (min(leave_out), max(leave_out)),
+        float(largest["s"].sum()) / float(largest["n"].sum()),
+    )
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Print the scores and write the per-row table."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--widening", type=float, default=1.0)
-    parser.add_argument("--skip", nargs="*", default=[], help="arms to leave out (for example arep)")
+    parser.add_argument(
+        "--skip", nargs="*", default=[], help="arms to leave out (for example arep)"
+    )
     args = parser.parse_args()
     pl.Config.set_tbl_rows(200)
     pl.Config.set_tbl_cols(30)
@@ -259,7 +267,7 @@ def main() -> None:
             )
     for pre_registered, pairs in (("pre-registered", CONTRASTS), ("descriptive", DESCRIPTIVE)):
         for arm, control in pairs:
-            if arm not in arms and arm != "f" or control not in arms and control != "f":
+            if (arm not in arms and arm != "f") or (control not in arms and control != "f"):
                 continue
             for band, band_cond in BANDS.items():
                 for row_set in ("outside", "harm", "during", "after7d"):
@@ -290,13 +298,11 @@ def main() -> None:
                                 n_resamples=RESAMPLES,
                             )
                         )
-    fire = pl.concat(
-        [
-            pl.read_parquet(p)
-            for p in sorted((fit.ARM_DIR / "fire").glob("*.parquet"))
-        ]
+    fire = pl.concat([pl.read_parquet(p) for p in sorted((fit.ARM_DIR / "fire").glob("*.parquet"))])
+    print(
+        "\n== Rule firing on real forecast keys: "
+        "share of keys where a rule sets at least one lag =="
     )
-    print("\n== Rule firing on real forecast keys: share of keys where a rule sets at least one lag ==")
     on_g = rows.filter(pl.col("arm") == "g").join(
         fire, on=list(s392.KEY_COLUMNS), how="left", validate="1:1"
     )

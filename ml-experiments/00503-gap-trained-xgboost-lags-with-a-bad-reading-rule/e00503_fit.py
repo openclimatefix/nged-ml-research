@@ -7,8 +7,8 @@ scoring, plain targets, `colsample` 1.0, and the three original lags. The only d
 training matrix: each of the three lag values of every training row is independently set to
 missing (NaN) with probability `GAP_RATE`, so XGBoost learns a default branch for a missing lag.
 The mask is drawn once per series and refit from a seeded generator and saved beside the booster
-(`work/boosters/g_gap/<site>_s<seed>_<refit>_mask.npz`, bit-packed with its shape). Inputs at scoring time are not
-masked here: the serving rules in `e00503_rules.py` act on them.
+(`work/boosters/g_gap/<site>_s<seed>_<refit>_mask.npz`, bit-packed with its shape). Inputs at
+scoring time are not masked here: the serving rules in `e00503_rules.py` act on them.
 
 Fits write `work/arm_preds/g_gap/<site>_s<seed>_<refit>.parquet` and save each booster under
 `work/boosters/g_gap/`.
@@ -141,12 +141,15 @@ def run_job(
         path.parent.mkdir(parents=True, exist_ok=True)
         models[site].save_model(path)
         np.savez_compressed(
-            path.with_name(f"{path.stem}_mask.npz"), packed=np.packbits(mask, axis=None), shape=mask.shape
+            path.with_name(f"{path.stem}_mask.npz"),
+            packed=np.packbits(mask, axis=None),
+            shape=mask.shape,
         )
         peak_gb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
         lines.append(
             f"{ARM_NAME} {site} refit {refit:%Y-%m-%d}: {known.height:,} rows, "
-            f"{mask.mean():.3f} of lag values masked, fit total {time.monotonic() - started:.0f} s, "
+            f"{mask.mean():.3f} of lag values masked, "
+            f"fit total {time.monotonic() - started:.0f} s, "
             f"peak resident memory so far {peak_gb:.1f} GB"
         )
     pieces: dict[str, list[pl.DataFrame]] = {s: [] for s in todo}

@@ -70,9 +70,7 @@ def run_job(*, booster: str, refit: datetime, origins: list[datetime], sites: li
         pieces.pop("none", None)
         fires: list[pl.DataFrame] = []
         for origin in origins:
-            frame = pl.read_parquet(
-                common.demand_frame_path(run=origin - common.PUBLICATION_DELAY)
-            )
+            frame = pl.read_parquet(common.demand_frame_path(run=origin - common.PUBLICATION_DELAY))
             prepared = fd.prepared_run(
                 run_rows=frame.filter(pl.col("time_series_id") == row["time_series_id"]),
                 row=row,
@@ -87,7 +85,7 @@ def run_job(*, booster: str, refit: datetime, origins: list[datetime], sites: li
             )
             matrix = prepared.select(columns).to_numpy().astype(np.float32)
             keys = prepared.select(*common.KEYS).unique(maintain_order=True)
-            for rule_set in pieces:
+            for rule_set, tables in pieces.items():
                 ruled = rules.apply_rules(
                     matrix=matrix,
                     lag_positions=positions,
@@ -95,7 +93,7 @@ def run_job(*, booster: str, refit: datetime, origins: list[datetime], sites: li
                     rules=rules.rules_to_apply(name=rule_set),
                 )
                 raw = model.predict(xgb.DMatrix(ruled))
-                pieces[rule_set].append(
+                tables.append(
                     fd.mixture_frame(keys=keys, raw=raw, members=members, seed=common.SEED)
                 )
             if booster == "g":

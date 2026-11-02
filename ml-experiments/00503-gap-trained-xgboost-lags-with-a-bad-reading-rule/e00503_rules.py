@@ -115,8 +115,9 @@ def rule_flags(
     reading = common.take(values=power, index=index)
     stage1 = common.take(values=median, index=index)
     back, forward = runs
-    visible_ahead = np.minimum(common.take(values=forward.astype(np.float32), index=index) - 1,
-                               (newest[:, None] - index)).astype(np.int64)
+    visible_ahead = np.minimum(
+        common.take(values=forward.astype(np.float32), index=index) - 1, (newest[:, None] - index)
+    ).astype(np.int64)
     run = common.take(values=back.astype(np.float32), index=index).astype(np.int64) + visible_ahead
     return {
         "zero": reading == 0.0,

@@ -8,7 +8,8 @@ after an event. The arms are those of `e00503_score.py` (BG2, S1, and `manual_he
 reproduced here).
 
 ```bash
-PYTHONPATH=... DATA_PATH_INTERNAL=... uv run --no-sync python ml-experiments/00503-*/e00503_curtail.py
+PYTHONPATH=... DATA_PATH_INTERNAL=... \\
+    uv run --no-sync python ml-experiments/00503-*/e00503_curtail.py
 ```
 """
 
@@ -37,7 +38,9 @@ def main() -> None:
     for fold, name in enumerate(s392.FOLD_NAMES):
         stored = {}
         for arm in arms:
-            frame = s392.read_fold(directory=score.SOURCES[arm], sites=list(fit.SIGNED_MW_LABELS), fold=fold)
+            frame = s392.read_fold(
+                directory=score.SOURCES[arm], sites=list(fit.SIGNED_MW_LABELS), fold=fold
+            )
             stored[arm] = adapter.forecast_frame(
                 stored=frame, series=series, unit="fraction"
             ).filter(s392.lead_expression() <= score.MAX_LEAD_HOURS)
@@ -94,7 +97,10 @@ def main() -> None:
                 print(f"\n-- {row_set}, f = {fraction}: cost undefined in every month --")
                 continue
             wide = part.pivot(on="arm", index="month", values="cost").sort("month")
-            print(f"\n-- {row_set}, f = {fraction}: avoidable cost, pounds, six Primaries, by month --")
+            print(
+                f"\n-- {row_set}, f = {fraction}: avoidable cost, pounds, "
+                f"six Primaries, by month --"
+            )
             print(wide.with_columns(pl.selectors.float().round(0)))
             total = part.group_by("arm").agg(cost=pl.col("cost").sum())
             print("total:", {r["arm"]: round(r["cost"]) for r in total.iter_rows(named=True)})
