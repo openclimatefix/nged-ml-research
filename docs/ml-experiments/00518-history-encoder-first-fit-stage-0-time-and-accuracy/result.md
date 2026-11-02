@@ -67,13 +67,12 @@ adopted_in: none
 take_home_message: >-
   Interim and unaudited. A small neural network trained for 69 seconds learned to find about a
   third of the injected shifts in 14 days of power readings, far below what a perfect finder
-  would, and it flagged too many ordinary windows. This is a weak result (one seed, a noisy
-  validation set), so it does not rule out a learned repair, but it gives no reason to build one
-  yet.
+  would, and it flagged too many ordinary windows. The result is weak (one seed, a noisy
+  validation set), so it does not rule out a learned repair. It leaves the case for building one
+  unsupported for now.
 lessons: >-
-  One cheap fit cannot settle whether a history encoder is learnable. The fit was 30 times cheaper
-  than its cap, so a longer, multi-seed attempt is affordable. The lab median used in the test
-  month is quieter than the one used in training, which flatters the false-flag rate.
+  One cheap fit cannot settle whether a history encoder is learnable. The fit was about 100 times cheaper
+  than its 2-hour cap, so a longer, multi-seed attempt is affordable. The test month may be quieter than training (78% of its medians come from the post-refit module), which would flatter the false-flag rate; this is a hypothesis, not a finding.
 advice:
   - >-
     Choose the flag threshold on a validation block with the training provenance of the median, not
@@ -90,7 +89,7 @@ advice:
 
 **This page is interim and unaudited, and its result is a weak null.** A small neural network (the
 history encoder, 86,747 parameters) was trained once, for 69 seconds, on injected shifts in 14 days
-of power readings at the fold 2026-01 Primaries. It did not pass the pre-registered proxy for the
+of power readings at the fold 2026-01 Primaries. The encoder did not pass the pre-registered proxy for the
 plan's kill rule (c). The fit used one seed and a noisy validation block of 401 windows, so the
 result does not rule out a learned repair.
 
@@ -116,7 +115,13 @@ result does not rule out a learned repair.
 
 ## Results
 
-![Validation step loss by epoch](figure_1_validation_loss.svg)
+![Validation step loss (`L_u`) by epoch; the dashed line marks the best epoch, 14](figure_1_validation_loss.svg)
+
+**Terms.** A spread is a Primary's residual standard deviation (the reading minus the lagless
+median, which is the forecast of a network that sees no power input). A candidate step is defined
+in the Method. The ceiling is the score of a predictor that outputs the injected step. A temporary
+shift (family A) ends; a genuine change (family B) persists. The signed-MW six are the Primaries
+that report signed megawatts and the MVA-only eight report apparent power only.
 
 **Scores are on the 372 test windows (origins in January 2026) in injected worlds 200 to 202.**
 Intervals resample whole Primaries (13 in the test month). "Ceiling" is the same score for a
@@ -124,13 +129,13 @@ perfect predictor that outputs the injected step, read through the same candidat
 
 | Check | Threshold (fixed before the fit) | Result | Outcome |
 |---|---|---|---|
-| P1: best validation epoch | 8 or later | 14 (validation step loss 0.244) | Passed, but the loss moved between 0.24 and 0.57 from epoch to epoch |
+| P1: best epoch of the validation step loss (`L_u`, the pre-registered measure) | 8 or later | 14 (`L_u` 0.244) | Passed on that measure only: the loss moved between 0.24 and 0.57 from epoch to epoch, and the plain cross-entropy beside it was lowest at epoch 4 |
 | P2: error at the three lags on rows a step touches | under half of the unrepaired error | 0.446 against 0.988 spreads (45%) | Passed |
-| P2: error added on rows no step touches | under 0.1 of the mean injected step | 0.144 | Failed |
+| P2: error added on rows no step touches | under 0.1 of the mean injected step | 0.144 | Failed (no interval computed) |
 | P3: steps found within 6 hours | at least 70% of the ceiling (0.896) | 0.396 (0.365 to 0.434), 44% of the ceiling | Failed |
-| P4: planted-step precision at a 2% rate | at least 0.3 | 0.165 | Failed |
+| P4: planted-step precision at a 2% rate | at least 0.3 | 0.165 (0.07 at the six, 0.40 at the eight) | Failed on the pooled value (no interval computed; the groups straddle the threshold, so the pooled failure is not firm) |
 
-![Share of injected steps found, encoder against ceiling](figure_2_found_against_ceiling.svg)
+![Share of injected steps found within 2, 6, and 24 hours of their onset, encoder against ceiling](figure_2_found_against_ceiling.svg)
 
 - **The encoder found a third of the steps within 2 hours.** The shares found within 2, 6, and 24
   hours were 0.313, 0.396, and 0.464, against ceilings of 0.870, 0.896, and 0.910. The ceiling is
@@ -139,16 +144,15 @@ perfect predictor that outputs the injected step, read through the same candidat
 - **Size was roughly right when a step was found.** The median relative size error among found
   steps was 0.25, and 50% were within 25%.
 - **The false-flag rate depends on which median is used.** On test windows with no injection it was
-  0.032 (0.003 to 0.085). On the validation block's real windows, which share the training
-  provenance of the median, it was 0.297. In the test month 78% of half-hours take their median
-  from the table's post-refit module, so the test surprise is quieter.
+  0.032 (0.003 to 0.085). On the validation block's real windows it was 0.297. A possible
+  cause (not tested) is that 78% of test half-hours take their median from the table's post-refit
+  module, while training and validation use cross-fitted medians, so the test surprise is quieter.
 - **Raising the candidate threshold trades recall for precision.** At 1.5 spreads the planted-step
   precision was 0.334, but only 7% of steps were found within 2 hours. The thresholds of 0.5, 0.75,
   1.0, and 1.5 spreads gave precisions of 0.165, 0.188, 0.246, and 0.334. P4 was fixed at 0.5.
 - **The genuine-change head was weak.** Its area under the ROC curve was 0.64 on 373 labelled
-  windows. The generator makes 75% of steps in force at the newest reading genuine.
-- **Cost.** One fit took 69 seconds (22 epochs of 16,384 windows, about 3 seconds each, bound by
-  the world generator on one core), against a cap of 2 hours.
+  window-world pairs (windows with a step in force at the newest reading, pooled over the three worlds). The generator makes 75% of steps in force at the newest reading genuine.
+- **Cost.** One fit took 69 seconds (22 epochs of 16,384 windows, about 3 seconds each), against a cap of 2 hours.
 
 ## Outcome against the plan
 
