@@ -7,7 +7,7 @@ title: >-
 theme: generator-forecasting
 also_relevant_to:
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 date: 2026-11-02
 size: >-
@@ -52,76 +52,147 @@ row_set_id: fold_a_tuesdays_v1
 metric: >-
   Quantile score in MW (mean over the 11 levels), share of actuals above q99 after table P, and
   coverage and pinball loss at q01, q05, q95, and q99, per series, at true days 1 to 10.
-protocol: wind-v1
+verdict: not supported
+best_arm: >-
+  P-730 (p99.9 of the last 730 days): pooled share above q99 0.849% wind and 1.449% solar, Solar A
+  score +0.44% against the old capacity (+2.29% under P-all), but Solar B 1.506% and two
+  leave-one-out drops break the share rule.
+headline: >-
+  A rolling p99.9 capacity does not give one rule for wind and solar at every series. P-730 comes
+  closest: it passes the pooled tail limit for both technologies and removes most of Solar A's
+  score loss, but Solar B sits at 1.506% and dropping Solar C or Solar D lifts the pooled solar
+  share above 1.5%.
+lessons: >-
+  Solar A's score improves as its capacity ratio falls (+2.29% at 1.14, +0.44% at 1.1, -1.68% at
+  1.0, against the old capacity), which fits the hypothesis that its high capacity is the problem,
+  without testing why. The 1.5% share limit is a point-estimate rule that series at 1.45% to 1.55%
+  cannot meet reliably.
+take_home_message: >-
+  Setting each series' capacity from only the last 730 days of power keeps wind unchanged and brings
+  the pooled share of actuals above the 99% quantile to 0.85% for wind and 1.45% for solar, and
+  Solar A's score loss falls from 2.3% to 0.4%. It still misses the pre-registered rule at Solar B
+  (1.506%) and when Solar C or Solar D is dropped, so wind keeps its all-history rule and solar
+  keeps the old capacity at Solar A and Solar E.
+advice:
+  - >-
+    Keep the all-history p99.9 capacity for wind and the old capacity for Solar A and Solar E; a
+    rolling window does not yet give one rule (C1, C2).
+  - >-
+    If a single rule is still wanted, test a 730-day window with a share limit judged by an
+    interval rather than a point estimate, because six series sit within 0.06 points of 1.5%
+    (figure 1).
+  - >-
+    Do not use a 365-day window for solar: it leaves 6,000 to 8,600 daylight half-hours, falls back
+    at Solar D and Solar E, and is worse than 730 days at Solar A and Solar B
+    (capacity table).
+production_status: not-for-production
+adopted_in: none
 code: ml-experiments/00505-rolling-p99-9-effective-capacity-for-wind-and-solar/
 ---
 
-**Planned.** This page is the plan, committed before any fit. The results replace it.
+**Take-home: taking each series' capacity from only its last 730 days of power gets close to one
+rule for wind and solar, but not close enough. Wind is unchanged, the pooled share of actuals above
+the 99% quantile forecast is 0.85% for wind and 1.45% for solar, and Solar A's score loss falls from
+2.3% to 0.4%. It still fails the pre-registered rule at Solar B (1.506% against a 1.5% limit) and
+when Solar C or Solar D is dropped (1.537% and 1.517%). A 365-day window is worse.**
 
-## Question
+Capacity is the divisor that turns a series' power into a fraction between 0 and 1 for the neural
+network. Experiment 461 set it to the 99.9th percentile of all earlier power, which suited the three
+wind farms and not Solar A or Solar E. Here the 99.9th percentile is taken over only the last 730
+days (P-730) or 365 days (P-365) before each fit's training ends, and the same wind network
+(`member_plain`, 5 seeds) and solar network (`a2_member`, 3 seeds, 4 quarterly refits) are refitted.
+P-all is experiment 461's all-earlier-power rule and P-old is the 99th percentile of the whole
+record (experiments 429 and 430). Farm A to C are three metered wind farms and Solar A to F are six
+metered solar farms.
 
-Experiment 461 adopted a p99.9 effective capacity (capacity is the divisor that turns a series'
-power into a fraction between 0 and 1 for the neural network) computed from all earlier power for
-wind and did not adopt it for Solar A and Solar E. The maintainer asked for one rule for wind and
-solar if possible. This experiment tests a rolling capacity: the 99.9th percentile of the power in
-the 730 days (P-730) or 365 days (P-365) before the fit's training ends.
+**Terms.** *Table P*, *the limit* (at most 1.5% of actuals above the 99% quantile forecast), and
+*pooled* are as in [experiment 461](../00461-wind-and-solar-retrain-with-p99-9-effective-capacity/result.md).
+A window with under 8,000 valid half-hours (solar: daylight half-hours) falls back to P-all.
 
-## Design
+## Figures
 
-- **Arms**, each applied to wind `member_plain` and solar `a2_member` (experiment 461's headline
-  networks), with the same seeds, folds, table P, clip, and rows as experiment 461:
-    - P-all: p99.9 of all earlier power (stored, experiment 461; no refit).
-    - P-730: p99.9 of the cleaned power in [cutoff - 730 days, cutoff).
-    - P-365: the same over 365 days.
-    - P-old: p99 of the whole record (stored, experiments 429 and 430), the reference.
-- **Valid half-hours** are half-hours that pass cleaning. For solar only daylight half-hours (cleaned
-  power above zero) count, for wind every cleaned half-hour counts. The percentile itself is taken
-  over every cleaned half-hour of the window, night zeros included, as in experiment 461.
-- **Fallback.** A window with under 8,000 valid half-hours (about 45% of a year of daylight solar
-  half-hours) falls back to P-all, for both windows. Every series and refit that falls back is
-  flagged. Planned from the stored series: P-365 falls back at Solar D and Solar E (6,000 to 7,300
-  daylight half-hours in the window), P-730 falls back nowhere, but Solar E's history is shorter
-  than 730 days, so its P-730 window is its whole history and P-730 equals P-all exactly there.
-  Solar E is therefore not a test of the window, and its verdict is decided separately. Solar A's
-  P-365 window holds 8,043 to 8,204 daylight half-hours, just above the threshold, so it does not
-  fall back. Wind never falls back.
-- **Capacity is fixed per fit,** as in experiment 461, so the arms differ in the training-target
-  scale as well as in the divisor.
-- **Reported alongside:** each series' capacity as a ratio to P-old at every refit, the count of
-  window half-hours above the capacity (the count behind each p99.9), and the trailing p99.9
-  against power over time for each series, so a reader sees whether the capacity follows the level
-  shift of Solar A, B, and D.
-- **Fits:** 5 wind fits (seeds) and 12 solar refit-seeds (3 seeds, 4 quarterly refits) per window,
-  34 in all, about 0.44 GPU-hours at experiment 461's timings (wind about 60 s, solar about 36 s
-  each). The count is confirmed after timing one fit.
-- **Reused:** the scripts of experiment 461, with a window argument added to `capacity()`.
-  Experiment 461's P-all forecasts and the P-old forecasts of experiments 429 and 430 are read, not
-  refitted. No identity gate is rerun, because experiment 461's gate covers the unchanged fit loop;
-  only `capacity()` differs.
+![Share of actuals above q99 after table P](figure_1_share_above_q99.svg)
 
-## Scoring
+![Change in quantile score in MW against the old capacity](figure_2_score_change.svg)
 
-- Month-block bootstrap intervals of each rolling arm minus P-all, and minus P-old, pooled and per
-  series, plus six leave-one-series-out contrasts for solar. The minimum detectable effect is
-  stated first (experiment 461: 0.0034 MW wind, 0.0017 MW solar, pooled). Margins are stated in MW
-  beside each series' minimum detectable effect.
-- Bonferroni count: 44 intervals (two rolling arms, two references, 11 intervals each: 2 pooled, 3
-  wind, 6 solar), level 99.89%.
-- Tails per series after table P: share above q99, coverage at q01, q05, q95, and q99, and q99
-  pinball loss.
-- Absolute scores beside every contrast, rows equal across arms (wind 54,899 half-hours, solar
-  345,510), seed counts, and production cost.
+![Trailing p99.9 against monthly maximum power](figure_3_trailing_p999.svg)
 
-## Standing practices
+![Day-ahead forecasts of Farm A and Solar A under P-730](figure_4_day_ahead.svg)
 
-Retraining follows experiment 461's schedule (wind one fit, solar quarterly refits), not weekly;
-the contrast could depend on it. The cleaned series of experiment 453 supplies the capacity. The
-past-weather caveat does not apply, because these networks read the weather inputs they were
-trained with in experiments 429 and 430 and the capacity reads only earlier power. Charts show
-Farm A to C and Solar A to F only. The hypotheses about Solar A and Solar E are hypotheses:
-experiment 453 covers April to August only, and Solar E's short history is experiment 461's remark
-on noise, not an explanation of its 2.4% above q99.
+![Ten-day forecasts of Farm A and Solar A under P-730](figure_5_ten_day_horizon.svg)
 
-## Problems caused by the move
+## Results
 
-None so far.
+- **C1, wind: no rolling arm differs from P-all beyond fit-to-fit spread.** Pooled score 1.1744 MW
+  (P-all), 1.1757 (P-730), 1.1764 (P-365), 1.1765 (P-old). P-730 minus P-all is +0.0013 MW (95%
+  interval +0.0003 to +0.0021; Bonferroni interval -0.0005 to +0.0024). Pooled share above q99:
+  0.882% (P-all), 0.849% (P-730), 0.883% (P-365). The minimum detectable effect is 0.0034 MW, the
+  mean gap between two P-old single-seed fits. Margins are 0.0209 MW (Farm A), 0.0090 MW (Farm B),
+  and 0.0027 MW (Farm C), so Farm C's margin is under the minimum detectable effect and its verdict
+  is inconclusive. The wind decision rests on the pooled score and the tail limit, and both pass.
+- **C2, solar P-730 fails the rule narrowly.** Pooled score 0.6602 MW against 0.6627 (P-all) and
+  0.6601 (P-old). Pooled share 1.449% (passes). Series above 1.5%: Solar B 1.506% and Solar E
+  2.355%. Dropping one series leaves pooled shares of 1.451% (A), 1.437% (B), 1.537% (C), 1.517% (D),
+  1.297% (E), 1.460% (F), so dropping C or D fails the pooled rule. No series worsens by more than
+  the margin of 1% of the pooled old score (0.0066 MW; Solar F +0.0038 MW is the largest).
+- **C3, solar P-365 fails more.** Pooled share 1.496%; Solar A 1.535%, Solar B 1.552%, Solar E
+  2.365% are above 1.5%; dropping C, D, or F gives 1.569%, 1.576%, 1.513%. Solar D and Solar E fall
+  back to P-all at every refit, so there they equal P-all. Solar A's score is 1.68% better than
+  P-old (95% interval -0.0192 to -0.0004 MW), not significant at the Bonferroni level.
+- **Solar A follows its capacity.** Score against P-old: +2.29% (P-all, ratio 1.14), +0.44% (P-730,
+  ratio 1.105 and 1.039 at the last refit), -1.68% (P-365, ratio 1.017 and 1.002). P-730 minus P-all
+  at Solar A is -0.0096 MW (-1.81%; Bonferroni interval -0.0177 to -0.0012). This fits the
+  hypothesis that Solar A's high capacity under P-all is the cause. A level shift in Solar A's
+  earlier output is a hypothesis: experiment 453 covers April to August only, and this page does not
+  test it. The trailing p99.9 in figure 3 follows the monthly maximum only loosely.
+- **Solar E is untestable.** Its history (21,852 to 31,278 half-hours) is under 730 days, so P-730
+  equals P-all there, and P-365 falls back. Solar E stays at 2.35% to 2.37% above q99 in both arms,
+  against 2.41% for P-all. The cause is not found: experiment 461's remark on its short history is
+  a remark on noise, not an explanation.
+- **Tails after table P, pooled (cover at nominal 1%, 5%, 95%, 99%).** Wind P-all, P-730, P-365: q01
+  1.35%, 1.37%, 1.37%; q05 5.44%, 5.53%, 5.52%; q95 95.13%, 95.25%, 95.23%; q99 99.12%, 99.15%,
+  99.12%; q99 pinball 0.0641 MW in all three. Solar: q01 3.29%, 3.28%, 3.29%; q05 6.69%, 6.68%,
+  6.79%; q95 94.45%, 94.66%, 94.59%; q99 98.50%, 98.55%, 98.50%; q99 pinball 0.0248, 0.0247, 0.0244
+  MW. Solar D's q01 coverage is 12.3% in every arm, so the capacity rule does not cause it.
+- **Capacities** (new over old, P-730 and P-365 at the last refit): Farm A 1.027 and 1.027, B 1.041
+  and 1.057, C 1.067 and 1.036; Solar A 1.039 and 1.002, B 1.121 and 1.125, C 1.053 and 1.040, D
+  1.083 and 1.079 (fallback), E 1.057 and 1.057 (fallback), F 1.058 and 1.060. The window
+  half-hours above each capacity number 30 to 36 for P-730 and 15 to 18 for P-365 (full table in the
+  report).
+- **Rows, seeds, cadence.** Rows are equal across arms: wind 54,899 half-hours, solar 345,510.
+  Seeds: 5 wind, 3 solar. Solar refits are quarterly and wind is one fit, as in experiment 461;
+  the contrast could depend on this. Bonferroni count: 44 intervals (two rolling arms, two
+  references, 11 each), level 99.89%; leave-one-out intervals are extra and carry no Bonferroni
+  correction. Production cost: one number per series per refit from power already stored.
+
+## Caveats
+
+- **The 1.5% limit is a point-estimate rule.** Solar B at 1.506% and Solar A at 1.535% are within
+  noise of the limit, and no interval is computed for a share, so the verdict "fails" is the
+  pre-registered rule applied literally.
+- **Capacity is fixed per fit,** so the arms differ in the training-target scale and in the divisor.
+- **Retraining schedule** is experiment 461's (wind one fit, solar quarterly), not weekly.
+- **Scored range** stops at true day 10 (lead 240 hours); solar scoring is not restricted to
+  12 to 36 hours.
+- **The avoidable-curtailment cost does not apply to wind and solar farms.**
+
+## Checks
+
+- **Reviews.** One fresh Sonnet reviewed the plan and the code before the first fit (4 minor
+  points, all accepted: the Bonferroni count for leave-one-out intervals, Solar E's P-730 window
+  equalling P-all exactly, the missing report script, a clearer verdict block). A fresh Sonnet
+  results review is recorded in the pull request.
+- **Mean of the median forecast minus the actual, pooled after table P.** Wind -0.64 MW (P-old),
+  -0.61 (P-all), -0.61 (P-730), -0.63 (P-365). Solar +0.089, +0.078, +0.089, +0.092 MW. Per series
+  these move by under 0.05 MW except Solar A (+0.099 under P-all, +0.061 under P-730, +0.013 under
+  P-365) and Solar B.
+- **Triggers.** Trigger 4 fires in form: dropping Solar C or Solar D flips the pooled share rule
+  under P-730. That leave-one-out condition is part of the pre-registered rule, so the flip is the
+  reported result and the verdict was already "not supported". No ratio-1 gate was rerun, because
+  only `capacity()` differs from experiment 461's fit loop, whose gate passed.
+
+## Next steps
+
+- Keep the all-history p99.9 for wind and the old capacity for Solar A and Solar E.
+- If one rule is still wanted, judge the 1.5% limit by an interval on the share, and test a
+  730-day window at Solar A and Solar E with a weekly refit.
