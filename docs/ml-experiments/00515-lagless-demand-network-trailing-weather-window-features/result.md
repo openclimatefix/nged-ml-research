@@ -30,20 +30,24 @@ hypothesis: >-
   419, 437, 441, 442) all fed the network three origin lags of power, which may have carried the
   same information, so their nulls may not transfer.
 prediction: >-
-  Written before any score is read. P1 (W-T): the gain over the 37-column base is at least 0.05
-  points of CRPS on cold winter nights at the eight; P1 fails if the gain over the ten winter folds
-  is under 0.03. P2 (W-S): the gain on cold sunny days is at least 0.05 points larger than on cold
-  overcast days; P2 fails if the difference is under 0.03. P3 (W-X): the product helps only on the
-  cold-sunny and warm-sunny slices; P3 fails if the all-rows change is above +0.02. P4 (W-null): the
-  shuffled-day copy of the nine columns scores within the minimum detectable effect of the base; P4
-  fails if it scores worse than the base by more than that effect. P5 (W-seam): the two seam builds
-  of W-T are within 0.02 points of each other in a paired same-seed contrast; P5 fails if they
-  differ by more.
+  Written before any score is read. Sign convention for every prediction: a contrast is the arm's CRPS minus
+  the base's CRPS in points, so negative favours the arm, and a gain is the negative of the contrast.
+  All predictions pool the 10 winter folds and the 3 seeds. P1 (W-T, cold nights, the eight
+  MVA-only Primaries): the gain is at least 0.05; P1 fails if the gain is under 0.03. P2 (W-S, the
+  six signed-MW Primaries): the gain on cold sunny days exceeds the gain on cold overcast days by at
+  least 0.05; P2 fails if the difference is under 0.03. P3 (W-X, both groups): the contrast is
+  negative on the cold-sunny and warm-sunny slices and within +0.02 of zero on all rows; P3 fails if
+  the all-rows contrast is above +0.02 or if neither sunny slice has a negative contrast. P4
+  (W-null, cold nights, both groups): the contrast against the base is inside plus or minus the
+  minimum detectable effect of the cold-night slice, in both directions; P4 fails if it lies outside.
+  P5 (W-seam, all rows, both groups): the paired same-seed contrast between the two seam builds of
+  W-T lies within plus or minus 0.02; P5 fails if it lies outside.
 decision_rule: >-
   See "Pre-registered rules". A gain counts only through CRPS at the six and the eight and through
   the cold-night tail slices (q95 and q99 pinball loss), scored with ensemble windows built as at
-  serving. The stop rule continues to W-ALL when a Bonferroni interval excludes zero at either group
-  and the point estimate is at least 0.03 points better than the base. A stop reads "not resolved",
+  serving. The stop rule continues to W-ALL when, on cold nights or on all rows, a Bonferroni interval of a
+  core arm minus the base excludes zero at either group and the point estimate is at least 0.03
+  points better than the base. A stop reads "not resolved",
   not "no effect".
 benchmark: >-
   The 37-column base (arm W0: the lag-free network of experiment 448's `L0PT` and experiment 513's
@@ -65,9 +69,9 @@ The lag-free demand network (37 input columns plus an 8-wide embedding of the Pr
 weather only at the valid time. We ask whether it forecasts better when it also sees the weather of
 the previous hours. The maintainer's argument is that every earlier neural test of trailing,
 forward, or daily-mean weather fed the network three origin lags of power, so those nulls may not
-transfer. The lag-free tests that exist are experiment 6 (XGBoost, with a 0.1-point floor) and
-nothing else: no experiment has tested a trailing shortwave window or a temperature-by-shortwave
-product in a lag-free network.
+transfer. Among the merged result pages searched for the brief, the only lag-free test of trailing
+temperature is experiment 6 (XGBoost, with a 0.1-point floor), and none tested a trailing shortwave
+window or a temperature-by-shortwave product in a lag-free neural network.
 
 This pull request holds the **core arms** (W-T, W-S, W-X, W-null, and the seam control W-seam).
 The learned-window arms (W-CNN) are a separate later pull request. W-ALL, and W-DH as a drop-one
@@ -102,22 +106,28 @@ existing columns.
 - **Ensemble rows (fine-tuning and scoring).** A row belongs to a run with origin `O` (09:00 UTC).
   For half-hours after `O` the series is that run's ensemble mean. For half-hours at or before `O` it
   is the "analysis proxy" of experiment 437: the first day of the freshest earlier run that covers
-  that half-hour (leads of about 9.5 to 33.5 hours). No later run is used. This is available at
+  that half-hour (leads of about 9.5 to 33.5 hours). No later run is used. The proxy is available at
   serving, because every earlier run was published by `O`. The 72-hour window reaches back three
-  days, so it uses up to three earlier runs. I copy experiment 437's `e00437_features.py`, add the new
-  columns, and re-run its check, which rebuilds sampled runs with every later run deleted and
-  requires the same result. That check covers only the 22 columns of experiment 437, so it is
-  re-run on the new columns.
+  days, so it uses up to three earlier runs. The module is copied from experiment 437's `e00437_features.py` with the new
+  columns added, and its check, which rebuilds sampled runs with every later run deleted and
+  requires the same result, is re-run on the new columns, because the original covers only the 22
+  columns of experiment 437.
 - **Training rows (pretraining on ERA5 and CAMS).** ERA5 temperature is the `:00` rows of the
   half-hourly `era5_features.parquet` (the `:30` rows are interpolation and contain the next hour),
   and shortwave is the hourly CAMS file with its hour-end stamps. Both are subsampled to the
   ensemble's step grid, at 3-hourly UTC stamps for half-hours up to 144 hours after the run's 00 UTC
-  start and at 6-hourly stamps after that, and then linearly interpolated to half-hours. The pretraining
+  start and at 6-hourly stamps after that, and then linearly interpolated to half-hours. A
+  pretraining row's pseudo-run is experiment 418's: its origin is 09:00 UTC and its start is 9 hours
+  earlier, and that start decides where the step grid changes. Before the first fit, the code check
+  compares the stored ensemble shortwave step with the CAMS hour-end value; if the ensemble step is a
+  mean over the preceding step, CAMS is averaged over the preceding 3 or 6 hours before
+  interpolation. The pretraining
   windows are therefore as smooth as the serving windows, and the grid change follows the lead of
   the window's half-hour, not the lead of the valid time.
 - **Missing earlier runs.** A window silently shortens when an earlier run is missing. Each row
-  carries a degradation count, the number of the three days before the origin whose run is absent,
-  and the scorer reports it. Windows at the start of the ensemble history (April 2024) are truncated
+  carries a degradation count, `diag_missed_runs`: the number of the three days before the origin
+  whose run is absent. It is a scoring diagnostic, never a network input. The scorer reports the
+  share of rows with a non-zero count by horizon band. Windows at the start of the ensemble history (April 2024) are truncated
   to what exists and flagged.
 - **Calibration of the ensemble level.** The 2 K level offsets between the ensemble mean and ERA5
   are not corrected in the core arms. Arms that pass the stop rule get the noise arm of the brief
@@ -125,17 +135,23 @@ existing columns.
 - **Scoring uses ensemble windows built exactly as at serving**, never ERA5 windows. A gain that
   exists with ERA5 windows but not with ensemble windows does not count.
 - **Standardisation.** Each new column is standardised with the mean and standard deviation of the
-  fold's fine-tuning training rows (the rows that fit the fold's existing standardiser), so a test
-  month never sets its own scale.
+  fold's ensemble fine-tuning rows that are not held out for early stopping, in the pretraining,
+  fine-tuning, and scoring stages alike, so a test month never sets its own scale. W-null takes the
+  donor's raw values and applies the same scale as W-ALL, so it has the real columns' distribution.
+  The ERA5 windows are smoother and offset from the ensemble windows by up to 2 K; this offset is
+  the mismatch that the conditional noise arm addresses.
 
 ## Placebo and seam control
 
-- **W-null.** For each local day, a seeded draw (`seed = 515`) picks another day of the same calendar
-  month, the same day type (Monday to Friday, Saturday, Sunday), and the same length, never the day
-  itself, without replacement, and from the same side of the fold's refit (training rows take donors
+- **W-null.** For each local valid day (Europe/London midnight to midnight), a seeded draw (`seed = 515`)
+  picks another valid day of the same calendar month, the same day type (Monday to Friday,
+  Saturday, Sunday), and the same length in half-hours (46, 48, or 50, so a clock-change day matches
+  only another clock-change day), at least 3 days away so that persistent weather cannot make the
+  donor informative, without replacement, and from the same side of the fold's refit (training rows take donors
   that start before the refit, scored rows take donors in the test month). The row takes the nine
-  window columns of the donor day at the same half-hour of day and the same lead, which is the donor
-  day's own run for ensemble rows. If the donor's run is missing the row takes the next donor in the
+  window columns of the donor day at the same half-hour of day and the same lead: its origin and
+  valid time both move by the whole-day shift between the two days, so an ensemble row takes the
+  donor shift's run, and an ERA5 row builds the columns at the shifted origin and valid time. If the donor's run is missing the row takes the next donor in the
   seeded order. The number of rows with no donor is printed, and those rows take the column means.
   The same draw serves training and scoring.
 - **W-seam.** Persistence fill holds the run's first value (the value at its first half-hour after
@@ -145,7 +161,7 @@ existing columns.
 
 ## Folds, seeds, and the minimum detectable effect
 
-- **Folds.** Ten winter months: 2024-11, 2024-12, 2025-01, 2025-02, 2025-03, 2025-11, 2025-12,
+- **Folds.** Ten winter months (the "10 winter folds"): 2024-11, 2024-12, 2025-01, 2025-02, 2025-03, 2025-11, 2025-12,
   2026-01, 2026-02, and 2026-03. Ensemble summaries exist for every daily run from 2024-04-01 to
   2026-06-30. The five early months have 7 to 11 months of ensemble fine-tuning, no `L0PT`
   pretrained weights, and no D15 or D18 (their cut is 2025-03-01; report-only). 2025-11 and 2026-02
@@ -176,7 +192,10 @@ existing columns.
 - **Widening.** Forecast quantiles are scored raw and widened by 1.15, as experiment 510 does. The
   widening is a fixed table for every arm.
 - **Slices (pre-registered).** All rows; cold nights (temperature below 5 °C, 18:00 to 08:00);
-  cold sunny and cold overcast days, with experiment 441's definitions; Christmas week; horizon
+  cold sunny, cold overcast, warm sunny, and warm overcast days, with experiment 441's definitions
+  extended to warm days (a local day's mean temperature of at least 15.5 °C); slice membership comes
+  from the stored ensemble mean at the valid time, which no arm edits, never from an arm's own
+  columns; Christmas week; horizon
   bands day 1, days 2 to 3, and days 4 to 10. Tail results are q95 and q99 pinball loss and
   coverage on cold nights beside CRPS (experiment 441 found signed-six cold-night coverage of 76% and
   83%).
@@ -215,6 +234,26 @@ existing columns.
   is 0.9 to 1.4 GPU-hours for the core fits, plus building the window columns (not yet timed). One GPU
   process under 8 GB, with `MemoryMax=8G` and `OMP_NUM_THREADS=1`; launches are staggered against the
   other workers' GPU jobs.
+
+## Departures from the brief
+
+- The brief's five anchor folds of experiment 513's `P0` reduce to 3 here (2025-12, 2026-01,
+  2026-03), because 2025-10 and 2026-06 are not winter months. W0 is fitted for the other 7 folds.
+- Experiment 513's `P0` comes from its branch `price-shape-privileged-input`, whose commit is
+  recorded in the pull request before the reuse. Fits start after experiments 511 and 513 Part 1 are
+  scored, which has happened.
+- W-DH has no prediction of its own, because it runs only as a drop-one inside W-ALL.
+- The cost estimate is lower than the brief's 1.2 to 2.6 GPU-hours because it uses experiment 513's
+  measured pretrain time (18 to 24 s) at 141 pretrainings; the brief assumed longer fits.
+- The minimum detectable effect comes from seed spread; the fold-to-fold term enters through the
+  month-block bootstrap, and the page states both.
+- The month-block bootstrap resamples the 10 folds with each fold's 3-seed mean (seed-paired), at
+  the Bonferroni level 1/(2 x 20). With 10 blocks the interval is wide but not min-to-max.
+- Charts show per-fold gains, cold-night and sunny slices, in the OCF palette with no mark in the
+  background colour; metered generators are not scored (substations only).
+- The reported family of 84 tests counts 7 arms: W-T, W-S, W-X, W-ALL, W-ALL minus W-DH, and the
+  two W-CNN variants of the later pull request. The scorer prints 84; this pull request runs at most
+  5 of those arms. P4 and P5 are descriptive tests outside both families.
 
 ## Standing practices followed
 
