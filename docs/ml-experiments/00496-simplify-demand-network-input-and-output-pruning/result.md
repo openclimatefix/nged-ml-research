@@ -35,21 +35,22 @@ prediction: >-
   the combined network of the arms that pass scores within the limit of PretrainOnce.
 decision_rule: >-
   An arm is equivalent to PretrainOnce when the upper Bonferroni bound of its CRPS difference to
-  PretrainOnce (origin-day block bootstrap within months, 100,000 resamples, since a Bonferroni
-  level of 0.0025 leaves only 50 tail draws at 20,000) as a one-sided upper bound is at most the
-  limit at
-  the eight and at the six ("the six" is the `six_clean` slice), and the upper Bonferroni bound of
+  PretrainOnce is at most the limit at the eight and at the six ("the six" is the `six_clean`
+  slice), and the upper Bonferroni bound of
   its q99 pinball-loss difference is at most +0.02 points. The limit is the printed two-seed minimum
   detectable effect (MDE, experiment 428's definition with k = 2 seeds, restricted to the folds
-  scored): 0.086 points at the eight and 0.170 at the six, which sit at or above the briefs' caps of
-  0.03 (a), 0.02 (c), 0.05 (d), and 0.05 (b). An interval that reaches past the limit is
+  scored): 0.086 points at the eight and 0.170 at the six, The limits sit at or above the caps in
+  the series brief of 0.03 (a), 0.02 (c), 0.05 (d), and 0.05 (b). The interval is an origin-day
+  block bootstrap within months with 100,000 resamples, because a Bonferroni level of 0.0025
+  leaves only 50 tail draws at 20,000. An interval that reaches past the limit is
   inconclusive, not equivalent, and an equivalence claim at the MDE cannot show a loss smaller than
   the MDE. Arm (b) also needs q99 coverage within 0.01 of PretrainOnce. Bonferroni count 20 (5
   arms x 2 groups x [CRPS, q99 pinball loss]), fixed up front; it is 16 if the combined arm does
   not run. The q99 coverage check for (b) is a point estimate and is not counted. The page prints
   the q99 pinball MDE before any contrast. It also prints, for each arm, whether the interval met
   the brief's original cap (0.03, 0.02, 0.05, 0.05), because the limits above are 1.7 to 8.5 times
-  those caps and the serving table would otherwise hide how loose "equivalent" is. Arm (b) is
+  the caps in the series brief and the serving table would otherwise hide how loose "equivalent"
+  is. Arm (b) is
   expected to fail its coverage check (P4), and the 1.15 widening is applied to it unchanged,
   which is a caveat on its q99 result. Descriptive and not counted: the fresh-pretraining check
   (below), a Christmas-week row for the 2025-12 fold (one Christmas, so inconclusive by
@@ -73,10 +74,10 @@ best_arm: >-
 headline: >-
   Of four removals, only the 7 ensemble-spread inputs came out equivalent to PretrainOnce at both
   groups (+0.012 points at the eight, Bonferroni upper bound +0.042 against a limit of 0.086; -0.043
-  at the six, upper bound -0.004 against 0.170). Merging the 4 holiday columns into one cost +0.095
-  at the eight and +0.229 at the six. Dropping the 3 weekly-lag inputs cost +0.079 at the eight (not
-  shown equivalent) and +0.050 at the six (equivalent). One Gaussian instead of three cost +0.152 at
-  the eight and failed the q99 pinball limit.
+  at the six, upper bound -0.004 against 0.170). Merging the 4 holiday columns into one raised
+  CRPS by 0.095 at the eight and 0.229 at the six. Dropping the 3 weekly-lag inputs raised it by
+  0.079 at the eight (not shown equivalent) and 0.050 at the six (equivalent). One Gaussian
+  instead of three raised it by 0.152 at the eight and failed the q99 pinball limit.
 lessons: >-
   The fresh-pretraining check on arm d gave the same verdicts as arm d against PretrainOnce, so
   pretrain-once did not change a verdict. Arm a is worse on cold winter nights at the six (+0.187,
@@ -87,18 +88,18 @@ take_home_message: >-
   The demand neural network can drop its 7 ensemble-spread inputs (46 inputs down to 39) with no
   measurable loss in five scored months: the CRPS change was +0.012 points at the 8 MVA-only
   Primaries and -0.043 at the 6 signed-MW Primaries, both inside the limit, although the network
-  scored 0.187 points worse at the six on cold winter nights. The other three simplifications cost
-  more than the limit allows: merging the holiday columns, dropping the weekly lag (at the eight),
-  and using one Gaussian instead of three (at the eight).
+  scored 0.187 points worse at the six on cold winter nights. The other three simplifications were
+  not shown equivalent: merging the holiday columns (at both groups), dropping the weekly lag (at
+  the eight), and using one Gaussian instead of three (at the eight).
 advice:
   - >-
     Consider dropping the 7 ensemble-spread inputs from the demand network, after checking the cold
     winter nights at the six on more folds; it matched PretrainOnce at both groups (Results table,
     figure 1).
   - >-
-    Keep the four holiday columns, the three weekly-lag inputs, and the three-Gaussian output; each
-    removal scored worse than PretrainOnce by more than the limit at the eight or the six (Results
-    table, figure 1).
+    Keep the four holiday columns, the three weekly-lag inputs, and the three-Gaussian output;
+    each removal's interval reached past the limit at the eight or the six (Results table,
+    figure 1).
   - >-
     Check every equivalence claim on cold winter nights as well as on the whole sample, because the
     spread-input removal passed the whole sample and lost 0.187 points at the six on cold nights
@@ -108,34 +109,39 @@ adopted_in: none
 ---
 
 **The demand neural network can drop its 7 ensemble-spread inputs (46 inputs down to 39) with no
-loss that five scored months can detect: its CRPS changed by +0.012 points at the 8 MVA-only
-Primaries and by -0.043 at the 6 signed-MW Primaries (a lower score is better), both inside the
-equivalence limit. The other three simplifications scored worse than the limit allows. On cold
-winter nights at the six, the network without spread inputs scored 0.187 points worse, which
-the equivalence claim on the whole sample does not show.**
+loss that five scored months can detect. The change in forecast error (CRPS, continuous ranked
+probability score, in percentage points of each Primary substation's capacity; a lower score is
+better) was +0.012 at the 8 Primaries that report only apparent power (MVA) and -0.043 at the 6 that
+report signed megawatts. Both changes are inside the equivalence limit. On cold winter nights at the
+6 signed-MW Primaries the network without spread inputs scored 0.187 points worse, and the
+whole-sample equivalence claim does not show that loss.**
 
-We asked whether four parts of the demand network could be removed one at a time. Each arm starts
-from PretrainOnce (experiment 494: pretrained once at the 2025-07 cut, fine-tuned each month, two
-seeds), which was equivalent to a fresh refit. The CRPS is in points of effective capacity. "The
-eight" are the 8 Primaries that report only apparent power (MVA); "the six" are the 6 that report
-signed megawatts, scored on rows with no labelled event. The limits are the printed two-seed minimum
-detectable effect: 0.086 points at the eight and 0.170 at the six.
+**Each of four removals is tested alone against PretrainOnce (PO), with the printed minimum
+detectable effect as the limit.** PO is experiment 494's network: pretrained once at the 2025-07
+cut and fine-tuned each month, two seeds. Experiment 494 found PO equivalent to a fresh refit. "The
+eight" are the 8 MVA-only Primaries and "the six" are the 6 signed-MW Primaries, scored on rows with
+no labelled event. The limits are the smallest differences that two seeds per fold could reliably
+detect: 0.086 points at the eight and 0.170 at the six. "Bonferroni" bounds are 95% interval bounds
+adjusted for 20 comparisons.
 
-| Arm | What is removed | Inputs | Output values |
-|---|---|---|---|
-| PO | nothing (PretrainOnce) | 46 | 9 |
-| a | the 7 ensemble-spread (`std_*`) inputs; the ensemble mean stays | 39 | 9 |
-| c | the 4 Christmas and bank-holiday columns, replaced by one day-type column | 43 | 9 |
-| d | the 3 weekly-lag inputs (value, missing flag, age) | 43 | 9 |
-| b | two of the three Gaussians of the output | 46 | 3 |
-| dF | arm d, with fresh pretraining at every fold (a check) | 43 | 9 |
+| Arm | What is removed | Inputs | Output values (3 per Gaussian) | CRPS change to PO, eight / six |
+|---|---|---|---|---|
+| PO | nothing (PretrainOnce) | 46 | 9 | 0 |
+| a | the 7 ensemble-spread (`std_*`) inputs; the ensemble mean stays | 39 | 9 | +0.012 / -0.043 |
+| c | the 4 Christmas and bank-holiday columns, replaced by one day-type column | 43 | 9 | +0.095 / +0.229 |
+| d | the 3 weekly-lag inputs (value, missing flag, age) | 43 | 9 | +0.079 / +0.050 |
+| b | two of the three Gaussians of the output | 46 | 3 | +0.152 / +0.082 |
+| dF | arm d, with fresh pretraining at every fold (a check, not a candidate) | 43 | 9 | +0.080 / +0.064 |
 
-Verdict: partly supported. Arm a is equivalent to PO at both groups. Arm c is not shown equivalent
-at either group (upper bounds +0.143 and +0.332). Arm d is not shown equivalent at the eight
-(+0.124)
-and is equivalent at the six (+0.089). Arm b is not shown equivalent at the eight (+0.201) and fails
-the q99 pinball limit there (+0.029 against 0.02). No combined network was run, because arm a is
-the only arm equivalent at both groups.
+**Only arm a is equivalent to PO at both the eight and the six.** An arm is equivalent when the
+upper Bonferroni bound of its CRPS difference to PO is at most the limit. Arm a's upper bounds are
++0.042 at the eight and -0.004 at the six. Arm c is not shown equivalent at either group: its CRPS
+difference could be as large as +0.143 at the eight and +0.332 at the six. Arm d could be as large
+as
++0.124 at the eight (not shown equivalent) and +0.089 at the six (equivalent). Arm b could be as
+large as +0.201 at the eight, and its q99 pinball-loss difference could be as large as +0.029
+against a limit of 0.02. No combined network was run, because arm a is the only arm equivalent at
+both groups. Verdict: partly supported.
 
 ## Figures
 
@@ -160,13 +166,15 @@ limits](figure_1_headline.svg)
   behind a fixed input transform, pretrained once at the 2025-07 cut and fine-tuned at each of the 5
   folds (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), seeds 0 and 1, widening 1.15, rows of
   experiment 470 (`experiment_470_intersection_v1`), cleaned data with 1,179 scoring actuals dropped
-  for a flagged exact zero, the D15 and D18 start cut applied. The removed inputs are multiplied by
-  zero inside the network, after the standardiser and after the pretraining spread table, so
+  for a flagged exact zero, the D15 and D18 start cut applied. Experiment 425's arm A is the pooled
+  plain network with a Primary embedding (setting `g09`). The removed inputs are multiplied by zero
+  inside the network, after the standardiser and after the pretraining spread table, so
   training, forecasting, and reloading share one code path. A gate before any arm: an identity
   transform started from experiment 425's stored 2025-07 weights reproduced PretrainOnce's stored
   forecasts to within 5e-6.
 - **Minimum detectable effect (two seeds, five folds).** 0.086 points at the eight and 0.170 at the
-  six. The briefs' caps (0.03 for a, 0.02 for c, 0.05 for d and b) lie below those limits, so an
+  six. The caps in the series brief (0.03 for a, 0.02 for c, 0.05 for d and b) lie below those
+  limits, so an
   equivalence claim at the limit cannot show a loss smaller than the minimum detectable effect, and
   an interval that reaches past the limit is inconclusive. Bonferroni count 20 (5 arms x 2 groups x
   CRPS and q99 pinball loss), with 100,000 origin-day block resamples. The scorer's Bonferroni
@@ -191,7 +199,8 @@ limits](figure_1_headline.svg)
   and -0.045 [-0.077, -0.014] at the six. Arms c, d, and b are not shown equivalent to K2 at the
   eight (+0.065, +0.049, +0.122).
 - **Fold by fold.** Arm a's gain at the six comes mostly from 2026-01 (-0.268; the other four folds
-  range from -0.059 to +0.083), so the gain is not established. Leaving one fold out moves arm a's
+  range from -0.059 to +0.083), so the improvement at the six is not established. Leaving one fold
+  out moves arm a's
   difference at the eight between 0.000 and +0.023, which stays inside the limit.
 - **Fresh-pretraining check on arm d (dF).** dF against K2 (both pretrained fresh): +0.051
   [+0.007, +0.096] at the eight (not shown equivalent) and +0.062 [+0.031, +0.092] at the six
@@ -200,21 +209,22 @@ limits](figure_1_headline.svg)
 - **Cold winter nights (CRPS difference to PO, Bonferroni interval; descriptive).** At the eight: a
   +0.051 [-0.041, +0.172], c +0.053 [-0.037, +0.203], d +0.225 [+0.042, +0.445], b +0.273 [+0.155,
   +0.405]. At the six: a +0.187 [+0.014, +0.312], c +0.745 [+0.353, +1.109], d +0.167 [+0.051,
-  +0.261], b +0.288 [+0.042, +0.475]. Every arm is worse on cold nights at the six, and
-  arm a's loss there (+0.187 against -0.043 on the whole sample) is the largest sign that
-  the whole-sample equivalence overstates the case for removing the spread inputs.
+  +0.261], b +0.288 [+0.042, +0.475]. Every arm is worse on cold nights at the six. Arm a's loss on
+  cold nights at the six (+0.187) contrasts with its change on the whole sample (-0.043). The
+  whole-sample result therefore hides a loss on the nights NGED cares about most.
 - **12 to 36 hours (CRPS difference to PO).** At the eight: a -0.027, c +0.024, d +0.025, b +0.116.
   At the six: a +0.033, c +0.265, d +0.083, b +0.114.
 - **Christmas week (descriptive, one Christmas).** At the eight a is -0.320 [-0.411, -0.206] better
   than PO; c -0.017, d +0.010, b -0.162. At the six: a +0.046, c +0.204, d +0.228, b +0.200. Arm c
-  does not lose at the eight in Christmas week, so its loss comes from other days, mostly at the
-  six (12 to 36 hours +0.265).
+  does not lose at the eight in Christmas week. Its loss comes from other days, mostly at the six
+  (12 to 36 hours: +0.265).
 - **Tails (widened 1.15, all folds, rows with no labelled event).** q99 coverage at the eight: PO
   0.987, a 0.986, c 0.984, d 0.984, b 0.978. At the six: PO 0.979, a 0.983, c 0.974, d 0.977,
   b 0.974. Arm b's q99 coverage falls by 0.009 at the eight, inside the 0.01 limit. q95 coverage is
   0.934 (PO) and 0.923 (b) at the eight, 0.907 (PO) and 0.895 (c) at the six.
 - **Avoidable-curtailment cost at the six, difference to PO (experiment 470's cost measure).** At
-  f = 0.9: a -0.461 [-1.370, +0.039], c +0.193 [-0.009, +0.541], d -0.119 [-0.265, -0.004], b -0.307
+  curtailment fraction f = 0.9: a -0.461 [-1.370, +0.039], c +0.193 [-0.009, +0.541], d -0.119
+  [-0.265, -0.004], b -0.307
   [-0.917, +0.027]. At f = 0.5: a -1.234 [-4.226, +0.888], c +2.539 [+0.773, +4.654], d +0.917
   [-0.219, +2.230], b +0.195 [-1.315, +1.698]. Only arm c's cost differs from zero at f = 0.5 (a
   higher cost).
@@ -235,10 +245,8 @@ limits](figure_1_headline.svg)
   the eight: PO 6.724, a 6.734, c 6.854, d 6.840, b 6.970 points; at the six: PO 5.662, a 5.600, c
   5.979, d 5.700, b 5.749. The directions agree with the CRPS contrasts for every arm (a at the six
   improves in both), so trigger 3 did not fire.
-- **Triggers.** No trigger fired and no audit was run. A leave-one-fold-out check on arm a at the
-  eight stays inside the limit (0.000 to +0.023). One Sonnet code review before the first fit found
-  a bug that would have made the fresh-pretraining arm silently reuse pretrain-once weights if it
-  ran after another arm in one process; the fix was made before any fit.
+- **Triggers.** No audit trigger of the `ml-experiment` skill fired and no audit was run. A
+  leave-one-fold-out check on arm a at the eight stays inside the limit (0.000 to +0.023).
 
 ## Caveats
 
@@ -254,8 +262,6 @@ limits](figure_1_headline.svg)
   its q99 result.
 - NGED's event labels are incomplete: "rows with no labelled event" may hold unlabelled events.
   Every score is selection-biased, and July 2026 is unused.
-- Reviews: one Sonnet plan review and one Sonnet code review before the first fit; the results
-  review and two write-up reviews follow in this pull request.
 
 ## What to try next
 
