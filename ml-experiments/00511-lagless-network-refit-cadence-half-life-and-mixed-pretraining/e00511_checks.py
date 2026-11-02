@@ -10,7 +10,7 @@ of capacity against the cleaned actual, their contrasts, and per site the median
 from typing import Final
 
 import e00470_build as build470  # ty: ignore[unresolved-import]
-import e00510_common as c
+import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_score as score
 import numpy as np
 import polars as pl

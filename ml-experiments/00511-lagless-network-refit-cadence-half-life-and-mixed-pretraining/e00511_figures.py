@@ -23,7 +23,7 @@ import e00402_worlds as worlds402  # ty: ignore[unresolved-import]
 import e00407_score as s407  # ty: ignore[unresolved-import]
 import e00425_prep as prep425  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]
-import e00510_common as c
+import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k
 import e00511_score as score
 import polars as pl
