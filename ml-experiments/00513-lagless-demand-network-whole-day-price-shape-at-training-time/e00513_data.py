@@ -98,7 +98,10 @@ class ShapeTables:
         times = prep422.GRID_START_US + first.astype(np.int64) * shape.STEP_US
         self.day_local = shape.local_day_of(times_us=times)
         self.donor, self.unmatched = shape.placebo_draw(
-            day_id=self.day_id, missing=self.price_missing, first_local_day=self.day_local
+            day_id=self.day_id,
+            missing=self.price_missing,
+            first_local_day=self.day_local,
+            after_refit=first >= fit_until_idx,
         )
         price = shape.standardise_levels(columns=raw_price, fit_rows=fit_rows)
         self.tables: dict[str, np.ndarray] = {

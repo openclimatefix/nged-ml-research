@@ -14,6 +14,8 @@ Per day: the minimum, the maximum, the spread (maximum minus minimum), and the m
 16:00 to 19:00 local half-hours minus the mean of the 00:00 to 05:00 local half-hours
 (`evening_minus_overnight`).
 
+Ties in the day's values break by time order (a stable sort), which affects only `rank` and the two window indicators.
+
 A day is "missing" when any of its half-hours has no usable value. A missing day has all ten shape
 columns 0 and its missing flag 1. The one shared draw of the shuffled-day placebo is `placebo_draw`.
 """
@@ -150,7 +152,12 @@ def standardise_levels(*, columns: np.ndarray, fit_rows: np.ndarray) -> np.ndarr
 
 
 def placebo_draw(
-    *, day_id: np.ndarray, missing: np.ndarray, first_local_day: np.ndarray, seed: int = 513
+    *,
+    day_id: np.ndarray,
+    missing: np.ndarray,
+    first_local_day: np.ndarray,
+    after_refit: np.ndarray,
+    seed: int = 513,
 ) -> tuple[np.ndarray, int]:
     """Return, per day id, the day id whose shape it carries under the shuffled-day placebo, or -1.
 
@@ -163,6 +170,8 @@ def placebo_draw(
         day_id: The day id of every grid half-hour.
         missing: True per day id for a day with no usable value.
         first_local_day: For each day id, the local date as days since 1970-01-01.
+        after_refit: True per day id for a day that starts at or after the fold's refit. Donors are
+            drawn within the same side of the refit, so no price after the refit enters a training day.
         seed: The generator seed.
 
     Returns:
@@ -179,7 +188,9 @@ def placebo_draw(
     keys = {}
     for d in range(n_days):
         if not missing[d]:
-            keys.setdefault((int(month[d]), int(kind[d]), int(length[d])), []).append(d)
+            keys.setdefault(
+                (int(month[d]), int(kind[d]), int(length[d]), bool(after_refit[d])), []
+            ).append(d)
     for key in sorted(keys):
         members = np.array(keys[key])
         if len(members) < 2:

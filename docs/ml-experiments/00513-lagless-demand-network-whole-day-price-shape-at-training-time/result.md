@@ -159,10 +159,10 @@ generation, per half-hour, so they describe the day's residual demand shape.
   P-drop, P-aux, P-teach (6 contrasts at 2 groups, so 12 CRPS tests: Bonferroni count 12; the family
   of the whole price-and-lockdown brief is 18 with Part 2's 6). Descriptive, at the same interval
   width: PO minus PP and PO minus PN.
-- **Minimum detectable effect.** From the seed spread of the four arms pooled (three seeds, five folds),
-  printed by `e00513_score.py baseline` before any contrast. A seed spread cannot exist before any fit, so
-  this replaces the brief's "before any fit". The minimum detectable effect is scaled to a 3-seed
-  mean. Experiments 448 to
+- **Minimum detectable effect.** From the seed spread of the four arms pooled (three seeds, five
+  folds), printed by `e00513_score.py baseline` before any contrast. A seed spread cannot exist
+  before any fit, so this replaces the brief's "before any fit". The minimum detectable effect is
+  scaled to a 3-seed mean. Experiments 448 to
   510 report 0.057 to 0.164 points, so a pooled pass of 0.05 or less is unlikely to be resolved: the
   price terms are 3 to 5% of the error at the one Primary where they were measured.
 - **Intervals.** Month-block bootstrap with five blocks gives near min-to-max intervals; the page
@@ -180,6 +180,8 @@ generation, per half-hour, so they describe the day's residual demand shape.
 - **Stop rule.** Continue to P-drop and P-aux only if, at either group, the Bonferroni interval of
   PO minus P0 excludes zero and its point estimate is at most minus the 3-seed minimum detectable
   effect. Otherwise stop and report.
+- **Printed test count.** The scorer prints 10 counted tests (it counts the two descriptive
+  contrasts); the Bonferroni family stays 12.
 - **Missing flags.** PO and PP carry the missing flag on the 101 days without a price; PN carries
   it on the 50 days without a national series. The scoring mask uses the price-missing days only,
   for every arm.

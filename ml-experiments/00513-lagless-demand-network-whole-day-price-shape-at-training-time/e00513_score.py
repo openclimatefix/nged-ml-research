@@ -68,8 +68,12 @@ _PRICE_OK: dict[str, np.ndarray] = {}
 def price_ok_of_target(*, target: np.ndarray) -> np.ndarray:
     """Return True where the half-hour's local day has a Market Index price (target is a grid index)."""
     if "ok" not in _PRICE_OK:
-        tables = shapes.ShapeTables(fit_until_idx=0)
-        _PRICE_OK["ok"] = ~tables.price_missing[tables.day_id]
+        _, day_id, missing = shapes.shape.grid_features(
+            grid_start_us=shapes.prep422.GRID_START_US,
+            grid_length=shapes.grid_length(),
+            values=shapes.price_values(),
+        )
+        _PRICE_OK["ok"] = ~missing[day_id]
     return _PRICE_OK["ok"][target.astype(np.int64)]
 
 

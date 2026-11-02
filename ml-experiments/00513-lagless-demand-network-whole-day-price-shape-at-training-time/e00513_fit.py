@@ -55,7 +55,7 @@ def pretrained_path(*, arm: str, month: str, seed: int) -> Path:
     return W / "pretrained" / arm / f"{month}_s{seed}.pt"
 
 
-def _prepare(*, arm: str, month: str, clean: np.ndarray, with_pretrain_rows: bool) -> dict:
+def _prepare(*, month: str, clean: np.ndarray, with_pretrain_rows: bool) -> dict:
     """Return the fold's rows, shape tables, test rows, and (optionally) the pretraining rows, with shape columns appended."""
     refit = c.month_start(month=month)
     rows = data.build_fold(refit=refit, clean=clean)
@@ -118,7 +118,7 @@ def run(
         if not todo_pre and not todo_fit:
             continue
         t0 = time.monotonic()
-        prep = _prepare(arm="", month=month, clean=clean, with_pretrain_rows=bool(todo_pre))
+        prep = _prepare(month=month, clean=clean, with_pretrain_rows=bool(todo_pre))
         rows, test, tables, pre = prep["rows"], prep["test"], prep["tables"], prep["pre"]
         print(
             f"{month}: feeder {time.monotonic() - t0:.0f} s; shape tables: price-missing days {int(tables.price_missing.sum())}, placebo-unmatched {tables.unmatched}",
