@@ -254,6 +254,9 @@ K2-S1: 0.23 to 0.32 points. (The brief's earlier "4% to 5%" is not what experime
   L-Ww-D beats its twin by the minimum detectable effect, a 30 and 180 day half-life sweep runs as
   an addition. Intervals are month-block bootstraps with Bonferroni correction; seeds and rows are
   equal across arms. Titles say "load-shift", never "switching". The merge follows the skill's rule.
+- The Beta(3, 97) prior is applied once per row, so it acts as a per-row regulariser that pins the
+  outlier weight near 3%; early stopping scores the three served components alone. NGED's labels are
+  hindsight labels, sharper than a live detector, and L-Ww-D validates on a different set than L-Ww.
 - Weights and standardisers of the pretraining are the month's, not refreshed per week.
 - The 2025-12 fold has no stored L0PT weights; the 2-seed pretraining here is new.
 - Lag-free rows need no lag-age cut, so more rows survive than in experiment 425's arm A; scoring

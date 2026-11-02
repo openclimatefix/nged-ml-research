@@ -32,7 +32,9 @@ import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00510-lagless-demand-network-weekly-finetune-and-recency-weights" / "work"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00510-lagless-demand-network-weekly-finetune-and-recency-weights"
+    / "work"
 )
 E448_PRETRAINED: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
@@ -126,7 +128,9 @@ def _extension(*, refit: datetime, last: datetime, clean: np.ndarray, rows: data
         keep = (z["valid"] > low) & (z["valid"] <= high) & (z["origin"] <= us(t=last))
         if not keep.any():
             continue
-        target_idx = ((z["valid"][keep] - prep422.GRID_START_US) // prep422.STEP_US).astype(np.int64)
+        target_idx = ((z["valid"][keep] - prep422.GRID_START_US) // prep422.STEP_US).astype(
+            np.int64
+        )
         y = clean[row["primary"]][target_idx]
         usable = np.isfinite(y)
         parts.append(
@@ -184,7 +188,9 @@ def labelled_events() -> dict[int, list[tuple[int, int]]]:
     return out
 
 
-def event_drop_mask(*, rows: MonthRows, cutoff: datetime, events: dict[int, list[tuple[int, int]]]) -> np.ndarray:
+def event_drop_mask(
+    *, rows: MonthRows, cutoff: datetime, events: dict[int, list[tuple[int, int]]]
+) -> np.ndarray:
     """Return True for rows inside a labelled event known at `cutoff`, padded two days before and after.
 
     An event is known if it started at or before the cutoff. The drop runs from two days before its
@@ -328,7 +334,9 @@ def outlier_parts(*, out: torch.Tensor) -> tuple[torch.Tensor, ...]:
     log_w, mean, std = base.mixture_parts(out=out[..., : 3 * k], components=k)
     p_out = torch.sigmoid(out[..., 3 * k])
     mu_out = (log_w.exp() * mean).sum(-1)
-    sd_out = std.max(dim=-1).values * (OUTLIER_MIN_SCALE + torch.nn.functional.softplus(out[..., 3 * k + 1]))
+    sd_out = std.max(dim=-1).values * (
+        OUTLIER_MIN_SCALE + torch.nn.functional.softplus(out[..., 3 * k + 1])
+    )
     return log_w, mean, std, p_out, mu_out, sd_out
 
 
@@ -346,9 +354,20 @@ def outlier_nll(*, out: torch.Tensor, z: torch.Tensor, prior: bool) -> torch.Ten
     return nll
 
 
-def row_nll(*, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor, z: torch.Tensor, outlier: bool, prior: bool = False) -> torch.Tensor:
-    """Return the negative log-likelihood of each row."""
+def row_nll(
+    *,
+    model: torch.nn.Module,
+    x: torch.Tensor,
+    p: torch.Tensor,
+    z: torch.Tensor,
+    outlier: bool,
+    prior: bool = False,
+    main_only: bool = False,
+) -> torch.Tensor:
+    """Return the negative log-likelihood of each row (`main_only` scores the served 3 components)."""
     out = model(x, p)
+    if outlier and main_only:
+        return base.mixture_nll(out=out[..., : 3 * COMPONENTS], z=z, components=COMPONENTS)
     if outlier:
         return outlier_nll(out=out, z=z, prior=prior)
     return base.mixture_nll(out=out, z=z, components=COMPONENTS)
@@ -360,8 +379,8 @@ def train(
 ) -> tuple[int, float]:  # fmt: skip
     """Train with weighted NLL and early stopping (experiment 428's loop for a lag-free arm).
 
-    The Beta prior of the outlier weight enters the training loss only; the early-stopping
-    validation uses the likelihood alone. Returns the epoch count and the best validation NLL.
+    The Beta prior of the outlier weight enters the training loss only (once per row, a per-row
+    regulariser); the early-stopping validation scores the served three main components alone. Returns the epoch count and the best validation NLL.
     """
     torch.manual_seed(seed)
     train_idx = torch.nonzero(~is_val).squeeze(1)
@@ -389,7 +408,9 @@ def train(
             val = float(
                 torch.cat(
                     [
-                        row_nll(model=model, x=x[c], p=p[c], z=z[c], outlier=outlier)
+                        row_nll(
+                            model=model, x=x[c], p=p[c], z=z[c], outlier=outlier, main_only=True
+                        )
                         for c in val_idx.split(BATCH * 2)
                     ]
                 ).mean()
@@ -408,7 +429,9 @@ def train(
     return epochs, best
 
 
-def serving_quantiles(*, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor, outlier: bool) -> torch.Tensor:
+def serving_quantiles(
+    *, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor, outlier: bool
+) -> torch.Tensor:
     """Return the 11 standardised quantiles of the three main components (the outlier is dropped)."""
     with torch.no_grad():
         out = model(x, p)
@@ -453,7 +476,7 @@ def forecast_frame(
         pl.col("power_fcst_init_time").cast(pl.Datetime("us", "UTC")),
         pl.col("valid_time").cast(pl.Datetime("us", "UTC")),
     )
-    frame = frame.join(table, on="primary", how="left").drop("primary")
+    frame = frame.join(table, on="primary", how="left", maintain_order="left").drop("primary")
     levels = pl.DataFrame(q, schema=list(common.LEVEL_COLUMNS), orient="row")
     return frame.select(
         pl.col("time_series_id").cast(pl.Int32), "power_fcst_init_time", "valid_time"
