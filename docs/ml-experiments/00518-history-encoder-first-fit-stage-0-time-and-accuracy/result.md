@@ -189,3 +189,26 @@ perfect predictor that outputs the injected step, read through the same candidat
 Whether a longer fit with several seeds, a larger validation block, a lower learning rate, and a
 flag threshold chosen on validation reaches the thresholds. The neural Discuss session decides
 whether that fit is worth its cost.
+
+## Attempt 2 (design fixed before it ran)
+
+**A second, bounded attempt changes the fit in six ways and reads the same four checks.** The
+maintainer approved it, and the lag-free results of experiment 511 (the lag-free network beats the
+lagged network below about 2 days, and the gap sits at days 5 to 10) weaken the case for a lag
+encoder. The changes: 3 seeds (each with its own network initialisation and training worlds); a
+validation block of 130 days (1,558 windows) in place of 30; early-stopping worlds 150 to 152 and
+separate threshold worlds 160 to 162; a learning rate of 5e-4; epochs of 32,768 windows; and
+early stopping after 10 epochs. The flag threshold is chosen per seed on the validation block
+alone, as the grid value (0.5, 0.75, 1.0, or 1.5 spreads) that maximises planted precision times
+recall within 2 hours, and is written to a file before any test window is scored. P1 to P4 are read
+unchanged at the frozen threshold, per seed, with the spread over seeds. The cap is 0.5 GPU-hours
+for the fits together (the scoring passes are not counted).
+
+- **Tuned design.** The test windows and worlds 200 to 202 were read in attempt 1, and the changes
+  above were chosen afterwards, so a pass is a pass of a design tuned after that read-out.
+- **Best epoch.** A loss counts as better only if it is 0.5% below the best, so "best epoch" means
+  the last such improvement. A best epoch of 8 to 12 is reported as inconclusive for P1.
+- **Seeds.** The three seeds share one training pool, one validation block, and one set of test
+  windows, so the spread over seeds understates the uncertainty. If the seeds disagree on P2 to P4,
+  the page says so and does not pick a seed.
+- **A second null closes the line.** The neural Discuss session decides what follows.
