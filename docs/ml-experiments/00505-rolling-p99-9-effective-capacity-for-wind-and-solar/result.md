@@ -157,8 +157,8 @@ A window with under 8,000 valid half-hours (solar: daylight half-hours) falls ba
 - **Capacities** (new over old, P-730 and P-365 at the last refit): Farm A 1.027 and 1.027, B 1.041
   and 1.057, C 1.067 and 1.036; Solar A 1.039 and 1.002, B 1.121 and 1.125, C 1.053 and 1.040, D
   1.083 and 1.079 (fallback), E 1.057 and 1.057 (fallback), F 1.058 and 1.060. The window
-  half-hours above each capacity number 30 to 36 for P-730 and 15 to 18 for P-365 (full table in the
-  report).
+  half-hours above each capacity number 22 to 36 for P-730 (Solar E 22 to 29) and 15 to 18 for P-365
+  (Solar D and Solar E fall back; full table in `work/report505.txt`).
 - **Rows, seeds, cadence.** Rows are equal across arms: wind 54,899 half-hours, solar 345,510.
   Seeds: 5 wind, 3 solar. Solar refits are quarterly and wind is one fit, as in experiment 461;
   the contrast could depend on this. Bonferroni count: 44 intervals (two rolling arms, two
@@ -184,8 +184,8 @@ A window with under 8,000 valid half-hours (solar: daylight half-hours) falls ba
   results review is recorded in the pull request.
 - **Mean of the median forecast minus the actual, pooled after table P.** Wind -0.64 MW (P-old),
   -0.61 (P-all), -0.61 (P-730), -0.63 (P-365). Solar +0.089, +0.078, +0.089, +0.092 MW. Per series
-  these move by under 0.05 MW except Solar A (+0.099 under P-all, +0.061 under P-730, +0.013 under
-  P-365) and Solar B.
+  the largest moves are Solar E (+0.37, +0.43, +0.48 MW under P-all, P-730, P-365) and Solar A
+  (+0.099, +0.061, +0.013 MW).
 - **Triggers.** Trigger 4 fires in form: dropping Solar C or Solar D flips the pooled share rule
   under P-730. That leave-one-out condition is part of the pre-registered rule, so the flip is the
   reported result and the verdict was already "not supported". No ratio-1 gate was rerun, because
