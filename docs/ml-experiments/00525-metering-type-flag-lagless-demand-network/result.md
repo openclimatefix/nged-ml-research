@@ -29,25 +29,34 @@ prediction: >-
   Written before any score is read. P1: the flag does not move CRPS at either group, so the
   paired interval of flag minus constant flag contains zero at the six and at the eight (a flag
   duplicates information the embedding may already carry); the page words this as "not shown to move
-  CRPS (interval a to b)". P2: at D8, D12, and D22 (the only eight Primaries whose stored 5% to 1%
-  quantiles ever fall below zero) the flag cuts the mixture's probability mass below zero by at
-  least half, measured against the inference-only baseline of the stored L-Ww weights. P2 is tested
-  per Primary and is untestable at a Primary whose baseline mass is below 0.1% of rows. P3: the flag
-  does not move q99 pinball loss at either group. P4: at D10 (the one signed-MW Primary with
-  reverse flow on 15 of 117 days since 2025-10) the flag does not change the share of forecast
-  median or q05 below zero on those days; this is a case study, not a group test.
+  CRPS (interval a to b)". P2: at D8, D12, and D22 (the only ones of the eight whose stored q01 falls below
+  zero in a proxy check, which the first inference-only step re-verifies) the flag cuts the
+  mixture's probability mass below zero by at least half against the paired control C: the mean mass
+  of M divided by that of C is at most 0.5 in both seeds in at least 4 of 5 folds. The stored L-Ww
+  mass is shown for scale only. P2 is tested per Primary, with per-fold values, and is untestable at
+  a Primary whose baseline mass is below 0.1% of rows. P3: the flag
+  moves q99 pinball loss by less than 0.01 at both groups (experiment 519's flag moved it by 0.011
+  to 0.012, so a larger move falsifies P3). P4 is description, not a test: at D10 (the one signed-MW Primary with
+  reverse flow on 15 of 117 days since 2025-10) the flag is 0 in both M and C, so any difference
+  between them comes from interference through shared weights; the page reports the share of
+  forecast medians and q05 below zero on those days. P5 (falsifier): M is worse than C at either
+  group, with an interval excluding zero.
 decision_rule: >-
   A contrast counts only if its Bonferroni interval excludes zero. The counted family is 8 tests:
   2 contrasts (flag minus constant flag, the core; flag minus L-Ww, the 37-input anchor) x 2 groups
   (six, eight) x 2 metrics (CRPS, q99 pinball loss). q05 and q95 pinball loss and coverage at all
-  four tails are report-only. The smallest gain worth porting is zero CRPS, because the column costs
-  nothing at serving, but a gain below the two-seed minimum detectable effect (0.164 at the eight,
-  0.123 at the six, from experiment 511) is worded as a point estimate only. If CRPS improves by
+  four tails are report-only. Porting the column needs a maintained metering label per series (a
+  data-contract change), so the smallest gain worth porting is 0.03 points of CRPS, the margin
+  experiment 519 used. This experiment's own paired-block minimum detectable effect is computed from
+  its seed-paired fits and printed beside every contrast (experiment 511's 0.164 and 0.123 are for a
+  larger family and are shown for scale only). A null is worded "an effect smaller than X could not
+  have been detected" and "not shown to move CRPS (interval a to b)". If CRPS improves by
   at least the minimum detectable effect, the embedding is too thin and the descriptor-initialised
   embedding, higher embedding learning rate, and static-descriptor options move up the queue.
 benchmark: >-
-  The constant-flag control C (38 inputs, the column fixed at 0 in pretraining, fine-tuning, and
-  scoring, the same network width and seed pairing) is the counted control. L-Ww (experiment 510,
+  The constant-flag control C is the counted control. C is experiment 519's stored arm F0z
+  (38 inputs, the column 0 in pretraining, fine-tuning, and scoring, seeds 0 and 1, the same five
+  folds, CRPS 4.875 at the eight and 3.556 at the six). L-Ww (experiment 510,
   weekly, 90-day half-life, 37 inputs) is the anchor; K2-S1, BG2, climatology, and `manual_heuristic`
   are linked for scale.
 row_set_id: experiment_470_intersection_v1
@@ -70,10 +79,17 @@ read it.**
   flag is the only added column.
 - **Arms.** M: 38 inputs, the 37 lag-free columns plus a metering column read from the Primary index
   (1 for apparent power in MVA, 0 for signed MW), pretrained with it, fine-tuned weekly from those
-  weights. C: the same 38-input network with the column fixed at 0 everywhere, built with experiment
-  519's `with_flag` helper (`e00519_fit.with_flag`, appends a constant column) so that M and C share
-  the code path, the width, and the seed pairing. L-Ww: experiment 510's stored forecasts, not
-  refitted. Experiment 519's F0 is not the control, because its flag is a source flag.
+  weights. M is pretrained with experiment 519's `train_share` at share 0 (8,192 ERA5 and CAMS rows
+  per step), with the column derived from the Primary index, so M and C share the recipe, the width,
+  and (with the same `torch.manual_seed`) the initial weights. C: experiment 519's stored F0
+  pretrains and F0z fits, reused unrefitted; its column is a source flag held at 0, which is a constant
+  column here. A sanity check runs M's code path with the lookup forced to 0 and must reproduce F0z to
+  float tolerance, and the row counts must match 519's. L-Ww: experiment 510's stored forecasts. The
+  M minus L-Ww contrast is confounded with the width and batch difference that 519 documented (F0
+  minus L-Ww is -0.043 at the eight). P (report-only): the same network with a fixed random
+  8/6 assignment of the 16 Primaries to the flag, one draw, to separate "metering type" from "any
+  extra per-Primary column". At the six, M and C have identical inputs (flag 0 in both), so the
+  six's contrast tests interference and noise, not information.
 - **Recipe.** The L-Ww harness: ERA5-and-CAMS pretraining (experiment 448's rows and loop), weekly
   refit, 90-day half-life, restart from the month's pretrained weights, five folds (2025-10,
   2025-12, 2026-01, 2026-03, 2026-06), seeds 0 and 1, weekly cadence because L-Ww is the weekly
@@ -84,6 +100,9 @@ read it.**
   D18 take the flag of their own metering unit (checked against the metering table before any fit)
   and are report-only. The code review checks the Primary-index-to-label mapping against `sites()`
   before any per-Primary number is quoted, because the earlier proxy inferred it.
+- **Mass below zero.** For each row, the sum over the three components of the softmax weight times
+  the normal CDF of (z0 - mean_k) / std_k, with z0 = -target_mean / target_std of the Primary; no
+  outlier component. It is not zero for a correct network, because demand sits near zero at the eight.
 - **Inference-only baseline first (CPU, no GPU go needed).** Load experiment 510's stored L-Ww
   fine-tuned state dicts (`models/hl90`), run them on the scored rows, and compute for each Primary
   the mixture's probability mass below zero (the mixture CDF at 0 MW after undoing the Primary's
@@ -105,10 +124,12 @@ read it.**
   per-Primary mass below zero at D8, D12, and D22 for L-Ww, C, and M, the D10 reverse-flow days with
   the three forecasts, two example forecasts (day-ahead and 14-day, one Primary), and the per-fold
   signs.
-- **Compute.** About 0.4 GPU-hours: 20 pretrains (2 arms x 5 folds x 2 seeds, 31 to 46 s each) and
-  100 weekly fine-tunes (2 arms x 5 folds x 2 seeds x 5 weeks, about 5 s each) plus the month
-  builds. One GPU process under 8 GB (`MemoryMax=8G`, `OMP_NUM_THREADS=1`). No fit starts before
-  the manager's "GPU go". Experiment 510's and 511's stored L-Ww forecasts and weights are reused,
-  which saves 10 pretrains and 50 fine-tunes.
+- **Compute.** About 0.4 GPU-hours: 20 pretrains (arms M and P x 5 folds x 2 seeds, 31 to 46 s
+  each) and 100 weekly fine-tunes (2 arms x 5 folds x 2 seeds x 5 weeks, about 5 s each) plus the
+  month builds; C costs nothing because 519 stored it. One GPU process under 8 GB (`MemoryMax=8G`, `OMP_NUM_THREADS=1`). No fit starts before
+  the manager's "GPU go". Experiment 510's L-Ww forecasts and weights and 519's F0 and F0z are reused,
+  which saves 10 pretrains and 50 fine-tunes. Code changes: a 16-long flag lookup in `sites()` order
+  (asserted), a `with_flag` variant that appends `lookup[p]` in pretraining, validation, `GpuMonth`,
+  and the test rows, and a mixture-mass function.
 - **Reviews.** One Sonnet plan review, one Sonnet code review before the first fit, a results review
   that re-derives the headline numbers, and two write-up reviews.
