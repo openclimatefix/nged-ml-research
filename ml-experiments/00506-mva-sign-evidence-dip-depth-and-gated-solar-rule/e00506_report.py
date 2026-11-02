@@ -25,8 +25,8 @@ def main() -> None:
     order = [*data.SIGNED_SIX, *data.MVA_ONLY]
     base = alt.Chart(apply).encode(y=alt.Y("site:N", sort=order, title=None))
     chart = (
-        base.mark_rule().encode(x="min_dip:Q", x2="median_dip:Q")
-        + base.mark_point(filled=True, size=70, color=ocf.DATA_BLUE).encode(
+        base.mark_rule().encode(x="min_dip:Q", x2="median_dip:Q")  # ty: ignore[unresolved-attribute]
+        + base.mark_point(filled=True, size=70, color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "p10_dip:Q", title="Dip depth: minimum reading over the window, points of capacity"
             ),
@@ -47,11 +47,11 @@ def main() -> None:
         color=alt.Color("level:N", title="Injection level"),
     )
     chart2 = (
-        b.mark_rule().encode(
+        b.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("auc_lo:Q", scale=alt.Scale(domain=[0.7, 1.0]), title="Area under the curve"),
             x2="auc_hi:Q",
         )
-        + b.mark_point(filled=True, size=70).encode(x="auc:Q")
+        + b.mark_point(filled=True, size=70).encode(x="auc:Q")  # ty: ignore[unresolved-attribute]
     ).properties(
         width=420,
         height=200,
@@ -65,7 +65,7 @@ def main() -> None:
         y=alt.Y("site:N", sort=list(data.SIGNED_SIX), title=None), color="level:N"
     )
     chart3 = (
-        c.mark_rule().encode(
+        c.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "false_reverse_lo:Q",
                 scale=alt.Scale(domain=[0, 1]),
@@ -73,7 +73,7 @@ def main() -> None:
             ),
             x2="false_reverse_hi:Q",
         )
-        + c.mark_point(filled=True, size=70).encode(x="false_reverse:Q")
+        + c.mark_point(filled=True, size=70).encode(x="false_reverse:Q")  # ty: ignore[unresolved-attribute]
     ).properties(
         width=420,
         height=200,
