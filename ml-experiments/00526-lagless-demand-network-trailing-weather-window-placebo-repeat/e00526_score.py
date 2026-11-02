@@ -224,8 +224,7 @@ def mask_of(
     }.get(slice_name)
     if flag is None:
         flag = frame[slice_name]
-        if slice_name not in SUMMER_SLICES:
-            flag = flag & (frame["season"] == "winter")
+        flag = flag & (frame["season"] == ("summer" if slice_name in SUMMER_SLICES else "winter"))
     out = (frame["group"] == GROUPS[group]) & flag
     for month in exclude:
         out = out & (frame["month"] != month)
@@ -354,6 +353,9 @@ def stats_command() -> None:  # noqa: PLR0912
     if have(f"W-T{TAG_11}") and have(f"W-Tnull{TAG_11}"):
         records.append(contrast(frame=frame, a=f"W-T{TAG_11}", b=f"W-Tnull{TAG_11}", group="eight", slice_name="cold_night", tests=PRIMARY_TESTS) | {"family": "primary_11_seeds"})  # fmt: skip
         records.append(contrast(frame=frame, a=f"W-T{TAG_11}", b=f"W-Tnull{TAG_11}", group="eight", slice_name="cold_night", tests=PRIMARY_TESTS, exclude=LEAVE_OUT) | {"family": "primary_11_seeds_without_2024-11"})  # fmt: skip
+    if have(f"W-T{TAG_11}") and have(f"W0{TAG_11}"):
+        for g in ("eight", "six"):
+            records.append(contrast(frame=frame, a=f"W-T{TAG_11}", b=f"W0{TAG_11}", group=g, slice_name="all") | {"family": "adoption_ii_11_seeds"})  # fmt: skip
     records.append(contrast(frame=frame, a="W-T", b="W-Tnull", group="eight", slice_name="cold_night", tests=PRIMARY_TESTS, exclude=LEAVE_OUT) | {"family": "primary_without_2024-11"})  # fmt: skip
     for a, b, g, s in secondary_family():
         if have(a) and have(b):

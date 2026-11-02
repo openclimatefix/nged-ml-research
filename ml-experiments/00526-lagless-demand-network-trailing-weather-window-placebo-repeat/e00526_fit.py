@@ -112,7 +112,7 @@ def pretrained_source(*, arm: str, month: str, seed: int) -> Path | None:
     own = own_pretrained(arm=arm, month=month, seed=seed)
     if own.exists():
         return own
-    if arm in E515_ARMS and seed in E515_SEEDS:
+    if arm in E515_ARMS and seed in E515_SEEDS and month in f515.MONTHS:
         if arm == "W0" and month in f515.REUSED_BASE:
             old = E513_ROOT / "pretrained" / "P0" / f"{month}_s{seed}.pt"
         else:
@@ -124,7 +124,7 @@ def pretrained_source(*, arm: str, month: str, seed: int) -> Path | None:
 
 def stored_forecast(*, arm: str, month: str, seed: int) -> Path:
     """Return the forecast file for an arm, fold, and seed, in experiment 515 or in this folder."""
-    if arm in (*E515_ARMS, SEAM_ARM) and seed in E515_SEEDS:
+    if arm in (*E515_ARMS, SEAM_ARM) and seed in E515_SEEDS and month in f515.MONTHS:
         if arm == "W0" and month in f515.REUSED_BASE:
             return E513_ROOT / "seed_preds" / "P0" / f"{month}_s{seed}.parquet"
         return f515.prediction_path(arm=arm, month=month, seed=seed)
@@ -360,6 +360,8 @@ def main() -> None:
     if args.stage is not None:
         jobs = STAGES[args.stage]
     else:
+        if not (args.arms and args.months and args.seeds):
+            parser.error("fit needs --stage, or --arms, --months, and --seeds")
         jobs = [{"arms": args.arms, "months": args.months, "seeds": args.seeds}]
     run(jobs=jobs, device=args.device, refit_mean=False)
 
