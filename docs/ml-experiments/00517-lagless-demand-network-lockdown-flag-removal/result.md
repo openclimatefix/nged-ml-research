@@ -35,7 +35,7 @@ decision_rule: >-
 benchmark: >-
   C0 (the flag as in experiments 425, 448, 449, and 510, pretrained here with the same loop) for every
   contrast.
-verdict: partly supported
+verdict: inconclusive
 best_arm: >-
   At the eight MVA-only Primaries, C2 (flag column removed, lockdown rows dropped from pretraining):
   CRPS 5.117 points, against 5.150 for C0 (flag kept) and 5.161 for C1 (flag removed, rows kept). At
@@ -46,13 +46,12 @@ headline: >-
   well scored 0.044 better than C1 at the eight (-0.069 to -0.021, better in all 5 folds) and 0.019
   better at the six (-0.049 to +0.009).
 take_home_message: >-
-  Removing the lockdown flag while keeping the lockdown rows in pretraining scored slightly worse at
-  the six signed-MW Primaries (0.029 points). Dropping the lockdown rows as well scored better at
-  the eight MVA-only Primaries (0.033 points better than keeping the flag, in 3 of 5 folds) and no
-  different at the six, but worse at the six on 22 to 31 December and on the two report-only
-  Primaries. No arm is a clear replacement for the flag. Every difference is below the minimum
-  detectable effect of 0.12 to 0.13 points, and five month blocks give narrow intervals, so the
-  experiment cannot rank the arms with confidence.
+  No arm is a clear replacement for the lockdown flag, and the experiment cannot rank the arms.
+  Removing the flag while keeping the lockdown rows scored 0.029 points worse at the six signed-MW
+  Primaries, and dropping the lockdown rows as well scored 0.033 points better than keeping the flag
+  at the eight MVA-only Primaries, but leaving out one Primary at a time removes the first
+  difference and weakens the second. Every difference is below the minimum detectable effect of
+  0.12 to 0.13 points.
 production_status: candidate
 row_set_id: experiment_470_intersection_v1
 metric: >-
@@ -61,16 +60,15 @@ metric: >-
 
 ## Take-home message
 
-**Removing the flag is slightly worse at the six; dropping the lockdown rows as well helps the eight
-but hurts Christmas week at the six and the two report-only Primaries, so neither removal is a clear
-replacement for the flag.** The flag is 0 in every fine-tune and scored row, so the flag acts only
-through pretraining. Arm C2 (flag removed, 2020-03-23 to 2021-07-19 rows dropped from pretraining)
-scored 5.117 at the eight and 3.751 at the six, against 5.150 and 3.741 with the flag (C0). C2 is
-better than C0 at the eight in 3 of 5 folds and no different at the six. On 22 to 31 December (at
-the six) and on D15 and D18, C2 scored worse than C0. Every difference is below the minimum
-detectable effect (0.125 at the eight, 0.133 at the six, 3-seed means), so the intervals below are
-suggestive. The result narrows the question to whether the 2020 rows matter at Primaries with short
-history and at Christmas, and does not show that the lockdown rows hurt in absolute terms.
+**No arm is a clear replacement for the flag, and the experiment cannot rank the arms.** The flag
+is 0 in every fine-tune and scored row, so the flag acts only through pretraining. Arm C2 (flag
+removed, 2020-03-23 to 2021-07-19 rows dropped from pretraining) scored 5.117 at the eight and 3.751
+at the six, against 5.150 and 3.741 with the flag (C0). C2 is better than C0 at the eight in 3 of 5
+folds, and that gain rests on two Primaries (see Checks). Removing the flag with the lockdown rows
+kept (C1) scored 0.029 worse at the six, and that difference disappears when one Primary is left
+out. On 22 to 31 December (at the six) and on D15 and D18, C2 scored worse than C0. Every difference
+is below the minimum detectable effect (0.125 at the eight, 0.133 at the six, 3-seed means). The
+result does not show that the lockdown rows hurt, and it keeps the flag as the default.
 
 ## Figure
 
@@ -100,12 +98,54 @@ per-fold differences, so they are ranges, not confidence intervals. Negative fav
   0.0024, and 0.0032. C2's q99 loss is higher than C0's at the eight, so the CRPS gain does not come
   from the upper tail.
 
+## Example forecasts
+
+Day-ahead and 10-day forecasts from 09:00 UTC on 2026-01-12 and 2026-06-15 for D10 (signed MW) and D4
+(MVA only), seeds averaged and widened by 1.15 as in experiment 510 (the scored numbers above use raw
+quantiles). C0 and C2 look nearly the same in both seasons, and the bands widen only mildly with
+horizon.
+
+![D10: day-ahead forecast, C0 and C2, winter and summer](figure_2_example_D10_day_ahead.svg)
+
+![D10: 10-day forecast, C0 and C2, winter and summer](figure_2_example_D10_10_days.svg)
+
+![D4: day-ahead forecast, C0 and C2, winter and summer](figure_2_example_D4_day_ahead.svg)
+
+![D4: 10-day forecast, C0 and C2, winter and summer](figure_2_example_D4_10_days.svg)
+
+## Checks
+
+Audit by a fresh Sonnet agent; interim and unaudited beyond the Sonnet reviews and this audit.
+
+- **Median error beside the quantile score.** The absolute error of the median forecast has the same
+  sign as the CRPS contrast in all nine contrast-by-group cells. The mean forecast is not stored, so
+  the median stands in for it, and no median-minus-mean check per site was possible.
+- **Re-derived contrasts.** The audit's own CRPS from the raw seed forecasts matches the stored
+  scores to four decimals.
+- **Leaving one Primary out (trigger 4 fired).** At the six, dropping Primary 6 turns C1 minus C0 to
+  -0.010 (-0.036 to +0.014), so "flag needed" fails and "not shown to be needed" would pass at both
+  groups. At the eight, C2 minus C0 loses significance when Primary 4 or 15 is left out, and the gain
+  rests on Primaries 15 (-0.209) and 8 (-0.082). C2 minus C1 at the eight survives every deletion.
+- **Nested arms (trigger 5 fired).** C2 uses a subset of C1's pretraining rows and beats C1 at the
+  eight in all 5 folds. No size-matched placebo was run, and C2 also drops the flagged rows from the
+  early-stopping set, so its stopping point differs. A single seed's CRPS varies by 0.06 to 0.11
+  within a fold, so only the eight's C2 minus C1 clearly exceeds seed and fold noise.
+- **Interval width (trigger 6 fired).** The intervals here are 0.4 times as wide as those of
+  experiment 513 on the same rows; the arms differ, so this is a prompt, not a fault.
+- **Seeds are not paired across arms,** because the first layer has a different width.
+- **Earlier finding.** Experiment 6 found that the flag helps XGBoost; this result agrees only
+  weakly (+0.029 at the six, not stable).
+- **Triggers 1, 2, and 7** did not fire. The audit report is in the private
+  `data/ml-experiments/briefs/` folder.
+
 ## Caveats
 
 - **The minimum detectable effect is larger than every difference.** The minimum detectable effect
   comes from the seed spread (0.078 and 0.083 points per seed; 3 seeds, 5 folds). The intervals come
-  from a month-block bootstrap of 5 blocks, which is narrow. The minimum detectable effect, not the
-  bootstrap interval, sets how far to trust a difference.
+  from a bootstrap that resamples blocks of month and origin day (about 150 blocks), so the intervals
+  ignore variation between folds and between training runs. A paired t test across the 5 folds,
+  uncorrected, gives p values of 0.06 to 0.82; the lowest is the eight's C2 minus C1 (0.058). The
+  minimum detectable effect, not the bootstrap interval, sets how far to trust a difference.
 - **Christmas week (22 to 31 December, fold 2025-12 only).** C1 minus C0 is -0.15 at the eight and
   +0.09 at the six. C2 is worse than C0 at the six (+0.31) and no different at the eight (-0.008),
   and worse than C1 at both (+0.15 and +0.22). Treat these as single-fold results.
@@ -117,16 +157,15 @@ per-fold differences, so they are ranges, not confidence intervals. Negative fav
   2025-12 (+0.050) and 2026-06 (+0.020) go the other way.
 - **Load-shift events.** Rows with no labelled event are scored; NGED says some events are unlabelled,
   so these rows may hold events that no label covers.
-- **Not run.** The example probabilistic forecast graphs and the load-shift event plots are not in
-  this page. The arms differ in the pretraining and in one input column, and the scored rows are the
-  same.
+- **Not run.** The load-shift event plots: the scored rows are those with no labelled event.
 - **Schedule.** Monthly refit; the contrast could differ under weekly refits.
 
 ## What to try next
 
 - Keep the flag in later lag-free experiments until the 2020 rows are tested at the report-only
   Primaries and at Christmas on more than one fold.
-- Test C2 on weekly refits and on more December folds before any release claim.
+- Test C2 against a size-matched placebo (an equal number of ordinary 2019 to 2021 rows dropped), on
+  weekly refits, and on more December folds before any release claim.
 
 ## Plan
 
@@ -184,8 +223,8 @@ In the first fold 1,395,832 of 7,005,809 pretraining rows are flagged (19.9%).
 - **Minimum detectable effect.** From the seed spread of the three arms pooled (three seeds, five
   folds), scaled to a 3-seed mean, printed by `e00517_score.py baseline` before any contrast.
   Earlier experiments report 0.057 to 0.164 points for single-seed or two-seed comparisons.
-- **Intervals.** Month-block bootstrap with five blocks gives near min-to-max intervals; the page says
-  so and gives the sign per fold beside every interval.
+- **Intervals.** The scorer's bootstrap over month and origin-day blocks; the page gives the sign per
+  fold beside every interval.
 
 ## Pre-registered rules
 
