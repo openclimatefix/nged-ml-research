@@ -127,22 +127,23 @@ def build_pv_fold(*, refit: datetime, month: str) -> PvFold:
             target_mean[p] = cat["y"][sel].mean()
             target_std[p] = max(float(cat["y"][sel].std()), 1e-3)
     keep = train | held
-    return PvFold(
-        x=standardiser.apply(x=cat["x"][keep]),
-        y=cat["y"][keep],
-        primary=cat["primary"][keep],
-        weight=weight[keep].astype(np.float32),
-        is_val=held[keep],
-        lead=cat["lead"][keep],
-        origin_day=origin_day[keep],
-        standardiser=standardiser,
-        target_mean=target_mean,
-        target_std=target_std,
-        layout=layout,
-        valid=cat["valid"][keep],
-        dropped=dropped,
-        pv_unit=cat["pv"][keep],
-    )
+    fields = {
+        "x": standardiser.apply(x=cat["x"][keep]),
+        "y": cat["y"][keep],
+        "primary": cat["primary"][keep],
+        "weight": weight[keep].astype(np.float32),
+        "is_val": held[keep],
+        "lead": cat["lead"][keep],
+        "origin_day": origin_day[keep],
+        "standardiser": standardiser,
+        "target_mean": target_mean,
+        "target_std": target_std,
+        "layout": layout,
+        "valid": cat["valid"][keep],
+        "dropped": dropped,
+        "pv_unit": cat["pv"][keep],
+    }
+    return PvFold(**fields)
 
 
 def expand_state(*, state: dict, n_inputs: int) -> dict:

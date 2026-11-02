@@ -271,7 +271,7 @@ def main() -> None:
             )
             print(
                 n,
-                round(float(sub.group_by("label").agg(pl.col("crps").mean())["crps"].mean()), 4),
+                round(float(sub.group_by("label").agg(pl.col("crps").mean())["crps"].mean()), 4),  # ty: ignore[invalid-argument-type]
                 sub.height,
             )
     # Tables with the references on the half-hours every arm shares.

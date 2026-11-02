@@ -59,12 +59,12 @@ def figure_contrasts() -> None:
         )
     frame = pl.DataFrame(rows).to_pandas()  # ty: ignore[unresolved-attribute]
     base = alt.Chart(frame).encode(y=alt.Y("group:N", title=None, sort=None))  # ty: ignore[unresolved-attribute]
-    bars = base.mark_rule(strokeWidth=3, color=theme.BRAND_ORANGE).encode(
+    bars = base.mark_rule(strokeWidth=3, color=theme.BRAND_ORANGE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lower:Q", title="Column arm minus arm A, CRPS (points; below zero is better)"),
         x2="upper:Q",
     )
-    points = base.mark_point(filled=True, size=70, color="black").encode(x="difference:Q")
-    limit = base.mark_tick(color=theme.DATA_BLUE, thickness=2, size=18).encode(x="mde:Q")
+    points = base.mark_point(filled=True, size=70, color="black").encode(x="difference:Q")  # ty: ignore[unresolved-attribute]
+    limit = base.mark_tick(color=theme.DATA_BLUE, thickness=2, size=18).encode(x="mde:Q")  # ty: ignore[unresolved-attribute]
     chart = (
         (bars + points + limit)
         .properties(width=WIDTH, height=90)
