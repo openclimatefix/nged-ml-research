@@ -14,7 +14,8 @@ Per day: the minimum, the maximum, the spread (maximum minus minimum), and the m
 16:00 to 19:00 local half-hours minus the mean of the 00:00 to 05:00 local half-hours
 (`evening_minus_overnight`).
 
-Ties in the day's values break by time order (a stable sort), which affects only `rank` and the two window indicators.
+Ties in the day's values break by time order (a stable sort), which affects only `rank` and
+the two window indicators.
 
 A day is "missing" when any of its half-hours has no usable value. A missing day has all ten shape
 columns 0 and its missing flag 1. The one shared draw of the shuffled-day placebo is `placebo_draw`.

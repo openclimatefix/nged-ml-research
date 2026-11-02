@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Slices and figures of experiment 513: the oracle's CRPS gain by Primary, half-hour of day, horizon band, and asset group.
+"""Slices and figures of experiment 513: the oracle's CRPS gain.
+
+The slices are by Primary, half-hour of day, horizon band, and asset group.
 
 Reads the row tables of `e00513_score.py rows`, keeps rows with no labelled event (`cls == clean`) of
 the priced days, and writes `slices.csv` under the work folder plus two figures in the docs folder.

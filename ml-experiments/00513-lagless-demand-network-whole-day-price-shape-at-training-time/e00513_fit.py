@@ -56,7 +56,7 @@ def pretrained_path(*, arm: str, month: str, seed: int) -> Path:
 
 
 def _prepare(*, month: str, clean: np.ndarray, with_pretrain_rows: bool) -> dict:
-    """Return the fold's rows, shape tables, test rows, and (optionally) the pretraining rows, with shape columns appended."""
+    """Return the fold's rows, shape tables, test rows, and optionally the pretraining rows."""
     refit = c.month_start(month=month)
     rows = data.build_fold(refit=refit, clean=clean)
     test = data.build_test(month=month, standardiser=rows.standardiser)
