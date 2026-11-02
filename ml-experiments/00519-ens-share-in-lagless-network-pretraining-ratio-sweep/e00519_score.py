@@ -1,12 +1,12 @@
 # ruff: noqa: E501
-"""Score experiment 519's arms against the 0% flag-column control F0, L-Ww, and K2-S1 with experiment 470's scorer.
+"""Score experiment 519's arms against the 0% control F0, L-Ww, and K2-S1 with experiment 470's scorer.
 
-The pattern of experiment 511: experiment 470's scorer, tail script, and curtailment script are pointed at
-this folder. Arms are the quantile averages of seeds 0 and 1 of the window forecasts that
-`e00519_fit.py assemble` wrote, on experiment 454's rows. L-Ww is experiment 510's stored seed table and
-L-mix (the 50% share) is experiment 511's, both linked unchanged. The minimum detectable effect is
-experiment 511's two-seed `mde.csv`, not refitted. Counted tests: 16 contrasts x 2 groups for CRPS (32),
-and the same for q99 pinball loss (64 in all).
+The pattern of experiment 511: experiment 470's scorer, tail script, and curtailment script are
+pointed at this folder. Arms are the quantile averages of seeds 0 and 1 of the window forecasts that
+`e00519_fit.py assemble` wrote, on experiment 454's rows. L-Ww is experiment 510's stored seed table
+and L-mix (the 50% share) is experiment 511's, both linked unchanged. The minimum detectable effect
+is experiment 511's two-seed `mde.csv`, not refitted. Counted tests: 16 contrasts x 2 groups for CRPS
+(32), and the same for q99 pinball loss (64 in all).
 
 Commands: `build`, `rows`, `stats`, `tails`, `curtailment`.
 """

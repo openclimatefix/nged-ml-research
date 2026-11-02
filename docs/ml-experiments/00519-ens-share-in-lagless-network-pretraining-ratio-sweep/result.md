@@ -240,10 +240,11 @@ The numbers were re-derived from the score tables by a fresh reviewer (see "Chec
 
 ## What to try next
 
-- Repeat the diagnostics (ENS date range, cold nights, leak) on F0 and E25 only, since larger
-  shares are clearly worse.
-- Test a tail-focused variant: 25% to 75% ENS rows scored on q99 pinball loss and the avoidable
-  curtailment cost, since ENS rows lowered the q99 loss.
+- Do not spend more experiments on the ENS share of pretraining for the mean score: the share is
+  not supported. The planned diagnostics experiment (ENS date range, cold nights, leak) is dropped.
+- A tail-focused variant (25% to 75% ENS rows, flag set at fine-tuning) would need its own test on
+  q99 pinball loss and the avoidable curtailment cost, because the q99 gain against the 37-input
+  network is inside zero at 25%.
 
 ## Plan (written before any fit)
 

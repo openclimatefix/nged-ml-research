@@ -15,7 +15,7 @@ Commands:
 
 ```bash
 export PYTHONPATH=<every folder under ml-experiments/, joined by colons>
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL=<private data folder>
 OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
     uv run --no-sync python ml-experiments/00519-*/e00519_fit.py time
 ```
@@ -219,7 +219,9 @@ def train_share(
 
 
 def stage_two(*, model: torch.nn.Module, ens: dict, seed: int, device: str) -> tuple[float, float]:
-    """One epoch on ENS rows only at 0.1 x the pretraining rate; keep the weights only if the held-out ENS NLL fell.
+    """Train one epoch on ENS rows only at 0.1 x the pretraining rate.
+
+    Keep the stage-2 weights only if the held-out ENS NLL fell.
 
     Returns the held-out ENS NLL before and after stage 2 (the kept state is the lower).
     """
@@ -261,7 +263,10 @@ def to_gpu(
     rows: data.Rows,
     device: str,
 ) -> dict:
-    """Return a source's inputs (no flag column), standardised targets, Primary indices, and held-out mask on the GPU."""
+    """Return a source's tensors on the GPU.
+
+    The tensors are the inputs (no flag column), standardised targets, Primary indices, and held-out mask.
+    """
     z = (y - rows.target_mean[primary]) / rows.target_std[primary]
     return {
         "x": torch.from_numpy(x).to(device), "z": torch.from_numpy(z.astype(np.float32)).to(device),
