@@ -12,6 +12,9 @@ scored months, as the PretrainOnce arm of experiment 494 was. Arms:
 - `dF`: arm `d` with fresh pretraining at every fold (the pretrain-once check).
 - `X`: the arms named with `--combine`, together.
 
+Each arm's transform is recorded in `work/variants/<arm>.json`; the saved `meta.json` files are those
+of experiment 397's `save_fits` and do not carry it.
+
 ```bash
 source <paths>   # PYTHONPATH of every folder under ml-experiments/, DATA_PATH_INTERNAL
 OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
@@ -41,6 +44,8 @@ SCORED_MONTHS: Final[tuple[str, ...]] = ("2025-10", "2025-12", "2026-01", "2026-
 SEEDS: Final[tuple[int, ...]] = (0, 1)
 PRETRAIN_CUT: Final[str] = "2025-07"
 BASE_SETTING: Final[fit397.Setting] = fit425.SETTING
+ORIGINAL_PATH: Final = fit425.pretrained_path
+"""Experiment 425's path function, bound once so that repeated `configure` calls cannot chain."""
 NAMES: Final[list[str]] = base.feature_names(scheme="summary")[0]
 SPREAD_COLUMNS: Final[tuple[str, ...]] = tuple(n for n in NAMES if n.startswith("std_"))
 HOLIDAY_REMOVED: Final[tuple[str, ...]] = ("christmas_days", "christmas_tent", "bank_holiday")
@@ -107,7 +112,6 @@ def configure(*, name: str, variant: Variant) -> fit425.Arm:
     fit425.OUT_DIR = WORK_DIR
     fit425.SETTING = replace(BASE_SETTING, components=variant.components)
     arm = fit425.Arm(name, embedding=True, pretrained=True)
-    original_path = fit425.pretrained_path
 
     def new_model(*, arm: fit425.Arm, fold: prep425.EnsFold) -> torch.nn.Module:
         """Return the untrained pruned network for a fold."""
@@ -124,7 +128,7 @@ def configure(*, name: str, variant: Variant) -> fit425.Arm:
 
     def path(*, arm: fit425.Arm, cut: bool, month: str, seed: int) -> Path:
         """Return the pretrained weights: one file at the 2025-07 cut, or each fold's own for `dF`."""
-        return original_path(
+        return ORIGINAL_PATH(
             arm=arm, cut=cut, month=month if name in FRESH_ARMS else PRETRAIN_CUT, seed=seed
         )
 
@@ -156,7 +160,10 @@ def link_stored_weights(*, arm: fit425.Arm) -> None:
     for seed in SEEDS:
         target = fit425.pretrained_path(arm=arm, cut=True, month=PRETRAIN_CUT, seed=seed)
         target.parent.mkdir(parents=True, exist_ok=True)
-        if not target.exists():
+        source = E425_WORK / "pretrained" / "A" / f"{PRETRAIN_CUT}_s{seed}.pt"
+        if not source.exists():
+            raise FileNotFoundError(source)
+        if not target.is_symlink():
             target.symlink_to(E425_WORK / "pretrained" / "A" / f"{PRETRAIN_CUT}_s{seed}.pt")
 
 
