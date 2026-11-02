@@ -197,8 +197,8 @@ solar export. At D8, 55 of the 71 midday dip days have an engine running at most
 which is consistent with the gas engine, although the engine flag also tracks any low D8 reading
 and so is weak evidence. The data cannot say which cause explains the other 16 D8 dip days or the 13
 D22 dip days, and the sunny-versus-cloudy test does not support a solar cause at D22. Verdict:
-`partly supported`. This page is interim and the audit is recorded below. Counts are lower bounds, because NGED's event
-labels are incomplete.
+`partly supported`. This page is interim and the audit is recorded below. Counts are lower bounds,
+because NGED's event labels are incomplete.
 
 **What we asked.** Experiment 506 looked for a dip of the apparent power (MVA, never negative) only
 between 10:00 and 15:00. We asked two questions. First, does a dip at the edges of the sun's path
