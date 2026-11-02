@@ -120,7 +120,8 @@ verifiably the day-ahead price; N2EX day-ahead exists only from 2025-09. Rows ar
 
 **Missing-price days.** A day with any missing half-hour is a missing day: its ten shape columns are
 0 and its missing flag is 1, in training and at scoring. The grid holds 2,527 local days; the
-checks print how many are missing (101 for price, 50 for the national series). The scored rows exclude the
+checks print how many are missing (101 for price, 50 for the national series). The scored rows
+exclude the
 half-hours of missing days, for every arm, so the contrasts stay paired on one row set; the
 number of excluded half-hours is reported.
 
@@ -164,7 +165,8 @@ generation, per half-hour, so they describe the day's residual demand shape.
 - **Slices.** Per Primary and by half-hour of day, with the Primaries that have a known battery or
   gas engine (D2, D5, D8, D9, D11, D14) against the other Primaries; evening-peak and overnight
   half-hours against the rest; horizon bands day 1, days 2 to 3, and days 4 to 10 beside days 1 to
-  10; the half-hours of missing price days are excluded and counted. A pooled gain at Primaries with no known asset is a
+  10; the half-hours of missing price days are excluded and counted. A pooled gain at Primaries
+  with no known asset is a
   leak check, not a finding. The chart of the oracle gain by Primary and by half-hour of day uses
   the OCF palette and no mark in the background colour.
 
