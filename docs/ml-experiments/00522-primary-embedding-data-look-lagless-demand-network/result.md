@@ -31,25 +31,26 @@ prediction: >-
   the regenerated start, divided by the norm of the start, over all 16 Primaries) is 0.40 to 0.60
   after pretraining, and under 0.05 between the pretrained and the daily fine-tuned weights. This
   differs from the queue-order check's 15% to 17%, which compared two folds of one seed with each
-  other and not with the start. P2: none of the 11 counted Mantel tests (10 descriptors and the metering
-  type) and the metering probe passes the level 0.05 / 12 = 0.0042. P3: under the 20 random derangements, the mean CRPS (continuous ranked
-  probability score) of the 14 Primaries that are not report-only rises by more than 0.5 percentage
-  points of effective capacity; removing the embedding altogether raised it by 0.65 to 0.85 in
-  experiments 406, 425, and 448. P4: scoring each Primary with its own regenerated start vector
-  (the "start" arm) raises CRPS by less than the minimum detectable effect, so the movement is
-  nearly unused. P5: the lagged neural network (arm A of experiment 425) loses less than the
-  lag-free neural network under the derangements, by at least a third.
+  other and not with the start. P2: none of the 11 counted Mantel tests (10 descriptors and the
+  metering type) and the metering probe passes the level 0.05 / 12 = 0.0042. P3: under the 20 random
+  derangements, the mean CRPS (continuous ranked probability score) of the 14 Primaries that are not
+  report-only rises by more than 0.5 percentage points of effective capacity; removing the embedding
+  altogether raised it by 0.65 to 0.85 in experiments 406, 425, and 448. P4: scoring each Primary
+  with its own regenerated start vector (the "start" arm) raises CRPS by less than the minimum
+  detectable effect, so the movement is nearly unused. P5: the lagged neural network (arm A of
+  experiment 425) loses less than the lag-free neural network under the derangements, by at least a
+  third.
 decision_rule: >-
-  The minimum detectable effect is fixed at 2 times the two-seed, five-fold value of experiment
-  511: 0.328 percentage points at the 8 Primaries that report apparent power only (MVA) and 0.246 at
-  the 6 that report signed megawatts. Applying it to one fold and one seed, and to per-Primary
-  changes, is an assumption. "Thin": no Mantel test and no probe passes 0.0042 and the 95% interval of the
+  The minimum detectable effect is fixed at 2 times the two-seed, five-fold value of experiment 511:
+  0.328 percentage points at the 8 Primaries that report apparent power only (MVA) and 0.246 at the
+  6 that report signed megawatts. Applying it to one fold and one seed, and to per-Primary changes,
+  is an assumption. "Thin": no Mantel test and no probe passes 0.0042 and the 95% interval of the
   start-arm-minus-stored CRPS difference lies inside the minimum detectable effect; a follow-up
   brief for the best option of Part 4 that uses only the training window is then warranted.
-  "Healthy": at least one Mantel test or the probe passes 0.0042 and the start arm is worse than the stored
-  vectors by more than the minimum detectable effect. Anything else is "mixed", and the page says
-  which half failed. A null Mantel result is weak evidence, because 16 points have little power;
-  the planted-signal control below reports how much. The page makes no claim of benefit.
+  "Healthy": at least one Mantel test or the probe passes 0.0042 and the start arm is worse than the
+  stored vectors by more than the minimum detectable effect. Anything else is "mixed", and the page
+  says which half failed. A null Mantel result is weak evidence, because 16 points have little
+  power; the planted-signal control below reports how much. The page makes no claim of benefit.
 benchmark: >-
   Within the experiment: the stored vectors (identity) against the derangements, the mean vector,
   the start vector, and fresh N(0, 1) vectors. The lagged neural network of experiment 425 (arm A)
