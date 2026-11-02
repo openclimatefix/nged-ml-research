@@ -45,22 +45,32 @@ def _forest(*, table: pl.DataFrame, title: list[str], file: str) -> None:
         part = table.filter(pl.col("group") == g).with_columns(
             slice=pl.col("slice").replace(SLICES)
         ).to_pandas()  # fmt: skip
-        base = alt.Chart(part).encode(y=alt.Y("arm:N", sort=list(ARMS), title=None), yOffset="slice:N")  # ty: ignore[unresolved-attribute]
-        bar = base.mark_rule(strokeWidth=3).encode(
+        base = alt.Chart(part).encode(
+            y=alt.Y("arm:N", sort=list(ARMS), title=None), yOffset="slice:N"
+        )  # ty: ignore[unresolved-attribute]
+        bar = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lo:Q", title="CRPS minus W0 (points of capacity; lower is better)"), x2="hi:Q",
             color=alt.Color("arm:N", scale=alt.Scale(domain=list(ARMS), range=[COLOURS[a] for a in ARMS]), legend=None),
             opacity=alt.Opacity("slice:N", scale=alt.Scale(domain=list(SLICES.values()), range=[1.0, 0.4]), legend=alt.Legend(title=None)),
         )  # fmt: skip
-        dot = base.mark_point(filled=True, size=60).encode(
+        dot = base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
             x="contrast:Q",
             color=alt.Color("arm:N", scale=alt.Scale(domain=list(ARMS), range=[COLOURS[a] for a in ARMS]), legend=None),
             opacity=alt.Opacity("slice:N", scale=alt.Scale(domain=list(SLICES.values()), range=[1.0, 0.4]), legend=None),
         )  # fmt: skip
-        zero = alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="black").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        zero = (
+            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
+            .mark_rule(color="black")
+            .encode(x="x:Q")
+        )  # ty: ignore[unresolved-attribute]
         panels.append(
-            alt.layer(zero, bar, dot).properties(width=WIDTH, height=190, title=alt.TitleParams(label, anchor="start"))
+            alt.layer(zero, bar, dot).properties(
+                width=WIDTH, height=190, title=alt.TitleParams(label, anchor="start")
+            )
         )
-    alt.vconcat(*panels).properties(title=alt.TitleParams(title, anchor="start")).save(DOCS_DIR / file)
+    alt.vconcat(*panels).properties(title=alt.TitleParams(title, anchor="start")).save(
+        DOCS_DIR / file
+    )
 
 
 def _per_fold(*, frame: pl.DataFrame) -> None:
@@ -70,7 +80,7 @@ def _per_fold(*, frame: pl.DataFrame) -> None:
             mask = score.mask_of(frame=frame, group=g, slice_name="cold_night")
             a = score.fold_sums(frame=frame, column=f"{arm}__crps", mask=mask)
             b = score.fold_sums(frame=frame, column="W0__crps", mask=mask)
-            records.extend({"arm": arm, "group": GROUPS[g], "fold": m, "gain": (a[m][0] - b[m][0]) / a[m][1]} for m in sorted(a) if a[m][1])  # fmt: skip
+            records.extend({"arm": arm, "group": GROUPS[g], "fold": m, "contrast": (a[m][0] - b[m][0]) / a[m][1]} for m in sorted(a) if a[m][1])  # fmt: skip
     table = pl.DataFrame(records)
     table.write_csv(score.SCORE_DIR / "per_fold_cold_night.csv")
     panels = []
@@ -78,13 +88,23 @@ def _per_fold(*, frame: pl.DataFrame) -> None:
         part = table.filter(pl.col("group") == label).to_pandas()
         base = alt.Chart(part).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("fold:N", title=None, axis=alt.Axis(labelAngle=-45)),
-            y=alt.Y("gain:Q", title="CRPS minus W0, cold nights (points)"),
+            y=alt.Y("contrast:Q", title="CRPS minus W0, cold nights (points)"),
             color=alt.Color("arm:N", scale=alt.Scale(domain=list(ARMS), range=[COLOURS[a] for a in ARMS])),
         )  # fmt: skip
-        zero = alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas()).mark_rule(color="black").encode(y="y:Q")  # ty: ignore[unresolved-attribute]
-        panels.append(alt.layer(zero, base.mark_point(filled=True, size=55)).properties(width=WIDTH, height=200, title=alt.TitleParams(label, anchor="start")))  # fmt: skip
+        zero = (
+            alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
+            .mark_rule(color="black")
+            .encode(y="y:Q")
+        )  # ty: ignore[unresolved-attribute]
+        panels.append(alt.layer(zero, base.mark_point(filled=True, size=55)).properties(width=WIDTH, height=200, title=alt.TitleParams(label, anchor="start")))  # fmt: skip  # ty: ignore[invalid-argument-type]
     alt.vconcat(*panels).properties(
-        title=alt.TitleParams(["Cold-night CRPS minus W0 in each fold (negative favours the arm).", "Fold 2024-11 has the weakest W0 and the largest gains for every arm, the placebo W-null included."], anchor="start")  # fmt: skip
+        title=alt.TitleParams(
+            [
+                "Cold-night CRPS minus W0 in each fold (negative favours the arm).",
+                "Fold 2024-11 has the weakest W0 and the largest gains for every arm, the placebo W-null included.",
+            ],
+            anchor="start",
+        )
     ).save(DOCS_DIR / "figure_2_per_fold.svg")
 
 

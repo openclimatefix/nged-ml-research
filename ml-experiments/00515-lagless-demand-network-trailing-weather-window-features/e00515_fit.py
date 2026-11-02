@@ -374,7 +374,7 @@ def checks(*, month: str) -> None:
         month=month, clean=clean, need_pre=True, arms=["W-T", "W-S", "W-X", "W-null"], seam=True
     )
     print(
-        f"{month}: {len(fold.rows.y):,} fine-tuning rows, {len(fold.test.x):,} test rows, {len(fold.pre.x):,} pretraining rows"
+        f"{month}: {len(fold.rows.y):,} fine-tuning rows, {len(fold.test.x):,} test rows, {len(fold.pre.x):,} pretraining rows"  # ty: ignore[unresolved-attribute]
     )  # ty: ignore[unresolved-attribute]
     print(
         f"placebo: days without a donor per draw {fold.windows.days['ens'].unmatched} (ensemble), widened {fold.windows.days['ens'].widened}; rows without any donor {fold.windows.unfilled}"

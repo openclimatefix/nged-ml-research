@@ -7,7 +7,15 @@ title: >-
 theme: demand-inputs
 also_relevant_to:
   - retraining-and-training-history
-status: planned
+status: done
+verdict: not resolved
+best_arm: W-T
+headline: >-
+  W-T lowers cold-night CRPS at the eight MVA-only Primaries by 0.150 points (Bonferroni-20 interval
+  -0.314 to -0.075, 10 of 10 folds), but a shuffled-day placebo lowers it by 0.071, and nothing is
+  resolved at the six signed-MW Primaries or on all rows.
+production_status: not adopted
+adopted_in: none
 kind: other
 protocol: demand-v2
 size: >-
@@ -62,10 +70,83 @@ metric: >-
   10).
 ---
 
-**This is the plan, written before any fit that produced a quoted number.** All numbers produced
-later are interim and unaudited until the reviews are recorded in the pull request.
+**Take-home: trailing temperature windows may help the lag-free network a little on cold nights at
+the eight MVA-only Primaries, but this experiment cannot tell them apart from extra columns.** The
+verdict is "not resolved".
 
-## Question
+- **Minimum detectable effect first.** One fold with 3 seeds can detect 0.34 points on all rows and
+  0.48 on cold nights, from seed spread alone. Pooled over 10 folds the seed-only figure is about
+  0.11 and 0.15; fold-to-fold variation adds to that, so the intervals below are wide. W0 scores
+  5.40 (all rows) and 4.67 (cold nights) at the eight, and 4.16 and 3.44 at the six.
+- **Eight MVA-only Primaries, cold nights, arm minus W0** (negative favours the arm; Bonferroni-20
+  interval; negative folds of 10):
+    - W-T: -0.150 [-0.314, -0.075], 10 of 10. W-S: -0.122 [-0.358, -0.017], 9 of 10. Only these two
+      exclude zero.
+    - W-X -0.081, W-ALL -0.086, W-ALL minus W-DH -0.105: all include zero.
+    - **W-null (the shuffled-day placebo) gains -0.071.** W-T minus W-null is -0.079
+      [-0.290, +0.089]: the real windows do not resolve from the placebo.
+- **Six signed-MW Primaries, cold nights:** W-T -0.147 [-0.596, +0.055], W-S -0.160
+  [-0.574, +0.009], W-ALL minus W-DH -0.167 [-0.614, +0.004], W-null -0.108. Every interval includes
+  zero.
+- **All rows:** nothing resolves. W-T is -0.004 at the eight and -0.099 at the six.
+- **Fold 2024-11 drives part of every gain.** W0 is weak in that fold, and every arm, the placebo
+  included, gains 0.46 to 1.29 points there ([Figure 2](figure_2_per_fold.svg)). A **post hoc**
+  check, chosen after seeing the per-fold table, leaves 2024-11 out ([Figure 3](figure_3_leave_out_2024_11.svg)):
+  W-T at the eight is -0.119 [-0.205, -0.071] in 9 of 9 folds and W-null falls to -0.023, so the
+  eight-Primary result holds at about 80% of its size. At the six, W-T falls to -0.044 and W-S to
+  -0.062 [-0.122, +0.021].
+- **Tails:** on cold nights at the eight, W-T lowers q95 pinball loss by 0.043 and q99 by 0.023; the
+  placebo lowers them by 0.038 and 0.024. Absolute q95 and q99 coverage is not in the stored report.
+- **Combining windows did not help.** W-ALL (-0.086) did no better than W-T alone (-0.150), which
+  argues for extra columns adding noise as much as signal.
+
+![Each arm against W0](figure_1_headline.svg)
+
+![Cold-night difference in each fold](figure_2_per_fold.svg)
+
+![The same contrasts without fold 2024-11 (post hoc)](figure_3_leave_out_2024_11.svg)
+
+## Predictions
+
+- **P1 (W-T, cold nights, eight; gain at least 0.05):** passes on the point estimate (0.150), but
+  not against the placebo.
+- **P2 (W-S, six; cold-sunny gain exceeds cold-overcast gain by at least 0.05):** passes on the point
+  estimate (-0.065 against +0.178), with both intervals spanning zero.
+- **P3 (W-X):** not testable on winter folds, because the warm-sunny and warm-overcast slices hold no
+  rows in any of the 10 folds. The cold-sunny clause is unresolved.
+- **P4 (W-null inside plus or minus the minimum detectable effect):** passes only vacuously. The
+  cold-night minimum detectable effect (0.48) is far wider than the placebo gain (-0.071).
+- **P5 (W-seam, all rows, within plus or minus 0.02):** fails, at +0.025 (eight) and +0.023 (six).
+  The cold-night values (+0.019, +0.016) are inside.
+- **Stop rule:** W-T and W-S passed at the eight, so W-ALL and W-ALL minus W-DH ran. Neither beat W-T.
+
+## Checks and caveats
+
+- **Audit triggers.** The placebo gain (trigger 1), W-ALL doing worse than its nested arm W-T
+  (trigger 5), and the minimum detectable effect being wider than the plan expected (trigger 6)
+  fire. The median-minus-mean forecast check and the mean-forecast error beside each
+  quantile-score contrast were **not run**.
+- **Placebo ties.** The placebo takes 88 to 100% of W-T's tail gains, and W-T minus W-null is
+  negative in only 5 of 10 folds at the eight.
+- **W0 reuse.** Experiment 513's `P0` forecasts serve as W0 for 2025-12, 2026-01, and 2026-03; W0 is
+  fitted here for the other 7 folds. Fold 2024-11 is the weakest.
+- **Warm slices are empty,** so no claim covers warm days.
+- **Example probabilistic forecast graphs were not drawn** for this PR.
+- **Window resolution.** A 6-hour window holds two distinct ensemble samples on day 1 and one beyond
+  day 6.
+- **Event labels are incomplete,** so clean rows may hold unlabelled events and counts are lower
+  bounds.
+
+## What to try next
+
+- Repeat W-T against W-null with more seeds, and with 2024-11 given a stronger W0, before building
+  W-CNN on W-T.
+- Treat the temperature windows as a candidate for the six only after a run that resolves the
+  placebo.
+
+## Plan (written before any fit that produced a quoted number)
+
+### Question
 
 The lag-free demand network (37 input columns plus an 8-wide embedding of the Primary) sees the
 weather only at the valid time. We ask whether it forecasts better when it also sees the weather of
@@ -79,7 +160,7 @@ This pull request holds the **core arms** (W-T, W-S, W-X, W-null, and the seam c
 The learned-window arms (W-CNN) are a separate later pull request. W-ALL, and W-DH as a drop-one
 inside W-ALL, run here only if the stop rule passes.
 
-## Arms
+### Arms
 
 Every arm adds columns to the 37 and is re-pretrained from scratch with them, using one loop for
 all arms (experiment 513's `P0` loop). The pretrained weights of experiment 448 do not load, and no
@@ -98,7 +179,7 @@ new column is zero-initialised.
 The valid-time product of temperature and shortwave is dropped: the network can learn it from two
 existing columns.
 
-## How a window is built
+### How a window is built
 
 - **One rule at every lead (maintainer, 2026-11-02).** Every window is built on the half-hourly
   weather series that the stored ensemble summaries already are, with no lead-dependent definitions.
@@ -142,7 +223,7 @@ existing columns.
   The ERA5 windows are smoother and offset from the ensemble windows by up to 2 K; this offset is
   the mismatch that the conditional noise arm addresses.
 
-## Placebo and seam control
+### Placebo and seam control
 
 - **W-null.** For each local valid day (Europe/London midnight to midnight), a seeded draw (`seed =
   515`) picks another valid day of the same calendar month, the same day type (Monday to Friday,
@@ -162,7 +243,7 @@ existing columns.
   builds' 3-seed mean quantiles on common rows, with per-seed contrasts alongside, because the 0.02
   limit sits below the minimum detectable effect.
 
-## Folds, seeds, and the minimum detectable effect
+### Folds, seeds, and the minimum detectable effect
 
 - **Folds.** Ten winter months (the "10 winter folds"): 2024-11, 2024-12, 2025-01, 2025-02, 2025-03,
   2025-11, 2025-12, 2026-01, 2026-02, and 2026-03. Ensemble summaries exist for every daily run from
@@ -184,7 +265,7 @@ existing columns.
 - **Intervals.** Month-block bootstrap over ten folds, with the fold count printed beside every
   interval and the sign per fold beside it. Few blocks give near min-to-max intervals.
 
-## Scoring
+### Scoring
 
 - **Rows and groups.** Rows with no labelled event, leads up to 240 hours, cleaned data, the D15
   and D18 start cut, and the eight MVA-only Primaries and six signed-MW Primaries as the gating
@@ -211,7 +292,7 @@ existing columns.
   experiment 441's cold-night figure (inconclusive, 2 of 3 folds). Experiment 442 gave -0.014 at the
   eight and -0.086 at the six (D16 drives it).
 
-## Pre-registered rules
+### Pre-registered rules
 
 - **Stop rule.** Continue to W-ALL and W-ALL minus W-DH if a Bonferroni interval of a core arm
   against W0 excludes zero at either group and its point estimate is at least 0.03 points better.
@@ -225,7 +306,7 @@ existing columns.
   slices, not through a feature's importance. A simple hand-built window that passes is preferred
   to W-CNN for the first release.
 
-## Folds, fit count, and cost
+### Folds, fit count, and cost
 
 - **Fit count.** Pretrainings: 4 core arms (W-T, W-S, W-X, W-null) times 10 folds times 3 seeds is
   120, plus W0 on 7 folds times 3 seeds is 21, so **141 pretrainings**. Fine-tunes: the same 141,
@@ -237,7 +318,7 @@ existing columns.
   GPU process under 8 GB, with `MemoryMax=8G` and `OMP_NUM_THREADS=1`; launches are staggered
   against the other workers' GPU jobs.
 
-## Departures from the brief
+### Departures from the brief
 
 - The brief's five anchor folds of experiment 513's `P0` reduce to 3 here (2025-12, 2026-01,
   2026-03), because 2025-10 and 2026-06 are not winter months. W0 is fitted for the other 7 folds.
@@ -257,7 +338,7 @@ existing columns.
   two W-CNN variants of the later pull request. The scorer prints 84; this pull request runs at most
   5 of those arms. P4 and P5 are descriptive tests outside both families.
 
-## Standing practices followed
+### Standing practices followed
 
 Cleaned data and the D15 and D18 start cut; rows with no labelled event; July 2026 unused; no
 XGBoost work; metered generators are not shown (substations only); titles say "load-shift", never

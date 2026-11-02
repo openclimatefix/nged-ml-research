@@ -315,7 +315,7 @@ def mde(*, frame: pl.DataFrame, group: str, slice_name: str, arms: list[str]) ->
         residuals.append(values - values.mean(axis=1, keepdims=True))
     resid = np.concatenate(residuals)
     sd = math.sqrt((resid**2).sum() / (len(resid) * (len(SEEDS) - 1)))
-    return {"group": group, "slice": slice_name, "folds": resid.shape[0] // len(arms), "seed_sd": sd, "mde": 1.96 * math.sqrt(2.0) * sd / math.sqrt(len(SEEDS))}  # fmt: skip
+    return {"group": group, "slice": slice_name, "folds": resid.shape[0] // len(arms), "seed_sd": sd, "mde": 1.96 * math.sqrt(2.0) * sd / math.sqrt(len(SEEDS)), "mde_pooled": 1.96 * math.sqrt(2.0) * sd / math.sqrt(len(SEEDS) * (resid.shape[0] // len(arms)))}  # fmt: skip
 
 
 def baseline_command() -> None:
@@ -335,7 +335,7 @@ def baseline_command() -> None:
     print(counts)
 
 
-def stats_command() -> None:
+def stats_command() -> None:  # noqa: PLR0912
     """Write and print every contrast, tails, and horizon bands against W0."""
     frame = load_rows()
     arms = [a for a in (*CORE, *CONDITIONAL) if f"{a}__crps" in frame.columns]
@@ -385,7 +385,10 @@ def stats_command() -> None:
             mask = mask_of(frame=frame, group=g, slice_name="cold_night")
             a = fold_sums(frame=frame, column=f"{arm}__crps", mask=mask)
             b = fold_sums(frame=frame, column=" W0__crps".strip(), mask=mask)
-            folds.append({"arm": arm, "group": g} | {m: round((a[m][0] - b[m][0]) / a[m][1], 3) for m in sorted(a)})
+            folds.append(
+                {"arm": arm, "group": g}
+                | {m: round((a[m][0] - b[m][0]) / a[m][1], 3) for m in sorted(a)}
+            )
     with pl.Config(tbl_cols=20, tbl_width_chars=200):
         print(pl.DataFrame(folds))
     print(f"Bonferroni: primary family {BONFERRONI}; reported family 84")
