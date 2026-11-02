@@ -82,6 +82,7 @@ def configure() -> None:
         )
         return {c: frame[c] for c in frame.columns}
 
+    score470.mde = mde_two_seeds  # ty: ignore[invalid-assignment]
     score470.masks = masks  # ty: ignore[invalid-assignment]
     tails470.ARMS = (*ARMS, *CONTROLS)
     curtailment470.ARMS = (*ARMS, *CONTROLS)

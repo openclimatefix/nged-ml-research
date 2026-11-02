@@ -8,7 +8,7 @@ theme: retraining-and-training-history
 also_relevant_to:
   - production-reference-and-best-guess
   - lsc-detectors
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -48,10 +48,228 @@ row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity, q01, q05, q95, and q99 coverage and pinball loss,
   avoidable-curtailment cost at f = 0.9, 0.75, and 0.5 at the signed-MW six.
+verdict: partly supported
+best_arm: >-
+  L-Ww (lag-free demand network, refitted weekly, 90-day recency weight): CRPS 4.920 points at the
+  eight MVA-only Primaries and 3.555 at the six signed-MW Primaries, against 4.763 and 3.423 for
+  K2-S1 and 4.682 and 3.457 for A-pool.
+headline: >-
+  Refitting the lag-free network every week scored 0.173 points better than refitting it monthly at
+  the eight and 0.185 better at the six (Bonferroni intervals exclude zero). A 90-day recency weight
+  scored a further 0.083 and 0.068 better. The best arm, L-Ww, stayed 0.156 (eight) and 0.132 (six)
+  behind K2-S1, the network that reads lagged power. Dropping labelled events or adding an outlier
+  component did not reduce how much an injected load shift leaks into the next week's forecast.
+lessons: >-
+  The weekly gain grew through the month (zero in week 1, by construction, and 0.27 to 0.39 points
+  in week 5), so a lag-free network that is refitted rarely ages faster than a network that reads
+  lags; the gain may mean that any weekly refit beats a monthly one, because K2-S1 (monthly, with
+  lags) did not age faster than L-M. A shorter recency weight raised the leak of an injected shift
+  from 3.8 to 6.1 points of capacity (11% to 18% of the shift). In December 2025 and late January
+  2026 L-Ww scored better than K2-S1, so the gap is not uniform.
+take_home_message: >-
+  A lag-free demand network that is refitted every week forecasts clearly better than one refitted
+  every month (0.17 to 0.19 points of CRPS, far more than the 0.02 to 0.08 we predicted), and a
+  90-day recency weight adds a further 0.07 to 0.08. That narrows the gap to the lagged network
+  K2-S1 from 0.39 to 0.41 points down to 0.13 to 0.16, but does not close it, and the 90-day weight
+  makes the forecast follow a recent load shift more closely. Dropping labelled events, or adding a
+  latent outlier component, did not cut that leak. In the Christmas week of 2025 and the last week
+  of January 2026 the weekly lag-free network scored better than K2-S1, so a weekly fine-tuned
+  lag-free network is worth testing as a first-release candidate, with the weekly refit counted as
+  part of its serving cost (about 5 fits per month instead of 1).
+advice:
+  - >-
+    If the lag-free network is used in the first release, refit it weekly rather than monthly: the
+    weekly refit scored 0.173 (eight) and 0.185 (six) points better, with intervals that exclude
+    zero (Results table, figure 1).
+  - >-
+    Do not adopt the 90-day recency weight on this evidence: it scored 0.068 to 0.083 points better
+    than the 182.6-day weight, below the minimum detectable effect, and its injected-shift leak was
+    2.3 points of capacity larger (figures 1 and 4).
+  - >-
+    Do not add the event-dropping or outlier-component arms to the lag-free network: neither cut the
+    leak, and the outlier weight the network learned was the same (0.020) on every class of row
+    (figure 4, Results).
+  - >-
+    Test the weekly lag-free network against K2-S1 over a full winter, because the 2025-12 and
+    2026-01 weeks that favour it are two folds (figure 3).
+production_status: candidate
+adopted_in: none
 ---
 
-**Planned; no score has been read.** The plan below is the one the brief and the queue-order check
-fixed on 2026-11-02, with the corrections the check made.
+**A lag-free demand neural network that is refitted every week scored 0.17 to 0.19 points of CRPS
+better than one refitted every month (a lower score is better), and a 90-day recency weight added a
+further 0.07 to 0.08. The best arm, L-Ww, stayed 0.13 to 0.16 points behind K2-S1, the network that
+reads lagged power. The 90-day weight made the next week's forecast follow an injected load shift
+more closely, and neither dropping labelled events nor a latent outlier component reduced that
+leak.** In the Christmas week of 2025 and the last week of January 2026, L-Ww scored better than
+K2-S1, so the gap to K2-S1 is not uniform.
+
+We asked whether a network that reads no lagged power can come close to K2-S1 by being fine-tuned
+more often. The lag-free network is pretrained on ERA5 and CAMS estimates of past weather, then
+fine-tuned on archived ECMWF ensemble (ENS) forecasts. We compared a monthly refit with a weekly
+refit, and a 182.6-day with a 90-day recency half-life. We also tried two ways to make the
+fine-tune ignore load-shift events, and injected a shift into the training targets to measure how
+much of it the next week's forecast absorbs. All arms are scored on the half-hours of experiment
+470's row set, over five months, in points of effective capacity (a percentage of each Primary's
+capacity). "The eight" are the 8 Primaries that report only apparent power; "the six" are the 6 that
+report signed megawatts (rows with no labelled event).
+
+| Arm | What it is |
+|---|---|
+| L-M | Lag-free network, refitted monthly, 182.6-day half-life weight (experiment 425's recipe). |
+| L-W | Same network, refitted weekly (days 1, 8, 15, 22 and 29 of the scored month). |
+| L-Ww | Weekly refit with a 90-day half-life weight. |
+| L-Ww-D | L-Ww with the half-hours inside labelled events (padded by 96 half-hours) dropped. |
+| L-Ww-O | L-Ww with a fourth, wide Gaussian component that is dropped at serving. |
+| K2-S1, A-pool | Stored references that read lagged power (experiments 470 and 425). |
+
+Verdict: partly supported. The weekly refit and the 90-day weight helped by much more than
+predicted. No arm got within 0.1 points of K2-S1 at the six on the full score, and neither
+leak-reducing arm worked.
+
+## Figures
+
+![Each arm's CRPS difference to K2-S1 at the eight and the six, with Bonferroni
+intervals](figure_1_headline.svg)
+
+![The weekly-over-monthly gain by week of the month](figure_2_week_of_month.svg)
+
+![Christmas week and January 2026 by arm](figure_3_christmas_january.svg)
+
+![Injected-shift leak by arm](figure_4_stress_leak.svg)
+
+![A day-ahead forecast of a signed-MW Primary](figure_5_example_D10_day_ahead.svg)
+
+![A 10-day forecast of a signed-MW Primary](figure_5_example_D10_10_days.svg)
+
+![A day-ahead forecast of an MVA-only Primary](figure_5_example_D4_day_ahead.svg)
+
+![A 10-day forecast of an MVA-only Primary](figure_5_example_D4_10_days.svg)
+
+![Load-shift event 1](figure_6_event_1.svg)
+
+![Load-shift event 2](figure_6_event_2.svg)
+
+![Load-shift event 3](figure_6_event_3.svg)
+
+![Load-shift event 4](figure_6_event_4.svg)
+
+![Load-shift event 5](figure_6_event_5.svg)
+
+![Load-shift event 6](figure_6_event_6.svg)
+
+## Results
+
+- **Setup.** Seeds 0 and 1 (L-Ww-D and L-Ww-O seed 0 only); widening 1.15; rows of experiment 470
+  (`experiment_470_intersection_v1`, 572,041 half-hours at the eight and 322,323 at the six);
+  folds 2025-10, 2025-12, 2026-01, 2026-03, 2026-06; cleaned data; the D15 and D18 start cut.
+  Forecasts reach 240 hours, so the page scores leads up to 10 days; the row set excludes
+  longer leads.
+- **Minimum detectable effect from this experiment's own two seeds.** 0.164 points at the eight and
+  0.123 at the six, not the 0.086 and 0.170 in the plan (those came from experiment 494, with
+  other arms). Bonferroni count 28 CRPS tests (56 with q99 pinball loss).
+- **CRPS contrasts (points; Bonferroni 95% interval; negative favours the first arm).**
+
+| Contrast | Eight | Six |
+|---|---|---|
+| L-W minus L-M | -0.173 [-0.219, -0.133] | -0.185 [-0.246, -0.132] |
+| L-Ww minus L-W | -0.083 [-0.168, -0.012] | -0.068 [-0.104, -0.031] |
+| L-Ww-D minus L-Ww | +0.079 [+0.044, +0.117] | +0.032 [+0.005, +0.062] |
+| L-Ww-O minus L-Ww | +0.062 [+0.004, +0.118] | +0.034 [-0.019, +0.087] |
+| L-M minus K2-S1 | +0.412 [+0.319, +0.505] | +0.385 [+0.300, +0.474] |
+| L-W minus K2-S1 | +0.239 [+0.130, +0.338] | +0.200 [+0.114, +0.294] |
+| L-Ww minus K2-S1 | +0.156 [+0.027, +0.275] | +0.132 [+0.020, +0.238] |
+| L-Ww minus A-pool | +0.238 [+0.157, +0.322] | +0.098 [+0.031, +0.174] |
+
+- **Absolute CRPS (points).** Eight: L-M 5.175, L-W 5.003, L-Ww 4.920, L-Ww-D 4.998, L-Ww-O 4.982,
+  K2-S1 4.763, A-pool 4.682. Six: L-M 3.807, L-W 3.623, L-Ww 3.555, L-Ww-D 3.587, L-Ww-O 3.589,
+  K2-S1 3.423, A-pool 3.457.
+- **Week of the month (figure 2).** The weekly gain is zero in week 1, because the first weekly
+  fit is the monthly fit, and grows afterwards: at the six -0.170, -0.195, -0.366, and -0.268
+  points in weeks 2 to 5, and at the eight -0.116, -0.170, -0.345, and -0.386.
+- **Christmas week and January (report only; figure 3).** In 22 to 31 December 2025, L-Ww scored
+  4.332 at the eight and 2.861 at the six, against 5.406 and 3.210 for K2-S1 (-1.074 and -0.349). In
+  25 to 31 January 2026 at the six L-Ww scored 4.027 against 4.271 for K2-S1 (-0.244), but in 1 to
+  14 January it scored 0.090 (eight) and 0.216 (six) points behind. One Christmas week is a single
+  event, and the noise floor of a single fold is about 0.26 (six) to 0.27 (eight) points, so the
+  Christmas result is suggestive only.
+- **Injected-shift leak (descriptive; one seed, 5 folds, both signs).** The shift is 3 times the
+  standard deviation of a Primary's 7-day mean target (on average 31 to 36 points of capacity),
+  added to the 7 days before the refit. The next week's median moves by this many points of
+  capacity (share of the shift in brackets): L-W 3.84 (11%), L-Ww 6.11 (18%), L-Ww-D 6.18 (18%),
+  L-Ww-O 5.94 (17%). The leak is largest in 2026-01 (7.4 for L-W, 14.5 for L-Ww, 15.2 for L-Ww-D,
+  16.9 for L-Ww-O). L-Ww-D and L-Ww-O do not cut L-Ww's leak by the pre-registered 30%.
+- **Learned outlier weight of L-Ww-O.** The mean weight is 0.020 for rows with no labelled event,
+  0.020 inside labelled events, 0.020 on cold winter nights (48,742 rows), and 0.019 in Christmas
+  week. The component does not pick out events or weather; the prior pins it near the same value
+  everywhere.
+- **Tails (widened 1.15, metered actuals).** On rows with no labelled event at the six, q99
+  coverage is 0.989 (L-W and L-Ww), 0.985 (L-Ww-D), 0.982 (L-Ww-O), 0.978 (L-M), and 0.979
+  (K2-S1). On event rows q99 coverage is poor for every arm (0.77 for K2-S1, 0.79 to 0.87 for the
+  lag-free arms). q99 pinball loss differences are within 0.02 points of K2-S1 at the six for every
+  arm, but L-Ww is 0.036 worse than A-pool at the eight.
+- **Cold winter nights and horizon bands.** On cold winter nights at the eight L-Ww scores 4.60
+  (K2-S1 4.61); at the six 6.80 (K2-S1 6.86). In the 12 to 36 hour band L-Ww scores 4.55 (eight)
+  and 3.81 (six), against 4.48 and 3.86 for K2-S1.
+- **Avoidable-curtailment cost at the six.** At f = 0.9, L-Ww 0.95 [0.15, 2.29] against K2-S1 1.90
+  [0.24, 4.89]; at f = 0.75, 5.96 against 8.43; at f = 0.5, 22.26 against 26.94. Every difference
+  to K2-S1 has an interval that includes zero, so the lag-free arms are not shown worse.
+- **D15 and D18 (report only).** L-Ww scores 11.19 against 11.53 for K2-S1.
+- **Event rows (figure 6).** Metered event rows at the six: L-Ww 7.776, L-W 7.624, L-Ww-D 8.071,
+  L-Ww-O 7.875, K2-S1 7.554. NRA-corrected rows: L-Ww 22.78, K2-S1 22.62.
+- **Serving cost per arm.** 1 network per serving pass for every lag-free arm. Monthly refit: about
+  1 fine-tune per month; weekly refit: about 5 per month (3 to 9 seconds each on one GPU). No stored
+  tables are added.
+
+## Checks
+
+- **Pre-registered rules.**
+    - Weekly beats monthly: pass (point estimates -0.173 and -0.185, intervals exclude zero, q99
+      pinball loss within +0.02).
+    - A recency weight helps: fail (gains of 0.083 and 0.068 are below the minimum detectable
+      effects of 0.164 and 0.123, and the leak is 2.3 points larger, not at most 0.05).
+    - A lag-free candidate exists: not within the pre-registered 0.03 of K2-S1 (gap 0.132 at the six,
+      0.156 at the eight); the gap is narrowed, not closed, and the line is not closed because the
+      weekly arms score better than K2-S1 in some weeks.
+    - L-Ww-D or L-Ww-O worth adopting: fail for both (the leak did not fall by 30%).
+- **Triggers.** Trigger 2 (a prediction contradicted) fired: the weekly gain was 3 to 8 times the
+  predicted 0.02 to 0.08. A Sonnet audit re-derived the two headline contrasts from the raw
+  forecasts (-0.1846 and -0.1725; -0.0681 and -0.0829), found L-M equal to experiment 448's L0PT
+  forecasts to 9.5e-6, found no refit using later data than its cutoff, and found the first
+  week of L-M and L-W identical to zero. Nothing in the audit explains the gains away.
+- **Median minus mean forecast per Primary (checks).** The median is below the mean at the eight
+  for every arm (-0.39 to -0.61 points), as in earlier experiments.
+- **Conditional half-life sweep.** Not run: L-Ww did not beat L-W by the minimum detectable effect.
+- **Seed 1 for L-Ww-D and L-Ww-O.** Not run: both failed the leak rule.
+
+## Caveats
+
+- **The cause of the weekly gain is not isolated.** L-M minus K2-S1 is about the same in every week
+  of the month, so the lag-free network does not age faster than the lagged one; a weekly refit may
+  simply beat any monthly refit. No arm refits K2-S1 weekly.
+- **The 90-day weight helps unevenly.** At the eight L-Ww minus L-W is about +0.07 in weeks 1 and 2
+  and -0.32 in week 4, and positive in 2026-06.
+- Intervals are origin-day block bootstraps and ignore dependence across days of one fold; five
+  folds is few. The Christmas and January results are two folds.
+- NGED's event labels are incomplete and are hindsight labels. "Rows with no labelled event" may
+  hold unlabelled events, and event counts are lower bounds. L-Ww-D validates on a different
+  early-stopping set than L-Ww.
+- The Beta(3, 97) prior is applied once per row in the fine-tune loss only, so it pins the outlier
+  weight near 0.02 on every class of row; the arm tests that setting and not an outlier component
+  in general.
+- The scorer widens only q01, q05, q95, and q99 about the median; widening all 11 levels changes
+  the contrasts by about 0.01 points.
+- The stress run is one seed and one refit week per fold; its leaks are descriptive.
+- Forecasts reach 240 hours only; the saved networks allow a later 14-day pass.
+- Reviews: one Sonnet plan review, one Sonnet code review before the first fit, one Sonnet audit of
+  the headline contrasts, a Sonnet numbers review, and Sonnet prose reviews.
+
+## What to try next
+
+- Refit K2-S1 weekly as well, to separate "weekly refits help any network" from "weekly refits help
+  only a lag-free network".
+- Test the weekly lag-free network and K2-S1 over a full winter, including a second Christmas.
+- Repair the hindsight labels in the fine-tune targets (untested here) rather than dropping rows.
 
 ## Plan
 

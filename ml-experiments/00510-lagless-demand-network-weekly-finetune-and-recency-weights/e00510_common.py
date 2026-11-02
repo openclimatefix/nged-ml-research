@@ -254,6 +254,9 @@ def select_rows(
         shift: Per-Primary shift size for the stress run, or None.
         sign: +1 or -1, the sign of the injected shift.
         clean: Unused unless `shift` is given.
+
+    Returns:
+        The refit's rows, targets, weights, early-stopping flags, and a report of the leak check.
     """
     c = us(t=cutoff)
     keep = (
