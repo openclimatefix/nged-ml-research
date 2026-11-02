@@ -57,63 +57,92 @@ best_arm: >-
   +7.5% when its lags sit inside an injected event, and B-mix is similar. A-pool loses 0.24 of q95
   coverage in scenario 4.
 headline: >-
-  Injecting a load shift into the lags changed K2-S1's q95 coverage by -0.024 to +0.025 on rows
-  whose newest lag is inside the event (bootstrap standard deviation 0.004 to 0.009), against a
-  change of -0.236 for A-pool in the -3x, 14-day, unmirrored scenario. K2-S1's band under-covers
-  with or without the injection (q95 coverage 0.78 to 0.83 at these three donors).
+  Adding a load shift to the lags changed K2-S1's q95 coverage (the share of actuals at or below its
+  95th-percentile line) by -0.024 to +0.025 on rows whose newest lag is inside the event (bootstrap
+  standard deviation 0.004 to 0.009), against -0.236 for A-pool in the -3x, 14-day scenario with no
+  compensating neighbours. K2-S1's q95 coverage is 0.78 to 0.83 with no shift, against a nominal 0.95.
 lessons: >-
   A lagged forecast that learned to ignore bad lags keeps about the same band inside an event as
-  without one, so the bands are not made worse by events. They are too narrow at these three donors
-  everywhere, so the next step is general calibration, not an event-specific widening.
+  without one, so events do not make its bands worse. The bands are too narrow at these three
+  Primaries everywhere, so the next step is general calibration, not an event-specific widening.
 take_home_message: >-
-  When a power lag sits inside an injected load shift, the forecast that mixes lagged and lagless
-  heads (K2-S1) keeps almost the same band and almost the same coverage as on the same rows with no
-  injection, so the band is about as confident as it already was, not more. The pooled network that
-  never saw an injected shift (A-pool) is the exception: its q95 coverage falls by 0.24 in the worst
-  scenario. At the three donors we could check, every forecast under-covers its upper tail with or
-  without the event, so widening the band is a general calibration question and not an event rule.
+  When we add a load shift to one of the earlier power readings that a demand forecast uses
+  (a lag), the forecast that mixes lagged and lagless neural networks (K2-S1) keeps almost the same
+  90% band and almost the same coverage as on the same rows with no shift added, so the shift does not
+  make its band any narrower relative to the errors. The pooled neural network that never saw an
+  added shift (A-pool) is the exception: its upper-tail coverage falls by 0.24 in the worst scenario.
+  At the three Primary substations we could check, every forecast under-covers its upper tail with
+  or without a shift, so the bands need widening everywhere, not only inside load-shift events.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Score a forecast's coverage inside a load-shift event against the same rows with the injection
-    off, never against other rows, because the three stored donors under-cover by 0.12 to 0.19 at
-    q95 even without an event (figure 1 and the table below).
+    Score a forecast's coverage inside a load-shift event against the same rows with the shift
+    removed, never against other rows, because the three stored Primaries under-cover by 0.12 to
+    0.19 at q95 even without an event (figure 1 and the tail table).
   - >-
-    Do not add an event-specific widening to K2-S1 or B-mix: the factor that restores q95 coverage
-    is within 0.05 inside and outside the event in 6 of 8 scenarios (figure 4).
+    Do not add an event-specific widening to K2-S1 or B-mix: the widening factor that restores q95
+    coverage is within 0.05 inside and outside the event in 6 of 8 scenarios for each (figure 4).
   - >-
-    Keep A-pool, or any network trained only on real lags, away from lagged inputs that can sit
-    inside a load-shift event: its q95 coverage fell by 0.09 to 0.24 in the three unmirrored
-    negative scenarios (figure 1).
+    Keep A-pool, or any neural network trained only on real lags, away from lagged inputs that can
+    sit inside a load-shift event: its q95 coverage fell by 0.09 to 0.24 in the three negative
+    scenarios with no compensating neighbours (figure 1).
 ---
 
-**When a power lag sits inside a load-shift event, the forecast that mixes lagged and lagless heads
-(K2-S1) keeps almost the same band and almost the same coverage as on the same rows with no event,
-so its band is about as confident as before.** The pooled network that never saw an injected shift
-(A-pool) is the exception. At the three donors we could check, every forecast under-covers its upper
-tail with or without an event, so the widening needed is a general calibration question and not an
-event rule. The verdict is partly supported, because two of the planned thresholds failed.
+**When a load shift is added to one of the earlier power readings that a demand forecast uses, the
+forecast that mixes lagged and lagless neural networks (K2-S1) keeps almost the same band and almost
+the same coverage as on the same rows with no shift, so the shift does not make its band narrower
+relative to the errors.** The pooled neural network that never saw an added shift (A-pool) is the
+exception. At the three Primary substations we could check, every forecast under-covers its upper
+tail with or without a shift, so the bands need widening everywhere, not only inside load-shift
+events. The verdict is partly supported, because K2-S1's coverage in scenario 6, K2-S1's band width
+in scenarios 5, 7, and 8, and A-pool's coverage in scenario 2 missed the pre-registered thresholds
+(see Predictions).
 
-**We asked whether the uncertainty band of a demand forecast is too narrow, too wide, or about right
-when one of its three power lags falls inside a load-shift event.** Experiment 482 injected shifts
-into the lags of stored forecasts and found that K2-S1's central 90% band covered 85% of actuals
-inside the event. It did not score the same rows with the injection switched off, so that figure
-could not be told apart from the networks' ordinary under-coverage. This experiment scores the
-forecast with the injected lags (stored by experiment 482) and the forecast with no injection (stored
-by experiments 454 and 470) on identical rows, and reports the difference. Nothing was fitted.
+**We asked whether the 90% band of a demand forecast is too narrow, too wide, or about right when one
+of its three lags falls inside a load-shift event.** A lag is the power reading from an earlier time,
+such as 24 hours before the forecast, that the neural network takes as an input. A load-shift event
+is a period when NGED moves demand from one feeder to another, which steps the recorded power
+without changing true demand. Experiment 482 added artificial shifts to the lags of stored
+forecasts, and found that K2-S1's central 90% band covered 85% of actuals inside the event. That
+85% could not be told apart from the networks' ordinary under-coverage, because experiment 482 did
+not score the same rows with no shift. This experiment scores both forecasts on identical rows: the
+forecast with shifted lags (stored by experiment 482) and the forecast with unshifted lags (stored by
+experiments 454 and 470). It reports the difference.
 
-**The comparison covers 15 of experiment 482's 80 (month, donor) clusters.** Experiment 482 stored
-row-level quantiles for three donor Primaries (D5, D12, and D14) in five test months. The 13 other
-donors keep only summary tables, so they cannot be paired. The five forecasts are the lagless network
-(LL), S1, B-mix, K2-S1, and A-pool, as defined in experiment 482. The signed-MW six are the six
-Primaries whose power is signed in MW, and the MVA-only eight are the eight recorded only in MVA. D5
-and D14 are in the first group and D12 is in the second. The headline rows are experiment 482's
-`newest_in` class (the newest lag is inside the event) over days 1 to 10 (24 to 240 hours ahead),
-which is 6,495 rows for the 1-day scenarios, 90,915 for the 14-day scenarios, and 19,485 for
-scenario 8.
+**The comparison covers three Primary substations, D5, D12, and D14, in five test months.** Those 15
+(month, Primary) pairs are the only ones for which experiment 482 stored forecasts row by row.
+Experiment 482 shifted each of 16 Primaries in turn, and the other 13 keep summary tables only. D5
+and D14 are among the six Primaries whose power is recorded in signed MW, and D12 is among the eight
+recorded only in MVA (apparent power). Five forecasts are compared, as defined in experiment 482:
 
-## Injected against injection off
+- **LL** is the lagless neural network, which reads no lag.
+- **S1** is a neural network that reads lags and was trained on added shifts.
+- **B-mix** is an equal mixture of a lagged and a lagless network.
+- **K2-S1** is a mixture of two S1 and two lagless networks.
+- **A-pool** is a pooled neural network trained on real lags only.
+
+"q95 coverage" is the share of actual values at or below the forecast's 95th-percentile line, with a
+nominal value of 0.95. The headline rows have the newest of the three lags inside the event
+(experiment 482's `newest_in` class) and a lead of 24 to 240 hours. That is 6,495 rows in the 1-day
+scenarios, 90,915 in the 14-day scenarios, and 19,485 in scenario 8. Widths are in points of
+capacity, which are percentages of the Primary's effective capacity.
+
+| Scenario | Shift | Duration | Neighbours compensated |
+|---|---|---|---|
+| 1 | +1x | 1 day | no |
+| 2 | -3x | 1 day | no |
+| 3 | +1x | 14 days | yes |
+| 4 | -3x | 14 days | no |
+| 5 | +3x | 14 days | yes |
+| 6 | -1x | 14 days | no |
+| 7 | +3x | 1 day | yes |
+| 8 | +2x | 3 days | no, and the actual also moves (a genuine level change) |
+
+A shift of 1x is one standard deviation of the Primary's 24-hour change in power. "Neighbours
+compensated" means the same energy is taken off up to two neighbouring Primaries.
+
+## Shifted lags against unshifted lags
 
 ![q95 coverage difference](figure_1_q95_coverage_difference.svg)
 
@@ -121,26 +150,29 @@ scenario 8.
 
 - **K2-S1's q95 coverage moves by -0.024 to +0.025.** The differences are +0.011, -0.014, +0.016,
   -0.015, +0.018, -0.024, +0.019, and +0.025 in scenarios 1 to 8, with bootstrap standard
-  deviations of 0.004 to 0.009. Its injected q95 coverage is 0.78 to 0.85, and 0.78 to 0.83 with no
-  injection.
-  Intervals at the Bonferroni level for 48 contrasts exclude zero in scenarios 1, 3, 5, 6, and 8.
+  deviations of 0.004 to 0.009. Its q95 coverage with shifted lags is 0.78 to 0.85, and 0.78 to 0.83
+  with no shift. Intervals at the Bonferroni level for 48 contrasts (the interval widened so that
+  48 comparisons together keep a 5% error rate) exclude zero in scenarios 1, 3, 5, 6, and 8.
 - **K2-S1's 90% band changes by -0.7% to +7.5%.** The changes are +1.5%, -0.7%, +3.0%, +1.3%,
   +7.5%, -0.7%, +4.0%, and +4.1% in scenarios 1 to 8. The band is 30 points of capacity wide.
 - **A-pool's q95 coverage falls by 0.09 in scenario 2, 0.24 in scenario 4, and 0.13 in scenario 6.**
-  These are the negative unmirrored shifts. Standard deviations are 0.025, 0.039, and 0.025. It rises
-  by 0.04 to 0.15 in the other scenarios, because a positive shift lifts its median above the actual.
-  Its q05 coverage in scenario 4 falls to 0.007 from 0.042.
-- **S1 loses 0.05 to 0.07 of q95 coverage in the negative unmirrored scenarios, and B-mix loses
-  0.01 to 0.03.** The lagless network changes by exactly zero in all 8 scenarios (the code check).
-- **The ranking holds in the 12 to 36 hour band** (735 and 10,289 rows, so fewer). K2-S1's q95
-  coverage changes by -0.031 to +0.029, and A-pool's by -0.304 in scenario 4.
-- **Tail calibration, scenario 4, `newest_in`, days 1 to 10.** The table shows q05 and q95 coverage
-  (nominal 0.05 and 0.95), injected and with the injection off, and the pinball loss at q95 in points
-  of capacity.
+  These are the negative shifts with no compensating neighbours. Standard deviations are 0.025,
+  0.039, and 0.025. A-pool's q95 coverage rises by 0.04 to 0.15 in the other scenarios, because a
+  positive shift lifts its median above the actual. Its q05 coverage in scenario 4 falls to 0.007
+  from 0.042.
+- **S1 loses 0.05 to 0.07 of q95 coverage in the three negative scenarios with no compensating
+  neighbours, and B-mix loses 0.01 to 0.03.** The lagless network changes by exactly zero in all 8
+  scenarios, which confirms that the code leaves an unshifted forecast untouched.
+- **The same pattern holds at 12 to 36 hours ahead** (735 rows in the 1-day scenarios and 10,289 in
+  the 14-day scenarios). K2-S1's q95 coverage changes by -0.031 to +0.033, and A-pool's by -0.304
+  in scenario 4.
+- **Tail calibration, scenario 4, `newest_in` rows, 24 to 240 hours ahead.** The table shows q05 and
+  q95 coverage (nominal 0.05 and 0.95) with shifted and unshifted lags, and the pinball loss at q95
+  (the quantile score at the 95th percentile, in points of capacity).
 
-| Forecast | q05 injected | q05 off | q95 injected | q95 off | q95 pinball injected | off |
+| Forecast | q05 shifted | q05 unshifted | q95 shifted | q95 unshifted | q95 pinball shifted | q95 pinball unshifted |
 |---|---|---|---|---|---|---|
-| Lagless network | 0.061 | 0.061 | 0.771 | 0.771 | 1.789 | 1.789 |
+| LL | 0.061 | 0.061 | 0.771 | 0.771 | 1.789 | 1.789 |
 | S1 | 0.042 | 0.062 | 0.693 | 0.759 | 2.231 | 1.790 |
 | B-mix | 0.044 | 0.054 | 0.762 | 0.790 | 1.725 | 1.666 |
 | K2-S1 | 0.038 | 0.049 | 0.786 | 0.802 | 1.601 | 1.594 |
@@ -148,92 +180,103 @@ scenario 8.
 
 ## Probability integral transform and widening factor
 
-![PIT histograms, scenario 4](figure_3_pit_scenario_4.svg)
+![Probability integral transform histograms, scenario 4](figure_3_pit_scenario_4.svg)
 
 ![Widening factor](figure_4_widening_factor.svg)
 
-- **The probability integral transform of every forecast piles up in the top bin.** In scenario 4,
-  27% of actuals fall above the forecast's 90th percentile for K2-S1 and A-pool with no injection
-  (nominal 10%). The injection raises that share to 30% for K2-S1 and to 54% for A-pool.
-- **The factor on the q95 distance from the median is the same inside and outside the event for
-  K2-S1 in 6 of 8 scenarios.** Injected minus injection-off is -0.03, +0.01, -0.05, -0.03, -0.11,
-  +0.03, -0.04, and -0.06 in scenarios 1 to 8. The two exceptions (scenarios 5 and 8) are lower inside
-  the event, so the band was already wider. B-mix behaves the same way. The factor with no injection
-  is 1.8 to 1.9, and the stored widening is 1.15, so most of the gap is general, not event-specific.
-- **A-pool's factor falls to 0.89 in scenario 5 and rises to 2.33 in scenario 4**, which says its
-  band is too wide when a mirrored positive shift lifts its median and too narrow when a negative
-  one pulls it down.
-- **The lower tail needs less widening.** The q05 factor for K2-S1 is 0.91 to 1.27 inside the event
-  and 1.00 to 1.27 with no injection.
+- **The probability integral transform of every forecast piles up in the top bin.** The transform
+  places each actual within the forecast's distribution, and a flat histogram means calibrated. In
+  scenario 4, 27% of actuals fall above the forecast's 90th percentile for K2-S1 and A-pool with no
+  shift (nominal 10%). Shifted lags raise that share to 30% for K2-S1 and to 54% for A-pool.
+- **The widening factor is the multiplier on each quantile's distance from the median that makes
+  q95 coverage equal 0.95.** For K2-S1 it differs between shifted and unshifted lags by -0.03,
+  +0.01, -0.05, -0.03, -0.11, +0.03, -0.04, and -0.06 in scenarios 1 to 8, so it is within 0.05 in 6
+  of 8 scenarios. In the two exceptions (scenarios 5 and 8) the factor is lower with shifted lags,
+  so the band was already wider.
+- **B-mix is within 0.05 in 6 of 8 scenarios too, but not the same six.** Its differences are 0, 0,
+  -0.04, +0.06, -0.14, +0.04, -0.02, and -0.04.
+- **Most of the gap is general, not specific to events.** K2-S1's factor with no shift is 1.8 to 1.9
+  in scenarios 1 to 7 and 2.4 in scenario 8, and the widening stored by experiment 454 is 1.15.
+- **A-pool's factor falls to 0.89 in scenario 5 and rises to 2.33 in scenario 4.** Its band is too
+  wide when a positive shift with compensated neighbours lifts its median, and too narrow when a
+  negative shift pulls the median down.
+- **The lower tail needs less widening.** K2-S1's q05 factor is 0.91 to 1.27 with shifted lags and
+  1.00 to 1.27 with none.
 
 ## Real events (sensitivity)
 
 ![Real events](figure_5_real_events.svg)
 
-- **This is a sensitivity, not a paired result.** It compares rows with any of the three lags inside
-  a labelled event (58,638 rows at 12 of 30 (month, Primary) clusters in the signed-MW six, 40,819 rows
-  at 12 of 40 clusters in the MVA-only eight) with rows that have no label, over days 1 to 10. The
-  rows come from different Primaries and months, so the contrast mixes the event with the Primary.
-- **Against the NRA-corrected actual, K2-S1's q95 coverage is 0.92 on event rows against 0.88 on
-  rows with no label** in the signed-MW six (difference +0.044, bootstrap standard deviation 0.040,
-  minimum detectable effect 0.113), and 0.92 against 0.92 in the MVA-only eight (-0.005, 0.025).
-- **Against the metered actual the signed-MW six drop to 0.70** (difference -0.176, standard
-  deviation 0.080). The band does not follow the metered power during the event, which is the
-  event itself, so the NRA-corrected actual is the headline.
-- **K2-S1's band is 1.2 points narrower on event rows in the signed-MW six** (standard deviation 1.5).
-  In the MVA-only eight event rows are 15 points wider than rows with no label, for every forecast
-  including the lagless network, so that is a Primary effect.
+- **This is not a paired result.** The page compares rows with any of the three lags inside a
+  labelled event (58,638 rows at 12 of 30 (month, Primary) pairs in the signed-MW six, and 40,819
+  rows at 12 of 40 pairs in the MVA-only eight) with rows that have no label, 24 to 240 hours ahead.
+  The two kinds of rows come from different Primaries and months, so the contrast mixes the event
+  with the Primary.
+- **Against the NRA-corrected actual, K2-S1's q95 coverage is 0.92 on event rows and 0.88 on rows
+  with no label** in the signed-MW six (difference +0.044, bootstrap standard deviation 0.040,
+  minimum detectable effect 0.113). The NRA-corrected actual is the metered actual with the normal
+  running arrangement restored (the correction of experiment 435). In the MVA-only eight the
+  figures are 0.92 and 0.92 (difference -0.005, standard deviation 0.025).
+- **Against the metered actual, the signed-MW six drop to 0.70** (difference -0.176, standard
+  deviation 0.080). The metered power during the event is itself shifted, so the NRA-corrected
+  actual is the headline.
+- **K2-S1's band is 1.2 points narrower on event rows in the signed-MW six** (standard deviation
+  1.5). In the MVA-only eight, event rows are 15 points wider than rows with no label for every
+  forecast including the lagless network, so the difference comes from the Primary, not the event.
 - **The labels are incomplete.** NGED says load-shift events may be missing from its logs, so rows
   with no label may hold events no label covers, and the real-event slices undercount.
 
-## Other 13 donors (summary level, not the same rows)
+## Other 13 Primaries (summary level, not the same rows)
 
-- **The three stored donors are the worst-covered.** K2-S1's raw q95 coverage on `newest_in` rows is
-  0.790 at the three stored donors and 0.902 at the other 13 in scenario 4, 0.828 and 0.929 in
-  scenario 1, and 0.774 and 0.855 in scenario 8. With the 1.15 widening the figures are 0.836 and
-  0.933 (scenario 4). The 13 donors have no injection-off scores, so these figures do not form a pair.
+- **The three stored Primaries are the worst covered.** K2-S1's q95 coverage with the stored raw
+  quantiles on `newest_in` rows is 0.790 at the three stored Primaries and 0.902 at the other 13 in
+  scenario 4, 0.828 and 0.929 in scenario 1, and 0.774 and 0.855 in scenario 8. With the 1.15
+  widening, scenario 4 gives 0.836 and 0.933. The other 13 have no unshifted scores, so these
+  figures do not form a pair.
 
 ## Predictions
 
-- **P1 held in part.** K2-S1's q95 coverage changed by less than 0.02 in scenarios 1 to 5 and 7, but
-  by -0.024 in scenario 6, which is under the 0.03 line for too confident. The band was under 3%
-  wider in scenarios 1, 2, 4, and 6, was 2.98% wider in scenario 3, and 4.0% wider in scenario 7.
-- **P2 held in two of three.** A-pool's q95 coverage fell by 0.24 and 0.13 in scenarios 4 and 6, and
-  by 0.09 in scenario 2 (under the 0.10 line, interval -0.17 to -0.01).
-- **P3 held in 6 of 8 scenarios for K2-S1** (tolerance 0.05); it failed in scenarios 5 and 8 by
-  -0.11 and -0.06, where the factor was lower inside the event.
-- **P4 held trivially.** In scenario 8 every forecast's q95 coverage is 0.76 to 0.87, below 0.95, but
-  the same forecasts under-cover in the other scenarios too, so scenario 8 is not worse than them.
-- **P5 held.** The width threshold failed in scenario 5 (+7.5%) and scenario 8 (+4.1%). The early check
-  on the same rows had found +4.0% and +3.1%; the numbers here use the days 1 to 10 band.
+- **P1 held in part.** K2-S1's q95 coverage changed by less than 0.02 in scenarios 1 to 5 and 7. In
+  scenario 6 it fell by 0.024, which is below the 0.03 fall that would call the band too
+  confident. The band was under 3% wider in scenarios 1 to 4 and 6 (scenario 3 is 2.98%), and 4.0%
+  wider in scenario 7, which fails.
+- **P2 held in two of three scenarios.** A-pool's q95 coverage fell by 0.24 and 0.13 in scenarios 4
+  and 6, and by 0.09 in scenario 2, just short of the 0.10 line (interval -0.17 to -0.01).
+- **P3 held in 6 of 8 scenarios for K2-S1** (tolerance 0.05). It failed in scenarios 5 and 8, by
+  -0.11 and -0.06, where the factor was lower with shifted lags.
+- **P4 held, but every other scenario also under-covers.** In scenario 8 every forecast's q95
+  coverage is 0.76 to 0.87, below 0.95, so the prediction that the bands are too narrow could not
+  fail, and scenario 8 is not worse than the others.
+- **P5 held.** The width threshold failed in scenario 5 (+7.5%) and scenario 8 (+4.1%). The early
+  check on the same rows had found +4.0% and +3.1% over all leads; this page uses 24 to 240 hours.
 
 ## Checks and caveats
 
-- **Resolution.** A difference of 0.02 is 2 to 5 bootstrap standard deviations at 15 clusters. The
-  coverage minimum detectable effect from the seed cells (2.8 times the seed standard deviation of
-  the pooled coverage) is 0.011 at q95 for K2-S1 (0.008 to 0.012 at q05) and 0.022 to 0.028 at q95
-  for A-pool. The seed standard deviation comes from 3 seed cells (5 for A-pool), so it is noisy, and it measures seed variation
-  and not the clustering of rows. The Bonferroni count is 48 for the confirmatory contrasts (3
-  forecasts, 8 scenarios, coverage and width); every other contrast is descriptive.
+- **A difference of 0.02 is 2 to 5 bootstrap standard deviations at 15 pairs.** The coverage
+  minimum detectable effect (2.8 times the seed standard deviation of the pooled coverage) is
+  0.011 at q95 for K2-S1 (0.008 to 0.012 at q05) and 0.022 to 0.028 at q95 for A-pool. The seed
+  standard deviation comes from 3 seed cells (5 for A-pool), so it is noisy, and it measures seed
+  variation, not the clustering of rows.
+- **The Bonferroni count is 48 for the confirmatory contrasts** (3 forecasts, 8 scenarios, coverage
+  and width). Every other contrast is descriptive.
 - **Scenario 8 is a different contrast.** Both forecasts are scored against the shifted actual, so
-  the contrast is between a forecast that saw the shifted lags and one that did not. In scenario 8 the
-  `before` and `after` classes mix shifted and unshifted targets.
-- **Reproduction.** The stored forecasts of experiments 454 and 470 match experiment 482's no-shift
-  rows to 2.4e-06 on `before` rows for every forecast, and the pooled coverage of K2-S1's scenario 4
-  `newest_in` rows over all lead hours (0.790) matches experiment 482's summary tables.
-- **Three donors only.** They under-cover more than the other 13, so the absolute coverage figures are
-  not representative of the 16 donors. The 80-cluster re-run was not done (it needs a GPU stage that
-  has not been timed). The result is not borderline, so the re-run was not requested.
-- **Median minus mean forecast:** not computed, because no mean forecast is scored. Triggers fired:
-  none. The planned predictions P1 and P2 failed in one scenario each, and neither contradicts an
-  earlier finding.
-- **Example forecasts and event plots.** This page re-scores stored quantiles and draws no new fan
-  chart. Experiments 468 and 482 hold 6 injected-scenario fans and 4 real-event plots on the same
-  forecasts.
-- **Not done.** The avoidable-curtailment cost, the price of widening on rows with no labelled event
-  (experiments 446 and 483 hold it), and a table P comparison for LL, S1, and B-mix (it exists only
-  for K2-S1 and A-pool). Table P like for like was not re-run here.
+  the contrast is between a forecast that saw the shifted lags and one that did not. In scenario 8
+  the `before` and `after` classes mix shifted and unshifted targets.
+- **The stored forecasts reproduce.** The unshifted forecasts of experiments 454 and 470 match
+  experiment 482's no-shift rows to 2.4e-06 on `before` rows for every forecast. K2-S1's scenario 4
+  `newest_in` q95 coverage over all lead hours (0.790) matches experiment 482's summary tables.
+- **The absolute coverage figures come from three Primaries that under-cover more than the other
+  13.** They are not representative of all 16. The 80-pair re-run was not done, because it needs a
+  GPU stage that has not been timed and the result is not borderline.
+- **No mean forecast is scored, so the median-minus-mean check does not apply.**
+- **No audit trigger fired.** P1 and P2 each failed in part, and neither contradicts an earlier
+  finding.
+- **No new example forecast charts.** This page re-scores stored quantiles. Experiments 468 and 482
+  hold six injected-scenario fan charts and four real-event charts for the same forecasts.
+- **Not scored here:** the avoidable-curtailment cost, the price of widening on rows with no
+  labelled event (experiments 446 and 483 hold it), and table P (experiment 435's recalibration) for
+  LL, S1, and B-mix, because it exists only for K2-S1 and A-pool.
 
-**What the next experiment should answer.** The three stored donors under-cover at q95 by 0.12 to
-0.19 without any event. Whether the other 13 donors also need a larger factor than 1.15 on rows with
-no event is a question for experiment 483's widening results, not for an event rule.
+**What the next experiment should answer.** The three stored Primaries under-cover at q95 by 0.12 to
+0.19 without any event. Whether the other 13 Primaries also need a factor above 1.15 on rows with no
+event is a question for experiment 483's widening results, not for an event rule.
