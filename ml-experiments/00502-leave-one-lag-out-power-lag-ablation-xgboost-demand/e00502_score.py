@@ -13,10 +13,10 @@ valid time before 2026-07-01, lead up to 336 hours; scored at leads up to 240 ho
 
 Row sets as in experiment 392 (`outside` = no labelled event: not inside an event and not within 48
 hours after one; `during`; `after7d`), plus `harm`: a lag lies in an unpadded corrected event and
-the target lies outside every event (experiment 402's `gate_scores_r0_forward` table,
-real rows with `lags_real` > 0 and not `target_real`). Only the six Primaries with signed-MW readings are
-scored. The minimum detectable effect (MDE), (rep) minus (a) on the four refit dates, is printed
-before any contrast.
+the target lies outside every event (experiment 402's
+`gate_scores_r0_forward` table: real rows with `lags_real` > 0 and not `target_real`). Only the
+six Primaries with signed-MW readings are scored. The minimum detectable effect (MDE), (rep) minus
+(a) on the four refit dates, is printed before any contrast.
 
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\\
@@ -82,7 +82,7 @@ BANDS: Final = {
 }
 METRIC_COLUMNS: Final[tuple[str, ...]] = ("crps", *s392.LOSS_COLUMNS[1:])
 BONFERRONI_CONTRASTS: Final[int] = 12
-"""Contrasts times row sets, on the headline band (0-240 h) and widening (1.0); the rest is descriptive."""
+"""Contrasts times row sets, on the 0-240 h band and widening 1.0; the rest is descriptive."""
 LEVEL_PERCENT: Final[float] = 100.0 * (1.0 - 0.05 / BONFERRONI_CONTRASTS)
 RESAMPLES: Final[int] = 20_000
 GROUP: Final[str] = "signed-MW six"
