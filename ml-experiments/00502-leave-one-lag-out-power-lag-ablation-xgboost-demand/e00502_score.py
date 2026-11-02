@@ -13,8 +13,8 @@ valid time before 2026-07-01, lead up to 336 hours; scored at leads up to 240 ho
 
 Row sets as in experiment 392 (`outside` = no labelled event: not inside an event and not within 48
 hours after one; `during`; `after7d`), plus `harm`: a lag lies in an unpadded corrected event and
-the target lies outside every event (experiment 402's `real_r0_<label>` tables, where
-`lags_in_event` > 0 and not `target_in_event`). Only the six Primaries with signed-MW readings are
+the target lies outside every event (experiment 402's `gate_scores_r0_forward` table,
+real rows with `lags_real` > 0 and not `target_real`). Only the six Primaries with signed-MW readings are
 scored. The minimum detectable effect (MDE), (rep) minus (a) on the four refit dates, is printed
 before any contrast.
 
@@ -82,10 +82,10 @@ BANDS: Final = {
 }
 METRIC_COLUMNS: Final[tuple[str, ...]] = ("crps", *s392.LOSS_COLUMNS[1:])
 BONFERRONI_CONTRASTS: Final[int] = 12
+"""Contrasts times row sets, on the headline band (0-240 h) and widening (1.0); the rest is descriptive."""
 LEVEL_PERCENT: Final[float] = 100.0 * (1.0 - 0.05 / BONFERRONI_CONTRASTS)
 RESAMPLES: Final[int] = 20_000
 GROUP: Final[str] = "signed-MW six"
-EQUIVALENCE_LIMIT: Final[float] = 0.11
 
 
 def mix_frames(*, first: pl.DataFrame, second: pl.DataFrame) -> pl.DataFrame:
@@ -115,28 +115,20 @@ def mix_frames(*, first: pl.DataFrame, second: pl.DataFrame) -> pl.DataFrame:
 
 def harm_keys(*, series: pl.DataFrame) -> pl.DataFrame:
     """Return the (time_series_id, power_fcst_init_time, valid_time) keys of the harm rows."""
-    worlds = (
+    scores = pl.read_parquet(
         ML_EXPERIMENTS_DATA_DIR
         / "00402-lag-gate-learned-weight-injected-load-shifts-part-1"
         / "work"
-        / "worlds"
+        / "gate_scores_r0_forward.parquet",
+        columns=["kind", "site", "power_fcst_init_time", "valid_time", "lags_real", "target_real"],
+    ).filter((pl.col("kind") == "real") & (pl.col("lags_real") > 0) & ~pl.col("target_real"))
+    ids = series.filter(pl.col("label").is_in(list(SIGNED_MW_LABELS))).select(
+        pl.col("label").alias("site"), "time_series_id"
     )
-    pieces = []
-    for row in series.iter_rows(named=True):
-        label = row["label"]
-        if label not in SIGNED_MW_LABELS:
-            continue
-        frame = pl.read_parquet(
-            worlds / f"real_r0_{label}.parquet",
-            columns=["power_fcst_init_time", "valid_time", "lags_in_event", "target_in_event"],
-        ).filter((pl.col("lags_in_event") > 0) & ~pl.col("target_in_event"))
-        pieces.append(
-            frame.select(
-                pl.lit(row["time_series_id"]).alias("time_series_id"),
-                pl.col("power_fcst_init_time", "valid_time").dt.replace_time_zone("UTC"),
-            )
-        )
-    return pl.concat(pieces)
+    return scores.join(ids, on="site", how="inner").select(
+        "time_series_id",
+        pl.col("power_fcst_init_time", "valid_time").dt.replace_time_zone("UTC"),
+    )
 
 
 def main() -> None:
