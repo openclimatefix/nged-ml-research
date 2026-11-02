@@ -1,7 +1,8 @@
 """Summarise the mixture's probability mass below zero per Primary, fold, and seed (experiment 525).
 
 Writes `scores/mass_by_primary.csv` (mean mass, share of half-hours whose q05 is below zero, share
-whose median is below zero), `scores/mass_ratio.csv` (M over C per fold and seed at D8, D12, and D22),
+whose median is below zero), `scores/mass_ratio.csv` (M over C per fold and seed at D8, D12, and
+D22),
 and `scores/d10_reverse_flow.csv` (the same shares on the days experiment 506 stored as having a
 negative reading at D10, from 2025-10-01). A half-hour has its q05 below zero when its mass exceeds
 0.05, and its median below zero when its mass exceeds 0.5.

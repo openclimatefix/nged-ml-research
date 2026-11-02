@@ -1,10 +1,12 @@
 # ruff: noqa: E501
 """Score experiment 525's arms against the constant-flag control C and L-Ww with experiment 470's scorer.
 
-The pattern of experiment 519 (`e00519_score`): arms are the quantile averages of seeds 0 and 1 of the
+The pattern of experiment 519 (`e00519_score`): arms are the quantile averages of seeds 0 and 1 of
+the
 window forecasts that `e00525_fit.py assemble` wrote, on experiment 454's rows. C is experiment 519's
 stored F0z (the metering column held at 0), linked unchanged; L-Ww is experiment 510's. Counted family
-(`primary`): 2 contrasts x 2 groups x 2 metrics = 8 tests. The `report` family (P against C and M, C against
+(`primary`): 2 contrasts x 2 groups x 2 metrics = 8 tests. The `report` family (P against C and M,
+C against
 L-Ww) is report-only.
 
 Commands: `build`, `rows`, `stats`, `tails`, `curtailment`.

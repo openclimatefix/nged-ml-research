@@ -1,23 +1,29 @@
 # ruff: noqa: E501
-r"""Pretrain and fine-tune the metering-flag arms of experiment 525 and measure the mixture's mass below zero.
+r"""Pretrain and fine-tune the metering-flag arms of experiment 525; measure mass below zero.
 
-The harness is experiment 519's (`e00519_fit`), experiment 511's (`e00511_common`, `e00511_fit`), and
-experiment 510's (`e00510_common`): ERA5-and-CAMS pretraining at share 0 through `train_share`, then weekly
+The harness is experiment 519's (`e00519_fit`), experiment 511's (`e00511_common`, `e00511_fit`),
+and
+experiment 510's (`e00510_common`): ERA5-and-CAMS pretraining at share 0 through `train_share`,
+then weekly
 fine-tunes from the month's pretrained weights. This module appends one per-Primary 0/1 column
 (1 for apparent power in MVA) to the 37 lag-free inputs.
 
 Arms: `M` (the real metering flag) and `P` (a fixed random 8/6 assignment of the 16 Primaries, report-only).
-The constant-flag control C is experiment 519's stored `F0z` (flag 0 everywhere), reused unrefitted. L-Ww is
+The constant-flag control C is experiment 519's stored `F0z` (flag 0 everywhere), reused
+unrefitted. L-Ww is
 experiment 510's.
 
 Commands:
 
-- `check`: input checks (the flag lookup against `sites()`, M's forced-zero input against 519's `with_flag`).
-- `check-c`: run 519's stored F0z weights through this module's flagged test rows (CPU) and compare with 519's stored forecast.
+- `check`: input checks (the flag lookup against `sites()`, M's forced-zero input against 519's
+  `with_flag`).
+- `check-c`: run 519's stored F0z weights through this module's flagged test rows (CPU) and compare
+  with 519's stored forecast.
 - `pretrain`: pretrain M and P (5 folds x 2 seeds, skipping files that exist). Needs the GPU go.
 - `fit --arm A`: the weekly fine-tunes and forecasts of one arm. Needs the GPU go.
 - `assemble`: concatenate each arm's window forecasts into one table per arm, month, and seed.
-- `mass --arm A`: the mixture's mass below zero per row for an arm (`LWW` and `C` read stored weights; CPU).
+- `mass --arm A`: the mixture's mass below zero per row for an arm (`LWW` and `C` read stored
+  weights; CPU).
 
 ```bash
 export PYTHONPATH=<every folder under ml-experiments/, joined by colons>
@@ -60,7 +66,7 @@ SHARE_ZERO: Final = f519.Variant("FLAGGED", 0.0, False)
 
 
 def lookup(*, arm: str) -> np.ndarray:
-    """Return the 16-long flag per Primary index: 1 for MVA, 0 for MW (M); a fixed permutation of it (P); zeros (C)."""
+    """Return the 16-long flag per Primary index (M: 1 for MVA; P: permuted; C: zeros)."""
     table = prep.primaries().sort("primary")
     assert table["primary"].to_list() == list(range(16)), "Primary indices are not 0..15"
     assert table["site"].to_list() == data.sites(), "Primary table and sites() disagree"
@@ -88,7 +94,7 @@ def pretrained_file(*, arm: str, month: str, seed: int) -> Path:
 
 
 def check() -> None:
-    """Fail unless the flag lookup is right and M's forced-zero input equals experiment 519's constant flag 0."""
+    """Fail unless the flag lookup is right and a forced-zero input equals 519's flag 0."""
     m, p = lookup(arm="M"), lookup(arm="P")
     table = prep.primaries().sort("primary")
     print(dict(zip(table["site"], m.astype(int), strict=True)), flush=True)
@@ -281,7 +287,7 @@ def mixture_mass_below_zero(*, out: torch.Tensor, z0: torch.Tensor) -> torch.Ten
 
 
 def stored_model(*, arm: str, month: str, day: int, week: int, seed: int) -> tuple[Path, int]:
-    """Return a stored fine-tuned weights file and its input width for the arm (LWW: 510's, C: 519's F0z, else this one's)."""
+    """Return the arm's stored fine-tuned weights file and input width."""
     if arm == "LWW":
         return c.WORK_DIR / "models" / "hl90" / f"{month}_w{week}_s{seed}.pt", 37
     if arm == "C":

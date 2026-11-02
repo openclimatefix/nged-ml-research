@@ -1,7 +1,8 @@
 # ruff: noqa: E501
 """Figures of experiment 525, from the tables the scorer and `e00525_mass_report` stored.
 
-Figures: 1 the CRPS and q99 pinball contrasts with Bonferroni intervals; 2 the mass-below-zero ratio of M to C
+Figures: 1 the CRPS and q99 pinball contrasts with Bonferroni intervals; 2 the mass-below-zero
+ratio of M to C
 per fold and seed at D8, D12, and D22; 3 and 4 example forecasts (day-ahead and 10 days) at D8 and D10.
 Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
 """
@@ -68,11 +69,11 @@ def figures() -> None:
                 x=alt.X("low_bonferroni:Q", title=f"{metric} difference (points of capacity)"),
                 x2="high_bonferroni:Q",
             )  # ty: ignore[unresolved-attribute]
-            dot = base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(
+            dot = base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
                 x="difference:Q"
             )  # ty: ignore[unresolved-attribute]
             zero = (
-                alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+                alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
                 .mark_rule(color="black")
                 .encode(x="x:Q")
             )  # ty: ignore[unresolved-attribute]
@@ -98,7 +99,7 @@ def figures() -> None:
     base = alt.Chart(ratio.to_pandas()).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("cell:N", title=None), y=alt.Y("ratio:Q", title="Mass below zero, M divided by C")
     )
-    base.mark_point(filled=True, size=60, color=theme.DATA_BLUE).properties(
+    base.mark_point(filled=True, size=60, color=theme.DATA_BLUE).properties(  # ty: ignore[unresolved-attribute]
         width=200, height=180
     ).facet(column=alt.Column("site:N", title=None)).properties(  # ty: ignore[unresolved-attribute]
         title=alt.TitleParams(
@@ -155,13 +156,13 @@ def examples() -> None:
             for arm, f in one.items():
                 sub = f.filter(pl.col("day").is_between(*window)).to_pandas()
                 layers.append(
-                    alt.Chart(sub)
+                    alt.Chart(sub)  # ty: ignore[unresolved-attribute]
                     .mark_line(color=COLOURS[arm], strokeWidth=2)
                     .encode(x=x, y="q50:Q")
                 )  # ty: ignore[unresolved-attribute]
             act = actual.filter(pl.col("day").is_between(*window)).to_pandas()
             layers.append(
-                alt.Chart(act)
+                alt.Chart(act)  # ty: ignore[unresolved-attribute]
                 .mark_line(color="black", strokeWidth=1.5, strokeDash=[4, 3])
                 .encode(x=x, y="actual:Q")
             )  # ty: ignore[unresolved-attribute]
