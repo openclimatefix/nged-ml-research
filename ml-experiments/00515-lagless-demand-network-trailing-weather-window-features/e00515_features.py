@@ -332,7 +332,7 @@ def check(*, site: str = "D2") -> None:
             msg = "a window column depends on a later run"
             raise AssertionError(msg)
     dense = DenseWindows(row=row)
-    sample = table.filter(pl.col("diag_short_72h").not_()).sample(n=20_000, seed=0)
+    sample = table.filter(pl.col("diag_short_72h") == 0).sample(n=20_000, seed=0)
     era5 = dense.columns(
         origin_idx=f437.grid_of(us=sample["origin_us"].to_numpy()),
         valid_idx=f437.grid_of(us=sample["valid_us"].to_numpy()),
