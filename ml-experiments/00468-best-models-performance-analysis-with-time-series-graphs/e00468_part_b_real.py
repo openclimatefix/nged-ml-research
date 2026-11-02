@@ -181,7 +181,7 @@ def figure(*, number: int, ev: dict, sites: list[str], bounds: dict[str, tuple[i
     flagged = band.filter(pl.col("lag_real")).with_columns(day2=pl.col("day") + 1.0 / 48.0)
     strip = (
         alt.Chart(flagged if flagged.height else band.head(0).with_columns(day2=pl.col("day")))  # ty: ignore[unresolved-attribute]
-        .mark_rect(color=ocf.GREY_1, clip=True)
+        .mark_rect(color=ocf.GREY_3, clip=True)
         .encode(
             x=alt.X("day:Q", title=None, axis=None, scale=alt.Scale(domain=x_domain)),
             x2="day2:Q",

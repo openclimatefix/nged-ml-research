@@ -192,7 +192,7 @@ def figure_headline(*, rows: dict[str, pl.DataFrame]) -> None:
         )
         rule = (
             alt.Chart(pl.DataFrame({"x": [reference]}))
-            .mark_rule(strokeDash=[4, 3], color=theme.GREY_1, aria=False)
+            .mark_rule(strokeDash=[4, 3], color=theme.BLACK_1, aria=False)
             .encode(x=alt.X("x:Q", scale=alt.Scale(domain=[low, high], nice=False)))  # ty: ignore[unresolved-attribute]
         )
         panels.append(
@@ -263,7 +263,7 @@ def figure_by_fold(*, rows: dict[str, pl.DataFrame]) -> None:
         part = data.filter(pl.col("group") == group)
         zero = (
             alt.Chart(pl.DataFrame({"x": [0.0]}))
-            .mark_rule(strokeDash=[4, 3], color=theme.GREY_1, aria=False)
+            .mark_rule(strokeDash=[4, 3], color=theme.BLACK_1, aria=False)
             .encode(x=alt.X("x:Q", scale=alt.Scale(domain=[-bound, bound])))  # ty: ignore[unresolved-attribute]
         )
         dots = (
@@ -378,7 +378,7 @@ def figure_by_lead_day(*, rows: dict[str, pl.DataFrame]) -> None:
         if kind == "minus R":
             zero = (
                 alt.Chart(pl.DataFrame({"y": [0.0]}))
-                .mark_rule(color=theme.GREY_1, aria=False)
+                .mark_rule(color=theme.BLACK_1, aria=False)
                 .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
             )
             layers = zero + layers

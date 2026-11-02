@@ -116,7 +116,7 @@ def event_figure(*, site: str, month: str, onset: int, end: int, number: int) ->
             y="v:Q",
             color=alt.Color(
                 "series:N",
-                scale=alt.Scale(domain=domain, range=[theme.GREY_1, *COLOURS]),
+                scale=alt.Scale(domain=domain, range=[theme.DATA_GREEN, *COLOURS]),
                 legend=alt.Legend(title=None, orient="top"),
             ),
         )  # fmt: skip
@@ -191,7 +191,7 @@ def headline_figure() -> None:
         )  # fmt: skip
         zero = (
             alt.Chart(pl.DataFrame({"z": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
-            .mark_rule(color=theme.GREY_1)
+            .mark_rule(color=theme.BLACK_1)
             .encode(x="z:Q")
         )  # ty: ignore[unresolved-attribute]
         panels.append((zero + bars + points).properties(width=330, height=70, title=name))

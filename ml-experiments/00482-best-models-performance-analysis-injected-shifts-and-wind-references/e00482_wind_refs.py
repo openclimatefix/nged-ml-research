@@ -34,6 +34,7 @@ import e00303_common as c303  # noqa: E402  # ty: ignore[unresolved-import]
 import e00303_ens_final as ef  # noqa: E402  # ty: ignore[unresolved-import]
 import e00340_common as c340  # noqa: E402  # ty: ignore[unresolved-import]
 import e00347_s4_data as data347  # noqa: E402  # ty: ignore[unresolved-import]
+import e00482_svg_guard as guard  # noqa: E402  # ty: ignore[unresolved-import]
 import numpy as np  # noqa: E402
 import plotting.ocf_theme as ocf  # noqa: E402
 import polars as pl  # noqa: E402
@@ -226,6 +227,7 @@ def main() -> None:
     )
     (OUT / "png").mkdir(exist_ok=True)
     chart.save(OUT / "wind_error_by_lead_with_references.svg")
+    guard.assert_no_invisible_marks(svg_path=OUT / "wind_error_by_lead_with_references.svg")
     chart.save(OUT / "png" / "wind_error_by_lead_with_references.png", scale_factor=1.5)
     rng = np.random.default_rng(0)
     level = 1 - 0.05 / len(NAMES)

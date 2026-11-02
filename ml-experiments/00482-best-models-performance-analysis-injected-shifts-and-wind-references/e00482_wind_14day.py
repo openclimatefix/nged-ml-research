@@ -30,6 +30,7 @@ import altair as alt  # noqa: E402
 import e00347_s4_data as data347  # noqa: E402  # ty: ignore[unresolved-import]
 import e00461_common as common461  # noqa: E402  # ty: ignore[unresolved-import]
 import e00461_wind_fit as wind_fit  # noqa: E402  # ty: ignore[unresolved-import]
+import e00482_svg_guard as guard  # noqa: E402  # ty: ignore[unresolved-import]
 import numpy as np  # noqa: E402
 import plotting.ocf_theme as ocf  # noqa: E402
 import polars as pl  # noqa: E402
@@ -143,6 +144,7 @@ def main() -> None:
             c = chart(run=run, farm=farm, kind=kind)
             name = f"wind_14day_{kind}_{farm.replace(' ', '_')}"
             c.save(OUT / f"{name}.svg")
+            guard.assert_no_invisible_marks(svg_path=OUT / f"{name}.svg")
             c.save(OUT / "png" / f"{name}.png", scale_factor=1.5)
             cover90 = float(((run["actual"] >= run["q05"]) & (run["actual"] <= run["q95"])).mean())  # ty: ignore[invalid-argument-type]
             rows.append(dict(farm=farm, kind=kind, half_hours=run.height, cover90=cover90,
