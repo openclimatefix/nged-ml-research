@@ -210,7 +210,7 @@ def width_table(*, table: pl.DataFrame) -> pl.DataFrame:
             for arm in arms:
                 records.append(
                     {"set": name, "band": band, "arm": arm, "n": sub.height,
-                     "w90": float(sub[f"{arm}__w90"].mean()), "w98": float(sub[f"{arm}__w98"].mean())}
+                     "w90": float(sub[f"{arm}__w90"].mean()), "w98": float(sub[f"{arm}__w98"].mean())}  # ty: ignore[invalid-argument-type]
                 )  # fmt: skip
     return pl.DataFrame(records)
 
