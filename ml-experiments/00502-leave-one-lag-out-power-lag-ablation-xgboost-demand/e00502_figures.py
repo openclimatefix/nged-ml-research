@@ -78,7 +78,7 @@ def sweep_figure() -> None:
     chart = (
         alt.Chart(data.to_pandas())
         .mark_line(point=True)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "hours:Q",
                 title="Length of the injected step, ending at the forecast origin (hours)",
@@ -146,8 +146,8 @@ def contrast_figure() -> None:
         yOffset="rows:N",
     )
     chart = (
-        base.mark_rule().encode(x="lower:Q", x2="upper:Q")
-        + base.mark_point(filled=True, size=60).encode(
+        base.mark_rule().encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
+        + base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("difference:Q", title="CRPS minus all-three-lags CRPS (points of capacity)")
         )
     ).properties(

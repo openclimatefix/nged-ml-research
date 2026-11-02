@@ -71,8 +71,8 @@ take_home_message: >-
   move the median forecast (0.00 of the step, against 0.06 with all three lags), but a
   7-day step still moves it by 0.29, and the score loss is +0.049 points of capacity. Without the
   week lag, the 7-day leak falls from 0.33 to 0.22, but a step of 24 hours to 5 days leaks 0.20 to
-  0.22 and a stuck meter moves the median by 2.2 points of capacity (0.8 with all three lags). Interim and
-  unaudited, two Primaries and two refit dates for the leak figures.
+  0.22 and a stuck meter moves the median by 2.2 points of capacity (0.8 with all three lags).
+  Interim and unaudited, two Primaries and two refit dates for the leak figures.
 advice:
   - >-
     Do not drop the week lag to reduce the leak of short events or bad data: it raises both (24
