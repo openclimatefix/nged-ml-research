@@ -86,7 +86,7 @@ def curve() -> None:
                         "arm": arm,
                         "age": age,
                         "n": part.height,
-                        "crps": float(part[f"{arm}__{age}"].mean()),
+                        "crps": part[f"{arm}__{age}"].mean(),
                     }
                 )
     out = pl.DataFrame(records)

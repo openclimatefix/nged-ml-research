@@ -24,8 +24,7 @@ hypothesis: >-
   Refitting the lag-free demand network more often than weekly (twice weekly or daily) closes more
   of the 0.13 to 0.16 point gap that experiment 510's best arm L-Ww (weekly, 90-day half-life) left
   to K2-S1, because the gain from weekly over monthly refits grew through the month and so is a
-  staleness effect. A 30-day or 60-day half-life closes part of the gap at the price of a larger
-  leak of an injected load shift. Pretraining on ERA5 and CAMS rows together with ENS rows,
+  staleness effect. A 30-day or 60-day half-life closes part of the gap but raises the leak of an injected load shift. Pretraining on ERA5 and CAMS rows together with ENS rows,
   with a source flag, separates the two jobs of the network (learning the ERA5-to-ENS difference and
   learning recent level shifts) and so improves the weekly fine-tune.
 prediction: >-
@@ -56,26 +55,26 @@ best_arm: >-
   at the six signed-MW Primaries, against 4.920 and 3.555 for L-Ww and 4.763 and 3.423 for K2-S1.
 headline: >-
   Refitting the lag-free network every day scored 0.065 points better than weekly at the eight and
-  0.063 better at the six (Bonferroni intervals exclude zero), and twice a week scored 0.036 and
-  0.041 better. Half-lives of 30 and 60 days did not beat 90 days, and the mixed ERA5, CAMS, and ENS
+  0.061 better at the six (Bonferroni intervals exclude zero), and twice a week scored 0.036 and
+  0.041 better. Half-lives of 30 and 60 days did not reach the -0.05 bar against 90 days, and the mixed ERA5, CAMS, and ENS
   pretraining scored worse (0.062 and 0.045 behind). The daily refit stays 0.091 (eight) and 0.071
   (six) behind K2-S1.
 lessons: >-
-  A model gets about 0.02 points of CRPS worse for each day since its refit, so the gain from a
+  A lag-free demand network gets about 0.02 points of CRPS worse for each day since its refit, so the gain from a
   daily refit is mostly freshness. The shorter half-life gives no gain and raises the injected-shift
   leak from 6.1 to 9.5 points of capacity. A daily warm start scored worse than a daily restart and
   went wrong in Christmas week. The daily refit leaks an injected shift most on the next day (7.2
   points) and less each day after (3.0 to 3.4 points by days 5 and 6).
 take_home_message: >-
   Refitting the lag-free network every day instead of every week improves its forecast by about 0.065
-  points of CRPS (about 1.3%), enough to pass the porting rule we set but small, and it leaves the
+  points of CRPS (about 1.3%), enough to pass the point-estimate, interval, q99, and cold-night bars of the porting rule but small, with the injected-shift leak 1.1 points above the weekly network's on the day after a bad block, and it leaves the
   network 0.07 to 0.09 points behind the lagged network K2-S1. A shorter recency window and the
   mixed ERA5, CAMS, and ENS pretraining do not help. A daily refit needs one fine-tune of about 3
   seconds a day.
 advice:
   - >-
     If the lag-free network is used in the first release, refit it daily rather than weekly. The
-    gain is 0.065 (eight) and 0.063 (six) points with intervals that exclude zero, at about 3
+    gain is 0.065 (eight) and 0.061 (six) points with intervals that exclude zero, at about 3
     seconds of fine-tuning a day (Results, figure 1).
   - >-
     Keep the 90-day recency half-life; do not shorten it to 30 or 60 days, which gave no gain and a
@@ -92,13 +91,13 @@ adopted_in: none
 ---
 
 **Refitting the lag-free demand network every day scored 0.065 points of CRPS better than refitting
-it every week at the eight and 0.063 better at the six (lower is better; Bonferroni intervals
-exclude zero), and refitting twice a week scored 0.036 and 0.041 better.** Interim and unaudited
-until the reviews below have run. The daily refit leaves the network 0.091 points (eight) and 0.071
-points (six) behind K2-S1, the network that reads lagged power, so it closes about 40% of the weekly
-gap of 0.156 and 0.132. A 30-day or 60-day recency half-life did not beat the 90-day half-life, and
-the mixed pretraining on ERA5, CAMS, and ENS rows scored worse than the ERA5 and CAMS pretraining of
-experiment 510.
+it every week at the eight and 0.061 better at the six (lower is better; Bonferroni intervals
+exclude zero), and refitting twice a week scored 0.036 and 0.041 better.**  The daily refit leaves
+the network 0.091 points (eight) and 0.071 points (six) behind K2-S1, the network that reads lagged
+power, so it closes 42% (eight) and 46% (six) of the weekly network's gap of 0.156 and 0.132.
+Neither a 30-day nor a 60-day recency half-life reached the -0.05 bar against the 90-day half-life,
+and the mixed pretraining on ERA5, CAMS, and ENS rows scored worse than the ERA5 and CAMS
+pretraining of experiment 510.
 
 We asked whether refitting more often than weekly, or changing the recency weight, or pretraining on
 ENS rows as well, closes more of the gap to K2-S1. All arms are lag-free, restart each fine-tune
@@ -108,10 +107,10 @@ signed-MW Primaries. Headline scores use rows with no labelled event. Each model
 origins from its own cutoff to the next cutoff of the same cadence.
 
 Verdict: partly supported. Prediction P1 held: L-1d beat L-3d, which beat L-Ww, and L-1d ended 0.07
-to 0.09 behind K2-S1, inside the predicted 0.05 to 0.12 (the L-3d gain of 0.036 and 0.041 was
-inside the predicted 0.03 to 0.08 at the six and just above it at the eight). P2 held: L-Ww-30 did
-not beat L-Ww and its leak was larger. P3 failed: L-mix scored worse than L-Ww by 0.06 and 0.05,
-which is outside the predicted "less than 0.05 better".
+to 0.09 behind K2-S1, inside the predicted 0.05 to 0.12 (the L-3d gains of 0.036 and 0.041 are
+inside the predicted 0.03 to 0.08). P2 held: L-Ww-30 did not beat L-Ww and its leak was larger. P3
+failed: L-mix scored worse than L-Ww by 0.06 and 0.05, a result outside the predicted "less than
+0.05 better".
 
 ## Figures
 
@@ -150,25 +149,27 @@ which is outside the predicted "less than 0.05 better".
 - **Absolute CRPS (eight / six), five folds, two seeds.** L-Ww 4.920 / 3.555; L-3d 4.883 / 3.513;
   L-1d 4.854 / 3.493; L-Ww-30 4.954 / 3.538; L-Ww-60 4.917 / 3.535; L-mix 4.981 / 3.599; K2-S1 4.763
   / 3.423; A-pool 4.682 / 3.457.
-- **Paired contrasts against L-Ww (Bonferroni interval, 28 CRPS tests).** L-3d -0.036 [-0.058,
-  -0.017] eight, -0.041 [-0.073, -0.020] six. L-1d -0.065 [-0.094, -0.039] eight, -0.063 [-0.101,
-  -0.030] six. L-Ww-30 +0.035 [-0.010, +0.082] eight, -0.016 [-0.055, +0.021] six. L-Ww-60 -0.003
-  [-0.032, +0.026] eight, -0.020 [-0.039, -0.001] six. L-mix +0.062 [-0.013, +0.145] eight, +0.045
-  [+0.009, +0.083] six. L-1d minus L-3d -0.029 [-0.051, -0.009] eight, -0.020 [-0.043, -0.002] six.
-  The minimum detectable effect with two seeds is 0.164 (eight) and 0.123 (six), experiment 510's
-  values, so every gain here is below it: the intervals exclude zero because the contrasts are
-  paired on the same rows, but a gain "of at least 0.05" is not established.
-- **Gap to K2-S1 (unadjusted 95% block interval).** L-1d +0.091 [+0.017, +0.168] eight, +0.071
-  [+0.007, +0.136] six; L-Ww +0.156 and +0.132. No arm is within noise of K2-S1.
+- **Paired contrasts against L-Ww (Bonferroni interval, corrected for 56 tests).** L-3d -0.036
+  [-0.058, -0.017] eight, -0.041 [-0.071, -0.019] six. L-1d -0.065 [-0.096, -0.038] eight, -0.061
+  [-0.104, -0.028] six. L-Ww-30 +0.035 [-0.010, +0.079] eight, -0.016 [-0.055, +0.022] six. L-Ww-60
+  -0.003 [-0.032, +0.025] eight, -0.020 [-0.039, -0.001] six. L-mix +0.062 [-0.015, +0.148] eight,
+  +0.045 [+0.009, +0.081] six. L-1d minus L-3d -0.029 [-0.050, -0.009] eight, -0.020 [-0.041,
+  -0.002] six. The minimum detectable effect with two seeds is 0.164 (eight) and 0.123 (six),
+  experiment 510's values, so every gain here is below it: the intervals exclude zero because the
+  contrasts are paired on the same rows, but a gain "of at least 0.05" is not established.
+- **Gap to K2-S1 (unadjusted 95% block interval).** L-1d +0.091 [+0.012, +0.168] eight, +0.071
+  [+0.005, +0.135] six; L-Ww +0.156 and +0.132. The unadjusted intervals exclude zero, but the
+  Bonferroni intervals of L-1d and L-3d against K2-S1 include zero at both groups ([-0.039, +0.216]
+  eight for L-1d), so the data do not rule out that the daily refit reaches K2-S1.
 - **Decision rule for the daily refit.** The point estimate and the Bonferroni interval pass at both
   groups. q99 pinball loss is 0.286 against 0.287 (eight) and 0.183 against 0.184 (six), inside
-  +0.02. Cold winter nights: L-1d minus L-Ww -0.124 [-0.178, -0.069] eight, -0.060 [-0.106, -0.016]
+  +0.02. Cold winter nights: L-1d minus L-Ww -0.124 [-0.182, -0.069] eight, -0.060 [-0.103, -0.017]
   six, so no worse. The injected-shift leak is a reported trade-off (below). Twice weekly does not
   reach the -0.05 point estimate. L-Ww-30 and L-Ww-60 fail the rule, and L-mix is worse.
-- **Horizon bands, L-1d minus L-Ww (eight / six).** Day 1 -0.101 / -0.099; days 2 to 3 -0.087 / (see
-  slices.csv); days 4 to 10 -0.053 / -0.054; the 12 to 36 hour band -0.090 / -0.077. The gain is
-  largest on the first day but reaches days 4 to 10, so the daily refit's new rows help beyond the
-  short leads they reach directly.
+- **Horizon bands, L-1d minus L-Ww (eight / six).** Day 1 -0.101 / -0.099; days 2 to 3 -0.087 /
+  -0.068; days 4 to 10 -0.053 / -0.054; the 12 to 36 hour band -0.090 / -0.077. The gain is largest
+  on the first day but reaches days 4 to 10, so the daily refit's new rows help beyond the short
+  leads they reach directly.
 - **Staleness curve (figure 2).** CRPS rises about 0.02 points per day of model age in every arm
   (L-1d at the eight: 4.917 at age 0 to 5.062 at age 7). The curve is on the origins whose age-7
   model exists in every fold, so its levels are higher than the headline. Experiment 510's L-M minus
@@ -177,26 +178,33 @@ which is outside the predicted "less than 0.05 better".
 - **Injected-shift leak (one seed, five folds, both signs; descriptive).** L-1d: 7.2 points of
   capacity on the day after the block, 5.4, 5.1, 4.1, 3.2, 3.0, and 3.4 on the following days.
   L-Ww-30: 9.5, against 6.1 for experiment 510's L-Ww (range across folds 3.4 to 14.5). The weekly
-  L-Ww-30 leaks 3.4 points more than L-Ww, so a shorter half-life costs robustness. The daily
-  refit's leak is larger the day after a bad block and fades within about 5 days.
-- **Real events and holidays.** Christmas week 2025, L-1d minus L-Ww: -0.162 [-0.266, -0.066] eight,
-  -0.144 [-0.249, -0.044] six (noise floor 0.26 and 0.27). Both are below the noise floor. 1 to 14
-  January 2026: -0.069 eight, -0.104 six.
-- **Tails.** q01 and q99 pinball loss and coverage are within 0.002 of L-Ww at both groups for L-1d
-  and L-3d; see absolute.csv in the private data folder. Coverage of the 99% quantile is 0.995
-  (eight) and 0.991 (six).
+  L-Ww-30 leaks 3.4 points more than L-Ww, so a shorter half-life makes the forecast follow an
+  injected shift more closely. The daily refit's leak is larger the day after a bad block and fades
+  within about 5 days.
+- **Real events and holidays.** Christmas week 2025, L-1d minus L-Ww: -0.162 [-0.261, -0.070] eight,
+  -0.144 [-0.244, -0.045] six. The plan's noise floor for one Christmas is 0.27 at the eight and
+  0.26 at the six; both differences are smaller than it. The slice holds the 22 to 31 December
+  target half-hours with no labelled event (22,580 rows at the six); the unsliced `xmas_six` set in
+  contrasts.csv (28,800 rows) gives -0.234. For 1 to 14 January 2026 the differences are -0.069
+  [-0.119, -0.023] (eight) and -0.104 [-0.171, -0.029] (six).
+- **Tails.** q01 and q99 pinball loss and coverage are within 0.003 of L-Ww at both groups for L-1d
+  and L-3d (largest gap: six-group q99 coverage, 0.9913 against 0.9891); see absolute.csv in the
+  private data folder. Coverage of the 99% quantile is 0.995 (eight) and 0.991 (six).
 - **Avoidable-curtailment cost at the six, f = 0.9 / 0.75 / 0.5.** L-Ww 0.95 / 5.96 / 22.26; L-1d
   0.73 / 5.47 / 21.43; K2-S1 1.90 / 8.43 / 26.94; `manual_heuristic` 2.02 / 12.88 / 37.79. L-1d
   minus `manual_heuristic` is -1.28 [-3.54, -0.07], -7.41 [-15.51, -2.17], and -16.36 [-28.27,
   -8.12]. L-1d minus K2-S1 is -1.17 [-3.30, -0.02] at f = 0.9 and includes zero at the other two.
-- **D15 and D18 (report only).** CRPS L-Ww 11.19, L-3d 11.00, L-1d 10.88, K2-S1 11.53.
+- **D15 and D18 (report only).** CRPS L-Ww 11.19, L-3d 11.00, L-1d 10.88, L-Ww-30 10.70, K2-S1
+  11.53, A-pool 10.65. L-Ww-30 and A-pool beat L-1d there, and L-1d is 0.17 behind A-pool at the
+  eight on the main rows.
 - **Warm start (L-1d-warm, seed 0, report-only).** One epoch from the previous day's weights scored
   0.018 [-0.013, +0.050] (eight) and 0.032 [+0.008, +0.057] (six) worse than a daily restart on seed
-  0, and +0.27 / +0.20 worse in Christmas week, so errors accumulate. Restart each day.
+  0, and +0.27 / +0.20 worse in Christmas week, which suggests errors accumulate in a warm start.
+  Restart each day.
 - **L-mix.** The source flag is a 38th input; arm A already has `lead` and `lead_sqrt` inputs and
   the ERA5 and CAMS pseudo-runs carry real leads, so no lead input was added. Pretraining took 31 to
-  32 seconds per network. The mixed pretraining scored worse at both groups, so the daily repeat
-  (L-mix-1d) was not run.
+  32 seconds per network. The mixed pretraining scored worse at the six (the eight interval includes
+  zero), so the daily repeat (L-mix-1d) was not run.
 - **Not run.** L-1d-oldPT, because it is optional and experiment 494's PretrainOnce arm already
   tests stale pretraining.
 
@@ -209,8 +217,9 @@ which is outside the predicted "less than 0.05 better".
 - **Leak check.** Printed before any fit: 0 rows past the valid-time or origin cut for every cutoff
   and half-life, and the scored windows tile each month and start at their own cutoff. The reused
   day-0 weights reproduce experiment 510's forecast exactly (maximum difference 0.0).
-- **Reviews.** One fresh Sonnet code review before the first fit. Results, write-up, and prose
-  reviews: pending when this was written; this page is interim until they have run.
+- **Reviews.** One fresh Sonnet code review before the first fit, and one fresh Sonnet review of the
+  results, the numbers, and the prose, whose findings are applied in this page. L-1d seed 1 is not
+  scored alone: the headline pools both seeds, and the plan's separate replication was not computed.
 
 ## Caveats
 
@@ -223,8 +232,8 @@ which is outside the predicted "less than 0.05 better".
   events, and the event slices undercount.
 - **Staleness.** The staleness curve is on a subset of origins and mixes the effect of age with the
   weather of the later weeks.
-- **Stress run.** One seed and a fixed block; the leak differs 3-fold across folds, so the 1-point
-  limit of the plan cannot be tested.
+- **Stress run.** One seed and a fixed block; the leak differs threefold across folds, so the
+  1-point limit of the plan cannot be tested.
 
 ## What to try next
 

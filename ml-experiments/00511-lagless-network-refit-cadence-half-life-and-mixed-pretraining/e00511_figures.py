@@ -58,12 +58,12 @@ def _interval_chart(
         part = t.filter(pl.col("group") == label).to_pandas()
         base = alt.Chart(part).encode(y=alt.Y("arm:N", sort=arms, title=None))  # ty: ignore[unresolved-attribute]
         colour = alt.Color("arm:N", scale=_scale(arms=arms), legend=None)
-        bar = base.mark_rule(strokeWidth=3).encode(
+        bar = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low_bonferroni:Q", title=x_title), x2="high_bonferroni:Q", color=colour
         )  # ty: ignore[unresolved-attribute]
         dot = base.mark_point(filled=True, size=70).encode(x="difference:Q", color=colour)  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black")
             .encode(x="x:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -152,14 +152,14 @@ def figure_horizon() -> None:
                 legend=alt.Legend(orient="top", title=None, columns=2),
             ),
         )  # ty: ignore[unresolved-attribute]
-        bar = base.mark_rule(strokeWidth=3).encode(
+        bar = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low:Q", title="CRPS minus L-Ww (points of capacity)"),
             x2="high:Q",
             yOffset="arm:N",
         )
-        dot = base.mark_point(filled=True, size=60).encode(x="value:Q", yOffset="arm:N")
+        dot = base.mark_point(filled=True, size=60).encode(x="value:Q", yOffset="arm:N")  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black")
             .encode(x="x:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -197,7 +197,7 @@ def figure_stress() -> None:
         }
     ).to_pandas()
     rules = (
-        alt.Chart(marks)
+        alt.Chart(marks)  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3])
         .encode(y="y:Q", color=alt.Color("arm:N", legend=alt.Legend(orient="top", title=None)))
     )  # ty: ignore[unresolved-attribute]
