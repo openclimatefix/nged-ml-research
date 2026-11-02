@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 r"""S2-0 CPU gate of experiment 524: stored L0PT weights scored on ENS rows with no fine-tune.
 
 The stored pretrained networks (experiment 448's `L0PT` files, and experiment 510's own for 2025-12)

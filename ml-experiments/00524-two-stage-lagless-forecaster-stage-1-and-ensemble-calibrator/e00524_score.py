@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Score experiment 524's arms with experiment 510's scorer (experiment 470's machinery underneath).
 
 The S2-0 gate: the stored L0PT weights with no fine-tune against L-Ww, L-W, L-M, and K2-S1, on
