@@ -166,6 +166,7 @@ nav:
           - Summary: ml-experiments/themes/production-reference-and-best-guess/index.md
           - Experiments: ml-experiments/themes/production-reference-and-best-guess/experiments.md
           - Research plan: ml-experiments/themes/production-reference-and-best-guess/plan.md
+          - Neural simplification series: ml-experiments/themes/production-reference-and-best-guess/neural-simplification-series.md
       - Retraining and training history:
           - Summary: ml-experiments/themes/retraining-and-training-history/index.md
           - Experiments: ml-experiments/themes/retraining-and-training-history/experiments.md

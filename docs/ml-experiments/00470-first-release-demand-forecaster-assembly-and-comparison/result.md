@@ -300,7 +300,8 @@ the mixture parameters. The recovered parameters reproduced the stored quantiles
   and 457 is July 2026, which is held back for a finalist. Scoring July 2026 needs the monthly refit
   with 24 months of training, the arm A pipeline of experiment 425 (`e00425_fit.py`), and the scorer
   of this experiment on the new rows. The maintainer can run it when July 2026 lands. That scoring
-  is not a gate here.
+  is not a gate here. Experiment 470 scored 9 hours of valid times on 2026-07-01, so July 2026 is
+  not fully unused; July scoring in later work starts at 2026-07-02 00:00.
 - **Interval width.** The bootstrap resamples one forecast day per block. Each target half-hour
   appears under up to 10 consecutive origin days, so neighbouring blocks share weather and actuals.
   The intervals are therefore probably too narrow.
