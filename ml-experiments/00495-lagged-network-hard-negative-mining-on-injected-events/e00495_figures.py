@@ -271,9 +271,13 @@ def figure_events(*, best: str) -> None:
 def figure_hard_set() -> None:
     """Figure 5: share of training rows that are hard, by lead band and by size of the lag step."""
     frame = pl.read_parquet(WORK / "hard" / "2026-06_s0.parquet").with_columns(
-        lead=pl.col("lead_hours").cut(
-            [24.0, 48.0, 120.0], labels=["0-24", "24-48", "48-120", "120+"]
-        ),
+        lead=pl.when(pl.col("lead_hours") <= 24.0)
+        .then(pl.lit("0-24"))
+        .when(pl.col("lead_hours") <= 48.0)
+        .then(pl.lit("24-48"))
+        .when(pl.col("lead_hours") <= 120.0)
+        .then(pl.lit("48-120"))
+        .otherwise(pl.lit("120+")),
         depth=pl.when(~pl.col("corrupted"))
         .then(pl.lit("no lag in an event"))
         .when(pl.col("step").abs() < 0.02)
