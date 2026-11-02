@@ -29,14 +29,15 @@ prediction: >-
   Written before any score is read. P1: the flag does not move CRPS at either group, so the
   paired interval of flag minus constant flag contains zero at the six and at the eight (a flag
   duplicates information the embedding may already carry); the page words this as "not shown to move
-  CRPS (interval a to b)". P2: at D8, D12, and D22 (the only ones of the eight whose stored q01 falls below
-  zero in a proxy check, which the first inference-only step re-verifies) the flag cuts the
+  CRPS (interval a to b)". P2: at D8, D12, and D22 (the only ones of the eight whose stored q01 falls
+  below zero in a proxy check, which the first inference-only step re-verifies) the flag cuts the
   mixture's probability mass below zero by at least half against the paired control C: the mean mass
   of M divided by that of C is at most 0.5 in both seeds in at least 4 of 5 folds. The stored L-Ww
   mass is shown for scale only. P2 is tested per Primary, with per-fold values, and is untestable at
   a Primary whose baseline mass is below 0.1% of rows. P3: the flag
   moves q99 pinball loss by less than 0.01 at both groups (experiment 519's flag moved it by 0.011
-  to 0.012, so a larger move falsifies P3). P4 is description, not a test: at D10 (the one signed-MW Primary with
+  to 0.012, so a larger move falsifies P3). P4 is description, not a test: at D10 (the one signed-MW
+  Primary with
   reverse flow on 15 of 117 days since 2025-10) the flag is 0 in both M and C, so any difference
   between them comes from interference through shared weights; the page reports the share of
   forecast medians and q05 below zero on those days. P5 (falsifier): M is worse than C at either
@@ -126,7 +127,8 @@ read it.**
   signs.
 - **Compute.** About 0.4 GPU-hours: 20 pretrains (arms M and P x 5 folds x 2 seeds, 31 to 46 s
   each) and 100 weekly fine-tunes (2 arms x 5 folds x 2 seeds x 5 weeks, about 5 s each) plus the
-  month builds; C costs nothing because 519 stored it. One GPU process under 8 GB (`MemoryMax=8G`, `OMP_NUM_THREADS=1`). No fit starts before
+  month builds; C costs nothing because 519 stored it. One GPU process under 8 GB (`MemoryMax=8G`, `OMP_NUM_THREADS=1`).
+  No fit starts before
   the manager's "GPU go". Experiment 510's L-Ww forecasts and weights and 519's F0 and F0z are reused,
   which saves 10 pretrains and 50 fine-tunes. Code changes: a 16-long flag lookup in `sites()` order
   (asserted), a `with_flag` variant that appends `lookup[p]` in pretraining, validation, `GpuMonth`,
