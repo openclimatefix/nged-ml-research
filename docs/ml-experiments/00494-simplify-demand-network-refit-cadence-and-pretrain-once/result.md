@@ -58,55 +58,73 @@ metric: >-
   avoidable-curtailment cost at f = 0.9, 0.75, and 0.5 at the signed-MW six.
 verdict: partly supported
 best_arm: >-
-  PO (pretrained once at the 2025-07 cut, fine-tuned each month): CRPS 4.690 points at the eight
-  and 3.484 at the signed-MW six, against 4.720 and 3.486 for K2.
+  PretrainOnce (pretrained once at the 2025-07 cut, fine-tuned each month): CRPS 4.690 points at the
+  eight MVA-only Primaries and 3.484 at the six signed-MW Primaries, against 4.720 and 3.486 for the
+  fresh two-seed pool (K2).
 headline: >-
-  Pretraining once and fine-tuning each month matches the fresh two-seed pool (eight -0.030, six
-  -0.002 points; both inside the limits, so equivalent). A network 3 months old loses 0.067 points
-  at the eight (0.023 to 0.109 Bonferroni, not shown equivalent within 0.086) and 0.022 at the six
-  (equivalent within 0.170); a network 6 months old loses 0.069 and 0.018.
+  Over five scored months, pretraining once and fine-tuning each month scored within the limits of
+  the fresh two-seed pool (K2): -0.030 points at the eight MVA-only Primaries and -0.002 at the six
+  signed-MW Primaries. A network 3 months old scored 0.067 points worse at the eight (Bonferroni
+  interval 0.023 to 0.109, not shown equivalent within 0.086) and 0.022 worse at the six (within
+  0.170); a network 6 months old scored 0.069 and 0.018 worse.
 lessons: >-
-  The loss from an older network is as large at 3 months as at 6 or 11 months, and it differs by
-  fold (from -0.13 to +0.21 at the eight), so with five folds the interval across folds is wide and
-  the cadence question stays open. Reusing one pretraining run does not cost skill.
+  The loss from an older network shows no clear growth with age in five folds (0.067 at 3 months,
+  0.069 at 6, and 0.094 for 6 months against 0.059 for 3 months on the three folds with stored
+  networks), and it differs by fold (from -0.13 to +0.21 at the eight), so with five folds the
+  interval across folds is wide and the cadence question stays open. In these five months, reusing
+  one pretraining run lowered no score by more than 0.03 points.
 take_home_message: >-
-  The demand network does not need ERA5-and-CAMS pretraining at every refit: pretraining once and
-  fine-tuning each month scores the same as the full monthly refit, and would drop 46 of the 80 GPU
-  seconds each seed-refit takes. Refitting less often is not shown to be safe: a network that is
-  3 months old scored about 0.07 CRPS points worse at the MVA-only eight than a fresh one, with an
-  interval across folds too wide to say how much worse. Keep monthly refits until a larger test
-  says otherwise.
+  In five scored months, the demand neural network pretrained once and fine-tuned each month scored
+  within 0.03 points of the same network pretrained at every refit, and would drop about 42 of the
+  80 GPU seconds that refitting one network takes. A network refitted 3 months earlier scored about
+  0.07 points worse at the eight MVA-only Primaries than a freshly refitted one, with an interval
+  across months too wide to say how much worse. Whether to refit less often than monthly is
+  therefore open until a larger test.
 advice:
   - >-
-    Pretrain the demand network once and fine-tune it at each monthly refit, instead of pretraining
-    at every refit; it matched the fresh two-seed pool at both groups (C3, figure 1).
+    Consider pretraining the demand network once and fine-tuning it at each monthly refit, instead
+    of pretraining at every refit; it matched the fresh two-seed pool at both groups (Results table,
+    figure 1).
   - >-
-    Keep monthly fine-tuning for the demand network; a network 3 months old lost 0.067 points at the
-    eight and the loss did not grow at 6 months, so test any cadence on more than five folds (C1,
-    figure 2).
+    Test any refit cadence slower than monthly on more than five folds: a network 3 months old
+    scored 0.067 points worse at the eight and the loss showed no clear growth at 6 months (Results
+    table, figure 2).
   - >-
     Report an interval across folds beside the origin-day interval whenever the arms differ by which
-    network was fitted, because the origin-day interval treats each fitted network as fixed (C1).
+    network was fitted, because the origin-day interval treats each fitted network as fixed (Results
+    table).
 production_status: candidate
 adopted_in: none
 ---
 
-**Pretraining the demand network once and fine-tuning it at each monthly refit forecasts as well as
-pretraining at every refit, and it saves 46 of the 80 GPU seconds that each seed-refit takes.
-Refitting less often is not shown to be safe: a network 3 months old scored about 0.07 CRPS
-points worse at the MVA-only eight than a freshly refitted one, and the five folds are too few to
-say how much worse.** Keep monthly refits for now, and test any longer cadence on more folds.
+**In five scored months, pretraining the demand neural network once and fine-tuning it each
+month scored within 0.03 points of pretraining it at every refit (a lower score is better), and
+would save about 42 of the 80 GPU seconds that refitting one network takes (46 per refit, less the
+one yearly pretraining). A network refitted 3 months earlier scored about 0.07 points worse than a
+freshly refitted one at the eight Primary substations that report only apparent power, and five
+months are too few to say how much worse.** Whether to refit less often than monthly is therefore
+open until a larger test.
 
 We asked whether the neural network that forecasts demand at 16 Primary substations could be
-simplified. One change was to refit it every 3 or 6 months instead of every month. The other was
-to run the ERA5-and-CAMS pretraining once and then only fine-tune each month. We scored a network
-fitted 3 months earlier, one fitted 6 months earlier, and a network fine-tuned from the
-pretraining of 2025-07. We compared each with experiment 425's fresh pool of 2 networks on the same
-5 months and rows. Points are points of effective capacity; "the eight" is the 8 MVA-only
-Primaries and "the six" the 6 signed-MW Primaries.
+simplified. A refit has two stages: pretraining on estimates of past weather (ERA5 and CAMS), then
+fine-tuning on archived ECMWF ensemble (ENS) forecasts. One change was to refit every 3 or 6
+months instead of every month. The other was to pretrain once and fine-tune each month. We scored
+three arms against the average of two neural networks (trained from different random seeds, each
+refitted in the scored month; experiment 425's arm A). All four were scored on the same
+half-hours of the same five months. The score is the continuous ranked probability score (CRPS),
+in points of effective capacity, a percentage of each Primary's capacity. The 16 Primaries are 8
+that report only apparent power in megavolt-amperes (MVA), called "the eight"; 6 that report
+signed megawatts, called "the six"; and D15 and D18, which are reported separately.
 
-Verdict: partly supported. Pretraining once is equivalent to the fresh pool at both groups. The
-older networks are equivalent at the six but not shown equivalent at the eight.
+| Arm | What it is |
+|---|---|
+| K2 | The fresh pool: two neural networks, each pretrained and fine-tuned in the scored month. |
+| Stale3, Stale6 | Two networks refitted 3 or 6 months before the scored month. |
+| PretrainOnce | Two networks fine-tuned each month from pretraining done once, with data to 2025-07. |
+
+Verdict: partly supported. In these five months, PretrainOnce is equivalent to K2 at both groups,
+meaning its upper Bonferroni bound lies inside the limit of 0.086 points at the eight and 0.170 at
+the six. Stale3 and Stale6 are equivalent at the six but not shown equivalent at the eight.
 
 ## Figures
 
@@ -127,9 +145,9 @@ limits](figure_1_headline.svg)
 
 ## Results
 
-- **Arms.** K2 is the quantile average of seeds 0 and 1 of experiment 425's arm A (fresh pretraining
-  and fine-tuning in the scored month). Stale3 and Stale6 are experiment 425's arm A networks fitted
-  3 and 6 months before the scored month. PO fine-tunes each scored month from the pretraining of
+- **Arms.** (PO in the tables below is PretrainOnce.) K2 is the quantile average of seeds 0 and 1
+  of experiment 425's arm A (fresh pretraining and fine-tuning in the scored month). Stale3 and
+  Stale6 are experiment 425's arm A networks fitted 3 and 6 months before the scored month. PO fine-tunes each scored month from the pretraining of
   the 2025-07 cut. Stale11 is the single fold 2026-06 from the 2025-07 networks. Seeds 0 and 1;
   widening 1.15; rows of experiment 470 (`experiment_470_intersection_v1`); folds 2025-10, 2025-12,
   2026-01, 2026-03, 2026-06; monthly refits; cleaned data with 1,179 scoring actuals dropped for a
@@ -151,16 +169,18 @@ limits](figure_1_headline.svg)
   Stale6 4.789 and 3.504; PO 4.690 and 3.484.
 - **Fold by fold.** Stale3 at the eight changes sign between folds (-0.126 in 2026-03, +0.213 in
   2026-06). The 2026-06 loss comes mostly from one Primary (its q95 coverage falls to 0.76
-  against 0.87), and a network 11 months old loses 0.205 in the same fold, so the loss does not
-  grow with age. PO's gain at the eight comes from 2025-12 (-0.112); without that fold it is -0.008,
-  so the page claims equivalence and no gain.
+  against 0.87), and a network 11 months old loses 0.205 in the same fold, so the five folds show no
+  clear growth of the loss with age (on the 3 folds with stored networks, Stale6 loses 0.094 at the
+  eight against 0.059 for Stale3, so an age effect is not excluded). PO's gain at the eight comes
+  from 2025-12 (-0.112); without the 2025-12 fold, PO's gain at the eight is -0.008, so the page
+  claims equivalence and no gain.
 - **Tails (widened 1.15, all folds).** q99 pinball loss differences at the eight are +0.009
   (Stale3), +0.010 (Stale6), and +0.003 (PO), and at the six +0.001, -0.001, and -0.009, all
   inside the 0.02 limit. q99 coverage is 0.990 to 0.991 at the eight for every arm and 0.982 to
   0.986 at the six. q95 coverage is 0.947 to 0.950 at the eight and 0.916 to 0.921 at the six.
 - **Cold winter nights.** At the eight Stale3 scores 4.369 and K2 4.237; Stale6 4.372; PO 4.224. At
-  the six Stale3 scores 6.244, Stale6 6.279, K2 5.996, and PO 5.937. Older networks lose more on cold
-  nights, in the direction predicted.
+  the six Stale3 scores 6.244, Stale6 6.279, K2 5.996, and PO 5.937. Older networks lose more on
+  cold nights, in the direction predicted.
 - **12 to 36 hours.** At the eight Stale3 scores 4.286, Stale6 4.270, K2 4.163, and PO 4.202. At the
   six Stale3 scores 3.648, Stale6 3.635, K2 3.565, and PO 3.564.
 - **Avoidable-curtailment cost at the six, difference to K2 (experiment 470's cost measure).** At
@@ -168,35 +188,35 @@ limits](figure_1_headline.svg)
   +0.223]. At f = 0.75: +0.662, +0.695, +0.093. At f = 0.5: +0.496, +0.944, -0.259. Every interval
   includes zero.
 - **D15 and D18 (report only).** The stale networks are much worse (CRPS 18.6 for Stale3 and 21.2
-  for Stale6 against 11.0 for K2) probably because a network fitted before their cleaned history is long
-  has seen little of it. PO scores 11.6.
+  for Stale6 against 11.0 for K2) probably because a network fitted before the D15 and D18 cleaned
+  histories grew long has seen little of those histories. PO scores 11.6.
 - **Serving table.** K2: 2 networks per pass, 12 refits and 12 pretrainings per year, about 80 GPU
   seconds per seed-refit (46 pretraining, 34 fine-tuning; experiment 481). PO: 2 networks, 12
-  fine-tunes, 1 pretraining per year, about 34 GPU seconds per seed-refit, score cost -0.030 and
-  -0.002 points. Stale3: 4 refits per year if the 3-month worst case held, +0.067 and +0.022 points.
+  fine-tunes, 1 pretraining per year, about 38 GPU seconds per seed-refit including the yearly
+  pretraining, change in CRPS against K2 -0.030 and -0.002 points (negative is better). Stale3: 3
+  refits per year if the 4-month cadence's worst month held, +0.067 and +0.022 points.
 
 ## Checks
 
-- **Median minus mean forecast per Primary.** K2 and PO both have a median below the mean at 15 of
-  16 Primaries, by up to 2.4 points of capacity (the two largest are -2.4 and -1.7); PO's values
-  differ from K2's by under 0.5 points.
+- **Median minus mean forecast per Primary.** K2 has a median below the mean at 15 of 16 Primaries
+(the two largest gaps are -2.4 and -1.7 points of capacity) and PO at all 16 (-2.6 and -2.1); PO's
+values differ from K2's by under 0.5 points.
 - **Error of the median beside the CRPS contrast.** Mean absolute error of the median forecast at
   the eight: K2 6.777, Stale3 6.885, Stale6 6.892, PO 6.724 points; at the six: 5.652, 5.710, 5.678,
-  and 5.662. The directions agree with the CRPS contrasts, so trigger 3 did not fire.
+  and 5.662. The directions agree with the CRPS contrasts except for PO at the six (CRPS -0.002,
+  median error +0.009), a gap too small to fire trigger 3.
 - **Triggers.** Trigger 2 (the 3-month network missed the prediction of 0.05 at the eight) was
   tested: the loss does not follow the length of the ENS fine-tuning window (15 to 23 months), and
-  the stale-network loader reproduces experiment 425's stored forecasts exactly (a maximum difference
-  of 0.0 in all 10 files). Trigger 4: dropping 2025-12 turns PO's -0.030 into -0.008, which leaves
-  the equivalence verdict unchanged, so it did not fire. No audit was run. A Sonnet results review
-  re-derived every contrast from the stored row tables and agreed with them; it found that the six's
-  minimum detectable effect had been taken on all signed-MW rows, which was corrected to rows with
-  no labelled event (0.123 to 0.170).
+  the stale-network loader reproduces experiment 425's stored forecasts exactly (a maximum
+  difference of 0.0 in all 10 files). Trigger 4: dropping 2025-12 turns PO's -0.030 into -0.008,
+  which leaves the equivalence verdict unchanged, so trigger 4 did not fire. No audit was run. A
+  Sonnet results review re-derived every contrast from the stored row tables and agreed with them.
 
 ## Caveats
 
 - Five folds, each from one pair of networks, give wide intervals across folds; the origin-day
-  interval treats each fitted network as fixed, so it is optimistic. Read the interval across folds
-  for cadence.
+  interval treats each fitted network as fixed, so that interval is optimistic. Read the interval
+  across folds for cadence.
 - Stale3 and Stale6 differ from K2 in age and in the length of the ENS history they trained on (12
   to 23 months, against 24 for K2), and the two Stale6 refits at 2025-04 and 2025-06 were fitted
   here with 12 and 14 months. Stale12 could not be run because refits before 2025-04 have under 12
@@ -206,8 +226,8 @@ limits](figure_1_headline.svg)
 - Stale3 measures the worst month of a 4-month cadence, not its average.
 - NGED's event labels are incomplete: "rows with no labelled event" may hold unlabelled events.
   Every score is selection-biased, and July 2026 is unused.
-- Reviews: one Sonnet plan review, one Sonnet code review before the first fit, and one Sonnet
-  results review ran, and their findings were applied. The write-up reviews follow.
+- Reviews: one Sonnet plan review, one Sonnet code review before the first fit, one Sonnet results
+review, and two Sonnet write-up reviews.
 
 ## What to try next
 
@@ -279,7 +299,7 @@ pretraining run reused at every refit. The baseline is experiment 425's arm A wi
 - **Stop.** Do not run Stale6's two new fits if Stale3 already fails its limit at either group.
 - **Serving table (required).** Networks per serving pass, refits per year, pretrainings per year,
   GPU seconds per refit (experiment 481: about 80 per seed, 46 pretraining and 34 fine-tuning), and
-  the score cost against K2.
+  the change in CRPS against K2.
 
 ### Compute
 
