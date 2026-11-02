@@ -8,7 +8,7 @@ theme: calibration-and-uncertainty
 also_relevant_to:
   - lagged-power-and-error-correction
   - retraining-and-training-history
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -47,7 +47,9 @@ decision_rule: >-
   Report-only for band width and the probability integral transform (PIT) histogram. A CRPS contrast
   counts only when its Bonferroni interval excludes zero (28 counted CRPS tests: 7 lead bands x 2
   groups x 2 contrasts, the two contrasts being Part 2's per-band widening minus flat 1.15 and the
-  pretrained-minus-unpretrained contrast L0PT minus LL) under origin-day blocks, with whole-month
+  pretrained-minus-unpretrained contrast; post hoc, the counted unpretrained control is experiment
+  448's own L0, because experiment 454's LL, named in the plan, differs in training recipe, and L0PT
+  minus LL is report-only) under origin-day blocks, with whole-month
   blocks (4 folds for each contrast, so near the minimum-to-maximum of the folds) as the
   conservative check. The q95 and q99 pinball contrasts are counted separately, 56 tests each, and
   the 0-12 h non-worsening check below is one more test. P3's 0.03 is a point-estimate threshold,
@@ -72,105 +74,197 @@ metric: >-
   CRPS in points of effective capacity by lead band (0 to 6 h, 6 to 12 h, 12 to 24 h, 24 to 48 h, 48
   to 72 h, 72 to 120 h, 120 to 240 h), q01, q05, q95, and q99 coverage and pinball loss, mean 90%
   width, and the PIT histogram.
+verdict: partly supported
+best_arm: >-
+  Not a ranking of arms. At 120 to 240 h at the eight MVA-only Primaries, K2-S1 scores 4.867 points
+  of CRPS (continuous ranked probability score), L0PT (pretrained) 5.455, L0 (same network, not
+  pretrained) 5.596, and LL 5.084.
+headline: >-
+  The daily-refit lag-free network L-1d does not widen its bands with lead: replacing its lead input
+  changes the mean 90% band width by under 4%, and within one half-hour of the day the band grows
+  only 5% from 12-24 h to 120-240 h (K2-S1: 4%). Per-lead widening fitted on earlier held-out
+  forecasts changes CRPS by at most 0.024 points. ERA5 pretraining lowers CRPS in every lead band
+  (L0PT minus L0: -0.14 at 120-240 h at the eight, -0.05 at the six).
+lessons: >-
+  The 27 to 30% widening of the pooled bands from 12-24 h to 120-240 h is mostly time of day,
+  because every forecast origin is at 09:00 UTC and so lead fixes the half-hour of the target. The
+  long-lead gap to K2-S1 is not a band-width problem. Re-fitting the width per lead band recovers
+  under 5% of that gap. Pretraining does not cause the gap.
+take_home_message: >-
+  The lag-free neural network does not make its forecast bands wider at longer lead times, but
+  neither does K2-S1, and re-fitting the band width per lead time recovers almost none of K2-S1's
+  advantage at days 5 to 10. ERA5 pretraining does not explain the gap either: it lowers the
+  error at every lead time. The next thing to test is why K2-S1 and the monthly five-head lag-free
+  arm score better at days 5 to 10, with the centre of the forecast (not the band width) as the
+  suspect.
+advice:
+  - >-
+    Do not build a per-lead widening table for the lag-free network to close K2-S1's gap: it
+    recovers under 5% of the 120-240 h gap (Part 2 table).
+  - >-
+    Stratify any width-by-lead comparison by the half-hour of the day, because every origin is at
+    09:00 UTC and lead fixes the target's half-hour (width growth table).
+  - >-
+    Keep ERA5-and-CAMS pretraining in the lag-free network: against the same network without it,
+    it lowers CRPS in all seven lead bands (figure 1).
+  - >-
+    Compare pretrained and unpretrained networks only when they share one training recipe: the
+    pretrained network against experiment 454's lag-free heads reversed the sign at 120-240 h
+    (Checks).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**Plan: three CPU-only reads of stored output, and one inference check on stored weights, ask
-whether the lag-free network uses its lead input.** This page is the plan; the write-up replaces it.
+**The lag-free network does not widen its bands with lead, but neither does K2-S1, and re-fitting
+the band width per lead recovers almost none of K2-S1's advantage at days 5 to 10.** We asked
+whether the daily-refit lag-free neural network L-1d has learned what "lead time" (how far ahead
+the forecast looks) means, because it starts from weights pretrained on ERA5 weather, where the
+weather is the truth at every lead. We read the forecasts that experiments 511, 454, and 448 had
+stored, scored them by lead band, and fed experiment 511's stored L-1d weights altered lead inputs.
+Replacing the lead input changed the mean 90% band width by under 4%. The band grows only 5% from
+12-24 h to 120-240 h once the half-hour of the day is held fixed, against 27% in the pooled
+figures. K2-S1, the network with lagged and lag-free heads, grows by 4%. Per-lead widening fitted
+only on earlier held-out forecasts changed CRPS by at most 0.024 points in any band. ERA5
+pretraining lowers CRPS at every lead. Every number on this page is interim and unaudited until a
+human has read it.
 
-## What the experiment does
+Here "the eight" are the eight MVA-only (megavolt-ampere-metered) Primary substations and "the six"
+are the six signed-MW (megawatt-metered) Primary substations, as in experiment 521. CRPS (the
+continuous ranked probability score, lower is better) is in points of effective capacity. This
+experiment fitted no neural network and used no GPU.
 
-- **Part 1a, width by lead, stratified by hour of day.** From 521's `work/refs_{month}.parquet`
-  and experiment 511's row tables, the mean 90% width of L-1d, K2-S1 (cell c0 and the three-cell
-  mean), L-Ww, and 454's LL, LL-ens3, LL-ens5, by the seven lead bands, within each of six
-  four-hour blocks of target hour (so a wide 0-12 h band that comes from time of day is not
-  mistaken for lead). The 2,736 L-1d rows in 2026-06 with NaN `cov_*` and `pin_*` are counted and
-  excluded with `fill_nan(None)`; the count is reported.
-- **Part 1b, PIT histogram.** Ten bins from the stored 11 quantiles (the piecewise-linear
-  interpolation of the quantile function, tails clamped at q01 and q99), by lead band, for L-1d and
-  K2-S1.
-- **Part 1d, width growth against the ensemble's error growth.** The ratio of width at days 6 to 10
-  to width below 12 h, beside experiment 418's stored statement of the ensemble's root-mean-square
-  error to spread (1.2 to 3.3 at day 1, 1.1 to 1.5 at day 4; no stored value for days 6 to 10, which
-  the page says).
-- **Part 1c, lead swap (stored weights, no refit, CPU).** L-1d seed 0 of fold 2026-01 uses
-  `00511-*/work/models/L-1d/2026-01_d{day}_s0.pt` for every daily cutoff; K2-S1's lag-free heads use
-  `00454-*/work/heads/A/2026-01_s0.pt`. The same 2026-01 test rows are scored with `lead` and
-  `lead_sqrt` (columns found by `e00446_models.lead_columns()`, set on the fold's input scale) set
-  to
-  (a) the true lead, (b) day 1 for every row, (c) day 10 for every row, (d) a shuffled lead
-  (within each Primary and origin). The page reports the change in median forecast and in 90% width
-  by
-  true lead. K2-S1's lag-free heads are not pretrained, so the swap contrasts a pretrained network
-  with unpretrained heads; the page says this. If rebuilding the fold's inputs on 8 GB does not
-  fit, the swap runs on a subset of origin days and the page says which.
-- **Part 2, per-band widening on held-out fits only.** Folds 2025-12 onward (four). For each daily
-  cutoff, the factor on each tail quantile's distance from the median (q01, q05, q95, q99) is
-  estimated per lead band and metering group from the stored, unwidened L-1d quantiles whose target
-  is at least 3.5 h before the cutoff. The pool is every earlier stored fold plus the earlier days
-  of the same fold, with no trailing-window limit. This departs from the brief's "730-day training
-  window" on purpose: only the stored held-out forecasts are free of the fit's own training rows.
-  The standardised residual of an upper tail is (actual - median) / (q_tail - median), and of a
-  lower tail (median - actual) / (median - q_tail); the factor is its empirical quantile at the
-  tail's level (upper) or at one minus the level (lower), which restores nominal coverage, floored
-  at 0.5 and capped at 3. A band and group with fewer than 2,000 pool rows uses the flat 1.15, and
-  the count of such cases is reported. The factor is applied to the next cutoff's rows, as table P
-  (experiment 435) does. A post hoc variant fits one factor per group with no band, to separate the
-  effect of banding from the effect of re-estimating on held-out forecasts. K2-S1 is not re-widened
-  per band: its stored bands are the control, scored at 1.15, and the page says so. The
-  comparison is flat 1.15, no widening, and table P's factors (experiment 435's stored table, which
-  were fitted on other arms). The flat 1.15 was selected on the scored rows, so it is not held-out,
-  which the page states. The 2025-10 fold has no earlier fold; it is shown with flat 1.15 only.
-- **Pretrained against unpretrained, by lead.** Experiment 448's L0PT (pretrained, ensemble
-  fine-tuned, monthly, seeds 0 to 2, world 0) minus the `LL` arm of experiment 454's stored
-  predictions (the lag-free heads, ensemble only, monthly, three cells) on the rows of the four
-  folds where both exist (2025-10, 2026-01, 2026-03, 2026-06; experiment 448 stored no 2025-12
-  fold), joined on `(primary, origin, target)` to experiment 511's rows. CRPS and q95/q99
-  pinball by the seven bands, the minimum detectable effect, and the per-fold signs.
-- **Comparability of the pretrained contrast.** The page confirms from the code that L0PT and LL
-  share the architecture, the 1.15 widening, the row set, and the monthly cadence, and differ in
-  pretraining, and states any other difference found.
-- **Gate for Part 3.** The page states whether L-1d minus K2-S1 q95 coverage at 120-240 h falls
-  short by 0.03 more than at 12-24 h. Part 3 (L-Pshare waits for experiment 519; L-lead-head waits
-  for this result) is not run.
+![Pretrained minus unpretrained](figure_1_pretrained_minus_unpretrained.svg)
 
-## Standing practices
+![Width growth](figure_2_width_growth.svg)
 
-- **Followed:** cleaned data (the stored rows are cleaned; dropped half-hours per fold are copied
-  from experiment 511's checks), the D15 and D18 cut at 2025-03-01 (experiment 511's rows), stored
-  predictions reused, July 2026 unused, the tail table (q01, q05, q95, q99), example forecasts
-  (day-ahead and 10-day, a winter and a summer Primary, from 521's example script), and the
-  draft pull request.
-- **Not applicable:** no refit (CPU, stored output), no new weights saved, no load-shift event plots
-  (this experiment scores no event slice; it says so).
-- **Advice followed from earlier experiments:** experiment 521 (quote K2-S1 as the three-cell mean,
-  which this plan does) and experiment 511 (origin-day block bootstrap).
+![Lead swap](figure_3_lead_swap.svg)
 
-## Step 0 (read from the code, before any fit)
+![Per-band widening](figure_4_per_band_widening.svg)
 
-- **Pretraining rows carry a real lead.** L-1d starts from experiment 448's L0PT weights
-  (`e00510_fit.pretrained_path` falls back to them), which `e00448_run.pretrain_rows` and
-  `spread_table` build with the logic of experiment 418's `e00418_prep.pretrain_frame`, which builds
-  pseudo-runs (a
-  pseudo-origin every `STRIDE_DAYS` days, leads of 0.5 to 351 h) and stores `lead_hours` as
-  `(target - origin) / 2`; `lead` and `lead_sqrt` come from `feature_matrix` (experiment 397's
-  summary scheme) as functions of that value. Lead is neither a fixed value nor drawn at random.
-- **The `std_*` columns are the ensemble's median spread by 24-hour lead band.** `fold_pretrain`
-  overwrites the raw zeros with `spread_tables`' median standardised `std_*` of the fold's ensemble
-  training rows, so the `std_*` inputs grow with lead in pretraining as they do in fine-tuning.
-- **Only the noisy variant of the pretraining rows could tell the network that long lead means
-  larger error, and L-1d does not use it.** The pretraining targets are power observed against ERA5
-  weather, so the label noise does not grow with lead. Experiment 418's P3 arm adds noise at the
-  ensemble spread by lead band; `e00448_run.pretrain_rows` has no noise option and adds none.
-- **K2-S1's lag-free heads are not pretrained**, so the heads see only ensemble fine-tuning rows,
-  where lead and error do move together.
+![PIT at 120 to 240 h](figure_5_pit.svg)
 
-## Statistics
+![Day-ahead forecast, D4, winter](figure_6_example_winter_day_ahead.svg)
 
-- **Counted tests:** 28 for CRPS (7 bands x 2 groups x 2 contrasts) and 56 with q99 pinball.
-  Width, PIT, and the lead swap are report-only.
-- **Blocks:** origin days within month (as experiment 511 and 521) and, as the conservative
-  check, whole months (4 blocks for each contrast, so near minimum-to-maximum intervals; the page
-  says so).
-- **Minimum detectable effect:** from the seed spread, beside every contrast; we expect the per-band
-  MDE to exceed the pooled values of experiment 511 (0.164 at the eight, 0.123 at the six).
-- **Interim numbers:** every number is interim and unaudited until the reviews have run.
+![10-day forecast, D4, winter](figure_6_example_winter_10_days.svg)
+
+![Day-ahead forecast, D4, summer](figure_6_example_summer_day_ahead.svg)
+
+![10-day forecast, D4, summer](figure_6_example_summer_10_days.svg)
+
+## Predictions
+
+- **P1 held for the width and failed for the median.** Setting every row to day 10 changes L-1d's
+  mean 90% width by -4% to +3% across lead bands (under the predicted 10%). It moves the median by a
+  mean absolute 0.7 to 4.1 points of capacity (day 10), against the predicted 1% of capacity or
+  less.
+  The network ignores lead for the band and uses it for the centre of the forecast.
+- **P2 held.** Within one half-hour of the day the 90% width grows by 4.9% (L-1d) and 3.7%
+  (K2-S1) at the eight and by 5.0% and 4.6% at the six, differences of 0.012 and 0.003 as ratios.
+- **P3 failed.** Per-band widening lowers CRPS at 120-240 h by 0.008 points at the six
+  (Bonferroni interval -0.012 to -0.003, excludes zero) and by 0.002 at the eight (includes
+  zero). The predicted 0.03 at the six was not reached. It closes 4% of the six's 0.196 gap and 1%
+  of the eight's 0.174.
+- **P4 failed.** Against L0, the same network without pretraining, the pretrained L0PT has the
+  lower CRPS in every band (see Results). Against LL, experiment 454's lag-free heads, L0PT is
+  worse at 120-240 h by 0.37 (eight) and 0.53 (six); that contrast is kept below as
+  recipe-confounded.
+
+## Results
+
+- **Pretraining helps at every lead (like-for-like).** L0PT minus L0, in points of CRPS (negative
+  means pretraining is better; Bonferroni intervals over origin-day blocks, 28 counted tests).
+  Eight: -0.39 [-0.58, -0.22] at 0-6 h, -0.14 [-0.23, -0.05] at 120-240 h, -0.13 [-0.21, -0.06]
+  pooled. Six: -0.18 [-0.33, -0.04] at 0-6 h, -0.05 [-0.09, -0.01] at 120-240 h, -0.08
+  [-0.11, -0.05] pooled. The whole-month intervals (4 blocks, near the range of the folds) exclude
+  zero in 1 of the 7 bands at the eight and in 6 of the 7 at the six.
+- **The contrast with LL is confounded.** L0PT minus LL is +0.37 [+0.22, +0.53] at 120-240 h at
+  the eight and +0.53 [+0.33, +0.73] at the six, but LL is the cross-fitted lag-free table of
+  experiment 404, trained with another recipe. LL scores 5.084 and L0 5.596 at the eight, so the
+  difference lies in the recipe and not in pretraining.
+- **Per-band widening gains under 0.03 everywhere.** Per-band minus flat 1.15, CRPS: -0.002
+  (eight) and -0.008 (six) at 120-240 h; -0.018 and -0.007 at 0-6 h; -0.005 and -0.009 pooled
+  (folds 2025-12 onward). The flat 1.15 was chosen on the scored rows, so it is not held-out. The
+  per-band factors, fitted on earlier forecasts, leave q95 coverage at 0.920 (eight) and 0.938 (six)
+  pooled, below the 0.95 target, because the earlier folds were better covered than the later
+  ones.
+- **Hour of day and lead are tied together.** Every origin is at 09:00 UTC, so lead fixes the
+  half-hour of the target. The pooled 90% width grows 27% (eight) and 30% (six) from 12-24 h to
+  120-240 h, and 5% once the half-hour is held fixed.
+- **The Part 3 gate does not hold.** L-1d minus K2-S1 q95 coverage at 120-240 h is 0.015 (eight)
+  and 0.027 (six) lower than at 12-24 h, short of the 0.03 gate, and L-1d covers more than K2-S1
+  in both bands. Part 3 is not run.
+- **PIT histograms.** At 120-240 h the top PIT bin holds 0.124 (eight) and 0.172 (six) of L-1d's
+  rows against 0.1 if calibrated, and the bottom bin holds 0.084 and 0.051. The actuals fall above
+  the bands more often than below.
+
+## Tail calibration at 120-240 h (L0PT, L0 in the like-for-like pair; K2-S1 for reference)
+
+| Arm | Group | q95 coverage | q99 coverage | q99 pinball |
+|---|---|---|---|---|
+| L0PT | eight | 0.938 | 0.987 | 0.302 |
+| L0 | eight | 0.934 | 0.984 | 0.306 |
+| K2-S1 | eight | 0.952 | 0.989 | 0.287 |
+| L0PT | six | 0.899 | 0.975 | 0.215 |
+| L0 | six | 0.896 | 0.972 | 0.225 |
+| K2-S1 | six | 0.911 | 0.979 | 0.196 |
+
+## Checks
+
+- **Median minus mean forecast.** The only change to a forecast is widening about the median, which
+  leaves the median unchanged. The median minus the atom-weighted mean of the 11 stored quantiles
+  is -0.6 (L0PT) and -0.5 (L0) points at the eight, and -0.3 at the six.
+- **Error of the median beside the CRPS contrast.** The mean absolute error of the median,
+  L0PT minus L0, is -0.22 at the eight and -0.08 at the six at 120-240 h, the same sign as the CRPS
+  contrast.
+- **Leave one Primary out.** The L0PT minus L0 CRPS at 120-240 h is between -0.17 and -0.10 at the
+  eight and between -0.06 and -0.03 at the six, whichever Primary is left out.
+- **Triggers.** Trigger 2 fired (P1's median part, P3, and P4 contradict their predictions); the
+  explanation is the 09:00 UTC origin (P1), non-stationary coverage (P3), and the recipe
+  difference between L0PT and LL (P4), tested by adding L0. Triggers 1, 3, 4, 5, and 6 did not
+  fire. Trigger 7 may fire: the manager's next lead experiments could depend on the pretraining
+  sign, which rests on one pair of experiments (448's L0 and L0PT, 3 seeds, 4 folds); no audit has
+  run.
+- **Reviews.** A Sonnet plan review, a Sonnet code review (no blocking findings; the hour
+  stratification, the width comparison rows, the Bonferroni tail resamples, and unused code were
+  fixed), and a Sonnet results review that re-derived the L0PT minus LL contrast, the width ratios,
+  one widening factor, and the L-1d reproduction without a mismatch. The like-for-like L0 contrast
+  was added after the manager objected to the LL contrast, and is covered by the same code and
+  panel; the results review ran before it was added.
+- **Reproduction.** The panel reproduces experiment 511's stored L-1d CRPS to 5e-7 in every month.
+  The lead-swap "true" condition reproduces experiment 511's stored seed-0 quantiles to 5.4e-5 of
+  capacity. Experiment 511's 2,736 rows of 2026-06 with NaN `cov_*` and `pin_*` are in no row set
+  and are excluded.
+
+## Method and data
+
+- **Arms and rows.** Rows are experiment 511's scored rows (row set
+  `experiment_470_intersection_v1`;
+  folds 2025-10, 2025-12, 2026-01, 2026-03, 2026-06; D15 and D18 cut at 2025-03-01; cleaned data).
+  L-1d is the quantile average of experiment 511's two seeds. K2-S1 and LL are experiment 454's
+  three cells each. L0PT and L0 are experiment 448's seeds 0 to 2 (world 0; no 2025-12 fold, so
+  four folds). All scores use the 1.15 widening, and the cells are scored one by one and averaged.
+- **Cadence.** Monthly for experiments 448 and 454, daily for L-1d. No refit here.
+- **Part 2 factors.** Estimated per daily cutoff from the unwidened L-1d quantiles whose target is
+  at
+  least 3.5 h before the cutoff; floor 0.5, cap 3, fallback 1.15 when a band holds under 2,000
+  rows (100 of 6,832 day, set, band, and tail cells; `part2_fallbacks.csv`).
+- **Past-weather caveat.** No weather enters this experiment; it re-reads stored forecasts, whose
+  inputs are the stored ensemble mean and spread.
+- **Minimum detectable effect.** From the seed spread, for L0PT and L0 at 120-240 h: 0.13 and 0.20
+  (eight), 0.21 and 0.09 (six). At 120-240 h the L0PT minus L0 contrast of -0.14 (eight) sits
+  below the L0 arm's own 0.20, so it is a point estimate with 3 of 4 folds negative at the eight (4
+  of 4 at the six), and its Bonferroni interval excludes zero over origin-day blocks only.
+- **Lead swap.** L-1d, fold 2026-01, seed 0, 31 daily models, CPU. K2-S1's lag-free heads cannot be
+  swapped: experiment 454 stored their forecasts, not their weights.
+- **No load-shift event plots.** This experiment scores no event slice.
+- **Not done.** Part 3 (L-Pshare waits for experiment 519; L-lead-head is not supported by the lead
+  swap and Part 2). Comparison with experiment 435's table P factors, which were fitted on other
+  arms.
+
+## What the next experiment should answer
+
+**The long-lead gap is in the centre of the forecast, not the band.** The lead swap moves L-1d's
+median by up to 4 points of capacity while its band stays put, and a per-band width correction
+recovers under 5% of the gap. The next experiment can test whether K2-S1's and LL-ens5's advantage
+at days 5 to 10 comes from averaging several heads (the median) by scoring the mean absolute error
+of the median of each arm by lead.

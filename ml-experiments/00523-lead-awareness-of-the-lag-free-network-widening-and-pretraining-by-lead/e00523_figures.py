@@ -3,7 +3,7 @@
 
 Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
 
-1. `figure_1_pretrained_minus_unpretrained.svg`: L0PT minus LL CRPS by lead band, Bonferroni intervals;
+1. `figure_1_pretrained_minus_unpretrained.svg`: L0PT minus L0 CRPS by lead band, Bonferroni intervals;
 2. `figure_2_width_growth.svg`: 90% band width growth from 12-24 h to 120-240 h, pooled and within one half-hour of the day;
 3. `figure_3_lead_swap.svg`: change in the 90% width and in the median when L-1d's lead input is replaced;
 4. `figure_4_per_band_widening.svg`: per-band widening minus flat 1.15, CRPS by lead band;
@@ -78,12 +78,14 @@ def interval_panels(
 def figure_pretraining() -> None:
     """Draw L0PT minus LL by lead band."""
     t = pl.read_csv(SCORES / "edit8_contrasts.csv").filter(
-        (pl.col("metric") == "crps") & (pl.col("band") != "all")
+        (pl.col("metric") == "crps")
+        & (pl.col("band") != "all")
+        & (pl.col("contrast") == "L0PT - L0")
     )
     interval_panels(
         table=t,
-        title="ERA5 pretraining hurts the lag-free network at days 3 to 10 (above zero = pretrained is worse).",
-        ytitle="L0PT minus LL CRPS (points)",
+        title="ERA5 pretraining lowers the lag-free network's CRPS in every lead band (below zero = pretrained is better).",
+        ytitle="L0PT minus L0 CRPS (points)",
         caption=[
             "Dot: difference. Thick bar: Bonferroni interval, origin-day blocks. Thin bar: same level, whole-month blocks (4)."
         ],

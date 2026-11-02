@@ -52,6 +52,7 @@ CELLS: Final[dict[str, tuple[str, ...]]] = {
     "K2-S1": ("K2c0", "K2c1", "K2c2"),
     "LL": ("LLc0", "LLc1", "LLc2"),
     "L0PT": ("PTs0", "PTs1", "PTs2"),
+    "L0": ("L0s0", "L0s1", "L0s2"),
 }
 HOUR_BLOCKS: Final[int] = 48
 """Hour blocks are single UTC half-hours: every origin is at 09:00 UTC, so lead fixes the half-hour."""
@@ -422,28 +423,29 @@ def part2_tables(*, scores: pl.DataFrame, factors: pl.DataFrame) -> dict[str, pl
 
 
 def edit8(*, table: pl.DataFrame) -> dict[str, pl.DataFrame]:
-    """Return absolute scores, contrasts, and the seed spread of L0PT against LL on the shared folds."""
+    """Return absolute scores, contrasts, and the seed spread of L0PT against two unpretrained controls.
+
+    L0 (experiment 448, the same network and fine-tuning recipe without pretraining) is the counted
+    control. LL (experiment 454's lag-free heads, a different training recipe) is report-only.
+    """
     both = table.filter(pl.col("month").is_in(list(PT_MONTHS)))
-    ok = finite_rows(table=both, cells=("PTs0", "PTs1", "PTs2", "LLc0", "LLc1", "LLc2"))
-    both = both.filter(pl.Series(ok))
-    pt, ll, k2 = (arm_metrics(table=both, arm=a) for a in ("L0PT", "LL", "K2-S1"))
-    scored = (
-        both.select("group", "cls", "main16", "month", "day", "band")
-        .hstack(pt)
-        .hstack(ll)
-        .hstack(k2)
-    )
+    needed = tuple(c for arm in ("L0PT", "L0", "LL") for c in CELLS[arm])
+    both = both.filter(pl.Series(finite_rows(table=both, cells=needed)))
+    arms = ("L0PT", "L0", "LL", "K2-S1")
+    scored = both.select("group", "cls", "main16", "month", "day", "band")
+    for arm in arms:
+        scored = scored.hstack(arm_metrics(table=both, arm=arm))
     cols = ("crps", *[f"{k}_{t}" for k in ("pin", "cov") for t in TAIL_NAMES], "w90")
     absolute, contrasts, mde = [], [], []
     rng = np.random.default_rng(3)
-    # one-cell scores for the seed spread (mean over folds of each cell's CRPS)
-    per_cell: dict[str, dict[str, np.ndarray]] = {}
     y = both["actual"].to_numpy().astype(np.float64)
-    for arm in ("L0PT", "LL"):
-        for cell in CELLS[arm]:
-            per_cell.setdefault(arm, {})[cell] = metrics(
-                q=widen(q=quantiles(table=both, cell=cell), factor=FLAT), y=y
-            )["crps"]
+    per_cell = {
+        arm: {
+            cell: metrics(q=widen(q=quantiles(table=both, cell=cell), factor=FLAT), y=y)["crps"]
+            for cell in CELLS[arm]
+        }
+        for arm in ("L0PT", "L0", "LL")
+    }
     cellframe = both.select("group", "cls", "main16", "month", "day", "band").hstack(
         pl.DataFrame({f"{arm}__{cell}": v for arm, d in per_cell.items() for cell, v in d.items()})
     )
@@ -453,12 +455,13 @@ def edit8(*, table: pl.DataFrame) -> dict[str, pl.DataFrame]:
         for band in (*st.BANDS, st.ALL):
             sub = part if band == st.ALL else part.filter(pl.col("band") == band)
             csub = cells if band == st.ALL else cells.filter(pl.col("band") == band)
-            for arm in ("L0PT", "LL", "K2-S1"):
+            for arm in arms:
                 absolute.append(
                     {"set": name, "band": band, "arm": arm, "n": sub.height}
                     | {m: float(sub[f"{arm}__{m}"].mean()) for m in cols}  # ty: ignore[invalid-argument-type]
                 )
-            for arm, cell_names in (("L0PT", CELLS["L0PT"]), ("LL", CELLS["LL"])):
+            for arm in ("L0PT", "L0", "LL"):
+                cell_names = CELLS[arm]
                 means = (
                     csub.group_by("month")
                     .agg([pl.col(f"{arm}__{c}").mean() for c in cell_names])
@@ -471,18 +474,20 @@ def edit8(*, table: pl.DataFrame) -> dict[str, pl.DataFrame]:
                     {"set": name, "band": band, "source": arm, "seed_sd": sd,
                      "mde": 1.96 * math.sqrt(2.0) * sd / math.sqrt(values.shape[1])}
                 )  # fmt: skip
-            for metric, tests in (
-                ("crps", st.TESTS),
-                ("pin_q95", 2 * st.TESTS),
-                ("pin_q99", 2 * st.TESTS),
-            ):
-                diff = sub.select(
-                    "month", "day", d=pl.col(f"L0PT__{metric}") - pl.col(f"LL__{metric}")
-                )
-                contrasts.append(
-                    {"set": name, "contrast": "L0PT - LL", "metric": metric, "band": band,
-                     "counted": band != st.ALL, "tests": tests, **st.block_stats(diff=diff, rng=rng, tests=tests)}
-                )  # fmt: skip
+            for control, counted in (("L0", True), ("LL", False)):
+                for metric, tests in (
+                    ("crps", st.TESTS),
+                    ("pin_q95", 2 * st.TESTS),
+                    ("pin_q99", 2 * st.TESTS),
+                ):
+                    diff = sub.select(
+                        "month", "day", d=pl.col(f"L0PT__{metric}") - pl.col(f"{control}__{metric}")
+                    )
+                    contrasts.append(
+                        {"set": name, "contrast": f"L0PT - {control}", "metric": metric, "band": band,
+                         "counted": counted and band != st.ALL, "tests": tests,
+                         **st.block_stats(diff=diff, rng=rng, tests=tests)}
+                    )  # fmt: skip
     return {
         "edit8_absolute": pl.DataFrame(absolute),
         "edit8_contrasts": pl.DataFrame(contrasts),
