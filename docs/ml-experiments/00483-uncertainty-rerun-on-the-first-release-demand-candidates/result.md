@@ -148,9 +148,9 @@ target half-hour marked in orange.
   clean rows of the other four folds, one factor per group, lead band, and tail). The sweep 1.05 and
   1.10 is in `free_tails.parquet`.
 - **Rows:** the `gam14` set of experiment 470 plus D15 and D18 (report-only). Folds: 2025-10,
-  2025-12, 2026-01, 2026-03, 2026-06; July 2026 is nearly unused (the scoring included 9 hours of
-  valid times on 2026-07-01, and July scoring in later work starts at 2026-07-02 00:00). Flagged
-  exact-zero half-hours are dropped (inherited from experiment 470's scoring context). The
+  2025-12, 2026-01, 2026-03, 2026-06; July 2026 is nearly unused (experiment 470's scoring included
+  9 hours of valid times on 2026-07-01, so July scoring in later work starts at 2026-07-02 00:00).
+  Flagged exact-zero half-hours are dropped (inherited from experiment 470's scoring context). The
   experiment 399 start cut for D15 and D18
   is inherited from experiment 470's rows.
 - **Actuals:** rejoined from experiment 470's scoring context. "Rows with no labelled event" are
