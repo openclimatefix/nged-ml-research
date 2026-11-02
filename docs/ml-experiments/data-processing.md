@@ -497,6 +497,20 @@ physical clear-sky index, all at elevations of 14 to 16 degrees
 change when rows under 17 degrees were dropped. The confidence is moderate, and the entry is
 provisional until the experiment has had its reviews.
 
+**Build a clear-sky index from satellite irradiance with a floor on the clear-sky value and a cap
+at 1.5 (medium confidence, provisional).** The ratio of the CAMS irradiance of a half-hour to the
+Haurwitz clear-sky irradiance reached 10.9 near sunrise and sunset, so the index is set to 0 where
+the clear-sky irradiance is below 1 W/m2 and capped at 1.5. Applies to experiments and production.
+Evidence: [experiment
+480](00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md), where the two
+columns lowered the CRPS at all 16 Primaries in lab conditions.
+
+**Treat satellite irradiance as unavailable for the first day of lead (high confidence).** The CAMS
+radiation service publishes with about a 1-day delay, so a column built from it can describe lag
+times older than a day and not the first day ahead. Applies to experiments and production.
+Evidence: [experiment
+480](00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md).
+
 ## Wind farms
 
 **Do not compute air density from the ECMWF ensemble's surface pressure for a model trained on ERA5
@@ -1100,4 +1114,13 @@ first row of the sorted frame is the longest-lead one (mean lead 333 hours at D5
 a blurred 6-hour mean. Experiment 417's Primary-level gate did this and shut at D8 and D12; on the
 shortest-lead row it opens at both, as with recorded weather
 ([experiment 424](00424-neural-mva-export-gated-signed-ens-serving-test/result.md)). The entry is
+provisional until the experiment has had its reviews.
+
+**Drop valid times on or after 2026-07-01 from the scored rows of experiments 470 and 483
+(provisional; high confidence).** *Applies to: experiments.* Experiment 483's cache for the
+2026-06 fold holds 2,736 rows (1.4% of the fold) with valid times on 2026-07-01 from 00:00 to 09:00,
+at leads of 39 hours or more, although the rule that keeps July 2026 for a finalist excludes every
+scored valid time from that date. Experiment 500 drops them from every arm and its raw scores differ
+from experiment 483's in the third decimal place
+([experiment 500](00500-rolling-conformal-recalibration-of-the-demand-tails/result.md)). The entry is
 provisional until the experiment has had its reviews.
