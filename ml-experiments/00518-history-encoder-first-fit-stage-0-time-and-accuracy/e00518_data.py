@@ -216,13 +216,17 @@ def arrays_of(*, spec: gen.Spec, ev: gen.Events, med: np.ndarray, windows: Windo
 
 
 def sampling_weights(*, spec: gen.Spec, med: np.ndarray, windows: Windows) -> np.ndarray:
-    """Return the family D weight (3 for the top decile of lagless-median range, else 1)."""
-    out = np.empty(len(windows), dtype=np.float64)
+    """Return the family D weight: 3 for the top decile of lagless-median range, else 1.
+
+    The decile is taken over all of `windows`, not chunk by chunk.
+    """
+    span = np.empty(len(windows))
     for lo in range(0, len(windows), 8192):
         sl = slice(lo, lo + 8192)
         g = history_grid(day=windows.day[sl])
-        out[sl] = gen.hard_negative_weight(median=med[windows.primary[sl][:, None], g])
-    return out
+        m = med[windows.primary[sl][:, None], g]
+        span[sl] = np.nanmax(m, axis=1) - np.nanmin(m, axis=1)
+    return np.where(span >= np.nanquantile(span, 0.9), 3.0, 1.0)
 
 
 def epoch_arrays(

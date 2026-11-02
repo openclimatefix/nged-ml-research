@@ -44,7 +44,7 @@ PLANT_RATE: Final[float] = 0.02
 BOOTSTRAPS: Final[int] = 400
 
 
-def candidate_mask(*, level: np.ndarray) -> np.ndarray:
+def candidate_mask(*, level: np.ndarray, threshold: float = THRESHOLD) -> np.ndarray:
     """Return a boolean (windows, 672) array: True where a candidate onset begins at that index."""
     n, size = level.shape
     cum = np.concatenate([np.zeros((n, 1)), np.cumsum(level, axis=1, dtype=np.float64)], axis=1)
@@ -55,7 +55,7 @@ def candidate_mask(*, level: np.ndarray) -> np.ndarray:
     diff[:, t + 1] = np.abs(right - left)
     padded = np.pad(diff, ((0, 0), (RADIUS, RADIUS)), constant_values=0.0)
     peak = sliding_window_view(padded, 2 * RADIUS + 1, axis=1).max(axis=-1)
-    return (diff >= THRESHOLD) & (diff >= peak)
+    return (diff >= threshold) & (diff >= peak)
 
 
 def true_events(
@@ -80,35 +80,45 @@ def true_events(
             rows.append(
                 {
                     "window": int(w),
+                    "end": max(hi, lo + 1),
                     "onset": lo,
                     "family": int(fam[w]),
                     "size": float(np.median(step_true[w, lo:hi])),
                 }
             )
     return pl.DataFrame(
-        rows, schema={"window": pl.Int64, "onset": pl.Int64, "family": pl.Int64, "size": pl.Float64}
+        rows,
+        schema={
+            "window": pl.Int64,
+            "end": pl.Int64,
+            "onset": pl.Int64,
+            "family": pl.Int64,
+            "size": pl.Float64,
+        },
     )
 
 
-def score_events(*, level: np.ndarray, events: pl.DataFrame, step_true: np.ndarray) -> pl.DataFrame:
+def score_events(
+    *, level: np.ndarray, events: pl.DataFrame, step_true: np.ndarray, threshold: float = THRESHOLD
+) -> pl.DataFrame:
     """Return the events with their onset error (hours; inf if none) and their size error.
 
     Args:
         level: The estimated step (windows, 672) in spreads.
         events: The output of `true_events`.
         step_true: The injected step (windows, 672) in spreads.
+        threshold: The candidate threshold in spreads.
 
     Returns:
         `events` plus `onset_error_hours`, `size_error` (relative), and the estimated `size_hat`.
     """
-    mask = candidate_mask(level=level)
+    mask = candidate_mask(level=level, threshold=threshold)
     err, size_hat = [], []
     for row in events.iter_rows(named=True):
         cand = np.flatnonzero(mask[row["window"]])
         err.append(float(np.abs(cand - row["onset"]).min()) / 2.0 if len(cand) else np.inf)
         w, o = row["window"], row["onset"]
-        covered = np.flatnonzero(np.abs(step_true[w]) > 1e-6)
-        covered = covered[covered >= o]
+        covered = np.flatnonzero(np.abs(step_true[w, o : row["end"]]) > 1e-6) + o
         size_hat.append(float(np.median(level[w, covered])) if len(covered) else 0.0)
     out = events.with_columns(
         pl.Series("onset_error_hours", err, dtype=pl.Float64),
@@ -144,9 +154,9 @@ def lag_errors(*, level: np.ndarray, step_true: np.ndarray, valid: np.ndarray) -
     )
 
 
-def flagged(*, level: np.ndarray) -> np.ndarray:
+def flagged(*, level: np.ndarray, threshold: float = THRESHOLD) -> np.ndarray:
     """Return True for each window with at least one candidate onset."""
-    return candidate_mask(level=level).any(axis=1)
+    return candidate_mask(level=level, threshold=threshold).any(axis=1)
 
 
 def rank_auc(*, score: np.ndarray, label: np.ndarray) -> float:

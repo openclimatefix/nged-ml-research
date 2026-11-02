@@ -47,6 +47,8 @@ BATCH: Final[int] = 128
 LEARNING_RATE: Final[float] = 2e-3
 MAX_EPOCHS: Final[int] = 60
 MIN_EPOCHS: Final[int] = 10
+IMPROVEMENT: Final[float] = 0.005
+"""A validation step loss counts as better only if it is this share below the best."""
 PATIENCE: Final[int] = 8
 ABORT_SECONDS: Final[float] = 2 * 3600.0
 """The plan's cap: abort if one fit extrapolates above 2 GPU-hours."""
@@ -164,13 +166,13 @@ def validation_loss(*, net: model.HistoryEncoder, t: dict[str, torch.Tensor]) ->
         index = torch.arange(lo, min(lo + 256, n), device=t["x"].device)
         loss = batch_loss(net=net, t=t, index=index)
         for key in sums:
-            sums[key] += float(getattr(loss, key)) * len(index)
+            sums[key] += float(getattr(loss, key).detach()) * len(index)
     out = {key: value / n for key, value in sums.items()}
     out["l_u"] = out["step"] + out["size"]
     return out
 
 
-def fit(
+def fit(  # noqa: PLR0915
     *,
     ctx: Context,
     device: str,
@@ -227,8 +229,13 @@ def fit(
         return arrays, time.monotonic() - started
 
     start = time.monotonic()
-    best, best_epoch, best_state = float("inf"), -1, None
+    best, best_epoch = float("inf"), -1
     rows: list[dict[str, float]] = []
+    aborted = ""
+    first_epoch_seconds = 0.0
+    if out_dir is not None:
+        (out_dir / "models").mkdir(parents=True, exist_ok=True)
+    target = None if out_dir is None else out_dir / "models" / f"h_stage0_{MONTH}_seed0.pt"
     with ThreadPoolExecutor(max_workers=1) as feeder:
         pending = feeder.submit(make, 0)
         for epoch in range(max_epochs):
@@ -245,9 +252,11 @@ def fit(
                 optimiser.zero_grad(set_to_none=True)
                 loss.total.backward()
                 optimiser.step()
-                running += float(loss.total)
+                running += float(loss.total.detach())
             val_loss = validation_loss(net=net, t=val)
             elapsed = time.monotonic() - start
+            if epoch == 0:
+                first_epoch_seconds = elapsed
             row = {
                 "epoch": epoch + 1,
                 "train_total": running / max(len(order) // BATCH, 1),
@@ -263,17 +272,25 @@ def fit(
                 f"{val_loss['genuine']:.3f}, gen {gen_seconds:.1f} s, wait {wait_seconds:.1f} s, "
                 f"elapsed {elapsed:.0f} s"
             )
-            if val_loss["l_u"] < best:
+            if val_loss["l_u"] < best * (1.0 - IMPROVEMENT):
                 best, best_epoch = val_loss["l_u"], epoch + 1
-                best_state = {k: v.detach().cpu().clone() for k, v in net.state_dict().items()}
+                if target is not None:
+                    torch.save(net.state_dict(), target.with_suffix(".tmp"))
+                    target.with_suffix(".tmp").replace(target)
+            if out_dir is not None:
+                pl.DataFrame(rows).write_csv(out_dir / "fit_log.csv")
+            # The first epoch holds start-up; extrapolate from the later epochs only.
             reason = should_abort(
-                elapsed=elapsed, epochs_done=epoch + 1, max_epochs=max_epochs, limit=limit
+                elapsed=elapsed if epoch < 3 else elapsed - first_epoch_seconds,
+                epochs_done=epoch + 1 if epoch < 3 else epoch,
+                max_epochs=max_epochs if epoch < 3 else max_epochs - 1,
+                limit=limit,
             )
             if reason is not None:
-                raise RuntimeError(f"fit aborted: {reason}")
+                aborted = reason
+                break
             if epoch + 1 >= MIN_EPOCHS and epoch + 1 - best_epoch >= PATIENCE:
                 break
-    assert best_state is not None
     summary: dict[str, float | int | str] = {
         "epochs": len(rows),
         "best_epoch": best_epoch,
@@ -281,14 +298,12 @@ def fit(
         "val_stops_falling_before_epoch_10": int(best_epoch < 10),
         "elapsed_seconds": rows[-1]["elapsed_seconds"],
         "parameters": model.parameter_count(model=net),
+        "aborted": aborted,
     }
     if out_dir is not None:
-        (out_dir / "models").mkdir(parents=True, exist_ok=True)
-        target = out_dir / "models" / f"h_stage0_{MONTH}_seed0.pt"
-        torch.save(best_state, target.with_suffix(".tmp"))
-        target.with_suffix(".tmp").replace(target)
-        pl.DataFrame(rows).write_csv(out_dir / "fit_log.csv")
         (out_dir / "fit_summary.json").write_text(json.dumps(summary, indent=2))
+    if aborted:
+        raise RuntimeError(f"fit aborted: {aborted}")
     return summary
 
 
@@ -309,7 +324,7 @@ def predict(
 Predictor = Callable[[data.Arrays], tuple[np.ndarray, np.ndarray]]
 
 
-def score(
+def score(  # noqa: PLR0915
     *,
     ctx: Context,
     predictor: Predictor,
@@ -323,6 +338,7 @@ def score(
     n = len(windows)
     groups = ctx.groups[windows.primary]
     event_parts, lag_parts, auc_parts, ceiling_parts = [], [], [], []
+    sweep_inputs: list[tuple[np.ndarray, pl.DataFrame, np.ndarray]] = []
     for w in worlds:
         ev = gen.sample_world(spec=ctx.spec, seed=w)
         arrays = data.arrays_of(spec=ctx.spec, ev=ev, med=ctx.med, windows=windows)
@@ -330,6 +346,7 @@ def score(
         events = sc.true_events(ev=ev, p=windows.primary, d=windows.day, step_true=arrays.step_true)
         scored = sc.score_events(level=level, events=events, step_true=arrays.step_true)
         event_parts.append(scored.with_columns(pl.lit(w).alias("world")))
+        sweep_inputs.append((level, events, arrays.step_true))
         ceiling_parts.append(
             sc.score_events(level=arrays.step_true, events=events, step_true=arrays.step_true)
         )
@@ -360,6 +377,10 @@ def score(
     real = data.arrays_of(spec=ctx.spec, ev=empty, med=ctx.med, windows=windows)
     real_level, _ = predictor(real)
     real_flag = sc.flagged(level=real_level)
+    val_windows = ctx.split.validation
+    val_real = data.arrays_of(spec=ctx.spec, ev=empty, med=ctx.med, windows=val_windows)
+    val_flag = sc.flagged(level=predictor(val_real)[0])
+    val_groups = ctx.groups[val_windows.primary]
     result: dict[str, Any] = {}
     genuine_all = np.concatenate([a for a, _ in auc_parts])
     target_all = np.concatenate([b for _, b in auc_parts])
@@ -373,17 +394,19 @@ def score(
         sel = np.ones(n, dtype=bool) if name == "all" else groups == name
         found = {
             f"found_{int(h)}h": sc.cluster_mean(
-                values=(e["onset_error_hours"].to_numpy() <= h), cluster=e["window"].to_numpy()
+                values=(e["onset_error_hours"].to_numpy() <= h),
+                cluster=windows.primary[e["window"].to_numpy()],
             )
             for h in sc.FOUND_HOURS
         }
         missed = sc.cluster_mean(
-            values=~(e["onset_error_hours"].to_numpy() <= 24.0), cluster=e["window"].to_numpy()
+            values=~(e["onset_error_hours"].to_numpy() <= 24.0),
+            cluster=windows.primary[e["window"].to_numpy()],
         )
         hit = e.filter(pl.col("onset_error_hours") <= 24.0)
         touched = lg.filter(pl.col("touched"))
         clean = lg.filter(pl.col("usable") & ~pl.col("touched"))
-        false_rate = sc.cluster_mean(values=real_flag[sel], cluster=np.arange(n)[sel])
+        false_rate = sc.cluster_mean(values=real_flag[sel], cluster=windows.primary[sel])
         recall = found["found_2h"]
         result[name] = {
             "events": e.height,
@@ -406,10 +429,37 @@ def score(
             "lag_error_clean_rows": float(clean["repaired"].mean())
             if clean.height
             else float("nan"),
+            "clean_rows_error_over_injected_step": float(clean["repaired"].mean())
+            / float(touched["unrepaired"].mean())
+            if clean.height and touched.height
+            else float("nan"),
             "false_flag_rate_real_windows": str(false_rate),
+            "primaries_in_test": len(np.unique(windows.primary[sel])),
+            "false_flag_rate_validation_real_windows": float(
+                val_flag[
+                    np.ones(len(val_flag), bool) if name == "all" else val_groups == name
+                ].mean()
+            ),
             "planted_precision_at_2pc": sc.precision_at_rate(
                 recall=recall.mean, false_rate=false_rate.mean
             ),
+        }
+    result["threshold_sweep_all_groups"] = {}
+    for th in (0.5, 0.75, 1.0, 1.5):
+        err = np.concatenate(
+            [
+                sc.score_events(level=lv, events=ev_, step_true=st, threshold=th)[
+                    "onset_error_hours"
+                ].to_numpy()
+                for lv, ev_, st in sweep_inputs
+            ]
+        )
+        r_th = float((err <= 2.0).mean())
+        f_th = float(sc.flagged(level=real_level, threshold=th).mean())
+        result["threshold_sweep_all_groups"][str(th)] = {
+            "found_2h": r_th,
+            "false_flag_rate": f_th,
+            "planted_precision_at_2pc": sc.precision_at_rate(recall=r_th, false_rate=f_th),
         }
     result["genuine_head_auc"] = sc.rank_auc(score=genuine_all, label=target_all)
     result["genuine_head_windows"] = len(target_all)
@@ -650,6 +700,23 @@ def selftest() -> None:  # noqa: PLR0915
     )
     assert np.array_equal(a0.x, a0b.x)
     assert not np.array_equal(a0.x, a1.x)
+    # fit() end to end on the toy fold: two epochs, then the log and the saved state exist.
+    import tempfile
+
+    tmp = Path(tempfile.mkdtemp(dir=Path.home() / ".cache"))
+    summary = fit(
+        ctx=ctx, device="cpu", out_dir=tmp, max_epochs=2, epoch_windows=256, emit=lambda _: None
+    )
+    log = pl.read_csv(tmp / "fit_log.csv")
+    assert log.height == 2
+    assert {"val_l_u", "gen_seconds", "feeder_wait_seconds"} <= set(log.columns)
+    assert (tmp / "models" / f"h_stage0_{MONTH}_seed0.pt").exists()
+    assert summary["aborted"] == ""
+    for p in [*(tmp / "models").iterdir(), *tmp.iterdir()]:
+        if p.is_file():
+            p.unlink()
+    (tmp / "models").rmdir()
+    tmp.rmdir()
     print("selftest passed")
 
 
@@ -657,7 +724,7 @@ def main() -> None:
     """Run one command."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("selftest", "counts", "timing", "fit", "score"))
-    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
     if args.command == "selftest":
         selftest()
