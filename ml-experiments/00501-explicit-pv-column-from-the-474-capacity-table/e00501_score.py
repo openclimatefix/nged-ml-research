@@ -198,10 +198,12 @@ def print_checks(*, frames: dict[str, pl.DataFrame], ctx: dict) -> None:
     levels = list(common.LEVEL_COLUMNS)
     actuals = ctx["actuals"]
     for name in ("A_w115", "APV_w115"):
-        frame = frames[name].join(actuals, on=["time_series_id", "valid_time"])
-        frame = frame.filter(pl.col("lead_hours") < 240.0).with_columns(
-            mean_forecast=pl.concat_list(levels).list.mean()
+        frame = frames[name].join(
+            actuals.filter(pl.col("actual").is_not_nan()), on=["time_series_id", "valid_time"]
         )
+        frame = frame.filter(
+            (pl.col("valid_time") - pl.col("power_fcst_init_time")) < timedelta(hours=240)
+        ).with_columns(mean_forecast=pl.concat_list(levels).list.mean())
         rows = frame.group_by("time_series_id").agg(
             median_minus_mean=(pl.col("q50") - pl.col("mean_forecast")).mean(),
             mae_median=(pl.col("q50") - pl.col("actual")).abs().mean(),
