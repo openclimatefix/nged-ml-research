@@ -7,7 +7,7 @@ title: >-
 theme: demand-inputs
 also_relevant_to:
   - generator-forecasting
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -50,13 +50,99 @@ row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity, q99 pinball loss, and CRPS by Primary, by half-hour of
   day, and by horizon band.
+verdict: not supported
+best_arm: >-
+  None. The oracle (true whole-day price shape at training and scoring) scored 5.187 points at the
+  eight and 3.693 at the six, against 5.150 and 3.741 for the no-shape control.
+headline: >-
+  Giving the lag-free network the true price shape of the whole day, at training and at scoring, did
+  not lower its error by a resolvable amount: -0.048 points at the six (Bonferroni interval -0.100
+  to +0.004) and +0.037 at the eight (-0.037 to +0.118), against a minimum detectable effect of
+  about 0.17.
+lessons: >-
+  The oracle was no better at the Primaries with a known battery or gas engine than at the others
+  (eight +0.059 against -0.003; six -0.027 against -0.089), so the price shape is not carrying
+  information about those assets that the network can use. A shuffled day's shape scored worse
+  than the control at the eight (+0.057, interval excludes zero), so adding 11 columns that carry
+  no usable signal costs a little. Five month blocks and a seed spread of 0.10 to 0.11 points
+  leave only gains above about 0.17 points resolvable.
+take_home_message: >-
+  Even a perfect, hindsight price shape for the whole day does not lower the lag-free demand
+  network's error at NGED's Primaries by a measurable amount, and the oracle gains no more at the
+  Primaries with a known battery or gas engine. A training-time-only price arm (price dropout, an
+  auxiliary price head, or a teacher network) can recover at most what the oracle gains, which is
+  nothing resolvable, so those arms were not run. The next experiment on batteries and
+  price-following generators should not use price as a demand-network input; it should try metered
+  or modelled battery output as its own target or a subtracted term.
+advice:
+  - >-
+    Do not add price-shape columns, or a training-time-only price arm, to the lag-free demand
+    network on this evidence: the oracle bound is not resolvable from zero (Results table).
+  - >-
+    Do not read the interim timing-run result (all shape arms better than the control on one fold
+    and one seed) as a gain: with five folds and three seeds the placebo scored worse than the
+    control at the eight.
+production_status: not_adopted
+adopted_in: none
 ---
 
-## Plan (status: planned; no score has been read)
+**We asked whether a demand neural network forecasts better if it is shown the electricity price of the
+whole day during training, because batteries and gas engines behind a substation follow the price.**
+We gave the network the exact price shape of each day, as ten numbers such as the day's cheapest and
+dearest half-hours and the evening-minus-overnight spread, at both training and scoring. That test is
+an upper bound, because no price exists when we forecast days 2 to 10. The network did not forecast
+better by an amount we can resolve: its error changed by +0.037 points of capacity at the eight
+Primaries that report only apparent power and by -0.048 at the six that report signed megawatts
+(intervals include zero), where the seed noise alone is about 0.17 points. A shuffled day's shape
+and the shape of national demand minus wind did no better. All numbers are interim and unaudited
+until the reviews are recorded in the pull request.
 
-**The plan was written before any fit that produced a quoted number.** The take-home message, the
-verdict, and the results are added when the experiment finishes. The plan covers Part 1 of the brief
-(the price shape) only; whether the 0/1 lockdown flag is still needed is a separate experiment.
+## Figures
+
+![The oracle's gain by Primary](figure_1_oracle_gain_by_primary.svg)
+
+![The oracle's gain by half-hour of day](figure_2_oracle_gain_by_half_hour.svg)
+
+## Results
+
+- **Setup.** Five folds (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), seeds 0, 1, and 2, rows of
+  experiment 470 with no labelled event, widening 1.15. The scoring mask excludes the half-hours of
+  price-missing days, and none of the 1,145,256 scored half-hours falls on one, so no row was
+  excluded.
+- **Minimum detectable effect of a 3-seed mean (four arms pooled).** 0.176 at the eight and 0.168
+  at the six.
+- **CRPS contrasts (points; Bonferroni count 12; negative favours the first arm).**
+
+| Contrast | Eight | Six |
+|---|---|---|
+| PO minus P0 (oracle) | +0.037 [-0.037, +0.118] | -0.048 [-0.100, +0.004] |
+| PP minus P0 (placebo) | +0.057 [+0.017, +0.101] | +0.018 [-0.005, +0.040] |
+| PN minus P0 (national) | +0.054 [-0.008, +0.118] | -0.003 [-0.060, +0.055] |
+| PO minus PP | -0.020 [-0.068, +0.031] | -0.065 [-0.112, -0.017] |
+| PO minus PN | -0.017 [-0.086, +0.048] | -0.045 [-0.098, +0.013] |
+
+- **Absolute CRPS (points).** Eight: P0 5.150, PO 5.187, PP 5.207, PN 5.204. Six: P0 3.741, PO 3.693,
+  PP 3.758, PN 3.738.
+- **Per fold (PO minus P0).** Eight: +0.001, +0.244, +0.015, +0.081, -0.201 (2025-10, 2025-12,
+  2026-01, 2026-03, 2026-06). Six: +0.089, -0.191, -0.085, +0.103, -0.181. Five month blocks give
+  near min-to-max intervals, and the signs are mixed.
+- **Stop rule.** Neither group's point estimate reaches minus the minimum detectable effect, and
+  the six's interval includes zero, so P-drop, P-aux, and P-teach did not run.
+- **Known-asset Primaries (D2, D5, D8, D9, D11, D14) against the others, oracle minus control.**
+  Eight: +0.059 against -0.003. Six: -0.027 against -0.089. P4 fails.
+- **Horizon bands, oracle minus control.** Eight: +0.059 (day 1), +0.053 (days 2 to 3), -0.011
+  (days 4 to 10). Six: +0.014, -0.020, -0.065.
+- **Evening peak and overnight.** The six's overnight half-hours gain -0.134 against -0.025 for
+  the rest, one slice of many and not corrected for the number of slices.
+- **Predictions.** P1 held (the gain is inside 0.00 to 0.06 and unresolved). P2 to P4 did not
+  apply, because the oracle did not pass the stop rule.
+- **Interim timing run.** A single-fold, single-seed run (2025-10, seed 0, pinball loss) scored all
+  three shape arms better than the control; five folds and three seeds did not reproduce that.
+
+## Plan
+
+**The plan below was written before any fit that produced a quoted number.** It covers Part 1 of
+the brief (the price shape) only; whether the 0/1 lockdown flag is still needed is a separate experiment.
 
 ## Question
 
@@ -121,9 +207,8 @@ verifiably the day-ahead price; N2EX day-ahead exists only from 2025-09. Rows ar
 **Missing-price days.** A day with any missing half-hour is a missing day: its ten shape columns are
 0 and its missing flag is 1, in training and at scoring. The grid holds 2,527 local days; the
 checks print how many are missing (101 for price, 50 for the national series). The scored rows
-exclude the
-half-hours of missing days, for every arm, so the contrasts stay paired on one row set; the
-number of excluded half-hours is reported.
+exclude the half-hours of missing days, for every arm, so the contrasts stay paired on one row
+set; the number of excluded half-hours is reported.
 
 **Shuffled-day placebo.** Each non-missing day takes the shape of another non-missing day with the
 same calendar month (any year), the same day type (Monday to Friday, Saturday, Sunday), and the same
@@ -205,10 +290,3 @@ generation, per half-hour, so they describe the day's residual demand shape.
 Cleaned data and the D15 and D18 start cut (through experiment 428's rows); rows with no labelled
 event; July 2026 unused; no XGBoost work; metered generators are not shown (this experiment scores
 substations); titles say "load-shift", never "switching"; every interim number is unaudited.
-
-## Implementation details (deleted when this ships)
-
-Code in `ml-experiments/00513-.../`: `e00513_shape.py` (feature definitions and the placebo draw),
-`e00513_data.py` (the price, placebo, and national tables on experiment 428's grid),
-`e00513_checks.py` (feature and placebo checks, run before any fit), `e00513_fit.py` (pretrain,
-fine-tune, forecast), `e00513_score.py` (experiment 510's scorer pointed here).
