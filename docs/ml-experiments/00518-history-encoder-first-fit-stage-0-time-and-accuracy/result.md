@@ -72,7 +72,9 @@ take_home_message: >-
   unsupported for now.
 lessons: >-
   One cheap fit cannot settle whether a history encoder is learnable. The fit was about 100 times cheaper
-  than its 2-hour cap, so a longer, multi-seed attempt is affordable. The test month may be quieter than training (78% of its medians come from the post-refit module), which would flatter the false-flag rate; this is a hypothesis, not a finding.
+  than its 2-hour cap, so a longer, multi-seed attempt is affordable. The test month may be
+  quieter than training (78% of its medians come from the post-refit module), which would flatter
+  the false-flag rate; this is a hypothesis, not a finding.
 advice:
   - >-
     Choose the flag threshold on a validation block with the training provenance of the median, not
@@ -90,8 +92,8 @@ advice:
 **This page is interim and unaudited, and its result is a weak null.** A small neural network (the
 history encoder, 86,747 parameters) was trained once, for 69 seconds, on injected shifts in 14 days
 of power readings at the fold 2026-01 Primaries. The encoder did not pass the pre-registered
-proxy for the plan's kill rule (c). The fit used one seed and a noisy validation block of 401 windows, so the
-result does not rule out a learned repair.
+proxy for the plan's kill rule (c). The fit used one seed and a noisy validation block of 401
+windows, so the result does not rule out a learned repair.
 
 ## Method
 
