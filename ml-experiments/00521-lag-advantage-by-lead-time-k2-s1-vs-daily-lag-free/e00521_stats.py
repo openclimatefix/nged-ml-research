@@ -139,7 +139,7 @@ def percentiles(*, boot: np.ndarray, tests: int = TESTS) -> dict[str, float]:
 
 def block_stats(*, diff: pl.DataFrame, rng: np.random.Generator, tests: int = TESTS) -> dict:
     """Return the mean of `d`, its day-block and month-block intervals, and the per-fold means."""
-    out: dict = {"n": diff.height, "difference": float(diff["d"].mean())}
+    out: dict = {"n": diff.height, "difference": float(diff["d"].mean())}  # ty: ignore[invalid-argument-type]
     for label, keys in (("day", ["month", "day"]), ("month", ["month"])):
         blocks = diff.group_by(keys).agg(pl.len().alias("n"), pl.col("d").sum().alias("s"))
         n, s = blocks["n"].to_numpy().astype(float), blocks["s"].to_numpy()
@@ -190,7 +190,7 @@ def absolute_table(*, table: pl.DataFrame) -> pl.DataFrame:
             for arm in arms:
                 records.append(
                     {"set": name, "band": band, "arm": arm, "n": sub.height}
-                    | {m: float(sub[f"{arm}__{m}"].mean()) for m in cols}
+                    | {m: float(sub[f"{arm}__{m}"].mean()) for m in cols}  # ty: ignore[invalid-argument-type]
                 )
     return pl.DataFrame(records)
 
@@ -298,12 +298,12 @@ def checks_table(*, table: pl.DataFrame) -> pl.DataFrame:
     for name in ("eight", "six", "six_all", "report"):
         part = row_set(table=table, name=name)
         records.append({"check": f"rows in {name}", "value": float(part.height)})
-        gap = float((part["L-1d__crps"] - part["K2-S1__crps"]).mean())
+        gap = float((part["L-1d__crps"] - part["K2-S1__crps"]).mean())  # ty: ignore[invalid-argument-type]
         records.append({"check": f"pooled gap L-1d minus K2-S1, {name}", "value": gap})
         no_event = part.filter(~pl.col("tgt_real"))
-        gap_ne = float((no_event["L-1d__crps"] - no_event["K2-S1__crps"]).mean())
+        gap_ne = float((no_event["L-1d__crps"] - no_event["K2-S1__crps"]).mean())  # ty: ignore[invalid-argument-type]
         records.append({"check": f"pooled gap, {name}, tgt_real false", "value": gap_ne})
-        gap3 = float((part["L-1d__crps"] - part["K2-S1-3cell__crps"]).mean())
+        gap3 = float((part["L-1d__crps"] - part["K2-S1-3cell__crps"]).mean())  # ty: ignore[invalid-argument-type]
         records.append({"check": f"pooled gap vs 3-cell K2-S1, {name}", "value": gap3})
     for name in ("eight", "six"):
         part = row_set(table=table, name=name)
