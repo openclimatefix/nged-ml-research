@@ -1,6 +1,7 @@
 # ruff: noqa: E501
-"""Draw the figures of experiment 523 from the tables of `e00523_scores.py`,
-`e00523_lead_swap.py`, and the panels.
+"""Draw the figures of experiment 523 from its stored score tables.
+
+The tables come from `e00523_scores.py`, `e00523_lead_swap.py`, and the panels.
 
 Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
 
