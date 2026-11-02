@@ -351,6 +351,10 @@ def stats_command() -> None:
                             frame=frame, arm=arm, ref="W0", group=g, slice_name=s, metric=metric
                         )
                     )
+    for arm in ("W-T", "W-S", "W-X"):
+        for g in GROUPS:
+            for s in ("all", "cold_night"):
+                records.append(contrast(frame=frame, arm=arm, ref="W-null", group=g, slice_name=s))
     if f"{fit.SEAM_ARM}__crps" in frame.columns:
         for g in GROUPS:
             for s in ("all", "cold_night"):
@@ -375,6 +379,15 @@ def stats_command() -> None:
                 )
                 absolute.append({"arm": arm, "group": g, "slice": s, "crps": sum(v[0] for v in sums.values()) / max(sum(v[1] for v in sums.values()), 1)})  # fmt: skip
     print(pl.DataFrame(absolute))
+    folds = []
+    for arm in ("W-T", "W-S", "W-X", "W-null"):
+        for g in ("eight", "six"):
+            mask = mask_of(frame=frame, group=g, slice_name="cold_night")
+            a = fold_sums(frame=frame, column=f"{arm}__crps", mask=mask)
+            b = fold_sums(frame=frame, column=" W0__crps".strip(), mask=mask)
+            folds.append({"arm": arm, "group": g} | {m: round((a[m][0] - b[m][0]) / a[m][1], 3) for m in sorted(a)})
+    with pl.Config(tbl_cols=20, tbl_width_chars=200):
+        print(pl.DataFrame(folds))
     print(f"Bonferroni: primary family {BONFERRONI}; reported family 84")
 
 
