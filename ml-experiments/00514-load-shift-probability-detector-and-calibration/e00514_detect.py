@@ -30,6 +30,8 @@ EDGE_TOLERANCE: Final[int] = 2
 THRESHOLDS: Final[tuple[float, float]] = (3.0, 5.0)
 SYMMETRY_TOLERANCE: Final[float] = 2.5
 SHAPE_MIN_STEPS: Final[int] = 24
+EXCLUDED_PARTNERS: Final[tuple[int, ...]] = (10, 12)
+"""D15 and D18 (Primary indices 10 and 12) are never partners: their history is too short in most worlds."""
 FEATURES: Final[tuple[str, ...]] = (
     "log_score", "log_duration", "open", "return_ratio", "edge_asymmetry", "amplitude",
     "after_fraction", "start_opp3", "start_opp5", "end_opp3", "both_opp3", "start_same3",
@@ -59,7 +61,9 @@ def _prefix(*, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     )
 
 
-def _mean(*, cs: np.ndarray, cn: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _mean(
+    *, cs: np.ndarray, cn: np.ndarray, lo: np.ndarray, hi: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Return the mean and the count of finite values in [lo, hi) with indices clipped to the series."""
     n = len(cs) - 1
     lo = np.clip(lo, 0, n)
@@ -139,6 +143,9 @@ def scan_series(*, x: np.ndarray, sigma: np.ndarray, end: int, lo: int = 0) -> C
         sigma: This series' step noise per duration.
         end: First index that is not observed.
         lo: First index a candidate may start at.
+
+    Returns:
+        The candidates, thinned by greedy suppression.
     """
     starts, durs, opens, scores, d1s, d2s, afs = [], [], [], [], [], [], []
     for k, dur in enumerate(DURATIONS):
@@ -176,7 +183,12 @@ def scan_series(*, x: np.ndarray, sigma: np.ndarray, end: int, lo: int = 0) -> C
         d2s.append(np.zeros(len(idx)))
         afs.append(np.zeros(len(idx)))
     cat = lambda parts: np.concatenate(parts) if parts else np.array([])  # noqa: E731
-    start, dur_a, is_open, score_a = cat(starts).astype(np.int64), cat(durs).astype(np.int64), cat(opens).astype(bool), cat(scores)
+    start, dur_a, is_open, score_a = (
+        cat(starts).astype(np.int64),
+        cat(durs).astype(np.int64),
+        cat(opens).astype(bool),
+        cat(scores),
+    )
     d1_a, d2_a, af_a = cat(d1s), cat(d2s), cat(afs)
     order = np.argsort(-score_a, kind="stable")[: MAX_CANDIDATES * 3]
     covered = np.zeros(len(x) + 1, dtype=bool)
@@ -202,7 +214,10 @@ def shape_profile(*, power: np.ndarray) -> np.ndarray:
     """Return the median of the same half-hour in the 4 earlier weeks (causal demand shape)."""
     n = len(power)
     past = np.stack(
-        [np.concatenate([np.full(k * d514.WEEK, np.nan), power[: n - k * d514.WEEK]]) for k in range(1, 5)]
+        [
+            np.concatenate([np.full(k * d514.WEEK, np.nan), power[: n - k * d514.WEEK]])
+            for k in range(1, 5)
+        ]
     )
     with np.errstate(all="ignore"):
         return np.nanmedian(past, axis=0)
@@ -210,9 +225,11 @@ def shape_profile(*, power: np.ndarray) -> np.ndarray:
 
 def edge_matrix(*, matrix: np.ndarray, scales: Scales) -> np.ndarray:
     """Return the (20, n) partner edge statistic in units of each series' own edge noise."""
-    return np.stack(
+    out = np.stack(
         [d514.edge_statistic(x=matrix[i]) / scales.edge_sd[i] for i in range(matrix.shape[0])]
     )
+    out[list(EXCLUDED_PARTNERS)] = np.nan
+    return out
 
 
 def candidate_features(
@@ -256,15 +273,19 @@ def candidate_features(
         symmetry, has_pair = 0.0, 0.0
         if both.any():
             f = flank_of(d=dur)
-            m_d = _mean(cs=cs[series][0], cn=cs[series][1], lo=np.array([a]), hi=np.array([end_t]))[0] - _mean(
-                cs=cs[series][0], cn=cs[series][1], lo=np.array([a - f]), hi=np.array([a])
-            )[0]
+            m_d = (
+                _mean(cs=cs[series][0], cn=cs[series][1], lo=np.array([a]), hi=np.array([end_t]))[0]
+                - _mean(cs=cs[series][0], cn=cs[series][1], lo=np.array([a - f]), hi=np.array([a]))[
+                    0
+                ]
+            )
             donor_mw = float(m_d[0]) * scales.mw_per_z[series]
             partner_mw = 0.0
             for q in others[both]:
-                m_q = _mean(cs=cs[q][0], cn=cs[q][1], lo=np.array([a]), hi=np.array([end_t]))[0] - _mean(
-                    cs=cs[q][0], cn=cs[q][1], lo=np.array([a - f]), hi=np.array([a])
-                )[0]
+                m_q = (
+                    _mean(cs=cs[q][0], cn=cs[q][1], lo=np.array([a]), hi=np.array([end_t]))[0]
+                    - _mean(cs=cs[q][0], cn=cs[q][1], lo=np.array([a - f]), hi=np.array([a]))[0]
+                )
                 partner_mw += float(np.nan_to_num(m_q[0])) * scales.mw_per_z[q]
             if np.isfinite(donor_mw) and abs(donor_mw) > 1e-9:
                 ratio = float(np.clip(-partner_mw / donor_mw, 0.05, 20.0))
@@ -297,8 +318,8 @@ def _return_ratio(*, d1: float, d2: float, is_open: bool) -> float:
 
 
 def row_probability(*, cands: Candidates, p_cand: np.ndarray, n: int) -> np.ndarray:
-    """Return the largest candidate probability that covers each of the `n` rows (0 if none)."""
-    p = np.zeros(n)
+    """Return the largest candidate probability that covers each of the `n` rows (-1 if none)."""
+    p = np.full(n, -1.0)
     for j in np.argsort(p_cand):
         a, b = int(cands.start[j]), int(min(cands.start[j] + cands.duration[j], n))
         p[a:b] = np.maximum(p[a:b], p_cand[j])

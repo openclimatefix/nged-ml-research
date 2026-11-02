@@ -9,13 +9,13 @@ block and the `further` rows is detrended causally at each cutoff by `junction_o
 """
 
 import functools
+import itertools
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
-import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00428_data as data  # ty: ignore[unresolved-import]
 import e00510_common as c510  # ty: ignore[unresolved-import]
 import numpy as np
@@ -77,7 +77,9 @@ def series_info() -> pl.DataFrame:
 def primary_capacity_mw() -> np.ndarray:
     """Return the Primaries' effective capacity in MW, in Primary-index order."""
     table = series_info().filter(pl.col("substation_type") == "Primary")
-    by_site = dict(zip(table["site"].to_list(), table["effective_capacity_mw"].to_list(), strict=True))
+    by_site = dict(
+        zip(table["site"].to_list(), table["effective_capacity_mw"].to_list(), strict=True)
+    )
     return np.array([by_site[s] for s in sites()], dtype=np.float64)
 
 
@@ -90,7 +92,9 @@ def supply_sites() -> list[str]:
 def supply_capacity_mw() -> np.ndarray:
     """Return the four supply points' effective capacity in MW."""
     table = series_info()
-    by_site = dict(zip(table["site"].to_list(), table["effective_capacity_mw"].to_list(), strict=True))
+    by_site = dict(
+        zip(table["site"].to_list(), table["effective_capacity_mw"].to_list(), strict=True)
+    )
     return np.array([by_site[s] for s in supply_sites()], dtype=np.float64)
 
 
@@ -108,7 +112,12 @@ def profile_difference_supply() -> np.ndarray:
     out = []
     for site in supply_sites():
         x = arrays[site].power.astype(np.float64)
-        past = np.stack([np.concatenate([np.full(k * WEEK, np.nan), x[: len(x) - k * WEEK]]) for k in range(1, 5)])
+        past = np.stack(
+            [
+                np.concatenate([np.full(k * WEEK, np.nan), x[: len(x) - k * WEEK]])
+                for k in range(1, 5)
+            ]
+        )
         with np.errstate(all="ignore"):
             med = np.nanmedian(past, axis=0)
         out.append((x - med).astype(np.float32))
@@ -200,24 +209,25 @@ def build_fold(*, month: str) -> Fold:
         grid = sub["grid"].to_numpy().astype(np.int64)
         q50 = sub["q50"].to_numpy().astype(np.float64)
         hw = (sub["q95"].to_numpy() - sub["q05"].to_numpy()).astype(np.float64) / 2.0
-        cross = sub["source"].to_numpy() == "crossfit"
+        cross = (sub["source"].to_numpy() == "crossfit") & (grid < refit - CUT_STEPS)
         half_width[p] = float(np.median(hw[cross]))
         z[p, grid] = (clean[p, grid] - q50) / half_width[p]
     edges = [int(np.ceil(k * refit / BLOCKS)) for k in range(1, BLOCKS)]
-    bounds = [0, *edges, refit]
-    for a, b in zip(bounds[:-1], bounds[1:], strict=True):
+    bounds = [0, *edges, refit - CUT_STEPS]
+    for a, b in itertools.pairwise(bounds):
         for p in range(16):
             block = z[p, a:b]
             if np.isfinite(block).sum() > 100:
                 z[p, a:b] = block - np.nanmedian(block)
-    spread = np.array([robust_sd(x=z[p, :refit]) for p in range(16)])
+    hist = refit - CUT_STEPS
+    spread = np.array([robust_sd(x=z[p, :hist]) for p in range(16)])
     supply = profile_difference_supply().astype(np.float64)
     supply_sd = np.zeros(supply.shape[0])
     for k in range(supply.shape[0]):
-        supply_sd[k] = robust_sd(x=supply[k, :refit])
+        supply_sd[k] = robust_sd(x=supply[k, :hist])
         supply[k] = supply[k] / supply_sd[k]
     partners = np.concatenate([z, supply])
-    edge_sd = np.array([robust_sd(x=edge_statistic(x=partners[k, :refit])) for k in range(20)])
+    edge_sd = np.array([robust_sd(x=edge_statistic(x=partners[k, :hist])) for k in range(20)])
     cap = np.concatenate([primary_capacity_mw(), supply_capacity_mw()])
     return Fold(
         month=month,
@@ -263,7 +273,7 @@ def series_at(*, fold: Fold, end: int) -> np.ndarray:
     out = fold.partners().copy()
     out[:, end:] = np.nan
     offset, first = junction_offset(z=out[:16], junction=fold.refit, end=end)
-    if first >= end and end > fold.refit:
+    if first >= end > fold.refit:
         out[:16, fold.refit : end] = np.nan
     elif end > fold.refit:
         out[:16, fold.refit : end] += offset[:, None]
@@ -341,7 +351,10 @@ def load_shapes() -> np.ndarray:
         out = np.empty((16, n), dtype=np.float32)
         for p in range(16):
             past = np.stack(
-                [np.concatenate([np.full(k * WEEK, np.nan), clean[p, : n - k * WEEK]]) for k in range(1, 5)]
+                [
+                    np.concatenate([np.full(k * WEEK, np.nan), clean[p, : n - k * WEEK]])
+                    for k in range(1, 5)
+                ]
             )
             with np.errstate(all="ignore"):
                 out[p] = np.nanmedian(past, axis=0)

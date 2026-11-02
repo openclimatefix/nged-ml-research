@@ -12,7 +12,6 @@ import argparse
 import json
 import multiprocessing as mp
 import pickle
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -53,19 +52,37 @@ def month_index(*, month: str) -> int:
     return d514.index_of(t=datetime.fromisoformat(f"{month}-01").replace(tzinfo=UTC))
 
 
+def month_stop_index(*, month: str) -> int:
+    """Return the grid index of 00:00 UTC on the first day after a month."""
+    return d514.index_of(t=d514.c510.month_stop(month=month))
+
+
+def month_of(*, index: int) -> str:
+    """Return the `YYYY-MM` label of the month containing a grid index."""
+    return d514.time_of(index=index).strftime("%Y-%m")
+
+
 def dip_windows() -> tuple[list[int], list[int]]:
     """Return D8's explained dip day indices before 2025-07 and the held-out dip day indices.
 
     The second list holds D8's unexplained dips and D22's dip days; no training world contains them.
     """
-    root = d514.ML_EXPERIMENTS_DATA_DIR / "00508-mva-shoulder-hours-and-d8-d22-dips-solar-or-load-shift" / "work"
+    root = (
+        d514.ML_EXPERIMENTS_DATA_DIR
+        / "00508-mva-shoulder-hours-and-d8-d22-dips-solar-or-load-shift"
+        / "work"
+    )
     engine = pl.read_parquet(root / "partB_engine_d8.parquet")
-    shape = pl.read_parquet(root / "partB_shape.parquet").filter((pl.col("kind") == "dip") & (pl.col("site") == "D22"))
+    shape = pl.read_parquet(root / "partB_shape.parquet").filter(
+        (pl.col("kind") == "dip") & (pl.col("site") == "D22")
+    )
 
     def idx(date: int) -> int:
         return d514.index_of(t=datetime(date // 10_000, date // 100 % 100, date % 100, tzinfo=UTC))
 
-    explained = [idx(x) for x in engine.filter(pl.col("coincident"))["date"].to_list() if x < 20250701]
+    explained = [
+        idx(x) for x in engine.filter(pl.col("coincident"))["date"].to_list() if x < 20250701
+    ]
     unexplained = [idx(x) for x in engine.filter(~pl.col("coincident"))["date"].to_list()]
     unexplained += [idx(x) for x in shape["date"].to_list()]
     return explained, unexplained
@@ -81,6 +98,12 @@ def _init() -> None:
     explained, unexplained = dip_windows()
     _STATE["explained"] = explained
     _STATE["unexplained"] = unexplained
+    hold = np.zeros((20, fold.z.shape[1]), dtype=bool)
+    d8, d22 = unexplained[: len(unexplained) - 12], unexplained[len(unexplained) - 12 :]
+    for series, days in ((inj.DIP_SITE, d8), (15, d22)):
+        for day in days:
+            hold[series, day : day + 48] = True
+    _STATE["holdout"] = hold
 
 
 def _scales(*, month_start: int) -> det.Scales:
@@ -88,7 +111,9 @@ def _scales(*, month_start: int) -> det.Scales:
     cache = _STATE["scales"]
     if month_start not in cache:
         fold = _STATE["fold"]
-        cache[month_start] = det.fit_scales(matrix=fold.partners(), mw_per_z=fold.mw_per_z, hist_end=month_start)
+        cache[month_start] = det.fit_scales(
+            matrix=fold.partners(), mw_per_z=fold.mw_per_z, hist_end=month_start
+        )
     return cache[month_start]
 
 
@@ -120,20 +145,26 @@ def build_chunk(args: tuple[str, int, int]) -> list[dict]:
     fold = _STATE["fold"]
     for seed in range(lo, hi):
         rng = np.random.default_rng(seed)
-        month = spec["months"][int(rng.integers(len(spec["months"])))]
-        ms = month_index(month=month)
+        first = month_index(month=spec["months"][0])
+        last_end = month_stop_index(month=spec["months"][-1])
         kind = str(rng.choice(names, p=shares / shares.sum()))
-        forced = None
+        forced = int(rng.integers(first, last_end - inj.WORLD_LENGTH))
         if kind == "dip":
-            pool = _STATE["explained"]
-            date = int(rng.choice(pool))
-            forced = date - int(rng.integers(35, 80)) * 48
-            ms = max(forced - 20 * 48, 0)
-            if any(abs(u - date) < 90 * 48 for u in _STATE["unexplained"]):
-                continue
+            pool = [
+                x for x in _STATE["explained"] if first <= x - 80 * 48 and x + 10 * 48 < last_end
+            ]
+            if not pool:
+                kind = "null"
+            else:
+                date = int(rng.choice(pool))
+                forced = max(
+                    first, min(date - int(rng.integers(35, 80)) * 48, last_end - inj.WORLD_LENGTH)
+                )
+        month = month_of(index=forced)
+        ms = month_index(month=month)
         world = inj.make_world(
             fold=fold, month_start=ms, rng=rng, kind=kind, shapes=spec["shapes"], donors=spec["donors"],
-            shape_all=_STATE["shapes"], scales=_scales(month_start=ms), event_rows=_STATE["events"],
+            shape_all=_STATE["shapes"], scales=_scales(month_start=ms), event_rows=_STATE["events"], holdout_rows=_STATE["holdout"],
             forced_start=forced,
         )  # fmt: skip
         if world is None:
@@ -141,8 +172,16 @@ def build_chunk(args: tuple[str, int, int]) -> list[dict]:
         meta = {"set": name, "seed": seed, "month": month, "kind": kind}
         for item in inj.world_candidates(world=world):
             rec = _entry(world=world, item=item, meta=meta)
-            pulse = next((p for p in world.pulses if p.series == item["series"] and not p.genuine), None)
-            rec["pulse"] = None if pulse is None else (pulse.size, pulse.duration, pulse.shape, pulse.sign, pulse.mirrored)
+            pulse = next(
+                (p for p in world.pulses if p.series == item["series"] and not p.genuine), None
+            )
+            rec["pulse"] = (
+                None
+                if pulse is None
+                else (pulse.size, pulse.duration, pulse.shape, pulse.sign, pulse.mirrored)
+            )
+            step = next((p for p in world.pulses if p.series == item["series"] and p.genuine), None)
+            rec["genuine_start"] = None if step is None else step.start - rec["rows"][0]
             out.append(rec)
     return out
 
@@ -162,20 +201,27 @@ def build_grid(args: tuple[int, int]) -> list[dict]:
     for seed in range(lo, hi):
         rng = np.random.default_rng(100_000 + seed)
         s, dur, shape, sign, mir = cells[seed % len(cells)]
-        month = HELD_MONTHS[int(rng.integers(len(HELD_MONTHS)))]
+        first, last_end = month_index(month=HELD_MONTHS[0]), month_stop_index(month=HELD_MONTHS[-1])
+        forced = int(rng.integers(first, last_end - inj.WORLD_LENGTH))
+        month = month_of(index=forced)
         ms = month_index(month=month)
         world = inj.make_world(
             fold=fold, month_start=ms, rng=rng, kind="pulses", shapes=(shape,), donors=None,
-            shape_all=_STATE["shapes"], scales=_scales(month_start=ms), event_rows=_STATE["events"],
+            shape_all=_STATE["shapes"], scales=_scales(month_start=ms), event_rows=_STATE["events"], holdout_rows=_STATE["holdout"],
+            forced_start=forced,
             force={"size": s, "duration": dur, "shape": shape, "sign": sign, "mirrored": mir},
         )  # fmt: skip
         if world is None:
             continue
         meta = {"set": "grid", "seed": seed, "month": month, "kind": "grid"}
-        for item in inj.world_candidates(world=world):
+        for item in inj.world_candidates(world=world, eval_all=True):
             rec = _entry(world=world, item=item, meta=meta)
             pulse = next((p for p in world.pulses if p.series == item["series"]), None)
-            rec["pulse"] = None if pulse is None else (pulse.size, pulse.duration, pulse.shape, pulse.sign, pulse.mirrored)
+            rec["pulse"] = (
+                None
+                if pulse is None
+                else (pulse.size, pulse.duration, pulse.shape, pulse.sign, pulse.mirrored)
+            )
             out.append(rec)
     return out
 
@@ -212,7 +258,7 @@ def run_worlds() -> None:
 
 def load_set(*, name: str) -> list[dict]:
     """Return a stored set of records."""
-    return pickle.loads((WORK / f"set_{name}.pkl").read_bytes())  # noqa: S301
+    return pickle.loads((WORK / f"set_{name}.pkl").read_bytes())
 
 
 def stack(*, records: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -235,8 +281,8 @@ class Model:
         """Return the base model's candidate probability."""
         if len(x) == 0:
             return np.zeros(0)
-        z = self.scaler.transform(x) if self.scaler is not None else x  # type: ignore[union-attr]
-        return self.base.predict_proba(z)[:, 1]  # type: ignore[union-attr]
+        z = self.scaler.transform(x) if self.scaler is not None else x  # ty: ignore[unresolved-attribute]
+        return self.base.predict_proba(z)[:, 1]  # ty: ignore[unresolved-attribute]
 
     def row_p(self, *, record: dict, shift: float | None = None) -> np.ndarray:
         """Return the calibrated row probability over the record's evaluated rows."""
@@ -254,7 +300,8 @@ class Model:
     def calibrate(self, *, raw: np.ndarray, shift: float) -> np.ndarray:
         """Map raw row probabilities through the row-level Platt fit and the prior shift."""
         eps = 1e-6
-        covered = raw > 0
+        covered = raw >= 0
+        raw = np.clip(raw, 0.0, 1.0)
         logit = np.log(np.clip(raw, eps, 1 - eps) / (1 - np.clip(raw, eps, 1 - eps)))
         p = 1.0 / (1.0 + np.exp(-(self.row_a * logit + self.row_b + shift)))
         q0 = np.clip(self.zero_rate, eps, 1 - eps)
@@ -268,7 +315,9 @@ def brier(*, p: np.ndarray, y: np.ndarray, w: np.ndarray | None = None) -> float
     return float(np.sum(w * (p - y) ** 2) / np.sum(w))
 
 
-def reliability(*, p: np.ndarray, y: np.ndarray, w: np.ndarray | None = None, bins: int = 10) -> pl.DataFrame:
+def reliability(
+    *, p: np.ndarray, y: np.ndarray, w: np.ndarray | None = None, bins: int = 10
+) -> pl.DataFrame:
     """Return the reliability table (equal-width bins) and the weighted expected calibration error."""
     w = np.ones(len(p)) if w is None else w
     edges = np.linspace(0, 1, bins + 1)
@@ -283,11 +332,17 @@ def reliability(*, p: np.ndarray, y: np.ndarray, w: np.ndarray | None = None, bi
             "observed": float(np.average(y[m], weights=w[m])),
         })  # fmt: skip
     table = pl.DataFrame(rows)
-    ece = float((table["weight"] / table["weight"].sum() * (table["mean_p"] - table["observed"]).abs()).sum())
+    ece = float(
+        (
+            table["weight"] / table["weight"].sum() * (table["mean_p"] - table["observed"]).abs()
+        ).sum()
+    )
     return table.with_columns(pl.lit(ece).alias("ece"))
 
 
-def row_arrays(*, model: Model, records: list[dict], shift: float | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def row_arrays(
+    *, model: Model, records: list[dict], shift: float | None = None
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return row probabilities, row truth, and the record index of every evaluated row."""
     ps, ys, ks = [], [], []
     for k, r in enumerate(records):
@@ -318,17 +373,26 @@ def fit_and_freeze() -> dict:
     train, val = load_set(name="train"), load_set(name="val")
     x_tr, y_tr, _ = stack(records=train)
     x_va, y_va, _ = stack(records=val)
-    print(f"train candidates {len(y_tr)} positives {y_tr.mean():.3f}; val {len(y_va)} positives {y_va.mean():.3f}", flush=True)
+    print(
+        f"train candidates {len(y_tr)} positives {y_tr.mean():.3f}; val {len(y_va)} positives {y_va.mean():.3f}",
+        flush=True,
+    )
     scaler = StandardScaler().fit(x_tr)
-    logistic = LogisticRegression(C=1.0, max_iter=2000, class_weight=None).fit(scaler.transform(x_tr), y_tr)
+    logistic = LogisticRegression(C=1.0, max_iter=2000, class_weight=None).fit(
+        scaler.transform(x_tr), y_tr
+    )
     tree = DecisionTreeClassifier(max_depth=3, min_samples_leaf=200, random_state=0).fit(x_tr, y_tr)
     scores = {
         "logistic": brier(p=logistic.predict_proba(scaler.transform(x_va))[:, 1], y=y_va),
         "tree": brier(p=tree.predict_proba(x_va)[:, 1], y=y_va),
     }
     print("validation candidate Brier", scores, flush=True)
-    choice = min(scores, key=scores.get)  # type: ignore[arg-type]
-    model = Model(kind=choice, base=logistic if choice == "logistic" else tree, scaler=scaler if choice == "logistic" else None)
+    choice = min(scores, key=lambda k: scores[k])
+    model = Model(
+        kind=choice,
+        base=logistic if choice == "logistic" else tree,
+        scaler=scaler if choice == "logistic" else None,
+    )
     # row-level calibration on the validation rows: Platt on covered rows, a constant on uncovered rows
     raw_rows, y_rows = [], []
     for r in val:
@@ -343,10 +407,13 @@ def fit_and_freeze() -> dict:
         raw_rows.append(raw[lo:hi])
         y_rows.append(r["truth"])
     raw_all, y_all = np.concatenate(raw_rows), np.concatenate(y_rows).astype(float)
-    covered = raw_all > 0
+    covered = raw_all >= 0
+    raw_all = np.clip(raw_all, 0.0, 1.0)
     model.zero_rate = float(y_all[~covered].mean()) if (~covered).any() else 0.0
     eps = 1e-6
-    lg = np.log(np.clip(raw_all[covered], eps, 1 - eps) / (1 - np.clip(raw_all[covered], eps, 1 - eps)))
+    lg = np.log(
+        np.clip(raw_all[covered], eps, 1 - eps) / (1 - np.clip(raw_all[covered], eps, 1 - eps))
+    )
     platt = LogisticRegression(C=1e6, max_iter=1000).fit(lg[:, None], y_all[covered])
     model.row_a, model.row_b = float(platt.coef_[0, 0]), float(platt.intercept_[0])
     pi_val = float(y_all.mean())
@@ -355,7 +422,7 @@ def fit_and_freeze() -> dict:
         "choice": choice, "val_scores": scores, "row_a": model.row_a, "row_b": model.row_b,
         "zero_rate": model.zero_rate, "validation_row_prevalence": pi_val,
         "prior_shift_to_7_percent": model.shift,
-        "train_candidates": int(len(y_tr)), "train_positive_share": float(y_tr.mean()),
+        "train_candidates": len(y_tr), "train_positive_share": float(y_tr.mean()),
     }  # fmt: skip
     (WORK / "frozen_model.pkl").write_bytes(pickle.dumps(model))
     (WORK / "frozen_model.json").write_text(json.dumps(info, indent=2))
@@ -368,12 +435,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("worlds", "fit"))
     args = parser.parse_args()
+    import e00514_train as me  # the pickled model must live in an importable module, not `__main__`
+
     if args.command == "worlds":
-        run_worlds()
+        me.run_worlds()
     else:
-        fit_and_freeze()
+        me.fit_and_freeze()
 
 
 if __name__ == "__main__":
-    sys.modules.setdefault("e00514_train", sys.modules["__main__"])
     main()

@@ -19,6 +19,8 @@ EVAL_ROWS: Final[int] = 30 * 48
 """Rows before the cut that carry labels (the last 30 days of the world)."""
 MIN_CUTOFF: Final[int] = 40 * 48
 FIRST_START: Final[int] = 14 * 48
+DIP_SITE: Final[int] = 4
+"""Primary index of D8, whose engine-explained midday dips are real hard negatives."""
 HELD_OUT_PRIMARIES: Final[tuple[int, ...]] = (3, 8, 13)
 SIZE_RANGE: Final[tuple[float, float]] = (0.4, 3.5)
 DURATION_RANGE: Final[tuple[int, int]] = (2, 672)
@@ -62,13 +64,17 @@ class World:
     meta: dict = field(default_factory=dict)
 
 
-def _profile(*, kind: str, start: int, duration: int, rng: np.random.Generator, own: np.ndarray) -> np.ndarray:
+def _profile(
+    *, kind: str, start: int, duration: int, rng: np.random.Generator, own: np.ndarray
+) -> np.ndarray:
     """Return the within-pulse profile, normalised to mean 1 over the pulse."""
     t = np.arange(start, start + duration)
     if kind == "box":
         prof = np.ones(duration)
     elif kind == "own":
-        seg = np.nan_to_num(own[start : start + duration], nan=np.nanmean(own) if np.isfinite(own).any() else 1.0)
+        seg = np.nan_to_num(
+            own[start : start + duration], nan=np.nanmean(own) if np.isfinite(own).any() else 1.0
+        )
         prof = np.maximum(seg, 1e-3)
     elif kind == SHAPE_HELD_OUT:
         tod = (t % 48) / 2.0
@@ -76,7 +82,9 @@ def _profile(*, kind: str, start: int, duration: int, rng: np.random.Generator, 
             prof = np.where((tod >= 0.5) & (tod < 7.5), 1.0, 0.2)
         else:
             b1, b2 = rng.uniform(0.2, 1.5, size=2)
-            prof = 0.3 + b1 * np.exp(-((tod - 8) ** 2) / 8.0) + b2 * np.exp(-((tod - 18) ** 2) / 8.0)
+            prof = (
+                0.3 + b1 * np.exp(-((tod - 8) ** 2) / 8.0) + b2 * np.exp(-((tod - 18) ** 2) / 8.0)
+            )
     else:
         raise ValueError(kind)
     prof = prof / prof.mean()
@@ -88,31 +96,43 @@ def _profile(*, kind: str, start: int, duration: int, rng: np.random.Generator, 
     return prof
 
 
+MIN_RECIPIENT_SPREADS: Final[float] = 1.0
+"""A recipient is a positive (and is evaluated) only if its mean absolute change is at least this many spreads."""
+
+
 def add_pulse(
     *, matrix: np.ndarray, truth: np.ndarray, pulse: Pulse, scales: det.Scales, own: np.ndarray,
     neighbours: list[int], rng: np.random.Generator,
-) -> None:  # fmt: skip
-    """Add a pulse (and its mirror) to `matrix` and mark the truth rows."""
+) -> list[int]:  # fmt: skip
+    """Add a pulse (and its mirror) to `matrix`, mark the truth rows, and return the evaluable recipients."""
     a, dur = pulse.start, pulse.duration
     prof = _profile(kind=pulse.shape, start=a, duration=dur, rng=rng, own=own)
     amp = pulse.sign * pulse.size * scales.spread[pulse.series]
     delta = amp * prof
     matrix[pulse.series, a : a + dur] += delta
     truth[pulse.series, a : a + dur] = True
+    found: list[int] = []
+    pulse.mirrored = False
+    neighbours = [q for q in neighbours if np.isfinite(matrix[q, a : a + dur]).mean() >= 0.5]
     if pulse.mirrored and neighbours:
         n_rec = int(rng.integers(1, min(2, len(neighbours)) + 1))
         recipients = rng.choice(neighbours, size=n_rec, replace=False)
         leak = float(rng.uniform(*LEAK_RANGE))
         mw = delta * scales.mw_per_z[pulse.series]
+        pulse.mirrored = True
         for q in recipients:
-            matrix[q, a : a + dur] += -leak * mw / n_rec / scales.mw_per_z[q]
-            truth[q, a : a + dur] = True
+            change = -leak * mw / n_rec / scales.mw_per_z[q]
+            matrix[q, a : a + dur] += change
+            if np.mean(np.abs(change)) >= MIN_RECIPIENT_SPREADS * scales.spread[q]:
+                truth[q, a : a + dur] = True
+                found.append(int(q))
+    return found
 
 
-def make_world(
+def make_world(  # noqa: PLR0912, PLR0915
     *, fold: d514.Fold, month_start: int, rng: np.random.Generator, kind: str,
     shapes: tuple[str, ...], donors: tuple[int, ...] | None, shape_all: np.ndarray,
-    scales: det.Scales, event_rows: np.ndarray, forced_start: int | None = None,
+    scales: det.Scales, event_rows: np.ndarray, holdout_rows: np.ndarray, forced_start: int | None = None,
     force: dict | None = None,
 ) -> World | None:  # fmt: skip
     """Build one world.
@@ -127,6 +147,7 @@ def make_world(
         shape_all: (16, n) demand-shape profiles.
         scales: Noise scales fitted on rows below `month_start`.
         event_rows: (16, n) True inside a labelled event padded by 2 days.
+        holdout_rows: (16, n) True on held-out dip days, which become missing in every world.
         forced_start: Window start for `dip` worlds.
         force: Fixed `size`, `duration`, `shape`, `sign`, and `mirrored` of a single pulse (recall grid).
 
@@ -139,26 +160,40 @@ def make_world(
         return None
     full = fold.partners()
     matrix = full[:, w0:w1].copy()
+    matrix[holdout_rows[:, w0:w1]] = np.nan
     truth = np.zeros_like(matrix, dtype=bool)
     genuine = np.zeros_like(matrix, dtype=bool)
     end = int(rng.integers(MIN_CUTOFF, WORLD_LENGTH)) - d514.CUT_STEPS
     graph = d514.neighbour_graph()
-    allowed = [p for p in (donors if donors is not None else range(16)) if donors is not None or p not in HELD_OUT_PRIMARIES]
+    allowed = [
+        p
+        for p in (donors if donors is not None else range(16))
+        if donors is not None or p not in HELD_OUT_PRIMARIES
+    ]
+
     def usable(p: int) -> bool:
         seg = matrix[p, :end]
-        return bool(np.isfinite(seg).mean() > 0.8 and event_rows[p, w0 : w0 + end].mean() < 0.02)
+        return bool(np.isfinite(seg).mean() > 0.8 and not event_rows[p, w0:w1].any())
+
     candidates = [p for p in allowed if usable(p)]
     pulses: list[Pulse] = []
+    recipients_ok: set[int] = set()
     if kind in ("pulses", "pulses_genuine"):
         if not candidates:
             return None
         donor = int(rng.choice(candidates))
         occupied = np.zeros(WORLD_LENGTH, dtype=bool)
         for _ in range(1 if force else int(rng.integers(1, 3))):
-            dur = int(force["duration"]) if force else int(np.exp(rng.uniform(np.log(DURATION_RANGE[0]), np.log(DURATION_RANGE[1]))))
+            dur = (
+                int(force["duration"])
+                if force
+                else int(np.exp(rng.uniform(np.log(DURATION_RANGE[0]), np.log(DURATION_RANGE[1]))))
+            )
             lo, hi = FIRST_START, end - 1
             if force:
-                hi = max(lo + 1, end - dur - 2 * det.FLANK_MAX if end - dur - 2 * det.FLANK_MAX > lo else end - 1)
+                hi = end - dur - 24
+                if hi <= lo:
+                    return None
             if hi <= lo:
                 continue
             a = int(rng.integers(lo, hi))
@@ -172,11 +207,15 @@ def make_world(
                 shape=str(force["shape"]) if force else str(rng.choice(shapes)),
                 mirrored=bool(force["mirrored"]) if force else bool(rng.random() < MIRROR_SHARE),
             )  # fmt: skip
-            neighbours = [q for q in graph.get(donor, []) if q not in HELD_OUT_PRIMARIES]
-            add_pulse(
+            neighbours = [
+                q for q in graph.get(donor, [])
+                if q not in HELD_OUT_PRIMARIES and not event_rows[q, w0:w1].any()
+            ]  # fmt: skip
+            recipients_ok.update(add_pulse(
                 matrix=matrix, truth=truth, pulse=pulse, scales=scales,
-                own=shape_all[donor, w0:w1].astype(np.float64), neighbours=neighbours, rng=rng,
-            )  # fmt: skip
+                own=shape_all[donor, w0 - d514.WEEK : w1 - d514.WEEK].astype(np.float64),
+                neighbours=neighbours, rng=rng,
+            ))  # fmt: skip
             pulses.append(pulse)
     if kind == "pulses_genuine":
         others = [p for p in candidates if p not in {x.series for x in pulses}]
@@ -187,14 +226,30 @@ def make_world(
             sign = int(rng.choice([-1, 1]))
             matrix[g, a:] += sign * size * scales.spread[g]
             genuine[g, a:] = True
-            pulses.append(Pulse(series=g, start=a, duration=WORLD_LENGTH - a, size=size, sign=sign, shape="step", mirrored=False, genuine=True))
+            pulses.append(
+                Pulse(
+                    series=g,
+                    start=a,
+                    duration=WORLD_LENGTH - a,
+                    size=size,
+                    sign=sign,
+                    shape="step",
+                    mirrored=False,
+                    genuine=True,
+                )
+            )
     if kind in ("null", "dip") and not candidates:
         return None
     matrix[:, end:] = np.nan
-    injected = sorted({x.series for x in pulses} | {int(q) for q in np.flatnonzero(truth.any(axis=1))})
+    injected = sorted({x.series for x in pulses} | recipients_ok)
     pool = [p for p in candidates if p not in injected]
     extra = [int(rng.choice(pool))] if pool else []
-    evaluated = [*injected, *extra] if kind != "dip" else [8] if 8 in candidates else extra
+    if kind == "dip":
+        evaluated = [DIP_SITE] if DIP_SITE in candidates else []
+    elif donors is not None:
+        evaluated = sorted({x.series for x in pulses if not x.genuine})
+    else:
+        evaluated = [*injected, *extra]
     if not evaluated:
         return None
     return World(
@@ -204,11 +259,11 @@ def make_world(
     )  # fmt: skip
 
 
-def world_candidates(*, world: World) -> list[dict]:
+def world_candidates(*, world: World, eval_all: bool = False) -> list[dict]:
     """Return, per evaluated series, its candidates, features, and the row index range evaluated."""
     edges = det.edge_matrix(matrix=world.matrix, scales=world.scales)
     out = []
-    lo_rows = max(det.FLANK_MIN, world.end - EVAL_ROWS)
+    lo_rows = det.FLANK_MIN if eval_all else max(det.FLANK_MIN, world.end - EVAL_ROWS)
     for i in world.evaluated:
         cands = det.scan_series(x=world.matrix[i], sigma=world.scales.sigma[i], end=world.end)
         x = det.candidate_features(
