@@ -58,8 +58,6 @@ metric: >-
   12 to 36 hour band.
 ---
 
-# Explicit solar-output column from the experiment 474 capacity table
-
 **Planned. This page holds the plan only; the question, the answer, and the take-home message are
 written after the run.**
 
