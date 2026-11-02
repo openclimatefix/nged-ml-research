@@ -5,6 +5,9 @@ calibrator and a correction by the mean error of the last 14 days lower the fore
 similar amounts against different reference forecasts; on solar farms, wind farms, and supply points
 neither has been shown to help.**
 
+A [summary of what the experiments found about load-shift events](load-shift-summary.md) collects
+the answers to ten questions on one page.
+
 Recent measured power can enter the forecast as input, or shift the forecast by its recent errors.
 The experiments put lagged power into stage 1b (a second model that corrects the weather-only
 forecast) or into the [stage 2
