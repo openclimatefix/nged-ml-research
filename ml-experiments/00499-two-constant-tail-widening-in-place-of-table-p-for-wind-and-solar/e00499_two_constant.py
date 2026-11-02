@@ -61,7 +61,7 @@ LIMITS: Final[dict[str, float]] = {
     "share_above_q99": 0.002, "pinball_tails": 0.05,
 }  # fmt: skip
 BONFERRONI_COUNT: Final[int] = 36  # 3 rules x 2 families x 6 criteria
-RESAMPLES: Final[int] = 20_000
+RESAMPLES: Final[int] = 100_000
 SEED: Final[int] = 499
 # "block" is a run for wind and an initialisation week for solar; "init" (a run for both) is the
 # sensitivity check, selected by setting BLOCK_COLUMN=init, which also writes `*_init_blocks` files.
@@ -127,20 +127,31 @@ def fit_pair(*, fit: pl.DataFrame) -> tuple[float, float]:
     return fit_constant(fit=fit, names=LOWER), fit_constant(fit=fit, names=UPPER)
 
 
-def fit_constants(*, fit: pl.DataFrame) -> dict[tuple[str, str], tuple[float, float]]:
-    """Return the (lower, upper) pair per (rule, key): d by family, e by farm, f by farm and group.
+def fit_constants(
+    *, fit: pl.DataFrame
+) -> tuple[dict[tuple[str, str], tuple[float, float]], set[tuple[str, str]]]:
+    """Return the (lower, upper) pair per (rule, key), and the keys that used a fallback.
 
-    A farm-and-group cell with fewer than MIN_FIT_ROWS fitting rows takes its farm's pair.
+    Rule d is by family, e by farm, f by farm and group. A farm with fewer than MIN_FIT_ROWS
+    fitting rows takes the family pair; a farm-and-group cell with fewer takes its farm's pair.
     """
     out: dict[tuple[str, str], tuple[float, float]] = {("d", "all"): fit_pair(fit=fit)}
-    for (site,), part in fit.group_by("site"):
-        out["e", site] = fit_pair(fit=part)
+    fallbacks: set[tuple[str, str]] = set()
+    for site in sorted(fit["site"].unique()):
+        part = fit.filter(pl.col("site") == site)
+        if part.height >= MIN_FIT_ROWS:
+            out["e", site] = fit_pair(fit=part)
+        else:
+            out["e", site] = out["d", "all"]
+            fallbacks.add(("e", site))
         for group in sorted(set(GROUP_OF_BAND.values())):
             cell = part.filter(pl.col("group") == group)
-            out["f", f"{site}|{group}"] = (
-                fit_pair(fit=cell) if cell.height >= MIN_FIT_ROWS else out["e", site]
-            )
-    return out
+            if cell.height >= MIN_FIT_ROWS:
+                out["f", f"{site}|{group}"] = fit_pair(fit=cell)
+            else:
+                out["f", f"{site}|{group}"] = out["e", site]
+                fallbacks.add(("f", f"{site}|{group}"))
+    return out, fallbacks
 
 
 def scale_tails(*, held: pl.DataFrame, lower: np.ndarray, upper: np.ndarray) -> pl.DataFrame:
@@ -197,7 +208,7 @@ def apply_rules(
         )
     out["P"] = clip_rows(rows=table, upper=upper)
     # Two-constant rules.
-    constants = fit_constants(fit=fit)
+    constants, fallbacks = fit_constants(fit=fit)
     site = held["site"].to_list()
     group = held["group"].to_list()
     keyed = {
@@ -212,14 +223,17 @@ def apply_rules(
             rows=scale_tails(held=held, lower=pairs[:, 0], upper=pairs[:, 1]), upper=upper
         )
     for (rule, key), (lo, up) in constants.items():
-        records.append({"rule": rule, "key": key, "lower": lo, "upper": up})
+        records.append(
+            {"rule": rule, "key": key, "lower": lo, "upper": up,
+             "fallback": (rule, key) in fallbacks}
+        )  # fmt: skip
     return out, records
 
 
 def row_scores(*, rows: pl.DataFrame) -> pl.DataFrame:
     """Return per-row hit indicators and pinball losses (MW) for the tails and all 11 levels."""
     y = rows["actual"].to_numpy()
-    q = np.sort(rows.select(list(LEVELS)).to_numpy(), axis=1)
+    q = rows.select(list(LEVELS)).to_numpy()
     cols: dict[str, np.ndarray] = {}
     tail_pin = np.zeros(rows.height)
     for name, tau in TAILS.items():
@@ -231,7 +245,8 @@ def row_scores(*, rows: pl.DataFrame) -> pl.DataFrame:
     cols["share_above_q99"] = 1.0 - cols["cov_q99"]
     cols["pinball_tails"] = tail_pin
     levels_pin = np.mean(
-        [pinball(y=y, q=q[:, i], tau=LEVEL_TAU[n]) for i, n in enumerate(LEVELS)], axis=0
+        [pinball(y=y, q=np.sort(q, axis=1)[:, i], tau=LEVEL_TAU[n]) for i, n in enumerate(LEVELS)],
+        axis=0,
     )
     cols["quantile_score_mw"] = levels_pin
     return pl.DataFrame(cols)
@@ -397,7 +412,14 @@ def main() -> None:
     scored, constants = score_all()
     loose = score_all(strict=False)[0].filter(pl.col("rule") == "P")
     print("GATE: table P share above q99 with experiment 461's fit window (wind 0.88% expected):")
-    print(loose.group_by("family").agg(pl.col("share_above_q99").mean()), flush=True)
+    gate = loose.group_by("family").agg(pl.col("share_above_q99").mean()).sort("family")
+    print(gate, flush=True)
+    gate.write_csv(WORK / "gate.csv")
+    wind_share = gate.filter(pl.col("family") == "wind")["share_above_q99"].item()
+    if abs(wind_share - 0.0088) > 0.0006:
+        raise SystemExit(
+            f"Gate failed: wind table P share above q99 is {wind_share:.4f}, not 0.0088"
+        )
     scored.write_parquet(WORK / "rows_scored.parquet")
     constants.write_csv(WORK / "constants.csv")
     level = 100.0 * (1.0 - 0.05 / BONFERRONI_COUNT)
@@ -424,6 +446,9 @@ def main() -> None:
                     }
                     for c, v in mde.items()
                 ]
+    mde_above = {
+        (r["family"], r["slice"], r["site"], r["criterion"]): r["mde_above_limit"] for r in mde_rows
+    }
     mde_table = pl.DataFrame(mde_rows)
     mde_table.write_csv(WORK / f"mde{SUFFIX}.csv")
     print("MINIMUM DETECTABLE EFFECT (printed before any contrast)", flush=True)
@@ -445,12 +470,19 @@ def main() -> None:
                     for c in CRITERIA:
                         low = float(np.percentile(draws[c], tail))
                         high = float(np.percentile(draws[c], 100.0 - tail))
+                        interval_verdict = verdict(criterion=c, low=low, high=high)
                         contrasts.append(
                             {
                                 "family": family, "slice": slice_name, "site": site or "pooled",
                                 "rule": rule, "criterion": c, "diff": float(point[c]),
                                 "low": low, "high": high, "limit": LIMITS[c],
-                                "verdict": verdict(criterion=c, low=low, high=high),
+                                "verdict": interval_verdict,
+                                "verdict_after_mde": (
+                                    "inconclusive (MDE above limit)"
+                                    if interval_verdict == "equivalent"
+                                    and mde_above[family, slice_name, site or "pooled", c]
+                                    else interval_verdict
+                                ),
                                 "counted": site is None and slice_name == "all"
                                 and rule in CANDIDATES,
                             }
