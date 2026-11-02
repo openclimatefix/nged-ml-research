@@ -34,7 +34,8 @@ prediction: >-
 decision_rule: >-
   One rule is adopted for both families only if all of these hold for the same window: the pooled
   share above q99 after table P is at most 1.5% for wind and for solar; no series is above 1.5%,
-  except Solar E, whose history is under 20,000 valid half-hours and which is reported separately;
+  except Solar E, whose window holds only about 11,000 to 14,000 daylight half-hours (its history is
+  shorter than 730 days) and which is reported separately;
   no series score worsens against P-old by more than its margin (wind 0.10 points of capacity,
   stated in MW per farm; solar 1% of the pooled score); and dropping any one solar series does not
   break the pooled share rule. Per-series wind verdicts may be inconclusive when the margin is under
@@ -80,9 +81,10 @@ the 730 days (P-730) or 365 days (P-365) before the fit's training ends.
   half-hours) falls back to P-all, for both windows. Every series and refit that falls back is
   flagged. Planned from the stored series: P-365 falls back at Solar D and Solar E (6,000 to 7,300
   daylight half-hours in the window), P-730 falls back nowhere, but Solar E's history is shorter
-  than 730 days, so its P-730 window is almost its whole history and P-730 equals P-all up to a
-  few days there. Solar E is therefore not a test of the window, and its verdict is decided
-  separately. Wind never falls back.
+  than 730 days, so its P-730 window is its whole history and P-730 equals P-all exactly there.
+  Solar E is therefore not a test of the window, and its verdict is decided separately. Solar A's
+  P-365 window holds 8,043 to 8,204 daylight half-hours, just above the threshold, so it does not
+  fall back. Wind never falls back.
 - **Capacity is fixed per fit,** as in experiment 461, so the arms differ in the training-target
   scale as well as in the divisor.
 - **Reported alongside:** each series' capacity as a ratio to P-old at every refit, the count of

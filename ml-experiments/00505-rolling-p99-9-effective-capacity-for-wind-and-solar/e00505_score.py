@@ -392,14 +392,31 @@ def main() -> None:
                     )
                     m = {r["rule"]: r["score_mw_sum"] / r["n"] for r in agg.iter_rows(named=True)}
                     diff = m[new] - m[ref]
+                    # Leave-one-out intervals are extra to the 44 counted, so they get no Bonferroni.
+                    bonf = (
+                        ""
+                        if label.startswith("pooled without")
+                        else f"Bonferroni [{np.percentile(draws, lo):+.4f}, "
+                        f"{np.percentile(draws, hi):+.4f}], "
+                    )
                     share = share_above_q99(piece=piece.filter(pl.col("rule") == new)) * 100
                     lines.append(
                         f"{label}: {ref} {m[ref]:.4f} MW, {new} {m[new]:.4f} MW, diff "
                         f"{diff:+.4f} MW ({diff / m[ref] * 100:+.2f}%), 95% "
                         f"[{np.percentile(draws, 2.5):+.4f}, {np.percentile(draws, 97.5):+.4f}], "
-                        f"Bonferroni [{np.percentile(draws, lo):+.4f}, "
-                        f"{np.percentile(draws, hi):+.4f}], share above q99 {share:.3f}%"
+                        f"{bonf}share above q99 {share:.3f}%"
                     )
+        lines.append("-- verdict inputs (after table P): series above the 1.5% limit, and margin")
+        for rule in ROLLING:
+            for site in sites:
+                piece = sub.filter(
+                    (pl.col("site") == site) & (pl.col("rule") == rule) & (pl.col("variant") == "P")
+                )
+                share = share_above_q99(piece=piece) * 100
+                lines.append(
+                    f"  {rule} {site}: share above q99 {share:.3f}% "
+                    f"{'ABOVE LIMIT' if share > LIMIT * 100 else 'ok'}"
+                )
         for rule in RULES:
             for variant in ("raw", "P"):
                 for label, group in groups[: 1 + len(sites)]:
