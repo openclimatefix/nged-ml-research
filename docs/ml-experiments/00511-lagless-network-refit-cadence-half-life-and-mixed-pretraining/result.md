@@ -15,32 +15,33 @@ size: >-
   complex. Stored: fitted network weights, window forecasts, and stale-model forecasts, under this
   experiment's private data folder only; experiment 510's models and forecasts are read, never
   written. Serving path: not touched (this repository holds none). Degradation rule: not touched.
-  Designs: more than one defensible (what a staleness curve means for a daily refit, how a warm start
-  is defined, how a mixed pretraining weights its sources), so the plan fixes each before any score
-  is read. Callers: this folder's scripts import experiments 397, 425, 428, 448, 470, and 510 and the
-  `studies` evaluation code. One Sonnet code review before the first fit, one Sonnet results review,
-  and two Sonnet write-up reviews.
+  Designs: more than one defensible (what a staleness curve means for a daily refit, how a warm
+  start is defined, how a mixed pretraining weights its sources), so the plan fixes each before any
+  score is read. Callers: this folder's scripts import experiments 397, 425, 428, 448, 470, and 510
+  and the `studies` evaluation code. One Sonnet code review before the first fit, one Sonnet results
+  review, and two Sonnet write-up reviews.
 hypothesis: >-
   Refitting the lag-free demand network more often than weekly (twice weekly or daily) closes more
   of the 0.13 to 0.16 point gap that experiment 510's best arm L-Ww (weekly, 90-day half-life) left
   to K2-S1, because the gain from weekly over monthly refits grew through the month and so is a
-  staleness effect. A 30-day or 60-day half-life closes part of the gap but raises the leak of an injected load shift. Pretraining on ERA5 and CAMS rows together with ENS rows,
-  with a source flag, separates the two jobs of the network (learning the ERA5-to-ENS difference and
-  learning recent level shifts) and so improves the weekly fine-tune.
+  staleness effect. A 30-day or 60-day half-life closes part of the gap but raises the leak of an
+  injected load shift. Pretraining on ERA5 and CAMS rows together with ENS rows, with a source flag,
+  separates the two jobs of the network (learning the ERA5-to-ENS difference and learning recent
+  level shifts) and so improves the weekly fine-tune.
 prediction: >-
-  Written before any score is read. P1: L-3d beats L-Ww by 0.03 to 0.08 points of CRPS and L-1d beats
-  L-3d by a further 0.02 to 0.06, at both groups, so L-1d ends 0.05 to 0.12 behind K2-S1 and no arm
-  closes the gap completely. P2: L-Ww-30 beats L-Ww by under 0.05 points but its injected-shift leak
-  is more than 1 point of capacity above L-Ww's. P3: L-mix beats L-Ww by less than 0.05 points
-  (inside the minimum detectable effect).
+  Written before any score is read. P1: L-3d beats L-Ww by 0.03 to 0.08 points of CRPS and L-1d
+  beats L-3d by a further 0.02 to 0.06, at both groups, so L-1d ends 0.05 to 0.12 behind K2-S1 and
+  no arm closes the gap completely. P2: L-Ww-30 beats L-Ww by under 0.05 points but its
+  injected-shift leak is more than 1 point of capacity above L-Ww's. P3: L-mix beats L-Ww by less
+  than 0.05 points (inside the minimum detectable effect).
 decision_rule: >-
   See "Pre-registered rules". A more frequent refit, or a shorter half-life, or the mixed
   pretraining, is worth porting only if its paired contrast against L-Ww has a Bonferroni interval
-  excluding zero and a point estimate of at most -0.05 at the six or at the eight, with q99
-  pinball loss within +0.02, cold winter nights no worse than +0.05, and (for refit cadence and
-  half-life) an injected-shift leak no more than 1 point of capacity above L-Ww's. The -0.05 bar
-  sits below the minimum detectable effect (0.164 at the eight and 0.123 at the six, experiment
-  510's two-seed values), so a pass reads "interval excludes zero" and never "at least 0.05".
+  excluding zero and a point estimate of at most -0.05 at the six or at the eight, with q99 pinball
+  loss within +0.02, cold winter nights no worse than +0.05, and (for refit cadence and half-life)
+  an injected-shift leak no more than 1 point of capacity above L-Ww's. The -0.05 bar sits below the
+  minimum detectable effect (0.164 at the eight and 0.123 at the six, experiment 510's two-seed
+  values), so a pass reads "interval excludes zero" and never "at least 0.05".
 benchmark: >-
   L-Ww (experiment 510, weekly, 90-day half-life, stored) for every contrast; K2-S1 and A-pool
   (experiments 470 and 425, stored) for the gap to the lagged network; BG2, climatology, and
@@ -56,21 +57,22 @@ best_arm: >-
 headline: >-
   Refitting the lag-free network every day scored 0.065 points better than weekly at the eight and
   0.061 better at the six (Bonferroni intervals exclude zero), and twice a week scored 0.036 and
-  0.041 better. Half-lives of 30 and 60 days did not reach the -0.05 bar against 90 days, and the mixed ERA5, CAMS, and ENS
-  pretraining scored worse (0.062 and 0.045 behind). The daily refit stays 0.091 (eight) and 0.071
-  (six) behind K2-S1.
+  0.041 better. Half-lives of 30 and 60 days did not reach the -0.05 bar against 90 days, and the
+  mixed ERA5, CAMS, and ENS pretraining scored worse (0.062 and 0.045 behind). The daily refit stays
+  0.091 (eight) and 0.071 (six) behind K2-S1.
 lessons: >-
-  A lag-free demand network gets about 0.02 points of CRPS worse for each day since its refit, so the gain from a
-  daily refit is mostly freshness. The shorter half-life gives no gain and raises the injected-shift
-  leak from 6.1 to 9.5 points of capacity. A daily warm start scored worse than a daily restart and
-  went wrong in Christmas week. The daily refit leaks an injected shift most on the next day (7.2
-  points) and less each day after (3.0 to 3.4 points by days 5 and 6).
+  A lag-free demand network gets about 0.02 points of CRPS worse for each day since its refit, so
+  the gain from a daily refit is mostly freshness. The shorter half-life gives no gain and raises
+  the injected-shift leak from 6.1 to 9.5 points of capacity. A daily warm start scored worse than a
+  daily restart and went wrong in Christmas week. The daily refit leaks an injected shift most on
+  the next day (7.2 points) and less each day after (3.0 to 3.4 points by days 5 and 6).
 take_home_message: >-
-  Refitting the lag-free network every day instead of every week improves its forecast by about 0.065
-  points of CRPS (about 1.3%), enough to pass the point-estimate, interval, q99, and cold-night bars of the porting rule but small, with the injected-shift leak 1.1 points above the weekly network's on the day after a bad block, and it leaves the
-  network 0.07 to 0.09 points behind the lagged network K2-S1. A shorter recency window and the
-  mixed ERA5, CAMS, and ENS pretraining do not help. A daily refit needs one fine-tune of about 3
-  seconds a day.
+  Refitting the lag-free network every day instead of every week improves its forecast by about
+  0.065 points of CRPS (about 1.3%), enough to pass the point-estimate, interval, q99, and
+  cold-night bars of the porting rule but small, with the injected-shift leak 1.1 points above the
+  weekly network's on the day after a bad block, and it leaves the network 0.07 to 0.09 points
+  behind the lagged network K2-S1. A shorter recency window and the mixed ERA5, CAMS, and ENS
+  pretraining do not help. A daily refit needs one fine-tune of about 3 seconds a day.
 advice:
   - >-
     If the lag-free network is used in the first release, refit it daily rather than weekly. The
@@ -80,12 +82,12 @@ advice:
     Keep the 90-day recency half-life; do not shorten it to 30 or 60 days, which gave no gain and a
     larger injected-shift leak (figures 1 and 4).
   - >-
-    Do not pretrain on ERA5, CAMS, and ENS rows together with a source flag, which scored 0.062 (eight)
-    and 0.045 (six) points worse than ERA5 and CAMS rows alone (figure 1).
+    Do not pretrain on ERA5, CAMS, and ENS rows together with a source flag, which scored 0.062
+    (eight) and 0.045 (six) points worse than ERA5 and CAMS rows alone (figure 1).
   - >-
-    Restart each daily fine-tune from the monthly pretrained weights rather than continuing from
-    the previous day, because the warm start scored 0.018 to 0.032 points worse and drifted in
-    Christmas week (Results).
+    Restart each daily fine-tune from the monthly pretrained weights rather than continuing from the
+    previous day, because the warm start scored 0.018 to 0.032 points worse and drifted in Christmas
+    week (Results).
 production_status: candidate
 adopted_in: none
 ---
