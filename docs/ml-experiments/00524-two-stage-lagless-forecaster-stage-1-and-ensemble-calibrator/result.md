@@ -193,8 +193,9 @@ L-Ww. Several arms in the plan did not run (below).
   curtailment cost, and the load-shift plots. They remain proposals.
 - **Audit triggers.** Trigger 2 fired for P1; the page tests an explanation (S2-J minus S2-F above:
   the frozen first network cannot track recent demand). Trigger 3 was not checked: the mean-forecast
-  error and the median-minus-mean forecast per site were not computed. No audit has run, no
-  results review or write-up review has run, and every number is interim and unaudited. Trigger 7
+  error and the median-minus-mean forecast per site were not computed. The results review, the
+  prose review, and the audit were skipped for quota, and every number is interim and unaudited. The
+  author checked the quoted numbers once against the stored score tables. Trigger 7
   applies to any later design that builds on S2-J's equivalence.
 - **Seeds and statistics.** Two seeds, five folds; the intervals resample 153 origin days, with the
   five whole-month blocks as a check (per-fold signs above). The Bonferroni count is 18.
