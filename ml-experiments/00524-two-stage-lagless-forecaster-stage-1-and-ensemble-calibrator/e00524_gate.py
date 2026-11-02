@@ -23,7 +23,6 @@ import e00428_data as data  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00510_fit as fit510  # ty: ignore[unresolved-import]
 import numpy as np
-import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -69,6 +68,9 @@ def run(*, months: list[str], seeds: list[int]) -> None:
                 widen=1.0,
                 device="cpu",
             )
+            assert frame.height == int(select.sum()), (
+                "row count differs from the selected test rows"
+            )
             target = WORK_DIR / "seed_preds" / ARM / f"{month}_s{seed}.parquet"
             target.parent.mkdir(parents=True, exist_ok=True)
             tmp = target.with_suffix(".tmp")
@@ -87,7 +89,6 @@ def main() -> None:
     parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
     args = parser.parse_args()
-    _ = pl
     run(months=args.months, seeds=args.seeds)
 
 

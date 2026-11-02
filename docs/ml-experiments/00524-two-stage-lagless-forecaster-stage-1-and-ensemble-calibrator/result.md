@@ -33,9 +33,9 @@ prediction: >-
   read per band from experiment 521's `scores/mde.csv` (recomputed for two seeds). P1. S2-F beats
   L-Ww at 120-240 h by at least 0.087 at the eight and 0.098 at the six CRPS points. P2. S2-J is
   within the MDE of L-Ww in every coarse band (equivalence), and closes at least half of the
-  120-240 h gap to K2-S1 only if P1 also holds. P3. S2-R is not run unless P1 or P2's gain at days 5 to
-  10 exceeds the MDE; if it runs, it beats S2-F below 2 days by more than the MDE. P4. Form A (per-lead
-  scale and shift on the mixture) recovers at least 70% of form B's gain over S2-0, where form B's
+  120-240 h gap to K2-S1 only if P1 also holds. P3. S2-R is not run unless P1 or P2's gain at days
+  5 to 10 exceeds the MDE; if it runs, it beats S2-F below 2 days by more than the MDE. P4. Form A
+  (per-lead scale and shift on the mixture) recovers at least 70% of form B's gain over S2-0, where form B's
   gain exceeds the MDE; below that gate the ratio is descriptive. P5. Injected-shift leak (experiment
   511's stress world) of S2-F is at most L-Ww's 7.2 points the day after the shift, fading to 3.0;
   S2-R's is at least S2-F's. P6. S0-A form 2 (the multilayer perceptron) lowers CRPS against S2-0 by

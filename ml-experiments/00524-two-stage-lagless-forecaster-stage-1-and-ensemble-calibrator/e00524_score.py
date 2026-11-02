@@ -34,6 +34,17 @@ def setup() -> None:
     s510.score470.TESTS = 16
     s510.tails470.ARMS = s510.score470.MAIN_ARMS
     s510.link_stored()
+    source = (
+        s510.ML_EXPERIMENTS_DATA_DIR
+        / "00510-lagless-demand-network-weekly-finetune-and-recency-weights"
+        / "work"
+        / "seed_preds"
+    )
+    for arm in ("L-M", "L-W", "L-Ww"):
+        link = WORK_DIR / "seed_preds" / arm
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if not link.exists():
+            link.symlink_to(source / arm, target_is_directory=True)
 
 
 def main() -> None:
