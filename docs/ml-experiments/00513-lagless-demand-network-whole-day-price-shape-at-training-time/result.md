@@ -82,7 +82,7 @@ advice:
     Do not read the interim timing-run result (all shape arms better than the control on one fold
     and one seed) as a gain: with five folds and three seeds the placebo scored worse than the
     control at the eight.
-production_status: not_adopted
+production_status: not-for-production
 adopted_in: none
 ---
 

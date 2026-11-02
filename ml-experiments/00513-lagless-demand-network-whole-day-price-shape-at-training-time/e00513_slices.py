@@ -94,7 +94,7 @@ def figures(*, out: pl.DataFrame) -> None:
     chart1 = (
         alt.Chart(prim)
         .mark_circle(size=70)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("gain_PO:Q", title="Oracle minus control, CRPS points (negative is better)"),
             y=alt.Y("value:N", sort=list(c.sites()), title=None),
             color=colour,
@@ -102,7 +102,7 @@ def figures(*, out: pl.DataFrame) -> None:
         .properties(width=520, height=320)
     )
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="#808080").encode(x="x:Q")
+        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="#808080").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
     (chart1 + zero).save(DOCS_DIR / "figure_1_oracle_gain_by_primary.svg")
     hh = (
@@ -113,7 +113,7 @@ def figures(*, out: pl.DataFrame) -> None:
     chart2 = (
         alt.Chart(hh)
         .mark_line(point=True)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("value:Q", title="Local half-hour of day (0 is midnight)"),
             y=alt.Y("gain_PO:Q", title="Oracle minus control, CRPS points"),
             color=colour,
