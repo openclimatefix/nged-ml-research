@@ -1,7 +1,6 @@
 """Experiment 508 figures, drawn from the stored tables.
 
-PYTHONPATH=ml-experiments/00087-*:ml-experiments/00506-*:ml-experiments/00508-* \
-        uv run --no-sync python ml-experiments/00508-*/e00508_report.py
+uv run --no-sync python ml-experiments/00508-*/e00508_report.py
 """
 
 from pathlib import Path
@@ -84,7 +83,7 @@ def main() -> None:
     )
     eng = engine.unpivot(index="date", variable_name="Half-hours", value_name="share")
     chart3 = (
-        alt.Chart(eng)
+        alt.Chart(eng)  # ty: ignore[unresolved-attribute]
         .mark_bar()  # ty: ignore[unresolved-attribute]
         .encode(
             x=alt.X("Half-hours:N", sort=["Dip", "Placebo", "Control"], title=None),
@@ -117,7 +116,7 @@ def main() -> None:
         .with_columns(label=pl.col("site") + " " + pl.col("kind").str.replace("_", " "))
     )
     chart4 = (
-        alt.Chart(shape)
+        alt.Chart(shape)  # ty: ignore[unresolved-attribute]
         .mark_bar(color="#306BFF")  # ty: ignore[unresolved-attribute]
         .encode(
             y=alt.Y("label:N", title=None, sort="-x"),

@@ -207,7 +207,7 @@ def sky_placebo(*, site: str, rng: np.random.Generator) -> pl.DataFrame:
             q = part.filter(pl.col("sky") == sky)
             k, n = int(q["dip"].sum()), q.height
             lo, hi = wilson(k=k, n=n)
-            row |= {
+            row |= {  # ty: ignore[unsupported-operator]
                 f"{sky}_dips": k,
                 f"{sky}_days": n,
                 f"{sky}_rate": k / n if n else float("nan"),
@@ -324,10 +324,10 @@ def engine_test(*, rng: np.random.Generator) -> tuple[pl.DataFrame, dict]:
         "n_dip_days_with_engine_gate": table.height,
         "n_coincident": int(table["coincident"].sum()),
         "coincident_wilson": wilson(k=int(table["coincident"].sum()), n=table.height),
-        "mean_engine_share_dip": float(table["engine_share"].mean()),
-        "mean_engine_share_placebo": float(table["placebo_share"].mean()),
-        "mean_engine_share_controls": float(table["control_share"].mean()),
-        "dip_minus_placebo": float((table["engine_share"] - table["placebo_share"]).mean()),
+        "mean_engine_share_dip": float(table["engine_share"].mean()),  # ty: ignore[invalid-argument-type]
+        "mean_engine_share_placebo": float(table["placebo_share"].mean()),  # ty: ignore[invalid-argument-type]
+        "mean_engine_share_controls": float(table["control_share"].mean()),  # ty: ignore[invalid-argument-type]
+        "dip_minus_placebo": float((table["engine_share"] - table["placebo_share"]).mean()),  # ty: ignore[invalid-argument-type]
         "dip_minus_placebo_ci": [
             float(np.percentile(boot_diff, 2.5)),
             float(np.percentile(boot_diff, 97.5)),
@@ -487,9 +487,9 @@ def main() -> None:
     )
     correct = {
         kind: float(
-            inj.filter(pl.col("kind") == f"injected_{kind}")["label_solar"].mean()
+            inj.filter(pl.col("kind") == f"injected_{kind}")["label_solar"].mean()  # ty: ignore[invalid-argument-type]
             if kind == "solar"
-            else 1 - inj.filter(pl.col("kind") == f"injected_{kind}")["label_solar"].mean()
+            else 1 - inj.filter(pl.col("kind") == f"injected_{kind}")["label_solar"].mean()  # ty: ignore[unsupported-operator]
         )
         for kind in ("solar", "boxcar")
     }
