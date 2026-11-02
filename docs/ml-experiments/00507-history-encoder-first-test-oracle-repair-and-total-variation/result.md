@@ -109,18 +109,30 @@ can reach the accuracy the oracle's noise curve demands.
 | TV | total-variation-repaired | total-variation-repaired | Non-learned repair |
 | Z1e-2 | lags zeroed | lags zeroed | Experiment 472's lag-free control, for the same recipe |
 
-- **Oracle repair** subtracts the exactly known injected shift from each lag, so the oracle lag is
-  the stored reading at that half-hour (the injected worlds are the stored reading plus an
-  additive shift). Real events that nobody injected stay in every arm's lags, and the page says so.
+- **Oracle repair, per family.** On the old worlds (injected load shifts and spikes, codes 1 to 3)
+  the oracle lag is the stored reading (world -1), because those worlds are the stored reading
+  plus an additive shift. On the new-generator worlds the oracle removes families A and C (the
+  temporary shifts and the corruptions, restoring dropouts, stuck readings, delays, and missing
+  runs to the stored reading) and keeps family B, so the oracle lag is the stored reading plus the
+  genuine step in force at the lag time. Real events that nobody injected stay in every arm's lags.
+- **Data path.** `forecast` takes a `lag_world` and a `flag_world` separately, so the oracle arms
+  read lags from the repaired source and row-class flags from worlds 200 to 202. `fit_one` takes a
+  preloaded pool, so many fits share one data load. A unit test checks that the changed code,
+  given the old worlds and no repair, reproduces the stored AvgAnchor forecasts.
+- **Training target.** On the new-generator training worlds the target is the stored reading plus
+  the family B step at the target time (`target_power`), for every arm, as it is for scoring. On
+  the old worlds it is the stored reading.
 - **Retrained plain, three seeds.** The retrained plain control uses seeds 0 to 2 and the stored
   recipe, so it should reproduce the stored AvgAnchor; the script prints the difference. The
   3-seed spread of its scores gives the injected-row minimum detectable effect, stated before any
   contrast is read: 2.8 times the mean over fold pairs of the standard deviation of paired seed
   differences, divided by the square root of 4 (experiment 454's formula, with 4 folds).
-- **Noise curve.** Size errors of 10%, 25%, and 50%; onset errors of 2, 6, and 24 hours; 10%, 30%,
-  and 50% of steps missed; plus one joint point (25% size error, 6 hour onset error, 30% steps
-  missed). Each is the oracle repair degraded, then retrained (3 seeds by 4 folds is 12 small fits
-  per point, about 35 seconds each).
+- **Noise curve, on the new-generator worlds.** Size errors of 10% and 50%; onset errors of 2 and 24
+  hours; 10% and 50% of steps missed; plus the joint point (25% size error, 6 hour onset error,
+  30% steps missed) that brief edit 4 asks for, and the 25%, 6 hour, and 30% mid-points on each
+  axis (9 points in all). Each is the oracle repair degraded using the event table, then
+  retrained (4 folds by 3 seeds is 12 small fits per point, about 35 seconds each, run in 3 parallel
+  processes). Degrading by event table means the old worlds are not used for the curve.
 
 ### The injection generator (new code, `e00507_generator.py`)
 
@@ -143,15 +155,27 @@ can reach the accuracy the oracle's noise curve demands.
   below twice |s| from the step loss and report their share. No signed claim is made at the eight.
   The old-world generator (experiment 402) skips windows below 0.2 of capacity at the eight; the
   difference is stated beside every number at the eight.
-- **Window-level injection with deterministic seeds.** A window is one (Primary, origin). Its
-  injection is a pure function of (world seed, Primary, origin), so rows that share an origin
-  share an injection and any worker regenerates it. Worlds G100 to G102 train; worlds G200 to G202
-  are held out and use a seed range disjoint from every training world.
-- **Self-test (printed before any total-variation or encoder number is read):** the share of
-  windows with a step in force at the origin; the share of family B among those windows (expected
-  about 60%, an arithmetic result of the chosen shares, not a finding); and a two-sample test that
-  ramp length, size, sign, and onset hour have the same distribution in families A and B. Unit
-  tests cover step algebra, conservation of the corrupted-reading definitions, and the seeding.
+- **Grid-level worlds.** The generator writes worlds in the format of experiment 428
+  (`power[primary, grid]` and `code[primary, grid]`), so the reused fit and scoring code reads them
+  unchanged. Events are placed on the dense half-hourly grid per Primary as a Poisson process whose
+  rates are set so that the shares above hold per origin. It also writes `target_power` (the stored
+  reading plus the family B steps and nothing else), `step_temp` and `step_gen` (the exact step in
+  force, in capacity fractions, per half-hour), and an event table (Primary, family, onset, end,
+  size, shape). Worlds G100 to G102 train (one per seed, as in experiment 454's advice); G200 to
+  G202 are held out, with seeds disjoint from every training world; G110 is a tuning world.
+- **Terms.** The history is the 672 half-hours ending at the newest usable reading, which is
+  `origin - NEWEST_AGE` (7 half-hours of telemetry delay, as in `e00087_common`). A step is "in
+  force at the origin" if the history's last half-hour lies inside its span.
+- **Self-test (printed before any total-variation or encoder number is read), with acceptance
+  criteria.** It prints the share of origins with a step in force (target 60% to 80% of origins at
+  which family A or B places any step, within 5 points of the value derived in the script's
+  docstring from the duration mix); the share of family B among them (expected 60%, within 5
+  points; this is arithmetic on the chosen shares and not a finding); and, for events whose onset
+  lies inside the history, a two-sample test (Kolmogorov-Smirnov, level 0.01) that ramp length,
+  size, sign, and onset hour of day match between families A and B. A failing self-test stops the
+  experiment until the generator is fixed. Unit tests cover step algebra, the corrupted-reading
+  definitions, determinism, and that a repaired lag never reads a half-hour after the newest usable
+  reading.
 
 ### N0, before any fit (CPU)
 
@@ -164,6 +188,10 @@ can reach the accuracy the oracle's noise curve demands.
   at least 12 months of history, before July 2026), and the demoted real-event reading: the count
   of the 34 events with a measured deviation (about 5 at the six) and one plot, no score.
 - The generator's self-test, as above.
+- **Actions.** A leak-check failure stops the experiment and is reported to the manager (the
+  stored lagless tables would be unusable for the residual). A month-boundary step larger than the
+  residual's usual month-to-month spread restricts the total-variation window to one source (or
+  masks the boundary) and is reported.
 - The hold-back cost step is dropped (no stored table was fitted with a hold-back, and stored
   tables are already out of sample for the history).
 
@@ -173,21 +201,23 @@ can reach the accuracy the oracle's noise curve demands.
    minutes), re-predict the stored AvgAnchor correction on exact lags, and score all of them on
    worlds 200 to 202. All fits share one data load and one GPU process under 8 GB.
 2. Print the injected-row minimum detectable effect. Then read the contrast oracle minus plain.
-3. If rule (a) fires, the line ends here at about 0.3 GPU-hours. The page is still written, with
+3. If rule (a) fires, the line ends here at about 0.3 GPU-hours (24 fits and the re-prediction). The page is still written, with
    the oracle-gain interval, the retrained plain control, and the minimum detectable effect, so the
    null is informative.
 4. Otherwise run the noise curve (ten points) and build the new-generator worlds.
 
 ### T0-TV: the non-learned repair (only if rule (a) passes)
 
-- **Repair.** For each window, take the 672-half-hour residual of the reading against LL-ens3's
+- **Repair.** For each origin, take the 672-half-hour residual (ending at `origin - NEWEST_AGE`) of the reading against LL-ens3's
   median and denoise it by total variation (batched solver on the GPU). The normal level is the
   median of the denoised level. Where the denoised level departs from the normal level by more
   than tau spreads (the Primary's residual spread), subtract the departure. Zero, stuck, and
   missing readings are set to missing by the rules of experiments 435 and 410 before the solve.
-- **Tuning.** The total-variation weight and tau are chosen on new-generator worlds from the screen
-  folds that are not worlds G200 to G202 (worlds G100 to G102 held-out halves by Primary and
-  month), never on the scoring worlds.
+- **Tuning.** The criterion is the mean absolute error of the repaired lag against the oracle
+  lag, over rows with a temporary step in force, on tuning world G110. G110 uses only origins in
+  months of the training window that are not among the four scored months, and no correction fit
+  trains on those origins' injections. The grid is 6 total-variation weights times 5 values of tau
+  (30 solves of the tuning set), printed in full. Worlds G200 to G202 are never used for tuning.
 - **Scoring.** The 32-unit correction is retrained on repaired lags (4 folds by 3 seeds), with
   Z1e-2 beside it, on the old worlds and on the new-generator worlds with family B. Plain and
   oracle are retrained on the new-generator training worlds too, so the three arms see the same
@@ -203,33 +233,53 @@ can reach the accuracy the oracle's noise curve demands.
   same worlds as the noise curve, and place the three errors on the noise curve.
 - **Timing first.** One epoch of one encoder fit is timed and the total is reported to the manager
   before T1 runs. Abort and message the manager and the neural Discuss session if one fit
-  extrapolates above 2 GPU-hours. Total cost at most 3 GPU-hours.
+  extrapolates above 2 GPU-hours. Budget: T0 0.3, noise curve 0.6 (108 fits across 3 parallel
+  processes), new-generator and TV retrains 0.5 (about 48 fits), T1 at most 1.6, in GPU-hours of
+  wall-clock, so at most 3. The total-variation solves and the tuning grid are CPU work and are
+  timed and reported.
 
 ## Decision rule
 
-All scores are CRPS in points of effective capacity at the signed-MW six, lower is better, on
-injected harm and target rows, with a month-block interval over the 4 folds (3 seeds averaged in
-each fold). Differences are written "arm minus plain".
+All scores are CRPS in points of effective capacity (the `pinball_points` scorer of experiment
+472), lower is better, at the signed-MW six, on injected harm and target rows (the union of
+`harm_inj` and `tgt_inj`, with its own seed-spread minimum detectable effect), with a month-block
+interval over the 4 folds (3 seeds averaged in each fold; the interval is the exact enumeration of
+the 256 resamples of 4 blocks, with the four monthly contrasts also printed). Differences are
+written "arm minus plain"; gain is plain minus arm.
 
-1. **Rule (a), stop the whole line.** The oracle minus plain contrast is not below the negative of
-   the injected-row minimum detectable effect, or its 95% interval includes zero.
-2. **Rule (b), promote the non-learned repair.** Let gain be plain minus arm. The ratio (TV gain)
-   over (oracle gain), on the same rows, has a 95% interval (month-block bootstrap of the ratio of
-   means) whose lower end is at least 0.5, both on the old worlds and on the new-generator worlds
-   pooled at the generator's own mix (about 60% genuine among steps in force). The genuine-only
-   ratio is reported beside it. The repair is also not shown worse than plain AvgAnchor by more
-   than 0.03 points of capacity on rows with no labelled event at the six (the upper end of the
-   interval for TV minus AvgAnchor is at most 0.03), and not shown worse by more than 0.02 points
-   on q99 pinball loss. "Not shown worse" is not equivalence; both limits sit well below the
-   clean-row minimum detectable effect of 0.237. If the point ratio is at least 0.5 and its lower
-   end is below 0.5, the page says "point estimate passes, not shown", and T1 still runs.
-3. **Rule (c), stop the neural encoder.** The encoder's three errors land where the noise curve
-   keeps under half the oracle gain, or its validation step loss stops falling before epoch 10.
-   When the three errors land in different regions, the worst region decides.
-
-The Bonferroni count is 8 (4 decision contrasts at the six, 4 at the eight), stated as a number.
-The signed-MW six and the MVA-only eight are scored separately and never pooled. D15 and D18 are
-trained after the 2025-03-01 cut and are report-only.
+1. **Rule (a), stop the whole line.** The oracle gain is below the injected-row minimum detectable
+   effect, or its interval includes zero, on the old worlds. The new-generator worlds are scored
+   too. If the old worlds pass and the new-generator worlds do not, the line continues to T0-TV and
+   the page reports both.
+2. **Rule (b), promote the non-learned repair.** Test the difference (TV gain minus half the oracle
+   gain) with the paired interval: it passes when the lower end is at or above zero, on the old
+   worlds and on the new-generator worlds pooled at the generator's own mix (about 60% genuine
+   among steps in force). The ratio TV gain over oracle gain is reported only when the oracle
+   gain's lower end exceeds the minimum detectable effect, because the ratio is unstable otherwise.
+   The genuine-only difference is reported beside. The clean-row clause is a point estimate of TV
+   minus plain AvgAnchor of at most 0.03 points on rows with no labelled event at the six, on the
+   real world (-1), reported with its interval and labelled "not shown worse", and the q99 clause is
+   a point estimate of at most +0.02 points on the single-level q99 pinball loss (formula and
+   AvgAnchor's baseline printed, with the absolute and relative margin). The brief's "within 0.03" is a point
+   estimate, so the plan keeps it one; both limits sit far below the clean-row minimum detectable
+   effect of 0.237 and prove no equivalence. If the point estimate passes and the interval does
+   not, the page says "point estimate passes, not shown", and T1 still runs.
+3. **Rule (c), stop the neural encoder.** T1's onset error (reported as a distribution in hours,
+   from which the shares within 2, 6, and 24 hours follow), size error, and share of steps missed
+   are placed on the noise curve of the same new-generator worlds G200 to G202. The noise curve is
+   measured on those worlds only (their event table gives the exact onsets and sizes). The curve's
+   axis values are interpolated linearly in the error, and "under half the oracle gain" needs the
+   curve's point to lie below half the oracle gain by more than the seed spread. The worst of the
+   three axes decides. The rule also fires if validation step loss stops falling before epoch 10.
+   T1 is one fold and one seed, so the page calls the result a single-fit reading.
+4. **Contrasts and levels.** Four decision contrasts at the six: C1 oracle minus plain (old
+   worlds), C2 TV against half the oracle gain (old worlds), C3 the same on the new-generator
+   worlds, C4 TV minus AvgAnchor on rows with no labelled event. The same four at the eight, which
+   are report-only: a result at the eight that contradicts the six is flagged and does not change
+   the rule. Bonferroni count 8, interval level 1 - 0.05/8, stated as numbers, with the 95% level
+   beside it.
+5. **Not units-free.** The signed-MW six and the MVA-only eight are never pooled. D15 and D18 are
+   trained after the 2025-03-01 cut and are report-only.
 
 ## Scores, caveats, and what this cannot show
 
