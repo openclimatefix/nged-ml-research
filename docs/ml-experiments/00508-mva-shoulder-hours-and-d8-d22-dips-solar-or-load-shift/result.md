@@ -8,7 +8,7 @@ theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - solar-disaggregation
   - lsc-detectors
-status: planned
+status: finished
 kind: other
 date: 2026-11-02
 size: >-
@@ -59,6 +59,44 @@ metric: >-
   Area under the curve of the dip statistic per window, arm, and injection level; shoulder dip rate
   on sunny days, cloudy days, and dark hours; shares of dip days by cause; each with a month-block
   bootstrap interval (20,000 resamples).
+verdict: partly supported
+best_arm: >-
+  Shoulder windows at export-to-import ratio 1.5 to 3, floor 0: area under the curve 0.85 (0.74 to
+  0.91) morning and 0.88 (0.80 to 0.93) evening, against 0.51 (0.42 to 0.58) for the midday window.
+headline: >-
+  A dip at the edges of the sun's path finds sign-change days where the midday dip fails, up to
+  export about three times the night import. D12 (about 5) cannot be calibrated and its shoulder
+  dips fail the cloudy-day and dark-hour placebos. 55 of D8's 71 dip days coincide with the engine
+  flag, which is weak evidence because the flag also tracks any low D8 reading.
+take_home_message: >-
+  Looking at the edges of the sun's path finds the days when a substation's power changes sign far
+  better than the midday dip does, but only up to export about three times the night import. D12
+  exports about five times its night import, and its dips at the edges are as common on cloudy days
+  and in the dark, so they show low demand and not solar export. D8's midday dips mostly coincide
+  with the gas engine's running states, which is consistent with the engine but not proof, and the
+  data cannot say what causes D22's 13 dips or D8's other 16.
+lessons: >-
+  The dip statistic cannot be calibrated by injection once export exceeds about three times the
+  night import, because nearly every injected day then crosses zero. The shape test cannot tell a
+  solar drop from a boxcar at 3 to 4 half-hours. Only NGED's records can settle the cause of the D8
+  and D22 dips.
+advice:
+  - >-
+    Use a window set by the sun's elevation, not the clock, when looking for a sign change in
+    apparent power; the midday window is at chance (0.51) once export is 1.5 to 3 times the night
+    import while the shoulders stay at 0.85 to 0.88 (Part A).
+  - >-
+    Do not calibrate a dip statistic by injecting more than about three times the night import;
+    over 98% of injected days then cross zero and no area under the curve exists (Part A).
+  - >-
+    Check a shoulder dip against cloudy days and a dark-hour window of the same length before
+    reading it as export; at D12 the dip is as common on cloudy days (ratio 1.05) (Part A).
+  - >-
+    Do not use the engine detector's flag alone to explain a D8 dip; it is also high on days whose
+    lowest reading is 7 to 25 points (Audit).
+  - >-
+    Ask NGED what changed at D8 and D22 from 2023 to 2026; the telemetry cannot separate solar, a
+    load transfer, and the engine (Part C).
 code: ml-experiments/00508-mva-shoulder-hours-and-d8-d22-dips-solar-or-load-shift/
 production_status: not-for-production
 adopted_in: none
@@ -156,9 +194,10 @@ telling when a substation's power changes sign, but only up to export about thre
 import, and D12 (about five times) lies beyond what we could calibrate. At D12 the shoulder dips
 are as common on cloudy days and in the dark as on sunny days, so they show low demand and not
 solar export. At D8, 55 of the 71 midday dip days have an engine running at most dip half-hours,
-which is consistent with the gas engine and not with solar or a load transfer. The data cannot say
-which cause explains the other 16 D8 dip days or the 13 D22 dip days. Verdict: `partly supported`.
-This page is interim and the audit is recorded below. Counts are lower bounds, because NGED's event
+which is consistent with the gas engine, although the engine flag also tracks any low D8 reading
+and so is weak evidence. The data cannot say which cause explains the other 16 D8 dip days or the 13
+D22 dip days, and the sunny-versus-cloudy test does not support a solar cause at D22. Verdict:
+`partly supported`. This page is interim and the audit is recorded below. Counts are lower bounds, because NGED's event
 labels are incomplete.
 
 **What we asked.** Experiment 506 looked for a dip of the apparent power (MVA, never negative) only
@@ -227,9 +266,9 @@ signed power changes sign. No model was fitted.
   neither solar nor a load transfer. The engine class cannot be assessed at D22.
 - **Season and sky.** From March to October, D8 has 62 dips in 717 sunny days and 2 in 129 cloudy
   days (Mantel-Haenszel cloudy-to-sunny ratio 0.18, interval 0.04 to 0.57); D22 has 13 in 710 and 0
-  in 122 (0.29, 0.16 to 0.71). A solar cause predicts almost no cloudy dips, but two intervals
-  reach 0.57 and 0.71, and the engine also runs more on sunny days at D8, so neither cause is
-  excluded.
+  in 122 (0.29, 0.16 to 0.71). A solar cause predicts almost no cloudy dips, but the two intervals
+  reach 0.57 and 0.71, the engine also runs more on sunny days at D8, and the D22 figure rests on
+  zero cloudy dips, so neither cause is excluded.
 - **Shape test fails its known answer.** It labels 63% of injected solar-shaped drops and 85% of
   injected boxcars correctly (target 80% each), and 72% of D10's real reverse-flow days solar. The
   dip days are 32% (D8) and 67% (D22) solar-labelled. The shape test carries no weight.
@@ -274,7 +313,34 @@ signed power changes sign. No model was fitted.
 
 ## Audit
 
-To be filled after the audit.
+A fresh Sonnet auditor re-derived the three headlines with its own code (`briefs/508_audit.md`).
+Triage:
+
+- **Part A bin 1.5 to 3 survives.** Midday 0.509, morning 0.846, evening 0.875 against the stored
+  0.517, 0.844, 0.873. Leaving out D10 and moving the shoulder band to 8 to 20 or 12 to 25 degrees
+  leave the ordering unchanged. Accepted as a caveat: the pooled midday interval (0.42 to 0.58)
+  does not separate it from 0.5 exactly.
+- **Selection of days (accepted as a caveat).** Only about 22% of April to September days qualify,
+  because the recorded farm output is missing in 20% to 63% of shoulder half-hours, so the sample
+  leans toward days on which the farm was already producing at both shoulders. Requiring 2 shoulder
+  half-hours instead of 3 gives 3.4 times as many days and the same ordering (midday 0.50, morning
+  0.84, evening 0.83).
+- **Farm extension (accepted as a caveat).** The extension creates no spurious crossings, but
+  without it the evening area rises from 0.875 to 0.91, so shoulder areas are mildly sensitive to
+  it.
+- **Engine overlap (accepted; wording weakened).** The count of 55 reproduces and the index
+  alignment is right, but the engine flag is also high on D8 days whose lowest reading is 7 to 25
+  points (0.72 to 0.85), and the flag is fitted to D8's own series. The page therefore says
+  "consistent with" and treats the engine as an unproven explanation.
+- **Sky test (accepted; wording weakened).** D8's ratio of 0.18 holds from March to October
+  (one-sided Fisher p = 0.0013) but is 0.44 (0.11 to 1.11) from April to September. D22's 0.29 rests
+  on 0 cloudy dips in 122 days (Fisher p = 0.12), so the sky test does not support a solar cause
+  at D22.
+- **Crossing share above ratio 3 (corrected).** 99.4% in the 3 to 6 bin, 97.4% above 6 (98.7%
+  combined); the page already gives the two figures.
+- **Shape test (accepted).** The injected solar drop uses the recorded farm shape while the
+  classifier fits the fleet shape, and the no-injection control is labelled solar 25% (D8) and 47%
+  (D22) of the time. The page already gives the test no weight.
 
 ## Reuse and cost
 
