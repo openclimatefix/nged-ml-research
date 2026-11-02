@@ -95,10 +95,13 @@ rows at every share, so all arms take the same number of steps per epoch.
 
 ## Pre-registered rules
 
-- **Tests.** 16 contrasts x 2 groups = 32 CRPS tests (64 with q99): E10, E25, E75, E100, L-mix,
-  and F0-vs-L-Ww are the sweep; the flag ablations and TS are each contrasted with their reference.
-  Minimum detectable effect: 0.164 (eight) and 0.123 (six), experiment 511's `mde.csv` from two
-  seeds, not refitted.
+- **Tests.** 16 contrasts x 2 groups = 32 CRPS tests (64 with q99). Against F0: E10, E25, L-mix
+  (the 50% share), E75, E100. Against L-Ww: F0, E25, L-mix (repeats experiment 511's contrast). Flag
+  ablation: NF25 against E25, NF50 against L-mix, Z25 against E25, Z50 against L-mix. Shape: E25
+  against E10, E75 against E25, E100 against E25, L-mix against E25. The optional two-stage control TS
+  is its own family (TS against L-Ww and against F0: 4 CRPS tests, 8 with q99) and is reported
+  separately. Minimum detectable effect: 0.164 (eight) and 0.123 (six), experiment 511's `mde.csv`
+  from two seeds, not refitted.
 - **Seeds.** Seeds 0 and 1 for every arm. No outcome-selected third seed.
 - **Scored set.** Experiment 470's rows, five folds, "rows with no labelled event"; D15 and D18
   report only; horizon bands day 1, days 2 to 3, days 4 to 10.
