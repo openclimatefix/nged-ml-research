@@ -48,7 +48,9 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00515-lagless-demand-network-trailing-weather-window-features" / "work"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00515-lagless-demand-network-trailing-weather-window-features"
+    / "work"
 )
 TABLE_DIR: Final[Path] = WORK_DIR / "windows"
 ARM_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
@@ -226,7 +228,9 @@ class DenseWindows:
             for name, series in (("t", t), ("s", s), ("heat", heat), ("cool", cool)):
                 self.prefix[(grid, name)] = _prefix(a=series)
 
-    def _window_mean(self, *, name: str, end: np.ndarray, n_steps: int, cut: np.ndarray) -> np.ndarray:
+    def _window_mean(
+        self, *, name: str, end: np.ndarray, n_steps: int, cut: np.ndarray
+    ) -> np.ndarray:
         """Return the mean of the `n_steps` half-hours ending at `end`, grid A up to `cut` and grid B after."""
         pa, pb = self.prefix[("A", name)], self.prefix[("B", name)]
         start = np.maximum(end - n_steps + 1, 0)
@@ -246,14 +250,22 @@ class DenseWindows:
         cut = origin_idx - INIT_TO_ORIGIN_STEPS + FINE_GRID_STEPS
         out = {}
         for label, n_steps in WINDOWS.items():
-            out[f"t_mean_{label}"] = self._window_mean(name="t", end=valid_idx, n_steps=n_steps, cut=cut)
+            out[f"t_mean_{label}"] = self._window_mean(
+                name="t", end=valid_idx, n_steps=n_steps, cut=cut
+            )
             if label != "72h":
-                out[f"sw_mean_{label}"] = self._window_mean(name="s", end=valid_idx, n_steps=n_steps, cut=cut)
+                out[f"sw_mean_{label}"] = self._window_mean(
+                    name="s", end=valid_idx, n_steps=n_steps, cut=cut
+                )
         out["sw_mean_prev_24h"] = self._window_mean(
             name="s", end=np.maximum(valid_idx - STEPS_PER_DAY, 0), n_steps=STEPS_PER_DAY, cut=cut
         )
-        out["heat_dh_24h"] = self._window_mean(name="heat", end=valid_idx, n_steps=STEPS_PER_DAY, cut=cut) * 24.0
-        out["cool_dh_24h"] = self._window_mean(name="cool", end=valid_idx, n_steps=STEPS_PER_DAY, cut=cut) * 24.0
+        out["heat_dh_24h"] = (
+            self._window_mean(name="heat", end=valid_idx, n_steps=STEPS_PER_DAY, cut=cut) * 24.0
+        )
+        out["cool_dh_24h"] = (
+            self._window_mean(name="cool", end=valid_idx, n_steps=STEPS_PER_DAY, cut=cut) * 24.0
+        )
         out["t_sw_product_24h"] = (out["t_mean_24h"] - HEATING_BASE_C) * out["sw_mean_24h"]
         return np.stack([out[c] for c in ALL_COLUMNS], axis=1).astype(np.float32)
 
@@ -310,7 +322,10 @@ def check(*, site: str = "D2") -> None:
         "of",
         table.height,
     )
-    print("rows by missed earlier runs:", table["diag_missed_runs"].value_counts().sort("diag_missed_runs").to_dicts())
+    print(
+        "rows by missed earlier runs:",
+        table["diag_missed_runs"].value_counts().sort("diag_missed_runs").to_dicts(),
+    )
     full = prep.load_summary(series_id=int(row["time_series_id"]))
     origins = full["power_fcst_init_time"].unique().sort()
     rng = np.random.default_rng(0)
@@ -326,7 +341,9 @@ def check(*, site: str = "D2") -> None:
         key = int(cut_origin.timestamp() * 1_000_000)
         a = table.filter(pl.col("origin_us") == key).sort("valid_us")
         b = rebuilt.filter(pl.col("origin_us") == key).sort("valid_us")
-        worst = max(float(np.nanmax(np.abs(a[c].to_numpy() - b[c].to_numpy()))) for c in ALL_COLUMNS)
+        worst = max(
+            float(np.nanmax(np.abs(a[c].to_numpy() - b[c].to_numpy()))) for c in ALL_COLUMNS
+        )
         print(f"run {cut_origin}: largest difference with all later runs deleted: {worst:.2e}")
         if worst > 1e-5:
             msg = "a window column depends on a later run"

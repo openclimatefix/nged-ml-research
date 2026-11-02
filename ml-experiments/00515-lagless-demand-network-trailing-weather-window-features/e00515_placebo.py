@@ -34,7 +34,9 @@ class DayStructure:
             allowed: Grid index range `[low, high)` of days that may send or receive a donor, or
                 None for every day. Ensemble rows use the span that holds ensemble runs.
         """
-        times = common.grid_times().dt.replace_time_zone("UTC").dt.convert_time_zone("Europe/London")
+        times = (
+            common.grid_times().dt.replace_time_zone("UTC").dt.convert_time_zone("Europe/London")
+        )
         date = times.dt.date().cast(pl.Int32).to_numpy()
         _, self.day_id = np.unique(date, return_inverse=True)
         n_days = int(self.day_id.max()) + 1
@@ -54,9 +56,7 @@ class DayStructure:
         self.unmatched = []
         self.widened = []
         for k, seed in enumerate(SEEDS):
-            donor = self._draw(
-                seed=seed, month=month, kind=kind, side=side, first_date=first_date
-            )
+            donor = self._draw(seed=seed, month=month, kind=kind, side=side, first_date=first_date)
             ok = donor >= 0
             self.widened.append(int(self.last_widened))
             self.shift[k, ok] = (
@@ -65,7 +65,13 @@ class DayStructure:
             self.unmatched.append(int((~ok).sum()))
 
     def _draw(
-        self, *, seed: int, month: np.ndarray, kind: np.ndarray, side: np.ndarray, first_date: np.ndarray
+        self,
+        *,
+        seed: int,
+        month: np.ndarray,
+        kind: np.ndarray,
+        side: np.ndarray,
+        first_date: np.ndarray,
     ) -> np.ndarray:
         """Return each day's donor day (-1 for none), shuffling within groups until donors are far enough."""
         rng = np.random.default_rng(seed)

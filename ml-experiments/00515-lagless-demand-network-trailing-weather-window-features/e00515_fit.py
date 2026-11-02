@@ -100,7 +100,8 @@ class Windows:
         """Load the ensemble tables and the ERA5 prefix sums, and draw the placebo days."""
         self.ens = EnsembleLookup(seam="previous")
         self.dense = {
-            int(r["primary"]): feat.DenseWindows(row=r) for r in prep.primaries().iter_rows(named=True)
+            int(r["primary"]): feat.DenseWindows(row=r)
+            for r in prep.primaries().iter_rows(named=True)
         }
         first_run = int(common.grid_index(times=prep.FIRST_RUN)) + 5 * placebo.STEPS_PER_DAY
         holdout = int(common.grid_index(times=common.HOLDOUT))
@@ -119,9 +120,13 @@ class Windows:
             out = np.empty((len(primary), len(ALL)), dtype=np.float32)
             for p in np.unique(primary):
                 sel = primary == p
-                out[sel] = self.dense[int(p)].columns(origin_idx=origin_idx[sel], valid_idx=valid_idx[sel])
+                out[sel] = self.dense[int(p)].columns(
+                    origin_idx=origin_idx[sel], valid_idx=valid_idx[sel]
+                )
             return out
-        values, found = (ens or self.ens).get(primary=primary, origin_idx=origin_idx, valid_idx=valid_idx)
+        values, found = (ens or self.ens).get(
+            primary=primary, origin_idx=origin_idx, valid_idx=valid_idx
+        )
         if not found.all():
             msg = f"{int((~found).sum())} ensemble rows have no window columns"
             raise ValueError(msg)
@@ -143,10 +148,14 @@ class Windows:
             inside = usable & (o2 >= 0) & (v2 < len(self.days[kind].day_id))
             idx = np.nonzero(inside)[0]
             if kind == "era5":
-                out[idx] = self.real(kind="era5", primary=primary[idx], origin_idx=o2[idx], valid_idx=v2[idx])
+                out[idx] = self.real(
+                    kind="era5", primary=primary[idx], origin_idx=o2[idx], valid_idx=v2[idx]
+                )
                 todo[idx] = False
             else:
-                values, found = self.ens.get(primary=primary[idx], origin_idx=o2[idx], valid_idx=v2[idx])
+                values, found = self.ens.get(
+                    primary=primary[idx], origin_idx=o2[idx], valid_idx=v2[idx]
+                )
                 out[idx[found]] = values[found]
                 todo[idx[found]] = False
         self.unfilled += int(todo.sum())
@@ -166,13 +175,17 @@ def prediction_path(*, arm: str, month: str, seed: int) -> Path:
 class Fold:
     """One fold's rows, test rows, pretraining rows, and standardised window columns per arm."""
 
-    def __init__(self, *, month: str, clean: np.ndarray, need_pre: bool, arms: list[str], seam: bool) -> None:
+    def __init__(
+        self, *, month: str, clean: np.ndarray, need_pre: bool, arms: list[str], seam: bool
+    ) -> None:
         """Build the rows and the raw (real and placebo) window columns once."""
         self.month = month
         refit = c.month_start(month=month)
         self.rows = data.build_fold(refit=refit, clean=clean)
         self.test = data.build_test(month=month, standardiser=self.rows.standardiser)
-        self.pre = r448.pretrain_rows(rows=self.rows, refit=refit, clean=clean) if need_pre else None
+        self.pre = (
+            r448.pretrain_rows(rows=self.rows, refit=refit, clean=clean) if need_pre else None
+        )
         fit_until = int((c.us(t=refit) - c.prep422.GRID_START_US) // c.prep422.STEP_US)
         windows = Windows(fit_until_idx=fit_until)
         self.windows = windows
@@ -183,7 +196,11 @@ class Fold:
         if self.pre is not None:
             sets["pre"] = (self.pre, "era5")
         for stage, (rows, kind) in sets.items():
-            args = {"primary": rows.primary, "origin_idx": rows.origin_idx, "valid_idx": rows.target_idx}
+            args = {
+                "primary": rows.primary,
+                "origin_idx": rows.origin_idx,
+                "valid_idx": rows.target_idx,
+            }
             if needs_real:
                 self.raw[(stage, "real")] = windows.real(kind=kind, **args)
             if needs_null:
@@ -241,8 +258,18 @@ def _fine_tune_and_forecast(
     started = time.monotonic()
     rows = fold.rows
     x = fold.matrix(arm=parent, stage="ft", x=rows.x, seam=seam)
-    t = _tensor_set(x=x, y=rows.y, w=rows.weight, primary=rows.primary, is_val=rows.is_val, rows=rows, device=device)
-    model = c.new_model(outlier=False, n_inputs=x.shape[1], n_primaries=len(rows.target_mean)).to(device)
+    t = _tensor_set(
+        x=x,
+        y=rows.y,
+        w=rows.weight,
+        primary=rows.primary,
+        is_val=rows.is_val,
+        rows=rows,
+        device=device,
+    )
+    model = c.new_model(outlier=False, n_inputs=x.shape[1], n_primaries=len(rows.target_mean)).to(
+        device
+    )
     c.load_pretrained(model=model, path=pretrained_path(arm=parent, month=fold.month, seed=seed))
     model.to(device)
     epochs, best = c.train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed, lr=c.FINE_TUNE_LR, outlier=False, prior=False, device=device)  # fmt: skip
@@ -264,7 +291,13 @@ def _fine_tune_and_forecast(
 
 
 def run(
-    *, months: list[str], seeds: list[int], arms: list[str], do_pretrain: bool, do_fit: bool, device: str
+    *,
+    months: list[str],
+    seeds: list[int],
+    arms: list[str],
+    do_pretrain: bool,
+    do_fit: bool,
+    device: str,
 ) -> None:
     """Pretrain and/or fine-tune and forecast each arm (and W-seam), fold, and seed (skips outputs that exist)."""
     clean = c.clean_stack()
@@ -277,9 +310,15 @@ def run(
             continue
         t0 = time.monotonic()
         used = [a for a, _ in (*todo_pre, *todo_fit)]
-        fold = Fold(month=month, clean=clean, need_pre=bool(todo_pre), arms=used or [SEAM_PARENT], seam=bool(todo_seam))
+        fold = Fold(
+            month=month,
+            clean=clean,
+            need_pre=bool(todo_pre),
+            arms=used or [SEAM_PARENT],
+            seam=bool(todo_seam),
+        )
         print(
-            f"{month}: feeder {time.monotonic() - t0:.0f} s; placebo days without donor per draw {fold.windows.days["ens"].unmatched} (ensemble) and {fold.windows.days["era5"].unmatched} (ERA5); days that needed a wider group {fold.windows.days["ens"].widened} and {fold.windows.days["era5"].widened}; rows without any donor {fold.windows.unfilled}",
+            f"{month}: feeder {time.monotonic() - t0:.0f} s; placebo days without donor per draw {fold.windows.days['ens'].unmatched} (ensemble) and {fold.windows.days['era5'].unmatched} (ERA5); days that needed a wider group {fold.windows.days['ens'].widened} and {fold.windows.days['era5'].widened}; rows without any donor {fold.windows.unfilled}",
             flush=True,
         )
         rows = fold.rows
@@ -287,37 +326,72 @@ def run(
             assert fold.pre is not None
             pre = fold.pre
             x = fold.matrix(arm=arm, stage="pre", x=pre.x)
-            t = _tensor_set(x=x, y=pre.y, w=np.ones(len(pre.y)), primary=pre.primary, is_val=pre.is_val, rows=rows, device=device)
+            t = _tensor_set(
+                x=x,
+                y=pre.y,
+                w=np.ones(len(pre.y)),
+                primary=pre.primary,
+                is_val=pre.is_val,
+                rows=rows,
+                device=device,
+            )
             started = time.monotonic()
             torch.manual_seed(seed)
-            model = c.new_model(outlier=False, n_inputs=x.shape[1], n_primaries=len(rows.target_mean)).to(device)
+            model = c.new_model(
+                outlier=False, n_inputs=x.shape[1], n_primaries=len(rows.target_mean)
+            ).to(device)
             epochs, best = c.train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed, lr=c.PRETRAIN_LR, outlier=False, prior=False, device=device)  # fmt: skip
-            r448.atomic_save(state=model.state_dict(), target=pretrained_path(arm=arm, month=month, seed=seed))
-            print(f"  pretrain {arm} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s", flush=True)
+            r448.atomic_save(
+                state=model.state_dict(), target=pretrained_path(arm=arm, month=month, seed=seed)
+            )
+            print(
+                f"  pretrain {arm} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s",
+                flush=True,
+            )
             del t, model, x
             torch.cuda.empty_cache()
         for arm, seed in todo_fit:
-            print(_fine_tune_and_forecast(fold=fold, arm=arm, parent=arm, seed=seed, seam=False, device=device), flush=True)
+            print(
+                _fine_tune_and_forecast(
+                    fold=fold, arm=arm, parent=arm, seed=seed, seam=False, device=device
+                ),
+                flush=True,
+            )
         for seed in todo_seam:
-            print(_fine_tune_and_forecast(fold=fold, arm=SEAM_ARM, parent=SEAM_PARENT, seed=seed, seam=True, device=device), flush=True)
+            print(
+                _fine_tune_and_forecast(
+                    fold=fold, arm=SEAM_ARM, parent=SEAM_PARENT, seed=seed, seam=True, device=device
+                ),
+                flush=True,
+            )
         del fold
 
 
 def checks(*, month: str) -> None:
     """Print the sanity checks of one fold: columns found, placebo coverage, standardised ranges, no NaN."""
     clean = c.clean_stack()
-    fold = Fold(month=month, clean=clean, need_pre=True, arms=["W-T", "W-S", "W-X", "W-null"], seam=True)
-    print(f"{month}: {len(fold.rows.y):,} fine-tuning rows, {len(fold.test.x):,} test rows, {len(fold.pre.x):,} pretraining rows")  # ty: ignore[unresolved-attribute]
-    print(f"placebo: days without a donor per draw {fold.windows.days["ens"].unmatched} (ensemble), widened {fold.windows.days["ens"].widened}; rows without any donor {fold.windows.unfilled}")
+    fold = Fold(
+        month=month, clean=clean, need_pre=True, arms=["W-T", "W-S", "W-X", "W-null"], seam=True
+    )
+    print(
+        f"{month}: {len(fold.rows.y):,} fine-tuning rows, {len(fold.test.x):,} test rows, {len(fold.pre.x):,} pretraining rows"
+    )  # ty: ignore[unresolved-attribute]
+    print(
+        f"placebo: days without a donor per draw {fold.windows.days['ens'].unmatched} (ensemble), widened {fold.windows.days['ens'].widened}; rows without any donor {fold.windows.unfilled}"
+    )
     for arm in ("W-T", "W-S", "W-X", "W-null"):
         for stage, base in (("pre", fold.pre.x), ("ft", fold.rows.x), ("test", fold.test.x)):  # ty: ignore[unresolved-attribute]
             m = fold.matrix(arm=arm, stage=stage, x=base)
-            extra = m[:, base.shape[1]:]
-            print(f"  {arm} {stage}: {extra.shape[1]} columns, mean {extra.mean():+.3f}, sd {extra.std():.3f}, min {extra.min():+.2f}, max {extra.max():+.2f}, NaN {int(np.isnan(extra).sum())}")
+            extra = m[:, base.shape[1] :]
+            print(
+                f"  {arm} {stage}: {extra.shape[1]} columns, mean {extra.mean():+.3f}, sd {extra.std():.3f}, min {extra.min():+.2f}, max {extra.max():+.2f}, NaN {int(np.isnan(extra).sum())}"
+            )
     for stage, base in (("ft", fold.rows.x), ("test", fold.test.x)):
-        real = fold.matrix(arm="W-T", stage=stage, x=base)[:, base.shape[1]:]
-        seam = fold.matrix(arm="W-T", stage=stage, x=base, seam=True)[:, base.shape[1]:]
-        print(f"  W-T seam variants {stage}: mean absolute difference {np.abs(real - seam).mean():.4f}")
+        real = fold.matrix(arm="W-T", stage=stage, x=base)[:, base.shape[1] :]
+        seam = fold.matrix(arm="W-T", stage=stage, x=base, seam=True)[:, base.shape[1] :]
+        print(
+            f"  W-T seam variants {stage}: mean absolute difference {np.abs(real - seam).mean():.4f}"
+        )
     same = float(np.mean(fold.raw[("ft", "null")] == fold.raw[("ft", "real")]))
     print(f"  share of placebo entries equal to the real entries (fine-tuning): {same:.4f}")
 
@@ -328,14 +402,23 @@ def main() -> None:
     parser.add_argument("command", choices=("time", "pretrain", "fit", "both", "checks"))
     parser.add_argument("--months", nargs="+", default=list(MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS))
-    parser.add_argument("--arms", nargs="+", default=[*CORE_ARMS, SEAM_ARM], choices=[*ARM_COLUMNS, SEAM_ARM])
+    parser.add_argument(
+        "--arms", nargs="+", default=[*CORE_ARMS, SEAM_ARM], choices=[*ARM_COLUMNS, SEAM_ARM]
+    )
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args()
     if args.command == "checks":
         checks(month=args.months[0])
         return
     if args.command == "time":
-        run(months=args.months[:1], seeds=args.seeds[:1], arms=args.arms, do_pretrain=True, do_fit=True, device=args.device)
+        run(
+            months=args.months[:1],
+            seeds=args.seeds[:1],
+            arms=args.arms,
+            do_pretrain=True,
+            do_fit=True,
+            device=args.device,
+        )
         return
     run(months=args.months, seeds=args.seeds, arms=args.arms, do_pretrain=args.command in ("pretrain", "both"), do_fit=args.command in ("fit", "both"), device=args.device)  # fmt: skip
 
