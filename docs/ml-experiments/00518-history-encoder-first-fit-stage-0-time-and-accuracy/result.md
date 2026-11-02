@@ -59,17 +59,21 @@ best_arm: >-
   error (0.446 against 0.988 spreads) but failed on error added to untouched rows; P3 failed
   (found 44% of the ceiling within 6 hours) and P4 failed (planted-step precision 0.165).
 headline: >-
-  Interim and unaudited, and a weak null. One encoder fit (one seed, 69 seconds) did not pass the
-  pre-registered proxy: it found 31% of injected steps within 2 hours (a perfect predictor would
-  find 87%) and its planted-step precision at a 2% rate was 0.165 (threshold 0.3).
+  Interim and unaudited, and a second null. Attempt 1 (one seed, 69 seconds) and attempt 2 (three
+  seeds, 0.22 GPU-hours) both failed the pre-registered proxy. In attempt 2 every seed failed P2
+  (error on untouched rows 0.24 to 0.31 of the injected step, limit 0.1), P3 (45% to 52% of the
+  ceiling for seeds 0 and 1, 17% for seed 2, limit 70%), and P4 (planted precision 0.025 to 0.197,
+  limit 0.3).
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   Interim and unaudited. A small neural network trained for 69 seconds learned to find about a
   third of the injected shifts in 14 days of power readings, far below what a perfect finder
   would, and it flagged too many ordinary windows. The result is weak (one seed, a noisy
-  validation set), so it does not rule out a learned repair. It leaves the case for building one
-  unsupported for now.
+  validation set), so it does not rule out a learned repair. A second attempt with three seeds, a
+  validation block of 1,558 windows, and a lower learning rate failed the same checks in every
+  seed. The case for a learned history encoder is unsupported, and the line closes unless the
+  neural Discuss session overrules.
 lessons: >-
   One cheap fit cannot settle whether a history encoder is learnable. The fit was about 100 times cheaper
   than its 2-hour cap, so a longer, multi-seed attempt is affordable. The test month may be
@@ -186,6 +190,60 @@ perfect predictor that outputs the injected step, read through the same candidat
 
 ## What the next experiment should answer
 
-Whether a longer fit with several seeds, a larger validation block, a lower learning rate, and a
-flag threshold chosen on validation reaches the thresholds. The neural Discuss session decides
-whether that fit is worth its cost.
+Attempt 2 (below) asked whether a longer, three-seed fit with a larger validation block, a lower
+learning rate, and a flag threshold chosen on validation reaches the thresholds. It did not, so the
+line closes unless the neural Discuss session overrules.
+
+## Attempt 2 (design fixed before it ran)
+
+**A second, bounded attempt changes the fit in six ways and reads the same four checks.** The
+maintainer approved it, and the lag-free results of experiment 511 (the lag-free network beats the
+lagged network below about 2 days, and the gap sits at days 5 to 10) weaken the case for a lag
+encoder. The changes: 3 seeds (each with its own network initialisation and training worlds); a
+validation block of 130 days (1,558 windows) in place of 30; early-stopping worlds 150 to 152 and
+separate threshold worlds 160 to 162; a learning rate of 5e-4; epochs of 32,768 windows; and
+early stopping after 10 epochs. The flag threshold is chosen per seed on the validation block
+alone, as the grid value (0.5, 0.75, 1.0, or 1.5 spreads) that maximises planted precision times
+recall within 2 hours, and is written to a file before any test window is scored. P1 to P4 are read
+unchanged at the frozen threshold, per seed, with the spread over seeds. The cap is 0.5 GPU-hours
+for the fits together (the scoring passes are not counted).
+
+- **Tuned design.** The test windows and worlds 200 to 202 were read in attempt 1, and the changes
+  above were chosen afterwards, so a pass is a pass of a design tuned after that read-out.
+- **Best epoch.** A loss counts as better only if it is 0.5% below the best, so "best epoch" means
+  the last such improvement. A best epoch of 8 to 12 is reported as inconclusive for P1.
+- **Seeds.** The three seeds share one training pool, one validation block, and one set of test
+  windows, so the spread over seeds understates the uncertainty. If the seeds disagree on P2 to P4,
+  the page says so and does not pick a seed.
+- **A second null closes the line.** The neural Discuss session decides what follows.
+
+### Attempt 2 results
+
+**All three seeds fail P2, P3, and P4, and the seeds agree.** The result is a second null, so the
+line of work on a learned history encoder closes. The scores below are at each seed's frozen
+threshold on the same 372 test windows and worlds 200 to 202. The three fits took 332, 164, and
+287 seconds (783 seconds, 0.22 GPU-hours, inside the 0.5 GPU-hour cap, and no fit aborted).
+
+| Seed | Frozen threshold (spreads) | Best epoch (P1) | Repaired / unrepaired lag error (P2, below 0.5) | Error on untouched rows / injected step (P2, below 0.1) | Found within 6 h / ceiling (P3, at least 0.7) | Planted precision at 2% (P4, at least 0.3) |
+|---|---|---|---|---|---|---|
+| 0 | 0.5 | 59 (pass) | 0.478 (pass) | 0.312 (fail) | 0.463 / 0.896 = 0.52 (fail) | 0.025 (fail) |
+| 1 | 0.5 | 19 (pass) | 0.440 (pass) | 0.243 (fail) | 0.404 / 0.896 = 0.45 (fail) | 0.067 (fail) |
+| 2 | 1.5 | 41 (pass) | 0.477 (pass) | 0.314 (fail) | 0.078 / 0.466 = 0.17 (fail) | 0.197 (fail) |
+
+- **P1 passes in every seed.** Seed 0 reached the 60-epoch cap with its best epoch at 59, so its
+  validation loss was still falling when the fit stopped.
+- **The repair shrinks the lag error but adds error elsewhere.** The ratio of repaired to
+  unrepaired lag error is 0.44 to 0.48, but the encoder also puts an error of 0.24 to 0.31 of the
+  mean injected step on rows where no step touches a lag, three times the allowed 0.1.
+- **The seeds differ in how they fail.** Seeds 0 and 1 chose the lowest threshold and found 46% and
+  40% of injected steps within 6 hours, with false-flag rates of 0.277 and 0.089 on real test
+  windows. Seed 2 chose 1.5 spreads, found 8%, and flagged 0.5% of real windows. At the threshold
+  the validation block chose, no seed gets near the 0.3 planted precision.
+- **The genuine-change head is weak.** Its ranking area under the ROC curve is 0.63, 0.66, and 0.64
+  across the seeds (373 labelled window-world pairs).
+- **Limits.** The seeds share one training pool, one validation block, and one set of test windows,
+  so the spread over seeds understates the uncertainty. The design was tuned after attempt 1 read
+  the same test windows. The noise curve was withheld by the maintainer's standing instruction, so
+  the proxy is not the noise-curve region itself. The tuning of the total-variation repair in
+  experiment 507 hit the edge of its grid (weight 16, tau 5, the weakest repair), so that test was
+  weak as well.
