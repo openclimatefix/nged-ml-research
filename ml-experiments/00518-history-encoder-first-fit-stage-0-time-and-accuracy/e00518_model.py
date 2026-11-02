@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from typing import Final
 
 import torch  # ty: ignore[unresolved-import]
-import torch.nn.functional as F  # noqa: N812
+import torch.nn.functional as F  # noqa: N812  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]
 
 HISTORY: Final[int] = 672
