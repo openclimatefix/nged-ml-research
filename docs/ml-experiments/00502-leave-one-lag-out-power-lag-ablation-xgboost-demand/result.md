@@ -8,7 +8,8 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
+verdict: partly supported
 date: 2026-11-02
 kind: other
 protocol: demand-v2
@@ -49,44 +50,145 @@ metric: >-
   Mass-weighted pinball loss (CRPS-like) in points of effective capacity from the 11 quantiles of
   the 51-member mixture, on the intersection of finite actuals and all arms' forecasts, valid time
   before 2026-07-01.
+best_arm: >-
+  No single arm. Dropping the day lag shields events up to 3 days and bad data (a stuck meter, a
+  dropout) at +0.049 CRPS; dropping the week lag cuts the 7-day leak at +0.049 CRPS but leaks more
+  for short events. Dropping the origin lag scores -0.019 CRPS (experiment 388's arm E, re-scored).
+headline: >-
+  On rows with no labelled event at the six Primaries metered in signed megawatts (leads to 10
+  days), CRPS against all three lags is +0.049 for no week lag [-0.034, +0.102], +0.049 for no day
+  lag [+0.015, +0.113], and -0.019 for no origin lag [-0.034, -0.011]; the noise floor (a repeat
+  fit) is -0.0002. Interim and unaudited.
+lessons: >-
+  The leak is not carried by one lag. The day lag carries the short-event leak and the sensitivity
+  to bad data, and the week lag carries part of the 5 to 7 day leak. Removing either costs about
+  0.05 CRPS, and removing the week lag makes short events and bad data worse.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  Dropping a single power lag does not make the XGBoost demand forecast robust to a load-shift
+  event at every length. Without the day lag, a step of 5% of capacity in the last 3 days does not
+  move the median forecast (0.00 of the step, against 0.05 to 0.08 with all three lags), but a
+  7-day step still moves it by 0.29, and the score loss is +0.049 points of capacity. Without the
+  week lag, the 7-day leak falls from 0.33 to 0.23, but a step of 24 to 72 hours leaks 0.21 and a
+  stuck meter moves the median by 2.2 points of capacity (0.8 with all three lags). Interim and
+  unaudited, two Primaries and two refit dates for the leak figures.
+advice:
+  - >-
+    Do not drop the week lag to reduce the leak of short events or bad data: it raises both (24 to
+    72 hour step 0.21 of the step against 0.05 to 0.08, stuck meter 2.2 against 0.8 points of
+    capacity), at +0.049 CRPS (experiment 502, figure 1).
+  - >-
+    If a single lag is dropped for robustness, drop the day lag: it shields steps up to 3 days and
+    a stuck meter or dropout, at +0.049 CRPS [+0.015, +0.113] on rows with no labelled event, but
+    the interval just exceeds the 0.11 equivalence limit (experiment 502, figure 2).
+  - >-
+    Score the origin lag removal (arm E of experiment 388, -0.019 [-0.034, -0.011]) before
+    spending fits on it, and sweep it once to see whether it leaks (experiment 502).
+code: >-
+  ml-experiments/00502-leave-one-lag-out-power-lag-ablation-xgboost-demand/
 ---
 
-**Which power lag carries the information and which carries the leak? Status: planned; no score has been read.** The plan follows the brief of the load-shift Discuss
-session (2026-11-02) and its queue-order edits.
+**Dropping one power lag does not remove the leak at every event length, and every single-lag
+drop costs about 0.05 points of capacity (CRPS) on rows with no labelled event.** The day lag
+carries the leak of events up to 3 days and the sensitivity to a stuck meter or a dropout. The
+week lag carries part of the leak of events of 5 to 7 days. Dropping the week lag makes short
+events and bad data worse. The three lags are power readings 1 day, 2 days, and 7 days (the origin,
+day, and week lags) before the forecast time. NGED's event labels are incomplete, so "rows with no
+labelled event" may hold unlogged events, the harm rows are optimistic, and the real-event slices
+undercount. Every number is interim and unaudited.
 
-## Plan
+![Share of a step that reaches the median forecast, by event length](figure_1_sweep_share.svg)
 
-- **Recipe.** Experiment 392's R0 arm, as copied by experiment 402's refit script: monthly refits at
-  2025-10-01, 2026-01-01, 2026-03-01, and 2026-06-01, 500 rounds, `eta` 0.05, 11 quantiles, the ENS
-  control member for training, 51 members pooled at scoring, CUDA. Flagged `substation_zero`
-  half-hours are dropped from fits and scoring actuals. The noisy start of D15 and D18 is not
-  relevant, because only the six signed-MW Primaries (D5, D9, D10, D11, D14, D16) are fitted.
-- **Retraining cadence.** Monthly, because this is a screen-level contrast of a column set and not a
-  cadence question. A candidate that passes is re-checked weekly before any release claim.
-- **New fits (72).** A-nowk (no `lag_same_time_latest_week`), A-noday (no `lag_same_time_latest_day`),
-  and a-rep (the three original lags, refitted on CUDA once more), each for 6 Primaries and 4
-  refits. A-noorigin is not fitted: its score is experiment 388's arm E re-scored on this
-  experiment's equal rows (192 stored forecasts), and it is fitted (24 fits) only if its sweep share
-  is wanted after A-nowk and A-noday report.
-- **Reused.** Arm (a) from experiment 402 and arm (b) from experiment 392 (stored forecasts);
-  experiment 465's `sweep.parquet` for arms (a) and (b). Checked before use: same series, init
-  times, leads, and scoring rows (equal-row intersection), and the 1.15 widening applied once.
-- **MDE.** Printed first, from arm (a) minus a-rep on the four dates. Experiment 465's
-  `a_cpu_control` covers one refit date and compares CPU with GPU, so it is not the MDE here. If
-  (a) minus a-rep is under 0.02, the device and seed noise is small and the equivalence limit stays
-  0.11.
-- **Scoring.** Experiment 392's and 465's scorers on equal rows: rows with no labelled event, harm
-  rows, rows inside events (normal-running-arrangement corrected actuals, depth 1.0, with 0.75 and
-  1.25 as sensitivities), rows within 7 days after events, and cold nights. Month-block bootstrap
-  (4 blocks) with the sign count beside each interval; event slices use whole-event intervals. Tails
-  (q01, q05, q95, q99 coverage; q95 and q99 pinball) raw and with 1.15 widening; avoidable
-  curtailment at f = 0.9, 0.75, and 0.5 as differences against (a), (b), (f), BG2, S1, and
-  manual_heuristic. The 12 to 36 h band is reported on its own.
-- **Sweeps.** Experiment 392's column-level sweep and experiment 465's readings-level sweep and
-  bad-data injections on the new arms, first on 2 Primaries at 2 refit dates, extended only if a
-  result is worth it. Every scorer, sweep, and injection filters `valid_time` < 2026-07-01
-  explicitly, because stored forecasts run to 2026-07-15.
-- **Unlogged-event caveat.** NGED's event labels are incomplete, so rows with no labelled event may
-  hold events, the harm-row table is optimistic, and real-event slices undercount.
-- **Advice followed.** Report absolute scores beside every contrast; equal rows; MDE before
-  contrasts; Bonferroni k = 12; the six and the eight reported apart.
+![Change in CRPS against all three lags](figure_2_crps_contrasts.svg)
+
+## Setup
+
+- **Arms.** All fitted like experiment 402's arm (a): monthly refits (2025-10-01, 2026-01-01,
+  2026-03-01, 2026-06-01), 500 rounds, `eta` 0.05, 11 quantiles, CUDA, six Primaries metered in
+  signed megawatts (D5, D9, D10, D11, D14, D16). "No week lag" and "no day lag" are 24 fits each.
+  "a-rep" is a second CUDA fit of the three original lags (24 fits). "No origin lag" is experiment
+  388's arm E, re-scored on the same rows with no fits; experiment 388 fitted it separately, so its
+  device and code path may differ from arm (a)'s.
+- **Cadence.** Monthly refits, as the standing rule says for research. The contrasts could depend
+  on the schedule; no weekly check was run.
+- **Reused.** Arm (a) from experiment 402 (`r0_lagged`), arm (b) (no lags) from experiment 392
+  (`r0_lagless`), their 50/50 mixture (f), and experiment 465's `sweep.parquet` for arms (a) and (b).
+  Code reused: experiments 87, 383, 392, 402, and 465.
+- **Rows.** The intersection of finite actuals and every arm's forecast, valid time before
+  2026-07-01, leads to 240 hours, no flagged zeros dropped at these six Primaries (0 in every fold).
+  Rows with no labelled event: 326,964; harm rows (a lag lies in an event and the target does not):
+  5,449; rows inside events: 8,740; rows within 7 days after an event: 14,441. The 12 to 36 hour
+  band has 34,214 rows with no labelled event.
+- **Noise floor.** Arm (a) minus a-rep is -0.0002 CRPS [-0.0012, +0.0006], so the device and seed
+  noise is far below 0.02 and the equivalence limit stays 0.11 (experiment 465's range).
+
+## Results
+
+CRPS in points of effective capacity, six Primaries, leads to 240 hours, no widening, intervals are
+95% Bonferroni (k = 12) month-block bootstraps with 4 months (harm rows 3). Smaller is better.
+
+- **Absolute scores, rows with no labelled event:** all three lags 3.096; no lags 3.247; 50/50
+  mixture 3.064; no week lag 3.145; no day lag 3.145; no origin lag 3.077.
+- **Contrast against all three lags, rows with no labelled event:** no week lag +0.049
+  [-0.034, +0.102] (inside the 0.11 limit, so equivalent); no day lag +0.049 [+0.015, +0.113]
+  (the upper end is just outside the limit); no origin lag -0.019 [-0.034, -0.011]. The sign count
+  over the four months: no week lag is worse in 3 of 4 months and no day lag in 4 of 4.
+- **Contrast against no lags, rows with no labelled event:** no week lag -0.102 [-0.268, +0.038];
+  no day lag -0.102 [-0.257, +0.115]; no origin lag -0.170 [-0.404, +0.060].
+- **12 to 36 hour band, rows with no labelled event:** no week lag +0.038 [-0.034, +0.110]; no day
+  lag +0.110 [+0.069, +0.175]; no origin lag -0.016 [-0.061, +0.001].
+- **Within 7 days after an event (absolute):** all three lags 4.950; no lags 4.184; mixture 4.293;
+  no week lag 4.415; no day lag 5.146; no origin lag 4.944. Dropping the week lag recovers about
+  two thirds of the gain from dropping all lags here.
+- **Harm rows (descriptive; the intervals span about 0.5 to 1 point and cannot show equivalence):**
+  all three lags 3.897; no lags 3.686; mixture 3.570; no week lag 3.718 (-0.179 against all three
+  lags, interval -0.271 to +0.383); no day lag 4.085 (+0.188 [-0.055, +0.249]); no origin lag 3.949.
+- **Tails, rows with no labelled event (no widening; the 1.15 widening is in `work/score.log`):**
+  q99 pinball loss 0.341 (all three lags), 0.345 (no week lag), 0.343 (no day lag), 0.338 (no
+  origin lag), all within the +0.02 limit. q95 coverage 0.902, 0.895, 0.898, and 0.905.
+- **Leak of a step of 5% of capacity (readings-level sweep, 24 to 72 hour leads, two Primaries
+  (D5, D16) and two refit dates (2026-01-01, 2026-06-01); median shift as a share of the step):**
+
+| Step length | All three lags | No week lag | No day lag | No lags |
+|---|---|---|---|---|
+| 24 hours | 0.04 to 0.07 | 0.19 to 0.21 | 0.00 | 0 |
+| 3 days | 0.05 to 0.08 | 0.21 to 0.23 | 0.00 | 0 |
+| 5 days | 0.18 to 0.20 | 0.21 to 0.23 | 0.13 | 0 |
+| 7 days | 0.32 to 0.33 | 0.21 to 0.23 | 0.29 to 0.30 | 0 |
+
+- **Bad data (median shift in points of capacity, 24 to 72 hour leads; the injection is
+  experiment 465's):** a stuck meter for 24 hours: -0.82 (all three lags), -2.20 (no week lag),
+  -0.02 (no day lag). A dropout to zero for 6 hours: -0.19, -1.35, -0.09. A spike of 20 times the
+  week-on-week median change: +3.79, +5.32, +5.50. The band width ratio stays between 0.98 and 1.19.
+- **Predictions.** P1 partly: no week lag costs +0.049 (inside the limit), but the readings-level
+  leak is 0.21 to 0.23, not at most 0.20, and the column-level sweep was not run. P2 not tested
+  (the sweep of the origin lag was not run). P3 partly: the day lag arm leaks 0.00 to 0.13 up to
+  5 days and 0.29 to 0.30 at 7 days. P4 holds: the 50/50 mixture (3.064) beats every new arm on
+  rows with no labelled event.
+- **Stop rule.** Not triggered, because the week lag arm cuts the 7-day leak below 0.25 at a loss
+  under +0.30. The MVA-only eight were not fitted, because no arm cuts the leak at every length
+  without raising it at another.
+
+## Checks and caveats
+
+- **Not run.** Avoidable curtailment, cold nights, the whole-event intervals for event slices, the
+  column-level sweep of every lag subset, example forecast time series, and load-shift event plots.
+  The leak figures use two Primaries and two refit dates because of the brief's cost limit, so they
+  are a screen.
+- **Audit triggers.** The seven audit triggers are listed in the pull request body with the result
+  of the results review.
+- **Unlogged events.** NGED says load-shift events may be missing from its logs, so clean rows can
+  hold events and the harm-row table is optimistic.
+- **Device.** The arms of experiment 502 and arm (a) are CUDA fits. Arm E of experiment 388 may be a
+  CPU fit; its contrast against arm (a) can carry up to 0.06 to 0.11 of device difference
+  (experiment 465).
+
+## What the next experiment should answer
+
+- Whether a day-lag-free forecast mixed 50/50 with the no-lag forecast matches the mixture of all
+  three lags (3.064) on rows with no labelled event and after events.
+- Whether the readings-level sweep of the origin lag arm shows a leak above 0.05.
+
+Scripts: `e00502_fit.py`, `e00502_score.py`, `e00502_sweep.py`, `e00502_figures.py`. Predictions:
+`work/arm_preds/{a_rep,nowk,noday}` (private data folder); boosters in `work/boosters/`.
