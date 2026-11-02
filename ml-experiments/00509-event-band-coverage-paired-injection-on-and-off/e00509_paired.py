@@ -18,7 +18,6 @@ systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
 ```
 """
 
-import re
 from pathlib import Path
 from typing import Final
 
@@ -218,10 +217,7 @@ def build() -> None:
         bands=np.array(band_names),
     )
     (WORK / "reproduction_checks.txt").write_text("\n".join(checks) + "\n")
-    print(
-        f"wrote cube {cube.shape}; worst before-row difference "
-        f"{max(float(re.search(r'difference (\S+);', c).group(1)) for c in checks):.2e}"
-    )  # ty: ignore[unresolved-attribute]
+    print(f"wrote cube {cube.shape}; checks in reproduction_checks.txt")
 
 
 def seed_cells() -> None:

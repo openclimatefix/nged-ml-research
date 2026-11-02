@@ -50,7 +50,9 @@ def save(*, chart: alt.TopLevelMixin, name: str) -> None:
     guard.assert_no_invisible_marks(svg_path=DOCS / name)
 
 
-def difference_chart(*, c: pl.DataFrame, measure: str, title: str, axis: str, name: str) -> None:
+def difference_chart(
+    *, c: pl.DataFrame, measure: str, title: str | list[str], axis: str, name: str
+) -> None:
     """Draw the injected-minus-injection-off difference by scenario with Bonferroni intervals."""
     d = c.filter(
         (pl.col("clusters") == "all")
@@ -80,10 +82,10 @@ def difference_chart(*, c: pl.DataFrame, measure: str, title: str, axis: str, na
         xOffset="forecast:N",
     )
     chart = (
-        base.mark_rule().encode(y=alt.Y("lo:Q", title=axis), y2="hi:Q")
-        + base.mark_point(filled=True, size=45).encode(y="diff:Q")
+        base.mark_rule().encode(y=alt.Y("lo:Q", title=axis), y2="hi:Q")  # ty: ignore[unresolved-attribute]
+        + base.mark_point(filled=True, size=45).encode(y="diff:Q")  # ty: ignore[unresolved-attribute]
     ).properties(width=WIDTH, height=260, title=title)
-    zero = alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color=ocf.GREY_3).encode(y="y:Q")
+    zero = alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color=ocf.GREY_3).encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     save(chart=zero + chart, name=name)
 
 
@@ -100,7 +102,7 @@ def pit_chart(*, pit: pl.DataFrame, scenario: int, name: str) -> None:
         x=(pl.col("bin") + 0.5) / 10,
     )
     chart = (
-        alt.Chart(d)
+        alt.Chart(d)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X(
@@ -122,7 +124,7 @@ def pit_chart(*, pit: pl.DataFrame, scenario: int, name: str) -> None:
         .properties(width=WIDTH - 60, height=130)
     )
     rule = (
-        alt.Chart(pl.DataFrame({"y": [0.1]}))
+        alt.Chart(pl.DataFrame({"y": [0.1]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3])
         .encode(y="y:Q")
     )
@@ -148,7 +150,7 @@ def factor_chart(*, c: pl.DataFrame, name: str) -> None:
         scenario_name=pl.col("scenario").cast(pl.String),
     )
     chart = (
-        alt.Chart(d)
+        alt.Chart(d)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=55)
         .encode(
             x=alt.X("scenario_name:N", title="Scenario", axis=alt.Axis(labelAngle=0)),
@@ -203,7 +205,7 @@ def real_chart(*, r: pl.DataFrame, name: str) -> None:
         )
     )
     chart = (
-        alt.Chart(d)
+        alt.Chart(d)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X(
