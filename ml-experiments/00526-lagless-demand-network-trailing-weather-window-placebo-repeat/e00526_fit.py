@@ -32,6 +32,7 @@ OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=contin
 """
 
 import argparse
+import gc
 import time
 from pathlib import Path
 from typing import Final
@@ -312,6 +313,7 @@ def run(*, jobs: list[dict], device: str, refit_mean: bool) -> None:
                     )  # ty: ignore[invalid-argument-type]
                     print(f"    refit vs stored {arm} {month} s{seed}: {both.height}/{old.height} rows matched, max |difference| in q01, q50, q99 = {diff:.6f}", flush=True)  # fmt: skip
             del fold
+            gc.collect()
 
 
 def checks(*, month: str) -> None:
