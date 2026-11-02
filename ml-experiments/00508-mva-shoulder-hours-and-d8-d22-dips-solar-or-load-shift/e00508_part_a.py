@@ -298,7 +298,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     for site in data.MVA_ONLY:
         mats = geo.Mats(site=site, extra={})
         st = day_stats(mats=mats, level=0.0, band=band)
-        in_months = st["qualifies"] | mats.in_months()
+        in_months = st["qualifies"]
         for arm in common.ARMS:
             b = bin_of(ratio=st["ratio"][arm])
             for window in common.SHOULDERS:
@@ -334,14 +334,21 @@ def main() -> None:  # noqa: PLR0912, PLR0915
                         "share_cloudy": kc / max(nc, 1),
                     }
                     ratio_est = ((ks + 0.5) / (ns + 1)) / ((kc + 0.5) / (nc + 1))
-                    blocks = np.unique(mats.block[sunny | cloudy])
-                    draws = []
-                    for _ in range(N_RESAMPLES // 4):
-                        pick = rng.choice(blocks, len(blocks))
-                        w = np.array([(mats.block == x) for x in pick]).sum(axis=0)  # days weighted
-                        ks_, ns_ = (w * (dip & sunny)).sum(), (w * sunny).sum()
-                        kc_, nc_ = (w * (dip & cloudy)).sum(), (w * cloudy).sum()
-                        draws.append(((ks_ + 0.5) / (ns_ + 1)) / ((kc_ + 0.5) / (nc_ + 1)))
+                    uniq, inv = np.unique(mats.block, return_inverse=True)
+                    per_block = np.stack(
+                        [
+                            np.bincount(inv, weights=x.astype(float), minlength=len(uniq))
+                            for x in (dip & sunny, sunny, dip & cloudy, cloudy)
+                        ]
+                    )
+                    w = np.stack(
+                        [
+                            np.bincount(rng.integers(0, len(uniq), len(uniq)), minlength=len(uniq))
+                            for _ in range(N_RESAMPLES)
+                        ]
+                    ).astype(float)
+                    ks_, ns_, kc_, nc_ = (w @ per_block[r] for r in range(4))
+                    draws = ((ks_ + 0.5) / (ns_ + 1)) / ((kc_ + 0.5) / (nc_ + 1))
                     row |= {
                         "sunny_to_cloudy": ratio_est,
                         "ratio_lo": float(np.percentile(draws, 2.5)),

@@ -47,7 +47,7 @@ LABELLED: Final = (
 def engine_on_grid(*, label: str) -> np.ndarray:
     """Return experiment 291's engine-running probability aligned to the grid (NaN outside)."""
     run = np.load(ENGINE_DIR / f"p_run_{label}_v1.npy")
-    start = (data.grid().dt.offset_by("-30m")).to_numpy().astype("datetime64[m]").astype(np.int64)
+    start = data.grid().to_numpy().astype("datetime64[m]").astype(np.int64)
     origin = np.datetime64("2022-01-01T00:00").astype("datetime64[m]").astype(np.int64)
     idx = (start - origin) // 30
     out = np.full(len(idx), np.nan)
@@ -67,7 +67,7 @@ def baseline(*, mats: Mats, which: str, i: int, pool: np.ndarray, window: slice)
 
 
 def classify(*, drop: np.ndarray, shape: np.ndarray) -> dict[str, float]:
-    """Compare a solar-shaped drop with a boxcar of the same complexity (one amplitude each).
+    """Compare a solar-shaped drop with a boxcar (one amplitude each).
 
     `drop` is the baseline minus the reading over the day's slots, and `shape` the half-hourly
     fleet shape `u`. The boxcar covers the contiguous run around the deepest slot where the drop is
@@ -116,7 +116,7 @@ def dip_days(*, site: str) -> tuple[pl.DataFrame, pl.DataFrame]:
 def shape_test(*, site: str, rng: np.random.Generator) -> pl.DataFrame:
     """Classify every dip day, injected boxcars and solar-shaped drops, and D10's real days."""
     midday, dips = dip_days(site=site)
-    mats = Mats(site=site)
+    mats = Mats(site=site, extra={"farm": data.farm_norm(farm="A")})
     where = {int(d): i for i, d in enumerate(mats.dates)}
     dip_set = set(dips["date"].to_list())
     pool = np.array([int(d) not in dip_set for d in mats.dates])
@@ -153,7 +153,7 @@ def shape_test(*, site: str, rng: np.random.Generator) -> pl.DataFrame:
                     )
                     reading[start : start + length] -= amp
                 elif kind == "solar":
-                    shape = mats.u[i, SLOTS]
+                    shape = np.nan_to_num(mats.extra["farm"][i, SLOTS])
                     reading -= amp * shape / max(shape.max(), 1e-9)
                 reading = np.abs(reading)
                 drop = base - reading
@@ -278,27 +278,32 @@ def engine_test(*, rng: np.random.Generator) -> tuple[pl.DataFrame, dict]:
         near = cand[
             np.argsort(np.abs(mats.ordinal[cand] - mats.ordinal[i]), kind="stable")[:N_BASE]
         ]
-        placebo = mats.extra["run_D8"][near][:, slots].mean()
         rows.append(
             {
                 "date": int(d),
                 "n_dip_half_hours": int(low.sum()),
-                "engine_share": float(np.nanmean(run > ENGINE_FLAG)),
-                "placebo_share": float(placebo > ENGINE_FLAG)
-                if False
-                else float((mats.extra["run_D8"][near][:, slots] > ENGINE_FLAG).mean()),
+                "engine_share": float(
+                    np.nanmean(np.where(np.isfinite(run), run > ENGINE_FLAG, np.nan))
+                ),
+                "placebo_share": float((mats.extra["run_D8"][near][:, slots] > ENGINE_FLAG).mean()),
                 "control_share": float(
                     np.nanmean(
                         [
-                            (mats.extra[f"run_{c}"][i, slots] > ENGINE_FLAG).mean()
+                            np.nanmean(
+                                np.where(
+                                    np.isfinite(mats.extra[f"run_{c}"][i, slots]),
+                                    mats.extra[f"run_{c}"][i, slots] > ENGINE_FLAG,
+                                    np.nan,
+                                )
+                            )
                             for c in ("D5", "D10", "D11")
                         ]
                     )
                 ),
             }
         )
-    table = pl.DataFrame(rows).with_columns(coincident=pl.col("engine_share") >= 0.5)
-    spread = pl.read_parquet(SPREAD_TABLE).select("date", "spread_40")
+    table = pl.DataFrame(rows).with_columns(coincident=pl.col("engine_share") > 0.5)
+    spread = pl.read_parquet(SPREAD_TABLE).select("date", "spread_40").drop_nulls()
     sunny = midday.filter(pl.col("sky") == "sunny").with_columns(
         pl.col("date")
         .map_elements(lambda x: date(x // 10000, x // 100 % 100, x % 100), return_dtype=pl.Date)
@@ -475,7 +480,11 @@ def main() -> None:
         rec.write_parquet(common.WORK / f"partB_recipients_{site}.parquet")
         print(f"== recipients of {site} (low power)")
         print(rec)
-    inj = shape.filter(pl.col("kind").str.starts_with("injected")).drop_nulls("label_solar")
+    inj = (
+        shape.filter(pl.col("kind").str.starts_with("injected"))
+        .with_columns(pl.col("label_solar").fill_nan(None))
+        .drop_nulls("label_solar")
+    )
     correct = {
         kind: float(
             inj.filter(pl.col("kind") == f"injected_{kind}")["label_solar"].mean()

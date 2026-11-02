@@ -151,4 +151,133 @@ sky, so the plan below replaces that choice and the choices that depended on it.
 
 ## Results
 
-To be filled after the code review and the run.
+**Take-home.** A dip of the apparent power at the sun's edges is much better than a midday dip at
+telling when a substation's power changes sign, but only up to export about three times the night
+import, and D12 (about five times) lies beyond what we could calibrate. At D12 the shoulder dips
+are as common on cloudy days and in the dark as on sunny days, so they show low demand and not
+solar export. At D8, 55 of the 71 midday dip days have an engine running at most dip half-hours,
+which is consistent with the gas engine and not with solar or a load transfer. The data cannot say
+which cause explains the other 16 D8 dip days or the 13 D22 dip days. Verdict: `partly supported`.
+This page is interim and the audit is recorded below. Counts are lower bounds, because NGED's event
+labels are incomplete.
+
+**What we asked.** Experiment 506 looked for a dip of the apparent power (MVA, never negative) only
+between 10:00 and 15:00. We asked two questions. First, does a dip at the edges of the sun's path
+find the days when power changes sign better than a midday dip, once the export is several times
+the night-time import, as at D12? Second, are the short midday dips at D8 and D22 solar export, a
+load transfer, or the gas engine behind D8? We added recorded solar-farm output (Solar A to C) to
+the six primary substations that report signed power, at 1, 2, 4, and 8 times their median sunny
+midday reading, and measured how well each window's lowest reading finds the days on which the
+signed power changes sign. No model was fitted.
+
+## Figures
+
+![Area under the curve by window and ratio](figure_1_auc_by_window_and_ratio.svg)
+
+![Dip rate on sunny and cloudy middays](figure_2_dip_rate_sunny_and_cloudy.svg)
+
+![Engine overlap at D8](figure_3_engine_overlap_at_d8.svg)
+
+![Shape test](figure_4_shape_test.svg)
+
+## Part A: the shoulders
+
+- **Windows.** Shoulders are the half-hours with the sun between 5.6 and 19.0 degrees above the
+  horizon (where the clear-sky fleet shape is 0.05 to 0.3), rising for the morning and setting for
+  the evening. April to September only. Day-worlds (a day counted once per injected level): 3,329
+  (ratio below 1.5), 1,529 (1.5 to 3), 829 (3 to 6), and 429 (above 6). The farm shape was extended
+  below 15 degrees of elevation on about 11% of half-hours.
+- **Usable range.** Ratio below 1.5, floor 0: midday 0.82 (95% interval 0.78 to 0.86), morning 0.75
+  (0.72 to 0.78), evening 0.78 (0.74 to 0.81), whole day 0.94 (0.92 to 0.95). Ratio 1.5 to 3: midday
+  0.51 (0.42 to 0.58), morning 0.85 (0.74 to 0.91), evening 0.88 (0.80 to 0.93), whole day 0.84
+  (0.73 to 0.90). At power factor 0.97 the 1.5 to 3 values are 0.52, 0.84, 0.87, and 0.84. The
+  midday window stops being usable at a ratio of 1.5 to 3, earlier than the predicted 3 to 6.
+- **Named contrasts, shoulder minus midday, ratio 1.5 to 3.** Floor 0: +0.33 (morning) and +0.37
+  (evening); power factor 0.97: +0.32 and +0.36. All four are above zero at the 0.025/64 level
+  (lower bounds +0.03 to +0.07; minimum detectable effect 0.16 to 0.18). In the ratio bin below 1.5
+  the shoulders are worse than midday by 0.04 to 0.07, not significant after correction.
+- **Not estimable above ratio 3.** In the 3 to 6 and above 6 bins 99% and 97% of days cross
+  zero (5 and 11 ordinary days), so no area under the curve can be computed. D12's ratio is 5.3
+  (81.6 over 15.6 in experiment 506's May to July days; 5.27 here), so D12 lies where this
+  calibration cannot say whether a shoulder window works.
+- **D12 placebo (post hoc, thresholds of the 1.5 to 3 bin).** The morning threshold of 37 points is
+  passed on 98.2% of sunny days and 93.7% of cloudy days; the sunny-to-cloudy ratio is 1.05 (1.01 to
+  1.10); the dark-window reading is below the threshold on 96.6% of sunny days. The evening
+  threshold of 46 points is passed on 96.3% of sunny days and 98.9% of cloudy days (ratio 0.98, 0.95
+  to 1.01), with the dark window below it on 93.4%. D12's shoulder readings are low because its
+  night import is low, which the dip cannot separate from export.
+- **The other seven.** With thresholds of 40 to 53 points, the evening dip rate at D8 is about
+  twice the cloudy rate (ratio 1.9, lower bound 1.2), as at D22 in the morning (1.5, lower bound
+  1.2). D8's dips with no dark-window dip are 10% to 13% of such days, D22's 10% to 19%, and D2,
+  D3, and D4 at most 2%. The thresholds sit far above zero, so these are low-reading days and not
+  proven sign changes.
+- **Bonferroni count.** 32 area intervals, 16 named contrasts, and 16 placebo ratios: 64. Decision
+  rule intervals are plain 95% by design.
+
+## Part B: D8 and D22 midday dips
+
+- **Dip days reproduced.** 71 at D8, 13 at D22, and 13 at D12 (experiment 506). D8's share of
+  sunny days with a dip is 0.7% in 2023, 3.9% in 2024, 23% in 2025, and 32% in 2026; D22's is 0.7%
+  to 4.2%.
+- **Engine running (D8).** In 55 of the 71 dip days (77%; Wilson interval 66% to 86%) more than
+  half the dip half-hours are flagged as engine running. The mean flagged share is 0.78 in dip
+  half-hours, 0.60 in the same half-hours on the 14 nearest non-dip days (difference 0.18, 95%
+  interval 0.08 to 0.28), and 0.007 at D5, D10, and D11. The detector reads D8's own residual and
+  flags 40% of D8 half-hours since 2025, so the placebo share is high; an engine-running dip is
+  neither solar nor a load transfer. The engine class cannot be assessed at D22.
+- **Season and sky.** From March to October, D8 has 62 dips in 717 sunny days and 2 in 129 cloudy
+  days (Mantel-Haenszel cloudy-to-sunny ratio 0.18, interval 0.04 to 0.57); D22 has 13 in 710 and 0
+  in 122 (0.29, 0.16 to 0.71). A solar cause predicts almost no cloudy dips, but two intervals
+  reach 0.57 and 0.71, and the engine also runs more on sunny days at D8, so neither cause is
+  excluded.
+- **Shape test fails its known answer.** It labels 63% of injected solar-shaped drops and 85% of
+  injected boxcars correctly (target 80% each), and 72% of D10's real reverse-flow days solar. The
+  dip days are 32% (D8) and 67% (D22) solar-labelled. The shape test carries no weight.
+- **Spark spread and neighbours.** Positive spark spread on 57% of dip days against 47% of other
+  sunny days (difference +0.10, interval -0.03 to +0.22). The neighbours' readings over D8's dip
+  half-hours move by -7.1 (D3), +22.6 (D12), and -14.3 (D22) points against placebo changes
+  near zero, and D22's dips by -6.2, -0.9, and +26.0; with unmetered neighbours and opposite signs
+  this is a low-power diagnostic and shows no clear recipient.
+- **Growth and labels.** The dips began in 2023 at both Primaries. 71 of 71 D8 dip days and 12 of
+  13 D22 dip days fall outside every labelled event that has times (3 events for D8 and 14 for
+  D22), so the count of dips outside NGED's labelled events is at least 71 and 12.
+- **Cause classes.** D8: 55 engine running, 16 not separable. D22: 12 not separable (one dip day had
+  no usable drop curve). The 55 are consistent with the engine; the rest could be solar or a load
+  transfer.
+
+## Part C: what the answers change
+
+- **D12.** Experiment 370's reverse flow at D12 is not shown by the shoulder dip, which fails the
+  placebo; the dip is consistent with low demand. A probability of reverse flow at D12 should not
+  use shoulder dips alone.
+- **D8.** Label D8's dips as a probable engine regime, not "inferred, heavy reverse flow only". The
+  16 days not flagged and the 13 D22 dips remain candidates for either a signed-power estimate or
+  an unlabelled load shift, and are listed as unlabelled events in the training rows for the
+  history-encoder line later. No count is promised to experiment 507.
+- **Question for NGED.** What changed at D8 and D22 between 2023 and 2026: did the gas engine
+  behind D8 start or change its running hours, were any connections added, or were loads
+  transferred in the daytime at either Primary? Which of the dip days from 2023 to June 2026 does
+  NGED's own log explain?
+
+## Checks
+
+- Median forecast minus mean forecast, and the error of the mean forecast: not applicable, no
+  forecast was made.
+- **Triggers fired.** Trigger 1 (a known-answer test failed: the shape test) and trigger 2 (results
+  contradict predictions A1 and A2, with the explanation recorded above). A fresh Sonnet audit
+  (`briefs/508_audit.md`) is recorded in the audit section.
+- **Deviations.** Windows by sun elevation and April to September, not the clock; a daylight
+  crossing label on all-sky days; ratio bins in place of injection levels; the D12 post hoc read;
+  a different shape-test metric from the 506 audit; the plan review and code review changed the
+  design, as the plan section records. Part B's cloudy half-hours need a clear-sky index of 0.1 to
+  0.3. Two daylight-saving days a year are dropped from the day matrices.
+
+## Audit
+
+To be filled after the audit.
+
+## Reuse and cost
+
+CPU only; Part A takes 21 seconds and Part B 6 seconds. Scripts import the experiment 506 data
+layer (folder `ml-experiments/00506-*`) and experiment 87's `grid_times`. Stored tables are under
+`data/ml-experiments/00508-*/work/`.

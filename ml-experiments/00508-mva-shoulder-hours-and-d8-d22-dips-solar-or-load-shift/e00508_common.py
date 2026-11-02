@@ -49,8 +49,10 @@ def base_frame(*, site: str) -> pl.DataFrame:
     return pl.DataFrame(
         {
             "date": (
-                local.dt.year().to_numpy() * 10000 + month * 100 + local.dt.day().to_numpy()
-            ).astype(np.int64),
+                local.dt.year().to_numpy().astype(np.int64) * 10000
+                + month.astype(np.int64) * 100
+                + local.dt.day().to_numpy().astype(np.int64)
+            ),
             "year": local.dt.year().to_numpy(),
             "month": month,
             "hour": hour,
