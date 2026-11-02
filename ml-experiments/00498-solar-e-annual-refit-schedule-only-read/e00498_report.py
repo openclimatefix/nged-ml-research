@@ -55,8 +55,13 @@ def main() -> None:
         (g0, q2, "C3: schedule and design", SEEDS[:6]),
     ):
         for s in seeds:
-            a, b = rd.paired(a=rd.load_seed(name=name_a, seed=s), b=rd.load_seed(name=name_b, seed=s))
-            pct = 100.0 * (rd.score_rows(frame=a)["score"].mean() / rd.score_rows(frame=b)["score"].mean() - 1.0)
+            a, b = rd.paired(
+                a=rd.load_seed(name=name_a, seed=s), b=rd.load_seed(name=name_b, seed=s)
+            )
+            pct = 100.0 * (
+                rd.score_rows(frame=a)["score"].mean() / rd.score_rows(frame=b)["score"].mean()  # ty: ignore[unsupported-operator]
+                - 1.0
+            )
             per_seed.append({"contrast": label, "seed": s, "pct": float(pct)})
     seed_table = pl.DataFrame(per_seed)
     seed_table.write_csv(rd.NEW_DIR / "scores" / "per_seed_contrasts.csv")
@@ -72,18 +77,21 @@ def main() -> None:
     vb, _ = rd.by_block(rows=rows["quarterly"], column="month")
     point, lo, hi, _ = rd.block_interval(a=va, b=vb)
     summary = pl.DataFrame(
-        [
-            {"contrast": "C2 ten seeds, month-block 97.5% interval", "pct": point, "lo": lo, "hi": hi}
-        ]
+        [{"contrast": "C2 ten seeds, month-block 97.5% interval", "pct": point, "lo": lo, "hi": hi}]
     )
     print(summary)
     mean_by_contrast = seed_table.group_by("contrast", maintain_order=True).agg(
-        pl.col("pct").mean().alias("mean"), pl.col("pct").min().alias("lo"), pl.col("pct").max().alias("hi")
+        pl.col("pct").mean().alias("mean"),
+        pl.col("pct").min().alias("lo"),
+        pl.col("pct").max().alias("hi"),
     )
     dots = (
         alt.Chart(alt.Data(values=seed_table.to_dicts()))  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=60, color=ocf.DATA_BLUE, opacity=0.8)
-        .encode(x=alt.X("pct:Q", title="Change in quantile score (%, negative is better)"), y=alt.Y("contrast:N", title=None, sort=None))
+        .encode(
+            x=alt.X("pct:Q", title="Change in quantile score (%, negative is better)"),
+            y=alt.Y("contrast:N", title=None, sort=None),
+        )
     )
     means = (
         alt.Chart(alt.Data(values=mean_by_contrast.to_dicts()))  # ty: ignore[unresolved-attribute]
@@ -112,28 +120,42 @@ def main() -> None:
     for m in months:
         a_ = rows["annual"].filter(pl.col("month") == m)["score"].mean()
         b_ = rows["quarterly"].filter(pl.col("month") == m)["score"].mean()
-        month_rows.append({"month": m, "pct": 100.0 * (a_ / b_ - 1.0)})
+        month_rows.append({"month": m, "pct": 100.0 * (a_ / b_ - 1.0)})  # ty: ignore[unsupported-operator]
     (
         alt.Chart(alt.Data(values=month_rows))  # ty: ignore[unresolved-attribute]
         .mark_bar(color=ocf.DATA_BLUE)
-        .encode(x=alt.X("month:N", title="Valid-time month", sort=None), y=alt.Y("pct:Q", title="Change in quantile score (%)"))
-        .properties(width=WIDTH, height=160, title="Solar E, C2 by month (ten seeds). The first three months are zero by construction.")
+        .encode(
+            x=alt.X("month:N", title="Valid-time month", sort=None),
+            y=alt.Y("pct:Q", title="Change in quantile score (%)"),
+        )
+        .properties(
+            width=WIDTH,
+            height=160,
+            title="Solar E, C2 by month (ten seeds). The first three months are zero by construction.",
+        )
         .configure_title(fontSize=11, anchor="start")
         .save(str(DOCS / "per_month.svg"))
     )
     hour_rows = []
-    total = rows["annual"]["score"].sum() - rows["quarterly"]["score"].sum()
+    total = rows["annual"]["score"].sum() - rows["quarterly"]["score"].sum()  # ty: ignore[unsupported-operator]
     for h in sorted(rows["annual"]["hour"].unique().to_list()):
         sa = rows["annual"].filter(pl.col("hour") == h)
         sb = rows["quarterly"].filter(pl.col("hour") == h)
         hour_rows.append(
-            {"hour": h, "share": float((sa["score"].sum() - sb["score"].sum()) / total), "pct": 100.0 * float(sa["score"].mean() / sb["score"].mean() - 1.0)}
+            {
+                "hour": h,
+                "share": float((sa["score"].sum() - sb["score"].sum()) / total),  # ty: ignore[unsupported-operator]
+                "pct": 100.0 * float(sa["score"].mean() / sb["score"].mean() - 1.0),  # ty: ignore[unsupported-operator]
+            }
         )
     pl.DataFrame(hour_rows).write_csv(rd.NEW_DIR / "scores" / "by_hour_ten_seeds.csv")
     (
         alt.Chart(alt.Data(values=hour_rows))  # ty: ignore[unresolved-attribute]
         .mark_bar(color=ocf.DATA_BLUE)
-        .encode(x=alt.X("hour:O", title="Hour of day (UTC)"), y=alt.Y("pct:Q", title="Change in quantile score (%)"))
+        .encode(
+            x=alt.X("hour:O", title="Hour of day (UTC)"),
+            y=alt.Y("pct:Q", title="Change in quantile score (%)"),
+        )
         .properties(width=WIDTH, height=160, title="Solar E, C2 by hour of day (ten seeds)")
         .configure_title(fontSize=11, anchor="start")
         .save(str(DOCS / "per_hour.svg"))
@@ -144,7 +166,11 @@ def main() -> None:
     for season, init in (("summer", "2026-06-15"), ("winter", "2026-01-15")):
         for name, frame in cut.items():
             sel = frame.filter(pl.col("init_time").dt.strftime("%Y-%m-%d") == init)
-            pieces.append(sel.with_columns(season=pl.lit(season), hours=pl.col("lead_hours"), schedule=pl.lit(name)))
+            pieces.append(
+                sel.with_columns(
+                    season=pl.lit(season), hours=pl.col("lead_hours"), schedule=pl.lit(name)
+                )
+            )
     data = pl.concat(pieces)
     for fname, bands, title in (
         ("example_day_ahead.svg", ["d1"], "Day ahead (12 to 36 hours), Solar E, ten-seed average"),
@@ -153,10 +179,22 @@ def main() -> None:
         d = data.filter(pl.col("band").is_in(bands)).sort("hours")
         base = alt.Chart().mark_line().encode(x=alt.X("hours:Q", title="Hours since the run"))  # ty: ignore[unresolved-attribute]
         is_annual = alt.datum.schedule == "annual"
-        band90 = base.transform_filter(is_annual).mark_area(opacity=0.25, color=ocf.DATA_BLUE).encode(y=alt.Y("q05:Q", title="Output (share of capacity)"), y2="q95:Q")  # ty: ignore[unresolved-attribute]
+        band90 = (
+            base.transform_filter(is_annual)
+            .mark_area(opacity=0.25, color=ocf.DATA_BLUE)
+            .encode(y=alt.Y("q05:Q", title="Output (share of capacity)"), y2="q95:Q")
+        )  # ty: ignore[unresolved-attribute]
         median = base.transform_filter(is_annual).mark_line(color=ocf.DATA_BLUE).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
-        quarterly = base.transform_filter(~is_annual).mark_line(color=ocf.DATA_PURPLE, strokeDash=[4, 3]).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
-        actual = base.transform_filter(is_annual).mark_point(size=12, color=ocf.BRAND_ORANGE, filled=True).encode(y="actual:Q")  # ty: ignore[unresolved-attribute]
+        quarterly = (
+            base.transform_filter(~is_annual)
+            .mark_line(color=ocf.DATA_PURPLE, strokeDash=[4, 3])
+            .encode(y="q50:Q")
+        )  # ty: ignore[unresolved-attribute]
+        actual = (
+            base.transform_filter(is_annual)
+            .mark_point(size=12, color=ocf.BRAND_ORANGE, filled=True)
+            .encode(y="actual:Q")
+        )  # ty: ignore[unresolved-attribute]
         alt.layer(band90, median, quarterly, actual).properties(width=WIDTH, height=150).facet(
             row=alt.Row("season:N", title=None), data=alt.Data(values=d.to_dicts()), title=title
         ).save(str(DOCS / fname))

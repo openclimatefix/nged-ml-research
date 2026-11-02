@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, ANN201, PLR0912, PLR0915, SIM300, B023
 """Experiment 498: read experiment 493's stored seeds 0 to 5 for Solar E, annual against quarterly refits.
 
 CPU only, no fits. Contrast C2 is `a2_member` annual against `a2_member` quarterly (schedule only).
@@ -44,17 +44,28 @@ def folder(*, name: str):
 def load_seed(*, name: str, seed: int) -> pl.DataFrame:
     """Return one arm's rows for Solar E and one seed, finite quantiles only."""
     if seed >= 6:
-        annual = pl.read_parquet(NEW_DIR / "predictions_annual" / "annual_a2_member" / f"s{seed}_2025-09.parquet")
+        annual = pl.read_parquet(
+            NEW_DIR / "predictions_annual" / "annual_a2_member" / f"s{seed}_2025-09.parquet"
+        )
         if name == "annual_a2_member":
             frame = annual
         else:
-            later = [pl.read_parquet(f) for f in sorted((NEW_DIR / "predictions_quarterly" / "a2_member").glob(f"s{seed}_*.parquet"))]
-            first = annual.filter(pl.col("init_time") < pl.lit(FIRST_QUARTER_END).str.to_datetime(time_zone="UTC"))
+            later = [
+                pl.read_parquet(f)
+                for f in sorted(
+                    (NEW_DIR / "predictions_quarterly" / "a2_member").glob(f"s{seed}_*.parquet")
+                )
+            ]
+            first = annual.filter(
+                pl.col("init_time") < pl.lit(FIRST_QUARTER_END).str.to_datetime(time_zone="UTC")
+            )
             frame = pl.concat([first.with_columns(arm=pl.lit("a2_member")), *later])
         frame = frame.filter(pl.col("time_series_id") == FARM)
     else:
         files = sorted(folder(name=name).glob(f"s{seed}_*.parquet"))
-        frame = pl.concat([pl.read_parquet(f) for f in files]).filter(pl.col("time_series_id") == FARM)
+        frame = pl.concat([pl.read_parquet(f) for f in files]).filter(
+            pl.col("time_series_id") == FARM
+        )
     return frame.filter(pl.all_horizontal([pl.col(c).is_finite() for c in s430.QCOLS]))
 
 
@@ -105,14 +116,16 @@ def main() -> None:
 
     # Seed-averaged frames (six seeds), then all pairs on shared rows.
     avg = {
-        n: s430.average_seeds(
-            frame=pl.concat([raw[(n, s)] for s in seeds]), arm=n
-        ).with_columns(time_series_id=pl.lit(FARM))
+        n: s430.average_seeds(frame=pl.concat([raw[(n, s)] for s in seeds]), arm=n).with_columns(
+            time_series_id=pl.lit(FARM)
+        )
         for n in arms
     }
     cut = s430.common_rows(frames=avg)
     rows = {n: score_rows(frame=f) for n, f in cut.items()}
-    print(f"Solar E rows per arm {rows['annual_a2'].height}; interval level {LEVEL_PCT:.2f}% (Bonferroni count {BONFERRONI_COUNT})")
+    print(
+        f"Solar E rows per arm {rows['annual_a2'].height}; interval level {LEVEL_PCT:.2f}% (Bonferroni count {BONFERRONI_COUNT})"
+    )
     lead = rows["annual_a2"]["lead_hours"]
     print(f"lead hours min {lead.min()} max {lead.max()}")
 
@@ -125,15 +138,28 @@ def main() -> None:
         for s in seeds:
             a, b = paired(a=raw[(na, s)], b=raw[(nb, s)])
             ra, rb = score_rows(frame=a), score_rows(frame=b)
-            per_seed[cid].append(100.0 * (ra["score"].mean() / rb["score"].mean() - 1.0))
+            per_seed[cid].append(100.0 * (ra["score"].mean() / rb["score"].mean() - 1.0))  # ty: ignore[unsupported-operator]
     print("\nPER-SEED CONTRASTS (percent, Solar E, all bands, paired by seed)")
     out = []
     for cid, vals in per_seed.items():
         sd = float(np.std(vals, ddof=1))
         mde = 1.96 * sd / np.sqrt(len(vals))
-        print(cid, [f"{v:+.2f}" for v in vals], f"mean {np.mean(vals):+.3f} sd {sd:.3f} min {min(vals):+.2f} max {max(vals):+.2f}  MDE (1.96 sd/sqrt n_seeds) {mde:.3f}%")
-        out.append({"id": cid, "mean": float(np.mean(vals)), "sd": sd, "mde": mde, "min": min(vals), "max": max(vals)})
-    print(f"limit: {LIMIT_PERCENT}% (at or above the C2 MDE: {LIMIT_PERCENT >= out[0]['mde']})")
+        print(
+            cid,
+            [f"{v:+.2f}" for v in vals],
+            f"mean {np.mean(vals):+.3f} sd {sd:.3f} min {min(vals):+.2f} max {max(vals):+.2f}  MDE (1.96 sd/sqrt n_seeds) {mde:.3f}%",
+        )
+        out.append(
+            {
+                "id": cid,
+                "mean": float(np.mean(vals)),
+                "sd": sd,
+                "mde": mde,
+                "min": min(vals),
+                "max": max(vals),
+            }
+        )
+    print(f"limit: {LIMIT_PERCENT}% (at or above the C2 MDE: {LIMIT_PERCENT >= out[0]['mde']})")  # ty: ignore[unsupported-operator]
 
     print(f"\n{len(seeds)}-SEED AVERAGE CONTRASTS, valid-month-block and valid-quarter-block")
     for cid, (na, nb) in pairs.items():
@@ -144,12 +170,22 @@ def main() -> None:
             vb, _ = by_block(rows=rb, column="month")
             p, lo, hi, n = block_interval(a=va, b=vb)
             print(f"{cid} {cut_name} month-block ({n} months): {p:+.3f}% ({lo:+.3f} to {hi:+.3f})")
-            qa = ra.with_columns(quarter=pl.col("month").map_elements(lambda m: (months.index(m) // 3), return_dtype=pl.Int64))
-            qb = rb.with_columns(quarter=pl.col("month").map_elements(lambda m: (months.index(m) // 3), return_dtype=pl.Int64))
+            qa = ra.with_columns(
+                quarter=pl.col("month").map_elements(
+                    lambda m: months.index(m) // 3, return_dtype=pl.Int64
+                )
+            )
+            qb = rb.with_columns(
+                quarter=pl.col("month").map_elements(
+                    lambda m: months.index(m) // 3, return_dtype=pl.Int64
+                )
+            )
             qva, _ = by_block(rows=qa, column="quarter")
             qvb, _ = by_block(rows=qb, column="quarter")
             p, lo, hi, n = block_interval(a=qva, b=qvb)
-            print(f"{cid} {cut_name} quarter-block ({n} quarters, 35 distinct resamples at most): {p:+.3f}% ({lo:+.3f} to {hi:+.3f})")
+            print(
+                f"{cid} {cut_name} quarter-block ({n} quarters, 35 distinct resamples at most): {p:+.3f}% ({lo:+.3f} to {hi:+.3f})"
+            )
 
     print("\nBY QUARTER OF THE SCORED YEAR (init-month groups = refit quarters), per seed contrast")
     init_months = sorted(rows["annual_a2"]["init_month"].unique().to_list())
@@ -167,13 +203,21 @@ def main() -> None:
                 seed_vals.append(
                     100.0
                     * (
-                        ra.filter(pl.col("init_month").is_in(sel))["score"].mean()
+                        ra.filter(pl.col("init_month").is_in(sel))["score"].mean()  # ty: ignore[unsupported-operator]
                         / rb.filter(pl.col("init_month").is_in(sel))["score"].mean()
                         - 1.0
                     )
                 )
             qrows.append(
-                {"quarter": k + 1, "months": f"{sel[0]}..{sel[-1]}", "id": cid, "pct": 100.0 * (va / vb - 1.0), "seed_sd": float(np.std(seed_vals, ddof=1)), "seed_min": min(seed_vals), "seed_max": max(seed_vals)}
+                {
+                    "quarter": k + 1,
+                    "months": f"{sel[0]}..{sel[-1]}",
+                    "id": cid,
+                    "pct": 100.0 * (va / vb - 1.0),  # ty: ignore[unsupported-operator]
+                    "seed_sd": float(np.std(seed_vals, ddof=1)),
+                    "seed_min": min(seed_vals),
+                    "seed_max": max(seed_vals),
+                }
             )
     print(pl.DataFrame(qrows))
 
@@ -184,41 +228,63 @@ def main() -> None:
         for cid, (na, nb) in pairs.items():
             va = rows[na].filter(pl.col("month") == m)["score"].mean()
             vb = rows[nb].filter(pl.col("month") == m)["score"].mean()
-            rec[f"{cid}_pct"] = 100.0 * (va / vb - 1.0)
-            rec[f"{cid}_loss_pts"] = va - vb
+            rec[f"{cid}_pct"] = 100.0 * (va / vb - 1.0)  # ty: ignore[unsupported-operator]
+            rec[f"{cid}_loss_pts"] = va - vb  # ty: ignore[unsupported-operator]
         mrows.append(rec)
     print(pl.DataFrame(mrows))
 
-    print(f"\nBY HOUR OF DAY (UTC), C2 {len(seeds)}-seed average; share of the total score difference")
+    print(
+        f"\nBY HOUR OF DAY (UTC), C2 {len(seeds)}-seed average; share of the total score difference"
+    )
     ra, rb = rows["annual_a2"], rows["q_a2"]
-    total = ra["score"].sum() - rb["score"].sum()
+    total = ra["score"].sum() - rb["score"].sum()  # ty: ignore[unsupported-operator]
     hrows = []
     for h in sorted(ra["hour"].unique().to_list()):
         sa, sb = ra.filter(pl.col("hour") == h), rb.filter(pl.col("hour") == h)
-        diff = sa["score"].sum() - sb["score"].sum()
-        hrows.append({"hour_utc": h, "rows": sa.height, "pct": 100.0 * (sa["score"].mean() / sb["score"].mean() - 1.0), "share_of_total_diff": diff / total})
+        diff = sa["score"].sum() - sb["score"].sum()  # ty: ignore[unsupported-operator]
+        hrows.append(
+            {
+                "hour_utc": h,
+                "rows": sa.height,
+                "pct": 100.0 * (sa["score"].mean() / sb["score"].mean() - 1.0),  # ty: ignore[unsupported-operator]
+                "share_of_total_diff": diff / total,
+            }
+        )
     print(pl.DataFrame(hrows))
 
-    print("\nCAPACITY AND CLIP (actual output in the stored units, share of the effective capacity)")
+    print(
+        "\nCAPACITY AND CLIP (actual output in the stored units, share of the effective capacity)"
+    )
     act = cut["annual_a2"].with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
     for m in months:
         a_ = act.filter(pl.col("month") == m)["actual"]
-        print(m, f"p99.9 {a_.quantile(0.999):.3f} max {a_.max():.3f} share >=0.98 of p99.9: {float((a_ >= 0.98 * a_.quantile(0.999)).mean()):.4f}")
+        print(
+            m,
+            f"p99.9 {a_.quantile(0.999):.3f} max {a_.max():.3f} share >=0.98 of p99.9: {float((a_ >= 0.98 * a_.quantile(0.999)).mean()):.4f}",
+        )
     top = float(act["actual"].quantile(0.999))
     near = act.filter(pl.col("actual") >= 0.98 * top)
     sa = score_rows(frame=cut["annual_a2"]).join(near.select(s430.KEYS), on=s430.KEYS, how="semi")
     sq = score_rows(frame=cut["q_a2"]).join(near.select(s430.KEYS), on=s430.KEYS, how="semi")
-    all_diff = rows["annual_a2"]["score"].sum() - rows["q_a2"]["score"].sum()
-    clip_diff = sa["score"].sum() - sq["score"].sum()
-    print(f"rows with actual >= 0.98 of the year's p99.9 ({near.height} rows): C2 clipped-rows share of total score difference {clip_diff / all_diff:+.3f}")
-    print(f"upper-tail pinball q95 and q99 contrasts (C2, all rows):")
+    all_diff = rows["annual_a2"]["score"].sum() - rows["q_a2"]["score"].sum()  # ty: ignore[unsupported-operator]
+    clip_diff = sa["score"].sum() - sq["score"].sum()  # ty: ignore[unsupported-operator]
+    print(
+        f"rows with actual >= 0.98 of the year's p99.9 ({near.height} rows): C2 clipped-rows share of total score difference {clip_diff / all_diff:+.3f}"
+    )
+    print("upper-tail pinball q95 and q99 contrasts (C2, all rows):")
     for t in ("pin95", "pin99", "pin01", "pin05"):
         print(t, f"annual {rows['annual_a2'][t].mean():.4f} quarterly {rows['q_a2'][t].mean():.4f}")
     for t in ("cover95", "cover99"):
         print(t, f"annual {rows['annual_a2'][t].mean():.4f} quarterly {rows['q_a2'][t].mean():.4f}")
-    print("median minus mean (points):", f"annual {rows['annual_a2']['median_minus_mean'].mean():+.3f} quarterly {rows['q_a2']['median_minus_mean'].mean():+.3f}")
-    print("mean-forecast absolute error (points):", f"annual {rows['annual_a2']['ae_mean'].mean():.3f} quarterly {rows['q_a2']['ae_mean'].mean():.3f}")
-    print("absolute scores:", {n: round(float(rows[n]['score'].mean()), 3) for n in rows})
+    print(
+        "median minus mean (points):",
+        f"annual {rows['annual_a2']['median_minus_mean'].mean():+.3f} quarterly {rows['q_a2']['median_minus_mean'].mean():+.3f}",
+    )
+    print(
+        "mean-forecast absolute error (points):",
+        f"annual {rows['annual_a2']['ae_mean'].mean():.3f} quarterly {rows['q_a2']['ae_mean'].mean():.3f}",
+    )
+    print("absolute scores:", {n: round(float(rows[n]["score"].mean()), 3) for n in rows})  # ty: ignore[invalid-argument-type]
     (NEW_DIR / "scores").mkdir(exist_ok=True)
     pl.DataFrame(out).write_csv(NEW_DIR / "scores" / f"seed_contrasts_{len(seeds)}.csv")
 
