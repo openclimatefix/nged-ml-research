@@ -48,8 +48,6 @@ metric: >-
 code: ml-experiments/00509-event-band-coverage-paired-injection-on-and-off/
 ---
 
-# Experiment 509: are the forecast bands appropriately confident when a power lag sits inside a load-shift event?
-
 **Plan, written before any score is read.** We ask whether a forecast's uncertainty band is too
 narrow, too wide, or about right when one of its power lags sits inside a load-shift event. Experiment
 482 injected load shifts into the lags of stored demand networks and reported coverage inside the
