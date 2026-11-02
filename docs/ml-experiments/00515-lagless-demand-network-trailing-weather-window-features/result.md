@@ -8,14 +8,17 @@ theme: demand-inputs
 also_relevant_to:
   - retraining-and-training-history
 status: done
-verdict: not resolved
+verdict: inconclusive
 best_arm: W-T
 headline: >-
   W-T lowers cold-night CRPS at the eight MVA-only Primaries by 0.150 points (Bonferroni-20 interval
   -0.314 to -0.075, 10 of 10 folds), but a shuffled-day placebo lowers it by 0.071, and nothing is
   resolved at the six signed-MW Primaries or on all rows.
-production_status: not adopted
-adopted_in: none
+production_status: not-for-production
+take_home_message: >-
+  Trailing temperature windows lowered cold-night CRPS at the eight MVA-only Primaries by 0.150
+  points in 10 of 10 folds, but a shuffled-day placebo lowered it by 0.071, and nothing resolved at
+  the six signed-MW Primaries or on all rows, so the effect is not resolved.
 kind: other
 protocol: demand-v2
 size: >-
@@ -70,35 +73,48 @@ metric: >-
   10).
 ---
 
-**Take-home: trailing temperature windows may help the lag-free network a little on cold nights at
-the eight MVA-only Primaries, but this experiment cannot tell them apart from extra columns.** The
-verdict is "not resolved".
+**Take-home: trailing temperature windows may help the lag-free demand network a little on cold
+nights at the eight MVA-only Primaries, but this experiment cannot tell the real windows from a
+shuffled-day placebo, so the verdict is "not resolved".**
 
-- **Minimum detectable effect first.** One fold with 3 seeds can detect 0.34 points on all rows and
-  0.48 on cold nights, from seed spread alone. Pooled over 10 folds the seed-only figure is about
-  0.11 and 0.15; fold-to-fold variation adds to that, so the intervals below are wide. W0 scores
-  5.40 (all rows) and 4.67 (cold nights) at the eight, and 4.16 and 3.44 at the six.
-- **Eight MVA-only Primaries, cold nights, arm minus W0** (negative favours the arm; Bonferroni-20
-  interval; negative folds of 10):
-    - W-T: -0.150 [-0.314, -0.075], 10 of 10. W-S: -0.122 [-0.358, -0.017], 9 of 10. Only these two
-      exclude zero.
-    - W-X -0.081, W-ALL -0.086, W-ALL minus W-DH -0.105: all include zero.
-    - **W-null (the shuffled-day placebo) gains -0.071.** W-T minus W-null is -0.079
-      [-0.290, +0.089]: the real windows do not resolve from the placebo.
-- **Six signed-MW Primaries, cold nights:** W-T -0.147 [-0.596, +0.055], W-S -0.160
-  [-0.574, +0.009], W-ALL minus W-DH -0.167 [-0.614, +0.004], W-null -0.108. Every interval includes
-  zero.
-- **All rows:** nothing resolves. W-T is -0.004 at the eight and -0.099 at the six.
-- **Fold 2024-11 drives part of every gain.** W0 is weak in that fold, and every arm, the placebo
-  included, gains 0.46 to 1.29 points there ([Figure 2](figure_2_per_fold.svg)). A **post hoc**
-  check, chosen after seeing the per-fold table, leaves 2024-11 out ([Figure 3](figure_3_leave_out_2024_11.svg)):
-  W-T at the eight is -0.119 [-0.205, -0.071] in 9 of 9 folds and W-null falls to -0.023, so the
-  eight-Primary result holds at about 80% of its size. At the six, W-T falls to -0.044 and W-S to
-  -0.062 [-0.122, +0.021].
-- **Tails:** on cold nights at the eight, W-T lowers q95 pinball loss by 0.043 and q99 by 0.023; the
-  placebo lowers them by 0.038 and 0.024. Absolute q95 and q99 coverage is not in the stored report.
+- **Arms.** W0 is the base lag-free neural network with 37 input columns. W-T adds trailing
+  temperature means over 6, 24, and 72 hours. W-S adds trailing shortwave-radiation means. W-X adds
+  the product of the 24-hour temperature (minus 15.5 °C) and the 24-hour shortwave. W-ALL combines
+  all of these with W-DH (heating and cooling degree-hours), and "W-ALL minus W-DH" drops W-DH.
+  **W-null is the placebo:** it gives every row the windows of a randomly drawn other day of the same
+  month and day type. W-seam builds W-T differently before the forecast origin. W-CNN is a later
+  pull request with learned windows.
+- **Seed spread alone limits what this experiment can detect.** The minimum detectable effect (the
+  smallest difference in the continuous ranked probability score, CRPS, that seed spread alone would
+  resolve) is 0.34 points of effective capacity on all rows and 0.48 on cold nights for one fold
+  with 3 seeds. Pooled over 10 folds the seed-only figure is about 0.11 and 0.15, and fold-to-fold
+  variation widens the intervals further. W0 scores 5.40 (all rows) and 4.67 (cold nights) at the
+  eight MVA-only Primaries, and 4.16 and 3.44 at the six signed-MW Primaries (those whose metered
+  power carries a sign). A lower score is better.
+- **At the eight MVA-only Primaries, only W-T and W-S beat W0 on cold nights, and the placebo gains
+  almost as much.** Cold nights are half-hours below 5 °C between 18:00 and 08:00 local time. The
+  contrast is arm minus W0 (negative favours the arm), with a Bonferroni interval corrected for 20
+  comparisons, and the count is of negative folds out of 10:
+    - W-T: -0.150 [-0.314, -0.075], 10 of 10. W-S: -0.122 [-0.358, -0.017], 9 of 10.
+    - W-X -0.081, W-ALL -0.086, and W-ALL minus W-DH -0.105 include zero.
+    - W-null: -0.071. W-T minus W-null is -0.079 [-0.290, +0.089], so the real windows do not
+      resolve from the placebo.
+- **At the six signed-MW Primaries, no window resolves on cold nights.** W-T is -0.147
+  [-0.596, +0.055], W-S -0.160 [-0.574, +0.009], W-ALL minus W-DH -0.167 [-0.614, +0.004], and
+  W-null -0.108.
+- **On all rows nothing resolves.** W-T is -0.004 at the eight and -0.099 at the six.
+- **One fold, 2024-11, supplies part of every gain, because W0 scores badly there.** Every arm,
+  the placebo included, gains 0.46 to 1.29 points in that fold
+  ([Figure 2](figure_2_per_fold.svg)). A **post hoc** check, chosen after seeing the per-fold
+  table, leaves 2024-11 out ([Figure 3](figure_3_leave_out_2024_11.svg)). At the eight, W-T then
+  keeps about 80% of its gain: -0.119 [-0.205, -0.071] in 9 of 9 folds, while W-null falls to
+  -0.023. At the six, W-T falls to -0.044 and W-S to -0.062 [-0.122, +0.021].
+- **In the tails the placebo gains as much as W-T.** On cold nights at the eight, W-T lowers q95
+  pinball loss by 0.043 and q99 by 0.023, and the placebo lowers them by 0.038 and 0.024. The share
+  of observations below the q95 and q99 forecasts (coverage) was not saved in the report, so it is
+  not quoted.
 - **Combining windows did not help.** W-ALL (-0.086) did no better than W-T alone (-0.150), which
-  argues for extra columns adding noise as much as signal.
+  suggests that each extra column adds noise as well as signal.
 
 ![Each arm against W0](figure_1_headline.svg)
 
@@ -108,41 +124,42 @@ verdict is "not resolved".
 
 ## Predictions
 
-- **P1 (W-T, cold nights, eight; gain at least 0.05):** passes on the point estimate (0.150), but
-  not against the placebo.
-- **P2 (W-S, six; cold-sunny gain exceeds cold-overcast gain by at least 0.05):** passes on the point
-  estimate (-0.065 against +0.178), with both intervals spanning zero.
-- **P3 (W-X):** not testable on winter folds, because the warm-sunny and warm-overcast slices hold no
-  rows in any of the 10 folds. The cold-sunny clause is unresolved.
-- **P4 (W-null inside plus or minus the minimum detectable effect):** passes only vacuously. The
-  cold-night minimum detectable effect (0.48) is far wider than the placebo gain (-0.071).
-- **P5 (W-seam, all rows, within plus or minus 0.02):** fails, at +0.025 (eight) and +0.023 (six).
-  The cold-night values (+0.019, +0.016) are inside.
-- **Stop rule:** W-T and W-S passed at the eight, so W-ALL and W-ALL minus W-DH ran. Neither beat W-T.
+- **P1 (W-T, cold nights, eight: gain of at least 0.05):** passes on the point estimate (gain
+  0.150), but not against the placebo.
+- **P2 (W-S, six: gain on cold sunny days exceeds gain on cold overcast days by at least 0.05):**
+  passes on the point estimate (cold-sunny contrast -0.065, cold-overcast contrast +0.178), with both
+  intervals spanning zero.
+- **P3 (W-X: negative on sunny slices, within +0.02 on all rows):** winter folds contain no
+  warm-sunny or warm-overcast rows, so P3 cannot be tested. The cold-sunny clause is unresolved.
+- **P4 (W-null inside plus or minus the minimum detectable effect):** passes only because the test
+  cannot fail. The cold-night minimum detectable effect (0.48) is far wider than the placebo gain
+  (-0.071).
+- **P5 (W-seam within plus or minus 0.02 of W-T, all rows):** fails, at +0.025 (eight) and +0.023
+  (six). The cold-night values (+0.019, +0.016) are inside.
+- **Stop rule:** W-T and W-S met the condition for continuing at the eight, so W-ALL and W-ALL minus
+  W-DH ran. Neither W-ALL nor W-ALL minus W-DH beat W-T.
 
 ## Checks and caveats
 
-- **Audit triggers.** The placebo gain (trigger 1), W-ALL doing worse than its nested arm W-T
-  (trigger 5), and the minimum detectable effect being wider than the plan expected (trigger 6)
-  fire. The median-minus-mean forecast check and the mean-forecast error beside each
-  quantile-score contrast were **not run**.
-- **Placebo ties.** The placebo takes 88 to 100% of W-T's tail gains, and W-T minus W-null is
-  negative in only 5 of 10 folds at the eight.
-- **W0 reuse.** Experiment 513's `P0` forecasts serve as W0 for 2025-12, 2026-01, and 2026-03; W0 is
-  fitted here for the other 7 folds. Fold 2024-11 is the weakest.
+- **Three audit triggers fired:** the placebo gained, W-ALL did worse than its nested arm W-T, and
+  the minimum detectable effect was wider than the plan expected. The median-minus-mean forecast
+  check and the mean-forecast error beside each quantile-score contrast were not run.
+- **The placebo takes 88 to 100% of W-T's tail gains,** and W-T minus W-null is negative in only 5
+  of 10 folds at the eight.
+- **W0 for 2025-12, 2026-01, and 2026-03 is reused from experiment 513's `P0`.** W0 is fitted here
+  for the other 7 folds.
 - **Warm slices are empty,** so no claim covers warm days.
-- **Example probabilistic forecast graphs were not drawn** for this PR.
-- **Window resolution.** A 6-hour window holds two distinct ensemble samples on day 1 and one beyond
-  day 6.
+- **Example probabilistic forecast graphs were not drawn** in this experiment.
+- **A 6-hour window holds only two distinct ensemble samples on day 1 and one beyond day 6.**
 - **Event labels are incomplete,** so clean rows may hold unlabelled events and counts are lower
   bounds.
 
 ## What to try next
 
-- Repeat W-T against W-null with more seeds, and with 2024-11 given a stronger W0, before building
-  W-CNN on W-T.
-- Treat the temperature windows as a candidate for the six only after a run that resolves the
-  placebo.
+- Repeat W-T against W-null with more seeds, and with a stronger W0 in 2024-11, before building the
+  convolutional-network version of the windows (W-CNN) on W-T.
+- The temperature windows would be a candidate for the six signed-MW Primaries only after a run that
+  resolves the placebo.
 
 ## Plan (written before any fit that produced a quoted number)
 
