@@ -105,10 +105,10 @@ intervals](figure_1_weekly_and_recency_december_2024.svg)
 
 | Contrast | Eight | Six |
 |---|---|---|
-| L-W minus L-M, whole month | -0.110 [-0.214, -0.024] | -0.336 [-0.465, -0.215] |
-| L-Ww minus L-W, whole month | -0.002 [-0.036, +0.032] | -0.081 [-0.126, -0.040] |
-| L-W minus L-M, Christmas week | -0.018 [-0.083, +0.054] | -0.704 [-0.806, -0.582] |
-| L-Ww minus L-W, Christmas week | +0.005 [-0.007, +0.016] | -0.121 [-0.165, -0.093] |
+| L-W minus L-M, whole month | -0.110 [-0.215, -0.026] | -0.336 [-0.465, -0.209] |
+| L-Ww minus L-W, whole month | -0.002 [-0.036, +0.033] | -0.081 [-0.126, -0.040] |
+| L-W minus L-M, Christmas week | -0.018 [-0.085, +0.055] | -0.704 [-0.810, -0.587] |
+| L-Ww minus L-W, Christmas week | +0.005 [-0.007, +0.016] | -0.121 [-0.165, -0.092] |
 
 - **Two Christmas weeks.** Christmas week is valid time 22 to 31 December. Experiment 510's
   December 2025 values, on all rows, were: L-W minus L-M -0.31 at the eight and -0.28 at the six;
