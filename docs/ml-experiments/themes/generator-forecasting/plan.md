@@ -16,6 +16,7 @@
 | 461 | Does retraining the wind and solar networks with effective capacity at p99.9 of earlier power keep their score and bring the upper tail inside 1.5%? | 1 | 453 | Finished (partly supported); p99.9 helps wind, marginal for solar |
 | 466 | Does weighting recent training rows more raise the quantile score of the wind and solar networks? | 1 | 461 | Finished (not supported); no half-life helps, line closed |
 | 473 | What makes Generators X, Y, and Z hard to forecast, and can any of them be forecast from weather and calendar? | 1 | nothing | Finished (refuted); stage 2 for Generator X, and Generator Y only with folds before mid-2024, awaits the manager |
+| 505 | Does one effective-capacity rule for wind and solar, the p99.9 of the most recent 365 or 730 days of power, keep the score and the upper tail at every series? | 1 | 461 | Planned |
 
 ## Planned experiments
 
