@@ -131,13 +131,16 @@ class Split:
     test: Windows
 
 
-def split_by_time(*, windows: Windows, refit: int, month_half_hours: int) -> Split:
+def split_by_time(
+    *, windows: Windows, refit: int, month_half_hours: int, validation_days: int = VALIDATION_DAYS
+) -> Split:
     """Split the candidate windows by the newest reading's grid index.
 
     Args:
         windows: The candidate windows.
         refit: The grid index of the refit (the first half-hour of the scored month).
         month_half_hours: The number of half-hours in the scored month.
+        validation_days: The length of the validation block in days.
 
     Returns:
         The split, with the embargo and the gap applied.
@@ -146,7 +149,7 @@ def split_by_time(*, windows: Windows, refit: int, month_half_hours: int) -> Spl
     origin = gen.origin_of(day=windows.day)
     day = 48
     embargo_start = refit - EMBARGO_DAYS * day
-    val_start = embargo_start - VALIDATION_DAYS * day
+    val_start = embargo_start - validation_days * day
     train_end = val_start - GAP_DAYS * day
     return Split(
         train=windows.take(np.flatnonzero(newest < train_end)),

@@ -7,10 +7,11 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 date: 2026-11-02
+verdict: inconclusive
 size: >-
   complex. Stored: one saved neural network (about 87,000 parameters), its training log, and score
   tables, all under the experiment's private data folder. Serving path: not touched (this
@@ -45,7 +46,7 @@ benchmark: >-
   A perfect predictor (the injected step itself, read through the same candidate rule) and a zero
   predictor (no repair), both printed beside the encoder on the same windows and worlds. No
   forecast is scored, so there is no forecast benchmark.
-row_set_id: injected_windows_fold_2026_01_worlds_200_to_202  # nothing is forecast, so no row set is stored
+row_set_id: injected_windows_fold_2026_01_worlds_200_to_202
 metric: >-
   Share of injected steps found within 2, 6, and 24 hours of their onset; median relative size error
   of the found steps; mean absolute error of the three lag readings in spreads, repaired and
@@ -53,173 +54,130 @@ metric: >-
   ROC curve of the genuine-change head.
 code: >-
   ml-experiments/00518-history-encoder-first-fit-stage-0-time-and-accuracy/
+best_arm: >-
+  Not applicable (one encoder). Of the four pre-registered checks, P1 passed and P2 passed on lag
+  error (0.446 against 0.988 spreads) but failed on error added to untouched rows; P3 failed
+  (found 44% of the ceiling within 6 hours) and P4 failed (planted-step precision 0.165).
+headline: >-
+  Interim and unaudited, and a weak null. One encoder fit (one seed, 69 seconds) did not pass the
+  pre-registered proxy: it found 31% of injected steps within 2 hours (a perfect predictor would
+  find 87%) and its planted-step precision at a 2% rate was 0.165 (threshold 0.3).
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  Interim and unaudited. A small neural network trained for 69 seconds learned to find about a
+  third of the injected shifts in 14 days of power readings, far below what a perfect finder
+  would, and it flagged too many ordinary windows. This is a weak result (one seed, a noisy
+  validation set), so it does not rule out a learned repair, but it gives no reason to build one
+  yet.
+lessons: >-
+  One cheap fit cannot settle whether a history encoder is learnable. The fit was 30 times cheaper
+  than its cap, so a longer, multi-seed attempt is affordable. The lab median used in the test
+  month is quieter than the one used in training, which flatters the false-flag rate.
+advice:
+  - >-
+    Choose the flag threshold on a validation block with the training provenance of the median, not
+    on the test month, because the false-flag rate was 0.03 on test windows and 0.30 on validation
+    windows (results table).
+  - >-
+    Use at least three seeds and a validation block of more than 1,000 windows before reading a
+    stop rule, because the validation step loss moved between 0.24 and 0.57 from epoch to epoch
+    (figure 1).
+  - >-
+    Compare every detection score with the score of a perfect predictor under the same candidate
+    rule, because the rule alone caps the share found within 2 hours at 87% (figure 2).
 ---
 
-**This page is the plan; the write-up replaces it when the experiment finishes.** The plan follows
-the brief `briefs/history_encoder_first_test_brief.md` with both sets of edits of 2026-11-02 (step
-T1 only), sections 2.2 to 2.8 of `briefs/history_encoder_debate_3_opus_reply.md`, and the merged
-[experiment 507](../00507-history-encoder-first-test-oracle-repair-and-total-variation/result.md).
-Rung R1 and later rungs are not planned and never started, and no oracle noise curve is run.
+**This page is interim and unaudited, and its result is a weak null.** A small neural network (the
+history encoder, 86,747 parameters) was trained once, for 69 seconds, on injected shifts in 14 days
+of power readings at the fold 2026-01 Primaries. It did not pass the pre-registered proxy for the
+plan's kill rule (c). The fit used one seed and a noisy validation block of 401 windows, so the
+result does not rule out a learned repair.
 
-## Question
+## Method
 
-Experiment 507 showed that a perfect repair of the three lag readings improves the lag correction,
-and that one non-learned repair did not. This experiment asks whether a small neural network can be
-trained to find and size the shifts, and measures how long one such fit takes, so that the Discuss
-session can decide whether the learned encoder is worth a further rung.
+- **Question.** Experiment 507 showed that a perfect repair of the three lag readings improves the
+  lag correction. This experiment asks whether a small neural network can learn to find and size
+  injected shifts in the 672 half-hours (14 days) of readings, and how long one fit takes.
+- **Data.** Experiment 507's generator, with temporary shifts (family A), genuine level changes
+  (family B), and hard negatives drawn three times as often (family D). One window is a Primary
+  and a day. The two input channels are the surprise (reading minus the ERA5 and CAMS lagless
+  median, over the Primary's residual spread) and the median standardised within the window. Windows
+  touching a labelled event are dropped. Test windows have origins in January 2026; training windows
+  end 68 days before the refit, the validation block (30 days) sits before a 24-day embargo.
+- **Encoder.** A dilated convolution stem, 168 two-hour tokens, two transformer layers with a
+  learned relative-position bias, and heads for the step probability, the step size, and whether
+  the step in force at the newest reading is genuine. The losses were a positive-unlabelled step
+  loss with a size loss (weight 0.5), a genuine-head cross-entropy (0.2), and a total-variation
+  penalty (1e-3). Adam at 2e-3, batches of 128, a fresh generator world each epoch.
+- **Checks.** The four checks P1 to P4 and their thresholds were written into the plan before the
+  fit. A candidate step is a half-hour where the mean estimated step over the next 4 half-hours
+  differs from the mean over the previous 4 by at least 0.5 spreads.
 
-## Two limits to read first
+## Results
 
-- **The total-variation test of experiment 507 is weak.** Its tuning hit the edge of the grid
-  (weight 16 and tau 5, the largest of each, which is the weakest repair), so the 507 result cannot
-  say whether any non-learned repair could work. A learned encoder is therefore not compared with a
-  well-tuned non-learned repair here.
-- **The lab setting flatters detection.** The lagless median comes from ERA5 and CAMS weather that
-  already happened (experiment 507's table, one seed), so the reading minus the median is smaller
-  than at serving. A single-seed fit is informative only when its result is far from the thresholds.
+![Validation step loss by epoch](figure_1_validation_loss.svg)
 
-## Design
+**Scores are on the 372 test windows (origins in January 2026) in injected worlds 200 to 202.**
+Intervals resample whole Primaries (13 in the test month). "Ceiling" is the same score for a
+perfect predictor that outputs the injected step, read through the same candidate rule.
 
-### Data and split (fold 2026-01, refit 2026-01-01)
+| Check | Threshold (fixed before the fit) | Result | Outcome |
+|---|---|---|---|
+| P1: best validation epoch | 8 or later | 14 (validation step loss 0.244) | Passed, but the loss moved between 0.24 and 0.57 from epoch to epoch |
+| P2: error at the three lags on rows a step touches | under half of the unrepaired error | 0.446 against 0.988 spreads (45%) | Passed |
+| P2: error added on rows no step touches | under 0.1 of the mean injected step | 0.144 | Failed |
+| P3: steps found within 6 hours | at least 70% of the ceiling (0.896) | 0.396 (0.365 to 0.434), 44% of the ceiling | Failed |
+| P4: planted-step precision at a 2% rate | at least 0.3 | 0.165 | Failed |
 
-- **Inputs.** Experiment 507's injected-world generator, families A (temporary) and B (genuine) and
-  family D (hard negatives, drawn three times as often). Family C and the reading-class head are
-  dropped, as are the missing-mask, flagged-zero, and age channels. The two input channels are the
-  surprise (shifted reading minus the lagless median, over the Primary's residual spread, clipped
-  at 30 spreads and divided by 10) and the lagless median standardised within the window. Readings
-  or medians that are missing enter as zero in both channels.
-- **Windows.** One window per Primary and day: the 672 half-hours (14 days) ending 7 half-hours
-  before the 09:00 UTC origin. The median must be finite at 90% of the half-hours. A window is
-  dropped if its history, padded by 48 half-hours, touches a labelled load-shift event. D15 and D18
-  need a history that starts after 2025-03-01.
-- **Split.** Test windows: origins in January 2026. Embargo: no training or validation window ends
-  within 24 days before the refit. Validation block: the 30 days before the embargo. Training
-  windows end 14 days before the validation block begins.
-- **Worlds.** Training uses a fresh generator seed (1000 plus the epoch number) for each epoch.
-  Validation uses worlds 150 to 152, scoring uses worlds 200 to 202, and none of these is a world
-  that experiment 507 trained or tuned on (100 to 102, 110).
-- **Targets.** Signed MW at the six Primaries, apparent power at the eight (the shift is injected
-  as the magnitude of the sum, and half-hours where the lagless median is below twice the injected
-  step are masked from the step loss; the share masked is printed). D15 and D18 are scored as a
-  third, report-only group.
+![Share of injected steps found, encoder against ceiling](figure_2_found_against_ceiling.svg)
 
-### The encoder
+- **The encoder found a third of the steps within 2 hours.** The shares found within 2, 6, and 24
+  hours were 0.313, 0.396, and 0.464, against ceilings of 0.870, 0.896, and 0.910. The ceiling is
+  below 1 because a step under 0.5 spreads is never a candidate. At the signed-MW six the share
+  within 2 hours was 0.297 (4 Primaries), and at the MVA-only eight 0.326 (7 Primaries).
+- **Size was roughly right when a step was found.** The median relative size error among found
+  steps was 0.25, and 50% were within 25%.
+- **The false-flag rate depends on which median is used.** On test windows with no injection it was
+  0.032 (0.003 to 0.085). On the validation block's real windows, which share the training
+  provenance of the median, it was 0.297. In the test month 78% of half-hours take their median
+  from the table's post-refit module, so the test surprise is quieter.
+- **Raising the candidate threshold trades recall for precision.** At 1.5 spreads the planted-step
+  precision was 0.334, but only 7% of steps were found within 2 hours. The thresholds of 0.5, 0.75,
+  1.0, and 1.5 spreads gave precisions of 0.165, 0.188, 0.246, and 0.334. P4 was fixed at 0.5.
+- **The genuine-change head was weak.** Its area under the ROC curve was 0.64 on 373 labelled
+  windows. The generator makes 75% of steps in force at the newest reading genuine.
+- **Cost.** One fit took 69 seconds (22 epochs of 16,384 windows, about 3 seconds each, bound by
+  the world generator on one core), against a cap of 2 hours.
 
-- **Architecture.** A dilated convolution stem of width 32, a strided convolution to 168
-  two-hour tokens of width 64, two transformer layers of width 64 with 4 heads and a learned
-  relative-position bias, and a head that joins each token to the stem features of its four
-  half-hours. The encoder has 86,747 parameters and writes, per half-hour, the
-  probability that a step is in force and the step size in spreads, and, from the last token, the
-  probability that the step in force at the newest reading is genuine.
-- **Losses (weights fixed before the fit).** `L_u` (weight 0.5): a non-negative
-  positive-unlabelled risk on the step probability, plus a Huber loss on the size at injected
-  half-hours only; `L_g` (0.2): cross-entropy of the genuine-change head on windows with a step in
-  force at the newest reading whose onset lies inside the window; `L_tv` (1e-3): L1 on first
-  differences of the estimated step. The positive-unlabelled prior is 0.03, a guess, and is not
-  swept here.
-- **Training.** Adam at 2e-3, batch 128, epochs of 16,384 windows drawn with the family D weights,
-  at most 60 epochs, early stopping 8 epochs after the best validation step loss (a loss counts as better only if it is 0.5% below the best) and never before
-  epoch 10. One seed. A feeder thread builds the next epoch's world on one core while the device
-  trains.
-- **Cap.** The fit aborts, and the worker messages the manager and the neural Discuss session, if
-  the time spent passes 2 hours or the time per epoch (after the first epoch) extrapolated to 60 epochs does.
+## Outcome against the plan
 
-### What is read
+| Item | Outcome |
+|---|---|
+| Kill rule (c), clause 2: validation step loss stops falling before epoch 10 | Not fired (best epoch 14), but the curve is noisy |
+| Kill rule (c), clause 1, read through the proxy P2 to P4 | The proxy failed (P2 on the clean-row guard, P3, P4) |
+| Consequence in the plan | The neural encoder stops unless the neural Discuss session overrules |
 
-On the 372 test windows (124 at the six, 204 at the eight, 44 at D15 and D18), in worlds 200 to 202,
-with intervals from resampling whole windows (the three worlds share each window):
+## Limits
 
-- **Found within 2, 6, and 24 hours.** The share of injected events with a candidate onset within
-  that time of their onset, with the ceiling (the same score for a perfect predictor) beside it.
-  Candidates are defined in `e00518_score.py`, on the estimated step (the probability of a step
-  times its size, in spreads); a step smaller than 0.5 spreads is never a candidate. Half-hours
-  masked at the eight are excluded from the step loss only, and are scored.
-  A step is missed if no candidate lies within 24 hours.
-- **Size error.** The median relative difference between the estimated and injected step over the
-  event's half-hours, among found events.
-- **Repaired lag error.** The mean absolute error of the estimated step at the three lag positions,
-  in spreads, against the mean absolute injected step, on rows where a step touches a lag, and the
-  mean absolute estimate on rows where none does (what the repair adds).
-- **Planted-step precision at 2%.** `0.02 r / (0.02 r + 0.98 f)`, where `r` is the share found
-  within 2 hours and `f` is the share of real windows (no injection) with a candidate. The real
-  windows hold events that NGED did not log, so `f` is an upper bound on the false-step rate. The
-  ceiling of `r` (the perfect predictor) is printed beside P4, and P4 is flagged "ceiling-limited"
-  if that ceiling is under 0.5. The 372 windows overlap within a
-  Primary, so intervals resample whole Primaries, not windows.
-- **Genuine head.** The area under the ROC curve on windows that carry a label. The generator makes
-  75% of steps in force at the newest reading genuine (experiment 507 measured 79%).
-  The genuine head, the median size error, and the 24-hour found share carry no threshold and are
-  diagnostics.
-- **Limits of the test windows.** After the labelled-event exclusion the test month holds 4
-  Primaries at the six (D5 and D16 are excluded entirely) and 7 at the eight. 78% of the test
-  half-hours take their median from the table's post-refit module, while training and validation
-  take theirs from cross-fitted modules, so the test surprise is quieter. The false-flag rate is
-  therefore also printed on the validation block's real windows, which share the training
-  provenance. A candidate cannot lie within 4 half-hours of either end of the window.
-- **P4 depends on the training mix.** 19% of the valid training half-hours are positives, against
-  at most a few per cent in real data, so the step probability is calibrated to a busier world
-  than the real one. Precision, recall, and the false-flag rate are also printed at candidate
-  thresholds of 0.5, 0.75, 1.0, and 1.5 spreads, as a sensitivity (the P4 threshold stays at
-  0.5, fixed now). The positive-unlabelled clamp stops penalising false positives below about
-  `prior` times the positive loss, and low-median half-hours that no injection touched stay in
-  the unlabelled set.
-- **Validation step loss by epoch**, and the time per epoch of the feeder and of the device.
+- **A weak null.** One seed, a 69-second fit, and a validation block of 401 windows (the step loss
+  swung by more than a factor of two between epochs) cannot separate "the encoder cannot learn this"
+  from "this fit was too small". The thresholds were fixed before the fit.
+- **The total-variation test of experiment 507 is also weak.** Its tuning hit the edge of the grid
+  (weight 16 and tau 5, the weakest repair), so this experiment cannot say how a learned encoder
+  compares with a well-tuned non-learned repair.
+- **The noise curve was not run,** by the maintainer's standing instruction, so the first clause of
+  rule (c) is read only through the proxy.
+- **The lab setting flatters detection,** and the test month holds 4 Primaries at the six (D5 and
+  D16 are excluded by labelled events) and 7 at the eight.
+- **NGED's event labels are incomplete,** so the real windows used for the false-flag rate hold
+  events that no label covers.
+- **Training prevalence.** 19% of the valid training half-hours are positives, against at most a
+  few per cent in real data, so the step probability is calibrated to a busier world than the real
+  one.
 
-## Decision rule
+## What the next experiment should answer
 
-Fixed before any fit. In the order of the brief's kill rule (c):
-
-1. **The encoder's validation step loss stops falling before epoch 10.** The best epoch of the
-   validation step loss (fixed worlds 150 to 152, no smoothing) is under 8: the neural encoder
-   stops. A best epoch of 8 to 12 is reported as inconclusive, because one seed and a validation
-   block of 401 windows cannot separate epoch 9 from epoch 10.
-2. **The first clause of (c) asks whether the errors fall in the region of the oracle's noise curve
-   that keeps under half of the oracle gain.** The noise curve is not run here. The proxy chosen
-   now is: the encoder passes if P2, P3, and P4 all hold. Failing any one is this plan's reading of
-   the first clause, so the neural encoder stops unless the neural Discuss session overrules. The
-   thresholds are not mapped to the noise curve's points: P3 (70% found within 6 hours) resembles
-   its joint point (30% of steps missed, 6-hour onset error) and P2 (error under half) resembles a
-   50% size error, but only roughly. A pass shows that the learned encoder reaches an accuracy
-   worth costing a noise curve and a retrained correction. A pass does not show headroom in forecast
-   score. The smallest result worth acting on is a pass of all three, because the encoder adds a
-   network and a 672-half-hour history store to serving.
-3. **A single-seed null is read only if far from the thresholds.** A threshold is met if the point
-   estimate meets it. If the 95% interval spans the threshold, the result is reported as
-   "inconclusive". The three thresholds are three planned tests, and the intervals are not adjusted
-   for multiplicity.
-4. **If the fit aborts at the cap,** P1 is not read, the partial scores are reported, and the page
-   has status `failed`.
-
-## Cost
-
-One encoder fit and one scoring pass, on one GPU process under 8 GB (`MemoryMax=8G`,
-`OMP_NUM_THREADS=1`) and one feeder core. No other fit runs: no noise curve, no retrained
-correction, no total-variation retune. The cap is 2 GPU-hours, and about 2.3 of the original 3
-GPU-hours remain. On the shared workstation, with other jobs running, one core takes 0.20 ms to
-build a window and 1.06 s for one training step of 128 windows, so one epoch on a single core
-would take about 135 s. These CPU figures are an upper bound and were not measured on the GPU,
-which stays untouched until the manager releases it.
-
-## Standing practices
-
-- **Followed:** cleaned data in training and scoring; the D15 and D18 start cut; model saved to the
-  private data folder; reuse of experiment 507's generator, loaders, and lab lagless table; the
-  unlogged-event caveat; PR opened as a draft.
-- **Not applicable:** monthly refit and the forecast-score practices (no forecast is scored), the
-  climatology row, plots of forecasts.
-- **Advice from earlier results followed.** Experiment 507's advice to score a repair on rows whose
-  lag positions a shift touches (split into temporary and genuine) is followed for the lag error.
-  Its advice to run the noise curve before building the encoder is **not** followed: the manager
-  withheld the noise curve for this experiment.
-
-## Implementation details (deleted when this ships)
-
-- Scripts: `e00518_model.py` (encoder and losses), `e00518_data.py` (windows, split, worlds),
-  `e00518_score.py` (candidates and metrics), `e00518_fit.py` (commands `selftest`, `counts`,
-  `timing`, `fit`, `score`), and `run.sh`, which puts every earlier experiment folder on
-  `PYTHONPATH` and runs under `MemoryMax=8G`.
-- The scripts import experiment 507's `e00507_common`, `e00507_generator`, and `e00507_lagless`
-  (and, through them, experiments 87, 397, 402, 404, 418, 428, 435, and 449). Nothing from 507 is
-  edited.
-- Outputs go to `data/ml-experiments/00518-history-encoder-first-fit-stage-0-time-and-accuracy/`:
-  `fit_log.csv`, `fit_summary.json`, `models/h_stage0_2026-01_seed0.pt`, `t1_score.json`.
+Whether a longer fit with several seeds, a larger validation block, a lower learning rate, and a
+flag threshold chosen on validation reaches the thresholds. The neural Discuss session decides
+whether that fit is worth its cost.

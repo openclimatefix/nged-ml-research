@@ -75,7 +75,7 @@ class Context:
     weights: np.ndarray
 
 
-def build_context(*, month: str = MONTH) -> Context:
+def build_context(*, month: str = MONTH, validation_days: int = data.VALIDATION_DAYS) -> Context:
     """Load the private data for the fold: readings, ERA5 lab median, labelled events, the split."""
     import calendar
 
@@ -104,7 +104,12 @@ def build_context(*, month: str = MONTH) -> Context:
     year, mon = (int(x) for x in month.split("-"))
     half_hours = calendar.monthrange(year, mon)[1] * gen.STEPS_PER_DAY
     candidates = data.candidate_windows(spec=spec, med=med, labelled=labelled, first_history=first)
-    split = data.split_by_time(windows=candidates, refit=refit, month_half_hours=half_hours)
+    split = data.split_by_time(
+        windows=candidates,
+        refit=refit,
+        month_half_hours=half_hours,
+        validation_days=validation_days,
+    )
     return Context(
         spec=spec,
         med=med,
@@ -182,6 +187,10 @@ def fit(  # noqa: PLR0915
     limit: float = ABORT_SECONDS,
     seed: int = 0,
     emit: Callable[[str], None] = print,
+    lr: float = LEARNING_RATE,
+    patience: int = PATIENCE,
+    validation_worlds: tuple[int, ...] = VALIDATION_WORLDS,
+    tag: str = "stage0",
 ) -> dict[str, float | int | str]:
     """Train H; return a summary. Raises `RuntimeError` if the abort rule fires.
 
@@ -192,7 +201,7 @@ def fit(  # noqa: PLR0915
     """
     torch.manual_seed(seed)
     net = model.HistoryEncoder().to(device)
-    optimiser = torch.optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    optimiser = torch.optim.Adam(net.parameters(), lr=lr)
     val_parts = [
         data.arrays_of(
             spec=ctx.spec,
@@ -200,7 +209,7 @@ def fit(  # noqa: PLR0915
             med=ctx.med,
             windows=ctx.split.validation,
         )
-        for w in VALIDATION_WORLDS
+        for w in validation_worlds
     ]
     val = to_tensors(
         arrays=data.Arrays(
@@ -224,7 +233,7 @@ def fit(  # noqa: PLR0915
             weights=ctx.weights,
             epoch=epoch,
             size=epoch_windows,
-            base_seed=TRAIN_SEED_BASE,
+            base_seed=TRAIN_SEED_BASE + 1000 * seed,
         )
         return arrays, time.monotonic() - started
 
@@ -235,7 +244,7 @@ def fit(  # noqa: PLR0915
     first_epoch_seconds = 0.0
     if out_dir is not None:
         (out_dir / "models").mkdir(parents=True, exist_ok=True)
-    target = None if out_dir is None else out_dir / "models" / f"h_stage0_{MONTH}_seed0.pt"
+    target = None if out_dir is None else out_dir / "models" / f"h_{tag}_{MONTH}_seed{seed}.pt"
     with ThreadPoolExecutor(max_workers=1) as feeder:
         pending = feeder.submit(make, 0)
         for epoch in range(max_epochs):
@@ -278,7 +287,7 @@ def fit(  # noqa: PLR0915
                     torch.save(net.state_dict(), target.with_suffix(".tmp"))
                     target.with_suffix(".tmp").replace(target)
             if out_dir is not None:
-                pl.DataFrame(rows).write_csv(out_dir / "fit_log.csv")
+                pl.DataFrame(rows).write_csv(out_dir / f"fit_log_{tag}_seed{seed}.csv")
             # The first epoch holds start-up; extrapolate from the later epochs only.
             reason = should_abort(
                 elapsed=elapsed if epoch < 3 else elapsed - first_epoch_seconds,
@@ -289,7 +298,7 @@ def fit(  # noqa: PLR0915
             if reason is not None:
                 aborted = reason
                 break
-            if epoch + 1 >= MIN_EPOCHS and epoch + 1 - best_epoch >= PATIENCE:
+            if epoch + 1 >= MIN_EPOCHS and epoch + 1 - best_epoch >= patience:
                 break
     summary: dict[str, float | int | str] = {
         "epochs": len(rows),
@@ -301,7 +310,7 @@ def fit(  # noqa: PLR0915
         "aborted": aborted,
     }
     if out_dir is not None:
-        (out_dir / "fit_summary.json").write_text(json.dumps(summary, indent=2))
+        (out_dir / f"fit_summary_{tag}_seed{seed}.json").write_text(json.dumps(summary, indent=2))
     if aborted:
         raise RuntimeError(f"fit aborted: {aborted}")
     return summary
@@ -324,11 +333,27 @@ def predict(
 Predictor = Callable[[data.Arrays], tuple[np.ndarray, np.ndarray]]
 
 
+def empty_events(*, spec: gen.Spec) -> gen.Events:
+    """Return a world with no events, so a window holds only the real reading."""
+    shape = (spec.real.shape[0], spec.days, gen.SLOTS)
+    like = gen.sample_world(spec=spec, seed=0)
+    return gen.Events(
+        family=np.zeros(shape, dtype=np.int8),
+        start=np.zeros_like(like.start),
+        end=np.zeros_like(like.end),
+        size=np.zeros(shape, dtype=np.float32),
+        source=np.full(shape, -1, dtype=np.int16),
+        ramp=np.zeros(shape, dtype=np.int16),
+        stair=np.zeros(shape, dtype=np.int16),
+    )
+
+
 def score(  # noqa: PLR0915
     *,
     ctx: Context,
     predictor: Predictor,
     worlds: tuple[int, ...] = TEST_WORLDS,
+    threshold: float = sc.THRESHOLD,
 ) -> dict[str, Any]:
     """Score a predictor on the test windows of held-out worlds, and on real windows.
 
@@ -344,11 +369,18 @@ def score(  # noqa: PLR0915
         arrays = data.arrays_of(spec=ctx.spec, ev=ev, med=ctx.med, windows=windows)
         level, genuine_logit = predictor(arrays)
         events = sc.true_events(ev=ev, p=windows.primary, d=windows.day, step_true=arrays.step_true)
-        scored = sc.score_events(level=level, events=events, step_true=arrays.step_true)
+        scored = sc.score_events(
+            level=level, events=events, step_true=arrays.step_true, threshold=threshold
+        )
         event_parts.append(scored.with_columns(pl.lit(w).alias("world")))
         sweep_inputs.append((level, events, arrays.step_true))
         ceiling_parts.append(
-            sc.score_events(level=arrays.step_true, events=events, step_true=arrays.step_true)
+            sc.score_events(
+                level=arrays.step_true,
+                events=events,
+                step_true=arrays.step_true,
+                threshold=threshold,
+            )
         )
         lag = sc.lag_errors(level=level, step_true=arrays.step_true, valid=arrays.valid)
         lag_parts.append(
@@ -365,21 +397,13 @@ def score(  # noqa: PLR0915
     )
     ceiling = pl.concat(ceiling_parts).with_columns(events["group"])
     lag = pl.concat(lag_parts)
-    empty = gen.Events(
-        family=np.zeros((ctx.spec.real.shape[0], ctx.spec.days, gen.SLOTS), dtype=np.int8),
-        start=np.zeros_like(gen.sample_world(spec=ctx.spec, seed=0).start),
-        end=np.zeros_like(gen.sample_world(spec=ctx.spec, seed=0).end),
-        size=np.zeros((ctx.spec.real.shape[0], ctx.spec.days, gen.SLOTS), dtype=np.float32),
-        source=np.full((ctx.spec.real.shape[0], ctx.spec.days, gen.SLOTS), -1, dtype=np.int16),
-        ramp=np.zeros((ctx.spec.real.shape[0], ctx.spec.days, gen.SLOTS), dtype=np.int16),
-        stair=np.zeros((ctx.spec.real.shape[0], ctx.spec.days, gen.SLOTS), dtype=np.int16),
-    )
+    empty = empty_events(spec=ctx.spec)
     real = data.arrays_of(spec=ctx.spec, ev=empty, med=ctx.med, windows=windows)
     real_level, _ = predictor(real)
-    real_flag = sc.flagged(level=real_level)
+    real_flag = sc.flagged(level=real_level, threshold=threshold)
     val_windows = ctx.split.validation
     val_real = data.arrays_of(spec=ctx.spec, ev=empty, med=ctx.med, windows=val_windows)
-    val_flag = sc.flagged(level=predictor(val_real)[0])
+    val_flag = sc.flagged(level=predictor(val_real)[0], threshold=threshold)
     val_groups = ctx.groups[val_windows.primary]
     result: dict[str, Any] = {}
     genuine_all = np.concatenate([a for a, _ in auc_parts])
@@ -466,10 +490,12 @@ def score(  # noqa: PLR0915
     return result
 
 
-def load_net(*, out_dir: Path, device: str) -> model.HistoryEncoder:
+def load_net(
+    *, out_dir: Path, device: str, tag: str = "stage0", seed: int = 0
+) -> model.HistoryEncoder:
     """Load the saved best H."""
     net = model.HistoryEncoder().to(device)
-    net.load_state_dict(torch.load(out_dir / "models" / f"h_stage0_{MONTH}_seed0.pt"))
+    net.load_state_dict(torch.load(out_dir / "models" / f"h_{tag}_{MONTH}_seed{seed}.pt"))
     return net
 
 
@@ -707,7 +733,7 @@ def selftest() -> None:  # noqa: PLR0915
     summary = fit(
         ctx=ctx, device="cpu", out_dir=tmp, max_epochs=2, epoch_windows=256, emit=lambda _: None
     )
-    log = pl.read_csv(tmp / "fit_log.csv")
+    log = pl.read_csv(tmp / "fit_log_stage0_seed0.csv")
     assert log.height == 2
     assert {"val_l_u", "gen_seconds", "feeder_wait_seconds"} <= set(log.columns)
     assert (tmp / "models" / f"h_stage0_{MONTH}_seed0.pt").exists()
