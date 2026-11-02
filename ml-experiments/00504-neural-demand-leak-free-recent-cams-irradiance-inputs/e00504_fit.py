@@ -39,6 +39,7 @@ import e00425_fit as fit425  # ty: ignore[unresolved-import]
 import e00425_prep as prep425  # ty: ignore[unresolved-import]
 import e00504_cams as cams_mod  # ty: ignore[unresolved-import]
 import numpy as np
+import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -204,7 +205,7 @@ def forecast(
     month: str,
     device: str,
     mode: str,
-) -> object:
+) -> pl.DataFrame:
     """Return the month's raw quantiles from experiment 397's forecast step with CAMS columns.
 
     `mode` is `normal` (the arm's columns from the leak-free or realised rule), `mean` (the CAMS
@@ -250,7 +251,7 @@ def forecast(
         )
         q, _ = fit397.forecast_month(
             fits={None: fitted},
-            fold=stand,
+            fold=stand,  # ty: ignore[invalid-argument-type]
             scheme="summary",
             month=month,
             device=device,  # ty: ignore[invalid-argument-type]

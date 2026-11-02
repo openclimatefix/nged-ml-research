@@ -106,7 +106,7 @@ def configure(*, comparison: str) -> None:
         frame = original_context(month=month, sites=sites, ctx=ctx).filter(
             pl.col("valid_time") < JULY
         )
-        assert frame["valid_time"].max() < JULY
+        assert frame["valid_time"].max() < JULY  # ty: ignore[unsupported-operator]
         return frame
 
     score470.slice_filter = slice_filter  # ty: ignore[invalid-assignment]
@@ -136,7 +136,7 @@ def configure(*, comparison: str) -> None:
     )
 
 
-def cams_for(*, row: dict) -> object:
+def cams_for(*, row: dict) -> cams_mod.SiteCams:
     """Return a Primary's CAMS arrays (for the report script)."""
     return cams_mod.site_cams(
         site=row["site"], latitude=float(row["latitude"]), longitude=float(row["longitude"])

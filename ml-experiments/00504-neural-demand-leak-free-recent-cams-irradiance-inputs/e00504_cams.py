@@ -121,6 +121,15 @@ def extra_columns(
 ) -> np.ndarray:
     """Return the five raw CAMS columns (`COLUMNS` order), float32, for rows of (origin, valid).
 
+    Args:
+        cams: The Primary's CAMS arrays.
+        origin_us: Forecast origin of each row, microseconds since the epoch.
+        valid_us: Valid time (half-hour end stamp) of each row, microseconds since the epoch.
+        stale_days: Days to move the leak-free day earlier (the one-day-earlier check).
+
+    Returns:
+        An array of shape (rows, 5).
+
     Raises:
         ValueError: A needed CAMS value lies outside the table.
     """

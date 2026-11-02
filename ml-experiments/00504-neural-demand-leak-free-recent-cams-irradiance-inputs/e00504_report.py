@@ -99,7 +99,7 @@ def contrasts(*, table: pl.DataFrame) -> pl.DataFrame:
             records.append(
                 {
                     "slice": name, "arm": arm, "rows": part.height,
-                    "k3_crps": float(part["K3__crps"].mean()),
+                    "k3_crps": float(part["K3__crps"].mean()),  # ty: ignore[invalid-argument-type]
                     "difference": result["difference"], "low": result["low"], "high": result["high"],
                 }
             )  # fmt: skip
