@@ -383,7 +383,8 @@ def train(
     """Train with weighted NLL and early stopping (experiment 428's loop for a lag-free arm).
 
     The Beta prior of the outlier weight enters the training loss only (once per row, a per-row
-    regulariser); the early-stopping validation scores the served three main components alone. Returns the epoch count and the best validation NLL.
+    regulariser); the early-stopping validation scores the served three main components alone.
+    Returns the epoch count and the best validation NLL.
     """
     torch.manual_seed(seed)
     train_idx = torch.nonzero(~is_val).squeeze(1)
