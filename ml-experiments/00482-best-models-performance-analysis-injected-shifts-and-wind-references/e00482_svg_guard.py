@@ -25,15 +25,13 @@ def invisible_mark_count(*, svg_path: Path) -> int:
     Returns:
         The number of elements drawn in the background colour.
     """
+    root = ElementTree.parse(svg_path).getroot()
+    canvas = {id(child) for child in root if child.tag.rpartition("}")[2] in {"rect", "path"}}
     count = 0
-    for element in ElementTree.parse(svg_path).iter():
-        tag = element.tag.rpartition("}")[2]
-        is_background = (
-            tag == "rect"
-            or "background" in element.get("class", "")
-            or element.get("d", "").startswith("M0 0h")
-        )
-        if is_background:
+    for element in root.iter():
+        is_canvas = id(element) in canvas and element.get("class") is None
+        is_plot_background = "background" in element.get("class", "").split()
+        if is_canvas or is_plot_background:
             continue
         colours = (element.get("stroke", ""), element.get("fill", ""))
         count += any(colour.lower() == _BACKGROUND_COLOUR for colour in colours)
