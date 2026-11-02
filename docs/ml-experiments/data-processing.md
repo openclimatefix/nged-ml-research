@@ -497,6 +497,20 @@ physical clear-sky index, all at elevations of 14 to 16 degrees
 change when rows under 17 degrees were dropped. The confidence is moderate, and the entry is
 provisional until the experiment has had its reviews.
 
+**Build a clear-sky index from satellite irradiance with a floor on the clear-sky value and a cap
+at 1.5 (medium confidence, provisional).** The ratio of the CAMS irradiance of a half-hour to the
+Haurwitz clear-sky irradiance reached 10.9 near sunrise and sunset, so the index is set to 0 where
+the clear-sky irradiance is below 1 W/m2 and capped at 1.5. Applies to experiments and production.
+Evidence: [experiment
+480](00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md), where the two
+columns lowered the CRPS at all 16 Primaries in lab conditions.
+
+**Treat satellite irradiance as unavailable for the first day of lead (high confidence).** The CAMS
+radiation service publishes with about a 1-day delay, so a column built from it can describe lag
+times older than a day and not the first day ahead. Applies to experiments and production.
+Evidence: [experiment
+480](00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md).
+
 ## Wind farms
 
 **Do not compute air density from the ECMWF ensemble's surface pressure for a model trained on ERA5

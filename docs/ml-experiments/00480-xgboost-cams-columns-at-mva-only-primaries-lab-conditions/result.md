@@ -8,7 +8,7 @@ theme: demand-inputs
 also_relevant_to:
   - solar-disaggregation
   - weather-products-and-blending
-status: planned
+status: finished
 kind: other
 protocol: demand-v1
 size: >-
@@ -62,112 +62,200 @@ metric: >-
   median, and twCRPS, in points of effective capacity, from `studies.eval_protocol`; leads 0.5 to
   336 hours; headline band days 1 to 10.
 code: ml-experiments/00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/
+verdict: supported
+best_arm: >-
+  A1 (monthly XGBoost model plus the CAMS unit PV shape and clear-sky index) minus A0: -0.355
+  points of CRPS at days 1 to 10 over the eight MVA-only Primaries (99.67% interval -0.497 to
+  -0.228)
+headline: >-
+  Two columns of realised CAMS irradiance lowered the CRPS at all 16 Primaries: -0.355 over the
+  eight MVA-only Primaries, -0.476 over the six signed-MW Primaries, and -0.769 at D12. The gain
+  sits on sunny half-hours and grows with lead, which is what realised weather in place of a
+  forecast would do.
+lessons: >-
+  The gain is an upper bound on what a forecast irradiance could give, because the columns hold
+  realised irradiance at every lead. The columns did not lower the avoidable curtailment cost at
+  the 0.9 limit at the signed-MW six, so a better mean score did not carry over to the tail cost.
+take_home_message: >-
+  Giving the XGBoost demand model the satellite-measured sunshine of each half-hour lowered its
+  error at every one of 16 Primary substations, by 0.36 points of capacity on average at the eight
+  that report apparent power and by 0.48 at the six that report real power. The gain is real only
+  for inputs a live service can have: the satellite data arrives about a day late, so it can
+  describe past days and not the first day ahead, and the gain is an upper bound on what the
+  weather forecast could give. The next step is to measure how much of the gain a forecast
+  irradiance keeps.
+advice:
+  - >-
+    Port the CAMS unit PV shape and clear-sky index for lag-time use only (data at least a day
+    old), not for the first day of lead (C1).
+  - >-
+    Treat the 0.355-point gain as an upper bound when planning forecast-weather experiments,
+    because the columns hold realised irradiance at every lead (C1, lead bands).
+  - >-
+    Cap the clear-sky index at 1.5 and set it to 0 where the Haurwitz clear-sky irradiance is
+    below 1 W/m2, because the ratio reaches 10.9 near sunrise and sunset (design).
+  - >-
+    Score a gain from irradiance columns on avoidable curtailment cost as well as CRPS, because
+    the gain at the 0.9 limit was absent at the signed-MW six (curtailment table).
+production_status: candidate
+adopted_in: none
 ---
 
-**Status: planned.** This page is the pre-registered plan; the write-up replaces it when the fits
-finish. Nothing here has been scored yet.
+**Take-home.** Giving the monthly XGBoost demand model the satellite-measured sunshine of each
+half-hour lowered its error at all 16 Primaries. The gain was 0.36 points of capacity over the eight
+Primaries that report apparent power (MVA) and 0.48 over the six that report real power (MW). The
+gain is an upper bound on what a live service can have: the columns hold realised irradiance at
+every lead, and the satellite data arrives about a day late, so only data at least a day old can
+feed the model. The next experiment should replace the realised columns with columns built from the
+ensemble's forecast irradiance and measure how much of the gain remains.
 
-We ask whether a monthly XGBoost demand model forecasts better when each half-hour carries two
-extra columns computed from the irradiance that satellites measured, rather than what the weather
-model forecast. The eight Primaries in the test report apparent power in MVA, which hides reverse
-flow from embedded solar panels, so the model has no direct view of how much solar a half-hour
-held. We refit the model monthly with and without the two columns on the same rows, and compare
-the CRPS of the forecasts at days 1 to 10. This is "lab" conditions: the columns use realised
-irradiance, which a live service cannot have for the first day of lead.
+## What was asked and what happened
 
-## Scope: stage 1 only
+We asked whether two extra input columns, computed from the irradiance that a satellite measured in
+each half-hour, lower the error of the monthly XGBoost demand forecast. The two columns are the
+output of a generic south-facing solar fleet under that irradiance, and the ratio of the irradiance
+to its clear-sky value. We refitted the model monthly for 12 months with and without the columns
+(arms A1 and A0), on the same rows, and compared the continuous ranked probability score (CRPS) at
+days 1 to 10 ahead, in points of capacity (negative favours A1).
 
-**This experiment is stage 1 of the brief `xgboost_mva_signed_label_cams_brief`: arms A0 and A1.**
-The queue-order check of 2026-11-01 found that the rest of the brief repeats stored work: the
-reverse-flow rule and its placebos (experiment 366), the GAM's rule-chosen fits (experiments 372
-and 374), the folded XGBoost loss (experiment 387, whose sign followed the start tilt at 68% to 98%
-of sunny middays), the fold's effect on the CRPS gap (experiment 393), and the neural network's
-export gate at D8 and D12 (experiments 420 and 424). The one open piece is whether the two CAMS
-columns alone, with no sign label, help the XGBoost model at the eight. The known-answer test (level
-2.0, then 1.0) and the A2 arms (sign label with a threshold of 0.7 and 0.5, the switched-off arm,
-and the shuffled arm) are queued behind this stage and are not started. If A1 shows no gain they
-do not start without the maintainer's word.
+A1 was better at every group and every Primary, and the gain was far larger than the 0.03 to 0.10
+points predicted. The gain sits on sunny half-hours and grows with lead, which is what realised
+weather in place of a forecast would give. This is stage 1 of a larger brief. The known-answer test
+and the sign-label arms (A2) were not started, and they do not start unless the maintainer asks,
+because A1 shows the gain comes from the columns alone and needs no sign label.
 
-## Design
+## Figures
 
-- **Arms.** A0 is `monthly/control` of experiment 381 refitted fresh: the recipe of experiment 87's
-  `n1h` configuration (the BG2 monthly member), 500 rounds, eta 0.05, depth 6, seed 0, built-in
-  `reg:quantileerror` at 11 levels, whole-history rows with a 0.5-year half-life, 51 members mixed
-  at prediction time. A1 is A0 plus two columns.
-- **The two columns.** For each half-hour ending at `valid_time`: `cams_unit_pv_shape`, the unit PV
-  output of the generic south-facing fleet from `studies.dp_features.unit_pv_shape`, and
-  `cams_clear_sky_index`, the CAMS global horizontal irradiance of that half-hour (the hour's
-  value spread over its two half-hours by the cosine of the zenith, `studies.pv_physics.half_hour_sun_and_sky`)
-  divided by the Haurwitz clear-sky irradiance at the half-hour's midpoint, set to 0 where the
-  clear-sky irradiance is below 1 W/m2 and capped at 1.5 (near sunrise and sunset the ratio of two
-  small irradiances is unbounded; the uncapped maximum was 10.9). Both are the half-hour's own realised values and are the
-  same for every ensemble member, and they enter training rows, prediction rows, and nothing else.
-- **CAMS source and delay.** The CAMS radiation service's satellite retrieval at each site's
-  coordinates (`CAMS_PATH` in `studies.dp_features`, hourly, 2019-09 to 2026-09). The service
-  publishes with about a 1-day delay, so the columns are unavailable at forecast time for any valid
-  time in the first day of lead and are available for lag times older than about 1 day.
-- **Rows and series.** The 16 Primaries, `fold_a_daily_gap_v1`, scored on the shared half-hours of
-  every arm (`metrics.shared_slice_table`, one row set for A0 and A1). Fitted at all 16: the eight
-  MVA-only Primaries carry the confirmatory contrast, and the other eight are the no-harm group.
-  D5, D12, D15, and D18 are marked in the tables (D12 is a reverse-flow Primary; D5 is the hard
-  case for the reverse-flow rule; D15 and D18 are the short-history Primaries).
-- **Standing practices followed.** Monthly refits, no weekly. Cleaned data: training rows and lags
-  come from experiment 87's `observed.parquet` (flagged half-hours are nulls and drop out of the
-  training rows), and the number of flagged half-hours in the scored set is printed. The noisy start
-  of D15 and D18 is cut: the power series of both are set to missing before 2025-03-01, so training
-  rows and lag inputs omit them; this differs from experiment 381, so A0 is refitted at these two
-  Primaries rather than read from the store. Fitted boosters are saved as `.ubj` in the experiment's
-  data folder. Reviews: a fresh Sonnet agent reviews the code before the first fit, another checks
-  the results, and two review the write-up.
-- **Compute.** CPU only, 3 threads, `MemoryMax=16G`, no GPU (experiment 381's stored control used the
-  GPU, so A0 is refitted on CPU to give the contrast the same device on both arms). The fit count is
-  384: A0 and A1 at 16 Primaries and 12 refits (192 fits each). The queue-order check priced the stage
-  at about 288 fits (eight Primaries for A0 and A1, and A1 alone at the other eight); the extra 96 are
-  A0 at the other eight, needed because the stored control was fitted on the GPU and without the
-  D15 and D18 cut.
-- **Stored forecasts reused.** Experiment 381's stored `monthly/control` is a reference and a code
-  check, not a comparator for the contrast. Experiment 377's stack, `manual_heuristic`, `climatology`,
-  and BG2 are read from the stores as references.
+![A1 minus A0 at each group and Primary](headline.svg)
 
-## Pre-registered checks
+![A1 minus A0 by lead band](lead_bands.svg)
 
-1. **Code check.** A0 at D5 and D12 matches experiment 381's stored `monthly/control` within 0.05
-   points of CRPS at days 1 to 10. A larger gap is reported as a device or seed effect and the
-   contrast is read against the fresh A0 only.
-2. **Minimum detectable effect.** `e00480_mde.py` computes the half-width of the 99.67% interval of
-   experiment 381's stored `solar` arm minus its `control` arm over the eight, and over D12 alone,
-   before any A0 or A1 score is read; the result is written to this page in its own commit. A C1
-   point estimate smaller in size than that half-width cannot be told from zero.
-3. **Row hygiene.** All tables use "rows with no labelled event" for rows outside NGED's hand
-   labels, because NGED's event labels are incomplete: clean rows may hold unlabelled events and
-   event counts are lower bounds.
-4. **Tails.** q01, q05, q95, and q99 coverage and pinball loss, per group and per Primary, beside
-   CRPS and twCRPS, and the avoidable-curtailment cost in the three row sets (during a labelled
-   event, in the 7 days after one, and across all rows).
-5. **Sunny half-hours three ways:** realised `sunny_clear_sky_index`, the CAMS index at or above
-   0.7, and `sunny_unit_shape`. D12's bias on sunny half-hours is reported by lead band for A0 and
-   A1, because experiment 381's bias of -4.92 points at D12 is mostly selection on realised sunshine.
-6. **Six and eight apart.** The six signed-MW Primaries and the eight MVA-only Primaries are
-   reported separately, with and without D8 in the MVA-only group, and never pooled into one figure.
+![A1 minus A0 on sunny half-hours and on other slices](slices.svg)
 
-## Minimum detectable effect (computed before any A0 or A1 score)
+![Day-ahead forecasts at D12](example_day_ahead.svg)
 
-- **Eight MVA-only Primaries:** the 99.67% interval of experiment 381's `solar` arm minus its
-  `control` arm is -0.016 (-0.046 to +0.017) points, so the half-width is 0.032 points. A C1 point
-  estimate smaller than 0.032 points in size cannot be told from zero.
-- **D12 alone:** -0.060 (-0.170 to +0.040), a half-width of 0.105 points.
-- **Prediction P1** (0.03 to 0.10 points) therefore starts at the edge of what the eight can resolve.
+![Full 14-day forecasts at D12](example_14_day.svg)
 
-## Known failures and risks
+## Results
 
-- **Reactive power.** The reverse-flow rule of experiment 366 holds only for reactive power zero. At
-  a power factor of 0.97 it fails (0 of 5 Primaries in experiment 366). Stage 1 uses no sign label, so
-  the failure does not reach A0 or A1, and the queued A2 arms inherit it.
-- **Lab conditions.** The columns hold realised irradiance. A gain is an upper bound on what the
-  forecast irradiance can deliver and does not carry to a live service at the first day of lead.
-- **Solar attribution.** The columns assume that irradiance explains the embedded generation at each
-  Primary. Where other generators sit behind the meter, the columns carry nothing for them.
+- **Arms.** A0 is experiment 381's monthly control (experiment 87's `n1h` recipe: 500 rounds, eta
+  0.05, depth 6, 0.5-year half-life, 51 members mixed) refitted on CPU. A1 is A0 plus
+  `cams_unit_pv_shape` and `cams_clear_sky_index`. Cadence: monthly refits, 12 refits from
+  2025-07-01 to 2026-06-01, 384 fits in 8.6 hours on 12 threads. Code:
+  `ml-experiments/00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/`, which imports
+  the folders of experiments 87, 377, and 381.
+- **Weather source at lag times.** CAMS radiation service satellite retrieval at each Primary's
+  coordinates, hourly. CAMS publishes with about a 1-day delay, so the columns are unavailable at
+  forecast time for the first day of lead. In this experiment they hold the half-hour's own realised
+  value at every lead, so every figure here is a lab-condition upper bound.
+- **Row set.** `fold_a_daily_gap_v1`, 4,012,330 shared half-hours at the 16 Primaries (core set of
+  A0, A1, and experiment 381's stored control). Scored half-hours with a missing actual: 0. The
+  noisy start of D15 and D18 (before 2025-03-01) is cut from training rows and lags. D5, D12, D15,
+  and D18 are marked in the tables.
+- **Minimum detectable effect, computed before any score.** 0.032 points at the eight and 0.105
+  points at D12, from experiment 381's `solar` arm minus its `control` arm. C1 is about 11 times
+  that value.
+- **Code check.** A0 minus experiment 381's stored GPU control: +0.001 (-0.003 to +0.005) at D5 and
+  +0.006 (-0.010 to +0.036) at D12, inside the 0.05 limit.
 
-## What the next experiment should answer
+| Contrast (A1 minus A0), CRPS days 1 to 10 | Estimate | Interval |
+|---|---|---|
+| C1, MVA-only eight | -0.355 | 99.67%: -0.497 to -0.228 |
+| MVA-only seven (no D8) | -0.386 | 99.67%: -0.543 to -0.241 |
+| Signed-MW six | -0.476 | 99.67%: -0.627 to -0.316 |
+| D15 and D18 | -0.313 | 99.67%: -0.429 to -0.201 |
+| D12 | -0.769 | 99.67%: -1.180 to -0.406 |
+| D8 | -0.138 | 99.67%: -0.220 to -0.058 |
 
-To be written with the results.
+- **Per Primary (95%).** All 16 point estimates are negative, from -0.053 at D4 to -0.843 at D5. 15
+  of 16 intervals lie wholly below zero. D15 is the exception, -0.149 (-0.305 to +0.018). No Primary
+  is worse than +0.05.
+- **Absolute CRPS (days 1 to 10).** A0 and A1 per Primary are in `scores/scores.parquet` in the data
+  folder. At D12: A0 6.82, A1 6.05, stack 7.52, BG2 6.75, `manual_heuristic` 7.92, `climatology`
+  8.83. At D5: A0 3.89, A1 3.05, stack 4.08, BG2 3.94. A1 is below `manual_heuristic` and
+  `climatology` at all 14 Primaries of the signed-MW and MVA-only groups, and at D12 and D5 it is
+  below BG2.
+- **Lead bands.** The gain at the eight grows from -0.24 at day 1 to -0.42 at days 8 to 10 and stays
+  level through days 11 to 14. At the signed-MW six it grows from -0.32 to -0.57.
+- **Slices.** Sunny half-hours (unit shape): -0.97 (-1.41 to -0.61) at the eight and -1.33 (-1.77 to
+  -0.96) at the six. CAMS index at least 0.7: -0.63 at the eight and -0.88 at the six. Winter
+  nights, cold nights, and Economy 7 step hours move by under 0.02 points. Rows in the 7 days after
+  a labelled event: -0.37 (-0.73 to -0.17) at the eight. Rows during a labelled event: -0.28 (-0.65
+  to +0.05). These counts are lower bounds, because NGED's event labels are incomplete: rows with no
+  labelled event may hold unlabelled events.
+- **D12 bias on sunny half-hours (median minus actual, points, unit-shape slice).** A0 -4.89, A1
+  +2.09 over days 1 to 10. A0 runs from -2.10 at day 1 to -6.34 at days 8 to 10, and A1 stays
+  between +1.87 and +2.37. The columns remove the under-forecast and slightly overshoot. At D8 the
+  bias falls from +9.97 to +7.90.
+
+| Tails, mean over each group (days 1 to 10) | A0 MVA-only | A1 MVA-only | A0 signed-MW | A1 signed-MW |
+|---|---|---|---|---|
+| Coverage q01 (nominal 0.01) | 0.0126 | 0.0124 | 0.0074 | 0.0070 |
+| Coverage q05 (0.05) | 0.069 | 0.072 | 0.052 | 0.055 |
+| Coverage q95 (0.95) | 0.933 | 0.936 | 0.909 | 0.913 |
+| Coverage q99 (0.99) | 0.991 | 0.991 | 0.980 | 0.981 |
+| Pinball q01 | 0.248 | 0.242 | 0.249 | 0.240 |
+| Pinball q05 | 0.883 | 0.829 | 0.674 | 0.600 |
+| Pinball q95 | 0.975 | 0.903 | 0.947 | 0.844 |
+| Pinball q99 | 0.332 | 0.326 | 0.385 | 0.378 |
+| twCRPS | 0.201 | 0.191 | 0.386 | 0.380 |
+
+- **Tails.** The upper tail improves most (pinball q95 -0.07 at the eight and -0.10 at the six).
+  Coverage moves by under 0.005 and stays at the same side of nominal as A0.
+- **Avoidable curtailment cost, signed-MW six, scored year, pounds (as
+  `metrics.avoidable_curtailment_cost` defines it).** At the 0.9 limit, the headline: A1 is lower
+  than A0 at D10 (28,733 against 29,036), D11 (201,909 against 213,752), and D5 (426,074 against
+  427,491), and higher at D14 (2.217 million against 2.177 million), D16 (7.465 million against
+  7.446 million), and D9 (169,524 against 166,786). The stack is lower than both at D10, D11, D14,
+  D16, and D9. At the 0.5 limit A1 is lower than A0 at all six Primaries (for example D16, 24.3
+  million against 25.2 million). The two row sets "during a labelled event" and "in the 7 days after
+  one" could not be scored: the function needs a perfect-forecast arm that is empty on those rows.
+  The better CRPS did not carry over to the cost at the 0.9 limit.
+- **Which of the pre-registered rules held.** C1's interval lies wholly below zero and no Primary is
+  worse than +0.05, so the port rule is met for the two columns, limited to lag-time use. The
+  no-harm contrasts at the signed-MW six and at D15 and D18 have upper bounds at -0.316 and -0.201,
+  below +0.05. The A2 stop rules were not tested.
+- **Predictions.** P1 (0.03 to 0.10 points at the eight) failed on size: -0.355. P2 (largest at D12
+  and D8) held for D12 only; D8 is among the smaller gains and D5 is the largest overall. P3 (gain
+  concentrated in days 1 to 3) failed: the gain grows with lead. P4 (under 0.03 at the other eight)
+  failed: the signed-MW six gain -0.476.
+
+## Checks
+
+- **Median minus mean forecast per Primary (MW, mean of the quantile-based mean estimate).** All 16
+  are between -0.093 and +0.004 in A0 and between -0.089 and +0.004 in A1, so the spread does not
+  shift the forecast. The gap is smaller in A1 at 13 of 16 Primaries.
+- **Error of the median beside the CRPS contrasts.** The median's mean absolute error is lower in A1
+  at all 16 Primaries (for example D5 6.76 to 5.11, D12 12.27 to 10.67), so audit trigger 3 did not
+  fire.
+- **Triggers fired.** Trigger 2 (a result contradicting its prediction) fired on size. The tested
+  explanation is that the columns hold realised irradiance in place of a forecast: the gain is 96%
+  within 08:00 to 16:00 UTC (peak -1.43 points at 12:00), under 0.015 points between 19:00 and
+  05:00, negative in all 12 scored months, and larger in the months of strongest sun. A fresh Sonnet
+  audit (report in the private `briefs/e480_audit_report.md`) rebuilt the CRPS from the stored
+  quantiles with its own code, matched all 16 per-Primary contrasts to within 0.0005, and found no
+  leakage in the CAMS join. The audit did not retrain, so a refit with the CAMS columns shuffled
+  across days at one Primary remains the stronger test. Trigger 4 did not fire: leaving out any one
+  Primary leaves the eight between -0.295 (without D12) and -0.398 (without D4), and the six between
+  -0.404 (without D5) and -0.503 (without D11), all intervals below zero. Trigger 5 did not fire:
+  the control A0 moved by under 0.01 against experiment 381's stored control. Trigger 7 is moot
+  because the A2 arms were not started.
+
+## Caveats and what to try next
+
+- **Lab conditions.** The gain is an upper bound. A live service has the realised satellite value
+  only for data at least about a day old.
+- **Mixed result at the tail cost.** The better CRPS at the signed-MW six did not lower the
+  avoidable curtailment cost at the 0.9 limit.
+- **D12 overshoot.** A1 over-forecasts sunny D12 half-hours by about 2 points at all leads, so the
+  correction overshoots.
+- **Not tested here.** Power factor 0.97 stays a known failure of the reverse-flow rule (experiment
+  366). The known-answer test and the A2 arms repeat work in experiments 366, 372, 374, 387, 393,
+  420, and 424 and are not started.
+- **Next.** Build the same two columns from the ensemble's forecast irradiance and from CAMS only
+  for lag times older than a day, and measure how much of the 0.355-point gain remains. A
+  day-shuffle refit of the CAMS columns at one Primary would test the mechanism directly.
+
+## Problems caused by the move
+
+None.
