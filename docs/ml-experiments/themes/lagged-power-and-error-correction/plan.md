@@ -17,7 +17,6 @@
 | 459 | Is the sum over a load-shift donor and its recipient Primaries unchanged by the event, so that a forecast of the group sum split by a slowly changing share could work? | High (load-shift Discuss session, 2026-11-01) | Nothing | Finished: refuted, see experiment 459 |
 | 458 | Can a weight per lead band, a prequential weight, or a shrunk level offset on the lagless forecast beat the fixed 50/50 mixture of the lagged and lagless forecasts (zero fits)? | High (neural Discuss session, 2026-11-01) | Nothing | Finished: not supported, see experiment 458 |
 | 462 | Can a lag network that sees the neighbours learn to follow a level change that no neighbour mirrors, when its training worlds contain genuine level changes with and without a mirror (row 4 of the experiment 404 review, G3)? | High (neural Discuss session, 2026-11-01) | Row 3 reported; NRA final list | Done (inconclusive by design: the optimal mirror gap is 0.054 to 0.075, below the seed noise; see experiment 462) |
-| 503 | Does training the XGBoost demand forecast with 10% of its power lags randomly missing, plus a rule that treats an exactly-zero, stuck, or implausibly distant lag as missing, shield the median from a dropout, a stuck reading, and a spike without losing accuracy on rows with no labelled event? | High (load-shift Discuss session, 2026-11-02) | Experiment 502's CUDA repeat of arm (a), shared | Planned |
 
 ## Planned experiments
 
