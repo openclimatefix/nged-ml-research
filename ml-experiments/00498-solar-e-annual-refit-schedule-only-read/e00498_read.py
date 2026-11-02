@@ -8,6 +8,7 @@ Contrast C3 is `g0_onepass` annual against `a2_member` quarterly (schedule and n
         uv run --no-sync python ml-experiments/00498-*/e00498_read.py
 """
 
+import sys
 from typing import Final
 
 import e00430_score as s430  # ty: ignore[unresolved-import]
@@ -28,6 +29,11 @@ ARMS: Final[dict[str, str]] = {
 }
 
 
+NEW_DIR: Final = common.DATA_DIR.parent / "00498-solar-e-annual-refit-schedule-only-read"
+"""Experiment 498's own folder: seeds 6 to 9 of `a2_member`, annual and the three later quarterly refits."""
+FIRST_QUARTER_END: Final = "2025-12-01"
+
+
 def folder(*, name: str):
     """Return the stored prediction folder of an arm (`annual_*` is 493's, `q_*` is 430's)."""
     if name.startswith("annual_"):
@@ -37,8 +43,18 @@ def folder(*, name: str):
 
 def load_seed(*, name: str, seed: int) -> pl.DataFrame:
     """Return one arm's rows for Solar E and one seed, finite quantiles only."""
-    files = sorted(folder(name=name).glob(f"s{seed}_*.parquet"))
-    frame = pl.concat([pl.read_parquet(f) for f in files]).filter(pl.col("time_series_id") == FARM)
+    if seed >= 6:
+        annual = pl.read_parquet(NEW_DIR / "predictions_annual" / "annual_a2_member" / f"s{seed}_2025-09.parquet")
+        if name == "annual_a2_member":
+            frame = annual
+        else:
+            later = [pl.read_parquet(f) for f in sorted((NEW_DIR / "predictions_quarterly" / "a2_member").glob(f"s{seed}_*.parquet"))]
+            first = annual.filter(pl.col("init_time") < pl.lit(FIRST_QUARTER_END).str.to_datetime(time_zone="UTC"))
+            frame = pl.concat([first.with_columns(arm=pl.lit("a2_member")), *later])
+        frame = frame.filter(pl.col("time_series_id") == FARM)
+    else:
+        files = sorted(folder(name=name).glob(f"s{seed}_*.parquet"))
+        frame = pl.concat([pl.read_parquet(f) for f in files]).filter(pl.col("time_series_id") == FARM)
     return frame.filter(pl.all_horizontal([pl.col(c).is_finite() for c in s430.QCOLS]))
 
 
@@ -81,15 +97,18 @@ def main() -> None:
     """Print the minimum detectable effect, the per-seed contrasts, and the breakdowns."""
     pl.Config.set_tbl_rows(60)
     pl.Config.set_tbl_cols(14)
-    seeds = common.SEEDS
-    raw = {(n, s): load_seed(name=ARMS[n], seed=s) for n in ARMS for s in seeds}
+    ten = len(sys.argv) > 1 and sys.argv[1] == "ten"
+    seeds = tuple(range(10)) if ten else common.SEEDS
+    arms = {k: v for k, v in ARMS.items() if not (ten and k == "annual_g0")}
+    print(f"SEEDS {len(seeds)}; arms {list(arms)}")
+    raw = {(n, s): load_seed(name=ARMS[n], seed=s) for n in arms for s in seeds}
 
     # Seed-averaged frames (six seeds), then all pairs on shared rows.
     avg = {
         n: s430.average_seeds(
             frame=pl.concat([raw[(n, s)] for s in seeds]), arm=n
         ).with_columns(time_series_id=pl.lit(FARM))
-        for n in ARMS
+        for n in arms
     }
     cut = s430.common_rows(frames=avg)
     rows = {n: score_rows(frame=f) for n, f in cut.items()}
@@ -99,7 +118,9 @@ def main() -> None:
 
     # Minimum detectable effect from per-seed paired contrasts (annual seed s against quarterly seed s).
     pairs = {"C2": ("annual_a2", "q_a2"), "C3": ("annual_g0", "q_a2")}
-    per_seed: dict[str, list[float]] = {"C2": [], "C3": []}
+    if ten:
+        del pairs["C3"]
+    per_seed: dict[str, list[float]] = {k: [] for k in pairs}
     for cid, (na, nb) in pairs.items():
         for s in seeds:
             a, b = paired(a=raw[(na, s)], b=raw[(nb, s)])
@@ -110,11 +131,11 @@ def main() -> None:
     for cid, vals in per_seed.items():
         sd = float(np.std(vals, ddof=1))
         mde = 1.96 * sd / np.sqrt(len(vals))
-        print(cid, [f"{v:+.2f}" for v in vals], f"mean {np.mean(vals):+.3f} sd {sd:.3f} min {min(vals):+.2f} max {max(vals):+.2f}  MDE (1.96 sd/sqrt 6) {mde:.3f}%")
+        print(cid, [f"{v:+.2f}" for v in vals], f"mean {np.mean(vals):+.3f} sd {sd:.3f} min {min(vals):+.2f} max {max(vals):+.2f}  MDE (1.96 sd/sqrt n_seeds) {mde:.3f}%")
         out.append({"id": cid, "mean": float(np.mean(vals)), "sd": sd, "mde": mde, "min": min(vals), "max": max(vals)})
     print(f"limit: {LIMIT_PERCENT}% (at or above the C2 MDE: {LIMIT_PERCENT >= out[0]['mde']})")
 
-    print("\nSIX-SEED AVERAGE CONTRASTS, month-block and quarter-block")
+    print(f"\n{len(seeds)}-SEED AVERAGE CONTRASTS, valid-month-block and valid-quarter-block")
     for cid, (na, nb) in pairs.items():
         for cut_name, sel in (("all", None), ("d1", "d1")):
             ra = rows[na] if sel is None else rows[na].filter(pl.col("band") == sel)
@@ -130,14 +151,15 @@ def main() -> None:
             p, lo, hi, n = block_interval(a=qva, b=qvb)
             print(f"{cid} {cut_name} quarter-block ({n} quarters, 35 distinct resamples at most): {p:+.3f}% ({lo:+.3f} to {hi:+.3f})")
 
-    print("\nBY QUARTER OF THE SCORED YEAR (init-month groups), per seed contrast for C2")
+    print("\nBY QUARTER OF THE SCORED YEAR (init-month groups = refit quarters), per seed contrast")
+    init_months = sorted(rows["annual_a2"]["init_month"].unique().to_list())
     months = sorted(rows["annual_a2"]["month"].unique().to_list())
     qrows = []
     for k in range(4):
-        sel = months[3 * k : 3 * k + 3]
+        sel = init_months[3 * k : 3 * k + 3]
         for cid, (na, nb) in pairs.items():
-            va = rows[na].filter(pl.col("month").is_in(sel))["score"].mean()
-            vb = rows[nb].filter(pl.col("month").is_in(sel))["score"].mean()
+            va = rows[na].filter(pl.col("init_month").is_in(sel))["score"].mean()
+            vb = rows[nb].filter(pl.col("init_month").is_in(sel))["score"].mean()
             seed_vals = []
             for s in seeds:
                 a, b = paired(a=raw[(na, s)], b=raw[(nb, s)])
@@ -145,8 +167,8 @@ def main() -> None:
                 seed_vals.append(
                     100.0
                     * (
-                        ra.filter(pl.col("month").is_in(sel))["score"].mean()
-                        / rb.filter(pl.col("month").is_in(sel))["score"].mean()
+                        ra.filter(pl.col("init_month").is_in(sel))["score"].mean()
+                        / rb.filter(pl.col("init_month").is_in(sel))["score"].mean()
                         - 1.0
                     )
                 )
@@ -155,7 +177,7 @@ def main() -> None:
             )
     print(pl.DataFrame(qrows))
 
-    print("\nBY MONTH (C2 and C3, six-seed average)")
+    print(f"\nBY VALID MONTH (C2 and C3, {len(seeds)}-seed average)")
     mrows = []
     for m in months:
         rec: dict = {"month": m}
@@ -167,7 +189,7 @@ def main() -> None:
         mrows.append(rec)
     print(pl.DataFrame(mrows))
 
-    print("\nBY HOUR OF DAY (UTC), C2 six-seed average; share of the total score difference")
+    print(f"\nBY HOUR OF DAY (UTC), C2 {len(seeds)}-seed average; share of the total score difference")
     ra, rb = rows["annual_a2"], rows["q_a2"]
     total = ra["score"].sum() - rb["score"].sum()
     hrows = []
@@ -177,7 +199,7 @@ def main() -> None:
         hrows.append({"hour_utc": h, "rows": sa.height, "pct": 100.0 * (sa["score"].mean() / sb["score"].mean() - 1.0), "share_of_total_diff": diff / total})
     print(pl.DataFrame(hrows))
 
-    print("\nCAPACITY AND CLIP (actual output as a fraction of capacity in the scored year)")
+    print("\nCAPACITY AND CLIP (actual output in the stored units, share of the effective capacity)")
     act = cut["annual_a2"].with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
     for m in months:
         a_ = act.filter(pl.col("month") == m)["actual"]
@@ -197,7 +219,8 @@ def main() -> None:
     print("median minus mean (points):", f"annual {rows['annual_a2']['median_minus_mean'].mean():+.3f} quarterly {rows['q_a2']['median_minus_mean'].mean():+.3f}")
     print("mean-forecast absolute error (points):", f"annual {rows['annual_a2']['ae_mean'].mean():.3f} quarterly {rows['q_a2']['ae_mean'].mean():.3f}")
     print("absolute scores:", {n: round(float(rows[n]['score'].mean()), 3) for n in rows})
-    pl.DataFrame(out).write_csv(common.DATA_DIR / "scores" / "e00498_seed_contrasts.csv")
+    (NEW_DIR / "scores").mkdir(exist_ok=True)
+    pl.DataFrame(out).write_csv(NEW_DIR / "scores" / f"seed_contrasts_{len(seeds)}.csv")
 
 
 if __name__ == "__main__":
