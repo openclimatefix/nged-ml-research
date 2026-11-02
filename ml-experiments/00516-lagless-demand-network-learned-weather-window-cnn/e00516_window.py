@@ -207,3 +207,29 @@ def fill_nearest(*, windows: np.ndarray) -> np.ndarray:
 def missed_runs(*, missing_history: np.ndarray) -> np.ndarray:
     """Return the missing history positions as whole missed runs (48 half-hours per run, rounded up)."""
     return -(-missing_history // HALF_HOURS_PER_DAY)
+
+
+def era5_step_grids(
+    *, hourly: np.ndarray, hour_of_day: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return one ERA5 variable on the two step grids: 3-hourly (grid A) and 6-hourly (grid B).
+
+    Both are linear interpolations of the hourly values stamped at whole UTC hours that are
+    multiples of 3 h (A) or 6 h (B). A window position at or before the run's 144th hour reads grid
+    A, and a later position reads grid B, which is `step_interpolate` evaluated for a run that
+    starts at 00:00 UTC.
+
+    Args:
+        hourly: The variable on the half-hourly grid; only the whole-hour entries are read.
+        hour_of_day: The UTC hour of each grid position, or -1 where the stamp is not a whole hour.
+
+    Returns:
+        Grid A and grid B, each on the half-hourly grid.
+    """
+    out = []
+    for step_hours in (3, 6):
+        knots = np.flatnonzero(
+            (hour_of_day >= 0) & (hour_of_day % step_hours == 0) & np.isfinite(hourly)
+        )
+        out.append(np.interp(np.arange(len(hourly)), knots, hourly[knots]))
+    return out[0], out[1]

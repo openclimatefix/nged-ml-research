@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E402, PLR2004
+# ruff: noqa: D103, E402
 """Check experiment 516's convolutional encoder: shapes, the position it keeps, and wiring."""
 
 import sys

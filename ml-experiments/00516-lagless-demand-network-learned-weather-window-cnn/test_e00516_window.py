@@ -1,5 +1,5 @@
 # ruff: noqa: D103, E402
-"""Check experiment 516's window builder: step-grid smoothness, causality, and the missed-run count."""
+"""Check experiment 516's window builder: step-grid smoothness, causality, and missed runs."""
 
 import sys
 from pathlib import Path
@@ -183,3 +183,23 @@ def test_era5_and_ensemble_like_windows_are_equally_smooth() -> None:
     knots = set(w.STEP_OFFSETS[1:-1] - 1)  # the series bends only at the steps
     bends = {int(i) for i in np.flatnonzero(np.abs(second_difference) > 1e-9)}
     assert bends <= knots
+
+
+def test_two_grid_form_equals_step_interpolate_for_a_midnight_run() -> None:
+    """Grid A before the 144th hour and grid B after it reproduce `step_interpolate`."""
+    rng = np.random.default_rng(2)
+    hour = np.arange(SIZE) // 2 % 24
+    hour = np.where(np.arange(SIZE) % 2 == 0, hour, -1)
+    series = rng.normal(size=SIZE)
+    series[hour < 0] = np.nan
+    anchor = 20 * DAY
+    assert hour[anchor] == 0
+    grid_a, grid_b = w.era5_step_grids(hourly=series, hour_of_day=hour)
+    offsets = np.arange(w.HORIZON + 1)
+    expected = w.step_interpolate(
+        series=np.where(np.isfinite(series), series, 0.0),
+        anchors=np.array([anchor]),
+        query_offsets=offsets,
+    )[0]
+    got = np.where(offsets <= w.EARLY_HORIZON, grid_a[anchor + offsets], grid_b[anchor + offsets])
+    np.testing.assert_allclose(got, expected, atol=1e-9)
