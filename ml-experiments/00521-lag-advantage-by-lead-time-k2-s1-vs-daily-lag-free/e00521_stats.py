@@ -70,7 +70,9 @@ CONTRASTS: Final[tuple[tuple[str, str, bool], ...]] = (
 def load() -> pl.DataFrame:
     """Return the five folds' rows with every arm's scores and the flags, on experiment 511's rows."""
     sites = pl.read_csv(DATA / "site_map.csv")
-    PRIMARY_LABELS.update(dict(zip(sites["primary"].to_list(), sites["label"].to_list(), strict=True)))
+    PRIMARY_LABELS.update(
+        dict(zip(sites["primary"].to_list(), sites["label"].to_list(), strict=True))
+    )
     metrics = ("crps", *[f"{k}_{t}" for k in ("pin", "cov") for t in TAILS])
     wanted = [f"{a}__{m}" for a in FROM_511 for m in metrics]
     frames = []
@@ -134,7 +136,7 @@ def percentiles(*, boot: np.ndarray, tests: int = TESTS) -> dict[str, float]:
     }  # fmt: skip
 
 
-def block_stats(*, diff: pl.DataFrame, rng: np.random.Generator) -> dict:
+def block_stats(*, diff: pl.DataFrame, rng: np.random.Generator, tests: int = TESTS) -> dict:
     """Return the mean of `d`, its day-block and month-block intervals, and the per-fold means."""
     out: dict = {"n": diff.height, "difference": float(diff["d"].mean())}
     for label, keys in (("day", ["month", "day"]), ("month", ["month"])):
@@ -142,10 +144,12 @@ def block_stats(*, diff: pl.DataFrame, rng: np.random.Generator) -> dict:
         n, s = blocks["n"].to_numpy().astype(float), blocks["s"].to_numpy()
         draws = rng.integers(0, len(n), (RESAMPLES, len(n)))
         boot = s[draws].sum(axis=1) / n[draws].sum(axis=1)
-        out |= {f"{k}_{label}": v for k, v in percentiles(boot=boot).items()}
+        out |= {f"{k}_{label}": v for k, v in percentiles(boot=boot, tests=tests).items()}
         out[f"blocks_{label}"] = len(n)
     by_fold = diff.group_by("month").agg(pl.col("d").mean()).sort("month")
-    out["by_fold"] = json.dumps({r["month"]: round(r["d"], 4) for r in by_fold.iter_rows(named=True)})
+    out["by_fold"] = json.dumps(
+        {r["month"]: round(r["d"], 4) for r in by_fold.iter_rows(named=True)}
+    )
     out["folds_positive"] = int((by_fold["d"] > 0).sum())
     out["folds"] = by_fold.height
     return out
@@ -158,16 +162,18 @@ def contrast_table(*, table: pl.DataFrame) -> pl.DataFrame:
     for name in SETS:
         part = row_set(table=table, name=name)
         for a, b, counted in CONTRASTS:
-            for band in (*BANDS, ALL):
-                sub = in_band(part=part, band=band).select(
-                    "month", "day", d=pl.col(f"{a}__crps") - pl.col(f"{b}__crps")
-                )
-                sub = sub.filter(pl.col("d").is_finite())
-                records.append(
-                    {"set": name, "contrast": f"{a} - {b}", "band": band,
-                     "counted": counted and band != ALL and name in ("eight", "six"),
-                     **block_stats(diff=sub, rng=rng)}
-                )  # fmt: skip
+            for metric in ("crps", "pin_q99") if counted else ("crps",):
+                tests = TESTS * (2 if metric == "pin_q99" else 1)
+                for band in (*BANDS, ALL):
+                    sub = in_band(part=part, band=band).select(
+                        "month", "day", d=pl.col(f"{a}__{metric}") - pl.col(f"{b}__{metric}")
+                    )
+                    sub = sub.filter(pl.col("d").is_finite())
+                    records.append(
+                        {"set": name, "contrast": f"{a} - {b}", "metric": metric, "band": band,
+                         "counted": counted and band != ALL and name in ("eight", "six"),
+                         "tests": tests, **block_stats(diff=sub, rng=rng, tests=tests)}
+                    )  # fmt: skip
     return pl.DataFrame(records)
 
 
@@ -300,9 +306,16 @@ def checks_table(*, table: pl.DataFrame) -> pl.DataFrame:
         records.append({"check": f"pooled gap vs 3-cell K2-S1, {name}", "value": gap3})
     for name in ("eight", "six"):
         part = row_set(table=table, name=name)
+        total = float((part["L-1d__crps"] - part["K2-S1__crps"]).sum())
         for band in BANDS:
+            sub = in_band(part=part, band=band)
+            share = float((sub["L-1d__crps"] - sub["K2-S1__crps"]).sum()) / total
+            records.append({"check": f"share of pooled summed gap, {name} {band}", "value": share})
             records.append(
-                {"check": f"rows in {name} {band}", "value": float(in_band(part=part, band=band).height)}
+                {
+                    "check": f"rows in {name} {band}",
+                    "value": float(in_band(part=part, band=band).height),
+                }
             )
     return pl.DataFrame(records)
 
@@ -323,11 +336,15 @@ def main() -> None:
     absolute_table(table=table).write_csv(SCORES / "absolute.csv")
     contrasts = contrast_table(table=table)
     contrasts.write_csv(SCORES / "contrasts.csv")
-    print(f"counted tests: {int(contrasts['counted'].sum())} (pre-registered {TESTS})")
+    print(
+        f"counted tests: {int(contrasts['counted'].sum())} (28 CRPS + 28 more for q99, pre-registered 56)"
+    )
     primary_table(table=table).write_csv(SCORES / "per_primary.csv")
     slice_table(table=table).write_csv(SCORES / "slices.csv")
     half_hour_table(table=table).write_csv(SCORES / "half_hour.csv")
-    show = contrasts.filter(pl.col("contrast") == "L-1d - K2-S1").drop("by_fold")
+    show = contrasts.filter(
+        (pl.col("contrast") == "L-1d - K2-S1") & (pl.col("metric") == "crps")
+    ).drop("by_fold")
     with pl.Config(tbl_rows=100, tbl_width_chars=250):
         print(show.select(pl.exclude("n")).with_columns(pl.col(pl.Float64).round(3)))
 

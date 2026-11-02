@@ -28,7 +28,9 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-DATA: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free"
+DATA: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free"
+)
 WORK: Final[Path] = DATA / "work"
 E454: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
@@ -101,9 +103,9 @@ def read_seed(*, month: str, seed: int, sites: pl.DataFrame, actual: pl.DataFram
     frame = pl.read_parquet(E511 / "seed_preds" / "L-1d" / f"{month}_s{seed}.parquet")
     frame = frame.join(sites.select("time_series_id", "primary"), on="time_series_id").with_columns(
         primary=pl.col("primary").cast(pl.Int16),
-        origin=(
-            (pl.col("power_fcst_init_time").dt.epoch("us") - GRID_START_US) // STEP_US
-        ).cast(pl.Int32),
+        origin=((pl.col("power_fcst_init_time").dt.epoch("us") - GRID_START_US) // STEP_US).cast(
+            pl.Int32
+        ),
         target=((pl.col("valid_time").dt.epoch("us") - GRID_START_US) // STEP_US).cast(pl.Int32),
     )
     return frame.select(*KEYS, *LEVELS).join(actual, on=KEYS, how="inner")

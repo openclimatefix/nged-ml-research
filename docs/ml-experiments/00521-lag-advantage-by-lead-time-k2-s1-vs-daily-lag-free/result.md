@@ -40,12 +40,14 @@ decision_rule: >-
   correction on a lag-free anchor is supported and gets its own brief. If the gap sits at days 5 to
   10 (P1 holds), a short-horizon correction is not supported, and the page says which of refit age
   and mixture width the references favour, or that they cannot tell. A band counts as a difference
-  only when its Bonferroni interval (28 counted tests) excludes zero; with five month blocks
-  the interval is near the minimum-to-maximum range of the five folds, and the page says so.
+  only when its Bonferroni interval (28 counted CRPS tests, 56 with q99) excludes zero under the
+  origin-day blocks that experiment 511 used; the whole-month blocks (5, so near the
+  minimum-to-maximum range of the five folds) are reported as the conservative check.
 benchmark: >-
   L-1d (experiment 511, daily refit, two-seed quantile average) against K2-S1 (experiment 454's
   monthly refit schedule, three cells, each an equal-weight mixture of two S1 heads and two lag-free
-  heads, scored as the mean of the three cells' CRPS). References by lead: L-Ww (weekly), and
+  heads; the headline uses cell c0 alone, because that is what experiment 511's stored K2-S1 score
+  is, and the mean of the three cells is the sensitivity). References by lead: L-Ww (weekly), and
   experiment 454's monthly LL, LL-ens3, and LL-ens5.
 row_set_id: experiment_470_intersection_v1
 metric: >-
