@@ -145,13 +145,14 @@ limits](figure_1_headline.svg)
 
 ## Results
 
-- **Arms.** (PO in the tables below is PretrainOnce.) K2 is the quantile average of seeds 0 and 1
-  of experiment 425's arm A (fresh pretraining and fine-tuning in the scored month). Stale3 and
-  Stale6 are experiment 425's arm A networks fitted 3 and 6 months before the scored month. PO fine-tunes each scored month from the pretraining of
-  the 2025-07 cut. Stale11 is the single fold 2026-06 from the 2025-07 networks. Seeds 0 and 1;
-  widening 1.15; rows of experiment 470 (`experiment_470_intersection_v1`); folds 2025-10, 2025-12,
-  2026-01, 2026-03, 2026-06; monthly refits; cleaned data with 1,179 scoring actuals dropped for a
-  flagged exact zero; the D15 and D18 start cut applied.
+- **Arms.** (PO in the tables below is PretrainOnce.) K2 is the quantile average of seeds 0 and 1 of
+  experiment 425's arm A (fresh pretraining and fine-tuning in the scored month). Stale3 and Stale6
+  are experiment 425's arm A networks fitted 3 and 6 months before the scored month. PO fine-tunes
+  each scored month from the pretraining of the 2025-07 cut. Stale11 is the single fold 2026-06 from
+  the 2025-07 networks. Seeds 0 and 1; widening 1.15; rows of experiment 470
+  (`experiment_470_intersection_v1`); folds 2025-10, 2025-12, 2026-01, 2026-03, 2026-06; monthly
+  refits; cleaned data with 1,179 scoring actuals dropped for a flagged exact zero; the D15 and D18
+  start cut applied.
 - **Minimum detectable effect (two seeds, five folds).** 0.086 points at the eight and 0.170 at the
   six (the six on rows with no labelled event). Experiment 489's 5-seed values (0.065 and 0.100) do
   not apply to a 2-seed pool. Limits: 0.086 for Stale3 and PO at the eight, 0.100 for Stale6, 0.170
