@@ -33,6 +33,16 @@ WORK_DIR: Final[Path] = (
     / "work"
 )
 STAGE1: Final[Path] = WORK_DIR / "stage1"
+CROSSFIT: Final[Path] = WORK_DIR / "stage1_crossfit"
+BLOCKS: Final[int] = 6
+"""Contiguous time blocks of the ERA5 and CAMS history, as in experiment 449's cross-fit."""
+PAD_STEPS: Final[int] = 144
+"""Three days of half-hours left out on each side of a held-out block."""
+
+
+def block_edges(*, target_idx: np.ndarray) -> np.ndarray:
+    """Return the BLOCKS + 1 edges (grid indices) that split the pretraining valid times equally."""
+    return np.linspace(target_idx.min(), target_idx.max() + 1, BLOCKS + 1).astype(np.int64)
 
 
 def stage1_columns(*, columns: list[str]) -> list[int]:
@@ -48,12 +58,18 @@ def stage1_columns(*, columns: list[str]) -> list[int]:
     return [i for i in range(len(columns)) if i not in dropped]
 
 
-def run(*, months: list[str], seeds: list[int], device: str) -> None:
+def run(*, months: list[str], seeds: list[int], device: str, crossfit: bool = False) -> None:
     """Pretrain stage 1 for each month and seed."""
     clean = c.clean_stack()
     for month in months:
-        todo = [s for s in seeds if not (STAGE1 / f"{month}_s{s}.pt").exists()]
-        if not todo:
+        folder = CROSSFIT if crossfit else STAGE1
+        jobs = [
+            (s, b)
+            for s in seeds
+            for b in (range(BLOCKS) if crossfit else [None])
+            if not (folder / f"{month}_s{s}{'' if b is None else f'_b{b}'}.pt").exists()
+        ]
+        if not jobs:
             continue
         refit = c.month_start(month=month)
         rows = data.build_fold(refit=refit, clean=clean)
@@ -70,28 +86,38 @@ def run(*, months: list[str], seeds: list[int], device: str) -> None:
             "v": torch.from_numpy(pre.is_val).to(device),
         }
         print(f"{month}: {len(pre.y):,} rows, {len(keep)} inputs", flush=True)
-        for seed in todo:
+        edges = block_edges(target_idx=pre.target_idx)
+        for seed, block in jobs:
             started = time.monotonic()
             torch.manual_seed(seed)
             model = c.new_model(
                 outlier=False, n_inputs=len(keep), n_primaries=len(rows.target_mean)
             ).to(device)
+            if block is None:
+                use = torch.ones(len(pre.y), dtype=torch.bool, device=device)
+            else:
+                lo, hi = edges[block] - PAD_STEPS, edges[block + 1] + PAD_STEPS
+                tid = torch.from_numpy(pre.target_idx).to(device)
+                use = ~((tid >= lo) & (tid < hi))
             epochs, best = c.train(
-                model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
-                lr=c.PRETRAIN_LR, outlier=False, prior=False, device=device,
+                model=model, x=t["x"][use], z=t["z"][use], w=t["w"][use], p=t["p"][use],
+                is_val=t["v"][use], seed=seed, lr=c.PRETRAIN_LR, outlier=False, prior=False,
+                device=device,
             )  # fmt: skip
-            STAGE1.mkdir(parents=True, exist_ok=True)
-            tmp = STAGE1 / f"{month}_s{seed}.tmp"
+            suffix = "" if block is None else f"_b{block}"
+            folder.mkdir(parents=True, exist_ok=True)
+            tmp = folder / f"{month}_s{seed}{suffix}.tmp"
             torch.save(model.state_dict(), tmp)
-            tmp.rename(STAGE1 / f"{month}_s{seed}.pt")
+            tmp.rename(folder / f"{month}_s{seed}{suffix}.pt")
             c.write_json(
-                obj={"month": month, "seed": seed, "epochs": epochs, "val_nll": best, "keep": keep,
-                     "columns": [rows.columns[i] for i in keep], "rows": len(pre.y),
+                obj={"month": month, "seed": seed, "block": block, "edges": edges.tolist(),
+                     "epochs": epochs, "val_nll": best, "keep": keep,
+                     "columns": [rows.columns[i] for i in keep], "rows": int(use.sum()),
                      "seconds": round(time.monotonic() - started)},
-                path=STAGE1 / f"{month}_s{seed}.json",
+                path=folder / f"{month}_s{seed}{suffix}.json",
             )  # fmt: skip
             print(
-                f"  {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s",
+                f"  {month} s{seed}{suffix}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s",
                 flush=True,
             )
         del t, pre, rows
@@ -104,9 +130,10 @@ def main() -> None:
     parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--crossfit", action="store_true")
     args = parser.parse_args()
     _ = json
-    run(months=args.months, seeds=args.seeds, device=args.device)
+    run(months=args.months, seeds=args.seeds, device=args.device, crossfit=args.crossfit)
 
 
 if __name__ == "__main__":
