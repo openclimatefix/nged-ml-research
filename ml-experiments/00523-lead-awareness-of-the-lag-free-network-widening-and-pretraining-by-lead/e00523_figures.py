@@ -1,11 +1,15 @@
 # ruff: noqa: E501
-"""Draw the figures of experiment 523 from the tables of `e00523_scores.py`, `e00523_lead_swap.py`, and the panels.
+"""Draw the figures of experiment 523 from the tables of `e00523_scores.py`,
+`e00523_lead_swap.py`, and the panels.
 
 Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
 
-1. `figure_1_pretrained_minus_unpretrained.svg`: L0PT minus L0 CRPS by lead band, Bonferroni intervals;
-2. `figure_2_width_growth.svg`: 90% band width growth from 12-24 h to 120-240 h, pooled and within one half-hour of the day;
-3. `figure_3_lead_swap.svg`: change in the 90% width and in the median when L-1d's lead input is replaced;
+1. `figure_1_pretrained_minus_unpretrained.svg`: L0PT minus L0 CRPS by lead band, Bonferroni
+   intervals;
+2. `figure_2_width_growth.svg`: 90% band width growth from 12-24 h to 120-240 h, pooled and within
+   one half-hour of the day;
+3. `figure_3_lead_swap.svg`: change in the 90% width and in the median when L-1d's lead input is
+   replaced;
 4. `figure_4_per_band_widening.svg`: per-band widening minus flat 1.15, CRPS by lead band;
 5. `figure_5_pit.svg`: PIT histograms at 120 to 240 h;
 6. `figure_6_example_*.svg`: day-ahead and 10-day forecasts of D4.
