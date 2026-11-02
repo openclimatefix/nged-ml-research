@@ -16,8 +16,8 @@ hours after one; `during`; `after7d`), plus `harm`: a lag lies in an unpadded co
 the target lies outside every event (experiment 402's `real_r0_<label>` tables, where
 `lags_in_event` > 0 and not `target_in_event`). Only the six Primaries with signed-MW readings are
 scored. The minimum detectable effect (MDE), (rep) minus (a) on the four refit dates, is printed
-
 before any contrast.
+
 ```bash
 PYTHONPATH=ml-experiments/00087-bg2-best-guess-assembled-with-drop-one-ablations:\\
 ml-experiments/00379-bg2-components-all-16-primaries-to-14-days:\\
