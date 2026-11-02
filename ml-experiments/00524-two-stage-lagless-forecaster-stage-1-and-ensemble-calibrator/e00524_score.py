@@ -23,15 +23,30 @@ def setup() -> None:
     """Point experiment 510's scorer at this experiment's arms and folders."""
     s510.WORK_DIR = WORK_DIR
     s510.SEED_PREDS = WORK_DIR / "seed_preds"
-    s510.ARMS = {"S2-0": (0, 1), "L-M": (0, 1), "L-W": (0, 1), "L-Ww": (0, 1)}
-    s510.CONTRASTS = tuple(("S2-0", b) for b in ("L-Ww", "L-W", "L-M", "K2-S1"))
-    s510.TESTS = 16
+    new = (
+        "S2-0F",
+        "S2-F-A-nll",
+        "S2-F-A-crps",
+        "S2-F-B-nll",
+        "S2-F-B-crps",
+        "S2-J-0.4x",
+        "S2-J-0.1x",
+    )
+    s510.ARMS = {
+        "S2-0": (0, 1),
+        **dict.fromkeys(new, (0, 1)),
+        "L-M": (0, 1),
+        "L-W": (0, 1),
+        "L-Ww": (0, 1),
+    }
+    s510.CONTRASTS = (
+        *[(a, "L-Ww") for a in ("S2-0", *new)],
+        ("S2-F-B-nll", "S2-0F"), ("S2-F-A-nll", "S2-0F"), ("S2-F-A-nll", "S2-F-B-nll"),
+        ("S2-F-B-nll", "S2-F-B-crps"), ("S2-J-0.4x", "S2-F-B-nll"), ("S2-J-0.1x", "S2-J-0.4x"),
+        ("S2-0", "K2-S1"), ("S2-J-0.4x", "K2-S1"), ("S2-F-B-nll", "K2-S1"),
+    )  # fmt: skip
+    s510.TESTS = 4 * len(s510.CONTRASTS)
     s510.configure()
-    s510.score470.CANDIDATES = tuple(s510.ARMS)
-    s510.score470.MAIN_ARMS = (*s510.ARMS, *s510.CONTROLS)
-    s510.score470.CONTRASTS = s510.CONTRASTS
-    s510.score470.TESTS = 16
-    s510.tails470.ARMS = s510.score470.MAIN_ARMS
     s510.link_stored()
     source = (
         s510.ML_EXPERIMENTS_DATA_DIR

@@ -8,7 +8,7 @@ theme: retraining-and-training-history
 also_relevant_to:
   - calibration-and-uncertainty
   - weather-products-and-blending
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -67,167 +67,139 @@ metric: >-
   to 12 h, 12 to 24 h, 24 to 48 h, 48 to 72 h, 72 to 120 h, 120 to 240 h; three coarse bands for the
   counted contrasts), q01, q05, q95, and q99 pinball loss and coverage by lead, mean 90% width, the
   probability integral transform by lead, avoidable-curtailment cost, and serving cost.
+verdict: partly supported
+production_status: candidate
+adopted_in: none
+best_arm: >-
+  S2-J-0.1x, stage 1 (no lead, no spread) plus a form-B head fine-tuned jointly at 0.1x of the
+  pretrain rate: CRPS 4.828 (eight) and 3.529 (six) against L-Ww 4.920 and 3.555.
+headline: >-
+  A weather-to-power network that never sees lead or ensemble spread, fine-tuned jointly with a
+  small calibrator, scores within the minimum detectable effect of L-Ww (-0.09 at the eight, -0.03
+  at the six). The same two parts with stage 1 frozen score 0.06 to 0.15 worse.
+lessons: >-
+  Stage 1 needs the recent ensemble rows. A frozen stage 1 plus a calibrator (S2-F) cannot replace
+  that, and a per-lead shift and scale (form A) recovers almost none of the loss, so the calibrator
+  does not carry the information. Once stage 1 is allowed to move (S2-J), the lead and spread
+  inputs of the single-stage network add nothing measurable.
+take_home_message: >-
+  The lag-free demand network does not need lead time or ensemble spread as inputs to its main
+  weather-to-power network: removing both and adding a small calibrator that sees them scored the
+  same as the current network (within noise, if anything 0.03 to 0.10 CRPS points better at the
+  eight MVA-only substations), as long as the main network keeps being fine-tuned on recent ensemble
+  forecasts. Freezing that network and letting only the calibrator adapt made the forecast 0.06 to
+  0.15 points worse, so the recent-data refit cannot be dropped.
+advice:
+  - >-
+    Keep fine-tuning the weather-to-power network on recent ensemble rows each week; freezing it and
+    calibrating afterwards cost 0.06 to 0.15 CRPS points against L-Ww (figure 1, S2-F contrasts).
+  - >-
+    Do not give the lag-free network's pretraining a lead or spread input; the lead-free, spread-free
+    network fine-tuned jointly with a head scored within the minimum detectable effect of L-Ww
+    (figure 1, S2-J contrasts).
+  - >-
+    Do not use a per-lead shift and scale on the mixture (form A) as a calibrator for a frozen
+    network; it recovered at most a third of the loss that the multilayer perceptron (form B) removed
+    at the six and none at the eight (S2-F-A against S2-0F contrasts).
 ---
 
-**Plan: split the lag-free demand network into a weather-to-power stage and an ensemble calibrator,
-and test whether the split loses any accuracy.** This page is the plan; the write-up replaces it.
-The CPU gate (S2-0) runs first and is reported before any GPU use.
+**A weather-to-power network that never sees lead time or ensemble spread, fine-tuned together with
+a small calibrator, forecasts as well as the current single-stage lag-free network L-Ww; the same
+two parts with the first network frozen forecast worse.** We split the lag-free demand network in
+two. The first network maps ERA5 and CAMS weather, the calendar, and the Primary substation to a
+probability distribution of power. It was trained on past-weather rows only and has no lead-time or
+spread input. A small second network takes that distribution plus the lead, the ensemble spread,
+the hour, and the metering group, and returns a corrected distribution. We scored five test months
+(2025-10, 2025-12, 2026-01, 2026-03, 2026-06) with weekly refits, two seeds, and CRPS in points of
+capacity (lower is better). The method builds on the lag-free network of experiments
+[448](../00448-s1-network-assembly-ladder-with-pretraining-b-mix-and-seed-pool/result.md) and
+[510](../00510-lagless-demand-network-weekly-finetune-and-recency-weights/result.md), and on
+experiment 449's cross-fit for the second network's training rows. Interim, unaudited numbers.
 
-## Why the split is worth testing
+Verdict: partly supported. S2-J, with the first network fine-tuned together with the calibrator, is
+inside the minimum detectable effect (MDE) of L-Ww in all six group-and-band cells (equivalence
+holds). The pre-registered gain for the frozen arm S2-F (P1) did not appear: S2-F is worse than
+L-Ww. Several arms in the plan did not run (below).
 
-**A weather-to-power network that never sees lead time is simpler to explain and has fewer parts
-that depend on live recent data.** Stage 1 sees only ERA5 and CAMS weather, so it cannot learn a
-false idea of lead. Stage 2 sees lead only where lead matters, in a small network that is easy to
-inspect. Evidence from earlier experiments sets the expectations:
+## Figures
 
-- **Pretraining helps at every lead.** [Experiment
-  418](../00418-mdn-pretrain-on-era5-and-cams-then-fine-tune-on-ens/result.md) found that
-  pretrained minus ensemble-only
-  CRPS is negative at every lead band, most at day 1. The split therefore cannot be justified as a
-  fix for a harm pretraining does.
-- **The eight's long-lead gap looks like head count.** [Experiment
-  521](../00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free/result.md) found that a
-  monthly five-head lag-free
-  ensemble matches K2-S1 at 120-240 h at the eight (4.984 against 4.967) and not at the six
-  (3.724 against 3.523). The split is not expected to close that gap by calibration alone.
-- **Experiment 523** ([PR 184](https://github.com/openclimatefix/nged-ml-research/pull/184)) asks
-  whether L-Ww uses its lead input. Its Part 3 (a lead-aware head) is merged into this plan as
-  arm S2-F with the lead going only to stage 2.
+![CRPS minus L-Ww by lead band](figure_1_headline.svg)
 
-## Arms
+![Absolute CRPS of every arm](figure_2_absolute.svg)
 
-All arms use the five folds of experiment 511 (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), two
-seeds, the weekly harness (refit cutoffs at days 1, 8, 15, 22, 29), and the experiment-510 row
-rule: stage-2 labels at a cutoff have valid time at most cutoff minus 3.5 h, origin at most the
-cutoff, valid time within 730 days, and a 90-day half-life recency weight.
+![Day-ahead forecast, signed-MW Primary D10](figure_3_example_D10_day_ahead.svg)
 
-### Core (CPU gate, then GPU)
+![10-day forecast, signed-MW Primary D10](figure_3_example_D10_10_days.svg)
 
-- **S2-0 (stage 1 alone, the denominator of every gain).** CPU gate: the stored L0PT pretrained
-  weights (`E448_PRETRAINED/{month}_s{seed}.pt`; 510's own `L0PT/2025-12_s*.pt`) forecast the ENS
-  rows with no fine-tune. These networks keep `lead`, `lead_sqrt`, and the `std_*` columns, so S2-0
-  bounds a frozen stage 1 from below. The 10 lead-free, spread-free stage-1 networks (5 folds x 2
-  seeds, same recipe and rows, those 9 columns removed) are the GPU part.
-- **S2-F (frozen stage 1).** Stage 1 trained once per fold on ERA5 and CAMS rows to the month's
-  start, then frozen. Stage 2 trains on the 730-day ensemble window with the 90-day recency weight
-  and refits at each cutoff. Form A: for each metering group and each of 8 lead bins of 30 h, a shift of the three means and a
-  shift of the three log standard deviations (identity at the start, 32 parameters). Form B: a
-  multilayer perceptron (2 hidden layers of 32) on the 9 mixture outputs, the lead, two spread
-  terms (temperature and shortwave), two hour terms, and the metering group. Both forms take the
-  group flag and no Primary input, because stage 1's mixture already carries the Primary.
-- **S2-J (joint fine-tune).** Same two stages; stage 1's weights change after stage 2 is plugged
-  in. Primary: the L-1d rate ratio (0.4x of the pretrain rate of 5e-4, that is 2e-4, so only the
-  missing lead input differs from L-1d). Second arm: 0.1x. The base rate is the pretrain rate.
+![Day-ahead forecast, MVA-only Primary D4](figure_3_example_D4_day_ahead.svg)
 
-### CPU-only arms on cached stage-1 outputs (minutes)
+![10-day forecast, MVA-only Primary D4](figure_3_example_D4_10_days.svg)
 
-- **Mixture-input stage-2 forms.** Stage 2 takes the 9 mixture parameters (3 logits, 3 means, 3 log
-  standard deviations), the lead, two spread terms, two half-hour terms, and the group; it returns
-  a mixture of the same form, trained with the negative log-likelihood and, as a second arm, the
-  closed-form CRPS of the mixture. The 11-quantile input is a control, reporting its crossing rate
-  before sorting; its output is monotone by cumulative softplus steps.
-- **S0-A (stage 0, weather-space adaptor, no stage 2).** Maps ensemble weather (mean, spread, lead,
-  half-hour) to ERA5 and CAMS weather at the same valid time; pairs use ERA5 up to the cutoff minus
-  5 days and CAMS up to minus 1 day. Form 1: per-variable, per-lead-band bias and scale. Form 2: a
-  multilayer perceptron on all seven weather variables with the lead. Then frozen in front of frozen
-  stage 1.
-- **S0-S2.** The better stage-0 form of S0-A plus stage 2.
+## Results
 
-### Later arms (after the core, and only as stated)
+- **Arms.** S2-0: the stored L0PT network with no fine-tune (the CPU gate; keeps lead and spread).
+  S2-0F: the new lead-free, spread-free first network alone. S2-F: S2-0F plus a second network
+  trained on cross-fitted outputs, form A (a shift of the means and log standard deviations per
+  group and 30-hour lead bin) or form B (2 x 32 multilayer perceptron), with the negative
+  log-likelihood (nll) or the closed-form CRPS as loss. S2-J-0.4x and S2-J-0.1x: first network and
+  form-B head fine-tuned together at 0.4x or 0.1x of the 5e-4 pretraining rate (0.4x is experiment
+  511's L-1d rate).
+- **Absolute CRPS (eight / six), all lead bands.** K2-S1 4.763 / 3.423; S2-J-0.1x 4.828 / 3.529;
+  S2-J-0.4x 4.849 / 3.537; L-Ww 4.920 / 3.555; S2-F-B-nll 5.040 / 3.634; S2-F-B-crps 5.137 / 3.653;
+  S2-0F 6.118 / 4.022; S2-0 6.287 / 4.041; S2-F-A-nll 6.168 / 3.924; S2-F-A-crps 6.071 / 4.041.
+  The MDE of a two-seed pool is 0.164 (eight) and 0.123 (six).
+- **Counted contrasts against L-Ww (18 tests; first minus second; negative is better).** S2-J-0.1x:
+  eight -0.075, -0.094, -0.098 and six -0.031, -0.021, -0.028 in the bands under 48 h, 48 to 120 h,
+  and 120 to 240 h. S2-J-0.4x: eight -0.042, -0.057, -0.091 and six -0.011, -0.011, -0.024.
+  S2-F-B-nll: eight +0.149, +0.137, +0.098 and six +0.107, +0.085, +0.063. The Bonferroni intervals
+  exclude zero for S2-J-0.1x at the eight in all three bands (upper bounds -0.015, -0.038, -0.039)
+  and for S2-J-0.4x at the eight only at 120 to 240 h (-0.029). No S2-J gain reaches the MDE, so
+  none counts as a gain; the equivalence is the finding. S2-J-0.1x is better than L-Ww in 4 or 5 of 5
+  folds at the eight and 3 or 4 of 5 at the six.
+- **Predictions.** P1 (S2-F beats L-Ww at 120 to 240 h by 0.087 / 0.098): not supported, S2-F-B-nll is
+  +0.098 / +0.063 worse. P2 (S2-J within the MDE): holds in every band. S2-J-0.4x closes 42% of the
+  eight's 120 to 240 h gap to K2-S1 (0.091 of 0.215) and 10% of the six's; S2-J-0.1x closes 46% and
+  11%. P4 (form A recovers 70% of form B's gain over S2-0F): not supported; form A is +0.03 to +0.08
+  worse than S2-0F at the eight and recovers 8% to 32% of form B's gain at the six. P3, P5, P6, P7:
+  not run (below).
+- **What the calibrator adds.** Form B minus S2-0F: -1.21, -1.09, -1.02 (eight) and -0.46, -0.39,
+  -0.36 (six), in all 5 folds. S2-J-0.4x minus S2-F-B-nll: -0.19, -0.19, -0.19 (eight) and -0.12,
+  -0.10, -0.09 (six). The nll loss beats the CRPS loss for form B by 0.05 to 0.13 at the eight
+  (descriptive).
+- **Tails (all leads; 95th and 99th percentile pinball loss / coverage, eight).** L-Ww 1.015 /
+  0.964 and 0.287 / 0.995; S2-J-0.1x 1.014 / 0.958 and 0.285 / 0.993; S2-J-0.4x 1.027 / 0.959 and
+  0.293 / 0.993; S2-F-B-nll 1.092 / 0.954 and 0.309 / 0.991. Six: L-Ww 0.699 / 0.935 and 0.184 /
+  0.989; S2-J-0.1x 0.694 / 0.933 and 0.184 / 0.989. The two-stage tails match L-Ww's. The 1st and 5th
+  percentiles, the tails by lead band, and the avoidable-curtailment cost were not computed.
+- **Gate (S2-0).** The stored L0PT weights with no fine-tune score +1.37 (eight) and +0.49 (six)
+  CRPS above L-Ww, so fine-tuning on ensemble rows carries most of the skill.
 
-- **S2-M (member-wise).** Each of the 51 ensemble members goes through stage 1; the 51 mixtures are
-  combined as an equal-weight mixture of mixtures and collapsed to 3 components by moment matching
-  (the choice is reported, with the fixed-quantile route as a check on the tails), with and without
-  stage 2. Runs after the core, sharing its cache, regardless of the earlier results.
-- **S2-R and the daily L-1d harness.** Run only if S2-F or S2-J beats L-Ww at days 5 to 10 by more
-  than the MDE. S2-R restarts from the month's pretrained weights each week and never warm-starts.
-- **S0-E2E.** Stage 0 trained end to end through frozen stage 1 against the power negative
-  log-likelihood on ensemble rows: labels cut at cutoff minus 3.5 h, pairs cut at 5 days (ERA5) and
-  1 day (CAMS). Tested against S2-J.
+## Checks and caveats
 
-### Controls
-
-L-Ww; L-W and L-M (experiment 510); L-1d (experiment 511); experiment 454's ensemble-only lag-free
-heads LL and LL-ens5; K2-S1; the 11-quantile stage 2. A stage 2 with no stage 1 is the stored LL
-and LL-ens5 of experiment 454 and arm R of experiment 425, unless a like-for-like small network is
-cheap.
-
-## Stage 2 training design
-
-**Stage 1 has already fitted the power in stage 2's window, so stage 2 trains on cross-fitted
-stage-1 outputs.** The fold's stage 1 trains on ERA5 and CAMS rows to the month's start and sees
-the power at every valid time of stage 2's 730-day window. A stage 2 trained on those in-sample
-outputs would learn a calibration that does not hold at test. The design follows experiment 449's
-cross-fit: the ERA5 and CAMS history is split into 6 contiguous blocks by valid time, and 6 extra
-stage-1 networks per fold and seed each leave out one block and a 3-day pad on each side. An ENS
-row whose valid time lies in block `k` takes its stage-1 mixture from the network that left out
-block `k`; a row with a valid time after the last block takes it from the fold's full network. This
-costs 60 extra pretrains of about 20 s each. A first design that held out 1 week in 12 was dropped
-before any score was read, because it leaves only 7 held-out weeks in the 730-day window. The CPU
-gate does not need either design, because it fits no stage 2. The ensemble archive covers only 18 to
-26 months before the five folds, so early folds train stage 2 on under 730 days.
-
-## Step 0 (read from the code and from the earlier experiments, before any fit)
-
-- **Stage-1 inputs.** The 37 non-lag columns of the `summary` scheme (`e00397_prep.feature_names`
-  minus the 9 lag columns of `e00428_data.non_lag_layout`) are 7 `mean_` and 7 `std_` weather
-  columns, 3 solar, 12 calendar (4 hour terms, 7 `dow_`, `covid`), 6 holiday, `lead`, and
-  `lead_sqrt`. Stage 1 drops `lead`, `lead_sqrt`, and the 7 `std_*`, leaving 28 columns plus the
-  8-wide Primary embedding. `covid` stays (experiment 517 was inconclusive). The network is
-  `PlainMdn` (64 x 2, 3 components), about 7,241 weights.
-- **ERA5 and CAMS rows carry a fabricated spread and a real lead.** Their `std_*` is the fold's
-  median ensemble spread by 24-hour lead band, and their pseudo-runs have leads 0.5 to 351 h
-  ([experiment
-  418](../00418-mdn-pretrain-on-era5-and-cams-then-fine-tune-on-ens/result.md)). Stage 1 drops
-  both.
-  This is the first arm that is lead-free and spread-free in the pretraining role; the only
-  precedent is experiment 449's cross-fitted ERA5 and CAMS module, which was never scored on
-  ensemble rows.
-- **Serving grid.** Lead steps are 3-hourly to 144 h and 6-hourly after, upsampled to half-hourly.
-- **Why stage 2's rows do not overlap stage 1's.** Stage 1 never sees ensemble rows, so no row is
-  shared; the stacking leak above is the one that remains, and the cuts above address it.
-- **Earlier weather-space corrections.** Experiment 9 (CAMS- against ERA5-trained stage 1a, refuted)
-  -0.035 (-0.070 to +0.001); experiment 14 (empirical quantile mapping of ensemble shortwave to
-  CAMS, inconclusive because monthly daylight bias checks failed up to 18.6%) -0.067 (-0.094 to
-  -0.039) for a CAMS-trained arm and -0.025 for an ERA5-trained arm; experiment 111 fitted per-site,
-  season, lead, and hour calibration of ensemble temperature (shifts -1.15 to +2.05 K) and
-  irradiance (ratio 0.80 to 1.11) without a stored effect size for the calibration alone;
-  experiment 418's arm P3 (ensemble-sized noise on ERA5 rows) was +0.012 (-0.003 to +0.026) at the
-  eight and -0.003 (-0.022 to +0.013) at the six, a null. The new stage 0 differs by covering all
-  seven variables, taking lead and spread as inputs, using a network and not a marginal mapping,
-  and (S0-E2E) training through stage 1.
-
-## Standing practices
-
-- **Followed:** monthly-fold screen on the five folds of experiment 511 with weekly refits (the
-  harness the control L-Ww uses; the cadence is not the question), cleaned data, the D15 and D18 cut
-  at 2025-03-01, stored predictions reused (L-Ww, L-W, L-M, L-1d, K2-S1, LL, references), July 2026
-  unused, saved weights (stage-1 and stage-2 state files in the private data folder), the tail table
-  (q01, q05, q95, q99 pinball and coverage, by lead), avoidable-curtailment cost beside CRPS, example
-  forecasts (a day-ahead and a 14-day horizon, a winter and a summer Primary), the draft pull
-  request, GPU use through one process under 8 GB with `OMP_NUM_THREADS=1`.
-- **Load-shift events.** The injected-shift leak uses experiment 511's stress world. The incomplete
-  event-label caveat applies: clean rows may hold unlabelled events, so the leak table is optimistic
-  and real-event slices undercount. Metered generators appear only as Farm A to C and Solar A to F.
-  Rows with no labelled event are `tgt_real` false. Charts use the OCF palette, never `ocf.GREY_1`,
-  and no mark in the background colour `#fffbf5`.
-- **Advice followed:** experiment 521 (quote K2-S1 as the three-cell mean); experiment 511
-  (origin-day block bootstrap, per-fold signs). **Departure:** the brief sets the counted family
-  against L-1d; the screen runs on the weekly harness, so the counted control is L-Ww and L-1d is
-  report-only.
-
-## Scope after the quota alert
-
-The manager paused S2-M, the stage-0 arms, S2-R, and extra reviews until 2026-11-04 01:00 UTC. This
-experiment therefore runs S2-0, S2-F (forms A and B, each with the negative log-likelihood and the
-closed-form CRPS loss), and S2-J at the two rates, and writes up. The paused arms stay in the plan
-as proposals. Two caveats come from the code review: each cross-fit network lacks one block of the
-history, so stage 2 trains on a slightly staler stage 1 than it meets at test, and the CRPS loss is
-in units of each Primary's standard deviation, which weights low-variance Primaries more than the
-negative log-likelihood arm does.
-
-## Cost
-
-About 2.3 to 3.6 GPU-hours for the whole set; GPU only for the 10 stage-1 pretrains, S2-J, S2-R,
-S0-E2E, and the S2-M passes. The CPU gate and the CPU-only arms use 2 cores and 8 GB. GPU runs
-wait for the manager's "GPU go", which waits for experiments 519 and 515/516 to merge.
+- **Setup.** Weekly refits, 90-day half-life, rows by experiment 510's rule (valid time at most 3.5 h
+  before the cutoff, within 730 days), widening 1.15 applied by the scorer to every arm, cleaned data
+  (1,179 scoring half-hours dropped as flagged exact zeros across the folds), the D15 and D18 cut
+  from the rows of experiment 454. The contrasts are for weekly refits only. L-Ww, L-W, L-M, K2-S1
+  are stored predictions from experiments 510 and 454. Stage 1 and the cross-fit networks are saved
+  under `work/stage1` and `work/stage1_crossfit` (60 + 10 files) in the private data folder; the
+  stage-2 and S2-J weights were not saved.
+- **Cross-fit.** Each second-network training row uses a first network that left out a 3-day-padded
+  block of the history around its valid time (6 blocks per fold and seed). That network is slightly
+  staler than the full one used at test, which may over-widen S2-F. The CRPS loss is in units of
+  each Primary's standard deviation, so it weights low-variance Primaries more than nll does.
+- **Not run (quota pause until Wednesday 2026-11-04 01:00 UTC).** The stage-0 arms, S2-M, S2-R, the
+  daily harness, the injected-shift leak, the eleven-quantile control, the 1st and 5th percentile
+  tails, tails by lead, widths and the probability integral transform by lead, the avoidable
+  curtailment cost, and the load-shift plots. They remain proposals.
+- **Audit triggers.** Trigger 2 fired for P1; the page tests an explanation (S2-J minus S2-F above:
+  the frozen first network cannot track recent demand). Trigger 3 was not checked: the mean-forecast
+  error and the median-minus-mean forecast per site were not computed. No audit has run, no
+  results review or write-up review has run, and every number is interim and unaudited. Trigger 7
+  applies to any later design that builds on S2-J's equivalence.
+- **Seeds and statistics.** Two seeds, five folds; the intervals resample 153 origin days, with the
+  five whole-month blocks as a check (per-fold signs above). The Bonferroni count is 18.
+- **Unlogged events.** NGED's logs may miss load-shift events, so clean rows may hold events no label
+  covers; this page scores no event slice.
+- **What to try next.** Run S2-M (51 members through the first network), the stage-0 weather adaptor,
+  and the injected-shift leak once the quota returns. Test whether the S2-J head still helps
+  against a lead-free network without a head, to see whether the head adds anything.

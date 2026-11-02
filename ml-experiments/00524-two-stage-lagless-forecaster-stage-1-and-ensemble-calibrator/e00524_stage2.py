@@ -3,7 +3,8 @@ r"""Stage 2 of experiment 524: the ensemble calibrator on the mixture of a froze
 
 For each fold month and seed, `cache` runs the frozen stage-1 networks (`e00524_stage1.py`) over the
 ENS rows of the 730-day window with a cross-fit (each row uses a stage-1 network that left out the
-power around its valid time, which removes the stacking leak) and over the month's test rows, and stores the raw 9 mixture outputs with the stage-2 inputs.
+power around its valid time, which removes the stacking leak) and over the month's test rows, and
+stores the raw 9 mixture outputs with the stage-2 inputs.
 `fit` then trains, at each of the five weekly cutoffs, a stage-2 calibrator on the cross-fitted
 rows that satisfy experiment 510's row rule (valid time at most cutoff - 3.5 h, origin at most the
 cutoff, within 730 days, weight 0.5 ** (age / 90)), and forecasts the cutoff's week.
@@ -202,8 +203,8 @@ class FormB(torch.nn.Module):
             torch.nn.Linear(3 * K + 6, 32), torch.nn.ReLU(), torch.nn.Linear(32, 32),
             torch.nn.ReLU(), torch.nn.Linear(32, 3 * K),
         )  # fmt: skip
-        torch.nn.init.zeros_(self.net[-1].weight)
-        torch.nn.init.zeros_(self.net[-1].bias)
+        torch.nn.init.zeros_(self.net[-1].weight)  # ty: ignore[invalid-argument-type]
+        torch.nn.init.zeros_(self.net[-1].bias)  # ty: ignore[invalid-argument-type]
 
     def forward(self, out: torch.Tensor, aux: torch.Tensor) -> torch.Tensor:
         """Return the calibrated raw outputs."""
