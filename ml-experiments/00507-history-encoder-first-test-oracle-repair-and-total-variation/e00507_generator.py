@@ -41,6 +41,8 @@ P_B: Final[float] = 0.25
 CAP_MW: Final[float] = 5.4
 SIZE_SPREADS: Final[tuple[float, float]] = (0.5, 3.0)
 NEVER: Final[int] = 1 << 30
+MAX_DAYS: Final[int] = 4000
+"""Every random vector is drawn at this length, so a window's events do not change when the grid grows."""
 RAMP_SHARE: Final[float] = 0.3
 STAIR_SHARE: Final[float] = 0.2
 ONSET_RANGE_A: Final[int] = 2 * HISTORY
@@ -77,9 +79,9 @@ class Spec:
 
 
 def shape_of(*, real: np.ndarray) -> np.ndarray:
-    """Return each Primary's reading over its mean, with 1 where unobserved or non-positive."""
+    """Return each Primary's reading over its mean (1 where unobserved or not positive), clipped to 0..4."""
     mean = np.nanmean(np.abs(real), axis=1, keepdims=True)
-    out = np.where(np.isfinite(real), real / np.maximum(mean, 1e-6), 1.0)
+    out = np.where(np.isfinite(real) & (real > 0), real / np.maximum(mean, 1e-6), 1.0)
     return np.clip(out, 0.0, 4.0).astype(np.float32)
 
 
@@ -110,6 +112,7 @@ def sample_world(*, spec: Spec, seed: int) -> Events:
     """Draw every window's events for one world; deterministic in (seed, Primary, day)."""
     days = spec.days
     n_p = spec.real.shape[0]
+    assert days <= MAX_DAYS, days
     shape = (n_p, days, SLOTS)
     fam = np.zeros(shape, dtype=np.int8)
     start = np.zeros(shape, dtype=np.int64)
@@ -121,36 +124,38 @@ def sample_world(*, spec: Spec, seed: int) -> Events:
     newest = newest_of(day=np.arange(days))
     for p in range(n_p):
         rng = np.random.default_rng([seed, p])
-        u = rng.random(days)
+        u = rng.random(MAX_DAYS)[:days]
         window_family = np.where(u < P_A, FAMILY_A, np.where(u < P_A + P_B, FAMILY_B, NONE))
-        n_events = rng.integers(1, SLOTS + 1, size=days)
+        n_events = rng.integers(1, SLOTS + 1, size=MAX_DAYS)[:days]
         for k in range(SLOTS):
             active_a = (window_family == FAMILY_A) & (k < n_events)
             active_b = (window_family == FAMILY_B) & (k == 0)
             active = active_a | active_b
-            onset_a = newest - (ONSET_RANGE_A - 1) + rng.integers(0, ONSET_RANGE_A, size=days)
-            onset_b = newest - (HISTORY - 1) + rng.integers(0, HISTORY, size=days)
-            from_pool = rng.random(days) < 0.5
-            pool_d = spec.pool_steps[rng.integers(0, len(spec.pool_steps), size=days)]
-            log_d = np.rint(np.exp(rng.uniform(np.log(2), np.log(HISTORY), size=days)))
+            onset_a = newest - (ONSET_RANGE_A - 1) + (rng.integers(0, ONSET_RANGE_A, size=MAX_DAYS))[:days]
+            onset_b = newest - (HISTORY - 1) + (rng.integers(0, HISTORY, size=MAX_DAYS))[:days]
+            from_pool = (rng.random(MAX_DAYS) < 0.5)[:days]
+            pool_d = (spec.pool_steps[rng.integers(0, len(spec.pool_steps), size=MAX_DAYS)])[:days]
+            log_d = np.rint(np.exp((rng.uniform(np.log(2), np.log(HISTORY), size=MAX_DAYS))[:days]))
             duration = np.where(from_pool, pool_d, log_d).astype(np.int64)
             magnitude = np.minimum(
-                rng.uniform(*SIZE_SPREADS, size=days) * spec.spread[p],
+                (rng.uniform(*SIZE_SPREADS, size=MAX_DAYS))[:days] * spec.spread[p],
                 CAP_MW / spec.capacity_mw[p],
             )
-            sign = np.where(rng.random(days) < 0.5, 1.0, -1.0)
-            kind = np.searchsorted(np.cumsum(SHAPE_MIX)[:-1], rng.random(days), side="right")
-            other = (p + 1 + rng.integers(0, n_p - 1, size=days)) % n_p
+            sign = np.where((rng.random(MAX_DAYS) < 0.5)[:days], 1.0, -1.0)
+            circuit_fraction = (rng.uniform(0.3, 1.0, size=MAX_DAYS))[:days]
+            kind = np.searchsorted(np.cumsum(SHAPE_MIX)[:-1], (rng.random(MAX_DAYS))[:days], side="right")
+            other = (p + 1 + (rng.integers(0, n_p - 1, size=MAX_DAYS))[:days]) % n_p
             src = np.where(kind == 0, -1, np.where(kind == 1, p, other))
-            ramped = rng.random(days) < RAMP_SHARE
-            ramp_len = rng.integers(1, 5, size=days)
-            staired = rng.random(days) < STAIR_SHARE
-            stair_len = rng.integers(2, 13, size=days)
+            ramped = (rng.random(MAX_DAYS) < RAMP_SHARE)[:days]
+            ramp_len = (rng.integers(1, 5, size=MAX_DAYS))[:days]
+            staired = (rng.random(MAX_DAYS) < STAIR_SHARE)[:days]
+            stair_len = (rng.integers(2, 13, size=MAX_DAYS))[:days]
             fam[p, :, k] = np.where(active_a, FAMILY_A, np.where(active_b, FAMILY_B, NONE))
             s = np.where(active_a, onset_a, onset_b)
             start[p, :, k] = s
             end[p, :, k] = np.where(active_a, s + duration, NEVER)
-            size[p, :, k] = (sign * magnitude).astype(np.float32)
+            fraction = np.where(kind == 2, circuit_fraction, 1.0)
+            size[p, :, k] = (sign * magnitude * fraction).astype(np.float32)
             source[p, :, k] = src
             ramp[p, :, k] = np.where(ramped, ramp_len, 0)
             stair[p, :, k] = np.where(staired, stair_len, 0)
@@ -190,9 +195,9 @@ def step_values(
             continue
         src = ev.source[p, d, k].astype(np.int64)
         shape = np.where(src < 0, 1.0, spec.shape[np.maximum(src, 0), gs])
-        total += np.where(
-            use, ev.size[p, d, k] * event_profile(ev=ev, p=p, d=d, k=k, g=g) * shape, 0.0
-        )
+        cap = CAP_MW / spec.capacity_mw[p]
+        step = ev.size[p, d, k] * event_profile(ev=ev, p=p, d=d, k=k, g=g) * shape
+        total += np.where(use, np.clip(step, -cap, cap), 0.0)
     return total
 
 
@@ -327,7 +332,8 @@ def selftest(*, spec: Spec | None = None, strict: bool = True) -> dict[str, floa
         if strict:
             assert p_value > 0.01, f"{name} differs between families A and B"
     if strict:
-        assert abs(share_a - exp_a) < 0.05, "A share is not within 5 points of the derived value"
+        assert abs(share_a - exp_a) < 0.15 * exp_a, "A share is not within 15% of the derived value"
+        assert share_a > 0.01, "the generator makes almost no A step in force at the origin"
         assert abs(genuine - exp_genuine) < 0.05, "genuine share is not within 5 points"
     print("selftest passed")
     return results

@@ -433,7 +433,7 @@ class MonthContext:
 def old_world_sources() -> tuple[dict[int, GridLags], GridLags, dict[int, np.ndarray]]:
     """Return the training worlds, the stored reading as a world, and the scoring worlds' codes."""
     train = {s: GridLags(power=fit.world_power(seed=100 + s)[0]) for s in range(3)}
-    real_world = GridLags(power=fit.world_power(seed=None)[0])
+    real_world = GridLags(power=c.clean_world())
     return train, real_world, {w: fit.world_power(seed=w)[1] for w in c.SCORE_WORLDS}
 
 
@@ -446,6 +446,7 @@ def run_old(*, month: str, device: str, seeds: tuple[int, ...] = (0, 1, 2)) -> N
     """
     started = time.monotonic()
     ctx = MonthContext.build(month=month, device=device)
+    print(f"{month}: {len(ctx.test):,} scored rows, {len(ctx.train):,} training rows", flush=True)
     train_worlds, real_world, codes = old_world_sources()
     score_worlds = {w: GridLags(power=fit.world_power(seed=w)[0]) for w in c.SCORE_WORLDS}
     out: list[pl.DataFrame] = []

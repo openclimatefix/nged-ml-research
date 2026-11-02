@@ -146,7 +146,7 @@ def shapes() -> None:
     for e in events.filter(pl.col("event_id").is_in(list(measured))).iter_rows(named=True):
         p = sites.index(e["label"])
         g0, g1 = int(e["onset_idx"]), int(e["end_idx"]) + 1
-        base = np.nanmedian(resid[p, g0 - 7 * 48 : g0] * spec.spread[p])
+        base = np.nanmedian(resid[p, max(g0 - 7 * 48, 0) : g0] * spec.spread[p])
         dev = resid[p, g0:g1] * spec.spread[p] - base
         shape = spec.shape[p, g0:g1]
         ok = np.isfinite(dev)
