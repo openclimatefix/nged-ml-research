@@ -10,9 +10,9 @@ Commands:
 
 - `rows`: write the row-level metrics of every arm and month;
 - `stats`: print the minimum detectable effect first, then absolute scores and contrasts;
-- `build`: write each cell (H0, WO, RO; seeds 0 to 2) on experiment 470's rows for the curtailment script;
+- `build` (run before `curtailment`): write each cell (H0, WO, RO; seeds 0 to 2) on experiment 470's rows for the curtailment script;
 - `curtailment [--christmas]`: avoidable-curtailment cost at f = 0.9, 0.75, and 0.5 at the signed-MW six on
-  rows with no labelled event, beside `manual_heuristic` and BG2 (`--christmas`: only the 22 to
+  rows with no labelled event, beside `manual_heuristic` (`--christmas`: only the 22 to
   31 December 2025 half-hours).
 
 ```bash

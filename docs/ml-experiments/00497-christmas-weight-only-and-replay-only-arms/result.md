@@ -49,7 +49,8 @@ decision_rule: >-
   with no serving cost.
 benchmark: >-
   H0, experiment 425's stored arm A fine-tunes (seeds 0 to 2 as cells), the bundle H2 from
-  experiment 485 (descriptive), BG2, `manual_heuristic`, and climatology from experiment 470.
+  experiment 485 (quoted from its page, not rescored), BG2, `manual_heuristic`, and climatology from
+  experiment 470 (curtailment cost: `manual_heuristic` only).
 row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity, q01 to q99 pinball loss and coverage, and avoidable
