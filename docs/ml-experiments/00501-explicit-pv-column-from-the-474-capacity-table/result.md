@@ -98,6 +98,15 @@ experiment 425's arm A when supplied as one extra input column.
   NGED's event labels are incomplete, so "rows with no labelled event" is the correct phrase for
   clean rows.
 
+## Leaks that remain, fixed in advance
+
+- The recovery divisor of each Primary (0.956 to 0.994) is experiment 474's stored median
+  known-answer recovery, which used data to June 2026. It moves a capacity by under 5%.
+- The farm output is normalised by its 99th percentile over all history, and `u99` of experiment
+  405 comes from all of D10's ensemble summaries. Both are constant scale factors.
+- The first fold (2025-10) identifies the latest season-year's capacity increment from July to
+  September 2025 rows only, so its capacity is noisier than the later folds'.
+
 ## Minimum detectable effect
 
 Printed by `e00501_score.py mde` from arm A's five stored seeds alone, before any fit of this
@@ -106,8 +115,9 @@ signed-MW six CRPS is taken, averaged over the 10 pairs, and divided by the squa
 give one seed's standard deviation. The minimum detectable effect is twice that standard deviation,
 times the square root of 2/3, for a contrast of two 3-seed averages. **Sunny-midday half-hours
 (138,655 half-hours in the shared set): 0.225 CRPS points** (one seed's standard deviation 0.138).
-**All daylight half-hours: 0.134 points** (one seed's standard deviation 0.082). The prediction's
-threshold for C1 is therefore 0.225 points. This is below experiment 416's 0.28 to 0.37, which
+**All daylight half-hours: 0.134 points** (one seed's standard deviation 0.082). **All half-hours
+(days 1 to 10): 0.104 points.** The thresholds for C1, C2, and C3 are therefore 0.225, 0.134, and
+0.104 points. This is below experiment 416's 0.28 to 0.37, which
 used a different network and the 5-seed definition.
 
 ## Serving table (to complete after the run)

@@ -56,12 +56,19 @@ class PvFold(prep425.EnsFold):
     pv_unit: np.ndarray = None  # ty: ignore[invalid-assignment]
 
 
+_CAPACITY: dict[tuple[str, str], float] = {}
+
+
 def capacity_table() -> dict[tuple[str, str], float]:
-    """Return the out-of-fold AC capacity in MW by (fold, site)."""
-    frame = pl.concat(
-        [pl.read_parquet(p) for p in sorted(WORK_DIR.glob("capacity_by_fold_*.parquet"))]
-    )
-    return {(r["fold"], r["site"]): r["ac_mw"] for r in frame.iter_rows(named=True)}
+    """Return the out-of-fold AC capacity in MW by (fold, site), read once and checked complete."""
+    if not _CAPACITY:
+        frame = pl.concat(
+            [pl.read_parquet(p) for p in sorted(WORK_DIR.glob("capacity_by_fold_*.parquet"))]
+        )
+        assert frame.height == len(frame.select("fold", "site").unique()), "duplicate capacity rows"
+        assert frame.height == len(capacity.FOLDS) * len(capacity.SIGNED_SIX), frame.height
+        _CAPACITY.update({(r["fold"], r["site"]): r["ac_mw"] for r in frame.iter_rows(named=True)})
+    return _CAPACITY
 
 
 def pv_column(*, site: str, month: str, unit_shape: np.ndarray) -> np.ndarray:

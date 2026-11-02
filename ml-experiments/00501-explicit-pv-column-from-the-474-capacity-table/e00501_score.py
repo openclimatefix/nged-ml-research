@@ -141,14 +141,18 @@ def run_mde() -> None:
         rows = add_flags(rows=rows, table=table)
         per_seed[seed] = {
             sl: monthly_means(rows=rows["A"], flag=pl.col(flag))
-            for sl, flag in (("sunny_midday", "sunny_midday"), ("daylight", "daylight"))
+            for sl, flag in (
+                ("sunny_midday", "sunny_midday"),
+                ("daylight", "daylight"),
+                ("all", "all"),
+            )
         }
     assert table is not None
     print(
         f"shared half-hours {table.height}; sunny-midday half-hours {int(table['sunny_midday'].sum())}"
     )
     out = {}
-    for sl in ("sunny_midday", "daylight"):
+    for sl in ("sunny_midday", "daylight", "all"):
         sds = []
         for s1, s2 in itertools.combinations(range(5), 2):
             diff = [per_seed[s1][sl][m] - per_seed[s2][sl][m] for m in MONTHS]
@@ -161,6 +165,7 @@ def run_mde() -> None:
             f"{sl}: mean SD over folds of a two-seed difference {sd_pair:.4f}; one seed's SD "
             f"{sd_seed:.4f}; MDE for a contrast of two 3-seed averages (2 x SD) {mde_3:.4f} points"
         )
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     (OUT_DIR / "mde.json").write_text(json.dumps(out, indent=1))
 
 
