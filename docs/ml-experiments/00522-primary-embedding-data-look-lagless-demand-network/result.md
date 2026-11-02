@@ -19,35 +19,41 @@ size: >-
   plan review, one Sonnet code review before the first number is quoted, one Sonnet results review,
   and two Sonnet write-up reviews.
 hypothesis: >-
-  The lag-free network (the L0PT network of experiment 448: pretrained on ERA5 and CAMS rows, no
-  lagged-power input) identifies each Primary through an 8-wide embedding vector that starts as a
-  random N(0, 1) draw. The vectors mostly stay at their random start, and the part they learn is
-  small and not arranged the way a Primary's physical behaviour is. The network still uses the
-  vectors, because a random fixed label is enough to separate 16 Primaries.
+  The Primary embedding of the lag-free neural network does more than label the 16 Primaries. The
+  embedding is the 16 x 8 table of vectors that tells the network which Primary (primary
+  substation) a row belongs to. The network is the L0PT network of experiment 448: it reads no
+  lagged power and is pretrained on ERA5 and CAMS estimates of past weather. Each vector starts as
+  a random N(0, 1) draw. The hypothesis is that the movement from that start is small, is not
+  arranged by a Primary's physical behaviour, and is not needed by the network, because a random
+  fixed label is enough to separate 16 Primaries.
 prediction: >-
-  Written before any statistic is read. P1: the per-dimension standard deviation of the stored
-  vectors is 1.0 to 1.2, and the learned movement (stored vector minus regenerated start) is 40% to
-  60% of the start's norm after pretraining and under 5% in daily fine-tuning. P2: the distance
-  matrix of the movement, averaged over 5 seeds, has a Mantel correlation with at most 2 of the 10
-  descriptor-distance matrices that survives the Bonferroni count of 20. P3: swapping the vectors
-  of two Primaries raises the CRPS of every scored Primary by more than 0.5 points of capacity (the
-  removal of the embedding costs 0.65 to 0.85 points). P4: scoring every Primary with its own
-  regenerated start vector (the "start" arm) costs under 0.3 points against the stored vectors, so
-  the learned movement is nearly unused. P5: the lagged network (arm A of experiment 425) loses less
-  than the lag-free network under the swap, by at least a third.
+  Written before any statistic is read. P1: the displacement (the norm of the stored vectors minus
+  the regenerated start, divided by the norm of the start, over all 16 Primaries) is 0.40 to 0.60
+  after pretraining, and under 0.05 between the pretrained and the daily fine-tuned weights. This
+  differs from the queue-order check's 15% to 17%, which compared two folds of one seed with each
+  other and not with the start. P2: none of the 10 counted Mantel tests passes the level
+  0.05 / 10 = 0.005. P3: under the 20 random derangements, the mean CRPS (continuous ranked
+  probability score) of the 14 Primaries that are not report-only rises by more than 0.5 percentage
+  points of effective capacity; removing the embedding altogether raised it by 0.65 to 0.85 in
+  experiments 406, 425, and 448. P4: scoring each Primary with its own regenerated start vector
+  (the "start" arm) raises CRPS by less than the minimum detectable effect, so the movement is
+  nearly unused. P5: the lagged neural network (arm A of experiment 425) loses less than the
+  lag-free neural network under the derangements, by at least a third.
 decision_rule: >-
-  "Thin" if no Mantel test passes the Bonferroni count of 20 and the start arm scores within the
-  minimum detectable effect of the stored vectors; then a follow-up brief for the best
-  training-window-only option of Part 4 is warranted. "Healthy" if at least one Mantel test passes
-  the count and the start arm scores worse than the stored vectors by more than the minimum
-  detectable effect. Anything else is "mixed", and the page says which half failed. The page makes
-  no claim of benefit either way: it is a diagnostic. The minimum detectable effect for one fold and
-  one seed is taken as 1.5 to 2 times the two-seed, five-fold value of experiment 511: 0.164 at the
-  eight and 0.123 at the six.
+  The minimum detectable effect is fixed at 2 times the two-seed, five-fold value of experiment
+  511: 0.328 percentage points at the 8 Primaries that report apparent power only (MVA) and 0.246 at
+  the 6 that report signed megawatts. Applying it to one fold and one seed, and to per-Primary
+  changes, is an assumption. "Thin": no Mantel test passes 0.005 and the 95% interval of the
+  start-arm-minus-stored CRPS difference lies inside the minimum detectable effect; a follow-up
+  brief for the best option of Part 4 that uses only the training window is then warranted.
+  "Healthy": at least one Mantel test passes 0.005 and the start arm is worse than the stored
+  vectors by more than the minimum detectable effect. Anything else is "mixed", and the page says
+  which half failed. A null Mantel result is weak evidence, because 16 points have little power;
+  the planted-signal control below reports how much. The page makes no claim of benefit.
 benchmark: >-
-  Within the experiment: the stored vectors (identity) against the swap, the mean vector, the start
-  vector, and fresh N(0, 1) vectors. The lagged network of experiment 425 (arm A) under the same
-  tests.
+  Within the experiment: the stored vectors (identity) against the derangements, the mean vector,
+  the start vector, and fresh N(0, 1) vectors. The lagged neural network of experiment 425 (arm A)
+  under the same tests.
 row_set_id: experiment_522_test_2026_01_all_leads
 metric: >-
   Rank correlation and Mantel test of 16 x 16 distance matrices; CRPS in points of effective
@@ -69,55 +75,80 @@ behaviour, and whether the network uses it.
 
 ## Parts
 
-All parts use stored weights, CPU only, two cores, and no fitting.
+All parts read stored weights on CPU with two cores and fit nothing. "Primary" means a primary
+substation. D15 and D18 (the two short-history Primaries) are among the 16 permuted labels and
+every table row, and are left out only of the headline means.
 
-- **Part 1: displacement from the start.** Regenerate each start with `torch.manual_seed(seed)`
-  followed by the construction of `PlainMdn` (verified before the plan: the regenerated start
-  correlates 0.88 to 0.91 with the stored vector of the same seed and about 0 with other seeds).
-  Weights: 5 seeds x 4 folds of L0PT (experiment 448: 2025-10, 2026-01, 2026-03, 2026-06) and the
-  L-1d seed 0 network of experiment 511 at 2026-01. Report the per-dimension standard deviation, the
-  singular values and the number of dimensions for 90% of the variance, the displacement from the
-  start as a share of the start's norm per fold and seed, and the movement per Primary (the only
-  learned part). Alignment (Spearman correlation of the 120-pair distance matrices) only between
-  same-seed pairs after removing the start, and between the movements of different seeds as a
-  descriptive null. D15 and D18 are included and report-only.
-- **Part 2: does the movement follow physical behaviour?** Ten descriptors per Primary, cut at
-  each fold's pretraining end: median and 95th percentile of demand and load factor (points of
-  effective capacity), the weekday daily profile in winter and in summer (48 values each), the
-  weekend-to-weekday ratio in winter and in summer, and the slopes of demand on ERA5 temperature in
-  winter and in summer. The shortwave sensitivity at midday, and the reverse-flow share (the six)
-  and the midday-dip share (the eight, experiments 506 and 508), are reported beside the tests and
-  stay out of the counted family, because each covers a subset of 6 or 8 Primaries. Assets and the
-  grid supply point group are annotation only. A Mantel test (10,000 permutations of the 16 labels)
-  on 120 pairs, not a Procrustes fit. Counted tests: 10 descriptors x 2 views (the stored vectors,
-  and the movement) = 20, on fold 2026-01 with the seed-averaged distance matrix (the other three
-  folds are descriptive), Bonferroni level 0.05 / 20. A hierarchical clustering of the movement is
-  listed next to the descriptors. The 120 pairs come from 16 points, so the pair count overstates the
-  independent evidence.
-- **Part 3: does the network use the vectors?** Fold 2026-01, seed 0, with the pretrained L0PT
-  weights and their stored standardiser. Each Primary keeps its own target statistics. Arms:
-  identity (checked against experiment 448's stored forecasts), 20 random derangements of the
-  vectors, the mean vector, the start vector of each Primary, and 20 draws of fresh N(0, 1)
-  vectors. The same arms on arm A of experiment 425. Output: CRPS change per Primary in points of
-  capacity. The swap shows that the vectors are used, not that they are informative.
-- **Part 4: other ways to tell the network which Primary it is.** A design list only, with a
-  prediction that could fail and a cost for each option: initialise the embedding from per-Primary
-  descriptors, a higher learning rate or no weight decay on the embedding, static descriptor inputs
-  recomputed at each refit, a wider embedding, a per-Primary output scale and bias head, and
-  feature-wise modulation of the hidden layers. It cites experiments 406, 421, 425, and 448. None
-  is run.
+- **Part 1: displacement from the start.** The start is regenerated with `torch.manual_seed(seed)`
+  followed by the construction of the network. The check made before this plan found that the
+  regenerated start correlates 0.88 to 0.91 with the stored vectors of the same seed and about 0
+  with other seeds. The weights are 5 seeds x 4 folds of L0PT (2025-10, 2026-01, 2026-03, and
+  2026-06), the same cells of arm A of experiment 425 (checked to share the start, because both
+  build the embedding first), the fine-tuned L0PT weights of experiment 448, and one fine-tuned
+  L-1d network of experiment 511 (daily refit, 2026-01, day 10, seed 0). The page reports the
+  per-dimension standard deviation, the singular values, the number of dimensions that carry 90%
+  of the variance, and any near-constant dimension. It reports the displacement per fold and seed
+  and the movement per Primary. It also reports the drift between the pretrained and the
+  fine-tuned weights. Spearman correlations of the 120-pair distance matrices come only from
+  same-seed pairs after the start is removed, with the cross-seed correlations as a descriptive
+  null. Each correlation is reported with its number of matrix pairs.
+- **Part 2: does the movement follow physical behaviour?** Ten descriptors per Primary are cut at
+  each fold's pretraining end: median and 95th percentile of demand, load factor, the weekday
+  profile in winter and in summer (48 values each), the weekend-to-weekday ratio in winter and in
+  summer, and the slope of demand on ERA5 temperature in winter and in summer. Coverage of ERA5 at
+  the 16 H3 cells is verified first. The midday shortwave sensitivity, the reverse-flow share (the
+  6 signed-MW Primaries), and the midday-dip share (the 8 MVA-only Primaries, experiments 506 and
+  508) are reported beside the tests and stay out of the counted family, because each covers 6 or 8
+  Primaries. Assets and the grid supply point group are annotation. The test is a two-sided Mantel
+  test with Spearman correlation and 10,000 permutations of the 16 labels, with no Procrustes fit.
+  The distance is plain Euclidean distance between the movement vectors, averaged over the 5 seeds
+  of fold 2026-01, and the descriptor distance is Euclidean on standardised descriptors. The
+  counted family is these 10 tests (level 0.05 / 10); the other three folds, the stored-vector
+  view, and a cosine-distance version are descriptive. The correlation of each descriptor with the
+  movement norm is reported, because a movement norm that tracks demand level would drive a pass.
+  A planted-signal control builds a movement that equals the descriptor-derived signal plus noise
+  at the observed movement norm, and reports the detection rate. The page lists a hierarchical
+  clustering of the movement next to the descriptors, says which expected pairs cluster and which do
+  not, and states that 120 pairs from 16 points overstate the independent evidence.
+- **Part 3: does the network use the vectors?** The weights are the pretrained L0PT weights of fold
+  2026-01, seed 0, with the stored input standardiser, so that only the embedding changes. Each
+  Primary keeps its own target statistics. The arms are the identity (checked against experiment
+  448's stored forecasts), 20 random derangements of the 16 vectors, the mean vector, the start
+  vector of each Primary, and 20 draws of fresh N(0, 1) vectors (one vector per Primary, drawn
+  independently of the start seed). Arm A of experiment 425 gets the same arms except the start arm,
+  unless the regenerated start is verified for it. The output is the per-Primary CRPS change in
+  percentage points of effective capacity, averaged over the 20 draws. The rows are the 2026-01 test
+  rows (all leads up to 240 hours, rows with a cleaned actual). Intervals come from the 20 draws
+  and from a bootstrap over origin days; the part covers one fold and one seed. The derangements
+  show that the vectors are used, not that they are informative.
+- **Part 4: other ways to tell the network which Primary it is.** The page lists, without running
+  them, these options, each with a prediction that could fail, a cost estimate, and whether it uses
+  only the training window: initialise the embedding from per-Primary descriptors, a higher learning
+  rate or no weight decay on the embedding, static descriptor inputs recomputed at each refit, a
+  wider embedding, a per-Primary output scale and bias head, and feature-wise modulation of the
+  hidden layers. The list cites experiments 406, 421, 425, and 448.
 - **Consistency with experiment 511.** The page says whether 511's short-lead result (the lag-free
-  network beats K2-S1 below about 2 days and the gap sits at days 5 to 10) is consistent with a thin
-  embedding.
+  neural network beats K2-S1 below about 2 days, and the gap to K2-S1 sits at days 5 to 10) is
+  consistent with a thin embedding.
+
+## Figures
+
+The page charts the 16 x 16 pairwise-distance matrix of the movement, and the two leading
+dimensions of the movement with Primary names, both with the OCF palette and no mark in the
+background colour `#fffbf5`. It adds a chart of the displacement per Primary and one of the Part 3
+CRPS changes.
 
 ## Standing practices
 
-- Cleaned data throughout (`studies.power.scan_power` or experiment 87's cleaned arrays); the
-  D15 and D18 start cut at 2025-03-01 applies to every descriptor, and the count of dropped
-  half-hours is reported.
-- No fits, so no refit cadence and no seeds beyond those stored. Intervals are bootstrap intervals
-  over the 5 stored seeds and 4 folds, which is very few; the page says so.
-- Tail calibration, curtailment cost, and load-shift plots do not apply to a diagnostic of
-  stored weights. The page says that.
-- July 2026 is unused. Load-shift, never "switching", in every title.
-- Metered generators do not appear. Substations are named.
+- Cleaned data throughout, with the flagged half-hours dropped; the D15 and D18 start cut at
+  2025-03-01 applies to every descriptor (so their descriptor windows are shorter), and the count of
+  dropped half-hours is reported. The page says "rows with no labelled event" where it means the
+  rows without a labelled load-shift event.
+- No fits, so no refit cadence and no seeds beyond those stored. Bootstrap intervals over the 5
+  stored seeds and 4 folds rest on very few cells, and the page says so. The 2025-12 weights of
+  experiment 510 are not used.
+- Tail calibration, curtailment cost, and load-shift plots do not apply to a diagnostic of stored
+  weights, and the page says that.
+- July 2026 is unused. Titles say "load-shift", never "switching". No metered generator appears.
+- The manager is messaged when the plan PR opens, when the code review is done, when results exist,
+  and when the PR merges.
