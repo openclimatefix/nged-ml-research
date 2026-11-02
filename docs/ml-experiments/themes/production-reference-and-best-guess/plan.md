@@ -2,6 +2,7 @@
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 496 | Can the demand neural network drop its ensemble-spread inputs, merge its holiday columns, drop its weekly lag, or use one Gaussian without losing skill? | High (series step 6) | Nothing | Planned |
 | 252 | Does the best-guess stack score within 0.05 points of BG2 at the eight Primaries with no stack forecast? | High (cards) | Nothing | Planned |
 | 353 | How well does Primary demand research default 3's stack forecast D8 when the MVA meter's fold is modelled? | High (maintainer asked) | Nothing | Planned |
 | 379 | What does each component of BG2 contribute at all 16 Primaries, out to 14 days, under `demand-v1`? | High (maintainer asked 2026-10-28) | Nothing | Planned |
