@@ -161,6 +161,8 @@ class Fold:
     block_edges: list[int]
     cap_mw: np.ndarray
     """(20,) capacity in MW, Primaries then supply points."""
+    mw_per_z: np.ndarray
+    """(20,) MW per unit of the partner matrix (band half-width times capacity; supply sd times capacity)."""
 
     def partners(self) -> np.ndarray:
         """Return the (20, n) partner matrix: Primary `z` then the supply series."""
@@ -210,9 +212,10 @@ def build_fold(*, month: str) -> Fold:
                 z[p, a:b] = block - np.nanmedian(block)
     spread = np.array([robust_sd(x=z[p, :refit]) for p in range(16)])
     supply = profile_difference_supply().astype(np.float64)
+    supply_sd = np.zeros(supply.shape[0])
     for k in range(supply.shape[0]):
-        sd = robust_sd(x=supply[k, :refit])
-        supply[k] = supply[k] / sd
+        supply_sd[k] = robust_sd(x=supply[k, :refit])
+        supply[k] = supply[k] / supply_sd[k]
     partners = np.concatenate([z, supply])
     edge_sd = np.array([robust_sd(x=edge_statistic(x=partners[k, :refit])) for k in range(20)])
     cap = np.concatenate([primary_capacity_mw(), supply_capacity_mw()])
@@ -226,6 +229,7 @@ def build_fold(*, month: str) -> Fold:
         edge_sd=edge_sd,
         block_edges=edges,
         cap_mw=cap,
+        mw_per_z=np.concatenate([half_width, supply_sd]) * cap,
     )
 
 
@@ -287,3 +291,59 @@ def neighbour_graph() -> dict[int, list[int]]:
         if site in names:
             out[names.index(site)] = sorted(names.index(o) for o in others if o in names)
     return out
+
+
+def fold_cache_path(*, month: str) -> Path:
+    """Return where a fold's arrays are cached."""
+    return WORK_DIR / f"fold_{month}.npz"
+
+
+def save_fold(*, fold: Fold) -> None:
+    """Write a fold's arrays to the work folder (atomically)."""
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    target = fold_cache_path(month=fold.month)
+    tmp = target.with_name(target.name + ".tmp.npz")
+    np.savez(
+        tmp, z=fold.z.astype(np.float32), supply=fold.supply.astype(np.float32),
+        half_width=fold.half_width, spread=fold.spread, edge_sd=fold.edge_sd,
+        refit=fold.refit, block_edges=np.array(fold.block_edges), cap_mw=fold.cap_mw,
+        mw_per_z=fold.mw_per_z,
+    )  # fmt: skip
+    tmp.rename(target)
+
+
+def load_fold(*, month: str) -> Fold:
+    """Read a cached fold, building and caching it first if absent."""
+    path = fold_cache_path(month=month)
+    if not path.exists():
+        save_fold(fold=build_fold(month=month))
+    z = np.load(path)
+    return Fold(
+        month=month, refit=int(z["refit"]), z=z["z"].astype(np.float64),
+        half_width=z["half_width"], spread=z["spread"], supply=z["supply"].astype(np.float64),
+        edge_sd=z["edge_sd"], block_edges=[int(v) for v in z["block_edges"]],
+        cap_mw=z["cap_mw"], mw_per_z=z["mw_per_z"],
+    )  # fmt: skip
+
+
+def shape_cache_path() -> Path:
+    """Return where the Primaries' demand-shape profiles are cached."""
+    return WORK_DIR / "shape_profiles.npy"
+
+
+def load_shapes() -> np.ndarray:
+    """Return the (16, n) median of the same half-hour in the 4 earlier weeks of the cleaned power."""
+    path = shape_cache_path()
+    if not path.exists():
+        WORK_DIR.mkdir(parents=True, exist_ok=True)
+        clean = clean_primary_power().astype(np.float64)
+        n = clean.shape[1]
+        out = np.empty((16, n), dtype=np.float32)
+        for p in range(16):
+            past = np.stack(
+                [np.concatenate([np.full(k * WEEK, np.nan), clean[p, : n - k * WEEK]]) for k in range(1, 5)]
+            )
+            with np.errstate(all="ignore"):
+                out[p] = np.nanmedian(past, axis=0)
+        np.save(path, out)
+    return np.load(path)
