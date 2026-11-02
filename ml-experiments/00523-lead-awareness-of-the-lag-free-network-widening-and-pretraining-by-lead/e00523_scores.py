@@ -210,7 +210,7 @@ def pooled_ratio(*, sub: pl.DataFrame, num: list[str], den: list[str]) -> float:
 
     def weighted(bands: list[str]) -> float:
         part = pooled.filter(pl.col("band").is_in(bands))
-        return float((part["w90"] * part["n"]).sum() / part["n"].sum())
+        return float((part["w90"] * part["n"]).sum() / part["n"].sum())  # ty: ignore[unsupported-operator]
 
     return weighted(num) / weighted(den)
 
@@ -260,7 +260,7 @@ def coverage_gate(*, table: pl.DataFrame) -> pl.DataFrame:
         for band in st.BANDS:
             sub = part.filter(pl.col("band") == band)
             for q in ("q95", "q99"):
-                cov[(band, q)] = float(sub[f"L-1d__cov_{q}"].mean() - sub[f"K2-S1__cov_{q}"].mean())  # ty: ignore[unresolved-attribute]
+                cov[(band, q)] = float(sub[f"L-1d__cov_{q}"].mean() - sub[f"K2-S1__cov_{q}"].mean())  # ty: ignore[unresolved-attribute, unsupported-operator]
         for q in ("q95", "q99"):
             gate = cov[("120-240h", q)] - cov[("12-24h", q)]
             records.append(
@@ -512,7 +512,7 @@ def reproduction_checks(*, table: pl.DataFrame) -> pl.DataFrame:
         records.append(
             {
                 "check": f"{month} mean |CRPS panel - CRPS 511|",
-                "value": float((both["L-1d__crps"] - both["L-1d__crps_right"]).abs().mean()),
+                "value": float((both["L-1d__crps"] - both["L-1d__crps_right"]).abs().mean()),  # ty: ignore[invalid-argument-type]
             }
         )  # ty: ignore[invalid-argument-type]
         records.append(

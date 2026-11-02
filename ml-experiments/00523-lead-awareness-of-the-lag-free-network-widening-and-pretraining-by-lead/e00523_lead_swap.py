@@ -139,7 +139,7 @@ def main() -> None:
         stored, on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_stored"
     )
     diff = float(
-        max((joined[q] - joined[f"{q}_stored"]).abs().max() for q in levels)  # ty: ignore[no-matching-overload]
+        max((joined[q] - joined[f"{q}_stored"]).abs().max() for q in levels)  # ty: ignore[invalid-argument-type, no-matching-overload]
     )
     pl.DataFrame(
         {"check": ["max abs quantile difference to experiment 511 seed 0 (fraction of capacity)",

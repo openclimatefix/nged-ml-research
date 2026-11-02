@@ -68,22 +68,22 @@ def main() -> None:
             sub = part if band == st.ALL else part.filter(pl.col("band") == band)
             records.append(
                 {"check": "mean |median error| L0PT minus L0 (points)", "set": name, "band": band,
-                 "value": float(sub["L0PT__mae"].mean() - sub["L0__mae"].mean())}
+                 "value": float(sub["L0PT__mae"].mean() - sub["L0__mae"].mean())}  # ty: ignore[unsupported-operator]
             )  # fmt: skip
             records.append(
                 {"check": "median minus mean forecast, L0PT (points)", "set": name, "band": band,
-                 "value": float(sub["L0PT__median_minus_mean"].mean())}
+                 "value": float(sub["L0PT__median_minus_mean"].mean())}  # ty: ignore[invalid-argument-type]
             )  # fmt: skip
             records.append(
                 {"check": "median minus mean forecast, L0 (points)", "set": name, "band": band,
-                 "value": float(sub["L0__median_minus_mean"].mean())}
+                 "value": float(sub["L0__median_minus_mean"].mean())}  # ty: ignore[invalid-argument-type]
             )  # fmt: skip
         long = part.filter(pl.col("band") == "120-240h")
         for primary in sorted(long["primary"].unique().to_list()):
             rest = long.filter(pl.col("primary") != primary)
             records.append(
                 {"check": f"CRPS L0PT minus L0 at 120-240h without Primary index {primary}", "set": name,
-                 "band": "120-240h", "value": float(rest["L0PT__crps"].mean() - rest["L0__crps"].mean())}
+                 "band": "120-240h", "value": float(rest["L0PT__crps"].mean() - rest["L0__crps"].mean())}  # ty: ignore[unsupported-operator]
             )  # fmt: skip
     out = pl.DataFrame(records)
     out.write_csv(panel.DATA / "scores" / "checks_median_and_leave_one_out.csv")

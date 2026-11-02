@@ -42,7 +42,7 @@ ARM_COLOURS: Final[dict[str, str]] = {
 def zero_rule() -> alt.Chart:
     """Return a horizontal rule at zero."""
     return (
-        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color=theme.BLACK_2)
         .encode(y="y:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -210,7 +210,7 @@ def figure_pit() -> None:
             )
         )
         ideal = (
-            alt.Chart(pl.DataFrame({"y": [0.1]}).to_pandas())
+            alt.Chart(pl.DataFrame({"y": [0.1]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color=theme.BLACK_2, strokeDash=[3, 2])
             .encode(y="y:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -264,16 +264,16 @@ def figure_examples() -> None:
             base = alt.Chart(data).encode(
                 x=alt.X("hours:Q", title="Hours after the forecast origin")
             )  # ty: ignore[unresolved-attribute]
-            band = base.mark_area(opacity=0.2).encode(
+            band = base.mark_area(opacity=0.2).encode(  # ty: ignore[unresolved-attribute]
                 y="q05:Q",
                 y2="q95:Q",
                 color=alt.Color("arm:N", scale=scale, legend=alt.Legend(orient="top", title=None)),
             )
-            med = base.mark_line().encode(
+            med = base.mark_line().encode(  # ty: ignore[unresolved-attribute]
                 y=alt.Y("q50:Q", title="Power (% of capacity)"),
                 color=alt.Color("arm:N", scale=scale),
             )
-            actual = base.mark_line(color=theme.BRAND_ORANGE, strokeDash=[3, 2]).encode(
+            actual = base.mark_line(color=theme.BRAND_ORANGE, strokeDash=[3, 2]).encode(  # ty: ignore[unresolved-attribute]
                 y="actual:Q"
             )
             alt.layer(band, med, actual).properties(
