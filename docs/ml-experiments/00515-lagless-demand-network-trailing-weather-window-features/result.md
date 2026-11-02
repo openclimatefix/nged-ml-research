@@ -149,17 +149,18 @@ existing columns.
   Saturday, Sunday), and the same length in half-hours (46, 48, or 50, so a clock-change day matches
   only another clock-change day), at least 3 days away so that persistent weather cannot make the
   donor informative, without replacement, and from the same side of the fold's refit (training rows
-  take donors that start before the refit, scored rows take donors in the test month). The row takes
-  the nine window columns of the donor day at the same half-hour of day and the same lead: its
-  origin and valid time both move by the whole-day shift between the two days, so an ensemble row
-  takes the donor shift's run, and an ERA5 row builds the columns at the shifted origin and valid
-  time. If the donor's run is missing the row takes the next donor in the seeded order. The number
-  of rows with no donor is printed, and those rows take the column means. The same draw serves
-  training and scoring.
+  take donors that start before the refit, scored rows take donors from days after the refit (the
+  later side), within the ensemble period). The row takes the nine window columns of the donor day
+  at the same half-hour of day and the same lead: its origin and valid time both move by the
+  whole-day shift between the two days, so an ensemble row takes the donor shift's run, and an ERA5
+  row builds the columns at the shifted origin and valid time. If the donor's run is missing the row
+  takes the next donor in the seeded order. The number of rows with no donor is printed, and those
+  rows take the column means. The same draw serves training and scoring.
 - **W-seam.** Persistence fill holds the run's first value (the value at its first half-hour after
   `O`) for every half-hour at or before `O`. W-seam shares W-T's pretrained weights, because ERA5
-  windows have no seam, so it adds 30 fine-tunes and no pretrains. P5 uses a paired contrast on the
-  same seed and fold, because the 0.02 limit sits below the minimum detectable effect.
+  windows have no seam, so it adds 30 fine-tunes and no pretrains. P5 uses a contrast of the two
+  builds' 3-seed mean quantiles on common rows, with per-seed contrasts alongside, because the 0.02
+  limit sits below the minimum detectable effect.
 
 ## Folds, seeds, and the minimum detectable effect
 
@@ -249,7 +250,7 @@ existing columns.
 - The minimum detectable effect comes from seed spread; the fold-to-fold term enters through the
   month-block bootstrap, and the page states both.
 - The month-block bootstrap resamples the 10 folds with each fold's 3-seed mean (seed-paired), at
-  the Bonferroni level 1/(2 x 20). With 10 blocks the interval is wide but not min-to-max.
+  the Bonferroni level 0.05 / (2 x 20) per tail. With 10 blocks the interval approaches min-to-max.
 - Charts show per-fold gains, cold-night and sunny slices, in the OCF palette with no mark in the
   background colour; metered generators are not scored (substations only).
 - The reported family of 84 tests counts 7 arms: W-T, W-S, W-X, W-ALL, W-ALL minus W-DH, and the

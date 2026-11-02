@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PERF401
 r"""Score experiment 515's arms on the ten winter folds.
 
 Rows (`experiment_515_winter_v1`): every forecast row of a fold's test month with a lead up to 240
@@ -62,7 +62,7 @@ WIDEN: Final[float] = 1.15
 MAX_LEAD_HOURS: Final[float] = 240.0
 COLD_C, WARM_C = 5.0, 15.5
 SUNNY, OVERCAST = 0.7, 0.3
-GROUPS: Final[dict[str, str]] = {"eight": "mva_eight", "six": "signed_six"}
+GROUPS: Final[dict[str, str]] = {"eight": "mva_eight", "six": "signed_six", "report": "report_only"}
 BONFERRONI: Final[int] = 20
 RESAMPLES: Final[int] = 20_000
 POINTS: Final[float] = 100.0
@@ -119,7 +119,7 @@ def slice_context(*, keys: pl.DataFrame) -> pl.DataFrame:
         day = t.group_by("power_fcst_init_time", "local_date").agg(
             pl.len().alias("n"),
             pl.col("temperature").mean().alias("day_t"),
-            pl.col("csi").mean().alias("day_csi"),
+            pl.col("csi").filter(pl.col("csi").is_finite()).mean().alias("day_csi"),
             pl.col("csi").is_finite().sum().alias("n_csi"),
         )
         t = t.join(day, on=["power_fcst_init_time", "local_date"], how="left")
@@ -150,7 +150,7 @@ def slice_context(*, keys: pl.DataFrame) -> pl.DataFrame:
                 & (pl.col("day_csi") <= OVERCAST),
                 christmas=((pl.col("local").dt.month() == 12) & (pl.col("local").dt.day() >= 24))
                 | ((pl.col("local").dt.month() == 1) & (pl.col("local").dt.day() <= 2)),
-            )  # fmt: skip
+            )
         )
     context = pl.concat(parts)
     return keys.join(
@@ -195,10 +195,12 @@ def month_rows(
     wide = base.select("time_series_id", "power_fcst_init_time", "valid_time", "actual", "lead_hours", "group", "cold_night", "cold_sunny", "cold_overcast", "warm_sunny", "warm_overcast", "christmas")  # fmt: skip
     cols: dict[str, np.ndarray] = {}
     every = np.ones(base.height, dtype=bool)
-    jobs = {arm: SEEDS for arm in arms} | {f"{arm}-s{s}": (s,) for arm in arms for s in SEEDS}
+    jobs = dict.fromkeys(arms, SEEDS) | {f"{arm}-s{s}": (s,) for arm in arms for s in SEEDS}
     for name, seeds in jobs.items():
         arm = (
-            name.split("-s")[0] if name.rsplit("-s", 1)[-1].isdigit() and name not in arms else name
+            name.rsplit("-s", 1)[0]
+            if name.rsplit("-s", 1)[-1].isdigit() and name not in arms
+            else name
         )
         frames = []
         for s in seeds:
@@ -292,7 +294,7 @@ def contrast(
     rng = np.random.default_rng(515)
     draws = rng.integers(0, len(months), size=(RESAMPLES, len(months)))
     boot = (sa[draws].sum(axis=1) - sb[draws].sum(axis=1)) / n[draws].sum(axis=1)
-    alpha = 0.5 / BONFERRONI
+    alpha = 0.05 / (2 * BONFERRONI)
     lo, hi = np.quantile(boot, [alpha, 1.0 - alpha])
     per_fold = (sa - sb) / n
     return {
@@ -307,11 +309,9 @@ def mde(*, frame: pl.DataFrame, group: str, slice_name: str, arms: list[str]) ->
     mask = mask_of(frame=frame, group=group, slice_name=slice_name)
     residuals = []
     for arm in arms:
-        values = []
-        for s in SEEDS:
-            sums = fold_sums(frame=frame, column=f"{arm}-s{s}__crps", mask=mask)
-            values.append([sums[m][0] / max(sums[m][1], 1) for m in sorted(sums)])
-        values = np.array(values).T
+        per_seed = [fold_sums(frame=frame, column=f"{arm}-s{s}__crps", mask=mask) for s in SEEDS]
+        months = [m for m in sorted(per_seed[0]) if all(p[m][1] > 0 for p in per_seed)]
+        values = np.array([[p[m][0] / p[m][1] for m in months] for p in per_seed]).T
         residuals.append(values - values.mean(axis=1, keepdims=True))
     resid = np.concatenate(residuals)
     sd = math.sqrt((resid**2).sum() / (len(resid) * (len(SEEDS) - 1)))

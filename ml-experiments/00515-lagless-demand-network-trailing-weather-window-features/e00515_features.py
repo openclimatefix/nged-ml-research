@@ -169,12 +169,11 @@ def ensemble_table(*, row: dict, seam: str) -> pl.DataFrame:
         after = origin_index + 1 - lo
         t_all[after:], s_all[after:] = np.nan, np.nan  # nothing after the origin from a later run
         if seam == "persistence":
-            first_finite_s = s_all.copy()
             s_first = summary["shortwave"].to_numpy()[rows]
             s_first = s_first[np.isfinite(s_first)]
-            t_all[:after] = temperature[rows[0]]
+            t_first = temperature[rows][np.isfinite(temperature[rows])]
+            t_all[:after] = t_first[0]
             s_all[:after] = s_first[0] if len(s_first) else 0.0
-            del first_finite_s
         p = vi[rows] - lo
         t_all[p], s_all[p] = temperature[rows], shortwave[rows]
         columns, short = run_columns(t_all=t_all, s_all=s_all, p=p)
@@ -333,7 +332,7 @@ def check(*, site: str = "D2") -> None:
     for pick in rng.choice(len(origins) - 3, size=3, replace=False) + 8:
         cut_origin = origins[int(pick)]
         truncated = full.filter(pl.col("power_fcst_init_time") <= cut_origin)
-        prep.load_summary = lambda *, series_id, t=truncated: t  # noqa: ARG005
+        prep.load_summary = lambda *, series_id, t=truncated: t
         try:
             rebuilt = ensemble_table(row=row, seam="previous")
         finally:

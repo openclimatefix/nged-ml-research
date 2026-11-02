@@ -189,7 +189,7 @@ class Fold:
         fit_until = int((c.us(t=refit) - c.prep422.GRID_START_US) // c.prep422.STEP_US)
         windows = Windows(fit_until_idx=fit_until)
         self.windows = windows
-        needs_real = any(a != "W0" and a != "W-null" for a in arms) or seam
+        needs_real = any(a not in {"W0", "W-null"} for a in arms) or seam
         needs_null = "W-null" in arms
         self.raw: dict[tuple[str, str], np.ndarray] = {}  # (stage, "real"|"null") -> (n, 9)
         sets = {"ft": (self.rows, "ens"), "test": (self.test, "ens")}
@@ -302,10 +302,10 @@ def run(
     """Pretrain and/or fine-tune and forecast each arm (and W-seam), fold, and seed (skips outputs that exist)."""
     clean = c.clean_stack()
     for month in months:
-        arms = [a for a in arms if not (a == "W0" and month in REUSED_BASE)]
-        todo_pre = [(a, s) for a in arms if a != SEAM_ARM for s in seeds if do_pretrain and not pretrained_path(arm=a, month=month, seed=s).exists()]  # fmt: skip
-        todo_fit = [(a, s) for a in arms if a != SEAM_ARM for s in seeds if do_fit and not prediction_path(arm=a, month=month, seed=s).exists()]  # fmt: skip
-        todo_seam = [s for s in seeds if SEAM_ARM in arms and do_fit and not prediction_path(arm=SEAM_ARM, month=month, seed=s).exists()]  # fmt: skip
+        month_arms = [a for a in arms if not (a == "W0" and month in REUSED_BASE)]
+        todo_pre = [(a, s) for a in month_arms if a != SEAM_ARM for s in seeds if do_pretrain and not pretrained_path(arm=a, month=month, seed=s).exists()]  # fmt: skip
+        todo_fit = [(a, s) for a in month_arms if a != SEAM_ARM for s in seeds if do_fit and not prediction_path(arm=a, month=month, seed=s).exists()]  # fmt: skip
+        todo_seam = [s for s in seeds if SEAM_ARM in month_arms and do_fit and not prediction_path(arm=SEAM_ARM, month=month, seed=s).exists()]  # fmt: skip
         if not todo_pre and not todo_fit and not todo_seam:
             continue
         t0 = time.monotonic()
