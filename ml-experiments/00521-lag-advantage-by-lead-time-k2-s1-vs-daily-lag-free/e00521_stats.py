@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PERF401
 """Cut experiment 511's per-row scores by lead time and test where K2-S1 beats the daily lag-free network.
 
 Inputs (stored, read-only; no fit and no GPU):
@@ -218,7 +219,7 @@ def slice_table(*, table: pl.DataFrame) -> pl.DataFrame:
     """Return the gap L-1d minus K2-S1 and L-1d minus LL-ens5 on slices (report-only, uncorrected)."""
     rng = np.random.default_rng(1)
     slices: dict[str, pl.Expr] = {
-        "all rows": pl.lit(True),  # noqa: FBT003
+        "all rows": pl.lit(True),
         "no labelled event (tgt_real false)": ~pl.col("tgt_real"),
         "inside a labelled event (tgt_real true)": pl.col("tgt_real"),
         "lag_real true": pl.col("lag_real"),

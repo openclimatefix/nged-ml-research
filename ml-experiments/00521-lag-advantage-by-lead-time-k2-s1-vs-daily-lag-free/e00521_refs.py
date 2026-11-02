@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Score experiment 454's monthly lag-free references and L-1d's two seeds on experiment 511's rows.
 
 Experiment 511's row table holds per-row scores for K2-S1, L-1d, and L-Ww. It holds none for
