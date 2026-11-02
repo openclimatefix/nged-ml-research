@@ -1101,3 +1101,12 @@ a blurred 6-hour mean. Experiment 417's Primary-level gate did this and shut at 
 shortest-lead row it opens at both, as with recorded weather
 ([experiment 424](00424-neural-mva-export-gated-signed-ens-serving-test/result.md)). The entry is
 provisional until the experiment has had its reviews.
+
+**Drop valid times on or after 2026-07-01 from the scored rows of experiments 470 and 483
+(provisional; high confidence).** *Applies to: experiments.* Experiment 483's cache for the
+2026-06 fold holds 2,736 rows (1.4% of the fold) with valid times on 2026-07-01 from 00:00 to 09:00,
+at leads of 39 hours or more, although the rule that keeps July 2026 for a finalist excludes every
+scored valid time from that date. Experiment 500 drops them from every arm and its raw scores differ
+from experiment 483's in the third decimal place
+([experiment 500](00500-rolling-conformal-recalibration-of-the-demand-tails/result.md)). The entry is
+provisional until the experiment has had its reviews.
