@@ -29,8 +29,6 @@ DOCS_DIR: Final[Path] = (
 )
 SCORES: Final[Path] = DATA / "scores"
 WIDTH: Final[int] = 560
-D4_CAPACITY: Final[float] = 12.138
-"""Capacity of D4 in MW (the site map of experiment 470)."""
 BAND_ORDER: Final[list[str]] = list(BANDS)
 SETS: Final[dict[str, str]] = {"eight": "MVA-only eight", "six": "Signed-MW six"}
 COLOURS: Final[dict[str, str]] = {
@@ -353,10 +351,10 @@ def figure_examples() -> None:
             )
             frames.append(widened.join(act, on=keys).with_columns(arm=pl.lit(name)))
         t = pl.concat(frames, how="vertical_relaxed").with_columns(
-            hours=pl.col("lead_hours"), actual=pl.col("actual") / D4_CAPACITY * 100.0
+            hours=pl.col("lead_hours"), actual=pl.col("actual") * 100.0
         )
         for col in ("q05", "q25", "q50", "q75", "q95"):
-            t = t.with_columns((pl.col(col) / D4_CAPACITY * 100.0).alias(col))
+            t = t.with_columns((pl.col(col) * 100.0).alias(col))
         for horizon, limit, tag in (("day-ahead", 36.0, "day_ahead"), ("10-day", 240.0, "10_days")):
             part = t.filter(pl.col("hours") <= limit).to_pandas()
             base = alt.Chart(part).encode(

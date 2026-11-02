@@ -156,13 +156,13 @@ lagged against lag-free heads, daily against monthly refit, and four heads again
   eight and -0.019 [-0.031, -0.007] at the six (56 tests). K2-S1's bands are closer to nominal at
   the eight and too narrow at the six.
 - **Band width (mean q05 to q95 width in points of capacity, L-1d against K2-S1 cell c0).** L-1d's
-  bands are wider in every band: at the eight 6.61 against 6.33 (0 to 6 h), 5.23 against 4.87 (24 to
-  48 h), and 5.47 against 5.14 (120 to 240 h); at the six 4.06 against 3.66, 3.02 against 2.75, and
-  3.18 against 2.95. Both networks widen by about the same from 12 to 24 h to 120 to 240 h (1.1 to
-  1.2 points at the eight). Mixture width therefore does not explain K2-S1's long-lead advantage:
-  K2-S1 has the narrower bands and the lower CRPS. The tables are `scores/widths.csv`,
-  `scores/absolute.csv` (coverage and pinball loss by band), and `scores/contrasts.csv`, in this
-  experiment's private data folder.
+  bands are wider in every band: at the eight 41.1 against 38.9 (0 to 6 h), 32.5 against 30.1 (24 to
+  48 h), and 34.0 against 31.6 (120 to 240 h); at the six 30.2 against 27.6, 22.8 against 20.9, and
+  24.0 against 22.5. Both networks widen by about the same from 12 to 24 h to 120 to 240 h (7.3
+  points for L-1d and 6.9 for K2-S1 at the eight). Mixture width therefore does not explain K2-S1's
+  long-lead advantage: K2-S1 has the narrower bands and the lower CRPS. The tables are
+  `scores/widths.csv`, `scores/absolute.csv` (coverage and pinball loss by band), and
+  `scores/contrasts.csv`, in this experiment's private data folder.
 - **Per Primary at the eight (pooled gap, share).** D2 +0.235 (32%), D12 +0.223 (31%), D3 +0.166
   (23%), D8 +0.124 (17%), D21 +0.124 (17%), D19 +0.025, D22 -0.052, D4 -0.115 (-16%). No Primary
   exceeds 40%, so the pre-registered prediction P4 fails. At the six the pooled gap is a sum of
