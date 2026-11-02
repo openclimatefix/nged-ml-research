@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Draw experiment 497's figures (copied from experiment 485's figure script) from the stored scores (no fit).
+"""Draw experiment 497's figures from the stored scores (no fit).
+
+The code is copied from experiment 485's figure script.
 
 Figure 1: each arm minus H0 on the gate and Christmas slices (Bonferroni intervals).
 Figure 2: CRPS by valid date, 17 December to 6 January, at the eight and the six.
