@@ -138,7 +138,9 @@ def descriptor_matrix(*, name: str, values: np.ndarray) -> np.ndarray:
 
 
 def metering_probe(*, fold: str, view: str) -> dict[str, object]:
-    """Return the leave-one-Primary-out linear probe of the metering type (MW = 1, MVA = 0) from the 8-wide vector.
+    """Return the leave-one-Primary-out linear probe of the metering type from the 8-wide vector.
+
+    Metering type is MW = 1 and MVA = 0.
 
     A logistic regression (L2, C = 1) is fitted on 15 Primaries and predicts the 16th, for each of the
     5 seeds. D15 and D18 belong to the group of their metering unit and are among the 16. The exact
@@ -266,7 +268,10 @@ def planted_signal_detection(
 
 
 def _norm_corr(*, norms: np.ndarray, values: np.ndarray) -> float:
-    """Return the Spearman correlation of the movement norm with a descriptor (profiles: their mean absolute deviation)."""
+    """Return the Spearman correlation of the movement norm with a descriptor.
+
+    A profile descriptor enters as its mean absolute deviation from the mean profile.
+    """
     v = np.abs(values - np.nanmean(values, axis=0)).mean(axis=1) if values.ndim == 2 else values
     keep = np.isfinite(v)
     return float(np.corrcoef(rankdata(norms[keep]), rankdata(v[keep]))[0, 1])

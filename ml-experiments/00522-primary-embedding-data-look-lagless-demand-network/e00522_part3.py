@@ -241,7 +241,7 @@ def run_network(
 def summarise(
     *, identity: np.ndarray, arms: dict[str, list[np.ndarray]], sites: list[str], seed: int
 ) -> dict[str, object]:
-    """Return per-Primary CRPS change (percentage points), the headline mean over scored Primaries, and a day-block interval."""
+    """Return per-Primary CRPS change (percentage points), the scored mean, and a day-block interval."""
     scored = np.array([s not in REPORT_ONLY for s in sites])
     rng = np.random.default_rng(seed)
     n_days = identity.shape[1]

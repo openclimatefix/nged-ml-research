@@ -4,7 +4,7 @@
 Figures (SVG, in the experiment's docs folder; optimise each with `npx svgo@4 --multipass
 --precision=1 --final-newline`):
 
-1. `figure_1_part3_crps_change.svg`: the CRPS change when the embedding is replaced, per network and arm;
+1. `figure_1_part3_crps_change.svg`: the CRPS change when the embedding is replaced;
 2. `figure_2_distance_matrix.svg`: the 16 x 16 distance matrix of the movement (fold 2026-01, 5 seeds);
 3. `figure_3_leading_dimensions.svg`: the two leading dimensions of the movement, with Primary names;
 4. `figure_4_displacement.svg`: each Primary's displacement from the start after pretraining.
