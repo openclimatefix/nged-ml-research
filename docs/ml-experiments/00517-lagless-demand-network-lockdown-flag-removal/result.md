@@ -37,22 +37,22 @@ benchmark: >-
   contrast.
 verdict: partly supported
 best_arm: >-
-  C2 (flag column removed, lockdown rows dropped from pretraining): CRPS 5.117 points at the eight
-  MVA-only Primaries and 3.751 at the six signed-MW Primaries, against 5.150 and 3.741 for C0 (flag
-  kept) and 5.161 and 3.770 for C1 (flag removed, rows kept).
+  At the eight MVA-only Primaries, C2 (flag column removed, lockdown rows dropped from pretraining):
+  CRPS 5.117 points, against 5.150 for C0 (flag kept) and 5.161 for C1 (flag removed, rows kept). At
+  the six signed-MW Primaries, C0: 3.741, against 3.751 for C2 and 3.770 for C1.
 headline: >-
   With the lockdown rows kept, removing the flag cost 0.011 points at the eight (Bonferroni
   interval -0.020 to +0.042) and 0.029 at the six (+0.007 to +0.052). Dropping the lockdown rows as
   well scored 0.044 better than C1 at the eight (-0.069 to -0.021, better in all 5 folds) and 0.019
   better at the six (-0.049 to +0.009).
 take_home_message: >-
-  A network pretrained on the 2019 to 2021 rows without the flag does a little worse than one that
-  has the flag, but dropping the lockdown rows from pretraining recovers all of that and more at the
-  eight Primaries (0.033 points better than the flag, in 3 of 5 folds). The flag can therefore be
-  replaced by dropping the lockdown rows from pretraining, which also removes an input that is 0 at
-  every serving time. Every difference is below the minimum detectable effect of 0.12 to 0.13
-  points, so the experiment cannot rank the arms with confidence, and five month blocks give narrow
-  intervals.
+  Removing the lockdown flag while keeping the lockdown rows in pretraining scored slightly worse at
+  the six signed-MW Primaries (0.029 points). Dropping the lockdown rows as well scored better at
+  the eight MVA-only Primaries (0.033 points better than keeping the flag, in 3 of 5 folds) and no
+  different at the six, but worse at the six on 22 to 31 December and on the two report-only
+  Primaries. No arm is a clear replacement for the flag. Every difference is below the minimum
+  detectable effect of 0.12 to 0.13 points, and five month blocks give narrow intervals, so the
+  experiment cannot rank the arms with confidence.
 production_status: candidate
 row_set_id: experiment_470_intersection_v1
 metric: >-
@@ -61,14 +61,16 @@ metric: >-
 
 ## Take-home message
 
-**Removing the flag but keeping the lockdown rows is slightly worse; dropping the lockdown rows
-makes the network no worse than with the flag, and better at the eight.** The flag is 0 in every
-fine-tune and scored row, so it acts only through pretraining. Replacing it with dropping the
-2020-03-23 to 2021-07-19 rows from pretraining (arm C2) scored 5.117 at the eight and 3.751 at the
-six, against 5.150 and 3.741 with the flag (C0). Every difference is below the minimum detectable
-effect (0.125 at the eight, 0.133 at the six, 3-seed means), so read the intervals below as
-suggestive. This narrows the search to C2 as a simpler recipe for later lag-free experiments; it does
-not show that the lockdown rows hurt in absolute terms.
+**Removing the flag is slightly worse at the six; dropping the lockdown rows as well helps the eight
+but hurts Christmas week at the six and the two report-only Primaries, so neither removal is a clear
+replacement for the flag.** The flag is 0 in every fine-tune and scored row, so the flag acts only
+through pretraining. Arm C2 (flag removed, 2020-03-23 to 2021-07-19 rows dropped from pretraining)
+scored 5.117 at the eight and 3.751 at the six, against 5.150 and 3.741 with the flag (C0). C2 is
+better than C0 at the eight in 3 of 5 folds and no different at the six. On 22 to 31 December (at
+the six) and on D15 and D18, C2 scored worse than C0. Every difference is below the minimum
+detectable effect (0.125 at the eight, 0.133 at the six, 3-seed means), so the intervals below are
+suggestive. The result narrows the question to whether the 2020 rows matter at Primaries with short
+history and at Christmas, and does not show that the lockdown rows hurt in absolute terms.
 
 ## Figure
 
@@ -86,9 +88,10 @@ per-fold differences, so they are ranges, not confidence intervals. Negative fav
     - C2 minus C1: eight -0.044 (-0.069 to -0.021, 5 of 5), six -0.019 (-0.049 to +0.009, 3 of 5).
 - **Pre-registered rules.** "Flag not shown to be needed" fails: the six's upper bound for C1 minus C0
   is 0.052, above the 0.05 margin. "Flag needed" passes at the six only (lower bound +0.007, a
-  fifth of the minimum detectable effect). "Lockdown rows hurt" passes at the eight (upper bound -0.021). C2
-  is not shown worse than C0 at either group (upper bounds -0.007 and +0.038, both below 0.05).
-  Prediction P1 failed at the six; P2 held.
+  twentieth of the minimum detectable effect; the point estimate +0.029 is a fifth). "Lockdown rows
+  hurt" passes at the eight (upper bound -0.021). Post hoc, using the same margin: C2 is not shown
+  worse than C0 at either group (upper bounds -0.007 and +0.038, both below 0.05). Prediction P1
+  failed at the six; P2 held.
 - **Absolute scores** (eight / six): C0 5.150 / 3.741, C1 5.161 / 3.770, C2 5.117 / 3.751.
 - **Horizon bands** (C2 minus C1, eight): day 1 -0.040, days 2 to 3 -0.034, days 4 to 10 -0.048;
   (C1 minus C0, six): +0.012, +0.020, +0.034. No band reverses the sign of its group.
@@ -99,42 +102,46 @@ per-fold differences, so they are ranges, not confidence intervals. Negative fav
 
 ## Caveats
 
-- **The minimum detectable effect is larger than every difference.** It comes from the seed spread
-  (0.078 and 0.083 points per seed; 3 seeds, 5 folds), while the intervals come from a month-block
-  bootstrap of 5 blocks, which is narrow. The two disagree about how sure to be; trust the larger.
-- **Christmas week and the report-only Primaries.** The Christmas-week slices (fold 2025-12 only)
-  disagree in sign between the eight and the six, so no reading is drawn. D15 and D18 (report-only)
-  scored 0.24 to 0.72 points worse for C1 and C2 than for C0; their history is short, so the 2020 rows
-  may matter there. This was not pre-registered as a contrast.
+- **The minimum detectable effect is larger than every difference.** The minimum detectable effect
+  comes from the seed spread (0.078 and 0.083 points per seed; 3 seeds, 5 folds). The intervals come
+  from a month-block bootstrap of 5 blocks, which is narrow. The minimum detectable effect, not the
+  bootstrap interval, sets how far to trust a difference.
+- **Christmas week (22 to 31 December, fold 2025-12 only).** C1 minus C0 is -0.15 at the eight and
+  +0.09 at the six. C2 is worse than C0 at the six (+0.31) and no different at the eight (-0.008),
+  and worse than C1 at both (+0.15 and +0.22). Treat these as single-fold results.
+- **Report-only Primaries (D15 and D18, pooled over all rows).** C1 minus C0 is +0.38
+  (Bonferroni +0.17 to +0.58) and C2 minus C0 is +0.62 (+0.47 to +0.76), worse in all 5 folds for
+  both arms; C2 minus C1 is +0.24. These Primaries have short history, so the 2020 rows may matter
+  there. This was not a pre-registered contrast.
+- **Folds.** C2's gain over C0 at the eight comes from 3 folds (2025-10, 2026-03, 2026-01); folds
+  2025-12 (+0.050) and 2026-06 (+0.020) go the other way.
 - **Load-shift events.** Rows with no labelled event are scored; NGED says some events are unlabelled,
   so these rows may hold events that no label covers.
-- **Not run.** The two example probabilistic forecast graphs and the load-shift event plots are not
-  in this page: the arms differ only in pretraining, and the scored rows are the same. Say if the
-  manager wants them added.
+- **Not run.** The example probabilistic forecast graphs and the load-shift event plots are not in
+  this page. The arms differ in the pretraining and in one input column, and the scored rows are the
+  same.
 - **Schedule.** Monthly refit; the contrast could differ under weekly refits.
-- **Interim.** The fits and numbers have had one code review; the results review and write-up review
-  are recorded in the PR body.
 
 ## What to try next
 
-- Use C2 (no flag, lockdown rows dropped) as the lag-free pretraining recipe in later experiments, and
-  confirm on weekly refits before a release claim.
-- Test the report-only Primaries separately if D15 and D18 matter: their short history may need the
-  2020 rows.
+- Keep the flag in later lag-free experiments until the 2020 rows are tested at the report-only
+  Primaries and at Christmas on more than one fold.
+- Test C2 on weekly refits and on more December folds before any release claim.
 
 ## Plan
 
 **The plan was written before any score was read.** One fold and one seed (2025-10, seed 0) were
 timed first; their forecasts are kept as part of the final fits and were not scored until the code
-review had run. The plan covers Part 2 of the brief (the lockdown flag); the whole-day price shape is
-[experiment 513](../00513-lagless-demand-network-whole-day-price-shape-at-training-time/result.md).
+review had run. The plan covers Part 2 of the brief (the lockdown flag); the whole-day price shape
+is [experiment 513](../00513-lagless-demand-network-whole-day-price-shape-at-training-
+time/result.md).
 
 ## Question
 
-The lag-free demand network takes a 0/1 input that is 1 from 2020-03-23 to 2021-07-19. The network is
-pretrained on ERA5 and CAMS rows from 2019-09, which include that period, and fine-tuned on ensemble
-forecast rows from 2024-04, which do not. The flag is 0 in every scored month. Is the column still
-needed, and do the lockdown rows hurt a network that cannot see the flag?
+The lag-free demand network takes a 0/1 input that is 1 from 2020-03-23 to 2021-07-19. The network
+is pretrained on ERA5 and CAMS rows from 2019-09, which include that period, and fine-tuned on
+ensemble forecast rows from 2024-04, which do not. The flag is 0 in every scored month. Is the
+column still needed, and do the lockdown rows hurt a network that cannot see the flag?
 
 ## Arms
 
@@ -173,7 +180,7 @@ In the first fold 1,395,832 of 7,005,809 pretraining rows are flagged (19.9%).
   over days 1 to 10, at the eight and the six: 6 tests. The Bonferroni count is the family of the
   whole price-and-lockdown brief, 18.
 - **Slices.** Horizon bands day 1, days 2 to 3, and days 4 to 10 beside days 1 to 10, and Christmas
-  week (22 to 28 December, fold 2025-12).
+  week (22 to 31 December, fold 2025-12).
 - **Minimum detectable effect.** From the seed spread of the three arms pooled (three seeds, five
   folds), scaled to a 3-seed mean, printed by `e00517_score.py baseline` before any contrast.
   Earlier experiments report 0.057 to 0.164 points for single-seed or two-seed comparisons.
