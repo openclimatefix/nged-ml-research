@@ -13,6 +13,7 @@ experiment 510's.
 Commands:
 
 - `check`: input checks (the flag lookup against `sites()`, M's forced-zero input against 519's `with_flag`).
+- `check-c`: run 519's stored F0z weights through this module's flagged test rows (CPU) and compare with 519's stored forecast.
 - `pretrain`: pretrain M and P (5 folds x 2 seeds, skipping files that exist). Needs the GPU go.
 - `fit --arm A`: the weekly fine-tunes and forecasts of one arm. Needs the GPU go.
 - `assemble`: concatenate each arm's window forecasts into one table per arm, month, and seed.
@@ -51,6 +52,7 @@ W: Final[Path] = (
 SEEDS: Final[tuple[int, ...]] = (0, 1)
 ARMS: Final[tuple[str, ...]] = ("M", "P")
 PERMUTATION_SEED: Final[int] = 525
+EIGHT: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
 MASS_ARMS: Final[tuple[str, ...]] = ("LWW", "C", "M", "P")
 MASS_PRIMARIES: Final[tuple[str, ...]] = ("D8", "D12", "D22")
 SHARE_ZERO: Final = f519.Variant("FLAGGED", 0.0, False)
@@ -62,11 +64,14 @@ def lookup(*, arm: str) -> np.ndarray:
     table = prep.primaries().sort("primary")
     assert table["primary"].to_list() == list(range(16)), "Primary indices are not 0..15"
     assert table["site"].to_list() == data.sites(), "Primary table and sites() disagree"
+    assert table["units"].is_in(["MW", "MVA"]).all(), "a Primary has no metering unit"
     flags = (table["units"] == "MVA").cast(pl.Float32).to_numpy()
     if arm == "M":
         return flags
     if arm == "P":
-        return np.random.default_rng(PERMUTATION_SEED).permutation(flags)
+        permuted = np.random.default_rng(PERMUTATION_SEED).permutation(flags)
+        assert not np.array_equal(permuted, flags), "the permuted flag equals the real flag"
+        return permuted
     if arm == "C":
         return np.zeros(16, np.float32)
     raise ValueError(arm)
@@ -90,14 +95,38 @@ def check() -> None:
     assert int(m.sum()) == 8, "expected 8 MVA Primaries"
     assert int(p.sum()) == 8, "the permuted flag must keep 8 ones"
     mva = set(table.filter(pl.col("units") == "MVA")["site"])
-    assert mva >= {"D8", "D12", "D22"}, "D8, D12, D22 must be MVA"
-    assert {"D5", "D10"}.isdisjoint(mva), "D5 and D10 must be signed MW"
+    assert mva == set(EIGHT), f"the MVA set is {sorted(mva)}"
+    assert {"D15", "D18"}.isdisjoint(mva), "D15 and D18 must be signed MW"
     x = np.random.default_rng(0).normal(size=(50, 37)).astype(np.float32)
     primary = np.arange(50) % 16
     forced = add_flag(x=x, primary=primary, table=lookup(arm="C"))
     reference = f519.with_flag(x=torch.from_numpy(x), flag=0.0).numpy()
     assert np.array_equal(forced, reference), "forced-zero input differs from 519's with_flag(0.0)"
     print("check ok: 8 MVA Primaries, forced-zero input equals 519's constant flag 0", flush=True)
+
+
+def check_c(*, month: str = "2026-01", seed: int = 0, week: int = 2) -> None:
+    """Run C's stored F0z weights through this module's flagged test rows and compare with 519's stored forecast."""
+    clean = c.clean_stack()
+    mr, test = flagged_month(month=month, arm="C", clean=clean)
+    cut = k.cutoffs(month=month, cadence="w")[week]
+    day = f511.day_of(month=month, cut=cut)
+    path, width = stored_model(arm="C", month=month, day=day, week=week, seed=seed)
+    model = c.new_model(outlier=False, n_inputs=width, n_primaries=len(mr.base.target_mean))
+    c.load_pretrained(model=model, path=path)
+    model.eval()
+    lo, hi = k.window_of(month=month, cadence="w", index=week)
+    ours = f511.window_frame(model=model, test=test, mr=mr, lo=lo, hi=hi, flag=False, device="cpu")
+    stored = pl.read_parquet(f519.W / "fits" / "F0z" / f"{month}_d{day}_s{seed}.parquet")
+    assert ours is not None, "no rows in the window"
+    assert ours.height == stored.height, f"row counts differ: {ours.height} vs {stored.height}"
+    cols = [col for col in ours.columns if col.startswith("q")]
+    keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
+    joined = ours.join(stored, on=keys, suffix="_s", how="inner")
+    assert joined.height == ours.height, "keys differ from 519's stored forecast"
+    worst = max(float((joined[col] - joined[f"{col}_s"]).abs().max()) for col in cols)
+    print(f"check-c {month} d{day} s{seed}: {ours.height} rows, max |diff| {worst:.2e}", flush=True)
+    assert worst < 1e-4, "M's code path with the lookup at 0 does not reproduce F0z"
 
 
 def pretrain(*, months: list[str], arms: list[str], seeds: list[int], device: str) -> None:
@@ -180,6 +209,8 @@ def fit_arm(*, arm: str, months: list[str], seeds: list[int], device: str) -> No
                     continue
                 started = time.monotonic()
                 refit = c.select_rows(rows=mr, cutoff=cut, half_life_days=c.HALF_LIFE_90)
+                assert refit.report["rows_past_valid_cut"] == 0, "rows past the valid-time cut"
+                assert refit.report["rows_past_origin_cut"] == 0, "rows past the origin cut"
                 t = g.refit_tensors(refit=refit)
                 model = c.new_model(
                     outlier=False, n_inputs=mr.x.shape[1], n_primaries=len(mr.base.target_mean)
@@ -246,8 +277,7 @@ def mixture_mass_below_zero(*, out: torch.Tensor, z0: torch.Tensor) -> torch.Ten
         out=out.double()[..., : 3 * c.COMPONENTS], components=c.COMPONENTS
     )
     w = torch.softmax(log_w, dim=-1)
-    normal = torch.distributions.Normal(0.0, 1.0)
-    return (w * normal.cdf((z0[:, None].double() - mean) / std)).sum(dim=-1)
+    return (w * torch.special.ndtr((z0[:, None].double() - mean) / std)).sum(dim=-1)
 
 
 def stored_model(*, arm: str, month: str, day: int, week: int, seed: int) -> tuple[Path, int]:
@@ -317,7 +347,9 @@ def mass(*, arm: str, months: list[str], seeds: list[int], device: str) -> None:
 def main() -> None:
     """Run a command."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("check", "pretrain", "fit", "assemble", "mass"))
+    parser.add_argument(
+        "command", choices=("check", "check-c", "pretrain", "fit", "assemble", "mass")
+    )
     parser.add_argument("--arm", default="M")
     parser.add_argument("--arms", nargs="+", default=list(ARMS))
     parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
@@ -326,6 +358,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "check":
         check()
+    elif args.command == "check-c":
+        check_c()
     elif args.command == "pretrain":
         pretrain(months=args.months, arms=args.arms, seeds=args.seeds, device=args.device)
     elif args.command == "fit":
