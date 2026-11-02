@@ -33,7 +33,7 @@ SCORE_SEEDS = (200, 201, 202)
 class WithTarget:
     """Lags from one source, target from another."""
 
-    def __init__(self, *, lags: "arms.LagSource", target: "arms.LagSource") -> None:
+    def __init__(self, *, lags: arms.LagSource, target: arms.LagSource) -> None:
         """Hold both sources."""
         self.lags, self.target_source = lags, target
 
@@ -152,7 +152,7 @@ def run(
                             "world": w,
                             "final_loss": losses[-1],
                         },
-                    )  # fmt: skip
+                    )
                 )
             print(f"{month} s{seed} {arm}: loss {losses[-1]:.4f}, "
                   f"{time.monotonic() - started:.0f} s", flush=True)  # fmt: skip

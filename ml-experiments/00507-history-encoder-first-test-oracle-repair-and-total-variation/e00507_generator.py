@@ -10,8 +10,9 @@ An event adds `size * profile(g) * shape(g)` to the Primary's stored reading, wh
 up over `ramp + 1` half-hours from the onset, ramps down over `ramp + 1` half-hours to the end, and
 a staircase runs at half size for its first `stair` half-hours. The shape is 1 (constant MW), the
 Primary's own demand over its mean (proportional), or another Primary's demand over its mean at the
-same time (a circuit profile), in the shares of `SHAPE_MIX`. At the MVA-only Primaries the reading is `abs(real +
-step)`. The "history" is the 672 half-hours ending at the newest usable reading, `origin - 7`.
+same time (a circuit profile), in the shares of `SHAPE_MIX`. At the MVA-only Primaries the reading
+is `abs(real + step)`. The "history" is the 672 half-hours ending at the newest usable reading,
+`origin - 7`.
 
 Derived expectation used by the self-test: with L = 1344 possible onsets and durations d,
 P(one A event in force at the newest half-hour) = E[min(d, L)] / L, and with k events uniform on 1
@@ -28,7 +29,6 @@ from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
-import polars as pl
 
 HISTORY: Final[int] = 672
 NEWEST_AGE: Final[int] = 7
@@ -42,7 +42,7 @@ CAP_MW: Final[float] = 5.4
 SIZE_SPREADS: Final[tuple[float, float]] = (0.5, 3.0)
 NEVER: Final[int] = 1 << 30
 MAX_DAYS: Final[int] = 4000
-"""Every random vector is drawn at this length, so a window's events do not change when the grid grows."""
+"""Every random vector is drawn at this length, so events do not change when the grid grows."""
 RAMP_SHARE: Final[float] = 0.3
 STAIR_SHARE: Final[float] = 0.2
 ONSET_RANGE_A: Final[int] = 2 * HISTORY
@@ -79,7 +79,7 @@ class Spec:
 
 
 def shape_of(*, real: np.ndarray) -> np.ndarray:
-    """Return each Primary's reading over its mean (1 where unobserved or not positive), clipped to 0..4."""
+    """Return each Primary's reading over its mean, clipped to 0..4 (1 if unobserved)."""
     mean = np.nanmean(np.abs(real), axis=1, keepdims=True)
     out = np.where(np.isfinite(real) & (real > 0), real / np.maximum(mean, 1e-6), 1.0)
     return np.clip(out, 0.0, 4.0).astype(np.float32)
@@ -130,8 +130,11 @@ def sample_world(*, spec: Spec, seed: int) -> Events:
         for k in range(SLOTS):
             active_a = (window_family == FAMILY_A) & (k < n_events)
             active_b = (window_family == FAMILY_B) & (k == 0)
-            active = active_a | active_b
-            onset_a = newest - (ONSET_RANGE_A - 1) + (rng.integers(0, ONSET_RANGE_A, size=MAX_DAYS))[:days]
+            onset_a = (
+                newest
+                - (ONSET_RANGE_A - 1)
+                + (rng.integers(0, ONSET_RANGE_A, size=MAX_DAYS))[:days]
+            )
             onset_b = newest - (HISTORY - 1) + (rng.integers(0, HISTORY, size=MAX_DAYS))[:days]
             from_pool = (rng.random(MAX_DAYS) < 0.5)[:days]
             pool_d = (spec.pool_steps[rng.integers(0, len(spec.pool_steps), size=MAX_DAYS)])[:days]
@@ -143,7 +146,9 @@ def sample_world(*, spec: Spec, seed: int) -> Events:
             )
             sign = np.where((rng.random(MAX_DAYS) < 0.5)[:days], 1.0, -1.0)
             circuit_fraction = (rng.uniform(0.3, 1.0, size=MAX_DAYS))[:days]
-            kind = np.searchsorted(np.cumsum(SHAPE_MIX)[:-1], (rng.random(MAX_DAYS))[:days], side="right")
+            kind = np.searchsorted(
+                np.cumsum(SHAPE_MIX)[:-1], (rng.random(MAX_DAYS))[:days], side="right"
+            )
             other = (p + 1 + (rng.integers(0, n_p - 1, size=MAX_DAYS))[:days]) % n_p
             src = np.where(kind == 0, -1, np.where(kind == 1, p, other))
             ramped = (rng.random(MAX_DAYS) < RAMP_SHARE)[:days]
@@ -224,7 +229,7 @@ def window_family(*, ev: Events) -> np.ndarray:
 
 
 def analytic_in_force(*, spec: Spec) -> tuple[float, float, float]:
-    """Return the derived share of windows with an A step in force, with B, and B's share of both."""
+    """Return the derived shares of windows with an A step and a B step in force, and B's share."""
     length = ONSET_RANGE_A
     pool = np.minimum(spec.pool_steps, length).astype(np.float64)
     log_mean = float(
@@ -248,6 +253,9 @@ def hard_negative_weight(*, median: np.ndarray) -> np.ndarray:
 
     Args:
         median: The lagless median over each window's history, shape (windows, 672).
+
+    Returns:
+        The sampling weight of each window.
     """
     span = np.nanmax(median, axis=1) - np.nanmin(median, axis=1)
     return np.where(span >= np.nanquantile(span, 0.9), 3.0, 1.0)
@@ -264,7 +272,8 @@ def synthetic_spec(*, seed: int = 0, primaries: int = 4, days: int = 200) -> Spe
     ).astype(np.float32)  # fmt: skip
     return Spec(
         real=real, shape=shape_of(real=real), spread=np.full(primaries, 0.02),
-        capacity_mw=np.full(primaries, 40.0), mva_only=np.array([False, False, True, True][:primaries]),
+        capacity_mw=np.full(primaries, 40.0),
+        mva_only=np.array([False, False, True, True][:primaries]),
         pool_steps=np.array([2, 8, 40, 96, 400]),
     )  # fmt: skip
 
@@ -275,8 +284,11 @@ def selftest(*, spec: Spec | None = None, strict: bool = True) -> dict[str, floa
     Args:
         spec: Use the real Primaries; the default is a small synthetic spec.
         strict: Raise when a share or a distribution test misses its acceptance criterion.
+
+    Returns:
+        The simulated shares and the Kolmogorov-Smirnov p-values.
     """
-    from scipy import stats  # noqa: PLC0415
+    from scipy import stats
 
     # Step algebra on one hand-made event: constant 0.1, onset 100, end 110, ramp 1, no stair.
     toy = synthetic_spec(primaries=2, days=4)
@@ -310,8 +322,10 @@ def selftest(*, spec: Spec | None = None, strict: bool = True) -> dict[str, floa
           f"(derived {exp_a:.3f})")  # fmt: skip
     print(f"windows with a B step in force: {share_b:.3f} (derived {exp_b:.3f}); any step "
           f"{any_step:.3f}")  # fmt: skip
-    print(f"family B share of steps in force at the origin: {genuine:.3f} (derived {exp_genuine:.3f},"
-          f" target about 0.60)")  # fmt: skip
+    print(
+        f"family B share of steps in force at the origin: {genuine:.3f} "
+        f"(derived {exp_genuine:.3f}, plan target about 0.60)"
+    )
     days = ev.family.shape[1]
     newest = newest_of(day=np.arange(days))[None, :, None]
     inside = (ev.family > 0) & (ev.start >= newest - (HISTORY - 1))

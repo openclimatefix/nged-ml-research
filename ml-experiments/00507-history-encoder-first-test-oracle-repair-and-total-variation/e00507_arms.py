@@ -53,7 +53,7 @@ class Rows:
     lag_grid: np.ndarray
 
     @classmethod
-    def of(cls, *, pool: fit.Pool) -> "Rows":
+    def of(cls, *, pool: fit.Pool) -> Rows:
         """Read the rows from a pool on the device."""
         primary = pool.primary.cpu().numpy().astype(np.int64)
         origin = pool.origin.cpu().numpy().astype(np.int64)
@@ -94,7 +94,7 @@ class GridLags:
         v = self.power[rows.primary[:, None], np.clip(rows.lag_grid, 0, size - 1)]
         return np.where(inside, v, np.nan).astype(np.float32)
 
-    def target(self, *, rows: Rows, clean: np.ndarray) -> np.ndarray:  # noqa: ARG002
+    def target(self, *, rows: Rows, clean: np.ndarray) -> np.ndarray:
         """Return the stored reading."""
         return clean
 
@@ -174,7 +174,7 @@ class GenLags:
             self._const = out
         return self._const
 
-    def target(self, *, rows: Rows, clean: np.ndarray) -> np.ndarray:  # noqa: ARG002
+    def target(self, *, rows: Rows, clean: np.ndarray) -> np.ndarray:
         """Return the stored reading plus the family B step at the target time."""
         return gen.reading(
             spec=self.spec, ev=self.ev, p=rows.primary, d=rows.day, g=rows.target, mode="true"
@@ -184,11 +184,11 @@ class GenLags:
 class ZeroLags:
     """Experiment 472's lag-free control: every lag input is zero."""
 
-    def values(self, *, rows: Rows) -> np.ndarray:  # noqa: ARG002
+    def values(self, *, rows: Rows) -> np.ndarray:
         """Never used: the lag tensor is zeroed by `lag_tensor`."""
         raise NotImplementedError
 
-    def target(self, *, rows: Rows, clean: np.ndarray) -> np.ndarray:  # noqa: ARG002
+    def target(self, *, rows: Rows, clean: np.ndarray) -> np.ndarray:
         """Return the stored reading."""
         return clean
 
@@ -393,7 +393,7 @@ class MonthContext:
     real_mask: np.ndarray
 
     @classmethod
-    def build(cls, *, month: str, device: str) -> "MonthContext":
+    def build(cls, *, month: str, device: str) -> MonthContext:
         """Load the pools once for the month."""
         c.use_lab_tables()
         train, test, scalers, _arrays, lag_stats = fit.build_pools(
@@ -505,7 +505,7 @@ def run_old(*, month: str, device: str, seeds: tuple[int, ...] = (0, 1, 2)) -> N
                         classes=classes,
                         groups=groups,
                         meta={**meta, "label": label, "world": world},
-                    )  # fmt: skip
+                    )
                 )
             print(f"{month} s{seed} {arm}: loss {losses[-1]:.4f}, "
                   f"{time.monotonic() - started:.0f} s", flush=True)  # fmt: skip

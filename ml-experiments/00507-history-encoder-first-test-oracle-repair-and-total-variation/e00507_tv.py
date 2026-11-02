@@ -9,9 +9,7 @@ unobserved in the output. The solver is FISTA on the dual problem, batched over 
 
     minimise  0.5 * sum((y - u)^2) + lam * sum(|u[t+1] - u[t]|)   over u.
 
-```bash
-ml-experiments/00507-*/run.sh ml-experiments/00507-*/e00507_tv.py selftest
-```
+Run the self-test with `ml-experiments/00507-*/run.sh ml-experiments/00507-*/e00507_tv.py selftest`.
 """
 
 import argparse
@@ -79,6 +77,9 @@ def repair(
         weight: The total-variation weight in units of `spread`.
         tau: The departure, in spreads, beyond which the level is subtracted.
         device: Where to solve.
+
+    Returns:
+        The repaired readings (windows, 672), NaN where unobserved.
     """
     resid = reading - median
     observed = np.isfinite(resid)
@@ -93,7 +94,8 @@ def window_positions(*, rows: arms.Rows) -> np.ndarray:
     """Return each row's three lag positions inside its 672-half-hour history."""
     newest = gen.newest_of(day=rows.day)
     pos = rows.lag_grid - (newest[:, None] - (gen.HISTORY - 1))
-    assert pos.min() >= 0 and pos.max() < gen.HISTORY, "a lag lies outside the history"
+    assert pos.min() >= 0, "a lag lies before the history"
+    assert pos.max() < gen.HISTORY, "a lag lies after the history"
     assert (rows.lag_grid <= newest[:, None]).all(), "a lag is newer than the newest usable reading"
     return pos
 
@@ -129,7 +131,7 @@ class TvLags:
     def values(self, *, rows: arms.Rows) -> np.ndarray:
         """Return the repaired lag readings of each row."""
         key = rows.primary * 100_000 + rows.day
-        uniq, first, inverse = np.unique(key, return_index=True, return_inverse=True)
+        _, first, inverse = np.unique(key, return_index=True, return_inverse=True)
         windows = self.repaired(p=rows.primary[first], d=rows.day[first])
         pos = window_positions(rows=rows)
         return windows[inverse[:, None], pos]
@@ -149,7 +151,8 @@ def selftest() -> None:
     u = tv_denoise(y=y, lam=np.full(4, 0.5))
     assert np.abs(u - true).mean() < 0.03, "total-variation solution is not close to the signal"
     jumps = (np.abs(np.diff(u, axis=1)) > 0.2).sum(axis=1)
-    assert (jumps[:2] == 2).all() and jumps[2] == 3, jumps
+    assert (jumps[:2] == 2).all(), jumps
+    assert jumps[2] == 3, jumps
     nan_y = y.copy()
     nan_y[0, 100:110] = np.nan
     fixed = fill_nearest(x=nan_y)

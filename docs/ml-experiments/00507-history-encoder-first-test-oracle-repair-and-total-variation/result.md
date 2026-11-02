@@ -8,7 +8,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 date: 2026-11-02
@@ -25,7 +25,8 @@ hypothesis: >-
   Repairing the shifted readings in the last 14 days of power, instead of down-weighting them as
   experiments 402 to 482 did, leaves enough forecast gain to justify a learned history encoder. A
   perfect (oracle) repair of the three lag readings improves the lag correction of experiment 472
-  (on the ERA5 lab anchor) on rows where a shift is in force. A non-learned repair (total-variation denoising of
+  (on the ERA5 lab anchor) on rows where a shift is in force. A non-learned repair (total-variation
+  denoising of
   the 14-day residual) keeps less than half of that gain once genuine level changes are in the
   data, and a learned encoder can reach the accuracy that the oracle's noise curve demands.
 prediction: >-
@@ -44,7 +45,8 @@ decision_rule: >-
   3-seed spread of the retrained plain control) with an interval excluding zero; (b) promote the
   non-learned repair and stop the neural encoder only if total-variation repair keeps at least half
   of the oracle gain on the old worlds and on the new-generator worlds with genuine changes (lower
-  end of the interval on the paired difference of TV gain and half the oracle gain at or above zero), is not shown worse than the plain correction by more than
+  end of the interval on the paired difference of TV gain and half the oracle gain at or above
+  zero), is not shown worse than the plain correction by more than
   0.03 points on rows with no labelled event at the six, and is not shown worse by more than 0.02
   points on q99 pinball loss; (c) stop the neural encoder if the encoder's errors fall where the
   noise curve keeps under half of the oracle gain, or its validation step loss stops falling
@@ -60,260 +62,131 @@ metric: >-
   class and group, as in experiment 472's report; q01, q05, q95, and q99 coverage and pinball loss.
 code: >-
   ml-experiments/00507-history-encoder-first-test-oracle-repair-and-total-variation/
+verdict: partly supported
+best_arm: >-
+  Oracle repair of the three lag readings on the new generator worlds: CRPS lower than the plain
+  correction by 0.59 points of capacity at the signed-MW six (95% interval 0.51 to 0.67; minimum
+  detectable effect 0.09) and by 0.73 at the MVA-only eight (0.66 to 0.79).
+headline: >-
+  A perfect repair of shifted lag readings helps (0.2 to 0.7 CRPS points on rows where a shift
+  touches a lag), but total-variation denoising, the cheap non-learned repair, kept 0 to 2% of that
+  gain, far below the half that would have made a neural encoder unnecessary. No encoder was fitted.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  If the readings of the last 14 days could be repaired exactly, the forecast of rows hit by a
+  shifted reading would improve by 0.2 to 0.7 CRPS points of capacity, so the repair is worth
+  something. The cheap repair we tried, total-variation denoising, recovered almost none of it
+  because it cannot tell a temporary shift from a genuine level change. The next test is whether a
+  learned repair can do better, and its first check is whether it can reach the accuracy the oracle
+  noise curve demands.
+lessons: >-
+  The oracle ceiling is real but lab-flattered. The non-learned repair we tuned does nothing
+  useful, so the question of a learned encoder stays open and is not answered by this page.
+advice:
+  - >-
+    Do not use total-variation denoising of the 14-day residual to repair shifted lags, because it
+    kept 0 to 2% of the oracle gain on the new generator worlds (rule (b) section).
+  - >-
+    Score any repair against both oracles and the zero-lag control on rows whose lag positions are
+    touched, not on all rows, because the oracle gain on all rows is diluted by 70% of rows that
+    no shift touches (oracle gain table).
+  - >-
+    Report a repair's effect on rows with no shift touching a lag, because an oracle trained on
+    exact lags was 0.09 points worse there at the six (clean-row table).
+  - >-
+    Before building a learned history encoder, run the noise curve on the new generator worlds, as
+    the plan describes, because this page measured only the ceiling and the non-learned repair.
+code: >-
+  ml-experiments/00507-history-encoder-first-test-oracle-repair-and-total-variation/
 ---
 
-**This page is the plan; the write-up replaces it when the experiment finishes.** The plan follows
-the neural Discuss session's brief
-`briefs/history_encoder_first_test_brief.md` with its edits of 2026-11-02, the queue-order check
-`briefs/queue_order_check_history_encoder_answer.md`, and sections 2.2 to 2.8 of the final design
-`briefs/history_encoder_debate_3_opus_reply.md`. Rungs R1 and later are never started.
+**A perfect (oracle) repair of shifted lag readings helps the forecast, but a cheap non-learned
+repair gets almost none of that help.** We asked whether the power readings of the last 14 days
+need repairing, or whether down-weighting them (as experiments 402 to 482 did) is enough. We
+injected shifts into the readings (temporary load transfers, and genuine level changes that move
+the true power), retrained the lag correction of experiment 472, and scored it with each lag set
+repaired in turn: by an oracle that knows the injected shift, and by total-variation denoising of
+the 14-day residual. The oracle improved the score on rows where a shift touches a lag. The
+denoising improved it by at most 2% of the oracle's gain. The rule that stops the line at the
+non-learned repair therefore did not fire, and the learned encoder (rung T1) was not built or
+fitted in this experiment.
 
-## Question
+## Results
 
-Do the readings of the last 14 days need repairing, or is it enough to down-weight them? A perfect
-(oracle) repair that gains nothing ends the line. A cheap non-learned repair that keeps half of the
-oracle's gain replaces the neural encoder. Otherwise one encoder fit says whether a learned repair
-can reach the accuracy the oracle's noise curve demands.
+All scores are CRPS in points of capacity (lower is better), on the four screen folds
+(2026-06, 2026-01, 2025-10, 2026-03), three fit seeds, held-out injected worlds 200 to 202. The
+lagless forecast is ERA5 and CAMS for both history and forecast, one seed. Intervals are exact
+month-block resamples of the four fold means.
 
-## Design
+![Change in CRPS against the plain correction on rows where a shift touches a lag](figure_1_gain_over_plain.svg)
 
-### Lab setting
+| Rows and worlds | Group | Oracle minus plain | Total-variation minus plain |
+|---|---|---|---|
+| Injected harm and target rows, old worlds | six | -0.214 (-0.314 to -0.132), MDE 0.014 | not run |
+| Injected harm and target rows, old worlds | eight | -0.466 (-0.581 to -0.309), MDE 0.223 | not run |
+| Rows where a shift touches a lag, new worlds | six | -0.589 (-0.674 to -0.505), MDE 0.089 | +0.045 (-0.006 to +0.139) |
+| Rows where a shift touches a lag, new worlds | eight | -0.727 (-0.793 to -0.661), MDE 0.088 | -0.012 (-0.018 to -0.005) |
 
-- **Weather everywhere is ERA5 and CAMS, never ensemble forecasts**, on the history side and on the
-  forecast side. The lagless forecast is experiment 449's cross-fitted ERA5 and CAMS lagless
-  module, one seed (seed 0). The lab surprise (reading minus lagless median) is smaller than at
-  serving, because ERA5 knows the weather that happened, so detection is flattered. The page says
-  so, and says that a single-seed encoder or lagless null is informative only when it lies far
-  from the minimum detectable effect.
-- **The stored ERA5 tables of experiment 449 are rebuilt, not read as they are.** They hold only
-  the 5%, 50%, and 95% quantiles and only the cross-fitted half-hours before each refit, so they
-  have no 9-number mixture for the correction's anchor and no forecast for the scored month. The
-  rebuild uses experiment 449's code and the same cross-fit blocks, saves the mixture, and adds one
-  "further" module fitted on every half-hour before the refit that forecasts the scored month and
-  the 62 days after it (7 small lagless fits per screen month, 28 in all). Nothing at or after the
-  refit enters any fit.
-- **The 30-day hold-back step is dropped.**
+- **Rule (a) passed.** At the six, the oracle gain on the old worlds was 15 times the minimum
+  detectable effect, with an interval excluding zero. The same held at the eight (2.1 times).
+  The zero-lag control (experiment 472's lag-free correction) was worse than plain by 0.49 (six) and
+  0.91 (eight) points, so the lag readings carry information that repair can recover.
+- **Prediction P1 was met only partly.** The plan predicted an oracle gain of at least 0.3 points.
+  The old worlds gave 0.21 at the six (below) and 0.47 at the eight. The new worlds gave 0.59 and
+  0.73.
+- **Oracle-constant** (a single mean level removed per temporary shift) gained 0.57 (six) and 0.68
+  (eight), so most of the oracle gain needs only the right level, not the right shape.
+- **Rule (b) fired.** Total-variation repair, tuned on a separate world, kept 0 to 2% of the
+  oracle gain. The paired difference between the repair's loss and the halfway point to the oracle
+  was +0.34 (0.25 to 0.46) at the six and +0.35 (0.31 to 0.39) at the eight, where a negative value
+  would have meant that the repair keeps more than half. Re-weighting the rows so that 60% of the
+  steps are genuine level changes (the generator makes 79%) gave +0.37 and +0.38, so the conclusion
+  does not depend on that share. The repair was not run on the old worlds, because failing on the
+  new worlds already fails the rule.
+- **Not shown worse on rows with no shift touching a lag.** The repair's point estimates there
+  were +0.028 CRPS points at the six and 0.000 at the eight, below the 0.03 bound, and +0.011 and
+  +0.000 on q99 pinball loss, below the 0.02 bound. The oracle, retrained on exact lags, was
+  0.09 points worse than plain on those rows at the six (+0.016 to +0.185), probably because it
+  saw no shifted readings in training.
 
-### What the correction reads
+![Mean absolute error of the repaired lags against the exact lags, for each total-variation setting](figure_2_tv_tuning.svg)
 
-- **Correction network.** Experiment 472's 32-unit network, penalty 1e-2, on the single-seed
-  3-component ERA5 lagless anchor, reading the three origin lags (value and the surprise against the
-  anchor median) and two lead features. There are no missing-flag or age inputs because family C is
-  dropped. The scripts import experiment 472's and 404's modules and copy only what must change.
-- **Folds.** The four screen folds, 2026-06, 2026-01, 2025-10, and 2026-03, each trained on the 24
-  months before (one fit per fold, seed `s` trained on injected world `100 + s`). Only the tiny
-  correction fits use 3 seeds (they give the minimum detectable effect); the lagless module and
-  the encoder are single-seed. No confirmation month is read. July 2026 stays unused. 2025-12 is
-  "not yet scored by a rolling-origin refit" and is not used.
-- **Scoring rows and target.** Experiment 404's rows (`experiment_404_scoring_rows`). On the old
-  worlds the target is the clean actual (`test.y`, the stored reading) on every row, including rows
-  whose target lies inside an injected event, because an injected shift is a metering artefact. On
-  the new-generator worlds the target is the stored reading plus the family B step in force at the
-  target time, because a genuine level change moves the true power; the training target is the same.
-- **Row classes.** On the old worlds, experiment 472's `tgt_inj`, `harm_inj`, and `clean_inj`;
-  "injected harm and target rows" is the union of the first two. On the new-generator worlds,
-  `temp` (the row's window has a family A step), `gen` (family B), and `none`; "step rows" is
-  `temp` plus `gen`.
+## Why the repair failed
 
-### Arms
+- **The tuning picked the weakest repair.** On the tuning world (origins in 2024, no scored month),
+  all 30 settings (6 weights times 5 values of tau) gave a larger mean lag error than no repair at
+  all (0.124 spreads). The best setting (weight 16, tau 5) gave 0.127, so it repaired almost nothing.
+  The mean lag error is dominated by the 68% of windows with no shift touching a lag, where any
+  repair adds noise.
+- **A repair tuned on the lag error of all windows may under-repair.** We did not run a setting
+  tuned only on windows with a temporary shift in force, because the plan fixed the tuning
+  criterion before any score was read. A non-learned repair that does better is not ruled out.
 
-| Arm | Lags the correction trains and scores on | Role |
-|---|---|---|
-| Plain | shifted | Retrained lab reference |
-| Oracle-exact | the exact injected shift removed (the stored reading, or on new worlds the stored reading plus the genuine step) | Ceiling |
-| Oracle-constant | a constant removed: the step's mean over the history (capacity fraction), so a shape that varies over the day leaves a residual | Prices a simple constant repair |
-| Oracle-reprediction | trained shifted, scored on exact lags | Brief arm (a), no retrain |
-| Noise curve | exact lags degraded | Nine points, below |
-| TV | total-variation-repaired | Non-learned repair |
-| Z1e-2 | lags zeroed | Experiment 472's lag-free control |
+## What we did not do, and what limits the result
 
-- **Oracle repair on the old worlds** subtracts the exactly known injected shift, so the oracle lag
-  is the stored reading (those worlds are the stored reading plus an additive shift). On the new
-  worlds the oracle removes family A and keeps family B. Real events that nobody injected stay in
-  every arm's lags.
-- **Data path.** `forecast` takes a `lag_world` and a `flag_world` separately; `fit_one` takes a
-  preloaded pool so many fits share one data load; on the new worlds lag values come from a per-row
-  evaluation of the window's events (the next section). A unit test checks that the changed code,
-  fed the old worlds and no repair, reproduces a plain fit.
-- **Retrained plain, three seeds.** Its 3-seed spread gives the injected-row minimum detectable
-  effect, stated before any contrast is read: 2.8 times the mean over fold pairs of the standard
-  deviation of paired seed differences, divided by the square root of 4 (experiment 454's formula
-  with 4 folds).
-- **Noise curve, on the new-generator worlds** (the event table gives exact onsets and sizes).
-  Size errors of 10% and 50%; onset errors of 2 and 24 hours; 10% and 50% of steps missed; the
-  joint point (25% size error, 6 hour onset error, 30% steps missed); and the 25%, 6 hour, and 30%
-  mid-points on each axis (9 points). Each is the oracle repair degraded, then retrained (4 folds
-  by 3 seeds is 12 small fits per point, about 35 seconds each, in 3 parallel processes).
+- **No encoder was fitted and the noise curve was not run.** Both belong to rungs after rule (b),
+  which stopped the plan at the non-learned repair. The trained-encoder question stays open.
+- **The lab setting flatters detection.** ERA5 knows the weather that happened, so the lagless
+  surprise is smaller than at serving. A single-seed null is informative only when far from the
+  minimum detectable effect; the repair's null at the six (+0.045, MDE 0.089) is not far from it.
+- **The NGED event labels are incomplete,** so "rows with no labelled event" may hold unlabelled
+  events, and counts of events are lower bounds.
+- **Code review 1 found 12 problems before any number was read;** nine were fixed (the oracle now
+  uses the cleaned readings, window events are a function of seed, Primary, and day, the size cap
+  applies to the final step, the circuit fraction is drawn, and the self-test tolerance is
+  relative). Unfixed: the oracle and plain fit seeds are not paired by world, and the row count was
+  not asserted against experiment 404's scoring rows.
+- **The generator makes 79% of the steps in force genuine, not the planned 60%.** This follows
+  from the shares and durations chosen (self-test: derived 78%, simulated 79%), and the 60%
+  re-weighting above shows it does not matter here.
+- **N0.** The leak checks and month-boundary check are in `work/n0/` (private). The 34 events with
+  a measured deviation: a median coefficient of variation of 0.44, 29 of the 34 with a correlation
+  above 0.5 with the Primary's own daily demand shape, so a flat step is a poor description of most
+  real events; the generator draws shapes in the planned thirds regardless.
 
-### The injection generator (new code, `e00507_generator.py`)
+## Next
 
-- **Window-level sampling.** A window is one (Primary, origin) pair; origins are daily at 09:00 UTC.
-  Its events are a pure function of (world seed, Primary, origin), so rows that share an origin
-  share an injection. 45% of windows get family A, 25% get family B, and 30% get neither. Worlds G100
-  to G102 train (one per seed, as experiment 454's advice asks), G200 to G202 are held out with
-  disjoint seeds, and G110 is a tuning world.
-- **Family A, temporary load shift** (1 to 3 events). Durations: 50% sampled from the labelled
-  quantiles of experiment 402's pool, 50% log-uniform from 1 hour to 14 days. Sizes are 0.5 to 3
-  times the Primary's lagless residual spread, either sign, capped at 5.4 MW. Onsets run from 14
-  days before the history to its last half-hour.
-- **Family B, genuine level change** (1 event). The same size, sign, shape, and onset
-  distributions as family A, with the onset inside the history and no end.
-- **Family D, hard negatives.** Windows where the lagless median moves most (top decile of its
-  14-day range), oversampled three times. They receive families A and B at the same rates as every
-  other window.
-- **Shapes, both families**, in equal thirds: constant MW; proportional to the Primary's own demand;
-  and a circuit profile, a fraction (0.3 to 1) of another Primary's demand profile at the same time
-  of day, scaled to the drawn size. Of each, 30% ramp over 1 to 4 half-hours and 20% are two-stage
-  staircases. No slow ramps. N0's shape table (below) may change the thirds; the change is printed
-  and recorded before any score is read.
-- **No family C** (bad readings), no reading-class head, and no missing, flagged-zero, or age
-  channel: NGED's telemetry is very clean once experiment 399's start cut removes the first months
-  of a new meter.
-- **At the eight (MVA only):** inject as |MVA + s|; mask half-hours where the anchor's median is
-  below twice |s| from the step loss and report their share. No signed claim is made at the eight.
-  The old-world generator skips windows below 0.2 of capacity at the eight; the difference is
-  stated beside every number at the eight.
-- **Terms.** The history is the 672 half-hours ending at the newest usable reading, `origin -
-  NEWEST_AGE` (7 half-hours of telemetry delay). A step is "in force at the origin" if it covers
-  that last half-hour.
-- **Self-test (printed before any total-variation or encoder number is read), with acceptance
-  criteria.** It prints the share of windows with a step in force at the origin (within 5 points of
-  the value derived in the docstring from the duration mix); the share of family B among them
-  (expected about 60%, within 5 points; an arithmetic result of the chosen shares, not a finding);
-  and, for events whose onset lies inside the history, a two-sample test (Kolmogorov-Smirnov, level
-  0.01) that ramp length, size, sign, and onset hour of day match between families A and B. A
-  failing self-test stops the experiment until the generator is fixed. Unit tests cover step
-  algebra, determinism, and that no repaired lag reads a half-hour after the newest usable reading.
-
-### N0, before any fit (CPU)
-
-- Leak checks of the final design's point 2.6c: no training-window row of a test month came from a
-  lagless network that saw that month, using the `source` column of the stored lagless tables.
-- The month-boundary check of the stored tables: whether the switch from `crossfit` to `further`
-  at a month start moves the mean residual by more than the residual's usual month-to-month
-  spread (a faked level step).
-- The number of labelled events and the confirmation months (every other month with a labelled
-  event, at least 12 months of history, before July 2026).
-- **Shift-shape table and plot for the 34 events with a measured deviation.** For each event, the
-  spread of the deviation over the event relative to its mean, and the correlation of the deviation
-  with the Primary's own daily demand shape and with a flat profile. The count (about 5 at the six),
-  the table, and the plot set the shape thirds. No score is computed.
-- The generator's self-test, as above.
-- **Actions.** A leak-check failure stops the experiment and is reported to the manager (the
-  stored lagless tables would be unusable for the residual). A month-boundary step larger than the
-  residual's usual month-to-month spread restricts the total-variation window to one source (or
-  masks the boundary) and is reported.
-- The hold-back cost step is dropped (no stored table was fitted with a hold-back, and stored
-  tables are already out of sample for the history).
-
-### T0: the oracle ceiling (rule (a)), then the rest only if (a) passes
-
-1. Retrain the plain control and the oracle-exact and oracle-constant corrections (4 folds by 3
-   seeds each, 36 fits, about 20 minutes), re-predict the plain correction on exact lags, and score all of them on
-   worlds 200 to 202. All fits share one data load and one GPU process under 8 GB.
-2. Print the injected-row minimum detectable effect. Then read the contrast oracle minus plain.
-3. If rule (a) fires, the line ends here at about 0.3 GPU-hours (36 fits and the re-prediction). The page is still written, with
-   the oracle-gain interval, the retrained plain control, and the minimum detectable effect, so the
-   null is informative.
-4. Otherwise run the noise curve (nine points) and build the new-generator worlds.
-
-### T0-TV: the non-learned repair (only if rule (a) passes)
-
-- **Repair.** For each origin, take the 672-half-hour residual (ending at `origin - NEWEST_AGE`) of the reading against the lab lagless
-  median and denoise it by total variation (batched solver on the GPU). The normal level is the
-  median of the denoised level. Where the denoised level departs from the normal level by more
-  than tau spreads (the Primary's residual spread), subtract the departure.
-- **Tuning.** The criterion is the mean absolute error of the repaired lag against the oracle
-  lag, over rows with a temporary step in force, on tuning world G110. G110 uses only origins in
-  months of the training window that are not among the four scored months, and no correction fit
-  trains on those origins' injections. The grid is 6 total-variation weights times 5 values of tau
-  (30 solves of the tuning set), printed in full. Worlds G200 to G202 are never used for tuning.
-- **Scoring.** The 32-unit correction is retrained on repaired lags (4 folds by 3 seeds), with
-  Z1e-2 beside it, on the old worlds and on the new-generator worlds with family B. Plain and
-  oracle are retrained on the new-generator training worlds too, so the three arms see the same
-  generator.
-
-### T1: one encoder fit (only if rule (b) did not fire)
-
-- Stage 0 only: the history encoder H alone on fold 2026-01, one seed, losses L_u (spike-and-slab
-  step loss with the non-negative positive-unlabelled estimator on the spike), L_cls, L_g, and L_tv
-  of the final design's section 2.4. About 100,000 parameters. No stage 1, no R1 or later rung.
-- Read onset within 2 hours, size error, share of steps missed, and the planted-step precision test
-  (held-out injected steps planted at 2% of windows into real windows) on worlds G200 to G202, the
-  same worlds as the noise curve, and place the three errors on the noise curve.
-- **Timing first.** One epoch of one encoder fit is timed and the total is reported to the manager
-  before T1 runs. Abort and message the manager and the neural Discuss session if one fit
-  extrapolates above 2 GPU-hours. Budget: T0 0.3, noise curve 0.6 (108 fits across 3 parallel
-  processes), new-generator and TV retrains 0.5 (about 48 fits), T1 at most 1.6, in GPU-hours of
-  wall-clock, so at most 3. The total-variation solves and the tuning grid are CPU work and are
-  timed and reported.
-
-## Decision rule
-
-All scores are CRPS in points of effective capacity (the `pinball_points` scorer of experiment
-472), lower is better, at the signed-MW six, on injected harm and target rows (the union of
-`harm_inj` and `tgt_inj`, with its own seed-spread minimum detectable effect), with a month-block
-interval over the 4 folds (3 seeds averaged in each fold; the interval is the exact enumeration of
-the 256 resamples of 4 blocks, with the four monthly contrasts also printed). Differences are
-written "arm minus plain"; gain is plain minus arm.
-
-1. **Rule (a), stop the whole line.** The oracle gain is below the injected-row minimum detectable
-   effect, or its interval includes zero, on the old worlds. The new-generator worlds are scored
-   too. If the old worlds pass and the new-generator worlds do not, the line continues to T0-TV and
-   the page reports both.
-2. **Rule (b), promote the non-learned repair.** Test the difference (TV gain minus half the oracle
-   gain) with the paired interval: it passes when the lower end is at or above zero, on the old
-   worlds and on the new-generator worlds pooled at the generator's own mix (about 60% genuine
-   among steps in force). The ratio TV gain over oracle gain is reported only when the oracle
-   gain's lower end exceeds the minimum detectable effect, because the ratio is unstable otherwise.
-   The genuine-only difference is reported beside. The clean-row clause is a point estimate of TV
-   minus plain of at most 0.03 points on rows with no labelled event at the six, on the
-   real world (-1), reported with its interval and labelled "not shown worse", and the q99 clause is
-   a point estimate of at most +0.02 points on the single-level q99 pinball loss (formula and
-   the plain correction's baseline printed, with the absolute and relative margin). The brief's "within 0.03" is a point
-   estimate, so the plan keeps it one; both limits sit far below the clean-row minimum detectable
-   effect of 0.237 and prove no equivalence. If the point estimate passes and the interval does
-   not, the page says "point estimate passes, not shown", and T1 still runs.
-3. **Rule (c), stop the neural encoder.** T1's onset error (reported as a distribution in hours,
-   from which the shares within 2, 6, and 24 hours follow), size error, and share of steps missed
-   are placed on the noise curve of the same new-generator worlds G200 to G202. The noise curve is
-   measured on those worlds only (their event table gives the exact onsets and sizes). The curve's
-   axis values are interpolated linearly in the error, and "under half the oracle gain" needs the
-   curve's point to lie below half the oracle gain by more than the seed spread. The worst of the
-   three axes decides. The rule also fires if validation step loss stops falling before epoch 10.
-   T1 is one fold and one seed, so the page calls the result a single-fit reading.
-4. **Contrasts and levels.** Four decision contrasts at the six: C1 oracle minus plain (old
-   worlds), C2 TV against half the oracle gain (old worlds), C3 the same on the new-generator
-   worlds, C4 TV minus plain on rows with no labelled event. The same four at the eight, which
-   are report-only: a result at the eight that contradicts the six is flagged and does not change
-   the rule. Bonferroni count 8, interval level 1 - 0.05/8, stated as numbers, with the 95% level
-   beside it.
-5. **Not units-free.** The signed-MW six and the MVA-only eight are never pooled. D15 and D18 are
-   trained after the 2025-03-01 cut and are report-only.
-
-## Scores, caveats, and what this cannot show
-
-- **Scores.** CRPS and absolute scores beside every contrast, tail calibration (q01, q05, q95, q99
-  coverage and pinball loss), the 12 to 36 hour band, the share of an unmirrored 5% step followed
-  at k = 3, rows with no labelled event, equal rows across arms. The write-up includes at least two
-  example forecasts and the load-shift plots required by the common brief where scoring allows.
-- **What this cannot show.** The test reads injected worlds. A pass shows headroom, not that real
-  shifts behave like injected ones. Inside real events the minimum detectable effect is 0.38 at
-  the six (experiment 454). NGED's event labels are incomplete, so "rows with no labelled event"
-  may hold real events nobody logged.
-- **Serving cost of a repair.** A repair needs a 672-half-hour history store per Primary and, for
-  total variation, one convex solve per Primary per forecast (well under a millisecond), plus the
-  anchor's lagless forecasts for the history half-hours (one lagless seed). The encoder adds one
-  network at serving.
-- **Anonymisation.** Demand series only: Primaries may be named (D codes), no generator series
-  appear.
-
-## Reuse and advice followed
-
-- **Stored forecasts reused:** none as contrasts. Experiment 449's cross-fit code is reused to
-  rebuild the ERA5 lab tables. Every correction fit is new because its training lags change.
-- **Advice followed:** give each fit seed its own injected training world (experiment 454); judge a
-  correction on injected held-out shifts and real harm rows together (experiment 472); include the
-  lag-zeroed control Z1e-2 beside a corrected arm (experiment 472).
-- **Cadence:** one fit per screen fold (24-month window), the screen design of the common brief.
-  A winner needs the full evaluation before any release claim.
+The repair question is open, not closed: the oracle gain is large, and the one non-learned repair
+we tried fails. A learned encoder is the obvious next test, with its error placed on the oracle's
+noise curve first. This page does not commit the project to that experiment.

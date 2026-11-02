@@ -5,11 +5,11 @@ from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
+import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00402_worlds as worlds402  # ty: ignore[unresolved-import]
 import e00404_fit as fit  # ty: ignore[unresolved-import]
-import e00428_data as data428  # ty: ignore[unresolved-import]
 import e00404_lagless as lagless  # ty: ignore[unresolved-import]
-import e00397_prep as prep  # ty: ignore[unresolved-import]
+import e00428_data as data428  # ty: ignore[unresolved-import]
 import e00507_generator as gen  # ty: ignore[unresolved-import]
 import e00507_lagless as lab  # ty: ignore[unresolved-import]
 import numpy as np
@@ -73,10 +73,9 @@ def load_spec() -> gen.Spec:
 
 def group_of_primary() -> np.ndarray:
     """Return 'six' for the signed-MW six, 'eight' for the MVA-only eight, else 'other'."""
-    out = []
-    for s in sites():
-        out.append("six" if s in SIGNED_SIX else "eight" if s in fit.MVA_ONLY else "other")
-    return np.array(out)
+    return np.array(
+        ["six" if s in SIGNED_SIX else "eight" if s in fit.MVA_ONLY else "other" for s in sites()]
+    )
 
 
 GRID_START_US: Final[int] = int(common.GRID_START.timestamp() * 1_000_000)

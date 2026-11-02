@@ -70,7 +70,7 @@ def seed_series(*, table: pl.DataFrame, label: str, group: str, metric: str) -> 
 
 
 def minimum_detectable_effect(*, series: np.ndarray) -> float:
-    """Return experiment 454's formula: 2.8 times the mean sd of paired seed differences, over sqrt(months)."""
+    """Return experiment 454's formula: 2.8 times the mean paired seed sd, over sqrt(months)."""
     sds = [
         float(np.std(series[i] - series[j], ddof=1))
         for i, j in itertools.combinations(range(len(series)), 2)
@@ -88,7 +88,7 @@ def block_interval(*, diffs: np.ndarray, level: float) -> tuple[float, float]:
 
 def contrast(
     *, table: pl.DataFrame, arm: str, ref: str, group: str, metric: str = "crps"
-) -> dict[str, float]:
+) -> dict[str, float | str]:
     """Return arm minus ref: the mean, both intervals, monthly values, and absolute scores."""
     a = month_means(table=table, label=arm, group=group, metric=metric)
     r = month_means(table=table, label=ref, group=group, metric=metric)
@@ -122,7 +122,8 @@ def old_report() -> None:
                 print(f"{name:10s} {arm:20s} minus plain: {row['diff']:+.3f} "
                       f"95% [{row['lo95']:+.3f}, {row['hi95']:+.3f}] "
                       f"Bonf [{row['loB']:+.3f}, {row['hiB']:+.3f}] "
-                      f"abs {row['abs_arm']:.3f} vs {row['abs_ref']:.3f}; months {row['monthly']}")  # fmt: skip
+                      f"abs {row['abs_arm']:.3f} vs {row['abs_ref']:.3f}; "
+                      f"months {row['monthly']}")  # fmt: skip
         real = pooled(scores=scores.filter(pl.col("world") == -1), classes=("clean",))
         real_ev = pooled(scores=scores.filter(pl.col("world") == -1), classes=("event",))
         for name, table in (
@@ -148,10 +149,8 @@ def mixed(*, temp: pl.DataFrame, gen: pl.DataFrame, genuine: float | None) -> pl
     """
     keys = ["label", "month", "seed", "group"]
     joined = temp.join(gen, on=keys, suffix="_g")
-    if genuine is None:
-        w = pl.col("n_g") / (pl.col("n") + pl.col("n_g"))
-    else:
-        w = pl.lit(genuine)
+    own = pl.col("n_g") / (pl.col("n") + pl.col("n_g"))
+    w = own if genuine is None else pl.lit(genuine)
     return joined.select(
         *keys,
         pl.col("n") + pl.col("n_g"),

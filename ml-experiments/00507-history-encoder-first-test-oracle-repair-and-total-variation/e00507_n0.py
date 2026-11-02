@@ -2,8 +2,8 @@
 
 - `leaks`: for each screen month's lab table, that crossfit rows stop before the refit, that
   `further` rows start at it, and whether the level of the residual (reading minus lagless median,
-  over the Primary's spread) jumps at the refit boundary or at a cross-fit block edge by more than it
-  moves between adjacent 14-day windows elsewhere.
+  over the Primary's spread) jumps at the refit boundary or at a cross-fit block edge by more than
+  it moves between adjacent 14-day windows elsewhere.
 - `labels`: the number of labelled events and the confirmation months.
 - `shapes`: for the labelled events with a measured deviation, how constant the deviation is over
   each event and how it correlates with the Primary's own daily demand shape.
@@ -29,7 +29,7 @@ OUT: Final = c.WORK_DIR / "n0"
 
 
 def residual_series(*, month: str) -> tuple[np.ndarray, np.ndarray, int]:
-    """Return (residual over spread, source code 0/1, refit grid index) per Primary and half-hour."""
+    """Return (residual over spread, source code 0/1, refit grid index) per Primary, half-hour."""
     spec = c.load_spec()
     table = pl.read_parquet(lab.table_path(month=month, seed=0))
     n_p, n = spec.real.shape
@@ -65,8 +65,8 @@ def leaks() -> None:
         usual = np.stack(
             [
                 np.abs(
-                    window_mean(resid=resid, lo=s, hi=s + WINDOW)
-                    - window_mean(resid=resid, lo=s - WINDOW, hi=s)
+                    window_mean(resid=resid, lo=int(s), hi=int(s) + WINDOW)
+                    - window_mean(resid=resid, lo=int(s) - WINDOW, hi=int(s))
                 )
                 for s in starts
             ]
@@ -101,7 +101,7 @@ def leaks() -> None:
 
 
 def event_rows() -> tuple[pl.DataFrame, dict[int, float]]:
-    """Return experiment 400's corrected event rows (one per event and Primary) and the measured steps."""
+    """Return experiment 400's corrected event rows (per event and Primary) and measured steps."""
     events = pl.read_parquet(nra.EVENTS)
     valid = events.filter(
         pl.col("depth_mw").is_not_null() & (pl.col("depth_mw") != 0) & (pl.col("onset_idx") >= 0)
