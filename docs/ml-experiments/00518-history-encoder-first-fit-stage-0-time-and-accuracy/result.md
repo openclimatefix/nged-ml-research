@@ -89,8 +89,8 @@ advice:
 
 **This page is interim and unaudited, and its result is a weak null.** A small neural network (the
 history encoder, 86,747 parameters) was trained once, for 69 seconds, on injected shifts in 14 days
-of power readings at the fold 2026-01 Primaries. The encoder did not pass the pre-registered proxy for the
-plan's kill rule (c). The fit used one seed and a noisy validation block of 401 windows, so the
+of power readings at the fold 2026-01 Primaries. The encoder did not pass the pre-registered
+proxy for the plan's kill rule (c). The fit used one seed and a noisy validation block of 401 windows, so the
 result does not rule out a learned repair.
 
 ## Method
@@ -151,8 +151,10 @@ perfect predictor that outputs the injected step, read through the same candidat
   precision was 0.334, but only 7% of steps were found within 2 hours. The thresholds of 0.5, 0.75,
   1.0, and 1.5 spreads gave precisions of 0.165, 0.188, 0.246, and 0.334. P4 was fixed at 0.5.
 - **The genuine-change head was weak.** Its area under the ROC curve was 0.64 on 373 labelled
-  window-world pairs (windows with a step in force at the newest reading, pooled over the three worlds). The generator makes 75% of steps in force at the newest reading genuine.
-- **Cost.** One fit took 69 seconds (22 epochs of 16,384 windows, about 3 seconds each), against a cap of 2 hours.
+  window-world pairs (windows with a step in force at the newest reading, pooled over the three
+  worlds). The generator makes 75% of steps in force at the newest reading genuine.
+- **Cost.** One fit took 69 seconds (22 epochs of 16,384 windows, about 3 seconds each), against a
+  cap of 2 hours.
 
 ## Outcome against the plan
 
