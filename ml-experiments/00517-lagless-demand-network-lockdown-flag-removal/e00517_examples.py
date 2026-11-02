@@ -51,7 +51,7 @@ def _panel(
     arm: str,
     title: str,
     window: tuple[float, float],
-) -> alt.LayerChart:
+) -> alt.LayerChart | alt.FacetChart:
     """Return one panel: the arm's 50% and 90% bands and median, with the actuals dashed."""
     x = alt.X(
         "day:Q",
