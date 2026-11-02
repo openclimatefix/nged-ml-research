@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Part 2 of experiment 522: do the Primary embeddings' movements follow physical behaviour?
+r"""Part 2 of experiment 522: do the Primary embeddings' movements follow physical behaviour?
 
 Builds ten counted per-Primary descriptors from the 730 days of cleaned power before each fold's
 refit (the fold's training window), runs two-sided Mantel tests (Spearman correlation, 10,000
@@ -61,7 +61,9 @@ def local_frame() -> pl.DataFrame:
     )
 
 
-def descriptors(*, fold: str, clean: dict[str, np.ndarray], local: pl.DataFrame) -> dict[str, np.ndarray]:
+def descriptors(
+    *, fold: str, clean: dict[str, np.ndarray], local: pl.DataFrame
+) -> dict[str, np.ndarray]:
     """Return each descriptor for the 16 Primaries, from the 730 days before the fold's refit.
 
     Scalar descriptors are arrays of length 16; the two profiles are 16 x 48 shape arrays (each
@@ -81,7 +83,9 @@ def descriptors(*, fold: str, clean: dict[str, np.ndarray], local: pl.DataFrame)
     for row in table.iter_rows(named=True):
         y = clean[row["site"]][start:stop]
         ok = np.isfinite(y)
-        weather = prep418.dense_weather(series_id=int(row["time_series_id"]), site=row["site"])[start:stop]
+        weather = prep418.dense_weather(series_id=int(row["time_series_id"]), site=row["site"])[
+            start:stop
+        ]
         temp = weather[:, prep.WEATHER.index("temperature_2m")]
         sw = weather[:, prep.WEATHER.index("shortwave")]
         p95 = float(np.quantile(y[ok], 0.95))
@@ -91,7 +95,10 @@ def descriptors(*, fold: str, clean: dict[str, np.ndarray], local: pl.DataFrame)
         out["load_factor"].append(float(y[ok].mean() / p95))
         for name, season in (("winter", winter), ("summer", summer)):
             weekday = ok & season & ~weekend
-            enough = int(weekday.sum()) >= MIN_HALF_HOURS and int((ok & season & weekend).sum()) >= MIN_HALF_HOURS
+            enough = (
+                int(weekday.sum()) >= MIN_HALF_HOURS
+                and int((ok & season & weekend).sum()) >= MIN_HALF_HOURS
+            )
             if not enough:
                 out[f"profile_{name}"].append(np.full(HALF_HOURS_PER_DAY, np.nan))
                 out[f"weekend_ratio_{name}"].append(np.nan)
@@ -99,10 +106,15 @@ def descriptors(*, fold: str, clean: dict[str, np.ndarray], local: pl.DataFrame)
                 continue
             profile = np.array([y[weekday & (half == h)].mean() for h in range(HALF_HOURS_PER_DAY)])
             out[f"profile_{name}"].append(profile / profile.mean())
-            out[f"weekend_ratio_{name}"].append(float(y[ok & season & weekend].mean() / y[weekday].mean()))
-            daily = pl.DataFrame({"d": day[ok & season], "y": y[ok & season], "t": temp[ok & season]}).group_by("d").agg(
-                pl.col("y").mean(), pl.col("t").mean(), pl.len().alias("n")
-            ).filter(pl.col("n") >= 40)
+            out[f"weekend_ratio_{name}"].append(
+                float(y[ok & season & weekend].mean() / y[weekday].mean())
+            )
+            daily = (
+                pl.DataFrame({"d": day[ok & season], "y": y[ok & season], "t": temp[ok & season]})
+                .group_by("d")
+                .agg(pl.col("y").mean(), pl.col("t").mean(), pl.len().alias("n"))
+                .filter(pl.col("n") >= 40)
+            )
             slope = np.polyfit(daily["t"].to_numpy(), daily["y"].to_numpy(), 1)[0]
             out[f"temperature_slope_{name}"].append(float(slope))
         midday = ok & summer & ~weekend & (half >= 22) & (half <= 27) & np.isfinite(sw)
@@ -132,8 +144,8 @@ def metering_probe(*, fold: str, view: str) -> dict[str, object]:
     5 seeds. D15 and D18 belong to the group of their metering unit and are among the 16. The exact
     binomial (Clopper-Pearson) interval is on the 16 majority-vote predictions across seeds.
     """
-    from scipy.stats import beta  # noqa: PLC0415
-    from sklearn.linear_model import LogisticRegression  # noqa: PLC0415
+    from scipy.stats import beta
+    from sklearn.linear_model import LogisticRegression
 
     labels = np.array([1 if u == "MW" else 0 for u in prep.primaries()["units"].to_list()])
     votes = np.zeros((len(common.SEEDS), common.N_PRIMARIES))
@@ -161,7 +173,9 @@ def metering_probe(*, fold: str, view: str) -> dict[str, object]:
     }
 
 
-def mantel(*, a: np.ndarray, b: np.ndarray, seed: int, permutations: int = PERMUTATIONS) -> dict[str, float]:
+def mantel(
+    *, a: np.ndarray, b: np.ndarray, seed: int, permutations: int = PERMUTATIONS
+) -> dict[str, float]:
     """Return the Spearman correlation of two distance matrices and its two-sided permutation p-value.
 
     Args:
@@ -184,13 +198,22 @@ def mantel(*, a: np.ndarray, b: np.ndarray, seed: int, permutations: int = PERMU
         order = rng.permutation(n)
         r = float(np.corrcoef(ra, rankdata(b[np.ix_(order, order)][upper]))[0, 1])
         count += abs(r) >= abs(observed) - 1e-12
-    return {"rho": observed, "p": (count + 1) / (permutations + 1), "n_primaries": n, "n_pairs": len(upper[0])}
+    return {
+        "rho": observed,
+        "p": (count + 1) / (permutations + 1),
+        "n_primaries": n,
+        "n_pairs": len(upper[0]),
+    }
 
 
-def mantel_on_finite(*, a: np.ndarray, name: str, values: np.ndarray, seed: int) -> dict[str, float]:
+def mantel_on_finite(
+    *, a: np.ndarray, name: str, values: np.ndarray, seed: int
+) -> dict[str, float]:
     """Return `mantel` on the Primaries that have the descriptor."""
     keep = finite_rows(values=values)
-    return mantel(a=a[np.ix_(keep, keep)], b=descriptor_matrix(name=name, values=values[keep]), seed=seed)
+    return mantel(
+        a=a[np.ix_(keep, keep)], b=descriptor_matrix(name=name, values=values[keep]), seed=seed
+    )
 
 
 def movement_distance(*, fold: str, view: str, metric: str) -> tuple[np.ndarray, np.ndarray]:
@@ -200,12 +223,14 @@ def movement_distance(*, fold: str, view: str, metric: str) -> tuple[np.ndarray,
         emb = common.embedding_of_state(path=common.L0PT_PRETRAINED / f"{fold}_s{seed}.pt")
         if view == "movement":
             emb = emb - common.regenerated_start(seed=seed)
-        matrices.append(squareform(pdist(emb, metric=metric)))
+        matrices.append(squareform(pdist(emb, metric=metric)))  # ty: ignore[no-matching-overload]
         norms.append(np.linalg.norm(emb, axis=1))
     return np.mean(matrices, axis=0), np.mean(norms, axis=0)
 
 
-def planted_signal_detection(*, values: np.ndarray, name: str, signal_share: float, draws: int, seed: int) -> float:
+def planted_signal_detection(
+    *, values: np.ndarray, name: str, signal_share: float, draws: int, seed: int
+) -> float:
     """Return the share of synthetic movements, built from one descriptor, that the Mantel test detects at `LEVEL`.
 
     A synthetic 16 x 8 movement is the standardised descriptor times a random unit vector plus
@@ -225,9 +250,17 @@ def planted_signal_detection(*, values: np.ndarray, name: str, signal_share: flo
     for draw in range(draws):
         u = rng.normal(size=common.EMBEDDING_WIDTH)
         u /= np.linalg.norm(u)
-        noise = rng.normal(size=(common.N_PRIMARIES, common.EMBEDDING_WIDTH))
-        synthetic = np.sqrt(signal_share) * z[:, None] * u[None, :] * np.sqrt(common.EMBEDDING_WIDTH) + np.sqrt(1 - signal_share) * noise
-        result = mantel(a=squareform(pdist(synthetic)), b=target, seed=seed + draw, permutations=PLANTED_PERMUTATIONS)
+        noise = rng.normal(size=(len(values), common.EMBEDDING_WIDTH))
+        synthetic = (
+            np.sqrt(signal_share) * z[:, None] * u[None, :] * np.sqrt(common.EMBEDDING_WIDTH)
+            + np.sqrt(1 - signal_share) * noise
+        )
+        result = mantel(
+            a=squareform(pdist(synthetic)),
+            b=target,
+            seed=seed + draw,
+            permutations=PLANTED_PERMUTATIONS,
+        )
         hits += result["p"] < LEVEL
     return hits / draws
 
@@ -246,14 +279,25 @@ def main() -> None:
     table = prep.primaries()
     sites = table["site"].to_list()
     signed = [s for s, u in zip(sites, table["units"].to_list(), strict=True) if u == "MW"]
-    report: dict[str, object] = {"sites": sites, "signed_mw_sites": signed, "level": LEVEL, "counted_tests": len(COUNTED)}
+    report: dict[str, object] = {
+        "sites": sites,
+        "signed_mw_sites": signed,
+        "level": LEVEL,
+        "counted_tests": len(COUNTED),
+    }
     for fold in common.FOLDS:
         desc = descriptors(fold=fold, clean=clean, local=local)
         flat = {k: (v if v.ndim == 1 else np.nanmean(v, axis=1)) for k, v in desc.items()}
-        pl.DataFrame({"site": sites, **{k: v.tolist() for k, v in flat.items()}}).write_parquet(common.WORK_DIR / f"descriptors_{fold}.parquet")
+        pl.DataFrame({"site": sites, **{k: v.tolist() for k, v in flat.items()}}).write_parquet(
+            common.WORK_DIR / f"descriptors_{fold}.parquet"
+        )
         views = {
-            ("movement", "euclidean"): movement_distance(fold=fold, view="movement", metric="euclidean"),
-            ("stored", "euclidean"): movement_distance(fold=fold, view="stored", metric="euclidean"),
+            ("movement", "euclidean"): movement_distance(
+                fold=fold, view="movement", metric="euclidean"
+            ),
+            ("stored", "euclidean"): movement_distance(
+                fold=fold, view="stored", metric="euclidean"
+            ),
             ("movement", "cosine"): movement_distance(fold=fold, view="movement", metric="cosine"),
         }
         fold_out: dict[str, object] = {
@@ -268,11 +312,12 @@ def main() -> None:
             fold_out[f"{view}_{metric}"] = tests
             if view == "movement" and metric == "euclidean":
                 fold_out["movement_norm_spearman_with_descriptor"] = {
-                    name: _norm_corr(norms=norms, values=desc[name])
-                    for name in COUNTED
+                    name: _norm_corr(norms=norms, values=desc[name]) for name in COUNTED
                 }
                 link = linkage(squareform(dist), method="average")
-                fold_out["clusters_movement_4"] = dict(zip(sites, fcluster(link, 4, criterion="maxclust").tolist(), strict=True))
+                fold_out["clusters_movement_4"] = dict(
+                    zip(sites, fcluster(link, 4, criterion="maxclust").tolist(), strict=True)
+                )
                 fold_out["linkage"] = link.tolist()
                 # Classical multidimensional scaling of the averaged distance matrix, for the figure.
                 d2 = dist**2
@@ -286,21 +331,30 @@ def main() -> None:
             desc_flat = {k: v.tolist() for k, v in flat.items()}
             report["descriptors_2026-01"] = desc_flat
             report["planted_signal_detection"] = {
-                f"{name}|share{share}": planted_signal_detection(values=desc[name], name=name, signal_share=share, draws=100, seed=900)
+                f"{name}|share{share}": planted_signal_detection(
+                    values=desc[name], name=name, signal_share=share, draws=100, seed=900
+                )
                 for name in COUNTED
                 if name != "metering"
                 for share in (0.25, 0.5)
             }
             sign = [s in signed for s in sites]
-            flow = [float((clean[s][:] < 0).mean()) if g else None for s, g in zip(sites, sign, strict=True)]
+            flow = [
+                float((clean[s][:] < 0).mean()) if g else None
+                for s, g in zip(sites, sign, strict=True)
+            ]
             report["reverse_flow_share_signed_mw"] = dict(zip(sites, flow, strict=True))
     (common.WORK_DIR / "part2.json").write_text(json.dumps(report, indent=1, default=float))
-    summary = {
-        fold: {k: {n: (round(t["rho"], 2), round(t["p"], 4)) for n, t in v.items()} for k, v in report[fold].items() if k.startswith(("movement_", "stored_"))}
-        for fold in common.FOLDS
-    }
-    print(json.dumps(summary["2026-01"], indent=1))
-    print(json.dumps(report["planted_signal_detection"], indent=0))
+    shown = ("movement_euclidean", "stored_euclidean", "movement_cosine")
+    for fold in common.FOLDS:
+        fold_report = report[fold]
+        assert isinstance(fold_report, dict)
+        for key in shown:
+            print(
+                fold,
+                key,
+                {n: (round(t["rho"], 2), round(t["p"], 4)) for n, t in fold_report[key].items()},
+            )
 
 
 if __name__ == "__main__":

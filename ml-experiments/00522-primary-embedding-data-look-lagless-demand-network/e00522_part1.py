@@ -70,7 +70,9 @@ def load_all() -> dict[str, dict[tuple[str, int], np.ndarray]]:
     return out
 
 
-def displacement_table(*, tables: dict[str, dict[tuple[str, int], np.ndarray]]) -> dict[str, object]:
+def displacement_table(
+    *, tables: dict[str, dict[tuple[str, int], np.ndarray]]
+) -> dict[str, object]:
     """Return the displacement from the regenerated start for every family, as shares of the start's norm."""
     out: dict[str, object] = {}
     for family, cells in tables.items():
@@ -102,14 +104,10 @@ def alignment(*, tables: dict[str, dict[tuple[str, int], np.ndarray]]) -> dict[s
 
     out: dict[str, object] = {}
     same_seed = [
-        (f1, f2, s)
-        for s in common.SEEDS
-        for f1, f2 in itertools.combinations(common.FOLDS, 2)
+        (f1, f2, s) for s in common.SEEDS for f1, f2 in itertools.combinations(common.FOLDS, 2)
     ]
     out["L0PT_same_seed_across_folds_stored"] = _summary(
-        values=[
-            corr(a=tables["L0PT"][f1, s], b=tables["L0PT"][f2, s]) for f1, f2, s in same_seed
-        ]
+        values=[corr(a=tables["L0PT"][f1, s], b=tables["L0PT"][f2, s]) for f1, f2, s in same_seed]
     )
     out["L0PT_same_seed_across_folds_movement"] = _summary(
         values=[
@@ -193,15 +191,23 @@ def drift_table(*, tables: dict[str, dict[tuple[str, int], np.ndarray]]) -> dict
         "finetune_move_share_of_pretrained_norm": bootstrap_mean(values=np.array(share), seed=2),
         "per_primary_mean_share": np.mean(per_primary, axis=0).round(4).tolist(),
     }
-    mix = common.embedding_of_state(path=common.E511 / "work" / "pretrained" / "MIX" / "2026-01_s0.pt")
-    l1d = common.embedding_of_state(path=common.E511 / "work" / "models" / "L-1d" / "2026-01_d10_s0.pt")
+    mix = common.embedding_of_state(
+        path=common.E511 / "work" / "pretrained" / "MIX" / "2026-01_s0.pt"
+    )
+    l1d = common.embedding_of_state(
+        path=common.E511 / "work" / "models" / "L-1d" / "2026-01_d10_s0.pt"
+    )
     start = common.regenerated_start(seed=0)
     pre = tables["L0PT"]["2026-01", 0]
     out["L-1d_2026-01_d10_s0"] = {
         "from_L0PT_pretrained_share": float(np.linalg.norm(l1d - pre) / np.linalg.norm(pre)),
-        "L0PT_pretrained_from_start_share": float(np.linalg.norm(pre - start) / np.linalg.norm(start)),
+        "L0PT_pretrained_from_start_share": float(
+            np.linalg.norm(pre - start) / np.linalg.norm(start)
+        ),
         "from_start_share": float(np.linalg.norm(l1d - start) / np.linalg.norm(start)),
-        "MIX_pretrained_from_start_share": float(np.linalg.norm(mix - start) / np.linalg.norm(start)),
+        "MIX_pretrained_from_start_share": float(
+            np.linalg.norm(mix - start) / np.linalg.norm(start)
+        ),
     }
     return out
 
@@ -243,7 +249,11 @@ def main() -> None:
     }
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     (common.WORK_DIR / "part1.json").write_text(json.dumps(report, indent=1))
-    print(json.dumps({k: v for k, v in report.items() if k != "dimensions_of_movement"}, indent=1)[:6000])
+    print(
+        json.dumps({k: v for k, v in report.items() if k != "dimensions_of_movement"}, indent=1)[
+            :6000
+        ]
+    )
 
 
 if __name__ == "__main__":

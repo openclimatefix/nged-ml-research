@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Part 3 of experiment 522: does the network use its Primary embedding vectors?
+r"""Part 3 of experiment 522: does the network use its Primary embedding vectors?
 
 Scores the 2026-01 test rows (all leads up to 240 hours, rows with a cleaned actual) of three stored
 networks, with the embedding replaced in turn by: the stored vectors (identity), 20 random
@@ -21,7 +21,7 @@ DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=2 \\
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00087_common as c87  # ty: ignore[unresolved-import]
 import e00397_models as base  # ty: ignore[unresolved-import]
@@ -67,7 +67,12 @@ def embedding_module(*, model: torch.nn.Module) -> torch.nn.Embedding:
 
 
 def predict(
-    *, model: torch.nn.Module, rows: Rows, table: np.ndarray, target_mean: np.ndarray, target_std: np.ndarray
+    *,
+    model: torch.nn.Module,
+    rows: Rows,
+    table: np.ndarray,
+    target_mean: np.ndarray,
+    target_std: np.ndarray,
 ) -> np.ndarray:
     """Return per-row CRPS (fraction of capacity) with the embedding table replaced by `table`."""
     layer = embedding_module(model=model)
@@ -79,7 +84,10 @@ def predict(
         x = torch.from_numpy(rows.x[sl])
         p = torch.from_numpy(rows.primary[sl])
         q = c510.serving_quantiles(model=model, x=x, p=p, outlier=False).numpy()
-        q = np.sort(q * target_std[rows.primary[sl]][:, None] + target_mean[rows.primary[sl]][:, None], axis=1)
+        q = np.sort(
+            q * target_std[rows.primary[sl]][:, None] + target_mean[rows.primary[sl]][:, None],
+            axis=1,
+        )
         out[sl] = c87.pinball_quantile_score(quantiles=q, actual=rows.actual[sl])
     return out
 
@@ -102,7 +110,9 @@ def l0pt_rows(*, standardiser_path: Path, clean: np.ndarray) -> Rows:
     actual = clean[test.primary, test.target_idx]
     keep = np.isfinite(actual)
     origin_day = ((test.origin - int(test.origin.min())) // (86_400 * 1_000_000)).astype(np.int64)
-    return Rows(x=test.x[keep], primary=test.primary[keep], actual=actual[keep], day=origin_day[keep])
+    return Rows(
+        x=test.x[keep], primary=test.primary[keep], actual=actual[keep], day=origin_day[keep]
+    )
 
 
 def a_rows(*, standardiser_path: Path, clean: np.ndarray) -> Rows:
@@ -112,7 +122,9 @@ def a_rows(*, standardiser_path: Path, clean: np.ndarray) -> Rows:
     xs, ps, ys, ds = [], [], [], []
     origins = prep.test_origins(month=MONTH)
     for day, origin in enumerate(origins):
-        for row, keys, x in prep.run_inputs(origin=origin, scheme="summary", standardiser=standardiser):
+        for row, keys, x in prep.run_inputs(
+            origin=origin, scheme="summary", standardiser=standardiser
+        ):
             valid_idx = np.asarray(c87.grid_index(times=keys["valid_time"]))
             actual = clean[int(row["primary"]), valid_idx]
             keep = np.isfinite(actual) & (keys["lead_hours"].to_numpy() <= 240)
@@ -120,7 +132,12 @@ def a_rows(*, standardiser_path: Path, clean: np.ndarray) -> Rows:
             ps.append(np.full(int(keep.sum()), int(row["primary"]), dtype=np.int64))
             ys.append(actual[keep])
             ds.append(np.full(int(keep.sum()), day, dtype=np.int64))
-    return Rows(x=np.concatenate(xs), primary=np.concatenate(ps), actual=np.concatenate(ys), day=np.concatenate(ds))
+    return Rows(
+        x=np.concatenate(xs),
+        primary=np.concatenate(ps),
+        actual=np.concatenate(ys),
+        day=np.concatenate(ds),
+    )
 
 
 def load_l0pt(*, path: Path, n_inputs: int) -> torch.nn.Module:
@@ -148,32 +165,82 @@ def run_network(
     """Score every arm of Part 3 for one network and return per-Primary changes against the identity."""
     stored = embedding_module(model=model).weight.detach().numpy().astype(np.float64).copy()
     n_days = int(rows.day.max()) + 1
-    kwargs = {"model": model, "rows": rows, "target_mean": target_mean, "target_std": target_std}
-    identity = per_primary_day(crps=predict(table=stored, **kwargs), rows=rows, n_days=n_days)
+    identity = per_primary_day(
+        crps=predict(
+            model=model, rows=rows, target_mean=target_mean, target_std=target_std, table=stored
+        ),
+        rows=rows,
+        n_days=n_days,
+    )
     arms: dict[str, list[np.ndarray]] = {}
     rng = np.random.default_rng(seed)
     arms["derangement"] = [
-        per_primary_day(crps=predict(table=stored[derangement(rng=rng)], **kwargs), rows=rows, n_days=n_days)
+        per_primary_day(
+            crps=predict(
+                model=model,
+                rows=rows,
+                target_mean=target_mean,
+                target_std=target_std,
+                table=stored[derangement(rng=rng)],
+            ),
+            rows=rows,
+            n_days=n_days,
+        )
         for _ in range(DRAWS)
     ]
     arms["mean_vector"] = [
-        per_primary_day(crps=predict(table=np.tile(stored.mean(axis=0), (common.N_PRIMARIES, 1)), **kwargs), rows=rows, n_days=n_days)
+        per_primary_day(
+            crps=predict(
+                model=model,
+                rows=rows,
+                target_mean=target_mean,
+                target_std=target_std,
+                table=np.tile(stored.mean(axis=0), (common.N_PRIMARIES, 1)),
+            ),
+            rows=rows,
+            n_days=n_days,
+        )
     ]
     if include_start:
         arms["start_vector"] = [
-            per_primary_day(crps=predict(table=common.regenerated_start(seed=seed), **kwargs), rows=rows, n_days=n_days)
+            per_primary_day(
+                crps=predict(
+                    model=model,
+                    rows=rows,
+                    target_mean=target_mean,
+                    target_std=target_std,
+                    table=common.regenerated_start(seed=seed),
+                ),
+                rows=rows,
+                n_days=n_days,
+            )
         ]
     arms["fresh_random"] = [
         per_primary_day(
-            crps=predict(table=np.random.default_rng(1000 + i).normal(size=stored.shape), **kwargs), rows=rows, n_days=n_days
+            crps=predict(
+                model=model,
+                rows=rows,
+                target_mean=target_mean,
+                target_std=target_std,
+                table=np.random.default_rng(1000 + i).normal(size=stored.shape),
+            ),
+            rows=rows,
+            n_days=n_days,
         )
         for i in range(DRAWS)
     ]
-    np.savez(common.WORK_DIR / f"part3_per_day_{name}.npz", identity=identity, **{k: np.stack(v) for k, v in arms.items()})
+    saved: dict[str, Any] = {k: np.stack(v) for k, v in arms.items()}
+    np.savez(
+        common.WORK_DIR / f"part3_per_day_{name}.npz",
+        identity=identity,
+        **saved,
+    )
     return summarise(identity=identity, arms=arms, sites=sites, seed=seed)
 
 
-def summarise(*, identity: np.ndarray, arms: dict[str, list[np.ndarray]], sites: list[str], seed: int) -> dict[str, object]:
+def summarise(
+    *, identity: np.ndarray, arms: dict[str, list[np.ndarray]], sites: list[str], seed: int
+) -> dict[str, object]:
     """Return per-Primary CRPS change (percentage points), the headline mean over scored Primaries, and a day-block interval."""
     scored = np.array([s not in REPORT_ONLY for s in sites])
     rng = np.random.default_rng(seed)
@@ -181,17 +248,24 @@ def summarise(*, identity: np.ndarray, arms: dict[str, list[np.ndarray]], sites:
     resamples = rng.integers(0, n_days, size=(BOOTSTRAPS, n_days))
     out: dict[str, object] = {
         "identity_crps_by_primary_pct": (100 * np.nanmean(identity, axis=1)).round(3).tolist(),
-        "identity_crps_mean_scored_pct": float(100 * np.nanmean(np.nanmean(identity, axis=1)[scored])),
+        "identity_crps_mean_scored_pct": float(
+            100 * np.nanmean(np.nanmean(identity, axis=1)[scored])
+        ),
     }
     for name, draws in arms.items():
         delta = np.mean([d - identity for d in draws], axis=0)  # (16, days)
         per_primary = 100 * np.nanmean(delta, axis=1)
-        boot = np.array([100 * np.nanmean(np.nanmean(delta[:, r], axis=1)[scored]) for r in resamples])
+        boot = np.array(
+            [100 * np.nanmean(np.nanmean(delta[:, r], axis=1)[scored]) for r in resamples]
+        )
         draw_means = [100 * np.nanmean(np.nanmean(d - identity, axis=1)[scored]) for d in draws]
         out[name] = {
             "change_by_primary_pct": per_primary.round(3).tolist(),
             "change_mean_scored_pct": float(100 * np.nanmean(np.nanmean(delta, axis=1)[scored])),
-            "day_block_interval_95": [float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))],
+            "day_block_interval_95": [
+                float(np.quantile(boot, 0.025)),
+                float(np.quantile(boot, 0.975)),
+            ],
             "draw_sd_of_scored_mean": float(np.std(draw_means)) if len(draw_means) > 1 else None,
             "n_draws": len(draws),
         }
@@ -235,7 +309,16 @@ def main() -> None:
     for name in ("L0PT_pretrained", "L0PT_finetuned", "A"):
         net = report[name]
         assert isinstance(net, dict)
-        print(name, "identity", round(net["identity_crps_mean_scored_pct"], 3), {k: round(v["change_mean_scored_pct"], 3) for k, v in net.items() if isinstance(v, dict)})
+        print(
+            name,
+            "identity",
+            round(net["identity_crps_mean_scored_pct"], 3),
+            {
+                k: round(v["change_mean_scored_pct"], 3)
+                for k, v in net.items()
+                if isinstance(v, dict)
+            },
+        )
 
 
 if __name__ == "__main__":

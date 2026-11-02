@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Shared pieces of experiment 522: stored-weight paths, embedding loaders, and distance helpers.
 
 The Primary embedding is the 16 x 8 table `embedding.weight` of experiment 397's `PlainMdn` (the
