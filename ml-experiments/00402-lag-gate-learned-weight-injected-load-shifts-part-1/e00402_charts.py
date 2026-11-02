@@ -81,7 +81,7 @@ def event_figure(*, group: str, series: pl.DataFrame) -> None:
         )
         rule = (
             alt.Chart(pl.DataFrame({"y": [0.5]}))  # ty: ignore[unresolved-attribute]
-            .mark_rule(color=ocf.GREY_1, strokeDash=[4, 3])
+            .mark_rule(color=ocf.BLACK_1, strokeDash=[4, 3])
             .encode(y="y:Q")
         )
         title = alt.TitleParams(

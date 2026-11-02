@@ -119,7 +119,7 @@ def main() -> None:
         )
         rule = (
             alt.Chart(pl.DataFrame({"bar": [bar]}).to_pandas())
-            .mark_rule(strokeDash=[4, 3], color=theme.GREY_1)
+            .mark_rule(strokeDash=[4, 3], color=theme.BLACK_1)
             .encode(  # ty: ignore[unresolved-attribute]
                 x="bar:Q"
             )
