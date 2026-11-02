@@ -30,13 +30,14 @@ prediction: >-
   the recall of injected pulses of at least 1 times the residual spread that last at least 6 hours
   is 0.8 or more, with at most 2 false flags per Primary-year. P3: injected genuine level changes
   reach p of at least 0.5 on under 10% of their rows, counting only rows from day 15 after the step
-  start. P4: over real
-  rows with no labelled event, the mean weight (1 - p)^g (floor 0.1) is at least 0.90 for g = 1 and
-  g = 2, and the Kish effective sample size ratio is at least 0.85. P5: the lower end of the day-block bootstrap interval of the area under the curve of p on the 184
-  labelled rows against matched rows with no labelled event is above 0.50 (the area is a lower
-  bound, because the matched rows hold unlabelled events). P6: p stays under 0.5 on at least 80% of the rows of D22's 13 dip days, and separately of D8's 16
-  unexplained dips. P3 is read on rows from day 15 after the step start. P7: on experiment 511's
-  national same-sign shift, under 30% of the shifted rows reach p of at least 0.5. Any of these can fail.
+  start. P4: over real rows with no labelled event, the mean weight (1 - p)^g (floor 0.1) is at
+  least 0.90 for g = 1 and g = 2, and the Kish effective sample size ratio is at least 0.85. P5: the
+  lower end of the day-block bootstrap interval of the area under the curve of p on the 184 labelled
+  rows against matched rows with no labelled event is above 0.50 (the area is a lower bound, because
+  the matched rows hold unlabelled events). P6: p stays under 0.5 on at least 80% of the rows of
+  D22's 13 dip days, and separately of D8's 16 unexplained dips. P3 is read on rows from day 15
+  after the step start. P7: on experiment 511's national same-sign shift, under 30% of the shifted
+  rows reach p of at least 0.5. Any of these can fail.
 decision_rule: >-
   The p tables are frozen and written before any fine-tune score is read (the soft-weight fine-tune
   is a separate later experiment, which this one does not run). The tables go to that experiment
