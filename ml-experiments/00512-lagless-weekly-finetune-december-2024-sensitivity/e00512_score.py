@@ -1,4 +1,4 @@
-"""Score experiment 511's arms (L-M, L-W, L-Ww on the fold 2024-12) and write `scores/slices.csv`.
+"""Score experiment 512's arms (L-M, L-W, L-Ww on the fold 2024-12) and write `scores/slices.csv`.
 
 Seeds 0 and 1 are averaged by quantile and widened by 1.15 (experiment 470's scorer functions). The
 actuals are the cleaned power over capacity; rows with an unflagged actual are scored. No K2-S1,
@@ -8,7 +8,7 @@ effective capacity, split by group (the eight and the six), week of the month, a
 descriptive).
 
 ```bash
-source <paths>; uv run --no-sync python ml-experiments/00511-*/e00511_score.py
+source <paths>; uv run --no-sync python ml-experiments/00512-*/e00512_score.py
 ```
 """
 
@@ -24,7 +24,7 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00511-lagless-weekly-finetune-december-2024-sensitivity" / "work"
+    ML_EXPERIMENTS_DATA_DIR / "00512-lagless-weekly-finetune-december-2024-sensitivity" / "work"
 )
 MONTH: Final[str] = "2024-12"
 ARMS: Final[tuple[str, ...]] = ("L-M", "L-W", "L-Ww")

@@ -1,8 +1,8 @@
 # ruff: noqa: E501
-"""Draw experiment 511's figure: weekly-over-monthly and recency-weight CRPS differences.
+"""Draw experiment 512's figure: weekly-over-monthly and recency-weight CRPS differences.
 
 ```bash
-source <paths>; uv run --no-sync python ml-experiments/00511-*/e00511_figures.py
+source <paths>; uv run --no-sync python ml-experiments/00512-*/e00512_figures.py
 ```
 """
 
@@ -10,13 +10,13 @@ from pathlib import Path
 from typing import Final
 
 import altair as alt
-import e00511_score as score  # ty: ignore[unresolved-import]
+import e00512_score as score  # ty: ignore[unresolved-import]
 import polars as pl
 from plotting import ocf_theme as theme
 
 DOCS_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
-    / "docs/ml-experiments/00511-lagless-weekly-finetune-december-2024-sensitivity"
+    / "docs/ml-experiments/00512-lagless-weekly-finetune-december-2024-sensitivity"
 )
 ORDER: Final[list[str]] = [
     "all", "christmas", "origin_days_1_7", "origin_days_8_14", "origin_days_15_21", "origin_days_22_28", "origin_days_29_31",

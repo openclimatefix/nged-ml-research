@@ -1,12 +1,12 @@
 # ruff: noqa: E501
-r"""Run experiment 510's lag-free fine-tuning harness on the single fold 2024-12 (experiment 511).
+r"""Run experiment 510's lag-free fine-tuning harness on the single fold 2024-12 (experiment 512).
 
 Re-points experiment 510's modules at this experiment's own work folder and at the month 2024-12,
 then runs one of its commands (`leak`, `pretrain`, `fit`, `assemble`) unchanged.
 
 ```bash
 source <PYTHONPATH of every folder under ml-experiments/>; export DATA_PATH_INTERNAL=<private data folder>
-OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00511-*/e00511_run.py leak
+OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00512-*/e00512_run.py leak
 ```
 """
 
@@ -19,7 +19,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 MONTH: Final[str] = "2024-12"
 WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00511-lagless-weekly-finetune-december-2024-sensitivity" / "work"
+    ML_EXPERIMENTS_DATA_DIR / "00512-lagless-weekly-finetune-december-2024-sensitivity" / "work"
 )
 
 
