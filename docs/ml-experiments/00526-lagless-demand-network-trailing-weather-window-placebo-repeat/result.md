@@ -13,8 +13,8 @@ size: >-
   complex. Stored: pretrained and fine-tuned lag-free networks, their raw quantile forecasts, and a
   mixture-mean column, under this experiment's private data folder only; every earlier experiment is
   read and never written. Serving path: not touched (this repository holds none). Degradation rule:
-not touched. Designs: more than one defensible (how the placebo matches the three real columns, what
-the column-count control is made of, how seeds are added without refitting), so the plan fixes each
+  not touched. Designs: more than one defensible (how the placebo matches the three real columns, what
+  the column-count control is made of, how seeds are added without refitting), so the plan fixes each
   before any score is read. Callers: this folder's scripts import experiments 397, 428, 510, and 515
   and the `studies` evaluation code. One Sonnet plan review, one Sonnet code review before the first
   fit that produces quoted numbers, one Sonnet results review, and two Sonnet write-up reviews.
@@ -31,10 +31,10 @@ prediction: >-
   arm's CRPS minus the second arm's CRPS in points, so negative favours the first arm. P1 (primary,
   W-T minus W-Tnull, cold nights, the eight MVA-only Primaries, 10 winter folds, 5 seeds): the
   point estimate is -0.05 or lower. P1 fails if it is above -0.03; between -0.05 and -0.03 it is
-inconclusive. The observed 515 contrast against the nine-column placebo was -0.079. P2 (column-count
+  inconclusive. The observed 515 contrast against the nine-column placebo was -0.079. P2 (column-count
   control, cold nights, the eight): W-noise3 minus W0 lies inside plus or minus the pooled
-cold-night minimum detectable effect at 5 seeds (0.118); P2 fails if it lies outside. P3 (seam, all
-rows, 10 winter folds, both groups): the pooled paired contrast between the two seam builds of W-T
+  cold-night minimum detectable effect at 5 seeds (0.118); P2 fails if it lies outside. P3 (seam, all
+  rows, 10 winter folds, both groups): the pooled paired contrast between the two seam builds of W-T
   at
   5 seeds has a point estimate within plus or minus 0.02. P3 fails if it lies outside, as 515's
   3-seed contrast did (+0.025 at the eight, +0.023 at the six).
@@ -43,29 +43,29 @@ decision_rule: >-
   the eight MVA-only Primaries, 10 winter folds, 5 seeds, with a 95% month-block bootstrap interval
   (1 test, level 0.05). The result is worded as a tighter interval and not as a verdict, unless the
   point estimate is below -0.12 (the 95% half-width at 5 seeds is about 0.12). A contrast inside the
-minimum detectable effect is worded "not shown", never "no effect". The 11-seed extension of W0,
+  minimum detectable effect is worded "not shown", never "no effect". The 11-seed extension of W0,
   W-T,
-and W-Tnull on the winter folds repeats the primary at 11 seeds, and the 11-seed reading is the one
+  and W-Tnull on the winter folds repeats the primary at 11 seeds, and the 11-seed reading is the one
   that the adoption rule uses. Adoption rule for the first-release recipe, applied to those readings
   only: adopt W-T if (i) the cold-night interval of W-T minus W-Tnull at the eight (11 seeds, level
-0.05) and the cold-night interval of W-T minus W-noise3 at the eight (5 seeds, Bonferroni level for
+  0.05) and the cold-night interval of W-T minus W-noise3 at the eight (5 seeds, Bonferroni level for
   21
-tests) both exclude zero, (ii) the point estimate of W-T minus W0 on all rows is no worse than +0.03
+  tests) both exclude zero, (ii) the point estimate of W-T minus W0 on all rows is no worse than +0.03
   at
   both the eight and the six, and (iii) the seam check P3 passes. The secondary family is 21 tests,
-Bonferroni-corrected. Every other contrast is descriptive and uncorrected. Fold 2024-11 is reported
+  Bonferroni-corrected. Every other contrast is descriptive and uncorrected. Fold 2024-11 is reported
   with and without, descriptively, and takes no part in any rule. Recipes and serving code are not
   changed by this experiment; it records results only.
 benchmark: >-
   The 37-column base (arm W0) on the same folds, rows, and seeds, with seeds 0 to 2 read from
-experiment 515 (and experiment 513's `P0` for 2025-12, 2026-01, and 2026-03) and seeds 3 and 4
+  experiment 515 (and experiment 513's `P0` for 2025-12, 2026-01, and 2026-03) and seeds 3 and 4
   fitted
   here. The placebo comparators are W-Tnull and W-null.
 row_set_id: experiment_526_v1
 metric: >-
   CRPS in points of effective capacity at the eight MVA-only and the six signed-MW Primaries, on all
   rows, cold nights, cold sunny, and warm sunny slices; q95 and q99 pinball loss on cold nights; the
-absolute error of the mixture-mean forecast and the median minus the mean forecast; CRPS by horizon
+  absolute error of the mixture-mean forecast and the median minus the mean forecast; CRPS by horizon
   band (day 1, days 2 to 3, days 4 to 10).
 ---
 
