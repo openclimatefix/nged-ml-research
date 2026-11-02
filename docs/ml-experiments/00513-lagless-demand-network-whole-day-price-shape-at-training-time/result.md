@@ -27,15 +27,15 @@ hypothesis: >-
   exists, so this experiment first asks the upper-bound question: does the true shape, given at
   both training and scoring time, help at all?
 prediction: >-
-  Written before any score is read. P1: the oracle (PO) beats the no-shape control (P0) by 0.00 to
+  Written before any quoted score. P1: the oracle (PO) beats the no-shape control (P0) by 0.00 to
   0.06 points of CRPS at both groups, below or near the minimum detectable effect, because price
-  terms are 3 to 5% of the error at the one Primary where they were measured. P2: the shuffled-day
-  placebo (PP) recovers at least half of the oracle's gain, because a typical-shape day carries
-  day-type information. P3: the national demand-and-wind control (PN) gains at least as much as the
-  oracle. P4: at the Primaries with a known battery or gas engine (D2, D5, D8, D9, D11, D14) the
-  oracle's gain is no larger than at the other Primaries. A single-fold, single-seed timing run
-  (2025-10, seed 0, pinball loss only, no contrast and no interval) already scored the oracle,
-  placebo, and national control all better than P0, which fits P2 and P3.
+  terms are 3 to 5% of the error at the one Primary where they were measured. P2 to P4 apply only
+  if the oracle passes the stop rule, because a ratio against a gain near zero cannot fail. P2: the
+  shuffled-day placebo (PP) recovers at least 0.75 of the oracle's gain at a group; P2 fails if PP
+  recovers less. P3: the national demand-and-wind control (PN) recovers at least 0.75 of the
+  oracle's gain; P3 fails if PN recovers less. P4: at the Primaries with a known battery or gas
+  engine (D2, D5, D8, D9, D11, D14) the oracle's gain is larger than at the other Primaries; P4
+  fails if it is no larger.
 decision_rule: >-
   See "Pre-registered rules". Continue to the training-time-only arms only if either group's
   Bonferroni interval for PO minus P0 excludes zero and the point estimate is at most minus the
@@ -54,7 +54,7 @@ metric: >-
 
 ## Plan (status: planned; no score has been read)
 
-**This plan was written before any fit that produced a quoted number.** The take-home message, the
+**The plan was written before any fit that produced a quoted number.** The take-home message, the
 verdict, and the results are added when the experiment finishes. The plan covers Part 1 of the brief
 (the price shape) only; whether the 0/1 lockdown flag is still needed is a separate experiment.
 
@@ -139,7 +139,10 @@ generation, per half-hour, so they describe the day's residual demand shape.
 
 - **Folds and seeds.** The five folds of experiments 448, 449, and 510 (2025-10, 2025-12, 2026-01,
   2026-03, 2026-06), seeds 0, 1, and 2. July 2026 is unused.
-- **Fit count.** 4 arms x 5 folds x 3 seeds = 60 pretrainings and 60 fine-tunings. The conditional
+- **Fit count.** Four arms, five folds, and three seeds give 60 pretrainings and 60 fine-tunings,
+  above the brief's cap of 30 to 45 pretrainings, because the control is re-pretrained too. All
+  three shape arms run before the stop rule is read, as the brief's core cap requires; running P0
+  and PO first would halve the cost and give the same stop-rule verdict. The conditional
   arms add about 55 pretrainings and 55 fine-tunings (one at a time, if the stop rule passes).
 - **Timed cost.** One fold, seed 0, all four arms: feeder 13 s (rows and shape tables), pretraining
   17 to 24 s per arm, fine-tune 3 to 6 s, so about 5 minutes per fold and 0.4 GPU-hours for the 60
@@ -156,8 +159,10 @@ generation, per half-hour, so they describe the day's residual demand shape.
   P-drop, P-aux, P-teach (6 contrasts at 2 groups, so 12 CRPS tests: Bonferroni count 12; the family
   of the whole price-and-lockdown brief is 18 with Part 2's 6). Descriptive, at the same interval
   width: PO minus PP and PO minus PN.
-- **Minimum detectable effect.** From the seed spread of P0 (three seeds, five folds), printed by
-  `e00513_score.py baseline` before any contrast. It is scaled to a 3-seed mean. Experiments 448 to
+- **Minimum detectable effect.** From the seed spread of the four arms pooled (three seeds, five folds),
+  printed by `e00513_score.py baseline` before any contrast. A seed spread cannot exist before any fit, so
+  this replaces the brief's "before any fit". The minimum detectable effect is scaled to a 3-seed
+  mean. Experiments 448 to
   510 report 0.057 to 0.164 points, so a pooled pass of 0.05 or less is unlikely to be resolved: the
   price terms are 3 to 5% of the error at the one Primary where they were measured.
 - **Intervals.** Month-block bootstrap with five blocks gives near min-to-max intervals; the page
@@ -175,6 +180,9 @@ generation, per half-hour, so they describe the day's residual demand shape.
 - **Stop rule.** Continue to P-drop and P-aux only if, at either group, the Bonferroni interval of
   PO minus P0 excludes zero and its point estimate is at most minus the 3-seed minimum detectable
   effect. Otherwise stop and report.
+- **Missing flags.** PO and PP carry the missing flag on the 101 days without a price; PN carries
+  it on the 50 days without a national series. The scoring mask uses the price-missing days only,
+  for every arm.
 - **Reading a passing oracle.** If PN or PP reproduces at least 0.75 of the oracle's gain at a
   group, call that gain a national-state or day-type effect. A battery reading needs the oracle to
   beat both, at the Primaries with a known asset.
