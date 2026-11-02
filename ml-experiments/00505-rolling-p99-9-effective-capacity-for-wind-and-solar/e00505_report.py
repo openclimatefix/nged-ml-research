@@ -7,13 +7,15 @@ The bootstrap intervals of the full analysis are in `work/report.txt`; figure 2 
 the per-series intervals with a month-block resample of the same cells.
 
 ```bash
-export DATA_PATH_INTERNAL=...; source ml-experiments/00429-*/env.sh   # plus the 00461 and 00505 folders
+export DATA_PATH_INTERNAL=...
+source ml-experiments/00429-*/env.sh   # plus the 00461 and 00505 folders
 uv run --no-sync python ml-experiments/00505-*/e00505_report.py
 ```
 """
 
 import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
@@ -32,7 +34,9 @@ WIND: Final[list[str]] = ["Farm A", "Farm B", "Farm C"]
 SOLAR: Final[list[str]] = ["Solar A", "Solar B", "Solar C", "Solar D", "Solar E", "Solar F"]
 SERIES: Final[list[str]] = WIND + SOLAR
 LINE: Final[dict[str, str]] = {
-    "p999": "all earlier power", "p730": "last 730 days", "p365": "last 365 days",
+    "p999": "all earlier power",
+    "p730": "last 730 days",
+    "p365": "last 365 days",
 }
 RULES: Final[list[str]] = ["old", "p999", "p730", "p365"]
 LABEL: Final[dict[str, str]] = {
@@ -78,7 +82,10 @@ def sub(*, cells: pl.DataFrame, site: str, rule: str) -> pl.DataFrame:
 def capacity_table() -> None:
     """Print the capacity ratios (new over old) and window counts per series and refit."""
     say("(a) capacity table: ratio new/old (n_valid, n_above, * = fell back to P-all)")
-    say("series | refit | P-all ratio (n_history) | P-730 ratio | P-365 ratio | P-730 n_valid, n_above | P-365 n_valid, n_above")  # fmt: skip
+    say(
+        "series | refit | P-all ratio (n_history) | P-730 ratio | P-365 ratio | "
+        "P-730 n_valid, n_above | P-365 n_valid, n_above"
+    )
     all_w = json.loads((common.EXP461_DIR / "wind_capacity.json").read_text())
     all_s = json.loads((common.EXP461_DIR / "solar_capacity.json").read_text())
     roll = {
@@ -127,7 +134,9 @@ def score_change_tables(*, cells: pl.DataFrame) -> pl.DataFrame:
                 draws = np.empty(DRAWS)
                 for d in range(DRAWS):
                     pick = rng.integers(0, len(n), size=len(n))
-                    draws[d] = s_new[pick].sum() / nn[pick].sum() - s_ref[pick].sum() / n[pick].sum()
+                    draws[d] = (
+                        s_new[pick].sum() / nn[pick].sum() - s_ref[pick].sum() / n[pick].sum()
+                    )
                 lo, hi = np.percentile(draws, [2.5, 97.5])
                 pct = point / (s_ref.sum() / n.sum()) * 100
                 say(f"{site} | {arm} | {ref} | {point:+.4f} | {pct:+.2f} | [{lo:+.4f}, {hi:+.4f}]")
@@ -146,14 +155,16 @@ def share_table(*, cells: pl.DataFrame) -> pl.DataFrame:
         vals = []
         for rule in RULES:
             t = sub(cells=cells, site=site, rule=rule)
-            share = float((t["n"] - t["hit_q99"]).sum() / t["n"].sum() * 100)
+            share = 100.0 * (t["n"] - t["hit_q99"]).sum() / t["n"].sum()  # ty: ignore[unsupported-operator]
             vals.append(f"{share:.2f}")
             rows.append({"series": site, "rule": LABEL[rule], "share": share})
         say(f"{site} | " + " | ".join(vals))
     return pl.DataFrame(rows)
 
 
-def panels(*, make, wind_h: int, solar_h: int, title: list[str]) -> alt.VConcatChart:
+def panels(
+    *, make: Callable[[list[str]], alt.LayerChart], wind_h: int, solar_h: int, title: str
+) -> alt.VConcatChart:
     """Stack a wind panel over a solar panel, with a shared title."""
     return alt.vconcat(
         make(WIND).properties(height=wind_h, width=PLOT_W),
@@ -239,19 +250,19 @@ def fig_over_time() -> None:
         times = s["time"].dt.replace_time_zone(None).to_numpy().astype("datetime64[ns]")
         power = s["power"].to_numpy().astype(float)
         weeks = np.arange(times[0] + np.timedelta64(400, "D"), times[-1], np.timedelta64(7, "D"))
-        for key, days, label in (("p999", None, "all earlier power"), ("p730", 730, "last 730 days"),
-                                 ("p365", 365, "last 365 days")):  # fmt: skip
+        for key, days in (("p999", None), ("p730", 730), ("p365", 365)):
             vals = trailing(times=times, power=power, at=weeks, days=days)
             frames.append(pl.DataFrame({
                 "series": site, "time": weeks.astype("datetime64[us]"),
                 "value": [v / old if v is not None else None for v in vals],
                 "line": LINE[key],
             }))  # fmt: skip
-        last_month = s["time"].max().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_month = s["time"].dt.truncate("1mo").max()
         monthly = (
             s.filter(pl.col("time") < last_month)
             .with_columns(month=pl.col("time").dt.truncate("1mo").dt.replace_time_zone(None))
-            .group_by("month").agg(pl.col("power").max() / old)
+            .group_by("month")
+            .agg(pl.col("power").max() / old)
         )
         frames.append(
             monthly.rename({"month": "time", "power": "value"})
@@ -260,6 +271,7 @@ def fig_over_time() -> None:
         )
     data = pl.concat(frames, how="vertical_relaxed").drop_nulls("value")
     domain = ["all earlier power", "last 730 days", "last 365 days", "monthly maximum power"]
+    year_axis = alt.Axis(format="%Y", values=[{"year": y} for y in (2020, 2022, 2024, 2026)])
     colour = alt.Color(
         "line:N", title=None,
         scale=alt.Scale(domain=domain,
@@ -268,9 +280,9 @@ def fig_over_time() -> None:
     )  # fmt: skip
     chart = (
         alt.Chart(data)
-        .mark_line(clip=True)  # ty: ignore[unresolved-attribute]
-        .encode(
-            x=alt.X("time:T", title="Year", axis=alt.Axis(format="%Y", values=[{"year": y} for y in (2020, 2022, 2024, 2026)])),
+        .mark_line(clip=True)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("time:T", title="Year", axis=year_axis),
             y=alt.Y("value:Q", title="Share of old capacity", scale=alt.Scale(zero=False)),
             color=colour,
             strokeWidth=alt.condition(
@@ -312,26 +324,36 @@ def fan(
         band("q05", "q95", 0.2)
         + band("q25", "q75", 0.3)
         + base.mark_line(color=COLOUR["p730"], aria=False).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
-        + alt.Chart(other).mark_line(color=COLOUR["old"], strokeDash=[4, 3], strokeWidth=1, aria=False)  # ty: ignore[unresolved-attribute]
-        .encode(x="lead_hours:Q", y="q50:Q")
+        + alt.Chart(other)
+        .mark_line(color=COLOUR["old"], strokeDash=[4, 3], strokeWidth=1, aria=False)
+        .encode(x="lead_hours:Q", y="q50:Q")  # ty: ignore[unresolved-attribute]
         + base.mark_line(color="black", aria=False).encode(y="actual:Q")  # ty: ignore[unresolved-attribute]
     ).properties(width=PLOT_W, height=height, title=title)
 
 
 def fig_examples() -> None:
     """Figures 4 and 5: day-ahead and ten-day runs for Farm A and Solar A, winter and summer."""
-    spec = [("Farm A", "member_plain", "2026-01", "winter"), ("Farm A", "member_plain", "2025-07", "summer"),
-            ("Solar A", "a2_member", "2025-12", "winter"), ("Solar A", "a2_member", "2026-06", "summer")]  # fmt: skip
+    spec = [
+        ("Farm A", "member_plain", "2026-01", "winter"),
+        ("Farm A", "member_plain", "2025-07", "summer"),
+        ("Solar A", "a2_member", "2025-12", "winter"),
+        ("Solar A", "a2_member", "2026-06", "summer"),
+    ]
     day, horizon = [], []
     for site, arm, month, season in spec:
-        run = pick_run(rows=pl.read_parquet(WORK / f"rows_{arm}_p730.parquet"), site=site, month=month)
+        run = pick_run(
+            rows=pl.read_parquet(WORK / f"rows_{arm}_p730.parquet"), site=site, month=month
+        )
         full = pl.read_parquet(WORK / f"rows_{arm}_p999.parquet")
         ref = full.filter((pl.col("site") == site) & (pl.col("init") == run["init"][0]))
         for out, lo, hi, kind in ((day, 24, 48, "day ahead"), (horizon, 24, 240, "days 1 to 10")):
             out.append(fan(run=run, ref=ref, lo_h=lo, hi_h=hi, height=110,
                            title=f"{site}, one {season} run: {kind}"))  # fmt: skip
     note = "Black: actual. Orange: P-730. Dashed: P-all median"
-    for name, charts in (("figure_4_day_ahead.svg", day), ("figure_5_ten_day_horizon.svg", horizon)):
+    for name, charts in (
+        ("figure_4_day_ahead.svg", day),
+        ("figure_5_ten_day_horizon.svg", horizon),
+    ):
         alt.vconcat(*charts).properties(title=note).save(DOCS / name)
 
 

@@ -343,7 +343,7 @@ def share_above_q99(*, piece: pl.DataFrame) -> float:
     return 1.0 - float(piece["hit_q99"].sum()) / float(piece["n"].sum())
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912
     """Build every arm's frame, the cells, and the report."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     frames = [wind_frame(rule=rule) for rule in RULES]
@@ -392,7 +392,7 @@ def main() -> None:
                     )
                     m = {r["rule"]: r["score_mw_sum"] / r["n"] for r in agg.iter_rows(named=True)}
                     diff = m[new] - m[ref]
-                    # Leave-one-out intervals are extra to the 44 counted, so they get no Bonferroni.
+                    # Leave-one-out intervals are extra to the 44 counted: no Bonferroni.
                     bonf = (
                         ""
                         if label.startswith("pooled without")
