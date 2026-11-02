@@ -109,11 +109,14 @@ production_status: candidate
 adopted_in: none
 ---
 
-**The demand neural network can drop its 7 ensemble-spread inputs (46 inputs down to 39) with no loss on the whole scored sample. The change in forecast error (CRPS, continuous ranked
+**The demand neural network can drop its 7 ensemble-spread inputs (46 inputs down to 39) with no
+loss on the whole scored sample. The change in forecast error (CRPS, continuous ranked
 probability score, in percentage points of each Primary substation's capacity; a lower score is
 better) was +0.012 at the 8 Primaries that report only apparent power (MVA) and -0.043 at the 6 that
 report signed megawatts. Both changes are inside the equivalence limit. On cold winter nights at the
-6 signed-MW Primaries the network without spread inputs scored 0.187 points worse, and on the 6 Primaries' rows with a labelled event it scored 0.408 worse. The whole-sample equivalence claim does not show those losses.**
+6 signed-MW Primaries the network without spread inputs scored 0.187 points worse, and on the 6
+Primaries' rows with a labelled event it scored 0.408 worse. The whole-sample equivalence claim does
+not show those losses.**
 
 **Each of four removals is tested alone against PretrainOnce (PO), with the printed minimum
 detectable effect as the limit.** PO is experiment 494's network: pretrained once at the 2025-07

@@ -4,8 +4,8 @@
 Figures (680 pixels wide, SVG, in the experiment's docs folder; optimise each with
 `npx svgo@4 --multipass --precision=1 --final-newline`):
 
-1. `figure_1_headline.svg`: each arm's CRPS difference to PretrainOnce (PO) at the eight and the six, with the
-   origin-day Bonferroni interval, the interval across the folds, and the equivalence limit;
+1. `figure_1_headline.svg`: each arm's CRPS difference to PretrainOnce (PO) at the eight and the
+   six, with the origin-day Bonferroni interval, the interval across the folds, and the equivalence limit;
 2. `figure_2_per_fold.svg`: the same difference in each fold;
 3. `figure_3_tail_calibration.svg`: coverage at q01, q05, q95, and q99;
 4. `figure_4_example_*.svg`: a day-ahead and a 14-day forecast of PO and the four arms.
