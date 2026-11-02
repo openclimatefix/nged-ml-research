@@ -52,7 +52,7 @@ def point_at_495() -> None:
     fit.MODEL_DIR = fit495.MODEL_DIR
     fit.PRED_DIR = PRED_DIR
     fit.WORK_DIR = fit495.WORK_DIR
-    fit.build_network = _build_network
+    fit.build_network = _build_network  # ty: ignore[invalid-assignment]
     link_stored()
 
 

@@ -288,7 +288,7 @@ def figure_hard_set() -> None:
     chart = (
         alt.Chart(data)
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lead:N", sort=["0-24", "24-48", "48-120", "120+"], title="Lead (hours)"),
             y=alt.Y("share:Q", title="Share of rows that are hard", axis=alt.Axis(format="%")),
             color=alt.Color("depth:N", title=None, scale=alt.Scale(range=COLOURS)),
@@ -324,11 +324,11 @@ def figure_tradeoff() -> None:
         y=alt.Y("cost:Q", title="Score minus A0-inj, rows with no labelled event (points)"),
     )
     chart = (
-        base.mark_line(color="#888888").encode(order="follow:Q")
-        + base.mark_point(size=90, filled=True).encode(
+        base.mark_line(color="#888888").encode(order="follow:Q")  # ty: ignore[unresolved-attribute]
+        + base.mark_point(size=90, filled=True).encode(  # ty: ignore[unresolved-attribute]
             color=alt.Color("arm:N", scale=alt.Scale(range=COLOURS), title=None)
         )
-        + base.mark_text(dx=14, align="left").encode(text="arm:N")
+        + base.mark_text(dx=14, align="left").encode(text="arm:N")  # ty: ignore[unresolved-attribute]
     ).properties(
         width=WIDTH,
         height=260,

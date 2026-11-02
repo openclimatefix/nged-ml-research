@@ -190,6 +190,7 @@ def fit_hn(*, month: str, seed: int, device: str, stride: int) -> Path:  # noqa:
     train, _test, scalers, _arrays, lag_stats = fit.build_pools(
         month=month, seed=seed, device=device, stride=stride
     )
+    assert train is not None
     real = score.real_event_mask()
     table = pl.read_parquet(lagless.table_path(month=month, seed=seed))
     neighbours = rows_mod.neighbour_matrix(

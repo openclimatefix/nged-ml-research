@@ -34,7 +34,7 @@ def main() -> None:
     c454.ARMS = ARMS
     c454.COMPARISONS = COMPARISONS
     (fit495.WORK_DIR / "scores").mkdir(parents=True, exist_ok=True)
-    c449.ARMS, c449.REFERENCES, c449.COMPARISONS = ARMS, c454.REFERENCES, COMPARISONS
+    c449.ARMS, c449.REFERENCES, c449.COMPARISONS = ARMS, c454.REFERENCES, COMPARISONS  # ty: ignore[invalid-assignment]
     c454.main()
 
 
