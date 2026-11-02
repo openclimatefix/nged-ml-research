@@ -195,6 +195,26 @@ def absolute_table(*, table: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(records)
 
 
+def width_table(*, table: pl.DataFrame) -> pl.DataFrame:
+    """Return the mean width of the 90% (q05 to q95) and 98% (q01 to q99) bands, in points of capacity.
+
+    Widths come from the 1.15-widened quantiles that were scored. `K2-S1-c0` and `L-1d-454rows` are the
+    cell and the pooled seeds behind experiment 511's `K2-S1` and `L-1d` columns.
+    """
+    arms = ("K2-S1-c0", "K2-S1-3cell", "L-1d-454rows", "LL", "LL-ens3", "LL-ens5")
+    records = []
+    for name in SETS:
+        part = row_set(table=table, name=name)
+        for band in (*BANDS, ALL):
+            sub = in_band(part=part, band=band)
+            for arm in arms:
+                records.append(
+                    {"set": name, "band": band, "arm": arm, "n": sub.height,
+                     "w90": float(sub[f"{arm}__w90"].mean()), "w98": float(sub[f"{arm}__w98"].mean())}
+                )  # fmt: skip
+    return pl.DataFrame(records)
+
+
 def primary_table(*, table: pl.DataFrame) -> pl.DataFrame:
     """Return the gap L-1d minus K2-S1 per Primary, with its share of the row set's summed gap."""
     records = []
@@ -340,6 +360,7 @@ def main() -> None:
     print(
         f"counted tests: {int(contrasts['counted'].sum())} (28 CRPS + 28 more for q99, pre-registered 56)"
     )
+    width_table(table=table).write_csv(SCORES / "widths.csv")
     primary_table(table=table).write_csv(SCORES / "per_primary.csv")
     slice_table(table=table).write_csv(SCORES / "slices.csv")
     half_hour_table(table=table).write_csv(SCORES / "half_hour.csv")

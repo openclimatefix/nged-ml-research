@@ -77,7 +77,9 @@ def row_metrics(*, frame: pl.DataFrame) -> dict[str, np.ndarray]:
     return out
 
 
-def score_cells(*, rows: pl.DataFrame, cells: list[pl.DataFrame], name: str) -> pl.DataFrame:
+def score_cells(
+    *, rows: pl.DataFrame, cells: list[pl.DataFrame], name: str, capacity: dict[int, float]
+) -> pl.DataFrame:
     """Return `rows`' keys with the per-row metrics of `name`, averaged over its cells.
 
     A row that any cell does not hold gets NaN, so no arm is scored on a different row set.
@@ -88,6 +90,10 @@ def score_cells(*, rows: pl.DataFrame, cells: list[pl.DataFrame], name: str) -> 
         ok = np.isfinite(joined["q50"].to_numpy()) & np.isfinite(joined["actual"].to_numpy())
         widened = tail.widen(frame=joined.fill_null(0.0), factor=WIDENING)
         metrics = row_metrics(frame=widened)
+        cap = np.array([capacity[p] for p in joined["primary"].to_list()])
+        q = widened.select(["q01", "q05", "q95", "q99"]).to_numpy().astype(np.float64)
+        metrics["w90"] = POINTS * (q[:, 2] - q[:, 1]) / cap
+        metrics["w98"] = POINTS * (q[:, 3] - q[:, 0]) / cap
         per_cell.append({k: np.where(ok, v, np.nan) for k, v in metrics.items()})
     out = {f"{name}__{k}": np.mean([c[k] for c in per_cell], axis=0) for k in per_cell[0]}
     return pl.DataFrame({k: pl.Series(k, v, dtype=pl.Float32) for k, v in out.items()})
@@ -130,6 +136,7 @@ def pooled_seeds(*, tables: list[pl.DataFrame]) -> pl.DataFrame:
 
 def build_month(*, month: str, sites: pl.DataFrame) -> None:
     """Write one month's `refs_{month}.parquet` and `flags_{month}.parquet`."""
+    capacity = dict(zip(sites["primary"].to_list(), sites["capacity_mw"].to_list(), strict=True))
     rows = pl.read_parquet(E511 / "scores" / f"rows_{month}.parquet", columns=KEYS)
     parts = [rows]
     reference = pl.read_parquet(E454 / "K2-S1" / f"{month}_s0_w-1.parquet")
@@ -137,14 +144,20 @@ def build_month(*, month: str, sites: pl.DataFrame) -> None:
     for arm, cells in CELLS_454.items():
         name = "K2-S1-3cell" if arm == "K2-S1" else arm
         loaded = [read_454(arm=arm, month=month, cell=c) for c in cells]
-        parts.append(score_cells(rows=rows, cells=loaded, name=name))
+        parts.append(score_cells(rows=rows, cells=loaded, name=name, capacity=capacity))
         if len(loaded) > 1:
             for c, one in zip(cells, loaded, strict=True):
-                parts.append(score_cells(rows=rows, cells=[one], name=f"{arm}-c{c}"))
+                parts.append(
+                    score_cells(rows=rows, cells=[one], name=f"{arm}-c{c}", capacity=capacity)
+                )
     seeds = [read_seed(month=month, seed=s, sites=sites, actual=actual) for s in (0, 1)]
     for s, table in enumerate(seeds):
-        parts.append(score_cells(rows=rows, cells=[table], name=f"L-1d-seed{s}"))
-    parts.append(score_cells(rows=rows, cells=[pooled_seeds(tables=seeds)], name="L-1d-454rows"))
+        parts.append(score_cells(rows=rows, cells=[table], name=f"L-1d-seed{s}", capacity=capacity))
+    parts.append(
+        score_cells(
+            rows=rows, cells=[pooled_seeds(tables=seeds)], name="L-1d-454rows", capacity=capacity
+        )
+    )
     refs = pl.concat(parts, how="horizontal")
     refs.write_parquet(WORK / f"refs_{month}.parquet")
     flags = (
