@@ -102,8 +102,14 @@ def model_file(*, arm: Arm, month: str, day: int, seed: int, stress: str = "") -
         and arm.half_life == c.HALF_LIFE_90
         and day in k.WEEKLY_OFFSETS
     )
-    if reusable and not own.exists():
-        return E510 / "models" / "hl90" / f"{month}_w{k.WEEKLY_OFFSETS.index(day)}_s{seed}.pt"
+    old = (
+        E510
+        / "models"
+        / "hl90"
+        / f"{month}_w{k.WEEKLY_OFFSETS.index(day) if day in k.WEEKLY_OFFSETS else 0}_s{seed}.pt"
+    )
+    if reusable and not own.exists() and old.exists():
+        return old
     return own
 
 
@@ -138,6 +144,14 @@ def train_one_epoch(
     return last
 
 
+def flagged_test(*, arm: Arm, test: data.TestRows) -> data.TestRows:
+    """Return the test rows with the source-flag column (1) appended for L-mix arms, built once per month."""
+    if not arm.flag:
+        return test
+    ones = np.ones((len(test.x), 1), np.float32)
+    return dataclasses.replace(test, x=np.concatenate([test.x, ones], axis=1))
+
+
 def window_frame(
     *,
     model: torch.nn.Module,
@@ -147,16 +161,14 @@ def window_frame(
     hi: int,
     flag: bool,
     device: str,
-) -> pl.DataFrame:
-    """Return the forecast of origins in [lo, hi) from a model."""
+) -> pl.DataFrame | None:
+    """Return the forecast of origins in [lo, hi) from a model, or None when no test origin falls there."""
     sel = (test.origin >= lo) & (test.origin < hi)
-    t = test
-    if flag:
-        t = dataclasses.replace(
-            test, x=np.concatenate([test.x, np.ones((len(test.x), 1), np.float32)], axis=1)
-        )
+    _ = flag  # the source-flag column is already in `test.x` (see `flagged_test`)
+    if not ((test.origin >= lo) & (test.origin < hi)).any():
+        return None
     return c.forecast_frame(
-        model=model, outlier=False, test=t, select=sel, rows=mr.base, widen=1.0, device=device
+        model=model, outlier=False, test=test, select=sel, rows=mr.base, widen=1.0, device=device
     )
 
 
@@ -258,14 +270,18 @@ def fine_tune(
     return model, log
 
 
-def fit_arm(
+def fit_arm(  # noqa: PLR0912, PLR0915
     *, arm: Arm, months: list[str], seeds: list[int], stress: bool, limit: int | None, device: str
 ) -> None:
     """Fine-tune and forecast an arm's own scored window at each cutoff (or its stress cutoffs)."""
+    if stress and arm.warm:
+        raise ValueError("stress runs are defined for restart arms only")
     clean = c.clean_stack()
     for month in months:
         mr = k.build_month(month=month, clean=clean)
-        test = data.build_test(month=month, standardiser=mr.base.standardiser)
+        test = flagged_test(
+            arm=arm, test=data.build_test(month=month, standardiser=mr.base.standardiser)
+        )
         g = k.GpuMonth(mr=mr, device=device, flag=1.0 if arm.flag else None)
         cuts = k.cutoffs(month=month, cadence=arm.cadence)
         start_day = c.month_start(month=month)
@@ -290,7 +306,7 @@ def fit_arm(
                     sfx = f"_stress{'p' if sign > 0 else 'n'}" if stress else ""
                     out = W / "fits" / arm.tag / f"{month}_d{day}_s{seed}{sfx}.parquet"
                     mfile = model_file(arm=arm, month=month, day=day, seed=seed, stress=sfx)
-                    if out.exists() and mfile.exists():
+                    if (out.exists() or out.with_suffix(".empty").exists()) and mfile.exists():
                         if arm.warm:
                             prev_state = torch.load(mfile, map_location=device)
                         continue
@@ -313,20 +329,18 @@ def fit_arm(
                             prev_state=prev_state, shift=shift, sign=sign, block=block,
                         )  # fmt: skip
                         mfile.parent.mkdir(parents=True, exist_ok=True)
-                        torch.save(model.state_dict(), mfile)
+                        tmp_model = mfile.with_suffix(".tmp")
+                        torch.save(model.state_dict(), tmp_model)
+                        tmp_model.rename(mfile)
                     lo, hi = k.window_of(month=month, cadence=arm.cadence, index=i)
-                    atomic_frame(
-                        frame=window_frame(
-                            model=model,
-                            test=test,
-                            mr=mr,
-                            lo=lo,
-                            hi=hi,
-                            flag=arm.flag,
-                            device=device,
-                        ),
-                        target=out,
+                    frame = window_frame(
+                        model=model, test=test, mr=mr, lo=lo, hi=hi, flag=arm.flag, device=device
                     )
+                    if frame is None:
+                        out.parent.mkdir(parents=True, exist_ok=True)
+                        out.with_suffix(".empty").touch()
+                    else:
+                        atomic_frame(frame=frame, target=out)
                     log["seconds"] = round(time.monotonic() - started, 2)
                     c.write_json(
                         obj=log, path=W / "logs" / arm.tag / f"{month}_d{day}_s{seed}{sfx}.json"
@@ -499,8 +513,8 @@ def assemble() -> None:
                     / f"{month}_d{day_of(month=month, cut=cut)}_s{seed}.parquet"
                     for cut in cuts
                 ]
-                if all(p.exists() for p in parts):
-                    frame = pl.concat([pl.read_parquet(p) for p in parts])
+                if all(p.exists() or p.with_suffix(".empty").exists() for p in parts):
+                    frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
                     target = W / "seed_preds" / arm.tag / f"{month}_s{seed}.parquet"
                     atomic_frame(frame=frame, target=target)
                     print("wrote", arm.tag, target.name, frame.height, flush=True)
@@ -511,7 +525,9 @@ def stale(*, arm: Arm, months: list[str], seeds: list[int], max_age: int, device
     clean = c.clean_stack()
     for month in months:
         mr = k.build_month(month=month, clean=clean)
-        test = data.build_test(month=month, standardiser=mr.base.standardiser)
+        test = flagged_test(
+            arm=arm, test=data.build_test(month=month, standardiser=mr.base.standardiser)
+        )
         cuts = k.cutoffs(month=month, cadence=arm.cadence)
         for seed in seeds:
             models: dict[int, torch.nn.Module] = {}
@@ -535,28 +551,24 @@ def stale(*, arm: Arm, months: list[str], seeds: list[int], max_age: int, device
                 if out.exists():
                     continue
                 parts = []
-                for i in range(len(cuts)):
-                    lo, hi = k.window_of(month=month, cadence=arm.cadence, index=i)
-                    lo_t = (
-                        lo - 0
-                    )  # origin window [lo, hi) is scored by a model refit `age` days earlier
+                start_us, stop_us = (
+                    c.us(t=c.month_start(month=month)),
+                    c.us(t=c.month_stop(month=month)),
+                )
+                for lo in range(start_us, stop_us, c.DAY_US):
+                    # Each origin day is scored by the model with the latest cutoff at least `age` days earlier.
                     j = max(
-                        (q for q, cu in enumerate(cuts) if c.us(t=cu) <= lo_t - age * c.DAY_US),
+                        (q for q, cu in enumerate(cuts) if c.us(t=cu) <= lo - age * c.DAY_US),
                         default=None,
                     )
                     if j is None:
                         continue
-                    parts.append(
-                        window_frame(
-                            model=models[j],
-                            test=test,
-                            mr=mr,
-                            lo=lo,
-                            hi=hi,
-                            flag=arm.flag,
-                            device=device,
-                        )
-                    )
+                    day_frame = window_frame(
+                        model=models[j], test=test, mr=mr, lo=lo,
+                        hi=min(lo + c.DAY_US, stop_us), flag=arm.flag, device=device,
+                    )  # fmt: skip
+                    if day_frame is not None:
+                        parts.append(day_frame)
                 if parts:
                     atomic_frame(frame=pl.concat(parts), target=out)
                     print(
