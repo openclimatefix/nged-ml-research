@@ -35,7 +35,7 @@ COLOURS: Final[dict[str, str]] = {
     "all three lags": theme.DATA_BLUE,
     "no week lag": theme.BRAND_ORANGE,
     "no day lag": theme.DATA_PURPLE,
-    "no lags": theme.GREY_1,
+    "no lags": theme.BLACK_1,
 }
 HOURS: Final[dict[str, int]] = {"6h": 6, "24h": 24, "48h": 48, "3d": 72, "5d": 120, "7d": 168}
 BAND: Final[str] = "24-72 h"
