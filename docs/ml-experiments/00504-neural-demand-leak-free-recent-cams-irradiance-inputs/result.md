@@ -8,7 +8,7 @@ theme: demand-inputs
 also_relevant_to:
   - solar-disaggregation
   - weather-products-and-blending
-status: planned
+status: done
 kind: other
 protocol: demand-v2
 size: >-
@@ -88,86 +88,211 @@ row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity at days 1 to 10; q01, q05, q95, and q99 coverage and pinball
   loss; avoidable-curtailment cost at the signed-MW six.
+verdict: not supported
+best_arm: >-
+  None. A-cams (leak-free columns) minus K3: +0.006 points of CRPS at days 1 to 10 over the eight
+  (Bonferroni interval +0.001 to +0.011), so slightly worse. The report-only upper bound
+  A-cams-real (realised target-time columns) minus K3: -0.318 (interval -0.393 to -0.246).
+headline: >-
+  Satellite irradiance that a live service could hold (whole days at least 36 hours old) did not
+  lower the demand neural network's error: CRPS rose by 0.006 points at the eight and 0.010 at the
+  signed-MW six. The same kind of column read at the target half-hour itself lowered CRPS by 0.318
+  at the eight and 0.467 at the six.
+lessons: >-
+  Recent cloudiness carries little information about a later day (the daily correlation falls from
+  0.25 at one day to 0.16 at three days), and the fine-tune did not use it. The gain of the
+  realised columns measures how much error the ensemble's sunshine forecast causes, not what a
+  satellite feed could supply. A fresher feed was not tested.
+take_home_message: >-
+  Satellite sunshine measurements that a live service could have at forecast time (whole days at
+  least 36 hours old) do not help the demand neural network: its error rose by 0.1% at the eight
+  Primaries that report only apparent power. The same satellite columns read at the forecast's own
+  half-hour would cut the error by 6.8%, so the value lies in knowing the sunshine of the target
+  half-hour, not in older sunshine, and better sunshine forecasts or a nowcast are the next place to
+  look. The experiment did not test a fresher feed (the previous day).
+advice:
+  - >-
+    Do not add satellite irradiance columns older than one day to the demand neural network:
+    whole-day columns at least 36 hours old raised CRPS by 0.006 points at the eight (Results).
+  - >-
+    Read the gain of an input built from realised weather at the target time as the cost of
+    forecast error in that weather variable, not as the gain of a feed that serving can supply
+    (A-cams-real, Results).
+  - >-
+    Test a fresher satellite feed (the previous whole day, available at 09:00 UTC) only after a
+    nowcast-style input at short lead has been tried, because the daily cloudiness correlation is
+    0.25 at one day and 0.16 at three days (figure 4).
+  - >-
+    Score cold winter nights separately whenever a weather input is added: the realised-irradiance
+    columns lost 0.098 points at the eight on those nights while gaining overall (Results).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**This page is the plan; it is rewritten with the results.** We ask whether the demand neural
-network forecasts better when it can see how sunny the last few wholly observed days were, as
-measured by satellite. We give the network three such inputs, fine-tune it, and compare its error
-with that of the stored network without them, at the eight Primary substations whose meters report
-apparent power and so hide embedded solar generation. The result is not yet known.
+**Satellite sunshine measurements that a live service could have at forecast time did not help the
+demand neural network, and the same measurements read at the forecast's own half-hour would have
+helped a lot (a lower score is better).** At the eight Primary substations that report only apparent
+power, the continuous ranked probability score (CRPS) of the network with the three leak-free
+columns was 0.006 points of effective capacity worse than the stored network (4.705 against 4.699,
+0.1%). Columns that read the realised satellite irradiance of the half-hour being forecast lowered
+the score by 0.318 points (6.8%). The gain therefore measures how much error the ensemble's
+sunshine forecast causes, and no feed that exists at forecast time supplies it. The next place to
+look is a nowcast or a better sunshine forecast at short lead, because the realised arm gained 0.134
+points at day 1 and 0.407 at days 6 to 10.
 
-## Plan
+We asked whether the neural network that forecasts demand at 16 Primary substations forecasts
+better when it can see how sunny the last few days were, as measured by the Copernicus Atmosphere
+Monitoring Service (CAMS) satellite retrieval. The network already reads the ensemble weather
+forecast of sunshine. We built three inputs from CAMS days that were wholly over at least 36 hours
+before the forecast (a delay we assumed, because the CAMS table has no availability stamp), added
+them to experiment 425's stored network (its arm A), fine-tuned from the stored weights, and
+compared the result with the stored network at five scored months. The idea comes from
+[experiment 480](../00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md),
+where two realised satellite columns lowered the error of an XGBoost model by 0.355 points at the
+same eight Primaries. The score is CRPS in points of effective capacity (1 point is 1% of a
+Primary's capacity). "The eight" are the 8 Primaries that report only apparent power in
+megavolt-amperes, and "the six" are the 6 that report signed megawatts.
 
-**The XGBoost gain from realised satellite irradiance is an upper bound.**
-[Experiment 480](../00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md)
-gave the XGBoost demand model two columns of realised irradiance from the
-[CAMS radiation service](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-timeseries)
-and lowered CRPS at days 1 to 10 by 0.355 points at the eight and 0.476 at the signed-MW six. The
-columns hold realised irradiance at every lead, and CAMS arrives about a day late. The twin
-[experiment 408](../00408-xgboost-signed-label-and-cams-columns-at-mva-only-primaries/result.md)
-found 0.359 at the eight, with 15 of 16 Primaries improved (the interval at D15 includes zero).
-Experiment 504 asks how much of that gain survives for a neural network that already reads the
-ensemble shortwave, when only values a live service could have are used. The gain concerns the
-magnitude score, not the sign of reverse flow.
+| Arm | What it is |
+|---|---|
+| K3 | The stored arm A, quantile average of seeds 0 to 2 (no fit). |
+| A-cams | K3's network plus three leak-free columns, fine-tuned (3 seeds, pooled the same way). |
+| A-cams-lag-only | K3's network plus the cloudiness column only. |
+| A-cams-real | K3's network plus the realised unit PV shape and clear-sky index of the target half-hour, as in experiment 480 (report only; a serving system cannot supply them). |
 
-**The CAMS columns use only whole days that are at least 36 hours old at the origin.** Origins are
-09:00 UTC. The CAMS table (`cams_demand_points.parquet`: hourly irradiance and clear-sky irradiance
-per Primary, hour-ending stamps, 2019-09 to 2026-09-10) has no availability stamp, so the delay
-cannot be measured from it, and the plan assumes 36 hours. For an origin at 09:00 UTC on date D0,
-the cutoff is 21:00 UTC on D0-2, and the latest wholly available day is D0-3. That day ends at
-00:00 UTC on D0-2, 57 hours before the origin. The
-[lag-features study](../../studies/forecasts/lag-features.md) found the whole previous
-day available at 09:00 UTC after February 2026 (two days before that), so serving can be one to two
-days fresher than this plan. The one-day-earlier check measures sensitivity to staleness. The same
-rule applies to every training row of the fine-tune, which never sees realised CAMS values, and the
-fold's training end bounds both the pretrained weights and the fine-tune rows.
+Verdict: not supported. The gate needed A-cams to lower CRPS at the eight by at least the minimum
+detectable effect (0.077), and A-cams raised it by 0.006. The interval excludes a gain of 0.053
+(15% of experiment 480's 0.355), so at this design the neural network gains nothing from older
+satellite sunshine.
 
-**Three columns are built from those days.** An hour-ending stamp belongs to the hour before it, so
-an hour stamped 00:00 UTC is the last hour of the previous day. Half-hourly irradiance comes from
-`half_hour_sun_and_sky`, as in experiment 480. Column (a) is the CAMS irradiance at the target
-half-hour's time of day on day D. Column (b) is the mean of (a)'s quantity over days D, D-1, and
-D-2 at the same time of day. Column (c) is the sum of the day's CAMS irradiance divided by the sum
-of its clear-sky irradiance, a cloudiness state shared by all leads of an origin.
+## Figures
 
-**The experiment fits 45 neural networks.** Five folds, three seeds, and three arms give 45
-fine-tunes. Arm K3 is the stored arm A and needs no fit. A-cams adds columns (a) to (c).
-A-cams-real adds experiment 408's realised unit photovoltaic shape and clear-sky index of the
-target half-hour (an upper bound that serving cannot supply, report only). A-cams-lag-only adds
-column (c) only.
+![CRPS difference to K3 at the eight and the six, with intervals and the minimum detectable
+effect](figure_1_headline.svg)
 
-**Fine-tuning from the stored weights may fail to learn the new columns.** Each arm's neural
-network is experiment 425's pooled plain network. Its weights are loaded from the stored
-pretrained arm A network of the same month and seed, with zero-initialised first-layer weights
-inserted for the new inputs (before the Primary embedding). The network is then fine-tuned on the
-fold's ensemble (ENS) rows at a learning rate of 2e-4 with experiment 425's loop, and the new
-columns are standardised on the fold's training rows. A null result may therefore mean the columns
-were not learned in the fine-tune and not that they carry no information, and the page says so.
-Masked training (a random 20% of rows with the columns missing, as the fallback for a late feed)
-is not run here, because it would need a fourth arm (15 more fine-tunes, about 0.15 to 0.25
-GPU-hours). The prediction-only check with training-mean columns measures that loss instead.
+![The same difference in each of the five folds](figure_2_per_fold.svg)
 
-**Rows, cleaning, and standing practices follow experiments 470 and 494.** Rows are experiment
-470's intersection, with flagged exact-zero half-hours dropped (the count is printed per fold), the
-D15 and D18 start cut of 2025-03-01, and widening 1.15. The weather inputs are the ensemble mean and
-spread. Monthly refits, cleaned data, saved neural networks, stored predictions as the control,
-tails, avoidable-curtailment cost, and example forecasts all follow the skill. The screen on a few
-folds is these five folds, and the calendar inputs are experiment 425's unchanged. The plan follows
-the advice of [experiment 494](../00494-simplify-demand-network-refit-cadence-and-pretrain-once/result.md)
-(report an interval across folds beside the origin-day interval, and reuse stored networks) and
-departs from none. Load-shift event plots are not needed, because the experiment does not score
-events.
+![Tail calibration of K3 and the three arms](figure_3_tail_calibration.svg)
 
-**The write-up will carry a serving table and a Checks list.** The serving table lists a CAMS feed
-that arrives about a day late (not ingested today), one stored daily value per Primary for column
-(c) and three per half-hour for (a) and (b), unchanged neural networks per pass, and the proposed
-fallback of setting the columns to their training mean and widening the bands. The Checks list
-gives the median forecast minus the mean forecast per site, the error of the mean forecast beside
-each CRPS and q99 contrast, and which audit triggers fired.
+![Correlation of daily cloudiness at lags of 1 to 7 days](figure_4_autocorrelation.svg)
 
-**Compute is 0.43 to 0.75 GPU-hours.** One fine-tune takes 35 to 60 GPU seconds
-([experiment 481](../00481-seed-averaging-diminishing-returns-for-demand-and-wind/result.md)), and
-the first fit is timed and reported. One GPU process under 8 GB and one feeder core run at a time,
-and `free -g` shows more than 25 GB available before each launch.
+![A day-ahead forecast of an MVA-only Primary in winter](figure_5_example_D4_day_ahead.svg)
 
-**Reviews.** A Sonnet agent reviews the plan, another reviews the code before the first fit, a
-third checks the write-up against the printed report, and a fourth reviews the prose.
+![A 14-day forecast of an MVA-only Primary in winter](figure_5_example_D4_14_days.svg)
+
+![A day-ahead forecast of an MVA-only Primary in summer](figure_5_example_D12_day_ahead.svg)
+
+![A 14-day forecast of an MVA-only Primary in summer](figure_5_example_D12_14_days.svg)
+
+## Results
+
+- **Design.** Five monthly folds (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), seeds 0 to 2,
+  experiment 470's intersection of rows (`experiment_470_intersection_v1`), widening 1.15, the D15
+  and D18 start cut of 2025-03-01, flagged exact-zero half-hours dropped (1,179 scoring actuals,
+  and 2,155 to 2,925 fine-tuning rows per fold), valid times from 2026-07-01 not scored. Monthly
+  refits; each network starts from the stored pretrained arm A weights of the same month and seed,
+  with zero weights for the new first-layer columns, then fine-tunes at a learning rate of 2e-4.
+  Code: this folder, importing experiments 397, 425, 454, 470, and 494 (the scoring pattern).
+  Fitted networks: the experiment's private `work/models/` folder, never in git.
+- **Columns.** Origins are 09:00 UTC. For an origin on date D0 the cutoff is 21:00 UTC on D0-2, so
+  the latest wholly available day is D0-3, which ends 57 hours before the origin. (a) is the CAMS
+  irradiance at the target half-hour's time of day on that day. (b) is its mean over that day and
+  the two before. (c) is the day's summed irradiance over its summed clear-sky irradiance. The
+  [lag-features study](../../studies/forecasts/lag-features.md) found the previous whole day
+  available at 09:00 UTC after February 2026, so a service could be one to two days fresher than
+  this design.
+- **Minimum detectable effect (three seeds, five folds).** 0.077 points at the eight and 0.124 at
+  the six (experiment 428's definition, from the seed spread of the stored arm A). Bonferroni
+  count 12 (3 arms x 2 groups x CRPS and q99 pinball loss); 100,000 origin-day block-bootstrap
+  resamples.
+- **CRPS, difference to K3 (points; Bonferroni interval).**
+
+| Arm | Eight | Six (no labelled event) |
+|---|---|---|
+| A-cams | +0.006 [+0.001, +0.011] | +0.010 [+0.004, +0.017] |
+| A-cams-lag-only | +0.004 [-0.000, +0.009] | +0.009 [+0.003, +0.015] |
+| A-cams-real (report only) | -0.318 [-0.393, -0.246] | -0.467 [-0.577, -0.359] |
+
+- **Absolute CRPS (points).** At the eight: K3 4.699, A-cams 4.705, A-cams-lag-only 4.703,
+  A-cams-real 4.381. At the six: K3 3.463, A-cams 3.474, A-cams-lag-only 3.472, A-cams-real 2.997.
+- **Equivalence at the 0.02 limit.** The q99 pinball loss difference of A-cams is +0.001 at the
+  eight (upper bound +0.002) and -0.000 at the six (upper +0.001), so A-cams is equivalent to K3 in
+  the q99 tail at both groups. CRPS at the six is not tested for equivalence, because the minimum
+  detectable effect there (0.124) exceeds 0.02.
+- **Tails.** q99 coverage is 0.9908 (A-cams) against 0.9911 (K3) at the eight and 0.9845 against
+  0.9847 at the six; q95 coverage 0.949 against 0.950 and 0.922 against 0.924. q99 pinball loss
+  0.252 (A-cams) against 0.251 (K3) at the eight. A-cams-real has q99 pinball loss 0.238 at the
+  eight.
+- **Where the realised arm gains.** By lead at the eight: -0.134 at day 1, -0.256 at days 2 to 5,
+  -0.407 at days 6 to 10. On sunny midday rows (clear-sky index at least 0.7, 10:00 to 15:00 UTC)
+  -1.110 at the eight and -1.222 at the six. At D12 alone -0.635 (K3's CRPS there is 8.589), and at
+  the eight without D12 -0.273. It gains nothing at D8 (+0.005) and in the 2025-12 fold (+0.038
+  at the eight). On cold winter nights it loses: +0.098 at the eight and +0.121 at the six.
+- **Descriptive slices for A-cams (95% intervals, not corrected).** D12 alone +0.014 [+0.002,
+  +0.027]; the eight without D12 +0.005 [+0.001, +0.009]; cold winter nights +0.008 at the eight
+  [-0.005, +0.022] and +0.008 at the six [-0.005, +0.021]; the 12 to 36 hour band +0.004 at the
+  eight [-0.000, +0.009] and +0.013 at the six [+0.006, +0.020]; sunny midday -0.004 at the eight
+  [-0.013, +0.004] and -0.015 at the six [-0.029, -0.001]. Fold by fold at the eight A-cams ranges
+  from -0.003 to +0.018.
+- **Avoidable-curtailment cost at the six, difference to K3 (experiment 470's measure).** At
+  f = 0.9: A-cams +0.016 [-0.001, +0.048], A-cams-real +0.129 [-0.012, +0.353]. At f = 0.75:
+  +0.082 [+0.001, +0.206] and +0.809 [-0.035, +1.997]. At f = 0.5: +0.111 [-0.031, +0.327] and
+  +0.091 [-1.704, +2.410]. The realised columns therefore do not lower the curtailment cost at the
+  six, although they lower CRPS. All networks cost far less than `manual_heuristic` at f = 0.75
+  and 0.5 (K3 -5.8 and -16.1).
+- **D15 and D18 (report only).** CRPS 10.83 (K3), 10.86 (A-cams), 10.49 (A-cams-real).
+- **Why the leak-free columns do not help (tested).** (1) The validation loss of the fine-tuned
+  A-cams network is higher than the stored arm A's in 14 of 15 fits (mean +0.0008), so the
+  fine-tune found no use for the columns. (2) The daily correlation of cloudiness between two days
+  is 0.25 at one day, 0.16 at three days, and 0.10 at seven (figure 4), so a three-day-old value
+  holds little information. (3) The same fine-tune does use the realised columns (validation loss
+  0.24 to 0.29 against 0.33 to 0.39), so the recipe can learn informative columns. (4) Setting the
+  A-cams columns to their training mean at forecast time changes CRPS by -0.006 [-0.013, +0.000]
+  at the eight, and moving the day one day earlier changes it by +0.000 [-0.006, +0.006].
+  A null here may still mean that the columns were not learned in the fine-tune from zero weights;
+  a retrained network was not tested.
+- **Serving table.** A-cams needs a CAMS feed that arrives about a day late (not ingested today),
+  one stored cloudiness value per Primary per day plus three half-hourly values per target, and
+  leaves the number of neural networks per pass unchanged. The fallback when the feed is late
+  (set the columns to their training mean and widen the bands) costs -0.006 points at the eight in
+  the prediction-only check. Because A-cams gains nothing, the cost is not worth paying. A-cams-real
+  cannot be served at any lead, because its columns describe the target half-hour itself.
+- **Fit times.** 26 to 32 s for A-cams-real and A-cams-lag-only per seed; 67 to 120 s for A-cams,
+  which includes two extra prediction-only forecasts. 45 fine-tunes took about 1 hour of one GPU
+  process.
+
+## Checks
+
+- **Median minus mean.** The stored forecasts hold 11 quantiles only. The mean of the quantiles
+  minus the median per site differs by under 0.03 points between K3 and A-cams (D12 +2.94 for
+  both), so the new columns do not shift the forecast.
+- **Median error beside CRPS.** The mean absolute error of the median forecast moves with CRPS:
+  K3 and A-cams agree to within 0.02 points at every Primary, and A-cams-real lowers it at 13 of 14
+  Primaries (at D8 it rises by 0.08).
+- **Triggers of the audit rules.** None fired. No control failed. The result contradicts the
+  prediction (P1: a gain of 0.05 to 0.15), and the explanation tests above record why. The
+  quantile-score and median-error contrasts agree. Leaving out D12 leaves the sign and verdict of
+  the gate unchanged (+0.005 without D12). The nested arm A-cams-lag-only beats A-cams by 0.002,
+  less than the half-width (0.005) of A-cams's interval. The realised arm's interval at the eight
+  is 0.55 times as wide as experiment 480's.
+
+## Caveats
+
+- **Only a 36-hour-old feed was tested.** A fresher feed (the previous whole day) was not fitted.
+  The correlation in figure 4 suggests a small gain at most (0.25 at one day).
+- **Selection bias.** The five folds that choose the candidate also score it, and July 2026 stays
+  unused.
+- **Fine-tune only.** The new columns start at zero weight and the network was fine-tuned for about
+  10 epochs, so the experiment cannot say whether a network trained with the columns from the start
+  would use them.
+- **The horizon is 1 to 10 days**, the range NGED care about. The realised columns are an upper
+  bound, because a service never has them.
+
+## What to try next
+
+- **Nowcast.** Test a satellite or station nowcast of sunshine as an input at leads under 6 hours,
+  where the ensemble's forecast is least accurate.
+- **A fresher feed.** If a feed with the previous whole day is available at 09:00 UTC, fine-tune
+  once with it (one arm, 15 fits, about 0.2 GPU-hours) to close the question.
+- **Sunshine forecast error.** The realised arm's gain per lead band bounds what a better sunshine
+  forecast could add (0.318 points, 6.8% of CRPS at the eight).

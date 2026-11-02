@@ -508,8 +508,11 @@ columns lowered the CRPS at all 16 Primaries in lab conditions.
 **Treat satellite irradiance as unavailable for the first day of lead (high confidence).** The CAMS
 radiation service publishes with about a 1-day delay, so a column built from it can describe lag
 times older than a day and not the first day ahead. Applies to experiments and production.
-Evidence: [experiment
-480](00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md).
+Whole CAMS days at least 36 hours old added nothing to the demand neural network (CRPS +0.006
+points at the 8 MVA-only Primaries), so the delay is a limit on the input and not only a timing
+rule. Evidence: [experiment
+480](00480-xgboost-cams-columns-at-mva-only-primaries-lab-conditions/result.md) and [experiment
+504](00504-neural-demand-leak-free-recent-cams-irradiance-inputs/result.md).
 
 ## Wind farms
 

@@ -33,6 +33,7 @@ import e00470_curtailment as curtailment470  # ty: ignore[unresolved-import]
 import e00470_heads as heads470  # ty: ignore[unresolved-import]
 import e00470_score as score470  # ty: ignore[unresolved-import]
 import e00470_tails as tails470  # ty: ignore[unresolved-import]
+import e00504_cams as cams_mod  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -132,6 +133,13 @@ def configure(*, comparison: str) -> None:
         *((a, control) for a in arms),
         *((a, "manual_heuristic") for a in arms),
         (control, "manual_heuristic"),
+    )
+
+
+def cams_for(*, row: dict) -> object:
+    """Return a Primary's CAMS arrays (for the report script)."""
+    return cams_mod.site_cams(
+        site=row["site"], latitude=float(row["latitude"]), longitude=float(row["longitude"])
     )
 
 
