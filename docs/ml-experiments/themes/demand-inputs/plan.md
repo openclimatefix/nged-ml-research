@@ -6,6 +6,7 @@
 |---|---|---|---|---|
 | 437 | Do trailing and forward weather windows, calendar and tariff columns, and national signals lower the error of the pooled neural network? | High (maintainer request, 2026-10-31) | Nothing | Done: no bundle met the bar; thermal lag (bundle T) is the only candidate for a retest on more folds |
 | 442 | Does thermal lag (bundle T) lower the pooled neural network's error on cold winter nights, on six winter-weighted folds? | High (brief, 2026-10-31) | Nothing; fits wait for a free GPU slot | Planned |
+| 513 | Does the lag-free demand network forecast better when it sees the whole-day price shape at training time (oracle first, then training-time-only variants)? | High (maintainer request, 2026-11-02) | Experiment 511's fits launched | Planned |
 
 ## Planned experiments
 
