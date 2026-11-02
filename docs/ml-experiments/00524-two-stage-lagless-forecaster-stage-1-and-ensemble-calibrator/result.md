@@ -110,9 +110,11 @@ cutoff, valid time within 730 days, and a 90-day half-life recency weight.
   seeds, same recipe and rows, those 9 columns removed) are the GPU part.
 - **S2-F (frozen stage 1).** Stage 1 trained once per fold on ERA5 and CAMS rows to the month's
   start, then frozen. Stage 2 trains on the 730-day ensemble window with the 90-day recency weight
-  and refits at each cutoff. Form A: per-lead monotone scale on the mixture's standard deviations
-  and shift on its means, per metering group. Form B: a multilayer perceptron (2 hidden layers of
-  32) on the mixture parameters. Both forms take a group input and the Primary embedding.
+  and refits at each cutoff. Form A: for each metering group and each of 8 lead bins of 30 h, a shift of the three means and a
+  shift of the three log standard deviations (identity at the start, 32 parameters). Form B: a
+  multilayer perceptron (2 hidden layers of 32) on the 9 mixture outputs, the lead, two spread
+  terms (temperature and shortwave), two hour terms, and the metering group. Both forms take the
+  group flag and no Primary input, because stage 1's mixture already carries the Primary.
 - **S2-J (joint fine-tune).** Same two stages; stage 1's weights change after stage 2 is plugged
   in. Primary: the L-1d rate ratio (0.4x of the pretrain rate of 5e-4, that is 2e-4, so only the
   missing lead input differs from L-1d). Second arm: 0.1x. The base rate is the pretrain rate.
@@ -152,14 +154,18 @@ cheap.
 
 ## Stage 2 training design
 
-**Stage 1 has already fitted the power in stage 2's window, so stage 2 uses held-out stage-1
-outputs.** Stage 1 trains on ERA5 and CAMS rows to the month's start and sees the power at every
-valid time of stage 2's 730-day window. A stage 2 trained on those in-sample outputs would learn a
-calibration that does not hold at test. The plan uses one of two cuts, fixed before any score is
-read: cross-fit stage-1 outputs in the 6 contiguous blocks of experiment 449, or hold out 1 week in
-12 (`HELD_WEEK_PERIOD` of experiment 397) from stage 1's training and train stage 2 on those
-weeks. The CPU gate does not need either, because it fits no stage 2. The ensemble archive covers
-only 18 to 26 months before the five folds, so early folds train stage 2 on under 730 days.
+**Stage 1 has already fitted the power in stage 2's window, so stage 2 trains on cross-fitted
+stage-1 outputs.** The fold's stage 1 trains on ERA5 and CAMS rows to the month's start and sees
+the power at every valid time of stage 2's 730-day window. A stage 2 trained on those in-sample
+outputs would learn a calibration that does not hold at test. The design follows experiment 449's
+cross-fit: the ERA5 and CAMS history is split into 6 contiguous blocks by valid time, and 6 extra
+stage-1 networks per fold and seed each leave out one block and a 3-day pad on each side. An ENS
+row whose valid time lies in block `k` takes its stage-1 mixture from the network that left out
+block `k`; a row with a valid time after the last block takes it from the fold's full network. This
+costs 60 extra pretrains of about 20 s each. A first design that held out 1 week in 12 was dropped
+before any score was read, because it leaves only 7 held-out weeks in the 730-day window. The CPU
+gate does not need either design, because it fits no stage 2. The ensemble archive covers only 18 to
+26 months before the five folds, so early folds train stage 2 on under 730 days.
 
 ## Step 0 (read from the code and from the earlier experiments, before any fit)
 
@@ -209,6 +215,16 @@ only 18 to 26 months before the five folds, so early folds train stage 2 on unde
   (origin-day block bootstrap, per-fold signs). **Departure:** the brief sets the counted family
   against L-1d; the screen runs on the weekly harness, so the counted control is L-Ww and L-1d is
   report-only.
+
+## Scope after the quota alert
+
+The manager paused S2-M, the stage-0 arms, S2-R, and extra reviews until 2026-11-04 01:00 UTC. This
+experiment therefore runs S2-0, S2-F (forms A and B, each with the negative log-likelihood and the
+closed-form CRPS loss), and S2-J at the two rates, and writes up. The paused arms stay in the plan
+as proposals. Two caveats come from the code review: each cross-fit network lacks one block of the
+history, so stage 2 trains on a slightly staler stage 1 than it meets at test, and the CRPS loss is
+in units of each Primary's standard deviation, which weights low-variance Primaries more than the
+negative log-likelihood arm does.
 
 ## Cost
 
