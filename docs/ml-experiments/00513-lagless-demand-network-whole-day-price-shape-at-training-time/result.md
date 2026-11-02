@@ -63,17 +63,17 @@ lessons: >-
   The oracle was no better at the Primaries with a known battery or gas engine than at the others
   (eight +0.059 against -0.003; six -0.027 against -0.089), so the price shape is not carrying
   information about those assets that the network can use. A shuffled day's shape scored worse
-  than the control at the eight (+0.057, interval excludes zero), so adding 11 columns that carry
-  no usable signal costs a little. Five month blocks and a seed spread of 0.10 to 0.11 points
+  than the control at the eight (+0.057, interval excludes zero), so the placebo's 11 columns made
+  the forecast 0.057 points worse. Five month blocks and a seed spread of 0.10 to 0.11 points
   leave only gains above about 0.17 points resolvable.
 take_home_message: >-
   Even a perfect, hindsight price shape for the whole day does not lower the lag-free demand
   network's error at NGED's Primaries by a measurable amount, and the oracle gains no more at the
-  Primaries with a known battery or gas engine. A training-time-only price arm (price dropout, an
-  auxiliary price head, or a teacher network) can recover at most what the oracle gains, which is
-  nothing resolvable, so those arms were not run. The next experiment on batteries and
-  price-following generators should not use price as a demand-network input; it should try metered
-  or modelled battery output as its own target or a subtracted term.
+  Primaries with a known battery or gas engine. The oracle gain is the bound for a
+  training-time-only price arm (price dropout, an auxiliary price head, or a teacher network), and
+  that bound is not resolvable from zero, so those arms were not run. An option for batteries and
+  price-following generators is to model their output as a separate target or a subtracted term;
+  whether to test it belongs to the roadmap.
 advice:
   - >-
     Do not add price-shape columns, or a training-time-only price arm, to the lag-free demand
@@ -86,16 +86,16 @@ production_status: not_adopted
 adopted_in: none
 ---
 
-**We asked whether a demand neural network forecasts better if it is shown the electricity price of the
-whole day during training, because batteries and gas engines behind a substation follow the price.**
-We gave the network the exact price shape of each day, as ten numbers such as the day's cheapest and
-dearest half-hours and the evening-minus-overnight spread, at both training and scoring. That test is
-an upper bound, because no price exists when we forecast days 2 to 10. The network did not forecast
-better by an amount we can resolve: its error changed by +0.037 points of capacity at the eight
-Primaries that report only apparent power and by -0.048 at the six that report signed megawatts
-(intervals include zero), where the seed noise alone is about 0.17 points. A shuffled day's shape
-and the shape of national demand minus wind did no better. All numbers are interim and unaudited
-until the reviews are recorded in the pull request.
+**We asked whether a demand neural network forecasts better if it is shown the electricity price of
+the whole day during training, because batteries and gas engines behind a substation follow the
+price.** We gave the network the exact price shape of each day, as 10 numbers such as the day's
+cheapest and dearest half-hours and the evening-minus-overnight spread, at both training and
+scoring. The oracle test is an upper bound, because no price exists when we forecast days 2 to 10.
+The network did not forecast better by an amount we can resolve: its error changed by +0.037 points
+of capacity at the eight Primaries that report only apparent power and by -0.048 at the six that
+report signed megawatts (intervals include zero), where the minimum detectable effect is about 0.17
+points. A shuffled day's shape and the shape of national demand minus wind did no better. All
+numbers are interim and unaudited until the reviews are recorded in the pull request.
 
 ## Figures
 
@@ -107,8 +107,8 @@ until the reviews are recorded in the pull request.
 
 - **Setup.** Five folds (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), seeds 0, 1, and 2, rows of
   experiment 470 with no labelled event, widening 1.15. The scoring mask excludes the half-hours of
-  price-missing days, and none of the 1,145,256 scored half-hours falls on one, so no row was
-  excluded.
+  price-missing days. None of the 1,145,256 half-hours of the five months' base rows (before the
+  scorer's own filters) falls on one, so the mask removed no row.
 - **Minimum detectable effect of a 3-seed mean (four arms pooled).** 0.176 at the eight and 0.168
   at the six.
 - **CRPS contrasts (points; Bonferroni count 12; negative favours the first arm).**
@@ -121,28 +121,37 @@ until the reviews are recorded in the pull request.
 | PO minus PP | -0.020 [-0.068, +0.031] | -0.065 [-0.112, -0.017] |
 | PO minus PN | -0.017 [-0.086, +0.048] | -0.045 [-0.098, +0.013] |
 
-- **Absolute CRPS (points).** Eight: P0 5.150, PO 5.187, PP 5.207, PN 5.204. Six: P0 3.741, PO 3.693,
-  PP 3.758, PN 3.738.
+- **Absolute CRPS (points).** Eight: P0 5.150, PO 5.187, PP 5.207, PN 5.204. Six: P0 3.741, PO
+  3.693, PP 3.758, PN 3.738.
 - **Per fold (PO minus P0).** Eight: +0.001, +0.244, +0.015, +0.081, -0.201 (2025-10, 2025-12,
   2026-01, 2026-03, 2026-06). Six: +0.089, -0.191, -0.085, +0.103, -0.181. Five month blocks give
   near min-to-max intervals, and the signs are mixed.
 - **Stop rule.** Neither group's point estimate reaches minus the minimum detectable effect, and
   the six's interval includes zero, so P-drop, P-aux, and P-teach did not run.
 - **Known-asset Primaries (D2, D5, D8, D9, D11, D14) against the others, oracle minus control.**
-  Eight: +0.059 against -0.003. Six: -0.027 against -0.089. P4 fails.
+  Eight: +0.059 against -0.003. Six: -0.027 against -0.089.
 - **Horizon bands, oracle minus control.** Eight: +0.059 (day 1), +0.053 (days 2 to 3), -0.011
   (days 4 to 10). Six: +0.014, -0.020, -0.065.
 - **Evening peak and overnight.** The six's overnight half-hours gain -0.134 against -0.025 for
   the rest, one slice of many and not corrected for the number of slices.
-- **Predictions.** P1 held (the gain is inside 0.00 to 0.06 and unresolved). P2 to P4 did not
-  apply, because the oracle did not pass the stop rule.
+- **Predictions.** P1 held at the six (-0.048, inside 0.00 to 0.06) and did not hold at the
+  eight, where the oracle was worse by an unresolved +0.037. P2 and P3 did not apply, because the
+  oracle did not pass the stop rule. P4 is reported as a descriptive slice, uncorrected for the
+  number of slices.
+- **Christmas week 2025 and the report-only rows (descriptive; not gating).** In the 2025-12 fold's
+  Christmas week the oracle scored -0.459 [-0.502, -0.414] at the eight and -0.417 [-0.491, -0.311]
+  at the six against the control, while the placebo scored -0.182 and -0.039 and the national
+  control +0.309 and -0.284. One Christmas week is a single event, and the 2025-12 fold's full-month
+  eight score was +0.244 worse. The report-only rows (D15 and D18 included) scored +0.190
+  [-0.336, +0.702] for the oracle, with +3.02 in the 2026-03 fold, so the interval is wide.
 - **Interim timing run.** A single-fold, single-seed run (2025-10, seed 0, pinball loss) scored all
   three shape arms better than the control; five folds and three seeds did not reproduce that.
 
 ## Plan
 
-**The plan below was written before any fit that produced a quoted number.** It covers Part 1 of
-the brief (the price shape) only; whether the 0/1 lockdown flag is still needed is a separate experiment.
+**The plan below was written before any fit that produced a quoted number.** The plan covers Part 1
+of the brief (the price shape) only; whether the 0/1 lockdown flag is still needed is a separate
+experiment.
 
 ## Question
 
@@ -157,8 +166,9 @@ explain, no training-time-only variant can recover a gain, and the experiment st
 The idea comes from the maintainer. The lag-free network is that of experiments
 [448](../00448-s1-network-assembly-ladder-with-pretraining-b-mix-and-seed-pool/result.md) and
 [510](../00510-lagless-demand-network-weekly-finetune-and-recency-weights/result.md), pretrained on
-ERA5 and CAMS rows and fine-tuned monthly on ensemble forecast rows. No earlier experiment tested a
-forward whole-day price shape for demand: experiment 25's shape columns look back 24 hours only.
+ERA5 and CAMS rows and fine-tuned monthly on ensemble forecast rows. Among experiments 10, 15, 25,
+437, 476, and 510, none tested a forward whole-day price shape for demand: experiment 25's shape
+columns look back 24 hours only.
 
 ## Arms
 
@@ -171,16 +181,16 @@ pretrained weights of experiment 448 do not load, and no new column is zero-init
 | Arm | Extra input columns (11) | What it tests |
 |---|---|---|
 | P0 | none | The control. |
-| PO | The ten shape features and a missing flag, from the true Market Index price of the target half-hour's local day, at training and scoring. | Upper bound: does the true day shape help at all? |
+| PO | The 10 shape features and a missing flag, from the true Market Index price of the target half-hour's local day, at training and scoring. | Upper bound: does the true day shape help at all? |
 | PP | The same columns of a seeded other day of the same calendar month, day type, and length (the shuffled-day placebo). | What a typical shape for that kind of day gives. |
-| PN | The same ten features of national demand minus national wind, of the target local day. | What realised national state gives: the realised price encodes realised national demand, wind, and weather error. |
+| PN | The same 10 features of national demand minus national wind, of the target local day. | What realised national state gives: the realised price encodes realised national demand, wind, and weather error. |
 | P-drop, P-aux, P-teach | Conditional on the stop rule; defined below. | Whether the oracle's gain survives with no price at serving time. |
 
 **The oracle is an upper bound on the information in the realised national state, not a battery
 result.** A passing oracle that PN matches means the realised national state helps, not that
 batteries do.
 
-## The ten shape features
+## The 10 shape features
 
 A **delivery day** is a local settlement day (Europe/London midnight to midnight, so it starts at
 23:00 UTC in summer) and has 46, 48, or 50 half-hours. Every feature uses only the target day's own
@@ -215,9 +225,9 @@ same calendar month (any year), the same day type (Monday to Friday, Saturday, S
 length in half-hours. Days of one group are shuffled once with a seeded generator (`seed = 513`) and
 each takes the next day in that order, so a donor is never the day itself and is used once. The same
 draw serves training and scoring. A group of one day, and every missing day, takes the missing flag.
-The checks print the number of unmatched days (1).
+The checks print the number of unmatched days (3, 2, 2, 2, and 1 in the five folds).
 
-**National control.** The same ten features of national demand outturn (`INDO`) minus `FUELHH` wind
+**National control.** The same 10 features of national demand outturn (`INDO`) minus `FUELHH` wind
 generation, per half-hour, so they describe the day's residual demand shape.
 
 ## Folds, seeds, and cost
@@ -230,8 +240,8 @@ generation, per half-hour, so they describe the day's residual demand shape.
   and PO first would halve the cost and give the same stop-rule verdict. The conditional
   arms add about 55 pretrainings and 55 fine-tunings (one at a time, if the stop rule passes).
 - **Timed cost.** One fold, seed 0, all four arms: feeder 13 s (rows and shape tables), pretraining
-  17 to 24 s per arm, fine-tune 3 to 6 s, so about 5 minutes per fold and 0.4 GPU-hours for the 60
-  pretrainings and 60 fine-tunings. One GPU process under 8 GB, with `MemoryMax=8G` and
+  17 to 24 s per arm, fine-tune 3 to 6 s, so about 2 minutes per fold and seed and 0.4 GPU-hours for
+  the 60 pretrainings and 60 fine-tunings. One GPU process under 8 GB, with `MemoryMax=8G` and
   `OMP_NUM_THREADS=1`.
 
 ## Scoring and contrasts
@@ -273,9 +283,9 @@ generation, per half-hour, so they describe the day's residual demand shape.
 - **Reading a passing oracle.** If PN or PP reproduces at least 0.75 of the oracle's gain at a
   group, call that gain a national-state or day-type effect. A battery reading needs the oracle to
   beat both, at the Primaries with a known asset.
-- **P-drop (conditional).** The shape columns plus a missing flag as inputs. Training hides the shape
-  (flag on, columns zero) on a random 50% to 100% of the days, the fraction drawn per batch. Scoring
-  always sends the flag as missing, so the serving input is constant.
+- **P-drop (conditional).** The shape columns plus a missing flag as inputs. Training hides the
+  shape (flag on, columns zero) on a random 50% to 100% of the days, the fraction drawn per batch.
+  Scoring always sends the flag as missing, so the serving input is constant.
 - **P-aux (conditional).** No price input. An extra 10-output head predicts the day's standardised
   shape features from the network's own inputs, with a loss weight tuned on folds 2025-10 and
   2026-01 only and scored on the other three folds, or a fixed grid of weights reported in full and
