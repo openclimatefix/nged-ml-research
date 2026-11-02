@@ -132,7 +132,7 @@ def fig_share_and_score(*, cells: pl.DataFrame) -> None:
     rule0 = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule().encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     margin = (
         alt.Chart(pl.DataFrame({"x": [1.0]}))
-        .mark_rule(strokeDash=[4, 3], color=ocf.GREY_1)
+        .mark_rule(strokeDash=[4, 3], color=ocf.BLACK_1)
         .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )  # ty: ignore[unresolved-attribute]
     base = alt.Chart(score).encode(y=alt.Y("series:N", sort=SERIES, title=None))

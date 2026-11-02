@@ -20,6 +20,7 @@ from typing import Final
 import altair as alt
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00482_scenarios as scn
+import e00482_svg_guard as guard
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
@@ -186,6 +187,7 @@ def main() -> None:
         )
     )
     chart.save(OUT / "crps_by_scenario.svg")
+    guard.assert_no_invisible_marks(svg_path=OUT / "crps_by_scenario.svg")
     chart.save(OUT / "png" / "crps_by_scenario.png", scale_factor=1.5)
     # follow-share chart
     f2 = (
@@ -221,6 +223,7 @@ def main() -> None:
         )
     )
     c2.save(OUT / "follow_share.svg")
+    guard.assert_no_invisible_marks(svg_path=OUT / "follow_share.svg")
     c2.save(OUT / "png" / "follow_share.png", scale_factor=1.5)
     fan_charts()
     print(cr)
@@ -268,7 +271,12 @@ def fan_charts() -> None:
             for arm in ARMS
         )
         long = pl.concat(lines)
-        colours = {"Actual": ocf.BLACK_1, "Actual without the level change": ocf.GREY_1, **COLOURS}
+        colours = {
+            "Actual": ocf.BLACK_1,
+            "Actual without the level change": ocf.DATA_BLUE,
+            **COLOURS,
+        }
+        colours = {name: colour for name, colour in colours.items() if name in set(long["series"])}
         x = alt.X("day:Q", title="Days since the event began (shaded: the event)")
         shade = (
             alt.Chart(pl.DataFrame({"a": [0.0], "b": [(b - a) / 48.0]}))  # ty: ignore[unresolved-attribute]
@@ -298,6 +306,7 @@ def fan_charts() -> None:
             ),
         )
         chart.save(OUT / f"fan_{month}_{sid}_{donor}.svg")
+        guard.assert_no_invisible_marks(svg_path=OUT / f"fan_{month}_{sid}_{donor}.svg")
         chart.save(OUT / "png" / f"fan_{month}_{sid}_{donor}.png", scale_factor=1.5)
 
 

@@ -28,6 +28,7 @@ import e00404_lagless as lagless  # ty: ignore[unresolved-import]
 import e00404_rows as rows_mod  # ty: ignore[unresolved-import]
 import e00454_score as score454  # ty: ignore[unresolved-import]
 import e00468_part_b_real as real468  # ty: ignore[unresolved-import]
+import e00482_svg_guard as guard  # ty: ignore[unresolved-import]
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
@@ -103,7 +104,11 @@ def figure(
     for a, label in real468.ARMS.items():
         lines.append(frames[a].select("target", median=pl.col("q50") * 100, series=pl.lit(label)))
     lines_df = pl.concat(lines).with_columns(day=(pl.col("target") - onset) / 48.0)
-    colours = {**real468.COLOURS, "Actual with the normal running arrangement restored": ocf.GREY_1}
+    colours = {
+        **real468.COLOURS,
+        "Actual with the normal running arrangement restored": ocf.DATA_BLUE,
+    }
+    colours = {name: colour for name, colour in colours.items() if name in set(lines_df["series"])}
     band = base.select("target", low=pl.col("q05") * 100, high=pl.col("q95") * 100).with_columns(
         day=(pl.col("target") - onset) / 48.0
     )
@@ -146,7 +151,7 @@ def figure(
         .encode(
             x=x,
             y=alt.Y("v:Q", title="Lag (% of capacity)"),
-            color=alt.value(ocf.GREY_1),
+            color=alt.value(ocf.BLACK_1),
             strokeDash=alt.StrokeDash(
                 "lag:N",
                 scale=alt.Scale(domain=list(LAG_NAMES), range=[[1, 0], [6, 3], [2, 2]]),
@@ -165,7 +170,7 @@ def figure(
                 scale=alt.Scale(domain=x_domain),
             ),
             y=alt.Y("v:Q", title="Surprise (points of capacity)"),
-            color=alt.value(ocf.GREY_1),
+            color=alt.value(ocf.BLACK_1),
             strokeDash=alt.StrokeDash(
                 "lag:N",
                 scale=alt.Scale(domain=list(LAG_NAMES), range=[[1, 0], [6, 3], [2, 2]]),
@@ -193,6 +198,7 @@ def figure(
     (OUT / "png").mkdir(exist_ok=True)
     name = f"event_{number:02d}_{site}_{onset}"
     chart.save(OUT / f"{name}.svg")
+    guard.assert_no_invisible_marks(svg_path=OUT / f"{name}.svg")
     chart.save(OUT / "png" / f"{name}.png", scale_factor=1.5)
     inside = (lag_grid >= onset) & (lag_grid <= end)
     return dict(
