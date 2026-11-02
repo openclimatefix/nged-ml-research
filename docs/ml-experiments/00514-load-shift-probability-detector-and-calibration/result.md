@@ -29,16 +29,21 @@ prediction: >-
   0.05 at both prevalences (about 7% and about 2% of rows inside a pulse). P2: at p of at least 0.5,
   the recall of injected pulses of at least 1 times the residual spread that last at least 6 hours
   is 0.8 or more, with at most 2 false flags per Primary-year. P3: injected genuine level changes
-  that have run for 30 days or more reach p of at least 0.5 on under 10% of their rows. P4: the
-  mean p over real rows with no labelled event is under 0.10, so the weight (1 - p) loses under 10%
-  of the training weight. P5: the area under the curve of p on the 184 labelled rows against matched
-  rows with no labelled event is at least 0.60 (a lower bound, because the matched rows hold
-  unlabelled events). P6: p stays under 0.5 on at least 80% of the rows of D22's 13 dip days and
-  D8's 16 unexplained dips. Any of these can fail.
+  reach p of at least 0.5 on under 10% of their rows, counting only rows from day 15 after the step
+  start. P4: over real
+  rows with no labelled event, the mean weight (1 - p)^g (floor 0.1) is at least 0.90 for g = 1 and
+  g = 2, and the Kish effective sample size ratio is at least 0.85. P5: the lower end of the day-block bootstrap interval of the area under the curve of p on the 184
+  labelled rows against matched rows with no labelled event is above 0.50 (the area is a lower
+  bound, because the matched rows hold unlabelled events). P6: p stays under 0.5 on at least 80% of the rows of D22's 13 dip days, and separately of D8's 16
+  unexplained dips. P3 is read on rows from day 15 after the step start. P7: on experiment 511's
+  national same-sign shift, under 30% of the shifted rows reach p of at least 0.5. Any of these can fail.
 decision_rule: >-
   The p tables are frozen and written before any fine-tune score is read (the soft-weight fine-tune
   is a separate later experiment, which this one does not run). The tables go to that experiment
-  only if P1 holds at both prevalences on held-out shapes, seeds, and months, and P4 holds. If P1
+  only if P1 holds at both prevalences on the row-level reliability of every held-out axis (the
+  gating unit is the row), the Brier skill score against the constant-prevalence prediction is at
+  least 0.20 (sharpness), P4 holds, and the manager has seen P2 (a recall under 0.5 stops the
+  hand-off). If P1
   fails, the page reports the achieved calibration error and the manager decides; the classifier is
   not tuned further after the freeze. P2 to P3 and P5 to P6 are reports and do not gate. No
   confirmatory hypothesis test is run here (Bonferroni count 0 in this experiment; the soft-weight
@@ -227,3 +232,46 @@ Code in `ml-experiments/00514-load-shift-probability-detector-and-calibration/`:
 features), `e00514_inject.py` (series-level injector), `e00514_train.py` (worlds, classifier,
 calibration), `e00514_tables.py` (the p tables, the causality check, real-row reports),
 `e00514_report.py` (figures, numbers).
+
+## Amendments after the plan review (Sonnet, 27 findings; accepted unless noted)
+
+- **Causality.** All detrending, scale statistics, and noise scales use only half-hours at least
+  3.5 hours before the cutoff. The perturbation check recomputes the whole chain (detrend, candidates,
+  cached rows) with every later `z` replaced and compares p, for the cached rows too. Cached rows are
+  valid because the previous cutoff computed them with strictly less data. The recompute window is
+  45 days (a 14-day pulse, a 14-day flank, and margin), and a measured check reports how many p
+  values older than the window would change with a full recompute.
+- **Scale statistics.** For injected worlds the spread and noise scales come from the world's own
+  history before its cutoff. Months 2025-10 to 2026-06 are only scored, never trained or validated on.
+  Months 2025-01 to 2025-06 are used only as the held-out-month axis.
+- **Held-out axes.** Four axes: held-out shape (circuit-profile), held-out seeds (a weak axis, said
+  so), held-out months, and held-out Primaries (Primary indices 3, 8, and 13, excluded from every
+  training and validation world). The resampling unit is the Primary-month on each axis.
+- **World mixture.** Of the training worlds, 45% hold only pulses, 25% add a genuine level change,
+  10% are windows around D8 engine dips before 2025-07, and 20% hold no injection. Prevalence near
+  7% comes from the pulse count; the 2% reading subsamples pulses, and the intercept is shifted by the
+  log-odds change in prevalence (a prior-shift correction, not a separate Platt fit); P1 uses both
+  readings.
+- **Labels and matching.** An injected pulse matches its highest-overlap candidate; other candidates
+  overlapping it by under half their rows are negatives, and greedy suppression (a candidate that
+  overlaps an already-kept one by more than half is dropped) prevents duplicates. An open genuine
+  level change is labelled 0 in training, an open injected pulse 1, so the prior for an open step is
+  the share of each in the mixture (reported).
+- **Numbers fixed from the training worlds before any held-out number is read.** Admission score 2.5
+  noise units; flank clip 12 to 336 half-hours; symmetry tolerance a donor-to-partner magnitude ratio
+  between 1/2.5 and 2.5; partner edge thresholds 3 and 5 noise units. Pulses per grid cell of the
+  recall tables: at least 100 (sizes 4 x durations 5 x shapes 3 x signs 2, sixteen Primaries).
+- **Group of eight.** Signal 3 uses the sign of the apparent-power change as recorded; the feature
+  set also carries sign-free counts, and every figure is reported for the six signed-MW Primaries and
+  the eight MVA-only Primaries separately.
+- **Fold consequence.** The fine-tune experiment either rebuilds the 2025-12 table (7 GPU fits) or
+  runs four folds (123 daily cutoffs, not 154).
+- **Mask tables.** Written at p of at least 0.5 and at the thresholds giving 1%, 2%, 5%, and 7% of
+  rows flagged. No contrasts are run here; the minimum detectable effect belongs to the fine-tune
+  experiment. Interim numbers are labelled interim and unaudited.
+- **D8 and D22 dips.** The dip days after 2025-07 are not in any training set by date; those before
+  2025-07 are held out explicitly (D22's 13 and D8's 16 unexplained), and the report says how many of
+  each fall on each side.
+- **Reports to the manager** at plan PR open (done), code review done, results, and merge, with the
+  timed first fold.
+- **Not taken.** Reducing the number of reviews (finding 26): the plan keeps them.
