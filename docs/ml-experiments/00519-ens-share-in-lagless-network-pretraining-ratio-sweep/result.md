@@ -22,8 +22,9 @@ hypothesis: >-
   Experiment 511's mixed pretraining (L-mix: half of every batch from ENS rows, half from ERA5 and
   CAMS rows) scored worse than ERA5-and-CAMS pretraining alone, although ENS rows are what the
   network sees when serving. A smaller ENS share, or no source flag, gives a pretraining at least as
-  good as ERA5-and-CAMS alone; the L-mix deficit comes from the 50% share and its double use of the
-  fine-tune rows, not from the flag.
+  good as ERA5-and-CAMS alone; the L-mix deficit comes from the 50% share, not from the flag. The
+  sweep cannot separate the share from the double use of the fine-tune rows, because every ENS
+  pretraining row also lies in the fine-tune window in every arm.
 prediction: >-
   Written before any score is read. P1: no ENS share beats the 0% control by 0.03 or more at the
   eight or at the six (every difference is inside the minimum detectable effect, 0.164 at the eight
@@ -74,13 +75,18 @@ flag, or the double use of rows.
 
 ## Arms (all weekly cadence, 90-day half-life, restart from the month's pretrained weights)
 
-Shares are shares of each 8,192-row pretraining batch. An epoch is 20% of the ERA5-and-CAMS training
-rows at every share, so all arms take the same number of steps per epoch.
+Shares are shares of each 8,192-row pretraining batch. Every arm takes the same number of steps per
+epoch (20% of the ERA5-and-CAMS training rows at 4,096 rows per step) with the same batch size, so the
+number of ERA5-and-CAMS rows drawn per epoch falls as the ENS share rises. Contrasts are written
+"arm minus control", so a negative difference is a gain.
 
-- **F0, the 0% control.** The 38-input network, the flag column fixed at 0 in every pretraining
-  row (all rows are ERA5 and CAMS), flag 1 at fine-tuning and scoring, as in L-mix. F0 differs from
-  L-mix only in the absence of ENS rows in pretraining, and it keeps the seed pairing. L-Ww (37
-  inputs) anchors the cadence only.
+- **F0, the 0% control.** The 38-input network, the flag column fixed at 0 in every pretraining row
+  (all rows are ERA5 and CAMS), flag 1 at fine-tuning and scoring, as in L-mix. F0 differs from
+  L-mix in having no ENS rows in pretraining (and so drawing 8,192 ERA5-and-CAMS rows per step), and
+  it keeps the seed pairing. Caveat: the flag column is 0 in every F0 pretraining row, so its first-
+  layer weights stay at their random start and the switch to flag 1 at fine-tuning adds an untrained
+  input. F0z (report-only, outside the counted family) fine-tunes and scores the same weights at
+  flag 0. L-Ww (37 inputs) anchors the cadence only.
 - **E10, E25, E75, E100.** Same, with 10%, 25%, 75%, and 100% of every batch drawn from the ENS rows.
 - **E50 is L-mix.** Experiment 511's 2 seeds x 5 folds of fits are reused.
 - **Early stopping at any share** uses the held-out NLL averaged with the batch shares as weights,
@@ -112,6 +118,6 @@ rows at every share, so all arms take the same number of steps per epoch.
 ## What the plan costs
 
 - 7 new pretraining variants (F0, E10, E25, E75, E100, NF25, NF50) x 5 folds x 2 seeds = 70
-  pretrains (about 32 s each) + 10 stage-2 epochs, and 10 new arms (F0, E10, E25, E75, E100, NF25,
-  NF50, Z25, Z50, TS) x 25 weekly fine-tunes x 2 seeds = 500 fine-tunes (about 3.8 s each).
+  pretrains (about 32 s each) + 10 stage-2 epochs, and 11 new arms (F0, F0z, E10, E25, E75,
+  E100, NF25, NF50, Z25, Z50, TS) x 25 weekly fine-tunes x 2 seeds = 550 fine-tunes (about 3.8 s each).
   About 1.2 GPU-hours in all.

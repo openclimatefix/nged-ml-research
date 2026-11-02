@@ -88,6 +88,7 @@ ARMS: Final[dict[str, Arm]] = {
     a.tag: a
     for a in (
         Arm("F0", "F0", 1.0),
+        Arm("F0z", "F0", 0.0),
         Arm("E10", "E10", 1.0),
         Arm("E25", "E25", 1.0),
         Arm("E75", "E75", 1.0),
