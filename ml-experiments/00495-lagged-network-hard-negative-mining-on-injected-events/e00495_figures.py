@@ -268,6 +268,78 @@ def figure_events(*, best: str) -> None:
     chart.save(DOCS_DIR / "figure_4_events.svg")
 
 
+def figure_hard_set() -> None:
+    """Figure 5: share of training rows that are hard, by lead band and by size of the lag step."""
+    frame = pl.read_parquet(WORK / "hard" / "2026-06_s0.parquet").with_columns(
+        lead=pl.col("lead_hours").cut(
+            [24.0, 48.0, 120.0], labels=["0-24", "24-48", "48-120", "120+"]
+        ),
+        depth=pl.when(~pl.col("corrupted"))
+        .then(pl.lit("no lag in an event"))
+        .when(pl.col("step").abs() < 0.02)
+        .then(pl.lit("step under 2%"))
+        .when(pl.col("step").abs() < 0.05)
+        .then(pl.lit("step 2% to 5%"))
+        .otherwise(pl.lit("step over 5%")),
+    )
+    data = frame.group_by("lead", "depth").agg(
+        pl.col("hard").mean().alias("share"), pl.len().alias("rows")
+    )
+    chart = (
+        alt.Chart(data)
+        .mark_bar()
+        .encode(
+            x=alt.X("lead:N", sort=["0-24", "24-48", "48-120", "120+"], title="Lead (hours)"),
+            y=alt.Y("share:Q", title="Share of rows that are hard", axis=alt.Axis(format="%")),
+            color=alt.Color("depth:N", title=None, scale=alt.Scale(range=COLOURS)),
+            xOffset="depth:N",
+        )
+        .properties(
+            width=WIDTH,
+            height=240,
+            title=alt.TitleParams(
+                "Which training rows the mining pass marks as hard",
+                subtitle=[
+                    "2026-06 fit, seed 0. Step: mean over the 3 lags, as a share of capacity."
+                ],
+            ),
+        )
+    )
+    chart.save(DOCS_DIR / "figure_5_hard_set.svg")
+
+
+def figure_tradeoff() -> None:
+    """Figure 6: HN against the trade-off curve of experiment 486 (numbers from its page)."""
+    points = pl.DataFrame(
+        {
+            "arm": ["R05", "A0-inj", "R50", "HN"],
+            "follow": [0.224, 0.100, 0.058, 0.079],
+            "cost": [-0.101, 0.0, 0.119, 0.095],
+        }
+    )
+    base = alt.Chart(points).encode(
+        x=alt.X(
+            "follow:Q", title="Share of a 5% lag step in the median (3 lags, leads under 48 h)"
+        ),
+        y=alt.Y("cost:Q", title="Score minus A0-inj, rows with no labelled event (points)"),
+    )
+    chart = (
+        base.mark_line(color="#888888").encode(order="follow:Q")
+        + base.mark_point(size=90, filled=True).encode(
+            color=alt.Color("arm:N", scale=alt.Scale(range=COLOURS), title=None)
+        )
+        + base.mark_text(dx=14, align="left").encode(text="arm:N")
+    ).properties(
+        width=WIDTH,
+        height=260,
+        title=alt.TitleParams(
+            "HN against experiment 486's trade-off curve",
+            subtitle=["Grey line joins R05, A0-inj, and R50 of experiment 486; lower is better."],
+        ),
+    )
+    chart.save(DOCS_DIR / "figure_6_tradeoff.svg")
+
+
 def best_arm() -> str:
     """Return the new arm with the lowest score on rows with no labelled event at the six."""
     frame = pl.read_csv(WORK / "pooled_summary_vs_A0-inj.csv").filter(
@@ -281,6 +353,8 @@ def main() -> None:
     """Draw the figures."""
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     figure_contrasts()
+    figure_hard_set()
+    figure_tradeoff()
     if list((WORK / "sweep").glob("*.parquet")):
         figure_sweep()
     best = best_arm()
