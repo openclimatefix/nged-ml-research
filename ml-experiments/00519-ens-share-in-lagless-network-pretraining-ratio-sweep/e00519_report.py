@@ -83,7 +83,7 @@ def bands() -> None:
                     out.append(
                         {
                             "group": group, "band": band, "arm": arm, "month": month[0],
-                            "n": d.height, "crps_sum": float(d[col].sum()), "crps": float(d[col].mean()),
+                            "n": d.height, "crps_sum": float(d[col].sum()), "crps": float(d[col].mean()),  # ty: ignore[invalid-argument-type]
                         }
                     )  # fmt: skip
     table = pl.DataFrame(out)
@@ -136,12 +136,12 @@ def figures() -> None:
                 scale=alt.Scale(domain=[0, 105]),
             )
         )  # ty: ignore[unresolved-attribute]
-        bar = base.mark_rule(strokeWidth=3, color=theme.DATA_BLUE).encode(
+        bar = base.mark_rule(strokeWidth=3, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("low_bonferroni:Q", title="CRPS minus 0% control F0"), y2="high_bonferroni:Q"
         )  # ty: ignore[unresolved-attribute]
         dot = base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(y="difference:Q")  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())
+            alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black")
             .encode(y="y:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -174,12 +174,12 @@ def figures() -> None:
     for label in GROUP_LABEL.values():
         part = flag[(flag["group"] == label) & flag["contrast"].isin(order)]
         base = alt.Chart(part).encode(y=alt.Y("contrast:N", sort=order, title=None))  # ty: ignore[unresolved-attribute]
-        bar = base.mark_rule(strokeWidth=3, color=theme.DATA_SKY).encode(
+        bar = base.mark_rule(strokeWidth=3, color=theme.DATA_SKY).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low_bonferroni:Q", title="CRPS difference"), x2="high_bonferroni:Q"
         )  # ty: ignore[unresolved-attribute]
         dot = base.mark_point(filled=True, size=70, color=theme.DATA_SKY).encode(x="difference:Q")  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black")
             .encode(x="x:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -297,21 +297,21 @@ def examples() -> None:
             main = one["F0"].filter(pl.col("day").is_between(*window)).to_pandas()
             band = alt.Chart(main).encode(x=x)  # ty: ignore[unresolved-attribute]
             layers = [
-                band.mark_area(opacity=0.2, color=colours["F0"]).encode(
+                band.mark_area(opacity=0.2, color=colours["F0"]).encode(  # ty: ignore[unresolved-attribute]
                     y=alt.Y("q05:Q", title="Power (MW)", scale=alt.Scale(zero=False)), y2="q95:Q"
                 ),
-                band.mark_area(opacity=0.35, color=colours["F0"]).encode(y="q25:Q", y2="q75:Q"),
+                band.mark_area(opacity=0.35, color=colours["F0"]).encode(y="q25:Q", y2="q75:Q"),  # ty: ignore[unresolved-attribute]
             ]  # ty: ignore[unresolved-attribute]
             for arm, f in one.items():
                 sub = f.filter(pl.col("day").is_between(*window)).to_pandas()
                 layers.append(
-                    alt.Chart(sub)
+                    alt.Chart(sub)  # ty: ignore[unresolved-attribute]
                     .mark_line(color=colours[arm], strokeWidth=2)
                     .encode(x=x, y="q50:Q")
                 )  # ty: ignore[unresolved-attribute]
             act = actual.filter(pl.col("day").is_between(*window)).to_pandas()
             layers.append(
-                alt.Chart(act)
+                alt.Chart(act)  # ty: ignore[unresolved-attribute]
                 .mark_line(color="black", strokeWidth=1.5, strokeDash=[4, 3])
                 .encode(x=x, y="actual:Q")
             )  # ty: ignore[unresolved-attribute]
