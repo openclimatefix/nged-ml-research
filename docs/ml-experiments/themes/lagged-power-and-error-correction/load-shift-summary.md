@@ -4,12 +4,14 @@
 in the recent power readings and loses no accuracy on rows with no labelled event.** The best robust
 option tried is a fixed 50/50 mixture of a forecast that reads the recent power readings and a
 forecast that does not. No learned weight, event detector, or training mask beat that mixture inside
-real events. Mixing in more networks with extra inputs did better on rows with no labelled event,
-and not against actuals corrected to the NRA. The real events are too few to settle several of the
-questions. This page collects the answers to ten questions from 38 merged experiments, with the
-numbers and intervals of the merged pages. It says "Not measured" where no merged page answers a
-question. The page is written from the merged result pages only, and no fit, score, or figure on it
-is new.
+real events. Mixing in more neural networks with extra inputs scored better on rows with no labelled
+event, but only one six-network mixture (K3-A, [experiment
+454](../../00454-lag-trust-mixture-and-ensemble-constructs-for-lagged-and-lagless-heads/result.md))
+did so inside real events scored against actuals corrected to the normal running arrangement (NRA).
+The real events are too few to settle several of the questions. This page collects the answers to
+the maintainer's ten questions from 38 merged experiments, with the numbers and intervals of the
+merged pages. The page says "Not measured" where no merged page answers a question. The page is
+written from the merged result pages only, and no fit, score, or figure on it is new.
 
 **The page has four parts.** Part 1 shows what the data and the events look like. Part 2 answers the
 ten questions. Part 3 is a table of every experiment with its verdict and headline number. Part 4
@@ -19,20 +21,21 @@ says what the findings mean for the forecast and lists the decisions that remain
 
 **A load-shift event is a period in which National Grid Electricity Distribution (NGED) moves load
 from one Primary substation to its neighbours, so the Primary's recent power does not show its
-normal demand.** A Primary is a primary substation. The normal running arrangement (NRA) is the way
-NGED's electricity network is usually run. An alternative running arrangement (ARA) is any other
-arrangement, for example a transfer of load between Primaries. A forecast that stays at the NRA
-level while a transfer is under way is an NRA forecast. The forecasts on this page read three recent
-power readings of the Primary, called lags: the newest usable reading, the reading at the same time
-on an earlier day, and the reading at the same time and weekday in an earlier week (the exact days
-are given on each experiment's page).
+normal demand.** A Primary is a primary substation. The NRA is the way NGED's electricity network is
+usually run. An alternative running arrangement (ARA) is any other arrangement, for example a
+transfer of load between Primaries. A forecast that stays at the NRA level while a transfer is under
+way is an NRA forecast. The forecasts on this page read three recent power readings of the Primary,
+called lags: the newest usable reading, the reading at the same time on an earlier day, and the
+reading at the same time and weekday in an earlier week (the exact days are given on each
+experiment's page).
 
-**NGED's event labels are incomplete, so every count and every score on this page is affected.** The
-corrected label table holds 133 rows, of which 112 are usable because they have an end time and a
-depth ([experiment 402](../../00402-lag-gate-learned-weight-injected-load-shifts-part-1/result.md),
-[experiment 400](../../00400-lagged-lagless-forecast-blend-around-load-shifts-stored/result.md)).
-[Experiment 392](../../00392-xgboost-nra-load-shift-masked-targets/result.md) left 66 hand-labelled
-events out of its training targets, and [experiment
+**NGED's event labels are incomplete, so every count and every score on this page is affected.**
+NGED's table of hand-labelled events, as corrected by the experiments, holds 133 events, of which
+112 are usable because they have an end time and a depth ([experiment
+402](../../00402-lag-gate-learned-weight-injected-load-shifts-part-1/result.md), [experiment
+400](../../00400-lagged-lagless-forecast-blend-around-load-shifts-stored/result.md)). [Experiment
+392](../../00392-xgboost-nra-load-shift-masked-targets/result.md) left 66 hand-labelled events out
+of its training targets, and [experiment
 395](../../00395-xgboost-level-state-winter-spread-anchor-stored-forecasts/result.md) scored 184
 merged hand-labelled intervals from an earlier version of the table. NGED's logs miss some events,
 so a row with no labelled event may hold an event nobody logged, and each count of events is a lower
@@ -40,8 +43,8 @@ bound. Beside every score on such rows this page writes "rows with no labelled e
 
 **The experiments score 16 Primaries in three groups.** The signed-MW six (D5, D9, D10, D11, D14,
 and D16) are metered in signed megawatts. The MVA-only eight (D2, D3, D4, D8, D12, D19, D21, and
-D22) are metered in unsigned megavolt-amperes. D15 and D18 have under a year of history and are
-reported separately. The two metering groups are never pooled.
+D22) are metered in unsigned megavolt-amperes. D15 and D18 have under a year of history and are not
+scored on this page. The two metering groups are never pooled.
 
 The first figure shows day-ahead forecasts through four real events. The event masks are shaded.
 
@@ -55,8 +58,9 @@ redraws the event fans of [experiment
 shaded.
 
 The second figure shows one real event with the forecasts that [experiment
-392](../../00392-xgboost-nra-load-shift-masked-targets/result.md) compared. The page draws six real
-events, three at each metering group, and chose them by a rule fixed before the scores were read.
+392](../../00392-xgboost-nra-load-shift-masked-targets/result.md) compared. Experiment 392's page
+draws six real events, three at each metering group, chosen by a rule fixed before the scores were
+read.
 
 ![A real labelled event with the actuals, the median, and the 5% to 95% band of three forecasts](../../00392-xgboost-nra-load-shift-masked-targets/figure_events_1.svg)
 
@@ -103,7 +107,25 @@ forecast, and not recovery of the hidden event.
 - **q95 coverage** is the share of readings at or below the forecast's 95% quantile. The calibrated
   value is 0.95.
 - **Share of a step followed** is the shift of the median forecast divided by the size of a step
-  added to the lags. A step of 5% of capacity is the usual size.
+  added to the lags. A step of 5% of capacity is the usual size. Some pages call it the leak: the
+  share of a lag step that reaches the median forecast. **k** is the number of lags that carry the
+  step.
+- **Minimum detectable effect** is the smallest difference that the design can tell from
+  seed-to-seed noise.
+- **99.29% interval** is a 95% interval widened for the 7 contrasts that one experiment makes at
+  once (a Bonferroni correction).
+- **Weekly bundle** is the XGBoost model of experiment 381, refitted weekly with a solar summary, a
+  sunny flag, and a 1-year half-life. The **plain weekly member** is the weekly XGBoost member of
+  experiment 87. The **monthly control** is experiment 381's monthly-refitted XGBoost model.
+- **GAM stack** is the generalised additive model pipeline with a Kalman filter of experiment 377.
+  **BG2** is the best-guess stack of five demand models of experiment 87.
+- **A0-inj** and **R-inj** are the neural networks that read the three lags and are trained on clean
+  and injected power. **A-pool** is the pooled neural network that never saw an injected shift.
+- **B1, B3, and B6** are the learned trust weights of experiment 404: learned lag weights, attention
+  over the lags, and learned windows. **R1** is the XGBoost model trained with the labelled events
+  removed from its targets. **U1n-2** is S1 trained on worlds in which 2% of training rows hold a
+  lasting level change. **S3-amb** is a neural network that also reads the surprise at neighbouring
+  Primaries.
 - **S1** is a neural network that reads the three lags plus the surprise at each lag. The surprise
   at a lag is the lag minus the median of the lagless forecast, divided by half the width of the
   lagless forecast's 5% to 95% band.
@@ -111,13 +133,15 @@ forecast, and not recovery of the hidden event.
   the lags and the lagless forecast. **K2-S1** is an equal-weight mixture of two S1 networks and two
   lagless forecasts.
 - **Status** says whether a page is interim (few months scored, no 99% claim) or audited (a fresh
-  Sonnet agent re-derived the headline numbers). Part 3 gives the status of every page.
+  Claude Sonnet agent re-derived the headline numbers independently). Part 3 gives the status of
+  every page.
 
 ### Question 1: Does an ARA period in the lagged-power inputs affect the tails of the forecast?
 
-**Yes for the XGBoost forecasts: with a lag inside an event, q95 coverage falls from about 0.93 to
-between 0.75 and 0.85, and the band does not widen.** The neural networks trained on injected events
-keep near-calibrated tails on real harm rows.
+**Probably yes for the XGBoost forecasts: with a lag inside an event, q95 coverage falls from about
+0.93 to between 0.75 and 0.85 and the band does not widen, but the interval of the matching CRPS
+harm only just excludes zero.** The neural networks trained on injected events keep near-calibrated
+tails on real harm rows.
 
 - **All 16 Primaries, weekly XGBoost bundle.** On rows with an event lag, q95 coverage is 0.749 for
   the bundle, 0.772 for the plain weekly member, and 0.845 for the GAM stack. On rows with no lag in
@@ -125,7 +149,7 @@ keep near-calibrated tails on real harm rows.
   points, against 24.5). Rows whose target also lies inside an event drive the failure: their q95
   coverage is 0.566, against 0.855 for harm rows ([experiment
   390](../../00390-xgboost-d11-d14-gap-and-load-shift-event-lags/result.md), audited).
-- **Signed-MW six, harm rows with all 3 lags inside an event.** q95 coverage is 0.831 for the
+- **Signed-MW six, harm rows with all three lags inside an event.** q95 coverage is 0.831 for the
   bundle, 0.818 for the monthly control, and 0.840 for the GAM stack, against 0.928 for the bundle
   with lags outside events. The bundle's CRPS rises by 1.03 points (95% interval +0.05 to +2.32, 34
   events). The interval is fragile: matching the baseline on Primary, month, and lead band gives
@@ -145,9 +169,9 @@ keep near-calibrated tails on real harm rows.
   482](../../00482-best-models-performance-analysis-injected-shifts-and-wind-references/result.md),
   interim and unaudited).
 
-Scope: the XGBoost figures use hand-labelled events (5 Primaries carry most of the failure in
-[experiment 390](../../00390-xgboost-d11-d14-gap-and-load-shift-event-lags/result.md)). The harm
-interval of [experiment
+Scope: the XGBoost figures use hand-labelled events (most of the failure in [experiment
+390](../../00390-xgboost-d11-d14-gap-and-load-shift-event-lags/result.md) comes from five of the
+Primaries). The harm interval of [experiment
 395](../../00395-xgboost-level-state-winter-spread-anchor-stored-forecasts/result.md) is the less
 certain figure. Part 3 lists the other pages.
 
@@ -161,7 +185,7 @@ the event that holds a lag, at the signed-MW six.** Source: [experiment
 
 **No: when the lags lie outside an event and the target lies inside one, the XGBoost bands hold the
 event-level reading about 70% of the time, against the 90% they are meant to hold.** Training a
-neural network on lasting level changes widens the upper tail where a jump is ambiguous, and costs
+neural network on lasting level changes widens the upper tail where a jump is ambiguous, and lowers
 accuracy on rows with no labelled event.
 
 - **Forecasts issued before an event starts.** Across 19 events with all three lags outside an
@@ -179,8 +203,8 @@ accuracy on rows with no labelled event.
   training rows hold a lasting level change that does not return (U1n-2) raised q99 coverage on
   injected level-change rows from 0.909 to 0.983, and on real event rows from 0.852 to 0.947. The
   same training raised q99 coverage on rows with no labelled event from 0.981 to 0.996, above the
-  target range of 0.98 to 0.995, and raised CRPS there by 0.076 points (95% interval 0.063 to
-  0.090), above the pre-registered limit of 0.03 ([experiment
+  target range of 0.98 to 0.995, and raised CRPS there by 0.076 points. The 95% interval is 0.063 to
+  0.090, and the pre-registered limit was 0.03 ([experiment
   446](../../00446-honest-bands-and-tail-calibration-on-the-s1-network/result.md), interim and
   unaudited).
 
@@ -196,8 +220,9 @@ Source: [experiment 446](../../00446-honest-bands-and-tail-calibration-on-the-s1
 
 ### Question 3: Do the answers depend on the length and depth of the ARA period?
 
-**Yes for how far the median follows the lags: longer events leak more. The real events are too few
-to rank harm by length or depth.**
+**Yes for how far the median follows the lags in most arms: longer events leak more, and the arm
+without the week lag stays flat at 0.20 to 0.22. The real events are too few to rank harm by length
+or depth.**
 
 - **Length of the step (XGBoost, readings-level sweep).** For a step of 5% of capacity, 24 to 72
   hour leads, two Primaries and two refit dates, the share followed with all three lags is 0.06 for
@@ -251,13 +276,14 @@ the median far less than synthetic steps do.
   forecast with lags moves its median by 0.032 (-0.001 to 0.053) of the step more than the forecast
   without lags, against 0.338 (0.299 to 0.375) in synthetic steps ([experiment
   401](../../00401-real-and-synthetic-load-shift-median-share-and-fixed-forecast-mixture/result.md),
-  audited). The measured step in the telemetry is 0.62 of the labelled step, and 11 of the 16 events
-  with 3 lags inside last over 7 days, so a forecast trained over those events has absorbed them.
-- **Neural networks.** At 3 lags and leads under 48 hours, the median follows 0.100 of the step for
-  the reference network (A0-inj), 0.224 when 5% of training rows hold an injected event, and 0.058
-  when 50% do ([experiment 486](../../00486-lagged-network-injection-rate-and-schedule/result.md),
-  interim). In eight injected scenarios, K2-S1 moved by 1% to 6%, B-mix by 1% to 4%, S1 by 3% to
-  12%, A-pool by 8% to 25%, and the lagless network by 0 ([experiment
+  audited). The measured step in the telemetry is 0.62 of the labelled step. Of the 16 events with
+  three lags inside, 11 last over 7 days, so a forecast trained over those events has absorbed them.
+- **Neural networks.** At three lags and leads under 48 hours, the median follows 0.100 of the step
+  for the reference network (A0-inj), 0.224 when 5% of training rows hold an injected event, and
+  0.058 when 50% do ([experiment
+  486](../../00486-lagged-network-injection-rate-and-schedule/result.md), interim). In eight
+  injected scenarios, K2-S1 moved by 1% to 6%, B-mix by 1% to 4%, S1 by 3% to 12%, A-pool by 8% to
+  25%, and the lagless network by 0 ([experiment
   482](../../00482-best-models-performance-analysis-injected-shifts-and-wind-references/result.md)).
 
 Scope: the sweep adds steps to lags, which is a stronger and cleaner signal than most real events
@@ -266,8 +292,7 @@ Scope: the sweep adds steps to lags, which is a stronger and cleaner signal than
 
 ### Question 5: What does the current model do during and after real and synthetic injected events (plots)?
 
-**The plots are Figures 1 to 4 above, with the findings of the pages that draw them.** The pages
-that hold more plots of the same kind are listed below.
+**The plots are Figures 1 to 4 above, with the findings of the pages that draw them.**
 
 - **Real events, XGBoost.** Figure 1 and [experiment
   390](../../00390-xgboost-d11-d14-gap-and-load-shift-event-lags/result.md) show day-ahead fans
@@ -275,10 +300,10 @@ that hold more plots of the same kind are listed below.
   the first 24 hours (15 events) and 0.646 from 24 hours after the onset to the end (11 events), and
   recovers to 0.885 in the 7 days after the end (19 events) ([experiment
   390](../../00390-xgboost-d11-d14-gap-and-load-shift-event-lags/result.md)).
-- **Real events, after the end.** A lag inside an event keeps raising the error for at least a week
-  after the event ends. At the signed-MW six, targets 0 to 24 hours after the end score 1.66 CRPS
-  points worse (-0.06 to +3.69) and targets 3 to 7 days after score 1.05 worse (+0.04 to +2.36), for
-  the weekly bundle ([experiment
+- **Real events, after the end.** A lag inside an event raises the error after the event ends. At
+  the signed-MW six, for the weekly bundle, targets 0 to 24 hours after the end score 1.66 CRPS
+  points worse, and the interval spans zero (-0.06 to +3.69). Targets 3 to 7 days after score 1.05
+  worse, and the interval excludes zero (+0.04 to +2.36) ([experiment
   478](../../00478-load-shift-unpadded-curtailment-cost-and-after-event-slices/result.md)).
 - **Real events, networks.** [Experiment
   482](../../00482-best-models-performance-analysis-injected-shifts-and-wind-references/result.md)
@@ -300,20 +325,21 @@ that hold more plots of the same kind are listed below.
 
 ### Question 6: Lag-encroachment sweep: as a synthetic event reaches back over the most recent lag, then the two most recent, then all, does the median follow the event level or stay NRA, does the band widen, and where does the probability mass sit?
 
-**The median moves towards the event level in proportion to the number of lags shifted. The band
-does not widen. Most of the probability mass stays around the NRA level for one lag shifted and
-moves part of the way for three.**
+**The sweep adds a synthetic step to the lags, newest first. The median follows more of the step as
+more lags shift (XGBoost: 0.04, 0.20, and 0.39 of the step for one, two, and three lags), and the
+band does not widen.**
 
 - **Median.** XGBoost: 0.04, 0.20, 0.39 of the step for 1, 2, 3 lags ([experiment
   388](../../00388-xgboost-lagged-power-column-sets-weekly-demand/result.md)); 1.3%, 17.3%, 36.8% in
   [experiment 395](../../00395-xgboost-level-state-winter-spread-anchor-stored-forecasts/result.md).
-  Neural networks: R-inj follows 0.125 at k = 3 and S1 follows 0.141 against 0.055 for R-inj at k =
-  2 ([experiment
+  Neural networks: R-inj follows 0.125 of the step at k = 3. At k = 2, S1 follows 0.141 against
+  0.055 for R-inj ([experiment
   428](../../00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/result.md),
   interim). Dropping all lags gives exactly 0 in [experiment
   392](../../00392-xgboost-nra-load-shift-masked-targets/result.md), [experiment
-  428](../../00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/result.md),
-  and [experiment 502](../../00502-leave-one-lag-out-power-lag-ablation-xgboost-demand/result.md).
+  502](../../00502-leave-one-lag-out-power-lag-ablation-xgboost-demand/result.md), and the
+  lag-masked control of [experiment
+  428](../../00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/result.md).
 - **Band.** The 1% to 99% band stays within 3% of its width without the step for a step of up to 5%
   of capacity ([experiment
   388](../../00388-xgboost-lagged-power-column-sets-weekly-demand/result.md)); the 90% band is
@@ -321,8 +347,8 @@ moves part of the way for three.**
   395](../../00395-xgboost-level-state-winter-spread-anchor-stored-forecasts/result.md)); the width
   ratio stays within 1.006 for every network arm of [experiment
   486](../../00486-lagged-network-injection-rate-and-schedule/result.md).
-- **Probability mass.** At a step of 5% the step level lies inside the 1% to 99% band in 93% to 100%
-  of rows, and the 95% quantile reaches it in 70% to 100% of rows ([experiment
+- **Where the mass sits.** At a step of 5% the step level lies inside the 1% to 99% band in 93% to
+  100% of rows, and the 95% quantile reaches it in 70% to 100% of rows ([experiment
   388](../../00388-xgboost-lagged-power-column-sets-weekly-demand/result.md)). The reading at the
   event level lies inside the 90% band on 0.681 of rows at k = 0 and 0.784 at k = 3 ([experiment
   395](../../00395-xgboost-level-state-winter-spread-anchor-stored-forecasts/result.md)). The pages
@@ -343,8 +369,8 @@ number of lags shifted (k) and the lead band, at the signed-MW six.** Source: [e
 ### Question 7: Does giving XGBoost the "surprise" of each lagged input, at its own Primary and its neighbours, give it the benefit of an explicit detector?
 
 **No for XGBoost, where the surprise columns made the forecast worse. For the neural network the
-surprise lowers the error on rows with no labelled event, and even a perfect event flag would add
-little.**
+surprise lowers the error on rows with no labelled event, and a mixture rule given an exact event
+flag did not beat the 50/50 mixture.**
 
 - **XGBoost.** Adding own and neighbour surprise raised CRPS on rows whose lags lie inside a
   labelled event by +0.110 points (99.29% interval -0.249 to +0.432) and on rows outside events by
@@ -353,9 +379,9 @@ little.**
   (recall 0.42 against 0.55) and found 0 of 7 labelled transfers at its tuned threshold, so the
   detector arms were not fitted ([experiment
   391](../../00391-xgboost-lag-surprise-second-stage/result.md), audited).
-- **A learned blend.** The surprise scores did not tell a blend of the forecasts with and without
-  lags when to trust the lags: the fitted weight on the forecast with lags was 0.61 with three lags
-  in an event and 0.62 with none ([experiment
+- **A learned blend.** The surprise scores did not help a blend of the forecasts with and without
+  lags decide when to trust the lags. The fitted weight on the forecast with lags was 0.61 with
+  three lags in an event and 0.62 with none ([experiment
   400](../../00400-lagged-lagless-forecast-blend-around-load-shifts-stored/result.md), no audit
   recorded).
 - **Neural network.** S1 scored 0.083 (0.070 to 0.096) lower than the network without the surprise
@@ -365,7 +391,7 @@ little.**
   audited; [experiment
   439](../../00439-surprise-at-the-lags-confirmation-on-seeds-three-to-five/result.md), interim). On
   real harm rows the gain is -0.007 (-0.035 to +0.024), and S1 follows more of a step than the
-  network without it ([experiment
+  network without the surprise ([experiment
   428](../../00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/result.md)).
 - **An explicit detector.** A mixture given an exact flag of which lags lie inside an event scored
   0.465 points (0.198 to 0.644) worse than the fixed 50/50 mixture inside real events at the
@@ -374,15 +400,17 @@ little.**
   unaudited). Scored against NRA actuals, the gap shrinks from 0.38 to 0.17 and stays above zero
   ([experiment
   455](../../00455-nra-corrected-rescore-of-lag-trust-flag-oracle-and-lagless-arms/result.md),
-  interim and unaudited). A perfect detector would therefore add little.
-- **Neighbours.** A network that sees its neighbours (S3-amb) did not follow a level change with no
-  mirror any better than the same network given random neighbours. The result is inconclusive by
-  design, because a perfect forecaster would follow only 0.05 to 0.08 more of such a step
-  ([experiment 462](../../00462-lag-trust-mirrored-genuine-level-change-worlds/result.md), interim).
+  interim and unaudited). In that test, a mixture rule given an exact event flag did not beat the
+  50/50 mixture.
+- **Neighbours.** A neural network that sees neighbouring Primaries (S3-amb) did not follow a level
+  change with no mirror any better than the same network given random neighbours. The result is
+  inconclusive by design, because a perfect forecaster would follow only 0.05 to 0.08 more of such a
+  step ([experiment 462](../../00462-lag-trust-mirrored-genuine-level-change-worlds/result.md),
+  interim).
 
 Scope: the surprise gain on rows with no labelled event may only make up for a weakness in the
-reference network, because the network of experiment 425 without surprise scores level with S1
-([experiment
+reference network, because the pretrained neural network of experiment 425, which has no surprise
+inputs, scores level with S1 ([experiment
 448](../../00448-s1-network-assembly-ladder-with-pretraining-b-mix-and-seed-pool/result.md)).
 
 ### Question 8: Can an NRA forecast be made by training XGBoost with events removed from the training targets?
@@ -390,42 +418,42 @@ reference network, because the network of experiment 425 without surprise scores
 **No: removing the labelled events from the training targets left the median following the lags as
 much as before.**
 
-- The masked model (R1) scored 4.233 CRPS points outside events and the 48 hours after them, against
-  4.214 for the unmasked model and 4.235 for a control that dropped the same number of half-hours in
-  random blocks. With all three lags inside a synthetic step, the median moved by 38% to 41% of the
-  step in every lagged arm ([experiment
-  392](../../00392-xgboost-nra-load-shift-masked-targets/result.md), interim, four monthly folds).
-- Only dropping the lags gives an NRA forecast, at a cost of about 0.7 CRPS points outside events in
-  [experiment 392](../../00392-xgboost-nra-load-shift-masked-targets/result.md). In the
-  leave-one-lag-out test on rows with no labelled event, the forecast with no lags scores 3.247 and
-  the forecast with all three lags 3.096 ([experiment
+- The XGBoost model trained with the labelled events masked out (R1) scored 4.233 CRPS points
+  outside events and the 48 hours after them, against 4.214 for the unmasked XGBoost model and 4.235
+  for a control that dropped the same number of half-hours in random blocks. With all three lags
+  inside a synthetic step, the median moved by 38% to 41% of the step in every lagged arm
+  ([experiment 392](../../00392-xgboost-nra-load-shift-masked-targets/result.md), interim, four
+  monthly folds).
+- Only dropping the lags gives an NRA forecast, and in [experiment
+  392](../../00392-xgboost-nra-load-shift-masked-targets/result.md) the CRPS outside events is about
+  0.7 points higher. In the leave-one-lag-out test on rows with no labelled event, the forecast with
+  no lags scores 3.247 and the forecast with all three lags 3.096 ([experiment
   502](../../00502-leave-one-lag-out-power-lag-ablation-xgboost-demand/result.md), interim and
-  unaudited). The two costs come from different recipes and different months.
+  unaudited). The two figures come from different recipes and different months.
 - **Neural network.** Mixing real labelled events into training with their targets corrected to the
   NRA left the lagged network within the minimum detectable effect on every row class. Fine-tuning
   on the real events made four of five row classes worse by about 1 point ([experiment
   488](../../00488-real-labelled-events-in-training-the-lagged-network/result.md), no audit
   recorded).
 
-Scope: a mask built by the automatic detector (arm R2) was dropped and not tested.
+Scope: a mask built by an automatic detector (arm R2) was dropped and not tested.
 
 ### Question 9: What do events cost in avoidable curtailment, during and in the 7 days after?
 
-**Not established during events, because 2 to 11 events per Primary carry the pounds and one Primary
-(D16) carries most of them. In the 7 days after events the harm to the CRPS persists, but the cost
-differences between forecasts are small.** Avoidable-curtailment cost is the pounds of generation
-curtailed that a perfect forecast would have avoided, at an export limit of 0.9 times the Primary's
-largest earlier reading (f = 0.9) unless another limit is named.
+**Not established during events, because 2 to 11 events per Primary carry the pounds, and one
+Primary (D16) carries most of the pounds. In the 7 days after events the harm to the CRPS persists,
+and the cost differences between forecasts are small per event, with totals dominated by D14 and
+D16.** Avoidable-curtailment cost is the pounds of generation curtailed that a perfect forecast
+would have avoided, at an export limit of 0.9 times the Primary's largest earlier reading (f = 0.9)
+unless another limit is named.
 
 - **During events, XGBoost forecasts.** For the signed-MW six at a limit of 0.9, the cost was £8.71
   million for the unmasked monthly model, £8.76 million with the labelled events masked out, and
   £8.77 million with random blocks masked out, a difference under 2% between arms ([experiment
   392](../../00392-xgboost-nra-load-shift-masked-targets/result.md), interim). For the plain weekly
   member at 12 to 36 hour leads, D16 alone costs £7.76 million during events. That figure comes from
-  one site and one long event, and [experiment
-  383](../../00383-load-shift-xgboost-oracle-first-part-1/result.md) calls it a lead for later work
-  and not a result ([experiment 383](../../00383-load-shift-xgboost-oracle-first-part-1/result.md),
-  audited).
+  one site and one long event, and the page calls it a lead for later work and not a result
+  ([experiment 383](../../00383-load-shift-xgboost-oracle-first-part-1/result.md), audited).
 - **During events, mixtures.** The 50/50 mixture of the forecasts with and without lags costs
   £89,000 more than the forecast with lags (£6.65 million against £6.56 million), and the learned
   blend costs £61,000 more. The GAM stack costs £3.74 million less ([experiment
@@ -439,8 +467,8 @@ largest earlier reading (f = 0.9) unless another limit is named.
   recorded). Across all rows the plain weekly member costs £1.14 million more than the GAM stack at
   D14 and £3.84 million more at D16.
 - **Neural networks.** The S1 constructs cost less than B-mix across rows with no labelled event,
-  and BG2 costs less than every construct at f = 0.9 (1.37, against 1.82 to 1.96 million pounds for
-  the mixtures, 30 cells) ([experiment
+  and BG2 costs less than every construct at f = 0.9 (£1.37 million, against £1.82 to £1.96 million
+  for the mixtures; each sum covers 30 cells, each a Primary at one export limit) ([experiment
   454](../../00454-lag-trust-mixture-and-ensemble-constructs-for-lagged-and-lagless-heads/result.md),
   interim). The sums cover half-hours with no labelled event, so they say nothing about the cost
   during events. [Experiment
@@ -454,10 +482,11 @@ difference from the plain weekly member mixes the widening with forecast skill.
 
 ### Question 10: Which forecast design is wanted: median NRA with tails spanning both levels, and what does spanning cost outside events?
 
-**Not measured as framed: no merged page trained a forecast whose median stays at the NRA level and
-whose tails span the ARA level and measured what that costs outside events.** The experiments
-measured the two halves separately. The cheapest design found so far is the fixed 50/50 mixture of a
-forecast that reads the lags and a forecast that does not.
+**Not measured as framed. A median at the NRA level with tails spanning both levels would stay at
+normal running while its upper and lower quantiles also reach the ARA level. No merged page trained
+such a forecast and measured how much accuracy it loses outside events.** The experiments measured
+the two halves separately. The simplest design found so far that protects the median is the fixed
+50/50 mixture of a forecast that reads the lags and a forecast that does not.
 
 - **Median at the NRA level.** The lagless forecast follows 0 of a step by construction, and the
   50/50 mixture follows about half of the lagged network's share (1% to 6% for K2-S1 in [experiment
@@ -473,10 +502,10 @@ forecast that reads the lags and a forecast that does not.
   At the MVA-only eight it is +0.14 (-0.04 to +0.32) on event-lag rows ([experiment
   401](../../00401-real-and-synthetic-load-shift-median-share-and-fixed-forecast-mixture/result.md),
   audited).
-- **Alternatives to the fixed weight.** None beat the fixed 50/50 mixture inside real events. A gate
-  trained on injected events lowered the weight on the lagged forecast from 0.51 to 0.42 when a lag
-  fell in an event, but scored 10.75 against 10.50 for the 50/50 mixture when the target was inside
-  a real event ([experiment
+- **Alternatives to the fixed weight.** None clearly beat the fixed 50/50 mixture inside real events
+  (the intervals span zero in several cases). A gate trained on injected events lowered the weight
+  on the lagged forecast from 0.51 to 0.42 when a lag fell in an event, but scored 10.75 against
+  10.50 for the 50/50 mixture when the target was inside a real event ([experiment
   402](../../00402-lag-gate-learned-weight-injected-load-shifts-part-1/result.md)). Weighted by
   events, the learned trust weights of [experiment
   404](../../00404-mdn-lagless-and-calibration-module-trust-weights/result.md) were 0.13 to 0.31
@@ -497,12 +526,12 @@ forecast that reads the lags and a forecast that does not.
   no worse than the lagless forecast inside real events ([experiment
   467](../../00467-anchor-plus-penalised-lag-correction-network-for-the-lagless-forecast/result.md),
   interim and unaudited).
-- **Cost of spanning the tails.** Training with 2% genuine level changes widens the upper tail where
-  a jump is ambiguous and costs +0.076 points on rows with no labelled event ([experiment
-  446](../../00446-honest-bands-and-tail-calibration-on-the-s1-network/result.md)). A higher share
-  of injected events in training lowers the share of a step followed (0.224 at 5% of training rows,
-  0.100 at 28%, and 0.058 at 50%) and raises the CRPS on rows with no labelled event (3.590, 3.698,
-  and 3.793 points at the signed-MW six) ([experiment
+- **Accuracy lost by spanning the tails.** Training with 2% genuine level changes widens the upper
+  tail where a jump is ambiguous and raises the CRPS by 0.076 points on rows with no labelled event
+  ([experiment 446](../../00446-honest-bands-and-tail-calibration-on-the-s1-network/result.md)). A
+  higher share of injected events in training lowers the share of a step followed (0.224 at 5% of
+  training rows, 0.100 at 28%, and 0.058 at 50%) and raises the CRPS on rows with no labelled event
+  (3.590, 3.698, and 3.793 points at the signed-MW six) ([experiment
   486](../../00486-lagged-network-injection-rate-and-schedule/result.md)).
 
 ![Each arm minus B-mix at the signed-MW six](../../00404-mdn-lagless-and-calibration-module-trust-weights/figure_1_signed_mw_six.svg)
@@ -524,8 +553,8 @@ three row sets.** Source: [experiment
 question, verdict, and one headline number, so a reader sees the refuted ideas without opening the
 pages. The status column says how the page describes its own checking: "audited" means a fresh
 Sonnet agent re-derived the headline numbers, "interim" means few scored months and no 99% claim,
-and "no audit recorded" means the page states neither. The status is read from each page and is not
-re-checked here.
+and "no audit recorded" means the page states neither (experiment 478 mentions a check, not an
+audit). The status is read from each page and is not re-checked here.
 
 | Experiment | Question | Verdict | Headline number (signed-MW six unless noted) | Status |
 |---|---|---|---|---|
@@ -540,7 +569,7 @@ re-checked here.
 | [401](../../00401-real-and-synthetic-load-shift-median-share-and-fixed-forecast-mixture/result.md) | Do real events move the median as synthetic steps do, and does a fixed 50/50 mixture match the learned blend? | partly supported | Response to the lags 0.032 (-0.001 to 0.053) of the step in real events, 0.338 in synthetic steps; mixture minus learned blend -0.15 (-0.49 to +0.04) at the signed-MW six | audited |
 | [402](../../00402-lag-gate-learned-weight-injected-load-shifts-part-1/result.md) | Does a gate trained on injected events set the weight on the lagged forecast better than 50/50? | partly supported | Weight 0.51 to 0.42 inside an injected event; gain on real events 0.10 points at most | no audit recorded |
 | [404](../../00404-mdn-lagless-and-calibration-module-trust-weights/result.md) | Does a learned trust weight for each lag beat the fixed 50/50 mixture (B-mix)? | not supported | On real harm rows B3 +0.13, B6 +0.15, and B1 +0.31 points behind B-mix | interim, unaudited |
-| [428](../../00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/result.md) | Can a convolutional network over whole days replace the three lags and stop the following of events? | not supported | Day-window network +0.050 worse; S1 -0.083 (-0.096 to -0.070) on rows with no labelled event | audited |
+| [428](../../00428-day-window-convolution-attention-encoder-replacing-lagged-power-inputs/result.md) | Can a convolutional network over whole days replace the three lags and stop the following of events? | not supported | Day-window network +0.050 worse; S1 -0.083 (-0.096 to -0.070) on rows with no labelled event | audited, interim |
 | [439](../../00439-surprise-at-the-lags-confirmation-on-seeds-three-to-five/result.md) | Does the S1 gain hold on three new seeds? | supported | S1 -0.106 (-0.121 to -0.091) against a minimum detectable effect of 0.061 | interim |
 | [445](../../00445-flag-oracle-o-rule-ceiling-for-lag-event-detectors/result.md) | How much would an exact record of the events in the lags gain a mixture? | refuted | Hard rule 0.465 (0.198 to 0.644) worse than B-mix inside real events at the signed-MW six | interim, unaudited |
 | [446](../../00446-honest-bands-and-tail-calibration-on-the-s1-network/result.md) | Do bands trained on genuine level changes beat a recalibration table? | not supported | +0.076 CRPS points on rows with no labelled event; q99 coverage on genuine-change rows 0.909 to 0.983 | interim, unaudited |
@@ -548,7 +577,7 @@ re-checked here.
 | [449](../../00449-pretraining-with-lags-and-surprise-inputs-on-the-s1-network/result.md) | Does pretraining with real lags and the surprise help the S1 network? | partly supported | Pretrained network 0.082 (six) and 0.068 (eight) better than S1, most of it from one month | interim, unaudited |
 | [454](../../00454-lag-trust-mixture-and-ensemble-constructs-for-lagged-and-lagless-heads/result.md) | Which combination of lagged and lagless forecasts scores best? | partly supported | K2-S1 -0.121 (-0.182 to -0.076) against B-mix on rows with no labelled event, at twice the forecast passes | interim |
 | [455](../../00455-nra-corrected-rescore-of-lag-trust-flag-oracle-and-lagless-arms/result.md) | Does an exact event record help a mixture when scored against NRA actuals? | refuted | Hard rule still 0.16 to 0.19 worse than B-mix; the gap shrinks from 0.38 to 0.17 | interim, unaudited |
-| [456](../../00456-primary-demand-unmirrored-level-step-scan/result.md) | How often does a Primary show a level step that no neighbour mirrors? | not supported | 1.77 steps per Primary-year, against 1.74 in step-free surrogates | no audit recorded |
+| [456](../../00456-primary-demand-unmirrored-level-step-scan/result.md) | How often does a Primary show a level step that no neighbour mirrors? | not supported | 1.77 steps per Primary-year, against 1.74 in step-free surrogates | audited |
 | [458](../../00458-constant-prequential-and-offset-corrected-combinations-of-lagged-and-lagless-heads/result.md) | Does a weight per lead band, a prequential weight, or a level offset beat 50/50? | not supported | Offset rule -0.23 on rows with no labelled event (not significant) and +1.21 inside real events | interim, unaudited |
 | [459](../../00459-load-shift-conservation-check-donor-and-recipient-sum/result.md) | Does the sum over a donor and its recipients stay unchanged in an event? | refuted | Leak share 0.53 against a placebo 0.54 (15 events) | no audit recorded |
 | [460](../../00460-lag-dropout-network-forecast-disagreement-as-a-trust-and-width-signal/result.md) | Can the disagreement of a lag-dropout network flag wrong lags? | not supported | Area under the curve 0.51 (0.48 to 0.59) for real harm rows at the signed-MW six | interim, unaudited |
@@ -561,7 +590,7 @@ re-checked here.
 | [478](../../00478-load-shift-unpadded-curtailment-cost-and-after-event-slices/result.md) | What do events cost in avoidable curtailment, and how long does the harm last after an event? | not supported | Harm +1.66 (-0.06 to +3.69) at 0 to 24 hours and +1.05 (+0.04 to +2.36) at 3 to 7 days after an event | no audit recorded |
 | [482](../../00482-best-models-performance-analysis-injected-shifts-and-wind-references/result.md) | How do the best demand networks respond to injected shifts? | partly supported | A-pool up to 2.45 points worse; networks trained on injected shifts move the median 1% to 12% | interim, unaudited |
 | [486](../../00486-lagged-network-injection-rate-and-schedule/result.md) | Does the share of injected training rows change how far the lagged network follows a step? | not supported | Share followed 0.224, 0.100, and 0.058 at 5%, 28%, and 50% of rows, at +0.2 points on rows with no labelled event | interim; no audit run |
-| [488](../../00488-real-labelled-events-in-training-the-lagged-network/result.md) | Do real labelled events in training improve the lagged network? | not supported | RealMix -0.06 on rows with no labelled event, inside the minimum detectable effect | no audit recorded |
+| [488](../../00488-real-labelled-events-in-training-the-lagged-network/result.md) | Do real labelled events in training improve the lagged network? | not supported | RealMix -0.06 on rows with no labelled event, inside the minimum detectable effect | audited |
 | [489](../../00489-distill-the-five-network-pool-into-one-network/result.md) | Can one network copy the five-network pool? | not supported | Student closes about 2% of the 0.084-point gap at the MVA-only eight | no audit recorded |
 | [490](../../00490-one-lag-robust-network-distilled-from-the-lagged-plus-lagless-mixture/result.md) | Can one network imitate the four-network mixture K2-S1? | not supported | 0.28 points behind B-mix at the signed-MW six | interim; no trigger fired |
 | [495](../../00495-lagged-network-hard-negative-mining-on-injected-events/result.md) | Does hard-negative mining on injected events lower how far the network follows a step? | not supported | Share followed 0.079 against 0.100; 0.095 points worse on rows with no labelled event | interim; no audit run |
@@ -571,9 +600,9 @@ re-checked here.
 ## Part 4: What the findings mean for the forecast
 
 **The most robust design tried is the fixed 50/50 mixture of a forecast that reads the lags and a
-lagless forecast, and no later variant beat it inside real events scored against NRA actuals, except
-one six-network construct.** The mixture follows about half of the lagged forecast's share of a
-step. It scored level with the forecast with lags outside events at the signed-MW six ([experiment
+lagless forecast, and no other design tried beat it inside real events scored against NRA actuals,
+except one six-network construct.** The mixture follows about half of the lagged forecast's share of
+a step. It scored level with the forecast with lags outside events at the signed-MW six ([experiment
 401](../../00401-real-and-synthetic-load-shift-median-share-and-fixed-forecast-mixture/result.md),
 -0.019 with an interval from -0.054 to +0.016) and lower inside events. Two limits apply to that
 evidence: one Primary (D16) carries most of the gain at the signed-MW six, and the MVA-only eight
@@ -587,20 +616,19 @@ lagless table, and a mixture step ([experiment
 0.121 points better on rows with no labelled event at four forecast passes instead of two
 ([experiment
 454](../../00454-lag-trust-mixture-and-ensemble-constructs-for-lagged-and-lagless-heads/result.md)).
-Imitating K2-S1 with one network recovered a small part of the gap, so [experiment
+Imitating K2-S1 with one network recovered a small part of the gap, and [experiment
 490](../../00490-one-lag-robust-network-distilled-from-the-lagged-plus-lagless-mixture/result.md)
-concluded that the lagless forecast stays in the live service.
+found no single network that replaces the lagless forecast.
 
-**Each closed line rules out one way of removing the following of an event.** Reading the pages
-together:
+**Each group of experiments below failed to remove the following of an event by one route.**
 
 - **Hiding or masking lags is not enough.** Masking labelled events out of the training targets
-  ([experiment 392](../../00392-xgboost-nra-load-shift-masked-targets/result.md)), nulling the lags
-  inside labelled events ([experiment
-  383](../../00383-load-shift-xgboost-oracle-first-part-1/result.md)), and using the lagless
-  forecast whenever an exact flag marks a lag ([experiment
+  ([experiment 392](../../00392-xgboost-nra-load-shift-masked-targets/result.md)) and nulling the
+  lags inside labelled events ([experiment
+  383](../../00383-load-shift-xgboost-oracle-first-part-1/result.md)) failed to remove the following
+  of an event. Using the lagless forecast whenever an exact flag marks a lag ([experiment
   445](../../00445-flag-oracle-o-rule-ceiling-for-lag-event-detectors/result.md), [experiment
-  455](../../00455-nra-corrected-rescore-of-lag-trust-flag-oracle-and-lagless-arms/result.md)) each
+  455](../../00455-nra-corrected-rescore-of-lag-trust-flag-oracle-and-lagless-arms/result.md))
   failed to beat B-mix inside real events.
 - **Learning when to trust the lags did not beat a fixed weight.** The learned weights of
   [experiment 400](../../00400-lagged-lagless-forecast-blend-around-load-shifts-stored/result.md),
@@ -632,10 +660,10 @@ together:
 - **Group-sum and scan ideas did not reach their thresholds.** The sum over a donor and its
   recipients still steps by half of the donor's step ([experiment
   459](../../00459-load-shift-conservation-check-donor-and-recipient-sum/result.md)), and the scan
-  for unmirrored steps cannot yet separate genuine changes from noise ([experiment
+  for unmirrored steps did not separate genuine changes from noise ([experiment
   456](../../00456-primary-demand-unmirrored-level-step-scan/result.md)).
 
-**Four decisions remain open, and each can be taken either way on the current evidence.**
+**Five decisions remain open, and each can be taken either way on the current evidence.**
 
 1. **Whether to pursue a gate further.** A gate trained only on injected events lowered the weight
    on the lagged forecast from 0.51 to 0.42 inside an injected event and removed most of the harm
@@ -644,14 +672,15 @@ together:
    402](../../00402-lag-gate-learned-weight-injected-load-shifts-part-1/result.md)). Training a gate
    on real and injected events together is untested.
 2. **Whether to ask NGED for transformer-level series for the 16 Primaries.** No merged page tests
-   such series. The pages show that Primary-level series cannot separate the cases: the donor and
+   such series. The pages show that Primary-level series did not separate the cases: the donor and
    recipient sum is not conserved ([experiment
    459](../../00459-load-shift-conservation-check-donor-and-recipient-sum/result.md)), a step scan
-   cannot tell genuine changes from noise ([experiment
-   456](../../00456-primary-demand-unmirrored-level-step-scan/result.md)), and real labels add
+   did not tell genuine changes from noise ([experiment
+   456](../../00456-primary-demand-unmirrored-level-step-scan/result.md)), and real labels added
    nothing detectable to injected events ([experiment
-   488](../../00488-real-labelled-events-in-training-the-lagged-network/result.md)). That page also
-   records that NGED has said it does not plan to supply labels at about 1,300 substations.
+   488](../../00488-real-labelled-events-in-training-the-lagged-network/result.md)). Experiment
+   488's page also records that NGED has said it does not plan to supply labels at about 1,300
+   substations.
 3. **Whether to reconsider a hard mask of lagged power.** Nulling labelled lags did not repair the
    weekly XGBoost model ([experiment
    383](../../00383-load-shift-xgboost-oracle-first-part-1/result.md)), and an exact-flag rule that
@@ -660,21 +689,22 @@ together:
    followed by a serving rule is the form of a mask that lost no accuracy, but its distance rule
    fired on 2.8% of rows with no labelled event and its gain on harm rows rests on one event
    ([experiment 503](../../00503-gap-trained-xgboost-lags-with-a-bad-reading-rule/result.md)).
-4. **Which XGBoost lines to keep as references and as the production fallback.** On four test months
-   the five-seed pool of the S1 network scored 2.802 and 3.501 at the signed-MW six and the MVA-only
-   eight, against 3.017 and 3.615 for the monthly XGBoost recipe and 2.845 and 3.543 for BG2. With a
-   fifth month, BG2 leads at the signed-MW six ([experiment
-   448](../../00448-s1-network-assembly-ladder-with-pretraining-b-mix-and-seed-pool/result.md),
-   interim and unaudited). The GAM stack keeps more of its q95 coverage with an event lag than the
-   XGBoost forecasts (0.845 against 0.749) but loses more CRPS (+1.67 against +1.03 at the signed-MW
-   six) ([experiment 390](../../00390-xgboost-d11-d14-gap-and-load-shift-event-lags/result.md),
-   [experiment
+4. **Which XGBoost recipes to keep as references and as the production fallback.** The GAM stack
+   keeps more of its q95 coverage with an event lag than the XGBoost forecasts (0.845 against 0.749)
+   but loses more CRPS (+1.67 against +1.03 at the signed-MW six) ([experiment
+   390](../../00390-xgboost-d11-d14-gap-and-load-shift-event-lags/result.md), [experiment
    395](../../00395-xgboost-level-state-winter-spread-anchor-stored-forecasts/result.md)). The
    XGBoost variants of [experiment
    465](../../00465-median-day-and-week-lags-for-load-shift-robustness/result.md), [experiment
    502](../../00502-leave-one-lag-out-power-lag-ablation-xgboost-demand/result.md), and [experiment
    503](../../00503-gap-trained-xgboost-lags-with-a-bad-reading-rule/result.md) each cut part of the
-   leak and none cuts it at every event length.
+   leak, and none cuts it at every event length.
+5. **Which neural-network recipe to keep as a reference.** On four test months the five-seed pool of
+   the S1 network scored 2.802 at the signed-MW six and 3.501 at the MVA-only eight, against 3.017
+   and 3.615 for the monthly XGBoost recipe and 2.845 and 3.543 for BG2. With a fifth month, BG2
+   leads at the signed-MW six ([experiment
+   448](../../00448-s1-network-assembly-ladder-with-pretraining-b-mix-and-seed-pool/result.md),
+   interim and unaudited).
 
 **Four questions have no merged answer as asked.** Question 10 was not measured as framed. Question
 2 was measured for a lasting level change and not for an ARA period that ends. Question 6 reports
