@@ -31,8 +31,8 @@ prediction: >-
   the regenerated start, divided by the norm of the start, over all 16 Primaries) is 0.40 to 0.60
   after pretraining, and under 0.05 between the pretrained and the daily fine-tuned weights. This
   differs from the queue-order check's 15% to 17%, which compared two folds of one seed with each
-  other and not with the start. P2: none of the 10 counted Mantel tests passes the level
-  0.05 / 10 = 0.005. P3: under the 20 random derangements, the mean CRPS (continuous ranked
+  other and not with the start. P2: none of the 11 counted Mantel tests (10 descriptors and the metering
+  type) and the metering probe passes the level 0.05 / 12 = 0.0042. P3: under the 20 random derangements, the mean CRPS (continuous ranked
   probability score) of the 14 Primaries that are not report-only rises by more than 0.5 percentage
   points of effective capacity; removing the embedding altogether raised it by 0.65 to 0.85 in
   experiments 406, 425, and 448. P4: scoring each Primary with its own regenerated start vector
@@ -43,10 +43,10 @@ decision_rule: >-
   The minimum detectable effect is fixed at 2 times the two-seed, five-fold value of experiment
   511: 0.328 percentage points at the 8 Primaries that report apparent power only (MVA) and 0.246 at
   the 6 that report signed megawatts. Applying it to one fold and one seed, and to per-Primary
-  changes, is an assumption. "Thin": no Mantel test passes 0.005 and the 95% interval of the
+  changes, is an assumption. "Thin": no Mantel test and no probe passes 0.0042 and the 95% interval of the
   start-arm-minus-stored CRPS difference lies inside the minimum detectable effect; a follow-up
   brief for the best option of Part 4 that uses only the training window is then warranted.
-  "Healthy": at least one Mantel test passes 0.005 and the start arm is worse than the stored
+  "Healthy": at least one Mantel test or the probe passes 0.0042 and the start arm is worse than the stored
   vectors by more than the minimum detectable effect. Anything else is "mixed", and the page says
   which half failed. A null Mantel result is weak evidence, because 16 points have little power;
   the planted-signal control below reports how much. The page makes no claim of benefit.
@@ -103,7 +103,15 @@ every table row, and are left out only of the headline means.
   test with Spearman correlation and 10,000 permutations of the 16 labels, with no Procrustes fit.
   The distance is plain Euclidean distance between the movement vectors, averaged over the 5 seeds
   of fold 2026-01, and the descriptor distance is Euclidean on standardised descriptors. The
-  counted family is these 10 tests (level 0.05 / 10); the other three folds, the stored-vector
+  counted family is these 10 descriptor tests, the Mantel test of the binary metering type (signed
+  MW or apparent power in MVA; distance 0 within a group and 1 between), and a leave-one-Primary-out
+  linear probe of the metering type from the 8-wide vector (a logistic regression with L2 penalty,
+  fitted on 15 Primaries and predicting the 16th, once per seed, with majority vote across the 5
+  seeds and an exact binomial interval at the Bonferroni level). That is 12 tests at level
+  0.05 / 12; the brief's count of 14 includes descriptors this plan reports beside the tests. D15 and
+  D18 count in the group of their own metering unit, so there are two groups and not three. The
+  sign of each Mantel correlation is reported per fold. The metering-flag arm that the probe
+  motivates is a later experiment and is not part of this one; the other three folds, the stored-vector
   view, and a cosine-distance version are descriptive. The correlation of each descriptor with the
   movement norm is reported, because a movement norm that tracks demand level would drive a pass.
   A planted-signal control builds a movement that equals the descriptor-derived signal plus noise
