@@ -19,11 +19,12 @@ size: >-
 hypothesis: >-
   The gains that experiment 510 found for the lag-free demand neural network in the months of
   2025-10 to 2026-06, refitting weekly instead of monthly and weighting recent rows with a 90-day
-  half-life, also appear in December 2024, where the network has only 7 months of ensemble-forecast
-  (ENS) history to fine-tune on.
+  half-life, also appear in December 2024, where the network has only 7 months of
+  ensemble-forecast (ENS) history to fine-tune on.
 prediction: >-
   None was written before the scores were read: this is a sensitivity run that repeats experiment
-  510's harness on one more month, and the page reports whether each sign matches experiment 510's.
+  510's harness on one more month, and the page reports whether each sign matches experiment
+  510's.
 decision_rule: >-
   Descriptive. One fold gives no Bonferroni-corrected claim; intervals are 95% origin-day block
   bootstraps without multiplicity correction. The page reports whether each sign matches
@@ -37,22 +38,24 @@ metric: >-
   Christmas week.
 verdict: partly supported
 best_arm: >-
-  L-Ww (weekly refit, 90-day half-life): CRPS 5.659 points at the eight MVA-only Primaries and 4.277
-  at the six signed-MW Primaries over December 2024, against 5.772 and 4.695 for L-M.
+  L-Ww (weekly refit, 90-day half-life): CRPS 5.659 points at the eight MVA-only Primaries and
+  4.277 at the six signed-MW Primaries over December 2024, against 5.772 and 4.695 for L-M.
 headline: >-
   In December 2024 the weekly refit scored 0.110 points better than the monthly refit at the eight
-  and 0.336 better at the six; in Christmas week the gain was 0.018 at the eight (interval includes
-  zero) and 0.704 at the six. The 90-day weight improved the score by 0.002 at the eight (interval includes zero) and 0.081 at the six.
+  and 0.336 better at the six; in Christmas week the gain was 0.018 at the eight (interval
+  includes zero) and 0.704 at the six. The 90-day weight improved the score by 0.002 at the eight
+  (interval includes zero) and 0.081 at the six.
 lessons: >-
   The weekly gain has the same sign in both Decembers at the six, and it was larger in 2024 (0.70
-  points in Christmas week, against 0.28 in 2025). At the eight the Christmas-week gain was close to
-  zero in 2024 and 0.31 in 2025, so the weekly gain is not a stable property of Christmas week. The 90-day weight
-  helped at the six in both Christmas weeks, and at the eight only in 2025.
+  points in Christmas week, against 0.28 in 2025). At the eight the Christmas-week gain was close
+  to zero in 2024 and 0.31 in 2025, so the weekly gain is not a stable property of Christmas week.
+  The 90-day weight helped at the six in both Christmas weeks, and at the eight only in 2025.
 take_home_message: >-
-  A second Christmas confirms the direction of experiment 510's weekly-refit gain at the six signed-MW
-  Primaries (0.70 points in 2024, 0.28 in 2025) but not at the eight MVA-only Primaries (0.02 and
-  0.31), and the 2024 result came with only 7 months of ensemble history. In the first week of the month the weekly and monthly fits are the same, so the weekly gain is zero there. Two
-  Christmases are still two events, so this is more support, not a test.
+  A second Christmas confirms the direction of experiment 510's weekly-refit gain at the six
+  signed-MW Primaries (0.70 points in 2024, 0.28 in 2025) but not at the eight MVA-only Primaries
+  (0.02 and 0.31), and the 2024 result came with only 7 months of ensemble history. In the first
+  week of the month the weekly and monthly fits are the same, so the weekly gain is zero there.
+  Two Christmases are still two events, so this is more support, not a test.
 advice:
   - >-
     Consider the weekly refit for the lag-free network in the first-release comparison, since its
