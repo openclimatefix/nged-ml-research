@@ -411,7 +411,9 @@ class MonthContext:
         """Return the lag tensor of the train or test rows from a source (None gives zeros)."""
         pool, rows = (self.train, self.train_rows) if train else (self.test, self.test_rows)
         values = (
-            None if source is None or isinstance(source, ZeroLags) else source.values(rows=rows)
+            None
+            if source is None or isinstance(getattr(source, "lags", source), ZeroLags)
+            else source.values(rows=rows)
         )
         return lag_tensor(
             pool=pool,

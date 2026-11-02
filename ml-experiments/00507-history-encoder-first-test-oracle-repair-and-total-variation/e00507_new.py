@@ -16,6 +16,7 @@ ml-experiments/00507-*/run.sh ml-experiments/00507-*/e00507_new.py run --month 2
 
 import argparse
 import time
+from typing import Final
 
 import e00507_arms as arms  # ty: ignore[unresolved-import]
 import e00507_common as c  # ty: ignore[unresolved-import]
@@ -162,17 +163,84 @@ def run(
     print(f"wrote {target}")
 
 
+WEIGHTS: Final[tuple[float, ...]] = (0.5, 1.0, 2.0, 4.0, 8.0, 16.0)
+TAUS: Final[tuple[float, ...]] = (0.5, 1.0, 2.0, 3.0, 5.0)
+TUNING_SEED: Final[int] = 110
+TUNING_WINDOWS: Final[int] = 6000
+
+
+def tune(*, device: str) -> None:
+    """Pick the total-variation weight and tau on world 110 with origins in 2024.
+
+    The criterion is the mean absolute error, in spreads, of the three repaired lag readings
+    against the exact readings (family A and family B steps removed), over windows with a finite
+    lab median. Scoring months never enter.
+    """
+    spec = c.load_spec()
+    ctx = arms.MonthContext.build(month="2025-10", device=device)
+    ev = gen.sample_world(spec=spec, seed=TUNING_SEED)
+    rng = np.random.default_rng(0)
+    day_all = np.arange(spec.days)
+    origin_us = c.GRID_START_US + gen.origin_of(day=day_all) * 1_800_000_000
+    year = origin_us.astype("datetime64[us]").astype("datetime64[Y]").astype(int) + 1970
+    days_2024 = day_all[year == 2024]
+    assert len(days_2024) > 300, len(days_2024)
+    p = rng.integers(0, spec.real.shape[0], size=TUNING_WINDOWS)
+    d = rng.choice(days_2024, size=TUNING_WINDOWS)
+    newest = gen.newest_of(day=d)
+    g = newest[:, None] + np.arange(-(gen.HISTORY - 1), 1)[None, :]
+    median = ctx.med[p[:, None], np.clip(g, 0, ctx.med.shape[1] - 1)]
+    keep = np.isfinite(median).mean(axis=1) > 0.9
+    p, d, median = p[keep], d[keep], median[keep]
+    exact = gen_reader_mode(spec=spec, ev=ev, mode="true")(p, d)
+    shifted = gen_reader(spec=spec, ev=ev)(p, d)
+    positions = np.array([gen.HISTORY - 1, gen.HISTORY - 1 - 48, gen.HISTORY - 1 - 336])
+    spread = spec.spread[p]
+    best = None
+    print(f"tuning on {len(p)} windows of world {TUNING_SEED}, origins in 2024")
+    plain_err = np.nanmean(np.abs(shifted[:, positions] - exact[:, positions]) / spread[:, None])
+    print(f"unrepaired error {plain_err:.4f} spreads")
+    for weight in WEIGHTS:
+        for tau in TAUS:
+            fixed = tv.repair(reading=shifted, median=median, spread=spread, weight=weight,
+                              tau=tau, device=device)  # fmt: skip
+            err = float(np.nanmean(np.abs(fixed[:, positions] - exact[:, positions])
+                                   / spread[:, None]))  # fmt: skip
+            print(f"weight {weight:5.1f} tau {tau:3.1f}: error {err:.4f} spreads", flush=True)
+            if best is None or err < best[0]:
+                best = (err, weight, tau)
+    assert best is not None
+    print(f"best: weight {best[1]} tau {best[2]} (error {best[0]:.4f} spreads)")
+
+
+def gen_reader_mode(*, spec: gen.Spec, ev: gen.Events, mode: str) -> tv.Reader:
+    """Return a reader of histories (windows, 672) in the given generator mode."""
+
+    def read(p: np.ndarray, d: np.ndarray) -> np.ndarray:
+        newest = gen.newest_of(day=d)
+        g = newest[:, None] + np.arange(-(gen.HISTORY - 1), 1)[None, :]
+        out = gen.reading(spec=spec, ev=ev, p=np.repeat(p, gen.HISTORY),
+                          d=np.repeat(d, gen.HISTORY), g=g.reshape(-1), mode=mode)  # fmt: skip
+        return out.reshape(len(p), gen.HISTORY)
+
+    return read
+
+
 def main() -> None:
     """Run the arms for one month."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("step", choices=("run",))
-    parser.add_argument("--month", required=True)
+    parser.add_argument("step", choices=("run", "tune"))
+    parser.add_argument("--month", default=None)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--weight", type=float, default=None)
     parser.add_argument("--tau", type=float, default=None)
     parser.add_argument("--arms", nargs="*", default=["plain", "oracle", "oracle_const", "zero"])
     args = parser.parse_args()
     torch.set_num_threads(1)
+    if args.step == "tune":
+        tune(device=args.device)
+        return
+    assert args.month is not None, "--month is required for run"
     tv_params = (args.weight, args.tau) if args.weight is not None else None
     run(month=args.month, device=args.device, tv_params=tv_params, arm_names=tuple(args.arms))
 

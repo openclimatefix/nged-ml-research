@@ -140,13 +140,84 @@ def old_report() -> None:
     pl.DataFrame(out_rows).write_csv(arms.SCORE_DIR / "old_contrasts.csv", float_precision=4)
 
 
+def mixed(*, temp: pl.DataFrame, gen: pl.DataFrame, genuine: float | None) -> pl.DataFrame:
+    """Return step rows as a mix of `temp` and `gen` rows.
+
+    With `genuine` None the mix is the rows' own counts. Otherwise the genuine (`gen`) rows get
+    the weight `genuine` and the temporary (`temp`) rows `1 - genuine`.
+    """
+    keys = ["label", "month", "seed", "group"]
+    joined = temp.join(gen, on=keys, suffix="_g")
+    if genuine is None:
+        w = pl.col("n_g") / (pl.col("n") + pl.col("n_g"))
+    else:
+        w = pl.lit(genuine)
+    return joined.select(
+        *keys,
+        pl.col("n") + pl.col("n_g"),
+        *[(pl.col(m) * (1 - w) + pl.col(f"{m}_g") * w).alias(m) for m in METRICS],
+    )
+
+
+def new_report() -> None:
+    """Print the new-generator tables and the rule (b) reading."""
+    scores = load(kind="new")
+    scores = scores.filter(pl.col("world") > 0)
+    temp = pooled(scores=scores, classes=("temp",))
+    gen = pooled(scores=scores, classes=("gen",))
+    none = pooled(scores=scores, classes=("none",))
+    allrows = pooled(scores=scores, classes=("temp", "gen", "none"))
+    out_rows = []
+    for group in ("six", "eight"):
+        for genuine, tag in ((None, "generator mix"), (0.6, "reweighted to 60% genuine")):
+            step = mixed(temp=temp, gen=gen, genuine=genuine)
+            series = seed_series(table=step, label="plain", group=group, metric="crps")
+            mde = minimum_detectable_effect(series=series)
+            print(f"\n== {group}, step rows at the {tag}: MDE {mde:.3f} points")
+            res = {}
+            for arm in ("oracle", "oracle_const", "tv", "zero"):
+                row = contrast(table=step, arm=arm, ref="plain", group=group)
+                res[arm] = row
+                out_rows.append({"rows": f"step ({tag})", "mde": mde, **row})
+                print(f"   {arm:13s} minus plain: {row['diff']:+.3f} 95% [{row['lo95']:+.3f}, "
+                      f"{row['hi95']:+.3f}] Bonf [{row['loB']:+.3f}, {row['hiB']:+.3f}] "
+                      f"months {row['monthly']}")  # fmt: skip
+            # Rule (b): TV keeps half the oracle gain when (tv - plain) - 0.5 (oracle - plain) <= 0.
+            a = {n: month_means(table=step, label=n, group=group, metric="crps") for n in
+                 ("plain", "oracle", "tv")}  # fmt: skip
+            d = (a["tv"] - a["plain"]) - 0.5 * (a["oracle"] - a["plain"])
+            lo, hi = block_interval(diffs=d, level=LEVELS[0])
+            print(f"   rule (b): TV loss minus the halfway point to the oracle: {d.mean():+.3f} "
+                  f"95% [{lo:+.3f}, {hi:+.3f}] (negative: TV keeps more than half); months "
+                  f"{', '.join(f'{x:+.3f}' for x in d)}")  # fmt: skip
+            out_rows.append({"rows": f"rule b ({tag})", "mde": mde, "arm": "tv_vs_half_oracle",
+                             "group": group, "diff": d.mean(), "lo95": lo, "hi95": hi})  # fmt: skip
+    print()
+    for group in ("six", "eight"):
+        for name, table in (("no shift touching a lag", none), ("all windows", allrows),
+                            ("temporary-touched", temp), ("genuine-touched", gen)):  # fmt: skip
+            for arm in ("oracle", "tv", "zero"):
+                for metric in ("crps", "pin_q99", "cov_q99"):
+                    row = contrast(table=table, arm=arm, ref="plain", group=group, metric=metric)
+                    out_rows.append({"rows": name, "mde": float("nan"), **row})
+                    print(f"{group:5s} {name:24s} {arm:7s} {metric:8s} minus plain: "
+                          f"{row['diff']:+.4f} 95% [{row['lo95']:+.4f}, {row['hi95']:+.4f}] "
+                          f"abs {row['abs_arm']:.4f} vs {row['abs_ref']:.4f}")  # fmt: skip
+    arms.SCORE_DIR.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(out_rows, infer_schema_length=None).write_csv(
+        arms.SCORE_DIR / "new_contrasts.csv", float_precision=4
+    )
+
+
 def main() -> None:
     """Run one reading."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("step", choices=("old",))
+    parser.add_argument("step", choices=("old", "new"))
     args = parser.parse_args()
     if args.step == "old":
         old_report()
+    else:
+        new_report()
 
 
 if __name__ == "__main__":
