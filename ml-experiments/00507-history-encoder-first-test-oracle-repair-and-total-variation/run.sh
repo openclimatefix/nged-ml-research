@@ -2,7 +2,8 @@
 # Run an experiment 507 script with every earlier experiment folder on PYTHONPATH.
 # Usage: run.sh <script.py> [args...]   (from the repository root)
 set -euo pipefail
-export DATA_PATH_INTERNAL="${DATA_PATH_INTERNAL:-/home/jack/dev/nged-substation-forecast/data}"
+: "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
+export DATA_PATH_INTERNAL
 export OMP_NUM_THREADS=1
 PP="$(ls -d "$PWD"/ml-experiments/*/ | paste -sd:)"
 export PYTHONPATH="$PP"
