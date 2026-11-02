@@ -26,17 +26,18 @@ hypothesis: >-
   dips at D8 and D22 are a mix of causes, and the gas engine behind D8 explains a large share of the
   D8 dips.
 prediction: >-
-  Written before any number is read. A1: the midday window's area under the curve at floor 0 falls
-  below 0.7 once the observed export-to-import ratio of the injected world passes 3, and the better
-  shoulder window stays at or above 0.8 there; at power factor 0.97 the shoulder windows stay below
-  0.8. A2: D12's observed ratio (81.6 over 15.6, about 5.2) lies where the midday window fails. A3:
-  D12's shoulder dips fail the low-demand placebo (the sunny-to-cloudy ratio is below 2 or the dips
-  occur only on days with low dark-hour readings), because D12's dark-hour daily minimum is below
-  6.9 points on 20% of days. B1: at least half of D8's dip days have the engine detector flagging
-  most of the dip half-hours. B2: the dip rate on cloudy days from March to October is under a
-  fifth of the rate on sunny days at D22 and not at D8. B3: the boxcar-versus-solar shape test
-  recovers injected drops of 40 to 50 points for at least 80% of injections; otherwise it stays a
-  labelled diagnostic with no weight.
+  Written before any number is read. A1: the midday window stops being usable (area under the
+  curve below 0.8, or a lower end below 0.6) in the ratio bin from 3 to 6 and above, while at least
+  one shoulder window stays usable there at floor 0; at power factor 0.97 no shoulder window is
+  usable in those bins. A2: D12's observed ratio (about 5.1) lies in a bin where the midday window
+  is not usable. A3: D12's shoulder dips fail the placebo, because D12's dark-hour daily minimum
+  is below 6.9 points on 20% of days: the lower bound of the sunny-to-cloudy ratio is not above
+  1.5, or fewer than 3% of the sunny days without a dark-window dip show a shoulder dip. B1: the
+  engine detector flags more of the D8 dip half-hours than of the matched placebo half-hours, and
+  at least half of the dip days have most dip half-hours flagged. B2: the cloudy-to-sunny
+  Mantel-Haenszel ratio of dip rates has an upper bound under 0.2 at D22 and not at D8. B3: the
+  shape test labels at least 80% of injected boxcars and at least 80% of injected solar-shaped
+  drops correctly; otherwise it carries no weight in the cause classes.
 decision_rule: >-
   A window counts as usable at an export-to-import ratio if its area under the curve is at least 0.8
   with a month-block interval whose lower end is above 0.6 (as in experiment 506). D12's shoulder
@@ -71,43 +72,82 @@ unaudited until the reviews and the audit have run.
 
 ## Plan
 
+The first version of this plan took `u` over the clear-sky index as the clear-sky shape. A Sonnet
+plan review (16 findings, `briefs/508_plan_review.md`) showed that `u` is computed from the actual
+sky, so the plan below replaces that choice and the choices that depended on it.
+
 - **Rows.** Cleaned power (`scan_power`, flagged exact-zero half-hours dropped), the experiment 399
-  start cut (D15 and D18, neither in the six nor the eight), July 2026 untouched, the 506 data layer
-  and its sunny-day filter (clear-sky index 0.7 or more). Everything is recomputed from half-hours.
-- **Sun position.** The clear-sky shape `u_cs` is the fleet shape `u` over the clear-sky index `k`
-  (floored at 0.1), which removes the cloud and keeps the sun's path. The shoulder windows are the
-  half-hours with `u_cs` from 0.05 to 0.3, split into morning (UK clock before 12:00) and evening.
-  The midday window is 10:00 to 15:00 as in experiment 506, and the fourth window is the whole day.
-  A day needs 3 shoulder half-hours, 6 midday half-hours, or 40 whole-day half-hours.
-- **Injection.** signed = p - level x median|p| x farm shape, with levels 1, 2, 4, and 8 and the
-  farm rotation of experiment 408 (Solar A to C), the median taken as in experiment 506. Real
-  crossings (level 0) are reported without intervals. The observed export-to-import ratio of each
-  world is the median clear midday reading over the median dark-hour reading from May to July (D12
-  = 81.6 / 15.6), never a fitted capacity.
-- **Arms and counts.** Two arms (floor 0 and power factor 0.97; floors 0, 2, and 4 give identical
-  areas). Part A has 4 windows x 2 arms x 4 levels = 32 area-under-the-curve intervals plus 8 named
-  contrasts (the better shoulder window minus the midday window, per level and arm): 40 intervals,
-  plain 95% intervals with the count stated, and the 8 contrasts also at the 0.05/40 level.
-- **Thresholds.** Youden-optimal per window and arm on the six, frozen to disk before the eight are
-  read: at level 2.0 (comparable to experiment 506) and at the level whose observed ratio is
-  closest to the Primary's own observed ratio (computed from raw readings, not from dips).
-- **Placebos.** Sunny versus cloudy days (shoulder-window mean `k` below 0.3, same months and
-  Primary), and the Primary's own dark-hour daily minimum on the same days. The decision rule above
-  uses both.
-- **Part B.** The 71 D8 and 13 D22 dip days are re-derived from the 506 definition. Tests: (1)
-  shape within the day (drop against the 14 nearest non-dip days, clear-sky shape times the
-  half-hourly index against a boxcar), calibrated on D10's real reverse-flow days and on injected
-  boxcar and solar-shaped drops of 40 to 50 points; (2) dip rate on cloudy against sunny days from
-  March to October, within the same year; (3) engine states (experiment 291's detector, flagged at
-  probability 0.5) and spark spread (experiment 186) at D8; the neighbouring metered Primaries'
-  change over the dip half-hours against placebo days, as a low-power diagnostic. The three causes
-  are solar export, load transfer, and gas engine running. The D8 generator-output test and the
-  growth comparison with experiment 370 are dropped. The count of dips outside NGED's labelled
-  events is a stand-alone result.
-- **Reuse.** No predictions are reused or fitted. Compute: CPU only, 2 cores. Cadence: not
-  applicable. Past-weather caveat: the clear-sky index comes from CAMS and describes the day
-  observed, so the sunny and cloudy day labels are not available at forecast time.
-- **Advice followed.** Experiment 506 advice: treat the dip as a screen, not a signed label.
+  start cut (D15 and D18, neither in the six nor the eight), July 2026 untouched, the experiment 506
+  data layer (folder `ml-experiments/00506-*`). Part A uses April to September only, so that the
+  midday, shoulder, and whole-day windows describe the same days.
+- **Sun position.** The shoulders are the half-hours in which the sun's elevation (pvlib, at the
+  half-hour midpoint) lies between the two elevations at which the clear-sky fleet shape `u` of
+  experiment 412 reaches 0.05 and 0.3 on rising-sun half-hours with a clear-sky index of 0.9 or more
+  at D12. Morning is rising sun, evening is setting sun. The midday window is 10:00 to 15:00 UK
+  time, and the fourth window is the whole day.
+- **Qualifying days and one label.** A day qualifies when every window has enough finite
+  half-hours (6 midday, 3 per shoulder, 40 whole-day), so every window's area under the curve uses
+  the same days and any sky. The label is the same for all windows: the day's signed power is both
+  below and above zero while the sun is above the horizon.
+- **Injection.** signed = p - level x median|p| x farm shape, levels 1, 2, 4, and 8, farm rotation
+  of experiment 408 (Solar A to C), the median taken over sunny middays as in experiment 506. The
+  recorded farm shape is zero below 15 degrees of elevation, which is where the shoulders sit, so
+  there the farm shape is the site's own `u` times the median ratio of the farm shape to `u` where
+  `u` is 0.3 to 0.5. The share of half-hours extended this way is printed.
+- **Ratio bins.** The export-to-import ratio is the median clear midday reading over the median
+  dark-hour reading (sun more than 6 degrees below the horizon), May to July, from each arm's own
+  reading in each injected world, never a fitted capacity. Worlds are pooled into the bins 0 to
+  1.5, 1.5 to 3, 3 to 6, and above 6, per arm, and the area under the curve is computed per bin.
+  D12's observed ratio (about 5.1) is read off the bin that contains it.
+- **Arms, counts, and what counts as usable.** Two arms (floor 0 and power factor 0.97; floors 0, 2,
+  and 4 give identical areas). Bonferroni families, counted at the end of the run: 32 area-under-
+  the-curve intervals (4 bins x 4 windows x 2 arms), 16 named contrasts (each shoulder minus
+  midday, per bin and arm, named in advance with no choice of the better shoulder), and 16 placebo
+  ratios (8 Primaries x 2 shoulders), 64 in all, plus the Part B tests counted separately. The
+  decision rule uses plain 95% intervals on purpose; the named contrasts are also shown at the
+  0.025/64 level. A cell with fewer than 30 crossing or 30 ordinary days, or fewer than 10 month
+  blocks holding both, is reported as not estimable. Every area carries its crossing and ordinary
+  counts, the number of month blocks, and every contrast carries 2.8 standard errors as its minimum
+  detectable effect. A window is usable at a ratio if its area is at least 0.8 with a lower end
+  above 0.6 (as in experiment 506); the same criterion is used throughout.
+- **Thresholds.** Youden-optimal per bin, window, and arm on the six, frozen to disk before the
+  eight are read. Each of the eight uses the threshold of the bin that holds its own observed
+  ratio; because thresholds for every bin are computed from the six alone, reading the eight's
+  ratios only selects a row. For the eight, the power factor 0.97 arm is the matched one and floor
+  0 a lower bound, because the meters report apparent power.
+- **Placebos.** Sunny days (mean clear-sky index of the window 0.7 or more) against cloudy days
+  (below 0.3) for each Primary and shoulder, with the ratio of the dip rates (0.5 added to each
+  count) and a month-block interval, and the Primary's own dark-hour reading over a window of the
+  same number of half-hours immediately on the dark side of the shoulder. Cloudy-day maintenance
+  patterns are a confound that the placebo cannot remove, and the page says so.
+- **Part B.** A dip day is a sunny day (clear-sky index 0.7 or more) whose 10:00 to 15:00 minimum
+  reading is below 6.9 points of capacity (experiment 506). The run stops unless it finds 71 dip
+  days at D8, 13 at D22, and 13 at D12. Cause classes are solar export, load transfer, and gas
+  engine running. Engine running is scored against matched placebo days (the same half-hours on the
+  14 nearest same-day-type non-dip days after 2023-08-15) with D5, D10, and D11 as controls, using
+  experiment 196's engine states as stored by experiment 291, and cannot be assessed at D22. The
+  shape test fits one amplitude to the drop (baseline of the 14 nearest non-dip days minus the
+  reading), once with the fleet shape `u` and once with a boxcar over the half-peak run around the
+  deepest half-hour; injected boxcar and solar-shaped drops of 40 to 50 points on D8 and D22 days
+  before 2023 give the known answer, and the shape test enters the cause classes only if at least
+  80% of each injected class is labelled correctly. The dip rate on cloudy against sunny middays of
+  March to October is a Mantel-Haenszel risk ratio over year-month strata with a stratum bootstrap;
+  with few cloudy dips it is reported as underpowered. Spark spread (experiment 186) compares dip
+  days with other sunny days after 2023-08-15. The neighbour check reads the other Primaries under
+  the same supply point and is a low-power diagnostic. The count of dip days outside every labelled
+  event with times is a stand-alone result.
+- **Prediction and rule changes.** Prediction A1 and the usable criterion now share one threshold
+  (area 0.8, lower end above 0.6). The decision rule for D12 requires: a usable shoulder area in the
+  bin that holds D12's ratio; a sunny-to-cloudy ratio of dip rates with a lower bound above 1.5
+  (sensitivity at 1 and 2 reported); and, among sunny days with no dark-window reading below the
+  frozen shoulder threshold, a shoulder dip share of at least 3% (sensitivity at 1% and 2%).
+- **Deliverables.** Part C of the brief (what each answer changes, using "consistent with") and the
+  exact question for NGED about what changed at D8 and D22 from 2023 to 2026, including the engine,
+  new connections, and load transfers.
+- **Reuse.** No predictions are reused or fitted. CPU only, 2 cores. Cadence: not applicable.
+  Past-weather caveat: the clear-sky index comes from CAMS and describes the day observed, so the
+  sunny and cloudy day labels are not available at forecast time. Advice followed: experiment 506
+  says to treat the dip as a screen, not a signed label.
 
 ## Results
 
