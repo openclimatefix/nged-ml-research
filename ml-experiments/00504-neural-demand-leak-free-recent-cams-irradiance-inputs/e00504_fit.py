@@ -320,7 +320,9 @@ def run(*, months: list[str], arms: list[str], seeds: list[int], device: str) ->
                     fold=stand,  # ty: ignore[invalid-argument-type]
                     target=OUT_DIR / "models" / arm / month / f"s{seed}",
                 )
-                outputs = {arm: "normal"} | (CHECK_ARMS if arm == "A-cams" else {})
+                outputs = (CHECK_ARMS if arm == "A-cams" else {}) | {
+                    arm: "normal"
+                }  # the arm itself last: it marks the fit done
                 for name, mode in outputs.items():
                     q = forecast(
                         fitted=fitted, fold=fold, standardiser=standardiser, cols=cols,

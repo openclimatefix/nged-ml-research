@@ -125,7 +125,8 @@ def extra_columns(
         ValueError: A needed CAMS value lies outside the table.
     """
     day = latest_day(origin_us=origin_us, stale_days=stale_days)
-    tod = valid_us - (valid_us // DAY_US) * DAY_US
+    # A half-hour ending exactly at 00:00 is the last half-hour of its day, so tod runs 1..48 steps.
+    tod = (valid_us - 1) % DAY_US + 1
     out = np.empty((len(origin_us), len(COLUMNS)), dtype=np.float32)
     # Index of the stamp "time of day tod on day d": (d * DAY + tod - first) / STEP.
     idx = [((day - j) * DAY_US + tod - cams.first_us) // STEP_US for j in range(3)]

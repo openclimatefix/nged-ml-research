@@ -22,9 +22,11 @@ uv run --no-sync python ml-experiments/00504-*/e00504_score.py rows --comparison
 
 import argparse
 import math
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
+import e00397_prep as prep397  # ty: ignore[unresolved-import]
 import e00454_build as build454  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]
 import e00470_curtailment as curtailment470  # ty: ignore[unresolved-import]
@@ -49,6 +51,11 @@ COMPARISONS: Final[dict[str, tuple[str, ...]]] = {
     "main": ("A-cams", "A-cams-real", "A-cams-lag-only"),
     "checks": ("A-cams-mean", "A-cams-stale1"),
 }
+CONTROLS: Final[dict[str, str]] = {"main": "K3", "checks": "A-cams"}
+"""The arm each comparison's candidates are contrasted with (the checks are read against A-cams)."""
+JULY: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
+"""No valid time on or after this is scored (the ml-experiment skill)."""
+D12: Final[str] = "D12"
 ARM_FOLDERS: Final[dict[str, Path]] = {
     "K3": E425_SEED_PREDS / "A",
     **{a: WORK_DIR / "seed_preds" / a for a in (*COMPARISONS["main"], *COMPARISONS["checks"])},
@@ -63,13 +70,46 @@ def configure(*, comparison: str) -> None:
     curtailment470.MONTHS = FIVE
     build454.MONTHS = FIVE
     score470.SCORE_DIR = WORK_DIR / "scores" / comparison
+    control = CONTROLS[comparison]
     score470.CANDIDATES = arms
-    score470.CONTROLS = ("K3",)
+    score470.CONTROLS = (control,)
     score470.DESCRIPTIVE = ()
     score470.REFERENCES = ()
-    score470.MAIN_ARMS = (*arms, "K3")
+    score470.MAIN_ARMS = (*arms, control)
     score470.CELLS = {}
-    score470.CONTRASTS = tuple((a, "K3") for a in arms)
+    score470.CONTRASTS = tuple((a, control) for a in arms)
+    score470.GATING_CRPS = ("eight", "six_clean")
+    score470.GATING_Q99 = ("eight", "six_clean")
+    score470.SLICES = {
+        **score470.SLICES,
+        "d12": ("mva_eight", "d12"),
+        "eight_no_d12": ("mva_eight", "no_d12"),
+    }
+    d12 = int(prep397.primaries().filter(pl.col("site") == D12)["primary"][0])
+    original_slice = score470.slice_filter
+    original_context = score470.month_context
+
+    def slice_filter(
+        *, table: pl.DataFrame, name: str, basis: str = "metered"
+    ) -> tuple[pl.DataFrame, str]:
+        """Return a slice's rows; adds D12 alone and the eight without D12."""
+        kind = score470.SLICES[name][1]
+        if kind in ("d12", "no_d12"):
+            part = table.filter(pl.col("group") == "mva_eight")
+            keep = pl.col("primary") == d12 if kind == "d12" else pl.col("primary") != d12
+            return part.filter(keep), ""
+        return original_slice(table=table, name=name, basis=basis)
+
+    def month_context(*, month: str, sites: pl.DataFrame, ctx: dict) -> pl.DataFrame:
+        """Return experiment 470's month rows without valid times on or after 2026-07-01."""
+        frame = original_context(month=month, sites=sites, ctx=ctx).filter(
+            pl.col("valid_time") < JULY
+        )
+        assert frame["valid_time"].max() < JULY
+        return frame
+
+    score470.slice_filter = slice_filter  # ty: ignore[invalid-assignment]
+    score470.month_context = month_context  # ty: ignore[invalid-assignment]
     score470.TESTS = TESTS
     score470.RESAMPLES = RESAMPLES
 
@@ -84,14 +124,14 @@ def configure(*, comparison: str) -> None:
         return {c: frame[c] for c in frame.columns}
 
     score470.masks = masks  # ty: ignore[invalid-assignment]
-    tails470.ARMS = (*arms, "K3")
-    curtailment470.ARMS = (*arms, "K3")
-    curtailment470.CANDIDATES = (*arms, "K3")
+    tails470.ARMS = (*arms, control)
+    curtailment470.ARMS = (*arms, control)
+    curtailment470.CANDIDATES = (*arms, control)
     curtailment470.REFERENCES = ("manual_heuristic",)
     curtailment470.COMPARISONS = (
-        *((a, "K3") for a in arms),
+        *((a, control) for a in arms),
         *((a, "manual_heuristic") for a in arms),
-        ("K3", "manual_heuristic"),
+        (control, "manual_heuristic"),
     )
 
 
