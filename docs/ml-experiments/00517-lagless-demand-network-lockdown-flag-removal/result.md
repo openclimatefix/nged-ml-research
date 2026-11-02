@@ -1,5 +1,5 @@
 ---
-id: "00514"
+id: "00517"
 slug: lagless-demand-network-lockdown-flag-removal
 title: >-
   Is the 0/1 lockdown flag still needed by the lag-free demand network now that pretraining reaches
@@ -94,7 +94,7 @@ In the first fold 1,395,832 of 7,005,809 pretraining rows are flagged (19.9%).
 - **Slices.** Horizon bands day 1, days 2 to 3, and days 4 to 10 beside days 1 to 10, and Christmas
   week (22 to 28 December, fold 2025-12).
 - **Minimum detectable effect.** From the seed spread of the three arms pooled (three seeds, five
-  folds), scaled to a 3-seed mean, printed by `e00514_score.py baseline` before any contrast.
+  folds), scaled to a 3-seed mean, printed by `e00517_score.py baseline` before any contrast.
   Earlier experiments report 0.057 to 0.164 points for single-seed or two-seed comparisons.
 - **Intervals.** Month-block bootstrap with five blocks gives near min-to-max intervals; the page says
   so and gives the sign per fold beside every interval.
@@ -116,6 +116,6 @@ number is unaudited.
 
 ## Implementation details (deleted when this ships)
 
-Code in `ml-experiments/00514-.../`: `e00514_fit.py` (pretrain, fine-tune, forecast) and
-`e00514_score.py` (experiment 510's scorer pointed here). Run with `PYTHONPATH` set to the
+Code in `ml-experiments/00517-.../`: `e00517_fit.py` (pretrain, fine-tune, forecast) and
+`e00517_score.py` (experiment 510's scorer pointed here). Run with `PYTHONPATH` set to the
 `ml-experiments/*` folders and `DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data`.

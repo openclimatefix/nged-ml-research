@@ -1,8 +1,8 @@
 # ruff: noqa: E501
-"""Score experiment 514's arms with experiment 470's scorer, pointed at this folder.
+"""Score experiment 517's arms with experiment 470's scorer, pointed at this folder.
 
 The pattern of experiment 510: arms are the quantile averages of seeds 0, 1, and 2 of the forecasts
-that `e00514_fit.py` wrote under `seed_preds/<arm>/`; single seeds are also written, for the minimum
+that `e00517_fit.py` wrote under `seed_preds/<arm>/`; single seeds are also written, for the minimum
 detectable effect. Rows are experiment 454's scored rows, restricted to the half-hours where every
 arm has a forecast. Contrasts: C1 minus C0, C2 minus C0, and C2 minus C1 at two groups (6 tests); the
 Bonferroni count is the family of the whole price-and-lockdown brief, 18.
@@ -24,7 +24,7 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00514-lagless-demand-network-lockdown-flag-removal" / "work"
+    ML_EXPERIMENTS_DATA_DIR / "00517-lagless-demand-network-lockdown-flag-removal" / "work"
 )
 SEED_PREDS: Final[Path] = WORK_DIR / "seed_preds"
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)

@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-r"""Pretrain, fine-tune, and forecast the arms of experiment 514 (is the lockdown flag still needed?).
+r"""Pretrain, fine-tune, and forecast the arms of experiment 517 (is the lockdown flag still needed?).
 
 Commands: `pretrain`, `fit`, `both`. The loop is experiment 513's `P0` loop (experiment 510's `L-M`
 recipe: monthly refit, 182.6-day weight, pretraining on ERA5 and CAMS rows), so the three arms differ
@@ -17,7 +17,7 @@ only in pretraining. `run` asserts this for every fold.
 
 ```bash
 OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
-    uv run --no-sync python ml-experiments/00514-*/e00514_fit.py both
+    uv run --no-sync python ml-experiments/00517-*/e00517_fit.py both
 ```
 """
 
@@ -34,7 +34,7 @@ import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 W: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00514-lagless-demand-network-lockdown-flag-removal" / "work"
+    ML_EXPERIMENTS_DATA_DIR / "00517-lagless-demand-network-lockdown-flag-removal" / "work"
 )
 ARMS: Final[tuple[str, ...]] = ("C0", "C1", "C2")
 DROP_COLUMN: Final[dict[str, bool]] = {"C0": False, "C1": True, "C2": True}
@@ -74,7 +74,7 @@ def _tensor_set(
     }
 
 
-def run(
+def run(  # noqa: PLR0915
     *, months: list[str], seeds: list[int], arms: list[str], do_pretrain: bool, do_fit: bool,
     device: str,
 ) -> None:  # fmt: skip
@@ -110,6 +110,7 @@ def run(
         )
         for arm, seed in todo_pre:
             assert pre is not None
+            assert flagged > 0 or not DROP_LOCKDOWN_ROWS[arm], "no flagged pretraining row to drop"
             keep = (
                 pre.x[:, covid] == 0 if DROP_LOCKDOWN_ROWS[arm] else np.ones(len(pre.y), dtype=bool)
             )
