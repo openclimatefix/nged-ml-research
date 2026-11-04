@@ -8,7 +8,7 @@
 | 442 | Does thermal lag (bundle T) lower the pooled neural network's error on cold winter nights, on six winter-weighted folds? | High (brief, 2026-10-31) | Nothing; fits wait for a free GPU slot | Planned |
 | 515 | Do trailing weather windows (temperature, shortwave, their 24 h product) lower the error of a lag-free demand network that cannot see recent power, on ten winter folds? | High (maintainer request, 2026-11-02) | Experiments 511 and 513 scored | Done: not resolved; the placebo gains about half of the W-T cold-night gain at the eight |
 | 517 | Is the 0/1 lockdown flag still needed by the lag-free demand network now that pretraining reaches back to 2019? | Medium (brief, 2026-11-02) | Nothing | Planned |
-| 526 | Do trailing temperature windows beat a shuffled-day placebo of the same three columns on cold nights in the lag-free demand network, with five seeds and four summer folds? | High (brief, 2026-11-02) | Nothing; GPU stages wait for the manager's go | Planned |
+
 
 ## Done experiments
 

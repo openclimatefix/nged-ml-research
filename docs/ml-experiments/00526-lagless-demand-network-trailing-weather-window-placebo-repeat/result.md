@@ -6,7 +6,11 @@ title: >-
   network, with five seeds, four summer folds, and the checks experiment 515 did not run?
 theme: demand-inputs
 also_relevant_to: []
-status: planned
+status: done
+verdict: partly supported
+best_arm: W-T
+production_status: candidate
+adopted_in: none
 kind: other
 protocol: demand-v2
 size: >-
@@ -67,11 +71,121 @@ metric: >-
   rows, cold nights, cold sunny, and warm sunny slices; q95 and q99 pinball loss on cold nights; the
   absolute error of the mixture-mean forecast and the median minus the mean forecast; CRPS by horizon
   band (day 1, days 2 to 3, days 4 to 10).
+headline: >-
+  W-T beats a shuffled-day placebo of its own three columns on cold nights at the eight MVA-only
+  Primaries by 0.093 points of capacity (11 seeds, interval -0.133 to -0.053, 9 of 10 folds), but
+  nothing resolves at the six signed-MW Primaries or in summer, and the seam check fails again.
+take_home_message: >-
+  Trailing temperature windows do carry real information on cold winter nights at the eight MVA-only
+  Primaries: they lowered the error by 0.093 points of capacity more than a shuffled-day placebo of
+  the same three columns did, in 9 of 10 folds. The gain is small, shows nowhere else (not at the six
+  signed-MW Primaries, not on all rows, not in summer), and the seam check failed again.
+lessons: >-
+  A placebo built from the same columns as the real windows is the right comparator: the nine-column
+  placebo of experiment 515 hid the effect. The gain over W0 is about two thirds real and one third
+  placebo, so any later window arm needs its own matched placebo.
+advice:
+  - >-
+    Compare any new window or lag column with a shuffled-day placebo of exactly the same columns, and
+    with frozen noise columns of the same count (W-T minus W-Tnull, W-T minus W-noise3).
+  - >-
+    Use 11 seeds for cold-night contrasts at the eight, because the 5-seed pooled minimum
+    detectable effect is 0.14 points of capacity and the 11-seed one is 0.083 (C1).
+  - >-
+    Treat trailing temperature windows as a small cold-night gain at the eight only, not a gain for the
+    six signed-MW Primaries or for summer (W-T minus W0, 10 winter folds and 4 summer folds).
 ---
 
-**Take-home: to be written after the results. Interim and unaudited until then.**
+**Take-home: trailing temperature windows give the lag-free demand network a small real gain on cold
+winter nights at the eight MVA-only Primaries, because they beat a shuffled-day placebo of the same
+three columns, but the gain shows nowhere else, so the next step is a longer-history check at the
+eight only.**
 
-## Question
+We asked whether the cold-night gain of experiment 515's trailing temperature windows (the means of
+temperature over the previous 6, 24, and 72 hours, "W-T") came from the windows' content or merely
+from giving the neural network three extra columns. We gave a network the same three columns filled
+with the temperatures of a randomly drawn other day ("W-Tnull"), and a network three columns of
+random numbers ("W-noise3"), and compared the three with the plain network ("W0") on the 10 winter
+test months of experiment 515, with 5 seeds and then 11 seeds, and on 4 summer months. Cold nights
+are half-hours below 5 °C between 18:00 and 08:00 local time. CRPS is the continuous ranked
+probability score in points of effective capacity; a negative difference favours the first arm.
+
+**Maintainer decision.** The pre-registered adoption rule was not met, because the seam check
+failed narrowly (below). The maintainer overrode it and adopted W-T for the first-release recipe.
+This experiment changed no recipe, serving code, or dependency pin; it records results only.
+
+![W-T against each comparator](figure_1_headline.svg)
+
+![W-T minus W-Tnull in each winter fold](figure_2_per_fold.svg)
+
+![Summer folds](figure_3_summer.svg)
+
+![Example forecasts](figure_4_examples.svg)
+
+- **Primary (registered): W-T minus W-Tnull, cold nights, eight.** 5 seeds: -0.104, bootstrap 95%
+  interval [-0.168, -0.040], 8 of 10 folds negative. 11 seeds: -0.093 [-0.133, -0.053], 9 of 10
+  negative. Without 2024-11: -0.086 [-0.123, -0.045]. The 5-seed point estimate is above the
+  registered -0.12 line, so the 5-seed result reads as a tighter interval and not as a verdict. The
+  intervals are month-block bootstraps over 10 folds, so they are near min-to-max.
+- **Minimum detectable effect (seed spread only), eight, cold nights, pooled over 10 folds:** 0.140
+  at 5 seeds and 0.083 at 11 seeds (all rows: 0.104 and 0.062).
+- **Predictions.** P1 (point estimate -0.05 or lower): passes. P2 (W-noise3 minus W0 inside plus or
+  minus 0.118): passes, +0.014 [-0.075, +0.105]. P3 (seam, all rows, within plus or minus 0.02):
+  fails, W-seam minus W-T is +0.030 [+0.002, +0.071] at the eight and +0.026 [-0.002, +0.060] at the
+  six, as in experiment 515.
+- **Against the other comparators (eight, cold nights, 5 seeds).** W-T minus W0 -0.152 [-0.300,
+  -0.062] (experiment 515 found -0.150). W-Tnull minus W0 -0.048 [-0.189, +0.047], so about a third of
+  the gain over W0 also appears with shuffled days. W-T minus W-noise3 -0.166 [-0.384, -0.055]
+  (Bonferroni-21), 10 of 10 negative. W-null minus W0 -0.047; W-T minus W-null -0.105 [-0.358, +0.176].
+- **Absolute CRPS (11 seeds, cold nights / all rows).** Eight: W0 4.557 / 5.351, W-T 4.441 / 5.290,
+  W-Tnull 4.534 / 5.312. Six: W0 3.373 / 4.108, W-T 3.305 / 4.062, W-Tnull 3.329 / 4.060.
+- **Nothing else resolves.** All rows at the eight: W-T minus W-Tnull -0.020 [-0.106, +0.095]; W-T
+  minus W0 -0.062 [-0.092, -0.027] at 11 seeds, so W-T is no worse than +0.03 (adoption condition ii
+  met at both groups: -0.047 [-0.169, +0.060] at the six). Six cold nights: W-T minus W-Tnull -0.064
+  [-0.243, +0.127]. Summer (4 folds): warm sunny W-T minus W-Tnull -0.047 at the eight and -0.010 at
+  the six, intervals spanning zero. W-S and W-X minus W0 on cold nights at the eight (-0.079, -0.055)
+  do not resolve.
+- **Tails (eight, cold nights, W-T minus W0).** q95 pinball loss -0.030 [-0.039, -0.015], q99
+  -0.010 [-0.017, -0.001]; coverage at q95 rises by 0.8 points (0.001 to 0.016) and at q99 by 0.1
+  points. Horizon bands (all rows, eight): days 4 to 10 -0.060 [-0.155, +0.016], earlier bands about
+  -0.02.
+- **Fold 2024-11** gives W-T minus W0 -0.83, but W-T minus W-Tnull is -0.147 there and -0.101 without
+  it, so the placebo contrast does not depend on that fold. Folds 2025-11 and 2026-01 favour W-Tnull.
+- **Weather inputs and timing.** Every window column comes from the run issued at or before the
+  forecast origin, as in experiment 515's causality check (later runs removed, same result). This
+  experiment did not repeat that check row by row.
+
+## Checks
+
+- **Median minus mean forecast (eight, cold nights, points of capacity):** W0 +0.139, W-T +0.093,
+  W-Tnull +0.102, W-null +0.108, W-noise3 +0.142; all rows +0.21 to +0.29. The mixture mean sits
+  slightly above the median for every arm, so the spread does not shift the forecast by more than 0.3
+  points.
+- **Error of the mean forecast beside CRPS:** W-T minus W0 mean error -0.238 [-0.454, -0.095] and median
+  error -0.203 [-0.457, -0.058], the same sign as the CRPS contrast. W-Tnull minus W0 mean error -0.072
+  includes zero. The refit that supplies the mean for seeds 0 to 2 reproduced experiment 515's
+  quantiles to within 0.00003. The mean is not available for W-S, W-X, and W-seam.
+- **Audit triggers.** The placebo W-Tnull gained 0.048 on cold nights (trigger 1) and W-T was not
+  resolved at the six (no trigger). No audit was run, because the experiment is a repeat with a
+  matched placebo and the conclusion is worded as a small gain at one group. A result reader should
+  weigh that.
+- **Bonferroni.** 1 primary test at 0.05; a secondary family of 21 tests (the W-T minus W-null,
+  W-noise3, and W-Tnull contrasts at the registered slices). Everything else is descriptive and
+  uncorrected.
+- **Caveats.** W-noise3 columns are frozen across seeds, so its intervals are narrower than a
+  re-drawn noise arm's. Event labels are incomplete, so clean rows may hold unlabelled events. Warm
+  sunny rests on 4 summer month blocks. W0 for 2025-12, 2026-01, and 2026-03 seeds 0 to 2 comes from
+  experiment 513's `P0`. No example forecast shows a metered generator. W-noise9 was not run.
+
+## What to try next
+
+- Check W-T at the eight on a longer history (more winters) before relying on a 0.09-point gain.
+- Repeat with a nine-column noise arm only if the W-null contrast needs a column-count control.
+- The six signed-MW Primaries need a different test: no window arm resolved there at 11 seeds.
+
+## Plan (written before any fit that produced a quoted number)
+
+### Question
 
 Experiment 515 ([result
 page](../00515-lagless-demand-network-trailing-weather-window-features/result.md))
@@ -88,7 +202,7 @@ column-count control, four summer folds, and the missing checks. It adds files o
 `e00515_*` file is edited, and every output goes to this experiment's own folder, because the 515
 scorer lists arms by scanning its own `work/seed_preds/*`.
 
-## Design notes
+### Design notes
 
 - The primary comparator is **W-Tnull**: the shuffled-day version of exactly W-T's three columns,
   drawn with the same donor days as W-null. W-null (nine columns) is a secondary comparator.
@@ -110,7 +224,7 @@ of W0, W-T, and W-null for seeds 0 to 2 (and experiment 513 stored `P0`'s for th
   subclasses 515's `Fold`, because W-Tnull needs the temperature columns of the placebo array and
   W-noise3 needs unscaled columns.
 
-## Arms
+### Arms
 
 Every arm starts from the 37 non-lag columns and is pretrained from scratch with its added columns,
 in experiment 513's `P0` loop, as in 515.
@@ -128,7 +242,7 @@ in experiment 513's `P0` loop, as in 515.
 W-noise3 columns are drawn once per fold and stage from a fixed seed, so they carry no information
 about demand.
 
-## Folds and seeds
+### Folds and seeds
 
 - **Winter folds (10):** 2024-11, 2024-12, 2025-01, 2025-02, 2025-03, 2025-11, 2025-12, 2026-01,
   2026-02, 2026-03, as in 515. Each reports with and without 2024-11.
@@ -143,7 +257,7 @@ Seeds 0 to 2 of W0, W-T, W-null, W-S, W-X, and W-seam are read from 515 (W0 for 
 2026-03 from experiment 513's `P0`) and are not refitted. Summer folds fit every arm at all 5 seeds.
   The harness skips any forecast that exists, so more seeds can be added later without refitting.
 
-## Statistics (pre-registered)
+### Statistics (pre-registered)
 
 - **Primary:** 1 test, W-T minus W-Tnull, cold nights, the eight, level 0.05. The month-block
   bootstrap resamples the 10 winter folds, each carrying its 5-seed mean.
@@ -167,7 +281,7 @@ the 95% half-width is about 0.12 and the 80%-power minimum detectable effect abo
   leads up to 240 hours, no labelled event) and keeps the rows every core arm holds.
 - **Widening:** 1.15 about the median for CRPS, as in 515.
 
-## Checks that 515 did not run
+### Checks that 515 did not run
 
 - **Median minus mean forecast, per arm.** The mixture mean is `sum(exp(log_w) x mean)` as in
 `e00510_common.py`, converted to a fraction of capacity. Every new fit saves the mean column beside
@@ -180,7 +294,7 @@ pretrained weights (90 fine-tunes). The refit's quantiles are compared with 515'
   (substations only; no metered generator).
 - **Peak resident memory** of the first fold, measured with `/usr/bin/time -v`.
 
-## Run order and cost
+### Run order and cost
 
 The GPU runs in stages, each started only on the manager's "GPU go". One GPU process under 8 GB
 (`MemoryMax=8G`, `OMP_NUM_THREADS=1`). A fit pair (pretrain plus fine-tune) takes about 22 seconds,
@@ -201,7 +315,7 @@ fits.
 
 The total is about 3.9 GPU-hours, of which the core 5-seed comparison (stages 1 and 2) is 1.1.
 
-## Reuse and standing practices
+### Reuse and standing practices
 
 Stored forecasts reused: 515's seeds 0 to 2 of W0, W-T, W-null, W-S, W-X, and W-seam, and 513's
 `P0`.
