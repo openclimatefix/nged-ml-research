@@ -28,7 +28,7 @@ import e00511_common as k  # ty: ignore[unresolved-import]
 import e00511_fit as f  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK = (

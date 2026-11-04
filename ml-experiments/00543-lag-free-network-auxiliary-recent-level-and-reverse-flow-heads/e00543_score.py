@@ -8,13 +8,12 @@ from pathlib import Path
 
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-sys.path[:0] = [
-    str(p) for p in Path("/home/jack/dev/nged-ml-research/ml-experiments").iterdir() if p.is_dir()
-]
+sys.path[:0] = [str(p) for p in Path(__file__).resolve().parents[1].iterdir() if p.is_dir()]
 import e00521_stats as s  # ty: ignore[unresolved-import]
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = ML_EXPERIMENTS_DATA_DIR
 W = DD / "00543-lag-free-network-auxiliary-recent-level-and-reverse-flow-heads"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]
