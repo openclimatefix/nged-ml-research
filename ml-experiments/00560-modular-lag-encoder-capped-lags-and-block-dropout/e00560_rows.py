@@ -1,5 +1,8 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501
-"""Write per-row CRPS of the lag-encoder arms (and their removed/aged scorings) with 470's scorer on 511's rows (mirrors experiment 545's rows script)."""
+"""Write per-row CRPS of the lag-encoder arms and their removed/aged scorings.
+
+Uses 470's scorer on 511's rows, mirroring experiment 545's rows script.
+"""
 
 import e00454_build as build454  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]

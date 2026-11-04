@@ -319,7 +319,7 @@ def build_month(*, month, clean):
 
 
 def build_test(*, month, standardiser):
-    """Build the month's test rows with the lag columns, the weather-run assertions, and the inference-only variants."""
+    """Build the month's test rows with the lag columns, weather-run assertions, and variants."""
     test = _build_test(month=month, standardiser=standardiser)
     assert (test.valid > test.origin).all(), f"{month}: a test target is not after its origin"
     pub = common.PUBLICATION_DELAY
