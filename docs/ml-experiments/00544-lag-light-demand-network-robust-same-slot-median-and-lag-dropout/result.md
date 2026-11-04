@@ -60,7 +60,8 @@ headline: >-
   L-1d at the eight (interval includes zero) and 0.03 worse at the six.
 lessons: >-
   A median over several days did not protect against a load-shift event; a 7-day median over a
-  7-day shifted block may carry the whole shift. Lag dropout at 30% teaches the network to rely less on
+  7-day shifted block may carry the whole shift. Lag dropout at 30% teaches the network to rely
+  less on
   the readings, which cuts both the gain and the leak, and gives a network that still works when
   every reading is missing.
 take_home_message: >-
@@ -129,7 +130,8 @@ Verdict: not supported. P1 failed on both parts, P2 failed, and P3 held.
   absent minus L-1d is +0.028 (+0.006 to +0.054), +0.027, +0.031 (+0.004 to +0.061).
 - **Injected-shift leak (experiment 511's stress world, seed 0, five folds, all leads).** L-1d 4.49,
   R1 4.52, R-DROP 4.97, R9 5.38, R-DW 5.68, R-MED 7.02. At block age 0 the leak is 7.20 (L-1d), 9.23
-  (R-DROP), 11.49 (R-DW), and 11.90 (R-MED). The leak of R-MED is above R-DW's at every block age from 0 to 6.
+  (R-DROP), 11.49 (R-DW), and 11.90 (R-MED). The leak of R-MED is above R-DW's at every block
+  age from 0 to 6.
   A likely reason, not tested here, is that the 7-day median has most of its members inside the
   7-day shifted block, so the whole shift enters the input for several days.
 - **Checks.** Every power value and every median member is at least 3.5 h older than the origin,
