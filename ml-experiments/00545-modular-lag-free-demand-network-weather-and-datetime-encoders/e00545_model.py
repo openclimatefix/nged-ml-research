@@ -6,8 +6,8 @@ Three parts share the 8-wide Primary embedding of experiment 397's `PlainMdn`:
 - a weather encoder over the 7 ensemble-mean weather columns (columns 0-6 of the 37 lag-free inputs);
 - a datetime encoder over the 21 solar-geometry, calendar, and holiday columns (columns 14-34);
 - a mixer over both encoders' outputs. Pretraining on ERA5 and CAMS rows uses `mixer_pre`, which sees
-  nothing else. Fine-tuning on ENS rows discards it and attaches a fresh `mixer_ft`, which also sees the
-  7 ensemble-spread columns (7-13) and the 2 lead columns (35-36).
+  nothing else. Fine-tuning on ENS rows discards it and attaches a fresh `mixer_ft`, which also
+  sees the 7 ensemble-spread columns (7-13) and the 2 lead columns (35-36).
 
 M1 adds an auxiliary mixture head after each encoder (given the encoder output and the embedding),
 trained with weight `AUX_WEIGHT` on the same standardised target in pretraining and in fine-tuning.
@@ -45,16 +45,28 @@ class ModularMdn(nn.Module):
         assert stage in {"pre", "ft"}
         self.stage, self.aux = stage, aux
         self.embedding = nn.Embedding(n_primaries, EMBEDDING)
-        self.weather = base.mlp(n_in=7 + EMBEDDING, hidden=ENCODER_HIDDEN, layers=1, n_out=ENCODER_OUT, dropout=DROPOUT)
-        self.datetime = base.mlp(n_in=21 + EMBEDDING, hidden=ENCODER_HIDDEN, layers=1, n_out=ENCODER_OUT, dropout=DROPOUT)
+        self.weather = base.mlp(
+            n_in=7 + EMBEDDING, hidden=ENCODER_HIDDEN, layers=1, n_out=ENCODER_OUT, dropout=DROPOUT
+        )
+        self.datetime = base.mlp(
+            n_in=21 + EMBEDDING, hidden=ENCODER_HIDDEN, layers=1, n_out=ENCODER_OUT, dropout=DROPOUT
+        )
         wide = 2 * ENCODER_OUT + EMBEDDING
-        self.mixer_pre = base.mlp(n_in=wide, hidden=MIXER_HIDDEN, layers=2, n_out=3 * COMPONENTS, dropout=DROPOUT)
-        self.mixer_ft = base.mlp(n_in=wide + 7 + 2, hidden=MIXER_HIDDEN, layers=2, n_out=3 * COMPONENTS, dropout=DROPOUT)
+        self.mixer_pre = base.mlp(
+            n_in=wide, hidden=MIXER_HIDDEN, layers=2, n_out=3 * COMPONENTS, dropout=DROPOUT
+        )
+        self.mixer_ft = base.mlp(
+            n_in=wide + 7 + 2, hidden=MIXER_HIDDEN, layers=2, n_out=3 * COMPONENTS, dropout=DROPOUT
+        )
         for head in (self.mixer_pre, self.mixer_ft):
             base.init_head(head=head, components=COMPONENTS)
         if aux:
-            self.head_weather = base.mlp(n_in=ENCODER_OUT + EMBEDDING, hidden=AUX_HIDDEN, layers=1, n_out=3 * COMPONENTS)
-            self.head_datetime = base.mlp(n_in=ENCODER_OUT + EMBEDDING, hidden=AUX_HIDDEN, layers=1, n_out=3 * COMPONENTS)
+            self.head_weather = base.mlp(
+                n_in=ENCODER_OUT + EMBEDDING, hidden=AUX_HIDDEN, layers=1, n_out=3 * COMPONENTS
+            )
+            self.head_datetime = base.mlp(
+                n_in=ENCODER_OUT + EMBEDDING, hidden=AUX_HIDDEN, layers=1, n_out=3 * COMPONENTS
+            )
             base.init_head(head=self.head_weather, components=COMPONENTS)
             base.init_head(head=self.head_datetime, components=COMPONENTS)
 
@@ -70,7 +82,11 @@ class ModularMdn(nn.Module):
             main = self.mixer_ft(torch.cat([core, x[:, SPREAD_COLS], x[:, LEAD_COLS]], dim=-1))
         if not self.aux:
             return (main,)
-        return (main, self.head_weather(torch.cat([hw, emb], dim=-1)), self.head_datetime(torch.cat([hd, emb], dim=-1)))
+        return (
+            main,
+            self.head_weather(torch.cat([hw, emb], dim=-1)),
+            self.head_datetime(torch.cat([hd, emb], dim=-1)),
+        )
 
     def forward(self, x: torch.Tensor, primary: torch.Tensor | None = None) -> torch.Tensor:
         """Return the main mixture's raw outputs."""

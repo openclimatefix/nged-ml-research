@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, ANN001, ANN201, PT018
 """Experiment 545: pretrain, fine-tune, and forecast the modular lag-free networks M0 and M1.
 
 Rows, cutoffs, recency weights, early stopping, seeds, scoring windows, and the weekly/daily
@@ -29,31 +29,53 @@ import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK = ML_EXPERIMENTS_DATA_DIR / "00545-modular-lag-free-demand-network-weather-and-datetime-encoders"
+WORK = (
+    ML_EXPERIMENTS_DATA_DIR / "00545-modular-lag-free-demand-network-weather-and-datetime-encoders"
+)
 W = WORK / "work"
 MIXER_LR = 5e-4
 """Learning rate of the fresh fine-tuning mixer; the encoders and auxiliary heads use `c.FINE_TUNE_LR`."""
 parser = argparse.ArgumentParser()
 parser.add_argument("command", choices=("pretrain", "fit", "assemble"))
-parser.add_argument("--arm", choices=("M0", "M1"), required=True)
+parser.add_argument("--arm", choices=("M0", "M1", "M0lr"), required=True)
 parser.add_argument("--stress", action="store_true")
 parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
 parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 parser.add_argument("--limit", type=int, default=None)
 ARGS = parser.parse_args()
 AUX = ARGS.arm == "M1"
+PRETRAINED_TAG = "M0" if ARGS.arm == "M0lr" else ARGS.arm
+if ARGS.arm == "M0lr":
+    MIXER_LR = (
+        c.FINE_TUNE_LR
+    )  # post hoc control: the fresh mixer fine-tunes at the same rate as the encoders
 ARM = f.Arm(ARGS.arm, "d", 90.0)
 CHECK: dict = {"train_rows": 0, "test_rows": 0, "origins_weather_checked": 0, "months": {}}
 
 _, COLUMNS, _ = data.non_lag_layout()
 assert len(COLUMNS) == m.N_INPUTS
-assert COLUMNS[m.WEATHER_COLS] == [f"mean_{v}" for v in ("shortwave", "longwave", "temperature_2m", "dew_point_temperature_2m", "pressure_surface", "precipitation", "wind_speed_10m")]
+assert COLUMNS[m.WEATHER_COLS] == [
+    f"mean_{v}"
+    for v in (
+        "shortwave",
+        "longwave",
+        "temperature_2m",
+        "dew_point_temperature_2m",
+        "pressure_surface",
+        "precipitation",
+        "wind_speed_10m",
+    )
+]
 assert all(n.startswith("std_") for n in COLUMNS[m.SPREAD_COLS])
-assert COLUMNS[m.DATETIME_COLS][0] == "cos_zenith" and COLUMNS[m.DATETIME_COLS][-1] == "nearest_inside"
+assert (
+    COLUMNS[m.DATETIME_COLS][0] == "cos_zenith" and COLUMNS[m.DATETIME_COLS][-1] == "nearest_inside"
+)
 assert COLUMNS[m.LEAD_COLS] == ["lead", "lead_sqrt"]
 
 
-def new_model(*, outlier: bool, n_inputs: int, n_primaries: int, stage: str = "ft") -> torch.nn.Module:
+def new_model(
+    *, outlier: bool, n_inputs: int, n_primaries: int, stage: str = "ft"
+) -> torch.nn.Module:
     """Return an untrained modular network (the signature of `e00510_common.new_model`)."""
     assert not outlier
     assert n_inputs == m.N_INPUTS
@@ -62,23 +84,38 @@ def new_model(*, outlier: bool, n_inputs: int, n_primaries: int, stage: str = "f
 
 def load_pretrained(*, model: torch.nn.Module, path: Path) -> None:
     """Load pretrained weights; the fine-tuning mixer is discarded and freshly initialised (seed 12345)."""
-    state = {a: v for a, v in torch.load(path, map_location="cpu").items() if not a.startswith("mixer_ft.")}
+    state = {
+        a: v
+        for a, v in torch.load(path, map_location="cpu").items()
+        if not a.startswith("mixer_ft.")
+    }
     missing = model.load_state_dict(state, strict=False)
     assert all(a.startswith("mixer_ft.") for a in missing.missing_keys), missing
     assert not missing.unexpected_keys, missing
-    with torch.random.fork_rng():
+    with torch.random.fork_rng(devices=[]):
         torch.manual_seed(12345)
-        fresh = base.mlp(n_in=model.mixer_ft[0].in_features, hidden=m.MIXER_HIDDEN, layers=2, n_out=3 * m.COMPONENTS, dropout=m.DROPOUT)
+        fresh = base.mlp(
+            n_in=model.mixer_ft[0].in_features,  # ty: ignore[not-subscriptable,unresolved-attribute]
+            hidden=m.MIXER_HIDDEN,
+            layers=2,
+            n_out=3 * m.COMPONENTS,
+            dropout=m.DROPOUT,
+        )
         base.init_head(head=fresh, components=m.COMPONENTS)
-    model.mixer_ft.load_state_dict(fresh.state_dict())
+    model.mixer_ft.load_state_dict(fresh.state_dict())  # ty: ignore[unresolved-attribute]
 
 
-def row_nll(*, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor, z: torch.Tensor, training: bool) -> torch.Tensor:
+def row_nll(
+    *, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor, z: torch.Tensor, training: bool
+) -> torch.Tensor:
     """Return the per-row training loss (main NLL plus, for M1 in training, the two weighted auxiliary NLLs)."""
-    outs = model.forward_all(x, p)
+    outs = model.forward_all(x, p)  # ty: ignore[call-non-callable]
     nll = base.mixture_nll(out=outs[0], z=z, components=m.COMPONENTS)
     if training and len(outs) == 3:
-        nll = nll + m.AUX_WEIGHT * (base.mixture_nll(out=outs[1], z=z, components=m.COMPONENTS) + base.mixture_nll(out=outs[2], z=z, components=m.COMPONENTS))
+        nll = nll + m.AUX_WEIGHT * (
+            base.mixture_nll(out=outs[1], z=z, components=m.COMPONENTS)
+            + base.mixture_nll(out=outs[2], z=z, components=m.COMPONENTS)
+        )
     return nll
 
 
@@ -95,7 +132,7 @@ def train(
     if len(val_idx) > c.VALIDATION_ROWS:
         pick = torch.randperm(len(val_idx), generator=generator)[: c.VALIDATION_ROWS]
         val_idx = val_idx[pick.to(device)]
-    mixer = list(model.mixer_ft.parameters()) if model.stage == "ft" else []
+    mixer = list(model.mixer_ft.parameters()) if model.stage == "ft" else []  # ty: ignore[unresolved-attribute]
     mixer_ids = {id(q) for q in mixer}
     groups = [{"params": [q for q in model.parameters() if id(q) not in mixer_ids], "lr": lr}]
     if mixer:
@@ -116,7 +153,14 @@ def train(
             optimiser.step()
         model.eval()
         with torch.no_grad():
-            val = float(torch.cat([row_nll(model=model, x=x[i], p=p[i], z=z[i], training=False) for i in val_idx.split(c.BATCH * 2)]).mean())
+            val = float(
+                torch.cat(
+                    [
+                        row_nll(model=model, x=x[i], p=p[i], z=z[i], training=False)
+                        for i in val_idx.split(c.BATCH * 2)
+                    ]
+                ).mean()
+            )
         epochs = epoch + 1
         if val < best - 1e-5:
             best, stale = val, 0
@@ -132,25 +176,36 @@ def train(
 
 
 c.new_model, c.load_pretrained, c.train = new_model, load_pretrained, train
-f.pretrained_file = lambda *, arm, month, seed: W / "pretrained" / arm.tag / f"{month}_s{seed}.pt"
+f.pretrained_file = lambda *, arm, month, seed: (
+    W / "pretrained" / PRETRAINED_TAG / f"{month}_s{seed}.pt"
+)
 f.W = W
-f.model_file = lambda *, arm, month, day, seed, stress="": W / "models" / arm.tag / f"{month}_d{day}_s{seed}{stress}.pt"
+f.model_file = lambda *, arm, month, day, seed, stress="": (
+    W / "models" / arm.tag / f"{month}_d{day}_s{seed}{stress}.pt"
+)
 
 
 def pretrain(*, device: str) -> None:
     """Pretrain on ERA5 and CAMS rows (experiment 448's rows, the L0PT pretraining) for each month and seed."""
     clean = c.clean_stack()
     for month in ARGS.months:
-        todo = [s for s in ARGS.seeds if not (W / "pretrained" / ARM.tag / f"{month}_s{s}.pt").exists()]
+        todo = [
+            s for s in ARGS.seeds if not (W / "pretrained" / ARM.tag / f"{month}_s{s}.pt").exists()
+        ]
         if not todo:
             continue
         refit_t = c.month_start(month=month)
         rows = data.build_fold(refit=refit_t, clean=clean)
         pre = r448.pretrain_rows(rows=rows, refit=refit_t, clean=clean)
         assert pre.x.shape[1] == m.N_INPUTS
-        latest = datetime.fromtimestamp((pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC)
+        latest = datetime.fromtimestamp(
+            (pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC
+        )
         assert latest <= refit_t - c.regimes.REFIT_CUTOFF_AGE, (latest, refit_t)
-        print(f"{month}: pretraining rows {len(pre.x):,}; latest valid {latest.isoformat()} (refit {refit_t.isoformat()})", flush=True)
+        print(
+            f"{month}: pretraining rows {len(pre.x):,}; latest valid {latest.isoformat()} (refit {refit_t.isoformat()})",
+            flush=True,
+        )
         z = (pre.y - rows.target_mean[pre.primary]) / rows.target_std[pre.primary]
         t = {
             "x": torch.from_numpy(pre.x).to(device), "z": torch.from_numpy(z.astype(np.float32)).to(device),
@@ -160,14 +215,31 @@ def pretrain(*, device: str) -> None:
         for seed in todo:
             started = time.monotonic()
             torch.manual_seed(seed)
-            model = new_model(outlier=False, n_inputs=m.N_INPUTS, n_primaries=len(rows.target_mean), stage="pre").to(device)
-            epochs, best = train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed, lr=c.PRETRAIN_LR, outlier=False, prior=False, device=device)
+            model = new_model(
+                outlier=False, n_inputs=m.N_INPUTS, n_primaries=len(rows.target_mean), stage="pre"
+            ).to(device)
+            epochs, best = train(
+                model=model,
+                x=t["x"],
+                z=t["z"],
+                w=t["w"],
+                p=t["p"],
+                is_val=t["v"],
+                seed=seed,
+                lr=c.PRETRAIN_LR,
+                outlier=False,
+                prior=False,
+                device=device,
+            )
             target = W / "pretrained" / ARM.tag / f"{month}_s{seed}.pt"
             target.parent.mkdir(parents=True, exist_ok=True)
             tmp = target.with_suffix(".tmp")
             torch.save(model.state_dict(), tmp)
             tmp.rename(target)
-            print(f"  pretrain {ARM.tag} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s", flush=True)
+            print(
+                f"  pretrain {ARM.tag} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s",
+                flush=True,
+            )
         del t, pre, rows
         torch.cuda.empty_cache()
 
@@ -176,13 +248,22 @@ _build_month, _build_test = k.build_month, data.build_test
 
 
 def build_month(*, month, clean):
-    """Build the month's rows and assert, for every training origin, that its weather run exists and precedes it."""
+    """Build the month's rows; assert each training origin's weather run exists and precedes it."""
     mr = _build_month(month=month, clean=clean)
     assert (mr.valid_us > mr.origin_us).all(), f"{month}: a training target is not after its origin"
     runs = np.unique(mr.origin_us)
     delay = int(common.PUBLICATION_DELAY.total_seconds() * 1e6)
-    miss = [r for r in runs if not (prep.SUMMARY_DIR / f"init={datetime.fromtimestamp((r - delay) / 1e6, UTC):%Y-%m-%d}.parquet").exists()]
-    assert not miss, f"{month}: {len(miss)} training origins have no weather-run summary file {common.PUBLICATION_DELAY} earlier"
+    miss = [
+        r
+        for r in runs
+        if not (
+            prep.SUMMARY_DIR
+            / f"init={datetime.fromtimestamp((r - delay) / 1e6, UTC):%Y-%m-%d}.parquet"
+        ).exists()
+    ]
+    assert not miss, (
+        f"{month}: {len(miss)} training origins have no weather-run summary file {common.PUBLICATION_DELAY} earlier"
+    )
     CHECK["train_rows"] += len(mr.y)
     CHECK["months"][month] = {"train_rows": len(mr.y), "train_origins": len(runs)}
     print(month, "train checks passed", flush=True)
@@ -219,10 +300,15 @@ def assemble() -> None:
     for month in c.MONTHS:
         cuts = k.cutoffs(month=month, cadence="d")
         for seed in (0, 1):
-            parts = [W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet" for cut in cuts]
+            parts = [
+                W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet"
+                for cut in cuts
+            ]
             assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
-            f.atomic_frame(frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet")
+            f.atomic_frame(
+                frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet"
+            )
             print("wrote", ARM.tag, month, seed, frame.height, flush=True)
 
 
@@ -232,7 +318,14 @@ if __name__ == "__main__":
     elif ARGS.command == "pretrain":
         pretrain(device="cuda")
     else:
-        f.fit_arm(arm=ARM, months=ARGS.months, seeds=ARGS.seeds, stress=ARGS.stress, limit=ARGS.limit, device="cuda")
+        f.fit_arm(
+            arm=ARM,
+            months=ARGS.months,
+            seeds=ARGS.seeds,
+            stress=ARGS.stress,
+            limit=ARGS.limit,
+            device="cuda",
+        )
         out = WORK / f"checks_{ARM.tag}{'_stress' if ARGS.stress else ''}.json"
         out.write_text(json.dumps(CHECK, indent=1, default=str))
         print("CHECKS PASSED", {a: v for a, v in CHECK.items() if a != "months"})
