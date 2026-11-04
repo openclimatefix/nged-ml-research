@@ -85,9 +85,9 @@ advice:
 **Take-home message: K2-S1's advantage over the daily lag-free network L-1d at 5 to 10 days came
 from a look-ahead in its weather.** When every weather input comes from the run issued at or before
 the forecast origin, K2-S1 is about 0.4 points of capacity worse at 120 to 240 h. By point estimate
-it is then worse than L-1d in every lead band, but the Bonferroni intervals include zero except at the eight for
-12 to 24 h, so L-1d is not shown to be better elsewhere. The next step is a lag-free head that also sees the lead time. Verdict:
-partly supported (see "Predictions").
+it is then worse than L-1d in every lead band, but the Bonferroni intervals include zero except at
+the eight for 12 to 24 h, so L-1d is not shown to be better elsewhere. The next step is a lag-free
+head that also sees the lead time. Verdict: partly supported (see "Predictions").
 
 ![CRPS by lead band](figure_1_crps_by_lead.svg)
 
