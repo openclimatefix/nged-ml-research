@@ -1,8 +1,10 @@
 # ruff: noqa: E501
 """Draw the figures of experiment 516 from the contrasts that `e00516_score.py stats` stored.
 
-1. `figure_1_headline.svg`: each CNN arm and the shuffled-day control minus W0 on cold nights and all rows;
-2. `figure_2_against_references.svg`: C-CNN and T-CNN against the shuffled-day control and experiment 515's W-T;
+1. `figure_1_headline.svg`: each encoder and the shuffled-day control minus W0, cold nights and all
+   rows;
+2. `figure_2_against_references.svg`: C-CNN and T-CNN against the shuffled-day control and
+   experiment 515's W-T;
 3. `figure_3_per_fold.svg`: each arm minus W0 on cold nights, one dot per fold.
 """
 

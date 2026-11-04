@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-r"""Row-by-row check that every ensemble window of experiment 516 comes from runs issued at or before the row's origin.
+r"""Check row by row that every ensemble window comes from runs issued at or before the origin.
 
 For a random sample of test rows, rebuild each window position directly from the stored ensemble
 summaries and compare it with `WindowStore.window`:
