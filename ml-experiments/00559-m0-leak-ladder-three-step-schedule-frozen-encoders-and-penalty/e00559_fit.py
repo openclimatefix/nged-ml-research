@@ -38,6 +38,7 @@ import e00511_fit as f  # ty: ignore[unresolved-import]
 import e00559_extra as extra
 import e00559_folded as folded
 import e00559_model as m
+import e00559_model_drift as mdr
 import e00559_model_extra as mex
 import e00559_model_wt as mwt
 import e00559_wt as wt
@@ -103,6 +104,7 @@ SPECS = {
         Spec("A8", "step2", head="folded"),
         Spec("A9", "fresh", columns="real"),
         Spec("A9-null", "fresh", columns="null"),
+        Spec("A10", "fresh", frozen=True, columns="real", source="drift"),
         Spec("A11", "fresh", columns="real", source="uv"),
         Spec("A11-null", "fresh", columns="null", source="uv"),
     )
@@ -236,6 +238,10 @@ def fresh_mixer(*, model: m.ModularMdn) -> None:
 def load_pretrained_fresh(*, model: m.ModularMdn, path: Path) -> None:
     """Load pretrained weights (without `mixer_ft`), then a fresh mixer."""
     raw = torch.load(path, map_location="cpu")
+    if SPEC.source == "drift":
+        mdr.load_pre_into_ft(model=model, state=raw)
+        fresh_mixer(model=model)
+        return
     state = {a: v for a, v in raw.items() if not a.startswith("mixer_ft.")}
     missing = model.load_state_dict(state, strict=False)
     assert all(a.startswith("mixer_ft.") for a in missing.missing_keys), missing
@@ -246,6 +252,8 @@ def load_pretrained_fresh(*, model: m.ModularMdn, path: Path) -> None:
 def new_model(*, n_primaries: int, stage: str = "ft") -> m.ModularMdn:
     """Return an untrained network (fine-tuning stage unless `stage` says `pre`)."""
     if SPEC.columns:
+        if SPEC.source == "drift":
+            return mdr.ModularMdnDrift(n_primaries=n_primaries, stage=stage, n_knots=KNOTS)
         if SPEC.source == "uv":
             return mex.ModularMdnExtra(
                 n_primaries=n_primaries, stage=stage, n_weather=4, n_spread=4
@@ -254,7 +262,7 @@ def new_model(*, n_primaries: int, stage: str = "ft") -> m.ModularMdn:
     return m.ModularMdn(n_primaries=n_primaries, stage=stage)
 
 
-def train(  # noqa: PLR0912
+def train(  # noqa: PLR0912, PLR0915
     *, model: m.ModularMdn, x, z, w, p, is_val, seed: int, lr: float, max_epochs: int,
     fresh_lr: float | None, frozen: bool, anchor: dict | None, lam: float, device: str,
 ) -> tuple[int, float]:  # fmt: skip
@@ -301,6 +309,8 @@ def train(  # noqa: PLR0912
             b = order[start : start + c.BATCH]
             nll = row_nll(out=model(x[b], p[b]), z=z[b], p=p[b])
             loss = (w[b] * nll).sum() / w[b].sum()
+            if hasattr(model, "penalty"):
+                loss = loss + model.penalty()
             if anchors is not None:
                 loss = loss + lam * sum(
                     ((q - anchors[a]) ** 2).sum()
@@ -338,7 +348,8 @@ def train(  # noqa: PLR0912
 
 
 _build_month, _build_test = k.build_month, data.build_test
-WT: wt.WtColumns | extra.ExtraColumns | None = None
+WT: wt.WtColumns | extra.ExtraColumns | extra.DriftColumns | None = None
+KNOTS: int = 0
 UV: extra.UvSource | None = None
 
 
@@ -372,7 +383,11 @@ def build_month(*, month, clean):
     print(month, "train checks passed", flush=True)
     if SPEC.columns:
         global WT  # noqa: PLW0603
-        if SPEC.source == "uv":
+        global KNOTS  # noqa: PLW0603
+        if SPEC.source == "drift":
+            WT = extra.DriftColumns(month=month, mr=mr)
+            KNOTS = WT.n_knots
+        elif SPEC.source == "uv":
             WT = extra.ExtraColumns(month=month, mr=mr, source=uv_source())
         else:
             WT = wt.WtColumns(month=month, mr=mr)

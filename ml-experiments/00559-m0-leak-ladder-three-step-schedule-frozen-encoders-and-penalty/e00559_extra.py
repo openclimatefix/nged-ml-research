@@ -216,3 +216,47 @@ class ExtraColumns:
         args = {"kind": kind, "primary": primary, "origin_idx": origin_idx, "valid_idx": valid_idx}
         raw = self._shuffled(**args) if null else self._real(**args)
         return self.scale(raw=raw)
+
+
+class DriftColumns:
+    """The knot position `tau` of each row (arm A10), with the same interface as `ExtraColumns`.
+
+    `tau` is the number of months from 2019-09-01 to the row's valid time, fractional within the month.
+    The fold has one knot at the first of every month from 2019-09 up to the fold's month (`n_knots`).
+    """
+
+    def __init__(self, *, month: str, mr: c.MonthRows) -> None:
+        """Count the fold's knots and compute every month row's position."""
+        year, mon = (int(part) for part in month.split("-"))
+        self.n_knots = (year - 2019) * 12 + (mon - 9) + 1
+        self.mr_valid = mr.valid_us
+        self.null_rows_without_donor = 0
+        i = len(mr.valid_us) // 2
+        self.example = f"valid {datetime.fromtimestamp(mr.valid_us[i] / 1e6, UTC)} -> knot position {self.tau(valid_us=mr.valid_us[i : i + 1])[0]:.3f} of {self.n_knots - 1}"
+
+    @staticmethod
+    def tau(*, valid_us: np.ndarray) -> np.ndarray:
+        """Return the knot position of valid times in microseconds."""
+        t = valid_us.astype("datetime64[us]")
+        start = t.astype("datetime64[M]")
+        lo, hi = start.astype("datetime64[us]"), (start + 1).astype("datetime64[us]")
+        frac = (t - lo) / (hi - lo)
+        return ((start - np.datetime64("2019-09", "M")).astype(np.float64) + frac).astype(
+            np.float32
+        )
+
+    def month(self, *, null: bool) -> np.ndarray:
+        """Return the position column of every month row."""
+        return self.tau(valid_us=self.mr_valid)[:, None]
+
+    def rows(
+        self,
+        *,
+        kind: str,
+        primary: np.ndarray,
+        origin_idx: np.ndarray,
+        valid_idx: np.ndarray,
+        null: bool,
+    ) -> np.ndarray:
+        """Return the position column of another row set from its valid-time grid indices."""
+        return self.tau(valid_us=GRID + valid_idx.astype(np.int64) * STEP)[:, None]
