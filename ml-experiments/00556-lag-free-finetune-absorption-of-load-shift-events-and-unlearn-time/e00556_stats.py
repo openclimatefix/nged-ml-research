@@ -98,7 +98,7 @@ def leak_contrasts(*, leaks: pl.DataFrame, tests: int = 24) -> pl.DataFrame:
             rows.append(
                 {"group": group, "contrast": f"{arm} - F1d", "mean": mean, "lo": lo, "hi": hi,
                  "fold_values": ", ".join(f"{d:+.2f}" for d in diff), "folds_negative": int((diff < 0).sum()),
-                 "base_leak": float(base["leak"].mean())}
+                 "base_leak": float(base["leak"].mean())}  # ty: ignore[invalid-argument-type]
             )  # fmt: skip
     return pl.DataFrame(rows)
 
@@ -164,6 +164,52 @@ def days_to(*, curve: pl.DataFrame, level: float) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def real_event_table() -> pl.DataFrame:
+    """Return the absorbed share of real labelled events per arm: all events, without the largest, and the fold means with a five-block interval."""
+    events = pl.read_parquet(OUT / "real_events.parquet").drop_nulls("absorbed_share")
+    rows = []
+    for arm in ("F1d", "F3d", "F7d"):
+        part = events.filter(pl.col("arm") == arm)
+        folds = (
+            part.group_by("month")
+            .agg(pl.col("absorbed_share").mean())
+            .sort("month")["absorbed_share"]
+            .to_numpy()
+        )
+        trimmed = part.sort("absorbed_share").head(part.height - 1)
+        trimmed_folds = (
+            trimmed.group_by("month")
+            .agg(pl.col("absorbed_share").mean())
+            .sort("month")["absorbed_share"]
+            .to_numpy()
+        )
+        mean, lo, hi = block_interval(diffs=folds, level=0.95)
+        tmean, tlo, thi = block_interval(diffs=trimmed_folds, level=0.95)
+        rows.append(
+            {
+                "arm": arm,
+                "events": part.height,
+                "mean": part["absorbed_share"].mean(),
+                "median": part["absorbed_share"].median(),
+                "fold_means": ", ".join(f"{x:+.3f}" for x in folds),
+                "fold_mean": mean,
+                "lo": lo,
+                "hi": hi,
+                "mean_without_largest": trimmed["absorbed_share"].mean(),
+                "fold_mean_without_largest": tmean,
+                "lo_wl": tlo,
+                "hi_wl": thi,
+                "events_with_depth_10_points_or_more": part.filter(
+                    pl.col("depth_points") >= 10
+                ).height,
+                "mean_depth_10_plus": part.filter(pl.col("depth_points") >= 10)[
+                    "absorbed_share"
+                ].mean(),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def main() -> None:
     """Write and print every table."""
     OUT.mkdir(parents=True, exist_ok=True)
@@ -202,6 +248,10 @@ def main() -> None:
             curve.write_csv(OUT / f"unlearn_{scenario}.csv")
             print(scenario, "unlearn")
             print(days_below(curve=curve).with_columns(pl.col(pl.Float64).round(2)))
+        if (OUT / "real_events.parquet").exists():
+            table_re = real_event_table()
+            table_re.write_csv(OUT / "real_event_summary.csv")
+            print(table_re.with_columns(pl.col(pl.Float64).round(3)))
         ad = adaptation(frame=frame)
         if ad.height:
             ad.write_csv(OUT / "adaptation.csv")
@@ -210,5 +260,77 @@ def main() -> None:
             )
 
 
+def score_slices() -> None:
+    """Print CRPS by lead band and on cold winter nights for each arm, at the eight and the six (rows with no labelled event)."""
+    import e00521_stats as s521  # ty: ignore[unresolved-import]
+
+    arms = ["L-Ww", "F1d", "F3d", "F1d-182", "F3d-E3", "F3d-R"]
+    frames = [
+        pl.read_parquet(
+            OUT / f"rows_{m}.parquet",
+            columns=[
+                "primary",
+                "origin",
+                "target",
+                "group",
+                "cls",
+                "lead_hours",
+                "cold",
+                "main16",
+                "tgt_real",
+                *[f"{a}__crps" for a in arms],
+            ],
+        )
+        for m in fit.c.MONTHS
+    ]
+    t = pl.concat(frames).filter(pl.col("main16") & ~pl.col("tgt_real"))
+    t = t.with_columns(
+        set=pl.when(pl.col("group") == "mva_eight")
+        .then(pl.lit("eight"))
+        .when((pl.col("group") == "signed_six") & (pl.col("cls") == "clean"))
+        .then(pl.lit("six"))
+        .otherwise(None),
+        band=s521.band_expr(),
+    ).drop_nulls("set")
+    by_band = (
+        t.group_by("set", "band")
+        .agg(*[pl.col(f"{a}__crps").mean().alias(a) for a in arms])
+        .sort("set", "band")
+    )
+    cold = (
+        t.filter(pl.col("cold"))
+        .group_by("set")
+        .agg(pl.len().alias("rows"), *[pl.col(f"{a}__crps").mean().alias(a) for a in arms])
+    )
+    by_band.write_csv(OUT / "crps_by_band.csv")
+    cold.write_csv(OUT / "crps_cold_nights.csv")
+    with pl.Config(tbl_rows=40, tbl_cols=12):
+        print(by_band.with_columns(pl.col(pl.Float64).round(3)))
+        print(cold.with_columns(pl.col(pl.Float64).round(3)))
+
+
+def noise_proxy() -> None:
+    """Print the sign-pair noise proxy of the first-refit leak: the standard deviation of (leak at +1 minus leak at -1) over cells, over root 2."""
+    cells = pl.read_csv(OUT / "leak_cells.csv").filter(
+        pl.col("scenario").is_in(["step3_p10", "step7_p10"])
+        & pl.col("group").is_in(["eight", "six"])
+        & pl.col("arm").is_in(["F1d", "F3d-E3", "F3d-R", "F1d-182"])
+    )
+    wide = cells.pivot(
+        on="sign", index=["arm", "scenario", "month", "origin_day", "group"], values="leak"
+    ).with_columns(diff=pl.col("1") - pl.col("-1"))
+    print(
+        wide.group_by("arm", "scenario", "group")
+        .agg(
+            (pl.col("diff").std() / 2**0.5).alias("noise_points"),
+            pl.col("diff").mean().alias("mean_sign_asymmetry"),
+        )
+        .sort("scenario", "group", "arm")
+        .with_columns(pl.col(pl.Float64).round(2))
+    )
+
+
 if __name__ == "__main__":
     main()
+    score_slices()
+    noise_proxy()

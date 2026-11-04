@@ -132,6 +132,8 @@ class Cell:
         self.last_day = (k.cutoffs(month=month, cadence="d")[-1] - c.month_start(month=month)).days
         self.sd = {}
         self.shares = np.load(NRA_SHARES)["f1.0"]
+        self.nra_event: tuple[int, int, int] | None = None
+        """(Primary, onset index, end index) of the only event the `nra` scenario corrects."""
         self.mu_t = torch.from_numpy(self.mr.base.target_mean).to(device)
         self.sd_t = torch.from_numpy(self.mr.base.target_std).to(device)
         self.models: dict[tuple, torch.nn.Module] = {}
@@ -170,6 +172,9 @@ class Cell:
         tgt = mr.target_idx[r.index]
         if scen.kind == "nra":
             corrected = -self.shares[prim, np.clip(tgt, 0, self.shares.shape[1] - 1)]
+            if self.nra_event is not None:
+                ep, onset, end = self.nra_event
+                corrected = np.where((prim == ep) & (tgt >= onset) & (tgt <= end), corrected, 0.0)
             return corrected.astype(np.float32), corrected != 0
         end = o - c.CUTOFF_AGE_US
         if scen.kind == "step":
@@ -645,7 +650,7 @@ def real_events(*, arms: list[str], months: list[str], device: str) -> None:
     """Fit once on metered and once on NRA-corrected targets at the first cutoff 3 or more days after each event.
 
     The correction is experiment 435's labelled step (depth factor 1.0), subtracted from every
-    training target in all events known at the cutoff. The absorbed share of an event is the sign of
+    training target of the one event being measured (every other event stays as metered). The absorbed share of an event is the sign of
     the event times (metered median - corrected median) over the 7 days after the cutoff, at the
     event's Primary, divided by the event's labelled depth.
     """
@@ -674,17 +679,17 @@ def real_events(*, arms: list[str], months: list[str], device: str) -> None:
                         wanted.setdefault(ok[0], []).append((p, onset, end))
             for cut, evs in sorted(wanted.items()):
                 model_m = cell.control(arm=arm, cut=cut)
-                model_c = cell.fit(
-                    arm=arm, cut=cut, scen=scen, origin=cut, sign=1, ref=None, mad_model=None
-                )
                 rows = cell.window_rows(cut=cut)
                 if len(rows) == 0:
                     continue
-                diff = cell.q50(model=model_m, rows=rows).astype(np.float64) - cell.q50(
-                    model=model_c, rows=rows
-                ).astype(np.float64)
+                q_m = cell.q50(model=model_m, rows=rows).astype(np.float64)
                 prim = cell.test.primary[rows]
                 for p, onset, end in evs:
+                    cell.nra_event = (p, onset, end)
+                    model_c = cell.fit(
+                        arm=arm, cut=cut, scen=scen, origin=cut, sign=1, ref=None, mad_model=None
+                    )
+                    diff = q_m - cell.q50(model=model_c, rows=rows).astype(np.float64)
                     sign = 1 if float(cell.shares[p, onset : end + 1].sum()) > 0 else -1
                     depth = float(np.abs(cell.shares[p, onset : end + 1]).max())
                     sel = prim == p
@@ -704,7 +709,8 @@ def real_events(*, arms: list[str], months: list[str], device: str) -> None:
                             else None,
                         }
                     )
-                del model_c
+                    del model_c
+                cell.nra_event = None
         del cell
         torch.cuda.empty_cache()
     out = WORK / "scores" / "real_events.parquet"
