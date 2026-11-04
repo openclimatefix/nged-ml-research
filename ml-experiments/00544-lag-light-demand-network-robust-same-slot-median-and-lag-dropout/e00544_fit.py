@@ -194,18 +194,20 @@ _build_month, _build_test = k.build_month, data.build_test
 def build_month(*, month, clean):
     mr = _build_month(month=month, clean=clean)
     ex = check_rows(x=mr.x, valid_us=mr.valid_us, origin_us=mr.origin_us, lead=mr.lead, label=f"{month} train")
+    for key in [k_ for k_ in CTX if isinstance(k_, tuple)]:
+        del CTX[key]
     if ARGS.arm == "R-MED":
         CTX["clean"], CTX["tab"] = clean, tables(clean=clean)
         origin_idx = (mr.origin_us - c.prep422.GRID_START_US) // c.prep422.STEP_US
         first = first_index(target_idx=mr.target_idx, origin_idx=origin_idx)
-        CTX["first_mr"], CTX["mr_id"] = first, id(mr)
+        CTX["first_mr"], CTX["month"] = first, month
         age_day = mr.x[:, POS["lag_day_age"]].copy()
         cols = median_columns(tab=CTX["tab"], prim=mr.primary, first=first, standardiser=mr.base.standardiser)
         put_medians(x=mr.x, cols=cols, age_day=age_day)
         ex = ex + " | " + verify_medians(prim=mr.primary, first=first, cols=cols, clean=clean, label=f"{month} train")
     if ARGS.arm == "R-DROP":
         CTX["age_max"] = {n: float(mr.x[:, POS[n]].max()) for n in POS if n.endswith("_age")}
-        CTX["mr_id"] = id(mr)
+        CTX["month"] = month
     runs = np.unique(mr.origin_us)
     miss = [r for r in runs if not (prep.SUMMARY_DIR / f"init={datetime.fromtimestamp((r - int(common.PUBLICATION_DELAY.total_seconds()*1e6))/1e6, UTC):%Y-%m-%d}.parquet").exists()]
     assert not miss, f"{month}: {len(miss)} training origins have no weather-run summary file 9 h earlier"
@@ -268,7 +270,7 @@ def lag_delta(*, x_cols, valid_us, prim, std, ctx):
 
 def stressed_tab(*, sign):
     """Median tables of the cleaned power with the injected shift added inside the stress block."""
-    key = ("stab", CTX["mr_id"], sign)
+    key = ("stab", CTX["month"], sign)
     if key not in CTX:
         shift = CTX["shift"]
         lo = int((CTX["block"][0] - c.prep422.GRID_START_US) // c.prep422.STEP_US)
@@ -369,7 +371,9 @@ def assemble_one(*, tag):
         cuts = k.cutoffs(month=month, cadence="d")
         for seed in (0, 1):
             parts = [W / "fits" / tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet" for cut in cuts]
-            assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
+            # R-DROP-absent shares R-DROP's windows, so an empty R-DROP window is empty here too
+            twin = lambda p: (p.parent.parent / "R-DROP" / p.name).with_suffix(".empty")
+            assert all(p.exists() or p.with_suffix(".empty").exists() or (tag == "R-DROP-absent" and twin(p).exists()) for p in parts), (month, seed)
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
             f.atomic_frame(frame=frame, target=W / "seed_preds" / tag / f"{month}_s{seed}.parquet")
             print("wrote", tag, month, seed, frame.height, flush=True)
@@ -380,6 +384,6 @@ if __name__ == "__main__":
         assemble()
     else:
         f.fit_arm(arm=ARM, months=ARGS.months, seeds=ARGS.seeds, stress=ARGS.stress, limit=ARGS.limit, device="cuda")
-        out = WORK / f"checks_{tag}{'_stress' if ARGS.stress else ''}.json"
+        out = WORK / f"checks_{ARM.tag}{'_stress' if ARGS.stress else ''}.json"
         out.write_text(json.dumps(CHECK, indent=1, default=str))
         print("CHECKS PASSED", {k_: v for k_, v in CHECK.items() if k_ != "months"})

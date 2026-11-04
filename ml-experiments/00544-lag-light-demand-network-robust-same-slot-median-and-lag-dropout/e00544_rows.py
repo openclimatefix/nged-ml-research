@@ -37,7 +37,7 @@ def main():
     score470.CELLS = {}
     score470.CONTRASTS = tuple((a, b) for a in NEW for b in ("A-pool", "L-1d"))
     score470.GATING_CRPS = ("eight", "six_clean"); score470.GATING_Q99 = ("eight", "six_clean")
-    score470.TESTS = 28
+    score470.TESTS = 42
     def masks(*, wide):
         have = pl.all_horizontal([pl.col(f"{a}__q50").is_finite() for a in score470.MAIN_ARMS])
         fr = wide.select(main16=have, gam14=have, ref14=have); return {c: fr[c] for c in fr.columns}
