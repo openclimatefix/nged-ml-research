@@ -3,8 +3,8 @@
 
 Pure numpy functions, shared with later experiments. Grid indices are half-hours; the cap is 48
 steps. At a forecast origin, the capped day lag of a target is the latest value of the target's
-half-hour of day observed at least 24 h before the origin (24 to 48 h old), and the capped week lag
-is the latest same-weekday, same-half-hour value observed at least 24 h before the origin. The newest
+half-hour of day observed at least 24 h before the origin (24 to 48 h old). The capped week lag is
+the latest same-weekday, same-half-hour value observed at least 24 h before the origin. The newest
 lag does not exist in the capped recipe.
 """
 
@@ -20,14 +20,15 @@ P_DAY_ONLY: Final[float] = 0.15
 
 
 def capped_lag_indices(*, target_idx: np.ndarray, origin_idx: np.ndarray):
-    """Return (day, week) grid indices of the capped lags; asserts every index is >= 24 h before origin."""
+    """Return (day, week) capped-lag grid indices, each asserted >= 24 h before the origin."""
     target_idx, origin_idx = np.asarray(target_idx), np.asarray(origin_idx)
     assert (target_idx > origin_idx).all(), "every target must be after its origin"
     newest = origin_idx - CAP_STEPS
     gap = target_idx - newest
     day = target_idx - STEPS_PER_DAY * np.ceil(gap / STEPS_PER_DAY).astype(np.int64)
     week = target_idx - 7 * STEPS_PER_DAY * np.ceil(gap / (7 * STEPS_PER_DAY)).astype(np.int64)
-    assert (day <= newest).all() and (week <= newest).all(), "a capped lag is younger than 24 h"
+    assert (day <= newest).all(), "a capped day lag is younger than 24 h"
+    assert (week <= newest).all(), "a capped week lag is younger than 24 h"
     assert (day > newest - STEPS_PER_DAY).all(), "capped day lag older than 48 h"
     return day, week
 
