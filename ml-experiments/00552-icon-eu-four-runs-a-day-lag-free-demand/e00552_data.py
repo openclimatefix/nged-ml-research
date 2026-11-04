@@ -159,8 +159,10 @@ class Sources:
 
 
 def icon_features(raw: np.ndarray) -> np.ndarray:
-    """Return six ICON-EU features: shortwave (direct + diffuse), temperature, dew point,
-    pressure, precipitation, and wind speed.
+    """Return the six ICON-EU features the adaptor uses.
+
+    They are shortwave (direct + diffuse), temperature, dew point, pressure, precipitation, and
+    wind speed.
     """
     return np.column_stack(
         [
