@@ -368,8 +368,8 @@ def build_test(*, month, standardiser):
     i = int(np.argmax(variants[0][:, 38] < 0.5))
     CHECK["months"][month]["lag_example"] = (
         f"row {i}: origin {datetime.fromtimestamp(test.origin[i] / 1e6, UTC)}, target {datetime.fromtimestamp(test.valid[i] / 1e6, UTC)}, "
-        f"day lag at {datetime.fromtimestamp((c.prep422.GRID_START_US + variants[0][i, 43] * c.prep422.STEP_US) / 1e6, UTC)} (>= 24 h before origin asserted for all rows), "
-        f"week lag at {datetime.fromtimestamp((c.prep422.GRID_START_US + variants[0][i, 44] * c.prep422.STEP_US) / 1e6, UTC)}"
+        f"day lag at {datetime.fromtimestamp((c.prep422.GRID_START_US + int(variants[0][i, 43]) * c.prep422.STEP_US) / 1e6, UTC)} (>= 24 h before origin asserted for all rows), "
+        f"week lag at {datetime.fromtimestamp((c.prep422.GRID_START_US + int(variants[0][i, 44]) * c.prep422.STEP_US) / 1e6, UTC)}"
     )
     print(
         month,
