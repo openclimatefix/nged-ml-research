@@ -125,6 +125,7 @@ def run(*, months: list[str], device: str) -> None:
             saved = torch.load(b454.head_path(kind="S", month=month, seed=seed), weights_only=False)
             s1[seed] = saved["head"]
             s1_keys = s1_keys or saved["keys"]
+        assert s1_keys is not None
         skeys = pl.DataFrame(
             {
                 k: s1_keys[k].astype(dt)

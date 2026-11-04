@@ -34,6 +34,11 @@ COLOURS: Final[dict[str, str]] = {
     "A-pool": theme.DATA_SKY,
 }
 
+CONTRASTS: Final[dict[str, str]] = {
+    "K2-S1-origin - K2-S1": theme.BRAND_ORANGE_LIGHT,
+    "K2-S1-origin-trained - K2-S1": theme.BRAND_ORANGE,
+}
+
 
 def figure_crps() -> None:
     """Draw CRPS by lead band."""
@@ -47,7 +52,7 @@ def figure_crps() -> None:
     for key, label in SETS.items():
         part = t.filter(pl.col("set") == key).to_pandas()
         panels.append(
-            alt.Chart(part)
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
             .mark_line(point=True)
             .encode(
                 x=alt.X("band:N", sort=BANDS, title="Lead time of the forecast"),
@@ -74,7 +79,7 @@ def figure_crps() -> None:
 def figure_difference() -> None:
     """Draw the rebuilt-minus-old difference with its Bonferroni month-block interval."""
     t = pl.read_csv(SCORES / "contrasts.csv").filter(
-        pl.col("contrast").is_in(["K2-S1-origin - K2-S1", "K2-S1-origin-trained - K2-S1"])
+        pl.col("contrast").is_in(list(CONTRASTS))
         & pl.col("set").is_in(list(SETS))
         & pl.col("band").is_in(BANDS)
     )
@@ -82,15 +87,22 @@ def figure_difference() -> None:
     for key, label in SETS.items():
         part = t.filter(pl.col("set") == key).to_pandas()
         base = alt.Chart(part).encode(
-            x=alt.X("band:N", sort=BANDS, title="Lead time of the forecast")
+            x=alt.X("band:N", sort=BANDS, title="Lead time of the forecast"), xOffset="contrast:N"
         )
-        bar = base.mark_rule(strokeWidth=3, color=theme.BRAND_ORANGE).encode(
+        colour = alt.Color(
+            "contrast:N",
+            title=None,
+            scale=alt.Scale(domain=list(CONTRASTS), range=list(CONTRASTS.values())),
+            legend=None,
+        )
+        bar = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("low_bonferroni_month:Q", title="Rebuilt minus old CRPS (points)"),
             y2="high_bonferroni_month:Q",
-        )  # ty: ignore[unresolved-attribute]
-        dot = base.mark_point(filled=True, size=70, color=theme.BLACK_2).encode(y="difference:Q")  # ty: ignore[unresolved-attribute]
+            color=colour,
+        )
+        dot = base.mark_point(filled=True, size=70).encode(y="difference:Q", color=colour)  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())
+            alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color=theme.BLACK_2)
             .encode(y="y:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -103,7 +115,9 @@ def figure_difference() -> None:
         title=alt.TitleParams(
             [
                 "Removing the look-ahead raises K2-S1's CRPS from 24 h onwards.",
-                "Dot: difference. Bar: Bonferroni interval, month blocks (5, near the minimum to maximum).",
+                "Left of each pair: heads trained on look-ahead weather.",
+                "Right: heads trained on origin-time weather.",
+                "Dot: difference. Bar: Bonferroni interval, 5 month blocks (near min to max).",
             ],
             anchor="start",
         )
