@@ -106,7 +106,10 @@ class Sources:
         self.ecm = {p: (e[f"x{p}"], e[f"o{p}"], e[f"v{p}"]) for p in range(16)}
 
     def make_rows(self, *, issues: np.ndarray) -> Rows:
-        """Return every row available at each issue time (microseconds), up to the ICON-EU run's 78 h horizon (measured from the run's init time)."""
+        """Return every row available at each issue time (microseconds).
+
+        Valid times run up to 78 h after the ICON-EU run's init time.
+        """
         parts: list[dict[str, np.ndarray]] = []
         for t in issues:
             k = np.searchsorted(self.init + ICON_DELAY, t, side="right") - 1
@@ -156,7 +159,9 @@ class Sources:
 
 
 def icon_features(raw: np.ndarray) -> np.ndarray:
-    """Return shortwave (direct + diffuse), 2 m temperature, dew point, surface pressure, precipitation, 10 m wind speed."""
+    """Return six ICON-EU features: shortwave (direct + diffuse), temperature, dew point,
+    pressure, precipitation, and wind speed.
+    """
     return np.column_stack(
         [
             raw[:, 0] + raw[:, 1],

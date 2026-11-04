@@ -73,7 +73,11 @@ def fold_stats(*, month: str, clean: np.ndarray) -> dict:
 def adaptor_inputs(
     *, x: np.ndarray, icon: np.ndarray, lead: np.ndarray, arm: str, icon_stats: tuple
 ) -> np.ndarray:
-    """Return the adaptor's inputs: standardised ICON-EU features, cos_zenith, hour terms, lead, and for N2 the ECMWF means and spreads."""
+    """Return the adaptor's inputs.
+
+    They are the standardised ICON-EU features, cos_zenith, the hour terms, and the lead, plus
+    the ECMWF means and spreads for N2.
+    """
     mu, sd = icon_stats
     parts = [
         np.clip((d.icon_features(icon) - mu) / sd, -5, 5),

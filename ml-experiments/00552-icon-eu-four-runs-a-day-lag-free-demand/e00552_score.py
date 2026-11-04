@@ -92,7 +92,10 @@ def bootstrap(*, per_fold: np.ndarray) -> tuple[float, float]:
 def contrast(
     df: pl.DataFrame, *, a: str, b: str, hours: list[int], bands: list[str], group: str
 ) -> dict:
-    """Return the CRPS difference a - b (negative: a is better) for one cell, with per-fold values and the seed MDE."""
+    """Return the CRPS difference a - b for one cell (negative: a is better).
+
+    The result also holds the per-fold values and the seed MDE.
+    """
     sub = df.filter(
         pl.col("issue_hour").is_in(hours), pl.col("band").is_in(bands), pl.col("group") == group
     )
