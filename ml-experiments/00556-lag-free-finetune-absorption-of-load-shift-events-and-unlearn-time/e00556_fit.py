@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, DTZ006, PLW0603, PLR0915, PT018, SIM102, RUF034, PERF401, FURB110
 r"""Fit the stress cells of experiment 556: how much of an injected step reaches the next forecasts.
 
 A fine-tune of the lag-free network depends only on its cutoff, half-life, pretrained weights, seed,
@@ -50,10 +50,16 @@ CLIP_C: Final[float] = 3.0
 SPIKE_MADS: Final[float] = 10.0
 CHAIN_DAYS: Final[int] = 14
 WINDOW_DAYS: Final[int] = 7
-SEED: Final[int] = 0
+SEED: int = 0
+"""The seed of every fit; `score-fits` sets it to 0 and 1 in turn."""
 ORIGIN_DAYS: Final[tuple[int, ...]] = (7, 14)
 """Refit origins in days from the month's first day: week 2 and week 3."""
 ADAPT_ORIGIN_DAY: Final[int] = 0
+NRA_SHARES: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00435-stage-0-recalibration-table-for-untrusted-inputs-and-tails/work/nra_correction_share.npz"
+)
+"""Experiment 435's NRA correction (share of capacity, 16 x grid) at depth factor 1.0."""
 
 
 @dataclass(frozen=True)
@@ -125,6 +131,7 @@ class Cell:
         self.test = data.build_test(month=month, standardiser=self.mr.base.standardiser)
         self.last_day = (k.cutoffs(month=month, cadence="d")[-1] - c.month_start(month=month)).days
         self.sd = {}
+        self.shares = np.load(NRA_SHARES)["f1.0"]
         self.mu_t = torch.from_numpy(self.mr.base.target_mean).to(device)
         self.sd_t = torch.from_numpy(self.mr.base.target_std).to(device)
         self.models: dict[tuple, torch.nn.Module] = {}
@@ -133,7 +140,9 @@ class Cell:
         self.band = np.full(len(self.lead_h), -1, np.int8)
         for i, (lo, hi) in enumerate(BANDS.values()):
             last = i == len(BANDS) - 1
-            self.band[(self.lead_h >= lo) & ((self.lead_h <= hi) if last else (self.lead_h < hi))] = i
+            self.band[
+                (self.lead_h >= lo) & ((self.lead_h <= hi) if last else (self.lead_h < hi))
+            ] = i
 
     # ---- selection and injection -------------------------------------------------------------
     def select(self, *, arm: Arm, cut: datetime) -> c.Refit:
@@ -141,18 +150,27 @@ class Cell:
         r = c.select_rows(rows=self.mr, cutoff=cut, half_life_days=arm.half_life)
         if arm.embargo_days:
             keep = self.mr.valid_us[r.index] <= c.us(t=cut) - day_us(arm.embargo_days)
-            r = c.Refit(index=r.index[keep], y=r.y[keep], weight=r.weight[keep], is_val=r.is_val[keep], report=r.report)
+            r = c.Refit(
+                index=r.index[keep],
+                y=r.y[keep],
+                weight=r.weight[keep],
+                is_val=r.is_val[keep],
+                report=r.report,
+            )
         return r
 
     def injection(
         self, *, r: c.Refit, scen: Scenario, origin: datetime, sign: int, mad: np.ndarray | None
-    ) -> np.ndarray:
-        """Return the additive shift (capacity fraction) of each selected row."""
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return the additive shift (capacity fraction) of each selected row and the injected-row mask."""
         mr = self.mr
         o = c.us(t=origin)
         valid = mr.valid_us[r.index]
         prim = mr.primary[r.index]
         tgt = mr.target_idx[r.index]
+        if scen.kind == "nra":
+            corrected = -self.shares[prim, np.clip(tgt, 0, self.shares.shape[1] - 1)]
+            return corrected.astype(np.float32), corrected != 0
         end = o - c.CUTOFF_AGE_US
         if scen.kind == "step":
             inj = (valid >= o - day_us(scen.length_days)) & (valid < end + 1)
@@ -163,7 +181,11 @@ class Cell:
         else:
             inj = (valid >= end - day_us(0.25)) & (valid < end + 1)
         inj &= ~r.is_val
-        signs = np.where(np.arange(len(mr.base.target_mean)) % 2 == 0, 1, -1) if scen.mirrored else np.ones(len(mr.base.target_mean), int)
+        signs = (
+            np.where(np.arange(len(mr.base.target_mean)) % 2 == 0, 1, -1)
+            if scen.mirrored
+            else np.ones(len(mr.base.target_mean), int)
+        )
         sgn = (sign * signs)[prim]
         if scen.depth is None:
             size = c.shift_sizes(clean=self.clean, cutoff=origin)[prim]
@@ -171,10 +193,18 @@ class Cell:
             size = np.full(len(prim), scen.depth)
         shift = sgn * size
         if scen.kind == "stuck":
-            start_idx = (end - day_us(1) - c.prep422.GRID_START_US) // c.prep422.STEP_US + 1
-            held = np.nan_to_num(self.clean[prim, start_idx], nan=0.0)
-            ok = np.isfinite(self.clean[prim, start_idx])
-            shift = np.where(ok, held - r.y, 0.0)
+            start_idx = (end - day_us(1) - c.prep422.GRID_START_US) // c.prep422.STEP_US
+            held_by_primary = np.zeros(len(self.clean))
+            ok_by_primary = np.zeros(len(self.clean), dtype=bool)
+            for q in range(len(self.clean)):
+                recent = self.clean[q, start_idx - 48 : start_idx + 1]
+                finite = recent[np.isfinite(recent)]
+                if len(finite):
+                    held_by_primary[q], ok_by_primary[q] = finite[-1], True
+            shift = np.where(ok_by_primary[prim], held_by_primary[prim] - r.y, 0.0)
+            assert ok_by_primary.sum() >= 14, (
+                f"stuck reading injected at only {ok_by_primary.sum()} Primaries"
+            )
         elif scen.kind == "dropout":
             shift = -r.y
         elif scen.kind == "spike":
@@ -186,17 +216,30 @@ class Cell:
     # ---- fitting and forecasting ---------------------------------------------------------------
     def new(self) -> torch.nn.Module:
         """Return a network loaded with the fold's pretrained weights."""
-        m = c.new_model(outlier=False, n_inputs=self.mr.x.shape[1], n_primaries=len(self.mr.base.target_mean)).to(self.device)
-        c.load_pretrained(model=m, path=f510.pretrained_path(v=f510.VARIANTS["hl90"], month=self.month, seed=SEED))
+        m = c.new_model(
+            outlier=False, n_inputs=self.mr.x.shape[1], n_primaries=len(self.mr.base.target_mean)
+        ).to(self.device)
+        c.load_pretrained(
+            model=m, path=f510.pretrained_path(v=f510.VARIANTS["hl90"], month=self.month, seed=SEED)
+        )
         return m.to(self.device)
 
-    def median_rows(self, *, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor) -> np.ndarray:
+    def median_rows(
+        self, *, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor
+    ) -> np.ndarray:
         """Return the model's median (capacity fraction) for rows on the GPU."""
         out = []
         for a in range(0, len(x), 262_144):
-            q = c.serving_quantiles(model=model, x=x[a : a + 262_144], p=p[a : a + 262_144], outlier=False)
+            q = c.serving_quantiles(
+                model=model, x=x[a : a + 262_144], p=p[a : a + 262_144], outlier=False
+            )
             q = torch.sort(q, dim=1).values[:, 5]
-            out.append((q * self.sd_t[p[a : a + 262_144]] + self.mu_t[p[a : a + 262_144]]).float().cpu().numpy())
+            out.append(
+                (q * self.sd_t[p[a : a + 262_144]] + self.mu_t[p[a : a + 262_144]])
+                .float()
+                .cpu()
+                .numpy()
+            )
         return np.concatenate(out)
 
     def residual_mad(self, *, ref: torch.nn.Module, r: c.Refit, cut: datetime) -> np.ndarray:
@@ -231,14 +274,18 @@ class Cell:
         weight = r.weight
         if arm.clip is not None:
             assert ref is not None
-            m = self.residual_mad(ref=ref, r=c.Refit(r.index, y_seen, r.weight, r.is_val, r.report), cut=cut)
+            m = self.residual_mad(
+                ref=ref, r=c.Refit(r.index, y_seen, r.weight, r.is_val, r.report), cut=cut
+            )
             idx = torch.from_numpy(r.index).to(self.device)
             med = self.median_rows(model=ref, x=self.g.x[idx], p=self.g.p[idx])
             prim = self.mr.primary[r.index]
             z = np.abs(y_seen - med) / np.maximum(m[prim], 1e-6)
             weight = (r.weight * np.minimum(1.0, arm.clip / np.maximum(z, 1e-9))).astype(np.float32)
         refit = c.Refit(r.index, r.y, weight, r.is_val, r.report)
-        shift_z = None if shift is None else shift / self.mr.base.target_std[self.mr.primary[r.index]]
+        shift_z = (
+            None if shift is None else shift / self.mr.base.target_std[self.mr.primary[r.index]]
+        )
         t = self.g.refit_tensors(refit=refit, shift_z=shift_z)
         model = self.new()
         c.train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=SEED, lr=c.FINE_TUNE_LR, outlier=False, prior=False, device=self.device)  # fmt: skip
@@ -262,9 +309,14 @@ class Cell:
         if arm.embargo_days or arm.clip is not None or arm.half_life != 90.0:
             return None
         day = (cut - c.month_start(month=self.month)).days
-        cands = [E511 / "models" / "L-1d" / f"{self.month}_d{day}_s{SEED}.pt", E511 / "models" / "L-3d" / f"{self.month}_d{day}_s{SEED}.pt"]
+        cands = [
+            E511 / "models" / "L-1d" / f"{self.month}_d{day}_s{SEED}.pt",
+            E511 / "models" / "L-3d" / f"{self.month}_d{day}_s{SEED}.pt",
+        ]
         if day in k.WEEKLY_OFFSETS:
-            cands.append(E510 / "models" / "hl90" / f"{self.month}_w{k.WEEKLY_OFFSETS.index(day)}_s{SEED}.pt")
+            cands.append(
+                E510 / "models" / "hl90" / f"{self.month}_w{k.WEEKLY_OFFSETS.index(day)}_s{SEED}.pt"
+            )
         return next((p for p in cands if p.exists()), None)
 
     def control(self, *, arm: Arm, cut: datetime) -> torch.nn.Module:
@@ -317,39 +369,101 @@ def run_cell(
     mad_model = cell.control(arm=arm, cut=origin) if scen.kind == "spike" else None
     # F3d-R needs the plain F3d fit three days earlier under the same injection.
     f3 = ARMS["F3d"]
+    adjust = sign * (
+        np.where(np.arange(len(cell.mr.base.target_mean)) % 2 == 0, 1, -1)
+        if scen.mirrored
+        else np.ones(len(cell.mr.base.target_mean), int)
+    )
+    if scen.kind in ("stuck", "dropout"):
+        # The injected direction differs by Primary (stuck) or is always downward (dropout): read the
+        # leak along the realised direction of each Primary's mean injection.
+        r0 = cell.select(arm=arm, cut=origin)
+        sh0, inj0 = cell.injection(r=r0, scen=scen, origin=origin, sign=1, mad=None)
+        prim0 = cell.mr.primary[r0.index]
+        adjust = np.ones(len(adjust), int)
+        for q in range(len(adjust)):
+            m = sh0[inj0 & (prim0 == q)]
+            adjust[q] = -1 if (len(m) and m.mean() < 0) else 1
     for j, cut in enumerate(cuts):
         ref = None
         if arm.clip is not None:
             pre = cut - timedelta(days=arm.cadence)
             if pre not in prev_state:
                 if pre < origin:
-                    prev_state[pre] = cell.fit(arm=f3, cut=pre, scen=scen if scen.kind != "lasting" else None, origin=origin, sign=sign, ref=None, mad_model=mad_model)
+                    prev_state[pre] = cell.fit(
+                        arm=f3,
+                        cut=pre,
+                        scen=scen if scen.kind != "lasting" else None,
+                        origin=origin,
+                        sign=sign,
+                        ref=None,
+                        mad_model=mad_model,
+                    )
                     nfits += 1
             ref = prev_state[pre]
-        model = cell.fit(arm=arm, cut=cut, scen=scen, origin=origin, sign=sign, ref=ref, mad_model=mad_model) if arm.clip is None else cell.fit(arm=arm, cut=cut, scen=scen, origin=origin, sign=sign, ref=ref, mad_model=mad_model)
+        model = (
+            cell.fit(
+                arm=arm, cut=cut, scen=scen, origin=origin, sign=sign, ref=ref, mad_model=mad_model
+            )
+            if arm.clip is None
+            else cell.fit(
+                arm=arm, cut=cut, scen=scen, origin=origin, sign=sign, ref=ref, mad_model=mad_model
+            )
+        )
         nfits += 1
+        if j == 0 and scen.kind != "lasting":
+            rr = cell.select(arm=arm, cut=cut)
+            _, injected = cell.injection(
+                r=rr,
+                scen=scen,
+                origin=origin,
+                sign=sign,
+                mad=None if scen.kind != "spike" else np.ones(len(adjust)),
+            )
+            assert (cell.mr.valid_us[rr.index] <= c.us(t=cut) - c.CUTOFF_AGE_US).all() and (
+                cell.mr.origin_us[rr.index] <= c.us(t=cut)
+            ).all()
+            assert injected.sum() > 0 or arm.embargo_days >= scen.length_days > 0, (
+                f"no injected rows: {arm.tag} {scen.name}"
+            )
         if arm.clip is None and arm.tag == "F3d":
             prev_state[cut] = model
         if arm.clip is not None:
             # the reference for the next cutoff is the plain F3d fit at this cutoff
-            prev_state[cut] = cell.fit(arm=f3, cut=cut, scen=scen, origin=origin, sign=sign, ref=None, mad_model=mad_model)
+            prev_state[cut] = cell.fit(
+                arm=f3, cut=cut, scen=scen, origin=origin, sign=sign, ref=None, mad_model=mad_model
+            )
             nfits += 1
         rows = cell.window_rows(cut=cut)
         if len(rows) == 0:
             continue
         s = cell.q50(model=model, rows=rows)
         ctl = cell.control_q50(arm=arm, cut=cut, rows=rows)
-        signs = np.where(np.arange(len(cell.mr.base.target_mean)) % 2 == 0, 1, -1) if scen.mirrored else np.ones(len(cell.mr.base.target_mean), int)
         prim = cell.test.primary[rows]
-        delta = (sign * signs[prim]) * 100.0 * (s - ctl)
+        delta = adjust[prim] * 100.0 * (s.astype(np.float64) - ctl.astype(np.float64))
         origin_off = ((cell.test.origin[rows] - c.us(t=origin)) // c.DAY_US).astype(np.int16)
         records.append(
-            pl.DataFrame({"j": j, "refit_off": (cut - origin).days, "primary": prim, "band": cell.band[rows], "origin_off": origin_off, "shift": delta})
+            pl.DataFrame(
+                {
+                    "j": j,
+                    "refit_off": (cut - origin).days,
+                    "primary": prim,
+                    "band": cell.band[rows],
+                    "origin_off": origin_off,
+                    "shift": delta,
+                }
+            )
             .group_by("j", "refit_off", "primary", "band", "origin_off")
             .agg(pl.col("shift").sum().alias("sum"), pl.len().alias("n"))
         )
         del model
-    frame = pl.concat(records).with_columns(arm=pl.lit(arm.tag), month=pl.lit(cell.month), scenario=pl.lit(scen.name), sign=pl.lit(sign), origin_day=pl.lit(origin_day))
+    frame = pl.concat(records).with_columns(
+        arm=pl.lit(arm.tag),
+        month=pl.lit(cell.month),
+        scenario=pl.lit(scen.name),
+        sign=pl.lit(sign),
+        origin_day=pl.lit(origin_day),
+    )
     out.parent.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(out.with_suffix(".tmp"))
     out.with_suffix(".tmp").rename(out)
@@ -370,7 +484,15 @@ SCENARIOS: Final[dict[str, Scenario]] = {
 }
 FIRST_ONLY: Final[tuple[str, ...]] = ("step1_p10", "step14_p10", "step7_sd3", "step3_p10_mir")
 SKIPPED: Final[dict[str, tuple[str, ...]]] = {
-    "F1d-182": ("step1_p10", "step14_p10", "step7_sd3", "step3_p10_mir", "stuck0_p10", "dropout0_p10", "spike0_p10"),
+    "F1d-182": (
+        "step1_p10",
+        "step14_p10",
+        "step7_sd3",
+        "step3_p10_mir",
+        "stuck0_p10",
+        "dropout0_p10",
+        "spike0_p10",
+    ),
     "F3d-E3": ("stuck0_p10", "dropout0_p10", "spike0_p10"),
     "F3d-R": ("stuck0_p10", "dropout0_p10", "spike0_p10"),
 }
@@ -392,12 +514,24 @@ def cell_list(*, kinds: list[str]) -> list[tuple[Scenario, int, tuple[int, ...]]
 def main() -> None:
     """Run a command."""
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("command", choices=("check", "time", "cells"))
+    ap.add_argument(
+        "command", choices=("check", "time", "cells", "score-fits", "assemble", "real-events")
+    )
     ap.add_argument("--arms", nargs="+", default=list(ARMS))
     ap.add_argument("--months", nargs="+", default=list(c.MONTHS))
     ap.add_argument("--kinds", nargs="+", default=list(SCENARIOS))
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
     a = ap.parse_args()
+    if a.command == "score-fits":
+        score_fits(arms=a.arms, months=a.months, seeds=a.seeds, device=a.device)
+        return
+    if a.command == "real-events":
+        real_events(arms=a.arms, months=a.months, device=a.device)
+        return
+    if a.command == "assemble":
+        assemble(arms=a.arms, months=a.months, seeds=a.seeds)
+        return
     if a.command == "check":
         check(device=a.device)
         return
@@ -406,7 +540,14 @@ def main() -> None:
         cell = Cell(month=month, device=a.device)
         for arm_tag, scen_name in (("F1d", "step3_p10"), ("F3d-R", "step3_p10")):
             t0 = time.monotonic()
-            n = run_cell(cell=cell, arm=ARMS[arm_tag], scen=SCENARIOS[scen_name], sign=1, origin_day=14, out=WORK / "time_test" / f"{arm_tag}.parquet")
+            n = run_cell(
+                cell=cell,
+                arm=ARMS[arm_tag],
+                scen=SCENARIOS[scen_name],
+                sign=1,
+                origin_day=14,
+                out=WORK / "time_test" / f"{arm_tag}.parquet",
+            )
             print(f"{arm_tag} {scen_name}: {n} fits, {time.monotonic() - t0:.1f} s", flush=True)
         return
     for month in a.months:
@@ -422,12 +563,154 @@ def main() -> None:
                         continue
                     sc = scen
                     if scen.name in FIRST_ONLY:
-                        sc = Scenario(scen.kind, scen.length_days, scen.depth, scen.mirrored, chain=False)
+                        sc = Scenario(
+                            scen.kind, scen.length_days, scen.depth, scen.mirrored, chain=False
+                        )
                     t0 = time.monotonic()
                     n = run_cell(cell=cell, arm=arm, scen=sc, sign=sign, origin_day=od, out=out)
-                    print(f"{arm.tag} {month} {scen.name} sign {sign:+d} origin {od}: {n} fits, {time.monotonic() - t0:.0f} s", flush=True)
+                    print(
+                        f"{arm.tag} {month} {scen.name} sign {sign:+d} origin {od}: {n} fits, {time.monotonic() - t0:.0f} s",
+                        flush=True,
+                    )
         del cell
         torch.cuda.empty_cache()
+
+
+def window_frame_of(*, cell: Cell, model: torch.nn.Module, lo: int, hi: int) -> pl.DataFrame | None:
+    """Return the quantile forecast of origins in [lo, hi), or None when no test origin falls there."""
+    sel = (cell.test.origin >= lo) & (cell.test.origin < hi)
+    if not sel.any():
+        return None
+    return c.forecast_frame(
+        model=model,
+        outlier=False,
+        test=cell.test,
+        select=sel,
+        rows=cell.mr.base,
+        widen=1.0,
+        device=cell.device,
+    )
+
+
+def score_fits(*, arms: list[str], months: list[str], seeds: list[int], device: str) -> None:
+    """Fit each arm at its cadence through each month with no injection, and write the window forecasts."""
+    global SEED
+    for month in months:
+        cell = Cell(month=month, device=device)
+        for seed in seeds:
+            SEED = seed
+            cell.models.clear()
+            for tag in arms:
+                arm = ARMS[tag]
+                cuts = [
+                    cut_of(month=month, day=d) for d in range(0, cell.last_day + 1, arm.cadence)
+                ]
+                for i, cut in enumerate(cuts):
+                    day = (cut - c.month_start(month=month)).days
+                    out = WORK / "fits" / tag / f"{month}_d{day}_s{seed}.parquet"
+                    if out.exists():
+                        continue
+                    model = cell.control(arm=arm, cut=cut)
+                    stop = (
+                        c.us(t=cuts[i + 1])
+                        if i + 1 < len(cuts)
+                        else c.us(t=c.month_stop(month=month))
+                    )
+                    frame = window_frame_of(cell=cell, model=model, lo=c.us(t=cut), hi=stop)
+                    if frame is None:
+                        continue
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    frame.write_parquet(out.with_suffix(".tmp"))
+                    out.with_suffix(".tmp").rename(out)
+                    print(tag, month, f"d{day}", f"s{seed}", frame.height, flush=True)
+        del cell
+        torch.cuda.empty_cache()
+    SEED = 0
+
+
+def assemble(*, arms: list[str], months: list[str], seeds: list[int]) -> None:
+    """Concatenate each arm's window forecasts into one table per arm, month, and seed."""
+    for tag in arms:
+        for month in months:
+            for seed in seeds:
+                parts = sorted((WORK / "fits" / tag).glob(f"{month}_d*_s{seed}.parquet"))
+                if parts:
+                    target = WORK / "seed_preds" / tag / f"{month}_s{seed}.parquet"
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    pl.concat([pl.read_parquet(x) for x in parts]).write_parquet(target)
+                    print("wrote", tag, month, seed, len(parts), "windows", flush=True)
+
+
+def real_events(*, arms: list[str], months: list[str], device: str) -> None:
+    """Fit once on metered and once on NRA-corrected targets at the first cutoff 3 or more days after each event.
+
+    The correction is experiment 435's labelled step (depth factor 1.0), subtracted from every
+    training target in all events known at the cutoff. The absorbed share of an event is the sign of
+    the event times (metered median - corrected median) over the 7 days after the cutoff, at the
+    event's Primary, divided by the event's labelled depth.
+    """
+    events = c.labelled_events()
+    grid, step = c.prep422.GRID_START_US, c.prep422.STEP_US
+    scen = Scenario("nra", chain=False)
+    rows_out = []
+    for month in months:
+        cell = Cell(month=month, device=device)
+        for tag in arms:
+            arm = ARMS[tag]
+            cuts = [cut_of(month=month, day=d) for d in range(0, cell.last_day + 1, arm.cadence)]
+            wanted: dict[datetime, list[tuple[int, int, int]]] = {}
+            for p, spans in events.items():
+                for onset, end in spans:
+                    end_us = grid + end * step
+                    depth = float(np.abs(cell.shares[p, onset : end + 1]).max())
+                    if depth <= 0:
+                        continue
+                    ok = [x for x in cuts if c.us(t=x) >= end_us + day_us(3)]
+                    if (
+                        ok
+                        and (ok[0] - c.month_start(month=month)).days <= cell.last_day
+                        and c.us(t=ok[0]) - end_us <= day_us(CHAIN_DAYS + cell.last_day)
+                    ):
+                        wanted.setdefault(ok[0], []).append((p, onset, end))
+            for cut, evs in sorted(wanted.items()):
+                model_m = cell.control(arm=arm, cut=cut)
+                model_c = cell.fit(
+                    arm=arm, cut=cut, scen=scen, origin=cut, sign=1, ref=None, mad_model=None
+                )
+                rows = cell.window_rows(cut=cut)
+                if len(rows) == 0:
+                    continue
+                diff = cell.q50(model=model_m, rows=rows).astype(np.float64) - cell.q50(
+                    model=model_c, rows=rows
+                ).astype(np.float64)
+                prim = cell.test.primary[rows]
+                for p, onset, end in evs:
+                    sign = 1 if float(cell.shares[p, onset : end + 1].sum()) > 0 else -1
+                    depth = float(np.abs(cell.shares[p, onset : end + 1]).max())
+                    sel = prim == p
+                    rows_out.append(
+                        {
+                            "arm": tag,
+                            "month": month,
+                            "cut": str(cut.date()),
+                            "primary": p,
+                            "onset": onset,
+                            "end": end,
+                            "depth_points": 100 * depth,
+                            "age_days": (c.us(t=cut) - (grid + end * step)) / c.DAY_US,
+                            "n_events_in_fit": len(evs),
+                            "absorbed_share": float(sign * diff[sel].mean() / depth)
+                            if sel.any()
+                            else None,
+                        }
+                    )
+                del model_c
+        del cell
+        torch.cuda.empty_cache()
+    out = WORK / "scores" / "real_events.parquet"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(rows_out).write_parquet(out)
+    print("real events", len(rows_out), flush=True)
 
 
 def check(*, device: str) -> None:
@@ -442,18 +725,41 @@ def check(*, device: str) -> None:
     fresh = cell.fit(arm=arm, cut=cut, scen=None, origin=None, sign=0, ref=None, mad_model=None)
     q_fresh = cell.q50(model=fresh, rows=rows)
     stored_fc = pl.read_parquet(E511 / "fits" / "L-1d" / f"{month}_d10_s0.parquet")
-    print("rows", len(rows), "stored-vs-fresh max |median diff| (points)", float(np.abs(q_fresh - q_stored).max() * 100), "mean", float(np.abs(q_fresh - q_stored).mean() * 100))
+    print(
+        "rows",
+        len(rows),
+        "stored-vs-fresh max |median diff| (points)",
+        float(np.abs(q_fresh - q_stored).max() * 100),
+        "mean",
+        float(np.abs(q_fresh - q_stored).mean() * 100),
+    )
     print("stored forecast file rows", stored_fc.height)
     # Look-ahead audit over the chain of a step scenario
     r = cell.select(arm=ARMS["F3d-E3"], cut=cut)
-    print("E3 rows", len(r.index), "latest valid", datetime.fromtimestamp(cell.mr.valid_us[r.index].max() / 1e6), "cut", cut)
+    print(
+        "E3 rows",
+        len(r.index),
+        "latest valid",
+        datetime.fromtimestamp(cell.mr.valid_us[r.index].max() / 1e6),
+        "cut",
+        cut,
+    )
     for arm in ARMS.values():
         rr = cell.select(arm=arm, cut=cut)
         past_valid = int((cell.mr.valid_us[rr.index] > c.us(t=cut) - c.CUTOFF_AGE_US).sum())
         past_origin = int((cell.mr.origin_us[rr.index] > c.us(t=cut)).sum())
-        print(f"{arm.tag}: rows {len(rr.index):,}, past valid cut {past_valid}, past origin cut {past_origin}")
+        print(
+            f"{arm.tag}: rows {len(rr.index):,}, past valid cut {past_valid}, past origin cut {past_origin}"
+        )
     i = int(rr.index[0])
-    print("example row: valid", datetime.fromtimestamp(cell.mr.valid_us[i] / 1e6), "origin", datetime.fromtimestamp(cell.mr.origin_us[i] / 1e6), "cut", cut)
+    print(
+        "example row: valid",
+        datetime.fromtimestamp(cell.mr.valid_us[i] / 1e6),
+        "origin",
+        datetime.fromtimestamp(cell.mr.origin_us[i] / 1e6),
+        "cut",
+        cut,
+    )
 
 
 if __name__ == "__main__":
