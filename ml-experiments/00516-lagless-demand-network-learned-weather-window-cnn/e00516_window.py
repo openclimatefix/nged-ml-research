@@ -18,9 +18,12 @@ half-hourly series carries no information finer than 6 h, and nothing is finer t
 - positions after the origin come from the row's own run.
 
 A position with no value (a run missing from the history, or a window position beyond the run's
-360 h horizon) is NaN in `gather_windows`; `fill_nearest` then holds the nearest finite value along
-the window, and `missed_runs` counts the history positions that had to be filled, in whole missed
-runs (the unit the degradation rules use), so a missed previous run cannot silently shorten a window.
+360 h horizon) is NaN in `gather_windows`. `fill_nearest` holds the nearest finite value, and
+`missed_runs` counts the missing history positions in whole missed runs. These three functions are
+the reference implementation that the unit tests exercise. The fit reads windows through
+`e00516_fit.WindowStore.window` (a GPU gather of the same rule), which fills a missing position
+with the training mean (0 after standardising); `e00516_leak_check.py` compares that gather with an
+independent rebuild.
 
 All positions are indices on a half-hourly grid; the caller owns the grid's origin.
 """

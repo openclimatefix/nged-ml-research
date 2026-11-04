@@ -133,7 +133,11 @@ class WindowStore:
             j = pos - origin[:, None]
             after = (j >= 1) & (j < FWD_WIDTH)
             fwd = self.forward[p3, v3, run[:, None, None], j.clamp(0, FWD_WIDTH - 1)[:, None, :]]
+            beyond = (
+                j >= FWD_WIDTH
+            )  # past the run's 360 h horizon: no value, never a later run's history
             raw = torch.where(after[:, None, :], fwd, self.history[p3, v3, pos3])
+            raw = torch.where(beyond[:, None, :], torch.full_like(raw, float("nan")), raw)
         scaled = (raw - self.mean) / self.std
         return torch.nan_to_num(scaled, nan=0.0)
 
