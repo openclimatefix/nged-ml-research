@@ -1,8 +1,8 @@
 ---
-id: "00522"
+id: "00563"
 slug: pooled-primary-bsp-gsp-data-check
 title: >-
-  Are there enough clean bulk and grid supply point series to test one network pooled over all
+  Are there enough clean bulk and grid supply point series to test one neural network pooled over all
   Primaries, bulk supply points, and grid supply points?
 theme: hierarchy-and-pooling
 also_relevant_to: []
@@ -15,7 +15,7 @@ size: >-
   path and the degradation rules are not touched in this repository. One Sonnet write-up review.
 hypothesis: >-
   At least 8 bulk supply point (BSP) and grid supply point (GSP) series in NGED's data are clean
-  for 2 years before each fold cutoff and have a weather location, so that a pooled network
+  for 2 years before each fold cutoff and have a weather location, so that a pooled neural network
   (arm M2 of the modular-architecture item) can learn from more series than the 16 Primaries.
 prediction: >-
   Written before the count. At least 8 series pass. This was a guess, because the brief did not
@@ -30,17 +30,18 @@ verdict: inconclusive
 code: none
 best_arm: none
 headline: >-
-  NGED's metadata holds 4 BSP and GSP series, not 8: 2 BSPs and 2 GSPs, all signed MW. The pooled
-  network test (M2) was stopped before any fit.
+  NGED's metadata holds 4 bulk supply point (BSP) and grid supply point (GSP) series, not 8: 2 BSPs
+  and 2 GSPs, all signed MW. The pooled neural network test (M2) was stopped before any fit.
 take_home_message: >-
-  There are only four bulk and grid supply point series, and the two grid series are largely the
-  sum of the two bulk series, so a network pooled over them cannot get the large increase in
-  training examples the idea needed. The test was not run. Experiment 415 already fitted a
-  pooled network at the 16 Primaries and these 4 series, and later experiments can reuse it.
+  NGED's metadata holds four bulk and grid supply point series. Adding them to the 16 Primaries
+  gives 20 series, too few to test whether many extra series help. By the hierarchy file, each
+  grid series should include one bulk series, so the four are not independent. The test was not
+  run. Experiment 415 already fitted a pooled neural network at the 16 Primaries and these four
+  series.
 lessons:
   - >-
-    Pooling across supply points is limited by the number of series NGED holds, which is 4 at
-    BSP and GSP level, not by the modelling.
+    In this check, the number of BSP and GSP series in NGED's metadata (4) fell below the 8 the
+    experiment needed.
 advice:
   - >-
     Do not plan an experiment that needs 8 or more bulk or grid supply point series, because
@@ -49,9 +50,10 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**The check stopped the experiment: NGED's data holds 4 BSP and GSP series, below the 8 the brief
-required.** No network was fitted and no GPU time was used. The two GSPs also contain the two
-BSPs' power, so they add little information beyond the BSPs.
+**The check stopped the experiment: NGED's metadata holds 4 bulk supply point (BSP) and grid
+supply point (GSP) series, below the 8 the experiment brief required.** No neural network was
+fitted and no GPU time was used. By the hierarchy file, each GSP's power should include one BSP's
+power. I did not compare the power series themselves.
 
 ## The four series
 
@@ -68,14 +70,14 @@ table, and zero and flagged shares are from the cleaned table.
 - Every flagged row is a zero row, so no other cleaning rule fired on these series.
 - Series 2, 27, and 28 have at least 2 years of history before any cutoff from 2021-10 on, and
   series 1 from 2023-12 on. I did not check the gaps inside that history against each of the five
-  folds of 511.
+  folds of experiment 511's row set.
 
 ## Parent-child map
 
-The hierarchy file received from NGED on 2026-10-15 lists 17 substations under Boston BSP and 13
-under Skegness BSP. Boston BSP sits under Walpole GSP and Skegness BSP under Bicker Fen GSP. So
-each GSP's power contains one BSP's power and the power of its children, which is why the two GSP
-series are close to the BSP series plus a small remainder.
+The hierarchy file received from NGED on 2026-10-15 lists 17 rows under Boston BSP (the BSP and 16 children) and 13 rows under Skegness BSP (the
+BSP and 12 children). Boston BSP sits under Walpole GSP and Skegness BSP under Bicker Fen GSP. So
+each GSP should include one BSP and the BSP's children, and the two GSP series are probably
+close to the BSP series. The residual of GSP minus BSP was not measured.
 
 ## Weather mapping
 
@@ -85,9 +87,9 @@ for all four without a fetch.
 
 ## What this means
 
-- **M2 is not run.** Four series do not meet the brief's bar of 8, and the rule said to stop.
-- **Pooling at these four series already exists.** Experiment 415 fitted one network on the 16
-  Primaries and these four series, so the step was already taken at a small scale.
+- **M2 is not run.** Four series do not meet the bar of 8, and the stop rule said to halt.
+- **Pooling at these four series already exists.** Experiment 415 (its nodes D13, D17, D1, and D6 are series 1, 2, 27, and 28) fitted one neural
+  network on the 16 Primaries and these four series, so the step was already taken at a small scale.
 - **No other bulk or grid series exist** in NGED's metadata, so the arms M2-a to M2-c cannot be
   filled by waiting for a download. A reduced four-series version would need the maintainer's
   request.
