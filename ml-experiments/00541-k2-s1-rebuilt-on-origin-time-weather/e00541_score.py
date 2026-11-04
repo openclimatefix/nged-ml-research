@@ -20,15 +20,20 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 KEYS = r521.KEYS
 NEW = "K2-S1-origin"
+TRAINED = "K2-S1-origin-trained"
+BUILT = (NEW, TRAINED)
 OLD = "K2-S1"
-ARMS = (OLD, NEW, "L-1d", "L-Ww")
+ARMS = (OLD, NEW, TRAINED, "L-1d", "L-Ww")
 CONTRASTS = (
     (NEW, OLD, True),
     (NEW, "L-1d", True),
-    (NEW, "L-Ww", False),
+    (TRAINED, OLD, True),
+    (TRAINED, "L-1d", True),
+    (TRAINED, NEW, False),
+    (TRAINED, "L-Ww", False),
     (OLD, "L-1d", False),
 )
-CELL_COLS = [f"{NEW}-c{c}__crps" for c in range(3)]
+CELL_COLS = {arm: [f"{arm}-c{c}__crps" for c in range(3)] for arm in BUILT}
 REFERENCE_TABLES = {
     "A-pool": ("00537-a-pool-minus-lags", "A-pool"),
     "A-pool minus lags": ("00537-a-pool-minus-lags", "A-nolag"),
@@ -41,28 +46,29 @@ def rows() -> None:
     m.WORK.mkdir(parents=True, exist_ok=True)
     for month in r521.MONTHS:
         base = pl.read_parquet(r521.E511 / "scores" / f"rows_{month}.parquet", columns=KEYS)
-        cells = [
-            pl.read_parquet(m.WORK / "cells" / NEW / f"{month}_c{c}.parquet").select(
-                *KEYS, "actual", *r521.LEVELS
-            )
-            for c in range(3)
-        ]
         parts = [base]
-        for c, cell in enumerate(cells):
-            parts.append(r521.score_cells(rows=base, cells=[cell], name=f"{NEW}-c{c}"))
-        parts.append(r521.score_cells(rows=base, cells=cells, name=NEW))
+        for arm in BUILT:
+            cells = [
+                pl.read_parquet(m.WORK / "cells" / arm / f"{month}_c{c}.parquet").select(
+                    *KEYS, "actual", *r521.LEVELS
+                )
+                for c in range(3)
+            ]
+            for c, cell in enumerate(cells):
+                parts.append(r521.score_cells(rows=base, cells=[cell], name=f"{arm}-c{c}"))
+            parts.append(r521.score_cells(rows=base, cells=cells, name=arm))
         frame = pl.concat(parts, how="horizontal")
         frame.write_parquet(m.WORK / f"new_{month}.parquet")
         print("rows", month, frame.height, flush=True)
 
 
-def cell_mde(*, part: pl.DataFrame) -> float:
+def cell_mde(*, part: pl.DataFrame, arm: str) -> float:
     """Return `1.96 sqrt(2) sd / sqrt(k)` of the per-fold means of the three cells (as 531)."""
     values = (
         part.group_by("month")
-        .agg([pl.col(c).mean() for c in CELL_COLS])
+        .agg([pl.col(c).mean() for c in CELL_COLS[arm]])
         .sort("month")
-        .select(CELL_COLS)
+        .select(CELL_COLS[arm])
         .to_numpy()
     )
     folds, k = values.shape
@@ -87,7 +93,7 @@ def stats() -> None:
     table = load()
     rng = np.random.default_rng(0)
     absolute, contrasts = [], []
-    n_counted = sum(1 for *_, c in CONTRASTS if c) * len(s521.BANDS) * 2
+    n_counted = sum(1 for *_, c in CONTRASTS if c) * len(s521.BANDS) * 2  # 4 x 7 x 2 = 56
     for name in ("eight", "six", "report"):
         part = s521.row_set(table=table, name=name)
         for band in (*s521.BANDS, s521.ALL):
@@ -107,7 +113,7 @@ def stats() -> None:
                 diff = sub.select(
                     "month", "day", d=pl.col(f"{a}__crps") - pl.col(f"{b}__crps")
                 ).filter(pl.col("d").is_finite())
-                mde = cell_mde(part=sub) if a == NEW else float("nan")
+                mde = cell_mde(part=sub, arm=a) if a in BUILT else float("nan")
                 contrasts.append(
                     {
                         "set": name,

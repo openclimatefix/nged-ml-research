@@ -21,13 +21,15 @@ BANDS: Final[list[str]] = ["0-6h", "6-12h", "12-24h", "24-48h", "48-72h", "72-12
 SETS: Final[dict[str, str]] = {"eight": "MVA-only eight", "six": "Signed-MW six"}
 LABELS: Final[dict[str, str]] = {
     "K2-S1": "K2-S1, old weather",
-    "K2-S1-origin": "K2-S1, rebuilt on origin-time weather",
+    "K2-S1-origin": "K2-S1, heads trained on look-ahead weather, scored on origin-time weather",
+    "K2-S1-origin-trained": "K2-S1, heads trained and scored on origin-time weather",
     "L-1d": "L-1d (daily)",
     "A-pool": "A-pool",
 }
 COLOURS: Final[dict[str, str]] = {
     "K2-S1": theme.BLACK_2,
-    "K2-S1-origin": theme.BRAND_ORANGE,
+    "K2-S1-origin": theme.BRAND_ORANGE_LIGHT,
+    "K2-S1-origin-trained": theme.BRAND_ORANGE,
     "L-1d": theme.DATA_BLUE,
     "A-pool": theme.DATA_SKY,
 }
@@ -62,7 +64,7 @@ def figure_crps() -> None:
         )  # ty: ignore[unresolved-attribute]
     chart = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
-            "Rebuilt on origin-time weather, K2-S1 scores worse than L-1d beyond 24 h.",
+            "Without the look-ahead, K2-S1 scores worse than before beyond 24 h, with either training weather.",
             anchor="start",
         )
     )
@@ -72,7 +74,7 @@ def figure_crps() -> None:
 def figure_difference() -> None:
     """Draw the rebuilt-minus-old difference with its Bonferroni month-block interval."""
     t = pl.read_csv(SCORES / "contrasts.csv").filter(
-        (pl.col("contrast") == "K2-S1-origin - K2-S1")
+        pl.col("contrast").is_in(["K2-S1-origin - K2-S1", "K2-S1-origin-trained - K2-S1"])
         & pl.col("set").is_in(list(SETS))
         & pl.col("band").is_in(BANDS)
     )
