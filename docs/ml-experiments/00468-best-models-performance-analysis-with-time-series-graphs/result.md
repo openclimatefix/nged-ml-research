@@ -81,6 +81,12 @@ advice:
     less accurate than the lagless forecast in 3 of 7 events (Part B table).
 ---
 
+> **Correction (2026-11-04).** The gap to K2-S1 above 24 h of lead on this page is voided. K2-S1
+> mixes in experiment 404's lag-free head, which took its weather from the freshest run at each
+> target's valid time (leads of 9 to 33 h at every horizon), a look-ahead that a forecast made at
+> the origin does not have. The gap at 0 to 24 h is unchanged, and comparisons that do not involve
+> K2-S1 are unaffected. The rebuilt K2-S1 will restate the gaps. Evidence: experiments 531 and 532.
+
 **Take-home.** Over a year, the wind and solar forecasts that experiment 461 selected have tails
 close to the shares expected of a perfectly calibrated forecast. Single months miss, and the demand
 forecasts that read lagged power are not reliably better than the forecast that does not during

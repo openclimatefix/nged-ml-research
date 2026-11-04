@@ -95,6 +95,13 @@ advice:
     network alone closed the 0.25 to 0.47 point gap to it (contrasts C5 to C8).
 code: ml-experiments/00486-lagged-network-injection-rate-and-schedule/
 ---
+
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead B-mix's lead over the lagged network is partly the look-ahead. Contrasts between variants of
+> the lagged network are unaffected. Scores at 0 to 24 h are unchanged. Evidence: experiments 531
+> and 532.
 **Training with more artificial load-shift events in the lags makes the forecast follow a step in
 its recent readings less, and raises its error on ordinary rows; none of the shares or schedules
 tried removes the following for free.** We asked whether the share of training rows that hold an

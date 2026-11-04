@@ -118,6 +118,13 @@ code: >-
   ml-experiments/00472-anchor-plus-correction-with-a-strong-penalty-and-a-seed-averaged-anchor/
 ---
 
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead the lagless anchor is stronger than a forecast made at the origin can be, so the gain of the
+> lag correction over its anchor is understated there, and the gaps to B-mix and K2-S1 are not valid
+> forecasts. Scores at 0 to 24 h are unchanged. Evidence: experiments 531 and 532.
+
 **A stronger penalty does not make the lag correction safe, and an anchor averaged over three
 lagless seeds makes the correction score better than K2-S1.** The correction is experiment 467's
 32-unit network on a frozen lagless forecast. The neural network reads the three lags, the surprise

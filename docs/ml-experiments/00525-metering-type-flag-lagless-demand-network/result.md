@@ -100,6 +100,12 @@ advice:
 production_status: not-for-production
 adopted_in: none
 ---
+
+> **Correction (2026-11-04).** The gap to K2-S1 above 24 h of lead on this page is voided. K2-S1
+> mixes in experiment 404's lag-free head, which took its weather from the freshest run at each
+> target's valid time (leads of 9 to 33 h at every horizon), a look-ahead that a forecast made at
+> the origin does not have. The gap at 0 to 24 h is unchanged, and comparisons that do not involve
+> K2-S1 are unaffected. The rebuilt K2-S1 will restate the gaps. Evidence: experiments 531 and 532.
 **Telling the lag-free demand network whether a Primary reports signed MW or apparent power in MVA
 did not improve its forecast.** M is the network with one 0/1 metering column (1 for MVA), C the
 same network with that column fixed at 0, P a copy with the column assigned to a random 8 of the 16
