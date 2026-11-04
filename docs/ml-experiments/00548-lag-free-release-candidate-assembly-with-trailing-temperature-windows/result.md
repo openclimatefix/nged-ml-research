@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - demand-inputs
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -47,6 +47,41 @@ benchmark: >-
   L-1d (experiment 511, two seeds), A-pool (experiments 425 and 533), R-DW (experiment 539), and the
   K2-S1 rebuilt on origin-time weather (experiment 541), all on experiment 533's rows.
 row_set_id: experiment_470_intersection_v1
+verdict: partly supported
+best_arm: >-
+  Not a ranking. At the eight, E scores 4.790 points of CRPS over all leads, against 4.855 for L-1d
+  and 4.682 for A-pool; at 120 to 240 h E scores 5.090 against 5.058 for A-pool.
+headline: >-
+  Adding the three trailing temperature window columns to the daily lag-free network lowers its CRPS
+  by 0.05 to 0.11 points of capacity in every lead band at the eight (4 of 5 folds negative) and by
+  0.04 to 0.09 at the six, but no Bonferroni interval excludes zero except the six at 12 to 24 h. E
+  stays 0.13 to 0.34 points behind A-pool at 0 to 120 h at the eight, with intervals that exclude
+  zero, and is within the minimum detectable effect of A-pool at 120 to 240 h and at the six. Interim
+  checks only; see the Checks list.
+production_status: candidate
+adopted_in: none
+take_home_message: >-
+  A daily-refit forecast that sees no recent power, and also sees the recent temperature, is slightly
+  better than the same forecast without the temperature, and at 5 to 10 days it is as good as the
+  forecast that does see recent power. At 0 to 5 days ahead for the eight MVA-only Primaries it
+  remains 0.13 to 0.34 points of capacity worse. The windows cannot close that gap, and the only
+  tested way to close most of it is to feed the forecast the power from a day and a week ago, which
+  makes it follow an injected load shift more.
+lessons:
+  - >-
+    The weather-side parts that already had evidence (pretraining, daily refit, 90-day half-life,
+    trailing temperature windows) together are within resolution of the lag-enabled network at 5 to
+    10 days and at the six, and not at 0 to 5 days at the eight.
+  - >-
+    The windows' gain here (0.05 to 0.11 at the eight) is of the size experiment 526 found (about
+    0.06 on all rows), and is too small to resolve with 2 seeds and 5 folds after Bonferroni.
+advice:
+  - >-
+    Do not expect trailing temperature windows to close the 0 to 5 day gap to A-pool at the eight; the
+    gap that remains is 0.13 to 0.34 points (contrast table).
+  - >-
+    To close the short-lead gap, test the windows together with the day-ago and week-ago lags of
+    experiment 539, and measure the injected-shift leak beside the score (leak figure).
 metric: >-
   CRPS in points of effective capacity by lead band (0 to 6 h, 6 to 12 h, 12 to 24 h, 24 to 48 h,
   48 to 72 h, 72 to 120 h, 120 to 240 h) at the eight MVA-only and the six signed-MW Primaries,
@@ -54,10 +89,122 @@ metric: >-
   injected-shift leak in points of capacity.
 ---
 
-**Plan only.** Folds: the five folds of experiment 511 (2025-10, 2025-12, 2026-01, 2026-03,
-2026-06), two seeds, July 2026 neither scored nor tuned on. Experiment 526's ten winter folds hold
-no L-1d, A-pool, or R-DW scores, so they cannot be compared with the lag-enabled arms and are used
-only through experiment 526's own W-T result. Dropped from the assembly: the 4-head mixture (experiment 527
-found head count does not explain the gap), per-lead widening (experiment 523 found at most 0.024
-points from it), and a two-stage ensemble calibrator (no stored follow-up of experiment 524 supports
-it).
+**Take-home message: adding recent temperature to the daily lag-free network helps a little in every
+lead band, and at 5 to 10 days the network is then as good as the lag-enabled network. At 0 to 5 days
+at the eight MVA-only Primaries a gap of 0.13 to 0.34 points of capacity remains.** The verdict is
+partly supported: the pre-registered pattern (close at 120 to 240 h, not at 24 to 48 h) held, and
+the size prediction for the windows' gain narrowly missed.
+
+We asked how good a demand forecast can be when it sees no recent power, only weather that was known
+at the forecast origin. We assembled the parts that earlier experiments had found useful: pretraining
+on past weather estimates, a refit every day with a 90-day half-life, three columns holding the mean
+temperature over the last 6, 24, and 72 hours ([experiment
+526](../00526-lagless-demand-network-trailing-weather-window-placebo-repeat/result.md)), and bands
+widened by 15% at scoring. We scored the result on the five test months of [experiment
+511](../00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/result.md) against the
+same network without the windows (L-1d), the lag-enabled network (A-pool), the network with the
+day-ago and week-ago lags ([experiment 539](../00540-lag-gap-what-closes-the-gap-to-lag-enabled-models/result.md)),
+and the rebuilt K2-S1 of [experiment 541](../00541-k2-s1-rebuilt-on-origin-time-weather/result.md).
+
+Terms: **E** is the assembled network. The **eight** are the 8 Primaries with MVA-only telemetry and
+the **six** the 6 with signed-MW telemetry. D15 and D18 are report-only. CRPS is the continuous
+ranked probability score in points of capacity (smaller is better). A-pool is [experiment
+425](../00425-best-mdn-architecture-assembly-with-ablations/result.md)'s arm A as scored in experiments
+533 and 537. Rows are the 1,142,520 rows of experiment 533's `main16` with no labelled event, July
+2026 unused. Intervals are Bonferroni-widened (42 counted tests: 3 contrasts, 7 lead bands, 2 row
+sets) month-block bootstraps with 5 blocks, which is near the minimum to maximum of the folds. The
+minimum detectable effect (MDE) is the 95% half-width of the two seeds' spread over the folds.
+
+![CRPS by lead band](figure_1_crps_by_lead.svg)
+
+## Predictions (written before any score was read)
+
+- **P1, met in direction, better than the stated size.** E minus A-pool at the eight is +0.031
+  at 120 to 240 h (interval -0.125 to +0.200, MDE 0.16), inside the MDE. At 24 to 48 h it is +0.205
+  (+0.138 to +0.283, MDE 0.13), above the MDE but below the predicted +0.23 to +0.27.
+- **P2, narrow miss.** E minus L-1d at the eight is -0.083 and -0.084 at 24 to 48 h and 48 to 72 h,
+  just outside the predicted -0.08 to 0.00; the other bands from 24 h are inside it. No interval at
+  the eight excludes zero, as predicted.
+- **P3, met.** E minus the rebuilt K2-S1 at 120 to 240 h at the eight is -0.310 (-0.584 to +0.058),
+  not shown different from zero (1 of 5 folds positive).
+- **P4, met.** The injected-shift leak of E is 4.55 points of capacity over all leads, against 4.49
+  for L-1d (threshold 4.99) and 5.68 for R-DW.
+
+## Scores
+
+Absolute CRPS, all leads (points of capacity):
+
+| Set | E | L-1d | R-DW | A-pool | Rebuilt K2-S1 |
+|---|---|---|---|---|---|
+| Eight | 4.790 | 4.855 | 4.713 | 4.682 | 5.068 |
+| Eight, cold winter nights | 4.309 | 4.479 | 4.270 | 4.161 | 5.035 |
+| Six | 3.446 | 3.493 | 3.449 | 3.457 | 3.698 |
+| D15 and D18 (report-only) | 10.816 | 10.876 | 10.004 | 10.652 | 12.195 |
+
+E minus comparator at the eight (difference, Bonferroni interval; folds where E is worse; MDE):
+
+| Band | E - L-1d | E - A-pool | E - R-DW |
+|---|---|---|---|
+| 0-6h | -0.113 (-0.338, +0.028; 1/5; 0.27) | +0.130 (+0.008, +0.211; 4/5; 0.27) | +0.104 (-0.118, +0.358; 3/5; 0.27) |
+| 6-12h | -0.079 (-0.215, +0.031; 2/5; 0.20) | +0.286 (+0.109, +0.501; 5/5; 0.20) | +0.272 (+0.161, +0.419; 5/5; 0.20) |
+| 12-24h | -0.072 (-0.146, +0.001; 1/5; 0.17) | +0.340 (+0.235, +0.483; 5/5; 0.17) | +0.188 (+0.058, +0.314; 5/5; 0.17) |
+| 24-48h | -0.083 (-0.173, +0.030; 1/5; 0.13) | +0.205 (+0.138, +0.283; 5/5; 0.13) | +0.136 (+0.006, +0.260; 4/5; 0.13) |
+| 48-72h | -0.084 (-0.161, +0.017; 1/5; 0.14) | +0.170 (+0.128, +0.244; 5/5; 0.14) | +0.118 (+0.007, +0.206; 4/5; 0.14) |
+| 72-120h | -0.068 (-0.142, +0.013; 1/5; 0.10) | +0.132 (+0.025, +0.236; 5/5; 0.10) | +0.098 (-0.008, +0.210; 4/5; 0.10) |
+| 120-240h | -0.051 (-0.109, +0.013; 1/5; 0.16) | +0.031 (-0.125, +0.200; 3/5; 0.16) | +0.025 (-0.087, +0.187; 2/5; 0.16) |
+
+At the six, E minus L-1d is -0.037 to -0.089 in every band, E minus A-pool is within +/-0.11, and no
+interval excludes zero except E minus L-1d at 12 to 24 h (-0.089, -0.153 to -0.017) and E minus R-DW
+at 12 to 24 h and 6 to 12 h. The full tables are in this experiment's private `scores/` folder.
+
+![E minus each comparator](figure_2_e_minus_comparators.svg)
+
+- **Cold winter nights, the eight (report-only, uncorrected for slices).** E minus L-1d is -0.169
+  over all leads (-0.221 to +0.103; 1 of 5 folds positive) and E minus A-pool is +0.148 (+0.076
+  to +0.207), so the windows help on cold nights by about as much as elsewhere, and the gap to A-pool
+  is larger there.
+- **Tails, the eight.** The q95 and q99 pinball loss of E minus L-1d is within 0.01 of zero in every
+  band. The share of rows below the q95 forecast is 0.967 for E, 0.968 for L-1d, and 0.952 for
+  A-pool, so the widened bands of E and L-1d are somewhat wide at the top.
+- **Fold signs, the eight, E minus L-1d over all leads:** -0.136 (2025-10), -0.027 (2025-12),
+  -0.082 (2026-01), +0.024 (2026-03), -0.109 (2026-06).
+
+![Injected-shift leak](figure_3_injected_shift_leak.svg)
+
+## Method
+
+- **Arm E.** Experiment 511's L-1d (daily refit at 00:00 UTC, 90-day half-life, two seeds, 5 folds)
+  with three columns appended after the 37 lag-free columns: the mean ensemble temperature over the 6,
+  24, and 72 hours ending at the valid time (experiment 515's `previous`-seam tables). Code reused
+  from the folders of experiments 397, 428, 510, 511, 515, 521, and 539. Weights stored under this
+  experiment's private data folder.
+- **Pretraining.** E starts from W-T pretrained weights: experiments 515 and 526's for 2025-12,
+  2026-01, and 2026-03, and this experiment's for 2025-10 and 2026-06 (same code). L-1d starts from
+  experiment 510's pretrained weights, so E minus L-1d is the windows plus new pretrained weights.
+- **Origin-time weather, row by row.** Every training and test row's weather run was issued 9 h
+  before its origin and the target follows the origin (asserted for all 24,979,347 training rows and
+  1,142,520 test rows; `nwp_init_time <= power_fcst_init_time` for all rows of all 153 test origins).
+  The window columns use only that run and earlier runs. Example (2025-12 test row): origin
+  2025-12-31 09:00 UTC, target 2026-01-08 08:30 UTC, weather run 2025-12-31 00:00 UTC.
+- **Dropped.** The 4-head mixture (experiment 527), per-lead widening (experiment 523: at most 0.024
+  points), and a two-stage ensemble calibrator (no stored follow-up of experiment 524 supports it).
+- **Not scored.** Experiment 526's ten winter folds hold no L-1d, A-pool, or R-DW scores.
+
+## Checks
+
+- **Median minus mean forecast, and the error of the mean forecast beside CRPS:** not computed. The
+  fitted forecasts store 11 quantiles and no mean column, so triggers 3 cannot be assessed.
+- **Triggers fired:** the miss on P2 (trigger 2) is 0.003 to 0.004 points and has the stated
+  explanation of the different pretrained weights; no audit was run. Leave-one-fold-out checks
+  were not run; the fold signs above show E minus L-1d negative in 4 of 5 folds.
+- **Caveats.** Two seeds, five folds, one stress seed. The comparison with L-1d mixes the windows
+  with new pretrained weights. Labelled events are incomplete: NGED's logs may miss events, so rows
+  with no labelled event may still hold one. No example-forecast figure is included because arm E
+  stores forecasts without the actual power; experiments 511 and 523 show the day-ahead and
+  14-day forecasts of the same network without the windows.
+- **Lead range.** The forecasts cover 0 to 240 h, which spans the NGED 1 to 10 day horizon.
+
+## What the next experiment should answer
+
+Does a network with both the windows and the day-ago and week-ago lags close the 0 to 5 day gap with
+less injected-shift leak than R-DW has, for example by down-weighting lags near a flagged event?
