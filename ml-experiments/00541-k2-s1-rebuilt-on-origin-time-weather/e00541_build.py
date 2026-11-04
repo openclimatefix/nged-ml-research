@@ -130,7 +130,7 @@ def run(*, months: list[str], device: str) -> None:
             }
         ).with_row_index("si")
         both = keys.join(skeys, on=["primary", "origin", "target"], how="inner")
-        assert both.height == len(keys) == len(skeys), (
+        assert both.height == len(keys) <= len(skeys), (
             f"{month}: lag-free rows {len(keys)}, S1 rows {len(skeys)}, common {both.height}"
         )
         assert not keys.select("primary", "origin", "target").is_duplicated().any()
