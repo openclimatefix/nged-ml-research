@@ -72,34 +72,39 @@ advice:
   - >-
     Do not expect pooling the 2 bulk and 2 grid supply points with the Primaries to improve the
     Primaries' forecasts; the gain over M0 was +0.026 at the eight and -0.054 at the six, both
-    within the minimum detectable effect (table of contrasts).
+    within the minimum detectable effect (Results, first table).
   - >-
     Include the extra series in fine-tuning, not only in pretraining, if one network must forecast
     them, because the pretraining-only arm scored 33.6 at one grid supply point against 15.7 when
-    they were also fine-tuned (extra-series table).
+    they were also fine-tuned (Results, second table).
   - >-
     Fit the input standardiser on the Primaries only when comparing against an earlier 16-series
-    network, because this experiment fitted it on all 20 series (Not done).
+    network, because this experiment fitted it on all 20 series (Checks).
 production_status: not-for-production
 adopted_in: none
 ---
 
 **Adding two bulk supply points (BSPs) and two grid supply points (GSPs) to the training rows of the
-demand network did not lower its forecast error at the 16 Primaries.** The change in CRPS (lower is
-better) at leads of 24 to 120 h is +0.026 points of capacity at the eight MVA-only Primaries
-(Bonferroni interval -0.048 to +0.125) and -0.054 at the six signed-MW Primaries (-0.169 to +0.022).
-Both are smaller than the minimum detectable effect (0.113 and 0.128). The same network forecasts
-the four extra series better than a climatology. Verdict: not supported.
+modular lag-free demand neural network M0 did not lower its forecast error at the 16 primary
+substations ("Primaries") at leads of 24 to 120 h.** Error is the continuous ranked probability score
+(CRPS, lower is better), in percentage points of each series' effective capacity. The pooled network
+M2-a minus M0 is +0.026 at the eight Primaries that report apparent power in MVA (Bonferroni interval
+-0.048 to +0.125) and -0.054 at the six that report signed power in MW (-0.169 to +0.022).
+Neither difference is larger than the smallest effect the experiment could detect (0.113 and 0.128).
+At longer leads of 120 to 240 h, M2-a is better at the six (-0.106, interval -0.308 to -0.023). The
+same network forecasts the four extra series better than a climatology. Verdict: not supported.
 
 We asked whether more series help the shared weather and calendar encoders of the modular network M0
 ([experiment 545](../00545-modular-lag-free-demand-network-weather-and-datetime-encoders/result.md),
-replicated in [experiment 554](../00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out/result.md)).
-[Experiment 563](../00563-pooled-primary-bsp-gsp-data-check/result.md) found only 4 such series, so
-the maintainer asked for this reduced test. Each of the four extra series (D1 and D6 are GSPs, D13
-and D17 are BSPs) has its own embedding row, and a fixed one-hot series type (Primary, BSP, or GSP)
-feeds the datetime encoder. The arms are M2-a (extra series in pretraining and fine-tuning), M2-b
-(pretraining only), and M2-c (fine-tuning only, from M0's pretrained weights). The control is M0 with
-the same 2 seeds (0 and 1), on the rows of [experiment
+replicated in [experiment
+554](../00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out/result.md)). [Experiment
+563](../00563-pooled-primary-bsp-gsp-data-check/result.md) found only 4 bulk or grid supply points
+with usable data in NGED's metadata, so the maintainer asked for this reduced test of those 4. Each
+of the four extra series (D1 and D6 are GSPs, D13 and D17 are BSPs) has its own embedding row, and a
+fixed one-hot series type (Primary, BSP, or GSP) feeds the datetime encoder. The arms are M2-a
+(extra series in pretraining and fine-tuning), M2-b (pretraining only), and M2-c (fine-tuning only,
+from M0's pretrained weights). The control is M0 fitted with the same 2 seeds (0 and 1), on the rows
+of [experiment
 511](../00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/result.md): 5 folds,
 daily refit, 90-day half-life, rows with no labelled event. "The eight" are the MVA-only Primaries
 and "the six" the signed-MW Primaries; D15 and D18 are report-only. The harness is experiment 554's,
@@ -124,10 +129,16 @@ comes from the 2-seed spread of M2-a.
 **The Primaries did not gain.** Absolute CRPS at 24 to 120 h at the eight is 4.491 (M2-a), 4.481
 (M2-b), 4.496 (M2-c), 4.465 (M0, seeds 0 and 1), 4.433 (M0, 5 seeds), 4.609 (L-1d, 5 seeds), and
 5.521 (`manual_heuristic`). At the six it is 3.213, 3.225, 3.300, 3.267, 3.245, 3.306, and 4.686.
-M2-a was worse than M0 in 2 of 5 folds at the eight and in 2 of 5 at the six, with fold signs that
-differ between folds. Leaving D8 out does not change any sign. Of the pre-registered predictions,
-P1 failed (no gain of 0.05 at the eight), P2 held (M2-b is not shown better than M2-a: minus M2-a is
--0.010, interval -0.069 to +0.035), and P3 was not tested (below).
+M2-a was worse than M0 in 2 of 5 folds at the eight and in 2 of 5 at the six. Leaving D8 out does not
+change the sign of any 24-120 h contrast in the table. Other bands and sets have intervals that
+exclude zero: M2-a minus M0 at the six is -0.106 at 120-240 h (-0.308 to -0.023) and -0.078 over all
+leads (-0.230 to -0.005); M2-b at the six is -0.067 at 12-24 h (-0.130 to -0.010); M2-c at the eight
+is +0.054 at 120-240 h (+0.025 to +0.105); and M2-c at D8 alone is -0.094 at 24-120 h (-0.184 to
+-0.049). With 42 counted tests, a few such intervals are expected by chance. Of the pre-registered predictions,
+P1 failed on both clauses (no gain of 0.05 at the eight; at the six M2-a is 0.054 away from M0, outside
+the allowed 0.03). The rule that fails the experiment (within 0.02 of M0 at both groups) did not
+fire, so the verdict rests on the gain threshold. P2 held (M2-b minus M2-a is -0.010, interval -0.069
+to +0.035), and P3 was not tested (below).
 
 **The extra series are forecast better by the pooled network than by a climatology, and only if they
 are fine-tuned.** CRPS at 24 to 120 h, over the five folds (climatology is the empirical quantiles
@@ -142,8 +153,8 @@ of the same month, half-hour, and weekend cell in the 24 months before the test 
 
 ![CRPS at the four extra series by arm](figure_2_extra_series.svg)
 
-The single-network L-1d of experiment 511 was never fitted to these series, so it is not a
-reference here. The GSPs include the BSPs beneath them (NGED's hierarchy file), and no series'
+The single lag-free neural network L-1d of experiment 511 was never fitted to these series, so it is
+not a reference here. The GSPs include the BSPs beneath them (NGED's hierarchy file), and no series'
 target is another series' input, because the network reads no power.
 
 ![M2-a day-ahead forecast at a BSP](figure_3_example_BSP_day_ahead.svg)
@@ -171,10 +182,10 @@ target is another series' input, because the network reads no power.
   differ from M0's because the embedding grew. The sign and size of these effects were not measured.
 - **Median forecast minus mean forecast; mean-forecast error beside the CRPS contrasts.** Not
   computed, because the network stores quantiles only.
-- **Audit triggers.** Trigger 2: the result contradicts the pre-registered P1, but no earlier
-  experiment's finding (experiment 415 found adding the nodes changed the Primaries by -0.022, within
-  noise). No explanation was tested and no audit was run. Trigger 4: leaving D8 out flips no sign.
-  Trigger 5: M2-b is not better than M2-a by more than its interval.
+- **Audit triggers.** The result contradicts the pre-registered P1, but no earlier experiment's
+  finding (experiment 415 found adding the nodes changed the Primaries by -0.022, within noise). No
+  explanation was tested and no audit was run. Leaving D8 out flips no sign of a 24-120 h contrast.
+  No nested arm beats the arm that contains it by more than its interval.
 
 ## Not done
 
@@ -182,9 +193,8 @@ target is another series' input, because the network reads no power.
   extra series raise the leak is unknown.
 - **No single-network reference was fitted to the extra series.** The comparison is a climatology.
 - **Two seeds only.** The M2-a minimum detectable effect rests on 2 seeds.
-- **Interim.** The labels are unaudited, and NGED's event labels are incomplete, so rows that look
-  clean may hold unlabelled events.
-- **Lead range.** The scores cover leads of 0 to 240 h; the NGED horizon of 1 to 10 days is covered.
+- **The results are interim.** The labels are unaudited, and NGED's event labels are incomplete, so
+  rows that look clean may hold unlabelled events.
 
 ## What the next experiment should answer
 
