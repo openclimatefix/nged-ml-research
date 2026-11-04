@@ -10,7 +10,8 @@ Arms (all `d` cadence, 90-day half-life unless the name says otherwise):
 
 - `L-1d`: the single multilayer network of experiment 511, seeds 2 to 4 run here (seeds 0 and 1 are 511's).
 - `M0`, `M0lr`: experiment 545's arms, seeds 2 to 4 run here (seeds 0 and 1 are 545's).
-- `M0-sep`: M0's separate encoders, but the pretrained mixer is kept at fine-tuning (no spread or lead input).
+- `M0-sep`: M0's separate encoders, but the pretrained mixer is kept at fine-tuning (no spread or
+  lead input).
 - `M0-mix`: the single network of L-1d, whose last two linear layers are re-initialised at fine-tuning.
 - `M0-hl180`: M0 with a 180-day recency half-life.
 - `M0-c3`: M0 refitted every third day (cutoffs on days 0, 2, 5, 8, ...).
@@ -103,7 +104,7 @@ assert COLUMNS[m.LEAD_COLS] == ["lead", "lead_sqrt"]
 
 
 def cutoffs(*, month: str, cadence: str) -> list[datetime]:
-    """Experiment 511's cutoffs; arm M0-c3 (which passes cadence `d` so 511's stress window is 7 days) refits on days 0, 2, 5, 8, ..."""
+    """Experiment 511's cutoffs; arm M0-c3 refits on days 0, 2, 5, 8, ... (it passes cadence `d`)."""
     if ARGS.arm != "M0-c3":
         return _cutoffs(month=month, cadence=cadence)
     start, stop = c.month_start(month=month), c.month_stop(month=month)
@@ -128,7 +129,7 @@ def new_model(
     if FAMILY != "modular":
         return _new_model(outlier=False, n_inputs=n_inputs, n_primaries=n_primaries)
     assert n_inputs == m.N_INPUTS
-    return m.ModularMdn(n_primaries=n_primaries, stage=stage or STAGE)
+    return m.ModularMdn(n_primaries=n_primaries, stage=stage or STAGE)  # ty: ignore[invalid-argument-type]
 
 
 def load_pretrained(*, model: torch.nn.Module, path: Path) -> None:

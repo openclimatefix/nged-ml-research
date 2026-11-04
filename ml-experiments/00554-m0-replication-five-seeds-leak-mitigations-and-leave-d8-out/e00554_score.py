@@ -125,7 +125,7 @@ def main():
                             "band": band,
                             "arm": arm,
                             "n": sub.height,
-                            "crps": float(sub.filter(pl.col(col).is_finite())[col].mean()),
+                            "crps": float(sub.filter(pl.col(col).is_finite())[col].mean()),  # ty: ignore[invalid-argument-type]
                         }
                     )
             mm = (

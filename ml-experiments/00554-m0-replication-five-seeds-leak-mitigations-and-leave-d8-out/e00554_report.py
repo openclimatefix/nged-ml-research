@@ -10,7 +10,7 @@ from typing import Final
 
 import altair as alt
 import polars as pl
-from e00521_refs import DATA as DATA_521
+from e00521_refs import DATA as DATA_521  # ty: ignore[unresolved-import]
 from plotting import ocf_theme as theme
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -144,9 +144,9 @@ def per_primary() -> pl.DataFrame:
     eight = g.filter(pl.col("primary").is_in(EIGHT))
     for a in ARMS:
         col = f"{a} - L-1d5"
-        print(
-            f"{a}: negative at {int((eight[col] < 0).sum())} of {eight.height} of the eight; mean of per-Primary means {float(eight[col].mean()):.3f}"
-        )  # ty: ignore[invalid-argument-type]
+        mean = float(eight[col].mean())  # ty: ignore[invalid-argument-type]
+        negative = int((eight[col] < 0).sum())
+        print(f"{a}: negative at {negative} of {eight.height} of the eight; mean {mean:.3f}")
     return g
 
 
@@ -179,7 +179,7 @@ def figure_gain() -> None:
         )
         dot = base.mark_point(filled=True, size=45).encode(x="difference:Q", color=colour)  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black")
             .encode(x="x:Q")
         )  # ty: ignore[unresolved-attribute]
