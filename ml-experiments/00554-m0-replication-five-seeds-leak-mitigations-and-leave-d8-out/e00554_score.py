@@ -43,7 +43,7 @@ CONTRASTS = [
 ]
 TESTS = 2 * 7 * 2  # 2 counted contrasts x 7 bands x 2 sets
 POOLED = "24-120h"
-"""A lead band added here: the three bands 24-48 h, 48-72 h, and 72-120 h pooled (prediction P1 and P3)."""
+"""The 24-48 h, 48-72 h, and 72-120 h bands pooled (predictions P1 and P3)."""
 NEW = [
     a
     for a in SEED_ARMS

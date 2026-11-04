@@ -9,7 +9,6 @@
 | 487 | Does mixing ERA5-and-CAMS rows into the fine-tuning batches improve the demand network on cold winter nights and in the tails? | 1 | Nothing | Finished: plain replay does not help cold nights at the eight; gain at the six is below the seed-noise minimum detectable effect |
 | 511 | How often should the lag-free demand network be refitted (daily, twice weekly, weekly), which recency half-life suits it, and does mixed ERA5, CAMS, and ENS pretraining help? | 1 | Nothing | Finished: daily refit beats weekly by 0.065 (eight) and 0.063 (six) CRPS; shorter half-lives and mixed pretraining do not help |
 | 519 | How large a share of ECMWF ENS rows should the lag-free demand network's pretraining contain (0%, 10%, 25%, 50%, 75%, 100%), with and without the source flag, and does an ENS-only second stage help? | 1 | Nothing | Planned |
-| 554 | Does the modular lag-free demand network keep its gain over L-1d with 5 seeds, which of its two changes raises its injected-shift leak, and does the gain survive without D8? | 1 | Nothing | Planned |
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
 
 ## Planned experiments
