@@ -7,7 +7,21 @@ title: >-
 theme: demand-inputs
 also_relevant_to:
   - weather-products-and-blending
-status: planned
+status: done
+verdict: not supported
+best_arm: >-
+  None. Neither encoder beat the 37-column base W0, and the shuffled-day control C-CNN-null scored
+  better than C-CNN.
+headline: >-
+  Neither convolutional window encoder improved the lag-free network: C-CNN scored +0.072 (eight) and
+  +0.125 (six) CRPS points worse than W0 on all rows, T-CNN +0.086 and +0.079, and every Bonferroni-8
+  interval includes zero.
+production_status: not-for-production
+take_home_message: >-
+  A small convolutional encoder over 24 hours of ensemble-mean weather did not improve the lag-free
+  demand network: on all rows both encoders scored 0.07 to 0.13 CRPS points worse than the base, with
+  every interval including zero, and the encoder reading real windows scored worse than the same
+  encoder reading shuffled-day windows.
 kind: other
 protocol: demand-v2
 size: >-
@@ -55,76 +69,101 @@ metric: >-
   against cold-overcast slices.
 ---
 
-**This experiment asks whether a learned encoder over the recent weather beats both the 37-column
-lag-free network and the hand-built trailing windows of experiment 515.** It is planned, with no fit
-run. Experiment 515 owns the folds, the base weights, the minimum detectable effect, and the
-later-runs-removed leak check; this experiment reuses them and builds only the half-hourly window
-builder and the encoder.
+**Take-home: a learned 24-hour weather window did not help the lag-free demand network, and the
+hand-built trailing windows of experiment 515 remain the only window input with any sign of a gain
+(on cold nights at the eight MVA-only Primaries, itself unresolved against a shuffled-day placebo).**
+Both encoders scored worse than the 37-column base on all rows, and the encoder that read real
+windows scored worse than the same encoder reading shuffled-day windows. The next step is to
+stop spending fits on learned windows and to resolve experiment 515's placebo question first.
 
-## Question
+We asked whether a one-dimensional convolutional encoder over the seven ensemble-mean weather
+variables (shortwave, longwave, temperature, dew point, surface pressure, precipitation, and 10 m
+wind speed) at 48 half-hourly positions improves the lag-free demand network. The folds, seeds, rows,
+slices, bootstrap, and base forecasts are experiment 515's. Contrasts are arm minus W0 in points of
+CRPS (negative favours the arm), with a Bonferroni-8 interval over fold blocks (10 blocks).
 
-The lag-free network (37 columns: 14 ensemble mean and spread weather columns at the valid time, 3
-solar geometry, 12 calendar, 6 holiday, 2 lead, plus the Primary embedding) sees weather at the
-valid time only. Does a one-dimensional convolutional encoder over the 24 hours of ensemble-mean
-weather around the valid time improve it? Every earlier neural test of trailing weather (experiments
-419, 437, 441, 442) fed the network three origin lags of power, which may have carried the same
-information. Experiment 6 (XGBoost) is the only earlier lag-free window test.
+![Each arm against W0](figure_1_headline.svg)
 
-## Arms
+![The encoders against the shuffled-day control and W-T](figure_2_against_references.svg)
 
-| Arm | What it is |
-|---|---|
-| C-CNN | Encoder over a 24 h window centred on the valid time (12 h before to 11.5 h after), 48 half-hourly positions of 7 variables. |
-| T-CNN | The same encoder over the 24 h ending at the valid time. |
-| C-CNN-null | C-CNN reading shuffled-day windows (experiment 513's placebo rule), so a gain from extra parameters alone is visible. |
-| Base | The 37-column network of experiment 515, not refitted here. |
+![Cold-night difference in each fold](figure_3_per_fold.svg)
 
-The seven variables are the ensemble means of shortwave, longwave, temperature, dew point, surface
-pressure, precipitation, and 10 m wind speed. The encoder is two strided convolutions (16 then 32
-channels, kernel 5) flattened (not pooled, so the position of a change inside the window survives)
-into an 8-number vector that is concatenated to the 37 columns before the mixture network. The new
-first layer is wider, so every arm is pretrained afresh and no weights are zero-initialised.
+## Results
 
-## The window rule
+- **Arms.** C-CNN reads the window centred on the valid time (12 h before to 11.5 h after). T-CNN
+  reads the 24 h ending at the valid time. C-CNN-null is C-CNN reading the window of a shuffled
+  other day (experiment 515's placebo rule). Each encoder is two strided convolutions (16 and 32
+  channels, kernel 5), flattened into an 8-number vector that joins the 37 columns. Every arm is
+  pretrained afresh on ERA5 and CAMS rows and fine-tuned on ensemble rows, with 3 seeds on 10 winter
+  folds (90 pretrains, 90 fine-tunes).
+- **Scoring windows are built as at serving.** Windows read the half-hourly series, which is a
+  linear interpolation of the ensemble's 3-hourly steps to 144 h and 6-hourly steps after, so
+  nothing is finer than 3 h on day 1 and nothing finer than 6 h beyond day 6. ERA5 windows used in
+  pretraining are subsampled to the same step grid and then interpolated.
+- **Minimum detectable effect, seed spread alone, 3-seed mean over the 10 folds:** 0.26 (eight) and
+  0.34 (six) on all rows, and 0.37 and 0.49 on cold nights. Every contrast below is smaller than
+  these, so this experiment cannot resolve a gain of 0.03 to 0.10.
+- **All rows.** C-CNN: +0.072 [-0.165, +0.338] at the eight (3 of 10 folds negative) and +0.125
+  [-0.068, +0.410] at the six (4 of 10). T-CNN: +0.086 [-0.172, +0.376] (6 of 10) and +0.079
+  [-0.132, +0.337] (5 of 10).
+- **Cold nights.** C-CNN: -0.044 [-0.248, +0.146] at the eight (6 of 10) and +0.131 [-0.141, +0.538]
+  at the six (4 of 10). T-CNN: -0.087 [-0.391, +0.193] and +0.046 [-0.237, +0.351].
+- **Cold sunny days at the six are worse with the centred encoder.** C-CNN is +0.430 [+0.025,
+  +1.066] (3 of 10 folds negative) and T-CNN +0.250 [+0.091, +0.557] (1 of 10). These two intervals
+  exclude zero, but the Bonferroni family is 8 primary tests and this slice is outside it.
+- **Against experiment 515's hand-built windows, the encoders are no better.** C-CNN minus W-T is
+  +0.077 [-0.180, +0.357] at the eight and +0.225 [-0.069, +0.638] at the six on all rows. T-CNN
+  minus W-T is +0.090 and +0.178. The 0.03 margin for "learned beats hand-built" is not met.
+- **The shuffled-day control scored better than the real windows.** C-CNN-null minus W0 is +0.004
+  [-0.102, +0.084] at the eight and -0.096 [-0.344, +0.052] at the six on all rows, and -0.167
+  [-0.512, -0.004] and -0.167 [-0.539, +0.010] on cold nights. C-CNN minus C-CNN-null is +0.069
+  and +0.221 on all rows. A control that reads no information about the day scoring 0.17 points
+  better than the base on cold nights shows that fit-to-fit variation (seed spread, and the extra
+  inputs changing the pretrained weights) can exceed any window effect here.
+- **Tails.** On cold nights, C-CNN changes q95 pinball loss by -0.018 (eight) and +0.059 (six), and
+  q99 by -0.012 and +0.045; coverage moves by at most 0.008, all intervals include zero. T-CNN
+  changes q95 by -0.037 and -0.034.
+- **Horizon bands.** No band resolves: at days 4 to 10, C-CNN is +0.060 (eight) and +0.128 (six).
+- **Absolute CRPS (points of capacity), all rows and cold nights.** W0: 5.40 and 4.67 at the eight,
+  4.16 and 3.44 at the six. C-CNN: 5.47 and 4.63, 4.29 and 3.57. T-CNN: 5.49 and 4.58, 4.24 and 3.49.
 
-- **Every window is built on the half-hourly series, at every lead** (maintainer, 2026-11-02). At
-  scoring and in fine-tuning the series is the ensemble-mean summary, which is a linear interpolation
-  of the ensemble's steps (3-hourly to 144 h, 6-hourly to 360 h; confirmed in the stored NWP of
-  the 2025-05-09 run: 85 steps, shortwave empty at step 0).
-- **ERA5 windows used in pretraining are subsampled to that step grid and then interpolated**
-  (`e00516_window.step_interpolate`), so the training and scoring series are equally smooth. Beyond
-  144 h the series carries no information finer than 6 h, and nothing is finer than 3 h on day 1.
-  The write-up says so.
-- **ERA5 values are the `:00` rows** of `era5_features.parquet` (the `:30` rows are interpolation),
-  with July 2026 cut. Shortwave comes from the hourly CAMS file with its hour-end stamps.
-- **Windows reaching before the origin read the history** (each earlier run's first day), as in
-  experiment 437. Nothing after the row's origin is read from a later run. A history position that
-  is missing is held at the nearest finite value, and the number of missed runs is stored beside
-  each row as a degradation flag.
-- **Scoring uses ensemble windows built exactly as at serving**, never ERA5 windows.
+## Predictions
 
-## Folds, seeds, and cost
+- **P1 (C-CNN vs W0, -0.08 to +0.02 at both groups on all rows):** fails at the six (+0.125); at
+  the eight (+0.072) the loss is above +0.02 too, so P1 fails at both groups.
+- **P2 (C-CNN beats T-CNN by under 0.03):** C-CNN minus T-CNN is -0.014 at the eight and +0.046 at
+  the six, so P2 holds at the eight and the centred window is worse at the six.
+- **P3 (best CNN beats best hand-built arm by under 0.03):** passes, because the CNN arms are worse.
+- **P4 (C-CNN-null within the minimum detectable effect of the base):** passes on all rows and cold
+  nights, but only because the minimum detectable effect is wide.
 
-- **Folds and seeds are experiment 515's** (ten winter months, 3 seeds, no noise arm), and so are the
-  base weights and the minimum detectable effect, which this experiment quotes from 515 first.
-  Fits wait until 515's window features and later-runs-removed check are done, and reuse them.
-- **Fit count, before timing:** 3 arms x 10 folds x 3 seeds = 90 pretrains and 90 fine-tunes.
-- **Cost, before timing:** an encoder pretrain is assumed to take 3 to 5 times the 18 to 24 s of a
-  37-column pretrain, so 90 pretrains take 1.4 to 3.0 GPU-hours. The first arm is timed and the fit
-  count and cost reported to the manager before the remaining fits.
-- **Memory:** pretraining windows are gathered on the GPU from one dense array per Primary (7
-  variables on the half-hourly grid). Fine-tuning and scoring windows are gathered from one combined
-  array per (Primary, run) of the history and the run (about 0.4 GB in total). One GPU process, under
-  8 GB.
+## Checks and caveats
 
-## Pre-registered rules
+- **Weather inputs come from runs issued at or before the origin.** `e00516_leak_check.py` rebuilt
+  144,000 window positions (3,000 test rows of 2025-12 x 48 positions) from the stored summaries.
+  Every position after the origin came from the row's own run and every position at or before it
+  from an earlier run's first day; the largest source-run origin minus row origin was 0 half-hours,
+  and values agreed to 1.1e-5 (float32). Example row: Primary index 4, origin grid index 109746,
+  valid grid index 109977.
+- **Windows with a missing source are filled with the training mean (0 after standardising).** No
+  sampled window held a missing source. Placebo rows with no donor day keep their own window: 10,752
+  to 19,068 rows per fold across pretraining, fine-tuning, and test tables.
+- **ERA5 windows differ from ensemble windows.** On fine-tuning rows, ERA5 minus ensemble windows
+  differ by 0.35 (temperature) to 0.81 (precipitation) standardised standard deviations. The
+  encoder is pretrained on ERA5 windows and scored on ensemble windows, which may explain why real
+  windows score worse than shuffled ones; this is unproven.
+- **Not done:** the noise arm (experiment 515's coherent ensemble-minus-ERA5 noise) because no
+  variant passed the stop rule,.
+- **Event labels are incomplete,** so "rows with no labelled event" may hold unlabelled events.
+- **Review:** the fit script, the scorer, and the leak check had no separate code review (one
+  fresh Sonnet review of the whole diff precedes merge).
+- **Cost.** Per fold: feeder 16 to 22 s; pretrain 20 to 35 s (about the same as a 37-column
+  pretrain, not the 3 to 5 times assumed); fine-tune 7 to 9 s; peak 6.1 GB of RAM.
 
-- **Bonferroni count 8:** 2 variants x 2 groups x (all rows, cold nights). Reported, not corrected: q95
-  and q99 cold-night tests and the cold-sunny against cold-overcast slice.
-- **Horizon bands** day 1, days 2 to 3, days 4 to 10; month-block bootstrap intervals with the fold
-  count stated and per-fold signs.
-- **Noise arm only for a variant that passes**, defined as in experiment 515 (temporally coherent,
-  per window column and lead band, offset fitted before the refit).
-- **Reporting rules:** "rows with no labelled event", "load-shift", Farm A to C and Solar A to F,
-  the OCF palette with no mark in `#fffbf5`, interim numbers labelled interim and unaudited.
-- **Merging:** merge commit, never squash; diff only in `ml-experiments/` and `docs/ml-experiments/`.
+## What to try next
+
+- **Resolve experiment 515's placebo question before any learned window.** A shuffled-day control
+  beat the real windows here and gained at the eight in experiment 515, so a control with the
+  same columns is the first thing a window experiment has to beat.
+- **Pretrain on ensemble-like windows,** by adding the coherent noise of experiment 515 to the ERA5
+  windows, only if a hand-built window passes first.
