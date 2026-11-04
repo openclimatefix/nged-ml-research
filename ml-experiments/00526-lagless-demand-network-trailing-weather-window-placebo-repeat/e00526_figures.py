@@ -46,7 +46,7 @@ EXAMPLES: Final[list[tuple[str, str, str]]] = [
 
 def _zero(*, axis: str) -> alt.Chart:
     return (
-        alt.Chart(pl.DataFrame({"z": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"z": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color="black")
         .encode(**{axis: "z:Q"})
     )  # ty: ignore[unresolved-attribute]
@@ -77,7 +77,7 @@ def _forest(
             y=alt.Y("pair:N", sort=order, title=None), yOffset="slice_label:N"
         )  # ty: ignore[unresolved-attribute]
         colour = alt.Color("slice_label:N", scale=alt.Scale(domain=list(slices.values()), range=[theme.BRAND_ORANGE, theme.DATA_BLUE][: len(slices)]), legend=alt.Legend(title=None, orient="top"))  # fmt: skip
-        bar = base.mark_rule(strokeWidth=3).encode(
+        bar = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "lo:Q", title="CRPS difference (points of capacity; negative favours the first arm)"
             ),
@@ -107,7 +107,7 @@ def _per_fold(*, frame: pl.DataFrame) -> None:
     for label in GROUPS.values():
         part = table.filter(pl.col("group") == label).to_pandas()
         dots = (
-            alt.Chart(part)
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=70, color=theme.BRAND_ORANGE)
             .encode(
                 x=alt.X("fold:N", title=None, axis=alt.Axis(labelAngle=-45)),
@@ -136,7 +136,7 @@ def _examples() -> pl.DataFrame:
         local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
         days = rows.with_columns(day=local.dt.date()).group_by("power_fcst_init_time", "day").agg(pl.len().alias("n")).filter(pl.col("n") >= 16).sort("power_fcst_init_time", "day")  # fmt: skip
         init, day = days["power_fcst_init_time"][0], days["day"][0]
-        window = rows.filter((pl.col("power_fcst_init_time") == init)).select(*ids, "actual")
+        window = rows.filter(pl.col("power_fcst_init_time") == init).select(*ids, "actual")
         start = window["valid_time"].min()
         full = pl.read_parquet(fit.stored_forecast(arm="W0", month=month, seed=0)).filter((pl.col("time_series_id") == ts_id) & (pl.col("power_fcst_init_time") == init)).select(*ids)  # fmt: skip
         full = full.filter(pl.col("valid_time") >= start).head(80)
@@ -183,16 +183,16 @@ def _example_figure() -> None:
         base = alt.Chart(part).encode(x=alt.X("valid_time:T", title="Valid time (UTC)"))  # ty: ignore[unresolved-attribute]
         colour = alt.Color("arm:N", scale=alt.Scale(domain=list(LINE_COLOURS), range=list(LINE_COLOURS.values())), legend=alt.Legend(title=None, orient="top"))  # fmt: skip
         band = (
-            base.transform_filter(alt.datum.arm == "W-T")
+            base.transform_filter(alt.datum.arm == "W-T")  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.18, color=theme.BRAND_ORANGE)
             .encode(y="q05:Q", y2="q95:Q")
         )  # ty: ignore[unresolved-attribute]
-        lines = base.mark_line(strokeWidth=2).encode(
+        lines = base.mark_line(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q50:Q", title="Demand (% of capacity)", scale=alt.Scale(zero=False)),
             color=colour,
         )  # ty: ignore[unresolved-attribute]
         actual = (
-            base.transform_filter(alt.datum.arm == "W0")
+            base.transform_filter(alt.datum.arm == "W0")  # ty: ignore[unresolved-attribute]
             .mark_line(color="black", strokeDash=[4, 3])
             .encode(y="actual:Q")
         )  # ty: ignore[unresolved-attribute]

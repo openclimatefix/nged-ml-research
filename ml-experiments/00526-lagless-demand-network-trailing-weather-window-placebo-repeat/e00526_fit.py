@@ -308,7 +308,7 @@ def run(*, jobs: list[dict], device: str, refit_mean: bool) -> None:
                     keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
                     both = old.join(new, on=keys, how="inner", suffix="_new")
                     diff = max(
-                        float((both[q] - both[f"{q}_new"]).abs().max())
+                        float((both[q] - both[f"{q}_new"]).abs().max())  # ty: ignore[invalid-argument-type]
                         for q in ("q01", "q50", "q99")
                     )  # ty: ignore[invalid-argument-type]
                     print(f"    refit vs stored {arm} {month} s{seed}: {both.height}/{old.height} rows matched, max |difference| in q01, q50, q99 = {diff:.6f}", flush=True)  # fmt: skip
