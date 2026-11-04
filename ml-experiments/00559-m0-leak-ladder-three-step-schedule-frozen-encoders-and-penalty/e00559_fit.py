@@ -33,6 +33,7 @@ import e00428_data as data  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k  # ty: ignore[unresolved-import]
 import e00511_fit as f  # ty: ignore[unresolved-import]
+import e00559_folded as folded
 import e00559_model as m
 import numpy as np
 import polars as pl
@@ -76,6 +77,7 @@ class Spec:
     lr: float = c.FINE_TUNE_LR
     max_epochs: int = c.MAX_EPOCHS
     average_of: str | None = None  # the arm whose daily weights are averaged (A5)
+    head: str = "mixture"  # "folded": folded-normal head for the MVA-only Primaries (A8)
 
 
 SPECS = {
@@ -88,6 +90,7 @@ SPECS = {
         Spec("A5", "step2", average_of="A1"),
         Spec("A6", "fresh", half_life=180.0),
         Spec("A7", "fresh", cadence="c3"),
+        Spec("A8", "step2", head="folded"),
     )
 }
 parser = argparse.ArgumentParser()
@@ -134,8 +137,65 @@ def pretrained_file(*, month: str, seed: int) -> Path:
 
 
 def step2_file(*, month: str, seed: int) -> Path:
-    """Return the saved step-2 weights."""
-    return W / "step2" / f"{month}_s{seed}.pt"
+    """Return the saved step-2 weights (arm A8 has its own, trained with the folded head's loss)."""
+    return W / ("step2_a8" if SPEC.head == "folded" else "step2") / f"{month}_s{seed}.pt"
+
+
+FOLDED: dict[str, torch.Tensor] | None = None
+"""Per-Primary `offset` (target mean over target std) and `mask` (MVA-only eight) for arm A8, set by `set_folded`."""
+MVA_ONLY_GROUP = "MVA-only eight"
+
+
+def set_folded(*, mr: c.MonthRows, device: str) -> None:
+    """Set the folded head's per-Primary tables from the month's target statistics (arm A8 only)."""
+    global FOLDED  # noqa: PLW0603
+    if SPEC.head != "folded":
+        return
+    sites = pl.read_csv(
+        ML_EXPERIMENTS_DATA_DIR
+        / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free/site_map.csv"
+    )
+    group = dict(zip(sites["primary"].to_list(), sites["group"].to_list(), strict=True))
+    n = len(mr.base.target_mean)
+    mask = np.array([group[i] == MVA_ONLY_GROUP for i in range(n)])
+    offset = (mr.base.target_mean / mr.base.target_std).astype(np.float32)
+    FOLDED = {
+        "offset": torch.from_numpy(offset).to(device),
+        "mask": torch.from_numpy(mask).to(device),
+    }
+    print("folded head on", int(mask.sum()), "of", n, "Primaries", flush=True)
+
+
+def row_nll(*, out: torch.Tensor, z: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
+    """Return each row's negative log-likelihood (folded for MVA-only Primaries under arm A8)."""
+    if FOLDED is None:
+        return base.mixture_nll(out=out, z=z, components=m.COMPONENTS)
+    return folded.folded_nll(
+        out=out, z=z, offset=FOLDED["offset"][p], folded=FOLDED["mask"][p], components=m.COMPONENTS
+    )
+
+
+def serving_quantiles(
+    *, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor, outlier: bool
+) -> torch.Tensor:
+    """Return the 11 standardised quantiles; folded rows use the folded CDF (replaces experiment 510's)."""
+    assert not outlier
+    with torch.no_grad():
+        log_w, mean, std = base.mixture_parts(out=model(x, p).double(), components=m.COMPONENTS)
+        q = base.mixture_quantiles(log_w=log_w, mean=mean, std=std)
+        if FOLDED is not None:
+            rows = FOLDED["mask"][p]
+            if bool(rows.any()):
+                q[rows] = folded.folded_quantiles(
+                    log_w=log_w[rows],
+                    mean=mean[rows],
+                    std=std[rows],
+                    offset=FOLDED["offset"][p][rows].double(),
+                )
+        return q
+
+
+c.serving_quantiles = serving_quantiles
 
 
 def fresh_mixer(*, model: m.ModularMdn) -> None:
@@ -213,7 +273,7 @@ def train(  # noqa: PLR0912
         order = order[: int(c.ROW_FRACTION * len(order))]
         for start in range(0, len(order), c.BATCH):
             b = order[start : start + c.BATCH]
-            nll = base.mixture_nll(out=model(x[b], p[b]), z=z[b], components=m.COMPONENTS)
+            nll = row_nll(out=model(x[b], p[b]), z=z[b], p=p[b])
             loss = (w[b] * nll).sum() / w[b].sum()
             if anchors is not None:
                 loss = loss + lam * sum(
@@ -230,7 +290,7 @@ def train(  # noqa: PLR0912
             val = float(
                 torch.cat(
                     [
-                        base.mixture_nll(out=model(x[i], p[i]), z=z[i], components=m.COMPONENTS)
+                        row_nll(out=model(x[i], p[i]), z=z[i], p=p[i])
                         for i in val_idx.split(c.BATCH * 2)
                     ]
                 ).mean()
@@ -318,6 +378,7 @@ def step2(*, device: str) -> None:
             continue
         mr = k.build_month(month=month, clean=clean)
         g = k.GpuMonth(mr=mr, device=device)
+        set_folded(mr=mr, device=device)
         cut = c.month_start(month=month)
         refit, t = refit_rows(g=g, cut=cut, half_life=UNIFORM_HALF_LIFE)
         assert float(t["w"].min()) > 0.999, "step 2 must have no recency weighting"
@@ -443,6 +504,7 @@ def fit_arm(
         mr = k.build_month(month=month, clean=clean)
         test = data.build_test(month=month, standardiser=mr.base.standardiser)
         g = k.GpuMonth(mr=mr, device=device)
+        set_folded(mr=mr, device=device)
         cuts = k.cutoffs(month=month, cadence=CADENCE)
         start_day = c.month_start(month=month)
         if stress:
