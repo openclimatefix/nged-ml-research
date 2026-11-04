@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0912, PLR0915, D103
+# ruff: noqa: E501, PLR0912, PLR0915, D103, D209, PT018, PERF401
 """Blend R-DW with the retrained K2-S1 by lead band, weights fitted walk-forward, and score it.
 
 Inputs are stored (read-only, no fit): experiment 539's R-DW quantiles (seed average in
@@ -30,7 +30,9 @@ from e00435_tailcore import widen  # ty: ignore[unresolved-import]
 
 DD: Final[Path] = Path(build470.ML_EXPERIMENTS_DATA_DIR)
 E539: Final[Path] = DD / "00539-l1d-plus-day-and-week-lags" / "work"
-K2: Final[Path] = DD / "00541-k2-s1-rebuilt-on-origin-time-weather" / "work" / "cells" / "K2-S1-origin-trained"
+K2: Final[Path] = (
+    DD / "00541-k2-s1-rebuilt-on-origin-time-weather" / "work" / "cells" / "K2-S1-origin-trained"
+)
 OUT: Final[Path] = DD / "00549-k2-s1-blend-and-climatology-stored-check"
 CELLS: Final[tuple[int, ...]] = (0, 1, 2)
 MONTHS: Final[tuple[str, ...]] = s.MONTHS
@@ -84,10 +86,17 @@ def month_table(*, month: str) -> tuple[pl.DataFrame, pl.DataFrame, list[pl.Data
     return rows, rdw, cells
 
 
-def mean_crps(*, left: pl.DataFrame, cells: list[pl.DataFrame], weight: np.ndarray, actual: np.ndarray) -> np.ndarray:
+def mean_crps(
+    *, left: pl.DataFrame, cells: list[pl.DataFrame], weight: np.ndarray, actual: np.ndarray
+) -> np.ndarray:
     """Return the per-row CRPS of the blend of `left` with each cell, averaged over the cells."""
     return np.mean(
-        [metrics(quantiles=blend_frame(left=left, right=cell, weight=weight), actual=actual)["crps"] for cell in cells],
+        [
+            metrics(quantiles=blend_frame(left=left, right=cell, weight=weight), actual=actual)[
+                "crps"
+            ]
+            for cell in cells
+        ],
         axis=0,
     )
 
@@ -106,12 +115,25 @@ def main() -> None:
         for cell in cells:
             ok &= finite(cell)
         assert (rows["target"] > rows["origin"]).all()
+        before = int(rows["main16"].sum())
         rows = rows.with_columns(main16=pl.col("main16") & pl.Series(ok))
+        print(
+            month,
+            "main16 rows",
+            before,
+            "->",
+            int(rows["main16"].sum()),
+            "after requiring all K2-S1 cells",
+            flush=True,
+        )
         left = left.fill_null(0.0)
         cells = [cell.fill_null(0.0) for cell in cells]
         actual = rows["actual"].to_numpy().astype(np.float64)
         grids[month] = np.stack(
-            [mean_crps(left=left, cells=cells, weight=np.full(rows.height, w), actual=actual) for w in GRID],
+            [
+                mean_crps(left=left, cells=cells, weight=np.full(rows.height, w), actual=actual)
+                for w in GRID
+            ],
             axis=1,
         )
         stored_crps = rows["R-DW__crps"].to_numpy().astype(np.float64)
@@ -129,7 +151,12 @@ def main() -> None:
         assert err < 1e-2, (month, "K2-S1", err)
         rows = rows.with_columns(**{"K2-S1__crps": pl.Series(grids[month][:, -1])})
         tables[month] = (rows, left, cells, actual)
-        print(month, rows.height, "rows; both parents reproduced from the stored quantiles", flush=True)
+        print(
+            month,
+            rows.height,
+            "rows; both parents reproduced from the stored quantiles",
+            flush=True,
+        )
 
     weights = []
     for i, month in enumerate(MONTHS):
@@ -142,11 +169,14 @@ def main() -> None:
                 cols, n = [], 0
                 for m in earlier:
                     rows = tables[m][0]
-                    sel = (rows["main16"] & (rows["group"] == group) & (rows["band"] == band)).to_numpy()
+                    sel = (
+                        rows["main16"] & (rows["group"] == group) & (rows["band"] == band)
+                    ).to_numpy()
                     if group == "signed_six":
                         sel &= (rows["cls"] == "clean").to_numpy()
                     cols.append(grids[m][sel])
                     n += int(sel.sum())
+                assert n > 0, (month, name, band)
                 means = np.concatenate(cols).mean(axis=0)
                 weights.append(
                     {"fold": month, "set": name, "band": band, "weight": float(GRID[int(np.argmin(means))]),
@@ -161,19 +191,44 @@ def main() -> None:
     group_name = {v: k for k, v in GROUPS.items()}
     for month in SCORED:
         rows, left, cells, actual = tables[month]
-        w = np.array([lookup[(month, group_name[g], b)] for g, b in zip(rows["group"].to_list(), rows["band"].to_list(), strict=True)])
+        w = np.array(
+            [
+                lookup[(month, group_name[g], b)]
+                for g, b in zip(rows["group"].to_list(), rows["band"].to_list(), strict=True)
+            ]
+        )
         extra = {"weight": w, "blend__crps": mean_crps(left=left, cells=cells, weight=w, actual=actual),
                  "blend-half__crps": mean_crps(left=left, cells=cells, weight=np.full(rows.height, 0.5), actual=actual)}  # fmt: skip
-        tails = [metrics(quantiles=blend_frame(left=left, right=cell, weight=w), actual=actual) for cell in cells]
-        for k in ("pin_q01", "pin_q05", "pin_q95", "pin_q99", "cov_q01", "cov_q05", "cov_q95", "cov_q99"):
+        tails = [
+            metrics(quantiles=blend_frame(left=left, right=cell, weight=w), actual=actual)
+            for cell in cells
+        ]
+        for k in (
+            "pin_q01",
+            "pin_q05",
+            "pin_q95",
+            "pin_q99",
+            "cov_q01",
+            "cov_q05",
+            "cov_q95",
+            "cov_q99",
+        ):
             extra[f"blend__{k}"] = np.mean([t[k] for t in tails], axis=0)
         for c, cell in enumerate(cells):
-            extra[f"blend-cell{c}__crps"] = metrics(quantiles=blend_frame(left=left, right=cell, weight=w), actual=actual)["crps"]
+            extra[f"blend-cell{c}__crps"] = metrics(
+                quantiles=blend_frame(left=left, right=cell, weight=w), actual=actual
+            )["crps"]
         out = rows.hstack(pl.DataFrame({k: pl.Series(k, v) for k, v in extra.items()}))
         out.write_parquet(OUT / "scores" / f"rows_{month}.parquet")
         outputs.append(out)
         if example is None:
-            i = int(np.flatnonzero((rows["group"] == "mva_eight").to_numpy() & (rows["band"] == "48-72h").to_numpy() & rows["main16"].to_numpy())[0])
+            i = int(
+                np.flatnonzero(
+                    (rows["group"] == "mva_eight").to_numpy()
+                    & (rows["band"] == "48-72h").to_numpy()
+                    & rows["main16"].to_numpy()
+                )[0]
+            )
             quant = blend_frame(left=left, right=cells[0], weight=w)
             example = {
                 "fold": month, "primary": int(rows["primary"][i]), "origin_index": int(rows["origin"][i]),
@@ -195,7 +250,11 @@ def main() -> None:
         if group == "signed_six":
             part = part.filter(pl.col("cls") == "clean")
         for band in (*s.BANDS, POOLED, s.ALL):
-            sub = part.filter(pl.col("band").is_in(POOLED_BANDS)) if band == POOLED else s.in_band(part=part, band=band)
+            sub = (
+                part.filter(pl.col("band").is_in(POOLED_BANDS))
+                if band == POOLED
+                else s.in_band(part=part, band=band)
+            )
             if sub.height == 0:
                 continue
             for arm, col in arms.items():
@@ -209,12 +268,19 @@ def main() -> None:
                        .sort("month").select([f"blend-cell{c}__crps" for c in CELLS]).to_numpy())  # fmt: skip
             f, k = seedmat.shape
             resid = seedmat - seedmat.mean(axis=1, keepdims=True)
-            mde = 1.96 * math.sqrt(2) * math.sqrt(float((resid**2).sum()) / (f * (k - 1))) / math.sqrt(k)
+            mde = (
+                1.96
+                * math.sqrt(2)
+                * math.sqrt(float((resid**2).sum()) / (f * (k - 1)))
+                / math.sqrt(k)
+            )
             for a, b, counted in CONTRASTS:
-                d = sub.select("month", "day", d=pl.col(arms[a]) - pl.col(arms[b])).filter(pl.col("d").is_finite())
+                d = sub.select("month", "day", d=pl.col(arms[a]) - pl.col(arms[b])).filter(
+                    pl.col("d").is_finite()
+                )
                 contrasts.append({"set": name, "band": band, "contrast": f"{a} - {b}",
                                   "counted": counted and band in s.BANDS and name != "report",
-                                  "tests": TESTS, "mde": mde, **s.block_stats(diff=d, rng=rng, tests=TESTS)})  # fmt: skip
+                                  "tests": TESTS, "mde": mde if "blend" in (a, b) and "blend-half" not in (a, b) and "A-pool" not in (a, b) else float("nan"), **s.block_stats(diff=d, rng=rng, tests=TESTS)})  # fmt: skip
     pl.DataFrame(absolute).write_csv(OUT / "scores" / "absolute.csv")
     pl.DataFrame(contrasts).write_csv(OUT / "scores" / "contrasts.csv")
     checks = {"scored_folds": list(SCORED), "first_fold_unscored": MONTHS[0], "rows_scored": table.height,
