@@ -78,8 +78,6 @@ advice:
     treating it as a reference for long lead (this experiment, section on caveats).
 ---
 
-# K2-S1 rebuilt on origin-time weather
-
 **Take-home message: K2-S1's lead over the daily lag-free network L-1d at 5 to 10 days was a
 look-ahead, and with the look-ahead removed K2-S1 scores worse than L-1d from 24 hours ahead.** The
 next step is to retrain the lag-free heads on origin-time weather, because the rebuilt K2-S1 here
