@@ -85,7 +85,7 @@ def best_arm(t, sub_eight):
     means = {
         a: float(sub.filter(pl.col(f"{a}__crps").is_finite())[f"{a}__crps"].mean()) for a in cand
     }
-    return min(means, key=means.get), means
+    return min(means, key=lambda arm: means[arm]), means
 
 
 def main():
@@ -122,6 +122,10 @@ def main():
     contrasts_spec += [
         (f"LAG-{a}", f"LAG-{b}", False) for i, a in enumerate(MODES) for b in MODES[:i]
     ]
+    unique: dict = {}
+    for a, b, counted in contrasts_spec:
+        unique[(a, b)] = unique.get((a, b), False) or counted
+    contrasts_spec = [(a, b, counted) for (a, b), counted in unique.items()]
     absolute, contrasts = [], []
     for name in ("eight", "eight_no_d8", "six", "report"):
         part = s.row_set(table=t, name="eight" if name == "eight_no_d8" else name)

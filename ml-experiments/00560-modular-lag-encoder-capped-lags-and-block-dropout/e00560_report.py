@@ -105,8 +105,8 @@ def figure_gain() -> None:
         zero = (
             alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
             .mark_rule(color="black")
-            .encode(x="x:Q")
-        )  # ty: ignore[unresolved-attribute]
+            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        )
         panels.append(
             alt.layer(zero, bar, dot).properties(
                 width=WIDTH, height=240, title=alt.TitleParams(label, anchor="start")
