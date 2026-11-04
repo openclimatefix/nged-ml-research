@@ -33,16 +33,17 @@ WORK = Path(
     + "/ml-experiments/00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network"
 )
 W = WORK / "work"
-EXTRA_IDX = {"R-DW-24": [1, 2, 4, 5, 7, 8]}
+EXTRA_IDX = {"R-DW-24": [1, 2, 4, 5, 7, 8], "R-DW-24-PT": [1, 2, 4, 5, 7, 8]}
 parser = argparse.ArgumentParser()
-parser.add_argument("command", choices=("fit", "assemble"))
+parser.add_argument("command", choices=("fit", "assemble", "pretrain"))
 parser.add_argument("--arm", choices=list(EXTRA_IDX), required=True)
 parser.add_argument("--stress", action="store_true")
 parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
 parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 parser.add_argument("--limit", type=int, default=None)
 ARGS = parser.parse_args()
-ARM = f.Arm(ARGS.arm, "d", 90.0)
+PT = ARGS.arm == "R-DW-24-PT"
+ARM = f.Arm(ARGS.arm, "d", 90.0, pretrained="PT" if PT else "L0PT")
 
 NAMES, MASK, LAYOUT = prep.feature_names(scheme="summary")
 LAG = LAYOUT.columns_of(groups=["lags"])
@@ -80,7 +81,15 @@ def load_pretrained(*, model, path):
     model.load_state_dict(state)
 
 
-c.load_pretrained = load_pretrained
+def load_pretrained_lags(*, model, path):
+    """Load weights pretrained with the lag inputs present (R-DW-24-PT); no zero initialisation."""
+    state = torch.load(path, map_location="cpu")
+    model.load_state_dict(state)
+
+
+c.load_pretrained = load_pretrained_lags if PT else load_pretrained
+if PT:
+    f.pretrained_file = lambda *, arm, month, seed: W / "pretrained" / "PT" / f"{month}_s{seed}.pt"
 f.W = W
 f.model_file = lambda *, arm, month, day, seed, stress="": (
     W / "models" / arm.tag / f"{month}_d{day}_s{seed}{stress}.pt"
@@ -165,6 +174,7 @@ def verify_capped_values(*, x, clean, primary, target_idx, origin_idx, standardi
             else:
                 assert x[i, POS[f"{slot}_missing"]] == 1.0, f"{label} {slot} flag at row {i}"
         i = int(sel[0])
+        j = target_idx[i] - period * (-(-(target_idx[i] - origin_idx[i] + 48) // period))
         out += f"{slot}: lag index {j} for target {target_idx[i]}, origin {origin_idx[i]}; "
     return f"{label}: capped lags match an independent loop on {len(sel)} rows; {out}"
 
@@ -367,7 +377,7 @@ def window_frame(*, model, test, mr, lo, hi, flag, device):
         test = dataclasses.replace(test, x=x)
     frame = _window_frame(model=model, test=test, mr=mr, lo=lo, hi=hi, flag=flag, device=device)
     CTX["absent_frame"] = None
-    if ARGS.arm == "R-DW-24" and not CTX["on"] and frame is not None:
+    if not CTX["on"] and frame is not None:
         x = test.x.copy()
         for n in NEW_NAMES:
             x[:, POS[n]] = (
@@ -392,13 +402,10 @@ _atomic_frame = f.atomic_frame
 
 def atomic_frame(*, frame, target):
     _atomic_frame(frame=frame, target=target)
-    if (
-        ARGS.arm == "R-DW-24"
-        and CTX.get("absent_frame") is not None
-        and target.parent.name == "R-DW-24"
-    ):
+    if True and CTX.get("absent_frame") is not None and target.parent.name == ARGS.arm:
         _atomic_frame(
-            frame=CTX["absent_frame"], target=target.parent.parent / "R-DW-24-absent" / target.name
+            frame=CTX["absent_frame"],
+            target=target.parent.parent / f"{ARGS.arm}-absent" / target.name,
         )
 
 
@@ -406,7 +413,7 @@ f.fine_tune, f.window_frame, f.atomic_frame = fine_tune, window_frame, atomic_fr
 
 
 def assemble():
-    for tag in (ARM.tag, "R-DW-24-absent") if ARM.tag == "R-DW-24" else (ARM.tag,):
+    for tag in (ARM.tag, f"{ARM.tag}-absent"):
         assemble_one(tag=tag)
 
 
@@ -419,11 +426,11 @@ def assemble_one(*, tag):
                 for cut in cuts
             ]
             # R-DW-24-absent shares R-DW-24's windows, so an empty R-DW-24 window is empty here too
-            twin = lambda p: (p.parent.parent / "R-DW-24" / p.name).with_suffix(".empty")
+            twin = lambda p: (p.parent.parent / ARM.tag / p.name).with_suffix(".empty")
             assert all(
                 p.exists()
                 or p.with_suffix(".empty").exists()
-                or (tag == "R-DW-24-absent" and twin(p).exists())
+                or (tag.endswith("-absent") and twin(p).exists())
                 for p in parts
             ), (month, seed)
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
@@ -431,9 +438,102 @@ def assemble_one(*, tag):
             print("wrote", tag, month, seed, frame.height, flush=True)
 
 
+def mask_inputs(*, x, mask_all, mask_day, age_max):
+    """Set masked lag inputs to value 0, flag 1, age at the maximum (in place)."""
+    for n in NEW_NAMES:
+        value = 1.0 if n.endswith("_missing") else (age_max[n] if n.endswith("_age") else 0.0)
+        x[mask_all | (mask_day if n.startswith("lag_day") else False), POS[n]] = value
+
+
+def pretrain(*, device):
+    """Pretrain on ERA5/CAMS rows with the capped lags and block dropout present (5 folds x seeds)."""
+    import time
+
+    import e00448_run as r448  # ty: ignore[unresolved-import]
+
+    clean = c.clean_stack()
+    for month in ARGS.months:
+        todo = [
+            s for s in ARGS.seeds if not (W / "pretrained" / "PT" / f"{month}_s{s}.pt").exists()
+        ]
+        if not todo:
+            continue
+        refit_t = c.month_start(month=month)
+        rows = data.build_fold(refit=refit_t, clean=clean)
+        pre = r448.pretrain_rows(rows=rows, refit=refit_t, clean=clean)
+        share = put_capped(
+            x=pre.x,
+            clean=clean,
+            primary=pre.primary,
+            target_idx=pre.target_idx,
+            origin_idx=pre.origin_idx,
+            lead=pre.lead,
+            standardiser=rows.standardiser,
+        )
+        ex = verify_capped_values(
+            x=pre.x,
+            clean=clean,
+            primary=pre.primary,
+            target_idx=pre.target_idx,
+            origin_idx=pre.origin_idx,
+            standardiser=rows.standardiser,
+            label=f"{month} pretrain",
+        )
+        grid, step = c.prep422.GRID_START_US, c.prep422.STEP_US
+        latest = datetime.fromtimestamp((grid + pre.target_idx.max() * step) / 1e6, UTC)
+        assert grid + pre.target_idx.max() * step <= c.us(t=refit_t) - c.CUTOFF_AGE_US
+        print(
+            f"{month}: pretraining rows {len(pre.x):,}; latest valid {latest}; {share}; {ex}",
+            flush=True,
+        )
+        age_max = {n: float(pre.x[:, POS[n]].max()) for n in POS if n.endswith("_age")}
+        z = (pre.y - rows.target_mean[pre.primary]) / rows.target_std[pre.primary]
+        for seed in todo:
+            started = time.monotonic()
+            x = pre.x.copy()
+            mask_all, mask_day = lags.block_dropout_masks(origin_idx=pre.origin_idx, seed=seed)
+            mask_inputs(x=x, mask_all=mask_all, mask_day=mask_day, age_max=age_max)
+            print(
+                f"  seed {seed}: rows all-lags-masked {mask_all.mean():.3f}, day-lag-only {mask_day.mean():.3f}",
+                flush=True,
+            )
+            torch.manual_seed(seed)
+            model = c.new_model(
+                outlier=False, n_inputs=x.shape[1], n_primaries=len(rows.target_mean)
+            ).to(device)
+            epochs, best = c.train(
+                model=model,
+                x=torch.from_numpy(x).to(device),
+                z=torch.from_numpy(z.astype(np.float32)).to(device),
+                w=torch.ones(len(z), device=device),
+                p=torch.from_numpy(pre.primary).to(device),
+                is_val=torch.from_numpy(pre.is_val).to(device),
+                seed=seed,
+                lr=c.PRETRAIN_LR,
+                outlier=False,
+                prior=False,
+                device=device,
+            )
+            target = W / "pretrained" / "PT" / f"{month}_s{seed}.pt"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            tmp = target.with_suffix(".tmp")
+            torch.save(model.state_dict(), tmp)
+            tmp.rename(target)
+            print(
+                f"  pretrain PT {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s",
+                flush=True,
+            )
+            del model, x
+            torch.cuda.empty_cache()
+        del pre, rows, z
+
+
 if __name__ == "__main__":
     if ARGS.command == "assemble":
         assemble()
+    elif ARGS.command == "pretrain":
+        assert PT, "pretrain is for --arm R-DW-24-PT"
+        pretrain(device="cuda")
     else:
         f.fit_arm(
             arm=ARM,
