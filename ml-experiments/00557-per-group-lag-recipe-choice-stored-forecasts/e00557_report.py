@@ -43,15 +43,15 @@ def main() -> None:
     )
     x = alt.X("band:N", sort=BANDS, title="Lead time")
     base = alt.Chart(contrasts)
-    rule = base.mark_rule().encode(
+    rule = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
         x=x,
         y=alt.Y("low_month:Q", title="Lag-light minus lag-free CRPS (points of capacity)"),
         y2="high_month:Q",
         color=colour,
         xOffset="group:N",
     )
-    pts = base.mark_point(filled=True, size=60).encode(x=x, y="difference:Q", color=colour, xOffset="group:N")  # fmt: skip
-    zero = alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas()).mark_rule(color="black", strokeDash=[3, 3]).encode(y="y:Q")  # fmt: skip
+    pts = base.mark_point(filled=True, size=60).encode(x=x, y="difference:Q", color=colour, xOffset="group:N")  # fmt: skip  # ty: ignore[unresolved-attribute]
+    zero = alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas()).mark_rule(color="black", strokeDash=[3, 3]).encode(y="y:Q")  # fmt: skip  # ty: ignore[unresolved-attribute]
     (rule + pts + zero).properties(
         width=480,
         height=260,
