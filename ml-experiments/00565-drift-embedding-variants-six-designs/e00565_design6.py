@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PTH123, SIM115
 """Experiment 565, stage 1: design 6, a slow residual correction of stored forecasts (CPU, no fit).
 
 For a base arm's forecast row with origin `o` and Primary `p`, the correction is the exponentially
@@ -183,9 +183,7 @@ def load_scored() -> pl.DataFrame:
 def score() -> None:
     """Write absolute CRPS and contrasts (corrected minus its base; corrected minus A-pool gap closed)."""
     t = load_scored()
-    arms = [a for a in SOURCES] + [
-        arm_name(base=b, half_life=h) for b in SOURCES for h in HALF_LIVES
-    ]
+    arms = list(SOURCES) + [arm_name(base=b, half_life=h) for b in SOURCES for h in HALF_LIVES]
     arms += ["A-pool", "L-1d", "manual_heuristic"]
     need = [f"{a}__crps" for a in arms if a != "manual_heuristic"]
     fin = pl.all_horizontal([pl.col(c).is_finite() for c in need])
