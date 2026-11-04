@@ -1,5 +1,5 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501
-"""Write per-row CRPS of R-MED, R-DROP and R-DROP-absent with 470's scorer on 511's rows (mirrors e00537_rows)."""
+"""Write per-row CRPS of the 558 arms with 470's scorer on 511's rows (mirrors e00544_rows)."""
 
 import os
 from pathlib import Path
@@ -14,13 +14,21 @@ import polars as pl
 W = Path(
     str(
         Path(os.environ["DATA_PATH_INTERNAL"])
-        / "ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/work"
+        / "ml-experiments/00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network/work"
     )
 )
 SRC511 = k511.WORK_DIR / "predictions"
 FIVE = build470.MONTHS
 assert FIVE == ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06"), FIVE
-NEW = ("R-MED", "R-DROP", "R-DROP-absent")
+ALL_NEW = (
+    "R-DW-24",
+    "R-DW-24-absent",
+    "R-DW-24-PT",
+    "R-DW-24-PT-absent",
+    "A-pool-24",
+    "A-pool-24-absent",
+)
+NEW = tuple(a for a in ALL_NEW if (W / "seed_preds" / a).is_dir())
 
 
 def main():

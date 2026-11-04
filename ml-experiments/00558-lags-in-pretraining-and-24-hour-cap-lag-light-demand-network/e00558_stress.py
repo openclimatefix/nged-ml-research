@@ -1,5 +1,5 @@
 # ruff: noqa: E501, E741
-"""Injected-shift leak of R-MED and R-DROP (544), R-DW (539), R1, R9 (538) and L-1d (511).
+"""Injected-shift leak of the 558 arms, R-DW (539) and L-1d (511).
 
 The leak is the sign times the change in the median forecast, in points of capacity, by block age
 and lead band.
@@ -11,21 +11,21 @@ from pathlib import Path
 import polars as pl
 
 DD = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
-W = DD / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/work/fits"
+W = DD / "00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network/work/fits"
 D539 = DD / "00539-l1d-plus-day-and-week-lags/work/fits"
-O = DD / "00538-l1d-plus-recent-level-and-lags/work/fits"
 L = DD / "00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/work/fits/L-1d"
 MONTHS = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 KEYS = ["time_series_id", "power_fcst_init_time", "valid_time"]
 rows = []
 for arm, folder in (
     ("L-1d", L),
-    ("R1", O / "R1"),
-    ("R9", O / "R9"),
     ("R-DW", D539 / "R-DW"),
-    ("R-MED", W / "R-MED"),
-    ("R-DROP", W / "R-DROP"),
+    ("R-DW-24", W / "R-DW-24"),
+    ("R-DW-24-PT", W / "R-DW-24-PT"),
+    ("A-pool-24", W / "A-pool-24"),
 ):
+    if not folder.is_dir():
+        continue
     for m in MONTHS:
         for day in range(14, 21):
             ctrl = pl.read_parquet(folder / f"{m}_d{day}_s0.parquet").select(*KEYS, c="q50")
@@ -57,7 +57,7 @@ for arm, folder in (
 t = pl.DataFrame(rows)
 t.write_csv(
     DD
-    / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/scores/stress_leak_long.csv"
+    / "00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network/scores/stress_leak_long.csv"
 )
 fold = t.group_by("arm", "month", "band").agg(pl.col("leak").mean())
 s = (
@@ -67,7 +67,7 @@ s = (
 )
 s.write_csv(
     DD
-    / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/scores/stress_leak.csv"
+    / "00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network/scores/stress_leak.csv"
 )
 byage = (
     t.filter(pl.col("band") == "all")
@@ -77,7 +77,7 @@ byage = (
 )
 byage.write_csv(
     DD
-    / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/scores/stress_leak_by_age.csv"
+    / "00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network/scores/stress_leak_by_age.csv"
 )
 with pl.Config(tbl_rows=60):
     print(s.with_columns(pl.col(pl.Float64).round(3)))

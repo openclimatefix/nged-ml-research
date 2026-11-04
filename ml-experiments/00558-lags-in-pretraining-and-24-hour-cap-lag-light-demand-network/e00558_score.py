@@ -1,5 +1,5 @@
 # ruff: noqa: ANN201, D103, E402, PTH123, SIM115
-"""Score R-MED, R-DROP, R-DROP-absent (544), R-DW (539) and R1, R9 (538) against L-1d and A-pool.
+"""Score the 558 arms against R-DW (539), L-1d, A-pool and the manual heuristic.
 
 Uses 533's rows, 533's loader and 521's statistics.
 """
@@ -17,41 +17,38 @@ sys.path[:0] = [str(p) for p in Path(__file__).resolve().parents[1].iterdir() if
 import e00521_stats as s  # ty: ignore[unresolved-import]
 
 DD = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
-W = DD / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout"
+W = DD / "00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]
-ARMS = {
-    "R-MED": "R-MED__crps",
-    "R-DROP": "R-DROP__crps",
-    "R-DROP-absent": "R-DROP-absent__crps",
-    "R-DW": "R-DW__crps",
-    "R1": "R1__crps",
-    "R9": "R9__crps",
-    "A-pool": "A-pool__crps",
-    "L-1d": "L-1d__crps",
-    "L-Ww": "L-Ww__crps",
-    "S2-J-0.4x": "S2-J-0.4x__crps",
-    "K2-S1": "K2-S1__crps",
-    "manual_heuristic": "manual_heuristic__crps",
-}
+NEW = tuple(
+    a
+    for a in (
+        "R-DW-24",
+        "R-DW-24-absent",
+        "R-DW-24-PT",
+        "R-DW-24-PT-absent",
+        "A-pool-24",
+        "A-pool-24-absent",
+    )
+    if (W / "work/seed_preds" / a).is_dir()
+)
+OLD = ("R-DW", "A-pool", "L-1d", "manual_heuristic")
+ARMS = {a: f"{a}__crps" for a in (*NEW, *OLD)}
+# counted contrasts: P1 cap cost, P2 pretraining lags, P3 A-pool-24 versus R-DW-24-PT (4 tests as pre-registered)
 CONTRASTS = [
-    ("R-MED", "R-DW", True),
-    ("R-DROP", "R-DW", True),
-    ("R-DROP-absent", "L-1d", True),
-    ("R-MED", "A-pool", False),
-    ("R-MED", "L-1d", False),
-    ("R-MED", "R9", False),
-    ("R-DROP", "A-pool", False),
-    ("R-DROP", "L-1d", False),
-    ("R-DROP", "R9", False),
-    ("R-DROP-absent", "A-pool", False),
-    ("R-DROP", "R-MED", False),
-    ("R-DW", "A-pool", False),
-    ("R-DW", "L-1d", False),
-    ("R-MED", "manual_heuristic", False),
-    ("R-DROP", "manual_heuristic", False),
+    ("R-DW-24", "R-DW", True),
+    ("R-DW-24-PT", "R-DW-24", True),
+    ("A-pool-24", "R-DW-24-PT", True),
+    ("R-DW-24", "L-1d", False),
+    ("R-DW-24-PT", "L-1d", False),
+    ("R-DW-24-PT", "R-DW", False),
+    ("A-pool-24", "A-pool", False),
+    ("R-DW-24-absent", "L-1d", False),
+    ("R-DW-24-PT-absent", "L-1d", False),
+    ("R-DW-24", "manual_heuristic", False),
 ]
-TESTS = 3 * 7 * 2  # 3 counted contrasts x 7 bands x 2 sets
+CONTRASTS = [c for c in CONTRASTS if c[0] in NEW and (c[1] in OLD or c[1] in NEW)]
+TESTS = 4  # pre-registered Bonferroni count
 
 
 def table():
@@ -69,7 +66,7 @@ def table():
         [
             pl.read_parquet(
                 W / "work/scores" / f"rows_{m}.parquet",
-                columns=[*K, "R-MED__crps", "R-DROP__crps", "R-DROP-absent__crps"],
+                columns=[*K, *(f"{a}__crps" for a in NEW)],
             )
             for m in s.MONTHS
         ]
@@ -84,16 +81,6 @@ def table():
         ]
     )
     mine = mine.join(dw, on=K, how="left", validate="1:1", maintain_order="left")
-    old = pl.concat(
-        [
-            pl.read_parquet(
-                DD / "00538-l1d-plus-recent-level-and-lags/work/scores" / f"rows_{m}.parquet",
-                columns=[*K, "R1__crps", "R9__crps"],
-            )
-            for m in s.MONTHS
-        ]
-    )
-    mine = mine.join(old, on=K, how="left", validate="1:1", maintain_order="left")
     assert base.select(K).equals(extra.select(K))
     drop = [c for c in ("A-pool__crps", "S2-J-0.4x__crps") if c in base.columns]
     t = pl.concat([base.drop(drop), extra.drop(K)], how="horizontal")
