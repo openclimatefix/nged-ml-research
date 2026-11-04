@@ -261,7 +261,7 @@ def block_of(*, clean, primary, target_idx, origin_idx, lead, extra_days=0) -> n
 
 def attach_tables(*, standardiser) -> None:
     """Build and upload the standardised expected-input tables of the fine-tuning and pretraining sources."""
-    for src in ("ft", "pre"):
+    for src in ("ft",):
         cols, origin = d.raw_table(source=src, cache=W / "expected")
         CTX[f"origin_{src}"] = np.asarray(origin)
         CTX[f"table_{src}"] = torch.from_numpy(
@@ -570,6 +570,10 @@ if __name__ == "__main__":
     elif ARGS.command == "pretrain":
         pretrain(device="cuda")
     else:
+        if ARGS.stress and list((W / "models" / ARM.tag).glob("*_stress*.pt")):
+            raise SystemExit(
+                f"stress models of {ARM.tag} exist; a resumed stress run would score reused models without the shift. Delete them and their fits first."
+            )
         f.fit_arm(
             arm=ARM,
             months=ARGS.months,
