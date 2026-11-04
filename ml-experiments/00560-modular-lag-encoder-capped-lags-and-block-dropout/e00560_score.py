@@ -119,6 +119,9 @@ def main():
     contrasts_spec += [(a, "M0", False) for a in mine if not a.count("-") > 1 and a != "LAG-v4"]
     contrasts_spec += [(a, "L-1d", False) for a in mine if a.count("-") == 1]
     contrasts_spec += [(f"LAG-{m}{x}", f"LAG-{m}", False) for m in MODES for x in SUFFIXES[1:]]
+    contrasts_spec += [
+        (f"LAG-{a}", f"LAG-{b}", False) for i, a in enumerate(MODES) for b in MODES[:i]
+    ]
     absolute, contrasts = [], []
     for name in ("eight", "eight_no_d8", "six", "report"):
         part = s.row_set(table=t, name="eight" if name == "eight_no_d8" else name)

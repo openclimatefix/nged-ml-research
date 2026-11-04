@@ -24,6 +24,8 @@ for arm, folder in ARMS:
         continue
     for m in MONTHS:
         for day in range(14, 21):
+            if not (folder / f"{m}_d{day}_s0.parquet").exists():
+                continue  # an arm still being fitted
             ctrl = pl.read_parquet(folder / f"{m}_d{day}_s0.parquet").select(*KEYS, c="q50")
             for sign, tag in ((1, "p"), (-1, "n")):
                 p = folder / f"{m}_d{day}_s0_stress{tag}.parquet"
