@@ -107,6 +107,8 @@ SPECS = {
         Spec("A10", "fresh", frozen=True, columns="real", source="drift"),
         Spec("A11", "fresh", columns="real", source="uv"),
         Spec("A11-null", "fresh", columns="null", source="uv"),
+        Spec("A11c", "fresh", columns="real", source="cloud"),
+        Spec("A11c-null", "fresh", columns="null", source="cloud"),
     )
 }
 parser = argparse.ArgumentParser()
@@ -254,6 +256,10 @@ def new_model(*, n_primaries: int, stage: str = "ft") -> m.ModularMdn:
     if SPEC.columns:
         if SPEC.source == "drift":
             return mdr.ModularMdnDrift(n_primaries=n_primaries, stage=stage, n_knots=KNOTS)
+        if SPEC.source == "cloud":
+            return mex.ModularMdnExtra(
+                n_primaries=n_primaries, stage=stage, n_weather=2, n_spread=1
+            )
         if SPEC.source == "uv":
             return mex.ModularMdnExtra(
                 n_primaries=n_primaries, stage=stage, n_weather=4, n_spread=4
@@ -350,14 +356,14 @@ def train(  # noqa: PLR0912, PLR0915
 _build_month, _build_test = k.build_month, data.build_test
 WT: wt.WtColumns | extra.ExtraColumns | extra.DriftColumns | None = None
 KNOTS: int = 0
-UV: extra.UvSource | None = None
+UV: extra.UvSource | extra.CloudSource | None = None
 
 
-def uv_source() -> extra.UvSource:
-    """Return the wind-component source, loaded once per process."""
+def uv_source() -> extra.UvSource | extra.CloudSource:
+    """Return the wind-component or cloud-cover source, loaded once per process."""
     global UV  # noqa: PLW0603
     if UV is None:
-        UV = extra.UvSource()
+        UV = extra.CloudSource() if SPEC.source == "cloud" else extra.UvSource()
     return UV
 
 
@@ -387,13 +393,16 @@ def build_month(*, month, clean):
         if SPEC.source == "drift":
             WT = extra.DriftColumns(month=month, mr=mr)
             KNOTS = WT.n_knots
-        elif SPEC.source == "uv":
+        elif SPEC.source in {"uv", "cloud"}:
             WT = extra.ExtraColumns(month=month, mr=mr, source=uv_source())
         else:
             WT = wt.WtColumns(month=month, mr=mr)
         mr.x = np.concatenate([mr.x, WT.month(null=SPEC.columns == "null")], axis=1)
         CHECK["months"][month]["wt_example"] = WT.example
         CHECK["months"][month]["placebo_rows_without_donor"] = WT.null_rows_without_donor
+        CHECK["months"][month]["fine_tune_rows_with_extra_values"] = getattr(
+            WT, "rows_with_value", None
+        )
         print(month, f"{SPEC.source} columns appended |", WT.example, flush=True)
     return mr
 
