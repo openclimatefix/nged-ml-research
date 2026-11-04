@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E741
+# ruff: noqa: E501
 """Injected-shift leak of the 558 arms, R-DW (539) and L-1d (511).
 
 The leak is the sign times the change in the median forecast, in points of capacity, by block age
@@ -24,7 +24,7 @@ for arm, folder in (
     ("R-DW-24-PT", W / "R-DW-24-PT"),
     ("A-pool-24", W / "A-pool-24"),
 ):
-    if not folder.is_dir():
+    if not (folder / "2025-10_d14_s0.parquet").exists():
         continue
     for m in MONTHS:
         for day in range(14, 21):
@@ -66,8 +66,7 @@ s = (
     .sort("band", "arm")
 )
 s.write_csv(
-    DD
-    / "00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network/scores/stress_leak.csv"
+    DD / "00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network/scores/stress_leak.csv"
 )
 byage = (
     t.filter(pl.col("band") == "all")

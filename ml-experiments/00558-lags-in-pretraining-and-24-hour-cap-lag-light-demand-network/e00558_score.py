@@ -29,6 +29,8 @@ NEW = tuple(
         "R-DW-24-PT-absent",
         "A-pool-24",
         "A-pool-24-absent",
+        "A-pool-24-drop",
+        "A-pool-24-drop-absent",
     )
     if (W / "work/seed_preds" / a).is_dir()
 )
@@ -46,6 +48,7 @@ CONTRASTS = [
     ("R-DW-24-absent", "L-1d", False),
     ("R-DW-24-PT-absent", "L-1d", False),
     ("R-DW-24", "manual_heuristic", False),
+    ("A-pool-24-drop", "A-pool-24", False),
 ]
 CONTRASTS = [c for c in CONTRASTS if c[0] in NEW and (c[1] in OLD or c[1] in NEW)]
 TESTS = 4  # pre-registered Bonferroni count
@@ -100,7 +103,7 @@ def main():
         "rows main16 with all arms finite": int(t["main16"].sum()),
         "columns used": need,
     }
-    json.dump(chk, open(W / "scores/checks.json", "w"), indent=1)
+    json.dump(chk, open(W / "work/scores/checks.json", "w"), indent=1)
     print(chk)
     rng = np.random.default_rng(0)
     absolute, contrasts = [], []
@@ -152,8 +155,8 @@ def main():
                         **st,
                     }
                 )
-    pl.DataFrame(absolute).write_csv(W / "scores/absolute.csv")
-    pl.DataFrame(contrasts).write_csv(W / "scores/contrasts.csv")
+    pl.DataFrame(absolute).write_csv(W / "work/scores/absolute.csv")
+    pl.DataFrame(contrasts).write_csv(W / "work/scores/contrasts.csv")
 
 
 main()

@@ -1,5 +1,6 @@
 # ruff: noqa: D100, I001, N812, PT018
-import sys, numpy as np
+import sys
+import numpy as np
 
 sys.path.insert(0, ".")
 import e00558_lags as L

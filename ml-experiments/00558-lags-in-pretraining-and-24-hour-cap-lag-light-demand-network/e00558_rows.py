@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, ANN202, D103, E501
+# ruff: noqa: ANN001, ANN201, ANN202, D103
 """Write per-row CRPS of the 558 arms with 470's scorer on 511's rows (mirrors e00544_rows)."""
 
 import os
@@ -27,6 +27,8 @@ ALL_NEW = (
     "R-DW-24-PT-absent",
     "A-pool-24",
     "A-pool-24-absent",
+    "A-pool-24-drop",
+    "A-pool-24-drop-absent",
 )
 NEW = tuple(a for a in ALL_NEW if (W / "seed_preds" / a).is_dir())
 

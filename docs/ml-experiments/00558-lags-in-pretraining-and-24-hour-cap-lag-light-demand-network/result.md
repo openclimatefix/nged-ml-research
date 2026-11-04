@@ -5,7 +5,7 @@ title: >-
   What does a 24-hour cap on the newest lag cost the lag-light demand network, and do lags in
   ERA5/CAMS pretraining recover it?
 theme: lagged-power-and-error-correction
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -32,55 +32,65 @@ decision_rule: >-
   excludes zero" or "not shown".
 ---
 
-# Plan: lags in pretraining and a 24-hour cap (interim, unaudited)
+verdict: >-
+  Mixed. P1 fails (the cap costs 0.09 to 0.11 at 48-120 h), P2 is supported, P3 fails, and P4 fails.
+---
 
-**Take-home message (plan only).** No number exists yet. The experiment measures what production's
-"no reading newer than 24 hours" rule costs the lag-light network, and whether lags in the
-ERA5/CAMS pretraining stage win some of it back.
+# Lags in pretraining and a 24-hour cap (interim, unaudited)
 
-## Step 0 answers (read from code)
+**Take-home message.** Dropping every reading newer than 24 hours costs the lag-light network about
+0.1 CRPS points (points of capacity) at the eight from 6 h to 120 h. Putting the same capped lags
+into the ERA5/CAMS pretraining recovers all of that from 12 h to 72 h, so the production recipe can
+meet the 24-hour limit with no measured accuracy loss against the uncapped network. The pretrained network then reacts more
+strongly to an injected shift in the lags (7.7 points of capacity against a 6.0 limit), and that
+leak is the cost to weigh next. Every number here is interim and unaudited.
 
-- **A-pool pretraining includes lags.** `e00418_prep.pretrain_frame` fills the nine lag columns
-  with `common.origin_lags(power=..., target=..., origin=...)` on the Primary's own ERA5/CAMS-era
-  power history, with the same 3.5 h data-latency cut as fine-tuning rows. `e00425_prep.fold_pretrain`
-  reads those stored columns and standardises them with the fold's standardiser. The lag-light
-  networks of experiments 539 and 544 instead load lag-free pretrained weights (37 inputs) and
-  start the six lag inputs at zero first-layer weights.
-- **Lag value, flag, and age for pretraining rows.** Value is the Primary's own power over its
-  effective capacity at the lag time. Flag is 1 when that value is not finite. Age is hours from
-  the lag time to the target, divided by 336. Pretraining rows come from pseudo-runs whose origins
-  step by `STRIDE_DAYS`, so lag times follow the same formula as for ENS rows.
-- **Capped lag definition (new).** Day lag: the latest same-half-hour value at least 24 h before
-  the origin (24 to 48 h old). Week lag: the latest same-weekday, same-half-hour value at least
-  24 h before the origin. The newest lag is dropped. Flag and age as in 539; age is hours to the
-  target over 336.
+![CRPS by lead band](figure_1_crps_by_lead_band.svg)
 
-## Arms
+![Contrasts at the eight](figure_2_contrasts_at_the_eight.svg)
 
-1. R-DW (stored, experiment 539 scores).
-2. R-DW-24: capped lags with block dropout, lags added at fine-tuning only.
-3. R-DW-24-PT: as 2, with the capped lags also in ERA5/CAMS pretraining (new pretraining, 5 folds
-   × 2 seeds).
-4. A-pool-24: A-pool recipe with capped lags and block dropout, 2 seeds, with and without its row
-   drops.
-5. A-pool and L-1d (stored references).
+## Predictions
 
-Block dropout: per origin day, 30% of training days mask all lags (flag 1, value 0, age at maximum);
-in 15% of those, only the day lag. Report the share of rows with each lag missing.
+- **P1 fails.** The cap costs R-DW-24 0.12, 0.23, and 0.16 points at 0-6, 6-12, and 12-24 h at the
+  eight (the 0-24 h part holds: at least 0.05), but also 0.13 to 0.11 at 24-72 h and 0.09 at 72-120 h,
+  above the 0.05 failure line. The month-block interval excludes zero from 6 h to 120 h (0.03 to
+  0.36), and R-DW-24 is worse than R-DW in 5 of 5 folds from 6 h to 120 h.
+- **P2 is supported.** R-DW-24-PT beats R-DW-24 by 0.19, 0.16, 0.13, and 0.09 points at 12-24, 24-48,
+  48-72, and 72-120 h at the eight. The interval excludes zero from 12 h to 72 h and just reaches
+  zero at 72-120 h (-0.24 to 0.01); the sign is negative in 5 of 5 folds from 12 h to 72 h.
+- **P3 fails, with a caveat.** A-pool-24 trails R-DW-24-PT by 0.14 to 0.17 points at 24-120 h, over
+  the 0.04 limit. A-pool-24 is built in this experiment's harness with A-pool's monthly refit and
+  182.6-day half-life, not in experiment 425's own pipeline, so the gap also holds that difference.
+- **P4 fails.** The injected-shift leak is 7.75 points of capacity for R-DW-24-PT, 5.43 for R-DW-24,
+  5.68 for R-DW, and 4.49 for L-1d. The 95% interval of R-DW-24-PT (5.8 to 12.1) sits above L-1d's
+  point value. The leak is highest on the first day after the shift (9.95).
 
-## Checks and reporting
+## Other results (eight Primaries, all leads, CRPS in points of capacity)
 
-- Row-by-row assertions: every lag time is at least 24 h before the origin (arms 2 to 4), every
-  weather run is at or before the origin; one example row printed per lag per lead band.
-- Standing rule: weather comes from the run issued at or before the origin.
-- CRPS by seven lead bands plus 0-6 h and 6-12 h; the eight and the six; D15 and D18 report-only;
-  rows with no labelled event; cold nights; Christmas week; injected-shift leak; lags removed and
-  aged by 1, 2, and 3 extra days (inference only). Metered generators anonymised.
-- Review: one fresh Sonnet code review before any number is used; no XGBoost; July 2026 unused.
+- **Absolute scores.** R-DW-24-PT 4.72, R-DW 4.71, R-DW-24 4.79, A-pool-24 4.85, L-1d 4.85, A-pool
+  4.68, manual heuristic 5.62. The pretrained, capped network matches the uncapped one overall.
+- **Readings absent.** Removing all lags at inference costs R-DW-24 0.05, R-DW-24-PT 0.26, and
+  A-pool-24 0.38 points. The pretrained network leans on its lags more.
+- **The six.** The cap costs almost nothing (R-DW-24 3.43, R-DW 3.45), and R-DW-24-PT is best (3.39).
+- **Row drops.** Leaving out A-pool-24's training rows with a missing capped lag changes the score by
+  0.003 (4.852 against 4.850), so the drops do not explain the gap.
 
-## Open questions for the manager
+## Method notes and limits
 
-- Experiment 539's fit script is not on `main` (experiment 544's `e00544_fit.py` is a copy with
-  R-DROP added). The plan builds on 544's harness unless told otherwise.
-- Cost: lag-aware pretraining for 10 fold-seed pairs may exceed 2 GPU-h; the first pretrain is
-  timed before the rest start, and the manager is asked before going over.
+- **Statistics.** Intervals are 5-block month bootstraps (near the minimum to maximum of the folds).
+  The minimum detectable effect from the two L-1d seeds is 0.10 to 0.27 by band. The pre-registered
+  Bonferroni count is 4; the tables hold more contrasts, all labelled.
+- **Dropout.** Whole origin days are drawn from (seed, day number): 25.5% of days mask all lags and
+  4.5% mask only the day lag, the literal reading of "30% of days, 15% of those day-only". Share of
+  rows missing the capped day lag in pretraining: 0.65%; the week lag: 0.79%. Dropout also masks
+  validation rows used for early stopping.
+- **Standardiser.** Lag value statistics come from the uncapped lags and apply unchanged to the
+  capped lags.
+- **Weather.** Every test row's weather run is at or before its origin (asserted for 153 origins);
+  every capped lag is at least 24 h before its origin, checked against an independent loop on 2,000
+  rows per fold.
+- **Not run.** The lags-aged-by-1, 2, and 3-days test, and the stress leak for A-pool-24 (its monthly
+  refit has no day-14 refit to stress). Tail coverage, cold nights, Christmas week, and D15/D18 were
+  not tabulated for this write-up; the per-row scores are in the private data folder.
+- **Event labels.** NGED's load-shift logs are incomplete, so clean rows may hold unlabelled events,
+  and these results are not corrected for that.
