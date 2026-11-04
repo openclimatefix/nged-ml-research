@@ -1,11 +1,12 @@
 # ruff: noqa: E501, E741
 """Injected-shift leak of R-MED and R-DROP (544), R-DW (539), R1, R9 (538) and L-1d (511): sign x change in the median forecast, points of capacity, by block age and lead band."""
 
+import os
 from pathlib import Path
 
 import polars as pl
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
 W = DD / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/work/fits"
 D539 = DD / "00539-l1d-plus-day-and-week-lags/work/fits"
 O = DD / "00538-l1d-plus-recent-level-and-lags/work/fits"

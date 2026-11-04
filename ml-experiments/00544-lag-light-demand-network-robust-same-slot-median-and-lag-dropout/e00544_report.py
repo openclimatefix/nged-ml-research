@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """Figures of experiment 544 from the tables its scorer stored. Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`."""
 
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -13,7 +14,7 @@ import e00470_build as build470  # ty: ignore[unresolved-import]
 import polars as pl
 from plotting import ocf_theme as theme
 
-DD: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD: Final[Path] = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
 MINE: Final[Path] = (
     DD / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/work"
 )

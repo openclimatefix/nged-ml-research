@@ -3,18 +3,17 @@
 
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 import polars as pl
 
-sys.path[:0] = [
-    str(p) for p in Path("/home/jack/dev/nged-ml-research/ml-experiments").iterdir() if p.is_dir()
-]
+sys.path[:0] = [str(p) for p in Path(__file__).resolve().parents[1].iterdir() if p.is_dir()]
 import e00521_stats as s
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
 W = DD / "00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]

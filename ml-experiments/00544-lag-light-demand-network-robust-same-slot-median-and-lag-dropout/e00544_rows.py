@@ -1,6 +1,7 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501
 """Write per-row CRPS of R-MED, R-DROP and R-DROP-absent with 470's scorer on 511's rows (mirrors e00537_rows)."""
 
+import os
 from pathlib import Path
 
 import e00454_build as build454
@@ -11,7 +12,10 @@ import e00511_score as k511
 import polars as pl
 
 W = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/work"
+    str(
+        Path(os.environ["DATA_PATH_INTERNAL"])
+        / "ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/work"
+    )
 )
 SRC511 = k511.WORK_DIR / "predictions"
 FIVE = build470.MONTHS

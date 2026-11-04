@@ -20,6 +20,7 @@ Usage: python e00544_fit.py {fit|assemble} --arm R-MED|R-DROP [--stress]
 import argparse
 import dataclasses
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -34,7 +35,8 @@ import polars as pl
 import torch
 
 WORK = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout"
+    os.environ["DATA_PATH_INTERNAL"]
+    + "/ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout"
 )
 W = WORK / "work"
 EXTRA_IDX = {"R-MED": [1, 2, 4, 5, 7, 8], "R-DROP": [1, 2, 4, 5, 7, 8]}

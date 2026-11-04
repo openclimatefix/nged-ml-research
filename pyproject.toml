@@ -619,6 +619,25 @@ invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 invalid-method-override = "ignore"
 
+[[tool.ty.overrides]]
+# Experiment 544's scripts are copies of experiment 539's harness, which imports sibling experiment
+# folders by bare name and `torch` (not installed in CI), and writes to attributes of untyped
+# module-level dictionaries.
+include = [
+    "ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/e00544_fit.py",
+    "ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/e00544_rows.py",
+    "ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/e00544_score.py",
+    "ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/e00544_stress.py",
+    "ml-experiments/00544-lag-light-demand-network-robust-same-slot-median-and-lag-dropout/e00544_report.py",
+]
+
+[tool.ty.overrides.rules]
+unresolved-import = "ignore"
+unresolved-attribute = "ignore"
+unsupported-operator = "ignore"
+invalid-assignment = "ignore"
+not-subscriptable = "ignore"
+
 [tool.ty.rules]
 # With the `gpu` dependency group installed, `torch` resolves, so `ty` reports every
 # `# ty: ignore[unresolved-import]` on a `torch` import as unused and every `nn.Module.forward`
