@@ -1,4 +1,4 @@
-"""Draw the two figures of experiment 540 from the interim numbers of experiments 538 and 539.
+"""Draw the two figures of experiment 540 from the interim numbers of experiments 533, 538, and 539.
 
 Nothing is fitted or scored here. Every number below is copied from the `interim_numbers.md` file of
 the experiment named beside it. Run with `uv run --no-sync python e00540_figures.py`, then optimise
@@ -144,7 +144,7 @@ def figure_2() -> None:
         title=alt.TitleParams(
             [
                 "Adding the day-ago and week-ago lags raises the injected load-shift leak",
-                "Leak: how far the median forecast moves when 3 standard deviations are added",
+                "Leak: how far the median forecast moves when plus or minus 3 SD are added",
                 "to the targets and lags of a 7-day block. Mean of five folds, one seed.",
                 "Fold ranges overlap (all leads: L-1d 2.6 to 10.5; R9 2.2 to 11.3).",
                 "Interim, unaudited.",
