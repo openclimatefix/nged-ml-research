@@ -103,6 +103,12 @@ advice:
     at the six and none at the eight (S2-F-A against S2-0F contrasts).
 ---
 
+> **Correction (2026-11-04).** The gap to K2-S1 above 24 h of lead on this page is voided. K2-S1
+> mixes in experiment 404's lag-free head, which took its weather from the freshest run at each
+> target's valid time (leads of 9 to 33 h at every horizon), a look-ahead that a forecast made at
+> the origin does not have. The gap at 0 to 24 h is unchanged, and comparisons that do not involve
+> K2-S1 are unaffected. The rebuilt K2-S1 will restate the gaps. Evidence: experiments 531 and 532.
+
 **A weather-to-power network that never sees lead time or ensemble spread, fine-tuned together with
 a small calibrator, forecasts as well as the current single-stage lag-free network L-Ww; the same
 two parts with the first network frozen forecast worse.** We split the lag-free demand network in
