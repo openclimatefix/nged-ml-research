@@ -77,9 +77,7 @@ def native_cell_frame(*, run: datetime) -> pl.DataFrame:
     lats = np.sort(weights["nwp_lat"].unique().to_numpy()).astype(np.float64)
     lons = np.sort(weights["nwp_lon"].unique().to_numpy()).astype(np.float64)
     chosen = store.sel(init_time=np.datetime64(run.replace(tzinfo=None), "ns"))
-    if np.datetime64(chosen["init_time"].values, "ns") != np.datetime64(
-        run.replace(tzinfo=None), "ns"
-    ):
+    if chosen["init_time"].values != np.datetime64(run.replace(tzinfo=None), "ns"):
         msg = f"store returned run {chosen['init_time'].values}, expected {run}"
         raise ValueError(msg)
     block = chosen.sel(latitude=lats, longitude=lons, method="nearest").load()

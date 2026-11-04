@@ -92,9 +92,9 @@ def validate(*, frame: pl.DataFrame) -> dict[str, object]:
     )
     stats = {
         c: {
-            "min": float(frame[c].min()),
-            "max": float(frame[c].max()),
-            "mean": float(frame[c].mean()),
+            "min": float(frame[c].min()),  # ty: ignore[invalid-argument-type]
+            "max": float(frame[c].max()),  # ty: ignore[invalid-argument-type]
+            "mean": float(frame[c].mean()),  # ty: ignore[invalid-argument-type]
             "nulls": int(frame[c].null_count()),
             "nans": int(frame[c].is_nan().sum()),
         }
@@ -116,7 +116,7 @@ def validate(*, frame: pl.DataFrame) -> dict[str, object]:
         "last_valid_time": str(frame["valid_time"].max()),
         "columns": stats,
         **speeds,
-        "hour_of_day_mean_u100_spread_m_s": float(hour_means.max() - hour_means.min()),
+        "hour_of_day_mean_u100_spread_m_s": float(hour_means.max() - hour_means.min()),  # ty: ignore[unsupported-operator],
     }
     if not same_keys or duplicates or gaps:
         msg = f"validation failed: {report}"
