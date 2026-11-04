@@ -28,8 +28,8 @@ decision_rule: >-
   of the folds), with per-fold signs and the minimum detectable effect beside each. Counted
   contrasts for the Bonferroni correction: P1 (2 bands), P2 (1 band), P3 (1 band), so 4 tests. The
   threshold for porting is zero for the cap itself (it is a production constraint, not an option)
-  and 0.03 CRPS for pretraining lags, because it adds a pretraining step to the production recipe. Wording is "interval
-  excludes zero" or "not shown".
+  and 0.03 CRPS for pretraining lags, because it adds a pretraining step to the production recipe.
+  Wording is "interval excludes zero" or "not shown".
 verdict: partly supported
 benchmark: >-
   R-DW (experiment 539), L-1d (experiment 511), A-pool (experiment 425), and `manual_heuristic`
@@ -55,8 +55,6 @@ take_home_message: >-
   injected-shift leak of the pretrained network (7.75 against a 6.0 limit) and to run the test that
   ages the lags by 1, 2, and 3 days.
 ---
-
-# Lags in pretraining and a 24-hour cap (interim, unaudited)
 
 **Take-home message.** Dropping every reading newer than 24 hours raises the lag-light network's
 CRPS by 0.09 to 0.23 points of capacity at the eight MVA-only Primaries from 6 h to 120 h.
