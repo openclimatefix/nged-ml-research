@@ -1,7 +1,9 @@
 # ruff: noqa: ANN201, D103, PTH123, SIM115
-"""Score M0, M0lr, and M1 (545) against L-1d, A-pool, and R-DW (539) on 511's rows.
+"""Score M2-a, M2-b, and M2-c against M0 (experiment 554's M0, seeds 0 and 1) on 511's rows.
 
-Reuses experiment 539's scorer, 533's loader, and 521's statistics.
+Reuses experiment 554's scorer structure, 533's loader, and 521's statistics. The
+contrast set is: each M2 arm minus M0 over the same 2 seeds (counted), M2-b and M2-c minus M2-a, and
+the references M0 (5 seeds) minus `L-1d5`. 42 counted tests: 3 arms x 2 sets x 7 lead bands.
 """
 
 import json
@@ -13,37 +15,31 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 DD = ML_EXPERIMENTS_DATA_DIR
-W = DD / "00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out"
-W539 = DD / "00539-l1d-plus-day-and-week-lags"
+W = DD / "00564-pooled-primary-bsp-gsp-m2-reduced"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]
 SEED_ARMS = (
-    "L-1d5", "M0", "M0lr", "L-1d3", "M0-3", "M0-sep", "M0-mix", "M0-hl180", "M0-c3",
-    *[f"L-1d5-s{i}" for i in range(5)],
+    "M2-a", "M2-b", "M2-c", "M0-2", "M0", "L-1d5",
+    *[f"{a}-s{i}" for a in ("M2-a", "M2-b", "M2-c", "M0-2") for i in (0, 1)],
 )  # fmt: skip
 ARMS = {
-    **{a: f"{a}__crps" for a in SEED_ARMS if not a.startswith("L-1d5-s")},
-    "R-DW": "R-DW__crps",
+    **{a: f"{a}__crps" for a in SEED_ARMS if "-s" not in a.removeprefix("M")},
     "A-pool": "A-pool__crps",
     "L-1d": "L-1d__crps",
     "manual_heuristic": "manual_heuristic__crps",
 }
+COUNTED = [("M2-a", "M0-2"), ("M2-b", "M0-2"), ("M2-c", "M0-2")]
 CONTRASTS = [
-    ("M0", "L-1d5", True),
-    ("M0lr", "L-1d5", True),
-    ("M0", "M0lr", False),
-    ("L-1d5", "L-1d", False),
-    ("M0", "L-1d", False),
-    ("M0", "A-pool", False),
-    ("M0", "R-DW", False),
-    ("L-1d5", "A-pool", False),
-    ("M0-3", "L-1d3", False),
-    *[(a, "L-1d3", False) for a in ("M0-sep", "M0-mix", "M0-hl180", "M0-c3")],
-    *[(a, "M0-3", False) for a in ("M0-sep", "M0-mix", "M0-hl180", "M0-c3")],
+    *[(a, b, True) for a, b in COUNTED],
+    ("M2-b", "M2-a", False),
+    ("M2-c", "M2-a", False),
+    ("M0-2", "L-1d5", False),
+    ("M0", "L-1d5", False),
+    ("M2-a", "M0", False),
 ]
-TESTS = 2 * 7 * 2  # 2 counted contrasts x 7 bands x 2 sets
+TESTS = 3 * 7 * 2  # 3 counted contrasts x 7 bands x 2 sets
 POOLED = "24-120h"
-"""The 24-48 h, 48-72 h, and 72-120 h bands pooled (predictions P1 and P3)."""
+"""The 24-48 h, 48-72 h, and 72-120 h bands pooled (predictions P1 and P2)."""
 NEW = [
     a
     for a in SEED_ARMS
@@ -62,12 +58,6 @@ def table():
             for m in s.MONTHS
         ]
     )
-    rdw = pl.concat(
-        [
-            pl.read_parquet(W539 / "work/scores" / f"rows_{m}.parquet", columns=[*K, "R-DW__crps"])
-            for m in s.MONTHS
-        ]
-    )
     mine = pl.concat(
         [
             pl.read_parquet(
@@ -76,7 +66,6 @@ def table():
             for m in s.MONTHS
         ]
     )
-    mine = mine.join(rdw, on=K, how="left", validate="1:1", maintain_order="left")
     assert base.select(K).equals(extra.select(K))
     drop = [c for c in ("A-pool__crps", "manual_heuristic__crps") if c in base.columns]
     t = pl.concat([base.drop(drop), extra.drop(K)], how="horizontal")
@@ -100,7 +89,7 @@ def main():
     print(chk)
     rng = np.random.default_rng(0)
     absolute, contrasts = [], []
-    seedcols = [f"L-1d5-s{i}__crps" for i in range(5)]
+    seedcols = [f"{a}-s{i}__crps" for a in ("M2-a",) for i in (0, 1)]
     d8 = [p for p, lab in s.PRIMARY_LABELS.items() if lab == "D8"]
     assert len(d8) == 1, d8
     for name in ("eight", "six", "report", "eight_without_D8", "D8_alone"):
