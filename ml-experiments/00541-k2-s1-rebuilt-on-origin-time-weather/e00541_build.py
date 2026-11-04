@@ -72,7 +72,11 @@ def assert_origin_time_weather(*, raw: dict[str, np.ndarray]) -> str:
         key = pl.DataFrame({"r": origin, "v": valid, "i": np.arange(len(origin))})
         joined = key.join(summ, on=["r", "v"], how="left").sort("i")
         assert joined.height == len(origin)
-        got = joined.select(cols).to_numpy()
+        got = joined.select(cols).to_numpy().astype(np.float64)
+        rain = [k for k, c in enumerate(cols) if c.endswith("_precipitation")]
+        got[:, rain] = np.log1p(
+            np.clip(got[:, rain], 0, None)
+        )  # the stored matrix applies log1p to rainfall
         assert np.isfinite(got).all(), f"{row['site']}: a row has no summary of the origin-time run"
         assert np.allclose(got, x, rtol=1e-4, atol=1e-4), (
             f"{row['site']}: weather differs from the origin-time run"
@@ -126,7 +130,11 @@ def run(*, months: list[str], device: str) -> None:
             }
         ).with_row_index("si")
         both = keys.join(skeys, on=["primary", "origin", "target"], how="inner")
-        li, si = both["li"].to_numpy(), both["si"].to_numpy()
+        assert both.height == len(keys) == len(skeys), (
+            f"{month}: lag-free rows {len(keys)}, S1 rows {len(skeys)}, common {both.height}"
+        )
+        assert not keys.select("primary", "origin", "target").is_duplicated().any()
+        li, si = both["li"].to_numpy().astype(np.int64), both["si"].to_numpy().astype(np.int64)
         ref = pl.read_parquet(r521.E454 / "K2-S1" / f"{month}_s0_w-1.parquet").select(
             *r521.KEYS, "actual"
         )
