@@ -59,8 +59,8 @@ headline: >-
   closes 76% to 83%, and leaks 4.97. R-DROP with every reading removed is 0.015 to 0.028 better than
   L-1d at the eight (interval includes zero) and 0.03 worse at the six.
 lessons: >-
-  A median over several days does not protect against a load-shift event: a 7-day median over a
-  7-day shifted block carries the whole shift. Lag dropout at 30% teaches the network to rely less on
+  A median over several days did not protect against a load-shift event; a 7-day median over a
+  7-day shifted block may carry the whole shift. Lag dropout at 30% teaches the network to rely less on
   the readings, which cuts both the gain and the leak, and gives a network that still works when
   every reading is missing.
 take_home_message: >-
@@ -129,16 +129,16 @@ Verdict: not supported. P1 failed on both parts, P2 failed, and P3 held.
   absent minus L-1d is +0.028 (+0.006 to +0.054), +0.027, +0.031 (+0.004 to +0.061).
 - **Injected-shift leak (experiment 511's stress world, seed 0, five folds, all leads).** L-1d 4.49,
   R1 4.52, R-DROP 4.97, R9 5.38, R-DW 5.68, R-MED 7.02. At block age 0 the leak is 7.20 (L-1d), 9.23
-  (R-DROP), 11.49 (R-DW), and 11.90 (R-MED). The leak of R-MED stays above R-DW's up to block age 5.
-  The reason is that a median over the last 7 days has most of its members inside a 7-day shifted
-  block, so the whole shift enters the input for several days.
+  (R-DROP), 11.49 (R-DW), and 11.90 (R-MED). The leak of R-MED is above R-DW's at every block age from 0 to 6.
+  A likely reason, not tested here, is that the 7-day median has most of its members inside the
+  7-day shifted block, so the whole shift enters the input for several days.
 - **Checks.** Every power value and every median member is at least 3.5 h older than the origin,
   asserted for all rows (24,979,347 training rows and 1,142,520 test rows); 2,000 random rows per
   month recomputed with an explicit loop matched the medians. Every weather input comes from the run
   issued at or before the origin (`nwp_init_time <= power_fcst_init_time` asserted for all 153 test
   origins and every training origin). Example test row: origin 2026-01-01 09:00 UTC, target
   2026-01-01 15:00 UTC, weather run 2026-01-01 00:00 UTC, day-ago reading observed 2025-12-31
-  15:00 UTC. Cost about 0.5 GPU-h, one process under 8 GB.
+  15:00 UTC. Cost under 1 GPU-h, one process under 8 GB.
 - **Reviews.** One Sonnet code review before the first fit found a crash in the checks writer, a
   cache key that could be reused across months, and a missing empty-window marker for the absent
   scoring; all three were fixed. No results review and no write-up review were run, because the quota
