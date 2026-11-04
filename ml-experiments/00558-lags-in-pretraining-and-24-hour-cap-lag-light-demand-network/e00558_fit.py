@@ -104,7 +104,6 @@ def check_rows(*, x, valid_us, origin_us, lead, label):
     cap_day, cap_week = lags.capped_lag_ages_hours(lead_hours=lead.astype(np.float64))
     ages = np.stack([np.zeros_like(cap_day), cap_day, cap_week], axis=1)
     delay_us = int(lags.CAP_STEPS * 30 * 60 * 1e6)
-    pub_us = int(common.PUBLICATION_DELAY.total_seconds() * 1e6)
     example = None
     for j, tag in enumerate(("origin", "day", "week")):
         nm = f"lag_{tag}_age"
@@ -125,7 +124,6 @@ def check_rows(*, x, valid_us, origin_us, lead, label):
                 f"lag observed {datetime.fromtimestamp(t_lag[i] / 1e6, UTC)} (<= origin - 24 h)"
             )
     assert (valid_us > origin_us).all(), f"{label}: target not after origin"
-    assert ((origin_us - pub_us) <= origin_us).all()
     return example
 
 
@@ -147,6 +145,30 @@ def put_capped(*, x, clean, primary, target_idx, origin_idx, lead, standardiser)
     }
 
 
+def verify_capped_values(*, x, clean, primary, target_idx, origin_idx, standardiser, label):
+    """Recompute 2,000 random rows' capped lags with an explicit loop and compare with the columns."""
+    rng = np.random.default_rng(2)
+    sel = rng.choice(len(primary), min(2000, len(primary)), replace=False)
+    out = ""
+    for slot, period in (("lag_day", 48), ("lag_week", 336)):
+        for i in sel:
+            k_ = 0
+            while origin_idx[i] - (target_idx[i] - period * k_) < 48:
+                k_ += 1
+            j = target_idx[i] - period * k_
+            raw = clean[primary[i], j] if j >= 0 else np.nan
+            if np.isfinite(raw):
+                z = (raw - standardiser.mean[POS[slot]]) / standardiser.std[POS[slot]]
+                want = float(np.clip(z, -prep.INPUT_CLIP_SD, prep.INPUT_CLIP_SD))
+                assert abs(x[i, POS[slot]] - want) < 1e-4, f"{label} {slot} differs at row {i}"
+                assert x[i, POS[f"{slot}_missing"]] == 0.0
+            else:
+                assert x[i, POS[f"{slot}_missing"]] == 1.0, f"{label} {slot} flag at row {i}"
+        i = int(sel[0])
+        out += f"{slot}: lag index {j} for target {target_idx[i]}, origin {origin_idx[i]}; "
+    return f"{label}: capped lags match an independent loop on {len(sel)} rows; {out}"
+
+
 _build_month, _build_test = k.build_month, data.build_test
 
 
@@ -165,6 +187,15 @@ def build_month(*, month, clean):
     )
     ex = check_rows(
         x=mr.x, valid_us=mr.valid_us, origin_us=mr.origin_us, lead=mr.lead, label=f"{month} train"
+    )
+    ex += " | " + verify_capped_values(
+        x=mr.x,
+        clean=clean,
+        primary=mr.primary,
+        target_idx=mr.target_idx,
+        origin_idx=origin_idx,
+        standardiser=mr.base.standardiser,
+        label=f"{month} train",
     )
     for key in [k_ for k_ in CTX if isinstance(k_, tuple)]:
         del CTX[key]
@@ -189,25 +220,6 @@ def build_month(*, month, clean):
         "lag_example_train": ex,
         "capped_lag_missing_shares": share,
     }
-    # sanity: standardised newest lag against the cleaned power at origin minus the data delay
-    if "lag_origin" in POS:
-        sd, mean = (
-            mr.base.standardiser.std[POS["lag_origin"]],
-            mr.base.standardiser.mean[POS["lag_origin"]],
-        )
-        sel = np.random.default_rng(0).choice(len(mr.y), 200_000, replace=False)
-        raw = mr.x[sel, POS["lag_origin"]] * sd + mean
-        idx = mr.target_idx[sel] - np.rint(2 * mr.lead[sel]).astype(np.int64) - common.NEWEST_AGE
-        ref = clean[mr.primary[sel], idx]
-        ok = (
-            (mr.x[sel, POS["lag_origin_missing"]] < 0.5)
-            & np.isfinite(ref)
-            & (np.abs(mr.x[sel, POS["lag_origin"]]) < 4.9)
-        )
-        CHECK["months"][month]["newest_lag_vs_cleaned_power"] = {
-            "rows": int(ok.sum()),
-            "within_1e-3": float((np.abs(raw[ok] - ref[ok]) < 1e-3).mean()),
-        }
     print(month, "train checks passed;", ex, flush=True)
     return mr
 
@@ -225,6 +237,15 @@ def build_test(*, month, standardiser):
     )
     ex = check_rows(
         x=test.x, valid_us=test.valid, origin_us=test.origin, lead=test.lead, label=f"{month} test"
+    )
+    ex += " | " + verify_capped_values(
+        x=test.x,
+        clean=CTX["clean"],
+        primary=test.primary,
+        target_idx=test.target_idx,
+        origin_idx=test.origin_idx,
+        standardiser=standardiser,
+        label=f"{month} test",
     )
     pub = common.PUBLICATION_DELAY
     for o in np.unique(test.origin):
@@ -257,9 +278,14 @@ def lag_delta(*, x_cols, valid_us, prim, std, ctx):
     out = np.zeros((len(valid_us), len(VALUE)), dtype=np.float32)
     for j, nm in enumerate(VALUE):
         tag = nm.replace("lag_", "")
-        t = valid_us - (
-            x_cols[f"lag_{tag}_age"].astype(np.float64) * prep.LEAD_SCALE_HOURS * 3.6e9
-        ).astype(np.int64)
+        step = 1_800_000_000  # 30 min in microseconds; rounding removes float32 age error
+        t = (
+            valid_us
+            - np.rint(
+                x_cols[f"lag_{tag}_age"].astype(np.float64) * prep.LEAD_SCALE_HOURS * 3.6e9 / step
+            ).astype(np.int64)
+            * step
+        )
         inblock = (t >= block[0]) & (t < block[1]) & (x_cols[f"lag_{tag}_missing"] < 0.5)
         out[:, j] = np.where(inblock, sign * shift[prim] / std[POS[nm]], 0.0)
     return out
@@ -392,7 +418,7 @@ def assemble_one(*, tag):
                 W / "fits" / tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet"
                 for cut in cuts
             ]
-            # R-DW-24-absent shares R-DROP's windows, so an empty R-DROP window is empty here too
+            # R-DW-24-absent shares R-DW-24's windows, so an empty R-DW-24 window is empty here too
             twin = lambda p: (p.parent.parent / "R-DW-24" / p.name).with_suffix(".empty")
             assert all(
                 p.exists()
