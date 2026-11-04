@@ -80,3 +80,24 @@ own commit, before any GPU fit starts.
 
 Step R first (A10 against M0, seeds 0 to 4, five folds), then designs 3, 5, 4, and 2, as the brief
 `drift_embedding_variants_brief.md` orders them. The details are added in the stage 2 commit.
+
+## Stage 1 result (interim and unaudited)
+
+**Adding a mean of the network's own recent residuals made the forecast worse and passed an injected
+load-shift almost straight through, so design 6 is not worth carrying forward.** Both pre-registered
+conditions failed.
+
+- **CRPS (corrected minus base, positive is worse), 24 to 120 h.** Against M0, the eight rose by 0.169
+  (28-day half-life) and 0.166 (90-day), and the six by 0.053 and 0.051. The Bonferroni month-block
+  intervals (5 blocks, near the minimum to maximum) are -0.03 to 0.41 at the eight and -0.26 to 0.23 at
+  the six, so a harm is not shown. The 12 counted contrasts all have intervals that include zero. The
+  minimum detectable effect of experiment 545's two seeds is 0.10 to 0.17 beside each contrast, and the
+  point estimates sit inside it. At the eight the contrast is positive in 3 to 4 of 5 folds.
+- **Gap to A-pool.** At the eight, M0 is 0.070 CRPS above A-pool at 24 to 120 h, and the correction
+  moves it further away (share of the gap closed -2.4), so the "closes at least 25%" prediction fails.
+- **Injected load-shift.** The correction alone adds 19.7 points of capacity of leak (28-day) and 19.6
+  (90-day), mean of 5 folds, against 7.60 for M0 and 6.0 for the release limit. Each fold's injected
+  shift is 0.14 to 0.61 of capacity, and 43% to 73% of the correction's weight sits on block rows. The
+  figure is closed-form and an upper bound, because the base network's own leak is not subtracted.
+- **Next step.** Stage 2 (GPU) starts after experiment 559 merges. A slow signal should not be an
+  average of recent residuals.

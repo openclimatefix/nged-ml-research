@@ -49,6 +49,8 @@ SOURCES: Final[dict[str, Path]] = {
     "A10": W559 / "predictions" / "A10",
     "A11": W559 / "predictions" / "A11",
 }
+heads470.WORK_DIR = W
+"""`build470.prediction_path` reads this module global, so it is set at import, for every command."""
 HALF_LIVES: Final[tuple[int, ...]] = (28, 90)
 STEPS_PER_DAY: Final[int] = 48
 MIN_AGE_STEPS: Final[int] = STEPS_PER_DAY
@@ -110,7 +112,6 @@ def corrections(
 
 def correct() -> None:
     """Write corrected quantiles for every base arm and half-life; assert the 24 h rule."""
-    heads470.WORK_DIR = W
     for month in MONTHS:
         scored = score454.month_base(month=month).select(*KEYS, "actual")
         for base in SOURCES:
