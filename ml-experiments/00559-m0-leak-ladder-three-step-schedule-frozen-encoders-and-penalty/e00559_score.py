@@ -19,7 +19,7 @@ W539 = DD / "00539-l1d-plus-day-and-week-lags"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]
 W554 = DD / "00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out/work/scores"
-LADDER = tuple(f"A{i}" for i in range(1, 9))
+LADDER = (*[f"A{i}" for i in range(1, 12) if i != 9], "A9", "A9-null", "A11-null")
 SEED_ARMS = ("M0", "M0lr", *LADDER)
 ARMS = {
     **{a: f"{a}__crps" for a in SEED_ARMS},
@@ -28,12 +28,17 @@ ARMS = {
     "L-1d": "L-1d__crps",
     "manual_heuristic": "manual_heuristic__crps",
 }
+VS_M0 = tuple(f"A{i}" for i in range(1, 12))
+"""Arms contrasted with M0 (11 arms; the two placebo arms are contrasted with their real arms)."""
+PLACEBO_PAIRS = (("A9", "A9-null"), ("A11", "A11-null"))
 CONTRASTS = [
-    *[(a, "M0", True) for a in LADDER],
+    *[(a, "M0", True) for a in VS_M0],
+    *[(a, b, True) for a, b in PLACEBO_PAIRS],
     *[(a, "L-1d", False) for a in ("M0", "M0lr", *LADDER)],
     *[(a, "M0lr", False) for a in LADDER],
 ]
-TESTS = 8 * 2  # 8 arms x 2 sets, pooled over 24-120 h only
+# Pooled 24-120 h at the eight and the six, plus the two placebo pairs on cold nights at the eight.
+TESTS = (len(VS_M0) + len(PLACEBO_PAIRS)) * 2 + 2
 POOLED = "24-120h"
 """The 24-48 h, 48-72 h, and 72-120 h bands pooled (predictions P1 and P3)."""
 W545 = DD / "00545-modular-lag-free-demand-network-weather-and-datetime-encoders/work/scores"
@@ -113,9 +118,19 @@ def main():
     seedcols = [f"L-1d5-s{i}__crps" for i in range(5)]
     d8 = [p for p, lab in s.PRIMARY_LABELS.items() if lab == "D8"]
     assert len(d8) == 1, d8
-    for name in ("eight", "six", "report", "eight_without_D8", "D8_alone"):
-        base_name = "eight" if name.startswith(("eight", "D8")) else name
+    for name in (
+        "eight",
+        "six",
+        "report",
+        "eight_without_D8",
+        "D8_alone",
+        "eight_cold",
+        "six_cold",
+    ):
+        base_name = "eight" if name.startswith(("eight", "D8")) else name.removesuffix("_cold")
         part = s.row_set(table=t, name=base_name)
+        if name.endswith("_cold"):
+            part = part.filter(pl.col("cold"))
         if name == "eight_without_D8":
             part = part.filter(pl.col("primary") != d8[0])
         elif name == "D8_alone":
@@ -166,7 +181,12 @@ def main():
                         "set": name,
                         "band": band,
                         "contrast": f"{a} - {b}",
-                        "counted": counted and band == POOLED and name in {"eight", "six"},
+                        "counted": counted
+                        and band == POOLED
+                        and (
+                            name in {"eight", "six"}
+                            or (name == "eight_cold" and (a, b) in PLACEBO_PAIRS)
+                        ),
                         "tests": TESTS,
                         "mde": mde,
                         **st,

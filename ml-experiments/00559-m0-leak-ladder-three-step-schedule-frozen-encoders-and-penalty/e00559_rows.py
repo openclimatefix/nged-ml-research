@@ -18,7 +18,9 @@ SRC511 = k511.WORK_DIR / "predictions"
 FIVE = build470.MONTHS
 assert FIVE == ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06"), FIVE
 TWO_SEEDS = (0, 1)
-ARMS: dict[str, tuple[str, tuple[int, ...]]] = {f"A{i}": (f"A{i}", TWO_SEEDS) for i in range(1, 9)}
+ARMS: dict[str, tuple[str, tuple[int, ...]]] = {
+    a: (a, TWO_SEEDS) for a in (*[f"A{i}" for i in range(1, 12)], "A9-null", "A11-null")
+}
 
 
 def ready(*, folder: str, seeds: tuple[int, ...]) -> bool:

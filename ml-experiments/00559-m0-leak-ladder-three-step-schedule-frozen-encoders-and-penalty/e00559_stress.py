@@ -21,7 +21,7 @@ for arm, folder in (
     ("R-DW", W539 / "R-DW"),
     ("M0", W545 / "M0"),
     ("M0lr", W545 / "M0lr"),
-    *[(f"A{i}", W / f"A{i}") for i in range(1, 9)],
+    *[(a, W / a) for a in (*[f"A{i}" for i in range(1, 12)], "A9-null", "A11-null")],
 ):
     if not folder.exists():
         continue
