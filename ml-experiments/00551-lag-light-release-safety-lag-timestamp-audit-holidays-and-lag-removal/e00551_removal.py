@@ -1,15 +1,17 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501, PT018
-"""Part 3: lag removal and late reading with the stored R-DW (539) and R-DROP (544) weights (inference only, weights fixed).
+"""Part 3: lag removal and late reading with the stored R-DW and R-DROP weights (inference only).
 
-For each month, day, and seed the stored network is loaded unchanged and scored on its own origin window
-with the six lag inputs (day-ago and week-ago value, missing flag, age) altered in the test rows only:
+For each month, day, and seed the stored network is loaded unchanged and scored on its own origin
+window with the six lag inputs (day-ago and week-ago value, missing flag, age) altered in the test
+rows only:
 
 - ``base``: readings present (must reproduce the stored forecasts; checked);
-- ``none``: every reading removed (value 0, flag 1, age at the training maximum), as R-DROP's dropout does;
+- ``none``: every reading removed (value 0, flag 1, age at the training maximum), as R-DROP's
+  dropout does;
 - ``noday`` / ``noweek``: only the day-ago / week-ago reading removed;
-- ``age1`` / ``age2`` / ``age3``: the readings arrive 1, 2, or 3 days late, so the newest usable reading is
-  that much older and every lag is re-taken from the latest same-clock half-hour at or before it
-  (value, flag, and age all recomputed from the cleaned power);
+- ``age1`` / ``age2`` / ``age3``: the readings arrive 1, 2, or 3 days late, so the newest usable
+  reading is that much older and every lag is re-taken from the latest same-clock half-hour at or
+  before it (value, flag, and age all recomputed from the cleaned power);
 - ``rand25``: in 25% of rows (fixed seed 551) both readings are removed.
 
 Usage: python e00551_removal.py [--months ...] [--limit-days N]

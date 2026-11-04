@@ -1,5 +1,5 @@
-# ruff: noqa: ANN001, ANN201, D103, E501, PERF401
-"""Part 3 scores: CRPS of the lag-removal and late-reading scenarios against L-1d and against the readings present.
+# ruff: noqa: ANN001, ANN201, D103, PERF401
+"""Part 3 scores: lag-removal and late-reading scenarios against L-1d and readings present.
 
 Pre-registered counted contrasts (Bonferroni count 28 = 2 contrasts x 7 lead bands x 2 row sets):
 R-DROP-none minus L-1d, and R-DW-none minus L-1d. Every other contrast is report-only.

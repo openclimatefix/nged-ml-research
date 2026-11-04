@@ -1,19 +1,20 @@
 # ruff: noqa: ANN001, ANN201, ANN202, B007, B023, D103, E501
 """Part 1: lag-timestamp audit of the R-DW, R-DROP and A-pool feature tables (CPU, no fit).
 
-Every lag input (value, missing flag, age) of every row is recomputed from the definition and compared
-with the table: the source half-hour is the latest same-clock half-hour (newest, day-ago, week-ago) at
-or before the newest usable reading, which is the origin minus 7 half-hours (3.5 h). The checks, row
-by row and with no sampling:
+Every lag input (value, missing flag, age) of every row is recomputed from the definition and
+compared with the table: the source half-hour is the latest same-clock half-hour (newest, day-ago,
+week-ago) at or before the newest usable reading, which is the origin minus 7 half-hours (3.5 h).
+The checks, row by row and with no sampling:
 
-1. the source time is at or before the origin minus 3.5 h;
-2. the age column equals the target minus the source time;
-3. the value equals the cleaned power at the source half-hour (standardised inverse for built tables);
-4. the missing flag is 1 exactly when the cleaned power at the source half-hour is missing.
+1. the source time is at or before the origin minus 3.5 h; 2. the age column equals the target
+minus the source time; 3. the value equals the cleaned power at the source half-hour (standardised
+inverse for built tables); 4. the missing flag is 1 exactly when the cleaned power at the source
+half-hour is missing.
 
-The tables audited are (a) the raw per-Primary summary matrices that every arm reads, all 16 Primaries,
-and (b) each fold's built training-plus-extension rows and test rows with A-pool's layout (all 9 lag
-columns) and with the 6-input R-DW / R-DROP layout, which is a column subset of A-pool's.
+The tables audited are (a) the raw per-Primary summary matrices that every arm reads, all 16
+Primaries, and (b) each fold's built training-plus-extension rows and test rows with A-pool's
+layout (all 9 lag columns) and with the 6-input R-DW / R-DROP layout, which is a column subset of
+A-pool's.
 
 Usage: ``PYTHONPATH=... python e00551_audit.py`` (needs DATA_PATH_INTERNAL).
 """

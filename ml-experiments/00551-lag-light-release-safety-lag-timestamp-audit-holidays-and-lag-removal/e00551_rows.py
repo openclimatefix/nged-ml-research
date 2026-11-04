@@ -1,5 +1,8 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501
-"""Write per-row CRPS of the Part 3 scenario forecasts with 470's scorer on 511's rows (mirrors e00544_rows)."""
+"""Write per-row CRPS of the Part 3 scenario forecasts with 470's scorer.
+
+The rows are 511's; the scorer is 470's (mirrors `e00544_rows.py`).
+"""
 
 import os
 from pathlib import Path

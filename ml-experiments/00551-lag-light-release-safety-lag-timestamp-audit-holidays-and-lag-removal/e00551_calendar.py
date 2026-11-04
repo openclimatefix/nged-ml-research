@@ -1,12 +1,14 @@
 # ruff: noqa: ANN001, ANN201, B007, D103, E501, PERF401
 """Part 2: calendar slices of stored per-row CRPS (CPU, no fit).
 
-Arms: L-1d (511), R-DW (539), R-DROP (544, readings present), A-pool (425 on 533's rows), and arm E of 548
-(lag-free plus trailing temperature windows). Slices, by target date: (a) Christmas week (24 Dec to
-1 Jan), (b) each bank holiday of England and Wales with the day before and the day after, (c) cold nights
-(the stored `cold` flag), (d) rows with no labelled event (`cls == "clean"`).
+Arms: L-1d (511), R-DW (539), R-DROP (544, readings present), A-pool (425 on 533's rows), and arm
+E of 548 (lag-free plus trailing temperature windows). Slices, by target date: (a) Christmas week
+(24 Dec to 1 Jan), (b) each bank holiday of England and Wales with the day before and the day
+after, (c) cold nights (the stored `cold` flag), (d) rows with no labelled event (`cls ==
+"clean"`).
 
-Reads experiment 521's loader for L-1d and A-pool, and the stored per-row score files of 539, 544 and 548.
+Reads experiment 521's loader for L-1d and A-pool, and the stored per-row score files of 539, 544
+and 548.
 """
 
 import json
