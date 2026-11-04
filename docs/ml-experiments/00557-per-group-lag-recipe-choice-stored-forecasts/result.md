@@ -113,8 +113,8 @@ six.
 - **Pre-registered test.** (a) within 0.03 of (c) at the six: **failed**. The difference is -0.081
   over 24-120 h and -0.059 over all leads, and larger than 0.03 in every band (smallest -0.031 at
   120-240 h). At the eight the test holds by construction, since (a) and (c) are the same
-  network. The failure has the opposite sign to the one the brief worried about: (a) is better than (c), so the per-group
-  choice gives up accuracy, and one network for all 14 does not.
+  network. The failure runs the other way from the cost the test guards against: (a) is better
+  than (c), so the per-group choice gives up accuracy, and one network for all 14 does not.
 - **Predictions.** P1 (six, 24-120 h, lag-light minus lag-free between -0.10 and 0.00): **held**,
   -0.081. P2 (lag-free at the eight trails by 0.10 to 0.14): **held**, 0.117. P3 (Christmas week at
   the eight, lag-light no worse than lag-free by more than 0.10): **held**, -0.064 (3.902 against 3.965
