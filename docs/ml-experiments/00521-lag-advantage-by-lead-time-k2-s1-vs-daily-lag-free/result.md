@@ -91,6 +91,12 @@ production_status: not-for-production
 adopted_in: none
 ---
 
+> **Correction (2026-11-04).** The gap to K2-S1 above 24 h of lead on this page is voided. K2-S1
+> mixes in experiment 404's lag-free head, which took its weather from the freshest run at each
+> target's valid time (leads of 9 to 33 h at every horizon), a look-ahead that a forecast made at
+> the origin does not have. The gap at 0 to 24 h is unchanged, and comparisons that do not involve
+> K2-S1 are unaffected. The rebuilt K2-S1 will restate the gaps. Evidence: experiments 531 and 532.
+
 **K2-S1's advantage over the daily-refit lag-free neural network L-1d is largest at 120 to 240 h,
 and the point estimates favour L-1d below 48 h, so the advantage is not a lag advantage.** K2-S1
 reads lagged power; L-1d does not. The gap is 0.174 points of CRPS (continuous ranked probability

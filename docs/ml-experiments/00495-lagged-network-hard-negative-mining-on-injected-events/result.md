@@ -102,6 +102,13 @@ advice:
     on rows with no labelled event (contrast C2).
 code: ml-experiments/00495-lagged-network-hard-negative-mining-on-injected-events/
 ---
+
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead B-mix's lead over the lagged network is partly the look-ahead. Contrasts between variants of
+> the lagged network are unaffected. Scores at 0 to 24 h are unchanged. Evidence: experiments 531
+> and 532.
 **Retraining the lagged neural network on its own worst rows lowered the share of a step in its
 readings that reaches its median forecast by only 0.021, and made its score on rows with no labelled
 event worse, which puts it on the trade-off that experiment 486 found between following a step and

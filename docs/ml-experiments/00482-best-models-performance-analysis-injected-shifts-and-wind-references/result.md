@@ -92,6 +92,13 @@ advice:
     contrasts bullet).
 ---
 
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead the comparison of K2-S1 with A-pool is not a valid forecast comparison. The change in one
+> forecast when shifts are injected into its lags, and A-pool's own change, are unaffected. Scores
+> at 0 to 24 h are unchanged. Evidence: experiments 531 and 532.
+
 **A forecast that mixes lagged and lagless heads (K2-S1) was in none of the eight scenarios
 meaningfully worse than the lagless forecast when we injected load shifts into its lags.** The
 pooled neural network that was never trained on shifted lags (A-pool) is the one that suffers. At

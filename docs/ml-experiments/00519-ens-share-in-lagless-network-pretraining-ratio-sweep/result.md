@@ -86,6 +86,12 @@ production_status: not-for-production
 adopted_in: none
 ---
 
+> **Correction (2026-11-04).** The gap to K2-S1 above 24 h of lead on this page is voided. K2-S1
+> mixes in experiment 404's lag-free head, which took its weather from the freshest run at each
+> target's valid time (leads of 9 to 33 h at every horizon), a look-ahead that a forecast made at
+> the origin does not have. The gap at 0 to 24 h is unchanged, and comparisons that do not involve
+> K2-S1 are unaffected. The rebuilt K2-S1 will restate the gaps. Evidence: experiments 531 and 532.
+
 **Putting ENS rows into the pretraining batches of the lag-free demand neural network made its mean
 forecast worse at the eight MVA-only Primaries, and the loss grew steeply from a 50% share upwards.**
 Against the 0% control F0, CRPS rose by 0.076 points at a 10% share, 0.059 at 25%, 0.105 at 50%
