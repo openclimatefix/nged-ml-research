@@ -6,5 +6,6 @@ for arm in A11c A11c-null; do
   $D/run.sh pretrain-wt --arm $arm --months $M || exit 1
   $D/run.sh fit --arm $arm --seeds 0 --stress --months $M || exit 1
   $D/run.sh fit --arm $arm --seeds 0 1 --months $M || exit 1
+  $D/run.sh assemble --arm $arm --months $M || exit 1
 done
 echo STAGE 6 DONE

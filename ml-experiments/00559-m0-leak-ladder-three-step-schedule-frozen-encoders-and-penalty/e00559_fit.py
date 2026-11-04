@@ -758,7 +758,7 @@ def average_arm(*, months: list[str], seeds: list[int], stress: bool, device: st
 
 def assemble() -> None:
     """Concatenate each cutoff's window forecast into one table per month and seed."""
-    for month in c.MONTHS:
+    for month in ARGS.months:
         cuts = k.cutoffs(month=month, cadence=CADENCE)
         for seed in ARGS.seeds:
             parts = [
