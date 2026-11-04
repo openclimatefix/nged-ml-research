@@ -37,6 +37,11 @@ class WtColumns:
         self.mean = self.month_real[: mr.n_base][train].mean(axis=0)
         self.std = np.maximum(self.month_real[: mr.n_base][train].std(axis=0), 1e-6)
         self.example = self._example(mr=mr, origin_idx=origin_idx)
+        self.unfilled = int(self.windows.unfilled)
+        self.null_rows_without_donor = int(np.isnan(self.month_null).any(axis=1).sum())
+        assert self.null_rows_without_donor < 0.01 * len(self.month_null), (
+            self.null_rows_without_donor
+        )
 
     def _example(self, *, mr: c.MonthRows, origin_idx: np.ndarray) -> str:
         """Describe one training row: its origin, target, the run its weather came from, and its columns."""

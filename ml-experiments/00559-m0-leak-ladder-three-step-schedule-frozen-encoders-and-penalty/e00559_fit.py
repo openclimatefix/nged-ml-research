@@ -357,6 +357,7 @@ def build_month(*, month, clean):
         WT = wt.WtColumns(month=month, mr=mr)
         mr.x = np.concatenate([mr.x, WT.month(null=SPEC.columns == "null")], axis=1)
         CHECK["months"][month]["wt_example"] = WT.example
+        CHECK["months"][month]["placebo_rows_without_donor"] = WT.null_rows_without_donor
         print(month, "W-T columns appended |", WT.example, flush=True)
     return mr
 
