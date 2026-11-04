@@ -266,6 +266,9 @@ def build_test(*, month, standardiser):
         present=present,
     )
     assert add.shape == (len(test.x), WIDTH) and np.isfinite(add).all()
+    CHECK["months"][month]["placebo_rows_without_donor_after_test_build"] = int(
+        FOLDS[month].unfilled
+    )
     CHECK["test_rows"] += len(test.x)
     CHECK["months"][month]["test_example"] = (
         f"origin {datetime.fromtimestamp(test.origin[0] / 1e6, UTC)}, weather run {datetime.fromtimestamp(test.origin[0] / 1e6, UTC) - pub}, "
@@ -359,6 +362,14 @@ if __name__ == "__main__":
         model = new_model(outlier=False, n_inputs=m.N_INPUTS + WIDTH, n_primaries=16)
         print(ARGS.arm, "extra columns", WIDTH, "encoder", cols.ENCODER[BASE], "parameters", sum(q.numel() for q in model.parameters()))  # fmt: skip
     else:
+        if ORACLE:
+            missing = [
+                (mo, sd)
+                for mo in ARGS.months
+                for sd in ARGS.seeds
+                if not list((W / "models" / STORE_AS).glob(f"{mo}_d*_s{sd}.pt"))
+            ]
+            assert not missing, f"B4-oracle fits nothing; run arm B4 first: {missing}"
         started = time.monotonic()
         f.fit_arm(
             arm=ARM,

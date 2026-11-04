@@ -140,7 +140,10 @@ class FoldColumns:
         out = np.full((len(primary), len(index)), np.nan, dtype=np.float32)
         todo = np.ones(len(primary), dtype=bool)
         for attempt in range(len(placebo.SEEDS)):
-            shift = self.days.shifts(valid_idx=valid_idx, attempt=attempt)
+            # B3b columns are constant within a run, so one donor shift per origin day keeps them so.
+            shift = self.days.shifts(
+                valid_idx=origin_idx if arm == "B3b" else valid_idx, attempt=attempt
+            )
             usable = todo & np.isfinite(shift)
             if not usable.any():
                 continue

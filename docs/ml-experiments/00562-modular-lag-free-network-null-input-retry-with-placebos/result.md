@@ -93,8 +93,8 @@ network missed.
     - A placebo for each arm (B1p, B2p, B3ap, B3bp, B4p) of the same width: every column is taken
       from a donor day with the same calendar month, day type, and length, at least 3 days away, on
       the same side of the fold's refit (experiment 515's `DayStructure`), with the donor's origin and
-      valid time both moved by the whole-day shift. B4p uses experiment 513's shuffled shape with the
-      same presence flags.
+      valid time both moved by the whole-day shift. B4p uses experiment 513's shuffled shape (donor day of the
+      same calendar month and day type, not the same day) with the same presence flags.
 - **Gate.** All arms run on M0 first. A passing arm re-runs on the best lag-encoder variant of
   experiment 560 (2 seeds). That re-run waits for experiment 560's scores.
 - **Standing rule: origin-time weather.** Every weather input for a target comes from the run issued
@@ -108,7 +108,7 @@ network missed.
   (published at 00 UTC); B3a is a fixed calendar; B3b needs daily Elexon and NESO feeds that
   production does not read today.
 
-**Statistics.** Contrasts are real minus placebo for each arm, at the eight and the six, on all
+**Statistics.** **Seed 0 alone is a screening pass:** it has no seed noise estimate, so its intervals cover the month-block resampling only, and the minimum detectable effect comes from seed 1 where that runs. The gate applies to the 10 all-rows contrasts; the Bonferroni level of 0.05/20 counts the cold-night contrasts too. Contrasts are real minus placebo for each arm, at the eight and the six, on all
 rows and on cold nights (as defined in experiment 526's scorer). That is 5 arms x 2 groups x 2 slices
 = **20 primary contrasts**, so the Bonferroni level is 0.05/20. Placebo-minus-M0 contrasts and the
 B4 without-price-minus-M0 contrast are reported beside them. A 5-block month bootstrap (near
@@ -116,6 +116,8 @@ min-to-max with 5 blocks), per-fold signs, and the minimum detectable effect fro
 sit beside each contrast. D15 and D18 are report-only. The injected-shift leak check (experiment 511's
 stress world) is run for each passing arm. A real-event leak check waits for the maintainer's primary
 measure. Rows with no labelled event means `tgt_real` false.
+
+**Placebo caveats, to state in the write-up.** Donors can lie after the row's own origin (the placebo is not causal, only the real arms are); rows without a donor (clock-change days, the first 5 days of runs) take the column mean, counted per fold and slice; B3b donors use one shift per origin day, but the two CAMS columns of B1 are constant within a run yet use the valid-day shift.
 
 **Standing practices followed.** Daily refit with a 90-day half-life (the harness of experiment
 511; the weekly and monthly cadences belong to other questions); cleaned data; D15 and D18 rows
