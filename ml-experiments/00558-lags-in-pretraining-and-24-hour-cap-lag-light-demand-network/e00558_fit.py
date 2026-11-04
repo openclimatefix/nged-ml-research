@@ -33,7 +33,9 @@ WORK = Path(
     + "/ml-experiments/00558-lags-in-pretraining-and-24-hour-cap-lag-light-demand-network"
 )
 W = WORK / "work"
-EXTRA_IDX = {"R-DW-24": [1, 2, 4, 5, 7, 8], "R-DW-24-PT": [1, 2, 4, 5, 7, 8]}
+EXTRA_IDX = {
+    a: [1, 2, 4, 5, 7, 8] for a in ("R-DW-24", "R-DW-24-PT", "A-pool-24", "A-pool-24-drop")
+}
 parser = argparse.ArgumentParser()
 parser.add_argument("command", choices=("fit", "assemble", "pretrain"))
 parser.add_argument("--arm", choices=list(EXTRA_IDX), required=True)
@@ -42,8 +44,33 @@ parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
 parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 parser.add_argument("--limit", type=int, default=None)
 ARGS = parser.parse_args()
-PT = ARGS.arm == "R-DW-24-PT"
-ARM = f.Arm(ARGS.arm, "d", 90.0, pretrained="PT" if PT else "L0PT")
+PT = ARGS.arm != "R-DW-24"  # arms whose pretraining already contains the capped lags
+APOOL = ARGS.arm.startswith("A-pool-24")
+DROP_ROWS = ARGS.arm == "A-pool-24-drop"
+# A-pool-24: monthly refit and a 182.6-day half-life (A-pool's), inside this harness
+ARM = f.Arm(
+    ARGS.arm,
+    "m" if APOOL else "d",
+    c.HALF_LIFE_425 if APOOL else c.HALF_LIFE_90,
+    pretrained="PT" if PT else "L0PT",
+)
+_cutoffs = k.cutoffs
+k.cutoffs = lambda *, month, cadence: (
+    [c.month_start(month=month)] if cadence == "m" else _cutoffs(month=month, cadence=cadence)
+)
+_select_rows = c.select_rows
+
+
+def select_rows(*, rows, **kw):
+    """A-pool-24-drop: leave out training rows whose capped day or week lag is missing."""
+    if DROP_ROWS:
+        kw["drop"] = (rows.x[:, POS["lag_day_missing"]] > 0.5) | (
+            rows.x[:, POS["lag_week_missing"]] > 0.5
+        )
+    return _select_rows(rows=rows, **kw)
+
+
+c.select_rows = select_rows
 
 NAMES, MASK, LAYOUT = prep.feature_names(scheme="summary")
 LAG = LAYOUT.columns_of(groups=["lags"])
@@ -419,7 +446,7 @@ def assemble():
 
 def assemble_one(*, tag):
     for month in c.MONTHS:
-        cuts = k.cutoffs(month=month, cadence="d")
+        cuts = k.cutoffs(month=month, cadence=ARM.cadence)
         for seed in (0, 1):
             parts = [
                 W / "fits" / tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet"
