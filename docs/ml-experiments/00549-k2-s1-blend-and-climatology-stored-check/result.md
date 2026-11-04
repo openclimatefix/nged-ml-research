@@ -90,10 +90,10 @@ supported` for Part 1; Part 2 stops, as pre-registered. Every number is interim 
 
 ## Part 1: blend of R-DW and the retrained K2-S1
 
-The blend averages the 11 stored quantiles of R-DW (experiment 539) and of each of the three cells of the retrained
-K2-S1 ([experiment 541](../00541-k2-s1-rebuilt-on-origin-time-weather/result.md), heads trained on
-origin-time weather), with the weight on K2-S1 fitted per group and lead band on earlier folds only.
-The code is a copy of [experiment
+The blend averages the 11 stored quantiles of R-DW (experiment 539) and of each of the three cells
+of the retrained K2-S1 ([experiment 541](../00541-k2-s1-rebuilt-on-origin-time-weather/result.md),
+heads trained on origin-time weather), with the weight on K2-S1 fitted per group and lead band on
+earlier folds only. The code is a copy of [experiment
 547](../00547-lag-light-and-lag-free-blend-by-lead-band-stored-forecasts/result.md)'s
 (`ml-experiments/00549-k2-s1-blend-and-climatology-stored-check/`). CRPS is in points of capacity,
 on rows with no labelled event, for the four folds 2025-12, 2026-01, 2026-03, and 2026-06; the first
