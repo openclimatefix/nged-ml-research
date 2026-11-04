@@ -66,7 +66,7 @@ take_home_message: >-
   Training the lag-free network to also predict the recent power level did not give it the benefit
   of lag inputs: its forecast got slightly worse (0.05 points of CRPS at the eight), and the gap to
   the lagged network stayed at 0.27 points. The recent level has to enter as an input, so the next
-  step is to choose which lagged inputs to feed (the day-ago and week-ago lags closed 76% to 83% of
+  step is to choose which lagged inputs to feed (the day-ago and week-ago lags closed 76% to 80% of
   the gap in experiment 539), not to try to learn them as a side task.
 advice:
   - >-
@@ -78,17 +78,20 @@ advice:
     (0.00% to 0.26% of half-hours) and the head scored 0.017 points worse at the eight (Results).
   - >-
     If a lag-free network needs recent level, give it lag inputs (experiment 539) rather than a
-    side task; a side task at weight 0.1 matched L-1d and did not beat it (Checks).
+    side task; a side task at weight 0.1 was still 0.005 worse than L-1d (Checks).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Training the lag-free demand network to predict the recent power level as a side task did not
-help it forecast: the forecast scored 0.049 points of CRPS worse than the network without the side
-task at the eight (lower is better), and none of the 0.271-point gap to the network that reads lagged
-power was closed.**  The reverse-flow side task scored 0.017 worse and the two together 0.059 worse.
+**Training a demand neural network without lagged-power inputs to predict the recent power level as
+a side task did not help it forecast.**  Its continuous ranked probability score (CRPS, the quality
+measure of a probabilistic forecast, here in percentage points of substation capacity; lower is
+better) was 0.049 points worse than the same network without the side task, averaged over the eight
+substations whose power is metered only as apparent power (MVA) and over forecasts 24 to 72 hours
+ahead. None of the 0.271-point gap to the neural network that reads lagged power closed. The
+reverse-flow side task scored 0.017 worse and the two side tasks together 0.059 worse.
 The next step is to give the network the day-ago and week-ago lags as inputs, as experiment 539
-did, because the recent level cannot be learned as a side task.
+did, because the recent level was not learnable as a side task in this test.
 
 We asked whether a lag-free demand network can recover what lag inputs tell a lagged network
 without receiving them at forecast time. We added extra outputs to the last layer of experiment
@@ -104,7 +107,7 @@ Verdict: refuted. The pre-registered prediction was that F1 would close at least
 between L-1d and A-pool (the lagged network of experiment 425) at lead 24 to 72 h at the eight,
 meaning F1 minus A-pool of at most +0.144 and +0.127. F1 minus A-pool was +0.345 and +0.295. F2 was
 predicted to change the eight by less than the minimum detectable effect (0.135), and it did (+0.017).
-F3 was predicted to be no better than F1 and it was 0.010 worse.
+F3 was predicted to be no better than F1 and F3 was 0.010 worse.
 
 ## Results
 
@@ -121,20 +124,23 @@ F3 was predicted to be no better than F1 and it was 0.010 worse.
 - **F1 minus L-1d** is +0.049 at the eight (month-block interval +0.035 to +0.061, 5 of 5 folds worse,
   minimum detectable effect 0.135) and +0.016 at the six (+0.008 to +0.024, 5 of 5 folds).
 - **F3 minus L-1d** is +0.059 at the eight (+0.040 to +0.074, 5 of 5 folds) and +0.018 at the six
-  (+0.001 to +0.032). **F2 minus L-1d** is +0.017 at the eight (+0.004 to +0.028, 4 of 5 folds).
+  (+0.002 to +0.033, 4 of 5 folds). **F2 minus L-1d** is +0.017 at the eight (+0.004 to +0.028, 4 of 5 folds).
 - **The gap that had to close** is L-1d minus A-pool: +0.271 at the eight (+0.182 to +0.352, 5 of 5
   folds) and +0.077 at the six (-0.015 to +0.160, 3 of 5 folds).
-- **Interval method.** The intervals are 95% month-block bootstraps with 5 blocks, which is near the
-  minimum to the maximum of the folds. The Bonferroni count is 56 (4 counted contrasts, F1 minus
-  A-pool, F1 minus L-1d, F2 minus L-1d, and F3 minus L-1d, times 7 bands times 2 sets). Every sign
-  holds in the same direction in every band from 24 h to 120 h; the effect sizes are inside the
-  minimum detectable effect, so the harm is a consistent small loss and not a large one.
+- **Interval method.** The intervals are 95% month-block bootstraps with 5 blocks, which is close to
+  the range from the best fold to the worst fold. The Bonferroni count is 56 (4 counted contrasts, F1 minus
+  A-pool, F1 minus L-1d, F2 minus L-1d, and F3 minus L-1d, times 7 bands times 2 sets). The minimum
+  detectable effect (0.135 at the eight) is two to three times every contrast above, so one
+  contrast alone could not detect a gain or loss of that size; the fold signs (5 of 5 worse for F1
+  and F3 at the eight) are the stronger evidence. At lead 24 to 120 h, F1 minus L-1d is positive
+  in every band at the eight.
 - **Injected-shift leak** (511's stress world, 7-day block of 3 times the weekly-mean standard
   deviation, seed 0, mean of five folds): F1 3.88, F2 3.96, F3 3.81, L-1d 4.49 points of capacity.
-  The pre-registered limit was 4.99. The leak is lower for every head, on day 1 (4.3 against 5.4)
+  The pre-registered limit was 4.99. The point estimates are lower for every head (the fold ranges overlap L-1d's, so a reduction is not shown), on day 1 (4.3 against 5.4)
   and on days 2 to 3 (3.7 to 3.8 against 4.6) alike. We did not test why.
-- **D15 and D18** (report-only) scored 10.42 for F1 and 10.36 for F3 at lead 24 to 72 h, against
-  10.37 for L-1d.
+- **D15 and D18** (report-only) scored 10.42 for F1, 10.28 for F2, and 10.36 for F3 at lead 24 to 72
+  h, against 10.37 for L-1d. F2 is 0.09 better there, where reverse flow is common; this was not
+  tested.
   July 2026 was not scored and not tuned on.
 
 ![CRPS by lead band](figure_1_crps_by_horizon.svg)
@@ -154,14 +160,16 @@ F3 was predicted to be no better than F1 and it was 0.010 worse.
   kept side targets equal the cleaned power at that time; targets whose cleaned power is missing
   were dropped (about 0.1% of rows), and so were values clipped at 5 standard deviations.
 - **Reverse-flow labels.** The label exists at the six and at D15 and D18 and is masked at the
-  eight. Reverse flow is rare at the six (0.00% to 0.26% of half-hours), so most positive labels come
+  eight. Reverse flow is rare at the six (at most 0.26% of half-hours at any one Primary, from a one-off look
+  at the cleaned power that is not stored), so most positive labels come
   from D15, which is report-only. F2 therefore had little to learn from, which is a reason its effect
   is small, not a finding about reverse flow.
 - **Explanation tested (trigger 2).** F1 with weight 0.1 (post hoc, not in the plan, not counted in
   the Bonferroni count) scored +0.005 against L-1d at the eight (+0.002 to +0.008) and +0.001 at the
-  six. The harm therefore scales with the side loss, and no weight tested gives a gain. The weight
+  six. The harm is smaller at the lower weight but does not vanish (the interval still excludes zero),
+  and neither weight tested gives a gain. The weight
   0.5 was fixed before any score; no other weight was run. The gradient clipping includes the side
-  gradients, a small confound that is part of the design.
+  gradients, a small difference from L-1d besides the extra outputs, which the design cannot avoid.
 - **Error of the mean or median.** Not computed: no contrast here points in a direction that a
   quantile-score disagreement could reverse, because every arm shares the same mixture output.
 - **Triggers.** Trigger 2 fired (the result contradicts the prediction) and the weight test above is
@@ -174,4 +182,4 @@ F3 was predicted to be no better than F1 and it was 0.010 worse.
 ## What the next experiment should answer
 
 Which of the day-ago and week-ago lag inputs, in what reduced form, keeps most of experiment 539's
-76% to 83% gap closure while leaking an injected load shift least.
+76% to 80% gap closure while leaking an injected load shift least.
