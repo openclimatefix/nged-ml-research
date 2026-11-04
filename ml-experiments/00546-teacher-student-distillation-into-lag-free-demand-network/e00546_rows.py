@@ -2,11 +2,12 @@
 import sys
 from pathlib import Path
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 import e00454_build as build454, e00470_build as build470, e00470_heads as heads470, e00470_score as score470
 import e00511_score as k511
 
-W = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments/00546-teacher-student-distillation-into-lag-free-demand-network/work")
-E539 = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments/00539-l1d-plus-day-and-week-lags/work")
+W = ML_EXPERIMENTS_DATA_DIR / "00546-teacher-student-distillation-into-lag-free-demand-network" / "work"
+E539 = ML_EXPERIMENTS_DATA_DIR / "00539-l1d-plus-day-and-week-lags" / "work"
 SRC511 = k511.WORK_DIR / "predictions"
 import os
 FIVE = tuple(os.environ.get("E546_MONTHS", "2025-10 2025-12 2026-01 2026-03 2026-06").split())

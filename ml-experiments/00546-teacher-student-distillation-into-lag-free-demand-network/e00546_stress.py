@@ -2,7 +2,8 @@
 from pathlib import Path
 import numpy as np
 import polars as pl
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
+DD = ML_EXPERIMENTS_DATA_DIR
 N = "00546-teacher-student-distillation-into-lag-free-demand-network"
 W = DD / N / "work/fits"
 T = DD / "00539-l1d-plus-day-and-week-lags/work/fits"

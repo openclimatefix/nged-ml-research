@@ -4,13 +4,13 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 
-sys.path[:0] = [str(p) for p in Path("/home/jack/dev/nged-ml-research/ml-experiments").iterdir() if p.is_dir()]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 import e00521_stats as s
 
 s.MONTHS = tuple(os.environ.get("E546_MONTHS", " ".join(s.MONTHS)).split())
 OUT = os.environ.get("E546_OUT", "scores")
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = ML_EXPERIMENTS_DATA_DIR
 W = DD / "00546-teacher-student-distillation-into-lag-free-demand-network"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]

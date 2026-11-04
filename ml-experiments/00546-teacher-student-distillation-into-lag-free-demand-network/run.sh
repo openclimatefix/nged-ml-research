@@ -3,7 +3,7 @@
 # Run from the worktree root. Puts every experiment folder on PYTHONPATH.
 set -e
 cd "$(git rev-parse --show-toplevel)"
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+export DATA_PATH_INTERNAL="${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
 source ml-experiments/00524*/env.sh
 script=$1; shift
 exec systemd-run --user --scope -q -p MemoryMax=8G -p OOMPolicy=continue \
