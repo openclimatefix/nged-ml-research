@@ -36,7 +36,7 @@ def figure_crps() -> None:
         chart = (
             alt.Chart(part)
             .mark_line(point=True)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("band:N", sort=BANDS, title="Lead time"),
                 y=alt.Y("crps:Q", title="CRPS (points of capacity)", scale=alt.Scale(zero=False)),
                 color=alt.Color(
@@ -88,7 +88,7 @@ def figure_contrasts() -> None:
         ),
         yOffset="what:N",
     )  # ty: ignore[unresolved-attribute]
-    bar = base.mark_rule(strokeWidth=2).encode(
+    bar = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "low_month:Q",
             title="CRPS difference (points of capacity; negative favours the first arm)",
@@ -99,8 +99,8 @@ def figure_contrasts() -> None:
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
         .mark_rule(color=theme.BLACK_2)
-        .encode(x="x:Q")
-    )  # ty: ignore[unresolved-attribute]
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    )
     alt.layer(zero, bar, dot).properties(
         width=560,
         height=330,

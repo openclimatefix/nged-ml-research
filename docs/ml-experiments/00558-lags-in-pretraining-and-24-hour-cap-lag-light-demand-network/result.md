@@ -30,9 +30,30 @@ decision_rule: >-
   threshold for porting is zero for the cap itself (it is a production constraint, not an option)
   and 0.03 CRPS for pretraining lags, because it adds a pretraining step to the production recipe. Wording is "interval
   excludes zero" or "not shown".
-verdict: >-
-  Mixed. P1 fails (the cap raises CRPS by 0.09 to 0.11 at 48-120 h), P2 is supported at 12-72 h, P3
-  fails on the point estimates, and P4 fails.
+verdict: partly supported
+benchmark: >-
+  R-DW (experiment 539), L-1d (experiment 511), A-pool (experiment 425), and `manual_heuristic`
+  for scale, on experiment 533's rows.
+row_set_id: experiment_470_intersection_v1
+best_arm: >-
+  R-DW-24-PT, the capped lags with lags in the ERA5/CAMS pretraining. Over all leads at the eight
+  it scores 4.72, against 4.71 for the uncapped R-DW and 4.79 for R-DW-24.
+headline: >-
+  The 24 h cap raises CRPS by 0.09 to 0.23 points of capacity at the eight from 6 h to 120 h.
+  Lags in pretraining lower it by 0.13 to 0.19 from 12 h to 72 h (interval excludes zero, 5 of 5
+  folds), but the injected-shift leak rises to 7.75 points of capacity against a 6.0 limit.
+lessons: >-
+  The 24 h cap is not free for a network that sees lags only at fine-tuning. Pretraining on the
+  capped lags recovers the loss, and also makes the network lean on its lags more: removing them at
+  inference raises CRPS by 0.26.
+production_status: not-for-production
+take_home_message: >-
+  Dropping every reading newer than 24 hours raises the lag-light network's CRPS by 0.09 to 0.23
+  points of capacity at the eight MVA-only Primaries from 6 h to 120 h. Putting the same capped
+  lags into the ERA5/CAMS pretraining lowers CRPS again by 0.13 to 0.19 from 12 h to 72 h, within
+  the minimum detectable effect of the uncapped network. The next step is to reduce the higher
+  injected-shift leak of the pretrained network (7.75 against a 6.0 limit) and to run the test that
+  ages the lags by 1, 2, and 3 days.
 ---
 
 # Lags in pretraining and a 24-hour cap (interim, unaudited)
