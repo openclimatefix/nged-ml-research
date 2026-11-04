@@ -60,7 +60,13 @@ def cell_weights() -> pl.DataFrame:
 
 
 def native_cell_frame(*, run: datetime) -> pl.DataFrame:
-    """Return one run's cell-level cloud cover: `h3_index`, `ensemble_member`, `valid_time`, `tcc`.
+    """Return one run's cell-level cloud cover from the Dynamical.org store.
+
+    Args:
+        run: The run's 00:00 UTC initialisation time.
+
+    Returns:
+        One row per `(h3_index, ensemble_member, valid_time)` with `tcc` in percent.
 
     Raises:
         ValueError: The store's run is not `run`, a grid point does not sit on a store point, or
