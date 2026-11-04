@@ -1,15 +1,16 @@
-"""Write per-row CRPS of R-DW with 470's scorer on 511's rows (mirrors e00537_rows)."""
+"""Write per-row CRPS of the student S-DW (546) with 470's scorer on 511's rows (mirrors e00539_rows)."""
 import sys
 from pathlib import Path
 import polars as pl
 import e00454_build as build454, e00470_build as build470, e00470_heads as heads470, e00470_score as score470
 import e00511_score as k511
 
-W = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments/00539-l1d-plus-day-and-week-lags/work")
+W = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments/00546-teacher-student-distillation-into-lag-free-demand-network/work")
+E539 = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments/00539-l1d-plus-day-and-week-lags/work")
 SRC511 = k511.WORK_DIR / "predictions"
-FIVE = build470.MONTHS
-assert FIVE == ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06"), FIVE
-NEW = ("R-DW",)
+import os
+FIVE = tuple(os.environ.get("E546_MONTHS", "2025-10 2025-12 2026-01 2026-03 2026-06").split())
+NEW = ("S-DW",)
 
 def main():
     heads470.WORK_DIR = W
@@ -18,6 +19,9 @@ def main():
         link = W / "predictions" / arm
         if not link.exists():
             link.symlink_to((SRC511 / arm).resolve(), target_is_directory=True)
+    link = W / "predictions" / "R-DW"
+    if not link.exists():
+        link.symlink_to((E539 / "predictions" / "R-DW").resolve(), target_is_directory=True)
     sites = build470.site_map()
     for m in FIVE:
         _, keys = build454.load_heads(month=m)
@@ -30,10 +34,10 @@ def main():
     score470.MONTHS = FIVE; build454.MONTHS = FIVE
     score470.SCORE_DIR = W / "scores"
     score470.CANDIDATES = NEW
-    score470.CONTROLS = ("A-pool", "L-1d", "K2-S1")
+    score470.CONTROLS = ("A-pool", "L-1d", "K2-S1", "R-DW")
     score470.DESCRIPTIVE = (); score470.SINGLES = ()
     score470.REFERENCES = ("manual_heuristic",)
-    score470.MAIN_ARMS = (*NEW, "A-pool", "L-1d", "K2-S1")
+    score470.MAIN_ARMS = (*NEW, "A-pool", "L-1d", "K2-S1", "R-DW")
     score470.CELLS = {}
     score470.CONTRASTS = tuple((a, b) for a in NEW for b in ("A-pool", "L-1d"))
     score470.GATING_CRPS = ("eight", "six_clean"); score470.GATING_Q99 = ("eight", "six_clean")

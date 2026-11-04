@@ -1,5 +1,5 @@
-"""Score R-DW (539) and R1, R9 (538) against L-1d and A-pool on 533's rows. Reuses 533's loader and 521's statistics."""
-import json, math, sys
+"""Score the student S-DW (546) against L-1d, A-pool, and the teacher R-DW (539) on 533's rows. Reuses 533's loader and 521's statistics."""
+import json, math, os, sys
 from pathlib import Path
 import numpy as np
 import polars as pl
@@ -7,24 +7,25 @@ import polars as pl
 sys.path[:0] = [str(p) for p in Path("/home/jack/dev/nged-ml-research/ml-experiments").iterdir() if p.is_dir()]
 import e00521_stats as s
 
+s.MONTHS = tuple(os.environ.get("E546_MONTHS", " ".join(s.MONTHS)).split())
+OUT = os.environ.get("E546_OUT", "scores")
+
 DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
-W = DD / "00539-l1d-plus-day-and-week-lags"
+W = DD / "00546-teacher-student-distillation-into-lag-free-demand-network"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]
-ARMS = {"R-DW": "R-DW__crps", "R1": "R1__crps", "R9": "R9__crps", "A-pool": "A-pool__crps", "L-1d": "L-1d__crps", "L-Ww": "L-Ww__crps",
+ARMS = {"S-DW": "S-DW__crps", "R-DW": "R-DW__crps", "A-pool": "A-pool__crps", "L-1d": "L-1d__crps", "L-Ww": "L-Ww__crps",
         "S2-J-0.4x": "S2-J-0.4x__crps", "K2-S1": "K2-S1__crps", "manual_heuristic": "manual_heuristic__crps"}
-CONTRASTS = [("R-DW", "A-pool", True), ("R-DW", "L-1d", True), ("R-DW", "R1", False), ("R-DW", "R9", False),
-             ("R-DW", "K2-S1", False), ("R-DW", "manual_heuristic", False), ("R9", "A-pool", False), ("R1", "A-pool", False),
-             ("R9", "L-1d", False), ("R1", "L-1d", False), ("L-1d", "A-pool", False)]
+CONTRASTS = [("S-DW", "A-pool", True), ("S-DW", "L-1d", True), ("S-DW", "R-DW", False),
+             ("S-DW", "K2-S1", False), ("S-DW", "manual_heuristic", False), ("R-DW", "A-pool", False),
+             ("R-DW", "L-1d", False), ("L-1d", "A-pool", False)]
 TESTS = 2 * 7 * 2  # 2 counted contrasts x 7 bands x 2 sets
 
 
 def table():
     base = s.load()
     extra = pl.concat([pl.read_parquet(E524 / f"rows_{m}.parquet", columns=[*K, "A-pool__crps", "manual_heuristic__crps", "S2-J-0.4x__crps"]) for m in s.MONTHS])
-    mine = pl.concat([pl.read_parquet(W / "work/scores" / f"rows_{m}.parquet", columns=[*K, "R-DW__crps"]) for m in s.MONTHS])
-    old = pl.concat([pl.read_parquet(DD / "00538-l1d-plus-recent-level-and-lags/work/scores" / f"rows_{m}.parquet", columns=[*K, "R1__crps", "R9__crps"]) for m in s.MONTHS])
-    mine = mine.join(old, on=K, how="left", validate="1:1", maintain_order="left")
+    mine = pl.concat([pl.read_parquet(W / "work/scores" / f"rows_{m}.parquet", columns=[*K, "S-DW__crps", "R-DW__crps"]) for m in s.MONTHS])
     assert base.select(K).equals(extra.select(K))
     drop = [c for c in ("A-pool__crps", "S2-J-0.4x__crps") if c in base.columns]
     t = pl.concat([base.drop(drop), extra.drop(K)], how="horizontal")
@@ -39,8 +40,9 @@ def main():
     need = [c for k2, c in ARMS.items() if k2 != "manual_heuristic" and c in t.columns]
     fin = pl.all_horizontal([pl.col(c).is_finite() for c in need])
     t = t.with_columns(main16=pl.col("main16") & fin)
-    chk = {"rows": t.height, "rows main16 with R-DW,R1,R9 finite": int(t["main16"].sum()), "columns used": need}
-    json.dump(chk, open(W / "scores/checks.json", "w"), indent=1); print(chk)
+    chk = {"rows": t.height, "rows main16 with S-DW,R-DW finite": int(t["main16"].sum()), "columns used": need}
+    (W / OUT).mkdir(exist_ok=True, parents=True)
+    json.dump(chk, open(W / OUT / "checks.json", "w"), indent=1); print(chk)
     rng = np.random.default_rng(0)
     absolute, contrasts = [], []
     seedcols = ["L-1d-seed0__crps", "L-1d-seed1__crps"]
@@ -62,7 +64,7 @@ def main():
                 d = sub.select("month", "day", d=pl.col(ARMS[a]) - pl.col(ARMS[b])).filter(pl.col("d").is_finite())
                 st = s.block_stats(diff=d, rng=rng, tests=TESTS)
                 contrasts.append({"set": name, "band": band, "contrast": f"{a} - {b}", "counted": counted and band != s.ALL and name != "report", "tests": TESTS, "mde": mde, **st})
-    pl.DataFrame(absolute).write_csv(W / "scores/absolute.csv")
-    pl.DataFrame(contrasts).write_csv(W / "scores/contrasts.csv")
+    pl.DataFrame(absolute).write_csv(W / OUT / "absolute.csv")
+    pl.DataFrame(contrasts).write_csv(W / OUT / "contrasts.csv")
 
 main()

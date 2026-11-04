@@ -53,9 +53,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("command", choices=("fit", "assemble"))
 parser.add_argument("--stress", action="store_true")
 parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
-parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
+parser.add_argument("--seeds", nargs="+", type=int, default=None)
 parser.add_argument("--limit", type=int, default=None)
 ARGS = parser.parse_args()
+if ARGS.seeds is None:
+    ARGS.seeds = [0] if ARGS.stress else [0, 1]  # experiment 539 saved stress teachers for seed 0 only
 ARM = f.Arm("S-DW", "d", 90.0)
 
 NAMES, MASK, LAYOUT = prep.feature_names(scheme="summary")
@@ -65,7 +67,7 @@ EXTRA = [LAG[i] for i in TEACHER_LAG_INDEX]
 KEEP0, COLS0, MASK0 = data.non_lag_layout()
 N0 = len(KEEP0)
 assert N0 == 37
-assert not any("lag" in str(n) for n in COLS0), "student input list contains a lag column"
+assert set(KEEP0).isdisjoint(LAG), "student input list contains a lag column"
 NEW_NAMES = [NAMES[i] for i in EXTRA]
 POS = {n: N0 + j for j, n in enumerate(NEW_NAMES)}
 VALUE = [n for n in NEW_NAMES if not n.endswith(("_missing", "_age"))]
@@ -188,12 +190,16 @@ def teacher_file(*, month: str, day: int, seed: int, stress: str) -> Path:
     return TEACHER_DIR / f"{month}_d{day}_s{seed}{stress}.pt"
 
 
-def sample_teacher(*, out: torch.Tensor) -> torch.Tensor:
-    """Draw one standardised target per row from the teacher's mixture."""
+def sample_teacher(*, out: torch.Tensor, gen: torch.Generator) -> torch.Tensor:
+    """Draw one standardised target per row from the teacher's mixture, using a dedicated generator.
+
+    The dedicated generator keeps the student's row order and dropout masks on the same random
+    stream as an L-1d fit with the same seed.
+    """
     log_w, mean, std = base.mixture_parts(out=out, components=c.COMPONENTS)
-    comp = torch.multinomial(log_w.exp(), 1)
+    comp = torch.multinomial(log_w.exp(), 1, generator=gen)
     m, s = mean.gather(1, comp).squeeze(1), std.gather(1, comp).squeeze(1)
-    return m + s * torch.randn_like(m)
+    return m + s * torch.randn(m.shape, device=m.device, dtype=m.dtype, generator=gen)
 
 
 def train_distill(
@@ -206,6 +212,7 @@ def train_distill(
     training value of the teacher term in the last epoch.
     """
     torch.manual_seed(seed)
+    gen = torch.Generator(device=device).manual_seed(seed + 10_000)
     x, z, w, p, is_val = t["x"], t["z"], t["w"], t["p"], t["v"]
     train_idx = torch.nonzero(~is_val).squeeze(1)
     val_idx = torch.nonzero(is_val).squeeze(1)
@@ -224,7 +231,7 @@ def train_distill(
             b = order[start : start + c.BATCH]
             xb, pb = x[b], p[b]
             with torch.no_grad():
-                z_teacher = sample_teacher(out=teacher(xb, pb))
+                z_teacher = sample_teacher(out=teacher(xb, pb), gen=gen)
             out = student(xb[:, :N0], pb)
             nll_real = base.mixture_nll(out=out, z=z[b], components=c.COMPONENTS)
             nll_teacher = base.mixture_nll(out=out, z=z_teacher, components=c.COMPONENTS)
@@ -234,8 +241,8 @@ def train_distill(
             loss.backward()
             torch.nn.utils.clip_grad_norm_(student.parameters(), c.GRAD_CLIP)
             optimiser.step()
-            terms.append(float(nll_teacher.mean()))
-        last_teacher_term = float(np.mean(terms))
+            terms.append(nll_teacher.mean().detach())
+        last_teacher_term = float(torch.stack(terms).mean())
         student.eval()
         with torch.no_grad():
             val = float(
