@@ -85,13 +85,15 @@ score, in points of capacity: percentage points of each Primary substation's cap
 is better. Cold winter nights are below 5 degrees C, 18:00 to 08:00, and "the eight" are the
 Primary substations that report apparent power (MVA) only. On those nights at the eight, the real
 windows score 4.162 and the placebo 4.266. The verdict is `supported` by the rule written before
-scoring (a difference of at most -0.05 with an interval excluding zero), with the caveats below. Every
+scoring (a difference of at most -0.05 with an interval excluding zero), with the caveats below.
+Every
 number is interim and unaudited.
 
 ![Window contrast on cold nights, by lead time](figure_1_cold_night_contrast.svg)
 
 - **Pre-registered contrast** (cold nights, below 5 degrees C, 18:00 to 08:00, eight MVA-only
-  Primaries, rows with no labelled event): R-DW + W-T minus R-DW + W-Tnull is **-0.104** (month-block
+  Primaries, rows with no labelled event): R-DW + W-T minus R-DW + W-Tnull is **-0.104** (month-
+  block
   interval -0.113 to -0.009, 3 blocks, one per winter fold; per-fold signs -0.112, -0.113, -0.009,
   all negative; 32,716 rows). The rule asked for at most -0.05 with an interval excluding zero, and
   both hold. Experiment 526 found -0.093 without the lags.
@@ -99,7 +101,8 @@ number is interim and unaudited.
   rests on 3 blocks. Treat the size as uncertain. The size is similar to the -0.093 that experiment
   526 found without the lags, but 526 used more winter folds, so the two are not like for like.
 - **By lead band on cold nights, eight:** -0.119 (24-48 h), -0.157 (48-72 h), -0.096 (72-120 h),
-  -0.101 (120-240 h; interval -0.114 to -0.023). Intervals at 24-72 h and at 72-120 h (-0.169 to +0.005) include zero; the 12-24 h band is
+  -0.101 (120-240 h; interval -0.114 to -0.023). Intervals at 24-72 h and at 72-120 h (-0.169 to
+  +0.005) include zero; the 12-24 h band is
   -0.110 to -0.027 and the 6-12 h band is positive (+0.045, 2 blocks).
 - **All rows, eight:** -0.018 (-0.054 to +0.037), per-fold signs -0.030, -0.044, -0.049, +0.088,
   -0.065. The interval includes zero.
@@ -117,12 +120,15 @@ number is interim and unaudited.
   +0.034). The gain does not come from how the window is filled across the forecast origin.
 - **Injected-shift leak** (a 7-day block of shifted power; change in the median forecast per 100
   points of shift, seed 0, five folds): R-DW + W-T 5.7, R-DW + W-Tnull 7.8, R-DW 5.7, L-1d 4.5,
-  L-1d + W-T 4.5. The windows do not raise the leak above R-DW's, but the seed-0 ranges across folds are wide
-  (about 2.4 to 13), and the placebo's 7.8 is higher by 2 points, so these figures cannot rank the arms.
+  L-1d + W-T 4.5. The windows do not raise the leak above R-DW's, but the seed-0 ranges across
+  folds are wide
+  (about 2.4 to 13), and the placebo's 7.8 is higher by 2 points, so these figures cannot rank the
+  arms.
 - **D15 and D18 (report-only):** R-DW + W-T minus R-DW + W-Tnull is +0.061 (-0.325 to +0.428) over
   all rows and -0.016 on cold nights; short history, not scored.
 - **Counted tests:** 28 (2 contrasts x 7 bands x 2 site sets, the eight and the six, all-rows slice
-  only). The cold-night contrast was pre-registered and is not counted. No interval is widened to that count. Intervals are month-block
+  only). The cold-night contrast was pre-registered and is not counted. No interval is widened to
+  that count. Intervals are month-block
   bootstraps, near the minimum to maximum of the folds (5 blocks all rows, 3 cold nights).
 
 ![Injected-shift leak](figure_2_injected_shift_leak.svg)
@@ -135,7 +141,8 @@ and 2026-06; July 2026 unused). The window inputs are experiment 515's three W-T
 after the six lag inputs; the pretraining weights are the lag-free W-T and W-Tnull networks of
 experiments 515, 526, and 548, with W-Tnull pretrained here for 2025-10 and 2026-06. The code
 copies experiment 539's lag code (not on `main`) and uses the window code of experiment 548. It
-lives in `ml-experiments/00550-lag-light-network-trailing-temperature-windows-with-placebo/`. The "winter
+lives in `ml-experiments/00550-lag-light-network-trailing-temperature-windows-with-placebo/`. The
+"winter
 folds of 526" are the three winter folds of these five (2025-12, 2026-01, 2026-03).
 
 - **Origin-time weather and lags**, asserted row by row: every day-ago and week-ago lag was observed
@@ -145,7 +152,8 @@ folds of 526" are the three winter folds of these five (2025-12, 2026-01, 2026-0
   2025-11-23 09:00 UTC.
 - **Placebo caveat:** the donor day is a different day of the same calendar month group and day type
   (experiment 515's draw) and can lie after the row's own day, so some placebo window values come
-  from a run issued after the origin. The donor day is a different day, so it carries no information about the target. If a later
+  from a run issued after the origin. The donor day is a different day, so it carries no
+  information about the target. If a later
   donor day helped the placebo at all, the contrast would be understated, not inflated. We did not
   measure that.
 - **Unlabelled events:** NGED's event labels are incomplete, so "rows with no labelled event" may
@@ -156,7 +164,8 @@ folds of 526" are the three winter folds of these five (2025-12, 2026-01, 2026-0
 - **Median forecast minus mean forecast:** not computed; these arms store quantiles only.
 - **Error of the mean or median forecast beside the quantile score:** not computed, for the same
   reason.
-- **Triggers for an audit** (listed in the `ml-experiment` skill): none fired (the placebo moves the score by 0.018 at the eight,
+- **Triggers for an audit** (listed in the `ml-experiment` skill): none fired (the placebo moves
+  the score by 0.018 at the eight,
   inside its interval half-width of about 0.04; the cold-night interval is of the same order as
   experiment 526's). Leave-one-site-out was not run. No audit was run.
 - **Not done:** forecast examples, tail coverage, and the curtailment cost are not shown on this
@@ -164,6 +173,7 @@ folds of 526" are the three winter folds of these five (2025-12, 2026-01, 2026-0
 
 ## Lessons and what the next experiment should answer
 
-The windows keep their cold-night gain beside the lags. The all-rows gain is not shown. The next experiment should add the other winter folds of
+The windows keep their cold-night gain beside the lags. The all-rows gain is not shown. The next
+experiment should add the other winter folds of
 experiment 526 (2024-11 to 2025-03 and 2025-11, 2026-02) to the lag-light harness, to lift the
 cold-night contrast above its minimum detectable effect.
