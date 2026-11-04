@@ -547,7 +547,7 @@ def assemble() -> None:
     for tag in (ARM.tag, *[f"{ARM.tag}-{s}" for s in SIBLINGS]):
         for month in c.MONTHS:
             cuts = k.cutoffs(month=month, cadence="d")
-            for seed in (0, 1):
+            for seed in ARGS.seeds:
                 parts = [
                     W / "fits" / tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet"
                     for cut in cuts

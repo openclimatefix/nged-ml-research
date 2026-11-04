@@ -33,7 +33,10 @@ def main():
         rows = pl.DataFrame({k: keys[k] for k in build470.KEYS})
         for arm in NEW:
             frame = build470.pool_stored(
-                folder=W / "seed_preds" / arm, month=m, sites=sites, seeds=(0, 1)
+                folder=W / "seed_preds" / arm,
+                month=m,
+                sites=sites,
+                seeds=(0,) if arm.startswith("LAG-b_") else (0, 1),
             )
             joined = build470.on_rows(rows=rows, frame=frame)
             print(
