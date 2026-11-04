@@ -52,12 +52,13 @@ best_arm: >-
   4.967 and 3.523 for the old K2-S1 and 5.140 and 3.719 for L-1d.
 headline: >-
   With the look-ahead removed, K2-S1 scores the same as before below 24 h only if its lag-free heads
-  keep the look-ahead training; heads retrained on origin-time weather lose 0.09 points at 12 to
-  24 h and 0.19 at 0 to 6 h at the eight. Beyond 24 h either way K2-S1 is worse than before, by 0.43
-  (eight) and 0.41 (six) points at 120 to 240 h with retrained heads (0.48 and 0.51 without
-  retraining), about 2.5 times the 0.17 and 0.20 predicted. The retrained K2-S1 is worse than L-1d
-  in every band by point estimate, but the intervals include zero except at the eight for 12 to
-  24 h, so L-1d is not shown to be better elsewhere.
+  keep the look-ahead training; heads retrained on origin-time weather lose 0.09 points at 12 to 24
+  h at the eight (interval +0.03 to +0.15); the 0.19 at 0 to 6 h has an interval that includes zero.
+  Beyond 24 h either way K2-S1 is worse than before, by 0.43 (eight) and 0.41 (six) points at 120 to
+  240 h with retrained heads (0.48 and 0.51 without retraining), 2.1 to 2.8 times the 0.17 and 0.20
+  predicted. The retrained K2-S1 is worse than L-1d in every band by point estimate, but the
+  intervals include zero except at the eight for 12 to 24 h, so L-1d is not shown to be better
+  elsewhere.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
@@ -82,12 +83,18 @@ advice:
     head without it loses at short lead (the retrained-head contrast, section "Scores").
 ---
 
-**Take-home message: K2-S1's advantage over the daily lag-free network L-1d at 5 to 10 days came
-from a look-ahead in its weather.** When every weather input comes from the run issued at or before
-the forecast origin, K2-S1 is about 0.4 points of capacity worse at 120 to 240 h. By point estimate
-it is then worse than L-1d in every lead band, but the Bonferroni intervals include zero except at
-the eight for 12 to 24 h, so L-1d is not shown to be better elsewhere. The next step is a lag-free
-head that also sees the lead time. Verdict: partly supported (see "Predictions").
+**Take-home message: K2-S1's advantage over the daily lag-free network L-1d at 5 to 10 days is not
+there once its weather is limited to what was known at the forecast origin.** With the lag-free
+heads still trained on the old weather, K2-S1 is 0.48 (eight) and 0.51 (six) points of capacity
+worse at 120 to 240 h, which isolates the look-ahead. With the heads retrained on origin-time
+weather the loss is 0.43 and 0.41, and also includes the missing lead input. By point estimate K2-S1
+is then worse than L-1d in every lead band, but the Bonferroni intervals include zero except at the
+eight for 12 to 24 h, so L-1d is not shown to be better elsewhere. The next step is a lag-free head
+that also sees the lead time. Verdict: partly supported (see "Predictions"). Terms: the eight are
+the 8 Primaries with MVA-only (megavolt-ampere) telemetry and the six the 6 with signed-MW
+telemetry; K2-S1 is experiment 454's mixture of two lagged S1 and two lag-free heads; L-1d is
+experiment 511's daily-refit lag-free network; A-pool, A-pool minus lags, and R-DW are the networks
+of experiments 533, 537, and 539.
 
 ![CRPS by lead band](figure_1_crps_by_lead.svg)
 
@@ -101,21 +108,22 @@ head that also sees the lead time. Verdict: partly supported (see "Predictions")
 - **Heads trained on look-ahead weather.** The lag-free heads (experiment 404's "further" module,
   seeds 0 to 2) are refitted with experiment 531's code, which reproduced the stored table to 5e-6.
   They are trained as experiment 404 trained them, on the freshest run published before each valid
-  time, and fed origin-time weather when scored. This is the first rebuild.
+  time, and fed origin-time weather when scored. Call this the first rebuild.
 - **Heads trained on origin-time weather.** The same module, loss, seeds, epochs, recency weights,
   and short-history cut, trained on experiment 397's rows instead: one row per Primary, forecast
   origin, and valid time, with origin and valid time before the refit date, leads up to 240 h, and
-  no lead input (about 5 million rows per refit). This is the second rebuild. It was added after the
-  first rebuild's scores were read, at the manager's request, so its predictions were not
-  registered beforehand.
+  no lead input (about 5 million rows per refit). Call this the second rebuild. The second rebuild
+  was added after the first rebuild's scores were read, at the manager's request, so its predictions
+  were not registered beforehand.
 - **Cells.** Experiment 454's three seed pairs, each an equal-weight mixture of two S1 heads and two
   lag-free heads. Code reused from experiments 404, 454, 521, and 531 (copied into this folder).
-- **Weather check.** All 1,142,520 scored rows were matched to the summary of the run initialised at
-  origin minus 9 h, with all 14 weather columns equal. Example: Primary D2, origin 2026-06-01 09:00
-  UTC, target 2026-06-07 15:30 UTC, run initialised 2026-06-01 00:00 UTC and published 09:00 UTC,
-  lead 150.5 h, mean shortwave radiation 444.776 in both the table and the run. The check ties each
-  row to its summary row, whose stored origin is the run time plus 9 h. The training rows of the
-  second rebuild select origin and valid time before the refit date by assertion.
+- **Weather check.** All 1,142,520 rows on which the lag-free heads were scored (before the row
+  filters of experiment 511's scoring) were matched to the summary of the run initialised at origin
+  minus 9 h, with all 14 weather columns equal. Example: Primary D2, origin 2026-06-01 09:00 UTC,
+  target 2026-06-07 15:30 UTC, run initialised 2026-06-01 00:00 UTC and published 09:00 UTC, lead
+  150.5 h, mean shortwave radiation 444.776 in both the table and the run. The check ties each row
+  to its summary row, whose stored origin is the run time plus 9 h. The training rows of the second
+  rebuild select origin and valid time before the refit date by assertion.
 - **Rows.** Rows with no labelled event, experiment 511's row set, five folds of 511, July 2026
   unused. Eight means the 8 Primaries with MVA-only (megavolt-ampere) telemetry, six the 6 Primaries
   with signed-MW telemetry.
@@ -125,10 +133,10 @@ head that also sees the lead time. Verdict: partly supported (see "Predictions")
 Differences are rebuilt minus old K2-S1, in points of CRPS (continuous ranked probability score,
 lower is better). Each cell shows the difference, the Bonferroni-widened month-block interval, the
 folds with a positive difference, and the minimum detectable effect (MDE): `1.96 sqrt(2) sd /
-sqrt(3)`, where `sd` is the standard deviation of the three cells' per-fold means. The pre-registered
-Bonferroni count was 28; it is 56 (4 counted contrasts, 7 bands, 2 row sets). Intervals are
-month-block bootstraps with 5 blocks (near the minimum to maximum of the folds). The cells share
-seeds, so the MDE is optimistic.
+sqrt(3)`, where `sd` is the standard deviation of the three cells' per-fold means. The
+pre-registered Bonferroni count was 28; it is 56 (4 counted contrasts, 7 bands, 2 row sets).
+Intervals are month-block bootstraps with 5 blocks (near the minimum to maximum of the folds). The
+cells share seeds, so the MDE is optimistic.
 
 ### Heads trained on look-ahead weather, minus old K2-S1
 
@@ -180,23 +188,29 @@ seeds, so the MDE is optimistic.
 ## Predictions
 
 - **P1 (same score as the old K2-S1 below 24 h, inside the MDE).** Held for the first rebuild: the
-  largest difference is 0.042 against an MDE of 0.12. Failed for the second rebuild at the eight
-  (12 to 24 h: +0.085 against an MDE of 0.07; 0 to 6 h: +0.193 against 0.16). Retraining on all
-  leads without a lead input costs short-lead skill that the day-ahead feed gave the old heads.
+  largest difference is 0.042 against an MDE of 0.12. Failed for the second rebuild at the eight (12
+  to 24 h: +0.085 against an MDE of 0.07, interval +0.03 to +0.15; 0 to 6 h: +0.193 against 0.16,
+  interval -0.04 to +0.50, which includes zero). Retraining on all leads without a lead input may
+  cost short-lead skill that the day-ahead feed gave the old heads; this is not tested.
 - **P2 (a fall of about 0.17 at the eight and 0.20 at the six at 120 to 240 h, within 0.05).**
   Failed for both rebuilds: +0.477 and +0.508 for the first, +0.433 and +0.413 for the second. The
-  falls are 2.1 to 2.8 times the prediction. The direction was right.
-- **A band-24-h boundary is not exact.** Differences at 24 to 48 h (+0.081 at the eight for the
-  first rebuild) already exceed the MDE.
+  falls are 2.1 to 2.8 times the prediction. The pre-registered P2 failed under both rebuilds; the
+  direction was right.
+- **The 24 h boundary is not sharp.** The 24 to 48 h difference for the first rebuild at the eight
+  is +0.081 (interval +0.006 to +0.137), which exceeds its MDE of 0.07 and barely clears zero.
 
 ## Caveats
 
 - No rebuild has a lag-free head that sees the lead time, and L-1d does. The gap to L-1d therefore
   mixes the loss of the look-ahead with the missing lead input.
+- The second rebuild trains on about 10 origins per valid time, so about 10 times as many rows and
+  gradient steps as experiment 404's head, and each valid time is weighted by its origin count. That
+  confounds any comparison of the two training feeds.
+- The "report" row set (D15 and D18) in the stored tables is not part of the Bonferroni count.
 - NGED's event labels are incomplete, so clean rows may hold unlabelled events.
-- The comparison with A-pool minus lags in the absolute table is a comparison of different
-  networks. Only A-pool against A-pool minus lags isolates lags (5.058 against 5.430 at the eight,
-  3.717 against 3.995 at the six, 120 to 240 h).
+- The comparison with A-pool minus lags in the absolute table is a comparison of different networks.
+  Only A-pool against A-pool minus lags isolates lags (5.058 against 5.430 at the eight, 3.717
+  against 3.995 at the six, 120 to 240 h).
 
 ## Correction table: gaps to K2-S1 that change
 
@@ -234,10 +248,11 @@ The sibling task that writes correction notes on those pages uses this list. Cla
 page's headline only, so each entry is a pointer and not a conclusion.
 
 - **The conclusion that a model stays behind K2-S1 may not survive:** 510 (L-Ww behind K2-S1 by
-  0.156 and 0.132 over all leads), 511 (L-1d behind by 0.091 and 0.071), 521 (K2-S1 advantage at
-  120 to 240 h). The retrained K2-S1 is worse than both L-1d and L-Ww at 24 h and beyond by point
-  estimate, but only where intervals exclude zero should a flip be stated. Gaps at short lead
-  (below 12 h) stay in K2-S1's favour or unchanged for L-Ww.
+  0.156 and 0.132 over all leads), 511 (L-1d behind by 0.091 and 0.071), 521 (K2-S1 advantage at 120
+  to 240 h). The retrained K2-S1 is worse than both L-1d and L-Ww at 24 h and beyond by point
+  estimate, but only where intervals exclude zero should a flip be stated. A negative gap means
+  K2-S1 is the worse forecast. Below 12 h K2-S1 was already behind L-Ww and L-1d at the eight in the
+  old scores, and the retrained heads widen those gaps.
 - **Probably stands, being lag-free against lag-free or about short-lead events:** 519, 523, 524,
   525 (lag-free contrasts); 468 (events, lead not stated in the headline).
 - **Not assessed:** 470, 527, 529, 530.
