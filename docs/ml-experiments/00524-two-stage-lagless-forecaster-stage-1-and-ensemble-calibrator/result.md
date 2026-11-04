@@ -118,7 +118,7 @@ advice:
 > affects the form-A, form-B, and S2-J results, so the S2-J equivalence to L-Ww, the S2-F
 > contrasts, P4, and the best arm all describe the group-free calibrator. The code is left as run,
 > and a rerun with the corrected label is not queued.
-
+>
 > **Correction (2026-11-04).** The gap to K2-S1 above 24 h of lead on this page is voided. K2-S1
 > mixes in experiment 404's lag-free head, which took its weather from the freshest run at each
 > target's valid time (leads of 9 to 33 h at every horizon), a look-ahead that a forecast made at

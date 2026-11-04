@@ -27,7 +27,8 @@ def main() -> None:
             f"{path.name}: group input, train {np.unique(cache['aux_train'][:, -1]).tolist()}, "
             f"test {np.unique(cache['aux_test'][:, -1]).tolist()}"
         )
-        assert not cache["aux_train"][:, -1].any() and not cache["aux_test"][:, -1].any()
+        assert not cache["aux_train"][:, -1].any()
+        assert not cache["aux_test"][:, -1].any()
 
 
 if __name__ == "__main__":
