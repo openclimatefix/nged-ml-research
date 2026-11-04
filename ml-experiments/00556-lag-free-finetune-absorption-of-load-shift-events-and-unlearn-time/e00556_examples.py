@@ -1,10 +1,11 @@
 # ruff: noqa: E501
-"""Example forecasts of experiment 556: an injected step and a real labelled event, day-ahead and 10 days ahead.
+"""Example forecasts of experiment 556: an injected step and a real labelled event.
 
-Figure 5: a 7-day, 10%-of-capacity step injected into the fine-tuning targets before the week-3 refit of
-the 2026-01 fold, seen at one signed-MW Primary by L-Ww (F7d), F1d, and F3d-E3 (dashed: the same arm's
-uninjected fit). Figure 6: the real labelled event at the same Primary that experiment 556's real-event
-fits absorbed most, fitted on metered and on NRA-corrected targets by L-Ww (F7d) and F1d.
+Each figure has a day-ahead and a 10-days-ahead version. Figure 5: a 7-day, 10%-of-capacity step
+injected into the fine-tuning targets before the week-3 refit of the 2026-01 fold, seen at one
+signed-MW Primary by L-Ww (F7d), F1d, and F3d-E3 (dashed: the same arm's uninjected fit). Figure 6:
+a real labelled event of 26 points at the same Primary, fitted on metered and on NRA-corrected
+targets by L-Ww (F7d) and F1d.
 Axes count days from the forecast origin; no calendar date is shown.
 """
 
@@ -34,7 +35,10 @@ ARMS: Final[tuple[str, ...]] = ("F7d", "F1d", "F3d-E3")
 def frame_of(
     *, cell: fit.Cell, model: torch.nn.Module, origin_us: int, primary: int
 ) -> pl.DataFrame:
-    """Return quantile forecasts (points of capacity) of one origin at one Primary, with days from the origin and the actual."""
+    """Return quantile forecasts (points of capacity) of one origin at one Primary.
+
+    The frame also holds the days from the origin and the actual load.
+    """
     first = cell.test.origin[(cell.test.origin >= origin_us) & (cell.test.primary == primary)].min()
     sel = (cell.test.origin == first) & (cell.test.primary == primary)
     frame = c.forecast_frame(

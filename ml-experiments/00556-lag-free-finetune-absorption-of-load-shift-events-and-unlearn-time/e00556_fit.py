@@ -647,12 +647,15 @@ def assemble(*, arms: list[str], months: list[str], seeds: list[int]) -> None:
 
 
 def real_events(*, arms: list[str], months: list[str], device: str) -> None:
-    """Fit once on metered and once on NRA-corrected targets at the first cutoff 3 or more days after each event.
+    """Fit once on metered and once on NRA-corrected targets, per labelled event.
+
+    The cutoff is the first one 3 or more days after the event.
 
     The correction is experiment 435's labelled step (depth factor 1.0), subtracted from every
-    training target of the one event being measured (every other event stays as metered). The absorbed share of an event is the sign of
-    the event times (metered median - corrected median) over the 7 days after the cutoff, at the
-    event's Primary, divided by the event's labelled depth.
+    training target of the one event being measured (every other event stays as metered). The
+    absorbed share of an event is the sign of the event times (metered median - corrected median)
+    over the 7 days after the cutoff, at the event's Primary, divided by the event's labelled
+    depth.
     """
     events = c.labelled_events()
     grid, step = c.prep422.GRID_START_US, c.prep422.STEP_US

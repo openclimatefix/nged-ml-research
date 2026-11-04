@@ -104,7 +104,10 @@ def leak_contrasts(*, leaks: pl.DataFrame, tests: int = 24) -> pl.DataFrame:
 
 
 def unlearn(*, frame: pl.DataFrame, scenario: str) -> pl.DataFrame:
-    """Return the leak per refit (days since the origin) and the days until it falls below 10% of its first value."""
+    """Return the leak per refit (days since the origin).
+
+    Also return the days until the leak falls below 10% of its first value.
+    """
     sub = own_window(frame=frame.filter(pl.col("scenario") == scenario))
     by = mean_by(frame=sub, keys=["arm", "group", "refit_off", "month", "origin_day", "sign"])
     curve = (
@@ -116,7 +119,10 @@ def unlearn(*, frame: pl.DataFrame, scenario: str) -> pl.DataFrame:
 
 
 def days_below(*, curve: pl.DataFrame, frac: float = 0.10) -> pl.DataFrame:
-    """Return, per arm and group, the first refit offset (days) at which the leak is below `frac` of its first value, or null."""
+    """Return, per arm and group, the first refit offset (days) with the leak below `frac`.
+
+    `frac` is a fraction of the first leak. The offset is null if the leak never falls that far.
+    """
     rows = []
     for (arm, group), part in curve.group_by("arm", "group", maintain_order=True):
         part = part.sort("refit_off")
@@ -165,7 +171,11 @@ def days_to(*, curve: pl.DataFrame, level: float) -> pl.DataFrame:
 
 
 def real_event_table() -> pl.DataFrame:
-    """Return the absorbed share of real labelled events per arm: all events, without the largest, and the fold means with a five-block interval."""
+    """Return the absorbed share of real labelled events per arm.
+
+    The table covers all events, all events without the largest, and the fold means with a
+    five-block interval.
+    """
     events = pl.read_parquet(OUT / "real_events.parquet").drop_nulls("absorbed_share")
     rows = []
     for arm in ("F1d", "F3d", "F7d"):
@@ -261,7 +271,10 @@ def main() -> None:
 
 
 def score_slices() -> None:
-    """Print CRPS by lead band and on cold winter nights for each arm, at the eight and the six (rows with no labelled event)."""
+    """Print CRPS by lead band and on cold winter nights for each arm.
+
+    The rows are those with no labelled event, at the eight and at the six.
+    """
     import e00521_stats as s521  # ty: ignore[unresolved-import]
 
     arms = ["L-Ww", "F1d", "F3d", "F1d-182", "F3d-E3", "F3d-R"]
@@ -310,7 +323,11 @@ def score_slices() -> None:
 
 
 def noise_proxy() -> None:
-    """Print the sign-pair noise proxy of the first-refit leak: the standard deviation of (leak at +1 minus leak at -1) over cells, over root 2."""
+    """Print the sign-pair noise proxy of the first-refit leak.
+
+    The proxy is the standard deviation, over cells, of (leak at +1 minus leak at -1), divided by
+    root 2.
+    """
     cells = pl.read_csv(OUT / "leak_cells.csv").filter(
         pl.col("scenario").is_in(["step3_p10", "step7_p10"])
         & pl.col("group").is_in(["eight", "six"])
