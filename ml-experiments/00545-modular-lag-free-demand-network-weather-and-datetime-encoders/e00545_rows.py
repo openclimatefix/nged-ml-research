@@ -1,17 +1,18 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501
 """Write per-row CRPS of M0 and M1 with 470's scorer on 511's rows (mirrors experiment 539's e00539_rows)."""
 
-from pathlib import Path
-
 import e00454_build as build454  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]
 import e00470_heads as heads470  # ty: ignore[unresolved-import]
 import e00470_score as score470  # ty: ignore[unresolved-import]
 import e00511_score as k511  # ty: ignore[unresolved-import]
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-W = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00545-modular-lag-free-demand-network-weather-and-datetime-encoders/work"
+W = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00545-modular-lag-free-demand-network-weather-and-datetime-encoders"
+    / "work"
 )
 SRC511 = k511.WORK_DIR / "predictions"
 FIVE = build470.MONTHS

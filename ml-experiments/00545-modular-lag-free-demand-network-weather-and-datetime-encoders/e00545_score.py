@@ -6,13 +6,13 @@ Reuses experiment 539's scorer, 533's loader, and 521's statistics.
 
 import json
 import math
-from pathlib import Path
 
 import e00521_stats as s  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = ML_EXPERIMENTS_DATA_DIR
 W = DD / "00545-modular-lag-free-demand-network-weather-and-datetime-encoders"
 W539 = DD / "00539-l1d-plus-day-and-week-lags"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"

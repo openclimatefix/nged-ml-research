@@ -17,8 +17,8 @@ Serving (`forward`) returns only the main mixture's 9 raw outputs.
 from typing import Final
 
 import e00397_models as base  # ty: ignore[unresolved-import]
-import torch
-from torch import nn
+import torch  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
 
 WEATHER_COLS: Final = slice(0, 7)
 SPREAD_COLS: Final = slice(7, 14)

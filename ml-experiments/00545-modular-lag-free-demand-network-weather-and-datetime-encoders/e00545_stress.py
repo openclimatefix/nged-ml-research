@@ -5,11 +5,10 @@ The leak is the sign times the change in the median forecast, in points of capac
 and lead band.
 """
 
-from pathlib import Path
-
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-DD = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DD = ML_EXPERIMENTS_DATA_DIR
 W = DD / "00545-modular-lag-free-demand-network-weather-and-datetime-encoders/work/fits"
 W539 = DD / "00539-l1d-plus-day-and-week-lags/work/fits"
 L = DD / "00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/work/fits/L-1d"
