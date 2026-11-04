@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - retraining-and-training-history
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -46,26 +46,132 @@ row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity at the eight (MVA-only Primaries) and the six (signed-MW
   Primaries), D15 and D18 report-only, and the injected-shift leak of the 511 stress world.
+verdict: refuted
+best_arm: >-
+  None. L-1d (no auxiliary head) scores 4.525 points of CRPS at the eight and 3.219 at the six for
+  lead 24 to 72 h; F1 scores 4.574 and 3.234, F2 4.541 and 3.226, F3 4.584 and 3.236, against
+  4.254 and 3.142 for A-pool.
+headline: >-
+  An auxiliary head that predicts the recent power level made the lag-free forecast worse, not
+  better: F1 scored 0.049 points behind L-1d at the eight for lead 24 to 72 h (interval +0.035 to
+  +0.061, 5 of 5 folds), so it closed none of the 0.271 gap to A-pool. Lowering the head's weight
+  from 0.5 to 0.1 removed the harm (+0.005) and still gave no gain.
+lessons: >-
+  The recent level that a lag input supplies is not recoverable from the lag-free inputs by
+  multi-task training: the head's targets are predictable only from information the network
+  already uses for the forecast, so sharing hidden layers adds nothing and the extra loss only
+  competes for capacity. The injected-shift leak fell for every head (3.8 to 4.0 points against
+  4.49), which was not a goal and is not explained.
+take_home_message: >-
+  Training the lag-free network to also predict the recent power level did not give it the benefit
+  of lag inputs: its forecast got slightly worse (0.05 points of CRPS at the eight), and the gap to
+  the lagged network stayed at 0.27 points. The recent level has to enter as an input, so the next
+  step is to choose which lagged inputs to feed (the day-ago and week-ago lags closed 76% to 83% of
+  the gap in experiment 539), not to try to learn them as a side task.
+advice:
+  - >-
+    Do not add an auxiliary head for the recent power level to the lag-free demand network; it
+    scored 0.049 points worse than L-1d at the eight and closed none of the gap to the lagged
+    network (Results, figure 2).
+  - >-
+    Do not add a reverse-flow head to the lag-free demand network; reverse flow is rare at the six
+    (0.00% to 0.26% of half-hours) and the head scored 0.017 points worse at the eight (Results).
+  - >-
+    If a lag-free network needs recent level, give it lag inputs (experiment 539) rather than a
+    side task; a side task at weight 0.1 matched L-1d and did not beat it (Checks).
+production_status: not-for-production
+adopted_in: none
 ---
 
-# Auxiliary heads for the lag-free network (planned)
+**Training the lag-free demand network to predict the recent power level as a side task did not
+help it forecast: the forecast scored 0.049 points of CRPS worse than the network without the side
+task at the eight (lower is better), and none of the 0.271-point gap to the network that reads lagged
+power was closed.**  The reverse-flow side task scored 0.017 worse and the two together 0.059 worse.
+The next step is to give the network the day-ago and week-ago lags as inputs, as experiment 539
+did, because the recent level cannot be learned as a side task.
 
-**Plan, committed before any fit or score.** Base recipe: experiment 511's L-1d (ERA5 and CAMS
-pretrained, ENS fine-tuned, daily refit, 90-day half-life, 2 seeds, 5 folds of 511). Each arm adds
-outputs to the last layer of the network and a loss on them. The inputs are the 37 lag-free columns
-and the Primary embedding, exactly as in L-1d. July 2026 is not scored and not tuned on.
+We asked whether a lag-free demand network can recover what lag inputs tell a lagged network
+without receiving them at forecast time. We added extra outputs to the last layer of experiment
+511's best lag-free network (L-1d) and trained them on power values from before each row's forecast
+origin, which the network never sees as inputs. F1 predicts the newest observed power at the origin,
+the day-ago power, and the week-ago power (three standardised values; this follows
+[Caruana (1997)](https://doi.org/10.1023/A:1007379606734) in sharing hidden layers between a main
+and a side task). F2 predicts whether power at the target time is below -0.005 of capacity (a
+reverse flow), where the sign is metered. F3 has both heads. Each side loss has weight 0.5. Scores are
+on experiment 511's five folds of one month each, 2 seeds, rows with no labelled event.
 
-- **F1, recent-level head.** Three regression outputs predict the standardised value of the newest
-  observed power at the origin, the day-ago power, and the week-ago power (the three lag value
-  columns of experiments 397 and 538), masked when the lag is missing. These lags are training
-  targets only. Loss: mean squared error, weight 0.5 relative to the forecast loss, fixed before any
-  score is read and not tuned.
-- **F2, reverse-flow head.** One logit predicts whether the power at the target time is below
-  -0.005 of capacity. The label exists only where the sign is metered: it is masked at the eight.
-  Loss: binary cross-entropy, weight 0.5. Reverse flow is rare at the six (0.00% to 0.26% of
-  half-hours), so F2 is expected to be nearly inert; the label counts are reported.
-- **F3.** Both heads.
-- **Weather inputs.** Every weather input of a row comes from the run issued at or before the
-  forecast origin. The code asserts this row by row and prints one example row.
-- **Leak.** The injected-shift stress world of experiment 511 (7-day block, both signs, seed 0)
-  shifts the forecast target and the lag-valued auxiliary targets together.
+Verdict: refuted. The pre-registered prediction was that F1 would close at least half of the gap
+between L-1d and A-pool (the lagged network of experiment 425) at lead 24 to 72 h at the eight,
+meaning F1 minus A-pool of at most +0.144 and +0.127. F1 minus A-pool was +0.345 and +0.295. F2 was
+predicted to change the eight by less than the minimum detectable effect (0.135), and it did (+0.017).
+F3 was predicted to be no better than F1 and it was 0.010 worse.
+
+## Results
+
+| Lead 24 to 72 h, CRPS (points of capacity) | Eight | Six |
+|---|---|---|
+| F1 (recent-level head) | 4.574 | 3.234 |
+| F2 (reverse-flow head) | 4.541 | 3.226 |
+| F3 (both heads) | 4.584 | 3.236 |
+| F1-w01 (post hoc: F1 with weight 0.1) | 4.530 | 3.220 |
+| L-1d (no head; experiment 511) | 4.525 | 3.219 |
+| R-DW (day-ago and week-ago lags as inputs; experiment 539) | 4.314 | 3.129 |
+| A-pool (lagged network; experiment 425) | 4.254 | 3.142 |
+
+- **F1 minus L-1d** is +0.049 at the eight (month-block interval +0.035 to +0.061, 5 of 5 folds worse,
+  minimum detectable effect 0.135) and +0.016 at the six (+0.008 to +0.024, 5 of 5 folds).
+- **F3 minus L-1d** is +0.059 at the eight (+0.040 to +0.074, 5 of 5 folds) and +0.018 at the six
+  (+0.001 to +0.032). **F2 minus L-1d** is +0.017 at the eight (+0.004 to +0.028, 4 of 5 folds).
+- **The gap that had to close** is L-1d minus A-pool: +0.271 at the eight (+0.182 to +0.352, 5 of 5
+  folds) and +0.077 at the six (-0.015 to +0.160, 3 of 5 folds).
+- **Interval method.** The intervals are 95% month-block bootstraps with 5 blocks, which is near the
+  minimum to the maximum of the folds. The Bonferroni count is 56 (4 counted contrasts, F1 minus
+  A-pool, F1 minus L-1d, F2 minus L-1d, and F3 minus L-1d, times 7 bands times 2 sets). Every sign
+  holds in the same direction in every band from 24 h to 120 h; the effect sizes are inside the
+  minimum detectable effect, so the harm is a consistent small loss and not a large one.
+- **Injected-shift leak** (511's stress world, 7-day block of 3 times the weekly-mean standard
+  deviation, seed 0, mean of five folds): F1 3.88, F2 3.96, F3 3.81, L-1d 4.49 points of capacity.
+  The pre-registered limit was 4.99. The leak is lower for every head, on day 1 (4.3 against 5.4)
+  and on days 2 to 3 (3.7 to 3.8 against 4.6) alike. We did not test why.
+- **D15 and D18** (report-only) scored 10.42 for F1 and 10.36 for F3 at lead 24 to 72 h, against
+  10.37 for L-1d.
+  July 2026 was not scored and not tuned on.
+
+![CRPS by lead band](figure_1_crps_by_horizon.svg)
+
+![Each head minus L-1d, lead 24 to 72 h](figure_2_head_minus_l1d.svg)
+
+![Injected-shift leak](figure_3_stress_leak.svg)
+
+## Checks
+
+- **Weather inputs.** Every row's weather comes from the run issued at or before the forecast
+  origin, asserted for all 153 test origins. Example: target 2026-06-07 15:30 UTC, origin
+  2026-06-01 09:00 UTC, weather run 2026-06-01 00:00 UTC. The 9 lag columns are removed from the
+  network inputs before training and scoring; they remain only as training targets, each observed at
+  least 3.5 hours before its origin (asserted row by row).
+- **Targets match the cleaned power.** After rounding the lag time to the half-hour grid, 100% of
+  kept side targets equal the cleaned power at that time; targets whose cleaned power is missing
+  were dropped (about 0.1% of rows), and so were values clipped at 5 standard deviations.
+- **Reverse-flow labels.** The label exists at the six and at D15 and D18 and is masked at the
+  eight. Reverse flow is rare at the six (0.00% to 0.26% of half-hours), so most positive labels come
+  from D15, which is report-only. F2 therefore had little to learn from, which is a reason its effect
+  is small, not a finding about reverse flow.
+- **Explanation tested (trigger 2).** F1 with weight 0.1 (post hoc, not in the plan, not counted in
+  the Bonferroni count) scored +0.005 against L-1d at the eight (+0.002 to +0.008) and +0.001 at the
+  six. The harm therefore scales with the side loss, and no weight tested gives a gain. The weight
+  0.5 was fixed before any score; no other weight was run. The gradient clipping includes the side
+  gradients, a small confound that is part of the design.
+- **Error of the mean or median.** Not computed: no contrast here points in a direction that a
+  quantile-score disagreement could reverse, because every arm shares the same mixture output.
+- **Triggers.** Trigger 2 fired (the result contradicts the prediction) and the weight test above is
+  the explanation; the other triggers did not. No audit was run, because the explanation was tested
+  and no later experiment's design depends on this result's sign.
+- **Not done.** The rebuilt K2-S1 (experiment 541) was not stored when this ran, so it is not a
+  comparator. The research default's absolute scores against BG2 and `manual_heuristic` are in
+  experiments 511 and 539. Lead range: 6 to 240 h; the headline concerns 24 to 72 h.
+
+## What the next experiment should answer
+
+Which of the day-ago and week-ago lag inputs, in what reduced form, keeps most of experiment 539's
+76% to 83% gap closure while leaking an injected load shift least.
