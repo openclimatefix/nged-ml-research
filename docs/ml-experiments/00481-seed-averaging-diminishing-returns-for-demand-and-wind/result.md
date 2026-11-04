@@ -105,6 +105,14 @@ advice:
     demand value, so quote the paired bootstrap interval beside it (Checks).
 ---
 
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead the value of the lagless head over averaged S1 seeds (3.441 against 3.628) is overstated. The
+> seed-averaging results for the lag-free networks built on experiment 425A are unaffected, because
+> experiment 532 found 425A's weather taken from the run published at the forecast origin. Scores at
+> 0 to 24 h are unchanged. Evidence: experiments 531 and 532.
+
 The solar half of the original brief is dropped because experiment 430 already stores six seeds
 for `a2_member` and `g0_onepass`.
 

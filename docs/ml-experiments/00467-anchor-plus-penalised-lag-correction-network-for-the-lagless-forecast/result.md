@@ -96,6 +96,13 @@ code: >-
   ml-experiments/00467-anchor-plus-penalised-lag-correction-network-for-the-lagless-forecast/
 ---
 
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead the lagless anchor is stronger than a forecast made at the origin can be, so the gain of the
+> lag correction over its anchor is understated there, and the gaps to B-mix and K2-S1 are not valid
+> forecasts. Scores at 0 to 24 h are unchanged. Evidence: experiments 531 and 532.
+
 **A forecast made without recent power readings (the lagless forecast), plus a small correction that
 reads those readings, beats the lagless forecast alone and B-mix on rows with no labelled event.
 It does not help inside real events.** A lag is a power reading available at the forecast origin:

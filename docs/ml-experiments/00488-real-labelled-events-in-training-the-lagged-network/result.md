@@ -94,6 +94,13 @@ advice:
     worsens the score on rows with no labelled event by 1.01 points (Results table, PT-FT row).
 ---
 
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead B-mix's lead over the lagged network is partly the look-ahead. Contrasts between variants of
+> the lagged network are unaffected. Scores at 0 to 24 h are unchanged. Evidence: experiments 531
+> and 532.
+
 **Real labelled load-shift events (periods when NGED moved a substation's load to a neighbouring
 substation), added to the training of the lagged-power neural network, change nothing detectable.**
 The question was whether the real events from months before the scored month improve the

@@ -106,6 +106,13 @@ advice:
     scores 0.12 better than B-mix there at the six with a wide interval (-0.90 to +0.24) (C3).
 ---
 
+> **Correction (2026-11-04).** The lagless forecast on this page, including the lagless half of
+> B-mix and K2-S1, comes from experiment 404's table, which took its weather from the freshest run
+> at each target's valid time (leads of 9 to 33 h at every horizon), a look-ahead. Above 24 h of
+> lead the gap between the imitation network and B-mix or K2-S1 is partly the look-ahead, so the
+> conclusion that the lagless forecast carries information the raw readings do not is shown only at
+> 0 to 24 h. Scores at 0 to 24 h are unchanged. Evidence: experiments 531 and 532.
+
 ## What this experiment found
 
 **Imitating the four-network mixture did not teach one neural network what the lagless forecast

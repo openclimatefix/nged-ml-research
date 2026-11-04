@@ -92,6 +92,12 @@ production_status: candidate
 adopted_in: none
 ---
 
+> **Correction (2026-11-04).** The gap to K2-S1 above 24 h of lead on this page is voided. K2-S1
+> mixes in experiment 404's lag-free head, which took its weather from the freshest run at each
+> target's valid time (leads of 9 to 33 h at every horizon), a look-ahead that a forecast made at
+> the origin does not have. The gap at 0 to 24 h is unchanged, and comparisons that do not involve
+> K2-S1 are unaffected. The rebuilt K2-S1 will restate the gaps. Evidence: experiments 531 and 532.
+
 **Refitting the lag-free demand network every day scored 0.065 points of CRPS better than refitting
 it every week at the eight and 0.061 better at the six (lower is better; Bonferroni intervals
 exclude zero), and refitting twice a week scored 0.036 and 0.041 better.**  The daily refit leaves
