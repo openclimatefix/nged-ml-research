@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, ANN202, D103, E501
+# ruff: noqa: ANN001, ANN201, ANN202, D103
 """Write per-row CRPS of the lag-encoder arms and their removed/aged scorings.
 
 Uses 470's scorer on 511's rows, mirroring experiment 545's rows script.

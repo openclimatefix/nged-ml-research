@@ -1,6 +1,7 @@
 # ruff: noqa: ANN001, ANN201, D103, PTH123, SIM115, E501, PLW2901
-"""Score the lag-encoder arms (560) against M0 (545), L-1d, A-pool, R-DW (539), and, when scored,
-R-DW-24 and A-pool-24 (558).
+"""Score the lag-encoder arms (560) against the stored reference arms.
+
+The references are M0 (545), L-1d, A-pool, R-DW (539), and, when scored, R-DW-24 and A-pool-24 (558).
 
 Reuses experiment 521's rows and block bootstrap. The counted contrasts are listed in `COUNTED`; the
 Bonferroni count is `TESTS`. Every scoring variant (`-removed`, `-aged1` to `-aged3`) is a column.
