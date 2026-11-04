@@ -193,7 +193,7 @@ def main():
                 "mde_all_rows": round(m_all, 3),
             }
             for a, col in ARMS.items():
-                rec[a] = float(sub[col].mean())
+                rec[a] = float(sub[col].mean())  # ty: ignore[invalid-argument-type]
             for a in ("R-DW", "R-DROP", "A-pool", "E (548)"):
                 rec[f"{a} - L-1d"] = rec[a] - rec["L-1d"]
             # per-day signs against L-1d

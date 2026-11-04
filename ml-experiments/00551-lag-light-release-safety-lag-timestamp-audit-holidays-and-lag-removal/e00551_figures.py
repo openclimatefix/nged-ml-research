@@ -53,7 +53,7 @@ def figure_calendar() -> None:
         for a in ARMS
     ]
     zero = (
-        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color=theme.BLACK_2)
         .encode(x="y:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -113,7 +113,7 @@ def figure_removal() -> None:
     )
     t = t.with_columns(label=pl.col("scn").replace(names))
     zero = (
-        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())
+        alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_rule(color=theme.BLACK_2)
         .encode(x="y:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -131,12 +131,12 @@ def figure_removal() -> None:
             legend=alt.Legend(orient="top"),
             scale=alt.Scale(domain=list(cols), range=list(cols.values())),
         )
-        bar = base.mark_rule(strokeWidth=3).encode(
+        bar = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low_month:Q", title="CRPS minus L-1d's (points of capacity)"),
             x2="high_month:Q",
             color=colour,
         )
-        dot = base.mark_point(filled=True, size=70).encode(x="difference:Q", color=colour)
+        dot = base.mark_point(filled=True, size=70).encode(x="difference:Q", color=colour)  # ty: ignore[unresolved-attribute]
         panels.append(
             alt.layer(zero, bar, dot).properties(
                 width=WIDTH, height=230, title=alt.TitleParams(label, anchor="start")
