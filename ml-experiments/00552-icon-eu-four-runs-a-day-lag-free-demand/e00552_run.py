@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, PLR0915, PERF401, PT018, D107
+# ruff: noqa: E501, PLR0915
 r"""Fit the ICON-EU adaptors (N1, N2) and forecast N0, N1, N2 for experiment 552, month by month.
 
 N0 feeds the ECMWF ensemble mean (the latest run usable at the issue time) straight into experiment

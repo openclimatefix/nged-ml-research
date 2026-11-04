@@ -1,4 +1,3 @@
-# ruff: noqa: E501, E402, PLR0915, PERF401, PT018, D107
 """Draw experiment 552's figures: CRPS against the ECMWF-only arm by fold, and by lead band."""
 
 from pathlib import Path

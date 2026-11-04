@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, PLR0915, PERF401, PT018, D107
+# ruff: noqa: E402
 """Fetch every Dynamical.org ICON-EU run from 2026-02-10 to 2026-06-30 at the 16 Primary points.
 
 One parquet per run goes to `OUTPUT_DIR / runs`, so a re-run skips finished runs. Coordinates stay

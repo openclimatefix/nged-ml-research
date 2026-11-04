@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, PLR0915, PERF401, PT018, D107
+# ruff: noqa: E501, PT018, D107
 """Rows for experiment 552: ICON-EU and ECMWF inputs at four issue times a day.
 
 `pack` writes two private caches under `WORK_DIR`: the ICON-EU runs as one array, and the ECMWF

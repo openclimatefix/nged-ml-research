@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, PLR0915, PERF401, PT018, D107
+# ruff: noqa: E501, PERF401
 """Score experiment 552: CRPS in points of capacity by arm, issue hour, lead band, group, and fold.
 
 CRPS is twice the mean pinball loss over the 11 quantile levels (experiment 448's `row_scores`
