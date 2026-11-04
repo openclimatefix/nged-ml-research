@@ -1,8 +1,9 @@
+# ruff: noqa: E501
 """Injected-shift leak of the student S-DW (546), the teacher R-DW (539), and L-1d (511): sign x change in the median forecast, points of capacity, by block age and lead band."""
-from pathlib import Path
-import numpy as np
+
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
 DD = ML_EXPERIMENTS_DATA_DIR
 N = "00546-teacher-student-distillation-into-lag-free-demand-network"
 W = DD / N / "work/fits"
@@ -21,16 +22,45 @@ for arm, folder in (("L-1d", L), ("R-DW", T / "R-DW"), ("S-DW", W / "S-DW")):
                     continue
                 j = ctrl.join(pl.read_parquet(p).select(*KEYS, s="q50"), on=KEYS).with_columns(
                     lead=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours(),
-                    leak=sign * 100.0 * (pl.col("s") - pl.col("c")))
-                for lab, cond in {"all": pl.lit(True), "day1": pl.col("lead") <= 24, "days2_3": (pl.col("lead") > 24) & (pl.col("lead") <= 72), "days4_10": pl.col("lead") > 72}.items():
-                    rows.append({"arm": arm, "month": m, "block_age_days": day - 14, "sign": sign, "band": lab, "leak": j.filter(cond)["leak"].mean(), "n": j.filter(cond).height})
+                    leak=sign * 100.0 * (pl.col("s") - pl.col("c")),
+                )
+                for lab, cond in {
+                    "all": pl.lit(True),
+                    "day1": pl.col("lead") <= 24,
+                    "days2_3": (pl.col("lead") > 24) & (pl.col("lead") <= 72),
+                    "days4_10": pl.col("lead") > 72,
+                }.items():
+                    rows.append(
+                        {
+                            "arm": arm,
+                            "month": m,
+                            "block_age_days": day - 14,
+                            "sign": sign,
+                            "band": lab,
+                            "leak": j.filter(cond)["leak"].mean(),
+                            "n": j.filter(cond).height,
+                        }
+                    )
 t = pl.DataFrame(rows)
 t.write_csv(DD / N / "scores/stress_leak_long.csv")
 fold = t.group_by("arm", "month", "band").agg(pl.col("leak").mean())
-s = fold.group_by("arm", "band").agg(leak=pl.col("leak").mean(), lo=pl.col("leak").min(), hi=pl.col("leak").max()).sort("band", "arm")
+s = (
+    fold.group_by("arm", "band")
+    .agg(leak=pl.col("leak").mean(), lo=pl.col("leak").min(), hi=pl.col("leak").max())
+    .sort("band", "arm")
+)
 s.write_csv(DD / N / "scores/stress_leak.csv")
-byage = t.filter(pl.col("band") == "all").group_by("arm", "block_age_days").agg(leak=pl.col("leak").mean()).sort("arm", "block_age_days")
+byage = (
+    t.filter(pl.col("band") == "all")
+    .group_by("arm", "block_age_days")
+    .agg(leak=pl.col("leak").mean())
+    .sort("arm", "block_age_days")
+)
 byage.write_csv(DD / N / "scores/stress_leak_by_age.csv")
 with pl.Config(tbl_rows=60):
     print(s.with_columns(pl.col(pl.Float64).round(3)))
-    print(byage.pivot(on="arm", index="block_age_days", values="leak").with_columns(pl.col(pl.Float64).round(3)))
+    print(
+        byage.pivot(on="arm", index="block_age_days", values="leak").with_columns(
+            pl.col(pl.Float64).round(3)
+        )
+    )

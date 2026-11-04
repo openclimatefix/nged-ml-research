@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, ANN001, ANN201, D102
 r"""Experiment 546: distil the day-ago and week-ago lag teacher R-DW (experiment 539) into a lag-free student.
 
 The student is experiment 511's L-1d recipe (37 lag-free inputs, the same pretrained weights, the
@@ -26,8 +26,8 @@ from pathlib import Path
 from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
-import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00397_models as base  # ty: ignore[unresolved-import]
+import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00428_data as data  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k  # ty: ignore[unresolved-import]
@@ -57,7 +57,9 @@ parser.add_argument("--seeds", nargs="+", type=int, default=None)
 parser.add_argument("--limit", type=int, default=None)
 ARGS = parser.parse_args()
 if ARGS.seeds is None:
-    ARGS.seeds = [0] if ARGS.stress else [0, 1]  # experiment 539 saved stress teachers for seed 0 only
+    ARGS.seeds = (
+        [0] if ARGS.stress else [0, 1]
+    )  # experiment 539 saved stress teachers for seed 0 only
 ARM = f.Arm("S-DW", "d", 90.0)
 
 NAMES, MASK, LAYOUT = prep.feature_names(scheme="summary")
@@ -83,7 +85,9 @@ def layout():
 
 data.non_lag_layout = layout
 f.W = W
-f.model_file = lambda *, arm, month, day, seed, stress="": W / "models" / arm.tag / f"{month}_d{day}_s{seed}{stress}.pt"
+f.model_file = lambda *, arm, month, day, seed, stress="": (
+    W / "models" / arm.tag / f"{month}_d{day}_s{seed}{stress}.pt"
+)
 f.n_inputs = lambda *, arm, mr: N0  # the student sees the first 37 columns only
 
 
@@ -97,9 +101,13 @@ def check_rows(*, x, valid_us, origin_us, lead, label):
         if nm not in POS:
             continue
         stored = x[:, POS[nm]].astype(np.float64) * prep.LEAD_SCALE_HOURS
-        assert np.allclose(stored, ages[:, j], atol=1e-3), f"{label} {tag} age differs from independent recomputation"
+        assert np.allclose(stored, ages[:, j], atol=1e-3), (
+            f"{label} {tag} age differs from independent recomputation"
+        )
         t_lag = valid_us - (ages[:, j] * 3.6e9).astype(np.int64)
-        assert (t_lag <= origin_us - delay_us).all(), f"{label} {tag} lag observed after origin minus data delay"
+        assert (t_lag <= origin_us - delay_us).all(), (
+            f"{label} {tag} lag observed after origin minus data delay"
+        )
         if example is None:
             i = int(np.argmax(ages[:, j] == ages[:, j].min()))
             example = (
@@ -117,13 +125,28 @@ _build_month, _build_test = k.build_month, data.build_test
 def build_month(*, month, clean):
     """Build the month's rows with the teacher's layout and run the row-by-row checks."""
     mr = _build_month(month=month, clean=clean)
-    ex = check_rows(x=mr.x, valid_us=mr.valid_us, origin_us=mr.origin_us, lead=mr.lead, label=f"{month} train")
+    ex = check_rows(
+        x=mr.x, valid_us=mr.valid_us, origin_us=mr.origin_us, lead=mr.lead, label=f"{month} train"
+    )
     runs = np.unique(mr.origin_us)
     pub_us = int(common.PUBLICATION_DELAY.total_seconds() * 1e6)
-    miss = [r for r in runs if not (prep.SUMMARY_DIR / f"init={datetime.fromtimestamp((r - pub_us) / 1e6, UTC):%Y-%m-%d}.parquet").exists()]
-    assert not miss, f"{month}: {len(miss)} training origins have no weather-run summary file 9 h earlier"
+    miss = [
+        r
+        for r in runs
+        if not (
+            prep.SUMMARY_DIR
+            / f"init={datetime.fromtimestamp((r - pub_us) / 1e6, UTC):%Y-%m-%d}.parquet"
+        ).exists()
+    ]
+    assert not miss, (
+        f"{month}: {len(miss)} training origins have no weather-run summary file 9 h earlier"
+    )
     CHECK["train_rows"] += len(mr.y)
-    CHECK["months"][month] = {"train_rows": len(mr.y), "train_origins": len(runs), "lag_example_train": ex}
+    CHECK["months"][month] = {
+        "train_rows": len(mr.y),
+        "train_origins": len(runs),
+        "lag_example_train": ex,
+    }
     print(month, "train checks passed;", ex, flush=True)
     return mr
 
@@ -131,7 +154,9 @@ def build_month(*, month, clean):
 def build_test(*, month, standardiser):
     """Build the month's test rows and assert the weather run is at or before the origin on every origin."""
     test = _build_test(month=month, standardiser=standardiser)
-    ex = check_rows(x=test.x, valid_us=test.valid, origin_us=test.origin, lead=test.lead, label=f"{month} test")
+    ex = check_rows(
+        x=test.x, valid_us=test.valid, origin_us=test.origin, lead=test.lead, label=f"{month} test"
+    )
     pub = common.PUBLICATION_DELAY
     for o in np.unique(test.origin):
         origin = datetime.fromtimestamp(o / 1e6, UTC)
@@ -147,7 +172,9 @@ def build_test(*, month, standardiser):
         f"target {datetime.fromtimestamp(test.valid[0] / 1e6, UTC)}, origin {datetime.fromtimestamp(test.origin[0] / 1e6, UTC)}, "
         f"weather run {datetime.fromtimestamp(test.origin[0] / 1e6, UTC) - pub} (nwp_init_time <= power_fcst_init_time asserted for all rows of every test origin)"
     )
-    print(month, "test checks passed;", ex, "|", CHECK["months"][month]["weather_example"], flush=True)
+    print(
+        month, "test checks passed;", ex, "|", CHECK["months"][month]["weather_example"], flush=True
+    )
     return test
 
 
@@ -160,7 +187,9 @@ def lag_delta(*, x_cols, valid_us, prim, std, ctx):
     out = np.zeros((len(valid_us), len(VALUE)), dtype=np.float32)
     for j, nm in enumerate(VALUE):
         tag = nm.replace("lag_", "")
-        t = valid_us - (x_cols[f"lag_{tag}_age"].astype(np.float64) * prep.LEAD_SCALE_HOURS * 3.6e9).astype(np.int64)
+        t = valid_us - (
+            x_cols[f"lag_{tag}_age"].astype(np.float64) * prep.LEAD_SCALE_HOURS * 3.6e9
+        ).astype(np.int64)
         inblock = (t >= block[0]) & (t < block[1]) & (x_cols[f"lag_{tag}_missing"] < 0.5)
         out[:, j] = np.where(inblock, sign * shift[prim] / std[POS[nm]], 0.0)
     return out
@@ -175,7 +204,13 @@ class LagGpuMonth(k.GpuMonth):
             idx = refit.index
             names = [n for n in POS if n.endswith(("_age", "_missing"))]
             cols = {n: self.mr.x[idx, POS[n]] for n in names}
-            d = lag_delta(x_cols=cols, valid_us=self.mr.valid_us[idx], prim=self.mr.primary[idx], std=self.mr.base.standardiser.std, ctx=CTX)
+            d = lag_delta(
+                x_cols=cols,
+                valid_us=self.mr.valid_us[idx],
+                prim=self.mr.primary[idx],
+                std=self.mr.base.standardiser.std,
+                ctx=CTX,
+            )
             for j, nm in enumerate(VALUE):
                 v = t["x"][:, POS[nm]] + torch.from_numpy(d[:, j]).to(t["x"].device)
                 t["x"][:, POS[nm]] = v.clamp(-prep.INPUT_CLIP_SD, prep.INPUT_CLIP_SD)
@@ -203,7 +238,12 @@ def sample_teacher(*, out: torch.Tensor, gen: torch.Generator) -> torch.Tensor:
 
 
 def train_distill(
-    *, student: torch.nn.Module, teacher: torch.nn.Module, t: dict[str, torch.Tensor], seed: int, device: str
+    *,
+    student: torch.nn.Module,
+    teacher: torch.nn.Module,
+    t: dict[str, torch.Tensor],
+    seed: int,
+    device: str,
 ) -> tuple[int, float, float]:
     """Experiment 510's loop (`c.train`) with the teacher-draw term added to the training loss.
 
@@ -220,7 +260,9 @@ def train_distill(
     if len(val_idx) > c.VALIDATION_ROWS:
         pick = torch.randperm(len(val_idx), generator=generator)[: c.VALIDATION_ROWS]
         val_idx = val_idx[pick.to(device)]
-    optimiser = torch.optim.AdamW(student.parameters(), lr=c.FINE_TUNE_LR, weight_decay=c.WEIGHT_DECAY)
+    optimiser = torch.optim.AdamW(
+        student.parameters(), lr=c.FINE_TUNE_LR, weight_decay=c.WEIGHT_DECAY
+    )
     best, best_state, stale, epochs, last_teacher_term = float("inf"), None, 0, 0, float("nan")
     for epoch in range(c.MAX_EPOCHS):
         student.train()
@@ -247,7 +289,12 @@ def train_distill(
         with torch.no_grad():
             val = float(
                 torch.cat(
-                    [base.mixture_nll(out=student(x[i][:, :N0], p[i]), z=z[i], components=c.COMPONENTS) for i in val_idx.split(c.BATCH * 2)]
+                    [
+                        base.mixture_nll(
+                            out=student(x[i][:, :N0], p[i]), z=z[i], components=c.COMPONENTS
+                        )
+                        for i in val_idx.split(c.BATCH * 2)
+                    ]
                 ).mean()
             )
         epochs = epoch + 1
@@ -277,8 +324,16 @@ def fine_tune(
     refit = c.select_rows(rows=mr, cutoff=cut, half_life_days=arm.half_life)
     shift_z, injected = None, 0
     if shift is not None and block is not None:
-        inj = (mr.valid_us[refit.index] >= block[0]) & (mr.valid_us[refit.index] < block[1]) & ~refit.is_val
-        shift_z = np.where(inj, sign * shift[mr.primary[refit.index]] / mr.base.target_std[mr.primary[refit.index]], 0.0)
+        inj = (
+            (mr.valid_us[refit.index] >= block[0])
+            & (mr.valid_us[refit.index] < block[1])
+            & ~refit.is_val
+        )
+        shift_z = np.where(
+            inj,
+            sign * shift[mr.primary[refit.index]] / mr.base.target_std[mr.primary[refit.index]],
+            0.0,
+        )
         injected = int(inj.sum())
     t = g.refit_tensors(refit=refit, shift_z=shift_z)
     feeder = time.monotonic() - started
@@ -296,7 +351,9 @@ def fine_tune(
     c.load_pretrained(model=student, path=f.pretrained_file(arm=arm, month=month, seed=seed))
     student.to(device)
     t0 = time.monotonic()
-    epochs, best, teacher_term = train_distill(student=student, teacher=teacher, t=t, seed=seed, device=device)
+    epochs, best, teacher_term = train_distill(
+        student=student, teacher=teacher, t=t, seed=seed, device=device
+    )
     log = {
         "name": f"{arm.tag}/{month}_d{day}_s{seed}", "epochs": epochs, "val_nll": best,
         "teacher_term_last_epoch": teacher_term, "teacher_file": str(tfile),
@@ -314,7 +371,9 @@ _window_frame = f.window_frame
 def window_frame(*, model, test, mr, lo, hi, flag, device):
     """Forecast with the student: it reads the first 37 columns only; stress runs shift nothing it reads."""
     student_test = dataclasses.replace(test, x=test.x[:, :N0])
-    return _window_frame(model=model, test=student_test, mr=mr, lo=lo, hi=hi, flag=flag, device=device)
+    return _window_frame(
+        model=model, test=student_test, mr=mr, lo=lo, hi=hi, flag=flag, device=device
+    )
 
 
 f.window_frame = window_frame
@@ -325,12 +384,17 @@ def assemble():
     for month in c.MONTHS:
         cuts = k.cutoffs(month=month, cadence="d")
         for seed in (0, 1):
-            parts = [W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet" for cut in cuts]
+            parts = [
+                W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet"
+                for cut in cuts
+            ]
             if not all(p.exists() or p.with_suffix(".empty").exists() for p in parts):
                 print("skip (incomplete)", month, seed)
                 continue
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
-            f.atomic_frame(frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet")
+            f.atomic_frame(
+                frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet"
+            )
             print("wrote", ARM.tag, month, seed, frame.height, flush=True)
 
 
@@ -338,7 +402,17 @@ if __name__ == "__main__":
     if ARGS.command == "assemble":
         assemble()
     else:
-        f.fit_arm(arm=ARM, months=ARGS.months, seeds=ARGS.seeds, stress=ARGS.stress, limit=ARGS.limit, device="cuda")
-        out = WORK / f"checks_{ARM.tag}{'_stress' if ARGS.stress else ''}_{'-'.join(ARGS.months)}.json"
+        f.fit_arm(
+            arm=ARM,
+            months=ARGS.months,
+            seeds=ARGS.seeds,
+            stress=ARGS.stress,
+            limit=ARGS.limit,
+            device="cuda",
+        )
+        out = (
+            WORK
+            / f"checks_{ARM.tag}{'_stress' if ARGS.stress else ''}_{'-'.join(ARGS.months)}.json"
+        )
         out.write_text(json.dumps(CHECK, indent=1, default=str))
         print("CHECKS PASSED", {k_: v for k_, v in CHECK.items() if k_ != "months"})
