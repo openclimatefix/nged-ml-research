@@ -62,9 +62,9 @@ def figure_crps() -> None:
 
 def figure_contrasts() -> None:
     names = {
-        "R-DW-24 - R-DW": "Cost of the cap (R-DW-24 minus R-DW)",
-        "R-DW-24-PT - R-DW-24": "Lags in pretraining (R-DW-24-PT minus R-DW-24)",
-        "A-pool-24 - R-DW-24-PT": "A-pool-24 minus R-DW-24-PT",
+        "R-DW-24 - R-DW": "Cap: R-DW-24 - R-DW",
+        "R-DW-24-PT - R-DW-24": "Pretraining lags: PT - R-DW-24",
+        "A-pool-24 - R-DW-24-PT": "A-pool-24 - R-DW-24-PT",
     }
     t = (
         pl.read_csv(OUT / "contrasts.csv")
