@@ -19,6 +19,7 @@ HISTORY = {
     "2026-06": "June (111 days)",
 }
 ORDER = list(HISTORY.values())
+FOLD_COLOURS = [ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_GREEN, ocf.DATA_PURPLE]
 LABELS = {"N1": "N1: ICON-EU only", "N2": "N2: ICON-EU and ECMWF"}
 
 df = sc.per_row().filter(pl.col("group") == EIGHT)
@@ -46,11 +47,7 @@ fig1 = (
             "fold:N",
             sort=ORDER,
             title="Fold (ICON-EU history for training)",
-            scale=alt.Scale(
-                range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_GREEN, ocf.DATA_PURPLE]
-                if hasattr(ocf, "DATA_PURPLE")
-                else None
-            ),
+            scale=alt.Scale(range=FOLD_COLOURS),
         ),
         strokeDash=alt.StrokeDash("arm:N", title=None),
     )

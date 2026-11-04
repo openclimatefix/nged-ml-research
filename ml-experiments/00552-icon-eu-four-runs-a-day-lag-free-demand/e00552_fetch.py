@@ -62,11 +62,8 @@ def main() -> None:
             continue
         start = time.time()
         run = store.sel(init_time=init).isel(lead_time=slice(0, N_LEADS)).isel(indexers).load()
-        frame = (
-            run.to_dataframe()
-            .reset_index()
-            .pipe(pl.from_pandas)
-            .with_columns(init_time=pl.lit(init).cast(pl.Datetime("ns")))
+        frame = pl.from_pandas(run.to_dataframe().reset_index()).with_columns(
+            init_time=pl.lit(init).cast(pl.Datetime("ns"))
         )
         tmp = path.with_suffix(".tmp")
         frame.write_parquet(tmp)
