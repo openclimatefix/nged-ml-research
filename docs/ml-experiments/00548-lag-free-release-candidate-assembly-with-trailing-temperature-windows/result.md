@@ -100,9 +100,9 @@ metric: >-
 power lowered its error a little in every lead band, although no interval excluded zero. At 120 to
 240 hours ahead its error was inside the minimum detectable effect of the same neural network
 given recent power. At 0 to 120 hours ahead, for the eight Primaries metered in MVA only, its CRPS
-stayed 0.13 to 0.34 points of capacity worse.** The verdict is partly supported by the predictions below: the
-pattern predicted (a gap at 24 to 48 hours, none at 120 to 240 hours) held, and the size predicted
-for the temperature columns' gain narrowly missed.
+stayed 0.13 to 0.34 points of capacity worse.** The verdict is partly supported by the predictions
+below: the pattern predicted (a gap at 24 to 48 hours, none at 120 to 240 hours) held, and the size
+predicted for the temperature columns' gain narrowly missed.
 
 We asked how good a demand forecast can be when its neural network sees no recent power (it is
 "lag-free"), only weather that was known at the forecast origin. We assembled the parts that earlier
