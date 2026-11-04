@@ -99,7 +99,7 @@ The code is a copy of [experiment
 on rows with no labelled event, for the four folds 2025-12, 2026-01, 2026-03, and 2026-06; the first
 fold (2025-10) only supplies weights. July 2026 is unused.
 
-![CRPS minus A-pool at the eight for R-DW, K2-S1 and the blend, by lead band](figure_1_gap_to_a_pool.svg)
+![CRPS minus A-pool at the eight, by lead band](figure_1_gap_to_a_pool.svg)
 
 - **Eight, 24-120 h:** blend 4.381, R-DW 4.403, K2-S1 4.776, A-pool 4.382. Blend minus R-DW -0.022
   (month-block interval -0.037 to -0.006, 4 blocks, near min-to-max), per-fold signs -0.035, -0.038,
