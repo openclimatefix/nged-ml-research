@@ -74,8 +74,8 @@ table, and zero and flagged shares are from the cleaned table.
 
 ## Parent-child map
 
-The hierarchy file received from NGED on 2026-10-15 lists 17 rows under Boston BSP (the BSP and 16 children) and 13 rows under Skegness BSP (the
-BSP and 12 children). Boston BSP sits under Walpole GSP and Skegness BSP under Bicker Fen GSP. So
+The hierarchy file received from NGED on 2026-10-15 lists 17 rows under Boston BSP (the BSP and 16 children) and 13 rows under Skegness BSP
+(the BSP and 12 children). Boston BSP sits under Walpole GSP and Skegness BSP under Bicker Fen GSP. So
 each GSP should include one BSP and the BSP's children, and the two GSP series are probably
 close to the BSP series. The residual of GSP minus BSP was not measured.
 
@@ -88,8 +88,8 @@ for all four without a fetch.
 ## What this means
 
 - **M2 is not run.** Four series do not meet the bar of 8, and the stop rule said to halt.
-- **Pooling at these four series already exists.** Experiment 415 (its nodes D13, D17, D1, and D6 are series 1, 2, 27, and 28) fitted one neural
-  network on the 16 Primaries and these four series, so the step was already taken at a small scale.
+- **Pooling at these four series already exists.** Experiment 415 fitted one neural network on the 16 Primaries and its four nodes, which are
+  these four series, so the step was already taken at a small scale.
 - **No other bulk or grid series exist** in NGED's metadata, so the arms M2-a to M2-c cannot be
   filled by waiting for a download. A reduced four-series version would need the maintainer's
   request.
