@@ -1,9 +1,10 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501
 """Write per-row CRPS of the experiment 554 arms with 470's scorer on 511's rows (mirrors 545's e00545_rows).
 
-Arm names carry the seed set: `M0`, `M0lr`, and `L-1d5` average seeds 0 to 4; `M0-3`, `L-1d3`, `M0-sep`,
-`M0-mix`, `M0-hl180`, and `M0-c3` average seeds 0 to 2; `L-1d5-s0` to `L-1d5-s4` are single
-seeds of L-1d (for the minimum detectable effect). The stored 2-seed L-1d of experiment 511 keeps the name `L-1d`.
+Arm names carry the seed set: `M0`, `M0lr`, and `L-1d5` average seeds 0 to 4; `M0-3`, `L-1d3`,
+`M0-sep`, `M0-mix`, `M0-hl180`, and `M0-c3` average seeds 0 to 2; `L-1d5-s0` to `L-1d5-s4` are
+single seeds of L-1d (for the minimum detectable effect). The stored 2-seed L-1d of experiment 511
+keeps the name `L-1d`.
 """
 
 import e00454_build as build454  # ty: ignore[unresolved-import]
