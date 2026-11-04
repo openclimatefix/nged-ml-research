@@ -1,5 +1,8 @@
 # ruff: noqa: E501
-"""Figures of experiment 544 from the tables its scorer stored. Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`."""
+"""Figures of experiment 544 from the tables its scorer stored.
+
+Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
+"""
 
 import os
 from datetime import UTC, datetime

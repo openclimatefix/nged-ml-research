@@ -1,5 +1,7 @@
 # ruff: noqa: ANN001, ANN003, ANN201, D101, D102, D103, E501, E731, RET504, B007
-"""Experiment 544 (copy of experiment 539's fit script with R-MED and R-DROP): 538: 511's daily-refit L-1d recipe plus recent-level inputs (R1: 3 inputs; R9: all 9 lag inputs).
+"""Experiment 544 (experiment 539's fit script with R-MED and R-DROP added).
+
+Experiment 538: 511's daily-refit L-1d recipe plus recent-level inputs (R1: 3 inputs; R9: all 9 lag inputs).
 
 Rows, cutoffs, recency weights, early stopping, seeds, and scoring windows are 511's. The lag columns
 (value, missing flag, age) are the ones in experiment 397's raw summary matrices, which are the columns
@@ -161,7 +163,11 @@ def lag_time_us(*, x, valid_us, name):
 
 
 def check_rows(*, x, valid_us, origin_us, lead, label):
-    """Row by row: ages equal the independent recomputation, every lag observed <= origin - data delay, weather run <= origin."""
+    """Check row by row that the ages, lag times and weather runs precede the origin.
+
+    Ages equal the independent recomputation, every lag was observed at or before the origin minus
+    the data delay, and the weather run is at or before the origin.
+    """
     ages = prep.lag_ages_hours(lead_hours=lead.astype(np.float64))
     delay_us = int(common.NEWEST_AGE * 30 * 60 * 1e6)
     pub_us = int(common.PUBLICATION_DELAY.total_seconds() * 1e6)

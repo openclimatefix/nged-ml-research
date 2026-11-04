@@ -1,5 +1,8 @@
-# ruff: noqa: ANN201, D103, E501, E402, PTH123, SIM115
-"""Score R-MED, R-DROP, R-DROP-absent (544), R-DW (539) and R1, R9 (538) against L-1d and A-pool on 533's rows. Reuses 533's loader and 521's statistics."""
+# ruff: noqa: ANN201, D103, E402, PTH123, SIM115
+"""Score R-MED, R-DROP, R-DROP-absent (544), R-DW (539) and R1, R9 (538) against L-1d and A-pool.
+
+Uses 533's rows, 533's loader and 521's statistics.
+"""
 
 import json
 import math

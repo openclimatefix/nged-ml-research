@@ -1,5 +1,9 @@
 # ruff: noqa: E501, E741
-"""Injected-shift leak of R-MED and R-DROP (544), R-DW (539), R1, R9 (538) and L-1d (511): sign x change in the median forecast, points of capacity, by block age and lead band."""
+"""Injected-shift leak of R-MED and R-DROP (544), R-DW (539), R1, R9 (538) and L-1d (511).
+
+The leak is the sign times the change in the median forecast, in points of capacity, by block age
+and lead band.
+"""
 
 import os
 from pathlib import Path
