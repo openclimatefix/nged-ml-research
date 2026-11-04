@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Injected-shift leak of M0, M0lr, M1 (545), R-DW (539), and L-1d (511).
+"""Injected-shift leak of M0, M0lr (545), M0-sep, M0-mix, M0-hl180, M0-c3 (554), R-DW (539), and L-1d (511).
 
 The leak is the sign times the change in the median forecast, in points of capacity, by block age
 and lead band.
@@ -10,6 +10,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 DD = ML_EXPERIMENTS_DATA_DIR
 W = DD / "00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out/work/fits"
+W545 = DD / "00545-modular-lag-free-demand-network-weather-and-datetime-encoders/work/fits"
 W539 = DD / "00539-l1d-plus-day-and-week-lags/work/fits"
 L = DD / "00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/work/fits/L-1d"
 MONTHS = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
@@ -18,14 +19,19 @@ rows = []
 for arm, folder in (
     ("L-1d", L),
     ("R-DW", W539 / "R-DW"),
-    ("M0", W / "M0"),
-    ("M1", W / "M1"),
-    ("M0lr", W / "M0lr"),
+    ("M0", W545 / "M0"),
+    ("M0lr", W545 / "M0lr"),
+    ("M0-sep", W / "M0-sep"),
+    ("M0-mix", W / "M0-mix"),
+    ("M0-hl180", W / "M0-hl180"),
+    ("M0-c3", W / "M0-c3"),
 ):
     if not folder.exists():
         continue
     for m in MONTHS:
         for day in range(14, 21):
+            if not (folder / f"{m}_d{day}_s0.parquet").exists():
+                continue  # arm M0-c3 refits only on days 14, 17, and 20
             ctrl = pl.read_parquet(folder / f"{m}_d{day}_s0.parquet").select(*KEYS, c="q50")
             for sign, tag in ((1, "p"), (-1, "n")):
                 p = folder / f"{m}_d{day}_s0_stress{tag}.parquet"

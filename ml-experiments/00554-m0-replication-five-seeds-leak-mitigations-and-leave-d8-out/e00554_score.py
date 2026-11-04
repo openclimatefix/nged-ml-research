@@ -17,34 +17,36 @@ W = DD / "00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out"
 W539 = DD / "00539-l1d-plus-day-and-week-lags"
 E524 = DD / "00524-two-stage-lagless-forecaster-stage-1-and-ensemble-calibrator/work/scores"
 K = ["primary", "origin", "target"]
+SEED_ARMS = (
+    "L-1d5", "M0", "M0lr", "L-1d3", "M0-3", "M0-sep", "M0-mix", "M0-hl180", "M0-c3",
+    *[f"L-1d5-s{i}" for i in range(5)],
+)  # fmt: skip
 ARMS = {
-    "M0": "M0__crps",
-    "M1": "M1__crps",
-    "M0lr": "M0lr__crps",
+    **{a: f"{a}__crps" for a in SEED_ARMS if not a.startswith("L-1d5-s")},
     "R-DW": "R-DW__crps",
     "A-pool": "A-pool__crps",
     "L-1d": "L-1d__crps",
-    "L-Ww": "L-Ww__crps",
     "manual_heuristic": "manual_heuristic__crps",
 }
 CONTRASTS = [
-    ("M0", "L-1d", True),
-    ("M1", "L-1d", True),
-    ("M1", "M0", False),
-    ("M0lr", "L-1d", False),
+    ("M0", "L-1d5", True),
+    ("M0lr", "L-1d5", True),
     ("M0", "M0lr", False),
-    ("M1", "M0lr", False),
+    ("L-1d5", "L-1d", False),
+    ("M0", "L-1d", False),
     ("M0", "A-pool", False),
-    ("M1", "A-pool", False),
     ("M0", "R-DW", False),
-    ("M1", "R-DW", False),
-    ("M1", "manual_heuristic", False),
-    ("L-1d", "A-pool", False),
+    ("L-1d5", "A-pool", False),
+    ("M0-3", "L-1d3", False),
+    *[(a, "L-1d3", False) for a in ("M0-sep", "M0-mix", "M0-hl180", "M0-c3")],
+    *[(a, "M0-3", False) for a in ("M0-sep", "M0-mix", "M0-hl180", "M0-c3")],
 ]
 TESTS = 2 * 7 * 2  # 2 counted contrasts x 7 bands x 2 sets
+POOLED = "24-120h"
+"""A lead band added here: the three bands 24-48 h, 48-72 h, and 72-120 h pooled (prediction P1 and P3)."""
 NEW = [
     a
-    for a in ("M0", "M1", "M0lr")
+    for a in SEED_ARMS
     if (W / "work/scores" / f"rows_{s.MONTHS[0]}.parquet").exists()
     and f"{a}__crps" in pl.read_parquet_schema(W / "work/scores" / f"rows_{s.MONTHS[0]}.parquet")
 ]
@@ -86,9 +88,7 @@ def table():
 
 def main():
     t = table().with_columns(band=s.band_expr())
-    need = [
-        c for k2, c in ARMS.items() if k2 not in ("manual_heuristic", "L-Ww") and c in t.columns
-    ]
+    need = [c for k2, c in ARMS.items() if k2 != "manual_heuristic" and c in t.columns]
     fin = pl.all_horizontal([pl.col(c).is_finite() for c in need])
     t = t.with_columns(main16=pl.col("main16") & fin)
     chk = {
@@ -100,11 +100,21 @@ def main():
     print(chk)
     rng = np.random.default_rng(0)
     absolute, contrasts = [], []
-    seedcols = ["L-1d-seed0__crps", "L-1d-seed1__crps"]
-    for name in ("eight", "six", "report"):
-        part = s.row_set(table=t, name=name)
-        for band in (*s.BANDS, s.ALL):
-            sub = s.in_band(part=part, band=band)
+    seedcols = [f"L-1d5-s{i}__crps" for i in range(5)]
+    d8 = [p for p, lab in s.PRIMARY_LABELS.items() if lab == "D8"]
+    assert len(d8) == 1, d8
+    for name in ("eight", "six", "report", "eight_without_D8", "D8_alone"):
+        base_name = "eight" if name.startswith(("eight", "D8")) else name
+        part = s.row_set(table=t, name=base_name)
+        if name == "eight_without_D8":
+            part = part.filter(pl.col("primary") != d8[0])
+        elif name == "D8_alone":
+            part = part.filter(pl.col("primary") == d8[0])
+        for band in (*s.BANDS, s.ALL, POOLED):
+            if band == POOLED:
+                sub = part.filter((pl.col("lead_hours") >= 24) & (pl.col("lead_hours") < 120))
+            else:
+                sub = s.in_band(part=part, band=band)
             if sub.height == 0:
                 continue
             for arm, col in ARMS.items():
@@ -142,7 +152,9 @@ def main():
                         "set": name,
                         "band": band,
                         "contrast": f"{a} - {b}",
-                        "counted": counted and band != s.ALL and name != "report",
+                        "counted": counted
+                        and band not in {s.ALL, POOLED}
+                        and name in {"eight", "six"},
                         "tests": TESTS,
                         "mde": mde,
                         **st,

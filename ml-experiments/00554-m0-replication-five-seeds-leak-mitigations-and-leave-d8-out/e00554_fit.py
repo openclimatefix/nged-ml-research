@@ -47,9 +47,9 @@ W545 = (
 )
 W511 = f.W
 """Experiment 511's work folder (its `fits/L-1d` holds seeds 0 and 1 of L-1d)."""
-MIXER_LR = 5e-4
-"""Learning rate of the fresh fine-tuning mixer; the other weights use `c.FINE_TUNE_LR`."""
 SEEDS_ALL = (0, 1, 2, 3, 4)
+ASSEMBLED_SEEDS = {"L-1d": SEEDS_ALL, "M0": SEEDS_ALL, "M0lr": SEEDS_ALL}
+"""Seeds assembled per arm; every other arm has seeds 0 to 2."""
 SEEDS_REUSED = (0, 1)
 """Seeds whose fits come from the earlier experiment's folder (545 for M0 and M0lr, 511 for L-1d)."""
 FRESH_SEED = 12345
@@ -382,7 +382,7 @@ def assemble() -> None:
     """Concatenate each cutoff's window forecast into one table per month and seed (seeds 0 to 4)."""
     for month in c.MONTHS:
         cuts = k.cutoffs(month=month, cadence=ARM.cadence)
-        for seed in SEEDS_ALL:
+        for seed in ASSEMBLED_SEEDS.get(ARGS.arm, (0, 1, 2)):
             folder = source_folder(seed=seed)
             parts = [
                 folder / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet"

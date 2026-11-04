@@ -1,5 +1,10 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103, E501
-"""Write per-row CRPS of M0 and M1 with 470's scorer on 511's rows (mirrors experiment 539's e00539_rows)."""
+"""Write per-row CRPS of the experiment 554 arms with 470's scorer on 511's rows (mirrors 545's e00545_rows).
+
+Arm names carry the seed set: `M0`, `M0lr`, and `L-1d5` average seeds 0 to 4; `M0-3`, `L-1d3`, `M0-sep`,
+`M0-mix`, `M0-hl180`, and `M0-c3` average seeds 0 to 2; `L-1d5-s0` to `L-1d5-s4` are single seeds of L-1d
+(for the minimum detectable effect). The stored 2-seed L-1d of experiment 511 keeps the name `L-1d`.
+"""
 
 import e00454_build as build454  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]
@@ -17,7 +22,30 @@ W = (
 SRC511 = k511.WORK_DIR / "predictions"
 FIVE = build470.MONTHS
 assert FIVE == ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06"), FIVE
-NEW = tuple(a for a in ("M0", "M1", "M0lr") if (W / "seed_preds" / a).exists())
+FIVE_SEEDS = (0, 1, 2, 3, 4)
+THREE_SEEDS = (0, 1, 2)
+ARMS: dict[str, tuple[str, tuple[int, ...]]] = {
+    "L-1d5": ("L-1d", FIVE_SEEDS),
+    "M0": ("M0", FIVE_SEEDS),
+    "M0lr": ("M0lr", FIVE_SEEDS),
+    "L-1d3": ("L-1d", THREE_SEEDS),
+    "M0-3": ("M0", THREE_SEEDS),
+    "M0-sep": ("M0-sep", THREE_SEEDS),
+    "M0-mix": ("M0-mix", THREE_SEEDS),
+    "M0-hl180": ("M0-hl180", THREE_SEEDS),
+    "M0-c3": ("M0-c3", THREE_SEEDS),
+    **{f"L-1d5-s{i}": ("L-1d", (i,)) for i in FIVE_SEEDS},
+}
+
+
+def ready(*, folder: str, seeds: tuple[int, ...]) -> bool:
+    """Return whether every month and seed of an arm has been assembled."""
+    return all(
+        (W / "seed_preds" / folder / f"{m}_s{s}.parquet").exists() for m in FIVE for s in seeds
+    )
+
+
+NEW = tuple(a for a, (folder, seeds) in ARMS.items() if ready(folder=folder, seeds=seeds))
 
 
 def main():
@@ -32,8 +60,9 @@ def main():
         _, keys = build454.load_heads(month=m)
         rows = pl.DataFrame({k: keys[k] for k in build470.KEYS})
         for arm in NEW:
+            folder, seeds = ARMS[arm]
             frame = build470.pool_stored(
-                folder=W / "seed_preds" / arm, month=m, sites=sites, seeds=(0, 1)
+                folder=W / "seed_preds" / folder, month=m, sites=sites, seeds=seeds
             )
             joined = build470.on_rows(rows=rows, frame=frame)
             print(
