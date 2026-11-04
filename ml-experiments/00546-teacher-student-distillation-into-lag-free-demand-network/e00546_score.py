@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN201, D103, PTH123, SIM115
+# ruff: noqa: ANN201, D103, PTH123, SIM115
 """Score the student S-DW (546) against L-1d, A-pool, and the teacher R-DW (539) on 533's rows.
 
 Reuses 533's loader and 521's statistics.

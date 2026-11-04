@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Injected-shift leak of the student S-DW (546), the teacher R-DW (539), and L-1d (511).
 
 The leak is sign x change in the median forecast, in points of capacity, by block age and lead band.
