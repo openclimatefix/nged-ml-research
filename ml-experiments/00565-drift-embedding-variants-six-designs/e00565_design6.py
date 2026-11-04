@@ -144,19 +144,25 @@ def correct() -> None:
 
 def load_scored() -> pl.DataFrame:
     """Return experiment 559's per-row table (M0, A1, A10, A11, A-pool, L-1d CRPS) joined to the new arms."""
-    wanted = [
-        f"{a}__crps" for a in ("M0", "A1", "A10", "A11", "A-pool", "L-1d", "manual_heuristic")
-    ]
+    wanted = [f"{a}__crps" for a in ("A1", "A10", "A11", "A-pool", "L-1d", "manual_heuristic")]
     frames = []
     for month in MONTHS:
         rows = pl.read_parquet(
             W559 / "scores" / f"rows_{month}.parquet",
             columns=[*KEYS, "group", "cls", "lead_hours", "tgt_real", "cold", "main16", *wanted],
         )
+        m0 = pl.read_parquet(W545 / "scores" / f"rows_{month}.parquet", columns=[*KEYS, "M0__crps"])
+        rows = rows.join(m0, on=KEYS, how="left", maintain_order="left", validate="1:1")
+        assert rows["M0__crps"].null_count() == 0
         base = score454.month_base(month=month).select(*KEYS, "actual")
         rows = rows.join(base, on=KEYS, how="left", maintain_order="left", validate="1:1")
         cols: dict[str, np.ndarray] = {}
         for b in SOURCES:
+            pb = pl.read_parquet(SOURCES[b] / f"{month}_c0.parquet")
+            fb = rows.select(*KEYS, "actual").join(pb, on=KEYS, how="left", maintain_order="left")
+            fb = score470.widen_arm(arm=b, frame=fb, factor=score470.HEADLINE)
+            diff = np.abs(score470.row_metrics(frame=fb)["crps"] - rows[f"{b}__crps"].to_numpy())
+            assert np.nanmax(diff) < 1e-4, (b, month, np.nanmax(diff))
             for hl in HALF_LIVES:
                 name = arm_name(base=b, half_life=hl)
                 pred = pl.read_parquet(build470.prediction_path(arm=name, month=month, cell=0))
@@ -165,6 +171,7 @@ def load_scored() -> pl.DataFrame:
                 )
                 ok = fr["q50"].is_not_null().to_numpy()
                 fr = fr.with_columns(*[pl.col(q).fill_null(0.0) for q in LEVELS])
+                fr = score470.widen_arm(arm=name, frame=fr, factor=score470.HEADLINE)
                 crps = score470.row_metrics(frame=fr)["crps"]
                 cols[f"{name}__crps"] = np.where(ok, crps, np.nan)
         rows = rows.hstack(
