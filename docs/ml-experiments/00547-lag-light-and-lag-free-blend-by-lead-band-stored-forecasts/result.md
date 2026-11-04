@@ -10,7 +10,8 @@ also_relevant_to:
 status: finished
 kind: other
 size: >-
-  Simple to run, scored as anything else. Only the blend weights are fitted, and nothing new is stored beyond the
+  Simple to run, scored as anything else. Only the blend weights are fitted, and nothing new is
+  stored beyond the
   blended quantiles in the private data folder (stored rows only, CPU). One design is defensible
   (one weight per group and lead band, fitted walk-forward by fold), and the script wraps the
   scoring code of experiments 470, 521 and 539, whose callers cannot be named without searching.
@@ -50,14 +51,16 @@ best_arm: >-
   None. The blend scored 4.404 at the eight, 24-120 h, against R-DW's 4.403 (difference +0.000,
   interval -0.018 to +0.013).
 headline: >-
-  A walk-forward blend of the lag-free neural network L-1d and the lag-light neural network R-DW did not beat
+  A walk-forward blend of the lag-free neural network L-1d and the lag-light neural network R-DW did
+  not beat
   R-DW: at the eight MVA-only Primaries, 24-120 h, the blend was +0.000 points of capacity from
   R-DW (month-block interval -0.018 to +0.013, 4 blocks, MDE 0.04), against a pre-registered gain
   of at least 0.05 over both parents. The fitted weight on R-DW was 0.7 to 1.0, so the blend is R-DW
   with a little L-1d added. Interim and unaudited.
 lessons: >-
   R-DW already holds what L-1d knows at 1 to 5 days ahead, so averaging the two quantile forecasts
-  only moves the answer towards the worse network. One possible reason, not tested here, is that the two networks share inputs and a pretrained
+  only moves the answer towards the worse network. One possible reason, not tested here, is that the
+  two networks share inputs and a pretrained
   start, so their errors are too alike to cancel.
 take_home_message: >-
   Averaging the lag-free network with the lag-light network gives no better forecast than the
@@ -85,7 +88,8 @@ Verdict: not supported. At the eight MVA-only Primaries and 24-120 h, the blend 
 points of capacity (CRPS) against R-DW's 4.403 and L-1d's 4.597. The pre-registered gain was at
 least 0.05 below both parents in each of 24-48 h, 48-72 h, and 72-120 h, and the blend minus R-DW
 was +0.003, +0.002, and -0.002 in those bands (positive means the blend is worse). The blend does
-clear 0.05 against L-1d (-0.21, -0.21, and -0.17), so only the R-DW half of the rule fails. The first fold (2025-10) supplies weights only, so
+clear 0.05 against L-1d (-0.21, -0.21, and -0.17), so only the R-DW half of the rule fails. The
+first fold (2025-10) supplies weights only, so
 everything below is the four folds 2025-12, 2026-01, 2026-03, and 2026-06. July 2026 is unused.
 Every number is interim and unaudited.
 
@@ -96,20 +100,23 @@ Every number is interim and unaudited.
 - **Eight, blend minus R-DW:** +0.003 (24-48 h), +0.002 (48-72 h), -0.002 (72-120 h), +0.000 (24-120
   h). The 24-120 h interval is -0.018 to +0.013 (month-block bootstrap, 4 blocks, near min-to-max),
   with 3 of 4 folds positive (the blend worse) and an MDE of 0.04. The difference is far below both
-  the 0.05 goal. The per-band MDE (0.054 and 0.057 at 24-48 h and 48-72 h) is above 0.05, so a per-band test could not resolve a gain of 0.05.
+  the 0.05 goal. The per-band MDE (0.054 and 0.057 at 24-48 h and 48-72 h) is above 0.05, so a
+  per-band test could not resolve a gain of 0.05.
 - **Eight, blend minus L-1d:** -0.19 at 24-120 h (interval -0.28 to -0.11, 0 of 4 folds positive);
   that difference is R-DW's own gain over L-1d, not a gain from blending.
 - **Six (signed MW, rows with no labelled event):** blend minus R-DW is -0.001 to -0.004 in each of
   the three bands (-0.002 at 24-120 h, interval -0.016 to 0.006, MDE 0.08); blend minus L-1d is
   -0.06 at 24-120 h.
-- **Weights:** at the eight the fitted weight on R-DW is 1.0 at 6-24 h, 0.8 to 1.0 at 24-72 h, 0.7 to 0.8
+- **Weights:** at the eight the fitted weight on R-DW is 1.0 at 6-24 h, 0.8 to 1.0 at 24-72 h, 0.7
+  to 0.8
   at 72-120 h, and 0.5 to 0.6 at 120-240 h (figure 2). At 120-240 h the blend is -0.010 from R-DW
   (interval -0.064 to 0.052).
 - **A fixed half-half blend** is worse than R-DW at the eight (+0.041 at 24-120 h, interval 0.006
   to 0.086): equal weights move the forecast towards the worse network.
 - **Versus A-pool** at the eight, 24-120 h: blend +0.021 (interval -0.027 to 0.061).
 - **Cold winter nights (eight, 24-120 h, 13,092 rows):** blend 3.976, R-DW 3.945, L-1d 4.318.
-  **22-31 December (fold 2025-12 only, 15,360 rows, so one fold):** blend 3.987, R-DW 4.062, L-1d 3.975.
+  **22-31 December (fold 2025-12 only, 15,360 rows, so one fold):** blend 3.987, R-DW 4.062, L-1d
+  3.975.
 - **Tails (eight, 24-120 h, blend):** the share of actuals below q01 is 0.25% (nominal 1%) and
   below q05 is 1.5% (nominal 5%), and the share below q95 is 96.2% (nominal 95%) and below q99 is
   99.4% (nominal 99%). The lower tail is therefore about 3 to 4 times too wide in coverage terms,
@@ -132,7 +139,8 @@ Every number is interim and unaudited.
   median 0.791, blend median 0.790, actual 0.892 (fractions of capacity).
 - The parents' CRPS recomputed from the stored quantiles matches experiment 539's stored per-row
   CRPS to under 0.01 on every row (asserted).
-- The weights come from quantile averaging with walk-forward weights. The four scored months are not contiguous, so earlier folds are not always the same season. Four month blocks are
+- The weights come from quantile averaging with walk-forward weights. The four scored months are not
+  contiguous, so earlier folds are not always the same season. Four month blocks are
   near the min-to-max of the folds.
 - The first fold is not scored. The MDE comes from the two seeds of each parent, blended with the
   same weights.
