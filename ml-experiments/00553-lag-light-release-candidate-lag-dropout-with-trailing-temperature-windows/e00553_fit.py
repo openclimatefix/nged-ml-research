@@ -46,12 +46,6 @@ ROOT: Final[Path] = (
 )
 W: Final[Path] = ROOT / "work"
 E515_PRE: Final[Path] = f515.W / "pretrained"
-E550_PRE: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00550-lag-light-network-trailing-temperature-windows-with-placebo"
-    / "work"
-    / "pretrained"
-)
 E526_PRE: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
     / "00526-lagless-demand-network-trailing-weather-window-placebo-repeat"
