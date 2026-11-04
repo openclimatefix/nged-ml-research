@@ -20,6 +20,7 @@ Usage: python e00559_fit.py {step2|choose-lambda|fit|average|assemble} --arm ARM
 """
 
 import argparse
+import dataclasses
 import json
 import time
 from dataclasses import dataclass
@@ -30,11 +31,14 @@ import e00087_common as common  # ty: ignore[unresolved-import]
 import e00397_models as base  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00428_data as data  # ty: ignore[unresolved-import]
+import e00448_run as r448  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k  # ty: ignore[unresolved-import]
 import e00511_fit as f  # ty: ignore[unresolved-import]
 import e00559_folded as folded
 import e00559_model as m
+import e00559_model_wt as mwt
+import e00559_wt as wt
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
@@ -77,6 +81,9 @@ class Spec:
     lr: float = c.FINE_TUNE_LR
     max_epochs: int = c.MAX_EPOCHS
     average_of: str | None = None  # the arm whose daily weights are averaged (A5)
+    columns: str | None = (
+        None  # "real" or "null": add experiment 515's W-T columns to the weather encoder (A9)
+    )
     head: str = "mixture"  # "folded": folded-normal head for the MVA-only Primaries (A8)
 
 
@@ -91,10 +98,14 @@ SPECS = {
         Spec("A6", "fresh", half_life=180.0),
         Spec("A7", "fresh", cadence="c3"),
         Spec("A8", "step2", head="folded"),
+        Spec("A9", "fresh", columns="real"),
+        Spec("A9-null", "fresh", columns="null"),
     )
 }
 parser = argparse.ArgumentParser()
-parser.add_argument("command", choices=("step2", "choose-lambda", "fit", "average", "assemble"))
+parser.add_argument(
+    "command", choices=("step2", "choose-lambda", "fit", "average", "assemble", "pretrain-wt")
+)
 parser.add_argument("--arm", choices=tuple(SPECS), default="A1")
 parser.add_argument("--stress", action="store_true")
 parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
@@ -130,7 +141,11 @@ CADENCE = "d"
 
 
 def pretrained_file(*, month: str, seed: int) -> Path:
-    """Return experiment 554's pretrained M0 weights (read only)."""
+    """Return experiment 554's pretrained M0 weights (read only), or this experiment's own for the W-T arms."""
+    if SPEC.columns:
+        own = W / "pretrained_wt" / SPEC.columns / f"{month}_s{seed}.pt"
+        assert own.exists(), own
+        return own
     p = W554 / "pretrained" / "M0" / f"{month}_s{seed}.pt"
     assert p.exists(), p
     return p
@@ -223,9 +238,11 @@ def load_pretrained_fresh(*, model: m.ModularMdn, path: Path) -> None:
     fresh_mixer(model=model)
 
 
-def new_model(*, n_primaries: int) -> m.ModularMdn:
-    """Return an untrained fine-tuning-stage network."""
-    return m.ModularMdn(n_primaries=n_primaries, stage="ft")
+def new_model(*, n_primaries: int, stage: str = "ft") -> m.ModularMdn:
+    """Return an untrained network (fine-tuning stage unless `stage` says `pre`)."""
+    if SPEC.columns:
+        return mwt.ModularMdnWt(n_primaries=n_primaries, stage=stage)
+    return m.ModularMdn(n_primaries=n_primaries, stage=stage)
 
 
 def train(  # noqa: PLR0912
@@ -312,6 +329,7 @@ def train(  # noqa: PLR0912
 
 
 _build_month, _build_test = k.build_month, data.build_test
+WT: wt.WtColumns | None = None
 
 
 def build_month(*, month, clean):
@@ -334,6 +352,12 @@ def build_month(*, month, clean):
     CHECK["train_rows"] += len(mr.y)
     CHECK["months"][month] = {"train_rows": len(mr.y), "train_origins": len(runs)}
     print(month, "train checks passed", flush=True)
+    if SPEC.columns:
+        global WT  # noqa: PLW0603
+        WT = wt.WtColumns(month=month, mr=mr)
+        mr.x = np.concatenate([mr.x, WT.month(null=SPEC.columns == "null")], axis=1)
+        CHECK["months"][month]["wt_example"] = WT.example
+        print(month, "W-T columns appended |", WT.example, flush=True)
     return mr
 
 
@@ -356,6 +380,12 @@ def build_test(*, month, standardiser):
         f"weather run {datetime.fromtimestamp(test.origin[0] / 1e6, UTC) - pub} (nwp_init_time <= power_fcst_init_time asserted for all rows of every test origin)"
     )
     print(month, "test checks passed |", CHECK["months"][month]["weather_example"], flush=True)
+    if SPEC.columns:
+        extra = WT.rows(
+            kind="ens", primary=test.primary, origin_idx=test.origin_idx, valid_idx=test.target_idx,
+            null=SPEC.columns == "null",
+        )  # fmt: skip
+        test = dataclasses.replace(test, x=np.concatenate([test.x, extra], axis=1))
     return test
 
 
@@ -407,6 +437,62 @@ def step2(*, device: str) -> None:
                 path=W / "logs" / "step2" / f"{month}_s{seed}.json",
             )
         del t, g, mr
+        torch.cuda.empty_cache()
+
+
+def pretrain_wt(*, device: str) -> None:
+    """Pretrain the W-T arm's network (real or placebo columns) on each fold's ERA5 and CAMS rows."""
+    assert SPEC.columns
+    clean = c.clean_stack()
+    for month in ARGS.months:
+        todo = [
+            s
+            for s in ARGS.seeds
+            if not (W / "pretrained_wt" / SPEC.columns / f"{month}_s{s}.pt").exists()
+        ]
+        if not todo:
+            continue
+        mr = k.build_month(month=month, clean=clean)
+        refit_t = c.month_start(month=month)
+        pre = r448.pretrain_rows(rows=mr.base, refit=refit_t, clean=clean)
+        latest = datetime.fromtimestamp(
+            (pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC
+        )
+        assert latest <= refit_t - c.regimes.REFIT_CUTOFF_AGE, (latest, refit_t)
+        extra = WT.rows(
+            kind="era5", primary=pre.primary, origin_idx=pre.origin_idx, valid_idx=pre.target_idx,
+            null=SPEC.columns == "null",
+        )  # fmt: skip
+        x = np.concatenate([pre.x, extra], axis=1)
+        z = (pre.y - mr.base.target_mean[pre.primary]) / mr.base.target_std[pre.primary]
+        t = {
+            "x": torch.from_numpy(x).to(device), "z": torch.from_numpy(z.astype(np.float32)).to(device),
+            "w": torch.ones(len(pre.y), device=device), "p": torch.from_numpy(pre.primary).to(device),
+            "v": torch.from_numpy(pre.is_val).to(device),
+        }  # fmt: skip
+        print(
+            f"{month}: pretraining rows {len(x):,}; latest valid {latest.isoformat()} (refit {refit_t.isoformat()})",
+            flush=True,
+        )
+        for seed in todo:
+            started = time.monotonic()
+            torch.manual_seed(seed)
+            model = new_model(n_primaries=len(mr.base.target_mean), stage="pre").to(device)
+            epochs, best = train(
+                model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
+                lr=c.PRETRAIN_LR, max_epochs=c.MAX_EPOCHS, fresh_lr=None, frozen=False,
+                anchor=None, lam=0.0, device=device,
+            )  # fmt: skip
+            target = W / "pretrained_wt" / SPEC.columns / f"{month}_s{seed}.pt"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            tmp = target.with_suffix(".tmp")
+            torch.save(model.state_dict(), tmp)
+            tmp.rename(target)
+            print(
+                f"  pretrain {SPEC.tag} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s",
+                flush=True,
+            )
+        del t, pre, mr
         torch.cuda.empty_cache()
 
 
@@ -648,6 +734,8 @@ if __name__ == "__main__":
         step2(device="cuda")
     elif ARGS.command == "choose-lambda":
         choose_lambda(device="cuda")
+    elif ARGS.command == "pretrain-wt":
+        pretrain_wt(device="cuda")
     elif ARGS.command == "average":
         average_arm(months=ARGS.months, seeds=ARGS.seeds, stress=ARGS.stress, device="cuda")
     else:
