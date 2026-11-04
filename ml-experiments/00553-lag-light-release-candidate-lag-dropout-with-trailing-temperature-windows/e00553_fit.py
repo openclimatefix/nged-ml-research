@@ -363,7 +363,10 @@ def lag_delta(
 
 
 def absent_value(*, name: str) -> float:
-    """Return the standardised input that marks a lag as absent: value 0, missing flag 1, age at the fold's maximum."""
+    """Return the input that marks a lag as absent.
+
+    The value is 0, the missing flag is 1, and the age is the fold's maximum.
+    """
     if name.endswith("_missing"):
         return 1.0
     return CTX["age_max"][name] if name.endswith("_age") else 0.0
@@ -391,9 +394,8 @@ class LagGpuMonth(k.GpuMonth):
                 t["x"][:, POS[nm]] = v.clamp(-prep.INPUT_CLIP_SD, prep.INPUT_CLIP_SD)
             CTX["n_shifted"] = int((d != 0).any(axis=1).sum())
         rng = np.random.default_rng([CTX["seed"], int(CTX["cut"].timestamp())])
-        drop = torch.from_numpy(rng.random(len(refit.index)) < DROP_FRACTION[ARM_TAG]).to(
-            t["x"].device
-        )
+        n_rows = len(refit.index)  # ty: ignore[unresolved-attribute]
+        drop = torch.from_numpy(rng.random(n_rows) < DROP_FRACTION[ARM_TAG]).to(t["x"].device)
         for n in NEW_NAMES:
             t["x"][drop, POS[n]] = absent_value(name=n)
         CTX["n_dropped"] = int(drop.sum())
