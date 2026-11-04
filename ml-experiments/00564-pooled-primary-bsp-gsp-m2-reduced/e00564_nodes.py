@@ -48,7 +48,12 @@ def climatology(*, power: np.ndarray, month: str) -> dict[tuple[int, int, int], 
     idx = np.arange(max(lo, 0), hi + 1)
     t = grid.gather(idx.tolist())
     cell = np.stack(
-        [t.dt.month().to_numpy(), (t.dt.hour() * 2 + t.dt.minute() // 30).to_numpy(), (t.dt.weekday() >= 6).to_numpy().astype(int)], axis=1
+        [
+            t.dt.month().to_numpy(),
+            (t.dt.hour() * 2 + t.dt.minute() // 30).to_numpy(),
+            (t.dt.weekday() >= 6).to_numpy().astype(int),
+        ],
+        axis=1,
     )
     values = power[idx]
     out = {}
@@ -82,11 +87,18 @@ def main(arms: list[str]) -> None:
                 pred = pred.filter(pl.col("time_series_id") == node["time_series_id"])
                 valid_idx = np.asarray(common.grid_index(times=pred["valid_time"]))
                 actual = clean[node["primary"]][valid_idx]
-                lead = (pred["valid_time"] - pred["power_fcst_init_time"]).dt.total_hours().to_numpy()
+                lead = (
+                    (pred["valid_time"] - pred["power_fcst_init_time"]).dt.total_hours().to_numpy()
+                )
                 if arm == "climatology":
                     t = pred["valid_time"]
                     keys = list(
-                        zip(t.dt.month().to_list(), (t.dt.hour() * 2 + t.dt.minute() // 30).to_list(), (t.dt.weekday() >= 6).cast(int).to_list(), strict=True)
+                        zip(
+                            t.dt.month().to_list(),
+                            (t.dt.hour() * 2 + t.dt.minute() // 30).to_list(),
+                            (t.dt.weekday() >= 6).cast(int).to_list(),
+                            strict=True,
+                        )
                     )
                     q = np.stack([clim.get(k, np.full(len(common.LEVELS), np.nan)) for k in keys])
                 else:
@@ -98,7 +110,15 @@ def main(arms: list[str]) -> None:
                     sel = ok & (lead >= lo) & (lead < hi)
                     if sel.any():
                         records.append(
-                            {"month": month, "site": node["site"], "kind": node["substation_type"], "arm": arm, "band": f"{lo}-{hi}h", "n": int(sel.sum()), "crps": 100.0 * float(score[sel].mean())}
+                            {
+                                "month": month,
+                                "site": node["site"],
+                                "kind": node["substation_type"],
+                                "arm": arm,
+                                "band": f"{lo}-{hi}h",
+                                "n": int(sel.sum()),
+                                "crps": 100.0 * float(score[sel].mean()),
+                            }
                         )
     out = pl.DataFrame(records)
     (W / "scores").mkdir(parents=True, exist_ok=True)

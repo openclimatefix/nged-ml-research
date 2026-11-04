@@ -32,7 +32,11 @@ TWO_SEEDS = (0, 1)
 ARMS: dict[str, tuple[Path, str, tuple[int, ...]]] = {
     **{a: (W, a, TWO_SEEDS) for a in ("M2-a", "M2-b", "M2-c")},
     "M0-2": (W554, "M0", TWO_SEEDS),
-    **{f"{a}-s{i}": (W if a != "M0-2" else W554, a if a != "M0-2" else "M0", (i,)) for a in ("M2-a", "M2-b", "M2-c", "M0-2") for i in TWO_SEEDS},
+    **{
+        f"{a}-s{i}": (W if a != "M0-2" else W554, a if a != "M0-2" else "M0", (i,))
+        for a in ("M2-a", "M2-b", "M2-c", "M0-2")
+        for i in TWO_SEEDS
+    },
     "M0": (W554, "M0", (0, 1, 2, 3, 4)),
     "L-1d5": (W554, "L-1d", (0, 1, 2, 3, 4)),
 }
@@ -45,7 +49,9 @@ def ready(*, root: Path, folder: str, seeds: tuple[int, ...]) -> bool:
     )
 
 
-NEW = tuple(a for a, (root, folder, seeds) in ARMS.items() if ready(root=root, folder=folder, seeds=seeds))
+NEW = tuple(
+    a for a, (root, folder, seeds) in ARMS.items() if ready(root=root, folder=folder, seeds=seeds)
+)
 
 
 def main():

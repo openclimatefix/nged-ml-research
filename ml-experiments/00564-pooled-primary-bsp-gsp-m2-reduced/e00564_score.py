@@ -76,6 +76,7 @@ def table():
 
 
 def main():
+    (W / "scores").mkdir(parents=True, exist_ok=True)
     t = table().with_columns(band=s.band_expr())
     need = [c for k2, c in ARMS.items() if k2 != "manual_heuristic" and c in t.columns]
     fin = pl.all_horizontal([pl.col(c).is_finite() for c in need])

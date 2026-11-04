@@ -14,7 +14,8 @@ Arms (all `d` cadence, 90-day half-life, fresh mixer at fine-tuning with learnin
 Fine-tuning rows of an extra series are scaled so that the series' total weight equals the mean total
 weight of a Primary. Pretraining rows have weight 1, as in M0.
 
-Usage: python e00564_fit.py {pretrain|fit|assemble|build-pretrain-rows} --arm ARM [--stress] [--months ...] [--seeds ...]
+Usage: python e00564_fit.py {pretrain|fit|assemble|build-pretrain-rows} --arm ARM
+[--stress] [--months ...] [--seeds ...]
 """
 
 import argparse
@@ -26,9 +27,9 @@ from pathlib import Path
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00397_models as base  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
+import e00415_prep as p415  # ty: ignore[unresolved-import]
 import e00428_data as data  # ty: ignore[unresolved-import]
 import e00448_run as r448  # ty: ignore[unresolved-import]
-import e00415_prep as p415  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k  # ty: ignore[unresolved-import]
 import e00511_fit as f  # ty: ignore[unresolved-import]
@@ -89,14 +90,17 @@ assert COLUMNS[m0.WEATHER_COLS] == [
 ]
 assert all(n.startswith("std_") for n in COLUMNS[m0.SPREAD_COLS])
 assert (
-    COLUMNS[m0.DATETIME_COLS][0] == "cos_zenith" and COLUMNS[m0.DATETIME_COLS][-1] == "nearest_inside"
+    COLUMNS[m0.DATETIME_COLS][0] == "cos_zenith"
+    and COLUMNS[m0.DATETIME_COLS][-1] == "nearest_inside"
 )
 assert COLUMNS[m0.LEAD_COLS] == ["lead", "lead_sqrt"]
 N_SERIES = len(pool.pooled_table())
 assert N_SERIES == 20
 
 
-def select_rows(*, rows: c.MonthRows, cutoff: datetime, half_life_days: float, **kwargs) -> c.Refit:
+def select_rows(
+    *, rows: c.MonthRows, cutoff: datetime, half_life_days: float, **kwargs: object
+) -> c.Refit:
     """Experiment 510's row selection, then the arm's treatment of the 4 extra series.
 
     The extra series are dropped (M2-b) or have their weights scaled so that each series' total
@@ -216,7 +220,10 @@ def train(
 
 
 def pretrained_file(*, arm: f.Arm, month: str, seed: int) -> Path:
-    """Return the pretrained weights an arm starts from (M0's from experiment 545, or this experiment's 20-series ones)."""
+    """Return the pretrained weights an arm starts from.
+
+    M0's come from experiment 545; the 20-series ones are this experiment's.
+    """
     if arm.pretrained == "M0":
         return W545 / "pretrained" / "M0" / f"{month}_s{seed}.pt"
     return W / "pretrained" / "P20" / f"{month}_s{seed}.pt"
@@ -312,7 +319,9 @@ def build_month(*, month, clean):
             / f"init={datetime.fromtimestamp((r - delay) / 1e6, UTC):%Y-%m-%d}.parquet"
         ).exists()
     ]
-    assert not miss_nodes, f"{month}: {len(miss_nodes)} training origins have no node weather-run file"
+    assert not miss_nodes, (
+        f"{month}: {len(miss_nodes)} training origins have no node weather-run file"
+    )
     CHECK["train_rows"] += len(mr.y)
     CHECK["months"][month] = {
         "train_rows": len(mr.y),

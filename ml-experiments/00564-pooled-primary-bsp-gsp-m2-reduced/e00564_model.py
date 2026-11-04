@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Experiment 545's modular lag-free network (M0) with a series-type input, for 20 series.
 
 The network is `e00554_model.ModularMdn` with one change: the datetime encoder also reads a fixed
@@ -32,17 +31,29 @@ class PooledModularMdn(nn.Module):
         self.register_buffer("kind", one_hot)
         self.embedding = nn.Embedding(n_series, m0.EMBEDDING)
         self.weather = base.mlp(
-            n_in=7 + m0.EMBEDDING, hidden=m0.ENCODER_HIDDEN, layers=1, n_out=m0.ENCODER_OUT, dropout=m0.DROPOUT
+            n_in=7 + m0.EMBEDDING,
+            hidden=m0.ENCODER_HIDDEN,
+            layers=1,
+            n_out=m0.ENCODER_OUT,
+            dropout=m0.DROPOUT,
         )
         self.datetime = base.mlp(
-            n_in=21 + m0.EMBEDDING + N_KINDS, hidden=m0.ENCODER_HIDDEN, layers=1, n_out=m0.ENCODER_OUT, dropout=m0.DROPOUT
+            n_in=21 + m0.EMBEDDING + N_KINDS,
+            hidden=m0.ENCODER_HIDDEN,
+            layers=1,
+            n_out=m0.ENCODER_OUT,
+            dropout=m0.DROPOUT,
         )
         wide = 2 * m0.ENCODER_OUT + m0.EMBEDDING
         self.mixer_pre = base.mlp(
             n_in=wide, hidden=m0.MIXER_HIDDEN, layers=2, n_out=3 * m0.COMPONENTS, dropout=m0.DROPOUT
         )
         self.mixer_ft = base.mlp(
-            n_in=wide + 7 + 2, hidden=m0.MIXER_HIDDEN, layers=2, n_out=3 * m0.COMPONENTS, dropout=m0.DROPOUT
+            n_in=wide + 7 + 2,
+            hidden=m0.MIXER_HIDDEN,
+            layers=2,
+            n_out=3 * m0.COMPONENTS,
+            dropout=m0.DROPOUT,
         )
         for head in (self.mixer_pre, self.mixer_ft):
             base.init_head(head=head, components=m0.COMPONENTS)
@@ -53,7 +64,7 @@ class PooledModularMdn(nn.Module):
         emb = self.embedding(primary)
         hw = nn.functional.gelu(self.weather(torch.cat([x[:, m0.WEATHER_COLS], emb], dim=-1)))
         hd = nn.functional.gelu(
-            self.datetime(torch.cat([x[:, m0.DATETIME_COLS], emb, self.kind[primary]], dim=-1))
+            self.datetime(torch.cat([x[:, m0.DATETIME_COLS], emb, self.kind[primary]], dim=-1))  # ty: ignore[not-subscriptable]
         )
         core = torch.cat([hw, hd, emb], dim=-1)
         if self.stage == "pre":

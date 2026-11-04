@@ -12,7 +12,6 @@ origin), and their ERA5 and CAMS pretraining rows are built by experiment 418's 
 patched table.
 """
 
-import os
 from pathlib import Path
 from typing import Final
 
@@ -26,9 +25,7 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00564-pooled-primary-bsp-gsp-m2-reduced" / "work"
-)
+WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00564-pooled-primary-bsp-gsp-m2-reduced" / "work"
 RAW: Final[Path] = WORK / "raw"
 RAW_PRETRAIN: Final[Path] = WORK / "raw_pretrain"
 N_PRIMARIES: Final[int] = 16
@@ -78,7 +75,7 @@ def _link(*, source: Path, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists():
         assert source.exists(), source
-        os.symlink(source, target)
+        target.symlink_to(source)
 
 
 def prepare_folders() -> None:
