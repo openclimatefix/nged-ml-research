@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, E402, PLR0915, PERF401, PT018, D107
 """Rows for experiment 552: ICON-EU and ECMWF inputs at four issue times a day.
 
 `pack` writes two private caches under `WORK_DIR`: the ICON-EU runs as one array, and the ECMWF
@@ -21,8 +21,12 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00552-icon-eu-four-runs-a-day-lag-free-demand" / "work"
-RUN_DIR: Final[Path] = Path(__import__("os").environ["DATA_PATH_INTERNAL"]) / "studies" / "icon_eu_multirun" / "runs"
+WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00552-icon-eu-four-runs-a-day-lag-free-demand" / "work"
+)
+RUN_DIR: Final[Path] = (
+    Path(__import__("os").environ["DATA_PATH_INTERNAL"]) / "studies" / "icon_eu_multirun" / "runs"
+)
 VARIABLES: Final[tuple[str, ...]] = (
     "downward_direct_short_wave_radiation_flux_surface",
     "downward_diffuse_short_wave_radiation_flux_surface",
@@ -58,7 +62,9 @@ def pack() -> None:
         d = pl.read_parquet(f).sort("primary", "lead_time")
         n_lead = d["lead_time"].n_unique()
         assert n_lead == MAX_LEAD_H + 1 and d["primary"].n_unique() == 16, f
-        arr = np.stack([d[v].to_numpy().reshape(16, n_lead) for v in VARIABLES], -1)  # primary, lead, var
+        arr = np.stack(
+            [d[v].to_numpy().reshape(16, n_lead) for v in VARIABLES], -1
+        )  # primary, lead, var
         inits.append(d["init_time"][0].replace(tzinfo=UTC))
         arrays.append(arr.transpose(1, 0, 2).astype(np.float32))  # lead, primary, var
     arr = np.stack(arrays)
@@ -109,7 +115,10 @@ class Sources:
             origin = ((t - ECM_OFFSET) // DAY) * DAY + ECM_OFFSET
             for p in range(16):
                 x, o, v = self.ecm[p]
-                a, b = np.searchsorted(o, origin, side="left"), np.searchsorted(o, origin, side="right")
+                a, b = (
+                    np.searchsorted(o, origin, side="left"),
+                    np.searchsorted(o, origin, side="right"),
+                )
                 if a == b:
                     continue
                 vv = v[a:b]
@@ -138,7 +147,9 @@ class Sources:
         cat = {key: np.concatenate([q[key] for q in parts]) for key in parts[0]}
         rows = Rows(**cat)
         assert (rows.ecm_origin <= rows.issue).all(), "ECMWF run issued after the issue time"
-        assert (rows.icon_init + ICON_DELAY <= rows.issue).all(), "ICON-EU run issued after the issue time"
+        assert (rows.icon_init + ICON_DELAY <= rows.issue).all(), (
+            "ICON-EU run issued after the issue time"
+        )
         assert (rows.valid >= rows.issue).all()
         assert not np.isnan(rows.icon).any(), "NaN in ICON-EU inputs"
         return rows
@@ -147,7 +158,14 @@ class Sources:
 def icon_features(raw: np.ndarray) -> np.ndarray:
     """Return shortwave (direct + diffuse), 2 m temperature, dew point, surface pressure, precipitation, 10 m wind speed."""
     return np.column_stack(
-        [raw[:, 0] + raw[:, 1], raw[:, 2], raw[:, 3], raw[:, 4], raw[:, 5], np.hypot(raw[:, 6], raw[:, 7])]
+        [
+            raw[:, 0] + raw[:, 1],
+            raw[:, 2],
+            raw[:, 3],
+            raw[:, 4],
+            raw[:, 5],
+            np.hypot(raw[:, 6], raw[:, 7]),
+        ]
     ).astype(np.float32)
 
 

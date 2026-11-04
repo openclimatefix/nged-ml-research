@@ -1,3 +1,4 @@
+# ruff: noqa: E501, E402, PLR0915, PERF401, PT018, D107
 """Fetch every Dynamical.org ICON-EU run from 2026-02-10 to 2026-06-30 at the 16 Primary points.
 
 One parquet per run goes to `OUTPUT_DIR / runs`, so a re-run skips finished runs. Coordinates stay
@@ -45,8 +46,12 @@ def main() -> None:
     primaries = common.series_table().filter(pl.col("substation_type") == "Primary")
     lat, lon = store["latitude"].to_numpy(), store["longitude"].to_numpy()
     indexers = {
-        "latitude": xr.DataArray([int(np.argmin(abs(lat - v))) for v in primaries["latitude"]], dims="primary"),
-        "longitude": xr.DataArray([int(np.argmin(abs(lon - v))) for v in primaries["longitude"]], dims="primary"),
+        "latitude": xr.DataArray(
+            [int(np.argmin(abs(lat - v))) for v in primaries["latitude"]], dims="primary"
+        ),
+        "longitude": xr.DataArray(
+            [int(np.argmin(abs(lon - v))) for v in primaries["longitude"]], dims="primary"
+        ),
     }
     inits = store["init_time"].to_numpy()
     inits = inits[(inits >= np.datetime64(FIRST_RUN)) & (inits <= np.datetime64(LAST_RUN))]
