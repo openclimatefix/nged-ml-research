@@ -107,7 +107,7 @@ def figure_leak_vs_gain() -> None:
         title=alt.TitleParams(
             [
                 "Leak against forecast skill for each arm, at the eight MVA-only Primaries.",
-                "Dot: arm (mean over 5 folds, seed 0 for the leak). Diamond: M0. Line at 0: same as M0.",
+                "Dot: arm (5-fold mean, leak from seed 0). Diamond: M0. Line at 0: same as M0.",
                 "Left of the diamond: less leak. Below the line: better forecast.",
             ],
             anchor="start",
