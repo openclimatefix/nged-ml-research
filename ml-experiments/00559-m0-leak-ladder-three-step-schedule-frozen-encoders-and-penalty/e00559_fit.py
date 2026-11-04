@@ -35,8 +35,10 @@ import e00448_run as r448  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k  # ty: ignore[unresolved-import]
 import e00511_fit as f  # ty: ignore[unresolved-import]
+import e00559_extra as extra
 import e00559_folded as folded
 import e00559_model as m
+import e00559_model_extra as mex
 import e00559_model_wt as mwt
 import e00559_wt as wt
 import numpy as np
@@ -81,6 +83,7 @@ class Spec:
     lr: float = c.FINE_TUNE_LR
     max_epochs: int = c.MAX_EPOCHS
     average_of: str | None = None  # the arm whose daily weights are averaged (A5)
+    source: str = "wt"  # which extra columns: "wt" (experiment 515's W-T) or "uv" (wind components)
     columns: str | None = (
         None  # "real" or "null": add experiment 515's W-T columns to the weather encoder (A9)
     )
@@ -100,6 +103,8 @@ SPECS = {
         Spec("A8", "step2", head="folded"),
         Spec("A9", "fresh", columns="real"),
         Spec("A9-null", "fresh", columns="null"),
+        Spec("A11", "fresh", columns="real", source="uv"),
+        Spec("A11-null", "fresh", columns="null", source="uv"),
     )
 }
 parser = argparse.ArgumentParser()
@@ -143,7 +148,7 @@ CADENCE = "d"
 def pretrained_file(*, month: str, seed: int) -> Path:
     """Return experiment 554's pretrained M0 weights (read only), or this experiment's own for the W-T arms."""
     if SPEC.columns:
-        own = W / "pretrained_wt" / SPEC.columns / f"{month}_s{seed}.pt"
+        own = W / f"pretrained_{SPEC.source}" / SPEC.columns / f"{month}_s{seed}.pt"
         assert own.exists(), own
         return own
     p = W554 / "pretrained" / "M0" / f"{month}_s{seed}.pt"
@@ -241,6 +246,10 @@ def load_pretrained_fresh(*, model: m.ModularMdn, path: Path) -> None:
 def new_model(*, n_primaries: int, stage: str = "ft") -> m.ModularMdn:
     """Return an untrained network (fine-tuning stage unless `stage` says `pre`)."""
     if SPEC.columns:
+        if SPEC.source == "uv":
+            return mex.ModularMdnExtra(
+                n_primaries=n_primaries, stage=stage, n_weather=4, n_spread=4
+            )
         return mwt.ModularMdnWt(n_primaries=n_primaries, stage=stage)
     return m.ModularMdn(n_primaries=n_primaries, stage=stage)
 
@@ -329,7 +338,16 @@ def train(  # noqa: PLR0912
 
 
 _build_month, _build_test = k.build_month, data.build_test
-WT: wt.WtColumns | None = None
+WT: wt.WtColumns | extra.ExtraColumns | None = None
+UV: extra.UvSource | None = None
+
+
+def uv_source() -> extra.UvSource:
+    """Return the wind-component source, loaded once per process."""
+    global UV  # noqa: PLW0603
+    if UV is None:
+        UV = extra.UvSource()
+    return UV
 
 
 def build_month(*, month, clean):
@@ -354,11 +372,14 @@ def build_month(*, month, clean):
     print(month, "train checks passed", flush=True)
     if SPEC.columns:
         global WT  # noqa: PLW0603
-        WT = wt.WtColumns(month=month, mr=mr)
+        if SPEC.source == "uv":
+            WT = extra.ExtraColumns(month=month, mr=mr, source=uv_source())
+        else:
+            WT = wt.WtColumns(month=month, mr=mr)
         mr.x = np.concatenate([mr.x, WT.month(null=SPEC.columns == "null")], axis=1)
         CHECK["months"][month]["wt_example"] = WT.example
         CHECK["months"][month]["placebo_rows_without_donor"] = WT.null_rows_without_donor
-        print(month, "W-T columns appended |", WT.example, flush=True)
+        print(month, f"{SPEC.source} columns appended |", WT.example, flush=True)
     return mr
 
 
@@ -449,7 +470,7 @@ def pretrain_wt(*, device: str) -> None:
         todo = [
             s
             for s in ARGS.seeds
-            if not (W / "pretrained_wt" / SPEC.columns / f"{month}_s{s}.pt").exists()
+            if not (W / f"pretrained_{SPEC.source}" / SPEC.columns / f"{month}_s{s}.pt").exists()
         ]
         if not todo:
             continue
@@ -484,7 +505,7 @@ def pretrain_wt(*, device: str) -> None:
                 lr=c.PRETRAIN_LR, max_epochs=c.MAX_EPOCHS, fresh_lr=None, frozen=False,
                 anchor=None, lam=0.0, device=device,
             )  # fmt: skip
-            target = W / "pretrained_wt" / SPEC.columns / f"{month}_s{seed}.pt"
+            target = W / f"pretrained_{SPEC.source}" / SPEC.columns / f"{month}_s{seed}.pt"
             target.parent.mkdir(parents=True, exist_ok=True)
             tmp = target.with_suffix(".tmp")
             torch.save(model.state_dict(), tmp)
