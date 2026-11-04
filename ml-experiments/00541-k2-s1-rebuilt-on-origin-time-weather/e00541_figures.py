@@ -1,8 +1,11 @@
 # ruff: noqa: E501
-"""Draw experiment 541's two figures from the stored score tables (SVG; optimise with `npx svgo@4 --multipass --precision=1 --final-newline`).
+"""Draw experiment 541's two figures from the stored score tables (SVG; optimise with `npx.
 
-1. `figure_1_crps_by_lead.svg`: CRPS by lead band of the old K2-S1, the rebuilt K2-S1, L-1d, and A-pool.
-2. `figure_2_rebuilt_minus_old.svg`: rebuilt minus old K2-S1 by lead band, Bonferroni month-block intervals.
+svgo@4 --multipass --precision=1 --final-newline`).
+
+1. `figure_1_crps_by_lead.svg`: CRPS by lead band of the old K2-S1, the rebuilt K2-S1, L-1d, and
+A-pool. 2. `figure_2_rebuilt_minus_old.svg`: rebuilt minus old K2-S1 by lead band, Bonferroni
+month-block intervals.
 """
 
 from pathlib import Path

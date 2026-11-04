@@ -1,12 +1,15 @@
 # ruff: noqa: E501
-r"""Experiment 541, part 2: refit the lag-free heads on origin-time weather and rebuild K2-S1 with them.
+r"""Experiment 541, second rebuild: lag-free heads retrained on origin-time weather.
 
-Part 1 fed origin-time weather to lag-free heads trained on experiment 404's freshest-run weather. Here
-each "further" module trains on the rows of experiment 397's summary tables instead: one row per
-(Primary, forecast origin, valid time) with the weather of the run issued at the origin, for origins and
-valid times before the refit date, leads up to 240 h, the same 35 non-lag inputs, the same module,
-loss, seeds, epochs, recency weights (by the valid time's age), and short-history cut as experiment 404.
-The refit date is the same as experiment 404's, so nothing from the scored month enters a fit.
+The script refits the lag-free heads on origin-time weather and rebuilds K2-S1 with them.
+
+Part 1 fed origin-time weather to lag-free heads trained on experiment 404's freshest-run weather.
+Here each "further" module trains on the rows of experiment 397's summary tables instead: one row
+per (Primary, forecast origin, valid time) with the weather of the run issued at the origin, for
+origins and valid times before the refit date, leads up to 240 h, the same 35 non-lag inputs, the
+same module, loss, seeds, epochs, recency weights (by the valid time's age), and short-history cut
+as experiment 404. The refit date is the same as experiment 404's, so nothing from the scored month
+enters a fit.
 
 ```bash
 PYTHONPATH=$(ls -d ml-experiments/*/ | tr '\n' ':') DATA_PATH_INTERNAL=<internal data folder> \

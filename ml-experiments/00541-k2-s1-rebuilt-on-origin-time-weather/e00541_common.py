@@ -1,5 +1,9 @@
 # ruff: noqa: E501
-"""Shared pieces of experiment 541: 511's test rows with a choice of weather feed (origin-time or 404's freshest run)."""
+"""Shared pieces of experiment 541.
+
+The pieces build experiment 511's test rows with a choice of weather feed (origin-time or the
+freshest run of experiment 404).
+"""
 
 from datetime import timedelta
 from typing import Final

@@ -1,10 +1,12 @@
-# ruff: noqa: E501
-"""Score experiment 541's rebuilt K2-S1 on experiment 511's rows, with 521's statistics. Commands: `rows`, `stats`.
+"""Score experiment 541's rebuilt K2-S1 on experiment 511's rows, with 521's statistics.
 
-The rebuilt K2-S1 is scored cell by cell and as the mean of three cells. The old K2-S1 is experiment 511's
-stored `K2-S1__crps` (cell c0). Contrasts: rebuilt minus old K2-S1 and rebuilt minus L-1d (both counted);
-rebuilt minus L-Ww and the old K2-S1 minus L-1d are report-only. A-pool, A-pool minus lags (537) and R-DW (539)
-come from their stored absolute tables, because their per-row scores sit in other folders.
+Commands: `rows`, `stats`.
+
+The rebuilt K2-S1 is scored cell by cell and as the mean of three cells. The old K2-S1 is experiment
+511's stored `K2-S1__crps` (cell c0). Contrasts: rebuilt minus old K2-S1 and rebuilt minus L-1d
+(both counted); rebuilt minus L-Ww and the old K2-S1 minus L-1d are report-only. A-pool, A-pool
+minus lags (537) and R-DW (539) come from their stored absolute tables, because their per-row scores
+sit in other folders.
 """
 
 import argparse

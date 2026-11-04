@@ -1,12 +1,16 @@
 # ruff: noqa: E501
-r"""Build experiment 541's rebuilt K2-S1: two S1 heads (experiment 454, origin-time weather) plus two lag-free heads refitted and fed origin-time weather.
+r"""Build experiment 541's first rebuild of K2-S1 on origin-time weather.
 
-Experiment 454's S1 heads read experiment 397's summary rows, whose weather is the run published at the
-forecast origin; their lag inputs sit before the origin. Only the lag-free heads (experiment 404's frozen
-table) read the freshest run published before each target's valid time. This script refits each lag-free
-"further" module (experiment 531's code and seeds 0 to 2), feeds it the weather of the 397 rows, asserts row
-by row that the weather is the summary of the run initialised at origin minus 9 h, mixes it with the stored
-S1 heads of 454 in 454's three seed pairs, and writes one forecast table per month and cell.
+The rebuild mixes two S1 heads (experiment 454, origin-time weather) with two lag-free heads that
+are refitted as experiment 404 fitted them and fed origin-time weather.
+
+Experiment 454's S1 heads read experiment 397's summary rows, whose weather is the run published at
+the forecast origin; their lag inputs sit before the origin. Only the lag-free heads (experiment
+404's frozen table) read the freshest run published before each target's valid time. This script
+refits each lag-free "further" module (experiment 531's code and seeds 0 to 2), feeds it the weather
+of the 397 rows, asserts row by row that the weather is the summary of the run initialised at origin
+minus 9 h, mixes it with the stored S1 heads of 454 in 454's three seed pairs, and writes one
+forecast table per month and cell.
 
 ```bash
 PYTHONPATH=$(ls -d ml-experiments/*/ | tr '\n' ':') DATA_PATH_INTERNAL=<internal data folder> \
