@@ -26,15 +26,15 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
-import e00087_common as common
-import e00397_prep as prep
-import e00428_data as data
-import e00510_common as c
-import e00511_common as k
-import e00511_fit as f
+import e00087_common as common  # ty: ignore[unresolved-import]
+import e00397_prep as prep  # ty: ignore[unresolved-import]
+import e00428_data as data  # ty: ignore[unresolved-import]
+import e00510_common as c  # ty: ignore[unresolved-import]
+import e00511_common as k  # ty: ignore[unresolved-import]
+import e00511_fit as f  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 WORK = Path(
     os.environ["DATA_PATH_INTERNAL"]
@@ -66,7 +66,7 @@ NEW_NAMES = [NAMES[i] for i in EXTRA]
 POS = {n: N0 + j for j, n in enumerate(NEW_NAMES)}
 VALUE = [n for n in NEW_NAMES if not n.endswith(("_missing", "_age"))]
 CTX: dict = {"on": False}
-CHECK = {"train_rows": 0, "test_rows": 0, "origins_weather_checked": 0, "months": {}}
+CHECK: dict = {"train_rows": 0, "test_rows": 0, "origins_weather_checked": 0, "months": {}}
 
 
 STEPS = common.STEPS_PER_DAY

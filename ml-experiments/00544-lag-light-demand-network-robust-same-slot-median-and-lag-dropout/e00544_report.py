@@ -135,19 +135,19 @@ def examples() -> None:
         main = one["R-DROP"].filter(pl.col("day").is_between(*window)).to_pandas()
         band = alt.Chart(main).encode(x=x)  # ty: ignore[unresolved-attribute]
         layers = [
-            band.mark_area(opacity=0.2, color=EX_COLOURS["R-DROP"]).encode(
+            band.mark_area(opacity=0.2, color=EX_COLOURS["R-DROP"]).encode(  # ty: ignore[unresolved-attribute]
                 y=alt.Y("q05:Q", title="Power (MVA)", scale=alt.Scale(zero=False)), y2="q95:Q"
             ),  # ty: ignore[unresolved-attribute]
             band.mark_area(opacity=0.35, color=EX_COLOURS["R-DROP"]).encode(y="q25:Q", y2="q75:Q"),  # ty: ignore[unresolved-attribute]
         ]
         for arm, f in one.items():
             layers.append(
-                alt.Chart(f.filter(pl.col("day").is_between(*window)).to_pandas())
+                alt.Chart(f.filter(pl.col("day").is_between(*window)).to_pandas())  # ty: ignore[unresolved-attribute]
                 .mark_line(color=EX_COLOURS[arm], strokeWidth=2)
                 .encode(x=x, y="q50:Q")
             )  # ty: ignore[unresolved-attribute]
         layers.append(
-            alt.Chart(actual.filter(pl.col("day").is_between(*window)).to_pandas())
+            alt.Chart(actual.filter(pl.col("day").is_between(*window)).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_line(color="black", strokeWidth=1.5, strokeDash=[4, 3])
             .encode(x=x, y="actual:Q")
         )  # ty: ignore[unresolved-attribute]

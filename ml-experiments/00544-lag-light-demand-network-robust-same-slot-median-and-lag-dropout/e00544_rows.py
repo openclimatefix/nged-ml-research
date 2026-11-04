@@ -4,11 +4,11 @@
 import os
 from pathlib import Path
 
-import e00454_build as build454
-import e00470_build as build470
-import e00470_heads as heads470
-import e00470_score as score470
-import e00511_score as k511
+import e00454_build as build454  # ty: ignore[unresolved-import]
+import e00470_build as build470  # ty: ignore[unresolved-import]
+import e00470_heads as heads470  # ty: ignore[unresolved-import]
+import e00470_score as score470  # ty: ignore[unresolved-import]
+import e00511_score as k511  # ty: ignore[unresolved-import]
 import polars as pl
 
 W = Path(
