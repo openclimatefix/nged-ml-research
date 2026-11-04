@@ -36,7 +36,8 @@ NEW = tuple(
 )
 OLD = ("R-DW", "A-pool", "L-1d", "manual_heuristic")
 ARMS = {a: f"{a}__crps" for a in (*NEW, *OLD)}
-# counted contrasts: P1 cap cost, P2 pretraining lags, P3 A-pool-24 versus R-DW-24-PT (4 tests as pre-registered)
+# Counted contrasts: P1 cap cost, P2 pretraining lags, P3 A-pool-24 versus R-DW-24-PT.
+# The pre-registered Bonferroni count is 4 tests.
 CONTRASTS = [
     ("R-DW-24", "R-DW", True),
     ("R-DW-24-PT", "R-DW-24", True),
