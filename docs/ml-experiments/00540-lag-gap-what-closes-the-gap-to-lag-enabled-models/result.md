@@ -62,7 +62,7 @@ take_home_message: >-
 advice:
   - >-
     Do not score any forecast against K2-S1 at leads above 24 h: its lag-free heads used weather
-    issued after the forecast origin (figure 1 and finding a).
+    issued after the forecast origin (finding a).
   - >-
     To bring a lag-free network close to a lag-enabled one at 1 to 5 days, give it the day-ago and
     week-ago lags with their missing flags and ages, not the newest value alone (figure 1).
