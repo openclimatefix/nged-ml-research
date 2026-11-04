@@ -1,4 +1,4 @@
-# ruff: noqa: E501, DTZ006, PLW0603, PLR0915, PT018, SIM102, RUF034, PERF401, FURB110
+# ruff: noqa: E501, PLR0912, DTZ006, PLW0603, PLR0915, PT018, SIM102, RUF034, PERF401, FURB110
 r"""Fit the stress cells of experiment 556: how much of an injected step reaches the next forecasts.
 
 A fine-tune of the lag-free network depends only on its cutoff, half-life, pretrained weights, seed,
