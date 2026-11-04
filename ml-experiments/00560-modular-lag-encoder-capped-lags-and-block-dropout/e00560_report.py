@@ -128,7 +128,7 @@ def figure_leak() -> None:
     """Draw the injected-shift leak by block age."""
     t = pl.read_csv(SCORES / "stress_leak_by_age.csv").to_pandas()
     domain = ["L-1d", "M0", "R-DW-24", *ARMS]
-    rng = [theme.DATA_GREEN, theme.DATA_BLUE, "#a0a0a0", *ARMS.values()]
+    rng = ["#000000", "#555555", "#b0b0b0", *ARMS.values()]
     present = [(d, r) for d, r in zip(domain, rng, strict=True) if d in set(t["arm"])]
     chart = (
         alt.Chart(t)  # ty: ignore[unresolved-attribute]
