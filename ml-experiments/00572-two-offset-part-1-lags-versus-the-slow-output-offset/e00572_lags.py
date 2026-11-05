@@ -68,7 +68,9 @@ def lag_block(
     day, week = lag_indices(
         target_idx=target_idx, origin_idx=origin_idx, cap_steps=cap_steps, extra_days=extra_days
     )
-    amax = age_max(cap_steps=cap_steps + STEPS * extra_days)
+    amax = age_max(
+        cap_steps=cap_steps
+    )  # as experiment 560: aged variants keep the unaged missing code
     out = np.zeros((len(primary), 8), dtype=np.float32)
     for j, idx in enumerate((day, week)):
         raw = np.where(idx >= 0, clean[primary, np.clip(idx, 0, None)], np.nan)

@@ -802,6 +802,14 @@ if __name__ == "__main__":
     elif ARGS.command == "pretrain-wt":
         pretrain_wt(device="cuda")
     else:
+        if (
+            ARGS.stress
+            and SPEC.lags != "none"
+            and list((W / "models" / SPEC.tag).glob("*_stress*.pt"))
+        ):
+            raise SystemExit(
+                f"stress models of {SPEC.tag} exist; a resumed stress run would score reused models without the shift. Delete them and their fits first."
+            )
         fit_arm(
             months=ARGS.months,
             seeds=ARGS.seeds,
