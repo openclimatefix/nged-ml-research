@@ -134,8 +134,24 @@ def real_events(
     return pl.DataFrame(rows_out)
 
 
+def dilated_near(*, near: np.ndarray) -> np.ndarray:
+    """Return `near` extended by the hold length plus the release lag after every event, so that
+    origin days held because of a real event's snap-back are not counted as event-free.
+    """
+    out = near.copy()
+    for k in range(1, c.HOLD_DAYS + c.LAG_DAYS + 2):
+        out[:, k:] |= near[:, :-k]
+    return out
+
+
 def event_free(
-    *, t: c.X4Table, pre: dict[str, np.ndarray], on: np.ndarray, hold: np.ndarray, frac: np.ndarray
+    *,
+    t: c.X4Table,
+    near: np.ndarray,
+    pre: dict[str, np.ndarray],
+    on: np.ndarray,
+    hold: np.ndarray,
+    frac: np.ndarray,
 ) -> pl.DataFrame:
     """Return the false-alarm cost on event-free rows, per group and lead band and arm, with the
     contrast against X3-syn's lag network in points of capacity: the mean pinball loss at q05 and
@@ -143,12 +159,13 @@ def event_free(
     at the Bonferroni level of `N_COUNTED` counted contrasts.
     """
     hold_r, on_r, frac_r = day_arrays(t=t, on=on, hold=hold, frac=frac, rows=np.arange(t.n))
+    free_rows = t.free & ~near[t.prim, t.origin_day]
     am = c.combine(base=pre, hold=hold_r, on=on_r, frac=frac_r)
     months = sorted(set(t.month))
     out = []
     for g in (*GROUPS_SCORED, "D15 and D18"):
         for band in (0, 1):
-            base_sel = t.free & (t.group_of_row == g) & (t.band == band)
+            base_sel = free_rows & (t.group_of_row == g) & (t.band == band)
             if base_sel.sum() < 500:
                 continue
             for arm, mm in am.items():
@@ -169,7 +186,7 @@ def event_free(
                         ]
                     )
                     r[name] = float(val[base_sel].mean())
-                    r[f"{name}_minus_V"] = float(val[base_sel].mean() - ref[base_sel].mean())
+                    r[f"{name}_minus_V"] = float(diffs.mean()) if len(diffs) else float("nan")
                     lo, hi = bonferroni_interval(diffs=diffs)
                     r[f"{name}_minus_V_lo"], r[f"{name}_minus_V_hi"] = lo, hi
                     r[f"{name}_mde"] = (hi - lo) / 2.0
@@ -201,11 +218,17 @@ def gate_tables(
     """Return how often the rule is active on event-free (Primary, origin day) pairs, and false
     triggers per Primary-year. A false trigger is a day the gate turns on with no event within 3 days.
     """
-    near, od = gi["near"], gi["origin_days"]
+    near, od, gap = dilated_near(near=gi["near"]), gi["origin_days"], gi["gap"]
+    lag, m = c.LAG_DAYS, c.GATE_M
     rows = []
     for g in (*GROUPS_SCORED, "D15 and D18", "all 16"):
         ps = [p for p in range(16) if g == "all 16" or t.group[p] == g]
-        pairs = [(p, d) for p in ps for d in od if not near[p, d]]
+        pairs = [
+            (p, d)
+            for p in ps
+            for d in od
+            if not near[p, d] and np.isfinite(gap[p, d - lag - m + 1 : d - lag + 1]).all()
+        ]
         if not pairs:
             continue
         pd_ = np.array(pairs)
@@ -237,7 +260,8 @@ def trigger_times(*, ev: pl.DataFrame, on: np.ndarray, snap: np.ndarray, label: 
     for e in ev.iter_rows(named=True):
         p = e["primary"]
         d0, d1 = e["onset_idx"] // 48, e["end_idx"] // 48
-        trig = [d for d in range(d0, d1 + 1) if on[p, d]]
+        d0 = max(d0, e.get("first_day", d0))
+        trig = [d for d in range(d0, d1 + 4) if d < on.shape[1] and on[p, d]]
         snaps = [d for d in range(d0, d1 + 30) if d < snap.shape[1] and snap[p, d] and d >= d1]
         out.append(
             {
@@ -361,7 +385,15 @@ def score_bank(*, t: c.X4Table, gi: dict) -> tuple[pl.DataFrame, list[dict]]:
                 p, sgn, depth = e["primary"], float(e["sign"]), float(e["depth"])
                 trig_rows.extend(
                     trigger_times(
-                        ev=pl.DataFrame([{**e, "length_days": float(e["length_days"])}]),
+                        ev=pl.DataFrame(
+                            [
+                                {
+                                    **e,
+                                    "length_days": float(e["length_days"]),
+                                    "first_day": int(days_m.min()),
+                                }
+                            ]
+                        ),
                         on=on,
                         snap=snap,
                         label=f"bank {m} r{r}",
@@ -459,12 +491,16 @@ def main() -> None:
     )
     real = real_events(t=t, pre=pre, on=on, hold=hold, frac=frac)
     real.write_csv(c.WORK / "real_event_phase.csv")
-    free = event_free(t=t, pre=pre, on=on, hold=hold, frac=frac)
+    free = event_free(t=t, near=dilated_near(near=gi["near"]), pre=pre, on=on, hold=hold, frac=frac)
     free.write_csv(c.WORK / "event_free.csv")
     gates = gate_tables(t=t, gi=gi, on=on, snap=snap, hold=hold, frac=frac)
     gates.write_csv(c.WORK / "gates.csv")
     print(gates)
     ev = sc.attach_depth(ev=sc.merged_events(), t=t)
+    scored = {int(d) for d in np.unique(t.idx // 48)}
+    ev = ev.filter(
+        pl.col("onset_idx").map_elements(lambda i: int(i) // 48 in scored, return_dtype=pl.Boolean)
+    )
     trig = trigger_times(ev=ev, on=on, snap=snap, label="verified")
     tab, trig_bank = score_bank(t=t, gi=gi)
     tab.write_csv(c.WORK / "bank_event_phase.csv")

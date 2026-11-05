@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -48,44 +48,194 @@ metric: >-
   after, 7-14 days after), the one-sided share on the NRA side, pinball loss at q01, q05, q95, q99,
   width, and on event-free rows the width inflation, the share of days the rule is active, and the
   false triggers per Primary-year.
+verdict: not supported
+best_arm: >-
+  No rule beats chance. On injected 15 and 30 day lag-only events (672 Primary-events, 24-120 h, 0-7
+  days after the end) the 7-day band after the snap-back (A1) holds the normal running arrangement
+  inside q05-q95 on 0.848 of rows, against 0.826 for X3-syn and 0.847 for the same rule triggered on
+  random days. Keeping the union band on while the gate is on (A2) reaches 0.915, close to the 0.921
+  of a union band that is always on.
+headline: >-
+  A band widened for 7 days after the gap collapses covers the normal running arrangement no better
+  than a band widened for 7 random days (0.848 against 0.847 after the end, bank). The only arms that
+  reach 0.90 are the ones that are on almost all the time after the end (A2 0.915, always-on union
+  0.921). On the verified D5 and D16 pair, A2 lifts the share after the end from 0.68 to 0.82 (D16) and
+  from 0.45 to 0.55 (D5); the 0.90 target is not met. On days with no load-shift the rule costs under
+  0.001 points of pinball loss.
+lessons: >-
+  The snap-back is seen 2 days after the end at best, and the lag contamination is gone by then, so a
+  band held from that day widens forecasts that no longer need it. X3-syn's coverage after the end is
+  flat in the origin day (0.82 to 0.83 on days +1 to +4), which a better-timed rule cannot improve
+  much. Whether the gain of A2 and of the union band is more than extra width is untested.
+take_home_message: >-
+  Widening the forecast band for 7 days after a load-shift ends does not work better than widening it
+  on random days, because the lag network is already back to normal by the time the rule notices the
+  end. Only a band that is wide whenever the gate has been on lifts coverage after the end to about
+  0.92 on injected events, and on the real December pair to 0.82 and 0.55, below the 0.90 target, at
+  no measurable cost on days without a load-shift. The next step is a width-matched control, to test
+  whether those gains are more than extra width.
+advice:
+  - >-
+    Do not widen the band only for a fixed 7 days after the snap-back: the rule gains nothing over
+    random placement because the lags are clean by the time the gap collapses (A1 against A4, bank).
+  - >-
+    Compare any event-mode band with a width-matched control (the lag network scaled to the same mean
+    width) before reading a coverage gain as detection (A2 and Union, bank).
+  - >-
+    Report the real D5 and D16 pair as one event pair, and check a gate's state before the event
+    starts, because the D5 gate was already on 19 days earlier (verified events).
 production_status: not-for-production
 ---
 
-**Planned; the numbers will follow the scoring run.** The plan is committed before any score is read.
+**Widening the band for 7 days after the gap collapses covers the normal running arrangement (NRA) no
+better than widening it for 7 random days.** The rule is seen too late: the lag network is already
+back to normal when the gap collapses, so the wider band lands on forecasts that no longer need it.
+Only the arm that stays wide whenever the gate has been on (A2) lifts coverage after the end to about
+0.92 on injected events, and A2 is almost the same as a union band that is always on. Verdict: not
+supported.
 
-## Question
+Experiment 582 found that after a load-shift ends, the forecast's q05-q95 band holds the NRA (the
+power the substation would have drawn without the load-shift) on too few rows. We asked whether a rule
+that watches the gap between the recent power readings and a forecast made without them, and widens
+the band for 7 days after that gap collapses, closes the shortfall. We re-scored the stored X3-syn
+forecasts of [experiment 581](../00581-robust-multiweek-lag-encoder-x3/result.md) on 1,248 injected
+events and on the verified December load-shift, and compared the rule with the same rule fired on
+random days. The rule is a version of experiment 578's gate on the lags and experiment 582's union
+band; nothing is refitted.
 
-Experiment 582 found that, in the 7 days after a verified load-shift ends, the forecast bands hold
-the normal running arrangement (NRA) on too few rows: 0.40 of rows for v3+D5, 0.59 for X3-syn, and
-0.67 for a union band. The target is 0.90. This experiment asks whether a rule that watches the
-lag-versus-expectation gap, and widens the band for 7 days after the gap collapses, closes that gap.
+## Figures
 
-## Arms (all on experiment 581's stored X3-syn forecasts; no fit)
+![Share of the NRA inside q05-q95 by phase, injected events of 15 and 30 days, both groups](coverage90_15_and_30_days_both_groups.svg)
 
-- **V:** X3-syn with its lags (the reference).
-- **M:** the same weights with every lag masked (the only lag-free forecast X3-syn has stored).
-- **Union:** the widest of the two bands at every quantile level, with the lag median, on every row
-  (experiment 582's union band, the control).
-- **A1:** the union band for 7 days from the origin day a snap-back is seen, X3-syn elsewhere.
-- **A2:** the union band on origin days when the gate is on and for 7 days after the snap-back.
-- **A3:** A1 with the lags-masked median in place of the lag median during the 7 days.
-- **A4 (placebo):** A1 with the snap-backs moved to random origin days (same number per Primary, 20
-  draws).
+![Share of the NRA on the safe side of the band, injected events of 15 and 30 days, both groups](nra_side95_15_and_30_days_both_groups.svg)
 
-**The gate** (experiment 578's G1, own gap only): the daily mean of (observed minus the lags-masked
-median) at 24-48 h lead, the gap, is sustained when it keeps one sign and exceeds
-max(3 standard deviations of the Primary's event-free daily gap, 5% of capacity) on 3 consecutive
-days. **A snap-back** is the first origin day on which the newest gap day falls below half that
-threshold. Every day the gate reads is at least 24 h old at the 09:00 UTC origin (the newest day read
-is the origin day minus 2).
+![Coverage by phase on the verified D5 and D16 events](coverage90_verified_events.svg)
 
-## Evidence and scoring
+![False-alarm cost: pinball loss against X3-syn on days with no load-shift](false_alarm_cost.svg)
 
-- **Verified events:** the load-shifts of experiment 580 (descriptive; the verdict rests on the
-  December pair D5 and D16).
-- **Injected bank:** experiment 581's 1,248 Primary-events (lag-only injection, so the observed power
-  is the NRA); the gate reads the injected lags, which is the clean gap plus the injected shift.
-- **Event-free rows:** the false-alarm cost, width inflation, share of days active, false triggers per
-  Primary-year.
-- Row sets, phase windows, and the metric code are experiment 582's; weather comes from the run issued
-  at or before the origin minus 9 h; July 2026 is unused.
+![Share of days in event mode on days with no load-shift](share_days_in_event_mode.svg)
+
+Day-ahead forecasts around the verified pair (coloured strips mark origin days in event mode):
+
+![D5, verified load-shift](verified_D5_2025-12-29.svg)
+
+![D16, verified load-shift](verified_D16_2025-12-29.svg)
+
+Day-ahead forecasts around injected events (a fixed selection rule: month 2025-10, the
+lowest-numbered Primary of each group for three length, depth, and sign combinations):
+
+![Eight MVA Primaries, 15 days up 50%](injected_mva-only_15d_up_50pct.svg)
+
+![Eight MVA Primaries, 30 days down 30%](injected_mva-only_30d_down_30pct.svg)
+
+![Eight MVA Primaries, 7 days down 50%](injected_mva-only_7d_down_50pct.svg)
+
+![Six MW Primaries, 15 days up 50%](injected_signed-mw_15d_up_50pct.svg)
+
+![Six MW Primaries, 30 days down 30%](injected_signed-mw_30d_down_30pct.svg)
+
+![Six MW Primaries, 7 days down 50%](injected_signed-mw_7d_down_50pct.svg)
+
+Full stored horizon of one run (X3-syn stores 0 to 120 h only, so no 14-day horizon exists here):
+
+![Winter run](horizon_2025-12-30.svg)
+
+![Summer run](horizon_2026-06-10.svg)
+
+Other cuts (all lengths, each group alone) sit beside this page as `coverage90_*` and `nra_side95_*`.
+
+## Results
+
+- **Arms:** V is X3-syn with lags; M is the same weights with lags masked; Union is the widest of both
+  bands on every row (experiment 582's control); A1 is the union band for 7 days from the origin day
+  a snap-back is seen; A2 is the union band while the gate is on plus those 7 days; A3 is A1 with the
+  lags-masked median; A4 is A1 at random days (20 draws, same count per Primary).
+- **Gate:** own gap only (experiment 578's G1), 3 sustained days above max(3 standard deviations, 5%
+  of capacity), reading only days at least 24 h old (newest day read: origin day minus 2). Snap-back:
+  the newest gap day falls below half the threshold. Row set: the five fold months with stored X3-syn
+  forecasts; 24-120 h unless stated; July 2026 unused. Retraining: none; the weights are
+  experiment 581's.
+- **Injected bank, 24-120 h, 0-7 days after the end, 15 and 30 day events (672 Primary-events, both
+  groups), q05-q95 coverage with 95% event-bootstrap interval:**
+
+| Arm | Coverage after end | Days 4 to end |
+|---|---|---|
+| V (X3-syn) | 0.826 (0.816 to 0.837) | 0.844 |
+| M (lags masked) | 0.876 | 0.882 |
+| Union (always on) | 0.921 (0.915 to 0.927) | 0.921 |
+| A1 | 0.848 (0.839 to 0.857) | 0.844 |
+| A2 | 0.915 (0.909 to 0.922) | 0.880 |
+| A3 | 0.848 | 0.844 |
+| A4 (placebo) | 0.847 (0.837 to 0.856) | 0.856 |
+
+- **A1 against the placebo:** A1 minus A4 is +0.0014 (interval -0.0002 to +0.0031, audit). The hold
+  covers 25% of after-end rows, and a random hold covers 21%.
+- **Per group and length:** the same pattern holds at the eight MVA Primaries and the six MW Primaries
+  and at 7, 15, and 30 days (A1 within 0.004 of A4 except the six MW Primaries at 15 days, 0.871
+  against 0.867).
+- **Tails (24-120 h, injected 15 and 30 days, after the end):** NRA-side share at q05 or q95 is 0.848
+  (V), 0.869 (A1), 0.936 (A2), 0.941 (Union), against 0.95 nominal. Pinball at q01 and q99 and the
+  coverage at q01-q99 are in `bank_summary.csv` (private data folder).
+- **Verified D5 and D16 pair, after the end (descriptive; one transfer pair, not two independent
+  events):**
+
+| Event | V | A1 | A2 | Union |
+|---|---|---|---|---|
+| D16 | 0.677 | 0.703 | 0.822 | 0.822 |
+| D5 | 0.447 | 0.447 | 0.552 | 0.552 |
+
+- **D5 is not a detection result:** its gate turned on 19 days before the event, on a gap of the
+  opposite sign, and did not release until 14 days after the end. A2 equals Union there because the
+  gate was on, and A1 equals V because no snap-back fell inside the window.
+- **Timing on the bank:** the gate triggered on 83% to 88% of events, a median 4 to 6 days after the
+  onset, and the snap-back came a median 2 days after the end (87% of events). The gate does not fire
+  at Primaries with a high threshold (largest: 0.61 of capacity at one MVA Primary).
+- **Cost on days with no load-shift (24-120 h, mean pinball in points of capacity, A1 and A2 against
+  V):** at the eight MVA Primaries, q05-q95 band -0.0003 and +0.0002, q01-q99 band 0.0000 and
+  -0.0001; at the six MW Primaries exactly 0. The half-width of the Bonferroni interval (the minimum
+  detectable effect here) is under 0.001 for A1 and A2. For comparison, the always-on union changes
+  the same loss by -0.007 to +0.005 and widens the 90% band by 9% (eight) and 8% (six).
+- **Activity and false triggers:** the gate is on for 1.1% of event-free origin days at the eight MVA
+  Primaries and 0% at the six MW Primaries; there were 2 false triggers, 0.87 per Primary-year at the
+  eight MVA Primaries and 0.47 over all 16 Primaries (prediction: at most 1; fails above 3).
+- **Predictions:** P1 holds numerically (A1 0.848, and V already covers 0.844 from day 4 to the end)
+  but not because of the rule. P2 holds (cost under 0.001 points, under 1 false trigger per
+  Primary-year). P3 fails: the placebo's lift (+0.021) is 94% of A1's (+0.022), not under a quarter.
+  Bonferroni count: 16 (4 arms, 2 groups, 2 coverage bands, event-free rows).
+
+## Checks
+
+- **Median minus mean forecast, per site:** only 11 quantiles are stored, so the mean forecast does
+  not exist. As a proxy, X3-syn's median minus the mean of its 11 quantiles is -0.008 of capacity on
+  average (standard deviation 0.026), pooled over sites.
+- **Mean-forecast error beside the quantile contrasts:** not available, for the same reason; the
+  median's absolute error is in `event_free.csv` (`ae50`) and does not change for A1, A2, and A3
+  except through A3's median swap on held days.
+- **Triggers fired:** trigger 1 (a placebo control matched the rule). A fresh Sonnet audit
+  re-derived every headline number from the stored forecasts with its own code, and all reproduced.
+  It showed the placebo equals the rule because the injected contamination is gone before the
+  snap-back is seen. Triaged: accepted, and it is the finding of this page.
+- **Code review (before the first run):** a fresh Sonnet review found no leakage and six issues; four
+  were fixed (event-free rows and activity shares polluted by holds after real events, false-trigger
+  rate understated by month-start days that cannot trigger, misleading trigger-time rows, and a
+  point estimate that did not match its interval). Two were kept as caveats: the design limit that a
+  rule keyed on origin day covers about half of after-end rows (valid-time phases), and the gate
+  threshold being computed on all five months.
+
+## Caveats and what to try next
+
+- **Width is untested:** Union and A2 may gain coverage only because they are wider. A control that
+  scales X3-syn's band to the same mean width is the next test (not run).
+- **Only 2 verified events,** one transfer pair. The injected bank uses lag-only shifts with a
+  constant depth, with the observed power unchanged, so the gate sees the injected lags and not a
+  change in the power.
+- **Unlogged events:** NGED's logs may miss events, so the event-free rows may hold events no label
+  covers, the cost on them is optimistic, and the real-event slices undercount.
+- **Horizon:** X3-syn stores 0 to 120 h. NGED cares about 1 to 10 days, so these results cover the
+  short end only.
+- **Next:** a rule fired by the lags themselves (a robust z-score of the newest day lag) would act
+  at the snap-back itself rather than 2 days later; the gate cannot see the end earlier than the
+  24 h age rule allows.
+- **Reuse:** code in `ml-experiments/00583-after-snap-back-event-band-on-x3-syn/`, importing
+  experiments 578, 581, and 582; no fitted models, no new forecasts; tables in
+  `data/ml-experiments/00583-after-snap-back-event-band-on-x3-syn/`.
