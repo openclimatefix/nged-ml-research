@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, PLR0912, ANN001, ANN201, PLR0915, PT018, ANN202, D103
+# ruff: noqa: E501, E402, ANN001, ANN201, PLR0915, PT018, D103, D107, D102, PLW0603
 r"""Experiment 567: pretrain, fine-tune, and forecast the neighbour lag-encoder networks.
 
 Rows, cutoffs, recency weights, early stopping, lag columns, block dropout, the expected-input table
@@ -23,11 +23,11 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 _argv = sys.argv
 parser = argparse.ArgumentParser()
-parser.add_argument("command", choices=("worlds", "pretrain", "coarse", "select"))
+parser.add_argument("command", choices=("worlds", "pretrain", "coarse", "select", "pretrained"))
 parser.add_argument("--arms", nargs="+", default=[])
 parser.add_argument("--months", nargs="+", default=None)
 parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
@@ -81,7 +81,7 @@ def make_arm(*, tag: str) -> Arm:
     kind, rate, *rest = tag.split("-")
     assert rate in w.RATES, tag
     weight = float(rest[0][1:]) if rest else 0.1
-    table = {
+    table: dict[str, dict[str, Any]] = {
         "N0": {"use_nb": False},
         "N1": {"use_nb": True},
         "N2": {"use_nb": True, "shared": False},
@@ -94,7 +94,10 @@ def make_arm(*, tag: str) -> Arm:
 
 
 class Topology:
-    """The neighbour graph and its three versions (real, placebo, event pairs), the held-out split, and worlds' inputs."""
+    """The neighbour graph and its three versions (real, placebo, event pairs).
+
+    It also holds the held-out split and the worlds' inputs.
+    """
 
     def __init__(self) -> None:
         import e00402_inject as inj  # ty: ignore[unresolved-import]
@@ -237,7 +240,10 @@ def own_block(*, world, primary, target_idx, origin_idx, lead, extra_days=0) -> 
 def slots_of(
     *, primary: np.ndarray, day_idx: np.ndarray, week_idx: np.ndarray, nbr: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return (rows x 10) slot Primary and lag index arrays: own day, own week, then each neighbour's day and week."""
+    """Return (rows x 10) slot Primary and lag index arrays.
+
+    The slots are the own day, the own week, then each neighbour's day and week.
+    """
     sp = np.empty((len(primary), m.SLOTS), dtype=np.int64)
     si = np.empty_like(sp)
     sp[:, 0] = sp[:, 1] = primary
@@ -252,7 +258,10 @@ def slots_of(
 def lag_columns(
     *, world, code, clean, arr: dict, nbr, aux: bool, extra_days=0, real_mask=None
 ) -> dict:
-    """Return the own columns (n, 8), neighbour columns (n, 28), and, if `aux`, the flag and fraction labels, in chunks."""
+    """Return the own columns (n, 8) and neighbour columns (n, 28), in chunks.
+
+    If `aux`, also return the flag and fraction labels.
+    """
     n = len(arr["primary"])
     own = np.empty((n, 8), dtype=np.float32)
     nbc = np.empty((n, 28), dtype=np.float32)
@@ -260,9 +269,11 @@ def lag_columns(
     frac = np.empty((n, m.SLOTS), dtype=np.float16) if aux else None
     for a in range(0, n, 2_000_000):
         s = slice(a, a + 2_000_000)
-        kw = dict(
-            target_idx=arr["target_idx"][s], origin_idx=arr["origin_idx"][s], lead=arr["lead"][s]
-        )
+        kw = {
+            "target_idx": arr["target_idx"][s],
+            "origin_idx": arr["origin_idx"][s],
+            "lead": arr["lead"][s],
+        }
         own[s] = own_block(world=world, primary=arr["primary"][s], extra_days=extra_days, **kw)
         nbc[s] = nb_block(
             world=world, primary=arr["primary"][s], nbr=nbr, extra_days=extra_days, **kw
@@ -274,7 +285,7 @@ def lag_columns(
                 week_idx=own[s, 7].astype(np.int64),
                 nbr=nbr,
             )
-            flag[s], frac[s] = w.aux_labels(
+            flag[s], frac[s] = w.aux_labels(  # ty: ignore[invalid-assignment]
                 world=world,
                 clean=clean,
                 code=code,
@@ -286,7 +297,10 @@ def lag_columns(
 
 
 def mask_neighbours(*, x: torch.Tensor, ma: torch.Tensor, md: torch.Tensor) -> None:
-    """Apply experiment 558's block dropout to the neighbour lag columns, in place (the same masks as the own lags)."""
+    """Apply experiment 558's block dropout to the neighbour lag columns, in place.
+
+    The masks are the same as for the own lags.
+    """
     for j in range(m.K):
         c0 = m.NB0 + 6 * j
         for use, col, age in ((ma | md, c0, d.AGE_MAX_DAY), (ma, c0 + 3, d.AGE_MAX_WEEK)):
@@ -333,7 +347,7 @@ class NbGpuMonth(b.LagGpuMonth):
             for j in range(m.K):
                 flag[day, 2 + 2 * j] = -1
                 flag[week, 3 + 2 * j] = -1
-            t["aux_flag"], t["aux_frac"] = flag, self.aux_frac[sel]
+            t["aux_flag"], t["aux_frac"] = flag, self.aux_frac[sel]  # ty: ignore[not-subscriptable]
         return t
 
 
@@ -445,8 +459,8 @@ class Cell:
         model.table = b.CTX["table_ft"]
         b.load_pretrained(model=model, path=pretrained_path(arm=arm, month=self.month, seed=seed))
         if arm.aux:  # the pretrained head read mixer_pre's hidden layer; mixer_ft is fresh
-            torch.nn.init.zeros_(model.aux_head.weight)
-            torch.nn.init.zeros_(model.aux_head.bias)
+            torch.nn.init.zeros_(model.aux_head.weight)  # ty: ignore[invalid-argument-type, unresolved-attribute]
+            torch.nn.init.zeros_(model.aux_head.bias)  # ty: ignore[invalid-argument-type, unresolved-attribute]
         model.to(self.device)
         aux = (t["aux_flag"], t["aux_frac"]) if arm.aux else None
         train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
@@ -455,15 +469,18 @@ class Cell:
         return model
 
     def variants(self, *, arm: Arm, held: dict) -> dict[str, np.ndarray]:
-        """Return the test inputs to score: as observed, removed, aged by 1 to 3 days, neighbour lags removed, held-out worlds."""
+        """Return the test inputs to score.
+
+        The variants are: as observed, removed, aged by 1 to 3 days, neighbour lags removed, held-out worlds.
+        """
         nbr = topo().index[arm.graph]
         test = self.test
-        kw = dict(
-            primary=test.primary,
-            target_idx=test.target_idx,
-            origin_idx=test.origin_idx,
-            lead=test.lead,
-        )
+        kw = {
+            "primary": test.primary,
+            "target_idx": test.target_idx,
+            "origin_idx": test.origin_idx,
+            "lead": test.lead,
+        }
         nb_real = nb_block(world=self.clean, nbr=nbr, **kw)
         out = {"base": widen73(x45=test.x, nb=nb_real)}
         for name in ("removed", "aged1", "aged2", "aged3"):
@@ -521,7 +538,10 @@ def model_path(*, tag: str, month: str, key: str, seed: int) -> Path:
 
 
 def aux_loss(*, logit, frac, flag, target, pos_weight: float) -> torch.Tensor:
-    """Binary cross-entropy with a positive-class weight on the labelled slots, plus a smooth-L1 term on the signed fraction."""
+    """Binary cross-entropy with a positive-class weight on the labelled slots.
+
+    A smooth-L1 term on the signed fraction is added.
+    """
     keep = flag >= 0
     n = keep.sum().clamp(min=1)
     y = flag.clamp(min=0).float()
@@ -631,7 +651,7 @@ def cmd_worlds() -> None:
         for month in MONTHS:
             for seed in ARGS.seeds:
                 started = time.monotonic()
-                power, code = train_world(
+                _power, code = train_world(
                     arm=arm, month=month, seed=seed, clean=cclean if arm.corrected else clean
                 )
                 n = cut_index(month=month)
@@ -832,11 +852,14 @@ def cmd_coarse() -> None:
 
 
 def cmd_select() -> None:
-    """Score each named arm's saved coarse model on held-out synthetic events of the 60 days before the cutoff (never the scored month).
+    """Score each named arm's saved coarse model on held-out synthetic events.
 
-    The rows are the fine-tuning rows with valid time in those 60 days (their targets were fitted, the same
-    for every arm), with the lags replaced by a held-out-pair world that ends at the cutoff. The score is
-    the mean mixture negative log-likelihood; the rate and the auxiliary weight are chosen on it.
+    The events fall in the 60 days before the cutoff (never the scored month).
+
+    The rows are the fine-tuning rows with valid time in those 60 days (their targets were
+    fitted, the same for every arm), with the lags replaced by a held-out-pair world that ends at
+    the cutoff. The score is the mean mixture negative log-likelihood; the rate and the auxiliary
+    weight are chosen on it.
     """
     t = topo()
     out: dict = {}
@@ -894,7 +917,64 @@ def cmd_select() -> None:
     c.write_json(obj=out, path=WORK / f"select_{'-'.join(ARGS.arms)}.json")
 
 
+def cmd_pretrained() -> None:
+    """Forecast the month with each arm's pretrained network alone (no fine-tuning; inference only).
+
+    The pretrained network is the `pre`-stage network (no spread or lead inputs), loaded from the
+    arm's pretrained weights and run on the same test rows and scoring variants as the fine-tuned
+    arms. Forecasts go to `seed_preds/<arm>-pre` and `<arm>-pre-<variant>`.
+    """
+    for month in MONTHS:
+        arms = [make_arm(tag=a) for a in ARGS.arms]
+        for corrected in sorted({a.corrected for a in arms}):
+            cell = Cell(month=month, device="cuda", corrected=corrected)
+            cut = c.month_start(month=month)
+            lo, hi = c.us(t=cut), c.us(t=c.month_stop(month=month))
+            first_day = cut_index(month=month) - 14 * 48
+            for arm in [a for a in arms if a.corrected == corrected]:
+                for seed in ARGS.seeds:
+                    out = W / "seed_preds" / f"{arm.tag}-pre" / f"{month}_s{seed}.parquet"
+                    if out.exists():
+                        continue
+                    held = {
+                        name: heldout_world(
+                            kind=kind,
+                            month=month,
+                            seed=seed,
+                            clean=cell.clean,
+                            first=first_day,
+                            last=cell.test.target_idx.max().item() + 1,
+                            tag=f"fold{month}",
+                            corrected=corrected,
+                        )
+                        for kind, name in (("exact", "hx"), ("imperfect", "hi"))
+                    }
+                    model = new_net(arm=arm, n_primaries=cell.n_primaries, stage="pre")
+                    model.load_state_dict(
+                        torch.load(
+                            pretrained_path(arm=arm, month=month, seed=seed), map_location="cpu"
+                        )
+                    )
+                    model = model.to("cuda").eval()
+                    model.table = b.CTX["table_pre"] if "table_pre" in b.CTX else b.CTX["table_ft"]
+                    model.table = b.CTX["table_ft"]
+                    frame, extra = cell.forecast(model=model, arm=arm, lo=lo, hi=hi, held=held)
+                    for name, fr in extra.items():
+                        b._atomic_frame(
+                            frame=fr, target=W / "seed_preds" / f"{arm.tag}-pre-{name}" / out.name
+                        )
+                    b._atomic_frame(frame=frame, target=out)
+                    print(f"{arm.tag}-pre {month} s{seed}: {frame.height} rows", flush=True)
+                    del model
+            del cell
+            torch.cuda.empty_cache()
+
+
 if __name__ == "__main__":
-    {"worlds": cmd_worlds, "pretrain": cmd_pretrain, "coarse": cmd_coarse, "select": cmd_select}[
-        ARGS.command
-    ]()
+    {
+        "worlds": cmd_worlds,
+        "pretrain": cmd_pretrain,
+        "coarse": cmd_coarse,
+        "select": cmd_select,
+        "pretrained": cmd_pretrained,
+    }[ARGS.command]()

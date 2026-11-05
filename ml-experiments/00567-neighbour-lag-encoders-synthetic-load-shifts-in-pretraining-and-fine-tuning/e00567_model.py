@@ -1,24 +1,31 @@
-# ruff: noqa: E501, ANN001, ANN201
-"""The modular demand network of experiment 567: experiment 560's lag encoder (variant 3) plus neighbour lag encoders.
+# ruff: noqa: E501
+"""The modular demand network of experiment 567.
 
-Input columns follow experiment 560's 45 (37 lag-free columns, then the own day and week lag value,
-missing flag, and age in 37-42, then the grid index of the day and week lag times in 43-44). New:
+It is experiment 560's lag encoder (variant 3) plus neighbour lag encoders.
 
-- 45-68: for each of 4 neighbour slots `j`, six columns at `45 + 6 j`: the neighbour's day lag value,
-  missing flag, age, then its week lag value, missing flag, age (same lag times as the own lags);
+Input columns follow experiment 560's 45 (37 lag-free columns, then the own day and week lag
+value, missing flag, and age in 37-42, then the grid index of the day and week lag times in
+43-44). New:
+
+- 45-68: for each of 4 neighbour slots `j`, six columns at `45 + 6 j`: the neighbour's day lag
+  value, missing flag, age, then its week lag value, missing flag, age (same lag times as the own
+  lags);
 - 69-72: the neighbour's Primary index as a float, -1 where the slot is empty.
 
 Flags (the arms):
 
-- `use_nb=False`: the network of experiment 560 (variant 3); columns 45 and up are ignored (arm N0);
-- `use_nb=True`: each present neighbour's lags, the expected weather and datetime embeddings at the
-  lag's own time and place (copies of the weather and datetime encoders, same weights, run on that
-  neighbour's table row and Primary embedding), the neighbour's Primary embedding, and the target
-  Primary's embedding go through one neighbour encoder; the K outputs are pooled by mean and by
-  attention over the target's embedding, masked for empty slots, and joined to the mixer's inputs;
+- `use_nb=False`: the network of experiment 560 (variant 3); columns 45 and up are ignored (arm
+  N0);
+- `use_nb=True`: each present neighbour's lags, the expected weather and datetime embeddings at
+  the lag's own time and place (copies of the weather and datetime encoders, same weights, run on
+  that neighbour's table row and Primary embedding), the neighbour's Primary embedding, and the
+  target Primary's embedding go through one neighbour encoder; the K outputs are pooled by mean
+  and by attention over the target's embedding, masked for empty slots, and joined to the mixer's
+  inputs;
 - `shared=False`: one neighbour encoder per target Primary (arm N2);
-- `aux=True`: a linear head on the mixer's last hidden layer gives, for each of the 10 lag slots (own day
-  and week, then each neighbour's day and week), one flag logit and one signed fraction (arm N1-aux).
+- `aux=True`: a linear head on the mixer's last hidden layer gives, for each of the 10 lag slots
+  (own day and week, then each neighbour's day and week), one flag logit and one signed fraction
+  (arm N1-aux).
 """
 
 from typing import Final

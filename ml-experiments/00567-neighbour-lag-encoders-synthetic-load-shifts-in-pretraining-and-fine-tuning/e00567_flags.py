@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, ANN001, ANN201, PLR0915, D103
+# ruff: noqa: E501, E402, D103, N812
 r"""Score the auxiliary flag head of the N1-aux arm on held-out synthetic events and on real labelled events.
 
 For each fold and fit seed the script loads the saved coarse fine-tuned model, computes the flag logit
@@ -96,12 +96,6 @@ def main() -> None:
         cell = F.Cell(month=month, device="cuda")
         nbr = t.index[arm.graph]
         test = cell.test
-        kw = {
-            "primary": test.primary,
-            "target_idx": test.target_idx,
-            "origin_idx": test.origin_idx,
-            "lead": test.lead,
-        }
         first = F.cut_index(month=month) - 14 * 48
         for seed in ARGS.seeds:
             held = {}
@@ -128,7 +122,7 @@ def main() -> None:
                     for a in range(0, len(x), 65_536):
                         xb = torch.from_numpy(x[a : a + 65_536]).to("cuda")
                         pb = torch.from_numpy(test.primary[a : a + 65_536]).to("cuda")
-                        logits[a : a + 65_536] = model.forward_aux(xb, pb)[1].float().cpu().numpy()
+                        logits[a : a + 65_536] = model.forward_aux(xb, pb)[1].float().cpu().numpy()  # ty: ignore[call-non-callable]
                 day = x[:, 43].astype(np.int64)
                 week = x[:, 44].astype(np.int64)
                 sp, si = F.slots_of(primary=test.primary, day_idx=day, week_idx=week, nbr=nbr)

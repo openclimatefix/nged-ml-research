@@ -1,14 +1,17 @@
-# ruff: noqa: E501, PLR0912, PLR0915, ANN001, ANN201
-r"""Synthetic load-shift worlds, the neighbour graph, and the auxiliary-flag labels of experiment 567.
+# ruff: noqa: E501, PLR0912, PLR0915, PT018
+r"""Synthetic load-shift worlds, the neighbour graph, and the auxiliary-flag labels.
 
-The injection is experiment 402's `inject()` (copied here, not edited) with three added parameters:
-`gain_range` (the share of the donor's loss that a recipient gains: 1.0 conserves load exactly, and
-experiment 459 measured 60% to 100% in real events), `spike_share`, and `require_recipient` (held-out
-worlds keep only events that have a recipient, so that every scored event carries a mirror).
+These are the pieces of experiment 567 that build its training and held-out worlds.
 
-A world is the clean power of the 16 Primaries (capacity fraction, NaN where flagged or cut) with
-synthetic events added to it, plus the event code per half-hour. Training worlds only change the lags:
-the training target is always the clean series.
+The injection is experiment 402's `inject()` (copied here, not edited) with three added
+parameters: `gain_range` (the share of the donor's loss that a recipient gains: 1.0 conserves
+load exactly, and experiment 459 measured 60% to 100% in real events), `spike_share`, and
+`require_recipient` (held-out worlds keep only events that have a recipient, so that every
+scored event carries a mirror).
+
+A world is the clean power of the 16 Primaries (capacity fraction, NaN where flagged or cut)
+with synthetic events added to it, plus the event code per half-hour. Training worlds only
+change the lags: the training target is always the clean series.
 
 ```bash
 PYTHONPATH=<every experiment folder> uv run --no-sync python ml-experiments/00567-*/e00567_world.py selftest
@@ -18,7 +21,7 @@ PYTHONPATH=<every experiment folder> uv run --no-sync python ml-experiments/0056
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00402_inject as inj  # ty: ignore[unresolved-import]
 import e00402_worlds as worlds402  # ty: ignore[unresolved-import]
@@ -184,7 +187,10 @@ def neighbour_graph(*, ctx: worlds402.Context) -> dict[str, list[str]]:
 
 
 def held_out_pairs(*, graph: dict[str, list[str]], seed: int = 0) -> set[frozenset[str]]:
-    """Return a third of the undirected neighbour pairs, chosen so that every Primary keeps a training neighbour when it has one."""
+    """Return a third of the undirected neighbour pairs.
+
+    The pairs are chosen so that every Primary keeps a training neighbour when it has one.
+    """
     pairs = sorted({frozenset((a, b)) for a, nbs in graph.items() for b in nbs}, key=sorted)
     rng = np.random.default_rng(seed)
     order = rng.permutation(len(pairs))
@@ -239,8 +245,8 @@ def event_pair_index(
 ) -> np.ndarray:
     """Return (primaries, K) neighbour indices from the label table's `pair` column (arm N4).
 
-    A pair names two Primaries (as `D5 / D8` style text); every pair among the 16 Primaries makes both
-    members neighbours of one another, ordered by index.
+    A pair names two Primaries (as `D5 / D8` style text); every pair among the 16 Primaries makes
+    both members neighbours of one another, ordered by index.
     """
     pairs: set[frozenset[str]] = set()
     for text in table["pair"].drop_nulls().to_list():
@@ -280,7 +286,10 @@ class WorldSpec:
 
 
 def real_share_of_days(*, table: pl.DataFrame, n_primaries: int) -> float:
-    """Return the share of Primary-days that a labelled event with a Primary named touches, over the table's span."""
+    """Return the share of Primary-days that a labelled event with a Primary named touches.
+
+    The share is taken over the table's span.
+    """
     usable = table.filter(pl.col("first_primary").is_not_null())
     onset = usable["onset_utc"].str.to_datetime().dt.date().to_numpy().astype("datetime64[D]")
     end = usable["end_utc"].str.to_datetime().dt.date().to_numpy().astype("datetime64[D]")
@@ -314,9 +323,10 @@ def build_world(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (power, code), each (primaries, grid), for a world; cached on disk.
 
-    `kind` is `train` (training graph, mixed exact and 60%-100% conservation, no spikes: a spike is a reading error, not a load transfer) or
-    `exact` / `imperfect` (held-out pairs only, every event has a recipient, no spikes). Events end
-    before `last`. The base is `clean` with real labelled events (padded) excluded.
+    `kind` is `train` (training graph, mixed exact and 60%-100% conservation, no spikes: a spike
+    is a reading error, not a load transfer) or `exact` / `imperfect` (held-out pairs only, every
+    event has a recipient, no spikes). Events end before `last`. The base is `clean` with real
+    labelled events (padded) excluded.
     """
     path = spec.file()
     if path.exists():
@@ -346,8 +356,9 @@ def build_world(
         }
         if spec.kind == "train":
             # Half of the events conserve exactly, half give the recipient 60% to 100% of the loss.
-            # Two runs on disjoint halves of the grid would change coverage; instead alternate by seed parity per event
-            # inside one run by drawing the gain range per call: run twice with half the coverage on the same mask.
+            # Two runs on disjoint halves of the grid would change coverage; instead alternate by
+            # seed parity per event inside one run by drawing the gain range per call: run twice
+            # with half the coverage on the same mask.
             injected_a = inject(power={s: clean[i].astype(np.float64) for i, s in enumerate(labels)},
                                 capacity_mw=ctx.capacity, neighbours=graph, magnitude_only=ctx.magnitude_only,
                                 spike_mad_mw=ctx.stage1_mad_mw, pool=pool, first=lo, last=last,
@@ -389,12 +400,15 @@ def aux_labels(
     slot_idx: np.ndarray,
     real_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return (flag, fraction) for lag slots: flag 1 positive, 0 negative, -1 excluded; fraction float16.
+    """Return (flag, fraction) for lag slots.
 
-    `slot_primary` and `slot_idx` are (rows, slots) arrays (Primary index, lag grid index). A slot
-    is excluded when the lag is missing (no index, or NaN in the world) or the injected change is
-    below `FLAG_MIN_FRACTION` of capacity inside a synthetic event (too small to identify). The
-    fraction is the injected change over the clean level, floored at `FRACTION_FLOOR`.
+    The flag is 1 for positive, 0 for negative, and -1 for excluded. The fraction is float16.
+
+    `slot_primary` and `slot_idx` are (rows, slots) arrays (Primary index, lag grid index). A
+    slot is excluded when the lag is missing (no index, or NaN in the world) or the injected
+    change is below `FLAG_MIN_FRACTION` of capacity inside a synthetic event (too small to
+    identify). The fraction is the injected change over the clean level, floored at
+    `FRACTION_FLOOR`.
     """
     ok = (slot_primary >= 0) & (slot_idx >= 0)
     p = np.clip(slot_primary, 0, None)
@@ -424,14 +438,16 @@ def selftest() -> None:
     graph = {s: [t for t in sites if t != s][:2] for s in sites}
     pool = inj.EventPool(share=np.array([-0.05, -0.1, 0.2, -0.3]), steps=np.array([5, 20, 96, 500]))
     first, last = inj.TRAILING_STEPS, n - 48 * 30
-    kw = dict(power=power, capacity_mw=cap, neighbours=graph, magnitude_only={"D5", "D6"},
-              spike_mad_mw=dict.fromkeys(sites, 0.3), pool=pool, first=first, last=last, coverage=0.10, seed=1)  # fmt: skip
+    kw: dict[str, Any] = {"power": power, "capacity_mw": cap, "neighbours": graph, "magnitude_only": {"D5", "D6"},
+              "spike_mad_mw": dict.fromkeys(sites, 0.3), "pool": pool, "first": first, "last": last, "coverage": 0.10, "seed": 1}  # fmt: skip
     ref = inj.inject(**kw)
     mine = inject(**kw)
     assert all(np.array_equal(ref.power[s], mine.power[s]) for s in sites), (
         "copy differs from experiment 402"
     )
-    strict = dict(kw, require_recipient=True, spike_share=0.0, no_recipient_share=0.0)
+    strict: dict[str, Any] = dict(
+        kw, require_recipient=True, spike_share=0.0, no_recipient_share=0.0
+    )
     for gain, conserved in ((GAIN_EXACT, True), (GAIN_IMPERFECT, False)):
         world = inject(**strict, gain_range=gain)
         net = sum((world.power[s] - power[s]) * cap[s] for s in sites)
@@ -446,7 +462,9 @@ def selftest() -> None:
     assert {frozenset((a, b)) for a, v in test_g.items() for b in v} == pairs
     labels = sites
     idx = neighbour_index(graph=graph, labels=labels)
-    assert idx.shape == (6, K_NEIGHBOURS) and (idx[:, 2:] == -1).all() and (idx[:, :2] >= 0).all()
+    assert idx.shape == (6, K_NEIGHBOURS)
+    assert (idx[:, 2:] == -1).all()
+    assert (idx[:, :2] >= 0).all()
     plc = placebo_index(graph=graph, labels=labels)
     for p, s in enumerate(labels):
         assert all(labels[j] not in graph[s] and labels[j] != s for j in plc[p] if j >= 0)
@@ -456,7 +474,8 @@ def selftest() -> None:
     sp = np.array([[0, 1], [2, 3]])
     si = np.array([[100, 100], [5000, 6000]])
     flag, frac = aux_labels(world=world, clean=clean_arr, code=code, slot_primary=sp, slot_idx=si)
-    assert flag.shape == (2, 2) and frac.dtype == np.float16
+    assert flag.shape == (2, 2)
+    assert frac.dtype == np.float16
     hit = np.argwhere(code != inj.NONE)
     s0, t0 = int(hit[0][0]), int(hit[0][1])
     f1, _ = aux_labels(

@@ -1,20 +1,21 @@
-# ruff: noqa: E501, ANN001, ANN201, PLR0912, PLR0915, D103
+# ruff: noqa: E501, PLR0912, PLR0915, D103, D107
 r"""Score the arms of experiment 567 on every slice of the plan.
 
-Forecasts are read from `work/seed_preds/<arm>[-<variant>]/<month>_s<seed>.parquet` (two fit seeds,
-pooled by averaging the quantiles, as experiment 470 does). CRPS is in points of capacity, from the
-11 stored quantiles, against the metered actual (the clean series), or against experiment 435's
-NRA-corrected actual (depth factor 1.0) inside labelled events.
+Forecasts are read from `work/seed_preds/<arm>[-<variant>]/<month>_s<seed>.parquet` (two fit
+seeds, pooled by averaging the quantiles, as experiment 470 does). CRPS is in points of
+capacity, from the 11 stored quantiles, against the metered actual (the clean series), or
+against experiment 435's NRA-corrected actual (depth factor 1.0) inside labelled events.
 
-Slices: all rows by lead band at the eight, the six, and the two report-only Primaries; rows with no
-labelled event; rows whose target lies inside a labelled event (padded 1 day before and after, plus
-the 2 days after), split by whether the recipient is named and is another Primary; rows whose own
-lag lies inside a labelled event; held-out synthetic events (variants `hx` exact conservation and `hi`
-60% to 100%); every arm's lags-removed, aged, and neighbour-lags-removed variants.
+Slices: all rows by lead band at the eight, the six, and the two report-only Primaries; rows
+with no labelled event; rows whose target lies inside a labelled event (padded 1 day before and
+after, plus the 2 days after), split by whether the recipient is named and is another Primary;
+rows whose own lag lies inside a labelled event; held-out synthetic events (variants `hx` exact
+conservation and `hi` 60% to 100%); every arm's lags-removed, aged, and neighbour-lags-removed
+variants.
 
-The Bonferroni count is `TESTS` (the counted contrasts of the plan). The minimum detectable effect is
-1.96 * sqrt(2) times the pooled within-month standard deviation of the contrast across the two
-fit seeds, over sqrt(2), as in experiment 566's scorer.
+The Bonferroni count is `TESTS` (the counted contrasts of the plan). The minimum detectable
+effect is 1.96 * sqrt(2) times the pooled within-month standard deviation of the contrast across
+the two fit seeds, over sqrt(2), as in experiment 566's scorer.
 """
 
 import argparse
@@ -24,9 +25,9 @@ from pathlib import Path
 from typing import Final
 
 import e00087_common as common  # ty: ignore[unresolved-import]
+import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00404_report as report404  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
-import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00521_stats as s  # ty: ignore[unresolved-import]
 import e00560_data as d  # ty: ignore[unresolved-import]
 import e00567_world as w  # ty: ignore[unresolved-import]
@@ -71,8 +72,11 @@ VARIANTS: Final[tuple[str, ...]] = (
 
 
 def folder_of(*, arm: str) -> Path:
-    """Return the folder holding an arm's forecasts: this experiment's work folder, or experiment 566's for C0 and C1."""
-    return W566 if arm.split("-")[0] in {"C0", "C1"} else W
+    """Return the folder holding an arm's forecasts.
+
+    That is this experiment's work folder, or experiment 566's for C0 and C1.
+    """
+    return W566 if arm.split("-", maxsplit=1)[0] in {"C0", "C1"} else W
 
 
 def pooled(*, arm: str, month: str, seeds: tuple[int, ...] | None = None) -> pl.DataFrame:
@@ -251,15 +255,18 @@ def mde(
 def cluster_stats(
     *, diff: np.ndarray, cluster: np.ndarray, rng: np.random.Generator, tests: int = TESTS
 ) -> dict:
-    """Return the mean of `diff` and event-cluster bootstrap intervals (95% and Bonferroni), with the number of clusters."""
+    """Return the mean of `diff` and event-cluster bootstrap intervals.
+
+    The intervals are 95% and Bonferroni, and the number of clusters is returned too.
+    """
     ok = np.isfinite(diff)
     diff, cluster = diff[ok], cluster[ok]
     codes, inverse = np.unique(cluster, return_inverse=True)
     total = np.bincount(inverse, weights=diff, minlength=len(codes))
     count = np.bincount(inverse, minlength=len(codes)).astype(float)
     out: dict = {
-        "n": int(len(diff)),
-        "clusters": int(len(codes)),
+        "n": len(diff),
+        "clusters": len(codes),
         "difference": float(diff.mean()) if len(diff) else float("nan"),
     }
     if len(codes) < 2:
@@ -273,17 +280,94 @@ def cluster_stats(
     return out
 
 
+def heldout_mask(
+    *, month: str, seed: int, variant: str, rows: pl.DataFrame, nbr: np.ndarray
+) -> np.ndarray:
+    """Return rows whose own or neighbour lag lies inside a synthetic held-out-pair event of that fold's world."""
+    kind = {"hx": "exact", "hi": "imperfect"}[variant]
+    spec = w.WorldSpec(kind=kind, rate="r21", month=month, seed=seed, gain=f"heldfold{month}")
+    code = np.load(spec.file())["code"]
+    primary = rows["primary"].to_numpy()
+    hit = np.zeros(len(primary), dtype=bool)
+    for idx in (rows["day_idx"].to_numpy(), rows["week_idx"].to_numpy()):
+        i = np.clip(idx, 0, code.shape[1] - 1)
+        hit |= (code[primary, i] != 0) & (idx >= 0)
+        for j in range(nbr.shape[1]):
+            nid = nbr[primary, j]
+            hit |= (nid >= 0) & (code[np.where(nid >= 0, nid, 0), i] != 0) & (idx >= 0)
+    return hit
+
+
+def heldout_tables(
+    *, arms: list[str], contrasts: list[str], month_rows_: dict[str, pl.DataFrame], nbr: np.ndarray
+) -> None:
+    """Score the held-out synthetic-event variants (`hx`, `hi`) per seed; write `heldout.csv` (arms) and `heldout_contrasts.csv`."""
+    rng = np.random.default_rng(1)
+    names = list(dict.fromkeys([*arms, *[x for p in contrasts for x in p.split(":")[:2]]]))
+    absolute, out_c = [], []
+    for var in ("hx", "hi"):
+        for group in ("mva_eight", "signed_six"):
+            vals: dict[str, list[np.ndarray]] = {n: [] for n in names}
+            diffs: dict[str, list[np.ndarray]] = {p: [] for p in contrasts}
+            cl: list[np.ndarray] = []
+            for m in MONTHS:
+                r = month_rows_[m]
+                lead = r["lead_hours"].to_numpy()
+                for sd in SEEDS:
+                    sel = (
+                        heldout_mask(month=m, seed=sd, variant=var, rows=r, nbr=nbr)
+                        & (r["group"] == group).to_numpy()
+                        & (lead >= 24)
+                        & (lead < 120)
+                    )
+                    crps = {
+                        n: per_seed(arm=f"{n}-{var}", month=m, seed=sd, rows=r)[sel] for n in names
+                    }
+                    for n in names:
+                        vals[n].append(crps[n])
+                    for p in contrasts:
+                        a, b = p.split(":")[:2]
+                        diffs[p].append(crps[a] - crps[b])
+                    cl.append(
+                        r["primary"].to_numpy()[sel] * 1000
+                        + r["day"].to_numpy()[sel] // 14
+                        + 100 * MONTHS.index(m)
+                        + 10_000 * sd
+                    )
+            for n in names:
+                v = np.concatenate(vals[n])
+                absolute.append(
+                    {
+                        "variant": var,
+                        "group": group,
+                        "band": BAND_24_120,
+                        "arm": n,
+                        "n": len(v),
+                        "crps": float(np.nanmean(v)),
+                    }
+                )
+            for p in contrasts:
+                a, b = p.split(":")[:2]
+                out_c.append({"variant": var, "group": group, "band": BAND_24_120, "contrast": f"{a} - {b}", "tests": TESTS,
+                              **cluster_stats(diff=np.concatenate(diffs[p]), cluster=np.concatenate(cl), rng=rng)})  # fmt: skip
+    pl.DataFrame(absolute).write_csv(WORK / "scores/heldout.csv")
+    pl.DataFrame(out_c).write_csv(WORK / "scores/heldout_contrasts.csv")
+
+
 def main() -> None:
-    global MONTHS, SEEDS  # noqa: PLW0603
+    global MONTHS, SEEDS
     parser = argparse.ArgumentParser()
     parser.add_argument("--arms", nargs="+", required=True)
     parser.add_argument(
         "--contrasts", nargs="*", default=[], help="a:b pairs; add :counted to count"
     )
+    parser.add_argument(
+        "--heldout", action="store_true", help="also score the -hx and -hi variants"
+    )
     parser.add_argument("--months", nargs="+", default=list(MONTHS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(SEEDS))
     args = parser.parse_args()
-    MONTHS, SEEDS = tuple(args.months), tuple(args.seeds)
+    MONTHS, SEEDS = tuple(args.months), tuple(args.seeds)  # ty: ignore[invalid-assignment]
     arms = args.arms
     ev = Events()
     clean = c.clean_stack()
@@ -316,7 +400,7 @@ def main() -> None:
         for group in ("mva_eight", "signed_six", "report_only"):
             for band, (lo, hi) in bands.items():
                 for arm in names:
-                    vals, n = [], 0
+                    vals, _n = [], 0
                     for m in MONTHS:
                         r = month_rows_[m]
                         sel = (
@@ -388,6 +472,8 @@ def main() -> None:
     WORK.joinpath("scores").mkdir(parents=True, exist_ok=True)
     pl.DataFrame(absolute).write_csv(WORK / "scores/absolute.csv")
     pl.DataFrame(contrasts).write_csv(WORK / "scores/contrasts.csv")
+    if args.heldout:
+        heldout_tables(arms=arms, contrasts=args.contrasts, month_rows_=month_rows_, nbr=ctx_nbr)
     print(json.dumps({"absolute": len(absolute), "contrasts": len(contrasts)}))
 
 
