@@ -40,7 +40,11 @@ def main():
             x2="high_bonferroni_month:Q",
         )
         dot = base.mark_point(color=theme.BRAND_ORANGE, filled=True, size=60, aria=False).encode(x="difference:Q")  # ty: ignore[unresolved-attribute]  # fmt: skip
-        zero = alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="black").encode(x="x:Q")  # fmt: skip
+        zero = (
+            alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())
+            .mark_rule(color="black")
+            .encode(x="x:Q")
+        )  # ty: ignore[unresolved-attribute]
         panels.append(alt.layer(zero, bar, dot).properties(width=470, height=100, title=alt.TitleParams(label, anchor="start")))  # fmt: skip
     chart = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
