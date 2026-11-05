@@ -76,28 +76,41 @@ own commit, before any GPU fit starts.
 - **Reference.** Experiment 500's 28-day median shift (A-pool, per lead band) cut q99 pinball by
   13%; this stage uses a per-Primary mean over all leads and does not reproduce 500's table.
 
-## Stages 2 to 4: the model designs (GPU, after experiment 559 has merged)
+## Step R: five-seed replication of A10 against M0 (GPU)
 
-Step R first (A10 against M0, seeds 0 to 4, five folds), then designs 3, 5, 4, and 2, as the brief
-`drift_embedding_variants_brief.md` orders them. The details are added in the stage 2 commit.
+- **Fits.** A10 seeds 2 to 4 are new fits with experiment 559's code, run in place; seeds 0 and 1 are
+  experiment 559's. M0 seeds 0 to 4 are experiment 554's. Both sets are daily-refit fits on the five
+  folds of 511, so the pairs match by fold and seed. Each seed is scored on its own (widened by 1.15,
+  as the stored row tables are) and the contrast of a row is the mean over seeds of the paired
+  difference.
+- **Counted contrasts: 8.** Two row sets (the eight and the six) x three lead bands (24-48, 48-72, and
+  72-120 h), and the cold-night rows of each set at 24-120 h (3 folds hold cold nights). The
+  minimum detectable effect is 1.96 x the seed-to-seed standard deviation of the contrast, pooled
+  within folds, divided by the square root of 5.
+- **Leak.** The injected 7-day shift of experiment 511 on all five seeds of both arms (M0 seeds 1 to 4
+  are new fits run with experiment 554's code). Real-event leak from experiment 556's harness is not
+  run here.
 
-## Stage 1 result (interim and unaudited)
+## Stages 2 to 4: the model designs (coarse screening, GPU)
 
-**Adding a mean of the network's own recent residuals made the forecast worse and passed an injected
-load-shift almost straight through, so design 6 is not worth carrying forward.** Both pre-registered
-conditions failed.
-
-- **CRPS (corrected minus base, positive is worse), 24 to 120 h.** Against M0, the eight rose by 0.169
-  (28-day half-life) and 0.166 (90-day), and the six by 0.053 and 0.051. The Bonferroni month-block
-  intervals (5 blocks, near the minimum to maximum) are -0.03 to 0.41 at the eight and -0.26 to 0.23 at
-  the six, so a harm is not shown. The 12 counted contrasts all have intervals that include zero. The
-  minimum detectable effect of experiment 545's two seeds is 0.10 to 0.17 beside each contrast, and the
-  point estimates sit inside it. At the eight the contrast is positive in 3 to 4 of 5 folds.
-- **Gap to A-pool.** At the eight, M0 is 0.070 CRPS above A-pool at 24 to 120 h, and the correction
-  moves it further away (share of the gap closed -2.4), so the "closes at least 25%" prediction fails.
-- **Injected load-shift.** The correction alone adds 19.7 points of capacity of leak (28-day) and 19.6
-  (90-day), mean of 5 folds, against 7.60 for M0 and 6.0 for the release limit. Each fold's injected
-  shift is 0.14 to 0.61 of capacity, and 43% to 73% of the correction's weight sits on block rows. The
-  figure is closed-form and an upper bound, because the base network's own leak is not subtracted.
-- **Next step.** Stage 2 (GPU) starts after experiment 559 merges. A slow signal should not be an
-  average of recent residuals.
+- **Base.** Experiment 559 names no arm on the gain-and-leak frontier without a drift term. The base
+  is therefore the coarse refit of M0 (C-M0: ERA5 and CAMS pretrained weights of experiment 554 and a
+  fresh mixer, 90-day half-life; CRPS 4.465 at the eight and leak 7.60 points in the daily harness).
+  The reference design is the coarse refit of A10 (C-A10).
+- **Coarse refit.** The screening fits twice per fold, on days 0 and 14 (cadence `h`), so that the
+  injected-shift control exists at day 14; the daily harness is not run. Seeds 0 and 1, five folds.
+  The injected-shift leak is a single fit at day 14 with the block injected, seed 0, scored over the
+  forecast window that follows (days 14 to the fold's end).
+- **Arms.** D3m (design 3, monthly knots, L2 on first differences, encoders not frozen), D3q (the same
+  with quarterly knots), D4 (design 4, one embedding per month shared by all Primaries, per-Primary
+  scale, encoders frozen) and D4-null (permuted month index), D5 (design 5, per-Primary slow offset
+  added to the component means, first-difference penalty, encoders frozen). The penalty weight is
+  10 for every design and is not tuned. Design 2 (slow-trend summary input) follows when its builder
+  exists.
+- **Pass rule.** An arm passes when its CRPS at 24-120 h is at least 0.03 better than C-M0 at the eight
+  or the six, with a Bonferroni month-block interval (36 counted contrasts) that excludes zero, and
+  its injected-shift leak is at most C-M0's plus 1.0 point. At most 3 passing arms get the daily and
+  per-event refits.
+- **Predictions that could fail.** As in the brief: design 3 within 0.03 of design 1; design 4 gains
+  at least 0.03 at both groups and its placebo does not match it; design 5 gains at least 0.05 at the
+  eight with leak at most the base's plus 1.0.
