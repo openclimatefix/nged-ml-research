@@ -6,6 +6,8 @@ capacity, over the forecast windows of the daily fits on days 14 to 20 (block ag
 signs, mean of the five folds. Files are looked up in every folder that holds the arm's fits.
 """
 
+from pathlib import Path
+
 import polars as pl
 from e00565_design6 import MONTHS, W545, W559
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -19,7 +21,7 @@ KEYS = ["time_series_id", "power_fcst_init_time", "valid_time"]
 SEEDS = (0, 1, 2, 3, 4)
 
 
-def find(*, arm: str, name: str):
+def find(*, arm: str, name: str) -> Path:
     """Return the one existing file called `name` in the arm's folders."""
     hits = [f / name for f in FOLDERS[arm] if (f / name).exists()]
     assert len(hits) >= 1, (arm, name)
