@@ -34,7 +34,8 @@ decision_rule: >-
   training spans, by S1 or S2), K-S2 (in the clean world no more than 1 false step of 1% or more per
   Primary-year), and K-S3 (in the ramp world the recovered path follows the ramp to within 25% of
   the injected rise, measured from 30 days before the ramp starts to 30 days after it ends, and
-  the ramp window holds at least 5 steps of 0.3% of capacity or more) all hold for S1 or S2. If neither passes K-S1 and K-S2,
+  the ramp window holds at least 5 steps of 0.3% of capacity or more) all hold for S1 or S2. If
+  neither passes K-S1 and K-S2,
   the experiment stops, no real-data score is read, and the page says that stepwise offsets cannot
   be identified from weather-error-noisy targets at the tested penalties. Step 2 counts 12 CRPS
   contrasts (S1, S2, S3 against S0; times 2 groups; times 2 measures); a gain counts when the
@@ -87,7 +88,10 @@ metric: >-
   effective capacity at 24-120 h at the eight MVA Primaries and the six MW Primaries.
 ---
 
-*Terms: CRPS is the continuous ranked probability score; GPU is graphics processing unit; MVA and MW Primaries are the eight substations that report apparent power only and the six that report signed power; D5 is experiment 565's output-offset design; M0 is the plain modular neural network; S0 to S3 and K-S1 to K-S3 are defined below.*
+*Terms: CRPS is the continuous ranked probability score; GPU is graphics processing unit; MVA and MW
+Primaries are the eight substations that report apparent power only and the six that report signed
+power; D5 is experiment 565's output-offset design; M0 is the plain modular neural network; S0 to S3
+and K-S1 to K-S3 are defined below.*
 
 **We ask whether a model of a substation's slow level can see an abrupt step.** Experiment 565's D5
 adds one number per Primary and month to the forecast's mean. A sudden change of a few percent of
@@ -97,8 +101,10 @@ steps of known date and size to real Primary series, refit the offset alone on t
 network, and check whether each offset finds the steps. Only if that check passes do we fit the
 network and the offset together on the real series.
 
-**Verdict: not supported. Take-home: at the penalties tested, a free jumpy offset did not find steps of
-2% to 6% of capacity; the weights that stop apparent false steps also stop real ones.** Step 1 failed, so the stop rule applied and no
+**Verdict: not supported. Take-home: at the penalties tested, a free jumpy offset did not find steps
+of
+2% to 6% of capacity; the weights that stop apparent false steps also stop real ones.** Step 1
+failed, so the stop rule applied and no
 real-data arm was run. The sections below are the plan, followed by the results.
 
 ## Arms
@@ -170,7 +176,8 @@ fold). Cost is measured on the first pre-training and projected before the rest 
   rows (about 1.8 million of 7 million; the weights below are per this subsample), 1,000 steps, rate
   0.02 decaying to 0.002. S0 uses experiment 565's weight
   of 10 on the mean squared first difference of the monthly knots. S1's total-variation weight is
-  swept over 300, 1000, and 3000 nats per standardised unit, and S2's gate weight over 30, 100, and 300
+  swept over 300, 1000, and 3000 nats per standardised unit, and S2's gate weight over 30, 100, and
+  300
   nats per expected open gate, on the first fold (2025-10) of worlds Ks and K0. One weight per arm
   is then fixed: the one with the highest F1 (the harmonic mean of recall and precision) in world
   Ks among those with at most 1 false step of 1% or more per Primary-year in world K0.
@@ -229,7 +236,8 @@ beside every contrast.
   gates it does not need. A precision gain of S2 over
   S1 tests thresholding of S1, not independent sparse recovery.
 - **Truth steps need data.** A truth step is scored only when the Primary has at least 100 cached
-  rows in each of the 5 days either side (a quarter of a typical 400), because some Primaries have no
+  rows in each of the 5 days either side (a quarter of a typical 400), because some Primaries have
+  no
   rows before 2023 or 2024.
 - **Per-Primary years.** K-S2's years run from each Primary's first cached day.
 - **Unlabelled real drift.** The real series moves on its own, so the offset path holds real level
@@ -260,7 +268,8 @@ level changes count as false, so this is an upper bound).
   against the required two thirds.
 - **The prediction that S0 recovers under 40% holds** (it recovers none), but the prediction that S1
   or S2 reaches 60% fails, so the experiment stops by its own rule. The prediction that S2 has
-  higher precision than S1 fails: no S2 row is more than 0.02 above the S1 row of the same start weight.
+  higher precision than S1 fails: no S2 row is more than 0.02 above the S1 row of the same start
+  weight.
 - **Penalty sweep (first fold, worlds Ks and K0):** S1 weights 300, 1000, and 3000 give recall 46%,
   21%, and 3% with 11.8, 2.5, and 0.41 false steps per Primary-year. The weight that satisfies the
   false-step limit of the selection rule is 3000, so 3000 is the selected weight; 1000 is shown as
@@ -270,12 +279,14 @@ level changes count as false, so this is an upper bound).
   false steps are a property of the real series and not of the injection.
 - **Why (a hypothesis, untested):** the clean world's steps may be the real series' own unlabelled
   level changes, or the weather model's error. In an unscored first look at three Primaries, the
-  recovered path correlated 0.3 to 0.7 with the injected path and varied more than it did. The paired
+  recovered path correlated 0.3 to 0.7 with the injected path and varied more than it did. The
+  paired
   path (world Ks minus world K0) that would separate the causes was not computed.
 
 ## Caveats
 
-- One seed, one frozen neural network (experiment 554's M0, seed 0), and a 25% row subsample, so the numbers
+- One seed, one frozen neural network (experiment 554's M0, seed 0), and a 25% row subsample, so the
+  numbers
   carry no interval; they are known-answer checks of recovery, not significance tests.
 - The fits ran on the neural network's outputs with the network frozen; a joint fit might behave
   differently, which Step 2 would have tested.
@@ -290,9 +301,11 @@ level changes count as false, so this is an upper bound).
 
 ## Checks
 
-- The median-minus-mean forecast and the quantile-score contrasts do not apply: no forecast was scored.
+- The median-minus-mean forecast and the quantile-score contrasts do not apply: no forecast was
+  scored.
 - Audit triggers: none fired. A control (S0 on the clean world) behaved as expected; no result
-  contradicted its prediction except the predicted success of S1 or S2, which is the recorded result.
+  contradicted its prediction except the predicted success of S1 or S2, which is the recorded
+  result.
 
 ## What the next experiment should answer
 
