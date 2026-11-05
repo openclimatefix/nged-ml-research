@@ -243,6 +243,8 @@ Day-ahead plots for the other testable events: [115](day_ahead_event115.svg),
 [143](day_ahead_event143.svg), [172](day_ahead_event172.svg), [175](day_ahead_event175.svg),
 [178](day_ahead_event178.svg).
 
+![Daily means for D5 event 146: observed, corrected, and the lag-free D5 expectation](event146_expectation.svg)
+
 **The forecast already holds the event's level.** With observed lags the median level share over the
 12 long events in the folds is 0.95, with corrected lags 0.84, with masked lags 0.96, and for the
 lag-free D5 network 0.73 (4 events). So the forecast reproduces most of a long event's level even

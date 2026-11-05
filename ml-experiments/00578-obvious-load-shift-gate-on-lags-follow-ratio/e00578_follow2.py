@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN204, D103, PERF401
+# ruff: noqa: E501, ANN001, D103, PERF401
 """Experiment 578: follow ratio of the lag network with observed lags against NRA-corrected lags (and masked lags).
 
 Follow ratio of an event = mean over valid times inside the event, forecasts issued 24 to 120 h earlier, of

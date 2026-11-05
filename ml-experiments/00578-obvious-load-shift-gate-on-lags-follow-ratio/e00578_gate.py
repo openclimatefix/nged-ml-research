@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, D103, PERF401, RET504, E402
+# ruff: noqa: E501, D103
 """Experiment 578: DESCRIPTIVE gates G1 and G2 with action A2 (mask the lags) on stored forecasts.
 
 Nothing is tuned: m = 3 days, k = 3 event-free standard deviations, theta = 5% of capacity, release after 2
@@ -61,7 +61,6 @@ def main() -> None:
     origin_days = sorted(
         {(o - k.GRID_START).days for o in j["power_fcst_init_time"].unique().to_list()}
     )
-    od_index = {d: n for n, d in enumerate(origin_days)}
 
     def sustained(p: int, d: int, sign: float | None) -> float:
         g = gap[p, d - M : d]

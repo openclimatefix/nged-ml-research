@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, D103, PERF401, RET504, E402
+# ruff: noqa: E501, D103, PERF401
 """Experiment 578: NRA metrics per event, follow ratio by days since onset and end, and day-ahead plots.
 
 Metrics (all per event, valid times inside the event unless stated; seed-mean medians; 24-120 h unless stated):
@@ -155,7 +155,7 @@ def summary(*, d: pl.DataFrame) -> None:
     """Follow ratio by day since onset (cap 20) and since end, mean over events with a bootstrap-over-events 95% interval."""
     rng = np.random.default_rng(0)
     rows = []
-    for axis, days in (("onset", range(0, 21)), ("end", range(0, 7))):
+    for axis, days in (("onset", range(21)), ("end", range(7))):
         for day in days:
             s = d.filter((pl.col("axis") == axis) & (pl.col("day") == day))
             if s.height < 3:
