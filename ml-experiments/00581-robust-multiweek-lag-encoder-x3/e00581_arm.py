@@ -8,8 +8,9 @@ is the lag block (`e00581_lags`), the lag encoder (`e00581_model`), and where th
 
 Usage: python e00581_arm.py KIND COMMAND [--months ...] [--seeds ...] [--passes ...]
 
-- KIND: `x3syn` / `v3syn` (X3-med / v3+D5 fine-tuned with lag-only synthetic load-shift events on 5% of the
-  time; they reuse the pre-trained weights of `x3med` / `v3d5`), `x3med` (5-week median and spread), `placebo` (the same encoder on weeks 6 to 10),
+- KIND: `x3syn` / `v3syn` (X3-med / v3+D5 fine-tuned with lag-only synthetic load-shift events on
+  5% of the time; they reuse the pre-trained weights of `x3med` / `v3d5`), `x3med` (5-week median
+  and spread), `placebo` (the same encoder on weeks 6 to 10),
   `x335` (X3-med with the newest reading 3.5 h before the origin), or `v3d5` (experiment 572's stored
   weights; only `inject` is meaningful).
 - COMMAND: `pretrain`, `fit`, `assemble`, or `inject` (forecast with lag-only contaminated lags,

@@ -137,7 +137,7 @@ def absent(*, x: np.ndarray, cap_steps: int, which: str = "all") -> None:
 
 
 def check_matches_560(*, clean, primary, target_idx, origin_idx, lead, stats) -> None:
-    """Assert that the newest day lag (columns 0-2) and its index equal experiment 560's (the first 100,000 rows)."""
+    """Assert the newest day lag (columns 0-2) and its index equal experiment 560's (100,000 rows)."""
     import e00560_data as d560  # ty: ignore[unresolved-import]
 
     s = slice(0, 100_000)

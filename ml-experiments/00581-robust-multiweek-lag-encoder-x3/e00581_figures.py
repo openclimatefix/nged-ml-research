@@ -49,7 +49,7 @@ KEYS = tl.KEYS
 
 
 def day_ahead(*, paths: list[Path], prim_ts: int, lo: int, hi: int) -> pl.DataFrame:
-    """Return the seed-mean quantiles of the 24-48 h forecasts for one series between grid indices `lo` and `hi`."""
+    """Return the seed-mean quantiles of the 24-48 h forecasts for one series from `lo` to `hi`."""
     df = tl.seed_mean(paths=paths).filter(pl.col("time_series_id") == prim_ts)
     df = df.with_columns(
         lead=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours(),
