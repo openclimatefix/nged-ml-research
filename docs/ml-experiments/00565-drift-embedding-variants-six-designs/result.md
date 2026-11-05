@@ -119,8 +119,8 @@ own commit, before any GPU fit starts.
 
 **A10 (the monthly drift embedding) is no better than M0 at the eight, is better at the six, is worse
 on cold nights, and leaks about 1 point less.** The pre-registered prediction fails: the leak falls by
-0.95 points rather than the 1.0 predicted, and the sign of A10 minus M0 at the eight is not the same in
-4 of 5 seeds.
+0.95 points rather than the 1.0 predicted, and the sign of A10 minus M0 at the eight is not the same
+in 4 of 5 seeds.
 
 - **Eight, 24-120 h.** A10 minus M0 is +0.010 (positive is worse; Bonferroni interval -0.31 to 0.29,
   minimum detectable effect 0.133), with per-seed values -0.001, -0.035, +0.085, -0.066, and +0.068.
