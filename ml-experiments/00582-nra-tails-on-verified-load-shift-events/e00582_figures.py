@@ -1,8 +1,10 @@
-# ruff: noqa: E501, RUF005, D103
-"""Experiment 582 figures: day-ahead forecasts with bands around each verified event, and phase summaries.
+# ruff: noqa: E501, RUF005, D103, D205
+"""Experiment 582 figures: day-ahead forecasts with bands around each verified event, and phase
+summaries.
 
-Run `e00582_score.py` first (it writes the CSVs this script reads). The event figures rebuild the arms
-from the stored forecasts, so this script takes a few minutes. Writes SVGs to the docs folder.
+Run `e00582_score.py` first (it writes the CSVs this script reads). The event figures rebuild the
+arms from the stored forecasts, so this script takes a few minutes. Writes SVGs to the docs
+folder.
 """
 
 from pathlib import Path
@@ -48,7 +50,9 @@ WEEKDAYS = 48
 def day_ahead_rows(
     *, t: a.Table, arms: dict[str, np.ndarray], prim: int, lo: int, hi: int
 ) -> np.ndarray:
-    """Return row indices of the day-ahead forecasts (issued 09:00 the day before the valid day) of a Primary for valid times in [lo, hi)."""
+    """Return row indices of the day-ahead forecasts (issued 09:00 the day before the valid day)
+    of a Primary for valid times in [lo, hi).
+    """
     sel = (
         (t.prim == prim)
         & (t.idx >= lo)
@@ -59,7 +63,9 @@ def day_ahead_rows(
 
 
 def event_figure(*, t: a.Table, arms: dict[str, np.ndarray], gates: dict, e: dict) -> None:
-    """Draw one stacked figure: observed power, the NRA, and an arm's bands, 3 days before onset to 7 days after the end."""
+    """Draw one stacked figure: observed power, the NRA, and an arm's bands, 3 days before onset
+    to 7 days after the end.
+    """
     lo, hi = e["onset_idx"] - 3 * 48, e["end_idx"] + 7 * 48
     rows = day_ahead_rows(t=t, arms=arms, prim=e["primary"], lo=lo, hi=hi)
     rows = rows[np.argsort(t.idx[rows])]

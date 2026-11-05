@@ -1,13 +1,15 @@
-# ruff: noqa: E501, E402, ANN001, ANN201
-"""Experiment 582: experiment 572's v3+D5 fit on the fold months that hold verified load-shift events, with a corrected-lag twin built from the verified transfers.
+# ruff: noqa: E402, ANN001, ANN201, D205
+"""Experiment 582: experiment 572's v3+D5 fit on the fold months that hold verified load-shift
+events, with a corrected-lag twin built from the verified transfers.
 
 A thin wrapper around experiment 572's `e00572_fit.py` (imported, unchanged), in the manner of
 experiment 578's `e00578_fit.py`: it re-points the output folder to this experiment's own work
 folder, adds the fold month 2026-05 (three verified transfers end in May 2026), and replaces the
-`corrected` scoring twin's shift with the verified one (observed minus the fitted depth inside each
-verified transfer, no other correction). Months of experiments 572 and 578 reuse their saved fine-tuned
-weights (predict only); 2026-05 pre-trains and fine-tunes here. Every lag is still at least 24 h before
-the origin and the weather is the run at or before the origin minus 9 h, as in experiment 572.
+`corrected` scoring twin's shift with the verified one (observed minus the fitted depth inside
+each verified transfer, no other correction). Months of experiments 572 and 578 reuse their saved
+fine-tuned weights (predict only); 2026-05 pre-trains and fine-tunes here. Every lag is still at
+least 24 h before the origin and the weather is the run at or before the origin minus 9 h, as in
+experiment 572.
 
 Usage: python e00582_fit.py {pretrain|fit|assemble} [--months ...] [--seeds ...]
 """
@@ -37,7 +39,9 @@ _model_file = e.model_file
 
 
 def model_file(*, tag: str, month: str, day: int, seed: int, sfx: str = "") -> Path:
-    """Return saved weights: experiment 572's or 578's for months they fitted, this experiment's otherwise."""
+    """Return saved weights: experiment 572's or 578's for months they fitted, this experiment's
+    otherwise.
+    """
     for months, root in ((OLD_572, W572), (OLD_578, W578)):
         if month in months:
             f = root / "models" / tag / f"{month}_d{day}_s{seed}{sfx}.pt"
@@ -52,7 +56,9 @@ SHIFT: np.ndarray | None = None
 
 
 def build_test(*, month, standardiser):
-    """Add the `corrected` scoring twin: the lag columns are rebuilt from the verified-event counterfactual."""
+    """Add the `corrected` scoring twin: the lag columns are rebuilt from the verified-event
+    counterfactual.
+    """
     global SHIFT  # noqa: PLW0603
     test = _build_test(month=month, standardiser=standardiser)
     clean = e.CTX["clean"]

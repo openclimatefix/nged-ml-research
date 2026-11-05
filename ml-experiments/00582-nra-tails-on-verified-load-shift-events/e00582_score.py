@@ -1,16 +1,18 @@
-# ruff: noqa: E501, C416, RUF046, D103
-"""Experiment 582: build the arms, score them by phase of each verified event and on rows with no labelled event.
+# ruff: noqa: E501, C416, RUF046, D103, D205
+"""Experiment 582: build the arms, score them by phase of each verified event and on rows with no
+labelled event.
 
-Writes, to this experiment's work folder: `arms_summary.csv` (calibration, widths), `event_phase.csv`
-(one row per merged Primary-event, phase, lead band, arm), `phase_summary.csv` (group means with
-event-block bootstrap intervals), `event_free.csv` (pinball and CRPS against R with month-block
-intervals), `gates.csv` (gate state and false triggers), and `day_ahead.parquet` (the plotted series).
+Writes, to this experiment's work folder: `arms_summary.csv` (calibration, widths),
+`event_phase.csv` (one row per merged Primary-event, phase, lead band, arm), `phase_summary.csv`
+(group means with event-block bootstrap intervals), `event_free.csv` (pinball and CRPS against R
+with month-block intervals), `gates.csv` (gate state and false triggers), and `day_ahead.parquet`
+(the plotted series).
 
-Event unit: one row per Primary and span, merging verified transfers that overlap at a Primary (the
-three May 2026 transfers overlap at D12). The NRA reference is the observed power minus the fitted
-depth inside the span (`Table.nra`), and the observed power elsewhere. Phases are by the valid time:
-before = the 7 days before onset; days 0-3; days 4 to the end; after = 0-7 days after the end; after2 =
-7-14 days after the end.
+Event unit: one row per Primary and span, merging verified transfers that overlap at a Primary
+(the three May 2026 transfers overlap at D12). The NRA reference is the observed power minus the
+fitted depth inside the span (`Table.nra`), and the observed power elsewhere. Phases are by the
+valid time: before = the 7 days before onset; days 0-3; days 4 to the end; after = 0-7 days after
+the end; after2 = 7-14 days after the end.
 """
 
 import sys
@@ -29,7 +31,9 @@ N_BOOT = 4000
 
 
 def merged_events() -> pl.DataFrame:
-    """Return one row per (Primary, merged span): onset, end, mean signed depth share over the span, and transfer ids."""
+    """Return one row per (Primary, merged span): onset, end, mean signed depth share over the
+    span, and transfer ids.
+    """
     ev = k.verified_events().sort("primary", "onset_idx")
     out: list[dict] = []
     for p, g in ev.group_by("primary", maintain_order=True):
@@ -54,7 +58,9 @@ def merged_events() -> pl.DataFrame:
 
 
 def attach_depth(*, ev: pl.DataFrame, t: a.Table) -> pl.DataFrame:
-    """Add the span's mean signed depth (capacity share; positive = the Primary carried more during the span than the NRA)."""
+    """Add the span's mean signed depth (capacity share; positive = the Primary carried more
+    during the span than the NRA).
+    """
     depth = [
         float(-t.shift[r["primary"], r["onset_idx"] : r["end_idx"]].mean())
         for r in ev.iter_rows(named=True)
@@ -87,13 +93,17 @@ def window(*, onset: int, end: int, phase: str) -> tuple[int, int]:
 
 
 STORES: dict[str, dict] = {}
-"""Recalibration factors and mixture weights per arm, keyed by (month, group, band) or (month, band); filled by `build_arms`."""
+"""Recalibration factors and mixture weights per arm, keyed by (month, group, band) or (month, band);
+filled by `build_arms`.
+"""
 
 
 def build_arms(
     *, t: a.Table, gates: dict
 ) -> tuple[dict[str, np.ndarray], np.ndarray, dict[str, np.ndarray]]:
-    """Return every arm's quantile array, the mask of rows on which every arm exists (`common`), and the has-fit masks."""
+    """Return every arm's quantile array, the mask of rows on which every arm exists (`common`),
+    and the has-fit masks.
+    """
     V, M, E = t.arms["V"], t.arms["M"], t.arms["E"]
     have_e = np.isfinite(E).all(axis=1)
     arms: dict[str, np.ndarray] = {
@@ -137,7 +147,9 @@ def build_arms(
 
 
 def _boot_mean(*, vals: np.ndarray, groups: np.ndarray | None = None) -> tuple[float, float, float]:
-    """Return the mean and a 95% bootstrap interval over the entries of `vals` (events or months as blocks)."""
+    """Return the mean and a 95% bootstrap interval over the entries of `vals` (events or months
+    as blocks).
+    """
     v = vals[np.isfinite(vals)]
     if len(v) == 0:
         return (np.nan, np.nan, np.nan)
@@ -230,7 +242,9 @@ def event_phase_table(
 
 
 def phase_summary(*, table: pl.DataFrame) -> pl.DataFrame:
-    """Return per (group, phase, band, arm) means over events with a 95% event-block bootstrap interval, and the leave-one-Primary-out range."""
+    """Return per (group, phase, band, arm) means over events with a 95% event-block bootstrap
+    interval, and the leave-one-Primary-out range.
+    """
     metrics = [
         c
         for c in table.columns
@@ -263,7 +277,9 @@ def phase_summary(*, table: pl.DataFrame) -> pl.DataFrame:
 
 
 def free_table(*, t: a.Table, arms: dict[str, np.ndarray], common: np.ndarray) -> pl.DataFrame:
-    """Return the false-alarm table on rows with no labelled event: absolute pinball and CRPS, the difference against R, calibration, and width."""
+    """Return the false-alarm table on rows with no labelled event: absolute pinball and CRPS,
+    the difference against R, calibration, and width.
+    """
     rows: list[dict] = []
     R = arms["R"]
     months = sorted({m for m in t.month[common]})
@@ -341,7 +357,9 @@ TAUS_REPORT = (0.01, 0.05, 0.50, 0.95, 0.99)
 
 
 def gate_table(*, t: a.Table, gates: dict) -> pl.DataFrame:
-    """Return false triggers per Primary-year on origin days with no labelled event, per gate variant, and event-day trigger days."""
+    """Return false triggers per Primary-year on origin days with no labelled event, per gate
+    variant, and event-day trigger days.
+    """
     rows = []
     near = gates["near"]
     gap = gates["gap"]

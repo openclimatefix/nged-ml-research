@@ -1,20 +1,21 @@
-# ruff: noqa: E501, PLR0915, PLR0912
+# ruff: noqa: E501, PLR0915, PLR0912, D205
 """Experiment 582: tail coverage of every arm on experiment 581's lag-only injected event bank.
 
-Experiment 581 forecast v3+D5 with lags contaminated by a constant shift (the lag inputs only, never
-the targets) in 24 passes: Primary `p` in pass `r` gets depth in {0.15, 0.30, 0.50} of capacity and
-length in {3, 7, 15, 30} days, ending on day 14 of the fold month, with sign + in passes 0 to 11 and
-- in passes 12 to 23 (every Primary meets every combination with both signs). Its stored forecasts are
-read here, read-only. The uninjected power is the NRA (the observed power is unchanged), and the
-uninjected v3+D5 forecast is the reference of the tail follow ratio.
+Experiment 581 forecast v3+D5 with lags contaminated by a constant shift (the lag inputs only,
+never the targets) in 24 passes: Primary `p` in pass `r` gets depth in {0.15, 0.30, 0.50} of
+capacity and length in {3, 7, 15, 30} days, ending on day 14 of the fold month, with a positive sign in
+passes 0 to 11 and a negative sign in passes 12 to 23 (every Primary meets every combination with both signs). Its stored
+  forecasts are read here, read-only. The uninjected power is the NRA (the observed power is
+  unchanged), and the uninjected v3+D5 forecast is the reference of the tail follow ratio.
 
-Arms built from the injected v3+D5 forecast: v3+D5, R (the recalibration factors of the fold month,
-fitted on earlier months without injection), the union band with the lags-masked twin, the 50/50
-mixture with the lag-free D5 network and the per-lead mixture, each with and without the factors.
-Arms that do not read the lags (lags masked, week lag masked, lag-free D5) are the stored forecasts.
-Gates are not scored: the observed power is unchanged under a lag-only injection, so the gate sees no
-gap. Every second half-hour of valid time is used (the other half is dropped to save time).
-Writes `bank_event_phase.csv` and `bank_summary.csv` to the work folder.
+Arms built from the injected v3+D5 forecast: v3+D5, R (the recalibration factors of the fold
+month, fitted on earlier months without injection), the union band with the lags-masked twin, the
+50/50 mixture with the lag-free D5 network and the per-lead mixture, each with and without the
+factors. Arms that do not read the lags (lags masked, week lag masked, lag-free D5) are the
+stored forecasts. Gates are not scored: the observed power is unchanged under a lag-only
+injection, so the gate sees no gap. Every second half-hour of valid time is used (the other half
+is dropped to save time). Writes `bank_event_phase.csv` and `bank_summary.csv` to the work
+folder.
 """
 
 import e00582_arms as a  # ty: ignore[unresolved-import]
@@ -60,7 +61,9 @@ def load_injected(
     order: np.ndarray,
     sorted_keys: np.ndarray,
 ) -> np.ndarray:
-    """Return the seed-mean injected quantiles of pass `r`, aligned to the table's rows of `month` (NaN where absent)."""
+    """Return the seed-mean injected quantiles of pass `r`, aligned to the table's rows of
+    `month` (NaN where absent).
+    """
     sm = a.k578.sites()
     prim_of = dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
     parts = []

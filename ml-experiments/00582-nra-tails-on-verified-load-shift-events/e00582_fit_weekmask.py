@@ -1,12 +1,12 @@
 # ruff: noqa: E402, ANN001, ANN201
 """Experiment 582: forecast every fold month with only the week lag masked (the day lag kept).
 
-Predict-only: every fitted weight of experiments 572 and 578 and of this experiment is reused, and
-the output goes to a separate work folder (`work_weekmask`), so no stored forecast is touched. The
-twin `weekmasked` sets the week lag's value to 0, its missing flag to 1, and its age code to the
-maximum, which is what `e00572_lags.absent` writes for a missing week lag and what the network saw
-for the 24% of training rows whose week lag was missing. Usage: python e00582_fit_weekmask.py
-{fit|assemble} --months ... --seeds 0 1.
+Predict-only: every fitted weight of experiments 572 and 578 and of this experiment is reused,
+and the output goes to a separate work folder (`work_weekmask`), so no stored forecast is
+touched. The twin `weekmasked` sets the week lag's value to 0, its missing flag to 1, and its age
+code to the maximum, which is what `e00572_lags.absent` writes for a missing week lag and what
+the network saw for the 24% of training rows whose week lag was missing. Usage: python
+e00582_fit_weekmask.py {fit|assemble} --months ... --seeds 0 1.
 """
 
 import sys

@@ -1,8 +1,9 @@
-# ruff: noqa: E501
-"""Experiment 582: shared loaders (verified load-shift events of experiment 580, the verified NRA shift).
+# ruff: noqa: D205
+"""Experiment 582: shared loaders (verified load-shift events of experiment 580, the verified NRA
+shift).
 
-Time is a half-hour grid index from 2019-09-01 UTC; power is a fraction of effective capacity, as in
-experiments 556, 565, 572, and 578. Arrays are (16 Primaries, grid).
+Time is a half-hour grid index from 2019-09-01 UTC; power is a fraction of effective capacity, as
+in experiments 556, 565, 572, and 578. Arrays are (16 Primaries, grid).
 """
 
 from datetime import timedelta
@@ -36,7 +37,9 @@ EVENT_MONTHS: Final[tuple[str, ...]] = ("2025-12", "2026-01", "2026-05")
 
 
 def verified_events() -> pl.DataFrame:
-    """Return one row per (transfer, Primary): label, primary index, onset and end grid index, signed depth (MW and capacity share)."""
+    """Return one row per (transfer, Primary): label, primary index, onset and end grid index,
+    signed depth (MW and capacity share).
+    """
     v = pl.read_parquet(V580 / "events_verified.parquet")
     sm = k.sites()
     prim = dict(zip(sm["label"].to_list(), sm["primary"].to_list(), strict=True))
@@ -65,7 +68,9 @@ def verified_events() -> pl.DataFrame:
 
 
 def verified_shift(*, shape: tuple[int, int]) -> np.ndarray:
-    """Return the additive NRA correction (capacity fraction): counterfactual = observed + shift = observed - depth inside [onset, end), summed over the transfers active at a Primary."""
+    """Return the additive NRA correction (capacity fraction): counterfactual = observed + shift
+    = observed - depth inside [onset, end), summed over the transfers active at a Primary.
+    """
     sh = np.zeros(shape, np.float32)
     for r in verified_events().iter_rows(named=True):
         sh[r["primary"], r["onset_idx"] : r["end_idx"]] -= np.float32(r["depth_share"])

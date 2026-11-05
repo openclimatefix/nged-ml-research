@@ -1,9 +1,9 @@
-# ruff: noqa: E501, E402
+# ruff: noqa: E402
 """Experiment 582: experiment 565's lag-free D5 network on the fold month 2026-05.
 
-A thin wrapper around experiment 565's `e00565_fit.py` (imported, unchanged) that re-points its output
-folder to this experiment's own work folder, so experiment 565's files are never written. Usage:
-python e00582_fit_d5.py {pretrain-wt|fit|assemble} --months 2026-05 [--seeds 0 1].
+A thin wrapper around experiment 565's `e00565_fit.py` (imported, unchanged) that re-points its
+output folder to this experiment's own work folder, so experiment 565's files are never written.
+Usage: python e00582_fit_d5.py {pretrain-wt|fit|assemble} --months 2026-05 [--seeds 0 1].
 """
 
 import sys

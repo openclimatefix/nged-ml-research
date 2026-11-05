@@ -1,17 +1,19 @@
-# ruff: noqa: E501, C416, ANN001, ANN201, D107
+# ruff: noqa: E501, C416, ANN001, ANN201, D107, D205
 """Experiment 582: load the stored forecasts and build every arm from their quantiles.
 
-Every arm is an (rows, 11) array of quantiles at `TAUS`, in fractions of effective capacity, on one
-shared table of (Primary, origin, valid time) rows with the forecast issued 0 to 120 h before the
-valid time. Quantiles are averaged across the two seeds. Arms read only stored forecasts, so the
-weather of every row is the run issued at or before the forecast origin by construction (experiment
-572's code asserts it row by row when it writes the forecasts).
+Every arm is an (rows, 11) array of quantiles at `TAUS`, in fractions of effective capacity, on
+one shared table of (Primary, origin, valid time) rows with the forecast issued 0 to 120 h before
+the valid time. Quantiles are averaged across the two seeds. Arms read only stored forecasts, so
+the weather of every row is the run issued at or before the forecast origin by construction
+(experiment 572's code asserts it row by row when it writes the forecasts).
 
 - `V`: v3+D5, the lag network (experiments 572 and 578; this experiment for 2026-05).
 - `M`: the same weights with every lag masked (the lags-masked twin).
 - `W`: the same weights with only the week lag masked.
-- `C`: the corrected-lag twin, lags rebuilt from the verified counterfactual (this experiment; equal to `V` in months with no verified event).
-- `E`: the lag-free D5 network (experiment 565; this experiment for 2026-05; absent in 2025-07 and 2025-08).
+- `C`: the corrected-lag twin, lags rebuilt from the verified counterfactual (this experiment;
+  equal to `V` in months with no verified event).
+- `E`: the lag-free D5 network (experiment 565; this experiment for 2026-05; absent in 2025-07
+  and 2025-08).
 """
 
 from typing import Final
@@ -161,7 +163,9 @@ class Table:
         self.free = self._event_free()
 
     def _event_free(self) -> np.ndarray:
-        """Return rows with no labelled event and no verified transfer within 7 days of the valid time at the same Primary."""
+        """Return rows with no labelled event and no verified transfer within 7 days of the valid
+        time at the same Primary.
+        """
         ev = pl.read_parquet(k578.EVENTS)
         lab2p = dict(zip(self.label.tolist(), range(len(self.label)), strict=True))
         spans: list[tuple[int, int, int]] = [
@@ -214,7 +218,8 @@ def scale_quantiles(
 
 
 def fit_scales(*, q: np.ndarray, y: np.ndarray, lo: float = 0.2, hi: float = 6.0) -> np.ndarray:
-    """Return, for each level, the factor on the distance from the median that makes the share of `y` at or below the quantile equal the level.
+    """Return, for each level, the factor on the distance from the median that makes the share of
+    `y` at or below the quantile equal the level.
 
     The share is monotone in the factor on each side of the median, so a bisection finds it.
     """
@@ -240,10 +245,12 @@ def fit_scales(*, q: np.ndarray, y: np.ndarray, lo: float = 0.2, hi: float = 6.0
 def recalibrate(
     *, t: Table, arm: np.ndarray, usable: np.ndarray, store: dict | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the arm recalibrated per group and lead band on earlier months, and a mask of rows that have a fit.
+    """Return the arm recalibrated per group and lead band on earlier months, and a mask of rows
+    that have a fit.
 
-    For a fold month, the factors are fitted on the event-free rows (`t.free`) of every earlier month in
-    `usable` (rows where the arm exists), in the same group and lead band. The first month has no fit.
+    For a fold month, the factors are fitted on the event-free rows (`t.free`) of every earlier
+    month in `usable` (rows where the arm exists), in the same group and lead band. The first
+    month has no fit.
     """
     out = arm.copy()
     has = np.zeros(t.n, bool)
@@ -275,7 +282,9 @@ LEVELS_EXT: Final[np.ndarray] = np.concatenate([[0.0], TAUS, [1.0]])
 
 
 def _knots(q: np.ndarray) -> np.ndarray:
-    """Return the 13 abscissae of a quantile function: the 11 quantiles plus an extension at levels 0 and 1."""
+    """Return the 13 abscissae of a quantile function: the 11 quantiles plus an extension at
+    levels 0 and 1.
+    """
     lo = q[:, :1] - 0.25 * (q[:, 1:2] - q[:, :1])
     hi = q[:, -1:] + 0.25 * (q[:, -1:] - q[:, -2:-1])
     k_ = np.concatenate([lo, q, hi], axis=1)
@@ -295,7 +304,9 @@ def _cdf(*, x: np.ndarray, kn: np.ndarray) -> np.ndarray:
 
 
 def mixture(*, a: np.ndarray, b: np.ndarray, w: np.ndarray, chunk: int = 100_000) -> np.ndarray:
-    """Return the quantiles of the mixture `w * a + (1 - w) * b` of two distributions given by their 11 quantiles (piecewise-linear CDFs)."""
+    """Return the quantiles of the mixture `w * a + (1 - w) * b` of two distributions given by
+    their 11 quantiles (piecewise-linear CDFs).
+    """
     out = np.empty_like(a)
     for s in range(0, len(a), chunk):
         sl = slice(s, s + chunk)
@@ -323,7 +334,9 @@ def union_band(*, lag: np.ndarray, masked: np.ndarray) -> np.ndarray:
 def per_lead_weights(
     *, t: Table, a: np.ndarray, b: np.ndarray, usable: np.ndarray, store: dict | None = None
 ) -> np.ndarray:
-    """Return a per-row weight on `a`, per lead band, fitted on earlier months' event-free rows (0.5 where none exist)."""
+    """Return a per-row weight on `a`, per lead band, fitted on earlier months' event-free rows
+    (0.5 where none exist).
+    """
     w = np.full(t.n, 0.5, np.float32)
     months = sorted({m for m in t.month[usable]})
     grid = np.linspace(0, 1, 11)
@@ -369,7 +382,9 @@ GATE_M, GATE_K_SD, GATE_THETA, GATE_RELEASE_DAYS, HOLD_DAYS = 3, 3.0, 0.05, 2, 7
 
 
 def daily_gap(*, t: Table) -> np.ndarray:
-    """Return (16, days) daily mean of (observed - lags-masked forecast) at 24-48 h lead, NaN with under 40 half-hours."""
+    """Return (16, days) daily mean of (observed - lags-masked forecast) at 24-48 h lead, NaN
+    with under 40 half-hours.
+    """
     sel = (t.lead >= 24) & (t.lead < 48)
     n_days = t.clean.shape[1] // 48
     s, c = np.zeros((16, n_days)), np.zeros((16, n_days))
@@ -444,7 +459,9 @@ def run_gates(*, t: Table) -> dict:
 def hold_after_release(
     *, on: np.ndarray, days: int = HOLD_DAYS, valid_days: np.ndarray | None = None
 ) -> np.ndarray:
-    """Return (16, days) True on the days after a gate turned off, for `days` days (the after-snap-back rule)."""
+    """Return (16, days) True on the days after a gate turned off, for `days` days (the
+    after-snap-back rule).
+    """
     hold = np.zeros_like(on)
     for p in range(on.shape[0]):
         d = 1
@@ -456,7 +473,9 @@ def hold_after_release(
 
 
 def gated_arm(*, t: Table, on: np.ndarray, with_rule: bool) -> np.ndarray:
-    """Return the gated forecast: the masked twin while the gate is on; with the rule, the week-masked twin for 7 days after release."""
+    """Return the gated forecast: the masked twin while the gate is on; with the rule, the
+    week-masked twin for 7 days after release.
+    """
     od = t.origin_idx // 48
     g = on[t.prim, od]
     out = np.where(g[:, None], t.arms["M"], t.arms["V"])
