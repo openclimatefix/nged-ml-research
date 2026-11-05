@@ -1,7 +1,8 @@
 #!/bin/bash
 # Q5 (scale offset) and its shuffled placebo; waits for run_all.sh.
-cd /home/jack/dev/nged-ml-research/.claude/worktrees/offset-tv-probabilistic
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+cd "$(dirname "$0")/../.."
+: "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
+export DATA_PATH_INTERNAL
 while pgrep -f run_all.sh >/dev/null; do sleep 20; done
 R=ml-experiments/00577-static-between-steps-offsets-and-probabilistic-offset-widening/run.sh
 $R e00577_fit.py pretrain --arm Q5 --seeds 0 1 || exit 1

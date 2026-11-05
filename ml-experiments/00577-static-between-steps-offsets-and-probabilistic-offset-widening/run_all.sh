@@ -1,7 +1,8 @@
 #!/bin/bash
 # Resumable pipeline: finished outputs are skipped. Log to the private data folder.
-cd /home/jack/dev/nged-ml-research/.claude/worktrees/offset-tv-probabilistic
-export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+cd "$(dirname "$0")/../.."
+: "${DATA_PATH_INTERNAL:?set DATA_PATH_INTERNAL to the private data folder}"
+export DATA_PATH_INTERNAL
 E=ml-experiments/00577-static-between-steps-offsets-and-probabilistic-offset-widening
 R=$E/run.sh
 P="( source ml-experiments/00524*/env.sh; .venv/bin/python $E/e00577_picks.py"
