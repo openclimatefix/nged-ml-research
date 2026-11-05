@@ -3,10 +3,11 @@
 
 Experiment 581 forecast v3+D5 with lags contaminated by a constant shift (the lag inputs only,
 never the targets) in 24 passes: Primary `p` in pass `r` gets depth in {0.15, 0.30, 0.50} of
-capacity and length in {3, 7, 15, 30} days, ending on day 14 of the fold month, with a positive sign in
-passes 0 to 11 and a negative sign in passes 12 to 23 (every Primary meets every combination with both signs). Its stored
-  forecasts are read here, read-only. The uninjected power is the NRA (the observed power is
-  unchanged), and the uninjected v3+D5 forecast is the reference of the tail follow ratio.
+capacity and length in {3, 7, 15, 30} days, ending on day 14 of the fold month, with a positive
+sign in passes 0 to 11 and a negative sign in passes 12 to 23 (every Primary meets every
+combination with both signs). Its stored forecasts are read here, read-only. The uninjected power
+is the NRA (the observed power is unchanged), and the uninjected v3+D5 forecast is the reference
+of the tail follow ratio.
 
 Arms built from the injected v3+D5 forecast: v3+D5, R (the recalibration factors of the fold
 month, fitted on earlier months without injection), the union band with the lags-masked twin, the
