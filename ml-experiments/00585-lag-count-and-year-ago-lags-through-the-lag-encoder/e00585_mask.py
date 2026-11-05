@@ -39,6 +39,7 @@ def real_events() -> list[dict]:
 
 
 def main() -> None:
+    """Write and print the Y1 against Y1-mask comparison."""
     sites = build470.site_map()
     prim = dict(zip(sites["time_series_id"].to_list(), sites["primary"].to_list(), strict=True))
     events = pl.DataFrame(real_events()).select("primary", "onset_idx", "end_idx")
