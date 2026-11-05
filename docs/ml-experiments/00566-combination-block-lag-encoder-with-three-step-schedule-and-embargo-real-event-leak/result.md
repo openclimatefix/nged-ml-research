@@ -67,8 +67,11 @@ gain while lowering the leak measured on real events.
 
 ## Method
 
-- **Real-event leak harness (ported from experiment 556).** For every labelled event with a refit cutoff at
-  least 3 days after its end, the network is fine-tuned once on the metered targets and once on targets
+- **Real-event leak harness (ported from experiment 556).** For every labelled event, the cutoff is the
+  first daily cutoff at least 1 day after the event's end (experiment 556 used 3 days, at which a 3-day
+  embargo cannot drop any of the event's rows, so 1 day is the test of the embargo); C1 is also run at
+  3 days, for comparison with experiment 556. C0 is run at 1 day as the lag-free reference. The network
+  is fine-tuned once on the metered targets and once on targets
   with that event's labelled step removed (experiment 435's correction at depth factor 1.0); the lag
   inputs stay as observed. The absorbed share is the sign of the event times the difference of the two
   median forecasts over the 7 days after the cutoff at the event's Primary, divided by the labelled
