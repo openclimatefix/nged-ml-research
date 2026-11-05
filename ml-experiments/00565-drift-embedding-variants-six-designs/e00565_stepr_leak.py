@@ -6,19 +6,27 @@ capacity, over the forecast windows of the daily fits on days 14 to 20 (block ag
 signs, mean of the five folds. Files are looked up in every folder that holds the arm's fits.
 """
 
+import os
 from pathlib import Path
 
 import polars as pl
-from e00565_design6 import MONTHS, W545, W559
+from e00565_design6 import MONTHS, W, W545, W559
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 W554 = (
     ML_EXPERIMENTS_DATA_DIR
     / "00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out/work"
 )
-FOLDERS = {"M0": [W545 / "fits/M0", W554 / "fits/M0"], "A10": [W559 / "fits/A10"]}
+FOLDERS = {
+    "M0": [W545 / "fits/M0", W554 / "fits/M0"],
+    "A10": [W559 / "fits/A10"],
+    "D5d": [W / "fits/D5d"],
+}
+ARMS = os.environ.get("LEAK_ARMS", "M0 A10").split()
+"""`LEAK_ARMS` picks the arms (default M0 and A10, the step-R pair); the output files get the `LEAK_PREFIX`."""
+PREFIX = os.environ.get("LEAK_PREFIX", "stepr")
 KEYS = ["time_series_id", "power_fcst_init_time", "valid_time"]
-SEEDS = (0, 1, 2, 3, 4)
+SEEDS = tuple(int(x) for x in os.environ.get("LEAK_SEEDS", "0 1 2 3 4").split())
 
 
 def find(*, arm: str, name: str) -> Path:
@@ -31,7 +39,7 @@ def find(*, arm: str, name: str) -> Path:
 def main() -> None:
     """Write the per-seed leak table and print the arm summaries."""
     rows = []
-    for arm in FOLDERS:
+    for arm in ARMS:
         for seed in SEEDS:
             for month in MONTHS:
                 for day in range(14, 21):
@@ -57,10 +65,10 @@ def main() -> None:
     t = pl.DataFrame(rows)
     out = W545.parent.parent / "00565-drift-embedding-variants-six-designs/work/scores"
     out.mkdir(parents=True, exist_ok=True)
-    t.write_csv(out / "stepr_leak_long.csv")
+    t.write_csv(out / f"{PREFIX}_leak_long.csv")
     fold = t.group_by("arm", "seed", "month").agg(pl.col("leak").mean())
     per_seed = fold.group_by("arm", "seed").agg(leak=pl.col("leak").mean()).sort("arm", "seed")
-    per_seed.write_csv(out / "stepr_leak_by_seed.csv")
+    per_seed.write_csv(out / f"{PREFIX}_leak_by_seed.csv")
     summary = per_seed.group_by("arm").agg(
         mean=pl.col("leak").mean(),
         sd=pl.col("leak").std(),
@@ -68,10 +76,10 @@ def main() -> None:
         hi=pl.col("leak").max(),
     )
     diff = per_seed.pivot(on="arm", index="seed", values="leak").with_columns(
-        diff=pl.col("A10") - pl.col("M0")
+        diff=pl.col(ARMS[1]) - pl.col("M0")
     )
-    summary.write_csv(out / "stepr_leak.csv")
-    diff.write_csv(out / "stepr_leak_diff_by_seed.csv")
+    summary.write_csv(out / f"{PREFIX}_leak.csv")
+    diff.write_csv(out / f"{PREFIX}_leak_diff_by_seed.csv")
     with pl.Config(tbl_rows=30):
         print(per_seed.pivot(on="arm", index="seed", values="leak"), summary, diff, sep="\n")
 
