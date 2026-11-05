@@ -49,7 +49,7 @@ def main() -> None:
     print("depth quartiles", np.percentile(ev["depth_share"].abs().to_numpy(), q).round(1).tolist())
     print("duration quartiles", np.percentile(ev["length_days"].to_numpy(), q).round(2).tolist())
     long = ev.filter(pl.col("length_days") >= MIN_DAYS)
-    med = float(long["depth_share"].abs().median())
+    med = float(long["depth_share"].abs().median())  # ty: ignore[invalid-argument-type]
     print("events >= 7 d:", long.height, "median depth share of those:", round(med, 2))
     # event-free days per Primary: not within an event (+-1 day)
     n_days = gap_d.shape[1]

@@ -40,7 +40,7 @@ def followers() -> None:
         )
     )
     bars = (
-        alt.Chart(t)
+        alt.Chart(t)  # ty: ignore[unresolved-attribute]
         .mark_bar(color=theme.DATA_BLUE)
         .encode(
             y=alt.Y("name:N", sort=None, title=None),
@@ -48,7 +48,7 @@ def followers() -> None:
         )
     )
     rule = (
-        alt.Chart(pl.DataFrame({"x": [0.15]}))
+        alt.Chart(pl.DataFrame({"x": [0.15]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="grey", strokeDash=[4, 3])
         .encode(x="x:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -105,12 +105,12 @@ def fourteen_day(*, event_ids: tuple[int, ...], start: dt.datetime, name: str) -
         t0 = k.GRID_START + dt.timedelta(minutes=30 * q["onset_idx"])
         t1 = k.GRID_START + dt.timedelta(minutes=30 * q["end_idx"])
         band = (
-            alt.Chart(pl.DataFrame({"a": [max(t0, start)], "b": [min(t1, stop)]}))
+            alt.Chart(pl.DataFrame({"a": [max(t0, start)], "b": [min(t1, stop)]}))  # ty: ignore[unresolved-attribute]
             .mark_rect(opacity=0.12, color="grey")
             .encode(x="a:T", x2="b:T")
         )  # ty: ignore[unresolved-attribute]
         line = (
-            alt.Chart(long)
+            alt.Chart(long)  # ty: ignore[unresolved-attribute]
             .mark_line(strokeWidth=1.2)
             .encode(
                 x=alt.X("valid_time:T", title="Date (UTC)"),
@@ -164,7 +164,7 @@ def expectation() -> None:
     )
     dom = ["Observed", "Corrected (event removed)", "Lag-free D5 expectation"]
     chart = (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_line()
         .encode(
             x=alt.X("date:T", title="Date (UTC)"),

@@ -49,9 +49,9 @@ def main() -> None:
         "of",
         old.height,
         "max abs diff",
-        float(diff.max()),
+        float(diff.max()),  # ty: ignore[invalid-argument-type]
         "mean",
-        float(diff.mean()),
+        float(diff.mean()),  # ty: ignore[invalid-argument-type]
     )
     v = load(root=_Root(), tag="V3D5", months=allm).rename({"q50": "v"})
     c = load(root=_Root(), tag="V3D5-corrected", months=allm).rename({"q50": "c"})

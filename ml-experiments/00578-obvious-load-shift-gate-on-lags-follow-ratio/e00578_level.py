@@ -64,7 +64,7 @@ def main() -> None:
         for n in (*arms, "lag-free D5 (E2)"):
             dd = d.drop_nulls(n)
             row[n] = (
-                float((dd[n] - dd["cf"]).sum() / (dd["obs"] - dd["cf"]).sum())
+                float((dd[n] - dd["cf"]).sum() / (dd["obs"] - dd["cf"]).sum())  # ty: ignore[unsupported-operator]
                 if dd.height > 100
                 else None
             )
@@ -80,9 +80,9 @@ def main() -> None:
             "n",
             s.height,
             "median",
-            round(float(s[n].median()), 3),
+            round(float(s[n].median()), 3),  # ty: ignore[invalid-argument-type]
             "mean",
-            round(float(s[n].mean()), 3),
+            round(float(s[n].mean()), 3),  # ty: ignore[invalid-argument-type]
         )
 
 

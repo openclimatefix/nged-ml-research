@@ -127,13 +127,13 @@ def main() -> None:
                         "variant": variant,
                         "part": part,
                         "share_of_origin_days_gated": float(
-                            s.group_by("od").agg(pl.col("gated").first())["gated"].mean()
+                            s.group_by("od").agg(pl.col("gated").first())["gated"].mean()  # ty: ignore[invalid-argument-type]
                         ),
                         "first_trigger_day_after_onset": first,
                         "follow_ungated": float(((s["v"] - s["c"]) / depth).mean()),
                         "follow_A2": float(((s["a2"] - s["c"]) / depth).mean()),
-                        "error_ungated": float((s["v"] - s["obs"]).abs().mean()) / abs(depth),
-                        "error_A2": float((s["a2"] - s["obs"]).abs().mean()) / abs(depth),
+                        "error_ungated": float((s["v"] - s["obs"]).abs().mean()) / abs(depth),  # ty: ignore[invalid-argument-type]
+                        "error_A2": float((s["a2"] - s["obs"]).abs().mean()) / abs(depth),  # ty: ignore[invalid-argument-type]
                     }
                 )
     # false triggers and cost on event-free days (not within 3 days of any labelled event)
@@ -187,13 +187,13 @@ def main() -> None:
                     "events triggered",
                     int((s["share_of_origin_days_gated"] > 0).sum()),
                     "mean follow ungated",
-                    round(float(s["follow_ungated"].mean()), 3),
+                    round(float(s["follow_ungated"].mean()), 3),  # ty: ignore[invalid-argument-type]
                     "A2",
-                    round(float(s["follow_A2"].mean()), 3),
+                    round(float(s["follow_A2"].mean()), 3),  # ty: ignore[invalid-argument-type]
                     "mean error ungated",
-                    round(float(s["error_ungated"].mean()), 3),
+                    round(float(s["error_ungated"].mean()), 3),  # ty: ignore[invalid-argument-type]
                     "A2",
-                    round(float(s["error_A2"].mean()), 3),
+                    round(float(s["error_A2"].mean()), 3),  # ty: ignore[invalid-argument-type]
                 )
 
 

@@ -48,7 +48,7 @@ def table() -> pl.DataFrame:
         fr = f2.load(root=f2._Root(), tag=tag, months=ms).rename({"q50": n})
         j = fr if j is None else j.join(fr, on=f2.KEYS)
     e = f2.load(root=k.d6.W, tag="D5", months=k.MONTHS).rename({"q50": "e"})
-    j = j.join(e, on=f2.KEYS, how="left").with_columns(
+    j = j.join(e, on=f2.KEYS, how="left").with_columns(  # ty: ignore[unresolved-attribute]
         lead=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours(),
         prim=pl.col("time_series_id").replace_strict(prim_of),
         idx=((pl.col("valid_time").dt.epoch("us") - k.prep.GRID_START_US) // k.prep.STEP_US).cast(
@@ -103,9 +103,9 @@ def main() -> None:
             "rows": ins.height,
             "follow": ins["follow"].mean(),
             "lag_effect": ins["lag_effect"].mean(),
-            "error_during": float((ins["v"] - ins["obs"]).abs().mean()) / abs(depth),
-            "error_corrected_lags_during": float((ins["c"] - ins["obs"]).abs().mean()) / abs(depth),
-            "recovery_error": float((aft["v"] - aft["obs"]).abs().mean()) / abs(depth)
+            "error_during": float((ins["v"] - ins["obs"]).abs().mean()) / abs(depth),  # ty: ignore[invalid-argument-type]
+            "error_corrected_lags_during": float((ins["c"] - ins["obs"]).abs().mean()) / abs(depth),  # ty: ignore[invalid-argument-type]
+            "recovery_error": float((aft["v"] - aft["obs"]).abs().mean()) / abs(depth)  # ty: ignore[invalid-argument-type]
             if aft.height > 100
             else None,
             "recovery_follow": aft["follow"].mean() if aft.height > 100 else None,
@@ -182,14 +182,14 @@ def summary(*, d: pl.DataFrame) -> None:
     ):
         sub = s.filter(pl.col("axis") == axis)
         base = alt.Chart(sub)
-        band = base.mark_area(opacity=0.25, color=theme.DATA_BLUE).encode(
+        band = base.mark_area(opacity=0.25, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("day:Q", title=title), y="lo:Q", y2="hi:Q"
         )  # ty: ignore[unresolved-attribute]
-        line = base.mark_line(point=True, color=theme.DATA_BLUE).encode(
+        line = base.mark_line(point=True, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             x="day:Q", y=alt.Y("mean:Q", title="Follow ratio")
         )  # ty: ignore[unresolved-attribute]
         rule = (
-            alt.Chart(pl.DataFrame({"y": [0.15]}))
+            alt.Chart(pl.DataFrame({"y": [0.15]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="grey", strokeDash=[4, 3])
             .encode(y="y:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -233,17 +233,17 @@ def day_ahead(*, j: pl.DataFrame, event_id: int) -> None:
         .filter(pl.col("share").is_not_null() & pl.col("share").is_finite())
     )
     band = (
-        alt.Chart(pl.DataFrame({"a": [t0], "b": [t1]}))
+        alt.Chart(pl.DataFrame({"a": [t0], "b": [t1]}))  # ty: ignore[unresolved-attribute]
         .mark_rect(opacity=0.12, color="grey")
         .encode(x="a:T", x2="b:T")
     )  # ty: ignore[unresolved-attribute]
     snap = (
-        alt.Chart(pl.DataFrame({"x": [t1]}))
+        alt.Chart(pl.DataFrame({"x": [t1]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="red", strokeDash=[2, 2])
         .encode(x="x:T")
     )  # ty: ignore[unresolved-attribute]
     line = (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1.1)
         .encode(
             x=alt.X("valid_time:T", title="Date (UTC)"),

@@ -178,16 +178,14 @@ Primary's load). The code is `ml-experiments/00578-*/e00578_nra.py`, which reads
   power). 0 means the forecast sits at the counterfactual level; 1 means it reproduces the event's
   level.
 - **Absorbed share and the 74 pairs.** The share of an event's depth that a fine-tune absorbs into
-  the next week's median, taken from [experiment 566](../00566-combination-block-lag-encoder-with-
-  three-step-schedule-and-embargo-real-event-leak/result.md): 0.026 for the lag network and 0.040
+  the next week's median, taken from [experiment 566][e566]: 0.026 for the lag network and 0.040
   for the lag-free network over 74 (month, event) pairs (59 distinct events). Not recomputed here.
 - **Lag-following on the 43 events.** Correcting the lags inside an event moves the lag network's
   forecast by 0.122 of the depth (43 events, intervals about 0.11 to 0.15), from the same page of
   experiment 566. This page's follow ratio is the same quantity for 12 long events (mean 0.110), at
   24-120 h.
 - **Injected 7-day shift leak.** A step of 10% of capacity in the fine-tuning targets reaches the
-  next week's median by 26% of the step after 7 days, from [experiment 556](../00556-lag-free-
-  finetune-absorption-of-load-shift-events-and-unlearn-time/result.md). Not recomputed here.
+  next week's median by 26% of the step after 7 days, from [experiment 556][e556]. Not recomputed here.
 
 Glossary. **NRA** is NGED's normal running arrangement; the
 corrected power is the metered power with a logged departure from it removed. **Depth** and **follow
@@ -305,3 +303,6 @@ sit among these days, so the false-trigger rate is an upper bound.
   `run.sh`, then `e00578_follow2.py`, `e00578_level.py`, `e00578_nra.py`, and `e00578_figures.py`.
 - The clean-lag rows may hold events no label covers, because NGED's logs may miss events, so these
   counts are lower bounds.
+
+[e566]: ../00566-combination-block-lag-encoder-with-three-step-schedule-and-embargo-real-event-leak/result.md
+[e556]: ../00556-lag-free-finetune-absorption-of-load-shift-events-and-unlearn-time/result.md
