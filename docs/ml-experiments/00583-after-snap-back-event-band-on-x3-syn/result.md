@@ -21,12 +21,11 @@ size: >-
   repository holds none). Cost: CPU only, zero GPU hours (inference-free re-scoring of stored
   forecasts).
 hypothesis: >-
-  After a load-shift ends, the lag network of experiment 581 (X3-syn) still takes old readings as input, so
-  its
-  q05-q95 band contains the normal running arrangement (NRA) on too few rows. Keeping the union of the
-  lag network's band and its lags-masked twin's band for the 7 days after the lag-versus-expectation
-  gap collapses restores most of that coverage, with a small rise in pinball loss on days with no
-  load-shift.
+  After a load-shift ends, the lag network of experiment 581 (X3-syn) still takes old readings as
+  input, so its q05-q95 band contains the normal running arrangement (NRA) on too few rows. Keeping
+  the union of the lag network's band and its lags-masked twin's band for the 7 days after the lag-
+  versus-expectation gap collapses restores most of that coverage, with a small rise in pinball loss
+  on days with no load-shift.
 prediction: >-
   Written before any score. P1: after the end of an injected lag-only event of 7, 15, or 30 days,
   arm
