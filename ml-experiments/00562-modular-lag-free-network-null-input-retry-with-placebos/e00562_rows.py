@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, D103, E501
+# ruff: noqa: ANN001, ANN201, ANN202, D103, E501
 """Write per-row CRPS of the experiment 562 arms with 470's scorer on 511's rows (mirrors 554's e00554_rows).
 
 Arm names: each arm of `ARMS_ALL` averages the seeds assembled for all five months; `M0s0` and
@@ -33,6 +33,11 @@ def seeds_of(*, arm: str) -> tuple[int, ...]:
 ARMS = {a: (W / "seed_preds" / a, seeds_of(arm=a)) for a in ARMS_ALL if seeds_of(arm=a)}
 ARMS["M0s0"] = (W545 / "seed_preds" / "M0", (0,))
 ARMS["M0s01"] = (W545 / "seed_preds" / "M0", (0, 1))
+ARMS["M0s1"] = (W545 / "seed_preds" / "M0", (1,))
+ARMS["B1ps0"] = (W / "seed_preds" / "B1p", (0,))
+ARMS["B1ps1"] = (W / "seed_preds" / "B1p", (1,))
+ARMS["B1s0"] = (W / "seed_preds" / "B1", (0,))
+ARMS["B1s1"] = (W / "seed_preds" / "B1", (1,))
 NEW = tuple(ARMS)
 
 

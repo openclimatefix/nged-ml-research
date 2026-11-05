@@ -1,4 +1,4 @@
-# ruff: noqa: ANN201, D103, E501
+# ruff: noqa: ANN201, ANN202, D103, E501, PERF401, RUF028
 """Score experiment 562: real minus placebo, real minus M0, and placebo minus M0, per arm.
 
 Reads the per-row CRPS that `e00562_rows.py` wrote and experiment 521's loader (the row sets, lead
@@ -37,7 +37,7 @@ def table(*, arms: list[str]) -> pl.DataFrame:
 
 def main():
     schema = pl.read_parquet_schema(W / "work/scores" / f"rows_{s.MONTHS[0]}.parquet")
-    arms = [a.removesuffix("__crps") for a in schema if a.endswith("__crps") and a.split("__")[0] in {*(x for p in PAIRS for x in p), "B4-oracle", "M0s0", "M0s01"}]  # fmt: skip
+    arms = [a.removesuffix("__crps") for a in schema if a.endswith("__crps") and a.split("__")[0] in {*(x for p in PAIRS for x in p), "B4-oracle", "M0s0", "M0s01", "M0s1", "B1s0", "B1s1", "B1ps0", "B1ps1"}]  # fmt: skip
     t = table(arms=arms)
     need = [f"{a}__crps" for a in arms]
     t = t.with_columns(

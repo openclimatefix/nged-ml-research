@@ -9,7 +9,6 @@
 | 516 | Does a small convolutional encoder over a 24 h weather window improve a lag-free demand network that cannot see recent power? | High (maintainer request, 2026-11-02) | Experiment 515's window features and leak check | Done: neither encoder beat the base or the shuffled-day control |
 | 515 | Do trailing weather windows (temperature, shortwave, their 24 h product) lower the error of a lag-free demand network that cannot see recent power, on ten winter folds? | High (maintainer request, 2026-11-02) | Experiments 511 and 513 scored | Done: not resolved; the placebo gains about half of the W-T cold-night gain at the eight |
 | 517 | Is the 0/1 lockdown flag still needed by the lag-free demand network now that pretraining reaches back to 2019? | Medium (brief, 2026-11-02) | Nothing | Planned |
-| 562 | Do thermal-lag, look-ahead, school-term, national-signal, and privileged-price inputs help the modular lag-free network, against shuffled-day placebos of the same width? | High (brief, 2026-11-04) | Experiment 554's pretrained weights; the lag-encoder re-run waits for experiment 560 | Planned |
 
 ## Done experiments
 
