@@ -93,7 +93,7 @@ def build() -> pl.DataFrame:
     )
     us = lambda c: pl.from_epoch(
         pl.col(c).cast(pl.Int64) * heads470.STEP_US + heads470.GRID_START_US, time_unit="us"
-    ).dt.replace_time_zone("UTC")  # noqa: E731
+    ).dt.replace_time_zone("UTC")
     t = t.join(sites, on="primary", how="left", validate="m:1").with_columns(
         power_fcst_init_time=us("origin"), valid_time=us("target")
     )
