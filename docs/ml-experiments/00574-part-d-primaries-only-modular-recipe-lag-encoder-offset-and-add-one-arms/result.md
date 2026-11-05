@@ -3,8 +3,8 @@ id: "00574"
 slug: part-d-primaries-only-modular-recipe-lag-encoder-offset-and-add-one-arms
 title: >-
   Which add-ons (multi-variable ensemble spread, thermal-lag and solar-gain columns, an expected
-  signal from the ERA5/CAMS encoders, a three-step schedule) improve the modular lag-encoder network
-  with the D5 output offset, and what does the combined final candidate score?
+  signal from the ERA5/CAMS encoders, a three-step schedule) improve the modular lag-encoder neural
+  network with the D5 output offset, and what does the combined final candidate score?
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - differentiable-physics-long-history-and-drift
@@ -14,13 +14,15 @@ kind: other
 size: >-
   complex. Stored: fitted weights, forecasts, and scores in the private data folder only (final
   candidate weights kept). More than one defensible design: how the thermal-lag columns reach the
-  lag encoder's expected embeddings, and how the spread columns join the lag network's mixer.
+  lag encoder's expected embeddings, and how the spread columns join the lag-encoder neural
+  network's mixer.
   Callers: the code copies and imports experiments 559, 560, 565, 568, 569, and 572 (more than two
   callers, found by search). Serving path and degradation rule: not touched (this repository holds
   none). Cost: ceiling 6 GPU-h (the manager's limit).
 protocol: demand-v2
 hypothesis: >-
-  Four add-ons to the modular lag-encoder network with the D5 offset (P0) each lower CRPS: the
+  Four add-ons to the modular lag-encoder neural network with the D5 offset (P0) each lower CRPS:
+  the
   multi-variable ensemble spread columns in the mixer (P1), thermal-lag and solar-gain columns
   through the weather encoder (P2), an expected signal for the lag encoder taken from encoders
   trained on ERA5 and CAMS only (P3), and a three-step schedule with a 3-day embargo (P4). The
@@ -47,7 +49,8 @@ decision_rule: >-
   least that slice's MDE, and does not actively hurt another slice (worse than the control by more
   than the larger of 0.03 and the slice's MDE with the interval excluding zero on the harmful
   side, or the harmful sign in 4 of 5 folds). The leak (6.0 points) is a flag, not a gate. The
-  threshold is the MDE because each factor adds a network part or a data input. Bonferroni count
+  threshold is the MDE because each factor adds a neural-network part or a data input. Bonferroni
+  count
   42: the four add-one contrasts x 2 groups x 3 lead bands (24) plus P5 against P0, E2, and
   A-pool-24 x 2 groups x 3 lead bands (18). A separate family of 2: P2 against its placebo on cold
   winter nights at each group. 5-block month bootstrap (near the minimum to maximum of the five
@@ -73,7 +76,7 @@ headline: >-
   made it worse at the eight MVA Primaries.
 lessons: >-
   Of the four add-ons, only the three-step schedule with the 3-day embargo (P4-E) earned its place.
-  It cut the injected shift from 7.29 to 3.35 points and, combined with the thermal-lag columns,
+  P4-E cut the injected shift from 7.29 to 3.35 points and, combined with the thermal-lag columns,
   lowered CRPS most at the six MW Primaries. The spread columns raised CRPS (P1: +0.088 at the
   eight, +0.075 at the six, all lead bands) and raised the leak to 17.4. Thermal-lag and solar-gain
   columns were neutral on error at the eight, slightly helpful at the six against their
@@ -81,12 +84,13 @@ lessons: >-
   ERA5/CAMS-only encoders was empty, because P0 already uses them; unfreezing the encoders (P3-E0)
   raised CRPS.
 take_home_message: >-
-  The best demand recipe we have fitted (P5) combines experiment 572's lag network and offset with
+  The best demand recipe we have fitted (P5) combines experiment 572's lag-encoder neural network
+  and offset with
   a fresh mixer fitted on the whole ensemble history up to the cutoff, a 3-day embargo, and the
-  thermal-lag and solar-gain columns. At the six MW Primaries it improves on the previous best
-  recipe by 0.22 points of capacity at 1 to 5 days (interval excludes zero), and at the eight MVA
-  Primaries by a smaller 0.09 (interval includes zero). It beats the daily-refit references at
-  every lead band, and it follows an injected 7-day shift of the history less than half as much
+  thermal-lag and solar-gain columns. At the six MW Primaries it improves on P0, the best earlier
+  recipe, by 0.22 points of capacity at 1 to 5 days (interval excludes zero), and at the eight MVA
+  Primaries by a smaller 0.09 (interval includes zero). P5 beats the daily-refit references at every
+  lead band, and follows an injected 7-day shift of the history less than half as much
   (2.9 against 7.3 points). The multi-variable ensemble spread columns do not help the network
   and should stay out.
 advice:
@@ -96,7 +100,8 @@ advice:
     within the minimum detectable effect in every row, contrasts table).
   - >-
     Keep the 3-day embargo in the three-step schedule. The embargo is what lowers the leak (3.35 for
-    P4-E, 5.60 for P4 without it), and it costs no measurable CRPS (P4-E minus P4 is within 0.02 in
+    P4-E, 5.60 for P4 without it), and it changes CRPS by about 0.02 or less (P4-E minus P4 is
+    within the MDE in
     all rows at the eight and at the six).
   - >-
     Leave the 7 spread columns out of the mixer. They raised CRPS in every lead band at both groups
@@ -111,8 +116,9 @@ production_status: candidate
 adopted_in: none
 ---
 
-**We asked which add-ons improve the modular demand network that combines power lags and a slow
-output offset.** The network forecasts demand at 16 primary substations (Primaries). Its base
+**We asked which add-ons improve the modular demand neural network that combines power lags and a
+slow
+output offset.** The neural network forecasts demand at 16 primary substations (Primaries). Its base
 recipe, P0, is [experiment
 572's](../00572-two-offset-part-1-lags-versus-the-slow-output-offset/result.md) v3+D5: a lag encoder
 for the previous day's and week's power, plus one offset per Primary and month, fine-tuned daily. We
@@ -121,16 +127,19 @@ tested four add-ons against P0 on five test months: the multi-variable ensemble 
 fine-tuning (P3-E0), and a three-step schedule (P4, and P4-E with a 3-day embargo). We then combined
 the survivors (P5). Error is the continuous ranked probability score (CRPS) in points of capacity,
 where lower is better. **The three-step schedule with the embargo, combined with the thermal-lag
-columns, is the only combination that helped: P5 is 0.090 below P0 at 24 to 120 hours at the eight
+columns, is the only recipe we tested that helped: P5 is 0.090 below P0 at 24 to 120 hours at the
+eight
 Primaries that report apparent power (the eight MVA Primaries, interval includes zero) and 0.215
 below at the six Primaries that report signed power (the six MW Primaries, interval excludes
-zero).** P5 beats the previous best recipe E2 and the daily-refit A-pool-24 by about 0.3 at both
+zero).** P5 beats E2 (offset, no lags) and the daily-refit A-pool-24 by about 0.3 at both
 groups, and follows an injected 7-day shift of the history 2.9 points against P0's 7.3. All numbers
 are interim and unaudited, because no audit has run.
 
-**Verdict: partly supported.** Of the four add-ons, one earns its place (P4-E), one is neutral on
-error and helps the leak (P2), and two make the forecast worse (P1 and P3-E0). P5 meets every
-pre-registered P5 prediction but one that was not run (leave-one-out removals). The numbers do not
+**Verdict: partly supported.** Of the four add-ons, one improves the forecast (P4-E), one leaves
+error unchanged at the eight MVA Primaries and lowers the leak (P2), and two make the forecast worse
+(P1 and P3-E0). P5 meets every pre-registered P5 prediction except the leave-one-out removals, which
+were not run; its absorbed-share fall against P0 is a point estimate (interval includes zero). The
+numbers do not
 show that P5 beats P0 at the eight MVA Primaries by the minimum detectable effect.
 
 Arm labels: P0 is experiment 572's v3+D5. E2 is experiment 565's D5 (offset, no lags). P1 adds the 7
@@ -236,10 +245,11 @@ month-block intervals at 42 tests.
   Primaries P2 is 0.035 higher than its placebo on cold winter nights, and its leak is 5.4 against
   the placebo's 7.7.
 - **The three-step schedule (P4) lowers CRPS a little at the eight and more at the six, and P4-E
-  lowers the leak.** Adding the embargo changes CRPS by at most 0.02 in any row (P4-E minus P4, all
-  within the MDE).
+  lowers the leak.** Adding the embargo changes CRPS by about 0.02 or less in every row (P4-E minus
+P4, all within the MDE).
 - **P6 adds nothing beyond P5.** P6 minus P5 is +0.005 (eight) and +0.020 (six) for all rows, both
-  within the MDE, so the pre-registered gain of 0.05 on cold winter nights does not appear (P6 is
+  within the MDE (Christmas week at the six is not: +0.095 against 0.023), so the pre-registered
+  gain of 0.05 on cold winter nights does not appear (P6 is
   0.108 below P0 there at the eight, P5 is 0.214 below).
 
 **Keep rule (addendum 14).** P5's improvement over P0 at the six MW Primaries at 120-240 h (0.228)
@@ -301,13 +311,13 @@ month).
 |---|---|
 | P0 beats E2 by at least 0.15 at 24-120 h, eight MVA Primaries | **Passes:** -0.224 |
 | P1 gains at least 0.03 at 24-120 h at one group, concentrated in the high-spread tercile | **Fails:** P1 is +0.055 and +0.047, and worse in the top tercile |
-| P2 minus placebo on cold winter nights at the six MW Primaries is at most -0.05, no other slice hurt | **Passes:** -0.152. The placebo contrast at the eight is +0.035 (not a harm by the pre-registered rule) |
-| P3 lowers the absorbed share by at least 0.005 with CRPS within the MDE | **Fails:** share -0.0004, CRPS +0.088 at the eight (P3-E0, since P3 equals P0) |
-| P4-E lowers the shift by at least 1.0 point, share at most 0.017, CRPS cost at most 0.05 | **Passes:** shift 3.35 against 7.29, share 0.0126, CRPS lower than P0 |
+| P2 minus placebo on cold winter nights at the six MW Primaries is at most -0.05, no other slice hurt | **Passes:** -0.152 (interval -0.251 to -0.106, inside the MDE of 0.291, so the pass rests on the interval); the same contrast at the eight is +0.035 (interval 0.022 to 0.181), and P2 is +0.078 above its placebo in all rows there |
+| P3 lowers the absorbed share by at least 0.005 with CRPS within the MDE | **Fails:** share -0.0004 against the required -0.005; CRPS is +0.088 at the eight (P3-E0, since P3 equals P0) |
+| P4-E lowers the shift by at least 1.0 point, share at most 0.017, CRPS rise at most 0.05 | **Passes:** shift 3.35 against 7.29, share 0.0126, CRPS lower than P0 |
 | P5 within 0.04 of A-pool-24, beats E2 by at least 0.15, lower absorbed share, no Primary worse than L-1d by over 1.0 | **Passes:** 0.297 better than A-pool-24, 0.315 better than E2, share 0.0139 against 0.0172, worst Primary D5 at +0.67 (0-24 h) |
 | P5 with lags aged one extra day keeps at least 60% of its lag gain | **Passes:** keeps 91% at the eight (24-120 h) |
 | Each leave-one-out removal costs at least the factor's slice MDE | **Not run** |
-| P6 adds at least 0.05 on cold winter nights over P5 | **Fails:** P6 minus P5 is within the MDE in every row |
+| P6 adds at least 0.05 on cold winter nights over P5 | **Fails:** P6 minus P5 is within the MDE in the all-rows contrasts; on cold winter nights P6 is 0.106 higher than P5 at the eight |
 
 ## Caveats
 
