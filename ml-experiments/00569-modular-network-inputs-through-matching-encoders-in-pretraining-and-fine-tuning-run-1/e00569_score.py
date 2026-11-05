@@ -56,7 +56,7 @@ def main():
     # high-spread proxy from M0's forecast width
     widths = []
     for m in s.MONTHS:
-        p = W / "work/predictions/M0" / f"{m}_cell0.parquet"
+        p = W / "work/predictions/M0" / f"{m}_c0.parquet"
         names = build470.LEVELS
         lo = (
             next(n for n in names if n.endswith("05"))
