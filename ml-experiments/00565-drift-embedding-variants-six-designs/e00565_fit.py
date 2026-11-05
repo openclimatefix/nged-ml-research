@@ -126,6 +126,7 @@ SPECS = {
         Spec(
             "D5d", "fresh", cadence="d", frozen=True, columns="real", source="drift", variant="out"
         ),
+        Spec("M0d", "fresh", cadence="d"),
         Spec("D2", "fresh", cadence="h", columns="real", source="slow", variant="slow"),
         Spec("D2-null", "fresh", cadence="h", columns="null", source="slow", variant="slow"),
     )
