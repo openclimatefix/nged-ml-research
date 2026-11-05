@@ -8,6 +8,7 @@ index used by every offset. The truth of a world is the list of its change point
 change point.
 """
 
+import itertools
 from datetime import UTC, datetime, timedelta
 from typing import Final
 
@@ -93,7 +94,7 @@ def _selftest() -> None:
     for p, points in steps.items():
         days = [d for d, _ in points]
         assert days == sorted(days), p
-        assert all(b - a >= 5 for a, b in zip(days, days[1:], strict=False)), p
+        assert all(b - a >= 5 for a, b in itertools.pairwise(days)), p
         print(p, len(points), "change points, first", GRID_DAY0 + timedelta(days=days[0]))
     inj = injection(world="Kr", grid=2300 * PER_DAY)
     assert abs(inj[0, -1]) == RAMP_SIZE

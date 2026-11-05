@@ -7,7 +7,7 @@ title: >-
 theme: retraining-and-training-history
 also_relevant_to:
   - differentiable-physics-long-history-and-drift
-status: planned
+status: finished
 kind: other
 size: >-
   complex. Stored: offsets, fitted weights, and forecasts under this experiment's private data
@@ -45,6 +45,38 @@ decision_rule: >-
 benchmark: >-
   S0 (D5 as built in experiment 565, monthly knots with the slope penalty) on the same worlds and
   folds; M0 (stored, experiment 554) for the real-data CRPS.
+verdict: not supported
+best_arm: >-
+  None. S1 at total-variation weight 1000 recovers the most 3%-or-larger steps (14% to 21% per fold,
+  precision 5% to 8%) and still shows 2.5 false steps per Primary-year in the clean world.
+headline: >-
+  Neither daily-knot offset (S1) nor gated-jump offset (S2) recovers injected level steps: the best
+  recall of steps of 3% of capacity or more is 14% to 21% per fold against the required 80%, and
+  the weights that keep false steps under 1 per Primary-year recover 3% or fewer. Monthly knots (S0)
+  recover none. The real-data arms were not run.
+lessons: >-
+  The offset fitted on the frozen network's weather-driven residuals moves by several percent of
+  capacity without any injection (the real series' own drift and the weather model's error), so a
+  step of 2% to 6% cannot be told apart from that noise at daily resolution. A penalty strong enough
+  to silence the noise also removes the steps.
+take_home_message: >-
+  An offset that is allowed to jump cannot find steps of 2% to 6% of capacity in the demand
+  forecast's residuals, because the residuals themselves drift by that much. The weights that stop
+  false steps also stop real ones. Abrupt level changes therefore need another signal (a neighbour
+  series, a metering log, or a label), not a free offset, and a free offset is not a useful
+  load-shift detector at this resolution.
+advice:
+  - >-
+    Do not read step dates or sizes off a free per-Primary offset fitted to forecast residuals
+    at daily resolution; it recovered 14% to 21% of 3% steps at best (Step 1 table).
+  - >-
+    Separate a step from the series' own drift with a second signal, such as a neighbour's series or
+    a label, before trying a stepwise offset again (Step 1 table).
+  - >-
+    Keep monthly knots (D5) for slow level change, since they take no step at the price of no false
+    steps (S0 row).
+production_status: not-for-production
+adopted_in: none
 row_set_id: experiment_470_intersection_v1
 metric: >-
   Step 1: step recovery (date within 3 days, size within 25%), precision and recall, false steps per
@@ -60,8 +92,9 @@ steps of known date and size to real Primary series, refit the offset alone on t
 network, and check whether each offset finds the steps. Only if that check passes do we fit the
 network and the offset together on the real series.
 
-**Status: planned. No score has been read.** The sections below are the plan, in the order the
-brief fixes.
+**Verdict: not supported. Take-home: a free offset cannot find 2% to 6% steps, because the forecast's
+residuals drift by that much without any step.** Step 1 failed, so the stop rule applied and no
+real-data arm was run. The sections below are the plan, followed by the results.
 
 ## Arms
 
@@ -197,3 +230,58 @@ beside every contrast.
 - **Unlabelled real drift.** The real series moves on its own, so the offset path holds real level
   changes as well as the injection. K-S3 therefore also reports the rise in world K0 beside the rise
   in world Kr, and a paired path (world Ks minus world K0) is reported as a descriptive diagnostic.
+
+## Results (Step 1, five folds, one seed)
+
+Recall is the share of injected steps of 3% of capacity or more that an arm recovers (date within 3
+days, size within 25%), pooled over the six injected Primaries; n is 39 to 43 steps per fold, so one
+step is about 2.5 points of recall. False steps are extracted steps of 1% of capacity or more per
+Primary-year in the clean world K0, on the six Primaries that world Ks injects (real unlabelled
+level changes count as false, so this is an upper bound).
+
+| Arm | Recall per fold | Precision per fold | False steps per Primary-year (clean world) | Ramp pass share per fold |
+|---|---|---|---|---|
+| S0, monthly knots | 0, 0, 0, 0, 0 | 0 | 0.00 to 0.06 | 0 |
+| S1, weight 3000 | 3%, 3%, 0%, 3%, 2% | 3% to 8% | 0.31 to 0.41 | 0 |
+| S1, weight 1000 | 21%, 18%, 15%, 17%, 14% | 5% to 8% | 2.47 to 2.76 | 0.17 to 0.33 |
+| S2, from S1 at 3000, gate 300 | 8%, 15%, 5%, 5%, 2% | 1% to 6% | 2.31 to 2.97 | 0 to 0.17 |
+| S2, from S1 at 1000, gate 30 | 23%, 13%, 2%, 7%, 16% | 1% to 4% | 6.83 to 8.55 | 0 to 0.17 |
+
+- **K-S1 fails for every arm:** no arm reaches 80% recall on any fold. The best fold is 23% (S2 from
+  S1 at 1000, gate 30), with 7.8 false steps per Primary-year.
+- **K-S2 holds only for S0 and S1 at weight 3000** (at most 1 false step per Primary-year), and
+  those two recover at most 3% of the steps. No arm passes K-S1 and K-S2 together.
+- **K-S3 fails for every arm:** the best ramp pass share is 0.33 (S1 at 1000, first two folds),
+  against the required two thirds.
+- **The prediction that S0 recovers under 40% holds** (it recovers none), but the prediction that S1
+  or S2 reaches 60% fails, so the experiment stops by its own rule. The prediction that S2 has
+  higher precision than S1 fails: S2 started from S1 has lower precision at every weight.
+- **Penalty sweep (first fold, worlds Ks and K0):** S1 weights 300, 1000, and 3000 give recall 46%,
+  21%, and 3% with 11.8, 2.5, and 0.41 false steps per Primary-year. The weight that satisfies the
+  false-step limit of the selection rule is 3000, so 3000 is the selected weight; 1000 is shown as
+  the sensitivity.
+- **Why:** the recovered path correlates 0.3 to 0.7 with the injected path, and its standard deviation
+  exceeds the injected path's, so the offset also carries the real series' drift. The paired path
+  (world Ks minus world K0) that would separate the two was not computed.
+
+## Caveats
+
+- One seed, one frozen network (experiment 554's M0, seed 0), and a 25% row subsample, so the numbers
+  carry no interval; they are known-answer checks of recovery, not significance tests.
+- The fits ran on the network's outputs with the network frozen; a joint fit might behave
+  differently, which Step 2 would have tested.
+- S2 starts from S1's jumps, so its recall is bounded by S1's.
+- Step 2, Step D, and world Kt were not run. Weather in these rows is the ERA5 and CAMS analysis of
+  the target time, as in experiment 565's pre-training; no ensemble forecast is involved.
+- Every number is interim and unaudited. GPU time used: about 0.3 GPU-hours.
+
+## Checks
+
+- The median-minus-mean forecast and the quantile-score contrasts do not apply: no forecast was scored.
+- Audit triggers: none fired. A control (S0 on the clean world) behaved as expected; no result
+  contradicted its prediction except the predicted success of S1 or S2, which is the recorded result.
+
+## What the next experiment should answer
+
+Whether a second signal (a neighbour Primary's offset, or the labelled events) lets a jumpy offset
+separate a step from drift, for example by testing the paired path of world Ks minus world K0 first.

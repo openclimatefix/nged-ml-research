@@ -74,17 +74,21 @@ class Fold:
 def load_fold(*, month: str, device: str) -> Fold:
     """Load a fold's cache."""
     z = np.load(WORK / "cache" / f"{month}.npz")
-    keep = np.sort(np.random.default_rng(573).permutation(len(z["y"]))[: int(SUBSAMPLE * len(z["y"]))])
+    keep = np.sort(
+        np.random.default_rng(573).permutation(len(z["y"]))[: int(SUBSAMPLE * len(z["y"]))]
+    )
     primary = z["primary"][keep].astype(np.int64)
     target_idx = z["target_idx"][keep].astype(np.int64)
     day = target_idx // world.PER_DAY
     year, mon = (int(p) for p in month.split("-"))
     n_knots = (year - 2019) * 12 + (mon - 9) + 1
     us = target_idx.astype("int64") * 1_800_000_000
-    t64 = (np.datetime64("2019-09-01T00:00:00", "us") + us.astype("timedelta64[us]"))
+    t64 = np.datetime64("2019-09-01T00:00:00", "us") + us.astype("timedelta64[us]")
     start = t64.astype("datetime64[M]")
     lo, hi = start.astype("datetime64[us]"), (start + 1).astype("datetime64[us]")
-    tau = ((start - np.datetime64("2019-09", "M")).astype(np.float64) + (t64 - lo) / (hi - lo)).astype(np.float32)
+    tau = (
+        (start - np.datetime64("2019-09", "M")).astype(np.float64) + (t64 - lo) / (hi - lo)
+    ).astype(np.float32)
     n_days = int(z["target_idx"].max() // world.PER_DAY) + 1
     rows_per_day = np.zeros((16, n_days))
     np.add.at(rows_per_day, (primary, day), 1.0)
@@ -111,7 +115,8 @@ def nll_sum(*, fold: Fold, z: torch.Tensor, offset_rows: torch.Tensor) -> torch.
     """Return the summed mixture negative log-likelihood with the row offset added to the component means."""
     k = COMPONENTS
     out = torch.cat(
-        [fold.out[:, :k], fold.out[:, k : 2 * k] + offset_rows[:, None], fold.out[:, 2 * k :]], dim=-1
+        [fold.out[:, :k], fold.out[:, k : 2 * k] + offset_rows[:, None], fold.out[:, 2 * k :]],
+        dim=-1,
     )
     return base.mixture_nll(out=out, z=z, components=k).sum()
 
@@ -148,11 +153,18 @@ def fit_s0(*, fold: Fold, z: torch.Tensor) -> np.ndarray:
 
     _optimise(params=[knots], loss_fn=loss, steps=STEPS)
     with torch.no_grad():
-        days = (np.datetime64("2019-09-01T12:00:00", "us") + np.arange(fold.n_days)[:, None].astype("timedelta64[D]").astype("timedelta64[us]")).ravel()
+        days = (
+            np.datetime64("2019-09-01T12:00:00", "us")
+            + np.arange(fold.n_days)[:, None].astype("timedelta64[D]").astype("timedelta64[us]")
+        ).ravel()
         start = days.astype("datetime64[M]")
         lo, hi = start.astype("datetime64[us]"), (start + 1).astype("datetime64[us]")
         t_np = (start - np.datetime64("2019-09", "M")).astype(np.float64) + (days - lo) / (hi - lo)
-        t_day = torch.from_numpy(t_np.astype(np.float32)).to(fold.out.device).clamp(0.0, float(fold.n_knots - 1))
+        t_day = (
+            torch.from_numpy(t_np.astype(np.float32))
+            .to(fold.out.device)
+            .clamp(0.0, float(fold.n_knots - 1))
+        )
         l2 = t_day.floor().long().clamp(max=fold.n_knots - 2)
         f2 = t_day - l2.float()
         path = (1 - f2)[None] * knots[:, l2] + f2[None] * knots[:, l2 + 1]
@@ -175,11 +187,15 @@ def fit_s1(*, fold: Fold, z: torch.Tensor, lam: float) -> np.ndarray:
 def fit_s2(*, fold: Fold, z: torch.Tensor, lam: float, init: np.ndarray) -> np.ndarray:
     """Return S2's daily path (16, days): sum of hard-concrete gated jumps, penalised by the expected number of open gates."""
     dev = fold.out.device
-    assert init is not None, "S2 starts from S1's thresholded jumps (pure gradient start from closed gates did not open any gate)"
+    assert init is not None, (
+        "S2 starts from S1's thresholded jumps (pure gradient start from closed gates did not open any gate)"
+    )
     jump = np.diff(init, axis=1, prepend=init[:, :1]) * fold.std[:, None]
     big = np.abs(jump) >= INIT_JUMP
     log_alpha = torch.from_numpy(np.where(big, 2.0, -3.0).astype(np.float32)).to(dev)
-    amp = torch.from_numpy((np.where(big, jump, 0.0) / fold.std[:, None]).astype(np.float32)).to(dev)
+    amp = torch.from_numpy((np.where(big, jump, 0.0) / fold.std[:, None]).astype(np.float32)).to(
+        dev
+    )
     log_alpha.requires_grad_(True)
     amp.requires_grad_(True)
     torch.manual_seed(573)
@@ -199,14 +215,18 @@ def fit_s2(*, fold: Fold, z: torch.Tensor, lam: float, init: np.ndarray) -> np.n
 
     def loss() -> torch.Tensor:
         pen = lam * torch.sigmoid(log_alpha - offset_const).sum()
-        return (nll_sum(fold=fold, z=z, offset_rows=path(noisy=True)[fold.primary, fold.day]) + pen) / n
+        return (
+            nll_sum(fold=fold, z=z, offset_rows=path(noisy=True)[fold.primary, fold.day]) + pen
+        ) / n
 
     _optimise(params=[log_alpha, amp], loss_fn=loss, steps=STEPS)
     with torch.no_grad():
         return path(noisy=False).cpu().numpy()
 
 
-def extract(*, path: np.ndarray, std: float, per_day: float = DETECT_PER_DAY, min_step: float = MIN_STEP) -> list[tuple[float, float]]:
+def extract(
+    *, path: np.ndarray, std: float, per_day: float = DETECT_PER_DAY, min_step: float = MIN_STEP
+) -> list[tuple[float, float]]:
     """Return the steps `(day, signed size in capacity fraction)` of one Primary's daily offset path.
 
     Runs of consecutive days whose change is at least `per_day` of capacity in the same direction
@@ -257,7 +277,11 @@ def match(*, truth: list[tuple[int, float]], found: list[tuple[float, float]]) -
         for j, (fd, fs) in enumerate(found):
             if j in used:
                 continue
-            if np.sign(fs) == np.sign(size) and abs(fd - day) <= TOL_DAYS and abs(fs - size) <= TOL_SIZE * abs(size):
+            if (
+                np.sign(fs) == np.sign(size)
+                and abs(fd - day) <= TOL_DAYS
+                and abs(fs - size) <= TOL_SIZE * abs(size)
+            ):
                 used.add(j)
                 hit += 1
                 break
@@ -270,11 +294,20 @@ def score_steps(*, fold: Fold, path: np.ndarray, truth: dict[int, list[tuple[int
     rec_all = rec_big = n_all = n_big = n_found = n_true_found = 0
     for p in world.INJECTED:
         found = [(d, s) for d, s in extract(path=path[p], std=fold.std[p]) if d <= limit]
-        tru = [(d, s) for d, s in truth.get(p, []) if d <= limit and supported(fold=fold, primary=p, day=d)]
+        tru = [
+            (d, s)
+            for d, s in truth.get(p, [])
+            if d <= limit and supported(fold=fold, primary=p, day=d)
+        ]
         hit, ok = match(truth=tru, found=found)
         big = [(d, s) for d, s in tru if abs(s) >= 0.03]
         hit_big, _ = match(truth=big, found=found)
-        rec_all, n_all, rec_big, n_big = rec_all + hit, n_all + len(tru), rec_big + hit_big, n_big + len(big)
+        rec_all, n_all, rec_big, n_big = (
+            rec_all + hit,
+            n_all + len(tru),
+            rec_big + hit_big,
+            n_big + len(big),
+        )
         n_found, n_true_found = n_found + len(found), n_true_found + ok
     return {
         "recall_all": rec_all / max(n_all, 1), "recall_3pct": rec_big / max(n_big, 1),
@@ -290,7 +323,10 @@ def score_clean(*, fold: Fold, path: np.ndarray) -> dict:
     """
     limit = fold.span_end_day - END_MARGIN
     out = {}
-    for name, ps in (("injected_six", world.INJECTED), ("untouched_ten", [p for p in range(16) if p not in world.INJECTED])):
+    for name, ps in (
+        ("injected_six", world.INJECTED),
+        ("untouched_ten", [p for p in range(16) if p not in world.INJECTED]),
+    ):
         n, years = 0, 0.0
         for p in ps:
             first = int(np.argmax(fold.rows_per_day[p] > 0))
@@ -305,18 +341,31 @@ def score_ramp(*, fold: Fold, path: np.ndarray) -> dict:
     rows = []
     for p in world.INJECTED:
         first, last, size = world.ramp_points(primary=p)
-        if last + 30 > fold.span_end_day or not (supported(fold=fold, primary=p, day=first) and supported(fold=fold, primary=p, day=last)):
+        if last + 30 > fold.span_end_day or not (
+            supported(fold=fold, primary=p, day=first) and supported(fold=fold, primary=p, day=last)
+        ):
             continue
         rec = float(path[p, last + 30] - path[p, max(first - 30, 0)]) * fold.std[p]
-        steps = [s for d, s in extract(path=path[p], std=fold.std[p], per_day=0.0005, min_step=0.003) if first - 15 <= d <= last + 15]
+        steps = [
+            s
+            for d, s in extract(path=path[p], std=fold.std[p], per_day=0.0005, min_step=0.003)
+            if first - 15 <= d <= last + 15
+        ]
         rows.append({
             "primary": p, "truth_end": size, "recovered_end": rec,
             "end_ok": abs(rec - size) <= 0.25 * abs(size), "n_steps": len(steps), "steps_ok": len(steps) >= 5,
         })  # fmt: skip
-    return {"per_primary": rows, "pass_share": float(np.mean([r["end_ok"] and r["steps_ok"] for r in rows])) if rows else float("nan")}
+    return {
+        "per_primary": rows,
+        "pass_share": float(np.mean([r["end_ok"] and r["steps_ok"] for r in rows]))
+        if rows
+        else float("nan"),
+    }
 
 
-def run_one(*, fold: Fold, world_name: str, device: str, tvs: tuple[float, ...], gates: tuple[float, ...]) -> dict:
+def run_one(
+    *, fold: Fold, world_name: str, device: str, tvs: tuple[float, ...], gates: tuple[float, ...]
+) -> dict:
     """Fit S0, S1 at each total-variation weight, and S2 at each gate weight started from each S1; return the scores."""
     grid = data.grid_length()
     inj = world.injection(world=world_name, grid=grid)
@@ -333,8 +382,17 @@ def run_one(*, fold: Fold, world_name: str, device: str, tvs: tuple[float, ...],
         else:
             res.update(score_ramp(fold=fold, path=path))
         result[key] = res
-        np.save(PATHS / f"{fold.month}_{world_name}_{key.replace('/', '_')}.npy", path.astype(np.float32))
-        print(fold.month, world_name, key, {k: v for k, v in res.items() if k != "per_primary"}, flush=True)
+        np.save(
+            PATHS / f"{fold.month}_{world_name}_{key.replace('/', '_')}.npy",
+            path.astype(np.float32),
+        )
+        print(
+            fold.month,
+            world_name,
+            key,
+            {k: v for k, v in res.items() if k != "per_primary"},
+            flush=True,
+        )
 
     started = time.monotonic()
     record(key="S0", path=fit_s0(fold=fold, z=z), started=started)
@@ -344,7 +402,11 @@ def run_one(*, fold: Fold, world_name: str, device: str, tvs: tuple[float, ...],
         record(key=f"S1@{tv:g}", path=p1, started=started)
         for gate in gates:
             started = time.monotonic()
-            record(key=f"S2@{tv:g}/{gate:g}", path=fit_s2(fold=fold, z=z, lam=gate, init=p1), started=started)
+            record(
+                key=f"S2@{tv:g}/{gate:g}",
+                path=fit_s2(fold=fold, z=z, lam=gate, init=p1),
+                started=started,
+            )
     return result
 
 
@@ -368,8 +430,14 @@ def main() -> None:
             target = WORK / f"step1_{args.command}_r2" / f"{month}_{w}.json"
             if target.exists():
                 continue
-            res = run_one(fold=fold, world_name=w, device=device, tvs=tuple(args.tv), gates=tuple(args.gate))
-            target.write_text(json.dumps(res, indent=1))
+            res = run_one(
+                fold=fold, world_name=w, device=device, tvs=tuple(args.tv), gates=tuple(args.gate)
+            )
+            target.write_text(
+                json.dumps(
+                    res, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o)
+                )
+            )
         del fold
         torch.cuda.empty_cache()
 
