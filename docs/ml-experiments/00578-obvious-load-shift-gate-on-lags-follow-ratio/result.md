@@ -78,6 +78,16 @@ advice:
 production_status: not-for-production
 adopted_in: none
 ---
+
+> **Erratum (experiment 580, 2026-11-05).** Of the 23 labelled events of at least 7 days only event
+> 55 (D16, mirrored by D5 from 2025-12-29 to 2026-01-13) is confirmed by the telemetry. The follow
+> ratios, level shares, and coverage of the normal running arrangement for every other labelled
+> event, including events 115, 143, 146, 28, 112, and 113, used a corrected power that the telemetry
+> does not confirm (for events 146 and 143 it contradicts the telemetry; event 146 has the wrong
+> sign and dates). Do not quote them. The event 55 numbers stand. See [experiment
+> 580](../00580-verified-load-shift-event-set-and-label-audit/result.md) for the audit of the labels
+> against the telemetry.
+
 **The forecast follows long, deep load-shift events, and the lags account for a modest share of
 that: 0.087 of the event's depth on average over the whole event (median 0.029), 0.163 after day 4,
 and 0.175 in the 7 days after the event ends, when day-old and week-old lags still contain the event
