@@ -51,27 +51,29 @@ best_arm: >-
   mean 0.087, median 0.029 of the labelled depth at 24-120 h.
 headline: >-
   On the 7 long-and-deep load-shift events that can be tested, reading the lags moves the 24-120 h
-  forecast by a median of 0.03 of the event's depth (one event above 0.15), because the slow output
-  offset and the fine-tune have already taken most of the level.
+  forecast by a median of 0.03 of the event's depth (one event above 0.15). The forecast already
+  holds most of the event's level without event lags.
 lessons: >-
-  The forecast follows long events through the offset and the fine-tune, which the lags neither add
-  to nor undo: with corrected lags the forecast still reproduces a median 0.84 of the event's level.
-  A gate on the lags cannot stop that. The one clear lag-driven case is the example pair at D16.
+  The forecast follows long events without the lags: across the 12 long events in the folds, the
+  forecast with corrected lags still reproduces a median 0.84 of the event's level. A gate on the
+  lags cannot stop that. The slow output offset and the fine-tune are candidates, but no arm without
+  them was run. Lags add the most at D8 event 173 (0.31) and at D16 event 55 (0.17).
 take_home_message: >-
   The lag network follows long, deep load-shift events only a little through its lags (a median of 3%
   of the event's depth), so a gate on the lags would have little to stop. Most of the event's level
-  enters through the slow output offset and the fine-tune, so any control has to act there. The 12
-  events were chosen before the result, and 5 of them cannot be tested.
+  is already in the forecast without event lags, so a control has to act elsewhere; the slow output
+  offset and the fine-tune are the candidates, and were not isolated here. Of the 12 long-and-deep
+  events, 5 cannot be tested.
 advice:
   - >-
     Do not build a lag gate for long, deep events yet: the lag effect has a median of 0.03 of the
     depth on the 7 testable events (Results).
   - >-
-    Look at the offset and the fine-tune, not the lags, for how a long event enters the forecast: the
-    forecast with corrected lags still keeps a median 0.84 of the event's level (Results).
+    Run an arm without the slow output offset to find out whether the offset or the fine-tune carries
+    a long event's level: the forecast with corrected lags keeps a median 0.84 of it (Results).
   - >-
-    Test the D16 example pair (events 55 and 146) and D8 event 173 in any later control of lags, as
-    they are the cases where lags add 0.17 to 0.31 of the depth (Results).
+    Include D8 event 173 (lag effect 0.31) and D16 event 55 (0.17) in any later control of lags, as
+    they are the two events where lags add more than 0.15 of the depth (Results).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -83,12 +85,15 @@ slow output offset) with the lags taken from the NRA-corrected power, which has 
 removed. We compared the two forecasts, in 24-120 h ahead forecasts, for every long event we could
 test. The lags moved the forecast by a median 0.03 of the event's depth, so the gate arms were not
 run. All numbers are interim and unaudited. **Next step:** if the event's level matters to NGED, test
-a control on the offset and the fine-tune, not on the lags.
+a control on the offset and the fine-tune, not on the lags. Terms: NRA is NGED's normal running
+arrangement; the corrected power is the metered power with the labelled load transfer added back; a
+fold is one scored month of experiment 572; D3 to D16 are anonymised Primary labels.
 
 **Verdict: not supported.** The prediction that the lag effect is at least 0.30 on obvious events
-fails, and the stop rule (under 0.15) applies. Obvious events (E-obv, defined in the plan) number 0:
-no long-and-deep event shows 3 consecutive days with a daily gap above 3 event-free standard
-deviations from the lag-free D5 expectation. Bonferroni count: 0 of the 8 planned tests were run, and
+fails, and the stop rule (under 0.15) applies. Obvious events among the long-and-deep ones (E-obv, defined in the
+plan) number 0: no long-and-deep event shows 3 consecutive days with a daily gap above 3 event-free standard
+deviations from the lag-free D5 expectation. One shorter event passes the rule (event 55, D16, 16%
+deep, not long and deep). Bonferroni count: 0 of the 8 planned tests were run, and
 the lag effect is descriptive, with per-event values in the table (n = 7 long-and-deep events, so only
 a large difference could be resolved; no bootstrap interval was computed).
 
@@ -105,7 +110,7 @@ summaries start on 2024-04-01. The other 7 lie in the five folds of experiment 5
 178) or in the two folds added here, 2025-07 and 2025-08 (ids 143, 172, 173, 175). Duration quartiles
 (days): 0.15, 0.4, 2.1, 3.6, 39.7; depth quartiles (% of capacity): 1.6, 10.9, 19.2, 31.3, 99.6.
 
-**Follow ratio.** It is the mean of (forecast with observed lags minus forecast with corrected lags)
+**Follow ratio.** The follow ratio is the mean of (forecast with observed lags minus forecast with corrected lags)
 divided by the labelled depth, over valid times in the event, at 24-120 h. Five more events of 7
 days or more (ids 28, 55, 112, 113, 174) lie in the folds and are shown beside the 7.
 
@@ -122,15 +127,15 @@ days or more (ids 28, 55, 112, 113, 174) lie in the folds and are shown beside t
 
 On the 7 long-and-deep events the mean is 0.087, the median 0.029, and one event (173) is above
 0.15. Across all 12 long events that lie in the folds the mean is 0.110, the median 0.070, and three
-(55, 173, 174) are above 0.15. The ratio is lowest in days 0 to 3 and higher after day 4, as the
-detection-delay argument predicts. The lags-masked version agrees in sign for most events and
-disagrees for 173 and 175 (0.43 and -0.27), so single-event values are noisy.
+(55, 173, 174) are above 0.15. The ratio is lowest in days 0 to 3 and higher after day 4 (all-event
+means 0.07 and 0.18). The lags-masked version gives the same sign for about 7 of the 12 events and a
+different sign for events 28, 112, 115, and 175, so single-event values are noisy.
 
 **The D5 offset absorbs the event.** The level share is the sum of (forecast minus corrected power)
 over the sum of (observed minus corrected power) inside the event, at 24-120 h. With observed lags
-the median level share is 0.95 (12 events), with corrected lags 0.84, with masked lags 0.96, and for
+the median level share over the 12 long events in the folds is 0.95, with corrected lags 0.84, with masked lags 0.96, and for
 the lag-free D5 network 0.73 (4 events, all in the five old folds). So the forecast reproduces most
-of a long event's level even when it reads no event lags. This does not isolate the offset: the
+of a long event's level even when it reads no event lags. That comparison does not isolate the offset: the
 corrected-lag forecast uses the weights fine-tuned on the uncorrected targets, so the offset and the
 fine-tune are both candidates. The exception is the example pair at D16 (event 55): the level share
 is 0.24 with observed lags and 0.12 with corrected or masked lags and for the lag-free network.
