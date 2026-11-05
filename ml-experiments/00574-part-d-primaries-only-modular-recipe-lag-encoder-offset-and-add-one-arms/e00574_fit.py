@@ -33,6 +33,7 @@ import e00515_placebo as placebo  # ty: ignore[unresolved-import]
 import e00558_lags as lags  # ty: ignore[unresolved-import]
 import e00559_extra as extra  # ty: ignore[unresolved-import]
 import e00559_model as m  # ty: ignore[unresolved-import]
+import e00559_wt as wt559  # ty: ignore[unresolved-import]
 import e00560_data as d560  # ty: ignore[unresolved-import]
 import e00560_model as m560  # ty: ignore[unresolved-import]
 import e00562_columns as c562  # ty: ignore[unresolved-import]
@@ -95,6 +96,7 @@ class Spec:
     average_of: str | None = None
     spread: bool = False  # arm P1: experiment 568's seven spread columns in the fine-tuning mixer
     sched: str = "1s"  # "1s" (experiment 559's one-step schedule), "3s" (three-step), or "3sE" (three-step plus a 3-day embargo)
+    wt: bool = False  # arm P6: experiment 515's three trailing-temperature columns (W-T) beside the B1 columns
     b1: str = ""  # arm P2 ("B1") or its placebo P2-plac ("B1p"): experiment 569's thermal-lag and solar-gain columns
     pretrain_from: str = "V3D5"  # which pre-training folder (under this experiment, or 572's V3D5) the arm starts from
 
@@ -114,6 +116,9 @@ SPECS = {
     for s in (
         Spec("P1", "24h", "lagoff", True, spread=True),
         Spec("P3E0", "24h", "lagoff", False),
+        Spec("P5", "24h", "lagoff", True, sched="3sE", b1="B1", pretrain_from="P2"),
+        Spec("P0", "24h", "lagoff", True),
+        Spec("P6", "24h", "lagoff", True, sched="3sE", b1="B1", wt=True, pretrain_from="P6"),
         Spec("P4", "24h", "lagoff", True, sched="3s"),
         Spec("P4E", "24h", "lagoff", True, sched="3sE"),
         Spec("P2", "24h", "lagoff", True, b1="B1", pretrain_from="P2"),
@@ -121,7 +126,7 @@ SPECS = {
     )
 }
 parser = argparse.ArgumentParser()
-parser.add_argument("command", choices=("fit", "assemble", "pretrain-wt", "step2"))
+parser.add_argument("command", choices=("fit", "assemble", "pretrain-wt", "step2", "events"))
 parser.add_argument("--arm", choices=tuple(SPECS), required=True)
 parser.add_argument("--stress", action="store_true")
 parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
@@ -315,7 +320,11 @@ CTX: dict = {"on": False, "extra": {}}
 AGED_DAYS = (1, 2, 3)
 SIBLINGS = ["removed", *[f"aged{n}" for n in AGED_DAYS]]
 CAP_HOURS = SPEC.cap_steps * 0.5
-N_B1 = cols569.width(arm=SPEC.b1) if SPEC.b1 else 0
+N_B1_COLUMNS = cols569.width(arm=SPEC.b1) if SPEC.b1 else 0
+N_WT = 3 if SPEC.wt else 0
+N_B1 = N_B1_COLUMNS + N_WT
+"""Width of the weather-encoder extras: the B1 columns, then the three W-T columns when the arm has them."""
+WTC: wt559.WtColumns | None = None
 EX = cols569.Extras(arm=SPEC.b1, proximity={}) if SPEC.b1 else None
 FOLDS: dict[str, c562.FoldColumns] = {}
 PRETRAIN_PRESENT = "B1 has no presence flag, so every pre-training row carries its columns"
@@ -581,6 +590,11 @@ def build_month(*, month, clean):
         mr.x = np.concatenate([mr.x, WT.month(null=False)], axis=1)
         CHECK["months"][month]["knot_example"] = WT.example
         print(month, "knot-position column appended |", WT.example, flush=True)
+    if SPEC.wt:
+        global WTC  # noqa: PLW0603
+        WTC = wt559.WtColumns(month=month, mr=mr)
+        CHECK["months"][month]["wt_example"] = WTC.example
+        print(month, "W-T columns built |", WTC.example, flush=True)
     if SPEC.b1 and not PRETRAINING["on"]:
         add = finetune_b1_columns(
             month=month,
@@ -588,6 +602,8 @@ def build_month(*, month, clean):
             origin_idx=origin_idx_of(us=mr.origin_us),
             target_idx=mr.target_idx,
         )
+        if SPEC.wt:
+            add = np.concatenate([add, WTC.month(null=False)], axis=1)
         assert add.shape == (len(mr.y), N_B1) and np.isfinite(add).all()
         assert mr.x.shape[1] == mod.b1_cols(n_b1=N_B1).start, mr.x.shape
         mr.x = np.concatenate([mr.x, add], axis=1)
@@ -659,6 +675,20 @@ def build_test(*, month, standardiser):
                 origin_idx=test.origin_idx,
                 target_idx=test.target_idx,
             )
+            if SPEC.wt:
+                add = np.concatenate(
+                    [
+                        add,
+                        WTC.rows(
+                            kind="ens",
+                            primary=test.primary,
+                            origin_idx=test.origin_idx,
+                            valid_idx=test.target_idx,
+                            null=False,
+                        ),
+                    ],
+                    axis=1,
+                )
             assert add.shape == (len(test.x), N_B1) and np.isfinite(add).all()
             tau = np.concatenate([tau, add], axis=1)
             CHECK["months"][month]["b1_example_test"] = (
@@ -767,6 +797,20 @@ def pretrain_wt(*, device: str) -> None:
             x_gpu[:, N_LAG_INPUTS] = torch.from_numpy(tau[:, 0]).to(device)
         if SPEC.b1:
             extra_b1 = pretrain_b1_columns(month=month, pre=pre)
+            if SPEC.wt:
+                extra_b1 = np.concatenate(
+                    [
+                        extra_b1,
+                        WTC.rows(
+                            kind="era5",
+                            primary=pre.primary,
+                            origin_idx=pre.origin_idx,
+                            valid_idx=pre.target_idx,
+                            null=False,
+                        ),
+                    ],
+                    axis=1,
+                )
             assert extra_b1.shape == (len(pre.x), N_B1) and np.isfinite(extra_b1).all()
             x_gpu[:, mod.b1_cols(n_b1=N_B1)] = torch.from_numpy(extra_b1).to(device)
             j = len(extra_b1) // 2
@@ -841,6 +885,7 @@ def model_file(*, tag: str, month: str, day: int, seed: int, sfx: str = "") -> P
 def fine_tune(
     *, g: k.GpuMonth, month: str, cut: datetime, seed: int, device: str,
     shift: np.ndarray | None = None, sign: int = 0, block: tuple[int, int] | None = None,
+    correction=None,
 ) -> tuple[torch.nn.Module, dict]:  # fmt: skip
     """Return a fine-tuned model and its log for one cutoff of the arm in `SPEC`."""
     mr = g.mr
@@ -866,6 +911,10 @@ def fine_tune(
         prim = mr.primary[refit.index]
         shift_z = np.where(inj, sign * shift[prim] / mr.base.target_std[prim], 0.0)
         injected = int(inj.sum())
+    if (
+        correction is not None
+    ):  # the real-event harness: a per-row target correction (capacity fraction) for the selected rows
+        shift_z = correction(refit) / mr.base.target_std[mr.primary[refit.index]]
     t = g.refit_tensors(refit=refit, shift_z=shift_z)
     feeder = time.monotonic() - started
     model = new_model(n_primaries=len(mr.base.target_mean)).to(device)
@@ -1029,6 +1078,146 @@ def step2(*, months: list[str], seeds: list[int], device: str) -> None:
         torch.cuda.empty_cache()
 
 
+NRA_SHARES = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00435-stage-0-recalibration-table-for-untrusted-inputs-and-tails/work/nra_correction_share.npz"
+)
+"""Experiment 435's NRA correction (share of capacity, 16 x grid) at depth factor 1.0."""
+MIN_AGE_DAYS = 1
+WINDOW_DAYS = 7
+
+
+def stored_model_file(*, month: str, day: int, seed: int) -> Path:
+    """Return the arm's fine-tuned model of a coarse cutoff (arm P0 is experiment 572's v3+D5)."""
+    if SPEC.tag == "P0":
+        return W572 / "models" / "V3D5" / f"{month}_d{day}_s{seed}.pt"
+    return model_file(tag=SPEC.tag, month=month, day=day, seed=seed)
+
+
+def median_of(*, model, x: np.ndarray, primary: np.ndarray, mr, device: str) -> np.ndarray:
+    """Return the model's median forecast (capacity fraction) of test rows."""
+    mu = torch.from_numpy(mr.base.target_mean).to(device)
+    sd = torch.from_numpy(mr.base.target_std).to(device)
+    out = []
+    for a in range(0, len(x), 262_144):
+        xb = torch.from_numpy(x[a : a + 262_144]).to(device)
+        pb = torch.from_numpy(primary[a : a + 262_144]).to(device)
+        q = torch.sort(c.serving_quantiles(model=model, x=xb, p=pb, outlier=False), dim=1).values[
+            :, 5
+        ]
+        out.append((q * sd[pb] + mu[pb]).float().cpu().numpy())
+    return np.concatenate(out)
+
+
+def events_command(*, months: list[str], seed: int, limit: int | None, device: str) -> None:
+    """Experiment 556's real-event harness on this arm: refit with one labelled event's targets corrected, per event.
+
+    The cutoff is the first coarse cutoff at least `MIN_AGE_DAYS` days after the event's end (the
+    event ends before the cut minus 3.5 h, asserted). The correction is experiment 435's labelled
+    step (depth factor 1.0), subtracted from the training targets of that one event only; the lag
+    inputs stay as observed. The absorbed share is the event's sign times (metered median minus
+    corrected median) over the 7 days after the cutoff at the event's Primary, divided by the
+    labelled depth. Step 2 is not refitted per event (`in_step2` marks events that end before the
+    fold's first cutoff, which sit in step 2 of both fits).
+    """
+    events = c.labelled_events()
+    shares = np.load(NRA_SHARES)["f1.0"]
+    grid, step = c.prep422.GRID_START_US, c.prep422.STEP_US
+    out = W / "scores" / f"real_events_{SPEC.tag}.parquet"
+    rows_out: list[dict] = []
+    clean = c.clean_stack()
+    count = 0
+    for month in months:
+        mr = k.build_month(month=month, clean=clean)
+        test = data.build_test(month=month, standardiser=mr.base.standardiser)
+        g = k.GpuMonth(mr=mr, device=device)
+        cuts = k.cutoffs(month=month, cadence=CADENCE)
+        first_cut = c.month_start(month=month)
+        wanted: dict[datetime, list[tuple[int, int, int]]] = {}
+        for p, spans in events.items():
+            for onset, end in spans:
+                end_us = grid + end * step
+                if float(np.abs(shares[p, onset : end + 1]).max()) <= 0:
+                    continue
+                ok = [x for x in cuts if c.us(t=x) >= end_us + MIN_AGE_DAYS * c.DAY_US]
+                if ok and c.us(t=ok[0]) - end_us <= 30 * c.DAY_US:
+                    wanted.setdefault(ok[0], []).append((p, onset, end))
+        print(
+            f"{month}: {sum(len(v) for v in wanted.values())} events at {len(wanted)} cutoffs",
+            flush=True,
+        )
+        for cut, evs in sorted(wanted.items()):
+            day = f.day_of(month=month, cut=cut)
+            win = np.nonzero(
+                (test.origin >= c.us(t=cut)) & (test.origin < c.us(t=cut) + WINDOW_DAYS * c.DAY_US)
+            )[0]
+            if len(win) == 0:
+                continue
+            model_m = new_model(n_primaries=len(mr.base.target_mean)).to(device)
+            model_m.load_state_dict(
+                torch.load(stored_model_file(month=month, day=day, seed=seed), map_location=device)
+            )
+            model_m.eval()
+            model_m.table = CTX["table_ft"]  # ty: ignore[invalid-assignment]
+            q_m = median_of(
+                model=model_m, x=test.x[win], primary=test.primary[win], mr=mr, device=device
+            ).astype(np.float64)
+            del model_m
+            prim_rows = test.primary[win]
+            for p, onset, end in evs:
+                end_us = grid + end * step
+                assert end_us <= c.us(t=cut) - c.CUTOFF_AGE_US, (
+                    "an event ends after the refit cut minus 3.5 h"
+                )
+
+                def correction(refit, p=p, onset=onset, end=end, mr=mr) -> np.ndarray:
+                    prim, tgt = mr.primary[refit.index], mr.target_idx[refit.index]
+                    corr = -shares[prim, np.clip(tgt, 0, shares.shape[1] - 1)]
+                    return np.where((prim == p) & (tgt >= onset) & (tgt <= end), corr, 0.0).astype(
+                        np.float32
+                    )
+
+                model_c, _ = fine_tune(
+                    g=g, month=month, cut=cut, seed=seed, device=device, correction=correction
+                )
+                model_c.table = CTX["table_ft"]  # ty: ignore[invalid-assignment]
+                diff = q_m - median_of(
+                    model=model_c, x=test.x[win], primary=prim_rows, mr=mr, device=device
+                ).astype(np.float64)
+                sign = 1 if float(shares[p, onset : end + 1].sum()) > 0 else -1
+                depth = float(np.abs(shares[p, onset : end + 1]).max())
+                sel = prim_rows == p
+                rows_out.append({
+                    "arm": SPEC.tag, "month": month, "seed": seed, "cut": str(cut.date()), "primary": p,
+                    "onset": onset, "end": end, "depth_points": 100 * depth,
+                    "age_days": (c.us(t=cut) - end_us) / c.DAY_US, "in_step2": bool(end_us <= c.us(t=first_cut) - c.CUTOFF_AGE_US),
+                    "absorbed_share": float(sign * diff[sel].mean() / depth) if sel.any() else None,
+                })  # fmt: skip
+                del model_c
+                count += 1
+                print(
+                    "event",
+                    count,
+                    month,
+                    "Primary",
+                    p,
+                    "share",
+                    rows_out[-1]["absorbed_share"],
+                    flush=True,
+                )
+                if limit and count >= limit:
+                    break
+            if limit and count >= limit:
+                break
+        del g, mr, test
+        torch.cuda.empty_cache()
+        if limit and count >= limit:
+            break
+    out.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(rows_out, schema_overrides={"absorbed_share": pl.Float64}).write_parquet(out)
+    print("real events", len(rows_out), flush=True)
+
+
 def assemble() -> None:
     """Concatenate each cutoff's window forecast into one table per month, seed, and scoring variant."""
     tags = (
@@ -1057,6 +1246,8 @@ def assemble() -> None:
 if __name__ == "__main__":
     if ARGS.command == "assemble":
         assemble()
+    elif ARGS.command == "events":
+        events_command(months=ARGS.months, seed=ARGS.seeds[0], limit=ARGS.limit, device="cuda")
     elif ARGS.command == "step2":
         step2(months=ARGS.months, seeds=ARGS.seeds, device="cuda")
     elif ARGS.command == "pretrain-wt":

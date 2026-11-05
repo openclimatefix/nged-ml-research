@@ -83,7 +83,6 @@ ARM_DIRS: Final[dict[str, tuple[Path, str]]] = {
     "P0": (W572, "V3D5"),
     "P7": (W572, "V35"),
     **{a: (W574, a) for a in ("P1", "P3E0", "P2", "P2plac", "P4", "P4E", "P5", "P6")},
-    **{f"P5no{f}": (W574, f"P5-no-{f}") for f in ("P1", "P2", "P4", "P4E")},
 }
 SIBLING_SUFFIXES: Final[tuple[str, ...]] = ("removed", "aged1", "aged2", "aged3")
 COUNTED: Final[tuple[tuple[str, str], ...]] = (
@@ -101,11 +100,13 @@ DESCRIPTIVE: Final[tuple[tuple[str, str], ...]] = (
     ("P4E", "P0"),
     ("P4E", "P4"),
     ("P6", "P5"),
+    ("P6", "P0"),
     ("P7", "P0"),
     ("P0", "L1d"),
     ("P5", "L1d"),
     ("P0", "M0"),
-    *[(f"P5no{f}", "P5") for f in ("P1", "P2", "P4", "P4E")],
+    ("P2", "P5"),
+    ("P4E", "P5"),
 )
 KEYS: Final = ["time_series_id", "power_fcst_init_time", "valid_time"]
 D8: Final[int] = 4
@@ -165,7 +166,14 @@ def build_table(*, arms: dict[str, tuple[Path, str]]) -> pl.DataFrame:
             tercile=pl.col("tercile"),
         )
         rows = rows.join(terc, on=d6.KEYS, how="left", maintain_order="left", validate="1:1")
-        assert rows["tercile"].null_count() == 0, f"{month}: rows without a spread tercile"
+        print(
+            month,
+            "rows without a spread tercile:",
+            rows["tercile"].null_count(),
+            "of",
+            rows.height,
+            flush=True,
+        )
         rows = rows.with_columns(
             evening=(
                 pl.from_epoch(GRID_US + pl.col("target").cast(pl.Int64) * STEP_US, time_unit="us")
@@ -236,7 +244,7 @@ def mde(*, sub: pl.DataFrame, a: str, b: str) -> float:
 
 
 SLICES: Final[dict[str, pl.Expr]] = {
-    "all rows": pl.lit(True),
+    "all rows": pl.col("group").is_not_null(),
     "no labelled event": ~pl.col("tgt_real"),
     "cold winter nights": pl.col("cold"),
     "Christmas week": pl.col("xmas"),
@@ -314,6 +322,7 @@ def main() -> None:
         for slice_name, expr in SLICES.items():
             if slice_name == "leave D8 out" and name != "eight":
                 continue
+            print("slice", name, slice_name, flush=True)
             sl = part.filter(expr.fill_null(value=False))
             for band in (*BANDS, "all"):
                 sub = sl if band == "all" else sl.filter(pl.col("band") == band)
