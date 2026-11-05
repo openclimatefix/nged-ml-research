@@ -59,7 +59,7 @@ def main() -> None:
                                 "month": month,
                                 "block_age_days": day - 14,
                                 "sign": sign,
-                                "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),
+                                "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),  # ty: ignore[invalid-argument-type]
                             }
                         )
     t = pl.DataFrame(rows)

@@ -1,9 +1,12 @@
 # ruff: noqa: E501, PTH123, SIM115, PERF401
-"""Experiment 565: D5 in the daily harness minus M0 (experiment 554, daily), seeds 0 and 1, five folds of 511.
+"""Experiment 565: D5 in the daily harness minus M0 (experiment 554), seeds 0 and 1.
+
+The five folds are those of experiment 511.
 
 Each seed's stored forecast is scored on its own (widened by 1.15 as every stored row table is), and
-the contrast of a row is the mean over seeds 0 and 1 of D5d's CRPS minus M0's CRPS of the same seed, so
-the two sets of fits are paired by fold and seed. D5d is this experiment's daily-refit fits; M0 seeds 0
+the contrast of a row is the mean over seeds 0 and 1 of D5d's CRPS minus M0's CRPS of the same
+seed, so the two sets of fits are paired by fold and seed. D5d is this experiment's daily-refit
+fits; M0 seeds 0
 and 1 are experiment 554's.
 
 Outputs under `data/ml-experiments/00565-*/work/scores/`: `d5d_absolute.csv`, `d5d_contrasts.csv`,

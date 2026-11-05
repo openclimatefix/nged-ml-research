@@ -27,13 +27,13 @@ import e00448_run as r448  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k  # ty: ignore[unresolved-import]
 import e00511_fit as f  # ty: ignore[unresolved-import]
-import e00559_extra as extra
-import e00559_folded as folded
-import e00559_model as m
-import e00559_model_drift as mdr
-import e00559_model_extra as mex
-import e00559_model_wt as mwt
-import e00559_wt as wt
+import e00559_extra as extra  # ty: ignore[unresolved-import]
+import e00559_folded as folded  # ty: ignore[unresolved-import]
+import e00559_model as m  # ty: ignore[unresolved-import]
+import e00559_model_drift as mdr  # ty: ignore[unresolved-import]
+import e00559_model_extra as mex  # ty: ignore[unresolved-import]
+import e00559_model_wt as mwt  # ty: ignore[unresolved-import]
+import e00559_wt as wt  # ty: ignore[unresolved-import]
 import e00565_model_variants as var
 import e00565_slow as slow
 import numpy as np
@@ -253,7 +253,9 @@ c.serving_quantiles = serving_quantiles
 
 
 class ShuffledMonthColumns(extra.DriftColumns):
-    """`DriftColumns` whose placebo (`null`) permutes the integer month index of the older months (design 4's placebo).
+    """`DriftColumns` whose placebo (`null`) permutes the older months' integer month index.
+
+    This is design 4's placebo.
 
     The permutation is fixed (seed 0) and leaves the newest knot in place, so that the position of a
     forecast after the cutoff still reads the newest knot.

@@ -72,22 +72,22 @@ def figure(*, knots: pl.DataFrame, ev: pl.DataFrame, field: str, group: str) -> 
     )
     x = alt.X("date:T", title=None, axis=alt.Axis(format="%Y", tickCount="year"))
     base = alt.Chart(agg).encode(x=x)
-    band = base.mark_area(opacity=0.35, color=theme.DATA_BLUE).encode(
+    band = base.mark_area(opacity=0.35, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("lo:Q", title=ytitle), y2="hi:Q"
     )
-    line = base.mark_line(color=theme.DATA_BLUE).encode(y="mean:Q")
-    dots = base.mark_point(color=theme.DATA_BLUE, size=8, filled=True).encode(y="mean:Q")
+    line = base.mark_line(color=theme.DATA_BLUE).encode(y="mean:Q")  # ty: ignore[unresolved-attribute]
+    dots = base.mark_point(color=theme.DATA_BLUE, size=8, filled=True).encode(y="mean:Q")  # ty: ignore[unresolved-attribute]
     spans = (
-        alt.Chart(e)
+        alt.Chart(e)  # ty: ignore[unresolved-attribute]
         .mark_rect(color=theme.BRAND_ORANGE, opacity=0.55)
         .encode(x="start:T", x2="end:T")
     )
     zero = (
-        alt.Chart(pl.DataFrame({"z": [0.0]}))
+        alt.Chart(pl.DataFrame({"z": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="grey", strokeDash=[3, 3])
         .encode(y="z:Q")
     )
-    return alt.vconcat(
+    return alt.vconcat(  # ty: ignore[invalid-return-type]
         *[
             alt.layer(
                 spans.transform_filter(alt.datum.label == s),

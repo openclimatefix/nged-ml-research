@@ -71,16 +71,16 @@ def main() -> None:
         xt = (
             "CRPS minus coarse M0's (points of capacity; more negative is better)" if last else None
         )
-        rule = base.mark_rule().encode(
+        rule = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lo:Q", title=xt, scale=alt.Scale(domain=[-0.7, 1.0])), x2="hi:Q"
         )
-        dot = base.mark_point(filled=True, size=50).encode(x="d:Q")
+        dot = base.mark_point(filled=True, size=50).encode(x="d:Q")  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"z": [0.0]}))
+            alt.Chart(pl.DataFrame({"z": [0.0]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="grey", strokeDash=[4, 3])
             .encode(x="z:Q")
         )
-        return alt.layer(zero, rule, dot).properties(
+        return alt.layer(zero, rule, dot).properties(  # ty: ignore[invalid-return-type]
             width=360, height=190, title=alt.TitleParams(group, anchor="start", fontSize=12)
         )
 

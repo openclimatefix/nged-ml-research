@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 565: forecast error in the weeks after a labelled load-shift event ends, D5 against M0 (daily harness).
+"""Experiment 565: forecast error after a labelled load-shift event ends, D5 against M0.
+
+The harness is the daily refit.
 
 For each labelled event at one of the sixteen Primaries, the rows whose valid time lies in the first
 14 days after the event's end, or in days 14 to 28, at that Primary, with a lead of 24 to 120 h.
@@ -42,7 +44,7 @@ def main() -> None:
             sub = t.filter(pl.Series(mask))
             part = sc.s.row_set(table=sub, name=grp) if sub.height else sub
             if part.height:
-                m = float(part["d"].mean())
+                m = float(part["d"].mean())  # ty: ignore[invalid-argument-type]
                 n = part.height
                 days = part.select(pl.col("month"), pl.col("day")).unique().height
                 print(

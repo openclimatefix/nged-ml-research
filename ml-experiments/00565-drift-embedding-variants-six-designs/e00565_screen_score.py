@@ -95,9 +95,13 @@ def build_table(*, arms: list[str]) -> pl.DataFrame:
 
 
 def mde(*, sub: pl.DataFrame, arm: str, ref: str) -> float:
-    """Return the seed-noise half-width: 1.96 x the seed-to-seed sd of the paired contrast (pooled within folds) / sqrt(seeds).
+    """Return the seed-noise half-width of a contrast.
 
-    This is a half-width, not a power-based minimum detectable effect, and it uses the normal quantile with 5 degrees of freedom.
+    The half-width is 1.96 x the seed-to-seed sd of the paired contrast (pooled within folds) /
+    sqrt(seeds).
+
+    This is a half-width, not a power-based minimum detectable effect, and it uses the normal
+    quantile with 5 degrees of freedom.
     """
     cols = [f"d_{arm}_{ref}_s{x}" for x in SEEDS]
     mm = (
@@ -129,7 +133,7 @@ def leak(*, arms: list[str]) -> pl.DataFrame:
                         "arm": arm,
                         "month": month,
                         "sign": sign,
-                        "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),
+                        "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),  # ty: ignore[invalid-argument-type]
                     }
                 )
     t = pl.DataFrame(rows)
