@@ -1,5 +1,5 @@
 # ruff: noqa: E501, ANN001, ANN201, PT018
-"""Experiment 571: coarse-refit fits of the drift-offset and drift-embedding arms in a known-answer world (GPU).
+"""Experiment 571: coarse-refit fits of the drift arms in a known-answer world (GPU).
 
 A reduced copy of experiment 565's `e00565_fit.py` (daily harness, rows, recency weights, early
 stopping, seeds, scoring windows, origin-time weather assertions), with these changes: the world named
@@ -7,7 +7,8 @@ by the `WORLD` environment variable is injected into the cleaned power before an
 (`e00571_world`); the arms are the base network, the oracle, D5, A10, and four hybrids; and the
 state of each world lives under its own folder. Cadence `h` refits on days 0 and 14 of each fold.
 
-Usage: WORLD=Wc python e00571_fit.py {pretrain|fit|assemble} --arm ARM [--stress] [--months ...] [--seeds ...]
+Usage: `WORLD=Wc python e00571_fit.py {pretrain|fit|assemble} --arm ARM [--stress]
+[--months ...] [--seeds ...]`
 """
 
 import argparse

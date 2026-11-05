@@ -1,5 +1,8 @@
 # ruff: noqa: E501
-"""Experiment 571: the recovery chart, share of the oracle's CRPS gain each arm recovers (injected Primaries, 24-120 h)."""
+"""Experiment 571: the recovery chart.
+
+The chart shows the share of the oracle's CRPS gain each arm recovers (injected Primaries, 24-120 h).
+"""
 
 from pathlib import Path
 
