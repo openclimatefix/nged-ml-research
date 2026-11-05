@@ -2,10 +2,12 @@
 """Arm A8: a folded-normal mixture head for the MVA-only Primaries.
 
 An MVA-only Primary's apparent power cannot be negative. Write `u = z + m` for the standardised
-target `z` shifted by `m = target_mean / target_std` of the Primary, so that `u >= 0` is the load in
-units of its standard deviation. The head's three components describe `u`, with each component
-mean equal to the raw mean plus `m`. A folded component has density `N(u; mu, sigma) + N(u; -mu, sigma)` on `u >= 0`, and its CDF
-is `Phi((u - mu) / sigma) - Phi((-u - mu) / sigma)`. The signed-MW Primaries keep the usual mixture,
+target `z` shifted by `m = target_mean / target_std` of the Primary, so that `u >= 0` is the load
+in units of its standard deviation. The head's three components describe `u`, with each component
+mean equal to the raw mean plus `m`.
+
+A folded component has density `N(u; mu, sigma) + N(u; -mu, sigma)` on `u >= 0`. Its CDF is
+`Phi((u - mu) / sigma) - Phi((-u - mu) / sigma)`. The signed-MW Primaries keep the usual mixture,
 so a row's loss and quantiles depend on its Primary's group.
 """
 
