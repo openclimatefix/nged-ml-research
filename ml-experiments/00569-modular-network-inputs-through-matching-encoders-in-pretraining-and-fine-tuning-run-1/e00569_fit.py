@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, PT018, PLR0915
+# ruff: noqa: E501, ANN001, ANN201, D103, PT018
 """Experiment 569, run 1: inputs enter the modular lag-free network in pre-training AND fine-tuning, through the matching encoder.
 
 Rows, cutoffs' training windows, recency weights (90-day half-life), early stopping, seeds, scoring
@@ -43,7 +43,11 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 NAME = "00569-modular-network-inputs-through-matching-encoders-in-pretraining-and-fine-tuning-run-1"
 WORK = ML_EXPERIMENTS_DATA_DIR / NAME
 W = WORK / "work"
-W554 = ML_EXPERIMENTS_DATA_DIR / "00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out" / "work"
+W554 = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out"
+    / "work"
+)
 FRESH_SEED = 12345
 MIXER_LR = 5e-4
 PRESENT_FRACTION = 0.5
@@ -74,7 +78,9 @@ def proximity() -> dict[int, float]:
     """Return each Primary's schools within 2 km as a share of the largest count (B3c's gate; 0 means no school)."""
     t = pl.read_csv(WORK / "school_proximity.csv")
     top = float(t[cols.SCHOOL_RADIUS_KM].max())
-    return {int(p): float(n) / top for p, n in zip(t["primary"], t[cols.SCHOOL_RADIUS_KM], strict=True)}
+    return {
+        int(p): float(n) / top for p, n in zip(t["primary"], t[cols.SCHOOL_RADIUS_KM], strict=True)
+    }
 
 
 EX = None if CONTROL else cols.Extras(arm=ARGS.arm, proximity=proximity())
@@ -97,7 +103,9 @@ def pretrained_file(*, arm, month: str, seed: int) -> Path:
     return path
 
 
-def new_model(*, outlier: bool, n_inputs: int, n_primaries: int, stage: str | None = None) -> torch.nn.Module:
+def new_model(
+    *, outlier: bool, n_inputs: int, n_primaries: int, stage: str | None = None
+) -> torch.nn.Module:
     assert not outlier
     assert n_inputs == m.N_INPUTS + WIDTH, (n_inputs, WIDTH)
     if CONTROL:
@@ -174,7 +182,9 @@ def train(
 c.new_model, c.load_pretrained, c.train = new_model, load_pretrained, train
 f.pretrained_file = pretrained_file
 f.W = W
-f.model_file = lambda *, arm, month, day, seed, stress="": W / "models" / ARGS.arm / f"{month}_d{day}_s{seed}{stress}.pt"
+f.model_file = lambda *, arm, month, day, seed, stress="": (
+    W / "models" / ARGS.arm / f"{month}_d{day}_s{seed}{stress}.pt"
+)
 _cutoffs = k.cutoffs
 
 
@@ -203,7 +213,9 @@ def pretrain_columns(*, month: str, pre) -> np.ndarray:
         rng = np.random.default_rng([569, month_code(month=month)])
         present = rng.random(n) < PRESENT_FRACTION
         shape = shapes.columns(source="placebo" if EX.placebo else "price", target_idx=ti)  # ty: ignore[unresolved-attribute]
-        out = np.concatenate([np.where(present[:, None], shape, 0.0), present[:, None]], axis=1).astype(np.float32)
+        out = np.concatenate(
+            [np.where(present[:, None], shape, 0.0), present[:, None]], axis=1
+        ).astype(np.float32)
         CHECK["months"].setdefault(month, {})["pretrain_present_share"] = float(present.mean())
         return out
     real = EX.raw_pretrain(primary=primary, origin_idx=oi, target_idx=ti, shift=None)  # ty: ignore[unresolved-attribute]
@@ -212,7 +224,9 @@ def pretrain_columns(*, month: str, pre) -> np.ndarray:
     stats.parent.mkdir(parents=True, exist_ok=True)
     np.savez(stats, mean=EX.mean, std=EX.std)  # ty: ignore[unresolved-attribute]
     if not EX.placebo:  # ty: ignore[unresolved-attribute]
-        CHECK["months"].setdefault(month, {})["pretrain_present_share"] = float(np.isfinite(real).all(axis=1).mean())
+        CHECK["months"].setdefault(month, {})["pretrain_present_share"] = float(
+            np.isfinite(real).all(axis=1).mean()
+        )
         return EX.scale(raw=real)  # ty: ignore[unresolved-attribute]
     days = placebo.DayStructure(fit_until_idx=fit_idx, allowed=None)
     raw = np.full(real.shape, np.nan, dtype=np.float32)
@@ -222,7 +236,9 @@ def pretrain_columns(*, month: str, pre) -> np.ndarray:
         idx = np.nonzero(todo & np.isfinite(shift))[0]
         if not len(idx):
             continue
-        got = EX.raw_pretrain(primary=primary[idx], origin_idx=oi[idx], target_idx=ti[idx], shift=shift[idx])  # ty: ignore[unresolved-attribute]
+        got = EX.raw_pretrain(
+            primary=primary[idx], origin_idx=oi[idx], target_idx=ti[idx], shift=shift[idx]
+        )  # ty: ignore[unresolved-attribute]
         raw[idx] = got
         todo[idx] = False
     CHECK["months"].setdefault(month, {})["pretrain_placebo_rows_without_donor"] = int(todo.sum())
@@ -238,7 +254,9 @@ def pretrain(*, device: str) -> None:
     assert not CONTROL, "arm M0 starts from experiment 554's pre-trained weights"
     clean = c.clean_stack()
     for month in ARGS.months:
-        todo = [s for s in ARGS.seeds if not (W / "pretrained" / ARGS.arm / f"{month}_s{s}.pt").exists()]
+        todo = [
+            s for s in ARGS.seeds if not (W / "pretrained" / ARGS.arm / f"{month}_s{s}.pt").exists()
+        ]
         if not todo:
             continue
         refit_t = c.month_start(month=month)
@@ -259,12 +277,18 @@ def pretrain(*, device: str) -> None:
             x[a:b, : m.N_INPUTS] = torch.from_numpy(pre.x[a:b]).to(device)
             x[a:b, m.N_INPUTS :] = torch.from_numpy(extra[a:b]).to(device)
         zt = torch.from_numpy(z.astype(np.float32)).to(device)
-        wt, pt, vt = torch.ones(n, device=device), torch.from_numpy(pre.primary).to(device), torch.from_numpy(pre.is_val).to(device)
+        wt, pt, vt = (
+            torch.ones(n, device=device),
+            torch.from_numpy(pre.primary).to(device),
+            torch.from_numpy(pre.is_val).to(device),
+        )
         del pre, rows, extra
         for seed in todo:
             started = time.monotonic()
             torch.manual_seed(seed)
-            model = new_model(outlier=False, n_inputs=m.N_INPUTS + WIDTH, n_primaries=16, stage="pre").to(device)
+            model = new_model(
+                outlier=False, n_inputs=m.N_INPUTS + WIDTH, n_primaries=16, stage="pre"
+            ).to(device)
             epochs, best = train(model=model, x=x, z=zt, w=wt, p=pt, is_val=vt, seed=seed, lr=c.PRETRAIN_LR, outlier=False, prior=False, device=device)  # fmt: skip
             target = W / "pretrained" / ARGS.arm / f"{month}_s{seed}.pt"
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -291,13 +315,13 @@ def finetune_columns(*, month: str, primary, origin_idx, target_idx, present) ->
     stats = np.load(stats_file(month=month))
     EX.mean, EX.std = stats["mean"], stats["std"]  # ty: ignore[unresolved-attribute]
     table_arm = "B3a" if BASE == "B3c" else BASE
-    getter = fc._raw_placebo if EX.placebo else fc._raw_real  # ty: ignore[unresolved-attribute]  # noqa: SLF001
+    getter = fc._raw_placebo if EX.placebo else fc._raw_real  # ty: ignore[unresolved-attribute]
     raw = getter(arm=table_arm, primary=primary, origin_idx=origin_idx, valid_idx=target_idx)
     flag = np.ones((len(raw), 1), dtype=np.float32)
     if BASE in {"B3a", "B3b", "B3c"}:
         raw = np.concatenate([raw, flag], axis=1)
     if BASE == "B3c":
-        gate = EX._gate(primary=primary)[:, None]  # ty: ignore[unresolved-attribute]  # noqa: SLF001
+        gate = EX._gate(primary=primary)[:, None]  # ty: ignore[unresolved-attribute]
         raw = np.concatenate([raw, np.nan_to_num(raw[:, :5]) * gate], axis=1)
     return EX.scale(raw=raw)  # ty: ignore[unresolved-attribute]
 
@@ -312,7 +336,9 @@ def build_month(*, month, clean):
     runs = np.unique(mr.origin_us)
     delay = int(common.PUBLICATION_DELAY.total_seconds() * 1e6)
     miss = [r for r in runs if not (prep.SUMMARY_DIR / f"init={datetime.fromtimestamp((r - delay) / 1e6, UTC):%Y-%m-%d}.parquet").exists()]  # fmt: skip
-    assert not miss, f"{month}: {len(miss)} training origins have no weather-run summary file {common.PUBLICATION_DELAY} earlier"
+    assert not miss, (
+        f"{month}: {len(miss)} training origins have no weather-run summary file {common.PUBLICATION_DELAY} earlier"
+    )
     CHECK["train_rows"] += len(mr.y)
     CHECK["months"].setdefault(month, {})["train_rows"] = len(mr.y)
     if CONTROL:
@@ -323,7 +349,13 @@ def build_month(*, month, clean):
     origin_idx = _idx(us=mr.origin_us)
     rng = np.random.default_rng([569, month_code(month=month), 2])
     present = rng.random(len(mr.y)) < PRESENT_FRACTION
-    add = finetune_columns(month=month, primary=mr.primary, origin_idx=origin_idx, target_idx=mr.target_idx, present=present)
+    add = finetune_columns(
+        month=month,
+        primary=mr.primary,
+        origin_idx=origin_idx,
+        target_idx=mr.target_idx,
+        present=present,
+    )
     assert add.shape == (len(mr.y), WIDTH) and np.isfinite(add).all()
     i = int(np.argmax(mr.valid_us > mr.origin_us + 24 * 3_600_000_000))
     CHECK["months"][month]["train_example"] = f"origin {datetime.fromtimestamp(mr.origin_us[i] / 1e6, UTC)}, weather run {datetime.fromtimestamp(mr.origin_us[i] / 1e6, UTC) - common.PUBLICATION_DELAY}, valid {datetime.fromtimestamp(mr.valid_us[i] / 1e6, UTC)}, primary {int(mr.primary[i])}, extra {np.round(add[i], 3).tolist()}"  # fmt: skip
@@ -365,7 +397,9 @@ def assemble() -> None:
             parts = [W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet" for cut in cuts]  # fmt: skip
             assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
-            f.atomic_frame(frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet")
+            f.atomic_frame(
+                frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet"
+            )
             print("wrote", ARM.tag, month, seed, frame.height, flush=True)
 
 
@@ -374,12 +408,30 @@ if __name__ == "__main__":
         assemble()
     elif ARGS.command == "show":
         model = new_model(outlier=False, n_inputs=m.N_INPUTS + WIDTH, n_primaries=16)
-        print(ARGS.arm, "extra columns", WIDTH, "route", ROUTE, "parameters", sum(q.numel() for q in model.parameters()))
+        print(
+            ARGS.arm,
+            "extra columns",
+            WIDTH,
+            "route",
+            ROUTE,
+            "parameters",
+            sum(q.numel() for q in model.parameters()),
+        )
     elif ARGS.command == "pretrain":
         pretrain(device="cuda")
     else:
         started = time.monotonic()
-        f.fit_arm(arm=ARM, months=ARGS.months, seeds=ARGS.seeds, stress=ARGS.stress, limit=ARGS.limit, device="cuda")
-        out = WORK / f"checks_{ARM.tag}_s{'-'.join(map(str, ARGS.seeds))}_d{ARGS.cut_day}{'_stress' if ARGS.stress else ''}.json"
+        f.fit_arm(
+            arm=ARM,
+            months=ARGS.months,
+            seeds=ARGS.seeds,
+            stress=ARGS.stress,
+            limit=ARGS.limit,
+            device="cuda",
+        )
+        out = (
+            WORK
+            / f"checks_{ARM.tag}_s{'-'.join(map(str, ARGS.seeds))}_d{ARGS.cut_day}{'_stress' if ARGS.stress else ''}.json"
+        )
         out.write_text(json.dumps(CHECK, indent=1, default=str))
         print("CHECKS PASSED", {a: v for a, v in CHECK.items() if a != "months"}, f"{time.monotonic() - started:.0f} s")  # fmt: skip

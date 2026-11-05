@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201
+# ruff: noqa: E501
 """The extra input columns of experiment 569, for pre-training rows (ERA5 and CAMS stand-ins) and fine-tuning rows.
 
 One `Extras` object serves one arm (`B1`, `B1p`, `B2`, ..., `B3c`, `B4`, `B4p`; a `p` suffix is the
@@ -74,13 +74,22 @@ class Extras:
 
     def _dense(self, *, primary: int) -> dict[str, np.ndarray]:
         if primary not in self.dense:
-            self.dense[primary] = f437.dense_arrays(row=self.rows[primary], local_date=self.local_date)
+            self.dense[primary] = f437.dense_arrays(
+                row=self.rows[primary], local_date=self.local_date
+            )
         return self.dense[primary]
 
     def _gate(self, *, primary: np.ndarray) -> np.ndarray:
         return np.array([self.proximity[int(p)] for p in primary], dtype=np.float32)
 
-    def raw_pretrain(self, *, primary: np.ndarray, origin_idx: np.ndarray, target_idx: np.ndarray, shift: np.ndarray | None) -> np.ndarray:
+    def raw_pretrain(
+        self,
+        *,
+        primary: np.ndarray,
+        origin_idx: np.ndarray,
+        target_idx: np.ndarray,
+        shift: np.ndarray | None,
+    ) -> np.ndarray:
         """Return the arm's unstandardised columns for pre-training rows (NaN where the source has no value).
 
         `shift` is each row's donor-day shift in half-hours (NaN where there is no donor), or None for
@@ -123,7 +132,9 @@ class Extras:
         if base == "B3b":
             first, dense = self.national
             codes = self.local_date[o2] - 1
-            out = np.stack([f437.lookup(first=first, dense=dense[c], codes=codes) for c in NATIONAL], axis=1).astype(np.float32)
+            out = np.stack(
+                [f437.lookup(first=first, dense=dense[c], codes=codes) for c in NATIONAL], axis=1
+            ).astype(np.float32)
             out[~ok] = np.nan
             present = np.isfinite(out[:, 0]).astype(np.float32)
             return np.concatenate([out, present[:, None]], axis=1)
