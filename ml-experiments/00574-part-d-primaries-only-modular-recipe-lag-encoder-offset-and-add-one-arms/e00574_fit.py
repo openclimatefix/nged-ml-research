@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, PT018, D102, RUF028
+# ruff: noqa: E501, ANN001, ANN201, PT018, D102, RUF028, PLR0915
 """Experiment 574: coarse-refit fits of the Part D add-one arms on experiment 572's v3+D5 base (GPU).
 
 A copy of experiment 565's `e00565_fit.py` (coarse cadence `h`: refits on days 0 and 14 of each fold;
@@ -29,12 +29,15 @@ import e00448_run as r448  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00511_common as k  # ty: ignore[unresolved-import]
 import e00511_fit as f  # ty: ignore[unresolved-import]
+import e00515_placebo as placebo  # ty: ignore[unresolved-import]
 import e00558_lags as lags  # ty: ignore[unresolved-import]
 import e00559_extra as extra  # ty: ignore[unresolved-import]
 import e00559_model as m  # ty: ignore[unresolved-import]
 import e00560_data as d560  # ty: ignore[unresolved-import]
 import e00560_model as m560  # ty: ignore[unresolved-import]
+import e00562_columns as c562  # ty: ignore[unresolved-import]
 import e00568_spread as spread_lib  # ty: ignore[unresolved-import]
+import e00569_columns as cols569  # ty: ignore[unresolved-import]
 import e00572_lags as lg  # ty: ignore[unresolved-import]
 import e00572_model as m572  # ty: ignore[unresolved-import]
 import e00574_model as mod
@@ -53,9 +56,7 @@ W559 = (
 """Experiment 559's work folder; only its `pretrained_drift/real` weights (arm A10) are read."""
 W560 = ML_EXPERIMENTS_DATA_DIR / "00560-modular-lag-encoder-capped-lags-and-block-dropout/work"
 """Experiment 560's work folder; only its `pretrained/LAG-v3` weights (arm V3) are read."""
-W572 = (
-    ML_EXPERIMENTS_DATA_DIR / "00572-two-offset-part-1-lags-versus-the-slow-output-offset/work"
-)
+W572 = ML_EXPERIMENTS_DATA_DIR / "00572-two-offset-part-1-lags-versus-the-slow-output-offset/work"
 """Experiment 572's work folder; its `pretrained_V3D5` weights are the pre-training of every arm that adds no pre-training input (base P0)."""
 W554 = (
     ML_EXPERIMENTS_DATA_DIR
@@ -70,6 +71,8 @@ COARSE_OFFSETS = (0, 14)
 """Cadence `h`: refits on days 0 and 14, so that the injected-shift control (the day-14 fit) exists."""
 CADENCE_3_OFFSETS = (0, *range(2, 31, 3))
 """Refit days of arm A7: day 0, then every third day from day 2, so that days 14, 17, and 20 are refits."""
+EMBARGO_DAYS = 3
+"""Days before the cutoff whose targets arm P4E leaves out of step 2 and of the daily fine-tune (experiment 556's embargo)."""
 UNIFORM_HALF_LIFE = 1e12
 """A half-life so long that every weight is 1 (step 2 has no recency weighting)."""
 
@@ -91,6 +94,8 @@ class Spec:
     head: str = "mixture"
     average_of: str | None = None
     spread: bool = False  # arm P1: experiment 568's seven spread columns in the fine-tuning mixer
+    sched: str = "1s"  # "1s" (experiment 559's one-step schedule), "3s" (three-step), or "3sE" (three-step plus a 3-day embargo)
+    b1: str = ""  # arm P2 ("B1") or its placebo P2-plac ("B1p"): experiment 569's thermal-lag and solar-gain columns
     pretrain_from: str = "V3D5"  # which pre-training folder (under this experiment, or 572's V3D5) the arm starts from
 
     @property
@@ -109,10 +114,14 @@ SPECS = {
     for s in (
         Spec("P1", "24h", "lagoff", True, spread=True),
         Spec("P3E0", "24h", "lagoff", False),
+        Spec("P4", "24h", "lagoff", True, sched="3s"),
+        Spec("P4E", "24h", "lagoff", True, sched="3sE"),
+        Spec("P2", "24h", "lagoff", True, b1="B1", pretrain_from="P2"),
+        Spec("P2plac", "24h", "lagoff", True, b1="B1p", pretrain_from="P2plac"),
     )
 }
 parser = argparse.ArgumentParser()
-parser.add_argument("command", choices=("fit", "assemble", "pretrain-wt"))
+parser.add_argument("command", choices=("fit", "assemble", "pretrain-wt", "step2"))
 parser.add_argument("--arm", choices=tuple(SPECS), required=True)
 parser.add_argument("--stress", action="store_true")
 parser.add_argument("--months", nargs="+", default=list(c.MONTHS))
@@ -205,14 +214,16 @@ def new_model(*, n_primaries: int, stage: str = "ft") -> torch.nn.Module:
         return m572.OffsetFtOnly(n_primaries=n_primaries, n_knots=KNOTS)
     model: torch.nn.Module
     if SPEC.variant == "lagoff":
-        model = mod.PartDMdn(n_primaries=n_primaries, stage=stage, n_knots=KNOTS, spread=SPEC.spread)
+        model = mod.PartDMdn(
+            n_primaries=n_primaries, stage=stage, n_knots=KNOTS, spread=SPEC.spread, n_b1=N_B1
+        )
     else:
         model = m560.LagModularMdn(n_primaries=n_primaries, mode="v3", stage=stage)
     model.table = CTX.get(f"table_{stage}")  # ty: ignore[invalid-assignment]
     return model
 
 
-def train(  # noqa: PLR0912, PLR0915
+def train(  # noqa: PLR0912
     *, model: torch.nn.Module, x, z, w, p, is_val, seed: int, lr: float, max_epochs: int,
     fresh_lr: float | None, frozen: bool, anchor: dict | None, lam: float, device: str,
 ) -> tuple[int, float]:  # fmt: skip
@@ -304,6 +315,10 @@ CTX: dict = {"on": False, "extra": {}}
 AGED_DAYS = (1, 2, 3)
 SIBLINGS = ["removed", *[f"aged{n}" for n in AGED_DAYS]]
 CAP_HOURS = SPEC.cap_steps * 0.5
+N_B1 = cols569.width(arm=SPEC.b1) if SPEC.b1 else 0
+EX = cols569.Extras(arm=SPEC.b1, proximity={}) if SPEC.b1 else None
+FOLDS: dict[str, c562.FoldColumns] = {}
+PRETRAIN_PRESENT = "B1 has no presence flag, so every pre-training row carries its columns"
 N_LAG_INPUTS = m560.N_INPUTS  # 37 lag-free columns + 8 lag columns
 
 
@@ -446,6 +461,73 @@ f.window_frame, f.atomic_frame = window_frame, atomic_frame
 BLOCKS: dict[str, spread_lib.SpreadBlock] = {}
 
 
+PRETRAINING: dict[str, bool] = {"on": False}
+"""True while `pretrain_wt` builds a fold's rows: the B1 scale and spread block exist only after pre-training."""
+
+
+def stats_file(*, month: str) -> Path:
+    """Return the fold's mean and standard deviation of the B1 columns (fitted on pre-training rows)."""
+    return W / "stats" / SPEC.b1 / f"{month}.npz"
+
+
+def fit_until(*, month: str) -> int:
+    """Return the grid index of the fold's refit time."""
+    return int((c.us(t=c.month_start(month=month)) - c.prep422.GRID_START_US) // c.prep422.STEP_US)
+
+
+def pretrain_b1_columns(*, month: str, pre) -> np.ndarray:
+    """Return the standardised B1 columns of the fold's pre-training rows and store the fold's scale.
+
+    Experiment 569's construction: the columns come from the dense ERA5 and CAMS weather at each
+    row's own origin and valid time; the placebo takes them from a donor day of the same side of the
+    refit, with the real arm's scale.
+    """
+    assert EX is not None
+    primary, oi, ti = pre.primary, pre.origin_idx, pre.target_idx
+    real = EX.raw_pretrain(primary=primary, origin_idx=oi, target_idx=ti, shift=None)
+    EX.fit(raw=real)
+    stats = stats_file(month=month)
+    stats.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(stats, mean=EX.mean, std=EX.std)
+    if not EX.placebo:
+        CHECK["months"].setdefault(month, {})["pretrain_b1_complete_share"] = float(
+            np.isfinite(real).all(axis=1).mean()
+        )
+        return EX.scale(raw=real)
+    days = placebo.DayStructure(fit_until_idx=fit_until(month=month), allowed=None)
+    raw = np.full(real.shape, np.nan, dtype=np.float32)
+    todo = np.ones(len(primary), dtype=bool)
+    for attempt in range(len(placebo.SEEDS)):
+        shift = days.shifts(valid_idx=ti, attempt=attempt)
+        idx = np.nonzero(todo & np.isfinite(shift))[0]
+        if not len(idx):
+            continue
+        raw[idx] = EX.raw_pretrain(
+            primary=primary[idx], origin_idx=oi[idx], target_idx=ti[idx], shift=shift[idx]
+        )
+        todo[idx] = False
+    CHECK["months"].setdefault(month, {})["pretrain_placebo_rows_without_donor"] = int(todo.sum())
+    return EX.scale(raw=raw)
+
+
+def finetune_b1_columns(*, month: str, primary, origin_idx, target_idx) -> np.ndarray:
+    """Return the standardised B1 columns of fine-tuning or scoring rows, on the fold's pre-training scale.
+
+    Each row's columns are experiment 437's stored values for the ensemble run keyed by the row's
+    origin (the run issued at or before the origin minus 9 h); a row with no stored key raises.
+    """
+    assert EX is not None
+    if month not in FOLDS:
+        FOLDS.clear()
+        FOLDS[month] = c562.FoldColumns(fit_until_idx=fit_until(month=month))
+    fc = FOLDS[month]
+    stats = np.load(stats_file(month=month))
+    EX.mean, EX.std = stats["mean"], stats["std"]
+    getter = fc._raw_placebo if EX.placebo else fc._raw_real
+    raw = getter(arm="B1", primary=primary, origin_idx=origin_idx, valid_idx=target_idx)
+    return EX.scale(raw=raw)
+
+
 def origin_idx_of(*, us: np.ndarray) -> np.ndarray:
     """Return the grid index of origin times given in microseconds."""
     return ((us - c.prep422.GRID_START_US) // c.prep422.STEP_US).astype(np.int64)
@@ -499,13 +581,31 @@ def build_month(*, month, clean):
         mr.x = np.concatenate([mr.x, WT.month(null=False)], axis=1)
         CHECK["months"][month]["knot_example"] = WT.example
         print(month, "knot-position column appended |", WT.example, flush=True)
-    if SPEC.spread:
+    if SPEC.b1 and not PRETRAINING["on"]:
+        add = finetune_b1_columns(
+            month=month,
+            primary=mr.primary,
+            origin_idx=origin_idx_of(us=mr.origin_us),
+            target_idx=mr.target_idx,
+        )
+        assert add.shape == (len(mr.y), N_B1) and np.isfinite(add).all()
+        assert mr.x.shape[1] == mod.b1_cols(n_b1=N_B1).start, mr.x.shape
+        mr.x = np.concatenate([mr.x, add], axis=1)
+        i = int(np.argmax(mr.valid_us > mr.origin_us + 24 * 3_600_000_000))
+        CHECK["months"][month]["b1_example_train"] = (
+            f"origin {datetime.fromtimestamp(mr.origin_us[i] / 1e6, UTC)}, weather run {datetime.fromtimestamp(mr.origin_us[i] / 1e6, UTC) - common.PUBLICATION_DELAY}, "
+            f"valid {datetime.fromtimestamp(mr.valid_us[i] / 1e6, UTC)}, Primary {int(mr.primary[i])}, B1 {np.round(add[i], 3).tolist()}"
+        )
+        print(
+            month, "B1 columns appended |", CHECK["months"][month]["b1_example_train"], flush=True
+        )
+    if SPEC.spread and not PRETRAINING["on"]:
         sb = spread_lib.SpreadBlock(month=month, mr=mr, placebo=False)
         block = sb.block(
             x37=mr.x[:, :37], standardiser=mr.base.standardiser, primary=mr.primary,
             origin_idx=origin_idx_of(us=mr.origin_us), valid_idx=mr.target_idx, describe=True,
         )  # fmt: skip
-        assert mr.x.shape[1] == mod.SPREAD_COLS.start, mr.x.shape
+        assert mr.x.shape[1] == mod.spread_cols(n_b1=N_B1).start, mr.x.shape
         mr.x = np.concatenate([mr.x, block], axis=1)
         BLOCKS[month] = sb
         CHECK["months"][month]["spread_example_train"] = sb.example
@@ -541,12 +641,31 @@ def build_test(*, month, standardiser):
             f"weather run {datetime.fromtimestamp(test.origin[i] / 1e6, UTC) - pub} (origin minus {pub}), "
             f"valid {datetime.fromtimestamp(test.valid[i] / 1e6, UTC)}"
         )
-    print(month, "lead-band examples |", [v for a_, v in CHECK["months"][month].items() if a_.startswith("band_")], flush=True)
+    print(
+        month,
+        "lead-band examples |",
+        [v for a_, v in CHECK["months"][month].items() if a_.startswith("band_")],
+        flush=True,
+    )
     tau = None
     if SPEC.columns:
         tau = WT.rows(  # ty: ignore[unresolved-attribute]
             kind="ens", primary=test.primary, origin_idx=test.origin_idx, valid_idx=test.target_idx, null=False,
         )  # fmt: skip
+        if SPEC.b1:
+            add = finetune_b1_columns(
+                month=month,
+                primary=test.primary,
+                origin_idx=test.origin_idx,
+                target_idx=test.target_idx,
+            )
+            assert add.shape == (len(test.x), N_B1) and np.isfinite(add).all()
+            tau = np.concatenate([tau, add], axis=1)
+            CHECK["months"][month]["b1_example_test"] = (
+                f"origin {datetime.fromtimestamp(test.origin[0] / 1e6, UTC)}, weather run {datetime.fromtimestamp(test.origin[0] / 1e6, UTC) - pub}, "
+                f"valid {datetime.fromtimestamp(test.valid[0] / 1e6, UTC)}, B1 {np.round(add[0], 3).tolist()}"
+            )
+            print(month, "test B1 columns |", CHECK["months"][month]["b1_example_test"], flush=True)
         if SPEC.spread:
             sb = BLOCKS[month]
             block = sb.block(
@@ -614,7 +733,9 @@ def pretrain_wt(*, device: str) -> None:
         todo = [s for s in ARGS.seeds if not (pretrained_dir() / f"{month}_s{s}.pt").exists()]
         if not todo:
             continue
+        PRETRAINING["on"] = True
         mr = k.build_month(month=month, clean=clean)  # sets CTX["stats"] and the ENS-side lag table
+        PRETRAINING["on"] = False
         refit_t = c.month_start(month=month)
         pre = r448.pretrain_rows(rows=mr.base, refit=refit_t, clean=clean)
         assert pre.x.shape[1] == 37
@@ -635,7 +756,7 @@ def pretrain_wt(*, device: str) -> None:
         ).to(device)
         del cols
         CTX["table_pre"] = table_pre
-        n_in = N_LAG_INPUTS + (1 if SPEC.columns else 0)
+        n_in = N_LAG_INPUTS + (1 if SPEC.columns else 0) + N_B1
         x_gpu = torch.empty((len(pre.x), n_in), dtype=torch.float32, device=device)
         for a in range(0, len(pre.x), 1_000_000):
             x_gpu[a : a + 1_000_000, :37] = torch.from_numpy(pre.x[a : a + 1_000_000]).to(device)
@@ -644,6 +765,16 @@ def pretrain_wt(*, device: str) -> None:
                 kind="era5", primary=pre.primary, origin_idx=pre.origin_idx, valid_idx=pre.target_idx, null=False,
             )  # fmt: skip
             x_gpu[:, N_LAG_INPUTS] = torch.from_numpy(tau[:, 0]).to(device)
+        if SPEC.b1:
+            extra_b1 = pretrain_b1_columns(month=month, pre=pre)
+            assert extra_b1.shape == (len(pre.x), N_B1) and np.isfinite(extra_b1).all()
+            x_gpu[:, mod.b1_cols(n_b1=N_B1)] = torch.from_numpy(extra_b1).to(device)
+            j = len(extra_b1) // 2
+            print(
+                f"  B1 pre-training example: Primary {int(pre.primary[j])}, origin {datetime.fromtimestamp((pre.origin_idx[j] * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC)}, valid {datetime.fromtimestamp((pre.target_idx[j] * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC)} (ERA5/CAMS stand-in), B1 {np.round(extra_b1[j], 3).tolist()}",
+                flush=True,
+            )
+            del extra_b1
         stub = np.zeros((min(2_000_000, len(blk)), N_LAG_INPUTS), np.float32)
         stub[:, 37:] = blk[: len(stub)]
         ex = lg.check_lag_ages(
@@ -689,6 +820,19 @@ def pretrain_wt(*, device: str) -> None:
         torch.cuda.empty_cache()
 
 
+def step2_file(*, month: str, seed: int) -> Path:
+    """Return the saved step-2 weights (encoders, lag encoder, offset, and a mixer trained without recency weighting)."""
+    return W / "step2" / SPEC.tag / f"{month}_s{seed}.pt"
+
+
+def embargoed(*, mr, refit: c.Refit, cut: datetime) -> c.Refit:
+    """Return `refit` without the targets in the newest `EMBARGO_DAYS` days before the cutoff (arm P4E)."""
+    keep = mr.valid_us[refit.index] <= c.us(t=cut) - EMBARGO_DAYS * c.DAY_US
+    return c.Refit(
+        refit.index[keep], refit.y[keep], refit.weight[keep], refit.is_val[keep], refit.report
+    )
+
+
 def model_file(*, tag: str, month: str, day: int, seed: int, sfx: str = "") -> Path:
     """Return the saved weights of a daily fit."""
     return W / "models" / tag / f"{month}_d{day}_s{seed}{sfx}.pt"
@@ -704,6 +848,11 @@ def fine_tune(
     CTX.update(on=shift is not None, shift=shift, sign=sign, block=block, seed=seed, cut=cut)
     refit = c.select_rows(rows=mr, cutoff=cut, half_life_days=SPEC.half_life)
     assert refit.report["rows_past_valid_cut"] == 0 and refit.report["rows_past_origin_cut"] == 0
+    if SPEC.sched == "3sE":
+        refit = embargoed(mr=mr, refit=refit, cut=cut)
+    assert KNOTS == 0 or WT.tau(valid_us=mr.valid_us[refit.index]).max() <= KNOTS - 1, (  # ty: ignore[unresolved-attribute]
+        "a training row lies beyond the newest offset knot (the fold's month start)"
+    )
     shift_z, injected = None, 0
     if shift is not None and block is not None:
         inj = (
@@ -718,12 +867,17 @@ def fine_tune(
     feeder = time.monotonic() - started
     model = new_model(n_primaries=len(mr.base.target_mean)).to(device)
     anchor = None
-    load_pretrained_fresh(model=model, path=pretrained_file(month=month, seed=seed))
+    if SPEC.sched == "1s":
+        load_pretrained_fresh(model=model, path=pretrained_file(month=month, seed=seed))
+        fresh_lr = FRESH_LR
+    else:
+        model.load_state_dict(torch.load(step2_file(month=month, seed=seed), map_location="cpu"))
+        fresh_lr = None  # fine-tuning from the step-2 weights keeps the mixer at the ordinary rate (experiment 559's A1)
     model.to(device)
     t0 = time.monotonic()
     epochs, best = train(
         model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
-        lr=SPEC.lr, max_epochs=SPEC.max_epochs, fresh_lr=FRESH_LR,
+        lr=SPEC.lr, max_epochs=SPEC.max_epochs, fresh_lr=fresh_lr,
         frozen=SPEC.frozen, anchor=anchor, lam=0.0, device=device,
     )  # fmt: skip
     day = f.day_of(month=month, cut=cut)
@@ -813,6 +967,65 @@ def fit_arm(
         torch.cuda.empty_cache()
 
 
+def step2(*, months: list[str], seeds: list[int], device: str) -> None:
+    """Train and save step 2 of the three-step schedule at each fold's first cutoff (arms P4 and P4E).
+
+    Experiment 559's recipe on the lag network of experiment 566: the pre-trained encoders, lag
+    encoder, and offset knots, a fresh mixer, no recency weighting (every weight is 1), early
+    stopping on the usual weeks, and rows with targets up to the cutoff minus 3.5 hours. P4E drops
+    the newest 3 days of targets as well.
+    """
+    assert SPEC.sched in {"3s", "3sE"}
+    clean = c.clean_stack()
+    for month in months:
+        todo = [s for s in seeds if not step2_file(month=month, seed=s).exists()]
+        if not todo:
+            continue
+        mr = k.build_month(month=month, clean=clean)
+        g = k.GpuMonth(mr=mr, device=device)
+        cut = c.month_start(month=month)
+        refit = c.select_rows(rows=mr, cutoff=cut, half_life_days=UNIFORM_HALF_LIFE)
+        assert (
+            refit.report["rows_past_valid_cut"] == 0 and refit.report["rows_past_origin_cut"] == 0
+        )
+        if SPEC.sched == "3sE":
+            refit = embargoed(mr=mr, refit=refit, cut=cut)
+        for seed in todo:
+            started = time.monotonic()
+            CTX.update(on=False, shift=None, sign=0, block=None, seed=seed, cut=cut)
+            t = g.refit_tensors(refit=refit)
+            assert float(t["w"].min()) > 0.999, "step 2 must have no recency weighting"
+            model = new_model(n_primaries=len(mr.base.target_mean)).to(device)
+            load_pretrained_fresh(model=model, path=pretrained_file(month=month, seed=seed))
+            model.to(device)
+            epochs, best = train(
+                model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
+                lr=SPEC.lr, max_epochs=SPEC.max_epochs, fresh_lr=FRESH_LR, frozen=SPEC.frozen,
+                anchor=None, lam=0.0, device=device,
+            )  # fmt: skip
+            target = step2_file(month=month, seed=seed)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), target.with_suffix(".tmp"))
+            target.with_suffix(".tmp").rename(target)
+            latest = datetime.fromtimestamp(mr.valid_us[refit.index].max() / 1e6, UTC)
+            assert latest <= cut - c.regimes.REFIT_CUTOFF_AGE, (latest, cut)
+            log = {
+                **refit.report,
+                "epochs": epochs,
+                "val_nll": best,
+                "rows": len(refit.index),
+                "latest_valid": str(latest),
+            }
+            c.write_json(obj=log, path=W / "logs" / "step2" / SPEC.tag / f"{month}_s{seed}.json")
+            print(
+                f"step 2 ({SPEC.tag}) {month} s{seed}: {len(refit.index):,} rows, {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s; latest valid {latest} (cutoff {cut})",
+                flush=True,
+            )
+            del t, model
+        del g, mr
+        torch.cuda.empty_cache()
+
+
 def assemble() -> None:
     """Concatenate each cutoff's window forecast into one table per month, seed, and scoring variant."""
     tags = (
@@ -841,6 +1054,8 @@ def assemble() -> None:
 if __name__ == "__main__":
     if ARGS.command == "assemble":
         assemble()
+    elif ARGS.command == "step2":
+        step2(months=ARGS.months, seeds=ARGS.seeds, device="cuda")
     elif ARGS.command == "pretrain-wt":
         pretrain_wt(device="cuda")
     else:
