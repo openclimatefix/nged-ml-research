@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, E402, PT018, D103, B023, F821, ANN202
+# ruff: noqa: E501, ANN001, E402, PT018, D103, B023, F821, ANN202
 """Experiment 586: fit, assemble, stress, and inject lag-only events for the lag-wiring arms S1 to S4 (GPU).
 
 A wrapper around experiment 572's `e00572_fit.py` (imported, with its module-level state patched, as
