@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 575: fit S0, S1, and S2 on cached outputs of the frozen network, in worlds Kl and Kp, and score recovery.
+"""Experiment 575: fit S0, S1, and S2 on the frozen network's cached outputs in worlds Kl and Kp.
+
+The fits are scored for step recovery.
 
 Reuses experiment 573's cache, fold loader, offset fits, step extractor, and penalty grid unchanged
 (`e00573_steps`, `e00573_cache`); only the worlds (`e00575_world`) and the scoring differ.
@@ -64,7 +66,10 @@ def match_changes(
 
 
 def residual_sd(*, fold: s.Fold, z0: torch.Tensor) -> dict[int, float]:
-    """Return per injected Primary the standard deviation (fraction of capacity) of the daily mean of the offset-free residual."""
+    """Return per injected Primary the spread of the offset-free residual.
+
+    The spread is the standard deviation, as a fraction of capacity, of the daily mean.
+    """
     log_w, mean, _ = base.mixture_parts(out=fold.out, components=s.COMPONENTS)
     mix = (log_w.exp() * mean).sum(-1)
     res = ((z0 - mix).float().cpu().numpy()) * fold.std[fold.primary_np]

@@ -1,9 +1,10 @@
 # ruff: noqa: E501
-"""Experiment 575: does the offset move by the injected amount (level recovery) even where `extract` finds no step?
+"""Experiment 575: does the offset move by the injected amount where `extract` finds no step?
 
-For each scored Kl event of 20% of capacity or more lasting 30 days or more in the latest fold, compare the
-offset's mean level in the 5 days before the end with its mean level in the 20 days before the onset, in
-capacity fraction, with the injected size. Prints the median ratio and the share within 25%, per arm.
+For each scored Kl event of 20% of capacity or more lasting 30 days or more in the latest
+fold, compare the offset's mean level in the 5 days before the end with its mean level in the
+20 days before the onset, in capacity fraction, with the injected size. Prints the median ratio
+and the share within 25%, per arm.
 """
 
 import json
