@@ -39,7 +39,7 @@ DURATION_DAYS: Final = (1.0, 180.0)
 RHO_RANGE: Final = (0.6, 1.0)
 NO_RECIPIENT_SHARE: Final = 0.3
 MIN_GAP: Final = 30
-SEEDS: Final = 3
+SEEDS: Final = 5
 """World draws per kind (Kl and Kp), to reach counts per bin that the binomial interval can resolve."""
 FIRST_DAY: Final = w573.day_of(t=datetime(2022, 1, 1, tzinfo=UTC))
 LAST_DAY: Final = w573.day_of(t=datetime(2026, 5, 31, tzinfo=UTC))

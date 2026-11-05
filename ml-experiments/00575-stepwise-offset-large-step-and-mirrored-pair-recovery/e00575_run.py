@@ -4,7 +4,9 @@
 Reuses experiment 573's cache, fold loader, offset fits, step extractor, and penalty grid unchanged
 (`e00573_steps`, `e00573_cache`); only the worlds (`e00575_world`) and the scoring differ.
 
-Usage: python e00575_run.py {run|clean} [--months ...] [--worlds ...] [--seeds ...]
+Usage: python e00575_run.py [--months ...] [--worlds ...] [--seeds ...]
+
+K0 false-step rates are not produced here: the report recounts them from experiment 573's saved K0 paths.
 """
 
 import argparse
@@ -71,7 +73,7 @@ def residual_sd(*, fold: s.Fold, z0: torch.Tensor) -> dict[int, float]:
         total = np.bincount(fold.day.cpu().numpy()[sel], weights=res[sel], minlength=fold.n_days)
         count = np.bincount(fold.day.cpu().numpy()[sel], minlength=fold.n_days)
         ok = count >= s.SUPPORT_ROWS // 5
-        out[p] = float(np.std(total[ok] / count[ok]))
+        out[p] = float(np.std(total[ok] / count[ok])) if ok.any() else float("nan")
     return out
 
 
@@ -93,6 +95,7 @@ def score_world(*, fold: s.Fold, path: np.ndarray, world: str, seed: int) -> dic
         for p in w.INJECTED
     }
     records = []
+    donor_size = {e.pair_id: e.size for evs in truth.values() for e in evs if e.role == "donor"}
     for p, evs in truth.items():
         for e in evs:
             scored = (
@@ -102,7 +105,7 @@ def score_world(*, fold: s.Fold, path: np.ndarray, world: str, seed: int) -> dic
             )
             records.append({
                 "primary": p, "pair_id": e.pair_id, "role": e.role, "onset": e.onset, "end": e.end,
-                "duration": e.end - e.onset, "size": e.size, "scored": scored,
+                "duration": e.end - e.onset, "size": e.size, "donor_size": donor_size.get(e.pair_id, e.size), "scored": scored,
                 "hit_onset": hits[p][(e.onset, e.size)], "hit_return": hits[p][(e.end, -e.size)],
             })  # fmt: skip
     clean_ps = [p for p in range(16) if p not in w.INJECTED]
@@ -117,7 +120,6 @@ def score_world(*, fold: s.Fold, path: np.ndarray, world: str, seed: int) -> dic
         ten_small += len(steps)
         ten_big += sum(abs(sz) >= FALSE_MIN for _, sz in steps)
         ten_years += w.w573.offset_years(start_day=first, end_day=limit)
-    # false steps on the injected six outside any event (a found step that matched no change, not within 3 days of one)
     return {
         "events": records,
         "untouched_ten": {"years": ten_years, "steps_1pct": ten_small, "steps_5pct": ten_big},
