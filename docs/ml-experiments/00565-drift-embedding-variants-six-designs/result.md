@@ -87,8 +87,8 @@ own commit, before any GPU fit starts.
   72-120 h), and the cold-night rows of each set at 24-120 h (3 folds hold cold nights). The
   minimum detectable effect is 1.96 x the seed-to-seed standard deviation of the contrast, pooled
   within folds, divided by the square root of 5.
-- **Leak.** The injected 7-day shift of experiment 511 on all five seeds of both arms (M0 seeds 1 to 4
-  are new fits run with experiment 554's code). Real-event leak from experiment 556's harness is not
+- **Leak.** The injected 7-day shift of experiment 511 on all five seeds of both arms (M0 seeds 1 to
+  4 are new fits run with experiment 554's code). Real-event leak from experiment 556's harness is not
   run here.
 
 ## Stages 2 to 4: the model designs (coarse screening, GPU)
