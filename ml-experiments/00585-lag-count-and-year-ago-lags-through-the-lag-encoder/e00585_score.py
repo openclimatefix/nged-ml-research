@@ -22,7 +22,16 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 NAME = "00585-lag-count-and-year-ago-lags-through-the-lag-encoder"
 WORK = ML_EXPERIMENTS_DATA_DIR / NAME
 W581 = ML_EXPERIMENTS_DATA_DIR / "00581-robust-multiweek-lag-encoder-x3/arms/x3med/work"
-ARMS = {"n1": "N1", "n3": "N3", "y1": "Y1", "y1c": "Y1c", "y3": "Y3"}
+ARMS = {
+    "n1": "N1",
+    "n3": "N3",
+    "y1": "Y1",
+    "y1c": "Y1c",
+    "y3": "Y3",
+    "y1miss": "Y1miss",
+    "y3miss": "Y3miss",
+}
+"""`y1miss` and `y3miss` (post hoc) are the saved weights forecast with every extra lag missing."""
 COUNTED_ARMS = ("N1", "N3", "N5", "Y1", "Y1c", "Y3")
 TESTS = 36
 
@@ -61,7 +70,12 @@ def main() -> None:
     sc.ARM_DIRS = keep
     counted_arms = [a for a in COUNTED_ARMS if a in keep]
     sc.COUNTED = tuple((a, "V3D5") for a in counted_arms)
-    sc.DESCRIPTIVE = tuple((a, "E2") for a in counted_arms)
+    extra = [a for a in ("Y1miss", "Y3miss") if a in keep]
+    sc.DESCRIPTIVE = (
+        *[(a, "E2") for a in counted_arms],
+        *[(a, "V3D5") for a in extra],
+        *[(a, b) for a, b in (("Y1miss", "Y1"), ("Y3miss", "Y3")) if a in keep],
+    )
     sc.TESTS = TESTS
     sc.W572 = WORK
     sc.arms_present = arms_present

@@ -150,6 +150,8 @@ def masked_extra_clean(*, clean: np.ndarray) -> np.ndarray:
 
 
 MASK_PASS = 200
+MISS_PASS = 201
+"""Pass number of a post hoc diagnostic: the same weights forecast with every extra lag missing."""
 """Pass number of Y1 forecast again with the year-ago lag masked inside verified events."""
 
 
@@ -190,8 +192,14 @@ def run_inject(*, device: str = "cuda") -> None:
 
         def x_for(r: int) -> np.ndarray:
             """Return the test inputs with pass `r`'s contaminated lag columns (built on demand)."""
-            mylags.EXTRA_CLEAN = masked if r == MASK_PASS else None
-            if r == MASK_PASS:
+            mylags.EXTRA_CLEAN = (
+                masked
+                if r == MASK_PASS
+                else np.full_like(clean, np.nan)
+                if r == MISS_PASS
+                else None
+            )
+            if r in (MASK_PASS, MISS_PASS):
                 fixed = clean
             elif r == bank.REAL_PASS:
                 fixed = bank.corrected_clean(clean=clean, events=real_events())
@@ -208,7 +216,7 @@ def run_inject(*, device: str = "cuda") -> None:
             assert np.array_equal(x[:, 43:45], test.x[:, 43:45]), "contamination moved a lag time"
             return x
 
-        for r in [p for p in passes if p not in (bank.REAL_PASS, MASK_PASS)]:
+        for r in [p for p in passes if p not in (bank.REAL_PASS, MASK_PASS, MISS_PASS)]:
             rows += [
                 {"month": month, **q}
                 for q in bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)[1]
