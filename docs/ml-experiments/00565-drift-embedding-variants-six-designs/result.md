@@ -114,3 +114,21 @@ own commit, before any GPU fit starts.
 - **Predictions that could fail.** As in the brief: design 3 within 0.03 of design 1; design 4 gains
   at least 0.03 at both groups and its placebo does not match it; design 5 gains at least 0.05 at the
   eight with leak at most the base's plus 1.0.
+
+## Step R result (interim and unaudited)
+
+**A10 (the monthly drift embedding) is no better than M0 at the eight, is better at the six, is worse
+on cold nights, and leaks about 1 point less.** The pre-registered prediction fails: the leak falls by
+0.95 points rather than the 1.0 predicted, and the sign of A10 minus M0 at the eight is not the same in
+4 of 5 seeds.
+
+- **Eight, 24-120 h.** A10 minus M0 is +0.010 (positive is worse; Bonferroni interval -0.31 to 0.29,
+  minimum detectable effect 0.133), with per-seed values -0.001, -0.035, +0.085, -0.066, and +0.068.
+  A10 keeps about 94% of M0's gain over L-1d, but the difference between the two arms is not shown.
+- **Six, 24-120 h.** A10 minus M0 is -0.134 (interval -0.37 to 0.15, minimum detectable effect 0.073).
+  All 5 seeds are negative and 4 of 5 folds favour A10, but the interval includes zero.
+- **Cold nights (3 folds hold them).** A10 is worse by +0.183 at the eight (interval 0.08 to 0.23) and
+  by +0.454 at the six (interval -0.39 to 0.86, 5 of 5 seeds worse). Experiment 559's two-seed gain on
+  cold nights at the six (-0.348) does not replicate.
+- **Injected load-shift leak (all 5 seeds, mean of 5 folds).** A10 6.81 points of capacity (seed
+  range 5.96 to 7.28) against 7.76 for M0 (7.50 to 8.03). A10 is lower in all 5 seeds, by 0.31 to 2.08.
