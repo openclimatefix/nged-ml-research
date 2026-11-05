@@ -238,11 +238,11 @@ def install(world: str) -> Path | None:
         if not out.exists():
             out.parent.mkdir(parents=True, exist_ok=True)
             tmp = out.with_suffix(".tmp.npz")
-            np.savez(tmp, truth=truth, primaries=np.array(INJECTED), **parts)
+            np.savez(tmp, truth=truth, primaries=np.array(INJECTED), **parts)  # ty: ignore[invalid-argument-type]
             tmp.rename(out)
         return clean
 
-    injected_arrays.injected = True  # type: ignore[attr-defined]
+    injected_arrays.injected = True  # ty: ignore[unresolved-attribute]
     prep422.cleaned_arrays = injected_arrays
     return out
 

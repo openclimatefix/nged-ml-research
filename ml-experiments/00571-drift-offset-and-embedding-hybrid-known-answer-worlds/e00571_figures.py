@@ -27,7 +27,7 @@ def main() -> None:
         pct=pl.col("recovery") * 100,
     )
     chart = (
-        alt.Chart(alt.Data(values=t.to_dicts()))
+        alt.Chart(alt.Data(values=t.to_dicts()))  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             y=alt.Y("arm_label:N", title=None, sort=list(LABEL.values())),

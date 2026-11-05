@@ -40,7 +40,7 @@ def available_seeds(*, w: str, arm: str, months: list[str], seeds: list[int]) ->
 
 def world_rows(*, w: str, arms: list[str], months: list[str], seeds: list[int]) -> pl.DataFrame:
     """Return the world's scored rows with one CRPS column per arm and seed."""
-    import e00510_common as c
+    import e00510_common as c  # ty: ignore[unresolved-import]
 
     world.install(w)
     actual = c.clean_stack()
@@ -130,7 +130,7 @@ def summary(*, worlds: list[str]) -> None:
                     {
                         "world": w, "scope": scope, "arm": arm, "n_rows": part.height,
                         **{f"crps_{r['month']}": r["crps"] for r in by.iter_rows(named=True)},
-                        "crps": float(by["crps"].mean()),
+                        "crps": float(by["crps"].mean()),  # ty: ignore[invalid-argument-type]
                     }
                 )  # fmt: skip
         for grp in ("eight", "six", None):
