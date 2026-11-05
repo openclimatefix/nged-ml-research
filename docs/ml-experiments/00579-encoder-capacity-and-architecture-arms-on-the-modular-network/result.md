@@ -31,10 +31,10 @@ prediction: >-
   Christmas week; F2 (Economy 7 proxy) gains at least 0.03 on cold winter nights. P1 and P2 each
   gain at least 0.03 at one group. K5 and K8 lower the summed tail pinball loss by at least 2% with
   CRPS within the minimum detectable effect (MDE) and no component weight under 0.02. RB, GB, ML,
-  A1, A2, and EW are each within the MDE of the base, and A2 improves the weakest 4 Primaries. C-tied
-  is within the MDE of the base. Each passer's real-event absorbed share is within 0.005 of the base's
-  and its injected shift within 1.0 point of capacity. The larger datetime encoder's probe CRPS is
-  at least 2% lower than the base's.
+  A1, A2, and EW are each within the MDE of the base, and A2 improves the weakest 4 Primaries.
+  C-tied is within the MDE of the base. Each passer's real-event absorbed share is within 0.005 of
+  the base's and its injected shift within 1.0 point of capacity. The larger datetime encoder's
+  probe CRPS is at least 2% lower than the base's.
 decision_rule: >-
   Stage 1 (seed 0, screening, descriptive): an arm passes the screen if its CRPS at 24-120 h
   improves on the base by at least that group's MDE at the eight MVA Primaries or the six MW
@@ -58,56 +58,62 @@ metric: >-
   quantiles; slices; leak (real-event absorbed share, injected 7-day shift) for passers.
 verdict: not supported
 best_arm: >-
-  None met the decision rule. ML (mixer of 3 layers of 256) had the clearest sign: CRPS 4.370 at 24-120
-  h at the eight MVA Primaries against 4.427 for B (-0.057, interval excludes zero, below the 0.123
-  minimum detectable effect).
+  None met the decision rule. ML (mixer of 3 layers of 256) had the clearest sign: CRPS 4.370 at
+  24-120 h at the eight MVA Primaries against 4.427 for B (-0.057, interval excludes zero, below the
+  0.123 minimum detectable effect).
 headline: >-
-  Larger encoders did not help the modular network beyond seed noise. The larger datetime encoder (DL)
-  gained 0.135 at the six MW Primaries and lost 0.046 at the eight MVA Primaries, and a weight-tied
-  copy with no extra capacity (DT) gained 0.077 of the 0.135.
+  Larger encoders did not help the modular network beyond seed noise. The larger datetime encoder
+  (DL) lowered the error by 0.135 at the six MW Primaries and raised it by 0.046 at the eight MVA
+  Primaries, and a copy with the same depth and about twice the weights of B (DT) lowered it by
+  0.077 at the six MW Primaries.
 lessons: >-
-  The 3.1 thousand and 4.0 thousand weights of the weather and datetime encoders are not the limit at
-  24-120 h at the eight MVA Primaries: every enlargement, richer datetime input, and architecture arm
-  stayed within 0.06 of B except RB, which was 0.26 worse. At the six MW Primaries DL's gain has a
-  consistent sign (4 of 5 folds) but more than half of it appears without extra capacity (DT), so
-  optimisation or regularisation noise cannot be ruled out.
+  The 3.1 thousand and 4.0 thousand weights of the weather and datetime encoders are not the limit
+  at 24-120 h at the eight MVA Primaries: every enlargement, richer datetime input, and architecture
+  arm stayed within 0.06 of B except RB, which was 0.26 worse. At the six MW Primaries DL's gain has
+  a consistent sign (4 of 5 folds) but DT, which has the same depth and no extra width, achieved
+  more than half of it, so depth, optimisation, or regularisation noise could explain the gain as
+  well as capacity.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  Making the weather and datetime encoders of the modular demand network larger, or giving the datetime
-  encoder richer inputs such as an Economy 7 proxy, did not lower the forecast error beyond what a
-  different random seed changes at the eight MVA Primaries, so capacity is not what limits the forecast
-  there. At the six MW Primaries a larger datetime encoder lowered the error by 0.135 points of
-  capacity, but a copy with no extra capacity achieved more than half of that, so the gain may come
-  from training noise. The next step is more seeds for DL and DT at the six MW Primaries, and no
-  further architecture arms.
+  Making the weather and datetime encoders of the modular demand network larger, or giving the
+  datetime encoder richer inputs such as an Economy 7 proxy, did not lower the forecast error beyond
+  what a different random seed changes at the eight MVA Primaries, so capacity is not what limits
+  the forecast there. At the six MW Primaries a larger datetime encoder lowered the error by 0.135
+  points of capacity, but a copy with the same depth and no extra width achieved more than half of
+  that, so the gain may come from depth or from training noise rather than capacity. The next step
+  is more seeds for DL and DT at the six MW Primaries, and no further architecture arms.
 advice:
   - >-
-    Do not enlarge the weather or datetime encoder of the modular network to gain accuracy at the
+    Do not enlarge the weather or datetime encoder of the modular network to improve accuracy at the
     eight MVA Primaries; every size arm was within seed noise or worse (crps_vs_base chart).
   - >-
-    Run at least 4 seeds before reading a single-seed contrast against the modular base B; the
-    single-seed contrast noise is about 0.25 points of capacity at 24-120 h (MDE table).
+    Do not read a single-seed contrast against the modular base B: the minimum detectable effect of
+    a difference between two single-seed fits is about 0.25 points of capacity at 24-120 h, and
+    0.123 for two seeds (MDE table).
   - >-
-    Do not use residual pre-layer-norm blocks (RB) in the encoders and the mixer; they were 0.26
-    worse at the eight MVA Primaries (crps_vs_base chart).
+    Do not use residual pre-layer-norm blocks (RB) in the encoders and the mixer at the eight MVA
+    Primaries, where they were 0.26 worse; the cause (depth, size, or block type) is not isolated
+    (crps_vs_base chart).
   - >-
-    Test a larger datetime encoder at the six MW Primaries against a weight-tied control with
-    5 seeds before adopting it (DL against DT, counted tests).
+    Test a larger datetime encoder at the six MW Primaries against a same-depth tied control (DT)
+    with at least 5 seeds before adopting it (DL against DT, counted tests).
 ---
 
-We asked whether the modular demand network, which forecasts a Primary substation's demand from a
-weather encoder, a datetime encoder, a lag encoder, and a mixer, is held back by the size of its
-encoders, by what the encoders are given, or by its design. We changed one part of the network at a
-time (15 arms), refitted each arm on the same five test months as experiment 572's best network, and
-compared the error with that network's (the base B). **Making the encoders bigger or adding datetime
-inputs did not lower the error beyond what a different random seed changes.** The one gain that
-looks large is the bigger datetime encoder at the six MW Primaries (-0.135 points of capacity), and
-a copy of that encoder with no extra capacity achieved more than half of it.
+**Making the encoders of our demand forecasting neural network bigger, or giving them richer
+datetime inputs, did not lower the forecast error beyond what a different random seed changes.** The
+network forecasts a Primary substation's demand from four parts: a weather encoder, a datetime
+encoder, a lag encoder (which reads demand from earlier days), and a mixer that combines them into a
+forecast distribution. We changed one part at a time (15 arms), refitted each arm on the same five
+test months as experiment 572's best network (the base B), and compared the error, measured as CRPS
+in points of effective capacity (percentage points of the Primary's capacity; lower is better). The
+Primaries split into the eight MVA Primaries and the six MW Primaries, which differ in how their
+power is metered, so they are scored apart. The one large-looking gain is the larger datetime
+encoder (DL) at the six MW Primaries, 0.135 lower than B. A copy of DL with the same depth and no
+extra width (DT) achieved 0.077 of it, and the intervals of both include zero.
 
-*Every number is interim and unaudited. The Primaries are the D-numbers of the experiment 521 site
-map. The real-event absorbed share and the encoder probes of the brief were not run (see "Not
-run").*
+*Every number is interim and unaudited. The Primaries appear as D-numbers. The real-event absorbed
+share and the encoder probes of the brief were not run (see "Not run").*
 
 ## What the base holds, and what was changed
 
@@ -165,13 +171,14 @@ Primaries; M0 is 4.803 and 3.641):
 | A1 | +0.041 | -0.001 | +0.6% / -0.5% |
 | A2 | -0.012 | -0.018 | -3.0% / -1.8% |
 
-Negative CRPS differences are improvements. **No arm met the CRPS rule** (a gain of at least the
-minimum detectable effect with 4 of 5 folds agreeing). The two-seed minimum detectable effect is
-0.123 at both groups (the brief's stored-seed values were 0.113 and 0.128), and the noise of a
-difference between two single-seed fits is about 0.25. The tail rule (2% gain) was met by 12 of 14
-Stage 1 arms, which shows that it is too loose for single-seed contrasts. I therefore chose the
-Stage 2 arms by hand: DL (the maintainer's hypothesis, and the largest six-MW gain), ML (the
-clearest sign at the eight MVA Primaries), and P1.
+Each cell is the arm's CRPS minus B's (negative is an improvement); arms with one seed are compared
+with B's seed 0, and the arms marked 2 seeds with B's mean of seeds 0 and 1. **No arm met the CRPS
+rule** (a gain of at least the minimum detectable effect with 4 of 5 folds agreeing). The two-seed
+minimum detectable effect is 0.123 at both groups (the brief's stored-seed values were 0.113 and
+0.128), and the noise of a difference between two single-seed fits is about 0.25. The tail rule (2%
+gain) was met by 9 of the 15 arms, which shows that it is too loose for single-seed contrasts. I
+therefore chose the Stage 2 arms by hand: DL (the maintainer's hypothesis, and the largest gain at
+the six MW Primaries), ML (the clearest sign at the eight MVA Primaries), and P1.
 
 ![CRPS of each arm minus B at 24-120 h](crps_vs_base.svg)
 
@@ -187,31 +194,33 @@ without D8 (4 of 5 folds), so the ML sign does not rest on D8.
 
 **Slices at the six MW Primaries (descriptive; slice minimum detectable effects are 0.38 for cold
 winter nights and 0.97 for Christmas week).** DL changes cold winter nights by -0.434 (3 of 5 folds
-better) and Christmas week by -1.156 (1 of 5 folds better, interval wide), so the gain is largest in
-the slices the maintainer's hypothesis names, but both are inside their slice minimum detectable
-effect. F1 and F2 change cold winter nights by -0.164 and -0.046 at the six MW Primaries and
-Christmas week by +0.443 and +0.619; they do not show a gain. Sunny days: no arm moves them beyond
-0.19.
+better) and Christmas week by -1.156 (Christmas week falls in one fold only, so its interval is
+degenerate). The gain is largest in the slices the maintainer's hypothesis names, but both changes
+are inside their slice minimum detectable effect, so the pattern is not established. F1 and F2
+change cold winter nights by -0.164 and -0.046 at the six MW Primaries and Christmas week by +0.443
+and +0.619; they do not show a gain. Sunny days: no arm moves them by more than 0.2.
 
 **Leak.** The injected 7-day shift (stress, in points of capacity) is 7.29 for B, 6.59 for DL, 6.45
 for ML, and 6.72 for P1, so the three Stage 2 arms are within 1.0 of B, and all four are above the
-flagged 6.0 limit, B included. Lags aged by one extra day cost every arm about 0.02 to 0.04 at
-24-120 h, as for B.
+flagged 6.0 limit, B included. Lags aged by one extra day worsen the CRPS of every arm by 0.006 to
+0.036 at 24-120 h, as they do for B.
 
-**K5 and K8 did not collapse.** The smallest average component weight over the 10 fits was 0.058
-(K5) and 0.040 (K8), above the 0.02 flag.
+**K5 and K8 did not collapse.** Averaged over the 10 fits, the smallest component weight is 0.106
+(K5) and 0.060 (K8), and the smallest weight in any single fit is 0.058 (K5) and 0.040 (K8), all
+above the 0.02 flag.
 
-**The 16-Primary table** (`primaries.csv`, seed 0) shows the Stage 2 arms at or better than M0 at 14
-of 16 Primaries. The exceptions are D8, where M0 scores 9.46 against 9.96 for B, 10.23 for DL, 9.69
-for ML, and 9.74 for P1, and D5, where M0 scores 5.78 against 5.94 for B and 5.97 for DL. DL is 0.27
-worse than B at D8 and 0.77 better at D15. A2 does not improve the four Primaries with the largest
-error (D15, D8, D12, D5): it worsens D15, D12, and D5 and improves D8.
+**The 16-Primary table** (`primaries.csv`, seed 0) shows each of DL, ML, and P1 at or better than M0
+at 14 of 16 Primaries, with different exceptions: DL loses to M0 at D8 (10.23 against 9.46) and D5
+(5.97 against 5.78); ML at D8 (9.69) and D5 (5.83); P1 at D8 (9.74) and D11. B itself loses to M0 at
+D5, D8, D10, and D11. DL is 0.27 worse than B at D8 and 0.77 better at D15. A2 does not improve the
+four Primaries with the largest error (D15, D8, D12, D5): it worsens D15, D12, and D5 and improves
+D8.
 
 ## Predictions
 
 - **DL gains at least 0.05 at one group, largest on cold winter nights and Christmas week:** met in
-  size and in slice pattern at the six MW Primaries (-0.135), not at the eight MVA Primaries
-  (+0.046); the interval includes zero.
+  size at the six MW Primaries (-0.135), not at the eight MVA Primaries (+0.046); the interval
+  includes zero, and the slice pattern is not established (see above).
 - **WL within 0.03 of B:** not met at the six MW Primaries (+0.095, worse); met at the eight MVA
   Primaries. XL was not run.
 - **F1 gains at least 0.03 on cold winter nights or Christmas week:** met in size on cold winter
@@ -225,8 +234,9 @@ error (D15, D8, D12, D5): it worsens D15, D12, and D5 and improves D8.
 - **RB, GB, ML, A1, A2, EW within the minimum detectable effect of B:** RB is 0.26 worse at the
   eight MVA Primaries (interval excludes zero); ML, A1, A2, and EW are within it. A2 does not
   improve the weakest 4 Primaries. GB was not run.
-- **C-tied within the minimum detectable effect of B; fails if it gains at least half of the large
-  arm's gain:** DT gains 0.077 of DL's 0.135 at the six MW Primaries, so this prediction fails.
+- **C-tied within the minimum detectable effect of B:** held as written (DT -0.077, minimum
+  detectable effect 0.123). The brief also said the prediction fails if DT gains at least half of
+  DL's gain; DT gains 0.077 of DL's 0.135 at the six MW Primaries, so the brief's clause fails.
 - **Leak:** the injected shift of each Stage 2 arm is within 1.0 of B's; the real-event absorbed
   share was not run.
 
@@ -244,8 +254,9 @@ error (D15, D8, D12, D5): it worsens D15, D12, and D5 and improves D8.
 - **Median forecast minus mean forecast per site:** not computed.
 - **Error of the mean or median forecast beside the quantile-score contrasts:** not computed; the
   tail pinball loss at the 5%, 95%, and 99% quantiles is reported beside CRPS.
-- **Audit triggers:** the C-tied prediction failed (DT gained more than half of DL's gain), which is
-  the explanation to test next (more seeds), not a method fault; no other trigger fired. No audit
+- **Audit triggers:** the brief's C-tied clause failed (DT gained more than half of DL's gain),
+  which is an explanation to test next (more seeds, and a tied control that also matches B's depth),
+  not a method fault; no other trigger fired. No audit
   was run.
 - **Timing asserts** (row by row, with examples printed in the checks JSON files): weather from the
   run at or before the origin minus 9 h; every lag at or before the origin minus 24 h; every extra
@@ -256,6 +267,6 @@ error (D15, D8, D12, D5): it worsens D15, D12, and D5 and improves D8.
 
 ## What the next experiment should answer
 
-Does DL's six-MW-Primaries gain survive 5 seeds, and does DT's gain survive them too? If DT's does,
-the gain comes from training noise or regularisation, and the datetime encoder is not
-capacity-limited.
+Does DL's gain at the six MW Primaries survive 5 seeds, and does DT's gain survive them too? If DT's
+gain survives, depth, training noise, or regularisation explains it better than capacity, and a
+one-layer tied control would separate depth from the rest.
