@@ -79,8 +79,8 @@ advice:
     Judge a lag control on the injected bank and on days 4 to the end and 0 to 7 after the end, where
     following peaks, not on the whole event (Injected bank).
   - >-
-    Do not expect a median over weekly lags to help against events shorter than 30 days, because the following
-    does not fall with event length (follow by length, Injected bank).
+    Do not expect a median over weekly lags to help against events shorter than 30 days, because the
+    following does not fall with event length (follow by length, Injected bank).
   - >-
     Report the share of readings on the safe side of q95 or q05 with the follow ratio, because the
     follow ratio of 0.1 to 0.2 hides a fall in coverage from 0.94 to 0.77 (Injected bank).
