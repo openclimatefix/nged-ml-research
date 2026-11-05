@@ -73,12 +73,14 @@ class Arm:
     aux: bool = False
     graph: str = "real"
     corrected: bool = False
+    aux_weight: float = 0.1
 
 
 def make_arm(*, tag: str) -> Arm:
     """Parse a tag such as `N0-r7`, `N1-r21`, `N2-r7`, `N4-r7`, `N1placebo-r7`, `N1corr-r7`, `N1aux-r7`."""
-    kind, rate = tag.split("-")
+    kind, rate, *rest = tag.split("-")
     assert rate in w.RATES, tag
+    weight = float(rest[0][1:]) if rest else 0.1
     table = {
         "N0": {"use_nb": False},
         "N1": {"use_nb": True},
@@ -88,7 +90,7 @@ def make_arm(*, tag: str) -> Arm:
         "N1corr": {"use_nb": True, "corrected": True},
         "N1aux": {"use_nb": True, "aux": True},
     }
-    return Arm(tag=tag, kind=kind, rate=rate, **table[kind])
+    return Arm(tag=tag, kind=kind, rate=rate, aux_weight=weight, **table[kind])
 
 
 class Topology:
@@ -111,6 +113,13 @@ class Topology:
             "placebo": w.placebo_index(graph=self.graph, labels=self.labels),
             "pairs": w.event_pair_index(labels=self.labels, table=table),
         }
+        # Training rows never see a held-out pair as neighbours, so no pair is learnt as uninformative.
+        self.train_index = {
+            "real": w.neighbour_index(graph=self.train_graph, labels=self.labels),
+            "placebo": self.index["placebo"],
+            "pairs": w.event_pair_index(labels=self.labels, table=table, drop=self.held),
+        }
+        self.real_mask = np.stack([self.ctx.event_mask[s] for s in self.labels])
         self.real_share = w.real_share_of_days(table=table, n_primaries=len(self.labels))
         self.inj = inj
 
@@ -136,18 +145,51 @@ def cut_index(*, month: str) -> int:
     return int((c.us(t=c.month_start(month=month)) - c.prep422.GRID_START_US) // c.prep422.STEP_US)
 
 
-def train_world(*, arm: Arm, month: str, seed: int, clean: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def train_world(
+    *, arm: Arm, month: str, seed: int, clean: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Return the arm's training world for a fold and seed (events end before the first cutoff)."""
     t = topo()
-    spec = w.WorldSpec(kind="train", rate=arm.rate, month=month, seed=seed, gain="corr" if arm.corrected else "mixed")
-    return w.build_world(spec=spec, clean=clean, ctx=t.ctx, pool=t.pool, graph=t.train_graph, last=cut_index(month=month))
+    spec = w.WorldSpec(
+        kind="train",
+        rate=arm.rate,
+        month=month,
+        seed=seed,
+        gain="corr" if arm.corrected else "mixed",
+    )
+    return w.build_world(
+        spec=spec,
+        clean=clean,
+        ctx=t.ctx,
+        pool=t.pool,
+        graph=t.train_graph,
+        last=cut_index(month=month),
+    )
 
 
-def heldout_world(*, kind: str, month: str, seed: int, clean: np.ndarray, first: int, last: int, tag: str = "") -> tuple[np.ndarray, np.ndarray]:
+def heldout_world(
+    *,
+    kind: str,
+    month: str,
+    seed: int,
+    clean: np.ndarray,
+    first: int,
+    last: int,
+    tag: str = "",
+    corrected: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
     """Return a held-out-pair world (`exact` or `imperfect`) over [first, last)."""
     t = topo()
-    spec = w.WorldSpec(kind=kind, rate="r21", month=month, seed=seed, gain=f"held{tag}")
-    return w.build_world(spec=spec, clean=clean, ctx=t.ctx, pool=t.pool, graph=t.test_graph, last=last, first=first)
+    spec = w.WorldSpec(
+        kind=kind,
+        rate="r21",
+        month=month,
+        seed=seed,
+        gain=f"held{tag}{'corr' if corrected else ''}",
+    )
+    return w.build_world(
+        spec=spec, clean=clean, ctx=t.ctx, pool=t.pool, graph=t.test_graph, last=last, first=first
+    )
 
 
 # --- lag columns from a world ---------------------------------------------------------------------
@@ -182,10 +224,19 @@ def absent_nb(*, nb: np.ndarray) -> np.ndarray:
 
 def own_block(*, world, primary, target_idx, origin_idx, lead, extra_days=0) -> np.ndarray:
     """Return the own lag columns 37-44 (6 values plus the 2 lag-time indices) for rows."""
-    return b.block_of(clean=world, primary=primary, target_idx=target_idx, origin_idx=origin_idx, lead=lead, extra_days=extra_days)
+    return b.block_of(
+        clean=world,
+        primary=primary,
+        target_idx=target_idx,
+        origin_idx=origin_idx,
+        lead=lead,
+        extra_days=extra_days,
+    )
 
 
-def slots_of(*, primary: np.ndarray, day_idx: np.ndarray, week_idx: np.ndarray, nbr: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def slots_of(
+    *, primary: np.ndarray, day_idx: np.ndarray, week_idx: np.ndarray, nbr: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Return (rows x 10) slot Primary and lag index arrays: own day, own week, then each neighbour's day and week."""
     sp = np.empty((len(primary), m.SLOTS), dtype=np.int64)
     si = np.empty_like(sp)
@@ -198,7 +249,9 @@ def slots_of(*, primary: np.ndarray, day_idx: np.ndarray, week_idx: np.ndarray, 
     return sp, si
 
 
-def lag_columns(*, world, code, clean, arr: dict, nbr, aux: bool, extra_days=0) -> dict:
+def lag_columns(
+    *, world, code, clean, arr: dict, nbr, aux: bool, extra_days=0, real_mask=None
+) -> dict:
     """Return the own columns (n, 8), neighbour columns (n, 28), and, if `aux`, the flag and fraction labels, in chunks."""
     n = len(arr["primary"])
     own = np.empty((n, 8), dtype=np.float32)
@@ -207,12 +260,28 @@ def lag_columns(*, world, code, clean, arr: dict, nbr, aux: bool, extra_days=0) 
     frac = np.empty((n, m.SLOTS), dtype=np.float16) if aux else None
     for a in range(0, n, 2_000_000):
         s = slice(a, a + 2_000_000)
-        kw = dict(target_idx=arr["target_idx"][s], origin_idx=arr["origin_idx"][s], lead=arr["lead"][s])
+        kw = dict(
+            target_idx=arr["target_idx"][s], origin_idx=arr["origin_idx"][s], lead=arr["lead"][s]
+        )
         own[s] = own_block(world=world, primary=arr["primary"][s], extra_days=extra_days, **kw)
-        nbc[s] = nb_block(world=world, primary=arr["primary"][s], nbr=nbr, extra_days=extra_days, **kw)
+        nbc[s] = nb_block(
+            world=world, primary=arr["primary"][s], nbr=nbr, extra_days=extra_days, **kw
+        )
         if aux:
-            sp, si = slots_of(primary=arr["primary"][s], day_idx=own[s, 6].astype(np.int64), week_idx=own[s, 7].astype(np.int64), nbr=nbr)
-            flag[s], frac[s] = w.aux_labels(world=world, clean=clean, code=code, slot_primary=sp, slot_idx=si)
+            sp, si = slots_of(
+                primary=arr["primary"][s],
+                day_idx=own[s, 6].astype(np.int64),
+                week_idx=own[s, 7].astype(np.int64),
+                nbr=nbr,
+            )
+            flag[s], frac[s] = w.aux_labels(
+                world=world,
+                clean=clean,
+                code=code,
+                slot_primary=sp,
+                slot_idx=si,
+                real_mask=real_mask,
+            )
     return {"own": own, "nb": nbc, "flag": flag, "frac": frac}
 
 
@@ -224,7 +293,9 @@ def mask_neighbours(*, x: torch.Tensor, ma: torch.Tensor, md: torch.Tensor) -> N
             x[use, col], x[use, col + 1], x[use, col + 2] = 0.0, 1.0, float(age)
 
 
-def dropout567(*, x: torch.Tensor, flag: torch.Tensor | None, origin_idx: np.ndarray, seed: int) -> dict:
+def dropout567(
+    *, x: torch.Tensor, flag: torch.Tensor | None, origin_idx: np.ndarray, seed: int
+) -> dict:
     """Experiment 560's block dropout of the own lags, extended to the neighbour columns and the flag labels."""
     share = b.apply_dropout(x=x, origin_idx=origin_idx, seed=seed)
     ma, md = b.lags.block_dropout_masks(origin_idx=origin_idx, seed=seed)
@@ -335,15 +406,28 @@ class Cell:
             return
         t = topo()
         power, code = train_world(arm=arm, month=self.month, seed=seed, clean=self.clean)
-        cols = lag_columns(world=power, code=code, clean=self.clean, arr=self.arr, nbr=t.index[arm.graph], aux=arm.aux)
+        cols = lag_columns(
+            world=power,
+            code=code,
+            clean=self.clean,
+            arr=self.arr,
+            nbr=t.train_index[arm.graph],
+            aux=arm.aux,
+            real_mask=t.real_mask,
+        )
         for a in range(0, len(self.g.x), CHUNK):
             s = slice(a, a + CHUNK)
             self.g.x[s, 37:45] = torch.from_numpy(cols["own"][s]).to(self.device)
             self.g.x[s, 45:] = torch.from_numpy(cols["nb"][s]).to(self.device)
         self.g.aux_flag = torch.from_numpy(cols["flag"]).to(self.device) if arm.aux else None
         self.g.aux_frac = torch.from_numpy(cols["frac"]).to(self.device) if arm.aux else None
-        share = float(((power != self.clean) & np.isfinite(power))[:, : cut_index(month=self.month)].mean())
-        print(f"{self.month} s{seed} {arm.tag}: world rate {arm.rate}, share of Primary half-hours before the cutoff with a changed reading {share:.4f}", flush=True)
+        share = float(
+            ((power != self.clean) & np.isfinite(power))[:, : cut_index(month=self.month)].mean()
+        )
+        print(
+            f"{self.month} s{seed} {arm.tag}: world rate {arm.rate}, share of Primary half-hours before the cutoff with a changed reading {share:.4f}",
+            flush=True,
+        )
         self.world_key = key
 
     def select(self, *, cut: datetime):
@@ -360,6 +444,9 @@ class Cell:
         model = new_net(arm=arm, n_primaries=self.n_primaries, stage="ft")
         model.table = b.CTX["table_ft"]
         b.load_pretrained(model=model, path=pretrained_path(arm=arm, month=self.month, seed=seed))
+        if arm.aux:  # the pretrained head read mixer_pre's hidden layer; mixer_ft is fresh
+            torch.nn.init.zeros_(model.aux_head.weight)
+            torch.nn.init.zeros_(model.aux_head.bias)
         model.to(self.device)
         aux = (t["aux_flag"], t["aux_frac"]) if arm.aux else None
         train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
@@ -371,7 +458,12 @@ class Cell:
         """Return the test inputs to score: as observed, removed, aged by 1 to 3 days, neighbour lags removed, held-out worlds."""
         nbr = topo().index[arm.graph]
         test = self.test
-        kw = dict(primary=test.primary, target_idx=test.target_idx, origin_idx=test.origin_idx, lead=test.lead)
+        kw = dict(
+            primary=test.primary,
+            target_idx=test.target_idx,
+            origin_idx=test.origin_idx,
+            lead=test.lead,
+        )
         nb_real = nb_block(world=self.clean, nbr=nbr, **kw)
         out = {"base": widen73(x45=test.x, nb=nb_real)}
         for name in ("removed", "aged1", "aged2", "aged3"):
@@ -387,12 +479,22 @@ class Cell:
             out[name] = widen73(x45=x45, nb=nb_block(world=power, nbr=nbr, **kw))
         return out
 
-    def forecast(self, *, model, arm: Arm, lo: int, hi: int, held: dict) -> tuple[pl.DataFrame, dict[str, pl.DataFrame]]:
+    def forecast(
+        self, *, model, arm: Arm, lo: int, hi: int, held: dict
+    ) -> tuple[pl.DataFrame, dict[str, pl.DataFrame]]:
         """Forecast the window with the lags as observed and with each scoring variant."""
         model.table = b.CTX["table_ft"]
         vs = self.variants(arm=arm, held=held)
         frames = {
-            n: b._window_frame(model=model, test=dataclasses.replace(self.test, x=v), mr=self.mr, lo=lo, hi=hi, flag=False, device=self.device)
+            n: b._window_frame(
+                model=model,
+                test=dataclasses.replace(self.test, x=v),
+                mr=self.mr,
+                lo=lo,
+                hi=hi,
+                flag=False,
+                device=self.device,
+            )
             for n, v in vs.items()
         }
         return frames.pop("base"), frames
@@ -403,7 +505,9 @@ class Cell:
 
 def new_net(*, arm: Arm, n_primaries: int, stage: str) -> torch.nn.Module:
     """Return an untrained network for the arm."""
-    return m.NeighbourLagMdn(n_primaries=n_primaries, stage=stage, use_nb=arm.use_nb, shared=arm.shared, aux=arm.aux)
+    return m.NeighbourLagMdn(
+        n_primaries=n_primaries, stage=stage, use_nb=arm.use_nb, shared=arm.shared, aux=arm.aux
+    )
 
 
 def pretrained_path(*, arm: Arm, month: str, seed: int) -> Path:
@@ -427,7 +531,21 @@ def aux_loss(*, logit, frac, flag, target, pos_weight: float) -> torch.Tensor:
     return ((bce + reg) * keep).sum() / n
 
 
-def train(*, model, x, z, w, p, is_val, seed: int, lr: float, fresh_lr: float | None, device: str, aux=None, aux_weight: float = 0.0):
+def train(
+    *,
+    model,
+    x,
+    z,
+    w,
+    p,
+    is_val,
+    seed: int,
+    lr: float,
+    fresh_lr: float | None,
+    device: str,
+    aux=None,
+    aux_weight: float = 0.0,
+):
     """Experiment 566's loop; with `aux` = (flag, fraction) labels the loss adds the auxiliary head's term."""
     torch.manual_seed(seed)
     train_idx = torch.nonzero(~is_val).squeeze(1)
@@ -457,7 +575,13 @@ def train(*, model, x, z, w, p, is_val, seed: int, lr: float, fresh_lr: float | 
             if aux is not None and aux_weight > 0:
                 out, logit, frac = model.forward_aux(x[bi], p[bi])
                 nll = b.base.mixture_nll(out=out, z=z[bi], components=b.m545.COMPONENTS)
-                extra = aux_loss(logit=logit, frac=frac, flag=aux[0][bi], target=aux[1][bi], pos_weight=pos_weight)
+                extra = aux_loss(
+                    logit=logit,
+                    frac=frac,
+                    flag=aux[0][bi],
+                    target=aux[1][bi],
+                    pos_weight=pos_weight,
+                )
                 loss = (w[bi] * nll).sum() / w[bi].sum() + aux_weight * extra
             else:
                 nll = b.row_nll(model=model, x=x[bi], p=p[bi], z=z[bi])
@@ -468,7 +592,14 @@ def train(*, model, x, z, w, p, is_val, seed: int, lr: float, fresh_lr: float | 
             optimiser.step()
         model.eval()
         with torch.no_grad():
-            val = float(torch.cat([b.row_nll(model=model, x=x[i], p=p[i], z=z[i]) for i in val_idx.split(c.BATCH * 2)]).mean())
+            val = float(
+                torch.cat(
+                    [
+                        b.row_nll(model=model, x=x[i], p=p[i], z=z[i])
+                        for i in val_idx.split(c.BATCH * 2)
+                    ]
+                ).mean()
+            )
         epochs = epoch + 1
         if val < best - 1e-5:
             best, stale = val, 0
@@ -491,16 +622,24 @@ def cmd_worlds() -> None:
     t = topo()
     clean = c.clean_stack()
     cclean = corrected_clean()
-    print(f"real share of Primary-days with a labelled event (Primary named): {t.real_share:.4f}", flush=True)
+    print(
+        f"real share of Primary-days with a labelled event (Primary named): {t.real_share:.4f}",
+        flush=True,
+    )
     for tag in ARGS.arms:
         arm = make_arm(tag=tag)
         for month in MONTHS:
             for seed in ARGS.seeds:
                 started = time.monotonic()
-                power, code = train_world(arm=arm, month=month, seed=seed, clean=cclean if arm.corrected else clean)
+                power, code = train_world(
+                    arm=arm, month=month, seed=seed, clean=cclean if arm.corrected else clean
+                )
                 n = cut_index(month=month)
                 share = w.share_of_days_with_event(code=code, first=n - 730, last=n)
-                print(f"{tag} {month} s{seed}: share of Primary-days with a synthetic event in the 730 days before the cutoff {share:.4f} ({time.monotonic() - started:.0f} s)", flush=True)
+                print(
+                    f"{tag} {month} s{seed}: share of Primary-days with a synthetic event in the 730 days before the cutoff {share:.4f} ({time.monotonic() - started:.0f} s)",
+                    flush=True,
+                )
 
 
 def cmd_pretrain() -> None:
@@ -508,7 +647,12 @@ def cmd_pretrain() -> None:
     t = topo()
     for month in MONTHS:
         arms = [make_arm(tag=a) for a in ARGS.arms]
-        todo = [(a, s) for a in arms for s in ARGS.seeds if not (W / "pretrained" / a.tag / f"{month}_s{s}.pt").exists()]
+        todo = [
+            (a, s)
+            for a in arms
+            for s in ARGS.seeds
+            if not (W / "pretrained" / a.tag / f"{month}_s{s}.pt").exists()
+        ]
         if not todo:
             continue
         refit_t = c.month_start(month=month)
@@ -517,34 +661,87 @@ def cmd_pretrain() -> None:
             rows = b.data.build_fold(refit=refit_t, clean=clean)
             b.CTX["stats"] = d.lag_stats(rows=rows, clean=clean)
             pre = b.r448.pretrain_rows(rows=rows, refit=refit_t, clean=clean)
-            latest = datetime.fromtimestamp((pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC)
+            latest = datetime.fromtimestamp(
+                (pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC
+            )
             assert latest <= refit_t - c.regimes.REFIT_CUTOFF_AGE, (latest, refit_t)
-            print(f"{month}: pretraining rows {len(pre.x):,}; latest valid {latest.isoformat()} (refit {refit_t.isoformat()})", flush=True)
+            print(
+                f"{month}: pretraining rows {len(pre.x):,}; latest valid {latest.isoformat()} (refit {refit_t.isoformat()})",
+                flush=True,
+            )
             cols, origin = d.raw_table(source="pre", cache=b.W / "expected")
-            b.CTX["table_pre"] = torch.from_numpy(d.standardised_table(cols=cols, standardiser=rows.standardiser)).to("cuda")
+            b.CTX["table_pre"] = torch.from_numpy(
+                d.standardised_table(cols=cols, standardiser=rows.standardiser)
+            ).to("cuda")
             del cols
             x_gpu = torch.empty((len(pre.x), m.N_INPUTS), dtype=torch.float32, device="cuda")
             for a in range(0, len(pre.x), CHUNK):
-                x_gpu[a : a + CHUNK, : b.m.N_BASE] = torch.from_numpy(pre.x[a : a + CHUNK]).to("cuda")
-            arr = {"primary": pre.primary, "target_idx": pre.target_idx, "origin_idx": pre.origin_idx, "lead": pre.lead}
+                x_gpu[a : a + CHUNK, : b.m.N_BASE] = torch.from_numpy(pre.x[a : a + CHUNK]).to(
+                    "cuda"
+                )
+            arr = {
+                "primary": pre.primary,
+                "target_idx": pre.target_idx,
+                "origin_idx": pre.origin_idx,
+                "lead": pre.lead,
+            }
             z = (pre.y - rows.target_mean[pre.primary]) / rows.target_std[pre.primary]
             tens = {"z": torch.from_numpy(z.astype(np.float32)).to("cuda"), "w": torch.ones(len(pre.y), device="cuda"),
                     "p": torch.from_numpy(pre.primary).to("cuda"), "v": torch.from_numpy(pre.is_val).to("cuda")}  # fmt: skip
             n_primaries = len(rows.target_mean)
             col_key: list = [None, None]
-            for arm, seed in sorted([(a, s) for a, s in todo if a.corrected == corrected], key=lambda r: (r[1], r[0].rate, r[0].graph, r[0].aux)):
+            for arm, seed in sorted(
+                [(a, s) for a, s in todo if a.corrected == corrected],
+                key=lambda r: (r[1], r[0].rate, r[0].graph, r[0].aux),
+            ):
                 started = time.monotonic()
                 power, code = train_world(arm=arm, month=month, seed=seed, clean=clean)
                 key = (arm.rate, arm.graph, arm.aux, seed, arm.corrected)
                 if col_key[0] != key:
-                    col_key[0], col_key[1] = key, lag_columns(world=power, code=code, clean=clean, arr=arr, nbr=t.index[arm.graph], aux=arm.aux)
+                    col_key[0], col_key[1] = (
+                        key,
+                        lag_columns(
+                            world=power,
+                            code=code,
+                            clean=clean,
+                            arr=arr,
+                            nbr=t.train_index[arm.graph],
+                            aux=arm.aux,
+                            real_mask=t.real_mask,
+                        ),
+                    )
                 cols = col_key[1]
                 prep_s = time.monotonic() - started
                 # row-by-row assertions: the neighbour's lag time is the own lag time, at least 24 h before the origin
-                lag_t = c.prep422.GRID_START_US + cols["own"][:, 6].astype(np.int64) * c.prep422.STEP_US
+                lag_t = (
+                    c.prep422.GRID_START_US + cols["own"][:, 6].astype(np.int64) * c.prep422.STEP_US
+                )
                 origin_us = c.prep422.GRID_START_US + arr["origin_idx"] * c.prep422.STEP_US
                 ok = cols["own"][:, 6] >= 0
-                assert (lag_t[ok] <= origin_us[ok] - 24 * 3_600_000_000).all(), "a pretraining lag is within 24 h of the origin"
+                assert (lag_t[ok] <= origin_us[ok] - 24 * 3_600_000_000).all(), (
+                    "a pretraining lag is within 24 h of the origin"
+                )
+                n_chk = min(2_000_000, len(cols["own"]))
+                stub = np.zeros((n_chk, 45), np.float32)
+                stub[:, 37:45] = cols["own"][:n_chk]
+                ex = d.check_expected(
+                    origin_tab=np.asarray(origin),
+                    primary=arr["primary"][:n_chk],
+                    x=stub,
+                    origin_us=origin_us[:n_chk],
+                    label=f"{month} pretrain own",
+                )
+                nid = cols["nb"][:n_chk, 24].astype(np.int64)
+                have = nid >= 0
+                ex_nb = d.check_expected(
+                    origin_tab=np.asarray(origin),
+                    primary=nid[have],
+                    x=stub[have],
+                    origin_us=origin_us[:n_chk][have],
+                    label=f"{month} pretrain neighbour slot 0",
+                )
+                if seed == ARGS.seeds[0]:
+                    print(ex, "|", ex_nb, flush=True)
                 for a in range(0, len(cols["own"]), CHUNK):
                     s = slice(a, a + CHUNK)
                     x_gpu[s, 37:45] = torch.from_numpy(cols["own"][s]).to("cuda")
@@ -557,13 +754,16 @@ def cmd_pretrain() -> None:
                 model.table = b.CTX["table_pre"]
                 epochs, best = train(model=model, x=x_gpu, z=tens["z"], w=tens["w"], p=tens["p"], is_val=tens["v"], seed=seed,
                                      lr=c.PRETRAIN_LR, fresh_lr=None, device="cuda",
-                                     aux=(flag, frac) if arm.aux else None, aux_weight=ARGS.aux_weight)  # fmt: skip
+                                     aux=(flag, frac) if arm.aux else None, aux_weight=arm.aux_weight)  # fmt: skip
                 target = W / "pretrained" / arm.tag / f"{month}_s{seed}.pt"
                 target.parent.mkdir(parents=True, exist_ok=True)
                 tmp = target.with_suffix(".tmp")
                 torch.save(model.state_dict(), tmp)
                 tmp.rename(target)
-                print(f"  pretrain {arm.tag} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s (rows {prep_s:.0f} s), dropout {share}", flush=True)
+                print(
+                    f"  pretrain {arm.tag} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s (rows {prep_s:.0f} s), dropout {share}",
+                    flush=True,
+                )
                 del model, flag, frac
             del x_gpu, tens, pre, rows
             b.CTX.pop("table_pre", None)
@@ -583,7 +783,16 @@ def cmd_coarse() -> None:
             held = {}
             for seed in ARGS.seeds:
                 for kind, name in (("exact", "hx"), ("imperfect", "hi")):
-                    held[(name, seed)] = heldout_world(kind=kind, month=month, seed=seed, clean=cell.clean, first=first_day, last=cell.test.target_idx.max().item() + 1, tag=f"fold{month}")
+                    held[(name, seed)] = heldout_world(
+                        kind=kind,
+                        month=month,
+                        seed=seed,
+                        clean=cell.clean,
+                        first=first_day,
+                        last=cell.test.target_idx.max().item() + 1,
+                        tag=f"fold{month}",
+                        corrected=corrected,
+                    )
             for arm in todo:
                 for seed in ARGS.seeds:
                     out = W / "seed_preds" / arm.tag / f"{month}_s{seed}.parquet"
@@ -596,20 +805,96 @@ def cmd_coarse() -> None:
                         model.load_state_dict(torch.load(mfile, map_location="cpu"))
                         model = model.to("cuda").eval()
                     else:
-                        model = cell.fit(arm=arm, cut=cut, seed=seed, aux_weight=ARGS.aux_weight)
+                        model = cell.fit(arm=arm, cut=cut, seed=seed, aux_weight=arm.aux_weight)
                         mfile.parent.mkdir(parents=True, exist_ok=True)
                         torch.save(model.state_dict(), mfile.with_suffix(".tmp"))
                         mfile.with_suffix(".tmp").rename(mfile)
-                    frame, extra = cell.forecast(model=model, arm=arm, lo=lo, hi=hi, held={n: v for (n, s), v in held.items() if s == seed})
+                    frame, extra = cell.forecast(
+                        model=model,
+                        arm=arm,
+                        lo=lo,
+                        hi=hi,
+                        held={n: v for (n, s), v in held.items() if s == seed},
+                    )
                     for name, fr in extra.items():
-                        b._atomic_frame(frame=fr, target=W / "seed_preds" / f"{arm.tag}-{name}" / out.name)
+                        b._atomic_frame(
+                            frame=fr, target=W / "seed_preds" / f"{arm.tag}-{name}" / out.name
+                        )
                     b._atomic_frame(frame=frame, target=out)
-                    print(f"{arm.tag} {month} s{seed}: {frame.height} rows, {time.monotonic() - started:.0f} s", flush=True)
+                    print(
+                        f"{arm.tag} {month} s{seed}: {frame.height} rows, {time.monotonic() - started:.0f} s",
+                        flush=True,
+                    )
                     del model
             del cell
             torch.cuda.empty_cache()
     c.write_json(obj=b.CHECK, path=WORK / f"checks_coarse_{'-'.join(ARGS.arms)}.json")
 
 
+def cmd_select() -> None:
+    """Score each named arm's saved coarse model on held-out synthetic events of the 60 days before the cutoff (never the scored month).
+
+    The rows are the fine-tuning rows with valid time in those 60 days (their targets were fitted, the same
+    for every arm), with the lags replaced by a held-out-pair world that ends at the cutoff. The score is
+    the mean mixture negative log-likelihood; the rate and the auxiliary weight are chosen on it.
+    """
+    t = topo()
+    out: dict = {}
+    for month in MONTHS:
+        cell = Cell(month=month, device="cuda")
+        cut = c.month_start(month=month)
+        refit = cell.select(cut=cut)
+        idx = refit.index[cell.mr.valid_us[refit.index] >= c.us(t=cut) - VALIDATION_DAYS * DAY_US]
+        sub = {k_: v[idx] for k_, v in cell.arr.items()}
+        n = cut_index(month=month)
+        power, code = heldout_world(
+            kind="exact",
+            month=month,
+            seed=900,
+            clean=cell.clean,
+            first=n - (VALIDATION_DAYS + 15) * 48,
+            last=n,
+            tag="val",
+        )
+        for tag in ARGS.arms:
+            arm = make_arm(tag=tag)
+            cols = lag_columns(
+                world=power, code=code, clean=cell.clean, arr=sub, nbr=t.index[arm.graph], aux=False
+            )
+            x = cell.g.x[torch.from_numpy(idx).to("cuda")].clone()
+            x[:, 37:45] = torch.from_numpy(cols["own"]).to("cuda")
+            x[:, 45:] = torch.from_numpy(cols["nb"]).to("cuda")
+            z, p = (
+                cell.g.z[torch.from_numpy(idx).to("cuda")],
+                cell.g.p[torch.from_numpy(idx).to("cuda")],
+            )
+            for seed in ARGS.seeds:
+                model = new_net(arm=arm, n_primaries=cell.n_primaries, stage="ft")
+                model.load_state_dict(
+                    torch.load(
+                        model_path(tag=tag, month=month, key="coarse", seed=seed),
+                        map_location="cpu",
+                    )
+                )
+                model = model.to("cuda").eval()
+                model.table = b.CTX["table_ft"]
+                with torch.no_grad():
+                    nll = float(
+                        torch.cat(
+                            [
+                                b.row_nll(model=model, x=x[i], p=p[i], z=z[i])
+                                for i in torch.arange(len(x), device="cuda").split(65_536)
+                            ]
+                        ).mean()
+                    )
+                out.setdefault(tag, {})[f"{month}_s{seed}"] = nll
+                print(tag, month, seed, f"validation NLL {nll:.4f}", flush=True)
+        del cell
+        torch.cuda.empty_cache()
+    c.write_json(obj=out, path=WORK / f"select_{'-'.join(ARGS.arms)}.json")
+
+
 if __name__ == "__main__":
-    {"worlds": cmd_worlds, "pretrain": cmd_pretrain, "coarse": cmd_coarse}[ARGS.command]()
+    {"worlds": cmd_worlds, "pretrain": cmd_pretrain, "coarse": cmd_coarse, "select": cmd_select}[
+        ARGS.command
+    ]()

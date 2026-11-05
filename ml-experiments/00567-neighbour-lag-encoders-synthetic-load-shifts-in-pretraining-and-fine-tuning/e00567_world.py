@@ -28,7 +28,8 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 WORK: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00567-neighbour-lag-encoders-synthetic-load-shifts-in-pretraining-and-fine-tuning"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00567-neighbour-lag-encoders-synthetic-load-shifts-in-pretraining-and-fine-tuning"
 )
 WORLD_DIR: Final[Path] = WORK / "worlds"
 K_NEIGHBOURS: Final[int] = 4
@@ -73,6 +74,7 @@ def inject(
     gain_range: tuple[float, float] = GAIN_EXACT,
     spike_share: float = inj.SPIKE_SHARE,
     require_recipient: bool = False,
+    active: set[str] | None = None,
 ) -> inj.Injected:
     """Experiment 402's injection with the three added parameters (see the module docstring)."""
     rng = np.random.default_rng(seed)
@@ -83,7 +85,8 @@ def inject(
     span = last - first
     rows: list[dict] = []
     attempts = 0
-    while min(covered.values()) < coverage * span and attempts < 400_000:
+    target_sites = sorted(active) if active is not None else sites
+    while min(covered[x] for x in target_sites) < coverage * span and attempts < 400_000:
         attempts += 1
         donor = sites[int(rng.integers(len(sites)))]
         if covered[donor] >= coverage * span * 1.5:
@@ -118,8 +121,7 @@ def inject(
         if allowed is not None and any(not allowed[s][window].all() for s in touched):
             continue
         if any(
-            s in magnitude_only and (power[s][window] <= inj.MAGNITUDE_FLOOR).any()
-            for s in touched
+            s in magnitude_only and (power[s][window] <= inj.MAGNITUDE_FLOOR).any() for s in touched
         ):
             continue
         sign = 1 if rng.random() < 0.5 else -1
@@ -130,7 +132,10 @@ def inject(
             delta = (
                 sign * float(pool.share[int(rng.integers(len(pool.share)))]) * power[donor][window]
             )
-        if donor in magnitude_only and (power[donor][window] + delta <= inj.MAGNITUDE_FLOOR / 2).any():
+        if (
+            donor in magnitude_only
+            and (power[donor][window] + delta <= inj.MAGNITUDE_FLOOR / 2).any()
+        ):
             continue
         gain = float(rng.uniform(*gain_range)) if gain_range[0] < gain_range[1] else gain_range[0]
         gains = {
@@ -159,7 +164,7 @@ def inject(
                 {"site": r, "role": "recipient", "start": start, "stop": start + n,
                  "mean_delta_mw": float(gains[r].mean() * capacity_mw[r])}
             )  # fmt: skip
-    short = [s for s in sites if covered[s] < coverage * span]
+    short = [s for s in target_sites if covered[s] < coverage * span]
     if short:
         print(f"warning: sites below the coverage target after {attempts} attempts: {short}")
     events = pl.DataFrame(
@@ -189,7 +194,8 @@ def held_out_pairs(*, graph: dict[str, list[str]], seed: int = 0) -> set[frozens
     for i in order:
         pair = pairs[int(i)]
         a, b = sorted(pair)
-        if left[a] > 1 and left[b] > 1:
+        in_slots = b in graph[a][:K_NEIGHBOURS] and a in graph[b][:K_NEIGHBOURS]
+        if in_slots and left[a] > 1 and left[b] > 1:
             chosen.add(pair)
             left[a] -= 1
             left[b] -= 1
@@ -228,7 +234,9 @@ def placebo_index(*, graph: dict[str, list[str]], labels: list[str], seed: int =
     return out
 
 
-def event_pair_index(*, labels: list[str], table: pl.DataFrame) -> np.ndarray:
+def event_pair_index(
+    *, labels: list[str], table: pl.DataFrame, drop: set[frozenset[str]] | None = None
+) -> np.ndarray:
     """Return (primaries, K) neighbour indices from the label table's `pair` column (arm N4).
 
     A pair names two Primaries (as `D5 / D8` style text); every pair among the 16 Primaries makes both
@@ -236,12 +244,20 @@ def event_pair_index(*, labels: list[str], table: pl.DataFrame) -> np.ndarray:
     """
     pairs: set[frozenset[str]] = set()
     for text in table["pair"].drop_nulls().to_list():
-        names = [t for t in str(text).replace("/", " ").replace("-", " ").replace(",", " ").split() if t in labels]
+        names = [
+            t
+            for t in str(text).replace("/", " ").replace("-", " ").replace(",", " ").split()
+            if t in labels
+        ]
         for a in names:
             for b in names:
                 if a != b:
                     pairs.add(frozenset((a, b)))
-    graph = {s: sorted({n for p in pairs if s in p for n in p if n != s}, key=lambda n: int(n[1:])) for s in labels}
+    pairs -= drop or set()
+    graph = {
+        s: sorted({n for p in pairs if s in p for n in p if n != s}, key=lambda n: int(n[1:]))
+        for s in labels
+    }
     return neighbour_index(graph=graph, labels=labels)
 
 
@@ -298,7 +314,7 @@ def build_world(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (power, code), each (primaries, grid), for a world; cached on disk.
 
-    `kind` is `train` (training graph, mixed exact and 60%-100% conservation, spikes included) or
+    `kind` is `train` (training graph, mixed exact and 60%-100% conservation, no spikes: a spike is a reading error, not a load transfer) or
     `exact` / `imperfect` (held-out pairs only, every event has a recipient, no spikes). Events end
     before `last`. The base is `clean` with real labelled events (padded) excluded.
     """
@@ -310,7 +326,7 @@ def build_world(
     assert labels == c.sites(), "context and row order differ"
     if spec.kind == "train":
         coverage = RATES[spec.rate]
-        seed = TRAIN_SEED_OFFSET + spec.seed
+        seed = TRAIN_SEED_OFFSET + 2 * spec.seed
         gain, spike, need = GAIN_EXACT, 0.0, False
         no_recip = inj.NO_RECIPIENT_SHARE
     else:
@@ -323,7 +339,9 @@ def build_world(
         power, code = clean.copy(), np.zeros(clean.shape, dtype=np.int8)
     else:
         allowed = {
-            s: ~ctx.event_mask[s] & np.isfinite(clean[i]) & (True if allowed_extra is None else allowed_extra[i])
+            s: ~ctx.event_mask[s]
+            & np.isfinite(clean[i])
+            & (True if allowed_extra is None else allowed_extra[i])
             for i, s in enumerate(labels)
         }
         if spec.kind == "train":
@@ -340,13 +358,16 @@ def build_world(
                               magnitude_only=ctx.magnitude_only, spike_mad_mw=ctx.stage1_mad_mw, pool=pool,
                               first=lo, last=last, coverage=coverage / 2, seed=seed + 1, allowed=allowed_b,
                               gain_range=GAIN_IMPERFECT, spike_share=spike)  # fmt: skip
-            code = np.stack([np.maximum(injected.mask[s], injected_a.mask[s]) for s in labels]).astype(np.int8)
+            code = np.stack(
+                [np.maximum(injected.mask[s], injected_a.mask[s]) for s in labels]
+            ).astype(np.int8)
         else:
             injected = inject(power={s: clean[i].astype(np.float64) for i, s in enumerate(labels)},
                               capacity_mw=ctx.capacity, neighbours=graph, magnitude_only=ctx.magnitude_only,
                               spike_mad_mw=ctx.stage1_mad_mw, pool=pool, first=lo, last=last, coverage=coverage,
                               seed=seed, no_recipient_share=no_recip, allowed=allowed, gain_range=gain,
-                              spike_share=spike, require_recipient=need)  # fmt: skip
+                              spike_share=spike, require_recipient=need,
+                              active={x for x, nbs in graph.items() if nbs} if need else None)  # fmt: skip
             code = np.stack([injected.mask[s] for s in labels]).astype(np.int8)
         power = np.stack([injected.power[s] for s in labels]).astype(np.float32)
     WORLD_DIR.mkdir(parents=True, exist_ok=True)
@@ -366,6 +387,7 @@ def aux_labels(
     code: np.ndarray,
     slot_primary: np.ndarray,
     slot_idx: np.ndarray,
+    real_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (flag, fraction) for lag slots: flag 1 positive, 0 negative, -1 excluded; fraction float16.
 
@@ -382,6 +404,10 @@ def aux_labels(
     delta = np.where(finite, w - base, 0.0)
     big = np.abs(delta) >= FLAG_MIN_FRACTION
     flag = np.where(~finite, -1, np.where(big, 1, np.where(ev != inj.NONE, -1, 0))).astype(np.int8)
+    if (
+        real_mask is not None
+    ):  # a lag inside a real labelled event is neither clean nor a synthetic positive
+        flag = np.where((flag == 0) & real_mask[p, i], -1, flag).astype(np.int8)
     frac = np.where(finite, delta / np.maximum(np.abs(base), FRACTION_FLOOR), 0.0)
     return flag, np.clip(frac, -1.0, 1.0).astype(np.float16)
 
@@ -391,7 +417,9 @@ def selftest() -> None:
     rng = np.random.default_rng(0)
     n = 48 * 365 * 2
     sites = [f"D{i}" for i in range(1, 7)]
-    power = {s: (0.5 + 0.2 * np.sin(np.arange(n) / 24.0) + 0.01 * rng.normal(size=n)) for s in sites}
+    power = {
+        s: (0.5 + 0.2 * np.sin(np.arange(n) / 24.0) + 0.01 * rng.normal(size=n)) for s in sites
+    }
     cap = {s: 10.0 + 5 * i for i, s in enumerate(sites)}
     graph = {s: [t for t in sites if t != s][:2] for s in sites}
     pool = inj.EventPool(share=np.array([-0.05, -0.1, 0.2, -0.3]), steps=np.array([5, 20, 96, 500]))
@@ -400,7 +428,9 @@ def selftest() -> None:
               spike_mad_mw=dict.fromkeys(sites, 0.3), pool=pool, first=first, last=last, coverage=0.10, seed=1)  # fmt: skip
     ref = inj.inject(**kw)
     mine = inject(**kw)
-    assert all(np.array_equal(ref.power[s], mine.power[s]) for s in sites), "copy differs from experiment 402"
+    assert all(np.array_equal(ref.power[s], mine.power[s]) for s in sites), (
+        "copy differs from experiment 402"
+    )
     strict = dict(kw, require_recipient=True, spike_share=0.0, no_recipient_share=0.0)
     for gain, conserved in ((GAIN_EXACT, True), (GAIN_IMPERFECT, False)):
         world = inject(**strict, gain_range=gain)
@@ -429,9 +459,20 @@ def selftest() -> None:
     assert flag.shape == (2, 2) and frac.dtype == np.float16
     hit = np.argwhere(code != inj.NONE)
     s0, t0 = int(hit[0][0]), int(hit[0][1])
-    f1, _ = aux_labels(world=world, clean=clean_arr, code=code, slot_primary=np.array([[s0]]), slot_idx=np.array([[t0]]))
+    f1, _ = aux_labels(
+        world=world,
+        clean=clean_arr,
+        code=code,
+        slot_primary=np.array([[s0]]),
+        slot_idx=np.array([[t0]]),
+    )
     assert f1[0, 0] in (1, -1), f1
-    print("selftest passed:", mine.events.group_by("role").len().sort("role").to_dicts(), "held-out pairs", len(pairs))
+    print(
+        "selftest passed:",
+        mine.events.group_by("role").len().sort("role").to_dicts(),
+        "held-out pairs",
+        len(pairs),
+    )
 
 
 if __name__ == "__main__":

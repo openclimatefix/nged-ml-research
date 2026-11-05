@@ -15,8 +15,8 @@ size: >-
   private folder. More than one defensible design (how neighbours enter the network, how conservation
   is modelled in the synthetic worlds, how the auxiliary flag is labelled). Spans code whose callers
   need a search (experiments 402, 428, 486, 556, 559, 560, 566). Serving path and degradation rule:
-  not touched (this repository holds none). Cost ceiling 5 GPU-h; the plan below estimates about 2 GPU-h
-  for the coarse screen and up to 2 GPU-h for the passing arms.
+  not touched (this repository holds none). Cost ceiling 7 GPU-h (raised by the manager); measured cost is about 2 GPU-h for
+  the rate sweep, about 2 GPU-h for the other arms, and up to 3 GPU-h for the daily and real-event refits of passing arms.
 hypothesis: >-
   A load transfer lowers the donor Primary's lags and raises a neighbour's lags by the same amount,
   while a genuine level change shows at one Primary only. A network that reads its neighbours' lags as
@@ -94,9 +94,11 @@ neighbours, which carry the mirror-image shift, lets the network discount a tran
   (no real labelled event). The training target is the original series; only the lags carry the
   shift. The held-out pairs (one third of the interconnection pairs, never used for a training world)
   and the stress world use seeds that no training world uses. Real events are used only to score.
-- **Rate sweep.** The share of Primary-days with a synthetic load shift in the training window is 0%,
-  about half, about equal to, and about three times the real share; the worker derives the real share
-  from the label table and prints it with the four levels.
+- **Rate sweep.** The share of Primary-days touched by a synthetic load shift in the 730 days before
+  the cutoff is 0%, 3.5%, 7%, and 21%. Real labelled events touch 3.6% to 4.3% of Primary-days in the
+  same window (6.3% to 7.7% when padded by 2 days as experiment 510's row drop pads them), so the
+  levels are 0, about half, about equal to, and about three times the padded real share. The manager
+  accepted these levels. Training rows never see a held-out pair as neighbours.
 - **Arms.** N0: LAG-v3 with synthetic worlds. N1: N0 plus a shared-weight neighbour lag encoder (each
   neighbour contributes its own day-ago and week-ago value, missing flag, age, the expected weather and
   datetime embeddings at that lag's own time and place, and its Primary embedding; pooled by mean and

@@ -53,17 +53,27 @@ class NeighbourLagMdn(m560.LagModularMdn):
             n_enc = 1 if shared else n_primaries
             self.nb_enc = nn.ModuleList(
                 [
-                    base.mlp(n_in=tok, hidden=NB_HIDDEN, layers=1, n_out=NB_OUT, dropout=m545.DROPOUT)
+                    base.mlp(
+                        n_in=tok, hidden=NB_HIDDEN, layers=1, n_out=NB_OUT, dropout=m545.DROPOUT
+                    )
                     for _ in range(n_enc)
                 ]
             )
             self.nb_att = nn.Linear(NB_OUT + e, 1)
             wide = 2 * m545.ENCODER_OUT + self.n_lag_out + e + 2 * NB_OUT
             self.mixer_pre = base.mlp(
-                n_in=wide, hidden=m545.MIXER_HIDDEN, layers=2, n_out=3 * m545.COMPONENTS, dropout=m545.DROPOUT
+                n_in=wide,
+                hidden=m545.MIXER_HIDDEN,
+                layers=2,
+                n_out=3 * m545.COMPONENTS,
+                dropout=m545.DROPOUT,
             )
             self.mixer_ft = base.mlp(
-                n_in=wide + 7 + 2, hidden=m545.MIXER_HIDDEN, layers=2, n_out=3 * m545.COMPONENTS, dropout=m545.DROPOUT
+                n_in=wide + 7 + 2,
+                hidden=m545.MIXER_HIDDEN,
+                layers=2,
+                n_out=3 * m545.COMPONENTS,
+                dropout=m545.DROPOUT,
             )
             for head in (self.mixer_pre, self.mixer_ft):
                 base.init_head(head=head, components=m545.COMPONENTS)
@@ -118,7 +128,9 @@ class NeighbourLagMdn(m560.LagModularMdn):
         core = torch.cat(parts, dim=-1)
         if self.stage == "pre":
             return core, self.mixer_pre
-        return torch.cat([core, x[:, m545.SPREAD_COLS], x[:, m545.LEAD_COLS]], dim=-1), self.mixer_ft
+        return torch.cat(
+            [core, x[:, m545.SPREAD_COLS], x[:, m545.LEAD_COLS]], dim=-1
+        ), self.mixer_ft
 
     def forward(self, x: torch.Tensor, primary: torch.Tensor | None = None) -> torch.Tensor:
         """Return the main mixture's 9 raw outputs."""
