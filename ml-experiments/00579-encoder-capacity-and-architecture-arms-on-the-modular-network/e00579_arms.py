@@ -12,7 +12,7 @@ XLARGE: Final[Part] = Part(layers=3, hidden=512, out=128)
 
 @dataclass(frozen=True)
 class Arm:
-    """One arm: the network, the extra column kind, whether it re-uses B's stored pre-training, whether encoders unfreeze."""
+    """One arm: the network, extra columns, whether it re-uses B's pre-training, and encoder freezing."""
 
     tag: str
     cfg: Cfg
@@ -27,6 +27,7 @@ ARMS: Final[dict[str, Arm]] = {
         Arm("B", Cfg(), reuse_pre=True),
         Arm("WL", Cfg(w=LARGE)),
         Arm("DL", Cfg(d=LARGE)),
+        Arm("DT", Cfg(d=Part(layers=2, hidden=256, out=64, tied=True))),
         Arm("WDL", Cfg(w=LARGE, d=LARGE)),
         Arm("DXL", Cfg(d=XLARGE)),
         Arm("WXL", Cfg(w=XLARGE)),

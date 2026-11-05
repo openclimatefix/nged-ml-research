@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, I001, PT018
 """Extra datetime columns of experiment 579, built from the grid index of the valid time alone.
 
 Every column is a deterministic function of the half-hour grid time (local civil time in
@@ -6,12 +6,13 @@ Europe/London), so no label, target, or weather enters it. `grid_features` retur
 index, and rows, pre-training rows, and the expected-input table index into it.
 
 - F1 (14 columns): time-of-day harmonics 3 and 4 (sin and cos of the fractional local hour; the base
-  holds harmonics 1 and 2 of the whole local hour), day-of-week harmonics 1 and 2 (sin and cos of
-  2 pi k (weekday - 1) / 7), and day-of-year harmonics 1 to 3 (sin and cos of 2 pi k (day - 1) / 365.25).
+  holds harmonics 1 and 2 of the whole local hour), day-of-week harmonics 1 and 2 (sin and cos of 2
+  pi k (weekday - 1) / 7), and day-of-year harmonics 1 to 3 (sin and cos of 2 pi k (day - 1) /
+  365.25).
 - F2 (15 columns): F1 plus an Economy 7 proxy: 1 inside the 00:30-07:30 local-time window, with a
   logistic ramp of 10 minutes at each edge. The real tariff window varies by supplier.
-- P2 (1 column): the local half-hour-of-day index (0-47), consumed by the learnt per-Primary embedding
-  and not fed to the network as a number.
+- P2 (1 column): the local half-hour-of-day index (0-47), consumed by the learnt per-Primary
+  embedding and not fed to the network as a number.
 """
 
 from typing import Final

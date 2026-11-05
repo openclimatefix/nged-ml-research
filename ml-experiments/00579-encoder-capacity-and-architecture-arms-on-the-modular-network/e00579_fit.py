@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, PT018, D102, RUF028
+# ruff: noqa: ANN001, ANN201, D102, D205, E501, PLR0915, PT018, RUF028, SIM300
 """Experiment 579: coarse-refit fits of the encoder-capacity and architecture arms (GPU).
 
 A modified copy of experiment 572's `e00572_fit.py` (coarse cadence: refits on days 0 and 14 of each
@@ -6,10 +6,11 @@ fold; rows, recency weights, early stopping, seeds, scoring windows, origin-time
 the frozen-encoder D5 fine-tune, the capped-lag machinery, the shifted-lag stress run, and the
 lags-removed and lags-aged scoring twins). Every arm is the base B (experiment 572's v3+D5) plus one
 change; `e00579_arms.py` defines them and `e00579_model.py` builds the network. Arms that change an
-encoder or the Primary embedding are pre-trained here (`pretrain-wt`); arms that change only the mixer,
-the mixture, or an adapter fine-tune from experiment 572's stored pre-trained encoders.
+encoder or the Primary embedding are pre-trained here (`pretrain-wt`); arms that change only the
+mixer, the mixture, or an adapter fine-tune from experiment 572's stored pre-trained encoders.
 
-Usage: python e00579_fit.py {pretrain-wt|fit|assemble} --arm ARM [--stress] [--months ...] [--seeds ...]
+Usage: python e00579_fit.py {pretrain-wt|fit|assemble} --arm ARM [--stress] [--months ...] [--seeds
+...]
 """
 
 import argparse
@@ -44,9 +45,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 NAME = "00579-encoder-capacity-and-architecture-arms-on-the-modular-network"
 WORK = ML_EXPERIMENTS_DATA_DIR / NAME
 W = WORK / "work"
-W572 = (
-    ML_EXPERIMENTS_DATA_DIR / "00572-two-offset-part-1-lags-versus-the-slow-output-offset/work"
-)
+W572 = ML_EXPERIMENTS_DATA_DIR / "00572-two-offset-part-1-lags-versus-the-slow-output-offset/work"
 """Experiment 572's work folder; only its `pretrained_V3D5` weights (arm B) are read."""
 W560 = ML_EXPERIMENTS_DATA_DIR / "00560-modular-lag-encoder-capped-lags-and-block-dropout/work"
 """Experiment 560's work folder; only its cached expected-input table (`expected`) is read."""
@@ -95,7 +94,9 @@ ARGS = parser.parse_args()
 SPEC = SPECS[ARGS.arm]
 ARM = SPEC.arm
 CFG = ARM.cfg
-c.COMPONENTS = CFG.k  # experiment 510's serving quantiles read the number of mixture components from here
+c.COMPONENTS = (
+    CFG.k
+)  # experiment 510's serving quantiles read the number of mixture components from here
 CHECK: dict = {"train_rows": 0, "test_rows": 0, "origins_weather_checked": 0, "months": {}}
 _cutoffs = k.cutoffs
 
@@ -148,14 +149,15 @@ def row_nll(*, out: torch.Tensor, z: torch.Tensor, p: torch.Tensor) -> torch.Ten
 
 def fresh_mixer(*, model: torch.nn.Module) -> None:
     """Give the model's `mixer_ft` a seed-12345 initialisation (experiment 554's recipe; with the default
-    config the weights equal experiment 572's `fresh_mixer`, because the layers are drawn in the same order).
+    config the weights equal experiment 572's `fresh_mixer`, because the layers are drawn in the
+    same order).
     """
     with torch.random.fork_rng(devices=[]):
         torch.manual_seed(FRESH_SEED)
         fresh = mod.Mixer(
-            n_in=model.mixer_ft.n_in,  # ty: ignore[unresolved-attribute]
+            n_in=model.mixer_ft.n_in,  # ty: ignore[unresolved-attribute, invalid-argument-type]
             cfg=CFG,
-            n_primaries=model.embedding.num_embeddings,  # ty: ignore[unresolved-attribute]
+            n_primaries=model.embedding.num_embeddings,  # ty: ignore[unresolved-attribute, invalid-argument-type]
         )
     model.mixer_ft.load_state_dict(fresh.state_dict())  # ty: ignore[unresolved-attribute]
 
@@ -174,7 +176,7 @@ def new_model(*, n_primaries: int, stage: str = "ft") -> torch.nn.Module:
     return model
 
 
-def train(  # noqa: PLR0912, PLR0915
+def train(  # noqa: PLR0912
     *, model: torch.nn.Module, x, z, w, p, is_val, seed: int, lr: float, max_epochs: int,
     fresh_lr: float | None, frozen: bool, anchor: dict | None, lam: float, device: str,
     enc_scale: float | None = None,
@@ -272,7 +274,9 @@ CTX: dict = {"on": False, "extra": {}}
 AGED_DAYS = (1, 2, 3)
 SIBLINGS = ["removed", *[f"aged{n}" for n in AGED_DAYS]]
 CAP_HOURS = SPEC.cap_steps * 0.5
-N_LAG_INPUTS = mod.TAU_COL  # 37 lag-free columns + 8 lag columns; the knot position is the next column
+N_LAG_INPUTS = (
+    mod.TAU_COL
+)  # 37 lag-free columns + 8 lag columns; the knot position is the next column
 
 
 def apply_dropout(*, x: torch.Tensor, origin_idx: np.ndarray, seed: int) -> dict:
@@ -367,21 +371,25 @@ def widen(*, x37: np.ndarray, blk: np.ndarray) -> np.ndarray:
 
 
 def extend_table(*, table: np.ndarray) -> np.ndarray:
-    """Append the extra datetime columns (at each grid time, the same for every Primary) to the expected-input table."""
+    """Append the extra datetime columns (same for every Primary) to the expected-input table."""
     if N_EXTRA == 0:
         return table
-    extra = np.broadcast_to(EXTRA_GRID.astype(np.float16)[None], (table.shape[0], *EXTRA_GRID.shape))
+    extra = np.broadcast_to(
+        EXTRA_GRID.astype(np.float16)[None], (table.shape[0], *EXTRA_GRID.shape)
+    )
     return np.concatenate([table, extra], axis=2)
 
 
-def with_extra(*, x: np.ndarray, target_idx: np.ndarray, valid_us: np.ndarray | None = None) -> np.ndarray:
-    """Append the extra columns of each row's valid time to `x`; with `valid_us`, assert the index is the valid time's."""
+def with_extra(
+    *, x: np.ndarray, target_idx: np.ndarray, valid_us: np.ndarray | None = None
+) -> np.ndarray:
+    """Append the extra columns of each row's valid time to `x`; `valid_us` asserts the index."""
     if N_EXTRA == 0:
         return x
     if valid_us is not None:
-        assert (
-            (valid_us - c.prep422.GRID_START_US) // c.prep422.STEP_US == target_idx
-        ).all(), "an extra datetime column would not be a function of the row's valid time"
+        assert ((valid_us - c.prep422.GRID_START_US) // c.prep422.STEP_US == target_idx).all(), (
+            "an extra datetime column would not be a function of the row's valid time"
+        )
     return np.concatenate([x, EXTRA_GRID[target_idx]], axis=1)
 
 
@@ -533,8 +541,18 @@ def build_test(*, month, standardiser):
     lg.absent(x=gone, cap_steps=SPEC.cap_steps)
     sets = {"removed": gone, **{f"aged{e}": variants[e] for e in AGED_DAYS}}
     if tau is not None:
-        variants = {e: with_extra(x=np.concatenate([v, tau], axis=1), target_idx=test.target_idx, valid_us=test.valid) for e, v in variants.items()}
-        sets = {n: with_extra(x=np.concatenate([v, tau], axis=1), target_idx=test.target_idx, valid_us=test.valid) for n, v in sets.items()}
+        variants = {
+            e: with_extra(
+                x=np.concatenate([v, tau], axis=1), target_idx=test.target_idx, valid_us=test.valid
+            )
+            for e, v in variants.items()
+        }
+        sets = {
+            n: with_extra(
+                x=np.concatenate([v, tau], axis=1), target_idx=test.target_idx, valid_us=test.valid
+            )
+            for n, v in sets.items()
+        }
     CTX["variants"] = sets
     i = int(np.argmax(variants[0][:, 38] < 0.5))
     CHECK["months"][month]["lag_example"] = (
@@ -581,7 +599,9 @@ def pretrain_wt(*, device: str) -> None:
         )
         cols, origin = d560.raw_table(source="pre", cache=W560 / "expected")
         table_pre = torch.from_numpy(
-            extend_table(table=d560.standardised_table(cols=cols, standardiser=mr.base.standardiser))
+            extend_table(
+                table=d560.standardised_table(cols=cols, standardiser=mr.base.standardiser)
+            )
         ).to(device)
         del cols
         CTX["table_pre"] = table_pre
@@ -595,7 +615,9 @@ def pretrain_wt(*, device: str) -> None:
             )  # fmt: skip
             x_gpu[:, N_LAG_INPUTS] = torch.from_numpy(tau[:, 0]).to(device)
         if N_EXTRA:
-            assert pre.target_idx.min() >= 0 and pre.target_idx.max() < len(EXTRA_GRID)  # the index is the valid time's grid index
+            assert pre.target_idx.min() >= 0 and pre.target_idx.max() < len(
+                EXTRA_GRID
+            )  # the index is the valid time's grid index
             x_gpu[:, N_LAG_INPUTS + 1 :] = torch.from_numpy(EXTRA_GRID[pre.target_idx]).to(device)
         stub = np.zeros((min(2_000_000, len(blk)), N_LAG_INPUTS), np.float32)
         stub[:, 37:] = blk[: len(stub)]
@@ -681,7 +703,9 @@ def fine_tune(
         enc_scale=0.1 if ARM.unfreeze else None,
     )  # fmt: skip
     with torch.no_grad():
-        pick = torch.randperm(len(t["x"]), generator=torch.Generator().manual_seed(seed))[:200_000].to(device)
+        pick = torch.randperm(len(t["x"]), generator=torch.Generator().manual_seed(seed))[
+            :200_000
+        ].to(device)
         weights = torch.softmax(model(t["x"][pick], t["p"][pick])[:, : CFG.k], dim=-1).mean(dim=0)
     day = f.day_of(month=month, cut=cut)
     log = {

@@ -1,5 +1,8 @@
-# ruff: noqa: E501
-"""Experiment 579 offline checks (CPU): the default `ArmMdn` equals experiment 572's `LagOffsetMdn`, and parameter counts per arm."""
+# ruff: noqa: C416, E501, PLW2901, PT018
+"""Experiment 579 offline checks (CPU).
+
+The default `ArmMdn` equals experiment 572's `LagOffsetMdn`; parameter counts per arm.
+"""
 
 import e00572_model as m572  # ty: ignore[unresolved-import]
 import e00579_arms as arms  # ty: ignore[unresolved-import]
@@ -23,7 +26,11 @@ def equivalence() -> float:
         elif a.startswith("mixer_pre."):
             a = a.replace("mixer_pre.", "mixer_pre.trunk.")
         elif a.startswith("mixer_ft."):
-            a = a.replace("mixer_ft.6.", "mixer_ft.out.") if ".6." in a else a.replace("mixer_ft.", "mixer_ft.trunk.")
+            a = (
+                a.replace("mixer_ft.6.", "mixer_ft.out.")
+                if ".6." in a
+                else a.replace("mixer_ft.", "mixer_ft.trunk.")
+            )
         sd[a] = v
     res = new.load_state_dict(sd, strict=True)
     assert not res.missing_keys and not res.unexpected_keys, res
@@ -59,7 +66,9 @@ def counts() -> None:
         out = model(x, p)
         assert out.shape == (8, 3 * arm.cfg.k), (tag, out.shape)
         c = model.parameter_counts()
-        print(tag, {a: v for a, v in c.items()}, "total", sum(v.numel() for v in model.parameters()))
+        print(
+            tag, {a: v for a, v in c.items()}, "total", sum(v.numel() for v in model.parameters())
+        )
 
 
 if __name__ == "__main__":

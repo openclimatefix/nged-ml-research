@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: D205, E501
 """Experiment 579: the v3+D5 modular network of experiment 572 with configurable parts.
 
 `ArmMdn` computes the same function class as experiment 572's `LagOffsetMdn` when `Cfg()` holds its
@@ -9,11 +9,13 @@ match, so a stored 572 pre-training loads into it; `tests`-free equivalence is a
 - encoder size (`w`, `d`: layers, hidden width, outputs), the Primary embedding width, the mixer
   (layers, width, mixture components K), block type (`mlp`, `res` pre-layer-norm residual, `geglu`),
 - FiLM conditioning of the encoders by the Primary embedding (`film`), a separate datetime embedding
-  (`emb_dt`), a learnt per-Primary half-hour-of-day embedding (`p2`), extra datetime columns (`n_extra`),
+  (`emb_dt`), a learnt per-Primary half-hour-of-day embedding (`p2`), extra datetime columns
+  (`n_extra`),
 - a rank-r per-Primary adapter on the mixer's last layer (`adapter_rank`).
 
-Input columns: 0-36 lag-free, 37-44 lag block, 45 the D5 knot position, 46 onward the `n_extra` extra
-datetime columns (when `p2`, the last extra column is the half-hour index and is not a network input).
+Input columns: 0-36 lag-free, 37-44 lag block, 45 the D5 knot position, 46 onward the `n_extra`
+extra datetime columns (when `p2`, the last extra column is the half-hour index and is not a network
+input).
 """
 
 from dataclasses import dataclass, field
@@ -44,6 +46,7 @@ class Part:
     layers: int = 1
     hidden: int = 64
     out: int = 32
+    tied: bool = False  # C-tied: the wide layers are weight-tied copies of 64-unit layers
 
 
 @dataclass(frozen=True)
@@ -112,20 +115,50 @@ def trunk(*, n_in: int, part: Part, block: str) -> tuple[nn.Module, int]:
         return nn.Sequential(*modules), width
     assert block == "res"
     modules = [nn.Linear(n_in, part.hidden)]
-    modules += [ResBlock(hidden=part.hidden, dropout=DROPOUT) for _ in range(part.layers)]
-    modules.append(nn.LayerNorm(part.hidden))
+    modules += [ResBlock(hidden=part.hidden, dropout=DROPOUT) for _ in range(part.layers)]  # ty: ignore[unsupported-operator]
+    modules.append(nn.LayerNorm(part.hidden))  # ty: ignore[invalid-argument-type]
     return nn.Sequential(*modules), part.hidden
+
+
+class TiedEncoder(nn.Module):
+    """C-tied: the shapes of a wide encoder whose units are copies of 64-unit layers.
+
+    Each layer's output is the same 64 values repeated, so the encoder computes a function of a
+    base-size network with the wide encoder's depth.
+    """
+
+    def __init__(self, *, n_in: int, part: Part) -> None:
+        """Build the tied encoder; the base unit width is 64 and the output unit width is 32."""
+        super().__init__()
+        self.rep, self.rep_out = part.hidden // 64, part.out // 32
+        self.l1 = nn.Linear(n_in, 64)
+        self.rest = nn.ModuleList([nn.Linear(64, 64) for _ in range(part.layers - 1)])
+        self.drop = nn.Dropout(DROPOUT)
+        self.out = nn.Linear(64, 32)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Return the output with each of the 32 base outputs repeated."""
+        h = self.drop(nn.functional.gelu(self.l1(x)))
+        for lin in self.rest:
+            h = self.drop(nn.functional.gelu(lin(h)))
+        return self.out(h).repeat(1, self.rep_out)
 
 
 def encoder(*, n_feats: int, emb: int, part: Part, block: str, film: bool) -> nn.Module:
     """Return an encoder reading `[features, embedding]`. With the plain `mlp` block and no FiLM it is
     experiment 545's `base.mlp` (same keys), so stored weights load.
     """
+    if part.tied:
+        return TiedEncoder(n_in=n_feats + emb, part=part)
     if film:
         return FilmEncoder(n_feats=n_feats, emb=emb, part=part)
     if block == "mlp":
         return base.mlp(
-            n_in=n_feats + emb, hidden=part.hidden, layers=part.layers, n_out=part.out, dropout=DROPOUT
+            n_in=n_feats + emb,
+            hidden=part.hidden,
+            layers=part.layers,
+            n_out=part.out,
+            dropout=DROPOUT,
         )
     stack, width = trunk(n_in=n_feats + emb, part=part, block=block)
     return nn.Sequential(stack, nn.Linear(width, part.out))
@@ -142,8 +175,8 @@ class FilmEncoder(nn.Module):
         self.lin = nn.ModuleList([nn.Linear(widths[i], widths[i + 1]) for i in range(part.layers)])
         self.film = nn.ModuleList([nn.Linear(emb, 2 * part.hidden) for _ in range(part.layers)])
         for f in self.film:
-            nn.init.zeros_(f.weight)
-            nn.init.zeros_(f.bias)
+            nn.init.zeros_(f.weight)  # ty: ignore[invalid-argument-type]
+            nn.init.zeros_(f.bias)  # ty: ignore[invalid-argument-type]
         self.drop = nn.Dropout(DROPOUT)
         self.out = nn.Linear(part.hidden, part.out)
 
@@ -176,7 +209,9 @@ class Mixer(nn.Module):
         self.rank = cfg.adapter_rank
         if self.rank:
             gen = torch.Generator().manual_seed(7)
-            self.adapt_a = nn.Parameter(0.1 * torch.randn(n_primaries, width, self.rank, generator=gen))
+            self.adapt_a = nn.Parameter(
+                0.1 * torch.randn(n_primaries, width, self.rank, generator=gen)
+            )
             self.adapt_b = nn.Parameter(torch.zeros(n_primaries, self.rank, 3 * cfg.k))
 
     def forward(self, x: torch.Tensor, primary: torch.Tensor) -> torch.Tensor:
@@ -184,7 +219,12 @@ class Mixer(nn.Module):
         h = self.trunk(x)
         out = self.out(h)
         if self.rank:
-            out = out + torch.bmm(torch.bmm(h[:, None, :], self.adapt_a[primary]), self.adapt_b[primary])[:, 0]
+            out = (
+                out
+                + torch.bmm(torch.bmm(h[:, None, :], self.adapt_a[primary]), self.adapt_b[primary])[
+                    :, 0
+                ]
+            )
         return out
 
 
@@ -205,12 +245,22 @@ class ArmMdn(nn.Module):
             self.embedding_dt = nn.Embedding(n_primaries, cfg.emb_dt)
         if cfg.p2:
             self.hh = nn.Embedding(n_primaries * HALF_HOURS, 8)
-        n_dt = 21 + cfg.n_extra + (7 if cfg.p2 else 0)  # p2: the index column becomes an 8-wide embedding
+        n_dt = (
+            21 + cfg.n_extra + (7 if cfg.p2 else 0)
+        )  # p2: the index column becomes an 8-wide embedding
         self.weather = encoder(n_feats=7, emb=e, part=cfg.w, block=cfg.block, film=cfg.film)
         self.datetime = encoder(n_feats=n_dt, emb=e_dt, part=cfg.d, block=cfg.block, film=cfg.film)
         expected = 2 * (cfg.w.out + cfg.d.out)
         self.lag = nn.ModuleList(
-            [base.mlp(n_in=6 + expected + e, hidden=LAG_HIDDEN, layers=1, n_out=LAG_OUT, dropout=DROPOUT)]
+            [
+                base.mlp(
+                    n_in=6 + expected + e,
+                    hidden=LAG_HIDDEN,
+                    layers=1,
+                    n_out=LAG_OUT,
+                    dropout=DROPOUT,
+                )
+            ]
         )
         wide = cfg.w.out + cfg.d.out + LAG_OUT + e
         self.mixer_ft = Mixer(n_in=wide + 7 + 2, cfg=cfg, n_primaries=n_primaries)
@@ -262,7 +312,9 @@ class ArmMdn(nn.Module):
     def datetime_feats(self, x: torch.Tensor) -> torch.Tensor:
         """Return the datetime encoder's feature columns of the rows."""
         if self.cfg.n_extra:
-            return torch.cat([x[:, DATETIME_COLS], x[:, EXTRA0 : EXTRA0 + self.cfg.n_extra]], dim=-1)
+            return torch.cat(
+                [x[:, DATETIME_COLS], x[:, EXTRA0 : EXTRA0 + self.cfg.n_extra]], dim=-1
+            )
         return x[:, DATETIME_COLS]
 
     def _expected(
@@ -293,7 +345,9 @@ class ArmMdn(nn.Module):
         if self.stage == "pre":
             out = self.mixer_pre(core, primary)
         else:
-            out = self.mixer_ft(torch.cat([core, x[:, SPREAD_COLS], x[:, LEAD_COLS]], dim=-1), primary)
+            out = self.mixer_ft(
+                torch.cat([core, x[:, SPREAD_COLS], x[:, LEAD_COLS]], dim=-1), primary
+            )
         k = self.cfg.k
         off = self.offset(x[:, TAU_COL], primary)
         return torch.cat([out[:, :k], out[:, k : 2 * k] + off, out[:, 2 * k :]], dim=-1)
@@ -310,7 +364,9 @@ class ArmMdn(nn.Module):
         return out
 
 
-def load_pre_into_ft(*, model: ArmMdn, state: dict[str, torch.Tensor], skip_mixer_pre: bool) -> None:
+def load_pre_into_ft(
+    *, model: ArmMdn, state: dict[str, torch.Tensor], skip_mixer_pre: bool
+) -> None:
     """Load a stage-`pre` state dict into the stage-`ft` network; `mixer_ft` stays as built."""
     assert model.stage == "ft"
     knots = state["knots"]
@@ -320,7 +376,9 @@ def load_pre_into_ft(*, model: ArmMdn, state: dict[str, torch.Tensor], skip_mixe
         if a != "knots" and not a.startswith(("mixer_ft.", "mixer_pre."))
     }
     missing = model.load_state_dict(rest, strict=False)
-    assert all(a.startswith("mixer_ft.") or a in {"knots_old", "knot_new"} for a in missing.missing_keys), missing
+    assert all(
+        a.startswith("mixer_ft.") or a in {"knots_old", "knot_new"} for a in missing.missing_keys
+    ), missing
     assert not missing.unexpected_keys, missing
     _ = skip_mixer_pre
     with torch.no_grad():
