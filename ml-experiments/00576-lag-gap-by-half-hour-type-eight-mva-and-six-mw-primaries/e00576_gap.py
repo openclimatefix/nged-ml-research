@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PT018, PERF401
+# ruff: noqa: E501, E731, PT018, PERF401
 """Experiment 576: where the lag gap sits, by half-hour type, Primary, hour, season, and lead band.
 
 Re-scores experiment 572's stored forecasts (E2, v3, v3+D5; two seeds, five folds) row by row. The
