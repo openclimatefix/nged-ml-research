@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 572: the lag network of experiment 560 with a slow per-Primary output offset (D5), and D5 learnt in fine-tuning only.
+"""Experiment 572: the lag network of experiment 560 with the D5 output offset, and D5 learnt in fine-tuning.
 
 - `LagOffsetMdn` (arm v3+D5): experiment 560's `LagModularMdn` (mode v3) plus experiment 565's
   design 5 offset. The knot position `tau` is input column 45 (after the 37 lag-free columns and the

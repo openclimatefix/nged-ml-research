@@ -1,5 +1,5 @@
 # ruff: noqa: E501, PTH123, SIM115, PT018, PERF401
-"""Experiment 572: score the Part 1 arms in three lead bands, with slices, contrasts, and the injected-shift leak.
+"""Experiment 572: score the Part 1 arms in three lead bands, with slices, contrasts, and leak.
 
 Arms: M0 and E2 are experiment 565's stored `C-M0` and `D5` (coarse refits, seeds 0 and 1); E2ft, V3,
 V3D5, and V35 are this experiment's fits. Each seed of each arm is scored on its own (widened by 1.15,
@@ -150,7 +150,7 @@ def build_table(*, arms: dict[str, tuple[Path, str]]) -> pl.DataFrame:
 
 
 def mde(*, sub: pl.DataFrame, a: str, b: str) -> float:
-    """Return the seed-noise half-width of a paired contrast (1.96 x the seed sd, pooled within folds, over sqrt(seeds))."""
+    """Return the seed-noise half-width of a paired contrast (1.96 x seed sd, pooled within folds, / sqrt(seeds))."""
     cols = [f"d_{a}_{b}_s{x}" for x in SEEDS]
     mm = (
         sub.group_by("month")
@@ -176,7 +176,7 @@ SLICES: Final[dict[str, pl.Expr]] = {
 
 
 def leak(*, arms: list[str]) -> pl.DataFrame:
-    """Return the injected-shift leak of each arm (mean over the five folds, with min and max), in points of capacity."""
+    """Return the injected-shift leak of each arm (mean over five folds, min, max), in points of capacity."""
     rows = []
     for arm in arms:
         root, folder = ARM_DIRS[arm]

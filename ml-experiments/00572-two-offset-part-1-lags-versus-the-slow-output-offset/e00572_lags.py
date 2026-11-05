@@ -37,7 +37,7 @@ def age_max(*, cap_steps: int) -> tuple[float, float]:
 def lag_indices(
     *, target_idx: np.ndarray, origin_idx: np.ndarray, cap_steps: int, extra_days: int = 0
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return (day, week) lag grid indices observed at least `cap_steps + 48 * extra_days` steps before the origin."""
+    """Return (day, week) lag grid indices at least `cap_steps + 48 * extra_days` steps before the origin."""
     target_idx, origin_idx = np.asarray(target_idx), np.asarray(origin_idx)
     assert (target_idx > origin_idx).all(), "every target must be after its origin"
     newest = origin_idx - cap_steps - STEPS * extra_days
@@ -64,7 +64,7 @@ def lag_stats(*, rows, clean: np.ndarray, cap_steps: int) -> np.ndarray:
 def lag_block(
     *, clean, primary, target_idx, origin_idx, stats, cap_steps: int, extra_days: int = 0
 ) -> np.ndarray:  # fmt: skip
-    """Return the 8 appended columns (37-44): value, missing flag, age for the day and week lag, then their grid indices."""
+    """Return the 8 appended columns (37-44): day and week lag value, missing flag, age, grid indices."""
     day, week = lag_indices(
         target_idx=target_idx, origin_idx=origin_idx, cap_steps=cap_steps, extra_days=extra_days
     )

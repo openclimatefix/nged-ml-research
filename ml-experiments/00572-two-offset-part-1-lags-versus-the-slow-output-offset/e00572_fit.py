@@ -148,7 +148,7 @@ def pretrained_dir() -> Path:
 
 
 def pretrained_file(*, month: str, seed: int) -> Path:
-    """Return the pre-trained weights: experiment 560's v3 (V3), experiment 554's M0 (E2ft), or this experiment's own."""
+    """Return the pre-trained weights: experiment 560's v3, experiment 554's M0, or this experiment's own."""
     if SPEC.tag == "V3":
         p = W560 / "pretrained" / "LAG-v3" / f"{month}_s{seed}.pt"
     elif SPEC.tag == "E2ft":
@@ -195,7 +195,7 @@ def load_pretrained_fresh(*, model: torch.nn.Module, path: Path) -> None:
 
 
 def new_model(*, n_primaries: int, stage: str = "ft") -> torch.nn.Module:
-    """Return an untrained network (fine-tuning stage unless `stage` says `pre`), with the expected-input table attached."""
+    """Return an untrained network, with the expected-input table attached for the lag arms."""
     if SPEC.variant == "ftonly":
         assert stage == "ft"
         return mod.OffsetFtOnly(n_primaries=n_primaries, n_knots=KNOTS)
