@@ -28,7 +28,7 @@ def zero_rule() -> alt.Chart:
     return (
         alt.Chart(pl.DataFrame({"z": [0.0]}))
         .mark_rule(color="grey", strokeDash=[4, 3])
-        .encode(x="z:Q")
+        .encode(x="z:Q")  # ty: ignore[unresolved-attribute]
     )  # ty: ignore[unresolved-attribute]
 
 
