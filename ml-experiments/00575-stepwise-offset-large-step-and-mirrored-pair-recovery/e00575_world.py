@@ -13,12 +13,12 @@ a Kl event there is always a gain, and in Kp a pair is oriented so that no MVA P
 import itertools
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Final
 
 import e00573_world as w573  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 INJECTED: Final = w573.INJECTED
 MVA_INJECTED: Final = w573.MVA_INJECTED
@@ -43,8 +43,9 @@ SEEDS: Final = 5
 """World draws per kind (Kl and Kp), to reach counts per bin that the binomial interval can resolve."""
 FIRST_DAY: Final = w573.day_of(t=datetime(2022, 1, 1, tzinfo=UTC))
 LAST_DAY: Final = w573.day_of(t=datetime(2026, 5, 31, tzinfo=UTC))
-EVENTS_PATH: Final = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00400-lagged-lagless-forecast-blend-around-load-shifts-stored/work/events_corrected.parquet"
+EVENTS_PATH: Final = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00400-lagged-lagless-forecast-blend-around-load-shifts-stored/work/events_corrected.parquet"
 )
 
 
@@ -111,7 +112,8 @@ def draw_pairs(*, seed: int) -> list[Event]:
     The donor changes by `sign * size`; the recipient (an injected neighbour, absent in about 30% of
     events and always for D9) changes by `-rho * sign * size * donor capacity / recipient capacity`.
     No MVA Primary loses load: a donor MVA event is a gain, and a recipient that would lose is dropped.
-    Events at one Primary keep at least 30 days between the end of one and the start of the next, whichever role.
+    Events at one Primary keep at least 30 days between the end of one and the start of the
+    next, whichever role.
     """
     cap = capacities()
     busy: dict[int, list[tuple[int, int]]] = {p: [] for p in INJECTED}
