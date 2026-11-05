@@ -62,3 +62,24 @@ metric: >-
 Planned. The full design is in the private brief `price_encoder_p1_brief.md`; this page is filled
 in as the steps finish. Order of work: step 0 (CPU diagnostics), the known-answer test, the
 pre-trained-stack diagnostics, a gate, then fine-tuned scoring for arms that pass the gate.
+
+## Price data and licence
+
+- **Licence:** "Copyright: Licence to use BMRS open data", Elexon Limited
+  (<https://www.elexon.co.uk/bsc/operations-settlement/bsc-central-services/balancing-mechanism-reporting-agent/copyright-licence-bmrs-data/>),
+  read verbatim on 2026-11-05. It grants "a worldwide, royalty-free, perpetual, non-exclusive
+  licence to Use the BMRS Data", and the licence text lists copying, publishing, distributing, and
+  adapting among the permitted uses. It sets no research-specific term and no limit on publishing
+  derived results. Attribution line, required on every chart of price data: "Contains BMRS data ©
+  Elexon Limited copyright and database right 2026."
+- **Fetch:** market index price (`APXMIDP` provider) and system price with net imbalance volume, for
+  2019-09-01 to 2025-08-31, through the public keyless API with 2 threads, about 4,300 small
+  requests and 18 MB, no cost. Saved under this experiment's private data folder (`market_early/`),
+  never committed. The longer series is `*_2019-09_to_2026-09.parquet` there.
+- **Gaps:** 72 whole days of market index price and 9 whole days of system price are not published
+  (listed by the fetch script); the price encoder treats them as missing.
+- **Definition is unchanged across the span:** the system sell and buy prices are identical in every
+  row from 2019 to 2026 (single imbalance price), and every zero market index price coincides with
+  zero traded volume, so zero-volume rows are masked. The market index mean is 37 GBP per MWh in
+  2019, 198 in 2022 (the gas shock), and 72 to 103 in 2024 to 2026, which is why the transform
+  normalises by trailing 28-day statistics.
