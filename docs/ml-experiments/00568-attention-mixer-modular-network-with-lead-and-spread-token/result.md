@@ -42,7 +42,8 @@ prediction: >-
 decision_rule: >-
   An arm passes screening if CRPS at 24-120 h at the eight MVA Primaries or at the six MW
   Primaries is at least 0.03 better than
-  T0 with a Bonferroni interval excluding zero. The injected-shift leak is reported beside the
+  T0 with a Bonferroni interval excluding zero. T1 meets that rule at the six MW Primaries (0.101
+  better), and the placebo T5 does as well. The injected-shift leak is reported beside the
   CRPS and
   is not a gate (maintainer policy of 2026-11-05: ideas that add performance are kept even if the
   leak
@@ -54,7 +55,8 @@ decision_rule: >-
   network
   block and a new input group to the serving path. Bonferroni count 36 for screening (30 CRPS
   contrasts for T1 against T0, T2, T3, T4 and T5 against T2, each at 2 groups and 3 lead bands, plus
-  6 for T6), and 6 for each of the cold-night, Christmas-week, and spread-tercile families. Wording
+  6 for T6, which was not run), and 6 for each of the cold-night, Christmas-week, and spread-tercile
+  families. Wording
   is "interval excludes zero" or "not shown".
 benchmark: >-
   T0, the MLP mixer on the same encoders under the same schedule, with its parameter count raised to
@@ -64,14 +66,16 @@ benchmark: >-
 row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity at 24-120 h and by the seven lead bands of experiment 521 and
-  0-6 h, at the eight MVA Primaries MVA-only Primaries and the six signed-MW Primaries (D15 and
+  0-6 h, at the eight MVA Primaries and the six signed-MW Primaries (D15 and
   D18 report-only);
   injected-shift leak in points of capacity; q01, q05, q95, q99 coverage and pinball loss.
 verdict: not supported
 best_arm: >-
   T4 (MLP mixer plus the multi-variable spread columns): CRPS 4.759 at the eight MVA Primaries and
-  3.439 at the six MW Primaries at 24-120 h, against 4.812 and 3.572 for T0; its gain over T0 is
-  inside the minimum detectable effect at the eight MVA Primaries.
+  3.439 at the six MW Primaries at 24-120 h, against 4.812 and 3.572 for T0; it is the best arm at
+  the eight MVA Primaries only (T5 is lower at the six MW Primaries, 3.425), and its gains over T0
+  are
+  inside the minimum detectable effect at both Primary groups.
 headline: >-
   The attention mixer T1 is worse than the MLP mixer T0 at the eight MVA Primaries (+0.180, interval
   +0.053 to +0.331, worse in 5 of 5 folds, CRPS 4.992 against 4.812). At the six MW Primaries T1
@@ -86,11 +90,11 @@ lessons: >-
   placebo.
 take_home_message: >-
   A self-attention mixer over the encoder outputs does not forecast Primary demand better than the
-  simpler MLP mixer, and at the eight MVA Primaries it is worse. Its small gain at the six MW
-  Primaries
-  also appears when the ensemble spread is shuffled between days, so it does not come from the
+  simpler MLP mixer, and at the eight MVA Primaries it is worse. The attention mixer's small gain at
+  the six MW Primaries also appears when the ensemble spread is shuffled between days, so it does
+  not come from the
   spread.
-  The next experiment should look for what the relative-spread block lets the networks do with the
+  A next experiment could look for what the relative-spread block lets the networks do with the
   recent shift, not for a better mixer.
 advice:
   - >-
@@ -98,13 +102,15 @@ advice:
     the eight MVA Primaries and its gain at the six MW Primaries is matched by a placebo (T1, T5).
   - >-
     Pair every spread input with a shuffled-spread placebo that keeps each day's marginal: here the
-    placebo explained the whole gain at the six MW Primaries (T5 minus T2).
+    placebo matched the gain at the six MW Primaries (T5 minus T2 was -0.098, interval includes
+    zero).
   - >-
     Test an MLP given the same spread columns before crediting attention (T4 minus T1 was -0.233
     at the eight MVA Primaries).
   - >-
-    Check a cloud-cover missing flag as a proxy for the date before adding it: runs before 2025-11-21
-    carry no cloud file, and the arms that read the block leaked about twice as much (stress leak).
+    A cloud-cover missing flag may act as a proxy for the date, so check that before adding it: runs
+    before 2025-11-21 carry no cloud file, and the arms that read the block leaked about twice as
+    much (stress leak). The explanation is untested.
 production_status: not-for-production
 adopted_in: none
 ---
@@ -155,16 +161,20 @@ The attention block follows [Vaswani et al. (2017)](https://doi.org/10.48550/arX
 **P1 (T1 beats T0 by 0.05 at the eight MVA Primaries and 0.03 at the six MW Primaries): fails at the
 eight MVA Primaries, holds at the six MW Primaries.** P2 (T1 beats T2 by 0.03, gain in the top
 spread
-tercile): fails; T1 minus T2 is +0.049 (-0.054 to +0.126) at the eight MVA Primaries and -0.051
-(-0.186 to +0.043) at the six MW Primaries. P3 (T1 beats T3 by 0.02): fails; +0.008 and -0.055, both
-intervals include zero. P4 (T4 at least 0.02 worse than T1): fails in the opposite direction, T4 is
+tercile): fails at the eight MVA Primaries, and at the six MW Primaries the gain (0.051) passes the
+0.02
+threshold but its interval includes zero; T1 minus T2 is +0.049 (-0.054 to +0.126) at the eight MVA
+Primaries and -0.051
+(-0.186 to +0.043) at the six MW Primaries. P3 (T1 beats T3 by 0.02): fails at the eight MVA
+Primaries (+0.008), and at the six MW Primaries the
+gain (0.055) passes the threshold but its interval includes zero (T1 minus T3 -0.055). P4 (T4 at
+least 0.02 worse than T1): fails in the opposite direction, T4 is
 better than T1 by 0.233 (-0.284 to -0.146) at the eight MVA Primaries. P5 (T5 within 0.02 of T2):
 fails at the six MW Primaries, where T5 minus T2 is -0.098 (-0.180 to +0.016). P6 (weather weight
 above
-Primary weight in every lead band; Primary weight not rising with lead): holds (Checks). The leak
-part
-of P6 is reported beside CRPS, not as a gate (maintainer policy of 2026-11-05), and T1 leaks 15.7
-points against T0's 6.6.
+Primary weight in every lead band; Primary weight not rising with lead): the attention-weight clause
+holds (Checks); the leak clause fails, with T1 at 15.7 points against T0's 6.6. The leak is reported
+beside CRPS, not as a gate (maintainer policy of 2026-11-05).
 
 ## Results
 
@@ -195,8 +205,9 @@ MW Primaries. Daily refit: seed 0, one fine-tune per day.
 | T0z minus T0 | +0.060 (-0.036 to +0.261) | -0.054 (-0.127 to +0.012) |
 | T4 daily minus T0 daily | -0.022 (-0.101 to +0.065) | -0.103 (-0.236 to +0.002) |
 
-Leaving Primary D8 out, T1 minus T0 at the eight MVA Primaries is +0.182 (+0.062 to +0.290), so one
-Primary does not carry it.
+Leaving Primary D8 out, T1 minus T0 at the eight MVA Primaries is +0.182 (+0.062 to +0.290), so the
+result does
+not depend on one Primary.
 
 ![CRPS by lead band for each arm](figure_1_crps_by_lead_band.svg)
 
@@ -211,11 +222,11 @@ seven
 daily cutoffs of experiment 559, so the numbers are not comparable with its 6.0-point flag. T5 keeps
 each day's block within its month, so a block column that tells the date (the cloud-missing flag is
 1
-before 2025-11-21) survives the shuffle. We did not test that explanation.
+before 2025-11-21) survives the shuffle. We did not test the cloud-missing-flag explanation.
 
 ![CRPS against the injected-shift leak](figure_2_crps_against_leak.svg)
 
-**Real labelled load-shift events (74 Primary-and-month pairs, daily refit, seed 0, refit one day
+**Real labelled load-shift events (74 events, daily refit, seed 0, refit one day
 after the event ends).** The share of an event's depth that reaches the forecast is 0.020 for T0
 (95% interval from resampling events 0.012 to 0.029) and 0.037 for T4 (0.017 to 0.066); T4 minus T0
 is +0.017 (+0.002 to +0.041) on the same 74 pairs. Without the event with the largest share the
@@ -282,10 +293,3 @@ interval (T4 minus T0 -0.217 and -0.366).
   fits
   for T0 and T4), step-2 and pretrained weights in `work/step2/` and `work/pretrained/ATT/`, in the
   experiment's private data folder. About 3 GPU-hours were used (estimated from logged run times).
-
-## What the next experiment should answer
-
-The arms that read the relative-spread block leak an injected shift about twice as much as the arms
-that
-do not, and the shuffled placebo leaks as much. A T4 variant without the cloud columns and the
-cloud-missing flag would show whether a date-like input causes the leak.
