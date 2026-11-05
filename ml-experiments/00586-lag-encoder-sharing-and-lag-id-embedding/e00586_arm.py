@@ -50,8 +50,6 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME = "00586-lag-encoder-sharing-and-lag-id-embedding"
 WORK = ML_EXPERIMENTS_DATA_DIR / NAME
-W572 = e.W
-W582 = ML_EXPERIMENTS_DATA_DIR / "00582-nra-tails-on-verified-load-shift-events/work"
 e.WORK = WORK
 e.W = WORK / "arms" / KIND / "work"
 assert e.SPEC.variant == "lagoff" and e.SPEC.frozen

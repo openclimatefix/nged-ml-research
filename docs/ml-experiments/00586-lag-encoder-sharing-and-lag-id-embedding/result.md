@@ -91,7 +91,10 @@ offset and used 1 seed. Experiment 560's own numbers stay a report-only referenc
 The day, week, 2-week, and year-ago lags (experiment 585's Y1c layout), arms S0w (one encoder reads
 all), S1w (shared plus lag ID, outputs concatenated in a fixed order with block dropout), and S3w
 (separate). Run after experiment 585 merges, or from its branch if the code is stable. Experiment 585's
-code is read, never edited.
+code is read, never edited. The maintainer's main hope for more lags is a lower leak during load-shift
+events and better forecasts at Christmas, New Year, and Easter, so stage 2 headlines the injected-shift
+leak, the lag-following measures and tail coverage after the shift ends (experiment 581's injected
+bank), and CRPS on Christmas, New Year, Easter, and bank-holiday slices, beside the usual groups.
 
 ## Standing practices followed
 
