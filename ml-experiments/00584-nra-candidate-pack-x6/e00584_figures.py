@@ -114,7 +114,8 @@ def c0_injected(*, month: str, r: int, rows0: np.ndarray) -> np.ndarray:
 
 def bank_examples(*, t: c.X4Table, gi: dict) -> None:
     """Draw four injected events chosen by a fixed rule: in month 2025-10 the lowest-numbered Primary of
-    each metering group for two deep 15-day (length, depth, sign) combinations (a 30-day event starts before the fold month, so its onset is not scored), taking the lowest pass.
+    each metering group for two deep 15-day (length, depth, sign) combinations. A 30-day event starts
+    before the fold month, so its onset is not scored., taking the lowest pass.
     """
     ev_all = pl.read_parquet(s3.BANK_PARQUET).filter(pl.col("month") == "2025-10")
     kk_all = s3.key(t.prim, t.origin_idx, t.idx)
@@ -190,7 +191,7 @@ def width_figure() -> None:
                 "arm:N", scale=sc_c, legend=alt.Legend(title="Arm", orient="top", columns=4)
             )
         )
-        pts = base.mark_point(filled=True, size=70, aria=False).encode(
+        pts = base.mark_point(filled=True, size=70, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "width:Q", title="Mean q05-q95 width (% of capacity)", scale=alt.Scale(zero=False)
             ),
@@ -200,13 +201,13 @@ def width_figure() -> None:
                 scale=alt.Scale(domain=[0.7, 1.0]),
             ),
         )  # ty: ignore[unresolved-attribute]
-        err = base.mark_rule(aria=False).encode(
+        err = base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
             x="width:Q",
             y=alt.Y("cover90_lo:Q", scale=alt.Scale(domain=[0.7, 1.0])),
             y2="cover90_hi:Q",
         )  # ty: ignore[unresolved-attribute]
         nom = (
-            alt.Chart(pl.DataFrame({"y": [0.90]}))
+            alt.Chart(pl.DataFrame({"y": [0.90]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black", strokeDash=[4, 3])
             .encode(y="y:Q")
         )  # ty: ignore[unresolved-attribute]
@@ -235,7 +236,7 @@ def false_alarm_figure() -> None:
             rows.append({"arm": r["arm"], "group": r["group"], "band": lab, "diff": r[f"{k}_minus_V"], "lo": r[f"{k}_minus_V_lo"], "hi": r[f"{k}_minus_V_hi"]})  # fmt: skip
     df = pl.DataFrame(rows)
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}))
+        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="grey", strokeDash=[4, 3])
         .encode(x="x:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -246,7 +247,7 @@ def false_alarm_figure() -> None:
             color=alt.Color("band:N", scale=alt.Scale(range=[theme.DATA_BLUE, theme.BRAND_ORANGE]), legend=alt.Legend(title="Pinball loss of", orient="top", columns=1)),
             yOffset="band:N",
         )  # fmt: skip
-        pts = base.mark_point(filled=True, size=40, aria=False).encode(
+        pts = base.mark_point(filled=True, size=40, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "diff:Q", title="Pinball loss minus C1's (points of capacity; negative is better)"
             )
@@ -278,7 +279,7 @@ def tails_figure() -> None:
         ]
     )
     arms = [a for a in ARMS_SHOWN if a in set(b["arm"].to_list())]
-    alt.Chart(long_).mark_bar(aria=False).encode(
+    alt.Chart(long_).mark_bar(aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("arm:N", sort=arms, title=None, axis=alt.Axis(labelAngle=0)),
         y=alt.Y("pinball:Q", title="Mean pinball loss (% of capacity; lower is better)"),
         color=alt.Color("arm:N", scale=alt.Scale(domain=arms, range=[COLOUR[a] for a in arms]), legend=None),

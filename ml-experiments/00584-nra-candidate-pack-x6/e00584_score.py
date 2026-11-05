@@ -62,7 +62,7 @@ def link_view(*, arm: str) -> Path:
         dst = view / "fits" / tag
         if dst.is_symlink():
             dst.unlink()
-        dst.symlink_to(spec["fits"] / src)
+        dst.symlink_to(spec["fits"] / src)  # ty: ignore[unsupported-operator]
         assert dst.exists() and any(dst.iterdir()), dst
     inj = view / "inject"
     if inj.is_symlink():
@@ -114,7 +114,10 @@ def combine(*, base, hold, on, frac=None):
 
 
 def setup(arm: str, override: float | None = None) -> Path:
-    """Point experiment 583's modules at arm `arm`'s stored forecasts and add the control bands; return the output folder."""
+    """Point experiment 583's modules at arm `arm`'s forecasts and add the control bands.
+
+    Returns the output folder.
+    """
     global OVERRIDE  # noqa: PLW0603
     OVERRIDE = override
     view = link_view(arm=arm)
