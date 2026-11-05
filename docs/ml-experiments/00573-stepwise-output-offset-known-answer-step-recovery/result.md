@@ -126,6 +126,34 @@ appear as a step on and a step off, and offset plots per Primary. Step D (the of
 load-shift detector) runs only if S1 or S2 passes Step 1. Seeds: 2; coarse refits (one fit per
 fold). Cost is measured on the first pre-training and projected before the rest runs.
 
+## Scoring protocol for Step 1 (fixed before any score is quoted)
+
+- **Offset fits.** Each offset is fitted with Adam on the full set of a fold's pre-training rows
+  (about 7 million rows), 1,500 steps, rate 0.02 decaying to 0.002. S0 uses experiment 565's weight
+  of 10 on the mean squared first difference of the monthly knots. S1's total-variation weight is
+  swept over 10, 100, and 1000 nats per standardised unit, and S2's gate weight over 3, 30, and 300
+  nats per expected open gate, on the first fold (2025-10) of worlds Ks and K0. One weight per arm
+  is then fixed: the one with the highest F1 (the harmonic mean of recall and precision) in world
+  Ks among those with at most 1 false step of 1% or more per Primary-year in world K0.
+- **Extracting steps.** A day's change of the offset counts toward a step when it is at least 0.1%
+  of capacity; same-direction days up to 2 days apart merge; a merged run of total size 1% of
+  capacity or more is a step, dated at the day where half of its change has happened.
+- **Recall and precision.** Truth steps in the last 10 days of a fold's span are not scored. K-S1
+  uses the truth steps of size 3% or more, pooled over the six injected Primaries, per fold; S1 or
+  S2 passes when at least 4 of the 5 folds have recall 0.80 or more. Precision is the share of
+  extracted steps that match a truth step.
+- **K-S2.** Extracted steps of 1% or more in world K0, counted on the six Primaries that world Ks
+  injects, divided by the six Primaries times the years of the fold's span; passing means 1 or fewer
+  per Primary-year on at least 4 of 5 folds. These steps include real, unlabelled level changes of
+  the real series, so the count is an upper bound on false steps. The count on the ten untouched
+  Primaries is reported beside it.
+- **K-S3.** For each injected Primary whose ramp ends at least 30 days before the span ends, the
+  recovered rise from 30 days before the ramp starts to 30 days after it ends is within 25% of the
+  truth, and the ramp window holds at least 5 steps of 0.3% of capacity or more (days of change of
+  0.05% or more). S1 or S2 passes when at least two thirds of the (Primary, fold) pairs pass.
+- **Which arm.** S1 and S2 are each scored on K-S1 to K-S3; "S1 or S2" means at least one of them
+  passes all three. S0 is scored the same way for reference.
+
 ## Predictions that could fail (written before any score)
 
 - K-S1 to K-S3 pass for S1 or S2, and S0 recovers under 40% of the steps. Fails if S0 recovers 60%
