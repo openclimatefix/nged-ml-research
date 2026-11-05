@@ -113,6 +113,13 @@ def main() -> None:
                 why.append("telemetry transfer of the opposite sign at the labelled dates")
             tid.append(m["transfer_id"])
             continue
+        if r["status"] != "too short to check" and not np.isfinite(r["fit_depth_mw"]):
+            final.append("rejected")
+            why.append(
+                "no telemetry (the record of this Primary has no data at the labelled dates)"
+            )
+            tid.append(None)
+            continue
         over = tr.filter(
             ((pl.col("primary_a") == r["label"]) | (pl.col("primary_b") == r["label"]))
             & (pl.col("onset_a_idx") <= r["label_end_idx"])

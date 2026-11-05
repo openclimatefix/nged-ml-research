@@ -94,8 +94,8 @@ adopted_in: none
 ---
 
 > **Erratum (experiment 580, 2026-11-05).** The real-event absorbed shares (0.026, 0.040, and 0.014
-> of the labelled depth) divide by labelled depths that the telemetry mostly does not show (1 of 184
-> labelled events is verified), so treat them as unproven. They were not recomputed. The CRPS,
+> of the labelled depth) divide by labelled depths that the telemetry mostly does not confirm (1 of
+> 184 labelled events is confirmed), so treat them as unproven. They were not recomputed. The CRPS,
 > coverage, and lag-encoder results do not depend on the labels and stand. See [experiment
 > 580](../00580-verified-load-shift-event-set-and-label-audit/result.md) for the audit of the labels
 > against the telemetry.
