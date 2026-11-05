@@ -11,6 +11,7 @@ arm has the same finite rows.
 """
 
 import sys
+from datetime import date
 from pathlib import Path
 
 import e00565_design6 as d6  # ty: ignore[unresolved-import]
@@ -25,7 +26,8 @@ ARMS = {"n1": "N1", "n3": "N3", "y1": "Y1", "y1c": "Y1c", "y3": "Y3"}
 COUNTED_ARMS = ("N1", "N3", "N5", "Y1", "Y1c", "Y3")
 TESTS = 36
 
-DATE = pl.col("valid_time").dt.date()
+# `target` is a half-hour index on the 30-minute UTC grid that starts on 2019-09-01.
+DATE = pl.lit(date(2019, 9, 1)) + pl.duration(days=pl.col("target") // 48)
 MD = DATE.dt.month() * 100 + DATE.dt.day()
 SLICES = {
     "Christmas and New Year": (MD >= 1224) | (MD <= 102),
