@@ -35,6 +35,7 @@ import e00559_model_extra as mex
 import e00559_model_wt as mwt
 import e00559_wt as wt
 import e00565_model_variants as var
+import e00565_slow as slow
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
@@ -304,6 +305,8 @@ def load_pretrained_fresh(*, model: m.ModularMdn, path: Path) -> None:
 def new_model(*, n_primaries: int, stage: str = "ft") -> m.ModularMdn:
     """Return an untrained network (fine-tuning stage unless `stage` says `pre`)."""
     if SPEC.columns:
+        if SPEC.source == "slow":
+            return slow.ModularMdnSlow(n_primaries=n_primaries, stage=stage)
         if SPEC.source == "drift":
             if SPEC.variant == "a10":
                 return mdr.ModularMdnDrift(n_primaries=n_primaries, stage=stage, n_knots=KNOTS)
@@ -451,6 +454,8 @@ def build_month(*, month, clean):
         if SPEC.source == "drift":
             WT = ShuffledMonthColumns(month=month, mr=mr)
             KNOTS = WT.n_knots
+        elif SPEC.source == "slow":
+            WT = slow.SlowTrendColumns(month=month, mr=mr, clean=clean)
         elif SPEC.source in {"uv", "cloud"}:
             WT = extra.ExtraColumns(month=month, mr=mr, source=uv_source())
         else:
