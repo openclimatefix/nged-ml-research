@@ -43,7 +43,7 @@ def hour_figure() -> None:
     line = (
         alt.Chart()
         .mark_line(point=True)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "hour:Q",
                 title="Hour of day (UTC) of the forecast target",
@@ -110,10 +110,10 @@ def primary_figure() -> None:
             ),
             yOffset="arm_label:N",
         )
-        bars = base.mark_rule().encode(
+        bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low_month:Q", title="E2 minus lag arm CRPS (points of capacity)"),
             x2="high_month:Q",
-        )  # ty: ignore[unresolved-attribute]
+        )
         dots = base.mark_point(filled=True, size=45).encode(x="difference:Q")  # ty: ignore[unresolved-attribute]
         panels.append(
             alt.layer(zero_rule(horizontal=False), bars, dots).properties(
