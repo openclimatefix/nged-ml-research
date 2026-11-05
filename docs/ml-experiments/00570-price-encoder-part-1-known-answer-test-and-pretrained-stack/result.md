@@ -38,8 +38,8 @@ prediction: >-
   pre-trained-stack gain. Step 0: the price window alone explains 2% to 6% of one metered battery's
   variance.
 decision_rule: >-
-  The known-answer test gates everything: if K1 or K2 fails, no real-data result is read. A
-  fine-tuned contrast counts only if its point estimate exceeds the minimum detectable effect of its
+  Step 0 is report-only and the known-answer test checks that the encoder can learn a stated
+  rule; neither gates the real-data arms (maintainer decision, 2026-11-05). A fine-tuned contrast counts only if its point estimate exceeds the minimum detectable effect of its
   group and at least 5 of 5 folds agree in sign (six counted tests, Bonferroni factor 6). The
   pre-trained-stack contrasts A6-1, A6-2, and probe CRPS are a separate counted family of 6. Fine-tuned
   scoring runs only for arms that pass A6-1 or A6-2. The threshold is the minimum detectable effect,
@@ -83,3 +83,15 @@ pre-trained-stack diagnostics, a gate, then fine-tuned scoring for arms that pas
   zero traded volume, so zero-volume rows are masked. The market index mean is 37 GBP per MWh in
   2019, 198 in 2022 (the gas shock), and 72 to 103 in 2024 to 2026, which is why the transform
   normalises by trailing 28-day statistics.
+
+## Maintainer decisions
+
+- **Step 0 is report-only.** Step 0(a), run on the 13 months then on disk, found an in-sample R-squared
+  of 0.2% to 4.1% at the 16 Primaries and a negative leave-one-month-out R-squared at all 16
+  (-0.3% to -16%). That shows no linear rule on same-time price features transfers across months. It
+  does not rule out a nonlinear rule, which a learnt encoder may find, so the real-data arms run
+  regardless.
+- **The known-answer test is a check, not a gate.** It shows whether the encoder can learn the
+  threshold, rank, and cheapest-and-dearest-4-hours rules. A failure is reported and the real-data
+  arms still run, with their results read in that light.
+- **Ceiling:** 6 GPU-hours; the maintainer is asked before it is exceeded.
