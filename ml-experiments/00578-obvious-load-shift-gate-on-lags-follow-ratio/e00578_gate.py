@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501, D103, PLR0912, PLR0915
 """Experiment 578: DESCRIPTIVE gates G1 and G2 with action A2 (mask the lags) on stored forecasts.
 
 Nothing is tuned: m = 3 days, k = 3 event-free standard deviations, theta = 5% of capacity, release after 2
