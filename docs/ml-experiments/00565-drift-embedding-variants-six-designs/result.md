@@ -89,6 +89,13 @@ metric: >-
   signed-MW Primaries (D15 and D18 report-only); injected-shift leak in points of capacity.
 ---
 
+> **Erratum (experiment 580, 2026-11-05).** The real-event absorbed share (74 month-event pairs)
+> divides by labelled depths that the telemetry mostly does not show (1 of 184 labelled events is
+> verified), so treat it as unproven. It was not recomputed. The other results do not depend on the
+> labels and stand. See [experiment
+> 580](../00580-verified-load-shift-event-set-and-label-audit/result.md) for the audit of the labels
+> against the telemetry.
+
 **We asked which way of giving the demand forecast network a slow-moving signal about each
 substation helps, because substations change over years while the network's Primary embedding stays
 fixed.** We tried five designs on 16 Primary substations (Primaries; 14 scored, 2 report-only) and
