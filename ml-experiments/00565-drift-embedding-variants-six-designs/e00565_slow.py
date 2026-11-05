@@ -38,13 +38,22 @@ BLOCK_STEPS: Final[int] = 30 * STEPS_PER_DAY
 def _mean(
     *, cs: np.ndarray, cn: np.ndarray, primary: np.ndarray, lo: np.ndarray, hi: np.ndarray
 ) -> np.ndarray:
-    """Return the mean of the observed values in the inclusive index range [lo, hi] (NaN when under-covered)."""
-    lo = np.maximum(lo, 0)
-    s = cs[primary, hi + 1] - cs[primary, lo]
-    n = cn[primary, hi + 1] - cn[primary, lo]
+    """Return the mean of the observed values in the inclusive range [lo, hi] of nominal width `hi - lo + 1`.
+
+    The value is NaN when the range lies at least partly before the grid start (`lo < 0`), because
+    a clamped window would silently be a shorter window, and when under `MIN_COVERAGE` of the
+    nominal width was observed. A negative `hi` is never used as an index.
+    """
+    assert (hi >= lo).all()
+    inside = lo >= 0
+    lo_c, hi_c = np.where(inside, lo, 0), np.where(inside, hi, 0)
+    assert (hi_c + 1 <= cs.shape[1] - 1 + 1).all()
+    s = cs[primary, hi_c + 1] - cs[primary, lo_c]
+    n = cn[primary, hi_c + 1] - cn[primary, lo_c]
     width = hi - lo + 1
     with np.errstate(invalid="ignore", divide="ignore"):
-        return np.where(n >= MIN_COVERAGE * width, s / np.maximum(n, 1), np.nan)
+        value = s / np.maximum(n, 1)
+    return np.where(inside & (n >= MIN_COVERAGE * width), value, np.nan)
 
 
 class SlowTrendColumns:
@@ -52,6 +61,7 @@ class SlowTrendColumns:
 
     def __init__(self, *, month: str, mr: c.MonthRows, clean: np.ndarray) -> None:
         """Build the cumulative sums, the placebo shifts, and the per-Primary standardisation."""
+        clean = clean.astype(np.float64)
         self.clean = clean
         obs = np.isfinite(clean)
         self.cs = np.concatenate(
@@ -64,7 +74,7 @@ class SlowTrendColumns:
         rng = np.random.default_rng(0)
         self.donor_k = rng.integers(1, DONOR_MONTHS + 1, size=(self.n_primaries, 4096))
         self.null_rows_without_donor = 0
-        self.rows_with_value = None
+        self.rows_with_value = None  # month rows with all 6 real columns observed, set below
         self.max_end_gap = None
         self.last_end_minus_origin = 0
         origin_idx = ((mr.origin_us - GRID) // STEP).astype(np.int64)
@@ -80,6 +90,12 @@ class SlowTrendColumns:
                 self.mean[p] = np.nanmean(vals, axis=0)
                 self.std[p] = np.maximum(np.nanstd(vals, axis=0), 1e-6)
         self.month_raw = raw
+        self.rows_with_value = int(np.isfinite(raw).all(axis=1).sum())
+        self.null_rows_without_donor = int(
+            (~np.isfinite(self._raw(primary=mr.primary, origin_idx=origin_idx, null=True)))
+            .any(axis=1)
+            .sum()
+        )
         self.month_origin_idx = origin_idx
         self.month_primary = mr.primary
         i = len(origin_idx) // 2

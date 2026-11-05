@@ -123,6 +123,8 @@ SPECS = {
         Spec(
             "D5", "fresh", cadence="h", frozen=True, columns="real", source="drift", variant="out"
         ),
+        Spec("D2", "fresh", cadence="h", columns="real", source="slow", variant="slow"),
+        Spec("D2-null", "fresh", cadence="h", columns="null", source="slow", variant="slow"),
     )
 }
 parser = argparse.ArgumentParser()
