@@ -1,4 +1,4 @@
-"""Print every number the experiment 559 page quotes, and draw its three figures.
+"""Print the contrast and leak tables the experiment 559 page quotes, and draw its three figures.
 
 Reads the tables `e00559_score.py` and `e00559_stress.py` stored.
 """
