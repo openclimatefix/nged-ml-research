@@ -74,10 +74,9 @@ correlation between the embedding's level path and the offset's level path is 0.
 Primaries, 0.04 at the six MW Primaries, and 0.04 at D15 and D18 over all months, and 0.21, 0.15, and
 0.67 over the last 12 months. The embedding carries 93% to 99% of the slow variance (embedding path
 variance 0.15 to 0.56 in standardised units squared, offset 0.006 to 0.007). So the joint hybrid is
-dominated by the embedding, not split between two paths. The staged and multiplicative-only
-constructions below address this (they stop the embedding having a level channel), but the
-correlation-based reading of "competition" is not supported, and this plan says so before the worlds
-are built.
+dominated by the embedding. Low correlation with a dominant embedding is a winner-take-all form of
+competition, so step 0 neither supports nor refutes the hypothesis. As the brief states, the
+correlation criterion failed, so the staged and orthogonal constructions are less certain to help.
 
 ## Design
 
@@ -93,7 +92,7 @@ are built.
   worlds, all five for the real data.
 - **Arms** on the lag-free base: D5, A10, H-joint (565's hybrid), H-staged (offset fitted first and
   frozen, then the embedding and mixer fitted), H-film (the embedding is a per-channel scale of 1 plus
-  delta on the weather encoder's output, dimension 4, strong L2 shrinkage, no additive path, offset
+  delta on the weather encoder's output, dimension 3, strong L2 shrinkage, no additive path, offset
   fitted jointly), H-orth (H-film plus a penalty that makes the embedding's mean effect on the mixture
   location zero within every Primary and month, and a penalty on the squared covariance of the two
   level paths; covariance rather than correlation because the first penalty drives the embedding's
@@ -110,6 +109,34 @@ are built.
   predictions reused (565's D5, A10, and H on the real data), coarse refits (days 0 and 14). Departed
   from: none. Earlier advice followed: carry slow change as an offset (565); the A10 embedding added
   to D5 lost the gain (565), which this experiment tests rather than repeats.
+
+## Choices fixed after the plan review, before any fit
+
+- **Component recoveries in Wc** (needed by the selection rule) are read-outs, not CRPS: step
+  recovery is the R-squared of the arm's total monthly level path (offset plus the embedding's
+  level path) against the injected step path over the 24 months before the fold; sensitivity
+  recovery is the R-squared of the implied sensitivity (slope of the mixture-location change
+  against heating degrees, newest embedding knot against the 2023-01 knot) against s(t). The
+  oracle-based CRPS recovery is the pooled measure, reported beside them.
+- **Oracle ceiling:** in Wb1 and Wc the oracle is given the realised-temperature component, which no
+  forecast-driven arm sees, so 100% recovery is not reachable and the W-both threshold is read with
+  that in mind.
+- **Frozen versus free encoders:** the base (M0w) and oracle fine-tune free encoders; D5, A10 and the
+  hybrids freeze them, as in experiment 565. Recovery is measured against the free base, so a frozen
+  arm can show lower recovery partly because of the freezing.
+- **H-film is not strictly level-free:** the scale change of a GELU output can move the mixture
+  location. Its level path is reported as a read-out; only H-orth penalises it. H-orth's penalty is
+  measured on 64 fixed probe rows per Primary pooled over months, not per month, and in
+  fine-tuning acts on the one trainable knot, so it is weak there.
+- **Staged hybrid:** the encoders copied from D5 stay trainable in staged pre-training while the
+  offset knots are frozen.
+- **Seeds and intervals:** Wa-in and Wb2 use 1 seed; synthetic results use 2 folds, so they are
+  reported as per-fold values with the minimum detectable effect from the W0 seed spread, not as
+  intervals. W0 is reported as CRPS differences only. The offset has monthly knots, so step dates
+  are resolved to a month, not 3 days.
+- **Timing asserts** are the harness asserts of experiment 565 (summary file of the run exists at
+  or before the origin minus the publication delay; nwp_init_time <= power_fcst_init_time on every
+  test row). No slow summary input exists, so the end-time assert has nothing to check.
 
 ## Cost and stop rules
 

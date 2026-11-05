@@ -93,6 +93,12 @@ def write_rows(*, w: str, arms: list[str] | None, months: list[str], seeds: list
             if available_seeds(w=w, arm=a.name, months=months, seeds=seeds)
         )
     table = world_rows(w=w, arms=arms, months=months, seeds=seeds)
+    per_arm = {a: available_seeds(w=w, arm=a, months=months, seeds=seeds) for a in arms}
+    assert len({tuple(v) for v in per_arm.values()}) == 1, f"arms differ in seeds: {per_arm}"
+    score_cols = [c for c in table.columns if "_s" in c and c.split("_s")[-1].isdigit()]
+    assert all(table[c].is_finite().all() for c in score_cols), (
+        "an arm has no forecast for some rows"
+    )
     out = world.world_dir(world=w) / "scores" / "rows.parquet"
     out.parent.mkdir(parents=True, exist_ok=True)
     table.write_parquet(out)
@@ -136,7 +142,7 @@ def summary(*, worlds: list[str]) -> None:
                 .to_numpy()
                 for a in arms
             }
-            if BASE in per and ORACLE in per:
+            if BASE in per and ORACLE in per and w != "W0":  # W0 has no gap to recover
                 gap = per[BASE] - per[ORACLE]
                 for arm in arms:
                     rec = (per[BASE] - per[arm]) / gap

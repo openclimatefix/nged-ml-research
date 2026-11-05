@@ -194,6 +194,7 @@ def install(world: str) -> Path | None:
     assert world in WORLDS, world
     if world == "real":
         return None
+    assert not getattr(prep422.cleaned_arrays, "injected", False), "a world is already installed"
     original = prep422.cleaned_arrays
     sites = prep.primaries()["site"].to_list()
     out = world_dir(world=world) / "truth.npz"
@@ -226,6 +227,7 @@ def install(world: str) -> Path | None:
             tmp.rename(out)
         return clean
 
+    injected_arrays.injected = True  # type: ignore[attr-defined]
     prep422.cleaned_arrays = injected_arrays
     return out
 
