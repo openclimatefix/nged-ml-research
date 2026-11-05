@@ -81,9 +81,12 @@ def transform(raw: np.ndarray) -> np.ndarray:
 
 def calendar_frame(*, grid_start_us: int, n_steps: int) -> pl.DataFrame:
     """Return the grid's half-hour of day, day type (0 weekday, 1 Saturday, 2 Sunday), and month."""
-    t = pl.from_epoch(pl.Series(grid_start_us + STEP_US * np.arange(n_steps)), time_unit="us")
-    return pl.DataFrame(
-        {"hh": t.dt.hour() * 2 + t.dt.minute() // 30, "dtype": (t.dt.weekday() - 1).clip(upper_bound=2), "month": t.dt.month()}
+    t = pl.DataFrame({"t": pl.from_epoch(pl.Series(grid_start_us + STEP_US * np.arange(n_steps)), time_unit="us")})
+    wd = pl.col("t").dt.weekday()
+    return t.select(
+        hh=pl.col("t").dt.hour() * 2 + pl.col("t").dt.minute() // 30,
+        dtype=pl.when(wd <= 5).then(0).when(wd == 6).then(1).otherwise(2),
+        month=pl.col("t").dt.month(),
     )
 
 
@@ -109,7 +112,7 @@ def typical(*, chans: np.ndarray, cal: pl.DataFrame, fit_until: int) -> np.ndarr
         v = pl.DataFrame({"i": np.arange(chans.shape[1]), "v": chans[k], "m": chans[3]})
         train = keys.join(v, on="i").filter((pl.col("i") < fit_until) & (pl.col("m") > 0))
         mean = train.group_by("hh", "dtype", "month").agg(pl.col("v").mean().alias("mean"))
-        out[k] = keys.join(mean, on=["hh", "dtype", "month"], how="left")["mean"].fill_null(0.0).to_numpy()
+        out[k] = keys.join(mean, on=["hh", "dtype", "month"], how="left", maintain_order="left")["mean"].fill_null(0.0).to_numpy()
     out[3] = 1.0
     return out.astype(np.float32)
 

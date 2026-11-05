@@ -72,7 +72,7 @@ assert FAMILY in FAMILIES and (FAMILY == "M0") == (KIND == ""), ARGS.arm
 assert FAMILY == "M0" or KIND in KIND_SERIES, ARGS.arm
 USE_PRICE_IN_FT = FAMILY in {"A1", "A3"}
 PRETRAIN_ARM = f"A6-{KIND}" if FAMILY in {"A6", "A1"} else "M0"
-ARM = f.Arm(ARGS.arm, "d", 90.0, pretrained="M0")
+ARM = f.Arm(ARGS.arm, "m", 90.0, pretrained="M0")
 CHECK: dict = {"train_rows": 0, "test_rows": 0, "origins_weather_checked": 0, "months": {}}
 GRID_START, STEP = c.prep422.GRID_START_US, c.prep422.STEP_US
 N_STEPS = 2600 * price.STEPS_PER_DAY
@@ -118,6 +118,8 @@ def extras(*, month: str, target_idx: np.ndarray, present_wanted: np.ndarray, sc
     Training rows index the truncated half of the bundle; scoring rows index the full half
     (offset by N_STEPS). The presence flag is the wanted flag times the mask at the (donor) half-hour.
     """
+    if FAMILY == "M0":
+        return np.zeros((len(target_idx), 2), dtype=np.float32)
     bundle, shift = bundle_for(month=month)
     donor = target_idx + shift[target_idx]
     assert (donor <= target_idx).all()
@@ -219,18 +221,32 @@ def train(
 
 
 def pretrained_file(*, arm: f.Arm, month: str, seed: int) -> Path:
-    """Return the pretrained weights an arm starts from (experiment 554's M0 weights or this experiment's A6-KIND)."""
+    """Return the pretrained weights an arm starts from (this experiment's M0 or A6-KIND pretraining)."""
     CURRENT_MONTH[0] = month
     if FAMILY == "A3" or PRETRAIN_ARM == "M0":
-        return W554 / "pretrained" / "M0" / f"{month}_s{seed}.pt"
+        return W / "pretrained" / "M0" / f"{month}_s{seed}.pt"
     return W / "pretrained" / PRETRAIN_ARM / f"{month}_s{seed}.pt"
 
 
 def cutoffs(*, month: str, cadence: str) -> list[datetime]:
-    """One refit per fold, at the first day of the month (monthly refit)."""
-    return [c.month_start(month=month)]
+    """Cadence `m` is one refit per fold, at the first day of the month; other cadences are experiment 511's."""
+    if cadence == "m":
+        return [c.month_start(month=month)]
+    return _cutoffs(month=month, cadence=cadence)
 
 
+_cutoffs, _window_frame = k.cutoffs, f.window_frame
+
+
+def window_frame(*args, **kwargs):
+    """Attach the month's price bundle to a reloaded network before it forecasts."""
+    model = kwargs.get("model")
+    if model is not None:
+        attach_bundle(model=model, month=CURRENT_MONTH[0])
+    return _window_frame(*args, **kwargs)
+
+
+f.window_frame = window_frame
 c.new_model, c.load_pretrained, c.train = new_model, load_pretrained, train
 k.cutoffs = cutoffs
 f.pretrained_file = pretrained_file
@@ -242,7 +258,7 @@ f.model_file = lambda *, arm, month, day, seed, stress="": (
 
 def pretrain(*, device: str) -> None:
     """Pretrain on ERA5 and CAMS rows (experiment 448's rows) with the oracle price, for each month and seed lacking weights."""
-    assert FAMILY == "A6", "only A6-KIND is pretrained here (A1 shares it; M0 and A3 use experiment 554's weights)"
+    assert ARGS.arm == "M0" or FAMILY == "A6", "only M0 and A6-KIND are pretrained here (A1 shares A6's; A3 shares M0's)"
     clean = c.clean_stack()
     for month in ARGS.months:
         CURRENT_MONTH[0] = month
@@ -305,7 +321,6 @@ def build_month(*, month, clean):
     wanted = rng.random(len(mr.y)) < PRESENT_FRACTION if USE_PRICE_IN_FT else np.ones(len(mr.y), bool)
     add = extras(month=month, target_idx=mr.target_idx.astype(np.int64), present_wanted=wanted, scoring=False)
     i = int(np.argmax(mr.valid_us > mr.origin_us + 24 * 3_600_000_000))
-    assert mr.target_idx.max() < fit_until_idx(month=month) or True
     CHECK["train_rows"] += len(mr.y)
     CHECK["months"][month] = {
         "train_rows": len(mr.y), "train_origins": len(runs), "price_present_share": float(add[:, 1].mean()),
@@ -346,7 +361,7 @@ k.build_month, data.build_test = build_month, build_test
 def assemble() -> None:
     """Concatenate each cutoff's window forecast into one table per month and seed."""
     for month in c.MONTHS:
-        cuts = k.cutoffs(month=month, cadence="d")
+        cuts = k.cutoffs(month=month, cadence="m")
         for seed in ARGS.seeds:
             parts = [W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet" for cut in cuts]
             assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
