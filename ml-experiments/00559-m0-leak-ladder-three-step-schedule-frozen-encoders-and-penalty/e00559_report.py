@@ -94,8 +94,8 @@ def figure_leak_vs_gain() -> None:
         y=alt.Y("diff:Q", title="CRPS minus M0, 24-120 h, eight (points; more negative is better)"),
     )
     layer = alt.layer(
-        pts.mark_point(filled=True, size=60, color=theme.DATA_BLUE),
-        pts.mark_text(dy=-9, fontSize=11).encode(text="arm:N"),
+        pts.mark_point(filled=True, size=60, color=theme.DATA_BLUE),  # ty: ignore[invalid-argument-type]
+        pts.mark_text(dy=-9, fontSize=11).encode(text="arm:N"),  # ty: ignore[unresolved-attribute]
         alt.Chart(m0)
         .mark_point(shape="diamond", filled=True, size=120, color="black")
         .encode(x="leak:Q", y="diff:Q"),  # ty: ignore[unresolved-attribute]
@@ -134,14 +134,14 @@ def figure_bands() -> None:
     )
     layer = alt.layer(
         alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="black").encode(x="x:Q"),  # ty: ignore[unresolved-attribute]
-        base.mark_rule(strokeWidth=2).encode(
+        base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "low_month:Q", title="CRPS minus M0 (points of capacity; more negative is better)"
             ),
             x2="high_month:Q",
             color=colour,
         ),
-        base.mark_point(filled=True, size=40).encode(x="difference:Q", color=colour),
+        base.mark_point(filled=True, size=40).encode(x="difference:Q", color=colour),  # ty: ignore[unresolved-attribute]
     ).properties(
         width=WIDTH,
         height=380,

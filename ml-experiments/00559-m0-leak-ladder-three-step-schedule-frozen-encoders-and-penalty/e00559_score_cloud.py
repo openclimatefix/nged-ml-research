@@ -38,7 +38,7 @@ def leak():
                             {
                                 "arm": arm,
                                 "month": m,
-                                "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),  # ty: ignore[unsupported-operator]
+                                "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),  # ty: ignore[invalid-argument-type]
                             }
                         )
     t = pl.DataFrame(out).group_by("arm", "month").agg(pl.col("leak").mean())

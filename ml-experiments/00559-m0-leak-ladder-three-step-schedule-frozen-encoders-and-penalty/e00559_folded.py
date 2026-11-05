@@ -1,12 +1,12 @@
 # ruff: noqa: E501
 """Arm A8: a folded-normal mixture head for the MVA-only Primaries.
 
-An MVA-only Primary's apparent power cannot be negative. Write `u = z + m` for the standardised target
-`z` shifted by `m = target_mean / target_std` of the Primary, so that `u >= 0` is the load in units of
-its standard deviation. The head's three components describe `u` (component mean = raw mean + `m`).
-A folded component has density `N(u; mu, sigma) + N(u; -mu, sigma)` on `u >= 0`, and its CDF is
-`Phi((u - mu) / sigma) - Phi((-u - mu) / sigma)`. The signed-MW Primaries keep the usual mixture, so a
-row's loss and quantiles depend on its Primary's group.
+An MVA-only Primary's apparent power cannot be negative. Write `u = z + m` for the standardised
+target `z` shifted by `m = target_mean / target_std` of the Primary, so that `u >= 0` is the load in
+units of its standard deviation. The head's three components describe `u`, with each component
+mean equal to the raw mean plus `m`. A folded component has density `N(u; mu, sigma) + N(u; -mu, sigma)` on `u >= 0`, and its CDF
+is `Phi((u - mu) / sigma) - Phi((-u - mu) / sigma)`. The signed-MW Primaries keep the usual mixture,
+so a row's loss and quantiles depend on its Primary's group.
 """
 
 import math
@@ -34,6 +34,9 @@ def folded_nll(
         offset: Each row's `m = target_mean / target_std`, (rows,).
         folded: Whether each row's Primary is MVA-only, (rows,), bool.
         components: Number of mixture components.
+
+    Returns:
+        The negative log-likelihood of each row, (rows,).
     """
     log_w, mean, std = base.mixture_parts(out=out, components=components)
     plain = (

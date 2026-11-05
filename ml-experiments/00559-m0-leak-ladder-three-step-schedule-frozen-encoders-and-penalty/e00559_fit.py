@@ -16,7 +16,8 @@ Arms (see `ARMS`): A1 plain step 3; A2 encoders frozen; A3 L2 penalty to the ste
 rate and at most 5 epochs; A5 the average of the last 5 daily fine-tunes of A1 (inference only); A6 and
 A7 are experiment 554's M0-hl180 and M0-c3 (fresh mixer at every daily fit, no step 2).
 
-Usage: python e00559_fit.py {step2|choose-lambda|fit|average|assemble} --arm ARM [--stress] [--months ...] [--seeds ...]
+Usage: python e00559_fit.py {step2|choose-lambda|fit|average|assemble} --arm ARM [--stress]
+    [--months ...] [--seeds ...]
 """
 
 import argparse
@@ -137,7 +138,7 @@ STRESS_FIRST_DAY = 10
 
 
 def cutoffs(*, month: str, cadence: str) -> list[datetime]:
-    """Experiment 511's cutoffs; arm A7 (which passes cadence `d` so the windows tile) refits on days 0, 2, 5, 8, ..."""
+    """Experiment 511's cutoffs; arm A7 (cadence `d` so the windows tile) refits on days 0, 2, 5, 8."""
     if SPEC.cadence != "c3":
         return _cutoffs(month=month, cadence=cadence)
     start, stop = c.month_start(month=month), c.month_stop(month=month)
@@ -241,7 +242,7 @@ def load_pretrained_fresh(*, model: m.ModularMdn, path: Path) -> None:
     """Load pretrained weights (without `mixer_ft`), then a fresh mixer."""
     raw = torch.load(path, map_location="cpu")
     if SPEC.source == "drift":
-        mdr.load_pre_into_ft(model=model, state=raw)
+        mdr.load_pre_into_ft(model=model, state=raw)  # ty: ignore[invalid-argument-type]
         fresh_mixer(model=model)
         return
     state = {a: v for a, v in raw.items() if not a.startswith("mixer_ft.")}
@@ -316,7 +317,7 @@ def train(  # noqa: PLR0912, PLR0915
             nll = row_nll(out=model(x[b], p[b]), z=z[b], p=p[b])
             loss = (w[b] * nll).sum() / w[b].sum()
             if hasattr(model, "penalty"):
-                loss = loss + model.penalty()
+                loss = loss + model.penalty()  # ty: ignore[call-non-callable]
             if anchors is not None:
                 loss = loss + lam * sum(
                     ((q - anchors[a]) ** 2).sum()
@@ -427,7 +428,7 @@ def build_test(*, month, standardiser):
     )
     print(month, "test checks passed |", CHECK["months"][month]["weather_example"], flush=True)
     if SPEC.columns:
-        extra = WT.rows(
+        extra = WT.rows(  # ty: ignore[unresolved-attribute]
             kind="ens", primary=test.primary, origin_idx=test.origin_idx, valid_idx=test.target_idx,
             null=SPEC.columns == "null",
         )  # fmt: skip
@@ -446,7 +447,7 @@ def refit_rows(*, g: k.GpuMonth, cut: datetime, half_life: float, shift_z=None):
 
 
 def step2(*, device: str) -> None:
-    """Train and save the step-2 weights of each month and seed: encoders and a fresh mixer on all rows up to the first cutoff."""
+    """Train and save each month and seed's step-2 weights: encoders and a fresh mixer, all rows."""
     clean = c.clean_stack()
     for month in ARGS.months:
         todo = [s for s in ARGS.seeds if not step2_file(month=month, seed=s).exists()]
@@ -505,7 +506,7 @@ def pretrain_wt(*, device: str) -> None:
             (pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC
         )
         assert latest <= refit_t - c.regimes.REFIT_CUTOFF_AGE, (latest, refit_t)
-        extra = WT.rows(
+        extra = WT.rows(  # ty: ignore[unresolved-attribute]
             kind="era5", primary=pre.primary, origin_idx=pre.origin_idx, valid_idx=pre.target_idx,
             null=SPEC.columns == "null",
         )  # fmt: skip
@@ -704,7 +705,7 @@ def fit_arm(
 
 
 def average_arm(*, months: list[str], seeds: list[int], stress: bool, device: str) -> None:
-    """Arm A5: the window forecast of cutoff `d` from the mean weights of A1's fits on days d-4 to d (clamped at day 0)."""
+    """Arm A5: the window forecast of cutoff `d` from the mean weights of A1's fits on days d-4 to d."""
     assert SPEC.average_of == "A1"
     clean = c.clean_stack()
     for month in months:

@@ -1,5 +1,5 @@
-# ruff: noqa: ANN001, ANN201, ANN202, D103, E501
-"""Write per-row CRPS of the experiment 559 arms A1 to A8 (2 seeds) with 470's scorer on 511's rows (mirrors 554's e00554_rows)."""
+# ruff: noqa: ANN001, ANN201, ANN202, D103
+"""Write per-row CRPS of the experiment 559 arms A1 to A8 (2 seeds), scored as in 554."""
 
 import e00454_build as build454  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]

@@ -1,14 +1,14 @@
 # ruff: noqa: E501
 """Extra weather columns for the weather encoder (and the spread input) of arm A11, real and placebo.
 
-A source supplies, for ensemble rows keyed by (Primary, forecast origin, valid time) and for ERA5 rows
-keyed by (Primary, valid time), a block of columns: the first `n_weather` columns are ensemble means and
-go to the weather encoder, the rest are ensemble spreads and go to the fine-tuning mixer. The placebo
-is experiment 515's shuffled-day draw (`e00515_placebo.DayStructure`), applied to every column of the
-block at once, so the real and placebo arms have the same number of columns and the same missing-value
-pattern after the donor shift. Rows keep the origin-time rule: an ensemble row's columns come from the
-run in the summary file keyed by that row's own origin, and a donor row moves origin and valid time by
-the same whole-day shift.
+A source supplies, for ensemble rows keyed by (Primary, forecast origin, valid time) and for ERA5
+rows keyed by (Primary, valid time), a block of columns: the first `n_weather` columns are ensemble
+means and go to the weather encoder, the rest are ensemble spreads and go to the fine-tuning mixer.
+The placebo is experiment 515's shuffled-day draw (`e00515_placebo.DayStructure`), applied to every
+column of the block at once, so the real and placebo arms have the same number of columns and the
+same missing-value pattern after the donor shift. Rows keep the origin-time rule: an ensemble row's
+columns come from the run in the summary file keyed by that row's own origin, and a donor row moves
+origin and valid time by the same whole-day shift.
 """
 
 from datetime import UTC, datetime
@@ -228,7 +228,7 @@ class CloudSource:
 
     @staticmethod
     def finish_null(*, real: np.ndarray, null: np.ndarray) -> np.ndarray:
-        """Give the placebo the real columns' missing pattern: where the real row has no cloud, mean 0, flag 1, spread 0."""
+        """Give the placebo the real columns' missing pattern (no cloud: mean 0, flag 1, spread 0)."""
         out = null.copy()
         missing = real[:, 1] == 1.0
         out[missing] = real[missing]
@@ -244,8 +244,8 @@ class CloudSource:
 class ExtraColumns:
     """Standardised extra columns (real and placebo) for the month rows, the test rows, and pretraining rows."""
 
-    def __init__(self, *, month: str, mr: c.MonthRows, source: UvSource) -> None:
-        """Draw the placebo days, build the month's columns, and fit the standardisation on the fold's training rows."""
+    def __init__(self, *, month: str, mr: c.MonthRows, source: UvSource | CloudSource) -> None:
+        """Draw the placebo days, build the month's columns, and standardise on the training rows."""
         self.source = source
         refit = c.month_start(month=month)
         fit_until = int((c.us(t=refit) - GRID) // STEP)
@@ -267,7 +267,7 @@ class ExtraColumns:
             kind="ens", primary=mr.primary, origin_idx=origin_idx, valid_idx=mr.target_idx
         )
         if hasattr(source, "finish_null"):
-            self.month_null = source.finish_null(real=self.month_real, null=self.month_null)
+            self.month_null = source.finish_null(real=self.month_real, null=self.month_null)  # ty: ignore[call-non-callable]
         train = ~mr.is_val[: mr.n_base]
         if source.prescaled:
             self.mean = np.zeros(self.month_real.shape[1], dtype=np.float32)
@@ -277,7 +277,7 @@ class ExtraColumns:
             self.std = np.maximum(self.month_real[: mr.n_base][train].std(axis=0), 1e-6)
         self.rows_with_value = None
         if hasattr(source, "present"):
-            present = source.present(real=self.month_real)
+            present = source.present(real=self.month_real)  # ty: ignore[call-non-callable]
             self.rows_with_value = int(present[: mr.n_base][train].sum())
         self.null_rows_without_donor = int(np.isnan(self.month_null).any(axis=1).sum())
         assert self.null_rows_without_donor < 0.01 * len(self.month_null), (
@@ -308,7 +308,7 @@ class ExtraColumns:
     def _shuffled(
         self, *, kind: str, primary: np.ndarray, origin_idx: np.ndarray, valid_idx: np.ndarray
     ) -> np.ndarray:
-        """Return the placebo columns: the donor day's, with fallback donors for rows whose donor row is missing (NaN if none)."""
+        """Return the placebo columns: the donor day's, with fallback donors (NaN if none)."""
         out = np.full(
             (len(primary), self.source.n_weather + self.source.n_spread), np.nan, dtype=np.float32
         )
@@ -356,7 +356,7 @@ class ExtraColumns:
         args = {"kind": kind, "primary": primary, "origin_idx": origin_idx, "valid_idx": valid_idx}
         raw = self._shuffled(**args) if null else self._real(**args)
         if null and hasattr(self.source, "finish_null") and kind == "ens":
-            raw = self.source.finish_null(real=self._real(**args), null=raw)
+            raw = self.source.finish_null(real=self._real(**args), null=raw)  # ty: ignore[call-non-callable]
         return self.scale(raw=raw)
 
 

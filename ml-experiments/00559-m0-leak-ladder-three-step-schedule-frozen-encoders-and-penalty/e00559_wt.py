@@ -64,7 +64,7 @@ class WtColumns:
         return self.scale(raw=self.month_null if null else self.month_real)
 
     def rows(self, *, kind: str, primary: np.ndarray, origin_idx: np.ndarray, valid_idx: np.ndarray, null: bool) -> np.ndarray:  # fmt: skip
-        """Return the standardised columns of another row set (`kind` is `ens` for test rows, `era5` for pretraining rows)."""
+        """Return the standardised columns of another row set (`kind`: `ens` for test, `era5` for pretraining)."""
         args = {"kind": kind, "primary": primary, "origin_idx": origin_idx, "valid_idx": valid_idx}
         raw = self.windows.shuffled(**args) if null else self.windows.real(**args)
         return self.scale(raw=raw[:, T_INDEX])

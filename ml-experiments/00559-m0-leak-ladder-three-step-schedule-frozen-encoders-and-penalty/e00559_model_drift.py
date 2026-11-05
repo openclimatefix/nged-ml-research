@@ -55,7 +55,7 @@ class ModularMdnDrift(m.ModularMdn):
         """Return every knot, (Primaries, knots, DIM)."""
         if self.stage == "pre":
             return self.knots
-        return torch.cat([self.knots_old, self.knot_new[:, None, :]], dim=1)
+        return torch.cat([self.knots_old, self.knot_new[:, None, :]], dim=1)  # ty: ignore[invalid-argument-type]
 
     def drift(self, tau: torch.Tensor, primary: torch.Tensor) -> torch.Tensor:
         """Return the interpolated knot embedding of each row (position clamped to the knot range)."""
@@ -83,7 +83,7 @@ class ModularMdnDrift(m.ModularMdn):
 
 
 def load_pre_into_ft(*, model: ModularMdnDrift, state: dict[str, torch.Tensor]) -> None:
-    """Load a stage-`pre` state dict into a stage-`ft` network: encoders, embedding, and the older knots (the last knot starts the newest one); `mixer_ft` stays as built."""
+    """Load a stage-`pre` state dict into a stage-`ft` network; `mixer_ft` stays as built."""
     assert model.stage == "ft"
     knots = state["knots"]
     rest = {a: v for a, v in state.items() if a != "knots" and not a.startswith("mixer_ft.")}
@@ -93,5 +93,5 @@ def load_pre_into_ft(*, model: ModularMdnDrift, state: dict[str, torch.Tensor]) 
     ), missing
     assert not missing.unexpected_keys, missing
     with torch.no_grad():
-        model.knots_old.copy_(knots[:, :-1])
+        model.knots_old.copy_(knots[:, :-1])  # ty: ignore[call-non-callable]
         model.knot_new.copy_(knots[:, -1])

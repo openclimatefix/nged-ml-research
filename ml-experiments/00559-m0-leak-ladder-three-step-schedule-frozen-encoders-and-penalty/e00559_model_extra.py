@@ -1,8 +1,10 @@
-# ruff: noqa: E501
-"""M0 with extra columns: `n_weather` ensemble-mean columns in the weather encoder and `n_spread` ensemble-spread columns in the fine-tuning mixer.
+"""M0 with extra columns in the weather encoder (`n_weather` means) and the fine-tuning mixer.
 
-The extra columns follow the 37 columns of `e00559_model`: columns 37 to 37 + n_weather - 1 go to the
-weather encoder, the next n_spread columns to the fine-tuning mixer (the pretraining mixer reads no spread).
+`n_spread` ensemble-spread columns go to the fine-tuning mixer.
+
+The extra columns follow the 37 columns of `e00559_model`: columns 37 to 37 + n_weather - 1 go to
+the weather encoder, the next n_spread columns to the fine-tuning mixer (the pretraining mixer
+reads no spread).
 """
 
 import e00559_model as m
