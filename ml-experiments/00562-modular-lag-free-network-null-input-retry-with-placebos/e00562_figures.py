@@ -1,4 +1,4 @@
-# ruff: noqa: ANN201, ANN202, D103, E501, PERF401, RUF028
+# ruff: noqa: ANN201, D103, E501, RUF028
 """Figure 1 of experiment 562: real minus placebo CRPS by arm, with Bonferroni intervals."""
 
 from pathlib import Path

@@ -1,4 +1,4 @@
-# ruff: noqa: ANN201, ANN202, D103, E501, PERF401, RUF028
+# ruff: noqa: ANN201, D103, E501, PERF401
 """Score experiment 562: real minus placebo, real minus M0, and placebo minus M0, per arm.
 
 Reads the per-row CRPS that `e00562_rows.py` wrote and experiment 521's loader (the row sets, lead

@@ -1,4 +1,4 @@
-# ruff: noqa: ANN201, ANN202, D103, E501, PERF401, RUF028
+# ruff: noqa: ANN201, D103, E501
 """Seed spread and minimum detectable effect of experiment 562 (the formula of experiment 545's scorer).
 
 Per-seed CRPS of M0 and of arms B1 and B1p give the fold-by-seed spread; the minimum detectable
