@@ -64,11 +64,6 @@ def main() -> None:
         x2="hi:Q",
     )
     dot = base.mark_point(filled=True, size=50).encode(x="d:Q")  # ty: ignore[unresolved-attribute]
-    zero = (
-        alt.Chart(pl.DataFrame({"z": [0.0]}))
-        .mark_rule(color="grey", strokeDash=[4, 3])
-        .encode(x="z:Q")
-    )  # ty: ignore[unresolved-attribute]
     layers = alt.layer(zero_rule(), rule, dot).properties(width=170, height=130)
     chart = layers.facet(
         data=df,
