@@ -89,7 +89,7 @@ def recall(*, df: pl.DataFrame, col: str = "hit_onset") -> tuple[float, float, i
     n = len(df)
     if n == 0:
         return float("nan"), float("nan"), 0
-    p = float(df[col].mean())
+    p = float(np.mean(df[col].to_numpy()))
     return p, 1.96 * float(np.sqrt(p * (1 - p) / n)), n
 
 
@@ -252,7 +252,7 @@ def heat(*, df: pl.DataFrame, sd: float) -> None:
                     & (pl.col("duration") < b)
                 )
                 if len(sub) >= 5:
-                    ys.append(float(sub["hit_onset"].mean()))
+                    ys.append(float(np.mean(sub["hit_onset"].to_numpy())))
                     xs.append(np.sqrt(a * b))
             ax.plot(xs, ys, "o-", color=c, label=f"{lo:.0%} to {min(hi, 0.5):.0%}")
         ax.set_xscale("log")
