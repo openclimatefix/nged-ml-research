@@ -24,6 +24,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME: Final = "00575-stepwise-offset-large-step-and-mirrored-pair-recovery"
 WORK: Final = ML_EXPERIMENTS_DATA_DIR / NAME / "work"
+SCORES_DIR: Final = WORK / "scores"
 TV: Final = (3000.0, 1000.0)
 GATE: Final = (300.0, 30.0)
 """The penalty grid of experiment 573's full run (`e00573_report.ARMS`), unchanged."""
