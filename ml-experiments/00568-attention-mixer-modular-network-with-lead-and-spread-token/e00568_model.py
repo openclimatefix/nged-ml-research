@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, B007, RET504
 """Experiment 568: the modular lag-free demand network with an attention mixer, and its MLP control.
 
 The weather encoder, datetime encoder, and Primary embedding are experiment 554's M0 (`e00559_model`).
@@ -43,7 +43,10 @@ class Block(nn.Module):
         self.norm1, self.norm2 = nn.LayerNorm(D_MODEL), nn.LayerNorm(D_MODEL)
         self.attn = nn.MultiheadAttention(D_MODEL, HEADS, dropout=DROPOUT, batch_first=True)
         self.ff = nn.Sequential(
-            nn.Linear(D_MODEL, 2 * D_MODEL), nn.GELU(), nn.Dropout(DROPOUT), nn.Linear(2 * D_MODEL, D_MODEL)
+            nn.Linear(D_MODEL, 2 * D_MODEL),
+            nn.GELU(),
+            nn.Dropout(DROPOUT),
+            nn.Linear(2 * D_MODEL, D_MODEL),
         )
         self.drop = nn.Dropout(DROPOUT)
 
@@ -52,7 +55,9 @@ class Block(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         """Return the block output and, when `record`, the head-averaged attention weights."""
         z = self.norm1(h)
-        out, w = self.attn(z, z, z, key_padding_mask=pad, need_weights=record, average_attn_weights=True)
+        out, w = self.attn(
+            z, z, z, key_padding_mask=pad, need_weights=record, average_attn_weights=True
+        )
         h = h + self.drop(out)
         h = h + self.drop(self.ff(self.norm2(h)))
         return h, w
@@ -129,12 +134,22 @@ class AttentionMdn(nn.Module):
         self.stage, self.spread = stage, spread
         self.embedding = nn.Embedding(n_primaries, m.EMBEDDING)
         self.weather = base.mlp(
-            n_in=7 + m.EMBEDDING, hidden=m.ENCODER_HIDDEN, layers=1, n_out=m.ENCODER_OUT, dropout=m.DROPOUT
+            n_in=7 + m.EMBEDDING,
+            hidden=m.ENCODER_HIDDEN,
+            layers=1,
+            n_out=m.ENCODER_OUT,
+            dropout=m.DROPOUT,
         )
         self.datetime = base.mlp(
-            n_in=21 + m.EMBEDDING, hidden=m.ENCODER_HIDDEN, layers=1, n_out=m.ENCODER_OUT, dropout=m.DROPOUT
+            n_in=21 + m.EMBEDDING,
+            hidden=m.ENCODER_HIDDEN,
+            layers=1,
+            n_out=m.ENCODER_OUT,
+            dropout=m.DROPOUT,
         )
-        self.mixer_pre = AttnMixer(kinds=("weather", "datetime", "primary"), spread_in=0, lead_on_query=False)
+        self.mixer_pre = AttnMixer(
+            kinds=("weather", "datetime", "primary"), spread_in=0, lead_on_query=False
+        )
         self.mixer_ft = self.make_mixer_ft()
 
     def make_mixer_ft(self) -> AttnMixer:
@@ -164,7 +179,15 @@ class AttentionMdn(nn.Module):
 class MlpMdn(m.ModularMdn):
     """M0 with a mixer of chosen hidden width; `with_block` appends the 7 spread-block columns (arm T4)."""
 
-    def __init__(self, *, n_primaries: int, stage: str, hidden: int, with_block: bool, zero_stored: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        n_primaries: int,
+        stage: str,
+        hidden: int,
+        with_block: bool,
+        zero_stored: bool = False,
+    ) -> None:
         """Build M0 and replace the fine-tuning mixer."""
         super().__init__(n_primaries=n_primaries, stage=stage)
         self.hidden, self.with_block, self.zero_stored = hidden, with_block, zero_stored
@@ -173,7 +196,9 @@ class MlpMdn(m.ModularMdn):
     def make_mixer_ft(self) -> nn.Sequential:
         """Return a new fine-tuning mixer."""
         wide = 2 * m.ENCODER_OUT + m.EMBEDDING + 7 + 2 + (7 if self.with_block else 0)
-        head = base.mlp(n_in=wide, hidden=self.hidden, layers=2, n_out=3 * m.COMPONENTS, dropout=m.DROPOUT)
+        head = base.mlp(
+            n_in=wide, hidden=self.hidden, layers=2, n_out=3 * m.COMPONENTS, dropout=m.DROPOUT
+        )
         base.init_head(head=head, components=m.COMPONENTS)
         return head
 
@@ -202,6 +227,11 @@ def matched_hidden(*, target: int, with_block: bool) -> int:
     """Return the MLP mixer's hidden width whose parameter count is closest to `target`."""
     best = min(
         range(32, 512),
-        key=lambda h: abs(n_parameters(MlpMdn(n_primaries=1, stage="ft", hidden=h, with_block=with_block).mixer_ft) - target),
+        key=lambda h: abs(
+            n_parameters(
+                MlpMdn(n_primaries=1, stage="ft", hidden=h, with_block=with_block).mixer_ft
+            )
+            - target
+        ),
     )
     return best

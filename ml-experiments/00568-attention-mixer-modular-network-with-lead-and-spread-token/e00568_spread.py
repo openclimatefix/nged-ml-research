@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, ANN001
 """Experiment 568: the relative-spread block appended to a row set's 37 columns.
 
 Seven columns per row (see `e00568_model`): the standard deviation across the 51 ensemble members of
@@ -52,7 +52,12 @@ def sources() -> tuple[extra.UvSource, extra.CloudSource]:
 
 
 def raw_block(
-    *, x37: np.ndarray, standardiser, primary: np.ndarray, origin_idx: np.ndarray, valid_idx: np.ndarray
+    *,
+    x37: np.ndarray,
+    standardiser,
+    primary: np.ndarray,
+    origin_idx: np.ndarray,
+    valid_idx: np.ndarray,
 ) -> np.ndarray:
     """Return the 7 raw columns (standard deviations, then the cloud flag) of a row set."""
     uv, cloud = sources()
@@ -122,38 +127,61 @@ class SpreadBlock:
         return rel
 
     @staticmethod
-    def shuffle(*, rel: np.ndarray, primary: np.ndarray, origin_idx: np.ndarray, valid_idx: np.ndarray) -> np.ndarray:
-        """Give each row the block of the same Primary, time of day, and lead on another origin day of the same month."""
+    def shuffle(
+        *, rel: np.ndarray, primary: np.ndarray, origin_idx: np.ndarray, valid_idx: np.ndarray
+    ) -> np.ndarray:
+        """Give each row the block of the same Primary, time of day, and lead on another origin day.
+
+        The donor origin day is in the same month.
+        """
         day = origin_idx // STEPS_PER_DAY
         month_id = np.array(
-            [datetime.fromtimestamp((extra.GRID + int(d) * STEPS_PER_DAY * extra.STEP) / 1e6, UTC).strftime("%Y-%m") for d in np.unique(day)]
+            [
+                datetime.fromtimestamp(
+                    (extra.GRID + int(d) * STEPS_PER_DAY * extra.STEP) / 1e6, UTC
+                ).strftime("%Y-%m")
+                for d in np.unique(day)
+            ]
         )
         month_of = dict(zip(np.unique(day).tolist(), month_id.tolist(), strict=True))
         rng = np.random.default_rng(568)
-        shift_day = {}
-        for mid in np.unique(month_id):
-            days = np.array(sorted(d for d, mm in month_of.items() if mm == mid))
-            if len(days) > 1:  # a cyclic shift by a random offset leaves no day on itself
-                donors = np.roll(days, int(rng.integers(1, len(days))))
-                shift_day.update(zip(days.tolist(), (donors - days).tolist(), strict=True))
-            else:
-                shift_day[int(days[0])] = 0
-        shift = np.array([shift_day[int(d)] for d in day], dtype=np.int64) * STEPS_PER_DAY
         key = origin_idx.astype(np.int64) * (1 << 22) + valid_idx.astype(np.int64)
-        want = (origin_idx + shift).astype(np.int64) * (1 << 22) + (valid_idx + shift).astype(np.int64)
-        out = rel.copy()
-        missing = 0
+        by_primary = {}
         for p in np.unique(primary):
             sel = np.nonzero(primary == p)[0]
             order = np.argsort(key[sel])
-            keys = key[sel][order]
-            pos = np.clip(np.searchsorted(keys, want[sel]), 0, len(keys) - 1)
-            hit = keys[pos] == want[sel]
-            out[sel[hit]] = rel[sel][order][pos[hit]]
-            missing += int((~hit).sum())
-        assert missing < 0.02 * len(rel), f"{missing} of {len(rel)} rows have no donor day"
+            by_primary[int(p)] = (sel, key[sel][order], rel[sel][order])
+        out = rel.copy()
+        todo = np.ones(len(rel), dtype=bool)
+        for _attempt in range(8):  # a row whose donor row was filtered out tries another donor day
+            shift_day = {}
+            for mid in np.unique(month_id):
+                days = np.array(sorted(d for d, mm in month_of.items() if mm == mid))
+                if len(days) > 1:  # a cyclic shift by a random offset leaves no day on itself
+                    donors = np.roll(days, int(rng.integers(1, len(days))))
+                    shift_day.update(zip(days.tolist(), (donors - days).tolist(), strict=True))
+                else:
+                    shift_day[int(days[0])] = 0
+            shift = np.array([shift_day[int(d)] for d in day], dtype=np.int64) * STEPS_PER_DAY
+            want = (origin_idx + shift).astype(np.int64) * (1 << 22) + (valid_idx + shift).astype(
+                np.int64
+            )
+            for sel, keys, vals in by_primary.values():
+                rows = sel[todo[sel]]
+                if len(rows) == 0:
+                    continue
+                pos = np.clip(np.searchsorted(keys, want[rows]), 0, len(keys) - 1)
+                hit = (keys[pos] == want[rows]) & (shift[rows] != 0)
+                out[rows[hit]] = vals[pos[hit]]
+                todo[rows[hit]] = False
+        missing = int(todo.sum())
+        assert missing < 0.02 * len(rel), (
+            f"{missing} of {len(rel)} rows have no donor day after 8 tries"
+        )
         for p in np.unique(primary):
             sel = primary == p
             own = (out[sel] == rel[sel]).all(axis=1).mean()
-            assert own < 0.10, f"Primary {p}: {own:.1%} of rows kept their own spread in the placebo"
+            assert own < 0.10, (
+                f"Primary {p}: {own:.1%} of rows kept their own spread in the placebo"
+            )
         return out
