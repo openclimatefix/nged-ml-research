@@ -76,11 +76,12 @@ def apply_dropout(*, x, origin_idx, seed) -> dict:
     """Experiment 572's block dropout, plus an independent whole-origin-day mask for each extra lag."""
     share = _orig_dropout(x=x, origin_idx=origin_idx, seed=seed)
     amax = mylags.EXTRA_AMAX
+    shared = torch.from_numpy(e.lags.block_dropout_masks(origin_idx=origin_idx, seed=seed)[0]).to(
+        x.device
+    )
     for k in range(N_EXTRA):
         mask_all, _ = e.lags.block_dropout_masks(origin_idx=origin_idx, seed=seed + 1000 * (k + 1))
-        m = torch.from_numpy(mask_all).to(x.device) | torch.from_numpy(
-            e.lags.block_dropout_masks(origin_idx=origin_idx, seed=seed)[0]
-        ).to(x.device)
+        m = torch.from_numpy(mask_all).to(x.device) | shared
         c = mylags.extra_value_col(k)
         x[m, c], x[m, c + 1], x[m, c + 2] = 0.0, 1.0, float(amax[k])
         share[f"share_extra{k}_missing"] = float((x[:, c + 1] > 0.5).float().mean())

@@ -8,7 +8,7 @@ columns has `8 + 4 * K` columns for `K` extra lags:
 - 0-7: experiment 572's block (day lag value, missing flag, age; week lag value, missing flag, age;
   the grid indices of the day and week lag times);
 - `8 + 3 * k` to `10 + 3 * k`: extra lag `k` (value, missing flag, age);
-- `8 + 3 * K + k`: the grid index of extra lag `k` (-1 where the lag is before the grid start).
+- `8 + 3 * K + k`: the grid index of extra lag `k` (negative where the lag is before the grid start).
 
 A negative period `-D` means the week lag moved `D` days further back (arm N3 uses -7, a second
 weekly lag; a fixed 14-day period would coincide with the week lag at many leads). An extra lag
@@ -114,6 +114,10 @@ def lag_block(
             target_idx=target_idx, origin_idx=origin_idx, cap_steps=cap_steps, extra_days=extra_days
         )
     ):
+        if EXTRA_PERIODS_DAYS[k] > 0:
+            assert (target_idx - idx == EXTRA_PERIODS_DAYS[k] * STEPS).all(), (
+                "a long lag is not an exact offset"
+            )
         raw = np.where(idx >= 0, src[primary, np.clip(idx, 0, None)], np.nan)
         miss = ~np.isfinite(raw)
         z = np.clip(
@@ -122,7 +126,9 @@ def lag_block(
         age = (target_idx - idx) * 0.5 / lags.LEAD_SCALE_HOURS
         out[:, 8 + 3 * k] = np.where(miss, 0.0, z)
         out[:, 9 + 3 * k] = miss
-        out[:, 10 + 3 * k] = np.where(miss, EXTRA_AMAX[k], age)
+        out[:, 10 + 3 * k] = np.where(
+            miss, EXTRA_AMAX[k], 0.0 if EXTRA_PERIODS_DAYS[k] > 0 else age
+        )
         out[:, 8 + 3 * k_extra + k] = idx
     return out
 
@@ -139,11 +145,9 @@ def set_periods(*, periods_days: tuple[int, ...], drop_day: bool = False) -> Non
     gap_h = lg572.MAX_LEAD_HOURS + CAP_24H * 0.5
     for days in EXTRA_PERIODS_DAYS:
         d = abs(days)
+        # A long lag's age is the constant `days`, so its age input is 0 (present or missing).
         EXTRA_AMAX.append(
-            24.0
-            * (d if days > 0 else 7 + d)
-            * float(np.ceil(gap_h / (24.0 * (d if days > 0 else 7))))
-            / lags.LEAD_SCALE_HOURS
+            0.0
             if days > 0
             else (168.0 * float(np.ceil(gap_h / 168.0)) + 24.0 * d) / lags.LEAD_SCALE_HOURS
         )
