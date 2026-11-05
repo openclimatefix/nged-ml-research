@@ -16,7 +16,7 @@ size: >-
   search). Serving path and degradation rule: not touched (this repository holds none).
 hypothesis: >-
   (a) Lags correct the lag-free network's poor modelling of reverse flow at sunny half-hours at the
-  eight MVA Primaries, so the CRPS gap (E2 minus v3, and E2 minus v3+D5) concentrates in sunny
+  eight MVA Primaries, so the CRPS gap (E2 minus v3 and E2 minus v3+D5) concentrates in sunny
   half-hours. (b) Much of the gap at the eight MVA Primaries comes from one Primary, D8, which
   has a gas generator.
 prediction: >-
@@ -46,10 +46,9 @@ headline: >-
   At the eight MVA Primaries the lag gap is as large at night and in low sun (0.244) as in sunny
   half-hours (0.230), and leaving D8 out raises it from 0.224 to 0.289, so neither hypothesis holds.
 lessons: >-
-  The gap is spread over most half-hours of three Primaries (D4, D12, and D19), which hold 85% of the
-  v3+D5 gap and 37.5% of the rows. At the six MW Primaries the gap is near zero overall and positive
-  only in sunny half-hours (0.133 for v3+D5, five of five folds), so a sunny-half-hour effect
-  exists there and not at the eight.
+  Three Primaries (D4, D12, and D19) hold 85% of the v3+D5 gap and 37.5% of the rows. At the six MW
+  Primaries the gap is near zero overall and largest in sunny half-hours (0.133 for v3+D5, five of
+  five folds), but the minimum detectable effect (0.336) exceeds it, so that is a lead only.
 take_home_message: >-
   Lags do not help the eight MVA Primaries by correcting reverse flow in sunny half-hours: the gain is
   as large at night. The gain also does not come from D8, which goes the other way. It comes from three
@@ -63,20 +62,21 @@ advice:
     (-0.230, interval includes zero), and leaving D8 out raises the gap to 0.289 (Results).
   - >-
     Score a lag-free arm against a lag arm separately in sunny and cloudy half-hours at the six MW
-    Primaries, where the only positive gap sits in sunny half-hours (Results).
+    Primaries, where the gap is largest in sunny half-hours but below the minimum detectable
+    effect (Results).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Lags beat the lag-free network at the eight MVA Primaries in every kind of half-hour, not mainly
-in sunny ones, and not because of D8.** The maintainer's two hypotheses were that the gap sits in
+**Lags beat the lag-free network at the eight MVA Primaries in sunny half-hours and at night, not
+mainly in sunny ones, and not because of D8.** The maintainer's two hypotheses were that the gap sits in
 sunny half-hours (hypothesis a) and that D8, a Primary with a gas generator (Gas A), supplies much of
-it (hypothesis b). Neither holds. The gap is as large at night and in low sun as in sunny
+it (hypothesis b). Neither hypothesis holds. The gap is as large at night and in low sun as in sunny
 half-hours, and D8 pulls the gap down, so leaving D8 out raises it. Three Primaries (D4, D12, and
 D19) hold 85% of the v3+D5 gap. **Next step: find what D4, D12, and D19 have in common.** All
 numbers are interim and unaudited. The page re-scores the stored forecasts of [experiment
 572](../00572-two-offset-part-1-lags-versus-the-slow-output-offset/result.md) (E2, v3, v3+D5; two
-seeds; five folds). The gap is E2's CRPS minus the lag arm's, in points of
+seeds; five folds). E2 is experiment 572's lag-free network with the output offset (experiment 565's D5), v3 is its network with lags and no offset, and v3+D5 has both. The gap is E2's CRPS minus the lag arm's, in points of
 capacity at 24-120 h unless a band is named, and positive means the lag arm is better.
 
 **Verdict: not supported** (both hypotheses). Pa is not met. The sunny to cloudy ratio in daytime
@@ -99,23 +99,23 @@ contrast.
 
 | Group, band | E2 minus v3 (interval, MDE, folds positive) | E2 minus v3+D5 (interval, MDE, folds positive) |
 |---|---|---|
-| Eight, 0-24 h | +0.187 (-0.069 to +0.391, 0.109, 4/5) | +0.271 (+0.097 to +0.463, 0.062, 5/5) |
-| Eight, 24-120 h | +0.131 (-0.127 to +0.329, 0.123, 3/5) | +0.224 (+0.033 to +0.394, 0.077, 4/5) |
-| Eight, 120-240 h | +0.030 (-0.117 to +0.189, 0.230, 2/5) | +0.157 (-0.044 to +0.407, 0.187, 3/5) |
-| Six, 0-24 h | +0.104 (-0.003 to +0.271, 0.150, 4/5) | +0.114 (+0.027 to +0.171, 0.153, 4/5) |
-| Six, 24-120 h | +0.005 (-0.087 to +0.228, 0.202, 1/5) | +0.049 (-0.136 to +0.128, 0.182, 4/5) |
-| Six, 120-240 h | -0.117 (-0.456 to +0.123, 0.083, 2/5) | -0.036 (-0.380 to +0.143, 0.104, 3/5) |
+| Eight MVA Primaries, 0-24 h | +0.187 (-0.069 to +0.391, 0.109, 4/5) | +0.271 (+0.097 to +0.463, 0.062, 5/5) |
+| Eight MVA Primaries, 24-120 h | +0.131 (-0.127 to +0.329, 0.123, 3/5) | +0.224 (+0.033 to +0.394, 0.077, 4/5) |
+| Eight MVA Primaries, 120-240 h | +0.030 (-0.117 to +0.189, 0.230, 2/5) | +0.157 (-0.044 to +0.407, 0.187, 3/5) |
+| Six MW Primaries, 0-24 h | +0.104 (-0.003 to +0.271, 0.150, 4/5) | +0.114 (+0.027 to +0.171, 0.153, 4/5) |
+| Six MW Primaries, 24-120 h | +0.005 (-0.087 to +0.228, 0.202, 1/5) | +0.049 (-0.136 to +0.128, 0.182, 4/5) |
+| Six MW Primaries, 120-240 h | -0.117 (-0.456 to +0.123, 0.083, 2/5) | -0.036 (-0.380 to +0.143, 0.104, 3/5) |
 
 The 24-120 h figures match the experiment 572 page. The lower end of the E2 minus v3+D5 interval at
-the eight is +0.033 here and +0.006 there, because the resampling draws differ.
+the eight MVA Primaries is +0.033 here and +0.006 there, because the resampling draws differ.
 
 **Sunny, cloudy, and night (hypothesis a).** Each half-hour is labelled by the shortwave radiation
 the ensemble forecast gave for it, from the weather run issued 9 hours before the origin. A
 half-hour is sunny when the sun is above 5 degrees and the forecast shortwave is at least 0.6 of
-clear-sky radiation (Haurwitz). Solar elevation uses one point (53.0 N, 2.0 W) for every Primary.
+clear-sky radiation (a standard clear-sky formula). Solar elevation uses one point (53.0 N, 2.0 W) for every Primary.
 Sunny half-hours hold 24% of the eight MVA Primaries' rows, cloudy 15%, and night or low sun 61%.
 
-- **At the eight, 24-120 h, E2 minus v3+D5:** sunny +0.230 (+0.156 to +0.373, MDE 0.204, 5/5), cloudy
+- **At the eight MVA Primaries, 24-120 h, E2 minus v3+D5:** sunny +0.230 (+0.156 to +0.373, MDE 0.204, 5/5), cloudy
   +0.134 (-0.103 to +0.447, MDE 0.169, 4/5), night or low sun +0.244 (+0.088 to +0.371, MDE 0.079,
   5/5). E2 minus v3 is +0.147, -0.077, and +0.177.
 - **By solar elevation, E2 minus v3+D5:** below the horizon +0.232, 0-10 degrees +0.337, 10-25
@@ -125,10 +125,10 @@ Sunny half-hours hold 24% of the eight MVA Primaries' rows, cloudy 15%, and nigh
   +0.134, 120-240 h +0.233 and +0.149. Night or low sun is +0.315 at 0-24 h and +0.127 at 120-240 h
   (interval includes zero).
 - **By season, E2 minus v3+D5:** December to February +0.193, March to May +0.255, June to August
-  +0.121, September to November +0.345. Intervals of single-fold seasons are degenerate, so these
-  are point estimates only.
+  +0.121, September to November +0.345. Intervals for March to May, June to August, and September to November are degenerate (one fold
+  each), so those are point estimates only.
 - **By hour of day:** the first figure shows the gap in sunny half-hours above the cloudy gap from
-  about 10:00 to 15:00 UTC at the eight. At the six, the cloudy gap is at or below zero from 09:00
+  about 10:00 to 15:00 UTC at the eight MVA Primaries. At the six MW Primaries, the cloudy gap is at or below zero from 09:00
   UTC.
 - **The three largest half-hour types** (day-light class x season, 24-120 h) are night or low sun in
   September to November, December to February, and March to May. They hold 65% of the E2 minus
@@ -152,13 +152,16 @@ Sunny half-hours hold 24% of the eight MVA Primaries' rows, cloudy 15%, and nigh
   +0.289 (+0.202 to +0.374, MDE 0.099, 5/5) and E2 minus v3 from +0.131 to +0.175 (+0.049 to
   +0.294, MDE 0.095, 4/5). Without D8, the sunny gap is +0.229, the cloudy gap +0.224, and the
   night or low sun gap +0.329 (v3+D5), so the sunny and cloudy gaps match.
-- **D4, D12, and D19 hold 85% of the v3+D5 gap** and 37.5% of the rows. Each interval excludes zero.
-  D8 and D22 are the two Primaries where v3 is behind E2.
+- **D4, D12, and D19 hold 85% of the v3+D5 gap** and 37.5% of the rows. The interval for each of
+  the three excludes zero. They also hold 75.6% of the summed gap of the seven Primaries with a
+  positive gap, so the share does not depend on D8's negative contribution. D8 and D22 are the two
+  Primaries where v3 is behind E2.
 - **At the six MW Primaries**, the gap is near zero overall (+0.049 for v3+D5, interval includes
   zero), and shares of a total near zero are not meaningful, so none are quoted. Per Primary,
-  D14 (+0.209, 5/5) and D5 (+0.053) favour v3+D5, D11 (-0.346) and D10 (-0.065) go the other way.
-- **At the six MW Primaries, the gap is a sunny-half-hour gap**: sunny +0.133 (+0.072 to +0.190, MDE
-  0.336, 5/5) and cloudy -0.024 for v3+D5; sunny +0.088 and cloudy -0.242 for v3. The MDE is
+  four of six favour v3+D5 (D16 +0.267, D14 +0.209, D9 +0.181, D5 +0.053) and two go the other way
+  (D11 -0.346, D10 -0.065).
+- **At the six MW Primaries, the gap is largest in sunny half-hours**: sunny +0.133 (+0.072 to
+  +0.190, MDE 0.336, 5/5) and cloudy -0.024 for v3+D5; sunny +0.088 and cloudy -0.242 for v3. The MDE is
   larger than the gap, so this is a lead, not a finding.
 
 ## Setup and checks
