@@ -20,6 +20,7 @@
 | 507 | Is there enough to gain from repairing shifted power readings, rather than down-weighting them, to justify a learned 14-day history encoder? | High (neural Discuss session, 2026-11-02) | Nothing | Interim: oracle repair helps; one total-variation repair does not; learned encoder not run (line paused) |
 | 550 | Do trailing temperature windows still help the lag-light demand network once the day-ago and week-ago power lags are in? | High (manager, 2026-11-04) | Nothing | Planned |
 | 567 | Do the neighbouring Primaries' lags let the modular lag-encoder demand network tell a load transfer from a genuine level change, when it trains on synthetic load shifts? | High (manager, 2026-11-05) | Experiments 559, 560, and 566 merged | Planned |
+| 584 | Does the best assembled forecast of the normal running arrangement (embargoed three-step recipe trained with synthetic load-shifts, plus a gated wider band) reach 0.90 coverage after a load-shift ends, and is that more than extra width? | High (manager brief X6, 2026-11-05) | Experiments 574, 581, 582, and 583 merged | Planned |
 
 ## Planned experiments
 
