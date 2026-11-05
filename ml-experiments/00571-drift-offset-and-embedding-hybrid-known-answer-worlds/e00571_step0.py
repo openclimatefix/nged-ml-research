@@ -1,4 +1,5 @@
-# ruff: noqa: E501, ANN001, ANN201
+# ruff: noqa: E402
+# ruff: noqa: E501, ANN001
 """Experiment 571, step 0: do the joint hybrid's embedding and offset compete for the same slow variance?
 
 Reads experiment 565's stored hybrid (arm H) fits, one per fold month and seed (day 14, the newest
@@ -21,7 +22,7 @@ import e00397_models as base  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00559_model as m  # ty: ignore[unresolved-import]
 import e00559_model_drift as mdr  # ty: ignore[unresolved-import]
-import e00565_fit as F  # ty: ignore[unresolved-import]
+import e00565_fit as f565  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
@@ -36,7 +37,7 @@ DAY = 14
 
 def location(*, model, x, p, vec) -> torch.Tensor:
     """Return the mixture location of rows with every row's drift embedding set to `vec` (rows, 4)."""
-    model.drift = lambda tau, primary: vec  # noqa: ARG005
+    model.drift = lambda tau, primary: vec
     with torch.no_grad():
         out = mdr.ModularMdnDrift.forward(model, x, p).double()
     log_w, mean, _ = base.mixture_parts(out=out, components=m.COMPONENTS)
@@ -44,30 +45,38 @@ def location(*, model, x, p, vec) -> torch.Tensor:
 
 
 def main() -> None:
+    """Compute and print the level-path comparison for every fold month and seed."""
     clean = c.clean_stack()
     sites = pl.read_csv(
-        ML_EXPERIMENTS_DATA_DIR / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free/site_map.csv"
+        ML_EXPERIMENTS_DATA_DIR
+        / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free/site_map.csv"
     )
     label = dict(zip(sites["primary"].to_list(), sites["label"].to_list(), strict=True))
     group = dict(zip(sites["primary"].to_list(), sites["group"].to_list(), strict=True))
     rows = []
     for month in c.MONTHS:
-        mr = F.build_month(month=month, clean=clean)
-        test = F.build_test(month=month, standardiser=mr.base.standardiser)
+        mr = f565.build_month(month=month, clean=clean)
+        test = f565.build_test(month=month, standardiser=mr.base.standardiser)
         n_p = len(mr.base.target_mean)
         rng = np.random.default_rng(0)
         pick = np.concatenate(
             [
-                rng.choice(np.flatnonzero(test.primary == q), min(ROWS_PER_PRIMARY, (test.primary == q).sum()), replace=False)
+                rng.choice(
+                    np.flatnonzero(test.primary == q),
+                    min(ROWS_PER_PRIMARY, (test.primary == q).sum()),
+                    replace=False,
+                )
                 for q in range(n_p)
             ]
         )
         x = torch.from_numpy(test.x[pick]).float().cuda()
         p = torch.from_numpy(test.primary[pick]).long().cuda()
         for seed in SEEDS:
-            model = F.new_model(n_primaries=n_p).cuda()
+            model = f565.new_model(n_primaries=n_p).cuda()
             model.load_state_dict(
-                torch.load(F.model_file(tag="H", month=month, day=DAY, seed=seed), map_location="cuda")
+                torch.load(
+                    f565.model_file(tag="H", month=month, day=DAY, seed=seed), map_location="cuda"
+                )
             )
             model.eval()
             knots = model.all_knots().detach()  # (P, K, 4)
@@ -79,7 +88,12 @@ def main() -> None:
                 base_loc = location(model=model, x=xs, p=ps, vec=avg).mean()
                 emb_path = np.array(
                     [
-                        float(location(model=model, x=xs, p=ps, vec=knots[q, j][None].expand(len(xs), -1)).mean() - base_loc)
+                        float(
+                            location(
+                                model=model, x=xs, p=ps, vec=knots[q, j][None].expand(len(xs), -1)
+                            ).mean()
+                            - base_loc
+                        )
                         for j in range(knots.shape[1])
                     ]
                 )
@@ -90,9 +104,18 @@ def main() -> None:
                     ve, vo = float((e**2).mean()), float((o**2).mean())
                     rows.append(
                         {
-                            "month": month, "seed": seed, "primary": q, "label": label[q], "group": group[q],
-                            "span": span, "corr": float(np.corrcoef(e, o)[0, 1]) if ve > 0 and vo > 0 else float("nan"),
-                            "var_emb": ve, "var_off": vo, "share_emb": ve / (ve + vo) if ve + vo > 0 else float("nan"),
+                            "month": month,
+                            "seed": seed,
+                            "primary": q,
+                            "label": label[q],
+                            "group": group[q],
+                            "span": span,
+                            "corr": float(np.corrcoef(e, o)[0, 1])
+                            if ve > 0 and vo > 0
+                            else float("nan"),
+                            "var_emb": ve,
+                            "var_off": vo,
+                            "share_emb": ve / (ve + vo) if ve + vo > 0 else float("nan"),
                             "var_sum": float(((e + o) ** 2).mean()),
                         }
                     )
