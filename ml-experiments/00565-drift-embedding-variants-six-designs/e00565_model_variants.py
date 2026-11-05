@@ -35,12 +35,16 @@ class RandomWalkDrift(mdr.ModularMdnDrift):
     def __init__(self, *, n_primaries: int, stage: str, n_knots: int, knot_months: int = 1) -> None:
         """Build the network; `n_knots` counts monthly knots, `knot_months` is the knot spacing."""
         self.knot_months = knot_months
+        self.n_monthly = n_knots
         coarse = -(-(n_knots - 1) // knot_months) + 1
+        self.grid_offset = float((n_knots - 1) - knot_months * (coarse - 1))
+        """Month of knot 0: knot j sits at month `grid_offset + knot_months * j`, so the newest knot is the cutoff month."""
         super().__init__(n_primaries=n_primaries, stage=stage, n_knots=coarse)
 
     def drift(self, tau: torch.Tensor, primary: torch.Tensor) -> torch.Tensor:
         """Return the interpolated knot embedding at the position `tau` months."""
-        return super().drift(tau / float(self.knot_months), primary)
+        tau = tau.clamp(max=float(self.n_monthly - 1))
+        return super().drift((tau - self.grid_offset) / float(self.knot_months), primary)
 
     def penalty(self) -> torch.Tensor:
         """Return `PENALTY_LAMBDA` times the mean squared first difference of the knots."""

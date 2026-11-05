@@ -547,6 +547,7 @@ def step2(*, device: str) -> None:
 def pretrain_wt(*, device: str) -> None:
     """Pretrain the W-T arm's network (real or placebo columns) on each fold's ERA5 and CAMS rows."""
     assert SPEC.columns
+    assert SPEC.tag != "C-A10", "arm C-A10 reads experiment 559's weights and must not write there"
     clean = c.clean_stack()
     for month in ARGS.months:
         todo = [s for s in ARGS.seeds if not (pretrained_dir() / f"{month}_s{s}.pt").exists()]
