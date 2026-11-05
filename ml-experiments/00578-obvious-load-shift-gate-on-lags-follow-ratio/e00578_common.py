@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, RET504
 """Experiment 578: shared loaders (labels, cleaned and corrected power, stored forecasts, daily gaps).
 
 Time is a half-hour grid index from `GRID_START` (2019-09-01 UTC). Power is in fractions of effective
@@ -13,7 +13,6 @@ import e00422_prep as prep  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00521_stats as s  # ty: ignore[unresolved-import]
 import e00565_design6 as d6  # ty: ignore[unresolved-import]
-import e00572_score as sc  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -80,12 +79,26 @@ def fill_grid(*, root: Path, tag: str, seeds: tuple[int, ...], grid: np.ndarray)
                     root / "fits" / tag / f"{m}_{d}_s{seed}.parquet",
                     columns=["time_series_id", "power_fcst_init_time", "valid_time", "q50"],
                 )
-                lead = ((df["valid_time"] - df["power_fcst_init_time"]).dt.total_seconds() / 3600.0).to_numpy()
+                lead = (
+                    (df["valid_time"] - df["power_fcst_init_time"]).dt.total_seconds() / 3600.0
+                ).to_numpy()
                 prim = np.array([prim_of[t] for t in df["time_series_id"].to_list()])
-                idx = ((df["valid_time"].dt.epoch("us").to_numpy() - prep.GRID_START_US) // prep.STEP_US).astype(np.int64)
-                better = lead < best[prim, idx]
-                best[prim[better], idx[better]] = lead[better]
-                val[prim[better], idx[better]] = df["q50"].to_numpy()[better]
+                idx = (
+                    (df["valid_time"].dt.epoch("us").to_numpy() - prep.GRID_START_US)
+                    // prep.STEP_US
+                ).astype(np.int64)
+                order = np.argsort(
+                    -lead, kind="stable"
+                )  # longest lead first, so the shortest lead is written last
+                prim, idx, lead_o, q50 = (
+                    prim[order],
+                    idx[order],
+                    lead[order],
+                    df["q50"].to_numpy()[order],
+                )
+                better = lead_o < best[prim, idx]
+                best[prim[better], idx[better]] = lead_o[better]
+                val[prim[better], idx[better]] = q50[better]
         ok = np.isfinite(val)
         acc[ok] += val[ok]
         cnt[ok] += 1

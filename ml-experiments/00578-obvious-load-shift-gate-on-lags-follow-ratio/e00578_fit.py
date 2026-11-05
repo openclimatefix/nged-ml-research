@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, PLW0603
+# ruff: noqa: E501, ANN001, ANN201, E402
 """Experiment 578: experiment 572's v3+D5 fit, on the old and two new folds, with a corrected-lag forecast added.
 
 A thin wrapper around experiment 572's `e00572_fit.py` (imported, unchanged): it re-points the output folder
@@ -63,7 +63,10 @@ def build_test(*, month, standardiser):
     assert np.array_equal(x[:, 43:45], test.x[:, 43:45]), "the corrected lags moved a lag time"
     e.CTX["variants"]["corrected"] = x
     ch = float((np.abs(x[:, 37] - test.x[:, 37]) > 1e-6).mean())
-    print(f"{month}: share of test rows whose day lag differs under the correction: {ch:.4f}", flush=True)
+    print(
+        f"{month}: share of test rows whose day lag differs under the correction: {ch:.4f}",
+        flush=True,
+    )
     return test
 
 
@@ -76,6 +79,9 @@ if __name__ == "__main__":
         e.pretrain_wt(device="cuda")
     else:
         e.fit_arm(months=e.ARGS.months, seeds=e.ARGS.seeds, stress=False, limit=None, device="cuda")
-        out = e.WORK / f"checks_fit_V3D5_{'-'.join(e.ARGS.months)}_s{'-'.join(map(str, e.ARGS.seeds))}.json"
+        out = (
+            e.WORK
+            / f"checks_fit_V3D5_{'-'.join(e.ARGS.months)}_s{'-'.join(map(str, e.ARGS.seeds))}.json"
+        )
         out.write_text(json.dumps(e.CHECK, indent=1, default=str))
         print("CHECKS PASSED", {a: v for a, v in e.CHECK.items() if a != "months"})

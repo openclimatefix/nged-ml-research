@@ -7,7 +7,7 @@ title: >-
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -45,11 +45,111 @@ row_set_id: experiment_470_intersection_v1
 metric: >-
   Lag effect (share of the labelled depth), CRPS in points of effective capacity at 0-24 h and 24-120
   h, false triggers per Primary-year, days from onset to trigger.
+verdict: not supported
+best_arm: >-
+  Not applicable (no gate was run). Lag effect of v3+D5 on the 7 testable long-and-deep events:
+  mean 0.087, median 0.029 of the labelled depth at 24-120 h.
+headline: >-
+  On the 7 long-and-deep load-shift events that can be tested, reading the lags moves the 24-120 h
+  forecast by a median of 0.03 of the event's depth (one event above 0.15), because the slow output
+  offset and the fine-tune have already taken most of the level.
+lessons: >-
+  The forecast follows long events through the offset and the fine-tune, which the lags neither add
+  to nor undo: with corrected lags the forecast still reproduces a median 0.84 of the event's level.
+  A gate on the lags cannot stop that. The one clear lag-driven case is the example pair at D16.
+take_home_message: >-
+  The lag network follows long, deep load-shift events only a little through its lags (a median of 3%
+  of the event's depth), so a gate on the lags would have little to stop. Most of the event's level
+  enters through the slow output offset and the fine-tune, so any control has to act there. The 12
+  events were chosen before the result, and 5 of them cannot be tested.
+advice:
+  - >-
+    Do not build a lag gate for long, deep events yet: the lag effect has a median of 0.03 of the
+    depth on the 7 testable events (Results).
+  - >-
+    Look at the offset and the fine-tune, not the lags, for how a long event enters the forecast: the
+    forecast with corrected lags still keeps a median 0.84 of the event's level (Results).
+  - >-
+    Test the D16 example pair (events 55 and 146) and D8 event 173 in any later control of lags, as
+    they are the cases where lags add 0.17 to 0.31 of the depth (Results).
 production_status: not-for-production
 adopted_in: none
 ---
-**Planned.** Step 0 (the label counts, no score) was run before this plan was committed: of 184
-labelled events, 23 last at least 7 days, and 12 of those are at least as deep as the median depth of
-the 23 (22.1% of effective capacity). Only 3 of the 12 fall in the five scored fold months of
-experiment 572, so two folds (2025-07 and 2025-08) are added; 5 of the 12 (ids 122, 85, 183, 157, and
-136) cannot be tested because the ensemble weather summaries start on 2024-04-01.
+**The lag network follows long, deep load-shift events only a little through its lags, so there is
+little for a gate on the lags to stop.** We asked whether the network that reads power lags follows
+long, deep events in the logs of load transfers between Primaries, and whether a gate that drops the
+lags during such an event would stop it. We re-forecast experiment 572's v3+D5 network (lags plus the
+slow output offset) with the lags taken from the NRA-corrected power, which has the labelled events
+removed. We compared the two forecasts, in 24-120 h ahead forecasts, for every long event we could
+test. The lags moved the forecast by a median 0.03 of the event's depth, so the gate arms were not
+run. All numbers are interim and unaudited. **Next step:** if the event's level matters to NGED, test
+a control on the offset and the fine-tune, not on the lags.
+
+**Verdict: not supported.** The prediction that the lag effect is at least 0.30 on obvious events
+fails, and the stop rule (under 0.15) applies. Obvious events (E-obv, defined in the plan) number 0:
+no long-and-deep event shows 3 consecutive days with a daily gap above 3 event-free standard
+deviations from the lag-free D5 expectation. Bonferroni count: 0 of the 8 planned tests were run, and
+the lag effect is descriptive, with per-event values in the table (n = 7 long-and-deep events, so only
+a large difference could be resolved; no bootstrap interval was computed).
+
+![Follow ratio per event](follow_ratio_per_event.svg)
+
+![14-day plots of the D5 and D16 example events](example_events_14_days.svg)
+
+## Results
+
+**Which events can be tested.** Of 184 labelled events (experiment 400), 23 last at least 7 days.
+Their median depth is 22.1% of effective capacity, and 12 are at least that deep (long and deep).
+Five of the 12 (ids 122, 85, 183, 157, and 136) cannot be tested, because the ensemble weather
+summaries start on 2024-04-01. The other 7 lie in the five folds of experiment 572 (ids 115, 146,
+178) or in the two folds added here, 2025-07 and 2025-08 (ids 143, 172, 173, 175). Duration quartiles
+(days): 0.15, 0.4, 2.1, 3.6, 39.7; depth quartiles (% of capacity): 1.6, 10.9, 19.2, 31.3, 99.6.
+
+**Follow ratio.** It is the mean of (forecast with observed lags minus forecast with corrected lags)
+divided by the labelled depth, over valid times in the event, at 24-120 h. Five more events of 7
+days or more (ids 28, 55, 112, 113, 174) lie in the folds and are shown beside the 7.
+
+| Event | Primary | Days, depth | Follow ratio | Days 0-3, 4-7, 8-14 after onset |
+|---|---|---|---|---|
+| 115 | D3 | 7.0, 25% | 0.029 | 0.05, 0.09, - |
+| 143 | D5 | 8.4, 43% | 0.018 | 0.04, 0.08, - |
+| 146 | D5 | 39.7, 51% | 0.132 | 0.07, 0.18, 0.18 |
+| 172 | D8 | 8.4, 24% | 0.077 | 0.13, 0.25, - |
+| 173 | D8 | 19.3, 23% | 0.311 | 0.21, 0.32, 0.36 |
+| 175 | D8 | 14.2, 22% | 0.017 | -0.04, 0.12, 0.15 |
+| 178 | D8 | 7.0, 31% | 0.028 | 0.05, 0.11, - |
+| 55 (D16, the example pair) | D16 | 15.5, 16% | 0.169 | 0.08, 0.27, 0.26 |
+
+On the 7 long-and-deep events the mean is 0.087, the median 0.029, and one event (173) is above
+0.15. Across all 12 long events that lie in the folds the mean is 0.110, the median 0.070, and three
+(55, 173, 174) are above 0.15. The ratio is lowest in days 0 to 3 and higher after day 4, as the
+detection-delay argument predicts. The lags-masked version agrees in sign for most events and
+disagrees for 173 and 175 (0.43 and -0.27), so single-event values are noisy.
+
+**The D5 offset absorbs the event.** The level share is the sum of (forecast minus corrected power)
+over the sum of (observed minus corrected power) inside the event, at 24-120 h. With observed lags
+the median level share is 0.95 (12 events), with corrected lags 0.84, with masked lags 0.96, and for
+the lag-free D5 network 0.73 (4 events, all in the five old folds). So the forecast reproduces most
+of a long event's level even when it reads no event lags. This does not isolate the offset: the
+corrected-lag forecast uses the weights fine-tuned on the uncorrected targets, so the offset and the
+fine-tune are both candidates. The exception is the example pair at D16 (event 55): the level share
+is 0.24 with observed lags and 0.12 with corrected or masked lags and for the lag-free network.
+
+**Not run.** The gates (G1 to G3), the actions A1 to A4, the injected-world tuning, and the cost on
+rows with no labelled event, because the stop rule applied. The lag-free D5 network (E2) was not
+re-fitted for 2025-07 and 2025-08, so event 173 and the other new-fold events have no E2 figures.
+
+## Method notes
+
+- The re-forecast of the five old folds equals experiment 572's stored v3+D5 forecasts exactly
+  (maximum absolute difference 0.0 over 1,142,520 rows).
+- Weather: every forecast row uses the ensemble run issued at or before the origin minus 9 h
+  (example row: origin 2026-06-08 09:00, run 2026-06-08 00:00). Every lag, observed or corrected, is
+  at least 24 h before the origin (asserted by experiment 572's checks; the corrected variant leaves
+  the lag times unchanged).
+- Event-free gap standard deviations and the lag-free expectation use experiment 565's D5 forecasts,
+  the shortest stored lead per half-hour.
+- GPU time: about 0.5 GPU-h (unmeasured), against a ceiling of 4. Reused code: experiments 400, 435
+  (NRA correction), 556, 565, 572, and 575.
+- Unlogged events: NGED's logs may miss events, so the clean-lag rows may hold events no label
+  covers, and the counts here are lower bounds.
