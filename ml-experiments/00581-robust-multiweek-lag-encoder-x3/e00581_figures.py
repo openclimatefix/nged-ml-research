@@ -94,26 +94,26 @@ def panel(
             axis=alt.Axis(labels=show_x),
         )
     )  # ty: ignore[unresolved-attribute]
-    band = base.mark_area(opacity=0.25).encode(
+    band = base.mark_area(opacity=0.25).encode(  # ty: ignore[unresolved-attribute]
         y=yaxis, y2="q95:Q", color=alt.value(COLOURS[names[0]])
     )
-    med = base.mark_line(strokeWidth=1.3).encode(
+    med = base.mark_line(strokeWidth=1.3).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("q50:Q", scale=alt.Scale(domain=[30, 135])), color=alt.value(COLOURS[names[0]])
     )
     t = pl.DataFrame(
         {"day": (truth["idx"].to_numpy() - onset) / 48.0, "y": 100 * truth["y"].to_numpy()}
     )
     tr = (
-        alt.Chart(t)
+        alt.Chart(t)  # ty: ignore[unresolved-attribute]
         .mark_line(color="#222222", strokeWidth=1.0)
         .encode(x="day:Q", y=alt.Y("y:Q", scale=alt.Scale(domain=[30, 135])))
     )  # ty: ignore[unresolved-attribute]
     ev = (
-        alt.Chart(pl.DataFrame({"a": [0.0], "b": [(end - onset) / 48.0]}))
+        alt.Chart(pl.DataFrame({"a": [0.0], "b": [(end - onset) / 48.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rect(color="#999999", opacity=0.15)
         .encode(x="a:Q", x2="b:Q")
     )  # ty: ignore[unresolved-attribute]
-    return alt.layer(ev, band, med, tr).properties(width=620, height=120, title=title)
+    return alt.layer(ev, band, med, tr).properties(width=620, height=120, title=title)  # ty: ignore[invalid-return-type]
 
 
 def figure(
@@ -288,7 +288,7 @@ def summary() -> None:
             layers = [base.mark_line(point=True)]
             if rule is not None:
                 layers.append(
-                    alt.Chart(pl.DataFrame({"y": [rule]}))
+                    alt.Chart(pl.DataFrame({"y": [rule]}))  # ty: ignore[unresolved-attribute]
                     .mark_rule(color="#999999", strokeDash=[4, 3])
                     .encode(y="y:Q")
                 )  # ty: ignore[unresolved-attribute]

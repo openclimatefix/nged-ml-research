@@ -48,26 +48,27 @@ metric: >-
   pinball loss at q01, q05, q95, and q99, and the width inflation, by phase.
 verdict: partly supported
 best_arm: >-
-  v3+D5 fine-tuned with lag-only synthetic load-shift events on 5% of the time (post hoc variant of the
-  planned X3-syn). Day 4 to the end of an injected event, the median forecast follows 0.104 of the
-  depth against 0.196 for v3+D5 at the eight MVA Primaries.
+  X3-syn (X3-med fine-tuned with lag-only synthetic load-shift events on 5% of the time). Day 4 to
+  the end of an injected event, the median forecast follows 0.085 of the depth against 0.196 for
+  v3+D5 at the eight MVA Primaries. The plain v3+D5 network with the same synthetic events follows
+  0.104 and needs no new lag inputs.
 headline: >-
   Replacing the week lag by the median of 5 weekly lags keeps the whole lag gain (CRPS 4.423 against
   4.427 at the eight MVA Primaries, 24-120 h) but trims following of an injected lag-only event only
   from 0.196 to 0.172 of its depth. Training with synthetic lag-only events halves following (0.104)
   and lifts the share of readings on the safe side of q95 or q05 from 0.77 to 0.89.
 lessons: >-
-  The day lag, not the week lag, carries most of the following during an event: following is the same
-  for events of 7, 15, and 30 days, so a median over weekly lags cannot remove it. Showing the
+  Following is nearly the same for events of 7, 15, and 30 days, which points to the day-old lag
+  rather than the weekly lags (not tested directly, since no arm removes the day lag). Showing the
   network contaminated lags during fine-tuning is what lowers following, and v3+D5 with the synthetic
   events does nearly as well as X3-med with them. After a 30-day event the 5-week median is followed
   more than the single week lag, as expected.
 take_home_message: >-
   A median over five weeks of power lags does not stop the forecast following a load-shift event,
-  because the day-old lag carries the event too, and this network follows the day lag most. Fine-tuning
+  probably because the day-old lag carries the event too (not tested directly). Fine-tuning
   on lag-only synthetic events roughly halves the following and moves the safe-side coverage of q95
   and q05 from 0.77 to 0.89, at a small loss of CRPS. On the one verified 15-day transfer the
-  coverage in the week after it ends is still only 0.5 to 0.6, so the tails stay below the 0.90 target
+  coverage in the week after it ends is still only 0.45 to 0.59, so the tails stay below the 0.90 target
   there.
 advice:
   - >-
@@ -78,8 +79,8 @@ advice:
     Judge a lag control on the injected bank and on days 4 to the end and 0 to 7 after the end, where
     following peaks, not on the whole event (Injected bank).
   - >-
-    Do not expect a median over weekly lags to help against events shorter than 30 days, because the
-    day lag carries them (follow by length, Injected bank).
+    Do not expect a median over weekly lags to help against events shorter than 30 days, because the following
+    does not fall with event length (follow by length, Injected bank).
   - >-
     Report the share of readings on the safe side of q95 or q05 with the follow ratio, because the
     follow ratio of 0.1 to 0.2 hides a fall in coverage from 0.94 to 0.77 (Injected bank).
@@ -102,8 +103,9 @@ NRA). We also scored the one verified real transfer of the telemetry set of [exp
 fold months, and the May 2026 transfers. All numbers are interim and unaudited.
 
 **Verdict: partly supported.** X3-med passes its accuracy condition and misses its following target;
-the synthetic-event variant, which is a post hoc change of the planned X3-syn, meets the target's
-direction but not its size. In CRPS (points of capacity, 24-120 h) at the eight MVA Primaries,
+the synthetic-event arms meet the after-the-end target (0.038 for X3-syn, 0.040 for v3+D5-syn at the
+eight MVA Primaries) but still follow 0.085 to 0.104 of the depth from day 4 to the end. In CRPS
+(points of capacity, 24-120 h) at the eight MVA Primaries,
 lag-free D5 scores 4.651, v3+D5 4.427, and X3-med 4.423, so X3-med keeps 102% of the lag gain. At
 the six MW Primaries v3+D5 scores 3.327 and X3-med 3.328. The median follow ratio (the share of the
 injected depth that the median forecast moves towards) is 0.065 after the end against a predicted
@@ -128,28 +130,37 @@ shifted forecast is wrong. The nominal value is 0.95.
 | Placebo (weeks 6-10) | 0.163 | 0.041 | 0.792 | 0.134 | 0.757 | 0.876 |
 | X3-3.5h | 0.196 | 0.055 | 0.760 | 0.180 | 0.744 | 0.875 |
 
-- **The day lag carries the following.** From day 4 to the end, v3+D5 follows 0.181 (7-day events),
+- **Following does not depend on event length, which points to the day lag.** From day 4 to the end,
+  v3+D5 follows 0.181 (7-day events),
   0.194 (15-day), and 0.198 (30-day) of the depth. A 7-day event contaminates 1 or 2 of the 5 weekly
-  lags, a 30-day event 4 or 5, and the following is the same, so the weekly lags are not the
-  channel. X3-med follows more than v3+D5 for 30-day events (0.231 against 0.198 from day 4, 0.148
+  lags, a 30-day event 4 or 5, and the following is the same, so the weekly lags are probably not
+the
+  channel (no arm removes the day lag, so this is untested). X3-med follows more than v3+D5 for
+30-day events (0.231 against 0.198 from day 4, 0.148
   against 0.082 in the week after the end), the design limit of a median over 5 weeks.
 - **The follow ratio falls as the depth rises** (v3+D5: 0.209, 0.193, 0.172 at depths of 15%, 30%,
   and 50%), so the network does not follow a large shift in proportion.
 - **The placebo** reads weeks 6 to 10 and keeps about half of the lag gain at the eight MVA
   Primaries (4.532), so recency matters there. At the six MW Primaries it scores 3.289, better than
   v3+D5 (3.327), so recency does not matter there.
-- **X3-3.5h** (report only) lowers CRPS at the eight MVA Primaries (4.402 at 24-120 h, contrast at
-  0-24 h of -0.089 against v3+D5, interval -0.154 to -0.023, minimum detectable effect 0.108) and
-  follows as much as v3+D5.
-- **CRPS cost of the synthetic events** (positive is worse), counted contrasts against v3+D5: at the
+- **X3-3.5h** (report only) lowers CRPS at the eight MVA Primaries at 0-24 h (contrast -0.089
+  against
+  v3+D5, interval -0.154 to -0.023, minimum detectable effect 0.108). At 24-120 h it scores 4.402
+and
+  the interval of its contrast (-0.085 to 0.029) includes zero. It follows as much as v3+D5.
+- **CRPS loss from the synthetic events** (positive is worse), counted contrasts against v3+D5: at
+  the
   eight MVA Primaries X3-syn +0.037 (0-24 h) and +0.032 (24-120 h); at the six MW Primaries +0.081
   and +0.071. All 8 counted intervals that were run include zero (Bonferroni count 12, of which the
-  4 X3-set cells were not run). The same cost for v3+D5-syn is +0.012 to +0.058 and is descriptive.
-  The two-seed minimum detectable effect is 0.06 to 0.15.
+  4 X3-set cells were not run). The same loss for v3+D5-syn is +0.012 to +0.058, and the intervals
+of 3 of its 4 contrasts exclude zero, so v3+D5-syn does lose some CRPS.
+  The two-seed minimum detectable effect is 0.06 to 0.17.
 - **Event-free calibration is unchanged.** On rows with no labelled or verified event within 7 days
-  (24-120 h), the share of readings at or below q95 is 0.919 (v3+D5) and 0.918 (X3-syn) at the eight
-  MVA Primaries, and 0.897 and 0.894 at the six MW Primaries. Pinball loss at q05 and q95 is 0.007
-  and 0.009 for all arms. Every arm's upper tail is too narrow, as the plan review found for v3+D5.
+  (24-120 h), the share of readings at or below q95 is 0.914 (v3+D5) and 0.918 (X3-syn) at the eight
+  MVA Primaries, and 0.897 and 0.894 at the six MW Primaries. Pinball loss at q05 and q95 differs by
+at
+  most 0.001 between arms (0.007 and 0.009 at the eight MVA Primaries). Every arm's upper tail is
+too narrow, as the plan review found for v3+D5.
 
 ![Injected 30% shift for 15 days at one MW Primary](injected_event_d5_30pct_for_15_days.svg)
 
@@ -170,9 +181,9 @@ transfer.
 
 - **After the transfer ends, the tails miss the NRA about half the time**, for every arm (0.45 to
   0.59 against 0.90), including X3-syn. Part of that is an ordinary miss: before the event the
-  q05-q95 coverage at D5 is 0.73 to 0.77.
+  q05-q95 coverage at D5 is 0.75 to 0.83 at both Primaries.
 - **The May 2026 transfers** at D10, D11, D12, and D16 lie in a fold where v3+D5 and X3-med cover
-  the NRA on only 0.17 to 0.45 of rows before and during the events, so they say little about lags.
+  the NRA on only 0.17 to 0.46 of rows before and during the events, so they say little about lags.
   In the June fold, 7 to 14 days after the ends, all arms cover 0.92 to 0.94 of the NRA.
 
 ![Verified transfer 23 at D16](verified_event_23_at_d16.svg)

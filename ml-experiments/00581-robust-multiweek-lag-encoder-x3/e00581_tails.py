@@ -44,6 +44,11 @@ BANDS = {"0-24h": (0.0, 24.0), "24-120h": (24.0, 120.0)}
 W582 = ML_EXPERIMENTS_DATA_DIR / "00582-nra-tails-on-verified-load-shift-events/work"
 
 
+def _f(x: object) -> float:
+    """Convert a Polars scalar to a float."""
+    return float(x)  # ty: ignore[invalid-argument-type]
+
+
 def arm_root(arm: str, month: str = "") -> Path:
     """Return the work folder of an arm: `v3d5` is experiment 572's, or experiment 582's for the extra months."""
     if arm == "v3d5":
@@ -328,13 +333,13 @@ def event_free(
         sub = d.filter((pl.col("lead") >= lo) & (pl.col("lead") < hi))
         for grp, g in [("all", sub), *[(k[0], x) for k, x in sub.group_by("group")]]:
             row = {"arm": arm, "band": band, "group": grp, "n": g.height,
-                   "cov90": float(((g["y"] >= g["q05"]) & (g["y"] <= g["q95"])).mean()),
-                   "cov98": float(((g["y"] >= g["q01"]) & (g["y"] <= g["q99"])).mean()),
-                   "width90": float((g["q95"] - g["q05"]).mean()), "width98": float((g["q99"] - g["q01"]).mean())}  # fmt: skip
+                   "cov90": _f(((g["y"] >= g["q05"]) & (g["y"] <= g["q95"])).mean()),
+                   "cov98": _f(((g["y"] >= g["q01"]) & (g["y"] <= g["q99"])).mean()),
+                   "width90": _f((g["q95"] - g["q05"]).mean()), "width98": _f((g["q99"] - g["q01"]).mean())}  # fmt: skip
             for name, tau in TAUS.items():
                 if name != "q50":
-                    row[f"below_{name}"] = float((g["y"] <= g[name]).mean())
-                    row[f"pin_{name}"] = float(
+                    row[f"below_{name}"] = _f((g["y"] <= g[name]).mean())
+                    row[f"pin_{name}"] = _f(
                         g.select(pinball(y=pl.col("y"), q=pl.col(name), tau=tau)).to_series().mean()
                     )
             out.append(row)
