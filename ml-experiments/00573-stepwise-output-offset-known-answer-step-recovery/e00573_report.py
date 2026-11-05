@@ -1,5 +1,8 @@
 # ruff: noqa: E501
-"""Experiment 573: collate Step 1 into the K-S1, K-S2, and K-S3 verdicts and print every number the page quotes."""
+"""Experiment 573: collate Step 1 into the K-S1, K-S2, and K-S3 verdicts.
+
+Prints every number the page quotes.
+"""
 
 import json
 

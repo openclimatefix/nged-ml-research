@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 573, Step 1: fit the offsets S0, S1, and S2 on the frozen network's cached outputs and score step recovery.
+"""Experiment 573, Step 1: fit the offsets S0, S1, and S2 on cached outputs and score recovery.
+
+The cached outputs are those of the frozen neural network.
 
 Usage: python e00573_steps.py {sweep|run} [--months ...] [--worlds ...]
 
@@ -102,7 +104,10 @@ def load_fold(*, month: str, device: str) -> Fold:
 
 
 def world_z(*, fold: Fold, inj: np.ndarray, device: str) -> torch.Tensor:
-    """Return the world's standardised targets: the real target plus the injection, MVA Primaries clipped at zero."""
+    """Return the world's standardised targets.
+
+    The real target plus the injection, with the MVA Primaries clipped at zero.
+    """
     add = inj[fold.primary_np, fold.target_idx]
     y = fold.y.astype(np.float64) + add
     mva = np.isin(fold.primary_np, list(world.MVA_INJECTED))
@@ -185,7 +190,10 @@ def fit_s1(*, fold: Fold, z: torch.Tensor, lam: float) -> np.ndarray:
 
 
 def fit_s2(*, fold: Fold, z: torch.Tensor, lam: float, init: np.ndarray) -> np.ndarray:
-    """Return S2's daily path (16, days): sum of hard-concrete gated jumps, penalised by the expected number of open gates."""
+    """Return S2's daily path (16, days): hard-concrete gated jumps.
+
+    The penalty is the expected number of open gates.
+    """
     dev = fold.out.device
     assert init is not None, (
         "S2 starts from S1's thresholded jumps (pure gradient start from closed gates did not open any gate)"
@@ -270,7 +278,10 @@ def supported(*, fold: Fold, primary: int, day: int) -> bool:
 
 
 def match(*, truth: list[tuple[int, float]], found: list[tuple[float, float]]) -> tuple[int, int]:
-    """Return (truth steps recovered, found steps that match a truth step): same sign, date within 3 days, size within 25%."""
+    """Return (truth steps recovered, found steps that match a truth step).
+
+    A match has the same sign, a date within 3 days, and a size within 25%.
+    """
     used: set[int] = set()
     hit = 0
     for day, size in truth:
@@ -317,7 +328,9 @@ def score_steps(*, fold: Fold, path: np.ndarray, truth: dict[int, list[tuple[int
 
 
 def score_clean(*, fold: Fold, path: np.ndarray) -> dict:
-    """Count steps of 1% or more per Primary-year on the six injected and on the ten untouched Primaries (world K0).
+    """Count steps of 1% or more per Primary-year in world K0.
+
+    The counts are for the six injected and the ten untouched Primaries.
 
     Each Primary's years run from its first cached day to ten days before the span ends.
     """
@@ -337,7 +350,10 @@ def score_clean(*, fold: Fold, path: np.ndarray) -> dict:
 
 
 def score_ramp(*, fold: Fold, path: np.ndarray) -> dict:
-    """K-S3 per injected Primary: the recovered end value within 25% of truth, and at least 5 steps of 0.3% or more inside the ramp."""
+    """Score K-S3 per injected Primary.
+
+    The recovered end value is within 25% of truth, with at least 5 steps of 0.3% or more in the ramp.
+    """
     rows = []
     for p in world.INJECTED:
         first, last, size = world.ramp_points(primary=p)
@@ -366,7 +382,10 @@ def score_ramp(*, fold: Fold, path: np.ndarray) -> dict:
 def run_one(
     *, fold: Fold, world_name: str, device: str, tvs: tuple[float, ...], gates: tuple[float, ...]
 ) -> dict:
-    """Fit S0, S1 at each total-variation weight, and S2 at each gate weight started from each S1; return the scores."""
+    """Fit S0, S1 at each total-variation weight, and S2 at each gate weight.
+
+    Each S2 starts from its S1. Returns the scores.
+    """
     grid = data.grid_length()
     inj = world.injection(world=world_name, grid=grid)
     z = world_z(fold=fold, inj=inj, device=device)
