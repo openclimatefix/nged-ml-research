@@ -3,7 +3,7 @@ id: "00577"
 slug: static-between-steps-offsets-and-probabilistic-offset-widening
 title: >-
   Do offsets that stay constant between sparse steps, and offsets whose uncertainty widens the
-  forecast, improve the output-side slow offset (D5) of the modular lag-free demand network?
+  forecast, improve the output-side slow offset (D5) of the modular lag-free demand neural network?
 theme: retraining-and-training-history
 also_relevant_to:
   - calibration-and-uncertainty
@@ -42,7 +42,8 @@ decision_rule: >-
   adds a penalty, a trained variance, or a mixture component. Bonferroni count 28 (22 pre-registered
   plus 6 for Q5, the scale offset added during the run; Design 1: 3 arms
   x 2 groups = 6; Design 2: CRPS of Q1 to Q4 x 2 groups = 8, Q2 and Q3 against Q-const x 2 groups
-  = 4, tail loss of Q2 and Q3 x 2 groups = 4). The threshold of 0.03 pays for one extra penalty or
+  = 4, tail loss of Q2 and Q3 x 2 groups = 4). The threshold of 0.03 is the smallest gain that
+  justifies one extra penalty or
   one stored variance per Primary. Static-ness, calibration, sharpness, known-answer errors, slices,
   and the per-Primary table are descriptive.
 benchmark: >-
@@ -52,9 +53,9 @@ verdict: refuted
 best_arm: >-
   D5 itself. No arm beats D5 at both groups: the best point estimates are O2 on 5 fresh seeds
   (-0.008 at the eight MVA Primaries, +0.054 at the six MW Primaries) and Q4-O2 on seeds 0 and 1
-  (-0.045 and +0.015), none with a Bonferroni interval that excludes zero.
+  (-0.046 and +0.015), none with a Bonferroni interval that excludes zero.
 headline: >-
-  A steadier offset (total-variation or gated-jump penalty) costs no accuracy but gains none, and
+  A steadier offset (total-variation or gated-jump penalty) loses no accuracy but gains none, and
   carrying the offset's uncertainty into the mixture does not improve CRPS, tails, or calibration;
   the one pre-registered widening that carries the jump risk (Q3) makes the forecast clearly worse.
 lessons: >-
@@ -62,7 +63,7 @@ lessons: >-
   static month pairs (best 60%), no arm gained 0.03 CRPS, and Q3 worsened CRPS by 0.15 to 0.18
   instead of improving the tails. The known-answer check showed that a larger penalty cuts the
   offset's error in a world with no true offset but also biases recovered step sizes low, so the
-  penalty trades a calmer path for smaller steps.
+  penalty gives a calmer path at the price of smaller recovered steps.
 take_home_message: >-
   The slow offset (D5) is already as good as these refinements can make it on this data. Making the
   offset steadier or wider does not help the forecast, so keep D5 as it is; the penalty and widening
@@ -86,13 +87,14 @@ metric: >-
   Primaries; summed 1% and 99% pinball loss; coverage of the 80%, 90%, and 98% central intervals.
 ---
 
-**We asked two questions about the slow offset (D5) that the modular lag-free demand network adds to
+**We asked two questions about the slow offset (D5) that the modular lag-free demand neural network
+adds to
 the forecast's mean: does an offset that stays constant between sparse steps forecast better, and
 does carrying the offset's uncertainty into the forecast improve it?** We tested three
 total-variation or gated-jump penalties (O1 to O3) and six ways to carry the uncertainty (Q1 to Q5
 and a placebo), on the same 16 Primary substations (14 scored) and five test months as [experiment
 565](../00565-drift-embedding-variants-six-designs/result.md), with 5 seeds for the arms that showed
-a point gain and 2 for the rest. Neither idea improved the forecast. A steadier offset costs no
+a point gain and 2 for the rest. Neither idea improved the forecast. A steadier offset loses no
 accuracy, and widening the forecast by the offset's uncertainty changes CRPS by under 0.03 points of
 capacity.
 
@@ -108,29 +110,29 @@ the five folds. The rest of this page says "interval excludes zero" only where i
 - **Absolute CRPS of D5 at 24-120 h (seeds 0 and 1).** 4.651 points of capacity at the eight MVA
   Primaries and 3.376 at the six MW Primaries. On seeds 5 to 9, D5 is 4.646 and 3.475.
 - **Steadier offsets (O1 to O3), seeds 0 and 1, CRPS minus D5 (minimum detectable effect, MDE).** O1
-  +0.017 at the eight (MDE 0.118) and +0.021 at the six (0.120); O2 -0.042 (0.128) and +0.018
-  (0.229); O3 +0.118 (0.178) and -0.025 (0.149). No interval excludes zero. Penalties picked on fold
+  +0.017 at the eight (MDE 0.119) and +0.021 at the six (0.120); O2 -0.042 (0.128) and +0.018
+  (0.229); O3 +0.118 (0.179) and -0.026 (0.149). No interval excludes zero. Penalties picked on fold
   1's pretraining NLL: O1 lambda 3000, O2 3000, O3 1000.
 - **O2 on fresh seeds 5 to 9.** CRPS minus D5 is -0.008 at the eight (interval -0.068 to +0.082, MDE
   0.102, 2 of 5 folds positive) and +0.054 at the six (-0.085 to +0.357, MDE 0.123, 2 of 5
   positive). O2 narrows the 90% interval by 0.9 points of capacity (eight) and 1.6 (six), and the
   80% interval covers 2.5 and 3.9 points less than D5's (interval excludes zero). Q4-O2 on the same
   seeds: -0.010 and +0.067.
-- **Offset-uncertainty widening, seeds 0 and 1.** Q1 (spread across seeds) is -0.000 and -0.001;
-  Q-const (placebo) is -0.000 and -0.001; Q2 (variational newest knot) is +0.028 and +0.000; Q4-O2
-  is -0.045 and +0.015. None meets the 0.03 threshold, and no interval excludes zero.
+- **Offset-uncertainty widening, seeds 0 and 1.** Q1 (spread across seeds) is -0.001 and -0.002;
+  Q-const (placebo) is -0.001 and -0.001; Q2 (variational newest knot) is +0.028 and +0.000; Q4-O2
+  is -0.046 and +0.015. None meets the 0.03 threshold, and no interval excludes zero.
 - **Q3 (jump-risk widening) as pre-registered is worse.** CRPS is +0.183 at the eight (0.128 to
   0.217) and +0.152 at the six (0.085 to 0.199), the summed 1% and 99% pinball loss rises by 0.158
   and 0.201, and the 90% interval is 11 points of capacity wider; all 5 folds are positive. Q3b, the
   same widening with statistics taken from O2's own jumps, is a **post hoc** variant and is neutral.
-- **Q5 (slow per-Primary scale offset).** CRPS minus D5 is +0.007 (MDE 0.158) and +0.014 (0.130);
+- **Q5 (slow per-Primary scale offset).** CRPS minus D5 is +0.007 (MDE 0.159) and +0.014 (0.131);
   the shuffled-across-Primaries placebo is +0.000 and +0.033, so the learnt scale knots are not
   better than shuffled ones. The knots do differ across Primaries and drift over time, and agree
-  across seeds (correlation above 0.93), see the figure below.
+  across seeds (correlation above 0.93), see the Q5 scale-knots figure.
 - **Slices (24-120 h, CRPS minus D5, O2 / Q4-O2).** Leave-D8-out at the eight: -0.053 / -0.057. D8
   alone: +0.032 / +0.033. D14 alone at the six: +0.002 / +0.055. Rows with no labelled event: -0.053
   / -0.060 (eight), +0.018 / +0.015 (six). Cold nights (3 folds): -0.093 / -0.091 (eight) and -1.091
-  / -1.118 (six, interval -2.072 to +0.424, 1 of 3 folds positive). Christmas week (1 fold only):
+  / -1.118 (six, interval -2.073 to +0.424, 1 of 3 folds positive). Christmas week (1 fold only):
   -0.430 / -0.286 (eight) and +0.349 / +0.262 (six). No slice is shown to improve.
 - **The offsets are not much steadier.** The share of month pairs without a labelled event whose
   offset moves by under 0.2% of capacity is 37% for D5, 60% for O1, 40% for O2, and 36% for O3. O1
@@ -144,8 +146,9 @@ the five folds. The rest of this page says "interval excludes zero" only where i
 
 ## Known-answer check
 
-The penalties were fitted on [experiment
-573](../00573-stepwise-output-offset-known-answer-step-recovery/result.md)'s cached network outputs
+**The penalties were tested where the true offset is known.** They were fitted on [experiment
+573](../00573-stepwise-output-offset-known-answer-step-recovery/result.md)'s cached neural-network
+outputs
 with nothing added (K0) and with two persistent steps of 10% to 20% of capacity per Primary (Kl).
 Static-period RMSE is in percent of capacity, averaged over five folds.
 
@@ -157,15 +160,17 @@ Static-period RMSE is in percent of capacity, averaged over five folds.
 | O2, lambda 3000 | 1.81 | 8.24 | 40 of 45 | -70% |
 | O2, lambda 30000 | 0.47 | 10.58 | 0 of 45 | n/a |
 
-The pre-registered prediction (O1 or O2 cuts the static-period RMSE by at least 40% in K0) fails at
-the picked penalty (4% for O1, 37% for O2) and holds only at lambda 10000 or more for O2 and 30000
-for O1. A larger penalty cuts K0's error but recovers fewer steps and shrinks the ones it recovers.
+**The pre-registered 40% cut is not met at the picked penalty.** The prediction (O1 or O2 cuts the
+static-period RMSE by at least 40% in K0) fails at
+the picked penalty (4% for O1, 37% for O2) and holds only at lambda 10000 or more, for both O1 and
+O2. A larger penalty cuts K0's error but recovers fewer steps and shrinks the ones it recovers.
 
 ## Checks and caveats
 
-- **Triggers fired.** Trigger 2 (Q3's result contradicted its prediction) and trigger 1 (the 40%
-  known-answer prediction failed for O1). Neither result is surprising once the known-answer table
-  is read, so no separate audit was run.
+- **Audit triggers fired.** The trigger for a result that contradicts its pre-registered prediction
+  fired twice: for Q3, and for the 40% known-answer prediction for O1. Both failures are explained
+  by the known-answer table: a penalty that calms the path also shrinks steps, so no separate audit
+  was run.
 - **Preliminary penalty grid.** The first grid of penalties was too weak (validation NLL 0.36 and
   0.40 against D5's 0.325) and was replaced; its fits are kept in the private data folder and are
   not used here.
