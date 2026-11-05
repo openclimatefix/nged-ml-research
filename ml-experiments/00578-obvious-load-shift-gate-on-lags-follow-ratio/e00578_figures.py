@@ -1,5 +1,7 @@
-# ruff: noqa: E501, D103
-"""Experiment 578 figures: expectation for event 146, follow ratio per event, 14-day plots of events 146 and 55."""
+# ruff: noqa: E501, D103, D205
+"""Experiment 578 figures: expectation for event 146, follow ratio per event, 14-day plots of events
+146 and 55.
+"""
 
 import datetime as dt
 from pathlib import Path

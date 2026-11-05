@@ -1,11 +1,12 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: D103
 """Experiment 578: how much of an event's level each forecast reproduces (the NRA concern).
 
-Per event, at 24-120 h, for valid times inside the event: level share = sum(forecast - counterfactual) /
-sum(observed - counterfactual), where the counterfactual is the NRA-corrected power (event removed) and the
-forecast is the seed-mean median. 0 = the forecast sits at the counterfactual level, 1 = it reproduces the
-event's level. Arms: v3+D5 with observed lags, v3+D5 with corrected lags, v3+D5 with masked lags, and the
-lag-free D5 network (E2, five old folds). Only half-hours with a finite observation and counterfactual count.
+Per event, at 24-120 h, for valid times inside the event: level share = sum(forecast -
+counterfactual) / sum(observed - counterfactual), where the counterfactual is the NRA-corrected
+power (event removed) and the forecast is the seed-mean median. 0 = the forecast sits at the
+counterfactual level, 1 = it reproduces the event's level. Arms: v3+D5 with observed lags, v3+D5
+with corrected lags, v3+D5 with masked lags, and the lag-free D5 network (E2, five old folds). Only
+half-hours with a finite observation and counterfactual count.
 """
 
 import datetime as dt

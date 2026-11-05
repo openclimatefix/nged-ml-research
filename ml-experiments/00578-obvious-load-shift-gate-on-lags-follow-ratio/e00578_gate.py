@@ -1,14 +1,15 @@
 # ruff: noqa: E501, D103, PLR0912, PLR0915
 """Experiment 578: DESCRIPTIVE gates G1 and G2 with action A2 (mask the lags) on stored forecasts.
 
-Nothing is tuned: m = 3 days, k = 3 event-free standard deviations, theta = 5% of capacity, release after 2
-days below half the threshold. The lag-free expectation is the lags-masked v3+D5 day-ahead forecast (24-48 h
-lead), so it exists in every fold and is issued at least 24 h before its target. A gate evaluated at origin O
-(09:00 UTC on day D) reads only the daily mean gap (observed minus expectation) of the 3 complete UTC days
-D-3 to D-1, observations at least 9 h old (the brief's limit is 3.5 h). G1: own gap sustained with one sign
-and above both thresholds. G2: G1 and a neighbour (Primary Substation Interconnections.csv, metered
-neighbours) with a sustained gap of the opposite sign above the same thresholds. A2: for a gated origin, the
-whole forecast is replaced by the lags-masked twin's. Writes `work/gate_events.csv` and `work/gate_cost.csv`.
+Nothing is tuned: m = 3 days, k = 3 event-free standard deviations, theta = 5% of capacity, release
+after 2 days below half the threshold. The lag-free expectation is the lags-masked v3+D5 day-ahead
+forecast (24-48 h lead), so it exists in every fold and is issued at least 24 h before its target. A
+gate evaluated at origin O (09:00 UTC on day D) reads only the daily mean gap (observed minus
+expectation) of the 3 complete UTC days D-3 to D-1, observations at least 9 h old (the brief's limit
+is 3.5 h). G1: own gap sustained with one sign and above both thresholds. G2: G1 and a neighbour
+(Primary Substation Interconnections.csv, metered neighbours) with a sustained gap of the opposite
+sign above the same thresholds. A2: for a gated origin, the whole forecast is replaced by the lags-
+masked twin's. Writes `work/gate_events.csv` and `work/gate_cost.csv`.
 """
 
 import datetime as dt

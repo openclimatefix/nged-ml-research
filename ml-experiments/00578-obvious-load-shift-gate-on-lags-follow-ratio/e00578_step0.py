@@ -2,7 +2,8 @@
 """Experiment 578, Step 0: define the long, deep, obvious subset (E-obv) from the labels.
 
 CPU only. Prints the label counts, the quartiles, the median depth of events lasting 7 days or more
-(printed before any score), and the E-obv table. Writes `work/step0_events.csv` and `work/step0_gap_sd.csv`.
+(printed before any score), and the E-obv table. Writes `work/step0_events.csv` and
+`work/step0_gap_sd.csv`.
 """
 
 import e00578_common as k  # ty: ignore[unresolved-import]

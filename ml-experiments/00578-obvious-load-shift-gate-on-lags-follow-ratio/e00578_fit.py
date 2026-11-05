@@ -1,16 +1,21 @@
-# ruff: noqa: E501, ANN001, ANN201, E402
-"""Experiment 578: experiment 572's v3+D5 fit, on the old and two new folds, with a corrected-lag forecast added.
+# ruff: noqa: E501, ANN001, ANN201, E402, D205
+"""Experiment 578: experiment 572's v3+D5 fit, on the old and two new folds, with a corrected-lag
+forecast added.
 
-A thin wrapper around experiment 572's `e00572_fit.py` (imported, unchanged): it re-points the output folder
-to this experiment's own work folder, adds two fold months (2025-07, 2025-08: the events of 143, 172, 173,
-and 175 lie there, and the ensemble weather summaries start on 2024-04-01), and adds a scoring twin
-`corrected`, the same fitted weights read with lags taken from the NRA-corrected power (the counterfactual
-without the labelled events). The lag inputs are still at least 24 h before the origin, and the weather is
-the run at or before the origin minus 9 h, as in experiment 572.
+A thin wrapper around experiment 572's `e00572_fit.py` (imported, unchanged): it re-points the
+output folder to this experiment's own work folder, adds two fold months (2025-07, 2025-08: the
+events of 143, 172, 173, and 175 lie there, and the ensemble weather summaries start on 2024-04-01),
+and adds a scoring twin `corrected`, the same fitted weights read with lags taken from the NRA-
+corrected power (the counterfactual without the labelled events). The lag inputs are still at least
+24 h before the origin, and the weather is the run at or before the origin minus 9 h, as in
+experiment 572.
 
 Usage: python e00578_fit.py {pretrain|fit|assemble} [--months ...] [--seeds ...]
- - months of experiment 572's five folds reuse its saved fine-tuned weights (predict only, no training);
- - new months pre-train and fine-tune here.
+
+- months of experiment 572's five folds reuse its saved fine-tuned weights (predict only, no
+  training);
+
+- new months pre-train and fine-tune here.
 """
 
 import json

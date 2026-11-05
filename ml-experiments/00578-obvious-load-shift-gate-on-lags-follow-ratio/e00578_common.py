@@ -1,8 +1,8 @@
 # ruff: noqa: E501, RET504
 """Experiment 578: shared loaders (labels, cleaned and corrected power, stored forecasts, daily gaps).
 
-Time is a half-hour grid index from `GRID_START` (2019-09-01 UTC). Power is in fractions of effective
-capacity, as in experiments 556, 565, and 572. All arrays are (16 Primaries, grid).
+Time is a half-hour grid index from `GRID_START` (2019-09-01 UTC). Power is in fractions of
+effective capacity, as in experiments 556, 565, and 572. All arrays are (16 Primaries, grid).
 """
 
 from datetime import UTC, datetime

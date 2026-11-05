@@ -1,11 +1,19 @@
-# ruff: noqa: E501, D103, PERF401
-"""Experiment 578: NRA metrics per event, follow ratio by days since onset and end, and day-ahead plots.
+# ruff: noqa: E501, D103, PERF401, D205
+"""Experiment 578: NRA metrics per event, follow ratio by days since onset and end, and day-ahead
+plots.
 
-Metrics (all per event, valid times inside the event unless stated; seed-mean medians; 24-120 h unless stated):
-- follow ratio: mean((v3+D5 median - corrected-lag median) / depth), depth = signed labelled depth, capacity fraction.
+Metrics (all per event, valid times inside the event unless stated; seed-mean medians; 24-120 h
+unless stated):
+
+- follow ratio: mean((v3+D5 median - corrected-lag median) / depth), depth = signed labelled depth,
+  capacity fraction.
+
 - lag effect: mean((v3+D5 median - lags-masked median) / depth).
+
 - error during the event: mean(|v3+D5 median - observed|) / |depth|.
+
 - recovery error: the same error for valid times in the 7 days after the event ends.
+
 - level share: sum(forecast - corrected power) / sum(observed - corrected power).
 Writes `work/nra_metrics.csv` and `work/follow_by_day.csv`, and the SVGs in the docs folder.
 """
@@ -152,7 +160,7 @@ def main() -> None:
 
 
 def summary(*, d: pl.DataFrame) -> None:
-    """Follow ratio by day since onset (cap 20) and since end, mean over events with a bootstrap-over-events 95% interval."""
+    """Plot the follow ratio by day since onset and since end, with intervals over events."""
     rng = np.random.default_rng(0)
     rows = []
     for axis, days in (("onset", range(21)), ("end", range(7))):

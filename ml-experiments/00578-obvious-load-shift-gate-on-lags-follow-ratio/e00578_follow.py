@@ -1,18 +1,21 @@
-# ruff: noqa: E501, ANN001, D103
-"""Experiment 578: lag effect of the stored v3+D5 forecasts on the labelled events inside the scored months.
+# ruff: noqa: ANN001, D103, D205
+"""Experiment 578: lag effect of the stored v3+D5 forecasts on the labelled events inside the scored
+months.
 
-Per event (any length, 15 events have at least 3 days of gap), at 24-120 h, for valid times inside the
-event, three ratios to the labelled depth (signed capacity fraction):
+Per event (any length, 15 events have at least 3 days of gap), at 24-120 h, for valid times inside
+the event, three ratios to the labelled depth (signed capacity fraction):
 
-- `lag_effect`: (v3+D5 median minus its lags-masked twin median) / depth. The twin is experiment 572's
-  `V3D5-removed`: the same fitted weights with both lag inputs set to the missing state, so this is the
-  share of the depth that reading the lags adds.
+- `lag_effect`: (v3+D5 median minus its lags-masked twin median) / depth. The twin is experiment
+  572's `V3D5-removed`: the same fitted weights with both lag inputs set to the missing state, so
+  this is the share of the depth that reading the lags adds.
+
 - `vs_lag_free`: (v3+D5 median minus E2 median) / depth.
+
 - `e2_minus_masked`: (E2 median minus the lags-masked twin) / depth, descriptive.
 
-The counterfactual-corrected-lag forecast of the brief is not stored, so this is a stand-in. Medians are
-seed means. Weather timing: every row comes from a stored origin, whose ensemble run is the one issued at
-or before the origin minus 9 h; one example row is printed.
+The counterfactual-corrected-lag forecast of the brief is not stored, so this is a stand-in. Medians
+are seed means. Weather timing: every row comes from a stored origin, whose ensemble run is the one
+issued at or before the origin minus 9 h; one example row is printed.
 """
 
 import datetime as dt

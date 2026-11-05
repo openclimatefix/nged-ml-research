@@ -1,12 +1,14 @@
-# ruff: noqa: E501, ANN001, D103, PERF401, ANN204
-"""Experiment 578: follow ratio of the lag network with observed lags against NRA-corrected lags (and masked lags).
+# ruff: noqa: E501, ANN001, D103, PERF401, ANN204, D205
+"""Experiment 578: follow ratio of the lag network with observed lags against NRA-corrected lags (and
+masked lags).
 
-Follow ratio of an event = mean over valid times inside the event, forecasts issued 24 to 120 h earlier, of
-(median with observed lags minus median with corrected lags) / labelled depth (signed capacity fraction).
-Also with masked lags (the lags-masked twin), and for the lag-free D5 network (E2, five old folds only):
-(E2 minus corrected-lag forecast) / depth, i.e. how much of the counterfactual gap E2 keeps. Bins by days
-from onset to the forecast origin: 0-3, 4-7, 8-14, over 14, and after the end (the five days after).
-Sanity check first: the re-forecast v3+D5 of the five old folds equals experiment 572's stored forecasts.
+Follow ratio of an event = mean over valid times inside the event, forecasts issued 24 to 120 h
+earlier, of (median with observed lags minus median with corrected lags) / labelled depth (signed
+capacity fraction). Also with masked lags (the lags-masked twin), and for the lag-free D5 network
+(E2, five old folds only): (E2 minus corrected-lag forecast) / depth, i.e. how much of the
+counterfactual gap E2 keeps. Bins by days from onset to the forecast origin: 0-3, 4-7, 8-14, over
+14, and after the end (the five days after). Sanity check first: the re-forecast v3+D5 of the five
+old folds equals experiment 572's stored forecasts.
 """
 
 import datetime as dt
