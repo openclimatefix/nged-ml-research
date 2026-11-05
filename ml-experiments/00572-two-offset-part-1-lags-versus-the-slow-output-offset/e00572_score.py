@@ -65,7 +65,7 @@ DESCRIPTIVE: Final[tuple[tuple[str, str], ...]] = (
 )
 KEYS: Final = ["time_series_id", "power_fcst_init_time", "valid_time"]
 D8: Final[int] = 4
-D14: Final[int] = 10
+D14: Final[int] = 9
 """Primary indices of D8 and D14 in experiment 521's site map (asserted in `build_table`)."""
 
 
