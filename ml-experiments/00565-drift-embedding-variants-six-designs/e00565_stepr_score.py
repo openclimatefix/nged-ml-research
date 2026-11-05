@@ -36,8 +36,8 @@ FOLDERS: Final = {
     "A10": d6.W559 / "seed_preds" / "A10",
 }
 BANDS: Final[tuple[str, ...]] = ("24-48h", "48-72h", "72-120h")
-TESTS: Final[int] = 7
-"""2 groups x 3 lead bands + 1 cold-night family."""
+TESTS: Final[int] = 8
+"""2 groups x 3 lead bands (6) + 2 cold-night contrasts (the eight and the six, 24-120 h, 3 folds)."""
 LEAVE_OUT: Final[str] = "D8"
 
 
@@ -94,7 +94,10 @@ def build_table() -> tuple[pl.DataFrame, dict]:
                 pooled.select(*d6.KEYS, *d6.LEVELS), on=d6.KEYS, how="left", maintain_order="left"
             )
             fr = score470.widen_arm(arm=arm, frame=fr, factor=score470.HEADLINE)
-            diff = np.abs(score470.row_metrics(frame=fr)["crps"] - rows[f"{arm}__crps"].to_numpy())
+            ours = score470.row_metrics(frame=fr)["crps"]
+            stored = rows[f"{arm}__crps"].to_numpy()
+            assert (np.isnan(ours) == np.isnan(stored)).all(), (arm, month)
+            diff = np.abs(ours - stored)
             checks[f"{arm} {month} max |pooled(0,1) rescored - stored table|"] = float(
                 np.nanmax(diff)
             )
@@ -144,9 +147,16 @@ def main() -> None:
     rng = np.random.default_rng(0)
     absolute, contrasts, signs = [], [], []
     for name in ("eight", "six", "report"):
-        part = s.row_set(table=t, name=name)
+        base_part = s.row_set(table=t, name=name)
         for kind in ("all", "leave_D8_out", "cold"):
+            part = (
+                s.row_set(table=t, name="six_all")
+                if (kind == "cold" and name == "six")
+                else base_part
+            )
             if kind == "leave_D8_out":
+                if name != "eight":
+                    continue
                 p = part.filter(pl.col("label") != LEAVE_OUT)
             elif kind == "cold":
                 p = part.filter(pl.col("cold"))
@@ -168,7 +178,9 @@ def main() -> None:
                             "band": band,
                             "arm": arm,
                             "n": sub.height,
-                            "crps": float(np.mean([sub[f"{arm}_s{x}"].mean() for x in SEEDS])),
+                            "mean_single_seed_crps": float(
+                                np.mean([sub[f"{arm}_s{x}"].mean() for x in SEEDS])
+                            ),
                         }
                     )
                 st = s.block_stats(diff=sub.select("month", "day", "d"), rng=rng, tests=TESTS)
