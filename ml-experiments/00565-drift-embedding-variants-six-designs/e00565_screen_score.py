@@ -15,6 +15,7 @@ Outputs under `data/ml-experiments/00565-*/work/scores/`: `screen_absolute.csv`,
 
 import json
 import math
+import os
 from typing import Final
 
 import e00454_score as score454  # ty: ignore[unresolved-import]
@@ -25,8 +26,12 @@ import e00565_design6 as d6  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 
-SEEDS: Final[tuple[int, ...]] = (0, 1)
-ARMS: Final[tuple[str, ...]] = ("C-M0", "C-A10", "D3m", "D3q", "D4", "D4-null", "D5")
+SEEDS: Final[tuple[int, ...]] = tuple(int(x) for x in os.environ.get("SCREEN_SEEDS", "0 1").split())
+ARMS: Final[tuple[str, ...]] = tuple(
+    os.environ.get("SCREEN_ARMS", "C-M0 C-A10 D3m D3q D4 D4-null D5").split()
+)
+PREFIX: Final[str] = os.environ.get("SCREEN_PREFIX", "screen")
+"""`SCREEN_SEEDS`, `SCREEN_ARMS`, and `SCREEN_PREFIX` select a subset run, such as the five-seed D5 and C-M0 pair."""
 BASE: Final[str] = "C-M0"
 BANDS: Final[tuple[str, ...]] = ("24-48h", "48-72h", "72-120h")
 TESTS: Final[int] = 36
@@ -90,7 +95,10 @@ def build_table(*, arms: list[str]) -> pl.DataFrame:
 
 
 def mde(*, sub: pl.DataFrame, arm: str, ref: str) -> float:
-    """Return 1.96 x the seed-to-seed sd of the paired contrast (pooled within folds) / sqrt(seeds)."""
+    """Return the seed-noise half-width: 1.96 x the seed-to-seed sd of the paired contrast (pooled within folds) / sqrt(seeds).
+
+    This is a half-width, not a power-based minimum detectable effect, and it uses the normal quantile with 5 degrees of freedom.
+    """
     cols = [f"d_{arm}_{ref}_s{x}" for x in SEEDS]
     mm = (
         sub.group_by("month")
@@ -140,7 +148,6 @@ def main() -> None:
     t = build_table(arms=arms)
     out = d6.W / "scores"
     out.mkdir(parents=True, exist_ok=True)
-    rng = np.random.default_rng(0)
     others = [a for a in arms if a != BASE]
     refs = [BASE] + (["C-A10"] if "C-A10" in arms else [])
     t = t.with_columns(
@@ -182,7 +189,11 @@ def main() -> None:
                     sub2 = sub.with_columns(
                         d=pl.mean_horizontal([pl.col(f"d_{arm}_{ref}_s{x}") for x in SEEDS])
                     )
-                    st = s.block_stats(diff=sub2.select("month", "day", "d"), rng=rng, tests=TESTS)
+                    st = s.block_stats(
+                        diff=sub2.select("month", "day", "d"),
+                        rng=np.random.default_rng(0),
+                        tests=TESTS,
+                    )
                     contrasts.append(
                         {
                             "set": name,
@@ -190,6 +201,7 @@ def main() -> None:
                             "arm": arm,
                             "ref": ref,
                             "counted": ref == BASE and band != "24-120h" and name != "report",
+                            "pass_rule": ref == BASE and band == "24-120h" and name != "report",
                             "tests": TESTS,
                             "mde": mde(sub=sub2, arm=arm, ref=ref),
                             **st,
@@ -206,14 +218,14 @@ def main() -> None:
                             },
                         }
                     )
-    pl.DataFrame(absolute).write_csv(out / "screen_absolute.csv")
-    pl.DataFrame(contrasts).write_csv(out / "screen_contrasts.csv")
-    pl.DataFrame(signs).write_csv(out / "screen_seed_signs.csv")
-    lk = leak(arms=arms)
-    lk.write_csv(out / "screen_leak.csv")
+    pl.DataFrame(absolute).write_csv(out / f"{PREFIX}_absolute.csv")
+    pl.DataFrame(contrasts).write_csv(out / f"{PREFIX}_contrasts.csv")
+    pl.DataFrame(signs).write_csv(out / f"{PREFIX}_seed_signs.csv")
+    lk = leak(arms=arms) if os.environ.get("SCREEN_LEAK", "1") == "1" else pl.DataFrame()
+    lk.write_csv(out / f"{PREFIX}_leak.csv")
     json.dump(
         {"arms": arms, "rows": t.height, "main16": int(t["main16"].sum())},
-        open(out / "screen_checks.json", "w"),
+        open(out / f"{PREFIX}_checks.json", "w"),
         indent=1,
     )
     with pl.Config(tbl_rows=80, tbl_cols=14):
