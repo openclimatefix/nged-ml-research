@@ -850,9 +850,12 @@ def fine_tune(
     assert refit.report["rows_past_valid_cut"] == 0 and refit.report["rows_past_origin_cut"] == 0
     if SPEC.sched == "3sE":
         refit = embargoed(mr=mr, refit=refit, cut=cut)
-    assert KNOTS == 0 or WT.tau(valid_us=mr.valid_us[refit.index]).max() <= KNOTS - 1, (  # ty: ignore[unresolved-attribute]
-        "a training row lies beyond the newest offset knot (the fold's month start)"
-    )
+    if KNOTS:
+        # A knot sits at each month start, and a row after the newest knot reads it (flat extrapolation), so no row's position may exceed the cutoff's own.
+        cut_tau = float(WT.tau(valid_us=np.array([c.us(t=cut)]))[0])  # ty: ignore[unresolved-attribute]
+        assert WT.tau(valid_us=mr.valid_us[refit.index]).max() <= cut_tau + 1e-6, (
+            "a training row lies after the refit cut"
+        )  # ty: ignore[unresolved-attribute]
     shift_z, injected = None, 0
     if shift is not None and block is not None:
         inj = (
