@@ -25,7 +25,7 @@ hypothesis: >-
   or real-event leak.
 prediction: >-
   Written before any fit. P1: T1 (attention, full) beats T0 (the MLP mixer on the same encoders) by
-  at least 0.05 CRPS at 24-120 h at the eight and by at least 0.03 at the six; fails if within 0.03
+  at least 0.05 CRPS at 24-120 h at the eight MVA Primaries and by at least 0.03 at the six MW Primaries; fails if within 0.03
   (eight) or if the sign differs in 2 or more folds. P2: T1 beats T2 (no spread token) by at least
   0.03, with the gain concentrated in the top spread tercile; fails if within 0.02. P3: T1 beats T3
   (temperature spread alone) by at least 0.02; fails if within 0.01. P4: T4 (MLP with the same spread
@@ -34,12 +34,14 @@ prediction: >-
   gains as much as T1. P6: T1's injected-shift leak is at most T0's plus 1.0 point of capacity, and
   the attention weight on the weather token exceeds that on the Primary token in every lead band;
   fails if the Primary token's weight rises with lead. P7 (T6, run only after experiment 567 has
-  merged): T6 is within 0.04 of A-pool-24 at 24-120 h at the eight and has a lower real-event leak
+  merged): T6 is within 0.04 of A-pool-24 at 24-120 h at the eight MVA Primaries and has a lower real-event leak
   than the MLP stack.
 decision_rule: >-
-  An arm passes screening if CRPS at 24-120 h at the eight or at the six is at least 0.03 better than
-  T0 with a Bonferroni interval excluding zero, and its injected-shift leak is at most T0's plus 1.0
-  point of capacity. At most 3 passers get daily refits and the real-event leak harness of experiment
+  An arm passes screening if CRPS at 24-120 h at the eight MVA Primaries or at the six MW Primaries is at least 0.03 better than
+  T0 with a Bonferroni interval excluding zero. The injected-shift leak is reported beside the CRPS and
+  is not a gate (maintainer policy of 2026-11-05: ideas that add performance are kept even if the leak
+  rises slightly, and a change that helps a slice such as cold winter nights is kept if it does not
+  hurt other slices by more than the minimum detectable effect). At most 3 passers get daily refits and the real-event leak harness of experiment
   566, where the real-event mean absorbed share is the primary leak measure and the injected 6.0
   points is a flag. The threshold of 0.03 is set by the cost of porting: attention adds a new network
   block and a new input group to the serving path. Bonferroni count 36 for screening (30 CRPS
@@ -53,7 +55,7 @@ benchmark: >-
 row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity at 24-120 h and by the seven lead bands of experiment 521 and
-  0-6 h, at the eight MVA-only Primaries and the six signed-MW Primaries (D15 and D18 report-only);
+  0-6 h, at the eight MVA Primaries MVA-only Primaries and the six signed-MW Primaries (D15 and D18 report-only);
   injected-shift leak in points of capacity; q01, q05, q95, q99 coverage and pinball loss.
 ---
 
@@ -100,7 +102,7 @@ forecast more than the original.
   time and the origin.
 - **Statistics:** 5-block month bootstrap (near the minimum to maximum of the folds), per-fold signs,
   the minimum detectable effect from the 2-seed spread beside every contrast (experiment 545's paired
-  values were 0.134, 0.139, and 0.101 at the eight), leave-D8-out beside every contrast, D15 and D18
+  values were 0.134, 0.139, and 0.101 at the eight MVA Primaries), leave-D8-out beside every contrast, D15 and D18
   report-only. Every number is interim and unaudited until the reviews have run.
 - **Compute:** one GPU process under 8 GB (`MemoryMax=8G`, `OMP_NUM_THREADS=1`), started only when
   available memory exceeds 20 GB, 5 GPU-hours in total; the maintainer is asked before this is
