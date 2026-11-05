@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 import polars as pl
-from e00565_design6 import MONTHS, W, W545, W559
+from e00565_design6 import MONTHS, W545, W559, W
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 W554 = (
