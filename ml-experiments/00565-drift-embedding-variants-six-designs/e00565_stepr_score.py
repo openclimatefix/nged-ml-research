@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PTH123, SIM115
+# ruff: noqa: E501, PTH123, SIM115, PERF401
 """Experiment 565, step R: A10 (drift embedding) minus M0, five seeds, five folds of 511.
 
 Each seed's stored forecast is scored on its own (widened by 1.15 as every stored row table is), and
