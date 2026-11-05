@@ -92,6 +92,14 @@ advice:
 production_status: not-for-production
 adopted_in: none
 ---
+
+> **Erratum (experiment 580, 2026-11-05).** The real-event absorbed shares (0.026, 0.040, and 0.014
+> of the labelled depth) divide by labelled depths that the telemetry mostly does not confirm (1 of
+> 184 labelled events is confirmed), so treat them as unproven. They were not recomputed. The CRPS,
+> coverage, and lag-encoder results do not depend on the labels and stand. See [experiment
+> 580](../00580-verified-load-shift-event-set-and-label-audit/result.md) for the audit of the labels
+> against the telemetry.
+
  **A larger refit leak for the lag-encoder network than for the lag-free network is not shown, and
 the three-step schedule and the embargo cut the leak by a third to a half. The larger leak is the
 lag channel, which neither protection lowers. Across 74 (month, event) pairs of real labelled
