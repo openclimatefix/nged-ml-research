@@ -194,6 +194,23 @@ def cutoffs(*, month: str, cadence: str) -> list[datetime]:
 
 
 k.cutoffs = cutoffs
+_extension = c._extension
+
+
+def extension(*, refit, last, clean, rows) -> dict:
+    """Experiment 510's extension; empty when the only cutoff is the refit itself (no rows after it)."""
+    if last <= refit:
+        return {
+            "x": np.empty((0, m.N_INPUTS), dtype=np.float32), "y": np.empty(0, dtype=np.float32),
+            "origin": np.empty(0, dtype=np.int64), "valid": np.empty(0, dtype=np.int64),
+            "target_idx": np.empty(0, dtype=np.int64), "lead": np.empty(0, dtype=rows.lead.dtype),
+            "primary": np.empty(0, dtype=np.int64), "is_val": np.empty(0, dtype=bool),
+        }  # fmt: skip
+    return _extension(refit=refit, last=last, clean=clean, rows=rows)
+
+
+c._extension = extension
+assert not ARGS.stress or ARGS.cut_day == 14, "the injected-shift check is defined at cut day 14"
 
 
 def fit_until(*, month: str) -> int:
@@ -344,6 +361,8 @@ def build_month(*, month, clean):
     if CONTROL:
         print(month, "train checks passed", flush=True)
         return mr
+    for other in [x for x in FOLDS if x != month]:
+        del FOLDS[other]
     if month not in FOLDS:
         FOLDS[month] = c562.FoldColumns(fit_until_idx=fit_until(month=month))
     origin_idx = _idx(us=mr.origin_us)
