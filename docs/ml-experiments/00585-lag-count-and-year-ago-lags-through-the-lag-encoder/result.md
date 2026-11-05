@@ -26,12 +26,16 @@ hypothesis: >-
 prediction: >-
   Written before any fit or score. Y1 (control plus one year-ago lag) lowers CRPS at 120-240 h by at
   least 0.05 points of effective capacity at one group (fails if within 0.03 of the control; a gain
-  between 0.03 and 0.05 is a small gain and is not kept). Y1 does not help in Christmas and New Year,
+  between 0.03 and 0.05 is a small gain and is not kept). Y1 does not help in Christmas and New
+  Year,
   because 364 days before 25 December is Boxing Day; Y1c lowers CRPS there by at least 0.10 at one
-  group (fails if within the MDE). Bank holidays that fall on a Monday align under Y1. Y1 does not improve cold winter
-  nights (within the minimum detectable effect, MDE). Y3 beats Y1 by under 0.03. A "within 0.03" claim is withdrawn wherever the printed MDE exceeds 0.03. N1 (week lag only)
+  group (fails if within the MDE). Bank holidays that fall on a Monday align under Y1. Y1 does not
+  improve cold winter
+  nights (within the minimum detectable effect, MDE). Y3 beats Y1 by under 0.03. A "within 0.03"
+  claim is withdrawn wherever the printed MDE exceeds 0.03. N1 (week lag only)
   is worse than the control by at least 0.10 at 0-24 h (fails if within the MDE). N3 (an added
-  second weekly lag) is within 0.03 of the control. N5 (experiment 581's X3-med, stored) is within 0.03 of
+  second weekly lag) is within 0.03 of the control. N5 (experiment 581's X3-med, stored) is within
+  0.03 of
   the control, as experiment 581 found. Masking the year-ago lag where it lies in a verified
   load-shift event (Y1-mask) changes CRPS by under 0.03 on all rows.
 decision_rule: >-
@@ -40,7 +44,8 @@ decision_rule: >-
   (cold winter nights, Christmas and New Year, Easter, bank holidays) by at least that slice's MDE.
   A leak or slice cost is a flag, not a gate, unless it actively hurts: worse than the control by
   more than the larger of 0.03 and the slice MDE with the interval excluding zero, or the harmful
-  sign in 4 of 5 folds. Bonferroni count 36 (N1, N3, N5, Y1, Y1c, and Y3 against the control, times 2
+  sign in 4 of 5 folds. Bonferroni count 36 (N1, N3, N5, Y1, Y1c, and Y3 against the control,
+  times 2
   groups, times the 3 lead bands); 48 if N5Y1 runs (adding N5Y1 against N5 and against Y1). The
   slice route is a second keep route that is not Bonferroni-corrected across slices (4 slices, 2
   groups, per arm), and the write-up labels it that way. Y3 against Y1 and Y1 against Y1-mask are
@@ -92,11 +97,14 @@ the hypothesis came first.
 - **Block dropout.** Each extra lag is masked on whole origin days by its own draw (experiment 558's
   all-lags probability, a separate random stream per lag), and also whenever experiment 558's
   all-lags mask fires.
-- **Y1-mask (inference only, no refit).** Experiment 580's event set covers only the period it verified, so events outside it stay unlabelled and Y1-mask understates contamination. Y1's saved weights forecast again with the year-ago lag set
+- **Y1-mask (inference only, no refit).** Experiment 580's event set covers only the period it
+  verified, so events outside it stay unlabelled and Y1-mask understates contamination. Y1's saved
+  weights forecast again with the year-ago lag set
   to the absent code wherever it lies inside a verified load-shift event of experiment 580. The
   contrast Y1 against Y1-mask on rows whose year-ago lag lies in an event measures contamination.
 - **Injected bank.** The lag-following measures of experiment 581 run on the injected bank for every
-  fitted arm (the control and N5 reuse 581's stored results). The bank shifts only recent lags, so it
+  fitted arm (the control and N5 reuse 581's stored results). The bank shifts only recent lags, so
+  it
   shows whether the extra lags dilute following; contamination of the year-ago lag itself is read
   from Y1-mask.
 - **Row-key checks.** The code asserts that the stored control, the stored N5, and every new arm
@@ -106,9 +114,11 @@ the hypothesis came first.
   after 2026-06-30).
 - **Scoring.** Experiment 572's scorer, patched as experiment 581 did, plus the lead band 120-240 h,
   and extra slices: Christmas and New Year (24 December to 2 January), Easter (Good Friday to Easter
-  Monday), bank holidays of England and Wales, and cold winter nights. False-alarm cost on event-free rows, plots of CRPS by lead and by event type for every arm, and
+  Monday), bank holidays of England and Wales, and cold winter nights. False-alarm cost on event-
+  free rows, plots of CRPS by lead and by event type for every arm, and
   per-Primary gain tables are included. Tail calibration (q01, q05,
-  q95, q99) and the avoidable-curtailment cost against the manual heuristic are reported beside CRPS.
+  q95, q99) and the avoidable-curtailment cost against the manual heuristic are reported beside
+  CRPS.
 - **Standing practices followed.** Monthly refits; cleaned data; the D15 and D18 cut; fitted weights
   saved in the experiment's data folder; stored control forecasts reused; example forecasts (a
   day-ahead forecast and a full 14-day horizon, with and without the year-ago lag, including
@@ -117,7 +127,8 @@ the hypothesis came first.
 - **Process.** Sonnet writes the code; a fresh Sonnet agent reviews the plan, then the code before
   the first fit; results, write-up, and prose each get a fresh Sonnet review.
 - **Compute.** One GPU process under 8 GB (`MemoryMax=8G`, `OMP_NUM_THREADS=1`), at most 4 GPU
-  processes machine-wide, fits start only when `free -g` shows more than 20 GB available. Five fitted
+  processes machine-wide, fits start only when `free -g` shows more than 20 GB available. Five
+  fitted
   arms (N1, N3, Y1, Y1c, Y3), each with its own pre-training (the lag encoder is frozen in
   fine-tuning, so every arm pre-trains per month and seed), plus the optional N5Y1. Reusing the
   control and N5 saves two arms. Projected 2 GPU-h, ceiling 3.
