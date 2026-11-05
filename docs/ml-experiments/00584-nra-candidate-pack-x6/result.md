@@ -60,9 +60,9 @@ metric: >-
 - **Arms.** C0: v3+D5 (experiment 572, stored). C1: experiment 574's P5 schedule (step 2 stored,
   embargoed daily fine-tune re-run) with lag-only synthetic load-shifts on 5% of fine-tune time
   (experiment 581's recipe), refits on days 0 and 14, seeds 0 and 1. C2: C1 with experiment 583's
-  A2 gated band. C3: C1 with the always-on union band. C4: C1 widened by a constant factor so its
-  mean width on event-free rows equals C2's; C4-w (post hoc) matches the mean width of C2 on the
-  after-end rows instead; C4-r places C2's widening on random days.
+  A2 gated band. C3: C1 with the always-on union band. C4: C1 widened about its median by one constant
+  factor so that its mean q05-q95 width on event-free rows at 24-120 h equals that of C2; C4u does the
+  same for C3's width. Both factors are fitted on event-free rows only, before any coverage is read.
 - **Standing practices followed.** Monthly-style coarse refits (days 0 and 14), cleaned data, the D15
   and D18 cut, July 2026 unused, weather from the run at or before origin minus 9 h, lags at least
   24 h old, anonymised generators. Fits saved as `.pt` in the private data folder.
