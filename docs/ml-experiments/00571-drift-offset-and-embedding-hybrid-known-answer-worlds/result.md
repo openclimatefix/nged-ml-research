@@ -7,7 +7,7 @@ title: >-
 theme: retraining-and-training-history
 also_relevant_to:
   - differentiable-physics-long-history-and-drift
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -54,6 +54,40 @@ benchmark: >-
   D5 (the incumbent), A10, and the joint hybrid (H) of experiment 565, the coarse M0 of experiment
   554, and, in each synthetic world, an oracle fit of the base network given the true injected
   component as an input.
+verdict: not supported
+best_arm: >-
+  The drift embedding alone (A10) and the joint hybrid: in the readable combined world they recover
+  96.5% and 99.9% of the oracle's CRPS gain, against 28.6% for the offset alone (D5).
+headline: >-
+  In a readable known-answer world the drift embedding takes the injected level steps as well as the
+  injected change in temperature sensitivity, and the output offset alone recovers little, so the
+  hypothesis that the offset takes levels and the embedding takes behaviour is not supported at this
+  design; the joint hybrid was not hurt here.
+lessons: >-
+  The first set of worlds (injected amplitudes of 3% to 6% of capacity) was unreadable: the oracle
+  gained 0.27 CRPS points, about the size of the seed noise. Tripling the amplitudes made the combined
+  world readable (oracle gain 2.76 points against a seed spread near 0.7), but the sensitivity-only
+  world stayed unreadable on the 2025-12 fold. Only one fold and two seeds were affordable.
+take_home_message: >-
+  When we inject both a level step and a growing temperature sensitivity into real substation
+  histories, the monthly drift embedding recovers nearly all of the injected change and the output
+  offset alone recovers under a third, so the embedding is not limited to changes in behaviour and
+  the offset is not the better carrier of levels. The joint hybrid that failed on the real data
+  did not fail in this world, so the real-data failure is not explained by the two components
+  competing. The next step, if the question is still wanted, is a readable sensitivity-only world
+  with more folds.
+advice:
+  - >-
+    Make every injected component several times the seed noise before scoring arms: check the
+    oracle and the drift-free base alone on one fold first (Worlds section).
+  - >-
+    Do not assume the output offset carries level steps better than the drift embedding: in the
+    step-only world the embedding recovered 114% and the offset 79% (Results).
+  - >-
+    Treat a staged hybrid as no better than the joint hybrid at this design: it recovered 85%
+    against 99.9% in the combined world (Results).
+production_status: not-for-production
+adopted_in: none
 row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity at 24-120 h at the eight MVA Primaries and the six MW
@@ -61,7 +95,64 @@ metric: >-
   oracle; injected-shift leak and absorbed share of depth on the 74 real events.
 ---
 
-**Plan, written before any fit.** Experiment 565 found that adding the drift embedding to the
+**We asked whether a slow output offset takes level shifts while a drift embedding takes changes in
+behaviour, using worlds where the answer is known.** We injected a known component into the demand
+series of six Primary substations (three MVA, three MW), fitted the offset (D5), the embedding (A10),
+the joint hybrid, and a staged hybrid, and measured how much of the CRPS gain of an oracle (a
+network given the true component) each recovered. **In the readable world the embedding recovered
+nearly all of it and the offset alone under a third, so the hypothesis is not supported.** The
+results are interim and unaudited, from one fold (2025-12) and two seeds.
+
+![Share of the oracle's CRPS gain recovered, per world](recovery_by_world.svg)
+
+## Results
+
+- **First worlds were unreadable.** With steps of 3% to 6% of capacity and sensitivity up to 0.4%
+  per degree, the oracle gained 0.27 CRPS points over the drift-free base (2 folds, 2 seeds), and the
+  oracle was worse than frozen D5 (recovery above 100% for several arms). The seed spread of the
+  base was 0.1 to 0.18. This world was dropped, as the pre-registered pass condition requires.
+- **Worlds with tripled amplitudes (`-big`), fold 2025-12, injected Primaries, 24-120 h.** Oracle gain
+  over the base: 2.76 points in the combined world (seed spread of the base about 0.7), 2.71 in the
+  steps-only world (1 seed), 0.35 in the sensitivity-only world (0.75 at the three MVA Primaries and
+  -0.06 at the three MW Primaries), so the sensitivity-only world is unreadable and its contrasts are
+  dropped.
+- **Combined world (2 seeds), recovery of the oracle gain.** A10 96.5%, joint hybrid 99.9%, staged
+  hybrid 85.0%, D5 28.6%. At the three MVA Primaries D5 recovered -10.6% and at the three MW
+  Primaries 53.6%. CRPS minus D5: A10 -1.87, joint hybrid -1.96, staged hybrid -1.55.
+- **Steps-only world (1 seed).** D5 recovered 78.6% and A10 113.9%. The offset does take steps, but the
+  embedding does too, so the prediction that the embedding recovers at most 40% fails.
+- **Untouched Primaries (combined world).** CRPS of the other ten Primaries: base 5.61; A10 5.70, D5
+  5.59, joint hybrid 5.61, staged hybrid 5.46. Differences are within the seed spread.
+- **Predictions.** S0 failed (step 0). W-level fails (A10 recovered more than 60% of the steps).
+  W-behaviour could not be tested (unreadable world). W-both: the joint hybrid recovered over 60%,
+  but the selected construction does not beat the joint hybrid. W-compete fails: the joint hybrid
+  did not recover less than the better single component. W0 and the real-data check were not run.
+- **Stop rule.** No hybrid construction beat the joint hybrid's recovery in the combined world, so the
+  real-data check was skipped. The film and orthogonal hybrids were fitted in the first combined
+  world only (unreadable), where no ranking is possible.
+
+## What was not done
+
+- The 2026-06 fold, the clean control W0, the evening-bump world, and the oracle-based seed-spread
+  minimum detectable effect were not run: the first worlds consumed most of the budget (about 2.5
+  GPU-hours of the 4 GPU-hours ceiling) before the manager asked for larger effects.
+- Component-level recoveries (offset path against the injected path, implied sensitivity against the
+  injected sensitivity) were planned as read-outs and not computed, so the selection rule was not
+  applied; the CRPS recovery is the only recovery reported.
+- Caveats: one fold and two seeds (one seed for the single-component worlds) give no intervals;
+  the free-encoder base and oracle are compared with frozen-encoder arms, which can lower the frozen
+  arms' recovery; the oracle sees the realised temperature, which forecast-driven arms do not.
+  NGED generator series are not plotted.
+
+## Lessons and next step
+
+No amplitude between the unreadable and the tripled worlds was tried. A sensible next
+experiment is a sensitivity-only world with amplitudes that make it readable on several folds, and the
+film and orthogonal hybrids in a readable world.
+
+## Plan as written before any fit
+
+Experiment 565 found that adding the drift embedding to the
 output offset removed the offset's gain. This experiment asks whether that failure came from the two
 components competing for the same slow variance, by (1) building worlds with a known injected
 answer, (2) building the hybrid four ways, and (3) checking the best construction on the real data.

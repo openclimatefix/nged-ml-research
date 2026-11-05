@@ -169,10 +169,10 @@ def summary(*, worlds: list[str]) -> None:
     out = world.WORK
     pl.DataFrame(absolute).write_csv(out / "summary_absolute.csv")
     pl.DataFrame(recovery).with_columns(
-        pl.col("recovery_by_fold").list.eval(pl.element().round(3)).list.join(" ")
+        pl.col("recovery_by_fold").list.eval(pl.element().round(3).cast(pl.String)).list.join(" ")
     ).write_csv(out / "summary_recovery.csv")
     pl.DataFrame(contrasts).with_columns(
-        pl.col("by_fold").list.eval(pl.element().round(3)).list.join(" ")
+        pl.col("by_fold").list.eval(pl.element().round(3).cast(pl.String)).list.join(" ")
     ).write_csv(out / "summary_contrasts.csv")
     with pl.Config(tbl_rows=120, tbl_cols=12, fmt_str_lengths=40):
         print(

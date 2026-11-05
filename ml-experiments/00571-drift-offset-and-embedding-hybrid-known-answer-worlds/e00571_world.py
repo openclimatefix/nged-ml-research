@@ -28,7 +28,20 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME: Final[str] = "00571-drift-offset-and-embedding-hybrid-known-answer-worlds"
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / NAME
-WORLDS: Final[tuple[str, ...]] = ("real", "W0", "Wa", "Wa-in", "Wb1", "Wb2", "Wc")
+WORLDS: Final[tuple[str, ...]] = (
+    "real",
+    "W0",
+    "Wa",
+    "Wa-in",
+    "Wb1",
+    "Wb2",
+    "Wc",
+    "Wa-big",
+    "Wb1-big",
+    "Wc-big",
+)
+BIG: Final[float] = 3.0
+"""Factor on every injected amplitude in a `-big` world (made readable after the first world proved unreadable)."""
 INJECTED: Final[tuple[int, ...]] = (0, 2, 8, 5, 7, 6)
 """Primary indices injected: D2, D4, D12 (the three MVA Primaries with the fewest labelled events) and D9, D11, D10 (the three MW Primaries with the fewest). D8 and D14 are excluded, and D15 and D18 are report-only."""
 MVA_INJECTED: Final[frozenset[int]] = frozenset({0, 2, 8})
@@ -173,6 +186,8 @@ def bump_path(*, n: int) -> np.ndarray:
 
 def build_truth(*, world: str, n: int, temperature: np.ndarray | None) -> dict[str, np.ndarray]:
     """Return the unclipped components `steps`, `sens`, and `bump`, each (injected Primaries, grid)."""
+    scale = BIG if world.endswith("-big") else 1.0
+    world = world.removesuffix("-big")
     k = len(INJECTED)
     parts = {name: np.zeros((k, n), dtype=np.float32) for name in ("steps", "sens", "bump")}
     for i, primary in enumerate(INJECTED):
@@ -183,7 +198,7 @@ def build_truth(*, world: str, n: int, temperature: np.ndarray | None) -> dict[s
             parts["sens"][i] = sensitivity_path(temperature=temperature[primary])
         if world == "Wb2":
             parts["bump"][i] = bump_path(n=n)
-    return parts
+    return {name: (scale * v).astype(np.float32) for name, v in parts.items()}
 
 
 def install(world: str) -> Path | None:
