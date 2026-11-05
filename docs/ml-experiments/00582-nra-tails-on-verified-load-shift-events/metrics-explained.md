@@ -17,7 +17,7 @@ used here.
 
 **The normal running arrangement (NRA) is the power the Primary would have drawn without the load-
 shift.**
-Inside a load-shift, the NRA is the observed power minus the load-shift's fitted depth. Outside it,
+Inside a load-shift, the NRA is the observed power minus the load-shift's signed fitted depth (negative when the load fell). Outside it,
 the
 NRA is the observed power. The NRA is what NGED want the forecast to cover, because the network
 operator
@@ -25,7 +25,7 @@ must plan for the moment the load-shift ends.
 
 **A quantile forecast gives several levels, and a band is the range between two of them.** The
 q05-q95
-band holds the readings that the network expects to fall between its 5th and 95th percentile, so a
+band is the range between the 5th and 95th percentile of the forecast, so a
 well-calibrated forecast holds 90% of readings inside it. The q01-q99 band should hold 98%.
 
 **A phase is a stretch of valid times measured from the event.** The five phases are the 7 days
@@ -39,9 +39,9 @@ to
 
 **One half-hour, one Primary.** A load-shift has lowered the Primary's load by a depth of 15 points.
 The
-NRA at this half-hour is 80, and the observed power is 65. The corrected-lag forecast, which never
-saw the
-load-shift in its lags, says q05 = 74, q50 = 79, q95 = 85, q99 = 88. The forecast being tested (the
+NRA at this half-hour is 80, and the observed power is 65. The corrected-lag forecast, whose lags have
+been corrected for the
+load-shift, says q05 = 74, q50 = 79, q95 = 85, q99 = 88. The forecast being tested (the
 arm)
 has followed the load-shift and says q05 = 64, q50 = 69, q95 = 75, q99 = 78.
 

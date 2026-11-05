@@ -237,7 +237,9 @@ def fit_scales(*, q: np.ndarray, y: np.ndarray, lo: float = 0.2, hi: float = 6.0
     return s
 
 
-def recalibrate(*, t: Table, arm: np.ndarray, usable: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def recalibrate(
+    *, t: Table, arm: np.ndarray, usable: np.ndarray, store: dict | None = None
+) -> tuple[np.ndarray, np.ndarray]:
     """Return the arm recalibrated per group and lead band on earlier months, and a mask of rows that have a fit.
 
     For a fold month, the factors are fitted on the event-free rows (`t.free`) of every earlier month in
@@ -262,6 +264,8 @@ def recalibrate(*, t: Table, arm: np.ndarray, usable: np.ndarray) -> tuple[np.nd
                 s = fit_scales(q=arm[tr], y=t.obs[tr])
                 out[te] = scale_quantiles(q=arm[te], s=s)
                 has[te] = True
+                if store is not None:
+                    store[(m, g, b)] = s
     return np.sort(out, axis=1), has
 
 
@@ -316,7 +320,9 @@ def union_band(*, lag: np.ndarray, masked: np.ndarray) -> np.ndarray:
     return out
 
 
-def per_lead_weights(*, t: Table, a: np.ndarray, b: np.ndarray, usable: np.ndarray) -> np.ndarray:
+def per_lead_weights(
+    *, t: Table, a: np.ndarray, b: np.ndarray, usable: np.ndarray, store: dict | None = None
+) -> np.ndarray:
     """Return a per-row weight on `a`, per lead band, fitted on earlier months' event-free rows (0.5 where none exist)."""
     w = np.full(t.n, 0.5, np.float32)
     months = sorted({m for m in t.month[usable]})
@@ -352,6 +358,8 @@ def per_lead_weights(*, t: Table, a: np.ndarray, b: np.ndarray, usable: np.ndarr
                 if loss < best:
                     best, best_w = loss, float(wv)
             w[te] = best_w
+            if store is not None:
+                store[(m, band)] = best_w
     return w
 
 

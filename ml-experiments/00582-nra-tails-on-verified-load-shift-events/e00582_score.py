@@ -86,6 +86,10 @@ def window(*, onset: int, end: int, phase: str) -> tuple[int, int]:
     }[phase]
 
 
+STORES: dict[str, dict] = {}
+"""Recalibration factors and mixture weights per arm, keyed by (month, group, band) or (month, band); filled by `build_arms`."""
+
+
 def build_arms(
     *, t: a.Table, gates: dict
 ) -> tuple[dict[str, np.ndarray], np.ndarray, dict[str, np.ndarray]]:
@@ -100,17 +104,24 @@ def build_arms(
         "Corrected lags": t.arms["C"],
     }
     allrows = np.ones(t.n, bool)
-    arms["R"], has_r = a.recalibrate(t=t, arm=V, usable=allrows)
+    STORES["R"] = {}
+    arms["R"], has_r = a.recalibrate(t=t, arm=V, usable=allrows, store=STORES["R"])
     w50 = np.full(t.n, 0.5, np.float32)
     w70 = np.full(t.n, 0.7, np.float32)
-    wpl = a.per_lead_weights(t=t, a=V, b=np.where(have_e[:, None], E, V), usable=have_e)
+    STORES["MixPL_w"] = {}
+    wpl = a.per_lead_weights(
+        t=t, a=V, b=np.where(have_e[:, None], E, V), usable=have_e, store=STORES["MixPL_w"]
+    )
     has: dict[str, np.ndarray] = {"R": has_r}
     for name, w in (("Mix50", w50), ("Mix70", w70), ("MixPL", wpl)):
         mix = np.full_like(V, np.nan)
         mix[have_e] = a.mixture(a=V[have_e], b=E[have_e], w=w[have_e])
         arms[name] = mix
         rc = np.full_like(V, np.nan)
-        r_, h_ = a.recalibrate(t=t, arm=np.where(have_e[:, None], mix, V), usable=have_e)
+        STORES[f"{name}-R"] = {}
+        r_, h_ = a.recalibrate(
+            t=t, arm=np.where(have_e[:, None], mix, V), usable=have_e, store=STORES[f"{name}-R"]
+        )
         rc[have_e] = r_[have_e]
         arms[f"{name}-R"] = rc
         has[f"{name}-R"] = h_ & have_e
