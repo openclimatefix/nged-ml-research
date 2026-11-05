@@ -8,7 +8,7 @@ title: >-
 theme: retraining-and-training-history
 also_relevant_to:
   - differentiable-physics-long-history-and-drift
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -43,14 +43,144 @@ decision_rule: >-
 benchmark: >-
   M0, M0lr, L-1d, and A-pool (experiments 545 and 511), the 559 arms A1, A10, and A11 (read only),
   and experiment 500's 28-day median shift as the reference for design 6.
+verdict: partly supported
+best_arm: >-
+  D5, the output-side slow offset: CRPS at 24-120 h is 0.137 points of capacity better than the coarse
+  M0 at the eight MVA Primaries on fresh seeds 5 to 9 (Bonferroni interval -0.253 to -0.025).
+headline: >-
+  One design of five helps: a slow offset added to the forecast's mean beats the coarse M0 at the
+  eight MVA Primaries on 10 seeds (-0.14 and -0.14, intervals excluding zero), with a lower leak,
+  while the embedding, trend-summary, random-walk, and global-time designs do not.
+lessons: >-
+  The designs that feed a slow signal to the encoders or the mixer (embedding, trend summary,
+  random walk, global time) gained nothing and leaked more, and their placebos show the signal is
+  easy to overfit. The offset acts on the forecast's mean only, and that is the design that helps.
+  Combining the offset with the embedding removed the offset's gain.
+take_home_message: >-
+  A slow, per-substation offset added to the demand forecast improves it at the eight MVA
+  substations and leaks no more of a recent load shift than the plain network. The other four ways
+  of carrying slow change did not help, so the next step is the offset alone, in more fits and on
+  the six MW substations, where the direction holds but the evidence does not yet exclude zero.
+advice:
+  - >-
+    Carry slow substation change as a per-Primary offset added to the mixture means, not as an
+    embedding or a summary input to the encoders (contrasts figure).
+  - >-
+    Do not add the A10 embedding to the offset: the combined arm lost the offset's gain (H minus D5
+    is about +0.25 at the eight MVA Primaries).
+  - >-
+    Confirm any gain found after a near miss on fresh seeds before relying on it, and label the
+    first result post hoc (D5 seeds 0-4 against seeds 5-9).
+  - >-
+    Report the leak window with the number: a leak measured over the 16-day coarse window is not
+    comparable with the 7-day daily-harness figures (the leak section).
+production_status: candidate
+adopted_in: none
 row_set_id: experiment_470_intersection_v1
 metric: >-
   CRPS in points of effective capacity by lead band at the eight MVA-only Primaries and the six
   signed-MW Primaries (D15 and D18 report-only); injected-shift leak in points of capacity.
 ---
 
-**Planned.** Stage 1 (design 6) is written first; stages 2 to 4 are added to this page, with their
-own commit, before any GPU fit starts.
+**We asked which way of giving the demand forecast network a slow-moving signal about each
+substation helps, because substations change over years while the network's Primary embedding stays
+fixed.** We tried five designs on 16 substations and compared each with the same network refitted
+every 14 days (the coarse M0), on five test months. One design helped: a slow offset, one number per
+substation and month, added to the forecast's mean. It lowered the error at the eight substations
+that report only apparent power (the eight MVA Primaries) by 0.137 points of capacity on seeds fixed
+after a near miss, and it did not raise the leak of a recent load shift. The other designs did not
+help, and the six substations that report signed power (the six MW Primaries) show the same
+direction without an interval that excludes zero.
+
+**Verdict: partly supported.** D5 (design 5, the output-side slow offset) is a keep candidate. The
+leak is reported beside it as a flag, not a gate.
+
+![Every design's CRPS minus the coarse M0's at 24 to 120 h](contrasts_vs_coarse_m0.svg)
+
+## Results
+
+- **D5 against the coarse M0, 24-120 h, positive is worse.** Seeds 0 and 1: -0.111 at the eight MVA
+  Primaries (Bonferroni interval -0.195 to +0.017, a near miss) and -0.228 at the six MW Primaries
+  (-0.549 to +0.058). Seeds 0 to 4, added after the near miss and therefore **post hoc**: -0.139
+  (-0.241 to -0.061) and -0.211 (-0.538 to +0.072). Fresh seeds 5 to 9, the confirmation: -0.137
+  (-0.253 to -0.025) at the eight MVA Primaries, with all 5 seeds negative, and -0.237 (-0.574 to
+  +0.051) at the six MW Primaries, with all 5 seeds negative. The gain at the eight MVA Primaries is
+  confirmed; the gain at the six MW Primaries is not excluded from zero.
+- **Absolute score.** CRPS at 24-120 h (mean single-seed): the coarse M0 4.762 and D5 4.651 at the
+  eight MVA Primaries; 3.604 and 3.376 at the six MW Primaries.
+- **Daily refits (seeds 0 and 1), the harness of experiments 511 and 554.** D5 minus M0 is -0.094
+  at the eight MVA Primaries (interval -0.155 to -0.055) and -0.166 at the six MW Primaries
+  (-0.278 to -0.034). On cold nights (3 folds) the contrast is -0.160 at the eight (-0.280 to
+  +0.232) and +0.117 at the six (-0.270 to +0.259), so cold nights are not shown to improve.
+- **Other designs against the coarse M0 (24-120 h, seeds 0 and 1).** A10 (design 1) +0.099 and
+  -0.092; D2 (design 2, trend summary) -0.066 and -0.116, with a placebo 0.206 worse at the eight;
+  D3m and D3q (design 3) +0.124 and -0.016 at the eight; D4 (design 4) -0.004 and -0.069, with a
+  placebo +0.633 worse at the eight, so the placebo harms the forecast and is not neutral. No
+  interval excludes zero except the placebos (worse). Design 6 (a slow residual correction) is
+  worse than every base it was added to (+0.17 at the eight against M0).
+- **Hybrid (A10 embedding plus the D5 offset), seeds 0 and 1.** +0.137 at the eight and -0.009 at the
+  six against the coarse M0. Against D5 it is about +0.25 and +0.22 worse, and against A10 about
+  +0.04 and +0.08. The hypothesis that the offset takes level shifts and the embedding takes changes
+  in behaviour is not supported: adding the embedding removed the offset's gain.
+
+## Leak of an injected load shift
+
+- **Daily harness (7-day block, ages 0 to 6, seed 0).** D5 7.17 points of capacity against M0 7.60.
+  Step R: A10 6.81 against M0 7.76 (5 seeds).
+- **Coarse harness (seeds 0 and 1).** The window is the whole forecast window of the day-14 fit (ages
+  0 to about 16 days), so the figures are not comparable with the daily ones: the coarse M0 9.76, D5
+  9.03, A10 11.05, hybrid 10.49, D2 11.44, D3m 11.17, D3q 16.47, D4 17.99. D2's figure is a lower
+  bound only, because the summaries were not shifted. D5's leak is below the coarse M0's, so it meets
+  the pass rule's +1.0 allowance.
+
+## Does the offset absorb a shifted state?
+
+Some load-shift events last months, so a slow offset could treat a shifted state as normal. Labels
+are incomplete (clean rows may hold unlabelled events), so each count below is a lower bound.
+
+- **Real events (experiment 556's harness, 74 month-event pairs, seed 0).** The absorbed share is
+  3.0% for M0 and 4.3% for D5, a difference of +1.3 points (standard error 0.6), with D5 higher in
+  61% of pairs. Most of it falls in the first 3 to 10 days after an event ends (M0 5.1%, D5 7.2%, 42
+  pairs); after 10 days both are near zero.
+- **Offset movement across events.** Only 9 of the 184 labelled events last half a month or more, so
+  the monthly knots cannot see most events. Across those 9 the offset moves 0.42% of capacity
+  between the event's start and end, against 0.48% over matched event-free windows.
+- **Error after an event ends (daily harness, D5 minus M0, 24-120 h).** Days 0-14 after an event:
+  -0.148 at the eight MVA Primaries and -0.183 at the six MW Primaries; days 14-28: -0.187 and
+  -0.074; all other rows: -0.082 and -0.180. D5 is no worse after events than elsewhere.
+- **Not run.** The variant that fits the offset on rows with no labelled event only was dropped to
+  stay within the 10 GPU-h ceiling.
+
+## The learnt offsets
+
+The offsets wander by 5% to 15% of capacity over the series, and the seeds agree to about 0.5% of
+capacity. The figures below show the offset per Primary, from the last fold's weights (the mean of
+seeds 0 to 4, the band the minimum to maximum), with the labelled events shaded.
+
+![D5 offset in percent of capacity, the eight MVA Primaries](offset_d5_pct_mva.svg)
+
+![D5 offset in percent of capacity, the six MW Primaries](offset_d5_pct_mw.svg)
+
+![D5 offset in MW or MVA, the eight MVA Primaries](offset_d5_mw_mva.svg)
+
+![D5 offset in MW or MVA, the six MW Primaries](offset_d5_mw_mw.svg)
+
+![A10 embedding, first principal component, the eight MVA Primaries](offset_a10_pc_mva.svg)
+
+![A10 embedding, first principal component, the six MW Primaries](offset_a10_pc_mw.svg)
+
+## Caveats
+
+- **The 5-seed D5 result is post hoc** (seeds 2 to 4 were added after the seeds 0 and 1 interval
+  reached +0.017); seeds 5 to 9 are the confirmation.
+- **The screening ran on a coarse refit** (days 0 and 14), two seeds. Cold nights use 3 folds.
+- **Placebos harm the forecast** (D4-null +0.633 at the eight), so a gain is not read as the
+  difference from a neutral placebo.
+- **Saved for later work.** D5 pretrained weights are in `pretrained_D5/real` and the fine-tuned
+  weights in `models/D5d` (seeds 0 and 1); A10's pretrained weights are experiment 559's
+  `pretrained_drift/real`; the hybrid's are in `pretrained_H/real`. The code is
+  `e00565_model_variants.py` and `e00565_fit.py`.
+- **Seeds 5 to 9 of M0** were pretrained into experiment 554's work folder as new files.
 
 ## Stage 1: design 6, a slow residual correction (CPU only, no fit)
 
