@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, D107, D205
+# ruff: noqa: E501, D107, D205
 """Experiment 583: the shared row table of X3-syn's stored forecasts, and the after-snap-back rule.
 
 Every arm is built from stored quantile forecasts; nothing is refitted. Two forecasts are read, both
@@ -44,15 +44,12 @@ N_PLACEBO: Final[int] = 20
 
 def _seed_mean(*, tag: str) -> pl.DataFrame:
     """Return the seed-mean quantiles of X3-syn's stored `fits/<tag>` forecasts, keyed by KEYS."""
-    parts = []
-    for m in MONTHS:
-        for d in ("d0", "d14"):
-            for s in a.SEEDS:
-                parts.append(
-                    pl.read_parquet(
-                        X3SYN / "fits" / tag / f"{m}_{d}_s{s}.parquet", columns=[*KEYS, *QCOLS]
-                    )
-                )
+    parts = [
+        pl.read_parquet(X3SYN / "fits" / tag / f"{m}_{d}_s{s}.parquet", columns=[*KEYS, *QCOLS])
+        for m in MONTHS
+        for d in ("d0", "d14")
+        for s in a.SEEDS
+    ]
     return pl.concat(parts).group_by(KEYS).agg([pl.col(q).mean() for q in QCOLS])
 
 

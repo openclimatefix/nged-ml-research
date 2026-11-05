@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915, PLR0912, PLR0913, D205, ANN001, ANN201
+# ruff: noqa: E501, D205
 """Experiment 583: score the after-snap-back rule and the event-mode band on stored X3-syn forecasts.
 
 Reads experiment 581's stored X3-syn forecasts (the lag network, its lags-masked twin, and the
@@ -201,7 +201,7 @@ def gate_tables(
     """Return how often the rule is active on event-free (Primary, origin day) pairs, and false
     triggers per Primary-year. A false trigger is a day the gate turns on with no event within 3 days.
     """
-    near, gap, od = gi["near"], gi["gap"], gi["origin_days"]
+    near, od = gi["near"], gi["origin_days"]
     rows = []
     for g in (*GROUPS_SCORED, "D15 and D18", "all 16"):
         ps = [p for p in range(16) if g == "all 16" or t.group[p] == g]
@@ -357,8 +357,6 @@ def score_bank(*, t: c.X4Table, gi: dict) -> tuple[pl.DataFrame, list[dict]]:
                 on[t.prim[rows], t.origin_day[rows]],
                 frac[t.prim[rows], t.origin_day[rows]],
             )
-            # reference for the follow ratio: the same weights with clean lags
-            v0 = t.arms["V"][rows]
             for e in ev.iter_rows(named=True):
                 p, sgn, depth = e["primary"], float(e["sign"]), float(e["depth"])
                 trig_rows.extend(
