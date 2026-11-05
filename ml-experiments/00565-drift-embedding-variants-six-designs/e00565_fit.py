@@ -123,6 +123,9 @@ SPECS = {
         Spec(
             "D5", "fresh", cadence="h", frozen=True, columns="real", source="drift", variant="out"
         ),
+        Spec(
+            "D5d", "fresh", cadence="d", frozen=True, columns="real", source="drift", variant="out"
+        ),
         Spec("D2", "fresh", cadence="h", columns="real", source="slow", variant="slow"),
         Spec("D2-null", "fresh", cadence="h", columns="null", source="slow", variant="slow"),
     )
@@ -168,7 +171,8 @@ def pretrained_dir() -> Path:
     """Return where the arm's pretrained weights live (arm C-A10 reads experiment 559's arm A10 weights)."""
     if SPEC.tag == "C-A10":
         return W559 / "pretrained_drift" / SPEC.columns  # ty: ignore[unsupported-operator]
-    return W / f"pretrained_{SPEC.tag}" / SPEC.columns  # ty: ignore[unsupported-operator]
+    tag = "D5" if SPEC.tag == "D5d" else SPEC.tag
+    return W / f"pretrained_{tag}" / SPEC.columns  # ty: ignore[unsupported-operator]
 
 
 def pretrained_file(*, month: str, seed: int) -> Path:
