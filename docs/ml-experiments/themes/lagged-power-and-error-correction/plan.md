@@ -19,7 +19,6 @@
 | 462 | Can a lag network that sees the neighbours learn to follow a level change that no neighbour mirrors, when its training worlds contain genuine level changes with and without a mirror (row 4 of the experiment 404 review, G3)? | High (neural Discuss session, 2026-11-01) | Row 3 reported; NRA final list | Done (inconclusive by design: the optimal mirror gap is 0.054 to 0.075, below the seed noise; see experiment 462) |
 | 507 | Is there enough to gain from repairing shifted power readings, rather than down-weighting them, to justify a learned 14-day history encoder? | High (neural Discuss session, 2026-11-02) | Nothing | Interim: oracle repair helps; one total-variation repair does not; learned encoder not run (line paused) |
 | 550 | Do trailing temperature windows still help the lag-light demand network once the day-ago and week-ago power lags are in? | High (manager, 2026-11-04) | Nothing | Planned |
-| 566 | Do the three-step schedule and a 3-day embargo cut the real-event load-shift leak of the modular lag-encoder demand network, and how much of its accuracy gain do they keep? | High (manager, 2026-11-05) | Experiments 559 and 560 merged | Planned |
 
 ## Planned experiments
 

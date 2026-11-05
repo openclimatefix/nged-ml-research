@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, ANN001, ANN201, PLR0915, PT018
+# ruff: noqa: E501, E402, PLR0912, ANN001, ANN201, PLR0915, PT018
 r"""Experiment 566: the coarse-refit arms C0 to C4 and the real-event leak harness.
 
 Rows, cutoffs, recency weights, early stopping, lag columns, block dropout, the expected-input table
@@ -32,7 +32,7 @@ from typing import Final
 
 _argv = sys.argv
 parser = argparse.ArgumentParser()
-parser.add_argument("command", choices=("step2", "coarse", "events"))
+parser.add_argument("command", choices=("step2", "coarse", "events", "lagfollow"))
 parser.add_argument("--arms", nargs="+", default=["C0", "C1", "C2", "C3", "C4"])
 parser.add_argument("--months", nargs="+", default=None)
 parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
@@ -119,9 +119,9 @@ def pretrained_path(*, arm: Arm, month: str, seed: int) -> Path:
     return p
 
 
-def step2_path(*, month: str, seed: int) -> Path:
-    """Return the saved step-2 weights of the lag network."""
-    return W / "step2" / f"{month}_s{seed}.pt"
+def step2_path(*, month: str, seed: int, embargo: bool = False) -> Path:
+    """Return the saved step-2 weights of the lag network (C4 has its own, trained without the newest 3 days)."""
+    return W / ("step2_embargo" if embargo else "step2") / f"{month}_s{seed}.pt"
 
 
 def model_path(*, tag: str, month: str, key: str, seed: int) -> Path:
@@ -185,7 +185,7 @@ def train(*, model, x, z, w, p, is_val, seed: int, lr: float, fresh_lr: float | 
 
 
 class Cell:
-    """One fold: its rows (with lag columns and all of experiment 560's assertions), its GPU copy, and its test rows."""
+    """One fold: its rows (with lag columns and 560's assertions), its GPU copy, and test rows."""
 
     def __init__(self, *, month: str, device: str) -> None:
         """Build the month once."""
@@ -223,9 +223,9 @@ class Cell:
         t = self.g.refit_tensors(refit=refit, shift_z=shift_z)
         model = new_net(arm=arm, n_primaries=self.n_primaries).to(self.device)
         if arm.step2:
-            model.load_state_dict(
-                torch.load(step2_path(month=self.month, seed=seed), map_location="cpu")
-            )
+            sp = step2_path(month=self.month, seed=seed, embargo=arm.embargo)
+            assert sp.exists(), f"run the step2 command first: {sp}"
+            model.load_state_dict(torch.load(sp, map_location="cpu"))
             fresh = None
         else:
             b.load_pretrained(
@@ -249,7 +249,7 @@ class Cell:
         return model.to(self.device).eval()
 
     def control(self, *, arm: Arm, cut: datetime, seed: int) -> torch.nn.Module:
-        """Return the uncorrected fit at a cutoff: the stored one where the recipe matches, else fitted once and saved."""
+        """Return the uncorrected fit at a cutoff: the stored one if the recipe matches, else fit and save."""
         day = self.day(cut=cut)
         if arm.tag == "C1":
             stored = W560 / "models" / "LAG-v3" / f"{self.month}_d{day}_s{seed}.pt"
@@ -268,7 +268,6 @@ class Cell:
         self, *, model: torch.nn.Module, x: torch.Tensor, p: torch.Tensor
     ) -> np.ndarray:
         """Return the model's median (capacity fraction) for rows on the GPU."""
-        model.table = b.CTX.get("table_ft") if hasattr(model, "table") else None
         out = []
         for a in range(0, len(x), 262_144):
             q = c.serving_quantiles(
@@ -292,45 +291,53 @@ class Cell:
 
 
 def step2(*, device: str) -> None:
-    """Train and save the lag network's step-2 weights: encoders and a fresh mixer on every row to the first cutoff.
+    """Train and save the lag network's step-2 weights: encoders and a fresh mixer.
 
     Experiment 559's recipe: uniform weights, early stopping on the usual weeks, fresh mixer, no
-    recency weighting, rows up to the fold's first cutoff minus 3.5 hours.
+    recency weighting, rows up to the fold's first cutoff minus 3.5 hours. `--arms C2` trains the
+    plain weights, `--arms C4` the weights without the newest 3 days of targets.
     """
-    arm = ARMS["C2"]
-    for month in MONTHS:
-        todo = [s for s in ARGS.seeds if not step2_path(month=month, seed=s).exists()]
-        if not todo:
-            continue
-        cell = Cell(month=month, device=device)
-        cut = c.month_start(month=month)
-        refit = cell.select(arm=arm, cut=cut, half_life=UNIFORM_HALF_LIFE, embargo=False)
-        for seed in todo:
-            b.CTX.update(on=False, shift=None, sign=None, block=None, seed=seed, cut=cut)
-            t = cell.g.refit_tensors(refit=refit)
-            assert float(t["w"].min()) > 0.999, "step 2 must have no recency weighting"
-            started = time.monotonic()
-            model = new_net(arm=arm, n_primaries=cell.n_primaries).to(device)
-            b.load_pretrained(model=model, path=pretrained_path(arm=arm, month=month, seed=seed))
-            model.to(device)
-            epochs, best = train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"],
-                                 seed=seed, lr=c.FINE_TUNE_LR, fresh_lr=FRESH_LR, device=device)  # fmt: skip
-            target = step2_path(month=month, seed=seed)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            torch.save(model.state_dict(), target.with_suffix(".tmp"))
-            target.with_suffix(".tmp").rename(target)
-            c.write_json(obj={"epochs": epochs, "val_nll": best, "rows": len(refit.index), **refit.report},
-                         path=W / "logs" / "step2" / f"{month}_s{seed}.json")  # fmt: skip
-            print(f"step 2 {month} s{seed}: {len(refit.index):,} rows, {epochs} epochs, val NLL {best:.4f}, "
-                  f"{time.monotonic() - started:.0f} s; latest valid "
-                  f"{datetime.fromtimestamp(cell.mr.valid_us[refit.index].max() / 1e6, UTC)}", flush=True)  # fmt: skip
-            del t, model
-        del cell
-        torch.cuda.empty_cache()
+    for tag in [a for a in ARGS.arms if a in {"C2", "C4"}]:
+        arm = ARMS[tag]
+        for month in MONTHS:
+            todo = [
+                s
+                for s in ARGS.seeds
+                if not step2_path(month=month, seed=s, embargo=arm.embargo).exists()
+            ]
+            if not todo:
+                continue
+            cell = Cell(month=month, device=device)
+            cut = c.month_start(month=month)
+            refit = cell.select(arm=arm, cut=cut, half_life=UNIFORM_HALF_LIFE)
+            for seed in todo:
+                b.CTX.update(on=False, shift=None, sign=None, block=None, seed=seed, cut=cut)
+                t = cell.g.refit_tensors(refit=refit)
+                assert float(t["w"].min()) > 0.999, "step 2 must have no recency weighting"
+                started = time.monotonic()
+                model = new_net(arm=arm, n_primaries=cell.n_primaries).to(device)
+                b.load_pretrained(
+                    model=model, path=pretrained_path(arm=arm, month=month, seed=seed)
+                )
+                model.to(device)
+                epochs, best = train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"],
+                                     seed=seed, lr=c.FINE_TUNE_LR, fresh_lr=FRESH_LR, device=device)  # fmt: skip
+                target = step2_path(month=month, seed=seed, embargo=arm.embargo)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                torch.save(model.state_dict(), target.with_suffix(".tmp"))
+                target.with_suffix(".tmp").rename(target)
+                latest = datetime.fromtimestamp(cell.mr.valid_us[refit.index].max() / 1e6, UTC)
+                c.write_json(obj={**refit.report, "epochs": epochs, "val_nll": best, "rows": len(refit.index), "latest_valid": str(latest)},
+                             path=W / "logs" / target.parent.name / f"{month}_s{seed}.json")  # fmt: skip
+                print(f"step 2 ({tag}) {month} s{seed}: {len(refit.index):,} rows, {epochs} epochs, val NLL {best:.4f}, "
+                      f"{time.monotonic() - started:.0f} s; latest valid {latest}", flush=True)  # fmt: skip
+                del t, model
+            del cell
+            torch.cuda.empty_cache()
 
 
 def coarse(*, device: str) -> None:
-    """Fit each arm once per fold at the month's first cutoff and forecast the whole month, with removed and aged variants."""
+    """Fit each arm once per fold at the first cutoff and forecast the month, with removed and aged lags."""
     for month in MONTHS:
         cell = Cell(month=month, device=device)
         cut = c.month_start(month=month)
@@ -475,7 +482,9 @@ def real_events(*, device: str) -> None:
                     count += 1
                     if count % 10 == 0:
                         out.parent.mkdir(parents=True, exist_ok=True)
-                        pl.DataFrame(rows_out).write_parquet(out)
+                        pl.DataFrame(
+                            rows_out, schema_overrides={"absorbed_share": pl.Float64}
+                        ).write_parquet(out)
                         print("events done", count, flush=True)
                     if ARGS.limit and count >= ARGS.limit:
                         break
@@ -483,9 +492,86 @@ def real_events(*, device: str) -> None:
                     break
         del cell
         torch.cuda.empty_cache()
+        if ARGS.limit and count >= ARGS.limit:
+            break
+    out.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(rows_out, schema_overrides={"absorbed_share": pl.Float64}).write_parquet(out)
+    print("real events", len(rows_out), flush=True)
+
+
+def lag_following(*, device: str) -> None:
+    """Inference only: how far does the forecast move when the lags that lie inside a real event are corrected?
+
+    For each labelled event and each arm's coarse fit (seed 0), take the test rows at the event's
+    Primary whose day lag or week lag was measured inside the event while the target time lies outside it.
+    Forecast them with the lags as observed and with each lag in the event corrected by experiment
+    435's NRA step (the same correction the refit harness applies to targets). The lag-following share
+    is the event's sign times the mean median difference divided by the labelled depth: 1 means the
+    forecast follows the abnormal lag fully, 0 means it ignores it.
+    """
+    events = c.labelled_events()
+    out = W / "scores" / "lag_following.parquet"
+    rows_out = []
+    seed = ARGS.seeds[0]
+    for month in MONTHS:
+        cell = Cell(month=month, device=device)
+        sd = b.CTX["stats"][:, 1]
+        x_all = cell.test.x
+        day_idx, week_idx = x_all[:, 43].astype(np.int64), x_all[:, 44].astype(np.int64)
+        day_ok, week_ok = x_all[:, 38] < 0.5, x_all[:, 41] < 0.5
+        tgt = cell.test.target_idx
+        for tag in ARGS.arms:
+            arm = ARMS[tag]
+            if not arm.lag:
+                continue
+            if tag == "C1":
+                model = cell.control(arm=arm, cut=c.month_start(month=month), seed=seed)
+            else:
+                model = cell.load(
+                    arm=arm, path=model_path(tag=tag, month=month, key="coarse", seed=seed)
+                )
+            for p, spans in events.items():
+                for onset, end in spans:
+                    depth = float(np.abs(cell.shares[p, onset : end + 1]).max())
+                    if depth <= 0:
+                        continue
+                    in_day = day_ok & (day_idx >= onset) & (day_idx <= end)
+                    in_week = week_ok & (week_idx >= onset) & (week_idx <= end)
+                    sel = np.nonzero(
+                        (cell.test.primary == p)
+                        & (in_day | in_week)
+                        & ~((tgt >= onset) & (tgt <= end))
+                    )[0]
+                    if len(sel) < 20:
+                        continue
+                    xo = cell.test.x[sel].copy()
+                    xc = xo.copy()
+                    for col, idx, ok, j in ((37, day_idx, in_day, 0), (40, week_idx, in_week, 1)):
+                        m = ok[sel]
+                        corr = (
+                            -cell.shares[p, np.clip(idx[sel], 0, cell.shares.shape[1] - 1)] / sd[j]
+                        )
+                        xc[:, col] = np.clip(
+                            xc[:, col] + np.where(m, corr, 0.0),
+                            -b.prep.INPUT_CLIP_SD,
+                            b.prep.INPUT_CLIP_SD,
+                        )
+                    pr = torch.from_numpy(cell.test.primary[sel]).to(device)
+                    qo = cell.median_rows(model=model, x=torch.from_numpy(xo).to(device), p=pr)
+                    qc = cell.median_rows(model=model, x=torch.from_numpy(xc).to(device), p=pr)
+                    sign = 1 if float(cell.shares[p, onset : end + 1].sum()) > 0 else -1
+                    rows_out.append({
+                        "arm": tag, "month": month, "primary": p, "onset": onset, "end": end,
+                        "depth_points": 100 * depth, "n_rows": len(sel),
+                        "lag_following_share": float(sign * (qo - qc).mean() / depth),
+                    })  # fmt: skip
+            print(month, tag, len(rows_out), flush=True)
+            del model
+        del cell
+        torch.cuda.empty_cache()
     out.parent.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(rows_out).write_parquet(out)
-    print("real events", len(rows_out), flush=True)
+    print("lag-following rows", len(rows_out), flush=True)
 
 
 if __name__ == "__main__":
@@ -493,5 +579,7 @@ if __name__ == "__main__":
         step2(device="cuda")
     elif ARGS.command == "coarse":
         coarse(device="cuda")
+    elif ARGS.command == "lagfollow":
+        lag_following(device="cuda")
     else:
         real_events(device="cuda")
