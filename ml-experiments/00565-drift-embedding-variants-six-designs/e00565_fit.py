@@ -127,6 +127,9 @@ SPECS = {
             "D5d", "fresh", cadence="d", frozen=True, columns="real", source="drift", variant="out"
         ),
         Spec("M0d", "fresh", cadence="d"),
+        Spec(
+            "H", "fresh", cadence="h", frozen=True, columns="real", source="drift", variant="hybrid"
+        ),
         Spec("D2", "fresh", cadence="h", columns="real", source="slow", variant="slow"),
         Spec("D2-null", "fresh", cadence="h", columns="null", source="slow", variant="slow"),
     )
@@ -322,7 +325,11 @@ def new_model(*, n_primaries: int, stage: str = "ft") -> m.ModularMdn:
                     n_primaries=n_primaries, stage=stage, n_knots=KNOTS,
                     knot_months=3 if SPEC.variant == "rwq" else 1,
                 )  # fmt: skip
-            cls = {"glob": var.GlobalTimeDrift, "out": var.OutputOffsetDrift}[SPEC.variant]
+            cls = {
+                "glob": var.GlobalTimeDrift,
+                "out": var.OutputOffsetDrift,
+                "hybrid": var.HybridDrift,
+            }[SPEC.variant]
             return cls(n_primaries=n_primaries, stage=stage, n_knots=KNOTS)
         if SPEC.source == "cloud":
             return mex.ModularMdnExtra(

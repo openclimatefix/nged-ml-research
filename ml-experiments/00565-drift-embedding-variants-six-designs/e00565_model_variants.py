@@ -150,9 +150,65 @@ class OutputOffsetDrift(_Interpolated):
         return torch.cat([out[:, :k], out[:, k : 2 * k] + offset, out[:, 2 * k :]], dim=-1)
 
 
+class HybridDrift(mdr.ModularMdnDrift):
+    """Designs 1 and 5 together: arm A10's drift embedding plus design 5's per-Primary output offset."""
+
+    def __init__(self, *, n_primaries: int, stage: str, n_knots: int) -> None:
+        """Build the network; the offset knots start at zero."""
+        super().__init__(n_primaries=n_primaries, stage=stage, n_knots=n_knots)
+        if stage == "pre":
+            self.off_knots = nn.Parameter(torch.zeros(n_primaries, n_knots))
+        else:
+            self.register_buffer("off_old", torch.zeros(n_primaries, n_knots - 1))
+            self.off_new = nn.Parameter(torch.zeros(n_primaries))
+
+    def all_offsets(self) -> torch.Tensor:
+        """Return every offset knot, (Primaries, knots)."""
+        if self.stage == "pre":
+            return self.off_knots
+        return torch.cat([self.off_old, self.off_new[:, None]], dim=1)  # ty: ignore[invalid-argument-type]
+
+    def offset(self, tau: torch.Tensor, primary: torch.Tensor) -> torch.Tensor:
+        """Return the interpolated offset of each row (position clamped to the knot range), (rows, 1)."""
+        knots = self.all_offsets()
+        tau = tau.clamp(0.0, float(self.n_knots - 1))
+        lo = tau.floor().long().clamp(max=self.n_knots - 2)
+        frac = tau - lo.to(tau.dtype)
+        return ((1.0 - frac) * knots[primary, lo] + frac * knots[primary, lo + 1])[:, None]
+
+    def penalty(self) -> torch.Tensor:
+        """Return arm A10's second-difference penalty plus design 5's first-difference penalty."""
+        k = self.all_offsets()
+        return super().penalty() + PENALTY_LAMBDA * ((k[:, 1:] - k[:, :-1]) ** 2).mean()
+
+    def forward(self, x: torch.Tensor, primary: torch.Tensor | None = None) -> torch.Tensor:
+        """Return the main mixture's 9 raw outputs with the offset added to the component means."""
+        assert primary is not None
+        out = super().forward(x, primary)
+        offset = self.offset(x[:, TAU_COL], primary)
+        k = m.COMPONENTS
+        return torch.cat([out[:, :k], out[:, k : 2 * k] + offset, out[:, 2 * k :]], dim=-1)
+
+
 def load_pre_into_ft(*, model: nn.Module, state: dict[str, torch.Tensor]) -> None:
     """Load a stage-`pre` state dict into the matching stage-`ft` variant."""
-    if isinstance(model, mdr.ModularMdnDrift):
+    if isinstance(model, HybridDrift):
+        assert model.stage == "ft"
+        knots, off = state["knots"], state["off_knots"]
+        skip = {"knots", "off_knots"}
+        rest = {a: v for a, v in state.items() if a not in skip and not a.startswith("mixer_ft.")}
+        missing = model.load_state_dict(rest, strict=False)
+        assert all(
+            a.startswith("mixer_ft.") or a in {"knots_old", "knot_new", "off_old", "off_new"}
+            for a in missing.missing_keys
+        ), missing
+        assert not missing.unexpected_keys, missing
+        with torch.no_grad():
+            model.knots_old.copy_(knots[:, :-1])  # ty: ignore[call-non-callable]
+            model.knot_new.copy_(knots[:, -1])
+            model.off_old.copy_(off[:, :-1])  # ty: ignore[call-non-callable]
+            model.off_new.copy_(off[:, -1])
+    elif isinstance(model, mdr.ModularMdnDrift):
         mdr.load_pre_into_ft(model=model, state=state)
     else:
         assert isinstance(model, _Interpolated)
