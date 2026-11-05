@@ -196,7 +196,7 @@ def leak(*, arms: list[str]) -> pl.DataFrame:
                         "arm": arm,
                         "month": month,
                         "sign": sign,
-                        "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),
+                        "leak": float((sign * 100.0 * (j["s"] - j["c"])).mean()),  # ty: ignore[invalid-argument-type]
                     }
                 )  # ty: ignore[invalid-argument-type]
     if not rows:
