@@ -58,8 +58,6 @@ metric: >-
   quantiles; slices; leak (real-event absorbed share, injected 7-day shift) for passers.
 ---
 
-# Encoder capacity and architecture arms on the modular network
-
 *Planned; every number below is a plan, not a result.*
 
 ## Plan
