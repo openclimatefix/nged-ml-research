@@ -149,6 +149,7 @@ def example_figure(
     for label, arm_dir in (
         ("Control (v3+D5)", None),
         ("Y1 (adds 364-day lag)", WORK / "arms/y1/work"),
+        ("Y1c (adds 365-day lag)", WORK / "arms/y1c/work"),
     ):
         f = forecasts(month="2025-12", arm_dir=arm_dir, primary=primary)
         f = f.filter((pl.col("target") >= lo_i) & (pl.col("target") < hi_i))
@@ -165,16 +166,17 @@ def example_figure(
     colours = {
         "Control (v3+D5)": theme.DATA_BLUE,
         "Y1 (adds 364-day lag)": theme.BRAND_ORANGE,
+        "Y1c (adds 365-day lag)": theme.DATA_PURPLE,
     }
     cs = alt.Scale(domain=list(colours), range=list(colours.values()))
     base = alt.Chart(d).encode(
         x=alt.X("day:Q", title=f"Days since {lo}"),
         color=alt.Color("series:N", scale=cs, legend=alt.Legend(orient="top", title=None)),
     )  # ty: ignore[unresolved-attribute]
-    b90 = base.mark_area(opacity=0.18).encode(
+    b90 = base.mark_area(opacity=0.10).encode(
         y=alt.Y("q05:Q", title="Power (% of capacity)", scale=alt.Scale(zero=False)), y2="q95:Q"
     )
-    b50 = base.mark_area(opacity=0.28).encode(y="q25:Q", y2="q75:Q")
+    b50 = base.mark_area(opacity=0.16).encode(y="q25:Q", y2="q75:Q")
     med = base.mark_line(strokeWidth=1.3).encode(y="q50:Q")
     act = (
         alt.Chart(d.filter(pl.col("series") == "Control (v3+D5)"))
@@ -200,24 +202,24 @@ def example_figure(
 def main() -> None:
     contrasts_figure()
     slices_figure()
-    d3 = 3
+    for primary, label, group in ((3, "D5", "signed-MW"), (11, "D16", "signed-MW"), (0, "D2", "MVA-only")):
+        example_figure(
+            name=f"example_day_ahead_christmas_{label.lower()}",
+            title=f"Day-ahead forecasts over Christmas 2025, Primary {label} ({group})",
+            lo="2025-12-22",
+            hi="2026-01-01",
+            day_ahead=True,
+            origin=None,
+            primary=primary,
+        )
     example_figure(
-        name="example_day_ahead_christmas",
-        title="Day-ahead forecasts over Christmas 2025, Primary 3",
-        lo="2025-12-22",
-        hi="2025-12-29",
-        day_ahead=True,
-        origin=None,
-        primary=d3,
-    )
-    example_figure(
-        name="example_full_horizon",
-        title="One forecast run (issued 2025-12-15 09:00 UTC), full 10-day horizon, Primary 3",
+        name="example_full_horizon_d5",
+        title="One forecast run (issued 2025-12-15 09:00 UTC), full 10-day horizon, Primary D5",
         lo="2025-12-15 09:00",
-        hi="2025-12-29 09:00",
+        hi="2025-12-25 09:00",
         day_ahead=False,
         origin="2025-12-15 09:00",
-        primary=d3,
+        primary=3,
     )
 
 

@@ -37,7 +37,7 @@ TESTS = 36
 
 # `target` is a half-hour index on the 30-minute UTC grid that starts on 2019-09-01.
 DATE = pl.lit(date(2019, 9, 1)) + pl.duration(days=pl.col("target") // 48)
-MD = DATE.dt.month() * 100 + DATE.dt.day()
+MD = DATE.dt.month().cast(pl.Int32) * 100 + DATE.dt.day().cast(pl.Int32)
 SLICES = {
     "Christmas and New Year": (MD >= 1224) | (MD <= 102),
     "bank-holiday days": MD.is_in([1225, 1226, 101]),
