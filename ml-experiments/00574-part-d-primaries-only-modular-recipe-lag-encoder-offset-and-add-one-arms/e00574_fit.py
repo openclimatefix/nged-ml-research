@@ -170,7 +170,10 @@ def pretrained_dir() -> Path:
 
 
 def pretrained_file(*, month: str, seed: int) -> Path:
-    """Return the pre-trained weights: experiment 572's v3+D5, or this experiment's own for arms that add pre-training inputs."""
+    """Return the pre-trained weights file.
+
+    Arms without extra pre-training inputs use experiment 572's v3+D5; the others use their own.
+    """
     own = SPEC.pretrain_from != "V3D5"
     p = (pretrained_dir() if own else W572 / "pretrained_V3D5") / f"{month}_s{seed}.pt"
     assert p.exists(), p
@@ -603,7 +606,7 @@ def build_month(*, month, clean):
             target_idx=mr.target_idx,
         )
         if SPEC.wt:
-            add = np.concatenate([add, WTC.month(null=False)], axis=1)
+            add = np.concatenate([add, WTC.month(null=False)], axis=1)  # ty: ignore[unresolved-attribute]
         assert add.shape == (len(mr.y), N_B1) and np.isfinite(add).all()
         assert mr.x.shape[1] == mod.b1_cols(n_b1=N_B1).start, mr.x.shape
         mr.x = np.concatenate([mr.x, add], axis=1)
@@ -679,7 +682,7 @@ def build_test(*, month, standardiser):
                 add = np.concatenate(
                     [
                         add,
-                        WTC.rows(
+                        WTC.rows(  # ty: ignore[unresolved-attribute]
                             kind="ens",
                             primary=test.primary,
                             origin_idx=test.origin_idx,
@@ -801,7 +804,7 @@ def pretrain_wt(*, device: str) -> None:
                 extra_b1 = np.concatenate(
                     [
                         extra_b1,
-                        WTC.rows(
+                        WTC.rows(  # ty: ignore[unresolved-attribute]
                             kind="era5",
                             primary=pre.primary,
                             origin_idx=pre.origin_idx,
@@ -898,7 +901,7 @@ def fine_tune(
     if KNOTS:
         # A knot sits at each month start, and a row after the newest knot reads it (flat extrapolation), so no row's position may exceed the cutoff's own.
         cut_tau = float(WT.tau(valid_us=np.array([c.us(t=cut)]))[0])  # ty: ignore[unresolved-attribute]
-        assert WT.tau(valid_us=mr.valid_us[refit.index]).max() <= cut_tau + 1e-6, (
+        assert WT.tau(valid_us=mr.valid_us[refit.index]).max() <= cut_tau + 1e-6, (  # ty: ignore[unresolved-attribute]
             "a training row lies after the refit cut"
         )  # ty: ignore[unresolved-attribute]
     shift_z, injected = None, 0
@@ -1110,7 +1113,9 @@ def median_of(*, model, x: np.ndarray, primary: np.ndarray, mr, device: str) -> 
 
 
 def events_command(*, months: list[str], seed: int, limit: int | None, device: str) -> None:
-    """Experiment 556's real-event harness on this arm: refit with one labelled event's targets corrected, per event.
+    """Run experiment 556's real-event harness on this arm.
+
+    Refit with one labelled event's targets corrected, per event.
 
     The cutoff is the first coarse cutoff at least `MIN_AGE_DAYS` days after the event's end (the
     event ends before the cut minus 3.5 h, asserted). The correction is experiment 435's labelled

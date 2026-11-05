@@ -1,5 +1,7 @@
 # ruff: noqa: E501, PTH123, SIM115, PT018, PERF401, PLR0912
-"""Experiment 574: score the Part D arms in three lead bands, with slices, contrasts, per-Primary gains, and leak.
+"""Experiment 574: score the Part D arms in three lead bands.
+
+The score covers slices, contrasts, per-Primary gains, and leak.
 
 Arms: M0 and E2 are experiment 565's stored `C-M0` and `D5`; P0 is experiment 572's stored `V3D5`
 (v3 plus the D5 offset); P1 (spread columns), P3E0 (encoders unfrozen), P2 and P2plac (thermal-lag and
@@ -297,6 +299,48 @@ def leak(*, arms: list[str]) -> pl.DataFrame:
     )
 
 
+def real_events(*, out: Path) -> None:
+    """Summarise the real-event absorbed share per arm and its paired difference from P0.
+
+    Events are resampled as clusters of (Primary, month), 2000 draws, seed 0.
+    """
+    frames = {
+        p.stem.removeprefix("real_events_"): pl.read_parquet(p)
+        for p in sorted(out.glob("real_events_*.parquet"))
+    }
+    if "P0" not in frames:
+        return
+    key = ["month", "primary", "onset", "end"]
+    base = frames["P0"].select(*key, "depth_points", p0="absorbed_share")
+    rng = np.random.default_rng(0)
+    rows = []
+    for arm, d in frames.items():
+        j = base.join(d.select(*key, arm_share="absorbed_share"), on=key)
+        clusters = j.with_columns(cl=pl.col("month") + "_" + pl.col("primary").cast(pl.String))
+        groups = [g for _, g in clusters.group_by("cl")]
+        diffs = []
+        for _ in range(2000):
+            pick = rng.integers(0, len(groups), len(groups))
+            x = pl.concat([groups[i] for i in pick])
+            diffs.append(float((x["arm_share"] - x["p0"]).mean()))
+        rows.append(
+            {
+                "arm": arm,
+                "events": j.height,
+                "mean_share": float(j["arm_share"].mean()),  # ty: ignore[invalid-argument-type]
+                "depth_weighted_share": float(
+                    (j["arm_share"] * j["depth_points"]).sum() / j["depth_points"].sum()  # ty: ignore[unsupported-operator]
+                ),
+                "minus_p0": float((j["arm_share"] - j["p0"]).mean()),  # ty: ignore[invalid-argument-type]
+                "low": float(np.quantile(diffs, 0.025)),
+                "high": float(np.quantile(diffs, 0.975)),
+            }
+        )
+    table = pl.DataFrame(rows)
+    table.write_csv(out / "real_events_summary.csv")
+    print(table.with_columns(pl.col(pl.Float64).round(4)))
+
+
 def main() -> None:
     """Score and write the tables."""
     arms = arms_present()
@@ -414,3 +458,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    real_events(out=W574 / "scores")

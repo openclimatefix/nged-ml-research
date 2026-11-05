@@ -33,7 +33,7 @@ ARMS = [
 def zero_rule() -> alt.Chart:
     """Return the dashed line at zero."""
     return (
-        alt.Chart(pl.DataFrame({"z": [0.0]}))
+        alt.Chart(pl.DataFrame({"z": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="grey", strokeDash=[4, 3])
         .encode(x="z:Q")
     )  # ty: ignore[unresolved-attribute]
@@ -100,7 +100,7 @@ def by_band() -> None:
         (pl.col("slice") == "all rows") & pl.col("arm").is_in(list(names)) & pl.col("set").is_in(list(GROUPS)) & pl.col("band").is_in(BANDS)
     ).with_columns(arm=pl.col("arm").replace(names), group=pl.col("set").replace(GROUPS))  # fmt: skip
     chart = (
-        alt.Chart(t)
+        alt.Chart(t)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X("band:O", sort=BANDS, title="Lead band", axis=alt.Axis(labelAngle=0)),
@@ -125,10 +125,10 @@ def leak() -> None:
     order = t["arm"].to_list()
     base = alt.Chart(t).encode(y=alt.Y("arm:N", sort=order, title=None))
     chart = alt.layer(
-        base.mark_rule(color=theme.GREY_2).encode(x=alt.X("lo:Q", title="Injected 7-day shift followed by the forecast (points of capacity; lower is better)"), x2="hi:Q"),
-        base.mark_point(filled=True, size=60, color=theme.BRAND_ORANGE).encode(x="leak:Q"),
-        alt.Chart(pl.DataFrame({"z": [6.0]})).mark_rule(color="grey", strokeDash=[4, 3]).encode(x="z:Q"),
-    ).properties(width=520, height=200, title=alt.TitleParams(["The embargoed three-step schedule roughly halves the shift the forecast follows", "Dot: mean of five folds (seed 0). Line: range over folds. Dashed line: the limit of 6.0 points, a flag and not a gate."], anchor="start", fontSize=11))  # fmt: skip
+        base.mark_rule(color=theme.GREY_2).encode(x=alt.X("lo:Q", title="Injected 7-day shift followed by the forecast (points of capacity; lower is better)"), x2="hi:Q"),  # ty: ignore[unresolved-attribute]
+        base.mark_point(filled=True, size=60, color=theme.BRAND_ORANGE).encode(x="leak:Q"),  # ty: ignore[unresolved-attribute]
+        alt.Chart(pl.DataFrame({"z": [6.0]})).mark_rule(color="grey", strokeDash=[4, 3]).encode(x="z:Q"),  # ty: ignore[unresolved-attribute]
+    ).properties(width=520, height=200, title=alt.TitleParams(["The embargoed three-step schedule cuts the shift the forecast follows by more than half", "Dot: mean of five folds (seed 0). Line: range over folds. Dashed line: the limit of 6.0 points, a flag and not a gate."], anchor="start", fontSize=11))  # fmt: skip
     chart.save(str(DOCS / "leak.svg"))
 
 
