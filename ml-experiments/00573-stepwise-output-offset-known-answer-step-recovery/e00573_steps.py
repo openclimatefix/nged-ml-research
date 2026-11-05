@@ -26,13 +26,19 @@ NAME: Final = "00573-stepwise-output-offset-known-answer-step-recovery"
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / NAME / "work"
 MONTHS: Final = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 COMPONENTS: Final = 3
+PATHS: Path = WORK / "paths_sweep"
+"""Where the offset paths are saved; `main` points it at the command's own folder."""
 S0_LAMBDA: Final = 10.0
 """Experiment 565's penalty weight on the mean squared first difference of the monthly knots."""
-TV_SWEEP: Final = (10.0, 100.0, 1000.0)
+TV_SWEEP: Final = (300.0, 1000.0, 3000.0)
 """Nats of negative log-likelihood per standardised unit of total variation (S1)."""
-GATE_SWEEP: Final = (3.0, 30.0, 300.0)
+GATE_SWEEP: Final = (30.0, 100.0, 300.0)
 """Nats per expected open gate (S2)."""
-STEPS: Final = 1500
+STEPS: Final = 1000
+SUBSAMPLE: Final = 0.25
+"""Share of each fold's pre-training rows the offset fits use (a fixed random subset; the rows of one half-hour differ only in lead)."""
+INIT_JUMP: Final = 0.001
+"""S2 starts with a gate open at every day where S1's offset changes by 0.1% of capacity or more."""
 LR: Final = 0.02
 DETECT_PER_DAY: Final = 0.001
 """A day's change of the offset counts toward a step when it is at least 0.1% of capacity."""
@@ -62,13 +68,15 @@ class Fold:
     n_days: int
     n_knots: int
     span_end_day: int
+    rows_per_day: np.ndarray
 
 
 def load_fold(*, month: str, device: str) -> Fold:
     """Load a fold's cache."""
     z = np.load(WORK / "cache" / f"{month}.npz")
-    primary = z["primary"].astype(np.int64)
-    target_idx = z["target_idx"].astype(np.int64)
+    keep = np.sort(np.random.default_rng(573).permutation(len(z["y"]))[: int(SUBSAMPLE * len(z["y"]))])
+    primary = z["primary"][keep].astype(np.int64)
+    target_idx = z["target_idx"][keep].astype(np.int64)
     day = target_idx // world.PER_DAY
     year, mon = (int(p) for p in month.split("-"))
     n_knots = (year - 2019) * 12 + (mon - 9) + 1
@@ -77,12 +85,15 @@ def load_fold(*, month: str, device: str) -> Fold:
     start = t64.astype("datetime64[M]")
     lo, hi = start.astype("datetime64[us]"), (start + 1).astype("datetime64[us]")
     tau = ((start - np.datetime64("2019-09", "M")).astype(np.float64) + (t64 - lo) / (hi - lo)).astype(np.float32)
+    n_days = int(z["target_idx"].max() // world.PER_DAY) + 1
+    rows_per_day = np.zeros((16, n_days))
+    np.add.at(rows_per_day, (primary, day), 1.0)
     return Fold(
-        month=month, out=torch.from_numpy(z["out"]).to(device), y=z["y"],
+        month=month, out=torch.from_numpy(z["out"][keep]).to(device), y=z["y"][keep],
         primary=torch.from_numpy(primary).to(device), primary_np=primary, target_idx=target_idx,
         day=torch.from_numpy(day).to(device), tau=torch.from_numpy(tau).to(device),
         mean=z["target_mean"].astype(np.float64), std=z["target_std"].astype(np.float64),
-        n_days=int(day.max()) + 1, n_knots=n_knots, span_end_day=int(day.max()),
+        n_days=int(z["target_idx"].max() // world.PER_DAY) + 1, n_knots=n_knots, span_end_day=int(z["target_idx"].max() // world.PER_DAY), rows_per_day=rows_per_day,
     )  # fmt: skip
 
 
@@ -137,10 +148,11 @@ def fit_s0(*, fold: Fold, z: torch.Tensor) -> np.ndarray:
 
     _optimise(params=[knots], loss_fn=loss, steps=STEPS)
     with torch.no_grad():
-        # each day's position on the month grid: the mean tau of its rows
-        sums = torch.zeros(fold.n_days, device=fold.out.device).index_add_(0, fold.day, fold.tau)
-        cnt = torch.zeros(fold.n_days, device=fold.out.device).index_add_(0, fold.day, torch.ones_like(fold.tau))
-        t_day = (sums / cnt.clamp(min=1)).clamp(0.0, float(fold.n_knots - 1))
+        days = (np.datetime64("2019-09-01T12:00:00", "us") + np.arange(fold.n_days)[:, None].astype("timedelta64[D]").astype("timedelta64[us]")).ravel()
+        start = days.astype("datetime64[M]")
+        lo, hi = start.astype("datetime64[us]"), (start + 1).astype("datetime64[us]")
+        t_np = (start - np.datetime64("2019-09", "M")).astype(np.float64) + (days - lo) / (hi - lo)
+        t_day = torch.from_numpy(t_np.astype(np.float32)).to(fold.out.device).clamp(0.0, float(fold.n_knots - 1))
         l2 = t_day.floor().long().clamp(max=fold.n_knots - 2)
         f2 = t_day - l2.float()
         path = (1 - f2)[None] * knots[:, l2] + f2[None] * knots[:, l2 + 1]
@@ -160,18 +172,17 @@ def fit_s1(*, fold: Fold, z: torch.Tensor, lam: float) -> np.ndarray:
     return knots.detach().cpu().numpy()
 
 
-def fit_s2(*, fold: Fold, z: torch.Tensor, lam: float, init: np.ndarray | None = None) -> np.ndarray:
+def fit_s2(*, fold: Fold, z: torch.Tensor, lam: float, init: np.ndarray) -> np.ndarray:
     """Return S2's daily path (16, days): sum of hard-concrete gated jumps, penalised by the expected number of open gates."""
     dev = fold.out.device
-    log_alpha = torch.full((16, fold.n_days), -3.0, device=dev)
-    amp = torch.zeros(16, fold.n_days, device=dev)
-    if init is not None:
-        jump = np.diff(init, axis=1, prepend=0.0)
-        big = np.abs(jump) > 0.0
-        log_alpha = torch.from_numpy(np.where(big, 2.0, -3.0).astype(np.float32)).to(dev)
-        amp = torch.from_numpy(np.where(big, jump, 0.0).astype(np.float32)).to(dev)
+    assert init is not None, "S2 starts from S1's thresholded jumps (pure gradient start from closed gates did not open any gate)"
+    jump = np.diff(init, axis=1, prepend=init[:, :1]) * fold.std[:, None]
+    big = np.abs(jump) >= INIT_JUMP
+    log_alpha = torch.from_numpy(np.where(big, 2.0, -3.0).astype(np.float32)).to(dev)
+    amp = torch.from_numpy((np.where(big, jump, 0.0) / fold.std[:, None]).astype(np.float32)).to(dev)
     log_alpha.requires_grad_(True)
     amp.requires_grad_(True)
+    torch.manual_seed(573)
     n = float(len(z))
     offset_const = HC_BETA * float(np.log(-HC_GAMMA / HC_ZETA))
 
@@ -227,6 +238,17 @@ def extract(*, path: np.ndarray, std: float, per_day: float = DETECT_PER_DAY, mi
     return steps
 
 
+SUPPORT_ROWS: Final = 100
+"""A step is scored only when the Primary has at least 100 cached rows in each of the 5 days before and after it (about a quarter of the typical 400)."""
+
+
+def supported(*, fold: Fold, primary: int, day: int) -> bool:
+    """Return whether the fold has rows on both sides of the day for the Primary."""
+    r = fold.rows_per_day[primary]
+    before, after = r[max(day - 5, 0) : day].sum(), r[day + 1 : day + 6].sum()
+    return bool(before >= SUPPORT_ROWS and after >= SUPPORT_ROWS)
+
+
 def match(*, truth: list[tuple[int, float]], found: list[tuple[float, float]]) -> tuple[int, int]:
     """Return (truth steps recovered, found steps that match a truth step): same sign, date within 3 days, size within 25%."""
     used: set[int] = set()
@@ -248,7 +270,7 @@ def score_steps(*, fold: Fold, path: np.ndarray, truth: dict[int, list[tuple[int
     rec_all = rec_big = n_all = n_big = n_found = n_true_found = 0
     for p in world.INJECTED:
         found = [(d, s) for d, s in extract(path=path[p], std=fold.std[p]) if d <= limit]
-        tru = [(d, s) for d, s in truth.get(p, []) if d <= limit]
+        tru = [(d, s) for d, s in truth.get(p, []) if d <= limit and supported(fold=fold, primary=p, day=d)]
         hit, ok = match(truth=tru, found=found)
         big = [(d, s) for d, s in tru if abs(s) >= 0.03]
         hit_big, _ = match(truth=big, found=found)
@@ -262,12 +284,19 @@ def score_steps(*, fold: Fold, path: np.ndarray, truth: dict[int, list[tuple[int
 
 
 def score_clean(*, fold: Fold, path: np.ndarray) -> dict:
-    """Count steps of 1% or more per Primary-year on the six injected and on the ten untouched Primaries (world K0)."""
+    """Count steps of 1% or more per Primary-year on the six injected and on the ten untouched Primaries (world K0).
+
+    Each Primary's years run from its first cached day to ten days before the span ends.
+    """
     limit = fold.span_end_day - END_MARGIN
     out = {}
     for name, ps in (("injected_six", world.INJECTED), ("untouched_ten", [p for p in range(16) if p not in world.INJECTED])):
-        n = sum(len([1 for d, _ in extract(path=path[p], std=fold.std[p]) if d <= limit]) for p in ps)
-        out[name] = {"steps": n, "per_primary_year": n / (len(ps) * world.offset_years(start_day=0, end_day=limit))}
+        n, years = 0, 0.0
+        for p in ps:
+            first = int(np.argmax(fold.rows_per_day[p] > 0))
+            n += len([1 for d, _ in extract(path=path[p], std=fold.std[p]) if first <= d <= limit])
+            years += world.offset_years(start_day=first, end_day=limit)
+        out[name] = {"steps": n, "primary_years": years, "per_primary_year": n / years}
     return out
 
 
@@ -276,7 +305,7 @@ def score_ramp(*, fold: Fold, path: np.ndarray) -> dict:
     rows = []
     for p in world.INJECTED:
         first, last, size = world.ramp_points(primary=p)
-        if last + 30 > fold.span_end_day:
+        if last + 30 > fold.span_end_day or not (supported(fold=fold, primary=p, day=first) and supported(fold=fold, primary=p, day=last)):
             continue
         rec = float(path[p, last + 30] - path[p, max(first - 30, 0)]) * fold.std[p]
         steps = [s for d, s in extract(path=path[p], std=fold.std[p], per_day=0.0005, min_step=0.003) if first - 15 <= d <= last + 15]
@@ -287,21 +316,15 @@ def score_ramp(*, fold: Fold, path: np.ndarray) -> dict:
     return {"per_primary": rows, "pass_share": float(np.mean([r["end_ok"] and r["steps_ok"] for r in rows])) if rows else float("nan")}
 
 
-def run_one(*, fold: Fold, world_name: str, device: str, tv: float, gate: float) -> dict:
-    """Fit S0, S1 at `tv`, and S2 at `gate` in one world on one fold; return the scores."""
+def run_one(*, fold: Fold, world_name: str, device: str, tvs: tuple[float, ...], gates: tuple[float, ...]) -> dict:
+    """Fit S0, S1 at each total-variation weight, and S2 at each gate weight started from each S1; return the scores."""
     grid = data.grid_length()
     inj = world.injection(world=world_name, grid=grid)
     z = world_z(fold=fold, inj=inj, device=device)
     truth = world.truth_steps(world=world_name)
-    result: dict = {"month": fold.month, "world": world_name, "tv": tv, "gate": gate}
-    for arm in ("S0", "S1", "S2"):
-        started = time.monotonic()
-        if arm == "S0":
-            path = fit_s0(fold=fold, z=z)
-        elif arm == "S1":
-            path = fit_s1(fold=fold, z=z, lam=tv)
-        else:
-            path = fit_s2(fold=fold, z=z, lam=gate)
+    result: dict = {"month": fold.month, "world": world_name}
+
+    def record(*, key: str, path: np.ndarray, started: float) -> None:
         res: dict = {"seconds": round(time.monotonic() - started, 1)}
         if world_name == "Ks":
             res.update(score_steps(fold=fold, path=path, truth=truth))
@@ -309,9 +332,19 @@ def run_one(*, fold: Fold, world_name: str, device: str, tv: float, gate: float)
             res.update(score_clean(fold=fold, path=path))
         else:
             res.update(score_ramp(fold=fold, path=path))
-        result[arm] = res
-        np.save(WORK / "paths" / f"{fold.month}_{world_name}_{arm}_{tv:g}_{gate:g}.npy", path.astype(np.float32))
-        print(fold.month, world_name, arm, {k: v for k, v in res.items() if k != "per_primary"}, flush=True)
+        result[key] = res
+        np.save(PATHS / f"{fold.month}_{world_name}_{key.replace('/', '_')}.npy", path.astype(np.float32))
+        print(fold.month, world_name, key, {k: v for k, v in res.items() if k != "per_primary"}, flush=True)
+
+    started = time.monotonic()
+    record(key="S0", path=fit_s0(fold=fold, z=z), started=started)
+    for tv in tvs:
+        started = time.monotonic()
+        p1 = fit_s1(fold=fold, z=z, lam=tv)
+        record(key=f"S1@{tv:g}", path=p1, started=started)
+        for gate in gates:
+            started = time.monotonic()
+            record(key=f"S2@{tv:g}/{gate:g}", path=fit_s2(fold=fold, z=z, lam=gate, init=p1), started=started)
     return result
 
 
@@ -321,22 +354,22 @@ def main() -> None:
     parser.add_argument("command", choices=("sweep", "run"))
     parser.add_argument("--months", nargs="+", default=list(MONTHS))
     parser.add_argument("--worlds", nargs="+", default=list(world.WORLDS))
-    parser.add_argument("--tv", type=float, default=100.0)
-    parser.add_argument("--gate", type=float, default=30.0)
+    parser.add_argument("--tv", type=float, nargs="+", default=list(TV_SWEEP))
+    parser.add_argument("--gate", type=float, nargs="+", default=list(GATE_SWEEP))
     args = parser.parse_args()
-    (WORK / "paths").mkdir(parents=True, exist_ok=True)
-    (WORK / "step1").mkdir(parents=True, exist_ok=True)
+    global PATHS  # noqa: PLW0603
+    PATHS = WORK / f"paths_{args.command}_r2"
+    PATHS.mkdir(parents=True, exist_ok=True)
+    (WORK / f"step1_{args.command}_r2").mkdir(parents=True, exist_ok=True)
     device = "cuda"
     for month in args.months:
         fold = load_fold(month=month, device=device)
-        combos = list(zip(TV_SWEEP, GATE_SWEEP, strict=True)) if args.command == "sweep" else [(args.tv, args.gate)]
         for w in args.worlds:
-            for tv, gate in combos:
-                target = WORK / "step1" / f"{args.command}_{month}_{w}_{tv:g}_{gate:g}.json"
-                if target.exists():
-                    continue
-                res = run_one(fold=fold, world_name=w, device=device, tv=tv, gate=gate)
-                target.write_text(json.dumps(res, indent=1))
+            target = WORK / f"step1_{args.command}_r2" / f"{month}_{w}.json"
+            if target.exists():
+                continue
+            res = run_one(fold=fold, world_name=w, device=device, tvs=tuple(args.tv), gates=tuple(args.gate))
+            target.write_text(json.dumps(res, indent=1))
         del fold
         torch.cuda.empty_cache()
 

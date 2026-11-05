@@ -53,14 +53,18 @@ def build(*, month: str, device: str) -> None:
     i = len(valid_us) // 2
     example = (
         f"target {datetime.fromtimestamp(valid_us[i] / 1e6, UTC)}, origin "
-        f"{datetime.fromtimestamp(origin_us[i] / 1e6, UTC)} (weather issued at or before the origin; "
+        f"{datetime.fromtimestamp(origin_us[i] / 1e6, UTC)} (ERA5 and CAMS analysis rows: origin before target, "
         f"all {len(valid_us):,} rows asserted origin < target <= refit {refit:%Y-%m-%d} minus "
         f"{c.regimes.REFIT_CUTOFF_AGE})"
     )
     print(month, "timing checks passed |", example, flush=True)
     model = m.ModularMdn(n_primaries=len(rows.target_mean), stage="pre")
     state = torch.load(W554 / "pretrained" / "M0" / f"{month}_s0.pt", map_location="cpu")
-    model.load_state_dict({a: v for a, v in state.items() if not a.startswith("mixer_ft.")}, strict=False)
+    loaded = model.load_state_dict(
+        {a: v for a, v in state.items() if not a.startswith("mixer_ft.")}, strict=False
+    )
+    assert all(a.startswith("mixer_ft.") for a in loaded.missing_keys), loaded
+    assert not loaded.unexpected_keys, loaded
     model.to(device).eval()
     outs = []
     with torch.no_grad():

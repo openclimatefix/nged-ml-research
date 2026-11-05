@@ -128,10 +128,11 @@ fold). Cost is measured on the first pre-training and projected before the rest 
 
 ## Scoring protocol for Step 1 (fixed before any score is quoted)
 
-- **Offset fits.** Each offset is fitted with Adam on the full set of a fold's pre-training rows
-  (about 7 million rows), 1,500 steps, rate 0.02 decaying to 0.002. S0 uses experiment 565's weight
+- **Offset fits.** Each offset is fitted with Adam on a fixed random 25% of a fold's pre-training
+  rows (about 1.8 million of 7 million; the weights below are per this subsample), 1,000 steps, rate
+  0.02 decaying to 0.002. S0 uses experiment 565's weight
   of 10 on the mean squared first difference of the monthly knots. S1's total-variation weight is
-  swept over 10, 100, and 1000 nats per standardised unit, and S2's gate weight over 3, 30, and 300
+  swept over 300, 1000, and 3000 nats per standardised unit, and S2's gate weight over 30, 100, and 300
   nats per expected open gate, on the first fold (2025-10) of worlds Ks and K0. One weight per arm
   is then fixed: the one with the highest F1 (the harmonic mean of recall and precision) in world
   Ks among those with at most 1 false step of 1% or more per Primary-year in world K0.
@@ -182,3 +183,17 @@ real series are scored; July 2026 unused; monthly or coarser refits; models save
 data folder. Departures: none in Step 1. Earlier `advice` items followed: carry slow Primary-level
 change as a per-Primary output offset (experiment 565), and state the minimum detectable effect
 beside every contrast.
+
+## Departures found in the code review (recorded before the scored run)
+
+- **S2 starts from S1.** Gates started closed never opened, so S2 starts with a gate open at every
+  day where S1's offset changes by 0.1% of capacity or more, and the gate penalty then closes the
+  gates it does not need. S2's recall is therefore bounded by S1's, and a precision gain of S2 over
+  S1 tests thresholding of S1, not independent sparse recovery.
+- **Truth steps need data.** A truth step is scored only when the Primary has at least 100 cached
+  rows in each of the 5 days either side (a quarter of a typical 400), because some Primaries have no
+  rows before 2023 or 2024.
+- **Per-Primary years.** K-S2's years run from each Primary's first cached day.
+- **Unlabelled real drift.** The real series moves on its own, so the offset path holds real level
+  changes as well as the injection. K-S3 therefore also reports the rise in world K0 beside the rise
+  in world Kr, and a paired path (world Ks minus world K0) is reported as a descriptive diagnostic.
