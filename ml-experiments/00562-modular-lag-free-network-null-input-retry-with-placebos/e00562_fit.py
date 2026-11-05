@@ -102,7 +102,10 @@ def train(
     *, model: torch.nn.Module, x: torch.Tensor, z: torch.Tensor, w: torch.Tensor, p: torch.Tensor,
     is_val: torch.Tensor, seed: int, lr: float, outlier: bool, prior: bool, device: str,
 ) -> tuple[int, float]:  # fmt: skip
-    """Experiment 554's loop for arm M0: experiment 510's loop with the fresh mixer in its own learning-rate group."""
+    """Experiment 554's loop for arm M0.
+
+    It is experiment 510's loop with the fresh mixer in its own learning-rate group.
+    """
     assert not outlier
     torch.manual_seed(seed)
     train_idx = torch.nonzero(~is_val).squeeze(1)
@@ -196,7 +199,10 @@ _build_month, _build_test = k.build_month, data.build_test
 
 
 def build_month(*, month, clean):
-    """Build the month's rows, assert each training origin's weather run exists and precedes it, and append the arm's columns."""
+    """Build the month's rows and append the arm's columns.
+
+    Asserts that each training origin's weather run exists and precedes the origin.
+    """
     mr = _build_month(month=month, clean=clean)
     assert (mr.valid_us > mr.origin_us).all(), f"{month}: a training target is not after its origin"
     runs = np.unique(mr.origin_us)
@@ -245,7 +251,10 @@ def build_month(*, month, clean):
 
 
 def build_test(*, month, standardiser):
-    """Build the month's test rows, assert nwp_init_time <= power_fcst_init_time for each test origin, and append the arm's columns."""
+    """Build the month's test rows and append the arm's columns.
+
+    Asserts nwp_init_time <= power_fcst_init_time for each test origin.
+    """
     test = _build_test(month=month, standardiser=standardiser)
     assert (test.valid > test.origin).all(), f"{month}: a test target is not after its origin"
     pub = common.PUBLICATION_DELAY
@@ -300,7 +309,10 @@ def assemble() -> None:
 
 
 def checks(*, month: str) -> None:
-    """Print the sanity checks of the arm on one fold: widths, placebo overlap, presence flags, and zero-start equality with M0."""
+    """Print the arm's sanity checks on one fold.
+
+    They cover widths, placebo overlap, presence flags, and zero-start equality with M0.
+    """
     clean = c.clean_stack()
     mr = k.build_month(month=month, clean=clean)
     test = data.build_test(month=month, standardiser=mr.base.standardiser)
