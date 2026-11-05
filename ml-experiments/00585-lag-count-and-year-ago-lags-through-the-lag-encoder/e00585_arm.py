@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, E402, PT018, D103, B023, F821, ANN202
+# ruff: noqa: E501, ANN001, E402, PT018, D103, B023, F821, ANN202, PLR0915
 """Experiment 585: fit, assemble, and inject lag-only events for the lag-count and year-ago arms (GPU).
 
 A wrapper around experiment 572's `e00572_fit.py` (imported, with its module-level state patched, as
@@ -11,8 +11,8 @@ Usage: python e00585_arm.py KIND COMMAND [--months ...] [--seeds ...] [--passes 
 
 - KIND: `n1` (week lag only), `n3` (day, week, and a second weekly lag, 14 days before the target's newest same weekday), `y1` (day, week, and 364-day
   lags), `y1c` (as y1 at 365 days, the same calendar date), `y3` (day, week, and 357-, 364-, and 371-day lags), or `y1mask` (Y1's saved weights, with
-  the year-ago lag masked inside verified load-shift events; only `fit` is meaningful, and it loads
-  Y1's weights instead of training).
+  the year-ago lag masked inside verified load-shift events; only `inject` is meaningful, and it
+  writes pass 200 next to Y1's own files).
 - COMMAND: `pretrain`, `fit`, `assemble`, or `inject` (forecast with lag-only contaminated lags).
 """
 
@@ -54,10 +54,16 @@ WORK = ML_EXPERIMENTS_DATA_DIR / NAME
 WEIGHTS_KIND = "y1" if KIND == "y1mask" else KIND
 e.WORK = WORK
 e.W = WORK / "arms" / WEIGHTS_KIND / "work"
-if KIND == "y1mask":
-    OUT_W = WORK / "arms" / "y1mask" / "work"
 
-PERIODS = {"n1": (), "n3": (-7,), "y1": (364,), "y1c": (365,), "y3": (357, 364, 371), "y1mask": (364,)}
+YEAR_AGO_DAYS = 300
+PERIODS = {
+    "n1": (),
+    "n3": (-7,),
+    "y1": (364,),
+    "y1c": (365,),
+    "y3": (357, 364, 371),
+    "y1mask": (364,),
+}
 mylags.set_periods(periods_days=PERIODS[KIND], drop_day=KIND == "n1")
 N_EXTRA = len(PERIODS[KIND])
 e.lg = mylags
@@ -90,10 +96,31 @@ def new_model(*, n_primaries: int, stage: str = "ft") -> torch.nn.Module:
         drop_day=KIND == "n1",
     )
     model.table = e.CTX.get(f"table_{stage}")  # ty: ignore[invalid-assignment]
+    model.extra_uses_pre = [d >= YEAR_AGO_DAYS for d in PERIODS[KIND]]
+    model.table_extra = e.CTX.get("table_extra")  # ty: ignore[invalid-assignment]
     return model
 
 
+_attach_tables = e.attach_tables
+
+
+def attach_tables(*, standardiser) -> None:
+    """Attach the ENS table, and the ERA5/CAMS table that year-ago lags read for their weather.
+
+    A year-ago lag time is 340 days or more before the origin, so ERA5 and CAMS estimates of its
+    weather exist at forecast time, and the ENS summaries (which start 2024-04-01) would leave
+    most fine-tuning rows without weather at the lag time.
+    """
+    _attach_tables(standardiser=standardiser)
+    cols, _ = e.d560.raw_table(source="pre", cache=e.W560 / "expected")
+    e.CTX["table_extra"] = torch.from_numpy(
+        e.d560.standardised_table(cols=cols, standardiser=standardiser)
+    ).to("cuda")
+
+
 e.apply_dropout, e.new_model = apply_dropout, new_model
+if any(d >= YEAR_AGO_DAYS for d in PERIODS[KIND]):
+    e.attach_tables = attach_tables
 
 
 def real_events() -> list[dict]:
@@ -121,6 +148,10 @@ def masked_extra_clean(*, clean: np.ndarray) -> np.ndarray:
     return out
 
 
+MASK_PASS = 200
+"""Pass number of Y1 forecast again with the year-ago lag masked inside verified events."""
+
+
 def _out(out_dir, month, r, day, seed):
     return out_dir / f"{month}_r{r:02d}_d{day}_s{seed}.parquet"
 
@@ -132,7 +163,9 @@ def _done(*, out) -> bool:
 def run_inject(*, device: str = "cuda") -> None:
     """Forecast every pass of the injected bank with the arm's saved weights; one parquet per cell."""
     clean = e.c.clean_stack()
-    passes = MINE.passes if MINE.passes is not None else [*range(bank.N_PASSES), bank.REAL_PASS]
+    masked = masked_extra_clean(clean=clean) if KIND == "y1mask" else None
+    default = [MASK_PASS] if KIND == "y1mask" else [*range(bank.N_PASSES), bank.REAL_PASS]
+    passes = MINE.passes if MINE.passes is not None else default
     rows: list[dict] = []
     for month in e.ARGS.months:
         out_dir = e.W / "inject"
@@ -156,7 +189,10 @@ def run_inject(*, device: str = "cuda") -> None:
 
         def x_for(r: int) -> np.ndarray:
             """Return the test inputs with pass `r`'s contaminated lag columns (built on demand)."""
-            if r == bank.REAL_PASS:
+            mylags.EXTRA_CLEAN = masked if r == MASK_PASS else None
+            if r == MASK_PASS:
+                fixed = clean
+            elif r == bank.REAL_PASS:
                 fixed = bank.corrected_clean(clean=clean, events=real_events())
             else:
                 fixed, _ = bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)
@@ -171,7 +207,7 @@ def run_inject(*, device: str = "cuda") -> None:
             assert np.array_equal(x[:, 43:45], test.x[:, 43:45]), "contamination moved a lag time"
             return x
 
-        for r in [p for p in passes if p != bank.REAL_PASS]:
+        for r in [p for p in passes if p not in (bank.REAL_PASS, MASK_PASS)]:
             rows += [
                 {"month": month, **q}
                 for q in bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)[1]

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 585: experiment 572's v3+D5 network whose lag encoder also reads `K` extra lags.
 
 The input has 37 lag-free columns, the 8 lag columns of experiment 560, 4 columns per extra lag (see
@@ -24,6 +25,9 @@ class MultiLagOffsetMdn(mod.LagOffsetMdn):
         """Build the network, then widen the lag encoder by the extra lags' inputs."""
         super().__init__(n_primaries=n_primaries, stage=stage, n_knots=n_knots)
         self.n_extra, self.drop_day = n_extra, drop_day
+        self.table_extra: torch.Tensor | None = None
+        """ERA5/CAMS expected-input table that year-ago lags read in fine-tuning (set by the arm driver)."""
+        self.extra_uses_pre: list[bool] = []
         e = m545.EMBEDDING
         expected = 2 * m545.ENCODER_OUT * (2 + n_extra)
         self.lag = nn.ModuleList(
@@ -44,11 +48,17 @@ class MultiLagOffsetMdn(mod.LagOffsetMdn):
         return 45 + 4 * self.n_extra
 
     def _expected_at(
-        self, *, idx: torch.Tensor, primary: torch.Tensor, emb: torch.Tensor
+        self,
+        *,
+        idx: torch.Tensor,
+        primary: torch.Tensor,
+        emb: torch.Tensor,
+        table: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Return the weather and datetime embeddings at grid indices `idx` (zeros where idx < 0)."""
-        assert self.table is not None, "attach the expected-input table first"
-        row = self.table[primary, idx.clamp(min=0)].float()
+        table = self.table if table is None else table
+        assert table is not None, "attach the expected-input table first"
+        row = table[primary, idx.clamp(min=0)].float()
         row = torch.where((idx >= 0)[:, None], row, torch.zeros_like(row))
         hw = nn.functional.gelu(self.weather(torch.cat([row[:, :7], emb], dim=-1)))
         hd = nn.functional.gelu(self.datetime(torch.cat([row[:, 7:], emb], dim=-1)))
@@ -65,7 +75,8 @@ class MultiLagOffsetMdn(mod.LagOffsetMdn):
         parts = [x[:, m560.LAG_COLS], x[:, 45 : 45 + 3 * k], dw, dd, ww, wd]
         for j in range(k):
             idx = x[:, 45 + 3 * k + j].long()
-            parts.extend(self._expected_at(idx=idx, primary=primary, emb=emb))
+            table = self.table_extra if self.stage == "ft" and self.extra_uses_pre[j] else None
+            parts.extend(self._expected_at(idx=idx, primary=primary, emb=emb, table=table))
         return self.lag[0](torch.cat([*parts, emb], dim=-1))
 
     def forward(self, x: torch.Tensor, primary: torch.Tensor | None = None) -> torch.Tensor:

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN202
+# ruff: noqa: E501, ANN001, D205
 """Experiment 585: experiment 572's day and week lags plus up to five extra lags at other periods.
 
 Same module surface as `e00572_lags`, so experiment 572's fitting script can use it unchanged
@@ -30,7 +30,7 @@ STEPS = lg572.STEPS
 WEEK_STEPS = lg572.WEEK_STEPS
 CAP_24H = lg572.CAP_24H
 CAP_3_5H = lg572.CAP_3_5H
-LAST_US = int(np.datetime64('2026-06-30T23:30', 'us').astype('int64'))
+LAST_US = int(np.datetime64("2026-06-30T23:30", "us").astype("int64"))
 
 EXTRA_PERIODS_DAYS: tuple[int, ...] = ()
 """Periods (in days) of the extra lags; set by `e00585_arm.py`."""
@@ -86,12 +86,11 @@ def lag_stats(*, rows, clean: np.ndarray, cap_steps: int) -> np.ndarray:
     """Return (mean, std) of the day, week, and extra lag values over the training rows, shape (2 + K, 2)."""
     base = lg572.lag_stats(rows=rows, clean=clean, cap_steps=cap_steps)
     train = ~rows.is_val
-    src = clean if EXTRA_CLEAN is None else EXTRA_CLEAN
     out = [base]
     for idx in extra_indices(
         target_idx=rows.target_idx[train], origin_idx=rows.origin_idx[train], cap_steps=cap_steps
     ):
-        v = np.where(idx >= 0, src[rows.primary[train], np.clip(idx, 0, None)], np.nan)
+        v = np.where(idx >= 0, clean[rows.primary[train], np.clip(idx, 0, None)], np.nan)
         out.append(np.array([[np.nanmean(v), max(float(np.nanstd(v)), 1e-6)]]))
     return np.concatenate(out)
 
@@ -134,14 +133,17 @@ EXTRA_AMAX: list[float] = []
 
 def set_periods(*, periods_days: tuple[int, ...], drop_day: bool = False) -> None:
     """Configure the extra lags and fill in their missing-age codes."""
-    global EXTRA_PERIODS_DAYS, DROP_DAY  # noqa: PLW0603
+    global EXTRA_PERIODS_DAYS, DROP_DAY
     EXTRA_PERIODS_DAYS, DROP_DAY = tuple(periods_days), drop_day
     EXTRA_AMAX.clear()
     gap_h = lg572.MAX_LEAD_HOURS + CAP_24H * 0.5
     for days in EXTRA_PERIODS_DAYS:
         d = abs(days)
         EXTRA_AMAX.append(
-            24.0 * (d if days > 0 else 7 + d) * float(np.ceil(gap_h / (24.0 * (d if days > 0 else 7)))) / lags.LEAD_SCALE_HOURS
+            24.0
+            * (d if days > 0 else 7 + d)
+            * float(np.ceil(gap_h / (24.0 * (d if days > 0 else 7))))
+            / lags.LEAD_SCALE_HOURS
             if days > 0
             else (168.0 * float(np.ceil(gap_h / 168.0)) + 24.0 * d) / lags.LEAD_SCALE_HOURS
         )
@@ -177,7 +179,9 @@ def check_lag_ages(
         idx = x[sel, extra_idx_col(k)].astype(np.int64)
         tgt = ((valid_us[sel] - grid_start) // step) if valid_us is not None else None
         if tgt is not None and days > 0:
-            assert (tgt - idx == days * STEPS).all(), f"{label}: the {days}-day lag is not exactly {days} days back"
+            assert (tgt - idx == days * STEPS).all(), (
+                f"{label}: the {days}-day lag is not exactly {days} days back"
+            )
         assert (grid_start + idx * step <= LAST_US).all(), f"{label}: a lag is after 2026-06-30"
         ok = idx >= 0
         t_lag = grid_start + idx[ok] * step
@@ -186,6 +190,11 @@ def check_lag_ages(
         )
         run = origin_tab[primary[sel][ok], idx[ok]]
         have = run > 0
+        if (
+            days >= 300
+        ):  # read from the ERA5/CAMS table; the lag is 340 days or more before the origin
+            assert (t_lag <= origin_us[sel][ok] - 340 * 86_400_000_000).all(), label
+            have = np.zeros_like(have)
         assert (run[have] <= t_lag[have]).all(), (
             f"{label}: the {days}-day lag's weather run is after the lag time"
         )
@@ -208,4 +217,6 @@ def check_matches_560(*, clean, primary, target_idx, origin_idx, lead, stats) ->
         clean=clean, primary=primary[s], target_idx=target_idx[s], origin_idx=origin_idx[s],
         stats=stats[:2], cap_steps=CAP_24H,
     )  # fmt: skip
-    assert np.array_equal(mine[:, :8], theirs), "the day and week columns differ from experiment 572's"
+    assert np.array_equal(mine[:, :8], theirs), (
+        "the day and week columns differ from experiment 572's"
+    )
