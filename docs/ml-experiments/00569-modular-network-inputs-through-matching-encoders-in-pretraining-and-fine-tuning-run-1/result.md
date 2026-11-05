@@ -1,6 +1,9 @@
 ---
 id: "00569"
 slug: modular-network-inputs-through-matching-encoders-in-pretraining-and-fine-tuning-run-1
+title: >-
+  Does each input group help the modular network when it also enters pre-training, through the
+  encoder that matches it?
 theme: demand-inputs
 also_relevant_to:
   - retraining-and-training-history
@@ -20,7 +23,8 @@ hypothesis: >-
   Experiment 562 added five input groups to the modular lag-free network at fine-tuning only. Each
   group may help once it is also pre-trained on ERA5 and CAMS rows and enters through the encoder
   that matches its content: thermal-lag and solar-gain windows (B1) and look-ahead windows (B2)
-  through the weather encoder, school terms and holidays (B3a) through the datetime encoder, national
+  through the weather encoder, school terms and holidays (B3a) through the datetime encoder,
+  national
   signals of the previous day (B3b) and the whole-day price shape (B4) through a small parallel
   encoder. A sixth group (B3c) adds, to B3a, the number of schools within 2 km of each Primary as a
   gate on the school columns.
@@ -31,16 +35,23 @@ prediction: >-
   minimum detectable effect or any slice is hurt. P2: B3a gains at least 0.03 on all rows at one
   group when entered at pre-training and fine-tuning (562: -0.027 at fine-tuning only); it fails if
   it is within 0.02 of its placebo. P3: B2, B3b, and B4 are each within 0.03 of their placebos; each
-  fails if it gains 0.03 or more on all rows. Step-1 expectation, fixed before the proximity count was computed: the rank correlation of the school-term effect with schools within 2 km is at most -0.3 with an interval excluding zero. P4: B3c beats B3a on all rows at the eight MVA Primaries
+  fails if it gains 0.03 or more on all rows. Step-1 expectation, fixed before the proximity count
+  was computed: the rank correlation of the school-term effect with schools within 2 km is at most
+  -0.3 with an interval excluding zero. P4: B3c beats B3a on all rows at the eight MVA Primaries
   by at least 0.02; it fails otherwise (the step-1 rank correlation of the school-term effect with
   school proximity was +0.28 with an interval that includes zero, so P4 is expected to fail).
 decision_rule: >-
-  The keep rule of addendum 14, part C: a group is kept if (a) real minus placebo improves all rows at
+  The keep rule of addendum 14, part C: a group is kept if (a) real minus placebo improves all rows
+  at
   a group by at least that contrast's minimum detectable effect (MDE) with a Bonferroni interval
   excluding zero, or (b) it improves cold nights, Christmas week, or the high-spread tercile by at
   least that slice's MDE with a Bonferroni interval excluding zero, and does not actively hurt
-  any other slice. A slice is actively hurt when the CRPS difference is worse than the larger of 0.03 points and the slice's MDE, and either the 5-block month interval excludes zero on the harmful side or the sign is harmful in at least 4 of 5 folds. The 0.03 floor is experiment 562's threshold
-  because an added column needs a production feed. The leak (injected 7-day shift) is reported beside
+  any other slice. A slice is actively hurt when the CRPS difference is worse than the larger of
+  0.03 points and the slice's MDE, and either the 5-block month interval excludes zero on the
+  harmful side or the sign is harmful in at least 4 of 5 folds. The 0.03 floor is experiment 562's
+  threshold
+  because an added column needs a production feed. The leak (injected 7-day shift) is reported
+  beside
   every contrast and does not enter the rule.
 benchmark: >-
   Each real arm's own shuffled-day placebo, and plain M0 refitted on the same coarse schedule
@@ -54,33 +65,44 @@ verdict: not supported
 production_status: not-for-production
 adopted_in: none
 best_arm: >-
-  None. The closest to a gain on all rows is B1 (thermal-lag and solar-gain columns) on all rows at the six MW
+  None. The closest to a gain on all rows is B1 (thermal-lag and solar-gain columns) on all rows at
+  the six MW
   Primaries, 24-120 h: 3.758 points of CRPS against 3.893 for its placebo (difference -0.135,
   5-month interval -0.31 to +0.04, minimum detectable effect 0.30), and 3.639 for plain M0.
 headline: >-
-  No input group beat its shuffled-day placebo by its minimum detectable effect on any pre-registered
+  No input group beat its shuffled-day placebo by its minimum detectable effect on any
+  pre-registered
   slice, and none passed the keep rule. Entering the columns in pre-training as well as fine-tuning
-  did not rescue the groups that 562 found null. Three contrasts were worse, all at the eight MVA Primaries: the price shape (B4) on all rows, and school proximity (B3c) against the school-term arm on all rows and on rows with no labelled event.
+  did not rescue the groups that 562 found null. Three contrasts were worse, all at the eight MVA
+  Primaries: the price shape (B4) on all rows, and school proximity (B3c) against the school-term
+  arm on all rows and on rows with no labelled event.
 lessons: >-
   A single seed on a coarse refit has a minimum detectable effect of 0.10 points at the eight MVA
-  Primaries and 0.30 at the six MW Primaries on all rows, too wide to see the gains these inputs gave
-  in earlier tests. Pre-training the widened network afresh scored 0.03 to 0.29 points worse than the two-seed mean of plain M0 with its stored pre-trained weights (B3c worst), so the control must be re-pre-trained the same way.
+  Primaries and 0.30 at the six MW Primaries on all rows, too wide to see the gains these inputs
+  gave
+  in earlier tests. Pre-training the widened network afresh scored 0.03 to 0.29 points worse than
+  the two-seed mean of plain M0 with its stored pre-trained weights (B3c worst), so the control must
+  be re-pre-trained the same way.
 take_home_message: >-
   Letting the demand network read thermal-lag, solar-gain, look-ahead, school-term, national-signal,
   and price-shape columns during pre-training as well as fine-tuning, through the encoder that
   matches each group, did not help: none of them beat a shuffled-day placebo of the same width on
   all rows, cold nights, Christmas week, or high-spread days, and a school-proximity input made the
-  eight MVA Primaries worse. This test cannot see small gains (one seed), and the network pre-trained
+  eight MVA Primaries worse. This test cannot see small gains (one seed), and the network
+  pre-trained
   from scratch with extra columns scored worse than plain M0's stored weights, which is the larger
   effect to understand first. The next step is a second seed and a plain M0 re-pre-trained under the
   same recipe, so that the control and the arms differ only in the columns.
 advice:
   - >-
     Do not add school-proximity columns, because B3c was worse than the school-term arm by 0.112
-    points at the eight MVA Primaries and the school-term effect does not follow the count of schools
+    points at the eight MVA Primaries and the school-term effect does not follow the count of
+    schools
     near each Primary (step 1).
   - >-
-    Re-pre-train plain M0 with the same code path as the arms before the next contrast, because the arms scored 0.03 to 0.29 points worse than the two-seed mean of M0 with stored weights and the cause is untested.
+    Re-pre-train plain M0 with the same code path as the arms before the next contrast, because the
+    arms scored 0.03 to 0.29 points worse than the two-seed mean of M0 with stored weights and the
+    cause is untested.
   - >-
     Use at least 2 seeds per arm; with 1 seed the minimum detectable effect is 0.10 (eight MVA
     Primaries) and 0.30 (six MW Primaries) on all rows.

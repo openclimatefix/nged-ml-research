@@ -1,15 +1,18 @@
-# ruff: noqa: E501
-"""Experiment 554's modular network (arm M0) with extra input columns that enter pre-training and fine-tuning.
+# ruff: noqa: D205, E501
+"""Experiment 554's modular network (arm M0) with extra input columns that enter pre-training and
+fine-tuning.
 
 The extra columns are the last `n_extra` entries of the input row, after the 37 lag-free inputs.
 Three routes, chosen by which encoder matches the columns' content:
 
-- `weather`: the weather encoder reads the columns beside its 7 weather inputs and the Primary embedding.
+- `weather`: the weather encoder reads the columns beside its 7 weather inputs and the Primary
+  embedding.
 - `datetime`: the datetime encoder reads them beside its 21 inputs and the Primary embedding.
 - `parallel`: a small separate encoder (columns plus the Primary embedding, 32 hidden units, 16
   outputs) feeds both mixers by concatenation with the two encoders' outputs.
 
-Unlike experiment 562, the added input units are randomly initialised (as the rest of the encoder is)
+Unlike experiment 562, the added input units are randomly initialised (as the rest of the encoder
+is)
 because the network is pre-trained with them.
 """
 
@@ -26,10 +29,14 @@ PARALLEL_OUT: Final[int] = 16
 
 
 class ExtraMdn(nn.Module):
-    """`m.ModularMdn` whose weather encoder, datetime encoder, or a parallel encoder also reads `n_extra` columns."""
+    """`m.ModularMdn` whose weather encoder, datetime encoder, or a parallel encoder also reads
+    `n_extra` columns.
+    """
 
     def __init__(self, *, n_primaries: int, stage: str, route: str, n_extra: int) -> None:
-        """Build the network; `stage` is `pre` or `ft`, `route` is `weather`, `datetime`, or `parallel`."""
+        """Build the network; `stage` is `pre` or `ft`, `route` is `weather`, `datetime`, or
+        `parallel`.
+        """
         super().__init__()
         assert stage in {"pre", "ft"}
         assert route in {"weather", "datetime", "parallel"}

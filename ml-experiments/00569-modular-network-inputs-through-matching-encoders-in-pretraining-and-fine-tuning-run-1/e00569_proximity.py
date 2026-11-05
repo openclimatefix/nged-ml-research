@@ -1,5 +1,6 @@
-# ruff: noqa: E501, D103, ANN201
-"""Step 2 and 3 of experiment 569: schools near each Primary and their rank correlation with B3a's effect.
+# ruff: noqa: D205, D103, ANN201
+"""Step 2 and 3 of experiment 569: schools near each Primary and their rank correlation with B3a's
+effect.
 
 Reads the DfE "Get Information about Schools" register (Open Government Licence v3.0, downloaded
 2026-11-05 into this experiment's private folder) and each Primary's coordinates. Writes

@@ -1,14 +1,17 @@
-# ruff: noqa: E501
-"""The extra input columns of experiment 569, for pre-training rows (ERA5 and CAMS stand-ins) and fine-tuning rows.
+# ruff: noqa: D205, E501
+"""The extra input columns of experiment 569, for pre-training rows (ERA5 and CAMS stand-ins) and
+fine-tuning rows.
 
 One `Extras` object serves one arm (`B1`, `B1p`, `B2`, ..., `B3c`, `B4`, `B4p`; a `p` suffix is the
 shuffled-day placebo of the same width). It builds each column group in both stages from the same
 sources, and standardises with one mean and standard deviation per fold, fitted on the pre-training
 rows' real columns, so a network pre-trained on the columns reads them at the same scale when it is
-fine-tuned. Fine-tuning rows take their columns from experiment 562's `FoldColumns` (experiment 437's
+fine-tuned. Fine-tuning rows take their columns from experiment 562's `FoldColumns` (experiment
+437's
 stored tables of ensemble-run columns); pre-training rows have no ensemble run, so their columns
 come from the dense ERA5 and CAMS weather (`e00437_features.dense_arrays`) or from the calendar and
-the stored daily signals, exactly as experiment 437's `pretrain_extras` does for its T, S, and F bundles.
+the stored daily signals, exactly as experiment 437's `pretrain_extras` does for its T, S, and F
+bundles.
 
 Presence flags: a school calendar exists from 2021-09, national signals from 2023-01, and the price
 shape from 2023, but pre-training history starts in 2019-09. Pre-training rows without the source
@@ -59,7 +62,9 @@ class Extras:
     """Extra columns of one arm in both stages; holds per-process caches of the dense sources."""
 
     def __init__(self, *, arm: str, proximity: dict[int, float]) -> None:
-        """Set the arm; `proximity` maps a Primary index to its share of the largest schools-within-2-km count (B3c)."""
+        """Set the arm; `proximity` maps a Primary index to its share of the largest schools-
+        within-2-km count (B3c).
+        """
         self.arm, self.base, self.placebo = arm, base_arm(arm=arm), is_placebo(arm=arm)
         self.proximity = proximity
         self.local_date = f437.local_date_codes()
@@ -90,9 +95,11 @@ class Extras:
         target_idx: np.ndarray,
         shift: np.ndarray | None,
     ) -> np.ndarray:
-        """Return the arm's unstandardised columns for pre-training rows (NaN where the source has no value).
+        """Return the arm's unstandardised columns for pre-training rows (NaN where the source has
+        no value).
 
-        `shift` is each row's donor-day shift in half-hours (NaN where there is no donor), or None for
+        `shift` is each row's donor-day shift in half-hours (NaN where there is no donor), or None
+        for
         the real arm. A placebo moves the row's origin and valid time by the shift together, and
         B3b by the origin's shift alone, as experiment 562 did.
         """
@@ -143,7 +150,9 @@ class Extras:
     # --- standardisation ----------------------------------------------------------------
 
     def fit(self, *, raw: np.ndarray) -> None:
-        """Set the fold's mean and standard deviation from the real pre-training columns (presence flags stay 0 or 1)."""
+        """Set the fold's mean and standard deviation from the real pre-training columns (presence
+        flags stay 0 or 1).
+        """
         mean = np.nanmean(raw, axis=0)
         std = np.maximum(np.nanstd(raw, axis=0), 1e-6)
         for i, name in enumerate(COLUMNS[self.base]):

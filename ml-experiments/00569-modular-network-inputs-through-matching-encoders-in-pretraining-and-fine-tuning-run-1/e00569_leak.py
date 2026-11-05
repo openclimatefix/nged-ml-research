@@ -1,5 +1,6 @@
-# ruff: noqa: ANN201, D103, E501
-"""Injected 7-day shift leak of experiment 569's arms at cut day 14 (the formula of experiment 554's stress script).
+# ruff: noqa: D205, ANN201, D103, E501
+"""Injected 7-day shift leak of experiment 569's arms at cut day 14 (the formula of experiment 554's
+stress script).
 
 The leak is the sign times the change in the median forecast, in points of capacity, over the rows
 of the window after the cutoff, by lead band.

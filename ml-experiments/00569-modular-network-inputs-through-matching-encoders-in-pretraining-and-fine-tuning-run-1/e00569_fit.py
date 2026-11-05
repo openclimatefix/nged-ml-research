@@ -1,5 +1,6 @@
-# ruff: noqa: E501, ANN001, ANN201, D103, PT018
-"""Experiment 569, run 1: inputs enter the modular lag-free network in pre-training AND fine-tuning, through the matching encoder.
+# ruff: noqa: D205, E501, ANN001, ANN201, D103, PT018
+"""Experiment 569, run 1: inputs enter the modular lag-free network in pre-training AND fine-tuning,
+through the matching encoder.
 
 Rows, cutoffs' training windows, recency weights (90-day half-life), early stopping, seeds, scoring
 windows and the fine-tuning loop are experiment 511's L-1d through experiment 554's M0 loop (fresh
@@ -11,7 +12,8 @@ month); the leak check refits once at day 14 (`--cut-day 14`), with and without 
 Arms: `M0` (control, experiment 554's pre-trained weights, no extra columns); `B1`, `B2`, `B3a`,
 `B3b`, `B4`, `B3c` and the shuffled-day placebos `B1p`, `B2p`, `B3ap`, `B3bp`, `B4p`.
 
-Usage: python e00569_fit.py {pretrain|fit|assemble|show|columns} --arm ARM [--months ...] [--seeds ...] [--cut-day N] [--stress]
+Usage: python e00569_fit.py {pretrain|fit|assemble|show|columns} --arm ARM [--months ...] [--seeds
+...] [--cut-day N] [--stress]
 """
 
 import argparse
@@ -75,9 +77,11 @@ assert len(COLUMNS) == m.N_INPUTS
 
 
 def proximity() -> dict[int, float]:
-    """Return each Primary's schools within 2 km as a share of the largest count (B3c's gate; 0 means no school)."""
+    """Return each Primary's schools within 2 km as a share of the largest count (B3c's gate; 0
+    means no school).
+    """
     t = pl.read_csv(WORK / "school_proximity.csv")
-    top = float(t[cols.SCHOOL_RADIUS_KM].max())
+    top = float(t[cols.SCHOOL_RADIUS_KM].max())  # ty: ignore[invalid-argument-type]
     return {
         int(p): float(n) / top for p, n in zip(t["primary"], t[cols.SCHOOL_RADIUS_KM], strict=True)
     }
@@ -114,7 +118,9 @@ def new_model(
 
 
 def load_pretrained(*, model: torch.nn.Module, path: Path) -> None:
-    """Load the pre-trained weights without the pre-training mixer; the fine-tuning mixer starts fresh (seed 12345)."""
+    """Load the pre-trained weights without the pre-training mixer; the fine-tuning mixer starts
+    fresh (seed 12345).
+    """
     raw = torch.load(path, map_location="cpu")
     state = {a: v for a, v in raw.items() if not a.startswith("mixer_ft.")}
     missing = model.load_state_dict(state, strict=False)
@@ -198,7 +204,9 @@ _extension = c._extension
 
 
 def extension(*, refit, last, clean, rows) -> dict:
-    """Experiment 510's extension; empty when the only cutoff is the refit itself (no rows after it)."""
+    """Experiment 510's extension; empty when the only cutoff is the refit itself (no rows after
+    it).
+    """
     if last <= refit:
         return {
             "x": np.empty((0, m.N_INPUTS), dtype=np.float32), "y": np.empty(0, dtype=np.float32),
@@ -221,7 +229,9 @@ def fit_until(*, month: str) -> int:
 
 
 def pretrain_columns(*, month: str, pre) -> np.ndarray:
-    """Return the arm's standardised extra columns for the fold's pre-training rows, and store the fold's scale."""
+    """Return the arm's standardised extra columns for the fold's pre-training rows, and store the
+    fold's scale.
+    """
     n = len(pre.y)
     fit_idx = fit_until(month=month)
     primary, oi, ti = pre.primary, pre.origin_idx, pre.target_idx
@@ -239,7 +249,7 @@ def pretrain_columns(*, month: str, pre) -> np.ndarray:
     EX.fit(raw=real)  # ty: ignore[unresolved-attribute]
     stats = stats_file(month=month)
     stats.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(stats, mean=EX.mean, std=EX.std)  # ty: ignore[unresolved-attribute]
+    np.savez(stats, mean=EX.mean, std=EX.std)  # ty: ignore[unresolved-attribute,invalid-argument-type]
     if not EX.placebo:  # ty: ignore[unresolved-attribute]
         CHECK["months"].setdefault(month, {})["pretrain_present_share"] = float(
             np.isfinite(real).all(axis=1).mean()
@@ -253,7 +263,7 @@ def pretrain_columns(*, month: str, pre) -> np.ndarray:
         idx = np.nonzero(todo & np.isfinite(shift))[0]
         if not len(idx):
             continue
-        got = EX.raw_pretrain(
+        got = EX.raw_pretrain(  # ty: ignore[unresolved-attribute]
             primary=primary[idx], origin_idx=oi[idx], target_idx=ti[idx], shift=shift[idx]
         )  # ty: ignore[unresolved-attribute]
         raw[idx] = got
@@ -267,7 +277,9 @@ def pretrain_columns(*, month: str, pre) -> np.ndarray:
 
 
 def pretrain(*, device: str) -> None:
-    """Pre-train on ERA5 and CAMS rows (experiment 448's rows) with the arm's extra columns, per fold and seed."""
+    """Pre-train on ERA5 and CAMS rows (experiment 448's rows) with the arm's extra columns, per
+    fold and seed.
+    """
     assert not CONTROL, "arm M0 starts from experiment 554's pre-trained weights"
     clean = c.clean_stack()
     for month in ARGS.months:
@@ -325,12 +337,14 @@ def _idx(*, us: np.ndarray) -> np.ndarray:
 
 
 def finetune_columns(*, month: str, primary, origin_idx, target_idx, present) -> np.ndarray:
-    """Return the arm's standardised extra columns for fine-tuning or scoring rows (stage 2), on the fold's pre-training scale."""
+    """Return the arm's standardised extra columns for fine-tuning or scoring rows (stage 2), on the
+    fold's pre-training scale.
+    """
     fc = FOLDS[month]
     if BASE == "B4":
         return fc.price_columns(arm=ARGS.arm, target_idx=target_idx, present=present)
     stats = np.load(stats_file(month=month))
-    EX.mean, EX.std = stats["mean"], stats["std"]  # ty: ignore[unresolved-attribute]
+    EX.mean, EX.std = stats["mean"], stats["std"]  # ty: ignore[unresolved-attribute,invalid-assignment]
     table_arm = "B3a" if BASE == "B3c" else BASE
     getter = fc._raw_placebo if EX.placebo else fc._raw_real  # ty: ignore[unresolved-attribute]
     raw = getter(arm=table_arm, primary=primary, origin_idx=origin_idx, valid_idx=target_idx)
@@ -347,7 +361,9 @@ _build_month, _build_test = k.build_month, data.build_test
 
 
 def build_month(*, month, clean):
-    """Build the month's training rows, assert each origin's weather run precedes it, and append the extra columns."""
+    """Build the month's training rows, assert each origin's weather run precedes it, and append the
+    extra columns.
+    """
     mr = _build_month(month=month, clean=clean)
     assert (mr.valid_us > mr.origin_us).all(), f"{month}: a training target is not after its origin"
     runs = np.unique(mr.origin_us)
@@ -383,7 +399,9 @@ def build_month(*, month, clean):
 
 
 def build_test(*, month, standardiser):
-    """Build the month's test rows, assert nwp_init_time <= power_fcst_init_time for each origin, and append the extra columns (B4 scored without price)."""
+    """Build the month's test rows, assert nwp_init_time <= power_fcst_init_time for each origin,
+    and append the extra columns (B4 scored without price).
+    """
     test = _build_test(month=month, standardiser=standardiser)
     assert (test.valid > test.origin).all(), f"{month}: a test target is not after its origin"
     pub = common.PUBLICATION_DELAY

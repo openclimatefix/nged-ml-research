@@ -1,5 +1,7 @@
-# ruff: noqa: ANN201, D103, E501
-"""Figure 1 of experiment 569: B3a school term, real minus placebo per Primary, beside the seed noise of plain M0."""
+# ruff: noqa: D205, ANN201, D103, E501
+"""Figure 1 of experiment 569: B3a school term, real minus placebo per Primary, beside the seed
+noise of plain M0.
+"""
 
 from pathlib import Path
 from typing import Final
@@ -27,17 +29,17 @@ def main():
         title="CRPS difference (points of capacity; negative favours the school-term columns)",
         scale=alt.Scale(domain=[-1.0, 1.0]),
     )
-    bar = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=3).encode(
+    bar = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
         x=x, x2="real_minus_placebo_high:Q"
     )  # ty: ignore[unresolved-attribute]
-    dot = base.mark_point(color=theme.BRAND_ORANGE, filled=True, size=70, aria=False).encode(
+    dot = base.mark_point(color=theme.BRAND_ORANGE, filled=True, size=70, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x="real_minus_placebo:Q"
     )  # ty: ignore[unresolved-attribute]
-    noise = base.mark_point(color="grey", shape="cross", size=70, aria=False).encode(
+    noise = base.mark_point(color="grey", shape="cross", size=70, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x="seed_noise:Q"
     )  # ty: ignore[unresolved-attribute]
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="black").encode(x="x:Q")
+        alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="black").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )  # ty: ignore[unresolved-attribute]
     chart = alt.layer(zero, bar, dot, noise).properties(
         width=470,
@@ -83,7 +85,7 @@ def figure_2():
     )
     d = c.to_pandas()
     base = alt.Chart().encode(y=alt.Y("arm:N", sort=list(LABEL.values()), title=None))
-    bar = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=3).encode(
+    bar = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "low_bonferroni_month:Q",
             title="Real minus placebo, CRPS points (negative favours real)",
@@ -91,7 +93,7 @@ def figure_2():
         ),
         x2="high_bonferroni_month:Q",
     )  # ty: ignore[unresolved-attribute]
-    dot = base.mark_point(color=theme.BRAND_ORANGE, filled=True, size=50, aria=False).encode(
+    dot = base.mark_point(color=theme.BRAND_ORANGE, filled=True, size=50, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x="difference:Q"
     )  # ty: ignore[unresolved-attribute]
     zero = alt.Chart().mark_rule(color="black").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]

@@ -1,7 +1,9 @@
-# ruff: noqa: ANN001, ANN201, ANN202, D103, E501
-"""Write per-row CRPS of the experiment 569 arms with 470's scorer on 511's rows (mirrors 562's e00562_rows).
+# ruff: noqa: D205, ANN001, ANN201, ANN202, D103
+"""Write per-row CRPS of the experiment 569 arms with 470's scorer on 511's rows (mirrors 562's
+e00562_rows).
 
-Arm names are the folder names under `work/seed_preds`; `M0s0` and `M0s1` are the control's seeds 0 and 1.
+Arm names are the folder names under `work/seed_preds`; `M0s0` and `M0s1` are the control's seeds 0
+and 1.
 """
 
 import e00454_build as build454  # ty: ignore[unresolved-import]

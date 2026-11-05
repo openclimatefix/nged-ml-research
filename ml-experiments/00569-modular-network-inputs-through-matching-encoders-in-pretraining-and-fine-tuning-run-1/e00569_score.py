@@ -1,9 +1,12 @@
-# ruff: noqa: ANN201, PLR0912, PLR0915, PERF401, D103, E501
-"""Score experiment 569: real minus placebo (and B3c minus B3a) on the slices of addendum 14, part C.
+# ruff: noqa: D205, ANN201, PLR0912, PLR0915, PERF401, D103, E501
+"""Score experiment 569: real minus placebo (and B3c minus B3a) on the slices of addendum 14, part
+C.
 
-Reads the per-row CRPS that `e00569_rows.py` wrote. Intervals are 5-block month-block bootstraps (near
+Reads the per-row CRPS that `e00569_rows.py` wrote. Intervals are 5-block month-block bootstraps
+(near
 min-to-max). Bonferroni count: 6 contrasts x 2 groups x 4 keep-rule slices (all rows, cold nights,
-Christmas week, high-spread tercile) = 48 for "improves"; the "hurts" test on every slice (10 slices)
+Christmas week, high-spread tercile) = 48 for "improves"; the "hurts" test on every slice (10
+slices)
 uses the 95% interval without a correction. The minimum detectable effect (MDE) of a slice is
 1.96 x sqrt(2) x s, with s the fold-by-seed residual sd of plain M0 seeds 0 and 1.
 High spread is the top tercile, within Primary, fold, and lead band, of experiment-569 M0's own
