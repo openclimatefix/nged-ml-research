@@ -17,7 +17,8 @@ used here.
 
 **The normal running arrangement (NRA) is the power the Primary would have drawn without the load-
 shift.**
-Inside a load-shift, the NRA is the observed power minus the load-shift's signed fitted depth (negative when the load fell). Outside it,
+Inside a load-shift, the NRA is the observed power minus the load-shift's signed fitted depth
+(negative when the load fell). Outside it,
 the
 NRA is the observed power. The NRA is what NGED want the forecast to cover, because the network
 operator

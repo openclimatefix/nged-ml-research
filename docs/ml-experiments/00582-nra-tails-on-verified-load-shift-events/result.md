@@ -18,7 +18,8 @@ size: >-
   CPU plus about 0.3 GPU-h.
 hypothesis: >-
   On load-shift events that the telemetry confirms (experiment 580), the forecast of the
-  lag network, issued 1 to 5 days ahead, covers the normal running arrangement (NRA) well during the event and badly in the 7
+  lag network, issued 1 to 5 days ahead, covers the normal running arrangement (NRA) well during
+  the event and badly in the 7
   days after the load-shift ends, because the week lag still holds the event. A rule that keeps
   the week lag masked for 7 days after the event restores that coverage without a loss on rows with
   no labelled event, and a mixture or union band does no better than the same network recalibrated
@@ -32,7 +33,8 @@ prediction: >-
   than 0.01, or if the rule lifts after-end coverage by less than 0.15. Stop rule: if R alone lifts
   after-end coverage to 0.75, no blend or gate is needed for the tails.
 decision_rule: >-
-  Descriptive. Fewer than 10 verified real events exist (4 transfers, 8 Primary-events; the statistics merge D12's three May spans, so they count 6), so
+  Descriptive. Fewer than 10 verified real events exist (4 transfers, 8 Primary-events; the
+  statistics merge D12's three May spans, so they count 6), so
   every event-phase number is descriptive, with an event-block bootstrap interval that leaves one
   Primary out at a time. Rows with no labelled event carry the counted tests: pinball loss at q05
   and at q95, for the eight MVA Primaries and the six MW Primaries, each arm against R (Bonferroni
@@ -93,11 +95,14 @@ advice:
 
 **Take-home message: the forecast with lags stops covering the normal running arrangement (NRA) once
 a
-long load-shift ends, and in the test pair hiding the lags for the week after the end raised coverage from 0.40 to 0.64.** We asked how often the 5% to 95% band of an electricity-demand forecast issued 1 to 5 days ahead holds
+long load-shift ends, and in the test pair hiding the lags for the week after the end raised
+coverage from 0.40 to 0.64.** We asked how often the 5% to 95% band of an electricity-demand
+forecast issued 1 to 5 days ahead holds
 the power a substation would have drawn without a logged transfer of load (the NRA), during and
 after long transfers that the telemetry itself confirms (experiment 580). We took the stored
 forecasts of
-experiments 565 (lag-free network), 572 (lag network), and 578 (gate), added one new test month (May 2026), and rebuilt the NRA as the
+experiments 565 (lag-free network), 572 (lag network), and 578 (gate), added one new test month (May
+2026), and rebuilt the NRA as the
 observed
 power minus each transfer's fitted depth. [A plain-language explanation of every metric, with a
 worked example, is here](metrics-explained.md).
@@ -145,9 +150,11 @@ hours lead, from the mean of 2 seeds, and descriptive: 2 Primary-events cannot s
 lag-free forecasts
 cannot know about the transfer, so their median should sit about one depth away from the observed
 power. For
-D16 (depth 0.14 of capacity), D10 (0.15) and D11 (0.11) the lag-free forecast's median sits 0.03, 0.01 and 0.01 from the
+D16 (depth 0.14 of capacity), D10 (0.15) and D11 (0.11) the lag-free forecast's median sits 0.03,
+0.01 and 0.01 from the
 observed
-power (the masked forecast: 0.05, 0.01 and 0.02; D12, depth 0.43, is not checked), and every arm covers the NRA on only 0.15 to 0.32 of rows from day 4 to the end. For the
+power (the masked forecast: 0.05, 0.01 and 0.02; D12, depth 0.43, is not checked), and every arm
+covers the NRA on only 0.15 to 0.32 of rows from day 4 to the end. For the
 December load-shift the gap is
 0.22 (D5 depth 0.26) and 0.22 (D16 depth 0.15). It is unproven whether the fitted depths or the NRA
 reference is wrong, so these
@@ -185,13 +192,24 @@ is held):
 - **The avoidable-curtailment difference** is not computed. The gate triggered on 28 of 2,934
   origin-days with no
   labelled event for G1 (3.5 per Primary-year) and on none for G2.
-- **Phases are by valid time.** The sign rule in the experiment plan for the follow ratio ("s is -1 when the
+- **Phases are by valid time.** The sign rule in the experiment plan for the follow ratio ("s is -1
+  when the
   transfer raised load")
   contradicts its own meaning ("positive means moved towards the event"). We used the meaning.
 
 ## Injected load-shifts from experiment 581
 
-**On 1,248 injected Primary-events, the lag network's after-end coverage falls to 0.77, and masking the lags or the union band restores it to 0.86 or 0.92.** Experiment 581 forecast the lag network with a constant shift added to the lag inputs only, for every Primary in four test months (2025-12, 2026-01, 2026-03, 2026-06) and 24 passes. The shift has a depth of 0.15, 0.30, or 0.50 of capacity, a length of 3, 7, 15, or 30 days, and a sign that either raises or lowers the lags. The observed power is unchanged, so it is the NRA, and the gates are not scored (they see no gap). We reuse 581's stored forecasts, so no forward pass was repeated and no GPU time was spent. Arms that never read the lags are the stored forecasts of this experiment. R, the union band, and the mixtures are rebuilt from the injected forecast with the factors and weights fitted on earlier months. The 14 Primaries of the eight MVA and six MW groups are scored (D15 and D18 are left out), at 24-120 h, with every second half-hour.
+**On 1,248 injected Primary-events, the lag network's after-end coverage falls to 0.77, and masking
+the lags or the union band restores it to 0.86 or 0.92.** Experiment 581 forecast the lag network
+with a constant shift added to the lag inputs only, for every Primary in four test months (2025-12,
+2026-01, 2026-03, 2026-06) and 24 passes. The shift has a depth of 0.15, 0.30, or 0.50 of capacity,
+a length of 3, 7, 15, or 30 days, and a sign that either raises or lowers the lags. The observed
+power is unchanged, so it is the NRA, and the gates are not scored (they see no gap). We reuse 581's
+stored forecasts, so no forward pass was repeated and no GPU time was spent. Arms that never read
+the lags are the stored forecasts of this experiment. R, the union band, and the mixtures are
+rebuilt from the injected forecast with the factors and weights fitted on earlier months. The 14
+Primaries of the eight MVA and six MW groups are scored (D15 and D18 are left out), at 24-120 h,
+with every second half-hour.
 
 Share of the NRA inside the q05-q95 band (target 0.90), mean over events, by phase:
 
@@ -206,12 +224,20 @@ Share of the NRA inside the q05-q95 band (target 0.90), mean over events, by pha
 | Mix50-R | 0.91 | 0.90 | 0.90 | 0.87 | 0.89 |
 | MixPL-R | 0.91 | 0.89 | 0.88 | 0.86 | 0.89 |
 
-- **The injected result agrees with the December pair:** v3+D5 loses coverage from the lag shift, and the loss is larger at greater depth (0-7 days after: 0.82, 0.76, and 0.74 at depths 0.15, 0.30, and 0.50).
+- **The injected result agrees with the December pair:** v3+D5 loses coverage from the lag shift,
+  and the loss is larger at greater depth (0-7 days after: 0.82, 0.76, and 0.74 at depths 0.15,
+  0.30, and 0.50).
 - **R alone does not repair it:** 0.79 after the end, against 0.77 for v3+D5.
-- **The union band comes closest to target (0.92)** because its lower and upper edges take the wider of the lag network and the masked twin. It does so by widening.
-- **Interval and spread:** the event-block interval of v3+D5 after the end is 0.72 to 0.82 (leave-one-Primary-out range 0.70 to 0.85), against 0.89 to 0.94 for the union band.
-- **Length does not matter beyond 3 days:** coverage after the end is the same for lengths of 7, 15, and 30 days (0.76 for v3+D5), because only the week lag at the end of the shift enters the forecast, and the 3-day shift is only partly in it (0.81).
-- **Scope:** the lag shift is a stylised stand-in for a real transfer, because the real transfer also changes the targets and the neighbour's lags. The tables are `bank_event_phase.csv` and `bank_summary.csv` in the private data folder.
+- **The union band comes closest to target (0.92)** because its lower and upper edges take the wider
+  of the lag network and the masked twin. It does so by widening.
+- **Interval and spread:** the event-block interval of v3+D5 after the end is 0.72 to 0.82
+  (leave-one-Primary-out range 0.70 to 0.85), against 0.89 to 0.94 for the union band.
+- **Length does not matter beyond 3 days:** coverage after the end is the same for lengths of 7, 15,
+  and 30 days (0.76 for v3+D5), because only the week lag at the end of the shift enters the
+  forecast, and the 3-day shift is only partly in it (0.81).
+- **Scope:** the lag shift is a stylised stand-in for a real transfer, because the real transfer
+  also changes the targets and the neighbour's lags. The tables are `bank_event_phase.csv` and
+  `bank_summary.csv` in the private data folder.
 
 ## Checks
 
@@ -228,7 +254,8 @@ Share of the NRA inside the q05-q95 band (target 0.90), mean over events, by pha
   is not
   adjusted for it, so only the Mix50 intervals that exclude zero are worth reading and they are
   small
-  (the minimum detectable effect is about 0.04 points: 1.4 times the interval half-width for the six MW Primaries and about 2.5 times for the eight MVA Primaries).
+  (the minimum detectable effect is about 0.04 points: 1.4 times the interval half-width for the six
+MW Primaries and about 2.5 times for the eight MVA Primaries).
 - **Months and rows:** every arm exists on 574,755 rows in 5 months (2025-12, 2026-01, 2026-03,
   2026-05,
   2026-06). The first fold month with each arm has no recalibration fit and is dropped.
@@ -237,7 +264,8 @@ Share of the NRA inside the q05-q95 band (target 0.90), mean over events, by pha
   that the weather run was issued at or before the origin (`nwp_init_time <= power_fcst_init_time`);
   an example
   row: origin 2026-01-01 09:00, weather run 2026-01-01 00:00, valid time 2026-01-05 09:00.
-- **Audit triggers:** the check that a lag-blind forecast sits about one depth from the observed power failed for the May transfers, so the write-up
+- **Audit triggers:** the check that a lag-blind forecast sits about one depth from the observed
+  power failed for the May transfers, so the write-up
   reviewer was
   asked to recompute the December headline numbers from the stored forecasts.
 - **Code review:** a fresh Sonnet review of the code found no leak and no sign error. Findings

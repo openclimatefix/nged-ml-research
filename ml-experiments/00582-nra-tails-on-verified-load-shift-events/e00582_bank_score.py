@@ -17,8 +17,6 @@ gap. Every second half-hour of valid time is used (the other half is dropped to 
 Writes `bank_event_phase.csv` and `bank_summary.csv` to the work folder.
 """
 
-import glob
-
 import e00582_arms as a  # ty: ignore[unresolved-import]
 import e00582_common as k  # ty: ignore[unresolved-import]
 import e00582_score as sc  # ty: ignore[unresolved-import]
@@ -27,11 +25,11 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 INJECT = ML_EXPERIMENTS_DATA_DIR / "00581-robust-multiweek-lag-encoder-x3/arms/v3d5/work/inject"
-BANK = glob.glob(
-    str(
-        ML_EXPERIMENTS_DATA_DIR / "00581-robust-multiweek-lag-encoder-x3/bank_events_v3d5_*.parquet"
+BANK = next(
+    (ML_EXPERIMENTS_DATA_DIR / "00581-robust-multiweek-lag-encoder-x3").glob(
+        "bank_events_v3d5_*.parquet"
     )
-)[0]
+)
 IQ = a.IQ
 BANK_ARMS = (
     "v3+D5",
@@ -96,9 +94,10 @@ def load_injected(
 
 
 def main() -> None:
+    """Score the injected bank and write the event and summary tables."""
     t = a.Table()
     gates = a.run_gates(t=t)
-    arms, common, _ = sc.build_arms(t=t, gates=gates)
+    _arms, common, _ = sc.build_arms(t=t, gates=gates)
     stores = sc.STORES
     bank = pl.read_parquet(BANK)
     kk_all = key(t.prim, t.origin_idx, t.idx)
