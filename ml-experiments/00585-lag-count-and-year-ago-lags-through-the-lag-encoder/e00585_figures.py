@@ -202,7 +202,11 @@ def example_figure(
 def main() -> None:
     contrasts_figure()
     slices_figure()
-    for primary, label, group in ((3, "D5", "signed-MW"), (11, "D16", "signed-MW"), (0, "D2", "MVA-only")):
+    for primary, label, group in (
+        (3, "D5", "signed-MW"),
+        (11, "D16", "signed-MW"),
+        (0, "D2", "MVA-only"),
+    ):
         example_figure(
             name=f"example_day_ahead_christmas_{label.lower()}",
             title=f"Day-ahead forecasts over Christmas 2025, Primary {label} ({group})",
