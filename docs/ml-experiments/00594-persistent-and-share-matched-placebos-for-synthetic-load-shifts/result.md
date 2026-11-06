@@ -72,5 +72,5 @@ metric: >-
 - **Reused.** Experiment 584's C1, experiment 590's T3 and P5 (stored forecasts), experiment 574's
   P5 step-2 weights. Code copied from `ml-experiments/00590-*`.
 - **Standing practices.** Refit days 0 and 14 per fold month, five development months, seeds 0 and
-  1, cleaned power, the D15 and D18 cut inherited from experiment 574's rows, GPU one process under
+  1, the row building, cleaning, and cuts of experiment 574 unchanged, GPU one process under
   8 GB, fitted weights saved in the private data folder.
