@@ -63,51 +63,6 @@ def main() -> None:
         exp_rows.append({"label": lab, "a": day_of(on), "b": day_of(en), "depth": r["depth_share"]})
     spans = pl.DataFrame(span_rows)
     exps = pl.DataFrame(exp_rows)
-    cols = alt.Scale(domain=list(EVENT_COLOURS), range=list(EVENT_COLOURS.values()))
-
-    def panel(*, data: pl.DataFrame, y_title: str, with_depth: bool) -> alt.Chart:
-        base = (
-            alt.Chart(data)
-            .mark_line(aria=False, strokeWidth=1.8)
-            .encode(
-                x=alt.X(
-                    "date:T",
-                    title=None,
-                    axis=alt.Axis(
-                        format="%d %b",
-                        values=[
-                            datetime(2026, 4, 20, tzinfo=UTC) + timedelta(days=7 * i)
-                            for i in range(7)
-                        ],
-                    ),
-                ),
-                y=alt.Y("value:Q", title=y_title),
-                color=alt.Color("label:N", scale=cols, legend=None),
-            )
-        )
-        shade = (
-            alt.Chart(spans)
-            .mark_rect(aria=False, opacity=0.12, color="#6b6b6b")
-            .encode(x="a:T", x2="b:T")
-        )
-        layers = [shade, base]
-        if with_depth:
-            layers.append(
-                alt.Chart(exps)
-                .mark_rule(aria=False, strokeDash=[5, 3], color="black")
-                .encode(x="a:T", x2="b:T", y="depth:Q")
-            )
-        return (
-            alt.layer(*layers)
-            .properties(width=W - 90, height=110)
-            .facet(
-                row=alt.Row(
-                    "label:N", title=None, header=alt.Header(labelAngle=0, labelAlign="left")
-                ),
-            )
-            if False
-            else alt.layer(*layers).properties(width=W - 90, height=110)
-        )
 
     def stacked(*, data: pl.DataFrame, y_title: str, with_depth: bool) -> alt.VConcatChart:
         parts = []
@@ -116,7 +71,7 @@ def main() -> None:
             sp = spans.filter(pl.col("label") == lab)
             ex = exps.filter(pl.col("label") == lab)
             line = (
-                alt.Chart(d)
+                alt.Chart(d)  # ty: ignore[unresolved-attribute]
                 .mark_line(aria=False, strokeWidth=1.8, color=EVENT_COLOURS[lab])
                 .encode(
                     x=alt.X(
@@ -134,14 +89,14 @@ def main() -> None:
                 )
             )
             shade = (
-                alt.Chart(sp)
+                alt.Chart(sp)  # ty: ignore[unresolved-attribute]
                 .mark_rect(aria=False, opacity=0.15, color="#6b6b6b")
                 .encode(x="a:T", x2="b:T")
             )
             layers = [shade, line]
             if with_depth:
                 layers.append(
-                    alt.Chart(ex)
+                    alt.Chart(ex)  # ty: ignore[unresolved-attribute]
                     .mark_rule(aria=False, strokeDash=[5, 3], color="black", strokeWidth=1.5)
                     .encode(x="a:T", x2="b:T", y="depth:Q")
                 )
@@ -201,7 +156,7 @@ def main() -> None:
         ]
     )
     fig3 = (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
         .encode(
             x=alt.X("label:N", title=None, sort=list(EVENT_COLOURS)),
