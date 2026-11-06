@@ -52,8 +52,6 @@ metric: >-
   the end), for the total effect and for the refit alone, at q50 and at q05, q95, q01, and q99.
 ---
 
-# Experiment 587: absorption of verified and injected load-shifts (X5)
-
 **Plan only; this page is rewritten when the experiment finishes.**
 
 ## Plan
