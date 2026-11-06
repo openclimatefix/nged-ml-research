@@ -79,6 +79,14 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
   the minimum detectable effect are printed beside each contrast.
 - **Stop rule.** As in the decision rule. One GPU process at a time under 8 GB; ask the manager
   before crossing 3 GPU-h.
+- **Maintainer's example event (2026-11-06).** Plots of forecast behaviour during and after
+  load-shifts use the December 2025 pair (D5 and D16), which the maintainer dates "2025-12-30 01:00
+  to 2026-01-14 11:30". One figure per Primary shows 14 days before to 14 days after, with dashed
+  vertical lines at those two times, for R, W, S, S-g, and S-p. The verified window in [experiment
+  580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)
+  is 2025-12-29 to 2026-01-13, about a day earlier. The scoring script checks the readings to see
+  which window matches the step, and the caption says which, and does not choose silently. The
+  predictions are unchanged.
 - **Standing practices followed.** Monthly-equivalent coarse refits, cleaned data, the D15 and D18
   cut, saved weights, reuse of stored forecasts, tails and avoidable-curtailment cost, load-shift
   event plots (at least 6, both metering groups), example forecasts, and the unlogged-event caveat.
