@@ -22,6 +22,9 @@ plus the observed (or synthetically shifted) power, as the G4 gate does with exp
   fresh reading is largest in megawatts (its fresh reading and its disagreement at the Primary's day
   lag time, each scaled to the Primary's capacity and negated). `nb_present` is 1 where the Primary
   has a neighbour.
+- `dis_day_missing`, `dis_week_missing`, `nb_fresh_missing`, `nb_dis_day_missing`: 1 where the matching
+  signal is 0 only because `T` or the power is absent (for the lag signals, only where the lag
+  itself is present), so the network can tell "absent" from "agrees with `T`".
 - `q05_width`, `q95_width`: the lags-masked network's q05 and q95 for the row, minus its median.
 
 The network adds the two lag ages (columns 39 and 42 of its input) to the signal columns itself.
@@ -51,12 +54,13 @@ CLIP: Final[float] = 10.0
 SIGNAL_NAMES: Final[tuple[str, ...]] = (
     "dis_day", "dis_week", "sustain_day", "sustain_week", "fresh", "fresh_missing",
     "nb_fresh", "nb_dis_day", "nb_present", "q05_width", "q95_width",
+    "dis_day_missing", "dis_week_missing", "nb_fresh_missing", "nb_dis_day_missing",
 )  # fmt: skip
 N_SIGNALS: Final[int] = len(SIGNAL_NAMES)
 COL: Final[dict[str, int]] = {n: i for i, n in enumerate(SIGNAL_NAMES)}
 LAG_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
-    "day": ("dis_day", "sustain_day", "nb_dis_day"),
-    "week": ("dis_week", "sustain_week"),
+    "day": ("dis_day", "sustain_day", "nb_dis_day", "dis_day_missing", "nb_dis_day_missing"),
+    "week": ("dis_week", "sustain_week", "dis_week_missing"),
 }
 """Signal columns that come from a lag, so a masked lag zeroes them."""
 NOISED: Final[tuple[str, ...]] = ("dis_day", "dis_week", "fresh")
@@ -233,6 +237,7 @@ def signal_block(
         i = np.clip(idx, 0, None)
         dis = np.where(miss | (idx < 0), np.nan, res_lag[prim, i])
         out[:, COL[f"dis_{name}"]] = np.nan_to_num(dis) * SCALE
+        out[:, COL[f"dis_{name}_missing"]] = ~np.isfinite(dis) & ~miss & (idx >= 0)
         out[:, COL[f"sustain_{name}"]] = np.where(miss | (idx < 0), 0.0, sustain[prim, i])
         used = ~miss & (idx >= 0)
         assert (table.origin_idx[prim[used], i[used]] < origin_idx[used]).all(), (
@@ -247,6 +252,7 @@ def signal_block(
     assert (table.origin_idx[prim[fok], origin_idx[fok] - FRESH_END - 1] < origin_idx[fok]).all()
     # neighbours: for each Primary, the neighbour with the largest fresh reading in MW
     best_mw = np.zeros(n, np.float32)
+    nb_seen = np.zeros(n, bool)
     for p, qs in nb.of.items():
         rows = np.flatnonzero(prim == p)
         if len(rows) == 0 or not qs:
@@ -257,16 +263,23 @@ def signal_block(
             qp = np.full(len(rows), q)
             f = fresh_reading(res=res_sig, prim=qp, origin_idx=origin_idx[rows], prefix=pre)
             mw = np.nan_to_num(f) * nb.capacity[q]
+            nb_seen[rows] |= np.isfinite(f)
             better = np.abs(mw) > best_abs
             best_abs = np.where(better, np.abs(mw), best_abs)
             best_mw[rows] = np.where(better, mw, best_mw[rows])
             i = np.clip(day_idx[rows], 0, None)
-            d = np.where(day_missing[rows] | (day_idx[rows] < 0), 0.0, np.nan_to_num(res_sig[q, i]))
+            lag_here = ~(day_missing[rows] | (day_idx[rows] < 0))
+            d = np.where(lag_here, np.nan_to_num(res_sig[q, i]), 0.0)
             cur = out[rows, COL["nb_dis_day"]]
             out[rows, COL["nb_dis_day"]] = np.where(
                 better, -d * nb.capacity[q] / nb.capacity[p] * SCALE, cur
             )
+            cur_m = out[rows, COL["nb_dis_day_missing"]]
+            out[rows, COL["nb_dis_day_missing"]] = np.where(
+                better, lag_here & ~np.isfinite(res_sig[q, i]), cur_m
+            )
         out[rows, COL["nb_fresh"]] = -best_mw[rows] / nb.capacity[p] * SCALE
+        out[rows, COL["nb_fresh_missing"]] = ~nb_seen[rows]
     out[:, COL["q05_width"]] = np.nan_to_num(widths[:, 0]) * SCALE
     out[:, COL["q95_width"]] = np.nan_to_num(widths[:, 1]) * SCALE
     np.clip(out, -CLIP, CLIP, out=out)
@@ -348,15 +361,18 @@ def add_training_noise(*, block: np.ndarray, prim: np.ndarray, sd: np.ndarray, s
     np.clip(block, -CLIP, CLIP, out=block)
 
 
-def column_moments(*, block: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Return the per-column mean and standard deviation of a training block (arm S-p's noise moments)."""
-    return block.mean(axis=0), block.std(axis=0)
+def placebo_block(*, source: np.ndarray, n: int, seed: int) -> np.ndarray:
+    """Return `n` rows (arm S-p) in which each column is resampled independently, with replacement,
+    from the same column of `source` (the training block).
 
-
-def placebo_block(*, mean: np.ndarray, sd: np.ndarray, n: int, seed: int) -> np.ndarray:
-    """Return `n` rows of independent Gaussian noise with the given per-column mean and standard deviation (arm S-p)."""
+    Every column keeps its marginal distribution (a binary flag stays binary) and its variance, and
+    the dependence between columns and with the row is broken.
+    """
     rng = np.random.default_rng(seed)
-    return (mean + sd * rng.standard_normal((n, len(mean)))).astype(np.float32)
+    out = np.empty((n, source.shape[1]), np.float32)
+    for j in range(source.shape[1]):
+        out[:, j] = source[rng.integers(0, len(source), size=n), j]
+    return out
 
 
 # ---------------------------------------------------------------- G4 on T

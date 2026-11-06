@@ -101,6 +101,20 @@ def check_known_answer() -> None:
     np.testing.assert_allclose(block[0, col["nb_fresh"]], shift * scale, atol=1e-3)
     assert block[0, col["nb_present"]] == 1 and block[3, col["nb_present"]] == 0
     assert block[3, col["nb_fresh"]] == 0
+    # an absent T at the day lag sets the missing flag and zeroes the signal; a present T leaves it unset
+    assert block[0, col["dis_day_missing"]] == 0 and block[0, col["nb_fresh_missing"]] == 0
+    holes = sig.LagFreeTable(median=w["table"].median.copy(), origin_idx=w["table"].origin_idx)
+    holes.median[:, :] = np.nan
+    gap = sig.signal_block(
+        prim=prim, origin_idx=origin, day_idx=day_lag, week_idx=week_lag, day_missing=miss,
+        week_missing=miss, power_lag=w["power_lag"], power_sig=w["power_sig"], table=holes,
+        widths=widths, nb=w["nb"],
+    )  # fmt: skip
+    live = ~miss
+    assert (gap[live, col["dis_day_missing"]] == 1).all() and (gap[live, col["dis_day"]] == 0).all()
+    assert (gap[live, col["dis_week_missing"]] == 1).all()
+    assert gap[0, col["nb_fresh_missing"]] == 1 and gap[3, col["nb_fresh_missing"]] == 0
+    assert gap[0, col["nb_dis_day_missing"]] == 1
     # masked lag zeroes the lag-derived columns
     sig.mask_lag_columns(block=block, day_masked=np.ones(n, bool), week_masked=np.ones(n, bool))
     assert (
@@ -180,6 +194,23 @@ def check_noise_rule() -> None:
     )
 
 
+def check_placebo_keeps_marginals() -> None:
+    rng = np.random.default_rng(1)
+    src = np.stack(
+        [
+            rng.integers(0, 2, 5_000),
+            rng.standard_normal(5_000) * 3,
+            np.clip(rng.exponential(1, 5_000), 0, 2),
+        ],
+        axis=1,
+    ).astype(np.float32)
+    out = sig.placebo_block(source=src, n=8_000, seed=0)
+    assert set(np.unique(out[:, 0])) <= {0.0, 1.0}
+    assert out[:, 2].max() <= 2.0
+    np.testing.assert_allclose(out.std(axis=0), src.std(axis=0), rtol=0.06)
+    print("placebo block keeps binary columns binary, clipped columns clipped, and the variances")
+
+
 def check_model_is_a1_at_init(*, path: Path) -> None:
     state = torch.load(path, map_location="cpu")
     shapes = model.shapes_from_state(state=state)
@@ -227,5 +258,6 @@ if __name__ == "__main__":
     check_table_no_lookahead()
     check_mirror_conserves_megawatts()
     check_noise_rule()
+    check_placebo_keeps_marginals()
     check_model_is_a1_at_init(path=Path(sys.argv[1]) if len(sys.argv) > 1 else STEP2)
     print("ALL CHECKS PASSED")

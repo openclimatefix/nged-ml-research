@@ -12,8 +12,8 @@ Arms:
 - `S`: the signal columns.
 - `S-g`: the signal columns plus the G4 state bit (experiment 592's G4 gate run on the table `T`
   instead of experiment 565's E2; wide while the gate is on and for 7 days after it releases).
-- `S-p`: the signal columns replaced by independent Gaussian noise with the training block's
-  per-column mean and standard deviation (no usable signal; the parity arm of the fine-tune).
+- `S-p`: the signal columns replaced by a column-wise resample, with replacement, of the training
+  block (same marginals and variances, no usable signal; the parity arm of the fine-tune).
 
 The signal block of training rows is built from the fold's frozen A1 step-2 network run with its lags
 masked (the table `T`, one per fold month and seed, cached under `tables/`). The synthetic shift is
@@ -223,7 +223,7 @@ class FoldSignals:
             base=self.fixed, shift=self.shift, choice=self.choice, capacity=NB.capacity
         )
         self._train: np.ndarray | None = None
-        self._moments: tuple[np.ndarray, np.ndarray] | None = None
+        self._source: np.ndarray | None = None
         self.report: dict = {}
         o = np.concatenate([origin_idx_of(origin_us=mr.origin_us), test.origin_idx])
         self.origin_days = sorted({int(d) for d in np.unique(o // sig.PER_DAY)})
@@ -270,14 +270,11 @@ class FoldSignals:
         synth = self._block(
             rows=rows, power_lag=self.fixed, power_sig=self.power_sig, widths=self.w_train
         )
-        real_train = self._block(
-            rows=rows, power_lag=self.clean, power_sig=self.clean, widths=self.w_train
-        )
         real_test = self._block(
             rows=self._test_rows(), power_lag=self.clean, power_sig=self.clean, widths=self.w_test
         )
         sd = sig.train_test_sd(
-            blocks={"train": real_train, "test": real_test},
+            blocks={"train": synth, "test": real_test},
             prim={"train": self.mr.primary, "test": self.test.primary}, n_primaries=16,
         )  # fmt: skip
         noise = sig.noise_sd(sd=sd)
@@ -297,15 +294,14 @@ class FoldSignals:
             ),
         }  # fmt: skip
         sig.add_training_noise(block=synth, prim=self.mr.primary, sd=noise, seed=self.seed)
-        del real_train, real_test
+        del real_test
+        assert synth.shape[0] == len(self.mr.x), "training block and month rows differ"
         if ARM == "S-g":
             bit = self.g4_bit(power_sig=self.power_sig, prim=self.mr.primary, origin=rows["origin"])
             synth = np.concatenate([synth, bit[:, None]], axis=1)
-        self._moments = sig.column_moments(block=synth)
+        self._source = synth
         if ARM == "S-p":
-            synth = sig.placebo_block(
-                mean=self._moments[0], sd=self._moments[1], n=len(synth), seed=self.seed
-            )
+            synth = sig.placebo_block(source=self._source, n=len(synth), seed=self.seed)
         self._train = synth
         return synth
 
@@ -321,9 +317,9 @@ class FoldSignals:
             bit = self.g4_bit(power_sig=power_sig, prim=test.primary, origin=test.origin_idx)
             block = np.concatenate([block, bit[:, None]], axis=1)
         if ARM == "S-p":
-            assert self._moments is not None
+            assert self._source is not None
             block = sig.placebo_block(
-                mean=self._moments[0], sd=self._moments[1], n=len(block),
+                source=self._source, n=len(block),
                 seed=self.seed + 1_000 + int(test.origin_idx.min()) % 997,
             )  # fmt: skip
         return block
@@ -351,6 +347,7 @@ class SigGpuMonth(e.LagGpuMonth):
         t = super().refit_tensors(refit=refit, shift_z=shift_z)  # applies block dropout
         fs = FOLD[(self.mr.month, e.CTX["seed"])]
         b = fs.train_block()[refit.index].copy()
+        assert len(b) == len(t["x"]), "signal block and refit tensors differ in rows"
         if ARM != "S-p":
             sig.mask_lag_columns(
                 block=b, day_masked=(t["x"][:, 38] > 0.5).cpu().numpy(),
@@ -427,10 +424,25 @@ def run_prepare(*, device: str, command: str) -> None:
                 print(
                     "  T missing at the day lag (train rows)", fs.report["t_missing_share_lag_day"]
                 )
+                missing_share_by_primary(fs=fs, test=test)
                 known_answer_real(fs=fs, test=test)
         del mr, test
         FOLD.clear()
         torch.cuda.empty_cache()
+
+
+def missing_share_by_primary(*, fs: FoldSignals, test) -> None:
+    """Print, per Primary, the share of test rows whose missing flags are set (observed power)."""
+    block = fs._block(
+        rows=fs._test_rows(), power_lag=fs.clean, power_sig=fs.clean, widths=fs.w_test
+    )
+    flags = [n for n in sig.SIGNAL_NAMES if n.endswith("_missing")]
+    print("  test-row share with the flag set, by Primary (columns: " + ", ".join(flags) + ")")
+    for p in range(len(fs.mr.base.target_mean)):
+        rows = test.primary == p
+        if rows.any():
+            share = [round(float(block[rows, sig.COL[n]].mean()), 3) for n in flags]
+            print(f"    Primary {p:2d} ({int(rows.sum()):6d} rows)", share, flush=True)
 
 
 def known_answer_real(*, fs: FoldSignals, test) -> None:
