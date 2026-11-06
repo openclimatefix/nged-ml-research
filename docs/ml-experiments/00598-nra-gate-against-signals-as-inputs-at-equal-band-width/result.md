@@ -56,13 +56,16 @@ lessons: >-
   The gate's value is placement as well as width: at equal width a constant widening reaches 0.909,
   the width-matched S 0.915, and the gate 0.928. The signals cost event-free CRPS (0.031 points of
   capacity at the eight MVA Primaries). The training signals are in-sample, which this experiment
-  could not separate from the signals carrying little (S-p was not run, by the stop rule).
+  could not fully separate from the signals carrying little: S-p, the noise placebo, matches plain
+  A1 and S is only 0.004 above it.
 take_home_message: >-
   A neural network that is handed the same signals as the hand-built gate did not learn to widen
   its band during a load-shift: it covered the normal running arrangement on 0.888 of rows from day 4
-  to the end, against 0.928 for the gate and 0.884 for the plain network. Even with its band
-  stretched to the gate's width it reached only 0.915, so the gate is worth keeping, and the next
-  test worth running is whether signals computed out of sample, not in sample, help.
+  to the end, against 0.928 for the gate, 0.884 for the plain network, and 0.884 for the same network
+  given noise instead of the signals. Stretched to the gate's width it reached 0.915, a gap of 0.013
+  to the gate (interval -0.003 to 0.032), so most of the gate's value is width and the rest is
+  placement that two fold months cannot settle. The keep-the-gate decision rests on two fold months
+  and on a signal table built in sample, so the next test is signals computed out of sample.
 advice:
   - >-
     Keep the G4 gate on the A1 band for load-shift work; do not replace it by signal inputs to the
@@ -87,11 +90,13 @@ on synthetic load-shifts with the gate's signals as extra inputs, and scored it 
 597](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00597-nra-assemble-c1-and-a1-with-g4-gate-as-single-forecasts/result/)).
 The network without the gate covered the normal running arrangement (NRA) inside q05-q95 on 0.888 of
 rows from day 4 to the end, against 0.928 with the gate. The stop rule then called for S-g only, which
-also failed, so the gate stays. This is a first-fold-pair result with two seeds, not a five-month
+also failed, so the gate stays. We also ran the noise placebo S-p, which the stop rule would have
+dropped, because it is the only way to tell "the signals carry little" from "the signals are in
+sample". This is a first-fold-pair result with two seeds, not a five-month
 result.
 
 **Verdict: not supported.** P1 failed (gap 0.040), P2 failed, P3 failed, P5 failed at the eight MVA
-Primaries, and P4 was not run.
+Primaries, and P4 failed: S is only 0.004 above S-p (-0.008 to 0.014).
 
 ## Figures
 
@@ -103,7 +108,7 @@ end; S and S-g sit close to plain A1.
 
 ![Safe-side share by phase](safe_side_by_phase.svg)
 
-Share of rows with the NRA on the safe side of q05 or q95. Dashed line: 0.95.
+Share of rows with the NRA on the safe side of q05 or q95: look for bars below the dashed 0.95 line.
 
 ![Band width by arm](width_by_arm.svg)
 
@@ -121,7 +126,12 @@ The maintainer's times match the observed steps (summed absolute step 0.90 of ca
 for [experiment
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)'s
 window about a day earlier). One arm per figure; coverage is scored against an estimated NRA, which
-is not drawn.
+is not drawn. Look at where the observed power (black) leaves the shaded band after the onset, and
+at whether the strip under the panel is on while it does. The strip is plotted at valid time (the
+origin day plus one), and "on" includes the roughly 7 days the band is held after the gate turns
+off. The gate strips of R and S-g were checked against the stored gate state (the 597 `mode_g4.npy`
+and the saved S-g bits): both Primaries are on from 2025-12-31 to 2026-01-21. The W band is A1's
+band widened by one constant factor, so it looks close to A1's.
 
 ![A1](example_event_A1.svg)
 
@@ -133,11 +143,19 @@ is not drawn.
 
 ![S-g](example_event_S_g.svg)
 
+![S-p](example_event_S_p.svg)
+
+![S against S-p](s_versus_s_p.svg)
+
 ## Results (first fold pair, 2025-10 and 2025-12; 24-120 h; injected 15 and 30 day events)
 
+- **Headline for "is placement worth anything beyond width".** Rescaled to R's width, S covers 0.915
+  from day 4 to the end against R's 0.928: a gap of 0.013 (-0.003 to 0.032, MDE 0.017), inconclusive
+  at this sample size. Without rescaling the gap is 0.040.
 - **Arms.** R: A1 + G4 from experiment 597. W: A1 widened by one constant factor to R's width
   (1.069 and 1.077 by month). S: signals as inputs. S-g: S plus the G4 state bit. `-rs`: each S arm
-  rescaled to R's width. G4T: G4 computed on the table T. S-p was not run (stop rule).
+  rescaled to R's width. G4T: G4 computed on the table T. S-p: the placebo, with noise in place of
+  the signals.
 - **Day 4 to the end, coverage.** A1 0.884, W 0.909, S 0.888, S-g 0.888, S-rs 0.915, S-g-rs 0.916,
   G4T 0.928, R 0.928. R minus S: 0.040 (0.022 to 0.060, MDE 0.019). R minus S-rs: 0.013 (-0.003 to
   0.032).
@@ -145,6 +163,9 @@ is not drawn.
   -0.015 (-0.023 to -0.009); S-rs minus W is +0.005 (0.0002 to 0.010), below the 0.03 margin.
 - **Follow ratio (P3).** S 0.101 (0.079 to 0.129), R and A1 0.119 (0.092 to 0.163), S-g 0.100. The
   0.08 target was not met; the interval of S includes it.
+- **Placebo S-p (P4).** Day 4 to the end 0.884, 0 to 7 days after 0.917, band 0.252 (A1 0.252),
+  follow 0.118, event-free CRPS minus A1 -0.0002 (eight MVA) and +0.0017 (six MW). S minus S-p:
+  +0.004 (-0.008 to 0.014, MDE 0.011), below the 0.02 margin.
 - **Event-free CRPS (P5, S minus A1, points of capacity).** Eight MVA Primaries +0.031 (0.020 to
   0.042, MDE 0.011); six MW Primaries +0.029 (0.001 to 0.056, MDE 0.028). The fixed margin is 0.03.
   Two fold months are two blocks, so these intervals are rough.
@@ -164,7 +185,7 @@ is not drawn.
   computed.** The network outputs quantiles, and the median error `ae50` is in the printed report.
 - **Triggers fired.** None of the seven fired in a form that changes the verdict: the contrasts agree
   between coverage and CRPS, no nested arm beats its parent, and no later experiment depends on this
-  result yet. P4 was not run, so the placebo trigger did not arise.
+  result yet. P4 was run after the stop rule fired and did not trigger one.
 - **Reviews.** Sonnet plan review (12 findings, all applied), Sonnet code review (15 findings, 12
   applied or answered, 3 declined), Sonnet figure review (see the pull request).
 
@@ -173,10 +194,14 @@ is not drawn.
 - **Training signals are in-sample.** The lag-free table T comes from the fold's own A1 step-2
   network, which saw the training rows. In the pre-fit check on 2025-12 with seed 0, two
   Primaries fell below the 0.8 standard-deviation ratio and received added noise; the other folds'
-  counts are in the fit logs. We cannot say whether the failure is the signals
-  carrying little or the in-sample mismatch; S-p was not run to test the first.
+  counts are in the fit logs. S-p (noise with the same per-column
+  marginals) is indistinguishable from plain A1, so the network ignores noise inputs. S differs from
+  S-p in follow ratio (0.101 against 0.118) and in event-free CRPS (+0.031 against 0 at the eight MVA
+  Primaries) without gaining coverage. That fits signals that are used but mismatched between
+  training and test, and it does not rule out signals that carry little.
 - **Two months only.** The stop rule ended the experiment after the first fold pair, so the five-month
-  bake-off was not run.
+  bake-off was not run. Running S-p after the stop rule fired is a deviation from the stop rule, made
+  at the manager's request.
 - **Not done:** target-side absorption for R and S (experiment 595's method), the avoidable-curtailment
   cost, and the Bonferroni count above covers only the coverage and event-free CRPS tests.
 - **Unlogged events.** NGED's logs may miss load-shifts, so clean rows may hold unlabelled events and
@@ -190,7 +215,6 @@ is not drawn.
 
 - Rebuild T from a cross-fitted lag-free network (trained without the block it is applied to) and
   rerun S on the first fold pair, to separate the in-sample explanation.
-- Run S-p on the first fold pair if the maintainer wants the placebo answered.
 
 ## Plan (fixed before any score)
 
