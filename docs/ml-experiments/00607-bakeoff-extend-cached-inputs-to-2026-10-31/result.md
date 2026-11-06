@@ -35,15 +35,15 @@ best_arm: not applicable (data build, no arms)
 headline: >-
   10 of the 11 cached inputs now reach 2026-10-31 or later and break no rule on any row; the ERA5
   farm-cell wind table is still being fetched. The missing zero readings at the solar and wind farms
-  trace to a change of file source on 2026-03-26, not to the farms.
+  are consistent with a change of file source on 2026-03-26, not with a change at the farms.
 lessons: >-
   The final bake-off test can be scored once the farm-cell table arrives. A generator half-hour
   that is absent after 2026-03-26 should be read as a zero-output half-hour, not as a fault.
 take_home_message: >-
   The weather and power inputs for the final test now run to the end of October 2026, and every row
   obeys the rule that weather comes from a run issued before the forecast. Solar and wind farms
-  stopped sending zero readings on 26 March 2026 because the files changed format, so an absent
-  half-hour from a farm usually means zero output.
+  stopped sending zero readings on 26 March 2026, which is consistent with the stored files
+  changing format that day, so an absent half-hour from a farm probably means zero output.
 advice:
   - >-
     Treat an absent solar or wind half-hour after 2026-03-26 as zero output when scoring generators,
@@ -60,7 +60,7 @@ metric: >-
   Newest timestamp of each input, rows breaking each assertion, and the largest difference between
   rebuilt and stored values on shared rows.
 ---
- **Ten of the 11 cached inputs that experiment 605 found stopping early now reach the end of the
+**Ten of the 11 cached inputs that experiment 605 found stopping early now reach the end of the
 final test window, and the 11th is still being fetched.** A cached input is a file built from stored
 tables that a model trains and scores on. We rebuilt each one from the production power and ensemble
 tables, or fetched the missing months from the same free weather services. Then we checked every row
@@ -73,16 +73,19 @@ production) is scored once. No forecast and no forecast error was read. This pag
 
 **Two of three predictions held, so the verdict is partly supported.** Prediction P1 held for every
 input except the farm-cell wind table, which is pending (see the last section). Prediction P2 held:
-no row breaks the origin or lag rules. Prediction P3 held: the site tables agree with the stored
-tables on every shared hour. The extended copies sit beside the stored tables, and no stored table
-was edited. Nothing here is adopted for production.
+no row breaks the origin or lag rules. Prediction P3 held in part: the site tables reach 2026-10-31
+with no duplicate keys, no null cells, and no gap at the join. The wind table is the only site table
+whose new request overlaps stored hours, and it agrees there exactly. The other site tables start
+after the stored table ends, so agreement was not tested for them. The extended copies sit beside
+the stored tables, and no stored table was edited. Nothing here is adopted for production.
 
 ![Share of readings that are exactly zero, and readings per series per day, by week](zero_readings_vanish.svg)
 
-*Look at the dashed line. Top: before 2026-03-26 solar farms read exactly 0 in about half of their
+*Look at the dashed line. Top: before 2026-03-26 solar farms read exactly 0 in 47% to 70% of their
 half-hours, and wind farms in 0% to 12% of half-hours (weekly pooled); after the line, no reading is
 exactly 0. Bottom: at the same line, readings per solar farm per day fall from about 44 to about 23
-to 32 (48 is complete), because the night half-hours are absent. Wind farms lose about 2 of 48.*
+to 32 in April to August (48 is complete), and to about 16 by October as the nights lengthen,
+because the night half-hours are absent. Wind farms lose about 2 of 48.*
 
 ## Inputs
 
@@ -90,8 +93,8 @@ to 32 (48 is complete), because the night half-hours are absent. Wind farms lose
   (2024-04-01 to 2026-10-31). The cloud-cover summary holds 345 runs (2025-11-21 to 2026-10-31),
   fetched at about 6 MB a run from Dynamical.org. Each folder holds the 821 and 222 earlier files,
   hard-linked, so each folder is complete.
-- **Observed power.** The cache holds 2,376,271 rows for 22 series, to 2026-11-06 14:00 UTC. It
-  equals the stored cache on all 2,352,228 shared rows.
+- **Observed power.** The cache holds 2,376,271 rows for 22 series, to 2026-11-06 14:00 UTC. Its
+  `power` column equals the stored cache on all 2,352,228 shared rows.
 - **ERA5 and CAMS site tables.** The Open-Meteo ERA5 irradiance table (20 cells) and wind table (3
   wind farms) end on 2026-10-31 23:00. The CAMS tables for 6 solar farms and 22 demand series end on
   2026-11-01 00:00 (period-ending stamps). The wind request reproduced the stored table's 1,584
@@ -127,12 +130,14 @@ every file after it covers a 6-hour window. The ingest code holds no zero filter
 table, not only the cleaned table, holds no zero after the change. Four findings fit the explanation
 that the 6-hour files omit zero-valued readings:
 
-- Solar farms lose about 45% of their half-hours in a week (the night half-hours, which were zeros).
+- Solar farms lose about half of their half-hours in the weeks just after the change (the night
+  half-hours, which were zeros).
 - The wind farms' single missing half-hours sit next to readings near zero: the neighbouring reading
   has a median of 2% of the farm's 95th percentile, against 17% for all readings.
-- Before the change, no wind or solar series has a single missing half-hour next to a reading, in
-  the stored data we checked (one solar case).
-- The change is within a day at all nine series.
+- Before the change, the wind farms have no single missing half-hour, and the solar farms have one.
+- The last exact zero at all 6 solar farms falls between 2026-03-25 05:30 and 2026-03-26 06:30, a
+  few hours before the bulk export ends. The wind farms have too few zeros to pin the date: their
+  last zeros are on 2026-03-23.
 
 We did not read the raw files from the source, so the cause is the best fit to the stored data, not
 a confirmed statement by the source.
@@ -140,8 +145,8 @@ a confirmed statement by the source.
 ![Solar E, midday readings present and median daily peak, by month](solar_e_midday.svg)
 
 *Look at July and October. In the two months where Solar E has about half the midday readings, its
-median daily peak is near 0 MW; in the other months it is 13 to 17 MW. Midday is 10:00 to 14:00
-UTC.*
+median daily peak is near 0 MW (July 0.2 MW; October -0.007 MW, too small to see as a bar); in the
+other months it is 13 to 17 MW. Midday is 10:00 to 14:00 UTC.*
 
 **Solar E lacks midday readings in July and October because it was producing almost nothing, so the
 absent half-hours are zero-output half-hours.** The median daily midday peak is 0.2 MW in July and
@@ -155,8 +160,9 @@ an outage or an export limit, is not in the data. We did not change the series.
 - **ERA5 farm-cell wind table (experiment 288's cells).** It stops on 2024-03-31. The request is the
   four wind variables for the bounding box of the 43 cells, hourly, 2024-03-29 to 2026-10-31, from
   the Climate Data Store, in 12 three-month requests (the service refused a six-month request as too
-  large). Size about 150 MB, free, same ERA5 licence. The queue serves one request at a time and had
-  finished 2 of 12 at the time of writing. The PR will be updated when it arrives.
+  large). The size is about 150 MB, the data are free, and the licence is the same ERA5 licence. The
+  queue serves one request at a time and had finished 2 of 12 at the time of writing. The PR will be
+  updated when it arrives.
 
 ## Checks
 

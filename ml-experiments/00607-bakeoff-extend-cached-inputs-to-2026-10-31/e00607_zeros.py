@@ -140,7 +140,13 @@ def figure_solar_e(*, table: pl.DataFrame) -> None:
     )
     bottom = (
         base.mark_bar(color=theme.BRAND_ORANGE)  # ty: ignore[unresolved-attribute]
-        .encode(y=alt.Y("median_daily_peak_mw:Q", title="Median daily midday peak (MW)"))
+        .encode(
+            y=alt.Y(
+                "median_daily_peak_mw:Q",
+                title="Median daily midday peak (MW)",
+                scale=alt.Scale(domain=[0, 18]),
+            )
+        )
         .properties(width=WIDTH, height=280)
     )
     alt.vconcat(top, bottom).properties(
