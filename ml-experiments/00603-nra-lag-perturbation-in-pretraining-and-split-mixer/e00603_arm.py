@@ -170,7 +170,7 @@ def block_of_pre(*, clean, primary, target_idx, origin_idx, extra_days=0):
         month = PRE_STATE["month"]
         fixed, n_events = bank.synthetic_clean(
             clean=clean, first=int(target_idx.min()), last=e.fit_until(month=month),
-            seed=int(month.replace("-", "")) + 603,
+            seed=int(str(month).replace("-", "")) + 603,
         )  # fmt: skip
         blk_check = _block_of(
             clean=fixed, primary=primary[:500_000], target_idx=target_idx[:500_000],

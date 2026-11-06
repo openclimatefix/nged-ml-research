@@ -1,6 +1,5 @@
 # ruff: noqa: E501, RUF100, UP037, FBT001, FBT002
-# ruff: noqa: E501
-"""Experiment 603: experiment 574's network with its mixer split into a kept stage 1 and a replaced stage 2.
+"""Experiment 603: experiment 574's network with the mixer split into stages 1 and 2.
 
 The core is `[hw, hd, hl, emb]`, the weather, datetime, and lag encoder outputs and the Primary
 embedding. Stage 1 (`mixer1`) maps the core to `h1` and is learnt in pre-training and kept (frozen)

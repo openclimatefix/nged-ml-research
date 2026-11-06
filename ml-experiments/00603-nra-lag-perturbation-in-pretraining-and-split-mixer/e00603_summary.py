@@ -6,7 +6,7 @@ q05-q95 coverage and safe-side share by phase, the median's absolute error again
 the follow proxy: it grows when the median follows the shifted lags), band width; and on event-free
 rows the coverage, width, and loss of the 90% band.
 
-Usage: python e00603_summary.py SUFFIX ARM [ARM ...]   (reads score_<arm><SUFFIX>)
+Usage: python e00603_summary.py SUFFIX ARM [ARM ...]   (reads `score_ARM` plus the suffix)
 """
 
 import csv

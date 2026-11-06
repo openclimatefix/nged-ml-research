@@ -49,7 +49,7 @@ for a, label in ARMS.items():
 chart = (
     alt.Chart(alt.Data(values=data))
     .mark_point(filled=True, size=90, clip=True)
-    .encode(
+    .encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("arm:N", sort=list(ARMS.values()), title="Arm", axis=alt.Axis(labelAngle=0)),
         xOffset=alt.XOffset("phase:N", sort=list(PHASES.values())),
         y=alt.Y(
