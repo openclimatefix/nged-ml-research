@@ -416,8 +416,8 @@ Look at the phases where the gate is on: C2's band is wider than C1's there, and
 
 ![Daily band width, verified events](summary_width_over_time.svg)
 
-The orange line (C2) lies above the purple line (C1) on gate-on days. Colours differ from the other
-figures: here purple is C1 and orange is C2.
+The orange line (C2) lies above the blue line (C1) on gate-on days. Colours differ from the other
+figures: here blue is C1 and orange is C2.
 
 ![Coverage by phase for each verified event](from584_coverage90_verified_events.svg)
 
