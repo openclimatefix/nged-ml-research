@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Fetch CAMS irradiance at the 22 demand series for 2026-09-11 to 2026-10-31.
 
 The published script `fetch_cams_demand_points.py` refuses a date override and rewrites the whole
@@ -35,16 +36,21 @@ def main() -> None:
         msg = "series table differs from the one the stored raw files were fetched with"
         raise SystemExit(msg)
     # One request per site for the whole window; the published helpers read the range from here.
-    published.date_range_of = lambda *, year: f"{FIRST}/{LAST}"  # noqa: ARG005
+    published.date_range_of = lambda *, year: f"{FIRST}/{LAST}"  # ty: ignore[invalid-assignment]
     jobs = published.build_jobs(series=series.with_columns())
     jobs = [job for job in jobs if job.year == 2026]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=published.MAX_CONCURRENT_REQUESTS) as pool:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=published.MAX_CONCURRENT_REQUESTS
+    ) as pool:
         futures = [pool.submit(published.fetch_one, job=job) for job in jobs]
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
             future.result()
             print(f"{done} of {len(jobs)} sites ready", flush=True)
     frame = pl.concat(
-        [published.read_one(path=published.csv_path(site=j.site, year=j.year), site=j.site) for j in jobs]
+        [
+            published.read_one(path=published.csv_path(site=j.site, year=j.year), site=j.site)
+            for j in jobs
+        ]
     )
     tidy = (
         frame.drop_nulls(subset=["time", *published.VALUE_COLUMNS])
@@ -53,7 +59,9 @@ def main() -> None:
     )
     tidy.write_parquet(OUTPUT)
     expected = 22 * 24 * 51
-    print(f"wrote {tidy.height:,} rows (expected {expected:,}), {tidy['time'].min()} to {tidy['time'].max()}")
+    print(
+        f"wrote {tidy.height:,} rows (expected {expected:,}), {tidy['time'].min()} to {tidy['time'].max()}"
+    )
 
 
 if __name__ == "__main__":

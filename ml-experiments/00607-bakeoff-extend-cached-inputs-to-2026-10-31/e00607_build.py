@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Extend the cached inputs of experiment 605's list that need only CPU or a free fetch.
 
 Builds, for runs 2026-07-01 to 2026-10-31, the ENS summary with wind components (experiment 561),
@@ -42,7 +43,9 @@ ORIGINAL_COLUMNS: Final[list[str]] = [
 
 def new_runs() -> list[datetime]:
     """Return the daily 00:00 UTC runs 2026-07-01 to 2026-10-31."""
-    return [FIRST_NEW_RUN + timedelta(days=i) for i in range((LAST_NEW_RUN - FIRST_NEW_RUN).days + 1)]
+    return [
+        FIRST_NEW_RUN + timedelta(days=i) for i in range((LAST_NEW_RUN - FIRST_NEW_RUN).days + 1)
+    ]
 
 
 def _init_uv() -> None:
@@ -96,7 +99,9 @@ def link_old_runs() -> None:
             if not target.exists():
                 os.link(path, target)
                 linked += 1
-        print(f"{new.name}: linked {linked} earlier files; folder holds {len(list(new.glob('init=*.parquet')))}")
+        print(
+            f"{new.name}: linked {linked} earlier files; folder holds {len(list(new.glob('init=*.parquet')))}"
+        )
 
 
 def build_observed() -> None:

@@ -1,13 +1,15 @@
-"""Fetch the 14 stage-1 ERA5 variables for 2026-07-28 to 2026-10-31 from the Climate Data Store.
+# ruff: noqa: E501
+"""Fetch 13 of the 14 stage-1 ERA5 variables for 2026-07-28 to 2026-10-31 from the Climate Data Store.
 
 The stage-1 ERA5 box was read from Google's ARCO-ERA5 store, which holds one global field per hour;
 extending it to 2026-10-31 that way would download roughly 120 GB, so this script asks the Climate
 Data Store, which cuts the same 11 x 11 cell block on the server, for about 60 MB. Both serve ERA5
-(Hersbach et al., 2020), so the values agree to the netCDF packing of the Climate Data Store (see
-`validation` below). One request per month; the first window starts on 2026-07-28 so that four days
+(Hersbach et al., 2020), so the values agree to the netCDF packing of the Climate Data Store (the script prints the largest difference on the four overlapping days). One request per month; the first window starts on 2026-07-28 so that four days
 overlap the stored table, and `expver` is kept as the service reports it (`0001` final, `0005`
 ERA5T, the preliminary release). Writes one parquet per variable under the experiment's folder, in
-the stored table's layout (`time`, `latitude`, `longitude`, `value`, `expver`). No coordinate is
+the stored table's layout (`time`, `latitude`, `longitude`, `value`, `expver`). The service accepts
+a request for `precipitation_type` but returns no such field in its netCDF files, so that variable
+is not written here; the Google store holds it. No coordinate is
 printed or written to a filename.
 
     uv run --no-sync --with cdsapi --with netCDF4 python e00607_fetch_era5_box_cds.py
@@ -35,7 +37,6 @@ CDS_NAMES: Final[dict[str, str]] = {
     "sp": "surface_pressure",
     "msl": "mean_sea_level_pressure",
     "tcc": "total_cloud_cover",
-    "ptype": "precipitation_type",
     "ssrd": "surface_solar_radiation_downwards",
     "fdir": "total_sky_direct_solar_radiation_at_surface",
     "strd": "surface_thermal_radiation_downwards",
@@ -98,7 +99,9 @@ def tidy(*, datasets: list[xr.Dataset], short: str) -> pl.DataFrame:
     """Return one variable as the stored table's layout, merging `expver` slots if present."""
     pieces = []
     for dataset in datasets:
-        names = [v for v in dataset.data_vars if v in (short, stage1.VARIABLES_BY_NAME[short].short_name)]
+        names = [
+            v for v in dataset.data_vars if v in (short, stage1.VARIABLES_BY_NAME[short].short_name)
+        ]
         if not names:
             continue
         array = dataset[names[0]]
@@ -123,7 +126,9 @@ def _frame(*, array: xr.DataArray, time_name: str, expver: str) -> pl.DataFrame:
     n = len(times)
     return pl.DataFrame(
         {
-            "time": pl.Series(np.repeat(times.astype("datetime64[us]"), len(lats) * len(lons))).dt.replace_time_zone("UTC"),
+            "time": pl.Series(
+                np.repeat(times.astype("datetime64[us]"), len(lats) * len(lons))
+            ).dt.replace_time_zone("UTC"),
             "latitude": np.tile(np.repeat(lats, len(lons)), n),
             "longitude": np.tile(lons, n * len(lats)),
             "value": values.reshape(-1),
@@ -143,20 +148,24 @@ def main() -> None:
         frame = pl.concat([tidy(datasets=ds, short=short) for ds in opened]).unique(
             subset=["time", "latitude", "longitude"], keep="last"
         )
-        stored = pl.scan_parquet(stored_dir / f"{short}.parquet").filter(
-            pl.col("time") >= pl.datetime(2026, 7, 28, time_zone="UTC")
-        ).collect()
+        stored = (
+            pl.scan_parquet(stored_dir / f"{short}.parquet")
+            .filter(pl.col("time") >= pl.datetime(2026, 7, 28, time_zone="UTC"))
+            .collect()
+        )
         both = frame.join(stored, on=["time", "latitude", "longitude"], suffix="_stored")
         variable = stage1.VARIABLES_BY_NAME[short]
         worst = (both["value"] - both["value_stored"]).abs().max()
         print(
             f"{short}: {frame.height:,} rows; overlap {both.height:,} rows with the stored table, "
-            f"largest difference {worst:.3g} ({worst / variable.maximum:.1e} of the variable's maximum)",
+            f"largest difference {worst:.3g} ({worst / variable.maximum:.1e} of the variable's maximum)",  # ty: ignore[unsupported-operator]
             flush=True,
         )
         new = frame.filter(pl.col("time") > stored["time"].max())
         new.write_parquet(WORK / f"{short}.parquet")
-        print(f"  new rows {new.height:,}; expver {new['expver'].value_counts().sort('expver').rows()}")
+        print(
+            f"  new rows {new.height:,}; expver {new['expver'].value_counts().sort('expver').rows()}"
+        )
 
 
 if __name__ == "__main__":

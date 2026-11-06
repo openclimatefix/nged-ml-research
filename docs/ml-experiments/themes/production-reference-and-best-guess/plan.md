@@ -18,7 +18,6 @@
 | 491 | Can one demand network trained with an exponential moving average or a stochastic weight average of its weights recover a useful share of the five-network pool's gain? | High (maintainer approved 2026-11-01) | Nothing | Finished: the averaged network closes 2% to 6% of the gap to the pool at the eight; pools of seeds close 59% to 99% |
 | 489 | Can one network, trained to match the five-network pool, forecast Primary demand as well as the pool? | High (maintainer asked 2026-11-01) | One GPU process under 8 GB | Finished: students score like a single seed, not the pool (not supported) |
 | 485 | Does treating 22 December to 2 January as its own regime (day type, lag substitute, Christmas weight with ERA5 replay, Christmas-weighted pretraining) improve the pretrained demand network's Christmas forecast without harming other days? | High (maintainer asked 2026-11-01) | Nothing | Finished: no arm gained more than one Christmas can detect; H2, H4, and P cost skill outside the window at the eight |
-| 607 | Can the cached inputs that stop early be extended to 2026-10-31 for the final bake-off test? | High (manager asked 2026-11-06) | Nothing | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 

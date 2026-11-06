@@ -46,9 +46,13 @@ def check_ensemble_tables() -> tuple[dict[str, object], list[pl.DataFrame]]:
             .collect()
         )
         keys = ["time_series_id", "power_fcst_init_time", "valid_time"]
-        bad_origin = frame.filter(pl.col("power_fcst_init_time") != pl.col("run") + pl.duration(hours=9))
+        bad_origin = frame.filter(
+            pl.col("power_fcst_init_time") != pl.col("run") + pl.duration(hours=9)
+        )
         bad_after = frame.filter(pl.col("valid_time") <= pl.col("power_fcst_init_time"))
-        too_far = frame.filter(pl.col("valid_time") > pl.col("power_fcst_init_time") + pl.duration(days=16))
+        too_far = frame.filter(
+            pl.col("valid_time") > pl.col("power_fcst_init_time") + pl.duration(days=16)
+        )
         duplicates = frame.height - frame.unique(subset=keys).height
         nulls = int(frame.null_count().sum_horizontal().item())
         per_run = frame.group_by("run").agg(
@@ -72,7 +76,9 @@ def check_ensemble_tables() -> tuple[dict[str, object], list[pl.DataFrame]]:
         ):
             if bad.height:
                 violations.append(
-                    bad.head(1000).select("run", *keys).with_columns(table=pl.lit(name), rule=pl.lit(label))
+                    bad.head(1000)
+                    .select("run", *keys)
+                    .with_columns(table=pl.lit(name), rule=pl.lit(label))
                 )
     return report, violations
 
@@ -111,7 +117,9 @@ def check_observed() -> tuple[dict[str, object], list[pl.DataFrame]]:
         )
         report[f"{col}_rows_not_equal_to_power_{hours}h_earlier"] = wrong.height
         report[f"{col}_age_hours"] = hours
-    report["newest_by_series_min"] = str(new.group_by("time_series_id").agg(pl.col("valid_time").max())["valid_time"].min())
+    report["newest_by_series_min"] = str(
+        new.group_by("time_series_id").agg(pl.col("valid_time").max())["valid_time"].min()
+    )
     return report, []
 
 
@@ -123,7 +131,9 @@ def check_capped_lags() -> dict[str, object]:
     grid = np.full((len(ids), n_steps), np.nan, dtype=np.float32)
     row_of = {sid: i for i, sid in enumerate(ids)}
     recent = new.filter(pl.col("valid_time") >= grid_start)
-    idx = (recent["valid_time"].dt.epoch("us").to_numpy() - int(grid_start.timestamp() * 1e6)) // (30 * 60 * 10**6)
+    idx = (recent["valid_time"].dt.epoch("us").to_numpy() - int(grid_start.timestamp() * 1e6)) // (
+        30 * 60 * 10**6
+    )
     keep = (idx >= 0) & (idx < n_steps)
     rows = np.array([row_of[s] for s in recent["time_series_id"].to_list()])
     grid[rows[keep], idx[keep]] = recent["power"].to_numpy()[keep]
@@ -148,7 +158,11 @@ def check_capped_lags() -> dict[str, object]:
 def main() -> None:
     ens_report, ens_violations = check_ensemble_tables()
     obs_report, _ = check_observed()
-    out = {"ensemble_tables": ens_report, "observed_cache": obs_report, "capped_lags": check_capped_lags()}
+    out = {
+        "ensemble_tables": ens_report,
+        "observed_cache": obs_report,
+        "capped_lags": check_capped_lags(),
+    }
     (OUT / "assertions.json").write_text(json.dumps(out, indent=2, default=str))
     if ens_violations:
         pl.concat(ens_violations).write_parquet(OUT / "violations.parquet")

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PERF401
 """Fetch Open-Meteo's ERA5 wind at the three wind sites, 2026-08-20 to 2026-10-31, and validate.
 
 The script that built `wind_era5.parquet` is not in the repository, so this script re-creates the
@@ -33,12 +34,13 @@ def fetch_site(*, latitude: float, longitude: float) -> pl.DataFrame:
         f"?latitude={latitude}&longitude={longitude}&start_date={FIRST}&end_date={LAST}"
         f"&hourly={','.join(VARIABLES)}&models=era5&timezone=UTC"
     )
-    with urllib.request.urlopen(url, timeout=300) as response:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=300) as response:
         payload = json.loads(response.read())
     hourly = payload["hourly"]
-    return pl.DataFrame({"time": hourly["time"], **{v: hourly[v] for v in VARIABLES}}).with_columns(
-        pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M").dt.replace_time_zone("UTC")
-    )
+    return pl.DataFrame(
+        {"time": hourly["time"], **{v: hourly[v] for v in VARIABLES}},
+        schema_overrides=dict.fromkeys(VARIABLES, pl.Float64),
+    ).with_columns(pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M").dt.replace_time_zone("UTC"))
 
 
 def main() -> None:
@@ -53,8 +55,10 @@ def main() -> None:
     new = pl.concat(frames).select("site", "time", *VARIABLES).drop_nulls().sort("site", "time")
     stored = pl.read_parquet(STORED)
     overlap = new.join(stored, on=["site", "time"], suffix="_stored")
-    print(f"overlap rows with the stored table: {overlap.height:,} (stored rows in window: "
-          f"{stored.filter(pl.col('time') >= pl.datetime(2026, 8, 20, time_zone='UTC')).height:,})")
+    print(
+        f"overlap rows with the stored table: {overlap.height:,} (stored rows in window: "
+        f"{stored.filter(pl.col('time') >= pl.datetime(2026, 8, 20, time_zone='UTC')).height:,})"
+    )
     for v in VARIABLES:
         gap = (overlap[v] - overlap[f"{v}_stored"]).abs().max()
         print(f"{v}: largest absolute difference from the stored table {gap}")
