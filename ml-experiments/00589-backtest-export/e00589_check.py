@@ -45,7 +45,8 @@ def anonymisation() -> None:
     )
     sub_ids = set(pl.read_csv(OUT / "substations.csv")["time_series_id"].to_list())
     print("== Anonymisation")
-    assert sub_ids <= primaries and len(sub_ids) == 16, sub_ids - primaries
+    assert sub_ids <= primaries, sub_ids - primaries
+    assert len(sub_ids) == 16
     for p in sorted(OUT.glob("*.parquet")):
         ids = set(
             pl.read_parquet(p, columns=["time_series_id"])["time_series_id"].unique().to_list()
