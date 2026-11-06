@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, PERF401, ANN003, D107, D102, RUF059, B007
+# ruff: noqa: E501, D103, ANN001, ANN201, PERF401, ANN003, D107, D102, RUF059, B007, DTZ001, PLR0915
 """Experiment 597 figures. Run `e00597_score.py c1` and `e00597_score.py a1` first.
 
 `python e00597_figures.py summary` draws the figures read from the score tables.
@@ -8,6 +8,7 @@ Demand series only: every plotted series is a Primary substation.
 """
 
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import altair as alt
@@ -16,6 +17,7 @@ import e00582_score as sc  # ty: ignore[unresolved-import]
 import e00583_common as c  # ty: ignore[unresolved-import]
 import e00583_figures as f3  # ty: ignore[unresolved-import]
 import e00583_score as s3  # ty: ignore[unresolved-import]
+import e00588_clean_panels as cp  # ty: ignore[unresolved-import]
 import e00592_common as g  # ty: ignore[unresolved-import]
 import e00597_common as k  # ty: ignore[unresolved-import]
 import e00597_score as sc597  # ty: ignore[unresolved-import]
@@ -52,6 +54,8 @@ DESIGNS = [  # (length in days, depth share of capacity, sign): as in experiment
     for depth, sign in ((0.15, 1), (0.30, -1), (0.50, 1), (0.50, -1))
 ]
 INJECT_MONTH = "2026-03"
+# The maintainer's switch times for the December 2025 example event (UTC).
+SWITCH_TIMES = [datetime(2025, 12, 30, 1, 0), datetime(2026, 1, 14, 11, 30)]
 GREY, BLUE, ORANGE = "#6b6b6b", theme.DATA_BLUE, theme.BRAND_ORANGE
 
 
@@ -338,15 +342,15 @@ def strips_for(*, t, rows, wide, prim, onset):
 
 
 def real_pair(views: dict[str, ArmView]) -> None:
+    """One figure per Primary on the verified December pair: C1 + G4 above A1 + G4."""
     v1, v2 = views["c1"], views["a1"]
     t1 = v1.inp.t
     ev = sc.attach_depth(ev=sc.merged_events(), t=t1).filter(
         pl.col("name").str.contains("2025-12-29")
     )
-    charts = []
     for e in ev.sort("name").iter_rows(named=True):
         p, onset, end = e["primary"], e["onset_idx"], e["end_idx"]
-        keys, rows = day_ahead_keys(t=t1, prim=p, lo=onset - 14 * 48, hi=end + 14 * 48)
+        keys, rows = day_ahead_keys(t=t1, prim=p, lo=onset - 14 * 48, hi=end + 15 * 48)
         r2 = v2.rows_for(keys)
         ok = r2 >= 0
         rows, r2 = rows[ok], r2[ok]
@@ -359,34 +363,39 @@ def real_pair(views: dict[str, ArmView]) -> None:
         q_b = k.assemble(
             v=t2.arms["V"][r2], m=t2.arms["M"][r2], wide=v2.inp.mode[t2.prim[r2], t2.origin_day[r2]]
         )
-        x = (t1.idx[rows] - onset) / 48.0
-        charts.append(
-            panel(x=x, q_a=q_a, q_b=q_b, obs=t1.obs[rows], nra=t1.nra[rows], strips=strips_for(t=t1, rows=rows, wide=v1.inp.mode, prim=p, onset=onset), span=(0.0, (end - onset) / 48.0), xdom=(-14, (end - onset) / 48.0 + 14),
-                  title=f"{t1.label[p]}: the verified December 2025 load-shift", xtitle="Days since the load-shift began", show_nra=True)
-        )  # fmt: skip
-    save(
-        alt.vconcat(*charts)
-        .properties(
-            title=alt.TitleParams(
-                [
-                    "Day-ahead forecasts of C1 + G4 (orange) and A1 + G4 (blue), December 2025 load-shifts",
-                    "Median and q05-q95 band, issued at 09:00 the day before. Solid black: observed power. Dashed black: NRA.",
-                    "Grey shade: the load-shift. Sky-blue bar: G4 wide band on (or held for 7 days).",
-                ],
-                fontSize=11,
-                anchor="start",
-            )
+        when = lambda i: (sc.k.k.GRID_START + timedelta(minutes=30 * float(i))).replace(tzinfo=None)  # noqa: E731
+        x = [when(i) for i in t1.idx[rows]]
+        ydom = cp.common_ydom([(q_a, t1.obs[rows]), (q_b, t1.obs[rows])], iq=IQ)
+        strip = [
+            {"x0": when(r["x0"] * 48 + onset), "x1": when(r["x1"] * 48 + onset)}
+            for r in strips_for(t=t1, rows=rows, wide=v1.inp.mode, prim=p, onset=onset)
+        ]
+        common = {
+            "x": x, "iq": IQ, "obs": t1.obs[rows], "ydom": ydom, "xtype": "T",
+            "xdom": (when(onset - 14 * 48), when(end + 14 * 48)), "strip": strip,
+            "span": (when(onset), when(end)), "rules": SWITCH_TIMES,
+        }  # fmt: skip
+        units = [
+            cp.arm_panel(q=q_a, title=f"{t1.label[p]}: C1 + G4", **common),
+            cp.arm_panel(q=q_b, title=f"{t1.label[p]}: A1 + G4", xtitle="Date (UTC)", **common),
+        ]  # fmt: skip
+        key = [
+            *cp.FORECAST_ENTRIES,
+            cp.OBS, cp.SHADE, cp.GATE, cp.RULES,
+        ]  # fmt: skip
+        fig = cp.figure(
+            units=units,
+            title=f"{t1.label[p]}: day-ahead forecasts through the December 2025 load-shift (issued 09:00 the day before)",
+            key=key,
         )
-        .resolve_scale(x="shared"),
-        "real_pair_day_ahead.svg",
-    )
+        save(fig, f"real_pair_{t1.label[p]}_day_ahead.svg")
 
 
 def injected(views: dict[str, ArmView]) -> None:
     v1, v2 = views["c1"], views["a1"]
     ev_all = pl.read_parquet(s3.BANK_PARQUET).filter(pl.col("month") == INJECT_MONTH)
     inputs = {"c1": v1, "a1": v2}
-    figs: dict[int, list] = {7: [], 15: [], 30: []}
+    snippets = []
     for length, depth, sign in DESIGNS:
         for grp in k.GROUPS_SCORED:
             t1 = v1.inp.t
@@ -459,39 +468,23 @@ def injected(views: dict[str, ArmView]) -> None:
             x = (t1.idx[rows1] - onset) / 48.0
             nra = t1.obs[rows1]
             started = x.min() <= 0
-            figs[length].append(
-                panel(
-                    x=x,
-                    q_a=qa,
-                    q_b=qb,
-                    obs=nra,
-                    nra=nra,
-                    strips=strips_for(t=t1, rows=rows1, wide=wide1, prim=p, onset=onset),
-                    span=(0.0 if started else float(x.min()), (end - onset) / 48.0),
-                    xdom=(float(x.min()), (end - onset) / 48.0 + 14),
-                    title=f"{t1.label[p]} ({k.GROUP_NAME[grp]}): {sign * depth * 100:+.0f}% of capacity for {length} days",
-                    height=110,
-                    show_nra=False,
-                    xtitle="Days since the injected shift began",
-                )
-            )
-    for length, charts in figs.items():
-        save(
-            alt.vconcat(*charts)
-            .properties(
-                title=alt.TitleParams(
-                    [
-                        f"Injected {length} day load-shifts in the lag inputs only, March 2026: C1 + G4 (orange), A1 + G4 (blue)",
-                        "The target stays clean, so observed power (black) is also the NRA. Median and q05-q95 band, day-ahead.",
-                        "Grey shade: the injected shift. Sky-blue bar: G4 wide band on (or held for 7 days).",
-                    ],
-                    fontSize=11,
-                    anchor="start",
-                )
-            )
-            .resolve_scale(x="independent"),
-            f"injected_{length}d_day_ahead.svg",
-        )
+            ydom = cp.common_ydom([(qa, nra), (qb, nra)], iq=IQ)
+            strip = strips_for(t=t1, rows=rows1, wide=wide1, prim=p, onset=onset)
+            common = {"x": x, "iq": IQ, "obs": nra, "ydom": ydom, "strip": strip,
+                      "span": (0.0 if started else float(x.min()), (end - onset) / 48.0),
+                      "xdom": (float(x.min()), (end - onset) / 48.0 + 14)}  # fmt: skip
+            units = [
+                cp.arm_panel(q=qa, title="C1 + G4", **common),
+                cp.arm_panel(q=qb, title="A1 + G4", xtitle="Days since the injected shift began", **common),
+            ]  # fmt: skip
+            key = [*cp.FORECAST_ENTRIES, cp.OBS, cp.SHADE, *([cp.GATE] if strip else [])]  # fmt: skip
+            sg = "up" if sign > 0 else "down"
+            tag = "mva" if k.GROUP_NAME[grp] == k.GROUP_NAME[k.GROUPS_SCORED[0]] else "mw"
+            out = f"injected_{length}d_{sg}_{int(depth * 100)}pct_{tag}.svg"
+            title = f"{t1.label[p]} ({k.GROUP_NAME[grp]}): injected {sign * depth * 100:+.0f}% of capacity for {length} days, March 2026, day-ahead"
+            save(cp.figure(units=units, title=title, key=key), out)
+            snippets.append(f"![{t1.label[p]}, injected {length} days, {sign * depth * 100:+.0f}%]({out})\n\n{t1.label[p]} ({k.GROUP_NAME[grp]}): {sign * depth * 100:+.0f}% of capacity for {length} days.\n")  # fmt: skip
+    (k.WORK / "injected_snippets.md").write_text("\n".join(snippets))
 
 
 def panels() -> None:
@@ -517,6 +510,10 @@ def summary() -> None:
     event_free_cost()
 
 
+def real_only() -> None:
+    real_pair({arm: ArmView(arm) for arm in ("c1", "a1")})
+
+
 if __name__ == "__main__":
-    (summary if sys.argv[1] == "summary" else panels)()
+    {"summary": summary, "panels": panels, "real": real_only}[sys.argv[1]]()
     _ = (bank, sc597)
