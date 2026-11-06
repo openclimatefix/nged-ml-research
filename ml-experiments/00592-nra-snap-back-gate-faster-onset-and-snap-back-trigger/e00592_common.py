@@ -10,8 +10,10 @@ Gates (all return `(on, snap)`, booleans of shape (16 Primaries, days) by foreca
 - `G0`: experiment 583's gate, a sustained gap of 3 days on lags at least 24 h old.
 - `G1`, `G2`: the same gate with a sustain of 2 days and of 1 day.
 - `G3`: the fast gate. One reading per origin day: the mean of (observed power minus E2's median)
-  over the half-hours from the previous origin to the current origin minus 4.0 h. A sustain of 1 reading.
-- `G4`: `G3` that turns on only when an electrical neighbour shows a gap of the opposite sign above its own threshold.
+  over the half-hours from the previous origin to the current origin minus 4.0 h. A sustain of 1
+  reading.
+- `G4`: `G3` that turns on only when an electrical neighbour shows a gap of the opposite sign above
+  its own threshold.
 - `G5`: `G3` that releases (a snap-back) as soon as the gap changes sign or falls by more than 60% in
   one day.
 """
