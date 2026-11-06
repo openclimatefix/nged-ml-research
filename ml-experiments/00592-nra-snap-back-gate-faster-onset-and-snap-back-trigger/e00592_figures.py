@@ -107,17 +107,17 @@ def headline() -> None:
             ),
             color=gate_colour(),
         )
-        return alt.layer(
+        return alt.layer(  # ty: ignore[invalid-return-type]
             alt.Chart(pl.DataFrame({"y": [0.9]}))
             .mark_rule(strokeDash=[4, 3], color="#444")
             .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0.86, 0.93]))),  # ty: ignore[unresolved-attribute]
             alt.Chart(pl.DataFrame({"x": [1.0]}))
             .mark_rule(strokeDash=[4, 3], color="#444")
             .encode(x="x:Q"),  # ty: ignore[unresolved-attribute]
-            base.mark_rule().encode(
+            base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
                 y=alt.Y("cover90_lo:Q", scale=alt.Scale(domain=[0.86, 0.93])), y2="cover90_hi:Q"
             ),
-            base.mark_point(filled=True, size=70),
+            base.mark_point(filled=True, size=70),  # ty: ignore[invalid-argument-type]
         ).properties(width=W, height=170)
 
     save(
@@ -162,8 +162,8 @@ def coverage_by_phase() -> None:
         xOffset="gate:N",
     )
     chart = alt.layer(
-        base.mark_point(filled=True, size=45),
-        base.mark_rule().encode(
+        base.mark_point(filled=True, size=45),  # ty: ignore[invalid-argument-type]
+        base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("cover90_lo:Q", scale=alt.Scale(domain=[0.75, 1.0])), y2="cover90_hi:Q"
         ),
         alt.Chart(pl.DataFrame({"y": [0.9]}))
@@ -288,13 +288,13 @@ def false_alarm_cost() -> None:
 
     def build(d: pl.DataFrame) -> alt.LayerChart:
         base = alt.Chart(d).encode(y=alt.Y("gate:N", title=None), color=gate_colour(legend=False))  # ty: ignore[unresolved-attribute]
-        return alt.layer(
+        return alt.layer(  # ty: ignore[invalid-return-type]
             alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#444").encode(x="x:Q"),  # ty: ignore[unresolved-attribute]
-            base.mark_rule().encode(
+            base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("lo:Q", title="Minus G0's loss, points of capacity (smaller is better)"),
                 x2="hi:Q",
             ),
-            base.mark_point(filled=True, size=60).encode(x="d:Q"),
+            base.mark_point(filled=True, size=60).encode(x="d:Q"),  # ty: ignore[unresolved-attribute]
         ).properties(width=W, height=110)
 
     save(
@@ -318,7 +318,7 @@ def real_pair() -> None:
     )
 
     def build(d: pl.DataFrame) -> alt.LayerChart:
-        return alt.layer(
+        return alt.layer(  # ty: ignore[invalid-return-type]
             alt.Chart(d)
             .mark_bar()
             .encode(  # ty: ignore[unresolved-attribute]
@@ -396,8 +396,9 @@ def timelines() -> None:
                 ),
             )
         )
-        return alt.layer(
-            heat, alt.Chart(pl.DataFrame({"x": [0]})).mark_rule(color="#000").encode(x="x:Q")
+        return alt.layer(  # ty: ignore[invalid-return-type]
+            heat,
+            alt.Chart(pl.DataFrame({"x": [0]})).mark_rule(color="#000").encode(x="x:Q"),  # ty: ignore[unresolved-attribute]
         ).properties(width=W, height=80)  # ty: ignore[unresolved-attribute]
 
     save(
@@ -467,7 +468,7 @@ def event_plot(
             axis=alt.Axis(values=list(range(-3, int(length) + 8, 3 if length < 20 else 6))),
         )
         span = (
-            alt.Chart(pl.DataFrame({"a": [0.0], "b": [length]}))
+            alt.Chart(pl.DataFrame({"a": [0.0], "b": [length]}))  # ty: ignore[unresolved-attribute]
             .mark_rect(color="#999999", opacity=0.10)
             .encode(x="a:Q", x2="b:Q")
         )  # ty: ignore[unresolved-attribute]

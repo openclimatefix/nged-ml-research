@@ -361,7 +361,7 @@ def main() -> None:
     np.savez(
         g.WORK / "gate_state.npz",
         fresh_gap=inp.fresh_gap, old_gap=inp.gi["gap"], old_thr=inp.gi["thr"],
-        fresh_thr=inp.fresh_thr, **{f"{k}_on": v[0] for k, v in inp.states.items()},
+        fresh_thr=inp.fresh_thr, **{f"{k}_on": v[0] for k, v in inp.states.items()},  # ty: ignore[invalid-argument-type]
         **{f"{k}_snap": v[1] for k, v in inp.states.items()},
     )  # fmt: skip
     print("done", tab.height, "bank rows")

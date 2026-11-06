@@ -24,7 +24,7 @@ def main() -> None:
         "max |cover90 difference|",
         (jr["cover90"] - jr["cover90_584"]).abs().max(),
     )
-    assert d.max() < 1e-4, "G0 does not reproduce experiment 584's C2"
+    assert d.max() < 1e-4, "G0 does not reproduce experiment 584's C2"  # ty: ignore[unsupported-operator]
 
 
 if __name__ == "__main__":
