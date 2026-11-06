@@ -158,7 +158,8 @@ arms, beside D15.
   every arm. The mean q05-q95 width in that week is 23.7 points for C0 and 18.5 for P5.
 
 - **Other Primaries show the same sign as D5:** in the December fold before the onset, D5's
-  median minus observed power is -8.9 (P5), D15's is -10.6, D12's is -6.7, and D10's is -6.4. D5 is the only Primary with P5 coverage below 0.70 in that
+  median minus observed power is -8.9 (P5), D15's is -10.6, D12's is -6.7, and D10's is -6.4. D5 is
+  the only Primary with P5 coverage below 0.70 in that
   window (0.37 for P5, 0.48 for C0, 0.34 for C1; the next lowest is D12 at 0.75 for P5).
 - **D5's level rose before the event.** The data alone cannot say whether the rise was
   weather-driven demand or an earlier unflagged shift. D5's daily mean observed power rose from
