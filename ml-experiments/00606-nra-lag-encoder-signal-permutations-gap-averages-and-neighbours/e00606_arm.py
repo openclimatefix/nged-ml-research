@@ -15,7 +15,8 @@ injected bank's contaminated power), by the same code path.
 
 Usage: python e00606_arm.py ARM COMMAND [--months ...] [--seeds ...] [--passes ...] [--work-suffix X]
 
-- ARM: a key of `ARMS`, optionally followed by `-p` (the same arm with its extra columns replaced by a
+- ARM: a key of `ARMS`, optionally followed by `-p` (the same arm with its extra columns replaced by
+  a
   column-wise resample of the training block, the placebo).
 - COMMAND: `table`, `check`, `fit`, `inject`, `assemble`, as in experiment 598.
 """
@@ -258,7 +259,9 @@ GRID_SHAPE = (16, 121248)
 
 
 class FoldSignals:
-    """The extra-column blocks of one fold month and seed: the training rows (with synthetic shifts) and any test power."""
+    """The extra-column blocks of one fold month and seed: the training rows (with synthetic shifts)
+    and any test power.
+    """
 
     def __init__(self, *, mr, test, clean: np.ndarray, month: str, seed: int) -> None:
         z = np.load(table_file(month=month, seed=seed))
@@ -481,7 +484,9 @@ def exp_missing_share(*, fs: FoldSignals, test) -> None:
 
 
 def known_answer_real(*, fs: FoldSignals, test) -> None:
-    """Shift one Primary's real power by a known amount for 10 days (mirrored onto its neighbours) and check the columns."""
+    """Shift one Primary's real power by a known amount for 10 days (mirrored onto its neighbours)
+    and check the columns.
+    """
     p, shift = 3, 0.2
     start = int(np.median(test.origin_idx)) - 5 * sig.PER_DAY
     end = start + 10 * sig.PER_DAY
@@ -682,7 +687,9 @@ def run_assemble() -> None:
 
 
 def run_step2(*, device: str = "cuda") -> None:
-    """Train this arm's own step 2 (the paired arms): experiment 574's `step2` with the paired lags and the extra columns."""
+    """Train this arm's own step 2 (the paired arms): experiment 574's `step2` with the paired lags
+    and the extra columns.
+    """
     assert PAIRED, "only a paired arm trains its own step 2"
     clean = e.c.clean_stack()
     for month in e.ARGS.months:

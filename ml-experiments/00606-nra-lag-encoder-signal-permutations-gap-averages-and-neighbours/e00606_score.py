@@ -1,11 +1,14 @@
 # ruff: noqa: D107, D102, E501, PERF401, PLR0915, D103, ANN001, D205
-"""Experiment 606: score R, W, A1, the permutation arms P3 to P7c, their placebos, and the width-matched arms.
+"""Experiment 606: score R, W, A1, the permutation arms P3 to P7c, their placebos, and the
+width-matched arms.
 
 No fit and no GPU. A copy of experiment 598's `e00598_score.py` with that experiment's contrasts and
-verdicts replaced by this experiment's. It reads the stored forecasts of arm A1 (experiment 591) and of
+verdicts replaced by this experiment's. It reads the stored forecasts of arm A1 (experiment 591) and
+of
 the arms of this experiment, and writes tables under `data/ml-experiments/00606-*/score<suffix>/`.
 
-Systems (every one a (rows, 11) quantile array on experiment 583's table of rows): `A1`; `R` (A1 plus the
+Systems (every one a (rows, 11) quantile array on experiment 583's table of rows): `A1`; `R` (A1
+plus the
 G4 gate, experiment 597); `W` (A1 rescaled to R's mean width on R's wide days); each arm (seed mean);
 `<arm>-rs`, each arm rescaled about its median, per fold month and seed, to R's width; `G4T`.
 

@@ -5,7 +5,8 @@
 coverage by phase, and event-free CRPS cost by arm. `python e00606_figures.py example` draws the
 December 2025 example event (Primaries D5 and D16, 14 days before the maintainer's onset to 14 days
 after the end), one figure per arm, with experiment 598's drawing code pointed at this experiment's
-tables and arms. The plot rules are experiment 598's (at most two panels, each at least 280 px high, a
+tables and arms. The plot rules are experiment 598's (at most two panels, each at least 280 px high,
+a
 legend above the data, no NRA line, observed power black and nothing else black or grey).
 """
 

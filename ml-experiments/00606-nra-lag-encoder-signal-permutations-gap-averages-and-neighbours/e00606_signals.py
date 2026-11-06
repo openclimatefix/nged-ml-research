@@ -11,17 +11,21 @@ lags (the day lag and the week lag), these column groups:
 
 - `gap`: the gap at the lag's own time, plus a flag that is 1 where the gap is absent (`T` or the lag
   missing).
-- `sustain`: experiment 598's sustain count, the share of the 3 days before the lag whose daily mean gap
+- `sustain`: experiment 598's sustain count, the share of the 3 days before the lag whose daily mean
+  gap
   had the sign of the lag's own daily mean gap and exceeded 5% of capacity.
-- `ew`: exponentially weighted averages of the gap over the days up to the lag's own time, at half-lives of
-  1, 3, and 7 days, each with an absent flag. A causal filter: the value at index `i` reads indices up to `i`.
+- `ew`: exponentially weighted averages of the gap over the days up to the lag's own time, at
+  half-lives of
+  1, 3, and 7 days, each with an absent flag. A causal filter: the value at index `i` reads indices
+  up to `i`.
 - `exp`: one flag per lag, 1 where the stored weather table has no row for the lag's valid time (the
   expected-embedding input is then the zero fill, which is also a valid embedding value).
 - `nb`: the summaries over all electrical neighbours (sum, mean, minimum, maximum, each signed and
   scaled to the Primary's capacity) of the gap and of the three weighted averages, at each lag's time,
   plus the sum of the Primary's own value and the neighbours' sum, the neighbour count, and a flag that
   is 1 where the Primary has no neighbour with a gap.
-- `bn`: the comparison arm's single best opposite-sign neighbour (the one whose day-lag gap, scaled to the
+- `bn`: the comparison arm's single best opposite-sign neighbour (the one whose day-lag gap, scaled
+  to the
   Primary's capacity, has the largest size and the opposite sign to the Primary's own day-lag gap), its
   values of the same 8 quantities, the sum of own and neighbour for each, the count, and the none flag.
 
