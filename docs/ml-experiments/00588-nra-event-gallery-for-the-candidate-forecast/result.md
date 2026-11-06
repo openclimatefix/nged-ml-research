@@ -42,7 +42,7 @@ metric: >-
 verdict: partly supported
 best_arm: >-
   C2 (gated band) against C0: on the injected designs, C2 covers the normal running arrangement on
-  more rows in the 7 days after the end than C0 in 17 of 24 panels (12 of 15 distinct cases). It
+  more rows in the 7 days after the end than C0 in 17 of 24 examples (12 of 15 distinct cases). It
   does
   not in 6 of the 12 designs at the MVA-only Primaries, where C0 already covers 0.92 or more, and in
   1 of 12 at the MW Primaries.
@@ -100,11 +100,12 @@ Nothing here is adopted for production.
 so recent power readings no longer show the NRA. A primary substation (a Primary) is named D2, D3,
 and so on. MW (megawatts) is real power. MVA (megavolt-amperes) is apparent power, and the eight
 "MVA-only" Primaries report only apparent power; the six "signed-MW" Primaries report signed real
-power. Each panel shows day-ahead forecasts (issued the day before the valid day) for one Primary.
-The grey band and line are C0's q05 to q95 range (the 90% band) and median. The orange band and dark
-orange line are C2's. The black solid line is the observed power. The black dashed line is the NRA.
-The grey shade is the load-shift. The sky-blue bar along the bottom marks origin days (days on which
-the forecast was issued) when the gate was on, or held for 7 days after it released. The gate is a
+power. Each figure shows day-ahead forecasts (issued the day before the valid day) for one Primary, with
+C0 in the top panel and C2 in the bottom panel, and a key under both. The grey band and line are
+C0's q05 to q95 range (the 90% band) and median. The orange band and dark orange line are C2's. The
+black solid line is the observed power. The black dashed line is the NRA. The grey shade is the
+load-shift. The sky-blue bar under the C2 panel marks origin days (days on which the forecast was
+issued) when the gate was on, or held for 7 days after it released. The gate is a
 rule that fires when the lagged power disagrees with a forecast made without it. Where a fold month
 is mentioned, it is one of the five test months.
 
@@ -120,8 +121,15 @@ while the gate is on and for 7 days after. The union band is that wider band.
 
 The December 2025 pair is the one verified transfer in the event set of [experiment
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)
-that falls in a fold month with stored forecasts. Each figure has the whole window (14 days before
-the start to 14 days after the end) and a zoom on the 7 days after the end.
+that falls in a fold month with stored forecasts. Each Primary has one figure for the whole window
+(14 days before the start to 14 days after the end) and one zoom on the 7 days after the end. The
+grey shade is the verified window of experiment 580 (2025-12-29 to 2026-01-13). The dashed vertical
+lines are the maintainer's switch times for the example event (2025-12-30 01:00 and 2026-01-14
+11:30). The power readings place the end of the load-shift on 14 January at both Primaries, so the
+maintainer's end time matches the readings and the verified window ends about one day early (see
+[experiment
+597](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00597-nra-assemble-c1-and-a1-with-g4-gate-as-single-forecasts/result/)
+for the step sizes).
 
 ![D5, verified load-shift](verified_D5_2025-12-29.svg)
 
@@ -129,10 +137,18 @@ D5 carried 1.5 MW less during the load-shift. The gate was on for the whole wind
 union band throughout and the sky-blue bar spans it. Look at the dashed NRA line: C2 follows it less
 well than C0 before the start.
 
+![D5, verified load-shift, zoom on the 7 days after the end](verified_D5_2025-12-29_zoom.svg)
+
+The same D5 window, zoomed on the 7 days after the end.
+
 ![D16, verified load-shift](verified_D16_2025-12-29.svg)
 
-D16 carried 1.5 MW more. Look at the zoom: after the end, C2's band is wider than C0's and contains
-the dashed NRA line more often.
+D16 carried 1.5 MW more. Look at the zoom below: after the end, C2's band is wider than C0's and
+contains the dashed NRA line more often.
+
+![D16, verified load-shift, zoom on the 7 days after the end](verified_D16_2025-12-29_zoom.svg)
+
+The same D16 window, zoomed on the 7 days after the end.
 
 ![Gate state around each verified event](summary_gate_timeline.svg)
 
@@ -235,10 +251,10 @@ inputs of two Primaries, one MVA-only and one signed-MW (March 2026, the bank of
 581](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00581-robust-multiweek-lag-encoder-x3/result/)).
 The Primary differs between designs. **The injected shift is added to the lag inputs only and the
 target stays clean, so the plots show the lag-input effect**, and the observed power is also the
-NRA. In each panel, compare the width of the orange band with the grey band after the grey shade
-ends. All events in a month end on the same day, so a 30-day event begins before the plotted window
-(the x axis then starts above 0). Coverage of the NRA in the 7 days after the end; each cell gives
-C0 coverage / C2 coverage:
+NRA. In each figure, compare the width of the orange band (bottom panel) with the grey band (top
+panel) after the grey shade ends. All events in a month end on the same day, so a 30-day event
+begins before the plotted window (the x axis then starts above 0). Coverage of the NRA in the 7 days
+after the end; each cell gives C0 coverage / C2 coverage:
 
 | Design | MVA-only Primary (C0 / C2) | MW Primary (C0 / C2) |
 |---|---|---|
@@ -257,33 +273,105 @@ C0 coverage / C2 coverage:
 
 D8, D12, D14, and D16 appear in several designs because the bank assigns each Primary to one design
 per pass. All events end on the same day, so their after-end rows are the same rows and their
-coverage repeats. The 24 panels hold 15 distinct Primary and design cases, and C2 covers more than
+coverage repeats. The 24 examples hold 15 distinct Primary and design cases, and C2 covers more than
 C0 in 12 of them. At the MVA-only Primaries C2 covers more than C0 in 6 of 12 designs. The 6
 exceptions are all negative-sign events at D8 and D12, where C0 already covers 0.92 or more.
 
-![Injected 7 days, up 15%](injected_7d_up_15pct.svg)
+![D3, injected 7 days, +15%](injected_7d_up_15pct_mva.svg)
 
-![Injected 7 days, down 30%](injected_7d_down_30pct.svg)
+D3 (MVA-only eight): +15% of capacity for 7 days.
 
-![Injected 7 days, up 50%](injected_7d_up_50pct.svg)
+![D16, injected 7 days, +15%](injected_7d_up_15pct_mw.svg)
 
-![Injected 7 days, down 50%](injected_7d_down_50pct.svg)
+D16 (signed-MW six): +15% of capacity for 7 days.
 
-![Injected 15 days, up 15%](injected_15d_up_15pct.svg)
+![D8, injected 7 days, -30%](injected_7d_down_30pct_mva.svg)
 
-![Injected 15 days, down 30%](injected_15d_down_30pct.svg)
+D8 (MVA-only eight): -30% of capacity for 7 days.
 
-![Injected 15 days, up 50%](injected_15d_up_50pct.svg)
+![D9, injected 7 days, -30%](injected_7d_down_30pct_mw.svg)
 
-![Injected 15 days, down 50%](injected_15d_down_50pct.svg)
+D9 (signed-MW six): -30% of capacity for 7 days.
 
-![Injected 30 days, up 15%](injected_30d_up_15pct.svg)
+![D12, injected 7 days, +50%](injected_7d_up_50pct_mva.svg)
 
-![Injected 30 days, down 30%](injected_30d_down_30pct.svg)
+D12 (MVA-only eight): +50% of capacity for 7 days.
 
-![Injected 30 days, up 50%](injected_30d_up_50pct.svg)
+![D14, injected 7 days, +50%](injected_7d_up_50pct_mw.svg)
 
-![Injected 30 days, down 50%](injected_30d_down_50pct.svg)
+D14 (signed-MW six): +50% of capacity for 7 days.
+
+![D12, injected 7 days, -50%](injected_7d_down_50pct_mva.svg)
+
+D12 (MVA-only eight): -50% of capacity for 7 days.
+
+![D14, injected 7 days, -50%](injected_7d_down_50pct_mw.svg)
+
+D14 (signed-MW six): -50% of capacity for 7 days.
+
+![D4, injected 15 days, +15%](injected_15d_up_15pct_mva.svg)
+
+D4 (MVA-only eight): +15% of capacity for 15 days.
+
+![D16, injected 15 days, +15%](injected_15d_up_15pct_mw.svg)
+
+D16 (signed-MW six): +15% of capacity for 15 days.
+
+![D8, injected 15 days, -30%](injected_15d_down_30pct_mva.svg)
+
+D8 (MVA-only eight): -30% of capacity for 15 days.
+
+![D10, injected 15 days, -30%](injected_15d_down_30pct_mw.svg)
+
+D10 (signed-MW six): -30% of capacity for 15 days.
+
+![D12, injected 15 days, +50%](injected_15d_up_50pct_mva.svg)
+
+D12 (MVA-only eight): +50% of capacity for 15 days.
+
+![D14, injected 15 days, +50%](injected_15d_up_50pct_mw.svg)
+
+D14 (signed-MW six): +50% of capacity for 15 days.
+
+![D12, injected 15 days, -50%](injected_15d_down_50pct_mva.svg)
+
+D12 (MVA-only eight): -50% of capacity for 15 days.
+
+![D14, injected 15 days, -50%](injected_15d_down_50pct_mw.svg)
+
+D14 (signed-MW six): -50% of capacity for 15 days.
+
+![D22, injected 30 days, +15%](injected_30d_up_15pct_mva.svg)
+
+D22 (MVA-only eight): +15% of capacity for 30 days.
+
+![D5, injected 30 days, +15%](injected_30d_up_15pct_mw.svg)
+
+D5 (signed-MW six): +15% of capacity for 30 days.
+
+![D8, injected 30 days, -30%](injected_30d_down_30pct_mva.svg)
+
+D8 (MVA-only eight): -30% of capacity for 30 days.
+
+![D11, injected 30 days, -30%](injected_30d_down_30pct_mw.svg)
+
+D11 (signed-MW six): -30% of capacity for 30 days.
+
+![D12, injected 30 days, +50%](injected_30d_up_50pct_mva.svg)
+
+D12 (MVA-only eight): +50% of capacity for 30 days.
+
+![D16, injected 30 days, +50%](injected_30d_up_50pct_mw.svg)
+
+D16 (signed-MW six): +50% of capacity for 30 days.
+
+![D12, injected 30 days, -50%](injected_30d_down_50pct_mva.svg)
+
+D12 (MVA-only eight): -50% of capacity for 30 days.
+
+![D16, injected 30 days, -50%](injected_30d_down_50pct_mw.svg)
+
+D16 (signed-MW six): -50% of capacity for 30 days.
 
 ## Event-free control
 
@@ -291,10 +379,15 @@ Four 14-day windows with no labelled or verified load-shift within 7 days. Rule:
 Primary of the stated group whose 14 days from day 8 of the month hold no event, for 2025-10 and
 2026-06 (MVA-only) and 2026-03 and 2026-06 (MW). The gate was off on every origin day in all four
 windows, and C2's 11 stored quantiles equal C1's on every one of the 672 rows in each window
-(maximum difference 0.0). C1 is drawn grey under C2's orange, so only the orange shows. Look for any
-grey edge: there is none.
+(maximum difference 0.0). Each panel shows C2 only, because C1 is identical on every row.
 
-![Event-free windows](event_free_windows.svg)
+![Event-free windows, first two](event_free_windows_1.svg)
+
+The first two event-free windows.
+
+![Event-free windows, last two](event_free_windows_2.svg)
+
+The last two event-free windows.
 
 ## Summary figures
 
@@ -343,7 +436,7 @@ better) is lowest after the end.
   0.90 (verified table). [experiment
   584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)
   reports the same.
-- **On injected events C2 covers more than C0 after the end in 17 of 24 panels (12 of 15 distinct
+- **On injected events C2 covers more than C0 after the end in 17 of 24 examples (12 of 15 distinct
   cases).** The exceptions are negative-sign events at D8 and D12, and one near-tie at D11 (0.991
   against 0.988; injected table).
 - **For labelled events that the power readings did not confirm, the band does not follow the

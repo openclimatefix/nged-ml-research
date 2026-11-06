@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, PERF401
+# ruff: noqa: E501, D103, ANN001, ANN201, PERF401, DTZ001
 """Experiment 588: event gallery for experiment 584's candidate forecast. No fit.
 
 Draws day-ahead forecasts of C0 (v3+D5, experiment 572) and C2 (P5 recipe with synthetic
@@ -10,6 +10,7 @@ Usage: DATA_PATH_INTERNAL=... PYTHONPATH=(all ml-experiments folders) python e00
 """
 
 import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import altair as alt
@@ -19,6 +20,7 @@ import e00583_figures as f3  # ty: ignore[unresolved-import]
 import e00583_score as s3  # ty: ignore[unresolved-import]
 import e00584_figures as fig4  # ty: ignore[unresolved-import]
 import e00584_score as sc4  # ty: ignore[unresolved-import]
+import e00588_clean_panels as cp  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from plotting import ocf_theme as theme
@@ -32,6 +34,9 @@ IQ = c.IQ
 W = 620
 GREY, ORANGE, BLUE, SKY = "#6b6b6b", theme.BRAND_ORANGE, theme.DATA_BLUE, theme.DATA_SKY
 INJECT_MONTH = "2026-03"
+# The maintainer's switch times for the December 2025 example event (UTC).
+SWITCH_TIMES = [datetime(2025, 12, 30, 1, 0), datetime(2026, 1, 14, 11, 30)]
+C0_MEDIAN, C2_MEDIAN = "#444444", "#b33000"
 DESIGNS = [  # (length in days, depth share of capacity, sign): spans depth, length, and sign
     (length, depth, sign)
     for length in (7, 15, 30)
@@ -49,65 +54,38 @@ def to_none(a: np.ndarray) -> list:
     return [None if not np.isfinite(v) else float(v) for v in a]
 
 
-def panel(*, x, q0, q2, obs, nra, label_nra=None, strips=(), span=None, xdom, title, height=150,
-          xtitle=None, ydom=None):  # fmt: skip
-    """One panel: C0 and C2 q05-q95 bands and medians, observed power, the NRA, and the label's NRA."""
-    d = {"x": x, "c0lo": q0[:, IQ[0.05]] * 100, "c0hi": q0[:, IQ[0.95]] * 100, "c0m": q0[:, IQ[0.5]] * 100,
-         "c2lo": q2[:, IQ[0.05]] * 100, "c2hi": q2[:, IQ[0.95]] * 100, "c2m": q2[:, IQ[0.5]] * 100,
-         "obs": obs * 100, "nra": nra * 100}  # fmt: skip
-    if label_nra is not None:
-        d["lab"] = label_nra * 100
-    df = pl.DataFrame({k: to_none(np.asarray(v, float)) for k, v in d.items()})
-    lo = np.nanmin([np.nanmin(d["c0lo"]), np.nanmin(d["c2lo"]), np.nanmin(d["obs"])]) - 2
-    hi = np.nanmax([np.nanmax(d["c0hi"]), np.nanmax(d["c2hi"]), np.nanmax(d["obs"])]) + 2
-    sc_y = alt.Scale(domain=ydom or [float(lo), float(hi)])
-    xax = alt.X(
-        "x:Q",
-        title=xtitle,
-        scale=alt.Scale(domain=list(xdom), zero=False, nice=False),
-        axis=alt.Axis(tickMinStep=1),
-    )
-    base = alt.Chart(df)
-    layers = []
-    dom = sc_y.domain
-    if len(strips):
-        bar = pl.DataFrame(list(strips)).with_columns(
-            y0=pl.lit(dom[0]), y1=pl.lit(dom[0] + 0.05 * (dom[1] - dom[0]))
-        )
-        layers.append(
-            alt.Chart(bar)  # ty: ignore[unresolved-attribute]
-            .mark_rect(opacity=0.9, color=SKY, clip=True)
-            .encode(x="x0:Q", x2="x1:Q", y=alt.Y("y0:Q", scale=sc_y), y2="y1:Q")
-        )
-    if span is not None:
-        layers.append(
-            alt.Chart(pl.DataFrame({"a": [span[0]], "b": [span[1]]}))  # ty: ignore[unresolved-attribute]
-            .mark_rect(color="#999999", opacity=0.12, clip=True)
-            .encode(x="a:Q", x2="b:Q")
-        )
-    layers += [
-        base.mark_area(color=GREY, opacity=0.30, aria=False, clip=True).encode(x=xax, y=alt.Y("c0lo:Q", scale=sc_y, title="% of capacity"), y2="c0hi:Q"),  # ty: ignore[unresolved-attribute]
-        base.mark_area(color=ORANGE, opacity=0.35, aria=False, clip=True).encode(x=xax, y=alt.Y("c2lo:Q", scale=sc_y), y2="c2hi:Q"),  # ty: ignore[unresolved-attribute]
-        base.mark_line(color=GREY, strokeWidth=1, aria=False, clip=True).encode(x=xax, y=alt.Y("c0m:Q", scale=sc_y)),  # ty: ignore[unresolved-attribute]
-        base.mark_line(color="#b33000", strokeWidth=1, aria=False, clip=True).encode(x=xax, y=alt.Y("c2m:Q", scale=sc_y)),  # ty: ignore[unresolved-attribute]
-        base.mark_line(color="black", strokeWidth=0.8, aria=False, clip=True).encode(x=xax, y=alt.Y("obs:Q", scale=sc_y)),  # ty: ignore[unresolved-attribute]
-        base.mark_line(color="black", strokeDash=[3, 2], strokeWidth=0.8, aria=False, clip=True).encode(x=xax, y=alt.Y("nra:Q", scale=sc_y)),  # ty: ignore[unresolved-attribute]
+def when(idx) -> datetime:
+    """The UTC time (naive) of a half-hour grid index."""
+    return (sc.k.k.GRID_START + timedelta(minutes=30 * float(idx))).replace(tzinfo=None)
+
+
+def two_arm_figure(*, x, q0, q2, obs, nra, strips, span, xdom, title, out, xtitle, xtype="Q",
+                   rules=(), label_nra=None, label=""):  # fmt: skip
+    """One figure: C0 in the top panel, C2 (with its gate strip) in the bottom panel, then the key."""
+    lo_obs = obs if label_nra is None else np.fmin(obs, label_nra)
+    ydom = cp.common_ydom([(q0, lo_obs), (q2, lo_obs)], iq=IQ)
+    common = {"x": x, "iq": IQ, "obs": obs, "nra": nra, "ydom": ydom, "xdom": xdom, "xtype": xtype,
+              "span": span, "rules": rules, "label_nra": label_nra}  # fmt: skip
+    units = [
+        cp.arm_panel(q=q0, colour=GREY, median_colour=C0_MEDIAN, title=f"{label}C0", **common),
+        cp.arm_panel(q=q2, colour=ORANGE, median_colour=C2_MEDIAN, title=f"{label}C2", strip=strips, xtitle=xtitle, **common),
     ]  # fmt: skip
-    if label_nra is not None:
-        layers.append(
-            base.mark_line(  # ty: ignore[unresolved-attribute]
-                color=BLUE, strokeDash=[5, 3], strokeWidth=1.2, aria=False, clip=True
-            ).encode(x=xax, y=alt.Y("lab:Q", scale=sc_y))
-        )
-    return alt.layer(*layers).properties(
-        width=W, height=height, title=alt.TitleParams(title, fontSize=11, anchor="start")
-    )
-
-
-def save(*, charts, title, out, shared=True):
-    alt.vconcat(*charts).properties(
-        title=alt.TitleParams(title, fontSize=11, anchor="start")
-    ).resolve_scale(x="shared" if shared else "independent").save(str(DOCS / out))
+    key = [
+        *cp.band_entries("C0", GREY, C0_MEDIAN),
+        *cp.band_entries("C2", ORANGE, C2_MEDIAN),
+        cp.OBS,
+    ]
+    if label_nra is None:
+        key.append(cp.NRA)
+    else:
+        key.append(cp.LABEL_NRA)
+    if span is not None:
+        key.append(cp.SHADE)
+    if strips:
+        key.append(cp.GATE)
+    if len(rules):
+        key.append(cp.RULES)
+    cp.figure(units=units, title=title, key=key).save(str(DOCS / out))
 
 
 def strips_for(*, t, rows, on, hold, prim, onset):
@@ -167,25 +145,22 @@ def verified(*, t, look, st, tables):
             c0_q(look=look, r0=r0),
             c2_of(t=t, rows=rows, v=t.arms["V"][rows], on=st["on"], hold=st["hold"]),
         )
-        x = (t.idx[rows] - onset) / 48.0
         length = (end - onset) / 48.0
-        strips = strips_for(t=t, rows=rows, on=st["on"], hold=st["hold"], prim=p, onset=onset)
         date = sc.k.date_of(onset)
-        ttl = [f"{e['label']}: verified load-shift of {e['depth_mw']:+.1f} MW for {length:.0f} days, starting {date}",
-               "Black solid: observed power. Black dashed: the NRA (observed minus the fitted load-shift). Grey: C0 median and q05-q95 band. Orange: C2 median and band.",
-               "Grey shade: the load-shift. Sky-blue bar along the bottom: origin days with the gate on or held."]  # fmt: skip
-        kw = {
-            "x": x,
-            "q0": q0,
-            "q2": q2,
-            "obs": t.obs[rows],
-            "nra": t.nra[rows],
-            "strips": strips,
-            "span": (0, length),
-        }
-        save(charts=[panel(**kw, xdom=(-14, length + 14), title="Whole window", xtitle="Days since the load-shift began"),
-                     panel(**kw, xdom=(length, length + 7), title="Zoom: the 7 days after the load-shift ends", xtitle="Days since the load-shift began")],
-             title=ttl, out=f"verified_{e['label']}_{date}.svg", shared=False)  # fmt: skip
+        strips = [{"x0": when(r["x0"] * 48 + onset), "x1": when(r["x1"] * 48 + onset)}
+                  for r in strips_for(t=t, rows=rows, on=st["on"], hold=st["hold"], prim=p, onset=onset)]  # fmt: skip
+        x = [when(i) for i in t.idx[rows]]
+        kw = {"x": x, "q0": q0, "q2": q2, "obs": t.obs[rows], "nra": t.nra[rows], "strips": strips,
+              "span": (when(onset), when(end)), "rules": SWITCH_TIMES, "xtype": "T",
+              "xtitle": "Date (UTC)", "label": f"{e['label']}: "}  # fmt: skip
+        ttl = f"{e['label']}: day-ahead forecasts through the verified load-shift of {e['depth_mw']:+.1f} MW for {length:.0f} days, starting {date}"
+        two_arm_figure(
+            **kw,
+            xdom=(when(onset - 14 * 48), when(end + 14 * 48)),
+            title=ttl,
+            out=f"verified_{e['label']}_{date}.svg",
+        )
+        two_arm_figure(**{**kw, "span": None}, xdom=(when(end), when(end + 7 * 48)), title=f"{ttl}. Zoom on the 7 days after the end", out=f"verified_{e['label']}_{date}_zoom.svg")  # fmt: skip
         for r in phase_cover(t=t, rows=rows, q0=q0, q2=q2, nra=t.nra[rows], onset=onset, end=end):
             tables["verified"].append({"event": f"{e['label']} {date}", **r})
 
@@ -231,14 +206,16 @@ def labelled(*, t, look, st, tables):
             & (pl.col("event_id") != e["event_id"])
         )["label"].to_list()
         date = sc.k.date_of(onset)
-        ttl = [f"{e['label']}, labelled event {e['event_id']}: {e['label_depth_mw']:+.2f} MW for {length:.1f} days from {date}. 580 status: {status}." + (f" Same dates as the label at {', '.join(partner)}." if partner else ""),
-               "NGED's labels are known to be imperfect, so a forecast that does not follow the label is not an error. Black solid: observed power. Blue dashed: observed power minus the labelled depth.",
-               "Grey: C0 median and q05-q95 band. Orange: C2 median and band. Grey shade: the labelled event. Sky-blue bar along the bottom: gate on or held."]  # fmt: skip
+        ttl = [
+            f"{e['label']}, labelled event {e['event_id']}: {e['label_depth_mw']:+.2f} MW for {length:.1f} days from {date}",
+            f"580 status: {status}."
+            + (f" Same dates as the label at {', '.join(partner)}." if partner else ""),
+        ]
         x = (t.idx[rows] - onset) / 48.0
         strips = strips_for(t=t, rows=rows, on=st["on"], hold=st["hold"], prim=p, onset=onset)
-        save(charts=[panel(x=x, q0=q0, q2=q2, obs=t.obs[rows], nra=np.full(len(rows), np.nan), label_nra=lab_nra, strips=strips, span=(0, length),
-                           xdom=(-7, length + 7), title="Day-ahead forecast", xtitle="Days since the labelled start")],
-             title=ttl, out=f"labelled_{e['event_id']:03d}_{e['label']}_{length:.0f}d.svg")  # fmt: skip
+        out = f"labelled_{e['event_id']:03d}_{e['label']}_{length:.0f}d.svg"
+        two_arm_figure(x=x, q0=q0, q2=q2, obs=t.obs[rows], nra=np.full(len(rows), np.nan), label_nra=lab_nra, strips=strips, span=(0, length),
+                       xdom=(-7, length + 7), xtitle="Days since the labelled start", title=ttl, out=out)  # fmt: skip
         tables["labelled"].append({"event_id": e["event_id"], "primary": e["label"], "onset": date, "length_days": round(length, 1),
                                    "label_depth_mw": e["label_depth_mw"], "status_580": e["final_class"], "partner": ",".join(partner),
                                    "gate_on_origin_days": int(sum(st["on"][p, d] for d in {int(d) for d in t.origin_day[rows]}))})  # fmt: skip
@@ -254,8 +231,8 @@ def injected(*, t, look, gi, tables):
     gap_m = np.full_like(gi["gap"], np.nan)
     gap_m[:, days_m.min() : days_m.max() + 1] = gi["gap"][:, days_m.min() : days_m.max() + 1]
     groups = ("MVA-only eight", "signed-MW six")
+    snippets = []
     for length, depth, sign in DESIGNS:
-        charts = []
         for g in groups:
             cand = ev_all.filter((pl.col("length_days") == length) & (pl.col("depth") == depth) & (pl.col("sign") == sign)
                                  & pl.col("primary").is_in([p for p in range(16) if t.group[p] == g])).sort("pass", "primary")  # fmt: skip
@@ -296,14 +273,15 @@ def injected(*, t, look, gi, tables):
                     }
                 )
             started = x.min() <= 0
-            charts.append(panel(x=x, q0=q0, q2=q2, obs=nra, nra=nra, strips=strips_for(t=t, rows=rows, on=on, hold=hold, prim=p, onset=onset),
-                                span=(0.0 if started else float(x.min()), (end - onset) / 48.0), xdom=(float(x.min()), (end - onset) / 48.0 + 7),
-                                title=f"{t.label[p]} ({g})", height=120, xtitle="Days since the injected shift began" if g == groups[-1] else None))  # fmt: skip
-        sg = "up" if sign > 0 else "down"
-        save(charts=charts, shared=False, out=f"injected_{length}d_{sg}_{int(depth * 100)}pct.svg",
-             title=[f"Injected load-shift in the lag inputs only: {sign * depth * 100:+.0f}% of capacity for {length} days, March 2026",
-                    "The target stays clean, so the observed power (black) is also the NRA. Grey: C0 median and q05-q95 band. Orange: C2 median and band.",
-                    "Grey shade: the injected shift (it began before the plotted window if the x axis starts above 0). Sky-blue bar along the bottom: gate on or held."])  # fmt: skip
+            sg = "up" if sign > 0 else "down"
+            tag = "mva" if g == groups[0] else "mw"
+            out = f"injected_{length}d_{sg}_{int(depth * 100)}pct_{tag}.svg"
+            two_arm_figure(x=x, q0=q0, q2=q2, obs=nra, nra=nra, strips=strips_for(t=t, rows=rows, on=on, hold=hold, prim=p, onset=onset),
+                           span=(0.0 if started else float(x.min()), (end - onset) / 48.0), xdom=(float(x.min()), (end - onset) / 48.0 + 7),
+                           xtitle="Days since the injected shift began", out=out,
+                           title=f"{t.label[p]} ({g}): injected {sign * depth * 100:+.0f}% of capacity for {length} days, March 2026, day-ahead")  # fmt: skip
+            snippets.append(f"![{t.label[p]}, injected {length} days, {sign * depth * 100:+.0f}%]({out})\n\n{t.label[p]} ({g}): {sign * depth * 100:+.0f}% of capacity for {length} days.\n")  # fmt: skip
+    (DATA / "injected_snippets.md").write_text("\n".join(snippets))
 
 
 def event_free(*, t, look, st, tables):
@@ -316,7 +294,7 @@ def event_free(*, t, look, st, tables):
         ("MVA-only eight", "2026-06"),
         ("signed-MW six", "2026-06"),
     ]
-    charts = []
+    pending: list = []
     for g, month in wanted:
         for p in free_prim[g]:
             m = (t.month == month) & (t.prim == p)
@@ -333,12 +311,40 @@ def event_free(*, t, look, st, tables):
             x = (t.idx[rows] - start) / 48.0
             tables["event_free"].append({"primary": str(t.label[p]), "group": g, "start": date, "n_rows": len(rows), "share_rows_c2_equals_c1": float((diff == 0).mean()),
                                          "max_abs_diff_any_quantile_pct": float(diff.max() * 100), "gate_on_origin_days": int(sum(st["on"][p, d] for d in {int(d) for d in t.origin_day[rows]}))})  # fmt: skip
-            charts.append(panel(x=x, q0=v, q2=q2, obs=t.obs[rows], nra=t.obs[rows], height=110, xdom=(0, 14),
-                                title=f"{t.label[p]} ({g}), 14 days from {date}", xtitle="Days since the window began" if len(charts) == len(wanted) - 1 else None))  # fmt: skip
+            pending.append(
+                {
+                    "x": x,
+                    "q": q2,
+                    "obs": t.obs[rows],
+                    "title": f"{t.label[p]} ({g}), 14 days from {date}",
+                }
+            )
+            if len(pending) == 2:
+                emit_event_free(
+                    pending=pending, out=f"event_free_windows_{len(tables['event_free']) // 2}.svg"
+                )
+                pending = []
             break
-    save(charts=charts, out="event_free_windows.svg",
-         title=["Event-free windows: C1 (grey) and C2 (orange) on 14 days with no labelled or verified load-shift within 7 days",
-                "The two bands lie on top of each other while the gate is off. Black: observed power. Window rule: the lowest-numbered Primary of the group whose 14 days starting on day 8 of the month hold no event."])  # fmt: skip
+
+
+def emit_event_free(*, pending, out):
+    """Two event-free windows in one figure, each drawn with C2 only (C1 is identical on every row)."""
+    ydom = cp.common_ydom([(w["q"], w["obs"]) for w in pending], iq=IQ)
+    units = [
+        cp.arm_panel(x=w["x"], q=w["q"], iq=IQ, obs=w["obs"], nra=w["obs"], colour=ORANGE, median_colour=C2_MEDIAN, xdom=(0, 14), ydom=ydom,
+                     title=w["title"], strip=[], xtitle="Days since the window began" if i == len(pending) - 1 else None)
+        for i, w in enumerate(pending)
+    ]  # fmt: skip
+    key = [*cp.band_entries("C2", ORANGE, C2_MEDIAN), cp.OBS, entry_nra_same()]
+    cp.figure(
+        units=units,
+        key=key,
+        title="Event-free windows: C2 on 14 days with no labelled or verified load-shift within 7 days",
+    ).save(str(DOCS / out))
+
+
+def entry_nra_same():
+    return cp.entry("NRA (equal to observed power here)", "dashed", "black")
 
 
 def summaries(*, tables):
@@ -377,7 +383,7 @@ def summaries(*, tables):
                 scale=alt.Scale(domain=["C1", "C2"], range=[theme.DATA_PURPLE, ORANGE]),
                 legend=alt.Legend(title="Arm", orient="top"),
             ),
-        ).properties(width=W, height=130).facet(row=alt.Row("event:N", title=None)).save(
+        ).properties(width=W, height=280).facet(row=alt.Row("event:N", title=None)).save(
             str(DOCS / "summary_width_over_time.svg")
         )
     for f in (

@@ -134,22 +134,125 @@ How far the median moved towards the injected shift, event by event, from day 4 
 the median ignored the shift. The shift is 15, 30, or 50 points of capacity. Most events move the
 median by under 5 points, and a few move it by 10 to 20 points in 50% events.
 
-![Real December pair](real_pair_day_ahead.svg)
+![D5, day-ahead forecasts through the December 2025 load-shift](real_pair_D5_day_ahead.svg)
 
-Day-ahead forecasts of both assembled forecasts on the two verified December 2025 load-shifts (D16
-and D5). The orange and blue bands lie close together. At D5 the observed power falls below the
-forecasts for most of the load-shift, and the dashed NRA stays close to the bands.
+D5 through the verified December 2025 load-shift: C1 + G4 above, A1 + G4 below, day-ahead, from 14
+days before the start to 14 days after the end. The grey shade is the verified window of experiment
+580 (2025-12-29 to 2026-01-13). The dashed vertical lines are the maintainer's switch times
+(2025-12-30 01:00 and 2026-01-14 11:30). Observed power falls below both forecasts for most of the
+load-shift, and the dashed NRA stays close to the bands. The two bands lie close together.
 
-![Injected 7 day shifts](injected_7d_day_ahead.svg)
+![D16, day-ahead forecasts through the December 2025 load-shift](real_pair_D16_day_ahead.svg)
 
-![Injected 15 day shifts](injected_15d_day_ahead.svg)
-
-![Injected 30 day shifts](injected_30d_day_ahead.svg)
+The same for D16, whose power rises during the load-shift. **Which window matches the readings:**
+the maintainer's switch times match the power readings better than the window of experiment 580,
+which is about one day early at both ends. At D5 the 24-hour average power falls by 2.3 MW around
+2025-12-30 00:00 and rises by 2.1 MW around 2026-01-14 11:30, matching the maintainer's times. At D16
+the two steps (a rise of 1.7 MW and a fall of 1.8 MW) come about 7 hours later, around 08:30 on 30
+December and 19:30 on 14 January. A 24-hour average cannot place a step to the hour, so the times
+are approximate.
 
 Day-ahead forecasts on 12 injected designs (7, 15, and 30 days; 15%, 30%, and 50% of capacity, up
-and down), one Primary from each metering group per design, March 2026. The target stays clean, so
-the observed power is also the NRA. The window runs from 14 days before the shift to 14 days after
-its end. The stored forecasts stop at 120 hours, so no panel shows the full 14-day horizon.
+and down), one Primary from each metering group per design, March 2026 (24 figures, each with C1 +
+G4 above and A1 + G4 below). The target stays clean, so the observed power is also the NRA. The
+window runs from 14 days before the shift to 14 days after its end. The stored forecasts stop at
+120 hours, so no panel shows the full 14-day horizon.
+
+![D3, injected 7 days, +15%](injected_7d_up_15pct_mva.svg)
+
+D3 (eight MVA Primaries): +15% of capacity for 7 days.
+
+![D16, injected 7 days, +15%](injected_7d_up_15pct_mw.svg)
+
+D16 (six MW Primaries): +15% of capacity for 7 days.
+
+![D8, injected 7 days, -30%](injected_7d_down_30pct_mva.svg)
+
+D8 (eight MVA Primaries): -30% of capacity for 7 days.
+
+![D9, injected 7 days, -30%](injected_7d_down_30pct_mw.svg)
+
+D9 (six MW Primaries): -30% of capacity for 7 days.
+
+![D12, injected 7 days, +50%](injected_7d_up_50pct_mva.svg)
+
+D12 (eight MVA Primaries): +50% of capacity for 7 days.
+
+![D14, injected 7 days, +50%](injected_7d_up_50pct_mw.svg)
+
+D14 (six MW Primaries): +50% of capacity for 7 days.
+
+![D12, injected 7 days, -50%](injected_7d_down_50pct_mva.svg)
+
+D12 (eight MVA Primaries): -50% of capacity for 7 days.
+
+![D14, injected 7 days, -50%](injected_7d_down_50pct_mw.svg)
+
+D14 (six MW Primaries): -50% of capacity for 7 days.
+
+![D4, injected 15 days, +15%](injected_15d_up_15pct_mva.svg)
+
+D4 (eight MVA Primaries): +15% of capacity for 15 days.
+
+![D16, injected 15 days, +15%](injected_15d_up_15pct_mw.svg)
+
+D16 (six MW Primaries): +15% of capacity for 15 days.
+
+![D8, injected 15 days, -30%](injected_15d_down_30pct_mva.svg)
+
+D8 (eight MVA Primaries): -30% of capacity for 15 days.
+
+![D10, injected 15 days, -30%](injected_15d_down_30pct_mw.svg)
+
+D10 (six MW Primaries): -30% of capacity for 15 days.
+
+![D12, injected 15 days, +50%](injected_15d_up_50pct_mva.svg)
+
+D12 (eight MVA Primaries): +50% of capacity for 15 days.
+
+![D14, injected 15 days, +50%](injected_15d_up_50pct_mw.svg)
+
+D14 (six MW Primaries): +50% of capacity for 15 days.
+
+![D12, injected 15 days, -50%](injected_15d_down_50pct_mva.svg)
+
+D12 (eight MVA Primaries): -50% of capacity for 15 days.
+
+![D14, injected 15 days, -50%](injected_15d_down_50pct_mw.svg)
+
+D14 (six MW Primaries): -50% of capacity for 15 days.
+
+![D22, injected 30 days, +15%](injected_30d_up_15pct_mva.svg)
+
+D22 (eight MVA Primaries): +15% of capacity for 30 days.
+
+![D5, injected 30 days, +15%](injected_30d_up_15pct_mw.svg)
+
+D5 (six MW Primaries): +15% of capacity for 30 days.
+
+![D8, injected 30 days, -30%](injected_30d_down_30pct_mva.svg)
+
+D8 (eight MVA Primaries): -30% of capacity for 30 days.
+
+![D11, injected 30 days, -30%](injected_30d_down_30pct_mw.svg)
+
+D11 (six MW Primaries): -30% of capacity for 30 days.
+
+![D12, injected 30 days, +50%](injected_30d_up_50pct_mva.svg)
+
+D12 (eight MVA Primaries): +50% of capacity for 30 days.
+
+![D16, injected 30 days, +50%](injected_30d_up_50pct_mw.svg)
+
+D16 (six MW Primaries): +50% of capacity for 30 days.
+
+![D12, injected 30 days, -50%](injected_30d_down_50pct_mva.svg)
+
+D12 (eight MVA Primaries): -50% of capacity for 30 days.
+
+![D16, injected 30 days, -50%](injected_30d_down_50pct_mw.svg)
+
+D16 (six MW Primaries): -50% of capacity for 30 days.
 
 ![Event-free cost](false_alarm_cost.svg)
 
