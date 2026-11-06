@@ -1,11 +1,11 @@
 # ruff: noqa: E501
-"""Experiment 595: summary tables of the shares of M0, D5, P5, C1, and A1, with the pre-registered checks.
+"""Experiment 595: summary tables of the shares of M0, D5, P5, C1, and A1, with the checks.
 
-Reads `scores/event_shares.parquet` (written by `e00595_score.py`), prints every table the result page
-quotes, and saves the same text as `scores/report.txt`. Bootstrap blocks are designs (both Primaries of
-one injected transfer share a block). Counted tests: 6 (C1 minus P5 and A1 minus P5, each for the first
-4 days, day 4 to the end, and the 7 days after the end, total share at q50, day-14 refit, paired by
-design). C1 minus A1 and every refit-share contrast are descriptive.
+Reads `scores/event_shares.parquet` (written by `e00595_score.py`), prints every table the result
+page quotes, and saves the same text as `scores/report.txt`. Bootstrap blocks are designs (both
+Primaries of one injected transfer share a block). Counted tests: 6 (C1 minus P5 and A1 minus P5,
+each for the first 4 days, day 4 to the end, and the 7 days after the end, total share at q50,
+day-14 refit, paired by design). C1 minus A1 and every refit-share contrast are descriptive.
 """
 
 from typing import Final
