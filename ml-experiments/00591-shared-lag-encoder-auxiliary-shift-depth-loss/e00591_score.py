@@ -12,12 +12,15 @@ Usage: python e00591_score.py ARM   (ARM: a0, c0, a1, a2, a3, a4, a5)
 
 import sys
 
+import e00583_score as s583  # ty: ignore[unresolved-import]
 import e00584_score as s584  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME = "00591-shared-lag-encoder-auxiliary-shift-depth-loss"
 ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
 s584.ROOT = ROOT
+s583.N_COUNTED = 10
+"""Counted tests of this experiment (plan): A1-A0, A2-A1, A3-A1, A3-A2, A4-A2, each at two groups."""
 C1 = ML_EXPERIMENTS_DATA_DIR / "00584-nra-candidate-pack-x6/c1/work"
 s584.ARMS["a0"] = {"fits": C1 / "fits", "fit_tag": "P5", "inject": C1 / "inject"}
 for arm in ("a1", "a2", "a3", "a4", "a5"):
