@@ -159,8 +159,9 @@ Day-ahead forecasts on 12 injected designs (7, 15, and 30 days; 15%, 30%, and 50
 and down), one Primary from each metering group per design, March 2026 (24 figures, each with C1 +
 G4 above and A1 + G4 below). The target stays clean, so the observed power is also the NRA. A 15 or
 30 day shift begins before the scored month, so the x axis then starts partway through the shift.
-The window runs from 14 days before the shift to 14 days after its end. The stored forecasts stop at
-120 hours, so no panel shows the full 14-day horizon.
+The window runs from up to 14 days before the shift (never before the start of the scored month) to
+14 days after its end. Look at whether the band widens once the shift starts and the sky-blue gate
+strip comes on. The stored forecasts stop at 120 hours, so no panel shows the full 14-day horizon.
 
 ![D3, injected 7 days, +15%](injected_7d_up_15pct_mva.svg)
 

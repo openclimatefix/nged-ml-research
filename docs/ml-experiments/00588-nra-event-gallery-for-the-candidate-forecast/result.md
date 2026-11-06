@@ -146,7 +146,8 @@ of experiment 597 is a different gate.
 
 ![D5, verified load-shift, zoom on the 7 days after the end](verified_D5_2025-12-29_zoom.svg)
 
-The same D5 window, zoomed on the 7 days after the end.
+The same D5 window, zoomed on the 7 days after the end. Look at how often the black line leaves
+each band.
 
 ![D16, verified load-shift](verified_D16_2025-12-29.svg)
 
@@ -257,12 +258,14 @@ origin days in the window: 0.
 Each figure injects one design (a length, a depth as a share of capacity, and a sign) into the lag
 inputs of two Primaries, one MVA-only and one signed-MW (March 2026, the bank of [experiment
 581](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00581-robust-multiweek-lag-encoder-x3/result/)).
-The Primary differs between designs. **The injected shift is added to the lag inputs only and the
-target stays clean, so the plots show the lag-input effect**, and the observed power is also the
-NRA. In each figure, compare the width of the band in the bottom panel (C2) with the band in the top
-panel (C0) after the lilac shade ends. All events in a month end on the same day, so a 30-day event
-begins before the plotted window (the x axis then starts above 0). Coverage of the NRA in the 7 days
-after the end; each cell gives C0 coverage / C2 coverage:
+Each figure's caption gives the Primary and the design; the Primary differs between designs. **The
+injected shift is added to the lag inputs only and the target stays clean, so the plots show the
+lag-input effect**, and the observed power is also the NRA. In each figure, compare the width of the
+band in the bottom panel (C2) with the band in the top panel (C0) after the lilac shade ends. All
+events in a month end on the same day, so a 30-day event begins before the plotted window (the x
+axis then starts above 0). Coverage of the NRA in the 7 days after the end. The sky-blue bar comes
+from the gate recomputed on the injected inputs; it is not read from the stored gate state of
+experiment 584. Each cell gives C0 coverage / C2 coverage:
 
 | Design | MVA-only Primary (C0 / C2) | MW Primary (C0 / C2) |
 |---|---|---|
@@ -391,11 +394,12 @@ windows, and C2's 11 stored quantiles equal C1's on every one of the 672 rows in
 
 ![Event-free windows, first two](event_free_windows_1.svg)
 
-The first two event-free windows.
+The first two event-free windows. Look for any gap between the band and the black line: the
+gate is off, so the band is C1's band.
 
 ![Event-free windows, last two](event_free_windows_2.svg)
 
-The last two event-free windows.
+The last two event-free windows, read the same way.
 
 ## Summary figures
 

@@ -477,7 +477,7 @@ def injected(views: dict[str, ArmView]) -> None:
                 cp.arm_panel(q=qa, title="C1 + G4", **common),
                 cp.arm_panel(q=qb, title="A1 + G4", xtitle="Days since the injected shift began", **common),
             ]  # fmt: skip
-            key = [*cp.FORECAST_ENTRIES, cp.OBS, cp.SHADE, cp.GATE]  # fmt: skip
+            key = [*cp.FORECAST_ENTRIES, cp.OBS, cp.SHADE, *([cp.GATE] if strip else [])]  # fmt: skip
             sg = "up" if sign > 0 else "down"
             tag = "mva" if k.GROUP_NAME[grp] == k.GROUP_NAME[k.GROUPS_SCORED[0]] else "mw"
             out = f"injected_{length}d_{sg}_{int(depth * 100)}pct_{tag}.svg"

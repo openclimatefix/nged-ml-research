@@ -162,9 +162,10 @@ FORECAST_ENTRIES = [
 ]
 OBS = entry("Observed power", "line", "black")
 SHADE = entry("Load-shift", "band", SHADE_COLOUR, 0.7)
+SHADE_LABELLED = entry("Labelled load-shift", "band", SHADE_COLOUR, 0.7)
 GATE = entry("Gate on, or held for 7 days", "band", SKY, 0.95)
 RULES = entry("Switch times given by the maintainer", "rule", RULE_COLOUR)
-LABEL_NRA = entry("Estimate of the NRA if the label were right", "dashed", "#306BFF")
+LABEL_NRA = entry("NRA estimate if label is right", "dashed", "#306BFF")
 
 
 def legend(entries: list[dict]):

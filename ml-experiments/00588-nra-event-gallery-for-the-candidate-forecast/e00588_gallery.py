@@ -74,7 +74,7 @@ def two_arm_figure(*, x, q0, q2, obs, strips, span, xdom, title, out, xtitle, xt
     if label_nra is not None:
         key.append(cp.LABEL_NRA)
     if span is not None:
-        key.append(cp.SHADE)
+        key.append(cp.SHADE if label_nra is None else cp.SHADE_LABELLED)
     if strips:
         key.append(cp.GATE)
     if len(rules):
@@ -370,7 +370,7 @@ def summaries(*, tables):
             y=alt.Y("width:Q", title="Width (% of capacity)"),
             color=alt.Color(
                 "arm:N",
-                scale=alt.Scale(domain=["C1", "C2"], range=[theme.DATA_PURPLE, ORANGE]),
+                scale=alt.Scale(domain=["C1", "C2"], range=[theme.DATA_BLUE, ORANGE]),
                 legend=alt.Legend(title="Arm", orient="top"),
             ),
         ).properties(width=W, height=300).facet(row=alt.Row("event:N", title=None)).save(
