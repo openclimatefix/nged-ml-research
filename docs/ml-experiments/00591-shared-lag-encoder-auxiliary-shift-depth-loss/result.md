@@ -4,8 +4,7 @@ slug: shared-lag-encoder-auxiliary-shift-depth-loss
 title: >-
   Does a lag encoder shared across lags, trained with an auxiliary loss that asks it to predict the
   depth of the load-shift injected into each lag, follow injected load-shifts less and cover the
-  normal running arrangement better after they end than the best model we have (C1 of experiment
-  584)?
+  normal running arrangement better after they end than the forecast of experiment 584's C1?
 theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
@@ -24,15 +23,14 @@ size: >-
 hypothesis: >-
   The maintainer's request: a lag encoder with weights shared across the lags, trained with an
   auxiliary loss that predicts the signed depth of the synthetic load-shift applied to each lag, is
-  forced to pick up the difference between the expected value and the actual lag. The network then
-  follows an injected load-shift less (the median forecast moves less with the shifted lag) and its
+  forced to pick up the difference between the expected value and the actual lag. The neural network then follows an injected load-shift less (the median forecast moves less with the shifted lag) and its
   q05-q95 band contains the normal running arrangement (NRA) on more rows after a load-shift ends
   than experiment 584's C1 does, because the encoder can tell a shifted lag from an ordinary lag.
 prediction: >-
   Written before any fit or score. P1 (the prediction that can fail): A2 or A3 halves the following
   of an injected shift relative to A0 (C1), to below 0.05 of the injected depth, and lifts the
   coverage of the NRA in the 0 to 7 days after an injected 15 or 30 day shift ends above 0.90
-  without the gated band, at a CRPS cost inside the minimum detectable effect (MDE) of the contrast.
+  without the gated band, with CRPS worse by no more than the minimum detectable effect (MDE) of the contrast.
   P2: A1 (sharing and a lag ID, no auxiliary loss) is within max(0.03, MDE) of A0 in CRPS, as
   experiment 586 found for the same wiring on a different base. P3: the auxiliary head recovers the
   injected depth on held-out injected events with R squared of at least 0.7 at depth 0.30 and 0.50
@@ -46,7 +44,7 @@ decision_rule: >-
   the six MW Primaries, at 24-120 h, so 10 tests (12 with A5). The auxiliary loss is kept if
   following is below 0.05 of the injected depth and after-end coverage without the band is 0.90 or
   more with CRPS no worse than A0 by more than max(0.03, MDE) with the interval excluding zero. The
-  threshold for porting is zero loss beyond the MDE, because the change adds one small head and a
+  threshold for porting is a CRPS loss no larger than the MDE, because the change adds one small head and a
   loss term to the daily fine-tune and nothing to forecasting. Stop rule from the brief: if A1 is
   worse than A0 by more than max(0.03, MDE) with the interval excluding zero in the first fold pair
   (2025-10 and 2025-12), run only A2 and A3 to see whether the auxiliary loss repairs it.
@@ -73,16 +71,14 @@ headline: >-
   recovers 0.47 (A2) to 0.57 (A3) of the variance of the injected depth in the two scored groups, short of the 0.7 predicted,
   and reads 0.01 to 0.04 on the two real December load-shifts, whose depths were -0.26 and +0.15.
 lessons: >-
-  Roughly all of the gain comes from sharing the encoder across the two lags (A1 against A0), not
-  from asking it to predict the depth. A head trained on synthetic depths does not transfer to the
+  In these injected-event results the coverage gain comes with sharing the encoder across the two lags (A1 against A0), not with asking it to predict the depth; the sharing also widens the band by 4% and lowers coverage 7 to 14 days after the end (0.885 to 0.879). A head trained on synthetic depths does not transfer to the
   real December pair (two Primary-events), and an auxiliary loss strong enough to give a usable
-  detector (A3, 0.82 detection at 11 false triggers per Primary-year at threshold 0.075 of capacity)
+  detector (A3: 0.68 detection at 11.0 false triggers per Primary-year at threshold 0.075 of capacity, and 1.5 at the Primaries other than D15 and D18)
   does not make the forecast band follow the lags less.
 take_home_message: >-
   Asking the shared lag encoder to predict how deep each injected load-shift is does not make the
-  forecast follow the shift less or cover the normal running arrangement better after it ends. The
-  one useful change is plain sharing of the encoder across the day-old and week-old lags with a lag
-  ID, which lifts after-end coverage by 0.025 at no measurable loss. The depth head works as a
+  forecast follow the shift less or cover the normal running arrangement better after it ends. The change that coincided with a gain is plain sharing of the encoder across the day-old and week-old lags with a lag
+  ID, which lifts after-end coverage on injected events by 0.025 with no CRPS change beyond the minimum detectable effect (a descriptive result). The depth head works as a
   detector on injected events but did not recognise the two real load-shifts.
 advice:
   - >-
@@ -103,7 +99,7 @@ adopted_in: none
 
 **Asking a shared lag encoder to predict the depth of each injected load-shift did not help: the
 forecast follows the shift as much as before and covers the normal running arrangement (NRA) on no
-more rows after the shift ends.** Only the sharing helped. One encoder shared by the day-old and
+more rows after the shift ends.** In these results only the sharing helped. One encoder shared by the day-old and
 week-old lags raised the share of rows whose NRA lies inside the q05-q95 band from 0.860 to 0.885 in
 the week after an injected 15 or 30 day load-shift, at the same event-free forecast error.
 
@@ -117,6 +113,17 @@ reads one lag at a time, and added a head that predicts, from the encoder's outp
 of the synthetic load-shift in that lag as a share of capacity. We scored five arms on the injected
 bank of 1,248 Primary-events (a constant shift added to the lag inputs only) and on the verified
 December pair of real load-shifts.
+
+Terms used below. **Following** is how far the median forecast moves with an injected shift, as a
+share of the shift's depth. **CRPS** (continuous ranked probability score) is the score of the whole
+forecast distribution, in points of capacity. **Eight MVA Primaries** and **six MW Primaries** are
+the two groups of primary substations whose power is metered in MVA and signed MW. **The gated band**
+is a wider band that a rule on the lags switches on while it suspects a load-shift, from [experiment
+583](../00583-after-snap-back-event-band-on-x3-syn/result.md). **The injected bank** is the set of
+synthetic load-shifts added to the lag inputs of stored forecasts, and a **Primary-event** is one
+injected or real load-shift at one Primary. **Phase** is the position of a row relative to an event
+(before, days 0 to 3, day 4 to the end, 0 to 7 days after, 7 to 14 days after). The forecasts are for
+NGED, the electricity distribution network operator.
 
 Verdict: **not supported**. Nothing here is adopted for production. All numbers come from the five
 fold months, with refits on days 0 and 14, seeds 0 and 1 averaged.
@@ -209,7 +216,7 @@ Primary's time) as in [experiment
   two heads.
 - **A5 (A2 with the head's output fed to the mixer):** not run, because A2 and A3 did not help.
 - At forecast time the head is dropped. The depth labels sit in two extra columns that exist only in
-  the daily fine-tune's training tensor, and the model reads them in training mode only, so
+  the daily fine-tune's training tensor, and the neural network reads them in training mode only, so
   validation, test, and forecast rows carry no label.
 
 ## Results
@@ -235,7 +242,7 @@ Primary's time) as in [experiment
   0.880.
 - **Safe side of q05 or q95, 0 to 7 days after the end:** A0 0.876, A1 0.901, A2 0.903, A3 0.902, A4
   0.885; with the gated band 0.943, 0.946, 0.945, 0.944, and 0.940, against 0.95 nominal.
-- **Following of the injected shift** (the change in the median forecast, as a share of the injected
+- **Following of the injected shift, all four lengths pooled** (the change in the median forecast, as a share of the injected
   depth, [experiment 581](../00581-robust-multiweek-lag-encoder-x3/result.md)'s measure, 24 to 120 h):
   from day 4 to the end A0 0.108, A1 0.110, A2 0.110, A3 0.104, A4 0.105; days 0 to 3 0.042 to 0.047
   for all five; 0 to 7 days after the end 0.038 to 0.047. The median already follows the lags by only
@@ -250,7 +257,7 @@ Primary's time) as in [experiment
 | A3 | 0.172 | 0.675 | 0.825 | 0.233 |
 | A4 | 0.172 | 0.689 | 0.840 | 0.236 |
 
-- **Event-free rows, 24 to 120 h** (578,209 rows at 16 Primaries): CRPS (estimated as 2 × the mean
+- **Event-free rows, 24 to 120 h** (335,520 rows at 16 Primaries, with no labelled or verified event within 7 days): CRPS (estimated as 2 × the mean
   pinball loss over the 11 stored quantile levels), in points of capacity, at the eight MVA
   Primaries and the six MW Primaries: A0 3.081 and 2.465, A1 3.057 and 2.445, A2 3.059 and 2.455, A3
   3.074 and 2.451, A4 3.084 and 2.460. Contrasts, month-block bootstrap at the Bonferroni level of
@@ -278,7 +285,7 @@ Primary's time) as in [experiment
   the head's output against the injected depth, positive when it recovers variance; the scored groups are the eight MVA and six MW Primaries, and the other columns pool all three groups, including D15 and D18, where the heads do worst; 61% of the lag rows carry no injected shift, and the injected events use the same depth and length grid as the training shifts, so "held-out" means held out in time only):
 
 | Arm | Scored groups | All three groups | Depth 0.15 | Depth 0.30 | Depth 0.50 | Eight MVA | Six MW | Length 3 days | Length 30 days |
-|---|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|---|---|---|---|
 | A1 (never trained) | -0.19 | -0.20 | -1.32 | -0.28 | -0.07 | -0.16 | -0.25 | -0.74 | -0.11 |
 | A2 | 0.47 | 0.44 | 0.28 | 0.42 | 0.46 | 0.46 | 0.49 | 0.40 | 0.44 |
 | A3 | 0.57 | 0.53 | 0.32 | 0.49 | 0.56 | 0.55 | 0.60 | 0.49 | 0.53 |
@@ -289,9 +296,7 @@ Primary's time) as in [experiment
   trigger rate rests on very few days): detection rate of injected events A2 0.78, 0.60, 0.48; A3
   0.82, 0.68, 0.54; A4 0.84, 0.63, 0.48. Detection of the deeper events (30% and 50%) with A3 is
   0.90, 0.81, 0.72. False triggers per Primary-year: A2 47.6, 13.6, 4.3; A3 29.9, 11.0, 7.3; A4
-  41.7, 16.9, 7.7. At threshold 0.075 the mean median onset delay of 3 and 7 day events is 1.4 to 2.2
-  days (shorter for deeper events). That is a slower, less selective detector than one reading the
-  lags directly, and every number here is for injected shifts.
+  41.7, 16.9, 7.7. At threshold 0.075 the mean median onset delay of 3 and 7 day events is 1.4 to 2.4 days (shorter for deeper events). The false-trigger rates are dominated by D15 and D18 (208 of the 1,857 days, which plausibly hold unlabelled load-shifts). At the other Primaries (1,649 Primary-days) the rates at the three thresholds are A2 33.0, 5.3, 1.3; A3 15.7, 1.5, 0.4; A4 35.0, 10.8, 1.3. Every number here is for injected shifts, and no detector that reads the lags directly was run for comparison.
 - **Verified December pair, 0 to 7 days after the end, 24 to 120 h** (descriptive; two Primaries),
   without and with the gated band:
 
@@ -311,11 +316,10 @@ Primary's time) as in [experiment
 - **Predictions** (written before any fit):
     - **P1 fails:** following does not halve (0.104 to 0.110 from day 4 to the end, against 0.108 for
       A0), and after-end coverage without the band is 0.886 (A2) and 0.884 (A3), below 0.90.
-    - **P2 holds:** A1's CRPS is within max(0.03, MDE) of A0's, and slightly lower.
+    - **P2 is not contradicted:** A1's CRPS is lower than A0's, but the interval (-0.092 to 0.023 at the eight MVA Primaries) is wider than max(0.03, MDE), so equivalence is not shown.
     - **P3 fails:** R squared is 0.42 (A2) and 0.49 (A3) at depth 0.30, and 0.46 and 0.56 at depth
       0.50, against at least 0.7.
-    - **P4 holds for CRPS and fails for coverage:** A4's CRPS is within max(0.03, MDE) of A2's, but
-      its after-end coverage (0.866) is 0.020 below A2's (0.886).
+    - **P4 is not contradicted on CRPS:** A4's CRPS is 0.026 and 0.008 above A2's with intervals that contain zero but are wider than max(0.03, MDE). After-end coverage (a clause not in the prediction) is 0.866 for A4 against 0.886 for A2, and the two intervals only just separate.
 - **Decision rule:** the auxiliary loss is not kept (following and after-end coverage unchanged from
   A1). The stop rule did not fire, so A2 and A3 were not run alone. Bonferroni count: 10 (12 with
   A5, which did not run).
@@ -326,24 +330,23 @@ Primary's time) as in [experiment
 
 - **Median forecast minus mean of the 11 stored quantiles, event-free rows, 24 to 120 h, % of
   capacity, per group** (eight MVA Primaries and six MW Primaries): A0 -0.51 and -0.22, A1 -0.45 and
-  -0.19, A2 -0.47 and -0.18, A3 -0.46 and -0.17, A4 -0.51 and -0.18. Only quantiles are stored, so
+  -0.19, A2 -0.46 and -0.18, A3 -0.46 and -0.17, A4 -0.51 and -0.18. Only quantiles are stored, so
   the mean forecast is not stored. The gap is small beside the 6.2 and 5.3 mean absolute error.
 - **Error of the median beside the quantile contrasts** (mean absolute error of the median,
   event-free, % of capacity, eight MVA and six MW Primaries): A0 6.22 and 5.32, A1 6.14 and 5.24, A2
-  6.16 and 5.27, A3 6.18 and 5.27, A4 6.21 and 5.25. It points the same way as the CRPS contrasts:
+  6.16 and 5.27, A3 6.18 and 5.27, A4 6.21 and 5.25. The error of the median points the same way as the CRPS contrasts:
   A1 is lowest, and the auxiliary loss adds none of that gain.
 - **Triggers fired:** trigger 2 (P1 fails). The explanation was tested above: the median follows the
   shifted lags only by about a tenth of the depth in A0 already, so the auxiliary loss had little to
   remove, and sharing alone moved the coverage. No other trigger fired; leaving one Primary out was
   not run.
-- **Reviews:** a fresh Sonnet agent reviewed the fit wrapper before any fit. It found that the first
-  pre-training run was overwriting experiment 574's stored B1 statistics files. They were
-  bit-identical to the backup, so no harm was done; the run now writes to its own folder and a check
+- **Reviews:** a fresh Sonnet agent reviewed the fit wrapper before any fit. The review found that the first
+  pre-training run was overwriting experiment 574's stored B1 statistics files. The stored files were bit-identical to the backup, so no harm was done; the run now writes to its own folder and a check
   asserts the stored files are unchanged. The review also reported lint and guard items, all fixed.
 
 ## Caveats
 
-- **Only one verified transfer pair is in the fold months** (a load moved from D5 to D16 and back,
+- **We found one verified transfer pair in the fold months** (a load moved from D5 to D16 and back,
   December 2025), so every real-event number is descriptive.
 - **Injected events** add a constant shift to the lag inputs only, so the head reads the injected
   lags and not a change in the power; the injected bank flatters any detector keyed on the lags.
