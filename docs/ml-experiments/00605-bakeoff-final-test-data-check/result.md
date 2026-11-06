@@ -79,8 +79,9 @@ zero power after 2026-03-26.
 
 **Two of three predictions held, so the verdict is partly supported.** Prediction P2 held: no
 ensemble run is missing. Prediction P1 failed: every series would miss under 2% of half-hours in
-each test month, but the three wind farms and three Primaries miss more in at least one month.
-Prediction P3 held: the derived inputs stop early. Nothing here is adopted for production.
+each test month, but the three wind farms and four Primaries (Stickney, both Wrangle transformers,
+and Kirton) miss more in at least one month. Prediction P3 held: the derived inputs stop early.
+Nothing here is adopted for production.
 
 ![Share of half-hours with no reading, per series and month](missing_half_hours.svg)
 
@@ -110,23 +111,23 @@ March point is lower than a full month.*
   one Wrangle transformer in October 2025) and none from May to October 2026.
 - **The raw and cleaned tables hold the same rows,** 561,278 for these 29 series since 2025-09-01.
 - **Wind farms miss more.** W1, W2, and W3 miss 7.6%, 1.7%, and 6.1% of half-hours in July to
-  October, against 0.9%, 0.4%, and 1.2% in the development months. They have 31, 3, and 12 gaps of 3
-  hours or more.
+  October, against 0.9%, 0.4%, and 1.2% in the development months. They have 31, 3, and 12 gaps
+  longer than 3 hours.
 - **Solar farms need a different count.** Night half-hours are absent, so the solar group's missing
-  share is 38% to 62% a month from May. In the four middle daylight hours (10:00 to 14:00 UTC), farm
+  share is 33% to 62% a month from May. In the four middle daylight hours (10:00 to 14:00 UTC), farm
   E misses 73% in July and 70% in October, farm D misses 2% to 18% a month, and farms A, B, C, and F
   miss under 2% apart from three months (A 6% in October, B 8% in August, F 16% in May).
 
 ## Generators have no exact-zero readings from late March 2026
 
 **The nine solar and wind series have no half-hour reading exactly 0 after 2026-03-26.** The last
-zero is between 2026-03-23 and 2026-03-26 at all nine, so the change is simultaneous and probably
-sits in how the source reports, not in any one farm. In the six full months before March, solar
-farms read 0 in 47% to 68% of half-hours a month and wind farms in 0.3% to 4.8%. The cause is not
-determined: the list of files the ingest has downloaded only starts on 2026-04-27, and the ingest
-code holds no zero filter. A missing generator half-hour therefore can mean night, calm, or a fault.
-Scoring on the rows present would drop the zero-output half-hours that the development months
-include, so the development and test scores would not be comparable.
+zero is between 2026-03-23 and 2026-03-26 at all nine, so the change falls within four days at all
+nine and probably sits in how the source reports, not in any one farm. In the six full months before
+March, solar farms read 0 in 47% to 68% of half-hours a month and wind farms in 0.3% to 4.8%. The
+cause is not determined: the list of files the ingest has downloaded only starts on 2026-04-27, and
+the ingest code holds no zero filter. A missing generator half-hour therefore can mean night, calm,
+or a fault. Scoring on the rows present would drop the zero-output half-hours that the development
+months include, so the development and test scores would not be comparable.
 
 ## Ensemble weather
 
@@ -152,8 +153,9 @@ include, so the development and test scores would not be comparable.
   before the origin. The day lag holds a reading for 99.35%, 98.55%, 100.0%, and 99.99% of targets
   in July, August, September, and October; the worst origin is 88.9% (August).
 - **This is not yet a row-by-row check.** No feature frame exists for these origins, so the
-  assertion covers the timing rules. The experiment that builds the frames repeats the check on them
-  with `e00605_assertions.py`.
+  assertion covers the timing rules. The origin-timing assertion only detects a missing run, because
+  the origin and the cut-off share the same 9 hours. The experiment that builds the frames repeats
+  the check on the frames themselves.
 - **Actuals limit the last origins.** Power ends on 2026-11-06 at 08:00, so a 10-day horizon is
   fully scorable for origins up to 2026-10-26 and a 14-day horizon up to 2026-10-22. Every origin
   reaches its 10-day horizon on 2026-11-11 once the daily ingest has run.
