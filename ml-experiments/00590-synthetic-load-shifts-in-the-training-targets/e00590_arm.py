@@ -15,6 +15,7 @@ Arms (`--arm`):
   by the event's depth, as a real load-shift moves both.
 - `t2`: lag-only events on 2.5% of each Primary's time (schedule seed `s`) and lag-plus-target events
   on a further 2.5% (schedule seed `s + 7919`).
+- `p5`: reference only, `inject` only: experiment 574's P5 weights (fine-tuned on clean lags) forecast the injected bank.
 - `t3`: placebo. The lag columns read the power plus independent Gaussian noise, one draw per Primary
   and half-hour, whose standard deviation equals the standard deviation, over the month's grid span, of
   the shift C1 would add at that Primary. No persistent shift; targets stay clean.
@@ -34,7 +35,7 @@ import sys
 
 _p = argparse.ArgumentParser()
 _p.add_argument("command", choices=("fit", "assemble", "inject"))
-_p.add_argument("--arm", required=True, choices=("t1", "t2", "t3"))
+_p.add_argument("--arm", required=True, choices=("t1", "t2", "t3", "p5"))
 _p.add_argument("--months", nargs="+", default=None)
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 _p.add_argument("--passes", nargs="+", type=int, default=None)
@@ -144,7 +145,7 @@ def build_month_variant(*, month, clean):
     origin_idx = (mr.origin_us - e.c.prep422.GRID_START_US) // e.c.prep422.STEP_US
     first, last = int(mr.target_idx.min()), int(mr.target_idx.max())
     seed = int(month.replace("-", ""))
-    if ARM == "t1" and month == e.ARGS.months[0]:
+    if month == e.ARGS.months[0]:
         check_schedule(clean=clean, first=first, last=last, seed=seed)
     lag_series, delta, info = lag_and_target_series(clean=clean, first=first, last=last, seed=seed)
     blk = e.block_of(
@@ -176,6 +177,7 @@ def build_month_variant(*, month, clean):
         "arm": ARM,
         "share_changed_day_lag": changed,
         "share_shifted_target": share_t,
+        "info": info,
     }
     if ARM == "t1":
         assert share_t > 0.02, share_t
