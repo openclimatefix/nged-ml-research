@@ -192,7 +192,12 @@ Descriptive only.*
   permanent level change enters the fine-tune 4 days later than with a 3-day embargo. This
   experiment scored no such change, so the delay is unmeasured. The event-free CRPS, which includes
   ordinary drift, did not rise measurably at 14 of 16 Primaries and rose by 4 to 5% at D15 and D18.
-- **Checks.** The audit re-derived the shares and one CRPS contrast independently (see the PR).
+- **Checks.** A fresh Sonnet agent re-derived the four shares independently (0.1599, 0.1283, 0.1421,
+  and 0.1144) and found no audit trigger: the rows match across arms, no quantiles cross, and E3
+  minus E0 is negative or about zero in all 12 designs (more than 0.02 below in 8; design 83 is the
+  largest at -0.178, and without it the mean is still -0.034). Its CRPS level for the eight MVA
+  Primaries was about 0.001 MW lower than the table's (cell weighting), with the same E3 minus E0
+  sign and size (+0.0002 against +0.0004).
   Cells with fewer than 48 half-hours are dropped (12 of 580). The CRPS omits the two outer strips
   of the distribution for every arm alike. The intervals for CRPS resample Primary-by-month cells as
   independent, so they are approximate. There is no median-minus-mean check because the stored
