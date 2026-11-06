@@ -92,6 +92,13 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
   with the observed power and the NRA, and a thin strip under the panel marks when the gate is on.
   A legend outside the data area names each line, band, shade, and bar. The five arms (R, W, S,
   S-g, S-p) therefore go in separate figures or small multiples of one arm each, never on one panel.
+- **Further figure rules (maintainer, 2026-11-06).** The NRA line is not drawn on time-series plots,
+  because it is an estimate, and each caption says coverage is scored against that estimate.
+  Observed power is black, no other mark is black or grey, and the load-shift shade is a pale colour
+  that no arm uses. A gate strip is checked against the stored gate state before it is published.
+  Before the pull request is marked ready, a fresh Sonnet reviewer opens each figure rendered to PNG
+  and answers the six-question figure checklist in writing; the pull request body records "figure
+  review: passed" with the date.
 - **Standing practices followed.** Monthly-equivalent coarse refits, cleaned data, the D15 and D18
   cut, saved weights, reuse of stored forecasts, tails and avoidable-curtailment cost, load-shift
   event plots (at least 6, both metering groups), example forecasts, and the unlogged-event caveat.
