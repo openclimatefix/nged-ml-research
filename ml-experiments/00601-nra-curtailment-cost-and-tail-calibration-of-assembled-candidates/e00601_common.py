@@ -7,11 +7,13 @@ leads 12 to 36 h). It is written here as a per-row formula, so that the injected
 events share one valid time, can be scored by phase. The known-answer check in `e00601_real.py`
 compares the formula with the metric on the real forecasts.
 
-For one forecast row of a node with limit `L` (MW), forecast q95 `u`, and metered flow `y`, the
-planned curtailment is 0.5 * max(0, u - L) MWh and the breach is
-0.5 * max(0, y - planned / 0.5 - L) MWh. The cost is the price times (planned + 20 * breach). The
-perfect forecast costs the price times 0.5 * max(0, y - L), and the avoidable cost is the
-difference.
+For one forecast row of a node with limit `L` (MW), forecast q95 `u`, and metered flow `y`:
+
+- the planned curtailment is `0.5 * max(0, u - L)` MWh;
+- the breach is `0.5 * max(0, y - planned / 0.5 - L)` MWh;
+- the cost is `price * (planned + 20 * breach)`;
+- the perfect forecast costs `price * 0.5 * max(0, y - L)`, and the avoidable cost is the
+  difference.
 """
 
 from typing import Final
