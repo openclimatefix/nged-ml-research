@@ -265,6 +265,95 @@ def tails() -> None:
     save(chart, "injected_event_following_by_phase")
 
 
+WIDE_NAMES = {
+    "S0w": "S0w one encoder, 4 lags",
+    "S1w": "S1w shared + learnt ID",
+    "S3w": "S3w separate encoders",
+}
+WIDE_COLOURS = {
+    WIDE_NAMES["S0w"]: theme.DATA_BLUE, WIDE_NAMES["S1w"]: theme.BRAND_ORANGE, WIDE_NAMES["S3w"]: theme.DATA_GREEN,
+}  # fmt: skip
+WIDE_SCORES = WORK / "work_wide" / "scores"
+
+
+def wide() -> None:
+    c = pl.read_csv(WIDE_SCORES / "part1_contrasts.csv").filter(
+        (pl.col("band") == "24-120h") & (pl.col("set") != "report") & (pl.col("b") == "S0w")
+        & pl.col("slice").is_in(["all rows", "cold winter nights", "Christmas and New Year", "bank-holiday days"])
+    )  # fmt: skip
+    rows = [
+        {"arm": WIDE_NAMES[r["a"]], "group": GROUPS[r["set"]], "slice": r["slice"], "diff": r["difference"],
+         "lo": r["low_month"], "hi": r["high_month"], "folds": r["folds"]}
+        for r in c.iter_rows(named=True)
+    ]  # fmt: skip
+    src = pl.DataFrame(rows)
+    order = [WIDE_NAMES["S1w"], WIDE_NAMES["S3w"]]
+    charts = []
+    slices = ["all rows", "cold winter nights", "Christmas and New Year", "bank-holiday days"]
+    for g in GROUPS.values():
+        for sl in slices:
+            sub = src.filter((pl.col("group") == g) & (pl.col("slice") == sl))
+            base = alt.Chart(sub).encode(
+                y=alt.Y("arm:N", title=None, sort=order),
+                color=alt.Color("arm:N", scale=alt.Scale(domain=list(WIDE_COLOURS), range=list(WIDE_COLOURS.values())), legend=None),
+            )  # fmt: skip
+            last = g == list(GROUPS.values())[-1] and sl == slices[-1]
+            rule = base.mark_rule(strokeWidth=2).encode(
+                x=alt.X("lo:Q", title="CRPS minus S0w's (points of capacity; negative is better)" if last else None, scale=alt.Scale(domain=[-1.5, 0.7]), axis=alt.Axis(values=[-1.5, -1.0, -0.5, 0.0, 0.5])),
+                x2="hi:Q",
+            )  # ty: ignore[unresolved-attribute]  # fmt: skip
+            dot = base.mark_point(filled=True, size=60).encode(x="diff:Q")  # ty: ignore[unresolved-attribute]
+            zero = (
+                alt.Chart(pl.DataFrame({"z": [0.0]}))
+                .mark_rule(color="#222222", strokeDash=[3, 3])
+                .encode(x="z:Q")
+            )
+            n = int(sub["folds"][0]) if sub.height else 0
+            charts.append(
+                alt.layer(zero, rule, dot).properties(
+                    width=WIDTH - 150,
+                    height=50,
+                    title=alt.TitleParams(
+                        f"{g}, {sl} ({n} fold{'s' if n != 1 else ''})", fontSize=10
+                    ),
+                )
+            )
+    chart = alt.vconcat(*charts, spacing=10).properties(
+        title=alt.TitleParams(
+            text=["With four lags, neither shared-weight wiring beats one encoder reading all lags"],
+            subtitle=[
+                "Dot: two-seed mean CRPS of the arm minus S0w (one encoder reading day, week, 2-week, and year-ago lags), lead 24 to 120 h.",
+                "Line: smallest to largest month-block fold mean; absent where one fold holds the slice. Slices are descriptive.",
+            ],
+            anchor="start", fontSize=13, subtitleFontSize=10,
+        )
+    )  # fmt: skip
+    save(chart, "wide_crps_minus_s0w_by_slice")
+
+
+def wide_tails() -> None:
+    arms = {"s0w": "S0w", "s1w": "S1w", "s3w": "S3w"}
+    t = summary.injected(arms=list(arms)).with_columns(
+        arm=pl.col("arm").replace_strict({k: WIDE_NAMES[v] for k, v in arms.items()})
+    )
+    order = ["before", "d0-3", "d4-end", "after0-7", "after7-14"]
+    charts = []
+    for metric, title, domain in (
+        ("follow_q50", "Share of shift followed", None),
+        ("nra_side95", "Safe-side share", [0, 1]),
+    ):
+        ch = alt.Chart(t).mark_line(point=True).encode(
+            x=alt.X("phase:N", sort=order, title="Forecast origin relative to the injected event" if metric == "nra_side95" else None, axis=alt.Axis(labelAngle=0)),
+            y=alt.Y(f"{metric}:Q", title=title, scale=alt.Scale(domain=domain) if domain else alt.Scale(zero=True)),
+            color=alt.Color("arm:N", scale=alt.Scale(domain=list(WIDE_COLOURS), range=list(WIDE_COLOURS.values())), legend=alt.Legend(orient="top", title=None)),
+        ).properties(width=WIDTH - 60, height=100).facet(row=alt.Row("group:N", title=None))  # ty: ignore[unresolved-attribute]  # fmt: skip
+        charts.append(ch)
+    chart = alt.vconcat(*charts, spacing=12).properties(
+        title=alt.TitleParams(text=["Four-lag arms on experiment 581's injected load shifts"], subtitle=["Lead 24 to 120 h; mean over events and 5 folds.", "Upper panels: share of the shift the median follows (smaller is better).", "Lower panels: share of true readings on the safe side of q95, or q05 for a shift that lowered load (larger is better)."], anchor="start", fontSize=13, subtitleFontSize=10)
+    )  # fmt: skip
+    save(chart, "wide_injected_event_following_by_phase")
+
+
 if __name__ == "__main__":
     for fn in sys.argv[1:] or ["contrasts", "leak", "examples", "tails"]:
         globals()[fn]()
