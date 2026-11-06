@@ -42,25 +42,29 @@ metric: >-
 verdict: partly supported
 best_arm: >-
   C2 (gated band) against C0: on the injected designs, C2 covers the normal running arrangement on
-  more rows in the 7 days after the end than C0 in 17 of 24 panels. It does not in 6 of the 12
-  designs at the MVA-only Primaries, where C0 already covers 0.92 or more, and in 1 of 12 at the MW
-  Primaries.
+  more rows in the 7 days after the end than C0 in 17 of 24 panels (12 of 15 distinct cases). It
+  does
+  not in 6 of the 12 designs at the MVA-only Primaries, where C0 already covers 0.92 or more, and in
+  1 of 12 at the MW Primaries.
 headline: >-
   C2 matches C1 exactly on the 4 event-free windows (P1 holds). C2 beats C0 after the end on both
   verified December Primaries (D16 0.85 against 0.33, D5 0.57 against 0.34), but not before the
   event at D5 (0.46 against 0.80). On injected load-shifts C2 beats C0 in 11 of 12 designs at the
-  MW Primary and in 6 of 12 at the MVA-only Primary (P2 fails there).
+  MW Primaries and in 6 of 12 at the MVA-only Primaries (P2 fails there; P3 does not hold).
 lessons: >-
-  The gate at D5 was on for the whole plotted December window, so C2's band was the wider union band
+  The gate at D5 was on for the whole plotted December window, so C2 used the union band
   throughout and still covered D5's normal running arrangement on only 0.46 of rows before the
-  event. The labelled events that the power readings did not confirm show no forecast response that
-  follows the label.
+  event. In the labelled events that the power readings did not confirm, the band does not follow
+  the label's
+  dates and sign.
 take_home_message: >-
-  The plots show the candidate forecast widening its band after a load-shift ends and covering the
-  normal running arrangement more often than the earlier forecast, with no change on days with no
-  load-shift. They also show that the real December pair is a case where the gate is on for a month
-  and the band still misses before the event. Labelled events that the power readings do not
-  confirm show no matching response, which is expected and not an error.
+  The plots show the candidate forecast covering the normal running arrangement more often than the
+  earlier forecast in the week after a load-shift ends, with no change on days with no load-shift,
+  but
+  less often during the load-shift. They also show that the real December pair is a case where the
+  gate is on for a month
+  and the band still misses before the event. For labelled events that the power readings do not
+  confirm, the band does not follow the label, which is expected and not an error.
 advice:
   - >-
     Judge a band rule on negative-sign injected events at the eight MVA-only Primaries separately,
@@ -74,58 +78,76 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**The plots show the candidate forecast (C2) widening its 90% band after a load-shift ends and
-covering the normal running arrangement (NRA) on more rows than the earlier v3+D5 forecast (C0) in
-most cases, and changing nothing on days with no load-shift.** The NRA is the power a substation
-would have drawn without the load-shift. The one real, telemetry-verified case, the December 2025
-transfer between substations D5 and D16, is mixed: C2 covers D5 on only 0.46 of rows before the
-event.
+**The plots show the candidate forecast (C2) covering the normal running arrangement (NRA) on more
+rows than the earlier v3+D5 forecast (C0) in the 7 days after a load-shift ends, and changing
+nothing on days with no load-shift.** The NRA is the power a substation would have drawn without the
+load-shift. C2 does worse than C0 while the load-shift is under way and, at one real substation,
+before it starts.
 
-A load-shift moves part of one primary substation's demand onto another, so the recent power
-readings no longer show the NRA. **How to read the plots:** each panel shows day-ahead forecasts
-(the forecast issued the day before the valid day) for one primary substation (a Primary). The grey
-band and line are C0's q05 to q95 range and median. The orange band and dark orange line are C2's.
-The black solid line is the observed power. The black dashed line is the NRA. The grey shade is the
-load-shift. The sky-blue bar along the bottom marks origin days on which the gate (a rule that fires
-when the lagged power disagrees with a forecast made without it) was on, or held for 7 days after it
-released. C2 is the [experiment
-584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)
-forecast: the P5 recipe trained with synthetic load-shifts in the lag inputs, with a wider band
-while the gate is on. C0 is the [experiment
-572](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00572-two-offset-part-1-lags-versus-the-slow-output-offset/result/)
-forecast. Nothing here is adopted for production.
+Verdict: **partly supported**. The pre-registered rule said the prediction fails if P1 or P2 fails,
+and P2 failed at one metering group, so the prediction as a whole failed. Outcomes:
 
-Verdict: **partly supported**. P1 holds, P2 fails at the MVA-only Primaries, and P3 is descriptive.
+- **P1 held.** C2 equals C1 on all 4 event-free windows.
+- **P2 held at the six MW substations (11 of 12 designs) and failed at the eight MVA-only
+  substations (6 of 12).** The run drew one substation per design from each group, not the same two
+  substations for every design.
+- **P3 did not hold.** On the December pair, C2's band is narrower than C0's on the gate-on days
+  before and during the event, and wider only after the end (verified table).
+
+Nothing here is adopted for production.
+
+**How to read the plots.** A load-shift moves part of one primary substation's demand onto another,
+so recent power readings no longer show the NRA. A primary substation (a Primary) is named D2, D3,
+and so on. MW (megawatts) is real power. MVA (megavolt-amperes) is apparent power, and the eight
+"MVA-only" Primaries report only apparent power; the six "signed-MW" Primaries report signed real
+power. Each panel shows day-ahead forecasts (issued the day before the valid day) for one Primary.
+The grey band and line are C0's q05 to q95 range (the 90% band) and median. The orange band and dark
+orange line are C2's. The black solid line is the observed power. The black dashed line is the NRA.
+The grey shade is the load-shift. The sky-blue bar along the bottom marks origin days (days on which
+the forecast was issued) when the gate was on, or held for 7 days after it released. The gate is a
+rule that fires when the lagged power disagrees with a forecast made without it. Where a fold month
+is mentioned, it is one of the five test months.
+
+**The arms.** C0 is the forecast of [experiment
+572](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00572-two-offset-part-1-lags-versus-the-slow-output-offset/result/).
+C1 is the P5 recipe of [experiment
+584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/):
+the same network and training as C2, trained with synthetic load-shifts in its lag inputs, with no
+extra band. C2 is C1 with a wider band (the union of C1's band and the band of its lags-masked twin)
+while the gate is on and for 7 days after. The union band is that wider band.
 
 ## Verified real events
 
-The December 2025 pair is the only telemetry-verified transfer from [experiment
+The December 2025 pair is the one verified transfer in the event set of [experiment
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)
 that falls in a fold month with stored forecasts. Each figure has the whole window (14 days before
 the start to 14 days after the end) and a zoom on the 7 days after the end.
 
 ![D5, verified load-shift](verified_D5_2025-12-29.svg)
 
-D5 carried 1.5 MW less during the load-shift. The gate was on for the whole window, so the band is
-the wider union band throughout, and the sky-blue bar spans it.
+D5 carried 1.5 MW less during the load-shift. The gate was on for the whole window, so C2 used the
+union band throughout and the sky-blue bar spans it. Look at the dashed NRA line: C2 follows it less
+well than C0 before the start.
 
 ![D16, verified load-shift](verified_D16_2025-12-29.svg)
 
-D16 carried the mirror load. Look at the zoom: after the end, C2's band is wider than C0's and
-contains the NRA more often.
+D16 carried 1.5 MW more. Look at the zoom: after the end, C2's band is wider than C0's and contains
+the dashed NRA line more often.
 
 ![Gate state around each verified event](summary_gate_timeline.svg)
 
 The gate at D5 was on for every origin day in the window. At D16 it fired 5 days after the start and
 released 19 days after.
 
-Share of the NRA inside the q05 to q95 band, by phase. Rows are day-ahead rows only, so the numbers
-differ slightly from the 24 to 120 h rows of [experiment
+Share of the NRA inside the q05 to q95 band (coverage), by phase: before (7 days before the start),
+days0-3 (the first 3 days), day4-end (day 4 to the end), and after0-7 (7 days after the end). Rows
+are day-ahead rows only, so the numbers differ slightly from the 24 to 120 h rows of [experiment
 584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/).
 Widths are in per cent of capacity. Both events belong to one transfer, so every number is
-descriptive.
+descriptive. During the event C2 covers less than C0 at both Primaries (D16 day4-end 0.68 against
+0.90).
 
-| Event | Phase | Rows | C0 | C2 | C0 width | C2 width |
+| Event | Phase | Rows | C0 coverage | C2 coverage | C0 width | C2 width |
 |---|---|---|---|---|---|---|
 | D5 2025-12-29 | before | 336 | 0.80 | 0.46 | 23.0 | 19.6 |
 | D5 2025-12-29 | days0-3 | 144 | 0.58 | 0.48 | 22.8 | 19.3 |
@@ -139,13 +161,17 @@ descriptive.
 ## Labelled events (label not verified by the power readings)
 
 These are NGED's labelled events of 3 days or more that fall in a fold month with stored forecasts
-(11 events, so fewer than the 12 allowed). The dashed blue line is the observed power minus the
-labelled depth, which is what the NRA would be if the label were right. **NGED's labels are known to
-be imperfect, so a plot where the forecast does not follow the label is not an error.** The status
+(11 events; the page shows up to 12). The dashed blue line is the observed power minus the labelled
+depth, which is what the NRA would be if the label were right. **NGED's labels are known to be
+imperfect, so a plot where the forecast does not follow the label is not an error.** The status
 comes from [experiment
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/):
-only event 55 is verified, and event 146's label has the wrong dates and sign. Events 177 to 182 are
-the mirrored halves of labelled pairs at D5, D3, and D8.
+only event 55 is verified, and event 146's label has the wrong dates and sign. "Not seen by the
+power rule" is the status that [experiment
+580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)
+calls "rejected". Events 177, 178, 181, and 182 are the mirrored halves of labelled pairs (the
+partner has the opposite depth on the same dates). Event 179 has no partner. Look at whether the
+orange band moves toward the dashed blue line.
 
 ![D5, labelled event 146](labelled_146_D5_40d.svg)
 
@@ -204,15 +230,17 @@ origin days in the window: 0.
 
 ## Injected events
 
-Each figure injects one design into the lag inputs of two Primaries, one MVA-only Primary and one
-signed-MW Primary (March 2026, the bank of [experiment
+Each figure injects one design (a length, a depth as a share of capacity, and a sign) into the lag
+inputs of two Primaries, one MVA-only and one signed-MW (March 2026, the bank of [experiment
 581](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00581-robust-multiweek-lag-encoder-x3/result/)).
-**The injected shift is added to the lag inputs only and the target stays clean, so the plots show
-the lag-input effect**, and the observed power is also the NRA. All events in a month end on the
-same day, so a 30-day event begins before the plotted window (the x axis then starts above 0).
-Coverage of the NRA in the 7 days after the end (C0 / C2):
+The Primary differs between designs. **The injected shift is added to the lag inputs only and the
+target stays clean, so the plots show the lag-input effect**, and the observed power is also the
+NRA. In each panel, compare the width of the orange band with the grey band after the grey shade
+ends. All events in a month end on the same day, so a 30-day event begins before the plotted window
+(the x axis then starts above 0). Coverage of the NRA in the 7 days after the end; each cell gives
+C0 coverage / C2 coverage:
 
-| Design | Eight MVA Primary (C0 / C2) | Six MW Primary (C0 / C2) |
+| Design | MVA-only Primary (C0 / C2) | MW Primary (C0 / C2) |
 |---|---|---|
 | 7 days, +15% | D3: 0.62 / 0.89 | D16: 0.66 / 0.97 |
 | 7 days, -30% | D8: 0.93 / 0.89 | D9: 0.68 / 0.91 |
@@ -227,10 +255,11 @@ Coverage of the NRA in the 7 days after the end (C0 / C2):
 | 30 days, -50% | D12: 0.92 / 0.91 | D16: 0.71 / 0.99 |
 | 30 days, +50% | D12: 0.70 / 0.84 | D16: 0.26 / 0.98 |
 
-D12, D14, and D16 appear in several designs because the bank assigns each Primary to one design per
-pass. Their after-end rows are the same rows, so their coverage repeats. At the MVA-only Primaries
-C2 covers more than C0 in 6 of 12 designs. The 6 exceptions are all negative-sign events at D8 and
-D12, where C0 already covers 0.92 or more.
+D8, D12, D14, and D16 appear in several designs because the bank assigns each Primary to one design
+per pass. All events end on the same day, so their after-end rows are the same rows and their
+coverage repeats. The 24 panels hold 15 distinct Primary and design cases, and C2 covers more than
+C0 in 12 of them. At the MVA-only Primaries C2 covers more than C0 in 6 of 12 designs. The 6
+exceptions are all negative-sign events at D8 and D12, where C0 already covers 0.92 or more.
 
 ![Injected 7 days, up 15%](injected_7d_up_15pct.svg)
 
@@ -262,7 +291,8 @@ Four 14-day windows with no labelled or verified load-shift within 7 days. Rule:
 Primary of the stated group whose 14 days from day 8 of the month hold no event, for 2025-10 and
 2026-06 (MVA-only) and 2026-03 and 2026-06 (MW). The gate was off on every origin day in all four
 windows, and C2's 11 stored quantiles equal C1's on every one of the 672 rows in each window
-(maximum difference 0.0). C1 is drawn grey under C2's orange, so only the orange shows.
+(maximum difference 0.0). C1 is drawn grey under C2's orange, so only the orange shows. Look for any
+grey edge: there is none.
 
 ![Event-free windows](event_free_windows.svg)
 
@@ -272,11 +302,12 @@ windows, and C2's 11 stored quantiles equal C1's on every one of the 672 rows in
 
 Injected events of 15 and 30 days, both groups, 24 to 120 h, from the tables of [experiment
 584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/).
-Look at the phases after the gate fires: C2 is highest there.
+Look at after0-7: C2 covers 0.927, against 0.860 for C1 and 0.759 for C0 (from [experiment
+584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)).
 
 ![Band width by phase](summary_width_by_phase.svg)
 
-C2's band is wider than C1's in the phases where the gate is on, and equal before.
+Look at the phases where the gate is on: C2's band is wider than C1's there, and equal before.
 
 ![Daily band width, verified events](summary_width_over_time.svg)
 
@@ -285,14 +316,20 @@ The orange line (C2) lies above the purple line (C1) on gate-on days.
 ![Coverage by phase for each verified event](from584_coverage90_verified_events.svg)
 
 Copied from [experiment
-584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/).
-The follow ratio by phase is not redrawn, because [experiment
+584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/);
+look at how coverage changes between phases. The follow ratio by phase is not redrawn, because
+[experiment
 584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)
 has no follow-ratio figure. [experiment
 582](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00582-nra-tails-on-verified-load-shift-events/result/)
 has one for earlier arms on the same events.
 
 ![Coverage by phase, injected events of 15 and 30 days](from584_coverage90_15_and_30_days_both_groups.svg)
+
+The same coverage as the first summary figure, with the earlier arms of the experiment.
+
+Look at the q05 and q95 bars: C2's pinball loss (the penalty for a quantile forecast; lower is
+better) is lowest after the end.
 
 ![Tail pinball loss after the end](from584_tail_pinball.svg)
 
@@ -301,14 +338,17 @@ has one for earlier arms on the same events.
 - **Event-free days are unchanged.** C2's quantiles equal C1's on all 4 windows (event-free figure).
 - **After the end, C2 beats C0 on both verified Primaries.** D16 0.85 against 0.33 and D5 0.57
   against 0.34 (verified table; descriptive, one transfer).
-- **Before the event at D5, C2 is worse than C0.** 0.46 against 0.80, with the gate on for the whole
-  window (D5 figure, gate timeline). [experiment
+- **Before and during the event, C2 covers the NRA less often than C0.** At D5 before the event 0.46
+  against 0.80, with the gate on for the whole window. At D16 from day 4 to the end 0.68 against
+  0.90 (verified table). [experiment
   584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)
   reports the same.
-- **On injected events C2 covers more than C0 after the end in 17 of 24 panels.** The exceptions are
-  negative-sign events at D8 and D12, and one at D11 (injected table).
-- **Labelled events that the power readings did not confirm show no matching response.** The label
-  line and the observed power disagree in those plots (labelled figures).
+- **On injected events C2 covers more than C0 after the end in 17 of 24 panels (12 of 15 distinct
+  cases).** The exceptions are negative-sign events at D8 and D12, and one near-tie at D11 (0.991
+  against 0.988; injected table).
+- **For labelled events that the power readings did not confirm, the band does not follow the
+  label's dates and sign.** The gate was on for 18 origin days of event 147, 6 of event 149, and 42
+  of event 146, and for none of the others except event 55 (labelled figures).
 
 ## Checks and caveats
 
@@ -317,28 +357,26 @@ has one for earlier arms on the same events.
   1 averaged, coarse refits (days 0 and 14). Weather comes from the run issued at or before the
   forecast origin minus 9 h, and lags are at least 24 h old. Stored forecasts cover 0 to 120 h, so
   NGED's 1 to 10 day horizon is not shown.
-- **Descriptive only:** one verified pair, 11 labelled events, and 12 injected designs at one
-  Primary per group. No contrast is tested. Where [experiment
+- **Descriptive only:** one verified pair, 11 labelled events, and 12 injected designs, each at one
+  MVA-only and one MW Primary. No contrast is tested. Where [experiment
   584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)
   quotes a contrast, its minimum detectable effect is on that page.
 - **Unlogged events:** NGED's logs may miss events, so the event-free windows may hold unlabelled
   events, and the real-event slices undercount.
-- **Injected events** flatter any rule keyed on the lags, because the gate reads the injected lags
-  and not a change in the power ([experiment
+- **Injected events** make any rule keyed on the lags look better than it would on real events,
+  because the gate reads the injected lags and not a change in the power ([experiment
   583](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00583-after-snap-back-event-band-on-x3-syn/result/)).
-- **Not computed:** the avoidable-curtailment cost (it needs node forecasts with generators), tail
-  tables beyond those of [experiment
+- **Not computed:** the avoidable-curtailment cost (the cost of curtailing a generator more than a
+  perfect forecast would require; it needs node forecasts with generators), tail tables beyond those
+  of [experiment
   584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/),
   and weekly refits.
-- **Reviews:** a fresh Sonnet agent reviewed the script before the numbers were quoted. It found no
-  leak and no generator data. Its findings were applied: the injected window now covers 7 days
-  before the start, the span shade and the labelled-event selection were fixed, the label line uses
-  the capacity of [experiment
-  580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/),
-  and the event-free check compares all 11 quantiles exactly. Its note that the March origin mask
-  cuts the injected "before" and late "after" rows stands, so injected coverage here is not
-  comparable with the 24 to 120 h bank tables of [experiment
+- **Injected rows are cut by the March origin mask:** rows before the start and late after the end
+  are missing, so injected coverage here is not comparable with the 24 to 120 h bank tables of
+  [experiment
   584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/).
+- **Reviews:** a fresh Sonnet agent reviewed the script before the numbers were quoted and found no
+  leak and no generator data. A second reviewed the write-up against the tables.
 
 Scripts: `ml-experiments/00588-nra-event-gallery-for-the-candidate-forecast/e00588_gallery.py`,
 which wraps the code of experiments 582, 583, and 584 without editing it. Tables are in
