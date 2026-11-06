@@ -1,5 +1,5 @@
 # ruff: noqa: E501, D103
-"""Experiment 589: the 14-day example plot for the export README (D5, December 2025, day-ahead forecasts).
+"""Experiment 593: the 14-day example plot for the export README (D5, December 2025, day-ahead forecasts).
 
 Day-ahead means the forecast issued at 09:00 UTC the day before the valid day. Substations may be named.
 """

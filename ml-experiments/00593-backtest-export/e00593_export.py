@@ -1,5 +1,5 @@
 # ruff: noqa: E501, D103, D107
-"""Experiment 589: package the stored backtests of the candidate normal-running-arrangement forecast.
+"""Experiment 593: package the stored backtests of the candidate normal-running-arrangement forecast.
 
 No fit and no GPU. Every arm is a stored forecast of experiments 565, 572, 574, or 584 (or is built
 from them with experiment 583's code), averaged over seeds 0 and 1 quantile by quantile, as
@@ -16,7 +16,7 @@ Arms:
 - `E2`: the lag-free D5 network of experiment 565 (experiment 572 calls it E2).
 - `P5plain`: experiment 574's P5 recipe without synthetic lags (`fits/P5`).
 
-Usage: python e00589_export.py [MONTH ...]   (default: all five fold months)
+Usage: python e00593_export.py [MONTH ...]   (default: all five fold months)
 """
 
 import sys

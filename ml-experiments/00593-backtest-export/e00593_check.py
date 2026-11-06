@@ -1,10 +1,10 @@
 # ruff: noqa: E501, D103
-"""Experiment 589: check the exported files against experiment 584's headline numbers.
+"""Experiment 593: check the exported files against experiment 584's headline numbers.
 
 Reads only the exported Parquet files and `substations.csv` (plus the series table, to prove that no
 generator is present). Prints the checks and writes them to `checks.txt` in the export folder.
 
-Usage: python e00589_check.py
+Usage: python e00593_check.py
 """
 
 import io
