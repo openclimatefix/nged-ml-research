@@ -56,6 +56,6 @@ def noise_floor() -> pl.DataFrame:
         j = pl.read_parquet(f).join(pl.read_parquet(theirs), on=s587.KEYS[2:], suffix="_s")
         d = (j["q50"] - j["q50_s"]).abs()
         rows.append(
-            {"file": f.name, "rows": j.height, "max": float(d.max()), "mean": float(d.mean())}
-        )  # ty: ignore[invalid-argument-type]
+            {"file": f.name, "rows": j.height, "max": d.max(), "mean": d.mean()}  # ty: ignore[invalid-argument-type]
+        )
     return pl.DataFrame(rows)
