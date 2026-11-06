@@ -1,10 +1,12 @@
 # ruff: noqa: E402, E501
-"""Experiment 587: how far the newest offset knot of the D5 and P5 networks moves toward an injected or verified event.
+"""Experiment 587: how far the newest offset knot of the D5 and P5 networks moves toward an injected
+or verified event.
 
-For each case, event Primary, fold month, refit day, and seed, the knot (`knot_new` for D5, `off_new`
-for P5; a per-Primary output offset in standardised units) of the fit in the event world minus the
-same knot in the no-event world, times the Primary's target standard deviation of that fold month
-(capacity share), times the event's sign. Written to `scores/knot_movement.parquet`.
+For each case, event Primary, fold month, refit day, and seed, the knot (`knot_new` for D5,
+`off_new` for P5; a per-Primary output offset in standardised units) of the fit in the event
+world minus the same knot in the no-event world, times the Primary's target standard deviation of
+that fold month (capacity share), times the event's sign. Written to
+`scores/knot_movement.parquet`.
 """
 
 import sys

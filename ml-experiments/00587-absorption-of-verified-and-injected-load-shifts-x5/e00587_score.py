@@ -63,14 +63,14 @@ def phase_expr(*, onset: int, end: int) -> pl.Expr:
 
 
 def check_complete(*, frame: pl.DataFrame, months: list[str], label: str) -> None:
-    """Assert that every month, refit day, and seed of a world has forecasts (an `.empty` window would hide here)."""
+    """Assert that every month, refit day, and seed of a world has forecasts."""
     have = set(frame.select("month", "refit_day", "seed").unique().iter_rows())
     want = set(product(months, (0, 14), common.SEEDS))
     assert have == want, f"{label}: missing {sorted(want - have)}"
 
 
 def score_case(*, arm: str, case: str) -> tuple[pl.DataFrame, int]:
-    """Return the share table of one arm and case (one row per event, month, refit day, phase) and the number of dropped thin cells."""
+    """Return the share table of one arm and case, and the count of dropped thin cells."""
     ev, no = common.case_worlds(case=case)
     months = common.case_months(case=case)
     e = read_world(arm=arm, world=ev, on=None, months=months)
@@ -121,10 +121,12 @@ def score_case(*, arm: str, case: str) -> tuple[pl.DataFrame, int]:
 
 
 def noise_floor(*, arm: str) -> pl.DataFrame:
-    """Return the largest and mean absolute difference of the q50 forecast between this experiment's `obs` refit and the stored fit of the harness' own experiment.
+    """Return the largest and mean absolute difference of the q50 forecast between this experiment's
+    `obs` refit and the stored fit of the harness' own experiment.
 
-    A refit on the same power with the same seeds should reproduce the stored forecast; the difference
-    (as a share of capacity) is the GPU non-determinism floor that a share is read against.
+    A refit on the same power with the same seeds should reproduce the stored forecast; the
+    difference (as a share of capacity) is the GPU non-determinism floor that a share is read
+    against.
     """
     harness, tag = common.ARMS[arm]
     stored_root = {"565": "00565-drift-embedding-variants-six-designs",

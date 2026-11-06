@@ -1,8 +1,10 @@
 # ruff: noqa: E501
-"""Experiment 587 figures: absorbed share by phase, the median forecasts around the verified pair and four injected events, and the newest-knot movement.
+"""Experiment 587 figures: absorbed share by phase, the median forecasts around the verified pair
+and four injected events, and the newest-knot movement.
 
-Run `e00587_score.py` and `e00587_knots.py` first. Every plotted series is a Primary substation (demand only),
-so substations are named by their anonymised D-label and the time axis counts days from the event's onset.
+Run `e00587_score.py` and `e00587_knots.py` first. Every plotted series is a Primary substation
+(demand only), so substations are named by their anonymised D-label and the time axis counts days
+from the event's onset.
 """
 
 from pathlib import Path
@@ -111,7 +113,7 @@ def share_figure(shares: pl.DataFrame) -> None:
 
 
 def knots_figure() -> None:
-    """Draw the newest-knot movement (share of capacity toward the event) by design for D5 and P5, with the 0.03 threshold."""
+    """Draw the newest-knot movement toward the event, by design, for D5 and P5."""
     k = pl.read_parquet(common.OUT / "scores" / "knot_movement.parquet").filter(
         (pl.col("case") != "verified") & (pl.col("refit_day") == 14)
     )
@@ -269,7 +271,7 @@ def examples_figure(
 
 
 def cells_figure(shares: pl.DataFrame) -> None:
-    """Draw each injected design's refit share (days 4 to the end and 7 days after pooled) by design cell and arm."""
+    """Draw each injected design's pooled refit share by design cell and arm."""
     dz = common.designs().select(
         case=pl.format("inj{}", pl.col("spec_id")),
         cell=pl.format("{} days from day {}", pl.col("length_days"), pl.col("start_day")),

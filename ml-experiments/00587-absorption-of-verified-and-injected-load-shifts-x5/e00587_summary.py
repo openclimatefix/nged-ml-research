@@ -1,10 +1,11 @@
 # ruff: noqa: E501
-"""Experiment 587: summary tables of the shares, with block-bootstrap intervals and the Bonferroni contrasts.
+"""Experiment 587: summary tables of the shares, with block-bootstrap intervals and the Bonferroni
+contrasts.
 
-Reads `scores/event_shares.parquet` (written by `e00587_score.py`) and prints every table the result
-page quotes; the same text is saved as `scores/report.txt`. Blocks for the bootstrap are designs
-(both Primaries of one injected transfer share a block), so the interval reflects design-to-design
-variation.
+Reads `scores/event_shares.parquet` (written by `e00587_score.py`) and prints every table the
+result page quotes; the same text is saved as `scores/report.txt`. Blocks for the bootstrap are
+designs (both Primaries of one injected transfer share a block), so the interval reflects
+design-to-design variation.
 """
 
 from typing import Final
@@ -35,7 +36,7 @@ def interval(
 
 
 def per_design(*, shares: pl.DataFrame, value: str) -> pl.DataFrame:
-    """Return one value per design, arm, refit day, and phase (the mean over the design's two Primaries, signed toward the event)."""
+    """Return one value per design, arm, refit day, and phase (mean of its two Primaries)."""
     return (
         shares.filter(pl.col("case") != "verified")
         .group_by("case", "arm", "refit_day", "phase")

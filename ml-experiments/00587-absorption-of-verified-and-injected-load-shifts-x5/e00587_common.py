@@ -2,10 +2,10 @@
 """Experiment 587: cases, worlds, and paths shared by the fit wrapper and the scorer.
 
 A *case* is one load-shift: the verified D5/D16 transfer of experiment 580, or one design of its
-injected bank. A *world* is a power stack (Primaries by half-hour grid, share of capacity): `obs` is
-the cleaned observed power, `inj<spec_id>` is `obs` plus one injected design, and `cor` is `obs`
-minus the verified transfer. For each case the event world `E` carries the event and the no-event
-world `N` does not (verified: E = obs, N = cor; injected: E = inj, N = obs).
+injected bank. A *world* is a power stack (Primaries by half-hour grid, share of capacity): `obs`
+is the cleaned observed power, `inj<spec_id>` is `obs` plus one injected design, and `cor` is
+`obs` minus the verified transfer. For each case the event world `E` carries the event and the
+no-event world `N` does not (verified: E = obs, N = cor; injected: E = inj, N = obs).
 """
 
 from dataclasses import dataclass
@@ -75,7 +75,7 @@ def designs() -> pl.DataFrame:
 
 
 def draw_designs() -> pl.DataFrame:
-    """Draw the 12 injected designs: the 9 cells depth x length (7, 15, 30 days) at start day 3, and 3 15-day designs at day 12."""
+    """Draw the 12 injected designs: 9 depth-by-length cells at day 3 and 3 at day 12."""
     bank = pl.read_parquet(D580 / "injected_event_bank.parquet").sort("spec_id")
     rng = np.random.default_rng(SEED)
     picks = []

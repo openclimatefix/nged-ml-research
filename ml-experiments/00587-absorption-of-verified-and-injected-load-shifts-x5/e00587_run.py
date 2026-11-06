@@ -1,14 +1,15 @@
 # ruff: noqa: E501, E402, D103, ANN202
-"""Experiment 587: fit the arms on event-carrying power and forecast, in one GPU process per harness.
+"""Experiment 587: fit the arms on event-carrying power and forecast, in one GPU process per
+harness.
 
 Usage: python e00587_run.py HARNESS --arm ARM [--cases ...] [--seeds ...]
 
-HARNESS is `565` (arms M0 = `C-M0`, D5) or `574` (arm P5); the two harnesses patch shared modules,
-so they run in separate processes. For each case this wrapper builds the event world E and the
-no-event world N (`e00587_common`), then, per fold month of the case and per arm:
+HARNESS is `565` (arms M0 = `C-M0`, D5) or `574` (arm P5); the two harnesses patch shared
+modules, so they run in separate processes. For each case this wrapper builds the event world E
+and the no-event world N (`e00587_common`), then, per fold month of the case and per arm:
 
-1. fits the arm on E (refits on days 0 and 14, seeds 0 and 1) and forecasts the scored windows with
-   E's inputs (`E`);
+1. fits the arm on E (refits on days 0 and 14, seeds 0 and 1) and forecasts the scored windows
+   with E's inputs (`E`);
 2. forecasts the same fitted weights with N's inputs (`E_on_N`, by pointing the fit folder's
    `models` at a symlink, so `fit_arm` reloads and does not refit);
 3. fits the arm on N and forecasts with N's inputs (`N`; a world that is shared between cases is
