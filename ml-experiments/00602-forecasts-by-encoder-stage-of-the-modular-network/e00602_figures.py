@@ -4,7 +4,7 @@
 Usage: DATA_PATH_INTERNAL=... PYTHONPATH=(all ml-experiments folders) python e00602_figures.py
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import altair as alt
@@ -22,6 +22,7 @@ V580 = (
     ML_EXPERIMENTS_DATA_DIR
     / "00580-verified-load-shift-event-set-and-label-audit/work/events_verified.parquet"
 )
+cp.PANEL_HEIGHT = 320
 NETS = ("P5", "C1", "A1")
 IQ = {0.05: 0, 0.5: 1, 0.95: 2}
 PRIM = {"D5": 3, "D16": 11}
@@ -99,7 +100,7 @@ def contribution_panel(*, x, contrib, depth, xdom, title, ydom, rules=(), span=N
 
 def forecast_panel(*, df, stage, obs, xdom, ydom, rules=(), span=None, title=None, xtitle=None):
     x = [_utc(i) for i in df["target_idx"]]
-    return cp.arm_panel(
+    unit = cp.arm_panel(
         x=x,
         q=stage_q(df, stage),
         iq=IQ,
@@ -112,6 +113,7 @@ def forecast_panel(*, df, stage, obs, xdom, ydom, rules=(), span=None, title=Non
         span=span,
         rules=rules,
     )
+    return unit.vconcat[0]  # drop the thin strip: it only repeated the shade
 
 
 def ydom_for(dfs, obs):
@@ -129,7 +131,7 @@ def key_for(*, span_name=None, rules=False, contrib=False, depth=None):
     if span_name:
         key.append(cp.entry(span_name, "band", cp.SHADE_COLOUR, 0.7))
     if rules:
-        key.append(cp.entry("Switch times (maintainer)", "rule", cp.RULE_COLOUR))
+        key.append(cp.entry("Switch times", "rule", cp.RULE_COLOUR))
     if contrib:
         key.append(cp.entry("Lag encoder contribution", "line", CONTRIB))
     if depth:
@@ -230,7 +232,7 @@ def real_figures(clean):
                 ydom=(lo, hi),
                 rules=SWITCH_TIMES,
                 span=span,
-                span_name="Load-shift window (maintainer's switch times)",
+                span_name="Load-shift window",
                 subtitle=f"{net}, {lab}, December 2025 example event, day-ahead forecasts",
             )
 
@@ -280,9 +282,7 @@ def injected_figures(clean):
                 end = month_start + bank.END_DAY * bank.PER_DAY
                 on = end - length * bank.PER_DAY
                 span = (_utc(on), _utc(end))
-                x = [_utc(i) for i in df["target_idx"]]
-                dep = np.array([sign * depth if span[0] <= t < span[1] else np.nan for t in x])
-                xdom = (_utc(month_start), _utc(month_start + 28 * bank.PER_DAY))
+                xdom = (_utc(int(df["target_idx"].min())), _utc(month_start + 28 * bank.PER_DAY))
                 lo, hi = ydom_for([df], obs[np.isfinite(obs)])
                 sgn = "up" if sign > 0 else "down"
                 two_figures(
@@ -294,67 +294,13 @@ def injected_figures(clean):
                     rules=(),
                     span=span,
                     span_name="Injected load-shift (lag inputs only)",
-                    depth=dep,
-                    depth_name="Injected depth",
-                    subtitle=f"{net}, {lab}, injected {length}-day load-shift, depth {sign * depth:+.2f} of capacity",
+                    subtitle=f"{net}, {lab}, injected {length}-day load-shift of {sign * depth * 100:+.0f} points of capacity (above the contribution panel)",
                 )
 
 
 def _utc_idx_of_month(month: str) -> int:
     start = c.month_start(month=month)
     return (c.us(t=start) - c.prep422.GRID_START_US) // c.prep422.STEP_US
-
-
-def summary_figure():
-    """Mean lag contribution over the injected event days (day 2 to the end), against the injected depth, all Primaries and passes."""
-    month_start = _utc_idx_of_month("2026-03")
-    end = month_start + bank.END_DAY * bank.PER_DAY
-    rows = []
-    for net in NETS:
-        for r in range(bank.N_PASSES):
-            df = load(net=net, case="inject", month="2026-03", r=r)
-            for p in sorted(df["primary"].unique().to_list()):
-                d, n, _s = bank.event(primary=p, r=r)
-                on = end - n * bank.PER_DAY
-                sel = df.filter(
-                    (pl.col("primary") == p)
-                    & (pl.col("target_idx") >= on + 2 * bank.PER_DAY)
-                    & (pl.col("target_idx") < end)
-                )
-                if sel.height < 24:
-                    continue
-                contrib = float((sel["s3_q50"] - sel["s2_q50"]).mean())
-                rows.append(
-                    {"network": net, "depth": d * 100, "contribution": contrib * 100, "length": n}
-                )
-    out = pl.DataFrame(rows)
-    out.write_csv(PROBE / "summary_contribution_vs_depth.csv")
-    lim = 55
-    ref = pl.DataFrame({"a": [-lim, lim], "b": [-lim, lim]})
-    panels = []
-    for net in NETS:
-        base = (
-            alt.Chart(out.filter(pl.col("network") == net))
-            .mark_point(filled=True, size=26, opacity=0.6, color=cp.FORECAST_COLOUR)
-            .encode(
-                x=alt.X(
-                    "depth:Q",
-                    title="Injected depth (points of capacity)",
-                    scale=alt.Scale(domain=[-lim, lim]),
-                ),
-                y=alt.Y(
-                    "contribution:Q",
-                    title="Mean lag contribution (points of capacity)",
-                    scale=alt.Scale(domain=[-lim, lim]),
-                ),
-            )
-        )
-        line = alt.Chart(ref).mark_line(strokeDash=[4, 3], color=DEPTH).encode(x="a:Q", y="b:Q")
-        panels.append(alt.layer(line, base).properties(width=260, height=280, title=net))
-    alt.hconcat(*panels).configure_view(stroke=None).save(
-        str(DOCS / "summary_contribution_vs_depth.svg")
-    )
-    return out
 
 
 def response_figure():
@@ -394,31 +340,65 @@ def response_figure():
                 )
     out = pl.DataFrame(rows)
     out.write_csv(PROBE / "response_share_by_design.csv")
+    depth_colours = {15.0: "#10C5F7", 30.0: "#306BFF", 50.0: cp.FORECAST_COLOUR}
+    out = out.with_columns((pl.col("depth").round(0)).alias("depth"))
     panels = []
     for net in NETS:
         sub = out.filter(pl.col("network") == net)
         pts = (
             alt.Chart(sub)
-            .mark_point(filled=True, size=40, opacity=0.65, color=cp.FORECAST_COLOUR)
+            .mark_point(filled=True, size=45, opacity=0.7)
             .encode(
                 x=alt.X("length:O", title="Length of the injected load-shift (days)"),
                 y=alt.Y(
                     "share:Q",
                     title="Response, share of injected depth",
-                    scale=alt.Scale(domain=[-0.3, 1.0]),
+                    scale=alt.Scale(domain=[-0.05, 0.5]),
                 ),
                 xOffset="depth:O",
+                color=alt.Color(
+                    "depth:O",
+                    scale=alt.Scale(domain=[15.0, 30.0, 50.0], range=list(depth_colours.values())),
+                    legend=None,
+                ),
             )
         )
-        zero = (
-            alt.Chart(pl.DataFrame({"z": [0.0, 1.0]}))
-            .mark_rule(strokeDash=[4, 3], color=DEPTH)
-            .encode(y="z:Q")
-        )
-        panels.append(alt.layer(zero, pts).properties(width=260, height=280, title=net))
-    alt.hconcat(*panels).configure_view(stroke=None).save(
-        str(DOCS / "summary_response_share_by_design.svg")
-    )
+        panels.append(pts.properties(width=300, height=320, title=net))
+    key = [
+        cp.entry(f"Depth {int(d)} points of capacity", "band", c_, 1.0)
+        for d, c_ in depth_colours.items()
+    ]
+    cp_key = cp.legend(key)
+    (
+        alt.vconcat(alt.hconcat(*panels), cp_key.properties(width=900)).configure_view(stroke=None)
+    ).save(str(DOCS / "summary_response_share_by_design.svg"))
+    return out
+
+
+def step_table(clean) -> pl.DataFrame:
+    """Return the 24-hour mean power (MW) either side of each switch time at D5 and D16 (capacity from experiment 521's site map)."""
+    cap = {"D5": 5.723, "D16": 9.115}
+    rows = []
+    for lab, p in PRIM.items():
+        for name, dt in zip(("start", "end"), SWITCH_TIMES, strict=True):
+            i = (
+                int(dt.replace(tzinfo=UTC).timestamp() * 1e6) - c.prep422.GRID_START_US
+            ) // c.prep422.STEP_US
+            before, after = (
+                np.nanmean(clean[p, i - 48 : i]) * cap[lab],
+                np.nanmean(clean[p, i : i + 48]) * cap[lab],
+            )
+            rows.append(
+                {
+                    "primary": lab,
+                    "switch": name,
+                    "mean_before_mw": before,
+                    "mean_after_mw": after,
+                    "step_mw": after - before,
+                }
+            )
+    out = pl.DataFrame(rows)
+    out.write_csv(PROBE / "switch_time_steps.csv")
     return out
 
 
@@ -428,7 +408,7 @@ if __name__ == "__main__":
     real_figures(clean)
     free_figures(clean)
     injected_figures(clean)
-    summary_figure()
+    print(step_table(clean))
     resp = response_figure()
     print(
         resp.group_by("network").agg(
