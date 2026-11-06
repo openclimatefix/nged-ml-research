@@ -57,7 +57,7 @@ ROOT606 = (
     ML_EXPERIMENTS_DATA_DIR
     / "00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours"
 )
-REUSED = {"P7": ROOT606}
+REUSED: dict[str, Path] = {}
 """Arms whose stored forecasts live in an earlier experiment's folder."""
 
 
@@ -852,6 +852,10 @@ def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame, arms: list[str]) -> pl.Dat
     if cand:
         best = min(cand, key=lambda a: float(np.mean(follow_cl(tab=tab, system=a)[0])))
         print("lowest follow:", best, flush=True)
+        if f"{best}-p" not in have:
+            print(
+                f"WARNING: no placebo run for {best}; the family has fewer than {N_COUNTED} contrasts"
+            )
         add(f"placebo ({best})", f"{best}-p", best, 0.02)
         for grp in k597.GROUPS_SCORED:
             r = ef.filter(

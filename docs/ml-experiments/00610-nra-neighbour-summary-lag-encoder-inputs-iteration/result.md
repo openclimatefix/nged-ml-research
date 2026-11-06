@@ -108,6 +108,11 @@ training takes more than 15 minutes, CF runs on one seed only and the page says 
 injected (the 15 and 30 day bank) only if its event-free CRPS minus A1's is below P7's at both
 groups. Arms that fail are reported with their event-free CRPS only.
 
+**Dropout details.** Dropout rows are drawn once per refit over the training rows only (the early-stopping
+rows keep their signals), so the mask does not change between epochs. O4 is a 50% dropout of the
+neighbour columns only. The screening rule is applied by hand: an arm is injected only after its
+event-free CRPS is read.
+
 **Target-side bank.** The winner is also scored on the target-side bank with a mirrored neighbour
 (experiment 595's method), because the lag-only bank flatters neighbour inputs. If the GPU ceiling
 does not leave time for it, the page says that the check was not run.

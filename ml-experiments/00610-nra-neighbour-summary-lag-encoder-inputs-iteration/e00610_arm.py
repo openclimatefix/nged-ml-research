@@ -100,7 +100,7 @@ GROUPS = list(dict.fromkeys(GROUPS))
 COLUMNS = sig.columns_of(groups=tuple(GROUPS))
 N_EXTRA = len(COLUMNS)
 CROSSFIT = "CF" in MODS
-DROP_P = 0.3 if "D30" in MODS else 0.5 if "D50" in MODS else 0.0
+DROP_P = 0.3 if "D30" in MODS else 0.5 if "D50" in MODS else 0.5 if "O4" in MODS else 0.0
 DROP_NB_ONLY = "O4" in MODS
 AUX_W = 0.1 if "X1" in MODS else 0.3 if "X3" in MODS else 0.0
 INPUTS = mymodel.InputSet(n_extra=N_EXTRA, bottleneck="BN" in MODS, label_head=AUX_W > 0)
@@ -256,6 +256,14 @@ def cross_fit_quantiles(
     edges = np.quantile(valid, np.linspace(0, 1, CF_BLOCKS + 1))
     block_of_row = np.clip(np.searchsorted(edges, valid, side="right") - 1, 0, CF_BLOCKS - 1)
     out = q_full.copy()
+    # Step 2 trained on clean lags, so the cross-fit nets do too: restore the clean lag columns.
+    clean = e.c.clean_stack()
+    sl = slice(LAG_FIRST, LAG_FIRST + LAG_WIDTH)
+    saved = mr.x[:, sl].copy()
+    mr.x[:, sl] = e.block_of(
+        clean=clean, primary=mr.primary, target_idx=mr.target_idx,
+        origin_idx=origin_idx_of(origin_us=mr.origin_us),
+    )  # fmt: skip
     g = e.LagGpuMonth(mr=mr, device=device)
     for b in range(CF_BLOCKS):
         started = e.time.monotonic()
@@ -290,6 +298,7 @@ def cross_fit_quantiles(
         )
         del t, model
     del g
+    mr.x[:, sl] = saved
     torch.cuda.empty_cache()
     return out
 
@@ -451,7 +460,7 @@ class SigGpuMonth(e.LagGpuMonth):
         )  # fmt: skip
         if DROP_P > 0:  # signal dropout: the "no information" value on a share of the rows
             key = int(e.CTX["seed"]) * 100_003 + int(e.CTX["cut"].timestamp()) % 100_003
-            rows = np.random.default_rng(key).random(len(b)) < DROP_P
+            rows = (np.random.default_rng(key).random(len(b)) < DROP_P) & ~refit.is_val
             only = None
             if DROP_NB_ONLY:
                 only = [
