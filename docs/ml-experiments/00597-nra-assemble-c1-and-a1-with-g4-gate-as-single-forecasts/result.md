@@ -26,7 +26,7 @@ prediction: >-
   of each assembled forecast is within the minimum detectable effect of its plain network. P4: the
   verified December pair is unchanged from experiment 592.
 decision_rule: >-
-  P1 to P4 hold or fail as stated. The counted tests are 6: the assembled forecast minus its plain
+  P1 to P4 hold or fail as stated. The counted tests are six: the assembled forecast minus its plain
   network at q05 and q95 for each of C1 and A1 (4), and A1 + G4 minus C1 + G4 CRPS for the two
   metering groups (2), all at 24-120 h on event-free rows. Each contrast uses a five-block month
   bootstrap at the Bonferroni level, and the half-width is printed beside it as the minimum
@@ -44,9 +44,9 @@ best_arm: >-
   7 days after, against 0.913 and 0.923 for C1 + G4.
 headline: >-
   C1 + G4 reproduces experiment 592's day-4-to-end coverage of 0.913 exactly. A1 + G4 reaches 0.925
-  and 0.928 after the end. Neither gated forecast costs more event-free pinball loss than the minimum
+  and 0.928 after the end. Neither gated forecast adds more event-free pinball loss than the minimum
   detectable effect, and the median still follows 0.11 of an injected shift. On the verified December
-  pair, the coverage is below 0.80 in two phases at D5 and one at D16.
+  pair, the coverage is below 0.80 in three phases at D5 and two at D16.
 lessons: >-
   The gated band works as one forecast, so the remaining weaknesses are the median's following (0.11
   of the depth, up to 20 points of capacity in single 50% events), the level miss before the real
@@ -57,11 +57,11 @@ take_home_message: >-
   injected load-shifts both hold the normal running arrangement inside the q05-q95 band on at least
   0.91 of rows from day 4 to the end, and A1 + G4 on 0.925, at no measurable cost on event-free
   rows. The median still follows about 0.11 of an injected shift, and the two real events show gaps
-  that the injected shifts do not, so the next test is a shift in the power itself.
+  that the injected shifts do not, so the next test worth running is a shift in the power itself.
 advice:
   - >-
     Use A1 + G4 as the reference forecast for later load-shift work: it clears the injected-bank
-    coverage bars in every phase from day 4 on (A1 + G4 against C1 + G4 headline bullets).
+    coverage bars in the day-4-to-end and 0-7-days-after phases (A1 + G4 against C1 + G4 headline bullets).
   - >-
     Run the target-side absorption test (the shift in the training power and the lag inputs) on
     both networks next, because the injected bank changes only the lags and flatters the lag
@@ -75,7 +75,8 @@ adopted_in: none
 
 **We assembled two single forecasts from stored parts and tested them without any new fit. On the
 injected load-shifts, both hold the normal running arrangement (NRA) inside the q05-q95 band on at
-least 0.91 of rows from day 4 of a load-shift to its end, at no measurable cost on event-free rows.
+least 0.91 of rows from day 4 of a load-shift to its end, with pinball loss at q05 and q95 on
+event-free rows within the minimum detectable effect.
 The median still follows about 0.11 of the shift, and the two real December 2025 events show gaps
 that the injected shifts do not.** Verdict: supported. All four pre-registered predictions held: P1
 reproduced (difference 0.000000), P2 held (A1 + G4 0.928), P3 held, and P4 held for C1.
@@ -89,14 +90,19 @@ the A1 neural network with a shared lag encoder ([experiment
 591](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00591-shared-lag-encoder-auxiliary-shift-depth-loss/result/)),
 and the G4 rule that widens the band ([experiment
 592](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00592-nra-snap-back-gate-faster-onset-and-snap-back-trigger/result/)).
-Nobody had joined them and scored the result as one forecast. We did, and we exported both forecasts
+None of the three experiments joined the parts and scored the result as one forecast. We did, and we
+exported both forecasts
 for others to score. Nothing is adopted for production.
 
-**How the forecast is assembled.** The median is the network's own median. While the G4 gate is on,
-and for 7 days after it turns off, every quantile is the widest of the network's value and the value
+**How the forecast is assembled.** The median is the neural network's own median. While the G4 gate
+is on,
+and for 7 days after the G4 gate turns off, every quantile is the widest of the network's value and
+the value
 of its lags-masked twin (the same weights with every lag removed). On other days the quantiles are
-the network's own. G4 reads observed power up to 4.0 hours old, the lag-free network E2, and a
-mirrored opposite-sign gap at a neighbouring Primary, so its state is the same for C1 and A1. The
+the network's own. G4 reads three inputs: observed power up to 4.0 hours old, the lag-free neural
+network
+E2, and a mirrored opposite-sign gap at a neighbouring Primary. The state is therefore the same for
+C1 and A1. The
 rebuilt state equals experiment 592's stored state exactly.
 
 ## Figures
@@ -105,7 +111,8 @@ rebuilt state equals experiment 592's stored state exactly.
 
 Share of rows with the NRA inside q05-q95, on injected 15 and 30 day load-shifts, by phase. Dot:
 mean over Primary-events. Line: 95% interval from resampling events. Dashed line: the 0.90 target.
-Grey and sky blue are the plain networks; orange and blue are the assembled forecasts. The gated
+Grey and sky blue are the plain neural networks; orange and blue are the assembled forecasts. The
+gated
 band lifts coverage in the two phases where the gate is on, and changes nothing 7 to 14 days after
 the end.
 
@@ -116,7 +123,8 @@ load, above q05 when it raised it. Dashed line: the 0.95 target.
 
 ![Coverage by phase, all lengths](coverage_by_phase_all_lengths.svg)
 
-The same as the first figure for all injected events (3, 7, 15, and 30 days). Only the 3 and 7 day
+This figure repeats the first figure for all injected events (3, 7, 15, and 30 days). Only the 3 and
+7 day
 events have rows before the shift and in days 0 to 3, because the 15 and 30 day events start before
 the scored month begins.
 
@@ -157,7 +165,7 @@ lie within the minimum detectable effect.
   quantile, then sorted across the 11 levels. No fit ran and no weights were saved. Reused: the
   stored forecasts of C1 (experiment 584) and A1 (experiment 591) with their lags-masked twins and
   injected-bank forecasts, E2, and the injected bank of [experiment
-  581](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00581-robust-multiweek-lag-encoder-x3/result/).
+581](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00581-robust-multiweek-lag-encoder-x3/result/).
 - **Reproduction.** C1 + G4, day 4 to end, 15 and 30 day events: 0.9132 (0.9062 to 0.9201),
   experiment 592 0.9132, 756 Primary-events.
 - **Headline, injected 15 and 30 day events, both metering groups, q05-q95 coverage (95%
@@ -174,8 +182,10 @@ lie within the minimum detectable effect.
   six MW Primaries. A1 + G4: 0.935 and 0.910. The safe-side share in the same phase is 0.940 and
   0.920 (C1 + G4) and 0.949 and 0.927 (A1 + G4).
 - **Other phases, all event lengths (3, 7, 15, and 30 days).** Before the shift: C1 + G4 0.882, A1 +
-  G4 0.885. Days 0 to 3: 0.872 and 0.883. These are below 0.90 and the gate does not change them,
-  because it is off until it fires about 1 day after onset. 7 to 14 days after the end: 0.890 and
+  G4 0.885. Days 0 to 3: 0.872 and 0.883. These coverages are below 0.90, and the gate does not
+change them,
+  because it is off until it fires about 1 day after onset. In the 7 to 14 days after the end,
+coverage is 0.890 and
   0.885, unchanged by the gate.
 - **Tail pinball, day 4 to end, points of capacity.** q05 and q95 for C1: 0.73 and 0.90; for C1 +
   G4: 0.69 and 0.81. For A1: 0.72 and 0.88; for A1 + G4: 0.71 and 0.82. The 0.01 and 0.99 pinball
@@ -188,31 +198,39 @@ lie within the minimum detectable effect.
 - **Gate.** Detection rate 0.905 and a median onset delay of 1 day on the 840 injected 15 and 30 day
   Primary-events. The median release delay is 1 day after the end. False triggers: 1 in 4.97
   Primary-years on event-free days, 0.20 per Primary-year (one-sided 95% upper bound 0.95); the wide
-  band is on for 1.2% of event-free rows.
-- **Event-free cost (CRPS, points of capacity).** The continuous ranked probability score (CRPS) is
+  band is on for 1.2% of event-free origin days (the export marks 1.4% of event-free rows, which
+includes the 7-day hold).
+- **Event-free pinball loss and CRPS (CRPS, points of capacity).** The continuous ranked probability
+  score (CRPS) is
   twice the mean pinball loss over the 11 quantile levels. At 24-120 h, eight MVA and six MW
   Primaries: C1 3.081 and 2.465; C1 + G4 3.084 and 2.466; A1 3.057 and 2.445; A1 + G4 3.061 and
   2.447. At 0-24 h: C1 2.876 and 2.265; C1 + G4 2.883 and 2.266; A1 2.843 and 2.218; A1 + G4 2.851
   and 2.219. The stored forecasts stop at 120 h, so no CRPS at 120-240 h exists. D15 and D18
   (report-only): C1 8.073, C1 + G4 8.076, A1 8.204, A1 + G4 8.209.
-- **Counted contrasts and minimum detectable effect (MDE).** 6 counted tests at the Bonferroni
+- **Counted contrasts and minimum detectable effect (MDE).** six counted tests at the Bonferroni
   level, month-block intervals over 5 months, so each is near the range of the five monthly
   differences. Pinball loss, both groups, 24-120 h, assembled minus plain network, in points of
   capacity: C1, q05 +0.0004 (0.0000 to 0.0011; MDE 0.0006) and q95 -0.0002 (-0.0010 to 0.0002; MDE
   0.0006); A1, q05 +0.0006 (0.0000 to 0.0015; MDE 0.0007) and q95 +0.0002 (0.0000 to 0.0005; MDE
-  0.0003). Both are inside the MDE, so P3 holds. A1 + G4 minus C1 + G4 CRPS: -0.025 (-0.079 to
+  0.0003). All four contrasts are inside the minimum detectable effect (MDE), so P3 holds. A1 + G4
+minus C1 + G4 CRPS: -0.025 (-0.079 to
   +0.021; MDE 0.050) at the eight MVA Primaries and -0.023 (-0.072 to +0.032; MDE 0.052) at the six
   MW Primaries: indistinguishable.
 - **Real December pair (D5 and D16, 2 Primary-events, descriptive only), 24-120 h.** C1 + G4 equals
-  experiment 592's G4 coverage (D5 0.868 and D16 0.686 from day 4 to the end), so P4 holds. Coverage
+  experiment 592's G4 coverage (D5 0.868 and D16 0.686 from day 4 to the end), so P4 holds. Phases
+follow experiment 592: the merged verified span of each Primary, with day 4 starting 3 days after
+onset; a cut on the export's `in_verified_event` rows gives 0.89 and 0.66 for these two cells, which
+flags the same phases. Coverage
   by phase, C1 + G4 then A1 + G4: D5 before 0.43 and 0.59, days 0 to 3 0.49 and 0.57, day 4 to end
   0.87 and 0.86, 0-7 days after 0.58 and 0.56. D16 before 0.95 and 0.92, days 0 to 3 0.71 and 0.77,
   day 4 to end 0.69 and 0.70, 0-7 days after 0.84 and 0.84. Phases below 0.80 are flagged: D5
   before, days 0-3, and after the end; D16 days 0-3 and day 4 to the end. [Experiment
-  589](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00589-p5-coverage-on-d5-before-the-december-load-shift/result/)
+589](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00589-p5-coverage-on-d5-before-the-december-load-shift/result/)
   traced the D5 miss before the shift to a level bias that every earlier forecast shares.
 - **Export.** `data/ml-experiments/backtest_export_candidates_2026-11-06/` (private, not committed):
-  `C1`, `C1_G4`, `A1`, and `A1_G4` for the five months, in the layout of experiment 593 with a
+  `C1`, `C1_G4`, `A1`, and `A1_G4` for the five months, in the layout of [experiment
+593](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00593-backtest-export/result/)
+with a
   `gate_on` column in the `_G4` files. `checks.txt` reproduces C1's CRPS of experiment 584 (3.081
   and 2.465), shows the C1 file equals experiment 593's, and shows the median is unchanged by the
   gate.
@@ -234,15 +252,18 @@ lie within the minimum detectable effect.
 
 ## Caveats
 
-- **The injected bank flatters the lag networks.** It changes the lag inputs only, not the power, so
+- **The injected bank gives the lag neural networks an easier test than a real load-shift would.**
+  It changes the lag inputs only, not the power, so
   it says nothing about a load-shift that enters the training power. That test (target-side
   absorption) has not been run on C1 or A1.
-- **One real pair.** Real-event numbers rest on two Primary-events. NGED's labels are imperfect, and
+- **One real pair.** Real-event numbers rest on two Primary-events. The network operator's (National
+  Grid Electricity Distribution, NGED) labels are imperfect, and
   NGED says load-shifts may be missing from its logs, so clean rows and training periods can hold
   events no label covers.
 - **Horizon.** The forecasts stop at 120 hours; NGED cares about 1 to 10 days.
 - **The G4 false-trigger rate rests on 1 trigger in 5 Primary-years.**
-- **Real events at D5.** Both forecasts miss the level before the shift and the band does not cover
+- **Real events at D5.** C1 + G4 and A1 + G4 both miss the level before the shift and the band does
+  not cover
   the NRA after it.
 
 ## What to try next
