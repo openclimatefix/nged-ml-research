@@ -99,6 +99,37 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
   Before the pull request is marked ready, a fresh Sonnet reviewer opens each figure rendered to PNG
   and answers the six-question figure checklist in writing; the pull request body records "figure
   review: passed" with the date.
+- **Changes after the Sonnet plan review (all 12 findings accepted; the review is in the private
+  briefs folder as `598_plan_review.md`).**
+    - **Equal width.** Each S arm also gets a width-matched control: its band rescaled about the
+      median so its mean q95 - q05 on R's G4-on-or-held origin days equals R's, one factor per fold
+      and seed, printed. P1 and P2 are read on the rescaled S as well as on S, and count as passed
+      only if S's own event-row width is within 5% of R's or the rescaled S also passes. W uses the
+      same factor rule applied to R.
+    - **Training signals are in-sample.** Cross-fitting the frozen network is too expensive, so a
+      pre-fit check prints, per Primary, the standard deviation of the fresh residual and of the lag
+      disagreement on training rows against test rows. Where the training-to-test ratio is below
+      0.8, Gaussian noise is added to the training-row signals to match the test standard
+      deviation, and the write-up says so.
+    - **The table.** `T` holds the lag-free median by Primary and grid time, taken from the freshest
+      origin that covers it. The lags-masked q05 and q95 are per row (Primary, origin, valid time),
+      computed by one masked inference pass over the rows used. The build asserts that no entry
+      used for an origin comes from an NWP run issued after that origin.
+    - **Signals in training.** The synthetic shift is added to the signal inputs (lag disagreement,
+      fresh residual, neighbour disagreement) and not to the target, as `FreshGap.gap(shifts=...)`
+      does in experiment 592. The sustain count and the neighbour disagreement are precomputed per
+      row from earlier origins only and are zero where history is missing, with an assertion. A
+      known-answer row checks the shift reaches each signal.
+    - **Reference parity.** A fifth reference, G4 computed on `T` instead of E2, separates the gate
+      from the change of expectation. Arm S-p (noise signals, same fine-tune and columns) is the
+      second fine-tune of the A1 wiring with no usable signal, so it serves as the parity arm.
+    - **Outcome bands.** Gap of S to R in day-4-to-end coverage: under 0.01 passes, 0.01 to 0.03 is
+      inconclusive (S-g is not run), 0.03 or more fails (run S-g as the stop rule says).
+    - **Detectability.** The minimum detectable effect of every prediction is printed before the
+      fits are scored; a prediction whose margin is below its minimum detectable effect is reported
+      as untestable. R's and S-p's follow ratios are printed beside P3. Contrasts counted: seven,
+      as above. S-g, the target-side absorption score (experiment 595's method, for R and S), and
+      the real pair are descriptive and uncounted.
 - **Standing practices followed.** Monthly-equivalent coarse refits, cleaned data, the D15 and D18
   cut, saved weights, reuse of stored forecasts, tails and avoidable-curtailment cost, load-shift
   event plots (at least 6, both metering groups), example forecasts, and the unlogged-event caveat.
