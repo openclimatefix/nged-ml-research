@@ -113,8 +113,8 @@ ends about a day and a half earlier. The readings show no step at its edges.
 
 ![P5 at D5: stages 1 and 2](real_P5_D5_stages_1_2.svg)
 
-*Caption: P5 at D5. The top panel shows the datetime encoder only: a daily shape sitting about 20 to
-35 points below the readings. The bottom panel adds the weather encoder, which lifts the median
+*Caption: P5 at D5. The top panel shows the datetime encoder only: a daily shape sitting about 15 to
+40 points below the readings. The bottom panel adds the weather encoder, which lifts the median
 above the readings inside the shaded window. Dashed lines are the switch times.*
 
 ![P5 at D5: stage 3 and the lag encoder's contribution](real_P5_D5_stage_3_and_lag_contribution.svg)
@@ -155,7 +155,7 @@ The injected-event figures exist for D5 for four designs and three networks:
 *Caption: for each injected design, the lag encoder's response as a share of the injected depth
 (stage-3 median with a positive shift minus with a negative shift, over twice the depth, averaged
 over days 2 to the end of the event). One dot per Primary, coloured by the injected depth. Look at
-how the dots rise with length and sit well below the dashed line at 1.0, which is a response equal
+how the dots rise with length and stay below 0.35, far from 1.0, which would be a response equal
 to the depth. The 3-day designs sit at 0 because only about one day of the event remains after day
 2.*
 

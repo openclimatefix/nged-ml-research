@@ -23,6 +23,8 @@ V580 = (
     / "00580-verified-load-shift-event-set-and-label-audit/work/events_verified.parquet"
 )
 cp.PANEL_HEIGHT = 320
+_x_parts = cp._x_parts
+cp._x_parts = lambda **k: _x_parts(**{**k, "labels": True})  # date labels on every panel
 NETS = ("P5", "C1", "A1")
 IQ = {0.05: 0, 0.5: 1, 0.95: 2}
 PRIM = {"D5": 3, "D16": 11}
@@ -71,9 +73,6 @@ def contribution_panel(*, x, contrib, depth, xdom, title, ydom, rules=(), span=N
             .encode(x=alt.X("a:T", scale=sx, axis=ax), x2="b")
         )
     layers += [
-        alt.Chart(pl.DataFrame({"z": [0.0]}))
-        .mark_rule(color="#BBBBBB", aria=False)
-        .encode(y=alt.Y("z:Q", scale=sy)),
         base.mark_line(color=CONTRIB, strokeWidth=1.6, aria=False, clip=True).encode(
             x=alt.X("x:T", scale=sx, axis=ax, title=None),
             y=alt.Y("contrib:Q", scale=sy, title="points of capacity"),
@@ -294,7 +293,7 @@ def injected_figures(clean):
                     rules=(),
                     span=span,
                     span_name="Injected load-shift (lag inputs only)",
-                    subtitle=f"{net}, {lab}, injected {length}-day load-shift of {sign * depth * 100:+.0f} points of capacity (above the contribution panel)",
+                    subtitle=f"{net}, {lab}, injected {length}-day load-shift: {sign * depth * 100:+.0f} points of capacity added to the lag inputs",
                 )
 
 
