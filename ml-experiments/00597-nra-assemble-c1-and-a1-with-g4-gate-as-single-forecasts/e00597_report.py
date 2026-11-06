@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501, D103, PLR0915
 """Experiment 597: print every number the write-up quotes, and test the pre-registered predictions.
 
 Reads the tables of `e00597_score.py` for arms `c1` and `a1` and writes `report.txt` (and prints it).
@@ -70,6 +70,13 @@ def run() -> None:
         print(
             pick(b=b).sort("system", "phase")
             .select("system", "phase", "n_events", "cover90", "cover90_lo", "cover90_hi", "nra_side95", "nra_side95_lo", "nra_side95_hi", "cover98", "nra_side99", "follow_q50", "follow_q50_lo", "follow_q50_hi", "follow_safety", "pin01", "pin05", "pin95", "pin99", "width90", "crps")
+        )  # fmt: skip
+        print(
+            f"\n-- {SYS[arm]}, all event lengths (3, 7, 15, 30 days; before and days 0-3 exist only for 3 and 7 day events), both groups, {BAND}"
+        )
+        print(
+            pick(b=b, cls="all lengths").sort("system", "phase")
+            .select("system", "phase", "n_events", "cover90", "cover90_lo", "cover90_hi", "nra_side95", "follow_q50", "follow_safety", "pin05", "pin95", "width90")
         )  # fmt: skip
         for grp in k.GROUPS_SCORED:
             print(f"\n-- {SYS[arm]}, {k.GROUP_NAME[grp]}")
@@ -167,7 +174,7 @@ def run() -> None:
         j = rp.filter(pl.col("system") == "G4").join(old_r, on=["event", "phase"], suffix="_592")
         print(
             "largest |difference| from experiment 592's G4 coverage, C1 only:",
-            float((j["cover90"] - j["cover90_592"]).abs().max())
+            float((j["cover90"] - j["cover90_592"]).abs().max())  # ty: ignore[invalid-argument-type]
             if arm == "c1"
             else "n/a (A1 is not in 592)",
         )
@@ -193,7 +200,7 @@ def run() -> None:
             months = sorted(sub["month"].unique().to_list())
             dm = np.array(
                 [
-                    (
+                    (  # ty: ignore[unsupported-operator]
                         sub.filter(pl.col("month") == m)["crps_g4_a1"]
                         - sub.filter(pl.col("month") == m)["crps_g4"]
                     ).mean()

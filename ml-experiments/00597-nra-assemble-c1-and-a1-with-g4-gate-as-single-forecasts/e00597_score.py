@@ -107,7 +107,7 @@ def event_free(*, inp: k.Inputs) -> tuple[pl.DataFrame, dict[str, np.ndarray]]:
                 }  # fmt: skip
                 for key, col in j.items():
                     r[key] = float(st[name][sel, col].mean() * 100.0)
-                r["cover90"] /= 100.0
+                r["cover90"] /= 100.0  # ty: ignore[unsupported-operator]
                 if name == "G4":
                     for key in ("pin05", "pin95", "crps"):
                         d = np.array(
@@ -320,7 +320,7 @@ def main(arm: str) -> None:
     ft.write_csv(out / "false_triggers.csv")
     ef, rows = event_free(inp=inp)
     ef.write_csv(out / "event_free.csv")
-    np.savez(out / "event_free_rows.npz", **rows)
+    np.savez(out / "event_free_rows.npz", **rows)  # ty: ignore[invalid-argument-type]
     real_events(inp=inp).write_csv(out / "real_event_phase.csv")
     tab, trig = score_bank(inp=inp)
     tab.write_csv(out / "bank_event_phase.csv")
