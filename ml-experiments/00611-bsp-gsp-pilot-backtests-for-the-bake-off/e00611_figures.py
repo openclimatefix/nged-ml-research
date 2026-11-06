@@ -102,14 +102,14 @@ def metric_figure(
         if rule is not None:
             ref = alt.Chart(pl.DataFrame({"x": [rule], "t": ["target 0.90"]}))
             layers.append(
-                ref.mark_rule(strokeDash=[4, 4], strokeWidth=1.5, color=theme.DATA_PURPLE).encode(
+                ref.mark_rule(strokeDash=[4, 4], strokeWidth=1.5, color="#000000").encode(  # ty: ignore[unresolved-attribute]
                     x="x:Q"
                 )
             )
             layers.append(
-                ref.mark_text(
-                    align="left", dx=4, dy=-4, color=theme.DATA_PURPLE, baseline="bottom"
-                ).encode(x="x:Q", y=alt.value(0), text="t:N")
+                ref.mark_text(align="left", dx=4, dy=-4, color="#000000", baseline="bottom").encode(  # ty: ignore[unresolved-attribute]
+                    x="x:Q", y=alt.value(0), text="t:N"
+                )
             )
         panels.append(alt.layer(*layers).properties(width=WIDTH, height=280, title=label))
     alt.vconcat(*panels).resolve_scale(

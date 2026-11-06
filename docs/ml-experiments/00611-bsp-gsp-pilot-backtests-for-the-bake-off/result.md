@@ -117,9 +117,9 @@ points cannot rank the forecasts.*
 
 ![Coverage of the q05 to q95 band](figure_2_coverage_by_lead_band.svg)
 
-*Figure 2. Share of rows with the observed power inside q05 to q95. The dashed line is the target of
-0.90. Look at both panels: Design 1 and Design 2 sit left of the line in every lead band, and BG2 is
-the closest to it at the bulk supply points.*
+*Figure 2. Share of rows with the observed power inside q05 to q95. The dashed black line is the
+target of 0.90. Look at both panels: Design 1 and Design 2 sit left of the line in every lead band,
+and BG2 is the closest to it at the bulk supply points.*
 
 ![Width of the q05 to q95 band](figure_3_width_by_lead_band.svg)
 
@@ -137,11 +137,13 @@ observed power leaving the band at the daily minimum in June, where the median r
 
 ![D17 day-ahead forecast, two fortnights](figure_5_day_ahead_D17.svg)
 
-*Figure 5. The same two windows for D17 (bulk supply point).*
+*Figure 5. The same two windows for D17 (bulk supply point). Look at the winter panel: the median
+follows the evening peaks, and the band is wider than at D13.*
 
 ![D6 day-ahead forecast, two fortnights](figure_6_day_ahead_D6.svg)
 
-*Figure 6. The same two windows for D6 (grid supply point).*
+*Figure 6. The same two windows for D6 (grid supply point). Look at the band: it spans several
+hundred MW, because the series itself swings by that much.*
 
 ![D1 day-ahead forecast, two fortnights](figure_7_day_ahead_D1.svg)
 
