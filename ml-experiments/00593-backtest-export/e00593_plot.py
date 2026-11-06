@@ -50,21 +50,21 @@ def main() -> None:
             scale=alt.Scale(domain=[0, 14]),
         )
     )
-    band = base.mark_area(opacity=0.25).encode(
+    band = base.mark_area(opacity=0.25).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("q05:Q", title="Power (MW; D5 is a signed-MW Primary)"),
         y2="q95:Q",
         color=alt.Color("arm:N", scale=scale, title=None),
     )
-    med = base.mark_line(strokeWidth=1.5).encode(
+    med = base.mark_line(strokeWidth=1.5).encode(  # ty: ignore[unresolved-attribute]
         y="q50:Q", color=alt.Color("arm:N", scale=scale, title=None)
     )
     obs = (
-        alt.Chart(df.filter(pl.col("arm") == names["C2"]))
+        alt.Chart(df.filter(pl.col("arm") == names["C2"]))  # ty: ignore[unresolved-attribute]
         .mark_line(color="#222222", strokeWidth=1.3)
         .encode(x="day:Q", y="observed_power:Q")
     )
     shade = (
-        alt.Chart(df.filter((pl.col("arm") == names["C2"]) & pl.col("in_verified_event")))
+        alt.Chart(df.filter((pl.col("arm") == names["C2"]) & pl.col("in_verified_event")))  # ty: ignore[unresolved-attribute]
         .mark_rect(opacity=0.12, color=GREY_3)
         .encode(x="day:Q", x2="day2:Q")
     )
