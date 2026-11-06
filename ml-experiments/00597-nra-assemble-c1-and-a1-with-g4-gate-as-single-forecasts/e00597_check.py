@@ -3,8 +3,9 @@
 
 Reads only the exported Parquet files (and experiment 593's export for the C1 comparison):
 
-- C1 equals experiment 593's C1 file exactly, and C1_G4 has the same median as C1 and differs from C1 only on rows with `gate_on`
-  (the union band moves every level except q50).
+- C1 equals experiment 593's C1 file exactly.
+- C1_G4 has the same median as C1, and differs from C1 only on rows with `gate_on` (the union band
+  moves every level except q50).
 - The CRPS of C1 on event-free rows at 24-120 h reproduces experiment 584 (3.081, 2.465).
 - Every quantile row is sorted, and `gate_on` is filled in the `_G4` files only.
 - The share of rows with `gate_on` per system and the coverage of the NRA on the verified December pair.
