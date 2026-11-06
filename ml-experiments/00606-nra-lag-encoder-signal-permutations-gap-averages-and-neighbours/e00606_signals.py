@@ -15,7 +15,7 @@ lags (the day lag and the week lag), these column groups:
   had the sign of the lag's own daily mean gap and exceeded 5% of capacity.
 - `ew`: exponentially weighted averages of the gap over the days up to the lag's own time, at half-lives of
   1, 3, and 7 days, each with an absent flag. A causal filter: the value at index `i` reads indices up to `i`.
-- `exp`: one flag per lag, 1 where no stored weather run exists at or before the lag's time (the
+- `exp`: one flag per lag, 1 where the stored weather table has no row for the lag's valid time (the
   expected-embedding input is then the zero fill, which is also a valid embedding value).
 - `nb`: the summaries over all electrical neighbours (sum, mean, minimum, maximum, each signed and
   scaled to the Primary's capacity) of the gap and of the three weighted averages, at each lag's time,
@@ -272,23 +272,28 @@ def _fill_neighbours(
             for st, arr in zip(STATS, (summ, mean, vmin, vmax), strict=True):
                 out[rows, COL[f"nb_{st}_{q}"]] = arr[j] * SCALE
             out[rows, COL[f"own_plus_nb_{q}"]] = (own0[j] + summ[j]) * SCALE
-        # the single best opposite-sign neighbour, by the day-lag gap
-        gd = np.where(have, vals[:, gap_day, :], np.nan)
-        sign_own = np.sign(np.nan_to_num(own[gap_day]))
-        opposite = np.where(have, -sign_own[None, :] * gd, np.nan)
-        opposite = np.where(np.isfinite(opposite), opposite, -np.inf)
-        best = opposite.argmax(axis=0)  # (rows,)
-        has_best = np.isfinite(np.take_along_axis(opposite, best[None, :], axis=0)[0]) & (
-            np.take_along_axis(opposite, best[None, :], axis=0)[0] > 0
-        )
-        # with no opposite-sign neighbour the strongest neighbour by size is used
-        by_size = np.where(have, np.abs(gd), -np.inf).argmax(axis=0)
-        best = np.where(has_best, best, by_size)
-        pick = np.take_along_axis(vals, best[None, None, :], axis=0)[0]  # (n_q, rows)
-        pick0 = np.nan_to_num(pick)
-        for j, q in enumerate(QUANTITIES):
-            out[rows, COL[f"bn_{q}"]] = pick0[j] * SCALE
-            out[rows, COL[f"own_plus_bn_{q}"]] = (own0[j] + pick0[j]) * SCALE
+        # the single best opposite-sign neighbour, chosen separately for each lag by that lag's gap
+        for lag in LAGS:
+            idx_q = [
+                QUANTITIES.index(f"{n}_{lag}")
+                for n in ("gap", *(f"ew{h}" for h in HALF_LIVES_DAYS))
+            ]
+            gj = QUANTITIES.index(f"gap_{lag}")
+            have_l = fin[:, gj, :]
+            gd = np.where(have_l, vals[:, gj, :], np.nan)
+            sign_own = np.sign(np.nan_to_num(own[gj]))
+            opposite = np.where(have_l, -sign_own[None, :] * gd, -np.inf)
+            best = opposite.argmax(axis=0)
+            top = np.take_along_axis(opposite, best[None, :], axis=0)[0]
+            # with no opposite-sign neighbour the strongest neighbour by size is used
+            by_size = np.where(have_l, np.abs(gd), -np.inf).argmax(axis=0)
+            best = np.where(top > 0, best, by_size)
+            pick = np.take_along_axis(vals, best[None, None, :], axis=0)[0]
+            pick0 = np.where(have_l.any(axis=0)[None, :], np.nan_to_num(pick), 0.0)
+            for j in idx_q:
+                q = QUANTITIES[j]
+                out[rows, COL[f"bn_{q}"]] = pick0[j] * SCALE
+                out[rows, COL[f"own_plus_bn_{q}"]] = (own0[j] + pick0[j]) * SCALE
         out[rows, COL["bn_count"]] = count
         out[rows, COL["bn_none"]] = none
 
@@ -301,6 +306,10 @@ def mask_lag_columns(
     `block` holds the columns `columns` (indices into `ALL_NAMES`). The expected-missing flags depend on
     the lag's time and not on its value, so they stay.
     """
+    pos = {ALL_NAMES[c]: j for j, c in enumerate(columns)}
+    for name, value in (("nb_count", 0.0), ("bn_count", 0.0), ("nb_none", 1.0), ("bn_none", 1.0)):
+        if name in pos:
+            block[day_masked, pos[name]] = value
     for lag, mask in (("day", day_masked), ("week", week_masked)):
         for j, c in enumerate(columns):
             name = ALL_NAMES[c]

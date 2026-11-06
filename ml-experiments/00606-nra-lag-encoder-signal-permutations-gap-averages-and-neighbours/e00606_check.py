@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, PT018
+# ruff: noqa: E501, D103, PT018, ANN001, ANN201
 """Experiment 606: CPU checks of the extra columns and the network (no data-folder rows needed).
 
 1. A known-answer test on a toy world of 4 Primaries (one with two neighbours, one with none): a shift
@@ -94,7 +94,9 @@ def check_known_answer() -> None:
     # the transfer lands on neighbour 1 in the neighbour power only: its own lag is not shifted
     np.testing.assert_allclose(block[1, c["gap_day"]], 0.0, atol=1e-3)
     # Primary 1 sees Primary 0 (gap +shift, scaled to 1's capacity) in its neighbour summary
-    np.testing.assert_allclose(block[1, c["nb_sum_gap_day"]], sh * w["cap"][0] / w["cap"][1] * sc, atol=1e-3)
+    np.testing.assert_allclose(
+        block[1, c["nb_sum_gap_day"]], sh * w["cap"][0] / w["cap"][1] * sc, atol=1e-3
+    )
     # Primary 0 sees neighbours 1 (the mirrored shift, scaled back to 0's capacity: -shift) and 2 (zero)
     np.testing.assert_allclose(block[0, c["nb_sum_gap_day"]], -sh * sc, atol=1e-3)
     np.testing.assert_allclose(block[0, c["nb_mean_gap_day"]], -sh * sc / 2, atol=1e-3)
@@ -145,7 +147,10 @@ def check_masking() -> None:
         block=block, columns=cols, day_masked=np.ones(2, bool), week_masked=np.ones(2, bool)
     )
     for j, name in enumerate(sig.ALL_NAMES):
-        if name.startswith("exp_missing") or name in {"nb_count", "nb_none", "bn_count", "bn_none"}:
+        if name.startswith("exp_missing"):
+            continue
+        if name in {"nb_none", "bn_none"}:
+            assert (block[:, j] == 1).all(), name
             continue
         assert (block[:, j] == 0).all(), name
     assert block[1, sig.COL["exp_missing_day"]] == 1, "masking cleared the expected-missing flag"
