@@ -46,6 +46,8 @@ LABEL = {
     "S-g": "S-g: S + G4 bit", "S-p": "S-p: noise for signals", "S-rs": "S, band width-matched",
     "S-g-rs": "S-g, width-matched", "S-p-rs": "S-p, width-matched", "G4T": "G4 on T",
 }  # fmt: skip
+GATE_STRIP = "#334155"
+"""Dark slate for the gate strip, so that green means S-p only."""
 GATE_NOTE = [
     "The gate strip is plotted at valid time (origin day plus one) and stays on for about a week after the gate releases (held).",
     "Compare the band width inside the shaded span with the same arm's width outside it.",
@@ -213,9 +215,22 @@ def follow_hist(*, suffix: str) -> None:
             rows.append({"name": name, "x0": float(x0), "x1": float(x1), "count": int(cnt), "key": key})  # fmt: skip
     d = pl.DataFrame(rows)
     order = list(series)
-    colours = [COLOUR[k] for k, _ in series.values()]
+    colours = [COLOUR["R" if k == "A1" and merged else k] for k, _ in series.values()]
+    first = order[0]
+    base = alt.Chart(d)  # ty: ignore[unresolved-attribute]
+    wide = (
+        base.transform_filter(alt.datum.name == first)
+        .mark_line(interpolate="step-after", strokeWidth=7, opacity=0.45)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x="x0:Q",
+            y="count:Q",
+            color=alt.Color(
+                "name:N", scale=alt.Scale(domain=order, range=colours), sort=order, legend=None
+            ),
+        )
+    )
     ch = (
-        alt.Chart(d).mark_line(interpolate="step-after", strokeWidth=2)  # ty: ignore[unresolved-attribute]
+        base.transform_filter(alt.datum.name != first).mark_line(interpolate="step-after", strokeWidth=2)  # ty: ignore[unresolved-attribute]
         .encode(
             x=alt.X("x0:Q", title="Median forecast moved towards the shift (share of the shift depth; 0 is no following)"),
             y=alt.Y("count:Q", title="Primary-events in the 0.1-wide bin"),
@@ -223,7 +238,10 @@ def follow_hist(*, suffix: str) -> None:
         )
         .properties(width=W, height=PANEL_H, title=alt.TitleParams(["Follow ratio on injected 15 and 30 day load-shifts, day 4 to the end, 24-120 h ahead", "Step outline: Primary-events per 0.1-wide bin of the follow ratio. Lower is better: the median ignores the lagged shift.", "A1 and R have identical follow ratios, because the gate widens the band and leaves the median alone."], fontSize=11, anchor="start"))
     )  # fmt: skip
-    save(ch, "follow_histogram.svg")
+    save(
+        alt.layer(wide, ch).properties(width=W, height=PANEL_H, title=ch.title),
+        "follow_histogram.svg",
+    )
 
 
 def placebo_scatter(*, suffix: str) -> None:
@@ -242,13 +260,23 @@ def placebo_scatter(*, suffix: str) -> None:
         "month", "pass", "primary", pl.col("cover90").alias("S-p")
     )
     j = a.join(b, on=["month", "pass", "primary"])
-    diag = pl.DataFrame({"v": [0.0, 1.0]})
+    dash, dot = "Equal coverage (dashed)", "One Primary-event"
+    diag = pl.DataFrame({"v": [0.0, 1.0], "what": [dash, dash]})
+    j = j.with_columns(what=pl.lit(dot))
+    scale = alt.Scale(domain=[dot, dash], range=[theme.DATA_BLUE, SHADE_LINE])
+    ax = alt.Scale(domain=[0, 1.01])
+    colour = alt.Color(
+        "what:N",
+        scale=scale,
+        sort=[dot, dash],
+        legend=alt.Legend(title=None, orient="top", columns=2),
+    )  # ty: ignore[invalid-argument-type]
     ch = (
         alt.layer(
-            alt.Chart(diag).mark_line(strokeDash=[4, 3], color=SHADE_LINE).encode(x=alt.X("v:Q", title="Coverage of S (share of rows with the NRA in q05-q95)", scale=alt.Scale(domain=[0, 1])), y=alt.Y("v:Q", title="Coverage of S-p")),  # ty: ignore[unresolved-attribute]
-            alt.Chart(j).mark_circle(opacity=0.35, size=40, color=theme.DATA_BLUE).encode(x="S:Q", y="S-p:Q"),  # ty: ignore[unresolved-attribute]
+            alt.Chart(diag).mark_line(strokeDash=[4, 3]).encode(x=alt.X("v:Q", title="Coverage of S (share of rows with the NRA in q05-q95)", scale=ax), y=alt.Y("v:Q", title="Coverage of S-p", scale=ax), color=colour),  # ty: ignore[unresolved-attribute]
+            alt.Chart(j).mark_circle(opacity=0.35, size=40).encode(x=alt.X("S:Q", scale=ax), y=alt.Y("S-p:Q", scale=ax), color=colour),  # ty: ignore[unresolved-attribute]
         )
-        .properties(width=W, height=PANEL_H, title=alt.TitleParams(["S against S-p on injected 15 and 30 day load-shifts, day 4 to the end, 24-120 h ahead", "Dot: one Primary-event. Dashed: equal coverage. Dots below the dashed line: the signals helped S."], fontSize=11, anchor="start"))
+        .properties(width=W, height=PANEL_H, title=alt.TitleParams(["S against S-p on injected 15 and 30 day load-shifts, day 4 to the end, 24-120 h ahead", "Dots below the dashed line: the signals helped S."], fontSize=11, anchor="start"))
     )  # fmt: skip
     save(ch, "s_versus_s_p.svg")
 
@@ -359,9 +387,7 @@ def arm_figure(
         cols["dash"],
         *([cols["gate"]] if gate is not None else []),
     ]
-    rng = [OBSERVED, COLOUR[name], COLOUR[name], SHADE, SHADE_LINE, theme.DATA_DEEP_TEAL][
-        : len(domain)
-    ]
+    rng = [OBSERVED, COLOUR[name], COLOUR[name], SHADE, SHADE_LINE, GATE_STRIP][: len(domain)]
     colour = alt.Color(
         "what:N",
         scale=alt.Scale(domain=domain, range=rng),
@@ -565,7 +591,7 @@ def example(*, suffix: str) -> None:
     )
     for row in wm["detail"]:
         print("  ", row)
-    extra = ["S-p, the placebo arm, was not run (the stop rule did not call for it), so no S-p panel is drawn."]  # fmt: skip
+    extra: list[str] = []
     cap = [
         "December 2025 pair, day-ahead forecasts. Coverage is scored against the NRA, an estimate that is not drawn.",
         f"Dashed lines: the maintainer's dates ({MAINTAINER_ONSET:%Y-%m-%d %H:%M} and {MAINTAINER_END:%Y-%m-%d %H:%M}).",
