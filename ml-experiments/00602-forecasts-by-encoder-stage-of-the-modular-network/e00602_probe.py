@@ -40,7 +40,7 @@ W574 = e.W
 if MINE.net == "C1":
     e.W = ML_EXPERIMENTS_DATA_DIR / "00584-nra-candidate-pack-x6" / "c1" / "work"
 elif MINE.net == "A1":
-    import e00591_model as mymodel
+    import e00591_model as mymodel  # ty: ignore[unresolved-import]
 
     e.W = (
         ML_EXPERIMENTS_DATA_DIR

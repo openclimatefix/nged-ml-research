@@ -68,25 +68,25 @@ def contribution_panel(*, x, contrib, depth, xdom, title, ydom, rules=(), span=N
     layers = []
     if span is not None:
         layers.append(
-            alt.Chart(pl.DataFrame({"a": [str(span[0])], "b": [str(span[1])]}))
+            alt.Chart(pl.DataFrame({"a": [str(span[0])], "b": [str(span[1])]}))  # ty: ignore[unresolved-attribute]
             .mark_rect(color=cp.SHADE_COLOUR, opacity=0.7, clip=True, aria=False)
             .encode(x=alt.X("a:T", scale=sx, axis=ax), x2="b")
         )
     layers += [
-        base.mark_line(color=CONTRIB, strokeWidth=1.6, aria=False, clip=True).encode(
+        base.mark_line(color=CONTRIB, strokeWidth=1.6, aria=False, clip=True).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:T", scale=sx, axis=ax, title=None),
             y=alt.Y("contrib:Q", scale=sy, title="points of capacity"),
         ),
     ]
     if np.isfinite(depth).any():
         layers.append(
-            base.mark_line(
+            base.mark_line(  # ty: ignore[unresolved-attribute]
                 color=DEPTH, strokeDash=[5, 3], strokeWidth=1.5, aria=False, clip=True
             ).encode(x=alt.X("x:T", scale=sx, axis=ax), y=alt.Y("depth:Q", scale=sy))
         )
     if len(rules):
         layers.append(
-            alt.Chart(pl.DataFrame({"x": [str(v) for v in rules]}))
+            alt.Chart(pl.DataFrame({"x": [str(v) for v in rules]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color=cp.RULE_COLOUR, strokeDash=[6, 3], strokeWidth=1.3, aria=False)
             .encode(x=alt.X("x:T", scale=sx, axis=ax))
         )
@@ -281,7 +281,7 @@ def injected_figures(clean):
                 end = month_start + bank.END_DAY * bank.PER_DAY
                 on = end - length * bank.PER_DAY
                 span = (_utc(on), _utc(end))
-                xdom = (_utc(int(df["target_idx"].min())), _utc(month_start + 28 * bank.PER_DAY))
+                xdom = (_utc(int(df["target_idx"].min())), _utc(month_start + 28 * bank.PER_DAY))  # ty: ignore[invalid-argument-type]
                 lo, hi = ydom_for([df], obs[np.isfinite(obs)])
                 sgn = "up" if sign > 0 else "down"
                 two_figures(
@@ -333,7 +333,7 @@ def response_figure():
                 j = a.join(b, on="target_idx", suffix="_dn")
                 if j.height < 24:
                     continue
-                share = float((j["s3_q50"] - j["s3_q50_dn"]).mean()) / (2 * d)
+                share = float((j["s3_q50"] - j["s3_q50_dn"]).mean()) / (2 * d)  # ty: ignore[invalid-argument-type]
                 rows.append(
                     {"network": net, "primary": p, "depth": d * 100, "length": n, "share": share}
                 )
@@ -345,7 +345,7 @@ def response_figure():
     for net in NETS:
         sub = out.filter(pl.col("network") == net)
         pts = (
-            alt.Chart(sub)
+            alt.Chart(sub)  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=45, opacity=0.7)
             .encode(
                 x=alt.X("length:O", title="Length of the injected load-shift (days)"),
