@@ -9,8 +9,10 @@ lags, and where the files go.
 
 Usage: python e00585_arm.py KIND COMMAND [--months ...] [--seeds ...] [--passes ...]
 
-- KIND: `n1` (week lag only), `n3` (day, week, and a second weekly lag, 14 days before the target's newest same weekday), `y1` (day, week, and 364-day
-  lags), `y1c` (as y1 at 365 days, the same calendar date), `y3` (day, week, and 357-, 364-, and 371-day lags), or `y1mask` (Y1's saved weights, with
+- KIND: `n1` (week lag only), `n3` (day, week, and a second weekly lag, 14 days before the target's
+  newest same weekday), `y1` (day, week, and 364-day
+  lags), `y1c` (as y1 at 365 days, the same calendar date), `y3` (day, week, and 357-, 364-, and
+  371-day lags), or `y1mask` (Y1's saved weights, with
   the year-ago lag masked inside verified load-shift events; only `inject` is meaningful, and it
   writes pass 200 next to Y1's own files).
 - COMMAND: `pretrain`, `fit`, `assemble`, or `inject` (forecast with lag-only contaminated lags).

@@ -15,8 +15,10 @@ weekly lag; a fixed 14-day period would coincide with the week lag at many leads
 with a positive period `P` days is the cleaned power at `target - P * ceil(gap / P)` days, where
 `gap` is the distance from the target to the newest admissible reading (at least `cap_steps`
 half-hours before the origin). For the periods used here (357, 364, 365, and 371 days) the
-multiplier is 1 for every lead up to 15 days (asserted). `DROP_DAY` replaces the day lag's value, flag, and age by the absent code
-(arm N1; the network also zeroes the day lag's expected-weather embeddings). `EXTRA_CLEAN`, when set, is the power grid that extra lags read (the day and week lags
+multiplier is 1 for every lead up to 15 days (asserted). `DROP_DAY` replaces the day lag's value,
+flag, and age by the absent code
+(arm N1; the network also zeroes the day lag's expected-weather embeddings). `EXTRA_CLEAN`, when
+set, is the power grid that extra lags read (the day and week lags
 still read the cleaned grid), which is how the year-ago lag is masked inside verified events.
 """
 

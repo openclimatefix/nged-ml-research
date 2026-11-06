@@ -1,5 +1,6 @@
-# ruff: noqa: E501, D103, ANN001, ANN202
-"""Experiment 585: CRPS scoring of the lag-count and year-ago arms with experiment 572's scorer (patched, not copied).
+# ruff: noqa: D103, ANN001, ANN202
+"""Experiment 585: CRPS scoring of the lag-count and year-ago arms with experiment 572's scorer
+(patched, not copied).
 
 Arms: M0, E2 (experiment 565's stored C-M0 and D5), V3 and V3D5 (experiment 572's stored forecasts;
 V3D5 is the control N2), N5 (experiment 581's stored X3-med), and this experiment's N1, N3, Y1, Y1c,
