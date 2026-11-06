@@ -70,7 +70,7 @@ headline: >-
   Sharing the lag encoder (A1) lifts after-end coverage from 0.860 to 0.885. The auxiliary depth loss
   adds nothing beyond that (A2 0.886, A3 0.884) and does not reduce how far the median follows an
   injected shift (0.11 of the depth from day 4 to the end for A0, A2, and A3 alike). The head
-  recovers 0.44 (A2) to 0.53 (A3) of the variance of the injected depth, short of the 0.7 predicted,
+  recovers 0.47 (A2) to 0.57 (A3) of the variance of the injected depth in the two scored groups, short of the 0.7 predicted,
   and reads 0.01 to 0.04 on the two real December load-shifts, whose depths were -0.26 and +0.15.
 lessons: >-
   Roughly all of the gain comes from sharing the encoder across the two lags (A1 against A0), not
@@ -264,7 +264,7 @@ Primary's time) as in [experiment
 | A3 minus A2 | +0.016 (-0.004 to 0.054) | 0.029 | -0.003 (-0.020 to 0.016) | 0.018 |
 | A4 minus A2 | +0.026 (-0.052 to 0.081) | 0.066 | +0.008 (-0.056 to 0.103) | 0.079 |
 
-  Every interval over all five folds contains zero. In the first fold pair alone (2025-10 and
+  Every interval over all five folds contains zero. A1 minus A0 at the eight MVA Primaries is positive in two of the five fold months (+0.012 in 2025-10, +0.026 in 2026-06) and negative in the other three (-0.107, -0.026, -0.033). In the first fold pair alone (2025-10 and
   2025-12, two blocks, so the bootstrap is degenerate and not to be trusted), A2 minus A1 at the eight
   MVA Primaries is +0.012 (0.009 to 0.015) and A3 minus A1 +0.042 (0.010 to 0.074): the auxiliary
   loss is, if anything, slightly worse than A1 there. The stop rule (A1 worse than A0 by more than
@@ -275,14 +275,14 @@ Primary's time) as in [experiment
   0.88 to 0.89, against 0.95 nominal, so the upper tail is thin on event-free rows in every arm,
   A0 included.
 - **Head recovery of the injected depth** (held-out injected events, both lags pooled; R squared of
-  the head's output against the injected depth, positive when it recovers variance):
+  the head's output against the injected depth, positive when it recovers variance; the scored groups are the eight MVA and six MW Primaries, and the other columns pool all three groups, including D15 and D18, where the heads do worst; 61% of the lag rows carry no injected shift, and the injected events use the same depth and length grid as the training shifts, so "held-out" means held out in time only):
 
-| Arm | All events | Depth 0.15 | Depth 0.30 | Depth 0.50 | Eight MVA | Six MW | Length 3 days | Length 30 days |
+| Arm | Scored groups | All three groups | Depth 0.15 | Depth 0.30 | Depth 0.50 | Eight MVA | Six MW | Length 3 days | Length 30 days |
 |---|---|---|---|---|---|---|---|---|
-| A1 (never trained) | -0.20 | -1.32 | -0.28 | -0.07 | -0.16 | -0.25 | -0.74 | -0.11 |
-| A2 | 0.44 | 0.28 | 0.42 | 0.46 | 0.46 | 0.49 | 0.40 | 0.44 |
-| A3 | 0.53 | 0.32 | 0.49 | 0.56 | 0.55 | 0.60 | 0.49 | 0.53 |
-| A4 | 0.42 | 0.25 | 0.39 | 0.44 | 0.43 | 0.47 | 0.32 | 0.43 |
+| A1 (never trained) | -0.19 | -0.20 | -1.32 | -0.28 | -0.07 | -0.16 | -0.25 | -0.74 | -0.11 |
+| A2 | 0.47 | 0.44 | 0.28 | 0.42 | 0.46 | 0.46 | 0.49 | 0.40 | 0.44 |
+| A3 | 0.57 | 0.53 | 0.32 | 0.49 | 0.56 | 0.55 | 0.60 | 0.49 | 0.53 |
+| A4 | 0.45 | 0.42 | 0.25 | 0.39 | 0.44 | 0.43 | 0.47 | 0.32 | 0.43 |
 
 - **The head as a detector** (an origin day fires when the head's score exceeds a threshold of 0.05,
   0.075, or 0.10 of capacity; 1,857 event-free Primary-days, about 5.1 Primary-years, so each false
