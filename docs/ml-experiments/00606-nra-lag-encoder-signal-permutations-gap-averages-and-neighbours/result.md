@@ -107,18 +107,17 @@ production_status: candidate
 adopted_in: none
 ---
 
-**We asked whether the demand network can learn to follow a load-shift less if its lag encoder is
-given more than the lag itself.** A load-shift moves part of one Primary substation's demand onto a
-neighbour for days or weeks. "Follow" is the share of the injected depth that the forecast's median
-moves with the shifted lags (lower is better). The lag encoder is the part of the A1 network
-([experiment
+**We asked whether the demand neural network can learn to follow a load-shift less if its lag
+encoder is given more than the lag itself.** A load-shift moves part of one Primary substation's
+demand onto a neighbour for days or weeks. "Follow" is the share of the injected depth that the
+forecast's median moves with the shifted lags (lower is better). The lag encoder is the part of the
+A1 network ([experiment
 591](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00591-shared-lag-encoder-auxiliary-shift-depth-loss/result/))
 that reads the two lagged power readings. The lag-free forecast is the same network's forecast with
 its lags removed ([experiment
 598](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00598-nra-gate-against-signals-as-inputs-at-equal-band-width/result/)).
 The gap is a lag minus the lag-free forecast at the lag's own time. The coverage of a forecast is
-the
-share of rows where the normal running arrangement (NRA) lies inside the q05-q95 band.
+the share of rows where the normal running arrangement (NRA) lies inside the q05-q95 band.
 
 We fine-tuned A1 on synthetic lag-only load-shifts ([experiment
 584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)),
@@ -131,15 +130,15 @@ inputs carry the gain. At R's band width ([experiment
 597](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00597-nra-assemble-c1-and-a1-with-g4-gate-as-single-forecasts/result/),
 A1 plus the hand-built G4 gate) P7 covers 0.932 of rows from day 4 to the end and R covers 0.928.
 
-**Verdict: partly supported.** The predictions that held: P5 beats P4 by more than 0.01, the inputs
-P5 beats its noise placebo by more than 0.02. The predictions that failed: the per-lag gap does not
-lower follow by 0.015 (P3), and the own-plus-sum
-column does not matter (P7 against P7b). Three predictions are untestable on two fold months
-because the minimum detectable effect exceeds the margin: neighbours lower follow by a further 0.01,
-P7 beats its noise placebo by 0.02, and R covers at least 0.01 more than P7 at R's width (the point
-estimate is 0.005 in P7's favour). The cost: event-free CRPS is higher than A1's at both metering
-groups in point estimate. Experiment 606 ran on two fold
-months and two seeds, and no arm was run on the remaining three development months.
+**Verdict: partly supported.** The predictions that held: P5 beats P4 by more than 0.01, and P5
+beats its noise placebo by more than 0.02. The predictions that failed: the per-lag gap does not
+lower follow by 0.015 (P3), and the own-plus-sum column does not matter (P7 against P7b). Three
+predictions are untestable on two fold months because the minimum detectable effect exceeds the
+margin: neighbours lower follow by a further 0.01, P7 beats its noise placebo by 0.02, and R covers
+at least 0.01 more than P7 at R's width (the point estimate is 0.005 in P7's favour). The cost:
+event-free continuous ranked probability score (CRPS) is higher than A1's at both metering groups in
+point estimate. Experiment 606 ran on two fold months and two seeds, and no arm was run on the
+remaining three development months.
 
 ## Figures
 
@@ -283,7 +282,7 @@ least
 `ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/`; the arm
 code
 (`e00606_signals.py`, `e00606_model.py`, `e00606_arm.py`) is meant to be copied by later experiments
-on the same inputs. It reuses the code of experiments 574, 584, 591, 592, 597, and 598.
+on the same inputs. This experiment reuses the code of experiments 574, 584, 591, 592, 597, and 598.
 
 ## Plan (as pre-registered; the Not run bullet above lists what was dropped)
 

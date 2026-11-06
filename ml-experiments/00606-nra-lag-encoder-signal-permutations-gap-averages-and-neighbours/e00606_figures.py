@@ -30,11 +30,11 @@ W, PANEL_H = f598.W, f598.PANEL_H
 
 LABEL = {
     "A1": "A1 alone", "R": "R: A1 + G4", "W": "W: A1, band widened", "G4T": "G4 on T",
-    "P3": "P3: gap", "P4": "P4: gap + sustain", "P5": "P5: gap + weighted averages",
-    "P6": "P6: P5 + sustain", "P7": "P7: P5 + neighbour summaries",
-    "P7b": "P7b: P7 without own-plus-sum", "P7c": "P7c: P5 + best neighbour",
+    "P3": "P3: gap", "P4": "P4: gap + sustain", "P5": "P5: gap + averages",
+    "P6": "P6: P5 + sustain", "P7": "P7: P5 + neighbours",
+    "P7b": "P7b: no own-plus-sum", "P7c": "P7c: P5 + best neighbour",
     "P5-p": "P5-p: noise for the inputs", "P7-p": "P7-p: noise for the inputs",
-    "P5-q": "P5-q: P5 + paired perturbation", "P7-q": "P7-q: P7 + paired perturbation",
+    "P5-q": "P5-q: P5 + paired shift", "P7-q": "P7-q: P7 + paired shift",
     "P5-rs": "P5, width-matched", "P7-rs": "P7, width-matched",
     "P5-q-rs": "P5-q, width-matched", "P7-q-rs": "P7-q, width-matched",
     "P5-p-rs": "P5-p, width-matched", "P7-p-rs": "P7-p, width-matched",
@@ -51,6 +51,7 @@ COLOUR = {
     "P7-q-rs": f598.lighten(theme.DATA_MAGENTA, 0.4),
     "P5-p-rs": f598.lighten(theme.DATA_BLUE, 0.7), "P7-p-rs": f598.lighten(theme.DATA_GREEN, 0.7),
 }  # fmt: skip
+f598.GATE_STRIP = theme.DATA_PURPLE  # a hue, so the strip is not mistaken for the black observed line
 f598.LABEL.update(LABEL)
 f598.COLOUR.update(COLOUR)
 
@@ -67,18 +68,17 @@ def follow_chart() -> None:
     scale = alt.Scale(domain=names, range=[COLOUR[s] for s in order])
     base = alt.Chart(a).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("name:N", sort=names, title=None, axis=alt.Axis(labelLimit=260)),
-        color=alt.Color("name:N", scale=scale, legend=None),
     )
     chart = alt.layer(
-        base.mark_rule().encode(
-            x=alt.X("follow_q50_days4-end_lo:Q", title="Follow: share of the injected depth that the median follows (lower is better)", scale=alt.Scale(domain=[0, 0.16])),
+        base.mark_rule(color=theme.DATA_BLUE).encode(
+            x=alt.X("follow_q50_days4-end_lo:Q", title="Follow: share of the injected depth that the median follows (lower is better)", scale=alt.Scale(domain=[-0.02, 0.18]), axis=alt.Axis(values=[0, 0.04, 0.08, 0.12, 0.16])),
             x2="follow_q50_days4-end_hi:Q",
         ),
-        base.mark_point(filled=True, size=70).encode(x="follow_q50_days4-end:Q"),
+        base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(x="follow_q50_days4-end:Q"),
     ).properties(
         width=W, height=420,
         title=alt.TitleParams(
-            ["Follow by arm", "Injected 15 and 30 day load-shifts, day 4 to the end, 24-120 h ahead, both metering groups, 2025-10 and 2025-12.", "Dot: mean over Primary-events. Line: 99.6% interval (Bonferroni across 12 counted contrasts) from resampling (month, Primary) clusters."],
+            ["Follow by arm", "Injected 15 and 30 day load-shifts, day 4 to the end, 24-120 h ahead, both metering groups, 2025-10 and 2025-12.", "Dot: mean over Primary-events. Line: 99.6% interval (Bonferroni across 12 counted contrasts) from resampling (month, Primary) clusters.", "R is not drawn: its follow equals A1's. -p: noise in place of the inputs."],
             fontSize=11, anchor="start",
         ),
     )  # fmt: skip
@@ -100,11 +100,10 @@ def cost_chart() -> None:
     scale = alt.Scale(domain=names, range=[COLOUR[s] for s in order])
     base = alt.Chart(d).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("name:N", sort=names, title=None, axis=alt.Axis(labelLimit=260)),
-        color=alt.Color("name:N", scale=scale, legend=None),
     )
     layers = [
-        base.mark_rule().encode(x=alt.X("lo:Q", title="Event-free CRPS minus A1's, points of capacity (lower is better)"), x2="hi:Q"),
-        base.mark_point(filled=True, size=70).encode(x="cost:Q"),
+        base.mark_rule(color=theme.DATA_BLUE).encode(x=alt.X("lo:Q", title="CRPS minus A1's, points of capacity"), x2="hi:Q"),
+        base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(x="cost:Q"),
     ]  # fmt: skip
     chart = alt.layer(*layers).properties(width=W // 2 - 40, height=360).facet(column=alt.Column("group:N", title=None)).properties(
         title=alt.TitleParams(["Event-free CRPS cost of each arm", "Rows with no load-shift, 24-120 h ahead, 2025-10 and 2025-12. Dot: difference from A1. Line: plus and minus the minimum detectable effect."], fontSize=11, anchor="start")
@@ -121,7 +120,7 @@ def summary() -> None:
     systems = [s for s in ("A1", "R", "P5", "P7", "P5-rs", "P7-rs", "P7-q-rs") if s in present]
     f598.phase_chart(
         suffix="", metric="cover90", systems=systems, name="coverage_by_phase.svg", domain=[0.7, 1.0], target=0.9,
-        title=["Share of rows with the NRA inside q05-q95", "Coverage by phase of an injected load-shift: 15 and 30 day events, both metering groups, 24-120 h ahead", "Dot: mean over Primary-events. Line: 95% interval from resampling events. Dashed: the 0.90 target. Scored against the NRA, an estimate. -rs: band rescaled to R's width."],
+        title=["Share of rows with the NRA inside q05-q95", "Coverage by phase of an injected load-shift: 15 and 30 day events, both metering groups, 24-120 h ahead", "Dot: mean over Primary-events. Line: 95% interval from resampling events (not Bonferroni-adjusted). Dashed: the 0.90 target. Scored against the NRA, an estimate. Width-matched: band rescaled to R's mean width."],
     )  # fmt: skip
     follow_chart()
     cost_chart()
