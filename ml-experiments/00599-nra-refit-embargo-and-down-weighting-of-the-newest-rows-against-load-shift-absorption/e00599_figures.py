@@ -76,7 +76,7 @@ def day_ahead(*, arm: str, world: str, months: list[str], tsid: int) -> pl.DataF
                     parts.append(
                         pl.read_parquet(p)
                         .filter(pl.col("time_series_id") == tsid)
-                        .with_columns(refit_day=pl.lit(day), month=pl.lit(month))
+                        .with_columns(refit_day=pl.lit(day), month=pl.lit(month), seed=pl.lit(seed))
                     )
     x = pl.concat(parts).with_columns(
         lead=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours(),
@@ -121,7 +121,7 @@ def panel(
             {
                 "idx": idx,
                 "Observed power": obs[primary, idx],
-                "Normal running arrangement (observed minus the event)": nra[primary, idx],
+                "Normal running arrangement (NRA)": nra[primary, idx],
             }
         )
         .unpivot(index="idx", variable_name="line", value_name="y")
@@ -138,7 +138,7 @@ def panel(
         band_name,
         med_name,
         "Observed power",
-        "Normal running arrangement (observed minus the event)",
+        "Normal running arrangement (NRA)",
         "Event window",
         *[m for _, m in marks],
     ]
@@ -151,7 +151,14 @@ def panel(
         *["#888888"] * len(marks),
     ]
     sc = alt.Scale(domain=names, range=cols)
-    leg = alt.Legend(orient="bottom", title=None, columns=2, labelFontSize=11, symbolType="stroke")
+    leg = alt.Legend(
+        orient="bottom",
+        title=None,
+        columns=2,
+        labelFontSize=11,
+        labelLimit=420,
+        symbolType="stroke",
+    )
     colour = alt.Color("line:N", scale=sc, legend=leg)
     area = mk(
         alt.Chart(band),
@@ -314,7 +321,8 @@ def main() -> None:
                 name=f"figure_{'ab'[k]}_{case}.svg",
                 title=f"Injected load-shift {case} at Primary {event.label}: median and 90% band of {pair[0]} and {pair[1]}",
                 subtitle=[
-                    "Daily mean of the day-ahead (24 to 48 h lead) forecast, mean over 2 seeds; the arms are fitted on the observed power, which carries the event."
+                    "Half-hourly day-ahead (24 to 48 h lead) forecast, mean over 2 seeds.",
+                    "The arm is fitted on the observed power, which carries the event; NRA is the observed power minus the event.",
                 ],
                 arm_panels=[(a, case, event) for a in pair],
                 obs=obs,
@@ -325,15 +333,16 @@ def main() -> None:
             name=f"figure_real_pair_{arm}.svg",
             title=f"Verified December 2025 D5/D16 transfer, arm {arm}: median and 90% band at both Primaries",
             subtitle=[
-                "Dashed lines: the maintainer's switched times (2025-12-30 01:00 and 2026-01-14 11:30); shaded: the switched window. See the caption for which window the readings match."
+                "Half-hourly day-ahead (24 to 48 h lead) forecast, mean over 2 seeds.",
+                "Dashed lines and shade: switched window 2025-12-30 01:00 to 2026-01-14 11:30.",
             ],
             arm_panels=[(arm, "verified", e) for e in ev],
             obs=obs,
             before=14,
             after=14,
             marks_dates=[
-                (SWITCH_START, "Switched 2025-12-30 01:00"),
-                (SWITCH_END, "Switched back 2026-01-14 11:30"),
+                (SWITCH_START, "Switched 30 Dec 01:00"),
+                (SWITCH_END, "Switched back 14 Jan 11:30"),
             ],
             shade_dates=(SWITCH_START, SWITCH_END),
         )
