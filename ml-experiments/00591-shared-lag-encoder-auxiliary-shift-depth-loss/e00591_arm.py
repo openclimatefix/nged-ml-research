@@ -23,7 +23,9 @@ import sys
 
 _p = argparse.ArgumentParser()
 _p.add_argument("arm", choices=("A1", "A2", "A3", "A4", "A5"))
-_p.add_argument("command", choices=("pretrain", "step2", "calibrate", "fit", "assemble", "inject"))
+_p.add_argument(
+    "command", choices=("pretrain", "step2", "calibrate", "fit", "assemble", "inject", "probe")
+)
 _p.add_argument("--months", nargs="+", default=None)
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 _p.add_argument("--passes", nargs="+", type=int, default=None)
@@ -57,7 +59,7 @@ W574 = e.W
 """Experiment 574's work folder: the fold's stored B1 statistics are read from here, never written."""
 LAM_MULT = {"A1": 0.0, "A2": 1.0, "A3": 3.0, "A4": 1.0, "A5": 1.0}
 LAMBDA = 0.0
-if CMD in {"fit", "inject"} and ARM != "A1":
+if CMD in {"fit", "inject", "probe"} and ARM != "A1":
     LAMBDA = LAM_MULT[ARM] * json.loads(LAMBDA_FILE.read_text())["lambda"]
 if CMD in {"pretrain", "step2"}:
     e.WORK, e.W = CHAIN.parent, CHAIN
@@ -271,6 +273,122 @@ def run_inject(*, device: str = "cuda") -> None:
         torch.cuda.empty_cache()
 
 
+REAL_PASS = 99
+"""Probe pass number of the observed lags (no contamination), labelled with experiment 580's verified depths."""
+LEAD_BAND = (24.0, 120.0)
+
+
+def real_events() -> list[dict]:
+    """Return the verified real events (experiment 580) as per-Primary rows (as experiment 586)."""
+    import polars as pl
+
+    sm = pl.read_csv(
+        ML_EXPERIMENTS_DATA_DIR
+        / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free/site_map.csv"
+    )
+    table = pl.read_parquet(
+        ML_EXPERIMENTS_DATA_DIR
+        / "00580-verified-load-shift-event-set-and-label-audit/work/events_verified.parquet"
+    )
+    return bank.verified_events(
+        capacity_mw=dict(zip(sm["label"].to_list(), sm["capacity_mw"].to_list(), strict=True)),
+        label_to_primary=dict(zip(sm["label"].to_list(), sm["primary"].to_list(), strict=True)),
+        table=table,
+    )
+
+
+def run_probe(*, device: str = "cuda") -> None:
+    """Write the heads' depth predictions and the true depths for rows 24 to 120 h ahead, one parquet per cell.
+
+    Passes 0 to 23 are the injected bank (label: the shift added at each lag's grid time). Pass 99 uses
+    the observed lags and labels them with the verified real events of experiment 580 (descriptive;
+    labels are imperfect). The head sees only the inputs the forecast sees.
+    """
+    import polars as pl
+
+    clean = e.c.clean_stack()
+    passes = MINE.passes if MINE.passes is not None else [*range(bank.N_PASSES), REAL_PASS]
+    out_dir = e.W / "probe"
+    for month in e.ARGS.months:
+        cuts = e.k.cutoffs(month=month, cadence=e.CADENCE)
+        mr = _build_month_p5(month=month, clean=clean)
+        test = e.build_test(month=month, standardiser=mr.base.standardiser)
+        start = e.c.month_start(month=month)
+        start_idx = (e.c.us(t=start) - e.c.prep422.GRID_START_US) // e.c.prep422.STEP_US
+        lead = (test.target_idx - test.origin_idx) * 0.5
+        in_band = (lead >= LEAD_BAND[0]) & (lead < LEAD_BAND[1])
+        sl = slice(LAG_FIRST, LAG_FIRST + LAG_WIDTH)
+        for i, cut in enumerate(cuts):
+            day = e.f.day_of(month=month, cut=cut)
+            lo, hi = e.k.window_of(month=month, cadence=e.CADENCE, index=i)
+            idx = np.flatnonzero((test.origin >= lo) & (test.origin < hi) & in_band)
+            for seed in e.ARGS.seeds:
+                model = e.new_model(n_primaries=len(mr.base.target_mean)).to(device)
+                model.load_state_dict(
+                    torch.load(
+                        e.model_file(tag=e.SPEC.tag, month=month, day=day, seed=seed),
+                        map_location=device,
+                    )
+                )
+                model.eval()
+                model.table = e.CTX["table_ft"]
+                for r in passes:
+                    target = out_dir / f"{month}_r{r:02d}_d{day}_s{seed}.parquet"
+                    if target.exists():
+                        continue
+                    if r == REAL_PASS:
+                        fixed = clean
+                        shift = np.where(
+                            np.isfinite(clean),
+                            clean - bank.corrected_clean(clean=clean, events=real_events()),
+                            0.0,
+                        )
+                    else:
+                        fixed, _ = bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)
+                        shift = np.where(
+                            np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0
+                        )
+                    x = test.x[idx].copy()
+                    x[:, sl] = e.block_of(
+                        clean=fixed, primary=test.primary[idx], target_idx=test.target_idx[idx],
+                        origin_idx=test.origin_idx[idx],
+                    )  # fmt: skip
+                    assert np.array_equal(x[:, 43:45], test.x[idx][:, 43:45]), (
+                        "contamination moved a lag time"
+                    )
+                    prim = test.primary[idx]
+                    pred = []
+                    with torch.no_grad():
+                        for a in range(0, len(idx), 100_000):
+                            xb = torch.from_numpy(x[a : a + 100_000]).to(device)
+                            pb = torch.from_numpy(prim[a : a + 100_000]).to(device)
+                            pred.append(model.predict_aux(x=xb, primary=pb).cpu().numpy())
+                    pred = np.concatenate(pred)
+                    cols = {}
+                    for j, name in enumerate(("day", "week")):
+                        li = x[:, 43 + j].astype(np.int64)
+                        ok = (li >= 0) & (x[:, (38, 41)[j]] < 0.5)
+                        cols[f"aux_{name}"] = pred[:, j]
+                        cols[f"true_{name}"] = np.where(
+                            ok, shift[prim, np.clip(li, 0, None)], np.nan
+                        ).astype(np.float32)
+                    frame = pl.DataFrame(
+                        {
+                            "primary": prim,
+                            "target_idx": test.target_idx[idx],
+                            "origin_idx": test.origin_idx[idx],
+                            **cols,
+                        }
+                    )
+                    e.atomic_frame(frame=frame, target=target)
+                    print(
+                        f"{ARM} probe {month} r{r:02d} d{day} s{seed}: {len(idx)} rows", flush=True
+                    )
+                del model
+        del mr, test
+        torch.cuda.empty_cache()
+
+
 if __name__ == "__main__":
     if CMD == "assemble":
         e.assemble()
@@ -281,6 +399,8 @@ if __name__ == "__main__":
         e.step2(months=e.ARGS.months, seeds=e.ARGS.seeds, device="cuda")
     elif CMD == "inject":
         run_inject()
+    elif CMD == "probe":
+        run_probe()
     else:
         e.row_nll = row_nll
         e.k.build_month = build_month_syn
