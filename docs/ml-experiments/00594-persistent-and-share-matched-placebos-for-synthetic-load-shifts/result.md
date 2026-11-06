@@ -228,4 +228,3 @@ the Bonferroni level for 8 tests; the minimum detectable effect (MDE) is the int
   neighbouring Primaries, or the real December pair with more verified events.
 - If perturbing 7% of lag rows is the active ingredient, vary that share (2%, 7%, 15%) with noise
   alone, because the share is the one setting this experiment did not vary.
-
