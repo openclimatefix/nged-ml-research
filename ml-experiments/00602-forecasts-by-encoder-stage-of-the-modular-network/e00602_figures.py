@@ -33,6 +33,7 @@ CONTRIB = "#306BFF"
 DEPTH = "#7A1FA2"
 STAGE_TITLE = {
     "s1": "Stage 1: datetime encoder only",
+    "d": "Datetime encoder only (weather and lag embeddings at their mean)",
     "w": "Weather encoder only (datetime and lag embeddings at their mean)",
     "s2": "Stage 2: datetime + weather encoders",
     "s3": "Stage 3: datetime + weather + lag encoders (the full network)",
@@ -441,6 +442,7 @@ def single_encoder_figures(clean):
         p1 = forecast_panel(
             df=df,
             stage="s1",
+            title=STAGE_TITLE["d"],
             obs=obs,
             xdom=xdom,
             ydom=(lo, hi),
@@ -483,7 +485,7 @@ def share_panel(*, series, xdom, title, ydom, xtitle=None):
     ax = alt.Axis(format="%d %b", tickCount=8)
     sy = alt.Scale(domain=list(ydom), nice=False)
     shade = (
-        alt.Chart(pl.DataFrame({"a": [str(SWITCH_TIMES[0])], "b": [str(SWITCH_TIMES[1])]}))
+        alt.Chart(pl.DataFrame({"a": [str(SWITCH_TIMES[0])], "b": [str(SWITCH_TIMES[1])]}))  # ty: ignore[unresolved-attribute]
         .mark_rect(color=cp.SHADE_COLOUR, opacity=0.7, clip=True, aria=False)
         .encode(x=alt.X("a:T", scale=sx, axis=ax), x2="b")
     )  # ty: ignore[unresolved-attribute]
@@ -501,7 +503,7 @@ def share_panel(*, series, xdom, title, ydom, xtitle=None):
         )
     )
     rules = (
-        alt.Chart(pl.DataFrame({"x": [str(v) for v in SWITCH_TIMES]}))
+        alt.Chart(pl.DataFrame({"x": [str(v) for v in SWITCH_TIMES]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color=cp.RULE_COLOUR, strokeDash=[6, 3], strokeWidth=1.3, aria=False)
         .encode(x=alt.X("x:T", scale=sx, axis=ax))
     )  # ty: ignore[unresolved-attribute]
@@ -516,8 +518,8 @@ def weight_figures():
     """The lag encoder's share of the encoders' effect over time, by two sensitivity measures (not attention)."""
     xdom = (datetime(2025, 12, 16), datetime(2026, 1, 28))
     names = {
-        "loo": "leave-one-encoder-out change in the median",
-        "grad": "gradient times input of the mixture mean",
+        "loo": "leave-one-encoder-out sensitivity, not attention",
+        "grad": "gradient-times-input sensitivity, not attention",
     }
     table = []
     for lab, p in PRIM.items():
@@ -570,13 +572,13 @@ def weight_figures():
             top = share_panel(
                 series=half,
                 xdom=xdom,
-                title=f"{lab}: every half-hour, {names[measure]}",
+                title=f"{lab}: every half-hour ({names[measure]})",
                 ydom=(0, 1),
             )
             bottom = share_panel(
                 series=day,
                 xdom=xdom,
-                title=f"{lab}: daily average",
+                title=f"{lab}: daily average ({names[measure]})",
                 ydom=(0, 0.6),
                 xtitle="Valid time (UTC)",
             )

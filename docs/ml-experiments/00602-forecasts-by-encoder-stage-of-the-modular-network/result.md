@@ -153,7 +153,7 @@ D16>_single_encoders.svg`.
 
 ## How much weight the mixer gives each encoder
 
-**The lag encoder carries about 0.15 to 0.30 of the three encoders' summed effect on the median, and
+**The lag encoder carries about 0.1 to 0.4 of the three encoders' summed effect on the median, and
 that share fell at D5 but not at D16 during the load-shift.** The mixer is a plain
 multi-layer perceptron, so it has no attention weights to plot. Two sensitivity measures stand in
 for them, and neither is attention:
@@ -170,24 +170,26 @@ The lag encoder's share is its absolute value over the sum of the three encoders
 
 *Caption: the lag encoder's share at D5 by leave-one-encoder-out, every half-hour (top) and as a
 daily average (bottom), for P5, C1, and A1. Look at the daily average: the share falls from about
-0.3 to about 0.1 to 0.15 about 3 days after the start of the load-shift and recovers about 3 days
-after the end, for all three networks. It is a sensitivity measure, not attention.*
+0.3 to about 0.2 around 3 days after the start of the load-shift and to 0.1 to 0.15 by about 7 days.
+P5 and C1 climb back to 0.2 or more within about 10 days after the end, and A1 stays near 0.07 for
+about a week after the end. It is a sensitivity measure, not attention.*
 
 ![Lag encoder's share at D16, leave-one-encoder-out](weights_loo_D16.svg)
 
-*Caption: the same at D16. The share stays between about 0.2 and 0.33 through the load-shift, so
-the network does not ignore the lag encoder here. It is a sensitivity measure, not attention.*
+*Caption: the same at D16. The daily share rises from about 0.2 to a peak of 0.35 to 0.42 around
+the end of the load-shift, and then falls back, so the network does not ignore the lag
+encoder here. It is a sensitivity measure, not attention.*
 
 The gradient-times-input versions are `weights_grad_D5.svg` and `weights_grad_D16.svg`.
 
 | Lag encoder's share | Measure | Before (14 d) | First 4 days | Day 4 to end | After (14 d) |
 |---|---|---|---|---|---|
-| D5 P5 | leave-one-out | 0.28 | 0.29 | 0.15 | 0.19 |
-| D5 C1 | leave-one-out | 0.25 | 0.28 | 0.16 | 0.18 |
+| D5 P5 | leave-one-out | 0.28 | 0.29 | 0.14 | 0.19 |
+| D5 C1 | leave-one-out | 0.25 | 0.27 | 0.16 | 0.18 |
 | D5 A1 | leave-one-out | 0.25 | 0.26 | 0.10 | 0.10 |
 | D5 P5 | gradient times input | 0.24 | 0.22 | 0.09 | 0.09 |
 | D5 C1 | gradient times input | 0.21 | 0.20 | 0.07 | 0.07 |
-| D5 A1 | gradient times input | 0.15 | 0.18 | 0.15 | 0.16 |
+| D5 A1 | gradient times input | 0.15 | 0.18 | 0.14 | 0.16 |
 | D16 P5 | leave-one-out | 0.23 | 0.24 | 0.33 | 0.30 |
 | D16 C1 | leave-one-out | 0.20 | 0.22 | 0.28 | 0.26 |
 | D16 A1 | leave-one-out | 0.22 | 0.28 | 0.28 | 0.24 |
@@ -201,9 +203,9 @@ which has no lag token, and they are not per half-hour. Plotting them here would
 encoder.
 
 The shares are one Primary, one event, and one seed each, and the fall at D5 starts about 3 days
-into the event and ends about 3 days after it. Weather also changed over those weeks, so the fall
-may not be a reaction to the load-shift. The leave-one-out and gradient measures disagree about A1
-at D5 (0.10 against 0.15 in the day 4 to end column).
+into the event and lasts to about 10 days after its end for P5 and C1 (longer for A1). Weather also
+changed over those weeks, so the fall may not be a reaction to the load-shift. The leave-one-out and
+gradient measures disagree about A1 at D5 (0.10 against 0.14 in the day 4 to end column).
 
 ## Injected load-shifts
 
