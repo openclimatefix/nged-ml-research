@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D205, D107, PLR0915, PLR0912, C901
+# ruff: noqa: E501, D205, PERF401, PLR0915
 """Experiment 597: score the assembled forecasts C1 + G4 and A1 + G4 (and their plain networks).
 
 No fit and no GPU. For one arm (`c1` or `a1`) this writes, under `data/ml-experiments/00597-*/<arm>/`:

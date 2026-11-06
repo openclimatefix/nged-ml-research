@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D205, D107
+# ruff: noqa: E501, D107
 """Experiment 597: shared set-up for assembling C1 + G4 and A1 + G4 from stored forecasts.
 
 Nothing is refitted. The assembled forecast of a network is, on every row, that network's own

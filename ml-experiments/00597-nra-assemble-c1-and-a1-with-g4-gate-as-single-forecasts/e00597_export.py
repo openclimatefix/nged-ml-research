@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, D107
+# ruff: noqa: D103
 """Experiment 597: export the assembled forecasts C1 + G4 and A1 + G4 in experiment 593's layout.
 
 No fit and no GPU. One Parquet file per system and fold month under
@@ -79,5 +79,6 @@ def main(months: tuple[str, ...]) -> None:
 
 
 if __name__ == "__main__":
-    assert a.MAX_LEAD_H == 120 and c.MONTHS
+    assert a.MAX_LEAD_H == 120
+    assert c.MONTHS
     main(tuple(sys.argv[1:]) or c.MONTHS)
