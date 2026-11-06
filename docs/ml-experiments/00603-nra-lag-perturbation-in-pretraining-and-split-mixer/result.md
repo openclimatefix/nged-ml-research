@@ -61,10 +61,11 @@ headline: >-
   on day 4 to the end and 0-7 days after the end, and the bands were narrower in nearly every arm
   (December 2025 only, descriptive).
 lessons: >-
-  The narrower bands are the one explanation we have for the lower coverage, and it was not
-  tested. The median's error against the normal running arrangement fell at the eight MVA
-  Primaries by at most 0.0065 (J3 0.0578 against J0 0.0643, 0-7 days after the end) and did not
-  fall at the six MW Primaries. Refit absorption (experiment 595 method) was not measured.
+  Widening the bands to J0's width closes the coverage gap for the arms that perturb in pre-
+  training (J1, J2, J3, J4, J4b, J5), so narrower bands explain their lower coverage. They do not
+  explain J3c, whose band is as wide as J0's and which still covers less. J0 has no re-run
+  control, so J1's and J3c's gaps of 0.016 to 0.039 are within what re-training alone could
+  produce. Refit absorption (experiment 595 method) was not measured.
 take_home_message: >-
   Showing the demand network synthetic load-shifts earlier in training, and freezing the first
   half of its mixer, did not make the forecast band hold the normal running arrangement on more
@@ -183,13 +184,27 @@ arrangement. The stored scorer has no follow ratio, so the median error stands i
 
 - Median minus mean forecast per site: not computed.
 - The median error beside the coverage contrast: the third bullet above.
-- Triggers: trigger 2 (a result contradicts its own prediction) fired for P1. The one explanation
-  we have is the narrower bands, and it was not tested, so whether to run an audit is the
-  manager's call. Triggers 1 and 3 to 7 did not fire.
+- Triggers: trigger 2 (a result contradicts its own prediction) fired for P1. A fresh Sonnet audit
+  (report `briefs/e603_audit.md`, private folder) re-derived all 32 coverage cells from the stored
+  injected-bank forecasts and matched the tables to 1e-6. Its findings, all accepted:
+    - **Narrower bands.** Rescaling each band about its median to J0's width closes the gap at day 4
+      to the end in both groups for J1, J2, J3, J4, J4b, and J5 (J3: eight MVA -0.010 becomes
+      +0.029, six MW -0.101 becomes +0.027). It does not close it for J3c, whose band is 1% to 3%
+      wider than J0's yet covers 0.018 to 0.038 less. The rescaling is a blunt control, because the
+      shift pushes the median to one side.
+    - **No re-run control for J0.** J0 is experiment 584's stored fit. Every other arm re-ran
+      pre-training and step 2 with this experiment's code, and no unsplit, clean pre-training arm
+      exists. J1's and J3c's gaps of 0.016 to 0.039 are the size that re-training could produce. The
+      six MW deficits of J3 (-0.10 and -0.08) are far larger.
+    - **Leave-one-Primary-out.** No single Primary flips the sign of J3 minus J0 in any group and
+      phase. With Primaries as the resampling unit, the eight MVA gap for J3 is indistinguishable
+      from zero (interval -0.030 to +0.007), and the six MW gap is not (-0.171 to -0.054).
+    - **Event counting.** The 15 and 30 day events give identical 0-7 days after the end rows, so
+      an event bootstrap over them would be too narrow in that phase.
 
 ## Caveats
 
-- One fold month (December 2025), two seeds, injected shifts only, no intervals, and no Bonferroni
+- One fold month (December 2025), two seeds, J0 not re-run (see Checks), injected shifts only, no intervals, and no Bonferroni
   count. The fold pair 2025-10 and 2025-12 was not run.
 - The real December 2025 pair, the tail quantiles, and the avoidable-curtailment cost were not
   scored.
