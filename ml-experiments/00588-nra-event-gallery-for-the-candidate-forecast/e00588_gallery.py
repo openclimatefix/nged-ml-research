@@ -12,6 +12,7 @@ Usage: DATA_PATH_INTERNAL=... PYTHONPATH=(all ml-experiments folders) python e00
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import altair as alt
 import e00582_score as sc  # ty: ignore[unresolved-import]
@@ -64,7 +65,7 @@ def two_arm_figure(*, x, q0, q2, obs, nra, strips, span, xdom, title, out, xtitl
     """One figure: C0 in the top panel, C2 (with its gate strip) in the bottom panel, then the key."""
     lo_obs = obs if label_nra is None else np.fmin(obs, label_nra)
     ydom = cp.common_ydom([(q0, lo_obs), (q2, lo_obs)], iq=IQ)
-    common = {"x": x, "iq": IQ, "obs": obs, "nra": nra, "ydom": ydom, "xdom": xdom, "xtype": xtype,
+    common: dict[str, Any] = {"x": x, "iq": IQ, "obs": obs, "nra": nra, "ydom": ydom, "xdom": xdom, "xtype": xtype,
               "span": span, "rules": rules, "label_nra": label_nra}  # fmt: skip
     units = [
         cp.arm_panel(q=q0, colour=GREY, median_colour=C0_MEDIAN, title=f"{label}C0", **common),
