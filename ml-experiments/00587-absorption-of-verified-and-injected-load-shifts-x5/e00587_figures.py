@@ -138,7 +138,7 @@ def knots_figure() -> None:
         width=W - 90,
         height=200,
         title=alt.TitleParams(
-            "The newest offset knot moves little: the absorption sits in the network weights",
+            "Movement of the newest offset knot toward the event, by arm",
             subtitle=[
                 "Day-14 refit, one dot per Primary-event of the 12 injected designs, mean over 2 seeds.",
                 "Dashed rules: the plan's 0.03 of capacity. Positive means toward the event.",
@@ -239,7 +239,9 @@ def examples_figure(
                     title="Days from the event's onset" if (case, event) == panels[-1] else None,
                 ),
                 y=alt.Y(
-                    "q50:Q", title=f"{event.label} (share of capacity)", scale=alt.Scale(zero=False)
+                    "q50:Q",
+                    title=f"Primary {event.label} (share of capacity)",
+                    scale=alt.Scale(zero=False),
                 ),
                 color=alt.Color(
                     "series:N",
@@ -256,7 +258,7 @@ def examples_figure(
             title,
             subtitle=[
                 "Daily mean of the day-ahead (24 to 48 h lead) median of each arm, mean over 2 seeds; shaded: the event.",
-                "Observed minus the event is the normal running arrangement; arms are fitted on the observed power.",
+                "The normal running arrangement is the observed power minus the event; the arms are fitted on the observed power. The page's shares use half-hourly values, not these daily means.",
             ],
             anchor="start",
             fontSize=13,
@@ -266,11 +268,62 @@ def examples_figure(
     save(chart, name)  # ty: ignore[invalid-argument-type]
 
 
+def cells_figure(shares: pl.DataFrame) -> None:
+    """Draw each injected design's refit share (days 4 to the end and 7 days after pooled) by design cell and arm."""
+    dz = common.designs().select(
+        case=pl.format("inj{}", pl.col("spec_id")),
+        cell=pl.format("{} days from day {}", pl.col("length_days"), pl.col("start_day")),
+    )
+    d = (
+        shares.filter(
+            (pl.col("case") != "verified")
+            & (pl.col("refit_day") == 14)
+            & pl.col("phase").is_in(["day_4_to_end", "after_7_days"])
+        )
+        .group_by("case", "arm")
+        .agg(pl.col("refit_q50").mean())
+        .join(dz, on="case")
+    )
+    order = ["7 days from day 3", "15 days from day 3", "30 days from day 3", "15 days from day 12"]
+    zero = alt.Chart().mark_rule(strokeDash=[4, 3], color="#888").encode(y=alt.datum(0))  # ty: ignore[unresolved-attribute]
+    pts = (
+        alt.Chart(d)
+        .mark_point(filled=True, size=60, opacity=0.85)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "cell:N",
+                sort=order,
+                title="Length of the load-shift, and the day of the month it starts",
+                axis=alt.Axis(labelAngle=0),
+            ),
+            xOffset="arm:N",
+            y=alt.Y("refit_q50:Q", title="Refit share of depth"),
+            color=ARM_COLOUR,
+        )
+    )
+    chart = alt.layer(pts, zero, data=d).properties(  # ty: ignore[invalid-argument-type]
+        width=W - 90,
+        height=200,
+        title=alt.TitleParams(
+            "Refit share of each injected load-shift by design cell",
+            subtitle=[
+                "Day-14 refit, one dot per design (3 per cell), days 4 to the end and the 7 days after the end pooled.",
+                "0 means the forecast did not move; 1 means it moved by the whole depth.",
+            ],
+            anchor="start",
+            fontSize=13,
+            subtitleFontSize=11,
+        ),
+    )
+    save(chart, "figure_5_share_by_design_cell.svg")  # ty: ignore[invalid-argument-type]
+
+
 def main() -> None:
     """Draw every figure."""
     shares = pl.read_parquet(common.OUT / "scores" / "event_shares.parquet")
     share_figure(shares)
     knots_figure()
+    cells_figure(shares)
     obs = c510.clean_stack()
     verified = [("verified", e) for e in common.case_events(case="verified")]
     examples_figure(

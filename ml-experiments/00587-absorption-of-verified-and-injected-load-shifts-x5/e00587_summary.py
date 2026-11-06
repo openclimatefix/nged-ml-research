@@ -40,6 +40,7 @@ def per_design(*, shares: pl.DataFrame, value: str) -> pl.DataFrame:
         shares.filter(pl.col("case") != "verified")
         .group_by("case", "arm", "refit_day", "phase")
         .agg(pl.col(value).mean(), pl.col("n_half_hours").mean())
+        .sort("case", "arm", "refit_day", "phase")
     )
 
 
@@ -48,7 +49,7 @@ def fmt(*, m: float, lo: float, hi: float) -> str:
     return f"{m:+.3f} ({lo:+.3f} to {hi:+.3f})"
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Print the injected-event, contrast, and verified-pair tables."""
     shares = pl.read_parquet(common.OUT / "scores" / "event_shares.parquet")
     lines: list[str] = []
@@ -176,6 +177,62 @@ def main() -> None:
             )["refit_q50"]
             cells.append(f"{v.median():+.3f}" if len(v) else "-")
         lines.append(f"| {arm} | " + " | ".join(cells) + " |")
+    dz2 = common.designs().select(
+        case=pl.format("inj{}", pl.col("spec_id")),
+        depth=pl.col("depth_share_of_smaller_capacity"),
+        length=pl.col("length_days"),
+    )
+    p1 = (
+        shares.filter(
+            (pl.col("case") != "verified")
+            & (pl.col("refit_day") == 14)
+            & (pl.col("phase") == "after_7_days")
+        )
+        .group_by("case", "arm")
+        .agg(pl.col("refit_q50").mean())
+        .join(dz2, on="case")
+        .filter(pl.col("length").is_in([15, 30]) & pl.col("depth").is_in([0.3, 0.5]))
+    )
+    lines.append(
+        "\n## P1 subset: 15 and 30 day events at 30% and 50% depth, day-14 refit, 7 days after the end (mean over designs; range; designs)"
+    )
+    for arm in common.ARMS:
+        v = p1.filter(pl.col("arm") == arm)["refit_q50"]
+        lines.append(
+            f"- {arm}: {v.mean():+.3f} (range {v.min():+.3f} to {v.max():+.3f}); {len(v)} designs; median {v.median():+.3f}"
+        )
+    kn = pl.read_parquet(common.OUT / "scores" / "knot_movement.parquet").filter(
+        (pl.col("case") != "verified") & (pl.col("refit_day") == 14)
+    )
+    kn = kn.group_by("arm", "case", "label").agg(
+        pl.col("knot_movement").mean(), pl.col("depth").first()
+    )
+    lines.append(
+        "\n## Newest-knot movement at the day-14 refit, injected (share of capacity; mean, largest, Primary-events above 0.03 in either direction)"
+    )
+    for arm in ("D5", "P5"):
+        k = kn.filter(pl.col("arm") == arm)
+        lines.append(
+            f"- {arm}: mean {k['knot_movement'].mean():+.4f}, largest {k['knot_movement'].max():+.4f}, above 0.03: {int((k['knot_movement'].abs() > 0.03).sum())} of {k.height}"
+        )
+    absorbed = (
+        shares.filter(
+            (pl.col("case") != "verified")
+            & (pl.col("refit_day") == 14)
+            & pl.col("phase").is_in(["day_4_to_end", "after_7_days"])
+        )
+        .group_by("case", "arm", "label", "depth")
+        .agg(pl.col("refit_q50").mean())
+        .with_columns((pl.col("refit_q50") * pl.col("depth").abs()).alias("absorbed_capacity"))
+    )
+    lines.append(
+        "\n## Absorbed amount in capacity units at the day-14 refit (refit share x |depth|, days 4 to the end and 7 days after pooled, mean over Primary-events), beside |depth|"
+    )
+    for arm in common.ARMS:
+        a = absorbed.filter(pl.col("arm") == arm)
+        lines.append(
+            f"- {arm}: absorbed {a['absorbed_capacity'].mean():+.3f} of capacity; mean |depth| {a['depth'].abs().mean():.3f} of capacity; Primary-events {a.height}"
+        )
     text = "\n".join(lines)
     (common.OUT / "scores" / "report.txt").write_text(text)
     print(text)
