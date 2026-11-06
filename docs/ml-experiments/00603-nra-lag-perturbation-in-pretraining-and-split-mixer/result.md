@@ -204,8 +204,8 @@ arrangement. The stored scorer has no follow ratio, so the median error stands i
 
 ## Caveats
 
-- One fold month (December 2025), two seeds, J0 not re-run (see Checks), injected shifts only, no intervals, and no Bonferroni
-  count. The fold pair 2025-10 and 2025-12 was not run.
+- One fold month (December 2025), two seeds, J0 not re-run (see Checks), injected shifts only, no
+  intervals, and no Bonferroni count. The fold pair 2025-10 and 2025-12 was not run.
 - The real December 2025 pair, the tail quantiles, and the avoidable-curtailment cost were not
   scored.
 - Pre-training sees ERA5 and CAMS analysis weather, so a distrust of lags learnt there may not
