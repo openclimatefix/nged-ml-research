@@ -207,6 +207,12 @@ days, so every number here is a short-lead result.
 - **Row set:** `experiment_470_intersection_v1`, five fold months (2025-10, 2025-12, 2026-01,
   2026-03, 2026-06), 24 to 120 h, July 2026 unused, D15 and D18 cut before 2025-03-01, cleaned data.
   Coarse refits (days 0 and 14); the contrast could depend on the cadence. Counted contrasts: 12.
+- **Two row selections.** The 672-event table sets the phase by valid time, uses the 14 Primaries of
+  the two scored groups, and keeps rows with no real event nearby. The follow table and the paired
+  contrasts set the phase by forecast origin and include D15 and D18 (16 Primaries, 960 events), so
+  their "both groups" rows include those two Primaries. Follow ratios are comparable only within one
+  definition: on the valid-time rows they are 0.105 (T0), 0.183 (T1), 0.131 (T2), 0.087 (T3), and
+  0.160 (P5).
 - **Coverage after the end** (injected 15 and 30 day events, 672 Primary-events, 0 to 7 days after,
   q05-q95, 95% event interval):
 
@@ -244,7 +250,8 @@ days, so every number here is a short-lead result.
 
 - **Safe side of q05 or q95** (share of the NRA at or above q05 for an upward shift, or at or below
   q95 for a downward shift; nominal 0.95): P5 0.793, T0 0.876, T1 0.902, T2 0.907, T3 0.895.
-- **Event-free rows, 24 to 120 h** (578,209 rows at 16 Primaries; each arm minus T0, month-block
+- **Event-free rows, 24 to 120 h** (458,689 of the 578,209 scored rows are event-free, 367,725 of
+  them at 24 h or more, at 16 Primaries; each arm minus T0, month-block
   bootstrap at the Bonferroni level of 12, points of capacity; minimum detectable effect in
   brackets). CRPS (2 × the mean pinball loss over the 11 stored quantile levels): eight MVA
   Primaries T1 +0.094 (0.105), T2 +0.034 (0.080), T3 +0.023 (0.022); six MW Primaries T1 +0.118
@@ -275,6 +282,8 @@ days, so every number here is a short-lead result.
 
 ## Checks
 
+- **Event-free CRPS, all rows at 24 h or more (x100):** P5 3.419, T0 3.440, T3 3.470, T2 3.493, T1
+  3.511, so the clean-lag reference scores best.
 - **Median minus mean forecast, and the error of the median:** not computed; only the 11 quantiles
   are stored, so the mean forecast is not stored.
 - **Triggers fired:** the placebo T3 matching the treatment T0 (P3 failed) is a surprise, which
@@ -287,8 +296,10 @@ days, so every number here is a short-lead result.
   traced that patching the target after the rows are built reaches every fine-tune row, including
   the
   early-stopping rows. It suggested running the schedule check for every arm and storing each arm's
-  schedule description; both were applied. A fresh Sonnet agent re-derived the headline numbers (see
-  the PR body). A prose review of this page follows.
+  schedule description; both were applied. A fresh Sonnet agent re-derived the coverage, width, and
+  follow ratios from the stored forecasts with its own code, and all matched to three decimals; it
+  found no leakage and no reference or twin mismatch, and its note on the event-free row count is
+  applied. A prose review of this page follows.
 
 ## Caveats
 

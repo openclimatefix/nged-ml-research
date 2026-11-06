@@ -1,7 +1,8 @@
 # ruff: noqa: E501, D103, PLC0206
 """Experiment 590: print every table the write-up quotes (also written to `report.txt`).
 
-Arms: P5 = experiment 574's plain P5 (clean lags), reference only; T0 = experiment 584's C1 (stored), T1, T2, T3 (this experiment). Reads each arm's score folder
+Arms: P5 = experiment 574's plain P5 (clean lags), reference only; T0 = experiment 584's C1
+(stored); T1, T2, and T3 (this experiment). Reads each arm's score folder
 (`score_<arm>/`, written by `e00590_score.py`; T0's is experiment 584's `score_c1`), the per-event
 follow table (`follow_events.parquet`), and `row_arrays.npz` for event-free CRPS contrasts.
 Counted contrasts: 12 = {T1, T2, T3} minus T0 x {coverage after the end, follow ratio after the end,
@@ -77,7 +78,7 @@ def follow_events() -> pl.DataFrame:
 
 
 def coverage_and_follow_contrasts(fe: pl.DataFrame) -> None:
-    """Event-paired contrasts T_k minus T0 after the end: coverage, follow ratio, safe-side share (event-level means)."""
+    """Print event-paired contrasts of each arm minus T0 after the end (event-level means)."""
     sub = fe.filter(pl.col("phase") == "after0-7")
     rows = []
     for g in GROUPS:

@@ -15,10 +15,11 @@ Arms (`--arm`):
   by the event's depth, as a real load-shift moves both.
 - `t2`: lag-only events on 2.5% of each Primary's time (schedule seed `s`) and lag-plus-target events
   on a further 2.5% (schedule seed `s + 7919`).
-- `p5`: reference only, `inject` only: experiment 574's P5 weights (fine-tuned on clean lags) forecast the injected bank.
+- `p5`: reference only, `inject` only: experiment 574's P5 weights (fine-tuned on clean lags)
+  forecast the injected bank.
 - `t3`: placebo. The lag columns read the power plus independent Gaussian noise, one draw per Primary
-  and half-hour, whose standard deviation equals the standard deviation, over the month's grid span, of
-  the shift C1 would add at that Primary. No persistent shift; targets stay clean.
+  and half-hour, whose standard deviation equals the standard deviation, over the month's grid
+  span, of the shift C1 would add at that Primary. No persistent shift; targets stay clean.
 
 The standardiser and target moments stay those of the clean power (as for C1). A shifted target is
 shifted by the same amount as the lag the schedule shifts, and where the clean power is missing the
