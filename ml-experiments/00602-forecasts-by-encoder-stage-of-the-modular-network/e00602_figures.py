@@ -305,7 +305,8 @@ def _utc_idx_of_month(month: str) -> int:
 def response_figure():
     """Per design: the lag encoder's response to an injected load-shift, with the daily-cycle baseline cancelled.
 
-    Pass r (sign +1) and pass r + 12 (sign -1) share the stage 1 and stage 2 forecasts (neither reads the lag inputs),
+    Pass r (sign +1) and pass r + 12 (sign -1) share the stage 1 and stage 2 forecasts (neither reads
+    the lag inputs),
     so the difference of their stage-3 medians is the response to a shift of twice the depth.
     """
     month_start = _utc_idx_of_month("2026-03")
@@ -375,7 +376,10 @@ def response_figure():
 
 
 def step_table(clean) -> pl.DataFrame:
-    """Return the 24-hour mean power (MW) either side of each switch time at D5 and D16 (capacity from experiment 521's site map)."""
+    """Return the 24-hour mean power (MW) either side of each switch time at D5 and D16.
+
+    Capacity comes from experiment 521's site map.
+    """
     cap = {"D5": 5.723, "D16": 9.115}
     rows = []
     for lab, p in PRIM.items():

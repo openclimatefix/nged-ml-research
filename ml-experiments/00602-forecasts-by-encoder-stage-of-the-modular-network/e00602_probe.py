@@ -91,7 +91,10 @@ def staged_quantiles(*, model, x, p, means, offset_in_tail=True) -> dict[str, to
 
 
 def mean_embeddings(*, model, mr, pool: np.ndarray, device: str) -> tuple[torch.Tensor, ...]:
-    """Return the mean activated (weather, datetime, lag) embeddings over a sample of `pool` (the cut's fine-tuning row indices)."""
+    """Return the mean activated (weather, datetime, lag) embeddings over a sample of `pool`.
+
+    `pool` holds the cut's fine-tuning row indices.
+    """
     rng = np.random.default_rng(0)
     idx = np.sort(rng.choice(pool, size=min(N_MEAN_ROWS, len(pool)), replace=False))
     sums = [0.0, 0.0, 0.0]
