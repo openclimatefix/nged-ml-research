@@ -82,6 +82,24 @@ Primaries hold long histories: D5, D10, and D11 start in 2019-09, D14 in 2019-10
 2020-12. The late starters begin between 2023 and 2025. Applies to experiments. Evidence:
 [experiment 103](00103-differentiable-physics-1-data-look/result.md).
 
+**Do not treat a missing half-hour at a solar or wind farm as a fault (medium confidence,
+provisional).** None of the 6 solar and 3 wind series has a half-hour that reads exactly 0 after
+2026-03-26, although each read 0 in 47% to 68% (solar) and 0.3% to 4.8% (wind) of half-hours a month
+in the six full months before. The cause is not determined. Applies to experiments, and to
+production if the cause lies in the source. Evidence: [experiment
+605](00605-bakeoff-final-test-data-check/result.md), which covers 2025-09 to 2026-10. Until the
+cause is known, do not compare a score over the rows present before and after late March 2026:
+score the generators on the rows present, and also on a version that fills solar night half-hours
+with 0.
+
+**Extend each cached input to the end of the window before scoring on it (high confidence for the
+dates).** A cached input is a file built from the stored tables, which a candidate trains and scores
+on. The cached inputs stop at different dates, for example the ensemble summaries at the run of
+2026-06-30, the ERA5 stage-1 tables at 2026-07-31, the ERA5 site tables at 2026-09-10, the CAMS site
+tables at 2026-09-11, and the observed-power cache at 2026-10-14, while the production power and
+ensemble tables reach 2026-11-06. Applies to experiments. Evidence: [experiment
+605](00605-bakeoff-final-test-data-check/result.md).
+
 ## Trim the start of each series
 
 **Cut the first months of most demand series (high confidence for D4, D14, D9, D16, and D18, medium
