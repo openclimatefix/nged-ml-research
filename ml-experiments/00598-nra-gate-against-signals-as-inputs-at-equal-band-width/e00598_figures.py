@@ -225,7 +225,10 @@ def follow_hist(*, suffix: str) -> None:
             x="x0:Q",
             y="count:Q",
             color=alt.Color(
-                "name:N", scale=alt.Scale(domain=order, range=colours), sort=order, legend=None
+                "name:N",
+                scale=alt.Scale(domain=order, range=colours),
+                sort=order,
+                legend=alt.Legend(title=None, orient="top", columns=2),
             ),
         )
     )
