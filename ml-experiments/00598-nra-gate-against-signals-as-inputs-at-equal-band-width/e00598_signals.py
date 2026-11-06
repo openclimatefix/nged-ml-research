@@ -224,6 +224,9 @@ def signal_block(
         table: The lag-free table `T`.
         widths: (rows, 2) lags-masked q05 minus median and q95 minus median, share of capacity.
         nb: The neighbours and capacities.
+
+    Returns:
+        The (rows, `N_SIGNALS`) float32 signal block.
     """
     n = len(prim)
     assert (day_idx[~day_missing] <= origin_idx[~day_missing] - 48).all()

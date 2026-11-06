@@ -138,9 +138,9 @@ The next five figures show the December 2025 example event, D5 and D16, from 14 
 days after, with dashed lines at the maintainer's switch times 2025-12-30 01:00 and 2026-01-14
 11:30.
 The maintainer's times match the observed steps (summed absolute step 0.90 of capacity, against 0.22,
-printed by `e00598_figures.py example`, for [experiment
-580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)'s
-window about a day earlier). One arm per figure; coverage is scored against an estimated NRA, which
+printed by `e00598_figures.py example`, for the window of [experiment
+580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/),
+about a day earlier). One arm per figure; coverage is scored against an estimated NRA, which
 is not drawn. Look at where the observed power (black) leaves the shaded band after the onset, and
 at whether the strip under the panel is on while it does. The strip is plotted at valid time (the
 origin day plus one), and "on" includes the roughly 7 days the band is held after the gate turns
