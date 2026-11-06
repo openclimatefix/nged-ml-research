@@ -54,7 +54,7 @@ def main() -> None:
     runs = pl.concat(frames).sort("init_time")
     runs.write_parquet(OUT_DIR / "ens_runs.parquet")
     expected = pl.datetime_range(
-        FIRST_RUN, runs["init_time"].max(), "1d", time_zone="UTC", eager=True
+        FIRST_RUN, runs.select(pl.col("init_time").max()).item(), "1d", time_zone="UTC", eager=True
     )
     missing = expected.filter(~expected.is_in(runs["init_time"]))
     pl.DataFrame({"missing_run": missing}).write_parquet(OUT_DIR / "ens_missing_runs.parquet")

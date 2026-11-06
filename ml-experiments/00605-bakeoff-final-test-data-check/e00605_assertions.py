@@ -44,7 +44,7 @@ def main() -> None:
             bad.append(str(run))
     out["origins_whose_run_is_not_the_same_day_run"] = bad
     horizon = runs.filter(pl.col("init_time") >= FIRST_ORIGIN_DAY)
-    out["min_run_horizon_hours"] = int(horizon["max_lead_h"].min())
+    out["min_run_horizon_hours"] = int(horizon.select(pl.col("max_lead_h").min()).item())
     out["runs_with_fewer_than_51_members"] = int((horizon["members"] < 51).sum())
     # 2. Lag ages on the half-hour grid.
     ids = series_labels().filter(pl.col("group").str.starts_with("Primary"))
