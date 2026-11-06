@@ -37,8 +37,9 @@ decision_rule: >-
   measure's tolerance; removable only if every interval lies inside the tolerance; otherwise
   inconclusive (kept, and flagged). Tolerances: coverage 0.01, follow 0.01, absorption 0.03,
   event-free CRPS the printed minimum detectable effect, event-free q05 and q95 coverage 0.01;
-  curtailment cost is reported only. The Bonferroni count is stated as a number in the write-up. No arm is read until the
-  K1 reference (K1-ref) reproduces experiment 597 within 0.003. The experiment adopts nothing.
+  curtailment cost is reported only. The Bonferroni count is stated as a number in the write-up. No
+  arm is read until the K1 reference (K1-ref) reproduces experiment 597 within 0.003. The
+  experiment adopts nothing.
 benchmark: >-
   A1 + G4 of experiment 597 (day-4-to-end coverage 0.925), and K1 itself as the reference for every
   removal.
