@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, C416, FURB192, PT018, PERF401, PLC0206
+# ruff: noqa: E501, D103, PT018, PERF401
 """Experiment 590: per-event follow ratios and phase coverage on the lag-only injected bank, all four arms.
 
 Reuses experiment 581's `event_table` (follow ratio = mean over rows of (q_tau with the injected lags

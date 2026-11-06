@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, C416, FURB192, PT018, PERF401, PLC0206
+# ruff: noqa: E501, D103, PLC0206
 """Experiment 590: print every table the write-up quotes (also written to `report.txt`).
 
 Arms: P5 = experiment 574's plain P5 (clean lags), reference only; T0 = experiment 584's C1 (stored), T1, T2, T3 (this experiment). Reads each arm's score folder

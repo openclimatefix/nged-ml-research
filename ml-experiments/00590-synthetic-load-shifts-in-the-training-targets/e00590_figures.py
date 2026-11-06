@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, C416, FURB192, PT018, PERF401, PLC0206
+# ruff: noqa: E501, D103, C416, FURB192
 """Experiment 590 figures: coverage, following, width, tails, event-free cost, and example forecasts.
 
 Run `e00590_score.py` for t1, t2, t3, and p5 and `e00590_follow.py` first. Demand series only: every
@@ -52,7 +52,7 @@ PHASE_TITLE = {
 }
 
 
-def save(chart: alt.Chart | alt.VConcatChart | alt.HConcatChart, name: str) -> None:
+def save(chart: alt.TopLevelMixin, name: str) -> None:
     DOCS.mkdir(parents=True, exist_ok=True)
     chart.save(str(DOCS / name))
 
@@ -83,7 +83,7 @@ def coverage_headline() -> None:
         .pipe(lab)
     )
     nom = (
-        alt.Chart(pl.DataFrame({"y": [0.9]}))
+        alt.Chart(pl.DataFrame({"y": [0.9]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="black", strokeDash=[4, 3])
         .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0.7, 1.0])))
     )
@@ -94,14 +94,14 @@ def coverage_headline() -> None:
             x=alt.X("arm:N", sort=ARMS, title=None),
             color=arm_colour() if g == "both groups" else arm_colour().legend(None),
         )
-        pts = base.mark_point(filled=True, size=90, aria=False).encode(
+        pts = base.mark_point(filled=True, size=90, aria=False).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y(
                 "cover90:Q",
                 scale=alt.Scale(domain=[0.7, 1.0]),
                 title="Share of the NRA inside q05-q95",
             )
         )
-        err = base.mark_rule(aria=False).encode(
+        err = base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("cover90_lo:Q", scale=alt.Scale(domain=[0.7, 1.0])), y2="cover90_hi:Q"
         )
         panels.append(alt.layer(nom, err, pts).properties(width=190, height=230, title=g))
@@ -143,16 +143,16 @@ def by_phase(
         ),
         color=arm_colour(),
     )
-    line = base.mark_line(aria=False).encode(
+    line = base.mark_line(aria=False).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("v:Q", title=title, scale=alt.Scale(domain=domain))
     )
-    pts = base.mark_point(filled=True, size=50, aria=False).encode(y="v:Q")
-    err = base.mark_rule(aria=False, opacity=0.5).encode(y="lo:Q", y2="hi:Q")
+    pts = base.mark_point(filled=True, size=50, aria=False).encode(y="v:Q")  # ty: ignore[unresolved-attribute]
+    err = base.mark_rule(aria=False, opacity=0.5).encode(y="lo:Q", y2="hi:Q")  # ty: ignore[unresolved-attribute]
     layers = [err, line, pts]
     if nominal is not None:
         layers.insert(
             0,
-            alt.Chart(pl.DataFrame({"y": [nominal]}))
+            alt.Chart(pl.DataFrame({"y": [nominal]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black", strokeDash=[4, 3])
             .encode(y="y:Q"),
         )
@@ -183,7 +183,7 @@ def width_figure() -> None:
         base = alt.Chart(d).encode(
             color=arm_colour() if g == "MVA-only eight" else arm_colour().legend(None)
         )
-        pts = base.mark_point(filled=True, size=80, aria=False).encode(
+        pts = base.mark_point(filled=True, size=80, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "width:Q", title="Mean q05-q95 width (% of capacity)", scale=alt.Scale(zero=False)
             ),
@@ -193,16 +193,16 @@ def width_figure() -> None:
                 scale=alt.Scale(domain=[0.7, 1.0]),
             ),
         )
-        err = base.mark_rule(aria=False).encode(
+        err = base.mark_rule(aria=False).encode(  # ty: ignore[unresolved-attribute]
             x="width:Q",
             y=alt.Y("cover90_lo:Q", scale=alt.Scale(domain=[0.7, 1.0])),
             y2="cover90_hi:Q",
         )
-        txt = base.mark_text(dy=-12, fontSize=10, aria=False).encode(
+        txt = base.mark_text(dy=-12, fontSize=10, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x="width:Q", y=alt.Y("cover90:Q", scale=alt.Scale(domain=[0.7, 1.0])), text="arm:N"
         )
         nom = (
-            alt.Chart(pl.DataFrame({"y": [0.9]}))
+            alt.Chart(pl.DataFrame({"y": [0.9]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black", strokeDash=[4, 3])
             .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0.7, 1.0])))
         )
@@ -226,7 +226,7 @@ def tails_figure() -> None:
         )
     )
     ch = (
-        alt.Chart(long_)
+        alt.Chart(long_)  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
         .encode(
             x=alt.X("arm:N", sort=ARMS, title=None, axis=None),
@@ -272,7 +272,7 @@ def event_free_figure() -> None:
             yOffset=alt.YOffset("group:N", sort=["MVA-only eight", "signed-MW six"]),
             color=arm_colour() if metric == "CRPS" else arm_colour().legend(None),
         )
-        pts = base.mark_point(filled=True, size=70, aria=False).encode(
+        pts = base.mark_point(filled=True, size=70, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("diff:Q", title=ttl),
             shape=alt.Shape(
                 "group:N",
@@ -282,9 +282,9 @@ def event_free_figure() -> None:
                 else None,
             ),
         )
-        err = base.mark_rule(aria=False).encode(x="lo:Q", x2="hi:Q")
+        err = base.mark_rule(aria=False).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
         zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}))
+            alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="black", strokeDash=[4, 3])
             .encode(x="x:Q")
         )
@@ -377,20 +377,20 @@ def example_figure(
                 axis=alt.Axis(labels=arm == "T3"),
             )
         )
-        wide = base.mark_area(opacity=0.18, color=COLOUR[arm], clip=True, aria=False).encode(
+        wide = base.mark_area(opacity=0.18, color=COLOUR[arm], clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q01:Q", title="Power (% of capacity)"), y2="q99:Q"
         )
-        mid = base.mark_area(opacity=0.40, color=COLOUR[arm], clip=True, aria=False).encode(
+        mid = base.mark_area(opacity=0.40, color=COLOUR[arm], clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
             y="q05:Q", y2="q95:Q"
         )
-        med = base.mark_line(color=COLOUR[arm], aria=False).encode(y="q50:Q")
+        med = base.mark_line(color=COLOUR[arm], aria=False).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
         act = (
-            alt.Chart(nr)
+            alt.Chart(nr)  # ty: ignore[unresolved-attribute]
             .mark_line(color="black", strokeDash=[3, 2], aria=False)
             .encode(x="day:Q", y=alt.Y("nra:Q"))
         )
         sh = (
-            alt.Chart(shade)
+            alt.Chart(shade)  # ty: ignore[unresolved-attribute]
             .mark_rect(color="#999999", opacity=0.12, aria=False)
             .encode(x="x0:Q", x2="x1:Q")
         )
