@@ -1,5 +1,5 @@
 # ruff: noqa: E501, D103, PT018, PERF401
-"""Experiment 594: per-event follow ratios and phase coverage on the lag-only injected bank, all four arms.
+"""Experiment 594: per-event follow ratios and phase coverage on the lag-only injected bank, all five arms.
 
 Reuses experiment 581's `event_table` (follow ratio = mean over rows of (q_tau with the injected lags
 minus q_tau of the same weights with clean lags) x sign / depth). The twin is the arm's regular
@@ -19,7 +19,10 @@ import e00581_tails as t  # ty: ignore[unresolved-import]
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-ROOT = ML_EXPERIMENTS_DATA_DIR / "00594-persistent-and-share-matched-placebos-for-synthetic-load-shifts"
+ROOT = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00594-persistent-and-share-matched-placebos-for-synthetic-load-shifts"
+)
 ROOT590 = ML_EXPERIMENTS_DATA_DIR / "00590-synthetic-load-shifts-in-the-training-targets"
 ROOT584 = ML_EXPERIMENTS_DATA_DIR / "00584-nra-candidate-pack-x6"
 VIEWS = {

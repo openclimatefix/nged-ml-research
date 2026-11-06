@@ -18,7 +18,10 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-ROOT = ML_EXPERIMENTS_DATA_DIR / "00594-persistent-and-share-matched-placebos-for-synthetic-load-shifts"
+ROOT = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00594-persistent-and-share-matched-placebos-for-synthetic-load-shifts"
+)
 ROOT590 = ML_EXPERIMENTS_DATA_DIR / "00590-synthetic-load-shifts-in-the-training-targets"
 ROOT584 = ML_EXPERIMENTS_DATA_DIR / "00584-nra-candidate-pack-x6"
 SCORE = {
@@ -103,7 +106,9 @@ def coverage_and_follow_contrasts(fe: pl.DataFrame) -> None:
                         "group": g,
                         "measure": m,
                         "arm": k.upper(),
-                        "counted": k.upper() in COUNTED_ARMS,
+                        "counted": k.upper() in COUNTED_ARMS
+                        and g == "both groups"
+                        and m in ("cov90", "follow_q50"),
                         "n_events": len(d),
                         "T0": ok["t0"].mean(),
                         "arm_value": ok[k].mean(),

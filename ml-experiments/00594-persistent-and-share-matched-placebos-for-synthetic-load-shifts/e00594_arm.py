@@ -86,7 +86,7 @@ _build_month_p5 = e.k.build_month
 
 
 def placebo_series(
-    *, clean: np.ndarray, first: int, last: int, seed: int, kind: str, share: float = bank.SYN_SHARE
+    *, clean: np.ndarray, first: int, last: int, seed: int, kind: str
 ) -> tuple[np.ndarray, dict]:
     """Return `clean` with a placebo in place of each synthetic event of experiment 581's schedule.
 
@@ -104,7 +104,7 @@ def placebo_series(
     net = []
     for p in range(clean.shape[0]):
         covered = 0
-        while covered < share * (last - first):
+        while covered < bank.SYN_SHARE * (last - first):
             length = int(rng.choice(bank.LENGTHS_DAYS)) * bank.PER_DAY
             on = int(rng.integers(first, max(first + 1, last - length)))
             depth = float(rng.choice(bank.DEPTHS))
@@ -141,9 +141,7 @@ def build_month_variant(*, month, clean):
     seed = int(month.replace("-", ""))
     if month == e.ARGS.months[0]:
         check_schedule(clean=clean, first=first, last=last, seed=seed)
-    lag_series, info = placebo_series(
-        clean=clean, first=first, last=last, seed=seed, kind=ARM
-    )
+    lag_series, info = placebo_series(clean=clean, first=first, last=last, seed=seed, kind=ARM)
     blk = e.block_of(
         clean=lag_series, primary=mr.primary, target_idx=mr.target_idx, origin_idx=origin_idx
     )

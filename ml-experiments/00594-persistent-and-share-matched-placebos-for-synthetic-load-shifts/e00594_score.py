@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Experiment 594: score arms PS and PP with experiment 584's scoring (which wraps experiment 583's).
 
-No fit and no GPU. Experiment 584's `ARMS` table is extended with the three new arms and `ROOT` is
+No fit and no GPU. Experiment 584's `ARMS` table is extended with the two new arms and `ROOT` is
 pointed at this experiment's data folder, so the symlink views and score folders land here. Arm T0 is
 experiment 584's C1, T3 and P5 are experiment 590's: their score folders are read in place by
 `e00594_report.py`.
