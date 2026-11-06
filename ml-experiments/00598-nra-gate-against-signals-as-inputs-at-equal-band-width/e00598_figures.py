@@ -16,6 +16,7 @@ black or grey; the load-shift shade is a pale yellow that no arm uses.
 """
 
 import argparse
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -138,7 +139,9 @@ def phase_chart(
 def width_chart(*, suffix: str) -> None:
     t = pl.read_csv(score.ROOT / f"score{suffix}" / "bank_summary.csv", infer_schema_length=None)
     systems = [
-        s for s in ("A1", "R", "W", "S", "S-g", "S-p") if s in t["system"].unique().to_list()
+        s
+        for s in ("A1", "R", "W", "S", "S-rs", "S-g", "S-g-rs", "S-p", "S-p-rs")
+        if s in t["system"].unique().to_list()
     ]
     t = t.filter(
         (pl.col("group") == "both groups") & (pl.col("length_class") == "15 and 30 days")
@@ -154,7 +157,7 @@ def width_chart(*, suffix: str) -> None:
             y=alt.Y("width90:Q", title="Mean q95 - q05 (share of capacity; smaller is narrower)"),
             color=alt.Color("name:N", scale=alt.Scale(domain=order, range=[COLOUR[s] for s in systems]), sort=order, legend=alt.Legend(title=None, orient="top", columns=3)),
         )
-        .properties(width=W, height=PANEL_H, title=alt.TitleParams(["Band width by arm on injected 15 and 30 day load-shifts, 24-120 h ahead, both metering groups", "Bar: mean over Primary-events. The width-matched controls equal R's width on R's wide origin days."], fontSize=11, anchor="start"))
+        .properties(width=W, height=PANEL_H, title=alt.TitleParams(["Band width by arm on injected 15 and 30 day load-shifts, 24-120 h ahead, both metering groups", "Bar: mean over Primary-events. The width-matched controls (-rs) are rescaled to R's width on R's wide origin days in the bank, 24-120 h."], fontSize=11, anchor="start"))
     )  # fmt: skip
     save(ch, "width_by_arm.svg")
 
@@ -295,6 +298,7 @@ def arm_figure(
     gate: np.ndarray | None,
     gate_label: str,
     caption: list[str],
+    check=None,
 ) -> None:
     t = sy.t
     cols = {
@@ -382,9 +386,8 @@ def arm_figure(
         if gate is not None:
             od = t.origin_day[rows]
             state = gate[p, od]
-            assert np.array_equal(state, gate[p][od]), (
-                "gate strip does not match the stored gate state"
-            )
+            if check is not None:
+                check(p=p, origin_idx=t.origin_idx[rows], state=state)
             rects = strip_rects(x=x, on=state)
             rects = rects.with_columns(what=pl.lit(cols["gate"]))
             strip = (
@@ -402,6 +405,75 @@ def arm_figure(
         alt.vconcat(*parts, spacing=4).resolve_scale(color="shared"),
         f"example_event_{name.replace('-', '_')}.svg",
     )
+
+
+def saved_g4_bits(*, suffix: str, months: list[str], seeds: list[int], n_days: int) -> dict:
+    """Load the G4 bits that arm S-g's forecast windows used (saved by `e00598_arm.py`).
+
+    Returns `state` (16, days), True where the seed-mean bit is at least 0.5, `seen` (16, days), True
+    where any window used a bit for that Primary and origin day, and `split` (16, days), True where
+    the seeds' bits differ.
+    """
+    work = score.ROOT / f"{score.ARM_DIR['S-g']}{suffix}" / "work" / "bits" / "P5"
+    per_seed = {sd: np.full((16, n_days), np.nan, np.float32) for sd in seeds}
+    for sd in seeds:
+        for m in months:
+            for f in sorted(work.glob(f"{m}_d*_s{sd}.npz")):
+                z = np.load(f)
+                day = z["origin_idx"] // score.sig.PER_DAY
+                key = z["prim"].astype(np.int64) * n_days + day
+                cur = per_seed[sd].reshape(-1)
+                for kk, b in zip(key, z["bit"], strict=True):
+                    assert np.isnan(cur[kk]) or cur[kk] == b, "one origin day has two bit values"
+                    cur[kk] = b
+    stack = np.stack(list(per_seed.values()))
+    assert np.isfinite(stack).any(), f"no saved G4 bits under {work}"
+    rows = [np.load(f) for sd in seeds for m in months for f in sorted(work.glob(f"{m}_d*_s{sd}.npz"))]  # fmt: skip
+    key = np.concatenate([z["prim"].astype(np.int64) * (1 << 32) + z["origin_idx"] for z in rows])
+    bit = np.concatenate([z["bit"] for z in rows])
+    uniq, inv = np.unique(key, return_inverse=True)
+    row_bit = np.bincount(inv, weights=bit) / np.bincount(inv)
+    seen = np.isfinite(stack).any(axis=0)
+    mean = np.nanmean(np.where(np.isfinite(stack), stack, np.nan), axis=0)
+    split = np.nanmax(stack, axis=0) != np.nanmin(stack, axis=0)
+    return {
+        "state": np.nan_to_num(mean) >= 0.5, "seen": seen, "split": split & seen,
+        "row_key": uniq, "row_bit": row_bit,
+    }  # fmt: skip
+
+
+def bits_check(*, bits: dict) -> Callable[..., None]:
+    """Return a function that checks a drawn strip against the saved row-level bits.
+
+    The strip is drawn from the day-level state; the check looks each plotted row up by (Primary,
+    origin index) in the saved per-row bits and asserts the strip agrees wherever a bit was saved.
+    """
+
+    def check(*, p: int, origin_idx: np.ndarray, state: np.ndarray) -> None:
+        key = p * (1 << 32) + origin_idx.astype(np.int64)
+        pos = np.clip(np.searchsorted(bits["row_key"], key), 0, len(bits["row_key"]) - 1)
+        hit = bits["row_key"][pos] == key
+        assert hit.any(), "no saved G4 bit under the plotted window"
+        assert np.array_equal(state[hit], bits["row_bit"][pos[hit]] >= 0.5), (
+            "the S-g gate strip differs from the bit the forecasts used"
+        )
+
+    return check
+
+
+def report_gate_difference(
+    *, bits: dict, wide_t: np.ndarray, prims: list[int], lo: int, hi: int
+) -> None:
+    """Print how far the saved bit differs from the pooled-threshold table gate (`wide_t.npy`)."""
+    d0, d1 = lo // score.sig.PER_DAY, hi // score.sig.PER_DAY
+    for p in prims:
+        seen = bits["seen"][p, d0:d1]
+        diff = int((bits["state"][p, d0:d1][seen] != wide_t[p, d0:d1][seen]).sum())
+        print(
+            f"  S-g gate, Primary {p}: saved bit differs from the table gate on {diff} of {int(seen.sum())} origin days;"
+            f" the seeds disagree on {int(bits['split'][p, d0:d1].sum())}",
+            flush=True,
+        )
 
 
 def example(*, suffix: str) -> None:
@@ -443,11 +515,19 @@ def example(*, suffix: str) -> None:
     for n in sy.names:
         if n.endswith("-rs") or n == "G4T":
             continue
-        gate = stored if n == "R" else wide_t if n == "S-g" else None
-        glabel = "G4 on or held (stored state)" if n == "R" else "G4-on-T bit on or held"
+        gate, check = None, None
+        if n == "R":
+            gate = stored
+        elif n == "S-g":
+            bits = saved_g4_bits(suffix=suffix, months=["2025-12", "2026-01"], seeds=[0, 1], n_days=stored.shape[1])  # fmt: skip
+            gate = bits["state"]
+            report_gate_difference(bits=bits, wide_t=wide_t, prims=list(prims.values()), lo=lo, hi=hi)  # fmt: skip
+            check = bits_check(bits=bits)
+        glabel = "G4 on or held (stored state)" if n == "R" else "G4 bit S-g used (on or held)"
         arm_figure(
-            name=n, sy=sy, prims=prims, lo=lo, hi=hi, gate=gate, gate_label=glabel, caption=cap
-        )
+            name=n, sy=sy, prims=prims, lo=lo, hi=hi, gate=gate, gate_label=glabel, caption=cap,
+            check=check,
+        )  # fmt: skip
 
 
 if __name__ == "__main__":

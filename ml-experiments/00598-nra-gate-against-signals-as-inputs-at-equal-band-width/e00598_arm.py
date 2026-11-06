@@ -30,6 +30,7 @@ import argparse
 import dataclasses
 import json
 import sys
+from pathlib import Path
 
 _p = argparse.ArgumentParser()
 _p.add_argument("arm", choices=("S", "S-g", "S-p"))
@@ -225,6 +226,8 @@ class FoldSignals:
         self._train: np.ndarray | None = None
         self._source: np.ndarray | None = None
         self.report: dict = {}
+        self.last_bit: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+        # (Primary, origin index, G4 bit) of the rows of the latest `test_block` call (arm S-g)
         o = np.concatenate([origin_idx_of(origin_us=mr.origin_us), test.origin_idx])
         self.origin_days = sorted({int(d) for d in np.unique(o // sig.PER_DAY)})
         self.n_days = GRID_SHAPE[1] // sig.PER_DAY
@@ -316,6 +319,7 @@ class FoldSignals:
         if ARM == "S-g":
             bit = self.g4_bit(power_sig=power_sig, prim=test.primary, origin=test.origin_idx)
             block = np.concatenate([block, bit[:, None]], axis=1)
+            self.last_bit = (test.primary.copy(), test.origin_idx.copy(), bit.copy())
         if ARM == "S-p":
             assert self._source is not None
             block = sig.placebo_block(
@@ -480,6 +484,21 @@ def known_answer_real(*, fs: FoldSignals, test) -> None:
         assert abs(float(np.median(got_dis[live])) / sig.SCALE - shift) < 0.05
 
 
+def bits_file(*, month: str, day: int, seed: int) -> Path:
+    return e.W / "bits" / e.SPEC.tag / f"{month}_d{day}_s{seed}.npz"
+
+
+def save_g4_bits(*, fs: FoldSignals, month: str, day: int, seed: int) -> None:
+    """Save the G4 bit that arm S-g's forecast window used, per row (Primary, origin index, bit)."""
+    assert fs.last_bit is not None, "the window did not build a G4 bit"
+    prim, origin, bit = fs.last_bit
+    target = bits_file(month=month, day=day, seed=seed)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(".tmp.npz")
+    np.savez(tmp, prim=prim, origin_idx=origin, bit=bit)
+    tmp.rename(target)
+
+
 def run_fit(*, device: str = "cuda") -> None:
     clean = e.c.clean_stack()
     assert clean.shape == GRID_SHAPE, clean.shape
@@ -522,6 +541,8 @@ def run_fit(*, device: str = "cuda") -> None:
                     out.with_suffix(".empty").touch()
                 else:
                     e.atomic_frame(frame=frame, target=out)
+                    if ARM == "S-g":
+                        save_g4_bits(fs=fs, month=month, day=day, seed=seed)
                 log["seconds"] = round(e.time.monotonic() - started, 2)
                 log["signal_report"] = fs.report
                 e.c.write_json(

@@ -28,7 +28,7 @@ prediction: >-
   W (R's band widened by a constant factor to R's mean width on event rows) by at least 0.03 after
   the end. P3: S's follow ratio is at most 0.08. P4: arm S-p (the signals replaced by noise of the
   same variance) is at least 0.02 below S, otherwise the inputs carry nothing. P5: S's event-free
-  CRPS is within the minimum detectable effect of A1.
+  CRPS is within 0.03 points of capacity of A1's.
 decision_rule: >-
   P1 and P2 both hold: prefer S, because it has no hand-tuned threshold, no neighbour rule, and no
   false-trigger rate; say that one real pair and the step from synthetic to real events remain
@@ -103,7 +103,8 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
   briefs folder as `598_plan_review.md`).**
     - **Equal width.** Each S arm also gets a width-matched control: its band rescaled about the
       median so its mean q95 - q05 on R's G4-on-or-held origin days equals R's, one factor per fold
-      and seed, printed. P1 and P2 are read on the rescaled S as well as on S, and count as passed
+      and seed, printed with its row count. The factor is fitted on the injected bank's 24-120 h
+      rows, which are the rows P1 and P2 read. P1 and P2 are read on the rescaled S as well as on S, and count as passed
       only if S's own event-row width is within 5% of R's or the rescaled S also passes. W uses the
       same factor rule applied to R.
     - **Training signals are in-sample.** Cross-fitting the frozen network is too expensive, so a
@@ -127,7 +128,8 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
       inconclusive (S-g is not run), 0.03 or more fails (run S-g as the stop rule says).
     - **Detectability.** The minimum detectable effect of every prediction is printed before the
       fits are scored; a prediction whose margin is below its minimum detectable effect is reported
-      as untestable. R's and S-p's follow ratios are printed beside P3. Contrasts counted: seven,
+      as untestable. P5's margin is fixed at 0.03 points of capacity of event-free CRPS (S minus A1,
+      both metering groups), set before any score; its interval resamples the fold months as blocks. R's and S-p's follow ratios are printed beside P3. Contrasts counted: seven,
       as above. S-g, the target-side absorption score (experiment 595's method, for R and S), and
       the real pair are descriptive and uncounted.
 - **Standing practices followed.** Monthly-equivalent coarse refits, cleaned data, the D15 and D18

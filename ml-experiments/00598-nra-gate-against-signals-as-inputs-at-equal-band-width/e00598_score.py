@@ -1,4 +1,4 @@
-# ruff: noqa: D107, D102, E501, PERF401, PLR0915, PLR0912, D103, ANN001
+# ruff: noqa: D107, D102, E501, PERF401, PLR0915, PLR0912, D103, ANN001, D205
 """Experiment 598: score R, W, S, S-g, S-p, the width-matched S arms, and G4 on the table T.
 
 No fit and no GPU. Reads the stored forecasts of arm A1 (experiment 591) and of the S arms (this
@@ -25,6 +25,8 @@ Usage: python e00598_score.py [--suffix SUFFIX] [--months M ...] [--seeds S ...]
 """
 
 import argparse
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import e00581_bank as bank  # ty: ignore[unresolved-import]
@@ -55,8 +57,10 @@ J = {n: i for i, n in enumerate(STAT_NAMES)}
 PHASES = k597.PHASES
 OUTCOME_PASS, OUTCOME_FAIL = 0.01, 0.03
 WIDTH_TOL = 0.05
-MARGIN = {"P1": 0.01, "P2": 0.03, "P3": 0.08, "P4": 0.02}
-"""The margin of each prediction, for the untestable rule: a prediction whose minimum detectable effect exceeds its margin is reported as untestable."""
+MARGIN = {"P1": 0.01, "P2": 0.03, "P3": 0.08, "P4": 0.02, "P5": 0.03}
+EF_WIDTH_TOL = 0.02
+"""P1 needs S's event-free band width within 2% of R's."""
+"""The margin of each prediction, for the untestable rule: a prediction whose minimum detectable effect exceeds its margin is reported as untestable. P5's margin is 0.03 points of capacity of event-free CRPS, fixed before any score."""
 
 
 def width90(q: np.ndarray) -> np.ndarray:
@@ -192,56 +196,134 @@ class TableGate:
 
 
 class Systems:
-    """Every system's quantiles on the table's rows, and the width factors."""
+    """Every system's quantiles on the table's rows, and the width factors.
+
+    The width factors are fitted on the injected bank's rows (`factor_source="bank"`), the rows that
+    P1 and P2 read: the 24-120 h rows of the origin days where R's band is wide under the injection.
+    `factor_source="real"` fits them on the real rows R widens instead (used only with `--no-bank`).
+    """
 
     def __init__(
-        self, *, inp: k597.Inputs, arms: dict[str, Arm], months: list[str], seeds: list[int]
-    ) -> None:
+        self, *, inp: k597.Inputs, arms: dict[str, Arm], months: list[str], seeds: list[int],
+        factor_source: str = "bank",
+    ) -> None:  # fmt: skip
         t = inp.t
         self.inp, self.t, self.arms, self.months, self.seeds = inp, t, arms, months, seeds
         v, m = t.arms["V"], t.arms["M"]
         self.wide_r = inp.mode[t.prim, t.origin_day]
         self.q: dict[str, np.ndarray] = {"A1": v, "R": k597.assemble(v=v, m=m, wide=self.wide_r)}
         self.use = np.isin(t.month, months)
-        factors = []
-        w = np.full_like(v, np.nan)
-        for mo in months:
-            rows = self.use & (t.month == mo) & self.wide_r
-            f = float(width90(self.q["R"][rows]).mean() / width90(v[rows]).mean())
-            factors.append({"system": "W", "month": mo, "seed": -1, "factor": f})
-            sel = self.use & (t.month == mo)
-            w[sel] = scale_about_median(q=v[sel], factor=f)
-        self.q["W"] = w
         self.tg = TableGate(inp=inp, months=months, seeds=seeds)
         wide_t = self.tg.wide(gap=self.tg.gap, origin_days=inp.origin_days)
         self.wide_t = wide_t[t.prim, t.origin_day]
         self.q["G4T"] = k597.assemble(v=v, m=m, wide=self.wide_t)
         for name, arm in arms.items():
-            per_seed, per_seed_rs = [], []
-            for seed in seeds:
-                q = arm.q[seed]
-                rs = np.full_like(q, np.nan)
-                for mo in months:
-                    sel = self.use & (t.month == mo)
-                    rows = sel & self.wide_r & np.isfinite(q).all(axis=1)
-                    f = float(width90(self.q["R"][rows]).mean() / width90(q[rows]).mean())
-                    factors.append({"system": f"{name}-rs", "month": mo, "seed": seed, "factor": f})
-                    rs[sel] = scale_about_median(q=q[sel], factor=f)
-                per_seed.append(q)
-                per_seed_rs.append(rs)
-            self.q[name] = np.sort(np.mean(per_seed, axis=0), axis=1)
-            self.q[f"{name}-rs"] = np.sort(np.mean(per_seed_rs, axis=0), axis=1)
-        self.factors = pl.DataFrame(factors)
-        self.names = list(self.q)
+            self.q[name] = np.sort(np.mean([arm.q[sd] for sd in seeds], axis=0), axis=1)
         self.common = self.use & np.all(
             [np.isfinite(q).all(axis=1) for q in self.q.values()], axis=0
         )
+        self.factors = (
+            fit_factors_bank(sy=self) if factor_source == "bank" else fit_factors_real(sy=self)
+        )
+        print(self.factors, flush=True)
+        w = np.full_like(v, np.nan)
+        for mo in months:
+            sel = self.use & (t.month == mo)
+            w[sel] = scale_about_median(q=v[sel], factor=self.factor(system="W", month=mo, seed=-1))
+        self.q["W"] = w
+        for name, arm in arms.items():
+            per_seed_rs = []
+            for seed in seeds:
+                rs = np.full_like(arm.q[seed], np.nan)
+                for mo in months:
+                    sel = self.use & (t.month == mo)
+                    f = self.factor(system=f"{name}-rs", month=mo, seed=seed)
+                    rs[sel] = scale_about_median(q=arm.q[seed][sel], factor=f)
+                per_seed_rs.append(rs)
+            self.q[f"{name}-rs"] = np.sort(np.mean(per_seed_rs, axis=0), axis=1)
+        self.names = list(self.q)
+        scaled = self.use & np.all([np.isfinite(q).all(axis=1) for q in self.q.values()], axis=0)
+        assert np.array_equal(scaled, self.common), "a width factor removed rows"
 
     def factor(self, *, system: str, month: str, seed: int) -> float:
         f = self.factors.filter(
             (pl.col("system") == system) & (pl.col("month") == month) & (pl.col("seed") == seed)
         )
+        assert f.height == 1, (system, month, seed)
         return float(f["factor"][0])
+
+
+class FactorAcc:
+    """Sums of R's band width and a system's band width over the rows a width factor is fitted on."""
+
+    def __init__(self) -> None:
+        self.sums: dict[tuple[str, str, int], list[float]] = {}
+
+    def add(self, *, system: str, month: str, seed: int, ref: np.ndarray, own: np.ndarray) -> None:
+        a = self.sums.setdefault((system, month, seed), [0.0, 0.0, 0.0])
+        a[0] += float(width90(ref).sum())
+        a[1] += float(width90(own).sum())
+        a[2] += len(ref)
+
+    def table(self, *, months: list[str], systems: list[tuple[str, int]]) -> pl.DataFrame:
+        """Return one factor per (system, seed, month): R's summed width over the system's, with the
+        row count. A month with no rows takes the factor pooled over all months (`pooled` True).
+        """
+        out = []
+        for system, seed in systems:
+            per = {mo: self.sums.get((system, mo, seed), [0.0, 0.0, 0.0]) for mo in months}
+            tot = np.sum(list(per.values()), axis=0)
+            assert tot[2] > 0, f"no rows to fit the width factor of {system} seed {seed}"
+            for mo in months:
+                n = per[mo][2]
+                ref, own = (per[mo][0], per[mo][1]) if n > 0 else (tot[0], tot[1])
+                out.append({
+                    "system": system, "month": mo, "seed": seed, "factor": float(ref / own),
+                    "n_rows": int(n), "pooled": bool(n == 0),
+                })  # fmt: skip
+        return pl.DataFrame(out)
+
+
+def _system_seeds(*, sy: Systems) -> list[tuple[str, int]]:
+    return [("W", -1), *((f"{n}-rs", sd) for n in sy.arms for sd in sy.seeds)]
+
+
+def fit_factors_bank(*, sy: Systems) -> pl.DataFrame:
+    """Fit W's and each S arm's width factor, per fold month (and seed), on injected-bank rows.
+
+    The rows are the 24-120 h rows, in the bank's event windows, of the origin days where R's band is
+    wide under the injection. The factors are the ratio of the mean R width to the mean width of A1
+    (for W) or of the arm's seed (for the -rs arms), pooled over the 20 passes of the month.
+    """
+    t = sy.t
+    acc = FactorAcc()
+    for cell in bank_cells(sy=sy):
+        sel = (t.band[cell.rows] == 1) & cell.wide_r_inj[cell.p_rows, cell.od_rows]
+        if not sel.any():
+            continue
+        ref = cell.q_inj_r[sel]
+        acc.add(system="W", month=cell.month, seed=-1, ref=ref, own=cell.a1_in[sel])
+        for name, d in cell.inj.items():
+            for sd, q in d.items():
+                acc.add(system=f"{name}-rs", month=cell.month, seed=sd, ref=ref, own=q[sel])
+    return acc.table(months=sy.months, systems=_system_seeds(sy=sy))
+
+
+def fit_factors_real(*, sy: Systems) -> pl.DataFrame:
+    """Fit the factors on the real rows R widens (24-120 h), the fallback when there is no bank."""
+    t = sy.t
+    acc = FactorAcc()
+    for mo in sy.months:
+        rows = sy.common & (t.month == mo) & sy.wide_r & (t.band == 1)
+        if not rows.any():
+            continue
+        acc.add(system="W", month=mo, seed=-1, ref=sy.q["R"][rows], own=sy.q["A1"][rows])
+        for name, arm in sy.arms.items():
+            for sd in sy.seeds:
+                acc.add(
+                    system=f"{name}-rs", month=mo, seed=sd, ref=sy.q["R"][rows], own=arm.q[sd][rows]
+                )
+    return acc.table(months=sy.months, systems=_system_seeds(sy=sy))
 
 
 # ---------------------------------------------------------------- bootstrap helpers
@@ -276,7 +358,13 @@ def event_free(*, sy: Systems) -> pl.DataFrame:
             if sel.sum() < 500:
                 continue
             for name in sy.names:
-                r = {"system": name, "group": grp, "band": s.BANDS[band], "n_rows": int(sel.sum())}
+                r = {
+                    "system": name,
+                    "group": grp,
+                    "band": s.BANDS[band],
+                    "n_rows": int(sel.sum()),
+                    "n_months": len({m for m in months if (sel & (t.month == m)).any()}),
+                }
                 for key in ("cover90", "width90", "crps", *TAIL):
                     col = J[key]
                     r[key] = float(st[name][sel, col].mean() * (1.0 if key == "cover90" else 100.0))
@@ -333,11 +421,32 @@ def real_events(*, sy: Systems) -> pl.DataFrame:
 # ---------------------------------------------------------------- the injected bank
 
 
-def score_bank(*, sy: Systems) -> pl.DataFrame:
-    """Return one row per (month, pass, event, phase, band, system) of the injected bank.
+@dataclass
+class Cell:
+    """One (fold month, pass) of the injected bank: the rows, the forecasts on them, and R's wide days."""
 
-    R's wide days come from G4 on E2 with the injected shifts (experiment 597); `G4T` reads T. The
-    arms' injected quantiles are the seed means (the width-matched ones use the per-seed factors).
+    month: str
+    r: int
+    ev: pl.DataFrame
+    rows: np.ndarray
+    p_rows: np.ndarray
+    od_rows: np.ndarray
+    a1_in: np.ndarray
+    inj: dict[str, dict[int, np.ndarray]]
+    wide_r_inj: np.ndarray
+    wide_t_inj: np.ndarray
+    q_inj_r: np.ndarray
+    rows597: np.ndarray
+    q_r597: np.ndarray
+
+
+def bank_cells(*, sy: Systems) -> Iterator[Cell]:
+    """Yield each (fold month, pass) cell of the injected bank, one at a time.
+
+    R's wide days come from G4 on E2 with the injected shifts (experiment 597); `G4T` reads T.
+    `rows597` is experiment 597's own row set (injected A1 finite, no other filter), on which
+    `q_r597` is R, for the reproduction check; `rows` is that set restricted to rows where every
+    system is finite on the real rows and every arm's injected forecast is finite.
     """
     inp, t = sy.inp, sy.t
     gi = inp.gi
@@ -346,8 +455,6 @@ def score_bank(*, sy: Systems) -> pl.DataFrame:
     order = np.argsort(kk_all)
     sorted_keys = kk_all[order]
     months = [m for m in sy.months if m in set(ev_all["month"].unique().to_list())]
-    rows_out: list[dict] = []
-    real_wide_t = sy.wide_t
     for m in months:
         in_m = t.month == m
         days_m = np.unique(t.idx[in_m] // 48)
@@ -363,28 +470,29 @@ def score_bank(*, sy: Systems) -> pl.DataFrame:
             hi_p = {e["primary"]: e["end_idx"] + 14 * 48 for e in ev.iter_rows(named=True)}
             lo = np.array([lo_p.get(p, 1 << 40) for p in range(16)])[t.prim]
             hi = np.array([hi_p.get(p, -1) for p in range(16)])[t.prim]
-            rows = np.flatnonzero(
-                in_m & t.free & sy.common & (t.idx % 2 == 0) & (t.idx >= lo) & (t.idx < hi)
+            rows597 = np.flatnonzero(
+                in_m & t.free & (t.idx % 2 == 0) & (t.idx >= lo) & (t.idx < hi)
             )
-            if len(rows) == 0:
+            a1_597 = s.load_injected(
+                t=t, month=m, r=r, rows=rows597, order=order, sorted_keys=sorted_keys
+            )
+            ok597 = np.isfinite(a1_597).all(axis=1)
+            rows597, a1_597 = rows597[ok597], a1_597[ok597]
+            if len(rows597) == 0:
                 continue
+            keep = sy.common[rows597]
+            rows, a1_in = rows597[keep], a1_597[keep]
             inj = {
                 n: arm.inject(t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys)
                 for n, arm in sy.arms.items()
             }
-            a1_in = s.load_injected(
-                t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys
-            )
-            ok = np.isfinite(a1_in).all(axis=1)
             inj = {n: d for n, d in inj.items() if all(np.isfinite(q).any() for q in d.values())}
+            ok = np.ones(len(rows), bool)
             for d in inj.values():
                 for q in d.values():
                     ok &= np.isfinite(q).all(axis=1)
-            rows = rows[ok]
-            a1_in = a1_in[ok]
+            rows, a1_in = rows[ok], a1_in[ok]
             inj = {n: {s_: q[ok] for s_, q in d.items()} for n, d in inj.items()}
-            if len(rows) == 0:
-                continue
             # R's wide days under the injection (experiment 597), and G4 on T under the same injection
             old = np.full_like(gi["gap"], np.nan)
             old[:, sl] = gi["gap"][:, sl]
@@ -413,50 +521,105 @@ def score_bank(*, sy: Systems) -> pl.DataFrame:
             gap_t[:, origin_days_m[-1] + 1 :] = np.nan
             wide_t_inj = sy.tg.wide(gap=gap_t, origin_days=origin_days_m)
             p_rows, od_rows = t.prim[rows], t.origin_day[rows]
-            v_m = t.arms["M"][rows]
-            q_inj = {"A1": a1_in}
-            q_inj["R"] = k597.assemble(v=a1_in, m=v_m, wide=wide_r_inj[p_rows, od_rows])
-            q_inj["G4T"] = k597.assemble(v=a1_in, m=v_m, wide=wide_t_inj[p_rows, od_rows])
-            f_w = sy.factor(system="W", month=m, seed=-1)
-            q_inj["W"] = scale_about_median(q=a1_in, factor=f_w)
-            for n, d in inj.items():
-                q_inj[n] = np.sort(np.mean([d[s_] for s_ in sy.seeds], axis=0), axis=1)
-                q_inj[f"{n}-rs"] = np.sort(
-                    np.mean([scale_about_median(q=d[s_], factor=sy.factor(system=f"{n}-rs", month=m, seed=s_)) for s_ in sy.seeds], axis=0),
-                    axis=1,
-                )  # fmt: skip
-            wide_clean = {"R": sy.wide_r[rows], "G4T": real_wide_t[rows]}
-            y = t.obs[rows]
-            st = {n: sc597.row_stats(y=y, q=q) for n, q in q_inj.items()}
-            twins = {n: sy.q[n][rows] for n in q_inj}
-            for e in ev.iter_rows(named=True):
-                p, sgn, depth = e["primary"], float(e["sign"]), float(e["depth"])
-                for phase in PHASES:
-                    wlo, whi = sc.window(onset=e["onset_idx"], end=e["end_idx"], phase=phase)
-                    for band in (0, 1):
-                        sel = np.flatnonzero(
-                            (p_rows == p)
-                            & (t.idx[rows] >= wlo)
-                            & (t.idx[rows] < whi)
-                            & (t.band[rows] == band)
-                        )
-                        if len(sel) < 60:
-                            continue
-                        for name in q_inj:
-                            wide_share = (
-                                float(wide_r_inj[p_rows[sel], od_rows[sel]].mean()) if name == "R"
-                                else float(wide_t_inj[p_rows[sel], od_rows[sel]].mean()) if name == "G4T" else np.nan
-                            )  # fmt: skip
-                            rows_out.append({
-                                "month": m, "pass": r, "primary": p, "group": str(t.group[p]),
-                                "sign": int(sgn), "depth": depth, "length_days": int(e["length_days"]),
-                                "phase": phase, "band": s.BANDS[band], "system": name, "n_rows": len(sel),
-                                "share_origin_days_wide": wide_share,
-                                **sc597.means(rows_metrics=st[name][sel], sgn=sgn),
-                                **sc597.follow(q=q_inj[name][sel], twin=twins[name][sel], sgn=sgn, depth=depth),
-                            })  # fmt: skip
-            del wide_clean
-        print("bank", m, flush=True)
+            q_r = k597.assemble(v=a1_in, m=t.arms["M"][rows], wide=wide_r_inj[p_rows, od_rows])
+            q_r597 = k597.assemble(
+                v=a1_597, m=t.arms["M"][rows597],
+                wide=wide_r_inj[t.prim[rows597], t.origin_day[rows597]],
+            )  # fmt: skip
+            yield Cell(
+                month=m, r=r, ev=ev, rows=rows, p_rows=p_rows, od_rows=od_rows, a1_in=a1_in,
+                inj=inj, wide_r_inj=wide_r_inj, wide_t_inj=wide_t_inj, q_inj_r=q_r,
+                rows597=rows597, q_r597=q_r597,
+            )  # fmt: skip
+
+
+def reproduce_597_bank(*, sy: Systems, cell: Cell) -> list[dict]:
+    """Return R's per-event means on experiment 597's own row set, keyed like experiment 597's table."""
+    t = sy.t
+    y = t.obs[cell.rows597]
+    st = sc597.row_stats(y=y, q=cell.q_r597)
+    out = []
+    for e in cell.ev.iter_rows(named=True):
+        p, sgn = e["primary"], float(e["sign"])
+        for phase in PHASES:
+            wlo, whi = sc.window(onset=e["onset_idx"], end=e["end_idx"], phase=phase)
+            for band in (0, 1):
+                sel = np.flatnonzero(
+                    (t.prim[cell.rows597] == p)
+                    & (t.idx[cell.rows597] >= wlo)
+                    & (t.idx[cell.rows597] < whi)
+                    & (t.band[cell.rows597] == band)
+                )
+                if len(sel) < 60:
+                    continue
+                out.append({
+                    "month": cell.month, "pass": cell.r, "primary": p, "phase": phase,
+                    "band": s.BANDS[band], **sc597.means(rows_metrics=st[sel], sgn=sgn),
+                })  # fmt: skip
+    return out
+
+
+def score_bank(*, sy: Systems) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Return one row per (month, pass, event, phase, band, system) of the injected bank, and R's
+    per-event means on experiment 597's own row set.
+
+    The arms' injected quantiles are the seed means (the width-matched ones use the per-seed factors).
+    """
+    t = sy.t
+    rows_out: list[dict] = []
+    repro: list[dict] = []
+    last = None
+    for cell in bank_cells(sy=sy):
+        if last is not None and last != cell.month:
+            print("bank", last, flush=True)
+        last = cell.month
+        m, r, rows, ev = cell.month, cell.r, cell.rows, cell.ev
+        repro.extend(reproduce_597_bank(sy=sy, cell=cell))
+        if len(rows) == 0:
+            continue
+        p_rows, od_rows = cell.p_rows, cell.od_rows
+        v_m = t.arms["M"][rows]
+        q_inj = {"A1": cell.a1_in, "R": cell.q_inj_r}
+        q_inj["G4T"] = k597.assemble(v=cell.a1_in, m=v_m, wide=cell.wide_t_inj[p_rows, od_rows])
+        q_inj["W"] = scale_about_median(
+            q=cell.a1_in, factor=sy.factor(system="W", month=m, seed=-1)
+        )
+        for n, d in cell.inj.items():
+            q_inj[n] = np.sort(np.mean([d[s_] for s_ in sy.seeds], axis=0), axis=1)
+            q_inj[f"{n}-rs"] = np.sort(
+                np.mean([scale_about_median(q=d[s_], factor=sy.factor(system=f"{n}-rs", month=m, seed=s_)) for s_ in sy.seeds], axis=0),
+                axis=1,
+            )  # fmt: skip
+        y = t.obs[rows]
+        st = {n: sc597.row_stats(y=y, q=q) for n, q in q_inj.items()}
+        twins = {n: sy.q[n][rows] for n in q_inj}
+        for e in ev.iter_rows(named=True):
+            p, sgn, depth = e["primary"], float(e["sign"]), float(e["depth"])
+            for phase in PHASES:
+                wlo, whi = sc.window(onset=e["onset_idx"], end=e["end_idx"], phase=phase)
+                for band in (0, 1):
+                    sel = np.flatnonzero(
+                        (p_rows == p)
+                        & (t.idx[rows] >= wlo)
+                        & (t.idx[rows] < whi)
+                        & (t.band[rows] == band)
+                    )
+                    if len(sel) < 60:
+                        continue
+                    for name in q_inj:
+                        wide_share = (
+                            float(cell.wide_r_inj[p_rows[sel], od_rows[sel]].mean()) if name == "R"
+                            else float(cell.wide_t_inj[p_rows[sel], od_rows[sel]].mean()) if name == "G4T" else np.nan
+                        )  # fmt: skip
+                        rows_out.append({
+                            "month": m, "pass": r, "primary": p, "group": str(t.group[p]),
+                            "sign": int(sgn), "depth": depth, "length_days": int(e["length_days"]),
+                            "phase": phase, "band": s.BANDS[band], "system": name, "n_rows": len(sel),
+                            "share_origin_days_wide": wide_share,
+                            **sc597.means(rows_metrics=st[name][sel], sgn=sgn),
+                            **sc597.follow(q=q_inj[name][sel], twin=twins[name][sel], sgn=sgn, depth=depth),
+                        })  # fmt: skip
+    print("bank", last, flush=True)
     tab = pl.DataFrame(rows_out)
     # keep only (month, pass) cells scored for every system, so that every system's mean is over the same events
     cells = tab.group_by("month", "pass").agg(pl.col("system").n_unique().alias("n"))
@@ -467,11 +630,72 @@ def score_bank(*, sy: Systems) -> pl.DataFrame:
             f"dropped {dropped} (month, pass) cells where an arm's injected forecasts are absent",
             flush=True,
         )
-    return tab.join(full, on=["month", "pass"], how="semi")
+    return tab.join(full, on=["month", "pass"], how="semi"), pl.DataFrame(repro)
+
+
+REPRO_TOL = 1e-5
+"""Largest allowed difference from experiment 597 (coverage and tail shares agree exactly; the band widths and CRPS differ by float32 rounding, about 1e-6), relative to the stored value where that is above 1 (width and CRPS are in points of capacity), else absolute."""
+
+
+def check_reproduction(*, sy: Systems, repro_bank: pl.DataFrame) -> pl.DataFrame:
+    """Compute R on experiment 597's own row sets and assert it equals experiment 597's stored table.
+
+    Checks the injected bank (per event, phase, and band) and the real event-free rows (per group and
+    band); returns the largest differences found. Raises if any exceeds `REPRO_TOL`.
+    """
+    t = sy.t
+    out = []
+    old = pl.read_csv(k597.WORK / "a1" / "bank_event_phase.csv", infer_schema_length=None).filter(
+        (pl.col("system") == "G4") & pl.col("month").is_in(repro_bank["month"].unique())
+    )
+    keys = ["month", "pass", "primary", "phase", "band"]
+    cols = [x for x in (*STAT_NAMES, "nra_side95", "nra_side99") if x in old.columns]
+    j = repro_bank.join(old.select(*keys, *cols), on=keys, suffix="_597", how="inner")
+    assert j.height == repro_bank.height == old.height, (j.height, repro_bank.height, old.height)
+    bank_diff = max(
+        float(((j[x] - j[f"{x}_597"]).abs() / j[f"{x}_597"].abs().clip(lower_bound=1.0)).max())  # ty: ignore[invalid-argument-type]
+        for x in cols
+    )
+    out.append(
+        {"table": "injected bank, per event", "rows_compared": j.height, "max_diff": bank_diff}
+    )
+    ef597 = pl.read_csv(k597.WORK / "a1" / "event_free.csv", infer_schema_length=None).filter(
+        pl.col("system") == "G4"
+    )
+    st = sc597.row_stats(y=t.obs, q=sy.q["R"])
+    real_diff, n_cmp = 0.0, 0
+    for r in ef597.iter_rows(named=True):
+        grp = r["group"]
+        gsel = (
+            np.isin(t.group_of_row, k597.GROUPS_SCORED) if grp == "both groups"
+            else t.group_of_row == grp
+        )  # fmt: skip
+        band = 0 if r["band"] == s.BANDS[0] else 1
+        sel = t.free & gsel & (t.band == band)
+        assert int(sel.sum()) == int(r["n_rows"]), (grp, r["band"], int(sel.sum()), r["n_rows"])
+        for key, scale in (
+            ("cover90", 1.0),
+            ("width90", 100.0),
+            ("crps", 100.0),
+            ("pin05", 100.0),
+            ("pin95", 100.0),
+        ):
+            mine = float(st[sel, J[key]].mean() * scale)
+            real_diff = max(real_diff, abs(mine - float(r[key])) / max(1.0, abs(float(r[key]))))
+        n_cmp += 1
+    out.append({"table": "real event-free rows, per group and band", "rows_compared": n_cmp, "max_diff": real_diff})  # fmt: skip
+    tab = pl.DataFrame(out)
+    print(tab, flush=True)
+    assert (tab["max_diff"] <= REPRO_TOL).all(), f"R does not reproduce experiment 597: {tab}"
+    return tab
 
 
 def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
-    """Per (group, length class, first-fold-pair flag, phase, band, system): means over events with 95% event-bootstrap intervals."""
+    """Per (group, length class, first-fold-pair flag, phase, band, system): means over events with 95% intervals from resampling (month, Primary) clusters.
+
+    The 20 passes of a month reuse the same real rows and forecasts, so events are not independent;
+    each cluster is the mean over the passes and events of one Primary in one fold month.
+    """
     metrics = [*STAT_NAMES, "nra_side95", "nra_side99", "follow_q50", "follow_safety"]
     classes = {
         "all lengths": pl.lit(True),
@@ -501,8 +725,10 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
                         "system": system,
                         "n_events": grp.height,
                     }
+                    clusters = grp.group_by("month", "primary").agg(pl.col(metrics).mean())
+                    rec["n_clusters"] = clusters.height
                     for mname in metrics:
-                        mean, lo, hi = sc._boot_mean(vals=grp[mname].to_numpy())
+                        mean, lo, hi = sc._boot_mean(vals=clusters[mname].to_numpy())
                         rec[mname], rec[f"{mname}_lo"], rec[f"{mname}_hi"] = mean, lo, hi
                     out.append(rec)
     return pl.DataFrame(out)
@@ -511,10 +737,19 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
 # ---------------------------------------------------------------- the seven counted contrasts and the verdicts
 
 
+def cluster_means(*, j: pl.DataFrame, col: str) -> np.ndarray:
+    """Return the mean of `col` per (month, Primary) cluster of the events in `j`."""
+    return j.group_by("month", "primary").agg(pl.col(col).mean())[col].to_numpy()
+
+
 def paired(
     *, tab: pl.DataFrame, a_: str, b_: str, phase: str, metric: str, lengths: str = "15 and 30 days"
-) -> tuple[float, float, float, int]:
-    """Return mean(a - b), its Bonferroni-level interval, and the event count, paired on (month, pass, primary)."""
+) -> tuple[float, float, float, int, int]:
+    """Return mean(a - b), its Bonferroni-level interval, the event count, and the cluster count.
+
+    Events are paired on (month, pass, Primary); the interval resamples (month, Primary) clusters
+    (each the mean over passes), because the passes of a month share the real rows and forecasts.
+    """
     f = tab.filter(
         (pl.col("phase") == phase)
         & (pl.col("band") == BAND)
@@ -526,10 +761,20 @@ def paired(
     y = f.filter(pl.col("system") == b_).select(
         "month", "pass", "primary", pl.col(metric).alias("b")
     )
-    j = x.join(y, on=["month", "pass", "primary"], how="inner")
-    d = (j["a"] - j["b"]).to_numpy()
-    mean, lo, hi = boot_interval(vals=d)
-    return mean, lo, hi, len(d)
+    j = x.join(y, on=["month", "pass", "primary"], how="inner").with_columns(
+        d=pl.col("a") - pl.col("b")
+    )
+    cl = cluster_means(j=j, col="d")
+    mean, lo, hi = boot_interval(vals=cl)
+    return mean, lo, hi, j.height, len(cl)
+
+
+def _row(*, test: str, contrast: str, res: tuple, margin: float) -> dict:
+    mean, lo, hi, n, n_cl = res
+    return {
+        "test": test, "contrast": contrast, "mean": mean, "lo": lo, "hi": hi,
+        "mde": (hi - lo) / 2, "margin": margin, "n_events": n, "n_clusters": n_cl,
+    }  # fmt: skip
 
 
 def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -537,98 +782,36 @@ def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame) -> tuple[pl.DataFrame, pl.
     # P1: R - S coverage, days4-end and after0-7; also the width-matched S
     for phase in ("days4-end", "after0-7"):
         for arm in ("S", "S-rs"):
-            mean, lo, hi, n = paired(tab=tab, a_="R", b_=arm, phase=phase, metric="cover90")
-            rows.append(
-                {
-                    "test": f"P1 {phase}",
-                    "contrast": f"cover90(R) - cover90({arm})",
-                    "mean": mean,
-                    "lo": lo,
-                    "hi": hi,
-                    "mde": (hi - lo) / 2,
-                    "margin": MARGIN["P1"],
-                    "n_events": n,
-                }
-            )
-    mean, lo, hi, n = paired(tab=tab, a_="S", b_="W", phase="after0-7", metric="cover90")
-    rows.append(
-        {
-            "test": "P2 after0-7",
-            "contrast": "cover90(S) - cover90(W)",
-            "mean": mean,
-            "lo": lo,
-            "hi": hi,
-            "mde": (hi - lo) / 2,
-            "margin": MARGIN["P2"],
-            "n_events": n,
-        }
-    )
-    mean, lo, hi, n = paired(tab=tab, a_="S-rs", b_="W", phase="after0-7", metric="cover90")
-    rows.append(
-        {
-            "test": "P2 after0-7 (width-matched S)",
-            "contrast": "cover90(S-rs) - cover90(W)",
-            "mean": mean,
-            "lo": lo,
-            "hi": hi,
-            "mde": (hi - lo) / 2,
-            "margin": MARGIN["P2"],
-            "n_events": n,
-        }
-    )
+            res = paired(tab=tab, a_="R", b_=arm, phase=phase, metric="cover90")
+            rows.append(_row(test=f"P1 {phase}", contrast=f"cover90(R) - cover90({arm})", res=res, margin=MARGIN["P1"]))  # fmt: skip
+    res = paired(tab=tab, a_="S", b_="W", phase="after0-7", metric="cover90")
+    rows.append(_row(test="P2 after0-7", contrast="cover90(S) - cover90(W)", res=res, margin=MARGIN["P2"]))  # fmt: skip
+    res = paired(tab=tab, a_="S-rs", b_="W", phase="after0-7", metric="cover90")
+    rows.append(_row(test="P2 after0-7 (width-matched S)", contrast="cover90(S-rs) - cover90(W)", res=res, margin=MARGIN["P2"]))  # fmt: skip
     for sysn in ("S", "R", "S-p", "A1"):
-        mean, lo, hi, n = paired(tab=tab, a_=sysn, b_=sysn, phase="days4-end", metric="follow_q50")
         f = tab.filter(
             (pl.col("phase") == "days4-end")
             & (pl.col("band") == BAND)
             & (pl.col("length_days") >= 15)
             & (pl.col("system") == sysn)
         )
-        m3, l3, h3 = boot_interval(vals=f["follow_q50"].to_numpy())
-        rows.append(
-            {
-                "test": f"P3 follow ratio {sysn}",
-                "contrast": f"follow_q50({sysn})",
-                "mean": m3,
-                "lo": l3,
-                "hi": h3,
-                "mde": (h3 - l3) / 2,
-                "margin": MARGIN["P3"],
-                "n_events": f.height,
-            }
-        )
-    mean, lo, hi, n = paired(tab=tab, a_="S", b_="S-p", phase="days4-end", metric="cover90")
-    rows.append(
-        {
-            "test": "P4 days4-end",
-            "contrast": "cover90(S) - cover90(S-p)",
-            "mean": mean,
-            "lo": lo,
-            "hi": hi,
-            "mde": (hi - lo) / 2,
-            "margin": MARGIN["P4"],
-            "n_events": n,
-        }
-    )
+        cl = cluster_means(j=f, col="follow_q50")
+        m3, l3, h3 = boot_interval(vals=cl)
+        rows.append(_row(test=f"P3 follow ratio {sysn}", contrast=f"follow_q50({sysn})", res=(m3, l3, h3, f.height, len(cl)), margin=MARGIN["P3"]))  # fmt: skip
+    res = paired(tab=tab, a_="S", b_="S-p", phase="days4-end", metric="cover90")
+    rows.append(_row(test="P4 days4-end", contrast="cover90(S) - cover90(S-p)", res=res, margin=MARGIN["P4"]))  # fmt: skip
     for grp in k597.GROUPS_SCORED:
         r = ef.filter(
             (pl.col("group") == grp) & (pl.col("band") == BAND) & (pl.col("system") == "S")
         )
         if r.height:
-            rows.append(
-                {
-                    "test": f"P5 {grp}",
-                    "contrast": "event-free CRPS(S) - CRPS(A1), points of capacity",
-                    "mean": float(r["crps_minus_A1"][0]),
-                    "lo": float(r["crps_minus_A1_lo"][0]),
-                    "hi": float(r["crps_minus_A1_hi"][0]),
-                    "mde": float(r["crps_minus_A1_mde"][0]),
-                    "margin": float(r["crps_minus_A1_mde"][0]),
-                    "n_events": int(r["n_rows"][0]),
-                }
-            )
+            res = (
+                float(r["crps_minus_A1"][0]), float(r["crps_minus_A1_lo"][0]),
+                float(r["crps_minus_A1_hi"][0]), int(r["n_rows"][0]), int(r["n_months"][0]),
+            )  # fmt: skip
+            rows.append(_row(test=f"P5 {grp}", contrast="event-free CRPS(S) - CRPS(A1), points of capacity (n_events is rows; n_clusters is month blocks)", res=res, margin=MARGIN["P5"]))  # fmt: skip
     tab_c = pl.DataFrame(rows)
-    return tab_c, verdicts(c_=tab_c, tab=tab)
+    return tab_c, verdicts(c_=tab_c, tab=tab, ef=ef)
 
 
 def bank_width(*, tab: pl.DataFrame, system: str) -> float:
@@ -641,13 +824,64 @@ def bank_width(*, tab: pl.DataFrame, system: str) -> float:
     return float(f["width90"].mean()) if f.height else float("nan")  # ty: ignore[invalid-argument-type]
 
 
-def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame) -> pl.DataFrame:
+def ef_width_ratio(*, ef: pl.DataFrame, system: str) -> dict[str, float]:
+    """Return, per scored metering group, the event-free 24-120 h band width of `system` over R's."""
+    out = {}
+    for grp in k597.GROUPS_SCORED:
+        w = {
+            n: ef.filter((pl.col("group") == grp) & (pl.col("band") == BAND) & (pl.col("system") == n))["width90"]
+            for n in (system, "R")
+        }  # fmt: skip
+        out[grp] = float(w[system][0] / w["R"][0]) if w[system].len() and w["R"].len() else np.nan
+    return out
+
+
+def width_ratios(*, tab: pl.DataFrame, ef: pl.DataFrame) -> pl.DataFrame:
+    """Return each system's band width over R's: on the injected bank's day-4-to-end rows (what P1 reads),
+    its 0-7 days after rows (what P2 reads), and on event-free rows per metering group.
+    """
+    rows = []
+    for system in tab["system"].unique().sort().to_list():
+        r = {"system": system}
+        for phase in ("days4-end", "after0-7"):
+            f = tab.filter(
+                (pl.col("phase") == phase)
+                & (pl.col("band") == BAND)
+                & (pl.col("length_days") >= 15)
+            )
+            wm = {
+                n: float(f.filter(pl.col("system") == n)["width90"].mean())  # ty: ignore[invalid-argument-type]
+                for n in (system, "R")
+            }
+            r[f"bank_{phase}_over_R"] = wm[system] / wm["R"]
+        for grp, v in ef_width_ratio(ef=ef, system=system).items():
+            r[f"event_free_{grp}_over_R"] = v
+        rows.append(r)
+    out = pl.DataFrame(rows)
+    for r in out.iter_rows(named=True):
+        if r["system"].endswith("-rs") and abs(r["bank_days4-end_over_R"] - 1.0) > WIDTH_TOL:
+            print(
+                f"WARNING: {r['system']} bank width is {r['bank_days4-end_over_R']:.3f} of R's on the"
+                f" day-4-to-end rows, outside the {WIDTH_TOL:.0%} equal-width tolerance",
+                flush=True,
+            )
+    return out
+
+
+def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame, ef: pl.DataFrame) -> pl.DataFrame:
     """Return P1 to P5 verdicts with the 'untestable' rule (minimum detectable effect above the margin)."""
     out = []
     row = {r["test"]: r for r in c_.iter_rows(named=True)}
     width_ratio = (
         bank_width(tab=tab, system="S") / bank_width(tab=tab, system="R") if tab.height else np.nan
     )
+    rs_ratio = (
+        bank_width(tab=tab, system="S-rs") / bank_width(tab=tab, system="R")
+        if "S-rs" in tab["system"].unique().to_list() else np.nan
+    )  # fmt: skip
+    ef_s, ef_rs = ef_width_ratio(ef=ef, system="S"), ef_width_ratio(ef=ef, system="S-rs")
+    ef_ok = all(abs(v - 1.0) <= EF_WIDTH_TOL for v in ef_s.values())
+    ef_rs_ok = all(abs(v - 1.0) <= EF_WIDTH_TOL for v in ef_rs.values())
 
     def band_of(gap: float) -> str:
         return "pass" if gap < OUTCOME_PASS else "inconclusive" if gap < OUTCOME_FAIL else "fail"
@@ -663,10 +897,15 @@ def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame) -> pl.DataFrame:
             if r["test"] == f"P1 {phase}" and r["contrast"].endswith("(S)")
         )
         gap_raw, gap_rs = s_raw["mean"], rs["mean"] if rs else np.nan
-        equal_width = abs(width_ratio - 1.0) <= WIDTH_TOL
+        bank_ok = abs(width_ratio - 1.0) <= WIDTH_TOL
+        equal_width = bank_ok and ef_ok
+        rs_valid = abs(rs_ratio - 1.0) <= WIDTH_TOL and ef_rs_ok
         verdict = band_of(gap_raw)
-        if verdict == "pass" and not equal_width and band_of(gap_rs) != "pass":
-            verdict = "not passed: S is wider or narrower than R by more than 5% and the width-matched S does not pass"
+        if verdict == "pass" and not equal_width:
+            if band_of(gap_rs) == "pass" and rs_valid:
+                verdict = "pass on the width-matched S (S's own width is not within 5% on the bank or 2% event-free)"
+            else:
+                verdict = "not passed: S's band width is not within 5% of R's on the bank or within 2% event-free, and the width-matched S does not pass at equal width"
         if s_raw["mde"] > MARGIN["P1"]:
             verdict += "; untestable at this power"
         out.append(
@@ -675,6 +914,9 @@ def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame) -> pl.DataFrame:
                 "gap_R_minus_S": gap_raw,
                 "gap_R_minus_S_width_matched": gap_rs,
                 "S_over_R_width_days4_end": width_ratio,
+                "S_rs_over_R_width_days4_end": rs_ratio,
+                **{f"S_over_R_event_free_width_{g}": v for g, v in ef_s.items()},
+                **{f"S_rs_over_R_event_free_width_{g}": v for g, v in ef_rs.items()},
                 "mde": s_raw["mde"],
                 "verdict": verdict,
             }
@@ -732,7 +974,14 @@ def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame) -> pl.DataFrame:
     for grp in k597.GROUPS_SCORED:
         r = row.get(f"P5 {grp}")
         if r:
-            v = "supported" if abs(r["mean"]) <= r["mde"] else "not supported"
+            # supported: the whole interval lies within the fixed margin of A1 (either side)
+            v = (
+                "supported"
+                if r["lo"] >= -r["margin"] and r["hi"] <= r["margin"]
+                else "not supported"
+            )
+            if r["mde"] > r["margin"]:
+                v += "; untestable at this power"
             out.append(
                 {
                     "prediction": f"P5 {grp}",
@@ -740,6 +989,7 @@ def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame) -> pl.DataFrame:
                     "lo": r["lo"],
                     "hi": r["hi"],
                     "mde": r["mde"],
+                    "margin": r["margin"],
                     "verdict": v,
                 }
             )
@@ -778,9 +1028,11 @@ def main() -> None:
             arms[name] = arm
         else:
             print("arm", name, "has no complete fits under", arm.work, "- skipped", flush=True)
-    sy = Systems(inp=inp, arms=arms, months=args.months, seeds=args.seeds)
+    sy = Systems(
+        inp=inp, arms=arms, months=args.months, seeds=args.seeds,
+        factor_source="real" if args.no_bank else "bank",
+    )  # fmt: skip
     sy.factors.write_csv(out / "factors.csv")
-    print(sy.factors, flush=True)
     ef = event_free(sy=sy)
     ef.write_csv(out / "event_free.csv")
     real_events(sy=sy).write_csv(out / "real_event_phase.csv")
@@ -788,8 +1040,10 @@ def main() -> None:
     np.save(out / "wide_t.npy", sy.tg.wide(gap=sy.tg.gap, origin_days=inp.origin_days))
     if args.no_bank:
         return
-    tab = score_bank(sy=sy)
+    tab, repro_bank = score_bank(sy=sy)
+    check_reproduction(sy=sy, repro_bank=repro_bank).write_csv(out / "reproduction_597.csv")
     tab.write_csv(out / "bank_event_phase.csv")
+    width_ratios(tab=tab, ef=ef).write_csv(out / "width_ratios.csv")
     summarise_bank(tab=tab).write_csv(out / "bank_summary.csv")
     if "S" in arms:
         c_, v_ = contrasts(tab=tab, ef=ef)

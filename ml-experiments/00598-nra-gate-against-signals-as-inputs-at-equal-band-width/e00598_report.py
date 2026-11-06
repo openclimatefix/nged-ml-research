@@ -38,29 +38,28 @@ def order(df: pl.DataFrame) -> pl.DataFrame:
 
 def run(out) -> None:
     factors = read(out, "factors.csv")
-    print("== Width factors (one per fold month and seed; W has no seed)")
+    print(
+        "== Width factors, fitted on the injected bank's 24-120 h rows of the origin days where R is wide (one per fold month and seed; W has no seed; n_rows beside each)"
+    )
+    print(factors.sort("system", "seed", "month"))
+    print("\n   factor pivot")
     print(
         factors.pivot(on="month", index=["system", "seed"], values="factor").sort("system", "seed")
     )
     ef = read(out, "event_free.csv")
-    bank = read(out, "bank_event_phase.csv")
     summ = read(out, "bank_summary.csv")
 
     print(
-        "\n== Reproduction of experiment 597's stored A1 + G4 (R) on the injected bank, cover90 by event"
+        "\n== Band width of each system over R's: injected bank (day 4 to end, 0-7 days after; 15 and 30 day events, 24-120 h) and event-free rows per metering group"
     )
-    old = pl.read_csv(V597 / "bank_event_phase.csv", infer_schema_length=None).filter(
-        pl.col("system") == "G4"
-    )
-    new = bank.filter(pl.col("system") == "R")
-    j = new.select(
-        "month", "pass", "primary", "phase", "band", pl.col("cover90").alias("new")
-    ).join(
-        old.select("month", "pass", "primary", "phase", "band", pl.col("cover90").alias("old")),
-        on=["month", "pass", "primary", "phase", "band"],
-    )
+    print(order(read(out, "width_ratios.csv")))
     print(
-        f"events compared {j.height}, largest |difference| in cover90 {float((j['new'] - j['old']).abs().max()):.6f}"  # ty: ignore[invalid-argument-type]
+        "\n== Reproduction of experiment 597's stored R (A1 + G4), computed on experiment 597's own row sets; the scorer asserts the largest difference is at most "
+        f"{score.REPRO_TOL}"
+    )
+    print(read(out, "reproduction_597.csv"))
+    print(
+        "\n   (The bank tables below use only rows where every system is finite, so R's numbers there differ slightly from experiment 597's.)"
     )
 
     for subset in ("all months", "first fold pair"):
@@ -126,6 +125,9 @@ def run(out) -> None:
         .sort("event", "phase", maintain_order=True)
     )
 
+    print(
+        "\n== Caveats the write-up states: (1) the gate threshold of arm S-g and the training-noise standard deviation are fitted on all of the fold month's real rows, as R's threshold is, so 'fit stops at the fold's training end' is not literally true for those two scalars per Primary; (2) rows whose lag-free table entry is absent are flagged to the network and read as 'absent', not as 'agrees with the table'; (3) P5's margin is fixed at 0.03 points of capacity of event-free CRPS, and its interval resamples the fold months as blocks."
+    )
     print(
         f"\n== Counted contrasts (Bonferroni level 0.05 / {score.N_COUNTED} = {score.ALPHA:.4f}; MDE = half the interval width)"
     )
