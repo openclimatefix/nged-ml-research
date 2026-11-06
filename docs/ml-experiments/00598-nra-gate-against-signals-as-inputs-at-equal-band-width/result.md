@@ -87,6 +87,11 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
   is 2025-12-29 to 2026-01-13, about a day earlier. The scoring script checks the readings to see
   which window matches the step, and the caption says which, and does not choose silently. The
   predictions are unchanged.
+- **Time-series plot style (maintainer, 2026-11-06).** Every time-series figure has panels at least
+  280 px high and at most two panels per figure. Each panel shows one arm's median and q05-q95 band
+  with the observed power and the NRA, and a thin strip under the panel marks when the gate is on.
+  A legend outside the data area names each line, band, shade, and bar. The five arms (R, W, S,
+  S-g, S-p) therefore go in separate figures or small multiples of one arm each, never on one panel.
 - **Standing practices followed.** Monthly-equivalent coarse refits, cleaned data, the D15 and D18
   cut, saved weights, reuse of stored forecasts, tails and avoidable-curtailment cost, load-shift
   event plots (at least 6, both metering groups), example forecasts, and the unlogged-event caveat.
