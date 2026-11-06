@@ -64,7 +64,8 @@ headline: >-
 lessons: >-
   Only some of the planned removals ran. Not run: E3, the offset, the tail constants as a removal
   on the injected bank, per-removal q05 and q95 coverage, absorption, 120-240 h scoring,
-  curtailment cost, and K1, K2, K3 with the O2 offset. Without tail constants the event-free coverage of K1 is 0.88 against the 0.90 target.
+  curtailment cost, and K1, K2, K3 with the O2 offset.
+  Without tail constants the event-free coverage of K1 is 0.88 against the 0.90 target.
 take_home_message: >-
   On injected load-shifts, the lag-and-gate network (K1) keeps the normal running arrangement inside
   its band on 0.927 of rows from day 4 of a shift to its end, and the gated band is the largest
