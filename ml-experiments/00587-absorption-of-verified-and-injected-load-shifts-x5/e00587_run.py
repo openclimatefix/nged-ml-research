@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, E402, PT018, D103, F821, ANN202, PLR0912, PLR0915
+# ruff: noqa: E501, E402, D103, ANN202
 """Experiment 587: fit the arms on event-carrying power and forecast, in one GPU process per harness.
 
 Usage: python e00587_run.py HARNESS --arm ARM [--cases ...] [--seeds ...]
@@ -24,7 +24,7 @@ import sys
 
 _p = argparse.ArgumentParser()
 _p.add_argument("harness", choices=("565", "574"))
-_p.add_argument("--arm", required=True, choices=tuple(common_arms := ("M0", "D5", "P5")))
+_p.add_argument("--arm", required=True, choices=("M0", "D5", "P5"))
 _p.add_argument("--cases", nargs="+", default=None)
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 MINE = _p.parse_args()
@@ -39,9 +39,7 @@ if MINE.harness == "565":
 else:
     import e00574_fit as e  # ty: ignore[unresolved-import]
 import json
-import os
 import time
-from pathlib import Path
 
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
@@ -110,13 +108,20 @@ def run_world(*, arm: str, world: str, obs: np.ndarray, month: str, on: str | No
     base = common.world_dir(arm=arm, world=world, on=on)
     e.W = base / "work"
     if on is not None:  # reload the fits of `world`; never refit
+        tag = common.ARMS[arm][1]
+        missing = [
+            f"{month}_d{d}_s{s}.pt" for d in (0, 14) for s in MINE.seeds
+            if not (common.world_dir(arm=arm, world=world) / "work" / "models" / tag / f"{month}_d{d}_s{s}.pt").exists()
+        ]  # fmt: skip
+        assert not missing, f"E_on_N would refit: missing weights {missing}"
         src = common.world_dir(arm=arm, world=world) / "work" / "models"
         (base / "work").mkdir(parents=True, exist_ok=True)
         link = base / "work" / "models"
         if not link.exists():
-            os.symlink(src, link)
+            link.symlink_to(src)
     stack = common.world_clean(world=inputs, obs=obs)
     e.c.clean_stack = lambda: stack
+    e.CHECK.update(train_rows=0, test_rows=0, origins_weather_checked=0, months={})
     t = time.monotonic()
     e.fit_arm(months=[month], seeds=list(MINE.seeds), stress=False, limit=None, device="cuda")
     (base / "work").mkdir(parents=True, exist_ok=True)
@@ -129,12 +134,12 @@ def main() -> None:
     obs = e.c.clean_stack()
     cases = MINE.cases or ["verified", *[f"inj{i}" for i in common.designs()["spec_id"].to_list()]]
     for arm in ARMS:
-        e.SPEC = e.SPECS[common.ARMS[arm][1]]
         for case in cases:
             ev, no = common.case_worlds(case=case)
             for month in common.case_months(case=case):
                 run_world(arm=arm, world=ev, obs=obs, month=month)
-                run_world(arm=arm, world=ev, obs=obs, month=month, on=no)
+                if arm not in common.LAG_FREE:  # lag-free arms read no power lags: E_on_N equals E
+                    run_world(arm=arm, world=ev, obs=obs, month=month, on=no)
                 run_world(arm=arm, world=no, obs=obs, month=month)
 
 

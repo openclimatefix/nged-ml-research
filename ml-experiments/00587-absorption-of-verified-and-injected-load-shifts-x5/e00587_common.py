@@ -9,7 +9,8 @@ world `N` does not (verified: E = obs, N = cor; injected: E = inj, N = obs).
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Final
 
 import numpy as np
@@ -18,11 +19,10 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME: Final[str] = "00587-absorption-of-verified-and-injected-load-shifts-x5"
 OUT = ML_EXPERIMENTS_DATA_DIR / NAME
-D580 = (
-    ML_EXPERIMENTS_DATA_DIR / "00580-verified-load-shift-event-set-and-label-audit" / "work"
-)
+D580 = ML_EXPERIMENTS_DATA_DIR / "00580-verified-load-shift-event-set-and-label-audit" / "work"
 SITE_MAP = (
-    ML_EXPERIMENTS_DATA_DIR / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free/site_map.csv"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00521-lag-advantage-by-lead-time-k2-s1-vs-daily-lag-free/site_map.csv"
 )
 SEED: Final[int] = 20261106
 """Fixed seed of the design draw."""
@@ -31,6 +31,9 @@ PER_DAY: Final[int] = 48
 VERIFIED_TRANSFER: Final[int] = 23
 VERIFIED_MONTHS: Final[tuple[str, ...]] = ("2025-12", "2026-01")
 SEEDS: Final[tuple[int, ...]] = (0, 1)
+ALL_MONTHS: Final[tuple[str, ...]] = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
+LAG_FREE: Final[frozenset[str]] = frozenset({"M0", "D5"})
+"""Arms that read no power lags, so their forecasts do not depend on the inputs' world."""
 ARMS: Final[dict[str, tuple[str, str]]] = {
     "M0": ("565", "C-M0"),
     "D5": ("565", "D5"),
@@ -62,20 +65,17 @@ def site_map() -> pl.DataFrame:
     return pl.read_csv(SITE_MAP)
 
 
-def month_of_idx(idx: int) -> str:
-    """Return the `YYYY-MM` of a grid index."""
-    t = GRID_START + timedelta(minutes=30 * idx)
-    return f"{t.year}-{t.month:02d}"
-
-
-def idx_to_time(idx: np.ndarray | int) -> np.ndarray:
-    """Return grid indices as numpy datetimes (UTC, microsecond)."""
-    base = np.datetime64(GRID_START.replace(tzinfo=None), "us")
-    return base + np.asarray(idx).astype("int64") * np.timedelta64(30 * 60 * 1_000_000, "us")
-
-
 def designs() -> pl.DataFrame:
-    """Return the 12 injected designs: the 9 cells depth x length (7, 15, 30 days) at start day 3, and 3 15-day designs at day 12."""
+    """Return the 12 injected designs, drawn once and frozen in `designs.parquet` beside the fits."""
+    path = OUT / "designs.parquet"
+    if not path.exists():
+        OUT.mkdir(parents=True, exist_ok=True)
+        draw_designs().write_parquet(path)
+    return pl.read_parquet(path)
+
+
+def draw_designs() -> pl.DataFrame:
+    """Draw the 12 injected designs: the 9 cells depth x length (7, 15, 30 days) at start day 3, and 3 15-day designs at day 12."""
     bank = pl.read_parquet(D580 / "injected_event_bank.parquet").sort("spec_id")
     rng = np.random.default_rng(SEED)
     picks = []
@@ -96,7 +96,10 @@ def injected_events(*, spec: dict) -> list[Event]:
     """Return the two per-Primary events (donor and recipient) of one design."""
     sm = site_map()
     out = []
-    for lab, mw in ((spec["donor"], spec["donor_depth_mw"]), (spec["recipient"], spec["recipient_depth_mw"])):
+    for lab, mw in (
+        (spec["donor"], spec["donor_depth_mw"]),
+        (spec["recipient"], spec["recipient_depth_mw"]),
+    ):
         r = sm.filter(pl.col("label") == lab).row(0, named=True)
         out.append(
             Event(
@@ -132,7 +135,9 @@ def add_events(*, clean: np.ndarray, events: list[Event], factor: float) -> np.n
     out = clean.copy()
     for e in events:
         seg = out[e.primary, e.onset_idx : e.end_idx]
-        out[e.primary, e.onset_idx : e.end_idx] = np.where(np.isfinite(seg), seg + factor * e.depth, seg)
+        out[e.primary, e.onset_idx : e.end_idx] = np.where(
+            np.isfinite(seg), seg + factor * e.depth, seg
+        )
     return out
 
 
@@ -165,6 +170,6 @@ def world_clean(*, world: str, obs: np.ndarray) -> np.ndarray:
     return add_events(clean=obs, events=case_events(case=world), factor=1.0)
 
 
-def world_dir(*, arm: str, world: str, on: str | None = None):
+def world_dir(*, arm: str, world: str, on: str | None = None) -> Path:
     """Return the folder of an arm's fits in a world; `on` names the world whose inputs score the fits."""
     return OUT / "work" / arm / (world if on is None else f"{world}_on_{on}")
