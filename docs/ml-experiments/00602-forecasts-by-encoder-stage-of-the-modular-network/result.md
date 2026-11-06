@@ -14,7 +14,8 @@ protocol: demand-v2
 size: >-
   simple. Inference only on stored weights of experiments 574, 584, and 591 (no fit, no new data), a
   descriptive probe with no contrast that decides anything. One defensible design. Serving path and
-  degradation rule: not touched (this repository holds none). Compute under 1 GPU-h.
+  degradation rule: not touched (this repository holds none). Compute: about 0.3 GPU-h in all (the
+  probe ran twice), under the 1 GPU-h ceiling.
 hypothesis: >-
   Descriptive. The datetime encoder alone gives a smooth daily and weekly shape, the weather encoder
   moves it with temperature and sun, and the lag encoder adds the level that follows recent power,
@@ -138,6 +139,72 @@ D16>_stage_3_and_lag_contribution.svg`.
 | D16 C1 | 4.9 | 5.2 | 8.1 | 7.6 |
 | D16 A1 | 4.5 | 5.3 | 7.9 | 6.0 |
 
+## What the weather encoder adds on its own
+
+![C1 at D5: datetime only and weather only](real_C1_D5_single_encoders.svg)
+
+*Caption: C1 at D5. The top panel keeps only the datetime encoder live. The bottom panel keeps only
+the weather encoder live, with the datetime and lag embeddings at their mean. The weather-only
+median has no daily shape, and it lifts above the readings inside the shaded window, as in stage 2.
+These are off-distribution probes.*
+
+Figures of the same kind exist for P5 and A1, and for D16: `real_<network>_<D5 or
+D16>_single_encoders.svg`.
+
+## How much weight the mixer gives each encoder
+
+**The lag encoder carries about 0.15 to 0.30 of the three encoders' summed effect on the median, and
+that share fell at D5 but not at D16 during the load-shift.** The mixer is a plain
+multi-layer perceptron, so it has no attention weights to plot. Two sensitivity measures stand in
+for them, and neither is attention:
+
+- **Leave-one-encoder-out:** per half-hour, the absolute change in the median when one encoder's
+  embedding is replaced by its training-set mean.
+- **Gradient times input:** per half-hour, the gradient of the mixture mean with respect to an
+  encoder's embedding times that embedding, summed over the embedding's dimensions (the signed
+  contribution of that embedding to the mean).
+
+The lag encoder's share is its absolute value over the sum of the three encoders' absolute values.
+
+![Lag encoder's share at D5, leave-one-encoder-out](weights_loo_D5.svg)
+
+*Caption: the lag encoder's share at D5 by leave-one-encoder-out, every half-hour (top) and as a
+daily average (bottom), for P5, C1, and A1. Look at the daily average: the share falls from about
+0.3 to about 0.1 to 0.15 about 3 days after the start of the load-shift and recovers about 3 days
+after the end, for all three networks. It is a sensitivity measure, not attention.*
+
+![Lag encoder's share at D16, leave-one-encoder-out](weights_loo_D16.svg)
+
+*Caption: the same at D16. The share stays between about 0.2 and 0.33 through the load-shift, so
+the network does not ignore the lag encoder here. It is a sensitivity measure, not attention.*
+
+The gradient-times-input versions are `weights_grad_D5.svg` and `weights_grad_D16.svg`.
+
+| Lag encoder's share | Measure | Before (14 d) | First 4 days | Day 4 to end | After (14 d) |
+|---|---|---|---|---|---|
+| D5 P5 | leave-one-out | 0.28 | 0.29 | 0.15 | 0.19 |
+| D5 C1 | leave-one-out | 0.25 | 0.28 | 0.16 | 0.18 |
+| D5 A1 | leave-one-out | 0.25 | 0.26 | 0.10 | 0.10 |
+| D5 P5 | gradient times input | 0.24 | 0.22 | 0.09 | 0.09 |
+| D5 C1 | gradient times input | 0.21 | 0.20 | 0.07 | 0.07 |
+| D5 A1 | gradient times input | 0.15 | 0.18 | 0.15 | 0.16 |
+| D16 P5 | leave-one-out | 0.23 | 0.24 | 0.33 | 0.30 |
+| D16 C1 | leave-one-out | 0.20 | 0.22 | 0.28 | 0.26 |
+| D16 A1 | leave-one-out | 0.22 | 0.28 | 0.28 | 0.24 |
+| D16 P5 | gradient times input | 0.23 | 0.24 | 0.27 | 0.23 |
+| D16 C1 | gradient times input | 0.19 | 0.21 | 0.22 | 0.19 |
+| D16 A1 | gradient times input | 0.20 | 0.29 | 0.24 | 0.15 |
+
+**Experiment 568's stored attention weights cannot answer this question.** They are monthly means
+per lead band over four tokens (weather, datetime, Primary, and spread) for the attention mixer,
+which has no lag token, and they are not per half-hour. Plotting them here would not show the lag
+encoder.
+
+The shares are one Primary, one event, and one seed each, and the fall at D5 starts about 3 days
+into the event and ends about 3 days after it. Weather also changed over those weeks, so the fall
+may not be a reaction to the load-shift. The leave-one-out and gradient measures disagree about A1
+at D5 (0.10 against 0.15 in the day 4 to end column).
+
 ## Injected load-shifts
 
 ![C1 at D5, 30 days, up 50%](injected_C1_D5_30d_up_50pct_stage_3_and_lag_contribution.svg)
@@ -201,11 +268,15 @@ capacity) grow from 0.217 (stage 1) through 0.229 (stage 2) to 0.245 (P5 stage 3
   and the real pair from [experiment
   580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/).
   Inference only, seed 0, stored weights, about 15 minutes on the GPU.
+- **Extra measures (maintainer, 2026-11-06):** the weather-only stage and the two sensitivity
+  measures use the same stored weights and one extra pass of the probe, about 0.3 GPU-h in all.
 - **Not scored:** no CRPS, tail coverage, or curtailment cost, because no forecast here is a
   candidate.
 
 ## Caveats and next steps
 
+- **The sensitivity measures are not attention.** Leave-one-out and gradient times input describe
+  how the trained mixer reacts to its inputs, not how it weighs them.
 - **The probe is off-distribution.** Stages 1 and 2 show what the mixer reads from the encoders it is
   given, not a trained forecaster. Frozen linear heads were not needed (P1 held) and were not run.
 - **One seed and one injected Primary in the plots.** The response-share numbers use all 16 Primaries;

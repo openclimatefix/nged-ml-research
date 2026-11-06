@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN202, E402, D103, PLR0915
+# ruff: noqa: E501, ANN001, ANN202, E402, D103, PLR0915, PLR0912, PERF401, ANN201
 """Experiment 602: staged probe of the modular network's three encoders (GPU, inference only).
 
 For one network (P5: experiment 574; C1: experiment 584; A1: experiment 591) and each stored daily
@@ -65,8 +65,8 @@ N_MEAN_ROWS = 200_000
 LEVELS = {"q05": 1, "q50": 5, "q95": 9}
 
 
-def staged_quantiles(*, model, x, p, means, offset_in_tail=True) -> dict[str, torch.Tensor]:
-    """Return the standardised q05, q50, q95 of stages 1 to 3 for rows `x` of Primaries `p`."""
+def embeddings(*, model, x, p):
+    """Return the activated weather, datetime, and lag embeddings and the Primary embedding of rows `x`."""
     m = e.m
     emb = model.embedding(p)
     weather_in = [x[:, m.WEATHER_COLS], emb]
@@ -76,18 +76,56 @@ def staged_quantiles(*, model, x, p, means, offset_in_tail=True) -> dict[str, to
     hw = act(model.weather(torch.cat(weather_in, dim=-1)))
     hd = act(model.datetime(torch.cat([x[:, m.DATETIME_COLS], emb], dim=-1)))
     hl = act(model.lag_embedding(x=x, primary=p, emb=emb))
-    mw, _md, ml = (v.expand(len(x), -1) for v in means)
+    return hw, hd, hl, emb
+
+
+def mixer_out(*, model, x, p, hw, hd, hl, emb):
+    """Return the nine raw outputs (offset added to the means) for the given embeddings."""
+    m = e.m
+    core = torch.cat([hw, hd, hl, emb], dim=-1)
+    raw = model.mixer_ft(torch.cat([core, x[:, m.SPREAD_COLS], x[:, m.LEAD_COLS]], dim=-1))
+    off = model.offset(x[:, e.mod.TAU], p)
+    k = m.COMPONENTS
+    return torch.cat([raw[:, :k], raw[:, k : 2 * k] + off, raw[:, 2 * k :]], dim=-1)
+
+
+def staged_quantiles(*, model, x, p, means) -> dict[str, torch.Tensor]:
+    """Return standardised q05, q50, q95 of the stages and the leave-one-encoder-out forecasts.
+
+    `s1`: datetime only. `w`: weather only. `s2`: datetime and weather. `s3`: all three (the full
+    network). `loo_w`, `loo_d`, `loo_l`: the full network with one encoder's embedding set to its mean.
+    """
+    hw, hd, hl, emb = embeddings(model=model, x=x, p=p)
+    mw, md, ml = (v.expand(len(x), -1) for v in means)
     out = {}
-    for name, parts in (("s1", (mw, hd, ml)), ("s2", (hw, hd, ml)), ("s3", (hw, hd, hl))):
-        core = torch.cat([parts[0], parts[1], parts[2], emb], dim=-1)
-        raw = model.mixer_ft(torch.cat([core, x[:, m.SPREAD_COLS], x[:, m.LEAD_COLS]], dim=-1))
-        off = model.offset(x[:, e.mod.TAU], p)
-        k = m.COMPONENTS
-        raw = torch.cat([raw[:, :k], raw[:, k : 2 * k] + off, raw[:, 2 * k :]], dim=-1)
-        log_w, mean, std = e.base.mixture_parts(out=raw.double(), components=k)
+    stages = {
+        "s1": (mw, hd, ml), "w": (hw, md, ml), "s2": (hw, hd, ml), "s3": (hw, hd, hl),
+        "loo_w": (mw, hd, hl), "loo_d": (hw, md, hl), "loo_l": (hw, hd, ml),
+    }  # fmt: skip
+    for name, (a, b, c_) in stages.items():
+        raw = mixer_out(model=model, x=x, p=p, hw=a, hd=b, hl=c_, emb=emb)
+        log_w, mean, std = e.base.mixture_parts(out=raw.double(), components=e.m.COMPONENTS)
         q = e.base.mixture_quantiles(log_w=log_w, mean=mean, std=std)
         out[name] = q[:, [LEVELS["q05"], LEVELS["q50"], LEVELS["q95"]]]
     return out
+
+
+def attributions(*, model, x, p) -> np.ndarray:
+    """Return gradient times input of the mixture mean for the weather, datetime, and lag blocks.
+
+    Each value sums over the block's dimensions: the signed contribution of that embedding to the
+    standardised mixture mean. A sensitivity measure, not attention.
+    """
+    with torch.no_grad():
+        hw, hd, hl, emb = embeddings(model=model, x=x, p=p)
+    leaves = [v.detach().clone().requires_grad_(True) for v in (hw, hd, hl)]
+    with torch.enable_grad():
+        raw = mixer_out(model=model, x=x, p=p, hw=leaves[0], hd=leaves[1], hl=leaves[2], emb=emb)
+        k = e.m.COMPONENTS
+        log_w, mean, _ = e.base.mixture_parts(out=raw, components=k)
+        y = (log_w.exp() * mean).sum(dim=-1).sum()
+        y.backward()
+    return torch.stack([(v.grad * v.detach()).sum(dim=-1) for v in leaves], dim=1).cpu().numpy()
 
 
 def mean_embeddings(*, model, mr, pool: np.ndarray, device: str) -> tuple[torch.Tensor, ...]:
@@ -169,6 +207,18 @@ def main(*, device: str = "cuda") -> None:
                     mu, sd = mr.base.target_mean[prim], mr.base.target_std[prim]
                     cols: dict[str, np.ndarray] = {}
                     full_check = 0.0
+                    attr = []
+                    for a in range(0, len(idx), 25_000):
+                        attr.append(
+                            attributions(
+                                model=model,
+                                x=torch.from_numpy(x[a : a + 25_000]).to(device),
+                                p=torch.from_numpy(prim[a : a + 25_000]).to(device),
+                            )
+                        )
+                    attr = np.concatenate(attr) * sd[:, None]
+                    for j, name in enumerate(("w", "d", "l")):
+                        cols[f"g_{name}"] = attr[:, j]
                     with torch.no_grad():
                         parts: dict[str, list] = {}
                         for a in range(0, len(idx), 50_000):

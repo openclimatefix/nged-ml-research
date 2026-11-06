@@ -33,6 +33,7 @@ CONTRIB = "#306BFF"
 DEPTH = "#7A1FA2"
 STAGE_TITLE = {
     "s1": "Stage 1: datetime encoder only",
+    "w": "Weather encoder only (datetime and lag embeddings at their mean)",
     "s2": "Stage 2: datetime + weather encoders",
     "s3": "Stage 3: datetime + weather + lag encoders (the full network)",
 }
@@ -118,7 +119,7 @@ def forecast_panel(*, df, stage, obs, xdom, ydom, rules=(), span=None, title=Non
 def ydom_for(dfs, obs):
     lo, hi = np.inf, -np.inf
     for d in dfs:
-        for s in ("s1", "s2", "s3"):
+        for s in ("s1", "w", "s2", "s3"):
             q = stage_q(d, s)
             lo, hi = min(lo, np.nanmin(q[:, 0])), max(hi, np.nanmax(q[:, 2]))
     lo, hi = min(lo, np.nanmin(obs)), max(hi, np.nanmax(obs))
@@ -405,6 +406,194 @@ def step_table(clean) -> pl.DataFrame:
     return out
 
 
+NET_COLOUR = {"P5": cp.FORECAST_COLOUR, "C1": "#306BFF", "A1": "#10C5F7"}
+
+
+def single_encoder_figures(clean):
+    """Datetime-only and weather-only stages, one panel each, for the real pair and the injected D5 designs."""
+    cases = []
+    for net in NETS:
+        d = (
+            pl.concat(
+                [
+                    load(net=net, case="real", month="2025-12"),
+                    load(net=net, case="real", month="2026-01"),
+                ]
+            )
+            .unique(subset=["primary", "target_idx"], keep="last")
+            .sort("target_idx")
+        )
+        for lab, p in PRIM.items():
+            cases.append(
+                (
+                    f"real_{net}_{lab}",
+                    d.filter(pl.col("primary") == p),
+                    p,
+                    (datetime(2025, 12, 16), datetime(2026, 1, 28)),
+                    SWITCH_TIMES,
+                    f"{net}, {lab}, December 2025 example event, day-ahead forecasts",
+                    "Load-shift window",
+                )
+            )
+    for tag, df, p, xdom, rules, title, span_name in cases:
+        obs = obs_of(clean, p, df)
+        lo, hi = ydom_for([df], obs[np.isfinite(obs)])
+        p1 = forecast_panel(
+            df=df,
+            stage="s1",
+            obs=obs,
+            xdom=xdom,
+            ydom=(lo, hi),
+            rules=rules,
+            span=tuple(SWITCH_TIMES),
+        )
+        p2 = forecast_panel(
+            df=df,
+            stage="w",
+            obs=obs,
+            xdom=xdom,
+            ydom=(lo, hi),
+            rules=rules,
+            span=tuple(SWITCH_TIMES),
+            xtitle="Valid time (UTC)",
+        )
+        cp.figure(units=[p1, p2], title=title, key=key_for(span_name=span_name, rules=True)).save(
+            str(DOCS / f"{tag}_single_encoders.svg")
+        )
+
+
+def lag_share(df: pl.DataFrame, *, measure: str) -> np.ndarray:
+    """Return the lag encoder's share of the three encoders' summed absolute effect, per row."""
+    if measure == "loo":
+        a = [
+            np.abs(df["s3_q50"].to_numpy() - df[f"loo_{k}_q50"].to_numpy()) for k in ("w", "d", "l")
+        ]
+    else:
+        a = [np.abs(df[f"g_{k}"].to_numpy()) for k in ("w", "d", "l")]
+    return a[2] / np.maximum(a[0] + a[1] + a[2], 1e-12)
+
+
+def share_panel(*, series, xdom, title, ydom, xtitle=None):
+    """Lines of one share per network, with the load-shift window shaded and the switch times dashed."""
+    rows = []
+    for net, (xs, ys) in series.items():
+        rows += [{"x": str(x), "y": float(y), "net": net} for x, y in zip(xs, ys, strict=True)]
+    df = pl.DataFrame(rows)
+    sx = alt.Scale(domain=[str(v) for v in xdom])
+    ax = alt.Axis(format="%d %b", tickCount=8)
+    sy = alt.Scale(domain=list(ydom), nice=False)
+    shade = (
+        alt.Chart(pl.DataFrame({"a": [str(SWITCH_TIMES[0])], "b": [str(SWITCH_TIMES[1])]}))
+        .mark_rect(color=cp.SHADE_COLOUR, opacity=0.7, clip=True, aria=False)
+        .encode(x=alt.X("a:T", scale=sx, axis=ax), x2="b")
+    )  # ty: ignore[unresolved-attribute]
+    lines = (
+        alt.Chart(df)
+        .mark_line(strokeWidth=1.3, aria=False, clip=True)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:T", scale=sx, axis=ax, title=xtitle),
+            y=alt.Y("y:Q", scale=sy, title="Lag encoder's share"),
+            color=alt.Color(
+                "net:N",
+                scale=alt.Scale(domain=list(NET_COLOUR), range=list(NET_COLOUR.values())),
+                legend=None,
+            ),
+        )
+    )
+    rules = (
+        alt.Chart(pl.DataFrame({"x": [str(v) for v in SWITCH_TIMES]}))
+        .mark_rule(color=cp.RULE_COLOUR, strokeDash=[6, 3], strokeWidth=1.3, aria=False)
+        .encode(x=alt.X("x:T", scale=sx, axis=ax))
+    )  # ty: ignore[unresolved-attribute]
+    return alt.layer(shade, lines, rules).properties(
+        width=cp.W,
+        height=cp.PANEL_HEIGHT,
+        title=alt.TitleParams(title, fontSize=12, anchor="start"),
+    )
+
+
+def weight_figures():
+    """The lag encoder's share of the encoders' effect over time, by two sensitivity measures (not attention)."""
+    xdom = (datetime(2025, 12, 16), datetime(2026, 1, 28))
+    names = {
+        "loo": "leave-one-encoder-out change in the median",
+        "grad": "gradient times input of the mixture mean",
+    }
+    table = []
+    for lab, p in PRIM.items():
+        for measure in ("loo", "grad"):
+            half, day = {}, {}
+            for net in NETS:
+                d = (
+                    pl.concat(
+                        [
+                            load(net=net, case="real", month="2025-12"),
+                            load(net=net, case="real", month="2026-01"),
+                        ]
+                    )
+                    .unique(subset=["primary", "target_idx"], keep="last")
+                    .sort("target_idx")
+                    .filter(pl.col("primary") == p)
+                )
+                sh = lag_share(d, measure=measure)
+                x = [_utc(i) for i in d["target_idx"]]
+                half[net] = (x, sh)
+                dd = (
+                    pl.DataFrame({"day": [v.date() for v in x], "s": sh})
+                    .group_by("day", maintain_order=True)
+                    .agg(pl.col("s").mean())
+                )
+                day[net] = (
+                    [
+                        datetime.combine(v, datetime.min.time()) + timedelta(hours=12)
+                        for v in dd["day"]
+                    ],
+                    dd["s"].to_numpy(),
+                )
+                t = np.array(x)
+                for phase, (a, b) in {
+                    "before (14 d)": (SWITCH_TIMES[0] - timedelta(days=14), SWITCH_TIMES[0]),
+                    "first 4 days": (SWITCH_TIMES[0], SWITCH_TIMES[0] + timedelta(days=4)),
+                    "day 4 to end": (SWITCH_TIMES[0] + timedelta(days=4), SWITCH_TIMES[1]),
+                    "after (14 d)": (SWITCH_TIMES[1], SWITCH_TIMES[1] + timedelta(days=14)),
+                }.items():
+                    m = (t >= a) & (t < b)
+                    table.append(
+                        {
+                            "primary": lab,
+                            "measure": measure,
+                            "network": net,
+                            "phase": phase,
+                            "lag_share": float(sh[m].mean()),
+                        }
+                    )
+            top = share_panel(
+                series=half,
+                xdom=xdom,
+                title=f"{lab}: every half-hour, {names[measure]}",
+                ydom=(0, 1),
+            )
+            bottom = share_panel(
+                series=day,
+                xdom=xdom,
+                title=f"{lab}: daily average",
+                ydom=(0, 0.6),
+                xtitle="Valid time (UTC)",
+            )
+            key = [cp.entry(n, "line", c_) for n, c_ in NET_COLOUR.items()] + [
+                cp.entry("Load-shift window", "band", cp.SHADE_COLOUR, 0.7),
+                cp.entry("Switch times", "rule", cp.RULE_COLOUR),
+            ]
+            cp.figure(
+                units=[top, bottom],
+                title=f"Lag encoder's share of the three encoders' effect at {lab}",
+                key=key,
+            ).save(str(DOCS / f"weights_{measure}_{lab}.svg"))
+    out = pl.DataFrame(table)
+    out.write_csv(PROBE / "lag_share_by_phase.csv")
+    return out
+
+
 if __name__ == "__main__":
     DOCS.mkdir(parents=True, exist_ok=True)
     clean = c.clean_stack()
@@ -412,6 +601,12 @@ if __name__ == "__main__":
     free_figures(clean)
     injected_figures(clean)
     print(step_table(clean))
+    single_encoder_figures(clean)
+    print(
+        weight_figures().pivot(
+            on="phase", index=["primary", "measure", "network"], values="lag_share"
+        )
+    )
     resp = response_figure()
     print(
         resp.group_by("network").agg(
