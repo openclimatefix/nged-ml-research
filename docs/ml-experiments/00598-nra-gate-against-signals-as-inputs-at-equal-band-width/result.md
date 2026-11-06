@@ -8,7 +8,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -41,14 +41,158 @@ row_set_id: experiment_470_intersection_v1
 metric: >-
   Share of the NRA inside q05-q95 and on the safe side of q05 or q95, by phase; median follow ratio;
   band width; event-free CRPS at 0-24 h and 24-120 h; tail pinball.
+verdict: not supported
+best_arm: >-
+  R (A1 + G4), the hand-built gate. On injected 15 and 30 day load-shifts in 2025-10 and 2025-12
+  (288 Primary-events), 24 to 120 h ahead, it holds the normal running arrangement inside q05-q95 on
+  0.928 (0.896 to 0.953) of rows from day 4 to the end, against 0.888 (0.847 to 0.923) for the
+  network that reads the gate's signals (S).
+headline: >-
+  Giving the network the gate's signals did not replace the gate. S covers 0.888 from day 4 to the
+  end against R's 0.928 (gap 0.040, interval 0.022 to 0.060), barely above plain A1 at 0.884. S-g,
+  which also reads the gate state, covers 0.888. Rescaling S to R's width lifts it to 0.915, so the
+  network widens too little and does not place the width where the load-shift is.
+lessons: >-
+  The gate's value is placement as well as width: at equal width a constant widening reaches 0.909,
+  the width-matched S 0.915, and the gate 0.928. The signals cost event-free CRPS (0.031 points of
+  capacity at the eight MVA Primaries). The training signals are in-sample, which this experiment
+  could not separate from the signals carrying little (S-p was not run, by the stop rule).
+take_home_message: >-
+  A neural network that is handed the same signals as the hand-built gate did not learn to widen
+  its band during a load-shift: it covered the normal running arrangement on 0.888 of rows from day 4
+  to the end, against 0.928 for the gate and 0.884 for the plain network. Even with its band
+  stretched to the gate's width it reached only 0.915, so the gate is worth keeping, and the next
+  test worth running is whether signals computed out of sample, not in sample, help.
+advice:
+  - >-
+    Keep the G4 gate on the A1 band for load-shift work; do not replace it by signal inputs to the
+    lag encoder (P1, first fold pair).
+  - >-
+    Compare a gated band with a constant widening to the same mean width before crediting the gate
+    with placement (W against R, P2).
+  - >-
+    Build any signal that the network reads from out-of-sample lag-free forecasts, because
+    in-sample signals are cleaner in training than in test (pre-fit check, caveats).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**Planned, no score read yet.** We ask whether a neural network that reads the signals the G4 gate
-uses can learn to widen its own band during a load-shift, so that the hand-built G4 gate is not
-needed. A load-shift moves part of one Primary substation's demand onto a neighbour for days or
-weeks. The comparison is at equal band width, because a wider band alone raises coverage.
+**We asked whether a neural network that is given the signals of the hand-built gate can learn to
+widen its own forecast band during a load-shift, so that the gate is not needed.** A load-shift moves
+part of one Primary substation's demand onto a neighbour for days or weeks. We fine-tuned the A1
+network ([experiment
+591](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00591-shared-lag-encoder-auxiliary-shift-depth-loss/result/))
+on synthetic load-shifts with the gate's signals as extra inputs, and scored it on injected 15 and
+30 day load-shifts in 2025-10 and 2025-12 against the A1 network with the G4 gate ([experiment
+597](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00597-nra-assemble-c1-and-a1-with-g4-gate-as-single-forecasts/result/)).
+The network without the gate covered the normal running arrangement (NRA) inside q05-q95 on 0.888 of
+rows from day 4 to the end, against 0.928 with the gate. The stop rule then called for S-g only, which
+also failed, so the gate stays. This is a first-fold-pair result with two seeds, not a five-month
+result.
 
-## Plan
+**Verdict: not supported.** P1 failed (gap 0.040), P2 failed, P3 failed, P5 failed at the eight MVA
+Primaries, and P4 was not run.
+
+## Figures
+
+![Coverage by phase](coverage_by_phase.svg)
+
+Share of rows with the NRA inside q05-q95, injected 15 and 30 day load-shifts, 24-120 h. Coverage is
+scored against the estimated NRA. The gate (R) and the gate on the table T (G4T) lead from day 4 to the
+end; S and S-g sit close to plain A1.
+
+![Safe-side share by phase](safe_side_by_phase.svg)
+
+Share of rows with the NRA on the safe side of q05 or q95. Dashed line: 0.95.
+
+![Band width by arm](width_by_arm.svg)
+
+Mean q95 - q05 as a share of R's on the same rows. S is 0.936 of R's width from day 4 to the end;
+the width-matched arms are 1.02.
+
+![Follow histogram](follow_histogram.svg)
+
+How far the median moved towards the injected shift, event by event (0: ignored the shift). S follows
+0.101 of the depth, against R's 0.119.
+
+The next five figures show the December 2025 example event, D5 and D16, from 14 days before to 14
+days after, with dashed lines at the maintainer's switch times 2025-12-30 01:00 and 2026-01-14 11:30.
+The maintainer's times match the observed steps (summed absolute step 0.90 of capacity, against 0.22
+for [experiment
+580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)'s
+window about a day earlier). One arm per figure; coverage is scored against an estimated NRA, which
+is not drawn.
+
+![A1](example_event_A1.svg)
+
+![R](example_event_R.svg)
+
+![W](example_event_W.svg)
+
+![S](example_event_S.svg)
+
+![S-g](example_event_S_g.svg)
+
+## Results (first fold pair, 2025-10 and 2025-12; 24-120 h; injected 15 and 30 day events)
+
+- **Arms.** R: A1 + G4 from experiment 597. W: A1 widened by one constant factor to R's width
+  (1.069 and 1.077 by month). S: signals as inputs. S-g: S plus the G4 state bit. `-rs`: each S arm
+  rescaled to R's width. G4T: G4 computed on the table T. S-p was not run (stop rule).
+- **Day 4 to the end, coverage.** A1 0.884, W 0.909, S 0.888, S-g 0.888, S-rs 0.915, S-g-rs 0.916,
+  G4T 0.928, R 0.928. R minus S: 0.040 (0.022 to 0.060, MDE 0.019). R minus S-rs: 0.013 (-0.003 to
+  0.032).
+- **0 to 7 days after the end.** A1 0.917, W 0.936, S 0.921, S-rs 0.941, R 0.956. P2: S minus W is
+  -0.015 (-0.023 to -0.009); S-rs minus W is +0.005 (0.0002 to 0.010), below the 0.03 margin.
+- **Follow ratio (P3).** S 0.101 (0.079 to 0.129), R and A1 0.119 (0.092 to 0.163), S-g 0.100. The
+  0.08 target was not met; the interval of S includes it.
+- **Event-free CRPS (P5, S minus A1, points of capacity).** Eight MVA Primaries +0.031 (0.020 to
+  0.042, MDE 0.011); six MW Primaries +0.029 (0.001 to 0.056, MDE 0.028). The fixed margin is 0.03.
+  Two fold months are two blocks, so these intervals are rough.
+- **Tails.** Pinball loss at q05 and q95 for S is within 0.001 of A1 on the injected bank; the
+  event-free tail table is in the printed report.
+- **Real December pair (descriptive).** Before the event, S covers 0.28 to 0.33 at D5 against 0.59 to
+  0.62 for A1 and R, and about the same as A1 at D16 (0.92 against 0.91). From day 4 to the end, all
+  arms stay below 0.80 at D5 and D16.
+- **Counted tests: 7**, Bonferroni level 0.0071; minimum detectable effects are in the contrasts
+  above. P1 is flagged untestable at its 0.01 margin because its MDE is 0.019.
+
+## Checks
+
+- **Gate and rebuilt state.** The rebuilt G4 state equals experiment 592's stored state, and R
+  reproduces experiment 597 on its own row sets to within 1e-6.
+- **Median minus mean forecast, and the error of the mean forecast beside the quantile contrasts: not
+  computed.** The network outputs quantiles, and the median error `ae50` is in the printed report.
+- **Triggers fired.** None of the seven fired in a form that changes the verdict: the contrasts agree
+  between coverage and CRPS, no nested arm beats its parent, and no later experiment depends on this
+  result yet. P4 was not run, so the placebo trigger did not arise.
+- **Reviews.** Sonnet plan review (12 findings, all applied), Sonnet code review (15 findings, 12
+  applied or answered, 3 declined), Sonnet figure review (see the pull request).
+
+## Caveats
+
+- **Training signals are in-sample.** The lag-free table T comes from the fold's own A1 step-2
+  network, which saw the training rows. In the pre-fit check on 2025-12 with seed 0, two
+  Primaries fell below the 0.8 standard-deviation ratio and received added noise; the other folds'
+  counts are in the fit logs. We cannot say whether the failure is the signals
+  carrying little or the in-sample mismatch; S-p was not run to test the first.
+- **Two months only.** The stop rule ended the experiment after the first fold pair, so the five-month
+  bake-off was not run.
+- **Not done:** target-side absorption for R and S (experiment 595's method), the avoidable-curtailment
+  cost, and the Bonferroni count above covers only the coverage and event-free CRPS tests.
+- **Unlogged events.** NGED's logs may miss load-shifts, so clean rows may hold unlabelled events and
+  the real-event slices undercount.
+- **Thresholds.** The S-g gate threshold and the training-noise standard deviation use all of the
+  fold month's real rows, as R's threshold does.
+- **Weather source.** Weather at lag times comes from the run issued at or before the forecast origin
+  minus 9 h, so it exists at forecast time.
+
+## What to try next
+
+- Rebuild T from a cross-fitted lag-free network (trained without the block it is applied to) and
+  rerun S on the first fold pair, to separate the in-sample explanation.
+- Run S-p on the first fold pair if the maintainer wants the placebo answered.
+
+## Plan (fixed before any score)
 
 - **Arms (all P5 recipe with A1 wiring, fine-tuned on lag-only synthetic shifts mirrored at one
   neighbour).** R: A1 + G4 band (stored from [experiment
