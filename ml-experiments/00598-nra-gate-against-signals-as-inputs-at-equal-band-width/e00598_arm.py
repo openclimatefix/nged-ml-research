@@ -1,0 +1,614 @@
+# ruff: noqa: ANN001, ANN003, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205, E501, PLR0915, PLR0912, C901
+"""Experiment 598: fit and inject arms S, S-g, and S-p (GPU).
+
+A wrapper around experiment 574's `e00574_fit.py`, as experiment 591's `e00591_arm.py` is. The rows,
+recency weights, early stopping, seeds, scoring windows, origin-time weather assertions, refit days
+0 and 14, the embargoed daily fine-tune with synthetic lag-only load-shifts, and the A1 chain's
+step-2 weights are experiment 591's A1. What is new is the network (`e00598_model.SignalLagMdn`),
+which also reads the per-row signal columns of `e00598_signals`.
+
+Arms:
+
+- `S`: the signal columns.
+- `S-g`: the signal columns plus the G4 state bit (experiment 592's G4 gate run on the table `T`
+  instead of experiment 565's E2; wide while the gate is on and for 7 days after it releases).
+- `S-p`: the signal columns replaced by independent Gaussian noise with the training block's
+  per-column mean and standard deviation (no usable signal; the parity arm of the fine-tune).
+
+The signal block of training rows is built from the fold's frozen A1 step-2 network run with its lags
+masked (the table `T`, one per fold month and seed, cached under `tables/`). The synthetic shift is
+added to the power behind the signals and not to the target. Test rows read observed power.
+
+Usage: python e00598_arm.py ARM COMMAND [--months ...] [--seeds ...] [--passes ...] [--work-suffix X]
+
+- COMMAND: `table` (build and cache `T`), `check` (the pre-fit checks, printed), `fit` (daily
+  fine-tune at days 0 and 14 and the real-month forecasts), `inject` (the injected bank, as
+  experiments 584 and 591), `assemble` (concatenate the fits).
+"""
+
+import argparse
+import dataclasses
+import json
+import sys
+
+_p = argparse.ArgumentParser()
+_p.add_argument("arm", choices=("S", "S-g", "S-p"))
+_p.add_argument("command", choices=("table", "check", "fit", "inject", "assemble"))
+_p.add_argument("--months", nargs="+", default=["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"])
+_p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
+_p.add_argument("--passes", nargs="+", type=int, default=None)
+_p.add_argument("--work-suffix", default="")
+MINE = _p.parse_args()
+ARM, CMD = MINE.arm, MINE.command
+_argv = ["e00574_fit.py", "fit", "--arm", "P5"]
+_argv += ["--months", *MINE.months]
+_argv += ["--seeds", *map(str, MINE.seeds)]
+sys.argv = _argv
+
+import e00574_fit as e  # ty: ignore[unresolved-import]
+import e00578_common as k578  # ty: ignore[unresolved-import]
+import e00581_bank as bank  # ty: ignore[unresolved-import]
+import e00583_common as c583  # ty: ignore[unresolved-import]
+import e00591_model as aux  # ty: ignore[unresolved-import]
+import e00592_common as g592  # ty: ignore[unresolved-import]
+import e00598_model as mymodel  # ty: ignore[unresolved-import]
+import e00598_signals as sig  # ty: ignore[unresolved-import]
+import numpy as np
+import polars as pl
+import torch  # ty: ignore[unresolved-import]
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+NAME = "00598-nra-gate-against-signals-as-inputs-at-equal-band-width"
+ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
+DIR = {"S": "S", "S-g": "Sg", "S-p": "Sp"}[ARM]
+TABLES = ROOT / "tables"
+"""One `T_<month>_s<seed>.npz` per fold month and seed, shared by the three arms."""
+CHAIN = ML_EXPERIMENTS_DATA_DIR / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
+"""A1's pre-training and step-2 weights (experiment 591), read only."""
+W574 = e.W
+e.WORK = ROOT / f"{DIR}{MINE.work_suffix}"
+e.W = e.WORK / "work"
+assert e.SPEC.tag == "P5" and e.SPEC.sched == "3sE" and e.SPEC.lags == "24h" and e.SPEC.frozen
+N_SIG = sig.N_SIGNALS + (1 if ARM == "S-g" else 0)
+LAG_FIRST, LAG_WIDTH = 37, 8
+LEAD_OF = {"day": 43, "week": 44}
+
+
+def _step2_file(*, month: str, seed: int):
+    p = CHAIN / "step2" / e.SPEC.tag / f"{month}_s{seed}.pt"
+    assert p.exists(), p
+    return p
+
+
+def _stats_file(*, month: str):
+    p = W574 / "stats" / e.SPEC.b1 / f"{month}.npz"
+    assert p.exists(), p
+    return p
+
+
+e.step2_file, e.stats_file = _step2_file, _stats_file
+
+
+def new_model(*, n_primaries: int, stage: str = "ft") -> torch.nn.Module:
+    model = mymodel.SignalLagMdn(
+        n_primaries=n_primaries, stage=stage, n_knots=e.KNOTS, n_b1=e.N_B1, n_sig=N_SIG
+    )
+    model.table = e.CTX.get(f"table_{stage}")  # ty: ignore[invalid-assignment]
+    return model
+
+
+e.new_model = new_model
+
+
+# ---------------------------------------------------------------- neighbours, grid, synthetic shifts
+
+
+def world() -> sig.Neighbours:
+    """Return the Primaries' electrical neighbours and capacities (experiment 582's table)."""
+    import e00400_blend as b400  # ty: ignore[unresolved-import]
+
+    sm = k578.sites()
+    labels = sm["label"].to_list()
+    lab2p = {lab: i for i, lab in enumerate(labels)}
+    of = {i: [] for i in range(len(labels))}
+    for a, v in b400.nged_neighbours().items():
+        if a in lab2p:
+            of[lab2p[a]] = [lab2p[x] for x in v if x in lab2p]
+    return sig.Neighbours(of=of, capacity=sm["capacity_mw"].to_numpy().astype(np.float64))
+
+
+NB = world()
+GRID, STEP = e.c.prep422.GRID_START_US, e.c.prep422.STEP_US
+SYN: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+"""Per month-rows object: the synthetic power (16, grid) and the shift added to it (0 where none)."""
+_build_month_p5 = e.k.build_month
+
+
+def origin_idx_of(*, origin_us: np.ndarray) -> np.ndarray:
+    return ((origin_us - GRID) // STEP).astype(np.int64)
+
+
+def build_month_syn(*, month, clean):
+    """Build the month's P5 rows with experiment 591's synthetic lag-only load-shifts in the lag columns.
+
+    The lag columns are exactly A1's. The synthetic power and its shift are kept for the signal block.
+    """
+    mr = _build_month_p5(month=month, clean=clean)
+    origin_idx = origin_idx_of(origin_us=mr.origin_us)
+    first, last = int(mr.target_idx.min()), int(mr.target_idx.max())
+    fixed, n_events = bank.synthetic_clean(
+        clean=clean, first=first, last=last, seed=int(month.replace("-", ""))
+    )
+    blk = e.block_of(
+        clean=fixed, primary=mr.primary, target_idx=mr.target_idx, origin_idx=origin_idx
+    )
+    assert blk.shape[1] == LAG_WIDTH, blk.shape
+    for old, new in ((38, 1), (39, 2), (41, 4), (42, 5), (43, 6), (44, 7)):
+        assert np.array_equal(mr.x[:, old], blk[:, new]), (month, old)
+    mr.x[:, LAG_FIRST : LAG_FIRST + LAG_WIDTH] = blk
+    shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0).astype(np.float32)
+    SYN[id(mr)] = (fixed, shift)
+    print(f"{month}: {n_events} synthetic events", flush=True)
+    return mr
+
+
+# ---------------------------------------------------------------- the table T and the row blocks
+
+
+def table_file(*, month: str, seed: int):
+    return TABLES / f"T_{month}_s{seed}.npz"
+
+
+def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> None:
+    """Build and cache `T` and the lags-masked q05 and q95 widths of every training and test row."""
+    for seed in seeds:
+        target = table_file(month=month, seed=seed)
+        if target.exists():
+            continue
+        model = aux.AuxLagMdn(
+            n_primaries=len(mr.base.target_mean), stage="ft", n_knots=e.KNOTS, n_b1=e.N_B1,
+            kind="shared",
+        ).to(device)  # fmt: skip
+        model.load_state_dict(torch.load(_step2_file(month=month, seed=seed), map_location=device))
+        model.table = e.CTX["table_ft"]
+        q_mr = sig.masked_quantiles(
+            model=model, x=mr.x, primary=mr.primary, target_mean=mr.base.target_mean,
+            target_std=mr.base.target_std, device=device,
+        )  # fmt: skip
+        q_te = sig.masked_quantiles(
+            model=model, x=test.x, primary=test.primary, target_mean=mr.base.target_mean,
+            target_std=mr.base.target_std, device=device,
+        )  # fmt: skip
+        n_grid = GRID_SHAPE[1]
+        table = sig.build_lag_free_table(
+            prim=np.concatenate([mr.primary, test.primary]),
+            origin_idx=np.concatenate([origin_idx_of(origin_us=mr.origin_us), test.origin_idx]),
+            target_idx=np.concatenate([mr.target_idx, test.target_idx]),
+            median=np.concatenate([q_mr[:, 1], q_te[:, 1]]),
+            n_primaries=len(mr.base.target_mean), n_grid=n_grid,
+        )  # fmt: skip
+        filled = table.check_no_lookahead()
+        TABLES.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(".tmp.npz")
+        np.savez(
+            tmp, median=table.median, origin_idx=table.origin_idx,
+            w_train=np.stack([q_mr[:, 0] - q_mr[:, 1], q_mr[:, 2] - q_mr[:, 1]], axis=1),
+            w_test=np.stack([q_te[:, 0] - q_te[:, 1], q_te[:, 2] - q_te[:, 1]], axis=1),
+            n_train=len(q_mr), n_test=len(q_te),
+        )  # fmt: skip
+        tmp.rename(target)
+        print(f"{month} s{seed}: T filled {filled:,} of {table.median.size:,} entries", flush=True)
+        del model
+
+
+GRID_SHAPE = (16, 121248)
+
+
+class FoldSignals:
+    """The signal blocks of one fold month and seed: the training rows (with synthetic shifts) and any test power."""
+
+    def __init__(self, *, mr, test, clean: np.ndarray, month: str, seed: int) -> None:
+        z = np.load(table_file(month=month, seed=seed))
+        assert int(z["n_train"]) == len(mr.y) and int(z["n_test"]) == len(test.x), "stale table"
+        self.mr, self.test, self.clean, self.month, self.seed = mr, test, clean, month, seed
+        self.table = sig.LagFreeTable(median=z["median"], origin_idx=z["origin_idx"])
+        self.w_train, self.w_test = z["w_train"], z["w_test"]
+        self.fixed, self.shift = SYN[id(mr)]
+        self.choice = sig.mirror_choice(neighbours=NB.of, month=month)
+        self.power_sig = sig.mirrored_power(
+            base=self.fixed, shift=self.shift, choice=self.choice, capacity=NB.capacity
+        )
+        self._train: np.ndarray | None = None
+        self._moments: tuple[np.ndarray, np.ndarray] | None = None
+        self.report: dict = {}
+        o = np.concatenate([origin_idx_of(origin_us=mr.origin_us), test.origin_idx])
+        self.origin_days = sorted({int(d) for d in np.unique(o // sig.PER_DAY)})
+        self.n_days = GRID_SHAPE[1] // sig.PER_DAY
+        res_real = (clean - self.table.median).astype(np.float32)
+        gap_real = sig.fresh_gap_by_day(res_sig=res_real, n_days=self.n_days)
+        self.thr = g592.threshold(gap=gap_real, near=np.zeros(gap_real.shape, bool))
+
+    def _block(self, *, rows: dict, power_lag, power_sig, widths) -> np.ndarray:
+        lag_idx = {k: rows["x"][:, col].astype(np.int64) for k, col in LEAD_OF.items()}
+        return sig.signal_block(
+            prim=rows["prim"], origin_idx=rows["origin"], day_idx=lag_idx["day"],
+            week_idx=lag_idx["week"], day_missing=rows["x"][:, 38] > 0.5,
+            week_missing=rows["x"][:, 41] > 0.5, power_lag=power_lag, power_sig=power_sig,
+            table=self.table, widths=widths, nb=NB,
+        )  # fmt: skip
+
+    def _train_rows(self) -> dict:
+        return {
+            "x": self.mr.x[:, :45], "prim": self.mr.primary,
+            "origin": origin_idx_of(origin_us=self.mr.origin_us),
+        }  # fmt: skip
+
+    def _test_rows(self, *, test=None) -> dict:
+        t = test if test is not None else self.test
+        return {"x": t.x[:, :45], "prim": t.primary, "origin": t.origin_idx}
+
+    def g4_bit(self, *, power_sig: np.ndarray, prim: np.ndarray, origin: np.ndarray) -> np.ndarray:
+        """Return 1.0 where G4 on `T` is on or held at the row's origin day, else 0.0."""
+        res = (power_sig - self.table.median).astype(np.float32)
+        gap = sig.fresh_gap_by_day(res_sig=res, n_days=self.n_days)
+        wide = sig.g4_wide(
+            gap=gap, thr=self.thr, origin_days=self.origin_days, neighbours=NB.of
+        )  # fmt: skip
+        return wide[prim, origin // sig.PER_DAY].astype(np.float32)
+
+    def train_block(self) -> np.ndarray:
+        """Return the training rows' block: synthetic shifts in the signals, training noise where the
+        training-to-test spread ratio is low, the G4 bit for S-g, noise for S-p. Cached.
+        """
+        if self._train is not None:
+            return self._train
+        rows = self._train_rows()
+        synth = self._block(
+            rows=rows, power_lag=self.fixed, power_sig=self.power_sig, widths=self.w_train
+        )
+        real_train = self._block(
+            rows=rows, power_lag=self.clean, power_sig=self.clean, widths=self.w_train
+        )
+        real_test = self._block(
+            rows=self._test_rows(), power_lag=self.clean, power_sig=self.clean, widths=self.w_test
+        )
+        sd = sig.train_test_sd(
+            blocks={"train": real_train, "test": real_test},
+            prim={"train": self.mr.primary, "test": self.test.primary}, n_primaries=16,
+        )  # fmt: skip
+        noise = sig.noise_sd(sd=sd)
+        self.report = {
+            "sd_ratio": {
+                n: (sd["train"][j] / sd["test"][j]).round(3).tolist()
+                for j, n in enumerate(sig.NOISED)
+            },
+            "noise_sd": noise.round(3).tolist(),
+            "t_missing_share_lag_day": float(
+                1
+                - np.isfinite(
+                    self.table.median[
+                        self.mr.primary, np.clip(self.mr.x[:, 43].astype(np.int64), 0, None)
+                    ]
+                ).mean()
+            ),
+        }  # fmt: skip
+        sig.add_training_noise(block=synth, prim=self.mr.primary, sd=noise, seed=self.seed)
+        del real_train, real_test
+        if ARM == "S-g":
+            bit = self.g4_bit(power_sig=self.power_sig, prim=self.mr.primary, origin=rows["origin"])
+            synth = np.concatenate([synth, bit[:, None]], axis=1)
+        self._moments = sig.column_moments(block=synth)
+        if ARM == "S-p":
+            synth = sig.placebo_block(
+                mean=self._moments[0], sd=self._moments[1], n=len(synth), seed=self.seed
+            )
+        self._train = synth
+        return synth
+
+    def test_block(self, *, test, power_lag, power_sig, w_test) -> np.ndarray:
+        """Return a test (sub)set's block from the given power (observed, or the injected bank's)."""
+        if ARM == "S-p":
+            self.train_block()
+        block = self._block(
+            rows=self._test_rows(test=test), power_lag=power_lag, power_sig=power_sig,
+            widths=w_test,
+        )  # fmt: skip
+        if ARM == "S-g":
+            bit = self.g4_bit(power_sig=power_sig, prim=test.primary, origin=test.origin_idx)
+            block = np.concatenate([block, bit[:, None]], axis=1)
+        if ARM == "S-p":
+            assert self._moments is not None
+            block = sig.placebo_block(
+                mean=self._moments[0], sd=self._moments[1], n=len(block),
+                seed=self.seed + 1_000 + int(test.origin_idx.min()) % 997,
+            )  # fmt: skip
+        return block
+
+
+FOLD: dict[tuple[str, int], FoldSignals] = {}
+
+
+def fold_signals(*, mr, test, clean, month: str, seed: int) -> FoldSignals:
+    key = (month, seed)
+    if key not in FOLD:
+        for old in [k for k in FOLD if k[0] != month]:
+            del FOLD[old]
+        FOLD[key] = FoldSignals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+    return FOLD[key]
+
+
+# ---------------------------------------------------------------- training tensors with the signals
+
+
+class SigGpuMonth(e.LagGpuMonth):
+    """The month's rows on the GPU; the fine-tuning tensors get the signal columns appended."""
+
+    def refit_tensors(self, *, refit, shift_z=None):
+        t = super().refit_tensors(refit=refit, shift_z=shift_z)  # applies block dropout
+        fs = FOLD[(self.mr.month, e.CTX["seed"])]
+        b = fs.train_block()[refit.index].copy()
+        if ARM != "S-p":
+            sig.mask_lag_columns(
+                block=b, day_masked=(t["x"][:, 38] > 0.5).cpu().numpy(),
+                week_masked=(t["x"][:, 41] > 0.5).cpu().numpy(),
+            )  # fmt: skip
+        t["x"] = torch.cat([t["x"], torch.from_numpy(b).to(self.device)], dim=1)
+        return t
+
+
+# ---------------------------------------------------------------- commands
+
+
+def _out(out_dir, month, r, day, seed):
+    return out_dir / f"{month}_r{r:02d}_d{day}_s{seed}.parquet"
+
+
+def _done(*, out) -> bool:
+    return out.exists() or out.with_suffix(".empty").exists()
+
+
+def subset(*, test, sel: np.ndarray):
+    """Return the test rows `sel` (a boolean mask) as a new `TestRows`."""
+    return dataclasses.replace(
+        test, **{f.name: getattr(test, f.name)[sel] for f in dataclasses.fields(test)}
+    )
+
+
+def forecast_window(*, model, test, mr, device: str, fs: FoldSignals, lo: int, hi: int, power_lag, power_sig, lag_x=None):
+    """Return the forecast frame of origins in [lo, hi) with signals built from the given power."""
+    sel = (test.origin >= lo) & (test.origin < hi)
+    if not sel.any():
+        return None
+    sub = subset(test=test, sel=sel)
+    if lag_x is not None:
+        sub = dataclasses.replace(sub, x=lag_x[sel])
+    block = fs.test_block(
+        test=sub, power_lag=power_lag, power_sig=power_sig, w_test=fs.w_test[sel]
+    )  # fmt: skip
+    sub = dataclasses.replace(sub, x=np.concatenate([sub.x, block], axis=1))
+    model.table = e.CTX["table_ft"]
+    return e._window_frame(
+        model=model, test=sub, mr=mr, lo=lo, hi=hi, flag=False, device=device
+    )  # fmt: skip
+
+
+def run_prepare(*, device: str, command: str) -> None:
+    """The `table` and `check` commands."""
+    clean = e.c.clean_stack()
+    assert clean.shape == GRID_SHAPE, clean.shape
+    for month in e.ARGS.months:
+        mr = e.k.build_month(month=month, clean=clean)
+        test = e.build_test(month=month, standardiser=mr.base.standardiser)
+        ensure_tables(mr=mr, test=test, month=month, seeds=e.ARGS.seeds, device=device)
+        if command == "check":
+            for seed in e.ARGS.seeds:
+                fs = fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+                fs.train_block()
+                print(f"== {month} s{seed}: training-to-test sd ratio per Primary", flush=True)
+                for name, ratios in fs.report["sd_ratio"].items():
+                    print(f"  {name:10s}", ratios)
+                print("  noise sd added (rows: dis_day, dis_week, fresh)", fs.report["noise_sd"])
+                print("  T missing at the day lag (train rows)", fs.report["t_missing_share_lag_day"])
+                known_answer_real(fs=fs, test=test)
+        del mr, test
+        FOLD.clear()
+        torch.cuda.empty_cache()
+
+
+def known_answer_real(*, fs: FoldSignals, test) -> None:
+    """Add a known shift to one Primary's real power for 10 days and check it reaches the signals."""
+    p = 3
+    shift = 0.2
+    start = int(np.median(test.origin_idx)) - 5 * sig.PER_DAY
+    end = start + 10 * sig.PER_DAY
+    lag = fs.clean.copy()
+    lag[p, start:end] = np.where(np.isfinite(lag[p, start:end]), lag[p, start:end] + shift, np.nan)
+    sh = np.zeros_like(lag)
+    sh[p, start:end] = shift
+    pwr_sig = sig.mirrored_power(base=lag, shift=sh, choice=fs.choice, capacity=NB.capacity)
+    sel = (test.primary == p) & (test.origin_idx >= start + 2 * sig.PER_DAY) & (test.origin_idx < end - sig.PER_DAY)
+    sub = subset(test=test, sel=sel)
+    kw = {"test": sub, "w_test": fs.w_test[sel]}
+    base = fs.test_block(power_lag=fs.clean, power_sig=fs.clean, **kw)
+    moved = fs.test_block(power_lag=lag, power_sig=pwr_sig, **kw)
+    diff = moved - base
+    fresh_ok = base[:, sig.COL["fresh_missing"]] == 0
+    got_fresh = float(np.median(diff[fresh_ok, sig.COL["fresh"]])) / sig.SCALE
+    got_dis = diff[:, sig.COL["dis_day"]]
+    live = sub.x[:, 38] < 0.5
+    print(
+        f"  known answer on real rows (Primary {p}, shift {shift}): fresh moves by {got_fresh:.3f}; "
+        f"day-lag disagreement moves by {np.median(got_dis[live]) / sig.SCALE:.3f} (median over rows with a day lag)",
+        flush=True,
+    )  # fmt: skip
+    if ARM != "S-p":
+        assert abs(got_fresh - shift) < 0.02, got_fresh
+        assert abs(float(np.median(got_dis[live])) / sig.SCALE - shift) < 0.05
+
+
+def run_fit(*, device: str = "cuda") -> None:
+    clean = e.c.clean_stack()
+    assert clean.shape == GRID_SHAPE, clean.shape
+    e.k.build_month = build_month_syn
+    e.k.GpuMonth = SigGpuMonth
+    for month in e.ARGS.months:
+        cuts = e.k.cutoffs(month=month, cadence=e.CADENCE)
+        mr = e.k.build_month(month=month, clean=clean)
+        test = e.build_test(month=month, standardiser=mr.base.standardiser)
+        ensure_tables(mr=mr, test=test, month=month, seeds=e.ARGS.seeds, device=device)
+        g = SigGpuMonth(mr=mr, device=device)
+        for seed in e.ARGS.seeds:
+            fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+            for i, cut in enumerate(cuts):
+                day = e.f.day_of(month=month, cut=cut)
+                out = e.W / "fits" / e.SPEC.tag / f"{month}_d{day}_s{seed}.parquet"
+                mfile = e.model_file(tag=e.SPEC.tag, month=month, day=day, seed=seed)
+                if _done(out=out) and mfile.exists():
+                    continue
+                started = e.time.monotonic()
+                if mfile.exists():
+                    model = new_model(n_primaries=len(mr.base.target_mean)).to(device)
+                    model.load_state_dict(torch.load(mfile, map_location=device))
+                    model.eval()
+                    log: dict = {"name": f"{ARM}/{month}_d{day}_s{seed}", "reused": str(mfile)}
+                else:
+                    model, log = e.fine_tune(g=g, month=month, cut=cut, seed=seed, device=device)
+                    mfile.parent.mkdir(parents=True, exist_ok=True)
+                    tmp = mfile.with_suffix(".tmp")
+                    torch.save(model.state_dict(), tmp)
+                    tmp.rename(mfile)
+                lo, hi = e.k.window_of(month=month, cadence=e.CADENCE, index=i)
+                fs = FOLD[(month, seed)]
+                frame = forecast_window(
+                    model=model, test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi,
+                    power_lag=clean, power_sig=clean,
+                )  # fmt: skip
+                if frame is None:
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    out.with_suffix(".empty").touch()
+                else:
+                    e.atomic_frame(frame=frame, target=out)
+                log["seconds"] = round(e.time.monotonic() - started, 2)
+                log["signal_report"] = fs.report
+                e.c.write_json(obj=log, path=e.W / "logs" / e.SPEC.tag / f"{month}_d{day}_s{seed}.json")
+                print(f"{ARM} {log['name']}: {log.get('epochs', 'reused')} epochs, {log['seconds']} s", flush=True)
+                del model
+        del g, mr, test
+        FOLD.clear()
+        torch.cuda.empty_cache()
+    out = e.WORK / f"checks_fit_{DIR}_s{'-'.join(map(str, e.ARGS.seeds))}.json"
+    out.write_text(json.dumps(e.CHECK, indent=1, default=str))
+    print("CHECKS PASSED", {a: v for a, v in e.CHECK.items() if a != "months"})
+
+
+def run_inject(*, device: str = "cuda") -> None:
+    """Forecast every pass of the injected bank with the saved weights; one parquet per cell.
+
+    The lag columns are experiment 584's contaminated lags, exactly as for A1. The signals read the
+    contaminated power; the power behind the fresh and neighbour readings also carries each event
+    mirrored onto one neighbour, `nbs[(r + p) % len(nbs)]`, as experiment 597's G4 sees it.
+    """
+    clean = e.c.clean_stack()
+    e.k.build_month = build_month_syn
+    passes = MINE.passes if MINE.passes is not None else list(range(bank.N_PASSES))
+    for month in e.ARGS.months:
+        out_dir = e.W / "inject"
+        cuts = e.k.cutoffs(month=month, cadence=e.CADENCE)
+        todo = [
+            (r, i, seed)
+            for r in passes
+            for i in range(len(cuts))
+            for seed in e.ARGS.seeds
+            if not _done(out=_out(out_dir, month, r, e.f.day_of(month=month, cut=cuts[i]), seed))
+        ]
+        if not todo:
+            continue
+        mr = e.k.build_month(month=month, clean=clean)
+        test = e.build_test(month=month, standardiser=mr.base.standardiser)
+        e.CTX["variants"] = {}
+        e.CTX["on"] = False
+        ensure_tables(mr=mr, test=test, month=month, seeds=e.ARGS.seeds, device=device)
+        start_idx = (e.c.us(t=e.c.month_start(month=month)) - GRID) // STEP
+        sl = slice(LAG_FIRST, LAG_FIRST + LAG_WIDTH)
+        cache: dict[int, tuple] = {}
+
+        def power_for(r: int):
+            if r not in cache:
+                cache.clear()
+                fixed, _ = bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)
+                shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0)
+                choice = {
+                    p: qs[(r + p) % len(qs)] for p, qs in NB.of.items() if qs
+                }  # the 597 rule
+                mirrored = sig.mirrored_power(
+                    base=fixed, shift=shift, choice=choice, capacity=NB.capacity
+                )  # fmt: skip
+                blk = e.block_of(
+                    clean=fixed, primary=test.primary, target_idx=test.target_idx,
+                    origin_idx=test.origin_idx,
+                )  # fmt: skip
+                x = test.x.copy()
+                x[:, sl] = blk
+                assert np.array_equal(x[:, 43:45], test.x[:, 43:45]), "contamination moved a lag time"
+                cache[r] = (fixed, mirrored, x)
+            return cache[r]
+
+        models: dict[tuple[int, int], torch.nn.Module] = {}
+        for r, i, seed in todo:
+            cut = cuts[i]
+            day = e.f.day_of(month=month, cut=cut)
+            if (i, seed) not in models:
+                m = new_model(n_primaries=len(mr.base.target_mean)).to(device)
+                m.load_state_dict(
+                    torch.load(
+                        e.model_file(tag=e.SPEC.tag, month=month, day=day, seed=seed),
+                        map_location=device,
+                    )
+                )
+                m.eval()
+                models[(i, seed)] = m
+            fs = fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+            lo, hi = e.k.window_of(month=month, cadence=e.CADENCE, index=i)
+            fixed, mirrored, x = power_for(r)
+            frame = forecast_window(
+                model=models[(i, seed)], test=test, mr=mr, device=device, fs=fs, lo=lo, hi=hi,
+                power_lag=fixed, power_sig=mirrored, lag_x=x,
+            )  # fmt: skip
+            target = _out(out_dir, month, r, day, seed)
+            if frame is None:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.with_suffix(".empty").touch()
+            else:
+                e.atomic_frame(frame=frame, target=target)
+            print(f"{ARM} inject {month} r{r:02d} d{day} s{seed}", flush=True)
+        del mr, test, models
+        FOLD.clear()
+        torch.cuda.empty_cache()
+
+
+def run_assemble() -> None:
+    """Concatenate each cutoff's window forecast into one table per month and seed."""
+    for month in e.ARGS.months:
+        cuts = e.k.cutoffs(month=month, cadence=e.CADENCE)
+        for seed in e.ARGS.seeds:
+            parts = [
+                e.W / "fits" / e.SPEC.tag / f"{month}_d{e.f.day_of(month=month, cut=cut)}_s{seed}.parquet"
+                for cut in cuts
+            ]
+            assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
+            frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
+            e.atomic_frame(frame=frame, target=e.W / "seed_preds" / e.SPEC.tag / f"{month}_s{seed}.parquet")
+            print("wrote", month, seed, frame.height, flush=True)
+
+
+if __name__ == "__main__":
+    if CMD in {"table", "check"}:
+        e.k.build_month = build_month_syn
+        e.k.GpuMonth = SigGpuMonth
+        run_prepare(device="cuda", command=CMD)
+    elif CMD == "fit":
+        run_fit()
+    elif CMD == "inject":
+        run_inject()
+    else:
+        run_assemble()
