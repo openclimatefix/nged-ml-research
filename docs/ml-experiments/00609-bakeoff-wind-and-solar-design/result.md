@@ -20,7 +20,8 @@ hypothesis: >-
   number of refits for under 8 GPU-h in total, and every scoring choice can be fixed before any
   candidate is scored on the final test.
 prediction: >-
-  Written before reading the experiment pages. The whole wind and solar part costs under 2 GPU-h,
+  Written before reading the experiment pages. The whole wind and solar part costs under 2 GPU-h
+  (the most thorough design, at 3.1, did not meet this),
   because the earlier fits took seconds to about a minute each. The experiment 605 gaps force at
   least two scoring versions for the solar farms and one for the wind farms.
 decision_rule: >-
@@ -33,11 +34,12 @@ verdict: inconclusive
 code: none (a written design; all numbers are read from earlier pages and from file listings)
 best_arm: none
 headline: >-
-  The wind and solar bake-off would cost about 0.7 GPU-h in its cheapest design and about 2 GPU-h
+  The wind and solar bake-off would cost about 0.4 GPU-h in its cheapest design and about 3 GPU-h
   in its most thorough, against a ceiling of 8 GPU-h. Every earlier stored forecast covers
   only the development period, so every candidate has to be re-run for the final test.
 take_home_message: >-
-  Fitting is cheap for wind and solar: one wind head refit takes about 2 minutes and one solar
+  Fitting is cheap for wind and solar: one wind head refit takes about 25 seconds per seed and one
+  solar
   refit about 1 minute per seed. The expensive part is the data. The ensemble inputs of both
   technologies must be extended to 2026-10-31 by experiment 607 first, and the nine generators
   have had no exact-zero reading since 2026-03-26. We therefore score the generators in two
@@ -63,8 +65,8 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**The wind and solar part of the bake-off is cheap to fit and costly to prepare: about 0.7 GPU-h
-for the cheapest design and about 2 GPU-h for the most thorough, against a ceiling of 8 GPU-h.**
+**The wind and solar part of the bake-off is cheap to fit and costly to prepare: about 0.4 GPU-h
+for the cheapest design and about 3 GPU-h for the most thorough, against a ceiling of 8 GPU-h.**
 The fit times come from the logs of earlier experiments and are estimates, so the first worker
 must time one fit of each kind before relying on them. No weather model was fitted and no forecast
 was scored for this page. The page is a design that a later worker can follow once the list of
@@ -72,7 +74,8 @@ release candidates is frozen.
 
 The bake-off scores each frozen candidate once, on forecasts issued from 2026-07-01 to 2026-10-31
 (the final test, opened once). The five development months are 2025-10, 2025-12, 2026-01, 2026-03,
-and 2026-06. July 2026 is not used for anything else. Nothing here is adopted for production, and
+and 2026-06. July 2026 is the first month of the final test. Nothing here is adopted for production,
+and
 the generators appear only as W1 to W3 (wind) and Solar A to F (solar).
 
 ## 1. Candidates, stored artefacts, and cost
@@ -97,16 +100,18 @@ the generators appear only as W1 to W3 (wind) and Solar A to F (solar).
 runs, not on daily origins, so the development months need a daily-origin run of the plant
 summaries. The solar forecasts were scored over 2025-09 to 2026-08 on refits dated 2025-09,
 2025-12, 2026-03, and 2026-06, so the stored solar forecasts cover the five development months only
-where those refits apply. The worker must check the refit dates against the coarse-refit rule of
+where those refits apply. The stored annual forecasts come from a single refit dated 2025-09, so
+they match that rule even less well. The worker must check the refit dates against the coarse-refit
+rule of
 the common brief (day 0 and day 14 of each test month) and refit where the dates differ.
 
 **Fit costs are small.** The numbers below are read from logs, and the totals are estimates.
 
 | Fit | Cost per fit | Source |
 |---|---|---|
-| Solar `a2_member`, one refit, one seed | 40 to 61 s wall time (24 s of GPU time) | Logs of experiment 430 and the cost table of experiment 493 |
+| Solar `a2_member`, one refit, one seed | 29 to 61 s wall time (24 s of GPU time) | Logs of experiment 430 and the cost table of experiment 493 |
 | Solar one-pass network, one refit, one seed | 8 s of GPU time | Experiment 493 |
-| Wind head, one seed, one refit | about 25 s | Log of experiment 347 stage 4 (all 17 head fits took 1,102 s) |
+| Wind head, one seed, one refit | about 25 s | Log of experiment 347 stage 4 (the 45 timed head fits took 1,102 s in all) |
 | Wind plant summaries, one farm, hindcast and scored sets | about 96 s of CPU | `inputs_W1.log` of experiment 347 |
 | XGBoost, GAM, `climatology`, `manual_heuristic` | CPU only, minutes | Earlier pages |
 
@@ -114,11 +119,11 @@ the common brief (day 0 and day 14 of each test month) and refit where the dates
 
 | Rank | Design | GPU-h | Notes |
 |---|---|---|---|
-| 1 | Final test only. Solar: one annual refit and two quarterly refits, six seeds. Wind: one head refit at 2026-07-01, five seeds. Stored forecasts stand in for the development months where their rows match. | about 0.7 | The cheapest design, and the one I recommend as the minimum. |
-| 2 | Design 1, plus re-running the five development months with the same code (day 0 and day 14 refits, two seeds for wind and six for solar), so that the development and final-test numbers come from one script. | about 1.3 | Catches a mismatch between the stored forecasts and the new code before the test is opened. |
-| 3 | Design 2, plus a wind head refit every quarter inside the test window, and ten seeds for Solar E ([experiment 498](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00498-solar-e-annual-refit-schedule-only-read/result/) needed ten seeds to resolve a 1% contrast). | about 2.0 | The most thorough; the extra seeds matter only if a contrast at one farm decides a ranking. |
+| 1 | Final test only. Solar: one annual refit and two quarterly refits, six seeds. Wind: one head refit at 2026-07-01, five seeds. Stored forecasts stand in for the development months where their rows match. | about 0.4 | The cheapest design: 18 solar fits at 61 s and 5 wind fits at 25 s, plus 30% for data loading. |
+| 2 | Design 1, plus re-running the five development months with the same code (day 0 and day 14 refits, two seeds for wind and six for solar), so that the development and final-test numbers come from one script. | about 1.9 | Adds 60 solar fits and 20 wind head fits (10 refits). Catches a mismatch between the stored forecasts and the new code before the test is opened. |
+| 3 | Design 2, plus a wind head refit every quarter inside the test window, and ten seeds for Solar E ([experiment 498](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00498-solar-e-annual-refit-schedule-only-read/result/) needed ten seeds to resolve a 1% contrast). | about 3.1 | Adds 1 wind refit and 4 more solar seeds for 13 refits. The extra seeds matter only if a contrast at one farm decides a ranking. |
 
-**All three designs are far below the 8 GPU-h ceiling, so no stop is needed.** The estimate counts
+**All three designs are below the 8 GPU-h ceiling, so no stop is needed.** The estimate counts
 the longest fit time seen (61 s) for every solar fit and 25 s for every wind head fit, and adds 30%
 for data loading. The first worker confirms it with one timed fit of each kind.
 
@@ -130,23 +135,25 @@ q95, and q99. The continuous ranked probability score (CRPS) is twice the mean p
 those levels. Capacity is the p99.9 rule of [experiment 461](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00461-wind-and-solar-retrain-with-p99-9-effective-capacity/result/)
 for the wind farms. For the solar farms the capacity follows
 [experiment 505](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00505-rolling-p99-9-effective-capacity-for-wind-and-solar/result/):
-the old capacity at Solar A and Solar E, where the rolling and all-history p99.9 rules failed the
-tail test, and the worker chooses the rule for the other four farms from experiments 461 and 505
-and records it. The scoring code reads each capacity from one file, so no candidate can use another.
+the old capacity at Solar A and Solar E, where the rolling and all-history p99.9 rules failed (Solar
+A on score, Solar E on the tail test), and the worker chooses the rule for the other four farms from
+experiments 461 and 505
+and records the rule. The scoring code reads each capacity from one file, so no candidate can use
+another.
 
 | Metric | Definition | Why |
 |---|---|---|
 | Quantile score | Mean pinball loss over 11 levels, in points of capacity | The headline of both protocols |
 | CRPS | Twice the mean pinball loss | Comparable with the demand pages |
 | Interval coverage | Share of rows with the observed power inside q05 to q95; target 0.90 | Calibration |
-| Tail calibration | Share of rows above q99 (target 0.01) and below q01 (target 0.01); the 0.99 and 0.01 pinball losses | [Experiment 347](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00347-wind-physics-hybrid-plant-then-mdn/result/) found 2.3% above q99, so this must be reported for every candidate |
-| Threshold-weighted CRPS | Weight on observed power above 80% of capacity | The part of the distribution that matters for curtailment |
+| Tail calibration | Share of rows above q99 (target 0.01) and below q01 (target 0.01); the 0.99 and 0.01 pinball losses | [Experiment 347](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00347-wind-physics-hybrid-plant-then-mdn/result/) found 2.3% above q99, so the worker reports both shares for every candidate |
+| Threshold-weighted CRPS | Weight on observed power above 80% of capacity (this page's own choice; no earlier page sets a threshold) | The part of the distribution that matters for curtailment |
 
 **No curtailment-cost metric exists for generators yet.** The avoidable curtailment cost of
 [experiment 601](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00601-nra-curtailment-cost-and-tail-calibration-of-assembled-candidates/result/)
 is defined for demand nodes with an import limit, and experiment 347 lists a generator version as
 "not computed". The design therefore reports the 0.99 pinball loss and the threshold-weighted CRPS
-in its place. The maintainer must choose whether to define a generator curtailment cost before the
+instead. The maintainer must choose whether to define a generator curtailment cost before the
 test is opened; this page does not choose.
 
 **Every metric is reported in every slice below, and every slice row shows its half-hour count.**
@@ -167,8 +174,7 @@ times the 3 lead bands, and the worker computes it from the frozen list.
 | Near a data gap | Half-hours within 24 hours of a gap of at least 3 hours in the same series |
 | Series | Every farm on its own row; the pooled number is a mean over farms, not over rows |
 
-**Slices use the observed power only to label days, never as a forecast input.** A day label from
-the observed power is allowed because the label does not change any forecast.
+**Slices use the observed power only to label days, never as a forecast input.**
 
 ## 3. Missing readings and the experiment 605 gaps
 
@@ -191,12 +197,14 @@ in July and October 2026.
 **Version A is the headline, and A-dev is its development-period match.** Dropping zeros removes
 the easy half-hours, so version A scores are higher than the scores in the earlier pages and must
 never be set beside them. Version B is a bound: night half-hours are scored with zero forecasts and
-zero actuals, so it lowers the score and is reported separately, never pooled with daylight
+zero actuals, so the night fill lowers the score and is reported separately, never pooled with
+daylight
 half-hours. The solar protocol already scores daylight half-hours only, so version A and
 version B differ only through the dawn and dusk half-hours that read exactly zero.
 
 **Solar E is reported on its own row, and every pooled solar number is shown with and without it.**
-Its missing midday readings are the largest gap in the final test, and they remove the half-hours
+Its missing midday readings are the largest gap in the final test, and the missing readings remove
+the half-hours
 that carry most of its score. A pooled solar mean that includes Solar E is not comparable with the
 development months.
 
@@ -235,7 +243,8 @@ the version of the missing-reading rule, and the caveats of section 3. The files
 
 - `series` (W1 to W3 or Solar A to F), `power_fcst_init_time`, `valid_time`, and `lead_hours`;
 - `q01` to `q99`, in points of capacity and in the generator's unit (MW);
-- `observed_power` (null where there is no reading) and `observed_filled` (the version B or C value);
+- `observed_power` (null where there is no reading) and `observed_filled` (the version B or C
+  value);
 - `sun_elevation_degrees`, `reading_present`, and `near_gap` (true within 24 hours of a gap of at
   least 3 hours).
 
@@ -258,16 +267,18 @@ they stay under `data/` and are not published.
 
 **Risks.**
 
-- **Capacity moves.** Wind recomputes the p99.9 capacity at each refit, and the solar capacity is
-  fixed. A capacity computed from power that includes the test months would leak, so the worker
+- **Capacity can leak.** Wind recomputes the p99.9 capacity at each refit, and the solar capacity is
+  fixed or rolling according to the rule the worker records. A capacity computed from power that
+  includes the test months would leak, so the worker
   asserts that every capacity uses only readings from before the refit.
 - **Only 4 test months and 3 wind farms.** The intervals are wide. Experiment 347 found a gain of
   0.23 points with a 99.75% interval that included zero. The bake-off may not separate close
   candidates, and the page reports ties as ties.
-- **Upper tail of wind default 2.** 2.3% of observations exceeded q99 in experiment 347. This is
-  reported for every candidate and is not a pass or fail rule here.
-- **Solar E.** It has the fewest scored rows, and ten seeds were needed to resolve one contrast.
-  Design 3 pays for that; designs 1 and 2 do not.
+- **Upper tail of wind default 2.** 2.3% of observations exceeded q99 in experiment 347. The worker
+  reports this share for every candidate, and it is not a pass or fail rule here.
+- **Solar E.** Solar E has the fewest scored rows, and ten seeds were needed to resolve one
+  contrast.
+  Design 3 adds those seeds; designs 1 and 2 do not.
 - **One question for NGED.** Whether the source stopped reporting exact-zero readings on about
   2026-03-26. The answer decides whether version A or version B is the headline.
 - **Frozen list.** The candidates must be frozen before the first score is read. Any change after
