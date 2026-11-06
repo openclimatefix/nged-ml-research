@@ -581,7 +581,7 @@ def run_inject(*, device: str = "cuda") -> None:
                 fixed, _ = bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)
                 shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0)
                 choice = {p: qs[(r + p) % len(qs)] for p, qs in NB.of.items() if qs}  # the 597 rule
-                mirrored = sig.mirrored_power(
+                mirrored = s598.mirrored_power(
                     base=fixed, shift=shift, choice=choice, capacity=NB.capacity
                 )  # fmt: skip
                 blk = e.block_of(
