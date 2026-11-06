@@ -1,5 +1,5 @@
 # ruff: noqa: E501, D205, PLR0915
-"""Experiment 600: score C0, C1, A1 and their G4 assembled forecasts, and E2, at 0-24, 24-120, and 120-240 h.
+"""Experiment 600: score C0, C1, A1, their G4 forecasts, and E2 at 0-24, 24-120, and 120-240 h.
 
 No fit and no GPU. This is experiment 597's scoring with the stored forecasts read to 240 h and the
 lead split into three bands (`e00600_common`). For one arm (`c0`, `c1`, or `a1`) it writes, under
