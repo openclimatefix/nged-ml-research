@@ -22,6 +22,7 @@
 | 567 | Do the neighbouring Primaries' lags let the modular lag-encoder demand network tell a load transfer from a genuine level change, when it trains on synthetic load shifts? | High (manager, 2026-11-05) | Experiments 559, 560, and 566 merged | Planned |
 | 589 | Why does the P5 forecast cover Primary D5 poorly before the December 2025 load-shift, and is that one Primary or a property of the P5 recipe? | High (manager, 2026-11-06) | Nothing | Planned |
 | 597 | Do C1 and A1 with the G4 gated band, assembled as single forecasts, hold the normal running arrangement inside the q05-q95 band on 0.90 of rows from day 4 of a load-shift to its end? | High (manager, 2026-11-06) | Nothing | Finished: supported, see experiment 597 |
+| 598 | Does a neural network that reads the gate's signals as inputs cover the normal running arrangement as well as the hand-built G4 gate does, at the same band width? | High (manager, 2026-11-06) | Experiment 597 merged | Planned |
 
 ## Planned experiments
 
