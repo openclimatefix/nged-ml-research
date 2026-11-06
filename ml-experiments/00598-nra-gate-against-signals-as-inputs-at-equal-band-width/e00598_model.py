@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D205
+# ruff: noqa: E501
 """Experiment 598: experiment 591's A1 network with the gate's signals as extra lag-encoder inputs.
 
 The base is `e00591_model.AuxLagMdn` with the shared lag encoder and no auxiliary loss (arm A1). The
@@ -15,9 +15,9 @@ row is `label_col + 2` wide.
 
 from typing import Final
 
-import e00591_model as aux  # ty: ignore[unresolved-import]
 import e00545_model as m545  # ty: ignore[unresolved-import]
 import e00560_model as m560  # ty: ignore[unresolved-import]
+import e00591_model as aux  # ty: ignore[unresolved-import]
 import torch  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]
 
@@ -71,7 +71,10 @@ class SignalLagMdn(aux.AuxLagMdn):
         """Load a state dict; an A1 state dict's narrower first lag layer is padded with zero columns."""
         w = state_dict.get(LAG_KEY)
         if w is not None and w.shape[1] == self.lag[0][0].in_features - self.extra:
-            state_dict = {**state_dict, LAG_KEY: torch.cat([w, w.new_zeros(w.shape[0], self.extra)], dim=1)}
+            state_dict = {
+                **state_dict,
+                LAG_KEY: torch.cat([w, w.new_zeros(w.shape[0], self.extra)], dim=1),
+            }
         return super().load_state_dict(state_dict, strict=strict, assign=assign)
 
 

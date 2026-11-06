@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D205, PLR0915, PLR0912, C901
+# ruff: noqa: E501, D205
 """Experiment 598: the gate's signals as per-row network inputs.
 
 Everything here is numpy except `masked_quantiles`. Time is the half-hour grid index of experiment
@@ -159,7 +159,7 @@ def sustain_array(*, daily: np.ndarray) -> np.ndarray:
     Zero where the index's own daily mean is missing or below the floor. Reads only indices at or
     before the index itself.
     """
-    n_p, n_g = daily.shape
+    n_g = daily.shape[1]
     own = daily
     ok0 = np.isfinite(own) & (np.abs(own) > SUSTAIN_THETA)
     alive = ok0.copy()
@@ -185,7 +185,13 @@ class Neighbours:
     capacity: np.ndarray
 
 
-def fresh_reading(*, res: np.ndarray, prim: np.ndarray, origin_idx: np.ndarray, prefix=None) -> np.ndarray:  # noqa: ANN001
+def fresh_reading(
+    *,
+    res: np.ndarray,
+    prim: np.ndarray,
+    origin_idx: np.ndarray,
+    prefix: tuple[np.ndarray, np.ndarray] | None = None,
+) -> np.ndarray:
     """Return the fresh reading per row: the mean of `res` over `[origin - 48, origin - 8)` (NaN if short)."""
     return window_mean(
         res=res, prim=prim, end_idx=origin_idx - FRESH_END - 1, width=FRESH_START - FRESH_END,
@@ -255,9 +261,7 @@ def signal_block(
             best_abs = np.where(better, np.abs(mw), best_abs)
             best_mw[rows] = np.where(better, mw, best_mw[rows])
             i = np.clip(day_idx[rows], 0, None)
-            d = np.where(
-                day_missing[rows] | (day_idx[rows] < 0), 0.0, np.nan_to_num(res_sig[q, i])
-            )
+            d = np.where(day_missing[rows] | (day_idx[rows] < 0), 0.0, np.nan_to_num(res_sig[q, i]))
             cur = out[rows, COL["nb_dis_day"]]
             out[rows, COL["nb_dis_day"]] = np.where(
                 better, -d * nb.capacity[q] / nb.capacity[p] * SCALE, cur
@@ -285,7 +289,9 @@ def mirror_choice(*, neighbours: dict[int, list[int]], month: str) -> dict[int, 
     return {p: qs[(seed + p) % len(qs)] for p, qs in neighbours.items() if qs}
 
 
-def mirrored_power(*, base: np.ndarray, shift: np.ndarray, choice: dict[int, int], capacity: np.ndarray) -> np.ndarray:
+def mirrored_power(
+    *, base: np.ndarray, shift: np.ndarray, choice: dict[int, int], capacity: np.ndarray
+) -> np.ndarray:
     """Return `base` plus, on each Primary's mirrored neighbour, minus that Primary's shift in megawatts
     divided by the neighbour's capacity. `shift` is (16, grid), the shift added to each Primary's power.
     """
@@ -299,7 +305,9 @@ def mirrored_power(*, base: np.ndarray, shift: np.ndarray, choice: dict[int, int
 # ---------------------------------------------------------------- the pre-fit check and training noise
 
 
-def train_test_sd(*, blocks: dict[str, np.ndarray], prim: dict[str, np.ndarray], n_primaries: int) -> dict[str, np.ndarray]:
+def train_test_sd(
+    *, blocks: dict[str, np.ndarray], prim: dict[str, np.ndarray], n_primaries: int
+) -> dict[str, np.ndarray]:
     """Return per-Primary standard deviations of `NOISED` columns for the 'train' and 'test' blocks.
 
     Rows whose column is exactly zero (missing) are left out. Shape (len(NOISED), n_primaries) each.

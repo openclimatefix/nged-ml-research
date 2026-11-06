@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, PLR0915
+# ruff: noqa: E501, D103, PT018
 """Experiment 598: CPU checks of the signal build and the network (no data folder rows needed).
 
 1. A known-answer test: a shift of known size, added to the lag power, to the fresh power, and (mirrored)
@@ -94,14 +94,28 @@ def check_known_answer() -> None:
     # Primary 1 is Primary 0's neighbour: its own fresh reading holds the mirrored shift, its neighbour signal is Primary 0's
     mirrored = -shift * w["cap"][0] / w["cap"][1]
     np.testing.assert_allclose(block[2, col["fresh"]], mirrored * scale, atol=1e-3)
-    np.testing.assert_allclose(block[2, col["nb_fresh"]], -shift * w["cap"][0] / w["cap"][1] * -1 * scale * -1, atol=1e-3)
+    np.testing.assert_allclose(
+        block[2, col["nb_fresh"]], -shift * w["cap"][0] / w["cap"][1] * -1 * scale * -1, atol=1e-3
+    )
     # Primary 0 sees Primary 1's fresh reading (the mirrored shift), mirrored back to Primary 0's capacity: +shift
     np.testing.assert_allclose(block[0, col["nb_fresh"]], shift * scale, atol=1e-3)
     assert block[0, col["nb_present"]] == 1 and block[3, col["nb_present"]] == 0
     assert block[3, col["nb_fresh"]] == 0
     # masked lag zeroes the lag-derived columns
     sig.mask_lag_columns(block=block, day_masked=np.ones(n, bool), week_masked=np.ones(n, bool))
-    assert (block[:, [col["dis_day"], col["dis_week"], col["sustain_day"], col["sustain_week"], col["nb_dis_day"]]] == 0).all()
+    assert (
+        block[
+            :,
+            [
+                col["dis_day"],
+                col["dis_week"],
+                col["sustain_day"],
+                col["sustain_week"],
+                col["nb_dis_day"],
+            ],
+        ]
+        == 0
+    ).all()
     # a lag at the cap age (24 h) is allowed; one younger must fail
     try:
         sig.signal_block(
@@ -113,7 +127,9 @@ def check_known_answer() -> None:
         pass
     else:
         raise SystemExit("a lag younger than 24 h was accepted")
-    print("known-answer test passed: shift", shift, "reaches dis, fresh, sustain, neighbour columns")
+    print(
+        "known-answer test passed: shift", shift, "reaches dis, fresh, sustain, neighbour columns"
+    )
 
 
 def check_table_no_lookahead() -> None:
@@ -124,7 +140,9 @@ def check_table_no_lookahead() -> None:
     t = w["table"]
     i = 8 * sig.PER_DAY + 30
     assert t.origin_idx[0, i] == 8 * sig.PER_DAY + sig.ORIGIN_OFFSET
-    assert t.origin_idx[0, 8 * sig.PER_DAY + sig.ORIGIN_OFFSET] == 7 * sig.PER_DAY + sig.ORIGIN_OFFSET
+    assert (
+        t.origin_idx[0, 8 * sig.PER_DAY + sig.ORIGIN_OFFSET] == 7 * sig.PER_DAY + sig.ORIGIN_OFFSET
+    )
     print("T takes the freshest earlier origin and never a later one:", n, "entries")
 
 
@@ -147,13 +165,19 @@ def check_noise_rule() -> None:
     for name in sig.NOISED:
         tr[:, sig.COL[name]] = rng.standard_normal(n) * np.where(prim == 0, 0.5, 1.0)
         te[:, sig.COL[name]] = rng.standard_normal(n)
-    sd = sig.train_test_sd(blocks={"train": tr, "test": te}, prim={"train": prim, "test": prim}, n_primaries=2)
+    sd = sig.train_test_sd(
+        blocks={"train": tr, "test": te}, prim={"train": prim, "test": prim}, n_primaries=2
+    )
     nz = sig.noise_sd(sd=sd)
     assert (nz[:, 0] > 0.7).all() and (nz[:, 1] == 0).all(), nz  # Primary 0 is under-dispersed
     sig.add_training_noise(block=tr, prim=prim, sd=nz, seed=0)
-    after = sig.train_test_sd(blocks={"train": tr, "test": te}, prim={"train": prim, "test": prim}, n_primaries=2)
+    after = sig.train_test_sd(
+        blocks={"train": tr, "test": te}, prim={"train": prim, "test": prim}, n_primaries=2
+    )
     np.testing.assert_allclose(after["train"][:, 0], after["test"][:, 0], rtol=0.05)
-    print("training noise restores the under-dispersed Primary's spread; the matched Primary gets none")
+    print(
+        "training noise restores the under-dispersed Primary's spread; the matched Primary gets none"
+    )
 
 
 def check_model_is_a1_at_init(*, path: Path) -> None:
@@ -179,7 +203,9 @@ def check_model_is_a1_at_init(*, path: Path) -> None:
         ref = a1(x, prim)
         got = s(torch.cat([x, torch.randn(rows, n_sig) * 5], dim=1), prim)
         again = s(torch.cat([x, torch.zeros(rows, n_sig)], dim=1), prim)
-    assert torch.equal(ref, got) or torch.allclose(ref, got, atol=1e-6), float((ref - got).abs().max())
+    assert torch.equal(ref, got) or torch.allclose(ref, got, atol=1e-6), float(
+        (ref - got).abs().max()
+    )
     assert torch.allclose(ref, again, atol=1e-6)
     # the new columns are the only difference in the parameter set, and they are zero
     extra = s.lag[0][0].weight[:, -s.extra :]
@@ -189,7 +215,11 @@ def check_model_is_a1_at_init(*, path: Path) -> None:
         s.lag[0][0].weight[:, -s.extra] = 1.0
         moved = s(torch.cat([x, torch.randn(rows, n_sig) * 5], dim=1), prim)
     assert not torch.allclose(ref, moved, atol=1e-4)
-    print("network loads A1's step-2 weights and gives A1's output exactly (max abs diff", float((ref - got).abs().max()), ")")
+    print(
+        "network loads A1's step-2 weights and gives A1's output exactly (max abs diff",
+        float((ref - got).abs().max()),
+        ")",
+    )
 
 
 if __name__ == "__main__":

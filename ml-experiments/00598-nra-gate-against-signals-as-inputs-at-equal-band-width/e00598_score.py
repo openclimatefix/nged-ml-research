@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D205, PERF401, PLR0915, PLR0912, C901, D103, ANN001, ANN201
+# ruff: noqa: D107, D102, E501, PERF401, PLR0915, PLR0912, D103, ANN001
 """Experiment 598: score R, W, S, S-g, S-p, the width-matched S arms, and G4 on the table T.
 
 No fit and no GPU. Reads the stored forecasts of arm A1 (experiment 591) and of the S arms (this
@@ -28,7 +28,6 @@ import argparse
 from pathlib import Path
 
 import e00581_bank as bank  # ty: ignore[unresolved-import]
-import e00582_arms as a  # ty: ignore[unresolved-import]
 import e00582_score as sc  # ty: ignore[unresolved-import]
 import e00583_common as c  # ty: ignore[unresolved-import]
 import e00583_score as s  # ty: ignore[unresolved-import]
@@ -130,11 +129,15 @@ class Arm:
             ]
             self.q[seed] = load_rows(files=files, t=t, order=order, sorted_keys=sorted_keys)
 
-    def inject(self, *, t: c.X4Table, month: str, r: int, rows: np.ndarray, order, sorted_keys) -> dict[int, np.ndarray]:
+    def inject(
+        self, *, t: c.X4Table, month: str, r: int, rows: np.ndarray, order, sorted_keys
+    ) -> dict[int, np.ndarray]:
         """Return per seed the injected quantiles of pass `r` on `rows`."""
         out = {}
         for seed in self.seeds:
-            files = [self.work / "inject" / f"{month}_r{r:02d}_d{d}_s{seed}.parquet" for d in (0, 14)]
+            files = [
+                self.work / "inject" / f"{month}_r{r:02d}_d{d}_s{seed}.parquet" for d in (0, 14)
+            ]
             full = load_rows(files=files, t=t, order=order, sorted_keys=sorted_keys)
             out[seed] = full[rows]
         return out
@@ -151,7 +154,12 @@ class TableGate:
         self.n_days = inp.n_days
         self.clean = inp.t.clean
         self.tmean: dict[str, np.ndarray] = {}
-        for m in months:
+        self.months = [
+            m
+            for m in months
+            if all((ROOT / "tables" / f"T_{m}_s{s_}.npz").exists() for s_ in seeds)
+        ]
+        for m in self.months:
             meds = [np.load(ROOT / "tables" / f"T_{m}_s{s_}.npz")["median"] for s_ in seeds]
             self.tmean[m] = np.nanmean(np.stack(meds), axis=0)
         t = inp.t
@@ -186,7 +194,9 @@ class TableGate:
 class Systems:
     """Every system's quantiles on the table's rows, and the width factors."""
 
-    def __init__(self, *, inp: k597.Inputs, arms: dict[str, Arm], months: list[str], seeds: list[int]) -> None:
+    def __init__(
+        self, *, inp: k597.Inputs, arms: dict[str, Arm], months: list[str], seeds: list[int]
+    ) -> None:
         t = inp.t
         self.inp, self.t, self.arms, self.months, self.seeds = inp, t, arms, months, seeds
         v, m = t.arms["V"], t.arms["M"]
@@ -223,7 +233,9 @@ class Systems:
             self.q[f"{name}-rs"] = np.sort(np.mean(per_seed_rs, axis=0), axis=1)
         self.factors = pl.DataFrame(factors)
         self.names = list(self.q)
-        self.common = self.use & np.all([np.isfinite(q).all(axis=1) for q in self.q.values()], axis=0)
+        self.common = self.use & np.all(
+            [np.isfinite(q).all(axis=1) for q in self.q.values()], axis=0
+        )
 
     def factor(self, *, system: str, month: str, seed: int) -> float:
         f = self.factors.filter(
@@ -242,7 +254,11 @@ def boot_interval(*, vals: np.ndarray, alpha: float = ALPHA) -> tuple[float, flo
         return (np.nan, np.nan, np.nan)
     idx = RNG.integers(0, len(v), size=(N_BOOT, len(v)))
     m = v[idx].mean(axis=1)
-    return (float(v.mean()), float(np.percentile(m, 100 * alpha / 2)), float(np.percentile(m, 100 * (1 - alpha / 2))))
+    return (
+        float(v.mean()),
+        float(np.percentile(m, 100 * alpha / 2)),
+        float(np.percentile(m, 100 * (1 - alpha / 2))),
+    )
 
 
 # ---------------------------------------------------------------- event-free rows
@@ -251,7 +267,7 @@ def boot_interval(*, vals: np.ndarray, alpha: float = ALPHA) -> tuple[float, flo
 def event_free(*, sy: Systems) -> pl.DataFrame:
     t = sy.t
     st = {n: sc597.row_stats(y=t.obs, q=np.nan_to_num(q)) for n, q in sy.q.items()}
-    months = [m for m in sy.months]
+    months = list(sy.months)
     out = []
     for grp in (*k597.GROUPS_SCORED, "D15 and D18"):
         gsel = t.group_of_row == grp
@@ -273,7 +289,11 @@ def event_free(*, sy: Systems) -> pl.DataFrame:
                             for m in months if (sel & (t.month == m)).any()
                         ])  # fmt: skip
                         mean, lo, hi = boot_interval(vals=d)
-                        r[f"{key}_minus_{ref}"], r[f"{key}_minus_{ref}_lo"], r[f"{key}_minus_{ref}_hi"] = mean, lo, hi
+                        (
+                            r[f"{key}_minus_{ref}"],
+                            r[f"{key}_minus_{ref}_lo"],
+                            r[f"{key}_minus_{ref}_hi"],
+                        ) = mean, lo, hi
                         r[f"{key}_minus_{ref}_mde"] = (hi - lo) / 2
                 out.append(r)
     return pl.DataFrame(out, infer_schema_length=None)
@@ -293,7 +313,11 @@ def real_events(*, sy: Systems) -> pl.DataFrame:
             lo, hi = sc.window(onset=e["onset_idx"], end=e["end_idx"], phase=phase)
             for band in (0, 1):
                 sel = np.flatnonzero(
-                    sy.common & (t.prim == e["primary"]) & (t.idx >= lo) & (t.idx < hi) & (t.band == band)
+                    sy.common
+                    & (t.prim == e["primary"])
+                    & (t.idx >= lo)
+                    & (t.idx < hi)
+                    & (t.band == band)
                 )
                 if len(sel) < 100:
                     continue
@@ -339,12 +363,20 @@ def score_bank(*, sy: Systems) -> pl.DataFrame:
             hi_p = {e["primary"]: e["end_idx"] + 14 * 48 for e in ev.iter_rows(named=True)}
             lo = np.array([lo_p.get(p, 1 << 40) for p in range(16)])[t.prim]
             hi = np.array([hi_p.get(p, -1) for p in range(16)])[t.prim]
-            rows = np.flatnonzero(in_m & t.free & sy.common & (t.idx % 2 == 0) & (t.idx >= lo) & (t.idx < hi))
+            rows = np.flatnonzero(
+                in_m & t.free & sy.common & (t.idx % 2 == 0) & (t.idx >= lo) & (t.idx < hi)
+            )
             if len(rows) == 0:
                 continue
-            inj = {n: arm.inject(t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys) for n, arm in sy.arms.items()}
-            a1_in = s.load_injected(t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys)
+            inj = {
+                n: arm.inject(t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys)
+                for n, arm in sy.arms.items()
+            }
+            a1_in = s.load_injected(
+                t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys
+            )
             ok = np.isfinite(a1_in).all(axis=1)
+            inj = {n: d for n, d in inj.items() if all(np.isfinite(q).any() for q in d.values())}
             for d in inj.values():
                 for q in d.values():
                     ok &= np.isfinite(q).all(axis=1)
@@ -402,7 +434,12 @@ def score_bank(*, sy: Systems) -> pl.DataFrame:
                 for phase in PHASES:
                     wlo, whi = sc.window(onset=e["onset_idx"], end=e["end_idx"], phase=phase)
                     for band in (0, 1):
-                        sel = np.flatnonzero((p_rows == p) & (t.idx[rows] >= wlo) & (t.idx[rows] < whi) & (t.band[rows] == band))
+                        sel = np.flatnonzero(
+                            (p_rows == p)
+                            & (t.idx[rows] >= wlo)
+                            & (t.idx[rows] < whi)
+                            & (t.band[rows] == band)
+                        )
                         if len(sel) < 60:
                             continue
                         for name in q_inj:
@@ -420,7 +457,17 @@ def score_bank(*, sy: Systems) -> pl.DataFrame:
                             })  # fmt: skip
             del wide_clean
         print("bank", m, flush=True)
-    return pl.DataFrame(rows_out)
+    tab = pl.DataFrame(rows_out)
+    # keep only (month, pass) cells scored for every system, so that every system's mean is over the same events
+    cells = tab.group_by("month", "pass").agg(pl.col("system").n_unique().alias("n"))
+    full = cells.filter(pl.col("n") == cells["n"].max()).select("month", "pass")
+    dropped = cells.height - full.height
+    if dropped:
+        print(
+            f"dropped {dropped} (month, pass) cells where an arm's injected forecasts are absent",
+            flush=True,
+        )
+    return tab.join(full, on=["month", "pass"], how="semi")
 
 
 def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
@@ -431,7 +478,10 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
         "7 days": pl.col("length_days") == 7,
         "15 and 30 days": pl.col("length_days") >= 15,
     }
-    subsets = {"all months": pl.lit(True), "first fold pair": pl.col("month").is_in(["2025-10", "2025-12"])}
+    subsets = {
+        "all months": pl.lit(True),
+        "first fold pair": pl.col("month").is_in(["2025-10", "2025-12"]),
+    }
     out = []
     for sname, sexpr in subsets.items():
         for gname, gexpr in (
@@ -442,7 +492,15 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
             for cname, cexpr in classes.items():
                 sub = tab.filter(sexpr & gexpr & cexpr)
                 for (phase, band, system), grp in sub.group_by("phase", "band", "system"):
-                    rec = {"subset": sname, "group": gname, "length_class": cname, "phase": phase, "band": band, "system": system, "n_events": grp.height}
+                    rec = {
+                        "subset": sname,
+                        "group": gname,
+                        "length_class": cname,
+                        "phase": phase,
+                        "band": band,
+                        "system": system,
+                        "n_events": grp.height,
+                    }
                     for mname in metrics:
                         mean, lo, hi = sc._boot_mean(vals=grp[mname].to_numpy())
                         rec[mname], rec[f"{mname}_lo"], rec[f"{mname}_hi"] = mean, lo, hi
@@ -453,11 +511,21 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
 # ---------------------------------------------------------------- the seven counted contrasts and the verdicts
 
 
-def paired(*, tab: pl.DataFrame, a_: str, b_: str, phase: str, metric: str, lengths: str = "15 and 30 days") -> tuple[float, float, float, int]:
+def paired(
+    *, tab: pl.DataFrame, a_: str, b_: str, phase: str, metric: str, lengths: str = "15 and 30 days"
+) -> tuple[float, float, float, int]:
     """Return mean(a - b), its Bonferroni-level interval, and the event count, paired on (month, pass, primary)."""
-    f = tab.filter((pl.col("phase") == phase) & (pl.col("band") == BAND) & (pl.col("length_days") >= (15 if lengths == "15 and 30 days" else 0)))
-    x = f.filter(pl.col("system") == a_).select("month", "pass", "primary", pl.col(metric).alias("a"))
-    y = f.filter(pl.col("system") == b_).select("month", "pass", "primary", pl.col(metric).alias("b"))
+    f = tab.filter(
+        (pl.col("phase") == phase)
+        & (pl.col("band") == BAND)
+        & (pl.col("length_days") >= (15 if lengths == "15 and 30 days" else 0))
+    )
+    x = f.filter(pl.col("system") == a_).select(
+        "month", "pass", "primary", pl.col(metric).alias("a")
+    )
+    y = f.filter(pl.col("system") == b_).select(
+        "month", "pass", "primary", pl.col(metric).alias("b")
+    )
     j = x.join(y, on=["month", "pass", "primary"], how="inner")
     d = (j["a"] - j["b"]).to_numpy()
     mean, lo, hi = boot_interval(vals=d)
@@ -470,46 +538,130 @@ def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame) -> tuple[pl.DataFrame, pl.
     for phase in ("days4-end", "after0-7"):
         for arm in ("S", "S-rs"):
             mean, lo, hi, n = paired(tab=tab, a_="R", b_=arm, phase=phase, metric="cover90")
-            rows.append({"test": f"P1 {phase}", "contrast": f"cover90(R) - cover90({arm})", "mean": mean, "lo": lo, "hi": hi, "mde": (hi - lo) / 2, "margin": MARGIN["P1"], "n_events": n})
+            rows.append(
+                {
+                    "test": f"P1 {phase}",
+                    "contrast": f"cover90(R) - cover90({arm})",
+                    "mean": mean,
+                    "lo": lo,
+                    "hi": hi,
+                    "mde": (hi - lo) / 2,
+                    "margin": MARGIN["P1"],
+                    "n_events": n,
+                }
+            )
     mean, lo, hi, n = paired(tab=tab, a_="S", b_="W", phase="after0-7", metric="cover90")
-    rows.append({"test": "P2 after0-7", "contrast": "cover90(S) - cover90(W)", "mean": mean, "lo": lo, "hi": hi, "mde": (hi - lo) / 2, "margin": MARGIN["P2"], "n_events": n})
+    rows.append(
+        {
+            "test": "P2 after0-7",
+            "contrast": "cover90(S) - cover90(W)",
+            "mean": mean,
+            "lo": lo,
+            "hi": hi,
+            "mde": (hi - lo) / 2,
+            "margin": MARGIN["P2"],
+            "n_events": n,
+        }
+    )
     mean, lo, hi, n = paired(tab=tab, a_="S-rs", b_="W", phase="after0-7", metric="cover90")
-    rows.append({"test": "P2 after0-7 (width-matched S)", "contrast": "cover90(S-rs) - cover90(W)", "mean": mean, "lo": lo, "hi": hi, "mde": (hi - lo) / 2, "margin": MARGIN["P2"], "n_events": n})
+    rows.append(
+        {
+            "test": "P2 after0-7 (width-matched S)",
+            "contrast": "cover90(S-rs) - cover90(W)",
+            "mean": mean,
+            "lo": lo,
+            "hi": hi,
+            "mde": (hi - lo) / 2,
+            "margin": MARGIN["P2"],
+            "n_events": n,
+        }
+    )
     for sysn in ("S", "R", "S-p", "A1"):
         mean, lo, hi, n = paired(tab=tab, a_=sysn, b_=sysn, phase="days4-end", metric="follow_q50")
-        f = tab.filter((pl.col("phase") == "days4-end") & (pl.col("band") == BAND) & (pl.col("length_days") >= 15) & (pl.col("system") == sysn))
+        f = tab.filter(
+            (pl.col("phase") == "days4-end")
+            & (pl.col("band") == BAND)
+            & (pl.col("length_days") >= 15)
+            & (pl.col("system") == sysn)
+        )
         m3, l3, h3 = boot_interval(vals=f["follow_q50"].to_numpy())
-        rows.append({"test": f"P3 follow ratio {sysn}", "contrast": f"follow_q50({sysn})", "mean": m3, "lo": l3, "hi": h3, "mde": (h3 - l3) / 2, "margin": MARGIN["P3"], "n_events": f.height})
+        rows.append(
+            {
+                "test": f"P3 follow ratio {sysn}",
+                "contrast": f"follow_q50({sysn})",
+                "mean": m3,
+                "lo": l3,
+                "hi": h3,
+                "mde": (h3 - l3) / 2,
+                "margin": MARGIN["P3"],
+                "n_events": f.height,
+            }
+        )
     mean, lo, hi, n = paired(tab=tab, a_="S", b_="S-p", phase="days4-end", metric="cover90")
-    rows.append({"test": "P4 days4-end", "contrast": "cover90(S) - cover90(S-p)", "mean": mean, "lo": lo, "hi": hi, "mde": (hi - lo) / 2, "margin": MARGIN["P4"], "n_events": n})
+    rows.append(
+        {
+            "test": "P4 days4-end",
+            "contrast": "cover90(S) - cover90(S-p)",
+            "mean": mean,
+            "lo": lo,
+            "hi": hi,
+            "mde": (hi - lo) / 2,
+            "margin": MARGIN["P4"],
+            "n_events": n,
+        }
+    )
     for grp in k597.GROUPS_SCORED:
-        r = ef.filter((pl.col("group") == grp) & (pl.col("band") == BAND) & (pl.col("system") == "S"))
+        r = ef.filter(
+            (pl.col("group") == grp) & (pl.col("band") == BAND) & (pl.col("system") == "S")
+        )
         if r.height:
-            rows.append({"test": f"P5 {grp}", "contrast": "event-free CRPS(S) - CRPS(A1), points of capacity", "mean": float(r["crps_minus_A1"][0]), "lo": float(r["crps_minus_A1_lo"][0]), "hi": float(r["crps_minus_A1_hi"][0]), "mde": float(r["crps_minus_A1_mde"][0]), "margin": float(r["crps_minus_A1_mde"][0]), "n_events": int(r["n_rows"][0])})
+            rows.append(
+                {
+                    "test": f"P5 {grp}",
+                    "contrast": "event-free CRPS(S) - CRPS(A1), points of capacity",
+                    "mean": float(r["crps_minus_A1"][0]),
+                    "lo": float(r["crps_minus_A1_lo"][0]),
+                    "hi": float(r["crps_minus_A1_hi"][0]),
+                    "mde": float(r["crps_minus_A1_mde"][0]),
+                    "margin": float(r["crps_minus_A1_mde"][0]),
+                    "n_events": int(r["n_rows"][0]),
+                }
+            )
     tab_c = pl.DataFrame(rows)
     return tab_c, verdicts(c_=tab_c, tab=tab)
 
 
 def bank_width(*, tab: pl.DataFrame, system: str) -> float:
-    f = tab.filter((pl.col("phase") == "days4-end") & (pl.col("band") == BAND) & (pl.col("length_days") >= 15) & (pl.col("system") == system))
-    return float(f["width90"].mean()) if f.height else float("nan")
+    f = tab.filter(
+        (pl.col("phase") == "days4-end")
+        & (pl.col("band") == BAND)
+        & (pl.col("length_days") >= 15)
+        & (pl.col("system") == system)
+    )
+    return float(f["width90"].mean()) if f.height else float("nan")  # ty: ignore[invalid-argument-type]
 
 
 def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame) -> pl.DataFrame:
     """Return P1 to P5 verdicts with the 'untestable' rule (minimum detectable effect above the margin)."""
     out = []
     row = {r["test"]: r for r in c_.iter_rows(named=True)}
-    width_ratio = bank_width(tab=tab, system="S") / bank_width(tab=tab, system="R") if tab.height else np.nan
+    width_ratio = (
+        bank_width(tab=tab, system="S") / bank_width(tab=tab, system="R") if tab.height else np.nan
+    )
 
     def band_of(gap: float) -> str:
         return "pass" if gap < OUTCOME_PASS else "inconclusive" if gap < OUTCOME_FAIL else "fail"
 
     for phase in ("days4-end", "after0-7"):
-        raw, rs = row[f"P1 {phase}"], None
+        rs = None
         for r in c_.iter_rows(named=True):
             if r["test"] == f"P1 {phase}" and "S-rs" in r["contrast"]:
                 rs = r
-        s_raw = next(r for r in c_.iter_rows(named=True) if r["test"] == f"P1 {phase}" and r["contrast"].endswith("(S)"))
+        s_raw = next(
+            r
+            for r in c_.iter_rows(named=True)
+            if r["test"] == f"P1 {phase}" and r["contrast"].endswith("(S)")
+        )
         gap_raw, gap_rs = s_raw["mean"], rs["mean"] if rs else np.nan
         equal_width = abs(width_ratio - 1.0) <= WIDTH_TOL
         verdict = band_of(gap_raw)
@@ -517,28 +669,80 @@ def verdicts(*, c_: pl.DataFrame, tab: pl.DataFrame) -> pl.DataFrame:
             verdict = "not passed: S is wider or narrower than R by more than 5% and the width-matched S does not pass"
         if s_raw["mde"] > MARGIN["P1"]:
             verdict += "; untestable at this power"
-        out.append({"prediction": f"P1 {phase}", "gap_R_minus_S": gap_raw, "gap_R_minus_S_width_matched": gap_rs, "S_over_R_width_days4_end": width_ratio, "mde": s_raw["mde"], "verdict": verdict})
+        out.append(
+            {
+                "prediction": f"P1 {phase}",
+                "gap_R_minus_S": gap_raw,
+                "gap_R_minus_S_width_matched": gap_rs,
+                "S_over_R_width_days4_end": width_ratio,
+                "mde": s_raw["mde"],
+                "verdict": verdict,
+            }
+        )
     for key in ("P2 after0-7", "P2 after0-7 (width-matched S)"):
         r = row[key]
         v = "supported" if r["mean"] >= MARGIN["P2"] and r["lo"] > 0 else "not supported"
         if r["mde"] > MARGIN["P2"]:
             v += "; untestable at this power"
-        out.append({"prediction": key, "estimate": r["mean"], "lo": r["lo"], "hi": r["hi"], "mde": r["mde"], "verdict": v})
+        out.append(
+            {
+                "prediction": key,
+                "estimate": r["mean"],
+                "lo": r["lo"],
+                "hi": r["hi"],
+                "mde": r["mde"],
+                "verdict": v,
+            }
+        )
     r = row["P3 follow ratio S"]
     v = "supported" if r["mean"] <= MARGIN["P3"] else "not supported"
     if r["mde"] > MARGIN["P3"]:
         v += "; untestable at this power"
-    out.append({"prediction": "P3 follow ratio of S", "estimate": r["mean"], "lo": r["lo"], "hi": r["hi"], "mde": r["mde"], "R": row["P3 follow ratio R"]["mean"], "S-p": row["P3 follow ratio S-p"]["mean"], "A1": row["P3 follow ratio A1"]["mean"], "verdict": v})
+    out.append(
+        {
+            "prediction": "P3 follow ratio of S",
+            "estimate": r["mean"],
+            "lo": r["lo"],
+            "hi": r["hi"],
+            "mde": r["mde"],
+            "R": row["P3 follow ratio R"]["mean"],
+            "S-p": row["P3 follow ratio S-p"]["mean"],
+            "A1": row["P3 follow ratio A1"]["mean"],
+            "verdict": v,
+        }
+    )
     r = row["P4 days4-end"]
-    v = "supported" if r["mean"] >= MARGIN["P4"] and r["lo"] > 0 else "not supported (inputs carry nothing)"
+    v = (
+        "supported"
+        if r["mean"] >= MARGIN["P4"] and r["lo"] > 0
+        else "not supported (inputs carry nothing)"
+    )
     if r["mde"] > MARGIN["P4"]:
         v += "; untestable at this power"
-    out.append({"prediction": "P4 S minus S-p", "estimate": r["mean"], "lo": r["lo"], "hi": r["hi"], "mde": r["mde"], "verdict": v})
+    out.append(
+        {
+            "prediction": "P4 S minus S-p",
+            "estimate": r["mean"],
+            "lo": r["lo"],
+            "hi": r["hi"],
+            "mde": r["mde"],
+            "verdict": v,
+        }
+    )
     for grp in k597.GROUPS_SCORED:
         r = row.get(f"P5 {grp}")
         if r:
             v = "supported" if abs(r["mean"]) <= r["mde"] else "not supported"
-            out.append({"prediction": f"P5 {grp}", "estimate": r["mean"], "lo": r["lo"], "hi": r["hi"], "mde": r["mde"], "verdict": v})
+            out.append(
+                {
+                    "prediction": f"P5 {grp}",
+                    "estimate": r["mean"],
+                    "lo": r["lo"],
+                    "hi": r["hi"],
+                    "mde": r["mde"],
+                    "verdict": v,
+                }
+            )
     return pl.DataFrame(out, infer_schema_length=None)
 
 
@@ -555,7 +759,13 @@ def main() -> None:
     inp = k597.Inputs(arm="a1")
     chk = inp.check_gate_state()
     stored = np.load(k597.WORK / "a1" / "mode_g4.npy")
-    print("rebuilt G4 state equals experiment 592's:", chk, "| mode equals experiment 597's stored mode:", bool(np.array_equal(stored, inp.mode)), flush=True)
+    print(
+        "rebuilt G4 state equals experiment 592's:",
+        chk,
+        "| mode equals experiment 597's stored mode:",
+        bool(np.array_equal(stored, inp.mode)),
+        flush=True,
+    )
     t = inp.t
     kk = s.key(t.prim, t.origin_idx, t.idx)
     order = np.argsort(kk)

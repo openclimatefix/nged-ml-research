@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN003, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205, E501, PLR0915, PLR0912, C901
+# ruff: noqa: D107, ANN001, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205, E501, PLR0915
 """Experiment 598: fit and inject arms S, S-g, and S-p (GPU).
 
 A wrapper around experiment 574's `e00574_fit.py`, as experiment 591's `e00591_arm.py` is. The rows,
@@ -34,7 +34,9 @@ import sys
 _p = argparse.ArgumentParser()
 _p.add_argument("arm", choices=("S", "S-g", "S-p"))
 _p.add_argument("command", choices=("table", "check", "fit", "inject", "assemble"))
-_p.add_argument("--months", nargs="+", default=["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"])
+_p.add_argument(
+    "--months", nargs="+", default=["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"]
+)
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 _p.add_argument("--passes", nargs="+", type=int, default=None)
 _p.add_argument("--work-suffix", default="")
@@ -48,7 +50,6 @@ sys.argv = _argv
 import e00574_fit as e  # ty: ignore[unresolved-import]
 import e00578_common as k578  # ty: ignore[unresolved-import]
 import e00581_bank as bank  # ty: ignore[unresolved-import]
-import e00583_common as c583  # ty: ignore[unresolved-import]
 import e00591_model as aux  # ty: ignore[unresolved-import]
 import e00592_common as g592  # ty: ignore[unresolved-import]
 import e00598_model as mymodel  # ty: ignore[unresolved-import]
@@ -63,7 +64,10 @@ ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
 DIR = {"S": "S", "S-g": "Sg", "S-p": "Sp"}[ARM]
 TABLES = ROOT / "tables"
 """One `T_<month>_s<seed>.npz` per fold month and seed, shared by the three arms."""
-CHAIN = ML_EXPERIMENTS_DATA_DIR / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
+CHAIN = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
+)
 """A1's pre-training and step-2 weights (experiment 591), read only."""
 W574 = e.W
 e.WORK = ROOT / f"{DIR}{MINE.work_suffix}"
@@ -374,7 +378,19 @@ def subset(*, test, sel: np.ndarray):
     )
 
 
-def forecast_window(*, model, test, mr, device: str, fs: FoldSignals, lo: int, hi: int, power_lag, power_sig, lag_x=None):
+def forecast_window(
+    *,
+    model,
+    test,
+    mr,
+    device: str,
+    fs: FoldSignals,
+    lo: int,
+    hi: int,
+    power_lag,
+    power_sig,
+    lag_x=None,
+):
     """Return the forecast frame of origins in [lo, hi) with signals built from the given power."""
     sel = (test.origin >= lo) & (test.origin < hi)
     if not sel.any():
@@ -408,7 +424,9 @@ def run_prepare(*, device: str, command: str) -> None:
                 for name, ratios in fs.report["sd_ratio"].items():
                     print(f"  {name:10s}", ratios)
                 print("  noise sd added (rows: dis_day, dis_week, fresh)", fs.report["noise_sd"])
-                print("  T missing at the day lag (train rows)", fs.report["t_missing_share_lag_day"])
+                print(
+                    "  T missing at the day lag (train rows)", fs.report["t_missing_share_lag_day"]
+                )
                 known_answer_real(fs=fs, test=test)
         del mr, test
         FOLD.clear()
@@ -426,7 +444,11 @@ def known_answer_real(*, fs: FoldSignals, test) -> None:
     sh = np.zeros_like(lag)
     sh[p, start:end] = shift
     pwr_sig = sig.mirrored_power(base=lag, shift=sh, choice=fs.choice, capacity=NB.capacity)
-    sel = (test.primary == p) & (test.origin_idx >= start + 2 * sig.PER_DAY) & (test.origin_idx < end - sig.PER_DAY)
+    sel = (
+        (test.primary == p)
+        & (test.origin_idx >= start + 2 * sig.PER_DAY)
+        & (test.origin_idx < end - sig.PER_DAY)
+    )
     sub = subset(test=test, sel=sel)
     kw = {"test": sub, "w_test": fs.w_test[sel]}
     base = fs.test_block(power_lag=fs.clean, power_sig=fs.clean, **kw)
@@ -490,8 +512,13 @@ def run_fit(*, device: str = "cuda") -> None:
                     e.atomic_frame(frame=frame, target=out)
                 log["seconds"] = round(e.time.monotonic() - started, 2)
                 log["signal_report"] = fs.report
-                e.c.write_json(obj=log, path=e.W / "logs" / e.SPEC.tag / f"{month}_d{day}_s{seed}.json")
-                print(f"{ARM} {log['name']}: {log.get('epochs', 'reused')} epochs, {log['seconds']} s", flush=True)
+                e.c.write_json(
+                    obj=log, path=e.W / "logs" / e.SPEC.tag / f"{month}_d{day}_s{seed}.json"
+                )
+                print(
+                    f"{ARM} {log['name']}: {log.get('epochs', 'reused')} epochs, {log['seconds']} s",
+                    flush=True,
+                )
                 del model
         del g, mr, test
         FOLD.clear()
@@ -537,9 +564,7 @@ def run_inject(*, device: str = "cuda") -> None:
                 cache.clear()
                 fixed, _ = bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)
                 shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0)
-                choice = {
-                    p: qs[(r + p) % len(qs)] for p, qs in NB.of.items() if qs
-                }  # the 597 rule
+                choice = {p: qs[(r + p) % len(qs)] for p, qs in NB.of.items() if qs}  # the 597 rule
                 mirrored = sig.mirrored_power(
                     base=fixed, shift=shift, choice=choice, capacity=NB.capacity
                 )  # fmt: skip
@@ -549,7 +574,9 @@ def run_inject(*, device: str = "cuda") -> None:
                 )  # fmt: skip
                 x = test.x.copy()
                 x[:, sl] = blk
-                assert np.array_equal(x[:, 43:45], test.x[:, 43:45]), "contamination moved a lag time"
+                assert np.array_equal(x[:, 43:45], test.x[:, 43:45]), (
+                    "contamination moved a lag time"
+                )
                 cache[r] = (fixed, mirrored, x)
             return cache[r]
 
@@ -592,12 +619,17 @@ def run_assemble() -> None:
         cuts = e.k.cutoffs(month=month, cadence=e.CADENCE)
         for seed in e.ARGS.seeds:
             parts = [
-                e.W / "fits" / e.SPEC.tag / f"{month}_d{e.f.day_of(month=month, cut=cut)}_s{seed}.parquet"
+                e.W
+                / "fits"
+                / e.SPEC.tag
+                / f"{month}_d{e.f.day_of(month=month, cut=cut)}_s{seed}.parquet"
                 for cut in cuts
             ]
             assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
-            e.atomic_frame(frame=frame, target=e.W / "seed_preds" / e.SPEC.tag / f"{month}_s{seed}.parquet")
+            e.atomic_frame(
+                frame=frame, target=e.W / "seed_preds" / e.SPEC.tag / f"{month}_s{seed}.parquet"
+            )
             print("wrote", month, seed, frame.height, flush=True)
 
 
