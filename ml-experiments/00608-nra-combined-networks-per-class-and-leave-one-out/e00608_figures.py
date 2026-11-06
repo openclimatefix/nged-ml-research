@@ -79,7 +79,7 @@ def summary() -> None:
             )
         )
         pts = base.mark_point(filled=True, size=60, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("d:Q", title=f"{measure}: arm minus K1")
+            x=alt.X("d:Q", title=f"{measure}: arm minus K1 (dashed = K1)")
         )
         bars = base.mark_rule(color=theme.DATA_BLUE).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
         zero = (
@@ -99,35 +99,42 @@ def summary() -> None:
             band=pl.when(pl.col("band") == 0).then(pl.lit("0-24 h")).otherwise(pl.lit("24-120 h"))
         )
     )
-    chart = (
-        alt.Chart(  # ty: ignore[unresolved-attribute]
-            w.filter(pl.col("arm").is_in(["K1 (G4)", "K1 + tail constants", "K3 (lag-free)"]))
+    arms = ["K1 (G4)", "K1 + tail constants", "K3 (lag-free)"]
+    w = w.filter(pl.col("arm").is_in(arms) & (pl.col("band") == "24-120 h")).with_columns(
+        group=pl.col("group").replace(
+            {"signed-MW six": "Six MW Primaries", "MVA-only eight": "Eight MVA Primaries"}
         )
-        .mark_bar()
-        .encode(
-            x=alt.X(
-                "arm:N",
-                title=None,
-                axis=alt.Axis(labelAngle=0, labelLimit=120),
-                sort=["K1 (G4)", "K1 + tail constants", "K3 (lag-free)"],
-            ),
-            y=alt.Y(
-                "cover90:Q",
-                title="Share of rows inside q05-q95",
-                scale=alt.Scale(domain=[0.7, 1.0]),
-            ),
-            color=alt.Color(
-                "arm:N",
-                legend=alt.Legend(title="Network"),
-                scale=alt.Scale(
-                    domain=["K1 (G4)", "K1 + tail constants", "K3 (lag-free)"],
-                    range=[theme.DATA_BLUE, theme.BRAND_ORANGE, theme.DATA_SKY],
-                ),
-            ),
-        )
-        .properties(width=170, height=280)
-        .facet(column=alt.Column("group:N", title=None), row=alt.Row("band:N", title=None))
     )
+    target = (
+        alt.Chart(pl.DataFrame({"y": [0.9]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[4, 3], color="#6b6b6b")
+        .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0.8, 1.0])))
+    )
+    panels = []
+    for k, group in enumerate(sorted(w["group"].unique().to_list())):
+        dots = (
+            alt.Chart(w.filter(pl.col("group") == group))  # ty: ignore[unresolved-attribute]
+            .mark_point(filled=True, size=120)
+            .encode(
+                x=alt.X("arm:N", title=group, axis=None, sort=arms),
+                y=alt.Y(
+                    "cover90:Q",
+                    title="Share of rows inside q05-q95" if k == 0 else None,
+                    scale=alt.Scale(domain=[0.8, 1.0]),
+                ),
+                color=alt.Color(
+                    "arm:N",
+                    legend=alt.Legend(title="Network (dashed line: 0.90 target)")
+                    if k == 0
+                    else None,
+                    scale=alt.Scale(
+                        domain=arms, range=[theme.DATA_BLUE, theme.BRAND_ORANGE, theme.DATA_SKY]
+                    ),
+                ),
+            )
+        )
+        panels.append(alt.layer(target, dots).properties(width=220, height=280, title=group))
+    chart = alt.hconcat(*panels)
     save(chart, "event_free_coverage.svg")
 
 
