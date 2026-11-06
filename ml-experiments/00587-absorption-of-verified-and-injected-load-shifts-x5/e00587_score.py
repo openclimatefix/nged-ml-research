@@ -151,7 +151,7 @@ def noise_floor(*, arm: str) -> pl.DataFrame:
         j = pl.read_parquet(mine).join(pl.read_parquet(theirs), on=KEYS[2:], suffix="_stored")
         d = (j["q50"] - j["q50_stored"]).abs()
         rows.append({"arm": arm, "month": month, "refit_day": day, "seed": seed, "rows": j.height,
-                     "max_abs_diff": float(d.max()), "mean_abs_diff": float(d.mean())})  # fmt: skip
+                     "max_abs_diff": float(d.max()), "mean_abs_diff": float(d.mean())})  # fmt: skip  # ty: ignore[invalid-argument-type]
     return pl.DataFrame(rows)
 
 
