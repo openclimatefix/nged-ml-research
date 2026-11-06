@@ -117,31 +117,34 @@ def zero_share() -> pl.DataFrame:
 
 
 def figure_zeros() -> None:
-    """Line chart: readings of exactly zero stop in late March 2026."""
-    t = zero_share().to_pandas()
+    """Two panels: readings of exactly zero stop in late March 2026, solar above wind."""
+    t = zero_share()
     colours = {"Solar": theme.BRAND_ORANGE, "Wind": theme.DATA_BLUE}
-    chart = (
-        alt.Chart(t)
-        .mark_line(point=True)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("month:O", title=None, axis=alt.Axis(labelAngle=-45)),
-            y=alt.Y("zero_pct:Q", title="Half-hours reading exactly zero (%)"),
-            color=alt.Color(
-                "group:N",
-                scale=alt.Scale(domain=list(colours), range=list(colours.values())),
-                legend=alt.Legend(orient="top", title=None),
-            ),
+    panels = []
+    for group, colour in colours.items():
+        panels.append(
+            alt.Chart(t.filter(pl.col("group") == group).to_pandas())
+            .mark_line(point=True, color=colour)
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("month:O", title=None, axis=alt.Axis(labelAngle=-45)),
+                y=alt.Y("zero_pct:Q", title=f"{group}: half-hours reading 0 (%)"),
+            )
+            .properties(
+                width=WIDTH,
+                height=280,
+                title=alt.TitleParams(
+                    f"{'Six solar farms' if group == 'Solar' else 'Three wind farms'}",
+                    anchor="start",
+                ),
+            )
         )
-        .properties(
-            width=WIDTH,
-            height=280,
-            title=alt.TitleParams(
-                [
-                    "Generators stop reporting zero output after March 2026",
-                    "Six solar farms and three wind farms. Each line is the share of that month's stored half-hours that read 0.",
-                ],
-                anchor="start",
-            ),
+    chart = alt.vconcat(*panels).properties(
+        title=alt.TitleParams(
+            [
+                "Solar and wind farms stop reporting half-hours of exactly zero after March 2026",
+                "Each point is the share of that month's stored half-hours that read 0. March ends on the 26th.",
+            ],
+            anchor="start",
         )
     )
     chart.save(DOCS / "generator_zero_readings.svg")
@@ -149,17 +152,27 @@ def figure_zeros() -> None:
 
 def figure_ends() -> None:
     """Dot chart: the newest date each input holds, against the test window."""
-    inputs = pl.read_parquet(OUT_DIR / "inputs_end.parquet").select("input", "newest")
+    inputs = (
+        pl.read_parquet(OUT_DIR / "inputs_end.parquet")
+        .with_columns(
+            newest=pl.coalesce(
+                pl.col("newest_run").str.to_datetime("%Y-%m-%d", time_zone="UTC"), pl.col("newest")
+            ).dt.cast_time_unit("us"),
+            input=pl.when(pl.col("newest_run").is_not_null())
+            .then(pl.col("input") + pl.lit(" (newest run)"))
+            .otherwise(pl.col("input")),
+        )
+        .select("input", "newest")
+    )
+    power_end = pl.read_parquet(OUT_DIR / "series_end.parquet")["last"].max()
+    ens_end = pl.read_parquet(OUT_DIR / "ens_runs.parquet")["init_time"].max()
     extra = pl.DataFrame(
         {
             "input": [
-                "Power, production table (all series)",
-                "ENS runs, production table (newest run)",
+                "Power, production table (newest reading)",
+                "ENS, production table (newest run)",
             ],
-            "newest": [
-                datetime(2026, 11, 6, 8, tzinfo=UTC),
-                datetime(2026, 11, 6, tzinfo=UTC),
-            ],
+            "newest": [power_end, ens_end],
         }
     ).with_columns(pl.col("newest").dt.cast_time_unit("us"))
     t = pl.concat([extra, inputs], how="vertical_relaxed").with_columns(
