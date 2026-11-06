@@ -33,8 +33,8 @@ decision_rule: >-
   stated beside each contrast, with its minimum detectable effect. A contrast counts as a gain when
   its Bonferroni month-block interval (5 blocks) excludes zero.
 benchmark: >-
-  Climatology of the fold's training window; weekly XGBoost model (BG2) of experiment 415 where its
-  stored forecasts cover the same rows, and otherwise stated as missing.
+  Climatology of the fold's training window; weekly XGBoost model (BG2) of experiment 87 (stored forecasts),
+  scored on the rows it shares with each design.
 row_set_id: experiment_611_nodes_v1
 metric: >-
   CRPS in points of effective capacity, q05 to q95 coverage, and q05 to q95 width, by lead band
@@ -53,24 +53,27 @@ headline: >-
   0.86 (grid) of rows against a target of 0.90.
 lessons:
   - >-
-    Adding power lags (Design 2) did not improve on the lag-free network at either group, so the
-    weather and calendar inputs carry almost all the skill at these 4 series.
+    Adding power lags (Design 2) gave no clear gain over the lag-free network at either group: the
+    contrasts are +0.52 (bulk) and -0.07 (grid) points, both inside their intervals of zero. By
+    series, lags helped at D6 (-1.9 points) and hurt at D1 (+1.6).
   - >-
-    Both designs under-cover: the q05 to q95 band holds the observed power on 0.80 to 0.88 of
-    rows, and the one-sided q95 share is 0.88 (bulk) and 0.92 (grid) against 0.95.
+    Both designs under-cover at 24 to 120 h: the q05 to q95 band holds the observed power on 0.80 to
+    0.88 of rows for Design 1 and 0.78 to 0.86 for Design 2, by series, and the share at or below
+    q95 is 0.88 (bulk) and 0.92 (grid) for Design 1 against a target of 0.95.
 take_home_message: >-
-  A neural network that reads weather and the calendar but no recent power forecasts the 2 bulk
-  supply points better than the weekly XGBoost model, and the 2 grid supply points about as well.
-  Giving it the previous day's and the previous week's power did not help further. The 90% band is
-  too narrow everywhere, so the bake-off should score calibration beside accuracy at these 4 series.
+  A neural network that reads weather and the calendar but no recent power forecasts the two bulk
+  supply points better than the weekly XGBoost model, and the two grid supply points about as well.
+  Giving it the previous day's and the previous week's power gave no clear further gain. The 90%
+  band is too narrow everywhere, so calibration deserves scoring beside accuracy at these four
+  series.
 advice:
   - >-
-    Use the lag-free network with the O2 offset as the first candidate for the bake-off at the bulk
-    and grid supply points, because Design 2's lags added no skill (Table 1, contrast
-    "Design 2 minus Design 1").
+    Treat the lag-free network with the O2 offset as the simpler candidate at the bulk and grid
+    supply points, because Design 2's lags gave no clear gain at group level (Table 3, "Design 2
+    minus Design 1").
   - >-
     Widen or recalibrate the q05 to q95 band before reporting coverage at these 4 series, because
-    coverage is 0.80 to 0.88 against a target of 0.90 (Table 1).
+    coverage by series is 0.78 to 0.88 against a target of 0.90 (Table 2 and the Results text).
   - >-
     Report the grid supply point D1 separately, because it mostly exports power and its CRPS
     (15.7 points) differs from the other grid supply point's (20.1 points) (Table 2).
@@ -78,27 +81,36 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**A neural network that reads weather and the calendar but no recent power forecasts the 2 bulk
-supply points (BSPs) better than the weekly XGBoost model (BG2), and the 2 grid supply points
-(GSPs) about as well.** Adding the previous day's and the previous week's power (Design 2) did not
-improve the forecast. The 90% band (q05 to q95) is too narrow for both designs: it holds the
-observed power on 0.84 of rows at the BSPs and 0.86 at the GSPs, against a target of 0.90.
+**A neural network that reads weather and the calendar but no recent power forecasts the two bulk
+supply points (BSPs) better than the weekly XGBoost model (BG2), and the two grid supply points
+(GSPs) about as well.** The measure is the continuous ranked probability score (CRPS), in points of
+effective capacity (percent of the series' capacity; smaller is better). At 24 to 120 h ahead, the
+network scores 6.23 at the BSPs against 7.05 for BG2, and 17.89 at the GSPs against 18.00. A second
+network that also reads the previous day's and the previous week's power (Design 2) gave no clear
+further gain. The 90% band (q05 to q95) is too narrow for both networks: it holds the observed
+power on 0.84 of rows at the BSPs and 0.86 at the GSPs, against a target of 0.90.
 
 We backtested two designs over the five development months (2025-10, 2025-12, 2026-01, 2026-03,
-and 2026-06), at leads of 0 to 240 h, with seeds 0 and 1. The design comes from
+and 2026-06), at leads of 0 to 240 h, with seeds 0 and 1. The backtests prepare the final model
+comparison (the bake-off). The design comes from
 [experiment 604](../00604-bsp-gsp-pilot-design-for-the-bake-off/result.md). The two BSPs are D13 and
-D17 and the two GSPs are D6 and D1. **Design 1** is the lag-free network with the O2 offset of
-[experiment 577](../00577-static-between-steps-offsets-and-probabilistic-offset-widening/result.md).
-**Design 2** is the lag network of
+D17 and the two GSPs are D6 and D1. **Design 1** is the neural network with no power inputs
+(lag-free)
+and the O2 offset of
+[experiment 577](../00577-static-between-steps-offsets-and-probabilistic-offset-widening/result.md),
+a slowly changing per-series correction to the forecast mean. **Design 2** is the neural network
+with
+power lags of
 [experiment 415](../00415-pooled-mixture-density-network-at-bulk-and-grid-supply-points/result.md).
-Each group is one network of 2 series. BG2, a climatology, and the manual heuristic are the stored
-forecasts of experiment 87. Forecasts are in the private Parquet export.
+Each group is one neural network of two series. BG2, a climatology, and the manual heuristic are the
+stored forecasts of experiment 87. Forecasts are in the private Parquet export.
 
 ## Figures
 
 ![CRPS by lead band for each forecast](figure_1_crps_by_lead_band.svg)
 
-*Figure 1. CRPS (smaller is better) by lead band. Look at the top panel: Design 1 (dark blue) is the
+*Figure 1. CRPS (smaller is better) by lead band. The five monthly values are the only uncertainty
+shown. Look at the top panel: Design 1 (dark blue) is the
 lowest dot at all 3 lead bands, and its range over the 5 months does not overlap the climatology's
 at 24 to 120 h. Look at the bottom panel: every forecast's range overlaps, so the 2 grid supply
 points cannot rank the forecasts.*
@@ -112,12 +124,15 @@ the closest to it at the bulk supply points.*
 ![Width of the q05 to q95 band](figure_3_width_by_lead_band.svg)
 
 *Figure 3. Mean width of the q05 to q95 band as points of effective capacity. Look at the top panel:
-the 2 designs' bands are about a quarter narrower than BG2's, which is why their coverage is lower.*
+Design 1's bands are 17% to 29% narrower than BG2's across the three lead bands, and narrower bands
+go with lower coverage here.*
 
 ![D13 day-ahead forecast, two fortnights](figure_4_day_ahead_D13.svg)
 
-*Figure 4. D13 (bulk supply point): the forecast issued at 09:00 UTC the day before, over a smooth
-fortnight of June 2026 (top) and the fortnight around its highest-power night (bottom). Look for the
+*Figure 4. D13 (bulk supply point): the forecast issued at 09:00 UTC the day before, over the 14
+days of June 2026 with the smallest mean half-hour-to-half-hour change in observed power (top), and
+the 14 days centred on the night (18:00 to 06:00 UTC) of highest observed power in December 2025 and
+January 2026 (bottom). The same rules pick the windows in Figures 5 to 7. Look for the
 observed power leaving the band at the daily minimum in June, where the median runs low.*
 
 ![D17 day-ahead forecast, two fortnights](figure_5_day_ahead_D17.svg)
@@ -136,7 +151,9 @@ June panel: the daily swing of about 300 MW is followed closely, and the band is
 ## Results
 
 Table 1. CRPS in points of effective capacity (smaller is better), q05 to q95 coverage (target
-0.90), and the share of rows at or below q95 (target 0.95), at 24 to 120 h.
+0.90), and the share of rows at or below q95 (target 0.95), at 24 to 120 h. Each forecast is scored
+on all its own rows, and the designs have more rows than the stored references, so Table 3 uses
+shared rows only.
 
 | Group | Forecast | CRPS | Coverage | Share below q95 |
 |---|---|---|---|---|
@@ -177,13 +194,16 @@ lead bands are in the private `scores/contrasts.csv`.
 
 ## Pre-registered predictions
 
-- **Held:** Design 1 beats the climatology at all 4 series by at least 1 point at 24 to 120 h
-  (Table 2 gives D13 5.19 against 7.12, D17 7.26 against 11.32, D1 15.66 against 24.65, D6 20.12
-  against 21.50; the last is 1.4 points). Design 1 is within the minimum detectable effect of BG2 at
-  the BSPs.
+- **Held as point estimates:** Design 1 has a CRPS at least 1 point below the climatology at all
+  four
+  series at 24 to 120 h (D13 5.19 against 7.12, D17 7.26 against 11.32, D1 15.66 against 24.65, D6
+  20.12 against 21.50, a gap of 1.4 points). The interval excludes zero at the BSPs only (Table 3).
+  Design 1 differs from BG2 at the BSPs by less than the minimum detectable effect (-0.84 against
+  1.11), although its Bonferroni interval excludes zero.
 - **Failed:** Design 1 was not worse than BG2 by more than 1 point at the GSPs (difference -0.05).
-  The q05 to q95 band did not cover between 0.85 and 0.95 at every lead band (the BSPs reach 0.80 to
-  0.85). The exporting GSP D1 did not have the lowest coverage (0.88, against 0.80 at D13).
+  The q05 to q95 band did not cover between 0.85 and 0.95 at every lead band (Design 1's group
+coverage is 0.83 to 0.85 at the BSPs; Design 2's is 0.80 to 0.84). The exporting GSP D1 did not have
+the lowest coverage (0.88, against 0.80 at D13).
 
 ## Checks
 
@@ -196,7 +216,7 @@ lead bands are in the private `scores/contrasts.csv`.
 
 ## Caveats
 
-- **Five months and 2 series per group.** Each interval resamples 5 months, so the intervals are
+- **Five months and two series per group.** Each interval resamples 5 months, so the intervals are
   wide, and the GSP contrasts cannot rank any forecast. The result is a pilot, not a ranking.
 - **Design 2 is not the A1 network.** The shared lag encoder A1 sits in the three-step stack of
   experiment 574 for the Primaries, so Design 2 uses experiment 415's plain lag network, one fit per

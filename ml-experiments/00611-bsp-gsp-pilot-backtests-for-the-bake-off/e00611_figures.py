@@ -57,6 +57,7 @@ def metric_figure(
     y_title: str,
     file: str,
     rule: float | None = None,
+    domain: list[float] | None = None,
 ) -> None:
     """Draw a per-arm dot for each lead band with the minimum-to-maximum range over the 5 months; one panel per group."""
     monthly = (
@@ -89,18 +90,31 @@ def metric_figure(
         )
         layers = [
             base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X("lo:Q", title=y_title, scale=alt.Scale(zero=False)), x2="hi:Q"
+                x=alt.X(
+                    "lo:Q",
+                    title=y_title,
+                    scale=alt.Scale(zero=False, domain=domain) if domain else alt.Scale(zero=False),
+                ),
+                x2="hi:Q",
             ),
             base.mark_point(filled=True, size=60, opacity=1).encode(x="mean:Q"),  # ty: ignore[unresolved-attribute]
         ]
         if rule is not None:
+            ref = alt.Chart(pl.DataFrame({"x": [rule], "t": ["target 0.90"]}))
             layers.append(
-                alt.Chart(pl.DataFrame({"x": [rule]}))  # ty: ignore[unresolved-attribute]
-                .mark_rule(strokeDash=[4, 4], color="#000000", opacity=0.6)
-                .encode(x="x:Q")
+                ref.mark_rule(strokeDash=[4, 4], strokeWidth=1.5, color=theme.DATA_PURPLE).encode(
+                    x="x:Q"
+                )
+            )
+            layers.append(
+                ref.mark_text(
+                    align="left", dx=4, dy=-4, color=theme.DATA_PURPLE, baseline="bottom"
+                ).encode(x="x:Q", y=alt.value(0), text="t:N")
             )
         panels.append(alt.layer(*layers).properties(width=WIDTH, height=280, title=label))
-    alt.vconcat(*panels).resolve_scale(color="shared").properties(
+    alt.vconcat(*panels).resolve_scale(
+        color="shared", x="shared" if domain else "independent"
+    ).properties(
         title=alt.TitleParams(
             title,
             subtitle=[
@@ -167,8 +181,8 @@ def series_figure(*, design: str, series: str, file: str) -> dict[str, object]:
     wins = pick_windows(series=series)
     panels = []
     for key, label in (
-        ("quiet", "A smooth fortnight (the least jagged 14 days of June 2026)"),
-        ("cold", "A fortnight around the night of highest power"),
+        ("quiet", "The smoothest fortnight of June 2026"),
+        ("cold", "The fortnight around the highest-power night of December 2025 or January 2026"),
     ):
         start = cast(datetime, wins[key])
         fr = window_frame(design=design, series=series, start=start, days=14)
@@ -183,12 +197,12 @@ def series_figure(*, design: str, series: str, file: str) -> dict[str, object]:
             ]
         )
         kinds = ["Observed power", "Median forecast", "q05 to q95 band"]
-        colour = alt.Scale(domain=kinds, range=["#000000", theme.DATA_BLUE, theme.DATA_BLUE])
+        colour = alt.Scale(domain=kinds, range=["#000000", theme.DATA_BLUE, theme.DATA_SKY])
         legend = alt.Legend(title=None, orient="top", symbolType="square", columns=3)
         band = (
             alt.Chart(fr)  # ty: ignore[unresolved-attribute]
             .transform_calculate(kind="'q05 to q95 band'")
-            .mark_area(opacity=0.3)
+            .mark_area(opacity=0.45)
             .encode(
                 x=alt.X("valid_time:T", title="Time (UTC)", axis=alt.Axis(format="%-d %b")),
                 y=alt.Y("q05:Q", title="Power (MW)"),
@@ -239,6 +253,7 @@ def main() -> None:
         y_title="Coverage of the q05 to q95 band (target 0.90)",
         file="figure_2_coverage_by_lead_band.svg",
         rule=0.9,
+        domain=[0.6, 1.0],
     )
     metric_figure(
         rows=rows,
