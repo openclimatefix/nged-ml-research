@@ -104,9 +104,9 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
     - **Equal width.** Each S arm also gets a width-matched control: its band rescaled about the
       median so its mean q95 - q05 on R's G4-on-or-held origin days equals R's, one factor per fold
       and seed, printed with its row count. The factor is fitted on the injected bank's 24-120 h
-      rows, which are the rows P1 and P2 read. P1 and P2 are read on the rescaled S as well as on S, and count as passed
-      only if S's own event-row width is within 5% of R's or the rescaled S also passes. W uses the
-      same factor rule applied to R.
+      rows, which are the rows P1 and P2 read. P1 and P2 are read on the rescaled S as well as on
+      S, and count as passed only if S's own event-row width is within 5% of R's or the rescaled S
+      also passes. W uses the same factor rule applied to R.
     - **Training signals are in-sample.** Cross-fitting the frozen network is too expensive, so a
       pre-fit check prints, per Primary, the standard deviation of the fresh residual and of the lag
       disagreement on training rows against test rows. Where the training-to-test ratio is below
@@ -129,8 +129,9 @@ weeks. The comparison is at equal band width, because a wider band alone raises 
     - **Detectability.** The minimum detectable effect of every prediction is printed before the
       fits are scored; a prediction whose margin is below its minimum detectable effect is reported
       as untestable. P5's margin is fixed at 0.03 points of capacity of event-free CRPS (S minus A1,
-      both metering groups), set before any score; its interval resamples the fold months as blocks. R's and S-p's follow ratios are printed beside P3. Contrasts counted: seven,
-      as above. S-g, the target-side absorption score (experiment 595's method, for R and S), and
+      both metering groups), set before any score; its interval resamples the fold months as
+      blocks. R's and S-p's follow ratios are printed beside P3. Contrasts counted: seven, as
+      above. S-g, the target-side absorption score (experiment 595's method, for R and S), and
       the real pair are descriptive and uncounted.
 - **Standing practices followed.** Monthly-equivalent coarse refits, cleaned data, the D15 and D18
   cut, saved weights, reuse of stored forecasts, tails and avoidable-curtailment cost, load-shift
