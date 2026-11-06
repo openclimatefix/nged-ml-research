@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201
+# ruff: noqa: E501
 """Price series on the half-hourly grid, and the learnt price encoder of experiment 570.
 
 Prices come from Elexon's market index (provider `APXMIDP`) and system price tables, 2019-09 to
@@ -49,9 +49,13 @@ def load_raw(*, grid_start_us: int, n_steps: int) -> np.ndarray:
     out = np.full((3, n_steps), np.nan, dtype=np.float64)
 
     def idx(frame: pl.DataFrame) -> np.ndarray:
-        return ((frame["time"].dt.epoch("us").to_numpy() - grid_start_us) // STEP_US).astype(np.int64)
+        return ((frame["time"].dt.epoch("us").to_numpy() - grid_start_us) // STEP_US).astype(
+            np.int64
+        )
 
-    mid = mid.with_columns(price=pl.when(pl.col("volume_mwh") > 0).then(pl.col("price_gbp_per_mwh")))
+    mid = mid.with_columns(
+        price=pl.when(pl.col("volume_mwh") > 0).then(pl.col("price_gbp_per_mwh"))
+    )
     i = idx(mid)
     ok = (i >= 0) & (i < n_steps)
     out[0, i[ok]] = mid["price"].to_numpy()[ok]
@@ -73,7 +77,12 @@ def transform(raw: np.ndarray) -> np.ndarray:
         a = np.sign(raw[k]) * np.log1p(np.abs(raw[k]) / scale.to_numpy())
         a_s = pl.Series(a).fill_nan(None)
         med = _trail_median(a_s, 0.5).fill_null(0.0).to_numpy()
-        iqr = (_trail_median(a_s, 0.75) - _trail_median(a_s, 0.25)).fill_null(1.0).clip(lower_bound=0.05).to_numpy()
+        iqr = (
+            (_trail_median(a_s, 0.75) - _trail_median(a_s, 0.25))
+            .fill_null(1.0)
+            .clip(lower_bound=0.05)
+            .to_numpy()
+        )
         z = (a - med) / iqr
         chans.append(np.where(np.isfinite(z), z, 0.0))
     return np.stack([*chans, mask.astype(np.float64)]).astype(np.float32)
@@ -81,7 +90,13 @@ def transform(raw: np.ndarray) -> np.ndarray:
 
 def calendar_frame(*, grid_start_us: int, n_steps: int) -> pl.DataFrame:
     """Return the grid's half-hour of day, day type (0 weekday, 1 Saturday, 2 Sunday), and month."""
-    t = pl.DataFrame({"t": pl.from_epoch(pl.Series(grid_start_us + STEP_US * np.arange(n_steps)), time_unit="us")})
+    t = pl.DataFrame(
+        {
+            "t": pl.from_epoch(
+                pl.Series(grid_start_us + STEP_US * np.arange(n_steps)), time_unit="us"
+            )
+        }
+    )
     wd = pl.col("t").dt.weekday()
     return t.select(
         hh=pl.col("t").dt.hour() * 2 + pl.col("t").dt.minute() // 30,
@@ -105,14 +120,21 @@ def residualise(*, chans: np.ndarray, cal: pl.DataFrame, fit_until: int) -> np.n
 
 
 def typical(*, chans: np.ndarray, cal: pl.DataFrame, fit_until: int) -> np.ndarray:
-    """Return the mean of each channel for (month, half-hour, day type), from rows before `fit_until`, on the whole grid."""
+    """Return the mean of each channel for (month, half-hour, day type) on the whole grid.
+
+    The means use rows before `fit_until` only.
+    """
     out = chans.copy()
     keys = cal.with_columns(i=pl.int_range(pl.len()))
     for k in range(3):
         v = pl.DataFrame({"i": np.arange(chans.shape[1]), "v": chans[k], "m": chans[3]})
         train = keys.join(v, on="i").filter((pl.col("i") < fit_until) & (pl.col("m") > 0))
         mean = train.group_by("hh", "dtype", "month").agg(pl.col("v").mean().alias("mean"))
-        out[k] = keys.join(mean, on=["hh", "dtype", "month"], how="left", maintain_order="left")["mean"].fill_null(0.0).to_numpy()
+        out[k] = (
+            keys.join(mean, on=["hh", "dtype", "month"], how="left", maintain_order="left")["mean"]
+            .fill_null(0.0)
+            .to_numpy()
+        )
     out[3] = 1.0
     return out.astype(np.float32)
 
@@ -133,25 +155,34 @@ def constant(*, like: np.ndarray) -> np.ndarray:
 
 
 def shape_features(*, chans: np.ndarray) -> np.ndarray:
-    """Return hand-made shape vector (6, T) from channel 0: day rank, minus day mean, 12-step range, cheap4h, dear4h, evening-minus-night."""
+    """Return the hand-made shape vector (6, T) from channel 0.
+
+    Rows: day rank, minus day mean, 12-step range, cheapest 4 h flag, dearest 4 h flag, and
+    evening minus overnight.
+    """
     n = chans.shape[1]
     day = np.arange(n) // STEPS_PER_DAY
     df = pl.DataFrame({"d": day, "p": chans[0], "i": np.arange(n)})
     df = df.with_columns(
         rank=(pl.col("p").rank("average").over("d") - 1) / (STEPS_PER_DAY - 1),
         dev=pl.col("p") - pl.col("p").mean().over("d"),
-        rng=pl.col("p").rolling_max(13, center=True, min_samples=1) - pl.col("p").rolling_min(13, center=True, min_samples=1),
+        rng=pl.col("p").rolling_max(13, center=True, min_samples=1)
+        - pl.col("p").rolling_min(13, center=True, min_samples=1),
     )
     rank_ = df["rank"].to_numpy()
     cheap = (rank_ < 8 / STEPS_PER_DAY).astype(np.float32)
     dear = (rank_ >= 1 - 8 / STEPS_PER_DAY).astype(np.float32)
     hh = np.arange(n) % STEPS_PER_DAY
-    eve = pl.DataFrame({"d": day, "p": np.where((hh >= 32) & (hh < 38), chans[0], np.nan)}).with_columns(
-        e=pl.col("p").mean().over("d")
-    )["e"].to_numpy()
-    night = pl.DataFrame({"d": day, "p": np.where(hh < 10, chans[0], np.nan)}).with_columns(
-        e=pl.col("p").mean().over("d")
-    )["e"].to_numpy()
+    eve = (
+        pl.DataFrame({"d": day, "p": np.where((hh >= 32) & (hh < 38), chans[0], np.nan)})
+        .with_columns(e=pl.col("p").mean().over("d"))["e"]
+        .to_numpy()
+    )
+    night = (
+        pl.DataFrame({"d": day, "p": np.where(hh < 10, chans[0], np.nan)})
+        .with_columns(e=pl.col("p").mean().over("d"))["e"]
+        .to_numpy()
+    )
     en = np.nan_to_num(eve - night)
     out = np.stack([rank_, df["dev"].to_numpy(), df["rng"].to_numpy(), cheap, dear, en])
     return (np.nan_to_num(out) * (chans[3] > 0)).astype(np.float32)
@@ -161,7 +192,9 @@ def daily_stats(*, chans: np.ndarray) -> np.ndarray:
     """Return per-day stats (4, D): mean, max, min, evening-minus-overnight of channel 0."""
     n = chans.shape[1] // STEPS_PER_DAY * STEPS_PER_DAY
     d = chans[0, :n].reshape(-1, STEPS_PER_DAY)
-    return np.stack([d.mean(1), d.max(1), d.min(1), d[:, 32:38].mean(1) - d[:, :10].mean(1)]).astype(np.float32)
+    return np.stack(
+        [d.mean(1), d.max(1), d.min(1), d[:, 32:38].mean(1) - d[:, :10].mean(1)]
+    ).astype(np.float32)
 
 
 class Bundle:
@@ -175,8 +208,12 @@ class Bundle:
         hourly = [(p[:3] + np.roll(p[:3], -1, axis=1)) / 2 for p in parts]
         self.chans = torch.from_numpy(np.concatenate(parts, axis=1)).to(device)
         self.hourly = torch.from_numpy(np.concatenate(hourly, axis=1).astype(np.float32)).to(device)
-        self.shape = torch.from_numpy(np.concatenate([shape_features(chans=p) for p in parts], axis=1)).to(device)
-        self.daily = torch.from_numpy(np.concatenate([daily_stats(chans=p) for p in parts], axis=1)).to(device)
+        self.shape = torch.from_numpy(
+            np.concatenate([shape_features(chans=p) for p in parts], axis=1)
+        ).to(device)
+        self.daily = torch.from_numpy(
+            np.concatenate([daily_stats(chans=p) for p in parts], axis=1)
+        ).to(device)
 
     def windows(self, idx: torch.Tensor) -> dict[str, torch.Tensor]:
         """Return fine (B,4,97), medium (B,3,168), coarse (B,4,28), shape (B,6) windows for target indices."""
@@ -188,7 +225,12 @@ class Bundle:
         fine = self.chans[:, fine_pos.clamp(0, self.T - 1)].permute(1, 0, 2)
         medium = self.hourly[:, med_pos.clamp(0, self.T - 1)].permute(1, 0, 2)
         coarse = self.daily[:, coarse_pos.clamp(0, self.daily.shape[1] - 1)].permute(1, 0, 2)
-        return {"fine": fine, "medium": medium, "coarse": coarse, "shape": self.shape[:, idx.clamp(0, self.T - 1)].T}
+        return {
+            "fine": fine,
+            "medium": medium,
+            "coarse": coarse,
+            "shape": self.shape[:, idx.clamp(0, self.T - 1)].T,
+        }
 
 
 def glu_tower(c_in: int, k: int, stride: int = 1) -> nn.Sequential:
@@ -226,11 +268,15 @@ class PriceEncoder(nn.Module):
     def _pool(h: torch.Tensor) -> torch.Tensor:
         return torch.cat([h.mean(-1), h.amax(-1)], dim=-1)
 
-    def forward(self, w: dict[str, torch.Tensor], idx: torch.Tensor, present: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, w: dict[str, torch.Tensor], idx: torch.Tensor, present: torch.Tensor
+    ) -> torch.Tensor:
         """Return (B, 16) latents; rows with `present` 0 get the null vector."""
         fine = w["fine"]
         hf = self.fine(fine)
-        hours = ((idx[:, None] + torch.arange(-FINE_HALF, FINE_HALF + 1, device=idx.device)[None]) % STEPS_PER_DAY)
+        hours = (
+            idx[:, None] + torch.arange(-FINE_HALF, FINE_HALF + 1, device=idx.device)[None]
+        ) % STEPS_PER_DAY
         tokens = self.proj(fine).transpose(1, 2) + self.pos(hours)
         att, _ = self.attn(tokens[:, FINE_HALF : FINE_HALF + 1], tokens, tokens)
         day_vec = fine[:, 0, FINE_HALF - 24 : FINE_HALF + 24]
@@ -239,7 +285,14 @@ class PriceEncoder(nn.Module):
         reg = torch.softmax(self.tau * sim, dim=-1)
         self.last_regimes = reg
         z = torch.cat(
-            [self._pool(hf[:, :16]), self._pool(self.medium(w["medium"])), self._pool(self.coarse(w["coarse"])), att[:, 0], reg, w["shape"]],
+            [
+                self._pool(hf[:, :16]),
+                self._pool(self.medium(w["medium"])),
+                self._pool(self.coarse(w["coarse"])),
+                att[:, 0],
+                reg,
+                w["shape"],
+            ],
             dim=-1,
         )
         lat = self.out(z)
@@ -256,7 +309,9 @@ class PriceEncoder(nn.Module):
         return 0.01 * (-ent_batch) + 0.01 * sim
 
 
-def build_series(*, kind: str, grid_start_us: int, n_steps: int, fit_until: int, seed: int = 0) -> np.ndarray:
+def build_series(
+    *, kind: str, grid_start_us: int, n_steps: int, fit_until: int, seed: int = 0
+) -> np.ndarray:
     """Return channels (4, T) of a series kind for a fold whose price statistics are fitted before `fit_until`."""
     chans = transform(load_raw(grid_start_us=grid_start_us, n_steps=n_steps))
     cal = calendar_frame(grid_start_us=grid_start_us, n_steps=n_steps)
@@ -283,7 +338,9 @@ def donor_shift(*, n_steps: int, grid_start_us: int, seed: int) -> np.ndarray:
     n_days = n_steps // STEPS_PER_DAY
     start = dt.datetime.fromtimestamp(grid_start_us / 1e6, dt.UTC)
     days = [start + dt.timedelta(days=int(d)) for d in range(n_days)]
-    key = np.array([(d.month, min(d.weekday(), 5) if d.weekday() < 5 else d.weekday()) for d in days])
+    key = np.array(
+        [(d.month, min(d.weekday(), 5) if d.weekday() < 5 else d.weekday()) for d in days]
+    )
     code = key[:, 0] * 10 + np.where(key[:, 1] < 5, 0, key[:, 1] - 4)  # month, weekday/sat/sun
     shift = np.zeros(n_days, dtype=np.int64)
     by: dict[int, np.ndarray] = {c: np.nonzero(code == c)[0] for c in np.unique(code)}
@@ -307,7 +364,9 @@ def selftest() -> None:
     enc = PriceEncoder()
     print(enc(w, idx, torch.tensor([1.0, 0.0])).shape, float(enc.aux_loss()))
     print("present share", float(chans[3].mean()), "nonzero mid", float((chans[0] != 0).mean()))
-    print("donor shifts filled", float((donor_shift(n_steps=n, grid_start_us=gs, seed=0) != 0).mean()))
+    print(
+        "donor shifts filled", float((donor_shift(n_steps=n, grid_start_us=gs, seed=0) != 0).mean())
+    )
     print(Path(str(DATA)).exists())
 
 

@@ -1,5 +1,7 @@
-# ruff: noqa: E501, ANN001, ANN201
-"""Experiment 570's modular lag-free network with a learnt price encoder beside the weather and datetime encoders.
+# ruff: noqa: E501
+"""Experiment 570's modular lag-free network with a learnt price encoder.
+
+The price encoder sits beside the weather encoder and the datetime encoder.
 
 Two extra input columns follow the 37 lag-free columns: the (bundle-offset) grid index of the target
 half-hour, and a 0/1 presence flag. The price encoder reads its windows from `self.bundle`, a
@@ -29,7 +31,9 @@ class PriceMdn(m.ModularMdn):
         """Build the network; the price encoder is initialised from a fixed seed."""
         super().__init__(n_primaries=n_primaries, stage=stage)
         wide = 2 * m.ENCODER_OUT + m.EMBEDDING + price.LATENT + (0 if stage == "pre" else 7 + 2)
-        mixer = base.mlp(n_in=wide, hidden=m.MIXER_HIDDEN, layers=2, n_out=3 * m.COMPONENTS, dropout=m.DROPOUT)
+        mixer = base.mlp(
+            n_in=wide, hidden=m.MIXER_HIDDEN, layers=2, n_out=3 * m.COMPONENTS, dropout=m.DROPOUT
+        )
         base.init_head(head=mixer, components=m.COMPONENTS)
         if stage == "pre":
             self.mixer_pre = mixer
@@ -67,7 +71,10 @@ class PlainWithExtras(m.ModularMdn):
 
 
 def load_pretrained(*, model: nn.Module, path: str, fresh_seed: int, keep_price: bool) -> None:
-    """Load a pretrained state (weather, datetime, embedding, and optionally the price encoder); give `mixer_ft` a fresh start."""
+    """Load a pretrained state and give `mixer_ft` a fresh start.
+
+    The state holds the weather encoder, datetime encoder, embedding, and optionally the price encoder.
+    """
     raw = torch.load(path, map_location="cpu")
     own = model.state_dict()
     state = {
@@ -81,7 +88,9 @@ def load_pretrained(*, model: nn.Module, path: str, fresh_seed: int, keep_price:
         assert v.shape == own[a].shape, (a, v.shape, own[a].shape)
     res = model.load_state_dict(state, strict=False)
     assert not res.unexpected_keys, res
-    assert all(a.startswith(("mixer_ft.", "mixer_pre.", "price.")) for a in res.missing_keys), res.missing_keys
+    assert all(a.startswith(("mixer_ft.", "mixer_pre.", "price.")) for a in res.missing_keys), (
+        res.missing_keys
+    )
     if keep_price:
         assert not any(a.startswith("price.") for a in res.missing_keys), res.missing_keys
     with torch.random.fork_rng(devices=[]):

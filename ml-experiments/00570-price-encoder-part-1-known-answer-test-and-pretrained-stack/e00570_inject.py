@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, E501
+# ruff: noqa: E501
 """Synthetic price-driven generators for experiment 570's known-answer test.
 
 Each rule maps the raw market index price (GBP per MWh, NaN where missing) on the half-hourly grid to
@@ -14,7 +14,10 @@ RAMP_UP, RAMP_DOWN = 2.0 * 0.5, 3.0 * 0.5  # MW per half-hour
 
 
 def threshold_rule(*, price: np.ndarray, capacity_mw: float) -> np.ndarray:
-    """R1: run at full output when the price exceeds 90 GBP per MWh, min run 4 h, min off 2 h, ramps 2 up and 3 down MW per hour."""
+    """R1: full output above 90 GBP per MWh.
+
+    The minimum run is 4 h, the minimum off time 2 h, and the ramps 2 MW per hour up and 3 down.
+    """
     out = np.zeros(len(price))
     level, on, held = 0.0, False, 0
     for t, p in enumerate(price):

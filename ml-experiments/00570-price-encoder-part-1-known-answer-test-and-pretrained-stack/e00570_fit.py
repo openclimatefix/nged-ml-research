@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, PT018
+# ruff: noqa: ANN001, ANN002, ANN003, ANN201, E501, PLR0915, PT018, RUF034
 """Experiment 570: pretrain and fine-tune the modular lag-free network with a learnt price encoder.
 
 Rows, recency weights, early stopping, seeds, scoring windows, and the fine-tuning harness are
@@ -55,7 +55,14 @@ W554 = (
 FRESH_SEED = 12345
 MIXER_LR = 5e-4
 PRESENT_FRACTION = 0.5
-KIND_SERIES = {"res": "res", "raw": "real", "p1": "real", "p2": "typical", "noise": "noise", "const": "const"}
+KIND_SERIES = {
+    "res": "res",
+    "raw": "real",
+    "p1": "real",
+    "p2": "typical",
+    "noise": "noise",
+    "const": "const",
+}
 FAMILIES = ("M0", "A6", "A1", "A3")
 
 parser = argparse.ArgumentParser()
@@ -71,7 +78,9 @@ ARGS = parser.parse_args()
 ORACLE = ARGS.arm.endswith("-oracle")
 STORE_AS = ARGS.arm.removesuffix("-oracle")
 FAMILY, _, KIND = STORE_AS.partition("-")
-assert ARGS.command == "known" or FAMILY in FAMILIES and (FAMILY == "M0") == (KIND == ""), ARGS.arm
+assert ARGS.command == "known" or (FAMILY in FAMILIES and (FAMILY == "M0") == (KIND == "")), (
+    ARGS.arm
+)
 assert ARGS.command == "known" or FAMILY == "M0" or KIND in KIND_SERIES, ARGS.arm
 USE_PRICE_IN_FT = FAMILY in {"A1", "A3"}
 PRETRAIN_ARM = f"A6-{KIND}" if FAMILY in {"A6", "A1"} else "M0"
@@ -86,7 +95,10 @@ FOLDS_UNFILLED: dict[str, int] = {}
 
 _, COLUMNS, _ = data.non_lag_layout()
 assert len(COLUMNS) == m.N_INPUTS
-assert COLUMNS[m.WEATHER_COLS][0] == "mean_shortwave" and COLUMNS[m.WEATHER_COLS][-1] == "mean_wind_speed_10m"
+assert (
+    COLUMNS[m.WEATHER_COLS][0] == "mean_shortwave"
+    and COLUMNS[m.WEATHER_COLS][-1] == "mean_wind_speed_10m"
+)
 assert COLUMNS[m.LEAD_COLS] == ["lead", "lead_sqrt"]
 
 
@@ -100,7 +112,13 @@ def bundle_for(*, month: str) -> tuple[price.Bundle, np.ndarray]:
     key = (month, KIND)
     if key not in SERIES:
         until = fit_until_idx(month=month)
-        full = price.build_series(kind=KIND_SERIES[KIND], grid_start_us=GRID_START, n_steps=N_STEPS, fit_until=until, seed=570)
+        full = price.build_series(
+            kind=KIND_SERIES[KIND],
+            grid_start_us=GRID_START,
+            n_steps=N_STEPS,
+            fit_until=until,
+            seed=570,
+        )
         cut = full.copy()
         cut[:, until:] = 0.0
         cut[3, until:] = 0.0 if KIND not in {"noise", "const"} else 1.0
@@ -109,13 +127,17 @@ def bundle_for(*, month: str) -> tuple[price.Bundle, np.ndarray]:
         bundle = price.Bundle(parts=[cut, full], device=DEVICE)
         shift = np.zeros(N_STEPS, dtype=np.int64)
         if KIND == "p1":
-            day_shift = price.donor_shift(n_steps=N_STEPS, grid_start_us=GRID_START, seed=570 + int(month.replace("-", "")))
+            day_shift = price.donor_shift(
+                n_steps=N_STEPS, grid_start_us=GRID_START, seed=570 + int(month.replace("-", ""))
+            )
             shift = np.repeat(day_shift, price.STEPS_PER_DAY)
         SERIES[key] = (bundle, shift)
     return SERIES[key]
 
 
-def extras(*, month: str, target_idx: np.ndarray, present_wanted: np.ndarray, scoring: bool) -> np.ndarray:
+def extras(
+    *, month: str, target_idx: np.ndarray, present_wanted: np.ndarray, scoring: bool
+) -> np.ndarray:
     """Return the two extra columns (bundle index, presence) for rows with target grid indices.
 
     Training rows index the truncated half of the bundle; scoring rows index the full half
@@ -132,7 +154,9 @@ def extras(*, month: str, target_idx: np.ndarray, present_wanted: np.ndarray, sc
     return np.stack([idx.astype(np.float32), present], axis=1)
 
 
-def new_model(*, outlier: bool, n_inputs: int, n_primaries: int, stage: str | None = None) -> torch.nn.Module:
+def new_model(
+    *, outlier: bool, n_inputs: int, n_primaries: int, stage: str | None = None
+) -> torch.nn.Module:
     """Return an untrained network (the signature of `e00510_common.new_model`)."""
     assert not outlier
     assert n_inputs == m.N_INPUTS + xm.N_EXTRA, n_inputs
@@ -147,7 +171,7 @@ def new_model(*, outlier: bool, n_inputs: int, n_primaries: int, stage: str | No
 def attach_bundle(*, model: torch.nn.Module, month: str) -> None:
     """Give a price network its month's bundle."""
     if isinstance(model, xm.PriceMdn) and model.bundle is None:
-        model.bundle = bundle_for(month=month)[0]
+        model.bundle = bundle_for(month=month)[0]  # ty: ignore[invalid-assignment]
 
 
 CURRENT_MONTH: list[str] = [""]
@@ -155,7 +179,9 @@ CURRENT_MONTH: list[str] = [""]
 
 def load_pretrained(*, model: torch.nn.Module, path: Path) -> None:
     """Load the arm's pretrained weights; the fine-tuning mixer starts fresh with seed 12345."""
-    xm.load_pretrained(model=model, path=str(path), fresh_seed=FRESH_SEED, keep_price=FAMILY == "A1")
+    xm.load_pretrained(
+        model=model, path=str(path), fresh_seed=FRESH_SEED, keep_price=FAMILY == "A1"
+    )
     attach_bundle(model=model, month=CURRENT_MONTH[0])
 
 
@@ -260,12 +286,19 @@ f.model_file = lambda *, arm, month, day, seed, stress="": (
 
 
 def pretrain(*, device: str) -> None:
-    """Pretrain on ERA5 and CAMS rows (experiment 448's rows) with the oracle price, for each month and seed lacking weights."""
-    assert ARGS.arm == "M0" or FAMILY == "A6", "only M0 and A6-KIND are pretrained here (A1 shares A6's; A3 shares M0's)"
+    """Pretrain on experiment 448's ERA5 and CAMS rows with the oracle price.
+
+    Each month and seed that has no weights yet is trained.
+    """
+    assert ARGS.arm == "M0" or FAMILY == "A6", (
+        "only M0 and A6-KIND are pretrained here (A1 shares A6's; A3 shares M0's)"
+    )
     clean = c.clean_stack()
     for month in ARGS.months:
         CURRENT_MONTH[0] = month
-        todo = [s for s in ARGS.seeds if not (W / "pretrained" / ARGS.arm / f"{month}_s{s}.pt").exists()]
+        todo = [
+            s for s in ARGS.seeds if not (W / "pretrained" / ARGS.arm / f"{month}_s{s}.pt").exists()
+        ]
         if not todo:
             continue
         refit_t = c.month_start(month=month)
@@ -275,7 +308,12 @@ def pretrain(*, device: str) -> None:
         until = fit_until_idx(month=month)
         assert last < until, (last, until)
         # Standing rule: the price window of a pretraining row never reaches the refit time (truncated half).
-        add = extras(month=month, target_idx=pre.target_idx.astype(np.int64), present_wanted=np.ones(len(pre.y), bool), scoring=False)
+        add = extras(
+            month=month,
+            target_idx=pre.target_idx.astype(np.int64),
+            present_wanted=np.ones(len(pre.y), bool),
+            scoring=False,
+        )
         print(
             f"{month}: pretraining rows {len(pre.x):,}; latest valid {datetime.fromtimestamp((last * STEP + GRID_START) / 1e6, UTC).isoformat()} (refit {refit_t.isoformat()}); price present in {add[:, 1].mean():.3f} of rows; example row 0: target index {int(pre.target_idx[0])}, price index {int(add[0, 0])}, present {int(add[0, 1])}",
             flush=True,
@@ -290,7 +328,12 @@ def pretrain(*, device: str) -> None:
         for seed in todo:
             started = time.monotonic()
             torch.manual_seed(seed)
-            model = new_model(outlier=False, n_inputs=m.N_INPUTS + xm.N_EXTRA, n_primaries=len(rows.target_mean), stage="pre").to(device)
+            model = new_model(
+                outlier=False,
+                n_inputs=m.N_INPUTS + xm.N_EXTRA,
+                n_primaries=len(rows.target_mean),
+                stage="pre",
+            ).to(device)
             epochs, best = train(
                 model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
                 lr=c.PRETRAIN_LR, outlier=False, prior=False, device=device,
@@ -300,13 +343,18 @@ def pretrain(*, device: str) -> None:
             tmp = target.with_suffix(".tmp")
             torch.save(model.state_dict(), tmp)
             tmp.rename(target)
-            print(f"  pretrain {ARGS.arm} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s", flush=True)
+            print(
+                f"  pretrain {ARGS.arm} {month} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s",
+                flush=True,
+            )
         del t, pre, rows
         torch.cuda.empty_cache()
 
 
 def known(*, device: str) -> None:
-    """Known-answer test: inject a price-driven generator into the six signed-MW Primaries and ask what the encoder recovers.
+    """Known-answer test: inject a price-driven generator and ask what the encoder recovers.
+
+    The generator is injected into the six signed-MW Primaries.
 
     For each month and rule, pretrain M0 (no price), and price networks fed the real price, a shuffled-day
     price (P1), and the typical shape (P2), on rows whose target has the generator subtracted. The recovered
@@ -314,8 +362,9 @@ def known(*, device: str) -> None:
     M0 network's, both in MW. For rule R1 a second run injects into the training rows only and scores the
     clean held-out rows (K4). Results are appended to `known_<month>.json`.
     """
-    import e00570_inject as inject  # noqa: PLC0415
-    from e00397_models import mixture_parts  # noqa: PLC0415,I001
+    import e00570_inject as inject
+
+    mixture_parts = base.mixture_parts
 
     clean = c.clean_stack()
     caps = pl.DataFrame(__import__("e00470_build").site_map())
@@ -329,12 +378,21 @@ def known(*, device: str) -> None:
         until = fit_until_idx(month=month)
         raw_price = price.load_raw(grid_start_us=GRID_START, n_steps=N_STEPS)[0].copy()
         raw_price[until:] = np.nan
-        groups = pl.read_parquet(next(W554.glob("scores/rows_2025-10.parquet")), columns=["primary", "group"]).unique()
+        groups = pl.read_parquet(
+            next(W554.glob("scores/rows_2025-10.parquet")), columns=["primary", "group"]
+        ).unique()
         six = set(groups.filter(pl.col("group") == "signed_six")["primary"].to_list())
         cap = dict(zip(caps["primary"].to_list(), caps["capacity_mw"].to_list(), strict=True))
         tidx = pre.target_idx.astype(np.int64)
         prim = pre.primary.astype(np.int64)
-        print(f"{month}: mean |y| per signed-MW Primary vs capacity (units check):", {int(p): (round(float(np.abs(pre.y[prim == p]).mean()), 2), cap[p]) for p in sorted(six)}, flush=True)
+        print(
+            f"{month}: mean |y| per signed-MW Primary vs capacity (units check):",
+            {
+                int(p): (round(float(np.abs(pre.y[prim == p]).mean()), 2), cap[p])
+                for p in sorted(six)
+            },
+            flush=True,
+        )
         for rule in ARGS.rules:
             g = np.zeros(len(pre.y))
             for p in six:
@@ -349,56 +407,100 @@ def known(*, device: str) -> None:
                 if variant == "train":
                     y_in = np.where(pre.is_val, pre.y, y_in)
                 held = np.nonzero(pre.is_val)[0][:: max(1, pre.is_val.sum() // 200_000)]
-                res = {"injected_share_of_rows_nonzero": float((g != 0).mean()), "mean_g_mw": float(g.mean())}
+                res = {
+                    "injected_share_of_rows_nonzero": float((g != 0).mean()),
+                    "mean_g_mw": float(g.mean()),
+                }
                 means = {}
-                kinds = (("none", "real", "p1", "p2") if ARGS.with_p1 else ("none", "real", "p2")) if variant == "all" else ("none", "real")
+                kinds = (
+                    (("none", "real", "p1", "p2") if ARGS.with_p1 else ("none", "real", "p2"))
+                    if variant == "all"
+                    else ("none", "real")
+                )
                 for kind in kinds:
                     z = (y_in - rows.target_mean[pre.primary]) / rows.target_std[pre.primary]
                     zc = (pre.y - rows.target_mean[pre.primary]) / rows.target_std[pre.primary]
                     z_fit = z if variant == "all" else z
                     if kind == "none":
-                        model = new_model_known(n_primaries=len(rows.target_mean), price_net=False).to(device)
+                        model = new_model_known(
+                            n_primaries=len(rows.target_mean), price_net=False
+                        ).to(device)
                         add = np.zeros((len(pre.y), 2), dtype=np.float32)
                     else:
-                        ser = price.build_series(kind=KIND_SERIES["raw" if kind == "real" else kind], grid_start_us=GRID_START, n_steps=N_STEPS, fit_until=until, seed=570)
+                        ser = price.build_series(
+                            kind=KIND_SERIES["raw" if kind == "real" else kind],
+                            grid_start_us=GRID_START,
+                            n_steps=N_STEPS,
+                            fit_until=until,
+                            seed=570,
+                        )
                         cut = ser.copy()
                         cut[:, until:] = 0.0
                         cut[3, until:] = 0.0
-                        shift = np.repeat(price.donor_shift(n_steps=N_STEPS, grid_start_us=GRID_START, seed=570 + int(month.replace("-", ""))), price.STEPS_PER_DAY) if kind == "p1" else np.zeros(N_STEPS, dtype=np.int64)
+                        shift = (
+                            np.repeat(
+                                price.donor_shift(
+                                    n_steps=N_STEPS,
+                                    grid_start_us=GRID_START,
+                                    seed=570 + int(month.replace("-", "")),
+                                ),
+                                price.STEPS_PER_DAY,
+                            )
+                            if kind == "p1"
+                            else np.zeros(N_STEPS, dtype=np.int64)
+                        )
                         bundle = price.Bundle(parts=[cut, ser], device=device)
                         idx = tidx + shift[tidx]
                         present = (cut[3][idx] > 0).astype(np.float32)
                         add = np.stack([idx.astype(np.float32), present], axis=1)
-                        model = new_model_known(n_primaries=len(rows.target_mean), price_net=True).to(device)
-                        model.bundle = bundle
+                        model = new_model_known(
+                            n_primaries=len(rows.target_mean), price_net=True
+                        ).to(device)
+                        model.bundle = bundle  # ty: ignore[invalid-assignment]
                     x2 = np.concatenate([pre.x, add], axis=1)
                     t = {"x": torch.from_numpy(x2).to(device), "z": torch.from_numpy(z_fit.astype(np.float32)).to(device),
                          "w": torch.ones(len(pre.y), device=device), "p": torch.from_numpy(pre.primary).to(device), "v": torch.from_numpy(pre.is_val).to(device)}  # fmt: skip
                     if variant == "train":  # validation rows are clean in the contamination run
-                        t["z"][torch.from_numpy(pre.is_val).to(device)] = torch.from_numpy(zc.astype(np.float32)).to(device)[torch.from_numpy(pre.is_val).to(device)]
+                        t["z"][torch.from_numpy(pre.is_val).to(device)] = torch.from_numpy(
+                            zc.astype(np.float32)
+                        ).to(device)[torch.from_numpy(pre.is_val).to(device)]
                     torch.manual_seed(ARGS.seeds[0])
                     epochs, best = train(model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=ARGS.seeds[0], lr=c.PRETRAIN_LR, outlier=False, prior=False, device=device)  # fmt: skip
                     with torch.no_grad():
                         hi = torch.from_numpy(held).to(device)
-                        parts = mixture_parts(out=model(t["x"][hi], t["p"][hi]), components=m.COMPONENTS)
-                        mu = (parts[0].exp() * parts[1]).sum(-1).cpu().numpy() * rows.target_std[pre.primary][held]
+                        parts = mixture_parts(
+                            out=model(t["x"][hi], t["p"][hi]), components=m.COMPONENTS
+                        )
+                        mu = (parts[0].exp() * parts[1]).sum(-1).cpu().numpy() * rows.target_std[
+                            pre.primary
+                        ][held]
                     means[kind] = mu
                     res[f"val_nll_{kind}"] = best
-                    print(f"  {month} {key} {kind}: {epochs} epochs, val NLL {best:.4f}", flush=True)
+                    print(
+                        f"  {month} {key} {kind}: {epochs} epochs, val NLL {best:.4f}", flush=True
+                    )
                     del model, t
                     torch.cuda.empty_cache()
                 gh = g[held]
                 on_six = np.isin(prim[held], list(six))
                 for kind in kinds[1:]:
                     d = (means[kind] - means["none"])[on_six]
-                    res[f"recovered_{kind}"] = float(1 - ((gh[on_six] + d) ** 2).mean() / (gh[on_six] ** 2).mean()) if variant == "all" else None
+                    res[f"recovered_{kind}"] = (
+                        float(1 - ((gh[on_six] + d) ** 2).mean() / (gh[on_six] ** 2).mean())
+                        if variant == "all"
+                        else None
+                    )
                     if rule == "R1" and variant == "all" and kind == "real":
                         pr = raw_price[tidx[held]][on_six]
                         dem = -d  # demand falls where the generator runs
                         bins = np.arange(0, 400, 5)
                         cap_mean = np.array([0.02 * cap[p] for p in prim[held][on_six]])
                         frac = dem / cap_mean
-                        curve = [(float(b), float(np.nanmean(frac[(pr >= b) & (pr < b + 5)]))) for b in bins if ((pr >= b) & (pr < b + 5)).sum() > 50]
+                        curve = [
+                            (float(b), float(np.nanmean(frac[(pr >= b) & (pr < b + 5)])))
+                            for b in bins
+                            if ((pr >= b) & (pr < b + 5)).sum() > 50
+                        ]
                         res["threshold_curve_price_frac_of_capacity"] = curve
                         high = frac[pr > 150]
                         res["gain_over_capacity_price_above_150"] = float(np.nanmean(high))
@@ -406,7 +508,13 @@ def known(*, device: str) -> None:
                         res["learned_threshold_half_output"] = half[0] if half else None
                 results[key] = res
                 out_path.write_text(json.dumps(results, indent=1))
-                print(f"  {month} {key}: " + json.dumps({k: v for k, v in res.items() if not k.startswith("threshold_curve")}), flush=True)
+                print(
+                    f"  {month} {key}: "
+                    + json.dumps(
+                        {k: v for k, v in res.items() if not k.startswith("threshold_curve")}
+                    ),
+                    flush=True,
+                )
         del pre, rows
         torch.cuda.empty_cache()
 
@@ -432,10 +540,16 @@ def build_month(*, month, clean):
         r for r in runs
         if not (prep.SUMMARY_DIR / f"init={datetime.fromtimestamp((r - delay) / 1e6, UTC):%Y-%m-%d}.parquet").exists()
     ]  # fmt: skip
-    assert not miss, f"{month}: {len(miss)} training origins have no weather-run summary file {common.PUBLICATION_DELAY} earlier"
+    assert not miss, (
+        f"{month}: {len(miss)} training origins have no weather-run summary file {common.PUBLICATION_DELAY} earlier"
+    )
     rng = np.random.default_rng([570, int(month.replace("-", ""))])
-    wanted = rng.random(len(mr.y)) < PRESENT_FRACTION if USE_PRICE_IN_FT else np.ones(len(mr.y), bool)
-    add = extras(month=month, target_idx=mr.target_idx.astype(np.int64), present_wanted=wanted, scoring=False)
+    wanted = (
+        rng.random(len(mr.y)) < PRESENT_FRACTION if USE_PRICE_IN_FT else np.ones(len(mr.y), bool)
+    )
+    add = extras(
+        month=month, target_idx=mr.target_idx.astype(np.int64), present_wanted=wanted, scoring=False
+    )
     i = int(np.argmax(mr.valid_us > mr.origin_us + 24 * 3_600_000_000))
     CHECK["train_rows"] += len(mr.y)
     CHECK["months"][month] = {
@@ -461,7 +575,12 @@ def build_test(*, month, standardiser):
         assert (prep.SUMMARY_DIR / f"init={run:%Y-%m-%d}.parquet").exists()
         CHECK["origins_weather_checked"] += 1
     wanted = np.full(len(test.x), ORACLE, dtype=bool)
-    add = extras(month=month, target_idx=test.target_idx.astype(np.int64), present_wanted=wanted, scoring=True)
+    add = extras(
+        month=month,
+        target_idx=test.target_idx.astype(np.int64),
+        present_wanted=wanted,
+        scoring=True,
+    )
     CHECK["test_rows"] += len(test.x)
     CHECK["months"][month]["test_example"] = (
         f"origin {datetime.fromtimestamp(test.origin[0] / 1e6, UTC)}, weather run {datetime.fromtimestamp(test.origin[0] / 1e6, UTC) - pub}, valid {datetime.fromtimestamp(test.valid[0] / 1e6, UTC)}, "
@@ -479,10 +598,15 @@ def assemble() -> None:
     for month in c.MONTHS:
         cuts = k.cutoffs(month=month, cadence="m")
         for seed in ARGS.seeds:
-            parts = [W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet" for cut in cuts]
+            parts = [
+                W / "fits" / ARM.tag / f"{month}_d{f.day_of(month=month, cut=cut)}_s{seed}.parquet"
+                for cut in cuts
+            ]
             assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
-            f.atomic_frame(frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet")
+            f.atomic_frame(
+                frame=frame, target=W / "seed_preds" / ARM.tag / f"{month}_s{seed}.parquet"
+            )
             print("wrote", ARM.tag, month, seed, frame.height, flush=True)
 
 
@@ -498,10 +622,26 @@ if __name__ == "__main__":
         known(device=DEVICE)
     else:
         if ORACLE:
-            missing = [(mo, sd) for mo in ARGS.months for sd in ARGS.seeds if not list((W / "models" / STORE_AS).glob(f"{mo}_d*_s{sd}.pt"))]
+            missing = [
+                (mo, sd)
+                for mo in ARGS.months
+                for sd in ARGS.seeds
+                if not list((W / "models" / STORE_AS).glob(f"{mo}_d*_s{sd}.pt"))
+            ]
             assert not missing, f"{ARGS.arm} fits nothing; run arm {STORE_AS} first: {missing}"
         started = time.monotonic()
-        f.fit_arm(arm=ARM, months=ARGS.months, seeds=ARGS.seeds, stress=False, limit=ARGS.limit, device=DEVICE)
+        f.fit_arm(
+            arm=ARM,
+            months=ARGS.months,
+            seeds=ARGS.seeds,
+            stress=False,
+            limit=ARGS.limit,
+            device=DEVICE,
+        )
         out = WORK / f"checks_{ARM.tag}_s{'-'.join(map(str, ARGS.seeds))}.json"
         out.write_text(json.dumps(CHECK, indent=1, default=str))
-        print("CHECKS PASSED", {a: v for a, v in CHECK.items() if a != "months"}, f"{time.monotonic() - started:.0f} s")
+        print(
+            "CHECKS PASSED",
+            {a: v for a, v in CHECK.items() if a != "months"},
+            f"{time.monotonic() - started:.0f} s",
+        )
