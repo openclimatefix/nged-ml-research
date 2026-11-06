@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, PLR2004
+# ruff: noqa: E501, D103, D205, PLR0915
 """Experiment 589, stages 1 and 2 (no fit): coverage of the observed power by C0, P5, and C1.
 
 Reads the stored `row_arrays.npz` of experiment 584's `score_c0`, `score_p5`, and `score_c1` (the
@@ -10,8 +10,6 @@ Writes CSV tables to `data/ml-experiments/00589-*/tables/` and prints every numb
 
 Usage: DATA_PATH_INTERNAL=... python e00589_tables.py
 """
-
-from pathlib import Path
 
 import e00578_common as k578  # ty: ignore[unresolved-import]
 import e00582_common as k582  # ty: ignore[unresolved-import]
@@ -25,14 +23,12 @@ OUT = ML_EXPERIMENTS_DATA_DIR / "00589-p5-coverage-on-d5-before-the-december-loa
 ARMS = {"C0": "c0", "P5": "p5", "C1": "c1"}
 IQ = {0.01: 0, 0.05: 1, 0.5: 5, 0.95: 9, 0.99: 10}
 KEYS = ["prim", "origin_idx", "idx"]
-RNG = np.random.default_rng(589)
 
 
 def load() -> pl.DataFrame:
     """Return one row per (Primary, origin, valid time) with every arm's q01, q05, q50, q95, q99."""
     sites = k578.sites()
     lab = dict(zip(sites["primary"].to_list(), sites["label"].to_list(), strict=True))
-    cap = dict(zip(sites["primary"].to_list(), sites["capacity_mw"].to_list(), strict=True))
     grp = dict(zip(sites["primary"].to_list(), sites["group"].to_list(), strict=True))
     base = None
     for arm, folder in ARMS.items():
@@ -62,7 +58,6 @@ def load() -> pl.DataFrame:
     return base.with_columns(
         label=pl.col("prim").replace_strict(lab, return_dtype=pl.String),
         group=pl.col("prim").replace_strict(grp, return_dtype=pl.String),
-        cap=pl.col("prim").replace_strict(cap, return_dtype=pl.Float64),
         band=pl.when(pl.col("lead") < 24).then(pl.lit("0-24 h")).otherwise(pl.lit("24-120 h")),
     )
 
@@ -79,21 +74,38 @@ def stats(*, df: pl.DataFrame, by: list[str], y: str = "obs") -> pl.DataFrame:
             (pl.col(y) < pl.col(f"{arm}_q05")).mean().alias("below_q05"),
             (pl.col(y) > pl.col(f"{arm}_q95")).mean().alias("above_q95"),
             ((pl.col(f"{arm}_q50") - pl.col(y)) * 100).mean().alias("median_minus_y_pct"),
+            (pl.col(f"{arm}_q50") < pl.col(y)).mean().alias("median_below_y"),
             ((pl.col(f"{arm}_q95") - pl.col(f"{arm}_q05")) * 100).mean().alias("width90_pct"),
             ((pl.col(f"{arm}_q99") - pl.col(f"{arm}_q01")) * 100).mean().alias("width98_pct"),
         )
         parts.append(d.with_columns(arm=pl.lit(arm)))
-    return pl.concat(parts).sort(by + ["arm"])
+    return pl.concat(parts).sort([*by, "arm"])
 
 
-def month_block_ci(*, df: pl.DataFrame, arm: str, n: int = 4000) -> tuple[float, float, float]:
-    """Pooled coverage with a 95% interval from resampling the five fold months."""
-    ok = ((df["obs"] >= df[f"{arm}_q05"]) & (df["obs"] <= df[f"{arm}_q95"])).cast(pl.Float64)
-    t = df.with_columns(ok=ok).group_by("month").agg(pl.col("ok").sum().alias("s"), pl.len().alias("n"))
-    s, m = t["s"].to_numpy(), t["n"].to_numpy()
-    idx = RNG.integers(0, len(s), size=(n, len(s)))
-    boot = s[idx].sum(1) / m[idx].sum(1)
-    return float(s.sum() / m.sum()), float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))
+def month_block_ci(
+    *, df: pl.DataFrame, arm: str, base: str | None = None, n: int = 4000
+) -> tuple[float, float, float]:
+    """Pooled coverage (or, with `base`, its difference from `base`) with a 95% interval from
+    resampling the five fold months; the same months are drawn for every arm (paired).
+    """
+
+    def hit(a: str) -> pl.Expr:
+        return ((pl.col("obs") >= pl.col(f"{a}_q05")) & (pl.col("obs") <= pl.col(f"{a}_q95"))).cast(
+            pl.Float64
+        )
+
+    t = (
+        df.with_columns(ok=hit(arm), ok0=hit(base or arm))
+        .group_by("month")
+        .agg(pl.col("ok").sum().alias("s"), pl.col("ok0").sum().alias("s0"), pl.len().alias("n"))
+        .sort("month")
+    )
+    assert t.height == 5, t
+    s, s0, m = t["s"].to_numpy(), t["s0"].to_numpy(), t["n"].to_numpy()
+    idx = np.random.default_rng(589).integers(0, 5, size=(n, 5))
+    est = (s.sum() - (s0.sum() if base else 0)) / m.sum()
+    boot = (s[idx].sum(1) - (s0[idx].sum(1) if base else 0)) / m[idx].sum(1)
+    return float(est), float(np.quantile(boot, 0.025)), float(np.quantile(boot, 0.975))
 
 
 def main() -> None:
@@ -111,24 +123,47 @@ def main() -> None:
     wide = by_p.pivot(on="arm", index=["label", "group", "n"], values="cover90").with_columns(
         p5_minus_c0=pl.col("P5") - pl.col("C0"), c1_minus_c0=pl.col("C1") - pl.col("C0")
     )
-    print("\n== event-free 24-120 h coverage of observed power, by Primary ==\n", wide.sort("label"))
+    print(
+        "\n== event-free 24-120 h coverage of observed power, by Primary ==\n", wide.sort("label")
+    )
     stats(df=free, by=["group"]).write_csv(OUT / "event_free_by_group.csv")
     print("\n== by group ==\n", stats(df=free, by=["group"]))
-    for g, d in free.group_by("group"):
+    for g in [*sorted(free["group"].unique().to_list()), "all 16"]:
+        d = free if g == "all 16" else free.filter(pl.col("group") == g)
         for arm in ARMS:
-            print("pooled", g[0], arm, [round(v, 3) for v in month_block_ci(df=d, arm=arm)])
-    for arm in ARMS:
-        print("pooled all 16", arm, [round(v, 3) for v in month_block_ci(df=free, arm=arm)])
+            print("pooled", g, arm, [round(v, 3) for v in month_block_ci(df=d, arm=arm)])
+        for arm in ("P5", "C1"):
+            print(
+                "paired",
+                g,
+                arm,
+                "minus C0",
+                [round(v, 3) for v in month_block_ci(df=d, arm=arm, base="C0")],
+            )
     stats(df=free, by=["month"]).write_csv(OUT / "event_free_by_month.csv")
-    print("\n== by fold month ==\n", stats(df=free, by=["month"]).pivot(on="arm", index="month", values="cover90"))
+    print(
+        "\n== by fold month ==\n",
+        stats(df=free, by=["month"]).pivot(on="arm", index="month", values="cover90"),
+    )
     stats(df=df.filter(pl.col("free")), by=["band"]).write_csv(OUT / "event_free_by_band.csv")
     print("\n== by lead band ==\n", stats(df=df.filter(pl.col("free")), by=["band"]))
-    pm = stats(df=free, by=["label", "month"]).pivot(on="arm", index=["label", "month"], values="cover90")
+    pm = stats(df=free, by=["label", "month"]).pivot(
+        on="arm", index=["label", "month"], values="cover90"
+    )
     pm = pm.with_columns(p5_minus_c0=pl.col("P5") - pl.col("C0")).sort("label", "month")
     pm.write_csv(OUT / "event_free_by_primary_month.csv")
-    print("\n== Primary-month cells where P5 trails C0 by more than 0.15 ==\n", pm.filter(pl.col("p5_minus_c0") < -0.15))
-    print("n Primary-month cells", pm.height, "P5 trails by >0.15:", pm.filter(pl.col("p5_minus_c0") < -0.15).height,
-          "C1 trails by >0.15:", pm.with_columns(d=pl.col("C1") - pl.col("C0")).filter(pl.col("d") < -0.15).height)
+    print(
+        "\n== Primary-month cells where P5 trails C0 by more than 0.15 ==\n",
+        pm.filter(pl.col("p5_minus_c0") < -0.15),
+    )
+    print(
+        "n Primary-month cells",
+        pm.height,
+        "P5 trails by >0.15:",
+        pm.filter(pl.col("p5_minus_c0") < -0.15).height,
+        "C1 trails by >0.15:",
+        pm.with_columns(d=pl.col("C1") - pl.col("C0")).filter(pl.col("d") < -0.15).height,
+    )
 
     # Stage 2: D5 in the 2025-12 fold, by phase of the verified event.
     ev = sc.merged_events().filter(pl.col("label") == "D5")
@@ -140,10 +175,14 @@ def main() -> None:
         (pl.col("label") == "D5") & (pl.col("band") == "24-120 h") & (pl.col("month") == "2025-12")
     )
     phase = (
-        pl.when(pl.col("idx") < onset - 336).then(pl.lit("earlier"))
-        .when(pl.col("idx") < onset).then(pl.lit("before (7 d)"))
-        .when(pl.col("idx") < end).then(pl.lit("during"))
-        .when(pl.col("idx") < end + 336).then(pl.lit("after0-7"))
+        pl.when(pl.col("idx") < onset - 336)
+        .then(pl.lit("earlier"))
+        .when(pl.col("idx") < onset)
+        .then(pl.lit("before (7 d)"))
+        .when(pl.col("idx") < end)
+        .then(pl.lit("during"))
+        .when(pl.col("idx") < end + 336)
+        .then(pl.lit("after0-7"))
         .otherwise(pl.lit("later"))
     )
     d5 = d5.with_columns(phase=phase)
@@ -151,37 +190,68 @@ def main() -> None:
     ph.write_csv(OUT / "d5_by_phase.csv")
     print("\n== D5, 24-120 h, observed power vs bands by phase ==\n", ph)
     nr = stats(df=d5, by=["phase"], y="nra")
-    print("\n== D5 same, against the NRA ==\n", nr.filter(pl.col("phase").is_in(["before (7 d)", "during", "after0-7"])))
+    print(
+        "\n== D5 same, against the NRA ==\n",
+        nr.filter(pl.col("phase").is_in(["before (7 d)", "during", "after0-7"])),
+    )
 
     # Stage 2b: is the December miss specific to D5? All Primaries, 2025-12 fold, valid time before D5's onset.
-    dec_all = df.filter((pl.col("month") == "2025-12") & (pl.col("band") == "24-120 h") & (pl.col("idx") < onset))
+    dec_all = df.filter(
+        (pl.col("month") == "2025-12") & (pl.col("band") == "24-120 h") & (pl.col("idx") < onset)
+    )
     pdec = stats(df=dec_all, by=["label"])
     pdec.write_csv(OUT / "december_before_d5_onset_by_primary.csv")
-    wide = pdec.pivot(on="arm", index=["label", "n"], values="cover90").join(
-        pdec.pivot(on="arm", index="label", values="median_minus_y_pct").rename({a: f"{a}_med_minus_obs_pct" for a in ARMS}),
-        on="label",
-    ).sort("C0")
-    print("\n== 2025-12 fold, valid time before D5's onset (event-free or not), by Primary ==\n", wide)
-    print("\nPrimaries with P5 coverage below 0.70 in that window:", wide.filter(pl.col("P5") < 0.7)["label"].to_list())
+    wide = (
+        pdec.pivot(on="arm", index=["label", "n"], values="cover90")
+        .join(
+            pdec.pivot(on="arm", index="label", values="median_minus_y_pct").rename(
+                {a: f"{a}_med_minus_obs_pct" for a in ARMS}
+            ),
+            on="label",
+        )
+        .sort("C0")
+    )
+    print(
+        "\n== 2025-12 fold, valid time before D5's onset (event-free or not), by Primary ==\n", wide
+    )
+    print(
+        "\nPrimaries with P5 coverage below 0.70 in that window:",
+        wide.filter(pl.col("P5") < 0.7)["label"].to_list(),
+    )
     # D5 observed daily level from the cleaned data, November and December, to see when the level rose.
     clean = k578.clean()
     d5i = int(dec["primary"][0])
     day0 = (onset // 48) - 60
-    lv = [(d, float(np.nanmean(clean[d5i, d * 48 : (d + 1) * 48])) * 100) for d in range(day0, onset // 48 + 1)]
-    print("\nD5 daily mean observed power, % of capacity, 60 days up to onset:", [(k582.date_of(d * 48)[5:], round(v, 1)) for d, v in lv])
+    lv = [
+        (d, float(np.nanmean(clean[d5i, d * 48 : (d + 1) * 48])) * 100)
+        for d in range(day0, onset // 48 + 1)
+    ]
+    print(
+        "\nD5 daily mean observed power, % of capacity, 60 days up to onset:",
+        [(k582.date_of(d * 48)[5:], round(v, 1)) for d, v in lv],
+    )
     # Daily series of D5 in the fold: observed, median of each arm, lags-masked median.
     daily = (
         df.filter((pl.col("label") == "D5") & (pl.col("lead") >= 24) & (pl.col("lead") < 48))
         .with_columns(day=(pl.col("idx") // 48))
-        .group_by("day").agg(
-            pl.col("obs").mean(), pl.col("nra").mean(),
-            *[pl.col(f"{a}_q50").mean() for a in ARMS], *[pl.col(f"{a}_M").mean() for a in ARMS],
-            *[pl.col(f"{a}_q05").mean() for a in ARMS], *[pl.col(f"{a}_q95").mean() for a in ARMS],
-        ).sort("day")
+        .group_by("day")
+        .agg(
+            pl.col("obs").mean(),
+            pl.col("nra").mean(),
+            *[pl.col(f"{a}_q50").mean() for a in ARMS],
+            *[pl.col(f"{a}_M").mean() for a in ARMS],
+            *[pl.col(f"{a}_q05").mean() for a in ARMS],
+            *[pl.col(f"{a}_q95").mean() for a in ARMS],
+        )
+        .sort("day")
     )
     daily.write_csv(OUT / "d5_daily.csv")
     print("onset day", onset // 48, "end day", end // 48)
-    print(daily.filter(pl.col("day").is_between(onset // 48 - 30, end // 48 + 8)).with_columns((pl.col(c) * 100).round(1) for c in daily.columns if c != "day"))
+    print(
+        daily.filter(pl.col("day").is_between(onset // 48 - 30, end // 48 + 8)).with_columns(
+            (pl.col(c) * 100).round(1) for c in daily.columns if c != "day"
+        )
+    )
 
 
 if __name__ == "__main__":
