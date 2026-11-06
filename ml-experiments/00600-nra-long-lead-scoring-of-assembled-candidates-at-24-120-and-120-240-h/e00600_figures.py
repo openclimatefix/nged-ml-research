@@ -114,19 +114,14 @@ def coverage_chart(
         alt.Chart()  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color=theme.BLACK_1)
         .encode(y=alt.datum(target, scale=ys)),
-        alt.Chart()  # ty: ignore[unresolved-attribute]
-        .mark_text(align="left", baseline="bottom", dx=4, dy=-3, fontSize=10, color=theme.BLACK_1)  # ty: ignore[unresolved-attribute]
-        .encode(
-            x=alt.value(2),
-            y=alt.datum(target, scale=ys),
-            text=alt.value(f"dashed line: target {target:.2f}"),
-        ),
         base.mark_rule().encode(y=alt.Y("lo:Q", scale=ys, title=ytitle), y2="hi:Q"),  # ty: ignore[unresolved-attribute]
         base.mark_point(filled=True, size=45).encode(y=alt.Y("v:Q", scale=ys)),  # ty: ignore[unresolved-attribute]
         data=df,
     ).properties(width=W, height=290)
     chart = layer.facet(column=alt.Column("band:N", sort=BANDS, title="Hours ahead")).properties(
-        title=alt.TitleParams([caption], fontSize=11, anchor="start")
+        title=alt.TitleParams(
+            [caption, f"Dashed black line: the {target:.2f} target."], fontSize=11, anchor="start"
+        )
     )
     save(chart, name)
 
