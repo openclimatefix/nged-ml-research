@@ -1,5 +1,9 @@
 # ruff: noqa: E501, D103
-"""Experiment 586: the write-up's checks: error of the median forecast beside each CRPS contrast, and the median minus the mean-of-quantiles forecast per Primary group."""
+"""Experiment 586: the write-up's checks.
+
+Error of the median forecast beside each CRPS contrast, and the median minus the mean-of-quantiles
+forecast per Primary group.
+"""
 
 import e00454_score as score454  # ty: ignore[unresolved-import]
 import e00470_build as build470  # ty: ignore[unresolved-import]

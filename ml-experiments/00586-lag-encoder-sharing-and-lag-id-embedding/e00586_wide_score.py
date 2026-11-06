@@ -1,5 +1,7 @@
 # ruff: noqa: E501, D103
-"""Experiment 586, stage 2: CRPS scoring of the wide-layout arms with experiment 572's scorer (patched, not copied).
+"""Experiment 586, stage 2: CRPS scoring of the wide-layout arms.
+
+Uses experiment 572's scorer, patched and not copied.
 
 Arms: M0, E2 (experiment 565's stored C-M0 and D5), S0 (experiment 572's stored two-lag v3+D5, a
 report-only reference), and S0w, S1w, S3w with their lags-masked and lags-aged twins. Counted

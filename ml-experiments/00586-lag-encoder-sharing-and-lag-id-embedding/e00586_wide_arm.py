@@ -40,8 +40,8 @@ sys.argv = _argv
 
 import e00572_fit as e  # ty: ignore[unresolved-import]
 import e00581_bank as bank  # ty: ignore[unresolved-import]
-import e00585_lags as mylags
-import e00585_model as mymodel
+import e00585_lags as mylags  # ty: ignore[unresolved-import]
+import e00585_model as mymodel  # ty: ignore[unresolved-import]
 import e00586_wide_model as wide
 import numpy as np
 import polars as pl

@@ -71,7 +71,7 @@ def contrasts() -> None:
                 color=alt.Color("arm:N", scale=alt.Scale(domain=list(COLOURS), range=list(COLOURS.values())), legend=None),
             )  # fmt: skip
             last = g == list(GROUPS.values())[-1] and band == BANDS[-1]
-            rule = base.mark_rule(strokeWidth=2).encode(
+            rule = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "lo:Q",
                     title="CRPS minus S0's (points of capacity; negative is better)"
@@ -83,7 +83,7 @@ def contrasts() -> None:
             )  # ty: ignore[unresolved-attribute]
             dot = base.mark_point(filled=True, size=60).encode(x="diff:Q")  # ty: ignore[unresolved-attribute]
             zero = (
-                alt.Chart(pl.DataFrame({"z": [0.0]}))
+                alt.Chart(pl.DataFrame({"z": [0.0]}))  # ty: ignore[unresolved-attribute]
                 .mark_rule(color="#222222", strokeDash=[3, 3])
                 .encode(x="z:Q")
             )
@@ -112,7 +112,7 @@ def leak() -> None:
         y=alt.Y("arm:N", title=None, sort=list(NAMES.values())),
         color=alt.Color("arm:N", scale=alt.Scale(domain=list(COLOURS), range=list(COLOURS.values())), legend=None),
     )  # fmt: skip
-    rule = base.mark_rule(strokeWidth=2).encode(
+    rule = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lo:Q", title="Leak (points of capacity; smaller is better)"), x2="hi:Q"
     )  # ty: ignore[unresolved-attribute]
     dot = base.mark_point(filled=True, size=70).encode(x="leak:Q")  # ty: ignore[unresolved-attribute]
@@ -213,7 +213,7 @@ def examples() -> None:
                 color=col,
             )
             band = (
-                alt.Chart(fr.filter(pl.col("arm") == NAMES["S0"]))
+                alt.Chart(fr.filter(pl.col("arm") == NAMES["S0"]))  # ty: ignore[unresolved-attribute]
                 .mark_area(opacity=0.18, color=theme.DATA_BLUE)
                 .encode(
                     x="day:Q",
@@ -223,7 +223,7 @@ def examples() -> None:
             )  # ty: ignore[unresolved-attribute]
             med = base.mark_line(strokeWidth=1.2).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
             act = (
-                alt.Chart(fr.filter(pl.col("arm") == NAMES["S0"]))
+                alt.Chart(fr.filter(pl.col("arm") == NAMES["S0"]))  # ty: ignore[unresolved-attribute]
                 .mark_line(color="#222222", strokeWidth=1.0)
                 .encode(x="day:Q", y="y:Q")
             )  # ty: ignore[unresolved-attribute]
@@ -253,7 +253,7 @@ def tails() -> None:
         ("follow_q50", "Share of shift followed", None),
         ("nra_side95", "Safe-side share", [0, 1]),
     ):
-        ch = alt.Chart(t).mark_line(point=True).encode(
+        ch = alt.Chart(t).mark_line(point=True).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("phase:N", sort=order, title="Forecast origin relative to the injected event" if metric == "nra_side95" else None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y(f"{metric}:Q", title=title, scale=alt.Scale(domain=domain) if domain else alt.Scale(zero=True)),
             color=alt.Color("arm:N", scale=alt.Scale(domain=list(COLOURS), range=list(COLOURS.values())), legend=alt.Legend(orient="top", title=None)),
@@ -298,13 +298,13 @@ def wide() -> None:
                 color=alt.Color("arm:N", scale=alt.Scale(domain=list(WIDE_COLOURS), range=list(WIDE_COLOURS.values())), legend=None),
             )  # fmt: skip
             last = g == list(GROUPS.values())[-1] and sl == slices[-1]
-            rule = base.mark_rule(strokeWidth=2).encode(
+            rule = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("lo:Q", title="CRPS minus S0w's (points of capacity; negative is better)" if last else None, scale=alt.Scale(domain=[-1.5, 0.7]), axis=alt.Axis(values=[-1.5, -1.0, -0.5, 0.0, 0.5])),
                 x2="hi:Q",
             )  # ty: ignore[unresolved-attribute]  # fmt: skip
             dot = base.mark_point(filled=True, size=60).encode(x="diff:Q")  # ty: ignore[unresolved-attribute]
             zero = (
-                alt.Chart(pl.DataFrame({"z": [0.0]}))
+                alt.Chart(pl.DataFrame({"z": [0.0]}))  # ty: ignore[unresolved-attribute]
                 .mark_rule(color="#222222", strokeDash=[3, 3])
                 .encode(x="z:Q")
             )
@@ -342,7 +342,7 @@ def wide_tails() -> None:
         ("follow_q50", "Share of shift followed", None),
         ("nra_side95", "Safe-side share", [0, 1]),
     ):
-        ch = alt.Chart(t).mark_line(point=True).encode(
+        ch = alt.Chart(t).mark_line(point=True).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("phase:N", sort=order, title="Forecast origin relative to the injected event" if metric == "nra_side95" else None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y(f"{metric}:Q", title=title, scale=alt.Scale(domain=domain) if domain else alt.Scale(zero=True)),
             color=alt.Color("arm:N", scale=alt.Scale(domain=list(WIDE_COLOURS), range=list(WIDE_COLOURS.values())), legend=alt.Legend(orient="top", title=None)),
