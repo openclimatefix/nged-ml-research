@@ -51,7 +51,9 @@ COLOUR = {
     "P7-q-rs": f598.lighten(theme.DATA_MAGENTA, 0.4),
     "P5-p-rs": f598.lighten(theme.DATA_BLUE, 0.7), "P7-p-rs": f598.lighten(theme.DATA_GREEN, 0.7),
 }  # fmt: skip
-f598.GATE_STRIP = theme.DATA_PURPLE  # a hue, so the strip is not mistaken for the black observed line
+f598.GATE_STRIP = (
+    theme.DATA_PURPLE
+)  # a hue, so the strip is not mistaken for the black observed line
 f598.LABEL.update(LABEL)
 f598.COLOUR.update(COLOUR)
 
@@ -65,7 +67,6 @@ def follow_chart() -> None:
     order = ["A1", "P3", "P4", "P5", "P6", "P7b", "P7c", "P7", "P5-q", "P7-q", "P5-p", "P7-p"]
     a = a.filter(pl.col("system").is_in(order)).with_columns(name=pl.col("system").replace(LABEL))
     names = [LABEL[s] for s in order]
-    scale = alt.Scale(domain=names, range=[COLOUR[s] for s in order])
     base = alt.Chart(a).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("name:N", sort=names, title=None, axis=alt.Axis(labelLimit=260)),
     )
@@ -97,7 +98,6 @@ def cost_chart() -> None:
         lo=pl.col("cost") - pl.col("mde"), hi=pl.col("cost") + pl.col("mde")
     )
     names = [LABEL[s] for s in order]
-    scale = alt.Scale(domain=names, range=[COLOUR[s] for s in order])
     base = alt.Chart(d).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("name:N", sort=names, title=None, axis=alt.Axis(labelLimit=260)),
     )
