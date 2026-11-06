@@ -46,3 +46,16 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def noise_floor() -> pl.DataFrame:
+    """Return the q50 difference of the `E0chk` smoke refit on `obs` from 595's stored A1."""
+    rows = []
+    for f in sorted((common.OUT / "work/E0chk/obs/work/fits" / common.TAG).glob("*.parquet")):
+        theirs = common.world_dir(arm="E0", world="obs") / "work/fits" / common.TAG / f.name
+        j = pl.read_parquet(f).join(pl.read_parquet(theirs), on=s587.KEYS[3:], suffix="_s")
+        d = (j["q50"] - j["q50_s"]).abs()
+        rows.append(
+            {"file": f.name, "rows": j.height, "max": float(d.max()), "mean": float(d.mean())}
+        )  # ty: ignore[invalid-argument-type]
+    return pl.DataFrame(rows)
