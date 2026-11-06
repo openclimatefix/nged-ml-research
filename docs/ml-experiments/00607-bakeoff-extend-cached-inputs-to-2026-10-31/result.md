@@ -33,11 +33,10 @@ row_set_id: not_applicable_data_build
 verdict: partly supported
 best_arm: not applicable (data build, no arms)
 headline: >-
-  10 of the 11 cached inputs now reach 2026-10-31 or later and break no rule on any row; the ERA5
-  farm-cell wind table is still being fetched. The missing zero readings at the solar and wind farms
+  All 11 cached inputs now reach 2026-10-31 or later and break no rule on any row. The missing zero readings at the solar and wind farms
   are consistent with a change of file source on 2026-03-26, not with a change at the farms.
 lessons: >-
-  The final bake-off test can be scored once the farm-cell table arrives. A generator half-hour
+  The final bake-off test can now be scored. A generator half-hour
   that is absent after 2026-03-26 should be read as a zero-output half-hour, not as a fault.
 take_home_message: >-
   The weather and power inputs for the final test now run to the end of October 2026, and every row
@@ -60,24 +59,23 @@ metric: >-
   Newest timestamp of each input, rows breaking each assertion, and the largest difference between
   rebuilt and stored values on shared rows.
 ---
-**Ten of the 11 cached inputs that experiment 605 found stopping early now reach the end of the
-final test window, and the 11th is still being fetched.** A cached input is a file built from stored
-tables that a model trains and scores on. We rebuilt each one from the production power and ensemble
-tables, or fetched the missing months from the same free weather services. Then we checked every row
-of the rebuilt tables against the timing rules. We also asked why solar and wind farms stopped
-reporting zero readings in late March 2026. The final test is the held-out test, with forecast
-origins from 2026-07-01 to 2026-10-31, on which each release candidate (a model proposed for
-production) is scored once. No forecast and no forecast error was read. This page extends
-[experiment
+**All 11 cached inputs that experiment 605 found stopping early now reach the end of the final test
+window.** A cached input is a file built from stored tables that a model trains and scores on. We
+rebuilt each one from the production power and ensemble tables, or fetched the missing months from
+the same free weather services. Then we checked every row of the rebuilt tables against the timing
+rules. We also asked why solar and wind farms stopped reporting zero readings in late March 2026.
+The final test is the held-out test, with forecast origins from 2026-07-01 to 2026-10-31, on which
+each release candidate (a model proposed for production) is scored once. No forecast and no forecast
+error was read. This page extends [experiment
 605](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00605-bakeoff-final-test-data-check/result/).
 
-**Two of three predictions held, so the verdict is partly supported.** Prediction P1 held for every
-input except the farm-cell wind table, which is pending (see the last section). Prediction P2 held:
-no row breaks the origin or lag rules. Prediction P3 held in part: the site tables reach 2026-10-31
-with no duplicate keys, no null cells, and no gap at the join. The wind table is the only site table
-whose new request overlaps stored hours, and it agrees there exactly. The other site tables start
-after the stored table ends, so agreement was not tested for them. The extended copies sit beside
-the stored tables, and no stored table was edited. Nothing here is adopted for production.
+**Two of three predictions held in full and one in part, so the verdict is partly supported.**
+Prediction P1 held for every input. Prediction P2 held: no row breaks the origin or lag rules.
+Prediction P3 held in part: the site tables reach 2026-10-31 with no duplicate keys, no null cells,
+and no gap at the join. The wind table is the only site table whose new request overlaps stored
+hours, and it agrees there exactly. The other site tables start after the stored table ends, so
+agreement was not tested for them. The extended copies sit beside the stored tables, and no stored
+table was edited. Nothing here is adopted for production.
 
 ![Share of readings that are exactly zero, and readings per series per day, by week](zero_readings_vanish.svg)
 
@@ -155,14 +153,16 @@ solar farms have 98% to 100% of their midday readings on the 31 days when Solar 
 rules out a data feed failure shared by all farms. The cause of Solar E's near-zero output, such as
 an outage or an export limit, is not in the data. We did not change the series.
 
-## Still pending
+## ERA5 farm-cell wind table
 
-- **ERA5 farm-cell wind table (experiment 288's cells).** It stops on 2024-03-31. The request is the
-  four wind variables for the bounding box of the 43 cells, hourly, 2024-03-29 to 2026-10-31, from
-  the Climate Data Store, in 12 three-month requests (the service refused a six-month request as too
-  large). The size is about 150 MB, the data are free, and the licence is the same ERA5 licence. The
-  queue serves one request at a time and had finished 2 of 12 at the time of writing. The PR will be
-  updated when it arrives.
+- **The table now reaches 2026-10-31 23:00.** It is experiment 288's farm-cell table, which stopped
+  on 2024-03-31, for the four wind variables at the same 43 cells. We added 974,208 rows (43 cells
+  and 22,656 hours, 2024-04-01 to 2026-10-31) from the Climate Data Store, in 12 three-month
+  requests (the service refused a six-month request as too large), in the new file
+  `era5_farm_cells_2024-04_2026-10.parquet` in this experiment's data folder.
+- **The overlap agrees.** On the three days before the join (3,096 rows), the largest difference
+  from the stored values is 0.0005 m/s for every variable. The size was about 150 MB, the data are
+  free, and the licence is the ERA5 licence.
 
 ## Checks
 
