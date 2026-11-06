@@ -121,8 +121,9 @@ def score_case(*, arm: str, case: str) -> tuple[pl.DataFrame, int]:
 
 
 def noise_floor(*, arm: str) -> pl.DataFrame:
-    """Return the largest and mean absolute difference of the q50 forecast between this experiment's
-    `obs` refit and the stored fit of the harness' own experiment.
+    """Return the q50 forecast difference between the `obs` refit and the stored fit.
+
+    The difference is the largest and mean absolute value, against the harness' own experiment.
 
     A refit on the same power with the same seeds should reproduce the stored forecast; the
     difference (as a share of capacity) is the GPU non-determinism floor that a share is read

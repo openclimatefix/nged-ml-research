@@ -1,6 +1,5 @@
 # ruff: noqa: E501, E402, D103, ANN202
-"""Experiment 587: fit the arms on event-carrying power and forecast, in one GPU process per
-harness.
+"""Experiment 587: fit the arms on event-carrying power and forecast, one process per harness.
 
 Usage: python e00587_run.py HARNESS --arm ARM [--cases ...] [--seeds ...]
 

@@ -1,6 +1,7 @@
-# ruff: noqa: E402, E501
-"""Experiment 587: how far the newest offset knot of the D5 and P5 networks moves toward an injected
-or verified event.
+# ruff: noqa: E402
+"""Experiment 587: how far the newest offset knot moves toward an event.
+
+This covers the D5 and P5 neural networks, for an injected or verified event.
 
 For each case, event Primary, fold month, refit day, and seed, the knot (`knot_new` for D5,
 `off_new` for P5; a per-Primary output offset in standardised units) of the fit in the event

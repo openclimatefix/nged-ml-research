@@ -1,6 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 587: summary tables of the shares, with block-bootstrap intervals and the Bonferroni
-contrasts.
+"""Experiment 587: summary tables of the shares, with bootstrap intervals and contrasts.
 
 Reads `scores/event_shares.parquet` (written by `e00587_score.py`) and prints every table the
 result page quotes; the same text is saved as `scores/report.txt`. Blocks for the bootstrap are
