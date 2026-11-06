@@ -255,8 +255,8 @@ they stay under `data/` and are not published.
 
 **Dependencies.**
 
-- **Experiment 607 (extend the cached inputs to 2026-10-31) must finish first.** Experiment 605 found the ensemble
-  summary, wind-component, and cloud-cover tables ending with the run of 2026-06-30.
+- **Experiment 607 (extend the cached inputs to 2026-10-31) must finish first.** Experiment 605
+  found the ensemble summary, wind-component, and cloud-cover tables ending with the run of 2026-06-30.
 - **The inputs of the two networks are not on experiment 605's list of 11 cached inputs.** Wind
   default 2 reads the 51-member farm-point tables that experiment 303's builders write, and
   `a2_member` reads the member arrays of experiment 430 (`member_arrays`, 402 MB). The first
