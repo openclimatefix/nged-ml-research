@@ -55,7 +55,7 @@ class Inputs(k600.Inputs):
         self.e2 = k600.lag_free_quantiles(t=self.t) if arm == "c1" else None
         self.has_e2 = None if self.e2 is None else np.isfinite(self.e2).all(axis=1)
         if self.e2 is not None:
-            print("E2 rows present:", float(self.has_e2.mean()), flush=True)
+            print("E2 rows present:", float(self.has_e2.mean()), flush=True)  # ty: ignore[unresolved-attribute]
 
     def usable(self, *, name: str) -> np.ndarray | bool:
         """Return the mask of table rows on which system `name` exists."""

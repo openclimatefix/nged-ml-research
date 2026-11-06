@@ -38,6 +38,7 @@ class Inputs(k597.Inputs):
 
     def __init__(self, *, arm: str) -> None:
         super().__init__(arm=arm)
+        assert self.t.lead.max() >= 239, "a stored forecast stops short of 240 h"
         self.t.band = band_of(lead=self.t.lead)
 
 
