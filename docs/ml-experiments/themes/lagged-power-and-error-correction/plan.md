@@ -21,7 +21,6 @@
 | 550 | Do trailing temperature windows still help the lag-light demand network once the day-ago and week-ago power lags are in? | High (manager, 2026-11-04) | Nothing | Planned |
 | 567 | Do the neighbouring Primaries' lags let the modular lag-encoder demand network tell a load transfer from a genuine level change, when it trains on synthetic load shifts? | High (manager, 2026-11-05) | Experiments 559, 560, and 566 merged | Planned |
 | 589 | Why does the P5 forecast cover Primary D5 poorly before the December 2025 load-shift, and is that one Primary or a property of the P5 recipe? | High (manager, 2026-11-06) | Nothing | Planned |
-| 596 | Do the May 2026 load-shift transfers show up in the readings of the lag-free forecast and the neighbouring Primaries, and if one does, how does the C1 plus G4 candidate cover it? | High (manager, 2026-11-06) | Nothing | Planned |
 
 ## Planned experiments
 
