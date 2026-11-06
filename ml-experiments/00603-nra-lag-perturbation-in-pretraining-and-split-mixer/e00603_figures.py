@@ -50,7 +50,7 @@ chart = (
     alt.Chart(alt.Data(values=data))
     .mark_point(filled=True, size=90, clip=True)
     .encode(
-        x=alt.X("arm:N", sort=list(ARMS.values()), title=None, axis=alt.Axis(labelAngle=0)),
+        x=alt.X("arm:N", sort=list(ARMS.values()), title="Arm", axis=alt.Axis(labelAngle=0)),
         xOffset=alt.XOffset("phase:N", sort=list(PHASES.values())),
         y=alt.Y(
             "coverage:Q",
