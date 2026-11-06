@@ -2,7 +2,7 @@
 """Experiment 598 figures. Run `e00598_score.py` first.
 
 `python e00598_figures.py summary [--suffix S]` draws the figures read from the score tables:
-coverage by phase, band width by arm, the follow-ratio histogram, and S against S-p.
+coverage by phase, band width by arm, the follow-ratio histogram, and S against S-p when that arm exists.
 `python e00598_figures.py example [--suffix S]` draws the December 2025 example event (Primaries D5
 and D16, 14 days before the maintainer's onset to 14 days after the end), one figure per arm, and
 prints which of the two candidate windows matches the observed readings. It rebuilds the systems'
@@ -46,10 +46,22 @@ LABEL = {
     "S-g": "S-g: S + G4 bit", "S-p": "S-p: noise for signals", "S-rs": "S, band width-matched",
     "S-g-rs": "S-g, width-matched", "S-p-rs": "S-p, width-matched", "G4T": "G4 on T",
 }  # fmt: skip
+GATE_NOTE = [
+    "The gate strip is plotted at valid time (origin day plus one) and stays on for about a week after the gate releases (held).",
+    "Compare the band width inside the shaded span with the same arm's width outside it.",
+]
+
+
+def lighten(colour: str, share: float = 0.5) -> str:
+    """Return `colour` (hex) mixed with white by `share`, for a width-matched control."""
+    rgb = [int(colour.lstrip("#")[i : i + 2], 16) for i in (0, 2, 4)]
+    return "#" + "".join(f"{round(v + (255 - v) * share):02x}" for v in rgb)
+
+
 COLOUR = {
     "A1": theme.DATA_SKY, "R": theme.BRAND_ORANGE, "W": theme.DATA_PURPLE, "S": theme.DATA_BLUE,
     "S-g": theme.DATA_MAGENTA, "S-p": theme.DATA_GREEN, "S-rs": theme.DATA_BLUE_LIGHT,
-    "S-g-rs": theme.DATA_MAGENTA, "S-p-rs": theme.DATA_GREEN_LIGHT, "G4T": theme.DATA_BURNT_ORANGE,
+    "S-g-rs": lighten(theme.DATA_MAGENTA), "S-p-rs": theme.DATA_GREEN_LIGHT, "G4T": theme.DATA_BURNT_ORANGE,
 }  # fmt: skip
 SHADE, SHADE_LINE = "#FFF1A8", "#B8860B"
 """The pale load-shift shade and its dashed boundary lines; no arm uses either."""
@@ -108,7 +120,11 @@ def phase_chart(
         & (pl.col("band") == BAND) & (pl.col("subset") == "all months") & pl.col("system").is_in(systems)
     ).with_columns(phase_label=pl.col("phase").replace(PHASE_LABEL), name=pl.col("system").replace(LABEL))  # fmt: skip
     order = [LABEL[s] for s in systems]
-    scale = alt.Scale(domain=order, range=[COLOUR[s] for s in systems])
+    target_label = f"Target {target:.2f} (dashed)" if target is not None else None
+    scale = alt.Scale(
+        domain=[*order, *([target_label] if target_label else [])],
+        range=[*(COLOUR[s] for s in systems), *([SHADE_LINE] if target_label else [])],
+    )
     ys = alt.Scale(domain=domain)
     base = alt.Chart(b).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("phase_label:N", sort=PHASE_ORDER, title=None, axis=alt.Axis(labelAngle=0, labelLimit=140)),
@@ -124,9 +140,17 @@ def phase_chart(
     if target is not None:
         layers.insert(
             0,
-            alt.Chart(pl.DataFrame({"y": [target]}))  # ty: ignore[unresolved-attribute]
-            .mark_rule(strokeDash=[4, 3], color=SHADE_LINE)
-            .encode(y=alt.Y("y:Q", scale=ys)),
+            alt.Chart(pl.DataFrame({"y": [target], "name": [target_label]}))  # ty: ignore[unresolved-attribute]
+            .mark_rule(strokeDash=[4, 3])
+            .encode(
+                y=alt.Y("y:Q", scale=ys),
+                color=alt.Color(
+                    "name:N",
+                    scale=scale,
+                    sort=scale.domain,  # ty: ignore[invalid-argument-type]
+                    legend=alt.Legend(title=None, orient="top", columns=3),
+                ),
+            ),
         )  # ty: ignore[unresolved-attribute]
     save(
         alt.layer(*layers).properties(
@@ -166,20 +190,38 @@ def follow_hist(*, suffix: str) -> None:
     t = pl.read_csv(
         score.ROOT / f"score{suffix}" / "bank_event_phase.csv", infer_schema_length=None
     )
-    systems = [s for s in ("A1", "R", "S", "S-p") if s in t["system"].unique().to_list()]
+    present = t["system"].unique().to_list()
     t = t.filter(
         (pl.col("phase") == "days4-end") & (pl.col("band") == BAND) & (pl.col("length_days") >= 15)
-        & pl.col("system").is_in(systems)
-    ).with_columns(name=pl.col("system").replace(LABEL))  # fmt: skip
-    order = [LABEL[s] for s in systems]
+    )
+    a1 = t.filter(pl.col("system") == "A1")["follow_q50"].to_numpy()
+    r = t.filter(pl.col("system") == "R")["follow_q50"].to_numpy()
+    merged = np.allclose(np.sort(a1), np.sort(r)) if len(a1) == len(r) else False
+    series = {"A1 and R: same median" if merged else LABEL["A1"]: ("A1", a1)}
+    if not merged:
+        series[LABEL["R"]] = ("R", r)
+    for n in ("S", "S-g", "S-p"):
+        if n in present:
+            series[LABEL[n]] = (n, t.filter(pl.col("system") == n)["follow_q50"].to_numpy())
+    lo = float(np.floor(min(v.min() for _, v in series.values()) * 10) / 10)
+    hi = float(np.ceil(max(v.max() for _, v in series.values()) * 10) / 10) + 0.1
+    edges = np.round(np.arange(lo, hi + 1e-9, 0.1), 6)
+    rows = []
+    for name, (key, v) in series.items():
+        counts, _ = np.histogram(v, bins=edges)
+        for x0, x1, cnt in zip(edges[:-1], edges[1:], counts, strict=True):
+            rows.append({"name": name, "x0": float(x0), "x1": float(x1), "count": int(cnt), "key": key})  # fmt: skip
+    d = pl.DataFrame(rows)
+    order = list(series)
+    colours = [COLOUR[k] for k, _ in series.values()]
     ch = (
-        alt.Chart(t).mark_bar(opacity=0.55, binSpacing=0)  # ty: ignore[unresolved-attribute]
+        alt.Chart(d).mark_line(interpolate="step-after", strokeWidth=2)  # ty: ignore[unresolved-attribute]
         .encode(
-            x=alt.X("follow_q50:Q", bin=alt.Bin(step=0.1), title="Median forecast moved towards the shift (share of the shift depth; 0 is no following)"),
-            y=alt.Y("count():Q", stack=None, title="Primary-events"),
-            color=alt.Color("name:N", scale=alt.Scale(domain=order, range=[COLOUR[s] for s in systems]), sort=order, legend=alt.Legend(title=None, orient="top", columns=2)),
+            x=alt.X("x0:Q", title="Median forecast moved towards the shift (share of the shift depth; 0 is no following)"),
+            y=alt.Y("count:Q", title="Primary-events in the 0.1-wide bin"),
+            color=alt.Color("name:N", scale=alt.Scale(domain=order, range=colours), sort=order, legend=alt.Legend(title=None, orient="top", columns=2)),
         )
-        .properties(width=W, height=PANEL_H, title=alt.TitleParams(["Follow ratio on injected 15 and 30 day load-shifts, day 4 to the end, 24-120 h ahead", "Bars: Primary-events, overlaid. Lower is better: the median ignores the lagged shift."], fontSize=11, anchor="start"))
+        .properties(width=W, height=PANEL_H, title=alt.TitleParams(["Follow ratio on injected 15 and 30 day load-shifts, day 4 to the end, 24-120 h ahead", "Step outline: Primary-events per 0.1-wide bin of the follow ratio. Lower is better: the median ignores the lagged shift.", "A1 and R have identical follow ratios, because the gate widens the band and leaves the median alone."], fontSize=11, anchor="start"))
     )  # fmt: skip
     save(ch, "follow_histogram.svg")
 
@@ -222,7 +264,7 @@ def summary(*, suffix: str) -> None:
     systems = [s for s in ("A1", "R", "W", "S", "S-g", "S-p", "S-rs") if s in present]
     phase_chart(
         suffix=suffix, metric="cover90", systems=systems, name="coverage_by_phase.svg", domain=[0.7, 1.0], target=0.9,
-        title=["Share of rows with the NRA inside q05-q95", "Coverage by phase of an injected load-shift: 15 and 30 day events, both metering groups, 24-120 h ahead", "Dot: mean over Primary-events. Line: 95% interval from resampling events. Dashed: the 0.90 target. Higher is better. Scored against the NRA, an estimate."],
+        title=["Share of rows with the NRA inside q05-q95", "Coverage by phase of an injected load-shift: 15 and 30 day events, both metering groups, 24-120 h ahead", "Dot: mean over Primary-events. Line: 95% interval from resampling events. Dashed: the 0.90 target; closer to or above 0.90 is better. Scored against the NRA, an estimate."],
     )  # fmt: skip
     phase_chart(
         suffix=suffix, metric="nra_side95", systems=systems, name="safe_side_by_phase.svg", domain=[0.7, 1.0], target=0.95,
@@ -306,6 +348,7 @@ def arm_figure(
         "median": f"{LABEL[name]}: median",
         "band": f"{LABEL[name]}: q05-q95",
         "shade": "Load-shift (maintainer's dates)",
+        "dash": "Maintainer's onset and end (dashed)",
         "gate": gate_label,
     }
     domain = [
@@ -313,9 +356,12 @@ def arm_figure(
         cols["median"],
         cols["band"],
         cols["shade"],
+        cols["dash"],
         *([cols["gate"]] if gate is not None else []),
     ]
-    rng = [OBSERVED, COLOUR[name], COLOUR[name], SHADE, theme.DATA_DEEP_TEAL][: len(domain)]
+    rng = [OBSERVED, COLOUR[name], COLOUR[name], SHADE, SHADE_LINE, theme.DATA_DEEP_TEAL][
+        : len(domain)
+    ]
     colour = alt.Color(
         "what:N",
         scale=alt.Scale(domain=domain, range=rng),
@@ -353,9 +399,9 @@ def arm_figure(
             .encode(x=alt.X("a:T", scale=xs), x2="b:T", color=colour)
         )  # ty: ignore[unresolved-attribute]
         lines = (
-            alt.Chart(pl.DataFrame({"x": on_x}))  # ty: ignore[unresolved-attribute]
-            .mark_rule(strokeDash=[5, 4], color=SHADE_LINE, strokeWidth=1.2)
-            .encode(x=alt.X("x:T", scale=xs))
+            alt.Chart(pl.DataFrame({"x": on_x, "what": [cols["dash"]] * 2}))  # ty: ignore[unresolved-attribute]
+            .mark_rule(strokeDash=[5, 4], strokeWidth=1.2)
+            .encode(x=alt.X("x:T", scale=xs), color=colour)
         )  # ty: ignore[unresolved-attribute]
         band = (
             alt.Chart(d.with_columns(what=pl.lit(cols["band"])))  # ty: ignore[unresolved-attribute]
@@ -488,7 +534,24 @@ def example(*, suffix: str) -> None:
         if arm.available():
             arm.load(t=t, order=order, sorted_keys=keys[order])
             arms[n] = arm
-    sy = score.Systems(inp=inp, arms=arms, months=["2025-12", "2026-01"], seeds=[0, 1])
+    factors = pl.read_csv(score.ROOT / f"score{suffix}" / "factors.csv", infer_schema_length=None)
+    # a fold month the scorer did not fit takes the mean of the fitted months' factors, per system and seed
+    months_ex = ["2025-12", "2026-01"]
+    miss = [m for m in months_ex if m not in factors["month"].unique().to_list()]
+    if miss:
+        mean = factors.group_by("system", "seed").agg(pl.col("factor").mean())
+        factors = pl.concat(
+            [
+                factors.select("system", "month", "seed", "factor"),
+                *(
+                    mean.with_columns(month=pl.lit(m)).select("system", "month", "seed", "factor")
+                    for m in miss
+                ),
+            ]
+        )
+    sy = score.Systems(
+        inp=inp, arms=arms, months=["2025-12", "2026-01"], seeds=[0, 1], factors=factors
+    )
     sites = c.k578.sites()["label"].to_list()
     prims = {lab: sites.index(lab) for lab in EVENT_PRIMARIES}
     lo = grid_idx(when=MAINTAINER_ONSET) - CONTEXT_DAYS * 48
@@ -502,6 +565,7 @@ def example(*, suffix: str) -> None:
     )
     for row in wm["detail"]:
         print("  ", row)
+    extra = ["S-p, the placebo arm, was not run (the stop rule did not call for it), so no S-p panel is drawn."]  # fmt: skip
     cap = [
         "December 2025 pair, day-ahead forecasts. Coverage is scored against the NRA, an estimate that is not drawn.",
         f"Dashed lines: the maintainer's dates ({MAINTAINER_ONSET:%Y-%m-%d %H:%M} and {MAINTAINER_END:%Y-%m-%d %H:%M}).",
@@ -511,6 +575,8 @@ def example(*, suffix: str) -> None:
     assert np.array_equal(stored, inp.mode), (
         "the rebuilt G4 state differs from experiment 597's stored state"
     )
+    fac = factors.filter(pl.col("system") == "W")
+    w_note = "W is A1 with its band widened about its median by a constant factor per fold month (a month without a fitted factor takes the mean of the fitted months): " + ", ".join(f"{r['month']} x{r['factor']:.3f}" for r in fac.iter_rows(named=True) if r["month"] in ("2025-12", "2026-01")) + "."  # fmt: skip
     wide_t = np.load(score.ROOT / f"score{suffix}" / "wide_t.npy")
     for n in sy.names:
         if n.endswith("-rs") or n == "G4T":
@@ -525,7 +591,8 @@ def example(*, suffix: str) -> None:
             check = bits_check(bits=bits)
         glabel = "G4 on or held (stored state)" if n == "R" else "G4 bit S-g used (on or held)"
         arm_figure(
-            name=n, sy=sy, prims=prims, lo=lo, hi=hi, gate=gate, gate_label=glabel, caption=cap,
+            name=n, sy=sy, prims=prims, lo=lo, hi=hi, gate=gate, gate_label=glabel,
+            caption=[*cap, *extra, *([w_note] if n == "W" else []), *(GATE_NOTE if gate is not None else [])],
             check=check,
         )  # fmt: skip
 

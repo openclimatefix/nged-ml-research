@@ -201,11 +201,12 @@ class Systems:
     The width factors are fitted on the injected bank's rows (`factor_source="bank"`), the rows that
     P1 and P2 read: the 24-120 h rows of the origin days where R's band is wide under the injection.
     `factor_source="real"` fits them on the real rows R widens instead (used only with `--no-bank`).
+    `factors`, if given, are the stored factors of an earlier scoring run, used as they are.
     """
 
     def __init__(
         self, *, inp: k597.Inputs, arms: dict[str, Arm], months: list[str], seeds: list[int],
-        factor_source: str = "bank",
+        factor_source: str = "bank", factors: pl.DataFrame | None = None,
     ) -> None:  # fmt: skip
         t = inp.t
         self.inp, self.t, self.arms, self.months, self.seeds = inp, t, arms, months, seeds
@@ -222,9 +223,12 @@ class Systems:
         self.common = self.use & np.all(
             [np.isfinite(q).all(axis=1) for q in self.q.values()], axis=0
         )
-        self.factors = (
-            fit_factors_bank(sy=self) if factor_source == "bank" else fit_factors_real(sy=self)
-        )
+        if factors is not None:
+            self.factors = factors
+        elif factor_source == "bank":
+            self.factors = fit_factors_bank(sy=self)
+        else:
+            self.factors = fit_factors_real(sy=self)
         print(self.factors, flush=True)
         w = np.full_like(v, np.nan)
         for mo in months:
