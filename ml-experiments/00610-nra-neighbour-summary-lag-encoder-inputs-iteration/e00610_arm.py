@@ -1,29 +1,26 @@
 # ruff: noqa: D107, ANN001, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205, E501, PLR0915
-"""Experiment 606: fit and inject the permutation arms P0 to P7c (GPU).
+"""Experiment 610: fit and inject the neighbour-summary arms (GPU).
 
-A wrapper around experiment 574's `e00574_fit.py`, as experiment 598's `e00598_arm.py` is, which this
-file copies and changes. The rows, recency weights, early stopping, seeds, scoring windows, origin-time
-weather assertions, refit days 0 and 14, the embargoed daily fine-tune with synthetic lag-only
-load-shifts, and the A1 chain's step-2 weights are experiment 591's A1. What is new is the network
-(`e00610_model.PermLagMdn`), whose lag encoder drops some of A1's inputs and reads extra columns of
-`e00610_signals`, chosen per arm (see `ARMS`).
+A wrapper around experiment 574's `e00574_fit.py`, as experiment 598's `e00598_arm.py` and experiment
+606's `e00606_arm.py` are, which this file copies and changes. The rows, recency weights, early
+stopping, seeds, scoring windows, origin-time weather assertions, refit days 0 and 14, the embargoed
+daily fine-tune with synthetic lag-only load-shifts, and the A1 chain's step-2 weights are experiment
+591's A1. What is new is the choice of signal columns (`e00610_signals`) and the changes to the
+training of the lag encoder (`MODIFIERS`).
 
-The table `T` is experiment 598's (read from its folder when built there, else built here). The extra
-columns of the training rows read the synthetic shift in the Primary's own lags and, for the neighbour
-columns, the same shift mirrored onto one neighbour. At test time they read observed power (or the
-injected bank's contaminated power), by the same code path.
+An arm name is a stage 1 base followed by modifiers joined with `+`, for example `B7+CF+D30`, and may
+end in `-p` (the placebo: each Primary reads another Primary's neighbours, a fixed derangement).
 
 Usage: python e00610_arm.py ARM COMMAND [--months ...] [--seeds ...] [--passes ...] [--work-suffix X]
 
-- ARM: a key of `ARMS`, optionally followed by `-p` (the same arm with its extra columns replaced by a
-  column-wise resample of the training block, the placebo).
-- COMMAND: `table`, `check`, `fit`, `inject`, `assemble`, as in experiment 598.
+- COMMAND: `table`, `check`, `fit`, `inject`, `assemble`.
 """
 
 import argparse
 import dataclasses
 import json
 import sys
+from typing import Final
 
 _p = argparse.ArgumentParser()
 _p.add_argument("arm")
@@ -34,7 +31,6 @@ _p.add_argument(
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 _p.add_argument("--passes", nargs="+", type=int, default=None)
 _p.add_argument("--work-suffix", default="")
-_p.add_argument("--groups", default=None, help="comma-separated column groups for an ad hoc arm")
 MINE = _p.parse_args()
 ARM, CMD = MINE.arm, MINE.command
 _argv = ["e00574_fit.py", "fit", "--arm", "P5"]
@@ -56,35 +52,58 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME = "00610-nra-neighbour-summary-lag-encoder-inputs-iteration"
 ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
-BASE_ARM, PLACEBO = (ARM[:-2], True) if ARM.endswith("-p") else (ARM, False)
-DIR = ARM.replace("-", "")
+SHUFFLED = ARM.endswith("-p")
+SPEC_NAME = ARM[:-2] if SHUFFLED else ARM
+BASE_ARM, *MODS = SPEC_NAME.split("+")
+DIR = ARM.replace("-", "").replace("+", "_")
 TABLES = ROOT / "tables"
 TABLES_598 = (
     ML_EXPERIMENTS_DATA_DIR / "00598-nra-gate-against-signals-as-inputs-at-equal-band-width/tables"
 )
 """One `T_<month>_s<seed>.npz` per fold month and seed, shared by the arms; experiment 598's is read first."""
 
-ARMS: dict[str, tuple[mymodel.InputSet, tuple[str, ...]]] = {
-    "P0": (mymodel.InputSet(use_expected=False), ()),
-    "P1": (mymodel.InputSet(use_age=False), ()),
-    "P2": (mymodel.InputSet(use_id=False), ()),
-    "P3": (mymodel.InputSet(), ("gap", "exp")),
-    "P4": (mymodel.InputSet(), ("gap", "sustain", "exp")),
-    "P5": (mymodel.InputSet(), ("gap", "ew", "exp")),
-    "P6": (mymodel.InputSet(), ("gap", "ew", "sustain", "exp")),
-    "P7": (mymodel.InputSet(), ("gap", "ew", "exp", "nb")),
-    "P7b": (mymodel.InputSet(), ("gap", "ew", "exp", "nb_nosum")),
-    "P7c": (mymodel.InputSet(), ("gap", "ew", "exp", "bn")),
+P7_SPANS: Final = "gap,ew1,ew3,ew7"
+
+
+def _stage1(*, spans: str, qs: str | None = None) -> tuple[str, ...]:
+    """Return the group tokens of a stage 1 arm: P7's inputs with the weighted averages `spans`."""
+    qs = qs if qs is not None else f"gap,{spans}"
+    return ("gap", f"own:{spans}", "exp", f"nb:{qs}")
+
+
+BASES: dict[str, tuple[str, ...]] = {
+    "P7": _stage1(spans="ew1,ew3,ew7"),
+    "B1": _stage1(spans="bx1"),
+    "B3": _stage1(spans="bx3"),
+    "B7": _stage1(spans="bx7"),
+    "B14": _stage1(spans="bx14"),
+    "B1-14": _stage1(spans="bx1,bx3,bx7,bx14"),
+    "B1-28": _stage1(spans="bx1,bx3,bx7,bx14,bx28"),
+    "E1": _stage1(spans="ew1"),
+    "E7": _stage1(spans="ew7"),
 }
-"""Per arm: the lag encoder's kept inputs and the column groups appended. P1 and P2 drop an input and add none."""
-if MINE.groups is not None:  # an ad hoc arm, e.g. P8
-    ARMS[BASE_ARM] = (mymodel.InputSet(), tuple(MINE.groups.split(",")))
-INPUTS, GROUPS = ARMS[BASE_ARM]
-COLUMNS = sig.columns_of(groups=GROUPS) if GROUPS else []
+"""Per stage 1 arm: the group tokens of its extra columns (see `e00610_signals`)."""
+MODIFIERS: Final = ("CF", "D30", "D50", "BN", "X1", "X3", "O1", "O2", "O3", "O4")
+assert BASE_ARM in BASES and all(m in MODIFIERS for m in MODS), SPEC_NAME
+GROUPS = list(BASES[BASE_ARM])
+if "O1" in MODS:  # compact neighbour summaries
+    GROUPS = [g.replace("nb:", "nbc:") if g.startswith("nb:") else g for g in GROUPS]
+if "O2" in MODS:  # the share of opposite-sign neighbours
+    GROUPS += [
+        g.replace("nbc:", "nbopp:").replace("nb:", "nbopp:")
+        for g in GROUPS
+        if g.startswith(("nb:", "nbc:"))
+    ]
+if "O3" in MODS:  # signals for the week lag only
+    GROUPS = [g if g == "exp" else f"{g}@week" for g in GROUPS]
+GROUPS = list(dict.fromkeys(GROUPS))
+COLUMNS = sig.columns_of(groups=tuple(GROUPS))
 N_EXTRA = len(COLUMNS)
-INPUTS = mymodel.InputSet(
-    use_id=INPUTS.use_id, use_age=INPUTS.use_age, use_expected=INPUTS.use_expected, n_extra=N_EXTRA
-)
+CROSSFIT = "CF" in MODS
+DROP_P = 0.3 if "D30" in MODS else 0.5 if "D50" in MODS else 0.0
+DROP_NB_ONLY = "O4" in MODS
+AUX_W = 0.1 if "X1" in MODS else 0.3 if "X3" in MODS else 0.0
+INPUTS = mymodel.InputSet(n_extra=N_EXTRA, bottleneck="BN" in MODS, label_head=AUX_W > 0)
 CHAIN = (
     ML_EXPERIMENTS_DATA_DIR
     / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
@@ -142,7 +161,24 @@ def world() -> s598.Neighbours:
 
 
 NB = world()
+SHIFT_PRIMARIES: Final = 5
+
+
+def shuffled_neighbours(*, nb: s598.Neighbours) -> s598.Neighbours:
+    """Return `nb` with each Primary reading the neighbours of the Primary `SHIFT_PRIMARIES` on.
+
+    A Primary never reads itself as a neighbour. The training shifts stay mirrored onto the true
+    neighbours (`NB`), so the shuffled summaries carry no information about them.
+    """
+    n = len(nb.of)
+    of = {p: [q for q in nb.of[(p + SHIFT_PRIMARIES) % n] if q != p] for p in range(n)}
+    return s598.Neighbours(of=of, capacity=nb.capacity)
+
+
+NB_READ = shuffled_neighbours(nb=NB) if SHUFFLED else NB
 GRID, STEP = e.c.prep422.GRID_START_US, e.c.prep422.STEP_US
+LABELS: dict[int, np.ndarray] = {}
+"""Per month-rows object: (rows, 4) load-shift labels (day active, day depth, week active, week depth; NaN where the lag has none)."""
 SYN: dict[int, tuple[np.ndarray, np.ndarray]] = {}
 """Per month-rows object: the synthetic power (16, grid) and the shift added to it (0 where none)."""
 _build_month_p5 = e.k.build_month
@@ -172,6 +208,14 @@ def build_month_syn(*, month, clean):
     mr.x[:, LAG_FIRST : LAG_FIRST + LAG_WIDTH] = blk
     shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0).astype(np.float32)
     SYN[id(mr)] = (fixed, shift)
+    lab = np.full((len(mr.primary), mymodel.LABEL_COLUMNS), np.nan, np.float32)
+    for j, (miss_col, lead_col) in enumerate(((38, 43), (41, 44))):
+        idx = mr.x[:, lead_col].astype(np.int64)
+        ok = (idx >= 0) & (mr.x[:, miss_col] < 0.5)
+        sh = shift[mr.primary[ok], idx[ok]]
+        lab[ok, 2 * j] = (np.abs(sh) > 1e-6).astype(np.float32)
+        lab[ok, 2 * j + 1] = sh
+    LABELS[id(mr)] = lab
     print(f"{month}: {n_events} synthetic events", flush=True)
     return mr
 
@@ -179,9 +223,75 @@ def build_month_syn(*, month, clean):
 # ---------------------------------------------------------------- the table T and the row blocks
 
 
+TABLES_606 = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/tables"
+)
+CF_BLOCKS: Final = 3
+"""The number of contiguous blocks (by valid time) of the cross-fit."""
+
+
 def table_file(*, month: str, seed: int):
-    theirs = TABLES_598 / f"T_{month}_s{seed}.npz"
-    return theirs if theirs.exists() else TABLES / f"T_{month}_s{seed}.npz"
+    if CROSSFIT:
+        return TABLES / f"T_cf_{month}_s{seed}.npz"
+    for root in (TABLES_598, TABLES_606):
+        if (root / f"T_{month}_s{seed}.npz").exists():
+            return root / f"T_{month}_s{seed}.npz"
+    return TABLES / f"T_{month}_s{seed}.npz"
+
+
+def cross_fit_quantiles(
+    *, mr, month: str, seed: int, q_full: np.ndarray, device: str
+) -> np.ndarray:
+    """Return `q_full`, with cross-fitted lags-masked quantiles on step 2's training rows.
+
+    Step 2's recipe is experiment 574's `step2` (the pre-trained weights, a fresh mixer, no recency
+    weighting, the embargoed rows up to the fold's cutoff). The rows are split into `CF_BLOCKS`
+    contiguous blocks by valid time; the network of block `b` is trained on the rows outside the block.
+    """
+    cut = e.c.month_start(month=month)
+    refit = e.c.select_rows(rows=mr, cutoff=cut, half_life_days=e.UNIFORM_HALF_LIFE)
+    refit = e.embargoed(mr=mr, refit=refit, cut=cut)
+    valid = mr.valid_us[refit.index]
+    edges = np.quantile(valid, np.linspace(0, 1, CF_BLOCKS + 1))
+    block_of_row = np.clip(np.searchsorted(edges, valid, side="right") - 1, 0, CF_BLOCKS - 1)
+    out = q_full.copy()
+    g = e.LagGpuMonth(mr=mr, device=device)
+    for b in range(CF_BLOCKS):
+        started = e.time.monotonic()
+        keep = block_of_row != b
+        sub = e.c.Refit(
+            refit.index[keep], refit.y[keep], refit.weight[keep], refit.is_val[keep], refit.report
+        )
+        e.CTX.update(on=False, shift=None, sign=0, block=None, seed=seed, cut=cut)
+        t = g.refit_tensors(refit=sub)
+        model = aux.AuxLagMdn(
+            n_primaries=len(mr.base.target_mean), stage="ft", n_knots=e.KNOTS, n_b1=e.N_B1,
+            kind="shared",
+        ).to(device)  # fmt: skip
+        model.table = e.CTX["table_ft"]
+        e.load_pretrained_fresh(
+            model=model, path=CHAIN / f"pretrained_{e.SPEC.pretrain_from}" / f"{month}_s{seed}.pt"
+        )
+        model.to(device)
+        epochs, best = e.train(
+            model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
+            lr=e.SPEC.lr, max_epochs=e.SPEC.max_epochs, fresh_lr=e.FRESH_LR, frozen=e.SPEC.frozen,
+            anchor=None, lam=0.0, device=device,
+        )  # fmt: skip
+        rows = refit.index[~keep]
+        out[rows] = s598.masked_quantiles(
+            model=model, x=mr.x[rows], primary=mr.primary[rows], target_mean=mr.base.target_mean,
+            target_std=mr.base.target_std, device=device,
+        )  # fmt: skip
+        print(
+            f"cross-fit {month} s{seed} block {b}: {int(keep.sum()):,} training rows, {epochs} epochs, val NLL {best:.4f}, {e.time.monotonic() - started:.0f} s",
+            flush=True,
+        )
+        del t, model
+    del g
+    torch.cuda.empty_cache()
+    return out
 
 
 def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> None:
@@ -204,6 +314,8 @@ def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> Non
             model=model, x=test.x, primary=test.primary, target_mean=mr.base.target_mean,
             target_std=mr.base.target_std, device=device,
         )  # fmt: skip
+        if CROSSFIT:
+            q_mr = cross_fit_quantiles(mr=mr, month=month, seed=seed, q_full=q_mr, device=device)
         n_grid = GRID_SHAPE[1]
         table = s598.build_lag_free_table(
             prim=np.concatenate([mr.primary, test.primary]),
@@ -213,7 +325,7 @@ def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> Non
             n_primaries=len(mr.base.target_mean), n_grid=n_grid,
         )  # fmt: skip
         filled = table.check_no_lookahead()
-        TABLES.mkdir(parents=True, exist_ok=True)
+        target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_suffix(".tmp.npz")
         np.savez(
             tmp, median=table.median, origin_idx=table.origin_idx,
@@ -230,7 +342,7 @@ GRID_SHAPE = (16, 121248)
 
 
 class FoldSignals:
-    """The extra-column blocks of one fold month and seed: the training rows (with synthetic shifts) and any test power."""
+    """The extra-column blocks of one fold month and seed (training rows with synthetic shifts, and test power)."""
 
     def __init__(self, *, mr, test, clean: np.ndarray, month: str, seed: int) -> None:
         z = np.load(table_file(month=month, seed=seed))
@@ -244,7 +356,6 @@ class FoldSignals:
         )
         self.weather_origin = np.asarray(e.CTX["origin_ft"])
         self._train: np.ndarray | None = None
-        self._source: np.ndarray | None = None
         self.report: dict = {}
 
     def _block(self, *, rows: dict, power_lag, power_sig) -> np.ndarray:
@@ -253,7 +364,7 @@ class FoldSignals:
             prim=rows["prim"], origin_idx=rows["origin"], day_idx=lag_idx["day"],
             week_idx=lag_idx["week"], day_missing=rows["x"][:, 38] > 0.5,
             week_missing=rows["x"][:, 41] > 0.5, power_lag=power_lag, power_sig=power_sig,
-            table=self.table, nb=NB, weather_origin=self.weather_origin, columns=COLUMNS,
+            table=self.table, nb=NB_READ, weather_origin=self.weather_origin, columns=COLUMNS,
         )  # fmt: skip
 
     def _train_rows(self) -> dict:
@@ -268,7 +379,7 @@ class FoldSignals:
 
     def train_block(self) -> np.ndarray:
         """Return the training rows' block: synthetic shifts in the own and neighbour power, training
-        noise where the training-to-test spread ratio is low, noise for the placebo. Cached.
+        noise where the training-to-test spread ratio is low. Cached.
         """
         if self._train is not None:
             return self._train
@@ -278,9 +389,6 @@ class FoldSignals:
         sig.add_training_noise(block=synth, prim=self.mr.primary, plan=plan, seed=self.seed)
         del real_test
         assert synth.shape[0] == len(self.mr.x), "training block and month rows differ"
-        self._source = synth
-        if PLACEBO:
-            synth = s598.placebo_block(source=self._source, n=len(synth), seed=self.seed)
         self._train = synth
         return synth
 
@@ -304,18 +412,9 @@ class FoldSignals:
 
     def test_block(self, *, test, power_lag, power_sig) -> np.ndarray:
         """Return a test (sub)set's block from the given power (observed, or the injected bank's)."""
-        if PLACEBO:
-            self.train_block()
-        block = self._block(
+        return self._block(
             rows=self._test_rows(test=test), power_lag=power_lag, power_sig=power_sig
         )
-        if PLACEBO:
-            assert self._source is not None
-            block = s598.placebo_block(
-                source=self._source, n=len(block),
-                seed=self.seed + 1_000 + int(test.origin_idx.min()) % 997,
-            )  # fmt: skip
-        return block
 
 
 FOLD: dict[tuple[str, int], FoldSignals] = {}
@@ -345,12 +444,31 @@ class SigGpuMonth(e.LagGpuMonth):
         fs = FOLD[(self.mr.month, e.CTX["seed"])]
         b = fs.train_block()[refit.index].copy()
         assert len(b) == len(t["x"]), "extra block and refit tensors differ in rows"
-        if not PLACEBO:
-            sig.mask_lag_columns(
-                block=b, columns=COLUMNS, day_masked=(t["x"][:, 38] > 0.5).cpu().numpy(),
-                week_masked=(t["x"][:, 41] > 0.5).cpu().numpy(),
-            )  # fmt: skip
-        t["x"] = torch.cat([t["x"], torch.from_numpy(b).to(self.device)], dim=1)
+        day_masked = (t["x"][:, 38] > 0.5).cpu().numpy()
+        week_masked = (t["x"][:, 41] > 0.5).cpu().numpy()
+        sig.mask_lag_columns(
+            block=b, columns=COLUMNS, day_masked=day_masked, week_masked=week_masked
+        )  # fmt: skip
+        if DROP_P > 0:  # signal dropout: the "no information" value on a share of the rows
+            key = int(e.CTX["seed"]) * 100_003 + int(e.CTX["cut"].timestamp()) % 100_003
+            rows = np.random.default_rng(key).random(len(b)) < DROP_P
+            only = None
+            if DROP_NB_ONLY:
+                only = [
+                    c
+                    for c in COLUMNS
+                    if sig.ALL_NAMES[c].startswith(("nb_", "own_plus_nb_", "nbopp_"))
+                ]
+            sig.drop_signals(block=b, columns=COLUMNS, rows=rows, only=only)
+        parts = [t["x"], torch.from_numpy(b).to(self.device)]
+        if AUX_W > 0:
+            lab = torch.from_numpy(LABELS[id(self.mr)][refit.index]).to(self.device)
+            hidden = torch.from_numpy(
+                np.stack([day_masked, day_masked, week_masked, week_masked], axis=1)
+            )
+            lab = torch.where(hidden.to(self.device), torch.full_like(lab, float("nan")), lab)
+            parts.append(lab)
+        t["x"] = torch.cat(parts, dim=1)
         return t
 
 
@@ -449,7 +567,7 @@ def exp_missing_share(*, fs: FoldSignals, test) -> None:
 
 
 def known_answer_real(*, fs: FoldSignals, test) -> None:
-    """Shift one Primary's real power by a known amount for 10 days (mirrored onto its neighbours) and check the columns."""
+    """Shift one Primary's real power by 0.2 for 10 days, mirror it onto its neighbours, and check the columns."""
     p, shift = 3, 0.2
     start = int(np.median(test.origin_idx)) - 5 * sig.PER_DAY
     end = start + 10 * sig.PER_DAY
@@ -476,13 +594,24 @@ def known_answer_real(*, fs: FoldSignals, test) -> None:
                 f"  known answer (Primary {p}, shift {shift}): {target} moves by {v:.3f}",
                 flush=True,
             )
-            if not PLACEBO and target == "gap_day":
+            if not SHUFFLED and target == "gap_day":
                 assert abs(v - shift) < 0.05, v
-            if not PLACEBO and target == "own_plus_nb_gap_day" and NB.of[p]:
+            if not SHUFFLED and target == "own_plus_nb_gap_day" and NB.of[p]:
                 assert abs(v) < 0.05, v  # a pure transfer cancels in the sum
 
 
+def row_nll(*, out, z, p):
+    """The mixture negative log-likelihood, plus the label-head weight times the label loss (training only)."""
+    nll = e.base.mixture_nll(out=out, z=z, components=e.m.COMPONENTS)
+    lab = mymodel.STASH.pop("shift", None)
+    if lab is not None and AUX_W > 0:
+        nll = nll + AUX_W * lab
+    return nll
+
+
 def run_fit(*, device: str = "cuda") -> None:
+    if AUX_W > 0:
+        e.row_nll = row_nll
     clean = e.c.clean_stack()
     assert clean.shape == GRID_SHAPE, clean.shape
     e.k.build_month = build_month_syn

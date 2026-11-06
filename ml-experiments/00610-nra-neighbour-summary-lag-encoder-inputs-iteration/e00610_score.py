@@ -1,13 +1,17 @@
 # ruff: noqa: D107, D102, E501, PERF401, PLR0915, D103, ANN001, D205
-"""Experiment 606: score R, W, A1, the permutation arms P3 to P7c, their placebos, and the width-matched arms.
+"""Experiment 610: score R, W, A1, P7 (experiment 606), the new arms, and their variants.
 
-No fit and no GPU. A copy of experiment 598's `e00598_score.py` with that experiment's contrasts and
-verdicts replaced by this experiment's. It reads the stored forecasts of arm A1 (experiment 591) and of
-the arms of this experiment, and writes tables under `data/ml-experiments/00610-*/score<suffix>/`.
+No fit and no GPU. A copy of experiment 606's `e00606_score.py` with that experiment's contrasts
+replaced by this experiment's: follow of each arm against P7, and the keep rule of the brief (follow
+at most 0.05, event-free CRPS within the minimum detectable effect of A1 at both metering groups,
+and coverage at the gate's width no more than 0.01 below R's). It reads the stored forecasts of arm
+A1 (experiment 591), of P7 (experiment 606), and of the arms of this experiment, and writes tables
+under `data/ml-experiments/00610-*/score<suffix>/`.
 
-Systems (every one a (rows, 11) quantile array on experiment 583's table of rows): `A1`; `R` (A1 plus the
-G4 gate, experiment 597); `W` (A1 rescaled to R's mean width on R's wide days); each arm (seed mean);
-`<arm>-rs`, each arm rescaled about its median, per fold month and seed, to R's width; `G4T`.
+Systems (every one a (rows, 11) quantile array on experiment 583's table of rows): `A1`; `R` (A1
+plus the G4 gate, experiment 597); `W` (A1 rescaled to R's mean width on R's wide days); each arm
+(seed mean); `<arm>-rs`, each arm rescaled about its median, per fold month and seed, to R's width;
+`G4T`.
 
 Usage: python e00610_score.py [--suffix SUFFIX] [--months M ...] [--seeds S ...] [--arms A ...] [--no-bank]
 """
@@ -32,13 +36,12 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 NAME = "00610-nra-neighbour-summary-lag-encoder-inputs-iteration"
 ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
 ROOT598 = ML_EXPERIMENTS_DATA_DIR / "00598-nra-gate-against-signals-as-inputs-at-equal-band-width"
-DEFAULT_ARMS = ("P3", "P4", "P5", "P6", "P7", "P7b", "P7c")
-N_COUNTED = 12
-"""P3 follow, P4 and P5 follow steps, P7 follow steps (2), the width-matched reach (2 phases), the placebo, and event-free CRPS of the best arm (2 groups), plus O2 (1)."""
-"""P1 (two phases), P2, P3, P4, and P5 (two metering groups)."""
+DEFAULT_ARMS = ("P7", "B1", "B3", "B7", "B14", "B1-14", "B1-28", "E1", "E7")
+N_COUNTED = 20
+"""8 span arms and 10 stage 2 arms against P7 on follow, the combination against P7, and the placebo against the best arm."""
 ALPHA = 0.05 / N_COUNTED
 BAND = "24-120 h"
-RNG = np.random.default_rng(606)
+RNG = np.random.default_rng(610)
 N_BOOT = 20_000
 TAIL = ("pin01", "pin05", "pin95", "pin99")
 STAT_NAMES = sc597.STAT_NAMES
@@ -46,10 +49,16 @@ J = {n: i for i, n in enumerate(STAT_NAMES)}
 PHASES = k597.PHASES
 OUTCOME_PASS, OUTCOME_FAIL = 0.01, 0.03
 WIDTH_TOL = 0.05
-MARGIN = {"P1": 0.01, "P2": 0.03, "P3": 0.08, "P4": 0.02, "P5": 0.03}
-EF_WIDTH_TOL = 0.02
-"""P1 needs S's event-free band width within 2% of R's."""
-"""The margin of each prediction, for the untestable rule: a prediction whose minimum detectable effect exceeds its margin is reported as untestable. P5's margin is 0.03 points of capacity of event-free CRPS, fixed before any score."""
+FOLLOW_KEEP = 0.05
+"""The keep rule's ceiling on follow."""
+COVER_TOL = 0.01
+"""The keep rule's allowed shortfall of coverage at the gate's width, against R."""
+ROOT606 = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours"
+)
+REUSED = {"P7": ROOT606}
+"""Arms whose stored forecasts live in an earlier experiment's folder."""
 
 
 def width90(q: np.ndarray) -> np.ndarray:
@@ -101,7 +110,8 @@ class Arm:
 
     def __init__(self, *, name: str, suffix: str, months: list[str], seeds: list[int]) -> None:
         self.name = name
-        self.work = ROOT / f"{name.replace('-', '')}{suffix}" / "work"
+        folder = name.replace("-", "").replace("+", "_")
+        self.work = REUSED.get(name, ROOT) / f"{folder}{suffix}" / "work"
         self.months, self.seeds = months, seeds
         self.q: dict[int, np.ndarray] = {}
 
@@ -827,7 +837,7 @@ def arm_summary(*, tab: pl.DataFrame, ef: pl.DataFrame, systems: list[str]) -> p
 
 
 def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame, arms: list[str]) -> pl.DataFrame:
-    """Return the counted contrasts of the plan (arms that were not run are left out)."""
+    """Return the counted contrasts: each arm's follow against P7's, and the placebo against the best arm."""
     have = set(tab["system"].unique().to_list())
     rows = []
 
@@ -835,20 +845,14 @@ def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame, arms: list[str]) -> pl.Dat
         if a_ in have and b_ in have:
             rows.append(_row(test=test, contrast=f"follow_q50({a_}) - follow_q50({b_})", res=paired_follow(tab=tab, a_=a_, b_=b_), margin=margin))  # fmt: skip
 
-    add("P3 gap lowers follow", "P3", "A1", 0.015)
-    add("P4 sustain vs gap only", "P4", "P3", 0.01)
-    add("P5 weighted averages vs sustain", "P5", "P4", 0.01)
-    add("P7 neighbours vs P5", "P7", "P5", 0.01)
-    add("P7 own-plus-sum vs without", "P7", "P7b", 0.005)
-    fam = [a for a in arm_family(arms=arms) if a in have]
-    if fam:
-        best = min(fam, key=lambda a: float(np.mean(follow_cl(tab=tab, system=a)[0])))
-        print("best arm by follow:", best, flush=True)
-        for phase in ("days4-end", "after0-7"):
-            if f"{best}-rs" in have:
-                res = paired(tab=tab, a_="R", b_=f"{best}-rs", phase=phase, metric="cover90")
-                rows.append(_row(test=f"reach {phase}", contrast=f"cover90(R) - cover90({best}-rs)", res=res, margin=0.01))  # fmt: skip
-        add(f"placebo ({best})", best, f"{best}-p", 0.02)
+    fam = [a for a in arm_family(arms=arms) if a in have and a != "P7"]
+    for a in fam:
+        add(f"{a} against P7", a, "P7", 0.0)
+    cand = [a for a in fam if a in have]
+    if cand:
+        best = min(cand, key=lambda a: float(np.mean(follow_cl(tab=tab, system=a)[0])))
+        print("lowest follow:", best, flush=True)
+        add(f"placebo ({best})", f"{best}-p", best, 0.02)
         for grp in k597.GROUPS_SCORED:
             r = ef.filter(
                 (pl.col("group") == grp) & (pl.col("band") == BAND) & (pl.col("system") == best)
@@ -858,8 +862,47 @@ def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame, arms: list[str]) -> pl.Dat
                     float(r["crps_minus_A1"][0]), float(r["crps_minus_A1_lo"][0]),
                     float(r["crps_minus_A1_hi"][0]), int(r["n_rows"][0]), int(r["n_months"][0]),
                 )  # fmt: skip
-                rows.append(_row(test=f"event-free CRPS {grp}", contrast=f"CRPS({best}) - CRPS(A1), points of capacity (n_events is rows; n_clusters is month blocks)", res=res, margin=0.03))  # fmt: skip
+                rows.append(_row(test=f"event-free CRPS {grp}", contrast=f"CRPS({best}) - CRPS(A1), points of capacity (n_events is rows; n_clusters is month blocks)", res=res, margin=0.0))  # fmt: skip
     return pl.DataFrame(rows)
+
+
+def keep_rule(*, summary: pl.DataFrame) -> pl.DataFrame:
+    """Return, per arm, the three parts of the keep rule and whether it holds.
+
+    Follow at most `FOLLOW_KEEP`; event-free CRPS minus A1 at most the printed minimum detectable
+    effect at both metering groups; and the arm's coverage at R's width (`<arm>-rs`) no more than
+    `COVER_TOL` below R's, in both phases.
+    """
+    by = {r["system"]: r for r in summary.to_dicts()}
+    rows = []
+    for name, r in by.items():
+        if (
+            name.endswith(("-rs", "-p"))
+            or name in {"A1", "R", "W", "G4T"}
+            or f"{name}-rs" not in by
+        ):
+            continue
+        rs, ref = by[f"{name}-rs"], by["R"]
+        eight, six = "ef_crps_minus_A1_MVA-only eight", "ef_crps_minus_A1_signed-MW six"
+        rec = {
+            "arm": name,
+            "follow": r["follow_q50_days4-end"],
+            "ef_minus_A1_eight": r.get(eight), "ef_mde_eight": r.get(f"{eight}_mde"),
+            "ef_minus_A1_six": r.get(six), "ef_mde_six": r.get(f"{six}_mde"),
+            "cover_gap_days4_end": ref["cover90_days4-end"] - rs["cover90_days4-end"],
+            "cover_gap_after": ref["cover90_after0-7"] - rs["cover90_after0-7"],
+        }  # fmt: skip
+        rec["follow_ok"] = rec["follow"] <= FOLLOW_KEEP
+        rec["eight_ok"] = (
+            rec["ef_minus_A1_eight"] is not None and rec["ef_minus_A1_eight"] <= rec["ef_mde_eight"]
+        )
+        rec["six_ok"] = (
+            rec["ef_minus_A1_six"] is not None and rec["ef_minus_A1_six"] <= rec["ef_mde_six"]
+        )
+        rec["cover_ok"] = max(rec["cover_gap_days4_end"], rec["cover_gap_after"]) <= COVER_TOL
+        rec["keeper"] = all(rec[k] for k in ("follow_ok", "eight_ok", "six_ok", "cover_ok"))
+        rows.append(rec)
+    return pl.DataFrame(rows, infer_schema_length=None)
 
 
 def main() -> None:
@@ -901,9 +944,9 @@ def main() -> None:
     check_reproduction(sy=sy, repro_bank=repro_bank).write_csv(out / "reproduction_597.csv")
     tab.write_csv(out / "bank_event_phase.csv")
     summarise_bank(tab=tab).write_csv(out / "bank_summary.csv")
-    arm_summary(tab=tab, ef=ef, systems=sorted(tab["system"].unique().to_list())).write_csv(
-        out / "arm_summary.csv"
-    )
+    summary = arm_summary(tab=tab, ef=ef, systems=sorted(tab["system"].unique().to_list()))
+    summary.write_csv(out / "arm_summary.csv")
+    keep_rule(summary=summary).write_csv(out / "keep_rule.csv")
     contrasts(tab=tab, ef=ef, arms=list(arms)).write_csv(out / "contrasts.csv")
     print("scored", sorted(arms), "->", out, flush=True)
 

@@ -1,13 +1,15 @@
-# ruff: noqa: E501, D103, PT018, ANN001, ANN201
-"""Experiment 606: CPU checks of the extra columns and the network (no data-folder rows needed).
+# ruff: noqa: E501, D103, PT018, ANN001, ANN201, PLR0915
+"""Experiment 610: CPU checks of the extra columns and the network (no data-folder rows needed).
 
 1. A known-answer test on a toy world of 4 Primaries (one with two neighbours, one with none): a shift
-   of known size on Primary 0, mirrored onto its neighbours, reaches the gap, the weighted averages,
-   the neighbour summaries, and the own-plus-neighbours sum (which cancels for a pure transfer).
-2. A weighted average reads no time after the lag's own time.
+   of known size on Primary 0, mirrored onto its neighbours, reaches the gap, the exponentially
+   weighted and box averages, the neighbour summaries, the opposite-sign share, and the
+   own-plus-neighbours sum (which cancels for a pure transfer).
+2. Every average reads no time after the lag's own time, and the box average equals a direct mean.
 3. The expected-missing flag is 1 only where the weather run's origin is absent.
-4. Each input-removing arm and each extra-column arm loads A1's step-2 state dict, and with the
-   zero-initialised new columns the arm without an input removed reproduces A1's output exactly.
+4. Dropping signals sets the "no information" value and leaves the expected-missing flags alone.
+5. Each network variant (extra columns, bottleneck, label head) loads A1's step-2 state dict and
+   reproduces A1's output exactly at initialisation; the label head's loss is finite and trains.
 
 Usage: python e00610_check.py [STEP2_FILE]
 """
@@ -27,7 +29,6 @@ STEP2 = (
     ML_EXPERIMENTS_DATA_DIR
     / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work/step2/P5/2025-12_s0.pt"
 )
-ALL_GROUPS = ("gap", "sustain", "ew", "exp", "nb", "bn")
 
 
 def toy_world(*, n_days: int = 30, shift: float = 0.2) -> dict:
@@ -91,6 +92,10 @@ def check_known_answer() -> None:
     # a gap that has been `sh` for about 13 days: the short spans are close to `sh`, the long span lags it
     ew = [block[0, c[f"ew{h}_day"]] / sc for h in (1, 3, 7)]
     assert ew[0] > 0.99 * sh and ew[0] >= ew[1] > ew[2] > 0.5 * sh, ew
+    # box means: the shift began about 12 days before the lag, so 1, 3, 7 days are full and 14 days is about 12/14
+    bx = [block[0, c[f"bx{d}_day"]] / sc for d in (1, 3, 7, 14)]
+    np.testing.assert_allclose(bx[:3], [sh] * 3, atol=1e-3)
+    assert 0.8 * sh < bx[3] < 0.95 * sh, bx
     # the transfer lands on neighbour 1 in the neighbour power only: its own lag is not shifted
     np.testing.assert_allclose(block[1, c["gap_day"]], 0.0, atol=1e-3)
     # Primary 1 sees Primary 0 (gap +shift, scaled to 1's capacity) in its neighbour summary
@@ -106,11 +111,12 @@ def check_known_answer() -> None:
     for q in sig.QUANTITIES:
         np.testing.assert_allclose(block[0, c[f"own_plus_nb_{q}"]], 0.0, atol=1e-3)
     assert block[0, c["nb_count"]] == 2 and block[0, c["nb_none"]] == 0
-    # the single best opposite-sign neighbour is neighbour 1
-    np.testing.assert_allclose(block[0, c["bn_gap_day"]], -sh * sc, atol=1e-3)
-    np.testing.assert_allclose(block[0, c["own_plus_bn_gap_day"]], 0.0, atol=1e-3)
+    # Primary 0: neighbour 1 has the opposite sign (-shift, over the 5% threshold), neighbour 2 is zero
+    np.testing.assert_allclose(block[0, c["nbopp_gap_day"]], 0.5 * sc, atol=1e-3)
+    # Primary 1: its only neighbour (0) has gap +shift scaled to 1's capacity and Primary 1's own gap is 0
+    assert block[1, c["nbopp_gap_day"]] == 0
     # Primary 3 has no neighbour: zeros plus the flag
-    assert block[3, c["nb_none"]] == 1 and block[3, c["bn_none"]] == 1
+    assert block[3, c["nb_none"]] == 1
     assert (block[3, [c[n] for n in sig.NB_NAMES if n.startswith("nb_sum")]] == 0).all()
     print("known-answer test passed: gap, weighted averages, neighbour summaries, own-plus-sum")
 
@@ -124,6 +130,7 @@ def check_ew_is_causal() -> None:
     later[:, lag + 1 :] += 5.0  # change everything after the lag's own time
     changed = block_of(w=w, prim=[0], day_lag=[lag], week_lag=[lag], power_lag=later)
     own = [sig.COL[n] for n in sig.OWN_NAMES if not n.startswith("sustain")]
+    assert any(n.startswith("bx28") for n in sig.OWN_NAMES)
     assert np.array_equal(base[0, own], changed[0, own]), "an own column read a later time"
     print("causality test passed: no own column reads a time after the lag's own time")
 
@@ -138,6 +145,44 @@ def check_expected_missing() -> None:
     print("expected-missing flag test passed")
 
 
+def check_box_average() -> None:
+    rng = np.random.default_rng(1)
+    res = rng.normal(size=(2, 5 * sig.PER_DAY)).astype(np.float32)
+    res[0, 30:60] = np.nan
+    got = sig.box_average(res=res, days=2)
+    i = 4 * sig.PER_DAY
+    np.testing.assert_allclose(
+        got[0, i], np.nanmean(res[0, i - 2 * sig.PER_DAY + 1 : i + 1]), rtol=1e-4
+    )
+    assert np.isnan(got[0, 30]) or np.isfinite(got[0, 30])  # early rows may be NaN
+    print("box-average test passed")
+
+
+def check_drop_signals() -> None:
+    w = toy_world()
+    o = 25 * sig.PER_DAY + s598.ORIGIN_OFFSET
+    cols = sig.columns_of(groups=("gap", "own:ew1,bx3", "exp", "nb:gap,ew1"))
+    n = 6
+    block = sig.signal_columns(
+        prim=np.zeros(n, int), origin_idx=np.full(n, o), day_idx=np.full(n, o - 60),
+        week_idx=np.full(n, o - 400), day_missing=np.zeros(n, bool), week_missing=np.zeros(n, bool),
+        power_lag=w["power_lag"], power_sig=w["power_sig"], table=w["table"], nb=w["nb"],
+        weather_origin=np.zeros((4, w["n_g"]), np.int64), columns=cols,
+    )  # fmt: skip
+    rows = np.array([True, False, True, False, False, False])
+    before = block.copy()
+    sig.drop_signals(block=block, columns=cols, rows=rows)
+    names = [sig.ALL_NAMES[c] for c in cols]
+    for j, name in enumerate(names):
+        if name.startswith("exp_missing"):
+            assert np.array_equal(block[:, j], before[:, j]), name
+            continue
+        want = 1.0 if (name.endswith("_missing") or name == "nb_none") else 0.0
+        assert (block[rows, j] == want).all(), name
+        assert np.array_equal(block[~rows, j], before[~rows, j]), name
+    print("signal-dropout test passed: dropped rows hold the no-information value")
+
+
 def check_masking() -> None:
     w = toy_world()
     o = 25 * sig.PER_DAY + s598.ORIGIN_OFFSET
@@ -149,7 +194,7 @@ def check_masking() -> None:
     for j, name in enumerate(sig.ALL_NAMES):
         if name.startswith("exp_missing"):
             continue
-        if name in {"nb_none", "bn_none"}:
+        if name == "nb_none":
             assert (block[:, j] == 1).all(), name
             continue
         assert (block[:, j] == 0).all(), name
@@ -193,44 +238,57 @@ def check_model_is_a1_at_init(*, path: Path) -> None:
     with torch.no_grad():
         ref = a1(x, prim)
     for n_extra in (4, 6, 20, 55):
-        net = model.PermLagMdn(stage="ft", inputs=model.InputSet(n_extra=n_extra), **shapes)
-        net.load_state_dict(state)
-        net.table = table
-        net.eval()
-        with torch.no_grad():
-            got = net(torch.cat([x, torch.randn(rows, n_extra) * 5], dim=1), prim)
-        assert torch.allclose(ref, got, atol=1e-6), (n_extra, float((ref - got).abs().max()))
-        with torch.no_grad():
-            net.lag[0][0].weight[:, -1] = 1.0
-            moved = net(torch.cat([x, torch.randn(rows, n_extra) * 5], dim=1), prim)
-        assert not torch.allclose(ref, moved, atol=1e-4), "the extra columns are not wired in"
-    # each removed input changes the output of the loaded A1 weights, and a kept input does not
-    for name, inputs in (
-        ("no age", model.InputSet(use_age=False)),
-        ("no id", model.InputSet(use_id=False)),
-        ("no expected", model.InputSet(use_expected=False)),
-    ):
-        net = model.PermLagMdn(stage="ft", inputs=inputs, **shapes)
-        net.load_state_dict(state)
-        net.table = table
-        net.eval()
-        with torch.no_grad():
-            got = net(x, prim)
-        assert not torch.allclose(ref, got, atol=1e-4), f"{name} left the output unchanged"
-    same = model.PermLagMdn(stage="ft", inputs=model.InputSet(), **shapes)
-    same.load_state_dict(state)
-    same.table = table
-    same.eval()
+        for variant in (
+            model.InputSet(n_extra=n_extra),
+            model.InputSet(n_extra=n_extra, bottleneck=True),
+            model.InputSet(n_extra=n_extra, label_head=True),
+        ):
+            net = model.PermLagMdn(stage="ft", inputs=variant, **shapes)
+            net.load_state_dict(state)
+            net.table = table
+            net.eval()
+            with torch.no_grad():
+                got = net(torch.cat([x, torch.randn(rows, n_extra) * 5], dim=1), prim)
+            assert torch.allclose(ref, got, atol=1e-6), (variant, float((ref - got).abs().max()))
+            with torch.no_grad():
+                net.lag[0][0].weight[:, -1] = 1.0
+                moved = net(torch.cat([x, torch.randn(rows, n_extra) * 5], dim=1), prim)
+            assert not torch.allclose(ref, moved, atol=1e-4), "the extra columns are not wired in"
+    # the label head: labels in training mode give a finite loss that trains, and are ignored in eval mode
+    n_extra = 6
+    net = model.PermLagMdn(
+        stage="ft", inputs=model.InputSet(n_extra=n_extra, label_head=True), **shapes
+    )
+    net.load_state_dict(state)
+    net.table = table
+    xe = torch.cat([x, torch.randn(rows, n_extra)], dim=1)
+    nan = float("nan")
+    labels = torch.tensor([[1.0, 0.2, 0.0, 0.0]] * 32 + [[0.0, 0.0, nan, nan]] * 32)
+    net.train()
+    out = net(torch.cat([xe, labels], dim=1), prim)
+    loss = model.STASH.pop("shift")
+    assert loss.shape == (rows,) and torch.isfinite(loss).all()
+    (out.mean() + loss.mean()).backward()
+    assert (
+        net.shift_head[0].weight.grad is not None and net.shift_head[0].weight.grad.abs().sum() > 0
+    )
+    net.eval()
     with torch.no_grad():
-        assert torch.allclose(ref, same(x, prim), atol=1e-6)
+        out_eval = net(torch.cat([xe, labels], dim=1), prim)
+        assert "shift" not in model.STASH
+        assert torch.allclose(out_eval, net(xe, prim)), "labels reached the forecast"
+        probs = net.shift_probability(x=xe, primary=prim)
+    assert probs.shape == (rows, 2) and ((probs >= 0) & (probs <= 1)).all()
     print(
-        "network loads A1's weights: extra columns start inert; each removed input changes the output"
+        "network loads A1's weights: every variant starts inert; the label head trains and its labels never reach a forecast"
     )
 
 
 if __name__ == "__main__":
     check_known_answer()
     check_ew_is_causal()
+    check_box_average()
+    check_drop_signals()
     check_expected_missing()
     check_masking()
     check_young_lag_rejected()
