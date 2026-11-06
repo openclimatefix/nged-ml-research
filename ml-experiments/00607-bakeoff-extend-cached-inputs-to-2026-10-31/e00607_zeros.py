@@ -97,7 +97,7 @@ def figure_weekly(*, table: pl.DataFrame) -> None:
 
 
 def solar_e_midday(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Per Solar farm and month: share of midday half-hours with a reading, and the median of the daily midday peak."""
+    """Return the share of midday half-hours with a reading and the median daily midday peak."""
     mid = (
         frame.filter(
             pl.col("group") == "Solar farms",

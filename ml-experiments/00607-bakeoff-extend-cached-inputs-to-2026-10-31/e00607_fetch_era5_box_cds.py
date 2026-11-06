@@ -4,13 +4,14 @@
 The stage-1 ERA5 box was read from Google's ARCO-ERA5 store, which holds one global field per hour;
 extending it to 2026-10-31 that way would download roughly 120 GB, so this script asks the Climate
 Data Store, which cuts the same 11 x 11 cell block on the server, for about 60 MB. Both serve ERA5
-(Hersbach et al., 2020), so the values agree to the netCDF packing of the Climate Data Store (the script prints the largest difference on the four overlapping days). One request per month; the first window starts on 2026-07-28 so that four days
-overlap the stored table, and `expver` is kept as the service reports it (`0001` final, `0005`
-ERA5T, the preliminary release). Writes one parquet per variable under the experiment's folder, in
-the stored table's layout (`time`, `latitude`, `longitude`, `value`, `expver`). The service accepts
-a request for `precipitation_type` but returns no such field in its netCDF files, so that variable
-is not written here; the Google store holds it. No coordinate is
-printed or written to a filename.
+(Hersbach et al., 2020), so the values agree to the netCDF packing of the Climate Data Store (the
+script prints the largest difference on the four overlapping days). One request per month; the first
+window starts on 2026-07-28 so that four days overlap the stored table, and `expver` is kept as the
+service reports it (`0001` final, `0005` ERA5T, the preliminary release). Writes one parquet per
+variable under the experiment's folder, in the stored table's layout (`time`, `latitude`,
+`longitude`, `value`, `expver`). The service accepts a request for `precipitation_type` but returns
+no such field in its netCDF files, so that variable is not written here; the Google store holds it.
+No coordinate is printed or written to a filename.
 
     uv run --no-sync --with cdsapi --with netCDF4 python e00607_fetch_era5_box_cds.py
 """
