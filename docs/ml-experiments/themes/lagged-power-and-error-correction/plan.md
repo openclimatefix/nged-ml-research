@@ -21,6 +21,7 @@
 | 550 | Do trailing temperature windows still help the lag-light demand network once the day-ago and week-ago power lags are in? | High (manager, 2026-11-04) | Nothing | Planned |
 | 567 | Do the neighbouring Primaries' lags let the modular lag-encoder demand network tell a load transfer from a genuine level change, when it trains on synthetic load shifts? | High (manager, 2026-11-05) | Experiments 559, 560, and 566 merged | Planned |
 | 589 | Why does the P5 forecast cover Primary D5 poorly before the December 2025 load-shift, and is that one Primary or a property of the P5 recipe? | High (manager, 2026-11-06) | Nothing | Planned |
+| 595 | Does the fine-tuned demand network of C1 (P5 plus lag-only synthetic shifts) or A1 (shared lag encoder) absorb less of a load-shift in its training power than plain P5's 0.219 of the depth, so that the proposed bar L4 (at most 0.10) can be met? | High (manager, 2026-11-06) | Nothing | Finished: partly supported, see experiment 595 |
 | 597 | Do C1 and A1 with the G4 gated band, assembled as single forecasts, hold the normal running arrangement inside the q05-q95 band on 0.90 of rows from day 4 of a load-shift to its end? | High (manager, 2026-11-06) | Nothing | Finished: supported, see experiment 597 |
 
 ## Planned experiments
