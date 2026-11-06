@@ -371,18 +371,17 @@ def real_pair(views: dict[str, ArmView]) -> None:
             for r in strips_for(t=t1, rows=rows, wide=v1.inp.mode, prim=p, onset=onset)
         ]
         common = {
-            "x": x, "iq": IQ, "obs": t1.obs[rows], "nra": t1.nra[rows], "ydom": ydom, "xtype": "T",
+            "x": x, "iq": IQ, "obs": t1.obs[rows], "ydom": ydom, "xtype": "T",
             "xdom": (when(onset - 14 * 48), when(end + 14 * 48)), "strip": strip,
             "span": (when(onset), when(end)), "rules": SWITCH_TIMES,
         }  # fmt: skip
         units = [
-            cp.arm_panel(q=q_a, colour=SYSTEM_COLOUR["C1 + G4"], median_colour="#b33000", title=f"{t1.label[p]}: C1 + G4", **common),
-            cp.arm_panel(q=q_b, colour=SYSTEM_COLOUR["A1 + G4"], median_colour="#1d4f91", title=f"{t1.label[p]}: A1 + G4", xtitle="Date (UTC)", **common),
+            cp.arm_panel(q=q_a, title=f"{t1.label[p]}: C1 + G4", **common),
+            cp.arm_panel(q=q_b, title=f"{t1.label[p]}: A1 + G4", xtitle="Date (UTC)", **common),
         ]  # fmt: skip
         key = [
-            *cp.band_entries("C1 + G4", SYSTEM_COLOUR["C1 + G4"], "#b33000"),
-            *cp.band_entries("A1 + G4", SYSTEM_COLOUR["A1 + G4"], "#1d4f91"),
-            cp.OBS, cp.NRA, cp.SHADE, cp.GATE, cp.RULES,
+            *cp.FORECAST_ENTRIES,
+            cp.OBS, cp.SHADE, cp.GATE, cp.RULES,
         ]  # fmt: skip
         fig = cp.figure(
             units=units,
@@ -471,14 +470,14 @@ def injected(views: dict[str, ArmView]) -> None:
             started = x.min() <= 0
             ydom = cp.common_ydom([(qa, nra), (qb, nra)], iq=IQ)
             strip = strips_for(t=t1, rows=rows1, wide=wide1, prim=p, onset=onset)
-            common = {"x": x, "iq": IQ, "obs": nra, "nra": nra, "ydom": ydom, "strip": strip,
+            common = {"x": x, "iq": IQ, "obs": nra, "ydom": ydom, "strip": strip,
                       "span": (0.0 if started else float(x.min()), (end - onset) / 48.0),
                       "xdom": (float(x.min()), (end - onset) / 48.0 + 14)}  # fmt: skip
             units = [
-                cp.arm_panel(q=qa, colour=SYSTEM_COLOUR["C1 + G4"], median_colour="#b33000", title="C1 + G4", **common),
-                cp.arm_panel(q=qb, colour=SYSTEM_COLOUR["A1 + G4"], median_colour="#1d4f91", title="A1 + G4", xtitle="Days since the injected shift began", **common),
+                cp.arm_panel(q=qa, title="C1 + G4", **common),
+                cp.arm_panel(q=qb, title="A1 + G4", xtitle="Days since the injected shift began", **common),
             ]  # fmt: skip
-            key = [*cp.band_entries("C1 + G4", SYSTEM_COLOUR["C1 + G4"], "#b33000"), *cp.band_entries("A1 + G4", SYSTEM_COLOUR["A1 + G4"], "#1d4f91"), cp.OBS, cp.NRA, cp.SHADE, cp.GATE]  # fmt: skip
+            key = [*cp.FORECAST_ENTRIES, cp.OBS, cp.SHADE, cp.GATE]  # fmt: skip
             sg = "up" if sign > 0 else "down"
             tag = "mva" if k.GROUP_NAME[grp] == k.GROUP_NAME[k.GROUPS_SCORED[0]] else "mw"
             out = f"injected_{length}d_{sg}_{int(depth * 100)}pct_{tag}.svg"

@@ -37,7 +37,6 @@ GREY, ORANGE, BLUE, SKY = "#6b6b6b", theme.BRAND_ORANGE, theme.DATA_BLUE, theme.
 INJECT_MONTH = "2026-03"
 # The maintainer's switch times for the December 2025 example event (UTC).
 SWITCH_TIMES = [datetime(2025, 12, 30, 1, 0), datetime(2026, 1, 14, 11, 30)]
-C0_MEDIAN, C2_MEDIAN = "#444444", "#b33000"
 DESIGNS = [  # (length in days, depth share of capacity, sign): spans depth, length, and sign
     (length, depth, sign)
     for length in (7, 15, 30)
@@ -60,25 +59,19 @@ def when(idx) -> datetime:
     return (sc.k.k.GRID_START + timedelta(minutes=30 * float(idx))).replace(tzinfo=None)
 
 
-def two_arm_figure(*, x, q0, q2, obs, nra, strips, span, xdom, title, out, xtitle, xtype="Q",
+def two_arm_figure(*, x, q0, q2, obs, strips, span, xdom, title, out, xtitle, xtype="Q",
                    rules=(), label_nra=None, label=""):  # fmt: skip
     """One figure: C0 in the top panel, C2 (with its gate strip) in the bottom panel, then the key."""
     lo_obs = obs if label_nra is None else np.fmin(obs, label_nra)
     ydom = cp.common_ydom([(q0, lo_obs), (q2, lo_obs)], iq=IQ)
-    common: dict[str, Any] = {"x": x, "iq": IQ, "obs": obs, "nra": nra, "ydom": ydom, "xdom": xdom, "xtype": xtype,
+    common: dict[str, Any] = {"x": x, "iq": IQ, "obs": obs, "ydom": ydom, "xdom": xdom, "xtype": xtype,
               "span": span, "rules": rules, "label_nra": label_nra}  # fmt: skip
     units = [
-        cp.arm_panel(q=q0, colour=GREY, median_colour=C0_MEDIAN, title=f"{label}C0", **common),
-        cp.arm_panel(q=q2, colour=ORANGE, median_colour=C2_MEDIAN, title=f"{label}C2", strip=strips, xtitle=xtitle, **common),
+        cp.arm_panel(q=q0, title=f"{label}C0", **common),
+        cp.arm_panel(q=q2, title=f"{label}C2", strip=strips, xtitle=xtitle, **common),
     ]  # fmt: skip
-    key = [
-        *cp.band_entries("C0", GREY, C0_MEDIAN),
-        *cp.band_entries("C2", ORANGE, C2_MEDIAN),
-        cp.OBS,
-    ]
-    if label_nra is None:
-        key.append(cp.NRA)
-    else:
+    key = [*cp.FORECAST_ENTRIES, cp.OBS]
+    if label_nra is not None:
         key.append(cp.LABEL_NRA)
     if span is not None:
         key.append(cp.SHADE)
@@ -151,7 +144,7 @@ def verified(*, t, look, st, tables):
         strips = [{"x0": when(r["x0"] * 48 + onset), "x1": when(r["x1"] * 48 + onset)}
                   for r in strips_for(t=t, rows=rows, on=st["on"], hold=st["hold"], prim=p, onset=onset)]  # fmt: skip
         x = [when(i) for i in t.idx[rows]]
-        kw = {"x": x, "q0": q0, "q2": q2, "obs": t.obs[rows], "nra": t.nra[rows], "strips": strips,
+        kw = {"x": x, "q0": q0, "q2": q2, "obs": t.obs[rows], "strips": strips,
               "span": (when(onset), when(end)), "rules": SWITCH_TIMES, "xtype": "T",
               "xtitle": "Date (UTC)", "label": f"{e['label']}: "}  # fmt: skip
         ttl = f"{e['label']}: day-ahead forecasts through the verified load-shift of {e['depth_mw']:+.1f} MW for {length:.0f} days, starting {date}"
@@ -215,7 +208,7 @@ def labelled(*, t, look, st, tables):
         x = (t.idx[rows] - onset) / 48.0
         strips = strips_for(t=t, rows=rows, on=st["on"], hold=st["hold"], prim=p, onset=onset)
         out = f"labelled_{e['event_id']:03d}_{e['label']}_{length:.0f}d.svg"
-        two_arm_figure(x=x, q0=q0, q2=q2, obs=t.obs[rows], nra=np.full(len(rows), np.nan), label_nra=lab_nra, strips=strips, span=(0, length),
+        two_arm_figure(x=x, q0=q0, q2=q2, obs=t.obs[rows], label_nra=lab_nra, strips=strips, span=(0, length),
                        xdom=(-7, length + 7), xtitle="Days since the labelled start", title=ttl, out=out)  # fmt: skip
         tables["labelled"].append({"event_id": e["event_id"], "primary": e["label"], "onset": date, "length_days": round(length, 1),
                                    "label_depth_mw": e["label_depth_mw"], "status_580": e["final_class"], "partner": ",".join(partner),
@@ -277,7 +270,7 @@ def injected(*, t, look, gi, tables):
             sg = "up" if sign > 0 else "down"
             tag = "mva" if g == groups[0] else "mw"
             out = f"injected_{length}d_{sg}_{int(depth * 100)}pct_{tag}.svg"
-            two_arm_figure(x=x, q0=q0, q2=q2, obs=nra, nra=nra, strips=strips_for(t=t, rows=rows, on=on, hold=hold, prim=p, onset=onset),
+            two_arm_figure(x=x, q0=q0, q2=q2, obs=nra, strips=strips_for(t=t, rows=rows, on=on, hold=hold, prim=p, onset=onset),
                            span=(0.0 if started else float(x.min()), (end - onset) / 48.0), xdom=(float(x.min()), (end - onset) / 48.0 + 7),
                            xtitle="Days since the injected shift began", out=out,
                            title=f"{t.label[p]} ({g}): injected {sign * depth * 100:+.0f}% of capacity for {length} days, March 2026, day-ahead")  # fmt: skip
@@ -332,20 +325,16 @@ def emit_event_free(*, pending, out):
     """Two event-free windows in one figure, each drawn with C2 only (C1 is identical on every row)."""
     ydom = cp.common_ydom([(w["q"], w["obs"]) for w in pending], iq=IQ)
     units = [
-        cp.arm_panel(x=w["x"], q=w["q"], iq=IQ, obs=w["obs"], nra=w["obs"], colour=ORANGE, median_colour=C2_MEDIAN, xdom=(0, 14), ydom=ydom,
+        cp.arm_panel(x=w["x"], q=w["q"], iq=IQ, obs=w["obs"], xdom=(0, 14), ydom=ydom,
                      title=w["title"], strip=[], xtitle="Days since the window began" if i == len(pending) - 1 else None)
         for i, w in enumerate(pending)
     ]  # fmt: skip
-    key = [*cp.band_entries("C2", ORANGE, C2_MEDIAN), cp.OBS, entry_nra_same()]
+    key = [*cp.FORECAST_ENTRIES, cp.OBS]
     cp.figure(
         units=units,
         key=key,
         title="Event-free windows: C2 on 14 days with no labelled or verified load-shift within 7 days",
     ).save(str(DOCS / out))
-
-
-def entry_nra_same():
-    return cp.entry("NRA (equal to observed power here)", "dashed", "black")
 
 
 def summaries(*, tables):
@@ -384,7 +373,7 @@ def summaries(*, tables):
                 scale=alt.Scale(domain=["C1", "C2"], range=[theme.DATA_PURPLE, ORANGE]),
                 legend=alt.Legend(title="Arm", orient="top"),
             ),
-        ).properties(width=W, height=280).facet(row=alt.Row("event:N", title=None)).save(
+        ).properties(width=W, height=300).facet(row=alt.Row("event:N", title=None)).save(
             str(DOCS / "summary_width_over_time.svg")
         )
     for f in (

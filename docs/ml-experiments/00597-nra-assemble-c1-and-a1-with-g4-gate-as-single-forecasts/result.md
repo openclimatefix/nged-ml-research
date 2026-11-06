@@ -137,25 +137,29 @@ median by under 5 points, and a few move it by 10 to 20 points in 50% events.
 ![D5, day-ahead forecasts through the December 2025 load-shift](real_pair_D5_day_ahead.svg)
 
 D5 through the verified December 2025 load-shift: C1 + G4 above, A1 + G4 below, day-ahead, from 14
-days before the start to 14 days after the end. The grey shade is the verified window of experiment
+days before the start to 14 days after the end. The lilac shade is the verified window of experiment
 580 (2025-12-29 to 2026-01-13). The dashed vertical lines are the maintainer's switch times
 (2025-12-30 01:00 and 2026-01-14 11:30). Observed power falls below both forecasts for most of the
-load-shift, and the dashed NRA stays close to the bands. The two bands lie close together.
+load-shift, and the NRA (not drawn, because it is only an estimate) stays close to the bands. The
+two bands lie close together. The sky-blue strip is the G4 gate: the `gate_on` column of the export
+files is true for origin days 2025-12-31 to 2026-01-21 at both Primaries, plus the 7-day hold.
+Coverage in this page is scored against the NRA estimate.
 
 ![D16, day-ahead forecasts through the December 2025 load-shift](real_pair_D16_day_ahead.svg)
 
 The same for D16, whose power rises during the load-shift. **Which window matches the readings:**
 the maintainer's switch times match the power readings better than the window of experiment 580,
 which is about one day early at both ends. At D5 the 24-hour average power falls by 2.3 MW around
-2025-12-30 00:00 and rises by 2.1 MW around 2026-01-14 11:30, matching the maintainer's times. At D16
-the two steps (a rise of 1.7 MW and a fall of 1.8 MW) come about 7 hours later, around 08:30 on 30
-December and 19:30 on 14 January. A 24-hour average cannot place a step to the hour, so the times
+2025-12-30 00:00 and rises by 2.1 MW around 2026-01-14 11:30, matching the maintainer's times. At
+D16 the two steps (a rise of 1.7 MW and a fall of 1.8 MW) come about 7 hours later, around 08:30 on
+30 December and 19:30 on 14 January. A 24-hour average cannot place a step to the hour, so the times
 are approximate.
 
 Day-ahead forecasts on 12 injected designs (7, 15, and 30 days; 15%, 30%, and 50% of capacity, up
 and down), one Primary from each metering group per design, March 2026 (24 figures, each with C1 +
-G4 above and A1 + G4 below). The target stays clean, so the observed power is also the NRA. The
-window runs from 14 days before the shift to 14 days after its end. The stored forecasts stop at
+G4 above and A1 + G4 below). The target stays clean, so the observed power is also the NRA. A 15 or
+30 day shift begins before the scored month, so the x axis then starts partway through the shift.
+The window runs from 14 days before the shift to 14 days after its end. The stored forecasts stop at
 120 hours, so no panel shows the full 14-day horizon.
 
 ![D3, injected 7 days, +15%](injected_7d_up_15pct_mva.svg)

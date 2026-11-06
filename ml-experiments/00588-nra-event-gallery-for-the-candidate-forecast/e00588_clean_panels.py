@@ -2,7 +2,7 @@
 """Uncluttered time-series panels for the forecast figures of experiments 588 and 597.
 
 Standing rules (maintainer, 2026-11-06): at least 280 px per panel, at most two panels per figure,
-one forecast arm (median and q05-q95 band) per panel beside observed power and the NRA, the gate-on
+one forecast arm (median and q05-q95 band) per panel beside observed power, the gate-on
 bar in a thin strip under the panel, and a legend outside the data area. Demand series only.
 """
 
@@ -16,8 +16,10 @@ W = 620
 PANEL_HEIGHT = 280
 STRIP_HEIGHT = 14
 SKY = "#10C5F7"
-GREY_SHADE = "#999999"
-RULE_COLOUR = "#222222"
+SHADE_COLOUR = "#E3D3FA"  # pale lilac: the load-shift
+RULE_COLOUR = "#7A1FA2"  # dark purple: the maintainer's switch times
+FORECAST_COLOUR = "#FF4901"  # Brand Orange: every forecast band
+FORECAST_MEDIAN = "#B33000"
 
 
 def to_none(a: np.ndarray) -> list:
@@ -46,9 +48,6 @@ def arm_panel(
     q,
     iq: dict,
     obs,
-    nra,
-    colour: str,
-    median_colour: str,
     xdom,
     title: str,
     ydom,
@@ -59,7 +58,7 @@ def arm_panel(
     rules=(),
     label_nra=None,
 ):
-    """One panel unit: one arm's median and q05-q95 band, observed power, the NRA, and a gate strip.
+    """One panel unit: one arm's median and q05-q95 band, observed power, and a gate strip.
 
     `strip` is a list of `{"x0", "x1"}` origin-day spans with the gate on or held; None means the
     arm has no gate and the strip stays empty. `span` is the (start, end) of the shaded load-shift.
@@ -71,7 +70,6 @@ def arm_panel(
         "hi": to_none(np.asarray(q[:, iq[0.95]] * 100, float)),
         "med": to_none(np.asarray(q[:, iq[0.5]] * 100, float)),
         "obs": to_none(np.asarray(obs * 100, float)),
-        "nra": to_none(np.asarray(nra * 100, float)),
     }
     if label_nra is not None:
         cols["lab"] = to_none(np.asarray(label_nra * 100, float))
@@ -98,7 +96,7 @@ def arm_panel(
     def shade_layer(axis):
         return (
             alt.Chart(shade)  # ty: ignore[unresolved-attribute]
-            .mark_rect(color=GREY_SHADE, opacity=0.12, clip=True, aria=False)
+            .mark_rect(color=SHADE_COLOUR, opacity=0.7, clip=True, aria=False)
             .encode(x=alt.X(f"a:{xtype}", scale=scale, axis=axis), x2="b")
         )
 
@@ -114,10 +112,9 @@ def arm_panel(
     if shade is not None:
         layers.append(shade_layer(top_axis))
     layers += [
-        base.mark_area(color=colour, opacity=0.30, aria=False, clip=True).encode(x=top_x, y=alt.Y("lo:Q", scale=sy, title="% of capacity"), y2="hi:Q"),  # ty: ignore[unresolved-attribute]
-        base.mark_line(color=median_colour, strokeWidth=1.6, aria=False, clip=True).encode(x=top_x, y=alt.Y("med:Q", scale=sy)),  # ty: ignore[unresolved-attribute]
+        base.mark_area(color=FORECAST_COLOUR, opacity=0.30, aria=False, clip=True).encode(x=top_x, y=alt.Y("lo:Q", scale=sy, title="% of capacity"), y2="hi:Q"),  # ty: ignore[unresolved-attribute]
+        base.mark_line(color=FORECAST_MEDIAN, strokeWidth=1.6, aria=False, clip=True).encode(x=top_x, y=alt.Y("med:Q", scale=sy)),  # ty: ignore[unresolved-attribute]
         base.mark_line(color="black", strokeWidth=1.0, aria=False, clip=True).encode(x=top_x, y=alt.Y("obs:Q", scale=sy)),  # ty: ignore[unresolved-attribute]
-        base.mark_line(color="black", strokeDash=[4, 3], strokeWidth=1.0, aria=False, clip=True).encode(x=top_x, y=alt.Y("nra:Q", scale=sy)),  # ty: ignore[unresolved-attribute]
     ]  # fmt: skip
     if label_nra is not None:
         layers.append(
@@ -132,6 +129,8 @@ def arm_panel(
     )
 
     strip_layers = []
+    if shade is not None:
+        strip_layers.append(shade_layer(bot_axis))
     if strip:
         sdf = pl.DataFrame(
             {"x0": [_xs(r["x0"], xtype) for r in strip], "x1": [_xs(r["x1"], xtype) for r in strip]}
@@ -147,8 +146,6 @@ def arm_panel(
             .mark_point(opacity=0, aria=False)
             .encode(x=alt.X(f"x:{xtype}", scale=scale, axis=bot_axis, title=xtitle))
         )
-    if shade is not None:
-        strip_layers.append(shade_layer(bot_axis))
     if rule_df is not None:
         strip_layers.append(rule_layer(bot_axis))
     strip_chart = alt.layer(*strip_layers).properties(width=W, height=STRIP_HEIGHT)
@@ -159,19 +156,15 @@ def entry(label: str, kind: str, colour: str, alpha: float = 1.0) -> dict:
     return {"label": label, "kind": kind, "colour": colour, "alpha": alpha}
 
 
-def band_entries(arm: str, colour: str, median_colour: str) -> list[dict]:
-    return [
-        entry(f"{arm}: q05-q95 band", "band", colour, 0.30),
-        entry(f"{arm}: median", "line", median_colour),
-    ]
-
-
+FORECAST_ENTRIES = [
+    entry("q05-q95 band", "band", FORECAST_COLOUR, 0.30),
+    entry("Median", "line", FORECAST_MEDIAN),
+]
 OBS = entry("Observed power", "line", "black")
-NRA = entry("NRA (observed power minus the load-shift)", "dashed", "black")
-SHADE = entry("Load-shift", "band", GREY_SHADE, 0.30)
+SHADE = entry("Load-shift", "band", SHADE_COLOUR, 0.7)
 GATE = entry("Gate on, or held for 7 days", "band", SKY, 0.95)
 RULES = entry("Switch times given by the maintainer", "rule", RULE_COLOUR)
-LABEL_NRA = entry("Observed power minus the labelled depth", "dashed", "#306BFF")
+LABEL_NRA = entry("Estimate of the NRA if the label were right", "dashed", "#306BFF")
 
 
 def legend(entries: list[dict]):

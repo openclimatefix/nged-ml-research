@@ -100,13 +100,16 @@ Nothing here is adopted for production.
 so recent power readings no longer show the NRA. A primary substation (a Primary) is named D2, D3,
 and so on. MW (megawatts) is real power. MVA (megavolt-amperes) is apparent power, and the eight
 "MVA-only" Primaries report only apparent power; the six "signed-MW" Primaries report signed real
-power. Each figure shows day-ahead forecasts (issued the day before the valid day) for one Primary, with
-C0 in the top panel and C2 in the bottom panel, and a key under both. The grey band and line are
-C0's q05 to q95 range (the 90% band) and median. The orange band and dark orange line are C2's. The
-black solid line is the observed power. The black dashed line is the NRA. The grey shade is the
-load-shift. The sky-blue bar under the C2 panel marks origin days (days on which the forecast was
-issued) when the gate was on, or held for 7 days after it released. The gate is a
-rule that fires when the lagged power disagrees with a forecast made without it. Where a fold month
+power. Each figure shows day-ahead forecasts (issued the day before the valid day) for one Primary,
+with C0 in the top panel and C2 in the bottom panel, and a key under both. Both panels draw the
+forecast the same way: the orange band is the q05 to q95 range (the 90% band) and the dark orange
+line is the median. The black line is the observed power. The pale lilac shade is the load-shift.
+The sky-blue bar under the C2 panel marks origin days (days on which the forecast was issued) when
+the gate was on, or held for 7 days after it released. The gate is a rule that fires when the lagged
+power disagrees with a forecast made without it. No figure draws the NRA, because it is only an
+estimate (observed power minus the fitted load-shift); every coverage number on this page is scored
+against that estimate.
+Where a fold month
 is mentioned, it is one of the five test months.
 
 **The arms.** C0 is the forecast of [experiment
@@ -123,7 +126,7 @@ The December 2025 pair is the one verified transfer in the event set of [experim
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/)
 that falls in a fold month with stored forecasts. Each Primary has one figure for the whole window
 (14 days before the start to 14 days after the end) and one zoom on the 7 days after the end. The
-grey shade is the verified window of experiment 580 (2025-12-29 to 2026-01-13). The dashed vertical
+lilac shade is the verified window of experiment 580 (2025-12-29 to 2026-01-13). The dashed vertical
 lines are the maintainer's switch times for the example event (2025-12-30 01:00 and 2026-01-14
 11:30). The power readings place the end of the load-shift on 14 January at both Primaries, so the
 maintainer's end time matches the readings and the verified window ends about one day early (see
@@ -134,8 +137,12 @@ for the step sizes).
 ![D5, verified load-shift](verified_D5_2025-12-29.svg)
 
 D5 carried 1.5 MW less during the load-shift. The gate was on for the whole window, so C2 used the
-union band throughout and the sky-blue bar spans it. Look at the dashed NRA line: C2 follows it less
-well than C0 before the start.
+union band throughout and the sky-blue bar spans it. Before the start the observed power (black) is
+the NRA, and C2's band follows it less well than C0's. The stored gate state of [experiment
+584](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00584-nra-candidate-pack-x6/result/)
+(`score_c1/gate_state.npz`) is on for every origin day from at least 16 days before the start to 26
+days after it, and held for the next 4 days, so the bar really does span the whole axis. The G4 gate
+of experiment 597 is a different gate.
 
 ![D5, verified load-shift, zoom on the 7 days after the end](verified_D5_2025-12-29_zoom.svg)
 
@@ -144,11 +151,12 @@ The same D5 window, zoomed on the 7 days after the end.
 ![D16, verified load-shift](verified_D16_2025-12-29.svg)
 
 D16 carried 1.5 MW more. Look at the zoom below: after the end, C2's band is wider than C0's and
-contains the dashed NRA line more often.
+contains the observed power more often (after the end the observed power is the NRA).
 
 ![D16, verified load-shift, zoom on the 7 days after the end](verified_D16_2025-12-29_zoom.svg)
 
-The same D16 window, zoomed on the 7 days after the end.
+The same D16 window, zoomed on the 7 days after the end. Only the second switch time falls inside
+this window.
 
 ![Gate state around each verified event](summary_gate_timeline.svg)
 
@@ -178,7 +186,7 @@ descriptive. During the event C2 covers less than C0 at both Primaries (D16 day4
 
 These are NGED's labelled events of 3 days or more that fall in a fold month with stored forecasts
 (11 events; the page shows up to 12). The dashed blue line is the observed power minus the labelled
-depth, which is what the NRA would be if the label were right. **NGED's labels are known to be
+depth, which is an estimate of the NRA if the label were right. **NGED's labels are known to be
 imperfect, so a plot where the forecast does not follow the label is not an error.** The status
 comes from [experiment
 580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/):
@@ -251,8 +259,8 @@ inputs of two Primaries, one MVA-only and one signed-MW (March 2026, the bank of
 581](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00581-robust-multiweek-lag-encoder-x3/result/)).
 The Primary differs between designs. **The injected shift is added to the lag inputs only and the
 target stays clean, so the plots show the lag-input effect**, and the observed power is also the
-NRA. In each figure, compare the width of the orange band (bottom panel) with the grey band (top
-panel) after the grey shade ends. All events in a month end on the same day, so a 30-day event
+NRA. In each figure, compare the width of the band in the bottom panel (C2) with the band in the top
+panel (C0) after the lilac shade ends. All events in a month end on the same day, so a 30-day event
 begins before the plotted window (the x axis then starts above 0). Coverage of the NRA in the 7 days
 after the end; each cell gives C0 coverage / C2 coverage:
 
@@ -404,7 +412,8 @@ Look at the phases where the gate is on: C2's band is wider than C1's there, and
 
 ![Daily band width, verified events](summary_width_over_time.svg)
 
-The orange line (C2) lies above the purple line (C1) on gate-on days.
+The orange line (C2) lies above the purple line (C1) on gate-on days. Colours differ from the other
+figures: here purple is C1 and orange is C2.
 
 ![Coverage by phase for each verified event](from584_coverage90_verified_events.svg)
 
