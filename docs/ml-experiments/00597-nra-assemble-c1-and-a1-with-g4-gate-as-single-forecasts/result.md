@@ -228,8 +228,8 @@ flags the same phases. Coverage
 589](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00589-p5-coverage-on-d5-before-the-december-load-shift/result/)
   traced the D5 miss before the shift to a level bias that every earlier forecast shares.
 - **Export.** `data/ml-experiments/backtest_export_candidates_2026-11-06/` (private, not committed):
-  `C1`, `C1_G4`, `A1`, and `A1_G4` for the five months, in the layout of experiment 593 (the earlier export, which has no result page) with a
-  `gate_on` column in the `_G4` files. `checks.txt` reproduces C1's CRPS of experiment 584 (3.081
+  `C1`, `C1_G4`, `A1`, and `A1_G4` for the five months, in the layout of
+  experiment 593 (the earlier export, which has no result page) with a `gate_on` column in the `_G4` files. `checks.txt` reproduces C1's CRPS of experiment 584 (3.081
   and 2.465), shows the C1 file equals experiment 593's, and shows the median is unchanged by the
   gate.
 
