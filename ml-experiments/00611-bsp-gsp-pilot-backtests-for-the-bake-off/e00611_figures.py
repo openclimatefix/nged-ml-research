@@ -59,7 +59,7 @@ def metric_figure(
     rule: float | None = None,
     domain: list[float] | None = None,
 ) -> None:
-    """Draw a per-arm dot for each lead band with the minimum-to-maximum range over the 5 months; one panel per group."""
+    """Draw each forecast's dot and 5-month range per lead band, one panel per group."""
     monthly = (
         rows.group_by("arm", "group", "band", "month")
         .agg(pl.col(value).mean().alias("v"))
@@ -142,10 +142,11 @@ def window_frame(*, design: str, series: str, start: datetime, days: int) -> pl.
 
 
 def pick_windows(*, series: str) -> dict[str, object]:
-    """Return the first day of a quiet 14-day window (smallest half-hour-to-half-hour change in June 2026) and of a cold-night window.
+    """Return the first day of a smooth window and of a highest-power-night window.
 
-    The cold-night window is the 14 days centred on the night (18:00 to 06:00 UTC) of the highest observed
-    power in 2025-12 and 2026-01.
+    The smooth window is the 14 days of June 2026 with the smallest mean half-hour-to-half-hour
+    change. The other window is the 14 days centred on the night (18:00 to 06:00 UTC) of the highest
+    observed power in 2025-12 and 2026-01.
     """
     id_ = {"D1": 28, "D6": 27, "D13": 2, "D17": 1}[series]
     obs = (
@@ -177,7 +178,7 @@ def pick_windows(*, series: str) -> dict[str, object]:
 
 
 def series_figure(*, design: str, series: str, file: str) -> dict[str, object]:
-    """Draw two panels (a quiet fortnight, a fortnight around the coldest-night peak) of one design's day-ahead forecast."""
+    """Draw two panels (a smooth fortnight, a highest-power-night fortnight) of one design's forecast."""
     wins = pick_windows(series=series)
     panels = []
     for key, label in (

@@ -1,12 +1,11 @@
 # ruff: noqa: E501, ANN001, ANN201, PT018
 """Experiment 611, Design 1: the lag-free network with the O2 offset, pooled per group (GPU).
 
-A trimmed copy of experiment 577's `e00577_fit.py` (only arm O2, penalty 3000 as experiment 577 picked; the
-harness is pointed at one group of 2 series by `e00611_pool.install`). Original: experiment 565's coarse harness ( refits on days 0 and 14 of
-each of the five folds, ERA5 and CAMS pretraining rows, frozen encoders, a fresh mixer, early
-stopping, the origin-time weather assertions). Changes: the arms below, the penalty scaling (each
-network's `configure`), a predictive-variance hook for forecasts and for validation, and post hoc
-arms that re-forecast saved fits.
+A trimmed copy of experiment 577's `e00577_fit.py`: only arm O2 remains, with the penalty weight
+3000 that experiment 577 picked. The harness is pointed at one group of 2 series by
+`e00611_pool.install`. The harness is experiment 565's coarse one: refits on days 0 and 14 of each of
+the five folds, ERA5 and CAMS pretraining rows, frozen encoders, a fresh mixer, early stopping, and
+the origin-time weather assertions.
 
 Usage: python e00611_fit.py {pretrain|fit|assemble} --group {bsp|gsp} [--months ...]
        [--seeds ...] [--limit N]
