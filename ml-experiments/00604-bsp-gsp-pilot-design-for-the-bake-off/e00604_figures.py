@@ -64,7 +64,7 @@ def figure_history(df: pl.DataFrame) -> None:
             alt.Chart(sub)
             .mark_line(strokeWidth=1.6)
             .encode(
-                x=alt.X("time:T", title="Week"),
+                x=alt.X("time:T", title="Week", axis=alt.Axis(format="%b %Y")),
                 y=alt.Y("mw:Q", title="Weekly mean power (MW)"),
                 color=alt.Color(
                     "series:N",
@@ -97,7 +97,9 @@ def figure_pairs(df: pl.DataFrame) -> None:
             alt.Chart(sub.filter(pl.col("series").is_in(list(members))))
             .mark_line(strokeWidth=1.2)
             .encode(
-                x=alt.X("time:T", title="Time (UTC)"),
+                x=alt.X(
+                    "time:T", title="Time (UTC)", axis=alt.Axis(format="%a %-d %b", tickCount=7)
+                ),
                 y=alt.Y("power:Q", title="Power (MW)"),
                 color=alt.Color(
                     "series:N",

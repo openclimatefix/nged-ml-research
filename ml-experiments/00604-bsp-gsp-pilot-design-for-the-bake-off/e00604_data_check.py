@@ -121,6 +121,11 @@ def main() -> None:
             print(sid, m, "clean half-hours in the 24 months before:", n, "of", 730 * 48)
 
 
+def _print_capacity() -> None:
+    path = NGED.parent / "effective_capacity"
+    print(pl.scan_delta(str(path)).filter(pl.col("time_series_id").is_in(list(SERIES))).collect())
+
+
 def _days(month: str) -> int:
     year, mon = (int(x) for x in month.split("-"))
 
@@ -129,3 +134,4 @@ def _days(month: str) -> int:
 
 if __name__ == "__main__":
     main()
+    _print_capacity()
