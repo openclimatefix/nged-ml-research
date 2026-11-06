@@ -121,6 +121,11 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         lines.append(
             f"- C1 prediction (at least {HEADLINE_FLOOR}): {'holds' if m >= HEADLINE_FLOOR else 'does not hold'}; fails if at most {FAIL_CEILING}: {'FAILS' if m <= FAIL_CEILING else 'does not fail'}"
         )
+    if "A1" in means:
+        m = means["A1"][0]
+        lines.append(
+            f"- A1 prediction P2 (at least {HEADLINE_FLOOR}): {'holds' if m >= HEADLINE_FLOOR else 'does not hold'}; at most {FAIL_CEILING}: {m <= FAIL_CEILING}"
+        )
     if len(means) == 2:
         lines.append(
             f"- both C1 and A1 at most {FAIL_CEILING}: {all(v[0] <= FAIL_CEILING for v in means.values())}"

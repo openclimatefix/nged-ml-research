@@ -61,7 +61,7 @@ If C1 behaves like P5, it misses the proposed bar L4 (total share at most 0.10 o
 - **Worlds and designs.** Experiment 587's 12 injected designs and the verified D5/D16 pair; for
   each, the event world E (power plus the shift, in the targets and the lag inputs) and the no-event
   world N. Total share = sign x (q[E] - q[N]) / depth; refit share uses the E-fitted weights on N's
-  inputs. A mirrored neighbour carries the opposite shift in every design.
+  inputs. The two Primaries of a design are a donor and a recipient, which carry opposite shifts.
 - **Schedule.** Coarse refits on day 0 and day 14 of each fold month; seeds 0 and 1; five
   development months; July 2026 unused. Weather from the run issued at or before the forecast origin
   minus 9 h; lag inputs at least 24 h old. Cleaned power; D15 and D18 are outside the 12 designs.

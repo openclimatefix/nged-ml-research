@@ -28,6 +28,7 @@ import sys
 _p = argparse.ArgumentParser()
 _p.add_argument("arm", choices=("C1", "A1"))
 _p.add_argument("--cases", nargs="+", default=None)
+# the scorer expects seeds 0 and 1, so other seeds are for smoke tests only
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 MINE = _p.parse_args()
 ARM = MINE.arm
