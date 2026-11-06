@@ -53,7 +53,7 @@ def noise_floor() -> pl.DataFrame:
     rows = []
     for f in sorted((common.OUT / "work/E0chk/obs/work/fits" / common.TAG).glob("*.parquet")):
         theirs = common.world_dir(arm="E0", world="obs") / "work/fits" / common.TAG / f.name
-        j = pl.read_parquet(f).join(pl.read_parquet(theirs), on=s587.KEYS[3:], suffix="_s")
+        j = pl.read_parquet(f).join(pl.read_parquet(theirs), on=s587.KEYS[2:], suffix="_s")
         d = (j["q50"] - j["q50_s"]).abs()
         rows.append(
             {"file": f.name, "rows": j.height, "max": float(d.max()), "mean": float(d.mean())}
