@@ -1,4 +1,4 @@
-# ruff: noqa: B023, D103, E501, PERF401, PT018
+# ruff: noqa: B023, D103, E501, PERF401
 """Experiment 591: how well the auxiliary heads recover the injected depth, and the detector view.
 
 Reads the probe files that `e00591_arm.py ARM probe` wrote (rows 24 to 120 h ahead, one file per month,
