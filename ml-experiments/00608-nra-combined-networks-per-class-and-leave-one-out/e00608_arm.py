@@ -20,6 +20,7 @@ import sys
 _p = argparse.ArgumentParser()
 _p.add_argument("name")
 _p.add_argument("command", choices=("fit", "inject", "pretrain", "step2"))
+_p.add_argument("--offset", choices=("d5", "o2"), default="d5")
 _p.add_argument("--drop", nargs="*", default=[], choices=("id", "age", "expected", "spread"))
 _p.add_argument("--e3", type=int, default=1)
 _p.add_argument("--synthetic", type=int, default=1)
@@ -49,19 +50,28 @@ assert arm.LAMBDA == 0.0, "A1 has no auxiliary loss"
 assert e.EMBARGO_DAYS == 3, "the base embargo is experiment 574's 3 days"
 DROPS = mymodel.Drops(**{f"drop_{d}": True for d in MINE.drop})
 CHAIN = OUT / "chain" / "work"
-if MINE.drop:  # a removed input needs its own pre-training and step-2 weights
+if MINE.drop or MINE.offset == "o2":  # a removed input or O2 needs its own pre-training and step-2 weights
     arm.CHAIN = CHAIN
+    cls = mymodel.O2Mdn if MINE.offset == "o2" else mymodel.DropMdn
 
     def new_model(*, n_primaries: int, stage: str = "ft"):
-        model = mymodel.DropMdn(
-            n_primaries=n_primaries, stage=stage, n_knots=e.KNOTS, n_b1=e.N_B1, drops=DROPS
-        )
+        model = cls(n_primaries=n_primaries, stage=stage, n_knots=e.KNOTS, n_b1=e.N_B1, drops=DROPS)
         model.table = e.CTX.get(f"table_{stage}")
         return model
 
     e.new_model = new_model
+    if MINE.offset == "o2":
+        e.m572.load_lag_pre_into_ft = mymodel.load_o2_pre_into_ft
+        _train = e.train
+
+        def train(*, model, is_val, **kwargs):
+            """Set the penalty's row count (experiment 577's scaling), then run experiment 574's loop."""
+            model.n_rows = float((~is_val).sum())
+            return _train(model=model, is_val=is_val, **kwargs)
+
+        e.train = train
 if MINE.command in {"pretrain", "step2"}:
-    assert MINE.drop, "the stored chain of experiment 591 is read-only"
+    assert MINE.drop or MINE.offset == "o2", "the stored chain of experiment 591 is read-only"
     e.WORK, e.W = CHAIN.parent, CHAIN
 else:
     e.WORK = OUT

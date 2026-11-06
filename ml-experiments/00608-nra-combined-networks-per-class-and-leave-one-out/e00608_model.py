@@ -61,3 +61,64 @@ class DropMdn(aux.AuxLagMdn):
             x = x.clone()
             x[:, m.SPREAD_COLS] = 0.0
         return super().forward(x, primary)
+
+
+# ---------------------------------------------------------------- the steadier offset (O2) inside A1
+
+import e00577_model_variants as mv  # ty: ignore[unresolved-import]
+import e00574_model as mod  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
+
+O2_LAMBDA = 3000.0
+"""Experiment 577's picked penalty weight for O2 (nats per standardised unit, divided by the training rows)."""
+
+
+class O2Mdn(DropMdn):
+    """A1's network with experiment 577's O2 offset (one knot per day, L1 total-variation penalty).
+
+    The monthly knots of experiment 574's D5 offset stay in the module but are unused. In fine-tuning
+    the newest `TAIL` daily knots are trained and the older ones are fixed.
+    """
+
+    n_rows: float = 1.0
+
+    def __init__(self, *, n_primaries: int, stage: str, n_knots: int, n_b1: int, drops: Drops) -> None:
+        super().__init__(n_primaries=n_primaries, stage=stage, n_knots=n_knots, n_b1=n_b1, drops=drops)
+        self.n_days = int(mv.MONTH_FIRST_DAY[n_knots - 1]) + 1
+        if stage == "pre":
+            self.dknots = nn.Parameter(torch.zeros(n_primaries, self.n_days, 1))
+        else:
+            self.register_buffer("dknots_old", torch.zeros(n_primaries, self.n_days - mv.TAIL, 1))
+            self.dknot_new = nn.Parameter(torch.zeros(n_primaries, mv.TAIL, 1))
+
+    def all_dknots(self) -> torch.Tensor:
+        """Return every daily knot, (Primaries, days, 1)."""
+        if self.stage == "pre":
+            return self.dknots
+        return torch.cat([self.dknots_old, self.dknot_new], dim=1)  # ty: ignore[invalid-argument-type]
+
+    def penalty(self) -> torch.Tensor:
+        """Return `O2_LAMBDA x total variation / n_rows`."""
+        k = self.all_dknots()
+        return O2_LAMBDA * (k[:, 1:] - k[:, :-1]).abs().sum() / self.n_rows
+
+    def offset(self, tau: torch.Tensor, primary: torch.Tensor) -> torch.Tensor:
+        """Return each row's daily knot, (rows, 1); positions after the newest read the newest knot."""
+        idx = mv.day_index(tau=tau).clamp(0, self.n_days - 1)
+        return self.all_dknots()[primary, idx]
+
+
+def load_o2_pre_into_ft(*, model: O2Mdn, state: dict[str, torch.Tensor]) -> None:
+    """Load a stage-`pre` O2 state dict into the stage-`ft` network; `mixer_ft` stays as built."""
+    assert model.stage == "ft"
+    knots = state["dknots"]
+    rest = {
+        a: v for a, v in state.items() if a not in {"dknots", "knots"} and not a.startswith("mixer_ft.")
+    }
+    missing = model.load_state_dict(rest, strict=False)
+    allowed = {"knots_old", "knot_new", "dknots_old", "dknot_new"}
+    assert all(a.startswith("mixer_ft.") or a in allowed for a in missing.missing_keys), missing
+    assert not missing.unexpected_keys, missing
+    with torch.no_grad():
+        model.dknots_old.copy_(knots[:, : -mv.TAIL])  # ty: ignore[call-non-callable]
+        model.dknot_new.copy_(knots[:, -mv.TAIL :])

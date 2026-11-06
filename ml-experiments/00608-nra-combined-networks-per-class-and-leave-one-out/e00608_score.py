@@ -21,6 +21,7 @@ _p = argparse.ArgumentParser()
 _p.add_argument("outname")
 _p.add_argument("--arm", required=True)
 _p.add_argument("--twin", default=None)
+_p.add_argument("--twin-tag", default="D5")
 _p.add_argument("--months", nargs="+", default=["2025-10", "2025-12"])
 MINE = _p.parse_args()
 
@@ -43,7 +44,7 @@ if MINE.twin:
     _orig = g.a._load
 
     def load(*, root, tag, months):
-        return _orig(root=twin_root if tag == "D5" else root, tag=tag, months=months)
+        return _orig(root=twin_root, tag=MINE.twin_tag, months=months) if tag == "D5" else _orig(root=root, tag=tag, months=months)
 
     g.a._load = load
 sys.argv = ["e00597_score.py", MINE.arm]
