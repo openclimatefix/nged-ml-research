@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 587 figures: absorbed share by phase, the median forecasts around the verified pair
+"""Experiment 587 figures: absorbed share, forecasts around events, knot movement.
+
+Figures: absorbed share by phase and by design cell, the median forecasts around the verified pair
 and four injected events, and the newest-knot movement.
 
 Run `e00587_score.py` and `e00587_knots.py` first. Every plotted series is a Primary substation
