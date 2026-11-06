@@ -1,5 +1,5 @@
 # ruff: noqa: E501, ANN001, ANN201, E402, PT018, B023, F821, ANN202
-"""Experiment 594: fit and inject the two placebo arms PS and PP (GPU), variants of experiment 584's arm C1.
+"""Experiment 594: fit and inject the placebo arms PS and PP (GPU), variants of experiment 584 C1.
 
 Experiment 584's arm C1 (= T0 here) fine-tunes experiment 574's P5 recipe on lag inputs that carry
 synthetic load-shifts on 5% of each Primary's time, with clean targets. This wrapper (copied from
