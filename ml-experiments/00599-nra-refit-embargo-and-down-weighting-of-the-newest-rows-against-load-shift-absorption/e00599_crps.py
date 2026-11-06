@@ -3,15 +3,17 @@
 
 The event-free forecasts are each arm's fits in the no-event world `obs` (the cleaned observed
 power), which the injected cases share as their `N` world. Actuals are the cleaned power
-(`clean_stack`, NaN where flagged; those half-hours are dropped and counted). CRPS here covers levels 0.01 to 0.99 only (the two outer strips are omitted for every arm alike, so absolute values read slightly low). It is twice the
-trapezoid integral over the 11 stored quantile levels (0.01 to 0.99) of the pinball loss, in MW
-(share of capacity times the Primary's capacity), with the quantiles sorted per row. The band is
+(`clean_stack`, NaN where flagged; those half-hours are dropped and counted). CRPS here covers
+levels 0.01 to 0.99 only: the two outer strips are omitted for every arm alike, so absolute values
+read slightly low. It is twice the trapezoid integral over the 11 stored quantile levels of the
+pinball loss, in MW (share of capacity times the Primary's capacity), with the quantiles sorted per row. The band is
 set by the lead in hours (valid time minus forecast origin): 0 to 24 h, and 24 h to the end.
 
 Writes `scores/crps_by_cell.parquet` (arm, group, Primary, month, band: mean CRPS, rows, coverage of
 the q05-q95 band, and the shares of rows below q01 and q99) and prints the contrast tables:
 the arm-minus-E0 difference per group, with a bootstrap interval that resamples Primary-by-month
-cells within the group (2000 draws). The half-width of that interval is the minimum detectable effect.
+cells within the group (2000 draws). The half-width of that interval is the minimum detectable
+effect.
 """
 
 from typing import Final
