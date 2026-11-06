@@ -9,7 +9,7 @@ and labels them with the verified real events of experiment 580.
 Outputs (printed, and written to `probe_report_<arm>.txt`):
 - R squared and bias of the heads by metering group, injected depth, and event length (origins from 7
   days before the onset to 14 days after the end, both lags pooled, all lag-rows of the window);
-- the detector view: an origin day "fires" when the mean over its rows of the larger of the two heads'
+- the detector view (the onset delay is only given for the 3 and 7 day events: a longer event began before the month, so its first scored origin is already late): an origin day "fires" when the mean over its rows of the larger of the two heads'
   absolute outputs exceeds a threshold. Detection rate, median onset delay, and false triggers per
   Primary-year on origin days with no labelled or verified event (the `free` flag of experiment 583's
   row table) with observed lags;
@@ -115,9 +115,11 @@ def main(arm: str) -> None:
                 n=pl.len(),
                 sse=((pl.col("pred") - pl.col("true")) ** 2).sum(),
                 sst=((pl.col("true") - pl.col("true").mean()) ** 2).sum(),
-                in_pred=pl.col("pred").filter(pl.col("true").abs() > 0).mean(),
-                in_true=pl.col("true").filter(pl.col("true").abs() > 0).mean(),
-                out_pred=pl.col("pred").filter(pl.col("true") == 0).mean(),
+                in_pred=(pl.col("pred") * pl.col("true").sign())
+                .filter(pl.col("true").abs() > 0)
+                .mean(),
+                in_true=pl.col("true").abs().filter(pl.col("true").abs() > 0).mean(),
+                out_pred=pl.col("pred").abs().filter(pl.col("true") == 0).mean(),
             )
         )
         day = inj.group_by(
@@ -175,6 +177,9 @@ def main(arm: str) -> None:
         .with_columns(r2=1 - pl.col("sse") / pl.col("sst"))
         .sort("group", "depth", "length_days")
     )
+    out = ROOT / "probe_tables"
+    out.mkdir(exist_ok=True)
+    r2.write_csv(out / f"r2_{arm}.csv")
     print(
         f"\n== {arm.upper()}: R squared of the heads on held-out injected events (both lags pooled)"
     )
@@ -206,10 +211,11 @@ def main(arm: str) -> None:
         .agg(
             n_events=pl.len(),
             detected=pl.col("delay").is_not_null().mean(),
-            median_delay_days=pl.col("delay").median(),
+            median_delay_days=pl.col("delay").filter(pl.col("length_days") <= 7).median(),
         )
         .sort("thr", "group", "depth", "length_days")
     )
+    det.write_csv(out / f"detector_{arm}.csv")
     print(
         f"\n== {arm.upper()}: detector view on the injected bank (an origin day fires when the head score exceeds the threshold)"
     )
@@ -221,6 +227,7 @@ def main(arm: str) -> None:
         .with_columns(per_primary_year=pl.col("n_fire") / (pl.col("n_days") / 365.0))
         .sort("thr", "group")
     )
+    fa.write_csv(out / f"false_triggers_{arm}.csv")
     print(
         f"\n== {arm.upper()}: false triggers on event-free origin days with observed lags (note: Primary-days summed over the five folds)"
     )
