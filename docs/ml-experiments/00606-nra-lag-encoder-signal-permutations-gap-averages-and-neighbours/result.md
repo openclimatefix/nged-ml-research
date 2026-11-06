@@ -27,10 +27,8 @@ hypothesis: >-
   own time, with exponentially weighted averages of that gap over the last days, lowers follow, and
   summaries of the gaps at all electrical neighbours lower it further.
 prediction: >-
-  Written before any score. P0: removing the expected embeddings raises follow above A1's 0.119, or
-  lowers after-end coverage on the injected bank, by more than the minimum detectable effect. P1
-  and P2: lag ID and lag age are not redundant, so each of P1 (age removed) and P2 (ID removed)
-  differs from A1 by more than the minimum detectable effect on follow or on coverage. P3: the per-lag
+  Written before any score. (The removal arms P0, P1, and P2 are dropped; experiment 608 runs those
+  removals.) P3: the per-lag
   gap lowers follow below A1's 0.119 by at least 0.015. P5: the weighted gap averages lower follow
   by at least 0.01 more than the sustain count does (P5 below P4). P7: the neighbour summaries lower
   follow by at least 0.01 more than P5, and the own-plus-neighbours sum matters (P7 below P7b by
@@ -89,9 +87,6 @@ datetime embeddings of the lag's own time with the freshest weather run issued a
 | Arm | Lag encoder reads |
 |---|---|
 | A1 | the control, stored |
-| P0 | A1 without the expected embeddings (zero inputs) |
-| P1 | A1 without the lag age |
-| P2 | A1 without the lag ID |
 | P3 | A1 + per-lag gap (4 columns) + expected-missing flag (2) |
 | P4 | P3 + sustain count (2) |
 | P5 | P3 + weighted gap averages at half-lives of 1, 3, and 7 days (12 columns), the default design |
@@ -101,9 +96,22 @@ datetime embeddings of the lag's own time with the freshest weather run issued a
 | P7c | P5 + the single best opposite-sign neighbour |
 | P8 | the best subset of P3 to P7c, scored on the remaining months |
 | O2 | the best arm with experiment 577's O2 total-variation penalty on the D5 offsets |
+| Q-pair | the best neighbour arm and the best non-neighbour arm with the paired perturbation in step 2 and step 3 |
+| Q-pre | one pre-training variant of the best arm (only if GPU time is left) |
 
-Removed inputs are zeroed in step 3 and not retrained from pre-training, so P0 to P2 measure what
-the fine-tune does without them. The expected-missing flag is 1 where no stored weather run exists
+**Stages.** Stage 1: P3 to P7c with the step-3 perturbation only. Stage 2: the best neighbour arm and
+the best non-neighbour arm again, with the paired perturbation in step 2 and step 3 as well. The
+paired perturbation lowers demand at one Primary and raises it by a smaller amount at its
+electrically connected neighbours (a transfer of megawatts split across them), and the neighbour
+summaries are computed from those perturbed lags. Stage 3, only if GPU time is left: one
+pre-training variant of the best arm, whose lag-free table `T` comes from a clean-lag A1 step-2
+network of the same fold and seed, held fixed and trained only on rows before the fold's test month.
+That dependency is circular (pre-training now needs a step-2 network) and is a caveat of the page.
+The neighbour arms (P7, P7b, P7c) are also scored on a target-side bank with a mirrored neighbour
+(experiment 595's method), because the lag-only bank rewards any perturbation. At most 2 GPU
+processes; ceiling 4 GPU-h.
+
+The expected-missing flag is 1 where no stored weather run exists
 at or before the lag's time (about 0.3% to 0.8% of rows); the page reports its share per Primary
 and checks that adding it does not change all-rows CRPS by more than the minimum detectable effect.
 
