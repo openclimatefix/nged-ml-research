@@ -25,7 +25,7 @@ DOCS = (
 )
 f598.score = score
 f598.DOCS = DOCS
-score.S_ARMS = ("P5", "P7")  # the arms the example event shows
+score.S_ARMS = ("P5", "P7")  # the arms the example event shows  # ty: ignore[unresolved-attribute]
 W, PANEL_H = f598.W, f598.PANEL_H
 
 LABEL = {
@@ -71,11 +71,11 @@ def follow_chart() -> None:
         y=alt.Y("name:N", sort=names, title=None, axis=alt.Axis(labelLimit=260)),
     )
     chart = alt.layer(
-        base.mark_rule(color=theme.DATA_BLUE).encode(
+        base.mark_rule(color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("follow_q50_days4-end_lo:Q", title="Follow: share of the injected depth that the median follows (lower is better)", scale=alt.Scale(domain=[-0.02, 0.18]), axis=alt.Axis(values=[0, 0.04, 0.08, 0.12, 0.16])),
             x2="follow_q50_days4-end_hi:Q",
         ),
-        base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(x="follow_q50_days4-end:Q"),
+        base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(x="follow_q50_days4-end:Q"),  # ty: ignore[unresolved-attribute]
     ).properties(
         width=W, height=420,
         title=alt.TitleParams(
@@ -102,8 +102,8 @@ def cost_chart() -> None:
         y=alt.Y("name:N", sort=names, title=None, axis=alt.Axis(labelLimit=260)),
     )
     layers = [
-        base.mark_rule(color=theme.DATA_BLUE).encode(x=alt.X("lo:Q", title="CRPS minus A1's, points of capacity"), x2="hi:Q"),
-        base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(x="cost:Q"),
+        base.mark_rule(color=theme.DATA_BLUE).encode(x=alt.X("lo:Q", title="CRPS minus A1's, points of capacity"), x2="hi:Q"),  # ty: ignore[unresolved-attribute]
+        base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(x="cost:Q"),  # ty: ignore[unresolved-attribute]
     ]  # fmt: skip
     chart = alt.layer(*layers).properties(width=W // 2 - 40, height=360).facet(column=alt.Column("group:N", title=None)).properties(
         title=alt.TitleParams(["Event-free CRPS cost of each arm", "Rows with no load-shift, 24-120 h ahead, 2025-10 and 2025-12. Dot: difference from A1. Line: plus and minus the minimum detectable effect."], fontSize=11, anchor="start")

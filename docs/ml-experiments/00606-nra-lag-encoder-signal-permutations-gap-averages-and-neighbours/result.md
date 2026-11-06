@@ -156,8 +156,8 @@ to R). Coverage is scored against the estimated NRA.
 
 ![Event-free CRPS cost](event_free_cost.svg)
 
-Event-free CRPS minus A1's, by arm and metering group. Look at the six MW Primaries, where every
-arm with the weighted averages costs more than at the eight MVA Primaries.
+Event-free CRPS minus A1's, by arm and metering group. Look at the six MW Primaries, where P5, P6, P7,
+P7b, and P7c cost more than at the eight MVA Primaries.
 
 ![December 2025 example event, A1](example_event_A1.svg)
 
@@ -170,7 +170,7 @@ arm with the weighted averages costs more than at the eight MVA Primaries.
 The December 2025 pair (D5 and D16, the maintainer's example event), day-ahead forecasts from 14
 days before the onset to 14 days after the end. The observed readings match the maintainer's dates
 (see the printed window match). Look at whether the median moves with the shifted readings (in the
-figure it does not for A1, R, or P7) and at the band width inside the shaded span. The real pair is
+figure it does not for A1, R, P5, or P7) and at the band width inside the shaded span. The real pair is
 descriptive: one pair, with imperfect labels.
 
 ## Results
