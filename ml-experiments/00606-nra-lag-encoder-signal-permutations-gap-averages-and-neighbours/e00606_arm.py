@@ -27,7 +27,7 @@ import sys
 
 _p = argparse.ArgumentParser()
 _p.add_argument("arm")
-_p.add_argument("command", choices=("table", "check", "fit", "inject", "assemble"))
+_p.add_argument("command", choices=("table", "check", "step2", "fit", "inject", "assemble"))
 _p.add_argument(
     "--months", nargs="+", default=["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"]
 )
@@ -56,7 +56,13 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME = "00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours"
 ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
-BASE_ARM, PLACEBO = (ARM[:-2], True) if ARM.endswith("-p") else (ARM, False)
+PLACEBO = ARM.endswith(("-p", "-p-q"))
+PAIRED = ARM.endswith("-q")
+"""`-p`: the extra columns are replaced by a resample of the training block. `-q`: the paired perturbation
+(a shift at one Primary and a smaller opposite shift at a neighbour) in step 2 and step 3."""
+BASE_ARM = ARM.removesuffix("-q").removesuffix("-p")
+PAIR_SHARE = 0.5
+"""A paired shift raises the mirrored neighbour's power by this share of the megawatts the Primary lost."""
 DIR = ARM.replace("-", "")
 TABLES = ROOT / "tables"
 TABLES_598 = (
@@ -99,7 +105,21 @@ LEAD_OF = {"day": 43, "week": 44}
 
 
 def _step2_file(*, month: str, seed: int):
+    """The A1 chain's step-2 weights; a paired arm uses (and trains) its own."""
+    p = (e.W if PAIRED else CHAIN) / "step2" / e.SPEC.tag / f"{month}_s{seed}.pt"
+    assert (PAIRED and CMD == "step2") or p.exists(), p
+    return p
+
+
+def _a1_step2_file(*, month: str, seed: int):
+    """The A1 chain's step-2 weights, from which `T` is built."""
     p = CHAIN / "step2" / e.SPEC.tag / f"{month}_s{seed}.pt"
+    assert p.exists(), p
+    return p
+
+
+def _pretrained_file(*, month: str, seed: int):
+    p = CHAIN / "pretrained_P2" / f"{month}_s{seed}.pt"
     assert p.exists(), p
     return p
 
@@ -110,7 +130,7 @@ def _stats_file(*, month: str):
     return p
 
 
-e.step2_file, e.stats_file = _step2_file, _stats_file
+e.step2_file, e.stats_file, e.pretrained_file = _step2_file, _stats_file, _pretrained_file
 
 
 def new_model(*, n_primaries: int, stage: str = "ft") -> torch.nn.Module:
@@ -163,6 +183,12 @@ def build_month_syn(*, month, clean):
     fixed, n_events = bank.synthetic_clean(
         clean=clean, first=first, last=last, seed=int(month.replace("-", ""))
     )
+    if PAIRED:  # the smaller opposite shift at one neighbour enters that neighbour's own lags too
+        own_shift = np.where(np.isfinite(fixed) & np.isfinite(clean), fixed - clean, 0.0)
+        choice = s598.mirror_choice(neighbours=NB.of, month=month)
+        fixed = s598.mirrored_power(
+            base=fixed, shift=PAIR_SHARE * own_shift, choice=choice, capacity=NB.capacity
+        )
     blk = e.block_of(
         clean=fixed, primary=mr.primary, target_idx=mr.target_idx, origin_idx=origin_idx
     )
@@ -194,7 +220,9 @@ def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> Non
             n_primaries=len(mr.base.target_mean), stage="ft", n_knots=e.KNOTS, n_b1=e.N_B1,
             kind="shared",
         ).to(device)  # fmt: skip
-        model.load_state_dict(torch.load(_step2_file(month=month, seed=seed), map_location=device))
+        model.load_state_dict(
+            torch.load(_a1_step2_file(month=month, seed=seed), map_location=device)
+        )
         model.table = e.CTX["table_ft"]
         q_mr = s598.masked_quantiles(
             model=model, x=mr.x, primary=mr.primary, target_mean=mr.base.target_mean,
@@ -239,8 +267,12 @@ class FoldSignals:
         self.table = s598.LagFreeTable(median=z["median"], origin_idx=z["origin_idx"])
         self.fixed, self.shift = SYN[id(mr)]
         self.choice = s598.mirror_choice(neighbours=NB.of, month=month)
-        self.power_sig = s598.mirrored_power(
-            base=self.fixed, shift=self.shift, choice=self.choice, capacity=NB.capacity
+        self.power_sig = (
+            self.fixed
+            if PAIRED  # the paired shift is already in the lags of the Primary and its neighbour
+            else s598.mirrored_power(
+                base=self.fixed, shift=self.shift, choice=self.choice, capacity=NB.capacity
+            )
         )
         self.weather_origin = np.asarray(e.CTX["origin_ft"])
         self._train: np.ndarray | None = None
@@ -649,11 +681,64 @@ def run_assemble() -> None:
             print("wrote", month, seed, frame.height, flush=True)
 
 
+def run_step2(*, device: str = "cuda") -> None:
+    """Train this arm's own step 2 (the paired arms): experiment 574's `step2` with the paired lags and the extra columns."""
+    assert PAIRED, "only a paired arm trains its own step 2"
+    clean = e.c.clean_stack()
+    for month in e.ARGS.months:
+        todo = [sd for sd in e.ARGS.seeds if not e.step2_file(month=month, seed=sd).exists()]
+        if not todo:
+            continue
+        mr = e.k.build_month(month=month, clean=clean)
+        test = e.build_test(month=month, standardiser=mr.base.standardiser)
+        ensure_tables(mr=mr, test=test, month=month, seeds=todo, device=device)
+        g = SigGpuMonth(mr=mr, device=device)
+        cut = e.c.month_start(month=month)
+        refit = e.c.select_rows(rows=mr, cutoff=cut, half_life_days=e.UNIFORM_HALF_LIFE)
+        assert (
+            refit.report["rows_past_valid_cut"] == 0 and refit.report["rows_past_origin_cut"] == 0
+        )
+        refit = e.embargoed(mr=mr, refit=refit, cut=cut)
+        for seed in todo:
+            started = e.time.monotonic()
+            fold_signals(mr=mr, test=test, clean=clean, month=month, seed=seed)
+            e.CTX.update(on=False, shift=None, sign=0, block=None, seed=seed, cut=cut)
+            t = g.refit_tensors(refit=refit)
+            assert float(t["w"].min()) > 0.999, "step 2 must have no recency weighting"
+            model = new_model(n_primaries=len(mr.base.target_mean)).to(device)
+            e.load_pretrained_fresh(model=model, path=e.pretrained_file(month=month, seed=seed))
+            model.to(device)
+            epochs, best = e.train(
+                model=model, x=t["x"], z=t["z"], w=t["w"], p=t["p"], is_val=t["v"], seed=seed,
+                lr=e.SPEC.lr, max_epochs=e.SPEC.max_epochs, fresh_lr=e.FRESH_LR,
+                frozen=e.SPEC.frozen, anchor=None, lam=0.0, device=device,
+            )  # fmt: skip
+            target = e.step2_file(month=month, seed=seed)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(model.state_dict(), target.with_suffix(".tmp"))
+            target.with_suffix(".tmp").rename(target)
+            latest = e.datetime.fromtimestamp(mr.valid_us[refit.index].max() / 1e6, e.UTC)
+            assert latest <= cut - e.c.regimes.REFIT_CUTOFF_AGE, (latest, cut)
+            print(
+                f"step 2 ({ARM}) {month} s{seed}: {len(refit.index):,} rows, {epochs} epochs, "
+                f"val NLL {best:.4f}, {e.time.monotonic() - started:.0f} s; latest valid {latest}",
+                flush=True,
+            )  # fmt: skip
+            del t, model
+        FOLD.clear()
+        del g, mr, test
+        torch.cuda.empty_cache()
+
+
 if __name__ == "__main__":
     if CMD in {"table", "check"}:
         e.k.build_month = build_month_syn
         e.k.GpuMonth = SigGpuMonth
         run_prepare(device="cuda", command=CMD)
+    elif CMD == "step2":
+        e.k.build_month = build_month_syn
+        e.k.GpuMonth = SigGpuMonth
+        run_step2()
     elif CMD == "fit":
         run_fit()
     elif CMD == "inject":

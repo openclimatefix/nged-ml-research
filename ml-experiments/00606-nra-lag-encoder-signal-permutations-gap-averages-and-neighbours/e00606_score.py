@@ -841,14 +841,19 @@ def contrasts(*, tab: pl.DataFrame, ef: pl.DataFrame, arms: list[str]) -> pl.Dat
     add("P7 neighbours vs P5", "P7", "P5", 0.01)
     add("P7 own-plus-sum vs without", "P7", "P7b", 0.005)
     fam = [a for a in arm_family(arms=arms) if a in have]
+    fam_plain = [a for a in fam if not a.endswith("-q")]
     if fam:
-        best = min(fam, key=lambda a: float(np.mean(follow_cl(tab=tab, system=a)[0])))
+        best = min(fam_plain, key=lambda a: float(np.mean(follow_cl(tab=tab, system=a)[0])))
         print("best arm by follow:", best, flush=True)
         for phase in ("days4-end", "after0-7"):
             if f"{best}-rs" in have:
                 res = paired(tab=tab, a_="R", b_=f"{best}-rs", phase=phase, metric="cover90")
                 rows.append(_row(test=f"reach {phase}", contrast=f"cover90(R) - cover90({best}-rs)", res=res, margin=0.01))  # fmt: skip
-        add(f"placebo ({best})", best, f"{best}-p", 0.02)
+        for x in fam:
+            add(f"placebo ({x})", x, f"{x}-p", 0.02)
+        for x in fam:
+            if x.endswith("-q"):
+                add(f"paired perturbation ({x})", x, x.removesuffix("-q"), 0.01)
         for grp in k597.GROUPS_SCORED:
             r = ef.filter(
                 (pl.col("group") == grp) & (pl.col("band") == BAND) & (pl.col("system") == best)
@@ -895,6 +900,8 @@ def main() -> None:
     ef = event_free(sy=sy)
     ef.write_csv(out / "event_free.csv")
     real_events(sy=sy).write_csv(out / "real_event_phase.csv")
+    np.save(out / "wide_r.npy", inp.mode)
+    np.save(out / "wide_t.npy", sy.tg.wide(gap=sy.tg.gap, origin_days=inp.origin_days))
     if args.no_bank:
         return
     tab, repro_bank = score_bank(sy=sy)
