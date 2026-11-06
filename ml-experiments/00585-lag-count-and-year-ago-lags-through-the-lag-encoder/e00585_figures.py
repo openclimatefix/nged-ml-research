@@ -55,12 +55,12 @@ def contrasts_figure() -> None:
             legend=None,
         ),
     )  # ty: ignore[unresolved-attribute]
-    pts = base.mark_point(filled=True, size=50).encode(
+    pts = base.mark_point(filled=True, size=50).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "difference:Q", title="CRPS minus control (points of capacity; below zero is better)"
         )
     )
-    bars = base.mark_rule().encode(x="low_bonferroni_month:Q", x2="high_bonferroni_month:Q")
+    bars = base.mark_rule().encode(x="low_bonferroni_month:Q", x2="high_bonferroni_month:Q")  # ty: ignore[unresolved-attribute]
     zero = alt.Chart(c).mark_rule(color="#999999").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
     chart = (
         alt.layer(zero, bars, pts)
@@ -110,10 +110,10 @@ def slices_figure() -> None:
             legend=None,
         ),
     )  # ty: ignore[unresolved-attribute]
-    pts = base.mark_point(filled=True, size=50).encode(
+    pts = base.mark_point(filled=True, size=50).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("difference:Q", title="CRPS minus control at 24-120 h (points of capacity)")
     )
-    bars = base.mark_rule().encode(x="low_bonferroni_month:Q", x2="high_bonferroni_month:Q")
+    bars = base.mark_rule().encode(x="low_bonferroni_month:Q", x2="high_bonferroni_month:Q")  # ty: ignore[unresolved-attribute]
     zero = alt.Chart(c).mark_rule(color="#999999").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
     chart = (
         alt.layer(zero, bars, pts)
@@ -173,13 +173,13 @@ def example_figure(
         x=alt.X("day:Q", title=f"Days since {lo}"),
         color=alt.Color("series:N", scale=cs, legend=alt.Legend(orient="top", title=None)),
     )  # ty: ignore[unresolved-attribute]
-    b90 = base.mark_area(opacity=0.10).encode(
+    b90 = base.mark_area(opacity=0.10).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("q05:Q", title="Power (% of capacity)", scale=alt.Scale(zero=False)), y2="q95:Q"
     )
-    b50 = base.mark_area(opacity=0.16).encode(y="q25:Q", y2="q75:Q")
-    med = base.mark_line(strokeWidth=1.3).encode(y="q50:Q")
+    b50 = base.mark_area(opacity=0.16).encode(y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+    med = base.mark_line(strokeWidth=1.3).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
     act = (
-        alt.Chart(d.filter(pl.col("series") == "Control (v3+D5)"))
+        alt.Chart(d.filter(pl.col("series") == "Control (v3+D5)"))  # ty: ignore[unresolved-attribute]
         .mark_line(color="#222222", strokeWidth=1.0)
         .encode(x="day:Q", y="actual:Q")
     )  # ty: ignore[unresolved-attribute]
