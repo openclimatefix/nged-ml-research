@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, E402, D103, E501
+# ruff: noqa: ANN201, E402, E501, ANN003, PT018
 """Experiment 608: fit the lag-free twin with the O2 offset (arm K3 with O2) with or without the E3 refit rule (GPU).
 
 A wrapper over experiment 577's `e00577_fit.py` (arm O2: the lag-free network with the steadier output
@@ -53,7 +53,11 @@ if MINE.e3:
         keep = age_days >= E3_EMBARGO_DAYS
         window = (age_days >= E3_EMBARGO_DAYS) & (age_days < E3_EMBARGO_DAYS + DOWN_WEIGHT_DAYS)
         weight = np.where(window, refit.weight * DOWN_WEIGHT, refit.weight).astype(np.float32)
-        report = {**refit.report, "downweighted_rows": int(window.sum()), "embargo_days": E3_EMBARGO_DAYS}
+        report = {
+            **refit.report,
+            "downweighted_rows": int(window.sum()),
+            "embargo_days": E3_EMBARGO_DAYS,
+        }
         # the early-stopping rows are kept or dropped with the same age rule
         return c.Refit(refit.index[keep], refit.y[keep], weight[keep], refit.is_val[keep], report)
 

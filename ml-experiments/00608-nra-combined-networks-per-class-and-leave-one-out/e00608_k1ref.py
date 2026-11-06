@@ -33,7 +33,9 @@ def main() -> None:
     print(row.select("cover90", "cover90_lo", "cover90_hi", "n_events"))
     got = float(row["cover90"][0])
     verdict = abs(got - STORED) <= TOLERANCE
-    print(f"K1-ref day-4-to-end coverage {got:.4f} vs stored {STORED}: {'PASS' if verdict else 'FAIL'}")
+    print(
+        f"K1-ref day-4-to-end coverage {got:.4f} vs stored {STORED}: {'PASS' if verdict else 'FAIL'}"
+    )
     (WORK / "k1ref" / "k1ref_gate.txt").write_text(f"{got:.4f} {'PASS' if verdict else 'FAIL'}\n")
 
 

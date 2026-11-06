@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, E402, D103, E501
+# ruff: noqa: ANN201, E402, E501, ANN003, PT018
 """Experiment 608: fit the lag-free twin (arm K3 with D5) with or without the E3 refit rule (GPU).
 
 A wrapper over experiment 565's `e00565_fit.py` (arm D5: the lag-free network with the slow output
@@ -54,12 +54,18 @@ if MINE.e3:
         keep = age_days >= E3_EMBARGO_DAYS
         window = (age_days >= E3_EMBARGO_DAYS) & (age_days < E3_EMBARGO_DAYS + DOWN_WEIGHT_DAYS)
         weight = np.where(window, refit.weight * DOWN_WEIGHT, refit.weight).astype(np.float32)
-        report = {**refit.report, "downweighted_rows": int(window.sum()), "embargo_days": E3_EMBARGO_DAYS}
+        report = {
+            **refit.report,
+            "downweighted_rows": int(window.sum()),
+            "embargo_days": E3_EMBARGO_DAYS,
+        }
         # the early-stopping rows are kept or dropped with the same age rule
         return c.Refit(refit.index[keep], refit.y[keep], weight[keep], refit.is_val[keep], report)
 
     c.select_rows = select_rows
 
-f565.fit_arm(months=f565.ARGS.months, seeds=f565.ARGS.seeds, stress=False, limit=None, device="cuda")
+f565.fit_arm(
+    months=f565.ARGS.months, seeds=f565.ARGS.seeds, stress=False, limit=None, device="cuda"
+)
 (OUT / "checks_fit.json").write_text(__import__("json").dumps(f565.CHECK, indent=1, default=str))
 print("CHECKS PASSED", {a: v for a, v in f565.CHECK.items() if a != "months"})

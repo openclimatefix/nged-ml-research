@@ -26,10 +26,10 @@ _p.add_argument("--months", nargs="+", default=["2025-10", "2025-12"])
 MINE = _p.parse_args()
 
 import e00583_common as c  # ty: ignore[unresolved-import]
+import e00584_score as k584  # ty: ignore[unresolved-import]
 import e00592_common as g  # ty: ignore[unresolved-import]
 import e00597_common as k597  # ty: ignore[unresolved-import]
 import e00597_score as s597  # ty: ignore[unresolved-import]
-import e00584_score as k584  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME = "00608-nra-combined-networks-per-class-and-leave-one-out"
@@ -44,7 +44,11 @@ if MINE.twin:
     _orig = g.a._load
 
     def load(*, root, tag, months):
-        return _orig(root=twin_root, tag=MINE.twin_tag, months=months) if tag == "D5" else _orig(root=root, tag=tag, months=months)
+        return (
+            _orig(root=twin_root, tag=MINE.twin_tag, months=months)
+            if tag == "D5"
+            else _orig(root=root, tag=tag, months=months)
+        )
 
     g.a._load = load
 sys.argv = ["e00597_score.py", MINE.arm]

@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, D107, E402, PLW2901
 """Experiment 608: experiment 591's A1 network with one group of inputs removed.
 
 Removal multiplies the inputs by zero, in pre-training, step 2, and the daily fine-tune alike (the
@@ -35,11 +35,17 @@ class Drops:
 class DropMdn(aux.AuxLagMdn):
     """A1's network with the inputs of `drops` set to zero."""
 
-    def __init__(self, *, n_primaries: int, stage: str, n_knots: int, n_b1: int, drops: Drops) -> None:
-        super().__init__(n_primaries=n_primaries, stage=stage, n_knots=n_knots, n_b1=n_b1, kind="shared")
+    def __init__(
+        self, *, n_primaries: int, stage: str, n_knots: int, n_b1: int, drops: Drops
+    ) -> None:
+        super().__init__(
+            n_primaries=n_primaries, stage=stage, n_knots=n_knots, n_b1=n_b1, kind="shared"
+        )
         self.drops = drops
 
-    def lag_embedding(self, *, x: torch.Tensor, primary: torch.Tensor, emb: torch.Tensor) -> torch.Tensor:
+    def lag_embedding(
+        self, *, x: torch.Tensor, primary: torch.Tensor, emb: torch.Tensor
+    ) -> torch.Tensor:
         """Return the two lags' encoder outputs, day lag first, without the removed inputs."""
         (dw, dd), (ww, wd) = self._expected(x=x, primary=primary, emb=emb)
         outs = []
@@ -66,7 +72,6 @@ class DropMdn(aux.AuxLagMdn):
 # ---------------------------------------------------------------- the steadier offset (O2) inside A1
 
 import e00577_model_variants as mv  # ty: ignore[unresolved-import]
-import e00574_model as mod  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]
 
 O2_LAMBDA = 3000.0
@@ -82,8 +87,12 @@ class O2Mdn(DropMdn):
 
     n_rows: float = 1.0
 
-    def __init__(self, *, n_primaries: int, stage: str, n_knots: int, n_b1: int, drops: Drops) -> None:
-        super().__init__(n_primaries=n_primaries, stage=stage, n_knots=n_knots, n_b1=n_b1, drops=drops)
+    def __init__(
+        self, *, n_primaries: int, stage: str, n_knots: int, n_b1: int, drops: Drops
+    ) -> None:
+        super().__init__(
+            n_primaries=n_primaries, stage=stage, n_knots=n_knots, n_b1=n_b1, drops=drops
+        )
         self.n_days = int(mv.MONTH_FIRST_DAY[n_knots - 1]) + 1
         if stage == "pre":
             self.dknots = nn.Parameter(torch.zeros(n_primaries, self.n_days, 1))
@@ -113,7 +122,9 @@ def load_o2_pre_into_ft(*, model: O2Mdn, state: dict[str, torch.Tensor]) -> None
     assert model.stage == "ft"
     knots = state["dknots"]
     rest = {
-        a: v for a, v in state.items() if a not in {"dknots", "knots"} and not a.startswith("mixer_ft.")
+        a: v
+        for a, v in state.items()
+        if a not in {"dknots", "knots"} and not a.startswith("mixer_ft.")
     }
     missing = model.load_state_dict(rest, strict=False)
     allowed = {"knots_old", "knot_new", "dknots_old", "dknot_new"}

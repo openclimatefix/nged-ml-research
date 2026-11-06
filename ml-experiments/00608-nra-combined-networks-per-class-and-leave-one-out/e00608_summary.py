@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, ANN001, ANN201
+# ruff: noqa: D103, E501
 """Experiment 608: the leave-one-out table. Each arm minus K1, with Bonferroni intervals (CPU).
 
 For every scored arm (folder `score/<arm>/<arm>`), three paired contrasts against K1 (`k1_d5`):
@@ -43,12 +43,18 @@ def interval(*, diffs: np.ndarray, n_counted: int) -> tuple[float, float, float]
     idx = RNG.integers(0, len(diffs), size=(N_BOOT, len(diffs)))
     means = diffs[idx].mean(axis=1)
     a = 0.05 / n_counted
-    return float(diffs.mean()), float(np.percentile(means, 100 * a / 2)), float(np.percentile(means, 100 * (1 - a / 2)))
+    return (
+        float(diffs.mean()),
+        float(np.percentile(means, 100 * a / 2)),
+        float(np.percentile(means, 100 * (1 - a / 2))),
+    )
 
 
 def bank(*, arm: str) -> pl.DataFrame:
     t = pl.read_csv(SCORE / arm / arm / "bank_event_phase.csv").filter(
-        (pl.col("system") == "G4") & (pl.col("band") == "24-120 h") & (pl.col("length_days") >= 15)
+        (pl.col("system") == "G4")
+        & (pl.col("band") == "24-120 h")
+        & (pl.col("length_days") >= 15)
         & pl.col("phase").is_in(["days4-end", "after0-7"])
     )
     return t.select("month", "pass", "primary", "phase", "cover90", "follow_q50")
@@ -80,32 +86,60 @@ def main() -> None:
             rec[key], rec[f"{key}_lo"], rec[f"{key}_hi"] = m, lo, hi
             rec[f"{key}_verdict"] = verdict(lo=lo, hi=hi, tol=TOL[key], worse_is_negative=True)
         d = both.filter(pl.col("phase") == "days4-end")
-        m, lo, hi = interval(diffs=(d["follow_q50"] - d["follow_q50_ref"]).to_numpy(), n_counted=n_counted)
+        m, lo, hi = interval(
+            diffs=(d["follow_q50"] - d["follow_q50_ref"]).to_numpy(), n_counted=n_counted
+        )
         rec["follow"], rec["follow_lo"], rec["follow_hi"] = m, lo, hi
         rec["follow_verdict"] = verdict(lo=lo, hi=hi, tol=TOL["follow"], worse_is_negative=False)
         # event-free CRPS, paired on rows, cells = (Primary, month)
-        a = pl.DataFrame({k: ref_rows[k] for k in ("prim", "origin_idx", "idx", "band", "free", "group", "month", "crps_g4")})
+        a = pl.DataFrame(
+            {
+                k: ref_rows[k]
+                for k in ("prim", "origin_idx", "idx", "band", "free", "group", "month", "crps_g4")
+            }
+        )
         b = pl.DataFrame({k: rows[k] for k in ("prim", "origin_idx", "idx", "crps_g4")})
         j = a.join(b, on=["prim", "origin_idx", "idx"], suffix="_arm").filter(
             pl.col("free") & (pl.col("band") == 1) & pl.col("group").is_in(GROUPS)
         )
-        cells = j.group_by("prim", "month").agg((pl.col("crps_g4_arm") - pl.col("crps_g4")).mean().alias("d"))
+        cells = j.group_by("prim", "month").agg(
+            (pl.col("crps_g4_arm") - pl.col("crps_g4")).mean().alias("d")
+        )
         m, lo, hi = interval(diffs=cells["d"].to_numpy(), n_counted=n_counted)
         rec["crps"], rec["crps_lo"], rec["crps_hi"], rec["crps_mde"] = m, lo, hi, (hi - lo) / 2
         ef = pl.read_csv(SCORE / arm / arm / "event_free.csv").filter(
-            (pl.col("group") == "both groups") & (pl.col("band") == "24-120 h") & (pl.col("system") == "G4")
+            (pl.col("group") == "both groups")
+            & (pl.col("band") == "24-120 h")
+            & (pl.col("system") == "G4")
         )
         rec["event_free_cover90"] = float(ef["cover90"][0])
         out.append(rec)
     ref_ef = pl.read_csv(SCORE / REF / REF / "event_free.csv").filter(
-        (pl.col("group") == "both groups") & (pl.col("band") == "24-120 h") & (pl.col("system") == "G4")
+        (pl.col("group") == "both groups")
+        & (pl.col("band") == "24-120 h")
+        & (pl.col("system") == "G4")
     )
     ref_b = ref_bank.group_by("phase").agg(pl.col("cover90").mean(), pl.col("follow_q50").mean())
     table = pl.DataFrame(out, infer_schema_length=None)
     table.write_csv(SCORE / "leave_one_out.csv")
     print("K1 reference:", ref_b.to_dicts(), "event-free cover90", float(ref_ef["cover90"][0]))
     with pl.Config(tbl_rows=30, tbl_cols=30, fmt_str_lengths=40):
-        print(table.select("arm", "cover_days4", "cover_days4_lo", "cover_days4_hi", "cover_days4_verdict", "cover_after", "cover_after_verdict", "follow", "follow_verdict", "crps", "crps_mde", "event_free_cover90"))
+        print(
+            table.select(
+                "arm",
+                "cover_days4",
+                "cover_days4_lo",
+                "cover_days4_hi",
+                "cover_days4_verdict",
+                "cover_after",
+                "cover_after_verdict",
+                "follow",
+                "follow_verdict",
+                "crps",
+                "crps_mde",
+                "event_free_cover90",
+            )
+        )
 
 
 if __name__ == "__main__":

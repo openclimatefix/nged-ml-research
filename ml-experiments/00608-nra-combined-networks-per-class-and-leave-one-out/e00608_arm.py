@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, E402, D103, E501
+# ruff: noqa: ANN001, ANN201, E402, D103, E501, ANN003
 """Experiment 608: fit or inject one arm of the leave-one-out table (GPU).
 
 A wrapper over experiment 591's `e00591_arm.py` (arm A1: shared lag encoder with lag ID, no auxiliary
@@ -50,7 +50,9 @@ assert arm.LAMBDA == 0.0, "A1 has no auxiliary loss"
 assert e.EMBARGO_DAYS == 3, "the base embargo is experiment 574's 3 days"
 DROPS = mymodel.Drops(**{f"drop_{d}": True for d in MINE.drop})
 CHAIN = OUT / "chain" / "work"
-if MINE.drop or MINE.offset == "o2":  # a removed input or O2 needs its own pre-training and step-2 weights
+if (
+    MINE.drop or MINE.offset == "o2"
+):  # a removed input or O2 needs its own pre-training and step-2 weights
     arm.CHAIN = CHAIN
     cls = mymodel.O2Mdn if MINE.offset == "o2" else mymodel.DropMdn
 
@@ -88,7 +90,11 @@ if MINE.e3 and MINE.command in {"fit", "inject"}:
         age_days = (e.c.us(t=cutoff) - rows.valid_us[refit.index]) / e.c.DAY_US
         window = (age_days >= E3_EMBARGO_DAYS) & (age_days < E3_EMBARGO_DAYS + DOWN_WEIGHT_DAYS)
         weight = np.where(window, refit.weight * DOWN_WEIGHT, refit.weight).astype(np.float32)
-        report = {**refit.report, "downweighted_rows": int(window.sum()), "embargo_days": E3_EMBARGO_DAYS}
+        report = {
+            **refit.report,
+            "downweighted_rows": int(window.sum()),
+            "embargo_days": E3_EMBARGO_DAYS,
+        }
         return e.c.Refit(refit.index, refit.y, weight, refit.is_val, report)
 
     e.c.select_rows = select_rows

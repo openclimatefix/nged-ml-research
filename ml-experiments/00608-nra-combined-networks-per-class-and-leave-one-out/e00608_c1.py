@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, E402, D103, E501
+# ruff: noqa: ANN201, E402, D103, E501, ANN003
 """Experiment 608: fit or inject the C1 wiring (experiment 584's P5 with separate lag encoders) with E3 (GPU).
 
 A wrapper over experiment 584's `e00584_arm.py`, with the E3 refit rule of `e00608_arm.py` applied to
@@ -16,7 +16,14 @@ _p.add_argument("command", choices=("fit", "inject"))
 _p.add_argument("--months", nargs="+", default=["2025-10", "2025-12"])
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 MINE = _p.parse_args()
-sys.argv = ["e00584_arm.py", MINE.command, "--months", *MINE.months, "--seeds", *map(str, MINE.seeds)]
+sys.argv = [
+    "e00584_arm.py",
+    MINE.command,
+    "--months",
+    *MINE.months,
+    "--seeds",
+    *map(str, MINE.seeds),
+]
 
 import e00584_arm as arm  # ty: ignore[unresolved-import]
 import numpy as np
