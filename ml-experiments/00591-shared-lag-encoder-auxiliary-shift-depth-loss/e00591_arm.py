@@ -185,8 +185,8 @@ def calibrate_train(*, model, x, z, w, p, is_val, seed, **_):
         l_aux = (w[b] * aux).sum() / w[b].sum()
         g_nll = torch.autograd.grad(l_nll, params, retain_graph=True, allow_unused=True)
         g_aux = torch.autograd.grad(l_aux, params, allow_unused=True)
-        n1 = float(torch.sqrt(sum((g**2).sum() for g in g_nll if g is not None)))
-        n2 = float(torch.sqrt(sum((g**2).sum() for g in g_aux if g is not None)))
+        n1 = float(torch.sqrt(torch.stack([(g**2).sum() for g in g_nll if g is not None]).sum()))
+        n2 = float(torch.sqrt(torch.stack([(g**2).sum() for g in g_aux if g is not None]).sum()))
         rows.append(
             {"grad_norm_nll": n1, "grad_norm_aux": n2, "nll": float(l_nll), "aux_mse": float(l_aux)}
         )

@@ -118,7 +118,7 @@ class AuxLagMdn(mod.PartDMdn):
         aux = self.aux_from(hl=hl) if need_aux else None
         if labels is not None and self.training:
             ok = torch.isfinite(labels)
-            err = torch.where(ok, (aux - torch.nan_to_num(labels)) ** 2, torch.zeros_like(aux))  # ty: ignore[unsupported-operator]
+            err = torch.where(ok, (aux - torch.nan_to_num(labels)) ** 2, torch.zeros_like(aux))  # ty: ignore[unsupported-operator, invalid-argument-type]
             STASH["aux"] = err.sum(dim=1) / 2.0
         core = torch.cat([hw, hd, hl, emb], dim=-1)
         if self.stage == "pre":
@@ -127,7 +127,7 @@ class AuxLagMdn(mod.PartDMdn):
             parts = [core, x[:, m.SPREAD_COLS], x[:, m.LEAD_COLS]]
             if self.detector:
                 parts.append(aux)  # ty: ignore[invalid-argument-type]
-            out = self.mixer_ft(torch.cat(parts, dim=-1))
+            out = self.mixer_ft(torch.cat(parts, dim=-1))  # ty: ignore[invalid-argument-type]
         off = self.offset(x[:, mod.TAU], primary)
         k = m.COMPONENTS
         return torch.cat([out[:, :k], out[:, k : 2 * k] + off, out[:, 2 * k :]], dim=-1)

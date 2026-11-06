@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, D205, D107, D102, ANN001, ANN003
+# ruff: noqa: E501, D103, D205, ANN001, ANN003
 """Experiment 591 figures: day-ahead bands of arms A0 to A4 around the verified December pair and
 injected events, coverage by phase, the false-alarm cost, tail pinball loss, and the auxiliary heads'
 recovery of the injected depth.
@@ -57,7 +57,9 @@ def arm_injected(*, arm: str, t: c.X4Table, month: str, r: int, rows: np.ndarray
     saved = c.INJECT
     c.INJECT = ROOT / f"view_{arm.lower()}/inject"
     try:
-        return s3.load_injected(t=t, month=month, r=r, rows=rows, order=order, sorted_keys=sorted_keys)
+        return s3.load_injected(
+            t=t, month=month, r=r, rows=rows, order=order, sorted_keys=sorted_keys
+        )
     finally:
         c.INJECT = saved
 
@@ -69,7 +71,9 @@ def event_panels(*, arms, rows, t, **kw) -> None:
     if STATE.get("pass") is None:
         new = {a: STATE["V"][a][rows] for a in ARMS}
     else:
-        new = {a: arm_injected(arm=a, t=t, month="2025-10", r=STATE["pass"], rows=rows) for a in ARMS}
+        new = {
+            a: arm_injected(arm=a, t=t, month="2025-10", r=STATE["pass"], rows=rows) for a in ARMS
+        }
     _orig_panels(t=t, rows=rows, arms=new, **kw)
 
 
@@ -78,7 +82,8 @@ f3.event_panels = event_panels
 
 def bank_examples(*, t: c.X4Table, gi: dict) -> None:
     """Injected events chosen by a fixed rule: in 2025-10, per metering group, the lowest-numbered
-    Primary with a 15-day event of depth 0.5, up and down, taking the lowest pass; plus a 7-day pair."""
+    Primary with a 15-day event of depth 0.5, up and down, taking the lowest pass; plus a 7-day pair.
+    """
     ev_all = pl.read_parquet(s3.BANK_PARQUET).filter(pl.col("month") == "2025-10")
     in_m = t.month == "2025-10"
     origin_days_m = sorted({int(d) for d in np.unique(t.origin_day[in_m])})
@@ -98,12 +103,18 @@ def bank_examples(*, t: c.X4Table, gi: dict) -> None:
             evr = ev_all.filter(pl.col("pass") == r)
             lo, hi = e["onset_idx"] - 3 * 48, e["end_idx"] + 7 * 48
             rows = f3.day_ahead_rows(t=t, prim=p, lo=lo, hi=hi, mask=in_m)
-            ok = np.isfinite(arm_injected(arm="A2", t=t, month="2025-10", r=r, rows=rows)).all(axis=1)
+            ok = np.isfinite(arm_injected(arm="A2", t=t, month="2025-10", r=r, rows=rows)).all(
+                axis=1
+            )
             rows = rows[ok]
             gap_i = gap_m.copy()
             for ee in evr.iter_rows(named=True):
-                gap_i[ee["primary"], ee["onset_idx"] // 48 : ee["end_idx"] // 48] += ee["sign"] * ee["depth"]
-            on, snap = c.gate_state(gap=gap_i, thr=gi["thr"], origin_days=origin_days_m, release_days=1)
+                gap_i[ee["primary"], ee["onset_idx"] // 48 : ee["end_idx"] // 48] += (
+                    ee["sign"] * ee["depth"]
+                )
+            on, snap = c.gate_state(
+                gap=gap_i, thr=gi["thr"], origin_days=origin_days_m, release_days=1
+            )
             hold = c.hold_from(snap=snap)
             STATE["pass"] = r
             event_panels(
@@ -124,7 +135,14 @@ def tails_figure() -> None:
         (pl.col("band") == "24-120 h") & (pl.col("length_class") == "15 and 30 days")
         & (pl.col("phase") == "after0-7") & (pl.col("group") == "both groups")
     )  # fmt: skip
-    long_ = pl.concat([b.select("arm", pl.lit(q).alias("quantile"), (pl.col(f"pin{q[1:]}") * 100).alias("pinball")) for q in ("q01", "q05", "q95", "q99")])
+    long_ = pl.concat(
+        [
+            b.select(
+                "arm", pl.lit(q).alias("quantile"), (pl.col(f"pin{q[1:]}") * 100).alias("pinball")
+            )
+            for q in ("q01", "q05", "q95", "q99")
+        ]
+    )
     arms = [a for a in COLOUR if a in set(b["arm"].to_list())]
     alt.Chart(long_).mark_bar(aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("arm:N", sort=arms, title=None, axis=alt.Axis(labelAngle=-45)),
@@ -151,12 +169,21 @@ def false_alarm_figure() -> None:
             color=alt.Color("band:N", scale=alt.Scale(range=[theme.DATA_BLUE, theme.BRAND_ORANGE]), legend=alt.Legend(title="Pinball loss of", orient="top")),
             yOffset="band:N",
         )  # fmt: skip
-        cols.append(base.mark_point(filled=True, size=50, aria=False).properties(width=240, height=160, title=g))  # ty: ignore[unresolved-attribute]
+        cols.append(
+            base.mark_point(filled=True, size=50, aria=False).properties(  # ty: ignore[unresolved-attribute]
+                width=240, height=160, title=g
+            )
+        )  # ty: ignore[unresolved-attribute]
     alt.hconcat(*cols).properties(title=alt.TitleParams(["Pinball loss on rows with no load-shift within 7 days, 24-120 h"], fontSize=11, anchor="start")).save(str(DOCS / "event_free_pinball.svg"))  # fmt: skip
 
 
 def r2_figure() -> None:
-    d = pl.concat([pl.read_csv(ROOT / f"probe_tables/r2_{a.lower()}.csv").with_columns(arm=pl.lit(a)) for a in ("A1", "A2", "A3", "A4")])
+    d = pl.concat(
+        [
+            pl.read_csv(ROOT / f"probe_tables/r2_{a.lower()}.csv").with_columns(arm=pl.lit(a))
+            for a in ("A1", "A2", "A3", "A4")
+        ]
+    )
     d = d.group_by("arm", "depth").agg(pl.col("sse").sum(), pl.col("sst").sum()).with_columns(r2=1 - pl.col("sse") / pl.col("sst")).sort("arm", "depth")  # fmt: skip
     arms = ["A1", "A2", "A3", "A4"]
     alt.Chart(d).mark_bar(aria=False).encode(  # ty: ignore[unresolved-attribute]
@@ -168,8 +195,20 @@ def r2_figure() -> None:
 
 
 def detector_figure() -> None:
-    det = pl.concat([pl.read_csv(ROOT / f"probe_tables/detector_{a.lower()}.csv").with_columns(arm=pl.lit(a)) for a in ("A2", "A3", "A4")])
-    fa = pl.concat([pl.read_csv(ROOT / f"probe_tables/false_triggers_{a.lower()}.csv").with_columns(arm=pl.lit(a)) for a in ("A2", "A3", "A4")])
+    det = pl.concat(
+        [
+            pl.read_csv(ROOT / f"probe_tables/detector_{a.lower()}.csv").with_columns(arm=pl.lit(a))
+            for a in ("A2", "A3", "A4")
+        ]
+    )
+    fa = pl.concat(
+        [
+            pl.read_csv(ROOT / f"probe_tables/false_triggers_{a.lower()}.csv").with_columns(
+                arm=pl.lit(a)
+            )
+            for a in ("A2", "A3", "A4")
+        ]
+    )
     d = det.group_by("arm", "thr").agg(detected=(pl.col("detected") * pl.col("n_events")).sum() / pl.col("n_events").sum()).join(
         fa.group_by("arm", "thr").agg(pl.col("n_days").sum(), pl.col("n_fire").sum()).with_columns(false_per_primary_year=pl.col("n_fire") / (pl.col("n_days") / 365.0)), on=["arm", "thr"])  # fmt: skip
     arms = ["A2", "A3", "A4"]
