@@ -6,7 +6,7 @@ load-shifts plus the gated band, experiment 584) on verified events, labelled ev
 events, and event-free windows, from the forecasts experiment 584 stored. Demand series only: every
 plotted series is a Primary substation. Run experiment 584's `e00584_score.py c0` and `c1` first.
 
-Usage: DATA_PATH_INTERNAL=... PYTHONPATH=<every ml-experiments folder> python e00588_gallery.py
+Usage: DATA_PATH_INTERNAL=... PYTHONPATH=(all ml-experiments folders) python e00588_gallery.py
 """
 
 import shutil
