@@ -54,14 +54,15 @@ headline: >-
   and 0.20 of the fitted depth at D10, D11, D12, and D16, and sits inside the placebo range at
   all four. No fine-tune ran.
 lessons: >-
-  The May 2026 fitted depths cannot serve as a test target. D12's observed power does step down on
-  about 2026-05-03 and back up on about 2026-05-22 by roughly the depth of the first transfer, which
-  looks like a real transfer, but the lag-free forecast shows no matching gap and the labelled
-  partner D16 steps up on a different date, so the pair is not confirmed.
+  The May 2026 fitted depths cannot serve as a test target. One observation, not a finding: D12's
+  observed power steps down by about 0.22 of capacity on about 2026-05-03 and back up by 0.13 to
+  0.22 on about 2026-05-22, but it also returns near its old level on 7 to 10 May, the lag-free
+  forecast shows no matching gap, and the partner D16 steps up on 11 May, so the pair is not
+  confirmed.
 take_home_message: >-
   The four load-shifts that NGED logged in May 2026 do not show up as a gap between the observed power
-  and a forecast that reads no recent power. Their fitted depths are 3% to 37% as large in the readings
-  as the labels claim, so we cannot use them as a second real test of the candidate forecast. The
+  and a forecast that reads no recent power. The measured gap is 3% to 37% of each fitted depth, so
+  we cannot use these events as a second real test of the candidate forecast. The
   next step is to ask NGED to confirm which Primaries exchanged load in May 2026 and on which days,
   and to keep testing the candidate on the December 2025 pair and on injected events.
 production_status: not-for-production
@@ -76,16 +77,19 @@ advice:
     placebo 95th percentile (check table).
 ---
 
-**Take-home message: the four May 2026 load-shifts do not show up in the readings, so they cannot
-serve as a second real test.** We asked whether the transfers that NGED logged for May 2026
-(Primaries D10, D11, D12, and D16) leave the signature a real transfer should leave. A forecast that
-reads no recent power cannot know about a transfer, so inside the event it should sit about one
-fitted depth away from the observed power. We measured that gap at 24 to 120 hours ahead, after
-taking away the gap in the following week, and compared it with the gaps the same Primary shows on
-days with no transfer. **No event passes** (the experiment's verdict is "not supported": the
-hypothesis expected at least one pass, and the prediction written first expected none at D10, D11,
-and D16). Because none passed, no fine-tune ran, no GPU was used, and the candidate forecast was not
-scored on May 2026.
+**Take-home message: the four May 2026 load-shifts do not show up as a gap between the observed
+power and a forecast that reads no lags, so they cannot serve as a second real test.** We asked
+whether the transfers that NGED logged for May 2026 (at the primary substations, called Primaries,
+D10, D11, D12, and D16) leave the signature a real transfer should leave. A forecast that reads no
+recent power cannot know about a transfer, so inside the event the observed power should sit about
+one fitted depth away from that forecast. We measured the gap at 24 to 120 hours ahead, after taking
+away the gap in the following week. We compared the result with the gaps that the same Primary shows
+on days with no transfer. **No event passes.** The prediction written first, that D10, D11, and D16
+would not pass, held. The experiment's verdict is "not supported" because the hypothesis expected at
+least one pass. Because none passed, no fine-tune ran, no GPU was used, and the candidate forecast
+(the C1 forecast of experiment 584 with the G4 band of experiment 592, which widens the band when a
+load-shift looks likely) was not scored on May 2026. Here the normal running arrangement (NRA) is
+the power a Primary would draw with no load-shift.
 
 | Primary | Fitted depth (share of capacity) | Measured gap `S` | `S` as a share of depth (rule: 0.5 to 1.5) | Placebo 95th percentile of \|`S`\| (rule: `S` must exceed it) | Passes |
 |---|---|---|---|---|---|
@@ -94,15 +98,15 @@ scored on May 2026.
 | D12 (three transfers merged) | -0.426 | -0.014 | 0.03 | 0.253 | No |
 | D16 | +0.143 | +0.028 | 0.20 | 0.045 | No |
 
-Each event fails the size test, and each also fails the placebo test. The placebo count is 108, 107,
-79, and 34 windows for the four Primaries. The step-4 test (a passing Primary on each side of the
-transfer) was never reached. No contrast was tested, so there is no Bonferroni count and no minimum
-detectable effect to report.
+**Each event fails both the size test and the placebo test.** The placebo distributions hold 108,
+107, 79, and 34 windows for the four Primaries. The transfer test (a passing Primary on each side)
+was never reached. No contrast was tested, so there is no Bonferroni count (the correction for
+running several tests) and no minimum detectable effect to report.
 
 ![Daily gap between observed power and the lag-free median at each event Primary](gap_by_event.svg)
 
-*The dashed line is the gap the fitted depth predicts. The measured gap stays near zero, and at D16
-reaches the depth on only 4 days (11 to 14 May).*
+*The dashed line is the gap the fitted depth predicts. The measured gap stays near zero. At D16 it
+comes within about a quarter of the depth on only 4 days (11 to 14 May).*
 
 ![Observed daily power at the four Primaries](observed_by_event.svg)
 
@@ -115,14 +119,17 @@ on 4 May, so the pair does not mirror on the labelled dates. D10 and D11 show no
 
 ## What to ask NGED
 
-- **Which Primaries exchanged load in May 2026, and on which days?** The labelled dates (D12 and D16
-  from 3 to 21 May, D10 from 11 to 21 May, D11 from 12 to 22 May) do not match a mirrored pair in
+- **Which Primaries exchanged load in May 2026, and on which days?** The labelled dates (D12 from
+  3 to 21 May, D16 from 4 to 22 May, D10 from 11 to 21 May, D11 from 12 to 22 May) do not match a
+mirrored pair in
   the readings.
 - **How large was each transfer in megawatts?** The fitted depths come from steps in the telemetry,
   and the depth of D12 combines three overlapping transfers.
 - **Did D12 change its running arrangement on about 3 May and about 22 May?** The observed power at
-  D12 steps by roughly the depth of the first transfer on both dates (see the second figure), but no
-  Primary mirrors it.
+  D12 steps down by about 0.22 of capacity on the first date and up by 0.13 to 0.22 on the second
+  (see the second figure), but it returns near its old level on 7 to 10 May, and no Primary mirrors
+  the steps. This is an observation, not a finding. D12's gap to the lag-free forecast is positive
+  on most days, so the negative `S` comes only from the week after the span.
 
 ## Caveats and what was not done
 
@@ -131,20 +138,17 @@ on 4 May, so the pair does not mirror on the labelled dates. D10 and D11 show no
   reference window could change a ratio, so the rule's verdict is for this window only.
 - **NGED's logs may miss events,** so the readings may hold transfers no label covers.
 - **Not done:** the fine-tunes of C1 and A1 for 2026-05, the scoring of C1 plus G4, and any
-  measurement of when G4 fires on a May event. Without a confirmed event, those scores would measure
+  measurement of when G4 fires on a May event. Without a confirmed event, scores on May 2026 would
+measure
   a forecast against a target that the readings do not show.
-- **Reviews:** one Sonnet code review ran before the numbers (it found a mislabelled depth in
-  megawatts, which was fixed, and minor notes that the signal averages valid times rather than
-  forecast rows and that two ruff docstring rules need attention). A results review and a write-up
-  review follow in the pull request.
 - **Sources.** Pass rule, placebo, and check table: this folder and
   `ml-experiments/00596-nra-may-2026-transfers-recheck-and-second-real-event/e00596_check.py`.
   Forecasts and transfers: [experiment
-  582](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00582-nra-tails-on-verified-load-shift-events/result/)
+582](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00582-nra-tails-on-verified-load-shift-events/result/)
   and [experiment
-  580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/),
+580](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00580-verified-load-shift-event-set-and-label-audit/result/),
   which reuse the code of experiments 400, 565, 572, and 578. The level bias comes from [experiment
-  589](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00589-p5-coverage-on-d5-before-the-december-load-shift/result/).
+589](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00589-p5-coverage-on-d5-before-the-december-load-shift/result/).
 
 ## Pass rule (fixed before any gap was computed, 2026-11-06)
 
