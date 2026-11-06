@@ -85,7 +85,7 @@ the stored tables, and no stored table was edited. Nothing here is adopted for p
 half-hours, and wind farms in 0% to 12% of half-hours (weekly pooled); after the line, no reading is
 exactly 0. Bottom: at the same line, readings per solar farm per day fall from about 44 to about 23
 to 32 in April to August (48 is complete), and to about 16 by October as the nights lengthen,
-because the night half-hours are absent. Wind farms lose about 2 of 48.*
+because the night half-hours are absent. Wind farms lose a few of 48 (43 to 48 a week).*
 
 ## Inputs
 

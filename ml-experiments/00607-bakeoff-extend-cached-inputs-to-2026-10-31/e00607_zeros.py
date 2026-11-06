@@ -66,7 +66,7 @@ def figure_weekly(*, table: pl.DataFrame) -> None:
         domain=["Solar farms", "Wind farms"], range=[theme.BRAND_ORANGE, theme.DATA_BLUE]
     )
     base = alt.Chart(table.to_pandas()).encode(
-        x=alt.X("week:T", title="Week starting"),
+        x=alt.X("week:T", title="Week starting", axis=alt.Axis(format="%b %Y")),
         color=alt.Color("group:N", scale=colours, legend=alt.Legend(title=None, orient="top")),
     )
     top = (
