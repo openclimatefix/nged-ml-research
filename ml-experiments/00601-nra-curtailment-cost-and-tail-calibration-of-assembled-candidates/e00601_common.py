@@ -1,15 +1,17 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501
 """Experiment 601: shared constants and the per-row curtailment cost.
 
-The cost is experiment 277's and 478's metric (`metrics.avoidable_curtailment_cost` over
-`studies.node_curtailment`, node-only mode, breach ratio 20, price £2,000/MWh, leads 12 to 36 h), written
-here as a per-row formula so that the injected bank (many events share one valid time) can be scored by
-phase. `known_answer` checks the formula against the metric itself on the real forecasts.
+The cost is the metric of experiments 277 and 478 (`metrics.avoidable_curtailment_cost` over
+`studies.node_curtailment`, node-only mode, breach ratio 20, price 2,000 pounds per megawatt-hour,
+leads 12 to 36 h). It is written here as a per-row formula, so that the injected bank, where many
+events share one valid time, can be scored by phase. The known-answer check in `e00601_real.py`
+compares the formula with the metric on the real forecasts.
 
-For one forecast row of a node with limit `L` (MW), forecast q95 `u`, and metered flow `y`:
-planned = 0.5 * max(0, u - L) MWh; breach = 0.5 * max(0, y - planned / 0.5 - L) MWh;
-cost = price * (planned + 20 * breach); the perfect forecast costs price * 0.5 * max(0, y - L);
-the avoidable cost is the difference.
+For one forecast row of a node with limit `L` (MW), forecast q95 `u`, and metered flow `y`, the
+planned curtailment is 0.5 * max(0, u - L) MWh and the breach is
+0.5 * max(0, y - planned / 0.5 - L) MWh. The cost is the price times (planned + 20 * breach). The
+perfect forecast costs the price times 0.5 * max(0, y - L), and the avoidable cost is the
+difference.
 """
 
 from typing import Final
@@ -38,7 +40,7 @@ RATIO: Final = 20.0
 LEAD_COST: Final = (12.0, 36.0)
 SIX: Final = "six MW Primaries"
 EIGHT: Final = "eight MVA Primaries"
-REPORT_ONLY: Final = "report-only (D15 and D18)"
+REPORT_ONLY: Final = "report-only (D15 and D18, short history)"
 N_COUNTED: Final = 4
 """Counted tests: (C1 + G4 minus C1, A1 + G4 minus A1) x (event-free rows, 7 days after an injected end), cost at f = 0.9."""
 BONFERRONI_ALPHA: Final = 0.05 / N_COUNTED
@@ -61,4 +63,8 @@ def boot_interval(*, vals: np.ndarray, alpha: float, seed: int = 601) -> tuple[f
         return (np.nan, np.nan, np.nan)
     rng = np.random.default_rng(seed)
     means = v[rng.integers(0, len(v), size=(N_BOOT, len(v)))].mean(axis=1)
-    return (float(v.mean()), float(np.quantile(means, alpha / 2)), float(np.quantile(means, 1 - alpha / 2)))
+    return (
+        float(v.mean()),
+        float(np.quantile(means, alpha / 2)),
+        float(np.quantile(means, 1 - alpha / 2)),
+    )
