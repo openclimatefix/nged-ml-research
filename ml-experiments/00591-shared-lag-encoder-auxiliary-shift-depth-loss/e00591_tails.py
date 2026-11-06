@@ -1,9 +1,12 @@
-# ruff: noqa: D103, E501, PT018, B023
-"""Experiment 591: lag-following and tail metrics by phase on experiment 581's injected bank, for arms A0 to A5.
+# ruff: noqa: D103, PT018, B023, D205
+"""Experiment 591: lag-following and tail metrics by phase on experiment 581's injected bank, for
+arms A0 to A5.
 
-Experiment 581's `e00581_tails.event_table` patched, not copied. It reads an arm's injected forecasts
+Experiment 581's `e00581_tails.event_table` patched, not copied. It reads an arm's injected
+forecasts
 (`inject/`) and the same weights' forecasts with the observed lags (`fits/V3D5/`, the "uninjected
-twin"). Our arms store the latter under `fits/P5/`, so a folder of symlinks per arm presents them under
+twin"). Our arms store the latter under `fits/P5/`, so a folder of symlinks per arm presents them
+under
 the name the module expects. Arm `a0` is experiment 584's C1.
 
 Usage: python e00591_tails.py ARM [ARM ...]   (writes `tails/events_<arm>.parquet`)

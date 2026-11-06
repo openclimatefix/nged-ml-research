@@ -1,6 +1,7 @@
 # ruff: noqa: E501, D103, D205, ANN001, ANN003
 """Experiment 591 figures: day-ahead bands of arms A0 to A4 around the verified December pair and
-injected events, coverage by phase, the false-alarm cost, tail pinball loss, and the auxiliary heads'
+injected events, coverage by phase, the false-alarm cost, tail pinball loss, and the auxiliary
+heads'
 recovery of the injected depth.
 
 Run `e00591_score.py` for each arm and `e00591_probe_report.py` first. The event panels reuse
@@ -82,7 +83,8 @@ f3.event_panels = event_panels
 
 def bank_examples(*, t: c.X4Table, gi: dict) -> None:
     """Injected events chosen by a fixed rule: in 2025-10, per metering group, the lowest-numbered
-    Primary with a 15-day event of depth 0.5, up and down, taking the lowest pass; plus a 7-day pair.
+    Primary with a 15-day event of depth 0.5, up and down, taking the lowest pass; plus a 7-day
+    pair.
     """
     ev_all = pl.read_parquet(s3.BANK_PARQUET).filter(pl.col("month") == "2025-10")
     in_m = t.month == "2025-10"

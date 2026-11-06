@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN003, ANN201, E402, PT018, B023, F821, ANN202, D102, D103
+# ruff: noqa: ANN001, ANN003, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205
 """Experiment 591: fit the shared-lag-encoder arms with an auxiliary depth loss (GPU).
 
 A wrapper around experiment 574's `e00574_fit.py` (imported with its module-level state patched, as
@@ -10,7 +10,8 @@ load-shifts (as experiment 584's C1).
 
 Usage: python e00591_arm.py ARM COMMAND [--months ...] [--seeds ...] [--passes ...]
 
-- ARM: `A1` (shared, no auxiliary loss), `A2` (lambda from `calibrate`), `A3` (3 x A2's lambda), `A4`
+- ARM: `A1` (shared, no auxiliary loss), `A2` (lambda from `calibrate`), `A3` (3 x A2's lambda),
+  `A4`
   (separate encoders, A2's lambda), `A5` (A2 plus the detector input; starts from A2's step 2).
 - COMMAND: `pretrain` and `step2` (the arm's chain: shared for A1, A2, A3, A5; separate for A4),
   `calibrate` (A2's lambda, one-batch gradient probe), `fit`, `assemble`, `inject`.
@@ -53,10 +54,12 @@ NAME = "00591-shared-lag-encoder-auxiliary-shift-depth-loss"
 ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
 KIND = "separate" if ARM == "A4" else "shared"
 CHAIN = ROOT / f"chain_{KIND}" / "work"
-"""Pre-training and step-2 weights of the arm's chain (A1, A2, A3, and A5 share one; A4 has its own)."""
+"""Pre-training and step-2 weights of the arm's chain (A1, A2, A3, and A5 share one; A4 has its
+own)."""
 LAMBDA_FILE = ROOT / "lambda.json"
 W574 = e.W
-"""Experiment 574's work folder: the fold's stored B1 statistics are read from here, never written."""
+"""Experiment 574's work folder: the fold's stored B1 statistics are read from here, never
+written."""
 LAM_MULT = {"A1": 0.0, "A2": 1.0, "A3": 3.0, "A4": 1.0, "A5": 1.0}
 LAMBDA = 0.0
 if CMD in {"fit", "inject", "probe"} and ARM != "A1":
@@ -113,7 +116,8 @@ AUX: dict[int, np.ndarray] = {}
 
 
 def build_month_syn(*, month, clean):
-    """Build the month's P5 rows with synthetic lag-only load-shifts in the lag columns, and the depth labels.
+    """Build the month's P5 rows with synthetic lag-only load-shifts in the lag columns, and the
+    depth labels.
 
     As experiment 584's builder; in addition the label of a row's lag is the shift that
     `synthetic_clean` added at that lag's grid time (zero where none), NaN where the lag is missing.
@@ -147,7 +151,9 @@ def build_month_syn(*, month, clean):
 
 
 class AuxGpuMonth(e.LagGpuMonth):
-    """The month's rows on the GPU; the fine-tuning tensors get the two depth-label columns appended."""
+    """The month's rows on the GPU; the fine-tuning tensors get the two depth-label columns
+    appended.
+    """
 
     def refit_tensors(self, *, refit, shift_z=None):
         t = super().refit_tensors(refit=refit, shift_z=shift_z)  # applies block dropout
@@ -160,7 +166,9 @@ class AuxGpuMonth(e.LagGpuMonth):
 
 
 def row_nll(*, out, z, p):
-    """The mixture negative log-likelihood, plus lambda times the auxiliary squared error (training only)."""
+    """The mixture negative log-likelihood, plus lambda times the auxiliary squared error (training
+    only).
+    """
     nll = e.base.mixture_nll(out=out, z=z, components=e.m.COMPONENTS)
     aux = mymodel.STASH.pop("aux", None)
     if aux is not None and LAMBDA > 0:
@@ -169,7 +177,9 @@ def row_nll(*, out, z, p):
 
 
 def calibrate_train(*, model, x, z, w, p, is_val, seed, **_):
-    """Stand-in for `train` that measures the gradient norms of the two losses on the lag encoder and stops."""
+    """Stand-in for `train` that measures the gradient norms of the two losses on the lag encoder
+    and stops.
+    """
     torch.manual_seed(seed)
     model.train()
     for part in (model.weather, model.datetime):
@@ -208,7 +218,9 @@ def _done(*, out) -> bool:
 
 
 def run_inject(*, device: str = "cuda") -> None:
-    """Forecast every pass of the injected bank with the saved weights; one parquet per cell (as experiment 584)."""
+    """Forecast every pass of the injected bank with the saved weights; one parquet per cell (as
+    experiment 584).
+    """
     clean = e.c.clean_stack()
     passes = MINE.passes if MINE.passes is not None else list(range(bank.N_PASSES))
     for month in e.ARGS.months:
@@ -274,7 +286,8 @@ def run_inject(*, device: str = "cuda") -> None:
 
 
 REAL_PASS = 99
-"""Probe pass number of the observed lags (no contamination), labelled with experiment 580's verified depths."""
+"""Probe pass number of the observed lags (no contamination), labelled with experiment 580's
+verified depths."""
 LEAD_BAND = (24.0, 120.0)
 
 
@@ -298,9 +311,11 @@ def real_events() -> list[dict]:
 
 
 def run_probe(*, device: str = "cuda") -> None:
-    """Write the heads' depth predictions and the true depths for rows 24 to 120 h ahead, one parquet per cell.
+    """Write the heads' depth predictions and the true depths for rows 24 to 120 h ahead, one
+    parquet per cell.
 
-    Passes 0 to 23 are the injected bank (label: the shift added at each lag's grid time). Pass 99 uses
+    Passes 0 to 23 are the injected bank (label: the shift added at each lag's grid time). Pass 99
+    uses
     the observed lags and labels them with the verified real events of experiment 580 (descriptive;
     labels are imperfect). The head sees only the inputs the forecast sees.
     """

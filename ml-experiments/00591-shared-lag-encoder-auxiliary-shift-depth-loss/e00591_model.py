@@ -1,19 +1,23 @@
-# ruff: noqa: E501
-"""Experiment 591: experiment 574's P5 network with a shared (or separate) lag encoder and an auxiliary depth head.
+# ruff: noqa: E501, D205
+"""Experiment 591: experiment 574's P5 network with a shared (or separate) lag encoder and an
+auxiliary depth head.
 
 The base is `e00574_model.PartDMdn` (lag encoder, D5 output offset, B1 weather columns). As in
 experiment 586, the lag encoder is replaced by one that reads one lag at a time with that lag's
 expected-weather embeddings, and both mixers are widened to take the two encoder outputs.
 
-- `shared`: one encoder with shared weights and a learnt 8-number lag-ID embedding (experiment 586's S1);
+- `shared`: one encoder with shared weights and a learnt 8-number lag-ID embedding (experiment 586's
+  S1);
 - `separate`: one encoder per lag, no lag ID (experiment 586's S3).
 
 Each encoder has an auxiliary head: a small network that reads the encoder's (activated) output and
-predicts the signed depth of the synthetic load-shift in that lag, as a share of capacity. The head is
+predicts the signed depth of the synthetic load-shift in that lag, as a share of capacity. The head
+is
 used only by the training loss (and by the probe), and by the mixer in the detector arm A5.
 
 Fine-tuning tensors carry two extra trailing columns (the day and week depth labels, NaN where a lag
-has no label). The network reads them only in training mode, to build `last_aux_loss`; at forecast time
+has no label). The network reads them only in training mode, to build `last_aux_loss`; at forecast
+time
 the extra columns are absent, so the labels cannot reach a forecast.
 """
 
@@ -35,7 +39,9 @@ STASH: dict[str, torch.Tensor] = {}
 
 
 class AuxLagMdn(mod.PartDMdn):
-    """P5's network with the lag encoder of `kind`, auxiliary depth heads, and an optional detector input."""
+    """P5's network with the lag encoder of `kind`, auxiliary depth heads, and an optional detector
+    input.
+    """
 
     def __init__(
         self, *, n_primaries: int, stage: str, n_knots: int, n_b1: int, kind: str,
@@ -93,7 +99,9 @@ class AuxLagMdn(mod.PartDMdn):
         return torch.cat(outs, dim=-1)
 
     def aux_from(self, *, hl: torch.Tensor) -> torch.Tensor:
-        """Return the two heads' depth predictions, (rows, 2), from the activated encoder outputs."""
+        """Return the two heads' depth predictions, (rows, 2), from the activated encoder
+        outputs.
+        """
         w = m560.LAG_OUT
         outs = [
             self.head[0 if self.kind == "shared" else j](hl[:, j * w : (j + 1) * w])
@@ -133,9 +141,11 @@ class AuxLagMdn(mod.PartDMdn):
         return torch.cat([out[:, :k], out[:, k : 2 * k] + off, out[:, 2 * k :]], dim=-1)
 
     def load_state_dict(self, state_dict, strict: bool = True, assign: bool = False):  # noqa: ANN001, ANN201
-        """Load a state dict; a detector network pads a narrower first mixer layer with zero columns.
+        """Load a state dict; a detector network pads a narrower first mixer layer with zero
+        columns.
 
-        This starts arm A5 from arm A2's step-2 weights with two zero-initialised detector inputs, so it
+        This starts arm A5 from arm A2's step-2 weights with two zero-initialised detector inputs,
+        so it
         begins as the same network as A2.
         """
         key = "mixer_ft.0.weight"

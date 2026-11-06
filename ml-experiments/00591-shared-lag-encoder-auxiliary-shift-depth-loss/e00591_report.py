@@ -1,8 +1,10 @@
-# ruff: noqa: B023, D103, E501, PT018
+# ruff: noqa: B023, D103, E501, PT018, D205
 """Experiment 591: print every score table the write-up quotes (also written to `report.txt`).
 
-Adapted from experiment 584's `e00584_report.py`. Reads the tables that `e00591_score.py` wrote for each
-arm (`score_<arm>/`), and `row_arrays.npz` for the paired CRPS contrasts. Arm names: A0 = experiment 584's
+Adapted from experiment 584's `e00584_report.py`. Reads the tables that `e00591_score.py` wrote for
+each
+arm (`score_<arm>/`), and `row_arrays.npz` for the paired CRPS contrasts. Arm names: A0 = experiment
+584's
 C1; the gated band (`A2` in experiment 583's tables) is shown as "+band".
 
 Usage: python e00591_report.py [ARM ...]   (default: a0 a1 a2 a3 a4 a5, those that have been scored)
@@ -61,7 +63,9 @@ def load(arm: str) -> dict:
 
 
 def contrasts() -> None:
-    """New minus old on event-free rows at 24-120 h (points of capacity), month-block Bonferroni intervals (10 counted tests)."""
+    """New minus old on event-free rows at 24-120 h (points of capacity), month-block Bonferroni
+    intervals (10 counted tests).
+    """
     z = {x: load(x) for x in ARMS}
     for new, old in PAIRS:
         if new not in z or old not in z:

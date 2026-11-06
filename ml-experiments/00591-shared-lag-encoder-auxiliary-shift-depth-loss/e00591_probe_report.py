@@ -1,17 +1,25 @@
-# ruff: noqa: B023, D103, E501, PERF401
+# ruff: noqa: B023, D103, E501, PERF401, D205
 """Experiment 591: how well the auxiliary heads recover the injected depth, and the detector view.
 
-Reads the probe files that `e00591_arm.py ARM probe` wrote (rows 24 to 120 h ahead, one file per month,
-pass, refit day, and seed; the two seeds are averaged). Pass 0 to 23 is experiment 581's injected bank
-(every event is held out: the folds' test months are never trained on); pass 99 uses the observed lags
+Reads the probe files that `e00591_arm.py ARM probe` wrote (rows 24 to 120 h ahead, one file per
+month,
+pass, refit day, and seed; the two seeds are averaged). Pass 0 to 23 is experiment 581's injected
+bank
+(every event is held out: the folds' test months are never trained on); pass 99 uses the observed
+lags
 and labels them with the verified real events of experiment 580.
 
 Outputs (printed, and written to `probe_report_<arm>.txt`):
-- R squared and bias of the heads by metering group, injected depth, and event length (origins from 7
+
+- R squared and bias of the heads by metering group, injected depth, and event length (origins from
+  7
   days before the onset to 14 days after the end, both lags pooled, all lag-rows of the window);
-- the detector view (the onset delay is only given for the 3 and 7 day events: a longer event began before the month, so its first scored origin is already late): an origin day "fires" when the mean over its rows of the larger of the two heads'
+- the detector view (the onset delay is only given for the 3 and 7 day events: a longer event began
+  before the month, so its first scored origin is already late): an origin day "fires" when the mean
+  over its rows of the larger of the two heads'
   absolute outputs exceeds a threshold. Detection rate, median onset delay, and false triggers per
-  Primary-year on origin days with no labelled or verified event (the `free` flag of experiment 583's
+  Primary-year on origin days with no labelled or verified event (the `free` flag of experiment
+  583's
   row table) with observed lags;
 - the verified December pair: mean head output and mean verified depth inside each event.
 
@@ -60,7 +68,9 @@ def load_month(*, arm: str, month: str) -> pl.DataFrame:
 
 
 def free_origins() -> dict[str, set[tuple[int, int]]]:
-    """Return per month the (Primary, origin index) pairs whose scored rows are all event-free (experiment 583's flag)."""
+    """Return per month the (Primary, origin index) pairs whose scored rows are all event-free
+    (experiment 583's flag).
+    """
     z = np.load(ROOT / "score_a0" / "row_arrays.npz", allow_pickle=True)
     df = pl.DataFrame(
         {"prim": z["prim"], "origin_idx": z["origin_idx"], "free": z["free"], "month": z["month"]}
