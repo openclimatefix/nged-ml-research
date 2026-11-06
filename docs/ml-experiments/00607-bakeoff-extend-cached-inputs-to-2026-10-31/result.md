@@ -33,8 +33,8 @@ row_set_id: not_applicable_data_build
 verdict: partly supported
 best_arm: not applicable (data build, no arms)
 headline: >-
-  All 11 cached inputs now reach 2026-10-31 or later and break no rule on any row. The missing zero readings at the solar and wind farms
-  are consistent with a change of file source on 2026-03-26, not with a change at the farms.
+  All 11 cached inputs now reach 2026-10-31 or later and break no rule on any row. The missing zero
+  readings at the solar and wind farms are consistent with a change of file source on 2026-03-26, not with a change at the farms.
 lessons: >-
   The final bake-off test can now be scored. A generator half-hour
   that is absent after 2026-03-26 should be read as a zero-output half-hour, not as a fault.
