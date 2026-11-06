@@ -120,7 +120,8 @@ Each dot is one arm at one Primary. D5 (event-free rows only) is in the middle o
 
 ![Median bias by Primary, December fold](december_median_bias_by_primary.svg)
 
-In the December fold before 2025-12-29, D5 has one of the two largest negative biases in all three arms, beside D15.
+In the December fold before 2025-12-29, D5 has one of the two largest negative biases in all three
+arms, beside D15.
 
 ## Results
 
@@ -138,7 +139,8 @@ In the December fold before 2025-12-29, D5 has one of the two largest negative b
 | Six MW Primaries | 0.859 | 0.882 | 0.880 | +0.024 (+0.009 to +0.039) |
 | D15 and D18 | 0.879 | 0.880 | 0.879 | +0.001 (-0.029 to +0.022) |
 
-- **No Primary-month cell** (76 cells; the Primary-months with event-free rows, out of 80) has P5 more than 0.15 below C0. Per fold month, P5's
+- **No Primary-month cell** (76 cells; the Primary-months with event-free rows, out of 80) has P5
+  more than 0.15 below C0. Per fold month, P5's
   coverage is 0.854 to 0.909 and C0's is 0.837 to 0.890. By lead band, P5 covers 0.888 (0-24 h) and
   0.884 (24-120 h), against 0.879 and 0.869 for C0.
 - **Stage 2, D5 in the 2025-12 fold** (24-120 h, observed power, valid-time phases around the
@@ -151,20 +153,22 @@ In the December fold before 2025-12-29, D5 has one of the two largest negative b
 | 7 days before onset | 1,344 | 0.83 / 0.17 / -7.8 | 0.51 / 0.49 / -7.9 | 0.43 / 0.57 / -8.8 |
 | During the event | 1,120 | 0.27 / 0.00 / +14.0 | 0.19 / 0.02 / +17.2 | 0.17 / 0.04 / +16.5 |
 
-- **The median is below the observed power** on 0.93 to 0.95 of the rows in the week before onset, for
+- **The median is below the observed power** on 0.93 to 0.95 of the rows in the week before onset,
+  for
   every arm. The mean q05-q95 width in that week is 23.7 points for C0 and 18.5 for P5.
 
 - **Other Primaries show the same sign as D5:** in the December fold before the onset, D5's
-  median minus observed power is -8.9 (P5), D15's is -10.6, D12's is -6.7, and D10's is -6.4, so
-  other Primaries show the same sign. D5 is the only Primary with P5 coverage below 0.70 in that
+  median minus observed power is -8.9 (P5), D15's is -10.6, D12's is -6.7, and D10's is -6.4. D5 is the only Primary with P5 coverage below 0.70 in that
   window (0.37 for P5, 0.48 for C0, 0.34 for C1; the next lowest is D12 at 0.75 for P5).
 - **D5's level rose before the event.** The data alone cannot say whether the rise was
   weather-driven demand or an earlier unflagged shift. D5's daily mean observed power rose from
   about 60% of capacity in early November to about 80% from the first week of December, and all
-  three forecasts stayed between about 65% and 76%. The gate of experiment 584, a rule that fires when recent power lags
-  disagree with a forecast made without them, was on for the 19 days before the onset.
+  three forecasts stayed between about 65% and 76%. The gate of experiment 584, a rule that fires
+  when recent power lags disagree
+  with a forecast made without them, was on for the 19 days before the onset.
 - **Predictions:**
-    - **P1's first clause holds; its second does not.** P5 and C1 are not below C0 on event-free rows at any group (paired differences
+    - **P1's first clause holds; its second does not.** P5 and C1 are not below C0 on event-free
+      rows at any group (paired differences
       +0.001 to +0.024). D5 is not 0.15 below C0 on event-free rows (0.912 for P5 against 0.897),
       so D5 is not an outlier there, and no other Primary-month is either.
     - **P2 holds:** the median of P5 is below the observed power on 0.93 of the rows in the week
@@ -173,7 +177,8 @@ In the December fold before 2025-12-29, D5 has one of the two largest negative b
     - **P3 not run:** stage 3 (a 1-day embargo) was to run only if the cause pointed at the embargo
       or the schedule. The cause does not point there. C0 does not use the embargoed schedule, and
       its median bias at D5 (-7.8) equals P5's (-7.9).
-- **Bonferroni count:** 0 hypothesis tests were run, so no correction applies (the planned count of 2 belonged to stage 3). Every number
+- **Bonferroni count:** 0 hypothesis tests were run, so no correction applies (the planned count of
+  2 belonged to stage 3). Every number
   above is descriptive.
 - **Not computed:** the avoidable-curtailment cost, tail pinball loss beyond the q05-q95 band, and a
   14-day horizon plot (stored forecasts cover 0 to 120 hours only, so every number is a short-lead
