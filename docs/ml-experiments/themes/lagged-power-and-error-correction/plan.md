@@ -25,7 +25,6 @@
 | 597 | Do C1 and A1 with the G4 gated band, assembled as single forecasts, hold the normal running arrangement inside the q05-q95 band on 0.90 of rows from day 4 of a load-shift to its end? | High (manager, 2026-11-06) | Nothing | Finished: supported, see experiment 597 |
 | 600 | Do C1, A1, and their G4 assembled forecasts still hold the normal running arrangement inside the q05-q95 band at 120-240 h ahead, where NGED's horizon reaches 10 days? | High (manager, 2026-11-06) | Nothing | Planned |
 | 602 | What does each encoder of the modular demand network (datetime, weather, power lag) contribute to its forecast, on the December 2025 load-shift, on injected load-shifts, and on an event-free fortnight? | High (maintainer, 2026-11-06) | Nothing | Finished: partly supported, see experiment 602 |
-| 606 | Which inputs should the lag encoder read so that the demand network follows a load-shift less: lag ID or age, the expected embeddings, the gap to the lag-free forecast, weighted averages of the gap, or the gaps at all electrical neighbours? | High (maintainer, 2026-11-06) | Experiment 598 merged (code and signal table) | Planned |
 
 ## Planned experiments
 
