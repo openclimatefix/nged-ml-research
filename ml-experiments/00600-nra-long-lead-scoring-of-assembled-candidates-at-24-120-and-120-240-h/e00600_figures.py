@@ -27,8 +27,8 @@ PHASE_LABEL = {
     "before": "Before",
     "days0-3": "Days 0-3",
     "days4-end": "Day 4 to end",
-    "after0-7": "0-7 after",
-    "after7-14": "7-14 after",
+    "after0-7": "0-7 days after",
+    "after7-14": "7-14 days after",
 }
 PHASES = list(PHASE_LABEL.values())
 SYSTEMS = ["C1", "C1 + G4", "A1", "A1 + G4"]
@@ -114,6 +114,13 @@ def coverage_chart(
         alt.Chart()  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color=theme.BLACK_1)
         .encode(y=alt.datum(target, scale=ys)),
+        alt.Chart()  # ty: ignore[unresolved-attribute]
+        .mark_text(align="left", baseline="bottom", dx=4, dy=-3, fontSize=10, color=theme.BLACK_1)  # ty: ignore[unresolved-attribute]
+        .encode(
+            x=alt.value(2),
+            y=alt.datum(target, scale=ys),
+            text=alt.value(f"dashed line: target {target:.2f}"),
+        ),
         base.mark_rule().encode(y=alt.Y("lo:Q", scale=ys, title=ytitle), y2="hi:Q"),  # ty: ignore[unresolved-attribute]
         base.mark_point(filled=True, size=45).encode(y=alt.Y("v:Q", scale=ys)),  # ty: ignore[unresolved-attribute]
         data=df,
@@ -161,7 +168,7 @@ def gate_value() -> None:
         color=alt.Color(
             "network:N",
             scale=alt.Scale(domain=["C1", "A1"], range=[theme.BRAND_ORANGE, theme.DATA_BLUE]),
-            legend=alt.Legend(title="Network with G4 minus the network alone", orient="bottom"),
+            legend=alt.Legend(title="Network", orient="bottom"),
         ),
     )
     layer = alt.layer(
@@ -170,7 +177,7 @@ def gate_value() -> None:
     ).properties(width=W, height=290)
     save(
         layer.facet(
-            column=alt.Column("phase:N", sort=["Day 4 to end", "0-7 after"], title=None)
+            column=alt.Column("phase:N", sort=["Day 4 to end", "0-7 days after"], title=None)
         ).properties(
             title=alt.TitleParams(
                 ["Coverage the G4 band adds on injected 15 and 30 day load-shifts, by lead"],
@@ -244,6 +251,7 @@ def series_panel(
     df: pl.DataFrame,
     strip: pl.DataFrame,
     colour: str,
+    light: str,
     label: str,
     title: str,
     xdom: tuple,
@@ -251,13 +259,19 @@ def series_panel(
 ):
     """One panel: median and q05-q95 band of one network, observed power, switch times; a thin strip below."""
     leg = alt.Scale(
-        domain=["Observed power", "Median", "q05-q95 band", "Switch times", "G4 wide band on"],
-        range=[OBS, colour, colour, SHIFT, WIDE],
+        domain=[
+            "Observed power",
+            "Median",
+            "q05-q95 band",
+            "Load-shift times (dashed)",
+            "G4 wide band on (strip)",
+        ],
+        range=[OBS, colour, light, SHIFT, WIDE],
     )
     cs = alt.Color(
         "series:N",
         scale=leg,
-        legend=alt.Legend(title=None, orient="bottom", columns=5, symbolType="stroke"),
+        legend=alt.Legend(title=None, orient="bottom", columns=5, symbolType="square"),
     )
     x = alt.X(
         "t:T",
@@ -270,13 +284,13 @@ def series_panel(
     hi = float(max(df["hi"].max(), df["obs"].max())) + 2  # ty: ignore[invalid-argument-type]
     ys = alt.Scale(domain=[lo, hi])
     sw = (
-        alt.Chart(pl.DataFrame({"t": list(SWITCH), "series": ["Switch times"] * 2}))  # ty: ignore[unresolved-attribute]
+        alt.Chart(pl.DataFrame({"t": list(SWITCH), "series": ["Load-shift times (dashed)"] * 2}))  # ty: ignore[unresolved-attribute]
         .transform_calculate(t="toDate(datum.t)")
         .mark_rule(strokeDash=[5, 3], strokeWidth=1.6)
         .encode(x=x, color=cs)
     )
     layers = [
-        base.mark_area(opacity=0.25)  # ty: ignore[unresolved-attribute]
+        base.mark_area(opacity=1)  # ty: ignore[unresolved-attribute]
         .transform_calculate(series="'q05-q95 band'")
         .encode(x=x, y=alt.Y("lo:Q", scale=ys, title="% of capacity"), y2="hi:Q", color=cs),
         base.mark_line(strokeWidth=1.4)  # ty: ignore[unresolved-attribute]
@@ -295,7 +309,7 @@ def series_panel(
     st = (
         alt.Chart(strip)  # ty: ignore[unresolved-attribute]
         .mark_rect(opacity=0.9)
-        .transform_calculate(series="'G4 wide band on'")
+        .transform_calculate(series="'G4 wide band on (strip)'")
         .encode(
             x=alt.X("t0:T", scale=alt.Scale(domain=list(xdom)), title=None, axis=None),
             x2="t1:T",
@@ -310,9 +324,9 @@ def series_figures() -> None:
     import e00600_score as sc600  # ty: ignore[unresolved-import]
 
     out = {}
-    for arm, lab, colour in (
-        ("c1", "C1 + G4", theme.BRAND_ORANGE),
-        ("a1", "A1 + G4", theme.DATA_BLUE),
+    for arm, lab, colour, light in (
+        ("c1", "C1 + G4", theme.BRAND_ORANGE, theme.BRAND_ORANGE_LIGHT),
+        ("a1", "A1 + G4", theme.DATA_BLUE, theme.DATA_BLUE_LIGHT),
     ):
         inp = sc600.Inputs(arm=arm)
         t = inp.t
@@ -383,8 +397,9 @@ def series_figures() -> None:
                     df=df,
                     strip=strip,
                     colour=colour,
+                    light=light,
                     label=pl_name,
-                    title=f"{lab}, 9 to 10 days ahead",
+                    title=f"{lab}, 9 to 10 days ahead, December 2025 to January 2026",
                     xdom=xdom,
                     lead_note="Forecast issued 9 to 10 days before each half-hour.",
                 )
@@ -406,7 +421,7 @@ if __name__ == "__main__":
                 metric="cover90",
                 ytitle="Share of rows with the NRA inside q05-q95",
                 target=0.90,
-                domain=[0.5, 1.0],
+                domain=[0.8, 1.0],
                 name=f"coverage_by_phase_and_lead{suffix}.svg",
                 caption=f"Coverage by phase and lead, injected 15 and 30 day load-shifts, {gn}",
                 group=grp,
@@ -415,7 +430,7 @@ if __name__ == "__main__":
             metric="nra_side95",
             ytitle="Share of rows with the NRA on the safe side",
             target=0.95,
-            domain=[0.5, 1.0],
+            domain=[0.8, 1.0],
             name="safe_side_by_phase_and_lead.svg",
             caption="Safe-side share by phase and lead, injected 15 and 30 day load-shifts, both metering groups",
             group="both groups",

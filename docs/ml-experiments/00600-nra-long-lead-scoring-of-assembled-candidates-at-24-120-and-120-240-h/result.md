@@ -158,12 +158,14 @@ separately.
 
 The forecast of A1 + G4 issued 9 to 10 days before each half-hour, for the two Primaries of the
 maintainer's example load-shift (D5 and D16), from 14 days before the first switch time to 14 days
-after the last. Dashed green lines: the load-shift start and end times "2025-12-30 01:00" and
+after the last. Dashed green lines (legend: "Load-shift times"): the start and end times "2025-12-30
+01:00" and
 "2026-01-14 11:30" from the maintainer's log. The observed power steps down at D5 and up at D16 on
 2025-12-30 and steps back
 on 2026-01-14, so the logged times match the step. Experiment 580's verified span starts about one
-day earlier, and the phase scores below use that span. Purple bar: the days whose forecast was
-issued while the G4 wide band was on. The bar is placed by the half-hour being forecast, so it
+day earlier, and the phase scores below use that span. Purple bar: the half-hours whose forecast was
+issued while the G4 wide band was on; it runs to the axis end because the band stays wide for 7 days
+after the gate releases. The bar is placed by the half-hour being forecast, so it
 starts about 9 days after the gate fired. Coverage is scored against an estimate of the NRA, which
 is not drawn.
 
