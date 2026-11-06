@@ -210,7 +210,10 @@ GRID_SHAPE = (16, 121248)
 
 
 class FoldSignals:
-    """The signal blocks of one fold month and seed: the training rows (with synthetic shifts) and any test power."""
+    """The signal blocks of one fold month and seed.
+
+    The blocks cover the training rows (with synthetic shifts) and any test power.
+    """
 
     def __init__(self, *, mr, test, clean: np.ndarray, month: str, seed: int) -> None:
         z = np.load(table_file(month=month, seed=seed))

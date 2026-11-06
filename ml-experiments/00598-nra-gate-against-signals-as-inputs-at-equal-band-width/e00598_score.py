@@ -12,8 +12,9 @@ Systems (every one a (rows, 11) quantile array on experiment 583's table of rows
 - `W`: A1 with its band rescaled about its median by one constant factor per fold month, chosen so that
   its mean q95 - q05 on R's wide origin days equals R's. A width control, not a gateless baseline.
 - `S`, `S-g`, `S-p`: this experiment's arms, seed mean.
-- `S-rs`, `S-g-rs`, `S-p-rs`: each arm's band rescaled about its median, per fold month and seed, so that
-  its mean q95 - q05 on R's wide origin days equals R's (one factor printed per fold and seed).
+- `S-rs`, `S-g-rs`, `S-p-rs`: each arm's band rescaled about its median, per fold month and seed,
+  so that its mean q95 - q05 on R's wide origin days equals R's (one factor printed per fold and
+  seed).
 - `G4T`: A1 + G4 where the gate reads the table T (mean of the two seeds) instead of E2.
 
 Outputs: `factors.csv`; `event_free.csv` (CRPS, coverage, pinball loss, width per group, band, and
@@ -334,7 +335,10 @@ def fit_factors_real(*, sy: Systems) -> pl.DataFrame:
 
 
 def boot_interval(*, vals: np.ndarray, alpha: float = ALPHA) -> tuple[float, float, float]:
-    """Return the mean of `vals` (events or months as blocks) and its percentile bootstrap interval at level `alpha`."""
+    """Return the mean of `vals` and its percentile bootstrap interval at level `alpha`.
+
+    The values are events or months, resampled as blocks.
+    """
     v = vals[np.isfinite(vals)]
     if len(v) == 0:
         return (np.nan, np.nan, np.nan)
@@ -695,7 +699,9 @@ def check_reproduction(*, sy: Systems, repro_bank: pl.DataFrame) -> pl.DataFrame
 
 
 def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
-    """Per (group, length class, first-fold-pair flag, phase, band, system): means over events with 95% intervals from resampling (month, Primary) clusters.
+    """Return means over events per (group, length class, first-fold-pair flag, phase, band, system).
+
+    The 95% intervals come from resampling (month, Primary) clusters.
 
     The 20 passes of a month reuse the same real rows and forecasts, so events are not independent;
     each cluster is the mean over the passes and events of one Primary in one fold month.
