@@ -74,28 +74,29 @@ headline: >-
   (median follow ratio 0.080 for T1 against 0.049 for T0 after the end, and 0.202 against 0.108
   while the event lasts) and raises coverage after the end (0.896 against 0.860), but the extra
   coverage comes with a band 39% wider that also over-covers event-free rows at the eight MVA
-  Primaries (0.919 against 0.883, nominal 0.90). Random lag noise with no shift (T3) covers 0.876,
-  more than T0's 0.860.
+  Primaries (0.919 against 0.883, nominal 0.90). Random lag noise with no shift (T3) covers 0.006
+  more rows than T0 in the paired contrast (0.876 against 0.860 in the unpaired table).
 lessons: >-
   T1 and T2 beat T0 on coverage after the end by more than the minimum detectable effect, and lose
   on following. Their bands are wider on event-free rows too, so the gain may be general widening
   and not an event-specific response; no width-matched control was run. T3 matching T0 says the gain
-  of the fine-tune on shifted lags over
-  plain P5 (0.781) comes from perturbing the lags during fine-tuning, and a constant shift adds
-  little beyond noise on the injected bank. The verified December pair, two Primary-events, does not
+  of the fine-tune on shifted lags over plain P5 (0.781) comes from perturbing the lags during
+  fine-tuning, and a constant shift adds little beyond noise on the lag-only injected bank, which
+  also rewards a network that learns to distrust its lags. The verified December pair, two
+  Primary-events, does not
   separate the arms.
 take_home_message: >-
   Training on synthetic load-shifts that also move the targets raises coverage after an injected
   load-shift ends from 0.86 to 0.90, but only by making the band 29% to 39% wider on average, and
   the training also makes the forecast follow shifts in its lag inputs about twice as much while the
-  event lasts. Random
-  lag noise with no shift gets 0.88 on its own, so most of the coverage gain over a network trained
-  on clean lags comes from perturbing the lags, not from the shifts themselves.
+  event lasts. Random lag noise with no shift gets as much coverage on its own, so on this lag-only
+  injected bank the coverage gain over a neural network trained on clean lags comes from perturbing
+  the lags, not from the shifts themselves.
 advice:
   - >-
     Compare any synthetic-load-shift fine-tune with a noise-only placebo on the same lag columns
-    before crediting the shifts, because random lag noise gave 0.876 coverage after the end against
-    0.860 for lag-only shifts (T3 against T0).
+    before crediting the shifts, because random lag noise on about 97% of rows gave coverage after
+    the end 0.006 above lag-only shifts on about 7% of rows (paired contrast, T3 against T0).
   - >-
     Do not add the synthetic load-shift to the training targets as a way to raise coverage after
     the end, because it widens the band on event-free rows too (width 25.0 against 21.6% of
@@ -112,8 +113,8 @@ adopted_in: none
 **Putting the synthetic load-shift in the training targets as well raises coverage after a
 load-shift ends from 0.86 to 0.90, but the neural network gets there by widening its band and by
 following shifts in its lag inputs about twice as much while the event lasts (1.6 times as much
-after it ends).** A placebo that adds random noise to the
-lags, with no shift, covers 0.88 on its own. On the injected bank, all of the gain of fine-tuning on
+after it ends).** A placebo that adds random noise to the lags, with no shift, covers as many rows
+(0.006 more than T0 in the paired contrast). On the injected bank, all of the gain of fine-tuning on
 perturbed lags over a neural network fine-tuned on clean lags (0.78) therefore comes from the
 perturbation and not from the shifts. The effect on the verified December pair is too small to read.
 
@@ -284,13 +285,30 @@ days, so every number here is a short-lead result.
 
 - **Event-free CRPS, all rows at 24 h or more (x100):** P5 3.419, T0 3.440, T3 3.470, T2 3.493, T1
   3.511, so the clean-lag reference scores best.
-- **Median minus mean forecast, and the error of the median:** not computed; only the 11 quantiles
-  are stored, so the mean forecast is not stored.
-- **Triggers fired:** the placebo T3 matching the treatment T0 (P3 failed) is a surprise, which
-  fires
-  the audit rule for an unexpected result. The explanation tested here is the plain-P5 reference
-  (0.781): perturbing the lags in fine-tuning accounts for the gain, and a constant shift adds 0.006
-  beyond noise in the paired contrast. No other trigger fired. Leaving one Primary out was not run.
+- **Median minus mean of the 11 stored quantiles, and the error of the median** (event-free rows at
+  24 h or more, % of capacity; eight MVA Primaries, six MW Primaries): median minus mean T0 -0.52
+  and -0.38, T1 -0.25 and -0.06, T2 -0.53 and -0.45, T3 -0.53 and -0.38, P5 -0.54 and -0.38. Mean
+  absolute error of the median: T0 5.55 and 4.46, T1 5.69 and 4.59, T2 5.59 and 4.61, T3 5.59 and
+  4.53, P5 5.52 and 4.40. The error of the median points the same way as the CRPS contrasts: every
+  arm is worse than T0, and P5 is better.
+- **Triggers fired:** trigger 1 (the placebo T3 matches the treatment T0, so the control did not
+  behave as a null) fired. Trigger 3 did not: the error of the median points the same way as the
+  CRPS contrasts. The explanation tested here is the plain-P5 reference (0.781): perturbing the lags
+  in fine-tuning accounts for the gain, and a constant shift adds nothing measurable beyond it.
+  Leaving one Primary out was not run.
+- **Audit (fresh Sonnet agent, as the manager chose):** no method fault found. The noise reaches the
+  same lag columns (37 to 44) as the shifts, through the same function; T0 and T3 have identical
+  training-row, test-row, and weather-check counts; every arm scores the same 578,209 rows. The
+  placebo is variance-matched and sign-symmetric but not share-matched or magnitude-matched: it
+  perturbs 0.97 of rows by a standard deviation of about 0.08 of capacity (0.03 to 0.14 by Primary),
+  while T0 shifts about 0.07 of rows by 0.15, 0.30, or 0.50. The T3 minus T0 coverage gap is +0.006
+  in the paired contrast (interval 0.004 to 0.009, minimum detectable effect 0.0025), so T3 is
+  slightly better, not indistinguishable; the unpaired 0.016 gap in the table should not be quoted
+  as an advantage. T3 loses a little on event-free CRPS (+0.023 and +0.047). The audit could not
+  rule out that fine-tuning on perturbed lags teaches the network to distrust its lags, which gives
+  coverage for free on a bank whose target never moves; follow ratios are lowest for T3 (0.041),
+  then T0 (0.049), then P5 (0.073). It did not diff the experiment 574 sources between the T0 fit
+  (5 November) and the T1 to T3 fits (6 November), and T0 was not refitted.
 - **Reviews:** a fresh Sonnet agent reviewed the fit wrapper before the first fit: no leakage, and
   it
   traced that patching the target after the rows are built reaches every fine-tune row, including
@@ -310,8 +328,10 @@ days, so every number here is a short-lead result.
   load-shift, would be correct. The real December pair does not settle which view is right.
 - **Width is not controlled:** T1 and T2 cover more partly because their bands are wider, on event
   rows and on event-free rows. No width-matched control was run.
-- **T3's noise** is independent per half-hour. A persistent placebo (for example a random shift of
-  zero mean) is not tested.
+- **T3 is not a share-matched or magnitude-matched placebo.** Its noise is independent per
+  half-hour, perturbs about 0.97 of rows by about 0.08 of capacity (T0 shifts about 0.07 of rows by
+  0.15 to 0.50), and has no persistence. A persistent placebo and a placebo on about 7% of rows at
+  shift depth are not tested.
 - **T1 uses the same event schedule as T0**, so the two arms differ in the targets; the T0 fits were
   not rerun.
 - **Unlogged events:** NGED's logs may miss load-shift events, so clean rows may hold events no
@@ -321,9 +341,9 @@ days, so every number here is a short-lead result.
 
 ## What the next experiment should answer
 
-Whether the coverage gain of T0 over plain P5 survives a width-matched control for the placebo and
-the shifts, and whether a placebo with persistent zero-mean shifts, which has the persistence of the
-shifts but not their offset, performs as well as T0.
+Whether noise on about 7% of rows at shift depth, and a persistent zero-mean shift, perform as well
+as T0, and whether the network's weights on its lag columns explain the gain over plain P5 by
+distrust of the lags.
 
 Scripts: `ml-experiments/00590-synthetic-load-shifts-in-the-training-targets/` (`e00590_arm.py`
 wraps
