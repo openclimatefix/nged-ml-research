@@ -14,10 +14,14 @@ uv run --no-sync python ml-experiments/00626-*/e00626_bias.py
 ```
 """
 
+from pathlib import Path
+
+import altair as alt
 import e00434_score as s434  # ty: ignore[unresolved-import]
 import e00626_common as c  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
+from plotting import ocf_theme as theme
 
 PRIMARIES = 16
 
@@ -27,6 +31,73 @@ def exact_q(*, v: np.ndarray, level: float) -> np.ndarray:
     pos = level * 52 - 1
     i = 3 if level < 0.5 else 46
     return v[..., i] + (v[..., i + 1] - v[..., i]) * (pos - i)
+
+
+def draw_figure(*, df: pl.DataFrame) -> None:
+    """Draw the share of Primary actuals above q90 and below q10, by month and by lead band."""
+    docs = Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / c.SLUG
+    panels = []
+    for key, title in (("month", "By month"), ("band", "By lead band")):
+        g = df.group_by(key).agg(pl.col("n", "below_q10", "above_q90").sum()).sort(key)
+        if key == "band":
+            order = ["h0_12", "h12_36", "h36_120", "h120_240"]
+            g = g.with_columns(
+                pl.col("band").replace_strict(order, ["0-12 h", "12-36 h", "36-120 h", "120-240 h"])
+            )
+            sort = ["0-12 h", "12-36 h", "36-120 h", "120-240 h"]
+        else:
+            sort = g[key].to_list()
+        long = pl.concat(
+            [
+                g.select(
+                    key,
+                    pl.lit("Above q90 (target 10%)").alias("side"),
+                    (pl.col("above_q90") / pl.col("n") * 100).alias("rate"),
+                ),
+                g.select(
+                    key,
+                    pl.lit("Below q10 (target 10%)").alias("side"),
+                    (pl.col("below_q10") / pl.col("n") * 100).alias("rate"),
+                ),
+            ]
+        )
+        bars = (
+            alt.Chart(long.to_pandas())
+            .mark_bar()
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X(f"{key}:N", sort=sort, title=None, axis=alt.Axis(labelAngle=-45)),
+                xOffset="side:N",
+                y=alt.Y("rate:Q", title="Share of actuals (%)", scale=alt.Scale(domain=[0, 25])),
+                color=alt.Color(
+                    "side:N",
+                    title=None,
+                    scale=alt.Scale(
+                        domain=["Above q90 (target 10%)", "Below q10 (target 10%)"],
+                        range=[theme.BRAND_ORANGE, theme.DATA_BLUE],
+                    ),
+                ),
+            )
+        )
+        rule = (
+            alt.Chart(pl.DataFrame({"y": [10.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
+            .mark_rule(strokeDash=[4, 3], color="#555555")
+            .encode(y="y:Q")
+        )  # ty: ignore[unresolved-attribute]
+        panels.append(
+            alt.layer(bars, rule).properties(
+                width=380, height=200, title=alt.TitleParams(title, anchor="start")
+            )
+        )
+    chart = alt.hconcat(*panels).properties(
+        title=alt.TitleParams(
+            "Demand forecast: the q90 is exceeded too often, the q10 is not",
+            subtitle=[
+                "The 16 Primaries, all 44 runs, leads to 240 hours, experiment 425 arm A quantiles. Dashed line: 10%, the rate of a calibrated quantile."
+            ],
+            anchor="start",
+        )
+    )
+    chart.save(docs / "figure_3_demand_quantile_bias.svg")
 
 
 def main() -> None:
@@ -57,6 +128,7 @@ def main() -> None:
         )
         print(g.with_columns(below_q10=(pl.col("below_q10") / pl.col("n")).round(3), above_q90=(pl.col("above_q90") / pl.col("n")).round(3),
                              mean_err=(pl.col("err_sum") / pl.col("n")).round(2), mean_q10_q90_width=(pl.col("width_sum") / pl.col("n")).round(2)).drop("err_sum", "width_sum"))  # fmt: skip
+    draw_figure(df=df)
     # direct check against the stored table (month 2026-01), all demand rows, lead 12 to 240 h
     month = "2026-01"
     st = s434.stored_arm_a(month=month)

@@ -239,8 +239,8 @@ def figure_rates(*, rates: pl.DataFrame) -> None:
     once = base.transform_aggregate(
         low="min(low)", high="max(high)", target="min(target)", groupby=["side", "family"]
     )  # ty: ignore[unresolved-attribute]
-    target = once.mark_rect(opacity=0.15, color="#888888").encode(y="low:Q", y2="high:Q")
-    line = once.mark_rule(strokeDash=[4, 3], color="#555555").encode(y="target:Q")
+    target = once.mark_rect(opacity=0.15, color="#888888").encode(y="low:Q", y2="high:Q")  # ty: ignore[unresolved-attribute]
+    line = once.mark_rule(strokeDash=[4, 3], color="#555555").encode(y="target:Q")  # ty: ignore[unresolved-attribute]
     bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
         x=x,
         xOffset="arm_name:N",
@@ -256,10 +256,23 @@ def figure_rates(*, rates: pl.DataFrame) -> None:
     )
     chart = (
         alt.layer(target, line, bars, points)
-        .properties(width=190, height=170)
+        .properties(
+            width=190,
+            height=170,
+        )
         .facet(
             row=alt.Row("side:N", title=None),
             column=alt.Column("family:N", title=None, sort=list(c.FAMILIES)),
+        )
+        .properties(
+            title=alt.TitleParams(
+                "Exceedance of the q05 and q95 of the 51 values, by arm",
+                subtitle=[
+                    "Dot: share of actuals beyond the quantile. Bar: 95% interval from resampling test months.",
+                    "Dashed line: 5% target. Grey band: 4% to 6%, the pass bar.",
+                ],
+                anchor="start",
+            )
         )
         .configure_legend(orient="right")
     )

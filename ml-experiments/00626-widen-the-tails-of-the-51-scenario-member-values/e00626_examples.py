@@ -65,36 +65,63 @@ def main() -> None:
                 df.filter(pl.col("lead_h") <= limit),
                 actual.filter(pl.col("lead_h") <= limit),
             )
-            colour = alt.Color(
-                "arm:N",
-                title="Arm",
-                scale=alt.Scale(domain=list(COLOURS), range=list(COLOURS.values())),
+            d_band = sub.filter(pl.col("arm") == "D two factors")
+            a_edges = (
+                sub.filter(pl.col("arm") == "A unchanged")
+                .select("time", "lo", "hi")
+                .unpivot(index="time", variable_name="edge", value_name="power")
+                .with_columns(series=pl.lit("A unchanged: q05 and q95"))
             )
+            median = sub.filter(pl.col("arm") == "A unchanged").select(
+                "time",
+                pl.col("median").alias("power"),
+                pl.lit("Median (same in both arms)").alias("series"),
+            )
+            observed = act.drop_nulls().select(
+                "time", pl.col("actual").alias("power"), pl.lit("Actual").alias("series")
+            )
+            lines = pl.concat(
+                [
+                    a_edges.select("time", "power", "series", pl.col("edge")),
+                    median.with_columns(edge=pl.lit("m")),
+                    observed.with_columns(edge=pl.lit("o")),
+                ]
+            ).with_columns(key=pl.col("series") + pl.col("edge"))
+            domain = ["A unchanged: q05 and q95", "Median (same in both arms)", "Actual"]
+            colours = [theme.DATA_BLUE, "#7A7A7A", "#000000"]
             band = (
-                alt.Chart(sub.to_pandas())
-                .mark_area(opacity=0.25)
+                alt.Chart(d_band.to_pandas())
+                .mark_area(opacity=0.3, color=theme.BRAND_ORANGE)
                 .encode(  # ty: ignore[unresolved-attribute]
                     x=alt.X("time:T", title="Valid time (UTC)"),
-                    y=alt.Y("lo:Q", title="Power (points of capacity)"),
+                    y=alt.Y(
+                        "lo:Q", title="Power (points of capacity)", scale=alt.Scale(zero=False)
+                    ),
                     y2="hi:Q",
-                    color=colour,
                 )
             )
-            line = (
-                alt.Chart(sub.to_pandas())
-                .mark_line()
-                .encode(x="time:T", y="median:Q", color=colour)  # ty: ignore[unresolved-attribute]
-            )
-            obs = (
-                alt.Chart(act.drop_nulls().to_pandas())
-                .mark_line(color="black", strokeWidth=1)
-                .encode(x="time:T", y="actual:Q")  # ty: ignore[unresolved-attribute]
+            drawn = (
+                alt.Chart(lines.to_pandas())
+                .mark_line(strokeWidth=1.5)
+                .encode(  # ty: ignore[unresolved-attribute]
+                    x="time:T",
+                    y=alt.Y("power:Q", scale=alt.Scale(zero=False)),
+                    detail="key:N",
+                    color=alt.Color(
+                        "series:N",
+                        title="Lines",
+                        scale=alt.Scale(domain=domain, range=colours),
+                    ),
+                )
             )
             panels.append(
-                alt.layer(band, line, obs).properties(
+                alt.layer(band, drawn).properties(
                     width=560,
                     height=200,
-                    title=f"{title}, {season}: 90% band (q05 to q95), median, and actual (black)",
+                    title=alt.TitleParams(
+                        f"{title}, {season}, Primary D1 (orange band: arm D, q05 to q95)",
+                        anchor="start",
+                    ),
                 )
             )
         alt.vconcat(*panels).save(DOCS_DIR / f"figure_2_example_{season}.svg")

@@ -63,42 +63,45 @@ metric: >-
   score and variogram score (order 0.5) of the paths in experiment 436's blocks; slices of cold
   winter nights (demand, valid 18:00 to 06:00 UTC in December to February) and very sunny half-hours
   (solar, median of the 51 values at least 50 points of capacity).
-verdict: not supported
+verdict: partly supported
 best_arm: >-
-  None. Arm D (separate upper and lower factors) came closest: 6 of 12 family-by-band cells had a
-  q95 exceedance rate within 1 point of 5% and 7 of 12 had a q05 rate within 1 point, against 7 and
-  4 for the unchanged arm A. Pooled over the 25 nodes, arm D put q05 at 4.4% to 5.1% and q95 at 5.6%
-  to 6.1% in the four lead bands, missing the bar by 0.1 point at 0 to 12 hours.
+  Arm D (separate upper and lower factors), for demand only. Demand's q05 exceedance was 4.1% to
+  5.1% and its q95 exceedance 5.5% to 6.0% in all four lead bands, inside the registered 4% to 6%
+  bar, with demand CRPS -0.2% and path scores within 2%. Wind and solar missed the bar under every
+  arm, so the all-families bar failed: arm D met it in 6 of 12 cells at q95 and 7 of 12 at q05,
+  against 7 and 4 for the unchanged arm A.
 headline: >-
-  Widening the 51 values did not fix the tails, because the demand forecast looks biased low rather
-  than too narrow: at 12 to 36 hours the share of Primary actuals above q90 was 14.2% against 10%,
-  and
-  below q10 was 6.4% against 10%. A factor fitted on earlier months moved demand's upper tail the
-  wrong way (arm B raised its q95 exceedance from 4.7% to 7.1% at 12 to 36 hours), and separate
-  factors (arm D) brought the lower tail to 4.1% but left q90 at 15.6%. CRPS moved by -0.4% to +0.4%
-  and the joint variogram score of the paths by +0.6% to +1.1%.
+  Rescaling the 51 values fixed demand's q05 and q95 exceedance (arm D) but not its q90, and fixed
+  neither wind nor solar. Arm D reached demand's bar mainly by fitting factors of 0.8 to 1.06
+  (narrowing the lower side, with the factor on the 0.8 floor of the grid), while 14.2% of actuals
+  at 12 to 36 hours (36 test-month runs) still lay above q90 (target 10%) and 6.4% below q10, so the
+  demand forecast looks biased low rather than too narrow. CRPS moved by -0.4% to +0.4% and the
+  joint variogram score of the paths by +0.6% to +1.1%.
 lessons: >-
   The tails of the stored forecasts are not uniformly too narrow. Demand's lower tail is too wide
   and its upper tail too narrow, and wind and solar exceed q95 at rates of 4.6% to 8.0%. Arm A did
-  not reproduce the 7.6% to 8.8% q95 exceedance quoted in experiment 436, and the table does not
-  show why; the definition of the quantile is the first suspect. A shift of demand's median, not a
-  widening, is the likely need, but no table measures the median bias directly.
+  not reproduce the 7.6% to 8.8% q95 exceedance quoted in experiment 436, because experiment 436
+  took the q95 of the 51 values with numpy's default quantile (position 0.95 x 50 of the sorted
+  values), which sits lower than the weibull position (0.95 x 52 - 1); re-scoring arm A with that
+  definition gives 7.9% for demand, 8.4% for wind, and 7.4% for solar, against 7.9%, 8.8%, and 7.6%
+  in experiment 436. The share of actuals above the median was not measured, so the median bias is
+  inferred from q10 and q90 exceedance and the mean error.
 take_home_message: >-
-  Rescaling or stretching the 51 values about their median did not bring the q05 and q95 exceedance
-  rates to within 1 point of 5% in every family and lead band, and it cannot fix demand, whose
-  forecast sits too low (12% to 17% of actuals above q90, 6% to 8% below q10). The scenario paths
-  and the CRPS were hardly affected (joint variogram score +0.6% to +1.1%, CRPS -0.4% to +0.4%), so
-  widening cost little on the stored forecasts. The next step is a bias correction for demand, then
-  a re-check of the tails.
+  A separate upper and lower factor on the 51 values brought demand's q05 and q95 exceedance to 4%
+  to 6% in every lead band, but it did not fix wind or solar, and demand's q90 stays exceeded for
+  11% to 16% of actuals, which points to a forecast that sits too low rather than too narrow. The
+  scenario paths and the CRPS barely changed (joint variogram score +0.6% to +1.1%, CRPS -0.4% to
+  +0.4%). The next step is a bias correction for demand, then a re-check of the tails.
 advice:
   - >-
     Check the median bias of demand before widening the tails of the 51 values, because the demand
-    forecast exceeded q90 for 12% to 17% of actuals and fell below q10 for 6% to 8% (figure 1,
-    exceedance table).
+    forecast exceeded q90 for 11% to 16% of actuals across lead bands and fell below q10 for 7% to
+    9% (figure 3).
   - >-
     Quote tail exceedance with the weibull quantile of the 51 values (position k/52), and state the
-    definition, because experiment 436's 7.6% to 8.8% q95 figures do not reproduce under it
-    (exceedance table).
+    definition, because experiment 436's 7.6% to 8.8% q95 figures came from numpy's default quantile
+    of the 51 values and fall to 5.2% to 6.5% under the weibull quantile (the exceedance bullets
+    under "Design and numbers").
   - >-
     Fit one factor for the upper side and one for the lower side, not one factor for both, when the
     two tails miss in opposite directions (arm D against arm B).
@@ -107,14 +110,24 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**Widening the 51 scenario values about their median did not bring both tails to 5% in every family
-and lead band, mainly because the demand forecast is biased low, so its upper tail is too narrow
-while its lower tail is already too wide.** The question was whether a factor per family and lead
-band, fitted on earlier months, could bring the q05 and q95 exceedance rates to within 1 point of 5%
-without disturbing the Schaake-shuffled scenario paths. The answer is no for all four arms: the best
-arm (D) met the bar in 6 of 12 cells at q95 and 7 of 12 at q05. The scenario paths and the CRPS
-barely moved, so the cost of widening is small. What it narrows: the tail problem of experiments 434
-and 436 is a demand median bias plus modest wind and solar tails, not a uniform shortage of spread.
+**Rescaling the 51 scenario values about their median with a separate upper and lower factor (arm D)
+brought demand's q05 and q95 exceedance to the registered 4% to 6% bar in every lead band, but not
+wind's or solar's, and it left demand's q90 exceeded for 15.6% of actuals at 12 to 36 hours.** The
+question was whether a factor per family and lead band, fitted on earlier months, could bring the
+q05 and q95 exceedance rates to within 1 point of 5% without disturbing the Schaake-shuffled
+scenario paths (51 values re-ordered at each half-hour to follow the ranks of historical observed
+paths; experiment 436's arm J3). The four arms are: A, the stored values unchanged; B, one factor
+applied above and below the median; C, the values re-drawn at levels stretched about the median; and
+D, separate upper and lower factors. A cell is one family (demand, wind, or solar) in one lead band;
+the exceedance of a quantile is the share of actuals beyond the weibull quantile of the 51 values,
+meaning the k-th smallest value is taken as the level k/52. Demand is the 16 Primaries (the
+substations that feed the distribution network from the transmission network), and "points of
+capacity" are percentage points of a series' effective capacity. The registered verdict is `partly
+supported`: the bar held for demand alone. Arm D got there mostly by narrowing demand's lower side
+(its lower factor sat on the 0.8 floor of the fitting grid), so it is a recalibration of two tails,
+not evidence that the tails were too narrow. The scenario paths and the CRPS changed by under 1.2%.
+The tail problem of experiments 434 and 436 therefore looks like a demand median bias plus modest
+wind and solar tail misses, not a uniform shortage of spread.
 
 ![Exceedance rate at q95 and q05 by arm, family, and lead band; 95% month-block intervals](figure_1_exceedance_by_arm.svg)
 
@@ -122,25 +135,33 @@ and 436 is a demand median bias plus modest wind and solar tails, not a uniform 
 
 ![Summer example: Primary D1, day ahead and ten days, arms A and D](figure_2_example_summer.svg)
 
-The figures were written by the scripts and not rendered by the author, because no renderer was
-available; a reader should check them.
+Figure 1 colours: black is arm A, blue arm B, green arm C, orange arm D. Wind and solar intervals
+mostly span the whole 4% to 6% band, so those cells cannot be told apart from 5%. In figure 2, the
+orange band is arm D's q05 to q95, the blue lines are arm A's q05 and q95, and both arms share the
+median (grey).
+
+![Demand's q90 and q10 exceedance by month and lead band](figure_3_demand_quantile_bias.svg)
+
+Figure 3 shows the page's main finding: demand's q90 is exceeded for 7% to 22% of actuals by month
+and 11% to 16% by lead band (target 10%), while q10 is exceeded for 5% to 10% by month.
 
 ## Where demand's bias comes from
 
 **The bias is in the underlying forecast of experiment 425 (arm A), not in the member
 construction.** The 51 values are the stored quantiles interpolated linearly in the level, and q10
-and q90 are not widened by the 1.15 factor (only q01, q05, q95, and q99 are). Reading q10 and q90
-back from the 51 values reproduces the stored q10 and q90 of the quantile table to 0.00001 points of
-capacity (runs 2026-01-06 and 2026-01-13, all 16 Primaries). The direct quantile forecast therefore
-shows the same exceedance on the same rows. Script: `e00626_bias.py`; all 44 runs, 16 Primaries,
+and q90 are not widened by the 1.15 factor that experiment 436 applies to q01, q05, q95, and q99.
+Reading q10 and q90 back from the 51 values reproduces the stored q10 and q90 of the quantile table
+to 0.00001 points of capacity (runs 2026-01-06 and 2026-01-13, all 16 Primaries). The direct
+quantile forecast therefore shows the same exceedance on the same rows. Script: `e00626_bias.py`; it
+uses all 44 runs (not only the 36 test-month runs), because no factor is fitted here, 16 Primaries,
 leads to 240 hours.
 
-- **By month (above q90 / below q10 / mean of actual minus median, points of capacity).** 2025-09
-  10.6% / 10.0% / +2.0; 2025-10 14.6% / 7.7% / +2.6; 2025-11 6.6% / 9.8% / -0.2; 2025-12 21.7% /
-  5.2% / +2.8; 2026-01 16.9% / 9.9% / +1.2; 2026-02 10.7% / 8.5% / +1.2; 2026-03 20.5% / 5.4% /
-  +4.6; 2026-04 11.8% / 8.9% / +1.1; 2026-05 16.3% / 8.0% / +2.3; 2026-06 16.0% / 6.7% / +1.0. The
-  upper tail fails by 1.5 points or more in 7 of 10 months, worst in December and March; November is
-  the one month where the upper tail is too wide.
+- **By month, all 44 runs (above q90 / below q10 / mean of actual minus median, points of
+  capacity).** 2025-09 10.6% / 10.0% / +2.0; 2025-10 14.6% / 7.7% / +2.6; 2025-11 6.6% / 9.8% /
+  -0.2; 2025-12 21.7% / 5.2% / +2.8; 2026-01 16.9% / 9.9% / +1.2; 2026-02 10.7% / 8.5% / +1.2;
+  2026-03 20.5% / 5.4% / +4.6; 2026-04 11.8% / 8.9% / +1.1; 2026-05 16.3% / 8.0% / +2.3; 2026-06
+  16.0% / 6.7% / +1.0. The upper tail fails by 1.5 points or more in 7 of 10 months, worst in
+  December and March; November is the one month where the upper tail is too wide.
 - **By lead band (all 44 runs).** Above q90: 11.0% at 0 to 12 hours, 13.4% at 12 to 36, 14.7% at 36
   to 120, 15.5% at 120 to 240. Below q10: 8.2%, 7.2%, 7.1%, 8.7%. The upper-tail miss grows with the
   lead; the lower tail stays under 10% at every lead.
@@ -160,8 +181,8 @@ leads to 240 hours.
   of capacity. Every arm keeps J3's ranks.
 - **Rows.** 44 Tuesday runs of experiment 436; 7 test months (2025-12 to 2026-06), 36 runs; each
   month's factors fitted on all earlier runs (13 to 39 runs). Scored rows: leads to 240 hours with
-  an actual and a non-degenerate forecast. Data: experiment 436's cleaned actuals. No model was
-  fitted; retraining cadence is not applicable.
+  an actual and a non-degenerate forecast. Data: experiment 436's cleaned actuals. No forecasting
+  model was fitted.
 - **Exceedance, arm A (q95 / q05, share of actuals beyond the weibull quantile of the 51 values).**
   Demand 3.9% to 6.2% / 1.8% to 2.5%; wind 4.6% to 8.0% / 5.2% to 6.0%; solar 5.2% to 6.5% / 4.4% to
   7.3%. Demand above q90: 11.7% to 16.8% (target 10%); below q10: 6.2% to 7.8%.
@@ -186,13 +207,14 @@ leads to 240 hours.
   values, not the q01 and q99 quantile forecasts, and the scenario values stop at levels 1/52 and
   51/52.
 - **Registered predictions.** P1 failed (arm A does not reproduce 7% to 9%; the 7.6% to 8.8% quoted
-  by experiment 436 used a different definition). P2 held: arm D pooled came within 0.1 point of the
-  bar (6.1% at 0 to 12 hours), arm B pooled missed in all bands (q95 6.2% to 7.4%, q05 3.1% to
-  4.5%), and arms B to D failed in at least one cell. P3 failed (pooled CRPS rises were at most
-  0.4%, and the largest per-band rise, solar arm D at 0 to 12 hours, was about 0.9%, so none
-  exceeded the 1% limit). P4 cannot be judged: the path scores are pooled over families, and none
-  moved by more than 1.1%. P5 failed (wind factors changed by at most 14% between folds; the largest
-  change was 28%, for solar).
+  by experiment 436 used numpy's default quantile of the 51 values, as the re-score under 'Checks'
+  shows). P2 partly held (arm B and D were predicted to reach the pooled bar, and only the failure
+  in some cell held): arm D pooled came within 0.1 point of the bar (6.1% at 0 to 12 hours), arm B
+  pooled missed in all bands (q95 6.2% to 7.4%, q05 3.1% to 4.5%), and arms B to D failed in at
+  least one cell. P3 failed (pooled CRPS rises were at most 0.4%, and the largest per-band rise,
+  solar arm D at 0 to 12 hours, was about 0.9%, so none exceeded the 1% limit). P4 cannot be judged:
+  the path scores are pooled over families, and none moved by more than 1.1%. P5 failed (wind
+  factors changed by at most 14% between folds; the largest change was 28%, for solar).
 - **Stop rule.** Largest-to-smallest ratio of a fitted factor across folds: 1.28 (solar, arm D upper
   factor, 0 to 12 hours), under the 30% limit, so all arms were scored.
 - **Caveats.** Demand's lower factor reached the grid floor of 0.8 in six of seven folds up to 120
@@ -204,8 +226,22 @@ leads to 240 hours.
   interpolated quantile and the scoring's clipping to the values before interpolating (negligible).
   Experiments 577 and 608 were not reused because their widening applies to a different forecast.
 - **Reviews.** A fresh Sonnet agent reviewed the code before the first scoring run and found no
-  blocking bugs (items above are its low-severity points, kept as caveats). The numbers were not
-  re-derived by a second reviewer, and no separate prose review ran.
+  blocking bugs (its low-severity points are kept as caveats). A fresh Sonnet agent checked every
+  number against the printed report; a fresh Sonnet agent reviewed the rendered figures (applied:
+  outline for arm A, left-aligned titles, a subtitle on figure 1, and figure 3); and a fresh Sonnet
+  agent reviewed the diff and prose (applied: the verdict now follows the registered rule, arms and
+  terms are defined in the opening, and the 36-run and 44-run sets are labelled). Figure 1's colour
+  legend does not render in the review renderer; the SVG contains it.
 - **What to try next.** Remove the demand median bias (for example a per-Primary, per-lead offset
   fitted on earlier months), then refit arm D on the debiased values and re-check the tails; then
-  compare with experiment 483's table P.
+  compare with the planned experiment 483 (table P).
+- **Checks.** The experiment reports no mean forecast, so the median minus mean per site cannot be
+  computed; the mean of actual minus median is in the bias section (+1.0 to +4.6 points of capacity
+  in nine of ten months). No quantile-score contrast is paired with a mean-forecast contrast. Audit
+  triggers: trigger 2 fired (arm A contradicted experiment 436's tail figures), and the explanation
+  was tested here, which is the trigger's own condition: re-scoring arm A on all 44 runs and days 1
+  to 10 with numpy's default quantile gives a q95 exceedance of 7.9% (demand), 8.4% (wind), and 7.4%
+  (solar), against 7.9%, 8.8%, and 7.6% in experiment 436, and 5.2%, 6.5%, and 5.7% under the
+  weibull quantile. Experiment 436's "too narrow" finding therefore came largely from its quantile
+  definition. Triggers 1 and 3 to 7 did not fire (no control, no nested arm, no sister-experiment
+  interval, and no later design that depends on this result). No audit ran.
