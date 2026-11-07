@@ -129,7 +129,8 @@ false steps on the real, uninjected series.*
   clear-sky irradiance of at least 100 W/m2; each month's value is the least-squares slope of output
   on that expectation, weighted by the clear-sky index squared, divided by the same calendar month's
   median in earlier years.
-- **Envelope:** experiment 618's sunny-row filter, one median ratio per sunny day, averaged by month.
+- **Envelope:** experiment 618's sunny-row filter, one median ratio per sunny day, averaged by
+  month.
 - **Worlds:** 1 multiplies output by one minus the loss; 2 removes the loss from direct-current
   power and clips at the inverter limit (99.5th percentile of output); 3 injects at each farm's 3
   cloudiest months; 4 zeroes 5% of one month's daylight half-hours, three repeats at each start.
@@ -156,17 +157,18 @@ false steps on the real, uninjected series.*
   reaches it (14.3%). Envelope, 12 months only: Solar C 7.5% / 10%, Solar F 8% / 11%.
 - **Smaller losses (slope, 3 months, world 1).** A 5% loss: Solar C 70%, Solar F 25%. A 3% loss:
   Solar C 45%, Solar F 15%.
-- **The envelope and the slope do not separate the two worlds here.** In world 2 the envelope,
-  which responds only to the alternating-current limit, recovers 83% to 87% of a 10%
-  direct-current loss when it finds one at Solar C, D, and F (75% to 85% over all windows). It finds
-  the loss in only 30% to 35% of cases at Solar C and F, against 95% and 85% for the slope. A clipped
-  half-hour is only 0.4% (Solar A) to 1.1% (Solar F) of daylight half-hours, so a direct-current
-  loss barely differs from an alternating-current loss.
-- **Cloudy months (world 3).** False-step rate on the real series, pooled over the five farms: 7% (interval 1% to 30%, 15
-  windows) in the three cloudiest months against 1% to 2% in other months, and 6% (2% to 16%, 50
-  windows) in the ten cloudiest. Injected 10% losses at the three cloudiest start months of each farm are
-  found 40% of the time at 3 months, pooled over the five farms (15 windows, 20% to 64%). The same
-  pooled figure in ordinary months is 45%, so cloudy months do not reduce recall detectably.
+- **The envelope and the slope do not separate the two worlds here.** In world 2 the envelope, which
+  responds only to the alternating-current limit, recovers 83% to 87% of a 10% direct-current loss
+  when it finds one at Solar C, D, and F (75% to 85% over all windows). It finds the loss in only
+  30% to 35% of cases at Solar C and F, against 95% and 85% for the slope. A clipped half-hour is
+  only 0.4% (Solar A) to 1.1% (Solar F) of daylight half-hours, so a direct-current loss barely
+  differs from an alternating-current loss.
+- **Cloudy months (world 3).** False-step rate on the real series, pooled over the five farms: 7%
+  (interval 1% to 30%, 15 windows) in the three cloudiest months against 1% to 2% in other months,
+  and 6% (2% to 16%, 50 windows) in the ten cloudiest. Injected 10% losses at the three cloudiest
+  start months of each farm are found 40% of the time at 3 months, pooled over the five farms (15
+  windows, 20% to 64%). The same pooled figure in ordinary months is 45%, so cloudy months do not
+  reduce recall detectably.
 - **Curtailment placebo (world 4).** Zeroing 5% of a month's daylight half-hours is flagged as a
   fall at 1 month in 10% of 300 cases (7% to 14%) for the slope, twice the 5% bar. By farm: A 5%,
   B 17%, C 7%, D 15%, F 5%. Post hoc, dropping zero-output rows leaves it at 8% (6% to 12%) and
@@ -192,7 +194,8 @@ false steps on the real, uninjected series.*
 
 - **Setup:** five farms are testable (Solar E has only 20 months of data). Each has 20 start months,
   so recall resolves in steps of 5 points. Irradiance is from CAMS (Copernicus Atmosphere Monitoring
-  Service) to 2026-06-30, development data only, and no forecast is scored. No cleaning beyond the stored farm rows.
+  Service) to 2026-06-30, development data only, and no forecast is scored. No cleaning beyond the
+  stored farm rows.
 - **Deseasonalising** uses only months before the start month (code review change), so an injected
   loss cannot move the reference.
 - **Direct-current world is a stress case:** clipped half-hours are assumed to hold 15% more
@@ -202,9 +205,10 @@ false steps on the real, uninjected series.*
   exist, in thresholds and injections alike.
 - **Audit triggers:** the audit rule's seven triggers all concern forecast scores. This experiment
   scores no forecast, so none applies. Anonymised: no coordinates, no calendar dates.
-- **Code:** `ml-experiments/00636-metered-solar-monthly-slope-capacity-known-answer-test/`; it copies
-  experiment 218's rows and experiment 618's envelope filter. One Sonnet code review before the run
-  found a world 2 injection that left clipped half-hours unclipped; the stress case replaced it.
+- **Code:** `ml-experiments/00636-metered-solar-monthly-slope-capacity-known-answer-test/`; it
+  copies experiment 218's rows and experiment 618's envelope filter. One Sonnet code review before
+  the run found a world 2 injection that left clipped half-hours unclipped; the stress case replaced
+  it.
 
 ## What to try next
 
