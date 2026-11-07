@@ -14,12 +14,12 @@ kind: other
 protocol: demand-v2
 size: >-
   Complex. Answers to the five triggers: (1) it stores fitted network weights and forecasts for
-  about 8 new arms in the private data folder only; (2) more than one design could test the
-  question (the class 2 candidate takes experiment 610's closest arm, P7 with 50% signal dropout, but
-  other arms are possible); (3) it spans code whose callers cannot be named without searching
-  (experiments 565, 574, 577, 584, 591, 592, 595, 597, 599, 601, 606, 608, and 610); (4) it touches
-  no serving path and no degradation rule; (5) it changes no contract. Ceiling 10 GPU-hours (process
-  hours); ask before crossing.
+  about 8 new arms in the private data folder only; (2) more than one design could test the question
+  (the class 2 candidate takes experiment 610's closest arm, P7 with 50% signal dropout, but other
+  arms are possible); (3) it spans code whose callers cannot be named without searching (experiments
+  565, 574, 577, 584, 591, 592, 595, 597, 599, 601, 606, 608, and 610); (4) it touches no serving
+  path and no degradation rule; (5) it changes no contract. Ceiling 10 GPU-hours (process hours);
+  ask before crossing.
 hypothesis: >-
   Once the two-constant tail widening is fitted on each network's own forecasts, the steadier offset
   O2 is equivalent to D5 in K1, K2, and K3, and a class 2 network that reads neighbour summaries
@@ -29,8 +29,8 @@ prediction: >-
   Written before any score. P1: with tail constants fitted on each arm's own forecasts, O2 is within
   0.01 of D5 on event-free q05-q95 coverage at both metering groups (experiment 608 saw O2 lower
   coverage by 0.027 without tail constants). P2: O2 stays at least 0.01 below D5 on day-4-to-end
-  coverage in K1 (experiment 608 saw 0.041). P3: the class 2 candidate covers within 0.015 of K1
-  day 4 to the end at the gate's band width, and is worse than K1 on event-free CRPS by less than the
+  coverage in K1 (experiment 608 saw 0.041). P3: the class 2 candidate covers within 0.015 of K1 day
+  4 to the end at the gate's band width, and is worse than K1 on event-free CRPS by less than the
   minimum detectable effect. P4: dropping E3 raises absorption by 0.03 or more. P5: dropping the
   offset lowers event-free coverage by 0.02 or more at the six MW Primaries.
 decision_rule: >-
@@ -50,43 +50,46 @@ metric: >-
   0.75, and 0.5.
 verdict: partly supported
 best_arm: >-
-  Class 1: K1 (lag network, synthetic shifts, E3, G4 gated band) with the two-constant tail widening.
-  Class 2: the candidate (K2 plus experiment 610's neighbour summaries and 50% signal dropout, E3), with
-  its band scaled by 1.12 to 1.18 to match K1's width. Class 3: K3 (lag-free) with the tail constants.
+  Class 1: K1 (lag network, synthetic shifts, E3, G4 gated band) with the two-constant tail
+  widening. Class 2: the candidate (K2 plus experiment 610's neighbour summaries and 50% signal
+  dropout, E3), with its band scaled by 1.12 to 1.18 to match K1's width. Class 3: K3 (lag-free)
+  with the tail constants.
 headline: >-
   With tail constants fitted on each network's own earlier forecasts, the steadier offset O2 is not
-  shown to be equivalent to D5 (every interval is wider than the 0.01 tolerance), but no measure moved
-  against O2 beyond noise: on injected load-shifts in K1 it covers 0.926 against 0.928 from day 4
-  to the end, and 0.934 against 0.916 in the 7 days after. The class 2 candidate covers 0.931
-  (0.925 to 0.937) from day 4 to the end once its band is as wide as K1's, against K1's 0.924, follows 0.042 of an
-  injected shift against K1's 0.112, and absorbs 0.071 of it against 0.127. Whether it can replace the
-  G4 gate is not settled, because the intervals of its contrasts with K1 touch the 0.01 tolerance.
+  shown to be equivalent to D5 (every interval is wider than the 0.01 tolerance), but no measure
+  moved against O2 beyond noise: on injected load-shifts in K1 it covers 0.926 against 0.928 from
+  day 4 to the end, and 0.934 against 0.916 in the 7 days after. The class 2 candidate covers 0.931
+  (0.925 to 0.937) from day 4 to the end once its band is as wide as K1's, against K1's 0.924,
+  follows 0.042 of an injected shift against K1's 0.112, and absorbs 0.071 of it against 0.127.
+  Whether it can replace the G4 gate is not settled, because the intervals of its contrasts with K1
+  touch the 0.01 tolerance.
 lessons: >-
   The tail constants of experiment 608 were fitted with rows that postdate the origin of the month
   they were applied to; this experiment fits each month's constants on earlier origins only. The
-  event-free comparisons have printed minimum detectable effects of 0.02 to 0.06 in coverage, so they
-  cannot show equivalence at a 0.01 tolerance; only the injected bank can.
-  Not run: the absorption of K1 and K3 with O2, and a refit of K1 and K2 absorption (the K1 and K2
-  figures are experiment 599's E3 arm).
+  event-free comparisons have printed minimum detectable effects of 0.02 to 0.06 in coverage, so
+  they cannot show equivalence at a 0.01 tolerance; only the injected bank can. Not run: the
+  absorption of K1 and K3 with O2, and a refit of K1 and K2 absorption (the K1 and K2 figures are
+  experiment 599's E3 arm).
 take_home_message: >-
   Once the tail constants are fitted on each network's own forecasts, the steadier offset O2 costs
-  nothing measurable in K1, K2, or K3, so the maintainer's choice of O2 for explainability can stand;
-  the test is too coarse to prove the two offsets equal. The class 2 candidate, with a band 12 to
-  18% wider than its own, covers like K1 on injected load-shifts and follows and absorbs far less,
-  but the claim that it replaces the gate rests on point estimates inside the tolerance, not on
-  intervals inside it. Removing the offset makes the median follow a shift by 0.036 more.
+  nothing measurable in K1, K2, or K3, so the maintainer's choice of O2 for explainability can
+  stand; the test is too coarse to prove the two offsets equal. The class 2 candidate, with a band
+  12 to 18% wider than its own, covers like K1 on injected load-shifts and follows and absorbs far
+  less, but the claim that it replaces the gate rests on point estimates inside the tolerance, not
+  on intervals inside it. Removing the offset makes the median follow a shift by 0.036 more.
 advice:
   - >-
     Use O2 in class 1 and class 3 with tail constants refitted on the network's own forecasts; the
     day-4-to-end coverage of K1 is 0.926 with O2 against 0.928 with D5 (O2 table).
   - >-
-    Keep the offset itself: removing it raises the follow of an injected shift by 0.036 (ablation table).
+    Keep the offset itself: removing it raises the follow of an injected shift by 0.036
+    (ablation table).
   - >-
     Treat the class 2 candidate as a candidate for the gate's role, not a replacement, until its
     contrast with K1 is run on the 2026-07 test months (class 2 table).
   - >-
-    Keep E3: dropping it leaves coverage and follow within tolerance on the first pair but absorption
-    was not measured without it (ablation table, Not run).
+    Keep E3: dropping it leaves coverage and follow within tolerance on the first pair but
+    absorption was not measured without it (ablation table, Not run).
 production_status: candidate
 adopted_in: none
 ---
@@ -111,14 +114,16 @@ Share of event-free rows with the observed power inside the 90% band (the 5th to
 by metering group, at 24-120 h, on the four months after the first (the first month only supplies
 the first fit). Tail constants are the fitted factors that widen the band's lower and upper edges.
 D5 and O2 are the two output offsets. K2 is omitted because it has the same numbers as K1 in this
-chart. The dashed line is the 0.90 target. Look at the eight MVA Primaries, where the tail constants lift every network by
-0.02, and at the six MW Primaries, where they lift only the O2 and lag-free networks.
+chart. The dashed line is the 0.90 target. Look at the eight MVA Primaries, where the tail constants
+lift every network by 0.02, and at the six MW Primaries, where they lift only the O2 and lag-free
+networks.
 
 ![O2 minus D5 on coverage, tail constants on both](o2_vs_d5.svg)
 
 Each dot is the coverage of the O2 offset minus the coverage of the D5 offset with its Bonferroni
-interval (30 counted tests), with the tail constants applied to both. The dashed line marks no difference. Look at the injected 0-7 days after the end, where O2
-covers more, and at how wide the event-free intervals are.
+interval (30 counted tests), with the tail constants applied to both. The dashed line marks no
+difference. Look at the injected 0-7 days after the end, where O2 covers more, and at how wide the
+event-free intervals are.
 
 ![Class 2 candidate minus K1 and K2](class2_vs_k1_k2.svg)
 
@@ -139,8 +144,8 @@ capacity. Look at how every dot is a little above zero, which is slightly worse.
 
 ![D16, K3 and the class 2 candidate](event_D16_k3_c2.svg)
 
-Day-ahead forecasts through the December 2025 load-shift at the Primaries D5 and D16, one network per
-panel. The shaded span is the verified window. The dashed lines are the load-shift start and end
+Day-ahead forecasts through the December 2025 load-shift at the Primaries D5 and D16, one network
+per panel. The shaded span is the verified window. The dashed lines are the load-shift start and end
 the maintainer gave. The blue strip under K1 is the gate, which is on from about day 4. Coverage is
 scored against an estimate of the normal running arrangement, which these panels do not draw.
 
@@ -156,43 +161,45 @@ scored against an estimate of the normal running arrangement, which these panels
 
 ![A very sunny day, K3 and the class 2 candidate](sunny_day_D5_k3_c2.svg)
 
-Three further situations at the same scale: a week with no load-shift, a cold winter night, and a very
-sunny day at a Primary with embedded solar generation. Look at whether the bands stay at a similar
-width in K1 and K2 when the gate is off, and at how the class 2 candidate's band compares with K3's.
+Three further situations at the same scale: a week with no load-shift, a cold winter night, and a
+very sunny day at a Primary with embedded solar generation. Look at whether the bands stay at a
+similar width in K1 and K2 when the gate is off, and at how the class 2 candidate's band compares
+with K3's.
 
 ## Results
 
-- **Tail constants** (a lower and an upper factor per metering group and lead band, fitted on earlier
-  origins of earlier months only, applied before G4). At 24-120 h, event-free q05-q95 coverage at the
-  eight MVA Primaries rises from 0.887 to 0.904 in K1 and K2, and from 0.868 to 0.891 in K3. At the six
-  MW Primaries it stays at 0.860 to 0.862 in K1 and K2 (below q05 rises from 0.045 to 0.075, above q95
-  falls from 0.095 to 0.063) and rises from 0.836 to 0.863 in K3. On the injected bank, day 4 to the
-  end, K1 moves from 0.924 to 0.928 and K2 from 0.885 to 0.888. At 120-240 h, K1 covers 0.902 to 0.907
-  from day 4 to the end.
-- **O2 against D5 with tail constants on both** (30 counted tests, Bonferroni level 0.05/30; tolerance
-  0.01 in coverage and the printed minimum detectable effect of 0.0006 in CRPS). No event-free interval
-  lies inside the tolerance: the minimum detectable effects are 0.02 to 0.06 in coverage and 0.001 to
-  0.002 in CRPS, so the contrast cannot show equivalence. K1 with O2: injected day 4 to the end 0.926
-  against 0.928 (difference -0.002, interval -0.012 to +0.006); 0-7 days after the end 0.934 against
-  0.916 (+0.018, +0.011 to +0.026, better); follow 0.099 against 0.112. Event-free coverage at the eight
-  MVA Primaries 0.905 against 0.904, and at the six MW Primaries 0.882 against 0.862 (+0.021,
-  -0.019 to
-  +0.058). K3 with O2 covers 0.012 less at the eight MVA Primaries and 0.005 less at the six MW
-  Primaries, with CRPS 0.0002 and 0.0003 lower; all four intervals include zero. K2 behaves as K1.
-- **Without tail constants** O2 lowers event-free coverage by 0.02 to 0.04 in all three networks (K1,
-  four months: 0.864 against 0.887 at the eight MVA Primaries, 0.839 against 0.860 at the six MW
-  Primaries), which is the cost experiment 608 saw; refitting the constants on O2's own forecasts
+- **Tail constants** (a lower and an upper factor per metering group and lead band, fitted on
+  earlier origins of earlier months only, applied before G4). At 24-120 h, event-free q05-q95
+  coverage at the eight MVA Primaries rises from 0.887 to 0.904 in K1 and K2, and from 0.868 to
+  0.891 in K3. At the six MW Primaries it stays at 0.860 to 0.862 in K1 and K2 (below q05 rises from
+  0.045 to 0.075, above q95 falls from 0.095 to 0.063) and rises from 0.836 to 0.863 in K3. On the
+  injected bank, day 4 to the end, K1 moves from 0.924 to 0.928 and K2 from 0.885 to 0.888. At
+  120-240 h, K1 covers 0.902 to 0.907 from day 4 to the end.
+- **O2 against D5 with tail constants on both** (30 counted tests, Bonferroni level 0.05/30;
+  tolerance 0.01 in coverage and the printed minimum detectable effect of 0.0006 in CRPS). No
+  event-free interval lies inside the tolerance: the minimum detectable effects are 0.02 to 0.06 in
+  coverage and 0.001 to 0.002 in CRPS, so the contrast cannot show equivalence. K1 with O2: injected
+  day 4 to the end 0.926 against 0.928 (difference -0.002, interval -0.012 to +0.006); 0-7 days
+  after the end 0.934 against 0.916 (+0.018, +0.011 to +0.026, better); follow 0.099 against 0.112.
+  Event-free coverage at the eight MVA Primaries 0.905 against 0.904, and at the six MW Primaries
+  0.882 against 0.862 (+0.021, -0.019 to +0.058). K3 with O2 covers 0.012 less at the eight MVA
+  Primaries and 0.005 less at the six MW Primaries, with CRPS 0.0002 and 0.0003 lower; all four
+  intervals include zero. K2 behaves as K1.
+- **Without tail constants** O2 lowers event-free coverage by 0.02 to 0.04 in all three networks
+  (K1, four months: 0.864 against 0.887 at the eight MVA Primaries, 0.839 against 0.860 at the six
+  MW Primaries), which is the cost experiment 608 saw; refitting the constants on O2's own forecasts
   removes it.
-- **Class 2 candidate at the gate's band width** (22 counted tests). Its own band covers 0.895 from day
-  4 to the end, so its band is scaled by factors of 1.12 to 1.18 per month (the ratio of K1's mean
-  band width to its own on the injected bank, 24-120 h). At that width it covers 0.931 against K1's
-  0.924 from day 4 to the end (+0.006, -0.0005 to +0.012) and 0.916 against 0.911 after the end
+- **Class 2 candidate at the gate's band width** (22 counted tests). Its own band covers 0.895 from
+  day 4 to the end, so its band is scaled by factors of 1.12 to 1.18 per month (the ratio of K1's
+  mean band width to its own on the injected bank, 24-120 h). At that width it covers 0.931 against
+  K1's 0.924 from day 4 to the end (+0.006, -0.0005 to +0.012) and 0.916 against 0.911 after the end
   (+0.004, -0.003 to +0.011). It follows 0.042 of an injected shift against K1's 0.112 (better).
   Event-free coverage is higher than K1's and K2's (0.920 and 0.901 against 0.886 and 0.868) because
-  the band is wider everywhere. Event-free CRPS is 0.0002 higher at the eight MVA Primaries and 0.0005
-  higher at the six MW Primaries than K2's, which is inside the printed minimum detectable effect of
-  0.0006 in point estimate and not in interval. By the plan's rule (coverage within 0.01 of K1 and
-  CRPS within 0.0006 of K2) every interval touches the tolerance, so the replacement is not shown.
+  the band is wider everywhere. Event-free CRPS is 0.0002 higher at the eight MVA Primaries and
+  0.0005 higher at the six MW Primaries than K2's, which is inside the printed minimum detectable
+  effect of 0.0006 in point estimate and not in interval. By the plan's rule (coverage within 0.01
+  of K1 and CRPS within 0.0006 of K2) every interval touches the tolerance, so the replacement is
+  not shown.
 - **Absorption** (experiment 595's method: the share of an injected shift's depth that the median
   forecast takes up, day-14 refit, mean over injected designs with 95% interval). From day 4 to the
   end, K1 and K2 (experiment 599's E3 arm) absorb 0.127 (0.076 to 0.181), K3 absorbs 0.063 (0.018 to
@@ -201,24 +208,25 @@ width in K1 and K2 when the gate is off, and at how the class 2 candidate's band
   0.073, and 0.064. Both contrasts against E3 are within the 0.03 tolerance only as point estimates.
 - **Ablations on 2025-10 and 2025-12, injected day 4 to the end** (12 counted tests). Without E3
   coverage changes by +0.002 (inconclusive) and follow by -0.002 (equivalent). Without the offset,
-  coverage changes by -0.002 and follow rises by 0.036 (worse), and event-free coverage at the six MW
-  Primaries is 0.011 higher (inconclusive).
+  coverage changes by -0.002 and follow rises by 0.036 (worse), and event-free coverage at the six
+  MW Primaries is 0.011 higher (inconclusive).
 - **Scores at 120-240 h.** Event-free CRPS: K1 and K2 0.0355 (eight MVA) and 0.0284 (six MW), K3
   0.0383 and 0.0311, the class 2 candidate 0.0355 and 0.0288. Event-free coverage with tail
   constants: K1 0.881 and 0.853, K3 0.878 and 0.852.
-- **Curtailment cost** (pounds per Primary-day, mean over six MW Primary-months, event-free, 24-120 h;
-  reported only). Limits 0.9, 0.75, and 0.5: K1 and K2 305, 5,615, and 32,440, and with tail constants
-  233, 5,262, and 32,022; K3 405, 6,831, and 39,444, and with tails 367, 6,396, and 38,987; K1 with O2
-  398, 6,082, and 34,004, and with tails 415, 5,016, and 32,649; the class 2 candidate at gate width
-  290, 5,171, and 32,769. The no-tail figures cover five months and the tail figures four.
+- **Curtailment cost** (pounds per Primary-day, mean over six MW Primary-months, event-free, 24-120
+  h; reported only). Limits 0.9, 0.75, and 0.5: K1 and K2 305, 5,615, and 32,440, and with tail
+  constants 233, 5,262, and 32,022; K3 405, 6,831, and 39,444, and with tails 367, 6,396, and
+  38,987; K1 with O2 398, 6,082, and 34,004, and with tails 415, 5,016, and 32,649; the class 2
+  candidate at gate width 290, 5,171, and 32,769. The no-tail figures cover five months and the tail
+  figures four.
 - **G4 false triggers.** 0 in 1,817 event-free origin days for K1 with D5 and with O2.
-- **D15 and D18 (report only, 24-120 h, event-free).** K1 covers 0.861 with CRPS 0.0869, K3 0.840 and
-  0.0824, K1 with O2 0.843 and 0.0937, the class 2 candidate at gate width 0.887 and 0.0908.
+- **D15 and D18 (report only, 24-120 h, event-free).** K1 covers 0.861 with CRPS 0.0869, K3 0.840
+  and 0.0824, K1 with O2 0.843 and 0.0937, the class 2 candidate at gate width 0.887 and 0.0908.
 - **Predictions.** P1 (O2 within 0.01 of D5 on event-free coverage) is not shown: the intervals are
   too wide. P2 (O2 at least 0.01 below D5 on day-4-to-end coverage in K1) failed (-0.002). P3 (the
-  class 2 candidate within 0.015 of K1 and within the CRPS minimum detectable effect) held for the point
-  estimates. P4 (dropping E3 raises absorption by 0.03) was not tested. P5 (dropping the offset lowers
-  six MW coverage by 0.02) failed (+0.011).
+  class 2 candidate within 0.015 of K1 and within the CRPS minimum detectable effect) held for the
+  point estimates. P4 (dropping E3 raises absorption by 0.03) was not tested. P5 (dropping the
+  offset lowers six MW coverage by 0.02) failed (+0.011).
 
 ## Roster table for the maintainer
 
@@ -248,16 +256,16 @@ minimum detectable effects are printed in the tables as half the interval width.
 ## Reproduction notes
 
 - **Rows and data.** Cleaned power; 2025-07-01 onwards unused for the final test months; injected
-  bank of
-  experiment 581; seeds 0 and 1; refits on days 0 and 14. The tail constants of a month are fitted on
-  earlier months' event-free rows whose origins precede the month's first origin; experiment 608's
-  constants used rows without that purge, so its tail figures were slightly optimistic.
+  bank of experiment 581; seeds 0 and 1; refits on days 0 and 14. The tail constants of a month are
+  fitted on earlier months' event-free rows whose origins precede the month's first origin;
+  experiment 608's constants used rows without that purge, so its tail figures were slightly
+  optimistic.
 - **Code reused (copied into this folder).** Experiments 608 (K1, K2, K3 arms), 610 (P7 with 50%
-  signal dropout, closest arm of a draft experiment), 577 (O2), 565 (lag-free D5), 599 (E3), 592 (G4),
-  597 (scoring), 595 and 587 (absorption), 601 (curtailment cost), and 492 (tail constants).
+  signal dropout, closest arm of a draft experiment), 577 (O2), 565 (lag-free D5), 599 (E3), 592
+  (G4), 597 (scoring), 595 and 587 (absorption), 601 (curtailment cost), and 492 (tail constants).
 - **Fits and compute.** Fits are in the private data folder; the fit time on the GPU was well under
   the ceiling of 10 GPU-hours.
 - **Caveats.** NGED's logs may omit load-shift events, so clean rows may hold unlabelled events and
   the event counts are lower bounds. Coverage is scored against an estimate of the normal running
-  arrangement. The injected bank changes only the lags, which flatters lag networks (experiment 595).
-  Nothing is adopted for production.
+  arrangement. The injected bank changes only the lags, which flatters lag networks (experiment
+  595). Nothing is adopted for production.
