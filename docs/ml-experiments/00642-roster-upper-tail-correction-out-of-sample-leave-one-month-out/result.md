@@ -88,9 +88,9 @@ decision_rule: >-
   dropped from that fit and, in the held-out month, a row with no window gets a zero shift).
   Arms S, B, and Q need at least 500 fitting rows per cell; a smaller cell gets the identity
   correction (scale 1, shift 0, PIT mapping the identity). Arm Q's PIT is clipped to 0.001 to 0.999,
-  ties and flat segments of the quantile function take the mean of the tied levels, Sort every
-  corrected forecast across the 11
-  levels. Curtailment cost is `metrics.avoidable_curtailment_cost` at the six signed-MW Primaries
+  ties and flat segments of the quantile function take the mean of the tied levels, Every corrected
+  forecast is sorted across the 11 levels.  Curtailment cost is `metrics.avoidable_curtailment_cost`
+  at the six signed-MW Primaries
   only (null for the rest, with the status kept), scored from 2025-10-01 at limit fractions 0.9
   (headline), 0.75, and 0.5 of each Primary's earlier maximum, summed over the held-out months.
   twCRPS uses `metrics.tail_weighted_score` with each Primary's threshold set at the 95th percentile
@@ -107,8 +107,8 @@ decision_rule: >-
   three-part threshold, not a hypothesis test.
 benchmark: >-
   The uncorrected exported forecasts of the same network on the same rows, the nominal levels (10%,
-  5%), and experiment 630's out-of-sample result (shift S: 12.6% and 7.2%; rescale R: 11.7% and 6.5%
-  on the last two months).
+  5%), and experiment 630's out-of-sample result (its shift, called S there, gave 12.6% and 7.2%,
+  and its rescale, called R there, gave 11.7% and 6.5%, on the last two months).
 row_set_id: roster_export_2026-11-07_dev_months
 metric: >-
   Pooled and per-month event-free exceedance at q90 and q95 (and q05, q10 for the lower tail),
@@ -137,19 +137,20 @@ lessons: >-
   level changed. An arm that follows recent errors at each upper quantile (C) adds noise, because
   the adjustment's standard deviation across rows is 0.34 MW.
 take_home_message: >-
-  On the 14 Primaries with a longer history, shifting each stored demand forecast to the level of
-  the previous 28 days and then scaling its upper bands brings the share of readings above q90 to
-  about 11% in every test month, against 12% to 16% before, but it raises CRPS by about 2%. The
-  apparent absence of a CRPS increase over all 16 Primaries comes from the two short-history
-  Primaries D15 and D18, whose level changed in March 2026 and which are 45% above q90 that month
-  before any correction. The next step is to treat D15 and D18 separately and to test whether the
-  shift can be applied to the upper quantiles only, so that CRPS does not rise.
+  Shifting each stored demand forecast to the level of the previous 28 days, and then widening its
+  upper range, brings the share of readings above the forecast 90th percentile (q90) to between 9%
+  and 12.5% in every test month at 14 of the 16 primary substations, against 10% to 16% before, but
+  it makes the continuous ranked probability score (CRPS, the score of the whole forecast
+  distribution) about 2% worse. The other two substations, D15 and D18, hide that increase in a
+  pooled score, because their level changed in March 2026 and 45% of their readings were above q90
+  that month before any correction. A next experiment could treat D15 and D18 separately and test a
+  shift applied to the upper quantiles only.
 advice:
   - >-
     Treat a shift of the stored forecast to the recent median level as an option, not a default,
     because on the 14 Primaries with a longer history it lowered q95 exceedance by 0.4 to 0.5
     points more than a scale alone (5.9% and 6.1% against 6.4% and 6.5%) and narrowed the
-    cold-night gap, but raised CRPS by 0.6 to 1.1 points more (1.021 and 1.016 against 1.010 and
+    cold-night gap, but raised CRPS by 0.2 to 1.1 points more (1.021 and 1.016 against 1.010 and
     1.014; the 14-Primary bullet).
   - >-
     Do not use a rolling conformal adjustment of each upper quantile over 8 weeks, because it made
@@ -159,8 +160,8 @@ advice:
   - >-
     Score and report D15 and D18 separately from the other 14 Primaries when judging a calibration
     correction, because their March 2026 exceedance (45% to 46% above q90 before correction) alone
-    makes the month condition fail on 16 Primaries and makes a correction look free of CRPS
-    increase (the by-month and 14-Primary bullets).
+    makes the month condition fail on 16 Primaries and makes a correction look neutral in CRPS (the
+    by-month and 14-Primary bullets).
   - >-
     Fit upper-tail corrections separately for the eight MVA Primaries and the six MW Primaries, or
     check them there, because the MVA group reached 10.0% above q90 and the MW group stayed at
@@ -170,18 +171,25 @@ adopted_in: none
 code: ml-experiments/00642-roster-upper-tail-correction-out-of-sample-leave-one-month-out/
 ---
 
-**Shifting a forecast to the recent level, and then scaling its upper bands, comes closest to
-fixing the upper tail of the stored demand forecasts, but no correction fitted without the
-held-out month passes the bar we set.** The measure is the share of half-hours in which demand
-exceeds the forecast 90th percentile (q90, nominal 10%) or 95th percentile (q95, nominal 5%).
-[Experiment
+**Shifting each stored demand forecast to the level of recent weeks, and then widening its upper
+range, comes closest to fixing the too-low upper end of the forecasts, but no correction fitted
+without the held-out month passes the bar registered in the plan.** We asked whether five
+corrections, each fitted on other months, can bring two shares close to their nominal values. The
+first share is the half-hour readings above a forecast's 90th percentile (q90, nominal 10%), and the
+second is the readings above its 95th percentile (q95, nominal 5%). The forecasts are the stored
+output of three neural networks for 16 primary substations (Primaries): K1 (reads power from 24
+hours or more before the forecast), the Candidate (the same, plus summaries of the neighbouring
+Primaries' power), and K3 (reads no recent power). [Experiment
 630](../00630-roster-upper-demand-tail-calibration-event-days-and-bias-correction/result.md) found
-that the stored neural-network forecasts K1 and the Candidate exceed those percentiles too often, on
-ordinary days as well as around load-shifts. We tested five corrections of that excess on the same
-five test months (October, December 2025, January, March, and June 2026) at 16 primary
-substations. Each correction was fitted on the other four months, with the held-out month and the
-10 days around it removed from the fitting rows, and scored on the held-out month. The corrections
-change the stored forecasts only; no network was refitted.
+that K1 and the Candidate exceed those percentiles too often, on ordinary days as well as around
+load-shifts (NGED moving demand from one Primary to a neighbour). We tested the corrections on five
+test months (October 2025, December 2025, January 2026, March 2026, and June 2026). Each correction
+was fitted on the other four months, with the held-out month and the 10 days around it removed from
+the fitting rows, and scored on the held-out month. The corrections change the stored forecasts
+only, and no neural network was refitted. "Event-free" half-hours are those with no labelled or
+verified load-shift within 7 days at that Primary. D15 and D18 are the two Primaries with a short
+history. CRPS is the continuous ranked probability score, the quantile score of the whole forecast,
+and a CRPS ratio above 1 means the corrected forecast scores worse than the stored one.
 
 ![Share of half-hours above q90 and q95, by arm, for K1 and the Candidate](figure_1_exceedance_by_arm.svg)
 
@@ -222,7 +230,7 @@ change the stored forecasts only; no network was refitted.
 - **Pooled event-free exceedance, with 95% intervals from resampling origin days** (nominal: 10%
   and 5%; CRPS in MW or MVA; K1 uncorrected CRPS 0.2447, Candidate 0.2477):
 
-| Network and arm | Above q90 | Above q95 | CRPS ratio to uncorrected |
+| Forecast and arm | Above q90 | Above q95 | CRPS ratio to uncorrected |
 |---|---|---|---|
 | K1, uncorrected | 14.7% (14.1, 15.3) | 8.4% (7.9, 8.9) | 1 |
 | K1, S | 11.9% (11.3, 12.5) | 7.1% (6.6, 7.6) | 1.027 (1.024, 1.030) |
@@ -295,11 +303,11 @@ change the stored forecasts only; no network was refitted.
   minimum sizes, and weak predictions; the plan was revised before any run. One Sonnet code review
   before the first scored run found a leak in arm M (training shifts computed from a window that
   included the held-out month), fixed before the run; its other findings (ties, crossings) cannot
-  occur in the stored quantiles. A Sonnet review of the results and the write-up reproduced the numbers and found that arm M's
+  occur in the stored quantiles. A Sonnet review of the results and the write-up reproduced the
+  numbers and found that arm M's
   neutral CRPS and the March failure both come from D15 and D18, that the Candidate with arm M also
   misses the q95 limit, and a wrong statement about quantile mapping and the median; the write-up,
-  the headline, the advice, and figure 2 were rewritten to show the 14 Primaries separately. A
-  Sonnet prose review follows.
+  the headline, the advice, and figure 2 were rewritten to show the 14 Primaries separately.
 - **Checks.** The median error: arm M lowers the mean of observed power minus q50 from 0.0975 to
   0.0464 MW (K1) and cuts the median's absolute error by 0.8% (K1, 0.4414 to 0.4380 MW) and by 1.9%
   (Candidate, 0.4477 to 0.4390 MW), in the same direction as its CRPS ratio, and arms S and B leave
@@ -314,7 +322,8 @@ change the stored forecasts only; no network was refitted.
   separate a seasonal bias from a trend. Corrections S, B, and Q are not causal, because they use
   later months. The temperature third labels rows only, and comes from the ensemble mean of the
   latest run (a near-analysis proxy). The unlogged-event caveat applies to every event-free number.
-  The schedule is a free re-score of stored forecasts, so cadence does not apply; the absolute
+  The page re-scores stored forecasts with no refit, so retraining cadence does not apply; the
+  absolute
   scores are those of experiment 613's stored networks, and no comparison to BG2, the manual
   heuristic, or climatology is made here.
 - **What the next experiment should answer.** How D15 and D18 should be corrected, since their level
