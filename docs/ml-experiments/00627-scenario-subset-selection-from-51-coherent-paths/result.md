@@ -28,31 +28,43 @@ hypothesis: >-
   simple random sample (R).
 prediction: >-
   Written before any score is read. P1. At K = 5 the random sample R has a relative gap above 10%
-  at the 5th or 95th percentile of the 51-path distribution on at least one summary, and holds the
-  tails in about 1 - (1 - 0.1)^5 = 41% of draws at each tail. P2. A stratified sample S matches the
-  distribution of the summary it is ranked on (gap under 10%) but not the other two summaries, so
-  the mean over the three summaries fails the 10% bar. P3. The cluster medoids C are central paths
-  and rarely include a tail path, so C has lower tail coverage than R. Therefore the registered
-  verdict is `not supported` at K = 5, and K = 10 narrows the gap without closing it. P4. The share
-  of members that keep the same stratum from one weekly run to the next is within 3 points of the
-  chance level 1 / K for the Schaake-shuffled members, and about the same for ensemble-copula
-  members.
+  at the 5th or 95th percentile of the 51-path distribution on at least one summary, and holds each
+  tail (a path of rank 6 or lower, or 46 or higher, of the 51 on a summary) in about 1 - C(45,5) /
+  C(51,5) = 48% of draws, so its tail coverage is near 48%; the best of 5,000 random K = 5 subsets
+  (the oracle floor, printed beside every arm) has a mean relative gap below 10%, so the bar is
+  reachable only by choosing on the gap itself, which no rule can do. P2. A stratified sample S has a smaller gap than R on the summary it is ranked on and a
+  tail coverage of 50% to 65%, above R's 48%, but its mean relative gap stays above 10% at the 5th
+  and 95th percentiles, because the smallest of five stratified draws still sits several ranks
+  inside the tail. P3. The cluster medoids C are central paths
+  and rarely include a tail path, so C has lower tail coverage than R. Therefore the expected
+  verdict is `partly supported` (S passes the tail condition, nothing passes the coverage
+  condition) at K = 5, and K = 10 narrows the gap without closing it. The tail test has 10 month
+  blocks, so a failure to clear the interval is read as low power. P4. Within a run, the Spearman
+  correlation of the 51 paths' wind summary between days 1 to 3 and days 4 to 10 is below 0.5, so
+  a path's label does not carry over between bands. P5. Across weekly runs, the share of members
+  that keep the same stratum is within 3 points of the chance level 1 / K for the Schaake-shuffled
+  members (a tautology, since their index is arbitrary), and for the ensemble-copula members, whose
+  index is the weather member.
 decision_rule: >-
   Fixed before any score is read. Rows: the Tuesday runs of 2025-09 to 2026-06 stored by experiment
   436 (44 expected; the count is printed first), grouped into calendar months for a month-block
   bootstrap (20,000 resamples). Paths: experiment 436's Schaake-shuffled scenarios (J3), 51 per run
   over 25 nodes (16 Primaries, 3 wind farms, 6 solar farms) and 702 half-hours, in points of
   capacity; the ensemble-copula scenarios (J2) are a sensitivity. Three summaries per path and lead
-  band: the mean over the wind farms, the mean over the solar farms, and the peak over the band of
+  band: the mean over the wind farms, the mean over the solar farms, the peak over the band of
   the net demand (mean over the Primaries minus the wind-farm mean minus the solar-farm mean; an
-  unweighted proxy, because MW weights are not available). Lead bands: 12 to 36 hours, days 1 to
+  unweighted proxy, because MW weights are not in the run files), and the peak over the band of the
+  Primaries' mean demand. Lead bands: 12 to 36 hours, days 1 to
   3, days 4 to 10, and days 1 to 10 (the headline). The selection is made once per run on the days 1
   to 10 window; a selection made inside each band is a secondary arm. Arms: R (1,000 random draws
-  of K paths per run), S-wind, S-solar, and S-net (rank the 51 paths by that summary, cut into K
+  of K paths per run), S-wind, S-solar, S-net, and S-demand (rank the 51 paths by that summary, cut into K
   equal-count strata, draw one path from each; 1,000 draws per run), C (k-medoids with k-medoids++
-  starting points and seed 627, on the 51 joint paths with each node and half-hour standardised
-  across the 51 paths and every 4th half-hour of the window, each medoid weighted by its cluster
-  size), and All (the 51). Coverage: per summary and band, the Wasserstein-1 distance of the
+  starting points and seed 627, on the 51 joint paths with each node and half-hour centred across
+  the 51 paths, scaled by one standard deviation per node, every 4th half-hour of the window, all
+  25 nodes equally weighted, best of 10 starts, each medoid weighted by its cluster
+  size), Oracle (the best of 5,000 random
+  K-subsets on the gap itself, a floor and not a rule), and All (the 51). Every arm is scored on all
+  four summaries. Coverage: per summary and band, the Wasserstein-1 distance of the
   weighted K-path distribution to the 51-path distribution, and the gap at the 5th, 50th, and 95th
   percentiles (lower inverse CDF), each divided by the spread (95th minus 5th percentile) of the
   51-path distribution of the same run, then averaged over summaries and runs. Tail coverage: the
@@ -60,12 +72,18 @@ decision_rule: >-
   (lower tail) or the 90th percentile (upper tail) of the 51 on a summary, averaged over summaries
   and both tails. Joint score: energy score and variogram score (order 0.5) of the K weighted paths
   against the observed vector over the 25 nodes at a coarse step (about 25 half-hours per band),
-  reported as the relative difference to All. Stability: the share of members that fall in the same
-  one of K strata on consecutive weekly runs (S-net at K = 5), against the chance level 1 / K.
+  reported as the relative difference to All. Stability: within each run, the Spearman correlation and the same-stratum share of the 51
+  paths between lead bands, per summary; across runs, the share of members in the same one of K
+  strata on consecutive weekly runs (the stored runs are Tuesdays, so weekly replaces the brief's
+  consecutive days), against the chance level 1 / K. Absolute scores of every arm (and R's 5th to
+  95th percentile across draws) are reported beside each contrast. The joint vector is built member
+  first, `(51, 25, T)` flattened to `(51, 25 * T)`, which avoids the reshape error experiment 625
+  found in 436.
   The verdict is judged at K = 5, days 1 to 10, J3. A label-free arm passes the coverage condition
   if its mean relative gap is at most 0.10 at each of the three percentiles (point estimate), and
-  passes the tail condition if its tail coverage exceeds R's, with a month-block 98.75% interval (a
-  Bonferroni correction over the four label-free arms S-wind, S-solar, S-net, and C) that lies wholly
+  passes the tail condition if its tail coverage exceeds R's, with a month-block 99% interval (a
+  Bonferroni correction over the five label-free arms S-wind, S-solar, S-net, S-demand, and C, so
+  99% two-sided) that lies wholly
   above zero. Verdict: `supported` if at least one label-free arm passes both conditions; `partly
   supported` if at least one passes the tail condition but none passes the coverage condition;
   `not supported` otherwise. K = 3 and K = 10, the other bands, the other summaries, the joint
