@@ -199,23 +199,28 @@ intervals over 10 months. Generators are anonymised.
 
 ![Tail coverage by selection rule](figure_1_tail_coverage.svg)
 
-Figure 1 shows the share of draws that include a path in the lowest or highest 10% of the 51, with 95% month-block intervals; higher is better.
+Figure 1 shows the share of draws that include a path in the lowest or highest 10% of the 51, with
+95% month-block intervals; higher is better.
 
 ![Gap to the 51-path distribution](figure_2_percentile_gap.svg)
 
-Figure 2 shows the mean gap at the 5th, 50th, and 95th percentiles as a share of the range of the 51; the dashed line is 10%.
+Figure 2 shows the mean gap at the 5th, 50th, and 95th percentiles as a share of the range of the
+51; the dashed line is 10%.
 
 ![Variogram score of K paths relative to all 51](figure_3_joint_variogram.svg)
 
-Figure 3 shows how much worse than all 51 paths each rule scores against the observed vector of all 25 sites; lower is better.
+Figure 3 shows how much worse than all 51 paths each rule scores against the observed vector of all
+25 sites; lower is better.
 
 ![Gate for BSP group peak export](figure_4_bsp_gate.svg)
 
-Figure 4 shows the share of observed days on which the daily peak export beat the largest chosen path; the dashed line is the gate (all 51 plus 5 points).
+Figure 4 shows the share of observed days on which the daily peak export beat the largest chosen
+path; the dashed line is the gate (all 51 plus 5 points).
 
 ![Rank correlation of a path between lead bands](figure_5_label_carry_over.svg)
 
-Figure 5 shows the rank correlation of the 51 paths between days 1 to 3 and days 4 to 10 within a run, for two ways of coupling the paths.
+Figure 5 shows the rank correlation of the 51 paths between days 1 to 3 and days 4 to 10 within a
+run, for two ways of coupling the paths.
 
 ## Results
 
