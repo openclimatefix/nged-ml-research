@@ -55,7 +55,10 @@ def crps(*, y: np.ndarray, q: np.ndarray) -> np.ndarray:
 
 
 def twcrps(*, y: np.ndarray, q: np.ndarray, thr: np.ndarray) -> np.ndarray:
-    """Threshold-weighted CRPS stand-in of experiment 319: the CRPS of the values clipped below at each Primary's threshold."""
+    """Threshold-weighted CRPS stand-in of experiment 319.
+
+    It is the CRPS of the values clipped below at each Primary's threshold.
+    """
     d = np.maximum(y, thr)[:, None] - np.maximum(q, thr[:, None])
     return 2.0 * np.maximum(TAUS * d, (TAUS - 1.0) * d).mean(axis=1)
 

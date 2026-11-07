@@ -1,5 +1,7 @@
 # ruff: noqa: ANN001, ANN003, ANN201, ANN202, D102, D103, D107, D205, E402, E501, I001, PLR0915, PT018
-"""Experiment 620 (copy of 613's `e00613_nbarm.py`): table and fit the class 2 candidate on the final fold (GPU).
+"""Experiment 620 (copy of 613's `e00613_nbarm.py`): table and fit the class 2 candidate (GPU).
+
+The fit is on the final fold.
 
 The final fold `2026-07` has one cutoff and, in the training phase, a hidden held-out window; see
 `e00620_fold`. The training noise of the signal columns is calibrated against the real inputs of

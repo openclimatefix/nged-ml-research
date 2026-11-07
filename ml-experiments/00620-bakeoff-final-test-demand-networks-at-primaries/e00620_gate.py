@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 620: the G4 gate state over any window of origin days, from a lag-free forecast and the observed power.
+"""Experiment 620: the G4 gate state over any window of origin days.
+
+The state comes from a lag-free forecast and the observed power.
 
 Experiment 592 defined G4 and stored its dev-month state. The gate reads only observed power, the
 lag-free network's median (K3, experiment 565's "E2"), and the neighbours' readings, so its state
@@ -74,7 +76,10 @@ def fresh_gap(*, lag_free: pl.DataFrame, clean: np.ndarray, n_days: int) -> np.n
 def g4_mode(
     *, gap: np.ndarray, origin_days: list[int], thr: np.ndarray | None = None
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return (mode, on, snap), each (16, days): `mode` is True while the band is wide (gate on, or in the 7 days after it turned off)."""
+    """Return (mode, on, snap), each (16, days).
+
+    `mode` is True while the band is wide (gate on, or in the 7 days after it turned off).
+    """
     thr = frozen_threshold() if thr is None else thr
     on, snap = g.gate_fresh(gap=gap, thr=thr, origin_days=origin_days, neighbours=neighbours())
     return c.hold_from(snap=snap) | on, on, snap
