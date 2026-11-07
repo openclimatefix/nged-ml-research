@@ -7,7 +7,8 @@ title: >-
 theme: production-reference-and-best-guess
 also_relevant_to:
   - lagged-power-and-error-correction
-status: planned
+status: finished
+verdict: not supported
 kind: other
 protocol: demand-v2
 date: 2026-11-07
@@ -44,11 +45,54 @@ benchmark: >-
 row_set_id: backtest_export_roster_2026-11-07_development_months
 metric: >-
   CRPS, MAE of the median, q05-q95 coverage, and q01, q05, q95, and q99 pinball loss and coverage,
-  in percent of capacity, at leads 1 to 10 days.
+  in percent of capacity, at leads 1 to 10 days.best_arm: >-
+  None. The 14-day level term lowers D15's CRPS by 12.9% (95% interval -34.0% to +4.8%), which the
+  interval cannot separate from zero, and raises D12's by 5.5% (-2.0% to +17.0%).
+headline: >-
+  D15's error is a persistent level offset (K1's median sits about 15 points of capacity too low, and
+  an oracle that removes each day's bias would cut D15's CRPS by 48%). A causal 14-day level term
+  recovers about a quarter of that at D15 without a detectable gain, and it raises the CRPS of the
+  other 14 Primaries by 4.7% (0.6% to 10.2%). D12's error is a midday peak that no level term fixes.
+take_home_message: >-
+  D15's forecast error is mostly one lasting level offset: K1 forecasts a net export of about 1.4 MW
+  in March 2026 while the substation drew about 0.5 MW, and an oracle that removed each day's bias would
+  cut D15's CRPS by 48%. A level term built from the last 14 days of errors recovers only about a
+  quarter of that at D15 and makes the other 14 Primaries worse, so the offset must be understood (a
+  generator behind D15, or a change in how its reading is made) before it can be fixed. D12's error is
+  a midday peak, twice the night error, and a level term does not help it.
+lessons: >-
+  A trailing level correction cannot fix a level error that changes abruptly. At D15 the daily bias
+  autocorrelates at 0.81 after one day but 0.27 after 14 days. The lag-free K3 beats K1 at D15 by
+  6.5% on the point estimate, which suggests K1's power lags carry part of the offset.
+advice:
+  - >-
+    Do not add a trailing level term to K1 for D15 or D12; at 14 days it did not separate from zero
+    at D15, raised D12's CRPS, and raised the other 14 Primaries' CRPS by 4.7% (table of fixes).
+  - >-
+    Before fixing D15, find out why K1's median is about 1.4 MW below the readings in March 2026,
+    starting with a possible generator behind D15 and with the lag-free network (diagnosis).
+  - >-
+    Test D12's midday error against a sunshine-dependent term and the apparent-power fold, not a
+    level term (diagnosis, D12).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**Status.** Planned. This page is the plan; the diagnosis, the ranked fix list, and the results are
-added in later commits.
+**D15's error is mostly one lasting level offset, and a trailing level term does not fix it.** In
+March 2026 K1 forecasts a net export of about 1.4 MW at D15 while the substation draws about 0.5 MW
+(second figure below). An oracle that removed each day's bias would cut D15's CRPS by 48%, but the
+causal 14-day level term recovers only a quarter of that, with an interval that includes zero, and it
+raises the other 14 Primaries' CRPS. D12's error is a midday peak that a level term does not help.
+The verdict is `not supported`. This experiment asked what drives the error at D15 and D12, and
+whether a cheap correction of K1's stored forecasts lowers it. It ran no new fit.
+
+![Mean absolute error by hour of day](fig_error_by_hour.svg)
+
+![D15 daily median power, observed and forecast](fig_d15_daily_level.svg)
+
+![Change in CRPS from the level term and from the oracle, by Primary](fig_fix_by_primary.svg)
+
+![Example forecasts at D15 and D12](fig_examples.svg)
 
 ## Question
 
@@ -169,3 +213,58 @@ other 14 Primaries. The compute ceiling is 4 GPU hours; stored-forecast fixes us
   power). The lag-free network is better at D15, so K1's power lags are part of the D15 error.
 - **Metered series nearby.** The nearest series to each Primary are photovoltaic (4 to 7 km); none
   sits behind either Primary by this proximity alone.
+
+## Fixes scored (K1's stored forecasts, causal rule above, leads 24 to 240 hours)
+
+- **F1, trailing 14-day level term.** Every quantile is shifted by the mean error of K1's lead
+  24 to 48 hour forecasts over the 14 days up to 24 hours before the origin. It was applied to 92%
+  of rows at each Primary; the rest had no known error in the previous 3 days and keep K1 unchanged.
+  F2 (the same, per half-hour of the local day) gave the same picture.
+- **Change in CRPS against K1** (negative is better, 95% interval over week blocks):
+
+| Quantity | D15 | D12 | Other 14 Primaries |
+|---|---|---|---|
+| K1 CRPS (% of capacity) | 14.53 | 6.90 | 1.4 to 7.7 |
+| F1 level term | -12.9% (-34.0 to +4.8) | +5.5% (-2.0 to +17.0) | +4.7% (+0.6 to +10.2) |
+| F2 per-half-hour level term | -13.1% (-33.8 to +3.5) | +5.9% (-1.5 to +16.9) | +4.5% (+0.6 to +9.7) |
+| Oracle, each day's bias removed (a bound, not causal) | -47.9% | -16.4% | -8% to -47% |
+| Candidate | +3.6% | -0.0% | |
+| K3 (lag-free) | -6.5% | +7.0% | |
+
+- **Why not supported.** The decision rule needs an interval that excludes zero and a gain of at
+  least 5% at the target Primary, with the other 14 not worse by more than 1%. F1 and F2 fail all
+  three at D12, and the harm condition at the other 14 Primaries.
+- **D15 alone.** The point estimate (-12.9%) is above the 5% bar, but the interval includes zero, the
+  evidence is five months (10 flagged level-shift days at D15), and D15 was picked from the same
+  months the fix is scored on. The number is interim.
+- **The oracle bound.** Even perfect knowledge of each day's bias would leave D15's CRPS at 52% of K1's.
+  The trailing term recovers 27% of that gap, because the bias flips quickly: its autocorrelation is
+  0.81 at 1 day, 0.39 at 7 days, and 0.27 at 14 days.
+
+## Caveats
+
+- **Selection.** The fixes were ranked from the same five development months they are scored on.
+- **Cleaned power uses the whole table.** `observed_power` is cleaned with future data; the
+  level term reads recent cleaned values, which production would see slightly less clean.
+- **Rows.** Leads 24 to 240 hours, cleaned `observed_power`, all rows. D15 and D18 rows before
+  2025-03-01 are dropped. The per-fold counts of rows dropped for a null reading are not reported
+  separately; the export already holds only cleaned readings.
+- **Tails.** K1's q95 is exceeded by 14.6% of D15's readings (5% nominal) and 4.5% of D12's. The fix
+  was not scored on tail pinball loss beyond CRPS.
+- **Unlogged events.** NGED's logs may miss load-shift events, so event-free rows can hold events no
+  label covers.
+- **No refit and no curtailment score.** Both fixes act on stored forecasts, so no GPU time was used
+  and no new network was saved.
+
+## What to try next
+
+- **D15.** Find out why K1's median is about 1.4 MW too low at D15 in March (a generator behind the
+  Primary, a change in how the reading is made, or a lag that carries the previous level). K3's
+  better score points at the lags.
+- **D12.** Test the midday error against a sunshine term and the fold of the apparent-power
+  reading, not a level.
+
+## Files
+
+- `ml-experiments/00641-d15-d12-error-diagnosis-and-cheapest-fixes/e00641_diagnose.py`,
+  `e00641_fixes.py`, and `e00641_figures.py`. Tables: `data/ml-experiments/00641-.../tables/`.
