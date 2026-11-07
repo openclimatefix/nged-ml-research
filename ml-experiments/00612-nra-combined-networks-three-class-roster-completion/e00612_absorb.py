@@ -65,6 +65,7 @@ if KIND == "c2":
     def fit_world_month(*, month: str) -> None:
         e.ARGS.months = [month]
         arm.FOLD.clear()
+        e.WORK.mkdir(parents=True, exist_ok=True)
         arm.run_fit()
 else:
     import e00565_fit as e  # ty: ignore[unresolved-import]

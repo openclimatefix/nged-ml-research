@@ -138,101 +138,106 @@ def summary() -> None:
     save(chart, "event_free_coverage.svg")
 
 
-def real() -> None:
+def aligned(*, root_arm: str, tag: str, t) -> np.ndarray:
+    """Return the quantiles of the fits `arms/<root_arm>/work/fits/<tag>` aligned to the table rows (NaN where absent)."""
+    e = g.a._load(root=ROOT / "arms" / root_arm / "work", tag=tag, months=MONTHS)
+    sm = c.k578.sites()
+    prim_of = dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
+    e = e.with_columns(
+        prim=pl.col("time_series_id").replace_strict(prim_of, return_dtype=pl.Int64),
+        idx=((pl.col("valid_time").dt.epoch("us") - c.k578.prep.GRID_START_US) // c.k578.prep.STEP_US).cast(pl.Int64),
+        oidx=((pl.col("power_fcst_init_time").dt.epoch("us") - c.k578.prep.GRID_START_US) // c.k578.prep.STEP_US).cast(pl.Int64),
+    )  # fmt: skip
+    kk = g.s.key(e["prim"].to_numpy(), e["oidx"].to_numpy(), e["idx"].to_numpy())
+    order = np.argsort(kk)
+    mine = g.s.key(t.prim, t.origin_idx, t.idx)
+    pos = np.clip(np.searchsorted(kk[order], mine), 0, len(kk) - 1)
+    ok = kk[order][pos] == mine
+    q = np.sort(e.select(list(a.QCOLS)).to_numpy().astype(np.float32)[order[pos]], axis=1)
+    q[~ok] = np.nan
+    return q
+
+
+def day_rows(*, t, p: int, lo: int, hi: int) -> np.ndarray:
+    """Return the table rows of the day-ahead forecast (issued 09:00 the day before) of Primary `p`, valid in [lo, hi)."""
+    _, rows = f597.day_ahead_keys(t=t, prim=p, lo=lo, hi=hi)
+    return rows
+
+
+def situations() -> None:
+    """Draw K1 and K2, then K3 and the class 2 candidate, for five situations: the two December Primaries, a quiet week, a cold night, a sunny day."""
     c.MONTHS = MONTHS
     work = ROOT / "arms" / "k1_d5" / "work"
     k584.ARMS["k1_d5"] = {"fits": work / "fits", "fit_tag": "P5", "inject": work / "inject"}
     twin_root = ROOT / "arms" / "k3_d5" / "work"
     orig = g.a._load
-    g.a._load = lambda *, root, tag, months: orig(
-        root=twin_root if tag == "D5" else root, tag=tag, months=months
-    )
+    g.a._load = lambda *, root, tag, months: orig(root=twin_root if tag == "D5" else root, tag=tag, months=months)
     k597.WORK = ROOT / "score" / "figures_tmp"
     inp = k597.Inputs(arm="k1_d5")
     t = inp.t
-    e = orig(root=twin_root, tag="D5", months=MONTHS)
-    sm = c.k578.sites()
-    prim_of = dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
-    e = e.with_columns(
-        prim=pl.col("time_series_id").replace_strict(prim_of, return_dtype=pl.Int64),
-        idx=(
-            (pl.col("valid_time").dt.epoch("us") - c.k578.prep.GRID_START_US) // c.k578.prep.STEP_US
-        ).cast(pl.Int64),
-        oidx=(
-            (pl.col("power_fcst_init_time").dt.epoch("us") - c.k578.prep.GRID_START_US)
-            // c.k578.prep.STEP_US
-        ).cast(pl.Int64),
-    )
-    kk = g.s.key(e["prim"].to_numpy(), e["oidx"].to_numpy(), e["idx"].to_numpy())
-    order = np.argsort(kk)
-    ev = sc.attach_depth(ev=sc.merged_events(), t=t).filter(
-        pl.col("name").str.contains("2025-12-29")
-    )
+    g.a._load = orig
+    q3_all = aligned(root_arm="k3_d5", tag="D5", t=t)
+    q4_all = aligned(root_arm="c2_e3", tag="P5", t=t)
     when = lambda i: (sc.k.k.GRID_START + timedelta(minutes=30 * float(i))).replace(tzinfo=None)  # noqa: E731
-    for r in ev.sort("name").iter_rows(named=True):
-        p, onset, end = r["primary"], r["onset_idx"], r["end_idx"]
-        keys, rows = f597.day_ahead_keys(t=t, prim=p, lo=onset - 14 * 48, hi=end + 15 * 48)
-        pos = np.clip(np.searchsorted(kk[order], keys), 0, len(kk) - 1)
-        ok = kk[order][pos] == keys
-        rows, pos = rows[ok], pos[ok]
-        q3 = np.sort(e.select(list(a.QCOLS)).to_numpy().astype(np.float32)[order[pos]], axis=1)
-        v, m = t.arms["V"][rows], t.arms["M"][rows]
-        wide = inp.mode[t.prim[rows], t.origin_day[rows]]
-        q1 = k597.assemble(v=v, m=m, wide=wide)
+    eight = [p for p in range(16) if t.group[p] == "MVA-only eight"]
+    six = [p for p in range(16) if t.group[p] == "signed-MW six"]
+
+    def draw(*, name: str, p: int, lo: int, hi: int, title: str, event=None, rules=()) -> None:
+        rows = day_rows(t=t, p=p, lo=lo, hi=hi)
+        v, m, o = t.arms["V"][rows], t.arms["M"][rows], t.obs[rows]
+        q1 = k597.assemble(v=v, m=m, wide=inp.mode[t.prim[rows], t.origin_day[rows]])
+        q3, q4 = q3_all[rows], q4_all[rows]
         x = [when(i) for i in t.idx[rows]]
         label = t.label[p]
-        # which window matches the step: mean observed power in the 2 days before and after each candidate start
-        obs_all = t.obs[rows]
-        for cand in (datetime(2025, 12, 29), datetime(2025, 12, 30, 1, 0)):
-            xs = np.array([(xx - cand).total_seconds() / 86400 for xx in x])
-            before = obs_all[(xs > -2) & (xs < 0)]
-            after = obs_all[(xs > 0) & (xs < 2)]
-            print(
-                label,
-                cand,
-                "mean power before/after (share of capacity):",
-                np.nanmean(before),
-                np.nanmean(after),
-            )
-        ydom = cp.common_ydom([(q1, t.obs[rows]), (v, t.obs[rows]), (q3, t.obs[rows])], iq=IQ)
-        strip = [
-            {"x0": when(rr["x0"] * 48 + onset), "x1": when(rr["x1"] * 48 + onset)}
-            for rr in f597.strips_for(t=t, rows=rows, wide=inp.mode, prim=p, onset=onset)
-        ]
-        common = {
-            "x": x, "iq": IQ, "obs": t.obs[rows], "ydom": ydom, "xtype": "T",
-            "xdom": (when(onset - 14 * 48), when(end + 14 * 48)),
-            "span": (when(onset), when(end)), "rules": SWITCH_TIMES,
-        }  # fmt: skip
-        key = [*cp.FORECAST_ENTRIES, cp.OBS, cp.SHADE, cp.GATE, cp.RULES]
-        fig = cp.figure(
-            units=[
-                cp.arm_panel(
-                    q=q1, title=f"{label}: K1 (with the G4 gated band)", strip=strip, **common
-                ),
-                cp.arm_panel(
-                    q=v,
-                    title=f"{label}: K2 (no explicit gate)",
-                    xtitle="Date (UTC)",
-                    strip=None,
-                    **common,
-                ),
-            ],
-            title=f"{label}: day-ahead forecasts through the December 2025 load-shift (issued 09:00 the day before)",
-            key=key,
-        )
-        save(fig, f"real_{label}_k1_k2.svg")
-        fig3 = cp.figure(
-            units=[
-                cp.arm_panel(
-                    q=q3, title=f"{label}: K3 (lag-free)", xtitle="Date (UTC)", strip=None, **common
-                )
-            ],
-            title=f"{label}: day-ahead forecast of the lag-free network K3 through the same load-shift",
-            key=[*cp.FORECAST_ENTRIES, cp.OBS, cp.SHADE, cp.RULES],
-        )
-        save(fig3, f"real_{label}_k3.svg")
+        ydom = cp.common_ydom([(q1, o), (v, o), (np.nan_to_num(q3), o), (np.nan_to_num(q4), o)], iq=IQ)
+        common = {"x": x, "iq": IQ, "obs": o, "ydom": ydom, "xtype": "T", "xdom": (when(lo), when(hi)),
+                  "span": None if event is None else (when(event[0]), when(event[1])), "rules": list(rules)}  # fmt: skip
+        strip = None
+        if event is not None:
+            strip = [{"x0": when(rr["x0"] * 48 + event[0]), "x1": when(rr["x1"] * 48 + event[0])}
+                     for rr in f597.strips_for(t=t, rows=rows, wide=inp.mode, prim=p, onset=event[0])]  # fmt: skip
+        else:
+            on = inp.mode[t.prim[rows], t.origin_day[rows]]
+            strip = [{"x0": x[i], "x1": x[min(i + 1, len(x) - 1)]} for i in np.flatnonzero(on)] if on.any() else None
+        key_a = [*cp.FORECAST_ENTRIES, cp.OBS, *([cp.SHADE] if event else []), *([cp.GATE] if strip else []), *([cp.RULES] if rules else [])]
+        key_b = [*cp.FORECAST_ENTRIES, cp.OBS, *([cp.SHADE] if event else []), *([cp.RULES] if rules else [])]
+        save(cp.figure(units=[cp.arm_panel(q=q1, title=f"{label}: K1 (lag network with the G4 gated band)", strip=strip, **common),
+                              cp.arm_panel(q=v, title=f"{label}: K2 (same fits, no gate)", xtitle="Date (UTC)", strip=None, **common)],
+                       title=f"{label}: {title}", key=key_a), f"{name}_{label}_k1_k2.svg")  # fmt: skip
+        save(cp.figure(units=[cp.arm_panel(q=q3, title=f"{label}: K3 (lag-free)", strip=None, **common),
+                              cp.arm_panel(q=q4, title=f"{label}: class 2 candidate (neighbour summaries, signal dropout)", xtitle="Date (UTC)", strip=None, **common)],
+                       title=f"{label}: {title}", key=key_b), f"{name}_{label}_k3_c2.svg")  # fmt: skip
+
+    ev = sc.attach_depth(ev=sc.merged_events(), t=t).filter(pl.col("name").str.contains("2025-12-29"))
+    for r in ev.sort("name").iter_rows(named=True):
+        draw(name="event", p=r["primary"], lo=r["onset_idx"] - 14 * 48, hi=r["end_idx"] + 14 * 48,
+             title="day-ahead forecasts through the December 2025 load-shift", event=(r["onset_idx"], r["end_idx"]), rules=SWITCH_TIMES)  # fmt: skip
+
+    def pick(*, p: int, month: str, days: int, score) -> int:
+        """Return the first grid index of the best `days`-day window of Primary `p` in `month` by `score` (lower is better)."""
+        ok = (t.prim == p) & (t.month == month) & t.free & (t.band == 1)
+        days_present = np.unique(t.idx[ok] // 48)
+        best, best_s = None, np.inf
+        for d0 in days_present[:-days]:
+            w = ok & (t.idx // 48 >= d0) & (t.idx // 48 < d0 + days)
+            if w.sum() < days * 40:
+                continue
+            sc_ = score(w)
+            if sc_ < best_s:
+                best, best_s = int(d0), sc_
+        assert best is not None
+        return best * 48
+
+    p = eight[0]
+    lo = pick(p=p, month="2026-03", days=7, score=lambda w: float(np.nanmean(np.abs(t.arms["V"][w][:, IQ[0.5]] - t.obs[w]))))
+    draw(name="quiet_week", p=p, lo=lo, hi=lo + 7 * 48, title="a quiet week (event-free, 7 days with the smallest mean median-forecast error in March 2026)")
+    hour = lambda w: ((t.idx[w] % 48) / 2.0)  # noqa: E731
+    lo = pick(p=p, month="2026-01", days=3, score=lambda w: -float(np.nanmean(t.obs[w][hour(w) < 7])))
+    draw(name="cold_night", p=p, lo=lo, hi=lo + 3 * 48, title="three days around the highest overnight demand in January 2026 (a proxy for a cold winter night)")
+    p6 = six[0]
+    lo = pick(p=p6, month="2026-06", days=3, score=lambda w: float(np.nanmean(t.obs[w][(hour(w) >= 11) & (hour(w) < 14)]) - np.nanmean(t.obs[w][hour(w) < 5])))
+    draw(name="sunny_day", p=p6, lo=lo, hi=lo + 3 * 48, title="three days around the deepest midday dip in June 2026 (a proxy for a very sunny day)")
 
 
 if __name__ == "__main__":
-    {"summary": summary, "real": real}[sys.argv[1]]()
+    {"summary": summary, "situations": situations}[sys.argv[1]]()

@@ -213,3 +213,40 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def ablations() -> None:
+    """Pair-month ablations (no E3, no offset) against K1 on the same two months, with tail constants."""
+    pair = ["2025-12"]  # the only pair month that has tail constants
+    rows = []
+    ref = ("k1_d5", "K1+t")
+    arms = {"no E3": "noe3_d5", "no offset": "nooff_d5"}
+    n_counted = 2 * 6
+    alpha = 0.05 / n_counted
+    for label, arm in arms.items():
+        for band in ("24-120 h",):
+            for phase in ("days4-end", "after0-7"):
+                for months, tag in ((["2025-10", "2025-12"], "plain K1 (both pair months)"),):
+                    rec = bank_contrast(a=(arm, "K1"), b=("k1_d5", "K1"), band=band, phase=phase, metric="cover90", alpha=alpha, months=months)
+                    if rec:
+                        rows.append({"removed": label, "measure": f"injected cover90 {phase} {band}", "set": tag, **rec,
+                                     "verdict": verdict(lo=rec["lo"], hi=rec["hi"], tol=TOL["cover"], higher_is_better=True)})  # fmt: skip
+            rec = bank_contrast(a=(arm, "K1"), b=("k1_d5", "K1"), band="24-120 h", phase="days4-end", metric="follow_q50", alpha=alpha, months=["2025-10", "2025-12"])
+            if rec:
+                rows.append({"removed": label, "measure": "injected follow_q50 days4-end", "set": "pair", **rec,
+                             "verdict": verdict(lo=rec["lo"], hi=rec["hi"], tol=TOL["follow"], higher_is_better=False)})  # fmt: skip
+            for group in GROUPS:
+                for metric, tol, hib in (("cover90", TOL["cover"], True), ("crps", TOL["crps"], False)):
+                    rec = free_contrast(a=(arm, "K2"), b=("k1_d5", "K2"), band=band, group=group, metric=metric, alpha=alpha, months=["2025-10", "2025-12"])
+                    if rec:
+                        rows.append({"removed": label, "measure": f"event-free {metric} {band} {'eight' if group == EIGHT else 'six'}", "set": "pair", **rec,
+                                     "verdict": verdict(lo=rec["lo"], hi=rec["hi"], tol=tol, higher_is_better=hib)})  # fmt: skip
+    out = pl.DataFrame(rows, infer_schema_length=None).with_columns(pl.lit(n_counted).alias("n_counted"))
+    out.write_csv(TABLES / "t3_ablations.csv")
+    with pl.Config(tbl_rows=60, tbl_width_chars=200, fmt_str_lengths=60):
+        print(out.select("removed", "measure", "n_events", "n_cells", "diff", "lo", "hi", "verdict"))
+    _ = (pair, ref)
+
+
+if __name__ == "__main__":
+    ablations()
