@@ -47,7 +47,6 @@ SUNNY_KT: Final = 0.7
 SUNNY_HOURS: Final[tuple[int, int]] = (10, 15)
 """Sunny half-hours: UTC hour from 10 to 15 inclusive, with a clear-sky index of at least 0.7."""
 SHUFFLE_BLOCK_DAYS: Final = 21
-REFERENCE_SEASON_YEAR: Final = 2025
 SEASON_YEARS: Final[tuple[int, int]] = (2019, 2025)
 K_CLIP: Final[tuple[float, float]] = (0.5, 1.5)
 LEVELS: Final[tuple[float, ...]] = (0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99)
@@ -87,20 +86,28 @@ def probe_path(*, cutoff: str, world: str) -> Path:
     return WORK / "probes" / cutoff / f"{world}_free.parquet"
 
 
-def season_year(*, t_us: np.ndarray) -> np.ndarray:
-    """Return the season-year (July to June, named by July's year) of each time, clipped to the table's range."""
+def last_complete_season_year(*, cutoff: str) -> int:
+    """Return the last season-year (July to June, named by July's year) that ended before the cutoff."""
+    year, month = int(cutoff[:4]), int(cutoff[5:7])
+    return min((year - 1 if month >= 7 else year - 2), SEASON_YEARS[1])
+
+
+def season_year(*, t_us: np.ndarray, cutoff: str) -> np.ndarray:
+    """Return each time's season-year (July to June, named by July's year), held at the last complete one before the cutoff."""
     stamp = np.asarray(t_us, dtype="datetime64[us]")
     year = stamp.astype("datetime64[Y]").astype(int) + 1970
     month = stamp.astype("datetime64[M]").astype(int) % 12 + 1
     sy = np.where(month >= 7, year, year - 1)
-    return np.clip(sy, SEASON_YEARS[0], SEASON_YEARS[1])
+    return np.clip(sy, SEASON_YEARS[0], last_complete_season_year(cutoff=cutoff))
 
 
 def r4_table() -> dict[tuple[str, int], float]:
     """Return experiment 474's R4 table: the median AC capacity (MW) by site and season-year."""
     path = next(iter((ML_EXPERIMENTS_DATA_DIR).glob("00474-*/work/nged_table.parquet")))
     table = pl.read_parquet(path)
-    return {(r["site"], int(r["season_year"])): float(r["ac_p50"]) for r in table.iter_rows(named=True)}
+    return {
+        (r["site"], int(r["season_year"])): float(r["ac_p50"]) for r in table.iter_rows(named=True)
+    }
 
 
 @dataclass(frozen=True)
@@ -115,13 +122,15 @@ class SiteCapacity:
 
 def _read_probes(*, cutoff: str, world: str) -> pl.DataFrame:
     """Return the `plain` probe reads of a world's free networks (all five seeds), one row per seed and site."""
-    return pl.read_parquet(probe_path(cutoff=cutoff, world=world)).filter(pl.col("model") == "plain")
+    return pl.read_parquet(probe_path(cutoff=cutoff, world=world)).filter(
+        pl.col("model") == "plain"
+    )
 
 
 def _factor(*, cutoff: str) -> tuple[float, float]:
     """Return the mean leave-one-farm-out recovery factor and its mean standard deviation at a cutoff (experiment 638)."""
     reads = pl.read_csv(P638 / "step_reads_shift0.csv").filter(pl.col("cutoff") == cutoff)
-    return float(reads["factor"].mean()), float(reads["factor_sd"].mean())  # ty: ignore[invalid-return-type]
+    return float(reads["factor"].to_numpy().mean()), float(reads["factor_sd"].to_numpy().mean())
 
 
 def capacity_parameters(*, cutoff: str, arm: str) -> dict[str, SiteCapacity]:
@@ -147,21 +156,28 @@ def capacity_parameters(*, cutoff: str, arm: str) -> dict[str, SiteCapacity]:
         divisor = factor if arm in {"cal", "perm", "shuf"} else 1.0
         r_real = real.filter(pl.col("site") == site).sort("seed")
         r_step = step.filter(pl.col("site") == site).sort("seed")
-        base = float(r_real["capacity_mw"].median())  # ty: ignore[invalid-argument-type]
+        base = float(np.median(r_real["capacity_mw"].to_numpy()))
         diff = (r_step["capacity_mw"] - r_real["capacity_mw"]).to_numpy()
-        reference = table[(site, REFERENCE_SEASON_YEAR)]
+        reference = table[(site, last_complete_season_year(cutoff=cutoff))]
         k = float(np.clip(base / divisor / reference, *K_CLIP))
         d = max(float(np.median(diff)) / divisor, 0.0)
         boot_real = float(np.mean([np.std(b) for b in r_real["boot"].to_list()]))
         boot_step = float(np.mean([np.std(b) for b in r_step["boot"].to_list()]))
-        seed_real = float(r_real["capacity_mw"].std())  # ty: ignore[invalid-argument-type]
+        seed_real = float(np.std(r_real["capacity_mw"].to_numpy(), ddof=1))
         seed_diff = float(np.std(diff, ddof=1))
         factor_rel = factor_sd / factor if divisor != 1.0 else 0.0
         between = FACTOR_BETWEEN_FARMS_RELATIVE if divisor != 1.0 else 0.0
-        rel_k = float(np.sqrt((seed_real / base) ** 2 + (boot_real / base) ** 2 + factor_rel**2 + between**2))
+        rel_k = float(
+            np.sqrt((seed_real / base) ** 2 + (boot_real / base) ** 2 + factor_rel**2 + between**2)
+        )
         denom = max(abs(float(np.median(diff))), 1e-6)
         rel_d = float(
-            np.sqrt((seed_diff / denom) ** 2 + (np.hypot(boot_real, boot_step) / denom) ** 2 + factor_rel**2 + between**2)
+            np.sqrt(
+                (seed_diff / denom) ** 2
+                + (np.hypot(boot_real, boot_step) / denom) ** 2
+                + factor_rel**2
+                + between**2
+            )
         )
         out[site] = SiteCapacity(k=k, d=d, rel_sd_k=min(rel_k, 1.0), rel_sd_d=min(rel_d, 1.0))
     if arm == "perm":
