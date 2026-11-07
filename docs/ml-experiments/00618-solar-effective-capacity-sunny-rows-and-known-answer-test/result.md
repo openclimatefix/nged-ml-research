@@ -11,20 +11,25 @@ status: finished
 kind: other
 date: 2026-11-07
 size: >-
-  medium. Stored: private tables and fitted levels under data/ml-experiments/ only. Designs: more than
+  medium. Stored: private tables and fitted levels under data/ml-experiments/ only. Designs: more
+than
   one defensible estimator (penalty form, day versus half-hour observations), so the penalty is
   fixed by placebos before any real fit. Callers: this folder's scripts only. CPU only, at most 4
   cores. No forecast is scored (experiment 464 found no gain from slow scaling). Serving path and
   degradation rule: not touched.
 hypothesis: >-
-  A farm's capacity moves rarely, so a piecewise-constant level fitted to one daily number taken from
+  A farm's capacity moves rarely, so a piecewise-constant level fitted to one daily number taken
+from
   its very sunny half-hours (clear-sky index at least 0.9, clear-sky irradiance at least 700 W/m2,
-  six half-hours in a row) recovers injected capacity steps, raises few false steps, and shows whether
+  six half-hours in a row) recovers injected capacity steps, raises few false steps, and shows
+whether
   Solar A, Solar B, and Solar D produced more in 2021 to 2023 than now.
 prediction: >-
-  Written before any script ran. Step 1 passes: at least 3 of the 5 testable farms (Solar A, B, C, D,
+  Written before any script ran. Step 1 passes: at least 3 of the 5 testable farms (Solar A, B, C,
+D,
   F) have a median of 20 or more sunny half-hours per April to August month. Step 2: injected steps
-  of 8% or more are recovered at least 80% of the time at Solar A, B, C, and F; Solar D (fewest sunny
+  of 8% or more are recovered at least 80% of the time at Solar A, B, C, and F; Solar D (fewest
+sunny
   rows) is weaker. The real fits show a fall in level for Solar A, B, and D between 2021 to 2023
   and 2025 to 2026, as experiment 453 saw.
 decision_rule: >-
@@ -37,7 +42,8 @@ decision_rule: >-
   level within 3% of the truth. The penalty is the smallest on a fixed grid that meets the
   false-step bar on tuning permutations, then checked on fresh ones.
 benchmark: >-
-  Experiment 453's reading that Solar A, Solar B, and Solar D produced more in 2021 to 2023 than now.
+  Experiment 453's reading that Solar A, Solar B, and Solar D produced more in 2021 to 2023 than
+now.
 row_set_id: sunny_rows_to_2026_06_30
 metric: >-
   Recall, false steps per year, size error, and interval coverage of the recovered level; sunny
@@ -64,20 +70,21 @@ take_home_message: >-
   (its output in 2021 to 2023 was 14% higher than in 2025 to 2026, as experiment 453 saw), but at
   Solar B the output in 2021 to 2023 was 11% lower, not higher, and Solar C and Solar F show no
   change. The estimate lags a slow fall, so a smooth drift of 10% in three years leaves the final
-  level 2% to 5% too high.
+level 2% to 6% too high.
 advice:
   - >-
     Estimate a solar farm's capacity from very sunny half-hours only (clear-sky index at least 0.9,
     clear-sky irradiance at least 700 W/m2, six in a row), one median per day, with an exact
-    change-point fit at penalty 40 sigma^2 (known-answer test, figures 1 and 2).
+    change-point fit at penalty 40 sigma^2 (known-answer test, figures 1 and 6).
   - >-
     Do not use the sunny-row method for a farm with a median under about 20 sunny half-hours a
     month, such as Solar D (13); it needs a step of 12% to be found there (figure 1).
   - >-
     Widen the method's 90% interval by 2.25 times the naive standard error: the raw interval covers
-    the true level only 74% of the time because day-to-day errors are correlated (known-answer test).
+    the true level only 74% of the time because day-to-day errors are correlated (known-answer
+test).
   - >-
-    Treat the method's final level as 2% to 5% high after a slow decline, and use it to date steps,
+    Treat the method's final level as 2% to 6% high after a slow decline, and use it to date steps,
     not to track drift (drift placebo).
 ---
 
@@ -99,7 +106,7 @@ terms are explained where they first appear.
 
 ![Share of injected capacity steps found, by step size and farm](figure_2_recall.svg)
 
-*Figure 1 (headline). Each line is one farm. A step of 8% is found at least 93% of the time at Solar
+*Figure 1 (headline). Each line is one farm. A step of 8% is found at least 92% of the time at Solar
 A, B, C, and F and 11% of the time at Solar D, which needs 12%. The dashed line is the 80% pass bar.
 40 random start days per size, up and down, at each farm.*
 
@@ -126,8 +133,10 @@ step-free series. The fit (orange line) finds it at both farms.*
 
 ![False steps a year on placebo series, by penalty](figure_3_false_steps.svg)
 
-*Figure 6. Placebo series with no true change, 20 shuffles per farm, worst farm. A penalty of 40
-keeps all four placebo kinds under the dashed 1-a-year line.*
+*Figure 6. Placebo series with no true change, 20 shuffles per farm, worst farm. These are the
+tuning shuffles that chose penalty 40, so the curve at 40 is by construction under the bar; the
+fresh shuffles are in the results. Where the orange line is hidden, it lies under the sky-blue
+line.*
 
 ![Very sunny half-hours per month](figure_1_sunny_counts.svg)
 
@@ -157,7 +166,7 @@ level of 20.*
   and 2.4% too large. Pass bar (80%): met. The bias is upward, not the downward bias the larger
   penalty gave in experiment 577.
 - **Interval coverage.** The naive interval (1.645 sigma over the root of the days in the segment)
-  covers the true level on 74% of injected informative days, because day-to-day errors are
+  covers the true level on 74% of all days in the injected runs, because day-to-day errors are
   correlated. Widened by 2.25 (chosen on separate tuning runs, 89.8% there), coverage is 89.7%
   pooled; per farm 97.5%, 86.8%, 91.2%, 80.8%, 92.0% for Solar A, B, C, D, F. The pooled bar (85% to
   95%) is met; Solar A is above and Solar D below it.
@@ -192,6 +201,11 @@ level of 20.*
 - **Injection base.** The injected series are the real daily values divided by their own fitted
   levels (penalty 12), so real noise is kept and real steps removed. Recall is conditional on that
   choice.
+- **Edges and noise.** Injected steps start at least 15 days from each end of the series, so steps
+  in the first or last weeks were not tested. The injection base is slightly smoother than the real
+  series, so recall is somewhat optimistic. The fitted level is the plain mean of the days in a
+  segment while step positions use values clipped to 4 sigma, so a few low outlier days pull a level
+  below the bulk of the dots (visible at Solar E).
 - **Not tested.** Solar E (7 months), any forecast gain, July 2026 onwards. No contrast is tested,
   so no Bonferroni count applies.
 - **Audit triggers.** None apply: no forecast is scored, no skill is quoted, and no model is

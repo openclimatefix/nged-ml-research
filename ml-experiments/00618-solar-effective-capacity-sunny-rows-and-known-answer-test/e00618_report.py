@@ -133,7 +133,7 @@ def fig_sunny_counts() -> None:
     )
     rule = alt.Chart(pl.DataFrame({"y": [20.0], "rule": ["Stop-rule line (20)"]})).mark_rule(strokeDash=[5, 4], size=2).encode(y="y:Q", color=alt.Color("rule:N", title=None, scale=alt.Scale(domain=["Stop-rule line (20)"], range=["#000000"]), legend=alt.Legend(orient="top")))  # fmt: skip  # ty: ignore[unresolved-attribute]
     (bars + rule).resolve_scale(color="independent").properties(
-        width=WIDTH - 90, height=HEIGHT, title="Very sunny half-hours per month, Solar A to F"
+        width=WIDTH - 90, height=HEIGHT, title="Very sunny half-hours per month, Solar A to D and F"
     ).save(DOCS / "figure_1_sunny_counts.svg")
 
 
