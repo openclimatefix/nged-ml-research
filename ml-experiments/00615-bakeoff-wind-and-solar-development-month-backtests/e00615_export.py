@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Write the development-month forecasts to the private export folder, one file per candidate and month.
 
-source <env>; uv run --no-sync python ml-experiments/00615-*/e00615_export.py
+source the environment helper; uv run --no-sync python ml-experiments/00615-*/e00615_export.py
 """
 
 import os
