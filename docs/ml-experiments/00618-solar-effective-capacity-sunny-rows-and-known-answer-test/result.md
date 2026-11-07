@@ -7,7 +7,7 @@ title: >-
 theme: metered-solar-farms
 also_relevant_to:
   - generator-forecasting
-status: planned
+status: finished
 kind: other
 date: 2026-11-07
 size: >-
@@ -42,6 +42,43 @@ row_set_id: sunny_rows_to_2026_06_30
 metric: >-
   Recall, false steps per year, size error, and interval coverage of the recovered level; sunny
   half-hours per month.
+verdict: partly supported
+production_status: not-for-production
+adopted_in: none
+best_arm: >-
+  Penalty 40 (in units of the daily noise variance), interval widened by 2.25: steps of 8% found
+  96%, 93%, 98%, and 93% of the time at Solar A, B, C, and F (11% at Solar D, 88% at 12%), at most
+  0.67 false steps a year, pooled 90% interval coverage 89.7%.
+headline: >-
+  A solar farm's capacity step of 8% or more can be found from its very sunny half-hours alone at
+  four of the five testable farms. The real histories show a fall at Solar A and a dip at Solar B,
+  and no step at Solar C or Solar F.
+lessons: >-
+  Very sunny half-hours occur in only April to August, so a step is dated to within a winter gap.
+  Solar D has too few of them (median 13 a month) to find a step under 12%. Solar B was lower, not
+  higher, in 2021 to 2023.
+take_home_message: >-
+  Very sunny half-hours are enough to find a sudden change of 8% or more in a solar farm's capacity
+  at Solar A, B, C, and F, with at most 0.7 false changes a year; Solar D has too few of them and
+  needs a change of 12%. Applied to the real histories, the method finds a fall of 12.6% at Solar A
+  (its output in 2021 to 2023 was 14% higher than in 2025 to 2026, as experiment 453 saw), but at
+  Solar B the output in 2021 to 2023 was 11% lower, not higher, and Solar C and Solar F show no
+  change. The estimate lags a slow fall, so a smooth drift of 10% in three years leaves the final
+  level 2% to 5% too high.
+advice:
+  - >-
+    Estimate a solar farm's capacity from very sunny half-hours only (clear-sky index at least 0.9,
+    clear-sky irradiance at least 700 W/m2, six in a row), one median per day, with an exact
+    change-point fit at penalty 40 sigma^2 (known-answer test, figures 1 and 2).
+  - >-
+    Do not use the sunny-row method for a farm with a median under about 20 sunny half-hours a
+    month, such as Solar D (13); it needs a step of 12% to be found there (figure 1).
+  - >-
+    Widen the method's 90% interval by 2.25 times the naive standard error: the raw interval covers
+    the true level only 74% of the time because day-to-day errors are correlated (known-answer test).
+  - >-
+    Treat the method's final level as 2% to 5% high after a slow decline, and use it to date steps,
+    not to track drift (drift placebo).
 ---
 
 **Very sunny half-hours alone are enough to find a capacity step of 8% or more at four of the five
