@@ -14,7 +14,7 @@ from typing import Final
 import e00642_arms as arms
 import numpy as np
 import polars as pl
-from e00630_common import BAND_LABELS, MONTHS, NETWORKS, Q, load
+from e00630_common import BAND_LABELS, MONTHS, NETWORKS, Q, load  # ty: ignore[unresolved-import]
 from studies.eval_protocol.metrics import tail_weighted_score
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
