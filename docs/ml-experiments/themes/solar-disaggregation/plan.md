@@ -10,7 +10,7 @@
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
 | [PV-474](#planned-experiments) | Which constraint rungs pass a calibrated placebo gate on the GAM base, and what is the installed PV at each Primary with intervals? | 1 | Nothing | Experiment 00474 planned; stage 0 and 1 on CPU |
 | [PV-479](#planned-experiments) | Does an anomaly regression that uses only within-month weather variation give a capacity estimate that passes both the placebo and the known answer, including when the load follows the clouds? | 1 | Nothing | Experiment 00479 finished (not supported): validates no Primary; see its page |
-| [PV-616](#planned-experiments) | Does probing the stored lag-free neural networks with fixed datetime inputs and coherent donor weather return a stable, plausible PV capacity at the six MW Primaries? | 1 | Nothing | Experiment 00616 planned; CPU only, no fit |
+| [PV-616](#planned-experiments) | Does probing the stored lag-free neural networks with fixed datetime inputs and coherent donor weather return a stable, plausible PV capacity at the six MW Primaries? | 1 | Nothing | Experiment 00616 finished (partly supported): stable capacity, one placebo fails; step 2 (injected known-answer test) recommended |
 
 ## Planned experiments
 
