@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PERF401
 """Experiment 644: print every number the write-up quotes and draw its figures.
 
 Usage: python e00644_report.py
@@ -71,10 +71,10 @@ def headline(*, world: str, title: str, name: str) -> None:
             axis=alt.Axis(labelAngle=0),
         )
     )
-    band = base.mark_errorband(opacity=0.15).encode(
+    band = base.mark_errorband(opacity=0.15).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("lo:Q", title=None), y2="hi:Q", color=colour
     )
-    line = base.mark_line(point=True).encode(
+    line = base.mark_line(point=True).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y(
             "crps:Q",
             title="CRPS on sunny middays (points of capacity)",
@@ -121,7 +121,7 @@ def example(*, world: str = "real") -> None:
             )
     df = pl.concat(frames).sort("hour")
     base = alt.Chart(df).encode(x=alt.X("hour:Q", title="Hour of day (UTC)"))
-    band = base.mark_area(opacity=0.2).encode(
+    band = base.mark_area(opacity=0.2).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("q05:Q", title="Net demand (points of capacity)"),
         y2="q95:Q",
         color=alt.Color(
@@ -130,8 +130,8 @@ def example(*, world: str = "real") -> None:
             legend=alt.Legend(title=None, orient="bottom"),
         ),
     )
-    med = base.mark_line().encode(y="q50:Q", color="arm:N")
-    act = base.mark_line(color="black", strokeDash=[4, 3]).encode(y="actual:Q")
+    med = base.mark_line().encode(y="q50:Q", color="arm:N")  # ty: ignore[unresolved-attribute]
+    act = base.mark_line(color="black", strokeDash=[4, 3]).encode(y="actual:Q")  # ty: ignore[unresolved-attribute]
     save(
         alt.layer(band, med, act)
         .properties(width=W // 2 - 20, height=240)
@@ -159,9 +159,9 @@ def main() -> None:
     example()
     print(
         json.dumps(
-            json.load(open(fit.WORK / "analysis" / "contrasts_stage1.json"))["real"]["contrasts"][
-                "all_half_hours"
-            ],
+            json.loads((fit.WORK / "analysis" / "contrasts_stage1.json").read_text())["real"][
+                "contrasts"
+            ]["all_half_hours"],
             indent=1,
         )
     )

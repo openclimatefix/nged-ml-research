@@ -41,7 +41,7 @@ def realised_kt() -> pl.DataFrame:
     return pl.concat(parts).unique(subset=["primary", "t_us"])
 
 
-def load(*, world: str) -> dict[str, np.ndarray]:
+def load(*, world: str) -> dict:
     """Return the test rows of every cutoff's months, the six Primaries, with masks and keys."""
     kt = realised_kt()
     parts = []
@@ -67,7 +67,7 @@ def load(*, world: str) -> dict[str, np.ndarray]:
     frame = pl.concat(parts).join(kt, on=["primary", "t_us"], how="left", maintain_order="left")
     n_all = frame.height
     frame = frame.with_columns(pl.col("kt").is_null().alias("_nokt"))
-    out_missing = float(frame["_nokt"].mean())
+    out_missing = float(frame["_nokt"].mean())  # ty: ignore[invalid-argument-type]
     hour = ((frame["t_us"] // 3_600_000_000) % 24).to_numpy()
     out = {
         n: frame[n].to_numpy()
@@ -85,7 +85,7 @@ def load(*, world: str) -> dict[str, np.ndarray]:
     }
     out["kt"] = frame["kt"].fill_null(-1.0).to_numpy()
     out["in_window"] = ~frame["_nokt"].to_numpy()
-    out["share_without_realised_kt"] = out_missing
+    out["share_without_realised_kt"] = out_missing  # ty: ignore[invalid-assignment]
     assert n_all == len(out["y"])
     out["hour"] = hour
     out["midday"] = (hour >= k639.SUNNY_HOURS[0]) & (hour <= k639.SUNNY_HOURS[1])

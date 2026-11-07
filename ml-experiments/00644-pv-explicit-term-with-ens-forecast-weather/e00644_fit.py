@@ -80,17 +80,21 @@ def _load_for_finetune(*, model: torch.nn.Module, path: Path) -> None:
     with torch.random.fork_rng(devices=[]):
         torch.manual_seed(FRESH_SEED)
         fresh = base.mlp(
-            n_in=model.mixer_ft[0].in_features, hidden=m.MIXER_HIDDEN, layers=2,
+            n_in=model.mixer_ft[0].in_features, hidden=m.MIXER_HIDDEN, layers=2,  # ty: ignore[not-subscriptable,unresolved-attribute]
             n_out=3 * m.COMPONENTS, dropout=m.DROPOUT,
         )  # fmt: skip
         base.init_head(head=fresh, components=m.COMPONENTS)
-    model.mixer_ft.load_state_dict(fresh.state_dict())
+    model.mixer_ft.load_state_dict(fresh.state_dict())  # ty: ignore[unresolved-attribute]
 
 
 def _train(
     *, model, x, y, u_inc, r4, after, p, w, is_val, mean, std, tensors, seed: int, init_delta=None,
 ) -> tuple[int, float, torch.Tensor]:  # fmt: skip
-    """Experiment 639's `train_explicit` with recency weights, the fine-tune learning rates, and the fresh mixer group."""
+    """Return experiment 639's `train_explicit` fit with recency weights and the fresh mixer group.
+
+    Returns:
+        The epochs run, the best validation NLL, and the best per-Primary offsets.
+    """
     torch.manual_seed(seed)
     delta = (
         init_delta.clone()
@@ -326,7 +330,7 @@ def run_month(
                         shift[pr] = err[tr.primary[v] == pr].mean()
                     extra["shift"] = shift
                 tmp = target.with_name(target.name + ".tmp.npz")
-                np.savez(tmp, q=q.astype(np.float32), **extra)
+                np.savez(tmp, q=q.astype(np.float32), **extra)  # ty: ignore[invalid-argument-type]
                 tmp.rename(target)
                 out.with_suffix(".json").write_text(
                     json.dumps(
