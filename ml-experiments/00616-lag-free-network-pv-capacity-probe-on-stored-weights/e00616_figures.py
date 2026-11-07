@@ -76,7 +76,7 @@ def fig_headline(*, tables: pl.DataFrame, refs: pl.DataFrame) -> alt.Chart:
         height=300,
         title=alt.TitleParams(
             [
-                "The probe is lower than both earlier estimates at D10 and D16, and close at D5 and D9"
+                "The probe matches the earlier estimates at D5 and D9, and is 15 to 35% below them at the other four"
             ],
             anchor="start",
             subtitle=[
@@ -297,7 +297,7 @@ def fig_folds(*, tables: pl.DataFrame) -> alt.Chart:
             ["The capacity estimate barely depends on the fold or the network design"],
             anchor="start",
             subtitle=[
-                "Mean over the 10 seeds and over every probe date a fold can be probed on (12 dates; 15 for fold 2026-06), so values differ from figure 1."
+                "Mean over the 10 seeds and over every probe date a fold can be probed on (12 dates; 15 for fold 2026-06, 14 at D5), so values differ from figure 1."
             ],
         )
     )
