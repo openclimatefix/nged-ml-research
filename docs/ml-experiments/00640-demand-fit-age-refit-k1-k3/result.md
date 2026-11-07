@@ -64,10 +64,18 @@ metric: >-
   Each fit's cleaned power is hidden after its cutoff, as in experiment 620's training phase, so no
   code path can read a later reading.
 - **Cheapest recipe.** One cutoff per fit and no day-14 refit, with seeds 0 to 2 in place of
-  experiment 613's five. Experiment 620's logs show about 11 minutes of GPU time for K1 over 5
-  seeds, so 25 cutoffs cost about 3.3 GPU-hours for K1 at 3 seeds and under 0.5 GPU-hours for K3.
-  Prediction P4 is the check that this recipe reproduces the roster within 1%; if it fails, the
-  page says so and quotes only the contrast between ages, not absolute scores.
+  experiment 613's five (the recipe is otherwise experiment 613's, and the K1 seeds 0 and 1 are not
+  bit-identical to 613's, which came from experiment 591's stored chain). From experiment 620's
+  logs, K1 takes about 7.5 minutes per cutoff at 3 seeds and K3 about 4 to 5 minutes, so the 25
+  cutoffs cost about 5.5 to 6.5 GPU-hours with the prediction processes. That reaches the 6
+  GPU-hour ceiling, so the first cutoff of each network is timed before the chain starts, and the
+  manager is asked before crossing the ceiling. Prediction P4 checks that the recipe reproduces
+  the roster within 1%; if it fails, the page quotes only the contrast between ages.
+- **History confound.** The oldest cutoffs of the earliest months have less fine-tune history
+  (about 12 months at 2025-10 with age 26, against about 18 at age 0), and D15 and D18 have under
+  3 months of cleaned power there. The slope is therefore also reported without D15 and D18, and
+  with the 2025-10 fits older than 16 weeks left out. The synthetic load-shift events are seeded
+  from the development month, so every age of one month shares them.
 - **Scoring.** Reuse experiment 613's scorer (`e00613_score.py`) for the cells by Primary, month,
   and lead band, with K1 assembled with the gate from the K3 fit of the same cutoff, and group the
   rows by weeks since the fit. Report separately the Primaries with a labelled event in the
