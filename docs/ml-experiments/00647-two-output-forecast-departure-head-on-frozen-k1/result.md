@@ -183,6 +183,18 @@ mean forecast per site; and the CRPS contrast beside the same contrast on the me
 - **Figures chosen before scores.** Six time series plots: pass 2, 5, and 9 of 2025-12, one
   Primary of each metering group each, plus the verified D5 and D16 pair.
 
+## Read-out: the gap as a detector
+
+If the head works, the gap between the prevailing and NRA outputs is a detector of departures. A
+detector is needed anyway to mask rows when scoring NRA forecasts on new data, because NGED will
+send no new labels. The run scores two signals as detectors with no extra fit: the gap at lead 0
+(the head's depth *d*) and the head's survival probability. The scoring reports recall on the
+injected bank (per depth and length) and on the verified D5 and D16 pair, the false-alarm rate per
+month on event-free days, and the days from onset to the first alarm, beside experiment 637's
+frozen detector on the same days. Limits stated in the write-up: the gap is built from the same
+lag-minus-lag-free signal as G4; the bank holds four lengths and one verified real pair; and NGED's
+event labels are incomplete, so false alarms are an upper bound.
+
 ## Standing practices
 
 Followed: cleaned data throughout (the `substation_zero` rule's drops reported per fold); the noisy
