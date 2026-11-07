@@ -1,4 +1,3 @@
-# ruff: noqa: E402, D103
 """Experiment 622: experiment 437's thermal-lag and solar-gain tables for the 2 BSPs and 2 GSPs.
 
 Experiment 437 stored these tables for the 16 Primaries only. `site_table` is the same function, run

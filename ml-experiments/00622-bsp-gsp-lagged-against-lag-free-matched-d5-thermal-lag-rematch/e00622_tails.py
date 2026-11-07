@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 622: tail calibration of the lag-enabled and lag-free networks (both with B1) from the Parquet exports.
+"""Experiment 622: tail calibration of the lag-enabled and lag-free networks (both with B1).
 
 For q01, q05, q95, and q99: the share of rows with the observed power at or below the quantile (target
 equal to the level) and the pinball loss in points of effective capacity, by group and lead set, on
@@ -11,11 +11,12 @@ Usage: python e00622_tails.py
 from pathlib import Path
 from typing import Final
 
-import e00611_pool as pool  # ty: ignore[unresolved-import]
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-ROOT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch"
+ROOT: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch"
+)
 LEVELS: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
 FOLDERS: Final[dict[str, tuple[Path, str]]] = {
     "lagged_b1": (ROOT / "export", "lagged_b1"),

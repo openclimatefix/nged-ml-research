@@ -15,7 +15,9 @@ import polars as pl
 from plotting import ocf_theme as theme
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-ROOT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch"
+ROOT: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch"
+)
 W611: Final[Path] = f611.EXPORT.parent
 SCORES: Final[Path] = ROOT / "scores"
 DOCS: Final[Path] = (
@@ -25,12 +27,18 @@ DOCS: Final[Path] = (
 WIDTH: Final = 620
 NAME: Final[dict[str, str]] = {
     "lagged_b1": "Lag-enabled network",
-    "lagfree_b1": "Lag-free network (lags masked)",
+    "lagfree_b1": "Lag-free network",
     "bg2": "BG2 (weekly XGBoost)",
     "climatology": "Climatology",
 }
 ORDER: Final[list[str]] = list(NAME.values())
-COLOUR: Final[list[str]] = [theme.DATA_BLUE, theme.DATA_SKY, theme.BRAND_ORANGE, theme.DATA_GREEN]
+COLOUR: Final[list[str]] = [
+    theme.DATA_PURPLE,
+    theme.DATA_AMBER,
+    theme.DATA_DEEP_TEAL,
+    theme.DATA_BURNT_ORANGE,
+]
+RULE: Final[str] = "Target 0.90"
 GROUPS: Final[dict[str, str]] = {
     "BSP": "Bulk supply points (2 series)",
     "GSP": "Grid supply points (2 series)",
@@ -58,8 +66,10 @@ def day_figure(
             x=alt.X("day:O", title="Day of lead time (day 1 is 0 to 24 h ahead)"),
             y=alt.Y(f"{value}:Q", title=y_title, scale=alt.Scale(zero=False)),
             color=alt.Color(
-                "Forecast:N", scale=alt.Scale(domain=ORDER, range=COLOUR), sort=ORDER,
-                legend=alt.Legend(title="Forecast", orient="top", columns=2),
+                "Forecast:N",
+                scale=alt.Scale(domain=[*ORDER, RULE], range=[*COLOUR, "#000000"]) if rule is not None else alt.Scale(domain=ORDER, range=COLOUR),
+                sort=[*ORDER, RULE] if rule is not None else ORDER,
+                legend=alt.Legend(title="Forecast", orient="top", columns=3),
             ),
         )  # fmt: skip
         layers = [
@@ -67,9 +77,17 @@ def day_figure(
         ]
         if rule is not None:
             layers.append(
-                alt.Chart(pl.DataFrame({"y": [rule]}))
-                .mark_rule(strokeDash=[4, 4], color="#000000")
-                .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+                alt.Chart(pl.DataFrame({"y": [rule], "Forecast": [RULE]}))
+                .mark_rule(strokeDash=[4, 4], strokeWidth=2)
+                .encode(  # ty: ignore[unresolved-attribute]
+                    y="y:Q",
+                    color=alt.Color(
+                        "Forecast:N",
+                        scale=alt.Scale(domain=[*ORDER, RULE], range=[*COLOUR, "#000000"]),
+                        sort=[*ORDER, RULE],
+                        legend=alt.Legend(title="Forecast", orient="top", columns=3),
+                    ),
+                )
             )
         panels.append(alt.layer(*layers).properties(width=WIDTH, height=280, title=label))
     alt.vconcat(*panels).resolve_scale(color="shared").properties(
@@ -90,23 +108,32 @@ def difference_figure(
     for group, label in GROUPS.items():
         sub = daily.filter((pl.col("group") == group) & (pl.col("metric") == metric))
         base = alt.Chart(sub).encode(x=alt.X("day:O", title="Day of lead time"))
+        keys = ["Difference in mean CRPS", "95% interval", "No difference"]
+        colour = alt.Color(
+            "key:N", scale=alt.Scale(domain=keys, range=[theme.DATA_BLUE, theme.DATA_BLUE, "#000000"]),
+            legend=alt.Legend(title=None, orient="top", columns=3),
+        )  # fmt: skip
         layers = [
-            base.mark_rule(strokeWidth=2, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
-                y=alt.Y("lower:Q", title=y_title), y2="upper:Q"
-            ),
-            base.mark_point(filled=True, size=70, color=theme.DATA_BLUE, opacity=1).encode(  # ty: ignore[unresolved-attribute]
-                y="difference:Q"
-            ),
-            alt.Chart(pl.DataFrame({"y": [0.0]}))
-            .mark_rule(strokeDash=[4, 4], color="#000000")
-            .encode(y="y:Q"),  # ty: ignore[unresolved-attribute]
+            base.mark_rule(strokeWidth=2)
+            .encode(  # ty: ignore[unresolved-attribute]
+                y=alt.Y("lower:Q", title=y_title), y2="upper:Q", color=colour
+            )
+            .transform_calculate(key=f"'{keys[1]}'"),
+            base.mark_point(filled=True, size=70, opacity=1)
+            .encode(  # ty: ignore[unresolved-attribute]
+                y="difference:Q", color=colour
+            )
+            .transform_calculate(key=f"'{keys[0]}'"),
+            alt.Chart(pl.DataFrame({"y": [0.0], "key": [keys[2]]}))
+            .mark_rule(strokeDash=[4, 4], strokeWidth=2)
+            .encode(y="y:Q", color=colour),  # ty: ignore[unresolved-attribute]
         ]
         panels.append(alt.layer(*layers).properties(width=WIDTH, height=280, title=label))
     alt.vconcat(*panels).properties(
         title=alt.TitleParams(
             title,
             subtitle=[
-                "Dot: mean over the 5 months. Line: 95% interval from resampling the 5 months (not adjusted for the number of days)."
+                "Dot: difference in mean CRPS over every scored row of that day. Line: 95% interval from resampling the 5 months (not adjusted for the 10 days)."
             ],
         )
     ).save(DOCS / file)
@@ -206,7 +233,7 @@ def main() -> None:
     difference_figure(
         daily=daily,
         metric="crps_points",
-        title="CRPS of the lag-enabled network minus the lag-free network (both with D5 and thermal-lag columns)",
+        title="CRPS: lag-enabled minus lag-free network",
         y_title="CRPS difference (points; below 0 favours lags)",
         file="figure_1_crps_difference_by_day.svg",
     )

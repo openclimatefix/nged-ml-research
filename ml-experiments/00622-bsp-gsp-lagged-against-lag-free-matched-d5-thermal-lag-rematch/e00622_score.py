@@ -25,7 +25,9 @@ import e00611_score as s  # ty: ignore[unresolved-import]
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-ROOT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch"
+ROOT: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch"
+)
 R619: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00619-bsp-gsp-lag-enabled-network-for-the-bake-off"
 W611: Final[Path] = pool.WORK
 OUT: Final[Path] = ROOT / "scores"

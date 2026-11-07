@@ -55,8 +55,8 @@ TAG = f"J_{'LG' if MINE.lags == 'on' else 'LF'}_{'B1' if MINE.b1 == 'on' else 'N
 pool.WORK = ROOT
 W = pool.install(group=MINE.group)
 b1tables.install()
-import e00574_fit as e  # ty: ignore[unresolved-import]
 import e00572_lags as lg  # ty: ignore[unresolved-import]
+import e00574_fit as e  # ty: ignore[unresolved-import]
 
 assert set(e.ARGS.months) <= set(c.MONTHS), e.ARGS.months
 W.mkdir(parents=True, exist_ok=True)
@@ -64,7 +64,7 @@ e.WORK, e.W, e.W560 = ROOT, W, W
 e.SPEC = dataclasses.replace(e.SPEC, tag=TAG, pretrain_from=TAG)
 e.SPECS[TAG] = e.SPEC
 assert e.SPEC.sched == "3sE" and e.SPEC.lags == "24h" and e.SPEC.frozen and not e.SPEC.wt
-assert e.N_B1 == (e.cols569.width(arm="B1") if MINE.b1 == "on" else 0), e.N_B1
+assert (e.cols569.width(arm="B1") if MINE.b1 == "on" else 0) == e.N_B1, e.N_B1
 if MINE.b1 == "on":
     assert e.EX is not None and set(e.EX.rows) == {0, 1}
     assert [r["site"] for r in e.EX.rows.values()] == list(pool.GROUPS[MINE.group])
@@ -83,7 +83,7 @@ _block_of = e.block_of
 
 
 def block_of(**kwargs) -> np.ndarray:  # noqa: ANN003
-    """Return the 8 lag columns; with `--lags off` the value, missing, and age columns say 'absent'."""
+    """Return the 8 lag columns; with `--lags off` the value, missing, and age say 'absent'."""
     blk = _block_of(**kwargs)
     if MINE.lags == "off":
         amax = lg.age_max(cap_steps=e.SPEC.cap_steps)
@@ -97,7 +97,7 @@ e.block_of = block_of
 
 def assemble() -> None:
     """Concatenate each cutoff's window forecast into one table per month and seed."""
-    import datetime as dt  # noqa: PLC0415
+    import datetime as dt
 
     for month in e.ARGS.months:
         cuts = e.k.cutoffs(month=month, cadence=e.CADENCE)
@@ -112,8 +112,7 @@ def assemble() -> None:
             last = frame["power_fcst_init_time"].max().date()  # ty: ignore[unresolved-attribute]
             assert f"{first:%Y-%m}" == month == f"{last:%Y-%m}", (month, seed, first, last)
             assert (
-                first.day <= 2
-                and (last.replace(day=28) + dt.timedelta(days=4)).month != last.month
+                first.day <= 2 and (last.replace(day=28) + dt.timedelta(days=4)).month != last.month
             ) or last.day >= 28, (month, seed, first, last)
             ids = pool.group_table()["time_series_id"].to_list()
             assert sorted(frame["time_series_id"].unique().to_list()) == sorted(ids), (month, seed)
