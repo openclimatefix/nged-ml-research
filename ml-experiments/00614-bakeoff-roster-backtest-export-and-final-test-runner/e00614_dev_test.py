@@ -274,6 +274,16 @@ def main(out: Path) -> None:
         )
     finally:
         e00558_lags.CAP_STEPS = saved
+    cfg7 = json.loads((out / "config_final.json").read_text()) | {
+        "approved_by_maintainer": "2026-11-08"
+    }
+    (out / "config_final_other_lock.json").write_text(json.dumps(cfg7))
+    r = run(str(out / "config_final_other_lock.json"), "--run-final-test")
+    record(
+        "final mode refuses a lock file other than the pinned one",
+        r.returncode == 2 and "must use the lock file" in r.stderr,
+        r.stderr.strip(),
+    )
     lines.append("scores of the dummy candidates (development month, not meaningful as skill):")
     lines.append(pl.read_csv(Path(base["output_dir"]) / "scores.csv").__str__())
     lines.append(f"{sum(results.values())} of {len(results)} checks passed")

@@ -46,7 +46,7 @@ best_arm: not applicable (export and tooling, no arms compared)
 headline: >-
   The five-seed backtests of K1, the class 2 candidate, and K3 are exported for the five development
   months to 240 h, and recomputed event-free coverage matches experiment 613's stored cells exactly
-  (largest difference 0.00000, tolerance 0.003). The final-test runner passed all 14 development-month
+  (largest difference 0.00000, tolerance 0.003). The final-test runner passed all 15 development-month
   checks, including the refusal of a second run.
 lessons: >-
   Experiment 612's printed coverage comes from seeds 0 and 1, and experiment 613's from seeds 0 to 4,
@@ -171,7 +171,7 @@ on those origins, and no forecast error beyond 2026-06-07 was read.
 - **Scoring and output.** Each candidate is scored once: its forecasts are written as Parquet, and
   `scores.csv` holds the continuous ranked probability score (as points of capacity) and q05-q95
   coverage by lead band. The lock then records the hash of every output.
-- **Refusing a second run.** The lock file holds the configuration hash, the runner hash, the git
+- **Refusing a second run.** In final mode the lock must be `final_test.lock` beside the runner, so a second configuration cannot name a fresh lock. The runner loads the predictors and builds and checks the rows of every origin before it creates the lock, so a bad configuration cannot use up the test. Each predictor's module file is hashed into its candidate's combined hash. The lock file holds the configuration hash, the runner hash, the git
   commit, and each candidate's artefact list and combined hash. A lock left by a failed run also
   blocks a rerun, because the runner treats a started test as a used test. Only the maintainer may
   delete the lock.
@@ -183,7 +183,7 @@ on those origins, and no forecast error beyond 2026-06-07 was read.
 
 **Development-month test.** `e00614_dev_test.py` runs the runner on origins 2026-06-01 to 2026-06-07
 with two dummy frozen candidates (a persistence rule that stands in for a lag network, and a
-per-Primary mean that stands in for a lag-free network) and passed 14 of 14 checks:
+per-Primary mean that stands in for a lag-free network) and passed 15 of 15 checks:
 
 - the check mode passed and wrote no lock;
 - the first run completed, wrote both candidates' forecasts (53,648 rows each: 7 origins, 16
@@ -194,7 +194,7 @@ per-Primary mean that stands in for a lag-free network) and passed 14 of 14 chec
 - a missing ensemble run stopped the check;
 - a power lag younger than 24 hours (the lag cap lowered to 12 hours) stopped the run;
 - development mode refused an origin in July;
-- final mode refused to start without the flag and without the maintainer's approval.
+- final mode refused to start without the flag, without the maintainer's approval, and with a lock file other than the pinned `final_test.lock`.
 
 The dummy candidates' scores (continuous ranked probability score 6.9 and 8.2 points of capacity,
 coverage 0.60 and 0.92) show only that scoring works. They say nothing about forecast skill.

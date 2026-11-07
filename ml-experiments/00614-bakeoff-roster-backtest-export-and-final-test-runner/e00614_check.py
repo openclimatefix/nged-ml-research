@@ -62,6 +62,7 @@ def stored(*, folder: str, system: str) -> pl.DataFrame:
 def main() -> None:
     lines: list[str] = []
     worst = 0.0
+    bad_total = 0
     for network, (folder, system) in STORED.items():
         j = exported(network=network).join(
             stored(folder=folder, system=system),
@@ -94,6 +95,10 @@ def main() -> None:
             lines.append(
                 f"  in only one source: {r['primary_name']} {r['month']} {r['band']} (export rows {r['n_rows_export']}, stored rows {r['n_rows_stored']})"
             )
+        lost = missing.filter(
+            ~((pl.col("n_rows_export") < 100) & pl.col("n_rows_stored").is_null())
+        )
+        bad_total += int((j["n_rows_export"] != j["n_rows_stored"]).sum()) + lost.height
         max_cell = float(j["diff"].abs().max())  # ty: ignore[invalid-argument-type]
         worst = max(worst, max_cell, float(pooled["diff"].abs().max()))  # ty: ignore[invalid-argument-type]
         lines.append(
@@ -121,7 +126,7 @@ def main() -> None:
             cov = float((s["cover_export"] * s["n_rows_export"]).sum() / s["n_rows_export"].sum())  # ty: ignore[unsupported-operator]
             lines.append(f"  {network} {group}: {cov:.3f}")
     lines.append(
-        f"Largest absolute difference over all cells and pooled groups: {worst:.5f} (tolerance {TOL}): {'PASS' if worst <= TOL else 'MISMATCH'}"
+        f"Largest absolute difference over all cells and pooled groups: {worst:.5f} (tolerance {TOL}): {'PASS' if worst <= TOL and bad_total == 0 else 'MISMATCH'} (missing cells above 100 rows plus row-count mismatches: {bad_total})"
     )
     text = "\n".join(lines)
     print(text)

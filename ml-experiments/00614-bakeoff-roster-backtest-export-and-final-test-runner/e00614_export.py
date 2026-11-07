@@ -100,6 +100,8 @@ def main(months: tuple[str, ...]) -> None:
         m = load(arm="k1_d5", tag="P5-removed", month=month).rename({q: f"M_{q}" for q in QCOLS})
         c = load(arm="c2_e3", tag="P5", month=month).rename({q: f"C_{q}" for q in QCOLS})
         k3 = load(arm="k3_d5", tag="D5", month=month).rename({q: f"L_{q}" for q in QCOLS})
+        for name, frame in (("K1", v), ("twin", m), ("candidate", c), ("K3", k3)):
+            assert frame.height == frame.unique(KEYS).height, f"{name}: duplicate keys"
         both = v.join(m, on=KEYS).join(c, on=KEYS).join(k3, on=KEYS).sort(KEYS)
         print(
             month,

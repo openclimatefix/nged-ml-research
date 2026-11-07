@@ -9,9 +9,9 @@ the command-line flag `--run-final-test`, and no lock file.
 What a run does, in order:
 
 1. Reads the configuration and checks the origin range against the mode.
-2. Refuses to run if the lock file exists, whatever its status. A failed run leaves its lock, and
+2. Refuses to run if the lock file exists, whatever its status. Final mode accepts only `final_test.lock` beside the runner. A failed run leaves its lock, and
    only the maintainer may delete it.
-3. Checks every listed artefact of every candidate against its listed SHA-256 hash.
+3. Checks every listed artefact of every candidate against its listed SHA-256 hash, and hashes each predictor's module file into the candidate's combined hash. The runner then loads the predictors and builds and checks the rows of every origin before it creates the lock, so a bad configuration cannot use up the test.
 4. Creates the lock file atomically (exclusive create) with the configuration hash, the runner hash,
    the git commit, and each candidate's artefact hashes and combined hash.
 5. For each daily origin (00:00 UTC ensemble run plus 9 hours), builds the input rows from experiment
@@ -21,8 +21,7 @@ What a run does, in order:
    that origin, that the valid time is after the origin, and that both lag times are at least 24 hours
    before the origin. Any violation stops the run.
 6. Passes the rows to each candidate's predictor, which returns the 11 quantiles, and asserts that the
-   predictor changed neither the row order nor the row count and returned finite, non-crossing
-   quantiles.
+   predictor returned one row of finite, non-crossing quantiles per input row.
 7. Writes each candidate's forecasts as Parquet (one file per candidate), scores each candidate once
    against the observed power (continuous ranked probability score and q05-q95 coverage, by lead
    band), writes `scores.csv`, and marks the lock `completed`.
@@ -43,6 +42,7 @@ Usage: python e00614_final_runner.py CONFIG.json [--hash-artefacts | --check | -
 import argparse
 import hashlib
 import importlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -57,6 +57,8 @@ import polars as pl
 
 FINAL_FIRST: Final = datetime(2026, 7, 1, tzinfo=UTC)
 FINAL_LAST: Final = datetime(2026, 10, 31, tzinfo=UTC)
+FINAL_LOCK: Final = Path(__file__).with_name("final_test.lock")
+"""The only lock file final mode accepts, so a second configuration cannot dodge it."""
 PUBLICATION_DELAY: Final = timedelta(hours=9)
 HORIZON_STEPS: Final = 480
 STEP: Final = timedelta(minutes=30)
@@ -113,7 +115,11 @@ def verify_artefacts(*, cand: dict) -> str:
                 f"{cand['id']}: artefact {rel} hash {got} differs from the listed {cand['artefacts'][rel]}"
             )
         lines.append(f"{rel}:{got}")
-    if not lines:
+    module_file = importlib.util.find_spec(cand["predictor"].split(":")[0])
+    if module_file is None or module_file.origin is None:
+        raise RunnerError(f"{cand['id']}: predictor module {cand['predictor']} cannot be found")
+    lines.append(f"predictor:{sha256_file(Path(module_file.origin))}")
+    if len(lines) < 2:
         raise RunnerError(f"{cand['id']}: no artefacts listed")
     return sha256_text("\n".join(sorted(lines)))
 
@@ -139,6 +145,8 @@ def check_config(*, cfg: dict, final_flag: bool) -> tuple[datetime, datetime]:
             raise RunnerError("final mode runs on exactly the origins 2026-07-01 to 2026-10-31")
     else:
         raise RunnerError(f"unknown mode {cfg['mode']!r}")
+    if cfg["mode"] == "final" and Path(cfg["lock_file"]).resolve() != FINAL_LOCK.resolve():
+        raise RunnerError(f"final mode must use the lock file {FINAL_LOCK}")
     return first, last
 
 
@@ -212,24 +220,15 @@ def time_of(*, idx: np.ndarray) -> pl.Series:
 def origin_rows(*, origin: datetime, ens_dir: Path, observed: pl.DataFrame) -> pl.DataFrame:
     """Return the input rows of one origin, after asserting the timing rules on every row."""
     run = origin - PUBLICATION_DELAY
-    newest_allowed = origin - PUBLICATION_DELAY
     path = ens_dir / f"init={run:%Y-%m-%d}.parquet"
     if not path.is_file():
         raise RunnerError(f"origin {origin}: the ensemble run {run} is missing in {ens_dir}")
-    runs = sorted(
-        datetime.strptime(p.name[5:15], "%Y-%m-%d").replace(tzinfo=UTC)
-        for p in ens_dir.glob("init=*.parquet")
-    )
-    newest = max(r for r in runs if r <= newest_allowed)
-    if newest != run:
-        raise RunnerError(
-            f"origin {origin}: the newest run at or before the origin minus 9 h is {newest}, not {run}"
-        )
     ens = pl.read_parquet(path)
     n_before = ens.height
     ens = ens.filter(pl.col("valid_time") < pl.lit(origin + HORIZON_STEPS * STEP))
     if ens.is_empty():
         raise RunnerError(f"origin {origin}: no rows within 240 h")
+    # the file name is the only run label the tables carry, so the rows' own origin must equal run + 9 h
     bad_origin = ens.filter(pl.col("power_fcst_init_time") != pl.lit(origin))
     if bad_origin.height:
         raise RunnerError(
@@ -272,11 +271,21 @@ def origin_rows(*, origin: datetime, ens_dir: Path, observed: pl.DataFrame) -> p
             on=["time_series_id", col],
             how="left",
         )
+    if rows.height != ens.height:
+        raise RunnerError(
+            f"origin {origin}: joining the observed lags changed the row count ({ens.height} to {rows.height})"
+        )
     return rows
 
 
+def predictor_view(*, rows: pl.DataFrame) -> pl.DataFrame:
+    """Return only the columns a predictor may see: the inputs and the weather summaries."""
+    weather = [c for c in rows.columns if c.startswith(("mean_", "std_"))]
+    return rows.select([*INPUT_COLUMNS, *weather])
+
+
 def predict_once(*, predictor, rows: pl.DataFrame, cand_id: str) -> np.ndarray:
-    q = np.asarray(predictor.predict(rows.clone()), dtype=np.float64)
+    q = np.asarray(predictor.predict(predictor_view(rows=rows)), dtype=np.float64)
     if q.shape != (rows.height, len(QCOLS)):
         raise RunnerError(
             f"{cand_id}: predictor returned shape {q.shape}, expected {(rows.height, len(QCOLS))}"
@@ -358,6 +367,10 @@ def main(argv: list[str] | None = None) -> None:
     observed = pl.read_parquet(
         cfg["inputs"]["observed"], columns=["time_series_id", "valid_time", "power"]
     )
+    if cfg["mode"] == "development":
+        observed = observed.filter(pl.col("valid_time") < pl.lit(FINAL_FIRST))
+    if observed.select(pl.struct("time_series_id", "valid_time").is_duplicated().any()).item():
+        raise RunnerError("the observed-power cache holds duplicate (series, valid time) rows")
     capacity = pl.read_csv(cfg["inputs"]["capacity_csv"]).select(
         pl.col("time_series_id").cast(pl.Int32), "capacity"
     )
@@ -371,13 +384,15 @@ def main(argv: list[str] | None = None) -> None:
             f"check passed: {len(origins)} origins, candidates {list(hashes)}, no lock written, nothing predicted"
         )
         return
+    predictors = {c["id"]: load_predictor(cand=c) for c in cfg["candidates"]}
+    all_rows = [
+        origin_rows(origin=origin, ens_dir=ens_dir, observed=observed) for origin in origins
+    ]
     create_lock(path=lock, cfg_text=cfg_text, hashes=hashes, cfg=cfg)
     out_dir.mkdir(parents=True, exist_ok=True)
-    predictors = {c["id"]: load_predictor(cand=c) for c in cfg["candidates"]}
     frames: dict[str, list[pl.DataFrame]] = {cid: [] for cid in predictors}
     n_rows = 0
-    for origin in origins:
-        rows = origin_rows(origin=origin, ens_dir=ens_dir, observed=observed)
+    for rows in all_rows:
         n_rows += rows.height
         for cid, predictor in predictors.items():
             q = predict_once(predictor=predictor, rows=rows, cand_id=cid)
