@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, E501, PERF401, PLW2901
 """Experiment 645 figures (CPU): read the score tables; write SVGs for the page.
 
 The window rows (experiment 633, July to October 2026) are typed in from the leakage audit's
@@ -82,19 +82,19 @@ def headline(scores: Path, out: Path) -> None:
         ),
     )
     zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}))
+        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#555", strokeDash=[4, 3])
         .encode(x="x:Q")
     )  # ty: ignore[unresolved-attribute]
     chart = (
-        base.mark_rule(strokeWidth=2).encode(
+        base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "lo:Q",
                 title="K1's CRPS minus BG2's CRPS (points of capacity; below 0 means K1 is better, dashed line: equal)",
             ),
             x2="hi:Q",
         )
-        + base.mark_point(filled=True, size=60).encode(x="d:Q")
+        + base.mark_point(filled=True, size=60).encode(x="d:Q")  # ty: ignore[unresolved-attribute]
         + zero
     ).properties(
         width=560,
@@ -185,7 +185,7 @@ def example(out: Path) -> None:
             axis=alt.Axis(values=[0, 48, 96, 144, 192, 240]),
         )
         band = (
-            alt.Chart(d)
+            alt.Chart(d)  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.25, color=theme.DATA_BLUE)
             .encode(x=x, y=alt.Y("q05:Q", title="Power (MW)"), y2="q95:Q")
         )  # ty: ignore[unresolved-attribute]

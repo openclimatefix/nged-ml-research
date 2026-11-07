@@ -125,17 +125,18 @@ neighbouring Primaries'
   of the 1,140,221 exported rows on which all six systems have a forecast. BG2 has no forecast on
   the other 225,086 rows, because experiment 87 stored 292 of the 365 daily runs (`row_audit.csv`
   lists each month). No cleaned reading was missing. No valid time is on or after 2026-07-01.
-- **Event-free:** the days that [experiment
-  637](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00637-ara-detector-rescore-of-the-bakeoff-final-test/result/)'s
-  detector flags as an abnormal running arrangement (a temporary load transfer between Primaries)
-  are
-  removed: 23,339 of the 915,135 rows (2.6%). The detector's rule file is unchanged (we checked its
-  hash). The export's own `event_free` flag is a second reading and gives the same sign in every
-  contrast of the Results section.
-- **Scorer and intervals:** the formulas of [experiment
-  620](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00620-bakeoff-final-test-demand-networks-at-primaries/result/)'s
-  scorer. The intervals resample the five origin months, so they are coarse; day-block intervals are
-  in `contrasts.csv` and agree.
+- **Event-free:** the days that the detector of [experiment
+  637](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00637-ara-detector-rescore-of-the-bakeoff-final-test/result/)
+  flags as an abnormal
+  running arrangement (a temporary load transfer between Primaries) are removed: 23,339 of the
+  915,135 rows (2.6%). The detector's rule file is unchanged (we checked its hash). The export's own
+  `event_free` flag is a second reading and gives the same sign in every contrast of the Results
+  section.
+- **Scorer and intervals:** the formulas of the scorer of [experiment
+  620](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00620-bakeoff-final-test-demand-networks-at-primaries/result/).
+  The intervals
+  resample the five origin months, so they are coarse; day-block intervals are in `contrasts.csv`
+  and agree.
 
 ## Results
 

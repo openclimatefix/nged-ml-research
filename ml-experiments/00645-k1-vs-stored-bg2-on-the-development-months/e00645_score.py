@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, PERF401, PLR0912
+# ruff: noqa: D103, E501, PERF401, PLR0912, PLR0915
 """Experiment 645: score K1, the Candidate, K3, BG2, and two comparators on the development months.
 
 Reads the roster export (K1, Candidate, K3; experiments 612 and 613) and experiment 87's stored BG2
