@@ -1,8 +1,10 @@
-# ruff: noqa: E402, E501, PT018, D103
-"""Experiment 633, Part 2: the lag-enabled demand network with thermal-lag columns at the 4 BSP/GSP series, final-test fold (GPU).
+# ruff: noqa: E402, E501, PT018, D103, D205
+"""Experiment 633, Part 2: the lag-enabled demand network with thermal-lag columns at the 4 BSP/GSP
+series, final-test fold (GPU).
 
 A copy of experiment 622's `e00622_fit.py` restricted to the arm `lagged_b1` (`--lags on --b1 on`), with
-`e00633_fold` patched onto experiment 574's module so that the fold `2026-07` has one cutoff (2026-07-01) and
+`e00633_fold` patched onto experiment 574's module so that the fold `2026-07` has one cutoff
+(2026-07-01) and
 the held-out power is hidden in the training phase. Original docstring:
 
 Wraps experiment 619's `e00619_fit.py` (experiment 574's arm P4E or P5 with experiment 591's shared

@@ -1,10 +1,14 @@
-# ruff: noqa: D103, E501
-"""Experiment 633, Part 2: extend experiment 622's thermal-lag and solar-gain tables of the 4 nodes to the final-test window (CPU, weather only).
+# ruff: noqa: D103, E501, D205
+"""Experiment 633, Part 2: extend experiment 622's thermal-lag and solar-gain tables of the 4 nodes
+to the final-test window (CPU, weather only).
 
 Rebuilds each node's table with experiment 437's own `site_table` (through experiment 622's `e00622_b1.install_for_build`),
-from the extended ensemble summaries of the nodes (`e00633_nodes.py summaries`) and the CAMS irradiance of
-2019-09-01 to 2026-11-01 that experiment 620 extended (read only). No power is read. `check` proves the extension
-changes nothing for the past: on every key that both the stored table and the rebuilt table hold, every column is bit-equal.
+from the extended ensemble summaries of the nodes (`e00633_nodes.py summaries`) and the CAMS
+irradiance of
+2019-09-01 to 2026-11-01 that experiment 620 extended (read only). No power is read. `check` proves
+the extension
+changes nothing for the past: on every key that both the stored table and the rebuilt table hold,
+every column is bit-equal.
 
 Usage: python e00633_tables.py {build|check|coverage}
 """

@@ -1,7 +1,8 @@
-# ruff: noqa: ANN001, ANN003, ANN202, D103, E501
+# ruff: noqa: ANN001, ANN003, ANN202, D103, E501, D205
 """Experiment 633, Part 2: the final-test fold (cutoff 2026-07-01), patched onto the development pipeline.
 
-A copy of experiment 620's `e00620_fold.py` (an unmerged experiment) with the extended inputs of the 4 nodes.
+A copy of experiment 620's `e00620_fold.py` (an unmerged experiment) with the extended inputs of the
+4 nodes.
 
 The development pipeline (experiments 510, 511, 574, 591, 613) works on folds named by month, and
 refits on days 0 and 14. The final-test fold `2026-07` differs in three ways:
@@ -35,7 +36,8 @@ def is_final(*, months) -> bool:
 
 
 def redirect_to_extended_inputs(e, *, group: str) -> None:
-    """Point the pipeline at the nodes' extended inputs (grid to 2026-11-10, raw matrices, ensemble summaries, tables).
+    """Point the pipeline at the nodes' extended inputs (grid to 2026-11-10, raw matrices, ensemble
+    summaries, tables).
 
     The held-out power is readable after this call, so it only runs in the prediction phase.
     `e` is experiment 574's module. `group` is `bsp` or `gsp`; the expected-input cache is per group.

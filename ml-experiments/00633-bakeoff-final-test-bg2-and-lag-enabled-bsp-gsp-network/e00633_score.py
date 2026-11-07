@@ -1,5 +1,6 @@
-# ruff: noqa: D103, E501, PLR0912, PLR0915
-"""Experiment 633: score experiment 620's three networks, BG2, and the two comparators on the final-test window, once (CPU).
+# ruff: noqa: D103, E501, PLR0912, PLR0915, D205
+"""Experiment 633: score experiment 620's three networks, BG2, and the two comparators on the
+final-test window, once (CPU).
 
 A copy of experiment 620's `e00620_score.py` (an unmerged experiment) with BG2 added as a fourth forecast.
 The networks' forecasts are read from experiment 620's export folder, read only. Original docstring:
@@ -61,7 +62,9 @@ def crps(*, y: np.ndarray, q: np.ndarray) -> np.ndarray:
 
 
 def twcrps(*, y: np.ndarray, q: np.ndarray, thr: np.ndarray) -> np.ndarray:
-    """Threshold-weighted CRPS stand-in of experiment 319: the CRPS of the values clipped below at each Primary's threshold."""
+    """Threshold-weighted CRPS stand-in of experiment 319: the CRPS of the values clipped below at
+    each Primary's threshold.
+    """
     d = np.maximum(y, thr)[:, None] - np.maximum(q, thr[:, None])
     return 2.0 * np.maximum(TAUS * d, (TAUS - 1.0) * d).mean(axis=1)
 
@@ -149,7 +152,9 @@ def interval(draws: np.ndarray, alpha: float) -> tuple[float, float]:
 
 
 def bg2_quantiles(*, base: pl.DataFrame, cap: dict) -> np.ndarray:
-    """Return BG2-single-fit's 11 quantiles (shares of capacity) on the export's rows, spread factor 1.15 about the median."""
+    """Return BG2-single-fit's 11 quantiles (shares of capacity) on the export's rows, spread factor
+    1.15 about the median.
+    """
     series = common87.series_table().select("site", "time_series_id", "effective_capacity_mw")
     names = dict(zip(series["time_series_id"].to_list(), series["site"].to_list(), strict=True))
     parts = []

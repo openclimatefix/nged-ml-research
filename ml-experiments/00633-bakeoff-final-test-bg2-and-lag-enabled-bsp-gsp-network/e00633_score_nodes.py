@@ -1,9 +1,13 @@
-# ruff: noqa: E501, D103, PLR0915, PLR0912, PERF401
-"""Experiment 633, Part 2: score the lag-enabled network, BG2, the manual heuristic, and the climatology at the bulk and grid supply points, once (CPU).
+# ruff: noqa: E501, D103, PLR0915, PLR0912, PERF401, D205
+"""Experiment 633, Part 2: score the lag-enabled network, BG2, the manual heuristic, and the
+climatology at the bulk and grid supply points, once (CPU).
 
-Scoring follows experiment 620's `e00620_score.py` (copied into `e00633_score.py`): scores are shares of capacity, in percent
-where printed; the interval of every mean is a day-block bootstrap over forecast-origin days; every contrast prints its
-Bonferroni count. All systems are scored on the rows on which every system has a forecast and the series has a finite,
+Scoring follows experiment 620's `e00620_score.py` (copied into `e00633_score.py`): scores are
+shares of capacity, in percent
+where printed; the interval of every mean is a day-block bootstrap over forecast-origin days; every
+contrast prints its
+Bonferroni count. All systems are scored on the rows on which every system has a forecast and the
+series has a finite,
 unflagged reading. Only the series with readings in the window are scored (the count is printed).
 
 Usage: python e00633_score_nodes.py OUT_DIR

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001
+# ruff: noqa: E501, D103, ANN001, D205
 """Experiment 633: BG2 as one fit at 2026-07-01 ("BG2-single-fit"), fitted and then forecast over the window.
 
 BG2's weekly XGBoost member (experiment 87's configuration `n1h`): one booster per series, 500 rounds,
@@ -162,7 +162,8 @@ def predict(*, sites: list[str] | None) -> None:
 
 
 def lookahead(*, sites: list[str] | None) -> None:
-    """Row-by-row lookahead assertion on synthetic power: the forecast of an origin never reads power after origin - 3.5 h.
+    """Row-by-row lookahead assertion on synthetic power: the forecast of an origin never reads
+    power after origin - 3.5 h.
 
     For three runs of the window and two series, replace the power from 3.5 hours before the origin on with
     two different random values and check that the forecast is identical, and that it changes when the

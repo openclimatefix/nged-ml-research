@@ -7,11 +7,13 @@ timing assertions below. Nothing of the window is forecast or scored at this poi
 
 Timing assertions, run on all 123 origins from 2026-07-01 to 2026-10-31 without reading any power:
 
-- every frame's weather run is the 00:00 UTC run of the origin's day, and the origin is that run plus 9 hours;
+- every frame's weather run is the 00:00 UTC run of the origin's day, and the origin is that run
+  plus 9 hours;
 - every valid time is after the origin and at most 360 hours after it;
 - for every origin and every valid time, the three lag indices are at most the newest usable half-hour
   (the origin minus 3.5 hours), computed with experiment 87's `origin_lags` on a dummy power array;
-- no booster's training rows extend past 2026-06-30 20:30 (valid time) or the run of 2026-06-29 09:00 (origin).
+- no booster's training rows extend past 2026-06-30 20:30 (valid time) or the run of 2026-06-29
+  09:00 (origin).
 
 `e00633_bg2.py lookahead` adds the perturbation test on synthetic power. `predict.sh` refuses to start
 unless `--verify` passes and the lock file does not exist.

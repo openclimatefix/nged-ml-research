@@ -405,3 +405,7 @@ extended inputs (maximum difference 0.0 in all 8 files), which does not cover th
 - **One window, scored once per candidate set.** Nothing was tuned on it.
 - **The development-month ranking was not rechecked.** The hypothesis that the ranking of BG2
   against the networks equals its development-month ranking was not tested.
+- **The freeze hashes of the code files predate a comment-only edit.** After both windows were
+  scored, the docstrings of the code files were re-wrapped and lint headers adjusted to pass the
+  documentation lint. No executable line changed, so `freeze_part1.json` and `freeze_part2.json`
+  record the code as it ran, and their code hashes no longer match the committed files.

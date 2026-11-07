@@ -1,5 +1,6 @@
-# ruff: noqa: E501, D103, PT018
-"""Experiment 633, Part 2: extend the bulk and grid supply points' weather inputs to the final-test window (CPU, weather only).
+# ruff: noqa: E501, D103, PT018, D205
+"""Experiment 633, Part 2: extend the bulk and grid supply points' weather inputs to the final-test
+window (CPU, weather only).
 
 - `summaries`: the ensemble mean and standard deviation of each node, for the 123 runs from 2026-07-01
   to 2026-10-31, from the weather frames of `e00633_frames.py`. The folder `inputs/ens_summary_nodes`
@@ -8,9 +9,12 @@
 - `raw`: the raw input matrix of each node, with the rows of runs after 2026-06-29 appended to experiment
   564's stored matrix (a copy of `build_site` in experiment 620's `e00620_extend.py`).
 
-No power from the window is read by `summaries` or `check`. `raw` reads the extended power grid to build the lag
-columns and the target of the window rows, as experiment 620's version did; the window rows' target (the held-out
-power) is never read by training, because `e00633_fold.py` hides the cleaned power from the cutoff on in the
+No power from the window is read by `summaries` or `check`. `raw` reads the extended power grid to
+build the lag
+columns and the target of the window rows, as experiment 620's version did; the window rows' target
+(the held-out
+power) is never read by training, because `e00633_fold.py` hides the cleaned power from the cutoff
+on in the
 training phase and returns no test rows.
 
 Usage: python e00633_nodes.py {summaries|check|raw}
@@ -137,7 +141,9 @@ def raw() -> None:
 
 
 def check_raw() -> None:
-    """The extension must change nothing for the past: every stored row is unchanged, and the rows both files hold agree."""
+    """The extension must change nothing for the past: every stored row is unchanged, and the rows
+    both files hold agree.
+    """
     for site in NODES:
         old, new = np.load(OLD_RAW / f"{site}.npz"), np.load(RAW / f"{site}.npz")
         n = len(old["y"])
@@ -160,7 +166,9 @@ def row_key(d: dict) -> np.ndarray:
 
 
 def check_overlap() -> None:
-    """Rebuild the rows the stored matrix already holds, with the extension's code, and compare them key by key."""
+    """Rebuild the rows the stored matrix already holds, with the extension's code, and compare them
+    key by key.
+    """
     global CHECK_OVERLAP  # noqa: PLW0603
     CHECK_OVERLAP = True
     k.redirect()
