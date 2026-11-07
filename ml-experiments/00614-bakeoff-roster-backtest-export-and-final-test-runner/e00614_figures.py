@@ -100,15 +100,16 @@ def figure(*, network: str, title_label: str, out: Path) -> None:
             cp.arm_panel(
                 x=x, q=q, iq=IQ, obs=obs, xdom=(lo, hi), title=f"{p}: {title_label}", ydom=ydoms[i],
                 xtype="T", xtitle="Date (UTC)" if i == 1 else None, strip=strip or None,
-                span=(datetime(2025, 12, 29), datetime(2026, 1, 13)), rules=SWITCH,
+                span=(datetime(2025, 12, 29, 1), datetime(2026, 1, 13, 11)), rules=SWITCH,
             )
         )  # fmt: skip
+    cp.RULES = cp.entry("Maintainer's switch times", "rule", cp.RULE_COLOUR)
     key = [*cp.FORECAST_ENTRIES, cp.OBS, cp.SHADE, cp.RULES]
     if network == "K1":
         key.append(cp.GATE)
     chart = cp.figure(
         units=units,
-        title=f"Day-ahead forecasts through the December 2025 load-shift: {title_label}",
+        title="Day-ahead forecasts through the December 2025 load-shift",
         key=key,
     )
     chart.save(str(out))
@@ -123,10 +124,10 @@ def main(outdir: Path) -> None:
         print(step_check(primary=p), flush=True)
     figure(
         network="K1",
-        title_label="K1, lag network with the gated band",
+        title_label="K1, lag neural network with the gated band",
         out=outdir / "example_K1_2025-12.svg",
     )
-    figure(network="K3", title_label="K3, lag-free network", out=outdir / "example_K3_2025-12.svg")
+    figure(network="K3", title_label="K3, lag-free neural network", out=outdir / "example_K3_2025-12.svg")
 
 
 if __name__ == "__main__":

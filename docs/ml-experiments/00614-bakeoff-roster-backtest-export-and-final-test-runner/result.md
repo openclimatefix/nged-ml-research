@@ -2,7 +2,8 @@
 id: "00614"
 slug: bakeoff-roster-backtest-export-and-final-test-runner
 title: >-
-  Can the three roster networks be exported as stored backtests that reproduce experiments 612 and
+  Can the three candidate neural networks be exported as stored backtests that reproduce experiments
+  612 and
   613, and can a final-test runner be built that scores each frozen candidate once?
 theme: production-reference-and-best-guess
 also_relevant_to:
@@ -19,7 +20,8 @@ size: >-
   degradation rule; (5) it changes no contract. The export reads stored forecasts only. The runner
   is tested on a development month and is not run on the final test.
 hypothesis: >-
-  The stored forecasts of experiments 612 and 613 can be repackaged for the three roster networks
+  The stored forecasts of experiments 612 and 613 can be repackaged for the three candidate neural
+  networks
   (class 1 K1, class 2 candidate, class 3 K3) over the five development months so that
   event-free q05-q95 coverage recomputed from the exported files matches the coverage those
   experiments printed, and a runner can check the timing rules row by row, score each frozen
@@ -54,14 +56,18 @@ lessons: >-
   4,
   so an export reproduces a page only when it uses the same seeds as that page.
 take_home_message: >-
-  The three candidate networks' stored forecasts are now in one folder that a colleague can score
-  without refitting anything, and the numbers recomputed from it match the two earlier experiments.
+  The stored forecasts of the three candidate neural networks are now in one folder that a colleague
+  can score
+  without refitting anything, and the numbers recomputed from it match experiment 613 exactly, and
+  experiment 612 when rebuilt from its two seeds.
   The runner for the one final test is written and tested on a development month with two dummy
-  candidates. It has not been run on the final test, and the networks themselves still need wiring
-  into it once the maintainer freezes the roster.
+  candidates. It has not been run on the final test, and the three real neural networks still need
+  wiring
+  into it once the maintainer freezes the three candidate neural networks.
 advice:
   - >-
-    Score the roster from the exported files, not from the fit folders, and use five seeds for
+    Score the three candidate neural networks from the exported files, not from the fit folders, and
+    use five seeds for
     experiment 613's numbers and seeds 0 and 1 for experiment 612's (checks section).
   - >-
     Before the final test, write one predictor class per frozen network that reads only the supplied
@@ -73,13 +79,17 @@ advice:
 production_status: not-for-production
 adopted_in: none
 ---
-**Three roster networks, five development months, one folder.** The folder holds the stored
+**Three candidate neural networks, five development months, one folder.** The folder holds the
+stored
 forecasts
-of K1 (class 1, the lag network with the gated band), the class 2 candidate (K2 plus neighbour
-summaries and signal dropout, scaled to K1's band width), and K3 (class 3, the lag-free network).
-Each forecast is the mean of seeds 0 to 4 quantile by quantile, as [experiment
+of K1 (class 1, the lag network with the gated band), the class 2 candidate (a neural network that
+also reads neighbouring Primaries' power and has random signal dropout in training, with its band
+scaled to K1's width), and K3 (class 3, the lag-free network).
+Each forecast is the average of five training runs (seeds 0 to 4), taken quantile by quantile, as
+[experiment
 613](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00613-nra-roster-contrasts-with-intervals-five-seeds/result/)
-scored it. The same experiment also wrote a runner for the final test, which has not been run.
+scored it. Experiment 614 also wrote a script for the one-shot final test, which has not been run on
+the held-out months.
 
 **Terms.** A Primary is a primary substation, and the export covers 16 Primaries: eight metered in
 megavolt-amperes (the eight MVA Primaries) and six in megawatts (the six MW Primaries), plus two
@@ -107,7 +117,8 @@ scored against an estimate of the normal running arrangement, which is not drawn
 ![K3 at D5 and D16 through the December 2025 load-shift](example_K3_D5_D16.svg)
 
 *The same two Primaries and dates for K3, which reads no power lags. Look at the median holding the
-level it would have had without the load-shift, and at the band staying the same width throughout.
+level it would have had without the load-shift, and at the band staying narrow, though it widens a
+little after 20 January at D16.
 K3 has no gate, so the strip is empty. The legend and the dashed lines are as above.*
 
 ## The export
@@ -139,15 +150,16 @@ K3 has no gate, so the strip is empty. The legend and the dashed lines are as ab
   coverage for every Primary, month, and lead band matches experiment 613's `event_free_cells.csv`
   for K1, the candidate (system K2w), and K3: 228 cells each, largest difference 0.00000 against the
   0.003 tolerance, with identical row counts. One cell (D10, 2025-10, 0-24 h, 36 rows) is below
-  experiment 613's 100-row minimum and is not in its table. Pooled by group and lead band, K1 covers
+  experiment 613's 100-row minimum and is not in its table. Pooled over the five months, K1 covers
   0.890 at the eight MVA Primaries and 0.864 at the six MW Primaries at 24-120 h.
-- **Experiment 612's printed figures reproduce from seeds 0 and 1, and differ by up to 0.007 from
-  five seeds.** Experiment 612 printed event-free coverage at 24-120 h on four months (2025-12 to
+- **Experiment 612's printed coverage reproduces from seeds 0 and 1.** Experiment 612 printed
+  event-free coverage at 24-120 h on four months (2025-12 to
   2026-06) from seeds 0 and 1: K1 0.887 and 0.860, K3 0.868 and 0.836. Rebuilding the export from
   seeds 0 and 1 gave exactly those four figures. The five-seed files give 0.892, 0.859, 0.875, and
   0.837, so the figures differ because of the extra seeds, not because of an error in the export.
-  The mismatch beyond 0.003 is therefore in the K1 and K3 eight MVA Primaries figures (0.005 and
-  0.007).
+  The five-seed figures differ from the printed ones by more than 0.003 only for the eight MVA
+  Primaries (0.005 for K1 and 0.007 for K3). The seeds 0 and 1 rebuild is recorded in
+  `seeds01_check_summary.txt` beside the export.
 - **Not checked.** The injected-load-shift headline numbers of experiments 612 and 613, because the
   injected bank is not exported.
 - **Compute.** No fit and no GPU. The ceiling of 3 GPU hours was not used.
@@ -210,7 +222,8 @@ coverage 0.60 and 0.92) show only that scoring works. They say nothing about for
 
 ## What the maintainer must do before the final test
 
-- **Freeze the roster.** The three networks' weights and statistics files must be chosen and listed
+- **Freeze the three candidate neural networks.** Their weights and statistics files must be chosen
+  and listed
   with their hashes, one configuration per frozen set of weights.
 - **Wire the networks.** The runner has no predictor for K1, the candidate, or K3 yet. Each needs a
   class that loads its frozen weights and builds its features from the supplied columns plus
