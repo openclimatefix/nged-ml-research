@@ -70,6 +70,37 @@ def boot(
     return pt, float(lo), float(hi)
 
 
+def contrasts(*, nets: tuple[str, ...] = ("k1", "k3")) -> pl.DataFrame:
+    """Return the CRPS ratio of each older fit age to age 0, in percent, with month-block intervals."""
+    rng = np.random.default_rng(1)
+    out = []
+    for net in nets:
+        d = cells(net=net).filter(pl.col("free"))
+        for sname, sub in {
+            "all Primaries": d,
+            "without D15 and D18": d.filter(~pl.col("group").is_in(SHORT)),
+        }.items():
+            g = grid(d=sub)
+            draws = [
+                g[rng.integers(0, len(MONTHS), len(MONTHS))].mean(axis=0) for _ in range(N_BOOT)
+            ]
+            ratio = np.array([(x / x[0] - 1) * 100 for x in draws])
+            pt = (g.mean(axis=0) / g.mean(axis=0)[0] - 1) * 100
+            lo, hi = np.percentile(ratio, [(100 - LEVEL) / 2, 100 - (100 - LEVEL) / 2], axis=0)
+            for i, a in enumerate(AGES[1:], start=1):
+                out.append(
+                    {
+                        "net": net,
+                        "subset": sname,
+                        "age": int(a),
+                        "pct_vs_age0": pt[i],
+                        "lo": lo[i],
+                        "hi": hi[i],
+                    }
+                )
+    return pl.DataFrame(out)
+
+
 def main() -> None:
     """Print the tables and write the CSV files."""
     rows, by_age, by_week = [], [], []
@@ -135,6 +166,9 @@ def main() -> None:
     with pl.Config(tbl_rows=200, tbl_cols=20, fmt_str_lengths=80, float_precision=4):
         print(pl.DataFrame(rows))
         print(pl.DataFrame(by_age))
+        ct = contrasts()
+        ct.write_csv(ROOT / "contrasts.csv")
+        print(ct)
     # P4: the age-0 fit on the first 14 days against experiment 613's roster (K2 system, 5 seeds)
     for net in ("k1",):
         p = ROOT / f"cells_{net}.parquet"
