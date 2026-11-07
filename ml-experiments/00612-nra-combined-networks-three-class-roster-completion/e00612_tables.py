@@ -160,7 +160,7 @@ def main() -> None:
                 bank = load(arm=arm, name="bank_summary.csv")
                 if bank is not None:
                     for phase in ("days4-end", "after0-7"):
-                        b = bank.filter((pl.col("group") == "both groups") & (pl.col("length_class") == "15 and 30 days")
+                        b = bank.filter((pl.col("month_set") == "tail months") & (pl.col("group") == "both groups") & (pl.col("length_class") == "15 and 30 days")
                                         & (pl.col("band") == band) & (pl.col("phase") == phase) & (pl.col("system") == system))  # fmt: skip
                         if b.height:
                             rows.append({"network": name, "tail_constants": tails, "band": band, "group": "bank both groups",

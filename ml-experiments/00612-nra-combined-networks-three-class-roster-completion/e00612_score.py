@@ -61,6 +61,8 @@ ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
 OUT = ROOT / "score" / MINE.out
 OUT.mkdir(parents=True, exist_ok=True)
 MONTHS = tuple(MINE.months)
+assert max(MONTHS) <= "2026-06", "July 2026 onwards is never opened"
+assert MINE.lagfree or MINE.twin != "stored", "the G4 gate must read the arm's own lag-free twin"
 c.MONTHS = MONTHS
 BANDS = k600.BANDS
 BAND_IDS = (0, 1, 2)
@@ -136,8 +138,11 @@ def row_factors(*, t) -> tuple[np.ndarray, np.ndarray, pl.DataFrame]:
         for band in TAIL_BANDS:
             base = t.free & (t.group_of_row == gname) & (t.band == band)
             for mi in range(1, len(MONTHS)):
-                earlier = base & np.isin(t.month, MONTHS[:mi])
                 now = (t.group_of_row == gname) & (t.band == band) & (t.month == MONTHS[mi])
+                if not now.any():
+                    continue
+                # purge: a fitting row's target must be observed before the month's first origin
+                earlier = base & np.isin(t.month, MONTHS[:mi]) & (t.idx < t.origin_idx[now].min())
                 if earlier.sum() < 500 or now.sum() < 100:
                     continue
                 lo, hi = fit_constants(y=y[earlier], q=v[earlier])
@@ -283,6 +288,8 @@ def real_events(*, inp, lower, upper) -> pl.DataFrame:
                 if len(sel) < 100:
                     continue
                 for n in SYSTEMS:
+                    if n.endswith("+t") and not np.isfinite(lower[sel]).all():
+                        continue
                     out.append(
                         {"event": e["name"], "group": e["group"], "length_days": e["length_days"],
                          "phase": phase, "band": BANDS[band], "system": n, "n_rows": len(sel),
@@ -417,9 +424,12 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
                          ("signed-MW six", pl.col("group") == "signed-MW six"),
                          ("both groups", pl.lit(True))):  # fmt: skip
         for cname, cexpr in classes.items():
-            sub = tab.filter(gexpr & cexpr)
-            for (phase, band, system), grp in sub.group_by("phase", "band", "system"):
-                rec = {"group": gname, "length_class": cname, "phase": phase, "band": band,
+            sub0 = tab.filter(gexpr & cexpr)
+            for mset, sub in (("all", sub0), ("tail months", sub0.filter(pl.col("month") != MONTHS[0]))):
+              for (phase, band, system), grp in sub.group_by("phase", "band", "system"):
+                if mset == "all" and system.endswith("+t"):
+                    continue
+                rec = {"month_set": mset, "group": gname, "length_class": cname, "phase": phase, "band": band,
                        "system": system, "n_events": grp.height}  # fmt: skip
                 for mname in metrics:
                     if mname not in grp.columns or grp[mname].null_count() == grp.height:
