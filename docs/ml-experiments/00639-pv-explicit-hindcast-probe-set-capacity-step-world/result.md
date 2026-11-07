@@ -3,7 +3,7 @@ id: "00639"
 slug: pv-explicit-hindcast-probe-set-capacity-step-world
 theme: solar-disaggregation
 also_relevant_to: []
-status: planned
+status: finished
 kind: other
 size: >-
   complex. Stored: pretrained network weights, test-window quantiles, and a capacity table in this
@@ -58,21 +58,178 @@ metric: >-
   CRPS in points of effective capacity from the 11 quantiles of each mixture, on sunny middays and
   on all half-hours; capacity-timeline error in MW against the injected 4 MW; probed step per
   injected megawatt and per injected megawatt-hour.
+verdict: partly supported
+best_arm: >-
+  The explicit solar term set by the calibrated probe: sunny-midday CRPS 3.30 points against 4.05
+  for the free network (real months) and 6.09 against 8.99 (step world).
+headline: >-
+  A network given a physics solar curve and a probed capacity forecasts sunny middays better than a
+  network that learns solar from irradiance (gain 0.75 points on real months, 2.90 in the step
+  world), but permuting the capacities across Primaries costs almost nothing in the step world, so
+  the gain comes from the curve and a recent level, not from the Primary's own capacity.
+lessons:
+  - >-
+    The free network's median forecast is 2.7 to 5.0 points of capacity too high on sunny middays
+    (4.0 to 10.3 in the step world), and the explicit networks are within 2.3 points, so most of the
+    gain is a level that the explicit term carries and the free network averages away.
+  - >-
+    One Primary carries most of the gain, and two of the six Primaries score slightly better with
+    the free network, so the gain is not uniform.
+  - >-
+    The exact 4 MW step (the oracle) scores worse than the probe's calibrated 3.2 to 3.8 MW,
+    because the injected farm's energy is 0.78 of the unit curve's, so a probed capacity is the
+    better match for the curve than the injected nameplate.
+  - >-
+    The shuffled-day-sky placebo loses by 3.3 (real) and 8.8 (step) points, so the explicit term's
+    value depends on the real sky.
+take_home_message: >-
+  Giving the demand network a physics solar curve with a capacity set by the probe forecasts sunny
+  middays clearly better than letting the network learn solar from irradiance alone, when the
+  weather is known. Most of the gain comes from using the recent capacity level, and permuting
+  capacities between Primaries costs almost nothing after a step, so this test does not show that
+  the probed capacity tracks a capacity change. A version with weather forecasts, and a free
+  network corrected for its level, are the next checks.
+advice:
+  - >-
+    Score a free-irradiance network beside a level-corrected copy of itself whenever an explicit
+    solar term is tested, because the free network's sunny-midday median ran 2.7 to 5.0 points of
+    capacity too high (checks).
+  - >-
+    Test an explicit solar term with a placebo that keeps each Primary's own capacity out of reach
+    and enough rows to resolve it, because the permuted capacities lost only 0.14 points in the
+    step world against a minimum detectable effect of 0.18 (contrasts figure).
+  - >-
+    Set the explicit step from the probe's calibrated reading, not from the injected nameplate,
+    because the exact 4 MW step scored 0.21 points worse (contrasts figure).
+  - >-
+    Repeat the explicit-term test with ensemble weather forecasts before reading it as a forecast
+    gain, because this experiment used recorded weather (limits).
+production_status: not-for-production
+adopted_in: none
+
 ---
 
-# Explicit solar term with a probed capacity: does it follow a capacity step better than free irradiance?
+# An explicit solar term with a probed capacity beats free irradiance, mostly through its level
 
-**We ask whether a demand network that is told how much solar capacity sits behind a substation
-forecasts sunny middays better than a network that has to learn the solar response from its
-irradiance input.** The capacity comes from the probe of experiments
+**We asked whether a demand network that is told how much solar capacity sits behind a substation
+forecasts sunny middays better than a network that learns the solar response from its irradiance
+input.** The capacity comes from the probe of experiments
 [621](../00621-pv-probe-injected-known-answer-and-placebo-test/result.md),
 [623](../00623-pv-probe-monotone-arm-known-answer/result.md), and
-[638](../00638-pv-probe-step-placebo-climatological-and-ordinary-year-followup/result.md). The
-weather is the recorded weather (ERA5 and CAMS), so a gain here shows that the explicit term uses
-capacity well. It does not show a gain for a forecast that uses weather forecasts. The result is
-pending.
+[638](../00638-pv-probe-step-placebo-climatological-and-ordinary-year-followup/result.md), combined
+with the capacity table of experiment
+[474](../00474-pv-capacity-placebo-gated-ladder-and-per-primary-intervals/result.md). We trained
+the networks on recorded weather (ERA5 and CAMS) up to three cutoffs and scored the 60 days after
+each, on the six Primaries metered in megawatts. In one world the demand is the real demand. In the
+other, 4 MW of a real solar farm's output has been added to the demand since April 2023. On sunny
+middays the explicit network's error was 3.30 percentage points of capacity against 4.05 for the
+free network in the real world, and 6.09 against 8.99 in the step world. Most of that gain comes
+from the explicit network carrying the latest capacity level, and a placebo with the capacities
+permuted across Primaries lost only 0.14 points in the step world. The hypothesis is partly
+supported.
 
-## Plan
+![CRPS on sunny middays by arm](crps_by_arm.svg)
+
+## Definitions
+
+- **Free network**: experiment 554's pretraining network on the net demand, the recipe of
+  experiment [565](../00565-drift-embedding-variants-six-designs/result.md). Seeds 0 to 2 are
+  experiments 634's (real world) and 638's (step world); seeds 3 and 4 are trained here.
+- **Explicit network**: the same network trained on gross demand, which is net demand plus the
+  physics solar curve times a capacity timeline in megawatts. The forecast subtracts the same
+  curve. Arms: `cal` (probe level and step divided by the leave-one-farm-out recovery factor of
+  0.67 to 0.69), `raw` (as probed), `r4` (experiment 474's table unchanged), `oracle` (the table
+  plus exactly 4 MW from the step), `perm` and `shuf` (placebos: the capacity timelines shifted
+  by two Primaries, and the curve built from the weather of another date).
+- **Sunny middays**: 10:00 to 15:00 UTC with a CAMS clear-sky index of at least 0.7. **CRPS** is in
+  percentage points of each Primary's effective capacity (smaller is better), pooled over rows.
+- **Minimum detectable effect (MDE)**: the half-width of the 99% interval of the free network's
+  seeds {0, 2, 4} against {1, 3}, averaged over all ten splits: 0.067 (real) and 0.181 (step).
+
+## Results
+
+**The explicit network beats the free network, by an amount far above the MDE.** Differences are
+the arm's CRPS minus `cal`'s, so a positive value favours `cal`. Intervals are 99% day-block
+bootstraps.
+
+| Arm minus `cal` | Real, sunny | Step, sunny |
+|---|---|---|
+| `free` | +0.75 [0.51, 1.01] | +2.90 [2.15, 3.65] |
+| `raw` | -0.05 [-0.15, 0.05] | +0.20 [-0.10, 0.50] |
+| `r4` (fixed table) | -0.10 [-0.14, -0.05] | +1.78 [1.15, 2.40] |
+| `oracle` | not run | +0.21 [0.04, 0.38] |
+| `perm` placebo | +0.31 [0.22, 0.39] | +0.14 [0.06, 0.22] |
+| `shuf` placebo | +3.30 [3.02, 3.58] | +8.81 [8.09, 9.61] |
+
+![Each arm minus the calibrated explicit arm](contrasts_vs_calibrated.svg)
+
+- **C1 holds.** In the step world `free` minus `cal` is +2.90, above the MDE of 0.181. The MDE
+  exceeds the 0.10 limit set in the plan, so the plan's predicted gain of 0.05 to 0.15 could not
+  have been resolved. The observed gain is 16 times the MDE.
+- **C2 holds.** On all half-hours of the real months `cal` is 0.13 points better than `free`
+  [0.08, 0.19]; it loses nothing. The windows cover March to August only.
+- **C3 half holds.** The shuffled-sky placebo loses by 8.81. The permuted-capacity placebo loses
+  by 0.14 in the step world, below the MDE of 0.18, so the capacities' per-Primary values are not
+  shown to matter there. In the real world it loses by 0.31, above the MDE of 0.067.
+- **`raw` and `cal` are close.** Calibrating the probe changes the score by 0.2 points or less.
+- **The step is tracked about equally by the table plus the probe's step.** `r4` without the step
+  scores 1.78 worse, and `oracle` scores 0.21 worse than `cal`. The injected farm's energy is
+  about 0.78 of the unit curve's (experiment 634), so the calibrated step (3.2 to 3.8 MW) matches
+  the curve's energy better than 4 MW does.
+
+## Checks
+
+- **The gain is mostly a level.** The free network's median forecast is too high on sunny middays
+  by 5.0, 4.2, and 2.7 points of capacity at the three cutoffs in the real world (explicit
+  networks: 2.3, -0.4, 0.8), and by 7.7, 10.3, and 4.0 in the step world. Shifting the free
+  forecast by its own bias at each cutoff leaves `cal` ahead by about 0.07 in the real world
+  (audit's figure). Shifting it by its bias at each cutoff and Primary, in hindsight, makes the free
+  network 0.52 better than `cal` in the real world and leaves `cal` 0.90 ahead in the step world.
+  The free network is also overconfident (the 50% interval covers 38% to 49% of sunny rows), and in
+  the step world its 5% to 95% width is about twice `cal`'s.
+- **The gain is uneven.** By cutoff, `free` minus `cal` is +0.85, +0.89, and +0.27 (real), and
+  +3.12, +3.73, and +0.48 (step). One of the six Primaries carries +3.05 (real) and +7.15 (step);
+  two Primaries score slightly better with `free` in the real world (-0.39 and -0.29). Without that
+  Primary the real-world gain is still +0.27 on average.
+- **Error of the median forecast beside CRPS.** Mean absolute error of the median on sunny middays
+  is 5.81 (`free`) against 4.44 (`cal`) in the real world, and 11.74 against 8.37 in the step world,
+  in the same direction as the CRPS. The median minus the approximate mean (from the 11
+  quantiles) is -0.17 for `free` and 0.02 for `cal` in the real world, and -4.30 against -0.38 in
+  the step world.
+- **Triggers.** An audit ran (private brief and report). Trigger 2 (a gain after five earlier nulls
+  on the mean score) was explained as a level effect, partly. Trigger 5 (`oracle` loses to
+  `cal`) has the energy-ratio explanation above, but regularisation by the capacity draws (`cal`
+  samples `k` and `D` each epoch) could also explain it, and these files cannot separate the two.
+  Trigger 7 (a later experiment depends on the sign) holds, and the result is unreplicated. The
+  audit reproduced every headline CRPS with its own code and found no lookahead and no unequal
+  training between arms (free networks stopped after 30 to 54 epochs, explicit after 39 to 52).
+- **Findings not applied.** The audit asked for experiment 474's table for the one dominant
+  Primary without later data. That was not run, because the table's own fit used the whole history
+  and the write-up states it as a caveat.
+
+![One Primary, one week of the real world](example_week.svg)
+
+## Limits
+
+- **Recorded weather, not forecasts.** The weather is ERA5 and CAMS at the valid time, so this is
+  a hindcast. A gain here does not show a gain for a forecast that uses ensemble weather forecasts.
+- **Short lead range.** The rows have no forecast lead, so NGED's 1 to 10 day range is untested.
+- **Capacity table.** Experiment 474's table was fitted on data that includes the test windows. The
+  networks use only its season-years that ended before the cutoff, and hold the last value.
+- **What C1 tests.** The free network has trained on two to three years of post-step rows, and `k`
+  and `D` come from probing that same network, so the test shows the value of the explicit
+  structure and level, not tracking of a capacity that appeared shortly before the cutoff.
+- **The test windows.** Three cutoffs (July 2025, March 2026, June 2026) cover 150 days from March
+  to August; the sunny-midday sample is 4,397 rows. The shuffled-sky donor falls in the same
+  21-day block of the year, and a test row's input spread columns use one lead band.
+
+## What the next experiment should answer
+
+**Does the gain survive ensemble weather forecasts and a level-corrected free network?** Repeat
+the contrast with ENS weather, include a free network that is shifted to the latest level (one
+refit month), and test a step that starts within 60 days of the cutoff.
+
+## Plan (pre-registered)
 
 ### Standing practices followed and departed from
 
