@@ -81,9 +81,9 @@ adopted_in: none
 and solar `a2_member` scores better than every solar reference, though not decisively against the
 GAM. Its upper band on very sunny days is too low.** This experiment scored every candidate forecast
 for the 3 metered wind farms and the 6 metered solar farms on the 5 development months (forecast
-origins in 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06), with the scoring rules that [experiment
-609](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00609-bakeoff-wind-and-solar-
-design/result/) fixed for the final test. The final test (origins from 2026-07-01) was not run, and
+origins in 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06), with the scoring rules that
+[experiment 609](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00609-bakeoff-wind-and-solar-design/result/)
+fixed for the final test. The final test (origins from 2026-07-01) was not run, and
 no valid time in July 2026 or later is scored. Nothing here is adopted for production. Forecasts are
 stored in the private folder `backtest_export_wind_solar_dev_2026-11-07/`, and the generators appear
 only as W1 to W3 and Solar A to Solar F.
@@ -98,23 +98,21 @@ default", so a positive number means the default scored better.
 
 ## What was scored
 
-- **Wind default 2** is [experiment
-  347](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00347-wind-physics-hybrid-plant-then-mdn/result/)'s
-  physics plant run on each of the 51 ensemble members, followed by a mixture-density neural network
+- **Wind default 2** is the physics plant of
+  [experiment 347](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00347-wind-physics-hybrid-plant-then-mdn/result/),
+  run on each of the 51 ensemble members, followed by a mixture-density neural network
   head. This experiment rebuilt the member inputs for every daily run from 2025-06-17 to 2026-06-30
   and refitted the head at day 0 and day 15 of each development month (10 refits, seeds 0 and 1
   averaged), with capacity at the 99.9th percentile of earlier power
-  ([experiment
-  461](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00461-wind-and-solar-retrain-with-p99-9-effective-capacity/result/)'s
-  rule, recomputed at each refit).
+  (the rule of [experiment 461](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00461-wind-and-solar-retrain-with-p99-9-effective-capacity/result/),
+  recomputed at each refit).
 - **Wind references.** `climatology` is a per-farm, month, and hour table of power before
   2025-10-01. Wind default 1 and the stored wind default 2 exist only for Tuesday origins, so they
   are scored on those rows only.
 - **Solar** candidates are stored forecasts:
-  [experiment 430](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00430-unified-forecaster-solar-and-pretraining-ablations/result/)'s
-  `a2_member` refitted every quarter and
-  [experiment 493](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00493-solar-annual-against-quarterly-refits/result/)'s
-  yearly refit (6 seeds each), and the GAM, XGBoost, `climatology`, and `manual_heuristic`
+  `a2_member` refitted every quarter, from [experiment 430](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00430-unified-forecaster-solar-and-pretraining-ablations/result/),
+  and the yearly refit from [experiment 493](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00493-solar-annual-against-quarterly-refits/result/)
+  (6 seeds each), and the GAM, XGBoost, `climatology`, and `manual_heuristic`
   references of [experiment 310](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00310-metered-farm-long-lead-scoring/result/)
   (seed 0).
 
@@ -264,8 +262,8 @@ neither is adopted here.
 - **Wind default 1 and XGBoost were not rebuilt** for daily origins. Wind default 1 is scored on the
   Tuesday origins where it is stored. Persistence was not built.
 - **The solar scoring capacity is the stored forecasts' older capacity** for every candidate, so
-  [experiment 505](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00505-rolling-p99-9-effective-capacity-for-wind-and-solar/result/)'s
-  choice of rule for four of the farms was not applied. The wind scoring capacity is the 99.9th
+  the choice of rule for four of the farms in [experiment 505](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00505-rolling-p99-9-effective-capacity-for-wind-and-solar/result/)
+  was not applied. The wind scoring capacity is the 99.9th
   percentile of power before 2025-10-01.
 - **The wind head's early stopping** uses the 62 days before each refit date, and those rows contain
   short leads only for the last days, so the stopping loss favours short leads (as in experiment 347).
