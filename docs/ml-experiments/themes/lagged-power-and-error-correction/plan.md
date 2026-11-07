@@ -26,6 +26,7 @@
 | 600 | Do C1, A1, and their G4 assembled forecasts still hold the normal running arrangement inside the q05-q95 band at 120-240 h ahead, where NGED's horizon reaches 10 days? | High (manager, 2026-11-06) | Nothing | Planned |
 | 602 | What does each encoder of the modular demand network (datetime, weather, power lag) contribute to its forecast, on the December 2025 load-shift, on injected load-shifts, and on an event-free fortnight? | High (maintainer, 2026-11-06) | Nothing | Finished: partly supported, see experiment 602 |
 | 608 | Which parts of the combined lag-and-gate, lag-without-gate, and lag-free demand neural networks are needed, when each part is removed alone? | High (maintainer, 2026-11-06) | Nothing | Planned |
+| 648 | Does a larger or differently shaped part of the K1 or class 2 candidate demand network (lag-encoder width and depth, neighbour-summary encoder width, mixture components, hidden width, dropout, learning rate, epochs) lower its quantile score by the agreed margin? | High (maintainer, 2026-11-07) | Nothing | Planned |
 
 ## Planned experiments
 
