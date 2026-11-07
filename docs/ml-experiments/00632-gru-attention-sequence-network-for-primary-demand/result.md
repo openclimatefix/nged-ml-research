@@ -17,13 +17,33 @@ size: >-
   named without searching; (4) it touches no serving path and no degradation rule; (5) it changes
   no contract. Ceiling 6 GPU-hours (process hours); ask before crossing.
 hypothesis: >-
-  A sequence neural network (Seq: an encoder gated recurrent unit over the last 7 days, a decoder gated recurrent unit over the next 7 days that starts from the encoder's state, and three self-attention layers over all tokens), pre-trained on ERA5 and CAMS weather with one Primary embedding for all 16 Primaries, forecasts the next 7 days of demand better than the existing pre-trained networks, because it reads the last 6 days of power and not only a day lag and a week lag.
+    A sequence neural network (Seq: an encoder gated recurrent unit over the last 7 days, a
+  decoder gated recurrent unit over the next 7 days that starts from the encoder's state, and
+  three self-attention layers over all tokens), pre-trained on ERA5 and CAMS weather with one
+  Primary embedding for all 16 Primaries, forecasts the next 7 days of demand better than the
+  existing pre-trained networks, because it reads the last 6 days of power and not only a day lag
+  and a week lag.
 prediction: >-
-  Written before any fit. Seq lowers CRPS at 24 to 168 h against P2-pre by at least 0.06 points at the eight MVA Primaries, and is not worse by 0.06 or more at the six MW Primaries. The evidence from experiments 585, 560, and 558 predicts a tie, so the prediction can fail.
+    Written before any fit. Seq lowers CRPS at 24 to 168 h against P2-pre by at least 0.06 points
+  at the eight MVA Primaries, and is not worse by 0.06 or more at the six MW Primaries. The
+  evidence from experiments 585, 560, and 558 predicts a tie, so the prediction can fail.
 decision_rule: >-
-  (1) Four counted contrasts (Bonferroni count 4): Seq minus P2-pre and Seq minus P2-hist6, CRPS at 24 to 168 h, at the eight MVA Primaries and at the six MW Primaries. Seq minus K3-pre is reported without a count. (2) The prediction holds if, at the MVA Primaries, the whole interval of Seq minus P2-pre lies below zero and its point estimate is at most -0.06, and, at the MW Primaries, the upper end of the interval is below +0.06. (3) The margin 0.06 is the interval half-width experiment 591 measured for network contrasts at 24 to 120 h (0.058 and 0.059); it is also the smallest gain worth porting two GRUs and an attention stack. (4) Stage 3 (fine-tuning on ensemble weather) is a separate later experiment and runs only if the prediction holds and q05-q95 coverage lies in 0.85 to 0.95 in both groups. (5) Stop rule: after seed 0 on the folds 2025-12 and 2026-06 (a point estimate over two month blocks), stop if Seq is worse than K3-pre by more than 5% CRPS at days 1 to 2 in either group (the maintainer's rule), or worse than P2-pre by more than 0.10 points in both groups (larger than the 0.06 margin, so not noise).
+    (1) Four counted contrasts (Bonferroni count 4): Seq minus P2-pre and Seq minus P2-hist6, CRPS
+  at 24 to 168 h, at the eight MVA Primaries and at the six MW Primaries. Seq minus K3-pre is
+  reported without a count. (2) The prediction holds if, at the MVA Primaries, the whole interval
+  of Seq minus P2-pre lies below zero and its point estimate is at most -0.06, and, at the MW
+  Primaries, the upper end of the interval is below +0.06. (3) The margin 0.06 is the interval
+  half-width experiment 591 measured for network contrasts at 24 to 120 h (0.058 and 0.059); it is
+  also the smallest gain worth porting two GRUs and an attention stack. (4) Stage 3 (fine-tuning
+  on ensemble weather) is a separate later experiment and runs only if the prediction holds and
+  q05-q95 coverage lies in 0.85 to 0.95 in both groups. (5) Stop rule: after seed 0 on the folds
+  2025-12 and 2026-06 (a point estimate over two month blocks), stop if Seq is worse than K3-pre
+  by more than 5% CRPS at days 1 to 2 in either group (the maintainer's rule), or worse than
+  P2-pre by more than 0.10 points in both groups (larger than the 0.06 margin, so not noise).
 benchmark: >-
-  P2-pre (the lag neural network's pre-training, shared by K1, K2, and the Candidate), P2-hist6 (a per-row control that reads 6 daily lags), and K3-pre (the lag-free pre-training of experiment 565), all scored on ERA5 and CAMS inputs.
+    P2-pre (the lag neural network's pre-training, shared by K1, K2, and the Candidate), P2-hist6
+  (a per-row control that reads 6 daily lags), and K3-pre (the lag-free pre-training of experiment
+  565), all scored on ERA5 and CAMS inputs.
 row_set_id: roster_export_days_1_to_7_v1
 metric: >-
   CRPS (twice the mean pinball loss over 11 levels) by forecast day and pooled at 24 to 168 h; mean
