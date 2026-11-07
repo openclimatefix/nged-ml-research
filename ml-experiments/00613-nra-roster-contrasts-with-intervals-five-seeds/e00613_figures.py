@@ -204,9 +204,7 @@ def situations() -> None:
     """Draw K1, K2, K3, and the class 2 candidate for five situations (see the page)."""
     c.MONTHS = MONTHS
     cp.PANEL_HEIGHT = 300
-    cp.SHADE = cp.entry(
-        "Load-shift window verified in experiment 580", "band", cp.SHADE_COLOUR, 0.7
-    )
+    cp.SHADE = cp.entry("Verified window (exp. 580)", "band", cp.SHADE_COLOUR, 0.7)
     a.SEEDS = (0, 1, 2, 3, 4)
     cp.RULES = cp.entry("Load-shift start and end dates", "rule", cp.RULE_COLOUR)
     work = ROOT / "arms" / "k1_d5" / "work"
@@ -261,6 +259,13 @@ def situations() -> None:
                 if on.any()
                 else None
             )
+        print(
+            name,
+            label,
+            "gate strips (UTC):",
+            [(str(r["x0"]), str(r["x1"])) for r in (strip or [])],
+            flush=True,
+        )
         key_a = [
             *cp.FORECAST_ENTRIES,
             cp.OBS,

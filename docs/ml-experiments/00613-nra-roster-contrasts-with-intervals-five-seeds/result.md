@@ -146,7 +146,8 @@ safe-side share, 0.03 for absorption, and 0.0006 for event-free continuous ranke
 Each dot is an estimate and each line its Bonferroni interval. Coverage and absorption are scored
 against an estimate of the NRA. The dot is the class 2 candidate at K1's band width minus K1 (CRPS:
 minus K2), with its Bonferroni
-interval (12 counted contrasts, plus 2 for absorption). The blue band is the tolerance. Look at the
+interval (12 counted contrasts, plus 2 for absorption). The pale cyan band is the tolerance. Look at
+the
 top panel, where both injected intervals lie inside the band and every event-free coverage interval
 lies above it, and at the bottom panel, where absorption is lower but the intervals touch the band.
 
@@ -171,25 +172,28 @@ the maintainer gave. The pale shade is the window verified in [experiment
 580](../00580-verified-load-shift-event-set-and-label-audit/result.md),
 about one day earlier. In both figures the observed power drops at the maintainer's start date and
 rises at the end date, so the maintainer's dates fit the readings better than the verified window.
-The blue strip under K1 is the gate: it is on from about 1 January to about 23 January (the end plus
-the 7-day hold), not over the whole axis. The candidate has no gate. Each figure is one Primary.
+The blue strip under K1 is the gate: the stored gate state has it on from 1 January to 22 January
+inclusive, about 8 days after the end date, not over the whole axis. The candidate has no gate. Each
+figure is one Primary.
 Coverage is scored against an estimate of the NRA, which these panels do not draw.
 
 ![A quiet week, K1 and the candidate](quiet_week_D2_k1_c2.svg)
 
 A quiet week at Primary D2 in March 2026, chosen as the week with the smallest median-forecast
-error, so it shows a best case. K1's gate stays off, so no strip is drawn. Compare the band widths
-of the two panels.
+error, so it shows a best case. K1's gate stays off, so no strip is drawn. The two bands are close
+to identical, because the candidate's band is scaled to K1's width; look at where the median sits
+relative to the observed power.
 
 ![A cold winter night, K1 and the candidate](cold_night_D2_k1_c2.svg)
 
 Three days at Primary D2 around the highest overnight demand in January 2026, a proxy for a cold
-winter night. K1's gate stays off, so no strip is drawn.
+winter night. K1's gate stays off, so no strip is drawn. Look at whether the observed power stays
+inside the band on the evening peaks.
 
 ![A very sunny day, K1 and the candidate](sunny_day_D5_k1_c2.svg)
 
 Three days at a six MW Primary in June 2026 around the deepest midday dip, a proxy for a very sunny
-day. K1's gate stays off, so no strip is drawn.
+day. K1's gate stays off, so no strip is drawn. Look at whether the band covers the midday dips.
 
 ## Results
 
