@@ -41,7 +41,7 @@ prediction: >-
   experiment stops and runs no search.
 decision_rule: >-
   Screen folds: test months 2026-06, 2026-01, 2025-10; seed 0; the same monthly daily-refit recipe
-as
+  as
   K1 and the candidate of experiment 613, changed in one setting per arm. The reference is the same
   network at its current setting, refitted on the same folds and seed in this experiment (the
   stored seed 0 fits of experiments 612 and 613 are used only to check the refit reproduces them to
@@ -63,7 +63,7 @@ as
   99% claim.
 benchmark: >-
   K1 and the class 2 candidate (P7_D50_e3 at K1's band width) of experiments 612 and 613, refitted
-at
+  at
   their current settings on the screen folds as the reference of every contrast.
 row_set_id: experiment_470_intersection_v1
 metric: >-
