@@ -109,7 +109,7 @@ def fig_sunny_counts() -> None:
         ),
     )
     bars = (
-        alt.Chart(t)
+        alt.Chart(t)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X(
@@ -131,7 +131,7 @@ def fig_sunny_counts() -> None:
             ),
         )
     )
-    rule = alt.Chart(pl.DataFrame({"y": [20.0], "rule": ["Stop-rule line (20)"]})).mark_rule(strokeDash=[5, 4], size=2).encode(y="y:Q", color=alt.Color("rule:N", title=None, scale=alt.Scale(domain=["Stop-rule line (20)"], range=["#000000"]), legend=alt.Legend(orient="top")))  # fmt: skip
+    rule = alt.Chart(pl.DataFrame({"y": [20.0], "rule": ["Stop-rule line (20)"]})).mark_rule(strokeDash=[5, 4], size=2).encode(y="y:Q", color=alt.Color("rule:N", title=None, scale=alt.Scale(domain=["Stop-rule line (20)"], range=["#000000"]), legend=alt.Legend(orient="top")))  # fmt: skip  # ty: ignore[unresolved-attribute]
     (bars + rule).resolve_scale(color="independent").properties(
         width=WIDTH - 90, height=HEIGHT, title="Very sunny half-hours per month, Solar A to F"
     ).save(DOCS / "figure_1_sunny_counts.svg")
@@ -162,7 +162,7 @@ def fig_recall(*, penalty: float) -> None:
             legend=alt.Legend(orient="top"),
         ),
     )
-    bar = alt.Chart(pl.DataFrame({"y": [0.8], "rule": ["Pass bar (80%)"]})).mark_rule(strokeDash=[5, 4], size=2).encode(y="y:Q", color=alt.Color("rule:N", title=None, scale=alt.Scale(domain=["Pass bar (80%)"], range=["#000000"]), legend=alt.Legend(orient="top")))  # fmt: skip
+    bar = alt.Chart(pl.DataFrame({"y": [0.8], "rule": ["Pass bar (80%)"]})).mark_rule(strokeDash=[5, 4], size=2).encode(y="y:Q", color=alt.Color("rule:N", title=None, scale=alt.Scale(domain=["Pass bar (80%)"], range=["#000000"]), legend=alt.Legend(orient="top")))  # fmt: skip  # ty: ignore[unresolved-attribute]
     (base.mark_line(point=True, strokeWidth=2) + bar).resolve_scale(color="independent").properties(
         width=WIDTH - 90,
         height=HEIGHT,
@@ -191,7 +191,7 @@ def fig_false_steps(*, penalty: float) -> None:
     )
     colours = [ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY, ocf.DATA_GREEN]
     line = (
-        alt.Chart(t)
+        alt.Chart(t)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=2)
         .encode(
             x=alt.X(
@@ -216,7 +216,7 @@ def fig_false_steps(*, penalty: float) -> None:
             ),
         )
     )
-    bar = alt.Chart(pl.DataFrame({"y": [1.0], "rule": ["Pass bar (1 a year)"]})).mark_rule(strokeDash=[5, 4], size=2).encode(y="y:Q", color=alt.Color("rule:N", title=None, scale=alt.Scale(domain=["Pass bar (1 a year)"], range=["#000000"]), legend=alt.Legend(orient="top")))  # fmt: skip
+    bar = alt.Chart(pl.DataFrame({"y": [1.0], "rule": ["Pass bar (1 a year)"]})).mark_rule(strokeDash=[5, 4], size=2).encode(y="y:Q", color=alt.Color("rule:N", title=None, scale=alt.Scale(domain=["Pass bar (1 a year)"], range=["#000000"]), legend=alt.Legend(orient="top")))  # fmt: skip  # ty: ignore[unresolved-attribute]
     (line + bar).resolve_scale(color="independent").properties(
         width=WIDTH - 90,
         height=HEIGHT,
@@ -235,7 +235,7 @@ def real_panel(*, farm: str, levels: pl.DataFrame, steps: pl.DataFrame) -> alt.C
     scale = alt.Scale(domain=domain, range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_SKY])
     x = alt.X("years_since_first:Q", title=X_TITLE, scale=alt.Scale(domain=[0, 7.3]))
     pts = (
-        alt.Chart(d)
+        alt.Chart(d)  # ty: ignore[unresolved-attribute]
         .mark_circle(size=22, opacity=0.7)
         .encode(
             x=x,
@@ -246,7 +246,7 @@ def real_panel(*, farm: str, levels: pl.DataFrame, steps: pl.DataFrame) -> alt.C
         )
     )
     band = (
-        alt.Chart(d)
+        alt.Chart(d)  # ty: ignore[unresolved-attribute]
         .mark_area(opacity=0.35)
         .encode(
             x=x,
@@ -256,7 +256,7 @@ def real_panel(*, farm: str, levels: pl.DataFrame, steps: pl.DataFrame) -> alt.C
         )
     )
     fit = (
-        alt.Chart(d)
+        alt.Chart(d)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=2.5, interpolate="step-after")
         .encode(
             x=x,
@@ -298,7 +298,7 @@ def fig_example() -> None:
         scale = alt.Scale(domain=domain, range=[ocf.DATA_BLUE, ocf.DATA_PURPLE, ocf.BRAND_ORANGE])
         x = alt.X("years:Q", title=X_TITLE, scale=alt.Scale(domain=[0, 7.3]))
         pts = (
-            alt.Chart(d)
+            alt.Chart(d)  # ty: ignore[unresolved-attribute]
             .mark_circle(size=22, opacity=0.7)
             .encode(
                 x=x,
@@ -309,7 +309,7 @@ def fig_example() -> None:
             )
         )
         tr = (
-            alt.Chart(d)
+            alt.Chart(d)  # ty: ignore[unresolved-attribute]
             .mark_line(strokeWidth=2.5, strokeDash=[6, 4], interpolate="step-after")
             .encode(
                 x=x,
@@ -318,7 +318,7 @@ def fig_example() -> None:
             )
         )
         ft = (
-            alt.Chart(d)
+            alt.Chart(d)  # ty: ignore[unresolved-attribute]
             .mark_line(strokeWidth=2.5, interpolate="step-after")
             .encode(
                 x=x,

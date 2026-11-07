@@ -57,16 +57,16 @@ def main() -> None:
                 }
             )
         )
-        for j in steps:
-            steps_out.append(
-                {
-                    "farm": farm,
-                    "years_since_first": float(years[j]),
-                    "change": float(level[j] / level[j - 1] - 1.0),
-                    "days_before": j,
-                    "days_after": len(v) - j,
-                }
-            )
+        steps_out.extend(
+            {
+                "farm": farm,
+                "years_since_first": float(years[j]),
+                "change": float(level[j] / level[j - 1] - 1.0),
+                "days_before": j,
+                "days_after": len(v) - j,
+            }
+            for j in steps
+        )
         yr = np.array([d.year for d in days])
         early = v[(yr >= 2021) & (yr <= 2023)]
         late = v[(yr >= 2025) & (yr <= 2026)]

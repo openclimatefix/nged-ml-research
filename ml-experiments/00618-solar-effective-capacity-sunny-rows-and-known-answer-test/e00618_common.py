@@ -7,6 +7,7 @@ works on one number per sunny day and fits a piecewise-constant level by exact o
 (an L0 change-point penalty). Farms appear only as labels A to F.
 """
 
+from itertools import pairwise
 from pathlib import Path
 from typing import Final
 
@@ -147,7 +148,7 @@ def fit_levels(*, values: np.ndarray, penalty: float) -> tuple[list[int], np.nda
     steps = [c for c in cuts if c > 0]
     bounds = [*cuts, n]
     level = np.empty(n)
-    for a, b in zip(bounds[:-1], bounds[1:], strict=True):
+    for a, b in pairwise(bounds):
         level[a:b] = np.mean(values[a:b])
     return steps, level, sigma
 
@@ -158,6 +159,6 @@ def segment_halfwidth(
     """Return the 90% half-width of the level at each day: 1.645 sigma / sqrt(days in segment)."""
     bounds = [0, *steps, n]
     half = np.empty(n)
-    for a, b in zip(bounds[:-1], bounds[1:], strict=True):
+    for a, b in pairwise(bounds):
         half[a:b] = Z90 * sigma * inflate / np.sqrt(b - a)
     return half

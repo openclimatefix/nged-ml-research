@@ -7,7 +7,8 @@ no-change series) and add a smooth fall (a drift series).
 
 ```bash
 export DATA_PATH_INTERNAL=...
-PYTHONPATH=ml-experiments/00618-* uv run --no-sync python ml-experiments/00618-*/e00618_known_answer.py
+PYTHONPATH=ml-experiments/00618-* uv run --no-sync python \
+  ml-experiments/00618-*/e00618_known_answer.py
 ```
 """
 
@@ -36,7 +37,7 @@ def load_farms() -> dict[str, dict]:
     out = {}
     for farm in c.FARMS:
         daily = c.daily_index(rows=rows, farm=farm)
-        first = rows.filter(pl.col("site") == farm)["time"].min().date()
+        first = rows.filter(pl.col("site") == farm)["time"].min().date()  # ty: ignore[unresolved-attribute]
         years = np.array([(d - first).days / 365.25 for d in daily["day"]])
         v = daily["value"].to_numpy()
         _, level, _ = c.fit_levels(values=v, penalty=BASE_PENALTY)
@@ -105,7 +106,7 @@ def choose_penalty(*, tuning: pl.DataFrame) -> float:
             .agg(pl.col("per_year").mean())["per_year"]
             .max()
         )
-        if worst <= FALSE_STEP_BAR_PER_YEAR:
+        if worst <= FALSE_STEP_BAR_PER_YEAR:  # ty: ignore[unsupported-operator]
             return pen
     return c.PENALTY_GRID[-1]
 
