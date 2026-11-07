@@ -72,16 +72,18 @@ headline: >-
   percentage points of capacity.
 lessons: >-
   Hiding the signals on half of the training rows lowered the extra error at the eight MVA
-  Primaries and kept most of the benefit, but not at the six MW Primaries. A scalar bottleneck
-  removed the extra error at the six MW Primaries and lost the benefit. Cross-fitting, the label
-  head, and the span of the summaries did not help.
+  Primaries and kept most of the follow reduction, but left the six-MW extra error above its
+  minimum detectable effect. A scalar bottleneck removed the extra error at the six MW Primaries
+  and lost the benefit. Cross-fitting, the label head, and the span of the summaries did not help.
 take_home_message: >-
-  The neighbour-summary inputs make the forecast follow a load-shift much less, but all 28
-  variants that we tried still lose accuracy on ordinary days at the six MW Primaries or lose the
-  benefit. The closest variant (training with signals hidden on half of the rows) is within the
-  minimum detectable effect at the eight MVA Primaries and 0.015 percentage points of capacity
-  short at the six MW Primaries. A possible next step is blending the P7 forecast with the A1
-  forecast at the six MW Primaries, rather than trying more input permutations.
+  The neighbour-summary inputs (P7, from experiment 606) make the A1 demand network follow a load-
+  shift much less, but none of the 27 variants and the placebo that we tried keeps ordinary-day
+  accuracy at the six MW Primaries without losing that benefit. The closest variant (P7+D50, with
+  signals hidden on half of the training rows) is within the minimum detectable effect at the
+  eight MVA Primaries and 0.015 percentage points of capacity short at the six MW Primaries. A
+  possible next step is blending the P7 forecast with the A1 forecast at the six MW Primaries,
+  rather than trying more input permutations. The audit found that seed noise and the two-month
+  interval make the extra-error differences between arms unreliable.
 production_status: not-for-production
 advice:
   - >-
@@ -96,8 +98,8 @@ advice:
     (P7+CF).
   - >-
     Treat the lag-only injected bank as flattering neighbour inputs: on the target-side bank,
-    P7+D50 cuts the absorbed share from A1's 0.104 to 0.072, not from 0.119 to 0.040 (target-
-    side bank bullet).
+    P7+D50 cuts the absorbed share from A1's 0.104 to 0.072, not from 0.119 to 0.040 (target-side
+    bank bullet).
   - >-
     Test any new neighbour input for its ordinary-day extra error at the six MW Primaries first,
     because every arm that followed at most 0.05 had an extra error of 0.059 or more there, and
@@ -105,27 +107,28 @@ advice:
 ---
 
 **The neighbour-summary inputs make the forecast follow a load-shift much less, but no variant keeps
-both the benefit and the ordinary-day accuracy.** A load-shift is a spell when a Primary's
-demand moves because the electricity network has been reconfigured, not because of weather. The
-demand forecast reads recent lagged power, so a load-shift leaks into the forecast. "Follow" is the
-share of a load-shift that the median forecast copies. A1 is the demand neural network of experiment
-591, with follow 0.119. P7 is the best arm of
-[experiment
-606](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/result/):
-it gives A1's lag encoder summaries of the neighbouring Primaries' recent lags, and it cut follow to
-0.035. It also made the forecast worse on ordinary days, measured as CRPS (continuous ranked
-probability score, the quantile-forecast error) minus A1's, in percentage points of capacity: +0.021
-at the eight MVA Primaries and +0.068 at the six MW Primaries. Experiment 610 tried 27 variants of
-P7 and a placebo on the first two test months (2025-10 and 2025-12, two
-seeds). None met the keep rule (follow at most 0.05, ordinary-day CRPS within the minimum detectable
-effect (MDE) of A1's at both groups of Primaries, and coverage at the gate's band width within 0.01
-of the
-gate's). **The closest arm, P7+D50, follows 0.040 and is within the minimum detectable effect at the
-eight MVA Primaries (+0.005, minimum detectable effect 0.024; the audit below shows that pass rests
-on two fold months that disagree). At the six MW Primaries its extra
-error is
-+0.059 against a minimum detectable effect of 0.044, so 0.015 percentage points of capacity
-remain.**
+both the benefit and the ordinary-day accuracy.** A load-shift is a spell when a Primary
+substation's demand moves because the electricity network has been reconfigured, not because of
+weather. The demand forecast reads lagged power (the power readings from the previous day and week),
+so a load-shift leaks into the forecast. "Follow" is the share of a load-shift that the median
+forecast copies. A1 is the demand neural network of experiment 591, with follow 0.119. P7 is the
+best variant of
+experiment [606](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/result/).
+P7 gives A1's lag encoder (the part of the network that reads the lagged power) summaries of the
+neighbouring Primaries' recent lags, and it cut follow to 0.035. P7 also made the forecast worse on
+ordinary days. That extra error is measured as CRPS (continuous ranked probability score, the
+quantile-forecast error) minus A1's, in percentage points of capacity: +0.021 at the eight Primaries
+rated in MVA and +0.068 at the six Primaries rated in MW.
+
+Experiment 610 tried 27 variants of P7 and a placebo on the first two test months (2025-10 and
+2025-12, two seeds). No variant met the keep rule: follow at most 0.05; ordinary-day CRPS within the
+minimum detectable effect (MDE, the smallest difference that the two test months can tell from
+noise) of A1's at both groups of Primaries; and coverage at the gate's band width within 0.01 of
+the gate's. The gate is R, A1 plus the load-shift gate of experiment 597. **The closest variant,
+P7+D50 (P7 with all signals hidden on 50% of the training rows), follows 0.040 and passes at the
+eight MVA Primaries (+0.005, MDE 0.024). At the six MW Primaries its extra error is +0.059 against
+an MDE of 0.044, so 0.015 percentage points of capacity remain.** The audit below shows that the
+eight-MVA pass rests on two test months that disagree.
 
 The question was whether P7's extra error on ordinary days comes from a mismatch between training
 and test signals, or from a network that has learnt to depend on signals that are sometimes
@@ -134,8 +137,8 @@ uninformative. Building the signals out of fold (CF) to remove the mismatch rais
 be the cause. Hiding the signals on half of the training rows (D50) lowered the eight-MVA extra
 error from +0.021 to +0.005, but that difference is smaller than D50's minimum detectable effect
 (0.024), and D30 did not lower it. At the six MW Primaries the extra error stayed at +0.04 to +0.08
-in every arm that followed at most 0.05, so dependence on the signals is not shown to explain it
-either.
+in every arm that followed at most 0.05, so dependence on the signals is not shown to explain the
+six-MW extra error either.
 
 ![Follow against ordinary-day extra CRPS at the six MW Primaries, one dot per arm, with the minimum
 detectable effect as a bar](follow_vs_cost_six_mw.svg)
@@ -226,13 +229,13 @@ horizontal dashed line, so it passes the keep rule at this group.*
     - CF lowers the six-MW extra error by 0.03 and keeps follow at most 0.05: refuted (change
         -0.014; follow
       0.067).
-    - D30 and D50 lower the six-MW extra error by 0.02: refuted (D30 +0.008, D50 -0.009), with
+    - D30 and D50 lower the six-MW extra error by 0.02: refuted (D30 raised it by 0.008, D50 lowered
+      it by 0.009), with
         follow
       rising by at most 0.005 (as predicted).
-    - BN lowers the six-MW extra error by 0.02 and keeps follow at most 0.05: half supported (change
-        -0.078;
-      follow 0.100).
-        - X1 and X3 change follow by 0.01 and keep event-free CRPS within the minimum detectable
+    - BN lowers the six-MW extra error by 0.02 and keeps follow at most 0.05: met the first half
+      (change -0.078) and not the second (follow 0.100).
+    - X1 and X3 change follow by 0.01 and keep event-free CRPS within the minimum detectable
       effect: X3 changes follow by +0.014 and lowers the eight-MVA extra error by 0.011 (minimum
       detectable effect 0.010), so it misses the second half; X1 changes follow by +0.001,
       statistically nonzero but below 0.01.
@@ -282,8 +285,8 @@ horizontal dashed line, so it passes the keep rule at this group.*
   than P7+D50 against 0.02 predicted. Trigger 2 fired: most predictions were refuted. Trigger 5
   fired: P7+O3 gives less input than P7 and its six-MW extra error (+0.039) is below P7's (+0.068).
   Triggers 3, 4, 6, and 7 were not checked: the mean-forecast error was not computed, no
-  leave-one-Primary-out run was made, no sister experiment other than experiment 606 reports the
-  same contrasts, and no later experiment's design depends on this result yet.
+  leave-one-Primary-out run was made, no other experiment than experiment 606 reports the same
+  contrasts, and no later experiment's design depends on this result yet.
 - **Audit findings (a fresh Sonnet agent re-derived follow and the event-free extra CRPS from the
   stored forecasts, and every printed number reproduced).** The findings change how to read the
   numbers, not the numbers themselves:
@@ -292,7 +295,7 @@ horizontal dashed line, so it passes the keep rule at this group.*
       error is +0.029 in 2025-10 and -0.019 in 2025-12, giving the minimum detectable effect of
       0.024, so its eight-MVA pass of the keep rule comes from the two months disagreeing. The
       placebo's two months agree (+0.033 each), and it fails. The "0.015 percentage points short" at
-      the six MW Primaries is the same kind of figure.
+      the six MW Primaries also rests on two months that may disagree.
     - **Seed noise is large.** At the eight MVA Primaries the extra error of P7 is +0.011 for seed 0
       and +0.153 for seed 1 (P7+D50: +0.006 and +0.124). The printed values average two seeds, so
       the differences of 0.01 to 0.02 between arms, including the refuted "lowers by 0.02"
