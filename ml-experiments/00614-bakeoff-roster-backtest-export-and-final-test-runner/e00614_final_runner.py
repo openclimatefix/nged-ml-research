@@ -1,38 +1,53 @@
 # ruff: noqa: E501, D103, ANN001
-"""Experiment 614: the final-test runner (one pass over origins 2026-07-01 to 2026-10-31, never run twice).
+"""Experiment 614: the final-test runner (origins 2026-07-01 to 2026-10-31, never run twice).
 
 The runner has two modes, set in the configuration file. `development` mode runs on origins before
-2026-07-01 and refuses any later origin. `final` mode runs on exactly the final-test origins and needs
-three things: `approved_by_maintainer` (a date, filled in by the maintainer after freezing the roster),
+2026-07-01 and refuses any later origin. `final` mode runs on exactly the final-test origins and
+needs
+three things: `approved_by_maintainer` (a date, filled in by the maintainer after freezing the
+roster),
 the command-line flag `--run-final-test`, and no lock file.
 
 What a run does, in order:
 
 1. Reads the configuration and checks the origin range against the mode.
-2. Refuses to run if the lock file exists, whatever its status. Final mode accepts only `final_test.lock` beside the runner. A failed run leaves its lock, and
+2. Refuses to run if the lock file exists, whatever its status. Final mode accepts only
+   `final_test.lock` beside the runner. A failed run leaves its lock, and
    only the maintainer may delete it.
-3. Checks every listed artefact of every candidate against its listed SHA-256 hash, and hashes each predictor's module file into the candidate's combined hash. The runner then loads the predictors and builds and checks the rows of every origin before it creates the lock, so a bad configuration cannot use up the test.
+3. Checks every listed artefact of every candidate against its listed SHA-256 hash, and hashes each
+   predictor's module file into the candidate's combined hash. The runner then loads the predictors
+   and builds and checks the rows of every origin before it creates the lock, so a bad configuration
+   cannot use up the test.
 4. Creates the lock file atomically (exclusive create) with the configuration hash, the runner hash,
    the git commit, and each candidate's artefact hashes and combined hash.
-5. For each daily origin (00:00 UTC ensemble run plus 9 hours), builds the input rows from experiment
-   607's extended tables: the weather summary of the run issued at or before the origin minus 9 hours,
+5. For each daily origin (00:00 UTC ensemble run plus 9 hours), builds the input rows from
+   experiment
+   607's extended tables: the weather summary of the run issued at or before the origin minus 9
+   hours,
    and the day and week power lags (experiment 558's capped lags). It asserts, row by row, that the
-   weather run is the newest run at or before the origin minus 9 hours and that its table row carries
-   that origin, that the valid time is after the origin, and that both lag times are at least 24 hours
+   weather run is the newest run at or before the origin minus 9 hours and that its table row
+   carries
+   that origin, that the valid time is after the origin, and that both lag times are at least 24
+   hours
    before the origin. Any violation stops the run.
-6. Passes the rows to each candidate's predictor, which returns the 11 quantiles, and asserts that the
+6. Passes the rows to each candidate's predictor, which returns the 11 quantiles, and asserts that
+   the
    predictor returned one row of finite, non-crossing quantiles per input row.
 7. Writes each candidate's forecasts as Parquet (one file per candidate), scores each candidate once
    against the observed power (continuous ranked probability score and q05-q95 coverage, by lead
    band), writes `scores.csv`, and marks the lock `completed`.
 
-A predictor is a class `Predictor(artefacts: dict[str, Path])` with `predict(inputs: pl.DataFrame) ->
-np.ndarray` of shape (rows, 11). The runner gives it only the columns listed in `INPUT_COLUMNS` plus the
+A predictor is a class `Predictor(artefacts: dict[str, Path])` with `predict(inputs: pl.DataFrame)
+->
+np.ndarray` of shape (rows, 11). The runner gives it only the columns listed in `INPUT_COLUMNS` plus
+the
 weather summary columns. Observed power at the valid time is never given to a predictor.
 
-The configuration's `inputs` hold `ens_summary_dir` (experiment 607's folder of `init=YYYY-MM-DD.parquet`
+The configuration's `inputs` hold `ens_summary_dir` (experiment 607's folder of
+`init=YYYY-MM-DD.parquet`
 files), `observed` (its observed-power cache), and `capacity_csv` (a file with `time_series_id` and
-`capacity`, in the unit of the cache, used to express the continuous ranked probability score as points
+`capacity`, in the unit of the cache, used to express the continuous ranked probability score as
+points
 of capacity). With no event labels for the final window, the scores cover every row with an observed
 reading, not only event-free rows.
 
@@ -298,7 +313,7 @@ def predict_once(*, predictor, rows: pl.DataFrame, cand_id: str) -> np.ndarray:
 
 
 def score(*, fc: pl.DataFrame, observed: pl.DataFrame, capacity: pl.DataFrame) -> pl.DataFrame:
-    """Return CRPS (twice the mean pinball loss over the 11 levels, as points of capacity) and q05-q95 coverage by lead band."""
+    """Return CRPS (points of capacity) and q05-q95 coverage by lead band."""
     df = (
         fc.join(
             observed.rename({"power": "observed"}), on=["time_series_id", "valid_time"], how="inner"

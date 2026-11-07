@@ -2,8 +2,10 @@
 """Experiment 614: the 14-days-either-side example figure of the December 2025 D5/D16 load-shift.
 
 Reads the exported K1 and K3 files only. Day-ahead means the forecast issued at 09:00 UTC the day
-before the valid day. One forecast network per panel, two panels per figure (D5 and D16), observed power in
-black, the gate in a thin strip under the panel from the stored `gate_on` column, dashed lines at the
+before the valid day. One forecast network per panel, two panels per figure (D5 and D16), observed
+power in
+black, the gate in a thin strip under the panel from the stored `gate_on` column, dashed lines at
+the
 maintainer's switch times, and the verified window of experiment 580 shaded. Coverage is scored
 against an estimate of the normal running arrangement, which these panels do not draw.
 
@@ -45,7 +47,7 @@ def day_ahead(*, network: str, primary: str, lo: datetime, hi: datetime) -> pl.D
 
 
 def step_check(*, primary: str) -> str:
-    """Return which window matches the observed step: mean power in the 48 half-hours either side of each date."""
+    """Return the mean power in the 48 half-hours either side of each candidate step date."""
     frames = pl.concat(
         [pl.read_parquet(ex.OUT / f"K1_{m}.parquet") for m in ("2025-12", "2026-01")]
     )
@@ -127,7 +129,11 @@ def main(outdir: Path) -> None:
         title_label="K1, lag neural network with the gated band",
         out=outdir / "example_K1_2025-12.svg",
     )
-    figure(network="K3", title_label="K3, lag-free neural network", out=outdir / "example_K3_2025-12.svg")
+    figure(
+        network="K3",
+        title_label="K3, lag-free neural network",
+        out=outdir / "example_K3_2025-12.svg",
+    )
 
 
 if __name__ == "__main__":

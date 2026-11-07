@@ -1,10 +1,12 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: D103
 """Experiment 614: export the stored backtests of the three roster networks (CPU, no fit).
 
 Layout, columns, units and caveats follow experiment 593's export (`e00593_export.py`, whose
 `Context` this script reuses for the observed power, the load-shift flags and the units). Every
-forecast is read from experiments 612 and 613's stored fits (`arms/*/work/fits`) and combined the way
-experiment 613 scored it: the mean of seeds 0 to 4 quantile by quantile for each Primary, origin time,
+forecast is read from experiments 612 and 613's stored fits (`arms/*/work/fits`) and combined the
+way
+experiment 613 scored it: the mean of seeds 0 to 4 quantile by quantile for each Primary, origin
+time,
 and valid time, then sorted across the 11 levels. Nothing is refitted.
 
 Networks (one Parquet file per network and fold month, named by the month of the forecast origin):
@@ -38,7 +40,8 @@ ROOT613 = ML_EXPERIMENTS_DATA_DIR / "00613-nra-roster-contrasts-with-intervals-f
 OUT = Path(
     os.environ.get("E00614_OUT", ML_EXPERIMENTS_DATA_DIR / "backtest_export_roster_2026-11-07")
 )
-"""The export folder; `E00614_OUT` redirects it (used for the seeds 0 and 1 cross-check of experiment 612)."""
+"""The export folder; `E00614_OUT` redirects it (used for the seeds 0 and 1 cross-check of
+experiment 612)."""
 MONTHS = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 SEEDS = tuple(int(x) for x in os.environ.get("E00614_SEEDS", "0 1 2 3 4").split())
 KEYS = list(a.KEYS)
@@ -46,20 +49,22 @@ QCOLS = list(a.QCOLS)
 MAX_LEAD_H = 240
 IQ50 = a.IQ[0.5]
 MODE = np.load(ROOT613 / "score" / "k1_d5" / "mode_g4.npy")
-"""G4 gate state of experiment 613's K1 score folder: (16 Primaries, origin days), True where the band is wide."""
+"""G4 gate state of experiment 613's K1 score folder: (16 Primaries, origin days), True where the
+band is wide."""
 WIDTH = dict(pl.read_csv(ROOT613 / "score" / "c2_width_factors.csv").iter_rows())
-"""Experiment 613's band-width factor of the class 2 candidate, one per month of the forecast origin."""
+"""Experiment 613's band-width factor of the class 2 candidate, one per month of the forecast
+origin."""
 
 
 class RosterContext(x593.Context):
-    """Experiment 593's context with the gate state read from experiment 613's stored `mode_g4.npy`."""
+    """Experiment 593's context, with the gate state read from `mode_g4.npy` of experiment 613."""
 
     def _gate(self) -> None:
         self.gated = MODE
 
 
 def load(*, arm: str, tag: str, month: str) -> pl.DataFrame:
-    """Return the five-seed mean quantiles of one stored arm for one fold month, leads under 240 h."""
+    """Return the five-seed mean quantiles of one stored arm and month, leads under 240 h."""
     a.SEEDS = SEEDS
     return a._load(root=ROOT613 / "arms" / arm / "work", tag=tag, months=(month,)).filter(
         (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() < 60 * MAX_LEAD_H

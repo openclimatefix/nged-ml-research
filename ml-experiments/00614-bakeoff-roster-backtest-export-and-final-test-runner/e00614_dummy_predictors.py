@@ -1,9 +1,12 @@
-# ruff: noqa: D101, D102, D107, E501
+# ruff: noqa: D101, D102, D107
 """Experiment 614: two dummy frozen candidates that prove the final-test runner works.
 
-Neither is a forecast anyone would use. `PersistencePredictor` (a stand-in for a lag network) forecasts
-the day lag with a fixed band; `WeatherOnlyPredictor` (a stand-in for a lag-free network) forecasts from
-each Primary's mean and standard deviation before May 2026 only (it ignores weather). Each loads one JSON artefact whose numbers are the frozen weights.
+Neither is a forecast anyone would use. `PersistencePredictor` (a stand-in for a lag network)
+forecasts
+the day lag with a fixed band; `WeatherOnlyPredictor` (a stand-in for a lag-free network) forecasts
+from
+each Primary's mean and standard deviation before May 2026 only (it ignores weather). Each loads one
+JSON artefact whose numbers are the frozen weights.
 """
 
 import json

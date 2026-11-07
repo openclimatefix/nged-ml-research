@@ -1,9 +1,10 @@
 # ruff: noqa: E501, D103, PERF401
-"""Experiment 614: recompute event-free coverage from the exported files and compare it with the stored cells.
+"""Experiment 614: recompute event-free coverage from the export and compare it with stored cells.
 
 Reads only the exported Parquet files and experiment 613's `score/*/event_free_cells.csv`. For each
 network, Primary, fold month, and lead band, coverage is the share of event-free rows with the
-normal-running-arrangement-corrected power `nra_power` inside q05-q95 (experiment 613 scores the same
+normal-running-arrangement-corrected power `nra_power` inside q05-q95 (experiment 613 scores the
+same
 quantity under the column `obs`, which is the cleaned power, so this script uses `observed_power`
 as the scoring target, exactly as experiment 613's event-free cells do). Writes `checks.txt` beside
 the export and prints the largest differences.
