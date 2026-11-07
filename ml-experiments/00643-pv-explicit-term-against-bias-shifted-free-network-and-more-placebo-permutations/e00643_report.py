@@ -157,7 +157,7 @@ def print_checks() -> None:
                 shift.append(100 * (q[:, 5] - y))
             sun = rows["sunny"]
             print(
-                f"{world} {arm}: sunny median abs error {np.concatenate(med)[sun].mean():.2f}, median minus mean {np.concatenate(gap)[sun].mean():+.2f}, median forecast minus actual {np.concatenate(shift)[sun].mean():+.2f}"
+                f"{world} {arm}: sunny mean absolute error of the median {np.concatenate(med)[sun].mean():.2f}, median minus mean {np.concatenate(gap)[sun].mean():+.2f}, median forecast minus actual {np.concatenate(shift)[sun].mean():+.2f}"
             )
 
 
