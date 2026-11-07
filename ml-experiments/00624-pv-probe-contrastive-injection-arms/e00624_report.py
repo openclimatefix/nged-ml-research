@@ -29,6 +29,7 @@ BAND, NEED, PLACEBO, CLOUD, COVER = (
     r623.CLOUD_LIMIT,
     r623.COVERAGE_MIN,
 )
+Z80 = r623.Z80
 KEEP = set(k.CONDITIONS)
 
 
@@ -121,6 +122,60 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
         sel = pooled.filter(pl.col("world") == world)
         res[f"coverage_{world}"] = round(float(sel["covered_wide"].mean()), 3)
     return res
+
+
+def calibration(rec: pl.DataFrame, arm: str, *, model: str = "plain") -> dict:
+    """Return the leave-one-farm-out calibration of the 4 MW real-farm recovery, and the coverage it gives.
+
+    A network's farm is `FARMS[(j + rotation) % 4]` for the j-th MW Primary. The factor applied to a
+    network is the median recovery of every network whose farm differs. The raw interval is centred
+    on the raw probed capacity and widened by the spread (standard deviation) of the per-farm median
+    recoveries; the calibrated interval is centred on the probed capacity divided by the factor.
+    """
+    farms = k.k.FARMS
+    sites = list(k.k.SIX)
+    d = rec.filter(
+        (pl.col("arm") == arm) & (pl.col("world") == "farm") & (pl.col("model") == model)
+    ).with_columns(
+        farm=pl.struct("site", "rotation").map_elements(
+            lambda r: farms[(sites.index(r["site"]) + r["rotation"]) % len(farms)],
+            return_dtype=pl.String,
+        )
+    )
+    per_farm = d.group_by("farm").agg(med=pl.col("recovery").median()).sort("farm")
+    spread = float(per_farm["med"].std())
+    factor = {
+        f: float(d.filter(pl.col("farm") != f)["recovery"].median()) for f in per_farm["farm"]
+    }
+    d = d.with_columns(factor=pl.col("farm").replace_strict(factor), mw_f=pl.col("mw"))
+    bs = (pl.col("boot_sd") ** 2 + pl.col("seed_sd") ** 2).sqrt()
+    f = list(factor.values())
+    rel = float(np.std(f) / np.median(f))
+    d = d.with_columns(
+        raw_hw=Z80 * (bs**2 + (pl.col("mw") * spread) ** 2).sqrt(),
+        cal_est=pl.col("delta_mw") / pl.col("factor"),
+    ).with_columns(
+        cal_hw=Z80 * ((bs / pl.col("factor")) ** 2 + (pl.col("cal_est") * rel) ** 2).sqrt()
+    )
+    raw_cov = (
+        (d["delta_mw"] - d["raw_hw"] <= d["mw"]) & (d["mw"] <= d["delta_mw"] + d["raw_hw"])
+    ).mean()
+    cal_cov = (
+        (d["cal_est"] - d["cal_hw"] <= d["mw"]) & (d["mw"] <= d["cal_est"] + d["cal_hw"])
+    ).mean()
+    return {
+        "per_farm_median_recovery": dict(
+            zip(per_farm["farm"], per_farm["med"].round(3), strict=True)
+        ),
+        "leave_one_farm_out_factor": {a: round(b, 3) for a, b in factor.items()},
+        "factor_range": [round(min(f), 3), round(max(f), 3)],
+        "factors_in_0.55_to_0.85": int(sum(0.55 <= v <= 0.85 for v in f)),
+        "n_farms": len(f),
+        "calibrated_recovery_median": round(float((d["cal_est"] / d["mw"]).median()), 3),
+        "coverage_raw_widened_by_farm_spread": round(float(raw_cov), 3),
+        "coverage_calibrated_widened": round(float(cal_cov), 3),
+        "n": d.height,
+    }
 
 
 def twin_response() -> pl.DataFrame:
@@ -317,6 +372,13 @@ def main() -> None:
     rec = r623.recoveries(df)
     rec.write_csv(k.WORK / "recoveries.csv")
     summary = {arm: bars(rec, arm) for arm in ARM_LABEL}
+    for arm in ARM_LABEL:
+        summary[arm]["calibration"] = calibration(rec, arm)
+        summary[arm]["sensitivity_with_cloud_template"] = calibration(rec, arm, model="cloud_tpl")
+    ctx = pl.read_csv(k.k.WORK / "recoveries.csv")
+    summary["context_623_calibration"] = {
+        arm: calibration(ctx, arm) for arm in ("plain", "monotone")
+    }
     twin = twin_response()
     if twin.height:
         t = (

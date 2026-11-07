@@ -85,3 +85,16 @@ Recovery of that world is scored against the control of the same arm, cutoff, an
 cloud load under 0.20 of a 2 MW farm with the cloud template; 80% interval coverage of at least 60%.
 Also reported: the twin's synthetic recovery (in sample), validation CRPS against the plain network,
 and the arm (b) check.
+
+**Changes after experiments 621 and 623 (fixed before any experiment 624 recovery was read).** The
+headline regression is the one without the cloud template; the template version is a sensitivity
+row. The raw recovery is reported first, and a calibrated recovery (raw probed capacity divided by
+the median 4 MW real-farm recovery of the networks whose farm differs, leave-one-farm-out over farms
+A, B, C, and F) beside it, with the factor's range across the held-out farms. Farms D and E are not
+injected, so the stability bar (leave-one-farm-out factor within 0.55 to 0.85) is judged over 4
+farms, not 6. The raw interval is widened by the spread of the per-farm median recoveries, and the
+calibrated interval by the spread of the leave-one-farm-out factors; coverage of the injected
+capacity is reported in the real-farm world for both, with a target of at least 60%. The question
+experiment 624 answers is whether the contrastive loss lifts real-farm recovery from the plain
+network's 0.68 towards the physics-curve world's 0.97 with the placebos still passing. The
+calibrated figure is never a pass-or-fail gate.
