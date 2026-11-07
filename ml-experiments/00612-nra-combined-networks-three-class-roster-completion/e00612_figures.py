@@ -71,7 +71,7 @@ def interval_chart(
         )
         panels.append(
             alt.layer(zero, bars, pts).properties(
-                width=width, height=max(280, 40 * len(order)), title=m
+                width=width, height=max(320, 40 * len(order)), title=m
             )
         )
     return (
