@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 616, check 1: do the stored stage-`pre` weights load and reproduce their logged validation NLL?
+"""Experiment 616, check 1: do the stored stage-`pre` weights reproduce their logged validation NLL?
 
 Each pretraining log line of experiment 565 (arm D5) records the best validation negative
 log-likelihood (NLL) of one fold and seed. This script rebuilds the fold's pretraining rows, draws the

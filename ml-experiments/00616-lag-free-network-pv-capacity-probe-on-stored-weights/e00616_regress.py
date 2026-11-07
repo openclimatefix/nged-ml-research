@@ -1,9 +1,10 @@
 # ruff: noqa: E501
 """Experiment 616: the donor regression `y = a_slot + C * u(G, T) + b * (T - mean T) [+ cloud terms]`.
 
-`y` is the probed response in MW, `u` is the pooled unit PV curve of experiment 269 (MW of AC output per
-MW of AC capacity) read at the donor's rescaled irradiance, the probe date's sun elevation, and the
-donor's temperature. The slot intercepts absorb everything that depends on the fixed datetime inputs.
+`y` is the probed response in MW. `u` is the pooled unit PV curve of experiment 269 (MW of AC
+output per MW of AC capacity), read at the donor's rescaled irradiance, the probe date's sun
+elevation, and the donor's temperature. The slot intercepts absorb everything that depends on the
+fixed datetime inputs.
 `C` is the negative of the slope on `u`, because a larger `u` lowers net demand.
 """
 

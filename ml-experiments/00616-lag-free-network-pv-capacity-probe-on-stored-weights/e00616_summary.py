@@ -44,7 +44,7 @@ def pooled(*, draws: pl.DataFrame, dates: tuple[date, date] | None) -> pl.DataFr
 
 
 def summarise(*, p: pl.DataFrame) -> pl.DataFrame:
-    """Return, by fold, arm, variant, and Primary: the point value, seed spread, bootstrap spread, and 10/50/90 percentiles."""
+    """Return the point value, seed and bootstrap spread, and 10/50/90 percentiles by fold and Primary."""
     point = p.filter(pl.col("boot") == 0)
     boots = p.filter(pl.col("boot") > 0)
     keys = ["fold", "arm", "variant", "primary"]
@@ -70,7 +70,7 @@ def summarise(*, p: pl.DataFrame) -> pl.DataFrame:
 
 
 def profile_and_monotone(*, month: str) -> pl.DataFrame:
-    """Return, for each arm and Primary at one fold: hour-profile correlation and monotonicity of the seed-mean response."""
+    """Return hour-profile correlation and monotonicity of the seed-mean response, per arm and Primary."""
     rows = pl.read_parquet(OUT / f"probe_{month}.parquet").with_row_index("global_row")
     y_all = np.load(OUT / f"probe_{month}_y.npy")
     table = reg.unit_table()
@@ -129,7 +129,7 @@ def profile_and_monotone(*, month: str) -> pl.DataFrame:
 
 
 def references() -> pl.DataFrame:
-    """Return experiment 474's rung R4 (with cloud terms) and experiment 479's capacity (cloud terms) by Primary and season-year."""
+    """Return experiment 474's rung R4 and experiment 479's capacity (both with cloud terms)."""
     r4 = pl.read_parquet(R474).filter(pl.col("rung").str.contains("cloudterm"))
     r4 = r4.select(
         site="site", season_year="season_year", r4_p10="ac_p10", r4_p50="ac_p50", r4_p90="ac_p90"
