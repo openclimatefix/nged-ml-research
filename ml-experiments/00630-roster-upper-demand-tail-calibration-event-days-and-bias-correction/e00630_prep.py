@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Experiment 630: join the roster export with ensemble temperature and write one frame per network.
 
 Reads `backtest_export_roster_2026-11-07/` (read-only) and the production NWP Delta table, and
@@ -38,7 +37,10 @@ TAU: Final[tuple[float, ...]] = (0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75,
 
 
 def temperature_by_series(*, valid_min: datetime, valid_max: datetime) -> pl.DataFrame:
-    """Ensemble-mean 2 m temperature (deg C) at each Primary's H3 cell, from the latest run at or before each valid time."""
+    """Ensemble-mean 2 m temperature (deg C) at each Primary's H3 cell, from the latest run.
+
+    The run is the latest one that started at or before each valid time.
+    """
     meta = pl.read_parquet(ML_EXPERIMENTS_DATA_DIR.parent / "NGED" / "metadata.parquet").select(
         "time_series_id", pl.col("h3_res_5").alias("h3_index")
     )
