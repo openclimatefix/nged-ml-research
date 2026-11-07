@@ -61,15 +61,15 @@ This page is the plan; the write-up replaces it when the fits have run. Read
 - **Arms.** (a) CAMS only: experiment 621's stored plain networks. (b) CAMS plus the metered column.
   (c) The metered column replaces the CAMS shortwave (column 0 is zeroed); the other six weather
   columns stay.
-- **Input column.** For each of the six MW Primaries, the nearest of farms A, B, C, F, and D within
-  30 km of the Primary's centroid, other than the farm injected at that Primary. Farm E is never an
-  input because 10% to 36% of its half-hours are gaps. The ten other Primaries get 0.
+- **Input column.** For each of the six MW Primaries, the nearest of farms A, B, C, and F within
+  30 km of the Primary's centroid, other than the farm injected at that Primary. Farms D and E are never an
+  input because 3% to 36% of their half-hours are gaps, which the row mask does not cover. The ten other Primaries get 0.
 - **Public Elexon units.** The solar Balancing Mechanism Unit census gives 12 single-site units, and
   Sutton Bridge Solar Farm is the only one within 60 km of a MW Primary (21 to 57 km). It has only 12
   months of settled output, too short for pretraining, so it enters the census and no network.
 - **Worlds.** Those of experiment 621 at the 2026-06 cutoff and 3 seeds: real farm 2 and 4 MW (two
   rotations), physics curve 2 and 4 MW, profile and shuffled-sky placebos, four cloud-following
-  loads, plus a profile placebo whose metered column is shuffled across days within the month.
+  loads, plus a profile placebo, with its own uninjected twin, whose metered column is shuffled across days within the month in training and in the probe. CRPS is scored on all validation rows and on the six Primaries' alone.
 - **Standing practices.** Cleaned data and the D15/D18 cut are those of experiment 554's rows; the
   network is not refit monthly because it is a pretraining-only known-answer test; the networks are
   saved in the private data folder; no calendar column is added.
