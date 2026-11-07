@@ -126,7 +126,10 @@ def load_runs(*, network: str) -> list[dict]:
 
 
 def pit_z(*, q: np.ndarray, actual: np.ndarray) -> np.ndarray:
-    """Return the normal score of each actual under its 11 stored quantiles (linear between, 0.005 and 0.995 outside)."""
+    """Return the normal score of each actual under its 11 stored quantiles.
+
+    The score is linear between the stored levels, with 0.005 and 0.995 outside them.
+    """
     lv = client.LEVELS
     idx = (q < actual[..., None]).sum(-1)
     lo_i, hi_i = np.clip(idx - 1, 0, 10), np.clip(idx, 0, 10)
@@ -141,7 +144,10 @@ def pit_z(*, q: np.ndarray, actual: np.ndarray) -> np.ndarray:
 
 
 def fit_copula(*, z_runs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-    """Return the Cholesky factor of the node correlation (P, P) and the AR(1) terms (P,), as experiment 436 fits them."""
+    """Return the Cholesky factor of the node correlation (P, P) and the AR(1) terms (P,).
+
+    Both are fitted as experiment 436 fits them.
+    """
     z = np.concatenate([zr[:, ::4] for zr in z_runs], axis=1)
     corr = np.eye(P)
     for i in range(P):
@@ -163,7 +169,10 @@ def fit_copula(*, z_runs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
 
 
 def schaake_history(*, init: datetime, observed: np.ndarray) -> np.ndarray:
-    """Return 51 past observed paths (51, P, T) at the origin's time of day, nearest in day of year, ending 16 days before the origin."""
+    """Return 51 past observed paths (51, P, T) at the origin's time of day.
+
+    The paths are nearest in day of year and end 16 days before the origin.
+    """
     last = init - timedelta(days=16)
     t0 = SCHAAKE_FIRST
     cands = []
@@ -320,7 +329,10 @@ def process_run(
 
 
 def picks(*, path: np.ndarray) -> dict[str, float]:
-    """Return the 95th percentile over paths of each BSP's day-3 summed Primaries (MW or MVA) and the single-Primary maximum of that quantity."""
+    """Return the 95th percentile over paths of each BSP's day-3 summed Primaries (MW or MVA).
+
+    The single-Primary maximum of that quantity is returned too.
+    """
     out = {}
     for name in MAPPING["bsp"].unique().sort().to_list():
         rows = MAPPING.filter(pl.col("bsp") == name)

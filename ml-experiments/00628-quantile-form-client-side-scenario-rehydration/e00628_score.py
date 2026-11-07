@@ -143,7 +143,11 @@ BSP: Final[pl.DataFrame] = pl.read_csv(OUT / "bsp_mapping.csv")
 
 
 def picks(*, path: np.ndarray) -> dict[str, float]:
-    """Return the day-3 picks of K paths (K, N, S): lowest wind, 5th-percentile solar, and the 95th percentile of each BSP's summed Primaries."""
+    """Return the day-3 picks of K paths (K, N, S).
+
+    The picks are lowest wind, 5th-percentile solar, and the 95th percentile of each BSP's summed
+    Primaries.
+    """
     wind = path[:, KIND == 1, DAY3].mean(axis=(1, 2))
     solar = path[:, KIND == 2, DAY3].sum(axis=2).mean(axis=1)
     out = {"wind_min": float(wind.min()), "solar_p05": float(np.quantile(solar, 0.05))}
