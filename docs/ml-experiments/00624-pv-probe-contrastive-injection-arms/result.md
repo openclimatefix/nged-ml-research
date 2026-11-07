@@ -65,7 +65,14 @@ network's response to the synthetic +1 MW.
 from the real row's by the known change `delta` in standardised units, on the same inputs. (b) A
 post-hoc check on experiment 621's plain networks: only the twin vectors are fitted (4 epochs at
 learning rate 0.01, every other parameter frozen) on the twin rows. (c) Arm (a) followed by the same
-post-hoc refit. Every arm runs with the profile twin as the placebo.
+post-hoc refit. Every arm runs with the profile twin as the placebo. Arm (c)
+resets the twin vectors to the real vector before the refit, so the refit tests whether the
+network trained with the loss lets a fresh twin vector absorb the +1 MW again. The twin rows triple
+the six MW Primaries' weight in the likelihood, which the plain network of experiment 621 lacks, so
+a matched control, `nopair`, trains with the twin rows and no paired-difference term in the control
+world and both real-farm rotations (3 seeds, 2 cutoffs). Early stopping reads the validation
+likelihood, which excludes the paired-difference term. The forecast-skill comparison scores the real
+validation rows only, through the real vector, with experiment 623's CRPS code.
 
 **Held-out worlds.** The synthetic +1 MW is the only injection that the loss sees. Each network is
 also trained in one world injected into every row's target at the six Primaries, as in experiment
