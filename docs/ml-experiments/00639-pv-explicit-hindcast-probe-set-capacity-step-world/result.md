@@ -131,6 +131,38 @@ pending.
 - **Stop:** if C1 fails, the write-up reports that and no version with ensemble weather forecasts
   is planned.
 
+### Changes after the plan review
+
+- **Table lookahead.** Experiment 474's R4 table was fitted on the whole history. Each explicit
+  network uses only season-years that ended before its cutoff (2024 and earlier at 2025-07, 2025 and
+  earlier at 2026-03 and 2026-06) and holds the last value for later dates. The table's own fit
+  still saw later months, so the write-up states this as a caveat.
+- **What C1 tests.** The free network has trained on two to three years of post-step rows, and `k`
+  and `D` come from probing that same network. C1 therefore tests whether an explicit term built
+  from the probed level forecasts at least as well as the network's own implicit level. It does not
+  test tracking of a capacity that appeared shortly before the cutoff, and the write-up says so. A
+  late-step world is not part of this plan.
+- **Calibrated or raw.** Dividing by the factor may overstate the PV energy, because the real farm
+  carries 0.72 to 0.84 of the unit curve's energy. All of `raw`, `cal`, and `oracle` are reported on
+  sunny middays, with each arm's implied PV energy against the injected energy. If `raw` beats
+  `cal`, the write-up names `raw` as the better explicit arm, and C1 and C3 are repeated for it.
+- **Minimum detectable effect.** The null contrast and its split are computed and printed before
+  any explicit network is fitted, at the same confidence level as the contrasts. If it exceeds 0.10
+  points, C1 is reported as unable to resolve the predicted gain.
+- **Training detail.** Explicit networks standardise the gross target with the net target's mean
+  and standard deviation. The offset `delta` enters the gross target and trains by gradient.
+  Validation for early stopping uses the mean capacity (no draw) with the current `delta`. The loop
+  is experiment 634's `train` with that change only. Seeds 3 and 4 of the free networks use
+  experiment 634's `train` unchanged.
+- **Test rows.** A new builder takes experiment 448's pretraining rows with the valid-time filter
+  moved to the test window. It keeps one row per Primary and valid time (the first origin), excludes
+  no purged week (the rows postdate training), and applies experiment 634's farm-gap mask. The free
+  and explicit arms score the same rows.
+- **Definitions.** A sunny half-hour has `x[:, 0]` (the shortwave column) divided by the Haurwitz
+  clear-sky value at least 0.7. Pooling weights every test row equally, in points of that Primary's
+  effective capacity. C2 covers March to August only, so it says nothing about winter. The `perm`
+  placebo shifts the table and the step increment together, and the `shuf` placebo is a sanity check.
+
 ### Review order
 
 A fresh Sonnet agent reviews the code before the first fit. A fresh Sonnet agent reviews the
