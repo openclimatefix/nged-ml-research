@@ -73,7 +73,7 @@ def main() -> None:
             band = (
                 alt.Chart(sub.to_pandas())
                 .mark_area(opacity=0.25)
-                .encode(
+                .encode(  # ty: ignore[unresolved-attribute]
                     x=alt.X("time:T", title="Valid time (UTC)"),
                     y=alt.Y("lo:Q", title="Power (points of capacity)"),
                     y2="hi:Q",
@@ -83,12 +83,12 @@ def main() -> None:
             line = (
                 alt.Chart(sub.to_pandas())
                 .mark_line()
-                .encode(x="time:T", y="median:Q", color=colour)
+                .encode(x="time:T", y="median:Q", color=colour)  # ty: ignore[unresolved-attribute]
             )
             obs = (
                 alt.Chart(act.drop_nulls().to_pandas())
                 .mark_line(color="black", strokeWidth=1)
-                .encode(x="time:T", y="actual:Q")
+                .encode(x="time:T", y="actual:Q")  # ty: ignore[unresolved-attribute]
             )
             panels.append(
                 alt.layer(band, line, obs).properties(

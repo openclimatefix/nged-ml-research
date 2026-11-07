@@ -34,8 +34,8 @@ def factor_arrays(*, factors: pl.DataFrame, month: str) -> dict[str, np.ndarray]
     out = {p: np.ones((25, c.N_STEPS)) for p in ("b", "d_up", "d_down", "c")}
     sub = factors.filter(pl.col("test_month") == month)
     for row in sub.iter_rows(named=True):
-        nodes = c.FAMILIES.index(row["family"]) == c.KIND
-        steps = band == names.index(row["band"])
+        nodes = np.asarray(c.FAMILIES.index(row["family"]) == c.KIND)
+        steps = np.asarray(band == names.index(row["band"]))
         out[row["param"]][np.ix_(nodes, steps)] = row["value"]
     return out
 

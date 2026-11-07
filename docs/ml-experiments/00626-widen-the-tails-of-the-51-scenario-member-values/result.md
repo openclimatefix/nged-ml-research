@@ -71,7 +71,8 @@ best_arm: >-
   to 6.1% in the four lead bands, missing the bar by 0.1 point at 0 to 12 hours.
 headline: >-
   Widening the 51 values did not fix the tails, because the demand forecast looks biased low rather
-  than too narrow: at 12 to 36 hours the share of Primary actuals above q90 was 14.2% against 10%, and
+  than too narrow: at 12 to 36 hours the share of Primary actuals above q90 was 14.2% against 10%,
+  and
   below q10 was 6.4% against 10%. A factor fitted on earlier months moved demand's upper tail the
   wrong way (arm B raised its q95 exceedance from 4.7% to 7.1% at 12 to 36 hours), and separate
   factors (arm D) brought the lower tail to 4.1% but left q90 at 15.6%. CRPS moved by -0.4% to +0.4%

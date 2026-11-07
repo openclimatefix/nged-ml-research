@@ -24,7 +24,7 @@ def rows(*, runs: list[dict]) -> dict[tuple[int, int], dict[str, np.ndarray]]:
         v, a = run["values"], run["actual"]
         ok = ~np.isnan(a) & (v[..., -1] > v[..., 0])
         for fam in range(3):
-            node = fam == c.KIND
+            node = np.asarray(fam == c.KIND)
             for b in range(len(c.BANDS)):
                 sel = ok & node[:, None] & (band == b)[None, :]
                 if sel.any():

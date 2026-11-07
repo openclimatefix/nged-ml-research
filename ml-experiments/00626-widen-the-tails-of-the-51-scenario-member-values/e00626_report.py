@@ -222,7 +222,7 @@ def figure_rates(*, rates: pl.DataFrame) -> None:
     ).with_columns(rate=pl.col("rate") * 100, lo=pl.col("lo") * 100, hi=pl.col("hi") * 100)
     order = list(c.BANDS)
     base = alt.Chart(long.to_pandas())
-    points = base.mark_point(filled=True, size=45).encode(
+    points = base.mark_point(filled=True, size=45).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "band:N",
             sort=order,
@@ -241,7 +241,7 @@ def figure_rates(*, rates: pl.DataFrame) -> None:
             ),
         ),
     )
-    bars = base.mark_rule().encode(
+    bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("band:N", sort=order),
         xOffset="arm_name:N",
         y="lo:Q",
