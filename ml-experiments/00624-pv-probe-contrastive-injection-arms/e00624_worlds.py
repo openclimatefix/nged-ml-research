@@ -4,8 +4,8 @@
 Test 2 injects the physics unit curve of the Primary's own CAMS shortwave, clipped as an inverter does
 at DC-to-AC ratios 1.0, 1.2, and 1.4: the shape is `min(ratio * u, 1)`, divided by its 99th percentile
 over daylight rows (sun under 75 degrees of zenith) so that the injected series reaches the injected
-megawatts at its 99th percentile, as the farm series do. Test 3 injects the unit curve driven by the CAMS
-shortwave of the nth nearest other Primary (n = 1 and 2) instead of the Primary's own; the CAMS
+megawatts at its 99th percentile, as the farm series do. Test 3 injects the unit curve driven by the
+CAMS shortwave of the nth nearest other Primary (n = 1 and 2) instead of the Primary's own. The CAMS
 downloads are point series per site, so a one-pixel or two-pixel displacement is not available
 locally, and the distance between Primaries stands in for it.
 
@@ -24,7 +24,7 @@ import time
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00554_model as m  # ty: ignore[unresolved-import]
-import e00623_common as k
+import e00623_common as k  # ty: ignore[unresolved-import]
 import e00623_fit as f623  # ty: ignore[unresolved-import]
 import e00623_probe as p623  # ty: ignore[unresolved-import]
 import e00624_common as k4

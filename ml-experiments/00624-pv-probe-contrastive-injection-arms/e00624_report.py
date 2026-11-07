@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 624: bars for arm (a) against the plain network, the twin responses of arms (a), (b), (c), and figures.
+"""Experiment 624: bars for arm (a) against the plain network, twin responses, and figures.
 
 Reads probe results (`probes_<family>/<cutoff>/<condition>.parquet`), experiment 621's plain probes,
 and `skill_<cutoff>.json`; writes `work/summary.json`, `work/recoveries.csv`, and the figures.
@@ -73,7 +73,7 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
         "median_by_site": dict(zip(t["site"], t["v"].round(3), strict=True)),
         "inside_band": inside,
         "pass": inside >= NEED,
-        "median_of_medians": round(float(t["v"].median()), 3),
+        "median_of_medians": round(float(t["v"].median()), 3),  # ty: ignore[invalid-argument-type]
     }
     t = (
         rec.filter((pl.col("world") == "phys") & (pl.col("model") == "plain"))
@@ -83,7 +83,7 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
     )
     res["phys_4mw"] = {
         "median_by_site": dict(zip(t["site"], t["v"].round(3), strict=True)),
-        "median_of_medians": round(float(t["v"].median()), 3),
+        "median_of_medians": round(float(t["v"].median()), 3),  # ty: ignore[invalid-argument-type]
     }
     for world in ("profile", "shuffled"):
         t = (
@@ -97,7 +97,7 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
             "p95_by_site": dict(zip(t["site"], t["v"].round(3), strict=True)),
             "below_limit": below,
             "pass": below >= NEED,
-            "max_p95": round(float(t["v"].max()), 3),
+            "max_p95": round(float(t["v"].max()), 3),  # ty: ignore[invalid-argument-type]
         }
     for model in ("plain", "cloud_tpl"):
         t = (
@@ -115,12 +115,12 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
     pooled = rec.filter(pl.col("world").is_in(["farm", "phys"]) & (pl.col("model") == "plain"))
     res["coverage_injections"] = {
         "n": pooled.height,
-        "covered_with_seed_spread": round(float(pooled["covered_wide"].mean()), 3),
-        "pass": bool(float(pooled["covered_wide"].mean()) >= COVER),
+        "covered_with_seed_spread": round(float(pooled["covered_wide"].mean()), 3),  # ty: ignore[invalid-argument-type]
+        "pass": bool(float(pooled["covered_wide"].mean()) >= COVER),  # ty: ignore[invalid-argument-type]
     }
     for world in ("farm", "phys"):
         sel = pooled.filter(pl.col("world") == world)
-        res[f"coverage_{world}"] = round(float(sel["covered_wide"].mean()), 3)
+        res[f"coverage_{world}"] = round(float(sel["covered_wide"].mean()), 3)  # ty: ignore[invalid-argument-type]
     return res
 
 
@@ -143,9 +143,10 @@ def calibration(rec: pl.DataFrame, arm: str, *, model: str = "plain") -> dict:
         )
     )
     per_farm = d.group_by("farm").agg(med=pl.col("recovery").median()).sort("farm")
-    spread = float(per_farm["med"].std())
+    spread = float(per_farm["med"].std())  # ty: ignore[invalid-argument-type]
     factor = {
-        f: float(d.filter(pl.col("farm") != f)["recovery"].median()) for f in per_farm["farm"]
+        f: float(d.filter(pl.col("farm") != f)["recovery"].median())  # ty: ignore[invalid-argument-type]
+        for f in per_farm["farm"]  # ty: ignore[invalid-argument-type]
     }
     d = d.with_columns(factor=pl.col("farm").replace_strict(factor), mw_f=pl.col("mw"))
     bs = (pl.col("boot_sd") ** 2 + pl.col("seed_sd") ** 2).sqrt()
@@ -171,11 +172,36 @@ def calibration(rec: pl.DataFrame, arm: str, *, model: str = "plain") -> dict:
         "factor_range": [round(min(f), 3), round(max(f), 3)],
         "factors_in_0.55_to_0.85": int(sum(0.55 <= v <= 0.85 for v in f)),
         "n_farms": len(f),
-        "calibrated_recovery_median": round(float((d["cal_est"] / d["mw"]).median()), 3),
-        "coverage_raw_widened_by_farm_spread": round(float(raw_cov), 3),
-        "coverage_calibrated_widened": round(float(cal_cov), 3),
+        "calibrated_recovery_median": round(float((d["cal_est"] / d["mw"]).median()), 3),  # ty: ignore[invalid-argument-type]
+        "coverage_raw_widened_by_farm_spread": round(float(raw_cov), 3),  # ty: ignore[invalid-argument-type]
+        "coverage_calibrated_widened": round(float(cal_cov), 3),  # ty: ignore[invalid-argument-type]
         "n": d.height,
     }
+
+
+def worlds_summary() -> pl.DataFrame:
+    """Return the recovery of every clipped and displaced world network against experiment 621's control."""
+    frames = [
+        pl.read_parquet(f).select(
+            "cutoff", "condition", "seed", "site", "model", "capacity_mw", "boot"
+        )
+        for f in sorted((k.WORK / "probes_worlds").glob("*/*.parquet"))
+    ]
+    ctl = [
+        pl.read_parquet(f)
+        .filter(pl.col("condition") == "control")
+        .select("cutoff", "condition", "seed", "site", "model", "capacity_mw", "boot")
+        for f in sorted((k.k.PLAIN_WORK / "probes").glob("*/*.parquet"))
+    ]
+    df = pl.concat(frames + ctl).with_columns(
+        arm=pl.lit("plain"),
+        world=pl.when(pl.col("condition") == "control")
+        .then(pl.lit("control"))
+        .otherwise(pl.lit("w")),
+        mw=pl.lit(4.0),
+        rotation=pl.lit(0),
+    )
+    return r623.recoveries(df)
 
 
 def twin_response() -> pl.DataFrame:
@@ -258,12 +284,12 @@ def figures(rec: pl.DataFrame, twin: pl.DataFrame) -> None:
         band = (
             alt.Chart(pl.DataFrame({"a": [BAND[0]], "b": [BAND[1]]}))
             .mark_rect(opacity=0.12, color="grey")
-            .encode(x="a:Q", x2="b:Q")
+            .encode(x="a:Q", x2="b:Q")  # ty: ignore[unresolved-attribute]
         )
-        rule = base.mark_rule().encode(
+        rule = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lo:Q", scale=alt.Scale(domain=[-0.4, 1.6]), title=None), x2="hi:Q"
         )
-        dot = base.mark_point(filled=True, size=50).encode(x="med:Q")
+        dot = base.mark_point(filled=True, size=50).encode(x="med:Q")  # ty: ignore[unresolved-attribute]
         panels.append(
             alt.layer(band, rule, dot).properties(
                 width=560, height=130, title=alt.TitleParams(label, anchor="start", fontSize=12)
@@ -291,8 +317,8 @@ def figures(rec: pl.DataFrame, twin: pl.DataFrame) -> None:
             .with_columns(
                 family_label=pl.col("family").replace_strict(
                     {
-                        "a": "(a) trained with the loss",
-                        "b": "(b) post-hoc check on the plain network",
+                        "a": "(a) loss",
+                        "b": "(b) post-hoc",
                         "c": "(c) both",
                     }
                 ),
@@ -309,12 +335,12 @@ def figures(rec: pl.DataFrame, twin: pl.DataFrame) -> None:
             yOffset=alt.YOffset("family_label:N"),
             color=alt.Color("family_label:N", legend=alt.Legend(orient="top", title=None)),
         )
-        ref = alt.Chart().mark_rule(color="grey", strokeDash=[4, 3]).encode(x=alt.datum(1.0))
+        ref = alt.Chart().mark_rule(color="grey", strokeDash=[4, 3]).encode(x=alt.datum(1.0))  # ty: ignore[unresolved-attribute]
         layer = alt.layer(
-            base.mark_rule().encode(
+            base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("lo:Q", title="Probed response to the synthetic +1 MW (MW)"), x2="hi:Q"
             ),
-            base.mark_point(filled=True, size=50).encode(x="med:Q"),
+            base.mark_point(filled=True, size=50).encode(x="med:Q"),  # ty: ignore[unresolved-attribute]
             ref,
             data=t,
         )
@@ -340,7 +366,7 @@ def figures(rec: pl.DataFrame, twin: pl.DataFrame) -> None:
     box = (
         alt.Chart()
         .mark_boxplot(extent="min-max", size=12)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "fake:Q",
                 title=f"Spurious capacity as a share of a 2 MW farm (dashed line is the {CLOUD} bar)",
@@ -355,7 +381,7 @@ def figures(rec: pl.DataFrame, twin: pl.DataFrame) -> None:
     )
     alt.layer(
         box,
-        alt.Chart().mark_rule(color="grey", strokeDash=[4, 3]).encode(x=alt.datum(CLOUD)),
+        alt.Chart().mark_rule(color="grey", strokeDash=[4, 3]).encode(x=alt.datum(CLOUD)),  # ty: ignore[unresolved-attribute]
         data=cl,
     ).facet(column=alt.Column("regression:N", title=None)).properties(
         title=alt.TitleParams(
@@ -364,6 +390,93 @@ def figures(rec: pl.DataFrame, twin: pl.DataFrame) -> None:
             fontSize=11,
         )
     ).save(str(DOCS / "cloud_load_faking.svg"))
+
+
+def worlds_figure(sel: pl.DataFrame, neighbours: dict) -> None:
+    """Plot the recovery of the clipped worlds and of the displaced-sky worlds against distance."""
+    order = list(k.k.SIX)
+    clip = sel.filter(pl.col("condition").str.starts_with("physclip")).with_columns(
+        world=pl.col("condition")
+        .str.extract(r"dc([\d.]+)")
+        .map_elements(lambda r: f"DC-to-AC ratio {r}", return_dtype=pl.String)
+    )
+    rule = alt.Chart().mark_rule(color="grey", strokeDash=[4, 3]).encode(x=alt.datum(1.0))  # ty: ignore[unresolved-attribute]
+    base = alt.Chart().encode(
+        y=alt.Y("site:N", sort=order, title=None),
+        yOffset=alt.YOffset("world:N"),
+        color=alt.Color("world:N", legend=alt.Legend(orient="top", title=None)),
+    )
+    alt.layer(
+        base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "lo:Q", title="Recovery of the injected 4 MW", scale=alt.Scale(domain=[0.2, 1.3])
+            ),
+            x2="hi:Q",
+        ),
+        base.mark_point(filled=True, size=50).encode(x="med:Q"),  # ty: ignore[unresolved-attribute]
+        rule,
+        data=clip,
+    ).properties(
+        width=520,
+        height=220,
+        title=alt.TitleParams(
+            [
+                "Clipped physics-curve world: recovery by DC-to-AC ratio",
+                "Dot: median over 2 cutoffs and 3 seeds. Line: range. Dashed line: exact.",
+            ],
+            anchor="start",
+            fontSize=11,
+        ),
+    ).save(str(DOCS / "clipped_world.svg"))
+    rows = []
+    for r in sel.iter_rows(named=True):
+        if r["condition"].startswith("physdisp"):
+            n = r["condition"].split("_")[1]
+            rows.append(
+                {
+                    "site": r["site"],
+                    "n": f"{n[1:]}st nearest Primary's sky"
+                    if n == "n1"
+                    else f"{n[1:]}nd nearest Primary's sky",
+                    "distance_km": neighbours[r["site"]][n]["distance_km"],
+                    "recovery": r["med"],
+                }
+            )
+    pl_rows = pl.DataFrame(rows)
+    pts = (
+        alt.Chart(pl_rows)
+        .mark_point(filled=True, size=70)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "distance_km:Q",
+                title="Distance from the Primary to the Primary whose sky drives the injection (km)",
+            ),
+            y=alt.Y(
+                "recovery:Q",
+                title="Recovery of the injected 4 MW",
+                scale=alt.Scale(domain=[0.2, 1.3]),
+            ),
+            color=alt.Color("n:N", legend=alt.Legend(orient="top", title=None)),
+            tooltip=["site"],
+        )
+    )
+    lab = (
+        alt.Chart(pl_rows)
+        .mark_text(dx=10, fontSize=10)
+        .encode(x="distance_km:Q", y="recovery:Q", text="site:N")  # ty: ignore[unresolved-attribute]
+    )
+    alt.layer(pts, lab).properties(
+        width=520,
+        height=260,
+        title=alt.TitleParams(
+            [
+                "Displaced-sky world: recovery against the displacement",
+                "Dot: median over 2 cutoffs and 3 seeds at one Primary; label names the Primary.",
+            ],
+            anchor="start",
+            fontSize=11,
+        ),
+    ).save(str(DOCS / "displaced_sky_world.svg"))
 
 
 def main() -> None:
@@ -379,6 +492,29 @@ def main() -> None:
     summary["context_623_calibration"] = {
         arm: calibration(ctx, arm) for arm in ("plain", "monotone")
     }
+    wr = worlds_summary()
+    sel = (
+        wr.filter(pl.col("model") == "plain")
+        .group_by("condition", "site")
+        .agg(
+            med=pl.col("recovery").median(),
+            lo=pl.col("recovery").min(),
+            hi=pl.col("recovery").max(),
+        )
+    )
+    summary["worlds_recovery_median_by_site"] = {
+        c: dict(zip(g["site"], g["med"].round(3), strict=True))
+        for (c,), g in sel.sort("condition", "site").group_by("condition", maintain_order=True)
+    }
+    summary["worlds_recovery_median_over_sites"] = {
+        c: round(float(g["med"].median()), 3)  # ty: ignore[invalid-argument-type]
+        for (c,), g in sel.group_by("condition")  # ty: ignore[invalid-argument-type]
+    }
+    summary["worlds_neighbour_distance_km"] = json.loads(
+        (k.WORK / "worlds_neighbours_2026-06.json").read_text()
+    )
+    summary["audit"] = {c: json.loads((k.WORK / f"audit_{c}.json").read_text()) for c in k.CUTOFFS}
+    worlds_figure(sel, summary["worlds_neighbour_distance_km"])
     twin = twin_response()
     if twin.height:
         t = (

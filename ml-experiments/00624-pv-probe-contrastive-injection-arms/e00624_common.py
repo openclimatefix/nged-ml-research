@@ -17,7 +17,7 @@ import e00428_data as data  # ty: ignore[unresolved-import]
 import e00448_run as r448  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00554_model as m  # ty: ignore[unresolved-import]
-import e00623_common as k
+import e00623_common as k  # ty: ignore[unresolved-import]
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR

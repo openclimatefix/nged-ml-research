@@ -1,5 +1,4 @@
-# ruff: noqa: E501
-"""Experiment 624: validation-row CRPS of the uninjected arm (a) networks against experiment 621's plain ones.
+"""Experiment 624: validation-row CRPS of the arm (a) control networks against the plain ones.
 
 Scores the real rows only (never the twin rows) of the pretraining validation set, as in experiment
 623's `e00623_skill.py`, through the real Primary's embedding vector.

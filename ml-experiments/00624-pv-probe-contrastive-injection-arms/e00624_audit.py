@@ -17,7 +17,7 @@ import json
 
 import e00405_prep as p5  # ty: ignore[unresolved-import]
 import e00409_prep as p9  # ty: ignore[unresolved-import]
-import e00623_common as k
+import e00623_common as k  # ty: ignore[unresolved-import]
 import e00623_probe as p623  # ty: ignore[unresolved-import]
 import numpy as np
 
