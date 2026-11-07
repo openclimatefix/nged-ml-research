@@ -54,9 +54,11 @@ def _decorate(
     table = k.r4_table()
     sy = k.season_year(t_us=t_us, cutoff=cutoff)
     r4 = np.zeros(len(primary))
+    years = np.arange(k.SEASON_YEARS[0], k.SEASON_YEARS[1] + 1)
     for site, idx in inj.six.items():
+        by_year = np.array([table[(site, int(y_))] for y_ in years])
         sel = primary == idx
-        r4[sel] = [table[(site, int(s))] for s in sy[sel]]
+        r4[sel] = by_year[sy[sel] - years[0]]
     start = k638.parse(name="step_spring23_mw4").start_us
     after = ((t_us >= start) & (world == "step")).astype(np.float64)
     cz = x[:, 14].astype(np.float64)

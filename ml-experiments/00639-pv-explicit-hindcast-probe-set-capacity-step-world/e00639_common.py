@@ -182,7 +182,15 @@ def capacity_parameters(*, cutoff: str, arm: str) -> dict[str, SiteCapacity]:
         out[site] = SiteCapacity(k=k, d=d, rel_sd_k=min(rel_k, 1.0), rel_sd_d=min(rel_d, 1.0))
     if arm == "perm":
         sites = list(k634.SIX)
-        out = {s: out[sites[(i + PERM_SHIFT) % len(sites)]] for i, s in enumerate(sites)}
+        ref = last_complete_season_year(cutoff=cutoff)
+        shifted = {}
+        for i, s in enumerate(sites):
+            other = sites[(i + PERM_SHIFT) % len(sites)]
+            o = out[other]
+            # Rescale k so that Primary s gets the other Primary's megawatt timeline from its own table.
+            k_own = float(np.clip(o.k * table[(other, ref)] / table[(s, ref)], 0.0, None))
+            shifted[s] = SiteCapacity(k=k_own, d=o.d, rel_sd_k=o.rel_sd_k, rel_sd_d=o.rel_sd_d)
+        out = shifted
     return out
 
 

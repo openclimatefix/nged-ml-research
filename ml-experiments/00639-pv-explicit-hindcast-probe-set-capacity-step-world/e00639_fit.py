@@ -77,14 +77,18 @@ def run_free(*, cutoff: str) -> None:
         _save_rows(cutoff=cutoff, world=world, test=test)
         mean, std = _stats(rows=rows)
         g = _gpu(train)
-        z = ((g["y"] - mean[g["p"]]) / std[g["p"]]).float()
+        z = torch.from_numpy(
+            ((train.y - rows.target_mean[train.primary]) / rows.target_std[train.primary]).astype(
+                np.float32
+            )
+        ).to(DEVICE)
         w = torch.ones(len(z), device=DEVICE)
         for seed in k.SEEDS:
             path = k.free_weights_path(cutoff=cutoff, world=world, seed=seed)
+            torch.manual_seed(seed)
             model = m.ModularMdn(n_primaries=16, stage="pre").to(DEVICE)
             if not path.exists():
                 started = time.monotonic()
-                torch.manual_seed(seed)
                 epochs, best = f634.train(
                     model=model, x=g["x"], z=z, w=w, p=g["p"], is_val=g["is_val"], seed=seed, lr=PRETRAIN_LR, device=DEVICE,
                 )  # fmt: skip
@@ -138,8 +142,8 @@ def run_explicit(*, cutoff: str, arms: list[str], worlds: list[str], seeds: list
                 if target.exists():
                     continue
                 started = time.monotonic()
-                model = m.ModularMdn(n_primaries=16, stage="pre").to(DEVICE)
                 torch.manual_seed(seed)
+                model = m.ModularMdn(n_primaries=16, stage="pre").to(DEVICE)
                 epochs, best, delta = net.train_explicit(
                     model=model, x=g["x"], y=g["y"], u_inc=u_train, r4=g["r4"], after=g["after"], p=g["p"],
                     is_val=g["is_val"], mean=mean, std=std, tensors=tensors, seed=seed, lr=PRETRAIN_LR, device=DEVICE,
