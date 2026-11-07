@@ -21,7 +21,8 @@ LEVEL = 1.0 - a639.ALPHA / k.N_CONTRASTS
 def _arm_scores(*, world: str, arm: str, seeds: tuple[int, ...]) -> np.ndarray:
     """Return CRPS (points) per seed and six-Primary test row, stacked over cutoffs: shape (seeds, rows).
 
-    Arm `fhind` shifts each free network's sunny-midday forecast by its mean median error on the test window (a hindsight bound).
+    Arm `fhind` shifts each free network's sunny-midday forecast by its mean median error on the
+    test window (a hindsight bound).
     """
     out = []
     for seed in seeds:
@@ -29,7 +30,7 @@ def _arm_scores(*, world: str, arm: str, seeds: tuple[int, ...]) -> np.ndarray:
         for cutoff in k639.CUTOFFS:
             z = np.load(k639.test_rows_path(cutoff=cutoff, world=world))
             six = z["inc"] > 0
-            arm_read = "free" if arm == "fhind" else arm
+            arm_read = "free" if arm in {"fhind", "ftrail"} else arm
             q = np.load(k.prediction_path(cutoff=cutoff, world=world, arm=arm_read, seed=seed))[
                 "q"
             ][six].astype(np.float64)
@@ -42,9 +43,40 @@ def _arm_scores(*, world: str, arm: str, seeds: tuple[int, ...]) -> np.ndarray:
                     m = sun & (prim == p)
                     shifted[m] -= (q[m, 5] - y[m]).mean()
                 q = shifted
+            if arm == "ftrail":
+                q = _trailing_shift(
+                    q=q,
+                    y=y,
+                    sun=_sunny_mask(z=z)[six],
+                    prim=z["primary"][six],
+                    day=z["t_us"][six] // k639.k634.DAY_US,
+                )
             parts.append(100.0 * a639.crps(actual=y, q=q))
         out.append(np.concatenate(parts))
     return np.stack(out)
+
+
+TRAIL_DAYS = 14
+
+
+def _trailing_shift(
+    *, q: np.ndarray, y: np.ndarray, sun: np.ndarray, prim: np.ndarray, day: np.ndarray
+) -> np.ndarray:
+    """Post hoc control `ftrail`: shift each sunny-midday forecast by a trailing error.
+
+    The shift is the mean median error of the same Primary's sunny middays in the previous
+    `TRAIL_DAYS` days (none for the first day).
+
+    Uses only targets that are complete before the forecast day, as a production bias tracker could.
+    """
+    out = q.copy()
+    for p in np.unique(prim):
+        m = prim == p
+        for d in np.unique(day[m & sun]):
+            past = m & sun & (day < d) & (day >= d - TRAIL_DAYS)
+            if past.any():
+                out[m & sun & (day == d)] -= (q[past, 5] - y[past]).mean()
+    return out
 
 
 def _sunny_mask(*, z) -> np.ndarray:
@@ -86,7 +118,7 @@ def main() -> None:
         rows = a639.load(world=world)
         cal = _arm_scores(world=world, arm="cal", seeds=seeds)
         absolute = {"cal": float(cal.mean(axis=0)[rows["sunny"]].mean())}
-        controls = [] if args.perm_only else ["free", "fbias", "foff", "fhind"]
+        controls = [] if args.perm_only else ["free", "fbias", "foff", "fhind", "ftrail"]
         for arm in controls:
             scores = _arm_scores(world=world, arm=arm, seeds=seeds)
             absolute[arm] = float(scores.mean(axis=0)[rows["sunny"]].mean())

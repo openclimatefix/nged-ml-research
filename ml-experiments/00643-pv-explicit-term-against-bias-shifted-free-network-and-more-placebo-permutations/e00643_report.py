@@ -21,8 +21,15 @@ W = 560
 NAMES = {
     "free": "Free network (plain)", "fbias": "Free, shifted by training-month constant",
     "foff": "Free, trainable offset", "fhind": "Free, shifted in hindsight (bound)",
+    "ftrail": "Free, shifted by trailing 14-day error (post hoc)",
 }  # fmt: skip
-COLOURS = {"free": "#FF4901", "fbias": "#306BFF", "foff": "#10C5F7", "fhind": "#B701FF"}
+COLOURS = {
+    "free": "#FF4901",
+    "fbias": "#306BFF",
+    "foff": "#10C5F7",
+    "fhind": "#B701FF",
+    "ftrail": "#17E58F",
+}
 
 
 def save(chart: alt.TopLevelMixin, name: str) -> None:
