@@ -159,6 +159,22 @@ Intervals are 95% over week-long blocks.
   (midday error at least twice the night error at D12) held: 2.04. P3 (a gain of at least 5% with
   the interval excluding zero) failed. P4 (no harm of more than 1% to the other 14) failed: +4.7%.
 
+## Checks
+
+- **Median minus mean forecast per site.** Not computed, because the export holds 11 quantiles and
+  no mean forecast.
+- **Error of the median beside the CRPS contrast.** The mean absolute error of the median moves in
+  the same direction as the CRPS: -12.9% at D15, +4.5% at D12, and +3.5% at the other 14 Primaries.
+- **Audit triggers.** None fired. No control or placebo was run (trigger 1). The failed predictions P3
+  and P4 contradict no earlier finding of a stored-forecast level term (trigger 2; experiments 149 and
+  500 found recent-level gains only post hoc). The CRPS and median-error contrasts agree (trigger 3).
+  There are no nested arms and no sister-experiment interval to compare (triggers 4 to 6), and no
+  later experiment depends on the headline (trigger 7).
+- **Reviews.** One Sonnet plan review, one Sonnet code review (it found a causal unit test that tested
+  nothing, which was rewritten and passes, and the pooled-row interval, now saved to a table), and one
+  Sonnet prose review. All accepted findings were applied; the review of the persist-the-last-error
+  and best-of-network comparisons is listed under "Not done".
+
 ## Not done
 
 - Weather regime, step sizes, the neighbour comparison, and midday error against sunshine were not
