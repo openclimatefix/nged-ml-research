@@ -106,7 +106,6 @@ advice:
     gain, because this experiment used recorded weather (limits).
 production_status: not-for-production
 adopted_in: none
-
 ---
 
 # An explicit solar term with a probed capacity beats free irradiance, mostly through its level
@@ -291,9 +290,9 @@ refit month), and test a step that starts within 60 days of the cutoff.
 ### Changes after the plan review
 
 - **Table lookahead.** Experiment 474's R4 table was fitted on the whole history. Each explicit
-  network uses only season-years that ended before its cutoff (2024 and earlier at all three cutoffs, because a
-  season-year ends in June) and holds the last value for later dates. The table's own fit
-  still saw later months, so the write-up states this as a caveat.
+  network uses only season-years that ended before its cutoff (2024 and earlier at all three
+  cutoffs, because a season-year ends in June) and holds the last value for later dates. The
+  table's own fit still saw later months, so the write-up states this as a caveat.
 - **What C1 tests.** The free network has trained on two to three years of post-step rows, and `k`
   and `D` come from probing that same network. C1 therefore tests whether an explicit term built
   from the probed level forecasts at least as well as the network's own implicit level. It does not

@@ -69,7 +69,10 @@ def _decorate(
 
 
 def _shuffle_donors(*, primary: np.ndarray, t_us: np.ndarray) -> np.ndarray:
-    """Return, per row, the index of a row of another date: same Primary, same half-hour, same 21-day block of the year."""
+    """Return, per row, the index of a row of another date.
+
+    The donor has the same Primary, the same half-hour, and the same 21-day block of the year.
+    """
     stamp = pl.Series(t_us).cast(pl.Datetime("us"))
     doy = stamp.dt.ordinal_day().to_numpy().astype(np.int64)
     half_hour = (stamp.dt.hour().to_numpy() * 2 + stamp.dt.minute().to_numpy() // 30).astype(
@@ -87,7 +90,7 @@ def _shuffle_donors(*, primary: np.ndarray, t_us: np.ndarray) -> np.ndarray:
 
 
 def build_train(*, cutoff: str, world: str) -> tuple[Block, data.Rows, np.ndarray]:
-    """Return the training rows of a cutoff and world (farm-gap rows dropped), the fold's rows, and the clean stack."""
+    """Return the training rows (farm-gap rows dropped), the fold's rows, and the clean stack."""
     clean = c.clean_stack()
     refit = c.month_start(month=cutoff)
     rows = data.build_fold(refit=refit, clean=clean)

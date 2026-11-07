@@ -1,9 +1,10 @@
 # ruff: noqa: E501, ANN001
-"""Experiment 639: train the free networks (seeds 3 and 4), train the explicit networks, and forecast the test windows.
+"""Experiment 639: train the free and explicit networks and forecast the test windows.
 
 Phases, run in this order for each cutoff:
 
-1. `free`: train missing free networks of both worlds (experiment 634's `train`, unchanged), forecast the
+1. `free`: train missing free networks of both worlds (experiment 634's `train`, unchanged),
+   forecast the
    test window with all five seeds, and write each world's test rows.
 2. (run `e00639_probe.py` on the CPU.)
 3. `explicit`: train the explicit arms and forecast the test window.

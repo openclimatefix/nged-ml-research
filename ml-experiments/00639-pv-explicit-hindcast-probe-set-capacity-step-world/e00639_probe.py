@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment 639: probe the free networks of both worlds (five seeds) with experiment 634's donor-day probe (CPU).
+"""Experiment 639: probe the free networks of both worlds (five seeds) on the CPU.
+
+The probe is experiment 634's donor-day probe.
 
 Usage: python e00639_probe.py --cutoff 2026-06
 """

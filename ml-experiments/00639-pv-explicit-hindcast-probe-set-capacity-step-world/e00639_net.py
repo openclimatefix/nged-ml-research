@@ -5,7 +5,8 @@
 validation sample) with one change: the target is the gross target
 `z = (y + C * inc * u - mean) / std`, where `C` is the capacity timeline in megawatts. During training
 `C` carries a draw per epoch and a trainable offset per Primary. Validation uses the mean timeline and
-the current offset. `forecast` returns net quantiles in points of capacity, with the same `C * inc * u`
+the current offset. `forecast` returns net quantiles in points of capacity, with the same
+`C * inc * u`
 subtracted from every quantile.
 """
 

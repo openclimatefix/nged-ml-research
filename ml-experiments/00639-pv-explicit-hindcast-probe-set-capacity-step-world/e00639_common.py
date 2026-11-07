@@ -93,7 +93,10 @@ def last_complete_season_year(*, cutoff: str) -> int:
 
 
 def season_year(*, t_us: np.ndarray, cutoff: str) -> np.ndarray:
-    """Return each time's season-year (July to June, named by July's year), held at the last complete one before the cutoff."""
+    """Return each time's season-year (July to June, named by July's year).
+
+    Years after the last complete season-year before the cutoff are held at that year.
+    """
     stamp = np.asarray(t_us, dtype="datetime64[us]")
     year = stamp.astype("datetime64[Y]").astype(int) + 1970
     month = stamp.astype("datetime64[M]").astype(int) % 12 + 1
@@ -128,7 +131,7 @@ def _read_probes(*, cutoff: str, world: str) -> pl.DataFrame:
 
 
 def _factor(*, cutoff: str) -> tuple[float, float]:
-    """Return the mean leave-one-farm-out recovery factor and its mean standard deviation at a cutoff (experiment 638)."""
+    """Return the mean leave-one-farm-out recovery factor and its spread at a cutoff (experiment 638)."""
     reads = pl.read_csv(P638 / "step_reads_shift0.csv").filter(pl.col("cutoff") == cutoff)
     return float(reads["factor"].to_numpy().mean()), float(reads["factor_sd"].to_numpy().mean())
 

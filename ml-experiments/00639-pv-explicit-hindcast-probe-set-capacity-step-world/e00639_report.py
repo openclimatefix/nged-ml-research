@@ -163,7 +163,7 @@ def contrast_figure() -> None:
 
 
 def example_figure() -> None:
-    """One Primary, one week of sunny and cloudy days: actual with the free and calibrated medians and 5-95% bands."""
+    """One Primary, one week: actual demand with the free and calibrated medians and 5-95% bands."""
     cutoff, world, seed = "2026-03", "real", 0
     z = np.load(k.test_rows_path(cutoff=cutoff, world=world))
     six = z["inc"] > 0
