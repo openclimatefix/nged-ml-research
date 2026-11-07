@@ -122,3 +122,50 @@ other 14 Primaries. The compute ceiling is 4 GPU hours; stored-forecast fixes us
   not available at forecast time; it is used only to describe, never to fit a fix.
 - The July to October 2026 window is not used.
 - Generators are anonymised; D15 and D12 are named Primaries.
+
+## Amendment 1 (after the plan review and the diagnosis; before any fix is scored)
+
+**Review findings accepted.** These rules replace any looser wording above.
+
+- **Row set.** All rows with a cleaned `observed_power`, leads 24 to 240 hours (the export holds
+  leads from 0, but K1 reads power from 24 hours before the origin, so shorter leads are a different
+  problem), `observed_power` and not `nra_power`, all rows and not only `event_free` rows. An
+  `event_free` slice is reported beside it. The row set is `export_dev_months_lead_24_240_all_rows`.
+- **Causal rule for every fix.** A correction for a forecast issued at origin T may use only the
+  forecast errors on valid times at or before T minus 24 hours, using observed power from the export
+  at those times. Origins in the first days of a month have no stored errors, so they fall back to
+  K1 uncorrected and the count is reported. A unit test perturbs observed power after the cutoff and
+  checks the output is unchanged.
+- **Free comparisons first.** (a) The best of K1, the Candidate, and K3 per Primary. (b) An oracle
+  bound: each day's median bias removed perfectly. (c) "Persist the last known error at that lead".
+  If the oracle gain is under 3% at a Primary, no level fix is built for it.
+- **Decision rule.** Judged per Primary, not pooled. `supported`: the 95% interval of the CRPS
+  difference to K1 excludes zero with a gain of at least 5% at the target Primary; `small gain`: the
+  interval excludes zero with a gain under 5%; `not supported`: otherwise, including harm. The
+  interval resamples week-long blocks, and the page reports the number of independent episodes (about
+  five months at one Primary). The fix is fitted per Primary and applied to all 16 Primaries as the
+  harm check; the other 14 must not worsen by more than 1%, with a week-block bound on that change.
+- **Window choice.** One trailing window, 14 days, fixed here; no other window is tried.
+- **P1 and P2 are descriptive.** The first look already showed them. Only P3 and P4 are predictions.
+- **Selection.** The fixes were ranked from the same five months they are scored on, so a gain is
+  interim, and the page says so. The deviation from the brief: stored-forecast fixes replace refits
+  with K1's recipe unless the ranked list needs a refit.
+- **Anonymisation.** The nearest metered series are described by type only; no generator output is
+  drawn beside D15 or D12.
+
+## Diagnosis results (K1, development months, leads 24 to 240 hours)
+
+- **D15 has a persistent one-sided level error.** The mean absolute error is 24.8% of capacity and
+  the median forecast is 15.4 points too low. The worst 20% of days carry 49.5% of CRPS. The daily
+  bias autocorrelates at 0.81 (1 day), 0.39 (7 days), and 0.27 (14 days). March 2026 is the extreme
+  (bias +50.7, 55% of readings above q95). Error is flat across hours (ratio of midday to night 1.05).
+  Only 70% of the flagged level-shift days are event-free, so the shifts are partly unlabelled.
+- **D12's error is a midday peak.** Mean absolute error 18.9 at 10:00 to 14:00 against 9.3 at 00:00
+  to 04:00 (ratio 2.04). The bias changes sign through the day (+4 at 05:00, -5 at 17:00) and by month
+  (+8 in December). Level shifts are small: the worst 20% of days carry 32%, and the daily bias
+  autocorrelation falls to 0.19 at 7 days. Its apparent-power meter folds reverse flow
+  ([experiment 152](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result/)).
+- **Network comparison.** D15 CRPS is 14.53 (K1), 15.05 (Candidate), and 13.58 (K3, which reads no
+  power). The lag-free network is better at D15, so K1's power lags are part of the D15 error.
+- **Metered series nearby.** The nearest series to each Primary are photovoltaic (4 to 7 km); none
+  sits behind either Primary by this proximity alone.
