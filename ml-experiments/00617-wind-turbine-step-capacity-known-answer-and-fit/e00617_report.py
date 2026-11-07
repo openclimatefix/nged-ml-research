@@ -112,7 +112,9 @@ def main() -> None:
     DOCS.mkdir(parents=True, exist_ok=True)
     palette = alt.Scale(domain=FARMS, range=FARM_COLOURS)
     recall_data = rtab.filter(pl.col("m") >= 2).with_columns(
-        turbines=pl.col("m").cast(pl.Utf8) + " turbines out", bar=pl.lit(RECALL_BAR)
+        turbines=pl.col("m").cast(pl.Utf8) + " turbines out",
+        bar=pl.lit(RECALL_BAR),
+        label=pl.lit("80% bar"),
     )
     line = (
         alt.Chart()
@@ -123,22 +125,32 @@ def main() -> None:
             color=alt.Color("site:N", title="Wind farm", scale=palette),
         )
     )
-    bar = alt.Chart().mark_rule(strokeDash=[4, 3], color=ocf.GREY_1).encode(y="bar:Q")  # ty: ignore[unresolved-attribute]
-    alt.layer(line, bar, data=recall_data).properties(width=240, height=280).facet(
+    bar = alt.Chart().mark_rule(strokeDash=[4, 3], color=ocf.BLACK_1).encode(y="bar:Q")  # ty: ignore[unresolved-attribute]
+    bar_label = alt.Chart().mark_text(align="left", dy=-6, x=4).encode(y="bar:Q", text="label:N")  # ty: ignore[unresolved-attribute]
+    alt.layer(line, bar, bar_label, data=recall_data).properties(width=240, height=280).facet(
         column=alt.Column("turbines:N", title=None)
     ).save(DOCS / "figure_1_recall_by_duration.svg")
-    chart = (
-        alt.Chart(det.with_columns(turbines=pl.col("m").cast(pl.Utf8) + " turbines injected"))
+    step_data = det.filter(pl.col("m") >= 2).with_columns(
+        turbines=pl.col("m").cast(pl.Utf8) + " turbines injected", injected=pl.col("m")
+    )
+    boxes = (
+        alt.Chart()
         .mark_boxplot(extent="min-max")
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("duration:O", title="Outage length (days)"),
             y=alt.Y("step_in_turbines:Q", title="Recovered step (turbines)"),
             color=alt.Color("site:N", title="Wind farm", scale=palette),
-            column=alt.Column("turbines:N", title=None),
+            xOffset="site:N",
         )
-        .properties(width=240, height=280)
     )
-    chart.save(DOCS / "figure_3_recovered_vs_injected.svg")
+    truth_rule = (
+        alt.Chart()
+        .mark_rule(strokeDash=[4, 3], color=ocf.BLACK_1)  # ty: ignore[unresolved-attribute]
+        .encode(y="injected:Q")
+    )
+    alt.layer(boxes, truth_rule, data=step_data).properties(width=240, height=280).facet(
+        column=alt.Column("turbines:N", title=None)
+    ).save(DOCS / "figure_3_recovered_vs_injected.svg")
     false_chart = (
         alt.Chart(perm.with_columns(a=pl.col("step_up").cast(pl.Utf8)))
         .mark_bar()
@@ -155,7 +167,16 @@ def main() -> None:
         .mark_rule(strokeDash=[4, 3])  # ty: ignore[unresolved-attribute]
         .encode(y="y:Q")
     )
-    (false_chart + rules).save(DOCS / "figure_4_false_steps.svg")
+    rule_labels = (
+        alt.Chart(
+            pl.DataFrame(
+                {"y": [FALSE_BAR, STOP_FALSE], "t": ["pass bar (1 a year)", "stop rule (3 a year)"]}
+            )
+        )
+        .mark_text(align="left", dy=-6, x=4)  # ty: ignore[unresolved-attribute]
+        .encode(y="y:Q", text="t:N")
+    )
+    (false_chart + rules + rule_labels).save(DOCS / "figure_4_false_steps.svg")
 
 
 def example_figure(step_up: float) -> None:
@@ -184,12 +205,18 @@ def example_figure(step_up: float) -> None:
             "Recovered (posterior mean)": summary["mean"],
             "q05": summary["q05"],
             "q95": summary["q95"],
+            "band": "90% interval",
         }
     )
     band = (
         alt.Chart(frame)
-        .mark_area(opacity=0.3, color=ocf.DATA_BLUE_LIGHT)
+        .mark_area(opacity=0.3)
         .encode(  # ty: ignore[unresolved-attribute]
+            color=alt.Color(
+                "band:N",
+                title=None,
+                scale=alt.Scale(domain=["90% interval"], range=[ocf.DATA_BLUE_LIGHT]),
+            ),
             x=alt.X("years:Q", title="Years since the first reading"),
             y=alt.Y("q05:Q", title="Capacity deficit (MW)"),
             y2="q95:Q",
@@ -206,15 +233,20 @@ def example_figure(step_up: float) -> None:
                 title=None,
                 scale=alt.Scale(
                     domain=["Injected deficit", "Recovered (posterior mean)"],
-                    range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE],
+                    range=[ocf.BLACK_1, ocf.DATA_BLUE],
                 ),
             ),
         )
     )
-    (band + lines).properties(
+    for s0 in starts:
+        core = slice(s0 + 15, s0 + 45)
+        pre = slice(max(s0 - 30, 0), s0)
+        step = np.median(summary["mean"][core]) - np.median(summary["mean"][pre])
+        print("example run, step in turbines:", round(step / (base.ceiling / 14), 2))
+    (band + lines).resolve_scale(color="independent").properties(
         width=640,
         height=300,
-        title="W1: six injected 60-day, 3-turbine outages (light blue band: 90% interval)",
+        title="W1: six injected 60-day outages of 3 turbines",
     ).save(DOCS / "figure_5_example_run.svg")
 
 
