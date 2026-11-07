@@ -29,7 +29,8 @@ prediction: >-
   coefficient of variation falls). (2) The lag-free networks have no input that tells a row's year,
   so a network averages the injected capacity over the training rows it can reach. We therefore
   expect the calibrated step at the first summer cutoff to equal the post-step share of the donor
-  rows (about 0.5 for the spring step, about 0.2 for the summer step), and to miss the 70% bar. The constant-injection controls test
+  rows (about 0.5 for the spring step, about 0.2 for the summer step), and to miss the 70% bar. The
+  constant-injection controls test
   this reading: if the network ignores the year, a constant injection reads its full size. (3)
   The shuffled-shape step reads under 0.3 MW at every cutoff. (4) The seed noise floor, the
   probed capacity of one uninjected network minus another, has a 95th percentile under 0.3 MW. (5)
@@ -116,7 +117,8 @@ for the brief's pre-step placebo.
 **What a network that cannot tell the year can know.** The pretraining inputs carry the sun's position,
 the time of day, the day of the week, and holiday columns, and no year or day of the year. Weekday
 and moving holidays carry some information about the year, so the network may not be fully
-calendar-blind; the constant-injection controls and the step networks test this. A calibrated probe would then read the average of the injected capacity over
+calendar-blind; the constant-injection controls and the step networks test this. A calibrated probe
+would then read the average of the injected capacity over
 the rows the probe reaches. The probe's donor days are within 21 days of the probe date's day of the
 year and at the same half-hour, so the truth a calendar-blind network can know is
 `mw x post-step share of the donor rows`. We compute that share per cutoff and Primary from the
