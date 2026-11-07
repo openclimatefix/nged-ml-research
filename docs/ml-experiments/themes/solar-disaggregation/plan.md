@@ -12,6 +12,7 @@
 | [PV-479](#planned-experiments) | Does an anomaly regression that uses only within-month weather variation give a capacity estimate that passes both the placebo and the known answer, including when the load follows the clouds? | 1 | Nothing | Experiment 00479 finished (not supported): validates no Primary; see its page |
 | [PV-621](#planned-experiments) | Does the donor-day probe of a lag-free neural network recover an injected PV capacity at the six MW Primaries, read placebos near zero, and resist a cloud-following load? | 1 | Nothing | Experiment 00621 planned; one GPU process, about 0.7 GPU-hours |
 | [PV-616](#planned-experiments) | Does probing the stored lag-free neural networks with fixed datetime inputs and coherent donor weather return a stable, plausible PV capacity at the six MW Primaries? | 1 | Nothing | Experiment 00616 finished (partly supported): stable capacity, one placebo fails; step 2 (injected known-answer test) recommended |
+| [PV-644](#planned-experiments) | Does the explicit solar term still beat the free network, a 14-day tracker, and a bias-shifted free network when the weather is an ensemble forecast at lead 1 to 10 days? | 1 | Nothing | Experiment 00644 planned; one GPU process, ceiling 4 GPU-hours |
 
 ## Planned experiments
 
