@@ -38,27 +38,29 @@ headline: >-
   heuristic's moves from +0.10 (-0.03 to +0.22) to -0.15 (-0.26 to -0.05) points of capacity, and
   the candidate's from +0.15 to -0.13. K3 stays worse than the heuristic (+0.20).
 take_home_message: >-
-  Most of the networks' lost lead over the manual heuristic comes from one Primary, D18, which the
-  detector flags on 101 of the 112 days of its load transfer. After those days are removed K1 and
-  the candidate beat the heuristic, and the result barely changes at a stricter or a looser
-  threshold. The detector does not find the D14 side of the transfer (5 of 112 days), so D14 still
+  Most of the days the detector removes are at one Primary, D18, which it flags on 101 of the 112
+  days of its load transfer. With the flagged days removed, K1 and the candidate beat the heuristic
+  in the pooled score, and the sign does not change at a stricter or a looser threshold. The
+  detector flags D14, the other side of the transfer, on only 5 of those 112 days, so D14 still
   loses to the heuristic.
 advice:
   - >-
     Quote the networks' window result with the D18 days removed beside the all-rows result, and say
     that the detector is blind to D14's transfer and to transfers of 1 MW or less.
   - >-
-    Look at why D14's residual drifts only to about -2 to -4 robust standard deviations while its
-    transfer partner D18 stands out at +4 to +8: the heuristic's own members may have absorbed
+    Look at why D14's residual stays between -4.3 and -0.1 robust standard deviations while its
+    transfer partner D18 has a median of about +5: the heuristic's own members may have absorbed
     part of the step.
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Removing the days that a frozen detector flags as an abnormal running arrangement turns the
+**Removing the days that a frozen detector flags as an abnormal running arrangement (ARA, a
+temporary load transfer between Primaries) turns the
 networks' small loss to the manual heuristic into a lead.** K1's continuous ranked probability
 score (CRPS) minus the heuristic's falls from +0.10 to -0.15 points of capacity. Nearly all the
-removed days are at one Primary, D18. This is a second reading of a window that was already scored
+removed days are at one Primary, D18. The page is a second reading of a window that was already
+scored
 once, so it is descriptive and ranks nothing.
 
 ![K1, the candidate and K3 against the heuristic, on all rows and on rows kept at three thresholds](contrast_by_reading.svg)
@@ -86,13 +88,17 @@ once, so it is descriptive and ranks nothing.
 
 ## Results
 
+A Primary-day is one Primary on one UTC day. Dashed lines in the first figure mark a contrast of
+zero; in the second they mark the threshold of +3.5 and -3.5.
+
 - **Rows removed:** 56,699 of 929,870 (6.1%) at the operating point; 5.3% stricter; 8.0% looser.
   119 of 1,968 Primary-days (6.0%).
 - **Flag rate by month:** 6.3% (July), 5.6% (August), 6.3% (September), 6.0% (October).
 - **By Primary:** D18 102 of 123 days; D21 8; D14 5; D8 2; D10 2; the other 11 Primaries none.
 - **Episode:** of the 112 days from 2026-07-07 to 2026-10-26, D18 is flagged on 101 and D14 on 5.
-  D18's residual sits at +4 to +8 robust standard deviations throughout. D14's sits at -2 to -4, so
-  its transfer is mostly below the threshold.
+  D18's daily residual has a median of about +5 robust standard deviations. Gap bridging
+  joins its days above 3.5 into long runs. D14's residual runs from -4.3 to -0.1 and exceeds 3.5 in
+  size on 9 days, and the 2-day minimum run keeps only 5 of them.
 - **CRPS, points of capacity (day-block 95% interval):**
 
 | Rows | Rows scored | K1 | Candidate | K3 | Manual heuristic | Climatology |
@@ -112,16 +118,15 @@ once, so it is descriptive and ranks nothing.
   heuristic 3.03).
 - **Against rule R1 (experiment 620):** R1 removed 290 Primary-days; the detector's 119 include
 113 of them.
-  The detector therefore removes fewer days than R1, mainly because its threshold is higher.
+  The detector removes fewer Primary-days than R1.
 
 ## Predictions and what was not measured
 
-- **Prediction:** K1 minus heuristic falls below +0.05: supported (-0.15). D14 and D18 lose most of
-  their flagged days: only D18 does; D14 is barely flagged. Verdict: partly supported.
+- **Prediction:** K1 minus heuristic falls below +0.05: supported (-0.15). The detector flags most
+  days of the D14 and D18 episode at D18 and not at D14. Verdict: partly supported.
 - **Blind spots:** the detector cannot see transfers of about 1 MW or less (development recall 0.43
-  at 1 MW and 0.14 at 0.5 MW). It needs a transfer to last at least 2 days. It reads only the daily
-  mean, so a transfer inside a day is invisible. It flags a transfer at the Primary that gains or
-  loses power only if the step exceeds 3.5 robust standard deviations.
+  at 1 MW and 0.14 at 0.5 MW). It misses transfers shorter than 2 days. It reads only the daily
+  mean, so a transfer within one day is invisible.
 - **Incomplete labels:** NGED's event labels are incomplete, so the development false-alarm count is
   an upper bound and the real-transfer recall is measured on the labelled subset only.
 - **Audit triggers:** this is a re-score of stored forecasts. No model was refitted, no median or
