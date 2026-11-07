@@ -132,6 +132,7 @@ def main() -> None:
     fit_dir = c647.WORK / "fits"
     rows_out: list[dict] = []
     det_out: list[dict] = []
+    dropped: list[dict] = []
     nra_hash: dict[str, str] = {}
 
     # ------------------------------------------------------------------ per month, per variant
@@ -155,6 +156,10 @@ def main() -> None:
             "P4b verified D5/D16 pair": r["verified"],
             "all real rows": np.ones(len(ri), bool),
         }
+        r0ok_r = np.isfinite(r["res"]) & np.isfinite(r["res_star"])
+        for sn, sm_ in sets_r.items():
+            dropped.append({"month": month, "set": sn, "rows_before": int(sm_.sum()), "rows_dropped": int((sm_ & ~r0ok_r).sum())})
+        sets_r = {k_: v_ & r0ok_r for k_, v_ in sets_r.items()}
         # bank rows
         b = {k: bk[k][bi] for k in ("prim", "oi", "vi", "lead", "q", "y", "shift", "pass_", "res", "res_star")}
         b["prim"] = b["prim"].astype(np.int64)
@@ -168,6 +173,10 @@ def main() -> None:
         after = (b["vi"] >= end) & (b["oi"] < end)
         lag_in = (b["oi"] - PER) >= on
         sets_b = {"P2 inside shift": inside, "P2b inside, shift in lags": inside & lag_in, "P3 after end": after}
+        r0ok_b = np.isfinite(b["res"]) & np.isfinite(b["res_star"])
+        for sn, sm_ in sets_b.items():
+            dropped.append({"month": month, "set": sn, "rows_before": int(sm_.sum()), "rows_dropped": int((sm_ & ~r0ok_b).sum())})
+        sets_b = {k_: v_ & r0ok_b for k_, v_ in sets_b.items()}
         y_b = (b["y"] + b["shift"]).astype(np.float32)
 
         # no-fit arms
@@ -302,8 +311,11 @@ def main() -> None:
                     for sig, al in alarms.items():
                         det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": "false alarms per Primary-month (event-free origins)", "value": float(al[ef_o].sum() / 16.0), "n": int(ef_o.sum())})  # fmt: skip
                         det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": "alarm share on verified D5/D16 origins", "value": float(al[ver_o].mean()) if ver_o.any() else float("nan"), "n": int(ver_o.sum())})  # fmt: skip
-                        if ver_o.any():
-                            first_alarm = np.min(np.where(al & ver_o, u_oi, 10**9))
+                        on_v_ = (datetime(2025, 12, 29, tzinfo=UTC) - k578.GRID_START).days * PER
+                        off_v_ = (datetime(2026, 1, 13, tzinfo=UTC) - k578.GRID_START).days * PER
+                        in_pair = np.isin(u_prim, (3, 11)) & (u_oi >= on_v_ + PER) & (u_oi < off_v_)
+                        if in_pair.any():
+                            first_alarm = np.min(np.where(al & in_pair, u_oi, 10**9))
                             det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": "first alarm origin on verified pair (UTC date)", "value": float(first_alarm) if first_alarm < 10**9 else float("nan"), "n": 0})  # fmt: skip
                 else:
                     u_pass = bk["pass_"][bi][src]
@@ -313,7 +325,7 @@ def main() -> None:
                             for p_ in range(16):
                                 sgn, ln, _ = bank.event(primary=p_, r=rr)
                                 on_ = end - ln * PER
-                                sel = (u_prim == p_) & (u_pass == rr) & (u_oi >= on_) & (u_oi < end)
+                                sel = (u_prim == p_) & (u_pass == rr) & (u_oi >= on_ + PER) & (u_oi < end)
                                 if not sel.any():
                                     continue  # no stored forecast of this Primary in the event window
                                 hit = sel & al
@@ -328,6 +340,12 @@ def main() -> None:
             ev_rows = []
             has_ev = {(int(p_), int(rr)) for p_, rr in zip(b["prim"], b["pass_"], strict=True)}
             day_lo, day_hi = ms // PER - 20, ms // PER + 45
+            if month == "2025-12":  # one contaminated pass: the windowed rule must equal the full-grid rule
+                fx, _ = bank.contaminate(clean=clean, month_start_idx=ms, r=5)
+                w5 = window_flags(clean_c=fx, ref_clim=ref_clim, day_lo=day_lo, day_hi=day_hi)
+                f5 = k645.ara_flags(clean=fx)
+                assert np.array_equal(w5[:, 5:-5], f5[:, day_lo + 5 : day_hi - 5]), "windowed 637 differs from full grid on a contaminated pass"
+                print("windowed 637 equals full-grid 637 on contaminated pass 5 of 2025-12", flush=True)
             if month == PAIR[0]:  # the windowed rule must reproduce the full-grid flags on uncontaminated power
                 w = window_flags(clean_c=clean, ref_clim=ref_clim, day_lo=day_lo, day_hi=day_hi)
                 full = flags_real[:, day_lo + 5 : day_hi - 5]
@@ -339,9 +357,10 @@ def main() -> None:
                     if (p_, rr) not in has_ev:
                         continue
                     sgn, ln, _ = bank.event(primary=p_, r=rr)
-                    on_d, end_d = (end - ln * PER) // PER - day_lo, end // PER - day_lo
-                    days = np.flatnonzero(fl[p_, on_d : end_d + 1])
-                    ev_rows.append({"depth": abs(sgn), "length": ln, "detected": len(days) > 0, "days": float(days.min()) if len(days) else float("nan")})
+                    on_a = end - ln * PER
+                    orig = (day_lo + np.flatnonzero(fl[p_]) + 1) * PER + 18  # a day's flag is actionable at the next 09:00 origin
+                    orig = orig[(orig >= on_a + PER) & (orig < end)]
+                    ev_rows.append({"depth": abs(sgn), "length": ln, "detected": len(orig) > 0, "days": float((orig.min() - on_a) / PER) if len(orig) else float("nan")})
             edf = pl.DataFrame(ev_rows)
             for (dp, ln), g in edf.group_by(["depth", "length"]):
                 det_out.append({"variant": "n/a", "month": month, "seed": -1, "signal": "experiment 637", "what": f"bank recall depth {dp} length {ln}", "value": float(g["detected"].mean()), "n": g.height})  # fmt: skip
@@ -350,8 +369,9 @@ def main() -> None:
                 on_v = (datetime(2025, 12, 29, tzinfo=UTC) - k578.GRID_START).days
                 off_v = (datetime(2026, 1, 13, tzinfo=UTC) - k578.GRID_START).days
                 for p_ in (3, 11):
-                    days = np.flatnonzero(flags_real[p_, on_v : off_v + 1])
-                    det_out.append({"variant": "n/a", "month": month, "seed": -1, "signal": "experiment 637", "what": f"verified pair Primary {p_}: first flagged day after onset (days)", "value": float(days.min()) if len(days) else float("nan"), "n": int(len(days))})  # fmt: skip
+                    orig = (np.flatnonzero(flags_real[p_]) + 1) * PER + 18
+                    orig = orig[(orig >= on_v * PER + PER) & (orig < off_v * PER)]
+                    det_out.append({"variant": "n/a", "month": month, "seed": -1, "signal": "experiment 637", "what": f"verified pair Primary {p_}: first actionable origin (grid index)", "value": float(orig.min()) if len(orig) else float("nan"), "n": int(len(orig))})  # fmt: skip
             d0 = (dat.month_start_idx(month=month)) // PER
             m_days = np.arange(d0, d0 + 31)
             efd = flags_real[:, m_days] & True
@@ -390,8 +410,10 @@ def main() -> None:
     metric_cols = [c for c in tab.columns if c not in ("variant", "month", "set", "cut", "arm", "seed", "rows")]
     fitted_t = tab.filter(pl.col("seed") >= 0).group_by("variant", "month", "set", "cut", "arm").agg(pl.col("rows").first(), *[pl.col(c).mean() for c in metric_cols]).with_columns(seed=pl.lit(-2, dtype=pl.Int64))
     final = pl.concat([tab, fitted_t.select(tab.columns)])
+    final = final.rename({"crps": "crps_proxy"})  # 2 x mean pinball loss over the 11 stored levels, an 11-level CRPS proxy
     final.write_csv(OUT / "scorecard.csv")
     pl.DataFrame(det_out).write_csv(OUT / "detector.csv")
+    pl.DataFrame(dropped).write_csv(OUT / "r0_dropped_rows.csv")
     factors = {str(k[1:]): v for k, v in per.items() if k[0] == "factor"}
     (OUT / "widen_factors.txt").write_text("\n".join(f"{k}: {v:.3f}" for k, v in factors.items()))
     gate(final)
@@ -402,7 +424,7 @@ def gate(final: pl.DataFrame) -> None:
 
     def crps(arm: str, setname: str) -> float:
         r = f.filter((pl.col("arm") == arm) & (pl.col("set") == setname))
-        return float(r["crps"][0]) if r.height else float("nan")
+        return float(r["crps_proxy"][0]) if r.height else float("nan")
 
     base = ("R0_72", "R0_168", "R0s_72", "R0s_168")
     lines = ["FIRST-PAIR FEASIBILITY GATE (leave-one-month-out, pooled 2025-10 and 2025-12, seed-mean CRPS, points of capacity)"]
@@ -410,6 +432,9 @@ def gate(final: pl.DataFrame) -> None:
     lines.append(f"{'arm':10s} " + " ".join(f"{s[:22]:>24s}" for s in sets))
     for arm in ("K1", *base, "H1", "H2", "H1p", "H2p", "AG", "AS", "H1short", "H1long", "oracle"):
         lines.append(f"{arm:10s} " + " ".join(f"{crps(arm, s):24.3f}" for s in sets))
+    lines.append("PRIMARY COMPARISON (same training mix, same widening incentive): head minus its noise placebo, negative = real signal helps")
+    for h, pl_ in (("H1", "H1p"), ("H2", "H2p")):
+        lines.append(f"{h} - {pl_}: " + ", ".join(f"{s[:2]} {crps(h, s) - crps(pl_, s):+.3f}" for s in sets) + f"  -> {'signal helps on both' if all(crps(h, s) < crps(pl_, s) for s in sets) else 'NOT better than its placebo on both'}")
     passed = []
     for h in ("H1", "H2"):
         for label, bl in (("every R0 and R0* variant", base), ("main R0 only", base[:2])):

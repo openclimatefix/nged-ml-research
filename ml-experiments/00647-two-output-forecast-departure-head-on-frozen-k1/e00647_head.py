@@ -52,7 +52,8 @@ def survival_probability(*, age_days: torch.Tensor, lead_h: torch.Tensor, short_
 
     a = torch.clamp(age_days, AGE_FLOOR_DAYS, AGE_CAP_DAYS)
     h = (lead_h + 24.0) / 24.0
-    return torch.clamp(surv(a + h) / torch.clamp(surv(a), min=1e-3), 0.0, 1.0)
+    p = torch.clamp(surv(a + h) / torch.clamp(surv(a), min=1e-3), 0.0, 1.0)
+    return torch.where(age_days < AGE_FLOOR_DAYS, torch.zeros_like(p), p)  # no departure at the newest lag: p = 0
 
 
 def _knots(*, q: torch.Tensor) -> torch.Tensor:

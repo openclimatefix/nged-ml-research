@@ -14,7 +14,7 @@ early stop).
 
 Hyperparameters are the plan's: Adam, learning rate 0.003, weight decay 0.0001, batch 4096, up to 30
 epochs, early stop (patience 4) on the validation loss. The training set is a fixed random sample of
-each training month (`N_REAL`, `N_BANK` rows), a stated deviation made for run time.
+each training month (`N_REAL` real rows and `N_BANK` bank rows, about 10% bank so that the share of departures is near deployment), a stated deviation made for run time.
 
 Output per fit, `fits/<arm>_<month>_<variant>_s<seed>.npz`: for every scored real and bank row, the
 CRPS, coverage flags, band width, tail pinball losses, q05, q50, q95, the depth, and the spread; the
@@ -34,8 +34,9 @@ import numpy as np
 NAME: Final = "00647-two-output-forecast-departure-head-on-frozen-k1"
 MONTHS: Final = ("2025-10", "2025-12", "2026-01", "2026-03", "2026-06")
 N_REAL: Final[int] = 60_000
-N_BANK: Final[int] = 60_000
+N_BANK: Final[int] = 6_000
 N_VAL: Final[int] = 20_000
+N_VAL_BANK: Final[int] = 2_000
 BATCH: Final[int] = 4096
 EPOCHS: Final[int] = 30
 PATIENCE: Final[int] = 4
@@ -205,21 +206,22 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
         val_month = others[0]
         train_months = others[1:]
         tr = [(m, k, i) for m in train_months for k, i in sample(month=m, n_real=N_REAL, n_bank=N_BANK, rng=rng)]
-        va = [(val_month, k, i) for k, i in sample(month=val_month, n_real=N_VAL, n_bank=N_VAL, rng=rng)]
+        va = [(val_month, k, i) for k, i in sample(month=val_month, n_real=N_VAL, n_bank=N_VAL_BANK, rng=rng)]
     else:
         earlier = [m for m in MONTHS if m < month]
         assert earlier, "no earlier month to train on"
         tr, va = [], []
-        for m in earlier:
-            tr += [(m, k, i) for k, i in sample(month=m, n_real=N_REAL, n_bank=N_BANK, rng=rng, mask_day=(4, -1))]
+        import e00647_data as dat  # ty: ignore[unresolved-import]
+
         for m in earlier:
             d = load(month=m)
-            for k, n in (("real", N_VAL), ("bank", N_VAL)):
-                ok = d[k]["train_ok"] & ((d[k]["oi"] // 48) % 4 == 3)
-                idx = np.flatnonzero(ok)
-                va.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
-            # training rows must not come from the held-out origin days
-            tr = [(mm, kk, ii[(load(month=mm)[kk]["oi"][ii] // 48) % 4 != 3]) for mm, kk, ii in tr]
+            ms = dat.month_start_idx(month=m)
+            for k, n_tr, n_va in (("real", N_REAL, N_VAL), ("bank", N_BANK, N_VAL_BANK)):
+                dom = (d[k]["oi"] - ms) // 48
+                # contiguous blocks: train on days 0-13, leave days 14-20 out as a gap, validate on days 21 onward
+                for lo, hi, n, dst in ((0, 14, n_tr, tr), (21, 99, n_va, va)):
+                    idx = np.flatnonzero(d[k]["train_ok"] & (dom >= lo) & (dom < hi))
+                    dst.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
     train, val = Pool(parts=tr), Pool(parts=va)
     x_tr, age_tr, stats = make_inputs(raw=train.raw, arm=arm, stats=None, seed=seed)
     x_va, age_va, _ = make_inputs(raw=val.raw, arm=arm, stats=stats, seed=seed + 1)
