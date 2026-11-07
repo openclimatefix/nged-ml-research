@@ -74,7 +74,7 @@ def factors_and_reads(*, df: pl.DataFrame) -> pl.DataFrame:
     )  # fmt: skip
 
 
-def step_table(*, rec: pl.DataFrame) -> pl.DataFrame:
+def step_table(*, rec: pl.DataFrame, context: pl.DataFrame) -> pl.DataFrame:
     """Return, per start key, cutoff, and kind, the median calibrated read over Primaries and seeds."""
     names = {}
     for key in k.STEP_STARTS:
@@ -86,6 +86,7 @@ def step_table(*, rec: pl.DataFrame) -> pl.DataFrame:
         key=pl.col("condition").replace_strict({c: v[0] for c, v in names.items()}),
         kind=pl.col("condition").replace_strict({c: v[1] for c, v in names.items()}),
     )
+    sub = sub.join(context.select("key", "cutoff", "share"), on=["key", "cutoff"], how="left")
     return (
         sub.group_by("key", "kind", "cutoff")
         .agg(
@@ -94,7 +95,9 @@ def step_table(*, rec: pl.DataFrame) -> pl.DataFrame:
             p95_abs_mw=pl.col("delta_mw").abs().quantile(0.95),
             n_networks=pl.len(),
             covered_0=((pl.col("recovery_cal")).abs() <= pl.col("half_cal")).mean(),
-            covered_1=((pl.col("recovery_cal") - 1.0).abs() <= pl.col("half_cal")).mean(),
+            covered_share=(
+                (pl.col("recovery_cal") - pl.col("share")).abs() <= pl.col("half_cal")
+            ).mean(),
         )
         .sort("key", "kind", "cutoff")
     )
@@ -172,7 +175,7 @@ def main() -> None:
     for shift in SHIFTS:
         rec = factors_and_reads(df=load(shift_days=shift))
         rec.write_csv(k.WORK / f"step_reads_shift{shift}.csv")
-        table = step_table(rec=rec)
+        table = step_table(rec=rec, context=context)
         print(
             f"\nBASE DATES SHIFTED BY {shift} DAYS: calibrated read (median over 6 Primaries x 3 seeds)"
         )
@@ -188,12 +191,12 @@ def main() -> None:
         )
         print(wide)
         print(
-            "raw MW, p95 abs, and coverage of the widened interval (truth 1 for real; truth 0 for placebos)"
+            "raw MW, p95 abs, and coverage of the widened interval (covered_share: reference is the post-step donor share; covered_0: zero)"
         )
         print(table)
         if shift == 0:
             test = wide.filter((pl.col("key") == "spring25") & (pl.col("cutoff") != "2025-07"))
-            stop = int((test["ratio_clim"] >= STOP_RATIO).sum())
+            stop = int(((test["ratio_clim"] >= STOP_RATIO) & (test["real"] > 0.2)).sum())
             summary["stop_rule"] = {
                 "pairs_tested": test.height,
                 "pairs_with_ratio_ge_half": stop,

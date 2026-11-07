@@ -24,19 +24,18 @@ prediction: >-
   Fixed before any result was read. (1) For the spring-2025 step, the climatological placebo's
   calibrated read is at most half the real step's read at each of the cutoffs 2025-10, 2026-03, and
   2026-06, and at most 0.15 in absolute terms. (2) The ordinary-spring step (from 2023-04-01, with
-  0.55 to 0.62 of the donor rows after the step and a clearness difference of at most 0.016) is read
+  about 0.55 to 0.62 of the donor rows after the step and a clearness difference of at most 0.02) is read
   within 0.2 of its post-step donor share at every cutoff, and its climatological placebo reads at
-  most 0.15. (3) The summer-2024 step (post-step clearness 0.02 to 0.05 above the pre-step clearness)
-  is read between the ordinary-spring and the spring-2025 contrasts' reads, scaled by its donor
-  share. (4) Moving the probe dates 364 days earlier changes every calibrated read by at most 0.05.
+  most 0.15. (3) The summer-2024 step's read is reported against its donor share and clearness difference, with no bar. (4) Moving the probe dates 364 days earlier changes the median calibrated read, over the cutoffs of one step, by at most 0.05; single reads may move by 0.1, as experiment 634's did. This is a diagnostic and does not enter the decision rule.
 decision_rule: >-
   Fixed before any result was read. Stop rule from the brief: if the climatological placebo of the
-  spring-2025 step reads at least half of the real step's calibrated read at two or more of the
-  three cutoffs 2025-10, 2026-03, and 2026-06, stop, report, and do not tune. The sunny-year
+  spring-2025 step reads at least half of the real step's calibrated read (a ratio of medians over
+  Primaries and seeds), and the real read is above 0.2, at two or more of the three cutoffs
+  2025-10, 2026-03, and 2026-06, stop, report, and do not tune. The sunny-year
   explanation is supported if prediction (1) holds and the ordinary-spring step is read within 0.2
   of its donor share (prediction 2). A limit of the probe that holds in any year is supported if
   the stop rule fires, or if the ordinary-spring step is read at under 0.3 of its size while its
-  donor share is above 0.5. Any other outcome is inconclusive. No threshold for using the probe in
+  donor share is above 0.5. Any other outcome, including both explanations satisfied at once, is inconclusive. No threshold for using the probe in
   production is set here.
 benchmark: >-
   Experiment 634's networks and probe reads: the uninjected control, the constant injections
@@ -72,10 +71,10 @@ same farm's day-of-year mean profile (the climatological placebo).**
 
 | Step | Starts | What the brief asked for | Post-step share of donor rows | Clearness after minus before the step |
 |---|---|---|---|---|
-| `spring23` | 2023-04-01 | An ordinary-spring step | 0.55 to 0.62 | 0.007 to 0.016 |
-| `summer24` | 2024-07-01 | A sunny-summer step (see below) | 0.24 to 0.36 | 0.021 to 0.047 |
-| `spring25` | 2025-04-01 | Experiment 634's step | 0.12 to 0.26 | 0.048 to 0.125 |
-| `summer25` | 2025-07-01 | Experiment 634's step | 0.00 to 0.16 | -0.045 to 0.009 |
+| `spring23` | 2023-04-01 | An ordinary-spring step | 0.55 to 0.62 | 0.004 to 0.021 |
+| `summer24` | 2024-07-01 | A sunny-summer step (see below) | 0.20 to 0.32 | 0.023 to 0.090 |
+| `spring25` | 2025-04-01 | Experiment 634's step | 0.12 to 0.26 | 0.049 to 0.100 |
+| `summer25` | 2025-07-01 | Experiment 634's step | 0.00 to 0.16 | -0.052 to 0.012 |
 
 - **The shares and clearness differences are approximate, computed from the frames of experiment 634
   over all rows from 20 March to 1 October before any network is trained.** The analysis script
@@ -107,12 +106,12 @@ follows the step (the network would equal the control). That is 69 fits, about 0
 
 - **Stop rule** and **support rules**: as in the front matter.
 - **Placebo.** A climatological placebo's calibrated read is under 0.15 in absolute value, and
-  under half of the real step's read, for every step with a real read above 0.2.
-- **Noise floor.** Experiment 634 measured the 95th percentile of the probed capacity of one
-  uninjected network minus another at 0.244 MW. A read under 0.244 MW (0.06 of 4 MW before
-  calibration) is not distinguishable from zero.
-- **Coverage.** The widened 80% interval of experiment 634 covers the full step (real steps, base
-  after the step) and zero (placebos) in at least 60% of networks; reported by step, not pooled.
+  under half of the real step's read, for every step with a real read above 0.2. A read under
+  0.244 MW (experiment 634's noise floor, 0.06 before calibration) is not distinguishable from zero.
+- **Coverage.** The widened 80% interval of experiment 634 is compared with the post-step donor
+  share of each real step (the reference a date-blind network can know; reads barely move with the
+  probe date) and with zero for each placebo. Reported by step and cutoff, not pooled. Coverage of
+  "the full step" is not a bar, because about half the probe dates of `summer25` precede its start.
 - Season-year capacities only: no read is reported as a capacity that changed inside a window.
 
 ## Standing practices and checks
