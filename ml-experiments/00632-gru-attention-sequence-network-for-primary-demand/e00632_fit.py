@@ -35,7 +35,7 @@ def origins_for(
     target_end = fold_mod.idx_of(t=refit) - CUTOFF_AGE_STEPS
     day = 48
     last = target_end - day * 1
-    first_origin = 335 + 1
+    first_origin = hist
     all_o = np.arange(first_origin - first_origin % day + 18 + day, last + 1, day)
     all_o = all_o[all_o <= target_end - 48]
     # Roster-style validation: spread-out held-out weeks with a purge around each, so training
@@ -274,7 +274,7 @@ def main() -> None:
     ap.add_argument("--fut", type=int, default=336)
     a = ap.parse_args()
     tag = a.tag or a.arm
-    torch.cuda.set_per_process_memory_fraction(8 / 48)
+    torch.cuda.set_per_process_memory_fraction(float(__import__("os").environ.get("MEM_GB", "8")) / 48)
     clean = d.clean_power()
     b1g, b1c = d.dense_b1()
     ctx = {

@@ -150,7 +150,9 @@ def event_metrics(*, inj: pl.DataFrame, twin: pl.DataFrame, month: str, r: int, 
 
 def main() -> None:
     arm, tag, months = sys.argv[1], sys.argv[2], sys.argv[3:]
-    seeds = (0, 1, 2)
+    import os
+
+    seeds = tuple(int(x) for x in os.environ.get("SEEDS", "0 1 2").split())
     torch.cuda.set_per_process_memory_fraction(8 / 48)
     clean = d.clean_power()
     b1g, b1c = d.dense_b1()
