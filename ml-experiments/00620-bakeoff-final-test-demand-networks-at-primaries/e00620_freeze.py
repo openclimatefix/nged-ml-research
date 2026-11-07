@@ -34,7 +34,7 @@ LOCK = HERE / "final_test_620.lock"
 SEEDS = (0, 1, 2, 3, 4)
 CODE = (
     "e00620_fold.py", "e00620_extend.py", "e00620_k1.py", "e00620_k3.py", "e00620_cand.py",
-    "e00620_gate.py", "e00620_tables.py", "e00620_freeze.py", "e00620_assemble.py", "predict.sh", "gpu.sh",
+    "e00620_gate.py", "e00620_tables.py", "e00620_freeze.py", "e00620_assemble.py", "e00620_score.py", "predict.sh", "gpu.sh",
 )  # fmt: skip
 
 
