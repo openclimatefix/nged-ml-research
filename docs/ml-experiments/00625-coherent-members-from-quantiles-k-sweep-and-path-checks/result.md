@@ -47,7 +47,7 @@ decision_rule: >-
   against K = 51 of the same coupling), paired by month, with a month-block bootstrap (20,000
   resamples) and a 98.33% interval (Bonferroni over the three registered contrasts); a run-block
   bootstrap is reported beside it. The margin is 5%, which is the margin of experiment 434; the
-  fair energy score is secondary. C1: SS (J3) against IND on the spatial block of the nine farms
+  energy score is secondary. C1: SS (J3) against IND on the spatial block of the nine farms
   (wind and solar together, mean of the two family scores). `supported` for C1 if the interval lies
   wholly below -5%; this is expected, since 436 measured -28% to -43%. C2: anomaly-path SS (SS-R)
   against IND on the spatial block of the 16 Primaries; `supported` if the interval lies wholly
@@ -72,7 +72,7 @@ benchmark: >-
   observed share and observed autocorrelation for the path checks.
 row_set_id: joint_tuesdays_v1
 metric: >-
-  Variogram score (order 0.5) and fair energy score of the member paths in experiment 436's four
+  Variogram score (order 0.5) and energy score of the member paths in experiment 436's four
   blocks; CRPS of the K values against the direct 51-value CRPS; coverage of the member spread at
   50%, 80%, and 90%; share of opposite-sky-state farm pairs; autocorrelation of step-to-step
   changes.
