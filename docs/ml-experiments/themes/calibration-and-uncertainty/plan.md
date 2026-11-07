@@ -9,6 +9,7 @@
 | 483 | Does a widening or table P make the tails of the first-release demand candidates honest? | 1 | Experiment 470 | Planned |
 | 492 | Can two constants per metering group replace table P for the first-release demand candidates? | 2 | Experiment 483 | Planned |
 | 630 | Is the roster networks' upper demand tail too low on ordinary days, and does a bias correction fitted on earlier months remove the excess? | 1 | Nothing | In progress |
+| 642 | Can a correction fitted on other months bring the upper demand tail of K1 and the Candidate within 1.5 points of nominal without raising CRPS by more than 1%? | 2 | Experiment 630 (finished) | In progress |
 | 625 | How few member paths do NGED's power-flow studies need, and does a Schaake shuffle of anomaly paths help the Primaries? | 3 | Experiments 434 and 436 (finished) | In progress |
 | 629 | Do coherent Primary scenarios, summed to a bulk supply point, give a trustworthy tail for the flow through that point? | 4 | Experiments 625 and 626 (finished) | In progress |
 | 631 | Once the metered farms beneath a bulk supply point are in the sum, does a coherent scenario sum give a usable tail for the flow through that point? | 5 | Experiment 629 (finished) | In progress |
