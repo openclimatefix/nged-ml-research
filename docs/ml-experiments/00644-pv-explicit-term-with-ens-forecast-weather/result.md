@@ -119,4 +119,59 @@ D15/D18 start cut (not relevant at the six MW Primaries), saved models, reuse of
 tails and curtailment cost reported, day-ahead and 14-day forecast plots, draft pull request. Does
 not follow: the four-month screen (the three cutoffs are the pre-registered design). The advice of
 experiment 643 followed: compare against the 14-day tracker, report the gain without the largest
-contributing Primary, scale the capacity-swap placebo. Departed from: none.
+contributing Primary, scale the capacity-swap placebo.
+
+## Departures from the brief
+
+- **Summary weather, not members** (above).
+- **The tracker is the ensemble-forecast version of experiment 643's.** Experiment 643 corrected a
+  free network by its own mean error over the 14 days before each test day. Here the same rule
+  applies, with three conditions: the history holds only days whose date is before the run's origin
+  date; each history error is the free network's forecast from the last run issued before that
+  day (its lead 24 to 48 hours slice) against cleaned metered power; and the shift applies to
+  sunny-midday half-hours only, as in 643, so contrast (ii) is unaffected by it. In the first 14
+  days after a cutoff the history is incomplete, and the days with fewer than 3 history days get
+  no shift. The history never includes a day the network fine-tuned on, because fine-tuning stops
+  at the cutoff.
+- **Extra placebos** (0.5 and 1.5 scalings), taken from experiment 643's advice.
+- **The control in contrast (i) is the lower of d and e per lead band.** The bootstrap resamples days
+  and re-picks the control in each resample, so the interval includes the selection.
+- **The bars** (0.067 and 0.181) are experiment 639's. The first analysis step re-derives them per lead
+  band from the seed-split null on these rows, and the larger of the old and new value is the bar.
+- **Number of contrasts.** Contrast (i): 2 controls x 3 lead bands x 2 worlds = 12, (ii): 1, (iii): 2,
+  placebos: 2 x 2 = 4. The Bonferroni level is set for 19 contrasts.
+- **A pooled pass whose leave-one-Primary-out fails is reported as not a pass.** If the tracker beats
+  the free network but the explicit network does not, the explicit-PV line stops and the tracker is
+  named the candidate.
+
+## Leakage and row rules
+
+- Fine-tuning rows are filtered by valid time before the cutoff, not by run time, so no run at
+  lead up to 10 days carries a target after the cutoff. The early-stopping split is by day.
+- Lead is counted from `power_fcst_init_time` (run time plus 9 hours), 24 to 240 hours. Rows below
+  24 hours are not scored, which is a limit on the day-1 result.
+- Sunny middays use realised clear-sky index (as in 639). The write-up adds two further slices: all
+  middays, and middays whose ensemble-mean clear-sky index is at least 0.7, because conditioning on
+  the realised sky favours no arm but hides the forecast's sunniness error at long lead.
+- The ensemble-mean shortwave curve is smoother than the mean of member curves, and at day 6 to 10
+  it approaches climatology, so the shuffled-day placebo is weak by construction there. The
+  write-up says so where it reports the placebo by lead band.
+- The cutoff 2025-07 fine-tunes on 15 months of ensemble rows and the others on 24. The write-up shows
+  the contrasts per cutoff beside the pooled value.
+- Only the ensemble summary tables with shortwave and temperature are used (the cloud-cover
+  summary starts later than the 2025-07 cutoff).
+- The fine-tune stage reuses the pretrained weather and datetime encoders; its mixer is new, because
+  it takes the spread and lead columns.
+- In the step world the 4 MW step starts in 2023-04 and the ensemble rows start in 2024-04, so the
+  fine-tune sees only post-step data and the contrast tests whether the explicit term carries the
+  capacity change from pretraining to fine-tuning, not a step inside the fine-tune.
+- All arms, including the tracker, `fbias`, and the floors, are scored on the same rows (every run
+  at lead 24 to 240 hours).
+
+## Compute go/no-go
+
+Fit arms: a, b, c, f, `perm` (plain, 0.5, 1.5), and `shuf`, which is 8 fine-tunes per seed, cutoff,
+and world. A smoke fit fixes the minutes per fine-tune. If the full grid projects above 3
+GPU-hours, stage 1 runs seeds 0 to 2 in the real months for all arms and in the step world for a,
+b, and f only, with every second run subsampled for fine-tuning if the projection is still above 3
+GPU-hours. The step-world placebos are then untested and the write-up says so.
