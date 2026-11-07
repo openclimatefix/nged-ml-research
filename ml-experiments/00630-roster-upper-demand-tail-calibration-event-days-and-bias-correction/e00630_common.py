@@ -55,9 +55,13 @@ def load(*, network: str) -> pl.DataFrame:
             b10=(y < pl.col("q10")),
             b05=(y < pl.col("q05")),
             gap=(y - pl.col("q50")).cast(pl.Float64),
-            band=pl.col("lead_hours")
-            .cut(list(BAND_EDGES[1:-1]), labels=list(BAND_LABELS), left_closed=True)
-            .cast(pl.String),
+            band=pl.when(pl.col("lead_hours") < BAND_EDGES[1])
+            .then(pl.lit(BAND_LABELS[0]))
+            .when(pl.col("lead_hours") < BAND_EDGES[2])
+            .then(pl.lit(BAND_LABELS[1]))
+            .when(pl.col("lead_hours") < BAND_EDGES[3])
+            .then(pl.lit(BAND_LABELS[2]))
+            .otherwise(pl.lit(BAND_LABELS[3])),
             hour=pl.col("valid_time").dt.hour(),
             origin_date=pl.col("power_fcst_init_time").dt.date(),
             subset=pl.when(pl.col("event_free"))
