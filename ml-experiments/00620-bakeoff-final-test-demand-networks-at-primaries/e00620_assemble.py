@@ -62,6 +62,7 @@ class Context(x593.Context):
 
 
 def assemble(*, month: str, roots: dict[str, Path], days: tuple[str, ...], factor: float, mode: np.ndarray | None, out: Path) -> dict[str, pl.DataFrame]:
+    out.mkdir(parents=True, exist_ok=True)
     ctx = Context()
     k1_root, cand_root, k3_root = roots["K1"], roots["Candidate"], roots["K3"]
     v = load(root=k1_root, tag="P5", month=month, days=days)
@@ -125,6 +126,10 @@ def dev_check(month: str) -> None:
 def main(month: str) -> None:
     assert os.environ.get("E00620_PHASE") == "predict"
     ext.redirect()
+    # experiment 593's context reads the raw power through experiment 48's own copy of the loaders
+    fd48 = x593.fd.common
+    fd48.GRID_END, fd48.ERA5_PATH, fd48.OBSERVED_PATH = ext.GRID_END, ext.E607 / "era5_features.parquet", ext.E607 / "observed.parquet"
+    x593.fd._CACHE.clear()
     cfg = json.loads((HERE / "freeze_config.json").read_text())
     assert not (HERE / "final_test_620.lock").exists() or os.environ.get("E00620_PHASE") == "predict"
     roots = {"K1": R / "arms/k1/work", "Candidate": R / "P7_D50_e3/work", "K3": R / "arms/k3/work"}
