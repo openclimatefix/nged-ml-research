@@ -3,7 +3,7 @@ id: "00649"
 slug: pv-capacity-table-season-year-from-stored-probes
 theme: solar-disaggregation
 also_relevant_to: []
-status: planned
+status: finished
 kind: other
 size: >-
   simple. Stored: one small private parquet of table rows and the figure source. Designs: one
@@ -42,61 +42,165 @@ metric: >-
   AC capacity in MW at the 10th, 50th, and 90th percentiles per Primary, raw and calibrated; energy
   recovery per injected megawatt-hour; overlap of two 10th-to-90th-percentile intervals in MW and as
   a share of the narrower one.
+verdict: supported
+production_status: not-for-production
+adopted_in: none
+best_arm: >-
+  Calibrated probe at the 2026-06 cutoff, April to September 2025: the 80% interval overlaps
+  experiment 474's R4 interval at 6 of 6 Primaries (5 of 6 for April to September 2024).
+headline: >-
+  A second, independent estimate of the unmetered solar behind the six MW Primaries (2.4 MW at D9 to
+  3.9 MW at D14, April to September 2025) agrees with experiment 474's R4 table at every Primary,
+  within 0.94 to 1.14 times its median.
+take_home_message: >-
+  The neural-network probe, divided by how much of an injected real solar farm it finds, gives an
+  unmetered-solar capacity for each of the six megawatt Primaries that overlaps the earlier
+  regression table at all six (2.4 to 3.9 MW, medians within 6% below to 14% above). Two different
+  methods now agree, which is the strongest evidence we can give NGED short of its own connection
+  records. The values describe a whole summer, and the probe cannot tell one year from the next.
+lessons:
+  - >-
+    The probe's calibrated capacity is stable across the four pretraining cutoffs (largest to
+    smallest median 1.02 to 1.09) and between the 2024 and 2025 probe summers (at most 0.08 MW),
+    because a network with no year input averages over all its training years.
+  - >-
+    Where the probe and experiment 474 differ most (D9 +14%, D16 +11%, D5 -5%), experiment 474's
+    own table is flagged, so the next check is NGED's connection records, not a third estimator.
+advice:
+  - >-
+    Give NGED the calibrated probe table beside experiment 474's R4 table as two independent
+    season-year estimates, and describe the values as whole-summer capacity (table, resolution
+    section).
+  - >-
+    Do not read a change between two summers in the probe's capacity as a change in installed
+    capacity, because the 2024 and 2025 values differ by at most 0.08 MW at every Primary (table).
+  - >-
+    Ask NGED for its own connection records at D5, D9, and D16 before building another capacity
+    estimator, because those are the Primaries where the two methods differ by more than 10% or
+    where experiment 474 flags its own table (comparison table).
 ---
 
-# Capacity of unmetered solar behind the six MW Primaries, from the stored probes (planned)
+# Two independent methods agree on the unmetered solar behind the six MW Primaries
 
-This page is the plan. The experiment builds a table of the AC capacity of unmetered solar at each of
-the six signed-megawatt Primaries for the summer half-years of 2024 and 2025. It uses the stored
-outputs of experiments 621, 634, and 638 and refits nothing. The write-up replaces this section.
+**Take-home.** The neural-network probe, calibrated against injected real solar farms, estimates
+2.4 to 3.9 MW of AC unmetered solar behind the six MW Primaries in April to September 2025. The
+80% interval overlaps experiment 474's regression table at all six Primaries, so two methods that
+share no fitting code now agree. The values are whole-summer capacities: they do not resolve a
+change from one year to the next. Experiment 644 closed the explicit-solar forecast line as a
+forecast gain, so this table is an explainability and cross-check product for NGED.
 
-## Plan
+**Question and method.** Experiments 621, 634, and 638 trained neural networks that have no year
+input, and probed how much each Primary's net demand falls for a given amount of sunshine. This
+experiment reads the stored probe results and refits nothing. It divides the probe's capacity by the
+share of an injected real farm that the probe finds again (0.68 of the injected megawatts), and widens
+the interval by the spread of that share across four farms. The plan is committed first in this
+pull request.
 
-- **Why.** Experiment 644 closed the explicit-PV line as a forecast gain. The capacity estimate
-  remains useful as an explainability and cross-check product for NGED.
-- **Raw value.** Per cutoff, probe half-year, and Primary: the median over 3 seeds of the `plain`
-  control probe's capacity. The spread combines the 200-draw day-block bootstrap and the standard
-  deviation over seeds. The 10th and 90th percentiles are the median minus and plus 1.2816 standard
-  deviations, as in experiment 634.
-- **Calibrated value.** The raw value divided by the leave-one-farm-out factor: the median
-  recovery of the injected 4 MW real farms (A, B, C, F), leaving the farm out. The spread adds the
-  standard deviation of the four farms' median recoveries, in quadrature, to the relative spread.
-  The headline is the 2026-06 cutoff (the most training data). The other three cutoffs
-  (2025-07, 2025-10, 2026-03) are a sensitivity row. No cloud template is used in the headline.
-- **Energy-basis sensitivity.** Recovery per injected megawatt-hour, from experiment 634's
-  `energy_recoveries.csv`, gives the capacity of a physics-shaped plant carrying the same energy
-  (raw divided by the energy recovery), and the AC capacity of a farm-shaped fleet (that, divided by
-  the median farm-over-unit-curve energy ratio). The second is close to the megawatt basis by
-  construction, so prediction (5) is a consistency check.
-- **Comparison.** Each probe half-year Y (April to September of year Y) is set against experiment
-  474's R4 table for the two season-years (July to June) that its probe dates fall in, which are
-  the season-years starting in Y minus 1 and in Y. The comparison interval is the hull of the
-  two R4 intervals (lowest 10th percentile to highest 90th percentile), and the decision rule
-  counts overlap with that hull. The table also shows overlap with each season-year alone.
-  Experiment 479's anomaly rung
-  (`cloud = false`, `prior = none`; one interval per Primary, compared with both half-years), and
-  the register floor (experiment 267 has none for D9). Per Primary: whether the intervals overlap, by
-  how many megawatts, and as a share of the narrower interval.
-- **Coverage check and a post hoc widening.** The widening rule is applied to the leave-one-farm-out
-  constant injections, and the share of injections whose truth falls inside the 10th-to-90th
-  percentile interval is reported. If that share is under 80%, a second interval, labelled post
-  hoc, is widened by the smallest factor that reaches 80%. The verdict uses the pre-registered
-  interval.
-- **Resolution statement.** Values are season-year, not monthly. Experiment 638 found that a capacity
-  step is followed at 0.82 to 0.88 only in an ordinary spring, and experiment 634 found that a
-  sunny spring is read as solar capacity.
-- **Standing practices.** The data are stored probe outputs (cleaned power, the experiment 554
-  pretraining rows). No forecast is scored, so the tails, curtailment-cost, and example-forecast
-  rules do not apply. The D15 and D18 cut does not apply (the six signed-megawatt Primaries only).
-  Nothing from 2026-07-01 is used. Generators are not shown; the injected farms appear as A, B, C,
-  and F only in the recovery bullets.
-- **Review order.** Sonnet writes the script; a fresh Sonnet agent reviews the code before the first
-  run; a fresh Sonnet agent re-derives the headline numbers from the stored files; a fresh Sonnet agent
-  reviews the write-up; and a fresh Sonnet agent runs the prose review.
+![Calibrated probe, experiment 474, and experiment 479 per Primary](capacity_by_primary.svg)
 
-## Stop rules
+**Figure 1. At every Primary the calibrated probe (orange) overlaps experiment 474's R4 interval
+(blue), and the register floor (dashed) lies below the probe's 10th percentile.** The probe's 10th
+percentile is above the floor at all 5 Primaries that have one.
 
-- If the seed standard deviation of the raw capacity exceeds 0.5 MW at 3 or more Primaries, report
-  the table as unreliable and keep experiment 474's R4 table as the product.
-- If the cutoffs' calibrated medians differ by more than 30% at 3 or more Primaries, headline the
-  spread across cutoffs rather than the 2026-06 cutoff alone.
+## Table: AC capacity of unmetered solar, April to September 2025
+
+The raw value is the probe's capacity before calibration. The calibrated value is the raw value
+divided by 0.679, the mean over farms of the leave-one-farm-out recovery at the 2026-06 cutoff. Each
+row gives the 10th, 50th, and 90th percentiles in MW. The plain probe is used, with no cloud
+template.
+
+| Primary | Raw p10 | Raw p50 | Raw p90 | Calibrated p10 | Calibrated p50 | Calibrated p90 |
+|---|---|---|---|---|---|---|
+| D5 | 1.96 | 2.02 | 2.09 | 2.85 | 2.98 | 3.11 |
+| D9 | 1.50 | 1.66 | 1.82 | 2.20 | 2.44 | 2.68 |
+| D10 | 1.70 | 1.72 | 1.75 | 2.46 | 2.54 | 2.62 |
+| D11 | 2.12 | 2.32 | 2.52 | 3.11 | 3.42 | 3.73 |
+| D14 | 2.56 | 2.66 | 2.76 | 3.74 | 3.92 | 4.10 |
+| D16 | 2.01 | 2.15 | 2.28 | 2.95 | 3.16 | 3.38 |
+
+April to September 2024 (recovery factor 0.684), calibrated p10, p50, and p90: D5 2.84, 2.96, 3.08;
+D9 2.16, 2.39, 2.63; D10 2.44, 2.51, 2.59; D11 3.09, 3.40, 3.72; D14 3.69, 3.86, 4.03; D16 2.92,
+3.12, 3.32. The raw and calibrated values of every cutoff are in the private
+`work/capacity_table.parquet`.
+
+**Energy-basis sensitivity.** Measured in energy, the probe finds 0.88 (all daylight rows) or 0.78
+(donor rows) of an injected farm's energy, against 0.68 in megawatts, because a real farm carries
+less energy per unit of peak than a physics curve does. Dividing the raw value by the energy recovery
+gives the capacity of a physics-shaped plant carrying the same energy: at D5 2.29 MW (all daylight
+rows) or 2.59 MW (donor rows), and at D14 3.01 or 3.40 MW. Dividing again by the farms' energy ratio
+gives the AC capacity of a fleet shaped like the injected farms, which is 1.0% below the megawatt
+basis at every Primary, so the two bases agree.
+
+## Comparison with the earlier estimates
+
+The comparison interval for experiment 474 is the hull of its two season-years that overlap the
+probe's half-year (July 2024 to June 2025 and July 2025 to June 2026, for April to September 2025).
+Experiment 479's anomaly rung has one interval per Primary. "Share" is the overlap as a share of the
+narrower interval.
+
+| Primary | Probe p50 / R4 p50 | Overlap with R4 (MW, share) | Probe p50 / 479 p50 | Overlap with 479 (MW, share) | Register floor (MW) | Experiment 474 status |
+|---|---|---|---|---|---|---|
+| D5 | 0.95 | 0.06, 0.24 | 0.90 | -0.11 (gap) | 2.05 | export limit flagged |
+| D9 | 1.14 | 0.22, 0.61 | 1.13 | 0.11, 0.40 | none | pinned capacity flagged |
+| D10 | 0.94 | 0.17, 1.00 | 1.06 | 0.01, 0.08 | 1.90 | none |
+| D11 | 1.08 | 0.45, 0.89 | 1.06 | 0.24, 1.00 | 2.57 | none |
+| D14 | 1.06 | 0.36, 1.00 | 1.04 | 0.12, 0.58 | 2.52 | none |
+| D16 | 1.11 | 0.44, 1.00 | 0.90 | -0.02 (gap) | 2.20 | pinned capacity flagged |
+
+- **Experiment 474 R4:** overlap at 6 of 6 Primaries for April to September 2025 and 5 of 6 for April
+  to September 2024 (D16 has a 0.05 MW gap in 2024). The probe's median lies within 0.94 to 1.14 times
+  R4's.
+- **Experiment 479:** overlap at 4 of 6 for both half-years. D5 and D16 are separated by a gap, and the
+  probe is 10% below experiment 479's median at both.
+- **Register floor:** the probe's 10th percentile is at or above the Feed-in Tariff register floor at
+  all 5 Primaries that have a floor (experiment 267 has none for D9). The floor is a lower bound, so
+  this check can fail but cannot confirm.
+
+## Resolution: season-year only
+
+**The values describe a summer half-year and cannot date a change inside it.** Experiment 638 showed
+that a capacity step is followed at 0.82 to 0.88 only in an ordinary spring, and experiment 634
+showed that a sunny spring is read as solar capacity. The two probe summers differ by at most 0.08 MW
+at every Primary, and the four pretraining cutoffs differ by 2% to 9% (largest to smallest
+median). Experiment 474's R4 table, in contrast, moves by up to 0.36 MW between season-years (D10,
+2024 to 2025). The probe therefore agrees with experiment 474 on the level and says nothing about the
+trend.
+
+## Checks
+
+- **Median minus mean forecast, and mean-forecast error:** not applicable, because no forecast is
+  scored.
+- **Audit triggers:** none fired. No control or placebo is run here, no nested arm exists, and no
+  later experiment depends on this result. Prediction (4) missed its range (see below).
+- **Coverage:** the widened interval covers the truth in 0.81 of 96 leave-one-farm-out constant
+  injections (0.75 to 0.92 per cutoff and half-year). Experiment 634 read 0.66 with a different
+  widening (the standard deviation of the four leave-one-farm-out factors, against the standard
+  deviation of the four farms' median recoveries here), so the two figures are not comparable. With 96
+  injections, 0.81 is consistent with the nominal 0.80 and says nothing finer, so the post hoc widening
+  of the plan was not needed (factor 1.00).
+- **Predictions:** (1) held: overlap 6 of 6, and medians within 0.94 to 1.14 times R4's. (2) held: the
+  calibrated median is 1.46 to 1.47 times the raw median. (3) held: 5 of 5. (4) missed on the high
+  side, 0.81 against 0.60 to 0.80. (5) held: -1.0%.
+- **Stop rules:** the seed standard deviation of the raw capacity is at most 0.17 MW (stop at more than
+  0.5 MW at 3 Primaries); the cutoffs' medians differ by at most 9% (stop at 30% at 3 Primaries).
+- **Reviews:** a fresh Sonnet agent reviewed the code before the first run and found one low-medium
+  problem (the energy-basis rows included experiment 623's monotone arm and duplicate experiment 623
+  and 624 rows, a 0.3% shift), which is fixed, and five low items (stop-rule counting, a silent
+  NaN, a bootstrap degrees-of-freedom mismatch, an unused key, no svgo), all fixed.
+
+## Caveats and next steps
+
+- **Caveats:** the injected farms are four real metered farms that resemble each other, so the
+  recovery factor, and therefore the table, may not transfer to an unmetered fleet of rooftop panels
+  with other tilts. The farm spread is estimated from 4 farms. Experiment 474 flags its own table at
+  D5, D9, and D16. The probe covers April to September, so winter capacity is unprobed. Nothing dated
+  2026-07-01 or later is used. The raw rows, the table, and the figure source are in this
+  experiment's private folder.
+- **Next:** compare the table with NGED's connection records where NGED will share them, starting
+  with D5, D9, and D16.
+
+**Code:** `ml-experiments/00649-pv-capacity-table-season-year-from-stored-probes/e00649_table.py`
+reads experiment 634's stored probes, experiment 634's `energy_recoveries.csv` (which holds
+experiment 621's recoveries), and the stored tables of experiments 129, 474, and 479. It edits none
+of them.
+
