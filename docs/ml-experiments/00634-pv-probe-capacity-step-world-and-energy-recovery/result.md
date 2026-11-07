@@ -62,181 +62,224 @@ best_arm: >-
   rows), and the calibrated spring step reads 0.32 to 0.38 of its size at the first summer cutoff
   (bar 0.70).
 headline: >-
-  A solar-capacity step that starts in the very sunny April 2025 is read at 0.32 to 0.51 of its size
-  at every cutoff, and a step with no sky link reads about half as much, so most of the read is the
-  step's coincidence with the weather. A step that starts in July 2025 reads about 0.0 to 0.1.
+  A solar-capacity step that starts in April 2025 is read at 0.32 to 0.51 of its size at every
+  cutoff, and a placebo step with a shuffled shape is read at about half as much (nine tenths at the
+  first cutoff). A step that starts in July 2025 is read at 0.0 to 0.1. In energy the probe reads an
+  injected real farm at 0.78 to 0.88, against 0.68 in megawatts.
 lessons:
   - >-
-    The probe cannot date a capacity step: a step confined to a few months is read as the share of
-    that period's weather, not as a change in capacity, and the lag-free network averages over all
-    its training years (donor rows after the step are 19% of the total).
+    The probe cannot date a capacity step: the lag-free network averages over all its training
+    years, and only 19% of the donor rows follow the spring step.
   - >-
-    A step that coincides with unusually sunny weather (April to June 2025 clearness 0.76, against
-    0.61 a year earlier) is read as PV, even in a placebo shape; a step in a period of ordinary
-    weather (July to September) is not.
+    A step that starts in an unusually sunny period (April to June 2025 clearness 0.76, against 0.61
+    a year earlier) is read as solar capacity even with a shuffled shape; a step that starts in an
+    ordinary period (July to September) is read as almost nothing.
   - >-
-    A recovery factor measured on constant injections calibrates the constant injection to 0.95 to
-    1.04 at every cutoff, so the probe tracks a capacity that holds for the whole training window,
-    not one that changes inside it.
+    A recovery factor measured on constant injections calibrates a constant injection to 0.95 to
+    1.04 at every cutoff, so the probe tracks a capacity that holds across the whole training
+    window.
+  - >-
+    In energy the probe recovers 0.78 (plain network) to 0.81 (monotone network) of a real farm on
+    the donor rows, so the megawatt shortfall is partly a units effect, but the energy figure is not
+    tighter across Primaries or farms.
 take_home_message: >-
-  The probe cannot follow a solar-capacity step that happens inside the training history. It reads
-  a step that starts in a sunny spring as capacity even when the injected shape has no sky link, and
-  it reads a step that starts in a dull summer as almost nothing, so it reflects the weather of the
-  step's months more than the size of the step. It stays usable for a capacity that holds across the
-  whole training window, which it calibrates to within 5%.
+  The probe cannot follow a solar-capacity step that happens inside the training history. It read a
+  step starting in a very sunny spring as capacity even when the injected shape was shuffled, and it
+  read a step starting in an ordinary summer as almost nothing, so it reflects the weather of the
+  step's months as well as the size of the step. It stays usable for a capacity that holds across
+  the whole training window. In energy it recovers 0.78 to 0.88 of a real farm instead of 0.68, but
+  the figure is no more stable across substations.
 advice:
   - >-
     Report probed solar capacity as one value per training window (a season-year), never as a
-    capacity that changed inside the window, because the lag exceeds 9 months (step bar, lag).
+    capacity that changed inside the window, because no cutoff up to 14 months after the spring step
+    reached 0.7 (step figure).
   - >-
     Build a placebo step from a multi-year climatological profile, not the monthly profile of the
-    actual farm output, because the monthly profile keeps a month-level sky link (audit finding).
+    actual farm output, because the monthly profile probably keeps a month-level sky link (audit
+    finding).
   - >-
-    Check the clearness of the months a step covers before reading a step recovery, because a
-    step in a sunny spring read 0.3 to 0.5 of its size and a step in a dull summer read 0.0 to 0.1
-    (step figure).
+    Check the clearness of the months a step covers before reading a step recovery, because a step
+    in a sunny spring was read at 0.32 to 0.51 of its size and a step in an ordinary summer at 0.0 to
+    0.1 (step figure).
   - >-
-    Quote the recovery of a real farm in energy as well as in megawatts, weighted over the probe's
-    donor rows (0.78 plain, 0.81 monotone), because the all-rows and probe-cell ratios give 0.81
-    to 0.92 (energy figure).
+    Quote the recovery of a real farm in energy beside megawatts, weighted over the probe's donor
+    rows (0.78 plain, 0.81 monotone), and say which rows were summed, because the probe-cell and
+    all-rows ratios give 0.81 to 0.92 (energy figure).
 production_status: not-for-production
 adopted_in: none
 ---
 
-# Capacity-step world and energy-based recovery of the donor-day PV probe
+# A step in solar capacity, and recovery in energy, for the donor-day PV probe
 
-**We asked whether a probe of a lag-free neural network can follow a step in solar capacity, and
-whether its 0.68 recovery of an injected real farm is mostly a units effect.** The probe measures
-how much the network's demand forecast falls when the sky clears. We injected the output of a real
-solar farm into the training target at six Primary substations and checked how much of it the probe
-found again. In energy the probe finds 0.78 to 0.88 of a real farm, against 0.68 in megawatts, so
-part of the shortfall is a units effect. A step of +2 MW or +4 MW that starts in April 2025 is found
-at 0.32 to 0.51 of its size, a step with no sky link is found at about half of that, and a step that
-starts in July 2025 is found at 0.0 to 0.1. **The probe follows the weather of the step's months,
-not the step.** Verdict: not supported.
+**We asked whether a probe of a neural network can follow a step in solar capacity, and whether
+the probe's 0.68 recovery of an injected real solar farm is mostly an effect of the units.** The
+probe takes a neural network that is given no past power readings as input (a lag-free network, from
+experiments [554](../00554-m0-replication-five-seeds-leak-mitigations-and-leave-d8-out/result.md) and
+[621](../00621-pv-probe-injected-known-answer-and-placebo-test/result.md)) and measures how much its
+demand forecast falls when the sky clears. We added the half-hourly output of a real solar farm,
+scaled to 2 MW or 4 MW, to the demand that the network was trained to predict at six MW Primary
+substations. We then checked how much of that added capacity the probe found again, which we call
+the recovery (probed capacity divided by injected capacity, in megawatts or in megawatt-hours). In
+energy the probe recovers 0.78 to 0.88 of a real farm, against 0.68 in megawatts, so part of the
+shortfall comes from measuring in megawatts. A step is an addition that starts on 1 April 2025 or on
+1 July 2025 and continues to the end of the training data. The probe found a step starting in April
+at 0.32 to 0.51 of its size, found a placebo step with a shuffled shape at about half of that, and
+found a step starting in July at 0.0 to 0.1. **The probe's estimate tracks the weather of the step's
+months as well as the step.** Verdict: not supported.
 
 ![Share of the step read, by training cutoff](step_recovery_by_cutoff.svg)
 
+## Definitions
+
+- **Recovery**: the probed capacity of a network trained with the injection, minus that of the
+  network trained without it (same cutoff, seed, and Primary), divided by the injected capacity.
+- **Donor rows**: for each probe date and half-hour, the training rows within 21 days of the same day
+  of the year at the same half-hour. The probe regresses the network's forecast on the PV output
+  that the clear-sky irradiance of the donor rows implies.
+- **Cutoff**: the last date of the training data of one set of networks. The four cutoffs are
+  2025-07, 2025-10, 2026-03, and 2026-06.
+- **Calibrated**: the recovery divided by the leave-one-farm-out factor, which is the median
+  recovery of the constant-injection networks of the same cutoff whose injected farm differs from the
+  farm injected at that Primary.
+- **Plain network and monotone network**: experiment 554's unconstrained network, and experiment
+  [623](../00623-pv-probe-monotone-arm-known-answer/result.md)'s variant constrained so that net
+  demand cannot rise with shortwave irradiance. Part 2 uses the plain network only.
+- **Placebo step**: a step of the same size and calendar whose shape is the farm's monthly mean
+  output with the within-month anomaly shuffled. The page's results show it keeps some sky link.
+- **Energy ratio**: the sum of the farm's output over the sum of the physics unit PV curve, on one
+  set of rows. Part 1 uses three sets: the probe cells, the donor rows, and all daylight rows.
+- **Spread across Primaries (or farms)**: the standard deviation of the per-Primary (or per-farm)
+  median recoveries divided by their mean.
+- **Step bar**: for each of the four steps (spring or summer, 2 MW or 4 MW), the median calibrated
+  recovery over seeds is at least 0.7 at 4 of the 6 Primaries at 2025-10.
+
 ## Results
+
+**All four step bars fail, the placebo bar fails, and the noise-floor bar and the coverage bar of
+the constant injection pass.**
 
 | Bar (fixed before any step-world recovery was read) | Result |
 |---|---|
-| Calibrated step at 2025-10 at least 0.70 at 4 of 6 Primaries, each of 4 steps | **Fail** for all four: spring 0.32 (2 MW) and 0.38 (4 MW); summer 0.01 and 0.02 |
-| Shuffled-shape step under 0.3 MW at every cutoff | **Fail** for the spring placebo (95th percentile up to 2.06 MW; median per Primary 0.4 to 1.0 MW); the summer placebo fails at one Primary at 2025-10 (0.39 MW) and 2026-03 (0.64 MW) |
+| Calibrated step at 2025-10 at least 0.70 at 4 of 6 Primaries, each of the four steps | **Fail** for all four: spring 0.32 (2 MW) and 0.38 (4 MW); summer 0.01 and 0.02 |
+| Shuffled-shape step under 0.3 MW at every cutoff | **Fail** for the spring placebo (95th percentile over seeds up to 2.06 MW at one Primary; the median Primary's 95th percentile 0.55 to 1.33 MW) and for the summer placebo at 2025-10 (median 0.23, maximum 0.39 MW) and 2026-03 (median 0.33, maximum 0.64 MW) |
 | Seed noise floor, 95th percentile under 0.3 MW | **Pass**: 0.244 MW over 72 differences (median 0.094 MW) |
 | Widened interval covers the constant-injection truth in at least 60% | **Pass**: 0.66 (0.64 to 0.69 by cutoff) |
 | Same interval covers the full step / the calendar-blind share | 0.01 / 0.25 |
 | Lag to 0.7 within 9 months | **Stop rule fired**: no cutoff reaches 0.7, so only season-year values are reportable |
+| Energy-based recovery of a 4 MW real farm in 0.80 to 1.00 (median over Primaries) | **Mixed**: 0.78 on donor rows (fail), 0.80 on probe cells and 0.88 on all rows (pass) |
+| Energy-based spread across Primaries narrower than the megawatt spread | **Fail**: see "Energy-based recovery" |
 
-- **The summer-step networks at 2025-07 read exactly zero** (largest absolute difference
-  6.6e-7 MW), because they train on rows identical to the control's. The check confirms the probe is
-  deterministic and is the only pre-step check of a real-farm step.
+- **The spring step is read at far more than its share of training rows.** Only 19% of the donor rows
+  (23% at 2026-06) are dated after 1 April 2025, but the calibrated recovery is 0.32 to 0.51.
+  The summer step is read below its share at 2025-10 and 2026-03 (0.09 of donor rows against 0.01 to
+  0.02 and -0.02 to -0.01 read) and near it at 2026-06 (0.14 against 0.08 to 0.12).
+- **The recovery of the spring step does not grow steadily with time.** The 4 MW step is recovered
+  at 0.45, 0.38, 0.33, and 0.51 at the four cutoffs. The fall from 2025-07 to 2025-10 holds at all six
+  Primaries (mean 0.08). The audit traced it to the donor mix: the ordinary July to September 2025
+  donors dilute the sunny April to June 2025 ones.
 - **The constant injection calibrates to 1.** The leave-one-farm-out factor is 0.671, 0.689, 0.680,
-  and 0.685 at the four cutoffs, and the calibrated constant injection reads 0.95 to 1.04 at every
-  Primary and cutoff. A capacity that holds across the training window is read correctly.
-- **The spring step reads far more than its share of training rows.** Only 19% of the donor rows
-  (23% at 2026-06) are dated after 1 April 2025, but the calibrated read is 0.32 to 0.51. The summer
-  step reads below its share at 2025-10 and 2026-03 (0.09 of donor rows, 0.01 and -0.01 read) and
-  near it at 2026-06 (0.14 of donor rows, 0.08 to 0.12 read).
-- **The read does not rise with time.** The spring step reads 0.45 (4 MW), 0.38, 0.33, and 0.51 at
-  the four cutoffs. The fall from 2025-07 to 2025-10 holds at all six Primaries (mean 0.08); the
-  audit traced it to the donor mix, because the dull July to September 2025 donors dilute the sunny
-  April to June 2025 ones.
+  and 0.685 at the four cutoffs, and the calibrated constant injection is recovered at 0.95 to 1.04 at
+  every Primary and cutoff.
+- **The summer-step networks at 2025-07 read zero to within 6.5e-7 MW**, because they train on rows
+  identical to the control's. This is a determinism check and the only pre-step check of a real-farm
+  step that this experiment runs, because the spring step starts before the earliest cutoff.
+- **Primary D9 is the highest.** The 4 MW spring step reaches 0.82 at 2025-07 at D9 and 0.60 to 0.67
+  at the other cutoffs; the other five Primaries stay below 0.55.
 
 ![Real-farm step and placebo step](placebo_against_real_step.svg)
 
-## Why a placebo reads capacity
+## Why a placebo step is read as capacity
 
-**A step confined to a sunny period is learned as a response to sunshine.** The clearness (the ratio
-of measured to clear-sky shortwave irradiance) over the six Primaries was 0.76 in April to June 2025
-against 0.61 in April to June 2024 and 0.65 to 0.69 in 2020 to 2023, and 0.61 in July to September
-of both years. A demand step that exists only in the sunny months is therefore correlated with sky
-clearness in the training rows, and the probe reads the correlation. The audit found this explains
-the summer step completely and the spring step by 55% to 65%, and the placebo by only 10% to 30%
-(regressions of the injected MW on the unit PV curve with the probe's own cells).
+**A step whose donor rows fall mostly in a sunny period is learned as a response to sunshine.** The
+clearness (the ratio of measured to clear-sky shortwave irradiance) over the six MW Primaries was
+0.76 in April to June 2025. It was 0.61 in April to June 2024 and 0.65 to 0.69 in 2020 to 2023, and
+0.61 in July to September of both 2024 and 2025. A demand step that exists only in the sunny months
+is correlated with sky clearness in the training rows, and the probe reads that correlation. In the
+audit's regressions of the injected megawatts on the unit PV curve over the probe's own cells, sky
+clearness explains the summer step completely, the spring step by 55% to 65%, and the placebo by 10%
+to 30%. The calendar-blind share (0.19 to 0.23 of the donor rows) and the weather coincidence
+overlap and do not add.
 
-- **The shuffled-shape placebo is not sky-free.** The placebo keeps the monthly mean of the farm's
-  actual output and shuffles only the anomaly within the month, so a sunny April carries a large
-  injection. Its reads therefore partly measure a month-level sky link and are an upper bound on
-  spurious capacity.
-- **Moving the base date to 2024 changes nothing.** Probing with base dates 364 days earlier (before
-  either step) reads the spring step at 0.37, 0.31, and 0.48 (2025-10, 2026-03, 2026-06) against
-  0.38, 0.32, and 0.49 with 2025 base dates, so the network does not use a calendar or holiday
-  signature to switch the step on (post hoc probe, run after the audit asked for it; at 2025-07 it
-  is 0.33 against 0.43 with only 6 base dates).
+- **The shuffled-shape placebo probably keeps a month-level sky link.** The placebo keeps the monthly
+  mean of the farm's actual output and shuffles only the anomaly within the month, so a sunny April
+  carries a large injection. The placebo's recoveries are therefore an upper bound on spurious capacity.
+- **Moving the probe dates one year earlier changes the spring step's recovery by at most 0.02 at
+  three cutoffs.** With probe dates 364 days earlier (before either step) the 4 MW spring step is
+  recovered at 0.37, 0.31, and 0.48 at 2025-10, 2026-03, and 2026-06, against 0.38, 0.32, and 0.49
+  with the 2025 dates. At 2025-07, where only 6 dates exist, it is 0.33 against 0.43. The network
+  shows no sign of using a calendar or holiday signature to switch the step on. This probe was run
+  after the audit asked for it and is post hoc.
 
 ## Energy-based recovery of a real farm
 
 ![Recovery of a real farm in megawatts and in energy](energy_recovery_by_primary.svg)
 
-**In energy, the probe recovers a real farm at 0.78 (plain network) to 0.81 (monotone network)
-weighted over the probe's own donor rows.** The same recovery is 0.81 and 0.85 on the probe cells
-and 0.88 and 0.92 over all daylight rows, against 0.68 and 0.72 in megawatts. The energy ratio of
-the farms to the physics curve is 0.72 to 0.84 over all rows (the figure experiment 624's audit
-found) and 0.76 to 0.95 over the probe cells.
+**In energy, the probe recovers a real farm at 0.78 (plain network) to 0.81 (monotone network) over
+the probe's donor rows.** The same recovery is 0.81 and 0.85 over the probe cells and 0.88 and 0.92
+over all daylight rows, against 0.68 and 0.72 in megawatts. The figures pool the cutoffs 2026-03 and
+2026-06 and the 2 MW and 4 MW injections of experiments 621, 623, and 624. The energy ratio of the
+farms to the physics curve is 0.72 to 0.84 over all rows, the figure that experiment
+[624](../00624-pv-probe-contrastive-injection-arms/result.md)'s audit found, and 0.76 to 0.95 over
+the probe cells.
 
-- **Energy-based recovery is not tighter.** The spread across Primaries (standard deviation divided
-  by mean) is 0.023 in megawatts and 0.029 (donor rows), 0.039 (cells), and 0.032 (all rows) in
-  energy, and across farms 0.017 in megawatts and 0.027 (donor rows), 0.061 (cells), and 0.035 (all
-  rows) in energy. The prediction that it falls fails.
-- **The energy figure depends on the population summed over.** The donor-row figure is the most
-  faithful, because the regression runs over those rows, so the figures (0.78 to 0.88) bracket it.
+- **Energy-based recovery is not more stable.** The spread across Primaries is 0.023 in megawatts
+  and 0.029 (donor rows), 0.039 (probe cells), and 0.032 (all rows) in energy. Across farms it is
+  0.017 in megawatts and 0.027 (donor rows), 0.061 (probe cells), and 0.035 (all rows) in energy.
+- **The energy figure depends on the rows summed over.** The donor-row figure is the closest to
+  the regression's own rows and is the lowest of the three, so the range 0.78 to 0.88 is the honest
+  statement.
 
-## Deviations, and what was wrong in the plan
+## Deviations from the plan
 
 - **The plan assumed the pretraining rows start in April 2024.** They go back to 2019 or 2020, so
-  only about 19% of donor rows follow a step on 1 April 2025, not about 50%. The predicted share
-  (0.5 for the spring step, 0.2 for the summer step) was wrong; the share is computed from the
-  probe's donor rows in the analysis, and the full-step bar was never reachable.
-- **The year-shifted probe was added after the audit.** It is post hoc and labelled as such.
-- **The widened interval is too narrow for a farm-to-farm spread of 0.03 to 0.07.** The leave-one-
-  farm-out factor's own spread (0.001 to 0.009) is small, so constant-injection coverage is 0.66 and
-  not the nominal 0.80. The bar passes.
-- **Only the plain network was run, and only rotation 0 in the step worlds.**
+  only about 19% of donor rows follow a step on 1 April 2025, not about 50%. The predicted share (0.5
+  for the spring step, 0.2 for the summer step) was wrong, and the full-step bar was out of reach
+  from the start.
+- **The widened interval is too narrow.** The leave-one-farm-out factor's own spread (0.001 to
+  0.009) is smaller than the spread of recoveries across farms
+  (0.017 in megawatts and up to 0.061 in energy), so constant-injection coverage is 0.66, not the
+  nominal 0.80. The bar passes.
+- **The scope is narrow.** Two step months, one rotation of the real-farm shape (farms A, B, C, F, A,
+  B at the six Primaries), the plain network, and six MW Primaries. The calibration is in-sample at
+  each cutoff, with the injected farm left out.
 
 ## Checks
 
-- **Median forecast minus mean forecast, per site:** not applicable, because the experiment scores
-  no forecast.
+- **Median forecast minus mean forecast, per site:** not applicable, because the experiment scores no
+  forecast.
 - **Error of the mean or median forecast beside every quantile-score contrast:** not applicable, for
   the same reason.
-- **Triggers fired:** a placebo failed (trigger 1), and the result contradicted its own prediction
-  (trigger 2: the step read 0.32 to 0.51 against a predicted share of 0.2). A fresh Sonnet agent
-  re-derived the headline numbers from the stored probe outputs. Its findings and how each was
-  triaged: the step bar, the placebo, and the non-monotone ordering reproduced (accepted); the
-  sunny-spring explanation holds in direction and not fully in size (wording changed to "largely");
-  the placebo's monthly profile and the false 2024 start (accepted and stated above); the factor's
-  understated spread (accepted, stated above).
+- **Triggers that fired:** a placebo failed its bar, and the result contradicted its own prediction
+  (the spring step was recovered at 0.32 to 0.51 against a predicted share of 0.5 at most). The audit
+  was a fresh agent that re-derived the headline numbers from the stored probe outputs. Triage:
+    - The step bar, the placebo, and the non-monotone ordering reproduced (accepted).
+    - The sunny-spring explanation holds in direction and not fully in size (stated above with the
+      55% to 65% figure).
+    - The placebo's monthly profile and the wrong 2024 start of the rows (accepted, stated above).
+    - The understated spread of the factor (accepted, stated above).
 
 ## Method
 
-- **Part 1** (`e00634_energy.py`): `recovery_energy = recovery_MW x sum(u) / sum(farm)`, summed over
-  the probe cells, over the probe's donor rows, and over all daylight rows. It re-scores the stored
-  recoveries of experiments
-  [621](../00621-pv-probe-injected-known-answer-and-placebo-test/result.md),
-  [623](../00623-pv-probe-monotone-arm-known-answer/result.md), and
-  [624](../00624-pv-probe-contrastive-injection-arms/result.md).
-- **Part 2** (`e00634_fit.py`, `e00634_probe.py`, `e00634_analyse.py`, `e00634_report.py`): copies
-  of experiment 621's scripts with step conditions. The scripts import experiments 397, 405, 409,
-  428, 448, 510, 554, and 623 and edit none of them. The network, rows, loss, early stopping, and
-  seeds (0, 1, 2) are experiment 554's. 108 fits took about 0.7 GPU-hours on one GPU process.
-- **Cutoffs 2025-07, 2025-10, 2026-03, and 2026-06;** probe dates are 12 Wednesdays from 2025-04-09
-  to 2025-09-10 (6 of them at 2025-07). Farm gaps drop 15.6% of the six Primaries' rows from every
-  arm.
+- **Part 1** (`e00634_energy.py`) re-scores the stored recoveries of experiments 621, 623, and 624 as
+  `recovery_energy = recovery_MW x sum(u) / sum(farm)`.
+- **Part 2** (`e00634_fit.py`, `e00634_probe.py`, `e00634_analyse.py`, `e00634_report.py`) copies
+  experiment 621's scripts and adds the step conditions. The scripts import experiments 397, 405, 409,
+  428, 448, 510, 554, 621, and 623 and edit none of them. The 108 fits took about 0.7 GPU-hours of
+  fitting. Farm gaps dropped 15.4% to 15.9% of the six Primaries' rows from every arm.
 
 ## What the next experiment should answer
 
 The probe measures a capacity that holds across the training window, so the open question is whether
 the capacity can be read per season-year by training one network per window. A cleaner test of the
-step reading would inject steps in a dull spring and a sunny summer, with a placebo built from a
-multi-year climatological profile, to separate the weather coincidence from the probe's date-
-blindness.
+step reading would inject steps in an ordinary spring and a sunny summer, with a placebo built from a
+multi-year climatological profile, to separate the weather coincidence from the probe's date-blindness.
 
-## Plan
+## Plan, as written before the results
 
 **Standing practices followed.** Cleaned data, development months only, the six MW Primaries, and
 anonymised farms (Solar A to F, by letter). Not followed: no forecast is scored, so there is no
-tails, curtailment, or example-forecast reporting. Earlier advice followed: report a calibrated
+tail-calibration, curtailment, or example-forecast reporting. Earlier advice followed: report a calibrated
 figure beside the raw one, widen intervals by the leave-one-farm-out spread of the factor, and drop
 the cloud template from the headline (experiments 623 and 624).
 
@@ -256,7 +299,7 @@ Primaries from the first day of a step month, using the real-farm shape of exper
 rotation 0 (farm A, B, C, F, A, B): `step_spring_mw2` and `step_spring_mw4` from 2025-04-01, and
 `step_summer_mw2` and `step_summer_mw4` from 2025-07-01. Two placebo conditions use the same
 calendar and energy with the sky link removed (the shuffled shape of experiment 621):
-`shufstep_spring_mw4` and `shufstep_summer_mw4`. An `control` condition has no injection. Every
+`shufstep_spring_mw4` and `shufstep_summer_mw4`. A `control` condition has no injection. Every
 condition shares one row mask, as in experiment 621. The network, rows, loss, early stopping, and
 seeds (0, 1, 2) are experiment 554's `pretrain` through experiment 621's `fit`; the probe is
 experiment 621's `probe`. Cutoffs: 2025-07, 2025-10 (the first summer cutoff after both steps),
@@ -274,18 +317,17 @@ by construction: a determinism check, and the only pre-step check of a real-farm
 spring step starts before the earliest cutoff. The seed noise floor and the shuffled steps stand in
 for the brief's pre-step placebo.
 
-**What a network that cannot tell the year can know** (written before the results; the expected
-shares rest on a wrong assumption, see "Deviations"). The pretraining inputs carry the sun's
-position, the time of day, the day of the week, and holiday columns, and no year or day of the year.
-Weekday and moving holidays carry some information about the year, so the network may not be fully
-calendar-blind; the constant-injection controls and the step networks test this. A calibrated probe
-would then read the average of the injected capacity over the rows the probe reaches. The probe's
-donor days are within 21 days of the probe date's day of the year and at the same half-hour, so the
-truth a calendar-blind network can know is `mw x post-step share of the donor rows`. We compute that
-share per cutoff and Primary from the probe's donor rows and report the recovery against both the
-full step and this share.
+**What a network that cannot tell the year can know** (written before the results). The pretraining
+inputs carry the sun's position, the time of day, the day of the week, and holiday columns, and no
+year or day of the year. Weekday and moving holidays carry some information about the year, so the
+network may not be fully calendar-blind; the constant-injection controls and the step networks test
+this. A calibrated probe would then read the average of the injected capacity over the rows the
+probe reaches. The probe's donor days are within 21 days of the probe date's day of the year and at
+the same half-hour, so the truth a calendar-blind network can know is `mw x post-step share of the
+donor rows`. We compute that share per cutoff and Primary from the probe's donor rows and report the
+recovery against both the full step and this share.
 
-**Bars (fixed now).**
+**Bars (fixed before any step-world recovery was read).**
 
 - **Step bar.** The calibrated step at 2025-10 is at least 70% of the injected step, at 4 of the 6
   Primaries, for both step months and both sizes.
@@ -300,22 +342,3 @@ full step and this share.
   the full step and the calendar-blind share.
 - **Lag.** Months from the step to the first cutoff at which the calibrated recovery of the full
   step reaches 0.7 at the median Primary; stop rule above.
-
-## Definitions
-
-- **Raw step**: the probed capacity of the step network minus that of the control network of the
-  same cutoff, seed, Primary, and regression. **Calibrated step**: the raw step divided by the
-  leave-one-farm-out factor, the median recovery of the `farm_mw4` networks of the same cutoff whose
-  injected farm differs from the farm injected at that Primary.
-- **Energy ratio** `R = sum(farm) / sum(u)`, reported on the probe cells (the Primary's own weather
-  at the probe dates and 10:00 to 15:00 UTC) and on all daylight pretraining rows. The regression
-  runs over donor rows, which sit between the two populations, so the two figures bracket the
-  energy-based recovery. On all rows the physics-curve world has `R = 1` by construction.
-- **Spread across Primaries (or farms)**: the standard deviation divided by the mean of the
-  per-Primary (or per-farm) median recoveries.
-- **Seed noise floor**: the probed capacity of one control network minus another of the same cutoff,
-  over the three seed pairs, six Primaries, and four cutoffs (72 differences); the bar is on the
-  95th percentile of their absolute value.
-- **The step bar** applies to each of the four combinations (spring or summer, 2 MW or 4 MW)
-  separately, and passes when the median calibrated step over seeds is at least 70% of the injected
-  step at 4 of the 6 Primaries.

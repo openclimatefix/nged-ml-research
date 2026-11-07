@@ -41,7 +41,10 @@ class Std:
 
 
 def energy_ratios() -> pl.DataFrame:
-    """Return, per cutoff, Primary and farm, the farm-over-unit-curve energy ratio on the probe cells and on all rows."""
+    """Return the farm-over-unit-curve energy ratio per cutoff, Primary, and farm.
+
+    The ratio is taken over the probe cells, the donor rows, and all daylight rows.
+    """
     out = []
     for cutoff in k.CUTOFFS:
         frame = p623.load_frame(cutoff=cutoff)

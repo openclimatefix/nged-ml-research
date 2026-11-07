@@ -32,7 +32,10 @@ def load(*, probes: str) -> pl.DataFrame:
 
 
 def paired(df: pl.DataFrame) -> pl.DataFrame:
-    """Return one row per injected network: the capacity difference to the control of the same cutoff, seed, and Primary."""
+    """Return the capacity difference of each injected network to its control.
+
+    The control has the same cutoff, seed, and Primary.
+    """
     ctl = df.filter(pl.col("condition") == "control").select(
         "cutoff", "seed", "site", ctl=pl.col("capacity_mw"), ctl_boot=pl.col("boot")
     )

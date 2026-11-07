@@ -26,7 +26,10 @@ ORDER = [CUTOFF_LABEL[c] for c in k.CUTOFFS]
 
 
 def per_primary(rec: pl.DataFrame, *, conditions: list[str], column: str) -> pl.DataFrame:
-    """Return the median over seeds per cutoff, condition, and Primary, then its median and range over the six Primaries."""
+    """Return the median over seeds per cutoff, condition, and Primary.
+
+    The result holds the median and range of those medians over the six Primaries.
+    """
     sel = rec.filter(pl.col("condition").is_in(conditions))
     med = sel.group_by("cutoff", "condition", "site").agg(
         v=pl.col(column).median(), share=pl.col("share").first()
@@ -54,8 +57,12 @@ def line_panel(
     rule: float | None,
     rule_label: str | None,
     share: bool,
+    symmetric: bool = False,
 ) -> alt.Chart:
-    """Return one panel: median dots joined by a line, a range bar per cutoff, an optional reference rule and share line."""
+    """Return one panel of median dots joined by a line, with a range bar per cutoff.
+
+    An optional reference rule and a share line are drawn on top.
+    """
     colour = alt.Color(
         "label:N",
         scale=alt.Scale(domain=list(colours), range=list(colours.values())),
@@ -73,7 +80,7 @@ def line_panel(
     ]
     if rule is not None:
         layers.append(
-            alt.Chart(pl.DataFrame({"y": [rule]}))  # ty: ignore[unresolved-attribute]
+            alt.Chart(pl.DataFrame({"y": [rule, -rule] if symmetric else [rule]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#444444", strokeDash=[5, 3], strokeWidth=1.5)
             .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=domain)))
         )
@@ -89,7 +96,7 @@ def line_panel(
             .encode(x=x, y=alt.Y("share:Q", scale=alt.Scale(domain=domain)))  # ty: ignore[unresolved-attribute]
         )
     return alt.layer(*layers).properties(  # ty: ignore[invalid-return-type]
-        width=W, height=190, title=alt.TitleParams(title, anchor="start", fontSize=12)
+        width=W, height=150, title=alt.TitleParams(title, anchor="start", fontSize=12)
     )
 
 
@@ -119,7 +126,7 @@ def fig_step(rec: pl.DataFrame) -> None:
         title=alt.TitleParams(
             [
                 "Share of an injected solar-capacity step that the probe reads, by training cutoff (1 is the whole step).",
-                "Dot: median over the six MW Primaries (calibrated, 3 seeds). Line: range over Primaries.",
+                "Dot: median over the six MW Primaries (calibrated, 3 seeds). Vertical line: range over Primaries.",
                 "Orange diamonds: the share of donor rows dated after the step, the most a calendar-blind network could read.",
                 "Dashed line: the 0.7 bar.",
             ],
@@ -140,9 +147,7 @@ def fig_placebo(rec: pl.DataFrame) -> None:
         conds = [f"step_{month}_mw4", f"shufstep_{month}_mw4"]
         d = per_primary(rec, conditions=conds, column="delta_mw").with_columns(
             label=pl.col("condition").map_elements(
-                lambda c: (
-                    "Real farm shape" if c.startswith("step") else "Shuffled shape (no sky link)"
-                ),
+                lambda c: "Real farm shape" if c.startswith("step") else "Shuffled shape (placebo)",
                 return_dtype=pl.String,
             )
         )
@@ -151,7 +156,7 @@ def fig_placebo(rec: pl.DataFrame) -> None:
                 d,
                 colours={
                     "Real farm shape": theme.DATA_GREEN,
-                    "Shuffled shape (no sky link)": theme.DATA_PURPLE,
+                    "Shuffled shape (placebo)": theme.DATA_PURPLE,
                 },
                 title=label,
                 domain=[-0.5, 3.0],
@@ -159,14 +164,15 @@ def fig_placebo(rec: pl.DataFrame) -> None:
                 rule=0.3,
                 rule_label=None,
                 share=False,
+                symmetric=True,
             )
         )
     chart = alt.vconcat(*panels).properties(
         title=alt.TitleParams(
             [
-                "Capacity read by the probe for a 4 MW step of real-farm shape and of a shape with no sky link, by cutoff.",
-                "Dot: median over the six MW Primaries (raw, 3 seeds, minus the network trained without the step). Line: range.",
-                "Purple is a placebo: any capacity it reads is invented. Dashed line: the 0.3 MW bar for a placebo.",
+                "Capacity read by the probe for a 4 MW step of real-farm shape and of a shuffled shape (placebo), by cutoff.",
+                "Dot: median over six MW Primaries (raw, 3 seeds, minus the no-step network). Line: range over Primaries.",
+                "Purple: capacity read for the placebo is not real PV. Dashed lines: the bar of 0.3 MW either side of zero.",
             ],
             anchor="start",
             fontSize=11,
@@ -181,6 +187,7 @@ def fig_energy(rec: pl.DataFrame) -> None:
     cols = {
         "recovery_mw": "Per injected MW",
         "recovery_energy_donors": "Per injected energy (donor rows)",
+        "recovery_energy_cells": "Per injected energy (probe cells)",
         "recovery_energy_rows": "Per injected energy (all rows)",
     }
     long = pl.concat(
@@ -192,6 +199,7 @@ def fig_energy(rec: pl.DataFrame) -> None:
     colours = {
         "Per injected MW": theme.DATA_BLUE,
         "Per injected energy (donor rows)": theme.DATA_GREEN,
+        "Per injected energy (probe cells)": theme.DATA_PURPLE,
         "Per injected energy (all rows)": theme.DATA_SKY,
     }
     base = alt.Chart(long).encode(
