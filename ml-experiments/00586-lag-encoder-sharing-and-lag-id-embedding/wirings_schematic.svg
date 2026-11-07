@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="230" font-family="sans-serif" font-size="11"><rect width="680" height="230" fill="#fffcf5"/>
+<text x="8" y="18" font-size="13">Five ways of wiring the lag encoder (the weather and datetime encoders and the mixer are the same in all five)</text>
+<text x="8" y="34" font-size="10">Expected embeddings: the weather and datetime encoders applied at the lag's own time. Every arm also has the D5 output offset.</text>
+<rect x="8" y="48" width="12" height="24" fill="#306BFF"/><text x="26" y="58" font-weight="bold">S0: One encoder reads both lags</text><text x="26" y="70" font-size="10">[day lag, week lag, 4 expected-weather embeddings] -> encoder -> 32 numbers -> mixer</text>
+<rect x="8" y="82" width="12" height="24" fill="#FF4901"/><text x="26" y="92" font-weight="bold">S1: Shared encoder + learnt lag ID</text><text x="26" y="104" font-size="10">[one lag, its 2 expected embeddings, ID(day|week)] -> same encoder, twice -> 2 x 32 -> mixer</text>
+<rect x="8" y="116" width="12" height="24" fill="#777777"/><text x="26" y="126" font-weight="bold">S2: Shared encoder, no lag ID</text><text x="26" y="138" font-size="10">[one lag, its 2 expected embeddings] -> same encoder, twice -> 2 x 32 -> mixer</text>
+<rect x="8" y="150" width="12" height="24" fill="#17E58F"/><text x="26" y="160" font-weight="bold">S3: Separate encoder per lag</text><text x="26" y="172" font-size="10">[day lag, ...] -> encoder A;  [week lag, ...] -> encoder B -> 2 x 32 -> mixer</text>
+<rect x="8" y="184" width="12" height="24" fill="#B701FF"/><text x="26" y="194" font-weight="bold">S4: Shared encoder + fixed period code</text><text x="26" y="206" font-size="10">[one lag, its 2 expected embeddings, code(1 day|7 days)] -> same encoder, twice -> 2 x 32 -> mixer</text>
+</svg>
