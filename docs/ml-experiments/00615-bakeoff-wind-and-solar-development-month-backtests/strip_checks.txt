@@ -1,0 +1,27 @@
+wind_W1_high_wind: 4 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W1
+wind_W1_calm: 88 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W1
+wind_W1_gap: 116 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W1
+wind_W2_high_wind: 36 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W2
+wind_W2_calm: 65 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W2
+wind_W2_gap: 135 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W2
+wind_W3_high_wind: 13 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W3
+wind_W3_calm: 145 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W3
+wind_W3_gap: 181 of 672 usual half-hours have no reading (strip), file wind_climatology.parquet, series W3
+solar_Solar_A_very_sunny: 1 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar A
+solar_Solar_A_cloudy: 1 of 168 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar A
+solar_Solar_A_gap: 47 of 308 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar A
+solar_Solar_B_very_sunny: 0 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar B
+solar_Solar_B_cloudy: 0 of 168 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar B
+solar_Solar_B_gap: 42 of 280 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar B
+solar_Solar_C_very_sunny: 1 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar C
+solar_Solar_C_cloudy: 0 of 168 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar C
+solar_Solar_C_gap: 42 of 280 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar C
+solar_Solar_D_very_sunny: 59 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar D
+solar_Solar_D_cloudy: 9 of 168 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar D
+solar_Solar_D_gap: 65 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar D
+solar_Solar_E_very_sunny: 26 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar E
+solar_Solar_E_cloudy: 0 of 168 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar E
+solar_Solar_E_gap: 54 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar E
+solar_Solar_F_very_sunny: 2 of 406 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar F
+solar_Solar_F_cloudy: 0 of 168 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar F
+solar_Solar_F_gap: 41 of 280 usual half-hours have no reading (strip), file solar_a2_member_quarterly.parquet, series Solar F
