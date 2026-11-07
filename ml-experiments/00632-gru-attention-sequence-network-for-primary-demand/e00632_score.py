@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501, D103, RUF005
 """Experiment 632: score arms on the export's keys.
 
 CRPS is twice the mean pinball loss over the 11 levels, in points of capacity (percent of the
@@ -84,9 +84,7 @@ def score(*, arm_df: pl.DataFrame, month: str) -> pl.DataFrame:
         mae=(y - pl.col("q50")).abs() / pl.col("capacity") * 100,
         hit=((pl.col("q05") <= y) & (y <= pl.col("q95"))).cast(pl.Float64),
         above90=(y > pl.col("q90")).cast(pl.Float64),
-        day=(
-            (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / (24 * 60)
-        )
+        day=((pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / (24 * 60))
         .ceil()
         .cast(pl.Int64),
         month=pl.lit(month),

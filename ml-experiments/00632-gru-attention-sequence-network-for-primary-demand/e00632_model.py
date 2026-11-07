@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D102, D107
+# ruff: noqa: E501, D102, D107, RUF059
 """Experiment 632: the GRU plus self-attention network (Seq) and its ablations.
 
 Input layout of a batch is `e00632_data.Batch`. Per token: a weather encoder over the 7 weather

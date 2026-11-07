@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: D103
 """Experiment 632: month-by-half-hour climatology row.
 
 For each Primary and fold month, the quantiles of the cleaned power (a share of capacity) at the
@@ -13,7 +13,7 @@ import e00632_data as d
 import e00632_fold as fold_mod
 import numpy as np
 import polars as pl
-from e00632_score import MONTHS, Q, ROOT, TAU
+from e00632_score import MONTHS, ROOT, TAU, Q
 
 N_FUT = 336
 
@@ -31,7 +31,11 @@ def main() -> None:
     for month in MONTHS:
         origins = fold_mod.test_origins(month=month)
         refit = fold_mod.month_start(month=month)
-        end = fold_mod.idx_of(t=refit) - fold_mod.CUTOFF_AGE_STEPS if hasattr(fold_mod, "CUTOFF_AGE_STEPS") else fold_mod.idx_of(t=refit) - 7
+        end = (
+            fold_mod.idx_of(t=refit) - fold_mod.CUTOFF_AGE_STEPS
+            if hasattr(fold_mod, "CUTOFF_AGE_STEPS")
+            else fold_mod.idx_of(t=refit) - 7
+        )
         fallbacks = 0
         table = np.full((n_p, 13, 48, 11), np.nan, dtype=np.float32)
         for p in range(n_p):
@@ -39,7 +43,9 @@ def main() -> None:
                 for sl in range(48):
                     v = clean[p, :end][(month_of[:end] == mo) & (slot[:end] == sl)]
                     v = v[np.isfinite(v)]
-                    if len(v) < 10:  # no history in this calendar month: use every month at this half-hour
+                    if (
+                        len(v) < 10
+                    ):  # no history in this calendar month: use every month at this half-hour
                         v = clean[p, :end][slot[:end] == sl]
                         v = v[np.isfinite(v)]
                         fallbacks += 1

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN202
+# ruff: noqa: E501, D103, ANN001, ANN201, E731
 """Experiment 632: load-shift ride-through on experiment 581's lag-only injected bank.
 
 For each fold month and each of the bank's 24 passes, a constant shift is added to the cleaned power
@@ -29,6 +29,7 @@ import torch  # ty: ignore[unresolved-import]
 from e00632_score import KEYS, Q
 
 DEV = "cuda"
+HIST = int(__import__("os").environ.get("HIST", "336"))
 EXTREME = ["q05", "q50", "q95"]
 PHASES = ("before", "d0-3", "d4-end", "after0-7")
 LENGTHS_SCORED = (3, 7, 15)
@@ -60,16 +61,24 @@ def seq_forecast(*, ctx: dict, tag: str, month: str, seeds, clean_inj: np.ndarra
     x = d.standardised_inputs(raw=ctx["raw"], fold=fold, device=DEV, b1_grid=b1g)
     w = d.Windows(
         x=x, z=z, nb_mean=nb_mean, nb_share=nb_share, cams=cams, tau=ctx["tau"],
-        n_hist=336, n_fut=336, device=DEV, z_in=z_in,
+        n_hist=HIST, n_fut=336, device=DEV, z_in=z_in,
     )  # fmt: skip
     refit = fold_mod.month_start(month=month)
     n_knots = int((refit.year - 2019) * 12 + refit.month - 9) + 1
     origins = fold_mod.test_origins(month=month)
     frames = []
     for seed in seeds:
-        net = m.Seq(n_primaries=len(s.target_mean), n_knots=n_knots, n_hist=336, n_fut=336, arm="seq").to(DEV)
-        net.load_state_dict(torch.load(d.ROOT / "models" / tag / f"{month}_s{seed}.pt", map_location=DEV))
-        frames.append(fit.predict(net=net, w=w, s=s, cap=cap, month=month, origins=origins, hist=336, fut=336))
+        net = m.Seq(
+            n_primaries=len(s.target_mean), n_knots=n_knots, n_hist=HIST, n_fut=336, arm="seq"
+        ).to(DEV)
+        net.load_state_dict(
+            torch.load(d.ROOT / "models" / tag / f"{month}_s{seed}.pt", map_location=DEV)
+        )
+        frames.append(
+            fit.predict(
+                net=net, w=w, s=s, cap=cap, month=month, origins=origins, hist=HIST, fut=336
+            )
+        )
     return mean_sorted(frames=frames)
 
 
@@ -80,7 +89,9 @@ def mean_sorted(*, frames: list[pl.DataFrame]) -> pl.DataFrame:
     return base.with_columns(*[pl.Series(q, stack[:, i]) for i, q in enumerate(Q)])
 
 
-def comparator_forecasts(*, ctx: dict, arm: str, month: str, passes, seeds) -> dict[int, pl.DataFrame]:
+def comparator_forecasts(
+    *, ctx: dict, arm: str, month: str, passes, seeds
+) -> dict[int, pl.DataFrame]:
     """Return {pass: seed-mean forecast frame}; pass -1 is the clean twin. K3-pre ignores the lags."""
     s, cap = ctx["s"][month], ctx["cap"]
     rows = fold_mod.test_rows(raw=ctx["raw"], clean=ctx["clean"], s=s, month=month, device=DEV)
@@ -91,11 +102,21 @@ def comparator_forecasts(*, ctx: dict, arm: str, month: str, passes, seeds) -> d
     to_t = lambda idx: pl.from_epoch(
         pl.Series(d.prep422.GRID_START_US + idx * d.prep422.STEP_US), time_unit="us"
     ).dt.replace_time_zone("UTC")
-    keys = pl.DataFrame({"time_series_id": ids, "power_fcst_init_time": to_t(rows["origin_idx"]), "valid_time": to_t(rows["target_idx"])})
+    keys = pl.DataFrame(
+        {
+            "time_series_id": ids,
+            "power_fcst_init_time": to_t(rows["origin_idx"]),
+            "valid_time": to_t(rows["target_idx"]),
+        }
+    )
     out = {}
     start_idx = fold_mod.idx_of(t=fold_mod.month_start(month=month))
     for r in [-1, *passes]:
-        clean_r = ctx["clean"] if r < 0 else bank.contaminate(clean=ctx["clean"], month_start_idx=start_idx, r=r)[0]
+        clean_r = (
+            ctx["clean"]
+            if r < 0
+            else bank.contaminate(clean=ctx["clean"], month_start_idx=start_idx, r=r)[0]
+        )
         rr = dict(rows)
         if arm == "P2-pre" and r >= 0:
             rr["blk"] = fold_mod.lg.lag_block(
@@ -104,18 +125,39 @@ def comparator_forecasts(*, ctx: dict, arm: str, month: str, passes, seeds) -> d
             )  # fmt: skip
         frames = []
         for seed in seeds:
-            q = fold_mod.run_comparator(arm=arm, month=month, seed=seed, rows=rr, b1=b1, table=table, s=s, capacity=cap, device=DEV)
+            q = fold_mod.run_comparator(
+                arm=arm,
+                month=month,
+                seed=seed,
+                rows=rr,
+                b1=b1,
+                table=table,
+                s=s,
+                capacity=cap,
+                device=DEV,
+            )
             frames.append(keys.with_columns(*[pl.Series(c, q[:, i]) for i, c in enumerate(Q)]))
         out[r] = mean_sorted(frames=frames)
     return out
 
 
-def event_metrics(*, inj: pl.DataFrame, twin: pl.DataFrame, month: str, r: int, clean: np.ndarray, prim_of: dict, arm: str) -> pl.DataFrame:
+def event_metrics(
+    *,
+    inj: pl.DataFrame,
+    twin: pl.DataFrame,
+    month: str,
+    r: int,
+    clean: np.ndarray,
+    prim_of: dict,
+    arm: str,
+) -> pl.DataFrame:
     start_idx = fold_mod.idx_of(t=fold_mod.month_start(month=month))
     end_idx = start_idx + bank.END_DAY * bank.PER_DAY
     j = inj.join(twin, on=KEYS, suffix="_t")
     prim = np.array([prim_of[t] for t in j["time_series_id"].to_list()])
-    to_idx = lambda col: ((j[col].dt.epoch("us").to_numpy() - d.prep422.GRID_START_US) // d.prep422.STEP_US).astype(np.int64)
+    to_idx = lambda col: (
+        (j[col].dt.epoch("us").to_numpy() - d.prep422.GRID_START_US) // d.prep422.STEP_US
+    ).astype(np.int64)
     v_idx, o_idx = to_idx("valid_time"), to_idx("power_fcst_init_time")
     ev = np.array([bank.event(primary=p, r=r) for p in range(clean.shape[0])])
     depth, length, sign = ev[prim, 0], ev[prim, 1].astype(int), ev[prim, 2]
@@ -132,14 +174,20 @@ def event_metrics(*, inj: pl.DataFrame, twin: pl.DataFrame, month: str, r: int, 
     )  # fmt: skip
     # injected quantiles are in MW; the clean power y is a share of capacity
     capr = pl.Series(cap[df["primary"].to_numpy()])
-    f = lambda c: ((pl.col(c) - pl.col(f"{c}_t")) / capr * pl.col("sgn") / pl.col("depth"))
+    f = lambda c: (pl.col(c) - pl.col(f"{c}_t")) / capr * pl.col("sgn") / pl.col("depth")
     df = df.with_columns(
         y_mw=pl.col("y") * capr,
         follow_q50=f("q50"),
         follow_tail=pl.when(pl.col("sgn") > 0).then(f("q05")).otherwise(f("q95")),
     ).with_columns(
-        safe=pl.when(pl.col("sgn") > 0).then(pl.col("y_mw") >= pl.col("q05")).otherwise(pl.col("y_mw") <= pl.col("q95")).cast(pl.Float64),
-        safe_twin=pl.when(pl.col("sgn") > 0).then(pl.col("y_mw") >= pl.col("q05_t")).otherwise(pl.col("y_mw") <= pl.col("q95_t")).cast(pl.Float64),
+        safe=pl.when(pl.col("sgn") > 0)
+        .then(pl.col("y_mw") >= pl.col("q05"))
+        .otherwise(pl.col("y_mw") <= pl.col("q95"))
+        .cast(pl.Float64),
+        safe_twin=pl.when(pl.col("sgn") > 0)
+        .then(pl.col("y_mw") >= pl.col("q05_t"))
+        .otherwise(pl.col("y_mw") <= pl.col("q95_t"))
+        .cast(pl.Float64),
     )
     return (
         df.group_by("primary", "phase", "length_days")
@@ -173,11 +221,25 @@ def main() -> None:
         start_idx = fold_mod.idx_of(t=fold_mod.month_start(month=month))
         if arm == "seq":
             twin = seq_forecast(ctx=ctx, tag=tag, month=month, seeds=seeds, clean_inj=None)
-            inj = {r: seq_forecast(ctx=ctx, tag=tag, month=month, seeds=seeds, clean_inj=bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)[0]) for r in passes}
+            inj = {
+                r: seq_forecast(
+                    ctx=ctx,
+                    tag=tag,
+                    month=month,
+                    seeds=seeds,
+                    clean_inj=bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)[0],
+                )
+                for r in passes
+            }
         else:
             allf = comparator_forecasts(ctx=ctx, arm=arm, month=month, passes=passes, seeds=seeds)
             twin, inj = allf[-1], {r: allf[r] for r in passes}
-        parts = [event_metrics(inj=inj[r], twin=twin, month=month, r=r, clean=clean, prim_of=prim_of, arm=arm) for r in passes]
+        parts = [
+            event_metrics(
+                inj=inj[r], twin=twin, month=month, r=r, clean=clean, prim_of=prim_of, arm=arm
+            )
+            for r in passes
+        ]
         pl.concat(parts).write_parquet(target)
         print(f"{tag} {month}: {sum(p.height for p in parts)} event rows", flush=True)
 

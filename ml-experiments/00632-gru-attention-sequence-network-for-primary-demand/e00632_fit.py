@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, PLR0915
+# ruff: noqa: E501, D103, PLR0915, ANN001, E731
 """Experiment 632: pre-train Seq (or an ablation) on ERA5 and CAMS weather, one fit per fold and seed.
 
 Usage: python e00632_fit.py ARM MONTH [MONTH ...] [--seeds 0 1 2] [--max-passes 60] [--frac 1.0]
@@ -240,7 +240,9 @@ def fit_one(
             windows=w_clean,
             limit=BATCH,
         )
-    frame = predict(net=net, w=w_clean, s=s, cap=cap, month=month, origins=test_o, hist=hist, fut=fut)
+    frame = predict(
+        net=net, w=w_clean, s=s, cap=cap, month=month, origins=test_o, hist=hist, fut=fut
+    )
     out = d.ROOT / "predictions" / tag / f"{month}_s{seed}.parquet"
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".tmp")
@@ -274,7 +276,9 @@ def main() -> None:
     ap.add_argument("--fut", type=int, default=336)
     a = ap.parse_args()
     tag = a.tag or a.arm
-    torch.cuda.set_per_process_memory_fraction(float(__import__("os").environ.get("MEM_GB", "8")) / 48)
+    torch.cuda.set_per_process_memory_fraction(
+        float(__import__("os").environ.get("MEM_GB", "8")) / 48
+    )
     clean = d.clean_power()
     b1g, b1c = d.dense_b1()
     ctx = {

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, E402, PLR0915
+# ruff: noqa: E501, D103, E402, PLR0915, E731, PT018
 """Experiment 632: arm P2-hist6, P2's per-row network with a lag encoder that reads 6 daily lags.
 
 **What differs from P2-pre.** P2-pre (experiment 591's `AuxLagMdn(kind="shared")`, pre-training stage,
@@ -47,7 +47,6 @@ import e00560_data as d560  # ty: ignore[unresolved-import]
 import e00569_columns as cols569  # ty: ignore[unresolved-import]
 import e00572_lags as lg  # ty: ignore[unresolved-import]
 import e00574_fit as e574  # ty: ignore[unresolved-import]
-import e00574_model as mod  # ty: ignore[unresolved-import]
 import e00591_model as aux591  # ty: ignore[unresolved-import]
 import e00632_data as d
 import e00632_fold as fold_mod
@@ -121,7 +120,7 @@ class Hist6Mdn(aux591.AuxLagMdn):
     """P2's network (stage `pre`) whose lag encoder reads 6 lags and mean-pools them."""
 
     def __init__(self, *, n_primaries: int, n_knots: int) -> None:
-        """Build experiment 591's shared-encoder network, then give it a 6-slot embedding and mixers one lag output narrower."""
+        """Build experiment 591's network, then add a 6-slot embedding and narrow the mixers by one lag."""
         super().__init__(
             n_primaries=n_primaries, stage="pre", n_knots=n_knots, n_b1=N_B1, kind="shared"
         )
@@ -151,10 +150,18 @@ class Hist6Mdn(aux591.AuxLagMdn):
             idx = newest - lg.STEPS * j
             row = self.table[primary, idx.clamp(min=0)].float()
             row = torch.where((idx >= 0)[:, None], row, torch.zeros_like(row))
-            hw = nn.functional.gelu(self.weather(torch.cat([row[:, :7], emb, torch.zeros(len(x), N_B1, device=x.device)], dim=-1)))
+            hw = nn.functional.gelu(
+                self.weather(
+                    torch.cat([row[:, :7], emb, torch.zeros(len(x), N_B1, device=x.device)], dim=-1)
+                )
+            )
             hd = nn.functional.gelu(self.datetime(torch.cat([row[:, 7:], emb], dim=-1)))
             own = torch.stack(
-                [x[:, LAG_FIRST + j], x[:, LAG_FIRST + N_LAGS + j], x[:, LAG_FIRST + 2 * N_LAGS + j]],
+                [
+                    x[:, LAG_FIRST + j],
+                    x[:, LAG_FIRST + N_LAGS + j],
+                    x[:, LAG_FIRST + 2 * N_LAGS + j],
+                ],
                 dim=-1,
             )
             slot = self.lag_id(torch.full((len(x),), j, dtype=torch.long, device=x.device))
@@ -203,7 +210,9 @@ def apply_block_dropout(*, x: torch.Tensor, origin_idx: np.ndarray, seed: int) -
     }
 
 
-def assert_training_lags_not_leaky(*, blk: np.ndarray, origin_idx: np.ndarray, n: int = 2_000_000) -> None:
+def assert_training_lags_not_leaky(
+    *, blk: np.ndarray, origin_idx: np.ndarray, n: int = 2_000_000
+) -> None:
     """Assert for training rows that every available lag is at least 24 h and at most 7 days before its origin."""
     newest = blk[:n, NEWEST_INDEX_COL - LAG_FIRST].astype(np.int64)
     origin = origin_idx[:n]
@@ -251,7 +260,9 @@ def pretrain_month(*, month: str, seeds: list[int], clean: np.ndarray, device: s
     tau = e574.extra.DriftColumns.tau(valid_us=GRID_START_US + pre.target_idx * STEP_US)
     x_gpu[:, TAU_COL] = torch.from_numpy(tau.astype(np.float32)).to(device)
     cols, _ = d560.raw_table(source="pre", cache=e574.W560 / "expected")
-    table = torch.from_numpy(d560.standardised_table(cols=cols, standardiser=rows.standardiser)).to(device)
+    table = torch.from_numpy(d560.standardised_table(cols=cols, standardiser=rows.standardiser)).to(
+        device
+    )
     del cols
     z = (pre.y - rows.target_mean[pre.primary]) / rows.target_std[pre.primary]
     t_z = torch.from_numpy(z.astype(np.float32)).to(device)
@@ -324,8 +335,12 @@ def predict_month(
     with torch.no_grad():
         for a in range(0, len(x), 100_000):
             sl = slice(a, a + 100_000)
-            out = model(torch.from_numpy(x[sl]).to(device), torch.from_numpy(rows["primary"][sl]).to(device))
-            out_q[sl] = fold_mod.quantiles_mw(out=out, primary=rows["primary"][sl], s=stats, capacity=cap)
+            out = model(
+                torch.from_numpy(x[sl]).to(device), torch.from_numpy(rows["primary"][sl]).to(device)
+            )
+            out_q[sl] = fold_mod.quantiles_mw(
+                out=out, primary=rows["primary"][sl], s=stats, capacity=cap
+            )
     to_time = lambda idx: pl.from_epoch(
         pl.Series(GRID_START_US + idx * STEP_US), time_unit="us"
     ).dt.replace_time_zone("UTC")
@@ -357,7 +372,9 @@ def main() -> None:
     log.parent.mkdir(exist_ok=True)
     for month in MINE.months:
         seeds = [
-            s for s in MINE.seeds if not (d.ROOT / "predictions" / ARM / f"{month}_s{s}.parquet").exists()
+            s
+            for s in MINE.seeds
+            if not (d.ROOT / "predictions" / ARM / f"{month}_s{s}.parquet").exists()
         ]
         if not seeds:
             continue

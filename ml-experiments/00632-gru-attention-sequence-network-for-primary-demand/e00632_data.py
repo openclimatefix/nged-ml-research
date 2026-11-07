@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D107, PT018
+# ruff: noqa: E501, PT018
 """Experiment 632: dense inputs and window sampling for the GRU plus self-attention network.
 
 **Inputs on the dense half-hourly grid.** For each of the 16 Primaries the network reads, at every

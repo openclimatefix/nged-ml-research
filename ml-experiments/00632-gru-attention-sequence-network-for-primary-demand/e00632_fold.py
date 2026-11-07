@@ -1,12 +1,13 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501, D103, D101
 """Experiment 632: fold statistics, test rows, and the stored comparators P2-pre and K3-pre.
 
 **Fold statistics.** `fold_stats` calls experiment 428's `build_fold` once per fold month, the same
 function that gave P2-pre and K3-pre their input standardisation, target mean and standard
 deviation, and lag statistics, and caches the small result. Seq uses the same numbers.
 
-**Comparators.** P2-pre (experiment 591's `AuxLagMdn` (shared lag encoder) in stage `pre`, weights from experiment 613's
-chain) and K3-pre (experiment 565's `OutputOffsetDrift` in stage `pre`) are scored by inference only.
+**Comparators.** P2-pre (experiment 591's `AuxLagMdn` (shared lag encoder) in stage `pre`, weights
+from experiment 613's chain) and K3-pre (experiment 565's `OutputOffsetDrift` in stage `pre`)
+are scored by inference only.
 Their test rows are built here from the dense ERA5 and CAMS arrays: the 37 lag-free columns (weather
 and datetime filled; spread and lead columns are not read by the `pre` head), the 8 lag columns with
 the 24 h cap, the knot position, and for P2 the 14 B1 columns.
