@@ -20,10 +20,11 @@ size: >-
   637, and the callers of each are named in the plan; (4) it touches no serving path and no
   degradation rule; (5) it changes no contract.
 hypothesis: >-
-  The arrangement now in force (the prevailing forecast) can be forecast better by adding a
-  separate departure head to the normal-running-arrangement forecast of K1 (frozen, gradient
-  stopped, or retrained with its encoder) than by shifting K1's quantiles by its own recent error with a decaying weight (R0),
-  without changing the normal-running-arrangement output.
+  The arrangement now in force (the prevailing forecast) can be forecast better by a separate
+  departure head added to the normal-running-arrangement forecast of K1 than by shifting K1's
+  quantiles by its own recent error with a decaying weight (R0). The head may read K1's outputs, K1's
+  frozen encoder embeddings, or an encoder retrained on the departure loss, and the
+  normal-running-arrangement output stays K1 or, in the joint network, no worse than K1.
 prediction: >-
   Written before any head is fitted. P2 (injected bank, valid times inside the shift): the head with
   a survival mixture (H1) scores a CRPS at least 15% below K1 and below R0 by more than the
