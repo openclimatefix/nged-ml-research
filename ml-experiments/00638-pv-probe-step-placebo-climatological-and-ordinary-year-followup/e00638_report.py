@@ -72,10 +72,10 @@ def steps_figure() -> None:
             "cutoff_label:N", sort=ORDER, title="Training cutoff" if key == "summer25" else None
         )
         y = alt.Y("med:Q", scale=alt.Scale(domain=[-0.2, 1.1]), title="Calibrated read")
-        band = base.mark_rule(opacity=0.5, aria=False).encode(x=x, y="lo:Q", y2="hi:Q", color=color)
-        line = base.mark_line(point=True, aria=False).encode(x=x, y=y, color=color)
+        band = base.mark_rule(opacity=0.5, aria=False).encode(x=x, y="lo:Q", y2="hi:Q", color=color)  # ty: ignore[unresolved-attribute]
+        line = base.mark_line(point=True, aria=False).encode(x=x, y=y, color=color)  # ty: ignore[unresolved-attribute]
         sh = (
-            alt.Chart(share.filter(pl.col("key") == key))
+            alt.Chart(share.filter(pl.col("key") == key))  # ty: ignore[unresolved-attribute]
             .mark_point(shape="diamond", size=90, color="#555555", filled=True, aria=False)
             .encode(x=alt.X("cutoff_label:N", sort=ORDER), y="share:Q")
         )
@@ -103,13 +103,13 @@ def shift_figure() -> None:
         .group_by("cutoff", "condition", "site").agg(pl.col("y0", "y1").median())
         .with_columns(kind=pl.when(pl.col("condition").str.starts_with("climstep")).then(pl.lit("Climatological placebo")).otherwise(pl.lit("Real farm")))
     )  # fmt: skip
-    pts = alt.Chart(j).mark_point(opacity=0.7, aria=False).encode(
+    pts = alt.Chart(j).mark_point(opacity=0.7, aria=False).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("y0:Q", title="Calibrated read, probe dates in 2025", scale=alt.Scale(domain=[-0.3, 1.2])),
         y=alt.Y("y1:Q", title="Calibrated read, probe dates in 2024", scale=alt.Scale(domain=[-0.3, 1.2])),
         color=alt.Color("kind:N", scale=alt.Scale(domain=["Real farm", "Climatological placebo"], range=[COLOURS["real"], COLOURS["climatological"]]), legend=alt.Legend(title=None, orient="top")),
     )  # fmt: skip
     line = (
-        alt.Chart(pl.DataFrame({"x": [-0.3, 1.2], "y": [-0.3, 1.2]}))
+        alt.Chart(pl.DataFrame({"x": [-0.3, 1.2], "y": [-0.3, 1.2]}))  # ty: ignore[unresolved-attribute]
         .mark_line(color="#999999", strokeDash=[4, 3], aria=False)
         .encode(x="x:Q", y="y:Q")
     )

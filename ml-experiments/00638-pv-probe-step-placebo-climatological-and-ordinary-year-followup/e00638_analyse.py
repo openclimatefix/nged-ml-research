@@ -104,7 +104,7 @@ def step_table(*, rec: pl.DataFrame, context: pl.DataFrame) -> pl.DataFrame:
 
 
 def donor_context() -> pl.DataFrame:
-    """Return, per cutoff and start key, the post-step share of donor rows and the clearness before and after the step."""
+    """Return, per cutoff and start key, the post-step donor share and the clearness around the step."""
     out = []
     for cutoff in k.CUTOFFS:
         frame = p634.load_frame(cutoff=cutoff)
