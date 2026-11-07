@@ -77,31 +77,36 @@ random curtailment.
 - **`slope_nozero` (post hoc).** `slope` with half-hours dropped when the output is zero and the
   expectation is above 0.3. It is added to see whether zero rows explain world 4, and it enters no
   decision.
-- **Deseasonalising.** Each monthly value is divided by the median of the same calendar month across
-  years.
+- **Deseasonalising.** Each monthly value is divided by the median of the same calendar month
+  across the years before the start month, so an injected step cannot move the reference. A
+  calendar month with no earlier year uses all years.
 - **Statistic and threshold.** For a start month and a horizon k, the mean of the k months from the
   start over the mean of the 12 months before, minus 1. The threshold per farm, estimator, and
   horizon is the 95th percentile of the absolute statistic on the uninjected series over the 20
-  start months (January, April, July, and October of 2021 to 2025). A step is detected when the
-  statistic is below minus the threshold. Windows with no data count as missed.
+  start months (January, April, July, and October of 2021 to 2025; the cloudy starts of world 3 are
+  excluded). A step is detected when the statistic is below minus the threshold. Windows with no
+  data count as missed. A window running past 2026-06-30 averages only the months that exist, in
+  the thresholds and the injections alike.
 
 ## Worlds
 
 1. **Alternating-current loss.** Multiply all output from the start month on by one minus the
    loss. Losses 3%, 5%, 7.5%, 10%, and 15%, 20 start months per farm.
 2. **Direct-current loss under clipping.** The alternating-current limit is the 99.5th percentile
-   of a farm's daylight output. Output from half-hours at 97% of the limit or higher is clipped, and
-   its unclipped direct-current power is the larger of the output and a robust fit on unclipped
-   half-hours (output under 85% of the limit). A loss removes its share of the direct-current
-   power, and the result is clipped at the limit, so flat tops stay at the limit. Same losses and
-   starts.
+   of a farm's daylight output. A half-hour with output from 97% of the limit up to the limit is
+   clipped. The data cannot show how much direct-current power a clipped half-hour held, so this
+   stress case assumes 15% more than its output. A loss removes its share of the direct-current
+   power, and the result is clipped at the limit (half-hours above the limit just lose the share),
+   so a 10% loss is invisible on clipped half-hours and flat tops stay at the limit. Same losses
+   and starts. Clipped half-hours are 0.4% to 1.1% of daylight half-hours, so the world differs
+   little from world 1 at farms that clip rarely.
 3. **Cloudy months.** The three months with the lowest mean clear-sky index relative to the median
    of the same calendar month, per farm, in 2021 to 2025. Inject losses of 5% and 10% in worlds 1
    and 2 at those starts. The false-step rate is the share of uninjected statistics below minus the
    threshold at those starts, pooled over the 5 farms (15 windows). A wider check uses the 10
    cloudiest months.
-4. **Curtailment placebo.** Zero 5% of one month's half-hours at random, three repeats at each of
-   the 20 starts, with no capacity change. The false-alarm rate is the share of statistics at
+4. **Curtailment placebo.** Zero 5% of one month's daylight half-hours at random, three repeats at
+   each of the 20 starts, with no capacity change. The false-alarm rate is the share of statistics at
    horizon 1 below minus the threshold.
 
 ## Reported

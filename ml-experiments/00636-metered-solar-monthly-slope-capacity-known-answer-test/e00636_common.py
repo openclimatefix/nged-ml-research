@@ -32,7 +32,8 @@ SUNNY_RUN_MIN: Final[int] = 6
 MIN_ROWS_PER_SUNNY_DAY: Final[int] = 6
 AC_LIMIT_QUANTILE: Final[float] = 0.995
 CLIPPED_SHARE_OF_LIMIT: Final[float] = 0.97
-UNCLIPPED_SHARE_OF_LIMIT: Final[float] = 0.85
+CLIP_HEADROOM: Final[float] = 0.15
+"""Assumed excess of unclipped DC power over the limit on a clipped half-hour (a stress case)."""
 ZERO_DROP_EXPECTATION: Final[float] = 0.3
 HORIZONS: Final[tuple[int, ...]] = (1, 3, 6, 12)
 LOSSES: Final[tuple[float, ...]] = (0.03, 0.05, 0.075, 0.10, 0.15)
@@ -42,6 +43,7 @@ START_MONTHS: Final[tuple[tuple[int, int], ...]] = tuple(
 )
 """The 20 start months: January, April, July, and October of 2021 to 2025."""
 EPOCH_YEAR: Final[int] = 2019
+MIN_DAYLIGHT_ROWS: Final[int] = 500
 
 
 def month_index(year: int, month: int) -> int:
@@ -131,10 +133,8 @@ def load_farms() -> dict[str, Farm]:
         x = design(f)
         daylight = f["clear_sky"].to_numpy() >= CLEAR_SKY_MIN_ALL_W_M2
         limit = float(np.quantile(y[daylight], AC_LIMIT_QUANTILE))
-        unclipped = daylight & (y < UNCLIPPED_SHARE_OF_LIMIT * limit)
-        b_dc = robust_fit(x[unclipped], y[unclipped])
-        clipped = y >= CLIPPED_SHARE_OF_LIMIT * limit
-        dc_hat = np.where(clipped, np.maximum(y, x @ b_dc), y)
+        clipped = (y >= CLIPPED_SHARE_OF_LIMIT * limit) & (y <= limit)
+        dc_hat = np.where(clipped, y * (1.0 + CLIP_HEADROOM), y)
         t = f["time"].dt
         mo = ((t.year() - EPOCH_YEAR) * 12 + t.month() - 1).to_numpy()
         farms[site] = Farm(
@@ -194,25 +194,37 @@ def _envelope_by_month(farm: Farm, y: np.ndarray) -> tuple[np.ndarray, np.ndarra
     return monthly["mo"].to_numpy(), monthly["c"].to_numpy()
 
 
-def deseasonalise(months: np.ndarray, c: np.ndarray) -> np.ndarray:
-    """Divide each month's value by the median of the same calendar month across years."""
+def deseasonalise(months: np.ndarray, c: np.ndarray, *, before: int | None) -> np.ndarray:
+    """Divide each month's value by the median of the same calendar month across years.
+
+    With `before` set, the median uses only months earlier than `before`, so an injected step
+    cannot move the reference. A calendar month with no earlier year falls back to all years.
+    """
     cal = months % 12
     out = np.empty_like(c)
     for k in range(12):
         sel = cal == k
-        if sel.any():
-            out[sel] = c[sel] / np.median(c[sel])
+        if not sel.any():
+            continue
+        ref = sel if before is None else sel & (months < before)
+        if not ref.any():
+            ref = sel
+        out[sel] = c[sel] / np.median(c[ref])
     return out
 
 
-def monthly_levels(farm: Farm, y: np.ndarray) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    """Return each estimator's deseasonalised monthly level for the power series `y`."""
+def monthly_levels(
+    farm: Farm, y: np.ndarray, *, start: int
+) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """Return each estimator's monthly level for `y`, deseasonalised on months before `start`."""
     raw = {
         "slope": _slope_by_month(farm, y, drop_zero=False),
         "slope_nozero": _slope_by_month(farm, y, drop_zero=True),
         "envelope": _envelope_by_month(farm, y),
     }
-    return {k: (m, deseasonalise(m, c)) if len(m) else (m, c) for k, (m, c) in raw.items()}
+    return {
+        k: (m, deseasonalise(m, c, before=start)) if len(m) else (m, c) for k, (m, c) in raw.items()
+    }
 
 
 def step_statistic(months: np.ndarray, level: np.ndarray, *, start: int, horizon: int) -> float:
@@ -242,14 +254,15 @@ def inject_dc_loss(farm: Farm, *, start: int, loss: float) -> np.ndarray:
     """
     y = farm.y.copy()
     sel = farm.mo >= start
-    y[sel] = np.minimum((1.0 - loss) * farm.dc_hat[sel], farm.ac_limit)
+    scaled = (1.0 - loss) * farm.dc_hat[sel]
+    y[sel] = np.minimum(scaled, np.maximum(farm.ac_limit, (1.0 - loss) * farm.y[sel]))
     return y
 
 
 def inject_curtailment(farm: Farm, *, start: int, share: float, seed: int) -> np.ndarray:
-    """World 4: zero a random `share` of the half-hours of month `start` and change nothing else."""
+    """World 4: zero a random `share` of month `start`'s daylight half-hours; change nothing else."""
     y = farm.y.copy()
-    idx = np.flatnonzero(farm.mo == start)
+    idx = np.flatnonzero((farm.mo == start) & farm.daylight)
     rng = np.random.default_rng(seed)
     pick = rng.choice(idx, size=round(share * len(idx)), replace=False)
     y[pick] = 0.0
@@ -267,7 +280,7 @@ def cloudiest_months(farm: Farm, *, n: int) -> list[int]:
     mean_csi = np.array(
         [
             farm.csi[farm.daylight & (farm.mo == m)].mean()
-            if (farm.daylight & (farm.mo == m)).any()
+            if (farm.daylight & (farm.mo == m)).sum() >= MIN_DAYLIGHT_ROWS
             else np.nan
             for m in months
         ]

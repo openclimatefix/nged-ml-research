@@ -6,17 +6,23 @@ horizon). World `none` is the uninjected series, from which the thresholds come.
 `ac_cloudy` and `dc_cloudy` are worlds `ac` and `dc` at each farm's three cloudiest start months.
 """
 
+import os
 import sys
-from multiprocessing import Pool
 
-import e00636_common as c
-import polars as pl
+for _var in ("POLARS_MAX_THREADS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
+import multiprocessing  # noqa: E402
+
+import e00636_common as c  # noqa: E402
+import polars as pl  # noqa: E402
 
 CURTAILMENT_SHARE = 0.05
 CURTAILMENT_REPS = 3
 CLOUDY_LOSSES = (0.05, 0.10)
 N_CLOUDY_PLACEBO = 10
 Task = tuple[str, str, float, int, int]
+STANDARD_STARTS = frozenset(c.month_index(y, m) for y, m in c.START_MONTHS)
 FARMS: dict[str, c.Farm] = {}
 
 
@@ -38,13 +44,14 @@ def run_task(task: Task) -> list[dict]:
     else:
         seed = 1000 * start + 10 * rep + c.TESTABLE.index(site)
         y = c.inject_curtailment(farm, start=start, share=CURTAILMENT_SHARE, seed=seed)
-    levels = c.monthly_levels(farm, y)
+    levels = c.monthly_levels(farm, y, start=start)
     return [
         {
             "world": world,
             "farm": site,
             "loss": loss,
             "start": start,
+            "standard_start": start in STANDARD_STARTS,
             "rep": rep,
             "est": est,
             "k": k,
@@ -79,7 +86,7 @@ def main() -> None:
     n_workers = int(sys.argv[1]) if len(sys.argv) > 1 else 4
     tasks = build_tasks()
     out: list[dict] = []
-    with Pool(n_workers, initializer=_init) as pool:
+    with multiprocessing.get_context("forkserver").Pool(n_workers, initializer=_init) as pool:
         for i, rows in enumerate(pool.imap_unordered(run_task, tasks, chunksize=4)):
             out += rows
             if i % 200 == 0:
