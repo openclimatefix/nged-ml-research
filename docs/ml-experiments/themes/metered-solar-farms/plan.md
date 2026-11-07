@@ -10,6 +10,7 @@
 | [430](../../00430-unified-forecaster-solar-and-pretraining-ablations/result.md) | Which of ensemble members passed one by one, a PyTorch plant, ERA5 and CAMS pretraining, and point masses at zero and capacity does a pooled mixture-density network for the six metered solar farms need, and which routes give coherent ensemble member paths? | High (maintainer, 2026-10-31) | Nothing | Finished: none of the four beats the plain network; the A6 wind arms are deferred |
 | [433](../../00433-solar-idle-noise-data-look/result.md) | Do the six metered solar farms show the wind farms' idle-noise texture when they are not generating? | 1 | Nothing | Planned |
 | [618](../../00618-solar-effective-capacity-sunny-rows-and-known-answer-test/result.md) | Can a solar farm's capacity be tracked from its very sunny half-hours alone, and did Solar A, B, and D produce more in 2021 to 2023? | 1 | Nothing | Planned |
+| [636](../../00636-metered-solar-monthly-slope-capacity-known-answer-test/result.md) | Can a monthly regression of power on irradiance find known capacity steps at the metered solar farms, including a direct-current loss under clipping? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
