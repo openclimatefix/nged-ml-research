@@ -125,10 +125,8 @@ inputs and no shared encoder with K1, so its loss cannot flow into K1.
 - **Hyperparameters.** Adam, learning rate 0.003, weight decay 0.0001, batch 4096, 30 epochs,
   early stop by validation loss on a held-out training month, and the validation split grouped by
   month. This is the whole search.
-- **Compute.** The fits are a few thousand weights on stored forecasts and run on CPU (about 8 of
-  the slot's cores). The GPU ceiling of 2 GPU-hours is not expected to be used. K1 inference is
-  needed only if the lag-free table has missing days before a month's first origin; the plan then
-  times one fold first.
+- **Compute.** H1 and H2 are a few thousand weights on stored forecasts and run on CPU. The encoder
+  arms use the GPU under the ceiling in the Encoder arms section.
 - **Cadence.** No refit cadence applies: K1's forecasts are stored as made (monthly refit of
   experiment 612 and 613's E3 rule), and the head is fitted once per held-out month.
 
@@ -155,27 +153,45 @@ mean forecast per site; and the CRPS contrast beside the same contrast on the me
 
 ## Encoder arms (maintainer instruction, 2026-11-07)
 
-The departure head may need K1's raw lag-encoder and neighbour-summary embeddings, and the
-encoders may need to learn new concepts. Three encoder arms therefore run beside H1 and H2, each
-with the survival-mixture departure head of H1 and each scored on the same scorecard and the same
-detector read-out:
+The departure head may need K1's raw lag-encoder embeddings, and the encoder may need to learn new
+concepts. Three encoder arms therefore run beside H1 and H2, each with the survival-mixture
+departure head of H1, each scored on the same scorecard and the same detector read-out:
 
-- **E1 (frozen encoder).** The departure head reads K1's lag-encoder and neighbour-summary
-  embeddings, with K1's weights frozen. The NRA output is exactly K1.
-- **E2 (own encoder).** The departure head has its own copy of the encoder, initialised from K1's
-  weights and trained on the departure loss only. The NRA output stays exactly K1.
-- **E3 (joint network).** One network with a shared encoder trained on both losses. The NRA head is
-  trained only on unshifted targets, the departure head on shifted targets. The report gives
-  E3's NRA output against K1 on event-free rows (CRPS and MAE, development months) with a
-  month-block interval, and calls it non-inferior when the upper end is below 0.0006 of capacity
-  (experiment 613's tolerance).
+- **E1 (frozen encoder).** The head reads the embedding `hl` of K1's lag encoder (the day-lag and
+  week-lag outputs, concatenated), with K1's weights frozen, plus the gap, weighted-average, and
+  neighbour signals of experiment 606 as its own inputs. K1 itself has no neighbour embeddings,
+  because it is experiment 591's stock A1 network, so those signals reach the head only as inputs.
+  The NRA output is exactly K1.
+- **E2 (own encoder).** The head has its own copy of the encoder, initialised from K1's weights
+  and trained on the departure loss only. The NRA output stays exactly K1.
+- **E3 (joint network).** One network trains a shared encoder on both losses. The NRA head reads a
+  detached copy of the embedding, so only the departure loss moves the shared encoder, and a
+  placebo (E3 with the departure target replaced by the unshifted target) separates the architecture
+  from the shifted-target information. The NRA head trains on unshifted targets only.
 
-The encoder arms need K1's stored weights (experiments 612 and 613, `models` folders), so the plan
-adds a first check that the stored weights reload and reproduce the stored forecasts. Training on
-the GPU, one process at a time, within a ceiling of 8 GPU-hours (raised from 2); `nvidia-smi` is
-checked before each launch. Each arm's mean over head or network seeds is scored, with seeds 0 and
-1 on the first month pair and 0 to 4 for survivors. Retraining raises the leakage risk, so the
-leave-one-month-out and forward-chained variants above apply unchanged to E1 to E3.
+**Reading rule.** E1 failing alone is not evidence against encoders, because K1 is fine-tuned on
+synthetic lag shifts to ignore them and its `hl` may discard the signal. The report compares E1
+with H1 (the same head on K1's outputs and the 606 signals) and with E1 plus the 606 signals.
+E1, E2, or E3 beats H1 on a bar by the same rule as H1 beats R0.
+
+**Seeds and refits.** K1's weights are per month, refit day (d0 or d14), and seed, and embeddings
+of different networks are not aligned. Each origin day uses the d0 or d14 model that produced its
+stored forecast. One head is fitted per K1 seed with a refit indicator input, and the five
+departure outputs are averaged. This replaces the head-seed scheme above for E1 to E3. E2 and E3
+start from the K1 model of the scored month's refit, which has not seen later months.
+
+**NRA acceptance for E3.** E3 runs forward-chained only (earlier months only, as K1 is), and its
+NRA output must pass N1 (injected bank) and N2 (event-free CRPS and MAE) and show median follow no
+higher than K1's on the 637 flagged days and the verified D5 and D16 pair. N2 is non-inferior
+when the upper end of a month-block and seed-resampled interval is below the larger of 0.0003 of
+capacity and the noise floor, which is the spread of K1 against itself under different seeds in
+experiment 613.
+
+**Compute.** E1 to E3 rebuild K1's input tensors (experiment 613's per-month tables) and run or
+train the network, so the GPU is used, one process at a time, with `nvidia-smi` checked before each
+launch and a ceiling of 8 GPU-hours (E1 1, E2 2, E3 4, reserve 1). The first step checks that
+the stored `.pt` files load, and that rebuilt inputs reproduce the stored forecast within a stated
+tolerance for one d0 and one d14 model. One fold of each arm is timed before the full run.
 
 ## Inputs, controls, and limits
 
