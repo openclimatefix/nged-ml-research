@@ -121,25 +121,45 @@ def intervals() -> None:
             .str.replace_all("after_7_days", "7 days after the end")
             .str.replace(r" \(NRA below q95/above q05\)", ""),
         )
-        d = d.with_columns(row=pl.when(pl.col("contrast").str.starts_with("K")).then(pl.col("contrast").str.slice(0, 2) + pl.lit(" ") + pl.col("row")).otherwise(pl.col("row")))
+        d = d.with_columns(
+            row=pl.when(pl.col("contrast").str.starts_with("K"))
+            .then(pl.col("contrast").str.slice(0, 2) + pl.lit(" ") + pl.col("row"))
+            .otherwise(pl.col("row"))
+        )
         panels = []
         for k in [x for x in meas if x in d["kind"].unique().to_list()]:
             dm = d.filter(pl.col("kind") == k)
             tol = float(dm["tolerance"][0])
             order = dm["row"].to_list()
-            lo_x = min(-tol, float(dm["lo"].min()))
-            hi_x = max(tol, float(dm["hi"].max()))
+            lo_x = min(-tol, *dm["lo"].to_list())
+            hi_x = max(tol, *dm["hi"].to_list())
             pad = 0.1 * (hi_x - lo_x)
             dom = alt.Scale(domain=[lo_x - pad, hi_x + pad], nice=False)
             band = alt.Chart(pl.DataFrame({"a": [-tol], "b": [tol], "label": ["Tolerance"]})).mark_rect(opacity=0.5).encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("a:Q", scale=dom), x2="b:Q",
                 color=alt.Color("label:N", scale=alt.Scale(domain=["Tolerance"], range=[theme.DATA_SKY]), legend=alt.Legend(title=None, orient="bottom")),
             )  # fmt: skip
-            base = alt.Chart(dm).encode(y=alt.Y("row:N", sort=order, title=None, axis=alt.Axis(labelLimit=380, labelFontSize=11)))
-            bars = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=2.5).encode(x=alt.X("lo:Q", scale=dom, title=meas[k] + " (difference)"), x2="hi:Q")  # ty: ignore[unresolved-attribute]
-            pts = base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(x=alt.X("diff:Q", scale=dom))  # ty: ignore[unresolved-attribute]
-            panels.append(alt.layer(band, bars, pts).properties(width=420, height=max(280, 30 * len(order)), title=meas[k]))
-        chart = alt.vconcat(*panels).resolve_scale(x="independent", color="shared").properties(title=title)
+            base = alt.Chart(dm).encode(
+                y=alt.Y(
+                    "row:N", sort=order, title=None, axis=alt.Axis(labelLimit=380, labelFontSize=11)
+                )
+            )
+            bars = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=2.5).encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("lo:Q", scale=dom, title=meas[k] + " (difference)"), x2="hi:Q"
+            )
+            pts = base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("diff:Q", scale=dom)
+            )
+            panels.append(
+                alt.layer(band, bars, pts).properties(
+                    width=420, height=max(280, 30 * len(order)), title=meas[k]
+                )
+            )
+        chart = (
+            alt.vconcat(*panels)
+            .resolve_scale(x="independent", color="shared")
+            .properties(title=title)
+        )
         save(chart, f"intervals_{fam}.svg")
 
 
