@@ -171,7 +171,7 @@ def run_networks(
         train, rows, clean = d.build_train(cutoff=cutoff, world=world)
         test = d.build_test(cutoff=cutoff, world=world, rows=rows, clean=clean)
         mean, std = _stats(rows=rows)
-        g = _tensors(train)
+        g = _tensors(block=train)
         for arm in arms:
             if phase == "foff":
                 tensors = net.parameter_tensors(params=zero, six=six, device=DEVICE)
