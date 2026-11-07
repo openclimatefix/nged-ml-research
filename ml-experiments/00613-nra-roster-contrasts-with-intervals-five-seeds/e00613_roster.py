@@ -61,7 +61,10 @@ def a(arm: str) -> str:
 
 
 def run(*, family: str, specs: list[tuple], months: list[str] | None) -> pl.DataFrame:
-    """Evaluate (label, kind, A, B, band, x, metric, tol, higher_is_better) specs at the family's Bonferroni level."""
+    """Evaluate the specs at the family's Bonferroni level.
+
+    Each spec is (label, kind, A, B, band, x, metric, tol, higher_is_better).
+    """
     n = len(specs)
     alpha = 0.05 / n
     rows = []

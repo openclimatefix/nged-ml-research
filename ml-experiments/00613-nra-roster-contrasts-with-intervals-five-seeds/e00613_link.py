@@ -1,5 +1,7 @@
 # ruff: noqa: D103, E501
-"""Experiment 613: lay out the private data folder so seeds 0 and 1 (experiment 612) sit beside seeds 2 to 4 (CPU).
+"""Experiment 613: lay out the private data folder (CPU).
+
+Seeds 0 and 1 (experiment 612) sit beside seeds 2 to 4.
 
 For every arm, this creates `arms/NAME/work/{fits,inject}/...` in this experiment's folder and
 symlinks experiment 612's seed 0 and seed 1 forecast files into it. The new fits of seeds 2 to 4 are
