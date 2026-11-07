@@ -63,6 +63,7 @@ def artefacts() -> dict[str, dict[str, Path]]:
         "Inputs": {
             **{f"raw/summary/{p.name}": p for p in sorted((R / "inputs/raw/summary").glob("*.npz"))},
             "observed.parquet": E607 / "observed.parquet",
+            "era5_features.parquet": E607 / "era5_features.parquet",
             **{p.name: p for p in sorted((E607 / "ens_summary").glob("init=2026-0[7-9]-*.parquet"))},
             **{p.name: p for p in sorted((E607 / "ens_summary").glob("init=2026-10-*.parquet"))},
         },
@@ -78,6 +79,14 @@ def timing_assertions() -> int:
         runner.origin_rows(origin=origin, ens_dir=E607 / "ens_summary", observed=observed)
         n += 1
     return n
+
+
+def upstream_digest() -> str:
+    """Return one hash over every Python file of every experiment folder, which the networks import."""
+    h = hashlib.sha256()
+    for p in sorted(HERE.parent.glob("*/*.py")):
+        h.update(p.relative_to(HERE.parent).as_posix().encode() + sha(p).encode())
+    return h.hexdigest()
 
 
 def build() -> dict:
@@ -97,11 +106,12 @@ def build() -> dict:
         "g4_threshold_share_of_capacity": gate.frozen_threshold().tolist(),
         "g4_threshold_source": "experiment 592 gate_state.npz (dev months only)",
         "g4_neighbours": {str(k): v for k, v in gate.neighbours().items()},
-        "g4_hold_days_after_release": 7,
+        "g4_hold_days_after_release": gate.c.HOLD_DAYS,
         "candidate_width_factor": float(widths["factor"].mean()),
         "candidate_width_factor_source": "mean of experiment 613's five dev-month factors (c2_width_factors.csv)",
         "candidate_embargo": "E3 is the fixed refit rule (7-day embargo, then half weight for 7 days) applied at the single fit; no embargo trigger exists, so the candidate is scored with E3 only",
         "artefacts": {net: {rel: sha(p) for rel, p in files.items()} for net, files in artefacts().items()},
+        "upstream_code_digest": upstream_digest(),
         "code": {name: sha(HERE / name) for name in CODE if (HERE / name).exists()},
     }
 
@@ -114,6 +124,15 @@ def verify() -> None:
     for name, h in cfg["code"].items():
         assert sha(HERE / name) == h, f"{name} changed since the freeze"
     assert not LOCK.exists(), "the lock exists"
+    live = json.loads(json.dumps({
+        "g4_threshold_share_of_capacity": gate.frozen_threshold().tolist(),
+        "g4_neighbours": {str(k): v for k, v in gate.neighbours().items()},
+        "g4_hold_days_after_release": gate.c.HOLD_DAYS,
+        "candidate_width_factor": float(pl.read_csv(S613 / "score" / "c2_width_factors.csv")["factor"].mean()),
+    }))
+    for k, v in live.items():
+        assert cfg[k] == v, f"{k} differs from the freeze config"
+    assert upstream_digest() == cfg["upstream_code_digest"], "an experiment module changed since the freeze"
     print("freeze config verified:", {k: len(v) for k, v in cfg["artefacts"].items()})
 
 

@@ -23,6 +23,7 @@ from pathlib import Path
 import e00582_arms as a  # ty: ignore[unresolved-import]
 import e00593_export as x593  # ty: ignore[unresolved-import]
 import e00597_common as k597  # ty: ignore[unresolved-import]
+import e00620_extend as ext  # ty: ignore[unresolved-import]
 import e00620_gate as gate  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
@@ -104,6 +105,8 @@ def write(*, tables: dict[str, pl.DataFrame], month: str, out: Path) -> None:
 
 
 def dev_check(month: str) -> None:
+    if os.environ.get("E00620_PHASE") == "predict":
+        ext.redirect()  # smoke test of the extended grid on a development month
     exp = ML_EXPERIMENTS_DATA_DIR / "backtest_export_roster_2026-11-07"
     factor = dict(pl.read_csv(S613 / "score" / "c2_width_factors.csv").iter_rows())[month]
     out = R / "dev_check"
@@ -120,6 +123,8 @@ def dev_check(month: str) -> None:
 
 
 def main(month: str) -> None:
+    assert os.environ.get("E00620_PHASE") == "predict"
+    ext.redirect()
     cfg = json.loads((HERE / "freeze_config.json").read_text())
     assert not (HERE / "final_test_620.lock").exists() or os.environ.get("E00620_PHASE") == "predict"
     roots = {"K1": R / "arms/k1/work", "Candidate": R / "P7_D50_e3/work", "K3": R / "arms/k3/work"}
