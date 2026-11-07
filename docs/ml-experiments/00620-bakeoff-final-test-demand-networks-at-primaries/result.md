@@ -60,16 +60,23 @@ take_home_message: >-
   of 16 Primaries on CRPS. They lose at four Primaries, D14, D15, D16, and D18, and the losses at
   these four are what the wins at the other 12 offset. All three bands are too narrow, so the neural
   networks are over-confident.
-  Refitting during the window, which weekly production retraining would do, is the first test to run
-  before any conclusion about how good the networks are.
+  The pooled result rests on one unlabelled load transfer between D14 and D18: on event-free rows K1
+  and the candidate beat the heuristic by 0.26 and 0.25 points, and without D15 and D18 by 0.24 and
+  0.20 points. Both are descriptive second readings, not used to rank. Refitting during the window,
+  which weekly production retraining would do, is untested.
 advice:
   - >-
-    Do not read this page as the networks' production skill: the networks were fitted once and never
+    Do not read the pooled result as the networks' skill at Primaries in their normal arrangement:
+    it rests on one unlabelled load transfer between D14 and D18 (steps on 2026-07-06/07, reversed
+    on 2026-10-26/27), and the two descriptive second readings (event-free rows, and without D15 and
+    D18) both favour K1 and the candidate. The networks were also fitted once and never
     refitted, and the development months refit at day 0 and day 14 (limits section).
   - >-
     Run the same frozen networks with a refit every 14 days through the window, and compare band
-    coverage by days since the fit. Ageing of the weights is one possible cause of the narrow bands
-    and of the losses at D14, D15, D16, and D18, and this page has not tested it.
+    coverage by days since the fit. Ageing of the weights is one possible cause of the narrow bands.
+    The loss at D14 and D18 may be better explained by the load transfer, because K1's gap to the
+    heuristic at the 12 Primaries other than D14, D15, D16, and D18 does not shrink with weeks since
+    the fit (an audit of the stored results; not tested here).
   - >-
     Look at D14, D15, D16, and D18 before the next test: the CRPS of K1 and the candidate there is
     1.07 to 2.0 times the heuristic's, and K3's is up to 2.6 times (Primary results).
@@ -154,6 +161,83 @@ left of the dashed zero line favours the first system. The bar is the Bonferroni
 
 *Caption: the same contrasts for the MAE of the median.*
 
+## The pooled result rests on one unlabelled load transfer between D14 and D18
+
+**The daily power at D14 and D18 stepped in opposite directions on 2026-07-06/07 and stepped again
+on 2026-10-26/27.** D14 fell from about 48 to about 42 percent of capacity and stayed near 39 to 44
+until mid-October, then rose to 63 to 69. D18 rose from 44 to 48 to between 60 and 93, then fell to
+62 to 65. The pattern looks like a load transfer between the two Primaries lasting about 16 weeks
+(D14 lost about 1 MW and D18 gained 1 to 2 MW), although neither Primary returned to its old level.
+NGED's labels hold
+no
+event in the window, and the label file is a one-off dump that will not be updated, so an audit of
+the stored results found the transfer from the power itself, not from labels. K1's gate was on for
+116 of the 123 origin days at
+both Primaries, so K1 widened its band, but its median stayed at the old level, as the lag neural
+networks are built to do. The heuristic's weekly lags followed the step within a few weeks.
+
+**Two second readings of the window show how much of the pooled result this transfer carries.**
+Both are descriptive readings made after the window was opened. Neither was used to rank the
+systems, choose a network, or tune anything, and both were recomputed from the stored forecast
+tables with no network re-run (`e00620_second_reading.py`).
+
+- **Event-free rows (rule R1).** The rule was fixed before any score on the rows it removes was
+  computed, although the per-Primary headline scores had already been seen, so the rule is not blind
+  to which Primaries it flags. It reads only observed power, the heuristic, and climatology, never a
+  network. For each
+  Primary and UTC day it takes the daily mean of observed power minus the median of the heuristic
+  (all 13 members) and of climatology, subtracts that day's median across the 16 Primaries,
+  averages the two residuals, and standardises by the Primary's median and 1.4826 times the median
+  absolute deviation over 2026-05-01 to 2026-06-30. It flags days with an absolute z of more than 3,
+  bridges single-day gaps, keeps runs of 3 or more days, and removes every row of that Primary on
+  those days for all five systems alike. It removes 142,949 of the 929,870 rows (15.4%): D18
+  accounts for 120 Primary-days, D14 for 73, D10 for 50, and nine other Primaries for 82 together.
+- **Without D15 and D18.** This drops the two report-only Primaries with short histories, which
+  carry 114,434 rows. The pooled mean gives each Primary about equal weight, so these two count as
+  much as any other.
+
+| Reading | Rows | K1 | Candidate | K3 | Heuristic | Climatology |
+|---|---|---|---|---|---|---|
+| All rows: CRPS | 929,870 | 4.94 | 5.00 | 5.32 | 4.85 | 8.12 |
+| Event-free rows (R1): CRPS | 786,921 | 4.06 | 4.07 | 4.33 | 4.31 | 7.86 |
+| Without D15 and D18: CRPS | 815,436 | 3.61 | 3.66 | 4.01 | 3.85 | 7.37 |
+| Rows removed by R1: CRPS | 142,949 | 9.83 | 10.13 | 10.75 | 7.78 | 9.54 |
+| All rows: MAE | 929,870 | 8.30 | 8.42 | 8.85 | 8.49 | 14.75 |
+| Event-free rows (R1): MAE | 786,921 | 7.34 | 7.37 | 7.80 | 7.62 | 14.20 |
+| Without D15 and D18: MAE | 815,436 | 6.32 | 6.46 | 6.95 | 6.83 | 13.49 |
+
+*Caption: percent of capacity, lower is better. The first row of each measure is the pooled
+headline.
+The fourth row shows the rows R1 removed.*
+
+**The ranking against the heuristic reverses on both second readings.** The differences in CRPS,
+network minus heuristic, with day-block 95% intervals, are below.
+
+| Reading | K1 | Candidate | K3 |
+|---|---|---|---|
+| All rows | +0.10 (-0.03 to +0.22) | +0.15 (+0.03 to +0.28) | +0.47 (+0.34 to +0.61) |
+| Event-free rows (R1) | -0.26 (-0.36 to -0.15) | -0.25 (-0.35 to -0.14) | +0.02 (-0.10 to +0.14) |
+| Without D15 and D18 | -0.24 (-0.33 to -0.16) | -0.20 (-0.28 to -0.12) | +0.16 (+0.07 to +0.24) |
+
+*Caption: percentage points of capacity; negative favours the network. These intervals are not
+Bonferroni-corrected and are not used to rank.*
+
+**Per-Primary wins on the kept rows are the same under each reading, so the change comes from how
+far the networks
+lose, not from which Primaries they lose at.** K1 and the candidate have a lower CRPS than the
+heuristic at 12 of 16 Primaries on all rows and on the event-free rows, and at 12 of 14 without D15
+and D18. K3 does so at 9 of 16, 9 of 16, and 9 of 14. Climatology wins at none.
+
+- **R1 under-removes.** The heuristic adapts to a long step after some weeks, so the rule stops
+  flagging D14 after mid-September. Some of the D14 loss therefore stays in the event-free rows.
+- **Both second readings are made after the window was opened.** The two readings remove different
+  Primaries: R1 mainly D18, D14, and D10, and the other reading D15 and D18. They support the
+  description that the pooled loss comes largely from a few Primaries, and D15 and D16 are not
+  explained by the transfer. Neither reading supports any ranking among K1, the
+  candidate, and K3.
+- **The transfer is unconfirmed.** It is inferred from the power at two Primaries. NGED has not
+  said that load moved between them.
+
 ## The bands are too narrow for every network
 
 ![CRPS against lead time for the five systems](crps_vs_lead.svg)
@@ -198,7 +282,8 @@ Primaries.*
 - All three networks lose to the heuristic at D14 (K1 5.97 against 3.08), D15 (13.9 against 12.7),
   D16 (3.43 against 2.74), and D18 (15.0 against 11.1). K3 also loses at D2, D3, and D8.
 - K1's coverage is 0.31 at D14 and 0.26 at D18, against 0.80 and 0.55 for the heuristic. These two
-  Primaries pull K1's pooled coverage down. The cause is not known.
+  Primaries pull K1's pooled coverage down. The likely cause at D14 and D18 is the load transfer
+  described above, which is unconfirmed.
 
 ![Avoidable curtailment cost at the six MW Primaries](curtailment_cost.svg)
 
