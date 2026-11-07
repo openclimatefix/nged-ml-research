@@ -244,10 +244,10 @@ Both forecasters are over-confident at every age.*
 ## Registered plan (written before any fit)
 
 - **Question.** The production service will refit on some schedule. Experiments
-  [494](00494-simplify-demand-network-refit-cadence-and-pretrain-once/result.md) and
-  [511](00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/result.md) measured
+  [494](../00494-simplify-demand-network-refit-cadence-and-pretrain-once/result.md) and
+  [511](../00511-lagless-network-refit-cadence-half-life-and-mixed-pretraining/result.md) measured
   the price of an old fit on the lag-free network only, and the July to October window of
-  [experiment 620](00620-bakeoff-final-test-demand-networks-at-primaries/result.md) used one
+  [experiment 620](../00620-bakeoff-final-test-demand-networks-at-primaries/result.md) used one
   fit with no refit, so its fit age rose from 0 to 17 weeks. This experiment measures the loss
   per 4 weeks of fit age on the development months, where an answer cannot touch the closed window.
 - **Design.** For each development test month (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), fit
