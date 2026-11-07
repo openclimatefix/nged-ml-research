@@ -69,6 +69,18 @@ class DropMdn(aux.AuxLagMdn):
         return super().forward(x, primary)
 
 
+class NoOffsetMdn(DropMdn):
+    """A1's network with no output offset: the offset added to the component means is zero.
+
+    The monthly offset knots stay in the module but receive no gradient, in pre-training, step 2,
+    and the daily fine-tune alike.
+    """
+
+    def offset(self, tau: torch.Tensor, primary: torch.Tensor) -> torch.Tensor:
+        """Return a zero offset for each row, (rows, 1)."""
+        return torch.zeros(len(tau), 1, dtype=tau.dtype, device=tau.device)
+
+
 # ---------------------------------------------------------------- the steadier offset (O2) inside A1
 
 import e00577_model_variants as mv  # ty: ignore[unresolved-import]
