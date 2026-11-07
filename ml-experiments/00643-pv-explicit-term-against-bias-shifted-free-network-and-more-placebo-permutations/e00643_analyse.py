@@ -145,9 +145,14 @@ def main() -> None:
             )
             continue
         bar = k.MDE[r["world"]]
+        decides = r["subset"] == "sunny" and (
+            (r["world"] == "real" and r["arm"] in {"fbias", "foff"})
+            or (r["world"] == "step" and r["arm"] == "perm_mean")
+        )
+        decision = f"gain-by-rule={r['lo'] > 0 and r['diff'] >= bar}" if decides else ""
         print(
             f"{r['world']:5s} {r['arm']:10s} minus cal {r['subset']:5s} n={r['n_rows']:6d} {r['diff']:+.4f} "
-            f"[{r['lo']:+.4f}, {r['hi']:+.4f}] seed sd {r['per_seed_sd']:.4f}  gain-by-rule={r['lo'] > 0 and r['diff'] >= bar}"
+            f"[{r['lo']:+.4f}, {r['hi']:+.4f}] seed sd {r['per_seed_sd']:.4f}  {decision}"
         )
 
 

@@ -152,11 +152,20 @@ def _train_and_store(
     )
 
 
+def _linear_capacity_mw(*, t, delta, p, r4, after, ek=None, ed=None) -> torch.Tensor:
+    """Return the offset in megawatts with no floor at zero (`foff`: experiment 639's relu has a zero gradient at the zero start)."""
+    return delta[p] * t["six"][p] + 0.0 * (r4 + after)
+
+
 def run_networks(
     *, phase: str, cutoff: str, arms: list[str], worlds: list[str], seeds: list[int]
 ) -> None:
     """Train `foff` (phase `foff`) or explicit arms `cal`, `perm<shift>` (phase `perm`)."""
     six = k634.six_indices()
+    if phase == "foff":
+        net.capacity_mw = (
+            _linear_capacity_mw  # train_explicit and the forecast below look this up at call time
+        )
     zero = {s: k639.SiteCapacity(k=0.0, d=0.0, rel_sd_k=0.0, rel_sd_d=0.0) for s in six}
     for world in worlds:
         train, rows, clean = d.build_train(cutoff=cutoff, world=world)
