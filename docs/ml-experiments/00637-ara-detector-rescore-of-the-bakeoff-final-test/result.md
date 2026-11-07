@@ -84,7 +84,9 @@ once, so it is descriptive and ranks nothing.
   NGED's labels are incomplete). Injected recall by size: 0.5 MW 0.14, 1 MW 0.43, 2 MW 0.84, 4 MW and
   above 1.00.
 - **Rule file** `ara_rule.json` SHA-256: `e5fb5cc08a67327d74dbc93ee51ba4e31dfc25bb25d8d4fab426bb32762b0566`
-  (committed in the plan, and printed again by the window run).
+  (committed in the plan, and printed again by the window run). The committed file later gained a
+  trailing newline for the pre-commit hook; its hash is now
+  `e1c8df968b2da090b7c959077e38894d621a437796058e7cac4f0b33272280e5`. No other byte changed.
 
 ## Results
 
