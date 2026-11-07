@@ -52,7 +52,7 @@ benchmark: >-
   different weather inputs.
 row_set_id: >-
   Experiment 639's test windows (60 days after 2025-07, 2026-03, and 2026-06; 30 days at 2026-06),
-  with every ensemble run in those windows at lead 24 to 240 hours rather than the first run per
+  with every ensemble run in those windows at lead 0 to 240 hours rather than the first run per
   valid time, so a row is one Primary, valid time, and run. Cleaned power, farm-gap rows dropped.
   Nothing dated 2026-07-01 or later is used.
 metric: >-
@@ -128,12 +128,16 @@ contributing Primary, scale the capacity-swap placebo.
   free network by its own mean error over the 14 days before each test day. Here the same rule
   applies, with three conditions: the history holds only days whose date is before the run's origin
   date; each history error is the free network's forecast from the last run issued before that
-  day (its lead 24 to 48 hours slice) against cleaned metered power; and the shift applies to
+  day (the rows of that day with lead below 24 hours) against cleaned metered power; and the shift applies to
   sunny-midday half-hours only, as in 643, so contrast (ii) is unaffected by it. In the first 14
   days after a cutoff the history is incomplete, and the days with fewer than 3 history days get
   no shift. The history never includes a day the network fine-tuned on, because fine-tuning stops
   at the cutoff.
-- **Extra placebos** (0.5 and 1.5 scalings), taken from experiment 643's advice.
+- **No 0.5 and 1.5 capacity-scaling placebos.** They need new ERA5-and-CAMS pretraining, which this
+  experiment does not pay for. The capacity placebo is experiment 639's shift-2 permutation.
+- **No curtailment-cost proxy.** The earlier proxy needs a node table that does not exist for the
+  six Primaries as net-demand series, so the write-up reports q95 and q99 pinball loss and coverage
+  instead.
 - **The control in contrast (i) is the lower of d and e per lead band.** The bootstrap resamples days
   and re-picks the control in each resample, so the interval includes the selection.
 - **The bars** (0.067 and 0.181) are experiment 639's. The first analysis step re-derives them per lead
@@ -148,8 +152,8 @@ contributing Primary, scale the capacity-swap placebo.
 
 - Fine-tuning rows are filtered by valid time before the cutoff, not by run time, so no run at
   lead up to 10 days carries a target after the cutoff. The early-stopping split is by day.
-- Lead is counted from `power_fcst_init_time` (run time plus 9 hours), 24 to 240 hours. Rows below
-  24 hours are not scored, which is a limit on the day-1 result.
+- Lead is counted from `power_fcst_init_time` (run time plus 9 hours), 0 to 240 hours, and lead day
+  k holds leads from 24(k-1) to 24k hours. Day 1 therefore holds the rest of the origin's own day.
 - Sunny middays use realised clear-sky index (as in 639). The write-up adds two further slices: all
   middays, and middays whose ensemble-mean clear-sky index is at least 0.7, because conditioning on
   the realised sky favours no arm but hides the forecast's sunniness error at long lead.
@@ -166,11 +170,11 @@ contributing Primary, scale the capacity-swap placebo.
   fine-tune sees only post-step data and the contrast tests whether the explicit term carries the
   capacity change from pretraining to fine-tuning, not a step inside the fine-tune.
 - All arms, including the tracker, `fbias`, and the floors, are scored on the same rows (every run
-  at lead 24 to 240 hours).
+  at lead 0 to 240 hours).
 
 ## Compute go/no-go
 
-Fit arms: a, b, c, f, `perm` (plain, 0.5, 1.5), and `shuf`, which is 8 fine-tunes per seed, cutoff,
+Fit arms: a, b, c, f, `perm` (experiment 639's shift 2), and `shuf`, which is 8 fine-tunes per seed, cutoff,
 and world. A smoke fit fixes the minutes per fine-tune. If the full grid projects above 3
 GPU-hours, stage 1 runs seeds 0 to 2 in the real months for all arms and in the step world for a,
 b, and f only, with every second run subsampled for fine-tuning if the projection is still above 3
