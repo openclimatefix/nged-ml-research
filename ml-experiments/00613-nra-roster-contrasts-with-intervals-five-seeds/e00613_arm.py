@@ -30,6 +30,7 @@ _p.add_argument("--months", nargs="+", default=["2025-10", "2025-12"])
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 _p.add_argument("--passes", nargs="+", type=int, default=None)
 MINE = _p.parse_args()
+assert max(MINE.months) <= "2026-06", "July 2026 onwards is never opened"
 sys.argv = [
     "e00591_arm.py", "A1", MINE.command, "--months", *MINE.months, "--seeds", *map(str, MINE.seeds),
     *(["--passes", *map(str, MINE.passes)] if MINE.passes else []),
@@ -55,6 +56,8 @@ CHAIN_ENV = os.environ.get("CHAIN613")
 """A shared chain folder (`.../work`) holding pre-training and step-2 weights for all five seeds."""
 CHAIN = Path(CHAIN_ENV) if CHAIN_ENV else OUT / "chain" / "work"
 OWN_NETWORK = bool(MINE.drop) or MINE.offset != "d5"
+assert "00591" not in str(CHAIN.resolve()), "experiment 591's chain is read-only"
+assert not CHAIN_ENV or Path(CHAIN_ENV).parent.name.startswith("o2" if MINE.offset == "o2" else "d5")
 if CHAIN_ENV and not OWN_NETWORK:  # K1 with D5: stock network, own seeds 2-4 chain
     arm.CHAIN = CHAIN
 if (

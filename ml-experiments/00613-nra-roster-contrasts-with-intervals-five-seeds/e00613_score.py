@@ -77,10 +77,13 @@ SEEDS = tuple(MINE.seeds)
 a.SEEDS = SEEDS  # experiment 582's loader averages the quantiles of these seeds
 _inject_ns = dict(vars(s))
 _inject_ns["SEEDS_613"] = SEEDS
-exec(  # experiment 583's injected-bank loader hard-codes seeds (0, 1); the copy reads `SEEDS`
-    inspect.getsource(s.load_injected).replace("for s in (0, 1):", "for s in SEEDS_613:"),
-    _inject_ns,
+_src = inspect.getsource(s.load_injected)
+assert "for s in (0, 1):" in _src, "experiment 583's loader changed; re-check the seed patch"
+_src = _src.replace("for s in (0, 1):", "for s in SEEDS_613:").replace(
+    "            if f.exists():\n                seeds.append(",
+    "            if not f.exists():\n                raise FileNotFoundError(f)\n            if True:\n                seeds.append(",
 )
+exec(_src, _inject_ns)  # experiment 583's loader hard-codes seeds (0, 1); the copy reads `SEEDS`
 s.load_injected = _inject_ns["load_injected"]
 
 NAME = "00613-nra-roster-contrasts-with-intervals-five-seeds"
@@ -89,6 +92,7 @@ OUT = ROOT / "score" / MINE.out
 OUT.mkdir(parents=True, exist_ok=True)
 MONTHS = tuple(MINE.months)
 assert max(MONTHS) <= "2026-06", "July 2026 onwards is never opened"
+assert MINE.twin != "stored" or SEEDS == (0, 1), "the stored twin has seeds 0 and 1 only"
 assert MINE.lagfree or MINE.twin != "stored", "the G4 gate must read the arm's own lag-free twin"
 c.MONTHS = MONTHS
 BANDS = k600.BANDS

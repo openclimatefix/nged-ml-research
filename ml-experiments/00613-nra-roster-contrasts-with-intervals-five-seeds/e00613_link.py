@@ -6,6 +6,9 @@ symlinks experiment 612's seed 0 and seed 1 forecast files into it. The new fits
 written next to the links, so the scorer sees all five seeds in one folder. It also creates the two
 chain folders (`chains/d5`, `chains/o2`) with symlinks to the stored seed 0 and 1 weights.
 
+Experiment 577 stored O2 pre-training for seeds 0, 1, and 5 to 9 only, so the K3 O2 comparison uses seeds
+0, 1, 5, 6, and 7, and `k3_d5b` holds the matching D5 fits.
+
 Usage: python e00613_link.py
 """
 
@@ -40,6 +43,8 @@ def main() -> None:
             if src.exists():
                 n = link_tree(src=src, dst=NEW / "arms" / arm / "work" / sub)
                 print(f"{arm}/{sub}: {n} links")
+    n = link_tree(src=OLD / "arms" / "k3_d5" / "work" / "fits", dst=NEW / "arms" / "k3_d5b" / "work" / "fits")
+    print(f"k3_d5b/fits: {n} links (the D5 twin for the K3 comparison on seeds 0, 1, 5, 6, 7)")
     d591 = (
         ML_EXPERIMENTS_DATA_DIR / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
     )

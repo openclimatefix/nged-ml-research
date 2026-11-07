@@ -36,6 +36,7 @@ _p.add_argument("--passes", nargs="+", type=int, default=None)
 _p.add_argument("--work-suffix", default="")
 _p.add_argument("--e3", type=int, default=1)
 MINE = _p.parse_args()
+assert max(MINE.months) <= "2026-06", "July 2026 onwards is never opened"
 ARM, CMD = MINE.arm, MINE.command
 _argv = ["e00574_fit.py", "fit", "--arm", "P5"]
 _argv += ["--months", *MINE.months]

@@ -20,6 +20,7 @@ _p.add_argument("--e3", type=int, default=1)
 _p.add_argument("--months", nargs="+", default=["2025-10", "2025-12"])
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 MINE = _p.parse_args()
+assert max(MINE.months) <= "2026-06", "July 2026 onwards is never opened"
 sys.argv = [
     "e00565_fit.py", "fit", "--arm", "D5", "--months", *MINE.months, "--seeds", *map(str, MINE.seeds),
 ]  # fmt: skip

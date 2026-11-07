@@ -44,6 +44,7 @@ def main() -> None:
     )
     print(out)
     out.select("month", "factor").write_csv(SCORE / "c2_width_factors.csv")
+    assert out.height > 1
     f = dict(out.select("month", "factor").iter_rows())
     loo = [
         {"month": m, "factor": sum(v for k, v in f.items() if k != m) / (len(f) - 1)} for m in f
