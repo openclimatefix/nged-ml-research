@@ -68,10 +68,20 @@ outputs of experiments 621, 634, and 638 and refits nothing. The write-up replac
   (raw divided by the energy recovery), and the AC capacity of a farm-shaped fleet (that, divided by
   the median farm-over-unit-curve energy ratio). The second is close to the megawatt basis by
   construction, so prediction (5) is a consistency check.
-- **Comparison.** Each probe half-year is set against experiment 474's R4 table for the two
-  season-years (July to June) that its probe dates fall in, experiment 479's anomaly rung
-  (`cloud = false`, `prior = none`), and the register floor. Per Primary: whether the intervals
-  overlap, by how many megawatts, and as a share of the narrower interval.
+- **Comparison.** Each probe half-year Y (April to September of year Y) is set against experiment
+  474's R4 table for the two season-years (July to June) that its probe dates fall in, which are
+  the season-years starting in Y minus 1 and in Y. The comparison interval is the hull of the
+  two R4 intervals (lowest 10th percentile to highest 90th percentile), and the decision rule
+  counts overlap with that hull. The table also shows overlap with each season-year alone.
+  Experiment 479's anomaly rung
+  (`cloud = false`, `prior = none`; one interval per Primary, compared with both half-years), and
+  the register floor (experiment 267 has none for D9). Per Primary: whether the intervals overlap, by
+  how many megawatts, and as a share of the narrower interval.
+- **Coverage check and a post hoc widening.** The widening rule is applied to the leave-one-farm-out
+  constant injections, and the share of injections whose truth falls inside the 10th-to-90th
+  percentile interval is reported. If that share is under 80%, a second interval, labelled post
+  hoc, is widened by the smallest factor that reaches 80%. The verdict uses the pre-registered
+  interval.
 - **Resolution statement.** Values are season-year, not monthly. Experiment 638 found that a capacity
   step is followed at 0.82 to 0.88 only in an ordinary spring, and experiment 634 found that a
   sunny spring is read as solar capacity.
