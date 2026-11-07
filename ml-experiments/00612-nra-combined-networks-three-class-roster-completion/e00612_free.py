@@ -2,10 +2,10 @@
 """Experiment 612: fit the lag-free twin (arm K3 with D5) with or without the E3 refit rule (GPU).
 
 A wrapper over experiment 565's `e00565_fit.py` (arm D5: the lag-free network with the slow output
-offset, one-step recipe: experiment 565's pretrained weights, a fresh mixer, frozen encoders, refits on
-days 0 and 14). Experiment 565's pretrained weights are read only. `--e3 1` (default) applies the same
-refit rule as `e00612_arm.py`: no rows from the newest 7 days before the cutoff, and half the weight
-for the 7 days before that. `--e3 0` is experiment 565's own recipe (a reproduction check).
+offset, one-step recipe: experiment 565's pretrained weights, a fresh mixer, frozen encoders, refits
+on days 0 and 14). Experiment 565's pretrained weights are read only. `--e3 1` (default) applies the
+same refit rule as `e00612_arm.py`: no rows from the newest 7 days before the cutoff, and half the
+weight for the 7 days before that. `--e3 0` is experiment 565's own recipe (a reproduction check).
 
 Usage: python e00612_free.py NAME [--e3 0|1] [--months ...] [--seeds ...]
 Outputs: `data/ml-experiments/00612-*/arms/NAME/work/{fits,models}`.

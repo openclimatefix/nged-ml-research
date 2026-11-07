@@ -11,7 +11,8 @@ training of the lag encoder (`MODIFIERS`).
 An arm name is a stage 1 base followed by modifiers joined with `+`, for example `B7+CF+D30`, and may
 end in `-p` (the placebo: each Primary reads another Primary's neighbours, a fixed derangement).
 
-Usage: python e00612_nbarm.py ARM COMMAND [--months ...] [--seeds ...] [--passes ...] [--work-suffix X]
+Usage: python e00612_nbarm.py ARM COMMAND [--months ...] [--seeds ...] [--passes ...]
+[--work-suffix X]
 
 - COMMAND: `table`, `check`, `fit`, `inject`, `assemble`.
 """

@@ -56,10 +56,13 @@ def interval_chart(
         zero = (
             alt.Chart(pl.DataFrame({"x": [0.0]}))
             .mark_rule(strokeDash=[4, 3], color=theme.BRAND_ORANGE)
-            .encode(x="x:Q")
-        )  # ty: ignore[unresolved-attribute]
+            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        )
         bars = base.mark_rule(color=theme.DATA_BLUE).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
-        lo_x, hi_x = min(0.0, float(dm["lo"].min())), max(0.0, float(dm["hi"].max()))
+        lo_x, hi_x = (
+            min(0.0, dm.select(pl.col("lo").min()).item()),
+            max(0.0, dm.select(pl.col("hi").max()).item()),
+        )
         pad = 0.08 * (hi_x - lo_x)
         pts = base.mark_point(filled=True, size=60, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
@@ -207,7 +210,7 @@ def summary() -> None:
 
 
 def aligned(*, root_arm: str, tag: str, t) -> np.ndarray:
-    """Return the quantiles of the fits `arms/<root_arm>/work/fits/<tag>` aligned to the table rows (NaN where absent)."""
+    """Return fit quantiles of `arms/<root_arm>/work/fits/<tag>` aligned to the table rows."""
     e = g.a._load(root=ROOT / "arms" / root_arm / "work", tag=tag, months=MONTHS)
     sm = c.k578.sites()
     prim_of = dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
@@ -227,13 +230,13 @@ def aligned(*, root_arm: str, tag: str, t) -> np.ndarray:
 
 
 def day_rows(*, t, p: int, lo: int, hi: int) -> np.ndarray:
-    """Return the table rows of the day-ahead forecast (issued 09:00 the day before) of Primary `p`, valid in [lo, hi)."""
+    """Return the table rows of the day-ahead forecast of Primary `p`, valid in [lo, hi)."""
     _, rows = f597.day_ahead_keys(t=t, prim=p, lo=lo, hi=hi)
     return rows
 
 
 def situations() -> None:
-    """Draw K1 and K2, then K3 and the class 2 candidate, for five situations: the two December Primaries, a quiet week, a cold night, a sunny day."""
+    """Draw K1, K2, K3, and the class 2 candidate for five situations (see the page)."""
     c.MONTHS = MONTHS
     cp.RULES = cp.entry("Load-shift start and end given by the maintainer", "rule", cp.RULE_COLOUR)
     work = ROOT / "arms" / "k1_d5" / "work"
@@ -304,7 +307,7 @@ def situations() -> None:
              title="day-ahead forecasts through the December 2025 load-shift", event=(r["onset_idx"], r["end_idx"]), rules=SWITCH_TIMES)  # fmt: skip
 
     def pick(*, p: int, month: str, days: int, score) -> int:
-        """Return the first grid index of the best `days`-day window of Primary `p` in `month` by `score` (lower is better)."""
+        """Return the first grid index of the best `days`-day window of `p` in `month` by `score`."""
         ok = (t.prim == p) & (t.month == month) & t.free & (t.band == 1)
         days_present = np.unique(t.idx[ok] // 48)
         best, best_s = None, np.inf

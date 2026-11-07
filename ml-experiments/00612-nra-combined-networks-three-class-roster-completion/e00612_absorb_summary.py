@@ -1,11 +1,12 @@
 # ruff: noqa: D103, E501
-"""Experiment 612: absorption tables (CPU): total and refit shares of K1/K2 (experiment 599's E3 arm), K3 with D5 and E3, and the class 2 candidate.
+"""Experiment 612: absorption tables for K1/K2, K3, and the class 2 candidate (CPU).
 
-Reads `absorb/event_shares_{k3d5,c2}.parquet` (written by `e00612_absorb_score.py`) and experiment 599's
-`scores/event_shares.parquet`, whose arm `E3` is K1 and K2's refit rule (the lag network with the 7-day
-embargo and half weight on the next 7 days; K1 and K2 share these fits). One value per injected design (the mean of
-its two Primaries); contrasts are paired by design with a Bonferroni level over the counted contrasts
-(the day-14 refit, 7 days after the end, total share at q50; two contrasts: K3 and class 2 against E3).
+Reads `absorb/event_shares_{k3d5,c2}.parquet` (written by `e00612_absorb_score.py`) and experiment
+599's `scores/event_shares.parquet`, whose arm `E3` is K1 and K2's refit rule (the lag network with
+the 7-day embargo and half weight on the next 7 days; K1 and K2 share these fits). One value per
+injected design (the mean of its two Primaries); contrasts are paired by design with a Bonferroni
+level over the counted contrasts (the day-14 refit, 7 days after the end, total share at q50; two
+contrasts: K3 and class 2 against E3).
 
 Writes `tables_out/t6_absorption.csv` and `t6_absorption_contrasts.csv`.
 """

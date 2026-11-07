@@ -28,6 +28,11 @@ FIRST = "2025-10"
 """The first month has no tail constants, so contrasts that involve `+t` systems skip it. Contrasts of plain systems use all months, unless stated."""
 
 
+def as_float(x: object) -> float:
+    """Return a Polars aggregate as a float."""
+    return float(x)  # ty: ignore[invalid-argument-type]
+
+
 def load(*, arm: str, name: str) -> pl.DataFrame | None:
     f = SCORE / arm / name
     return pl.read_csv(f, infer_schema_length=None) if f.exists() else None
@@ -42,7 +47,7 @@ def ci(
     ok = np.isfinite(d) & np.isfinite(w)
     d, w = d[ok], w[ok]
     if len(d) < 2:
-        return (float("nan"),) * 3
+        return (np.nan, np.nan, np.nan)
     idx = RNG.integers(0, len(d), size=(N_BOOT, len(d)))
     means = (d[idx] * w[idx]).sum(axis=1) / w[idx].sum(axis=1)
     return (
@@ -115,7 +120,7 @@ def bank_contrast(
         return None
     mean, lo, hi = ci(diffs=(j[metric] - j[f"{metric}_b"]).to_numpy(), alpha=alpha)
     return {"n_events": j.height, "diff": mean, "lo": lo, "hi": hi, "mde": (hi - lo) / 2,
-            "level_a": float(j[metric].mean()), "level_b": float(j[f"{metric}_b"].mean())}  # fmt: skip
+            "level_a": as_float(j[metric].mean()), "level_b": as_float(j[f"{metric}_b"].mean())}  # fmt: skip
 
 
 # ---------------------------------------------------------------- event-free contrasts
@@ -180,7 +185,7 @@ def cost_level(*, arm: str, system: str, months: list[str] | None = None) -> dic
         c = c.filter(pl.col("month").is_in(months))
     if c.height == 0:
         return None
-    return {f: float(c[f"cost_{f}"].mean()) for f in (0.9, 0.75, 0.5)}
+    return {f: as_float(c[f"cost_{f}"].mean()) for f in (0.9, 0.75, 0.5)}
 
 
 # ---------------------------------------------------------------- tables
@@ -347,7 +352,7 @@ def ablations() -> None:
 
 
 def class2() -> None:
-    """Class 2 candidate (K2 + neighbour summaries + dropout, at the gate's band width) against K1 and K2, all five months, no tail constants."""
+    """Class 2 candidate at the gate's band width against K1 and K2, five months, no tail constants."""
     rows = []
     cand = ("c2_e3w", "K2w")
     refs = {"K1": ("k1_d5", "K1"), "K2": ("k1_d5", "K2")}
@@ -392,7 +397,7 @@ def class2() -> None:
 
 
 def measures() -> None:
-    """Levels at 120-240 h, curtailment cost, and event-free CRPS per group, for every network, plain and with tail constants (tail months for `+t`)."""
+    """Levels at 120-240 h, curtailment cost, and event-free CRPS for every network."""
     tail_months = ["2025-12", "2026-01", "2026-03", "2026-06"]
     nets = {"K1 (D5)": ("k1_d5", "K1"), "K2 (D5)": ("k1_d5", "K2"), "K3 (D5)": ("k3_d5", "K2"),
             "K1 (O2)": ("k1_o2", "K1"), "K2 (O2)": ("k1_o2", "K2"), "K3 (O2)": ("k3_o2", "K2"),

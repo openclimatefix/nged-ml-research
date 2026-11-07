@@ -1,9 +1,9 @@
-# ruff: noqa: E501, D103, ANN201
-"""Experiment 612: absorbed shares of the class 2 candidate and the lag-free K3, experiment 587's definitions (CPU).
+# ruff: noqa: D103, ANN201
+"""Experiment 612: absorbed shares of the class 2 candidate and the lag-free K3 (CPU).
 
-total = s * (q[E] - q[N]) / D and refit = s * (q[E_on_N] - q[N]) / D, by phase, as experiments 595 and
-599. `score_case` of experiment 587 is reused unchanged, with its `common` module replaced by one that
-points at this experiment's worlds. Writes `absorb/event_shares_<kind>.parquet`.
+`total = s * (q[E] - q[N]) / D` and `refit = s * (q[E_on_N] - q[N]) / D`, by phase, as experiments
+595 and 599. `score_case` of experiment 587 is reused unchanged, with its `common` module replaced
+by one that points at this experiment's worlds. Writes `absorb/event_shares_<kind>.parquet`.
 
 Usage: python e00612_absorb_score.py KIND   (c2 or k3d5)
 """

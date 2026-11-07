@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Experiment 612 (copy of 610): the lag encoder's extra inputs, built from the gap between a lag and the lag-free forecast.
+"""Experiment 612 (copy of 610): the lag encoder's extra inputs, built from lag-minus-twin gaps.
 
 Copied from experiment 606's `e00606_signals.py`. What changed: the span of the summaries is a choice
 (exponentially weighted averages `ew1`, `ew3`, `ew7`, and trailing box means `bx1` to `bx28`); the
