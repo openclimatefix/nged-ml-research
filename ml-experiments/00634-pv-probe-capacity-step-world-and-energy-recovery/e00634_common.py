@@ -44,6 +44,8 @@ STEP_STARTS: Final[dict[str, str]] = {"spring": "2025-04-01", "summer": "2025-07
 """First day of each capacity step. The pretraining rows start on 2024-04-01, so each step has a year without it before."""
 CONDITIONS: Final[tuple[str, ...]] = (
     "control",
+    "farm_mw4_r0",
+    "farm_mw4_r1",
     "step_spring_mw2",
     "step_spring_mw4",
     "step_summer_mw2",

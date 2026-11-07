@@ -12,14 +12,16 @@ size: >-
   way to inject a capacity step and to define the truth a calendar-blind network can know is
   defensible, so the construction and every bar are fixed below before any step-world recovery is
   read. Callers: this folder's scripts import experiments 397, 405, 409, 428, 448, 510, 554, 621, and
-  623 and edit none of them. Asset graph: not touched. One GPU process, about 1 GPU-hour (84 fits of
-  about 30 s each, plus four data builds), against a ceiling of 3.
+  623 and edit none of them. Asset graph: not touched. One GPU process, about 1.3 GPU-hours (108 fits
+  of about 30 s each, plus four data builds), against a ceiling of 3.
 hypothesis: >-
   (1) Measured in injected energy instead of injected AC megawatts, the donor-day probe of a lag-free
   neural network recovers a real injected farm at a factor closer to 1 and tighter across Primaries
   and farms than the 0.65 to 0.71 it reads in megawatts. (2) After a real-farm capacity step of +2
   MW or +4 MW at a chosen month, the calibrated probe shows at least 70% of the step by the first
-  summer cutoff after the step, and under 0.3 MW before the step.
+  summer cutoff after the step, and under 0.3 MW before the step. The brief sets the 70% bar, and
+  prediction (2) expects the bar to fail, because a network without a year input can show only the
+  share of its training rows that carry the step.
 prediction: >-
   Fixed before any energy re-score or step-world recovery was read. (1) The median energy-based
   recovery of the 4 MW real-farm injection lies in 0.80 to 1.00, and its range across the six
@@ -27,7 +29,8 @@ prediction: >-
   coefficient of variation falls). (2) The lag-free networks have no input that tells a row's year,
   so a network averages the injected capacity over the training rows it can reach. We therefore
   expect the calibrated step at the first summer cutoff to equal the post-step share of the donor
-  rows (about 0.5 for the spring step, about 0.25 for the summer step), and to miss the 70% bar. (3)
+  rows (about 0.5 for the spring step, about 0.2 for the summer step), and to miss the 70% bar. The constant-injection controls test
+  this reading: if the network ignores the year, a constant injection reads its full size. (3)
   The shuffled-shape step reads under 0.3 MW at every cutoff. (4) The seed noise floor, the
   probed capacity of one uninjected network minus another, has a 95th percentile under 0.3 MW. (5)
   The widened interval covers the constant-injection truth in at least 60% of leave-one-farm-out
@@ -96,11 +99,24 @@ calendar and energy with the sky link removed (the shuffled shape of experiment 
 condition shares one row mask, as in experiment 621. The network, rows, loss, early stopping, and
 seeds (0, 1, 2) are experiment 554's `pretrain` through experiment 621's `fit`; the probe is
 experiment 621's `probe`. Cutoffs: 2025-07, 2025-10 (the first summer cutoff after both steps),
-2026-03, and 2026-06. That is 7 conditions x 3 seeds x 4 cutoffs = 84 fits.
+2026-03, and 2026-06. Two constant-injection controls, `farm_mw4_r0` and `farm_mw4_r1` (4 MW of
+the real-farm shape on every row, as in experiment 621), also run at every cutoff. They give a
+calibration factor on the same rows and cells as the step networks, with every farm injected at two
+Primaries so that the leave-one-farm-out factor can be built, and they show whether the network
+reads a full size or a share. That is 9 conditions x 3 seeds x 4 cutoffs = 108 fits, about 1.3
+GPU-hours.
 
-**What a network that cannot tell the year can know.** The pretraining inputs carry the day of the
-year and the time of day and no year, so a pretrained network cannot tell a row before the step
-from a row after it. A calibrated probe would then read the average of the injected capacity over
+**Probe cells and the pre-step check.** The probe needs the base row of each probe date. At 2025-07
+only the 6 dates from 2025-04-09 to 2025-06-18 have rows; at the other three cutoffs all 12 do. The
+summer-step networks at 2025-07 train on rows identical to the control's, so their step reads zero
+by construction: a determinism check, and the only pre-step check of a real-farm step, because the
+spring step starts before the earliest cutoff. The seed noise floor and the shuffled steps stand in
+for the brief's pre-step placebo.
+
+**What a network that cannot tell the year can know.** The pretraining inputs carry the sun's position,
+the time of day, the day of the week, and holiday columns, and no year or day of the year. Weekday
+and moving holidays carry some information about the year, so the network may not be fully
+calendar-blind; the constant-injection controls and the step networks test this. A calibrated probe would then read the average of the injected capacity over
 the rows the probe reaches. The probe's donor days are within 21 days of the probe date's day of the
 year and at the same half-hour, so the truth a calendar-blind network can know is
 `mw x post-step share of the donor rows`. We compute that share per cutoff and Primary from the
@@ -121,6 +137,25 @@ probe's donor rows and report the recovery against both the full step and this s
   full step and the calendar-blind share.
 - **Lag.** Months from the step to the first cutoff at which the calibrated recovery of the full
   step reaches 0.7 at the median Primary; stop rule above.
+
+## Definitions
+
+- **Raw step**: the probed capacity of the step network minus that of the control network of the same
+  cutoff, seed, Primary, and regression. **Calibrated step**: the raw step divided by the
+  leave-one-farm-out factor, the median recovery of the `farm_mw4` networks of the same cutoff
+  whose injected farm differs from the farm injected at that Primary.
+- **Energy ratio** `R = sum(farm) / sum(u)`, reported on the probe cells (the Primary's own weather
+  at the probe dates and 10:00 to 15:00 UTC) and on all daylight pretraining rows. The regression
+  runs over donor rows, which sit between the two populations, so the two figures bracket the
+  energy-based recovery. On all rows the physics-curve world has `R = 1` by construction.
+- **Spread across Primaries (or farms)**: the standard deviation divided by the mean of the
+  per-Primary (or per-farm) median recoveries.
+- **Seed noise floor**: the probed capacity of one control network minus another of the same cutoff,
+  over the three seed pairs, six Primaries, and four cutoffs (72 differences); the bar is on the 95th
+  percentile of their absolute value.
+- **The step bar** applies to each of the four combinations (spring or summer, 2 MW or 4 MW)
+  separately, and passes when the median calibrated step over seeds is at least 70% of the injected
+  step at 4 of the 6 Primaries.
 
 ## Part 1 results
 
