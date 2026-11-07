@@ -144,7 +144,7 @@ def main() -> None:
         )
     )
     truth_rule = (
-        alt.Chart()
+        alt.Chart()  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color=ocf.BLACK_1)  # ty: ignore[unresolved-attribute]
         .encode(y="injected:Q")
     )
@@ -168,7 +168,7 @@ def main() -> None:
         .encode(y="y:Q")
     )
     rule_labels = (
-        alt.Chart(
+        alt.Chart(  # ty: ignore[unresolved-attribute]
             pl.DataFrame(
                 {"y": [FALSE_BAR, STOP_FALSE], "t": ["pass bar (1 a year)", "stop rule (3 a year)"]}
             )
