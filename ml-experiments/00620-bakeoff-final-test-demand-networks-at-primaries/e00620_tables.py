@@ -75,13 +75,30 @@ def check() -> None:
         for c in cols:
             a, b = j[c].to_numpy().astype(np.float64), j[c + "_n"].to_numpy().astype(np.float64)
             same = (a == b) | (np.isnan(a) & np.isnan(b))
-            worst[c] = float(np.nanmax(np.abs(np.where(same, 0.0, a - b))))
+            worst[c] = 0.0 if same.all() else float("inf")  # any value or NaN-mask difference
         t_s = max(v for k, v in worst.items() if k not in national)
         c_max = max((v for k, v in worst.items() if k in national), default=0.0)
         print(row["site"], "stored", old.height, "rebuilt", new.height, "new", new.height - old.height, "max diff T/S/diag", t_s, "C columns", c_max, "last origin", new["origin_us"].max(), flush=True)
-        worst_all = max(worst_all, t_s)
+        worst_all = max(worst_all, t_s, c_max)
     print("MAX DIFF on stored keys (non-calendar columns):", worst_all)
-    assert worst_all == 0.0
+    assert worst_all == 0.0 and c_max == 0.0, "a stored value or NaN mask differs (C columns included)"
+
+
+def coverage() -> None:
+    """Check that every (origin, valid) key the window's test rows need is in each rebuilt table (keys only)."""
+    from datetime import datetime  # noqa: PLC0415
+
+    first = int(datetime(2026, 7, 1, 9, tzinfo=UTC).timestamp() * 1_000_000)
+    day, step = 86_400 * 1_000_000, 1_800_000_000
+    for row in f437.prep.primaries().iter_rows(named=True):
+        t = pl.read_parquet(OUT / f"{row['site']}.parquet", columns=["origin_us", "valid_us"])
+        have = set(zip(t["origin_us"].to_list(), t["valid_us"].to_list(), strict=True))
+        missing = 0
+        for d in range(123):
+            origin = first + d * day
+            missing += sum((origin, origin + k * step) not in have for k in range(1, 481))
+        print(row["site"], "missing keys:", missing, flush=True)
+        assert missing == 0
 
 
 def causality() -> None:
@@ -112,4 +129,4 @@ def causality() -> None:
 
 
 if __name__ == "__main__":
-    {"build": build, "check": check, "causality": causality}[sys.argv[1]]()
+    {"build": build, "check": check, "causality": causality, "coverage": coverage}[sys.argv[1]]()

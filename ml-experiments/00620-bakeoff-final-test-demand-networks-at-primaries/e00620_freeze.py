@@ -64,6 +64,8 @@ def artefacts() -> dict[str, dict[str, Path]]:
             **{f"raw/summary/{p.name}": p for p in sorted((R / "inputs/raw/summary").glob("*.npz"))},
             "cams_demand_points_extended.parquet": R / "inputs/cams_demand_points_extended.parquet",
             **{f"trailing437/{p.name}": p for p in sorted((R / "inputs/trailing437").glob("*.parquet"))},
+            **{f"w560/{p.name}": p for p in sorted((R / "inputs/w560").rglob("*.npy"))},
+            **{f"frames/{p.name}": p for p in sorted((R / "inputs/frames").glob("*.parquet"))},
             "observed.parquet": E607 / "observed.parquet",
             "era5_features.parquet": E607 / "era5_features.parquet",
             **{p.name: p for p in sorted((E607 / "ens_summary").glob("init=2026-0[7-9]-*.parquet"))},

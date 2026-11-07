@@ -4,6 +4,8 @@
 D="$(cd "$(dirname "$0")" && pwd)"
 R=$DATA_PATH_INTERNAL/ml-experiments/00620-bakeoff-final-test-demand-networks-at-primaries
 set -e
+# a dry-run or bisection switch left set would use up the single run
+[ -z "${E00620_DRY:-}" ] && [ -z "${E00620_SKIP:-}" ] || { echo "E00620_DRY / E00620_SKIP must be unset" >&2; exit 4; }
 $D/gpu.sh e00620_freeze.py --verify
 # a second lock in the data folder survives a fresh checkout
 set -o noclobber
