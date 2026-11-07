@@ -89,10 +89,9 @@ did not score.
   scenario tables of IND (J0), ECC (J2), SS (J3), the copula-corrected ranks (J5), and MW (J6;
   wind and solar only, demand follows J2) from experiment 436's `work/paths`. The marginals are
   those of experiments 425 (demand, widened 1.15), 429 (wind), and 430 (solar).
-- **New.** Scores with the fair energy score at K = 5, 10, 20, 51; SS-R (anomaly-path shuffle);
+- **New.** Scores at K = 5, 10, 20, 51; SS-R (anomaly-path shuffle);
   CRPS from K values; member-spread coverage; opposite-sky-state shares; step-change
-  autocorrelation. Experiment 436's 51-path scores are recomputed under the fair energy form, so
-  the page does not mix the two forms.
+  autocorrelation. Experiment 436's 51-path scores are recomputed in the same script.
 
 ## Design
 
@@ -101,8 +100,7 @@ did not score.
   order of nearest day of year for SS and SS-R, so the K paths spread over the pool) and ranking
   those K paths. The 51 values are themselves interpolated from the 11 stored quantiles, so the K
   values interpolate twice; this is a stated limit. MW has no cut and is scored at 51 only. Before
-  the first run, a check on a known normal distribution shows the K-value CRPS and the fair energy
-  score are unbiased at K = 5, 10, 20, and 51.
+  the first run, a check on a known normal distribution shows the plain CRPS of K values at levels j/(K+1) is within 3.5% of the true value at K = 5 and within 0.5% from K = 10 (the fair form, with the pair term divided by K(K-1), is 13% low at K = 5, so it is not used).
 - **SS-R.** The anomaly of a past date is its observed path minus the mean of the same clock time
   on the four same-weekday dates 7, 14, 21, and 28 days before the path's start, per node (the runs
   are Tuesdays). The pool and the 16-day buffer are 436's. It is applied to

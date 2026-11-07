@@ -5,8 +5,8 @@ Reads experiment 436's `work/runs`, `work/observed.npz`, and `work/paths/<arm>/<
 per arm; not recomputed), builds the SS-R arm (a Schaake shuffle that ranks anomaly paths, not
 observed paths) and the K-path cuts, and writes five tables to this experiment's `work/` folder:
 
-- `coherence.parquet`: energy (fair form) and variogram scores by block, as in experiment 436;
-- `crps.parquet`: fair CRPS of each arm's paths against the actual, by family and window;
+- `coherence.parquet`: energy (experiment 434's form) and variogram scores by block, as in experiment 436;
+- `crps.parquet`: CRPS of each arm's paths against the actual, by family and window;
 - `coverage.parquet`: coverage of the member spread at 50%, 80%, and 90%;
 - `sky.parquet`: opposite-sky-state counts of neighbouring solar farms, by run and valid day;
 - `acf.parquet`: lag-1 autocorrelation of the step-to-step change along a path.
@@ -53,23 +53,6 @@ ACF_WINDOWS: Final[dict[str, tuple[int, int]]] = {"h12_36": (23, 72), "d1_3": (4
 """Step ranges (0 = lead 0.5 h) of the two windows the autocorrelation is computed over."""
 
 
-def fair_energy_score(*, x: np.ndarray, y: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """Return the energy score per batch item with the pair term over distinct members only.
-
-    Experiment 434's form averages the pair term over all M squared pairs, which biases a small M
-    towards a spread that is too small. This form divides by M(M-1), so different M compare.
-    """
-    m = mask[:, None, :]
-    members = x.shape[1]
-    to_obs = np.sqrt((((x - y[:, None, :]) * m) ** 2).sum(-1)).mean(-1)
-    pair = np.sqrt((((x[:, :, None, :] - x[:, None, :, :]) * m[:, :, None, :]) ** 2).sum(-1))
-    score_ = to_obs - 0.5 * pair.sum((-1, -2)) / (members * (members - 1))
-    return score_ / np.sqrt(mask.sum(-1))
-
-
-s434.energy_score = fair_energy_score
-
-
 def cut_paths(*, paths: np.ndarray, k: int) -> np.ndarray:
     """Return K paths (k, N, S) from an arm's 51 paths: every (51/K)-th member, re-valued at K levels.
 
@@ -85,9 +68,10 @@ def cut_paths(*, paths: np.ndarray, k: int) -> np.ndarray:
     lo = np.floor(pos).astype(np.int64)
     hi = np.minimum(lo + 1, paths.shape[0] - 1)
     w = pos - lo
-    return np.take_along_axis(sorted_values, lo, axis=0) * (1 - w) + np.take_along_axis(
-        sorted_values, hi, axis=0
-    ) * w
+    return (
+        np.take_along_axis(sorted_values, lo, axis=0) * (1 - w)
+        + np.take_along_axis(sorted_values, hi, axis=0) * w
+    )
 
 
 def anomaly_ssr(*, init: datetime, observed: np.ndarray, kind: np.ndarray) -> np.ndarray:
@@ -102,9 +86,7 @@ def anomaly_ssr(*, init: datetime, observed: np.ndarray, kind: np.ndarray) -> np
     anomalies = []
     for _, date, path in chosen:
         i = build.grid_index(t=date) + 1
-        base = np.stack(
-            [observed[:, i - 48 * d : i - 48 * d + S] for d in ANOMALY_LAGS]
-        )
+        base = np.stack([observed[:, i - 48 * d : i - 48 * d + S] for d in ANOMALY_LAGS])
         with np.errstate(all="ignore"):
             baseline = np.nanmean(base, axis=0)
         baseline = np.where(np.isnan(baseline), path.mean(axis=1, keepdims=True), baseline)
@@ -112,12 +94,12 @@ def anomaly_ssr(*, init: datetime, observed: np.ndarray, kind: np.ndarray) -> np
     return score.ranks_of_paths(paths=anomalies, init=init)
 
 
-def fair_crps(*, paths: np.ndarray, actual: np.ndarray) -> np.ndarray:
-    """Return the fair CRPS (N, S) of K paths (K, N, S) against the actual (N, S)."""
+def plain_crps(*, paths: np.ndarray, actual: np.ndarray) -> np.ndarray:
+    """Return the CRPS (pair term over all K squared pairs, as in experiment 434) (N, S) of K paths (K, N, S) against the actual (N, S)."""
     k = paths.shape[0]
     srt = np.sort(paths, axis=0)
     coeff = (2 * np.arange(1, k + 1) - k - 1).reshape(-1, 1, 1)
-    spread = (coeff * srt).sum(0) * 2 / (k * (k - 1))
+    spread = (coeff * srt).sum(0) * 2 / k**2
     return np.abs(paths - actual[None]).mean(0) - 0.5 * spread
 
 
@@ -216,13 +198,17 @@ def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR091
     y0 = np.nan_to_num(actual)
     pairs = sky_pairs(observed=observed, kind=kind)
     q = np.quantile(values, [0.2, 0.8], axis=-1)
-    day_steps = np.flatnonzero(masks["daylight"] & np.isin(np.arange(S), s434.window_steps(window="days_1_10")))
-    spread_all = (np.quantile(values, 0.9, axis=-1) - np.quantile(values, 0.1, axis=-1))[kind == 2].mean(0)
+    day_steps = np.flatnonzero(
+        masks["daylight"] & np.isin(np.arange(S), s434.window_steps(window="days_1_10"))
+    )
+    spread_all = (np.quantile(values, 0.9, axis=-1) - np.quantile(values, 0.1, axis=-1))[
+        kind == 2
+    ].mean(0)
     out["sky"].extend(
         sky_rows(label="OBS", k=0, paths=None, actual=actual, thresholds=q, pairs=pairs,
                  init=init, steps=day_steps, spread=spread_all[day_steps])
     )  # fmt: skip
-    direct = fair_crps(paths=arms51["J0"], actual=y0)
+    direct = plain_crps(paths=arms51["J0"], actual=y0)
     for k in KS:
         group = {a: cut_paths(paths=arms51[a], k=k) for a in CUT_ARMS}
         if k == 51:
@@ -231,7 +217,7 @@ def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR091
         for row in score.rows_for_run(paths=group, actual=actual, kind=kind, init=init):
             out["coherence"].append({**row, "k": k})
         for arm, path in group.items():
-            crps = fair_crps(paths=path, actual=y0)
+            crps = plain_crps(paths=path, actual=y0)
             for window in s434.WINDOWS:
                 steps = s434.window_steps(window=window)
                 for fam, f in FAMILIES.items():
