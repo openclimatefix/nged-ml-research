@@ -134,8 +134,8 @@ arm's shuffled-sky placebo reads slightly higher (0.13 to 0.17) than the plain a
 
 ![Cloud-load faking](cloud_load_faking.svg)
 
-Without the cloud template, both arms read a strong cloud-following load as PV (weak loads 0.11 to 0.23, strong loads
-0.35 to 0.66 of a 2 MW farm). With the template, both pass. The plain network over-corrects
+Without the cloud template, both arms read a cloud-following load as PV (weak loads 0.11 to 0.23,
+strong loads 0.35 to 0.66 of a 2 MW farm). With the template, both pass. The plain network over-corrects
 (negative spurious capacity as large as -0.7 for the strong squared load), and the monotone network
 stays closer to zero (-0.2). Over-correction is not faking, but it shows that the template
 regression absorbs more than the cloud load alone in the plain network.
