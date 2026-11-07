@@ -1,3 +1,4 @@
+# ruff: noqa: D103, PLR0915, ANN201, B007, F841
 """Experiment 637: choose and freeze the ARA day detector on development data only (to 2026-06-30).
 
 Truth on development days: the verified hand-filtered real load transfers lasting over 1 day (from
@@ -11,9 +12,9 @@ Usage: python e00637_dev.py OUT_DIR
 import hashlib
 import json
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00583_common as c  # ty: ignore[unresolved-import]
 import e00620_extend as ext  # ty: ignore[unresolved-import]
@@ -150,7 +151,7 @@ def main(out_dir: Path) -> None:
     best = grid_df.row(0, named=True)
     ks = sorted(KS)
     i = ks.index(best["k"])
-    rule = {
+    rule: dict[str, Any] = {
         "operating": {"k": best["k"], "n": best["n"]},
         "stricter": {"k": ks[min(i + 1, len(ks) - 1)], "n": best["n"]},
         "looser": {"k": ks[max(i - 1, 0)], "n": best["n"]},

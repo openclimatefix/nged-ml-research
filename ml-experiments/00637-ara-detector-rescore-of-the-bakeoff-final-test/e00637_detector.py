@@ -1,3 +1,4 @@
+# ruff: noqa: D103, E501
 """Experiment 637: the frozen abnormal-running-arrangement (ARA) day detector.
 
 The detector reads only cleaned observed power. For each Primary and UTC day it takes the mean over
