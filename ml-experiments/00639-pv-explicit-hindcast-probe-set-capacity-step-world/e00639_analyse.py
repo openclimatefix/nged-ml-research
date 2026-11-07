@@ -13,6 +13,7 @@ Usage: python e00639_analyse.py mde        # the null contrast of the free netwo
 import argparse
 import itertools
 import json
+from pathlib import Path
 from statistics import NormalDist
 
 import e00639_common as k
@@ -124,13 +125,83 @@ def contrast(*, world_a: str, arm_a: str, world_b: str, arm_b: str, subset: str)
     }  # fmt: skip
 
 
+def checks(*, out_dir: Path) -> None:
+    """Print the per-cutoff and per-Primary contrasts, the bias of the free network, and the implied step energy."""
+    result: dict = {}
+    for world in k.WORLDS:
+        rows = load(world=world)
+        free = arm_crps(world=world, arm="free", rows=rows)
+        cal = arm_crps(world=world, arm="cal", rows=rows)
+        diff = (free - cal).mean(axis=0)
+        sunny = rows["sunny"]
+        for ci, cutoff in enumerate(k.CUTOFFS):
+            m = sunny & (rows["cutoff"] == ci)
+            result[f"{world}_cutoff_{cutoff}"] = float(diff[m].mean())
+        for p in np.unique(rows["primary"]):
+            m = sunny & (rows["primary"] == p)
+            result[f"{world}_primary_{int(p)}"] = float(diff[m].mean())
+        # The free network shifted by its own mean error in each cutoff and Primary (a hindsight diagnostic).
+        shifted, gap_rows = [], []
+        for ci, cutoff in enumerate(k.CUTOFFS):
+            z = np.load(k.test_rows_path(cutoff=cutoff, world=world))
+            six = z["inc"] > 0
+            y = z["y"][six].astype(np.float64)
+            sun = rows["sunny"][rows["cutoff"] == ci]
+            prim = rows["primary"][rows["cutoff"] == ci]
+            per_seed = []
+            for seed in k.SEEDS:
+                q = np.load(k.prediction_path(cutoff=cutoff, world=world, arm="free", seed=seed))[
+                    "q"
+                ][six].astype(np.float64)
+                q = q.copy()
+                for p in np.unique(prim):
+                    m = sun & (prim == p)
+                    q[prim == p] -= (q[m, 5] - y[m]).mean()
+                per_seed.append(100 * crps(actual=y, q=q))
+            shifted.append(np.mean(per_seed, axis=0))
+            gap_rows.append(sun)
+        shifted_all = np.concatenate(shifted)
+        result[f"{world}_free_bias_corrected_minus_cal_sunny"] = float(
+            (shifted_all - cal.mean(axis=0))[sunny].mean()
+        )
+        # Median error and the approximate mean forecast from the 11 quantiles.
+        for arm in k.ARMS_BY_WORLD[world]:
+            med, mean_gap = [], []
+            for cutoff in k.CUTOFFS:
+                z = np.load(k.test_rows_path(cutoff=cutoff, world=world))
+                six = z["inc"] > 0
+                q = np.mean(
+                    [
+                        np.load(k.prediction_path(cutoff=cutoff, world=world, arm=arm, seed=s))[
+                            "q"
+                        ][six]
+                        for s in k.SEEDS
+                    ],
+                    axis=0,
+                )
+                approx_mean = np.trapezoid(q, np.asarray(k.LEVELS), axis=1) / (
+                    k.LEVELS[-1] - k.LEVELS[0]
+                )
+                med.append(100 * np.abs(q[:, 5] - z["y"][six]))
+                mean_gap.append(100 * (q[:, 5] - approx_mean))
+            med_all, gap_all = np.concatenate(med), np.concatenate(mean_gap)
+            result[f"{world}_{arm}_median_abs_error_sunny"] = float(med_all[sunny].mean())
+            result[f"{world}_{arm}_median_minus_mean_sunny"] = float(gap_all[sunny].mean())
+    (out_dir / "checks.json").write_text(json.dumps(result, indent=1))
+    for name, value in result.items():
+        print(f"{name:55s} {value:+.4f}")
+
+
 def main() -> None:
     """Print the minimum detectable effect, or every contrast."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("mde", "contrasts"))
+    parser.add_argument("command", choices=("mde", "contrasts", "checks"))
     args = parser.parse_args()
     out_dir = k.WORK / "analysis"
     out_dir.mkdir(parents=True, exist_ok=True)
+    if args.command == "checks":
+        checks(out_dir=out_dir)
+        return
     if args.command == "mde":
         values = {w: mde(world=w) for w in k.WORLDS}
         (out_dir / "mde.json").write_text(json.dumps(values, indent=1))
