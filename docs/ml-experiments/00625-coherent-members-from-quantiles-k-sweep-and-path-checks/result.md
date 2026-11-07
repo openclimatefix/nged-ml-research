@@ -25,7 +25,7 @@ hypothesis: >-
   farms and solar farms variogram scores 28% to 43% below IND but gave the 16 Primaries nothing.
   This experiment tests three new claims. (1) SS paths cut to K = 10 lose under 2% of the variogram
   score of K = 51. (2) A Schaake shuffle that orders by anomaly paths (observed power minus the
-  mean of the same clock time over the 28 preceding days) gives the Primaries a variogram score at
+  mean of the same clock time on the four preceding same-weekdays) gives the Primaries a variogram score at
   least 5% below IND, because observed-power paths mix the seasonal level with the weather
   anomaly. (3) SS paths put neighbouring solar farms in opposite sky states less often than IND
   does and about as often as the observations do.
@@ -41,22 +41,32 @@ prediction: >-
   autocorrelation of step-to-step changes along MW paths is further from the observed value than
   SS's, because MW draws one latent level per member.
 decision_rule: >-
-  Scores are variogram scores (order 0.5, as in experiment 436) over the 44 Tuesday runs of
-  2025-09 to 2026-06, grouped into calendar months, days 1 to 10 unless stated; the energy score is
-  the fair form (pair term divided by M(M-1)) so that different K compare, and is secondary. A
-  contrast is the relative difference of the monthly mean scores, paired by month, with a
-  month-block bootstrap (20,000 resamples), 95% interval, and no multiplicity correction (descriptive
-  where it is not named below). Margins: 5% for coherence, 2% for K, 1% for CRPS. `supported`: SS
-  or ECC or SS-R beats IND on the variogram score by 5% or more with an interval wholly below zero
-  in the pooled joint block, beats MW (farm families) on the same score, and the CRPS gap of the
-  K = 51 paths is under 1%. `partly supported`: the same holds in one family (farms or Primaries)
-  but not in the joint block, which is what experiment 436 found. Otherwise `not supported`. K
-  recommendation, per family: the smallest K in {5, 10, 20, 51} of the best coupling whose
-  variogram score is within 2% of K = 51 (point estimate), with its interval reported; the
-  recommendation is `K = 10` only if the interval's upper end is also below 4%. The opposite-sky
-  check and the autocorrelation check are descriptive (no verdict). No rescue tuning after a failed
-  bar. The stop rules are: no stored paths on disk (experiment 436's `work/paths`), or a K = 51
-  CRPS gap over 3% for the Primaries.
+  Scores are variogram scores (order 0.5, as in experiment 436) over the Tuesday runs of 2025-09 to
+  2026-06 (44 expected; the count is printed before any score), days 1 to 10, grouped into calendar
+  months. A contrast is the relative difference of the monthly mean scores against IND (or, for K,
+  against K = 51 of the same coupling), paired by month, with a month-block bootstrap (20,000
+  resamples) and a 98.33% interval (Bonferroni over the three registered contrasts); a run-block
+  bootstrap is reported beside it. The margin is 5%, which is the margin of experiment 434; the
+  fair energy score is secondary. C1: SS (J3) against IND on the spatial block of the nine farms
+  (wind and solar together, mean of the two family scores). `supported` for C1 if the interval lies
+  wholly below -5%; this is expected, since 436 measured -28% to -43%. C2: anomaly-path SS (SS-R)
+  against IND on the spatial block of the 16 Primaries; `supported` if the interval lies wholly
+  below -5%, `no difference at the margin` if it straddles -5%, and `not supported` if it lies
+  wholly above -5%. C3: SS at K = 10 against SS at K = 51 on the farms' spatial block, and SS-R at K
+  = 10 against SS-R at K = 51 on the Primaries' spatial block: `K = 10 is enough` if the point
+  estimate is within +2% and the interval's upper end is below +4%; if the two tests disagree the
+  page reports `unclear` and lists both. The K recommendation for each family is the smallest K in
+  {5, 10, 20, 51} that passes the same two tests; the coupling is fixed beforehand (SS for farms,
+  SS-R for the Primaries), and the other couplings are reported beside it. MW is judged only on
+  the farms against SS on the spatial block, and counts as beaten when its interval lies wholly
+  above zero. The experiment's verdict word: `supported` if C1 and C2 are supported; `partly
+  supported` if C1 is supported and C2 is not (expected, from experiments 434 and 436);
+  `not supported` if C1 is not supported. C3 sets the K recommendation, not the verdict. The CRPS
+  gap, coverage, opposite-sky check, and autocorrelation check are reported with month-block
+  intervals and carry no verdict, except that a K whose CRPS exceeds the direct 51-value CRPS by 1%
+  or more is marked as failing the marginal bar. No rescue tuning after a failed bar. Stop rules:
+  no stored paths on disk (experiment 436's `work/paths`), or a K = 51 CRPS gap over 3% for the
+  Primaries.
 benchmark: >-
   IND (experiment 436's J0) for coherence; the direct 51-value CRPS for the marginal check; the
   observed share and observed autocorrelation for the path checks.
@@ -87,12 +97,15 @@ did not score.
 ## Design
 
 - **K paths.** For K below 51 the K values are the 51 values interpolated at levels j/(K+1). The
-  ordering of the best coupling is cut to K by taking the K Schaake dates nearest in day of year
-  (the first K of the pool of 436's J3) and ranking those K paths. ECC cut to K takes the first K
-  members' ranks among K. Cutting after the fact never changes the marginal's shape: only the
-  number of levels changes.
+  ordering of a coupling is cut to K by taking every (51/K)-th path of its 51 (members are in the
+  order of nearest day of year for SS and SS-R, so the K paths spread over the pool) and ranking
+  those K paths. The 51 values are themselves interpolated from the 11 stored quantiles, so the K
+  values interpolate twice; this is a stated limit. MW has no cut and is scored at 51 only. Before
+  the first run, a check on a known normal distribution shows the K-value CRPS and the fair energy
+  score are unbiased at K = 5, 10, 20, and 51.
 - **SS-R.** The anomaly of a past date is its observed path minus the mean of the same clock time
-  over the 28 days before it, per node. The pool and the 16-day buffer are 436's. It is applied to
+  on the four same-weekday dates 7, 14, 21, and 28 days before the path's start, per node (the runs
+  are Tuesdays). The pool and the 16-day buffer are 436's. It is applied to
   all nodes; the report uses it for the Primaries, and for the farms beside J3. The weather source
   is none (observed power only), so every input is available at forecast time.
 - **Why nothing helped across the Primaries.** Reported from the stored `diag_dependence` table:
