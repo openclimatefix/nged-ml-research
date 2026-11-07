@@ -61,6 +61,8 @@ def month_boot(
 ) -> tuple[float, float, float]:
     """Return the mean and the 95% month-block bootstrap interval (origin months resampled)."""
     blocks, inv = np.unique(block, return_inverse=True)
+    if len(blocks) < 3:
+        return float(vals.mean()), float("nan"), float("nan")
     tot, cnt = np.bincount(inv, weights=vals), np.bincount(inv).astype(float)
     pick = np.random.default_rng(seed).integers(0, len(blocks), size=(N_BOOT, len(blocks)))
     draws = tot[pick].sum(axis=1) / cnt[pick].sum(axis=1)
@@ -74,8 +76,12 @@ def load() -> dict:
     name = dict(zip(sub["time_series_id"].to_list(), sub["primary_name"].to_list(), strict=True))
     sm = c.k578.sites()
     prim_of = dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
+    for t_, c_ in zip(sm["time_series_id"].to_list(), sm["capacity_mw"].to_list(), strict=True):
+        assert t_ not in cap or abs(cap[t_] - c_) <= 1e-3 * c_, (t_, cap[t_], c_)
     clean = c.k578.clean()
-    bg2_all = pl.read_parquet(BG2_PATH).filter(pl.col("lead_hours") < 240)
+    bg2_all = pl.read_parquet(BG2_PATH).filter(
+        pl.col("lead_hours") < 240, pl.col("valid_time") < WINDOW_START
+    )
     audit, parts = [], []
     thr_cut = int((datetime(2025, 10, 1, tzinfo=UTC) - s.START_US_DT) / s.STEP_DT)
     for mi, m in enumerate(MONTHS):
