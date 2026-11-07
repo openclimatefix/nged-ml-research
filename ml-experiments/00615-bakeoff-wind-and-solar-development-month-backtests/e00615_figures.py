@@ -456,7 +456,7 @@ def summary_figures(*, outdir: Path) -> None:
 def main(outdir: Path) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     notes = time_series_figures(outdir=outdir)
-    (outdir / "stretches.json").write_text(json.dumps(notes, indent=1))
+    (outdir / "stretches.json").write_text(json.dumps(notes, indent=1) + "\n")
     (outdir / "strip_checks.txt").write_text("\n".join(CHECKS) + "\n")
     summary_figures(outdir=outdir)
 
