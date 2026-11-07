@@ -27,7 +27,10 @@ from typing import Final
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
 import e00418_prep as prep418  # ty: ignore[unresolved-import]
+import e00422_prep as prep422  # ty: ignore[unresolved-import]
+import e00437_features as f437  # ty: ignore[unresolved-import]
 import e00510_common as c510  # ty: ignore[unresolved-import]
+import e00559_extra as extra  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
@@ -111,42 +114,90 @@ def neighbour_lists() -> list[list[int]]:
     return of
 
 
+B1_GRID_NAMES: Final[tuple[str, ...]] = (
+    "t_mean_3h", "t_mean_6h", "t_mean_24h", "t_change_3h", "t_change_6h", "t_min_day",
+    "t_max_day", "t_cold_snap_days", "sw_mean_3h", "sw_mean_6h", "sw_mean_24h", "csi_change_3h",
+)  # fmt: skip
+"""The 12 B1 columns that depend only on the valid time; the other two are `cams_prev_day_*`."""
+N_B1_GRID: Final[int] = len(B1_GRID_NAMES)
+N_B1: Final[int] = N_B1_GRID + 2
+DAY_US: Final[int] = 86_400 * 1_000_000
+DAY0: Final[int] = prep418.PRETRAIN_START.toordinal() - 719163 - 5
+"""A day code a few days before the grid start (days since 1970-01-01)."""
+N_DAYS: Final[int] = 2700
+
+
+def dense_b1() -> tuple[np.ndarray, np.ndarray]:
+    """Return raw B1 columns: (primaries, grid, 12) valid-time columns and (primaries, N_DAYS, 2) CAMS day columns.
+
+    The columns are experiment 437's, built exactly as `e00437_features.pretrain_extras` builds them
+    for pre-training rows: trailing temperature and shortwave windows at the valid time (from the
+    dense ERA5 and CAMS weather), and the CAMS mean irradiance and clear-sky ratio of the UTC day
+    before the origin's day.
+    """
+    f1, f2 = CACHE / "dense_b1_grid.npy", CACHE / "dense_b1_cams.npy"
+    if f1.exists() and f2.exists():
+        return np.load(f1, mmap_mode="r"), np.load(f2)
+    local_date = f437.local_date_codes()
+    table = prep.primaries()
+    grid = np.full((table.height, len(local_date), N_B1_GRID), np.nan, dtype=np.float32)
+    cams = np.full((table.height, N_DAYS, 2), np.nan, dtype=np.float32)
+    for row in table.iter_rows(named=True):
+        dense = f437.dense_arrays(row=row, local_date=local_date)
+        for k, name in enumerate(B1_GRID_NAMES):
+            grid[row["primary"], :, k] = dense[name]
+        for day, (mean, csi) in f437.cams_previous_day(site=row["site"]).items():
+            if 0 <= day - DAY0 < N_DAYS:
+                cams[row["primary"], day - DAY0] = (mean, csi)
+    CACHE.mkdir(parents=True, exist_ok=True)
+    np.save(f1, grid)
+    np.save(f2, cams)
+    return grid, cams
+
+
+def b1_scale(
+    *, grid: np.ndarray, cams: np.ndarray, mean: np.ndarray, std: np.ndarray, device: str
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Standardise B1 with the fold's stored mean and standard deviation (14 numbers); missing becomes 0."""
+    g = (np.asarray(grid) - mean[:N_B1_GRID]) / std[:N_B1_GRID]
+    c = (np.asarray(cams) - mean[N_B1_GRID:]) / std[N_B1_GRID:]
+    g = np.nan_to_num(g, nan=0.0).astype(np.float16)
+    c = np.nan_to_num(c, nan=0.0).astype(np.float32)
+    return torch.from_numpy(g).to(device), torch.from_numpy(c).to(device)
+
+
+def tau_grid() -> np.ndarray:
+    """Return the D5 knot position (months since 2019-09, fractional) of every grid half-hour."""
+    us = (
+        prep422.GRID_START_US
+        + np.arange(common.grid_times().len(), dtype=np.int64) * prep422.STEP_US
+    )
+    return extra.DriftColumns.tau(valid_us=us)
+
+
 @dataclass
 class Fold:
     """Statistics of one fold's training region, applied unchanged to every window."""
 
     mean: np.ndarray  # (28,)
     std: np.ndarray  # (28,)
-    standardise: np.ndarray  # (28,) bool: columns that are standardised (others pass through)
+    standardise: np.ndarray  # (28,) bool
     target_mean: np.ndarray  # (primaries,) power over capacity
     target_std: np.ndarray  # (primaries,)
-    train_end: int  # grid index of the first half-hour not used for training targets or inputs
-    first_valid: (
-        np.ndarray
-    )  # (primaries,) first grid index at or after which training windows start
+    train_end: int  # grid index of the first half-hour not used (refit minus 3.5 h)
+    first_valid: np.ndarray  # (primaries,) first grid index with a reading
 
 
-def fit_fold(*, raw: np.ndarray, power: np.ndarray, train_first: int, train_end: int) -> Fold:
-    """Fit the standardisation on grid indices [train_first, train_end) only."""
-    _, mask, _ = prep.feature_names(scheme="summary")
-    standardise = np.concatenate([mask[WEATHER_IN_46], mask[DATETIME_IN_46]]).astype(bool)
-    region = np.asarray(raw[:, train_first:train_end]).reshape(-1, N_COLUMNS)
-    mean = np.where(standardise, np.nanmean(region, axis=0), 0.0)
-    std = np.maximum(np.where(standardise, np.nanstd(region, axis=0), 1.0), 1e-6)
-    p = power[:, train_first:train_end]
-    target_mean = np.nanmean(p, axis=1)
-    target_std = np.maximum(np.nanstd(p, axis=1), 1e-3)
-    first = np.array([int(np.argmax(np.isfinite(power[i]))) for i in range(power.shape[0])])
-    return Fold(mean, std, standardise, target_mean, target_std, train_end, first)
-
-
-def standardised_inputs(*, raw: np.ndarray, fold: Fold, device: str) -> torch.Tensor:
-    """Return the (primaries, grid, 28) standardised inputs as float16 on `device`; NaN becomes 0."""
+def standardised_inputs(
+    *, raw: np.ndarray, fold: Fold, device: str, b1_grid: torch.Tensor | None = None
+) -> torch.Tensor:
+    """Return (primaries, grid, 28 [+ 12]) standardised inputs as float16 on `device`; NaN becomes 0."""
     out = np.empty(raw.shape, dtype=np.float16)
     for p in range(raw.shape[0]):
         z = np.clip((np.asarray(raw[p]) - fold.mean) / fold.std, -CLIP_SD, CLIP_SD)
         out[p] = np.nan_to_num(z, nan=0.0).astype(np.float16)
-    return torch.from_numpy(out).to(device)
+    x = torch.from_numpy(out).to(device)
+    return x if b1_grid is None else torch.cat([x, b1_grid], dim=-1)
 
 
 def standardised_power(*, power: np.ndarray, fold: Fold) -> np.ndarray:
@@ -155,10 +206,7 @@ def standardised_power(*, power: np.ndarray, fold: Fold) -> np.ndarray:
 
 
 def neighbour_summary(*, z: np.ndarray, of: list[list[int]]) -> tuple[np.ndarray, np.ndarray]:
-    """Return (mean z of the neighbours, share of neighbours with a reading), both (primaries, grid).
-
-    The mean is 0 and the share is 0 where no neighbour has a reading.
-    """
+    """Return (mean z of the neighbours, share of neighbours with a reading), both (primaries, grid)."""
     mean = np.zeros_like(z)
     share = np.zeros_like(z)
     for p, near in enumerate(of):
@@ -179,18 +227,17 @@ class Batch:
 
     primary: torch.Tensor  # (B,)
     origin: torch.Tensor  # (B,) grid index
-    x_hist: torch.Tensor  # (B, H, 28) weather and datetime
-    x_fut: torch.Tensor  # (B, F, 28)
+    x_hist: torch.Tensor  # (B, H, 40) weather, datetime, 12 B1 grid columns
+    x_fut: torch.Tensor  # (B, F, 40)
+    cams: torch.Tensor  # (B, 2) CAMS previous-day columns of the origin's day
     power: torch.Tensor  # (B, H) standardised own power, 0 where masked
-    power_missing: (
-        torch.Tensor
-    )  # (B, H) 1 where masked (newer than origin - 24 h, flagged, or absent)
+    power_missing: torch.Tensor  # (B, H) 1 where masked
     nb_mean: torch.Tensor  # (B, H)
     nb_share: torch.Tensor  # (B, H)
-    rel_hist: torch.Tensor  # (B, H) hours from the origin / 168, negative
-    rel_fut: torch.Tensor  # (B, F) hours from the origin / 168, positive
+    age: torch.Tensor  # (B, H) days before the origin
     target: torch.Tensor  # (B, F) standardised power; NaN where flagged or after the cut
-    hist_idx: torch.Tensor  # (B, H) grid index (kept for the assertions)
+    tau: torch.Tensor  # (B, F) D5 knot position of each future token
+    hist_idx: torch.Tensor  # (B, H)
     fut_idx: torch.Tensor  # (B, F)
 
 
@@ -199,13 +246,15 @@ class Windows:
 
     def __init__(
         self, *, x: torch.Tensor, z: np.ndarray, nb_mean: np.ndarray, nb_share: np.ndarray,
-        n_hist: int, n_fut: int, device: str,
+        cams: torch.Tensor, tau: np.ndarray, n_hist: int, n_fut: int, device: str,
+        lag_steps: int = LAG_STEPS,
     ) -> None:  # fmt: skip
-        self.x = x
+        self.x, self.cams_arr = x, cams
         self.z = torch.from_numpy(z).to(device)
         self.nb_mean = torch.from_numpy(nb_mean).to(device)
         self.nb_share = torch.from_numpy(nb_share).to(device)
-        self.n_hist, self.n_fut, self.device = n_hist, n_fut, device
+        self.tau = torch.from_numpy(tau).to(device)
+        self.n_hist, self.n_fut, self.device, self.lag_steps = n_hist, n_fut, device, lag_steps
         self.hist_off = torch.arange(-n_hist + 1, 1, device=device)
         self.fut_off = torch.arange(1, n_fut + 1, device=device)
         self.grid = x.shape[1]
@@ -213,49 +262,35 @@ class Windows:
     def cut(
         self, *, primary: torch.Tensor, origin: torch.Tensor, target_end: int | None = None
     ) -> Batch:
-        """Return the windows of (primary, origin) pairs.
-
-        Args:
-            primary: (B,) Primary indices.
-            origin: (B,) grid indices of the forecast origins.
-            target_end: if given, targets at grid indices at or after it are set to NaN (the fit
-                sees no reading from the refit cutoff on).
-        """
+        """Return the windows of (primary, origin) pairs; targets at grid indices >= `target_end` are NaN."""
         h = origin[:, None] + self.hist_off[None, :]
         f = origin[:, None] + self.fut_off[None, :]
         assert int(h.min()) >= 0 and int(f.max()) < self.grid, "window leaves the grid"
         p = primary[:, None]
-        visible = h <= (origin[:, None] - LAG_STEPS)
+        visible = h <= (origin[:, None] - self.lag_steps)
         z = self.z[p, h]
         seen = visible & torch.isfinite(z)
         target = self.z[p, f].clone()
         if target_end is not None:
             target[f >= target_end] = float("nan")
+        day_us = prep422.GRID_START_US + origin.cpu().numpy().astype(np.int64) * prep422.STEP_US
+        day = torch.from_numpy(day_us // DAY_US - 1 - DAY0).to(self.device)
         return Batch(
-            primary=primary,
-            origin=origin,
-            x_hist=self.x[p, h],
-            x_fut=self.x[p, f],
-            power=torch.where(seen, z, torch.zeros_like(z)),
+            primary=primary, origin=origin, x_hist=self.x[p, h], x_fut=self.x[p, f],
+            cams=self.cams_arr[primary, day], power=torch.where(seen, z, torch.zeros_like(z)),
             power_missing=(~seen).float(),
             nb_mean=torch.where(visible, self.nb_mean[p, h], torch.zeros_like(z)),
             nb_share=torch.where(visible, self.nb_share[p, h], torch.zeros_like(z)),
-            rel_hist=(h - origin[:, None]).float() / (2 * 168),
-            rel_fut=(f - origin[:, None]).float() / (2 * 168),
-            target=target,
-            hist_idx=h,
-            fut_idx=f,
-        )
+            age=(origin[:, None] - h).float() / STEPS_PER_DAY, target=target,
+            tau=self.tau[f], hist_idx=h, fut_idx=f,
+        )  # fmt: skip
 
 
-def assert_no_lookahead(*, batch: Batch, windows: Windows) -> str:
-    """Assert, row by row, that no power value the network reads is newer than origin - 24 h.
+def check_cheap(*, batch: Batch) -> None:
+    """Row-by-row checks that cost nothing: run on every training batch.
 
-    Three checks. (1) Every history token with a visible own-power or neighbour value has a grid index
-    at most `origin - 48`. (2) A poisoned copy of the power array, with every reading newer than the
-    origin minus 24 h of each sample replaced by 1e6, gives the same own-power, missing-flag, and
-    neighbour tensors. (3) The future tokens carry weather and datetime columns only: the batch has no
-    future power field, and `target` is not an input.
+    No own-power or neighbour value is newer than origin minus 24 h; the masked tail carries zeros;
+    the targets are future tokens only (every target index is after the origin).
     """
     origin = batch.origin[:, None]
     newest = batch.hist_idx.masked_fill(batch.power_missing > 0.5, -(10**9)).amax(dim=1)
@@ -263,25 +298,41 @@ def assert_no_lookahead(*, batch: Batch, windows: Windows) -> str:
     nb_seen = (batch.nb_share > 0) | (batch.nb_mean != 0)
     nb_newest = batch.hist_idx.masked_fill(~nb_seen, -(10**9)).amax(dim=1)
     assert (nb_newest <= batch.origin - LAG_STEPS).all(), "neighbour power newer than origin - 24 h"
-    masked_tail = batch.hist_idx > (origin - LAG_STEPS)
-    assert (batch.power[masked_tail] == 0).all() and (batch.power_missing[masked_tail] == 1).all()
-    assert (batch.nb_mean[masked_tail] == 0).all() and (batch.nb_share[masked_tail] == 0).all()
-    # poisoned copy
-    poisoned = Windows(
-        x=windows.x, z=windows.z.cpu().numpy().copy(), nb_mean=windows.nb_mean.cpu().numpy().copy(),
-        nb_share=windows.nb_share.cpu().numpy().copy(), n_hist=windows.n_hist, n_fut=windows.n_fut,
-        device=windows.device,
-    )  # fmt: skip
-    for arr in (poisoned.z, poisoned.nb_mean, poisoned.nb_share):
-        for i in range(len(batch.origin)):
-            arr[batch.primary[i], batch.origin[i] - LAG_STEPS + 1 :] = 1e6
-    again = poisoned.cut(primary=batch.primary, origin=batch.origin)
-    for name in ("power", "power_missing", "nb_mean", "nb_share"):
-        assert torch.equal(getattr(batch, name), getattr(again, name)), (
-            f"{name} read poisoned power"
+    tail = batch.hist_idx > (origin - LAG_STEPS)
+    assert (batch.power[tail] == 0).all()
+    assert (batch.power_missing[tail] == 1).all()
+    assert (batch.nb_mean[tail] == 0).all()
+    assert (batch.nb_share[tail] == 0).all()
+    assert (batch.fut_idx > origin).all(), "a future token is not after the origin"
+
+
+def check_poisoned(*, batch: Batch, windows: Windows, limit: int = 64) -> str:
+    """Per-sample check against a poisoned copy of the power arrays.
+
+    For each of the first `limit` samples, every reading newer than origin minus 24 h of the sample's
+    Primary (own power and neighbour summaries) is replaced by 1e6 in a private copy of that row, and
+    the expected history tensors are rebuilt from the copy. They must equal the batch's tensors.
+    """
+    n = min(limit, len(batch.origin))
+    for i in range(n):
+        p, o = int(batch.primary[i]), int(batch.origin[i])
+        rows = []
+        for arr in (windows.z, windows.nb_mean, windows.nb_share):
+            r = arr[p].clone()
+            r[o - LAG_STEPS + 1 :] = 1e6
+            rows.append(r)
+        z, nm, ns = (r[batch.hist_idx[i]] for r in rows)
+        visible = batch.hist_idx[i] <= o - LAG_STEPS
+        seen = visible & torch.isfinite(z)
+        zero = torch.zeros_like(z)
+        assert torch.equal(batch.power[i], torch.where(seen, z, zero)), (
+            f"sample {i}: power read poison"
         )
-    return (
-        f"no-lookahead: {len(batch.origin)} windows, newest own power "
-        f"{int((batch.origin - newest).min()) / 2:.1f} h before the origin at the closest, "
-        "poisoned copy gives identical inputs"
-    )
+        assert torch.equal(batch.power_missing[i], (~seen).float()), f"sample {i}: flag read poison"
+        assert torch.equal(batch.nb_mean[i], torch.where(visible, nm, zero)), (
+            f"sample {i}: nb mean read poison"
+        )
+        assert torch.equal(batch.nb_share[i], torch.where(visible, ns, zero)), (
+            f"sample {i}: nb share read poison"
+        )
+    return f"no-lookahead (poisoned copy): {n} windows identical"
