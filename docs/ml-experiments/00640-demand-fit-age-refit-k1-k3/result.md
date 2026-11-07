@@ -46,19 +46,18 @@ best_arm: >-
   Not applicable: the experiment compares fit ages, and the newest fit (age 0) scores best at
   every age comparison.
 headline: >-
-  At the 14 Primaries other than D15 and D18, K1's CRPS rises 1.0% per 4 weeks of fit age (97.5%
-  interval -0.2 to +1.8) and K3's 1.0% (-0.3 to +2.3). At all 16 Primaries it rises 5.4% (+2.9 to
-  +7.6) and 6.2% (+4.3 to +7.4), so the pre-registered limit of 1% fails, because D15 and D18 lose
-  far more.
+  K1's CRPS rises 5.4% per 4 weeks of fit age at all 16 Primaries (97.5% interval +2.9 to +7.6) and
+  K3's 6.2% (+4.3 to +7.4), against a pre-registered limit of 1%. Without D15 and D18 the slope is
+  1.0% (-0.2 to +1.8) for K1, but it is 1.6% (+0.7 to +3.2) once the history-limited 2025-10 fits
+  are left out, and the first 4 weeks cost K1 3.0% (+0.9 to +5.3).
 take_home_message: >-
-  A demand network fitted 4 weeks before the forecast month scores 3% worse (K1) than one fitted
-  at the month's start at the 14 Primaries with a long history, and the loss stops growing after
-  about 16 weeks. D15 and D18, whose training history is short, lose several times as much, so an
-  older fit costs them the most, and these two cannot be separated from having less training
-  history. A refit every 4 to 8 weeks is worth running for K1, and weekly refits are not shown to
-  be worth more.
+  A demand network fitted 4 weeks before the forecast month scores about 3% worse (K1) than one
+  fitted at the month's start, and the loss then levels off. The loss at D15 and D18 is several
+  times larger, but this experiment cannot say whether fit age, their short training history, or
+  level shifts in their power cause it. A refit every 4 to 8 weeks is worth running for K1, and
+  weekly refits are not shown to be worth more.
 lessons: >-
-  Fit age matters mostly where history is short. The loss at the 14 long-history Primaries is
+  Fit age matters mostly at D15 and D18. The loss at the 14 long-history Primaries is
   small and levels off, and K1 and K3 lose the same amount, so the lag inputs do not make K1 age
   faster.
 production_status: candidate
@@ -68,13 +67,13 @@ advice:
     Refit the demand networks at least every 4 to 8 weeks, because K1 loses 2.9% of CRPS after 4
     weeks and 6.3% after 8 weeks at the 14 Primaries with a long history (see the contrast table).
   - >-
-    Refit the short-history Primaries (D15, D18) more often than the others, because their CRPS
-    rises 17% in the first 4 weeks (see the group figure); a run of this experiment cannot
-    separate the effect of fit age from the effect of having fewer months of training data.
+    Test whether refitting D15 and D18 more often helps them, because their CRPS rises 17% in the
+    first 4 weeks (see the group figure) but fit age, training history, and level shifts in their power
+    are confounded here.
   - >-
     Do not expect K1 to age faster than K3 on account of its lag inputs; the slopes match at every
     lead band (see the slope figure).
-metric:
+metric: >-
   CRPS and MAE by lead band (0-24, 24-120, 120-240 h) and by weeks since the fit; q05-q95 coverage.
 ---
 
@@ -86,13 +85,15 @@ data 0, 4, 8, 16, and 26 weeks before the month started. We then scored each fit
 and compared the five fit ages. At the 14 Primaries with a long history, the continuous ranked
 probability score (CRPS, where lower is better) of K1, the network that reads recent power, rose by
 3.0% after 4 weeks and by 6.3% after 8 weeks, then levelled off. At D15 and D18 it rose by 17% after
-4 weeks and doubled by 26 weeks. K3, the network that reads no recent power, lost the same amount as
-K1.
+4 weeks (pooled over the months) and doubled by 26 weeks. K3, the network that reads no recent
+power, lost the same amount as K1.
 
-**The pre-registered limit of 1% per 4 weeks holds for neither network at all 16 Primaries.** It
-holds only at the margin for the 14 long-history Primaries, where K1's slope is 1.0% (97.5% interval
--0.2 to +1.8) and K3's is 1.0% (-0.3 to +2.3). The loss is not a straight line: it is about 3% in
-the first 4 weeks for K1 and then flattens, so a straight-line slope understates the first month.
+**The pre-registered limit of 1% per 4 weeks fails for both networks at all 16 Primaries, and is not
+safely met at the other 14.** At the 14 long-history Primaries K1's slope is 1.0% (97.5% interval
+-0.2 to +1.8) and K3's is 1.0% (-0.3 to +2.3), but the slope rises to 1.6% for K1 when the
+history-limited 2025-10 fits are left out, and the loss in the first 4 weeks is about 3%. The loss
+is
+not a straight line: it flattens after the first months.
 
 ## Figures
 
@@ -130,7 +131,7 @@ weeks. Both networks are over-confident at every age.*
 - **P4, the reproduction check, holds.** The age-0 K1 fit scores 0.03643 on the first 14 days of the
   five months, against 0.03677 for the roster's ungated K1 (a ratio of 0.991, inside the 1%
   tolerance). The roster has a refit on day 14 and five seeds, so only days 0 to 13 compare.
-- **P1 fails at 16 Primaries and holds at the margin at 14.** Slope per 4 weeks, percent of the
+- **P1 fails at 16 Primaries and is not safely met at 14.** Slope per 4 weeks, percent of the
   age-0
   CRPS at 0 to 240 h:
 
@@ -171,22 +172,46 @@ weeks. Both networks are over-confident at every age.*
 - **Weekly refits are not shown to be worth more than monthly refits.** The loss is about 3% in the
   first 4 weeks and flattens later, and this experiment did not run a weekly refit, so the extra
   gain of a weekly schedule over a monthly one is not measured here.
-- **The short-history Primaries need frequent refits.** D15 and D18 lose 17% (K1) within 4 weeks.
-  This experiment cannot separate that loss from their small number of training months (1 to 3
-  months at the oldest cutoffs of the earliest months, against 7 to 15 at age 0).
+- **The short-history Primaries may need frequent refits.** D15 and D18 lose 17% (K1, pooled) within
+  4 weeks. This experiment cannot separate that loss
+  from their small number of training months or from level shifts in their power.
 
 ## Checks
 
 - **Median minus mean forecast per site:** not computed, because the stored forecasts hold quantiles
   only. The absolute error of the median rises with fit age at the same rate as CRPS (K1 +33% from
   age 0 to 26 weeks in both), so the two scores agree.
-- **Triggers fired:** trigger 4 (leaving two sites out changes the verdict of P1) fires, and
-  trigger 2 (a result contradicts its prediction) fires and is explained by the same leave-out. An
-  audit and its triage are recorded below once they have run.
+- **Triggers fired:** trigger 2 (a result contradicts its prediction) and trigger 4 (leaving D15
+  and D18 out changes the verdict of P1; leaving out any one of three other Primaries moves the
+  14-Primary slope to 1.1 to 1.2). A fresh Sonnet audit re-derived every number from the stored
+  forecasts and confirmed them. Its findings and their triage:
+    - **The 14-Primary "at the margin" verdict is fragile (accepted).** The page now says P1 is not
+      safely met at 14 Primaries.
+    - **The history bullet contradicted its own number (accepted).** Corrected above: the
+sensitivity
+      analysis raises the slope.
+    - **The D15 and D18 loss is not shown to be fit age or history length (accepted).** The page
+      states the confound and no longer attributes the loss to history.
+    - **No leakage found, but two loaders bypass the train-phase patch (accepted as a caveat).** The
+      audit found by grep that the 640 chain never calls `e00428_data.load_stack` or
+      `prep422.cleaned_arrays`, and did not trace a run.
+    - **Scorer bias is negligible (accepted).** Averaging quantiles over seeds inflates the
+16-Primary
+      slope by about 0.2 points and changes no verdict.
+    - **P4 reproduces for K1 only (accepted).** By month the ratio spans 0.972 to 1.019, and the
+roster
+      has no K3 reference.
 - **History confound.** The oldest cutoffs of the earliest months have fewer months of fine-tune
-  rows, and D15 and D18 have under 3 months of cleaned power at the oldest cutoffs. The slope with
-  the 2025-10 fits older than 16 weeks left out is 1.6% (0.7 to 3.2) at the 14 Primaries for K1, so
-  the shorter history adds to the measured loss at those cutoffs. It is in `slopes.csv`.
+  rows, and D15 and D18 start on 2025-03-01, so they have 1.0 month of cleaned power at the oldest
+  cutoff of October 2025 and 3.0 months at that of December 2025 (never under 5.8 months for March
+  and June 2026). Leaving the 2025-10 fits older than 16 weeks out raises K1's 14-Primary slope from
+  1.0% to 1.6% (0.7 to 3.2), so the shorter history does not explain the loss at the 14 Primaries.
+  The audit found that D15's and D18's CRPS depends more on the test month than on fit age or
+  history length (K1 age-0 CRPS at the two is 16.4% of capacity in March 2026, 4.8% in January
+  2026), and that the CRPS steps line up with level shifts in their raw power. Fit age, history
+  length, and those shifts are confounded, so the page does not attribute the D15 and D18 loss to
+any
+  one of them.
 - **Lab conditions.** Each fit has no refit inside the month, so the oldest origins are about 30
   weeks after the fit. The gate is not in the scored K1. Synthetic load-shift events are seeded from
   the development month, so every age of one month shares them.
@@ -194,7 +219,9 @@ weeks. Both networks are over-confident at every age.*
 ## What to try next
 
 - **Refit D15 and D18 at a monthly or shorter cadence in an experiment of their own**, with a
-  control that holds the number of training months fixed while the fit age varies.
+  control that holds the number of training months fixed while the fit age varies, and a check of
+the
+  level shifts in their power.
 - **Add climatology and the manual heuristic to the headline chart** after a run that scores the
   gated K1 at each fit age.
 
