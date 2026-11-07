@@ -1,6 +1,6 @@
 {
- "frozen_at": "2026-11-07T11:23:58+00:00",
- "git_head": "91bd93fd4f65db679abd5c1fa9fb52bdc3974ab1",
+ "frozen_at": "2026-11-07T11:27:53+00:00",
+ "git_head": "1463ba987599147e0e6629936a68ced8a9be01a2",
  "train_data_ends_before": "2026-07-01",
  "test_origins": [
   "2026-07-01",
@@ -64,13 +64,13 @@
    0,
    13
   ],
-  "12": [
+  "10": [
    0,
    6,
    8,
    9
   ],
-  "10": [
+  "12": [
    0,
    6,
    8,
@@ -459,7 +459,7 @@
    "init=2026-10-31.parquet": "d254970b1cab0a0a58f2e382340b17a998a765c1d1d671ea8dcc8bc91a0c1d12"
   }
  },
- "upstream_code_digest": "7854a42151f7591fac72e7f83c3b84b73e7cb0743fc517a13b931ade29aba1ca",
+ "upstream_code_digest": "141e378cb5d9049f08e089d348efb333090c4b4d1155ef8ac28d2df374b68a4a",
  "code": {
   "e00620_fold.py": "da64f194b31dbd45e5323e3ef70892b6a83c5850070586133e2cdd4e43dda628",
   "e00620_extend.py": "8fa6c730d9400db3b102b1dafcc92122050d8662bc63fd98364a2f45b0567d1a",
@@ -470,7 +470,7 @@
   "e00620_tables.py": "d4bafe02588b07740851d3b4a93bbc2845e5450b62fbd63c5e0088ce63bfbab5",
   "e00620_freeze.py": "9e634acd44c2fda46848e58771903f48b267343da5575569c67e48dee6a27578",
   "e00620_assemble.py": "bf86c135734dd1765c9b882a7aad8473fbf91d655202fcbf3ddeb6d1c621551b",
-  "e00620_score.py": "6889dc6b0ffab644f15754491ab2ba5778467a9f44ad5cacb594e2b2e141e9fb",
+  "e00620_score.py": "ff3a5b384241c288892706c9d8aaacae9a3e0e734f3e4b2cfcadb71682b85ddd",
   "predict.sh": "89bf352db1dbe804bb3c5431f03c8b9b26a2ab733ad3ae997cc169b91b0a5125",
   "gpu.sh": "0f524b72aa74ee2ab12f0ebcc67ce33dc7690cb560e485a5330de8caedf8dba8"
  }

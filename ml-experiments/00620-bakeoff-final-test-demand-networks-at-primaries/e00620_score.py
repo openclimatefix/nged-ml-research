@@ -21,6 +21,7 @@ mean is a day-block bootstrap over forecast origin days; every contrast prints i
 Usage: python e00620_score.py MONTH CUTOFF EXPORT_DIR OUT_DIR   (CUTOFF = the first day not trained on)
 """
 
+import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +29,7 @@ from pathlib import Path
 import e00582_arms as a  # ty: ignore[unresolved-import]
 import e00583_common as c  # ty: ignore[unresolved-import]
 import e00601_common as k601  # ty: ignore[unresolved-import]
+import e00620_extend as ext  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -117,6 +119,9 @@ def interval(draws: np.ndarray, alpha: float) -> tuple[float, float]:
 
 def main(month: str, cutoff: str, export: Path, out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
+    if os.environ.get("E00620_PHASE") == "predict":
+        ext.redirect()  # the extended grid and observed power hold the window
+        assert (cutoff == "2026-07-01") == (month == "2026-07"), (month, cutoff)
     sub = pl.read_csv(SUBSTATIONS)
     cap = dict(zip(sub["time_series_id"].to_list(), sub["capacity"].to_list(), strict=True))
     grp = dict(zip(sub["time_series_id"].to_list(), sub["group"].to_list(), strict=True))
