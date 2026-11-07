@@ -136,8 +136,8 @@ arm's shuffled-sky placebo reads slightly higher (0.13 to 0.17) than the plain a
 Without the cloud template, both arms read a strong cloud-following load as PV (0.1 to 0.8 of a 2 MW
 farm, rising with the load's size). With the template, both pass. The plain network over-corrects
 (negative spurious capacity as large as -0.7 for the strong squared load), and the monotone network
-stays closer to zero (-0.2). A monotone path in shortwave leaves the other weather inputs free to carry the cloud signal, so the
-cloud template still does the work.
+stays closer to zero (-0.2). A monotone path in shortwave leaves the other weather inputs free to
+carry the cloud signal, so the cloud template still does the work.
 
 ## Seed spread
 
