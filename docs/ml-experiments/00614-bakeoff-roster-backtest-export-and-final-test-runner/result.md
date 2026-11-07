@@ -46,10 +46,12 @@ best_arm: not applicable (export and tooling, no arms compared)
 headline: >-
   The five-seed backtests of K1, the class 2 candidate, and K3 are exported for the five development
   months to 240 h, and recomputed event-free coverage matches experiment 613's stored cells exactly
-  (largest difference 0.00000, tolerance 0.003). The final-test runner passed all 15 development-month
+  (largest difference 0.00000, tolerance 0.003). The final-test runner passed all 15
+  development-month
   checks, including the refusal of a second run.
 lessons: >-
-  Experiment 612's printed coverage comes from seeds 0 and 1, and experiment 613's from seeds 0 to 4,
+  Experiment 612's printed coverage comes from seeds 0 and 1, and experiment 613's from seeds 0 to
+  4,
   so an export reproduces a page only when it uses the same seeds as that page.
 take_home_message: >-
   The three candidate networks' stored forecasts are now in one folder that a colleague can score
@@ -71,7 +73,8 @@ advice:
 production_status: not-for-production
 adopted_in: none
 ---
-**Three roster networks, five development months, one folder.** The folder holds the stored forecasts
+**Three roster networks, five development months, one folder.** The folder holds the stored
+forecasts
 of K1 (class 1, the lag network with the gated band), the class 2 candidate (K2 plus neighbour
 summaries and signal dropout, scaled to K1's band width), and K3 (class 3, the lag-free network).
 Each forecast is the mean of seeds 0 to 4 quantile by quantile, as [experiment
@@ -125,7 +128,7 @@ K3 has no gate, so the strip is empty. The legend and the dashed lines are as ab
   median by experiment 613's per-month width factor (1.076 to 1.120). The factors are in-sample, as
   in experiment 613.
 - **BSP/GSP pilot.** The export of [experiment
-  611](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00611-bsp-gsp-pilot-backtests-for-the-bake-off/result/)
+611](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00611-bsp-gsp-pilot-backtests-for-the-bake-off/result/)
   stays in its own folder, and the README points to it.
 - **Anonymisation.** All 16 series are Primaries. No file holds a metered generator's time series or
   ID.
@@ -162,7 +165,7 @@ on those origins, and no forecast error beyond 2026-06-07 was read.
   origin, that the valid time is after the origin, that no (series, valid time) pair is duplicated,
   and that both the day and the week power lag are stamped at least 24 hours before the origin
   (experiment 558's capped lags), on the extended inputs of [experiment
-  607](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00607-bakeoff-extend-cached-inputs-to-2026-10-31/result/).
+607](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00607-bakeoff-extend-cached-inputs-to-2026-10-31/result/).
   A violation stops the run.
 - **What a candidate sees.** A predictor class gets the input rows: the keys, the weather run time,
   the weather summary columns, the lag times, and the two lag readings. It never gets the observed
@@ -171,7 +174,11 @@ on those origins, and no forecast error beyond 2026-06-07 was read.
 - **Scoring and output.** Each candidate is scored once: its forecasts are written as Parquet, and
   `scores.csv` holds the continuous ranked probability score (as points of capacity) and q05-q95
   coverage by lead band. The lock then records the hash of every output.
-- **Refusing a second run.** In final mode the lock must be `final_test.lock` beside the runner, so a second configuration cannot name a fresh lock. The runner loads the predictors and builds and checks the rows of every origin before it creates the lock, so a bad configuration cannot use up the test. Each predictor's module file is hashed into its candidate's combined hash. The lock file holds the configuration hash, the runner hash, the git
+- **Refusing a second run.** In final mode the lock must be `final_test.lock` beside the runner, so
+  a second configuration cannot name a fresh lock. The runner loads the predictors and builds and
+  checks the rows of every origin before it creates the lock, so a bad configuration cannot use up
+  the test. Each predictor's module file is hashed into its candidate's combined hash. The lock file
+  holds the configuration hash, the runner hash, the git
   commit, and each candidate's artefact list and combined hash. A lock left by a failed run also
   blocks a rerun, because the runner treats a started test as a used test. Only the maintainer may
   delete the lock.
@@ -187,14 +194,16 @@ per-Primary mean that stands in for a lag-free network) and passed 15 of 15 chec
 
 - the check mode passed and wrote no lock;
 - the first run completed, wrote both candidates' forecasts (53,648 rows each: 7 origins, 16
-  Primaries, leads 0.5 to 239.5 h) and `scores.csv`, and recorded both candidates' hashes in the lock;
+  Primaries, leads 0.5 to 239.5 h) and `scores.csv`, and recorded both candidates' hashes in the
+  lock;
 - a second run was refused;
 - a changed artefact was refused and wrote no lock;
 - one row with a wrong origin stopped both the check and the run;
 - a missing ensemble run stopped the check;
 - a power lag younger than 24 hours (the lag cap lowered to 12 hours) stopped the run;
 - development mode refused an origin in July;
-- final mode refused to start without the flag, without the maintainer's approval, and with a lock file other than the pinned `final_test.lock`.
+- final mode refused to start without the flag, without the maintainer's approval, and with a lock
+  file other than the pinned `final_test.lock`.
 
 The dummy candidates' scores (continuous ranked probability score 6.9 and 8.2 points of capacity,
 coverage 0.60 and 0.92) show only that scoring works. They say nothing about forecast skill.
@@ -204,9 +213,12 @@ coverage 0.60 and 0.92) show only that scoring works. They say nothing about for
 - **Freeze the roster.** The three networks' weights and statistics files must be chosen and listed
   with their hashes, one configuration per frozen set of weights.
 - **Wire the networks.** The runner has no predictor for K1, the candidate, or K3 yet. Each needs a
-  class that loads its frozen weights and builds its features from the supplied columns plus experiment
-  607's other extended tables (wind components, cloud cover, ERA5 columns). Experiments 574, 591, and
-  613's fit code builds those features inside month-by-month fits, so that wiring is a separate piece
+  class that loads its frozen weights and builds its features from the supplied columns plus
+  experiment
+  607's other extended tables (wind components, cloud cover, ERA5 columns). Experiments 574, 591,
+  and
+  613's fit code builds those features inside month-by-month fits, so that wiring is a separate
+  piece
   of work.
 - **Approve and run.** Fill in `approved_by_maintainer`, run `--check`, then run once with
   `--run-final-test`.
@@ -227,5 +239,6 @@ coverage 0.60 and 0.92) show only that scoring works. They say nothing about for
 - **Counted tests.** 0 (no hypothesis about forecast skill), so no Bonferroni correction and no
   minimum detectable effect apply.
 - **Caveats.** NGED's logs may omit load-shift events, so event-free rows can hold unlogged
-  load-shifts. The candidate's band-width factors were set on the months they are applied to. Nothing
+  load-shifts. The candidate's band-width factors were set on the months they are applied to.
+  Nothing
   is adopted for production.
