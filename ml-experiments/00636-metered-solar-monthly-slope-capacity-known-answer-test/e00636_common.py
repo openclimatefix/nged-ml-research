@@ -260,7 +260,7 @@ def inject_dc_loss(farm: Farm, *, start: int, loss: float) -> np.ndarray:
 
 
 def inject_curtailment(farm: Farm, *, start: int, share: float, seed: int) -> np.ndarray:
-    """World 4: zero a random `share` of month `start`'s daylight half-hours; change nothing else."""
+    """World 4: zero a random `share` of month `start`'s daylight half-hours, nothing else."""
     y = farm.y.copy()
     idx = np.flatnonzero((farm.mo == start) & farm.daylight)
     rng = np.random.default_rng(seed)
