@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001
+# ruff: noqa: E501, ANN001, ANN202
 """Experiment 643: fit the new arms and write their test-window quantiles.
 
 Phases (one cutoff each): `fbias` (no fitting: shift stored free forecasts by a training-month constant),

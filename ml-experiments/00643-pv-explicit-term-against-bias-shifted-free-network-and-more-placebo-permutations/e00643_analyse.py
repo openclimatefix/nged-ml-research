@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN202, PERF401
+# ruff: noqa: E501, ANN001, PERF401
 """Experiment 643: score every arm and print the planned contrasts.
 
 CRPS and the day-block bootstrap are experiment 639's. A contrast is the control's CRPS minus
