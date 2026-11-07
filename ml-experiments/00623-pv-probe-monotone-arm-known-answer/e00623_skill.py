@@ -1,11 +1,12 @@
 # ruff: noqa: E501, ANN001, ANN201
 """Experiment 623: validation-row CRPS of the uninjected control networks, plain arm against monotone arm.
 
-The CRPS of a Gaussian mixture is exact: sum_k w_k A(y - mu_k, s_k^2) - 0.5 sum_kl w_k w_l A(mu_k - mu_l,
-s_k^2 + s_l^2), with A(m, v) = m (2 Phi(m / sqrt v) - 1) + 2 sqrt(v) phi(m / sqrt v). It is computed on the
-pretraining validation rows (the rows each network's early stopping reads, a time-ordered hold-out
-inside the pretraining window, so no row is dated 2026-07-01 or later), in megawatts, for all 16
-Primaries and for the six MW Primaries alone. The same rows score both arms.
+The CRPS of a Gaussian mixture is exact: the weighted sum over components k of A(y - mu_k, s_k^2),
+minus half the double sum over components k and l of w_k w_l A(mu_k - mu_l, s_k^2 + s_l^2), with
+A(m, v) = m (2 Phi(m / sqrt v) - 1) + 2 sqrt(v) phi(m / sqrt v). It is computed on the pretraining
+validation rows (the rows each network's early stopping reads, a time-ordered hold-out inside the
+pretraining window, so no row is dated 2026-07-01 or later), in megawatts, for all 16 Primaries and
+for the six MW Primaries alone. The same rows score both arms.
 
 Usage: python e00623_skill.py --cutoff 2026-06
 """
