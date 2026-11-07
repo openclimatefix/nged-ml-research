@@ -205,6 +205,7 @@ def main(month: str, cutoff: str, export: Path, out: Path) -> None:
     }
     q["Manual heuristic"] = manual_heuristic(clean=clean, prim=prim, idx=idx, lead_h=lead)
     q["Climatology"] = climatology(clean=clean, prim=prim, idx=idx, cutoff_idx=cutoff_idx)
+    q["BG2"] = bg2_quantiles(base=base, cap=cap)
     ok = np.isfinite(y)
     dropped = {"no observed reading": int((~ok).sum())}
     for n in SYSTEMS:
@@ -279,9 +280,10 @@ def main(month: str, cutoff: str, export: Path, out: Path) -> None:
     # paired contrasts of CRPS and MAE and twCRPS, Bonferroni-corrected intervals
     pairs = [
         (a_, b_)
-        for a_ in NETWORKS
+        for a_ in CONTRAST_LEFT
         for b_ in SYSTEMS
-        if a_ != b_ and (b_ not in NETWORKS or NETWORKS.index(b_) > NETWORKS.index(a_))
+        if a_ != b_
+        and (b_ not in CONTRAST_LEFT or CONTRAST_LEFT.index(b_) > CONTRAST_LEFT.index(a_))
     ]
     metrics = ("crps", "mae", "twcrps")
     n_tests = len(pairs) * len(metrics)

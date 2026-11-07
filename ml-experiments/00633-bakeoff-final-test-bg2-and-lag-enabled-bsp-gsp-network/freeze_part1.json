@@ -1,6 +1,6 @@
 {
- "frozen_at": "2026-11-07T12:43:32+00:00",
- "git_head": "5c258bdea8b6f1284a286b222aea6131a10c1f11",
+ "frozen_at": "2026-11-07T12:46:58+00:00",
+ "git_head": "0da278f0cea94bb13fe658e0542422a156a9f97e",
  "train_data_ends_before": "2026-07-01",
  "test_origins": [
   "2026-07-01",
@@ -177,16 +177,20 @@
    "init=2026-10-29.parquet": "6a6e9355fab4ea530769f624c5d821d532758459b16e26a1fe10a435ebc9d741",
    "init=2026-10-30.parquet": "8772fd597a83dd52b6769bd8838c7462b42057051a88d0b7240c97410e37b77c",
    "init=2026-10-31.parquet": "c70eec7c7a724d6b7d89ee8df42ab8b3ddc394027c8cc9e68d57e010f4bd673a"
+  },
+  "inputs": {
+   "observed.parquet": "58832665bfe5df9a357a90e3c8ee39775598475e19df9bed84bde61e9f4ff695",
+   "era5_features.parquet": "973bf0f5b4f2a6aabccaeed4833eb4ff2c3d4b11025710280e3275cae4432172"
   }
  },
- "upstream_code_digest": "28c2803bf2421695e41709d8f81c249d47002f4dc0f12d29e5d1703cd2be4096",
+ "upstream_code_digest": "09e981ea0e3c3ab4d7631481cb7629ce801ddaf0f06aea06dae94ff697306a73",
  "code": {
   "e00633_common.py": "7bc943e150e1803479d98e8a3788741d3e5c300724eb173578e2b615d9ffc04a",
   "e00633_frames.py": "b2f81f47fc774b57dd490d79948ee9f8be3129dc56786f6ba6ef0e565b632a7b",
   "e00633_bg2.py": "3c5d92e7811d8f0d971872334dfc60a9bb756547b5da05c0a631a2105e8e2338",
-  "e00633_freeze.py": "738d1de5f2246a0b5ffb30dccfda37d1ce3dbcd9684f5ae6187ebcef869e4ede",
-  "e00633_score.py": "88deca0acec9d5fcc88056b3ac1ab0ad29a5b48ba6f2cf15a903bad00b939355",
-  "predict_part1.sh": "8228d8630ee50b1f81c0939e50d0d60423037592fa4c4e1fb279661bcaf82c25",
+  "e00633_freeze.py": "0bc684b16fd5f20fb4ac43835245fbfa0608b7df988541e2f17f2a24b8a43cf1",
+  "e00633_score.py": "0e140ec09ff140b97900df5a216da5b83db0d63ff6aff79852625c6377033bbd",
+  "predict_part1.sh": "dac06cef94adb1ece32a29412f7dd2d9653e507a4ad54f9b0f498feb99f16d3a",
   "gpu.sh": "d17a47b3f1b41a1f7c7af0ed922060d2834877220a615ddb9d32e936e80fbfaf"
  }
 }

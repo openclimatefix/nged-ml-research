@@ -58,6 +58,9 @@ def artefacts() -> dict[str, dict[str, Path]]:
             p.name: p for p in sorted(folder.glob("*.json"))
         }
     out["frames"] = {p.name: p for p in sorted(k.FRAMES.glob("init=*.parquet"))}
+    out["inputs"] = {
+        p.name: p for p in (k.E607 / "observed.parquet", k.E607 / "era5_features.parquet")
+    }
     return out
 
 
