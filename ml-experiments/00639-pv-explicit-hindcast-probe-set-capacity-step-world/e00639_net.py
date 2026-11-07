@@ -30,7 +30,9 @@ def parameter_tensors(*, params: dict, six: dict[str, int], device: str) -> dict
     return {name: torch.tensor(v, dtype=torch.float32, device=device) for name, v in out.items()}
 
 
-def capacity_mw(*, t: dict[str, torch.Tensor], delta: torch.Tensor, p, r4, after, ek=None, ed=None) -> torch.Tensor:
+def capacity_mw(
+    *, t: dict[str, torch.Tensor], delta: torch.Tensor, p, r4, after, ek=None, ed=None
+) -> torch.Tensor:
     """Return the capacity timeline (MW) of the rows with Primary index `p`, floored at zero."""
     kk = t["k"] if ek is None else t["k"] + ek
     dd = t["d"] if ed is None else t["d"] + ed
