@@ -73,3 +73,15 @@ F, A, B. Rows with a gap in any of the four farms are dropped from every arm, wh
 six Primaries' rows at the 2026-06 cutoff. (c) The farm series has no zero-fill after 2026-03-26;
 those half-hours are dropped like any other gap. (d) The cloud load is run at two sizes because the
 size that experiment 129 used may be too small to test the 0.15 bar.
+
+**How each bar is computed (fixed before the grid was read; the only recoveries seen were a timing
+run of one seed at the 2026-06 cutoff).** The unit of evaluation is a Primary. For each bar, a
+Primary's value is the median (or, for the placebo bar, the 95th percentile) over the 2 cutoffs, the
+3 seeds, and, for the farm worlds, the 2 farm rotations. A bar passes when it holds at 5 of the 6
+Primaries (4 of 6 for the 2 MW real-farm bar). Recovery uses the `plain` regression for the
+real-farm, physics-curve, and placebo worlds, and the `cloud_tpl` regression for the cloud-load
+worlds. The nominal 80% interval of an injection is its recovery plus or minus 1.28 times the root of
+the bootstrap variance and the across-seed variance of the probed capacity difference; the
+bootstrap-only interval is reported beside it. In the cloud-load worlds, the interval has to cover
+zero, because no PV was injected. The cloud load fakes capacity when the `cloud_tpl` difference
+exceeds 0.15 of 2 MW.
