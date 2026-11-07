@@ -7,7 +7,7 @@ candidate's hash; a second run is refused; a changed artefact is refused; a wron
 ensemble file stops the run; a development configuration with an origin in July is refused; and a
 final configuration without the maintainer's approval is refused. Writes `dev_test_report.txt`.
 
-Usage: python e00614_dev_test.py OUTDIR
+Usage: python e00614_dev_run.py OUTDIR
 """
 
 import json
@@ -21,7 +21,6 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 RUNNER = Path(__file__).with_name("e00614_final_runner.py")
-E607 = next(ML_EXPERIMENTS_DATA_DIR.glob("00607-*")) / "work"
 
 
 def run(*args: str) -> subprocess.CompletedProcess:
@@ -35,12 +34,13 @@ def run(*args: str) -> subprocess.CompletedProcess:
 
 
 def main(out: Path) -> None:
+    e607 = next(ML_EXPERIMENTS_DATA_DIR.glob("00607-*")) / "work"
     if out.exists():
         shutil.rmtree(out)
     art = out / "artefacts"
     art.mkdir(parents=True)
     observed = pl.read_parquet(
-        E607 / "observed.parquet", columns=["time_series_id", "valid_time", "power"]
+        e607 / "observed.parquet", columns=["time_series_id", "valid_time", "power"]
     )
     prior = (
         observed.filter(pl.col("valid_time") < pl.datetime(2026, 5, 1, time_zone="UTC"))
@@ -67,8 +67,8 @@ def main(out: Path) -> None:
         "origin_last": "2026-06-07",
         "approved_by_maintainer": None,
         "inputs": {
-            "ens_summary_dir": str(E607 / "ens_summary"),
-            "observed": str(E607 / "observed.parquet"),
+            "ens_summary_dir": str(e607 / "ens_summary"),
+            "observed": str(e607 / "observed.parquet"),
             "capacity_csv": str(out / "capacity.csv"),
         },
         "output_dir": str(out / "run1_out"),
@@ -169,13 +169,13 @@ def main(out: Path) -> None:
     # a wrong-origin row in one ensemble file
     bad_dir = out / "ens_bad"
     bad_dir.mkdir()
-    for f in (E607 / "ens_summary").glob("init=2026-06-0[1-7].parquet"):
+    for f in (e607 / "ens_summary").glob("init=2026-06-0[1-7].parquet"):
         (bad_dir / f.name).symlink_to(f)
-    for f in (E607 / "ens_summary").glob("init=2026-05-*.parquet"):
+    for f in (e607 / "ens_summary").glob("init=2026-05-*.parquet"):
         (bad_dir / f.name).symlink_to(f)
     target = bad_dir / "init=2026-06-03.parquet"
     target.unlink()
-    pl.read_parquet(E607 / "ens_summary" / "init=2026-06-03.parquet").with_row_index().with_columns(
+    pl.read_parquet(e607 / "ens_summary" / "init=2026-06-03.parquet").with_row_index().with_columns(
         power_fcst_init_time=pl.when(pl.col("index") == 5)
         .then(pl.col("power_fcst_init_time") + pl.duration(hours=1))
         .otherwise(pl.col("power_fcst_init_time"))
@@ -203,7 +203,7 @@ def main(out: Path) -> None:
     shutil.copytree(bad_dir, missing_dir, symlinks=True)
     (missing_dir / "init=2026-06-03.parquet").unlink()
     (missing_dir / "init=2026-06-03.parquet").symlink_to(
-        E607 / "ens_summary" / "init=2026-06-03.parquet"
+        e607 / "ens_summary" / "init=2026-06-03.parquet"
     )
     (missing_dir / "init=2026-06-05.parquet").unlink()
     cfg4 = json.loads(cfg_path.read_text()) | {
@@ -262,7 +262,7 @@ def main(out: Path) -> None:
     try:
         runner.origin_rows(
             origin=runner.parse_day("2026-06-02") + runner.PUBLICATION_DELAY,
-            ens_dir=E607 / "ens_summary",
+            ens_dir=e607 / "ens_summary",
             observed=observed,
         )
         record("a lag younger than 24 h stops the run", False, "no error raised")

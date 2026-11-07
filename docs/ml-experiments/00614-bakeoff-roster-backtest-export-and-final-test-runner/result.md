@@ -200,7 +200,7 @@ on those origins, and no forecast error beyond 2026-06-07 was read.
   the hashes, and the timing rules on every origin without predicting or writing a lock, and
   `--hash-artefacts` prints the hashes to put in the configuration.
 
-**Development-month test.** `e00614_dev_test.py` runs the runner on origins 2026-06-01 to 2026-06-07
+**Development-month test.** `e00614_dev_run.py` runs the runner on origins 2026-06-01 to 2026-06-07
 with two dummy frozen candidates (a persistence rule that stands in for a lag network, and a
 per-Primary mean that stands in for a lag-free network) and passed 15 of 15 checks:
 
@@ -247,7 +247,7 @@ coverage 0.60 and 0.92) show only that scoring works. They say nothing about for
 
 - **Code.** `e00614_export.py` (reuses experiment 593's `Context` and experiment 613's score
   folders), `e00614_check.py`, `e00614_figures.py` (reuses experiment 588's panel code),
-  `e00614_final_runner.py`, `e00614_dummy_predictors.py`, and `e00614_dev_test.py`. Experiments 593,
+  `e00614_final_runner.py`, `e00614_dummy_predictors.py`, and `e00614_dev_run.py`. Experiments 593,
   597, 605, 607, 612, and 613 are the code and data reused.
 - **Counted tests.** 0 (no hypothesis about forecast skill), so no Bonferroni correction and no
   minimum detectable effect apply.
