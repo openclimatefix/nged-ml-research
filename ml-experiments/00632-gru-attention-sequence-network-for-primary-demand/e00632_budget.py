@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D102, D103, D107, PT018
+# ruff: noqa: E501, D102, D103
 """Experiment 632: token counts and memory estimates of the GRU plus self-attention network.
 
 Prints, for each token option, how many tokens the joint self-attention sees, the size of one
