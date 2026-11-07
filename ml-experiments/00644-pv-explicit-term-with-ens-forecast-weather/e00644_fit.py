@@ -90,11 +90,7 @@ def _load_for_finetune(*, model: torch.nn.Module, path: Path) -> None:
 def _train(
     *, model, x, y, u_inc, r4, after, p, w, is_val, mean, std, tensors, seed: int, init_delta=None,
 ) -> tuple[int, float, torch.Tensor]:  # fmt: skip
-    """Return experiment 639's `train_explicit` fit with recency weights and the fresh mixer group.
-
-    Returns:
-        The epochs run, the best validation NLL, and the best per-Primary offsets.
-    """
+    """Train as experiment 639 does, with recency weights and the fresh mixer group."""
     torch.manual_seed(seed)
     delta = (
         init_delta.clone()
