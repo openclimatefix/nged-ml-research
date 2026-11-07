@@ -103,9 +103,9 @@ def intervals() -> None:
         return "cover90"
 
     for fam, title, keep in (
-        ("class2", "Class 2 candidate at K1's band width minus K1 (CRPS: minus K2), five months, seeds 0 to 4", "in-sample"),
-        ("o2", "O2 offset minus D5 offset, tail constants on both, four months", None),
-        ("e3", "3-day embargo minus E3 refit rule, five months, seeds 0 to 4", None),
+        ("class2", ["Class 2 candidate at K1's band width minus K1", "(CRPS: minus K2); five months, seeds 0 to 4"], "in-sample"),
+        ("o2", ["O2 offset minus D5 offset, tail constants on both", "(four months)"], None),
+        ("e3", ["3-day embargo minus E3 refit rule", "five months, seeds 0 to 4"], None),
     ):  # fmt: skip
         d = pl.read_csv(out / f"roster_{fam}.csv", infer_schema_length=None)
         if keep:
@@ -118,8 +118,13 @@ def intervals() -> None:
             .str.replace_all("after0-7", "0-7 days after")
             .str.replace_all("follow_q50", "follow")
             .str.replace_all("day_4_to_end", "day 4 to end")
-            .str.replace_all("after_7_days", "7 days after the end")
-            .str.replace(r" \(NRA below q95/above q05\)", ""),
+            .str.replace_all("7 days after the end", "7 days after")
+            .str.replace_all("after_7_days", "7 days after")
+            .str.replace(r" \(NRA below q95/above q05\)", "")
+            .str.replace_all("cover90", "coverage")
+            .str.replace("c2 minus E3", "candidate minus K1, K2")
+            .str.replace_all("E0", "3-day embargo")
+            .str.replace_all("injected ", "injected: "),
         )
         d = d.with_columns(
             row=pl.when(pl.col("contrast").str.starts_with("K"))
@@ -137,7 +142,7 @@ def intervals() -> None:
             dom = alt.Scale(domain=[lo_x - pad, hi_x + pad], nice=False)
             band = alt.Chart(pl.DataFrame({"a": [-tol], "b": [tol], "label": ["Tolerance"]})).mark_rect(opacity=0.5).encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("a:Q", scale=dom), x2="b:Q",
-                color=alt.Color("label:N", scale=alt.Scale(domain=["Tolerance"], range=[theme.DATA_SKY]), legend=alt.Legend(title=None, orient="bottom")),
+                color=alt.Color("label:N", scale=alt.Scale(domain=["Tolerance", "Estimate and interval"], range=[theme.DATA_SKY, theme.DATA_BLUE]), legend=alt.Legend(title=None, orient="bottom")),
             )  # fmt: skip
             base = alt.Chart(dm).encode(
                 y=alt.Y(
@@ -145,7 +150,13 @@ def intervals() -> None:
                 )
             )
             bars = base.mark_rule(color=theme.DATA_BLUE, strokeWidth=2.5).encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X("lo:Q", scale=dom, title=meas[k] + " (difference)"), x2="hi:Q"
+                x=alt.X(
+                    "lo:Q",
+                    scale=dom,
+                    title=meas[k] + " (difference)",
+                    axis=alt.Axis(tickCount=4, labelOverlap="parity"),
+                ),
+                x2="hi:Q",
             )
             pts = base.mark_point(filled=True, size=70, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("diff:Q", scale=dom)
@@ -192,6 +203,10 @@ def day_rows(*, t, p: int, lo: int, hi: int) -> np.ndarray:
 def situations() -> None:
     """Draw K1, K2, K3, and the class 2 candidate for five situations (see the page)."""
     c.MONTHS = MONTHS
+    cp.PANEL_HEIGHT = 300
+    cp.SHADE = cp.entry(
+        "Load-shift window verified in experiment 580", "band", cp.SHADE_COLOUR, 0.7
+    )
     a.SEEDS = (0, 1, 2, 3, 4)
     cp.RULES = cp.entry("Load-shift start and end dates", "rule", cp.RULE_COLOUR)
     work = ROOT / "arms" / "k1_d5" / "work"
@@ -214,7 +229,18 @@ def situations() -> None:
     eight = [p for p in range(16) if t.group[p] == "MVA-only eight"]
     six = [p for p in range(16) if t.group[p] == "signed-MW six"]
 
+    orig_x = cp._x_parts
+
     def draw(*, name: str, p: int, lo: int, hi: int, title: str, event=None, rules=()) -> None:
+        def x_parts(*, xdom, xtype: str, labels: bool) -> tuple[alt.Scale, alt.Axis]:
+            scale, axis = orig_x(xdom=xdom, xtype=xtype, labels=labels)
+            if hi - lo <= 7 * 48:
+                axis = alt.Axis(
+                    format="%d %b", labels=labels, tickCount={"interval": "day", "step": 1}
+                )
+            return scale, axis
+
+        cp._x_parts = x_parts
         rows = day_rows(t=t, p=p, lo=lo, hi=hi)
         v, m, o = t.arms["V"][rows], t.arms["M"][rows], t.obs[rows]
         q1 = k597.assemble(v=v, m=m, wide=inp.mode[t.prim[rows], t.origin_day[rows]])
