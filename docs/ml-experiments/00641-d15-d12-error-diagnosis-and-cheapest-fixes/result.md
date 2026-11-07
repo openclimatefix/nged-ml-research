@@ -47,7 +47,7 @@ metric: >-
   in percent of capacity, at leads 24 to 240 hours.
 best_arm: >-
   None. The 14-day level term changes D15's CRPS by -12.9% (95% interval -34.0% to +4.8%) and D12's
-  by +5.5% (-2.0% to +17.0%), and raises the CRPS of the other 14 Primaries by 4.7% (0.6% to 10.2%).
+  by +5.5% (-2.0% to +17.0%), and raises the CRPS of the other 14 Primaries by 4.7% (0.6% to 10.1%).
 headline: >-
   At D15, K1's median forecast sat 50.7 percentage points of capacity below the readings in March
   2026, and removing each day's bias would cut D15's CRPS by 48%. A level term built from the
@@ -62,8 +62,8 @@ take_home_message: >-
   correction did not lower it.
 lessons: >-
   A trailing correction recovers little of an error that changes within days. The lag-free
-  neural network (K3) scored 6.5% better than K1 at D15 on the point estimate, with no interval,
-  which suggests but does not show that K1's power lags carry part of the offset.
+  neural network (K3) scored 6.5% better than K1 at D15 (interval -11.5% to -1.7%), which suggests,
+  but does not show, that K1's power lags carry part of the offset; D15 was chosen after the fact.
 advice:
   - >-
     Do not rely on a trailing 14-day level term for D15: it did not separate from zero there and
@@ -85,7 +85,7 @@ previous 14 days of errors did not detectably fix it.** The experiment asked why
 are so wrong at two Primary substations, D15 and D12, and whether shifting K1's stored forecast by
 its own recent errors lowers the error without a refit. A shift that removed each day's bias
 exactly (an oracle, not usable in practice) would cut D15's continuous ranked probability score
-(CRPS) by 48%. The shift that uses only past errors recovered 27% of that gap at D15, with an
+(CRPS; here the mean pinball loss over the 11 stored quantiles, times 2) by 48%. The shift that uses only past errors recovered 27% of that gap at D15, with an
 interval that includes zero, and raised the CRPS of the other 14 Primaries. At D12 the error is
 largest at midday, and the same shift did not lower it. The verdict is `not supported`.
 
@@ -113,10 +113,12 @@ count of dropped half-hours is available per month.
   49.5% of D15's CRPS.
 - **D15's bias lasts for days.** The daily mean error has an autocorrelation of 0.81 at 1 day, 0.39 at
   7 days, and 0.27 at 14 days. In March 2026 the median forecast was -1.34 MW and the median reading
-  +0.32 MW (capacity 3.01 MW). Of the 10 days flagged as level shifts (more than 3 robust standard
+  +0.32 MW (capacity 3.01 MW); the readings step up by about 1.5 MW on 8 to 9 March, so part of the
+  March error is a step that K1's lags had not yet followed. Of the 10 days flagged as level shifts (more than 3 robust standard
   deviations from the previous 28 days), 70% carry no event label in the export.
-- **K3 beats K1 at D15.** CRPS is 14.53 for K1, 15.05 for the Candidate, and 13.58 for K3, the
-  neural network that reads no recent power. These are point estimates without intervals.
+- **K3 beats K1 at D15.** The CRPS is 14.53 for K1, 15.05 for the Candidate (+3.6%, worse than K1), and 13.58 for K3, the
+  neural network that reads no recent power (-6.5%, better than K1). K3 is worse than K1 at D12 (+7.0%) and
+  at other Primaries, so D15 may be a special case.
 - **D12's error peaks at midday.** The mean absolute error is 18.9 points at 10:00 to 14:00 local
   time against 9.3 at 00:00 to 04:00. The bias is +4 at 05:00 and -5 at 17:00 and +8 in December
   2025, and the worst 20% of days carry 32.2% of the CRPS. Its daily bias autocorrelation falls to
@@ -130,17 +132,17 @@ count of dropped half-hours is available per month.
 **Both fixes shift all 11 quantiles by an amount known 24 hours before the origin.** F1 is the mean
 error of K1's 24 to 48 hour forecasts over the 14 days up to that time, per Primary. F2 is the same
 mean per half-hour of the local day. F1 was applied to 92% of rows; the other rows had no known error
-in the previous 3 days and keep K1 unchanged. A unit test perturbs the readings after the cutoff and
-checks that the shift does not change.
+in the previous 3 days and keep K1 unchanged. A unit test adds 1000 MW to every reading after 2026-03-15 09:00 and checks that the shift of every origin
+up to 24 hours later is unchanged, and that later origins do change.
 
 | Quantity (change in CRPS against K1; negative is better) | D15 | D12 | Other 14 Primaries |
 |---|---|---|---|
 | K1 CRPS (% of capacity) | 14.53 | 6.90 | 1.4 to 7.7 |
-| F1, 14-day level term | -12.9% (-34.0 to +4.8) | +5.5% (-2.0 to +17.0) | +4.7% (+0.6 to +10.2) |
-| F2, per half-hour level term | -13.1% (-33.8 to +3.5) | +5.9% (-1.5 to +16.9) | +4.5% (+0.6 to +9.7) |
+| F1, 14-day level term | -12.9% (-34.0 to +4.8) | +5.5% (-2.0 to +17.0) | +4.7% (+0.6 to +10.1) |
+| F2, per half-hour level term | -13.1% (-33.8 to +3.5) | +5.9% (-1.5 to +16.9) | +4.5% (+0.6 to +9.8) |
 | Oracle, each day's bias removed (a bound, not causal) | -47.9% | -16.4% | -8% to -47% |
-| Candidate (point estimate) | +3.6% | -0.0% | not computed |
-| K3 (point estimate) | -6.5% | +7.0% | not computed |
+| Candidate | +3.6% (+1.3 to +6.6) | -0.0% (-2.4 to +2.0) | not computed |
+| K3 | -6.5% (-11.5 to -1.7) | +7.0% (+3.3 to +11.5) | not computed |
 
 Intervals are 95% over week-long blocks.
 

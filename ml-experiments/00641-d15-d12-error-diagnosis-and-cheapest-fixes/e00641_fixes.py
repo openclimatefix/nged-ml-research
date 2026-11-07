@@ -138,7 +138,7 @@ def with_fixes(k1: pl.DataFrame) -> pl.DataFrame:
         .fill_null(0.0)
         .alias("s2"),
     ).with_columns(pl.col("s1").ne(0.0).alias("applied1"))
-    # staleness: the latest known error must be within 14 days of the cutoff
+    # staleness: the latest known error must be within 3 days of the cutoff
     return base
 
 
@@ -157,13 +157,11 @@ def block_boot(
 def main() -> None:
     rng = np.random.default_rng(SEED)
     k1 = load("K1")
-    # unit test of the causal rule: perturb observed power after each origin's cutoff
+    # unit test of the causal rule: perturb observed power after a mid-March cutoff
     base = with_fixes(k1)
+    split = pl.datetime(2026, 3, 15, 9, time_zone="UTC")
     pert = k1.with_columns(
-        pl.when(
-            pl.col("valid_time")
-            > pl.col("power_fcst_init_time").min().over("time_series_id") + pl.duration(days=60)
-        )
+        pl.when(pl.col("valid_time") > split)
         .then(pl.col("observed_power") + 1000)
         .otherwise(pl.col("observed_power"))
         .alias("observed_power")
@@ -173,16 +171,15 @@ def main() -> None:
     chk = base.select(*key, "s1", "s2").join(
         pb.select(*key, pl.col("s1").alias("p1"), pl.col("s2").alias("p2")), on=key
     )
-    early = chk.filter(
-        pl.col("power_fcst_init_time")
-        < pl.col("power_fcst_init_time").min().over("time_series_id") + pl.duration(days=59)
-    )
-    assert (
-        early.height > 0
-        and (early["s1"] - early["p1"]).abs().max() < 1e-9  # ty: ignore[unsupported-operator]
-        and (early["s2"] - early["p2"]).abs().max() < 1e-9  # ty: ignore[unsupported-operator]
-    )
-    print("causal unit test passed on", early.height, "rows")
+    # origins whose cutoff (origin minus 24 h) is at or before the split must be unchanged
+    early = chk.filter(pl.col("power_fcst_init_time") <= split + pl.duration(hours=24))
+    late = chk.filter(pl.col("power_fcst_init_time") > split + pl.duration(days=3))
+    d_early = (early["s1"] - early["p1"]).abs().max()
+    d_late = (late["s1"] - late["p1"]).abs().max()
+    assert early.height > 0 and late.height > 0
+    assert d_early < 1e-9 and (early["s2"] - early["p2"]).abs().max() < 1e-9  # ty: ignore[unsupported-operator]
+    assert d_late > 1.0  # ty: ignore[unsupported-operator]  # the test can fail: later origins do see it
+    print("causal unit test passed:", early.height, "unchanged rows,", late.height, "changed rows")
 
     for name in ("Candidate", "K3"):
         o = load(name).select(key + [pl.col(c).alias(f"{name}_{c}") for c in QCOLS])
@@ -254,11 +251,23 @@ def main() -> None:
             )
         )
     oth = out.filter(~pl.col("primary_name").is_in(["D15", "D12"]))
+    pooled = []
     for a in ("f1c", "f2c"):
-        m, lo, hi = block_boot((oth[a] - oth["k1"]).to_numpy(), oth["week"].to_numpy(), rng)
+        rng_pool = np.random.default_rng(SEED + 1)
+        m, lo, hi = block_boot((oth[a] - oth["k1"]).to_numpy(), oth["week"].to_numpy(), rng_pool)
+        base_mean = oth["k1"].mean()
+        pooled.append(
+            {
+                "fix": a,
+                "pct": 100 * m / base_mean,
+                "lo": 100 * lo / base_mean,
+                "hi": 100 * hi / base_mean,
+            }
+        )  # ty: ignore[unsupported-operator]
         print(
             f"other 14 Primaries, {a}: change {100 * m / oth['k1'].mean():.2f}% [{100 * lo / oth['k1'].mean():.2f}, {100 * hi / oth['k1'].mean():.2f}]"  # ty: ignore[unsupported-operator]
         )
+    pl.DataFrame(pooled).write_csv(OUT / "fix_other_14_pooled.csv")
 
 
 if __name__ == "__main__":
