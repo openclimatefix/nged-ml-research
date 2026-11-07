@@ -15,8 +15,9 @@ import e00409_prep as p9  # ty: ignore[unresolved-import]
 import e00621_common as k  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-from studies import pv_dataset
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+from studies import pv_dataset
 
 NAME: Final = "00635-pv-probe-metered-neighbour-pv-as-sky-input"
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / NAME / "work"
@@ -74,13 +75,18 @@ def distances() -> pl.DataFrame:
     rows = []
     for p in prim.filter(pl.col("site").is_in(list(k.SIX))).iter_rows(named=True):
         for f in farms.iter_rows(named=True):
-            d = km(lat1=p["area_center_lat"], lon1=p["area_center_lon"], lat2=f["latitude"], lon2=f["longitude"])
+            d = km(
+                lat1=p["area_center_lat"],
+                lon1=p["area_center_lon"],
+                lat2=f["latitude"],
+                lon2=f["longitude"],
+            )
             rows.append({"site": p["site"], "farm": f["site"], "km": d})  # fmt: skip
     return pl.DataFrame(rows)
 
 
 def assignment(*, rotation: int) -> dict[str, str]:
-    """Return the input farm of each MW Primary: the nearest candidate within the radius other than the injected farm."""
+    """Return the input farm of each MW Primary: the nearest candidate that is not injected there."""
     dist = distances()
     out = {}
     for j, site in enumerate(k.SIX):

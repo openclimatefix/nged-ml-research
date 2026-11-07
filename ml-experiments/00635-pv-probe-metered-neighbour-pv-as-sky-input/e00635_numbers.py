@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, ANN001
 """Experiment 635: recoveries per injected MW and per injected energy, placebos, CRPS, and the pass bars.
 
 Arm a is experiment 621's plain probe at the 2026-06 cutoff (its stored probe results). Arms b and c
@@ -17,7 +17,13 @@ import numpy as np
 import polars as pl
 
 PROBES_621 = k.WORK / "probes" / k5.CUTOFF
-WORLDS = {"farm": "farm", "phys": "phys", "profile": "profile", "shuffled": "shuffled", "cloud": "cloud"}
+WORLDS = {
+    "farm": "farm",
+    "phys": "phys",
+    "profile": "profile",
+    "shuffled": "shuffled",
+    "cloud": "cloud",
+}
 
 
 def load() -> pl.DataFrame:
@@ -26,7 +32,9 @@ def load() -> pl.DataFrame:
     for f in sorted(PROBES_621.glob("*.parquet")):
         name = f.stem
         d = pl.read_parquet(f).filter(pl.col("model") == "plain")
-        d = d.with_columns(arm=pl.lit("a"), condition=pl.lit("control_r0" if name == "control" else name))
+        d = d.with_columns(
+            arm=pl.lit("a"), condition=pl.lit("control_r0" if name == "control" else name)
+        )
         frames.append(d.select("arm", "condition", "seed", "site", "capacity_mw", "boot"))
         if name == "control":  # arm a has one input column, so one twin serves both rotations
             frames.append(frames[-1].with_columns(condition=pl.lit("control_r1")))
@@ -39,7 +47,9 @@ def load() -> pl.DataFrame:
     return df.with_columns(
         world=pl.col("condition").replace_strict({n: c.kind for n, c in meta.items()}),
         mw=pl.col("condition").replace_strict({n: c.mw for n, c in meta.items()}),
-        rotation=pl.col("condition").map_elements(lambda n: k5.split(name=n)[1], return_dtype=pl.Int64),
+        rotation=pl.col("condition").map_elements(
+            lambda n: k5.split(name=n)[1], return_dtype=pl.Int64
+        ),
         mshuf=pl.col("condition").str.ends_with("_mshuf"),
     )
 
@@ -70,17 +80,14 @@ def energy_factor(*, frame, site: str, farm: str, kind: str, shuffled: bool = Fa
 def recoveries(df: pl.DataFrame) -> pl.DataFrame:
     """Return one row per injected network with its recovery per injected MW."""
     twin = df.filter(pl.col("world") == "control").select(
-        "arm", "seed", "site", "rotation", twin_mw=pl.col("capacity_mw")
+        "arm", "seed", "site", twin_name=pl.col("condition"), twin_mw=pl.col("capacity_mw")
     )
-    inj = df.filter(pl.col("world") != "control")
-    inj = inj.with_columns(
-        rotation_for_twin=pl.col("condition").map_elements(
-            lambda n: int(k5.twin(name=n)[-1]), return_dtype=pl.Int64
+    inj = df.filter(pl.col("world") != "control").with_columns(
+        twin_name=pl.col("condition").map_elements(
+            lambda n: k5.twin(name=n), return_dtype=pl.String
         )
     )
-    j = inj.join(
-        twin.rename({"rotation": "rotation_for_twin"}), on=["arm", "seed", "site", "rotation_for_twin"]
-    )
+    j = inj.join(twin, on=["arm", "seed", "site", "twin_name"])
     return j.with_columns(recovery=(pl.col("capacity_mw") - pl.col("twin_mw")) / pl.col("mw"))
 
 
@@ -92,12 +99,18 @@ def main() -> None:
     for r in rec.iter_rows(named=True):
         j = k.SIX.index(r["site"])
         farm = k.FARMS[(j + r["rotation"]) % len(k.FARMS)]
-        f = energy_factor(frame=frame, site=r["site"], farm=farm, kind=r["world"]) if r["world"] != "cloud" else float("nan")
+        f = (
+            energy_factor(frame=frame, site=r["site"], farm=farm, kind=r["world"])
+            if r["world"] != "cloud"
+            else float("nan")
+        )
         out.append(r["recovery"] * f)
     rec = rec.with_columns(recovery_energy=pl.Series(out)).drop("boot")
     rec.write_csv(k5.WORK / "recoveries.csv")
     summary: dict = {}
-    for (arm, world, mw, mshuf), g in rec.group_by(["arm", "world", "mw", "mshuf"], maintain_order=True):
+    for (arm, world, mw, mshuf), g in rec.group_by(
+        ["arm", "world", "mw", "mshuf"], maintain_order=True
+    ):
         v = g["recovery"].to_numpy()
         e = g["recovery_energy"].to_numpy()
         summary[f"{arm}|{world}|{mw}|{'mshuf' if mshuf else ''}"] = {
@@ -107,7 +120,14 @@ def main() -> None:
         }  # fmt: skip
     (k5.WORK / "summary.json").write_text(json.dumps(summary, indent=1))
     for key, v in summary.items():
-        print(key, {a: (round(b, 3) if isinstance(b, float) else b) for a, b in v.items() if a != "by_site"})
+        print(
+            key,
+            {
+                a: (round(b, 3) if isinstance(b, float) else b)
+                for a, b in v.items()
+                if a != "by_site"
+            },
+        )
 
 
 if __name__ == "__main__":

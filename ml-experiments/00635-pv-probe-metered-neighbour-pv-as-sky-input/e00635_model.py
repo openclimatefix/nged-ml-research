@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Experiment 554's modular lag-free network M0 (stage `pre`) with a metered-farm sky input.
 
 The metered column rides in input column 35, which stage `pre` otherwise ignores. Arm `b` appends

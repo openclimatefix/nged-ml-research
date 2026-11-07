@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001
+# ruff: noqa: E501, ANN001, ANN201
 """Experiment 635: the donor-day probe of experiment 621 on the metered-input networks (CPU).
 
 The probe is experiment 621's (`e00621_probe`). The donor's metered column is swapped in with the
@@ -88,12 +88,18 @@ def main() -> None:
         records = []
         for seed in args.seeds:
             model = mm.MeteredMdn(n_primaries=16, arm=args.arm)
-            model.load_state_dict(torch.load(k5.weights_path(arm=args.arm, condition=name, seed=seed), map_location="cpu"))
+            model.load_state_dict(
+                torch.load(
+                    k5.weights_path(arm=args.arm, condition=name, seed=seed), map_location="cpu"
+                )
+            )
             model.eval()
             for site, i in six.items():
                 pr = probes[site]
                 met = metered_rows(probe=pr, farm=assign[site], shuffled=shuffled)
-                y, reg = forward_mw(model=model, frame=frame, primary=i, probe=pr, cap=float(cap[i]), metered=met)
+                y, reg = forward_mw(
+                    model=model, frame=frame, primary=i, probe=pr, cap=float(cap[i]), metered=met
+                )
                 cell = pr["cell"]
                 _, date_id = np.unique(pr["days"][pr["donor"]], return_inverse=True)
                 rng = np.random.default_rng(1000 * seed + i)
