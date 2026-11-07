@@ -46,27 +46,27 @@ production_status: not-for-production
 adopted_in: none
 verdict: not supported
 best_arm: >-
-  None. The physics-curve world is recovered best (0.89 to 1.03 of the injected MW); the real-farm
-  world is read at 0.65 to 0.71.
+  None. The physics-curve world is recovered best (0.95 to 1.03 of the injected MW at each Primary and
+  size); the real-farm world is read at 0.65 to 0.72.
 headline: >-
   The probe reads an injected real farm at 0.68 of its megawatts (median over 2 cutoffs, 3 seeds, 2
-  rotations; 0.65 to 0.71 at every one of the six MW Primaries, at both 2 MW and 4 MW), against a pass
-  bar of 0.85 to 1.15. Both placebos pass (95th percentile 0.06 to 0.12 and 0.10 to 0.18, bar 0.20).
-  Interval coverage fails (0.48 in the physics-curve world, 0.46 to 0.63 with a cloud-following
-  load).
+  rotations; 0.66 to 0.70 at each of the six MW Primaries), against a pass
+  bar of 0.85 to 1.15. Both placebos pass (95th percentile 0.08 to 0.12 and 0.09 to 0.16, bar 0.20).
+  Interval coverage is 0.68 in the physics-curve world (bar 0.70, fail) and 0.72 and 0.69 with a weak
+  and a strong linear cloud-following load.
 lessons:
   - >-
-    The probe is precise and biased: seed standard deviation of the capacity difference is 0.06 MW
-    and the bootstrap standard deviation 0.02 MW, but the real farm is read at 0.68, and the
-    physics-curve world at 0.96 to 0.98, so the shortfall comes from the sky-to-power mapping of a
-    real farm, not from the network's ability to learn a PV response.
+    The probe is precise and biased: the median seed standard deviation of the capacity difference is
+    0.10 MW and the bootstrap standard deviation 0.02 MW, yet the real farm is read at 0.68 while the
+    physics-curve world is read at 0.98. The shortfall is therefore consistent with a mismatch between
+    a real farm's output and the probe's unit curve, which this experiment did not test.
   - >-
     The cloud template removes the cloud-following load but removes most of the real PV with it:
-    real-farm recovery falls to 0.04 to 0.17, and the cloud-load read-out turns negative (down to
+    real-farm recovery falls to a median of 0.08, and the cloud-load read-out turns negative (down to
     -0.68 of a 2 MW farm).
   - >-
     A fixed calendar does remove the profile failure of experiments 405 and 477: the profile-only
-    placebo reads 0.06 to 0.12.
+    placebo reads 0.08 to 0.12 (95th percentile).
 take_home_message: >-
   A neural network that is probed with its calendar held fixed reads an injected solar farm at about
   two thirds of its true megawatts (0.68, tightly), reads the two placebos at about 0.1, and is
@@ -82,17 +82,17 @@ advice:
     the load.
   - >-
     Before trusting an interval from the probe, widen it by a bias term as well as the seed spread:
-    the bootstrap and seed spread together cover the truth at 0 of 96 real-farm injections.
+    the bootstrap and seed spread together cover the truth at 0 of 144 real-farm injections.
 ---
 
 # Injected known-answer and placebo test of the donor-day PV probe
 
 **Take-home: the donor-day probe reads an injected real solar farm at about 0.68 of its megawatts,
 so it fails the 0.85 to 1.15 bar, and the line stops here with no rescue tuning.** The reading is
-stable (0.65 to 0.71 at all six MW Primaries, both cutoffs, both sizes, both farm rotations), so a
+stable (0.66 to 0.70 at each of the six MW Primaries, and 0.65 to 0.72 when split by cutoff and size), so a
 divided estimate is possible. The probe separates a real farm from a profile-only and a shuffled-sky
 placebo, which the neural attempts of experiments 405 and 477 could not. It cannot separate PV from
-a load that follows the clouds: without a cloud template a strong linear load reads as 0.37 to 0.43
+a load that follows the clouds: without a cloud template a strong linear load reads as 0.39 to 0.45
 of a 2 MW farm, and with the template the real PV is mostly removed too.
 
 The question: if a lag-free neural network (experiment 554's modular network M0, pretrained on ERA5
@@ -113,31 +113,34 @@ GPU (about 0.7 GPU-hours in all).
 | Bar | Result | Pass |
 |---|---|---|
 | Real farm 4 MW inside 0.85 to 1.15 | 0 of 6 (medians 0.65 to 0.71) | fail |
+| Real farm 4 MW median 0.75 to 0.90 (prediction 1) | 0.68 pooled | not met |
 | Real farm 2 MW inside 0.85 to 1.15 | 0 of 6 (medians 0.67 to 0.70) | fail |
-| Profile-only placebo, 95th percentile under 0.20 | 6 of 6 (0.06 to 0.12) | pass |
-| Shuffled-sky placebo, 95th percentile under 0.20 | 6 of 6 (0.10 to 0.18) | pass |
+| Physics-curve world recovers more than the real farm (prediction 2) | 0.98 against 0.68 | met |
+| Profile-only placebo, 95th percentile under 0.20 | 6 of 6 (0.08 to 0.12) | pass |
+| Shuffled-sky placebo, 95th percentile under 0.20 | 6 of 6 (0.09 to 0.16) | pass |
 | Cloud load under 0.15 of 2 MW with the template | 6 of 6, all four loads, but negative, down to -0.68 | pass, uninformative |
-| 80% interval covers truth, physics-curve world | 0.48 (bootstrap only 0.08) | fail |
-| 80% interval covers truth, linear cloud load (weak, strong) | 0.63, 0.46 | fail |
+| 80% interval covers truth, physics-curve world | 0.68 (bootstrap only 0.10) | fail |
+| 80% interval covers truth, linear cloud load (weak, strong) | 0.72, 0.69 | pass, fail |
 
 - **Arms.** Real farm (farms A, B, C, F, two rotations, 2 MW and 4 MW), physics curve driven by the
   Primary's own CAMS shortwave (2 MW and 4 MW), profile-only and shuffled-sky placebos (4 MW,
   two rotations), cloud-following load (linear and squared, averaging 0.10 and 0.30 of 2 MW over
   daylight half-hours), and the uninjected twin.
 - **Absolute readings (uninjected twins).** Probed effective AC capacity 1.7 to 2.6 MW per Primary
-  (D5 2.0, D9 1.7, D10 1.7, D11 2.4, D14 2.6, D16 2.1), 2.07 MW at the 2026-03 cutoff and 2.13 MW at
-  2026-06 on average, with a seed standard deviation of 0.05 to 0.14 MW. Whether these are right is
+  (D5 2.0, D9 1.7, D10 1.7, D11 2.4, D14 2.7, D16 2.1), 2.07 MW at the 2026-03 cutoff and 2.10 MW at
+  2026-06 on average, with a seed standard deviation of 0.04 to 0.13 MW. Whether these are right is
   untested.
-- **Physics-curve world.** Recovery 0.89 to 1.03; this world uses the probe's own regressor as the
-  injected shape, so it shows what the probe loses when the shape is known exactly (about 3%) and
-  is not evidence for the real-farm worlds.
-- **Cloud load without the template.** A weak linear load reads as 0.10 to 0.16 of 2 MW, a strong
-  linear load as 0.37 to 0.43, and a strong squared load as 0.55 to 0.65. The template removes these
-  but also cuts the real-farm recovery to 0.04 to 0.17, and the squared strong load reads as -0.32
-  to -0.68, so the template is not a usable fix.
+- **Physics-curve world.** Recovery 0.95 to 1.03 at each Primary and size (0.81 to 1.17 for single
+  networks); this world uses the probe's own regressor as the injected shape, so it shows what the
+  probe loses when the shape is known exactly (about 2%) and is not evidence for the real-farm
+  worlds.
+- **Cloud load without the template.** A weak linear load reads as 0.11 to 0.16 of 2 MW, a strong
+  linear load as 0.39 to 0.45, and a strong squared load as 0.56 to 0.66. The template removes these
+  but also cuts the real-farm recovery to a median of 0.08 (0.04 to 0.16 by cutoff and size), and the
+  strong squared load reads as -0.38 to -0.68, so the template is not a usable fix.
 - **Interval.** The interval is the day-block bootstrap widened by the across-seed spread, as
   pre-registered. It is too narrow because the error is bias, not noise: it covers the injected
-  capacity at 0 of 96 real-farm injections.
+  capacity at 0 of 144 real-farm injections.
 - **Deviations (fixed before the grid was read).** The network has no time input, so the step world
   is not run. Farms D and E are left out for their daylight gaps, so the six Primaries take farms A,
   B, C, F, A, B. Half-hours with a gap in any of those four farms (15.5% of the six Primaries' rows at
