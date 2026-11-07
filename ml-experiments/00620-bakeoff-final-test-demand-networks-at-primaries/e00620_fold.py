@@ -42,6 +42,10 @@ def redirect_to_extended_inputs(e) -> None:
 
     ext.redirect()
     e.prep.RAW_DIR = ext.RAW_DIR
+    # experiment 437's weather-column tables, extended to the window by `e00620_tables.py`
+    import e00437_features as f437  # noqa: PLC0415
+
+    f437.TRAILING_DIR = ext.OUT_ROOT / "inputs" / "trailing437"
     e.W560 = ext.OUT_ROOT / "inputs" / "w560"
     e.data.HOLDOUT = datetime(2027, 1, 1, tzinfo=UTC)
     # the timing check of experiment 574 reads a run's demand frame; the runs after 2026-06-30 have
@@ -75,6 +79,9 @@ def redirect_to_extended_inputs(e) -> None:
         parts = [_inner(month=m, standardiser=standardiser) for m in ("2026-07", "2026-08", "2026-09", "2026-10")]
         first = parts[0]
         import dataclasses  # noqa: PLC0415
+
+        if os.environ.get("E00620_DRY"):  # coverage check: build the window's input rows, forecast nothing
+            raise SystemExit(f"DRY RUN OK: the window's test rows were built ({len(first.target_idx) if hasattr(first, 'target_idx') else '?'} rows in July); nothing was forecast")
 
         return dataclasses.replace(
             first,
