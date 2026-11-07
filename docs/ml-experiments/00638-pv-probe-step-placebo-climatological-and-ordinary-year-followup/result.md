@@ -15,7 +15,8 @@ size: >-
   s each, plus four data builds), against a ceiling of 2.
 hypothesis: >-
   Experiment 634's failure to follow a capacity step (a calibrated read of 0.32 to 0.38 of a 4 MW
-  spring-2025 step, and 1.2 to 2.1 MW read from a shuffled-shape placebo) was caused by the unusually
+  spring-2025 step, and 1.2 to 2.1 MW read from a shuffled-shape placebo) was caused by the
+  unusually
   sunny spring of 2025 (clearness 0.76 against 0.61 to 0.69 in other years), and not by a limit of
   the probe that holds in any year. The shuffled-shape placebo kept a month-level sky link, so a
   placebo whose shape is the farm's multi-year day-of-year mean, with no link to the sky of any one
@@ -24,9 +25,13 @@ prediction: >-
   Fixed before any result was read. (1) For the spring-2025 step, the climatological placebo's
   calibrated read is at most half the real step's read at each of the cutoffs 2025-10, 2026-03, and
   2026-06, and at most 0.15 in absolute terms. (2) The ordinary-spring step (from 2023-04-01, with
-  about 0.55 to 0.62 of the donor rows after the step and a clearness difference of at most 0.02) is read
+  about 0.55 to 0.62 of the donor rows after the step and a clearness difference of at most 0.02) is
+  read
   within 0.2 of its post-step donor share at every cutoff, and its climatological placebo reads at
-  most 0.15. (3) The summer-2024 step's read is reported against its donor share and clearness difference, with no bar. (4) Moving the probe dates 364 days earlier changes the median calibrated read, over the cutoffs of one step, by at most 0.05; single reads may move by 0.1, as experiment 634's did. This is a diagnostic and does not enter the decision rule.
+  most 0.15. (3) The summer-2024 step's read is reported against its donor share and clearness
+  difference, with no bar. (4) Moving the probe dates 364 days earlier changes the median calibrated
+  read, over the cutoffs of one step, by at most 0.05; single reads may move by 0.1, as experiment
+  634's did. This is a diagnostic and does not enter the decision rule.
 decision_rule: >-
   Fixed before any result was read. Stop rule from the brief: if the climatological placebo of the
   spring-2025 step reads at least half of the real step's calibrated read (a ratio of medians over
@@ -35,7 +40,8 @@ decision_rule: >-
   explanation is supported if prediction (1) holds and the ordinary-spring step is read within 0.2
   of its donor share (prediction 2). A limit of the probe that holds in any year is supported if
   the stop rule fires, or if the ordinary-spring step is read at under 0.3 of its size while its
-  donor share is above 0.5. Any other outcome, including both explanations satisfied at once, is inconclusive. No threshold for using the probe in
+  donor share is above 0.5. Any other outcome, including both explanations satisfied at once, is
+  inconclusive. No threshold for using the probe in
   production is set here.
 benchmark: >-
   Experiment 634's networks and probe reads: the uninjected control, the constant injections
@@ -59,8 +65,10 @@ rise inside its training years in any year.** Experiment
 [634](../00634-pv-probe-capacity-step-world-and-energy-recovery/result.md) added a real solar
 farm's output to the demand of six MW Primary substations from 1 April 2025, and the probe found
 0.32 to 0.38 of it. A placebo with the same calendar and a shuffled shape was found at about half
-that. The audit of experiment 634 found that spring 2025 was the sunniest spring in the data and that
-the placebo kept the actual monthly mean of the farm's output. We now repeat the test with steps that
+that. The audit of experiment 634 found that spring 2025 was the sunniest spring in the data and
+that
+the placebo kept the actual monthly mean of the farm's output. We now repeat the test with steps
+that
 start in other years and with a placebo that has no link to the sky of any date. This page is the
 plan, written before any result exists.
 
@@ -84,7 +92,8 @@ same farm's day-of-year mean profile (the climatological placebo).**
   the donor rows follow it.
 - **No summer in the data was sunny.** July-to-September clearness is 0.59 to 0.63 in every year
   from 2020 to 2025. The sunny-summer step of the brief cannot be built from a sunny summer, so the
-  `summer24` step stands in for it: its post-step period includes the sunny springs of 2025 and 2026,
+  `summer24` step stands in for it: its post-step period includes the sunny springs of 2025 and
+  2026,
   which gives a clearness difference between those of the ordinary-spring and spring-2025 steps.
   The four steps then give four clearness contrasts, and the page plots each step's read against its
   contrast.
@@ -93,7 +102,8 @@ same farm's day-of-year mean profile (the climatological placebo).**
   seasonal and daily shape and carries no weather of any single date. Its energy over the post-step
   window is 0.93 to 1.10 of the real farm's, per farm.
 - **Previous-year base.** Every probe is run twice: with the 12 probe dates of 2025, and with each
-  date moved 364 days earlier (a base in 2024, before the `spring25` and `summer25` steps). Experiment
+  date moved 364 days earlier (a base in 2024, before the `spring25` and `summer25` steps).
+  Experiment
   634 ran the second only for its own steps.
 
 **Reused without retraining:** experiment 634's `control`, `farm_mw4_r0`, and `farm_mw4_r1` networks
@@ -120,7 +130,9 @@ follows the step (the network would equal the control). That is 69 fits, about 0
   C, F), the experiment 634 code reused and unedited, and reads reported against the control.
 - **Not applicable:** no forecast is scored, so there is no tail calibration, curtailment cost, or
   example forecast, and no median-minus-mean check.
-- **Earlier advice followed** (experiment 634): report probed capacity per training window, build the
-  placebo from a multi-year climatological profile, and check the clearness of the months a step covers.
+- **Earlier advice followed** (experiment 634): report probed capacity per training window, build
+  the
+  placebo from a multi-year climatological profile, and check the clearness of the months a step
+  covers.
 - **Audit triggers:** a failed placebo (the stop rule) and a result that contradicts its prediction
   would each trigger a fresh-agent audit before the prose review.

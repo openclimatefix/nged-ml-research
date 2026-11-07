@@ -85,7 +85,8 @@ def climatological_profile(
 
     The mean is taken per day of the year and half-hour over every year before 2026-07-01, ignoring
     gaps, then smoothed over `SMOOTH_DAYS` days either side (circularly). The profile carries the
-    seasonal and daily shape of the farm and no information about the weather of any one date.
+    seasonal and daily shape of the farm and almost no information about the weather of any one date (one date moves
+    its own profile value by under 2%).
     """
     t, v = series
     stamp = pl.Series(t).cast(pl.Datetime("us"))
