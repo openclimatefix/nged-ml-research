@@ -125,6 +125,34 @@ and 436 is a demand median bias plus modest wind and solar tails, not a uniform 
 The figures were written by the scripts and not rendered by the author, because no renderer was
 available; a reader should check them.
 
+## Where demand's bias comes from
+
+**The bias is in the underlying forecast of experiment 425 (arm A), not in the member
+construction.** The 51 values are the stored quantiles interpolated linearly in the level, and q10
+and q90 are not widened by the 1.15 factor (only q01, q05, q95, and q99 are). Reading q10 and q90
+back from the 51 values reproduces the stored q10 and q90 of the quantile table to 0.00001 points of
+capacity (runs 2026-01-06 and 2026-01-13, all 16 Primaries). The direct quantile forecast therefore
+shows the same exceedance on the same rows. Script: `e00626_bias.py`; all 44 runs, 16 Primaries,
+leads to 240 hours.
+
+- **By month (above q90 / below q10 / mean of actual minus median, points of capacity).** 2025-09
+  10.6% / 10.0% / +2.0; 2025-10 14.6% / 7.7% / +2.6; 2025-11 6.6% / 9.8% / -0.2; 2025-12 21.7% /
+  5.2% / +2.8; 2026-01 16.9% / 9.9% / +1.2; 2026-02 10.7% / 8.5% / +1.2; 2026-03 20.5% / 5.4% /
+  +4.6; 2026-04 11.8% / 8.9% / +1.1; 2026-05 16.3% / 8.0% / +2.3; 2026-06 16.0% / 6.7% / +1.0. The
+  upper tail fails by 1.5 points or more in 7 of 10 months, worst in December and March; November is
+  the one month where the upper tail is too wide.
+- **By lead band (all 44 runs).** Above q90: 11.0% at 0 to 12 hours, 13.4% at 12 to 36, 14.7% at 36
+  to 120, 15.5% at 120 to 240. Below q10: 8.2%, 7.2%, 7.1%, 8.7%. The upper-tail miss grows with the
+  lead; the lower tail stays under 10% at every lead.
+- **By Primary.** Above q90 runs from 6.1% (D11) to 24.2% (D6); D3, D6, D10, and D13 exceed 19%. D4
+  has a mean error of +15.2 points of capacity.
+- **Reading.** The median forecast sits below the outcome on average (mean error +1.0 to +4.6 points
+  in nine of ten months), and the q10 to q90 width is about 20 points, so the upper tail is too
+  narrow and the lower tail too wide: a shift, not a widening, would fix both. The cause (for
+  example the monthly refit, the training window, or demand growth) was not investigated here.
+
+## Design and numbers
+
 - **Arms.** A unchanged (experiment 436's stored 51 values and J3 Schaake ranks); B one factor per
   family and lead band applied above and below the median; C values re-drawn at levels stretched
   about the median, with one stretch per family and band (end values extrapolated by the end

@@ -220,45 +220,49 @@ def figure_rates(*, rates: pl.DataFrame) -> None:
             ),
         ]
     ).with_columns(rate=pl.col("rate") * 100, lo=pl.col("lo") * 100, hi=pl.col("hi") * 100)
-    order = list(c.BANDS)
-    base = alt.Chart(long.to_pandas())
-    points = base.mark_point(filled=True, size=45).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X(
-            "band:N",
-            sort=order,
-            title="Lead band",
-            axis=alt.Axis(
-                labelAngle=0, labelExpr="replace(replace(datum.value, 'h', ''), '_', ' to ')"
-            ),
-        ),
-        xOffset="arm_name:N",
-        y=alt.Y("rate:Q", title="Exceedance rate (%)", scale=alt.Scale(domain=[0, 12])),
-        color=alt.Color(
-            "arm_name:N",
-            title="Arm",
-            scale=alt.Scale(
-                domain=list(ARM_NAMES.values()), range=[ARM_COLOURS[a] for a in ARM_NAMES]
-            ),
-        ),
+    labels = {
+        "h0_12": "0-12 h",
+        "h12_36": "12-36 h",
+        "h36_120": "36-120 h",
+        "h120_240": "120-240 h",
+    }
+    long = long.with_columns(
+        band_label=pl.col("band").replace(labels),
+        target=pl.lit(5.0),
+        low=pl.lit(4.0),
+        high=pl.lit(6.0),
     )
+    order = list(labels.values())
+    scale = alt.Scale(domain=list(ARM_NAMES.values()), range=[ARM_COLOURS[a] for a in ARM_NAMES])
+    base = alt.Chart(long.to_pandas())
+    x = alt.X("band_label:N", sort=order, title="Lead band", axis=alt.Axis(labelAngle=-45))
+    once = base.transform_aggregate(
+        low="min(low)", high="max(high)", target="min(target)", groupby=["side", "family"]
+    )  # ty: ignore[unresolved-attribute]
+    target = once.mark_rect(opacity=0.15, color="#888888").encode(y="low:Q", y2="high:Q")
+    line = once.mark_rule(strokeDash=[4, 3], color="#555555").encode(y="target:Q")
     bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("band:N", sort=order),
+        x=x,
         xOffset="arm_name:N",
         y="lo:Q",
         y2="hi:Q",
-        color=alt.Color(
-            "arm_name:N",
-            legend=None,
-            scale=alt.Scale(
-                domain=list(ARM_NAMES.values()), range=[ARM_COLOURS[a] for a in ARM_NAMES]
-            ),
-        ),
+        color=alt.Color("arm_name:N", legend=None, scale=scale),
     )
-    layer = alt.layer(bars, points)
-    chart = layer.properties(width=170, height=170).facet(
-        row=alt.Row("side:N", title=None),
-        column=alt.Column("family:N", title=None, sort=list(c.FAMILIES)),
-    )  # ty: ignore[unresolved-attribute]
+    points = base.mark_point(filled=True, size=45).encode(  # ty: ignore[unresolved-attribute]
+        x=x,
+        xOffset="arm_name:N",
+        y=alt.Y("rate:Q", title="Exceedance rate (%)", scale=alt.Scale(domain=[0, 12])),
+        color=alt.Color("arm_name:N", title="Arm (grey band: 4% to 6%)", scale=scale),
+    )
+    chart = (
+        alt.layer(target, line, bars, points)
+        .properties(width=190, height=170)
+        .facet(
+            row=alt.Row("side:N", title=None),
+            column=alt.Column("family:N", title=None, sort=list(c.FAMILIES)),
+        )
+        .configure_legend(orient="right")
+    )
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     chart.save(DOCS_DIR / "figure_1_exceedance_by_arm.svg")
 
