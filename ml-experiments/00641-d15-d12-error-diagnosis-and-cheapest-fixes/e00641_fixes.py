@@ -259,9 +259,9 @@ def main() -> None:
         pooled.append(
             {
                 "fix": a,
-                "pct": 100 * m / base_mean,
-                "lo": 100 * lo / base_mean,
-                "hi": 100 * hi / base_mean,
+                "pct": 100 * m / base_mean,  # ty: ignore[unsupported-operator]
+                "lo": 100 * lo / base_mean,  # ty: ignore[unsupported-operator]
+                "hi": 100 * hi / base_mean,  # ty: ignore[unsupported-operator]
             }
         )  # ty: ignore[unsupported-operator]
         print(

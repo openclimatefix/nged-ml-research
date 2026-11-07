@@ -117,8 +117,8 @@ count of dropped half-hours is available per month.
   March error is a step that K1's lags had not yet followed. Of the 10 days flagged as level shifts (more than 3 robust standard
   deviations from the previous 28 days), 70% carry no event label in the export.
 - **K3 beats K1 at D15.** The CRPS is 14.53 for K1, 15.05 for the Candidate (+3.6%, worse than K1), and 13.58 for K3, the
-  neural network that reads no recent power (-6.5%, better than K1). K3 is worse than K1 at D12 (+7.0%) and
-  at other Primaries, so D15 may be a special case.
+  neural network that reads no recent power (-6.5%, better than K1). K3 is worse than K1 at D12
+  (+7.0%) and at other Primaries, so D15 may be a special case.
 - **D12's error peaks at midday.** The mean absolute error is 18.9 points at 10:00 to 14:00 local
   time against 9.3 at 00:00 to 04:00. The bias is +4 at 05:00 and -5 at 17:00 and +8 in December
   2025, and the worst 20% of days carry 32.2% of the CRPS. Its daily bias autocorrelation falls to
@@ -132,8 +132,8 @@ count of dropped half-hours is available per month.
 **Both fixes shift all 11 quantiles by an amount known 24 hours before the origin.** F1 is the mean
 error of K1's 24 to 48 hour forecasts over the 14 days up to that time, per Primary. F2 is the same
 mean per half-hour of the local day. F1 was applied to 92% of rows; the other rows had no known error
-in the previous 3 days and keep K1 unchanged. A unit test adds 1000 MW to every reading after 2026-03-15 09:00 and checks that the shift of every origin
-up to 24 hours later is unchanged, and that later origins do change.
+in the previous 3 days and keep K1 unchanged. A unit test adds 1000 MW to every reading after 2026-03-15 09:00 and checks that the shift of every
+origin up to 24 hours later is unchanged, and that later origins do change.
 
 | Quantity (change in CRPS against K1; negative is better) | D15 | D12 | Other 14 Primaries |
 |---|---|---|---|
