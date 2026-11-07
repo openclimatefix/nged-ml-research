@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Experiment 627, part 2: choose K of the 51 paths by the peak export of a BSP group sum.
 
 A bulk supply point (BSP) group is the sum, in MW, of the Primaries beneath it that report real
@@ -59,7 +58,7 @@ def q_weights(*, summary: np.ndarray) -> np.ndarray:
     return w
 
 
-def process_run(*, file: str) -> list[dict]:  # noqa: PLR0912, PLR0915
+def process_run(*, file: str) -> list[dict]:
     """Return the BSP-group rows of one run for both couplings."""
     groups, cap = group_indices()
     z = np.load(file)
@@ -69,7 +68,8 @@ def process_run(*, file: str) -> list[dict]:  # noqa: PLR0912, PLR0915
     valid_time = np.array([init + (i + 1) * sc.STEP for i in range(sc.N_STEPS)])
     actual[:, valid_time >= sc.HOLDOUT] = np.nan
     first_full = next(i for i, t in enumerate(valid_time) if t.hour == 0 and t.minute == 30)
-    n_days = (sc.N_STEPS - first_full) // STEPS_PER_DAY
+    band_end = int(sc.band_steps(band="d1_10")[-1])
+    n_days = (band_end + 1 - first_full) // STEPS_PER_DAY  # full valid days inside days 1 to 10
     day_start = first_full + np.arange(n_days) * STEPS_PER_DAY
     run_index = int(init.toordinal())
     rows: list[dict] = []
@@ -81,7 +81,9 @@ def process_run(*, file: str) -> list[dict]:  # noqa: PLR0912, PLR0915
             obs_kids = actual[kids, :] / 100.0 * cap[kids][:, None]
             obs_export = -obs_kids.sum(axis=0)
             obs_ok = (~np.isnan(obs_kids)).all(axis=0)
-            dp_paths = daily_peaks(export=export, first_full=first_full, n_days=n_days)  # (51, days)
+            dp_paths = daily_peaks(
+                export=export, first_full=first_full, n_days=n_days
+            )  # (51, days)
             obs_day = np.full(n_days, np.nan)
             for d in range(n_days):
                 s = slice(day_start[d], day_start[d] + STEPS_PER_DAY)
@@ -90,25 +92,59 @@ def process_run(*, file: str) -> list[dict]:  # noqa: PLR0912, PLR0915
             full_summ = {b: export[:, sc.band_steps(band=b)].max(axis=1) for b in sc.BANDS}
             sel_summary = full_summ["d1_10"]
             day_ok = ~np.isnan(obs_day)
-            all_exceed = float((obs_day[day_ok] > dp_paths.max(axis=0)[day_ok]).mean()) if day_ok.any() else np.nan
+            all_exceed = (
+                float((obs_day[day_ok] > dp_paths.max(axis=0)[day_ok]).mean())
+                if day_ok.any()
+                else np.nan
+            )
             base = {"power_fcst_init_time": init, "coupling": coupling, "bsp": bsp}
-            rows.append({**base, "arm": "All", "k": sc.N_MEMBERS, "band": "d1_10", "exceed": all_exceed, "n_days": int(day_ok.sum()), "w1": 0.0, "gap05": 0.0, "gap50": 0.0, "gap95": 0.0, "tail_low": 1.0, "tail_high": 1.0})
+            rows.append(
+                {
+                    **base,
+                    "arm": "All",
+                    "k": sc.N_MEMBERS,
+                    "band": "d1_10",
+                    "exceed": all_exceed,
+                    "n_days": int(day_ok.sum()),
+                    "w1": 0.0,
+                    "gap05": 0.0,
+                    "gap50": 0.0,
+                    "gap95": 0.0,
+                    "tail_low": 1.0,
+                    "tail_high": 1.0,
+                }
+            )
             for k in KS_BSP:
                 rng = np.random.default_rng([sc.SEED, run_index, k, 7])
                 arms = {
                     "R": sc.random_weights(k=k, rng=rng, n=sc.N_DRAWS),
                     "S-bsp": sc.stratified_weights(summary=sel_summary, k=k, rng=rng, n=sc.N_DRAWS),
-                    "C": sc.medoid_weights(paths=paths, steps=sc.band_steps(band="d1_10"), k=k, rng=np.random.default_rng([sc.SEED, k, 3])),
+                    "C": sc.medoid_weights(
+                        paths=paths,
+                        steps=sc.band_steps(band="d1_10"),
+                        k=k,
+                        rng=np.random.default_rng([sc.SEED, k, 3]),
+                    ),
                 }
                 if k == len(Q_LEVELS):
                     arms["Q"] = q_weights(summary=sel_summary)
                 for arm, w in arms.items():
                     for band in sc.BANDS:
                         m = sc.distribution_rows(weights=w, summary=full_summ[band])
-                        row = {**base, "arm": arm, "k": k, "band": band, **{key: float(np.nanmean(v)) for key, v in m.items()}, "n_days": 0, "exceed": np.nan}
+                        row = {
+                            **base,
+                            "arm": arm,
+                            "k": k,
+                            "band": band,
+                            **{key: float(np.nanmean(v)) for key, v in m.items()},
+                            "n_days": 0,
+                            "exceed": np.nan,
+                        }
                         if band == "d1_10" and day_ok.any():
                             chosen = w > 0
-                            top = np.where(chosen[:, :, None], dp_paths[None], -np.inf).max(axis=1)  # (D, days)
+                            top = np.where(chosen[:, :, None], dp_paths[None], -np.inf).max(
+                                axis=1
+                            )  # (D, days)
                             row["exceed"] = float((obs_day[day_ok][None] > top[:, day_ok]).mean())
                             row["n_days"] = int(day_ok.sum())
                         rows.append(row)

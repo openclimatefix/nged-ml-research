@@ -146,7 +146,9 @@ def strata_of(*, summary: np.ndarray, k: int) -> np.ndarray:
     return label
 
 
-def stratified_weights(*, summary: np.ndarray, k: int, rng: np.random.Generator, n: int) -> np.ndarray:
+def stratified_weights(
+    *, summary: np.ndarray, k: int, rng: np.random.Generator, n: int
+) -> np.ndarray:
     """Return (n, 51) weights of n stratified samples: one path from each of K equal-count strata."""
     label = strata_of(summary=summary, k=k)
     w = np.zeros((n, N_MEMBERS))
@@ -165,7 +167,9 @@ def cluster_features(*, paths: np.ndarray, steps: np.ndarray) -> np.ndarray:
     return z.reshape(N_MEMBERS, -1)
 
 
-def k_medoids(*, dist: np.ndarray, k: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
+def k_medoids(
+    *, dist: np.ndarray, k: int, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
     """Return (medoid indices, cluster labels) of the cheapest of several k-medoids++ starts."""
     best: tuple[float, np.ndarray, np.ndarray] | None = None
     for _ in range(KMEDOIDS_RESTARTS):
@@ -189,11 +193,13 @@ def k_medoids(*, dist: np.ndarray, k: int, rng: np.random.Generator) -> tuple[np
         cost = float(dist[np.arange(N_MEMBERS), m[label]].sum())
         if best is None or cost < best[0]:
             best = (cost, m, label)
-    assert best is not None  # noqa: S101
+    assert best is not None
     return best[1], best[2]
 
 
-def medoid_weights(*, paths: np.ndarray, steps: np.ndarray, k: int, rng: np.random.Generator) -> np.ndarray:
+def medoid_weights(
+    *, paths: np.ndarray, steps: np.ndarray, k: int, rng: np.random.Generator
+) -> np.ndarray:
     """Return (1, 51) weights: each k-medoids medoid weighted by its cluster size over 51."""
     f = cluster_features(paths=paths, steps=steps)
     sq = (f**2).sum(axis=1)
@@ -205,7 +211,7 @@ def medoid_weights(*, paths: np.ndarray, steps: np.ndarray, k: int, rng: np.rand
     return w
 
 
-def arm_weights(  # noqa: PLR0913
+def arm_weights(
     *, paths: np.ndarray, kind: np.ndarray, select_band: str, k: int, rng: np.random.Generator
 ) -> dict[str, np.ndarray]:
     """Return {arm: (D, 51) weights} for R, the three S arms, and C, selecting on `select_band`."""
@@ -214,7 +220,9 @@ def arm_weights(  # noqa: PLR0913
     out = {"R": random_weights(k=k, rng=rng, n=N_DRAWS)}
     for arm, name in S_ARMS.items():
         out[arm] = stratified_weights(summary=summ[name], k=k, rng=rng, n=N_DRAWS)
-    out["C"] = medoid_weights(paths=paths, steps=steps, k=k, rng=np.random.default_rng([SEED, k, 3]))
+    out["C"] = medoid_weights(
+        paths=paths, steps=steps, k=k, rng=np.random.default_rng([SEED, k, 3])
+    )
     out["Oracle"] = oracle_weights(summ=summ, k=k, rng=rng)
     return out
 
@@ -237,7 +245,10 @@ def oracle_weights(*, summ: dict[str, np.ndarray], k: int, rng: np.random.Genera
 class JointBlock:
     """Precomputed distances from the 51 paths to the observed vector, for one lead band."""
 
-    def __init__(self, *, paths: np.ndarray, actual: np.ndarray, band: str, rng: np.random.Generator) -> None:
+    def __init__(
+        self, *, paths: np.ndarray, actual: np.ndarray, band: str, rng: np.random.Generator
+    ) -> None:
+        """Store the distances of the 51 paths to the observed vector for one band."""
         steps = band_steps(band=band)
         stride = max(1, len(steps) // JOINT_STEPS_PER_BAND)
         sub = steps[::stride]
@@ -268,7 +279,7 @@ class JointBlock:
         return es, vs
 
 
-def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR0915
+def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912
     """Score every coupling, selection window, arm, and K on one run; return the table rows."""
     z = np.load(file)
     init = datetime.fromisoformat(str(z["init"]) + "+00:00").astimezone(UTC)
@@ -281,7 +292,9 @@ def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR091
     run_index = int(init.toordinal())
     for coupling in COUPLINGS:
         paths = np.load(WORK436 / "paths" / coupling / f"{day_tag}.npy").astype(np.float64)
-        summ_by_band = {b: summaries(paths=paths, kind=kind, steps=band_steps(band=b)) for b in BANDS}
+        summ_by_band = {
+            b: summaries(paths=paths, kind=kind, steps=band_steps(band=b)) for b in BANDS
+        }
         jb_rng = np.random.default_rng([SEED, run_index, 0])
         joint = {b: JointBlock(paths=paths, actual=actual, band=b, rng=jb_rng) for b in BANDS}
         base = {"power_fcst_init_time": init, "coupling": coupling}
@@ -297,7 +310,9 @@ def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR091
                 )  # fmt: skip
         for select_band in ("d1_10", "band"):
             for k in KS:
-                rng = np.random.default_rng([SEED, run_index, k, 1 if select_band == "d1_10" else 2])
+                rng = np.random.default_rng(
+                    [SEED, run_index, k, 1 if select_band == "d1_10" else 2]
+                )
                 if select_band == "d1_10":
                     once = arm_weights(paths=paths, kind=kind, select_band="d1_10", k=k, rng=rng)
                     chosen = dict.fromkeys(BANDS, once)  # one selection, reused for every band
