@@ -21,7 +21,7 @@ GROUPS = {
     "MVA-only eight": ("the eight MVA Primaries", "eight_mva"),
     "signed-MW six": ("the six MW Primaries", "six_mw"),
 }
-LABELLED = ["P7", "P7+D50", "P7+BN", "P7+O3", "B3", "B1-14+D50", "P7+O3+D50", "P7+D50-p"]
+LABELLED = ["P7+D50", "P7+BN", "B3+O3+D50", "P7+D50-p"]
 """The arms named on the chart; the rest are in the tables."""
 FAMILY = [
     ("P7 (experiment 606)", theme.DATA_BLUE),

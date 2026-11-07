@@ -121,15 +121,16 @@ detectable effect as a bar](follow_vs_cost_six_mw.svg)
 
 *Each dot is one arm, scored on 2025-10 and 2025-12 with two seeds. The horizontal axis is follow on
 injected 15 and 30 day load-shifts, from day 4 to the end (lower is better; A1 is 0.119). The vertical
-axis is ordinary-day CRPS at 24-120 h ahead minus A1's (lower is better). The keep rule needs a dot
-left of the vertical dashed line and with its bar reaching the horizontal dashed line. Look at the empty
-bottom-left corner: only the scalar bottleneck (P7+BN, P7+D50+BN) reaches the horizontal line, and it
-follows 0.10.*
+axis is event-free CRPS at 24-120 h ahead minus A1's (lower is better), and each vertical bar is the
+minimum detectable effect. The keep rule needs a dot left of the vertical dashed line (follow at most
+0.05) whose bar reaches the horizontal dashed line (cost within the minimum detectable effect of A1's).
+No dot meets both: the two bottleneck arms (P7+BN and P7+D50+BN, bottom right) reach the horizontal
+line but follow 0.10.*
 
 ![The same chart at the eight MVA Primaries](follow_vs_cost_eight_mva.svg)
 
-*The same arms at the eight MVA Primaries. Look at P7+D50: it is the one low-follow arm whose bar
-reaches the horizontal line here.*
+*The same arms at the eight MVA Primaries. Look at P7+D50 (follow 0.040): its bar reaches the
+horizontal dashed line, so it passes the keep rule at this group.*
 
 ## Results
 
