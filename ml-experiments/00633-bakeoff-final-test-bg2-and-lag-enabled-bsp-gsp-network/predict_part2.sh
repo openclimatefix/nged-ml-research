@@ -4,6 +4,7 @@
 D="$(cd "$(dirname "$0")" && pwd)"
 R=$DATA_PATH_INTERNAL/ml-experiments/00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network
 set -e
+[ -z "${E00633_DRY:-}" ] || { echo "E00633_DRY must be unset" >&2; exit 4; }
 [ -z "$(ls $R/work/bsp/fits/J_LG_B1/2026-07_d0_s?.parquet $R/work/gsp/fits/J_LG_B1/2026-07_d0_s?.parquet 2>/dev/null)" ] || { echo "window forecasts exist already" >&2; exit 4; }
 $D/gpu.sh e00633_freeze2.py --verify
 set -o noclobber

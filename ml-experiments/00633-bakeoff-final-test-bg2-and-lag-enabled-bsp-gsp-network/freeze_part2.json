@@ -1,6 +1,6 @@
 {
- "frozen_at": "2026-11-07T15:57:31+00:00",
- "git_head": "3d8fe66a7b02b6bd7bdf7c8f4b08e8ac5c3c322a",
+ "frozen_at": "2026-11-07T16:03:39+00:00",
+ "git_head": "0df7cd3afc7ea0d42b78f00e8311c3760c7294e8",
  "train_data_ends_before": "2026-07-01",
  "test_origins": [
   "2026-07-01",
@@ -1113,21 +1113,27 @@
    "init=2026-10-30.parquet": "8772fd597a83dd52b6769bd8838c7462b42057051a88d0b7240c97410e37b77c",
    "init=2026-10-31.parquet": "c70eec7c7a724d6b7d89ee8df42ab8b3ddc394027c8cc9e68d57e010f4bd673a"
   },
+  "w560_nodes": {
+   "w560_nodes/bsp/expected/expected_ft_cols.npy": "607336640110ec90bba80b2e79392b6b34aec06f154a8d02e64ffdd7f1f85db6",
+   "w560_nodes/bsp/expected/expected_ft_origin.npy": "d4735e83bb9d4729aa6447feaef0be3a10694a914839f99c6c6792a702e6d01e",
+   "w560_nodes/gsp/expected/expected_ft_cols.npy": "af54dd3d58801d52c10c899d8b574994c836065c7149ea557fc8a78053d2c856",
+   "w560_nodes/gsp/expected/expected_ft_origin.npy": "aeb9a63f38f7f17bf9af0775ca080ed584616fa168b21f49b5914feb259c32c6"
+  },
   "inputs": {
    "observed.parquet": "58832665bfe5df9a357a90e3c8ee39775598475e19df9bed84bde61e9f4ff695",
    "era5_features.parquet": "973bf0f5b4f2a6aabccaeed4833eb4ff2c3d4b11025710280e3275cae4432172"
   }
  },
- "upstream_code_digest": "b1ca5d34bbd223724aa02f642ec23d8d0a879b68e483af381c95da2eac6be2d3",
+ "upstream_code_digest": "4fa413e5da1c002f4b620886c8a0ef957ad21e79156e2b4bd0ea87d5d38abd6a",
  "code": {
   "e00633_common.py": "7bc943e150e1803479d98e8a3788741d3e5c300724eb173578e2b615d9ffc04a",
   "e00633_fold.py": "596e2d1ae47c6381615462883a8781f287327f80dae4205c31780e7fe2cb5b28",
   "e00633_nodes.py": "41014cec10296374c148e3b5b8ae5dc08d23ece0b930d39595eca75a3e13caa3",
   "e00633_tables.py": "d775900087149f3510297572b159e137e3273c51ff0bb8db446f2f34ecc683c3",
   "e00633_node_fit.py": "814702251f53f25a04722a9238dbb191fb100c4da398b798af5ac375fb8136d7",
-  "e00633_score_nodes.py": "7d45ab5362afd7a53ff73a4340bb9b140b97c01be68b2d0331587e22cd8f6402",
-  "e00633_freeze2.py": "c278240ee5fa74154ba33bb13e32eedb410a753312e57736686169d75c8dfe66",
-  "predict_part2.sh": "56afbe36eb0a47c3e511219bd6cb19789a1159536fd950a9d955af89a5e205e0",
+  "e00633_score_nodes.py": "b814081593cc22cbf7f1d31fbb02834ca13c002e1112f6e748a0efaae7c567df",
+  "e00633_freeze2.py": "eb0df8ef9be0ddefabba37867da3675c6a7bc595cbef5e28a023c511ab89d7de",
+  "predict_part2.sh": "b04e93637f54fc2901afb891a5c855e2e5b5c021901fc6670da40d0fd7f03bd3",
   "gpu.sh": "d17a47b3f1b41a1f7c7af0ed922060d2834877220a615ddb9d32e936e80fbfaf"
  }
 }

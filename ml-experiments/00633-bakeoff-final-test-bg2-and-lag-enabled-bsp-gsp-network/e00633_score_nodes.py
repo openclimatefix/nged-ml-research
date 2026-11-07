@@ -11,10 +11,12 @@ Usage: python e00633_score_nodes.py OUT_DIR
 
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
+import e00611_pool as pool  # ty: ignore[unresolved-import]
 import e00633_common as k
 import e00633_score as s
 import numpy as np
@@ -63,7 +65,7 @@ def main(out: Path) -> None:
     series, arrays = fd._series_and_arrays()
     rows = {r["site"]: r for r in series.iter_rows(named=True) if r["site"] in NODE_SITES}
     cutoff_idx = int(common.grid_index(times=k.CUTOFF))
-    window_end = int(common.grid_index(times=k.GRID_END))
+    window_end = int(common.grid_index(times=datetime(2026, 11, 1, tzinfo=UTC)))
     readings = {
         site: int(np.isfinite(arrays[site].power[cutoff_idx : window_end + 1]).sum())
         for site in NODE_SITES
@@ -73,7 +75,10 @@ def main(out: Path) -> None:
         json.dumps({"readings_in_window": readings, "scored": scored_sites}, indent=1)
     )
     print("half-hours with a reading in the window:", readings, "scored:", scored_sites, flush=True)
-    clean = np.stack([arrays[site].power for site in scored_sites]).astype(np.float32)
+    cleaned = pool.prep422.stale.cleaned_power(
+        arrays=arrays, series=series.filter(pl.col("site").is_in(list(NODE_SITES)))
+    )  # NaN at flagged half-hours, as for the networks' training and experiment 620's scorer
+    clean = np.stack([cleaned[site] for site in scored_sites]).astype(np.float32)
     parts = {}
     for group in ("BSP", "GSP"):
         net = network(group=group)

@@ -60,6 +60,11 @@ def artefacts() -> dict[str, dict[str, Path]]:
         out[name] = {
             p.relative_to(root).as_posix(): p for p in sorted(root.rglob("*")) if p.is_file()
         }
+    out["w560_nodes"] = {
+        p.relative_to(k.ROOT / "inputs").as_posix(): p
+        for p in sorted((k.ROOT / "inputs" / "w560_nodes").rglob("*"))
+        if p.is_file()
+    }
     out["inputs"] = {
         p.name: p for p in (k.E607 / "observed.parquet", k.E607 / "era5_features.parquet")
     }
