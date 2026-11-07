@@ -9,7 +9,7 @@ Layout (fractions of the scoring capacity, which is the series' old capacity for
 daylight half-hours. Wind rows come from this experiment's refits, experiment 347's stored Tuesday
 forecasts, and experiment 303's stored default 1.
 
-    source <env>; uv run --no-sync python ml-experiments/00615-*/e00615_assemble.py
+    source the environment helper; uv run --no-sync python ml-experiments/00615-*/e00615_assemble.py
 """
 
 import json

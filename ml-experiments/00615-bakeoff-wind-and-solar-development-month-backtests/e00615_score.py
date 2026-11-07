@@ -7,7 +7,7 @@ scored: `all` (every row in the table) and `nonzero` (rows whose observed power 
 zero, which is the filter experiment 605 and 609 call version A-dev). Contrasts use a paired
 bootstrap over calendar months of forecast origin, so each resample draws 5 months with replacement.
 
-    source <env>; uv run --no-sync python ml-experiments/00615-*/e00615_score.py
+    source the environment helper; uv run --no-sync python ml-experiments/00615-*/e00615_score.py
 """
 
 import json

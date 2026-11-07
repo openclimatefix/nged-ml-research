@@ -6,7 +6,7 @@ forecasts for a 14-day stretch, observed power in black, axis in day numbers (ne
 dates), a thin strip of half-hours with no reading, and a key below. Forecast values are shown as
 percent of capacity. Summary figures: scores with month-bootstrap intervals.
 
-    source <env>; uv run --no-sync python ml-experiments/00615-*/e00615_figures.py OUTDIR
+    source the environment helper; uv run --no-sync python ml-experiments/00615-*/e00615_figures.py OUTDIR
 """
 
 import json
