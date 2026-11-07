@@ -89,7 +89,8 @@ advice:
 
 **Take-home: the donor-day probe reads an injected real solar farm at about 0.68 of its megawatts,
 so it fails the 0.85 to 1.15 bar, and the line stops here with no rescue tuning.** The reading is
-stable (0.66 to 0.70 at each of the six MW Primaries, and 0.65 to 0.72 when split by cutoff and size), so a
+stable (0.66 to 0.70 at each of the six MW Primaries, and 0.65 to 0.72 when split by cutoff
+and size), so a
 divided estimate is possible. The probe separates a real farm from a profile-only and a shuffled-sky
 placebo, which the neural attempts of experiments 405 and 477 could not. It cannot separate PV from
 a load that follows the clouds: without a cloud template a strong linear load reads as 0.39 to 0.45
