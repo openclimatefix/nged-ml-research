@@ -126,6 +126,17 @@ code: ml-experiments/00436-joint-scenarios-across-demand-wind-solar-and-leads/
 production_status: not-for-production
 adopted_in: none
 ---
+> **Erratum (experiment 625, 2026-11-07).** The joint-block scores on this page are void. The
+> scoring script built each joint vector with `transpose(1, 0, 2).reshape(N_MEMBERS, -1)`, which put
+> the node axis in front of the member axis, so every "member" of the joint block mixed members and
+> nodes. The spatial, cross-family, and temporal blocks, the dependence check, the marginal checks,
+> and the advice on the farms and the Primaries are unaffected. The registered gate on the joint
+> block, the claim that no construction passed it, and the joint-block figures in the headline,
+> best-arm, lessons, and advice (for example J4's joint score 1.9% below J3) rest on the void
+> scores. The corrected joint block over the 25 nodes at 6-hourly leads, days 1 to 10, shows no
+> coupling more than 1% from independent draws (absolute 2.19; SS +0.5%, J5 -0.1%, ECC +0.2%, MW
+> +0.8%); the values and a toy test that fails on the old reshape are in [experiment
+> 625](../00625-coherent-members-from-quantiles-k-sweep-and-path-checks/result.md).
 
 **A single Schaake shuffle or the copula-corrected ensemble ranks give the wind-farm and solar-farm
 scenarios a variogram score 28% to 43% lower than independent draws, but nothing helped across the

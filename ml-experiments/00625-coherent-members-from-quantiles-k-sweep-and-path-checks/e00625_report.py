@@ -1,3 +1,4 @@
+# ruff: noqa: E501, D103
 """Experiment 625: contrasts with month-block bootstrap intervals, printed as a report."""
 
 from pathlib import Path
@@ -26,7 +27,8 @@ def boot(a: np.ndarray, b: np.ndarray) -> tuple[float, float, float]:
     n = len(a)
     idx = RNG.integers(0, n, size=(N_BOOT, n))
     r = a[idx].mean(1) / b[idx].mean(1) - 1
-    return float(a.mean() / b.mean() - 1), *map(float, np.quantile(r, [ALPHA / 2, 1 - ALPHA / 2]))
+    lo, hi = np.quantile(r, [ALPHA / 2, 1 - ALPHA / 2])
+    return float(a.mean() / b.mean() - 1), float(lo), float(hi)
 
 
 def monthly(df: pl.DataFrame, col: str) -> pl.DataFrame:
