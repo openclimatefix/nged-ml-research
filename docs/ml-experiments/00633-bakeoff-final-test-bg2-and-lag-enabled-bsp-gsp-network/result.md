@@ -135,11 +135,13 @@ full five-member BG2. It also takes all power from the cleaned grid and drops D1
 
 ![MAE by forecast day: BG2 lowest at every day, climatology highest](mae_by_day.svg)
 
-BG2 has the lowest MAE on every forecast day. K1, the candidate, and the manual heuristic lie close together, and their lines overlap from about day 4.
+BG2 has the lowest MAE on every forecast day. K1, the candidate, and the manual heuristic lie close
+together, and their lines overlap from about day 4.
 
 ![CRPS by forecast day](crps_by_day.svg)
 
-BG2 has the lowest CRPS on every forecast day. K1, the candidate, and the manual heuristic lie within 0.3 points of each other, and the climatology is far above all of them.
+BG2 has the lowest CRPS on every forecast day. K1, the candidate, and the manual heuristic lie
+within 0.3 points of each other, and the climatology is far above all of them.
 
 | System | CRPS | MAE | Threshold-weighted CRPS | q05-q95 coverage |
 |---|---|---|---|---|
