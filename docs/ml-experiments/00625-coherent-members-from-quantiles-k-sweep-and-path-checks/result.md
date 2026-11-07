@@ -39,14 +39,15 @@ prediction: >-
   the solar farms is in the top quarter, the share of opposite-sky-state pairs is: IND about 8% of
   half-hours, ECC under 2%, SS between the observed share and IND's share. P5. The lag-1
   autocorrelation of step-to-step changes along MW paths is further from the observed value than
-  SS's, because MW draws one latent level per member.
+  the autocorrelation along SS paths is, because MW draws one latent level per member.
 decision_rule: >-
   Scores are variogram scores (order 0.5, as in experiment 436) over the Tuesday runs of 2025-09 to
   2026-06 (44 expected; the count is printed before any score), days 1 to 10, grouped into calendar
   months. A contrast is the relative difference of the monthly mean scores against IND (or, for K,
   against K = 51 of the same coupling), paired by month, with a month-block bootstrap (20,000
-  resamples) and a 98.33% interval (Bonferroni over the three registered contrasts); a run-block
-  bootstrap is reported beside it. The margin is 5%, which is the margin of experiment 434; the
+  resamples) and a 98.33% interval (Bonferroni over the three registered contrasts C1, C2, and C3,
+  each counted once). The run-block bootstrap and the energy score were not computed. The margin
+  is 5%, which is the margin of experiment 434; the
   energy score is secondary. C1: SS (J3) against IND on the spatial block of the nine farms
   (wind and solar together, mean of the two family scores). `supported` for C1 if the interval lies
   wholly below -5%; this is expected, since 436 measured -28% to -43%. C2: anomaly-path SS (SS-R)
@@ -94,17 +95,18 @@ lessons: >-
   nodes and members.
 take_home_message: >-
   NGED can get coherent wind-farm and solar-farm paths from a Schaake shuffle of past observed
-  paths, which scores 34% below independent draws across the farms, and about 20 paths lose 2% to
-  3% of the 51-path score (10 paths lose 5% to 11% across farms). The 16 Primaries gain nothing from
+  paths, which scores 34% below independent draws across the farms, and 20 paths lose 2% to 3% of
+  the 51-path score across the farms (10 paths lose 5% to 11%). The 16 Primaries gain nothing from
   any coupling we tried, including a shuffle of anomaly paths, because their errors are only
   weakly correlated, so independent draws are close to right there. Experiment 436's joint-block
   scores were wrong (a reshape mixed members and nodes) and are replaced by the values here, which
   show no difference between couplings on the joint block.
 advice:
   - >-
-    Offer NGED a Schaake shuffle of observed paths for the farms, and tell them that 20 paths is the
-    smallest number that keeps within 3% of the 51-path score; 10 paths lose 5% to 11% across farms
-    and about 3% across Primaries (C3).
+    Offer NGED a Schaake shuffle of observed paths for the farms, and tell them that 20 paths
+    lose 2.0% (wind farms) to 3.1% (solar farms) of the 51-path score; the registered tests
+    recommend K = 51 for the farms and K = 20 for the Primaries, and 10 paths lose 5% to 11%
+    across farms and 3% across Primaries (C3).
   - >-
     Use independent draws or any coupling for the Primaries, because none differs measurably (C2);
     do not use ensemble ranks, which score 6.8% worse than independent draws there.
@@ -116,7 +118,8 @@ production_status: not-for-production
 adopted_in: none
 ---
 **A Schaake shuffle of past observed paths makes the farms' paths coherent (34% below independent
-draws) and about 20 paths keep within 3% of the 51-path score, but no coupling helped the 16
+draws) and 20 paths lose 2% to 3% of the 51-path score across the farms (1% across the Primaries),
+but no coupling helped the 16
 Primaries.** NGED want member paths that are coherent across sites and time for power-flow studies.
 This experiment reuses the 51-path scenario tables of experiments
 [434](../00434-demand-ensemble-copula-coupling-and-schaake-reordering-of-stored-forecasts/result.md)
@@ -162,10 +165,12 @@ days](../00436-joint-scenarios-across-demand-wind-solar-and-leads/figure_4_examp
 - **Why the Primaries gain nothing.** From experiment 436's dependence table, the realised
   correlation of normal scores between Primaries is 0.29. IND gives 0.00, SS 0.47, ECC 0.93, and J5
   0.26. J5 matches the realised value best and still gains only 0.7%, so the variogram score on 16
-  weakly correlated nodes cannot resolve the coupling; ECC overshoots and loses 6.8%. SS-R is the
-  weaker of the shuffles' sources for this reason as well as for the 43-day pool. This is a
-  descriptive account, not a test.
-- **C3, K sweep (K = 10 is not enough).** Variogram score of K paths against 51 of the same
+  weakly correlated nodes cannot resolve the coupling; ECC overshoots and loses 6.8%. SS-R ranks
+anomaly paths from at most 43 earlier dates in each run's pool, so its ordering is noisy as well.
+This account is descriptive, not a test. The share of the Primaries' variance explained by two
+common components was not computed.
+- **C3, K sweep (`K = 10 is enough` not met; prediction P1 failed).** Variogram score of K paths
+  against 51 of the same
   coupling: farms SS K = 5 +20.9%, K = 10 +7.9% (+6.8% to +9.2%), K = 20 +2.5% (+1.6% to +3.5%);
   Primaries SS-R K = 5 +5.9%, K = 10 +3.0% (+2.0% to +3.9%), K = 20 +1.0% (+0.6% to +1.4%). By the
   registered tests, farms need K = 51 (K = 20 misses the 2% point test by 0.5 points) and the
@@ -177,9 +182,11 @@ days](../00436-joint-scenarios-across-demand-wind-solar-and-leads/figure_4_examp
 - **MW against SS on the farms:** +0.9% (-3.7% to +7.6%); MW is not beaten, and not better.
 - **CRPS of K paths against the direct 51-value CRPS (days 1 to 10).** K = 20: +0.28% demand, +0.50%
   wind, +0.32% solar. K = 10: +1.28%, +1.66%, +1.20%, so K = 10 fails the 1% marginal bar. K = 5:
-  +4.0%, +4.4%, +3.8%. MW at 51 paths: +1.07% wind, +4.13% solar (fails the bar). Demand at K = 51
++4.0%, +4.4%, +3.8%. Prediction P3 held. MW at 51 paths: +1.07% wind, +4.13% solar (fails the bar).
+Demand at K = 51
   is identical by construction (the stored marginal), so the stop rule did not fire.
-- **Coverage of the member spread, days 1 to 10 (nominal 50%, 80%, 90%).** K = 51: demand 46%, 75%,
+- **Coverage of the member spread, days 1 to 10 (nominal 50%, 80%, 90%; K = 5 and 10 are given for
+  the Primaries only).** K = 51: demand 46%, 75%,
   89%; wind 46%, 74%, 85%; solar 46%, 75%, 84%. K = 10: 40%, 66%, 74% (demand). K = 5: 33%, 55%, 61%
   (demand). The coverage is a property of the marginal and of K and does not depend on the coupling.
   The tail bands of wind and solar are under-covered, as experiment 436 found.
@@ -187,11 +194,13 @@ days](../00436-joint-scenarios-across-demand-wind-solar-and-leads/figure_4_examp
   chosen on 2025-03 to 2025-08).** Observed 0.82% (0.31% to 1.54%); IND 7.7%; ECC 0.00%; SS 0.21%
   (0.14% to 0.30%); SS-R 0.45%; J5 0.02%; MW 0.30%. IND puts neighbouring farms in opposite states
   about ten times as often as the observations; every coupling is at or below the observed rate.
-  Prediction P4 failed for SS, which fell below the observed share rather than between it and IND.
+Hypothesis claim (3) was half met: SS is far below IND, but also below the observed share.
+Prediction P4 failed for SS, which fell below the observed share rather than between it and IND.
 - **Step-change autocorrelation (days 1 to 3, lag 1).** Observed: Primaries 0.34, wind farms 0.04
   (the solar observed value is unavailable: solar actuals hold missing night half-hours, so no full
-  window qualifies). IND: -0.40, -0.49, -0.35. SS: 0.40, 0.02, 0.14. SS-R: 0.34, 0.00, 0.10. ECC
-  0.47, 0.47, 0.32. MW 0.47, 0.10, 0.05. IND's negative autocorrelation is the artefact of drawing
+  window qualifies). In the order Primaries, wind farms, solar farms: IND -0.40, -0.49, -0.35; SS
+0.40, 0.02, 0.14; SS-R 0.34, 0.00, 0.10; ECC 0.47, 0.47, 0.32; MW 0.47, 0.10, 0.05. IND's negative
+autocorrelation is the artefact of drawing
   each half-hour independently; SS-R matches the Primaries exactly. Prediction P5 holds: MW is
   further from the observed value than SS for the Primaries and the wind farms.
 - **Tails.** Marginals are unchanged from experiments 425, 429, and 430, so no new tail scores. K =
@@ -208,10 +217,11 @@ days](../00436-joint-scenarios-across-demand-wind-solar-and-leads/figure_4_examp
   the true value at K = 5 and 0.5% from K = 10.
 - **Caveats.** Ten calendar months give wide intervals. The opposite-sky check rests on 111 run-days
   and the observed share has an interval from 0.3% to 1.5%. The spread proxy for member disagreement
-  is the quantile model's q90 minus q10, not the ensemble's own spread. The solar observed
+  is the q90 minus q10 of the stored quantile forecast (XGBoost and neural network models), not the
+ensemble's own spread. The solar observed
   autocorrelation is missing. The pool of past paths starts on 2025-03-01 and is thin for the
   earliest runs.
-- **What to try next (the manager decides).** A Schaake shuffle that ranks forecast-error paths
+- **Options for later.** A Schaake shuffle that ranks forecast-error paths
   (actual minus median forecast) once more than 43 runs exist; the same sweep on BSP and GSP nodes
   once the topology lands; and testing whether NGED's power-flow studies change their answer between
   K = 10 and K = 20 paths.
@@ -243,8 +253,8 @@ j/(K+1) is within 3.5% of the true value at K = 5 and within 0.5% from K = 10 (t
 the pair term divided by K(K-1), is 13% low at K = 5, so it is not used).
 - **SS-R.** The anomaly of a past date is its observed path minus the mean of the same clock time
   on the four same-weekday dates 7, 14, 21, and 28 days before the path's start, per node (the runs
-  are Tuesdays). The pool and the 16-day buffer are 436's. It is applied to
-  all nodes; the report uses it for the Primaries, and for the farms beside J3. The weather source
+  are Tuesdays). The pool and the 16-day buffer are 436's. SS-R is applied to all nodes; the report
+uses it for the Primaries, and for the farms beside J3. The weather source
   is none (observed power only), so every input is available at forecast time.
 - **Why nothing helped across the Primaries.** Reported from the stored `diag_dependence` table:
   the realised and the constructed correlations of the normal scores between Primaries, and the
@@ -263,7 +273,7 @@ the pair term divided by K(K-1), is 13% low at K = 5, so it is not used).
   before 2025-03-01; dev months only, no half-hour on or after 2026-07-01; generators anonymised in
   every chart and table; example fans reuse 436's figure 4 style (a winter and a summer day-ahead
   and 14-day example). Not applicable: no fit, so no refit cadence, model saving, GPU, load-shift
-  events, or curtailment cost. The 1% and 3% stop rules above are the brief's.
+  events, or curtailment cost. The 3% stop rule above is the brief's.
 
 ## Compute and reviews
 
