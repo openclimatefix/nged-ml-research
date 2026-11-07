@@ -5,7 +5,8 @@ Reads experiment 436's `work/runs`, `work/observed.npz`, and `work/paths/<arm>/<
 per arm; not recomputed), builds the SS-R arm (a Schaake shuffle that ranks anomaly paths, not
 observed paths) and the K-path cuts, and writes five tables to this experiment's `work/` folder:
 
-- `coherence.parquet`: energy (experiment 434's form) and variogram scores by block, as in experiment 436;
+- `coherence.parquet`: energy (experiment 434's form) and variogram scores by block, as in
+  experiment 436;
 - `crps.parquet`: CRPS of each arm's paths against the actual, by family and window;
 - `coverage.parquet`: coverage of the member spread at 50%, 80%, and 90%;
 - `sky.parquet`: opposite-sky-state counts of neighbouring solar farms, by run and valid day;
@@ -77,7 +78,8 @@ def anomaly_ssr(*, init: datetime, observed: np.ndarray, kind: np.ndarray) -> np
     """Return the SS-R paths (51, N, S): Schaake ranks of anomaly paths, applied to the 51 values.
 
     The anomaly of a past date is its observed path minus the mean of the same clock time on the
-    four same-weekday dates 7 to 28 days before that date. The 51 dates, the 16-day buffer, and the gap filling are
+    four same-weekday dates 7 to 28 days before that date. The 51 dates, the 16-day buffer, and the
+    gap filling are
     those of experiment 436's J3.
     """
     pool = score.schaake_pool(init=init, observed=observed, kind=kind)
@@ -120,7 +122,10 @@ def joint_rows(*, paths: dict[str, np.ndarray], actual: np.ndarray, init: dateti
 
 
 def plain_crps(*, paths: np.ndarray, actual: np.ndarray) -> np.ndarray:
-    """Return the CRPS (pair term over all K squared pairs, as in experiment 434) (N, S) of K paths (K, N, S) against the actual (N, S)."""
+    """Return the CRPS (N, S) of K paths (K, N, S) against the actual (N, S).
+
+    The pair term averages over all K squared pairs, as in experiment 434.
+    """
     k = paths.shape[0]
     srt = np.sort(paths, axis=0)
     coeff = (2 * np.arange(1, k + 1) - k - 1).reshape(-1, 1, 1)
