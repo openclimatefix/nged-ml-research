@@ -68,8 +68,8 @@ take_home_message: >-
   Giving the network the previous day's and the previous week's power lowered the forecast error a
   little at both bulk and grid supply points, in 19 of the 20 group-and-day cells (days 1 to 10), but
   by less than the 5 development months can resolve. The lag-enabled network is the lowest-scoring
-  forecast in the table, yet the evidence does not separate it from the lag-free network, so the choice between them rests on cost
-  and on the maintainer's judgement. The 90% band is still too narrow.
+  forecast in the table, yet the evidence does not separate it from the lag-free network, so the
+  choice between them rests on cost and on the maintainer's judgement. The 90% band is still too narrow.
 advice:
   - >-
     Keep both networks in the bake-off roster at the BSPs and GSPs, because the lag-enabled
@@ -186,8 +186,8 @@ absolute error of the median.
 Table 2. Contrasts in CRPS (points; negative favours the lag-enabled network). The Bonferroni count
 is 16: 4 reference forecasts (the lag-free network, Design 2 of experiment 611, BG2, the
 climatology) times 2 lead sets times 2 groups. Each interval resamples the 5 months at the
-Bonferroni level. The minimum detectable effect is beside each contrast. Every contrast uses the 228,968 common
-rows.
+Bonferroni level. The minimum detectable effect is beside each contrast. Every contrast uses the
+228,968 common rows.
 
 | Contrast | Group | Lead | Difference | Interval | Minimum detectable effect |
 |---|---|---|---|---|---|
