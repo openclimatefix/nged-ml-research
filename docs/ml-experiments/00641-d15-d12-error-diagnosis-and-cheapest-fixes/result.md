@@ -47,8 +47,6 @@ metric: >-
   in percent of capacity, at leads 1 to 10 days.
 ---
 
-# What drives the forecast error at D15 and D12, and which cheap fix lowers it?
-
 **Status.** Planned. This page is the plan; the diagnosis, the ranked fix list, and the results are
 added in later commits.
 
