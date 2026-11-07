@@ -35,6 +35,9 @@ _p.add_argument(
     "--months", nargs="+", default=["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"]
 )
 _p.add_argument("--no-bank", action="store_true")
+_p.add_argument("--width-factors", default=None, help="CSV (month, factor): add system K2w, the network rescaled about its median by the month's factor")
+_p.add_argument("--lagfree", default=None, help="score this lag-free arm's fits (D5/O2 tag) on the rows of --arm")
+_p.add_argument("--lagfree-tag", default="D5")
 MINE = _p.parse_args()
 
 import e00581_bank as bank  # ty: ignore[unresolved-import]
@@ -64,7 +67,10 @@ BAND_IDS = (0, 1, 2)
 TAIL_BANDS = (1, 2)
 GROUPS = k597.GROUPS_SCORED
 PHASES = k597.PHASES
-SYSTEMS = ("K2", "K1", "K2+t", "K1+t")
+WFAC: dict[str, float] = (
+    {} if MINE.width_factors is None else dict(__import__("polars").read_csv(MINE.width_factors).select("month", "factor").iter_rows())
+)
+SYSTEMS = ("K2", "K1", "K2+t", "K1+t", *(("K2w",) if WFAC else ()))
 GRID = np.round(np.arange(0.50, 1.801, 0.01), 2)
 IQ = a.IQ
 STAT_NAMES = (*c.METRICS, "crps")
@@ -146,15 +152,29 @@ def row_factors(*, t) -> tuple[np.ndarray, np.ndarray, pl.DataFrame]:
 # ---------------------------------------------------------------- systems and row statistics
 
 
-def systems(*, v, m, wide, lower, upper) -> dict[str, np.ndarray]:
-    """Return the quantiles of the four systems; `+t` systems equal the plain ones where no factor applies."""
+def systems(*, v, m, wide, lower, upper, wf=None) -> dict[str, np.ndarray]:
+    """Return the quantiles of the systems; `+t` systems equal the plain ones where no factor applies.
+
+    `K2w` (only with `--width-factors`) is the network scaled about its median by the per-row factor `wf`.
+    """
     wv, wm = widen(q=v, lower=lower, upper=upper), widen(q=m, lower=lower, upper=upper)
-    return {
+    out = {
         "K2": v,
         "K1": k597.assemble(v=v, m=m, wide=wide),
         "K2+t": wv,
         "K1+t": k597.assemble(v=wv, m=wm, wide=wide),
     }
+    if wf is not None:
+        med = v[:, IQ[0.5] : IQ[0.5] + 1]
+        out["K2w"] = (med + wf[:, None] * (v - med)).astype(np.float32)
+    return out
+
+
+def month_factor(*, month_col: np.ndarray) -> np.ndarray | None:
+    """Return one width factor per row from `--width-factors` (1.0 for a month without one), or None."""
+    if not WFAC:
+        return None
+    return np.array([WFAC.get(str(x), 1.0) for x in month_col], np.float32) if len(month_col) else np.zeros(0, np.float32)
 
 
 def row_stats(*, y: np.ndarray, q: np.ndarray) -> np.ndarray:
@@ -190,7 +210,7 @@ def has_tail(*, name: str, month: str) -> bool:
 def event_free(*, inp, lower, upper) -> tuple[pl.DataFrame, pl.DataFrame, dict]:
     t = inp.t
     wide = inp.mode[t.prim, t.origin_day]
-    sy = systems(v=t.arms["V"], m=t.arms["M"], wide=wide, lower=lower, upper=upper)
+    sy = systems(v=t.arms["V"], m=t.arms["M"], wide=wide, lower=lower, upper=upper, wf=month_factor(month_col=t.month))
     st = {n: row_stats(y=t.obs, q=q) for n, q in sy.items()}
     j = {n: STAT_NAMES.index(n) for n in ("cover90", "pin05", "pin95", "width90", "crps", "ge05", "le95")}
     cells = []
@@ -250,7 +270,7 @@ def event_free(*, inp, lower, upper) -> tuple[pl.DataFrame, pl.DataFrame, dict]:
 def real_events(*, inp, lower, upper) -> pl.DataFrame:
     t = inp.t
     wide = inp.mode[t.prim, t.origin_day]
-    sy = systems(v=t.arms["V"], m=t.arms["M"], wide=wide, lower=lower, upper=upper)
+    sy = systems(v=t.arms["V"], m=t.arms["M"], wide=wide, lower=lower, upper=upper, wf=month_factor(month_col=t.month))
     st = {n: row_stats(y=t.nra, q=q) for n, q in sy.items()}
     ev = sc.attach_depth(ev=sc.merged_events(), t=t)
     out = []
@@ -330,8 +350,8 @@ def score_bank(*, inp, lower, upper) -> tuple[pl.DataFrame, list[dict]]:
             v_clean, m_q = t.arms["V"][rows], t.arms["M"][rows]
             lw, up = lower[rows], upper[rows]
             wide_rows = wide_inj[t.prim[rows], t.origin_day[rows]]
-            q_inj = systems(v=vin, m=m_q, wide=wide_rows, lower=lw, upper=up)
-            q_twin = systems(v=v_clean, m=m_q, wide=real_wide_all[rows], lower=lw, upper=up)
+            q_inj = systems(v=vin, m=m_q, wide=wide_rows, lower=lw, upper=up, wf=month_factor(month_col=t.month[rows]))
+            q_twin = systems(v=v_clean, m=m_q, wide=real_wide_all[rows], lower=lw, upper=up, wf=month_factor(month_col=t.month[rows]))
             st = {n: row_stats(y=y, q=q) for n, q in q_inj.items()}
             lead = t.lead[rows]
             for e in ev.iter_rows(named=True):
@@ -410,10 +430,38 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(out, infer_schema_length=None)
 
 
+def lag_free_quantiles(*, t) -> np.ndarray:
+    """Return the lag-free arm's quantiles aligned to the table rows (NaN where absent), sorted."""
+    e = g.a._load(root=ROOT / "arms" / MINE.lagfree / "work", tag=MINE.lagfree_tag, months=MONTHS)
+    sm = c.k578.sites()
+    prim_of = dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
+    e = e.with_columns(
+        prim=pl.col("time_series_id").replace_strict(prim_of, return_dtype=pl.Int64),
+        idx=((pl.col("valid_time").dt.epoch("us") - c.k578.prep.GRID_START_US) // c.k578.prep.STEP_US).cast(pl.Int64),
+        oidx=((pl.col("power_fcst_init_time").dt.epoch("us") - c.k578.prep.GRID_START_US) // c.k578.prep.STEP_US).cast(pl.Int64),
+    )  # fmt: skip
+    kk = s.key(e["prim"].to_numpy(), e["oidx"].to_numpy(), e["idx"].to_numpy())
+    order = np.argsort(kk)
+    mine = s.key(t.prim, t.origin_idx, t.idx)
+    pos = np.clip(np.searchsorted(kk[order], mine), 0, len(kk) - 1)
+    ok = kk[order][pos] == mine
+    q = e.select(list(a.QCOLS)).to_numpy().astype(np.float32)[order[pos]]
+    q[~ok] = np.nan
+    return np.sort(q, axis=1)
+
+
 def main() -> None:
     k600.WORK = OUT
     inp = k600.Inputs(arm=MINE.arm)
     t = inp.t
+    if MINE.lagfree:
+        q = lag_free_quantiles(t=t)
+        ok = np.isfinite(q).all(axis=1)
+        print("lag-free rows present:", float(ok.mean()), flush=True)
+        t.arms["V"] = np.where(ok[:, None], q, 0.0).astype(np.float32)
+        t.arms["M"] = t.arms["V"]
+        t.free = t.free & ok
+        MINE.no_bank = True
     chk = inp.check_gate_state()
     (OUT / "gate_check.json").write_text(json.dumps({"equals_592_stored_state": chk}))
     print("rows", t.n, "months", MONTHS, flush=True)
