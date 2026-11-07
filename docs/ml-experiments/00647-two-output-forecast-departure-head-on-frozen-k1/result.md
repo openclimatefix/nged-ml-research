@@ -33,19 +33,21 @@ prediction: >-
   0.03 points of capacity in any cell. The noise placebo (H1 with its signal inputs replaced by
   noise of the same variance) scores within the minimum detectable effect of K1 on P2.
 decision_rule: >-
-  The experiment follows the design answer's scorecard in `briefs/two_output_network_opus_design_answer.md`.
-  N1 and N2 (the normal-running-arrangement output) hold by construction, because K1's stored
-  forecasts are copied unchanged, and the scoring script asserts byte equality with the export. H1
-  or H2 counts as beating R0 on a bar when the month-block 95% interval of the CRPS difference
-  excludes zero in the predicted direction and the point estimate exceeds the minimum detectable
-  effect. The minimum detectable effect is a fixed 0.05 points of capacity (CRPS), chosen before any head
-  row is scored, so that the bar does not move with the baseline. The first month pair (2025-10 and 2025-12) is a feasibility gate and not a test, because two
-  month blocks cannot support a 95% interval. The experiment stops, and the prevailing output is
-  R0 itself, when neither H1 nor H2 has a point estimate below R0's on both P2 and P4 on that
-  pair. Claims need the pooled month-block interval over all five months. The smallest gain worth porting is set by the added pipeline step (a second model
-  whose inputs are K1's outputs and the lag signals): 15% on P2 and the interval bars above, because
-  R0 already gives 10% to 19% on the verified pair with no fit. The 0.03-point P1 and P3 limits are
-  the design answer's.
+  The experiment follows the design answer's scorecard in
+  `briefs/two_output_network_opus_design_answer.md`. N1 and N2 (the normal-running-arrangement
+  output) hold by construction, because no head code path writes to the NRA rows, and the scoring
+  script asserts that the NRA columns are unchanged. H1 or H2 counts as beating R0 on a bar when
+  the month-block 95% interval of the CRPS difference excludes zero in the predicted direction and
+  the point estimate exceeds the minimum detectable effect. The minimum detectable effect is a
+  fixed 0.05 points of capacity (CRPS), chosen before any head row is scored, so that the bar does
+  not move with the baseline. The first month pair (2025-10 and 2025-12) is a feasibility gate and
+  not a test, because two month blocks cannot support a 95% interval. The experiment stops, and
+  the prevailing output is R0 itself, when neither H1 nor H2 has a point estimate below R0's on
+  both P2 and P4 on that pair. Claims need the pooled month-block interval over all five months.
+  The smallest gain worth porting is set by the added pipeline step (a second model whose inputs
+  are K1's outputs and the lag signals): 15% on P2 and the interval bars above, because R0 already
+  gives 10% to 19% on the verified pair with no fit. The 0.03-point P1 and P3 limits are the
+  design answer's.
 benchmark: >-
   K1 (experiments 612 and 613, stored export), R0 (K1's quantiles shifted by K1's own mean residual
   over valid days 2 to 8 before the origin, times exp(-lead/tau), tau = 72 h and 168 h).
