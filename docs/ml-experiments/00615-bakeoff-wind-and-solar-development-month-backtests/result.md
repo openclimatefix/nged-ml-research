@@ -27,7 +27,8 @@ prediction: >-
   Written before any new forecast was scored. P1: wind default 2 beats wind default 1 and
   `climatology` over 24 to 240 h by about 0.2 points of capacity, as in experiment 347. P2: solar
   `a2_member` beats the GAM, XGBoost, `climatology`, and `manual_heuristic` references over 12 to
-  36 h. P3: scores on rows with the exact-zero readings dropped are higher than scores on all rows.
+  36 h. P3: the quantile score (smaller is better) is larger on rows with the exact-zero readings
+  dropped than on all rows.
 decision_rule: >-
   Descriptive. Rank the candidates of each technology on the quantile score over 24 to 240 h (wind)
   and 12 to 36 h (solar). The Bonferroni count is the number of candidates compared with each
@@ -52,12 +53,12 @@ headline: >-
   `a2_member` refitted yearly and quarterly score the same (0.005 points apart, minimum detectable
   effect 0.033).
 take_home_message: >-
-  For the 3 wind farms, the physics-plus-neural-network forecast is clearly better than a
-  seasonal average and a little better than the older XGBoost forecast, so it stays the default. For
-  the 6 solar farms, the neural network is better than the simpler references, but refitting it
-  every quarter instead of every year changes nothing, and its upper band is too low on very sunny
-  days (17% of observations above the 99% line, against a target of 1%). The next step is to fix the
-  upper band on sunny days before the final test.
+  For the 3 wind farms, the physics-plus-neural-network forecast scores clearly better than a
+  seasonal average and a little better than the older XGBoost forecast. For the 6 solar farms, the
+  neural network scores better than the simpler references, but its lead over the additive-curve
+  (GAM) reference is within the noise. Refitting it every quarter instead of every year made no
+  detectable difference, and its upper band is too low on very sunny days (17% of observations
+  above the 99% line, against a target of 1%).
 lessons:
   - >-
     Dropping the exact-zero readings barely changes any score in the development months (solar 3.34
@@ -68,23 +69,24 @@ advice:
     Score the final test on rows with exact zeros dropped as well as on all rows, and compare
     wind default 2 with wind default 1 only on rows that both forecasts cover (scores table).
   - >-
-    Treat the very-sunny-day upper band of solar `a2_member` as the first thing to fix before the
-    final test, because 17% of its observations on those days fall above q99 (very sunny days).
+    Check the upper band of solar `a2_member` on very sunny days before trusting its q99, because
+    17% of its observations on those days fall above q99 (very sunny days).
   - >-
-    Do not refit solar `a2_member` more often than yearly unless a later test shows a gain, because
-    quarterly and yearly refits differ by 0.005 points (contrasts table).
+    Expect no gain from refitting solar `a2_member` more often than yearly, because quarterly and
+    yearly refits differ by 0.005 points with a minimum detectable effect of 0.033 (contrasts).
 production_status: not-for-production
 adopted_in: none
 ---
-**Wind default 2 and solar `a2_member` should stay the default forecast of their technology.** This
-experiment scored every candidate forecast for the 3 metered wind farms and the 6 metered solar farms
-on the 5 development months (forecast origins in 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06),
-with the scoring rules that [experiment
-609](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00609-bakeoff-wind-and-solar-design/result/)
-fixed for the final test. The final test (origins from 2026-07-01) was not run, and no valid time in
-July 2026 or later is scored. Nothing here is adopted for production. Forecasts are stored in the
-private folder `backtest_export_wind_solar_dev_2026-11-07/`, and the generators appear only as W1 to
-W3 and Solar A to Solar F.
+**Wind default 2 scores clearly better than `climatology` and a little better than wind default 1,
+and solar `a2_member` scores better than every solar reference, though not decisively against the
+GAM. Its upper band on very sunny days is too low.** This experiment scored every candidate forecast
+for the 3 metered wind farms and the 6 metered solar farms on the 5 development months (forecast
+origins in 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06), with the scoring rules that [experiment
+609](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00609-bakeoff-wind-and-solar-
+design/result/) fixed for the final test. The final test (origins from 2026-07-01) was not run, and
+no valid time in July 2026 or later is scored. Nothing here is adopted for production. Forecasts are
+stored in the private folder `backtest_export_wind_solar_dev_2026-11-07/`, and the generators appear
+only as W1 to W3 and Solar A to Solar F.
 
 **Terms.** The quantile score is the mean pinball loss over the 11 quantile levels (q01 to q99), in
 points of capacity (smaller is better). Lead bands are 0 to 24, 24 to 120, and 120 to 240 hours.
@@ -121,17 +123,20 @@ default", so a positive number means the default scored better.
 **Wind default 2 scores 4.28 points over 0 to 240 h and beats every wind reference.** The table
 shows the pooled mean over the 3 farms with exact zeros dropped. Against `climatology` the gap is
 1.04 points (99.4% interval 0.56 to 1.53, minimum detectable effect 0.68, 9 contrasts). Against wind
-default 1, on the 40,901 Tuesday rows both cover, the gap is 0.13 points (0.04 to 0.24, minimum
-detectable effect 0.15), and the interval excludes zero only at 120 to 240 h (0.15, interval 0.08
-to 0.25). The stored single-fit wind default 2 scores 0.03 points worse than the refitted one
-(0.020 to 0.035) on the same rows.
+default 1, on the 40,847 Tuesday rows that both forecasts cover, the gap is 0.13 points (0.04 to
+0.24, minimum detectable effect 0.15), and the interval excludes zero only at 120 to 240 h (0.15,
+interval 0.08 to 0.25). The stored single-fit wind default 2 scores 0.03 points worse than the
+refitted one (0.020 to 0.035) on the same rows.
 
 | Candidate | Rows | Score (points) | q05-q95 coverage | Above q99 |
 |---|---|---|---|---|
 | Wind default 2 | 275,863 | 4.28 | 0.898 | 0.0130 |
 | `climatology` | 275,863 | 5.34 | 0.935 | 0.0164 |
-| Wind default 2, Tuesday rows | 40,901 | 4.30 | 0.899 | 0.0207 (stored fit) |
+| Wind default 2, stored single fit, Tuesday rows | 40,901 | 4.30 | 0.899 | 0.0207 |
 | Wind default 1, Tuesday rows | 40,901 | 4.39 | 0.932 | 0.0137 |
+
+The row counts are each candidate's own count. The gap to wind default 1 is paired on the 40,847 shared
+rows, so it does not equal the difference of the two table scores.
 
 ![Wind score by lead band](wind_score_by_lead_band.svg)
 
@@ -166,11 +171,11 @@ of the day.*
 **Solar `a2_member` scores 3.30 points and beats the GAM and XGBoost references, but not by a
 decisive margin.** Quarterly and yearly refits score the same: the gap is 0.005 points (interval
 -0.018 to 0.028, minimum detectable effect 0.033, 15 contrasts). The GAM is 0.073 points worse over
-all leads (-0.017 to 0.157), which includes zero, and its gap excludes zero only at 24 to 120 h
-(0.081, 0.017 to 0.134). XGBoost is 0.255 points worse (0.019 to 0.557). `climatology` and
-`manual_heuristic` are 0.88 and 0.83 points worse, with intervals that exclude zero in every lead
-band. Solar rows are daylight half-hours at 12 to 251.5 h, so the 0 to 24 h band holds only the
-12 to 24 h part.
+all leads (-0.017 to 0.157), which includes zero, and its gap excludes zero only at 0 to 24 h
+(0.137, 0.003 to 0.315) and 24 to 120 h (0.081, 0.017 to 0.134). XGBoost is 0.255 points worse
+(0.019 to 0.557). `climatology` and `manual_heuristic` are 0.87 and 0.83 points worse, with
+intervals that exclude zero in every lead band. Solar rows are daylight half-hours at 12 to 251.5 h,
+so the 0 to 24 h band holds only the 12 to 24 h part.
 
 | Candidate | Score (points) | q05-q95 coverage | Above q99 |
 |---|---|---|---|
@@ -207,8 +212,9 @@ points) and highest in month 4 (4.3 points).*
 
 ![Solar score by hour of day](solar_score_by_hour.svg)
 
-*Daylight hours only. Every candidate scores worst around 11 to 12 UTC. `a2_member` has the lowest
-score at every hour except 5 to 8 and 19 UTC, where another candidate is lower.*
+*Daylight hours only. Every candidate scores worst around 11 to 12 UTC. The quarterly
+refit of `a2_member` has the lowest score at every hour from 9 to 18 UTC. The GAM is lower at 5 UTC,
+and the yearly refit is lower at 6 to 8 and 19 UTC.*
 
 ## Forecast examples
 
@@ -233,20 +239,21 @@ midday; the yearly refit is on top and the quarterly refit below. Lines break at
 
 ![Solar farm E, stretch with missing readings](solar_Solar_E_gap.svg)
 
-*Solar E over 14 days in June 2026, with 54 of 406 usual half-hours missing. (In the Solar A stretch of
-March 2026 in the folder, the observed power reads exactly zero for about 3 days while the forecast
-stays high: the farm was probably off.) The other 23 stretches are
-in the folder beside this page (`wind_*` and `solar_*` SVG files).*
+*Solar E over 14 days in June 2026, with 54 of 406 usual half-hours missing. The other 23 stretches are
+in the folder beside this page (`wind_*` and `solar_*` SVG files). In the Solar A stretch of March
+2026, the observed power reads exactly zero for about 3 days while the forecast stays high. The
+cause is not known.*
 
 ## Recommendation
 
 **Keep wind default 2 as the wind default, and `a2_member` as the solar default.** For wind, the
 refitted physics-plus-head forecast beats `climatology` clearly and wind default 1 modestly, and
 refitting twice a month improves on the single fit. The upper tail and the January and March
-coverage are the weak points to watch. For solar, `a2_member` has the lowest score in 3 of the 5
-months (the GAM is lower in 2026-03 and XGBoost ties it in 2025-12) and beats every reference over
-all leads, but its interval against the GAM includes zero. Yearly refits are as good as quarterly
-ones, so the cheaper yearly refit is enough. The maintainer decides; neither is adopted here.
+coverage are the weak points to watch. For solar, the quarterly refit of `a2_member` has the lowest
+score in 3 of the 5 months (the GAM is lower in 2026-03 and XGBoost in 2025-12) and beats every
+reference over all leads, but the `a2_member` interval against the GAM includes zero. No difference
+between yearly and quarterly refits was detectable above 0.033 points. The maintainer decides;
+neither is adopted here.
 
 ## What this experiment did not do
 
@@ -263,8 +270,9 @@ ones, so the cheaper yearly refit is enough. The maintainer decides; neither is 
 - **The wind head's early stopping** uses the 62 days before each refit date, and those rows contain
   short leads only for the last days, so the stopping loss favours short leads (as in experiment 347).
 - **Exact-zero rows** are few in these months, so the two score versions barely differ. The solar
-  score is 3.34 on all rows and 3.30 with exact zeros dropped. The prediction that dropping zeros
-  raises the score did not hold.
+  score is 3.34 on all rows and 3.30 with exact zeros dropped. Dropping zeros therefore
+  lowered the solar score slightly (better) and left the wind score unchanged, so the prediction
+  that the score would be larger did not hold.
 - **The wind threshold-weighted score** uses 80% of capacity as its threshold, and the solar
   very-sunny day rule is a proxy. Both are this experiment's choices.
 - **The refitted wind heads' weights were not stored**, because the reused training function returns
@@ -286,9 +294,13 @@ ones, so the cheaper yearly refit is enough. The maintainer decides; neither is 
 - **Compute.** 20 head fits at about 30 s each on the GPU, one process under 8 GB: about 0.2 GPU-h.
 - **Code:** `ml-experiments/00615-bakeoff-wind-and-solar-development-month-backtests/`. It imports
   the folders of experiments 230, 259, 303, 310, 326, 336, 347, 429, 461, and 588.
-- **Figure review:** pending.
+- **Figure review:** passed on 2026-11-07 after two rounds. The first round found faults that are
+  fixed in this page (identical coverage panels, calendar labels, lines bridged across gaps, empty-strip
+  legend entries). The second found no mismatch with the data. Orange marks a candidate in the
+  summary figures and the forecast in the time-series figures, as the maintainer's panel rule requires.
 
 ## What the next experiment should answer
 
-Whether a wider upper band for solar `a2_member` on very sunny days removes the 17% above q99
-without costing score elsewhere, and whether the same ranking holds on the final test.
+The open questions are whether a wider upper band for solar `a2_member` on very sunny days removes
+the 17% above q99 without worsening the score elsewhere, and whether the same ranking holds on the
+final test.
