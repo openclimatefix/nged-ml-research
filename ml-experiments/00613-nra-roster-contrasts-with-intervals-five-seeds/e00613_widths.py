@@ -41,7 +41,9 @@ def main() -> None:
         j.group_by("month")
         .agg(
             ((pl.col("width90") * pl.col("n_rows")).sum() / pl.col("n_rows").sum()).alias("k1"),
-            ((pl.col("width90_c") * pl.col("n_rows_c")).sum() / pl.col("n_rows_c").sum()).alias("c2"),
+            ((pl.col("width90_c") * pl.col("n_rows_c")).sum() / pl.col("n_rows_c").sum()).alias(
+                "c2"
+            ),
             pl.len().alias("n_cells"),
         )
         .with_columns(factor=pl.col("k1") / pl.col("c2"))
@@ -51,9 +53,7 @@ def main() -> None:
     out.select("month", "factor").write_csv(SCORE / f"c2_width_factors{SFX}.csv")
     assert out.height > 1
     f = dict(out.select("month", "factor").iter_rows())
-    loo = [
-        {"month": m, "factor": sum(v for k, v in f.items() if k != m) / (len(f) - 1)} for m in f
-    ]
+    loo = [{"month": m, "factor": sum(v for k, v in f.items() if k != m) / (len(f) - 1)} for m in f]
     pl.DataFrame(loo).write_csv(SCORE / f"c2_width_factors_loo{SFX}.csv")
 
 

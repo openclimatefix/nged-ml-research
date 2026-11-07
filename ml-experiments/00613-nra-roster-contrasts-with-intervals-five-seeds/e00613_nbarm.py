@@ -115,7 +115,8 @@ INPUTS = mymodel.InputSet(n_extra=N_EXTRA, bottleneck="BN" in MODS, label_head=A
 CHAIN = (
     Path(os.environ["CHAIN613"])
     if os.environ.get("CHAIN613")
-    else ML_EXPERIMENTS_DATA_DIR / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
+    else ML_EXPERIMENTS_DATA_DIR
+    / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
 )
 """A1's pre-training and step-2 weights: experiment 591's, or a folder named by `CHAIN613`, read only."""
 W574 = e.W

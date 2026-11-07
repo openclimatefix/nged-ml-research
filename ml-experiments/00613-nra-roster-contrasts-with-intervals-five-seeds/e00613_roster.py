@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, E501, PERF401
 """Experiment 613: the three families of roster contrasts, each with a Bonferroni interval (CPU).
 
 Families (every contrast is a paired difference over matched cells, resampled with experiment 612's
@@ -67,9 +67,13 @@ def run(*, family: str, specs: list[tuple], months: list[str] | None) -> pl.Data
     rows = []
     for label, kind, A, B, band, x, metric, tol, hib in specs:
         if kind == "bank":
-            rec = t.bank_contrast(a=A, b=B, band=band, phase=x, metric=metric, alpha=alpha, months=months)
+            rec = t.bank_contrast(
+                a=A, b=B, band=band, phase=x, metric=metric, alpha=alpha, months=months
+            )
         else:
-            rec = t.free_contrast(a=A, b=B, band=band, group=x, metric=metric, alpha=alpha, months=months)
+            rec = t.free_contrast(
+                a=A, b=B, band=band, group=x, metric=metric, alpha=alpha, months=months
+            )
         if rec is None:
             print("MISSING", family, label)
             continue
@@ -88,15 +92,21 @@ def absorption(*, a_arm: str, b_arm: str, sources: dict[str, tuple]) -> list[dic
     frames = []
     for arm, (path, name) in sources.items():
         f = pl.read_parquet(path)
-        frames.append((f if name is None else f.filter(pl.col("arm") == name)).with_columns(arm=pl.lit(arm)))
+        frames.append(
+            (f if name is None else f.filter(pl.col("arm") == name)).with_columns(arm=pl.lit(arm))
+        )
     d = s595.per_design(shares=pl.concat(frames, how="diagonal_relaxed"), value="total_q50")
     out = []
     for phase in ("day_4_to_end", "after_7_days"):
         x = d.filter((pl.col("refit_day") == 14) & (pl.col("phase") == phase))
-        j = x.filter(pl.col("arm") == a_arm).join(x.filter(pl.col("arm") == b_arm), on="case", suffix="_b")
+        j = x.filter(pl.col("arm") == a_arm).join(
+            x.filter(pl.col("arm") == b_arm), on="case", suffix="_b"
+        )
         if j.height < 2:
             continue
-        m, lo, hi = s595.interval(values=(j["total_q50"] - j["total_q50_b"]).to_numpy(), level=0.05 / 2)
+        m, lo, hi = s595.interval(
+            values=(j["total_q50"] - j["total_q50_b"]).to_numpy(), level=0.05 / 2
+        )
         out.append({"contrast": f"absorption {phase}: {a_arm} minus {b_arm}", "n_cells": j.height, "diff": m,
                     "lo": lo, "hi": hi, "mde": (hi - lo) / 2, "level_a": float(j["total_q50"].mean()),
                     "level_b": float(j["total_q50_b"].mean()), "tolerance": t.TOL["absorb"], "n_counted": 2,
@@ -110,18 +120,86 @@ def class2(*, cand_arm: str, label: str) -> pl.DataFrame:
     k1, k2 = (a("k1_d5"), "K1"), (a("k1_d5"), "K2")
     specs = []
     for phase in ("days4-end", "after0-7"):
-        specs.append((f"injected cover90 {phase}", "bank", cand, k1, "24-120 h", phase, "cover90", t.TOL["cover"], True))
-    specs.append(("injected follow_q50 days4-end", "bank", cand, k1, "24-120 h", "days4-end", "follow_q50", t.TOL["follow"], False))
-    specs.append(("injected safe-side share (NRA below q95/above q05) days4-end", "bank", cand, k1, "24-120 h", "days4-end", "nra_side95", SIDE_TOL, True))
+        specs.append(
+            (
+                f"injected cover90 {phase}",
+                "bank",
+                cand,
+                k1,
+                "24-120 h",
+                phase,
+                "cover90",
+                t.TOL["cover"],
+                True,
+            )
+        )
+    specs.append(
+        (
+            "injected follow_q50 days4-end",
+            "bank",
+            cand,
+            k1,
+            "24-120 h",
+            "days4-end",
+            "follow_q50",
+            t.TOL["follow"],
+            False,
+        )
+    )
+    specs.append(
+        (
+            "injected safe-side share (NRA below q95/above q05) days4-end",
+            "bank",
+            cand,
+            k1,
+            "24-120 h",
+            "days4-end",
+            "nra_side95",
+            SIDE_TOL,
+            True,
+        )
+    )
     for band in BANDS:
         for g in t.GROUPS:
-            specs.append((f"event-free cover90 {band} {grp(g)}", "free", cand, k1, band, g, "cover90", t.TOL["cover"], True))
-            specs.append((f"event-free CRPS {band} {grp(g)} (minus K2)", "free", cand, k2, band, g, "crps", t.TOL["crps"], False))
+            specs.append(
+                (
+                    f"event-free cover90 {band} {grp(g)}",
+                    "free",
+                    cand,
+                    k1,
+                    band,
+                    g,
+                    "cover90",
+                    t.TOL["cover"],
+                    True,
+                )
+            )
+            specs.append(
+                (
+                    f"event-free CRPS {band} {grp(g)} (minus K2)",
+                    "free",
+                    cand,
+                    k2,
+                    band,
+                    g,
+                    "crps",
+                    t.TOL["crps"],
+                    False,
+                )
+            )
     out = run(family=f"class2:{label}", specs=specs, months=None)
     if not SFX:
         ab = absorption(a_arm="c2", b_arm="E3", sources={"c2": (R612_C2, None), "E3": (R599, "E3")})
         if ab:
-            out = pl.concat([out, pl.DataFrame(ab, infer_schema_length=None).with_columns(family=pl.lit(f"class2:{label}"))], how="diagonal_relaxed")
+            out = pl.concat(
+                [
+                    out,
+                    pl.DataFrame(ab, infer_schema_length=None).with_columns(
+                        family=pl.lit(f"class2:{label}")
+                    ),
+                ],
+                how="diagonal_relaxed",
+            )
     return out
 
 
@@ -133,12 +211,60 @@ def o2() -> pl.DataFrame:
     for net, (A, B) in nets.items():
         for band in BANDS:
             for g in t.GROUPS:
-                specs.append((f"{net}: O2 minus D5, event-free cover90 {band} {grp(g)}", "free", A, B, band, g, "cover90", t.TOL["cover"], True))
-                specs.append((f"{net}: O2 minus D5, event-free CRPS {band} {grp(g)}", "free", A, B, band, g, "crps", t.TOL["crps"], False))
+                specs.append(
+                    (
+                        f"{net}: O2 minus D5, event-free cover90 {band} {grp(g)}",
+                        "free",
+                        A,
+                        B,
+                        band,
+                        g,
+                        "cover90",
+                        t.TOL["cover"],
+                        True,
+                    )
+                )
+                specs.append(
+                    (
+                        f"{net}: O2 minus D5, event-free CRPS {band} {grp(g)}",
+                        "free",
+                        A,
+                        B,
+                        band,
+                        g,
+                        "crps",
+                        t.TOL["crps"],
+                        False,
+                    )
+                )
         if net != "K3":
             for phase in ("days4-end", "after0-7"):
-                specs.append((f"{net}: O2 minus D5, injected cover90 {phase}", "bank", A, B, "24-120 h", phase, "cover90", t.TOL["cover"], True))
-            specs.append((f"{net}: O2 minus D5, injected follow_q50 days4-end", "bank", A, B, "24-120 h", "days4-end", "follow_q50", t.TOL["follow"], False))
+                specs.append(
+                    (
+                        f"{net}: O2 minus D5, injected cover90 {phase}",
+                        "bank",
+                        A,
+                        B,
+                        "24-120 h",
+                        phase,
+                        "cover90",
+                        t.TOL["cover"],
+                        True,
+                    )
+                )
+            specs.append(
+                (
+                    f"{net}: O2 minus D5, injected follow_q50 days4-end",
+                    "bank",
+                    A,
+                    B,
+                    "24-120 h",
+                    "days4-end",
+                    "follow_q50",
+                    t.TOL["follow"],
+                    False,
+                )
+            )
     return run(family="o2", specs=specs, months=TAIL)
 
 
@@ -147,23 +273,98 @@ def e3() -> pl.DataFrame:
     A2, B2 = (a("noe3_d5"), "K2"), (a("k1_d5"), "K2")
     specs = []
     for phase in ("days4-end", "after0-7"):
-        specs.append((f"3-day minus E3, injected cover90 {phase}", "bank", A1, B1, "24-120 h", phase, "cover90", t.TOL["cover"], True))
-    specs.append(("3-day minus E3, injected follow_q50 days4-end", "bank", A1, B1, "24-120 h", "days4-end", "follow_q50", t.TOL["follow"], False))
-    specs.append(("3-day minus E3, injected safe-side share days4-end", "bank", A1, B1, "24-120 h", "days4-end", "nra_side95", SIDE_TOL, True))
+        specs.append(
+            (
+                f"3-day minus E3, injected cover90 {phase}",
+                "bank",
+                A1,
+                B1,
+                "24-120 h",
+                phase,
+                "cover90",
+                t.TOL["cover"],
+                True,
+            )
+        )
+    specs.append(
+        (
+            "3-day minus E3, injected follow_q50 days4-end",
+            "bank",
+            A1,
+            B1,
+            "24-120 h",
+            "days4-end",
+            "follow_q50",
+            t.TOL["follow"],
+            False,
+        )
+    )
+    specs.append(
+        (
+            "3-day minus E3, injected safe-side share days4-end",
+            "bank",
+            A1,
+            B1,
+            "24-120 h",
+            "days4-end",
+            "nra_side95",
+            SIDE_TOL,
+            True,
+        )
+    )
     for band in BANDS:
         for g in t.GROUPS:
-            specs.append((f"3-day minus E3, event-free cover90 {band} {grp(g)}", "free", A2, B2, band, g, "cover90", t.TOL["cover"], True))
-            specs.append((f"3-day minus E3, event-free CRPS {band} {grp(g)}", "free", A2, B2, band, g, "crps", t.TOL["crps"], False))
+            specs.append(
+                (
+                    f"3-day minus E3, event-free cover90 {band} {grp(g)}",
+                    "free",
+                    A2,
+                    B2,
+                    band,
+                    g,
+                    "cover90",
+                    t.TOL["cover"],
+                    True,
+                )
+            )
+            specs.append(
+                (
+                    f"3-day minus E3, event-free CRPS {band} {grp(g)}",
+                    "free",
+                    A2,
+                    B2,
+                    band,
+                    g,
+                    "crps",
+                    t.TOL["crps"],
+                    False,
+                )
+            )
     out = run(family="e3", specs=specs, months=None)
     if not SFX:
         ab = absorption(a_arm="E0", b_arm="E3", sources={"E0": (R599, "E0"), "E3": (R599, "E3")})
         if ab:
-            out = pl.concat([out, pl.DataFrame(ab, infer_schema_length=None).with_columns(family=pl.lit("e3"))], how="diagonal_relaxed")
+            out = pl.concat(
+                [out, pl.DataFrame(ab, infer_schema_length=None).with_columns(family=pl.lit("e3"))],
+                how="diagonal_relaxed",
+            )
     return out
 
 
 def main() -> None:
-    cols = ["family", "contrast", "diff", "lo", "hi", "mde", "n_cells", "n_events", "verdict", "side", "n_counted"]
+    cols = [
+        "family",
+        "contrast",
+        "diff",
+        "lo",
+        "hi",
+        "mde",
+        "n_cells",
+        "n_events",
+        "verdict",
+        "side",
+        "n_counted",
+    ]
     for name, frame in (("class2", pl.concat([class2(cand_arm="c2_e3w", label="in-sample width"),
                                               class2(cand_arm="c2_e3wo", label="leave-month-out width")], how="diagonal_relaxed")),
                         ("o2", o2()), ("e3", e3())):  # fmt: skip

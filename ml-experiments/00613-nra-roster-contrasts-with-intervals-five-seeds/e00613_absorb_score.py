@@ -16,9 +16,7 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 KIND = sys.argv[1]
-OUT = (
-    ML_EXPERIMENTS_DATA_DIR / "00613-nra-roster-contrasts-with-intervals-five-seeds" / "absorb"
-)
+OUT = ML_EXPERIMENTS_DATA_DIR / "00613-nra-roster-contrasts-with-intervals-five-seeds" / "absorb"
 TAG = {"c2": "P5", "k3d5": "D5"}[KIND]
 
 

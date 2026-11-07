@@ -57,12 +57,12 @@ CHAIN_ENV = os.environ.get("CHAIN613")
 CHAIN = Path(CHAIN_ENV) if CHAIN_ENV else OUT / "chain" / "work"
 OWN_NETWORK = bool(MINE.drop) or MINE.offset != "d5"
 assert "00591" not in str(CHAIN.resolve()), "experiment 591's chain is read-only"
-assert not CHAIN_ENV or Path(CHAIN_ENV).parent.name.startswith("o2" if MINE.offset == "o2" else "d5")
+assert not CHAIN_ENV or Path(CHAIN_ENV).parent.name.startswith(
+    "o2" if MINE.offset == "o2" else "d5"
+)
 if CHAIN_ENV and not OWN_NETWORK:  # K1 with D5: stock network, own seeds 2-4 chain
     arm.CHAIN = CHAIN
-if (
-    OWN_NETWORK
-):  # a removed input, O2, or no offset needs its own pre-training and step-2 weights
+if OWN_NETWORK:  # a removed input, O2, or no offset needs its own pre-training and step-2 weights
     arm.CHAIN = CHAIN
     cls = {"o2": mymodel.O2Mdn, "none": mymodel.NoOffsetMdn}.get(MINE.offset, mymodel.DropMdn)
 

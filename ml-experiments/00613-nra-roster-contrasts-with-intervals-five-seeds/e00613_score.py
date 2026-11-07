@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, E402, D103, E501, PLR0915, PLR0912, ANN202
+# ruff: noqa: ANN001, E402, D103, E501, PLR0915, PLR0912, ANN202, S102
 """Experiment 613: score one network with and without tail constants, at three lead bands (CPU).
 
 For one fitted arm (`--arm NAME`, the folder `arms/NAME/work`), this scores four systems on the same
@@ -62,6 +62,8 @@ _p.add_argument(
 )
 MINE = _p.parse_args()
 
+import inspect
+
 import e00581_bank as bank  # ty: ignore[unresolved-import]
 import e00582_arms as a  # ty: ignore[unresolved-import]
 import e00582_score as sc  # ty: ignore[unresolved-import]
@@ -74,8 +76,6 @@ import e00597_common as k597  # ty: ignore[unresolved-import]
 import e00600_common as k600  # ty: ignore[unresolved-import]
 import e00601_bank as b601  # ty: ignore[unresolved-import]
 import e00601_common as k601  # ty: ignore[unresolved-import]
-import inspect
-
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -547,7 +547,9 @@ def lag_free_quantiles(*, t) -> np.ndarray:
     if MINE.lagfree_seeds:
         a.SEEDS = tuple(MINE.lagfree_seeds)
     try:
-        e = g.a._load(root=ROOT / "arms" / MINE.lagfree / "work", tag=MINE.lagfree_tag, months=MONTHS)
+        e = g.a._load(
+            root=ROOT / "arms" / MINE.lagfree / "work", tag=MINE.lagfree_tag, months=MONTHS
+        )
     finally:
         a.SEEDS = saved
     sm = c.k578.sites()

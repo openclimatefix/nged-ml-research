@@ -1,4 +1,4 @@
-# ruff: noqa: D103
+# ruff: noqa: D103, E501
 """Experiment 613: lay out the private data folder so seeds 0 and 1 (experiment 612) sit beside seeds 2 to 4 (CPU).
 
 For every arm, this creates `arms/NAME/work/{fits,inject}/...` in this experiment's folder and
@@ -43,10 +43,13 @@ def main() -> None:
             if src.exists():
                 n = link_tree(src=src, dst=NEW / "arms" / arm / "work" / sub)
                 print(f"{arm}/{sub}: {n} links")
-    n = link_tree(src=OLD / "arms" / "k3_d5" / "work" / "fits", dst=NEW / "arms" / "k3_d5b" / "work" / "fits")
+    n = link_tree(
+        src=OLD / "arms" / "k3_d5" / "work" / "fits", dst=NEW / "arms" / "k3_d5b" / "work" / "fits"
+    )
     print(f"k3_d5b/fits: {n} links (the D5 twin for the K3 comparison on seeds 0, 1, 5, 6, 7)")
     d591 = (
-        ML_EXPERIMENTS_DATA_DIR / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
+        ML_EXPERIMENTS_DATA_DIR
+        / "00591-shared-lag-encoder-auxiliary-shift-depth-loss/chain_shared/work"
     )
     for sub in ("pretrained_P2", "step2/P5"):
         n = link_tree(src=d591 / sub, dst=NEW / "chains" / "d5" / "work" / sub)
