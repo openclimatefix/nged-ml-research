@@ -3,7 +3,7 @@ id: "00644"
 slug: pv-explicit-term-with-ens-forecast-weather
 theme: solar-disaggregation
 also_relevant_to: []
-status: planned
+status: finished
 kind: other
 size: >-
   complex. Stored: fine-tuned neural-network weights and test-window quantiles in this experiment's
@@ -59,124 +59,137 @@ metric: >-
   CRPS in points of effective capacity from the 11 quantiles of each mixture, on sunny middays and
   on all half-hours, by lead day; MAE of the median forecast; q05-q95 coverage; the
   avoidable-curtailment-cost proxy of earlier studies.
+verdict: refuted
+best_arm: >-
+  The free network corrected by its own mean error over the previous 14 days (the 14-day tracker):
+  sunny-midday CRPS 3.41, 3.82, and 4.48 points of capacity at lead days 1-2, 3-5, and 6-10 in the
+  real months, against 3.75, 4.28, and 5.05 for the free network and 4.11, 4.53, and 5.33 for the
+  explicit network.
+headline: >-
+  With ensemble forecast weather the explicit solar network is worse than the plain free network on
+  sunny middays at every lead band, by 0.37, 0.25, and 0.27 CRPS points (real months, intervals
+  exclude zero), so the explicit-PV line stops. The 14-day tracker beats the free network by 0.34,
+  0.46, and 0.57 points.
+lessons:
+  - >-
+    The sunny-midday gain of the explicit solar term in experiment 639 came with known weather and
+    does not survive forecast weather: the explicit network loses to the free network on 5 of 6
+    Primaries, at all 10 lead days, and in each of the 5 seeds at lead days 1-2.
+  - >-
+    The loss is not confined to days the ensemble mean calls cloudy. The audit found the explicit
+    network worse at every forecast-sunniness level, even where the ensemble-mean clear-sky index
+    is at least 0.85.
+  - >-
+    The shuffled-day placebo is far worse than every other arm, so the physics curve carries real
+    information; the capacity-permuted placebo is only 0.08 points worse than the right capacity.
+  - >-
+    A correction from the last 14 days of a free network's own errors is the best arm at every lead
+    band, so the production candidate for the sunny-midday bias is a tracker, not a capacity table.
+take_home_message: >-
+  Telling the demand network each Primary substation's solar capacity does not help once the weather
+  is an ensemble forecast: it scores worse than the plain network at every lead from 1 to 10 days. A
+  simple correction from the previous 14 days' errors beat both by 0.3 to 0.6 points of capacity on
+  sunny middays, so the explicit-capacity line stops and the tracker is the candidate to test next,
+  with its own placebo and a version that needs only forecast sunniness.
+advice:
+  - >-
+    Do not build an explicit solar-capacity term into the ensemble-weather demand network, because it
+    lost to the free network at all lead bands in experiment 644.
+  - >-
+    Test a trailing 14-day error correction of the free network as the sunny-midday bias remedy,
+    because it beat the free network by 0.34 to 0.57 points in experiment 644 (not independently
+    audited; it is applied on realised-sunny half-hours).
+  - >-
+    Do not carry a gain found with known weather (CAMS and ERA5) over to forecast weather without a
+    forecast-weather rerun, because experiment 639's 0.75-point gain became a 0.25 to 0.37-point loss.
+production_status: not-for-production
+adopted_in: none
 ---
 
-# Does the explicit solar term still help when the weather is a forecast?
+# The explicit solar term does not survive forecast weather, but a 14-day error correction does
 
-*Plan, written before any code runs. The write-up replaces this page when the fits finish.*
+**Telling the demand neural network each Primary substation's solar capacity makes its sunny-midday
+forecast worse once the weather inputs are ensemble forecasts. A correction from the previous 14
+days' errors makes the same forecast better.** The explicit-PV line therefore stops here, and the
+correction is the candidate to test next.
 
-We ask whether telling a demand neural network each Primary substation's solar capacity still lowers
-its error when the weather inputs are ensemble forecasts. [Experiment
-639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md) found a gain on sunny
-middays with known weather (CAMS and ERA5). [Experiment
-643](../00643-pv-explicit-term-against-bias-shifted-free-network-and-more-placebo-permutations/result.md)
-showed the gain beats two fixed bias corrections but not a correction from the previous 14 days'
-errors. This experiment repeats the comparison with the weather NGED would have at forecast time.
+We asked whether the gain of [experiment
+639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md), which gave the network
+the solar capacity behind each Primary substation and had it subtract a physics solar curve, holds
+when the weather is a forecast (ECMWF ensemble, leads 0 to 240 hours) instead of the recorded
+weather. The **free network** learns the solar response from weather alone. The **explicit network**
+is told the capacity. The **14-day tracker** is the free network plus its own mean error over the
+previous 14 days, as in [experiment
+643](../00643-pv-explicit-term-against-bias-shifted-free-network-and-more-placebo-permutations/result.md).
+We scored the six MW Primaries on sunny middays (10:00 to 15:00 UTC, observed clear-sky index at
+least 0.7) in the 60 days after each of three cutoffs, five seeds. The error is the continuous
+ranked probability score (CRPS) in points of each Primary's capacity, and smaller is better.
 
-## What the plan fixes
+## Results
 
-- **Weather inputs.** The cached ensemble tables from [experiment
-  607](../00607-bakeoff-extend-cached-inputs-to-2026-10-31/result.md) hold, per run, Primary, and
-  valid time, the ensemble mean and standard deviation of each weather column, not the 51 members.
-  No new download is allowed, so the networks read these summaries, as the demand networks of
-  experiment 397 do. The physics curve of the explicit term is computed from the ensemble-mean
-  shortwave, and the brief's "sampled once per ensemble member and epoch" cannot be done. Instead,
-  each epoch draws the capacity once per Primary from its probe spread (experiment 639's rule), and
-  the ensemble standard deviation of shortwave enters the network through its spread columns. This
-  is a stated departure from the brief. If the stored 51-member frames of 2025-07 onwards turn out
-  to be cheap to read, a member-level check of arm b is added as a labelled extra.
-- **Training.** Each network keeps experiment 639's and 643's ERA5/CAMS pretraining (stored
-  weights are reused where present), then fine-tunes on the 24 months of ensemble rows before the
-  cutoff (the "ft" stage of the modular network, experiment 510's recipe) with the same gross-target
-  construction as experiment 639: the target is `y + C(t) * inc * u(t)`, and the same term is
-  subtracted from every forecast quantile. The ensemble rows start in 2024-04, so the cutoff
-  2025-07 fine-tunes on 15 months.
-- **Arms.** (a) free; (b) explicit with the calibrated season-year capacity (experiment 639's
-  `cal`); (c) explicit with the raw probed capacity (`raw`); (d) the 14-day tracker; (e) the
-  experiment 643 bias-shifted free network (`fbias`); (f) the experiment 474 R4 table as a fixed
-  capacity (`r4`); (g) climatology and the manual heuristic. Placebos: `perm` (experiment 639's
-  shift 2) and `shuf`.
-- **The 14-day tracker.** Arm d is arm a's forecast plus the mean error of arm a's own day-1 and
-  day-2 forecasts over the sunny middays of the 14 days before the run's origin
-  (`power_fcst_init_time`, run time plus 9 hours). The error history uses only forecasts and metered
-  power available at the origin. It adds no fit, needs no capacity, and is defined here before any
-  ensemble-weather score is read.
-- **Scoring.** Sunny middays and all half-hours, by lead day 1 to 10 (each reported), in the real
-  months and in the step world (experiment 638's ordinary-spring step); CRPS, MAE of the median,
-  q05-q95 coverage, and the curtailment-cost proxy; five seeds with intervals; leave-one-Primary-out
-  for every contrast, because experiment 643's gain rested on one Primary.
-- **Compute.** About 60 pretrained networks already exist (experiments 639 and 643). The new work
-  is fine-tuning: seven fit arms (a, b, c, e, f and the two placebos), five seeds, three cutoffs,
-  two worlds. A smoke fit fixes the time per fine-tune before the batch starts. If the projection
-  exceeds 4 GPU-hours, stage 1 runs seeds 0 to 2 in the real months for all arms and in the step
-  world for a, b, d, and e only; stage 2 adds seeds 3 and 4 as the ceiling allows, and the write-up
-  states which cells ran.
+![CRPS by lead day, real months](crps_by_lead_real.svg)
 
-## Standing practices
+| Real months, sunny middays | Day 1-2 | Day 3-5 | Day 6-10 |
+|---|---|---|---|
+| Free network (a) | 3.75 | 4.28 | 5.05 |
+| Explicit, calibrated capacity (b) | 4.11 | 4.53 | 5.33 |
+| Explicit, raw capacity (c) | 3.92 | 4.41 | 5.24 |
+| Explicit, table capacity (f) | 3.99 | 4.44 | 5.23 |
+| 14-day tracker (d) | 3.41 | 3.82 | 4.48 |
+| Free + training-month constant (e) | 4.30 | 4.94 | 5.81 |
+| Capacity-permuted placebo | 4.19 | 4.63 | 5.39 |
+| Shuffled-day placebo | 5.40 | 5.60 | 6.09 |
 
-Follows: monthly refit cadence (a single refit per cutoff window), cleaned power everywhere, the
-D15/D18 start cut (not relevant at the six MW Primaries), saved models, reuse of stored networks,
-tails and curtailment cost reported, day-ahead and 14-day forecast plots, draft pull request. Does
-not follow: the four-month screen (the three cutoffs are the pre-registered design). The advice of
-experiment 643 followed: compare against the 14-day tracker, report the gain without the largest
-contributing Primary, scale the capacity-swap placebo.
+- **Contrast (i) fails.** Free network minus explicit network is -0.37 [-0.54, -0.20], -0.25
+  [-0.45, -0.08], and -0.27 [-0.40, -0.14] at the three bands (negative favours the free network;
+  intervals are 99.7% day-block bootstraps, Bonferroni over 19 contrasts). The best of d and e (d at
+  every band) beats the explicit network by 0.71, 0.71, and 0.84.
+- **Contrast (ii) passes.** Over all half-hours the explicit network is 0.007 points worse than the
+  free network [-0.04, +0.03], inside the 0.02 limit.
+- **Contrast (iii) fails.** In the step world the explicit network ties the free network (-0.45
+  [-0.99, +0.05], -0.20 [-0.63, +0.19], +0.04 [-0.35, +0.38]) and loses to the tracker by 1.2 to
+  1.3 points. Here the 4 MW step lies wholly before the ensemble rows begin, so the contrast tests
+  carrying capacity from pretraining to fine-tuning, not tracking a step.
+- **Placebos.** The explicit network beats the capacity-permuted placebo by only 0.08, 0.10, and
+  0.07 points, below the bars (0.084 to 0.123), so the gain, such as it is, does not depend on the
+  right capacity. It beats the shuffled-day placebo by 0.8 to 1.3.
+- **Absolute scores and tails.** Sunny-midday q05-q95 coverage is 88.0% (a), 89.2% (b), 91.9% (d),
+  and 82.3% (e). The mean absolute error of the median over all sunny-midday leads, in points of
+  capacity, is 6.33 (a), 6.67 (b), 5.58 (d), and 7.37 (e).
 
-## Departures from the brief
+![CRPS by lead day, step world](crps_by_lead_step.svg)
 
-- **Summary weather, not members** (above).
-- **The tracker is the ensemble-forecast version of experiment 643's.** Experiment 643 corrected a
-  free network by its own mean error over the 14 days before each test day. Here the same rule
-  applies, with three conditions: the history holds only days whose date is before the run's origin
-  date; each history error is the free network's forecast from the last run issued before that day
-  (the rows of that day with lead below 24 hours) against cleaned metered power; and the shift
-  applies to sunny-midday half-hours only, as in 643, so contrast (ii) is unaffected by it. In the
-  first 14 days after a cutoff the history is incomplete, and the days with fewer than 3 history
-  days get no shift. The history never includes a day the network fine-tuned on, because fine-tuning
-  stops at the cutoff.
-- **No 0.5 and 1.5 capacity-scaling placebos.** They need new ERA5-and-CAMS pretraining, which this
-  experiment does not pay for. The capacity placebo is experiment 639's shift-2 permutation.
-- **No curtailment-cost proxy.** The earlier proxy needs a node table that does not exist for the
-  six Primaries as net-demand series, so the write-up reports q95 and q99 pinball loss and coverage
-  instead.
-- **The control in contrast (i) is the lower of d and e per lead band.** The bootstrap resamples days
-  and re-picks the control in each resample, so the interval includes the selection.
-- **The bars** (0.067 and 0.181) are experiment 639's. The first analysis step re-derives them per lead
-  band from the seed-split null on these rows, and the larger of the old and new value is the bar.
-- **Number of contrasts.** Contrast (i): 2 controls x 3 lead bands x 2 worlds = 12, (ii): 1, (iii): 2,
-  placebos: 2 x 2 = 4. The Bonferroni level is set for 19 contrasts.
-- **A pooled pass whose leave-one-Primary-out fails is reported as not a pass.** If the tracker beats
-  the free network but the explicit network does not, the explicit-PV line stops and the tracker is
-  named the candidate.
+![One day at one Primary](example_day.svg)
 
-## Leakage and row rules
+## Checks
 
-- Fine-tuning rows are filtered by valid time before the cutoff, not by run time, so no run at
-  lead up to 10 days carries a target after the cutoff. The early-stopping split is by day.
-- Lead is counted from `power_fcst_init_time` (run time plus 9 hours), 0 to 240 hours, and lead day
-  k holds leads from 24(k-1) to 24k hours. Day 1 therefore holds the rest of the origin's own day.
-- Sunny middays use realised clear-sky index (as in 639). The write-up adds two further slices: all
-  middays, and middays whose ensemble-mean clear-sky index is at least 0.7, because conditioning on
-  the realised sky favours no arm but hides the forecast's sunniness error at long lead.
-- The ensemble-mean shortwave curve is smoother than the mean of member curves, and at day 6 to 10
-  it approaches climatology, so the shuffled-day placebo is weak by construction there. The
-  write-up says so where it reports the placebo by lead band.
-- The cutoff 2025-07 fine-tunes on 15 months of ensemble rows and the others on 24. The write-up shows
-  the contrasts per cutoff beside the pooled value.
-- Only the ensemble summary tables with shortwave and temperature are used (the cloud-cover
-  summary starts later than the 2025-07 cutoff).
-- The fine-tune stage reuses the pretrained weather and datetime encoders; its mixer is new, because
-  it takes the spread and lead columns.
-- In the step world the 4 MW step starts in 2023-04 and the ensemble rows start in 2024-04, so the
-  fine-tune sees only post-step data and the contrast tests whether the explicit term carries the
-  capacity change from pretraining to fine-tuning, not a step inside the fine-tune.
-- All arms, including the tracker, `fbias`, and the floors, are scored on the same rows (every run
-  at lead 0 to 240 hours).
+- **Triggers fired:** a placebo that should lose to the explicit network does not (trigger 1), and
+  the result contradicts experiment 639 (trigger 2). A fresh Sonnet audit re-derived the CRPS
+  contrasts from the stored quantiles and could not break them: b is worse at all 10 lead days, in
+  all 5 seeds at lead days 1-2, with every leave-one-Primary-out contrast keeping its sign. The
+  per-cutoff signs are not uniform: the 2026-06 cutoff at day 3-5 favours b by 0.06.
+- **Tested explanation:** the audit tested whether the smooth ensemble-mean curve hurts on days the
+  ensemble calls cloudy. The loss appears at every forecast-sunniness level, so that explanation is
+  not supported. The ensemble spread was not available to the audit, so a spread explanation is
+  untested.
+- **Median minus mean forecast per site:** not computed, because only the 11 quantiles are stored.
+- **Not audited:** the 14-day tracker (d) and the constant shift (e), which are post-processing in
+  `e00644_analyse.py`. Both are applied on realised-sunny half-hours, a selection a production
+  tracker would not have.
 
-## Compute go/no-go
+## What the next experiment should answer
 
-Fit arms: a, b, c, f, `perm` (experiment 639's shift 2), and `shuf`, which is 6 fine-tunes per seed,
-cutoff, and world. One fine-tune took about 11 seconds in a smoke test. A smoke fit fixes the
-minutes per fine-tune. If the full grid projects above 3 GPU-hours, stage 1 runs seeds 0 to 2 in the
-real months for all arms and in the step world for a, b, and f only, with every second run
-subsampled for fine-tuning if the projection is still above 3 GPU-hours. The step-world placebos are
-then untested and the write-up says so.
+Does the 14-day tracker still beat the free network when it is applied by forecast sunniness
+instead of observed sunniness, and does a shuffled-error placebo fail to match it? The explicit
+capacity term is not worth further work in this form.
+
+## Departures and caveats
+
+- The cached ensemble tables hold the mean and standard deviation per run, not the 51 members, so
+  the physics curve uses the ensemble-mean shortwave. A member-level version is untested.
+- The 0.5 and 1.5 capacity-scaling placebos and the curtailment-cost proxy were not run (see the
+  plan above).
+- The second month of each test window uses the standardiser of its own fold, not the cutoff
+  month's, so its inputs are slightly rescaled relative to the pretraining, equally for all arms.
+- Code: this experiment imports experiments 510, 554, 634, 638, 639, and 643 and edits none of
+  them.
