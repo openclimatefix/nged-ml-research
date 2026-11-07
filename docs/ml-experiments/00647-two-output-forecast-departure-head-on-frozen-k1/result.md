@@ -76,14 +76,16 @@ that design's first test, on K1's stored forecasts. It follows
 [experiment 590](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00590-synthetic-load-shifts-in-the-training-targets/result/),
 which found that training one network on shifted targets doubles how far its median follows a shift.
 
-**The NRA output is K1, frozen and unchanged.** On real rows it is the stored export of
-experiments 612 and 613 (the mean of five seeds, with the tail constants and the G4 gated band). On
-the injected bank the stored files are raw per-seed forecasts, so the script rebuilds K1 from them
-with experiment 613's scoring path (seed mean, tail constants, G4 state) and first asserts that the
-rebuild reproduces experiment 613's K1 score tables. Tail constants for 2025-10 are borrowed from
-later months, as in experiment 613. The head code has no path that writes to the NRA rows, and the
-scoring script asserts the NRA columns are identical before and after the head runs. N1 and N2
-are therefore reported, not tested.
+**The NRA output is K1, frozen and unchanged.** On real rows it is the stored export of experiments
+612 and 613 (the mean of five seeds, with the G4 gated band, and no tail constants). On the injected
+bank the stored files are raw per-seed forecasts, so the script rebuilds K1 from them with
+experiment 613's scoring path (seed mean, G4 state) and first asserts that the rebuild reproduces
+experiment 613's K1 score tables. The stored export applies no tail constants, so K1 with tail
+constants (K1+t) exists only in experiment 613's scoring path, and for 2025-10 experiment 613 has no
+K1+t, so K1+t equals K1 there. The NRA output is the stored export's K1 (no tail constants) on real
+rows and 613's seed mean on the injected bank. The head code has no path that writes to the NRA
+rows, and the scoring script asserts the NRA columns are identical before and after the head runs.
+N1 and N2 are therefore reported, not tested.
 
 ## Arms
 
@@ -202,11 +204,17 @@ tolerance for one d0 and one d14 model. One fold of each arm is timed before the
   7 day half-life needs) are dropped from every arm equally, and the counts are reported. If the
   lag-free table is missing days before a month's first origin, K1 inference fills them, with one
   fold timed first and the 2 GPU-hour ceiling kept.
-- **R0 specification.** The first step writes R0 as code and asserts that, on the stored
-  non-injected export, it reproduces the design answer's table (event-free all-16 Primaries 3.752
-  for K1, 3.637 for tau 72 h, 3.577 for tau 168 h; verified rows 14.93, 13.42, 12.79) within 0.01.
-  Observed power for R0 on the injected bank carries the same shift as the lags, with the same
-  staleness (at least 33 hours). Tau is the design answer's pair of values, and both are reported.
+- **R0 specification.** R0 is written as code (`e00647_r0.py`). On the stored non-injected export
+  it reproduces the design answer's event-free numbers (K1 3.752; R0 3.637 at tau 72 h and 3.581
+  against 3.577 at tau 168 h). It does not reproduce the design answer's verified-pair numbers:
+  the script gives 13.77 and 13.35 against 13.42 and 12.79, and the design answer's script was
+  not kept. The experiment therefore reports its own R0 as the baseline, lists the design answer's
+  verified figures as unaudited and unreproduced, and adds a second baseline R0* (the variant
+  among those tried that matches the design answer's verified figure at 72 h). A head counts as
+  beating R0 only when it beats both. Observed power for R0 on the injected bank carries the same
+  shift as the lags, with the same staleness (at least 33 hours). Tau takes the values 72 h and
+  168 h, and both are reported. The 68,384 of 814,538 event-free rows whose origin has no residual
+  get no shift (R0 equals K1 there).
 - **No calendar or date input enters either head.** The age of the current departure is the only
   duration signal. Because every injected shift ends on day 14, an extra control gives the head
   the age shuffled across rows. P2 and P3 are reported per injected length (3, 7, 15, and 30
