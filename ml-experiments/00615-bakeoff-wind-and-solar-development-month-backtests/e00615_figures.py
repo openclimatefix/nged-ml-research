@@ -251,7 +251,11 @@ def summary_figures(*, outdir: Path) -> None:
         df = pl.DataFrame(rows)
         order = [*sc.LEAD_BANDS, "all leads"]
         cands_main = [c for c in cands if "stored_tuesdays" not in c]
-        colour_main = alt.Color("candidate:N", scale=alt.Scale(domain=cands_main, range=[COLOURS[c] for c in cands_main]), legend=alt.Legend(orient="bottom", columns=2, title="Candidate"))
+        colour_main = alt.Color(
+            "candidate:N",
+            scale=alt.Scale(domain=cands_main, range=[COLOURS[c] for c in cands_main]),
+            legend=alt.Legend(orient="bottom", columns=2, title="Candidate"),
+        )
         colour = alt.Color(
             "candidate:N",
             scale=alt.Scale(domain=cands, range=[COLOURS[c] for c in cands]),
@@ -360,35 +364,89 @@ def summary_figures(*, outdir: Path) -> None:
         o = sc.table(frame=frame.with_columns(all=pl.lit("all")), by=["all"]).filter(
             ~pl.col("candidate").str.contains("stored_tuesdays")
         )
-        cov = alt.Chart(o).mark_point(size=110, filled=True, aria=False).encode(
-            x=alt.X("covered:Q", title="Share of observations inside q05 to q95", scale=alt.Scale(domain=[0.75, 1.0])),
-            y=alt.Y("candidate:N", sort=cands_main, title=None),
-            color=colour_main,
+        cov = (
+            alt.Chart(o)
+            .mark_point(size=110, filled=True, aria=False)
+            .encode(
+                x=alt.X(
+                    "covered:Q",
+                    title="Share of observations inside q05 to q95",
+                    scale=alt.Scale(domain=[0.75, 1.0]),
+                ),
+                y=alt.Y("candidate:N", sort=cands_main, title=None),
+                color=colour_main,
+            )
         )
-        rule = alt.Chart(pl.DataFrame({"t": [0.9]})).mark_rule(color="#444444", strokeDash=[4, 3], aria=False).encode(x="t:Q")
+        rule = (
+            alt.Chart(pl.DataFrame({"t": [0.9]}))
+            .mark_rule(color="#444444", strokeDash=[4, 3], aria=False)
+            .encode(x="t:Q")
+        )
         chart = (
             alt.layer(cov, rule)
-            .properties(width=560, height=300, title=alt.TitleParams([f"{tech.capitalize()}: q05-q95 coverage, development months", "Dashed line: the 0.90 target"], fontSize=12, anchor="start"))
+            .properties(
+                width=560,
+                height=300,
+                title=alt.TitleParams(
+                    [
+                        f"{tech.capitalize()}: q05-q95 coverage, development months",
+                        "Dashed line: the 0.90 target",
+                    ],
+                    fontSize=12,
+                    anchor="start",
+                ),
+            )
             .configure_view(stroke=None)
         )
         chart.save(str(outdir / f"{tech}_coverage.svg"))
         chart.save(str(outdir / f"{tech}_coverage.png"), scale_factor=2)
         long = pl.concat(
             [
-                o.select("candidate", pl.lit("above q99").alias("measure"), pl.col("above99").alias("value")),
-                o.select("candidate", pl.lit("below q01").alias("measure"), pl.col("below01").alias("value")),
+                o.select(
+                    "candidate",
+                    pl.lit("above q99").alias("measure"),
+                    pl.col("above99").alias("value"),
+                ),
+                o.select(
+                    "candidate",
+                    pl.lit("below q01").alias("measure"),
+                    pl.col("below01").alias("value"),
+                ),
             ]
         )
-        tails = alt.Chart(long).mark_point(size=110, filled=True, aria=False).encode(
-            x=alt.X("value:Q", title="Share of observations"),
-            y=alt.Y("candidate:N", sort=cands_main, title=None),
-            color=colour_main,
-            shape=alt.Shape("measure:N", scale=alt.Scale(domain=["above q99", "below q01"], range=["circle", "diamond"]), legend=alt.Legend(orient="bottom", title="Share")),
+        tails = (
+            alt.Chart(long)
+            .mark_point(size=110, filled=True, aria=False)
+            .encode(
+                x=alt.X("value:Q", title="Share of observations"),
+                y=alt.Y("candidate:N", sort=cands_main, title=None),
+                color=colour_main,
+                shape=alt.Shape(
+                    "measure:N",
+                    scale=alt.Scale(domain=["above q99", "below q01"], range=["circle", "diamond"]),
+                    legend=alt.Legend(orient="bottom", title="Share"),
+                ),
+            )
         )
-        rule = alt.Chart(pl.DataFrame({"t": [0.01]})).mark_rule(color="#444444", strokeDash=[4, 3], aria=False).encode(x="t:Q")
+        rule = (
+            alt.Chart(pl.DataFrame({"t": [0.01]}))
+            .mark_rule(color="#444444", strokeDash=[4, 3], aria=False)
+            .encode(x="t:Q")
+        )
         chart = (
             alt.layer(tails, rule)
-            .properties(width=560, height=300, title=alt.TitleParams([f"{tech.capitalize()}: tail shares, development months", "Dashed line: the 0.01 target for both"], fontSize=12, anchor="start"))
+            .properties(
+                width=560,
+                height=300,
+                title=alt.TitleParams(
+                    [
+                        f"{tech.capitalize()}: tail shares, development months",
+                        "Dashed line: the 0.01 target for both",
+                    ],
+                    fontSize=12,
+                    anchor="start",
+                ),
+            )
             .configure_view(stroke=None)
         )
         chart.save(str(outdir / f"{tech}_tails.svg"))
