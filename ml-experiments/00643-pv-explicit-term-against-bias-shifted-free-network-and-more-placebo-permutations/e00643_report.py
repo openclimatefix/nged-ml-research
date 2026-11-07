@@ -7,6 +7,7 @@ Usage: python e00643_report.py
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import altair as alt
 import e00639_analyse as a639  # ty: ignore[unresolved-import]
@@ -55,17 +56,17 @@ def contrasts_figure(results: list[dict]) -> None:
             y=alt.Y("arm:N", sort=order, title=None, axis=alt.Axis(labelLimit=320)),
             color=alt.Color("arm:N", scale=alt.Scale(domain=order, range=[COLOURS[a] for a in NAMES]), legend=None),
         )  # fmt: skip
-        pts = base.mark_point(filled=True, size=70).encode(
+        pts = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "diff:Q",
                 title="Free arm's CRPS minus the explicit network's (points; right favours the explicit network)",
             )
         )
-        bars = base.mark_rule(strokeWidth=2).encode(x="lo:Q", x2="hi:Q")
+        bars = base.mark_rule(strokeWidth=2).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
         zero = (
             alt.Chart(pl.DataFrame({"x": [0.0]}))
             .mark_rule(color="#999999", strokeDash=[4, 3])
-            .encode(x="x:Q")
+            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         )
         panels.append(alt.layer(zero, bars, pts).properties(width=W, height=120, title=world))
     chart = alt.vconcat(*panels).resolve_scale(x="independent")
@@ -82,18 +83,18 @@ def placebo_figure(results: list[dict]) -> None:
     df = pl.DataFrame(recs)
     order = [f"Shift {s}" for s in k.SHIFTS] + ["Mean of 5"]
     base = alt.Chart(df).encode(y=alt.Y("label:N", sort=order, title=None))
-    pts = base.mark_point(filled=True, size=70, color="#B701FF").encode(
+    pts = base.mark_point(filled=True, size=70, color="#B701FF").encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "diff:Q", title="Placebo CRPS minus explicit CRPS (points; step world, sunny middays)"
         )
     )
-    bars = base.mark_rule(strokeWidth=2, color="#B701FF").encode(x="lo:Q", x2="hi:Q")
+    bars = base.mark_rule(strokeWidth=2, color="#B701FF").encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}))
         .mark_rule(color="#999999", strokeDash=[4, 3])
-        .encode(x="x:Q")
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
-    bar = alt.Chart(pl.DataFrame({"x": [k.MDE["step"]]})).mark_rule(color="#FF4901").encode(x="x:Q")
+    bar = alt.Chart(pl.DataFrame({"x": [k.MDE["step"]]})).mark_rule(color="#FF4901").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     save(alt.layer(zero, bar, bars, pts).properties(width=W, height=170), "placebo_permutations")
 
 
@@ -160,7 +161,7 @@ def print_checks() -> None:
             )
 
 
-def json_load(path: Path) -> dict:
+def json_load(path: Path) -> Any:
     """Read a JSON file."""
     return json.loads(path.read_text())
 

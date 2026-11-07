@@ -173,15 +173,15 @@ def main() -> None:
             print(
                 r["world"],
                 "absolute sunny CRPS:",
-                {a: round(v, 3) for a, v in r["absolute"].items()},
+                {a: round(v, 3) for a, v in r["absolute"].items()},  # ty: ignore[unresolved-attribute]
             )
             continue
-        bar = k.MDE[r["world"]]
+        bar = k.MDE[r["world"]]  # ty: ignore[invalid-argument-type]
         decides = r["subset"] == "sunny" and (
             (r["world"] == "real" and r["arm"] in {"fbias", "foff"})
             or (r["world"] == "step" and r["arm"] == "perm_mean")
         )
-        decision = f"gain-by-rule={r['lo'] > 0 and r['diff'] >= bar}" if decides else ""
+        decision = f"gain-by-rule={r['lo'] > 0 and r['diff'] >= bar}" if decides else ""  # ty: ignore[unsupported-operator]
         print(
             f"{r['world']:5s} {r['arm']:10s} minus cal {r['subset']:5s} n={r['n_rows']:6d} {r['diff']:+.4f} "
             f"[{r['lo']:+.4f}, {r['hi']:+.4f}] seed sd {r['per_seed_sd']:.4f}  {decision}"
