@@ -95,6 +95,7 @@ def bank_cells(
         "sign",
         "cover90",
         "follow_q50",
+        "nra_side95",
         "width90",
         "crps",
     )
