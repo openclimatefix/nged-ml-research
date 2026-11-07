@@ -66,14 +66,14 @@ def line_panel(
     x = alt.X("cutoff_label:N", sort=ORDER, title=None, axis=alt.Axis(labelAngle=0))
     base = alt.Chart(d).encode(x=x, color=colour)
     layers = [
-        base.mark_rule().encode(
+        base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("lo:Q", scale=alt.Scale(domain=domain), title=y_title), y2="hi:Q"
         ),  # ty: ignore[unresolved-attribute]
         base.mark_line(point=alt.OverlayMarkDef(filled=True, size=70)).encode(y="med:Q"),  # ty: ignore[unresolved-attribute]
     ]
     if rule is not None:
         layers.append(
-            alt.Chart(pl.DataFrame({"y": [rule]}))
+            alt.Chart(pl.DataFrame({"y": [rule]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#444444", strokeDash=[5, 3], strokeWidth=1.5)
             .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=domain)))
         )
@@ -88,7 +88,7 @@ def line_panel(
             )
             .encode(x=x, y=alt.Y("share:Q", scale=alt.Scale(domain=domain)))  # ty: ignore[unresolved-attribute]
         )
-    return alt.layer(*layers).properties(
+    return alt.layer(*layers).properties(  # ty: ignore[invalid-return-type]
         width=W, height=190, title=alt.TitleParams(title, anchor="start", fontSize=12)
     )
 
@@ -204,7 +204,7 @@ def fig_energy(rec: pl.DataFrame) -> None:
             ),
         ),
     )
-    dots = base.mark_point(filled=True, size=70).encode(
+    dots = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "v:Q",
             scale=alt.Scale(domain=[0.5, 1.1]),
@@ -212,7 +212,7 @@ def fig_energy(rec: pl.DataFrame) -> None:
         )
     )  # ty: ignore[unresolved-attribute]
     ref = (
-        alt.Chart(pl.DataFrame({"x": [1.0]}))
+        alt.Chart(pl.DataFrame({"x": [1.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#444444", strokeDash=[4, 3])
         .encode(x=alt.X("x:Q", scale=alt.Scale(domain=[0.5, 1.1])))
     )

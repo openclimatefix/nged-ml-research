@@ -128,7 +128,7 @@ def main() -> None:
         recovery_energy_rows=pl.col("delta_mw") / pl.col("mw") / pl.col("ratio_rows"),
         recovery_energy_donors=pl.col("delta_mw") / pl.col("mw") / pl.col("ratio_donors"),
     )
-    assert (rec["recovery_mw"] - rec["recovery"]).abs().max() < 1e-6, (
+    assert (rec["recovery_mw"] - rec["recovery"]).abs().max() < 1e-6, (  # ty: ignore[unsupported-operator]
         "recovery column is not delta_mw / mw"
     )
     rec = rec.filter(

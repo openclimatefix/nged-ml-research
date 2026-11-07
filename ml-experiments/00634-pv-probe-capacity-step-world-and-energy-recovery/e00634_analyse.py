@@ -105,7 +105,7 @@ def main() -> None:  # noqa: PLR0915
         for farm in k.FARMS:
             held = sub.filter(pl.col("farm") != farm)
             factors.append(
-                {"cutoff": cutoff, "farm": farm, "factor": float(held["recovery"].median())}
+                {"cutoff": cutoff, "farm": farm, "factor": float(held["recovery"].median())}  # ty: ignore[invalid-argument-type]
             )
     fac = pl.DataFrame(factors)
     spread = fac.group_by("cutoff").agg(
@@ -214,7 +214,7 @@ def main() -> None:  # noqa: PLR0915
     det = rec.filter((pl.col("cutoff") == "2025-07") & pl.col("condition").str.contains("summer"))
     print(
         "\nDETERMINISM (summer-step networks at 2025-07 train on the control's rows): max |raw delta| MW =",
-        float(det["delta_mw"].abs().max()),
+        float(det["delta_mw"].abs().max()),  # ty: ignore[invalid-argument-type]
     )
 
     # seed noise floor
@@ -244,7 +244,7 @@ def main() -> None:  # noqa: PLR0915
         sub = sub.with_columns(
             covered=((pl.col("recovery_cal") - pl.col("truth")).abs() <= pl.col("half_cal"))
         )
-        cov[name] = float(sub["covered"].mean())
+        cov[name] = float(sub["covered"].mean())  # ty: ignore[invalid-argument-type]
         by = sub.group_by("cutoff").agg(cov=pl.col("covered").mean()).sort("cutoff")
         print(name, f"{cov[name]:.2f}", dict(zip(by["cutoff"], by["cov"].round(2), strict=True)))
     (k.WORK / f"summary{tag}.json").write_text(
