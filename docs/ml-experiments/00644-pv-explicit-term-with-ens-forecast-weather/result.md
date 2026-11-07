@@ -94,8 +94,8 @@ errors. This experiment repeats the comparison with the weather NGED would have 
 - **Arms.** (a) free; (b) explicit with the calibrated season-year capacity (experiment 639's
   `cal`); (c) explicit with the raw probed capacity (`raw`); (d) the 14-day tracker; (e) the
   experiment 643 bias-shifted free network (`fbias`); (f) the experiment 474 R4 table as a fixed
-  capacity (`r4`); (g) climatology and the manual heuristic. Placebos: `perm` (plus the 0.5 and
-  1.5 scalings) and `shuf`.
+  capacity (`r4`); (g) climatology and the manual heuristic. Placebos: `perm` (experiment 639's
+  shift 2) and `shuf`.
 - **The 14-day tracker.** Arm d is arm a's forecast plus the mean error of arm a's own day-1 and
   day-2 forecasts over the sunny middays of the 14 days before the run's origin
   (`power_fcst_init_time`, run time plus 9 hours). The error history uses only forecasts and metered
@@ -174,7 +174,7 @@ contributing Primary, scale the capacity-swap placebo.
 
 ## Compute go/no-go
 
-Fit arms: a, b, c, f, `perm` (experiment 639's shift 2), and `shuf`, which is 8 fine-tunes per seed, cutoff,
+Fit arms: a, b, c, f, `perm` (experiment 639's shift 2), and `shuf`, which is 6 fine-tunes per seed, cutoff,
 and world. A smoke fit fixes the minutes per fine-tune. If the full grid projects above 3
 GPU-hours, stage 1 runs seeds 0 to 2 in the real months for all arms and in the step world for a,
 b, and f only, with every second run subsampled for fine-tuning if the projection is still above 3
