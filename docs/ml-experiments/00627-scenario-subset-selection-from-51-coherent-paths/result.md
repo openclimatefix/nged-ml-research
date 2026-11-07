@@ -116,116 +116,147 @@ metric: >-
 code: ml-experiments/00627-scenario-subset-selection-from-51-coherent-paths/
 verdict: partly supported
 best_arm: >-
-  Stratifying the 51 paths on one summary and drawing one path per stratum (S-demand) at K = 5: tail
-  coverage 52.9% against 48.0% for a random sample (+4.9 points, 99% interval +4.3 to +5.6); the
-  mean gap at the 5th, 50th, and 95th percentiles is 11.4%, 9.9%, and 13.3% of the spread of the 51
-  paths (random sample 14.5%, 15.2%, 17.7%).
+  Ranking the 51 paths by the peak Primary demand, cutting them into K = 5 equal groups, and drawing
+  one path from each group (S-demand): tail coverage 52.9% against 48.0% for a random sample (+4.9
+  points, 99% interval +4.3 to +5.6); the mean gap at the 5th, 50th, and 95th percentiles is 11.4%,
+  9.9%, and 13.3% of the range of the 51 paths (random sample 14.5%, 15.2%, 17.7%).
 headline: >-
-  No way of picking 5 of the 51 paths holds the 5th and 95th percentile within 10% of the spread of
-  all 51 (the best rules reach 11% to 14%; a search on the gap itself reaches 4%), but stratifying
-  on a summary beats a random sample on tail coverage in all 10 months, and at K = 10 the mean gap
-  is under 10% for every rule. Under the Schaake shuffle a path keeps its wind rank between days 1
-  to 3 and days 4 to 10 only weakly (rank correlation 0.19), and keeps its solar and demand rank
-  more strongly (0.62 and 0.74).
+  None of the rules we tested for picking 5 of the 51 paths (random, four stratified, and
+  cluster-based) holds the 5th and 95th percentile within 10% of the range of all 51 (the best reach
+  11% to 14%, and a search on the gap itself reaches 4%). Stratifying on a summary beat a random
+  sample on tail coverage in all 10 months, and at K = 10 the mean gap is under 10% for every rule.
+  Under the Schaake shuffle a path keeps its wind rank between days 1 to 3 and days 4 to 10 only
+  weakly (rank correlation 0.19), and keeps its solar and demand rank more strongly (0.62 and 0.74).
 lessons: >-
   A stratified pick of 5 paths is a modest and consistent improvement on a random pick, not a
-  solution, because the extreme paths of the 51 sit in tails that five equal-weight paths cannot
-  reach. Ranking by the BSP's own peak export does not make the pick safe for a BSP limit: the
-  largest of 5 chosen paths is exceeded by an observed daily peak on 12% of days against 1.6% for
-  all 51.
+  solution: none of the five-path rules we tested reached the tails of the 51, though a search on
+  the gap itself found five-path subsets that did. Ranking by the bulk supply point's own peak
+  export
+  does not make the pick safe for a limit on that substation: an observed daily peak export beat the
+  largest of 5 chosen paths on 12% of days, against 1.6% for all 51.
 take_home_message: >-
-  Picking 5 of the 51 coherent paths by cutting them into 5 equal groups on one summary and taking
-  one path from each covers the spread of the 51 better than picking 5 at random, in every month,
-  but still misses the tails: the best rule leaves a gap of 11% to 14% of the spread at the 5th and
-  95th percentiles. For a BSP limit, the largest of 5 chosen paths is beaten by an observed daily
-  peak export on 12% of days (1.6% for all 51), and only 10 paths, chosen by the BSP's own peak
-  export, come close (6.3%). NGED should use 10 paths, or more, when the tail matters.
+  Picking 5 of the 51 forecast paths by cutting them into 5 equal groups on one summary and taking
+  one path from each covers their spread better than picking 5 at random, in every month, but still
+  misses the tails: the stratified rules leave a gap of 11% to 12% of the range at the 5th
+  percentile and 13% to 14% at the 95th. For a bulk supply point's limit, an observed daily peak
+  export beat the largest of 5 chosen paths on 12% of days (1.6% for all 51); 10 paths chosen by
+  that substation's own peak export came closest (6.3%, against 7.3% for a random 10). NGED should
+  treat 10 paths as a minimum when the tail matters.
 advice:
   - >-
-    Offer NGED 10 paths, not 5, when the tail of a BSP group matters: at K = 10 the stratified pick
-    keeps the gap under 10% and an observed daily peak export beats the largest chosen path on 6.3%
-    of days (Part 2 gate).
+    Offer NGED at least 10 paths, not 5, when the tail of a bulk supply point matters: at K = 10 the
+    stratified pick keeps the gap under 10% and an observed daily peak export beats the largest
+    chosen path on 6.3% of days, but the margin over the gate is 0.3 points, so treat 10 as a
+    minimum (Part 2 gate).
   - >-
     Choose a small set by stratifying the 51 paths on one summary and drawing one path per stratum,
     not at random: the stratified pick had higher tail coverage in all 10 months (verdict
     contrasts, Figures 1 and 2).
   - >-
-    Do not use k-medoids clusters to choose scenarios for tail studies: the medoids are central and
-    the interval on their tail coverage against a random sample spans zero (Figure 1).
+    Do not expect k-medoids clusters to beat stratifying for tail studies: their tail coverage
+    minus a random sample's had a 99% interval of -3.2 to +11.9 points, so the experiment could not
+    separate them from a random sample (Figure 1).
   - >-
     Do not label a scenario "the low-wind path" for a whole run: under the Schaake shuffle a path's
-    wind rank between days 1 to 3 and days 4 to 10 has a correlation of 0.19 (Figure 5).
+    wind rank between days 1 to 3 and days 4 to 10 has a rank correlation of only 0.19 (0.62 for
+    solar, 0.74 for demand), because each path takes a different past date for each lead (Figure 5).
   - >-
-    Add a conditioned arm only with a full tail: choosing the paths at the 50th, 90th, 95th, and
-    99th percentile of the BSP's peak export (Q) hits the export tail on every run but leaves a
-    5th percentile gap of 49% of the spread (Part 2).
+    If a fixed set of extreme paths is wanted, include scenarios from the far tail as well as the
+    middle: choosing the paths at the 50th, 90th, 95th, and 99th percentile of the substation's peak
+    export (Q) always included an export-tail path, but its gap at the 5th percentile was 49% of the
+    range, so the set misrepresents the low end (Part 2).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Picking 5 of the 51 coherent member paths by stratifying on one summary covers the 51-path
-distribution better than picking 5 at random, in every month, but still misses the tails; 10 paths
-are needed for the gap to fall under 10% of the spread.** NGED will run a handful of power-flow
-studies by hand and need to know which few of the 51 paths to run. We took the 51 coherent paths
-that experiments [436](../00436-joint-scenarios-across-demand-wind-solar-and-leads/result.md) and
-[625](../00625-coherent-members-from-quantiles-k-sweep-and-path-checks/result.md) stored for 25
-nodes (16 Primaries, 3 wind farms, 6 solar farms) over 44 weekly runs, chose 3, 5, or 10 of them in
-several ways, and measured how closely the chosen paths match the distribution of all 51. Part 2
-repeats the choice for the sum of the three Primaries under each of two bulk supply points (BSPs).
+**We asked which 3, 5, or 10 of 51 forecast scenarios NGED should run by hand, and found that
+choosing 5 by rank on one measure beats choosing 5 at random but still misses the extremes.** At 10
+scenarios the mismatch fell below 10% of the range for every rule we tried; we did not test 6 to 9.
+National Grid Electricity Distribution (NGED), the distribution network operator, will run a handful
+of power-flow studies by hand (calculations of how electricity flows through its network under one
+forecast scenario). We took the 51 equally likely forecast scenarios, called paths, that experiments
+[436](../00436-joint-scenarios-across-demand-wind-solar-and-leads/result.md) and
+[625](../00625-coherent-members-from-quantiles-k-sweep-and-path-checks/result.md) stored for each of
+44 weekly runs. Each path is one joint forecast of demand, wind, and solar for 25 sites (16 Primary
+substations, 3 wind farms, 6 solar farms) over the next 10 days. We chose K = 3, 5, or 10 of the 51
+paths in several ways. For each way, we measured how far the chosen paths' 5th, 50th, and 95th
+percentiles sit from those of all 51, as a share of the range between the 5th and 95th percentile of
+all 51 (the gap). Part 2 repeats the choice for the summed demand of the three Primaries under each
+of two bulk supply points (BSPs). Part 1 and Part 2 reuse [experiment
+161](../00161-dp-bsp-top-down-against-bottom-up/result.md)'s choice of covered Primaries.
 
-Terms: **R** random sample of K paths (1,000 draws per run); **S-wind, S-solar, S-net, S-demand**
-rank the 51 paths by one summary, cut them into K equal groups, and draw one path from each; **C**
-k-medoids clusters with each medoid weighted by its cluster size; **Oracle** the best of 5,000
-random K-subsets chosen on the gap itself, a floor that no rule can reach; **gap** the difference
-between a percentile of the chosen paths and the same percentile of the 51, divided by the spread
-(95th minus 5th percentile) of the 51; **tail coverage** the share of draws that include a path in
-the lowest or highest 10% (rank 6 or lower, or 46 or higher) of the 51 on a summary. The summaries
-are the mean wind-farm output, the mean solar-farm output, the peak net demand (an unweighted proxy,
-in points of capacity), and the peak Primary demand, over days 1 to 10. Intervals are month-block
-bootstrap intervals over 10 months. Generators are anonymised.
+Terms: K is the number of paths chosen. **R** random sample of K paths (1,000 draws per run);
+**S-wind, S-solar, S-net, S-demand** rank the 51 paths by one summary, cut them into K equal groups,
+and draw one path from each; **C** k-medoids clustering (each cluster is represented by its most
+central path), each medoid weighted by its cluster size; **Oracle** the best of 5,000 random
+K-subsets chosen on the gap itself, a floor that no rule can reach; **gap** the difference between a
+percentile of the chosen paths and the same percentile of the 51, divided by the spread (95th minus
+5th percentile) of the 51; **tail coverage** the share of draws that include a path in the lowest or
+highest 10% (ranks 1 to 6, or 46 to 51) of the 51 on a summary. The summaries are the mean wind-farm
+output, the mean solar-farm output, the peak net demand (an unweighted proxy, in points of
+capacity), and the peak Primary demand, over days 1 to 10. Intervals are month-block bootstrap
+intervals over 10 months. Generators are anonymised.
 
 ![Tail coverage by selection rule](figure_1_tail_coverage.svg)
 
+Figure 1 shows the share of draws that include a path in the lowest or highest 10% of the 51, with 95% month-block intervals; higher is better.
+
 ![Gap to the 51-path distribution](figure_2_percentile_gap.svg)
+
+Figure 2 shows the mean gap at the 5th, 50th, and 95th percentiles as a share of the range of the 51; the dashed line is 10%.
 
 ![Variogram score of K paths relative to all 51](figure_3_joint_variogram.svg)
 
+Figure 3 shows how much worse than all 51 paths each rule scores against the observed vector of all 25 sites; lower is better.
+
 ![Gate for BSP group peak export](figure_4_bsp_gate.svg)
+
+Figure 4 shows the share of observed days on which the daily peak export beat the largest chosen path; the dashed line is the gate (all 51 plus 5 points).
 
 ![Rank correlation of a path between lead bands](figure_5_label_carry_over.svg)
 
+Figure 5 shows the rank correlation of the 51 paths between days 1 to 3 and days 4 to 10 within a run, for two ways of coupling the paths.
+
 ## Results
 
-- **Verdict (K = 5, days 1 to 10, Schaake-shuffled paths).** `partly supported`: all four stratified
-  rules pass the tail condition and none passes the 10% coverage condition. The rule gave 99%
-  intervals for tail coverage minus R of +4.2 points (+3.7 to +4.8) for S-wind, +4.5 (+3.9 to +5.2)
-  for S-solar, +4.2 (+3.7 to +4.7) for S-net, and +4.9 (+4.3 to +5.6) for S-demand, positive in
-  10 of 10 months each. C: +3.9 points (-3.2 to +11.9), positive in 5 of 10 months.
-- **Absolute scores at K = 5 (mean of the 5th, 50th, and 95th percentile gaps; tail coverage).**
-  R 0.158 and 48.0%; S-wind 0.121 and 52.2%; S-solar 0.119 and 52.6%; S-net 0.123 and 52.2%;
-  S-demand 0.116 and 52.9%; C 0.122 and 51.9%; Oracle 0.039 and 86.6%. The 5th, 50th, and 95th
-  percentile gaps are in the table below. R's gap at the 95th percentile varies by 0.156 (mean
-  per-run standard deviation across draws), so one random draw can be much better or worse.
-- **K = 3 and K = 10.** Mean gap at K = 3: R 0.226, S 0.174 to 0.185, C 0.182. At K = 10: R 0.098,
-  S 0.072 to 0.077, C 0.085, so every rule is under 0.10 at K = 10. Tail coverage at K = 10: R
-  75%, S 83% to 85%, C 78%; at K = 3: R 32%, S 34%, C 24%.
+- **Verdict (K = 5, days 1 to 10, Schaake-shuffled paths, J3: each path takes the day-to-day pattern
+  of a different past date for each lead).** `partly supported`: all four stratified rules pass the
+  tail condition and none passes the 10% coverage condition. The decision rule's 99% intervals for
+  tail coverage minus R were +4.2 points (+3.7 to +4.8) for S-wind, +4.5 (+3.9 to +5.2) for S-solar,
+  +4.2 (+3.7 to +4.7) for S-net, and +4.9 (+4.3 to +5.6) for S-demand, positive in 10 of 10 months
+  each. C: +3.9 points (-3.2 to +11.9), positive in 5 of 10 months.
+- **Absolute scores at K = 5 (mean of the 5th, 50th, and 95th percentile gaps; tail coverage).** R
+  0.158 and 48.0%; S-wind 0.121 and 52.2%; S-solar 0.119 and 52.5%; S-net 0.123 and 52.2%; S-demand
+  0.116 and 52.9%; C 0.122 and 51.9%; Oracle 0.039 and 86.7%. The 5th, 50th, and 95th percentile
+  gaps are in the table below. R's gap at the 95th percentile varies by 0.156 (mean per-run standard
+  deviation across draws), so one random draw can be much better or worse.
+- **K = 3 and K = 10.** Mean gap at K = 3: R 0.226, S 0.174 to 0.185, C 0.182. At K = 10: R 0.098, S
+  0.072 to 0.077, C 0.085, so the mean gap of every rule is under 0.10 at K = 10. Per percentile, R
+  is 0.101 at the 95th and C 0.123, so only the stratified rules (at most 0.083 at each percentile)
+  pass the 10% coverage condition at K = 10. The plan predicted that K = 10 would narrow the gap
+  without closing it; that prediction failed. Tail coverage at K = 10: R 75%, S 83% to 85%, C 78%;
+  at K = 3: R 32%, S 34%, C 24%.
 - **Each stratified rule matches best the summary it ranks.** S-wind has a wind gap of 0.058 at the
-  50th percentile and 0.085 at the 95th; on the other summaries its gaps are 0.10 to 0.15, close to
+  50th percentile and 0.085 at the 95th; on the other summaries its gaps are 0.11 to 0.19, close to
   R. A stratified pick on one summary therefore helps little on the others.
-- **Joint score (variogram, 25 nodes, relative to all 51; absolute 2.161).** K = 5: R +16.4%
-  (+14.7% to +18.4%), S +14.4% to +14.9%, C +14.9% (+11.4% to +18.9%), Oracle +15.1%. K = 10: R
-  +7.2%, S +6.2% to +6.5%, C +7.5%. K = 3: R +28.6%, S +25.6% to +26.5%, C +22.4%. No rule is
-  distinguishable from the others by more than about 2 points; the loss comes from using fewer
-  paths.
+- **Joint score (variogram, 25 nodes, relative to all 51; absolute 2.161).** K = 5: R +16.4% (+14.7%
+  to +18.4%), S +14.4% to +14.9%, C +14.9% (+11.4% to +18.9%), Oracle +15.1%. K = 10: R +7.2%, S
+  +6.2% to +6.5%, C +7.5%. K = 3: R +28.6%, S +25.6% to +26.5%, C +22.4%. At K = 5 and K = 10 no
+  rule differs from the others by more than about 2 points; at K = 3 the rules span 6 points (C
+  +22.4%, R +28.6%). The loss comes mostly from using fewer paths.
 - **Labels do not carry over.** Within a run, the Spearman correlation between the 51 paths' ranks
   on days 1 to 3 and on days 4 to 10 is 0.19 for wind, 0.41 for net demand, 0.62 for solar, and 0.74
   for Primary demand under the Schaake shuffle (J3), and 0.18, 0.01, 0.10, and 0.11 under ensemble
-  copula coupling (J2). Prediction P4 held for wind and failed for solar and demand under J3,
-  because the Schaake shuffle gives each path one past date for every lead.
-- **Coupling.** J2 (ensemble copula coupling) at K = 5 gives the same ordering of rules, with S at
-  gap 0.146 and R at 0.167; tail coverage S 50.8% to 51% against R 48.0%.
-- **Selection inside each band** (secondary): selecting on a band instead of on days 1 to 10 changes
-  the days 1 to 10 gap by under 0.003 for every arm.
+  copula coupling (J2). Prediction P4 (a path's wind rank correlates below 0.5 between lead bands)
+  held for wind and failed for solar and demand under J3, because the Schaake shuffle gives each
+  path one past date for every lead.
+- **Coupling.** J2 (ensemble copula coupling: each path follows one weather-forecast member) at K =
+  5 keeps S ahead of R (mean gap 0.146 to 0.149 against 0.167; tail coverage 50.5% to 50.9% against
+  48.0%), but C is worse than R (gap 0.195, tail coverage 51.1%), unlike under J3.
+- **Selection inside each band** (secondary): selecting inside the 12-to-36-hour or days 1 to 3 band
+  instead of on days 1 to 10 improves that band's gap by about 0.01 to 0.016 for the stratified
+  rules (the days 4 to 10 band has no gap for the run of 2026-06-30, so it is not compared). Within
+  days 1 to 10 the two selections are the same.
 
 | Arm (K = 5) | Gap at 5th percentile | Gap at 50th | Gap at 95th | Tail coverage |
 |---|---|---|---|---|
@@ -238,33 +269,37 @@ bootstrap intervals over 10 months. Generators are anonymised.
 | Oracle | 0.041 | 0.041 | 0.034 | 86.7% |
 
 - **Part 2: BSP group peak export (D13 and D17, K = 5 unless stated).** The gate is the share of
-  observed daily peak exports above the largest daily peak export of the chosen paths, over 9 full
-  valid days per run. All 51 paths: 1.6%. K = 5: R 14.3%, S-bsp 12.1%, C 12.6%; all fail the gate
-  (at most 1.6% + 5 points). K = 4: Q (paths at the 50th, 90th, 95th, and 99th percentile) 8.0%
-  (the difference to All is +6.3 points, +2.1 to +11.8), against S-bsp 14.7% and R 17.4%. K = 10:
-  S-bsp 6.3% (+4.7 points, +2.4 to +7.1) passes the gate; R 7.3% and C 7.0% fail by about 0.5
-  points. The stratified pick on the BSP's own peak export has the lowest 50th percentile gap
-  (0.045 at K = 5) and a 95th percentile gap of 0.114. Q hits the export tail on every run but its
-  5th percentile gap is 0.49 of the spread, by construction.
+  observed days on which the daily peak export exceeded the largest daily peak export among the
+  chosen paths, over up to 9 full days per run (381 days in 43 runs). All 51 paths: 1.6%. K = 5: R
+  14.3%, S-bsp 12.1%, C 12.6%; all fail the gate (at most 1.6% + 5 points). K = 4: Q (paths at the
+  50th, 90th, 95th, and 99th percentile) 8.0% (the difference to All is +6.3 points, +2.1 to +11.8),
+  against S-bsp 14.7% and R 17.4%. K = 10: S-bsp 6.3% (+4.7 points, +2.4 to +7.1) passes the gate; R
+  7.3% and C 7.0% fail by 0.7 and 0.4 points. The stratified pick on the BSP's own peak export has
+  the lowest 50th percentile gap (0.045 at K = 5) and a 95th percentile gap of 0.114. Q hits the
+  export tail on every run but its 5th percentile gap is 0.49 of the spread, by construction.
 - **Tails.** The summaries are forecasts of the stored marginals of experiments 425, 429, and 430;
   no new quantile scores are computed. The tail results above are the experiment's tail results.
-- **Checks.** No forecast was fitted, so the median-minus-mean and audit triggers 3 to 6 do not
-  apply. Trigger 1 did not fire. Trigger 2: P3 failed (C was not below R on tail coverage; C's
-  interval is wide, +3.9 points, -3.2 to +11.9); the explanation, that medoids carry the cluster's
-  weight but sit near the centre, was not tested. Trigger 7: no later design depends on it. Part 1
-  scored every one of the 44 runs; the last run, 2026-06-30, has an identical wind summary on all 51
-  paths in days 4 to 10 (spread zero), so its gaps for that cell are missing (1 run, 1 band, 1
-  summary) and the means use the other runs.
-- **Caveats.** Demand is the stored XGBoost demand of experiment 436, not the neural networks of
-  the bake-off. The net-demand summary is an unweighted proxy in points of capacity. The BSP groups
-  are 3 Primaries each (experiment 161's covered children) and omit unmetered load and Primaries
-  that report apparent power; the groups are in MW from each Primary's capacity. Ten months give
-  wide intervals; the gate for K = 10 passes by 0.3 points and should not be read as a safe margin.
+- **Checks.** No forecast was fitted, so the median-minus-mean check and audit triggers 3 to 6 do
+  not apply. Audit trigger 1 (a control fails) did not fire. Audit trigger 2 (a result contradicts
+  its own prediction) fired: prediction P3, that C would have lower tail coverage than R, and the
+  prediction that K = 10 would not close the gap both failed (P1 and P2 held, and the verdict
+  `partly supported` was predicted). For P3, (C was not below R on tail coverage; C's interval is
+  wide, +3.9 points, -3.2 to +11.9); the explanation, that medoids carry the cluster's weight but
+  sit near the centre, was not tested. Audit trigger 7 (a later design depends on this result): none
+  does. Part 1 scored all 44 runs; the last run, 2026-06-30, has an identical wind summary on all 51
+  paths in days 4 to 10 (spread zero), so its gaps for that band and summary are missing and the
+  means use the other runs. Means in the table weight each month equally.
+- **Caveats.** Demand is the stored XGBoost demand of experiment 436, not the neural networks of the
+  bake-off. The net-demand summary is an unweighted proxy in points of capacity. The BSP groups are
+  3 Primaries each (experiment 161's covered children) and omit unmetered load and Primaries that
+  report apparent power; the groups are in MW from each Primary's capacity. Ten months give wide
+  intervals; the gate for K = 10 passes by 0.3 points and should not be read as a safe margin.
   Forecast paths for valid times after 2026-07-01 are used in the selection of the last runs; only
   the observed values are held out. The gate takes an observed daily peak over at least 44 of 48
   half-hours, which can miss a peak, and so understates the exceedance for all arms, `All` included.
   The 51 member values are those of experiments 425, 429, and 430; experiment 626 widens their tails
-  and was not used. The day-to-day stability score was dropped, so P5 was not tested.
+  and was not used. The day-to-day stability score was dropped, so prediction P5 (stratum
+  persistence across weekly runs) was not tested.
 - **Reused and new.** Reused: experiment 436's `work/runs` and `work/paths/J3` and `J2`, and the
   folder of experiment 625 (read only; nothing written to either). New: every selection rule, the
   summaries, the gap, tail, joint-score, and gate tables, and the figures. The folders of
