@@ -25,7 +25,7 @@ prediction: >-
   cloud-following load fakes under 0.20 of a 2 MW farm. (4) The nominal 80% interval covers the
   injected capacity in at least 60% of injections. (5) The across-seed standard deviation of the
   probed capacity is lower in the monotone arm than in the plain arm at 4 of 6 Primaries. (6) The
-  monotone constraint costs under 0.01 nats of validation negative log-likelihood.
+  monotone constraint raises validation negative log-likelihood by under 0.01 nats.
 decision_rule: >-
   Fixed before any recovery is read. Each bar passes or fails as written in the prediction. Stop and
   report when the median recovery is under 0.70 in both arms, or when a placebo reads over 0.30; no
@@ -49,20 +49,20 @@ best_arm: >-
   recovery is 0.71, against 0.68 for the plain network (bar: 0.80 to 1.20).
 headline: >-
   Making net demand non-increasing in shortwave irradiance lifts median real-farm recovery from 0.68
-  to 0.71, still short of 0.80, and costs 0.010 to 0.011 nats of validation negative log-likelihood.
+  to 0.71, still short of 0.80, and raises validation negative log-likelihood by 0.010 to 0.011 nats.
 lessons:
   - >-
-    The probe recovers a physics-curve injection almost exactly (0.97 to 1.03 at 4 MW) but only
-    0.65 to 0.74 of a real farm's output, so the shortfall comes from the real farm's shape and
-    sky response, not from the network losing the sky signal.
+    The probe recovers a physics-curve injection almost exactly (0.96 to 1.03 at 4 MW) but only
+    0.65 to 0.74 of a real farm's output. The cause is untested; the real farm's shape and sky
+    response are candidates.
   - >-
-    A monotone shortwave path removes most of the cloud-load faking of the plain network (the strong
-    squared load with the cloud template falls from -0.5 to -0.15 of a 2 MW farm) and keeps
-    both placebos under 0.18, but it does not lower the seed spread.
+    With the cloud template, the plain network over-corrects a strong squared cloud load (spurious
+    capacity -0.4 to -0.7 of a 2 MW farm) and the monotone network over-corrects less (-0.1 to -0.2).
+    Both keep both placebos under 0.18, and the monotone arm does not lower the seed spread.
 take_home_message: >-
   The probe still reads only about 70% of a real solar farm's capacity, whichever network is used.
   Forcing the network to lower demand as sunshine rises helps slightly and keeps the placebos near
-  zero, but costs a little forecast accuracy, so it does not rescue the capacity estimate.
+  zero, but raises the forecast error slightly, so it does not rescue the capacity estimate.
 advice:
   - >-
     Treat the donor-day probe's capacity as about 0.7 of the true AC capacity for real farms in a
@@ -92,10 +92,10 @@ median is 0.71 and the largest placebo read is 0.17.
 |---|---|---|
 | Median 4 MW real-farm recovery in 0.80 to 1.20 at 4 of 6 Primaries | **Fail**, 0 of 6 (median 0.68) | **Fail**, 0 of 6 (median 0.71) |
 | 95th percentile of each placebo under 0.25 at 4 of 6 | Pass (largest 0.16) | Pass (largest 0.17) |
-| Cloud load fakes under 0.20 of a 2 MW farm with the cloud template, at 4 of 6 | Pass | Pass |
+| Spurious capacity from a cloud load under 0.20 of a 2 MW farm with the cloud-template regression (a one-sided bar; negative values are over-correction), at 4 of 6 | Pass | Pass |
 | 80% interval covers the injected capacity in at least 60% of injections | **Fail**: 23% of the real-farm and physics-curve injections together (real farm 0%, physics curve 68%) | **Fail**: 26% (real farm 0%, physics curve 76%) |
 | Seed standard deviation lower in the monotone arm at 4 of 6 Primaries | | **Fail**: lower at 3 of 6 |
-| Validation negative log-likelihood cost under 0.01 nats | | **Fail**: 0.010 (2026-03 cutoff) and 0.011 (2026-06 cutoff) |
+| Validation negative log-likelihood rises by under 0.01 nats | | **Fail**: +0.0104 (2026-03 cutoff) and +0.0113 (2026-06 cutoff) |
 
 - **Real-farm recovery** is the same at both cutoffs (monotone 0.711 and 0.712; plain 0.682 and
   0.683) and at both farm rotations, so the shortfall is not an accident of one cutoff or one
@@ -105,24 +105,25 @@ median is 0.71 and the largest placebo read is 0.17.
   the truth. The interval passes in the physics-curve world for the monotone arm (76%) and the plain
   arm (68%), and in the linear strong cloud-load world (75% and 69%).
 - **The monotone arm does not lower the seed spread of the probed capacity.** It is lower at D10,
-  D14, and D9 and higher at D11, D16, and D5.
-- **Validation cost.** The mean validation negative log-likelihood of the uninjected networks is
+  D14, and D9 and higher at D11, D16, and D5 (spread of the uninjected networks' probed capacity,
+  the measure in the seed-spread figure; the spread of the injected differences is also lower at 3
+  of 6).
+- **Validation loss.** The mean validation negative log-likelihood of the uninjected networks is
   0.467 (plain) and 0.477 (monotone) at 2026-03, and 0.472 and 0.484 at 2026-06. The CRPS on the same
   validation rows rises from 0.365 to 0.368 MW (2026-03) and 0.365 to 0.369 MW (2026-06) over all 16
-  Primaries, about 0.8%, and from 0.276 to 0.278 MW at the six MW Primaries. These rows are the ones
-  each network's early stopping reads, so the figures compare the arms and do not measure
-  out-of-sample skill.
+  Primaries (0.8% and 1.0%), and from 0.276 to 0.278 MW (2026-03) and 0.275 to 0.277 MW (2026-06)
+  at the six MW Primaries. Each network's early stopping reads these rows, so the figures compare
+  the arms and do not measure out-of-sample skill.
 
-## Where the real-farm shortfall comes from
+## The probed response against the unit PV curve
 
 ![Probed response against the unit PV curve](probed_response_vs_unit_curve.svg)
 
 The probed difference between an injected network and its twin falls linearly in the unit PV curve of
 the donor weather in both worlds and both arms. In the physics-curve world the lines follow the
 dashed 4 MW slope. In the real-farm world the slope is about 0.7 of it. The monotone constraint
-changes neither slope visibly. A real farm's output carries orientation, shading, and inverter
-clipping that the unit curve lacks, so a network trained on it learns a flatter response to the
-unit curve's sky index.
+changes neither slope visibly. The cause of the flatter real-farm response is untested. A real
+farm's orientation, shading, and inverter clipping, which the unit curve lacks, are candidates.
 
 ![Probed against injected capacity](recovered_vs_injected.svg)
 
@@ -133,11 +134,11 @@ arm's shuffled-sky placebo reads slightly higher (0.13 to 0.17) than the plain a
 
 ![Cloud-load faking](cloud_load_faking.svg)
 
-Without the cloud template, both arms read a strong cloud-following load as PV (0.1 to 0.8 of a 2 MW
-farm, rising with the load's size). With the template, both pass. The plain network over-corrects
+Without the cloud template, both arms read a strong cloud-following load as PV (weak loads 0.11 to 0.23, strong loads
+0.35 to 0.66 of a 2 MW farm). With the template, both pass. The plain network over-corrects
 (negative spurious capacity as large as -0.7 for the strong squared load), and the monotone network
-stays closer to zero (-0.2). A monotone path in shortwave leaves the other weather inputs free to
-carry the cloud signal, so the cloud template still does the work.
+stays closer to zero (-0.2). Over-correction is not faking, but it shows that the template
+regression absorbs more than the cloud load alone in the plain network.
 
 ## Seed spread
 
