@@ -111,7 +111,10 @@ def load_rows(*, network: str) -> dict:
 
 
 def gap_shift(*, rows: dict) -> np.ndarray:
-    """Return the gap correction per row and group (rows, 4): mean(meter - Primaries' sum) by half-hour of day, other months."""
+    """Return the gap correction per row and group (rows, 4).
+
+    It is the mean of meter minus the Primaries' sum by half-hour of day, over the other months.
+    """
     valid = rows["valid"].astype("datetime64[m]")
     hod = ((valid - valid.astype("datetime64[D]")) / np.timedelta64(30, "m")).astype(int)
     gap = rows["meter"] - rows["prim_obs_sum"]
