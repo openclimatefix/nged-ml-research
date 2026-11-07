@@ -16,7 +16,9 @@ import polars as pl
 from scipy.special import logsumexp
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00617-wind-turbine-step-capacity-known-answer-and-fit"
+DATA_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00617-wind-turbine-step-capacity-known-answer-and-fit"
+)
 SERIES_PATH: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
     / "00453-effective-capacity-upper-bound-data-look"
@@ -52,6 +54,7 @@ class Daily:
 
     @property
     def years(self) -> float:
+        """Return the length of the record in years."""
         return self.n_days / 365.25
 
 
@@ -63,7 +66,9 @@ def daily_series(site: str) -> Daily:
     wind = pl.read_parquet(SERIES_PATH).filter(
         (pl.col("site") == SITES[site]) & (pl.col("time") < DEV_END)
     )
-    first = wind["time"].min().replace(hour=0, minute=0, second=0, microsecond=0)  # ty: ignore[unresolved-attribute]
+    assert wind["time"].dtype == pl.Datetime("us", "UTC")
+    assert wind.select(pl.col("time").max() < DEV_END).item()
+    first = pl.col("time").min().dt.truncate("1d")
     rows = (
         wind.filter(pl.col("wind").is_between(lo, hi) & pl.col("power").is_not_null())
         .with_columns(day=(pl.col("time") - first).dt.total_days())
@@ -72,7 +77,7 @@ def daily_series(site: str) -> Daily:
         .filter(pl.col("n") >= MIN_ROWS_PER_DAY)
         .sort("day")
     )
-    n_days = int((wind["time"].max() - first).days) + 1  # ty: ignore[unresolved-attribute]
+    n_days = wind.select((pl.col("time").max() - first).dt.total_days()).item() + 1
     value = rows["value"].to_numpy().astype(float)
     return Daily(
         site=site,
@@ -111,7 +116,9 @@ def transition_matrix(
     return matrix
 
 
-def free_size_transition(n_states: int, *, step_up: float, repair: float = REPAIR_PER_DAY) -> np.ndarray:
+def free_size_transition(
+    n_states: int, *, step_up: float, repair: float = REPAIR_PER_DAY
+) -> np.ndarray:
     """Return a transition matrix whose step sizes are free: geometric with mean 4 fine units."""
     weights = 0.75 ** np.arange(1, 25)
     weights /= weights.sum()
@@ -126,8 +133,13 @@ def free_size_transition(n_states: int, *, step_up: float, repair: float = REPAI
     return matrix
 
 
-def log_emission(daily: Daily, level: np.ndarray, *, sigma_fraction: float = SIGMA_FRACTION,
-                 contamination: float = CONTAMINATION) -> np.ndarray:
+def log_emission(
+    daily: Daily,
+    level: np.ndarray,
+    *,
+    sigma_fraction: float = SIGMA_FRACTION,
+    contamination: float = CONTAMINATION,
+) -> np.ndarray:
     """Return the `(n_days, n_levels)` log-likelihood of each day's value at each capacity level.
 
     A day without a value has log-likelihood 0. The model is a Gaussian around the capacity level
@@ -152,9 +164,9 @@ class Fit:
     level_step: float  # MW of one unit of k
 
 
-def forward_backward(log_em: np.ndarray, matrix: np.ndarray, prior: np.ndarray) -> tuple[
-    float, np.ndarray, np.ndarray
-]:
+def forward_backward(
+    log_em: np.ndarray, matrix: np.ndarray, prior: np.ndarray
+) -> tuple[float, np.ndarray, np.ndarray]:
     """Return log evidence, smoothed and filtered posteriors of a hidden Markov model."""
     n, m = log_em.shape
     em = np.exp(log_em - log_em.max(axis=1, keepdims=True))
@@ -178,14 +190,18 @@ def forward_backward(log_em: np.ndarray, matrix: np.ndarray, prior: np.ndarray) 
 
 
 def fit_grid(
-    daily: Daily, *, step_up: float, n_grid: np.ndarray = N_GRID,
-    sigma_fraction: float = SIGMA_FRACTION, contamination: float = CONTAMINATION,
+    daily: Daily,
+    *,
+    step_up: float,
+    n_grid: np.ndarray = N_GRID,
+    sigma_fraction: float = SIGMA_FRACTION,
+    contamination: float = CONTAMINATION,
 ) -> list[Fit]:
     """Fit the hidden Markov model for every number of turbines in `n_grid`."""
     fits = []
     for n_turbines in n_grid:
         step = daily.ceiling / n_turbines
-        n_states = min(int(round(n_turbines)), MAX_STATES)
+        n_states = min(round(float(n_turbines)), MAX_STATES)
         level = daily.ceiling - step * np.arange(n_states)
         prior = np.zeros(n_states)
         prior[0] = 0.9
@@ -218,7 +234,9 @@ def log_n_weights(fits: list[Fit]) -> np.ndarray:
     return np.exp(ev - logsumexp(ev))
 
 
-def deficit_summary(fits: list[Fit], weights: np.ndarray, *, filtered: bool = False) -> dict[str, np.ndarray]:
+def deficit_summary(
+    fits: list[Fit], weights: np.ndarray, *, filtered: bool = False
+) -> dict[str, np.ndarray]:
     """Return per-day posterior mean and 5% / 95% quantiles of the capacity deficit `C0 - C`, MW."""
     n_days = (fits[0].filtered if filtered else fits[0].smoothed).shape[0]
     values, probs = [], []
