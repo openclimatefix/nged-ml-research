@@ -50,7 +50,7 @@ decision_rule: >-
   436 (44 expected; the count is printed first), grouped into calendar months for a month-block
   bootstrap (20,000 resamples). Paths: experiment 436's Schaake-shuffled scenarios (J3), 51 per run
   over 25 nodes (16 Primaries, 3 wind farms, 6 solar farms) and 702 half-hours, in points of
-  capacity; the ensemble-copula scenarios (J2) are a sensitivity. Three summaries per path and lead
+  capacity; the ensemble-copula scenarios (J2) are a sensitivity. Four summaries per path and lead
   band: the mean over the wind farms, the mean over the solar farms, the peak over the band of
   the net demand (mean over the Primaries minus the wind-farm mean minus the solar-farm mean; an
   unweighted proxy, because MW weights are not in the run files), and the peak over the band of the
@@ -87,7 +87,19 @@ decision_rule: >-
   above zero. Verdict: `supported` if at least one label-free arm passes both conditions; `partly
   supported` if at least one passes the tail condition but none passes the coverage condition;
   `not supported` otherwise. K = 3 and K = 10, the other bands, the other summaries, the joint
-  scores, the stability check, and J2 are descriptive and carry no verdict. No rescue tuning after
+  scores, the stability check, and J2 are descriptive and carry no verdict. Part 2, added after the part 1 scores were read and before any BSP-group score was read, on the
+  manager's instruction: the same selection, with the peak export (minus the sum, in MW) of a bulk
+  supply point (BSP) group as the summary. The groups are experiment 161's covered children, D13 =
+  D9 + D10 + D11 and D17 = D5 + D14 + D16, which omit unmetered load and the Primaries that report
+  apparent power. Arms: R, S-bsp (strata of that BSP's peak export), C (the part 1 medoids), Q
+  (K = 4 only: the paths at the 50th, 90th, 95th, and 99th percentile of the 51 peak exports), and
+  All. The gate score is the share of observed daily peak exports (days with at least 44 of 48
+  half-hours observed on all three children, before 2026-07-01) above the largest daily peak export
+  of the chosen paths, at K = 5 and K = 4, days 1 to 10, J3, per BSP; an arm passes the gate if its
+  share is at most the share of All plus 0.05 (point estimate, month-block mean). Part 2 carries
+  its own words, `gate passed` and `gate failed`, and no verdict. The day-to-day stability score is
+  dropped; the within-run band-to-band check stays. Demand is the stored XGBoost demand of
+  experiment 436, not the neural networks of the bake-off. No rescue tuning after
   a failed bar. Stop rule: experiment 436's `work/paths/J3` is missing for any of the stored runs.
 benchmark: >-
   R (a simple random sample of K paths) for the verdict; All (the 51 paths) as the reference for

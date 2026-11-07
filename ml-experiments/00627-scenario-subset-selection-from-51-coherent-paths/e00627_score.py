@@ -214,7 +214,7 @@ def arm_weights(  # noqa: PLR0913
     out = {"R": random_weights(k=k, rng=rng, n=N_DRAWS)}
     for arm, name in S_ARMS.items():
         out[arm] = stratified_weights(summary=summ[name], k=k, rng=rng, n=N_DRAWS)
-    out["C"] = medoid_weights(paths=paths, steps=steps, k=k, rng=rng)
+    out["C"] = medoid_weights(paths=paths, steps=steps, k=k, rng=np.random.default_rng([SEED, k, 3]))
     out["Oracle"] = oracle_weights(summ=summ, k=k, rng=rng)
     return out
 
@@ -230,7 +230,7 @@ def oracle_weights(*, summ: dict[str, np.ndarray], k: int, rng: np.random.Genera
     cost = np.zeros(5000)
     for v in summ.values():
         m = distribution_rows(weights=w, summary=v)
-        cost += sum(m[f"gap{round(q * 100):02d}"] for q in PERCENTILES)
+        cost += np.nan_to_num(sum(m[f"gap{round(q * 100):02d}"] for q in PERCENTILES), nan=0.0)
     return w[[int(np.nanargmin(cost))]]
 
 
@@ -315,6 +315,9 @@ def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR091
                                 {**base, "selection": select_band, "arm": arm, "k": k, "band": band,
                                  "summary": sname, **{key: float(np.nanmean(v)) for key, v in m.items()},
                                  **{f"{key}_sd": float(np.nanstd(v)) for key, v in m.items()},
+                                 **{f"{key}_p05": float(np.nanquantile(v, 0.05)) for key, v in m.items()},
+                                 **{f"{key}_p95": float(np.nanquantile(v, 0.95)) for key, v in m.items()},
+                                 "degenerate": bool(np.isnan(m["w1"]).all()),
                                  "draws": int(w.shape[0])}
                             )  # fmt: skip
                         jb = joint[band]
