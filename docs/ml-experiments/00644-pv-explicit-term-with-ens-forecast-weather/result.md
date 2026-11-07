@@ -127,12 +127,12 @@ contributing Primary, scale the capacity-swap placebo.
 - **The tracker is the ensemble-forecast version of experiment 643's.** Experiment 643 corrected a
   free network by its own mean error over the 14 days before each test day. Here the same rule
   applies, with three conditions: the history holds only days whose date is before the run's origin
-  date; each history error is the free network's forecast from the last run issued before that
-  day (the rows of that day with lead below 24 hours) against cleaned metered power; and the shift applies to
-  sunny-midday half-hours only, as in 643, so contrast (ii) is unaffected by it. In the first 14
-  days after a cutoff the history is incomplete, and the days with fewer than 3 history days get
-  no shift. The history never includes a day the network fine-tuned on, because fine-tuning stops
-  at the cutoff.
+  date; each history error is the free network's forecast from the last run issued before that day
+  (the rows of that day with lead below 24 hours) against cleaned metered power; and the shift
+  applies to sunny-midday half-hours only, as in 643, so contrast (ii) is unaffected by it. In the
+  first 14 days after a cutoff the history is incomplete, and the days with fewer than 3 history
+  days get no shift. The history never includes a day the network fine-tuned on, because fine-tuning
+  stops at the cutoff.
 - **No 0.5 and 1.5 capacity-scaling placebos.** They need new ERA5-and-CAMS pretraining, which this
   experiment does not pay for. The capacity placebo is experiment 639's shift-2 permutation.
 - **No curtailment-cost proxy.** The earlier proxy needs a node table that does not exist for the
@@ -174,8 +174,9 @@ contributing Primary, scale the capacity-swap placebo.
 
 ## Compute go/no-go
 
-Fit arms: a, b, c, f, `perm` (experiment 639's shift 2), and `shuf`, which is 6 fine-tunes per seed, cutoff,
-and world. A smoke fit fixes the minutes per fine-tune. If the full grid projects above 3
-GPU-hours, stage 1 runs seeds 0 to 2 in the real months for all arms and in the step world for a,
-b, and f only, with every second run subsampled for fine-tuning if the projection is still above 3
-GPU-hours. The step-world placebos are then untested and the write-up says so.
+Fit arms: a, b, c, f, `perm` (experiment 639's shift 2), and `shuf`, which is 6 fine-tunes per seed,
+cutoff, and world. One fine-tune took about 11 seconds in a smoke test. A smoke fit fixes the
+minutes per fine-tune. If the full grid projects above 3 GPU-hours, stage 1 runs seeds 0 to 2 in the
+real months for all arms and in the step world for a, b, and f only, with every second run
+subsampled for fine-tuning if the projection is still above 3 GPU-hours. The step-world placebos are
+then untested and the write-up says so.
