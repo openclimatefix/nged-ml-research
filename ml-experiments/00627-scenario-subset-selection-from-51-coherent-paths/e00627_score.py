@@ -14,9 +14,8 @@ capacity). Nothing is written to either folder. Every arm is a weight vector ove
 - `All`: the 51 paths, equal weights.
 
 Writes `selection.parquet` (coverage and tail rows per run), `joint.parquet` (energy and variogram
-scores per run), and `strata.parquet` (the stratum of each member per run), and `summ.parquet` (the four summaries of
-each of the 51 paths per run and band) to this experiment's
-`work/` folder.
+scores per run), `strata.parquet` (the stratum of each member per run), and `summ.parquet` (the four
+summaries of each of the 51 paths per run and band) to this experiment's `work/` folder.
 
 ```bash
 export DATA_PATH_INTERNAL=...; source ml-experiments/00627-*/env.sh
