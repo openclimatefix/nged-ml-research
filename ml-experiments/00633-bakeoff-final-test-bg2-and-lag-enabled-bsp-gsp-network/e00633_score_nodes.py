@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, PLR0915
+# ruff: noqa: E501, D103, PLR0915, PLR0912, PERF401
 """Experiment 633, Part 2: score the lag-enabled network, BG2, the manual heuristic, and the climatology at the bulk and grid supply points, once (CPU).
 
 Scoring follows experiment 620's `e00620_score.py` (copied into `e00633_score.py`): scores are shares of capacity, in percent
@@ -31,15 +31,25 @@ KEYS = ["time_series_id", "power_fcst_init_time", "valid_time"]
 
 
 def network(*, group: str) -> pl.DataFrame:
-    files = [k.ROOT / "work" / GROUP_DIR[group] / "seed_preds" / TAG / f"2026-07_s{seed}.parquet" for seed in SEEDS]
+    files = [
+        k.ROOT / "work" / GROUP_DIR[group] / "seed_preds" / TAG / f"2026-07_s{seed}.parquet"
+        for seed in SEEDS
+    ]
     assert all(f.exists() for f in files), files
-    frame = pl.concat([pl.read_parquet(f) for f in files]).group_by(KEYS).agg(*[pl.col(c).mean() for c in s.QCOLS]).sort(KEYS)
+    frame = (
+        pl.concat([pl.read_parquet(f) for f in files])
+        .group_by(KEYS)
+        .agg(*[pl.col(c).mean() for c in s.QCOLS])
+        .sort(KEYS)
+    )
     values = np.sort(frame.select(s.QCOLS).to_numpy(), axis=1)
     return frame.with_columns(*[pl.Series(c, values[:, i]) for i, c in enumerate(s.QCOLS)])
 
 
 def bg2(*, site: str, tid: int) -> pl.DataFrame:
-    f = pl.read_parquet(k.ROOT / "preds" / "bg2_single_fit" / f"{site}.parquet").select(*KEYS, *s.QCOLS)
+    f = pl.read_parquet(k.ROOT / "preds" / "bg2_single_fit" / f"{site}.parquet").select(
+        *KEYS, *s.QCOLS
+    )
     arr = np.sort(f.select(s.QCOLS).to_numpy().astype(np.float64), axis=1)
     median = arr[:, [5]]
     arr = median + k.SPREAD_FACTOR * (arr - median)
@@ -54,9 +64,14 @@ def main(out: Path) -> None:
     rows = {r["site"]: r for r in series.iter_rows(named=True) if r["site"] in NODE_SITES}
     cutoff_idx = int(common.grid_index(times=k.CUTOFF))
     window_end = int(common.grid_index(times=k.GRID_END))
-    readings = {site: int(np.isfinite(arrays[site].power[cutoff_idx : window_end + 1]).sum()) for site in NODE_SITES}
+    readings = {
+        site: int(np.isfinite(arrays[site].power[cutoff_idx : window_end + 1]).sum())
+        for site in NODE_SITES
+    }
     scored_sites = [site for site in NODE_SITES if readings[site] > 0]
-    (out / "series_with_readings.json").write_text(json.dumps({"readings_in_window": readings, "scored": scored_sites}, indent=1))
+    (out / "series_with_readings.json").write_text(
+        json.dumps({"readings_in_window": readings, "scored": scored_sites}, indent=1)
+    )
     print("half-hours with a reading in the window:", readings, "scored:", scored_sites, flush=True)
     clean = np.stack([arrays[site].power for site in scored_sites]).astype(np.float32)
     parts = {}
@@ -76,13 +91,23 @@ def main(out: Path) -> None:
     tid = base["time_series_id"].to_numpy()
     prim = np.array([prim_of[int(t)] for t in tid])
     site_of = np.array([scored_sites[p] for p in prim])
-    idx = ((base["valid_time"].dt.epoch("us") - s.START_US) // s.STEP_US).to_numpy().astype(np.int64)
-    oidx = ((base["power_fcst_init_time"].dt.epoch("us") - s.START_US) // s.STEP_US).to_numpy().astype(np.int64)
+    idx = (
+        ((base["valid_time"].dt.epoch("us") - s.START_US) // s.STEP_US).to_numpy().astype(np.int64)
+    )
+    oidx = (
+        ((base["power_fcst_init_time"].dt.epoch("us") - s.START_US) // s.STEP_US)
+        .to_numpy()
+        .astype(np.int64)
+    )
     lead = (idx - oidx) / 2.0
     y = clean[prim, idx].astype(np.float64)
     q = {
-        "Lag-enabled network": np.sort(frames.select(s.QCOLS).to_numpy().astype(np.float64), axis=1),
-        "BG2": np.sort(frames.select([f"{c}_bg2" for c in s.QCOLS]).to_numpy().astype(np.float64), axis=1),
+        "Lag-enabled network": np.sort(
+            frames.select(s.QCOLS).to_numpy().astype(np.float64), axis=1
+        ),
+        "BG2": np.sort(
+            frames.select([f"{c}_bg2" for c in s.QCOLS]).to_numpy().astype(np.float64), axis=1
+        ),
         "Manual heuristic": s.manual_heuristic(clean=clean, prim=prim, idx=idx, lead_h=lead),
         "Climatology": s.climatology(clean=clean, prim=prim, idx=idx, cutoff_idx=cutoff_idx),
     }
@@ -93,9 +118,18 @@ def main(out: Path) -> None:
         dropped[f"{n}: no forecast"] = int(miss.sum())
         ok &= ~miss
     print("rows", len(y), "common scored rows", int(ok.sum()), dropped, flush=True)
-    pl.DataFrame({"what": list(dropped), "rows": list(dropped.values())}).write_csv(out / "dropped_rows.csv")
+    pl.DataFrame({"what": list(dropped), "rows": list(dropped.values())}).write_csv(
+        out / "dropped_rows.csv"
+    )
     sel = np.flatnonzero(ok & (lead < 240))
-    y, lead, prim, site_of, oidx, idx = y[sel], lead[sel], prim[sel], site_of[sel], oidx[sel], idx[sel]
+    y, lead, prim, site_of, oidx, idx = (
+        y[sel],
+        lead[sel],
+        prim[sel],
+        site_of[sel],
+        oidx[sel],
+        idx[sel],
+    )
     q = {n: v[sel] for n, v in q.items()}
     group = np.array([GROUP_OF[x] for x in site_of])
     day = oidx // 48
@@ -129,7 +163,18 @@ def main(out: Path) -> None:
             for n in SYSTEMS:
                 for metric, v in stats[n].items():
                     mean, lo_, hi_, _ = s.day_boot(day=day[mm], vals=v[mm], seed=633)
-                    rows_out.append({"slice": sl, "set": set_name, "system": n, "measure": metric, "mean": mean, "lo": lo_, "hi": hi_, "rows": int(mm.sum())})
+                    rows_out.append(
+                        {
+                            "slice": sl,
+                            "set": set_name,
+                            "system": n,
+                            "measure": metric,
+                            "mean": mean,
+                            "lo": lo_,
+                            "hi": hi_,
+                            "rows": int(mm.sum()),
+                        }
+                    )
     pl.DataFrame(rows_out).write_csv(out / "headline.csv")
     band = np.digitize(lead, [24, 48, 72, 96, 120, 144, 168, 192, 216], right=False)
     rows_b = []
@@ -138,9 +183,23 @@ def main(out: Path) -> None:
             mm = m_ & (band == b)
             if mm.any():
                 for n in SYSTEMS:
-                    rows_b.append({"slice": sl, "day": b + 1, "system": n, "rows": int(mm.sum()), **{key: float(v[mm].mean()) for key, v in stats[n].items()}})
+                    rows_b.append(
+                        {
+                            "slice": sl,
+                            "day": b + 1,
+                            "system": n,
+                            "rows": int(mm.sum()),
+                            **{key: float(v[mm].mean()) for key, v in stats[n].items()},
+                        }
+                    )
     pl.DataFrame(rows_b).write_csv(out / "by_day.csv")
-    pairs = [("Lag-enabled network", "BG2"), ("Lag-enabled network", "Manual heuristic"), ("Lag-enabled network", "Climatology"), ("BG2", "Manual heuristic"), ("BG2", "Climatology")]
+    pairs = [
+        ("Lag-enabled network", "BG2"),
+        ("Lag-enabled network", "Manual heuristic"),
+        ("Lag-enabled network", "Climatology"),
+        ("BG2", "Manual heuristic"),
+        ("BG2", "Climatology"),
+    ]
     metrics = ("crps", "mae", "twcrps")
     contrast_slices = [(sl, set_name) for sl in ("BSP", "GSP") for set_name in SETS]
     n_tests = len(pairs) * len(metrics) * len(contrast_slices)
@@ -153,12 +212,38 @@ def main(out: Path) -> None:
             continue
         for a_, b_ in pairs:
             for metric in metrics:
-                mean, lo95, hi95, draws = s.day_boot(day=day[mm], vals=stats[a_][metric][mm] - stats[b_][metric][mm], seed=633)
+                mean, lo95, hi95, draws = s.day_boot(
+                    day=day[mm], vals=stats[a_][metric][mm] - stats[b_][metric][mm], seed=633
+                )
                 blo, bhi = s.interval(draws, alpha)
-                rows_c.append({"slice": sl, "set": set_name, "a": a_, "b": b_, "measure": metric, "diff_a_minus_b": mean, "lo95": lo95, "hi95": hi95, "lo_bonferroni": blo, "hi_bonferroni": bhi, "n_tests": n_tests, "excludes_zero_bonferroni": bool(blo > 0 or bhi < 0)})
+                rows_c.append(
+                    {
+                        "slice": sl,
+                        "set": set_name,
+                        "a": a_,
+                        "b": b_,
+                        "measure": metric,
+                        "diff_a_minus_b": mean,
+                        "lo95": lo95,
+                        "hi95": hi95,
+                        "lo_bonferroni": blo,
+                        "hi_bonferroni": bhi,
+                        "n_tests": n_tests,
+                        "excludes_zero_bonferroni": bool(blo > 0 or bhi < 0),
+                    }
+                )
     pl.DataFrame(rows_c).write_csv(out / "contrasts.csv")
     print("Bonferroni count:", n_tests, flush=True)
-    np.savez_compressed(out / "rows.npz", site=site_of, lead=lead, day=day, idx=idx, y=y, **{f"crps_{n}": stats[n]["crps"] for n in SYSTEMS}, **{f"q50_{n}": q[n][:, 5] for n in SYSTEMS})
+    np.savez_compressed(
+        out / "rows.npz",
+        site=site_of,
+        lead=lead,
+        day=day,
+        idx=idx,
+        y=y,
+        **{f"crps_{n}": stats[n]["crps"] for n in SYSTEMS},  # ty: ignore[invalid-argument-type]
+        **{f"q50_{n}": q[n][:, 5] for n in SYSTEMS},
+    )
     print("done", flush=True)
 
 

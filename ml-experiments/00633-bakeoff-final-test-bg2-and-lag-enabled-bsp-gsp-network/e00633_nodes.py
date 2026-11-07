@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501, D103, PT018
 """Experiment 633, Part 2: extend the bulk and grid supply points' weather inputs to the final-test window (CPU, weather only).
 
 - `summaries`: the ensemble mean and standard deviation of each node, for the 123 runs from 2026-07-01
@@ -18,7 +18,6 @@ Usage: python e00633_nodes.py {summaries|check|raw}
 
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
@@ -40,8 +39,12 @@ def node_ids() -> list[int]:
 
 
 def summarise_run(*, frame: pl.DataFrame) -> pl.DataFrame:
-    table = prep.summarise(frame=frame.filter(pl.col("time_series_id").is_in(node_ids()))).sort("time_series_id", "valid_time")
-    return table.cast(dict.fromkeys([f"{a}_{w}" for a in ("mean", "std") for w in prep.WEATHER], pl.Float32))
+    table = prep.summarise(frame=frame.filter(pl.col("time_series_id").is_in(node_ids()))).sort(
+        "time_series_id", "valid_time"
+    )
+    return table.cast(
+        dict.fromkeys([f"{a}_{w}" for a in ("mean", "std") for w in prep.WEATHER], pl.Float32)
+    )
 
 
 def summaries() -> None:
@@ -65,7 +68,11 @@ def check() -> None:
     stored = pl.read_parquet(p415.NODE_SUMMARY_DIR / f"init={run:%Y-%m-%d}.parquet")
     j = mine.join(stored, on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_s")
     assert j.height == stored.height == mine.height, (j.height, stored.height, mine.height)
-    worst = max(float((j[c].cast(pl.Float64) - j[f"{c}_s"].cast(pl.Float64)).abs().max()) for c in mine.columns if c.startswith(("mean_", "std_")))  # ty: ignore[invalid-argument-type]
+    worst = max(
+        float((j[c].cast(pl.Float64) - j[f"{c}_s"].cast(pl.Float64)).abs().max())  # ty: ignore[invalid-argument-type]
+        for c in mine.columns
+        if c.startswith(("mean_", "std_"))
+    )  # ty: ignore[invalid-argument-type]
     print("max abs difference from experiment 415's file of 2026-06-30:", worst)
     assert worst == 0.0
 
@@ -79,17 +86,25 @@ def build_site(*, site: str) -> dict[str, np.ndarray]:
     A copy of `build_site` in experiment 620's `e00620_extend.py`, which builds a Primary's rows from the
     ensemble summaries, the solar angles, the calendar, and the lags of the extended power grid.
     """
-    import e00087_fit_demand as fd  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
 
     series, arrays = fd._series_and_arrays()
     row = next(r for r in series.iter_rows(named=True) if r["site"] == site)
-    summary = pl.scan_parquet(prep.SUMMARY_DIR / "init=*.parquet").filter(pl.col("time_series_id") == row["time_series_id"]).collect()
+    summary = (
+        pl.scan_parquet(prep.SUMMARY_DIR / "init=*.parquet")
+        .filter(pl.col("time_series_id") == row["time_series_id"])
+        .collect()
+    )
     idx = np.asarray(common.grid_index(times=summary["valid_time"]))
     power = common.take(values=arrays[site].power, index=idx) * row["effective_capacity_mw"]
     rows = summary.with_columns(power=pl.Series(power).cast(pl.Float32))
-    rows = rows.filter(pl.col("power").is_finite() & (pl.col("valid_time") > pl.col("power_fcst_init_time")))
+    rows = rows.filter(
+        pl.col("power").is_finite() & (pl.col("valid_time") > pl.col("power_fcst_init_time"))
+    )
     rows = common.with_derived(frame=rows, latitude=row["latitude"], longitude=row["longitude"])
-    rows = rows.with_columns(lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0)
+    rows = rows.with_columns(
+        lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
+    )
     rows = fd.add_lags(frame=rows, power=arrays[site].power, a7=False)
     rows = rows.with_columns(capacity=pl.lit(float(row["effective_capacity_mw"])))
     x = prep.feature_matrix(frame=rows, scheme="summary")
@@ -126,8 +141,22 @@ def check_raw() -> None:
     for site in NODES:
         old, new = np.load(OLD_RAW / f"{site}.npz"), np.load(RAW / f"{site}.npz")
         n = len(old["y"])
-        assert np.array_equal(new["x"][:n], old["x"], equal_nan=True) and np.array_equal(new["y"][:n], old["y"], equal_nan=True), site
-        print(site, "stored rows", n, "total", len(new["y"]), "last origin", np.datetime64(int(new["origin"].max()), "us"))
+        assert np.array_equal(new["x"][:n], old["x"], equal_nan=True) and np.array_equal(
+            new["y"][:n], old["y"], equal_nan=True
+        ), site
+        print(
+            site,
+            "stored rows",
+            n,
+            "total",
+            len(new["y"]),
+            "last origin",
+            np.datetime64(int(new["origin"].max()), "us"),
+        )
+
+
+def row_key(d: dict) -> np.ndarray:
+    return d["origin"].astype(np.int64) * (1 << 22) + (d["valid"] - d["origin"]) // 1_800_000_000
 
 
 def check_overlap() -> None:
@@ -139,15 +168,36 @@ def check_overlap() -> None:
     for site in NODES:
         both = build_site(site=site)
         new, old = both["new"], both["old"]  # ty: ignore[invalid-argument-type]
-        key = lambda d: d["origin"].astype(np.int64) * (1 << 22) + (d["valid"] - d["origin"]) // 1_800_000_000  # noqa: E731
-        ko, kn = key(old), key(new)
+        ko, kn = row_key(old), row_key(new)  # ty: ignore[invalid-argument-type]
         order = np.argsort(ko)
         pos = np.clip(np.searchsorted(ko[order], kn), 0, len(ko) - 1)
         hit = ko[order][pos] == kn
         sel, j = np.nonzero(hit)[0], order[pos[hit]]
-        worst = {c: float(np.nanmax(np.abs(new[c][sel].astype(np.float64) - old[c][j].astype(np.float64)))) for c in ("x", "y", "lead")}
-        print(site, "stored rows", len(old["y"]), "rebuilt rows", len(new["y"]), "matched", len(sel), "max abs diff", worst, flush=True)
+        worst = {
+            c: float(
+                np.nanmax(np.abs(new[c][sel].astype(np.float64) - old[c][j].astype(np.float64)))
+            )
+            for c in ("x", "y", "lead")
+        }
+        print(
+            site,
+            "stored rows",
+            len(old["y"]),
+            "rebuilt rows",
+            len(new["y"]),
+            "matched",
+            len(sel),
+            "max abs diff",
+            worst,
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
-    {"summaries": summaries, "check": check, "raw": raw, "check_raw": check_raw, "check_overlap": check_overlap}[sys.argv[1]]()
+    {
+        "summaries": summaries,
+        "check": check,
+        "raw": raw,
+        "check_raw": check_raw,
+        "check_overlap": check_overlap,
+    }[sys.argv[1]]()

@@ -29,11 +29,11 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import e00087_common as common87  # ty: ignore[unresolved-import]
 import e00582_arms as a  # ty: ignore[unresolved-import]
 import e00583_common as c  # ty: ignore[unresolved-import]
 import e00601_common as k601  # ty: ignore[unresolved-import]
 import e00633_common as k633
-import e00087_common as common87  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -156,7 +156,11 @@ def bg2_quantiles(*, base: pl.DataFrame, cap: dict) -> np.ndarray:
     for t in sorted(base["time_series_id"].unique().to_list()):
         site = names[int(t)]
         f = pl.read_parquet(k633.ROOT / "preds" / BG2_ARM / f"{site}.parquet")
-        assert abs(float(f["capacity"][0]) - cap[int(t)]) <= 1e-4 * cap[int(t)], (site, float(f["capacity"][0]), cap[int(t)])
+        assert abs(float(f["capacity"][0]) - cap[int(t)]) <= 1e-4 * cap[int(t)], (
+            site,
+            float(f["capacity"][0]),
+            cap[int(t)],
+        )
         parts.append(f.select(*KEYS, *QCOLS))
     bg2 = pl.concat(parts)
     joined = base.select(*KEYS).join(bg2, on=KEYS, how="left", validate="1:1")

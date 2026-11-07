@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, D103
 """Experiment 633: build the 51-member weather frames of the 123 window runs for the 20 demand series.
 
 Each run is read from the ECMWF ensemble archive, cut to the series' H3 cells, resampled to the
@@ -29,10 +29,16 @@ def build(*, run: datetime) -> pl.DataFrame:
     series = _SERIES.setdefault("s", common.series_table())
     rows, _init = bf._half_hourly_rows(run=run, targets=series.select(COLUMNS))
     local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
-    return rows.with_columns(
-        hour_local=local.dt.hour().cast(pl.Float64) + local.dt.minute().cast(pl.Float64) / 60.0,
-        day_of_week_local=local.dt.weekday().cast(pl.Float64),
-    ).select(*bf.RUN_KEY_COLUMNS, *bf.DEMAND_WEATHER, "hour_local", "day_of_week_local", "lead_hours").sort("time_series_id", "valid_time", "ensemble_member")
+    return (
+        rows.with_columns(
+            hour_local=local.dt.hour().cast(pl.Float64) + local.dt.minute().cast(pl.Float64) / 60.0,
+            day_of_week_local=local.dt.weekday().cast(pl.Float64),
+        )
+        .select(
+            *bf.RUN_KEY_COLUMNS, *bf.DEMAND_WEATHER, "hour_local", "day_of_week_local", "lead_hours"
+        )
+        .sort("time_series_id", "valid_time", "ensemble_member")
+    )
 
 
 def build_and_write(*, run: datetime) -> str:

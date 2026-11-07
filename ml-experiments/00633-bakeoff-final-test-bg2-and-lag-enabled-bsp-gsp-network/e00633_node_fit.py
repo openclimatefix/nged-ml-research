@@ -1,4 +1,4 @@
-# ruff: noqa: E402, PT018, D103
+# ruff: noqa: E402, E501, PT018, D103
 """Experiment 633, Part 2: the lag-enabled demand network with thermal-lag columns at the 4 BSP/GSP series, final-test fold (GPU).
 
 A copy of experiment 622's `e00622_fit.py` restricted to the arm `lagged_b1` (`--lags on --b1 on`), with

@@ -40,8 +40,8 @@ def redirect_to_extended_inputs(e, *, group: str) -> None:
     The held-out power is readable after this call, so it only runs in the prediction phase.
     `e` is experiment 574's module. `group` is `bsp` or `gsp`; the expected-input cache is per group.
     """
-    import e00437_features as f437  # noqa: PLC0415
-    import e00633_common as k633  # noqa: PLC0415
+    import e00437_features as f437  # ty: ignore[unresolved-import]
+    import e00633_common as k633
 
     k633.redirect()
     e.prep.SUMMARY_DIR = k633.ROOT / "inputs" / "ens_summary_nodes"

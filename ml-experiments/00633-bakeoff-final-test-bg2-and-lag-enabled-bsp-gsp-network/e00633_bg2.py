@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, D103, ANN001
 """Experiment 633: BG2 as one fit at 2026-07-01 ("BG2-single-fit"), fitted and then forecast over the window.
 
 BG2's weekly XGBoost member (experiment 87's configuration `n1h`): one booster per series, 500 rounds,
@@ -58,15 +58,28 @@ def training_rows(*, row: dict, arrays: dict) -> pl.DataFrame:
         .select(*common.KEYS, "ensemble_member", "power", *fd.WEATHER)
         .collect()
     )
-    after = pl.concat([pl.read_parquet(p).filter(pl.col("time_series_id") == series_id) for p in sorted(common.AFTER_DIR.glob("init=*.parquet"))])
+    after = pl.concat(
+        [
+            pl.read_parquet(p).filter(pl.col("time_series_id") == series_id)
+            for p in sorted(common.AFTER_DIR.glob("init=*.parquet"))
+        ]
+    )
     padded = after.with_columns(power=pl.lit(None, dtype=pl.Float32)).select(before.columns)
     rows = pl.concat([before, padded.cast(before.schema)])
     index = np.asarray(common.grid_index(times=rows["valid_time"]))
-    rows = rows.with_columns(power=pl.Series(common.take(values=arrays.power, index=index) * row["effective_capacity_mw"]))
-    rows = rows.filter(pl.col("power").is_finite() & (pl.col("valid_time") > pl.col("power_fcst_init_time")))
+    rows = rows.with_columns(
+        power=pl.Series(
+            common.take(values=arrays.power, index=index) * row["effective_capacity_mw"]  # ty: ignore[unresolved-attribute]
+        )
+    )
+    rows = rows.filter(
+        pl.col("power").is_finite() & (pl.col("valid_time") > pl.col("power_fcst_init_time"))
+    )
     rows = common.with_derived(frame=rows, latitude=row["latitude"], longitude=row["longitude"])
-    rows = rows.with_columns(lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0)
-    return fd.add_lags(frame=rows, power=arrays.power, a7=False)
+    rows = rows.with_columns(
+        lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
+    )
+    return fd.add_lags(frame=rows, power=arrays.power, a7=False)  # ty: ignore[unresolved-attribute]
 
 
 def fit(*, sites: list[str] | None) -> None:
@@ -83,7 +96,9 @@ def fit(*, sites: list[str] | None) -> None:
         if target.exists():
             continue
         started = time.monotonic()
-        known = fd.known_rows(rows=training_rows(row=row, arrays=arrays[site]), refit=k.CUTOFF, config=CONFIG)
+        known = fd.known_rows(
+            rows=training_rows(row=row, arrays=arrays[site]), refit=k.CUTOFF, config=CONFIG
+        )
         assert known["valid_time"].max() <= k.CUTOFF - fd.regimes.REFIT_CUTOFF_AGE  # ty: ignore[unresolved-attribute]
         assert known["power_fcst_init_time"].max() <= k.CUTOFF
         if site in k.SHORT_HISTORY_SITES:
@@ -109,10 +124,16 @@ def fit(*, sites: list[str] | None) -> None:
 
 def forecast_run(*, run, row, arrays, model) -> pl.DataFrame:
     """Return one run's mixture quantiles (fractions of capacity) for one series, before the spread factor."""
-    frame = pl.read_parquet(k.FRAMES / f"init={run:%Y-%m-%d}.parquet").filter(pl.col("time_series_id") == row["time_series_id"])
-    assert (frame["power_fcst_init_time"] - frame["nwp_init_time"]).unique().to_list() == [common.PUBLICATION_DELAY]
+    frame = pl.read_parquet(k.FRAMES / f"init={run:%Y-%m-%d}.parquet").filter(
+        pl.col("time_series_id") == row["time_series_id"]
+    )
+    assert (frame["power_fcst_init_time"] - frame["nwp_init_time"]).unique().to_list() == [
+        common.PUBLICATION_DELAY
+    ]
     prepared = fd.prepared_run(run_rows=frame, row=row, arrays=arrays, a7=False)
-    return fd.predict_variants(model=model, prepared=prepared, row=row, level=None, config=CONFIG, seed=k.SEED)[""]
+    return fd.predict_variants(
+        model=model, prepared=prepared, row=row, level=None, config=CONFIG, seed=k.SEED
+    )[""]
 
 
 def predict(*, sites: list[str] | None) -> None:
@@ -130,8 +151,12 @@ def predict(*, sites: list[str] | None) -> None:
         model = xgb.Booster()
         model.load_model(str(k.BOOSTERS / ARM / f"{site}_{k.CUTOFF:%Y%m%d}.ubj"))
         started = time.monotonic()
-        tables = [forecast_run(run=run, row=row, arrays=arrays[site], model=model) for run in k.runs()]
-        frame = pl.concat(tables).with_columns(site=pl.lit(site), capacity=pl.lit(float(row["effective_capacity_mw"])))
+        tables = [
+            forecast_run(run=run, row=row, arrays=arrays[site], model=model) for run in k.runs()
+        ]
+        frame = pl.concat(tables).with_columns(
+            site=pl.lit(site), capacity=pl.lit(float(row["effective_capacity_mw"]))
+        )
         common.atomic_write(frame=frame, target=target)
         print(site, frame.height, f"{time.monotonic() - started:.0f} s", flush=True)
 
@@ -159,10 +184,14 @@ def lookahead(*, sites: list[str] | None) -> None:
             keep = power[: newest + 1].copy()
             power[newest + 1 :] = rng.uniform(0.2, 0.8, size=power[newest + 1 :].shape)
             again = forecast_run(run=run, row=row, arrays=arrays[site], model=model)
-            assert base.equals(again), f"{site} {run}: a reading after the newest usable half-hour changed the forecast"
+            assert base.equals(again), (
+                f"{site} {run}: a reading after the newest usable half-hour changed the forecast"
+            )
             power[: newest + 1] = rng.uniform(0.2, 0.8, size=keep.shape)
             different = forecast_run(run=run, row=row, arrays=arrays[site], model=model)
-            assert not base.equals(different), f"{site} {run}: the lags do not read the permitted readings"
+            assert not base.equals(different), (
+                f"{site} {run}: the lags do not read the permitted readings"
+            )
             power[:] = saved
             print("lookahead ok", site, run.date(), flush=True)
 
