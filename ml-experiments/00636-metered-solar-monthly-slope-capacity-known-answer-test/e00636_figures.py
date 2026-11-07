@@ -1,3 +1,5 @@
+# ruff: noqa: E501, ANN001
+# ty: ignore[unresolved-attribute]
 """Experiment 636: draw the four figures of the write-up from the analysis CSVs."""
 
 from pathlib import Path

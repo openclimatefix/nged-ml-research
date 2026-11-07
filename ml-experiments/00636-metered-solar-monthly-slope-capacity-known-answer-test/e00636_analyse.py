@@ -1,3 +1,4 @@
+# ruff: noqa: C408, PLR0915, PLW2901
 """Experiment 636: turn the step statistics into recall, size, false-step, and MDS tables.
 
 Usage: `uv run --no-sync python e00636_analyse.py`. Writes CSVs next to `stats.parquet`.
