@@ -168,5 +168,6 @@ band on the stored gate days if the primary reading shows a gain.
 
 The brief asked for "at least two of the three fold pairs". The five development months have no
 natural three pairs, so this plan reads them as three season groups (autumn and early winter,
-winter and spring, summer). This is an interpretation, written before any score, and the
-manager may change it.
+winter and spring, summer). Experiment 612 names only the first fold pair (2025-10 and 2025-12), which
+matches the first group here; neither 612 nor 613 defines the others. The manager confirmed this
+reading before any score.
