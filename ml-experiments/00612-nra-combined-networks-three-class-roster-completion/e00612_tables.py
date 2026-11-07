@@ -51,7 +51,9 @@ def ci(*, diffs: np.ndarray, weights: np.ndarray | None = None, alpha: float) ->
 
 
 def verdict(*, lo: float, hi: float, tol: float, higher_is_better: bool) -> str:
-    """Return 'worse', 'equivalent', or 'inconclusive' for an interval against a tolerance."""
+    """Return 'better', 'worse', 'equivalent', or 'inconclusive' for an interval against a tolerance."""
+    if (higher_is_better and lo > tol) or (not higher_is_better and hi < -tol):
+        return "better"
     worse_lo, worse_hi = (-np.inf, -tol) if higher_is_better else (tol, np.inf)
     if worse_lo <= lo and hi <= worse_hi:
         return "worse"
@@ -211,10 +213,6 @@ def main() -> None:
         print(c2.select("contrast", "diff", "lo", "hi", "mde", "verdict"))
 
 
-if __name__ == "__main__":
-    main()
-
-
 def ablations() -> None:
     """Pair-month ablations (no E3, no offset) against K1 on the same two months, with tail constants."""
     pair = ["2025-12"]  # the only pair month that has tail constants
@@ -248,5 +246,66 @@ def ablations() -> None:
     _ = (pair, ref)
 
 
+def class2() -> None:
+    """Class 2 candidate (K2 + neighbour summaries + dropout, at the gate's band width) against K1 and K2, all five months, no tail constants."""
+    rows = []
+    cand = ("c2_e3w", "K2w")
+    refs = {"K1": ("k1_d5", "K1"), "K2": ("k1_d5", "K2")}
+    specs = []
+    for ref in refs:
+        for phase in ("days4-end", "after0-7"):
+            specs.append(("bank", ref, "24-120 h", phase, "cover90", TOL["cover"], True))
+        specs.append(("bank", ref, "24-120 h", "days4-end", "follow_q50", TOL["follow"], False))
+        for band in ("24-120 h", "120-240 h"):
+            for group in GROUPS:
+                specs.append(("free", ref, band, group, "cover90", TOL["cover"], True))
+                specs.append(("free", ref, band, group, "crps", TOL["crps"], False))
+    n_counted = len(specs)
+    alpha = 0.05 / n_counted
+    for kind, ref, band, x, metric, tol, hib in specs:
+        if kind == "bank":
+            rec = bank_contrast(a=cand, b=refs[ref], band=band, phase=x, metric=metric, alpha=alpha)
+            label = f"injected {metric}, {band}, {x}"
+        else:
+            rec = free_contrast(a=cand, b=refs[ref], band=band, group=x, metric=metric, alpha=alpha)
+            label = f"event-free {metric}, {band}, {'eight MVA' if x == EIGHT else 'six MW'}"
+        if rec:
+            rows.append({"candidate_minus": ref, "measure": label, **rec, "tolerance": tol, "n_counted": n_counted,
+                         "verdict": verdict(lo=rec["lo"], hi=rec["hi"], tol=tol, higher_is_better=hib)})  # fmt: skip
+    out = pl.DataFrame(rows, infer_schema_length=None)
+    out.write_csv(TABLES / "t4_class2.csv")
+    with pl.Config(tbl_rows=60, tbl_width_chars=200, fmt_str_lengths=60):
+        print(out.select("candidate_minus", "measure", "n_events", "n_cells", "level_a", "level_b", "diff", "lo", "hi", "verdict"))
+
+
+def measures() -> None:
+    """Levels at 120-240 h, curtailment cost, and event-free CRPS per group, for every network, plain and with tail constants (tail months for `+t`)."""
+    tail_months = ["2025-12", "2026-01", "2026-03", "2026-06"]
+    nets = {"K1 (D5)": ("k1_d5", "K1"), "K2 (D5)": ("k1_d5", "K2"), "K3 (D5)": ("k3_d5", "K2"),
+            "K1 (O2)": ("k1_o2", "K1"), "K2 (O2)": ("k1_o2", "K2"), "K3 (O2)": ("k3_o2", "K2"),
+            "Class 2 (gate band width)": ("c2_e3w", "K2w"), "Class 2 (own band width)": ("c2_e3w", "K2")}  # fmt: skip
+    rows = []
+    for name, (arm, system) in nets.items():
+        for tails in (False, True):
+            sysname = system + ("+t" if tails else "")
+            months = tail_months if tails else None
+            if tails and system == "K2w":
+                continue
+            c = cost_level(arm=arm, system=sysname, months=months)
+            for band in ("24-120 h", "120-240 h"):
+                for group in GROUPS:
+                    rows.append({"network": name, "tail_constants": tails, "band": band, "group": group,
+                                 "crps": free_level(arm=arm, system=sysname, band=band, group=group, metric="crps", months=months),
+                                 "cover90": free_level(arm=arm, system=sysname, band=band, group=group, metric="cover90", months=months),
+                                 **({f"cost_{k}": v for k, v in c.items()} if c and group == SIX and band == "24-120 h" else {})})  # fmt: skip
+    out = pl.DataFrame(rows, infer_schema_length=None)
+    out.write_csv(TABLES / "t5_measures.csv")
+    with pl.Config(tbl_rows=100, tbl_width_chars=220, fmt_str_lengths=40):
+        print(out)
+
+
 if __name__ == "__main__":
+    main()
     ablations()
+    class2()
+    measures()
