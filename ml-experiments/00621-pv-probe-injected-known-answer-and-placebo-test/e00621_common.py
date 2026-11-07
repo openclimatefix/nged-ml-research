@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Shared pieces of experiment 621: paths, the injected conditions, and the probe frame.
 
 An injected condition changes the target of the pretraining rows of the six signed-MW Primaries by
@@ -137,9 +138,7 @@ def unit_curve(
 ) -> np.ndarray:
     """Return the physics unit curve (AC output per MW of capacity at its 99th percentile)."""
     cos_zenith = x[:, 14].astype(np.float64)
-    doy = (
-        pl.Series(times_us).cast(pl.Datetime("us")).dt.ordinal_day().to_numpy().astype(np.float64)
-    )
+    doy = pl.Series(times_us).cast(pl.Datetime("us")).dt.ordinal_day().to_numpy().astype(np.float64)
     mean, _ = pv.unit_shape(
         ghi_mean=ghi, ghi_sd=np.zeros_like(ghi), cos_zenith=cos_zenith,
         sin_azimuth=x[:, 15].astype(np.float64), cos_azimuth=x[:, 16].astype(np.float64),
@@ -151,7 +150,9 @@ def unit_curve(
 class Injector:
     """Builds the injected change of the target, in points of effective capacity, for a row set."""
 
-    def __init__(self, *, primary: np.ndarray, target_idx: np.ndarray, x: np.ndarray, standardiser: object) -> None:
+    def __init__(
+        self, *, primary: np.ndarray, target_idx: np.ndarray, x: np.ndarray, standardiser: object
+    ) -> None:
         """Hold the rows' keys and the physical quantities every condition needs."""
         self.primary, self.target_idx, self.x = primary, target_idx, x
         self.t_us = time_us(target_idx=target_idx)
@@ -201,7 +202,13 @@ class Injector:
         # The grid step is local; use the UTC calendar day of the valid time.
         day = self.t_us // DAY_US
         frame = pl.DataFrame(
-            {"p": self.primary, "d": day, "t": self.target_idx, "cloud": cloud, "day_light": daylight}
+            {
+                "p": self.primary,
+                "d": day,
+                "t": self.target_idx,
+                "cloud": cloud,
+                "day_light": daylight,
+            }
         ).unique(subset=["p", "t"], keep="first")
         daily = frame.filter(pl.col("day_light")).group_by(["p", "d"]).agg(r=pl.col("cloud").mean())
         joined = pl.DataFrame({"p": self.primary, "d": day}).join(daily, on=["p", "d"], how="left")
@@ -222,7 +229,9 @@ class Injector:
                 shape = self.farm_series(farm=farm, kind=condition.kind)[self.inverse[sel]]
                 change[sel] = -condition.mw * inc * shape
             elif condition.kind == "phys":
-                shape = unit_curve(ghi=self.ghi[sel], x=self.x[sel], times_us=self.t_us[sel], temp=self.temp[sel])
+                shape = unit_curve(
+                    ghi=self.ghi[sel], x=self.x[sel], times_us=self.t_us[sel], temp=self.temp[sel]
+                )
                 change[sel] = -condition.mw * inc * shape
             else:
                 response = self.cloud_response(squared=condition.squared)[sel]

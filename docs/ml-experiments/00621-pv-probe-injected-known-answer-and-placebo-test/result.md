@@ -4,7 +4,7 @@ slug: pv-probe-injected-known-answer-and-placebo-test
 theme: solar-disaggregation
 also_relevant_to:
   - production-reference-and-best-guess
-status: planned
+status: done
 kind: other
 size: >-
   medium. Stored: pretrained network weights, probe frames, and probe results in this experiment's
@@ -44,44 +44,114 @@ metric: >-
   injected megawatts; day-block bootstrap 80% interval.
 production_status: not-for-production
 adopted_in: none
+verdict: not supported
+best_arm: >-
+  None. The physics-curve world is recovered best (0.89 to 1.03 of the injected MW); the real-farm
+  world is read at 0.65 to 0.71.
+headline: >-
+  The probe reads an injected real farm at 0.68 of its megawatts (median over 2 cutoffs, 3 seeds, 2
+  rotations; 0.65 to 0.71 at every one of the six MW Primaries, at both 2 MW and 4 MW), against a pass
+  bar of 0.85 to 1.15. Both placebos pass (95th percentile 0.06 to 0.12 and 0.10 to 0.18, bar 0.20).
+  Interval coverage fails (0.48 in the physics-curve world, 0.46 to 0.63 with a cloud-following
+  load).
+lessons:
+  - >-
+    The probe is precise and biased: seed standard deviation of the capacity difference is 0.06 MW
+    and the bootstrap standard deviation 0.02 MW, but the real farm is read at 0.68, and the
+    physics-curve world at 0.96 to 0.98, so the shortfall comes from the sky-to-power mapping of a
+    real farm, not from the network's ability to learn a PV response.
+  - >-
+    The cloud template removes the cloud-following load but removes most of the real PV with it:
+    real-farm recovery falls to 0.04 to 0.17, and the cloud-load read-out turns negative (down to
+    -0.68 of a 2 MW farm).
+  - >-
+    A fixed calendar does remove the profile failure of experiments 405 and 477: the profile-only
+    placebo reads 0.06 to 0.12.
+take_home_message: >-
+  A neural network that is probed with its calendar held fixed reads an injected solar farm at about
+  two thirds of its true megawatts (0.68, tightly), reads the two placebos at about 0.1, and is
+  fooled by a cloud-following load unless a cloud template is added, which also removes most of the
+  real PV. The probe is stable enough to be useful as a scaled estimate, but its intervals do not
+  cover the truth and it cannot separate PV from cloud-following demand, so it validates no capacity.
+advice:
+  - >-
+    Do not report a probe capacity as a measurement; report it beside a divided estimate (probe over
+    0.68) and say the division rests on one known-answer test at one set of farms.
+  - >-
+    Do not add a flat cloud template to the donor-day regression: it absorbs the real PV as well as
+    the load.
+  - >-
+    Before trusting an interval from the probe, widen it by a bias term as well as the seed spread:
+    the bootstrap and seed spread together cover the truth at 0 of 96 real-farm injections.
 ---
 
 # Injected known-answer and placebo test of the donor-day PV probe
 
-*Planned. The write-up replaces this page when the fits and probes have run.*
+**Take-home: the donor-day probe reads an injected real solar farm at about 0.68 of its megawatts,
+so it fails the 0.85 to 1.15 bar, and the line stops here with no rescue tuning.** The reading is
+stable (0.65 to 0.71 at all six MW Primaries, both cutoffs, both sizes, both farm rotations), so a
+divided estimate is possible. The probe separates a real farm from a profile-only and a shuffled-sky
+placebo, which the neural attempts of experiments 405 and 477 could not. It cannot separate PV from
+a load that follows the clouds: without a cloud template a strong linear load reads as 0.37 to 0.43
+of a 2 MW farm, and with the template the real PV is mostly removed too.
 
-**Worlds.** Each pretraining injects one world at all six MW Primaries (D5, D9, D10, D11, D14, D16)
-and is paired with an uninjected twin of the same cutoff and seed. The worlds are: a real farm's
-output scaled to 2 MW and 4 MW (farms A, B, C, and F, two rotations over the Primaries); the physics
-unit curve driven by the Primary's own CAMS shortwave at 2 MW and 4 MW; a profile-only placebo (the
-farm's year-month by half-hour mean) at 4 MW; a shuffled-sky placebo (that profile plus the farm's
-anomaly from another day of the same month) at 4 MW; and a cloud-following load (linear and squared
-forms of experiment 129's day-long cloud response, averaging 0.10 and 0.30 of 2 MW over daylight
-half-hours).
+The question: if a lag-free neural network (experiment 554's modular network M0, pretrained on ERA5
+and CAMS estimates of past weather) is trained on data with a known PV farm added at the six MW
+Primaries, does a probe with its datetime inputs held fixed read the injected capacity back? Each
+injected network is compared with an uninjected twin of the same cutoff and seed. The cutoffs are
+2026-03 and 2026-06, with 3 seeds each; 15 conditions give 90 pretrainings of about 22 s each on the
+GPU (about 0.7 GPU-hours in all).
 
-**Probe.** Datetime inputs and the Primary are held at the probe date and half-hour. The weather
-inputs come from every other date within 21 days of the probe date's day of year, at the same
-half-hour. Probed net demand is regressed, with an intercept per probe cell, on the physics unit
-curve of the donor weather and the donor temperature (`plain`), and also on a flat `1 - clear-sky
-index` cloud template (`cloud_tpl`). The capacity is minus the slope on the unit curve.
+![Recovery by world and Primary](recovery_by_world.svg)
 
-**Deviations from the design review, fixed before any recovery was read.** (a) The network is
-experiment 554's stage `pre` network (M0), which has no year or drift input, so the step world, whose
-point is time resolution, cannot be tested and is not run. (b) Farms D and E are not used, because
-their daylight gaps (14% and 24 to 78%) would remove most rows; the six Primaries take farms A, B, C,
-F, A, B. Rows with a gap in any of the four farms are dropped from every arm, which is 15.5% of the
-six Primaries' rows at the 2026-06 cutoff. (c) The farm series has no zero-fill after 2026-03-26;
-those half-hours are dropped like any other gap. (d) The cloud load is run at two sizes because the
-size that experiment 129 used may be too small to test the 0.15 bar.
+![Probed against injected capacity](recovered_vs_injected.svg)
 
-**How each bar is computed (fixed before the grid was read; the only recoveries seen were a timing
-run of one seed at the 2026-06 cutoff).** The unit of evaluation is a Primary. For each bar, a
-Primary's value is the median (or, for the placebo bar, the 95th percentile) over the 2 cutoffs, the
-3 seeds, and, for the farm worlds, the 2 farm rotations. A bar passes when it holds at 5 of the 6
-Primaries (4 of 6 for the 2 MW real-farm bar). Recovery uses the `plain` regression for the
-real-farm, physics-curve, and placebo worlds, and the `cloud_tpl` regression for the cloud-load
-worlds. The nominal 80% interval of an injection is its recovery plus or minus 1.28 times the root of
-the bootstrap variance and the across-seed variance of the probed capacity difference; the
-bootstrap-only interval is reported beside it. In the cloud-load worlds, the interval has to cover
-zero, because no PV was injected. The cloud load fakes capacity when the `cloud_tpl` difference
-exceeds 0.15 of 2 MW.
+![Cloud-following load read as PV](cloud_load_faking.svg)
+
+**Pass or fail, as pre-registered** (a bar passes at 5 of 6 Primaries; 4 of 6 for the 2 MW farm):
+
+| Bar | Result | Pass |
+|---|---|---|
+| Real farm 4 MW inside 0.85 to 1.15 | 0 of 6 (medians 0.65 to 0.71) | fail |
+| Real farm 2 MW inside 0.85 to 1.15 | 0 of 6 (medians 0.67 to 0.70) | fail |
+| Profile-only placebo, 95th percentile under 0.20 | 6 of 6 (0.06 to 0.12) | pass |
+| Shuffled-sky placebo, 95th percentile under 0.20 | 6 of 6 (0.10 to 0.18) | pass |
+| Cloud load under 0.15 of 2 MW with the template | 6 of 6, all four loads, but negative, down to -0.68 | pass, uninformative |
+| 80% interval covers truth, physics-curve world | 0.48 (bootstrap only 0.08) | fail |
+| 80% interval covers truth, linear cloud load (weak, strong) | 0.63, 0.46 | fail |
+
+- **Arms.** Real farm (farms A, B, C, F, two rotations, 2 MW and 4 MW), physics curve driven by the
+  Primary's own CAMS shortwave (2 MW and 4 MW), profile-only and shuffled-sky placebos (4 MW,
+  two rotations), cloud-following load (linear and squared, averaging 0.10 and 0.30 of 2 MW over
+  daylight half-hours), and the uninjected twin.
+- **Absolute readings (uninjected twins).** Probed effective AC capacity 1.7 to 2.6 MW per Primary
+  (D5 2.0, D9 1.7, D10 1.7, D11 2.4, D14 2.6, D16 2.1), 2.07 MW at the 2026-03 cutoff and 2.13 MW at
+  2026-06 on average, with a seed standard deviation of 0.05 to 0.14 MW. Whether these are right is
+  untested.
+- **Physics-curve world.** Recovery 0.89 to 1.03; this world uses the probe's own regressor as the
+  injected shape, so it shows what the probe loses when the shape is known exactly (about 3%) and
+  is not evidence for the real-farm worlds.
+- **Cloud load without the template.** A weak linear load reads as 0.10 to 0.16 of 2 MW, a strong
+  linear load as 0.37 to 0.43, and a strong squared load as 0.55 to 0.65. The template removes these
+  but also cuts the real-farm recovery to 0.04 to 0.17, and the squared strong load reads as -0.32
+  to -0.68, so the template is not a usable fix.
+- **Interval.** The interval is the day-block bootstrap widened by the across-seed spread, as
+  pre-registered. It is too narrow because the error is bias, not noise: it covers the injected
+  capacity at 0 of 96 real-farm injections.
+- **Deviations (fixed before the grid was read).** The network has no time input, so the step world
+  is not run. Farms D and E are left out for their daylight gaps, so the six Primaries take farms A,
+  B, C, F, A, B. Half-hours with a gap in any of those four farms (15.5% of the six Primaries' rows at
+  the 2026-06 cutoff) are dropped from every arm. The cloud load runs at two sizes.
+- **Not run.** The contrastive variant (a synthetic +1 MW of PV added to net demand and compared with
+  the uninjected rows) was not run here; another session runs contrastive injections on this
+  pipeline.
+- **Caveats.** The cloud load is a UTC-day mean of the cloud response, which the probe's single
+  donor half-hour only partly sees; one injected farm shape per Primary and rotation; the probe is
+  tested on one network family (stage `pre` of M0, no lags, no drift input).
+- **Reuse.** Code: `ml-experiments/00621-pv-probe-injected-known-answer-and-placebo-test/`; it imports
+  experiments 405, 409, 510, 554, and 448 and edits none of them.
+- **What to try next.** (1) Decide whether to publish the probe's capacity divided by 0.68, with an
+  interval widened for bias. (2) Test whether the 0.68 shortfall comes from the unit curve
+  (orientation, tilt, clipping) by injecting the physics curve with a different tilt. (3) Keep
+  experiment 474's R4 estimate as the main capacity table, with the probe as a second, independent
+  reading.

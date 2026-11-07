@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201
+# ruff: noqa: E501, ANN001
 """Experiment 621: the donor-day regression probe of a pretrained lag-free network (CPU).
 
 The probe holds every datetime input, and the Primary, at one probe date and half-hour, and feeds
@@ -63,7 +63,9 @@ def cells_and_donors(*, frame: dict[str, np.ndarray], primary: int) -> dict[str,
             if x[b, 14] < MIN_COS_ZENITH or x[b, 32] > 0:  # cos_zenith, bank_holiday
                 continue
             near = np.abs(((doy - d_doy + 182) % 365) - 182) <= WINDOW_DAYS
-            donors = np.nonzero(near & (minute == mm) & (days != day) & (x[:, 14] >= MIN_COS_ZENITH))[0]
+            donors = np.nonzero(
+                near & (minute == mm) & (days != day) & (x[:, 14] >= MIN_COS_ZENITH)
+            )[0]
             rows.append(
                 {
                     "base": np.full(len(donors), b), "donor": donors, "cell": np.full(len(donors), cell),
@@ -75,7 +77,12 @@ def cells_and_donors(*, frame: dict[str, np.ndarray], primary: int) -> dict[str,
 
 
 def forward_mw(
-    *, model: m.ModularMdn, frame: dict[str, np.ndarray], primary: int, probe: dict[str, np.ndarray], cap: float
+    *,
+    model: m.ModularMdn,
+    frame: dict[str, np.ndarray],
+    primary: int,
+    probe: dict[str, np.ndarray],
+    cap: float,
 ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """Return the probed net demand (MW) of every probe row, and the regressors."""
     x, b, d = probe["x"], probe["base"], probe["donor"]
@@ -91,7 +98,9 @@ def forward_mw(
     inp[:, 0] = np.clip((ghi_in - s_mean[0]) / s_std[0], -5.0, 5.0).astype(np.float32)
     with torch.no_grad():
         xt = torch.from_numpy(inp)
-        xt = torch.cat([xt, torch.zeros(len(xt), 2)], dim=1)  # the lead columns, unused at stage `pre`
+        xt = torch.cat(
+            [xt, torch.zeros(len(xt), 2)], dim=1
+        )  # the lead columns, unused at stage `pre`
         pt = torch.full((len(xt),), primary, dtype=torch.long)
         mean_z = []
         for i in range(0, len(xt), 65_536):
@@ -103,9 +112,7 @@ def forward_mw(
     return y_points * cap, {"u": unit, "temp": temp_d, "cloud": np.clip(1.0 - kt, 0.0, 1.0)}
 
 
-def fit(
-    *, y: np.ndarray, cell: np.ndarray, regressors: list[np.ndarray], w: np.ndarray
-) -> float:
+def fit(*, y: np.ndarray, cell: np.ndarray, regressors: list[np.ndarray], w: np.ndarray) -> float:
     """Return minus the slope on the first regressor, after weighted demeaning within each cell."""
     wsum = np.bincount(cell, weights=w)
     wsum = np.where(wsum > 0, wsum, 1.0)
@@ -120,7 +127,9 @@ def fit(
     return float(-beta[0])
 
 
-def probe_network(*, model: m.ModularMdn, frame, primary: int, probe, cap: float, rng: np.random.Generator) -> dict:
+def probe_network(
+    *, model: m.ModularMdn, frame, primary: int, probe, cap: float, rng: np.random.Generator
+) -> dict:
     """Return the point estimates and the bootstrap draws of the effective AC capacity (MW)."""
     y, reg = forward_mw(model=model, frame=frame, primary=primary, probe=probe, cap=cap)
     cell = probe["cell"]
@@ -171,7 +180,14 @@ def main() -> None:
             model.eval()
             for site, i in six.items():
                 rng = np.random.default_rng(1000 * seed + i)
-                res = probe_network(model=model, frame=frame, primary=i, probe=probes[site], cap=float(cap[i]), rng=rng)
+                res = probe_network(
+                    model=model,
+                    frame=frame,
+                    primary=i,
+                    probe=probes[site],
+                    cap=float(cap[i]),
+                    rng=rng,
+                )
                 for kind in ("plain", "cloud_tpl"):
                     point, boot = res[kind]
                     records.append(

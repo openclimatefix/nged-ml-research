@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201
+# ruff: noqa: E501, ANN001
 """Experiment 621: pretrain experiment 554's modular lag-free network M0 on ERA5 and CAMS rows with a known injection.
 
 The network, rows, loss, learning rate, early stopping and seeds are experiment 554's `pretrain`
@@ -79,7 +79,12 @@ def write_frame(*, cutoff: str, pre, rows, keep: np.ndarray) -> None:
     six = k.six_indices()
     t_us = k.time_us(target_idx=pre.target_idx)
     hour = (t_us // 3_600_000_000) % 24
-    sel = keep & np.isin(pre.primary, list(six.values())) & (hour >= FRAME_HOURS[0]) & (hour <= FRAME_HOURS[1])
+    sel = (
+        keep
+        & np.isin(pre.primary, list(six.values()))
+        & (hour >= FRAME_HOURS[0])
+        & (hour <= FRAME_HOURS[1])
+    )
     key = pre.primary[sel].astype(np.int64) * 10_000_000 + pre.target_idx[sel]
     _, first = np.unique(key, return_index=True)
     idx = np.nonzero(sel)[0][first]
@@ -112,7 +117,9 @@ def main() -> None:
         (pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC
     )
     assert latest <= refit_t - c.regimes.REFIT_CUTOFF_AGE, (latest, refit_t)
-    inj = k.Injector(primary=pre.primary, target_idx=pre.target_idx, x=pre.x, standardiser=rows.standardiser)
+    inj = k.Injector(
+        primary=pre.primary, target_idx=pre.target_idx, x=pre.x, standardiser=rows.standardiser
+    )
     keep = ~inj.gap
     print(
         f"{args.cutoff}: {len(pre.y):,} rows, {int(inj.gap.sum()):,} dropped for farm gaps "
@@ -149,7 +156,10 @@ def main() -> None:
             torch.save(model.state_dict(), tmp)
             tmp.rename(target)
             seconds = time.monotonic() - started
-            print(f"  {args.cutoff} {name} s{seed}: {epochs} epochs, val NLL {best:.4f}, {seconds:.0f} s", flush=True)
+            print(
+                f"  {args.cutoff} {name} s{seed}: {epochs} epochs, val NLL {best:.4f}, {seconds:.0f} s",
+                flush=True,
+            )
             log = k.WORK / "logs" / args.cutoff / f"{name}_s{seed}.json"
             log.parent.mkdir(parents=True, exist_ok=True)
             log.write_text(json.dumps({"epochs": epochs, "val_nll": best, "seconds": seconds}))
