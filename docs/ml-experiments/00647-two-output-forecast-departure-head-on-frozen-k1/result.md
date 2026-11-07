@@ -38,10 +38,11 @@ decision_rule: >-
   forecasts are copied unchanged, and the scoring script asserts byte equality with the export. H1
   or H2 counts as beating R0 on a bar when the month-block 95% interval of the CRPS difference
   excludes zero in the predicted direction and the point estimate exceeds the minimum detectable
-  effect. The minimum detectable effect is the half-width of the paired interval of R0 against K1
-  on the same cut, printed before any head row is scored. The experiment stops, and the
-  prevailing output is R0 itself, when neither H1 nor H2 beats R0 on both P2 and P4 on the first
-  month pair. The smallest gain worth porting is set by the added pipeline step (a second model
+  effect. The minimum detectable effect is a fixed 0.05 points of capacity (CRPS), chosen before any head
+  row is scored, so that the bar does not move with the baseline. The first month pair (2025-10 and 2025-12) is a feasibility gate and not a test, because two
+  month blocks cannot support a 95% interval. The experiment stops, and the prevailing output is
+  R0 itself, when neither H1 nor H2 has a point estimate below R0's on both P2 and P4 on that
+  pair. Claims need the pooled month-block interval over all five months. The smallest gain worth porting is set by the added pipeline step (a second model
   whose inputs are K1's outputs and the lag signals): 15% on P2 and the interval bars above, because
   R0 already gives 10% to 19% on the verified pair with no fit. The 0.03-point P1 and P3 limits are
   the design answer's.
@@ -72,9 +73,14 @@ that design's first test, on K1's stored forecasts. It follows
 [experiment 590](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00590-synthetic-load-shifts-in-the-training-targets/result/),
 which found that training one network on shifted targets doubles how far its median follows a shift.
 
-**The NRA output is K1, frozen and unchanged.** Its rows are copied from the stored export of
-experiments 612 and 613 (the mean of five seeds, with the G4 gated band). It never sees a shifted
-target.
+**The NRA output is K1, frozen and unchanged.** On real rows it is the stored export of
+experiments 612 and 613 (the mean of five seeds, with the tail constants and the G4 gated band). On
+the injected bank the stored files are raw per-seed forecasts, so the script rebuilds K1 from them
+with experiment 613's scoring path (seed mean, tail constants, G4 state) and first asserts that the
+rebuild reproduces experiment 613's K1 score tables. Tail constants for 2025-10 are borrowed from
+later months, as in experiment 613. The head code has no path that writes to the NRA rows, and the
+scoring script asserts the NRA columns are identical before and after the head runs. N1 and N2
+are therefore reported, not tested.
 
 ## Arms
 
@@ -143,6 +149,37 @@ tests, and P4 is the real-data check. The NRA is never drawn as truth in a figur
 and the avoidable-curtailment cost in three row sets (inside each hand-labelled event, the 7 days
 after, and all rows) per group and per Primary; the unlogged-event caveat; the median minus the
 mean forecast per site; and the CRPS contrast beside the same contrast on the median's error.
+
+## Inputs, controls, and limits
+
+- **Input sources.** Injected lags come from `e00581_bank.contaminate`; the lag-free forecasts
+  from experiment 598's table; the signals from experiment 606's code. The first step lists, per
+  input, its source file and its first and last available date. Rows where R0 or a lag input
+  cannot be formed (a 30 day shift starting in the previous month, or a history shorter than the
+  7 day half-life needs) are dropped from every arm equally, and the counts are reported. If the
+  lag-free table is missing days before a month's first origin, K1 inference fills them, with one
+  fold timed first and the 2 GPU-hour ceiling kept.
+- **R0 specification.** The first step writes R0 as code and asserts that, on the stored
+  non-injected export, it reproduces the design answer's table (event-free all-16 Primaries 3.752
+  for K1, 3.637 for tau 72 h, 3.577 for tau 168 h; verified rows 14.93, 13.42, 12.79) within 0.01.
+  Observed power for R0 on the injected bank carries the same shift as the lags, with the same
+  staleness (at least 33 hours). Tau is the design answer's pair of values, and both are reported.
+- **No calendar or date input enters either head.** The age of the current departure is the only
+  duration signal. Because every injected shift ends on day 14, an extra control gives the head
+  the age shuffled across rows. P2 and P3 are reported per injected length (3, 7, 15, and 30
+  days). The 28 to 112 day part of the duration prior cannot be exercised by this bank and rests on
+  the stated prior.
+- **Leakage.** The leave-one-month-out variant trains on later months as well as earlier ones, as
+  experiment 613's tail constants do. A forward-chained variant (earlier months only) runs on the
+  first month pair. Rows flagged by experiment 637's detector or by G4, and the verified D5 and
+  D16 days, are excluded from head training (the real rows in them have unknown NRA), and the
+  training row count per fold is reported.
+- **Extra controls.** An age-and-gate-only head (no gap inputs); H2 with a noise placebo; a plain
+  widened K1 band with the same coverage as H1 on P2 and P4; an oracle head given the true depth
+  and onset on injected rows (the ceiling). The mean q95-q05 band width is reported beside every
+  coverage. The five seeds of K1 enter the intervals by resampling seeds.
+- **Figures chosen before scores.** Six time series plots: pass 2, 5, and 9 of 2025-12, one
+  Primary of each metering group each, plus the verified D5 and D16 pair.
 
 ## Standing practices
 
