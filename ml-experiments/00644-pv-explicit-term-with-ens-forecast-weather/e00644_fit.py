@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001
+# ruff: noqa: E501, ANN001, PLR0912, PLR0915, PT018
 """Experiment 644: fine-tune the free and explicit solar networks on ensemble-forecast weather and forecast.
 
 For each pretraining cutoff, each month of its 60-day test window, and each world, a network starts
@@ -88,11 +88,15 @@ def _load_for_finetune(*, model: torch.nn.Module, path: Path) -> None:
 
 
 def _train(
-    *, model, x, y, u_inc, r4, after, p, w, is_val, mean, std, tensors, seed: int,
+    *, model, x, y, u_inc, r4, after, p, w, is_val, mean, std, tensors, seed: int, init_delta=None,
 ) -> tuple[int, float, torch.Tensor]:  # fmt: skip
     """Experiment 639's `train_explicit` with recency weights, the fine-tune learning rates, and the fresh mixer group."""
     torch.manual_seed(seed)
-    delta = torch.zeros(net.N_PRIMARIES, device=DEVICE, requires_grad=True)
+    delta = (
+        init_delta.clone()
+        if init_delta is not None
+        else torch.zeros(net.N_PRIMARIES, device=DEVICE)
+    ).requires_grad_(True)
     train_idx = torch.nonzero(~is_val).squeeze(1)
     val_idx = torch.nonzero(is_val).squeeze(1)
     generator = torch.Generator(device="cpu").manual_seed(seed)
@@ -108,7 +112,7 @@ def _train(
             {"params": [delta], "lr": c.FINE_TUNE_LR, "weight_decay": 0.0},
         ]
     )  # fmt: skip
-    prior = (delta.detach() * 0).clone()
+    prior = delta.detach().clone()
 
     def nll_of(idx: torch.Tensor, ek, ed) -> torch.Tensor:
         cap = net.capacity_mw(
@@ -126,7 +130,11 @@ def _train(
         order = order[: int(c.ROW_FRACTION * len(order))]
         for start in range(0, len(order), c.BATCH):
             b = order[start : start + c.BATCH]
-            penalty = ((delta - prior) ** 2).sum() / (2 * k639.DELTA_PRIOR_MW**2) / k639.DELTA_PENALTY_ROWS
+            penalty = (
+                ((delta - prior) ** 2).sum()
+                / (2 * k639.DELTA_PRIOR_MW**2)
+                / k639.DELTA_PENALTY_ROWS
+            )
             nll = nll_of(b, ek, ed)
             loss = (w[b] * nll).sum() / w[b].sum() + penalty
             optimiser.zero_grad()
@@ -135,11 +143,16 @@ def _train(
             optimiser.step()
         model.eval()
         with torch.no_grad():
-            val = float(torch.cat([nll_of(i, None, None) for i in val_idx.split(c.BATCH * 2)]).mean())
+            val = float(
+                torch.cat([nll_of(i, None, None) for i in val_idx.split(c.BATCH * 2)]).mean()
+            )
         epochs = epoch + 1
         if val < best - 1e-5:
             best, stale = val, 0
-            best_state = ({a: v.detach().clone() for a, v in model.state_dict().items()}, delta.detach().clone())
+            best_state = (
+                {a: v.detach().clone() for a, v in model.state_dict().items()},
+                delta.detach().clone(),
+            )
         else:
             stale += 1
             if stale >= c.PATIENCE:
@@ -169,29 +182,43 @@ def run_month(
     assert sel.report["rows_past_valid_cut"] == 0 and sel.report["rows_past_origin_cut"] == 0
     idx = sel.index
     if smoke:
-        idx = idx[:: 20]
+        idx = idx[::20]
     for world in worlds:
         inj = k638.Injector(
-            primary=mr.primary[idx], target_idx=mr.target_idx[idx], x=mr.x[idx], standardiser=mr.base.standardiser
+            primary=mr.primary[idx],
+            target_idx=mr.target_idx[idx],
+            x=mr.x[idx],
+            standardiser=mr.base.standardiser,
         )
         keep = ~inj.gap
-        change = inj.change_points_step(condition=k638.parse(name="step_spring23_mw4")) if world == "step" else 0.0
+        change = (
+            inj.change_points_step(condition=k638.parse(name="step_spring23_mw4"))
+            if world == "step"
+            else 0.0
+        )
         y = mr.y[idx].astype(np.float64) + change
         blk = d639._decorate(
             cutoff=cutoff, world=world, x=mr.x[idx], y=y, primary=mr.primary[idx],
             target_idx=mr.target_idx[idx], is_val=mr.is_val[idx], inj=inj,
         )  # fmt: skip
         tr = d639._select(block=blk, keep=keep)
-        w_all = (sel.weight[:: 20] if smoke else sel.weight)[keep]
+        w_all = (sel.weight[::20] if smoke else sel.weight)[keep]
         # Test rows: leads from MIN_LEAD_H to 240 hours, finite cleaned power, the six Primaries only.
         ok = np.isin(test.primary, list(six.values())) & (test.lead >= MIN_LEAD_H)
         y_test = clean[test.primary, test.target_idx]
         ok &= np.isfinite(y_test)
         tid = np.flatnonzero(ok)
         tinj = k638.Injector(
-            primary=test.primary[tid], target_idx=test.target_idx[tid], x=test.x[tid], standardiser=mr.base.standardiser
+            primary=test.primary[tid],
+            target_idx=test.target_idx[tid],
+            x=test.x[tid],
+            standardiser=mr.base.standardiser,
         )
-        tchange = tinj.change_points_step(condition=k638.parse(name="step_spring23_mw4")) if world == "step" else 0.0
+        tchange = (
+            tinj.change_points_step(condition=k638.parse(name="step_spring23_mw4"))
+            if world == "step"
+            else 0.0
+        )
         tblk = d639._decorate(
             cutoff=cutoff, world=world, x=test.x[tid], y=y_test[tid].astype(np.float64) + tchange,
             primary=test.primary[tid], target_idx=test.target_idx[tid],
@@ -201,6 +228,8 @@ def run_month(
         tblk = d639._select(block=tblk, keep=tkeep)
         tid = tid[tkeep]
         rp = rows_path(month=month, world=world)
+        if smoke:
+            rp = rp.with_name("smoke_" + rp.name)
         rp.parent.mkdir(parents=True, exist_ok=True)
         np.savez(
             rp.with_name(rp.name + ".tmp.npz"), primary=tblk.primary, target_idx=tblk.target_idx, y=tblk.y,
@@ -228,7 +257,11 @@ def run_month(
             u_train = (g["u_shuf"] if shuffled else g["u"]) * g["inc"]
             if name == "free":
                 u_train = u_train * 0.0
-            u_test = _f32((tblk.u_shuf if shuffled else tblk.u) * tblk.inc) if name != "free" else _f32(tblk.u * 0.0)
+            u_test = (
+                _f32((tblk.u_shuf if shuffled else tblk.u) * tblk.inc)
+                if name != "free"
+                else _f32(tblk.u * 0.0)
+            )
             for seed in seeds:
                 out = fits_path(cutoff=cutoff, month=month, world=world, arm=arm, seed=seed)
                 target = out.with_suffix(".npz")
@@ -237,11 +270,21 @@ def run_month(
                 started = time.monotonic()
                 torch.manual_seed(seed)
                 model = m.ModularMdn(n_primaries=16, stage="ft").to(DEVICE)
-                _load_for_finetune(model=model, path=_pretrained(cutoff=cutoff, world=world, arm=arm, seed=seed))
+                _load_for_finetune(
+                    model=model, path=_pretrained(cutoff=cutoff, world=world, arm=arm, seed=seed)
+                )
                 model.to(DEVICE)
+                init = None
+                js = _pretrained(cutoff=cutoff, world=world, arm=arm, seed=seed).with_suffix(
+                    ".json"
+                )
+                if name != "free" and js.exists():
+                    init = torch.tensor(
+                        json.loads(js.read_text())["delta_mw"], dtype=torch.float32, device=DEVICE
+                    )
                 epochs, best, delta = _train(
                     model=model, x=g["x"], y=g["y"], u_inc=u_train, r4=g["r4"], after=g["after"], p=g["p"], w=g["w"],
-                    is_val=g["is_val"], mean=mean, std=std, tensors=tensors, seed=seed,
+                    is_val=g["is_val"], mean=mean, std=std, tensors=tensors, seed=seed, init_delta=init,
                 )  # fmt: skip
                 p_test = torch.from_numpy(tblk.primary).to(DEVICE)
                 cap = net.capacity_mw(
@@ -251,7 +294,10 @@ def run_month(
                     model=model, x=tblk.x, p=tblk.primary, mean=mean, std=std, subtract=(cap * u_test).cpu(), device=DEVICE,
                 )  # fmt: skip
                 if smoke:
-                    print(f"SMOKE {cutoff} {month} {world} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows", flush=True)
+                    print(
+                        f"SMOKE {cutoff} {month} {world} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows",
+                        flush=True,
+                    )
                     continue
                 out.parent.mkdir(parents=True, exist_ok=True)
                 torch.save(model.state_dict(), out.with_suffix(".tmp"))
@@ -259,8 +305,21 @@ def run_month(
                 extra = {}
                 if name == "free":
                     # Arm e's constant: the mean median error on held-out fine-tuning rows that the ensemble forecast calls sunny.
-                    v = tr.is_val & (tr.kt >= k639.SUNNY_KT) & (tr.hour >= k639.SUNNY_HOURS[0]) & (tr.hour <= k639.SUNNY_HOURS[1])
-                    qv = net.forecast(model=model, x=tr.x[v], p=tr.primary[v], mean=mean, std=std, subtract=None, device=DEVICE)
+                    v = (
+                        tr.is_val
+                        & (tr.kt >= k639.SUNNY_KT)
+                        & (tr.hour >= k639.SUNNY_HOURS[0])
+                        & (tr.hour <= k639.SUNNY_HOURS[1])
+                    )
+                    qv = net.forecast(
+                        model=model,
+                        x=tr.x[v],
+                        p=tr.primary[v],
+                        mean=mean,
+                        std=std,
+                        subtract=None,
+                        device=DEVICE,
+                    )
                     err = qv[:, 5] - tr.y[v]
                     shift = np.zeros(16)
                     for pr in np.unique(tr.primary[v]):
@@ -270,9 +329,21 @@ def run_month(
                 np.savez(tmp, q=q.astype(np.float32), **extra)
                 tmp.rename(target)
                 out.with_suffix(".json").write_text(
-                    json.dumps({"epochs": epochs, "val_nll": best, "seconds": round(time.monotonic() - started), "rows": len(tr.x), "delta_mw": delta.cpu().tolist(), "train_val_rows": int(tr.is_val.sum())})
+                    json.dumps(
+                        {
+                            "epochs": epochs,
+                            "val_nll": best,
+                            "seconds": round(time.monotonic() - started),
+                            "rows": len(tr.x),
+                            "delta_mw": delta.cpu().tolist(),
+                            "train_val_rows": int(tr.is_val.sum()),
+                        }
+                    )
                 )
-                print(f"{cutoff} {month} {world} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows", flush=True)
+                print(
+                    f"{cutoff} {month} {world} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows",
+                    flush=True,
+                )
                 del model
         del g
         torch.cuda.empty_cache()
@@ -286,12 +357,25 @@ def main() -> None:
     parser.add_argument("--arms", nargs="+", default=list(ARMS), choices=list(ARMS))
     parser.add_argument("--worlds", nargs="+", default=list(k639.WORLDS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(k639.SEEDS))
-    parser.add_argument("--smoke", action="store_true", help="Time one fine-tune on every 20th row; store nothing.")
+    parser.add_argument(
+        "--smoke", action="store_true", help="Time one fine-tune on every 20th row; store nothing."
+    )
     a = parser.parse_args()
     clean = c.clean_stack()
     for month in MONTHS[a.cutoff]:
-        run_month(cutoff=a.cutoff, month=month, arms=a.arms, worlds=a.worlds, seeds=a.seeds, clean=clean, smoke=a.smoke)
-    print(json.dumps({"done": a.phase, "cutoff": a.cutoff, "at": datetime.now(UTC).isoformat()}), flush=True)
+        run_month(
+            cutoff=a.cutoff,
+            month=month,
+            arms=a.arms,
+            worlds=a.worlds,
+            seeds=a.seeds,
+            clean=clean,
+            smoke=a.smoke,
+        )
+    print(
+        json.dumps({"done": a.phase, "cutoff": a.cutoff, "at": datetime.now(UTC).isoformat()}),
+        flush=True,
+    )
 
 
 if __name__ == "__main__":
