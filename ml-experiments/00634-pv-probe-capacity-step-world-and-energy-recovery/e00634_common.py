@@ -8,8 +8,8 @@ the same rows.
 """
 
 import re
-from datetime import UTC, datetime
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -41,7 +41,7 @@ CLOUD_SHARE_STRONG: Final[float] = 0.30
 to test the 0.15 bar.
 """
 STEP_STARTS: Final[dict[str, str]] = {"spring": "2025-04-01", "summer": "2025-07-01"}
-"""First day of each capacity step. The pretraining rows start on 2024-04-01, so each step has a year without it before."""
+"""First day of each capacity step. The pretraining rows go back to 2019 or 2020, so about 19% of donor rows follow the spring step."""
 CONDITIONS: Final[tuple[str, ...]] = (
     "control",
     "farm_mw4_r0",

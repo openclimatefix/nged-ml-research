@@ -25,6 +25,8 @@ import polars as pl
 import torch  # ty: ignore[unresolved-import]
 
 PROBE_DATES: tuple[date, ...] = tuple(date(2025, 4, 9) + timedelta(days=14 * i) for i in range(12))
+SHIFT_DAYS = 0
+"""Days subtracted from every probe date. 364 (52 weeks) moves the base to the same weekday of 2024, before either step."""
 """Twelve Wednesdays from 2025-04-09 to 2025-09-10; the dates with no base row at a cutoff are skipped, so 2025-07 keeps only the first 6."""
 MINUTES: tuple[int, ...] = tuple(range(10 * 60, 15 * 60 + 1, 30))
 """Half-hour ends from 10:00 to 15:00 UTC."""
@@ -52,7 +54,7 @@ def cells_and_donors(*, frame: dict[str, np.ndarray], primary: int) -> dict[str,
     x, idx, days, minute, doy, t_us = (a[order] for a in (x, idx, days, minute, doy, t_us))
     rows: list[dict[str, np.ndarray]] = []
     cell = 0
-    for d in PROBE_DATES:
+    for d in (p - timedelta(days=SHIFT_DAYS) for p in PROBE_DATES):
         day = int(datetime(d.year, d.month, d.day, tzinfo=UTC).timestamp()) // 86_400
         d_doy = d.timetuple().tm_yday
         for mm in MINUTES:
@@ -159,7 +161,10 @@ def main() -> None:
     parser.add_argument("--cutoff", required=True, choices=k.CUTOFFS)
     parser.add_argument("--conditions", nargs="+", default=list(k.CONDITIONS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(k.SEEDS))
+    parser.add_argument("--shift-days", type=int, default=0)
     args = parser.parse_args()
+    global SHIFT_DAYS  # noqa: PLW0603
+    SHIFT_DAYS = args.shift_days
     torch.set_num_threads(2)
     frame = load_frame(cutoff=args.cutoff)
     six = k.six_indices()
@@ -168,7 +173,12 @@ def main() -> None:
     for site, pr in probes.items():
         print(site, "probe rows", len(pr["base"]), "cells", len(np.unique(pr["cell"])), flush=True)
     for name in args.conditions:
-        out = k.WORK / "probes" / args.cutoff / f"{name}.parquet"
+        out = (
+            k.WORK
+            / ("probes" if SHIFT_DAYS == 0 else f"probes_shift{SHIFT_DAYS}")
+            / args.cutoff
+            / f"{name}.parquet"
+        )
         if out.exists():
             continue
         records = []
