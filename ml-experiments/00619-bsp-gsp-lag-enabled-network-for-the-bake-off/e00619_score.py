@@ -1,5 +1,5 @@
 # ruff: noqa: E501, PERF401
-"""Experiment 619: score the lag-enabled network at the BSPs and GSPs against experiment 611's forecasts.
+"""Experiment 619: score the lag-enabled network at the BSPs and GSPs against experiment 611.
 
 Reuses experiment 611's scoring functions (cleaned actuals, atom-mass CRPS, coverage, width, the
 stored references of experiment 87, the month-block contrast with its Bonferroni level and minimum

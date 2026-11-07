@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, PT018, D103
+# ruff: noqa: E402, PT018, D103
 """Experiment 619: the lag-enabled demand network at the 4 BSP/GSP series, pooled per group (GPU).
 
 Wraps experiment 574's `e00574_fit.py` arm P4E (lags at least 24 h old, the D5 output offset,
@@ -8,7 +8,8 @@ thermal-lag and solar-gain columns (experiment 437's stored values exist only fo
 gate, no synthetic load-shifts, no E3 weighting. The harness is pointed at one group of 2 series by
 `e00611_pool.install` with this experiment's folder as the work folder.
 
-Usage: python e00619_fit.py {pretrain-wt|step2|fit|assemble} --group {bsp|gsp} [--months ...] [--seeds ...] [--limit N]
+Usage: python e00619_fit.py {pretrain-wt|step2|fit|assemble} --group {bsp|gsp}
+[--months ...] [--seeds ...] [--limit N]
 """
 
 import argparse
