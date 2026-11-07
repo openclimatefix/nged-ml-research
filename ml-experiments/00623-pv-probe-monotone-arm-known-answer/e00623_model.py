@@ -19,7 +19,6 @@ whatever the other inputs are. The mixture's weights and scales do not read `sw`
 
 from typing import Final
 
-import e00397_models as base  # ty: ignore[unresolved-import]
 import e00554_model as m  # ty: ignore[unresolved-import]
 import torch  # ty: ignore[unresolved-import]
 from torch import nn  # ty: ignore[unresolved-import]

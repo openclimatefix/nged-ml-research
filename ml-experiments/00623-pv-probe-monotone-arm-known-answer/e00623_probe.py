@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201
+# ruff: noqa: E501, ANN001
 """Experiment 623: the donor-day regression probe of a pretrained lag-free network (CPU).
 
 The probe holds every datetime input, and the Primary, at one probe date and half-hour, and feeds
@@ -19,8 +19,8 @@ from datetime import UTC, date, datetime, timedelta
 
 import e00397_models as base  # ty: ignore[unresolved-import]
 import e00554_model as m  # ty: ignore[unresolved-import]
-import e00623_model as mono
 import e00623_common as k
+import e00623_model as mono
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
@@ -33,6 +33,8 @@ WINDOW_DAYS = 21
 N_BOOT = 200
 MIN_COS_ZENITH = 0.15
 KT_MAX = 1.3
+RESPONSE_BINS = 10
+"""Bins of the unit curve `u` in which the probed response is stored, for the response figure."""
 
 
 def load_frame(*, cutoff: str) -> dict[str, np.ndarray]:
@@ -64,7 +66,9 @@ def cells_and_donors(*, frame: dict[str, np.ndarray], primary: int) -> dict[str,
             if x[b, 14] < MIN_COS_ZENITH or x[b, 32] > 0:  # cos_zenith, bank_holiday
                 continue
             near = np.abs(((doy - d_doy + 182) % 365) - 182) <= WINDOW_DAYS
-            donors = np.nonzero(near & (minute == mm) & (days != day) & (x[:, 14] >= MIN_COS_ZENITH))[0]
+            donors = np.nonzero(
+                near & (minute == mm) & (days != day) & (x[:, 14] >= MIN_COS_ZENITH)
+            )[0]
             rows.append(
                 {
                     "base": np.full(len(donors), b), "donor": donors, "cell": np.full(len(donors), cell),
@@ -76,7 +80,12 @@ def cells_and_donors(*, frame: dict[str, np.ndarray], primary: int) -> dict[str,
 
 
 def forward_mw(
-    *, model: m.ModularMdn, frame: dict[str, np.ndarray], primary: int, probe: dict[str, np.ndarray], cap: float
+    *,
+    model: m.ModularMdn,
+    frame: dict[str, np.ndarray],
+    primary: int,
+    probe: dict[str, np.ndarray],
+    cap: float,
 ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     """Return the probed net demand (MW) of every probe row, and the regressors."""
     x, b, d = probe["x"], probe["base"], probe["donor"]
@@ -92,7 +101,9 @@ def forward_mw(
     inp[:, 0] = np.clip((ghi_in - s_mean[0]) / s_std[0], -5.0, 5.0).astype(np.float32)
     with torch.no_grad():
         xt = torch.from_numpy(inp)
-        xt = torch.cat([xt, torch.zeros(len(xt), 2)], dim=1)  # the lead columns, unused at stage `pre`
+        xt = torch.cat(
+            [xt, torch.zeros(len(xt), 2)], dim=1
+        )  # the lead columns, unused at stage `pre`
         pt = torch.full((len(xt),), primary, dtype=torch.long)
         mean_z = []
         for i in range(0, len(xt), 65_536):
@@ -104,9 +115,7 @@ def forward_mw(
     return y_points * cap, {"u": unit, "temp": temp_d, "cloud": np.clip(1.0 - kt, 0.0, 1.0)}
 
 
-def fit(
-    *, y: np.ndarray, cell: np.ndarray, regressors: list[np.ndarray], w: np.ndarray
-) -> float:
+def fit(*, y: np.ndarray, cell: np.ndarray, regressors: list[np.ndarray], w: np.ndarray) -> float:
     """Return minus the slope on the first regressor, after weighted demeaning within each cell."""
     wsum = np.bincount(cell, weights=w)
     wsum = np.where(wsum > 0, wsum, 1.0)
@@ -121,7 +130,9 @@ def fit(
     return float(-beta[0])
 
 
-def probe_network(*, model: m.ModularMdn, frame, primary: int, probe, cap: float, rng: np.random.Generator) -> dict:
+def probe_network(
+    *, model: m.ModularMdn, frame, primary: int, probe, cap: float, rng: np.random.Generator
+) -> dict:
     """Return the point estimates and the bootstrap draws of the effective AC capacity (MW)."""
     y, reg = forward_mw(model=model, frame=frame, primary=primary, probe=probe, cap=cap)
     cell = probe["cell"]
@@ -141,6 +152,17 @@ def probe_network(*, model: m.ModularMdn, frame, primary: int, probe, cap: float
             boot[i] = fit(y=y, cell=cell, regressors=regs, w=w)
         out[name] = (point, boot)
     out["n_rows"] = len(y)
+    ycent = y - (np.bincount(cell, weights=y) / np.bincount(cell))[cell]
+    edges = np.linspace(0.0, 1.0, RESPONSE_BINS + 1)
+    which = np.clip(np.digitize(reg["u"], edges) - 1, 0, RESPONSE_BINS - 1)
+    out["resp_y"] = [
+        float(ycent[which == i].mean()) if (which == i).any() else float("nan")
+        for i in range(RESPONSE_BINS)
+    ]
+    out["resp_u"] = [
+        float(reg["u"][which == i].mean()) if (which == i).any() else float("nan")
+        for i in range(RESPONSE_BINS)
+    ]
     out["mean_swing_mw"] = float(np.ptp(np.array([y[cell == c].mean() for c in np.unique(cell)])))
     return out
 
@@ -151,6 +173,7 @@ def main() -> None:
     parser.add_argument("--cutoff", required=True, choices=k.CUTOFFS)
     parser.add_argument("--conditions", nargs="+", default=list(k.CONDITIONS))
     parser.add_argument("--seeds", nargs="+", type=int, default=list(k.SEEDS))
+    parser.add_argument("--arm", choices=("monotone", "plain"), default="monotone")
     args = parser.parse_args()
     torch.set_num_threads(2)
     frame = load_frame(cutoff=args.cutoff)
@@ -160,26 +183,47 @@ def main() -> None:
     for site, pr in probes.items():
         print(site, "probe rows", len(pr["base"]), "cells", len(np.unique(pr["cell"])), flush=True)
     for name in args.conditions:
-        out = k.WORK / "probes" / args.cutoff / f"{name}.parquet"
+        out = (
+            k.WORK
+            / ("probes" if args.arm == "monotone" else "probes_plain_rerun")
+            / args.cutoff
+            / f"{name}.parquet"
+        )
         if out.exists():
             continue
         records = []
         for seed in args.seeds:
-            path = k.weights_path(cutoff=args.cutoff, condition=name, seed=seed)
+            path = (
+                (k.WORK if args.arm == "monotone" else k.PLAIN_WORK)
+                / "pretrained"
+                / args.cutoff
+                / f"{name}_s{seed}.pt"
+            )
             assert path.exists(), path
-            model = mono.MonotoneModularMdn(n_primaries=16)
+            model = (
+                mono.MonotoneModularMdn(n_primaries=16)
+                if args.arm == "monotone"
+                else m.ModularMdn(n_primaries=16, stage="pre")
+            )
             model.load_state_dict(torch.load(path, map_location="cpu"))
             model.eval()
             for site, i in six.items():
                 rng = np.random.default_rng(1000 * seed + i)
-                res = probe_network(model=model, frame=frame, primary=i, probe=probes[site], cap=float(cap[i]), rng=rng)
+                res = probe_network(
+                    model=model,
+                    frame=frame,
+                    primary=i,
+                    probe=probes[site],
+                    cap=float(cap[i]),
+                    rng=rng,
+                )
                 for kind in ("plain", "cloud_tpl"):
                     point, boot = res[kind]
                     records.append(
                         {
                             "cutoff": args.cutoff, "condition": name, "seed": seed, "site": site, "model": kind,
                             "capacity_mw": point, "boot": boot.tolist(), "n_rows": res["n_rows"],
-                            "swing_mw": res["mean_swing_mw"],
+                            "swing_mw": res["mean_swing_mw"], "resp_y": res["resp_y"], "resp_u": res["resp_u"],
                         }
                     )  # fmt: skip
         out.parent.mkdir(parents=True, exist_ok=True)
