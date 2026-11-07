@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201
+# ruff: noqa: ANN001, ANN003, ANN202, D103, E501
 """Experiment 620: the final-test fold (cutoff 2026-07-01), patched onto the development pipeline.
 
 The development pipeline (experiments 510, 511, 574, 591, 613) works on folds named by month, and
@@ -38,12 +38,12 @@ def redirect_to_extended_inputs(e) -> None:
     The held-out power is readable after this call, so it only runs in the prediction phase.
     `e` is experiment 574's module (or experiment 565's, which exposes the same names).
     """
-    import e00620_extend as ext  # noqa: PLC0415
+    import e00620_extend as ext
 
     ext.redirect()
     e.prep.RAW_DIR = ext.RAW_DIR
     # experiment 437's weather-column tables, extended to the window by `e00620_tables.py`
-    import e00437_features as f437  # noqa: PLC0415
+    import e00437_features as f437  # ty: ignore[unresolved-import]
 
     f437.TRAILING_DIR = ext.OUT_ROOT / "inputs" / "trailing437"
     e.W560 = ext.OUT_ROOT / "inputs" / "w560"
@@ -62,9 +62,11 @@ def redirect_to_extended_inputs(e) -> None:
         stub = stub_dir / f"init={run:%Y-%m-%d}.parquet"
         if not stub.exists():
             summary = ext.E607 / "ens_summary" / f"init={run:%Y-%m-%d}.parquet"
-            import polars as pl  # noqa: PLC0415
+            import polars as pl
 
-            origin = pl.scan_parquet(summary).select(pl.col("power_fcst_init_time").unique()).collect()
+            origin = (
+                pl.scan_parquet(summary).select(pl.col("power_fcst_init_time").unique()).collect()
+            )
             assert origin.height == 1, summary
             origin.with_columns(nwp_init_time=pl.lit(run)).write_parquet(stub)
         return stub
@@ -76,16 +78,26 @@ def redirect_to_extended_inputs(e) -> None:
         """Return the months' test rows; the final fold's window is July to October together."""
         if month != FINAL_MONTH:
             return _inner(month=month, standardiser=standardiser)
-        parts = [_inner(month=m, standardiser=standardiser) for m in ("2026-07", "2026-08", "2026-09", "2026-10")]
+        parts = [
+            _inner(month=m, standardiser=standardiser)
+            for m in ("2026-07", "2026-08", "2026-09", "2026-10")
+        ]
         first = parts[0]
-        import dataclasses  # noqa: PLC0415
+        import dataclasses
 
-        if os.environ.get("E00620_DRY"):  # coverage check: build the window's input rows, forecast nothing
-            raise SystemExit(f"DRY RUN OK: the window's test rows were built ({len(first.target_idx) if hasattr(first, 'target_idx') else '?'} rows in July); nothing was forecast")
+        if os.environ.get(
+            "E00620_DRY"
+        ):  # coverage check: build the window's input rows, forecast nothing
+            raise SystemExit(
+                f"DRY RUN OK: the window's test rows were built ({len(first.target_idx) if hasattr(first, 'target_idx') else '?'} rows in July); nothing was forecast"
+            )
 
         return dataclasses.replace(
             first,
-            **{f.name: np.concatenate([getattr(p, f.name) for p in parts]) for f in dataclasses.fields(first)},
+            **{
+                f.name: np.concatenate([getattr(p, f.name) for p in parts])
+                for f in dataclasses.fields(first)
+            },
         )
 
     e._build_test = build_test_all_months
@@ -162,7 +174,11 @@ def install(e, *, months: list[str], reference_month: str | None = None) -> None
         def build_test(*, month, standardiser):
             """Keep the scored window closed while the networks are trained."""
             if reference_month is None or month != FINAL_MONTH:
-                return None if month == FINAL_MONTH else _build_test(month=month, standardiser=standardiser)
+                return (
+                    None
+                    if month == FINAL_MONTH
+                    else _build_test(month=month, standardiser=standardiser)
+                )
             assert reference_month < FINAL_MONTH
             e.CHECK["months"].setdefault(reference_month, {})
             return _build_test(month=reference_month, standardiser=standardiser)

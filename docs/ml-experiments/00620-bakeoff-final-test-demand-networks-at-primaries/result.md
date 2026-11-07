@@ -41,21 +41,25 @@ metric: >-
   absorption on verified events in the window, event-free CRPS.
 verdict: partly supported
 best_arm: >-
-  Among the three networks, K1 (class 1, with the G4 gated band) has the lowest CRPS and MAE, and the
+  Among the three networks, K1 (class 1, with the G4 gated band) has the lowest CRPS and MAE, and
+  the
   class 2 candidate is next. Neither is separable from the manual heuristic on CRPS or MAE, and the
   heuristic has the lower threshold-weighted CRPS.
 headline: >-
-  On the held-out months July to October 2026, with one fit and no refits, none of the three networks
+  On the held-out months July to October 2026, with one fit and no refits, none of the three
+  networks
   beats the manual heuristic on CRPS (K1 4.94, candidate 5.00, K3 5.32, heuristic 4.85, percent of
   capacity). K1 and the candidate are not separable from the heuristic on CRPS or MAE, K3 is worse
   than the heuristic on CRPS, and all three beat climatology (8.12). The q05-q95 band covers only
   0.73 to 0.77 of the readings, against a target of 0.90. The ranking K1, candidate, K3 matches the
   development months.
 take_home_message: >-
-  A network trained once on data before July 2026 and never refitted is as good as the manual
-  heuristic over the next four months, and not better. K1 and the candidate beat the heuristic at 12
-  of 16 Primaries on CRPS. They lose at four Primaries, D14, D15, D16, and D18, which carry most of
-  the pooled difference. All three bands are too narrow, so the networks are over-confident.
+  A network trained once on data before July 2026 and never refitted scored no better than the
+  manual heuristic over the next four months, and no worse for K1 and the candidate. K1 and the
+  candidate beat the heuristic at 12
+  of 16 Primaries on CRPS. They lose at four Primaries, D14, D15, D16, and D18, and the losses at
+  these four are what the wins at the other 12 offset. All three bands are too narrow, so the neural
+  networks are over-confident.
   Refitting during the window, which weekly production retraining would do, is the first test to run
   before any conclusion about how good the networks are.
 advice:
@@ -64,13 +68,15 @@ advice:
     refitted, and the development months refit at day 0 and day 14 (limits section).
   - >-
     Run the same frozen networks with a refit every 14 days through the window, and compare band
-    coverage by days since the fit. Ageing of the weights is the likeliest cause of the narrow bands
-    and of the losses at D14, D15, D16, and D18, but this page has not tested it.
+    coverage by days since the fit. Ageing of the weights is one possible cause of the narrow bands
+    and of the losses at D14, D15, D16, and D18, and this page has not tested it.
   - >-
-    Look at D14, D15, D16, and D18 before the next test: the networks' CRPS there is 1.1 to 2 times
-    the heuristic's (Primary results).
+    Look at D14, D15, D16, and D18 before the next test: the CRPS of K1 and the candidate there is
+    1.07 to 2.0 times the heuristic's, and K3's is up to 2.6 times (Primary results).
   - >-
-    Widen the q05-q95 band before use: coverage is 0.73 to 0.77 for the three networks, and the
+    Consider widening the q05-q95 band before use, although a uniform widening may not fix the
+    Primary-specific collapse at D14, D16, and D18: coverage is 0.73 to 0.77 for the three networks,
+    and the
     heuristic's own is 0.79.
 production_status: candidate
 adopted_in: none
@@ -80,8 +86,8 @@ adopted_in: none
 123 forecast origins from 2026-07-01 to 2026-10-31.** K1 and the class 2 candidate did not beat the
 manual heuristic on continuous ranked probability score (CRPS) or on the mean absolute error (MAE)
 of the median. K3 was worse than the heuristic on CRPS. All three beat climatology clearly, and the
-ranking K1, candidate, K3 is the one the development months gave. This is a descriptive result: it
-is scored once, nothing was tuned on the window, and nothing is adopted for production.
+ranking K1, candidate, K3 is the one the development months gave. This is a descriptive result: the
+window is scored once, nothing was tuned on the window, and nothing is adopted for production.
 
 **Terms.** K1 is the lag neural network with the G4 gate (a band that widens while a load-shift is
 detected and for 7 days after). The class 2 candidate is the ungated lag network with neighbour
@@ -97,18 +103,19 @@ quantile levels. Coverage is the share of readings inside the q05-q95 band. A Pr
 substation: the eight MVA Primaries are metered in megavolt-amperes and the six MW Primaries in
 megawatts. D15 and D18 are the two report-only Primaries with short histories.
 
-## Headline: the median forecast error is similar for four systems and 1.8 times higher for climatology
+## Headline: the median forecast error is similar for four systems and 1.7 to 1.8 times higher for climatology
 
 ![Median error against lead time for five systems](mae_vs_lead.svg)
 
 *Caption: lower is better. K1, the candidate, and the heuristic stay within 1 percentage point of
-each other at every lead. Climatology is about 14.7. The next figure leaves climatology out so that
+each other at every lead, and K3 is up to 0.7 points above K1. Climatology is about 14.8. The next
+figure leaves climatology out so that
 the other four can be told apart.*
 
 ![The same chart without climatology and with the axis not starting at zero](mae_vs_lead_zoom.svg)
 
-*Caption: K1 is lowest up to about 130 hours. The heuristic is flat at 8.4 to 8.6 and matches K1
-from about 130 hours on. K3 is highest at every lead from 36 hours on.*
+*Caption: K1 is below the heuristic up to about 140 hours. The heuristic is flat at 8.4 to 8.6 and
+is 0.1 below K1 from about 145 hours on. K3 is highest at every lead from 36 hours on.*
 
 | System | CRPS | MAE of the median | q05-q95 coverage | twCRPS |
 |---|---|---|---|---|
@@ -156,13 +163,14 @@ and the networks' rises from about 4.6 to 5.2 (K1).*
 
 ![CRPS against lead time without climatology](crps_vs_lead_zoom.svg)
 
-*Caption: K1 is below the heuristic up to about 48 hours and level with or above it from about 60
-hours on.*
+*Caption: K1 is below the heuristic up to about 36 hours and level with it (4.80 against 4.79) at 60
+hours.*
 
 ![q05-q95 coverage against lead time](coverage_vs_lead.svg)
 
-*Caption: the dashed line is the 0.90 target. No system reaches it except climatology, whose band is
-2.3 times wider than K1's (56.8 against 24.8 percentage points).*
+*Caption: the dashed line is the 0.90 target. No system reaches it. Climatology comes closest
+(0.875) because its band is 2.3 times wider than K1's (56.8 against 24.8 percentage points of
+capacity).*
 
 Tail calibration (all rows, percent of capacity):
 
@@ -178,7 +186,9 @@ Tail calibration (all rows, percent of capacity):
 
 ![CRPS by Primary for the five systems](crps_by_primary.svg)
 
-*Caption: lower is better. Primaries are sorted by K1's CRPS. The marker shape shows the group.*
+*Caption: lower is better. Primaries are sorted by K1's CRPS. D5, D9, D10, D11, D14, and D16 are the
+six MW Primaries, D15 and D18 are the report-only Primaries, and the rest are the eight MVA
+Primaries.*
 
 ![MAE of the median by Primary for the five systems](mae_by_primary.svg)
 
@@ -195,7 +205,7 @@ Tail calibration (all rows, percent of capacity):
 *Caption: the cost uses q95 as the planning level at 12 to 36 hours, a limit of 90% of the Primary's
 peak before the window, and the cost function of [experiment
 601](../00601-nra-curtailment-cost-and-tail-calibration-of-assembled-candidates/result.md). Only D9
-breaches that limit.*
+breaches that limit. An empty row means a cost of zero.*
 
 At the 90% limit only D9 has a non-zero cost: about £520 per day for K1, the candidate, and K3,
 against £484 for the heuristic. At the 75% limit D9 costs £4,400 to £6,400 per day for the networks,
@@ -219,7 +229,7 @@ fixed before the window was scored.*
   window has no labelled events, so coverage is over all rows.
 - **P3 holds.** The CRPS ranking K1, candidate, K3 equals the ranking in [experiment
   613](../00613-nra-roster-contrasts-with-intervals-five-seeds/result.md), and the Bonferroni
-  intervals exclude zero for all three adjacent contrasts.
+  intervals exclude zero for all three pairwise contrasts.
 - **Not compared:** BG2 and the weak production-style XGBoost model have no forecasts for the
   window, and none were generated for this run. A later, separately frozen run could add them.
 - **Not measured:** follow ratio and absorption, because no verified load-shift event is labelled in
@@ -230,8 +240,8 @@ fixed before the window was scored.*
 
 - **One fit and no refits.** Each network was fitted once, at the cutoff 2026-07-01, and not
   refitted during the four months. The development months refit on day 0 and day 14. The window is
-  therefore a harder test than weekly production retraining, and it is harder in the same way for
-  all three networks.
+  therefore probably a harder test than weekly production retraining. This page has not tested that,
+  nor whether the effect is the same for all three networks.
 - **Candidate band.** The band-width factor 1.0934 is the mean of experiment 613's five
   development-month factors. The candidate was scored with E3 only: E3 is a fixed refit rule and no
   embargo trigger exists, so there is no comparison with and without it.
@@ -247,7 +257,7 @@ fixed before the window was scored.*
   Flexibility Service table on 2026-03-27. The three networks read none of these columns.
 - **Standardisers.** The predict-time standardisers were rebuilt on the extended inputs and differ
   from the train-time ones by about 23 rows of 85,000 at D5. No window power is involved.
-- **BSP and GSP networks** were not scored here.
+- **BSP and GSP demand networks** were not scored here.
 
 ## How the run was frozen and run
 
@@ -274,6 +284,12 @@ were `out.mkdir(parents=True, exist_ok=True)` and pointing that loader copy at t
 inputs. Neither touched a forecast, the gate threshold, the neighbour list, or the width factor. The
 hash of `e00620_assemble.py` was `bf86c135…21551b` at the freeze and is `daf00981…74c94` after the
 fixes.
+
+**Lint-only edits after the run.** Before the pull request, `ruff` and `ty` edits changed the text
+of every `e00620_*.py` file: removed unused imports and `noqa` directives, added `ruff` and `ty`
+suppressions, and re-formatted. They changed no computation, so `freeze_config.json` no longer
+matches the code hashes, and the forecasts' hashes in `output_hashes.txt` are the evidence that the
+forecasts are the ones the frozen run produced.
 
 The exported forecasts are in `data/ml-experiments/backtest_export_final_test_demand_2026-11-07/`,
 in the layout of experiment 614's export.

@@ -1,4 +1,4 @@
-# ruff: noqa: ANN201, E402, E501, ANN003, PT018
+# ruff: noqa: ANN003, ANN201, E402, E501, I001, PT018
 """Experiment 620: pre-train and fit K3 (class 3, lag-free, D5, E3) on the final-test fold 2026-07 (GPU).
 
 A copy of experiment 613's `e00613_free.py` with `e00620_fold` patched onto experiment 565's module.
@@ -82,5 +82,7 @@ else:
     f565.fit_arm(
         months=f565.ARGS.months, seeds=f565.ARGS.seeds, stress=False, limit=None, device="cuda"
     )
-    (OUT / "checks_fit.json").write_text(__import__("json").dumps(f565.CHECK, indent=1, default=str))
+    (OUT / "checks_fit.json").write_text(
+        __import__("json").dumps(f565.CHECK, indent=1, default=str)
+    )
     print("CHECKS PASSED", {a: v for a, v in f565.CHECK.items() if a != "months"})

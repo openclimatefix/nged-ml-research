@@ -1,4 +1,4 @@
-# ruff: noqa: D107, ANN001, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205, E501, PLR0915, ANN003
+# ruff: noqa: ANN001, ANN003, ANN201, ANN202, D102, D103, D107, D205, E402, E501, I001, PLR0915, PT018
 """Experiment 620 (copy of 613's `e00613_nbarm.py`): table and fit the class 2 candidate on the final fold (GPU).
 
 The final fold `2026-07` has one cutoff and, in the training phase, a hidden held-out window; see
@@ -55,11 +55,10 @@ import e00598_signals as s598  # ty: ignore[unresolved-import]
 import e00613_nbmodel as mymodel  # ty: ignore[unresolved-import]
 import e00613_nbsignals as sig  # ty: ignore[unresolved-import]
 import numpy as np
-import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-import e00620_fold as fold  # noqa: E402
+import e00620_fold as fold
 
 NAME = "00620-bakeoff-final-test-demand-networks-at-primaries"
 ROOT = ML_EXPERIMENTS_DATA_DIR / NAME

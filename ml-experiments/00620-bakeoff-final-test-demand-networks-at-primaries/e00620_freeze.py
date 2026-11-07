@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN201
+# ruff: noqa: D103, E501
 """Experiment 620: freeze the three demand networks before the final-test window is opened.
 
 Writes `freeze_config.json` (artefact paths and SHA-256 hashes, the code files' hashes, the frozen
@@ -76,7 +76,9 @@ def artefacts() -> dict[str, dict[str, Path]]:
 
 def timing_assertions() -> int:
     """Run the runner's per-origin timing rules on the extended inputs; return the number of origins."""
-    observed = pl.read_parquet(E607 / "observed.parquet", columns=["time_series_id", "valid_time", "power"])
+    observed = pl.read_parquet(
+        E607 / "observed.parquet", columns=["time_series_id", "valid_time", "power"]
+    )
     n = 0
     for k in range((runner.FINAL_LAST - runner.FINAL_FIRST).days + 1):
         origin = runner.FINAL_FIRST + timedelta(days=k) + runner.PUBLICATION_DELAY
@@ -101,7 +103,9 @@ def build() -> dict:
     assert n_origins == 123, n_origins
     return {
         "frozen_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "git_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True, text=True, check=True).stdout.strip(),
+        "git_head": subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=HERE, capture_output=True, text=True, check=True
+        ).stdout.strip(),
         "train_data_ends_before": "2026-07-01",
         "test_origins": ["2026-07-01", "2026-10-31"],
         "n_origins_timing_checked": n_origins,
@@ -111,10 +115,12 @@ def build() -> dict:
         "g4_threshold_source": "experiment 592 gate_state.npz (dev months only)",
         "g4_neighbours": {str(k): v for k, v in gate.neighbours().items()},
         "g4_hold_days_after_release": gate.c.HOLD_DAYS,
-        "candidate_width_factor": float(widths["factor"].mean()),
+        "candidate_width_factor": float(widths["factor"].mean()),  # ty: ignore[invalid-argument-type]
         "candidate_width_factor_source": "mean of experiment 613's five dev-month factors (c2_width_factors.csv)",
         "candidate_embargo": "E3 is the fixed refit rule (7-day embargo, then half weight for 7 days) applied at the single fit; no embargo trigger exists, so the candidate is scored with E3 only",
-        "artefacts": {net: {rel: sha(p) for rel, p in files.items()} for net, files in artefacts().items()},
+        "artefacts": {
+            net: {rel: sha(p) for rel, p in files.items()} for net, files in artefacts().items()
+        },
         "upstream_code_digest": upstream_digest(),
         "code": {name: sha(HERE / name) for name in CODE if (HERE / name).exists()},
     }
@@ -128,15 +134,23 @@ def verify() -> None:
     for name, h in cfg["code"].items():
         assert sha(HERE / name) == h, f"{name} changed since the freeze"
     assert not LOCK.exists(), "the lock exists"
-    live = json.loads(json.dumps({
-        "g4_threshold_share_of_capacity": gate.frozen_threshold().tolist(),
-        "g4_neighbours": {str(k): v for k, v in gate.neighbours().items()},
-        "g4_hold_days_after_release": gate.c.HOLD_DAYS,
-        "candidate_width_factor": float(pl.read_csv(S613 / "score" / "c2_width_factors.csv")["factor"].mean()),
-    }))
+    live = json.loads(
+        json.dumps(
+            {
+                "g4_threshold_share_of_capacity": gate.frozen_threshold().tolist(),
+                "g4_neighbours": {str(k): v for k, v in gate.neighbours().items()},
+                "g4_hold_days_after_release": gate.c.HOLD_DAYS,
+                "candidate_width_factor": float(
+                    pl.read_csv(S613 / "score" / "c2_width_factors.csv")["factor"].mean()  # ty: ignore[invalid-argument-type]
+                ),
+            }
+        )
+    )
     for k, v in live.items():
         assert cfg[k] == v, f"{k} differs from the freeze config"
-    assert upstream_digest() == cfg["upstream_code_digest"], "an experiment module changed since the freeze"
+    assert upstream_digest() == cfg["upstream_code_digest"], (
+        "an experiment module changed since the freeze"
+    )
     print("freeze config verified:", {k: len(v) for k, v in cfg["artefacts"].items()})
 
 

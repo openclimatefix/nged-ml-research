@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN201
+# ruff: noqa: D103, E501, PT018
 """Experiment 620: extend experiment 437's per-Primary weather-column tables to the final-test window (CPU, weather only).
 
 Experiment 437's tables hold, for every (forecast run, valid time), the trailing temperature and
@@ -17,7 +17,6 @@ Usage: python e00620_tables.py build | check
 
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
 
 import e00418_prep as prep418  # ty: ignore[unresolved-import]
 import e00437_features as f437  # ty: ignore[unresolved-import]
@@ -36,10 +35,14 @@ STORED = f437.TRAILING_DIR
 def setup() -> None:
     """Point experiment 437's code at the extended summaries, CAMS file, and output folder."""
     ext.redirect()
-    f437.common.GRID_END = datetime(2026, 11, 30, 23, 30, tzinfo=UTC)  # the summaries' leads reach 351 h
+    f437.common.GRID_END = datetime(
+        2026, 11, 30, 23, 30, tzinfo=UTC
+    )  # the summaries' leads reach 351 h
     CAMS_EXTENDED.parent.mkdir(parents=True, exist_ok=True)
     if not CAMS_EXTENDED.exists():
-        pl.concat([pl.read_parquet(p) for p in sorted(CAMS.glob("cams_demand_points*.parquet"))]).unique(["site", "time"]).sort("site", "time").write_parquet(CAMS_EXTENDED)
+        pl.concat(
+            [pl.read_parquet(p) for p in sorted(CAMS.glob("cams_demand_points*.parquet"))]
+        ).unique(["site", "time"]).sort("site", "time").write_parquet(CAMS_EXTENDED)
     prep418.CAMS_PATH = CAMS_EXTENDED
     f437.TRAILING_DIR = OUT
 
@@ -54,7 +57,10 @@ def build() -> None:
         if target.exists():
             continue
         table = f437.site_table(row=row, local_date=local_date, daily=daily)
-        bad = {c: int(table[c].null_count() + table[c].is_nan().sum()) for c in f437.BUNDLES["T"] + f437.BUNDLES["S"]}
+        bad = {
+            c: int(table[c].null_count() + table[c].is_nan().sum())
+            for c in f437.BUNDLES["T"] + f437.BUNDLES["S"]
+        }
         assert not any(bad.values()), (row["site"], bad)
         table.write_parquet(target)
         print(row["site"], table.height, "rows, last origin", table["origin_us"].max(), flush=True)
@@ -69,7 +75,9 @@ def check() -> None:
         old = pl.read_parquet(STORED / f"{row['site']}.parquet").sort("origin_us", "valid_us")
         new = pl.read_parquet(OUT / f"{row['site']}.parquet")
         j = old.join(new, on=["origin_us", "valid_us"], suffix="_n")
-        assert j.height == old.height, f"{row['site']}: {old.height - j.height} stored keys missing from the rebuilt table"
+        assert j.height == old.height, (
+            f"{row['site']}: {old.height - j.height} stored keys missing from the rebuilt table"
+        )
         national = set(f437.BUNDLES["C"])
         worst = {}
         for c in cols:
@@ -78,15 +86,32 @@ def check() -> None:
             worst[c] = 0.0 if same.all() else float("inf")  # any value or NaN-mask difference
         t_s = max(v for k, v in worst.items() if k not in national)
         c_max = max((v for k, v in worst.items() if k in national), default=0.0)
-        print(row["site"], "stored", old.height, "rebuilt", new.height, "new", new.height - old.height, "max diff T/S/diag", t_s, "C columns", c_max, "last origin", new["origin_us"].max(), flush=True)
+        print(
+            row["site"],
+            "stored",
+            old.height,
+            "rebuilt",
+            new.height,
+            "new",
+            new.height - old.height,
+            "max diff T/S/diag",
+            t_s,
+            "C columns",
+            c_max,
+            "last origin",
+            new["origin_us"].max(),
+            flush=True,
+        )
         worst_all = max(worst_all, t_s, c_max)
     print("MAX DIFF on stored keys (non-calendar columns):", worst_all)
-    assert worst_all == 0.0 and c_max == 0.0, "a stored value or NaN mask differs (C columns included)"
+    assert worst_all == 0.0 and c_max == 0.0, (
+        "a stored value or NaN mask differs (C columns included)"
+    )
 
 
 def coverage() -> None:
     """Check that every (origin, valid) key the window's test rows need is in each rebuilt table (keys only)."""
-    from datetime import datetime  # noqa: PLC0415
+    from datetime import datetime
 
     first = int(datetime(2026, 7, 1, 9, tzinfo=UTC).timestamp() * 1_000_000)
     day, step = 86_400 * 1_000_000, 1_800_000_000
@@ -103,7 +128,7 @@ def coverage() -> None:
 
 def causality() -> None:
     """Rebuild a Primary's table from a summary with every later run deleted; the rows of the cut run must not change."""
-    from datetime import datetime  # noqa: PLC0415
+    from datetime import datetime
 
     setup()
     row = next(r for r in f437.prep.primaries().iter_rows(named=True) if r["site"] == "D2")
@@ -112,7 +137,11 @@ def causality() -> None:
     local_date = f437.local_date_codes()
     daily = {"school": f437.school_columns(), "national": f437.national_daily()}
     original = f437.prep.load_summary
-    for cut in (datetime(2026, 7, 1, 9, tzinfo=UTC), datetime(2026, 8, 15, 9, tzinfo=UTC), datetime(2026, 10, 31, 9, tzinfo=UTC)):
+    for cut in (
+        datetime(2026, 7, 1, 9, tzinfo=UTC),
+        datetime(2026, 8, 15, 9, tzinfo=UTC),
+        datetime(2026, 10, 31, 9, tzinfo=UTC),
+    ):
         truncated = full.filter(pl.col("power_fcst_init_time") <= cut)
         f437.prep.load_summary = lambda *, series_id, t=truncated: t
         try:
@@ -123,7 +152,9 @@ def causality() -> None:
         a = new.filter(pl.col("origin_us") == key).sort("valid_us")
         b = rebuilt.filter(pl.col("origin_us") == key).sort("valid_us")
         assert a.height == b.height > 0
-        worst = max(float(np.nanmax(np.abs(a[c].to_numpy() - b[c].to_numpy()))) for c in f437.INPUT_COLUMNS)
+        worst = max(
+            float(np.nanmax(np.abs(a[c].to_numpy() - b[c].to_numpy()))) for c in f437.INPUT_COLUMNS
+        )
         print("run", cut, "largest difference with all later runs deleted:", worst, flush=True)
         assert worst <= 1e-5, "a column depends on a later run"
 

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201
+# ruff: noqa: E501, D103
 """Experiment 620: rebuild the per-Primary raw ensemble-summary matrices for runs to 2026-10-31.
 
 Experiment 397's `write_raw` builds `work/raw/summary/<site>.npz` (feature matrix `x`, power over
@@ -33,7 +33,9 @@ GRID_END: Final[datetime] = datetime(2026, 11, 10, 23, 30, tzinfo=UTC)
 
 def redirect() -> None:
     """Point experiment 87's loaders at the extended inputs of experiment 607 and a longer grid."""
-    skip = os.environ.get("E00620_SKIP", "").split(",")  # bisection switches for the dev-month check
+    skip = os.environ.get("E00620_SKIP", "").split(
+        ","
+    )  # bisection switches for the dev-month check
     if "grid" not in skip:
         common.GRID_END = GRID_END
     if "era5" not in skip:
@@ -49,13 +51,17 @@ def build_site(*, site: str) -> dict[str, np.ndarray]:
 
     series, arrays = fd._series_and_arrays()
     row = next(r for r in series.iter_rows(named=True) if r["site"] == site)
-    summary = pl.scan_parquet(prep.SUMMARY_DIR / "init=*.parquet").filter(
-        pl.col("time_series_id") == row["time_series_id"]
-    ).collect()
+    summary = (
+        pl.scan_parquet(prep.SUMMARY_DIR / "init=*.parquet")
+        .filter(pl.col("time_series_id") == row["time_series_id"])
+        .collect()
+    )
     idx = np.asarray(common.grid_index(times=summary["valid_time"]))
     power = common.take(values=arrays[site].power, index=idx) * row["effective_capacity_mw"]
     rows = summary.with_columns(power=pl.Series(power).cast(pl.Float32))
-    rows = rows.filter(pl.col("power").is_finite() & (pl.col("valid_time") > pl.col("power_fcst_init_time")))
+    rows = rows.filter(
+        pl.col("power").is_finite() & (pl.col("valid_time") > pl.col("power_fcst_init_time"))
+    )
     rows = common.with_derived(frame=rows, latitude=row["latitude"], longitude=row["longitude"])
     rows = rows.with_columns(
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
@@ -85,21 +91,43 @@ def main() -> None:
         mine = RAW_DIR / "summary" / f"{site}.npz"
         if command == "build":
             mine.parent.mkdir(parents=True, exist_ok=True)
-            np.savez(mine.with_name(mine.name + ".tmp.npz"), **build_site(site=site))
+            np.savez(mine.with_name(mine.name + ".tmp.npz"), **build_site(site=site))  # ty: ignore[invalid-argument-type]
             mine.with_name(mine.name + ".tmp.npz").rename(mine)
             print("built", site, flush=True)
         else:
             old = np.load(prep.RAW_DIR / "summary" / f"{site}.npz")
             new = np.load(mine)
             assert np.array_equal(new["x"][: len(old["y"])], old["x"]), "stored rows changed"
-            key_old = old["origin"].astype(np.int64) * (1 << 22) + (old["valid"] - old["origin"]) // 1_800_000_000
-            key_new = new["origin"].astype(np.int64) * (1 << 22) + (new["valid"] - new["origin"]) // 1_800_000_000
+            key_old = (
+                old["origin"].astype(np.int64) * (1 << 22)
+                + (old["valid"] - old["origin"]) // 1_800_000_000
+            )
+            key_new = (
+                new["origin"].astype(np.int64) * (1 << 22)
+                + (new["valid"] - new["origin"]) // 1_800_000_000
+            )
             order = np.argsort(key_old)
             pos = np.clip(np.searchsorted(key_old[order], key_new), 0, len(key_old) - 1)
             hit = key_old[order][pos] == key_new
             sel, j = np.nonzero(hit)[0], order[pos[hit]]
-            worst = {k: float(np.nanmax(np.abs(new[k][sel].astype(np.float64) - old[k][j].astype(np.float64)))) for k in ("x", "y", "lead")}
-            print(site, "old rows", len(old["origin"]), "matched", len(sel), "of new", len(new["origin"]), "max abs diff", worst, flush=True)
+            worst = {
+                k: float(
+                    np.nanmax(np.abs(new[k][sel].astype(np.float64) - old[k][j].astype(np.float64)))
+                )
+                for k in ("x", "y", "lead")
+            }
+            print(
+                site,
+                "old rows",
+                len(old["origin"]),
+                "matched",
+                len(sel),
+                "of new",
+                len(new["origin"]),
+                "max abs diff",
+                worst,
+                flush=True,
+            )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN201
+# ruff: noqa: E501
 """Experiment 620: the G4 gate state over any window of origin days, from a lag-free forecast and the observed power.
 
 Experiment 592 defined G4 and stored its dev-month state. The gate reads only observed power, the
@@ -86,7 +86,14 @@ def check_dev() -> dict[str, bool]:
     n_days = z["fresh_gap"].shape[1]
     e = a._load(root=a.K565_W, tag="D5", months=c.MONTHS)
     gap = fresh_gap(lag_free=e, clean=c.k578.clean(), n_days=n_days)
-    origin_days = sorted({int(x) for x in (e["power_fcst_init_time"].dt.epoch("us").to_numpy() - START_US) // STEP_US // 48})
+    origin_days = sorted(
+        {
+            int(x)
+            for x in (e["power_fcst_init_time"].dt.epoch("us").to_numpy() - START_US)
+            // STEP_US
+            // 48
+        }
+    )
     _, on, snap = g4_mode(gap=gap, origin_days=origin_days, thr=z["fresh_thr"])
     return {
         "fresh_gap": bool(np.allclose(z["fresh_gap"], gap, equal_nan=True)),

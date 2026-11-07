@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, E402, D103, E501, ANN003
+# ruff: noqa: ANN003, ANN201, ANN202, E402, E501, I001, PT018
 """Experiment 620: pre-train, step-2, and fit K1 (class 1) on the final-test fold 2026-07 (GPU).
 
 A copy of experiment 613's `e00613_arm.py` (K1 with D5 and E3 only), with `e00620_fold` patched
@@ -72,7 +72,9 @@ if fold.is_final(months=MINE.months):
 
     _dev_stats_file = arm._stats_file
     e.stats_file = lambda *, month: (
-        _final_stats_file(month=month) if month == fold.FINAL_MONTH else _dev_stats_file(month=month)
+        _final_stats_file(month=month)
+        if month == fold.FINAL_MONTH
+        else _dev_stats_file(month=month)
     )
     arm.check_stats = lambda: None
 if MINE.command in {"pretrain", "step2"}:
