@@ -32,9 +32,12 @@ hypothesis: >-
 prediction: >-
   Written before any score. Reference values are P7's from experiment 606 (follow 0.035; event-free
   CRPS minus A1 0.021 at the eight MVA Primaries and 0.068 at the six MW Primaries). Cross-fitted
-  signals (CF) lower the six-MW cost by at least 0.03 and keep follow at most 0.05. Signal dropout
-  on 30% (D30) or 50% (D50) of the training rows lowers the six-MW cost by at least 0.02 each and
-  raises follow by less than 0.02. The scalar bottleneck (BN) lowers the six-MW cost by at least
+  signals (CF) lower the six-MW extra error by at least 0.03 and keep follow at most 0.05. Signal
+  dropout
+  on 30% (D30) or 50% (D50) of the training rows lowers the six-MW extra error by at least 0.02 each
+  and
+  raises follow by less than 0.02. The scalar bottleneck (BN) lowers the six-MW extra error by at
+  least
   0.02 and keeps follow at most 0.05. The label head at weight 0.1 (X1) or 0.3 (X3) changes follow
   by at least 0.01 (either direction) and leaves event-free CRPS within the minimum detectable
   effect. A box window of 3 or 7 days follows within 0.015 of P7, and a window of 1 day alone
@@ -54,77 +57,97 @@ benchmark: >-
   for the contrasts; R (A1 plus the G4 gate, experiment 597) for the coverage at the gate's width.
 row_set_id: experiment_470_intersection_v1
 metric: >-
-  Follow, share of the NRA inside q05-q95 by phase (day 4 to the end, 0 to 7 days after), band width,
+  Follow, share of the NRA inside q05-q95 by phase (day 4 to the end, 0 to 7 days after), band
+  width,
   event-free CRPS at 24-120 h at the eight MVA and the six MW Primaries, with the minimum
   detectable effect beside each contrast.
 verdict: not supported
 best_arm: >-
-  P7+D50 (experiment 606's neighbour summaries, with 50% of the training rows given no signals):
-  follow 0.040 and an event-free CRPS cost against A1 of +0.005 at the eight MVA Primaries (within
-  its minimum detectable effect of 0.024) and +0.059 at the six MW Primaries (minimum detectable
-  effect 0.044).
+  P7+D50 (experiment 606's neighbour summaries, with all signals hidden on 50% of the training
+  rows): follow 0.040 and an event-free CRPS extra error against A1 of +0.005 at the eight MVA
+  Primaries (within its minimum detectable effect of 0.024) and +0.059 at the six MW Primaries
+  (minimum detectable effect 0.044).
 headline: >-
   No arm met the keep rule. The closest, P7+D50, misses it only at the six MW Primaries, by 0.015
-  points of capacity.
+  percentage points of capacity.
 lessons: >-
-  Dropping the signals on half of the training rows removes the cost at the eight MVA Primaries and
-  keeps most of the benefit, but not at the six MW Primaries. A scalar bottleneck removes the cost at
-  the six MW Primaries and loses the benefit. Cross-fitting, the label head, and the span of the
-  summaries did not help.
+  Hiding the signals on half of the training rows lowered the extra error at the eight MVA
+  Primaries and kept most of the benefit, but not at the six MW Primaries. A scalar bottleneck
+  removed the extra error at the six MW Primaries and lost the benefit. Cross-fitting, the label
+  head, and the span of the summaries did not help.
 take_home_message: >-
-  The neighbour-summary inputs make the forecast follow a load-shift much less, but all 28 variants
-  that we tried still cost accuracy on ordinary days at the six MW Primaries or lose the benefit.
-  The closest variant (training with signals hidden on half of the rows) is within the minimum
-  detectable effect at the eight MVA Primaries and 0.015 points of capacity short at the six MW
-  Primaries. The next step is a different way of giving the six MW Primaries the information, such
-  as a gain-controlled mix of the P7 and A1 forecasts, rather than more input permutations.
+  The neighbour-summary inputs make the forecast follow a load-shift much less, but all 28
+  variants that we tried still lose accuracy on ordinary days at the six MW Primaries or lose the
+  benefit. The closest variant (training with signals hidden on half of the rows) is within the
+  minimum detectable effect at the eight MVA Primaries and 0.015 percentage points of capacity
+  short at the six MW Primaries. A possible next step is blending the P7 forecast with the A1
+  forecast at the six MW Primaries, rather than trying more input permutations.
 production_status: not-for-production
 advice:
   - >-
-    Hide the neighbour signals on about half of the training rows (D50) if the neighbour summaries
-    are used, because it removes the eight-MVA ordinary-day cost (+0.021 to +0.005) at the same
-    follow (P7 against P7+D50 in the arm table).
+    If the neighbour summaries are used, test hiding them on about half of the training rows
+    (D50) again on more months. It lowered the eight-MVA extra error from +0.021 to +0.005 at
+    the same follow, but that drop is smaller than the arm's minimum detectable effect of 0.024,
+    and hiding them on 30% of rows (D30) did not lower it (P7, P7+D30 and P7+D50 in the arm
+    table).
   - >-
-    Do not cross-fit the lag-free forecast for the signals' training rows; it raised follow from 0.035
-    to 0.067 and the six-MW cost stayed above the minimum detectable effect (P7+CF).
+    Do not cross-fit the lag-free forecast for the signals' training rows; it raised follow from
+    0.035 to 0.067, and the six-MW extra error stayed above the minimum detectable effect
+    (P7+CF).
   - >-
-    Treat the lag-only injected bank as flattering neighbour inputs: on the target-side bank, P7+D50
-    cuts the absorbed share from A1's 0.104 to 0.072, not from 0.119 to 0.040 (target-side bank
-    section).
+    Treat the lag-only injected bank as flattering neighbour inputs: on the target-side bank,
+    P7+D50 cuts the absorbed share from A1's 0.104 to 0.072, not from 0.119 to 0.040 (target-
+    side bank bullet).
   - >-
-    Test any new neighbour input for its ordinary-day cost at the six MW Primaries first, because
-    every arm that followed less than 0.05 cost 0.059 or more there, except the scalar bottleneck
-    that lost the benefit (arm table).
+    Test any new neighbour input for its ordinary-day extra error at the six MW Primaries first,
+    because every arm that followed at most 0.05 had an extra error of 0.059 or more there, and
+    the scalar bottleneck arms, which do not, followed 0.10 (arm table).
 ---
 
 **The neighbour-summary inputs make the forecast follow a load-shift much less, but no variant keeps
-both the benefit and the ordinary-day accuracy.** In experiment 606 the best arm, P7, cut the share of
-a load-shift that the median forecast follows from 0.119 to 0.035. It also made the forecast worse on
-ordinary days: by 0.021 points of capacity at the eight MVA Primaries and 0.068 at the six MW
-Primaries, measured as CRPS (continuous ranked probability score, the quantile-forecast error) minus
-A1's. Experiment 610 tried 27 variants of P7 on the first two test months (2025-10 and 2025-12, two
+both the benefit and the ordinary-day accuracy.** A load-shift is a spell when a Primary's
+demand moves because of switching elsewhere on the electricity network, not because of weather. The
+demand forecast reads recent lagged power, so a load-shift leaks into the forecast. "Follow" is the
+share of a load-shift that the median forecast copies. A1 is the demand neural network of experiment
+591, with follow 0.119. P7 is the best arm of [experiment
+606](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/result/):
+it gives A1's lag encoder summaries of the neighbouring Primaries' recent lags, and it cut follow to
+0.035. It also made the forecast worse on ordinary days, measured as CRPS (continuous ranked
+probability score, the quantile-forecast error) minus A1's, in percentage points of capacity: +0.021
+at the eight MVA Primaries and +0.068 at the six MW Primaries. Experiment 610 tried 27 variants of
+P7 and a placebo on the first two test months (2025-10 and 2025-12, two
 seeds). None met the keep rule (follow at most 0.05, ordinary-day CRPS within the minimum detectable
-effect of A1's at both groups of Primaries, and coverage at the gate's band width within 0.01 of the
+effect (MDE) of A1's at both groups of Primaries, and coverage at the gate's band width within 0.01
+of the
 gate's). **The closest arm, P7+D50, follows 0.040 and is within the minimum detectable effect at the
-eight MVA Primaries (+0.005, minimum detectable effect 0.024). At the six MW Primaries its cost is
-+0.059 against a minimum detectable effect of 0.044, so 0.015 points of capacity remain.**
+eight MVA Primaries (+0.005, minimum detectable effect 0.024). At the six MW Primaries its extra
+error is
++0.059 against a minimum detectable effect of 0.044, so 0.015 percentage points of capacity
+remain.**
 
-The question was whether the ordinary-day cost of P7 comes from a mismatch between training and test
-signals, or from a network that has learnt to depend on signals that are sometimes uninformative.
-Building the signals out of fold (CF) did not help, so the mismatch is not the cause. Hiding the signals
-on half of the training rows (D50) removes the cost at the eight MVA Primaries, so dependence explains
-part of it. At the six MW Primaries the cost is mostly there whenever the network reads neighbour
-signals at all.
+The question was whether P7's extra error on ordinary days comes from a mismatch between training
+and test signals, or from a network that has learnt to depend on signals that are sometimes
+uninformative. Building the signals out of fold (CF) to remove the mismatch raised both follow
+(0.035 to 0.067) and the eight-MVA extra error (+0.021 to +0.033), so the mismatch is not shown to
+be the cause. Hiding the signals on half of the training rows (D50) lowered the eight-MVA extra
+error from +0.021 to +0.005, but that difference is smaller than D50's minimum detectable effect
+(0.024), and D30 did not lower it. At the six MW Primaries the extra error stayed at +0.04 to +0.08
+in every arm that followed at most 0.05, so dependence on the signals is not shown to explain it
+either.
 
-![Follow against ordinary-day CRPS cost at the six MW Primaries, one dot per arm, with the minimum
+![Follow against ordinary-day extra CRPS at the six MW Primaries, one dot per arm, with the minimum
 detectable effect as a bar](follow_vs_cost_six_mw.svg)
 
 *Each dot is one arm, scored on 2025-10 and 2025-12 with two seeds. The horizontal axis is follow on
-injected 15 and 30 day load-shifts, from day 4 to the end (lower is better; A1 is 0.119). The vertical
+injected 15 and 30 day load-shifts, from day 4 to the end (lower is better; A1 is 0.119). The
+vertical
 axis is event-free CRPS at 24-120 h ahead minus A1's (lower is better), and each vertical bar is the
-minimum detectable effect. The keep rule needs a dot left of the vertical dashed line (follow at most
-0.05) whose bar reaches the horizontal dashed line (cost within the minimum detectable effect of A1's).
-No dot meets both: the two bottleneck arms (P7+BN and P7+D50+BN, bottom right) reach the horizontal
+minimum detectable effect. The keep rule needs a dot left of the vertical dashed line (follow at
+most
+0.05) whose bar reaches the horizontal dashed line (extra error within the minimum detectable effect
+of A1's).
+No dot meets both: the two bottleneck arms (P7+BN and P7+D50+BN, bottom right) sit on or below the
+horizontal
 line but follow 0.10.*
 
 ![The same chart at the eight MVA Primaries](follow_vs_cost_eight_mva.svg)
@@ -134,16 +157,21 @@ horizontal dashed line, so it passes the keep rule at this group.*
 
 ## Results
 
-- **Row set and schedule.** Experiment 606's rows; refits at day 0 and 14 of each fold month; monthly
+- **Row set and schedule.** Experiment 606's rows; refits at day 0 and 14 of each fold month;
+    monthly
   cadence (coarse); two seeds; the first fold pair only. Injected bank of 15 and 30 day load-shifts.
 - **Reference.** P7 was re-run in this experiment's pipeline and reproduces experiment 606 (follow
-  0.035; cost +0.021 and +0.068). A1 is experiment 591's stored forecast; R is experiment 597's gate.
-- **Arm table.** Follow is the median forecast's follow from day 4 to the end. The cost columns are
-  ordinary-day CRPS minus A1's, in points of capacity, with the minimum detectable effect in brackets.
-  The last column is R's coverage minus the arm's coverage when the arm's band is widened to R's width
+  0.035; extra error +0.021 and +0.068). A1 is experiment 591's stored forecast; R is experiment
+  597's gate.
+- **Arm table.** Follow is the median forecast's follow from day 4 to the end. The extra-error
+    columns are
+  ordinary-day CRPS minus A1's, in percentage points of capacity, with the minimum detectable effect
+  in brackets.
+  The last column is R's coverage minus the arm's coverage when the arm's band is widened to R's
+  width
   (the keep rule allows 0.01).
 
-| Arm | Follow | Cost, eight MVA (MDE) | Cost, six MW (MDE) | Coverage gap |
+| Arm | Follow | Extra CRPS, eight MVA (MDE) | Extra CRPS, six MW (MDE) | Coverage gap |
 |---|---|---|---|---|
 | A1 | 0.119 | 0 | 0 | n/a |
 | R (A1 plus gate) | 0.119 | 0.012 (0.011) | 0.004 (0.004) | n/a |
@@ -159,7 +187,7 @@ horizontal dashed line, so it passes the keep rule at this group.*
 | P7+O2 | 0.033 | +0.018 (0.001) | +0.071 (0.067) | -0.011 |
 | P7+O3 | 0.072 | +0.011 (0.010) | +0.039 (0.048) | -0.001 |
 | P7+O4 | 0.028 | +0.022 (0.007) | +0.080 (0.056) | -0.007 |
-| B1 | 0.062 | +0.016 (0.000) | +0.051 (0.046) | +0.001 |
+| B1 | 0.062 | +0.016 (<0.001) | +0.051 (0.046) | +0.001 |
 | B3 | 0.052 | +0.021 (0.007) | +0.049 (0.046) | -0.001 |
 | B7 | 0.056 | +0.020 (0.009) | +0.046 (0.047) | -0.001 |
 | B14 | 0.075 | +0.018 (0.007) | +0.049 (0.053) | +0.001 |
@@ -175,68 +203,91 @@ horizontal dashed line, so it passes the keep rule at this group.*
 | P7+O3+D50 | 0.067 | +0.018 (0.003) | +0.039 (0.036) | -0.004 |
 | P7+O3+D50+X3 | 0.073 | +0.011 (0.009) | +0.041 (0.041) | +0.000 |
 | B3+O3+D50 | 0.081 | +0.003 (0.009) | +0.033 (0.020) | +0.002 |
-| P7+D50-p (placebo) | 0.056 | +0.033 (0.000) | +0.034 (0.033) | n/a |
+| P7+D50-p (placebo) | 0.056 | +0.033 (<0.001) | +0.034 (0.033) | n/a |
 
-- **Arm names.** A modifier follows a plus sign. D30 and D50 hide all signal columns on 30% or 50% of
-  the training rows; BN passes the signals through one learnt number; CF builds the lag-free forecast
-  out of fold (three blocks); X1 and X3 add the load-shift label head at weights 0.1 and 0.3; O1 keeps
+- **Arm names.** A modifier follows a plus sign. D30 and D50 hide all signal columns on 30% or 50%
+    of
+  the training rows; BN passes the signals through one learnt number; CF builds the lag-free
+  forecast
+  out of fold (three blocks); X1 and X3 add the load-shift label head at weights 0.1 and 0.3; O1
+  keeps
   only the neighbours' mean and the own-plus-neighbours sum; O2 adds the share of opposite-sign
   neighbours; O3 gives signals for the week lag only; O4 hides only the neighbour columns on 50% of
-  rows. B1, B3, B7, B14 replace P7's three weighted averages by one trailing mean over that many days
+  rows. B1, B3, B7, B14 replace P7's three weighted averages by one trailing mean over that many
+  days
   (B1-14 and B1-28 use several); E1 and E7 keep one weighted average (half-life in days).
-- **Cost against benefit.** Every arm with follow at most 0.05 (P7, D30, D50, X1, O1, O2, O4, B1-14,
-  B1-28) has a six-MW cost of 0.059 or more. The arms with a six-MW cost within the
-  minimum detectable effect (B7, P7+O3, P7+O3+D50+X3, B3+O3+D50, and the bottleneck arms) all follow
-  at least 0.056.
+- **Extra error against benefit.** Every arm with follow at most 0.05 (P7, D30, D50, X1, X3, O1,
+  O2, O4, B1-14, B1-28, B1-14+D50, P7+D50+X3) has a six-MW extra error of 0.059 or more. The arms
+  with a six-MW extra error within its minimum detectable effect (B7, B14, E7, P7+O3,
+  P7+O3+D50+X3, and the two bottleneck arms) all follow at least 0.046.
 - **Pre-registered predictions.**
-    - CF lowers the six-MW cost by 0.03 and keeps follow at most 0.05: refuted (cost -0.014; follow
+    - CF lowers the six-MW extra error by 0.03 and keeps follow at most 0.05: refuted (change
+        -0.014; follow
       0.067).
-    - D30 and D50 lower the six-MW cost by 0.02: refuted (D30 +0.008, D50 -0.009), with follow
+    - D30 and D50 lower the six-MW extra error by 0.02: refuted (D30 +0.008, D50 -0.009), with
+        follow
       rising by at most 0.005 (as predicted).
-    - BN lowers the six-MW cost by 0.02 and keeps follow at most 0.05: half supported (cost -0.078;
+    - BN lowers the six-MW extra error by 0.02 and keeps follow at most 0.05: half supported (change
+        -0.078;
       follow 0.100).
-    - X1 and X3 change follow by 0.01: X3 does (+0.014, and lowers the eight-MVA cost by 0.011); X1 does
-      not (+0.002).
-    - Box windows of 3 or 7 days follow within 0.015 of P7: refuted (+0.017 and +0.021); a 1-day window
+        - X1 and X3 change follow by 0.01 and keep event-free CRPS within the minimum detectable
+      effect: X3 changes follow by +0.014 and lowers the eight-MVA extra error by 0.011 (minimum
+      detectable effect 0.010), so it misses the second half; X1 changes follow by +0.001,
+      statistically nonzero but below 0.01.
+    - Box windows of 3 or 7 days follow within 0.015 of P7: refuted (+0.017 and +0.021); a 1-day
+        window
       follows at least 0.02 more: supported (+0.027).
     - The best combination meets the keep rule: refuted.
     - The shuffled-neighbour placebo follows at least 0.02 more than P7+D50: refuted (0.056 against
       0.040, a difference of 0.016).
-- **Placebo.** With shuffled neighbours the six-MW cost is lower (+0.034) and the eight-MVA cost higher
-  (+0.033). The neighbour information is therefore doing real work at the eight MVA Primaries, and the
-  six MW Primaries pay for it.
-- **Contrasts against P7 (follow, Bonferroni alpha 0.05/20).** The following differ from P7 with the
-  interval excluding zero: CF (+0.031), BN (+0.065), X3 (+0.014), O1 (+0.011), O3 (+0.037), O4
-  (-0.007), B1, B3, B7, B14, E1, E7 (+0.017 to +0.039), B3+D50, B7+D50, B3+D50+X3, P7+D50+BN, and the
-  O3 combinations. D30, D50, X1, O2, B1-14, B1-28, B1-14+D50 and P7+D50+X3 do not. Twenty contrasts
-  were counted in the plan; 28 arms ran, because the plan's combination slot was spent on six
-  combinations, so the family is larger than the corrected level assumes.
+- **Placebo.** With shuffled neighbours, P7+D50-p follows 0.056 (under half of A1's 0.119) and has a
+  six-MW extra error of +0.034 and an eight-MVA extra error of +0.033. Most of the follow reduction
+  therefore survives wrong neighbours, and so does part of the six-MW extra error. Neither effect is
+  shown to come from the neighbours.
+- **Contrasts against P7 (follow, Bonferroni alpha 0.05/20).** The contrast intervals exclude zero
+  for CF (+0.031), BN (+0.065), X1 (+0.001), X3 (+0.014), O1 (+0.011), O3 (+0.037), O4 (-0.007), B1,
+  B3, B7, B14, E1, E7 (+0.017 to +0.039), B3+D50, B7+D50, B3+D50+X3, P7+D50+X3 (+0.008), P7+D50+BN,
+  and the three O3 combinations. They include zero for D30, D50, O2, B1-14, B1-28, and B1-14+D50.
+  The plan counted 20 contrasts; 26 follow contrasts were scored, because the plan's combination
+  slot was spent on several combinations, so the family is larger than the corrected level
+  assumes. O4 is the only arm whose follow is lower than P7's with an interval excluding zero.
 - **Target-side bank (experiment 595's method, injected and verified events).** On the target-side
-  bank the median's absorbed share from day 4 to the end is 0.072 for P7+D50 against 0.104 for A1
-  on 42 injected cells (a 31% cut, not the 66% cut seen on the lag-only bank), and 0.034 against
-  0.068 on the verified December 2025 pair (4 cells). The refit share is 0.040 against 0.035 on
-  injected cells, so P7+D50 still follows its own refitted targets slightly more than A1. The injected
+  bank the median's absorbed share (the fraction of the injected load-shift that the median forecast
+  copies) from day 4 to the end is 0.072 for P7+D50 against 0.104 for A1
+  on 42 injected cells (mean over cells, no interval) (a 30% cut, not the 66% cut seen on the
+  lag-only bank), and 0.034 against
+  0.068 on the verified December 2025 pair (4 cells, whose event runs from 2025-12-30 to
+  2026-01-14). The refit share is 0.040 against 0.035 on
+  injected cells, so P7+D50 still follows its own refitted targets slightly more than A1. The
+  injected
   events are not mirrored at a neighbour in this bank, so it does not test the neighbour inputs'
   benefit; it tests whether the benefit survives when the shift is also in the targets. R was not
   re-run on this bank.
-- **Label head.** The head was trained and never read at forecast time. The check on the real December
+- **Label head.** The head was trained and never read at forecast time. The check on the real
+    December
   2025 pair was not run.
 - **Not run.** The three further fold months for the winner (no arm met the keep rule), and
   experiment 577's O2 offset arm (experiment 608 tests it).
 
 ## Checks
 
-- **Median minus mean forecast per site.** Not computed; the contrasts are on the event-free CRPS and
-  on follow, both measured on the median.
-- **Error of the mean forecast beside the quantile-score contrasts.** Not computed.
-- **Triggers.** (1) The shuffled-neighbour placebo follows 0.056, only 0.016 more than P7+D50,
-  against 0.02 predicted: a weak control, so the neighbour inputs' causal role at the six MW Primaries
-  is not shown. (5) A nested arm beat its container: the six-MW cost of P7+O3 (0.039) is below
-  P7's (0.068). Both mean that an audit would be worth running before anything here is built on;
-  none was run.
-- **Caveats.** Two test months, two seeds, the injected bank mirrors the shift at one neighbour by
-  construction, and only one real pair is verified. NGED's event labels are incomplete, so the
-  ordinary-day rows may hold unlabelled events and the cost figures are lower bounds on harm.
+- **Median minus mean forecast per site.** Not computed. Every contrast here is on follow or on the
+  CRPS of the median and quantiles, and the stored forecasts hold no mean forecast, so the check
+  needs a rerun of the predictions.
+- **Error of the mean forecast beside the quantile-score contrasts.** Not computed, for the same
+  reason.
+- **Audit triggers.** Trigger 1 fired: the shuffled-neighbour placebo followed 0.056, 0.016 more
+  than P7+D50 against 0.02 predicted. Trigger 2 fired: most predictions were refuted, and the
+  placebo and D50 runs are the only tested explanations. Trigger 5 fired: P7+O3 gives less input
+  than P7 and its six-MW extra error (+0.039) is below P7's (+0.068). Triggers 3, 4, 6, and 7 were
+  not checked: the mean-forecast error was not computed, no leave-one-Primary-out run was made, no
+  sister experiment other than experiment 606 reports the same contrasts, and no later
+  experiment's design depends on this result yet. The audit of triggers 1, 2, and 5 is recorded in
+  the PR.
+- **Caveats.** Two fold months, two seeds, an injected bank that mirrors the shift at one
+  neighbour by construction, and one verified real pair. NGED's event labels are incomplete, so the
+  ordinary-day rows may hold unlabelled events and the extra-error figures are lower bounds on
+  harm.
 
 ## Plan
 
@@ -287,7 +338,8 @@ training takes more than 15 minutes, CF runs on one seed only and the page says 
 injected (the 15 and 30 day bank) only if its event-free CRPS minus A1's is below P7's at both
 groups. Arms that fail are reported with their event-free CRPS only.
 
-**Dropout details.** Dropout rows are drawn once per refit over the training rows only (the early-stopping
+**Dropout details.** Dropout rows are drawn once per refit over the training rows only (the
+early-stopping
 rows keep their signals), so the mask does not change between epochs. O4 is a 50% dropout of the
 neighbour columns only. The screening rule is applied by hand: an arm is injected only after its
 event-free CRPS is read.
