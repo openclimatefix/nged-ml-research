@@ -146,7 +146,8 @@ def main() -> None:
     TABLES.mkdir(parents=True, exist_ok=True)
     tail_months = ["2025-12", "2026-01", "2026-03", "2026-06"]
     nets = {"K1 (D5)": ("k1_d5", "K1"), "K2 (D5)": ("k1_d5", "K2"), "K3 (D5)": ("k3_d5", "K2"),
-            "K1 (O2)": ("k1_o2", "K1"), "K2 (O2)": ("k1_o2", "K2"), "K3 (O2)": ("k3_o2", "K2")}  # fmt: skip
+            "K1 (O2)": ("k1_o2", "K1"), "K2 (O2)": ("k1_o2", "K2"), "K3 (O2)": ("k3_o2", "K2"),
+            "Class 2 (own band width)": ("c2_e3w", "K2"), "Class 2 (gate band width)": ("c2_e3w", "K2w")}  # fmt: skip
 
     # --- T1: level table, with and without tail constants, on the four tail months
     rows = []

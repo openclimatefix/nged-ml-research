@@ -40,102 +40,72 @@ def save(chart, name: str) -> None:
     chart.save(str(DOCS / name))
 
 
-def summary() -> None:
-    t = pl.read_csv(ROOT / "score" / "leave_one_out.csv")
-    long = pl.concat(
-        [
-            t.select(
-                arm="arm",
-                measure=pl.lit("Coverage, day 4 to end"),
-                d="cover_days4",
-                lo="cover_days4_lo",
-                hi="cover_days4_hi",
-            ),
-            t.select(
-                arm="arm",
-                measure=pl.lit("Coverage, 0-7 days after"),
-                d="cover_after",
-                lo="cover_after_lo",
-                hi="cover_after_hi",
-            ),
-            t.select(
-                arm="arm",
-                measure=pl.lit("Median follow of the shift"),
-                d="follow",
-                lo="follow_lo",
-                hi="follow_hi",
-            ),
-        ]
-    )
-    order = t["arm"].to_list()
+def interval_chart(*, d: pl.DataFrame, title: str, width: int = 240, stack: bool = False) -> alt.Chart:
+    """One dot-and-interval panel per measure (columns `row`, `measure`, `diff`, `lo`, `hi`), zero line dashed."""
     panels = []
-    for j, measure in enumerate(
-        ["Coverage, day 4 to end", "Coverage, 0-7 days after", "Median follow of the shift"]
-    ):
-        d = long.filter(pl.col("measure") == measure)
-        base = alt.Chart(d).encode(
-            y=alt.Y(
-                "arm:N", sort=order, title=None, axis=alt.Axis(labelLimit=220) if j == 0 else None
-            )
-        )
-        pts = base.mark_point(filled=True, size=60, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("d:Q", title=f"{measure}: arm minus K1 (dashed = K1)")
-        )
+    for j, m in enumerate(d["measure"].unique(maintain_order=True).to_list()):
+        dm = d.filter(pl.col("measure") == m)
+        order = dm["row"].to_list()
+        base = alt.Chart(dm).encode(y=alt.Y("row:N", sort=order, title=None, axis=alt.Axis(labelLimit=260)))
+        zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3], color=theme.BRAND_ORANGE).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
         bars = base.mark_rule(color=theme.DATA_BLUE).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
-        zero = (
-            alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
-            .mark_rule(strokeDash=[4, 3], color=theme.BRAND_ORANGE)
-            .encode(x="x:Q")
+        lo_x, hi_x = min(0.0, float(dm["lo"].min())), max(0.0, float(dm["hi"].max()))
+        pad = 0.08 * (hi_x - lo_x)
+        pts = base.mark_point(filled=True, size=60, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("diff:Q", title=m, scale=alt.Scale(domain=[lo_x - pad, hi_x + pad], nice=False))
         )
-        panels.append(alt.layer(zero, bars, pts).properties(width=260, height=280))
-    chart = alt.hconcat(*panels).resolve_scale(x="independent")
-    save(chart, "leave_one_out.svg")
+        panels.append(alt.layer(zero, bars, pts).properties(width=width, height=max(120, 36 * len(order)), title=m))
+    return (alt.vconcat(*panels) if stack else alt.hconcat(*panels)).resolve_scale(x="independent").properties(title=title)
 
-    tails = pl.read_csv(ROOT / "score" / "tails_k1_d5" / "tails_event_free.csv")
-    w = (
-        tails.group_by("group", "band", "arm")
-        .agg((pl.col("cover90") * pl.col("n_rows")).sum() / pl.col("n_rows").sum())
-        .with_columns(
-            band=pl.when(pl.col("band") == 0).then(pl.lit("0-24 h")).otherwise(pl.lit("24-120 h"))
-        )
+
+def summary() -> None:
+    out = ROOT / "tables_out"
+    t1 = pl.read_csv(out / "t1_levels.csv", infer_schema_length=None).filter(
+        (pl.col("band") == "24-120 h") & pl.col("free_cover90").is_not_null()
     )
-    arms = ["K1 (G4)", "K1 + tail constants", "K3 (lag-free)"]
-    w = w.filter(pl.col("arm").is_in(arms) & (pl.col("band") == "24-120 h")).with_columns(
-        group=pl.col("group").replace(
-            {"signed-MW six": "Six MW Primaries", "MVA-only eight": "Eight MVA Primaries"}
-        )
+    nets = ["K1 (D5)", "K2 (D5)", "K3 (D5)", "K1 (O2)", "K3 (O2)", "Class 2 (gate band width)", "Class 2 (own band width)"]
+    t1 = t1.filter(pl.col("network").is_in(nets)).with_columns(
+        group=pl.col("group").replace({"signed-MW six": "Six MW Primaries", "MVA-only eight": "Eight MVA Primaries"}),
+        tails=pl.when(pl.col("tail_constants")).then(pl.lit("with tail constants")).otherwise(pl.lit("without")),
     )
-    target = (
-        alt.Chart(pl.DataFrame({"y": [0.9]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(strokeDash=[4, 3], color="#6b6b6b")
-        .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0.8, 1.0])))
+    target = alt.Chart(pl.DataFrame({"x": [0.9]})).mark_rule(strokeDash=[4, 3], color="#6b6b6b").encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X("x:Q", scale=alt.Scale(domain=[0.78, 0.94]))
     )
     panels = []
-    for k, group in enumerate(sorted(w["group"].unique().to_list())):
+    for k, group in enumerate(["Eight MVA Primaries", "Six MW Primaries"]):
         dots = (
-            alt.Chart(w.filter(pl.col("group") == group))  # ty: ignore[unresolved-attribute]
-            .mark_point(filled=True, size=120)
+            alt.Chart(t1.filter(pl.col("group") == group))  # ty: ignore[unresolved-attribute]
+            .mark_point(filled=True, size=90)
             .encode(
-                x=alt.X("arm:N", title=group, axis=None, sort=arms),
-                y=alt.Y(
-                    "cover90:Q",
-                    title="Share of rows inside q05-q95" if k == 0 else None,
-                    scale=alt.Scale(domain=[0.8, 1.0]),
-                ),
-                color=alt.Color(
-                    "arm:N",
-                    legend=alt.Legend(title="Network (dashed line: 0.90 target)")
-                    if k == 0
-                    else None,
-                    scale=alt.Scale(
-                        domain=arms, range=[theme.DATA_BLUE, theme.BRAND_ORANGE, theme.DATA_SKY]
-                    ),
-                ),
+                y=alt.Y("network:N", sort=nets, title=None, axis=alt.Axis(labelLimit=260) if k == 0 else None),
+                x=alt.X("free_cover90:Q", title="Share of event-free rows inside q05-q95", scale=alt.Scale(domain=[0.78, 0.94])),
+                color=alt.Color("tails:N", scale=alt.Scale(domain=["without", "with tail constants"], range=[theme.DATA_BLUE, theme.BRAND_ORANGE]),
+                                legend=alt.Legend(title="Tail constants (dashed: 0.90 target)", orient="bottom") if k == 0 else None),
             )
         )
-        panels.append(alt.layer(target, dots).properties(width=220, height=280, title=group))
-    chart = alt.hconcat(*panels)
-    save(chart, "event_free_coverage.svg")
+        panels.append(alt.layer(target, dots).properties(width=260, height=240, title=group))
+    save(alt.hconcat(*panels), "event_free_coverage.svg")
+
+    t2 = pl.read_csv(out / "t2_o2_vs_d5.csv", infer_schema_length=None).filter(
+        pl.col("contrast").str.contains("cover90") & pl.col("contrast").str.contains("24-120 h")
+    )
+    t2 = t2.with_columns(
+        row=pl.col("contrast").str.extract(r"^(K\d)", 1) + pl.when(pl.col("contrast").str.contains("injected")).then(pl.lit(", injected, ") + pl.col("contrast").str.extract(r"(days4-end|after0-7)", 1).replace({"days4-end": "day 4 to end", "after0-7": "0-7 days after"})).otherwise(pl.lit(", event-free ") + pl.when(pl.col("contrast").str.contains("eight")).then(pl.lit("eight MVA")).otherwise(pl.lit("six MW"))),
+        measure=pl.lit("Coverage of q05-q95, O2 minus D5, 24-120 h"),
+    )
+    save(interval_chart(d=t2, title="O2 minus D5, tail constants on both"), "o2_vs_d5.svg")
+
+    t4 = pl.read_csv(out / "t4_class2.csv", infer_schema_length=None).filter(
+        (pl.col("measure").str.contains("24-120 h")) & ~pl.col("measure").str.contains("after0-7|follow")
+    )
+    grp = pl.when(pl.col("measure").str.contains("eight")).then(pl.lit("eight MVA")).when(pl.col("measure").str.contains("six")).then(pl.lit("six MW")).otherwise(pl.lit("injected, days 4 to end"))
+    t4 = t4.with_columns(
+        row=pl.lit("minus ") + pl.col("candidate_minus") + pl.lit(", ") + grp,
+        measure=pl.when(pl.col("measure").str.contains("injected")).then(pl.lit("Injected coverage, class 2 minus network"))
+        .when(pl.col("measure").str.contains("cover90")).then(pl.lit("Event-free coverage, class 2 minus network"))
+        .otherwise(pl.lit("Event-free CRPS, class 2 minus network")),
+    )
+    save(interval_chart(d=t4, title="Class 2 candidate at the gate's band width, 24-120 h, five months", width=420, stack=True), "class2_vs_k1_k2.svg")
 
 
 def aligned(*, root_arm: str, tag: str, t) -> np.ndarray:
@@ -167,6 +137,7 @@ def day_rows(*, t, p: int, lo: int, hi: int) -> np.ndarray:
 def situations() -> None:
     """Draw K1 and K2, then K3 and the class 2 candidate, for five situations: the two December Primaries, a quiet week, a cold night, a sunny day."""
     c.MONTHS = MONTHS
+    cp.RULES = cp.entry("Load-shift start and end given by the maintainer", "rule", cp.RULE_COLOUR)
     work = ROOT / "arms" / "k1_d5" / "work"
     k584.ARMS["k1_d5"] = {"fits": work / "fits", "fit_tag": "P5", "inject": work / "inject"}
     twin_root = ROOT / "arms" / "k3_d5" / "work"
