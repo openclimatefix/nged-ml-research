@@ -8,7 +8,7 @@ theme: calibration-and-uncertainty
 also_relevant_to:
   - weather-products-and-blending
   - lagged-power-and-error-correction
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -27,15 +27,15 @@ hypothesis: >-
 prediction: >-
   Written before any score. P1: arm B (stored weights applied to each member, no refit) is worse
   than the seed-matched arm A by at least 0.05 points of capacity in CRPS. The weather encoder was
-  pre-trained on single ERA5 and CAMS estimates, so it may accept a member, but the mixer was fitted
-  on means and spreads, so the mixer is where B is expected to fail, most in B0 (zero spread). P2:
-  arm C's event-free CRPS is lower than arm A's by 0.01 to 0.06 points at days 6 to 10, where the
-  members differ most, and differs from A's by less than 0.03 points in either direction at days 1
-  and 2; a rise of 0.03 points or more at days 1 and 2 is a miss. Experiment 397 found the member
-  scheme within 0.05 points of the summary scheme for a plain network, and experiment 192 found no
-  gain from member temperatures on cold nights, so the expected result is a gain below the bar.
-  P3: arm C raises q95 and q99 coverage by 0.01 or more at days 6 to 10. P4: arm C's follow ratio is
-  within 0.03 of arm A's.
+  pre-trained on single ERA5 and CAMS estimates, so the weather encoder may accept one member. The
+  mixer was fitted on means and spreads, so B is expected to fail in the mixer, most of all in B0
+  (zero spread). P2: arm C's event-free CRPS is lower than arm A's by 0.01 to 0.06 points at days 6
+  to 10, where the members differ most, and differs from A's by less than 0.03 points in either
+  direction at days 1 and 2; a rise of 0.03 points or more at days 1 and 2 is a miss. Experiment 397
+  found the member scheme within 0.05 points of the summary scheme for a plain network, and
+  experiment 192 found no gain from member temperatures on cold nights, so the expected result is a
+  gain below the bar. P3: arm C raises q95 and q99 coverage by 0.01 or more at days 6 to 10. P4: arm
+  C's follow ratio is within 0.03 of arm A's.
 decision_rule: >-
   Comparator: the ungated seed-matched arm A (K2 seed 0 for K1, K3 seed 0 for K3; seeds 0 to 2 once
   seeds 1 and 2 run). Score: event-free CRPS pooled over the Primaries without D15 and D18, days 1
@@ -44,14 +44,14 @@ decision_rule: >-
   printed and experiment 613 used) in at least two of three fold groups, and the paired
   month-block interval of the pooled difference over the five months excludes zero. A fold group
   is one season group of months (2025-10 and 2025-12; 2026-01 and 2026-03; 2026-06 alone). The
-  width factor is the same for the arm and for A (see Width). The follow ratio is measured on the
-  injected bank, for A and for the arm, only for an arm that meets the CRPS condition; a follow
-  ratio more than 0.03 above A's removes the claim. Variant choice: on seed 0, B0 versus B1 and C0
-  versus C1 are chosen by pooled event-free CRPS on all five months, and the chosen variant is the
-  one carried to seeds 1 and 2. Stop rule: if no seed 0 arm B or C meets the CRPS condition for
-  K1 or K3, the experiment stops and reports. Families for Bonferroni: (1) 4 arm-versus-A CRPS
-  contrasts at seed 0 (B and C, K1 and K3), (2) the same 4 on 3 seeds if run; the count is
-  reported beside each. The experiment adopts nothing.
+  width factor is the same for the arm and for A (equal width scaling, defined under Terms). The
+  follow ratio is measured on the injected bank, for A and for the arm, only for an arm that meets
+  the CRPS condition; a follow ratio more than 0.03 above A's removes the claim. Variant choice: on
+  seed 0, B0 versus B1 and C0 versus C1 are chosen by pooled event-free CRPS on all five months, and
+  the chosen variant is the one carried to seeds 1 and 2. Stop rule: if no seed 0 arm B or C meets
+  the CRPS condition for K1 or K3, the experiment stops and reports. Families for Bonferroni: (1) 4
+  arm-versus-A CRPS contrasts at seed 0 (B and C, K1 and K3), (2) the same 4 on 3 seeds if run; the
+  count is reported beside each. The experiment adopts nothing.
 benchmark: >-
   Arm A: the seed-matched ungated forecasts from experiments 612 and 613's stored fits (the decision
   comparator), and experiment 614's export (five-seed mean, K1 gated) as a reference only.
@@ -60,114 +60,155 @@ metric: >-
   CRPS, MAE of the median, twCRPS, q05 to q95 coverage, and upper-tail exceedance, by lead band
   (day 1, day 2, days 3 to 5, days 6 to 10) and by Primary, pooled and without D15 and D18, on all
   rows and on event-free rows; injected-shift follow ratio and safe-side share as in experiment 613.
+verdict: not supported
+best_arm: >-
+  No arm beat the stored forecast once the bands had equal width. The closest was arm B with the
+  run's own spread for K3 (the stored weights run on each member and pooled). Its event-free CRPS
+  was 3.565 points of capacity against 3.581 for the stored forecast. The difference was -0.016
+  (month-block 95% interval -0.025 to -0.007) with the fitted widths, and +0.001 (-0.004 to +0.005)
+  with equal widths.
+headline: >-
+  Running the stored networks on each of the 51 ensemble members and pooling the outputs lowered the
+  event-free CRPS by 0.007 (K1 without the gate) and 0.016 (K3) points of capacity. With equal band
+  widths the differences were +0.002 and +0.001, so the gain came from a wider band. Refitting the
+  networks on single members raised the CRPS by 0.023 (K1 without the gate; the interval includes 0)
+  and 0.071 (K3) points. No arm reached the 0.06-point bar, so the stop rule ended the experiment at
+  seed 0.
+lessons: >-
+  For K1 and K3 on the five development months, the mean-and-spread input matched the 51 members
+  once the bands had equal width. Pooling mainly widens the band, and equal width scaling removes
+  that widening.
+take_home_message: >-
+  For K1 and K3 on the five development months, giving the demand networks the mean and spread of
+  the 51 ensemble members matched running them once per member and pooling the 51 answers, once the
+  bands had equal width. The mean-and-spread input needs one pass through the neural network per
+  forecast instead of 51. Pooling mainly widens the forecast band. Retraining the networks on one
+  member at a time raised the CRPS by 0.02 to 0.07 points of capacity (the K1 interval includes 0).
+  In this test the member inputs gave no gain beyond the mean and spread, so any gain from the
+  ensemble would have to come from another input or from the training method.
+advice:
+  - >-
+    Keep the ensemble mean and spread as the weather inputs of the demand networks K1 and K3;
+    running K1 and K3 once per member and pooling gave no gain once the band widths matched (arm B
+    with equal width scaling).
+  - >-
+    Do not refit the demand networks on single-member rows: the event-free CRPS rose by 0.023 (K1
+    without the gate) and 0.071 (K3) points of capacity (C, `crps_difference_by_arm.svg`; the K1
+    interval includes 0).
+  - >-
+    When a method widens a forecast band, compare it with the stored forecast after giving both the
+    same width; the as-fitted gain of 0.007 to 0.016 points disappeared after the rescaling (B).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**Plan only. The page is rewritten with the results when the arms have run.**
+**Running the demand neural networks K1 and K3 once per ensemble member and pooling the 51 answers
+did not beat giving them the ensemble mean and spread.** We asked whether a demand neural network
+that reads one weather member at a time, run 51 times and pooled, forecasts demand better than the
+same neural network reading the mean and the spread of the 51 members once. We tested two ways. In
+the first, the stored (already fitted) networks ran on each member without any refit. In the second,
+the networks were refitted on rows holding one randomly drawn member each, and then pooled. The
+first way matched the stored forecasts once the bands had equal width, and the second way made them
+worse. The result narrows the search: the mean and spread already carry what the members add, so for
+these two neural networks the weather inputs are not where the next gain lies. The experiment
+follows experiment 397, which ran a plain neural network once per member and found the per-member
+scheme within 0.05 points of capacity of the mean-and-spread scheme.
 
-## Step 0: how the ensemble weather enters today
+**Terms.** K1 is the lag network, scored here without its gated band (the stored forecasts call this
+arm K2), and K3 is the lag-free network, both from [experiment
+613](../00613-nra-roster-contrasts-with-intervals-five-seeds/result.md) and [experiment
+612](../00612-nra-combined-networks-three-class-roster-completion/result.md). Arm A is the stored
+forecast, seed 0. Arm B runs A's stored weights on each member. Arm C refits step 2 (K1 only) and
+the daily fine-tune on single-member rows. "Run spread" keeps the run's own ensemble standard
+deviation in the spread inputs, and "zero spread" sets the standard deviation to 0 in training and
+testing. Pooling takes the 51 members' 3-component mixtures with equal weights into one
+153-component mixture. CRPS is the continuous ranked probability score, in points of capacity (lower
+is better). The scored rows are event-free (experiment 637's detector) at the 14 Primaries other
+than D15 and D18, on the five development months (2025-10, 2025-12, 2026-01, 2026-03, and 2026-06),
+days 1 to 10. Equal width scaling gives every arm, A included, one width factor per metering group
+and lead band, chosen to bring the 5% to 95% forecast-band coverage closest to 90%, using only
+months before the scored month, except that 2025-10 uses the factor chosen on 2025-12.
 
-**K1, the class 2 candidate, and K3 read the ensemble as a mean and a spread, never as members.**
-The network applied once per forecast run gets, for each valid time, the 51 members' mean of seven
-weather columns (shortwave, longwave, temperature, dew point, surface pressure, log precipitation,
-10 m wind speed) in columns 0 to 6 of the 37 lag-free inputs. The members' population standard
-deviation of the same seven columns sits in columns 7 to 13. Both come from the per-run summary
-files that experiment 397 built (`ens_summary/init=<date>.parquet`), from the stored 51-member
-frames from 2025-07-01 and from an archive rebuild before that.
+## Figures
 
-**The weather encoder sees only the mean.** The standard deviations reach only the fine-tune
-mixer, which also gets the two lead columns. K1 adds the day lag and week lag encoders and the
-gated band G4; K3 has no lags.
+![CRPS difference by arm](crps_difference_by_arm.svg)
 
-**Training is in three steps** (`e00559_model.py`, `e00574_fit.py`):
+Each dot is an arm's event-free CRPS minus the stored forecast's, with its 95% interval from
+resampling the five origin months. Look at the B dots with run spread, which sit just below 0 as
+fitted (blue) and on 0 once the widths match (orange), and at the C dots, which sit above 0 in both
+readings.
 
-- pre-training on ERA5 and CAMS rows, where the weather columns hold a single estimate and the
-  spread columns do not exist, so the pre-training mixer ignores spread;
-- step 2, which fits a fresh mixer (`mixer_ft`) on every ensemble row up to the fold's first
-  cutoff, with the pre-trained encoders frozen; this mixer reads the seven spread columns and the
-  two lead columns, so it has seen means and spreads;
-- the ENS fine-tune on mean-and-spread rows from the 365 daily runs, refitted on days 0 and 14 of
-  each test month with the 7-day embargo E3 for K1 (K3 keeps experiment 613's setting, checked
-  before the first fit).
+![CRPS difference by lead band](crps_difference_by_lead_band.svg)
 
-**Consequence for the plan.** Only the pre-trained weather and datetime encoders (ERA5 and CAMS,
-single estimates) are free of ensemble spread, so arm C reuses the pre-trained weights and refits
-step 2 and the ENS fine-tune on member rows. The K1 fine-tune also uses the lag-only synthetic
-load-shift rows and the B1 columns of experiment 591's chain; arm C keeps both. Experiment 574 found
-extra relative-spread columns unhelpful, so C0 against C1 also tests whether the base seven spread
-columns are worth keeping. The "365 daily runs" and "about 10 seconds a fit" figures are taken from
-the logs of experiment 613 (one K1 fit took 7 to 11 seconds) and are checked in the code review.
+The same difference by lead band for the two run-spread arms, bands as fitted. Look at the days 6 to
+10 row, where pooling lowers the score most (K3 -0.024), and at C, which is worse at every lead.
 
-## Arms
+## Results
 
-- **A.** Current K1 and K3 from the roster export, scored as stored (K1 with the G4 gate). The
-  seed-matched control is the ungated seed 0 forecast (K2) from experiments 612 and 613's fits.
-- **B.** Per-member inference only: the stored weights applied to the 51 members' inputs, pooled.
-  B1 gives each member the run's own standard deviation in the spread columns, so the inputs keep
-  their trained format. B0 sets the spread columns to zero. The result says whether a network
-  trained on summaries can take a single member at all.
-- **C.** Per-member training: refit the ENS fine-tune on rows with one member's seven weather
-  columns, drawing a different member for each row each epoch. C1 keeps the run's standard deviation
-  as the spread input, C0 sets it to zero for training and test. Both pool the 51 outputs at
-  inference. K1 and K3, seed 0 first, then seeds 1 and 2 for the winning variant. Runs before
-  2025-07-01 have only the control member stored, so they train on it as BG2 and experiment 397
-  do. This is a limit on arm C.
+- **Verdict, stop rule.** Neither arm B nor the seed 0 arm C met the bar fixed in the plan (CRPS
+  lower by at least 0.06 points in at least two of three fold groups). The experiment stopped, so
+  seeds 1 and 2, the injected-shift follow ratio, the avoidable-curtailment cost, and the cold-night
+  split were not run.
+- **Arm B, run spread.** CRPS (as fitted) 3.289 against 3.296 (K1 without the gate, -0.007, interval
+  -0.012 to -0.003) and 3.565 against 3.581 (K3, -0.016, -0.025 to -0.007). After equal width
+  scaling the differences are +0.002 (-0.004 to +0.008) and +0.001 (-0.004 to +0.005). The
+  prediction that B would be at least 0.05 worse (P1) failed.
+- **Arm B, zero spread.** CRPS +0.020 (-0.019 to +0.051) and +0.015 (-0.026 to +0.058), worse by
+  0.056 and 0.024 at day 1 (K1, K3). Zero spread is out of the training distribution of the mixer.
+- **Arm C.** Run spread: +0.023 (-0.016 to +0.058) for K1 without the gate and +0.071 (+0.034 to
+  +0.109) for K3. Zero spread: +0.040 (+0.019 to +0.062) and +0.112 (+0.051 to +0.174). Every
+  contrast is above 0 in every fold group. The prediction that C would lower the score at days 6 to
+  10 (P2) failed.
+- **Fold groups (B, run spread, as fitted, K1 without the gate and K3).** 2025-10 and 2025-12:
+  -0.006 and -0.007; 2026-01 and 2026-03: -0.010 and -0.028; 2026-06: -0.002 and -0.011. No group
+  reaches -0.06.
+- **Absolute scores.** Stored K1 without the gate 3.296 and K3 3.581 as fitted, from
+  `score_B/summary.csv`. The comparison with BG2, the manual heuristic, and climatology is in
+  [experiment 645](../00645-k1-vs-stored-bg2-on-the-development-months/result.md) and is not
+  repeated here.
+- **Tails, days 1 to 10, as fitted** (event-free, 14 Primaries). The share of readings at or below
+  q95 should be 0.95: A 0.913 (K1 without the gate) and 0.896 (K3); B 0.921 and 0.913; C 0.917 and
+  0.905. q99 pinball loss: A 0.253 and 0.295; B 0.248 and 0.285; C 0.243 and 0.282. Pooling widens
+  the band, so q95 coverage rises by 0.008 and 0.017 (days 6 to 10: 0.011 and 0.024). Arm B
+  therefore shows the rise P3 predicts for arm C. For arm C, q95 coverage at days 6 to 10 rises by
+  +0.011 (K3) and +0.002 (K1 without the gate), so P3 is met for K3 only, and the q99 half is not
+  checked here. q99 and q95 pinball loss fall slightly for B and for C, except that q95 pinball loss
+  for C K3 rises from 0.983 to 0.985. The lower tail changes little.
+- **Row set and data.** `experiment_470_intersection_v1` rows of the roster export (experiment 614),
+  971,813 scored rows. The networks use seed 0 and are refitted on days 0 and 14 of each month, as
+  in experiments 612 and 613. The member weather is the 51-member frame of each run, read for test
+  rows and for training rows from 2025-07-02. Runs before that date store only the control member,
+  so arm C trained on the control member for those rows (2,750,046 of 5,571,065 rows of the 2026-06
+  fold hold all 51 members, from the arm's run log). This is a limit on arm C, and the 2025-10 and
+  2025-12 fold group is the most control-heavy.
+- **Compute.** Arm B made 4 runs (K1 and K3, each with run spread and zero spread) over 5 months,
+  and each run took minutes. Arm C: 20 fine-tunes and 10 step-2 fits for K1, 20 fine-tunes for K3 (7
+  to 21 seconds each, from the run logs). The GPU time is under 1 hour, against the 6-hour ceiling.
+  The fitted weights are in
+  `data/ml-experiments/00646-per-ens-member-neural-demand-networks-pooled-quantiles/arms/*/work/models`.
+- **Lead range.** The scored leads are 1 to 10 days.
 
-**Pooling** follows experiment 397: an equal-weight mixture of the 51 members' mixture components,
-with the 11 quantiles read from the pooled cumulative distribution function, then the D5 offset as
-fitted; the offset was fitted on mean inputs, which is an assumption for arm B. **Width.** The
-pooled mixture is wider than a single pass, so each arm, A included, gets one width factor per
-Primary group (six MW, eight MVA) and lead band, about the median, chosen to bring the q05 to q95
-coverage closest to 0.90 on earlier months only; 2025-10 has no earlier month and uses the factor
-chosen on 2025-12 (flagged as lookahead for that month alone). This replaces the fixed 1.15 of BG2
-and gives every arm the same calibration freedom. The unscaled numbers are reported beside the
-scaled ones, and P3's coverage is read on the unscaled bands. K1's gate is not applied in the primary
-reading (the K2 reading); a secondary reading unions the pooled band with the pooled lags-removed
-band on the stored gate days if the primary reading shows a gain.
+## Checks
 
-## Scoring and standing practices
+- **Pooling code.** With the members replaced by the stored mean (`--identity`), the pooled forecast
+  equals the stored K1 and K3 forecasts to 2e-7 (2025-10, seed 0). The members' mean matches the
+  stored mean to 0.0003 standard deviations in the five smooth weather columns.
+- **Median and mean forecasts.** The quantile frames hold no mean forecast, so the median minus the
+  mean per site is not computed. The error of the median forecast (MAE) moves with the CRPS: B run
+  spread -0.002 (K1 without the gate) and -0.007 (K3) points, C +0.081 and +0.168.
+- **Triggers.** None of the seven fired: no control failed, no result contradicts its prediction in
+  a way left unexplained (P1 and P2 failed and are explained above; C K3 is also 0.051 and 0.073
+  worse at days 1 and 2, where P2 asked for within 0.03), the CRPS and the MAE agree in direction,
+  leaving one site out was not run because no contrast is near the bar, no nested arm beats its
+  container by more than its interval, no interval is more than twice as wide as a sister
+  experiment's, and no later experiment depends on this result. This experiment has no audit.
+- **Not run.** The unlogged-event caveat does not apply (no load-shift slices were scored). The
+  example-forecast graphs were not drawn because the stop rule ended the experiment before any arm
+  was worth showing.
 
-- **Rows.** The five development months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06) and the
-  `experiment_470_intersection_v1` rows. The July to October 2026 window is never opened. Event-free
-  rows use experiment 637's frozen detector, with the verified-event flags as a second reading.
-- **Cleaned data and the short-history cut** follow the standing practices, since the arms reuse
-  experiments 612 and 613's rows. D15 and D18 rows before 2025-03-01 are dropped.
-- **Tails and cost.** q01, q05, q95, and q99 coverage and pinball loss, cold winter nights, and the
-  avoidable-curtailment cost are reported beside CRPS, per Primary and pooled.
-- **Injected shifts.** The follow ratio and safe-side share are measured on experiment 613's
-  injected bank for arm A and for any arm meeting the CRPS condition, because the bank multiplies
-  inference by 51 and arm C needs its own refits on shifted rows (counted in the compute below).
-- **Cadence.** Monthly refits (days 0 and 14 of each month), as experiments 612 and 613 used.
-- **Compute.** Inference is 51 times the rows of arm A's, and the input build is the cost, not the
-  forward pass. Arm C refits take about 10 seconds each: 5 months, 2 refits, 2 networks, 2 variants
-  is 40 fits for seed 0, plus step 2 refits and, for a qualifying arm, the injected-bank refits. The
-  estimate is under 3 GPU-hours in total, against the 6 GPU-hour ceiling; `nvidia-smi` is checked
-  before each run and one process runs at a time.
-- **Seeds.** Seed 0 first, then seeds 1 and 2 for the chosen variant, three seeds in total.
-- **Training rows.** Runs before 2025-07-01 hold only the control member, so the 2025-10 and
-  2025-12 fold group trains mostly on control-member rows; results are tabulated by fold group so
-  this limit is visible.
-- **Intervals.** Month-block bootstrap over the five months and the Primaries, as experiment 613.
-  The headline chart shows each arm's difference from A with its interval; at most two panels.
-- **Event-free rows.** Experiment 637's detector was applied to the development months by
-  experiment 645, so it applies here; the verified-event flags are the second reading.
-- **Reviews.** One Sonnet plan review, one Sonnet code review before the first number that will be
-  quoted, one Sonnet write-up review against the printed report, one Sonnet prose review.
+## What the next experiment should answer
 
-## Earlier work this plan follows
-
-- Experiment 397 ran a plain network on the control member and applied it to 51 members, and found
-  it within 0.05 points of the summary scheme. This plan trains on members, which 397 did not.
-- Experiments 620 and 633 run BG2's XGBoost once per member and pool 51 outputs with a spread factor
-  of 1.15, and experiment 125 treated members one at a time; arm C is the neural analogue.
-- Experiments 187 and 192 ran the 51 members through part of the demand model (the solar term, and
-  the temperature term on cold nights) and found a 2.2% daylight gain and no cold-night gain.
-- Advice from earlier results: report a score for every member as well as for the member average
-  when testing a weather correction, and train a calibrator on pooled members or leave it out.
-
-## Fold groups
-
-The brief asked for "at least two of the three fold pairs". The five development months have no
-natural three pairs, so this plan reads them as three season groups (autumn and early winter,
-winter and spring, summer). Experiment 612 names only the first fold pair (2025-10 and 2025-12), which
-matches the first group here; neither 612 nor 613 defines the others. The manager confirmed this
-reading before any score.
+Member inputs do not help these networks, so the question moves to what the networks do with the
+ensemble spread: whether a spread-aware network with a calibrated band improves the tails, or
+whether the spread input contributes anything at all (arm C with zero spread was worse, but the
+zero-spread arms also removed the input).
