@@ -14,7 +14,8 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 SLUG: Final[str] = "00642-roster-upper-tail-correction-out-of-sample-leave-one-month-out"
 DOCS: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / SLUG
-TABLES: Final[Path] = ML_EXPERIMENTS_DATA_DIR / SLUG / "tables"
+OUT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / SLUG
+TABLES: Final[Path] = OUT / "tables"
 W: Final[int] = 600
 LABEL: Final[dict[str, str]] = {
     "base": "Uncorrected",
@@ -105,13 +106,18 @@ def headline() -> None:
 
 
 def by_month() -> None:
-    """Figure 2: q90 exceedance by held-out month, one panel per network."""
+    """Figure 2: q90 exceedance by held-out month on the 14 Primaries without D15 and D18."""
     panels = []
     for network in ("Candidate", "K1"):
-        d = pl.read_csv(TABLES / f"by_month_{network}.csv").with_columns(
-            arm_label=pl.col("arm").replace_strict(LABEL), v=pl.col("a90") * 100
+        rows = (
+            pl.read_parquet(OUT / f"scored_{network}.parquet")
+            .filter(pl.col("event_free") & ~pl.col("primary_name").is_in(["D15", "D18"]))
+            .group_by("month")
+            .agg(*[pl.col(f"a90_{a}").mean().alias(a) for a in LABEL])
+            .unpivot(index="month", variable_name="arm", value_name="v")
+            .with_columns(arm_label=pl.col("arm").replace_strict(LABEL), v=pl.col("v") * 100)
         )
-        base = alt.Chart(d.to_pandas())
+        base = alt.Chart(rows.to_pandas())
         line = base.mark_line(point=True).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("month:N", sort=MONTHS, title=None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y("v:Q", title=f"{network}: above q90 (%)", scale=alt.Scale(domain=[6, 22])),
@@ -131,8 +137,8 @@ def by_month() -> None:
     save(
         chart,
         "figure_2_exceedance_by_month.svg",
-        "March 2026 stays above nominal for every arm, and June is overcorrected by most",
-        "Share of event-free half-hours above q90 in each held-out month. Dashed line: nominal 10%. Month is the month of the forecast origin.",
+        "Without D15 and D18, arm M keeps every month within 9% to 12.5% above q90",
+        "Share of event-free half-hours above q90 in each held-out month, 14 Primaries (D15 and D18 left out; at those two, March is 45% to 46% above q90 uncorrected). Dashed line: nominal 10%. Month is the month of the forecast origin.",
     )
 
 
@@ -180,8 +186,8 @@ def by_group() -> None:
     save(
         chart,
         "figure_3_exceedance_by_metering_group.svg",
-        "The corrections work better at the eight MVA Primaries than at the six MW Primaries",
-        "Candidate, event-free half-hours, 14 Primaries (D15 and D18 left out). Dashed line: nominal share.",
+        "The corrections bring the eight MVA Primaries near nominal; the six MW Primaries stay 2 to 3 points above",
+        "Candidate, event-free half-hours, 14 Primaries (D15 and D18 left out). Arm M's CRPS ratio is 1.025 at the MVA group and 1.001 at the MW group. Dashed line: nominal share.",
     )
 
 

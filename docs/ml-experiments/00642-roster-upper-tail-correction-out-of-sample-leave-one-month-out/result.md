@@ -118,46 +118,53 @@ metric: >-
 verdict: partly supported
 best_arm: >-
   None passes the bar. Arm M (a 28-day median shift of the quantiles, then a scale per Primary) came
-  closest: it cut the Candidate's event-free q90 exceedance from 13.2% to 11.7% (95% interval 11.1%
-  to 12.3%) and q95 from 7.2% to 6.6%, at a CRPS ratio of 0.992, and K1's from 14.7% to 11.4% and
-  8.4% to 6.4% at a CRPS ratio of 1.000.
+  closest: on 16 Primaries it cut K1's event-free q90 exceedance from 14.7% to 11.4% and q95 from
+  8.4% to 6.4% at a CRPS ratio of 1.000, and the Candidate's from 13.2% to 11.7% and 7.2% to 6.6% at
+  0.992; on the 14 Primaries without D15 and D18 its CRPS ratios are 1.021 and 1.016.
 headline: >-
-  No correction fitted without the held-out month brought q90 and q95 exceedance within 1.5 points
-  of nominal in every month. The pooled bar is met by K1 with arm M (11.4% and 6.4%, CRPS ratio
-  1.000) and missed by the Candidate with the same arm by 0.2 points at q90, but the per-month
-  condition fails for every arm, because March 2026 stays at 15% to 18% above q90. The scale per
-  Primary (S), the lead-band and hour scale (B), and quantile mapping (Q) raised CRPS by 2.7% to
-  6.4%, and the rolling 8-week conformal arm (C) made q90 exceedance worse (14.8%).
+  No correction fitted without the held-out month passed the bar. Arm M cut q90 exceedance to 11.4%
+  (K1) and 11.7% (Candidate) on all 16 Primaries at a CRPS ratio of 1.000 and 0.992, but that
+  neutral CRPS comes from D15 and D18. On the other 14 Primaries arm M keeps every month between
+  9.2% and 12.5% above q90 and raises CRPS by 2.1% (K1) and 1.6% (Candidate), over the 1% limit. The
+  month condition fails on 16 Primaries because D15 and D18 are 45% above q90 uncorrected in March
+  2026. Scaling alone (S, B, Q) raised CRPS by 2.7% to 6.4%, and rolling conformal (C) made q90
+  exceedance worse (14.8%).
 lessons: >-
-  The excess above q90 is a seasonal level bias that is largest in March and on cold nights, so a
-  scale fitted on other months over-widens June and under-widens March. The one arm that follows
-  recent errors at the level of the median (M) helps most, and an arm that follows recent errors at
-  each upper quantile (C) adds noise, because the 8-week residual quantile changes by a standard
-  deviation of 0.34 MW from day to day.
+  The excess above q90 at the 14 Primaries with a longer history is a level bias that is largest on
+  cold nights and in winter, so a scale fitted on other months over-widens June. A shift to the
+  recent level narrows the cold-night gap (12.3% against 15.1% for a scale alone) but raises CRPS by
+  about 2%. The two short-history Primaries D15 and D18 carry the March failure, because their
+  level changed. An arm that follows recent errors at each upper quantile (C) adds noise, because
+  the adjustment's standard deviation across rows is 0.34 MW.
 take_home_message: >-
-  The upper tail of the stored demand forecasts is too low partly because their level drifts, and
-  not only because their bands are too narrow: shifting the whole forecast by the median error of the
-  previous 28 days, and then scaling the upper bands, removed most of the excess on cold nights and
-  left CRPS unchanged, while widening the bands on their own made CRPS 3% to 6% worse. March 2026
-  still ended 5 points above nominal, so no correction fitted without the held-out month is ready.
-  The next step is an input that tells the network about the recent level, not a better scale.
+  On the 14 Primaries with a longer history, shifting each stored demand forecast to the level of
+  the previous 28 days and then scaling its upper bands brings the share of readings above q90 to
+  about 11% in every test month, against 12% to 16% before, but it raises CRPS by about 2%. The
+  apparent absence of a CRPS increase over all 16 Primaries comes from the two short-history
+  Primaries D15 and D18, whose level changed in March 2026 and which are 45% above q90 that month
+  before any correction. The next step is to treat D15 and D18 separately and to test whether the
+  shift can be applied to the upper quantiles only, so that CRPS does not rise.
 advice:
   - >-
-    Correct a demand forecast's upper tail by shifting its median to the recent level before
-    scaling its bands, not by scaling the bands alone, because the median shift plus a scale cut
-    q90 exceedance to 11.4% to 11.7% at CRPS ratios of 0.992 to 1.000 while a scale alone raised
-    CRPS by 2.7% to 3.3% (figure 1 and the CRPS bullets).
+    Treat a shift of the stored forecast to the recent median level as an option, not a default,
+    because on the 14 Primaries with a longer history it lowered q95 exceedance by 0.4 to 0.5
+    points more than a scale alone (5.9% and 6.1% against 6.4% and 6.5%) and narrowed the
+    cold-night gap, but raised CRPS by 0.6 to 1.1 points more (1.021 and 1.016 against 1.010 and
+    1.014; the 14-Primary bullet).
   - >-
     Do not use a rolling conformal adjustment of each upper quantile over 8 weeks, because it made
-    q90 exceedance worse (14.8% against 13.2%) from a day-to-day adjustment with a standard
-    deviation of 0.34 MW (the arm C bullet).
+    q90 exceedance worse (14.8% against 13.2%) from an adjustment whose standard deviation across
+    rows was 0.34 MW, although it lowered the avoidable curtailment cost by about as much as arm M
+    (the arm C and curtailment bullets).
   - >-
-    Score any upper-tail correction month by month as well as pooled, because March 2026 stayed
-    15% to 18% above q90 for every arm while June 2026 fell to 8% (figure 2).
+    Score and report D15 and D18 separately from the other 14 Primaries when judging a calibration
+    correction, because their March 2026 exceedance (45% to 46% above q90 before correction) alone
+    makes the month condition fail on 16 Primaries and makes a correction look free of CRPS
+    increase (the by-month and 14-Primary bullets).
   - >-
     Fit upper-tail corrections separately for the eight MVA Primaries and the six MW Primaries, or
-    check them there, because the MVA group reached 10.0% above q90 and the MW group stayed at 12.9%
-    (figure 3).
+    check them there, because the MVA group reached 10.0% above q90 and the MW group stayed at
+    12.9% (figure 3).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00642-roster-upper-tail-correction-out-of-sample-leave-one-month-out/
@@ -178,7 +185,7 @@ change the stored forecasts only; no network was refitted.
 
 ![Share of half-hours above q90 and q95, by arm, for K1 and the Candidate](figure_1_exceedance_by_arm.svg)
 
-![Share above q90 in each held-out month, Candidate and K1](figure_2_exceedance_by_month.svg)
+![Share above q90 in each held-out month at 14 Primaries, Candidate and K1](figure_2_exceedance_by_month.svg)
 
 ![Candidate: share above q90 and q95 by metering group](figure_3_exceedance_by_metering_group.svg)
 
@@ -189,14 +196,18 @@ change the stored forecasts only; no network was refitted.
 - **Verdict `partly supported`.** The registered bar needs, per network, an arm whose pooled
   event-free q90 exceedance lies in 8.5% to 11.5%, whose q95 lies in 3.5% to 6.5%, whose CRPS is at
   most 1.01 times the uncorrected network's, and whose q90 exceedance lies in 7% to 13% in every
-  held-out month. Arm M passes the first three conditions for K1 (11.4%, 6.4%, 1.000) and misses
-  the first for the Candidate by 0.2 points (11.7%, 6.6%, 0.992). Every arm fails the month
+  held-out month. On 16 Primaries arm M passes the first three conditions for K1 (11.4%, 6.4%,
+  1.000) and misses the first two for the Candidate (11.7%, 6.6%, 0.992). Every arm fails the month
   condition, so no arm passes in full. The rule gives `partly supported` when an arm passes the
   first two conditions and fails another, and arm M (the arm with the smallest distance from both
-  nominal levels) is the best arm.
+  nominal levels) is the best arm. **The month failure and the neutral CRPS both come from D15 and
+  D18.** On the 14 Primaries without them, arm M keeps every month between 9.2% and 12.5% above q90
+  and passes the q90, q95, and month conditions, but its CRPS ratio is 1.021 (K1) and 1.016
+  (Candidate), above 1.01. The pre-registered bar gates on all 16 Primaries, so the verdict stands.
 - **Arms** (all fitted on event-free rows of the other four months; held-out lead 0 to 240 hours,
   the whole 1 day to 10 day range that NGED uses). S: a scale per Primary on the distance above the
-  median of every upper quantile (fitted scales 0.87 to 1.63, median 1.09 for the Candidate). B: S,
+  median of every upper quantile (fitted scales per Primary, averaged over folds, 0.87 to 1.63,
+  median 1.09 for the Candidate). B: S,
   then a scale pooled over Primaries per lead band and 4-hour block of valid time. C: a rolling
   conformal adjustment of each upper quantile from the previous 56 days. Q: quantile mapping of the
   whole distribution per Primary and lead band. M: a shift of every quantile by the median error of
@@ -230,10 +241,12 @@ change the stored forecasts only; no network was refitted.
   intervals, because five months are few: the Candidate's arm M q90 is 11.7% (10.0, 13.6), its q95
   6.6% (5.5, 8.0), and its CRPS ratio 0.992 (0.939, 1.051). The bar uses the point estimates, so
   these intervals are descriptive.
-- **By month.** Candidate q90 exceedance, uncorrected and for arm M, by held-out month: October
-  12.4% and 9.9%; December 13.1% and 10.7%; January 12.4% and 9.9%; March 17.6% and 15.1%; June
-  9.3% and 11.8%. S, B, and Q reach 8.4% to 8.5% in June, an overcorrection. March stays at 17.1%
-  to 17.8% for every arm except M.
+- **By month.** On the 14 Primaries without D15 and D18, the Candidate's q90 exceedance, uncorrected
+  and for arm M, is: October 12.0% and 9.2%; December 13.7% and 10.8%; January 14.2% and 11.3%;
+  March 13.2% and 12.4%; June 10.1% and 11.9% (K1: 9.6% to 12.5% for arm M). S, B, and Q reach 9.4%
+  to 9.5% in June, an overcorrection. At D15 and D18, March is 45.5% (Candidate) and 45.9% (K1)
+  above q90 uncorrected and 30.2% to 32.2% for arm M, while the other months are 2% to 22%. On all
+  16 Primaries March therefore stays at 17.1% to 17.8% for every arm except M (15.1%).
 - **Cold nights.** The Candidate's q90 exceedance on cold nights (18:00 to 06:00 UTC, coldest third
   of ensemble temperatures) is 16.4% uncorrected against 12.4% elsewhere. Arm M brings it to 12.3%
   against 11.5%, and S leaves it at 15.1%. K1: 17.6% against 14.1% uncorrected, and 11.9% against
@@ -241,12 +254,17 @@ change the stored forecasts only; no network was refitted.
 - **Metering groups (Candidate, event-free).** The eight MVA Primaries: 11.3% and 5.9%
   uncorrected, 10.0% and 5.4% for arm M (CRPS ratio 1.025). The six MW Primaries: 14.6% and 8.1%
   uncorrected, 12.9% and 7.2% for arm M (CRPS ratio 1.001). The two report-only Primaries (D15 and
-  D18): 17.0% and 10.6% uncorrected, 15.2% and 10.5% for arm M (CRPS ratio 0.845). On the 14
-  Primaries without D15 and D18, arm M gives 11.2% and 6.1% for the Candidate and 11.0% and 5.9% for
-  K1.
+  D18): 17.0% and 10.6% uncorrected, 15.2% and 10.5% for arm M (CRPS ratio 0.845). **On the 14
+  Primaries without D15 and D18**, uncorrected, S, and M give q90 and q95 exceedance of 12.7% and
+  6.8%, 11.5% and 6.5%, and 11.2% and 6.1% for the Candidate, and 14.2% and 8.0%, 11.3% and 6.4%,
+  and 11.0% and 5.9% for K1. Their CRPS ratios are 1.014 (S) and 1.016 (M) for the Candidate and
+  1.010 (S) and 1.021 (M) for K1, so arm M raises CRPS by 0.2 to 1.1 points more than S for a q95
+  closer to nominal. At D15 and D18 alone, arm M improves CRPS by 13% to 15% (ratio 0.845 to 0.866)
+  and S worsens it by 13% to 15%.
 - **Arm C.** The rolling conformal adjustment raised q90 exceedance from 13.6% to 15.6% on the rows
-  it corrected (86% of event-free rows; October is uncorrected where the previous 56 days hold too
-  few residuals). The adjustment at q90 averages −0.016 MW with a standard deviation of 0.34 MW and
+  it corrected (86% of event-free rows; in October 55% of rows are corrected, because the previous
+  56 days hold too few residuals). The adjustment at q90 averages −0.016 MW with a standard
+  deviation of 0.34 MW across rows and
   is positive on 44.5% of rows, so it behaves as noise. The code recovers the nominal level on
   stationary synthetic data (15.2% before, 11.2% after), so the failure comes from the forecasts,
   as in [experiment
@@ -265,22 +283,28 @@ change the stored forecasts only; no network was refitted.
   −8.8% and S by +10.8% and +6.0%. The cost falls for arm M at every fraction tried for K1 and the
   Candidate, and for arm C too (−5.2% to −14.0%).
 - **Pre-registered predictions.** P1 failed (no arm passes). P2 failed in its first half: C and M
-  corrected 86% and 77% of event-free rows, above the predicted 70% limit, and held in its second
-  half (C misses by more than S). P3 failed: Q raised the Candidate's share below q05 from 3.4% to
-  6.6%, past nominal, and gave the largest CRPS rise (+6.4%). P4 held for March (above 12% for every
-  arm) and for June for S, B, and Q, not for C or M. P5 held for the metering groups; the curtailment
-  and K3 parts were not tested (no interval; K3's fitted scales not reported).
+  corrected 86% and 77% of event-free rows, above the predicted 70% limit, and held in part of its
+  second half (C misses by more than S; M does not). P3 failed: Q raised the Candidate's share below
+  q05 from 3.4% to
+  6.6%, past nominal, and gave the largest CRPS rise (+6.4%). P4 held on 16 Primaries for March
+  (above 12% for every arm, a result that D15 and D18 produce) and for June for S, B, and Q, not for
+  C or M. P5 held for the metering groups and for K3 (median fitted scale per Primary 1.25, against
+  1.15 for K1 and 1.10 for the Candidate); the curtailment part was not tested (no interval).
 - **Reviews.** One Sonnet plan review found a leak through valid times overlapping the held-out
   month, an in-sample Candidate band width, a pooled bar that lets months cancel, undefined
   minimum sizes, and weak predictions; the plan was revised before any run. One Sonnet code review
   before the first scored run found a leak in arm M (training shifts computed from a window that
   included the held-out month), fixed before the run; its other findings (ties, crossings) cannot
-  occur in the stored quantiles. A Sonnet review of the results and the write-up and a Sonnet
-  prose review follow.
+  occur in the stored quantiles. A Sonnet review of the results and the write-up reproduced the numbers and found that arm M's
+  neutral CRPS and the March failure both come from D15 and D18, that the Candidate with arm M also
+  misses the q95 limit, and a wrong statement about quantile mapping and the median; the write-up,
+  the headline, the advice, and figure 2 were rewritten to show the 14 Primaries separately. A
+  Sonnet prose review follows.
 - **Checks.** The median error: arm M lowers the mean of observed power minus q50 from 0.0975 to
   0.0464 MW (K1) and cuts the median's absolute error by 0.8% (K1, 0.4414 to 0.4380 MW) and by 1.9%
-  (Candidate, 0.4477 to 0.4390 MW), in the same direction as its CRPS ratio, and arms S, B, and Q
-  leave the median unchanged, so trigger 3 does not fire. The export holds no mean forecast, so the
+  (Candidate, 0.4477 to 0.4390 MW), in the same direction as its CRPS ratio, and arms S and B leave
+  the median unchanged while Q worsens its absolute error by about 4%, so trigger 3 does not fire.
+  The export holds no mean forecast, so the
   median-minus-mean check does not apply. Trigger 2 did not fire: P1 failed, but the by-month,
   by-group, cold-night, and arm C diagnostics above test the explanation. No other trigger applies,
   so no audit ran.
@@ -293,9 +317,9 @@ change the stored forecasts only; no network was refitted.
   The schedule is a free re-score of stored forecasts, so cadence does not apply; the absolute
   scores are those of experiment 613's stored networks, and no comparison to BG2, the manual
   heuristic, or climatology is made here.
-- **What the next experiment should answer.** Whether giving the network the recent level as an
-  input, or a shift that depends on temperature and season, removes March 2026's excess without
-  widening June; test it before opening the July to October 2026 window.
+- **What the next experiment should answer.** How D15 and D18 should be corrected, since their level
+  changed in March 2026, and whether a shift applied to the upper quantiles only keeps arm M's q95
+  gain without its 2% CRPS rise; test it before opening the July to October 2026 window.
 - **Code.** `ml-experiments/00642-roster-upper-tail-correction-out-of-sample-leave-one-month-out/`
   (`e00642_arms.py`, `e00642_score.py`, `e00642_report.py`, `e00642_cost.py`, `e00642_checks.py`,
   `e00642_figures.py`); imports `e00630_common` from experiment 630's folder; tables in the
