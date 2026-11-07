@@ -44,7 +44,9 @@ def crps(*, y: np.ndarray, q: np.ndarray) -> np.ndarray:
     return 2 * np.maximum(arms.TAU * err, (arms.TAU - 1) * err).mean(axis=1)
 
 
-def rolling_tables(*, df: pl.DataFrame) -> pl.DataFrame:
+def rolling_tables(
+    *, df: pl.DataFrame, exclude: tuple[datetime, datetime] | None = None
+) -> pl.DataFrame:
     """Causal conformal adjustments (5 upper levels) and median shift per (Primary, band, origin day).
 
     The pool for origin day d is the event-free rows of the same Primary and lead band whose origin
@@ -52,7 +54,12 @@ def rolling_tables(*, df: pl.DataFrame) -> pl.DataFrame:
     A cell with fewer than `MIN_POOL_ROWS` pool rows gets null adjustments (no correction).
     """
     rows = []
-    ef = df.filter(pl.col("event_free")).with_columns(
+    pool = df.filter(pl.col("event_free"))
+    if exclude is not None:
+        pool = pool.filter(
+            ~((pl.col("valid_time") >= exclude[0]) & (pl.col("valid_time") < exclude[1]))
+        )
+    ef = pool.with_columns(
         od=pl.col("origin_date").dt.epoch("d"), vt=pl.col("valid_time").dt.epoch("s") / 86400.0
     )
     days = df.select("time_series_id", "band", "origin_date").unique()
@@ -96,7 +103,8 @@ def attach(*, df: pl.DataFrame, tables: pl.DataFrame) -> pl.DataFrame:
     out = df.join(
         tables, on=["time_series_id", "band", "origin_date"], how="left", maintain_order="left"
     )
-    assert out["valid_time"].equals(df["valid_time"]), "join changed the row order"
+    assert out["valid_time"].equals(df["valid_time"])
+    assert out["time_series_id"].equals(df["time_series_id"]), "join changed the row order"
     return out.with_columns(block=(pl.col("hour") // 4).cast(pl.Int8))
 
 
@@ -192,6 +200,20 @@ def main() -> None:
                 & pl.col("event_free")
                 & ~((pl.col("valid_time") >= lo) & (pl.col("valid_time") < hi))
             )
+            # Training rows' shifts must not see the held-out span: recompute them without it.
+            fold_tables = rolling_tables(df=df, exclude=(lo, hi)).select(
+                "time_series_id", "band", "origin_date", pl.col("shift").alias("shift_fold")
+            )
+            train = (
+                train.join(
+                    fold_tables,
+                    on=["time_series_id", "band", "origin_date"],
+                    how="left",
+                    maintain_order="left",
+                )
+                .with_columns(shift=pl.col("shift_fold"))
+                .drop("shift_fold")
+            )
             res = fit_and_apply(train=train, test=test)
             y = test["observed_power"].to_numpy().astype(np.float64)
             thr = (
@@ -205,6 +227,7 @@ def main() -> None:
                 )["thr"]
                 .to_numpy()
             )
+            assert not np.isnan(thr).any(), "a Primary has no fitting rows"
             cols = {}
             for arm in ARMS:
                 q = res[arm]
