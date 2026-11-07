@@ -162,7 +162,8 @@ class Seq(nn.Module):
             h = torch.cat([eo, do], 1)
         if self.arm != "no_attn":
             h = self.attn(h)
-        out = self.head(h[:, self.n_hist :]).float()
+        with torch.autocast("cuda", enabled=False):
+            out = self.head(h[:, self.n_hist :].float())
         k = COMPONENTS
         off = self.offset(b.tau, b.primary)[..., None]
         return torch.cat([out[..., :k], out[..., k : 2 * k] + off, out[..., 2 * k :]], dim=-1)

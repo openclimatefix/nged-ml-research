@@ -23,7 +23,6 @@ from e00397_models import LEVELS, mixture_parts, mixture_quantiles  # ty: ignore
 
 DEV = "cuda"
 LR, WD, WARMUP, CLIP, BATCH, PATIENCE = 5e-4, 1e-2, 300, 1.0, 256, 8
-VAL_DAYS, PURGE_DAYS = 30, 7
 P_ALL_MASK, P_RECENT_MASK, P_NB_DROP = 0.25, 0.05, 0.5
 CUTOFF_AGE_STEPS = 7  # 3.5 h
 
@@ -39,8 +38,13 @@ def origins_for(
     first_origin = 335 + 1
     all_o = np.arange(first_origin - first_origin % day + 18 + day, last + 1, day)
     all_o = all_o[all_o <= target_end - 48]
-    val = all_o[-VAL_DAYS:]
-    train = all_o[all_o <= val[0] - PURGE_DAYS * day]
+    # Roster-style validation: spread-out held-out weeks with a purge around each, so training
+    # runs right up to the refit and the newest D5 knot sees targets (as the comparators' does).
+    held, purged = d.prep422.purge_masks(origin_day=all_o // day)
+    val = all_o[held]
+    train = all_o[~held & ~purged]
+    if train.max() < target_end - 48 - 30 * day:
+        raise ValueError("training origins stop long before the refit")
     return train, val, fold_mod.test_origins(month=month), target_end
 
 

@@ -62,7 +62,11 @@ def score(*, arm_df: pl.DataFrame, month: str) -> pl.DataFrame:
         & pl.col("observed_power").is_not_null()
         & pl.col("observed_power").is_finite()
     )
-    j = rows.join(arm_df.drop("lead_hours"), on=KEYS, how="inner")
+    j = rows.join(arm_df.drop("lead_hours"), on=KEYS, how="inner", validate="1:1")
+    if j.height != rows.height:
+        raise ValueError(
+            f"{month}: arm covers {j.height} of {rows.height} scored rows; key sets differ"
+        )
     y = pl.col("observed_power")
     pin = [
         pl.max_horizontal(t * (y - pl.col(q)), (t - 1) * (y - pl.col(q)))
@@ -73,8 +77,11 @@ def score(*, arm_df: pl.DataFrame, month: str) -> pl.DataFrame:
         mae=(y - pl.col("q50")).abs() / pl.col("capacity") * 100,
         hit=((pl.col("q05") <= y) & (y <= pl.col("q95"))).cast(pl.Float64),
         above90=(y > pl.col("q90")).cast(pl.Float64),
-        day=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_hours().floordiv(24)
-        + 1,
+        day=(
+            (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / (24 * 60)
+        )
+        .ceil()
+        .cast(pl.Int64),
         month=pl.lit(month),
     )
 
