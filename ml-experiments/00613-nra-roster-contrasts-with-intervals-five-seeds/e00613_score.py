@@ -53,6 +53,13 @@ _p.add_argument(
     help="score this lag-free arm's fits (D5/O2 tag) on the rows of --arm",
 )
 _p.add_argument("--lagfree-tag", default="D5")
+_p.add_argument(
+    "--lagfree-seeds",
+    nargs="+",
+    type=int,
+    default=None,
+    help="seeds averaged for the lag-free arm (default: --seeds); experiment 577 stored O2 pre-training for seeds 0, 1, 5 to 9",
+)
 MINE = _p.parse_args()
 
 import e00581_bank as bank  # ty: ignore[unresolved-import]
@@ -536,7 +543,13 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
 
 def lag_free_quantiles(*, t) -> np.ndarray:
     """Return the lag-free arm's quantiles aligned to the table rows (NaN where absent), sorted."""
-    e = g.a._load(root=ROOT / "arms" / MINE.lagfree / "work", tag=MINE.lagfree_tag, months=MONTHS)
+    saved = a.SEEDS
+    if MINE.lagfree_seeds:
+        a.SEEDS = tuple(MINE.lagfree_seeds)
+    try:
+        e = g.a._load(root=ROOT / "arms" / MINE.lagfree / "work", tag=MINE.lagfree_tag, months=MONTHS)
+    finally:
+        a.SEEDS = saved
     sm = c.k578.sites()
     prim_of = dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
     e = e.with_columns(

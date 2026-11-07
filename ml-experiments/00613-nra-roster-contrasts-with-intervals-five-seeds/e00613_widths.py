@@ -10,13 +10,18 @@ networks were scored on (24-120 h), weighted by the rows of each cell. Two files
 - `c2_width_factors_loo.csv`: each month's factor from the *other* months only (the mean of their
   factors), so that the scored months do not choose their own width.
 
-Usage: python e00613_widths.py
+Usage: python e00613_widths.py [--suffix _s01]
 """
+
+import argparse
 
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME = "00613-nra-roster-contrasts-with-intervals-five-seeds"
+_p = argparse.ArgumentParser()
+_p.add_argument("--suffix", default="", help="score folders of a seed subset, such as _s01")
+SFX = _p.parse_args().suffix
 SCORE = ML_EXPERIMENTS_DATA_DIR / NAME / "score"
 KEYS = ["month", "pass", "primary", "phase", "length_days", "depth", "sign"]
 
@@ -30,7 +35,7 @@ def cells(*, arm: str, system: str) -> pl.DataFrame:
 
 
 def main() -> None:
-    k1, c2 = cells(arm="k1_d5", system="K1"), cells(arm="c2_e3", system="K2")
+    k1, c2 = cells(arm="k1_d5" + SFX, system="K1"), cells(arm="c2_e3" + SFX, system="K2")
     j = k1.join(c2, on=KEYS, suffix="_c")
     out = (
         j.group_by("month")
@@ -43,13 +48,13 @@ def main() -> None:
         .sort("month")
     )
     print(out)
-    out.select("month", "factor").write_csv(SCORE / "c2_width_factors.csv")
+    out.select("month", "factor").write_csv(SCORE / f"c2_width_factors{SFX}.csv")
     assert out.height > 1
     f = dict(out.select("month", "factor").iter_rows())
     loo = [
         {"month": m, "factor": sum(v for k, v in f.items() if k != m) / (len(f) - 1)} for m in f
     ]
-    pl.DataFrame(loo).write_csv(SCORE / "c2_width_factors_loo.csv")
+    pl.DataFrame(loo).write_csv(SCORE / f"c2_width_factors_loo{SFX}.csv")
 
 
 if __name__ == "__main__":
