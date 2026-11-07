@@ -66,9 +66,9 @@ lessons:
     most 0.02.
 take_home_message: >-
   Giving the network the previous day's and the previous week's power lowered the forecast error a
-  little at both bulk and grid supply points, at every lead time, but by less than the 5 development
-  months can resolve. The lag-enabled network is the lowest-scoring forecast in the table, yet the
-  evidence does not separate it from the lag-free network, so the choice between them rests on cost
+  little at both bulk and grid supply points, in 19 of the 20 group-and-day cells (days 1 to 10), but
+  by less than the 5 development months can resolve. The lag-enabled network is the lowest-scoring
+  forecast in the table, yet the evidence does not separate it from the lag-free network, so the choice between them rests on cost
   and on the maintainer's judgement. The 90% band is still too narrow.
 advice:
   - >-
@@ -110,13 +110,14 @@ inputs.
 
 *Figure 1. CRPS of the lag-enabled network minus the lag-free network, by day of lead time. Look
 at the dots: they sit below zero at the BSPs on all 10 days and at the GSPs on days 1 to 9, and
-every interval includes zero except those of BSP days 9 and 10.*
+every interval includes zero except those of BSP days 9 and 10. Those intervals are not adjusted
+for the 20 cells; Table 2 gives the adjusted intervals.*
 
 ![CRPS by day of lead time](figure_2_crps_by_day.svg)
 
 *Figure 2. CRPS by day of lead time. Look at the dark blue line: the lag-enabled network is the
-lowest of the four forecasts on days 1 to 8 in both groups, and both networks beat BG2 and the
-climatology at every day at the BSPs.*
+lowest of the four forecasts on all 10 days at the BSPs and on days 1 to 9 at the GSPs, and
+both networks beat BG2 and the climatology at every day at the BSPs.*
 
 ![MAE of the median by day of lead time](figure_3_mae_by_day.svg)
 
@@ -154,7 +155,7 @@ Look at the band: it follows the daily shape of the observed power.*
 
 ![One forecast run at D6 over 10 days](figure_10_one_run_D6.svg)
 
-*Figure 10. D6: the same run date.*
+*Figure 10. D6: one forecast run issued on 25 January 2026 at 09:00 UTC.*
 
 ## Results
 
@@ -185,9 +186,8 @@ absolute error of the median.
 Table 2. Contrasts in CRPS (points; negative favours the lag-enabled network). The Bonferroni count
 is 16: 4 reference forecasts (the lag-free network, Design 2 of experiment 611, BG2, the
 climatology) times 2 lead sets times 2 groups. Each interval resamples the 5 months at the
-Bonferroni level. The minimum detectable effect is beside each contrast. Contrasts against Design 2
-and the manual heuristic use the rows each shares with the lag-enabled network; the other contrasts
-use the common rows.
+Bonferroni level. The minimum detectable effect is beside each contrast. Every contrast uses the 228,968 common
+rows.
 
 | Contrast | Group | Lead | Difference | Interval | Minimum detectable effect |
 |---|---|---|---|---|---|
@@ -259,7 +259,7 @@ pinball losses at the four quantiles are in the private `scores/tails.csv`.
 ## Reproduction
 
 `run_all.sh` runs pretraining, step 2, the fits, and the assembly for both groups (about 20 minutes
-on one GPU process under 8 GB, against no stated ceiling). `e00619_score.py`, `e00619_tails.py`, and
+on one GPU process under 8 GB). `e00619_score.py`, `e00619_tails.py`, and
 `e00619_figures.py` write the scores, the tails, and the figures. Forecasts are in the private
 Parquet export `export/lag_enabled_<month>.parquet`, in the layout of experiment 611's export
 (columns `time_series_id`, `power_fcst_init_time`, `valid_time`, `lead_hours`, q01 to q99,

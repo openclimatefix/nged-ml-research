@@ -25,7 +25,7 @@ DOCS: Final[Path] = (
 WIDTH: Final = 620
 NAME: Final[dict[str, str]] = {
     "lag_enabled": "Lag-enabled network",
-    "design1": "Lag-free network (611 Design 1)",
+    "design1": "Lag-free network (611)",
     "bg2": "BG2 (weekly XGBoost)",
     "climatology": "Climatology",
 }
