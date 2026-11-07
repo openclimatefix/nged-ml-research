@@ -49,7 +49,10 @@ NAMES = {
     "solar_a2_member_annual": "a2_member, refitted once a year",
     "solar_a2_member_quarterly": "a2_member, refitted every quarter",
 }
-GAP = cp.entry("No reading, or dropped as idle (wind)", "band", cp.SKY, 0.95)
+GAP_TECH = {
+    "wind": cp.entry("No reading, or dropped as idle", "band", cp.SKY, 0.95),
+    "solar": cp.entry("Usual daylight half-hour with no stored forecast row", "band", cp.SKY, 0.95),
+}
 CHECKS: list[str] = []
 
 
@@ -116,6 +119,18 @@ def stretch_missing(*, ref: pl.DataFrame, start, days: int = 14):
     return lo, hi, [t for t in grid if t not in have], len(grid)
 
 
+def with_breaks(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Insert an all-null row after any jump of more than 1.5 half-hours, so lines break at gaps."""
+    frame = frame.sort("valid_time")
+    gap = frame["valid_time"].diff().dt.total_minutes().fill_null(30) > 45
+    marks = frame.filter(gap).with_columns(
+        valid_time=pl.col("valid_time") - pl.duration(minutes=30),
+        actual=pl.lit(None, dtype=pl.Float64),
+        **{q: pl.lit(None, dtype=pl.Float64) for q in sc.Q},
+    )
+    return pl.concat([frame, marks]).sort("valid_time")
+
+
 def figure(*, tech: str, series: str, label: str, start, out: Path) -> None:
     left, right = PANELS[tech]
     ref = day_ahead(tech=tech, candidate=right, series=series)
@@ -129,6 +144,7 @@ def figure(*, tech: str, series: str, label: str, start, out: Path) -> None:
         d = day_ahead(tech=tech, candidate=cand, series=series).filter(
             (pl.col("valid_time") >= lo) & (pl.col("valid_time") < hi)
         )
+        d = with_breaks(frame=d)
         q = d.select(sc.Q).to_numpy()
         cols[cand] = (d, q)
     hi_y = max(float(np.nanmax(cols[c][1][:, IQ[0.95]])) for c in cols)
@@ -155,7 +171,7 @@ def figure(*, tech: str, series: str, label: str, start, out: Path) -> None:
     chart = cp.figure(
         units=units,
         title=f"{label}: day-ahead forecasts (lead {LEAD_LOW[tech]:.0f} to {LEAD_LOW[tech] + 24:.0f} h) over 14 days, % of capacity",
-        key=[*cp.FORECAST_ENTRIES, cp.OBS, GAP],
+        key=[*cp.FORECAST_ENTRIES, cp.OBS, *([GAP_TECH[tech]] if missing else [])],
     )
     chart.save(str(out))
     chart.save(str(out.with_suffix(".png")), scale_factor=2)
@@ -234,6 +250,8 @@ def summary_figures(*, outdir: Path) -> None:
                 )
         df = pl.DataFrame(rows)
         order = [*sc.LEAD_BANDS, "all leads"]
+        cands_main = [c for c in cands if "stored_tuesdays" not in c]
+        colour_main = alt.Color("candidate:N", scale=alt.Scale(domain=cands_main, range=[COLOURS[c] for c in cands_main]), legend=alt.Legend(orient="bottom", columns=2, title="Candidate"))
         colour = alt.Color(
             "candidate:N",
             scale=alt.Scale(domain=cands, range=[COLOURS[c] for c in cands]),
@@ -272,11 +290,20 @@ def summary_figures(*, outdir: Path) -> None:
         chart.save(str(outdir / f"{tech}_score_by_lead_band.svg"))
         chart.save(str(outdir / f"{tech}_score_by_lead_band.png"), scale_factor=2)
         # Score by month.
-        m = sc.table(frame=frame, by=["month"]).select("candidate", "month", "qs")
+        main_frame = frame.filter(~pl.col("candidate").str.contains("stored_tuesdays"))
+        m = (
+            sc.table(frame=main_frame, by=["month"])
+            .select("candidate", "month", "qs")
+            .with_columns(
+                dev=pl.col("month").replace_strict(
+                    {mo: f"Month {i + 1}" for i, mo in enumerate(common.DEV_MONTHS)}
+                )
+            )
+        )
         base = alt.Chart(m).encode(
-            x=alt.X("month:N", title="Forecast-origin month"),
-            xOffset=alt.XOffset("candidate:N", sort=cands),
-            color=colour,
+            x=alt.X("dev:N", title="Development month (1 to 5, in time order)"),
+            xOffset=alt.XOffset("candidate:N", sort=cands_main),
+            color=colour_main,
         )
         chart = (
             base.mark_bar(aria=False)
@@ -295,7 +322,7 @@ def summary_figures(*, outdir: Path) -> None:
         chart.save(str(outdir / f"{tech}_score_by_month.svg"))
         chart.save(str(outdir / f"{tech}_score_by_month.png"), scale_factor=2)
         # Score by hour of day.
-        h = sc.table(frame=frame, by=["hour"]).select("candidate", "hour", "qs")
+        h = sc.table(frame=main_frame, by=["hour"]).select("candidate", "hour", "qs")
         chart = (
             alt.Chart(h)
             .mark_line(aria=False, point=True)
@@ -309,7 +336,12 @@ def summary_figures(*, outdir: Path) -> None:
                     scale=alt.Scale(domain=[0, 24] if tech == "wind" else [4, 20]),
                 ),
                 y=alt.Y("qs:Q", title="Quantile score (points of capacity; smaller is better)"),
-                color=colour,
+                color=colour_main,
+                strokeDash=alt.condition(
+                    alt.datum.candidate == "solar_a2_member_annual",
+                    alt.value([5, 3]),
+                    alt.value([1, 0]),
+                ),
             )
             .properties(
                 width=560,
@@ -324,69 +356,43 @@ def summary_figures(*, outdir: Path) -> None:
         )
         chart.save(str(outdir / f"{tech}_score_by_hour.svg"))
         chart.save(str(outdir / f"{tech}_score_by_hour.png"), scale_factor=2)
-        # Coverage and tail shares.
-        o = sc.table(frame=frame.with_columns(all=pl.lit("all")), by=["all"])
-        long = pl.concat(
-            [
-                o.select(
-                    "candidate",
-                    pl.lit("q05-q95 coverage (target 0.90)").alias("measure"),
-                    pl.col("covered").alias("value"),
-                ),
-                o.select(
-                    "candidate",
-                    pl.lit("share above q99 (target 0.01)").alias("measure"),
-                    pl.col("above99").alias("value"),
-                ),
-                o.select(
-                    "candidate",
-                    pl.lit("share below q01 (target 0.01)").alias("measure"),
-                    pl.col("below01").alias("value"),
-                ),
-            ]
+        # Coverage and tail shares, one measure per figure.
+        o = sc.table(frame=frame.with_columns(all=pl.lit("all")), by=["all"]).filter(
+            ~pl.col("candidate").str.contains("stored_tuesdays")
         )
-        targets = pl.DataFrame(
-            {
-                "measure": [
-                    "q05-q95 coverage (target 0.90)",
-                    "share above q99 (target 0.01)",
-                    "share below q01 (target 0.01)",
-                ],
-                "t": [0.9, 0.01, 0.01],
-            }
+        cov = alt.Chart(o).mark_point(size=110, filled=True, aria=False).encode(
+            x=alt.X("covered:Q", title="Share of observations inside q05 to q95", scale=alt.Scale(domain=[0.75, 1.0])),
+            y=alt.Y("candidate:N", sort=cands_main, title=None),
+            color=colour_main,
         )
-        pts = (
-            alt.Chart(long)
-            .mark_point(size=90, filled=True, aria=False)
-            .encode(
-                x=alt.X("value:Q", title="Share of rows"),
-                y=alt.Y("candidate:N", sort=cands, title=None),
-                color=colour,
-            )
-        )
-        rule = (
-            alt.Chart(targets)
-            .mark_rule(color="#444444", strokeDash=[4, 3], aria=False)
-            .encode(x="t:Q")
-        )
+        rule = alt.Chart(pl.DataFrame({"t": [0.9]})).mark_rule(color="#444444", strokeDash=[4, 3], aria=False).encode(x="t:Q")
         chart = (
-            alt.layer(pts, rule, data=long)
-            .facet(row=alt.Row("measure:N", title=None, sort=list(targets["measure"])))
-            .resolve_scale(x="independent")
-            .properties(
-                title=alt.TitleParams(
-                    [
-                        f"{tech.capitalize()}: coverage and tail shares, development months",
-                        "Dashed line: target",
-                    ],
-                    fontSize=12,
-                    anchor="start",
-                )
-            )
+            alt.layer(cov, rule)
+            .properties(width=560, height=300, title=alt.TitleParams([f"{tech.capitalize()}: q05-q95 coverage, development months", "Dashed line: the 0.90 target"], fontSize=12, anchor="start"))
             .configure_view(stroke=None)
         )
-        chart.save(str(outdir / f"{tech}_coverage_tails.svg"))
-        chart.save(str(outdir / f"{tech}_coverage_tails.png"), scale_factor=2)
+        chart.save(str(outdir / f"{tech}_coverage.svg"))
+        chart.save(str(outdir / f"{tech}_coverage.png"), scale_factor=2)
+        long = pl.concat(
+            [
+                o.select("candidate", pl.lit("above q99").alias("measure"), pl.col("above99").alias("value")),
+                o.select("candidate", pl.lit("below q01").alias("measure"), pl.col("below01").alias("value")),
+            ]
+        )
+        tails = alt.Chart(long).mark_point(size=110, filled=True, aria=False).encode(
+            x=alt.X("value:Q", title="Share of observations"),
+            y=alt.Y("candidate:N", sort=cands_main, title=None),
+            color=colour_main,
+            shape=alt.Shape("measure:N", scale=alt.Scale(domain=["above q99", "below q01"], range=["circle", "diamond"]), legend=alt.Legend(orient="bottom", title="Share")),
+        )
+        rule = alt.Chart(pl.DataFrame({"t": [0.01]})).mark_rule(color="#444444", strokeDash=[4, 3], aria=False).encode(x="t:Q")
+        chart = (
+            alt.layer(tails, rule)
+            .properties(width=560, height=300, title=alt.TitleParams([f"{tech.capitalize()}: tail shares, development months", "Dashed line: the 0.01 target for both"], fontSize=12, anchor="start"))
+            .configure_view(stroke=None)
+        )
+        chart.save(str(outdir / f"{tech}_tails.svg"))
+        chart.save(str(outdir / f"{tech}_tails.png"), scale_factor=2)
 
 
 def main(outdir: Path) -> None:

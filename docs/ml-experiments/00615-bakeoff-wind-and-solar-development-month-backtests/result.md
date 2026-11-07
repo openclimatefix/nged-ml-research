@@ -139,10 +139,15 @@ to 0.25). The stored single-fit wind default 2 scores 0.03 points worse than the
 band. The lines are 95% intervals from resampling the 5 months. Wind default 2 gains most at short
 leads (2.35 against 5.33 points at 0 to 24 h) and least at 120 to 240 h (4.99 against 5.36).*
 
-![Wind coverage and tails](wind_coverage_tails.svg)
+![Wind coverage](wind_coverage.svg)
 
-*Look at wind default 2's coverage of 0.898, close to the 0.90 target, and its share above q99 of
-0.013, above the 0.01 target. The dashed lines are the targets.*
+*Look at wind default 2's coverage of 0.898, close to the dashed 0.90 target, and `climatology`'s
+wider band at 0.935.*
+
+![Wind tail shares](wind_tails.svg)
+
+*Look at wind default 2's share above q99 (circle) of 0.013, above the dashed 0.01 target, and its
+share below q01 (diamond) of 0.002, below the target.*
 
 **Wind default 2's band is too narrow in January and March and on high-wind days.** Coverage is 0.861
 in 2026-01 and 0.869 in 2026-03, and 0.807 on the 50 high-wind days (days on which at least 2 of
@@ -150,7 +155,8 @@ the 3 farms exceed 80% of capacity), where 4.1% of observations are above q99.
 
 ![Wind score by month](wind_score_by_month.svg)
 
-*Look at 2026-06 (a calm month, 2.5 points) against the other four months (4.3 to 4.8 points).*
+*Months 1 to 5 are 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06. Look at month 5 (a calm month,
+2.5 points) against the other four months (4.3 to 4.8 points).*
 
 ![Wind score by hour of day](wind_score_by_hour.svg)
 
@@ -180,10 +186,13 @@ band. Solar rows are daylight half-hours at 12 to 251.5 h, so the 0 to 24 h band
 *Look at the two `a2_member` bars (orange and light orange) being equal in every lead band, and
 the purple and green reference bars being far above them.*
 
-![Solar coverage and tails](solar_coverage_tails.svg)
+![Solar coverage](solar_coverage.svg)
 
-*Look at `manual_heuristic` missing the 0.90 coverage target (0.82) and at every network sitting above
-the 0.01 target for the share above q99.*
+*Look at `manual_heuristic` missing the dashed 0.90 target (0.82) and XGBoost at 0.85.*
+
+![Solar tail shares](solar_tails.svg)
+
+*Look at the `a2_member` and GAM circles (share above q99) sitting above the dashed 0.01 target.*
 
 **Solar `a2_member`'s upper band is far too low on very sunny days.** On the 12 days that reach 90%
 of the farm's own monthly 95th percentile on at least half their daylight half-hours (2,345 rows),
@@ -193,8 +202,8 @@ the figure is a warning, not an estimate.
 
 ![Solar score by month](solar_score_by_month.svg)
 
-*The `a2_member` scores are lowest in the winter months (2.3 to 2.7 points) and highest in 2026-03
-(4.3 points).*
+*Months 1 to 5 are as above. The `a2_member` scores are lowest in months 2 and 3 (winter, 2.3 to 2.7
+points) and highest in month 4 (4.3 points).*
 
 ![Solar score by hour of day](solar_score_by_hour.svg)
 
@@ -220,11 +229,13 @@ top panel (wind default 2), while the bottom panel's `climatology` band stays wi
 ![Solar farm A, very sunny stretch](solar_Solar_A_very_sunny.svg)
 
 *Solar A over 14 days in June 2026. Look at the observed power touching the top of the band at
-midday; the yearly refit is on top and the quarterly refit below.*
+midday; the yearly refit is on top and the quarterly refit below. Lines break at night.*
 
 ![Solar farm E, stretch with missing readings](solar_Solar_E_gap.svg)
 
-*Solar E over 14 days in June 2026, with 54 of 406 usual half-hours missing. The other 23 stretches are
+*Solar E over 14 days in June 2026, with 54 of 406 usual half-hours missing. (In the Solar A stretch of
+March 2026 in the folder, the observed power reads exactly zero for about 3 days while the forecast
+stays high: the farm was probably off.) The other 23 stretches are
 in the folder beside this page (`wind_*` and `solar_*` SVG files).*
 
 ## Recommendation
