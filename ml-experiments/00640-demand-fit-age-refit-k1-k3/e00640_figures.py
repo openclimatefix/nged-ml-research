@@ -34,10 +34,10 @@ def headline(*, out: Path) -> None:
     )
     chart = (
         (
-            base.mark_line(point=True, strokeWidth=2).encode(
+            base.mark_line(point=True, strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
                 y=alt.Y("pct_vs_age0:Q", title="CRPS above the age-0 fit (%)")
             )
-            + base.mark_errorbar(ticks=True).encode(y=alt.Y("lo:Q", title=""), y2="hi:Q")
+            + base.mark_errorbar(ticks=True).encode(y=alt.Y("lo:Q", title=""), y2="hi:Q")  # ty: ignore[unresolved-attribute]
         )
         .properties(width=W, height=280)
         .facet(column=alt.Column("panel:N", title=None, sort=["All 16 Primaries"]))
@@ -53,7 +53,7 @@ def by_group(*, out: Path) -> None:
         g = (
             d.with_columns(
                 panel=pl.when(pl.col("group") == "D15 and D18")
-                .then(pl.lit("D15 and D18 (short history)"))
+                .then(pl.lit("D15 and D18"))
                 .otherwise(pl.lit("14 other Primaries"))
             )
             .group_by(["panel", "age"])
@@ -94,10 +94,10 @@ def coverage(*, out: Path) -> None:
         )
     )
     rule = (
-        alt.Chart(pl.DataFrame({"y": [0.9]}))
+        alt.Chart(pl.DataFrame({"y": [0.9]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 4], color="#7a7a7a")
         .encode(y="y:Q")
-    )  # ty: ignore[unresolved-attribute]
+    )
     (line + rule).properties(width=2 * W, height=260).save(str(out / "coverage_vs_fit_age.svg"))
 
 
@@ -122,13 +122,13 @@ def weekly(*, out: Path) -> None:
     )
     chart = (
         (
-            base.mark_point(filled=True, size=70).encode(
+            base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X(
                     "slope_pct_per_4wk:Q",
                     title="CRPS change per 4 weeks of fit age (% of age-0 CRPS)",
                 )
             )
-            + base.mark_errorbar().encode(x=alt.X("lo:Q", title=""), x2="hi:Q")
+            + base.mark_errorbar().encode(x=alt.X("lo:Q", title=""), x2="hi:Q")  # ty: ignore[unresolved-attribute]
         )
         .properties(width=W, height=180)
         .facet(column=alt.Column("panel:N", title=None, sort=["All 16 Primaries"]))

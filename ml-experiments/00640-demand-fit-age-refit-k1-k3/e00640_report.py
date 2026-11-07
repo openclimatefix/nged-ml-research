@@ -147,11 +147,11 @@ def main() -> None:
         free = d.filter(pl.col("free"))
         for age in AGES:
             a = free.filter(pl.col("age") == age)
-            n = a["n"].sum()
+            n = float(a["n"].sum())
             by_age.append(
-                {"net": net, "age": int(age), "crps": a["crps"].sum() / n, "mae": a["abs_err"].sum() / n,
-                 "cover90": a["cover90"].sum() / n, "cover98": a["cover98"].sum() / n,
-                 **{k: a[k].sum() / n for k in ("pin01", "pin05", "pin95", "pin99")}}
+                {"net": net, "age": int(age), "crps": float(a["crps"].sum()) / n, "mae": float(a["abs_err"].sum()) / n,
+                 "cover90": float(a["cover90"].sum()) / n, "cover98": float(a["cover98"].sum()) / n,
+                 **{k: float(a[k].sum()) / n for k in ("pin01", "pin05", "pin95", "pin99")}}
             )  # fmt: skip
         w = (
             free.with_columns(since=pl.col("age") + pl.col("week"))
@@ -174,7 +174,8 @@ def main() -> None:
         p = ROOT / f"cells_{net}.parquet"
         if p.exists():
             d = pl.read_parquet(p).filter((pl.col("age") == 0) & (pl.col("week") < 2))
-            mine, ref = d["crps"].sum() / d["n"].sum(), d["ref_crps_k2"].sum() / d["n"].sum()
+            n = float(d["n"].sum())
+            mine, ref = float(d["crps"].sum()) / n, float(d["ref_crps_k2"].sum()) / n
             print(
                 f"P4 {net}: age-0 first 14 days CRPS {mine:.5f}, roster K2 {ref:.5f}, ratio {mine / ref:.4f}"
             )
