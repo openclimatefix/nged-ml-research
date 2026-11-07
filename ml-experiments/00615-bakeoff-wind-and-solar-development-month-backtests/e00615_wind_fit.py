@@ -78,7 +78,7 @@ def all_cases() -> tuple[pl.DataFrame, np.ndarray]:
 
 def coverage_checks(*, frame: pl.DataFrame) -> None:
     """Print and assert the coverage of the idle mask and the capacity series."""
-    from e00303_common import idle_mask, site_table
+    from e00303_common import idle_mask, site_table  # ty: ignore[unresolved-import]
 
     mask_end = idle_mask()["valid_time"].max()
     series = pl.read_parquet(common461.SERIES_PATH)

@@ -85,7 +85,7 @@ def window_starts(*, ref: pl.DataFrame) -> pl.DataFrame:
         window = [have.get(d + timedelta(days=k)) for k in range(14)]
         if any(w is None for w in window):
             continue
-        rows.append({"day": d, "r": float(np.mean([w[0] for w in window]))})
+        rows.append({"day": d, "r": float(np.mean([w[0] for w in window]))})  # ty: ignore[not-subscriptable]
     return pl.DataFrame(rows)
 
 
@@ -148,7 +148,7 @@ def figure(*, tech: str, series: str, label: str, start, out: Path) -> None:
         q = d.select(sc.Q).to_numpy()
         cols[cand] = (d, q)
     hi_y = max(float(np.nanmax(cols[c][1][:, IQ[0.95]])) for c in cols)
-    hi_y = max(hi_y, max(float(cols[c][0]["actual"].max()) for c in cols))
+    hi_y = max(hi_y, max(float(cols[c][0]["actual"].max()) for c in cols))  # ty: ignore[invalid-argument-type]
     ydom = (-0.02, hi_y + 0.03)
     for i, cand in enumerate((left, right)):
         d, q = cols[cand]
@@ -213,7 +213,7 @@ def gap_start(*, ref: pl.DataFrame) -> date:
         _, _, miss, _ = stretch_missing(ref=ref, start=d)
         if len(miss) > best_n:
             best, best_n = d, len(miss)
-    return best
+    return best  # ty: ignore[invalid-return-type]
 
 
 def summary_figures(*, outdir: Path) -> None:
@@ -267,13 +267,13 @@ def summary_figures(*, outdir: Path) -> None:
         )
         chart = (
             (
-                base.mark_bar(aria=False).encode(
+                base.mark_bar(aria=False).encode(  # ty: ignore[unresolved-attribute]
                     color=colour,
                     y=alt.Y(
                         "score:Q", title="Quantile score (points of capacity; smaller is better)"
                     ),
                 )
-                + base.mark_errorbar(color="black", ticks=True).encode(
+                + base.mark_errorbar(color="black", ticks=True).encode(  # ty: ignore[unresolved-attribute]
                     y=alt.Y("lo:Q", title=""), y2="hi:Q"
                 )
             )
@@ -310,7 +310,7 @@ def summary_figures(*, outdir: Path) -> None:
             color=colour_main,
         )
         chart = (
-            base.mark_bar(aria=False)
+            base.mark_bar(aria=False)  # ty: ignore[unresolved-attribute]
             .encode(y=alt.Y("qs:Q", title="Quantile score (points of capacity; smaller is better)"))
             .properties(
                 width=560,
@@ -328,7 +328,7 @@ def summary_figures(*, outdir: Path) -> None:
         # Score by hour of day.
         h = sc.table(frame=main_frame, by=["hour"]).select("candidate", "hour", "qs")
         chart = (
-            alt.Chart(h)
+            alt.Chart(h)  # ty: ignore[unresolved-attribute]
             .mark_line(aria=False, point=True)
             .encode(
                 x=alt.X(
@@ -365,7 +365,7 @@ def summary_figures(*, outdir: Path) -> None:
             ~pl.col("candidate").str.contains("stored_tuesdays")
         )
         cov = (
-            alt.Chart(o)
+            alt.Chart(o)  # ty: ignore[unresolved-attribute]
             .mark_point(size=110, filled=True, aria=False)
             .encode(
                 x=alt.X(
@@ -378,7 +378,7 @@ def summary_figures(*, outdir: Path) -> None:
             )
         )
         rule = (
-            alt.Chart(pl.DataFrame({"t": [0.9]}))
+            alt.Chart(pl.DataFrame({"t": [0.9]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#444444", strokeDash=[4, 3], aria=False)
             .encode(x="t:Q")
         )
@@ -415,7 +415,7 @@ def summary_figures(*, outdir: Path) -> None:
             ]
         )
         tails = (
-            alt.Chart(long)
+            alt.Chart(long)  # ty: ignore[unresolved-attribute]
             .mark_point(size=110, filled=True, aria=False)
             .encode(
                 x=alt.X("value:Q", title="Share of observations"),
@@ -429,7 +429,7 @@ def summary_figures(*, outdir: Path) -> None:
             )
         )
         rule = (
-            alt.Chart(pl.DataFrame({"t": [0.01]}))
+            alt.Chart(pl.DataFrame({"t": [0.01]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#444444", strokeDash=[4, 3], aria=False)
             .encode(x="t:Q")
         )

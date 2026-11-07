@@ -171,7 +171,7 @@ def paired_months(*, frame: pl.DataFrame, a: str, b: str, rows_key: list[str]) -
     months = per.group_by("month").agg(pl.col("d").mean()).sort("month")["d"].to_numpy()
     rng = np.random.default_rng(615)
     draws = months[rng.integers(0, months.size, size=(RESAMPLES, months.size))].mean(axis=1)
-    return {
+    return {  # ty: ignore[invalid-return-type]
         "diff": float(months.mean()),
         "draws": draws,
         "n_months": months.size,
@@ -203,7 +203,7 @@ def contrasts(*, frame: pl.DataFrame, default: str, others: list[str]) -> pl.Dat
                 frame=sub, a=other, b=default, rows_key=["series", "init_time", "valid_time"]
             )
             level = 1 - 0.05 / count
-            low, high = interval(draws=result["draws"], level=level)
+            low, high = interval(draws=result["draws"], level=level)  # ty: ignore[invalid-argument-type]
             out.append(
                 {
                     "candidate": other,
@@ -213,7 +213,7 @@ def contrasts(*, frame: pl.DataFrame, default: str, others: list[str]) -> pl.Dat
                     "low": low,
                     "high": high,
                     "interval_level": level,
-                    "mde": mde(draws=result["draws"], contrasts=count),
+                    "mde": mde(draws=result["draws"], contrasts=count),  # ty: ignore[invalid-argument-type]
                     "bonferroni_count": count,
                     "paired_rows": result["rows"],
                     "months": result["n_months"],
