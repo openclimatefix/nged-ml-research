@@ -121,12 +121,12 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
             "inside_band": inside,
             "need": NEED_PRIMARIES,
             "pass": inside >= NEED_PRIMARIES,
-            "median_of_medians": round(float(t["v"].median()), 3),
+            "median_of_medians": round(float(t["v"].median()), 3),  # ty: ignore[invalid-argument-type]
         }
     t = per_site("phys", 4.0, "median")
     res["phys_4mw"] = {
         "median_by_site": dict(zip(t["site"], t["v"].round(3), strict=True)),
-        "median_of_medians": round(float(t["v"].median()), 3),
+        "median_of_medians": round(float(t["v"].median()), 3),  # ty: ignore[invalid-argument-type]
     }
     for world in ("profile", "shuffled"):
         t = per_site(world, 4.0, "p95")
@@ -136,7 +136,7 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
             "below_limit": below,
             "need": NEED_PRIMARIES,
             "pass": below >= NEED_PRIMARIES,
-            "max_p95": round(float(t["v"].max()), 3),
+            "max_p95": round(float(t["v"].max()), 3),  # ty: ignore[invalid-argument-type]
         }
     for model in ("plain", "cloud_tpl"):
         for cond in ("cloudlin_weak", "cloudsq_weak", "cloudlin_strong", "cloudsq_strong"):
@@ -166,16 +166,16 @@ def bars(rec: pl.DataFrame, arm: str) -> dict:
     ):
         res[label] = {
             "n": sel.height,
-            "covered_with_seed_spread": round(float(sel["covered_wide"].mean()), 3),
-            "covered_bootstrap_only": round(float(sel["covered_boot"].mean()), 3),
-            "pass": bool(float(sel["covered_wide"].mean()) >= COVERAGE_MIN),
+            "covered_with_seed_spread": round(float(sel["covered_wide"].mean()), 3),  # ty: ignore[invalid-argument-type]
+            "covered_bootstrap_only": round(float(sel["covered_boot"].mean()), 3),  # ty: ignore[invalid-argument-type]
+            "pass": bool(float(sel["covered_wide"].mean()) >= COVERAGE_MIN),  # ty: ignore[invalid-argument-type]
         }
     # the bar says "the injected capacity": use the real-farm and physics worlds together
     pooled = rec.filter(pl.col("world").is_in(["farm", "phys"]) & (pl.col("model") == "plain"))
     res["coverage_injections"] = {
         "n": pooled.height,
-        "covered_with_seed_spread": round(float(pooled["covered_wide"].mean()), 3),
-        "pass": bool(float(pooled["covered_wide"].mean()) >= COVERAGE_MIN),
+        "covered_with_seed_spread": round(float(pooled["covered_wide"].mean()), 3),  # ty: ignore[invalid-argument-type]
+        "pass": bool(float(pooled["covered_wide"].mean()) >= COVERAGE_MIN),  # ty: ignore[invalid-argument-type]
     }
     # seed spread of the probed difference (MW), median over cells
     sd = (
@@ -281,9 +281,9 @@ def figures(rec: pl.DataFrame, df: pl.DataFrame) -> None:
         band = (
             alt.Chart(pl.DataFrame({"a": [BAND[0]], "b": [BAND[1]]}))
             .mark_rect(opacity=0.12, color="grey")
-            .encode(x="a:Q", x2="b:Q")
+            .encode(x="a:Q", x2="b:Q")  # ty: ignore[unresolved-attribute]
         )
-        rule = base.mark_rule().encode(
+        rule = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lo:Q", scale=alt.Scale(domain=[-0.4, 1.6]), title=None), x2="hi:Q"
         )  # ty: ignore[unresolved-attribute]
         dot = base.mark_point(filled=True, size=50).encode(x="med:Q")  # ty: ignore[unresolved-attribute]
@@ -312,11 +312,11 @@ def figures(rec: pl.DataFrame, df: pl.DataFrame) -> None:
     )
     wdom = [WORLD_LABEL[w] for w in ("farm", "phys", "profile", "shuffled")]
     wrng = [theme.DATA_GREEN, theme.DATA_BLUE, theme.DATA_PURPLE, theme.DATA_SKY]
-    diag = alt.Chart().mark_line(color="grey", strokeDash=[4, 3]).encode(x="mw:Q", y="mw:Q")
+    diag = alt.Chart().mark_line(color="grey", strokeDash=[4, 3]).encode(x="mw:Q", y="mw:Q")  # ty: ignore[unresolved-attribute]
     sc = (
         alt.Chart()
         .mark_point(filled=True, size=22, opacity=0.7)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "mw:Q",
                 title="Injected AC capacity (MW; placebos carry a 4 MW farm's shape)",
@@ -357,11 +357,11 @@ def figures(rec: pl.DataFrame, df: pl.DataFrame) -> None:
         arm_label=pl.col("arm").replace_strict(ARM_LABEL),
         fake=pl.col("delta_mw") / 2.0,
     )
-    rule = alt.Chart().mark_rule(color="grey", strokeDash=[4, 3]).encode(x=alt.datum(CLOUD_LIMIT))
+    rule = alt.Chart().mark_rule(color="grey", strokeDash=[4, 3]).encode(x=alt.datum(CLOUD_LIMIT))  # ty: ignore[unresolved-attribute]
     box = (
         alt.Chart()
         .mark_boxplot(extent="min-max", size=9)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "fake:Q",
                 title=f"Spurious capacity as a share of a 2 MW farm (smaller is better; dashed line is the {CLOUD_LIMIT} bar)",
@@ -396,7 +396,7 @@ def figures(rec: pl.DataFrame, df: pl.DataFrame) -> None:
         .agg(sd=pl.col("capacity_mw").std())
         .with_columns(arm_label=pl.col("arm").replace_strict(ARM_LABEL))
     )
-    alt.Chart(sd).mark_bar().encode(
+    alt.Chart(sd).mark_bar().encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("site:N", sort=order, title=None),
         x=alt.X("sd:Q", title="Across-seed standard deviation of the probed capacity (MW)"),
         yOffset=alt.YOffset("arm_label:N", sort=arm_domain),
@@ -458,13 +458,13 @@ def response_figure() -> None:
         .group_by("arm", "site", "world", pl.col("u").round(2))
         .agg(diff=pl.col("diff").mean())
     )
-    offset = float((d["diff"] + 4.0 * d["u"]).mean())
+    offset = float((d["diff"] + 4.0 * d["u"]).mean())  # ty: ignore[invalid-argument-type]
     d = d.with_columns(ideal=-4.0 * pl.col("u") + offset)
-    ideal = alt.Chart().mark_line(color="grey", strokeDash=[4, 3]).encode(x="u:Q", y="ideal:Q")
+    ideal = alt.Chart().mark_line(color="grey", strokeDash=[4, 3]).encode(x="u:Q", y="ideal:Q")  # ty: ignore[unresolved-attribute]
     pts = (
         alt.Chart()
         .mark_line(point=True)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("u:Q", title="Unit PV curve of the donor weather (share of capacity)"),
             y=alt.Y("diff:Q", title="Injected minus twin (MW)"),
             color=alt.Color(

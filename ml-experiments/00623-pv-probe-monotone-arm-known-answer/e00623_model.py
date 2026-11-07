@@ -41,12 +41,12 @@ class MonotoneModularMdn(m.ModularMdn):
             nn.Linear(CONTEXT_HIDDEN, 3 * HIDDEN),
         )
         last = self.sw_context[-1]
-        nn.init.zeros_(last.weight)
+        nn.init.zeros_(last.weight)  # ty: ignore[invalid-argument-type]
         with torch.no_grad():
-            last.bias.zero_()
-            last.bias[:HIDDEN] = AMPLITUDE_INIT
-            last.bias[HIDDEN : 2 * HIDDEN] = 0.0
-            last.bias[2 * HIDDEN :] = torch.linspace(-2.0, 2.0, HIDDEN)
+            last.bias.zero_()  # ty: ignore[call-non-callable]
+            last.bias[:HIDDEN] = AMPLITUDE_INIT  # ty: ignore[invalid-assignment]
+            last.bias[HIDDEN : 2 * HIDDEN] = 0.0  # ty: ignore[invalid-assignment]
+            last.bias[2 * HIDDEN :] = torch.linspace(-2.0, 2.0, HIDDEN)  # ty: ignore[invalid-assignment]
 
     def forward(self, x: torch.Tensor, primary: torch.Tensor | None = None) -> torch.Tensor:
         """Return the mixture's 9 raw outputs with the monotone shortwave shift applied."""
