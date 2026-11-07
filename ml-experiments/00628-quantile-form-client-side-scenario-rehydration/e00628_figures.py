@@ -38,8 +38,8 @@ TAIL_NAME: Final[dict[str, str]] = {
     "gaussian": "Gaussian tail",
 }
 COUPLING_COLOUR: Final[dict[str, str]] = {
-    "IND": theme.BRAND_ORANGE,
-    "COP": theme.DATA_BLUE,
+    "IND": "#7A7A7A",
+    "COP": theme.DATA_PURPLE,
     "SS": theme.DATA_GREEN,
 }
 COUPLING_NAME: Final[dict[str, str]] = {
@@ -84,19 +84,13 @@ def fig1() -> None:
     panels = []
     for side in sorted(data["side"].unique(), reverse=True):
         bars = (
-            CHART(data[data["side"] == side])
+            CHART()
             .mark_bar()
             .encode(
                 y=alt.Y("tail:N", title=None, sort=list(TAIL_NAME.values()), axis=None),
                 x=alt.X(
                     "share:Q",
-                    title="Share of actuals beyond the quantile (%; nearer 0.2 is better)",
-                ),
-                row=alt.Row(
-                    "family:N",
-                    title=None,
-                    sort=list(FAMILY_NAME.values()),
-                    header=alt.Header(labelAngle=0, labelAlign="left", labelPadding=4),
+                    title="Share of actuals beyond the quantile (%; dashed line: 0.2, the calibrated share)",
                 ),
                 color=alt.Color(
                     "tail:N",
@@ -106,9 +100,20 @@ def fig1() -> None:
                     legend=alt.Legend(title=None, orient="top"),
                 ),
             )
-            .properties(width=W - 200, height=34, title=side)
         )
-        panels.append(bars)
+        rule = CHART().mark_rule(strokeDash=[4, 3], color="#1A1A1A").encode(x=alt.datum(0.2))
+        panels.append(
+            alt.layer(bars, rule, data=data[data["side"] == side])
+            .properties(width=W - 200, height=34, title=side)
+            .facet(
+                row=alt.Row(
+                    "family:N",
+                    title=None,
+                    sort=list(FAMILY_NAME.values()),
+                    header=alt.Header(labelAngle=0, labelAlign="left", labelPadding=4),
+                )
+            )
+        )
     save(alt.vconcat(*panels).resolve_scale(color="shared"), "figure_1_tail_rules.svg")
 
 
@@ -201,14 +206,22 @@ def fig3() -> None:
                     )
     data = pl.DataFrame(rows).filter(pl.col("network") == "K1").to_pandas()
     panels = []
-    for col, title in (
+    for col, title, ytitle in (
         (
             "between_sets",
-            "Boston BSP: mean change of the pick between two independent sets of 1,000 draws (MW)",
+            [
+                "Pick: 95th percentile of the Boston BSP's day-3 demand.",
+                "Change of the pick between two sets of 1,000 draws (MW)",
+            ],
+            "MW (smaller is steadier between draw sets)",
         ),
         (
             "from_51",
-            "Boston BSP: mean distance of the pick from the pick of 51 stratified paths (MW)",
+            [
+                "Pick: 95th percentile of the Boston BSP's day-3 demand.",
+                "Distance of the pick from the 51-path pick (MW)",
+            ],
+            "MW (smaller is closer to the 51-path pick)",
         ),
     ):
         panels.append(
@@ -222,7 +235,7 @@ def fig3() -> None:
                     axis=alt.Axis(labelAngle=0, labelLimit=140),
                 ),
                 xOffset=alt.XOffset("coupling:N", sort=list(COUPLING_NAME.values())),
-                y=alt.Y(f"{col}:Q", title="MW (smaller is steadier)"),
+                y=alt.Y(f"{col}:Q", title=ytitle),
                 color=alt.Color(
                     "coupling:N",
                     scale=alt.Scale(
@@ -292,7 +305,7 @@ def example_fig(
         .encode(x=x, y=alt.Y("q05:Q", title="Power (% of capacity)"), y2="q95:Q"),
         CHART(b).mark_area(color=theme.DATA_BLUE, opacity=0.25).encode(x=x, y="q25:Q", y2="q75:Q"),
         CHART(ln)
-        .mark_line(strokeWidth=0.8, opacity=0.8, color=theme.DATA_PURPLE)
+        .mark_line(strokeWidth=1.2, opacity=0.9, color=theme.DATA_PURPLE)
         .encode(x=x, y="value:Q", detail="scenario:N"),
         CHART(b).mark_line(color=theme.DATA_BLUE, strokeWidth=2).encode(x=x, y="q50:Q"),
         CHART(b[b["actual"].notna()])
@@ -322,7 +335,10 @@ def main() -> None:
         lines,
         last_hour=240,
         name="figure_5_example_ten_days.svg",
-        title=["The same forecast over the full 10 days: the bands widen with lead time"],
+        title=[
+            "The same forecast over 10 days: black reading, blue median and 50% and 90% bands,",
+            "purple four client scenarios; the bands and the scenario spread widen with lead time",
+        ],
     )
 
 

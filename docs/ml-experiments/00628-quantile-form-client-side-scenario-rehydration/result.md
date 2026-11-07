@@ -70,7 +70,7 @@ headline: >-
   Eleven stored quantiles are enough to rebuild the marginal forecasts and the Schaake shuffle. The
   CRPS of 1,000 client draws is within +0.3% of the 51 in-pipeline paths, the tail rule moves CRPS
   by under 0.02%, and a client Schaake shuffle matches J3. A client copula without the
-  ensemble-rank component scores 6.6% (1.9% to 13.9%) worse than J5 on the solar farms' variogram
+  ensemble-rank component scores 6.6% (2% to 14%) worse than J5 on the solar farms' variogram
   score.
 lessons: >-
   The tail rule matters only for the extreme 0.2% of each distribution. There the Gaussian tail
@@ -166,27 +166,39 @@ experiments 612 and 613, about a day of work, and was not done.
 
 *Look at how far each bar sits from 0.2%, the share a calibrated forecast would give. The Gaussian
 tail is nearest on the lower side. All three rules overshoot on the upper side, because the stored
-upper quantiles are too narrow. 44 runs; the three families are scored separately.*
+upper quantiles are too narrow. 44 runs; the three families are scored separately. The two
+panels have different horizontal scales, and the bars are point estimates with no intervals: the
+share from month to month varies by more than the sampling error.*
 
 ![Client variogram score against the in-pipeline score](figure_2_client_against_pipeline.svg)
 
-*Look at the blue fitted-copula dot for the solar farms: 6.6% above the in-pipeline score. Every
-other dot is within 2% of zero. Lines are 98.33% month-block intervals. The panels have different
-horizontal scales.*
+*Look at the purple fitted-copula dot for the solar farms: about 6.6% above the in-pipeline score.
+Every other dot is within 2% of zero. Zero means the client's 51 stratified paths score the same as
+experiment 436's 51 paths, over days 1 to 10. Lines are 98.33% month-block intervals; for the
+Schaake shuffle they are narrower than the dot. The panels have different horizontal scales.*
 
 ![Day-3 BSP pick: movement between draw sets and distance from the 51-path pick](figure_3_bsp_pick.svg)
 
-*Look at the Schaake shuffle's tiny change between draw sets. Its 1,000 draws repeat 51 distinct
-paths, so the two sets are not independent information. The fitted copula changes by 0.1 MW
-between sets and moves 0.36 MW from the 51-path pick. Neural network K1, 82 origins.*
+*Top panel: the Schaake shuffle's pick changes least between draw sets, but its 1,000 draws repeat
+51 distinct paths, so the two sets are not independent information. The fitted copula changes by
+0.1 MW. Bottom panel: the Schaake shuffle's pick sits furthest (0.6 MW) from the 51-path pick, and
+the fitted copula 0.36 MW. The tail rule barely changes either panel. The pick is the 95th
+percentile over scenarios of the Boston BSP's summed Primaries on day 3 (leads 48.5 to 72 hours),
+from neural network K1 at 82 origins; MVA Primaries are added as if MW. The Skegness BSP is
+computed and not drawn. No intervals are shown.*
 
 ![One Primary, day ahead](figure_4_example_day_ahead.svg)
 
+*One Primary (D3), forecast from neural network K1. We drew the forecast run, out of the five
+development months' runs, with the most scored half-hours. Black is the reading, the blue line the median,
+and the blue bands the 50% and 90% ranges. The purple lines are four of the client's 1,000 copula
+scenarios with a Gaussian tail (one random draw, not an average). Look at how the scenarios scatter
+around the median.*
+
 ![The same forecast over ten days](figure_5_example_ten_days.svg)
 
-*One Primary (D3), forecast from neural network K1 at the
-origin of the five development months with the most scored half-hours. The purple lines are four
-of the client's 1,000 copula scenarios with a Gaussian tail.*
+*The same forecast and scenarios over 10 days. Look at how the bands and the spread of the
+scenarios widen with lead time.*
 
 ## Numbers
 
@@ -224,7 +236,7 @@ of the client's 1,000 copula scenarios with a Gaussian tail.*
   days 1 to 10).** Independent draws against J0: demand -0.0%, wind -0.1%, solar +0.1%. Schaake
   shuffle against J3: +0.0% in demand and wind, and -0.0% in solar. Fitted copula (no
   ensemble-rank component) against J5: demand -0.0%, wind +1.9% (-0.7% to +4.5%), solar +6.6%
-  (+1.9% to +13.9%). The J5 paths use the stored member ranks, and the copula does not, which is
+  (+2% to +14%). The J5 paths use the stored member ranks, and the copula does not, which is
   the likely cause of the solar gap; we did not run an ablation. Against independent client draws,
   the copula scores -0.7% for Primaries, -27.9% (-32.8% to -22.1%) for wind farms, and -39.1%
   (-43.5% to -34.4%) for solar farms. The Schaake shuffle scores +0.4% (-1.2% to +2.2%) for
