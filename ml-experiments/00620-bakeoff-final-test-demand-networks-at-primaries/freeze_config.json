@@ -1,6 +1,6 @@
 {
- "frozen_at": "2026-11-07T10:03:31+00:00",
- "git_head": "f6825901a87520f06fa74279a6f5c8d3062ff497",
+ "frozen_at": "2026-11-07T10:09:54+00:00",
+ "git_head": "e4be8d38050acabbd770a42098554793bdd5caf3",
  "train_data_ends_before": "2026-07-01",
  "test_origins": [
   "2026-07-01",
@@ -191,6 +191,7 @@
    "raw/summary/D8.npz": "deaf74329018c7f09dfb00301a39f6fb51a482db15fce714123fb695a2ffb0f3",
    "raw/summary/D9.npz": "2512339604b24628a3054bb1c4cf484197281d101916b708a42746eb763b8d86",
    "observed.parquet": "58832665bfe5df9a357a90e3c8ee39775598475e19df9bed84bde61e9f4ff695",
+   "era5_features.parquet": "973bf0f5b4f2a6aabccaeed4833eb4ff2c3d4b11025710280e3275cae4432172",
    "init=2026-07-01.parquet": "825bd0ee81333f2f74a5c4823fc30928d28b017299fa7ad17b65d967dbe89d69",
    "init=2026-07-02.parquet": "c70da3635cdde6a69f56d2f1638c07f145decbfcf518c14eb8f838423fcb7d09",
    "init=2026-07-03.parquet": "2247ffad91b20a68deaf3bd8dbc607ba242fff6749da42ebc54d302623dd75e7",
@@ -316,6 +317,7 @@
    "init=2026-10-31.parquet": "d254970b1cab0a0a58f2e382340b17a998a765c1d1d671ea8dcc8bc91a0c1d12"
   }
  },
+ "upstream_code_digest": "beafc16f5371c778427b5be390660d0f1de2134cd0cad490dcda2476057ff346",
  "code": {
   "e00620_fold.py": "bacd8581a3d5910677d541f10662e450e231beb48e62919879ebefd95555a017",
   "e00620_extend.py": "8fa6c730d9400db3b102b1dafcc92122050d8662bc63fd98364a2f45b0567d1a",
@@ -323,9 +325,9 @@
   "e00620_k3.py": "6b5a6a502845e90093a560a62f69bc3f6f4edb8af6327f8ea19708c17968eb8f",
   "e00620_cand.py": "5ef75fa33578a4540a087ca9e96af520f689a3910ffdbcbd1eec05d84963d270",
   "e00620_gate.py": "ac3d7b725e441699b56adeb397dedf14d1f9d7187f8fdb4b55299600dd1f8fcf",
-  "e00620_freeze.py": "426969da0a3e2dfbcf994d6ca5ef56126acba817877715ff5f92573d9ce9f41c",
-  "e00620_assemble.py": "638526dab6b8a431d105b75c30f196497947fe88ffd66cbf0de0c81b9cc828a7",
-  "predict.sh": "a7110f7a516d7bf31177dc835b9a60506389be0d0021de4cd2a5a7b54b254cf4",
+  "e00620_freeze.py": "8e65cd88c325a8b0991eafa610fe5ae15fe6f94205398f7019e9cd696abb0af3",
+  "e00620_assemble.py": "bf86c135734dd1765c9b882a7aad8473fbf91d655202fcbf3ddeb6d1c621551b",
+  "predict.sh": "5e64aa000ef798a07a0552a340e3ccb7de6b4a8dadadddddd85da20fab1128c1",
   "gpu.sh": "0f524b72aa74ee2ab12f0ebcc67ce33dc7690cb560e485a5330de8caedf8dba8"
  }
 }
