@@ -106,11 +106,11 @@ advice:
 
 **The neighbour-summary inputs make the forecast follow a load-shift much less, but no variant keeps
 both the benefit and the ordinary-day accuracy.** A load-shift is a spell when a Primary's
-demand moves because of switching elsewhere on the electricity network, not because of weather. The
+demand moves because the electricity network has been reconfigured, not because of weather. The
 demand forecast reads recent lagged power, so a load-shift leaks into the forecast. "Follow" is the
 share of a load-shift that the median forecast copies. A1 is the demand neural network of experiment
-591, with follow 0.119. P7 is the best arm of [experiment
-606](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/result/):
+591, with follow 0.119. P7 is the best arm of
+[experiment 606](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/result/):
 it gives A1's lag encoder summaries of the neighbouring Primaries' recent lags, and it cut follow to
 0.035. It also made the forecast worse on ordinary days, measured as CRPS (continuous ranked
 probability score, the quantile-forecast error) minus A1's, in percentage points of capacity: +0.021
