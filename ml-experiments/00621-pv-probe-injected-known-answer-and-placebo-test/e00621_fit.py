@@ -1,5 +1,5 @@
 # ruff: noqa: E501, ANN001
-"""Experiment 621: pretrain experiment 554's modular lag-free network M0 on ERA5 and CAMS rows with a known injection.
+"""Experiment 621: pretrain experiment 554's network M0 on ERA5 and CAMS rows with a known injection.
 
 The network, rows, loss, learning rate, early stopping and seeds are experiment 554's `pretrain`
 (stage `pre`); the only change is the injected condition added to the target of the six signed-MW
