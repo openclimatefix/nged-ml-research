@@ -8,7 +8,8 @@ title: >-
 theme: production-reference-and-best-guess
 also_relevant_to:
   - hierarchy-and-pooling
-status: planned
+status: finished
+date: 2026-11-07
 kind: other
 protocol: demand-v2
 size: >-
@@ -44,7 +45,63 @@ row_set_id: final_test_origins_2026_07_01_to_2026_10_31
 metric: >-
   The metrics of experiment 620: CRPS, MAE, threshold-weighted CRPS, curtailment cost, q05-q95
   coverage, and event-free CRPS, with day-block bootstrap intervals.
+code: ml-experiments/00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network/
+verdict: partly supported
+best_arm: >-
+  BG2-single-fit at the 16 Primaries: CRPS 4.23 points of capacity on all rows and 3.91 on
+  event-free rows (K1 4.94 and 4.29). At the bulk and grid supply points the lag-enabled network
+  and BG2 tie: 8.45 and 8.42.
+headline: >-
+  BG2-single-fit scores 0.71 CRPS points lower than K1 on all rows (0.38 on event-free rows) but
+  follows load-shifts: at Primary D18 its median follows 0.56 of the transfer against 0.33 for the
+  lag-free K3. BG2 also reads fresher power lags (3.5 h against at least 24 h). At the bulk and grid
+  supply points the lag-enabled network ties BG2 and beats the manual heuristic.
+lessons:
+  - >-
+    The all-rows CRPS lead of BG2 over the networks overstates its value as a normal-running
+    forecast, because removing the flagged load-shift days nearly halves the lead over K1.
+  - >-
+    BG2's CRPS lead over K1 is 0.78 points on day 1 and 0.68 to 0.73 points on days 2 to 10, while
+    its lead over the manual heuristic shrinks from 0.93 points to about 0.5 from day 5.
+  - >-
+    At the bulk and grid supply points the lag-enabled network does not beat BG2 at days 1 to 3, so
+    the predicted gain did not appear.
+take_home_message: >-
+  BG2-single-fit scores lower CRPS than all three demand networks at the 16 Primaries, but part of
+  that lead is a lag advantage (3.5-hour against 24-hour power lags) and part is following
+  load-shifts, which an NGED normal-running-arrangement forecast should not do. Removing the flagged
+  days halves the lead over K1, and at Primary D18 BG2's median follows 0.56 of the transfer against
+  0.33 for the lag-free K3. At the 2 bulk and 2 grid supply points the lag-enabled network ties BG2
+  and beats the manual heuristic.
+advice:
+  - >-
+    Do not read the all-rows CRPS lead of BG2 as a production result; compare on event-free rows and
+    with the follow penalty, and give the networks the same 3.5-hour lags before concluding.
+  - >-
+    Keep the lag-enabled network as the candidate at the bulk and grid supply points, since it
+    matches BG2 there without BG2's lag advantage.
+production_status: not-for-production
+adopted_in: none
 ---
+## Result
+
+**BG2 scores the lowest CRPS of six systems on all rows, but the event-free and follow-penalised
+readings narrow its lead, and BG2 reads fresher power lags than the networks.**
+
+- **All rows:** BG2-single-fit has CRPS 4.23 points of capacity against K1's 4.94, a lead of 0.71
+  points (Bonferroni interval -0.82 to -0.59).
+- **Event-free rows:** after experiment 637's flagged days are removed, BG2 has 3.91 against K1's
+  4.29, a lead of 0.38 points (-0.49 to -0.26).
+- **Follow penalty:** at Primary D18, BG2's median follows 0.56 of the load-shift against 0.33 for
+  the lag-free K3. Following a load-shift is the wrong behaviour for a normal-running-arrangement
+  forecast.
+- **Lag asymmetry:** BG2's power lags come from 3.5 hours before the forecast origin and the
+  networks' from at least 24 hours before, so a BG2 win over the networks is not like-for-like.
+- **Lead time:** BG2's lead over K1 is largest on day 1 (0.78 points) and stays at 0.68 to 0.73
+  points from day 2 to day 10.
+- **Bulk and grid supply points:** the lag-enabled network ties BG2 at days 1 to 3 and beats the
+  manual heuristic.
+
 ## Part 1: BG2 beside the three demand networks at the 16 Primaries
 
 **BG2-single-fit scored lower CRPS than all three networks on the held-out months, but it saw
@@ -120,7 +177,8 @@ others.** The table gives mean CRPS per Primary.
 | D21 | 2.42 | 2.41 | 2.56 | 2.46 | 2.68 |
 | D22 | 3.66 | 3.68 | 3.86 | 3.56 | 3.94 |
 
-**Predictions.** P1 (BG2 worse than K1) is refuted: BG2 scores 0.71 CRPS points lower than K1
+**Predictions (Part 1).** P1 (BG2 worse than K1) is refuted: BG2 scores 0.71 CRPS points lower than
+K1
 (Bonferroni interval above), though the lag advantage explains part of it. The hypothesis that BG2
 sits within 0.10 CRPS points of the networks is also refuted. P2 holds: BG2 beats the manual
 heuristic (by 0.61 CRPS points) and the climatology. P4 holds: BG2's q05-q95 coverage is 0.888,
@@ -129,6 +187,227 @@ inside 0.85 to 0.95. The ranking against the development months was not rechecke
 **Threshold-weighted CRPS (the upper tail) shows no BG2 advantage over the manual heuristic**
 (difference -0.0001, interval spanning zero).
 
+## Part 1b: BG2 on event-free rows and the follow penalty
+
+**BG2 keeps the lowest CRPS after the days that experiment 637's detector flags are removed, but on
+the flagged days at Primary D18 BG2's median follows the load-shift more than any other system's
+median.**
+NGED want a forecast of the normal running arrangement (NRA, the load pattern without the load-
+shift), so a forecast that follows a load-shift (a transfer of load between Primaries) is the wrong
+behaviour.
+BG2 is scored here on the rows that the frozen detector of [experiment 637](../00637-ara-detector-
+rescore-of-the-bakeoff-final-test/result.md) does not flag, and then measured on the rows it does
+flag.
+Nothing was refitted: all forecasts are the stored ones scored in Part 1.
+
+![CRPS of the six systems on all rows and on event-free rows](events_crps_event_free.svg)
+
+![Follow ratio and safe-side share at Primary D18](events_follow_d18.svg)
+
+![Primary D18: observed power, the estimated normal level, and five medians](events_d18_daily.svg)
+
+### Event-free scoring
+
+**The detector is experiment 637's, unchanged.**
+The rule file `ara_rule.json` has SHA-256
+`e5fb5cc08a67327d74dbc93ee51ba4e31dfc25bb25d8d4fab426bb32762b0566`, the hash that page states (the
+committed copy has the later hash
+`e1c8df968b2da090b7c959077e38894d621a437796058e7cac4f0b33272280e5`, which differs only by a trailing
+newline).
+At the operating point (threshold k = 3.5, runs of at least 2 days) the detector flags 56,699 of
+929,870 rows (6.1%) and 119 Primary-days, the counts that page reports, so the detector was
+reproduced.
+Of the 119 Primary-days, 102 are at D18, 8 at D21, 5 at D14, and 2 each at D8 and D10.
+
+**BG2's CRPS falls from 4.23 to 3.91 points of capacity on event-free rows, and BG2 stays the lowest
+of the six systems.**
+The other systems fall by more, so BG2's margin over the networks narrows.
+Intervals are day-block bootstrap 95% intervals over forecast origin days, as in Part 1.
+
+| System | CRPS, all rows | CRPS, event-free rows | MAE, event-free rows | q05-q95 coverage, event-free rows |
+|---|---|---|---|---|
+| BG2 | 4.23 (4.15 to 4.32) | 3.91 (3.84 to 3.98) | 6.92 | 0.914 |
+| K1 | 4.94 (4.88 to 5.01) | 4.29 (4.23 to 4.34) | 7.58 | 0.781 |
+| Candidate | 5.00 (4.94 to 5.06) | 4.31 (4.26 to 4.37) | 7.65 | 0.808 |
+| K3 | 5.32 (5.25 to 5.39) | 4.64 (4.57 to 4.70) | 8.12 | 0.762 |
+| Manual heuristic | 4.85 (4.74 to 4.96) | 4.44 (4.34 to 4.54) | 7.82 | 0.805 |
+| Climatology | 8.12 (7.96 to 8.29) | 7.83 (7.63 to 8.02) | 14.19 | 0.890 |
+
+Event-free rows: 873,171. The K1, Candidate, K3, heuristic, and climatology rows reproduce
+experiment 637's page.
+
+| Contrast on event-free rows (CRPS) | Difference | Bonferroni 95% interval |
+|---|---|---|
+| BG2 minus Manual heuristic | -0.53 | -0.62 to -0.45 |
+| BG2 minus K1 | -0.38 | -0.49 to -0.26 |
+| BG2 minus Candidate | -0.41 | -0.51 to -0.29 |
+| BG2 minus K3 | -0.73 | -0.85 to -0.59 |
+
+The Bonferroni count is 8 contrasts (the five systems against the heuristic, and BG2 against each
+network), computed separately for each reading.
+On all rows BG2 minus K1 is -0.71 (-0.82 to -0.59), so removing the flagged days nearly halves BG2's
+CRPS lead over K1.
+BG2 has a lower CRPS than the heuristic at 16 of 16 Primaries on both readings, against 12 of 16 for
+K1 and the candidate and 9 of 16 for K3.
+
+### Follow penalty on the flagged rows
+
+**Only D18 gives a usable measurement.**
+At D18 the observed power on the flagged days is on average 27.9 points of capacity (7.6 robust
+standard deviations of the detector's daily residual) above the estimated normal level.
+The other flagged Primaries do not give a usable measurement: D14's observed power is only 2.5
+points of capacity (0.8 robust standard deviations) away from its estimated normal level, and D8,
+D10, and D21 are flagged on 12 days between them.
+The follow ratios there are in `follow_penalty.csv` but are not interpretable, because the transfer
+is smaller than the drift of the estimate.
+
+**The normal level is an estimate, and every table and figure here says so.**
+The estimated normal level of a Primary is its median power in the 28 days before its first flagged
+day, taken separately for each half-hour of the day and for weekdays and weekends.
+For D18 the first flagged day is 2026-07-06, and the estimate is 43.6% of capacity on average.
+The estimate is the same for every system, so a system's follow ratio is the mean over flagged rows
+of (its median minus the estimated normal level) divided by the mean observed shift.
+The definitions follow experiments [586](../00586-lag-encoder-sharing-and-lag-id-
+embedding/result.md) and [613](../00613-nra-roster-contrasts-with-intervals-five-seeds/result.md),
+with the estimated normal level in place of the true normal level and the observed shift in place of
+the injected depth.
+Safe-side share is the share of flagged rows on which the estimated normal level lies at or above
+the system's q05 when the shift raises the load (at or below q95 when it lowers it).
+NRA-side coverage is the share of flagged rows on which the estimated normal level lies inside the
+system's q05-q95 interval.
+
+| System | Follow ratio | Follow ratio minus K3's | NRA-side coverage | Safe-side share |
+|---|---|---|---|---|
+| BG2 | 0.56 (0.51 to 0.60) | +0.22 (+0.21 to +0.23) | 0.27 (0.23 to 0.31) | 0.27 (0.23 to 0.31) |
+| K1 | 0.35 (0.30 to 0.40) | +0.02 (+0.01 to +0.02) | 0.62 (0.55 to 0.68) | 0.62 (0.55 to 0.68) |
+| Candidate | 0.31 (0.26 to 0.36) | -0.02 (-0.03 to -0.02) | 0.61 (0.54 to 0.68) | 0.61 (0.54 to 0.68) |
+| K3 (lag-free control) | 0.33 (0.29 to 0.38) | 0 | 0.54 (0.48 to 0.61) | 0.55 (0.48 to 0.62) |
+| Manual heuristic | 0.40 (0.33 to 0.47) | +0.07 (+0.04 to +0.09) | 0.70 (0.64 to 0.76) | 0.70 (0.64 to 0.76) |
+| Climatology (control) | 0.34 (0.33 to 0.35) | +0.01 (-0.04 to +0.06) | 0.87 (0.85 to 0.89) | 0.87 (0.85 to 0.89) |
+
+Rows at D18 on flagged days from day 7 after the first flagged day (45,853 rows, 121 forecast origin
+days). Intervals are day-block bootstrap 95% intervals; the minus-K3 column is paired by row. Follow
+ratio: 0 means the median ignores the transfer, 1 means the median follows all of it.
+
+**BG2 follows about 22 percentage points more of the transfer than the lag-free K3 does, which is
+about 6 points of capacity.**
+K3 reads no lagged power and the climatology reads none either, yet both show a follow ratio of 0.33
+to 0.34.
+That 0.33 to 0.34 is most likely the gap between the estimate and these systems' own level
+forecasts, which comes from the season and the weather between the 28 baseline days and the window,
+not from lags.
+Subtracting K3's ratio isolates how much of the transfer each system follows through its lags: BG2
++0.22, the manual heuristic +0.07, K1 +0.02, and the candidate -0.02.
+Following is the wrong behaviour for an NRA forecast, so BG2 is penalised: BG2's q05-q95 interval
+contains the estimated normal level on 0.27 of the flagged rows, against 0.54 to 0.70 for K1, the
+candidate, K3, and the manual heuristic, and 0.87 for the climatology.
+
+**The follow starts about a week into the transfer, which is when the one-week power lags first
+contain it.**
+In days 0 to 6 after D18's first flagged day, every system except the climatology has a follow ratio
+within 0.07 of zero (BG2 +0.03) and a safe-side share of at least 0.89.
+From day 7 BG2's ratio jumps to 0.56 and its safe-side share falls to 0.27.
+BG2 also holds an information advantage on lags: its power lags come from the newest reading at
+least 3.5 hours before the forecast origin, whereas the networks use lags at least 24 hours old
+(Part 1).
+Part of BG2's follow is therefore a consequence of its fresher lags, and the comparison with the
+networks is not like-for-like.
+
+**The result holds at two other settings.**
+At lead times of 24 to 120 hours only, BG2's ratio is 0.58 and exceeds K3's by 0.25 (0.23 to 0.26).
+With the estimate corrected for drift (adding the daily median change of the other Primaries' power
+since the 28-day baseline, excluding Primaries flagged that day), D18's mean shift falls to 25.1
+points of capacity, BG2's ratio is 0.50, K3's is 0.26, and BG2 exceeds K3 by 0.25 (0.23 to 0.26).
+The drift correction is a second, rougher estimate and is labelled as such in `follow_penalty.csv`;
+it does not bring K3's and the climatology's ratios to zero.
+
+### Injected-shift follow ratio on development months
+
+**No stored BG2 forecast on an injected shift exists, so the development-month follow ratio and
+safe-side share of BG2 were not computed.**
+Experiment 87 stored BG2 forecasts for 2025-07-02 to 2026-06-30 on the row set
+`fold_a_daily_gap_v1`, but those forecasts used the real power lags.
+Experiments 586 and 613 ran their injected-shift banks through the networks only, and no experiment
+folder holds BG2 forecasts made with shifted lag inputs.
+Computing the injected follow ratio for BG2 would need BG2 to forecast again on the shifted lags,
+which is a new run rather than a re-score, so it was not done.
+
+### Limits
+
+- **The labels are incomplete.** NGED's event labels are incomplete, and the detector misses
+  transfers of about 1 MW or less and transfers shorter than 2 days, so unflagged rows may still
+  contain a transfer.
+- **One Primary carries the follow measurement.** D18 is the only flagged Primary with a transfer
+  large enough to measure.
+- **The normal level is an estimate.** A gap of about a third of the transfer, most likely from the
+  season and the weather, sits in every system's follow ratio, so the comparison between systems
+  (the minus-K3 column) is firmer than any single ratio.
+- **Descriptive only.** Nothing here ranks systems or tunes the detector, and the window was read
+  once already in Part 1 and in experiment 637.
+
+Code: `ml-experiments/00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-
+network/e00633_events.py`. CSV outputs: `data/ml-experiments/00633-*/events/`
+(`event_free_scores.csv`, `event_free_contrasts.csv`, `event_free_wins.csv`,
+`event_free_by_primary.csv`, `follow_penalty.csv`, `nra_estimates.csv`, `d18_daily.csv`,
+`census.csv`).
+
 ## Part 2: the lag-enabled network at the bulk and grid supply points
 
-Not yet run.
+**At the 2 bulk and 2 grid supply points the lag-enabled network ties BG2 and beats the manual
+heuristic and the climatology.**
+The network is experiment 622's arm `lagged_b1` (the D5 offset, power lags at least 24 hours old,
+and the thermal-lag columns), fitted once on data before 2026-07-01 with seeds 0 and 1 as in that
+experiment, pooled per group of 2 series.
+All 4 series (D13, D17, D1, and D6) have readings in the window (5,893 to 5,904 half-hours each), so
+all 4 are scored, on 233,844 rows common to the four systems.
+BG2 here is the weekly XGBoost member alone, the stored Part 1 forecasts for the same series.
+
+![CRPS by forecast day at the bulk and grid supply points](nodes_crps_by_day.svg)
+
+| Slice | Days | Lag-enabled network | BG2 | Manual heuristic | Climatology |
+|---|---|---|---|---|---|
+| All 4 series | 1 to 3 | 7.45 | 7.51 | 9.83 | 15.12 |
+| All 4 series | 4 to 10 | 8.88 | 8.82 | 10.23 | 14.98 |
+| 2 bulk supply points | 1 to 3 | 5.03 | 5.00 | 6.63 | 11.68 |
+| 2 bulk supply points | 4 to 10 | 6.01 | 5.83 | 6.68 | 11.47 |
+| 2 grid supply points | 1 to 3 | 9.88 | 10.02 | 13.03 | 18.55 |
+| 2 grid supply points | 4 to 10 | 11.75 | 11.80 | 13.77 | 18.49 |
+
+Mean CRPS in points of effective capacity.
+
+**The network and BG2 are indistinguishable at days 1 to 3 in both groups.**
+The network minus BG2 is +0.03 points (Bonferroni interval -0.16 to +0.21) at the bulk supply points
+and -0.14 (-0.78 to +0.54) at the grid supply points.
+At days 4 to 10 the bulk-supply-point difference is +0.18 (-0.002 to +0.35) and the grid-supply-
+point difference is -0.04 (-0.49 to +0.46).
+Both groups beat the manual heuristic with intervals that exclude zero, for example by 1.60 points
+(-1.98 to -1.18) at the bulk supply points and 3.16 (-4.52 to -1.74) at the grid supply points at
+days 1 to 3.
+
+**The series split in two.** At D13 (days 1 to 3: 3.98 against 4.27) and D6 (7.76 against 8.84) the
+network scores lower CRPS than BG2, and at D17 (6.08 against 5.74) and D1 (12.00 against 11.19) BG2
+scores lower.
+
+**Predictions (Part 2).** P3 predicted that the network beats BG2 by about 0.1 CRPS points at the
+bulk supply points at days 1 to 3 and ties it at the grid supply points. The bulk-supply-point
+result is +0.03, so the predicted gain did not appear, and the grid-supply-point tie holds.
+BG2's 3.5-hour power lags are fresher than the network's 24-hour lags, so a tie means the network
+matches a forecast that holds an information advantage.
+Experiment 633 refitted neither forecaster in the window, so both rows are single-fit.
+
+**The predict-phase standardiser statistics differ slightly from the training-phase ones.**
+The predict phase builds its standardiser and target statistics from a raw matrix that holds about
+22 more rows per series (valid 2026-06-30 09:30 to 20:30, all before the cutoff), so the statistics
+differ from the ones the weights were trained with by about 1e-5 relative. This is not leakage.
+The dev-check reproduced experiment 622's stored 2026-06 forecast exactly on the extended inputs
+(maximum difference 0.0 in all 8 files), which does not cover this case.
+
+## Common limits
+
+- **BG2 holds a lag advantage.** BG2's power lags come from the newest reading at least 3.5 hours
+  before the forecast origin; the networks use lags at least 24 hours old.
+- **BG2-weekly was skipped**, as stated in Part 1.
+- **One window, scored once per candidate set.** Nothing was tuned on it.
+- **The development-month ranking was not rechecked.** The hypothesis that the ranking of BG2
+  against the networks equals its development-month ranking was not tested.
+

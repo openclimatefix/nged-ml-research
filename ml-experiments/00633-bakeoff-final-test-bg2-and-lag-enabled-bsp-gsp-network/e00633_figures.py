@@ -10,6 +10,7 @@ import polars as pl
 COLOURS = {
     "BG2": "#FF4901",
     "K1": "#306BFF",
+    "Lag-enabled network": "#306BFF",
     "Candidate": "#10C5F7",
     "K3": "#B701FF",
     "Manual heuristic": "#17E58F",
@@ -19,6 +20,7 @@ COLOURS = {
 
 def chart(*, frame: pl.DataFrame, measure: str, title: list[str]) -> alt.Chart:
     long = frame.with_columns(day=pl.col("lead_band") + 1)
+    drawn = [name for name in COLOURS if name in set(long["system"].to_list())]
     return (
         alt.Chart(long.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=2)
@@ -36,7 +38,7 @@ def chart(*, frame: pl.DataFrame, measure: str, title: list[str]) -> alt.Chart:
             color=alt.Color(
                 "system:N",
                 title=None,
-                scale=alt.Scale(domain=list(COLOURS), range=list(COLOURS.values())),
+                scale=alt.Scale(domain=drawn, range=[COLOURS[name] for name in drawn]),
                 legend=alt.Legend(orient="top", columns=3),
             ),
         )
@@ -44,6 +46,25 @@ def chart(*, frame: pl.DataFrame, measure: str, title: list[str]) -> alt.Chart:
             width=620, height=300, title=alt.TitleParams(title, anchor="start", fontSize=13)
         )
     )
+
+
+def nodes_chart(*, score_dir: Path, out: Path) -> None:
+    frame = (
+        pl.read_csv(score_dir / "by_day.csv")
+        .filter(pl.col("slice") == "all nodes")
+        .with_columns(lead_band=pl.col("day") - 1)
+        .filter(pl.col("system") != "Climatology")
+    )
+    sub = [
+        "Series D13, D17, D1, and D6 (2 bulk and 2 grid supply points), 123 forecast origins from",
+        "2026-07-01 to 2026-10-31, 233,844 half-hourly rows. Climatology (about 15 points) is not drawn.",
+    ]
+    c = chart(
+        frame=frame,
+        measure="crps",
+        title=["CRPS by forecast day at the bulk and grid supply points", *sub],
+    )
+    c.save(out / "nodes_crps_by_day.svg")
 
 
 def main(score_dir: Path, out: Path) -> None:
@@ -63,3 +84,5 @@ def main(score_dir: Path, out: Path) -> None:
 
 if __name__ == "__main__":
     main(Path(sys.argv[1]), Path(sys.argv[2]))
+    if len(sys.argv) > 3:
+        nodes_chart(score_dir=Path(sys.argv[3]), out=Path(sys.argv[2]))
