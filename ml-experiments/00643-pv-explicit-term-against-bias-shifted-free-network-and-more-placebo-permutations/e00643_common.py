@@ -27,7 +27,8 @@ N_CONTRASTS: Final = 5
 def prediction_path(*, cutoff: str, world: str, arm: str, seed: int) -> Path:
     """Return where an arm's test-window quantiles are stored.
 
-    Arms `free` and `cal` (seeds 0 to 4) and `perm2` (seeds 0 to 4, experiment 639's `perm`) live in experiment 639's folder.
+    Arms `free` and `cal` (seeds 0 to 4) and `perm2` (seeds 0 to 4, experiment 639's `perm`) live
+    in experiment 639's folder.
     """
     own = WORK / "predictions" / cutoff / f"{world}_{arm}_s{seed}.npz"
     if own.exists():
@@ -45,7 +46,7 @@ def weights_path(*, cutoff: str, world: str, arm: str, seed: int) -> Path:
 
 
 def shifted_parameters(*, cutoff: str, shift: int) -> dict:
-    """Return experiment 639's `cal` parameters with the Primaries' timelines cyclically shifted by `shift` places.
+    """Return experiment 639's `cal` parameters with the timelines shifted by `shift` places.
 
     The same rearrangement as experiment 639's `perm` arm: Primary `s` gets the megawatt timeline of the
     Primary `shift` places on, by rescaling `k` with the ratio of the two Primaries' table values.

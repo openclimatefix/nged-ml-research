@@ -63,7 +63,7 @@ def _tensors(*, block: d.Block) -> dict[str, torch.Tensor]:
 
 
 def run_fbias(*, cutoff: str, worlds: list[str]) -> None:
-    """Shift each free network's sunny-midday test forecasts by its mean median error on the held-out training rows."""
+    """Shift each free network's sunny-midday forecasts by its median error on held-out rows."""
     for world in worlds:
         train, rows, clean = d.build_train(cutoff=cutoff, world=world)
         test = d.build_test(cutoff=cutoff, world=world, rows=rows, clean=clean)
@@ -153,7 +153,7 @@ def _train_and_store(
 
 
 def _linear_capacity_mw(*, t, delta, p, r4, after, ek=None, ed=None) -> torch.Tensor:
-    """Return the offset in megawatts with no floor at zero (`foff`: experiment 639's relu has a zero gradient at the zero start)."""
+    """Return the offset in megawatts with no floor (a relu has a zero gradient at the zero start)."""
     return delta[p] * t["six"][p] + 0.0 * (r4 + after)
 
 
