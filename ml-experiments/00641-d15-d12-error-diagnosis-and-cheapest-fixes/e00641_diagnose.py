@@ -7,20 +7,17 @@ Writes tables to the experiment's private data folder and prints the headline nu
 
 import glob
 import math
+import os
 import sys
 from pathlib import Path
 from typing import Final
 
 import polars as pl
 
-EXPORT: Final = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/backtest_export_roster_2026-11-07"
-)
-OUT: Final = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/"
-    "00641-d15-d12-error-diagnosis-and-cheapest-fixes/tables"
-)
-NGED: Final = Path("/home/jack/dev/nged-substation-forecast/data/NGED")
+DATA: Final = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
+EXPORT: Final = DATA / "backtest_export_roster_2026-11-07"
+OUT: Final = Path(DATA / "00641-d15-d12-error-diagnosis-and-cheapest-fixes/tables")
+NGED: Final = Path(os.environ["DATA_PATH_INTERNAL"]) / "NGED"
 TARGETS: Final = ["D15", "D12"]
 SHORT_HISTORY_CUT: Final = pl.datetime(2025, 3, 1, time_zone="UTC")
 LEVELS: Final = [0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99]

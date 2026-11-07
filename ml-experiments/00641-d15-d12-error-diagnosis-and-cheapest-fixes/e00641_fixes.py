@@ -11,18 +11,16 @@ Causal rule: a forecast issued at origin T uses only errors at valid times <= T 
 """
 
 import glob
+import os
 from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
 
-EXPORT: Final = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/backtest_export_roster_2026-11-07"
-)
-OUT: Final = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00641-d15-d12-error-diagnosis-and-cheapest-fixes/tables"
-)
+DATA: Final = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
+EXPORT: Final = DATA / "backtest_export_roster_2026-11-07"
+OUT: Final = DATA / "00641-d15-d12-error-diagnosis-and-cheapest-fixes/tables"
 LEVELS: Final = [0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99]
 QCOLS: Final = ["q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99"]
 CUT: Final = pl.datetime(2025, 3, 1, time_zone="UTC")

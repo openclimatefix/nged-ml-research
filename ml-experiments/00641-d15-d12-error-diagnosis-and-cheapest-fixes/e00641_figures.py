@@ -1,6 +1,7 @@
 # ruff: noqa: D103, B007
 """Experiment 641: figures for the write-up (SVG, 680 px wide, one or two panels each)."""
 
+import os
 from pathlib import Path
 from typing import Final
 
@@ -8,7 +9,7 @@ import altair as alt
 import polars as pl
 from plotting import ocf_theme as theme
 
-DATA: Final = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+DATA: Final = Path(os.environ["DATA_PATH_INTERNAL"]) / "ml-experiments"
 TABLES: Final = DATA / "00641-d15-d12-error-diagnosis-and-cheapest-fixes/tables"
 EXPORT: Final = DATA / "backtest_export_roster_2026-11-07"
 DOCS: Final = (
