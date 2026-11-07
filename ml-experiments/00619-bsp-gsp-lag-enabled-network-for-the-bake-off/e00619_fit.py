@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, D103
+# ruff: noqa: E501, E402, PT018, D103
 """Experiment 619: the lag-enabled demand network at the 4 BSP/GSP series, pooled per group (GPU).
 
 Wraps experiment 574's `e00574_fit.py` arm P4E (lags at least 24 h old, the D5 output offset,
@@ -29,6 +29,7 @@ if MINE.limit is not None:
     _argv += ["--limit", str(MINE.limit)]
 sys.argv = _argv
 
+import e00510_common as c  # ty: ignore[unresolved-import]
 import e00574_fit as e  # ty: ignore[unresolved-import]
 import e00591_model as aux  # ty: ignore[unresolved-import]
 import e00611_pool as pool  # ty: ignore[unresolved-import]
@@ -40,6 +41,7 @@ NAME = "00619-bsp-gsp-lag-enabled-network-for-the-bake-off"
 ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
 TAG = "P4E"
 pool.WORK = ROOT
+assert set(e.ARGS.months) <= set(c.MONTHS), e.ARGS.months
 W = pool.install(group=MINE.group)
 W.mkdir(parents=True, exist_ok=True)
 e.WORK, e.W, e.W560 = ROOT, W, W
@@ -71,6 +73,14 @@ def assemble() -> None:
             ]
             assert all(p.exists() or p.with_suffix(".empty").exists() for p in parts), (month, seed)
             frame = pl.concat([pl.read_parquet(p) for p in parts if p.exists()])
+            first = frame["power_fcst_init_time"].min().date()  # ty: ignore[unresolved-attribute]
+            last = frame["power_fcst_init_time"].max().date()  # ty: ignore[unresolved-attribute]
+            assert f"{first:%Y-%m}" == month == f"{last:%Y-%m}", (month, seed, first, last)
+            assert (
+                first.day <= 2
+                and (last.replace(day=28) + __import__("datetime").timedelta(days=4)).month
+                != last.month
+            ) or last.day >= 28, (month, seed, first, last)
             ids = pool.group_table()["time_series_id"].to_list()
             assert sorted(frame["time_series_id"].unique().to_list()) == sorted(ids), (month, seed)
             n_origins = frame.group_by("time_series_id").agg(
@@ -79,7 +89,9 @@ def assemble() -> None:
             assert n_origins["power_fcst_init_time"].n_unique() == 1, (month, seed, n_origins)
             lead = (frame["valid_time"] - frame["power_fcst_init_time"]).dt.total_hours()
             assert lead.max() <= 240 and lead.min() >= 0  # ty: ignore[unsupported-operator]
-            e.f.atomic_frame(frame=frame, target=W / "seed_preds" / TAG / f"{month}_s{seed}.parquet")
+            e.f.atomic_frame(
+                frame=frame, target=W / "seed_preds" / TAG / f"{month}_s{seed}.parquet"
+            )
             print("wrote", TAG, month, seed, frame.height, flush=True)
 
 
@@ -91,7 +103,9 @@ if __name__ == "__main__":
     elif MINE.command == "step2":
         e.step2(months=e.ARGS.months, seeds=e.ARGS.seeds, device="cuda")
     else:
-        e.fit_arm(months=e.ARGS.months, seeds=e.ARGS.seeds, stress=False, limit=MINE.limit, device="cuda")
+        e.fit_arm(
+            months=e.ARGS.months, seeds=e.ARGS.seeds, stress=False, limit=MINE.limit, device="cuda"
+        )
         (ROOT / f"checks_fit_{MINE.group}_s{'-'.join(map(str, e.ARGS.seeds))}.json").write_text(
             __import__("json").dumps(e.CHECK, indent=1, default=str)
         )

@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PERF401
 """Experiment 619: score the lag-enabled network at the BSPs and GSPs against experiment 611's forecasts.
 
 Reuses experiment 611's scoring functions (cleaned actuals, atom-mass CRPS, coverage, width, the
@@ -21,7 +21,6 @@ from typing import Final
 
 import e00611_pool as pool  # ty: ignore[unresolved-import]
 import e00611_score as s  # ty: ignore[unresolved-import]
-import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -57,7 +56,9 @@ def load(*, arm: str, table: pl.DataFrame) -> pl.DataFrame:
         for month, files in by_month.items():
             assert len(files) == 2, (arm, group, month, files)
             parts.append(s.seed_average(files=files).with_columns(month=pl.lit(month)))
-    frame = pl.concat(parts).join(table.select("time_series_id", "capacity_mw"), on="time_series_id")
+    frame = pl.concat(parts).join(
+        table.select("time_series_id", "capacity_mw"), on="time_series_id"
+    )
     frame = frame.with_columns(*[(pl.col(c) * pl.col("capacity_mw")).alias(c) for c in s.LEVELS])
     return frame.with_columns(
         lead_hours=(
@@ -66,7 +67,9 @@ def load(*, arm: str, table: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def score(*, name: str, frame: pl.DataFrame, act: pl.DataFrame, table: pl.DataFrame) -> pl.DataFrame:
+def score(
+    *, name: str, frame: pl.DataFrame, act: pl.DataFrame, table: pl.DataFrame
+) -> pl.DataFrame:
     """Return one row per scored forecast row, in points of effective capacity, with the day of lead time."""
     j = frame.join(act, on=["time_series_id", "valid_time"], how="inner")
     j = s.pinball_crps(frame=j).filter(pl.col("lead_hours") < 240)
@@ -127,7 +130,13 @@ def main() -> None:
         "own_rows_by_arm": dict(zip(own_counts["arm"], own_counts["len"], strict=True)),
         "common_rows_per_arm": int(common.height),
         "common_rows_by_group": dict(
-            zip(*common.group_by(pl.col("label").replace(s.KIND).alias("g")).len().to_dict().values(), strict=True)
+            zip(
+                *common.group_by(pl.col("label").replace(s.KIND).alias("g"))
+                .len()
+                .to_dict()
+                .values(),
+                strict=True,
+            )
         ),
     }
     (OUT / "row_counts.json").write_text(json.dumps(counts, indent=1, default=int))
@@ -140,13 +149,15 @@ def main() -> None:
         pl.col("width_points").mean().alias("width_points"),
         pl.len().alias("n"),
     ]
-    rows.group_by("arm", "group", "day").agg(*agg).sort("arm", "group", "day").write_csv(OUT / "by_day.csv")
+    rows.group_by("arm", "group", "day").agg(*agg).sort("arm", "group", "day").write_csv(
+        OUT / "by_day.csv"
+    )
     rows.group_by("arm", "label", "day").agg(*agg).sort("arm", "label", "day").write_csv(
         OUT / "by_day_series.csv"
     )
-    rows.group_by("arm", "group", "label", "month").agg(*agg).sort("arm", "label", "month").write_csv(
-        OUT / "by_month.csv"
-    )
+    rows.group_by("arm", "group", "label", "month").agg(*agg).sort(
+        "arm", "label", "month"
+    ).write_csv(OUT / "by_month.csv")
     sets = pl.concat(
         [
             rows.filter((pl.col("lead_hours") >= lo) & (pl.col("lead_hours") < hi)).with_columns(
@@ -155,19 +166,18 @@ def main() -> None:
             for name, (lo, hi) in SETS.items()
         ]
     )
-    sets.group_by("arm", "group", "set").agg(*agg).sort("arm", "group", "set").write_csv(OUT / "by_set.csv")
-    sets.group_by("arm", "label", "set").agg(*agg).sort("arm", "label", "set").write_csv(OUT / "by_set_series.csv")
+    sets.group_by("arm", "group", "set").agg(*agg).sort("arm", "group", "set").write_csv(
+        OUT / "by_set.csv"
+    )
+    sets.group_by("arm", "label", "set").agg(*agg).sort("arm", "label", "set").write_csv(
+        OUT / "by_set_series.csv"
+    )
     # Tails: coverage and pinball loss at q01, q05, q95, q99 are scored from the export by e00619_tails.py.
     others = ("design1", "bg2", "climatology", "design2")
     out = []
     n_tests = len(SETS) * 2 * len(others)
-    for (set_name, (lo, hi)), group, ref in itertools.product(SETS.items(), ("BSP", "GSP"), others):
-        sub = sets.filter(
-            (pl.col("group") == group) & (pl.col("set") == set_name)
-        ).drop("set")
-        if ref == "design2":
-            # Design 2 has its own rows; contrast it on the rows it shares with the lag-enabled network.
-            pass
+    for set_name, group, ref in itertools.product(SETS, ("BSP", "GSP"), others):
+        sub = sets.filter((pl.col("group") == group) & (pl.col("set") == set_name)).drop("set")
         for metric in ("crps_points", "mae_points"):
             out.append(
                 {
@@ -193,7 +203,6 @@ def main() -> None:
     with pl.Config(tbl_rows=100, tbl_cols=20, tbl_width_chars=220):
         print(pl.read_csv(OUT / "by_set.csv"))
         print(pl.read_csv(OUT / "contrasts.csv"))
-    _ = np
 
 
 if __name__ == "__main__":
