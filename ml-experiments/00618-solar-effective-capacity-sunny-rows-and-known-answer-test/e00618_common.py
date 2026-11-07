@@ -152,7 +152,9 @@ def fit_levels(*, values: np.ndarray, penalty: float) -> tuple[list[int], np.nda
     return steps, level, sigma
 
 
-def segment_halfwidth(*, steps: list[int], n: int, sigma: float, inflate: float = 1.0) -> np.ndarray:
+def segment_halfwidth(
+    *, steps: list[int], n: int, sigma: float, inflate: float = 1.0
+) -> np.ndarray:
     """Return the 90% half-width of the level at each day: 1.645 sigma / sqrt(days in segment)."""
     bounds = [0, *steps, n]
     half = np.empty(n)
