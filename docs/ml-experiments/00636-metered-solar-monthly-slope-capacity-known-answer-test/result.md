@@ -93,9 +93,9 @@ advice:
 **A monthly regression of power on irradiance finds a 10% loss of capacity within 3 months at Solar
 C and Solar F, and does not find it at Solar A, B, or D at any horizon up to 12 months.** The
 pre-registered stop rule fires, because three of the five farms miss. The slope is therefore
-reported as not usable at Solar A, B, and D, and the line stops with no tuning. A direct-current loss hidden under the
-inverter limit is found as often as a proportional loss of alternating-current output, but only because clipping is rare at these
-farms.
+reported as not usable at Solar A, B, and D, and the line stops with no tuning. A direct-current
+loss hidden under the inverter limit is found as often as a proportional loss of
+alternating-current output, but only because clipping is rare at these farms.
 
 We injected capacity losses into each farm's real series, refitted both estimators, and counted how
 often the loss was found. A loss counts as found when the mean level of the months after the start
