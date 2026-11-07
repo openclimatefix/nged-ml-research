@@ -25,7 +25,7 @@ import polars as pl
 import torch  # ty: ignore[unresolved-import]
 
 PROBE_DATES: tuple[date, ...] = tuple(date(2025, 4, 9) + timedelta(days=14 * i) for i in range(12))
-"""Twelve Wednesdays from 2025-04-09 to 2025-09-10; every one lies inside both cutoffs' pretraining rows."""
+"""Twelve Wednesdays from 2025-04-09 to 2025-09-10; the dates with no base row at a cutoff are skipped, so 2025-07 keeps only the first 6."""
 MINUTES: tuple[int, ...] = tuple(range(10 * 60, 15 * 60 + 1, 30))
 """Half-hour ends from 10:00 to 15:00 UTC."""
 WINDOW_DAYS = 21

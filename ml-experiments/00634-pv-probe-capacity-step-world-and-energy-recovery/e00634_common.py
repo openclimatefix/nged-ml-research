@@ -25,7 +25,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 NAME: Final = "00634-pv-probe-capacity-step-world-and-energy-recovery"
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / NAME / "work"
 CUTOFFS: Final[tuple[str, ...]] = ("2025-07", "2025-10", "2026-03", "2026-06")
-"""The spring cutoff and the 2026-06 cutoff (development data only; July 2026 onwards untouched)."""
+"""Cutoffs of the pretraining rows (development data only; July 2026 onwards untouched)."""
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 SIX: Final[tuple[str, ...]] = pv.SIGNED_SIX
 FARMS: Final[str] = "ABCF"
