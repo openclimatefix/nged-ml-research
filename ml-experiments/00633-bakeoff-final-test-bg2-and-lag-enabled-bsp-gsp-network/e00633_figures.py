@@ -32,7 +32,7 @@ def chart(*, frame: pl.DataFrame, measure: str, title: list[str]) -> alt.Chart:
             ),
             y=alt.Y(
                 f"{measure}:Q",
-                title=f"{measure.upper()} (% of capacity; smaller is better)",
+                title=f"{measure.upper()} (percentage points of capacity; smaller is better)",
                 scale=alt.Scale(zero=True),
             ),
             color=alt.Color(

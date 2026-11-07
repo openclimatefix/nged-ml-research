@@ -543,65 +543,101 @@ def figures(events: Path, docs: Path) -> None:
         )
     )
     fig.save(docs / "events_follow_d18.svg")
-    # figure 3: daily view of D18
+    # figure 3: daily view of D18, two panels so each holds one cluster of near-identical lines
     dd = pl.read_csv(events / "d18_daily.csv")
-    long = dd.unpivot(
-        index=["day", "flagged"],
-        on=["observed", "nra_estimate", "BG2", "K1", "Candidate", "K3", "Manual heuristic"],
-        variable_name="series",
-        value_name="value",
-    ).drop_nulls()
-    names = {
-        "observed": "Observed",
-        "nra_estimate": "Estimated normal level",
-    }
-    long = long.with_columns(
-        system=pl.col("series").replace(names),
-        dash=pl.col("series") == "nra_estimate",
-    )
-    domain = [
-        "Observed",
-        "Estimated normal level",
-        "BG2",
-        "K1",
-        "Candidate",
-        "K3",
-        "Manual heuristic",
-    ]
-    colours = ["#000000", "#555555", *[COLOURS[s_] for s_ in domain[2:]]]
-    line = (
-        alt.Chart(long.to_pandas())  # ty: ignore[unresolved-attribute]
-        .mark_line(strokeWidth=1.8)
-        .encode(
-            x=alt.X(
-                "day:T", title="Valid day (2026)", axis=alt.Axis(format="%b", tickCount="month")
-            ),
-            y=alt.Y(
-                "value:Q", title="Daily mean power (% of capacity)", scale=alt.Scale(zero=False)
-            ),
-            color=alt.Color(
-                "system:N",
-                title=None,
-                scale=alt.Scale(domain=domain, range=colours),
-                legend=alt.Legend(orient="top", columns=3),
-            ),
-            strokeDash=alt.condition(alt.datum.dash, alt.value([5, 3]), alt.value([1, 0])),
+    flagged_days = dd.filter(pl.col("flagged"))
+    rule_day = "2026-07-13"  # day 7 after the first flagged day, 2026-07-06
+    assert flagged_days["day"].min() == "2026-07-06"
+    names = {"observed": "Observed", "nra_estimate": "Estimated normal level"}
+    shared = ["Observed", "Estimated normal level"]
+    panels = []
+    for series, sub in (
+        (["BG2", "K3"], "BG2 and K3 (K3 reads no lagged power)"),
+        (["K1", "Candidate", "Manual heuristic"], "K1, Candidate, and Manual heuristic"),
+    ):
+        long = (
+            dd.unpivot(
+                index=["day", "flagged"],
+                on=["observed", "nra_estimate", *series],
+                variable_name="series",
+                value_name="value",
+            )
+            .drop_nulls()
+            .with_columns(system=pl.col("series").replace(names))
         )
+        domain = [*shared, *series]
+        colours = ["#000000", "#555555", *[COLOURS[s_] for s_ in series]]
+        dashes = [[1, 0], [5, 3], *[[1, 0] for _ in series]]
+        enc_x = alt.X(
+            "day:T", title="Valid day (2026)", axis=alt.Axis(format="%b", tickCount="month")
+        )
+        line = (
+            alt.Chart(long.to_pandas())  # ty: ignore[unresolved-attribute]
+            .mark_line(strokeWidth=1.8)
+            .encode(
+                x=enc_x,
+                y=alt.Y(
+                    "value:Q", title="Daily mean (% of capacity)", scale=alt.Scale(domain=[10, 110])
+                ),
+                color=alt.Color(
+                    "system:N",
+                    title=None,
+                    scale=alt.Scale(domain=domain, range=colours),
+                    legend=alt.Legend(
+                        orient="top", columns=3, symbolType="stroke", symbolStrokeWidth=2
+                    ),
+                ),
+                strokeDash=alt.StrokeDash(
+                    "system:N", scale=alt.Scale(domain=domain, range=dashes), legend=None
+                ),
+            )
+        )
+        strip = (
+            alt.Chart(flagged_days.select("day").to_pandas())  # ty: ignore[unresolved-attribute]
+            .mark_bar(color="#999999", opacity=0.35, width=3)
+            .encode(x="day:T", y=alt.value(230), y2=alt.value(220))
+        )
+        rule = (
+            alt.Chart(  # ty: ignore[unresolved-attribute]
+                pl.DataFrame(
+                    {"day": [rule_day], "label": ["Day 7 after the first flagged day (13 Jul)"]}
+                ).to_pandas()
+            )  # ty: ignore[unresolved-attribute]
+            .mark_rule(color="#333333", strokeDash=[2, 2])
+            .encode(x="day:T")
+        )
+        text = (
+            alt.Chart(  # ty: ignore[unresolved-attribute]
+                pl.DataFrame(
+                    {"day": [rule_day], "label": ["Day 7 after first flagged day"]}
+                ).to_pandas()
+            )  # ty: ignore[unresolved-attribute]
+            .mark_text(align="left", dx=4, dy=-4, fontSize=11, baseline="bottom")
+            .encode(x="day:T", y=alt.value(214), text="label:N")
+        )
+        panels.append(
+            (strip + line + rule + text).properties(
+                width=WIDTH_PX,
+                height=230,
+                title=alt.TitleParams(sub, anchor="start", fontSize=12),
+            )
+        )
+    fig = (
+        alt.vconcat(*panels)
+        .resolve_scale(color="independent", strokeDash="independent")
         .properties(
-            width=WIDTH_PX,
-            height=300,
             title=alt.TitleParams(
                 [
-                    "Primary D18, forecasts 24 to 48 hours ahead (daily mean of the median). The observed power",
-                    "ran above the estimated normal level for most of July to October. BG2's median sits above the",
-                    "other systems' medians in July and August. In autumn every median rises, including K3's.",
+                    "Primary D18, forecasts 24 to 48 hours ahead (daily mean of the median). Observed power ran",
+                    "above the estimated normal level (median power in the 28 days before the first flagged day).",
+                    "Grey strip at the bottom: days the detector flags. Climatology is not drawn.",
                 ],
                 anchor="start",
                 fontSize=13,
-            ),
+            )
         )
     )
-    line.save(docs / "events_d18_daily.svg")
+    fig.save(docs / "events_d18_daily.svg")
 
 
 if __name__ == "__main__":
