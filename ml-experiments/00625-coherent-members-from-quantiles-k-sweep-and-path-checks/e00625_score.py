@@ -61,7 +61,7 @@ def cut_paths(*, paths: np.ndarray, k: int) -> np.ndarray:
     if k == paths.shape[0]:
         return paths
     sorted_values = np.sort(paths, axis=0)
-    take = np.round(np.linspace(0, paths.shape[0] - 1, k)).astype(np.int64)
+    take = np.arange(k) * paths.shape[0] // k
     ranks = np.argsort(np.argsort(paths[take], axis=0, kind="stable"), axis=0, kind="stable")
     pos = np.clip((ranks + 1) / (k + 1) * (paths.shape[0] + 1) - 1, 0, paths.shape[0] - 1)
     lo = np.floor(pos).astype(np.int64)
@@ -91,6 +91,32 @@ def anomaly_ssr(*, init: datetime, observed: np.ndarray, kind: np.ndarray) -> np
         baseline = np.where(np.isnan(baseline), path.mean(axis=1, keepdims=True), baseline)
         anomalies.append(path - baseline)
     return score.ranks_of_paths(paths=anomalies, init=init)
+
+
+def joint_rows(*, paths: dict[str, np.ndarray], actual: np.ndarray, init: datetime) -> list[dict]:
+    """Return the joint-block rows (all nodes at coarse leads), with the member axis kept intact.
+
+    Experiment 436's `rows_for_run` builds the joint vector with `transpose(1, 0, 2).reshape(M, -1)`,
+    which puts the node axis in front of the member axis before flattening, so each "member" row
+    mixes nodes and members. This function flattens (node, step) within each member instead.
+    """
+    rows = []
+    have = ~np.isnan(actual)
+    y_all = np.nan_to_num(actual)
+    for window in s434.WINDOWS:
+        steps = s434.window_steps(window=window)
+        sub = steps[:: s434.JOINT_STRIDE[window]]
+        jm = have[:, sub].reshape(1, -1)
+        if jm.sum() < (100 if window == "days_1_10" else 60):
+            continue
+        y = y_all[:, sub].reshape(1, -1)
+        for arm, path in paths.items():
+            x = path[:, :, sub].reshape(path.shape[0], -1)[None]
+            es, vs = s434.score_blocks(x=x, y=y, mask=jm, chunk=1)
+            rows.append(
+                score._row(init, "joint", window, "all", arm, "all", es[0], vs[0], int(jm.sum()))
+            )
+    return rows
 
 
 def plain_crps(*, paths: np.ndarray, actual: np.ndarray) -> np.ndarray:
@@ -128,7 +154,13 @@ def sky_pairs(*, observed: np.ndarray, kind: np.ndarray) -> list[tuple[int, int]
         for b in range(a + 1, len(solar)):
             x, y = observed[solar[a], sel], observed[solar[b], sel]
             ok = ~np.isnan(x) & ~np.isnan(y)
-            corr.append((float(np.corrcoef(x[ok], y[ok])[0, 1]), int(solar[a]), int(solar[b])))
+            corr.append(
+                (
+                    float(np.nan_to_num(np.corrcoef(x[ok], y[ok])[0, 1], nan=-2.0)),
+                    int(solar[a]),
+                    int(solar[b]),
+                )
+            )
     corr.sort(reverse=True)
     return [(a, b) for _, a, b in corr[:SKY_PAIRS]]
 
@@ -163,8 +195,9 @@ def sky_rows(
                 opp = ((pa > hi[a, cols]) & (pb < lo[b, cols])) | (
                     (pb > hi[b, cols]) & (pa < lo[a, cols])
                 )
-                count += int(opp.sum())
-                total += int(opp.size)
+                ok = ~np.isnan(actual[a, cols]) & ~np.isnan(actual[b, cols])
+                count += int((opp & ok[None]).sum())
+                total += int(ok.sum()) * paths.shape[0]
         rows.append(
             {"power_fcst_init_time": init, "day": int(day), "arm": label, "k": k,
              "opposite": count, "total": total, "spread": float(spread[days == day].mean())}
@@ -179,6 +212,8 @@ def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR091
     observed = np.load(WORK436 / "observed.npz")["observed"]
     kind = run["kind"]
     actual = run["actual"].astype(np.float64)
+    valid = np.array([init + (i + 1) * build.STEP for i in range(S)])
+    actual[:, valid >= HOLDOUT] = np.nan  # the holdout is never scored
     values = run["values"].astype(np.float64)
     day_tag = f"{init:%Y-%m-%d}"
     arms51: dict[str, np.ndarray] = {}
@@ -214,6 +249,9 @@ def process_run(*, file: str) -> dict[str, list[dict]]:  # noqa: PLR0912, PLR091
             group.update({a: arms51[a] for a in FULL_ARMS})
         score.N_MEMBERS = k
         for row in score.rows_for_run(paths=group, actual=actual, kind=kind, init=init):
+            if row["block"] != "joint":  # experiment 436's joint block scrambles members; see below
+                out["coherence"].append({**row, "k": k})
+        for row in joint_rows(paths=group, actual=actual, init=init):
             out["coherence"].append({**row, "k": k})
         for arm, path in group.items():
             crps = plain_crps(paths=path, actual=y0)
@@ -273,6 +311,7 @@ def main() -> None:
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     files = [str(f) for f in sorted((WORK436 / "runs").glob("*.npz"))[: args.max_runs]]
+    print(f"{len(files)} runs to score", flush=True)
     tables: dict[str, list[dict]] = {k: [] for k in ("coherence", "crps", "coverage", "sky", "acf")}
     import multiprocessing as mp
 
