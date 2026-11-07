@@ -93,12 +93,12 @@ score the generators on the rows present, and also on a version that fills solar
 with 0.
 
 **Do not clip a solar farm's forecast or reading at 100% of capacity (medium confidence,
-provisional).** In the stored solar forecasts of experiment 430, 10.8% of the daylight rows have a
-stored q95 above 100% of capacity, and 2.3% of the readings exceed 100%. Clipping the quantiles at
-100 raised the q95 exceedance from 6.1% to 7.4% across the 6 solar farms. Applies to experiments
-and to any client that rebuilds scenarios. Evidence: [experiment
-628](00628-quantile-form-client-side-scenario-rehydration/result.md), 44 forecast runs of 2025-09
-to 2026-06. Clip solar at 0 only.
+provisional).** In the stored solar forecasts of experiment 430, 11.3% of the daylight rows (those
+whose stored median is above zero) have a stored q95 above 100% of capacity, and 2.3% of the
+readings exceed 100%. Clipping the quantiles at 100 raised the q95 exceedance from 6.1% to 7.4%
+across the 6 solar farms. Applies to experiments and to any client that rebuilds scenarios. Evidence:
+[experiment 628](00628-quantile-form-client-side-scenario-rehydration/result.md), 44 forecast runs
+of 2025-09 to 2026-06, from `e00628_clip_check.py`. Clip solar at 0 only.
 
 **Extend each cached input to the end of the window before scoring on it (high confidence for the
 dates).** A cached input is a file built from the stored tables, which a candidate trains and scores
