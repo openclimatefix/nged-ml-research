@@ -172,8 +172,8 @@ Intervals are 95% over week-long blocks.
   later experiment depends on the headline (trigger 7).
 - **Reviews.** One Sonnet plan review, one Sonnet code review (it found a causal unit test that tested
   nothing, which was rewritten and passes, and the pooled-row interval, now saved to a table), and one
-  Sonnet prose review. All accepted findings were applied; the review of the persist-the-last-error
-  and best-of-network comparisons is listed under "Not done".
+  Sonnet prose review. The accepted findings were applied. Comparisons the plan listed and the
+  experiment did not run are under "Not done".
 
 ## Not done
 
