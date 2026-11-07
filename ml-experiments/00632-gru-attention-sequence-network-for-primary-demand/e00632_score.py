@@ -50,6 +50,13 @@ def scored_rows(*, month: str) -> pl.DataFrame:
     df = pl.read_parquet(EXPORT / f"K3_{month}.parquet").select(
         KEYS + ["observed_power", "event_free", "unit"]
     )
+    df = df.filter(
+        (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() <= 168 * 60
+    ).filter(
+        pl.col("valid_time") < pl.datetime(2026, 7, 1, time_zone="UTC"),
+        # Origins after 23 June 2026 have no 7-day horizon of ERA5 + CAMS weather before July.
+        pl.col("power_fcst_init_time") < pl.datetime(2026, 6, 24, time_zone="UTC"),
+    )
     return df.join(
         sub.select("time_series_id", "primary_name", "group", "capacity"), on="time_series_id"
     )

@@ -127,6 +127,7 @@ def fit_one(
     hist: int,
     fut: int,
     ctx: dict,
+    shifts: bool = False,
 ) -> dict:
     s, cap = ctx["s"][month], ctx["cap"]
     fold = fold_mod.fold_for_seq(s=s)
@@ -135,22 +136,32 @@ def fit_one(
     n_p = len(s.target_mean)
     z = d.standardised_power(power=ctx["clean"], fold=fold)
     nb_mean, nb_share = d.neighbour_summary(z=z, of=ctx["of"])
+    z_in = None
+    if shifts:
+        # lag-only synthetic load-shifts (experiment 581's recipe) on the history power; targets stay clean
+        import e00581_bank as bank  # ty: ignore[unresolved-import]
+
+        fixed, n_events = bank.synthetic_clean(
+            clean=ctx["clean"], first=0, last=target_end, seed=int(month.replace("-", ""))
+        )
+        z_in = d.standardised_power(power=fixed, fold=fold)
+        nb_in, nb_share_in = d.neighbour_summary(z=z_in, of=ctx["of"])
+        print(f"{month}: {n_events} synthetic events", flush=True)
     st = np.load(fold_mod.P2_DIR / "stats" / "B1" / f"{month}.npz")
     b1g, cams = d.b1_scale(
         grid=ctx["b1_grid"], cams=ctx["b1_cams"], mean=st["mean"], std=st["std"], device=DEV
     )
     x = d.standardised_inputs(raw=ctx["raw"], fold=fold, device=DEV, b1_grid=b1g)
-    w = d.Windows(
-        x=x,
-        z=z,
-        nb_mean=nb_mean,
-        nb_share=nb_share,
-        cams=cams,
-        tau=ctx["tau"],
-        n_hist=hist,
-        n_fut=fut,
-        device=DEV,
-    )
+    w_clean = d.Windows(
+        x=x, z=z, nb_mean=nb_mean, nb_share=nb_share, cams=cams, tau=ctx["tau"],
+        n_hist=hist, n_fut=fut, device=DEV,
+    )  # fmt: skip
+    w = w_clean
+    if shifts:
+        w = d.Windows(
+            x=x, z=z, nb_mean=nb_in, nb_share=nb_share_in, cams=cams, tau=ctx["tau"],
+            n_hist=hist, n_fut=fut, device=DEV, z_in=z_in,
+        )  # fmt: skip
     n_knots = int((refit.year - 2019) * 12 + refit.month - 9) + 1
     # a window must not read targets at or after target_end, and the newest training origin keeps >= 1 target
     pairs = lambda o: (
@@ -225,11 +236,11 @@ def fit_one(
     torig = torch.from_numpy(np.tile(test_o, n_p)).to(DEV)
     for a in range(0, len(torig), BATCH):
         d.check_poisoned(
-            batch=w.cut(primary=tprim[a : a + BATCH], origin=torig[a : a + BATCH]),
-            windows=w,
+            batch=w_clean.cut(primary=tprim[a : a + BATCH], origin=torig[a : a + BATCH]),
+            windows=w_clean,
             limit=BATCH,
         )
-    frame = predict(net=net, w=w, s=s, cap=cap, month=month, origins=test_o, hist=hist, fut=fut)
+    frame = predict(net=net, w=w_clean, s=s, cap=cap, month=month, origins=test_o, hist=hist, fut=fut)
     out = d.ROOT / "predictions" / tag / f"{month}_s{seed}.parquet"
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".tmp")
@@ -245,7 +256,7 @@ def fit_one(
     with (d.ROOT / "logs" / f"{tag}.jsonl").open("a") as f:
         f.write(json.dumps(info) + "\n")
     print(info, flush=True)
-    del x, w
+    del x, w, w_clean
     torch.cuda.empty_cache()
     return info
 
@@ -258,6 +269,7 @@ def main() -> None:
     ap.add_argument("--max-passes", type=int, default=60)
     ap.add_argument("--frac", type=float, default=1.0)
     ap.add_argument("--tag", default=None)
+    ap.add_argument("--synthetic-shifts", action="store_true")
     ap.add_argument("--hist", type=int, default=336)
     ap.add_argument("--fut", type=int, default=336)
     a = ap.parse_args()
@@ -284,6 +296,7 @@ def main() -> None:
                 hist=a.hist,
                 fut=a.fut,
                 ctx=ctx,
+                shifts=a.synthetic_shifts,
             )
 
 

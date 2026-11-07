@@ -247,10 +247,16 @@ class Windows:
     def __init__(
         self, *, x: torch.Tensor, z: np.ndarray, nb_mean: np.ndarray, nb_share: np.ndarray,
         cams: torch.Tensor, tau: np.ndarray, n_hist: int, n_fut: int, device: str,
-        lag_steps: int = LAG_STEPS,
+        lag_steps: int = LAG_STEPS, z_in: np.ndarray | None = None,
     ) -> None:  # fmt: skip
+        """Hold `z` as the targets; the history power and neighbour summaries come from `z_in` if given.
+
+        `z_in` is a lag-only altered copy of `z` (a synthetic or injected load-shift); the neighbour
+        summaries passed in must have been computed from `z_in` too.
+        """
         self.x, self.cams_arr = x, cams
         self.z = torch.from_numpy(z).to(device)
+        self.z_in = self.z if z_in is None else torch.from_numpy(z_in).to(device)
         self.nb_mean = torch.from_numpy(nb_mean).to(device)
         self.nb_share = torch.from_numpy(nb_share).to(device)
         self.tau = torch.from_numpy(tau).to(device)
@@ -268,7 +274,7 @@ class Windows:
         assert int(h.min()) >= 0 and int(f.max()) < self.grid, "window leaves the grid"
         p = primary[:, None]
         visible = h <= (origin[:, None] - self.lag_steps)
-        z = self.z[p, h]
+        z = self.z_in[p, h]
         seen = visible & torch.isfinite(z)
         target = self.z[p, f].clone()
         if target_end is not None:
@@ -317,7 +323,7 @@ def check_poisoned(*, batch: Batch, windows: Windows, limit: int = 64) -> str:
     for i in range(n):
         p, o = int(batch.primary[i]), int(batch.origin[i])
         rows = []
-        for arr in (windows.z, windows.nb_mean, windows.nb_share):
+        for arr in (windows.z_in, windows.nb_mean, windows.nb_share):
             r = arr[p].clone()
             r[o - LAG_STEPS + 1 :] = 1e6
             rows.append(r)
