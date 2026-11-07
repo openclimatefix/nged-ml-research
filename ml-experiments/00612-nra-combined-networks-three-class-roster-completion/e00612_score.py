@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, E402, D103, E501, PLR0915, PLR0912, PERF401, C901
+# ruff: noqa: ANN001, E402, D103, E501, PLR0915, PLR0912, ANN202
 """Experiment 612: score one network with and without tail constants, at three lead bands (CPU).
 
 For one fitted arm (`--arm NAME`, the folder `arms/NAME/work`), this scores four systems on the same
@@ -35,8 +35,16 @@ _p.add_argument(
     "--months", nargs="+", default=["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"]
 )
 _p.add_argument("--no-bank", action="store_true")
-_p.add_argument("--width-factors", default=None, help="CSV (month, factor): add system K2w, the network rescaled about its median by the month's factor")
-_p.add_argument("--lagfree", default=None, help="score this lag-free arm's fits (D5/O2 tag) on the rows of --arm")
+_p.add_argument(
+    "--width-factors",
+    default=None,
+    help="CSV (month, factor): add system K2w, the network rescaled about its median by the month's factor",
+)
+_p.add_argument(
+    "--lagfree",
+    default=None,
+    help="score this lag-free arm's fits (D5/O2 tag) on the rows of --arm",
+)
 _p.add_argument("--lagfree-tag", default="D5")
 MINE = _p.parse_args()
 
@@ -70,7 +78,11 @@ TAIL_BANDS = (1, 2)
 GROUPS = k597.GROUPS_SCORED
 PHASES = k597.PHASES
 WFAC: dict[str, float] = (
-    {} if MINE.width_factors is None else dict(__import__("polars").read_csv(MINE.width_factors).select("month", "factor").iter_rows())
+    {}
+    if MINE.width_factors is None
+    else dict(
+        __import__("polars").read_csv(MINE.width_factors).select("month", "factor").iter_rows()
+    )
 )
 SYSTEMS = ("K2", "K1", "K2+t", "K1+t", *(("K2w",) if WFAC else ()))
 GRID = np.round(np.arange(0.50, 1.801, 0.01), 2)
@@ -179,7 +191,11 @@ def month_factor(*, month_col: np.ndarray) -> np.ndarray | None:
     """Return one width factor per row from `--width-factors` (1.0 for a month without one), or None."""
     if not WFAC:
         return None
-    return np.array([WFAC.get(str(x), 1.0) for x in month_col], np.float32) if len(month_col) else np.zeros(0, np.float32)
+    return (
+        np.array([WFAC.get(str(x), 1.0) for x in month_col], np.float32)
+        if len(month_col)
+        else np.zeros(0, np.float32)
+    )
 
 
 def row_stats(*, y: np.ndarray, q: np.ndarray) -> np.ndarray:
@@ -215,9 +231,19 @@ def has_tail(*, name: str, month: str) -> bool:
 def event_free(*, inp, lower, upper) -> tuple[pl.DataFrame, pl.DataFrame, dict]:
     t = inp.t
     wide = inp.mode[t.prim, t.origin_day]
-    sy = systems(v=t.arms["V"], m=t.arms["M"], wide=wide, lower=lower, upper=upper, wf=month_factor(month_col=t.month))
+    sy = systems(
+        v=t.arms["V"],
+        m=t.arms["M"],
+        wide=wide,
+        lower=lower,
+        upper=upper,
+        wf=month_factor(month_col=t.month),
+    )
     st = {n: row_stats(y=t.obs, q=q) for n, q in sy.items()}
-    j = {n: STAT_NAMES.index(n) for n in ("cover90", "pin05", "pin95", "width90", "crps", "ge05", "le95")}
+    j = {
+        n: STAT_NAMES.index(n)
+        for n in ("cover90", "pin05", "pin95", "width90", "crps", "ge05", "le95")
+    }
     cells = []
     for prim in range(16):
         for mo in MONTHS:
@@ -254,7 +280,13 @@ def event_free(*, inp, lower, upper) -> tuple[pl.DataFrame, pl.DataFrame, dict]:
                 if not has_tail(name=n, month=mo):
                     continue
                 q = sy[n][sel]
-                rec = {"prim": prim, "label": str(t.label[prim]), "month": mo, "system": n, "n_rows": int(sel.sum())}
+                rec = {
+                    "prim": prim,
+                    "label": str(t.label[prim]),
+                    "month": mo,
+                    "system": n,
+                    "n_rows": int(sel.sum()),
+                }
                 for f in k601.FRACTIONS:
                     rec[f"cost_{f}"] = float(
                         k601.avoidable_cost(u=q[:, c.IQ[0.95]] * cap, y=t.obs[sel] * cap,
@@ -275,7 +307,14 @@ def event_free(*, inp, lower, upper) -> tuple[pl.DataFrame, pl.DataFrame, dict]:
 def real_events(*, inp, lower, upper) -> pl.DataFrame:
     t = inp.t
     wide = inp.mode[t.prim, t.origin_day]
-    sy = systems(v=t.arms["V"], m=t.arms["M"], wide=wide, lower=lower, upper=upper, wf=month_factor(month_col=t.month))
+    sy = systems(
+        v=t.arms["V"],
+        m=t.arms["M"],
+        wide=wide,
+        lower=lower,
+        upper=upper,
+        wf=month_factor(month_col=t.month),
+    )
     st = {n: row_stats(y=t.nra, q=q) for n, q in sy.items()}
     ev = sc.attach_depth(ev=sc.merged_events(), t=t)
     out = []
@@ -284,7 +323,9 @@ def real_events(*, inp, lower, upper) -> pl.DataFrame:
         for phase in PHASES:
             lo, hi = sc.window(onset=e["onset_idx"], end=e["end_idx"], phase=phase)
             for band in BAND_IDS:
-                sel = np.flatnonzero((t.prim == e["primary"]) & (t.idx >= lo) & (t.idx < hi) & (t.band == band))
+                sel = np.flatnonzero(
+                    (t.prim == e["primary"]) & (t.idx >= lo) & (t.idx < hi) & (t.band == band)
+                )
                 if len(sel) < 100:
                     continue
                 for n in SYSTEMS:
@@ -329,7 +370,9 @@ def score_bank(*, inp, lower, upper) -> tuple[pl.DataFrame, list[dict]]:
             lo = np.array([lo_p.get(p, 1 << 40) for p in range(16)])[t.prim]
             hi = np.array([hi_p.get(p, -1) for p in range(16)])[t.prim]
             rows = np.flatnonzero(in_m & t.free & (t.idx % 2 == 0) & (t.idx >= lo) & (t.idx < hi))
-            vin = s.load_injected(t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys)
+            vin = s.load_injected(
+                t=t, month=m, r=r, rows=rows, order=order, sorted_keys=sorted_keys
+            )
             ok = np.isfinite(vin).all(axis=1)
             rows, vin = rows[ok], vin[ok]
             if len(rows) == 0:
@@ -357,15 +400,31 @@ def score_bank(*, inp, lower, upper) -> tuple[pl.DataFrame, list[dict]]:
             v_clean, m_q = t.arms["V"][rows], t.arms["M"][rows]
             lw, up = lower[rows], upper[rows]
             wide_rows = wide_inj[t.prim[rows], t.origin_day[rows]]
-            q_inj = systems(v=vin, m=m_q, wide=wide_rows, lower=lw, upper=up, wf=month_factor(month_col=t.month[rows]))
-            q_twin = systems(v=v_clean, m=m_q, wide=real_wide_all[rows], lower=lw, upper=up, wf=month_factor(month_col=t.month[rows]))
+            q_inj = systems(
+                v=vin,
+                m=m_q,
+                wide=wide_rows,
+                lower=lw,
+                upper=up,
+                wf=month_factor(month_col=t.month[rows]),
+            )
+            q_twin = systems(
+                v=v_clean,
+                m=m_q,
+                wide=real_wide_all[rows],
+                lower=lw,
+                upper=up,
+                wf=month_factor(month_col=t.month[rows]),
+            )
             st = {n: row_stats(y=y, q=q) for n, q in q_inj.items()}
             lead = t.lead[rows]
             for e in ev.iter_rows(named=True):
                 p, sgn, depth = e["primary"], float(e["sign"]), float(e["depth"])
                 cap = float(t.capacity[p])
                 is_six = t.group[p] == "signed-MW six"
-                evf = pl.DataFrame([{**e, "length_days": float(e["length_days"]), "first_day": int(days_m.min())}])
+                evf = pl.DataFrame(
+                    [{**e, "length_days": float(e["length_days"]), "first_day": int(days_m.min())}]
+                )
                 trig_rows.extend(
                     k592.trigger_rows(
                         ev=evf, states={"G4": states["G4"]}, source=f"bank {m} r{r}",
@@ -387,7 +446,9 @@ def score_bank(*, inp, lower, upper) -> tuple[pl.DataFrame, list[dict]]:
                         for n in SYSTEMS:
                             if not has_tail(name=n, month=m):
                                 continue
-                            wide_sel = wide_rows[sel] if n.startswith("K1") else np.zeros(len(sel), bool)
+                            wide_sel = (
+                                wide_rows[sel] if n.startswith("K1") else np.zeros(len(sel), bool)
+                            )
                             rows_out.append(
                                 {**base, "band": BANDS[band], "system": n, "n_rows": len(sel),
                                  "share_origin_days_wide": float(wide_sel.mean()),
@@ -395,12 +456,19 @@ def score_bank(*, inp, lower, upper) -> tuple[pl.DataFrame, list[dict]]:
                                  **follow(q=q_inj[n][sel], twin=q_twin[n][sel], sgn=sgn, depth=depth)}
                             )  # fmt: skip
                     if is_six:
-                        sel = np.flatnonzero(in_win & (lead >= k601.LEAD_COST[0]) & (lead < k601.LEAD_COST[1]))
+                        sel = np.flatnonzero(
+                            in_win & (lead >= k601.LEAD_COST[0]) & (lead < k601.LEAD_COST[1])
+                        )
                         if len(sel) >= 30:
                             for n in SYSTEMS:
                                 if not has_tail(name=n, month=m):
                                     continue
-                                rec = {**base, "band": "cost 12-36 h", "system": n, "n_rows": len(sel)}
+                                rec = {
+                                    **base,
+                                    "band": "cost 12-36 h",
+                                    "system": n,
+                                    "n_rows": len(sel),
+                                }
                                 for f in k601.FRACTIONS:
                                     rec[f"cost_{f}"] = float(
                                         k601.avoidable_cost(u=q_inj[n][sel][:, c.IQ[0.95]] * cap, y=y[sel] * cap,
@@ -425,18 +493,21 @@ def summarise_bank(*, tab: pl.DataFrame) -> pl.DataFrame:
                          ("both groups", pl.lit(True))):  # fmt: skip
         for cname, cexpr in classes.items():
             sub0 = tab.filter(gexpr & cexpr)
-            for mset, sub in (("all", sub0), ("tail months", sub0.filter(pl.col("month") != MONTHS[0]))):
-              for (phase, band, system), grp in sub.group_by("phase", "band", "system"):
-                if mset == "all" and system.endswith("+t"):
-                    continue
-                rec = {"month_set": mset, "group": gname, "length_class": cname, "phase": phase, "band": band,
-                       "system": system, "n_events": grp.height}  # fmt: skip
-                for mname in metrics:
-                    if mname not in grp.columns or grp[mname].null_count() == grp.height:
+            for mset, sub in (
+                ("all", sub0),
+                ("tail months", sub0.filter(pl.col("month") != MONTHS[0])),
+            ):
+                for (phase, band, system), grp in sub.group_by("phase", "band", "system"):
+                    if mset == "all" and system.endswith("+t"):
                         continue
-                    mean, lo, hi = sc._boot_mean(vals=grp[mname].drop_nulls().to_numpy())
-                    rec[mname], rec[f"{mname}_lo"], rec[f"{mname}_hi"] = mean, lo, hi
-                out.append(rec)
+                    rec = {"month_set": mset, "group": gname, "length_class": cname, "phase": phase, "band": band,
+                       "system": system, "n_events": grp.height}  # fmt: skip
+                    for mname in metrics:
+                        if mname not in grp.columns or grp[mname].null_count() == grp.height:
+                            continue
+                        mean, lo, hi = sc._boot_mean(vals=grp[mname].drop_nulls().to_numpy())
+                        rec[mname], rec[f"{mname}_lo"], rec[f"{mname}_hi"] = mean, lo, hi
+                    out.append(rec)
     return pl.DataFrame(out, infer_schema_length=None)
 
 

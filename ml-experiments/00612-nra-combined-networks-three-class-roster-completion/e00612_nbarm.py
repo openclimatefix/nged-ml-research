@@ -1,4 +1,4 @@
-# ruff: noqa: D107, ANN001, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205, E501, PLR0915
+# ruff: noqa: D107, ANN001, ANN201, E402, PT018, B023, F821, ANN202, D102, D103, D205, E501, PLR0915, ANN003
 """Experiment 612 (copy of 610): fit and inject the neighbour-summary arms (GPU).
 
 A wrapper around experiment 574's `e00574_fit.py`, as experiment 598's `e00598_arm.py` and experiment
@@ -150,7 +150,11 @@ if MINE.e3 and CMD in {"fit", "inject"}:
         age_days = (e.c.us(t=cutoff) - rows.valid_us[refit.index]) / e.c.DAY_US
         window = (age_days >= E3_EMBARGO_DAYS) & (age_days < E3_EMBARGO_DAYS + DOWN_WEIGHT_DAYS)
         weight = np.where(window, refit.weight * DOWN_WEIGHT, refit.weight).astype(np.float32)
-        report = {**refit.report, "downweighted_rows": int(window.sum()), "embargo_days": E3_EMBARGO_DAYS}
+        report = {
+            **refit.report,
+            "downweighted_rows": int(window.sum()),
+            "embargo_days": E3_EMBARGO_DAYS,
+        }
         return e.c.Refit(refit.index, refit.y, weight, refit.is_val, report)
 
     e.c.select_rows = _select_rows_e3

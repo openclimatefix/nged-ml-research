@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, DTZ001
+# ruff: noqa: E501, D103, ANN001, DTZ001, B007, PLR0915
 """Experiment 612 figures (CPU). Run the scoring, `e00612_summary.py` and `e00612_tails.py` first.
 
 `python e00612_figures.py summary` draws the leave-one-out chart and the tail-constant chart.
@@ -40,22 +40,45 @@ def save(chart, name: str) -> None:
     chart.save(str(DOCS / name))
 
 
-def interval_chart(*, d: pl.DataFrame, title: str, width: int = 240, stack: bool = False) -> alt.Chart:
+def interval_chart(
+    *, d: pl.DataFrame, title: str, width: int = 240, stack: bool = False
+) -> alt.Chart:
     """One dot-and-interval panel per measure (columns `row`, `measure`, `diff`, `lo`, `hi`), zero line dashed."""
     panels = []
     for j, m in enumerate(d["measure"].unique(maintain_order=True).to_list()):
         dm = d.filter(pl.col("measure") == m)
         order = dm["row"].to_list()
-        base = alt.Chart(dm).encode(y=alt.Y("row:N", sort=order, title=None, axis=alt.Axis(labelLimit=260)))
-        zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3], color=theme.BRAND_ORANGE).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        base = alt.Chart(dm).encode(
+            y=alt.Y(
+                "row:N", sort=order, title=None, axis=alt.Axis(labelLimit=420, labelFontSize=11)
+            )
+        )
+        zero = (
+            alt.Chart(pl.DataFrame({"x": [0.0]}))
+            .mark_rule(strokeDash=[4, 3], color=theme.BRAND_ORANGE)
+            .encode(x="x:Q")
+        )  # ty: ignore[unresolved-attribute]
         bars = base.mark_rule(color=theme.DATA_BLUE).encode(x="lo:Q", x2="hi:Q")  # ty: ignore[unresolved-attribute]
         lo_x, hi_x = min(0.0, float(dm["lo"].min())), max(0.0, float(dm["hi"].max()))
         pad = 0.08 * (hi_x - lo_x)
         pts = base.mark_point(filled=True, size=60, color=theme.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("diff:Q", title=m, scale=alt.Scale(domain=[lo_x - pad, hi_x + pad], nice=False))
+            x=alt.X(
+                "diff:Q",
+                title=m,
+                axis=alt.Axis(tickCount=4),
+                scale=alt.Scale(domain=[lo_x - pad, hi_x + pad], nice=False),
+            )
         )
-        panels.append(alt.layer(zero, bars, pts).properties(width=width, height=max(120, 36 * len(order)), title=m))
-    return (alt.vconcat(*panels) if stack else alt.hconcat(*panels)).resolve_scale(x="independent").properties(title=title)
+        panels.append(
+            alt.layer(zero, bars, pts).properties(
+                width=width, height=max(280, 40 * len(order)), title=m
+            )
+        )
+    return (
+        (alt.vconcat(*panels) if stack else alt.hconcat(*panels))
+        .resolve_scale(x="independent")
+        .properties(title=title)
+    )
 
 
 def summary() -> None:
@@ -63,13 +86,28 @@ def summary() -> None:
     t1 = pl.read_csv(out / "t1_levels.csv", infer_schema_length=None).filter(
         (pl.col("band") == "24-120 h") & pl.col("free_cover90").is_not_null()
     )
-    nets = ["K1 (D5)", "K2 (D5)", "K3 (D5)", "K1 (O2)", "K3 (O2)", "Class 2 (gate band width)", "Class 2 (own band width)"]
+    nets = [
+        "K1 (D5)",
+        "K3 (D5)",
+        "K1 (O2)",
+        "K3 (O2)",
+        "Class 2 (gate band width)",
+        "Class 2 (own band width)",
+    ]
     t1 = t1.filter(pl.col("network").is_in(nets)).with_columns(
-        group=pl.col("group").replace({"signed-MW six": "Six MW Primaries", "MVA-only eight": "Eight MVA Primaries"}),
-        tails=pl.when(pl.col("tail_constants")).then(pl.lit("with tail constants")).otherwise(pl.lit("without")),
+        group=pl.col("group").replace(
+            {"signed-MW six": "Six MW Primaries", "MVA-only eight": "Eight MVA Primaries"}
+        ),
+        tails=pl.when(pl.col("tail_constants"))
+        .then(pl.lit("with tail constants"))
+        .otherwise(pl.lit("without")),
     )
-    target = alt.Chart(pl.DataFrame({"x": [0.9]})).mark_rule(strokeDash=[4, 3], color="#6b6b6b").encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("x:Q", scale=alt.Scale(domain=[0.78, 0.94]))
+    target = (
+        alt.Chart(pl.DataFrame({"x": [0.9]}))
+        .mark_rule(strokeDash=[4, 3], color="#6b6b6b")
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=alt.Scale(domain=[0.78, 0.94]))
+        )
     )
     panels = []
     for k, group in enumerate(["Eight MVA Primaries", "Six MW Primaries"]):
@@ -77,35 +115,95 @@ def summary() -> None:
             alt.Chart(t1.filter(pl.col("group") == group))  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=90)
             .encode(
-                y=alt.Y("network:N", sort=nets, title=None, axis=alt.Axis(labelLimit=260) if k == 0 else None),
-                x=alt.X("free_cover90:Q", title="Share of event-free rows inside q05-q95", scale=alt.Scale(domain=[0.78, 0.94])),
-                color=alt.Color("tails:N", scale=alt.Scale(domain=["without", "with tail constants"], range=[theme.DATA_BLUE, theme.BRAND_ORANGE]),
-                                legend=alt.Legend(title="Tail constants (dashed: 0.90 target)", orient="bottom") if k == 0 else None),
+                y=alt.Y(
+                    "network:N",
+                    sort=nets,
+                    title=None,
+                    axis=alt.Axis(labelLimit=260) if k == 0 else None,
+                ),
+                x=alt.X(
+                    "free_cover90:Q",
+                    title="Share of event-free rows inside the 90% band (5th to 95th percentile)",
+                    scale=alt.Scale(domain=[0.78, 0.94]),
+                ),
+                color=alt.Color(
+                    "tails:N",
+                    scale=alt.Scale(
+                        domain=["without", "with tail constants"], range=["#6b6b6b", theme.DATA_SKY]
+                    ),
+                    legend=alt.Legend(
+                        title="Tail constants (dashed line: 0.90 target)",
+                        titleLimit=500,
+                        orient="bottom",
+                    )
+                    if k == 0
+                    else None,
+                ),
             )
         )
-        panels.append(alt.layer(target, dots).properties(width=260, height=240, title=group))
-    save(alt.hconcat(*panels), "event_free_coverage.svg")
+        panels.append(alt.layer(target, dots).properties(width=260, height=300, title=group))
+    save(
+        alt.hconcat(*panels).properties(title="Event-free coverage of the 90% band, 24-120 h"),
+        "event_free_coverage.svg",
+    )
 
     t2 = pl.read_csv(out / "t2_o2_vs_d5.csv", infer_schema_length=None).filter(
         pl.col("contrast").str.contains("cover90") & pl.col("contrast").str.contains("24-120 h")
     )
     t2 = t2.with_columns(
-        row=pl.col("contrast").str.extract(r"^(K\d)", 1) + pl.when(pl.col("contrast").str.contains("injected")).then(pl.lit(", injected, ") + pl.col("contrast").str.extract(r"(days4-end|after0-7)", 1).replace({"days4-end": "day 4 to end", "after0-7": "0-7 days after"})).otherwise(pl.lit(", event-free ") + pl.when(pl.col("contrast").str.contains("eight")).then(pl.lit("eight MVA")).otherwise(pl.lit("six MW"))),
-        measure=pl.lit("Coverage of q05-q95, O2 minus D5, 24-120 h"),
+        row=pl.col("contrast").str.extract(r"^(K\d)", 1)
+        + pl.when(pl.col("contrast").str.contains("injected"))
+        .then(
+            pl.lit(", injected load-shifts, ")
+            + pl.col("contrast")
+            .str.extract(r"(days4-end|after0-7)", 1)
+            .replace({"days4-end": "day 4 to end", "after0-7": "0-7 days after"})
+        )
+        .otherwise(
+            pl.lit(", event-free ")
+            + pl.when(pl.col("contrast").str.contains("eight"))
+            .then(pl.lit("eight MVA"))
+            .otherwise(pl.lit("six MW"))
+        ),
+        measure=pl.lit("Coverage of the 90% band, O2 minus D5, 24-120 h"),
     )
-    save(interval_chart(d=t2, title="O2 minus D5, tail constants on both"), "o2_vs_d5.svg")
+    save(
+        interval_chart(
+            d=t2, title="O2 offset minus D5 offset, tail-constant widening applied to both"
+        ),
+        "o2_vs_d5.svg",
+    )
 
     t4 = pl.read_csv(out / "t4_class2.csv", infer_schema_length=None).filter(
-        (pl.col("measure").str.contains("24-120 h")) & ~pl.col("measure").str.contains("after0-7|follow")
+        (pl.col("measure").str.contains("24-120 h"))
+        & ~pl.col("measure").str.contains("after0-7|follow")
     )
-    grp = pl.when(pl.col("measure").str.contains("eight")).then(pl.lit("eight MVA")).when(pl.col("measure").str.contains("six")).then(pl.lit("six MW")).otherwise(pl.lit("injected, days 4 to end"))
+    grp = (
+        pl.when(pl.col("measure").str.contains("eight"))
+        .then(pl.lit("eight MVA"))
+        .when(pl.col("measure").str.contains("six"))
+        .then(pl.lit("six MW"))
+        .otherwise(pl.lit("injected load-shifts, day 4 to end"))
+    )
     t4 = t4.with_columns(
         row=pl.lit("minus ") + pl.col("candidate_minus") + pl.lit(", ") + grp,
-        measure=pl.when(pl.col("measure").str.contains("injected")).then(pl.lit("Injected coverage, class 2 minus network"))
-        .when(pl.col("measure").str.contains("cover90")).then(pl.lit("Event-free coverage, class 2 minus network"))
-        .otherwise(pl.lit("Event-free CRPS, class 2 minus network")),
+        measure=pl.when(pl.col("measure").str.contains("injected"))
+        .then(pl.lit("Coverage of the 90% band on injected load-shifts, class 2 minus network"))
+        .when(pl.col("measure").str.contains("cover90"))
+        .then(pl.lit("Event-free coverage of the 90% band, class 2 minus network"))
+        .otherwise(
+            pl.lit(
+                "Event-free continuous ranked probability score (share of capacity), class 2 minus network"
+            )
+        ),
     )
-    save(interval_chart(d=t4, title="Class 2 candidate at the gate's band width, 24-120 h, five months", width=420, stack=True), "class2_vs_k1_k2.svg")
+    crps = t4["measure"].str.contains("continuous")
+    for part, name in (
+        (t4.filter(~crps), "class2_vs_k1_k2.svg"),
+        (t4.filter(crps), "class2_crps_vs_k1_k2.svg"),
+    ):
+        title = "Class 2 candidate at the gate's band width, 24-120 h, five months"
+        save(interval_chart(d=part, title=title, width=420, stack=True), name)
 
 
 def aligned(*, root_arm: str, tag: str, t) -> np.ndarray:
@@ -142,7 +240,9 @@ def situations() -> None:
     k584.ARMS["k1_d5"] = {"fits": work / "fits", "fit_tag": "P5", "inject": work / "inject"}
     twin_root = ROOT / "arms" / "k3_d5" / "work"
     orig = g.a._load
-    g.a._load = lambda *, root, tag, months: orig(root=twin_root if tag == "D5" else root, tag=tag, months=months)
+    g.a._load = lambda *, root, tag, months: orig(
+        root=twin_root if tag == "D5" else root, tag=tag, months=months
+    )
     k597.WORK = ROOT / "score" / "figures_tmp"
     inp = k597.Inputs(arm="k1_d5")
     t = inp.t
@@ -160,7 +260,9 @@ def situations() -> None:
         q3, q4 = q3_all[rows], q4_all[rows]
         x = [when(i) for i in t.idx[rows]]
         label = t.label[p]
-        ydom = cp.common_ydom([(q1, o), (v, o), (np.nan_to_num(q3), o), (np.nan_to_num(q4), o)], iq=IQ)
+        ydom = cp.common_ydom(
+            [(q1, o), (v, o), (np.nan_to_num(q3), o), (np.nan_to_num(q4), o)], iq=IQ
+        )
         common = {"x": x, "iq": IQ, "obs": o, "ydom": ydom, "xtype": "T", "xdom": (when(lo), when(hi)),
                   "span": None if event is None else (when(event[0]), when(event[1])), "rules": list(rules)}  # fmt: skip
         strip = None
@@ -169,17 +271,34 @@ def situations() -> None:
                      for rr in f597.strips_for(t=t, rows=rows, wide=inp.mode, prim=p, onset=event[0])]  # fmt: skip
         else:
             on = inp.mode[t.prim[rows], t.origin_day[rows]]
-            strip = [{"x0": x[i], "x1": x[min(i + 1, len(x) - 1)]} for i in np.flatnonzero(on)] if on.any() else None
-        key_a = [*cp.FORECAST_ENTRIES, cp.OBS, *([cp.SHADE] if event else []), *([cp.GATE] if strip else []), *([cp.RULES] if rules else [])]
-        key_b = [*cp.FORECAST_ENTRIES, cp.OBS, *([cp.SHADE] if event else []), *([cp.RULES] if rules else [])]
+            strip = (
+                [{"x0": x[i], "x1": x[min(i + 1, len(x) - 1)]} for i in np.flatnonzero(on)]
+                if on.any()
+                else None
+            )
+        key_a = [
+            *cp.FORECAST_ENTRIES,
+            cp.OBS,
+            *([cp.SHADE] if event else []),
+            *([cp.GATE] if strip else []),
+            *([cp.RULES] if rules else []),
+        ]
+        key_b = [
+            *cp.FORECAST_ENTRIES,
+            cp.OBS,
+            *([cp.SHADE] if event else []),
+            *([cp.RULES] if rules else []),
+        ]
         save(cp.figure(units=[cp.arm_panel(q=q1, title=f"{label}: K1 (lag network with the G4 gated band)", strip=strip, **common),
                               cp.arm_panel(q=v, title=f"{label}: K2 (same fits, no gate)", xtitle="Date (UTC)", strip=None, **common)],
-                       title=f"{label}: {title}", key=key_a), f"{name}_{label}_k1_k2.svg")  # fmt: skip
+                       title=f"Primary {label}: {title}", key=key_a), f"{name}_{label}_k1_k2.svg")  # fmt: skip
         save(cp.figure(units=[cp.arm_panel(q=q3, title=f"{label}: K3 (lag-free)", strip=None, **common),
                               cp.arm_panel(q=q4, title=f"{label}: class 2 candidate (neighbour summaries, signal dropout)", xtitle="Date (UTC)", strip=None, **common)],
-                       title=f"{label}: {title}", key=key_b), f"{name}_{label}_k3_c2.svg")  # fmt: skip
+                       title=f"Primary {label}: {title}", key=key_b), f"{name}_{label}_k3_c2.svg")  # fmt: skip
 
-    ev = sc.attach_depth(ev=sc.merged_events(), t=t).filter(pl.col("name").str.contains("2025-12-29"))
+    ev = sc.attach_depth(ev=sc.merged_events(), t=t).filter(
+        pl.col("name").str.contains("2025-12-29")
+    )
     for r in ev.sort("name").iter_rows(named=True):
         draw(name="event", p=r["primary"], lo=r["onset_idx"] - 14 * 48, hi=r["end_idx"] + 14 * 48,
              title="day-ahead forecasts through the December 2025 load-shift", event=(r["onset_idx"], r["end_idx"]), rules=SWITCH_TIMES)  # fmt: skip
@@ -200,14 +319,47 @@ def situations() -> None:
         return best * 48
 
     p = eight[0]
-    lo = pick(p=p, month="2026-03", days=7, score=lambda w: float(np.nanmean(np.abs(t.arms["V"][w][:, IQ[0.5]] - t.obs[w]))))
-    draw(name="quiet_week", p=p, lo=lo, hi=lo + 7 * 48, title="a quiet week (event-free, 7 days with the smallest mean median-forecast error in March 2026)")
-    hour = lambda w: ((t.idx[w] % 48) / 2.0)  # noqa: E731
-    lo = pick(p=p, month="2026-01", days=3, score=lambda w: -float(np.nanmean(t.obs[w][hour(w) < 7])))
-    draw(name="cold_night", p=p, lo=lo, hi=lo + 3 * 48, title="three days around the highest overnight demand in January 2026 (a proxy for a cold winter night)")
+    lo = pick(
+        p=p,
+        month="2026-03",
+        days=7,
+        score=lambda w: float(np.nanmean(np.abs(t.arms["V"][w][:, IQ[0.5]] - t.obs[w]))),
+    )
+    draw(
+        name="quiet_week",
+        p=p,
+        lo=lo,
+        hi=lo + 7 * 48,
+        title="a quiet week (event-free, 7 days with the smallest mean median-forecast error in March 2026)",
+    )
+    hour = lambda w: (t.idx[w] % 48) / 2.0  # noqa: E731
+    lo = pick(
+        p=p, month="2026-01", days=3, score=lambda w: -float(np.nanmean(t.obs[w][hour(w) < 7]))
+    )
+    draw(
+        name="cold_night",
+        p=p,
+        lo=lo,
+        hi=lo + 3 * 48,
+        title="three days around the highest overnight demand in January 2026 (a proxy for a cold winter night)",
+    )
     p6 = six[0]
-    lo = pick(p=p6, month="2026-06", days=3, score=lambda w: float(np.nanmean(t.obs[w][(hour(w) >= 11) & (hour(w) < 14)]) - np.nanmean(t.obs[w][hour(w) < 5])))
-    draw(name="sunny_day", p=p6, lo=lo, hi=lo + 3 * 48, title="three days around the deepest midday dip in June 2026 (a proxy for a very sunny day)")
+    lo = pick(
+        p=p6,
+        month="2026-06",
+        days=3,
+        score=lambda w: float(
+            np.nanmean(t.obs[w][(hour(w) >= 11) & (hour(w) < 14)])
+            - np.nanmean(t.obs[w][hour(w) < 5])
+        ),
+    )
+    draw(
+        name="sunny_day",
+        p=p6,
+        lo=lo,
+        hi=lo + 3 * 48,
+        title="three days around the deepest midday dip in June 2026 (a proxy for a very sunny day)",
+    )
 
 
 if __name__ == "__main__":

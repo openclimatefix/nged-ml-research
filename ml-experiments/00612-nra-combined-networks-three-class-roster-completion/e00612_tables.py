@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, PLR0915, C901
+# ruff: noqa: D103, E501, PLR0912, PERF401
 """Experiment 612: the result tables, from the score folders written by `e00612_score.py` (CPU).
 
 Every contrast is a paired difference of two systems on the same cells, with a Bonferroni-adjusted
@@ -33,7 +33,9 @@ def load(*, arm: str, name: str) -> pl.DataFrame | None:
     return pl.read_csv(f, infer_schema_length=None) if f.exists() else None
 
 
-def ci(*, diffs: np.ndarray, weights: np.ndarray | None = None, alpha: float) -> tuple[float, float, float]:
+def ci(
+    *, diffs: np.ndarray, weights: np.ndarray | None = None, alpha: float
+) -> tuple[float, float, float]:
     """Return the (weighted) mean difference and its percentile bootstrap interval at level 1 - alpha."""
     d = np.asarray(diffs, float)
     w = np.ones(len(d)) if weights is None else np.asarray(weights, float)
@@ -65,19 +67,44 @@ def verdict(*, lo: float, hi: float, tol: float, higher_is_better: bool) -> str:
 # ---------------------------------------------------------------- bank contrasts
 
 
-def bank_cells(*, arm: str, system: str, band: str, phase: str, months: list[str] | None = None) -> pl.DataFrame | None:
+def bank_cells(
+    *, arm: str, system: str, band: str, phase: str, months: list[str] | None = None
+) -> pl.DataFrame | None:
     t = load(arm=arm, name="bank_event_phase.csv")
     if t is None:
         return None
     t = t.filter(
-        (pl.col("system") == system) & (pl.col("band") == band) & (pl.col("phase") == phase) & (pl.col("length_days") >= 15)
+        (pl.col("system") == system)
+        & (pl.col("band") == band)
+        & (pl.col("phase") == phase)
+        & (pl.col("length_days") >= 15)
     )
     if months:
         t = t.filter(pl.col("month").is_in(months))
-    return t.select("month", "pass", "primary", "length_days", "depth", "sign", "cover90", "follow_q50", "width90", "crps")
+    return t.select(
+        "month",
+        "pass",
+        "primary",
+        "length_days",
+        "depth",
+        "sign",
+        "cover90",
+        "follow_q50",
+        "width90",
+        "crps",
+    )
 
 
-def bank_contrast(*, a: tuple[str, str], b: tuple[str, str], band: str, phase: str, metric: str, alpha: float, months: list[str] | None = None) -> dict | None:
+def bank_contrast(
+    *,
+    a: tuple[str, str],
+    b: tuple[str, str],
+    band: str,
+    phase: str,
+    metric: str,
+    alpha: float,
+    months: list[str] | None = None,
+) -> dict | None:
     """Return mean of (arm a, system a) minus (arm b, system b) over matched injected events."""
     ca = bank_cells(arm=a[0], system=a[1], band=band, phase=phase, months=months)
     cb = bank_cells(arm=b[0], system=b[1], band=band, phase=phase, months=months)
@@ -94,17 +121,30 @@ def bank_contrast(*, a: tuple[str, str], b: tuple[str, str], band: str, phase: s
 # ---------------------------------------------------------------- event-free contrasts
 
 
-def cell_frame(*, arm: str, system: str, band: str, group: str, months: list[str] | None = None) -> pl.DataFrame | None:
+def cell_frame(
+    *, arm: str, system: str, band: str, group: str, months: list[str] | None = None
+) -> pl.DataFrame | None:
     t = load(arm=arm, name="event_free_cells.csv")
     if t is None:
         return None
-    t = t.filter((pl.col("system") == system) & (pl.col("band") == band) & (pl.col("group") == group))
+    t = t.filter(
+        (pl.col("system") == system) & (pl.col("band") == band) & (pl.col("group") == group)
+    )
     if months:
         t = t.filter(pl.col("month").is_in(months))
     return t
 
 
-def free_contrast(*, a: tuple[str, str], b: tuple[str, str], band: str, group: str, metric: str, alpha: float, months: list[str] | None = None) -> dict | None:
+def free_contrast(
+    *,
+    a: tuple[str, str],
+    b: tuple[str, str],
+    band: str,
+    group: str,
+    metric: str,
+    alpha: float,
+    months: list[str] | None = None,
+) -> dict | None:
     ca = cell_frame(arm=a[0], system=a[1], band=band, group=group, months=months)
     cb = cell_frame(arm=b[0], system=b[1], band=band, group=group, months=months)
     if ca is None or cb is None:
@@ -112,14 +152,18 @@ def free_contrast(*, a: tuple[str, str], b: tuple[str, str], band: str, group: s
     j = ca.join(cb, on=["prim", "month"], suffix="_b")
     if j.height < 5:
         return None
-    mean, lo, hi = ci(diffs=(j[metric] - j[f"{metric}_b"]).to_numpy(), weights=j["n_rows"].to_numpy(), alpha=alpha)
+    mean, lo, hi = ci(
+        diffs=(j[metric] - j[f"{metric}_b"]).to_numpy(), weights=j["n_rows"].to_numpy(), alpha=alpha
+    )
     w = j["n_rows"].to_numpy().astype(float)
     return {"n_cells": j.height, "diff": mean, "lo": lo, "hi": hi, "mde": (hi - lo) / 2,
             "level_a": float((j[metric].to_numpy() * w).sum() / w.sum()),
             "level_b": float((j[f"{metric}_b"].to_numpy() * w).sum() / w.sum())}  # fmt: skip
 
 
-def free_level(*, arm: str, system: str, band: str, group: str, metric: str, months: list[str] | None = None) -> float | None:
+def free_level(
+    *, arm: str, system: str, band: str, group: str, metric: str, months: list[str] | None = None
+) -> float | None:
     c = cell_frame(arm=arm, system=system, band=band, group=group, months=months)
     if c is None or c.height == 0:
         return None
@@ -158,7 +202,14 @@ def main() -> None:
                 for group in GROUPS:
                     rec = {"network": name, "tail_constants": tails, "band": band, "group": group}
                     for metric in ("cover90", "below_q05", "above_q95", "crps", "width90"):
-                        rec[f"free_{metric}"] = free_level(arm=arm, system=system, band=band, group=group, metric=metric, months=tail_months)
+                        rec[f"free_{metric}"] = free_level(
+                            arm=arm,
+                            system=system,
+                            band=band,
+                            group=group,
+                            metric=metric,
+                            months=tail_months,
+                        )
                     rows.append(rec)
                 bank = load(arm=arm, name="bank_summary.csv")
                 if bank is not None:
@@ -182,7 +233,10 @@ def main() -> None:
 
     families = []
     for net in ("K1", "K2", "K3"):
-        arm_d, arm_o = {"K1": "k1_d5", "K2": "k1_d5", "K3": "k3_d5"}[net], {"K1": "k1_o2", "K2": "k1_o2", "K3": "k3_o2"}[net]
+        arm_d, arm_o = (
+            {"K1": "k1_d5", "K2": "k1_d5", "K3": "k3_d5"}[net],
+            {"K1": "k1_o2", "K2": "k1_o2", "K3": "k3_o2"}[net],
+        )
         system = "K1+t" if net == "K1" else "K2+t"
         families.append((net, (arm_o, system), (arm_d, system)))
     counted = []
@@ -194,19 +248,33 @@ def main() -> None:
                 counted.append(("free", net, a, b, band, group, "crps", TOL["crps"], False))
         if net != "K3":
             for phase in ("days4-end", "after0-7"):
-                counted.append(("bank", net, a, b, "24-120 h", phase, "cover90", TOL["cover"], True))
-            counted.append(("bank", net, a, b, "24-120 h", "days4-end", "follow_q50", TOL["follow"], False))
+                counted.append(
+                    ("bank", net, a, b, "24-120 h", phase, "cover90", TOL["cover"], True)
+                )
+            counted.append(
+                ("bank", net, a, b, "24-120 h", "days4-end", "follow_q50", TOL["follow"], False)
+            )
     n_counted = len(counted)
     alpha = 0.05 / n_counted
     print("counted tests for O2 against D5:", n_counted)
     for kind, net, a, b, band, x, metric, tol, hib in counted:
         if kind == "free":
-            rec = free_contrast(a=a, b=b, band=band, group=x, metric=metric, alpha=alpha, months=tail_months)
+            rec = free_contrast(
+                a=a, b=b, band=band, group=x, metric=metric, alpha=alpha, months=tail_months
+            )
             label = f"{net}: O2 minus D5, event-free {metric}, {band}, {'eight MVA' if x == EIGHT else 'six MW'}"
             add(label, rec, tol=tol, hib=hib, family="O2 vs D5")
         else:
-            rec = bank_contrast(a=a, b=b, band=band, phase=x, metric=metric, alpha=alpha, months=tail_months)
-            add(f"{net}: O2 minus D5, injected {metric}, {band}, {x}", rec, tol=tol, hib=hib, family="O2 vs D5")
+            rec = bank_contrast(
+                a=a, b=b, band=band, phase=x, metric=metric, alpha=alpha, months=tail_months
+            )
+            add(
+                f"{net}: O2 minus D5, injected {metric}, {band}, {x}",
+                rec,
+                tol=tol,
+                hib=hib,
+                family="O2 vs D5",
+            )
     c2 = pl.DataFrame(contr, infer_schema_length=None)
     c2 = c2.with_columns(pl.lit(n_counted).alias("n_counted"))
     c2.write_csv(TABLES / "t2_o2_vs_d5.csv")
@@ -226,24 +294,55 @@ def ablations() -> None:
         for band in ("24-120 h",):
             for phase in ("days4-end", "after0-7"):
                 for months, tag in ((["2025-10", "2025-12"], "plain K1 (both pair months)"),):
-                    rec = bank_contrast(a=(arm, "K1"), b=("k1_d5", "K1"), band=band, phase=phase, metric="cover90", alpha=alpha, months=months)
+                    rec = bank_contrast(
+                        a=(arm, "K1"),
+                        b=("k1_d5", "K1"),
+                        band=band,
+                        phase=phase,
+                        metric="cover90",
+                        alpha=alpha,
+                        months=months,
+                    )
                     if rec:
                         rows.append({"removed": label, "measure": f"injected cover90 {phase} {band}", "set": tag, **rec,
                                      "verdict": verdict(lo=rec["lo"], hi=rec["hi"], tol=TOL["cover"], higher_is_better=True)})  # fmt: skip
-            rec = bank_contrast(a=(arm, "K1"), b=("k1_d5", "K1"), band="24-120 h", phase="days4-end", metric="follow_q50", alpha=alpha, months=["2025-10", "2025-12"])
+            rec = bank_contrast(
+                a=(arm, "K1"),
+                b=("k1_d5", "K1"),
+                band="24-120 h",
+                phase="days4-end",
+                metric="follow_q50",
+                alpha=alpha,
+                months=["2025-10", "2025-12"],
+            )
             if rec:
                 rows.append({"removed": label, "measure": "injected follow_q50 days4-end", "set": "pair", **rec,
                              "verdict": verdict(lo=rec["lo"], hi=rec["hi"], tol=TOL["follow"], higher_is_better=False)})  # fmt: skip
             for group in GROUPS:
-                for metric, tol, hib in (("cover90", TOL["cover"], True), ("crps", TOL["crps"], False)):
-                    rec = free_contrast(a=(arm, "K2"), b=("k1_d5", "K2"), band=band, group=group, metric=metric, alpha=alpha, months=["2025-10", "2025-12"])
+                for metric, tol, hib in (
+                    ("cover90", TOL["cover"], True),
+                    ("crps", TOL["crps"], False),
+                ):
+                    rec = free_contrast(
+                        a=(arm, "K2"),
+                        b=("k1_d5", "K2"),
+                        band=band,
+                        group=group,
+                        metric=metric,
+                        alpha=alpha,
+                        months=["2025-10", "2025-12"],
+                    )
                     if rec:
                         rows.append({"removed": label, "measure": f"event-free {metric} {band} {'eight' if group == EIGHT else 'six'}", "set": "pair", **rec,
                                      "verdict": verdict(lo=rec["lo"], hi=rec["hi"], tol=tol, higher_is_better=hib)})  # fmt: skip
-    out = pl.DataFrame(rows, infer_schema_length=None).with_columns(pl.lit(n_counted).alias("n_counted"))
+    out = pl.DataFrame(rows, infer_schema_length=None).with_columns(
+        pl.lit(n_counted).alias("n_counted")
+    )
     out.write_csv(TABLES / "t3_ablations.csv")
     with pl.Config(tbl_rows=60, tbl_width_chars=200, fmt_str_lengths=60):
-        print(out.select("removed", "measure", "n_events", "n_cells", "diff", "lo", "hi", "verdict"))
+        print(
+            out.select("removed", "measure", "n_events", "n_cells", "diff", "lo", "hi", "verdict")
+        )
     _ = (pair, ref)
 
 
@@ -276,7 +375,20 @@ def class2() -> None:
     out = pl.DataFrame(rows, infer_schema_length=None)
     out.write_csv(TABLES / "t4_class2.csv")
     with pl.Config(tbl_rows=60, tbl_width_chars=200, fmt_str_lengths=60):
-        print(out.select("candidate_minus", "measure", "n_events", "n_cells", "level_a", "level_b", "diff", "lo", "hi", "verdict"))
+        print(
+            out.select(
+                "candidate_minus",
+                "measure",
+                "n_events",
+                "n_cells",
+                "level_a",
+                "level_b",
+                "diff",
+                "lo",
+                "hi",
+                "verdict",
+            )
+        )
 
 
 def measures() -> None:
@@ -294,7 +406,7 @@ def measures() -> None:
                 continue
             c = cost_level(arm=arm, system=sysname, months=months)
             for band in ("24-120 h", "120-240 h"):
-                for group in GROUPS:
+                for group in (*GROUPS, "D15 and D18"):
                     rows.append({"network": name, "tail_constants": tails, "band": band, "group": group,
                                  "crps": free_level(arm=arm, system=sysname, band=band, group=group, metric="crps", months=months),
                                  "cover90": free_level(arm=arm, system=sysname, band=band, group=group, metric="cover90", months=months),

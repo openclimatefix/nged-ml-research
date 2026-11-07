@@ -1,4 +1,4 @@
-# ruff: noqa: E402, D103, E501, ANN001, ANN201, ANN003
+# ruff: noqa: E402, D103, E501, ANN201, ANN003, PT018
 """Experiment 612: fit one network on event-carrying power and forecast, for the absorption measure (GPU).
 
 Usage: python e00612_absorb.py KIND [--cases ...] [--seeds ...] [--months-only M ...]
@@ -69,7 +69,7 @@ if KIND == "c2":
         arm.run_fit()
 else:
     import e00565_fit as e  # ty: ignore[unresolved-import]
-    import numpy as np  # noqa: F811
+    import numpy as np
 
     W565 = e.W
     e.pretrained_dir = lambda: W565 / "pretrained_D5" / e.SPEC.columns
@@ -85,7 +85,9 @@ else:
         keep = age_days >= E3_EMBARGO_DAYS
         window = (age_days >= E3_EMBARGO_DAYS) & (age_days < E3_EMBARGO_DAYS + DOWN_WEIGHT_DAYS)
         weight = np.where(window, refit.weight * DOWN_WEIGHT, refit.weight).astype(np.float32)
-        return e.c.Refit(refit.index[keep], refit.y[keep], weight[keep], refit.is_val[keep], refit.report)
+        return e.c.Refit(
+            refit.index[keep], refit.y[keep], weight[keep], refit.is_val[keep], refit.report
+        )
 
     e.c.select_rows = select_rows
 

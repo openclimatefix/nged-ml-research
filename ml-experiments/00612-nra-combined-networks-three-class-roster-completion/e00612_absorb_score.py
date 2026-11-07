@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: E501, D103, ANN201
 """Experiment 612: absorbed shares of the class 2 candidate and the lag-free K3, experiment 587's definitions (CPU).
 
 total = s * (q[E] - q[N]) / D and refit = s * (q[E_on_N] - q[N]) / D, by phase, as experiments 595 and
@@ -16,11 +16,13 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 KIND = sys.argv[1]
-OUT = ML_EXPERIMENTS_DATA_DIR / "00612-nra-combined-networks-three-class-roster-completion" / "absorb"
+OUT = (
+    ML_EXPERIMENTS_DATA_DIR / "00612-nra-combined-networks-three-class-roster-completion" / "absorb"
+)
 TAG = {"c2": "P5", "k3d5": "D5"}[KIND]
 
 
-def world_dir(*, arm: str, world: str, on: str | None = None):  # noqa: ARG001
+def world_dir(*, arm: str, world: str, on: str | None = None):
     return OUT / KIND / (world if on is None else f"{world}_on_{on}")
 
 
