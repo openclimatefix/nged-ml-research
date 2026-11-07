@@ -1,0 +1,6 @@
+started 2026-11-07T16:05:07Z
+finished 2026-11-07T16:06:54Z
+972ace14dcdc081964f54b8cbd076b2f1565ab129e0b235ba8bc7b3db9d0a57c  /home/jack/dev/nged-substation-forecast/data/ml-experiments/00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network/work/bsp/seed_preds/J_LG_B1/2026-07_s0.parquet
+f2241f903cf9bd6bbc6f4cc16a121c1390cff298d8465c191bcf821f76fd95e9  /home/jack/dev/nged-substation-forecast/data/ml-experiments/00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network/work/bsp/seed_preds/J_LG_B1/2026-07_s1.parquet
+3e803cfbd69f4068c4a1e98866957353f26a7c5472fb6d54d0ee77c2bd806b1b  /home/jack/dev/nged-substation-forecast/data/ml-experiments/00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network/work/gsp/seed_preds/J_LG_B1/2026-07_s0.parquet
+f9d9e4ece9469ceff082eb9c33799f7ea31fa499d27711ac256bab811acefe8e  /home/jack/dev/nged-substation-forecast/data/ml-experiments/00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network/work/gsp/seed_preds/J_LG_B1/2026-07_s1.parquet
