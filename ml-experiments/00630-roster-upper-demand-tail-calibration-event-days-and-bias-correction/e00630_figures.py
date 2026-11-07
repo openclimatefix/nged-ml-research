@@ -37,7 +37,7 @@ def dots(
     scale: alt.Scale,
     sort: list[str] | None = None,
     offset: str | None = None,
-    height: int = 150,
+    height: int = 200,
     domain: tuple[float, float] = (0, 30),
 ) -> alt.LayerChart:
     """Draw dots with 95% interval bars and a dashed nominal line."""
@@ -82,7 +82,7 @@ def fig_months() -> None:
         .otherwise(pl.lit("Event rows"))
     )
     scale = alt.Scale(
-        domain=["Event-free rows", "Event rows"], range=[theme.BRAND_ORANGE, theme.DATA_BLUE]
+        domain=["Event-free rows", "Event rows"], range=[theme.BRAND_ORANGE, "#FFB599"]
     )
     months = ["2025-10", "2025-12", "2026-01", "2026-03", "2026-06"]
     p90 = dots(
@@ -192,7 +192,7 @@ def fig_primaries() -> None:
     save(
         p,
         "figure_3_candidate_exceedance_by_primary.svg",
-        "Ten of the 16 Primaries have an event-free q90 exceedance above 10%",
+        "Nine of the 16 Primaries have an event-free q90 exceedance clearly above 10%",
         [
             "Share of event-free observed power above the Candidate's q90, by Primary, sorted by share. D15 and D18 are the two report-only",
             "Primaries with short histories. Dot: estimate. Bar: 95% day-resampling interval. Dashed line: 10%.",
@@ -222,9 +222,7 @@ def fig_correction() -> None:
                 }
             )
     d = pl.DataFrame(recs)
-    scale = alt.Scale(
-        domain=list(names.values()), range=["#1A1A1A", theme.DATA_BLUE, theme.BRAND_ORANGE]
-    )
+    scale = alt.Scale(domain=list(names.values()), range=[theme.BRAND_ORANGE] * 3)
     panels = []
     for lvl, title, nominal, dom in (
         ("a90", "Above q90 (%)", 10, (0, 20)),
@@ -234,7 +232,7 @@ def fig_correction() -> None:
             v=pl.col("v") * 100, lo=pl.col("lo") * 100, hi=pl.col("hi") * 100
         )
         base = alt.Chart(g.to_pandas())
-        col = alt.Color("arm:N", scale=scale, title=None, legend=alt.Legend(orient="top"))
+        col = alt.Color("arm:N", scale=scale, title=None, legend=None)
         x = alt.X("arm:N", sort=list(names.values()), title=None, axis=alt.Axis(labelAngle=0))
         panels.append(
             alt.layer(
@@ -246,7 +244,7 @@ def fig_correction() -> None:
                     color=col,
                 ),
                 base.mark_point(filled=True, size=60).encode(x=x, y="v:Q", color=col),  # ty: ignore[unresolved-attribute]
-            ).properties(width=W, height=150)
+            ).properties(width=W, height=200)
         )
     save(
         alt.vconcat(*panels),
@@ -291,7 +289,7 @@ def fig_example() -> None:
         med = b.mark_line(color=theme.BRAND_ORANGE).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
         obs = b.mark_line(color="#1A1A1A").encode(y="observed_power:Q")  # ty: ignore[unresolved-attribute]
         panels.append(
-            alt.layer(band90, band50, med, obs).properties(width=W, height=150, title=title)
+            alt.layer(band90, band50, med, obs).properties(width=W, height=200, title=title)
         )
     save(
         alt.vconcat(*panels),
