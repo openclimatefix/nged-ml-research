@@ -110,7 +110,8 @@ demand moves because the electricity network has been reconfigured, not because 
 demand forecast reads recent lagged power, so a load-shift leaks into the forecast. "Follow" is the
 share of a load-shift that the median forecast copies. A1 is the demand neural network of experiment
 591, with follow 0.119. P7 is the best arm of
-[experiment 606](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/result/):
+[experiment
+606](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours/result/):
 it gives A1's lag encoder summaries of the neighbouring Primaries' recent lags, and it cut follow to
 0.035. It also made the forecast worse on ordinary days, measured as CRPS (continuous ranked
 probability score, the quantile-forecast error) minus A1's, in percentage points of capacity: +0.021
@@ -120,7 +121,8 @@ seeds). None met the keep rule (follow at most 0.05, ordinary-day CRPS within th
 effect (MDE) of A1's at both groups of Primaries, and coverage at the gate's band width within 0.01
 of the
 gate's). **The closest arm, P7+D50, follows 0.040 and is within the minimum detectable effect at the
-eight MVA Primaries (+0.005, minimum detectable effect 0.024). At the six MW Primaries its extra
+eight MVA Primaries (+0.005, minimum detectable effect 0.024; the audit below shows that pass rests
+on two fold months that disagree). At the six MW Primaries its extra
 error is
 +0.059 against a minimum detectable effect of 0.044, so 0.015 percentage points of capacity
 remain.**
@@ -277,13 +279,34 @@ horizontal dashed line, so it passes the keep rule at this group.*
 - **Error of the mean forecast beside the quantile-score contrasts.** Not computed, for the same
   reason.
 - **Audit triggers.** Trigger 1 fired: the shuffled-neighbour placebo followed 0.056, 0.016 more
-  than P7+D50 against 0.02 predicted. Trigger 2 fired: most predictions were refuted, and the
-  placebo and D50 runs are the only tested explanations. Trigger 5 fired: P7+O3 gives less input
-  than P7 and its six-MW extra error (+0.039) is below P7's (+0.068). Triggers 3, 4, 6, and 7 were
-  not checked: the mean-forecast error was not computed, no leave-one-Primary-out run was made, no
-  sister experiment other than experiment 606 reports the same contrasts, and no later
-  experiment's design depends on this result yet. The audit of triggers 1, 2, and 5 is recorded in
-  the PR.
+  than P7+D50 against 0.02 predicted. Trigger 2 fired: most predictions were refuted. Trigger 5
+  fired: P7+O3 gives less input than P7 and its six-MW extra error (+0.039) is below P7's (+0.068).
+  Triggers 3, 4, 6, and 7 were not checked: the mean-forecast error was not computed, no
+  leave-one-Primary-out run was made, no sister experiment other than experiment 606 reports the
+  same contrasts, and no later experiment's design depends on this result yet.
+- **Audit findings (a fresh Sonnet agent re-derived follow and the event-free extra CRPS from the
+  stored forecasts, and every printed number reproduced).** The findings change how to read the
+  numbers, not the numbers themselves:
+    - **The minimum detectable effect is half the gap between the two fold months.** With two
+      fold months, the interval reduces to the two monthly differences. P7+D50's eight-MVA extra
+      error is +0.029 in 2025-10 and -0.019 in 2025-12, giving the minimum detectable effect of
+      0.024, so its eight-MVA pass of the keep rule comes from the two months disagreeing. The
+      placebo's two months agree (+0.033 each), and it fails. The "0.015 percentage points short" at
+      the six MW Primaries is the same kind of figure.
+    - **Seed noise is large.** At the eight MVA Primaries the extra error of P7 is +0.011 for seed 0
+      and +0.153 for seed 1 (P7+D50: +0.006 and +0.124). The printed values average two seeds, so
+      the differences of 0.01 to 0.02 between arms, including the refuted "lowers by 0.02"
+      predictions, are not distinguishable from seed noise.
+    - **The placebo is leaky and the own-signal columns stay on.** The shuffle is a fixed shift of 5
+      Primaries with the Primary itself removed, applied at training and test time, and 7 of 16
+      Primaries keep at least one true neighbour. No arm tests the own-signal columns alone, which
+      may explain the follow reduction.
+    - **O3's lower six-MW extra error is consistent across both seeds and both months** (-0.028
+      against
+      P7 in both seeds) and is concentrated at Primaries 6, 11, and 9. Its cause is untested, and O3
+      also changes the initialisation, so it is not a strict subset of P7.
+    - **No leave-one-Primary-out run was made.** The six-MW results are dominated by Primary 6 and
+      by December. The full audit is in the private data folder, in `briefs/e610_audit.md`.
 - **Caveats.** Two fold months, two seeds, an injected bank that mirrors the shift at one
   neighbour by construction, and one verified real pair. NGED's event labels are incomplete, so the
   ordinary-day rows may hold unlabelled events and the extra-error figures are lower bounds on
