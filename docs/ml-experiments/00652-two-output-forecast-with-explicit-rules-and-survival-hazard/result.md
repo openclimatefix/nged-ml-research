@@ -170,8 +170,8 @@ across strata, so that scaling cannot absorb stratum-specific widening. Unscaled
 beside every scaled figure. The dropped rows (no R0 residual history) are tabulated per stratum, and
 every arm is scored on the rows that all arms share.
 
-Every table and figure reports the loss by lead day, 1 to 9 (leads of 24 to 239 h). Real rows give the event-free veto and
-a descriptive row for the verified D5 and D16 pair.
+Every table and figure reports the loss by lead day, 1 to 9 (leads of 24 to 239 h). Real rows give
+the event-free veto and a descriptive row for the verified D5 and D16 pair.
 
 ## Arms
 
