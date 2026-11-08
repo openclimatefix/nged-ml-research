@@ -4,7 +4,8 @@
 1. Scaled and unscaled CRPS where a shift is in force at the origin, with month-block intervals.
 2. CRPS by lead day far from and near a shift's end.
 3. CRPS by lead day in the middle of a shift (scaled) and at event-free origins (unscaled).
-4. and 5. Survival reliability on training-family and held-out shifts.
+4. Survival reliability on training-family shifts.
+5. Survival reliability on held-out shifts.
 6. Two example 10-day forecasts from one origin, far from and near a shift's end.
 
 Usage: python e00652_figures.py

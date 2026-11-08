@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, D103, PLR0912, PLR0915
+# ruff: noqa: ANN001, D103, PLR0912, PLR0915
 """Experiment 652, step 1: fit R-haz and its placebo, one head per scored month (CPU).
 
 Arms: `Rhaz_<mixture>` (hazard head, rows weighted to the duration mixture) for the mixtures
@@ -41,7 +41,10 @@ def with_state(*, z: dict, month: str) -> dict:
 
 
 def extras(*, z: dict, idx: np.ndarray, kind: str, mixture: str) -> tuple[np.ndarray, ...]:
-    """Return (weight, label, in-force, Primary) of the selected rows; real rows have unit weight and no label."""
+    """Return (weight, label, in-force, Primary) of the selected rows.
+
+    Real rows have unit weight and no label.
+    """
     n = len(idx)
     if kind == "real":
         return (

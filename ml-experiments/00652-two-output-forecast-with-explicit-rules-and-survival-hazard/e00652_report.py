@@ -1,7 +1,8 @@
-# ruff: noqa: D103, E501
-"""Experiment 652, step 3: contrasts with month-block intervals, levels by lead day, tails, and reliability (CPU).
+# ruff: noqa: D103
+"""Experiment 652, step 3: contrasts, levels, tails, and reliability (CPU).
 
-Reads `score/agg.parquet` and `score/reliability.parquet`; writes `score/{levels,contrasts,tails,reliability}.csv`.
+Reads `score/agg.parquet` and `score/reliability.parquet`; writes
+`score/{levels,contrasts,tails,reliability}.csv`.
 A cell's value in a month is the mean over lead days 1 to 10 of the event-weighted mean (seeds
 averaged first). Intervals are percentile bootstraps over the 5 development months.
 

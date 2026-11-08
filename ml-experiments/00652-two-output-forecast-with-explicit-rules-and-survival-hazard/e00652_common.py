@@ -57,11 +57,13 @@ def row_state(*, z: dict, month: str) -> dict[str, np.ndarray]:
     """Return per-row shift state of a bank file `z`: onset, end, short class, in force, still on, stratum.
 
     `in_force` means the Primary's shift is on at the origin. `still_on` is the survival label (the
-    shift is still on at the valid time, defined only for in-force rows). `event_w` makes each event count equally (the mean row count of an event over the row count of this
-    event), so that a mixture is a mixture of events and not of rows. `stratum` is one of
-    `STRATA`, `censored` (shift clipped at the window edge, so its end is false), or `onset_ahead` for rows whose shift starts after the origin and before the valid
-    time (no forecast can see an onset), or `other` (an origin before the onset whose valid time is
-    also before it is `free`; an origin more than 7 days after the end is `free`).
+    shift is still on at the valid time, defined only for in-force rows). `event_w` makes each event
+    count equally (the mean row count of an event over the row count of this event), so that a
+    mixture is a mixture of events and not of rows. `stratum` is one of `STRATA`, `censored` (shift
+    clipped at the window edge, so its end is false), or `onset_ahead` for rows whose shift starts
+    after the origin and before the valid time (no forecast can see an onset), or `other` (an origin
+    before the onset whose valid time is also before it is `free`; an origin more than 7 days after
+    the end is `free`).
     """
     ev = events_table(month=month)
     onset = {
