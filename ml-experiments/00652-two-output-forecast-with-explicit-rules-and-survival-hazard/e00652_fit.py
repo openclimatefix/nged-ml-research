@@ -50,7 +50,9 @@ def extras(*, z: dict, idx: np.ndarray, kind: str, mixture: str) -> tuple[np.nda
             np.zeros(n, np.float32),
             z["prim"][idx].astype(np.int64),
         )
-    w = c652.class_weight(short=z["short"][idx], mixture=mixture).astype(np.float32)
+    w = (c652.class_weight(short=z["short"][idx], mixture=mixture) * z["event_w"][idx]).astype(
+        np.float32
+    )
     return (
         w,
         z["still_on"][idx].astype(np.float32),
@@ -62,6 +64,7 @@ def extras(*, z: dict, idx: np.ndarray, kind: str, mixture: str) -> tuple[np.nda
 def fit_one(job: tuple[str, str, int]) -> str:
     import e00647_fit as f647  # ty: ignore[unresolved-import]
     import e00647_head as h  # ty: ignore[unresolved-import]
+    import e00647_head as h647  # ty: ignore[unresolved-import]
     import e00652_head as h652  # ty: ignore[unresolved-import]
     import torch  # ty: ignore[unresolved-import]
 
@@ -142,11 +145,11 @@ def fit_one(job: tuple[str, str, int]) -> str:
         qq, p = head(x=x, q=q, age=age, lead_h=lead)
         wt = torch.from_numpy(w[ix])
         pin = (h.pinball(y=y, q=qq) * wt).sum() / wt.sum()
-        m = torch.from_numpy(inf[ix])
+        m = torch.from_numpy(inf[ix]) * (age >= h647.AGE_FLOOR_DAYS).to(torch.float32)
         bce = nn.functional.binary_cross_entropy(
             torch.clamp(p, 1e-4, 1 - 1e-4), torch.from_numpy(lab[ix]), reduction="none"
         )
-        bce = (bce * m * wt).sum() / torch.clamp((m * wt).sum(), min=1.0)
+        bce = (bce * m * wt).sum() / torch.clamp((m * wt).sum(), min=1e-6)
         return pin + LAMBDA * bce
 
     from torch import nn  # ty: ignore[unresolved-import]

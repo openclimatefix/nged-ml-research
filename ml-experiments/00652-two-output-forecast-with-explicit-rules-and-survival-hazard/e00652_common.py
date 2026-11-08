@@ -7,6 +7,7 @@ are reused. A bank row is one (Primary, origin, valid time) with a lead of 24 h 
 
 from typing import Final
 
+import e00650_bank as gen  # ty: ignore[unresolved-import]
 import e00650_common as c650  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
@@ -32,8 +33,22 @@ def events_table(*, month: str) -> pl.DataFrame:
     )
 
 
+def _unclipped_days(*, month_idx: int, r: int, primary: int, nb_of: dict, is_mw: np.ndarray) -> int:
+    """Return the generator's drawn duration in days, before the clip at the window edge."""
+    ev = gen.draw(
+        month_idx=month_idx,
+        r=r,
+        primary=primary,
+        nb_of=nb_of,
+        month_start_idx=month_idx,
+        window_end_idx=10**9,
+        is_mw=is_mw,
+    )
+    return (ev.end_idx - ev.onset_idx) // 48
+
+
 def class_weight(*, short: np.ndarray, mixture: str) -> np.ndarray:
-    """Return the per-event weight that turns the generator's duration mixture into `mixture`."""
+    """Return the per-event-class weight that turns the generator's duration mixture into `mixture`."""
     s = MIXTURES[mixture]
     return np.where(short, s / GENERATOR_SHORT_SHARE, (1 - s) / (1 - GENERATOR_SHORT_SHARE))
 
@@ -42,7 +57,8 @@ def row_state(*, z: dict, month: str) -> dict[str, np.ndarray]:
     """Return per-row shift state of a bank file `z`: onset, end, short class, in force, still on, stratum.
 
     `in_force` means the Primary's shift is on at the origin. `still_on` is the survival label (the
-    shift is still on at the valid time, defined only for in-force rows). `stratum` is one of
+    shift is still on at the valid time, defined only for in-force rows). `event_w` makes each event count equally (the mean row count of an event over the row count of this
+    event), so that a mixture is a mixture of events and not of rows. `stratum` is one of
     `STRATA`, `censored` (shift clipped at the window edge, so its end is false), or `onset_ahead` for rows whose shift starts after the origin and before the valid
     time (no forecast can see an onset), or `other` (an origin before the onset whose valid time is
     also before it is `free`; an origin more than 7 days after the end is `free`).
@@ -65,10 +81,19 @@ def row_state(*, z: dict, month: str) -> dict[str, np.ndarray]:
     stratum[in_force & (remaining_days <= 1.0)] = "near"
     stratum[(oi >= en) & (after_days <= POST_END_DAYS)] = "just_ended"
     stratum[(oi < on) & (vi >= on)] = "onset_ahead"
-    short = ((en - on) / 48.0) <= SHORT_MAX_DAYS
+    nb_of, _cap, is_mw = c650.world()
+    ms = c650.month_start_idx(month=month)
+    days = {
+        (r, p): _unclipped_days(month_idx=ms, r=r, primary=p, nb_of=nb_of, is_mw=is_mw)
+        for r, p in set(zip(pa.tolist(), pr.tolist(), strict=True))
+    }
+    short = np.array([days[(p, q)] <= SHORT_MAX_DAYS for p, q in zip(pa, pr, strict=True)])
+    key = pa * 100 + pr
+    _u, inv, cnt = np.unique(key, return_inverse=True, return_counts=True)
+    event_w = (cnt.mean() / cnt[inv]).astype(np.float32)
     censored = en >= c650.WINDOW_START_IDX
     stratum[in_force & censored] = "censored"
     return {
         "onset": on, "end": en, "short": short, "in_force": in_force,
-        "still_on": in_force & (vi < en), "stratum": stratum, "censored": censored,
+        "still_on": in_force & (vi < en), "stratum": stratum, "censored": censored, "event_w": event_w,
     }  # fmt: skip

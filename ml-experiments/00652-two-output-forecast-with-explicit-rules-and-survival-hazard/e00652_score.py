@@ -3,13 +3,15 @@
 
 Arms: `K1` (the NRA output, scored against the observed-plus-shift truth), `K1_nra` (K1 scored
 against the unshifted base, bank rows only), `R0-168`, `Bhaz` (K1 plus the same residual times
-S(age + lead) / S(age) for the best single survival curve fitted to the training durations),
+S(age + 1 + lead / 24) / S(age + 1) for the best single survival curve fitted to the training durations),
 `Rold` and `Rnew` (experiment 650's five-month fits), `Rhaz` (this experiment's survival head for
 the mixture), and `Placebo`. Mixtures: `m50`, `mshort`, `mlong` (event-class weights on rows;
 `Rhaz` and `Bhaz` are the arms trained or fitted under that mixture).
 
-Equal width scaling: one factor per arm, month, set, and seed, fitted on all the month's scored
+Equal width scaling is fitted on unweighted rows, so the sensitivity mixtures reuse the unweighted factors. One factor per arm, month, set, and seed, fitted on all the month's scored
 rows pooled across strata (not on the shift's future end), so that the q05-q95 band covers 0.90.
+
+The stratum `inforce` pools `far`, `middle`, and `near` and duplicates their rows in `agg`: never sum over strata. The learned survival of `Rhaz` is measured from the origin; `Rprior` (experiment 647's fixed prior) is measured from the newest lag, one day earlier.
 
 Output (data folder `score/`): `agg.parquet` (weighted sums by month, set, mixture, arm, seed,
 stratum, lead day), `reliability.parquet`, `dropped.csv`, `survival_curves.csv`.
@@ -70,10 +72,10 @@ def survival_curve(*, months: list[str], mixture: str) -> tuple[str, tuple, floa
 def cond_survival(
     *, curve: tuple[str, tuple, float], age_days: np.ndarray, lead_h: np.ndarray
 ) -> np.ndarray:
-    """Return S(age + (lead + 24) / 24) / S(age) for the fitted curve; zero where no departure was detected (age < 0.5 days)."""
+    """Return S(age + 1 + lead / 24) / S(age + 1) for the fitted curve (age is measured at the newest lag, 1 day before the origin); zero where no departure was detected (age < 0.5 days)."""
     dist, par = DISTS[curve[0]], curve[1]
     a = np.clip(age_days, 0.5, 100.0)
-    p = dist.sf(a + (lead_h + 24.0) / 24.0, *par) / np.maximum(dist.sf(a, *par), 1e-3)
+    p = dist.sf(a + 1.0 + lead_h / 24.0, *par) / np.maximum(dist.sf(a + 1.0, *par), 1e-3)
     return np.where(age_days < 0.5, 0.0, np.clip(p, 0.0, 1.0))
 
 
@@ -236,7 +238,7 @@ def main() -> None:
                             )
                         )
                 if setname != "real":  # survival reliability on in-force rows with a valid label
-                    sel = keep & in_force
+                    sel = keep & in_force & (age >= 0.5)
                     probs = {"Bhaz": [(0, p_b)], "Rprior": [(0, prior_survival(age_days=age, lead_h=lead))],
                              "Rhaz": [(s, f[f"{setname}_p"]) for s, f in enumerate(rh[f"Rhaz_{mix}"])],
                              "Placebo": [(s, f[f"{setname}_p"]) for s, f in enumerate(rh["Placebo"])]}  # fmt: skip
@@ -244,7 +246,12 @@ def main() -> None:
                     for arm, lst in probs.items():
                         for seed, p_ in lst:
                             d = pl.DataFrame(
-                                {"p": p_, "label": label.astype(float), "w": w_row, "band": band}
+                                {
+                                    "p": np.asarray(p_, dtype=float),
+                                    "label": label.astype(float),
+                                    "w": w_row,
+                                    "band": band,
+                                }
                             ).filter(pl.Series(sel))
                             d = d.with_columns(bin=(pl.col("p") * 10).floor().clip(0, 9))
                             rel.append(
