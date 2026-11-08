@@ -27,6 +27,8 @@
 | 602 | What does each encoder of the modular demand network (datetime, weather, power lag) contribute to its forecast, on the December 2025 load-shift, on injected load-shifts, and on an event-free fortnight? | High (maintainer, 2026-11-06) | Nothing | Finished: partly supported, see experiment 602 |
 | 608 | Which parts of the combined lag-and-gate, lag-without-gate, and lag-free demand neural networks are needed, when each part is removed alone? | High (maintainer, 2026-11-06) | Nothing | Planned |
 | 647 | Can a small departure head on the frozen K1 neural network forecast the arrangement now in force better than K1 shifted by its own recent error? | High (maintainer, 2026-11-07) | Nothing | Finished: partly supported, see experiment 647 |
+| 650 | Does a departure head trained on shifts with random ends, varied shapes, and varied depths beat K1 shifted by its own decayed recent error, once band widening is removed? | High (manager, 2026-11-08) | Nothing | Finished: partly supported, see experiment 650 |
+| 652 | Does a departure head with an explicit survival output beat the best forecast that does not know when a shift ends, once each forecast is scored under its own rules? | High (maintainer, 2026-11-08) | Nothing | Finished: not supported, see experiment 652 |
 
 ## Planned experiments
 
