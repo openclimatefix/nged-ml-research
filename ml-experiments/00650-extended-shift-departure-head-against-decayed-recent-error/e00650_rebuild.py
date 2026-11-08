@@ -163,7 +163,9 @@ def main() -> None:
         passes = [0, 1, 2] if MINE.validate else MINE.passes
         for r in passes:
             if MINE.validate:
-                own, mirror, ev = old_bank_shifts(clean=clean, month=m, r=r, nb=nb_of, capacity=capacity)
+                own, mirror, ev = old_bank_shifts(
+                    clean=clean, month=m, r=r, nb=nb_of, capacity=capacity
+                )
                 events = [{"primary": p, "onset_idx": ev[p]["onset_idx"], "end_idx": ev[p]["end_idx"]} for p in range(16)]  # fmt: skip
             else:
                 own, mirror, evs = c650.shifts_for(clean=clean, month=m, r=r)

@@ -28,6 +28,9 @@ import e00650_common as c650
 import numpy as np
 
 PAIR: Final = ("2025-10", "2025-12")
+MONTHS: Final = c650.MONTHS
+N_BANK_PER_MONTH: Final[int] = 6_000
+
 N_REAL: Final[int] = 60_000
 N_BANK: Final[int] = 15_000
 N_VAL: Final[int] = 20_000
@@ -59,8 +62,15 @@ def load(*, path, kind: str) -> dict:
 
 def sources(*, month: str, bank: str) -> dict:
     """Return the real and bank arrays of `month`; `bank` is `new` (this experiment) or `old` (experiment 647)."""
-    bank_path = c650.WORK / "head_data" / f"bank_{month}.npz" if bank == "new" else D647 / f"bank_{month}.npz"
-    return {"real": load(path=D647 / f"real_{month}.npz", kind="real"), "bank": load(path=bank_path, kind="bank")}
+    bank_path = (
+        c650.WORK / "head_data" / f"bank_{month}.npz"
+        if bank == "new"
+        else D647 / f"bank_{month}.npz"
+    )
+    return {
+        "real": load(path=D647 / f"real_{month}.npz", kind="real"),
+        "bank": load(path=bank_path, kind="bank"),
+    }
 
 
 class Pool:
@@ -84,7 +94,9 @@ class Pool:
         self.raw = np.concatenate(raws).astype(np.float32)
 
 
-def pick(*, z: dict, kind: str, month: str, lo: int, hi: int, n: int, rng, train_family: bool) -> np.ndarray:
+def pick(
+    *, z: dict, kind: str, month: str, lo: int, hi: int, n: int, rng, train_family: bool
+) -> np.ndarray:
     ms = c650.month_start_idx(month=month)
     dom = (z["oi"] - ms) // 48
     ok = z["train_ok"] & (dom >= lo) & (dom < hi)
@@ -94,35 +106,48 @@ def pick(*, z: dict, kind: str, month: str, lo: int, hi: int, n: int, rng, train
     return np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))
 
 
-def fit_one(job: tuple[str, str, int]) -> str:
+def fit_one(job: tuple[str, str, int, str]) -> str:
     import e00647_fit as f647  # ty: ignore[unresolved-import]
     import e00647_head as h  # ty: ignore[unresolved-import]
     import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
-    arm_name, month, seed = job
-    out_dir = c650.WORK / "fits"
+    arm_name, month, seed, scope = job
+    train_set = PAIR if scope == "pair" else MONTHS
+    out_dir = c650.WORK / ("fits" if scope == "pair" else "fits5")
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"{arm_name}_{month}_s{seed}.npz"
     if out.exists():
         return f"{out.name}: exists"
     t0 = time.time()
-    train_month = next(m for m in PAIR if m != month)
+    train_months = [m for m in train_set if m != month]
     rng = np.random.default_rng(1000 * seed + int(month.replace("-", "")) % 997)
-    src = sources(month=train_month, bank=ARMS[arm_name])
     tr, va = [], []
-    for kind, n_tr, n_va in (("real", N_REAL, N_VAL), ("bank", N_BANK, N_VAL_BANK)):
-        z = src[kind]
-        i_tr = pick(z=z, kind=kind, month=train_month, lo=0, hi=18, n=n_tr, rng=rng, train_family=True)
-        i_va = pick(z=z, kind=kind, month=train_month, lo=21, hi=99, n=n_va, rng=rng, train_family=True)
-        y_tr = y_va = None
-        if arm_name == "Placebo" and kind == "bank":  # shuffle the shifts across the bank rows of the fold
-            sh = z["shift"].copy()
-            sh[i_tr] = sh[i_tr][rng.permutation(len(i_tr))]
-            sh[i_va] = sh[i_va][rng.permutation(len(i_va))]
-            y_tr, y_va = (z["y"][i_tr] + sh[i_tr]).astype(np.float32), (z["y"][i_va] + sh[i_va]).astype(np.float32)
-        tr.append((z, i_tr, y_tr))
-        va.append((z, i_va, y_va))
+    for train_month in train_months:
+        src = sources(month=train_month, bank=ARMS[arm_name])
+        n_bank = N_BANK if scope == "pair" else N_BANK_PER_MONTH
+        n_val_bank = N_VAL_BANK if scope == "pair" else N_VAL_BANK // 2
+        for kind, n_tr, n_va in (("real", N_REAL, N_VAL), ("bank", n_bank, n_val_bank)):
+            z = src[kind]
+            i_tr = pick(
+                z=z, kind=kind, month=train_month, lo=0, hi=18, n=n_tr, rng=rng, train_family=True
+            )
+            i_va = pick(
+                z=z, kind=kind, month=train_month, lo=21, hi=99, n=n_va, rng=rng, train_family=True
+            )
+            y_tr = y_va = None
+            if (
+                arm_name == "Placebo" and kind == "bank"
+            ):  # shuffle the shifts across the bank rows of the fold
+                sh = z["shift"].copy()
+                sh[i_tr] = sh[i_tr][rng.permutation(len(i_tr))]
+                sh[i_va] = sh[i_va][rng.permutation(len(i_va))]
+                y_tr, y_va = (
+                    (z["y"][i_tr] + sh[i_tr]).astype(np.float32),
+                    (z["y"][i_va] + sh[i_va]).astype(np.float32),
+                )
+            tr.append((z, i_tr, y_tr))
+            va.append((z, i_va, y_va))
     train, val = Pool(parts=tr), Pool(parts=va)
     arm = {"kind": "mix", "inputs": "all", "short": 0.5}
     x_tr, age_tr, stats = f647.make_inputs(raw=train.raw, arm=arm, stats=None, seed=seed)
@@ -168,8 +193,14 @@ def fit_one(job: tuple[str, str, int]) -> str:
     res: dict[str, np.ndarray] = {}
     sets = {
         "real": (test["real"], np.flatnonzero(test["real"]["usable"])),
-        "held": (test["bank"], np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] >= 200))),
-        "fam": (test["bank"], np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] < 200))),
+        "held": (
+            test["bank"],
+            np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] >= 200)),
+        ),
+        "fam": (
+            test["bank"],
+            np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] < 200)),
+        ),
     }
     for name, (z, idx) in sets.items():
         pool = Pool(parts=[(z, idx, None)])
@@ -184,7 +215,15 @@ def fit_one(job: tuple[str, str, int]) -> str:
         q_all = np.concatenate(qs).astype(np.float32)
         res[f"{name}_idx"] = idx.astype(np.int32)
         res[f"{name}_q"] = q_all
-    np.savez(out, **res, val_log=np.array(log), n_train=n, n_val=len(val.y), best=best, seconds=time.time() - t0)  # ty: ignore[invalid-argument-type]
+    np.savez(
+        out,
+        **res,
+        val_log=np.array(log),
+        n_train=n,
+        n_val=len(val.y),
+        best=best,
+        seconds=time.time() - t0,
+    )  # ty: ignore[invalid-argument-type]
     torch.save(head.state_dict(), out_dir / f"{out.stem}.pt")
     return f"{out.name}: {len(log)} epochs, val {best:.5f}, {time.time() - t0:.0f}s"
 
@@ -193,10 +232,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", nargs="+", default=list(ARMS))
     ap.add_argument("--months", nargs="+", default=list(PAIR))
+    ap.add_argument("--scope", choices=("pair", "all"), default="pair")
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
     ap.add_argument("--workers", type=int, default=6)
     a = ap.parse_args()
-    jobs = [(arm, m, s) for m in a.months for arm in a.arms for s in a.seeds]
+    jobs = [(arm, m, s, a.scope) for m in a.months for arm in a.arms for s in a.seeds]
     print(f"{len(jobs)} fits", flush=True)
     with mp.get_context("spawn").Pool(a.workers) as pool:
         for msg in pool.imap_unordered(fit_one, jobs):

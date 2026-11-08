@@ -38,7 +38,9 @@ import e00591_arm as arm  # ty: ignore[unresolved-import]
 month_of_start = {c650.month_start_idx(month=m): m for m in c650.MONTHS}
 
 
-def contaminate(*, clean: np.ndarray, month_start_idx: int, r: int) -> tuple[np.ndarray, list[dict]]:
+def contaminate(
+    *, clean: np.ndarray, month_start_idx: int, r: int
+) -> tuple[np.ndarray, list[dict]]:
     """Return `clean` plus pass `r`'s own shifts, and the event rows (experiment 581's interface)."""
     own, _mirror, events = c650.shifts_for(clean=clean, month=month_of_start[month_start_idx], r=r)
     return np.where(np.isfinite(clean), clean + own, clean), [e.row() for e in events]
@@ -50,7 +52,10 @@ def out_path(out_dir, month, r, day, seed):  # noqa: ANN001, ANN201, ARG001
 
 
 bank.contaminate = contaminate
-_K1_S01 = c650.ML_EXPERIMENTS_DATA_DIR / "00612-nra-combined-networks-three-class-roster-completion/arms/k1_d5/work/models"
+_K1_S01 = (
+    c650.ML_EXPERIMENTS_DATA_DIR
+    / "00612-nra-combined-networks-three-class-roster-completion/arms/k1_d5/work/models"
+)
 _model_file = arm.e.model_file
 
 
@@ -69,7 +74,9 @@ def attach_tables(*, standardiser) -> None:  # noqa: ANN001
     e = arm.e
     cols, origin = e.d560.raw_table(source="ft", cache=e.W560 / "expected")
     e.CTX["origin_ft"] = np.asarray(origin)
-    e.CTX["table_ft"] = e.torch.from_numpy(e.d560.standardised_table(cols=cols, standardiser=standardiser))
+    e.CTX["table_ft"] = e.torch.from_numpy(
+        e.d560.standardised_table(cols=cols, standardiser=standardiser)
+    )
 
 
 arm.e.attach_tables = attach_tables
@@ -77,4 +84,11 @@ arm._out = out_path
 _run = arm.run_inject
 arm.run_inject = lambda: (c650.INJECT.mkdir(parents=True, exist_ok=True), _run(device="cpu"))
 sys.argv = argv
-runpy.run_path(str(__import__("pathlib").Path(arm.__file__).parent.parent / "00613-nra-roster-contrasts-with-intervals-five-seeds" / "e00613_arm.py"), run_name="__main__")
+runpy.run_path(
+    str(
+        __import__("pathlib").Path(arm.__file__).parent.parent
+        / "00613-nra-roster-contrasts-with-intervals-five-seeds"
+        / "e00613_arm.py"
+    ),
+    run_name="__main__",
+)

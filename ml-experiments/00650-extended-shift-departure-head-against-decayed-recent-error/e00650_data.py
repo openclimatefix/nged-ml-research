@@ -33,7 +33,11 @@ def build_bank(*, month: str, clean: np.ndarray, table, nb: s598.Neighbours, n_d
         f = c650.ROWS / f"rows_{month}_r{r:02d}.npz"
         assert f.exists(), f"missing rebuilt pass {f.name}"
         z = np.load(f)
-        prim, oi, vi = (z["prim"].astype(np.int64), z["origin_idx"].astype(np.int64), z["idx"].astype(np.int64))
+        prim, oi, vi = (
+            z["prim"].astype(np.int64),
+            z["origin_idx"].astype(np.int64),
+            z["idx"].astype(np.int64),
+        )
         lead, obs, q = z["lead"], z["obs"], z["k1_inj"]
         assert np.array_equal(obs, clean[prim, vi].astype(np.float32), equal_nan=True)
         assert vi.max() < c650.WINDOW_START_IDX, "a valid time on or after 2026-07-01"

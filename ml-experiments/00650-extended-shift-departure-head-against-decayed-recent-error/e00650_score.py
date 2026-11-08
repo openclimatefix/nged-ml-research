@@ -26,7 +26,7 @@ import numpy as np
 import polars as pl
 
 TAUS = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99], np.float32)
-OUT = c650.WORK / "score"
+OUT = c650.WORK / "score"  # `--fits fits5` writes to score5
 ARMS = ("K1", "R0-168", "Rnew", "Rold", "Placebo")
 TAU_H = 168.0
 
@@ -46,7 +46,9 @@ def scale_to_nominal(*, y, q, target: float = 0.90):
     lo, hi = q[:, 1:2], q[:, 9:10]
 
     def cover(f):
-        return float(((y[:, None] >= med - f * (med - lo)) & (y[:, None] <= med + f * (hi - med))).mean())
+        return float(
+            ((y[:, None] >= med - f * (med - lo)) & (y[:, None] <= med + f * (hi - med))).mean()
+        )
 
     a, b = 0.2, 20.0
     for _ in range(40):
@@ -73,31 +75,53 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--months", nargs="+", default=list(f650.PAIR))
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
+    ap.add_argument("--fits", default="fits")
     a = ap.parse_args()
+    global OUT
+    OUT = c650.WORK / ("score" if a.fits == "fits" else "score5")
     OUT.mkdir(parents=True, exist_ok=True)
     rows_out, dropped, per_row = [], [], []
     for m in a.months:
         src = f650.sources(month=m, bank="new")
-        events = pl.concat([pl.read_parquet(c650.ROWS / f"events_{m}_r{r:02d}.parquet") for r in c650.ALL_PASSES])
+        events = pl.concat(
+            [pl.read_parquet(c650.ROWS / f"events_{m}_r{r:02d}.parquet") for r in c650.ALL_PASSES]
+        )
         ev = {(int(r["pass"]), int(r["primary"])): r for r in events.iter_rows(named=True)}
-        for setname, z, idx_name in (("held", src["bank"], "held"), ("fam", src["bank"], "fam"), ("real", src["real"], "real")):
-            fits = {arm: [np.load(c650.WORK / "fits" / f"{arm}_{m}_s{s}.npz") for s in a.seeds if (c650.WORK / "fits" / f"{arm}_{m}_s{s}.npz").exists()] for arm in ("Rnew", "Rold", "Placebo")}  # fmt: skip
+        for setname, z, idx_name in (
+            ("held", src["bank"], "held"),
+            ("fam", src["bank"], "fam"),
+            ("real", src["real"], "real"),
+            ("verified", src["real"], "real"),
+        ):
+            fits = {arm: [np.load(c650.WORK / a.fits / f"{arm}_{m}_s{s}.npz") for s in a.seeds if (c650.WORK / a.fits / f"{arm}_{m}_s{s}.npz").exists()] for arm in ("Rnew", "Rold", "Placebo")}  # fmt: skip
             if not fits["Rnew"]:
                 continue
             idx = fits["Rnew"][0][f"{idx_name}_idx"]
             for arm, fs in fits.items():
                 for f in fs:
                     assert np.array_equal(f[f"{idx_name}_idx"], idx)
-            if setname == "real":
+            if setname in ("real", "verified"):
                 y = z["y"][idx]
-                keep = z["event_free"][idx] & ~z["flagged"][idx] & ~z["verified"][idx] & np.isfinite(z["res"][idx])
-                phase = np.full(len(idx), "event_free")
+                if setname == "real":
+                    keep = (
+                        z["event_free"][idx]
+                        & ~z["flagged"][idx]
+                        & ~z["verified"][idx]
+                        & np.isfinite(z["res"][idx])
+                    )
+                else:
+                    keep = z["verified"][idx] & np.isfinite(z["res"][idx])
+                phase = np.full(len(idx), "event_free" if setname == "real" else "verified_pair")
                 meta = {k: np.full(len(idx), -1) for k in ("depth", "cell")}
                 meta["cell"] = np.full(len(idx), "")
             else:
                 y = (z["y"][idx] + z["shift"][idx]).astype(np.float32)
                 keep = np.isfinite(z["res"][idx])
-                pa, pr, vi = z["pass_"][idx].astype(int), z["prim"][idx].astype(int), z["vi"][idx].astype(int)
+                pa, pr, vi = (
+                    z["pass_"][idx].astype(int),
+                    z["prim"][idx].astype(int),
+                    z["vi"][idx].astype(int),
+                )
                 on = np.array([ev[(p, q)]["onset_idx"] for p, q in zip(pa, pr, strict=True)])
                 en = np.array([ev[(p, q)]["end_idx"] for p, q in zip(pa, pr, strict=True)])
                 phase = np.where(vi < on, "pre", np.where(vi < en, "inside", "after"))
@@ -108,10 +132,21 @@ def main() -> None:
             dropped.append({"month": m, "set": setname, "rows": len(idx), "kept": int(keep.sum())})
             lead = z["lead"][idx]
             assert z["vi"][idx].max() < c650.WINDOW_START_IDX, "a valid time on or after 2026-07-01"
-            assert {len(fs) for fs in fits.values()} == {len(fits["Rnew"])}, "arms have different seed counts"
+            assert {len(fs) for fs in fits.values()} == {len(fits["Rnew"])}, (
+                "arms have different seed counts"
+            )
             k1 = z["q"][idx]
-            r0 = np.sort(k1 + (z["res"][idx] * np.exp(-lead / TAU_H))[:, None], axis=1).astype(np.float32)
-            qs = {"K1": [k1], "R0-168": [r0], **{arm: [np.sort(f[f"{idx_name}_q"], axis=1) for f in fs] for arm, fs in fits.items()}}
+            r0 = np.sort(k1 + (z["res"][idx] * np.exp(-lead / TAU_H))[:, None], axis=1).astype(
+                np.float32
+            )
+            qs = {
+                "K1": [k1],
+                "R0-168": [r0],
+                **{
+                    arm: [np.sort(f[f"{idx_name}_q"], axis=1) for f in fs]
+                    for arm, fs in fits.items()
+                },
+            }
             for ph in sorted(set(phase[keep])):
                 sel = keep & (phase == ph)
                 if sel.sum() < 100:
@@ -123,7 +158,10 @@ def main() -> None:
                         rows_out.append({"month": m, "set": setname, "phase": ph, "arm": arm, "seed": si, "factor": fac, **stats(y=y[sel], q=q, qs=qsc)})  # fmt: skip
             for arm in ARMS:
                 for si, q_ in enumerate(qs.get(arm, [])):
-                    big = np.isin(phase, [p_ for p_ in set(phase[keep]) if (keep & (phase == p_)).sum() >= 100])
+                    big = np.isin(
+                        phase,
+                        [p_ for p_ in set(phase[keep]) if (keep & (phase == p_)).sum() >= 100],
+                    )
                     sel = keep & big
                     if not sel.any():
                         continue

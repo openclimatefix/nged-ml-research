@@ -8,7 +8,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -54,99 +54,194 @@ metric: >-
   CRPS (twice the mean pinball loss over the 11 stored quantile levels) in points of capacity after
   equal width scaling, q05-q95 coverage, and q01, q05, q95, and q99 pinball loss, by phase of the
   shift and lead band.
+verdict: partly supported
+best_arm: >-
+  R-new inside a held-out shift that lies outside the training range: scaled CRPS 14.40 points of
+  capacity against R0 (168 h) 16.69, R-old 15.85, K1 21.01, and the placebo 19.18.
+headline: >-
+  Trained on shifts with random ends, the departure head beats the no-fit shift R0 (168 h) by 2.29
+  points inside held-out shifts after equal width scaling (-2.29 [-2.63, -1.95]), but scores 3.59
+  points
+  worse than K1 after a shift ends and trails K1 by 0.05 on event-free rows.
+lessons: >-
+  Training on the extended generator beats training on experiment 647's constant-shift bank by 1.45
+  points inside shifts outside the training range, and equal width scaling does not remove the gain
+  over
+  the no-fit shift. The loss after a shift ends is larger with the extended bank (7.40 against 5.57
+  for
+  the head trained on the old bank), so random ends did not teach the head to let go.
+take_home_message: >-
+  Training the departure head on shifts that end at random times, with varied shapes and depths,
+  makes it
+  beat the no-fit shift by 2.3 points of capacity inside shifts outside its training range, and beat
+  the
+  head trained on the old bank by 1.5 points. The head still carries a shift past its end and scores
+  3.6
+  points worse than K1 there, so it is not ready for production. The next step is a head that ends a
+  shift as soon as the gap signals say so.
+advice:
+  - >-
+    Compare any departure head with R0 at 168 h and after equal width scaling, because scaling
+    removes
+    the gain that comes from a wider band alone (Results, first bullet).
+  - >-
+    Do not port the departure head as it stands: it scores 3.59 points worse than K1 after a shift
+    ends
+    (Results, bullet on the vetoes).
+  - >-
+    Test any change to the head's duration prior on shifts that end during the 10-day horizon,
+    because the
+    old bank, which ended every shift on day 14, hid the problem (Results, bullet on the vetoes).
+production_status: not-for-production
+adopted_in: none
 ---
 
-## Plan
+Experiment 650 asked whether the departure head of experiment 647 improves when it trains on a
+richer set of injected load shifts. A load shift is a period when the network operator moves part of
+a Primary's demand onto or off a neighbouring Primary. A Primary is a primary substation. K1 is the
+neural network of experiments 612 and 613 that forecasts the normal running arrangement, the demand
+with no load shift. The departure head is a small second neural network that reads K1's quantiles
+and the gap signals (differences between recent power and a lag-free forecast), and shifts K1's
+forecast towards the arrangement now in force. R0 (168 h) is the no-fit baseline: K1's quantiles
+plus K1's own mean error over valid days 2 to 8 before the forecast, decayed by exp(-lead / 168 h).
 
-Experiment 647 found that a departure head beats K1 inside injected shifts by 10.0 points of
-capacity, but 60% to 68% of that is band widening, R0 at tau 168 h is only 0.9 points behind, and
-the head is 3.7 points worse than K1 after a synthetic shift ends. The bank of experiment 581 ends
-every shift on day 14 with a constant shape, so both its training and its test cases share one grid.
-This experiment retrains the head on an extended shift generator and tests it on a shift family that
-no arm trains on. Development months only: nothing on or after 2026-07-01 is read, and there is no
-D14 or D18 scoring. Cadence: no K1 refit (K1 is frozen and stored); head fits are
-leave-one-month-out as in experiment 647. Cleaned power is used throughout (the K1 inputs and the
-observed power come from the stored clean stack), and the D15 and D18 cut before 2025-03-01 does not
-bite on these months.
+**Take-home message.** Trained on shifts with random ends, varied shapes, and depths from 3 to 50
+points of capacity, the head beats R0 (168 h) by 2.29 points of capacity inside shifts that lie
+outside the training range, after every arm's band is scaled to the same coverage. After a shift
+ends, however, the head scores 3.59 points worse than K1, and 1.83 points worse than the head
+trained on the old bank. The head is therefore not ready for production. Verdict: partly supported.
 
-**Arms** (matched rows, epochs, and seeds; first fold pair 2025-10 and 2025-12 first):
+## Figures
 
-- **R0-168:** K1 shifted by its own decayed recent error, tau 168 h. No fit.
-- **R-old:** experiment 647's H1 recipe, refitted on the same single training month (the stored
-  weights were deleted to free disk space), with experiment 647's constant-shift bank in place of
-  the extended bank.
-- **R-new:** H1 retrained on real unshifted bases plus the extended generator (below).
-- **Placebo:** R-new's training with the shifts shuffled across rows.
-- **G (only if time allows):** the extended generator on lag-free forecast bases from experiment
-  598's table.
+![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig1_inside_scaled.svg)
 
-**Extended generator** (new `bank` module, same interface as experiment 581's `contaminate`):
-half constant, half proportional to the Primary's own load (the realised mix is reported per
-group, because MVA receivers take constant shapes only); step or 6 to 48 h ramp onsets; depth
-log-uniform from 3 to 50 points of capacity; duration drawn from 3 to 14 days or 4 to 16 weeks,
-with a random end (before, inside, or after the 10-day horizon); the donor's loss reaches one or
-two real electrical neighbours at r times the loss, r from 0.5 to 1 (partial conservation);
-power is never summed across MW
-and MVA Primaries (MVA Primaries take constant-shape events only, with a stated power factor of
-0.97). Training passes use seeds disjoint from the test passes.
+![After a shift ends and on event-free rows: R-new is worse than K1 on both](fig2_vetoes.svg)
 
-**Held-out family** (never trained on). Each Primary gets one constant-shape event per pass, with
-depth 0.10, 0.20, 0.40, or 0.65 of capacity and duration 5, 10, 21, or 45 days (a 4 by 4 grid
-rotating across the 16 Primaries and 4 passes, both signs twice per cell). Half the events have a
-ramp onset of 72 to 120 h (training ramps are 6 to 48 h); the other half have a 6 to 48 h ramp. Each
-event is labelled by the attributes that lie outside the training support: a long ramp, depth 0.65
-(training stops at 0.50), and a duration of 15 to 27 days (training durations are 3 to 14 and 28 to
-112 days). Events with at least one label are the out-of-support cells, and the decision contrast
-pools them. Events with none are in-support context. A 5-day event with a 120 h ramp never reaches
-its labelled depth, so its effective depth is about half.
+![Scaled CRPS inside held-out shifts by depth: R-new leads at every depth](fig3_by_depth.svg)
 
-**Scoring.**
+![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig4_example_1.svg)
 
-- Held-out family: CRPS by phase (before, inside, after the shift). The decision contrast is the
-  inside phase. Every arm is also scored after equal width scaling, defined here before any score is
-  read: one factor per arm, month, and phase, applied to all 11 quantiles about the median, chosen
-  so that the q05-q95 band covers 0.90 of rows (the nominal level, not K1's own coverage). The same
-  rule applies to every arm, including K1 and R0-168. The factor is fitted on the scored rows, so it
-  is an oracle, and is stated as such. Unscaled CRPS and coverage are reported beside it. The scaled
-  contrast is the decision contrast.
-- Real event-free dev rows: cost and false alarms against K1, limit 0.03 points.
-- The verified D5 and D16 pair: descriptive only. The unlogged-event caveat applies: clean rows may
-  hold events no label covers, so the event-free cost is optimistic.
-- Tails: q01, q05, q95, q99 pinball loss and coverage next to CRPS, per group and per Primary.
-- Avoidable-curtailment cost in three row sets (inside, 7 days after, all rows) on the six MW
-  Primaries, using the experiment 601 function, as in experiment 647.
-- G only: a gradient-boosted classifier on the head's input vector, trained on half the origins and
-  scored by AUC on the other half, separating generated-base inputs from real-base inputs (AUC above
-  0.6 means the head can tell them apart).
-- Checks: median minus mean forecast per Primary, the mean-forecast error beside each quantile
-  contrast, and the seven audit triggers.
+![Example 2, December 2025: depth 0.20, 45 days](fig4_example_2.svg)
 
-**Leakage controls.** K1 is frozen and was fitted on the five development months with the
-leave-one-out design of experiments 612 and 613, which score each month with a K1 not trained on
-it, except that K1(Dec) is in-sample on the October rows (experiment 647's limit); this holds for
-every arm alike. The shifted bank changes the observed power of days 2 to 8 before the origin, so
-R0-168's residual is computed on the shifted series, as in experiment 647. Head fits are
-leave-one-month-out: the scored month's generated passes are never in training, the placebo shuffle
-is within the training fold only, and the epoch count is the fixed 30 with early stopping on a
-validation month, never on the scored month or the held-out family. The scorer asserts that the
-largest valid time read is before 2026-07-01.
+![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig4_example_3.svg)
 
-**Compute.** CPU only, 14 cores at most, 16 GB per job, one OMP thread per process, spawn start
-method. The cost is running K1's five seed networks (saved weights, 5.7 MB) on each new shifted
-bank: 12 training passes and 4 held-out passes per month, first for 2025-10 and 2025-12 (2 seeds and
-2 cut days per pass as in experiment 613's inject: 160 inference runs for the first pair). The first
-code step times one pass on 14 cores and writes the forecast-table size per pass into this page; the
-disk to free is that size times 16 passes times 5 months, plus the head data. Jobs run 2 at a time
-so as to stay inside 14 cores and 24 GB. Arm G adds 12 passes on the lag-free bases and is counted
-only if time allows. Forecasts of experiments 613 and 647 for unshifted rows and the 647 bank are
-reused for R-old and for the event-free rows; nothing is refitted. The reuse check (same series,
-origins, leads, widening) is the first step of the code. All outputs need free space on `/mnt/data`,
-which is full at planning time, so no fit starts until space is freed.
-
-**Reviews.** A fresh Sonnet agent reviews this plan; another reviews the code before the first run;
-the results and write-up are each reviewed by a fresh Sonnet agent. No Opus unless a verdict could
-change.
+![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig5_real_examples.svg)
 
 ## Results
 
-Not run yet.
+Scores are CRPS (twice the mean pinball loss over the 11 stored quantiles) in points of capacity,
+where 1 point is 1% of a Primary's effective capacity. A negative difference favours the first arm.
+Intervals are percentile bootstraps over the 5 development months (2025-10, 2025-12, 2026-01,
+2026-03, 2026-06) of the two-seed mean. Equal width scaling multiplies every arm's quantile spread
+about its median by one factor per month and phase, chosen so that the q05-q95 band covers 0.90 of
+the rows. It is fitted on the scored rows, so it is an oracle, and it applies to K1 and R0 as well.
+
+- **Inside a shift outside the training range, R-new beats every other arm (decision contrast).**
+  Scaled CRPS: K1 21.01, R0 (168 h) 16.69, R-old 15.85, R-new 14.40, placebo 19.18. R-new minus R0
+  is -2.29 [-2.63, -1.95]; minus R-old, -1.45 [-1.69, -1.22]; minus K1, -6.61 [-7.41, -5.79]; minus
+  placebo, -4.78 [-5.72, -3.68]. Unscaled CRPS: K1 26.64, R0 18.10, R-old 15.81, R-new 13.13.
+  Scaling cuts R-new's gain over R0 from 4.96 unscaled points to 2.29.
+- **The gain holds on in-support events and at every depth.** Inside events within the training
+  range, R-new scores 9.48 against R0's 10.90 (-1.42 [-1.90, -0.95]). By depth (0.10, 0.20, 0.40,
+  0.65), R-new scores 7.12, 10.43, 14.57, and 21.75 against R0's 8.31, 12.34, 17.07, and 24.64. On
+  the training family in the scored month (events the head never saw), R-new scores 6.65 against
+  R0's 7.94.
+- **Both vetoes fail or are not cleared.** After a held-out shift ends, scaled CRPS is K1 3.80, R0
+  6.52, R-old 5.57, R-new 7.40, and the placebo 4.08. R-new minus K1 is +3.59 [+2.70, +4.41] against
+  the 0.5 limit, and R-new minus R-old is +1.83 [+1.24, +2.53]. On event-free real rows, R-new minus
+  K1 is +0.05 [-0.24, +0.31] scaled and +0.03 [-0.28, +0.31] unscaled against the 0.03 limit, so the
+  experiment cannot tell whether the head costs anything there. R-new carries a shift for about 3
+  days past its end in the examples.
+- **The placebo moves K1's score as well.** On the decision rows the placebo scores 19.18 against
+  K1's 21.01 scaled (24.42 against 26.64 unscaled), because the shuffled targets still contain
+  shifts of the right size on average. R-new minus placebo is the clean contrast of the head's
+  signal.
+- **On the verified D5 and D16 pair (descriptive, 13,000 rows, one episode),** unscaled CRPS is K1
+  15.02, R0 13.25, R-old 9.76, R-new 9.57, and the placebo 14.12. R-new and R-old are equal there.
+- **Tail calibration (unscaled).** Inside a shift, q05-q95 coverage is K1 0.23, R0 0.37, R-old 0.55,
+  and R-new 0.59, against a nominal 0.90. Pinball loss at q01, q05, q95, and q99 is K1 6.91, 9.09,
+  11.35, and 8.84; R0 4.25, 5.95, 7.31, and 5.28; R-old 2.56, 4.21, 5.33, and 3.25; R-new 2.59,
+  4.08, 4.68, and 3.02. After a shift ends, coverage is K1 0.90, R0 0.62, R-old 0.88, and R-new
+  0.81, and the q99 pinball loss is 0.26, 0.98, 0.33, and 0.84. On event-free rows coverage is 0.87
+  for K1, 0.88 for R0, 0.89 for R-old, and 0.89 for R-new, and the q99 pinball loss is 0.275, 0.250,
+  0.256, and 0.258.
+- **Avoidable-curtailment cost** (experiment 601's function, in its own units with no pounds
+  conversion, six MW Primaries, leads 12 to 36 h, limit 0.9 of the earlier peak, mean over the
+  held-out rows; the range is the lowest and highest of the 5 months). Inside a shift: K1 549,533,
+  R0 213,749, R-old 167,632, R-new 147,900 (range 70,859 to 247,869), placebo 482,589. In the 7 days
+  after the end: K1 541, R0 13,980, R-old 8,087, R-new 10,512, placebo 1,967. Over all rows: K1
+  316,942, R0 126,244, R-old 97,594, R-new 87,208, placebo 278,503. Every head cuts the cost inside
+  a shift, and every head raises it after the end.
+- **The head's median is a better forecast too.** Median absolute error inside a shift is K1 30.59,
+  R0 21.92, R-old 22.18, and R-new 17.42 points of capacity, so CRPS and median error agree.
+
+## Arms, data, and method
+
+- **Arms.** R0 (168 h), K1 (stored), R-old (experiment 647's head recipe refitted on the extended
+  experiment 647 constant-shift bank, because its stored weights were deleted to free disk), R-new
+  (the same head on the extended generator), placebo (R-new with the shifts shuffled across the bank
+  rows of the training fold). All heads read K1's 11 quantiles and experiment 647's inputs, one head
+  per scored month (trained on the other 4 months), 2 seeds, with early stopping on origin days 21
+  onward of the training months. The arm G (generated bases) was not run.
+- **Extended generator.** One shift per Primary per pass, 12 training passes per month. Constant or
+  proportional shape (MVA Primaries constant only), step or 6 to 48 h ramp onset, depth log-uniform
+  from 3 to 50 points, duration 3 to 14 or 28 to 112 days with onset from 10 days before the month
+  to day 20, so ends fall before, inside, and after the 10-day horizon. The donor's loss reaches one
+  or two real electrical neighbours at 0.5 to 1 times the loss (15% of shifts have none), kept out
+  of MW-and-MVA sums by a power factor of 0.97.
+- **Held-out family.** 4 passes per month, constant shape, depths 0.10, 0.20, 0.40, 0.65, durations
+  5, 10, 21, 45 days, half the events with a 72 to 120 h ramp. Events with a long ramp, depth 0.65,
+  or a duration of 15 to 27 days are outside the training range; the decision contrast pools them. A
+  5-day event with a 120 h ramp never reaches its labelled depth.
+- **K1 on the bank.** K1's five saved seeds ran on CPU on each shifted bank, then experiment 613's
+  tail constants and G4 gate were rebuilt with this experiment's shifts. The rebuild reproduces
+  experiment 647's stored K1 rows on its constant bank (0.4% of rows in one pass differ where the
+  daily-mean gate differs from experiment 613's constant per-day step).
+- **Rows and cleaning.** The development months only; no row on or after 2026-07-01 is read
+  (asserted). Power comes from the stored clean stack, with flagged rows excluded from real-row
+  training and scoring; the count of flagged half-hours per fold was not tabulated separately. Rows
+  without R0 history are dropped from every arm (`score5/dropped.csv`).
+- **Cadence.** K1 is stored and not refitted. The heads are small and are fitted once per scored
+  month, so no refit cadence applies.
+- **Reused code.** Experiment 647 (data build, head, fit helpers, K1 rebuild pattern), experiment
+  581's bank interface, experiment 591 and 613's K1 inference, experiment 613's scorer, and
+  experiment 601's cost.
+
+## Checks
+
+- **Median minus mean forecast** (points of capacity, decision rows): K1 -0.75, R0 -0.75, R-old
+  -0.38, R-new -0.32. Event-free rows: -0.61, -0.61, -0.53, -0.53.
+- **Mean-forecast error beside the contrasts** (decision rows, mean absolute error of the mean
+  forecast): K1 30.59, R0 22.02, R-old 22.37, R-new 18.40; the order matches the CRPS order.
+- **Triggers fired.** The placebo moved the decision rows by 2.2 unscaled points against K1 (placebo
+  trigger), and the two vetoes missed their bars (bar trigger). The leave-one-Primary-out, sister
+  experiment, and later-dependency triggers were not assessed.
+- **Reviews.** A Sonnet agent reviewed the plan and another the code before the first scored run.
+  The code review found a held-out family with no in-support cells, unbalanced signs, a reversed
+  power-factor conversion, MVA Primaries given proportional shapes, and an events file overwritten
+  per batch; all were fixed and the inference was rerun. The results review and the write-up review
+  are listed in the pull request.
+
+## Caveats
+
+- The fitted heads and the figures use 5 month blocks, so every interval is coarse.
+- NGED's event labels are incomplete, so event-free rows may hold unlogged shifts. The event-free
+  cost is therefore optimistic and the number of real flagged events is a lower bound.
+- The held-out shifts differ from the training family in a few attributes only, they are constant
+  shapes, and an MVA Primary's target is clipped at zero.
+- Equal width scaling is an oracle fitted on the scored rows. It makes every arm look as well
+  calibrated as its sharpness allows, and it penalises sharper arms when their unscaled coverage is
+  below 0.90.
+- One episode (the verified pair) carries the real-row evidence; no real flagged day beyond it was
+  scored.
+- R-old is a refit on the same one-bank training months as R-new, not the stored head of experiment
+  647.
+- Arm G was not run.
+
+## What to try next
+
+- Let the head end a shift from the gap signals: replace the fixed duration prior with a prior
+  learned from the extended bank, and test it on shifts that end during the 10-day horizon.
+- Re-test the decision contrast with a fixed width-scaling rule that targets pinball loss, not
+  coverage.
+- Run arm G once the head's after-shift loss is fixed.

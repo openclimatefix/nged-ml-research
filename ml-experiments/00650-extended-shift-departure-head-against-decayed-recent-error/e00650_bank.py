@@ -104,7 +104,9 @@ def draw(*, month_idx: int, r: int, primary: int, nb_of: dict[int, list[int]], m
     else:
         k = r - HELD_OUT_FIRST
         cell = (primary + 5 * k) % 16
-        sign = 1 if k % 2 == 0 else -1  # each cell meets both signs, twice each, across the 4 passes
+        sign = (
+            1 if k % 2 == 0 else -1
+        )  # each cell meets both signs, twice each, across the 4 passes
         depth = HELD_DEPTHS[cell % 4]
         days = HELD_DAYS[cell // 4]
         kind = "constant"
@@ -155,16 +157,24 @@ def build(
             mean = float(np.nanmean(seg)) if np.isfinite(seg).any() else 1.0
             shape = (np.nan_to_num(clean[p], nan=mean) / max(abs(mean), 1e-6)).astype(np.float32)
         delta = (ev.sign * ev.depth * env * shape).astype(np.float32)
-        if not bool(is_mw[p]):  # an MVA-only Primary's power is a magnitude and stays at or above zero
-            delta = np.where(np.isfinite(clean[p]), np.maximum(clean[p] + delta, 0.0) - clean[p], delta).astype(np.float32)
+        if not bool(
+            is_mw[p]
+        ):  # an MVA-only Primary's power is a magnitude and stays at or above zero
+            delta = np.where(
+                np.isfinite(clean[p]), np.maximum(clean[p] + delta, 0.0) - clean[p], delta
+            ).astype(np.float32)
         own[p] = delta
         if not ev.receivers:
             continue
         per = ev.gain / len(ev.receivers)
         for q in ev.receivers:
-            mw = delta * capacity[p] / capacity[q]  # donor's megawatts as a share of the receiver's capacity
+            mw = (
+                delta * capacity[p] / capacity[q]
+            )  # donor's megawatts as a share of the receiver's capacity
             if bool(is_mw[p]) != bool(is_mw[q]):
-                mean_mw = np.full(n, float(delta[span].mean()) if ev.end_idx > ev.onset_idx else 0.0)
+                mean_mw = np.full(
+                    n, float(delta[span].mean()) if ev.end_idx > ev.onset_idx else 0.0
+                )
                 mean_mw = mean_mw * (env > 0) * capacity[p] / capacity[q]
                 mw = mean_mw * (1.0 / POWER_FACTOR if bool(is_mw[p]) else POWER_FACTOR)
             mirror[q] -= (per * mw).astype(np.float32)
