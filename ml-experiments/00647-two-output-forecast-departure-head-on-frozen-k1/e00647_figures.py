@@ -102,7 +102,7 @@ def fig1() -> None:
     sub = [
         "Bar: pooled over the five development months (2025-10 to 2026-06), leave-one-month-out.",
         "Black line: 95% interval from resampling the five months and the five seeds (months only for arms without seeds).",
-        "Sky blue marks the four rule-based baselines made from K1: R0, R0*, R0 at 168 h, and K1 with widened bands.",
+        "Sky blue marks the rule-based baselines made from K1: R0, R0*, R0 at 168 h, and (P2 and P4 only) K1 with widened bands.",
     ]
     bars(
         [
