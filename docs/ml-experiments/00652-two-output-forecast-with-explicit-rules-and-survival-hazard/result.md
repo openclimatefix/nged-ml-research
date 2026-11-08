@@ -33,7 +33,7 @@ prediction: >-
   days). The loss of every prevailing forecast after a shift ends is larger than K1's.
 decision_rule: >-
   One primary contrast decides the verdict: R-haz minus the no-fit hazard baseline, scaled CRPS
-  averaged over lead days 1 to 10, on origins where a shift is in force (far, middle, and near
+  averaged over lead days 1 to 9, on origins where a shift is in force (far, middle, and near
   strata pooled), on unseen training-family shifts, under the generator's duration mixture. It counts
   as a gain when the month-block 95% interval (percentile bootstrap over the 5 development months,
   seeds averaged within a month) excludes zero in the negative direction and the point estimate is
@@ -55,29 +55,31 @@ benchmark: >-
 row_set_id: dev_months_origins_2025_10_to_2026_06_export_roster
 metric: >-
   CRPS (twice the mean pinball loss over the 11 stored quantile levels) in points of capacity after
-  equal width scaling, by lead day (1 to 10) and by the state of the shift at the forecast origin;
+  equal width scaling, by lead day (1 to 9) and by the state of the shift at the forecast origin;
   q05-q95 coverage; q01, q05, q95, and q99 pinball loss; survival reliability.
 verdict: not supported
 best_arm: >-
   B-haz, R-new, and R-haz tie where a shift is in force: scaled CRPS 5.98, 5.84, and 5.96 points of
   capacity against R0 (168 h) 6.72, K1 9.18, and the placebo 8.31.
 headline: >-
-  A learned survival output scores the same as a single survival curve fitted to the training
-  durations where a shift is in force (R-haz minus B-haz -0.02 [-0.35, +0.24]), and both carry a
-  shift past its end, scoring 3.5 points worse than K1 in the last 24 hours before the end.
+  A learned survival output ties a single survival curve fitted to the training durations where a
+  shift is in force and the shifts follow the training mixture (R-haz minus B-haz -0.02 [-0.35,
+  +0.24] scaled), and both carry a shift past its end: R-haz scores 3.5 and B-haz 4.6 points worse
+  than K1 in the last 24 hours before the end (unscaled).
 lessons: >-
-  Where a shift is in force at the origin, every prevailing forecast scores about 3.5 points better
-  than K1 (5.8 against 9.9 unscaled), so the question is the end of the shift. A no-fit survival
-  curve captures all of the gain that a learned survival output captures. The cost of an unknown end
-  falls in the last day before it, and no arm avoids that cost.
+  Where a shift is in force at the origin, R-haz, R-new, and B-haz score 4.1 to 4.3 points better
+  than K1 (5.8 against 9.9 unscaled), so the open question is the end of the shift. On shifts drawn
+  from the training mixture, a no-fit survival curve captures all of the gain that a learned
+  survival output captures; on held-out durations the learned output is better by 0.74 points. The
+  cost of an unknown end falls in the last day before it, and no arm avoids that cost.
 take_home_message: >-
   A prevailing forecast that continues a load shift cuts the error where a shift is in force from
-  9.9 to 5.8 points of capacity, but a survival curve fitted to shift durations with no neural
-  network does as well as a neural network that learns the survival, so the learned survival output
-  is not worth porting. Every prevailing forecast scores about 3.5 points worse than K1 in the last
-  day before a shift ends, which is the price of not knowing the end, and the survival probabilities
-  are 0.04 to 0.10 too low on average on training-family shifts and 0.01 to 0.06 too high on the
-  held-out durations.
+  9.9 to 5.8 points of capacity (unscaled), but a survival curve fitted to shift durations, with no
+  neural network, scores 5.85 and so does as well as a neural network that learns the survival, when
+  the shifts follow the training mixture. On held-out durations the learned survival output is
+  better by 0.74 points, so the tie is not general. In the last day before a shift ends, the learned
+  forecast scores 3.5 points worse than K1 and the fitted curve 4.6 points worse, which is the price
+  of not knowing the end.
 advice:
   - >-
     Use a survival curve fitted to the shift durations, with no neural network, as the baseline for
@@ -95,20 +97,24 @@ advice:
 production_status: not-for-production
 adopted_in: none
 ---
+A Primary is a primary substation. A load shift is a period when the electricity network operator
+moves part of one Primary's demand onto, or off, a neighbouring Primary. K1 is the neural network of
+experiments 612 and 613 that forecasts the normal running arrangement (NRA), the demand with no load
+shift. Experiment 652 defines two forecasts, scores each under its own rules, and asks whether a
+departure head with a learned survival output beats a no-fit survival curve. R-haz is the departure
+head with a survival output. B-haz is K1 shifted by its recent error and decayed by a survival curve
+fitted to shift durations, with no neural network. R0 (168 h) is the same shift decayed by a fixed
+exponential. R-new and R-old are the departure heads of experiment 650 with a fixed duration prior.
+Scaled CRPS means the score after equal width scaling (see Results), and points of capacity are
+percentages of a Primary's effective capacity. Every shift here is injected into real history; the
+real rows check only the event-free veto and one verified episode.
 
-A load shift is a period when the network operator moves part of one Primary's demand onto or off
-a neighbouring Primary. A Primary is a primary substation. K1 is the neural network of experiments
-612 and 613 that forecasts the normal running arrangement (NRA), the demand with no load shift.
-Experiment 652 defines two forecasts, scores each under its own rules, and asks whether a departure
-head with a learned survival output beats a no-fit survival curve. Every shift here is injected
-into real history; the real rows check only the event-free veto and one verified episode.
-
-**Take-home message.** Where a shift is in force at the forecast origin, a prevailing forecast scores
-5.8 points of capacity against K1's 9.9 (unscaled CRPS), but a single survival curve fitted to the
-training durations scores 5.85, so the learned survival output adds nothing measurable (R-haz minus
-B-haz -0.02 [-0.35, +0.24] scaled). In the last 24 hours before a shift ends, every arm that carries
-the shift forward scores about 3.5 points worse than K1 (R-haz 7.44, B-haz 8.56, K1 3.98 unscaled);
-that cost cannot be avoided without knowing the end. Verdict: not supported.
+**Take-home message.** Where a shift is in force at the forecast origin, R-haz scores 5.8 points of
+capacity against K1's 9.9 (unscaled), and B-haz scores 5.85 (unscaled), so on shifts that follow the
+training mixture the learned survival output adds nothing measurable (R-haz minus B-haz -0.02
+[-0.35, +0.24] scaled). On held-out durations R-haz is better by 0.74 points. In the last 24 hours
+before a shift ends, R-haz scores 3.5 and B-haz 4.6 points worse than K1 (7.44, 8.56, and 3.98
+unscaled); that cost cannot be avoided without knowing the end. Verdict: not supported.
 
 ## Figures
 
@@ -136,10 +142,10 @@ The two forecasts answer different questions, so each is scored on its own truth
   riding through the shift, which is its job. The NRA output in this experiment is K1, unchanged.
 - **The prevailing forecast continues the arrangement now in force.** Its target is the observed
   power, and it is scored on all rows. A prevailing forecast issued during a shift will carry the
-  shift past its end, because shift ends are random and cannot be known at the origin. The only
-  legitimate hedge is a survival probability that decays the shift over the forecast horizon. A bad
-  score after a shift ends is therefore an expected cost, and the question is whether the forecast
-  is worse than the best forecast with no knowledge of the end time.
+  shift past its end, because shift ends are random and cannot be known at the origin. One hedge is
+  a survival probability that decays the shift over the forecast horizon. A bad score after a shift
+  ends is therefore an expected cost, and the question is whether the forecast is worse than the
+  best forecast with no knowledge of the end time.
 
 ## Scoring by the state at the forecast origin
 
@@ -156,32 +162,34 @@ strata, on the injected bank, are:
 - **Near the end:** a shift is in force and remains for at most 24 hours.
 - **Just ended (context):** the origin is within 7 days after the end.
 
-An origin inside an onset ramp counts as in force. A shift whose end was clipped at the
-2026-07-01 window edge has a false end, so its rows are excluded from the survival target and from
-the far, middle, and near strata. The strata use the future end, so they are for scoring only: the
-equal width scaling uses one factor per arm and month, fitted on all that month's scored rows pooled
+An origin inside an onset ramp counts as in force. A shift whose end was clipped at the 2026-07-01
+window edge has a false end, so its rows are excluded from the survival target and from the far,
+middle, and near strata. The strata use the future end, so they are for scoring only: the equal
+width scaling uses one factor per arm and month, fitted on all that month's scored rows pooled
 across strata, so that scaling cannot absorb stratum-specific widening. Unscaled CRPS is reported
-beside every scaled figure. The dropped rows (no R0 residual history) are tabulated per stratum,
-and every arm is scored on the rows that all arms share.
+beside every scaled figure. The dropped rows (no R0 residual history) are tabulated per stratum, and
+every arm is scored on the rows that all arms share.
 
-Every table and figure reports the loss by lead day, 1 to 10. Real rows give the event-free veto and
+Every table and figure reports the loss by lead day, 1 to 9 (leads of 24 to 239 h). Real rows give the event-free veto and
 a descriptive row for the verified D5 and D16 pair.
 
 ## Arms
 
 All arms use the same rows, the same equal width scaling, and 2 seeds (the fitted ones). Age is the
 age of the departure estimated from the lags (experiment 647's `departure_age`, from the gap
-signals); R-haz reads it as an input, and B-haz uses the same estimate in S(age + lead) / S(age).
-Neither arm sees the true onset.
+signals); R-haz reads it as an input, and B-haz uses the same estimate in S(age + 1 + lead / 24) /
+S(age + 1). Neither arm sees the true onset.
 
 - **K1:** the NRA output; context only for the prevailing scoring.
 - **R0-168:** K1's quantiles shifted by K1's recent residual times exp(-lead/168 h). No fit.
-- **B-haz:** the same residual decayed by S(age + lead) / S(age), where S is the best single
-  parametric survival curve (exponential, Weibull, log-normal, or log-logistic, chosen by
-  likelihood) fitted to the training shift durations. No neural network. Refitted under each
-  duration mixture.
+- **B-haz:** the same residual decayed by S(age + 1 + lead / 24) / S(age + 1), where S(d) is the
+  fitted probability that a shift lasts at least d days, the age is in days and the lead in hours,
+  and S is the best single parametric survival curve (exponential, Weibull, log-normal, or
+  log-logistic, chosen by likelihood) fitted to the training shift durations. No neural network.
+  Refitted under each duration mixture.
 - **R-old and R-new:** experiment 650's heads (fixed duration prior) from its five-month fits,
-  reused. Experiment 650 refitted R-old, because the weights of experiment 647 were deleted.
+  reused. R-old is a refit of experiment 647's head, because that experiment's weights are not
+  available.
 - **R-haz:** R-new plus an explicit survival output (a non-negative hazard per lead day, so that
   survival falls monotonically with lead) trained with a binary cross-entropy against the observed
   share of shifts still on, added to the pinball loss. Training rows are weighted so that the
@@ -197,16 +205,15 @@ Neither arm sees the true onset.
 
 ## Results
 
-Scores are CRPS (twice the mean pinball loss over the 11 stored quantiles) in points of capacity,
-where 1 point is 1% of a Primary's effective capacity. A negative difference favours the first arm.
-Cells are the mean over lead days 1 to 9 (leads of 24 to 239 h; no row has a lead of 240 h) of the
-event-weighted mean, seeds averaged, then the mean of the 5 development months (2025-10, 2025-12,
-2026-01, 2026-03, 2026-06). Intervals are percentile bootstraps over the 5 months. All numbers are on
-unseen training-family shifts of the scored month (the heads trained on the other 4 months) unless
-stated. Equal width scaling multiplies each arm's quantile spread about its median by one factor per
-arm, month, and seed, chosen so that the q05-q95 band covers 0.90 of the month's scored rows pooled
-across strata. NRA is the normal running arrangement; MW and MVA Primaries are those metered in
-megawatts and in megavolt-amperes.
+Scores are the continuous ranked probability score (CRPS, twice the mean pinball loss over the 11
+stored quantiles) in points of capacity. A negative difference favours the first arm. Cells are the
+mean over lead days 1 to 9 (leads of 24 to 239 h; no row has a lead of 240 h) of the event-weighted
+mean, seeds averaged, then the mean of the 5 development months (2025-10, 2025-12, 2026-01, 2026-03,
+2026-06). Intervals are percentile bootstraps over the 5 months. All numbers are on unseen
+training-family shifts of the scored month (the heads trained on the other 4 months) unless stated.
+Equal width scaling multiplies each arm's quantile spread about its median by one factor per arm,
+month, and seed, chosen so that the q05-q95 band covers 0.90 of the month's scored rows pooled
+across strata.
 
 - **Primary contrast: not met.** Where a shift is in force (far, middle, and near pooled), scaled
   CRPS is K1 9.18, R0 (168 h) 6.72, B-haz 5.98, R-new 5.84, R-haz 5.96, and the placebo 8.31. R-haz
@@ -221,22 +228,22 @@ megawatts and in megavolt-amperes.
   scaled; R-haz minus B-haz there is -0.06 [-0.71, +0.72], so R-haz is no worse than the no-fit
   hazard baseline, as the plan required. R0 (168 h) hedges better near the end and loses far from
   it: R-haz minus R0 is +1.45 [+0.76, +2.25] near and -1.30 [-1.38, -1.22] far. The strata use the
-  future end, so far-end rows are shifts that did last and near-end rows are shifts that ended: the
+  future end, so far-end rows are shifts that did last and near-end rows are shifts that ended. The
   pooled in-force row is the fair summary.
 - **Middle of a shift and just after the end.** Scaled R-haz minus B-haz is -0.19 [-0.50, +0.12] in
   the middle. Within 7 days after the end (unscaled), K1 3.70, R0 4.92, B-haz 5.25, R-new 4.56,
   R-haz 4.58.
 - **The duration mixture matters for the contrast.** Under the short-heavy mixture (0.8 short),
-  R-haz minus B-haz is +0.43 [+0.04, +0.80], so R-haz is worse than B-haz there. Under the long-
-  heavy mixture (0.8 long) it is -0.06 [-0.35, +0.16]. R-haz minus R0 is +0.10 [-0.08, +0.40] and
-  -1.13 [-1.49, -0.58]. The sign of the primary contrast does not hold across the mixtures.
+  R-haz minus B-haz is +0.43 [+0.04, +0.80], so R-haz is worse than B-haz there. Under the
+  long-heavy mixture (0.8 long) it is -0.06 [-0.35, +0.16]. R-haz minus R0 is +0.10 [-0.08, +0.40]
+  and -1.13 [-1.49, -0.58]. The sign of the primary contrast does not hold across the mixtures.
 - **The survival probabilities are not within 0.10 in every cell.** Averaged over in-force rows on
   training-family shifts, R-haz predicts survival 0.88, 0.76, and 0.68 at lead days 1 to 3, 4 to 7,
   and 8 to 10, against observed shares of 0.92, 0.83, and 0.78. B-haz predicts 0.92, 0.81, and 0.73.
   On the held-out durations (5, 10, 21, and 45 days) R-haz predicts 0.87, 0.75, and 0.67 against
   0.86, 0.71, and 0.61. Individual bins with at least 500 rows differ by up to 0.42 for R-haz (see
-  the reliability figures). The prior of experiment 647 (0.5 short) is closest on the training-
-  family shifts.
+  the reliability figures). R-haz sits further from the observed share than B-haz and the fixed
+  prior of experiment 647 (0.89, 0.80, and 0.74).
 - **Held-out durations.** The same contrasts, scaled and in-force: R-haz minus B-haz -0.74 [-0.96,
   -0.51], minus R0 -1.46 [-1.89, -0.89], and minus R-new -0.13 [-0.27, -0.01]. The head and the
   fitted curve are no longer tied there.
@@ -249,15 +256,13 @@ megawatts and in megavolt-amperes.
   against the shifted truth it scores 9.93. The 6.3-point gap is the scoring's fault and not the
   forecast's. On event-free origins K1 scores 3.70 against the unshifted base and R-haz 3.65 against
   the observed power.
-- **Placebo and nested-arm triggers.** Near the end of a shift the placebo scores 4.50 unscaled and
-  K1 3.98, both below R-haz's 7.44, and R-haz minus the placebo there is +1.91 [+1.32, +2.58]
-  scaled. The loss of the heads near the end is the cost of continuing a shift that has just ended;
-  why the placebo carries the shift forward less was not tested. The plan's prediction that R-haz
-  beats R0 at every in-force state therefore fails near the end (+1.45).
-- **Placebo.** The placebo scores 8.53 unscaled where a shift is in force, 1.4 below K1, so a head
-  unlinked to its inputs still gains by shifting and widening on average. R-haz minus placebo is
-  -2.35 [-2.90, -1.49] scaled, which is the part of the gain attributable to the inputs. No
-  threshold was set on the placebo.
+- **Placebo.** Near the end of a shift the placebo scores 4.50 unscaled and K1 3.98, both below
+  R-haz's 7.44, and R-haz minus the placebo there is +1.91 [+1.32, +2.58] scaled; the placebo's
+  lower loss near the end was not explained. The plan's prediction that R-haz beats R0 at every
+  in-force state therefore fails near the end (+1.45). Where a shift is in force, the placebo scores
+  8.53 unscaled where a shift is in force, 1.4 below K1, so a head unlinked to its inputs still
+  gains by shifting and widening on average. R-haz minus placebo is -2.35 [-2.90, -1.49] scaled,
+  which is the part of the gain attributable to the inputs. No threshold was set on the placebo.
 - **Tail calibration (unscaled, where a shift is in force).** q05-q95 coverage is K1 0.49, R0 0.63,
   B-haz 0.73, R-new 0.82, R-haz 0.83, placebo 0.73, against 0.90. Pinball loss at q01, q05, q95, and
   q99: K1 2.19, 3.66, 3.59, and 2.04; R0 1.04, 2.12, 2.10, and 0.99; B-haz 0.81, 1.66, 1.73, and
@@ -271,11 +276,11 @@ megawatts and in megavolt-amperes.
 
 - **Arms.** K1 (stored, the NRA output); R0 (168 h); B-haz (K1 plus the same residual times S(age +
   1 + lead / 24) / S(age + 1) for the best of an exponential, Weibull, log-normal, or log-logistic
-  curve fitted to the training durations of the other 4 months; the best curve was log-normal, log-
-  logistic, or Weibull, depending on month and mixture); R-old and R-new (experiment 650's five-
-  month fits, reused; `ml-experiments/00650-*`); R-haz (the survival head below); and the placebo
-  for R-haz. Reused code: experiment 647's head, inputs, and fit constants, experiment 650's banks,
-  K1 rebuild, and scaling.
+  curve fitted to the training durations of the other 4 months; the best curve was log-normal,
+  log-logistic, or Weibull, depending on month and mixture); R-old and R-new (experiment 650's
+  five-month fits, reused; `ml-experiments/00650-*`); R-haz (the survival head below); and the
+  placebo for R-haz. Reused code: experiment 647's head, inputs, and fit constants, experiment 650's
+  banks, K1 rebuild, and scaling.
 - **R-haz.** Experiment 647's mixture head with the survival probability read from 10 non-negative
   daily hazards (the survival probability falls with lead), a binary cross-entropy against the
   observed still-on label with weight 0.05, and the departure's age as an input. Rows are weighted
@@ -286,8 +291,8 @@ megawatts and in megavolt-amperes.
   (asserted). Shifts whose end was clipped at that date are excluded from the survival label and
   from the far, middle, and near strata. Power comes from experiment 650's stored clean stack.
 - **Cadence and compute.** One small head per scored month, trained on the other 4 months, 2 seeds,
-  so no refit cadence applies. The 40 fits took about 6 minutes on CPU (8 processes); the GPU was
-  not used. Fits are in `data/ml-experiments/00652-*/fits`.
+  so no refit cadence applies. The 40 fits took about 6 minutes on the CPU (8 processes); no
+  graphics processor was used. Fits are in `data/ml-experiments/00652-*/fits`.
 - **Reuse.** R-old and R-new predictions come from experiment 650's `fits5`; K1 rows and banks from
   experiments 650 and 647.
 
@@ -313,20 +318,19 @@ megawatts and in megavolt-amperes.
   but it inflates K1's factor and makes scaled event-free numbers for K1 misleading; unscaled
   numbers are given where that matters.
 - The duration mixture is an assumption (0.5 short, 3 to 14 days; 0.5 long, 28 to 112 days). The
-  only measured durations are one verified 15-day pair and one unconfirmed step of about 16 weeks.
-  Both heads learn that prior, and the survival curve of B-haz is fitted to it.
+  only measured durations we have are one verified 15-day pair and one unconfirmed step of about 16
+  weeks. Both heads learn that prior, and the survival curve of B-haz is fitted to it.
 - The intervals use 5 month blocks, so every interval is coarse. The held-out family differs from
   the training family in a few attributes only.
 - NGED's event labels are incomplete, so real event-free rows may hold unlogged shifts, and the
   real-row veto is optimistic.
 - No real-row 14-day example forecast is shown; the example figure uses injected shifts.
-- R-old is a refit on one training bank, not the stored head of experiment 647.
 - The first-month-pair gate was not run as a separate step.
 
 ## What to try next
 
 - Train the survival output on shifts whose end depends on observable signals (the gap signals
   falling back towards zero), because a duration prior alone gives no more than the fitted curve.
-- Give the head a different loss near the end: score R-haz and B-haz with a pinball loss that
-  targets the near-end rows, and test a fixed widening rule that is wider in the last day.
+- Train the head with a pinball loss weighted towards rows in the last 24 hours before a shift ends,
+  and test a fixed widening rule that is wider in the last day.
 - Re-test with a measured duration mixture once NGED supplies one.
