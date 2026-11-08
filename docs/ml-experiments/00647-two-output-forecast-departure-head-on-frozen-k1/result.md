@@ -8,7 +8,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -56,211 +56,187 @@ row_set_id: dev_months_origins_2025_10_to_2026_06_export_roster
 metric: >-
   CRPS (twice the mean pinball loss over the 11 stored quantile levels) in points of capacity,
   q05-q95 coverage, and q01, q05, q95, and q99 pinball loss, by phase of the shift and lead band.
+verdict: partly supported
+best_arm: >-
+  H1 (the departure head with a survival mixture) where a shift is in the lags: CRPS 14.35 points of
+  capacity on rows inside an injected shift (P2) against K1's 24.37 and R0's 19.09 (H1 minus K1
+  -10.02, interval -10.65 to -9.55). No arm is best after a shift ends: K1 scores 3.19 and H1 6.88
+  (P3).
+headline: >-
+  A departure head fitted on the outputs of K1 cut the CRPS inside an injected shift by 10.0 points
+  of capacity against K1 and 4.7 against R0, but cost 3.7 points after the synthetic shift ended
+  (interval 3.29 to 4.09), reached q05-q95 coverage of 0.62 on real flagged days against a bar of
+  0.75, and beat its noise placebo on those days by 1.71 points with an interval from -6.45 to 0.23.
+lessons: >-
+  The head learns what the duration prior tells it, that a shift usually continues. The injection
+  bank rewards that prior inside the shift and punishes it after the end. On real flagged days the
+  head's gain over its noise placebo has an interval that includes zero, and the verified D5 and D16
+  pair is two events. The encoder arms (E1, E2) added nothing measurable over the head on K1's
+  outputs. R0 with tau of 168 h was only scored on the first month pair, where it came within 1.1
+  points of H1 on P2.
+take_home_message: >-
+  A small head that reads K1's outputs and recent lag gaps can follow a load shift that is already
+  in
+  the lags, cutting the error inside the shift by about 40% against K1, but it also keeps
+  forecasting
+  the shift after it ends, so it is worse than K1 by 3.7 points on the days after a shift. On real
+  flagged days its gain over a head fed noise is small enough to be chance, and the encoder arms add
+  nothing, so the next experiment should give the head a way to learn when a shift ends, before any
+  head is considered for production.
+advice:
+  - >-
+    Do not port the departure head as it stands: it costs 3.7 points of CRPS after a shift ends
+    (P3 contrast, Results bullets), and the duration prior that causes the cost is a stated choice,
+    not a fitted quantity.
+  - >-
+    Score R0 with tau of 168 h over all five months beside tau of 72 h before treating the head's
+    4.7-point lead over R0 as settled, because on the first month pair R0 at 168 h scored 15.18
+    against H1's 14.08 on P2 (First month pair bullet).
+  - >-
+    Fit a head on injected shifts that end on varied days, because every shift in the bank ends on
+    day 14 and the shuffled-age control (AS) already closes 5.1 of the 10.0 points (Checks).
+  - >-
+    Treat the real-day result as unproven in both directions: 28,695 real rows, two real events in
+    the verified pair, and incomplete NGED event labels (Limits).
 production_status: not-for-production
 ---
 
-## Status
+Experiment 647 asked whether a second, small neural network can forecast the arrangement now in
+force at a Primary (primary substation) better than K1 does when K1's forecast is shifted by its own
+recent error (R0). K1 is the demand network that forecasts the normal running arrangement (NRA), the
+power a Primary would draw with no load shift. We froze K1, fitted a departure head on its stored
+forecasts and on the gap between recent power and the lag-free forecast, and scored the head on 5
+development months (2025-10 to 2026-06), leave-one-month-out. Scoring used shifts injected into real
+power (the injection bank of experiment 581), the days flagged by the experiment 637 detector, and
+the verified D5 and D16 pair. The head follows a shift that is already in the lags much better than
+K1 or R0 does, and it keeps forecasting the shift after the shift ends.
 
-**Plan only: no head has been fitted and no score read.** The page is rewritten as the write-up
-after the run.
+**Take-home message.** A head that reads K1's outputs and the lag gaps cuts the error inside an
+injected shift by about 40% against K1 (10.0 points of capacity) and by 4.7 points against R0. It
+also scores 3.7 points worse than K1 on the days after a synthetic shift ends, because the duration
+prior tells the head that shifts usually continue. On real flagged days its gain over a noise
+placebo has an interval that includes zero, and the encoder arms add nothing measurable. The next
+experiment should teach a head when a shift ends before any head is considered for production.
+Verdict: partly supported.
 
-## Question and design
+## Figures
 
-NGED want two forecasts from one demand network. The normal running arrangement (NRA) forecast is
-the power a Primary (primary substation) would draw with no load shift, and K1 already gives it.
-The prevailing forecast follows the arrangement in force now. The
-design answer in the private `data/ml-experiments/briefs/` folder
-for the two outputs proposes that the prevailing output equals the NRA output plus a departure term
-from a separate small head, and not a second quantile head on a shared trunk. This experiment is
-that design's first test, on K1's stored forecasts. It follows
-[experiment 590](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00590-synthetic-load-shifts-in-the-training-targets/result/),
-which found that training one network on shifted targets doubles how far its median follows a shift.
+![CRPS inside an injected shift and on real flagged days, by arm](fig1_p2_p4_bars.svg)
 
-**The NRA output is K1, frozen and unchanged.** On real rows it is the stored export of experiments
-612 and 613 (the mean of five seeds, with the G4 gated band, and no tail constants). On the injected
-bank the stored files are raw per-seed forecasts, so the script rebuilds K1 from them with
-experiment 613's scoring path (seed mean, G4 state) and first asserts that the rebuild reproduces
-experiment 613's K1 score tables. The stored export applies no tail constants, so K1 with tail
-constants (K1+t) exists only in experiment 613's scoring path, and for 2025-10 experiment 613 has no
-K1+t, so K1+t equals K1 there. The NRA output is the stored export's K1 (no tail constants) on real
-rows and 613's seed mean on the injected bank. The head code has no path that writes to the NRA
-rows, and the scoring script asserts the NRA columns are identical before and after the head runs.
-N1 and N2 are therefore reported, not tested.
+![Injected shift of 0.15 of capacity for 15 days](fig2_pass2.svg)
 
-## Arms
+![Injected shift of 0.30 of capacity for 7 days](fig2_pass5.svg)
 
-- **R0 (no fit).** K1's 11 quantiles shifted by the mean of observed power minus K1's day-ahead
-  median over valid days 2 to 8 before the origin, times exp(-lead / tau), for tau of 72 h and
-  168 h. The experiment reproduces the design answer's R0 numbers with its own code and reports
-  them.
-- **H1 (departure head with a survival mixture).** A small neural network (two hidden layers of 64
-  units) outputs a signed depth *d* and a depth uncertainty. The prevailing quantiles are those of
-  a mixture of K1's distribution (weight 1 - p) and K1's distribution shifted by *d* (weight p),
-  where *p* is the survival probability that the departure still holds *h* hours later, given its
-  age. The duration prior is a stated choice: an equal mixture of a uniform 3 to 14 day duration
-  and a uniform 28 to 112 day duration. A sensitivity run uses a short-heavy (80% short) and a
-  long-heavy (80% long) mixture.
-- **H2 (free quantile head).** The same inputs and loss, with 11 offsets added to K1's quantiles
-  and sorted. It tests whether the mixture structure helps.
-- **H1-p (noise placebo).** H1 with every signal input replaced by Gaussian noise that matches the
-  column's mean and variance. It must score close to K1.
+![Injected shift of 0.50 of capacity for 7 days](fig2_pass9.svg)
 
-**Head inputs.** The gap between each power lag and the lag-free forecast, its exponentially
-weighted averages (half-lives of 1, 3, and 7 days), and the neighbour summaries (experiment 606's
-`gap`, `ew`, and `nb` groups, which cut the median's follow from 0.119 to 0.035 to 0.065); the G4
-gate state; the age of the freshest lag; and the age of the current departure. The head has its own
-inputs and no shared encoder with K1, so its loss cannot flow into K1.
+![The verified D5 and D16 load shifts against K1 and H1](fig2_verified_pair.svg)
 
-## Training and scoring rows
+![Alarm rate and delay of H1, E2, and the experiment 637 detector](fig4_detector.svg)
 
-- **Prevailing target.** On an injected row, observed power plus the synthetic shift for valid
-  times before the synthetic end; elsewhere, observed (cleaned) power. The injection bank is
-  experiment 581's: 24 passes per month, depths of 0.15, 0.30, and 0.50 of capacity, lengths of 3,
-  7, 15, and 30 days, ending on day 14, in both signs. The stored forecasts on that bank are
-  experiment 613's `inject` folders, so no K1 inference is needed. The lags carry the shift; the
-  stored forecasts already reflect it.
-- **No tuning on the scored month.** The head is fitted leave-one-month-out: its training months
-  are the other development months and its scored month is held out. The first fold pair is
-  2025-10 and 2025-12 with head seeds 0 and 1. The survivor then runs on all five months with
-  head seeds 0 to 4. The first pair's hyperparameters (learning rate, weight decay, epochs) are
-  fixed in the plan below, and are not tuned on any scored month.
-- **Hyperparameters.** Adam, learning rate 0.003, weight decay 0.0001, batch 4096, 30 epochs,
-  early stop by validation loss on a held-out training month, and the validation split grouped by
-  month. This is the whole search.
-- **Compute.** H1 and H2 are a few thousand weights on stored forecasts and run on CPU. The encoder
-  arms use the GPU under the ceiling in the Encoder arms section.
-- **Cadence.** No refit cadence applies: K1's forecasts are stored as made (monthly refit of
-  experiment 612 and 613's E3 rule), and the head is fitted once per held-out month.
+## Results
 
-## Scorecard (from the design answer; pre-registered)
+CRPS is in points of capacity (a CRPS proxy from the 11 stored quantiles), 95% intervals resample
+the 5 months and 5 seeds, and a negative contrast favours the first arm.
 
-| Id | Output | Rows | Measure | Bar |
-|---|---|---|---|---|
-| N1 | NRA | injected 15 and 30 day bank | q05-q95 coverage day 4 to end; follow; safe-side share | within 0.01 of K1 (0.927, about 0.11, 0.944) |
-| N2 | NRA | event-free | CRPS | within 0.0006 of capacity of K1 |
-| P1 | Prevailing | event-free, not flagged | CRPS by group and lead band (day 1, days 2 to 5, days 6 to 10) | no worse than K1 by more than 0.03 points in any cell |
-| P2 | Prevailing | injected bank, during the shift | CRPS against the shifted target | at least 15% below K1, and below R0 by more than the MDE |
-| P3 | Prevailing | injected bank, after a synthetic end inside the horizon | CRPS against the NRA | no worse than K1 by more than 0.03 points |
-| P4 | Prevailing | experiment 637 detector flags on development days, and the verified D5 and D16 pair | CRPS against observed; coverage | below R0 by more than the MDE; coverage at least 0.75 |
-| P5 | Prevailing | event-free | q05-q95 coverage | 0.88 to 0.92 |
+- **Arms and architecture.** K1 is the stored forecast of experiments 612 and 613 (unchanged). R0 is
+  K1 shifted by its mean recent error times exp(-lead/tau), tau 72 h; R0\* is the variant that
+  matches the design answer's verified-pair figure. H1 is a two-layer, 64-unit network whose depth
+  and depth uncertainty drive a mixture of K1's distribution and K1 shifted by the depth, with a
+  stated duration prior. H2 is a free quantile head. H1-p is H1 with noise in place of its signals.
+  E1 reads K1's frozen encoder, E2 has its own copy, and E3 trains a joint network. AG (age and gate
+  only) and AS (age shuffled) are controls.
+- **Row set.** 5 months of the development window, 16 Primaries. P1 is 732,048 event-free rows, P2
+  is 1,281,930 rows inside an injected shift, P3 is 1,454,628 rows after a synthetic end, and P4 is
+  28,695 real rows on flagged days or in the verified pair. Leads run from 24 to 240 h. The head ran
+  with leave-one-month-out and 5 seeds on all months; K1 is the mean of 5 seeds.
+- **Inside a shift (P2).** K1 24.37 [23.97, 24.73], R0 19.09, R0\* 18.94, H1 14.35 [13.97, 14.68],
+  H2 15.18, E1 15.33, E2 14.68, H1-p 23.78. H1 minus K1 is -10.02 [-10.65, -9.55], and H1 minus R0
+  is -4.73 [-5.30, -4.31].
+- **After a synthetic end (P3).** K1 3.19, R0 4.16, H1 6.88, H1-p 3.30. H1 minus K1 is +3.69 [3.29,
+  4.09], which breaks the 0.03-point bar by a factor of about 120.
+- **Event-free rows (P1).** K1 3.713, R0 3.593, H1 3.685 [3.212, 4.421]. H1 minus K1 is -0.029
+  [-0.215, 0.132], inside the 0.03-point bar, but H1 minus R0 is +0.092 [0.045, 0.148], so R0 is
+  better here. Coverage of the q05-q95 band is 0.889 for H1 and 0.869 for K1 (bar 0.88 to 0.92).
+- **Real flagged days and the verified pair (P4).** K1 10.52 [8.19, 16.98], R0 9.79, H1 8.40 [7.31,
+  13.01], H1-p 10.11, E2 8.22. H1 minus K1 is -2.12 [-6.93, -0.15], H1 minus R0 is -1.39 [-4.52,
+  -0.10], and H1 minus H1-p is -1.71 [-6.45, 0.23]. Coverage is 0.62 for H1 (bar 0.75), 0.47 for R0,
+  and 0.44 for K1. On the verified pair alone (13,068 rows) K1 scores 14.93, R0 13.77, R0\* 13.42,
+  H1-p 14.24, H1 10.90, and E2 9.93.
+- **First month pair (feasibility gate; 2025-10 and 2025-12 only).** P2: K1 24.455, R0 (tau 72 h)
+  19.051, R0 (tau 168 h) 15.183, H1 14.084, H2 14.508. P4: K1 9.406, R0 9.350, H1 9.162, H2 8.859,
+  H1-p 9.024. The gate passed, but H1 minus H1-p on P4 was +0.139, so H1 was not better than its
+  placebo there.
+- **Encoder arms.** E1 minus H1 is +0.977 [0.156, 2.485] on P2 and +0.195 [0.082, 0.289] on P1; E2
+  minus H1 is +0.328 [-0.551, 1.306] on P2 and +0.208 [0.091, 0.310] on P1. Both intervals on P4
+  include zero (E2 -0.180 [-0.281, 0.146]; E1 +0.109 [-0.082, 0.636]). E3 (joint network,
+  forward-chained, 2025-12 only) scored 3.164 on event-free rows against K1's 3.283, but its placebo
+  E3p scored 3.236, and E3 scored worse than K1 on flagged days (8.484 against 8.302) and on the
+  verified pair (13.976 against 13.774).
+- **Tails.** On P2, pinball loss at q01 and q99 is 3.282 and 3.107 for H1 against 8.613 and 7.519
+  for K1, and the share of rows above q99 falls from 0.393 to 0.149 (nominal 0.01). After a shift
+  ends (P3), q01 and q99 pinball loss rise from 0.170 and 0.220 (K1) to 0.335 and 0.342 (H1). On P4,
+  H1 scores 0.863 and 1.771 against K1's 1.964 and 2.922, with 0.154 of rows above q99. On
+  event-free rows H1 scores 0.200 and 0.256 against K1's 0.193 and 0.279.
+- **Avoidable-curtailment cost proxy** (six MW Primaries, leads 24 to 36 h, limit at 0.9 of the
+  pre-2025-10 peak; the unit is the experiment 601 function's, with no interval and no
+  manual-heuristic comparison). On P2 K1 scores 259,512, R0 130,891, and H1 72,547. After a
+  synthetic end (P3) K1 scores 807, R0 11,551, and H1 25,275. On P4 K1 scores 183,820, R0 77,983,
+  and H1 43,413. Across all real rows K1 scores 13,547, R0 6,338, and H1 3,826.
+- **Detector read-out against experiment 637** (injected bank; depth alarm: the head's depth reaches
+  0.05 of capacity at leads 24 to 26 h). The head's survival probability alarms on 100% of injected
+  shifts at every depth and length except 99% at 0.15 for 7 days, and its depth alarms on 95% at 0.3
+  for 3 days. Experiment 637 alarms on 18% to 36% at 0.3 for 7 days and on 0% to 4% at 0.3 for 3
+  days. False alarms per Primary-month on event-free origins are 6.1 for the survival signal and 1.7
+  for the depth signal. Experiment 637's rate on the same basis was not computed; its flagged
+  Primary-days were 5, 27, 26, 2, and 0 in the five months. Days from onset to first alarm are 1.4
+  to 1.8 at depth 0.5 for lengths up to 15 days. On the verified pair the survival signal first
+  alarmed at grid index 110,994 against experiment 637's 111,090 and 111,186.
+- **Absolute scores for the reference table.** K1 3.713 (P1), 24.37 (P2), 3.19 (P3), 10.52 (P4); R0
+  3.593, 19.09, 4.16, 9.79; R0\* 3.578, 18.94, 4.24, 9.62; H1 3.685, 14.35, 6.88, 8.40; E1 3.880,
+  15.33, 6.69, 8.51; E2 3.892, 14.68, 6.98, 8.22.
 
-**Flagged-day caveat.** Experiment 637's detector selects days on which observed power leaves the
-manual heuristic, so P4 favours any forecast that follows a shift. P2 and P3 are the unbiased
-tests, and P4 is the real-data check. The NRA is never drawn as truth in a figure.
+## Checks
 
-**Reported with every score.** Tail calibration (coverage and pinball loss at q01, q05, q95, q99)
-and the avoidable-curtailment cost in three row sets (inside each hand-labelled event, the 7 days
-after, and all rows) per group and per Primary; the unlogged-event caveat; the median minus the
-mean forecast per site; and the CRPS contrast beside the same contrast on the median's error.
+- **Median minus mean forecast per Primary (event-free rows, points of capacity).** 14 of 16
+  Primaries lie within 0.65 for K1. Primary 10 is -5.181 (H1 -4.579, E2 -4.346) and Primary 8 is
+  -1.388 (H1 -1.310). R0 equals K1 on every Primary because the shift moves the mean and the median
+  equally.
+- **Mean-forecast contrast beside quantile contrasts.** The mean forecast's error was not scored.
+  The error of the median forecast (MAE) moves with the CRPS on P1 to P3: P1 K1 6.657, H1 6.656; P2
+  K1 30.06, H1 21.28; P3 K1 5.96, H1 13.39. The scorecard holds no MAE for P4.
+- **Triggers that fired.** Trigger 1 (a control failed): H1-p moved P2 by -0.59 points against K1,
+  above the 0.05-point bar, and H1 minus H1-p on P4 is -1.71 [-6.45, 0.23], with +0.139 on the first
+  pair. Trigger 2 (a result contradicts the prediction): P4 coverage is 0.62 against 0.75, and P3
+  breaks its bar. Trigger 5 (a control moves the score): the age-and-gate head AG scores 20.98 and
+  the shuffled-age head AS 19.26 on P2, closing 3.4 and 5.1 of H1's 10.0 points without the gap
+  signals. Trigger 3 did not fire on P1 to P3 and could not be checked on P4. Trigger 4 (leaving one
+  Primary out) was not run. Triggers 6 and 7 were not assessed. No audit has run yet; one is needed
+  before the prose review.
 
-## Encoder arms (maintainer instruction, 2026-11-07)
+## Limits
 
-The departure head may need K1's raw lag-encoder embeddings, and the encoder may need to learn new
-concepts. Three encoder arms therefore run beside H1 and H2, each with the survival-mixture
-departure head of H1, each scored on the same scorecard and the same detector read-out:
+- **Injection bank.** Injected events repeat per Primary and pass in every month, so the permuted
+  control was not run. Every shift ends on day 14, so the head can learn the end date from the age
+  input, and the 28 to 112 day part of the duration prior is not exercised.
+- **Coverage of the bank and the verified pair.** The bank covers 13 to 14 Primaries. The verified
+  D5 and D16 pair is two events. K1(Dec) is in-sample on the October rows.
+- **R0.** R0's verified-pair figures do not reproduce the design answer's (the script gives 13.77
+  and 13.35 against 13.42 and 12.79), so R0\* is the baseline that matches 13.42. Only tau of 72 h
+  is scored over all 5 months.
+- **Lab shortcuts and labels.** The detector read-out is a lab test: the head was fitted on the same
+  bank's shifts (leave-one-month-out), and the verified pair is the only real event. NGED's event
+  labels are incomplete, so clean-lag rows may hold events no label covers, false alarms are an
+  upper bound, and the harm on event-free rows is optimistic.
+- **Days to alarm.** The figure of about 16.7 days for 30-day shifts is inflated and should not be
+  read as a detection delay.
+- **Horizon.** Leads run from 24 to 240 h only.
 
-- **E1 (frozen encoder).** The head reads the embedding `hl` of K1's lag encoder (the day-lag and
-  week-lag outputs, concatenated), with K1's weights frozen, plus the gap, weighted-average, and
-  neighbour signals of experiment 606 as its own inputs. K1 itself has no neighbour embeddings,
-  because it is experiment 591's stock A1 network, so those signals reach the head only as inputs.
-  The NRA output is exactly K1.
-- **E2 (own encoder).** The head has its own copy of the encoder, initialised from K1's weights
-  and trained on the departure loss only. The NRA output stays exactly K1.
-- **E3 (joint network).** One network trains a shared encoder on both losses. The NRA head reads a
-  detached copy of the embedding, so only the departure loss moves the shared encoder, and a
-  placebo (E3 with the departure target replaced by the unshifted target) separates the architecture
-  from the shifted-target information. The NRA head trains on unshifted targets only.
+## Next experiments
 
-**Reading rule.** E1 failing alone is not evidence against encoders, because K1 is fine-tuned on
-synthetic lag shifts to ignore them and its `hl` may discard the signal. The report compares E1
-with H1 (the same head on K1's outputs and the 606 signals) and with E1 plus the 606 signals.
-E1, E2, or E3 beats H1 on a bar by the same rule as H1 beats R0.
-
-**Seeds and refits.** K1's weights are per month, refit day (d0 or d14), and seed, and embeddings
-of different networks are not aligned. Each origin day uses the d0 or d14 model that produced its
-stored forecast. One head is fitted per K1 seed with a refit indicator input, and the five
-departure outputs are averaged. This replaces the head-seed scheme above for E1 to E3. E2 and E3
-start from the K1 model of the scored month's refit, which has not seen later months.
-
-**NRA acceptance for E3.** E3 runs forward-chained only (earlier months only, as K1 is), and its
-NRA output must pass N1 (injected bank) and N2 (event-free CRPS and MAE) and show median follow no
-higher than K1's on the 637 flagged days and the verified D5 and D16 pair. N2 is non-inferior
-when the upper end of a month-block and seed-resampled interval is below the larger of 0.0003 of
-capacity and the noise floor, which is the spread of K1 against itself under different seeds in
-experiment 613.
-
-**Compute.** E1 to E3 rebuild K1's input tensors (experiment 613's per-month tables) and run or
-train the network, so the GPU is used, one process at a time, with `nvidia-smi` checked before each
-launch and a ceiling of 8 GPU-hours (E1 1, E2 2, E3 4, reserve 1). The first step checks that
-the stored `.pt` files load, and that rebuilt inputs reproduce the stored forecast within a stated
-tolerance for one d0 and one d14 model. One fold of each arm is timed before the full run.
-
-## Inputs, controls, and limits
-
-- **Input sources.** Injected lags come from `e00581_bank.contaminate`; the lag-free forecasts
-  from experiment 598's table; the signals from experiment 606's code. The first step lists, per
-  input, its source file and its first and last available date. Rows where R0 or a lag input
-  cannot be formed (a 30 day shift starting in the previous month, or a history shorter than the
-  7 day half-life needs) are dropped from every arm equally, and the counts are reported. If the
-  lag-free table is missing days before a month's first origin, K1 inference fills them, with one
-  fold timed first and the 2 GPU-hour ceiling kept.
-- **R0 specification.** R0 is written as code (`e00647_r0.py`). On the stored non-injected export
-  it reproduces the design answer's event-free numbers (K1 3.752; R0 3.637 at tau 72 h and 3.581
-  against 3.577 at tau 168 h). It does not reproduce the design answer's verified-pair numbers:
-  the script gives 13.77 and 13.35 against 13.42 and 12.79, and the design answer's script was
-  not kept. The experiment therefore reports its own R0 as the baseline, lists the design answer's
-  verified figures as unaudited and unreproduced, and adds a second baseline R0* (the variant
-  among those tried that matches the design answer's verified figure at 72 h). A head counts as
-  beating R0 only when it beats both. Observed power for R0 on the injected bank carries the same
-  shift as the lags, with the same staleness (at least 33 hours). Tau takes the values 72 h and
-  168 h, and both are reported. The 68,384 of 814,538 event-free rows whose origin has no residual
-  get no shift (R0 equals K1 there).
-- **No calendar or date input enters either head.** The age of the current departure is the only
-  duration signal. Because every injected shift ends on day 14, an extra control gives the head
-  the age shuffled across rows. P2 and P3 are reported per injected length (3, 7, 15, and 30
-  days). The 28 to 112 day part of the duration prior cannot be exercised by this bank and rests on
-  the stated prior.
-- **Leakage.** The leave-one-month-out variant trains on later months as well as earlier ones, as
-  experiment 613's tail constants do. A forward-chained variant (earlier months only) runs on the
-  first month pair. Rows flagged by experiment 637's detector or by G4, and the verified D5 and
-  D16 days, are excluded from head training (the real rows in them have unknown NRA), and the
-  training row count per fold is reported.
-- **Extra controls.** An age-and-gate-only head (no gap inputs); H2 with a noise placebo; a plain
-  widened K1 band with the same coverage as H1 on P2 and P4; an oracle head given the true depth
-  and onset on injected rows (the ceiling). The mean q95-q05 band width is reported beside every
-  coverage. The five seeds of K1 enter the intervals by resampling seeds.
-- **Figures chosen before scores.** Six time series plots: pass 2, 5, and 9 of 2025-12, one
-  Primary of each metering group each, plus the verified D5 and D16 pair.
-
-## Read-out: the gap as a detector
-
-If the head works, the gap between the prevailing and NRA outputs is a detector of departures. A
-detector is needed anyway to mask rows when scoring NRA forecasts on new data, because NGED will
-send no new labels. The run scores two signals as detectors with no extra fit: the gap at lead 0
-(the head's depth *d*) and the head's survival probability. The scoring reports recall on the
-injected bank (per depth and length) and on the verified D5 and D16 pair, the false-alarm rate per
-month on event-free days, and the days from onset to the first alarm, beside experiment 637's
-frozen detector on the same days. Limits stated in the write-up: the gap is built from the same
-lag-minus-lag-free signal as G4; the bank holds four lengths and one verified real pair; and NGED's
-event labels are incomplete, so false alarms are an upper bound.
-
-## Standing practices
-
-Followed: cleaned data throughout (the `substation_zero` rule's drops reported per fold); the noisy
-start of D15 and D18 cut; every head saved under the experiment's data folder; stored predictions of
-experiments 612 and 613 reused; tails and cost reported; the day-ahead and the 14-day horizon
-plotted against what happened; at least 6 time series plots across both metering groups of the
-shifts and of the two outputs. Not followed: refit monthly (no K1 refit occurs). The July to
-October 2026 window is closed.
-
-## Advice taken from earlier experiments
-
-Followed: experiment 590's placebo and no-shifted-target rules; experiment 598's rule to keep gate
-signals out of the NRA side; experiment 606's gap and neighbour inputs; experiment 613's tolerance;
-experiment 645's pairing of K1 against BG2 on the development months. Departures: none.
-
-## Next steps (rewritten after the run)
-
-A permanent change in load appears as a departure that never ends, which the first experiment does
-not test. The design answer's follow-up 1 (injected 4 to 16 week shifts) and follow-up 2 (joint
-training) wait for this result.
+Three questions follow from the result, and none is committed. First, whether a head that sees
+shifts ending on varied days, and shifts of 4 to 16 weeks, can keep the gain inside a shift without
+the cost after it; the departure that never ends (a permanent change in load) is not tested here.
+Second, whether R0 with tau of 168 h, scored over all 5 months, already matches the head on P2,
+since it came within 1.1 points on the first pair with no fit. Third, whether a head trained as a
+detector on the gap, with a separate forecast path, serves the use that needs a detector, which is
+masking rows when scoring NRA forecasts on new data.
