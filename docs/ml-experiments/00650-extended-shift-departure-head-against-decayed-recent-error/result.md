@@ -82,7 +82,8 @@ half constant, half proportional to the Primary's own load (the realised mix is 
 group, because MVA receivers take constant shapes only); step or 6 to 48 h ramp onsets; depth
 log-uniform from 3 to 50 points of capacity; duration drawn from 3 to 14 days or 4 to 16 weeks,
 with a random end (before, inside, or after the 10-day horizon); the donor's loss reaches one or
-two real electrical neighbours at r times the loss, r from 0.5 to 1 (partial conservation); power is never summed across MW
+two real electrical neighbours at r times the loss, r from 0.5 to 1 (partial conservation);
+power is never summed across MW
 and MVA Primaries (MVA receivers take constant-shape events only, with a stated power factor of
 0.97). Training passes use seeds disjoint from the test passes.
 
