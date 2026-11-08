@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: ANN001, D103, E501
 """Experiment 647, stage 2: build the head's rows and origin-level inputs for one month (CPU).
 
 Writes `head_data/real_<month>.npz` and `head_data/bank_<month>.npz` in the data folder.
@@ -205,7 +205,11 @@ def build_bank(*, month: str, clean: np.ndarray, table: s598.LagFreeTable, nb: s
     n_org = 0
     for r in range(bank.N_PASSES):
         z = np.load(BANK_ROWS / f"rows_{month}_r{r:02d}.npz")
-        prim, oi, vi = z["prim"].astype(np.int64), z["origin_idx"].astype(np.int64), z["idx"].astype(np.int64)
+        prim, oi, vi = (
+            z["prim"].astype(np.int64),
+            z["origin_idx"].astype(np.int64),
+            z["idx"].astype(np.int64),
+        )
         lead, obs, q = z["lead"], z["obs"], z["k1_inj"]
         assert np.array_equal(obs, clean[prim, vi].astype(np.float32), equal_nan=True)
         signed = np.array([bank.event(primary=p, r=r)[0] for p in range(16)])
@@ -245,7 +249,9 @@ def build_bank(*, month: str, clean: np.ndarray, table: s598.LagFreeTable, nb: s
     cat = {k: np.concatenate(v) for k, v in parts.items()}
     sel = cat.pop("keep")
     dt = {"prim": np.int8, "oi": np.int32, "vi": np.int32, "pass_": np.int8, "org": np.int32}
-    out = {k: (v[sel].astype(dt[k]) if k in dt else v[sel]) for k, v in cat.items() if k != "vin_wide"}
+    out = {
+        k: (v[sel].astype(dt[k]) if k in dt else v[sel]) for k, v in cat.items() if k != "vin_wide"
+    }
     np.savez(
         DATA / f"bank_{month}.npz", **out, feat=np.concatenate(feats), age=np.concatenate(ages),
         lag_age=np.concatenate(lag_ages), gate=np.concatenate(gates),

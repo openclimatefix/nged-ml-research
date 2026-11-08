@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D102, D107, E501
 """Experiment 647, stage 2: the departure heads (H1 survival mixture, H2 free quantile head) and the mixture quantiles.
 
 K1's 11 stored quantiles define a piecewise-linear distribution (two tail knots are added at 1.5
@@ -37,7 +37,9 @@ def _uniform_survival(*, t: torch.Tensor, lo: float, hi: float) -> torch.Tensor:
     return torch.clamp((hi - t) / (hi - lo), 0.0, 1.0)
 
 
-def survival_probability(*, age_days: torch.Tensor, lead_h: torch.Tensor, short_weight: float) -> torch.Tensor:
+def survival_probability(
+    *, age_days: torch.Tensor, lead_h: torch.Tensor, short_weight: float
+) -> torch.Tensor:
     """Return p: the probability that a departure of `age_days` at the newest lag still holds at the valid time.
 
     The valid time is `lead_h + 24` hours after the newest allowed lag, which sits 24 h before the
@@ -53,7 +55,9 @@ def survival_probability(*, age_days: torch.Tensor, lead_h: torch.Tensor, short_
     a = torch.clamp(age_days, AGE_FLOOR_DAYS, AGE_CAP_DAYS)
     h = (lead_h + 24.0) / 24.0
     p = torch.clamp(surv(a + h) / torch.clamp(surv(a), min=1e-3), 0.0, 1.0)
-    return torch.where(age_days < AGE_FLOOR_DAYS, torch.zeros_like(p), p)  # no departure at the newest lag: p = 0
+    return torch.where(
+        age_days < AGE_FLOOR_DAYS, torch.zeros_like(p), p
+    )  # no departure at the newest lag: p = 0
 
 
 def _knots(*, q: torch.Tensor) -> torch.Tensor:
@@ -67,22 +71,32 @@ def _knots(*, q: torch.Tensor) -> torch.Tensor:
 def _cdf(*, x: torch.Tensor, knots: torch.Tensor) -> torch.Tensor:
     """Return the piecewise-linear CDF of the distribution with `knots` (B, 13) at the points `x` (B, m)."""
     f = torch.from_numpy(F_KNOTS).to(x.device)
-    idx = torch.clamp(torch.searchsorted(knots.detach().contiguous(), x.detach().contiguous(), right=True) - 1, 0, knots.shape[1] - 2)
+    idx = torch.clamp(
+        torch.searchsorted(knots.detach().contiguous(), x.detach().contiguous(), right=True) - 1,
+        0,
+        knots.shape[1] - 2,
+    )
     x0, x1 = torch.gather(knots, 1, idx), torch.gather(knots, 1, idx + 1)
     frac = torch.clamp((x - x0) / (x1 - x0), 0.0, 1.0)
     return f[idx] + frac * (f[idx + 1] - f[idx])
 
 
-def mixture_quantiles(*, q: torch.Tensor, d: torch.Tensor, sigma: torch.Tensor, p: torch.Tensor) -> torch.Tensor:
+def mixture_quantiles(
+    *, q: torch.Tensor, d: torch.Tensor, sigma: torch.Tensor, p: torch.Tensor
+) -> torch.Tensor:
     """Return the 11 quantiles of `(1 - p) K1 + p (K1 shifted by d, spread by sigma)`, shape (B, 11)."""
     knots = _knots(q=q)
     shifts = torch.stack([torch.zeros_like(d)] + [d + g * sigma for g in GH_NODES], dim=1)  # (B, 4)
     weights = torch.stack([1.0 - p] + [p * w for w in GH_WEIGHTS], dim=1)  # (B, 4)
     pts = (knots[:, None, :] + shifts[:, :, None]).reshape(len(q), -1)  # (B, 52)
     xs, _ = torch.sort(pts, dim=1)
-    fm = sum(weights[:, c : c + 1] * _cdf(x=xs - shifts[:, c : c + 1], knots=knots) for c in range(4))
+    fm = sum(
+        weights[:, c : c + 1] * _cdf(x=xs - shifts[:, c : c + 1], knots=knots) for c in range(4)
+    )
     tau = torch.from_numpy(TAUS).to(q.device)[None, :].expand(len(q), -1).contiguous()
-    j = torch.clamp(torch.searchsorted(fm.detach().contiguous(), tau, right=False), 1, xs.shape[1] - 1)
+    j = torch.clamp(
+        torch.searchsorted(fm.detach().contiguous(), tau, right=False), 1, xs.shape[1] - 1
+    )
     f0, f1 = torch.gather(fm, 1, j - 1), torch.gather(fm, 1, j)
     x0, x1 = torch.gather(xs, 1, j - 1), torch.gather(xs, 1, j)
     frac = torch.clamp((tau - f0) / torch.clamp(f1 - f0, min=1e-9), 0.0, 1.0)
@@ -103,12 +117,22 @@ class Head(nn.Module):
         super().__init__()
         self.kind = kind
         n_out = 2 if kind == "mix" else len(TAUS)
-        self.net = nn.Sequential(nn.Linear(n_in, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, n_out))
+        self.net = nn.Sequential(
+            nn.Linear(n_in, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, n_out)
+        )
         with torch.no_grad():
             self.net[-1].weight.mul_(0.1)
             self.net[-1].bias.zero_()
 
-    def forward(self, *, x: torch.Tensor, q: torch.Tensor, age: torch.Tensor, lead_h: torch.Tensor, short_weight: float) -> tuple[torch.Tensor, ...]:
+    def forward(
+        self,
+        *,
+        x: torch.Tensor,
+        q: torch.Tensor,
+        age: torch.Tensor,
+        lead_h: torch.Tensor,
+        short_weight: float,
+    ) -> tuple[torch.Tensor, ...]:
         out = self.net(x)
         if self.kind == "mix":
             d = DEPTH_SCALE * torch.tanh(out[:, 0])

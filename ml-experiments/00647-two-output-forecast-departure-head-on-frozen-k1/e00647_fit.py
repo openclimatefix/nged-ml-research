@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501
+# ruff: noqa: D103, D107, E501, PLR0912, PLR0915
 """Experiment 647, stage 2: fit the departure heads on the first month pair and write per-row scores (CPU).
 
 Arms (`ARMS`): H1 (survival mixture), H2 (free quantile head), H1-p and H2-p (noise placebos: every
@@ -96,7 +96,15 @@ AGE_BLOCK: Final = slice(N_FEAT, N_FEAT + 2)
 AGEGATE_COLS: Final = list(range(N_FEAT, N_FEAT + 4))
 
 
-def sample(*, month: str, n_real: int, n_bank: int, rng: np.random.Generator, mask_day: tuple[int, int] | None = None) -> list:
+def sample(
+    *,
+    month: str,
+    n_real: int,
+    n_bank: int,
+    rng: np.random.Generator,
+    mask_day: tuple[int, int] | None = None,
+    day_range: tuple[int, int] | None = None,
+) -> list:
     """Return [(kind, row indices)] of a random sample of the month's trainable rows."""
     d = load(month=month)
     out = []
@@ -105,6 +113,11 @@ def sample(*, month: str, n_real: int, n_bank: int, rng: np.random.Generator, ma
         if mask_day is not None:
             day = d[kind]["oi"] // 48
             ok &= (day % mask_day[0] == mask_day[1]) if mask_day[1] >= 0 else ok
+        if day_range is not None:  # origin day of the month in [lo, hi)
+            import e00647_data as dat  # ty: ignore[unresolved-import]
+
+            dom = (d[kind]["oi"] - dat.month_start_idx(month=month)) // 48
+            ok &= (dom >= day_range[0]) & (dom < day_range[1])
         idx = np.flatnonzero(ok)
         out.append((kind, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
     return out
@@ -135,7 +148,9 @@ class Pool:
         self.raw = np.concatenate(raws).astype(np.float32)  # (n_org, 62)
 
 
-def make_inputs(*, raw: np.ndarray, arm: dict, stats: tuple | None, seed: int) -> tuple[np.ndarray, np.ndarray, tuple]:
+def make_inputs(
+    *, raw: np.ndarray, arm: dict, stats: tuple | None, seed: int
+) -> tuple[np.ndarray, np.ndarray, tuple]:
     """Return (standardised inputs, age in days, (mean, std)) for the arm; `stats` fixes the standardisation."""
     rng = np.random.default_rng(seed + 1000)
     r = raw.copy()
@@ -155,7 +170,9 @@ def make_inputs(*, raw: np.ndarray, arm: dict, stats: tuple | None, seed: int) -
 
 
 def row_inputs(*, q: np.ndarray, lead: np.ndarray) -> np.ndarray:
-    return np.stack([lead / 240.0, (q[:, 5] - q[:, 1]) * 10.0, (q[:, 9] - q[:, 5]) * 10.0], axis=1).astype(np.float32)
+    return np.stack(
+        [lead / 240.0, (q[:, 5] - q[:, 1]) * 10.0, (q[:, 9] - q[:, 5]) * 10.0], axis=1
+    ).astype(np.float32)
 
 
 def batch_inputs(*, x_org, age_org, pool: Pool, ix):  # noqa: ANN001, ANN201
@@ -177,7 +194,15 @@ def metrics(*, y: np.ndarray, q: np.ndarray) -> dict[str, np.ndarray]:
     tau = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99], np.float32)
     e = y[:, None] - q
     pin = np.maximum(tau * e, (tau - 1.0) * e) * 100.0
+    # mean of the forecast: the integral of the piecewise-linear quantile function, flat beyond q01 and q99
+    area = (
+        q[:, 0] * 0.01
+        + q[:, -1] * 0.01
+        + (0.5 * (q[:, 1:] + q[:, :-1]) * np.diff(tau)[None, :]).sum(1)
+    )
     return {
+        "low01": (y < q[:, 0]).astype(np.uint8), "high99": (y > q[:, 10]).astype(np.uint8),
+        "medmean": ((q[:, 5] - area) * 100.0).astype(np.float32),
         "crps": (2.0 * pin.mean(1)).astype(np.float32),
         "low": (y < q[:, 1]).astype(np.uint8), "high": (y > q[:, 9]).astype(np.uint8),
         "width": ((q[:, 9] - q[:, 1]) * 100.0).astype(np.float16),
@@ -188,8 +213,8 @@ def metrics(*, y: np.ndarray, q: np.ndarray) -> dict[str, np.ndarray]:
 
 
 def fit_one(job: tuple[str, str, str, int]) -> str:
-    import torch
     import e00647_head as h  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
     arm_name, month, variant, seed = job
@@ -200,13 +225,20 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
     if out.exists():
         return f"{out.name}: exists"
     t0 = time.time()
-    rng = np.random.default_rng(1000 * seed + int(month.replace('-', '')) % 997)
+    rng = np.random.default_rng(1000 * seed + int(month.replace("-", "")) % 997)
     others = [m for m in MONTHS if m != month]
     if variant == "lomo":
         val_month = others[0]
         train_months = others[1:]
-        tr = [(m, k, i) for m in train_months for k, i in sample(month=m, n_real=N_REAL, n_bank=N_BANK, rng=rng)]
-        va = [(val_month, k, i) for k, i in sample(month=val_month, n_real=N_VAL, n_bank=N_VAL_BANK, rng=rng)]
+        tr = [
+            (m, k, i)
+            for m in train_months
+            for k, i in sample(month=m, n_real=N_REAL, n_bank=N_BANK, rng=rng)
+        ]
+        va = [
+            (val_month, k, i)
+            for k, i in sample(month=val_month, n_real=N_VAL, n_bank=N_VAL_BANK, rng=rng)
+        ]
     else:
         earlier = [m for m in MONTHS if m < month]
         assert earlier, "no earlier month to train on"
@@ -219,14 +251,24 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
             for k, n_tr, n_va in (("real", N_REAL, N_VAL), ("bank", N_BANK, N_VAL_BANK)):
                 dom = (d[k]["oi"] - ms) // 48
                 # contiguous blocks: train on days 0-13, leave days 14-20 out as a gap, validate on days 21 onward
-                if variant == "fc4":  # every fourth origin day held out for the early stop, so both refit windows are trained
-                    for sel_, n, dst in ((dom % 4 != 3, n_tr * 3, tr), (dom % 4 == 3, n_va, va)):
+                if (
+                    variant == "fcb"
+                ):  # train on valid-time days 0-17, a gap of 10 days, validate from day 28
+                    vday = (d[k]["vi"] - ms) // 48
+                    for sel_, n, dst in (
+                        ((dom <= 17) & (vday <= 17), n_tr * 2, tr),
+                        ((dom >= 28) & (vday >= 28), n_va, va),
+                    ):
                         idx = np.flatnonzero(d[k]["train_ok"] & sel_)
-                        dst.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
+                        dst.append(
+                            (m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False)))
+                        )
                     continue
                 for lo, hi, n, dst in ((0, 14, n_tr, tr), (21, 99, n_va, va)):
                     idx = np.flatnonzero(d[k]["train_ok"] & (dom >= lo) & (dom < hi))
-                    dst.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
+                    dst.append(
+                        (m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False)))
+                    )
     train, val = Pool(parts=tr), Pool(parts=va)
     x_tr, age_tr, stats = make_inputs(raw=train.raw, arm=arm, stats=None, seed=seed)
     x_va, age_va, _ = make_inputs(raw=val.raw, arm=arm, stats=stats, seed=seed + 1)
@@ -281,7 +323,11 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
         pool = Pool(parts=[(month, kind, idx)])
         x_te, age_te, _ = make_inputs(raw=pool.raw, arm=arm, stats=stats, seed=seed + 3)
         if arm["inputs"] == "noise":
-            rv = np.random.default_rng(seed + 3000).standard_normal(pool.raw.shape).astype(np.float32)
+            rv = (
+                np.random.default_rng(seed + 3000)
+                .standard_normal(pool.raw.shape)
+                .astype(np.float32)
+            )
             r = (train.raw.mean(0) + np.maximum(train.raw.std(0), 1e-3) * rv).astype(np.float32)
             r[:, N_FEAT] = np.log1p(np.clip(np.expm1(r[:, N_FEAT]), 0.0, 120.0))
             age_te = np.expm1(np.clip(r[:, N_FEAT], 0.0, None)).astype(np.float32)
@@ -302,7 +348,15 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
         res[f"{kind}_sigma"] = np.concatenate(ss).astype(np.float32)
         for k, v in m.items():
             res[f"{kind}_{k}"] = v
-    np.savez(out, **res, val_log=np.array(log), n_train=n, n_val=len(val.y), best=best, seconds=time.time() - t0)
+    np.savez(
+        out,
+        **res,
+        val_log=np.array(log),
+        n_train=n,
+        n_val=len(val.y),
+        best=best,
+        seconds=time.time() - t0,
+    )
     torch.save(head.state_dict(), out_dir / f"{out.stem}.pt")
     return f"{out.name}: {len(log)} epochs, val {best:.5f}, {time.time() - t0:.0f}s"
 

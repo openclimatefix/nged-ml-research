@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, ANN001, ANN201
+# ruff: noqa: PLR0912, ANN001, ANN201, D102, D103, D107, E501, RUF059
 """Experiment 647, stage 3: the encoder arms E1 to E3 (GPU).
 
 All arms use the survival-mixture head of H1 and add K1's lag-encoder embedding `hl` (the day-lag and
@@ -43,7 +43,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 from torch import nn  # ty: ignore[unresolved-import]
 
 DEV: Final = "cuda"
-ENC_LR: Final[float] = 3e-4
+ENC_LR: float = 3e-4
 CACHE: Final = c647.WORK / "cache"
 ROOT: Final = ML_EXPERIMENTS_DATA_DIR
 MONTHS: Final = c647.MONTHS
@@ -65,7 +65,11 @@ def meta(month: str) -> dict:
 
 
 def weights(*, month: str, seed: int, day: int) -> str:
-    folder = "00608-nra-combined-networks-per-class-and-leave-one-out" if seed < 2 else "00613-nra-roster-contrasts-with-intervals-five-seeds"
+    folder = (
+        "00608-nra-combined-networks-per-class-and-leave-one-out"
+        if seed < 2
+        else "00613-nra-roster-contrasts-with-intervals-five-seeds"
+    )
     return str(ROOT / folder / "arms/k1_d5/work/models/P5" / f"{month}_d{day}_s{seed}.pt")
 
 
@@ -73,8 +77,16 @@ def k1_model(*, month: str, seed: int, refit: int) -> nn.Module:
     key = (month, seed, refit)
     if key not in _K1:
         mt = meta(month)
-        mdl = m591.AuxLagMdn(n_primaries=len(mt["target_mean"]), stage="ft", n_knots=int(mt["n_knots"]), n_b1=int(mt["n_b1"]), kind="shared")
-        mdl.load_state_dict(torch.load(weights(month=month, seed=seed, day=14 if refit else 0), map_location="cpu"))
+        mdl = m591.AuxLagMdn(
+            n_primaries=len(mt["target_mean"]),
+            stage="ft",
+            n_knots=int(mt["n_knots"]),
+            n_b1=int(mt["n_b1"]),
+            kind="shared",
+        )
+        mdl.load_state_dict(
+            torch.load(weights(month=month, seed=seed, day=14 if refit else 0), map_location="cpu")
+        )
         mdl.eval().to(DEV)
         for p in mdl.parameters():
             p.requires_grad_(False)
@@ -91,7 +103,13 @@ def lag_hl(*, mdl, x, prim, tab) -> torch.Tensor:
         pad = torch.zeros(len(row), mdl.n_b1, device=row.device)
         hw = nn.functional.gelu(mdl.weather(torch.cat([row[:, :7], emb, pad], dim=-1)))
         hd = nn.functional.gelu(mdl.datetime(torch.cat([row[:, 7:], emb], dim=-1)))
-        parts = [x[:, cols], hw, hd, emb, mdl.lag_id(torch.full((len(x),), j, dtype=torch.long, device=x.device))]
+        parts = [
+            x[:, cols],
+            hw,
+            hd,
+            emb,
+            mdl.lag_id(torch.full((len(x),), j, dtype=torch.long, device=x.device)),
+        ]
         outs.append(mdl.lag[0](torch.cat(parts, dim=-1)))
     return nn.functional.gelu(torch.cat(outs, dim=-1))
 
@@ -101,7 +119,11 @@ class LagPath(nn.Module):
 
     def __init__(self, k1: nn.Module) -> None:
         super().__init__()
-        self.embedding, self.weather, self.datetime = (copy.deepcopy(k1.embedding), copy.deepcopy(k1.weather), copy.deepcopy(k1.datetime))
+        self.embedding, self.weather, self.datetime = (
+            copy.deepcopy(k1.embedding),
+            copy.deepcopy(k1.weather),
+            copy.deepcopy(k1.datetime),
+        )
         self.lag = nn.ModuleList([copy.deepcopy(k1.lag[0])])
         self.lag_id = copy.deepcopy(k1.lag_id)
         self.n_b1 = k1.n_b1
@@ -112,7 +134,7 @@ class LagPath(nn.Module):
             for p in mm.parameters():
                 p.requires_grad_(True)
 
-    def train(self, mode: bool = True):  # noqa: ANN201
+    def train(self, mode: bool = True):
         super().train(mode)
         for mm in (self.embedding, self.weather, self.datetime):
             mm.eval()
@@ -148,7 +170,7 @@ class NraBranch(nn.Module):
         for p in (*self.k1.mixer_ft.parameters(), self.k1.knot_new):
             p.requires_grad_(True)
 
-    def train(self, mode: bool = True):  # noqa: ANN201
+    def train(self, mode: bool = True):
         super().train(mode)
         for mm in (self.k1.embedding, self.k1.weather, self.k1.datetime):
             mm.eval()
@@ -163,7 +185,9 @@ class Rows:
 
     def __init__(self, *, parts: list, stats: tuple | None, arm_stats: tuple | None = None) -> None:
         pool = fit.Pool(parts=parts)
-        x_org, age_org, self.stats = fit.make_inputs(raw=pool.raw, arm=fit.ARMS["H1"], stats=stats, seed=0)
+        x_org, age_org, self.stats = fit.make_inputs(
+            raw=pool.raw, arm=fit.ARMS["H1"], stats=stats, seed=0
+        )
         self.n = len(pool.y)
         xs, ps, rs, tb, yobs, mu, sd, mo = [], [], [], [], [], [], [], []
         self.parts = parts
@@ -185,17 +209,23 @@ class Rows:
         o = torch.from_numpy(pool.org).to(DEV)
         self.xorg = torch.from_numpy(x_org).to(DEV)[o]
         self.age = torch.from_numpy(age_org).to(DEV)[o]
-        self.q, self.y, self.lead = (torch.from_numpy(a).to(DEV) for a in (pool.q, pool.y, pool.lead))
+        self.q, self.y, self.lead = (
+            torch.from_numpy(a).to(DEV) for a in (pool.q, pool.y, pool.lead)
+        )
 
 
 def row_inputs(*, q: torch.Tensor, lead: torch.Tensor) -> torch.Tensor:
-    return torch.stack([lead / 240.0, (q[:, 5] - q[:, 1]) * 10.0, (q[:, 9] - q[:, 5]) * 10.0], dim=1)
+    return torch.stack(
+        [lead / 240.0, (q[:, 5] - q[:, 1]) * 10.0, (q[:, 9] - q[:, 5]) * 10.0], dim=1
+    )
 
 
 class Net(nn.Module):
     """Head, encoders, and (E3) NRA branches for one scored month and K1 seed."""
 
-    def __init__(self, *, arm: str, month: str, seed: int, hl_stats: tuple | None, n_in: int) -> None:
+    def __init__(
+        self, *, arm: str, month: str, seed: int, hl_stats: tuple | None, n_in: int
+    ) -> None:
         super().__init__()
         self.arm, self.month, self.seed = arm, month, seed
         self.head = h.Head(n_in=n_in, kind="mix").to(DEV)
@@ -203,9 +233,13 @@ class Net(nn.Module):
         self.paths = nn.ModuleList()
         self.branches = nn.ModuleList()
         if arm in {"E2", "E3", "E3p"}:
-            self.paths = nn.ModuleList([LagPath(k1_model(month=month, seed=seed, refit=r)) for r in (0, 1)]).to(DEV)
+            self.paths = nn.ModuleList(
+                [LagPath(k1_model(month=month, seed=seed, refit=r)) for r in (0, 1)]
+            ).to(DEV)
         if arm in {"E3", "E3p"}:
-            self.branches = nn.ModuleList([NraBranch(k1_model(month=month, seed=seed, refit=r)) for r in (0, 1)]).to(DEV)
+            self.branches = nn.ModuleList(
+                [NraBranch(k1_model(month=month, seed=seed, refit=r)) for r in (0, 1)]
+            ).to(DEV)
 
     def frozen_hl(self, rows: Rows, sel: torch.Tensor) -> torch.Tensor:
         """E1: the embedding of each row's own month, refit, and seed (no gradient)."""
@@ -217,7 +251,12 @@ class Net(nn.Module):
                     w = (mo == mi) & (rf == r)
                     if w.any():
                         s = sel[w]
-                        out[w] = lag_hl(mdl=k1_model(month=month, seed=self.seed, refit=r), x=rows.x[s], prim=rows.prim[s], tab=rows.tab[s])
+                        out[w] = lag_hl(
+                            mdl=k1_model(month=month, seed=self.seed, refit=r),
+                            x=rows.x[s],
+                            prim=rows.prim[s],
+                            tab=rows.tab[s],
+                        )
         return out
 
     def hl(self, rows: Rows, sel: torch.Tensor) -> torch.Tensor:
@@ -227,11 +266,15 @@ class Net(nn.Module):
         outs = [self.paths[r](rows.x[sel], rows.prim[sel], rows.tab[sel]) for r in (0, 1)]
         return torch.where((rf == 1)[:, None], outs[1], outs[0])
 
-    def nra(self, rows: Rows, sel: torch.Tensor, hl: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def nra(
+        self, rows: Rows, sel: torch.Tensor, hl: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """E3: (raw outputs, quantiles in fraction of capacity) of the NRA branch reading the detached embedding."""
         rf = rows.refit[sel]
         hd = hl.detach()
-        outs = [self.branches[r](rows.x[sel], rows.prim[sel], hd) for r in (0, 1)]
+        outs = [
+            self.branches[r](rows.x[sel], rows.prim[sel], hd) for r in (0, 1)
+        ]  # dropout follows the net's mode
         out = torch.where((rf == 1)[:, None], outs[1], outs[0])
         with torch.no_grad():
             log_w, mean, std = base.mixture_parts(out=out.double(), components=m559.COMPONENTS)
@@ -241,19 +284,22 @@ class Net(nn.Module):
 
     def forward(self, rows: Rows, sel: torch.Tensor, *, short: float = 0.5):
         hl = self.hl(rows, sel)
-        if self.arm in {"E3", "E3p"}:
-            nra_out, q = self.nra(rows, sel, hl)
-        else:
-            nra_out, q = None, rows.q[sel]
+        q = rows.q[sel]  # the head reads the stored K1 forecast, as H1 and E2 do
+        nra_out, q_nra = self.nra(rows, sel, hl) if self.arm in {"E3", "E3p"} else (None, q)
         lead = rows.lead[sel]
         hln = (hl - self.hl_stats[0]) / self.hl_stats[1]
-        x = torch.cat([rows.xorg[sel], row_inputs(q=q, lead=lead), hln, rows.refit[sel][:, None].float()], dim=1)
+        x = torch.cat(
+            [rows.xorg[sel], row_inputs(q=q, lead=lead), hln, rows.refit[sel][:, None].float()],
+            dim=1,
+        )
         qq, d, s = self.head(x=x, q=q, age=rows.age[sel], lead_h=lead, short_weight=short)
-        return qq, d, s, nra_out, q
+        return qq, d, s, nra_out, q_nra
 
 
 def initial_hl_stats(*, arm: str, rows: Rows, month: str, seed: int) -> tuple:
-    net = Net(arm="E1" if arm == "E1" else "E2", month=month, seed=seed, hl_stats=(0.0, 1.0), n_in=1)
+    net = Net(
+        arm="E1" if arm == "E1" else "E2", month=month, seed=seed, hl_stats=(0.0, 1.0), n_in=1
+    )
     outs = []
     with torch.no_grad():
         for a in range(0, rows.n, 50_000):
@@ -277,15 +323,35 @@ def losses(*, net: Net, rows: Rows, sel: torch.Tensor) -> tuple[torch.Tensor, to
     return head_loss, nra_loss
 
 
+BRANCH_LR: float = 3e-5
+BRANCH_EPOCHS: int = 3
+FREEZE_BRANCH: bool = False
+TAG: str = ""
+
+
+def branch_state(net: Net) -> list[dict]:
+    return [{k: v.clone() for k, v in b.state_dict().items()} for b in net.branches]
+
+
+def val_nll(*, net: Net, va: Rows) -> float:
+    net.eval()
+    tot = 0.0
+    with torch.no_grad():
+        for a in range(0, va.n, 20_000):
+            sel = torch.arange(a, min(a + 20_000, va.n), device=DEV)
+            tot += float(losses(net=net, rows=va, sel=sel)[1]) * len(sel)
+    return tot / va.n
+
+
 def train(*, net: Net, tr: Rows, va: Rows, seed: int) -> tuple[list, float]:
     groups = [{"params": list(net.head.parameters()), "lr": fit.LR, "weight_decay": fit.WD}]
     enc = [p for pth in net.paths for p in pth.parameters() if p.requires_grad]
     if enc:
         groups.append({"params": enc, "lr": ENC_LR, "weight_decay": 0.0})
-    br = [p for b in net.branches for p in b.parameters() if p.requires_grad]
-    if br:
-        groups.append({"params": br, "lr": ENC_LR, "weight_decay": 0.0})
     opt = torch.optim.Adam(groups)
+    br = [p for b in net.branches for p in b.parameters() if p.requires_grad]
+    opt_b = torch.optim.Adam(br, lr=BRANCH_LR) if br and not FREEZE_BRANCH else None
+    cands = [branch_state(net)] if br else []  # candidate 0: K1's own branch
     best, best_state, bad, log = float("inf"), None, 0, []
     for epoch in range(fit.EPOCHS):
         net.train()
@@ -293,10 +359,17 @@ def train(*, net: Net, tr: Rows, va: Rows, seed: int) -> tuple[list, float]:
         for a in range(0, tr.n, fit.BATCH):
             sel = perm[a : a + fit.BATCH]
             hl_, nl = losses(net=net, rows=tr, sel=sel)
-            loss = hl_ + (nl if nl is not None else 0.0)
             opt.zero_grad()
-            loss.backward()
+            if opt_b is not None:
+                opt_b.zero_grad()
+            if nl is not None and opt_b is not None and epoch < BRANCH_EPOCHS:
+                (hl_ + nl).backward()
+                opt_b.step()
+            else:
+                hl_.backward()
             opt.step()
+        if br and epoch < BRANCH_EPOCHS and opt_b is not None:
+            cands.append(branch_state(net))
         net.eval()
         v, vn = 0.0, 0.0
         with torch.no_grad():
@@ -316,6 +389,16 @@ def train(*, net: Net, tr: Rows, va: Rows, seed: int) -> tuple[list, float]:
                 break
     assert best_state is not None
     net.load_state_dict(best_state)
+    if cands:  # the branch state with the lowest validation NLL under the final encoder
+        scores = []
+        for st in cands:
+            for b, sd_ in zip(net.branches, st, strict=True):
+                b.load_state_dict(sd_)
+            scores.append(val_nll(net=net, va=va))
+        j = int(np.argmin(scores))
+        for b, sd_ in zip(net.branches, cands[j], strict=True):
+            b.load_state_dict(sd_)
+        log.append(("branch candidate NLLs (0 = K1's own branch)", scores, j))
     net.eval()
     return log, best
 
@@ -330,7 +413,12 @@ def predict(*, net: Net, rows: Rows) -> dict[str, np.ndarray]:
             ds.append(d.cpu().numpy())
             ss.append(s.cpu().numpy())
             nq.append(q.cpu().numpy())
-    return {"q": np.concatenate(qs), "d": np.concatenate(ds), "sigma": np.concatenate(ss), "q_nra": np.concatenate(nq)}
+    return {
+        "q": np.concatenate(qs),
+        "d": np.concatenate(ds),
+        "sigma": np.concatenate(ss),
+        "q_nra": np.concatenate(nq),
+    }
 
 
 def training_parts(*, month: str, variant: str, rng: np.random.Generator) -> tuple[list, list]:
@@ -339,8 +427,30 @@ def training_parts(*, month: str, variant: str, rng: np.random.Generator) -> tup
 
     others = [m for m in MONTHS if m != month]
     if variant == "lomo":
-        tr = [(m, k, i) for m in others[1:] for k, i in fit.sample(month=m, n_real=fit.N_REAL, n_bank=fit.N_BANK, rng=rng)]
-        va = [(others[0], k, i) for k, i in fit.sample(month=others[0], n_real=fit.N_VAL, n_bank=fit.N_VAL_BANK, rng=rng)]
+        v = others[0]
+
+        def months_index(m: str) -> int:
+            return int(m[:4]) * 12 + int(m[5:])
+
+        def gap(m: str) -> tuple[int, int] | None:
+            """Origin days of a training month kept so that it lies at least 10 days from the validation month."""
+            if months_index(m) == months_index(v) + 1:
+                return (10, 99)
+            if months_index(m) == months_index(v) - 1:
+                return (0, 21)
+            return None
+
+        tr = [
+            (m, k, i)
+            for m in others[1:]
+            for k, i in fit.sample(
+                month=m, n_real=fit.N_REAL, n_bank=fit.N_BANK, rng=rng, day_range=gap(m)
+            )
+        ]
+        va = [
+            (v, k, i)
+            for k, i in fit.sample(month=v, n_real=fit.N_VAL, n_bank=fit.N_VAL_BANK, rng=rng)
+        ]
         return tr, va
     earlier = [m for m in MONTHS if m < month]
     assert earlier, "no earlier month to train on"
@@ -348,16 +458,25 @@ def training_parts(*, month: str, variant: str, rng: np.random.Generator) -> tup
     for m in earlier:
         d = fit.load(month=m)
         ms = dat.month_start_idx(month=m)
-        for k, n_tr, n_va in (("real", fit.N_REAL, fit.N_VAL), ("bank", fit.N_BANK, fit.N_VAL_BANK)):
+        for k, n_tr, n_va in (
+            ("real", fit.N_REAL, fit.N_VAL),
+            ("bank", fit.N_BANK, fit.N_VAL_BANK),
+        ):
             dom = (d[k]["oi"] - ms) // 48
-            if variant == "fc4":  # every fourth origin day held out for the early stop, so both refit windows are trained
-                for sel_, n, dst in ((dom % 4 != 3, n_tr * 3, tr), (dom % 4 == 3, n_va, va)):
+            if (
+                variant == "fcb"
+            ):  # train on valid-time days 0-17, a gap of 10 days, validate on origins and valid times from day 28
+                vday = (d[k]["vi"] - ms) // 48
+                for sel_, n, dst in (
+                    ((dom <= 17) & (vday <= 17), n_tr * 2, tr),
+                    ((dom >= 28) & (vday >= 28), n_va, va),
+                ):
                     idx = np.flatnonzero(d[k]["train_ok"] & sel_)
-                    dst.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
+                    dst.append(
+                        (m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False)))
+                    )
                 continue
-            for lo, hi, n, dst in ((0, 14, n_tr, tr), (21, 99, n_va, va)):
-                idx = np.flatnonzero(d[k]["train_ok"] & (dom >= lo) & (dom < hi))
-                dst.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
+            raise AssertionError(variant)
     return tr, va
 
 
@@ -385,12 +504,25 @@ def run_one(*, arm: str, month: str, variant: str, seed: int) -> dict:
         out["yobs"] = te.yobs.cpu().numpy()
         res[kind] = out
         del te
-    print(f"  {arm} {month} {variant} s{seed}: {len(log)} epochs, best val {best:.5f}, fit {t_fit:.0f}s, total {time.time() - t0:.0f}s", flush=True)
-    return {"res": res, "log": np.array(log), "n_train": tr.n, "n_val": va.n, "fit_seconds": t_fit, "seconds": time.time() - t0}
+    print(
+        f"  {arm} {month} {variant} s{seed}: {len(log)} epochs, best val {best:.5f}, fit {t_fit:.0f}s, total {time.time() - t0:.0f}s",
+        flush=True,
+    )
+    return {
+        "res": res,
+        "log": np.array(
+            log[: -1 if log and isinstance(log[-1][0], str) else None], dtype=np.float64
+        ),
+        "branch_log": str(log[-1]) if log and isinstance(log[-1][0], str) else "",
+        "n_train": tr.n,
+        "n_val": va.n,
+        "fit_seconds": t_fit,
+        "seconds": time.time() - t0,
+    }
 
 
 def write(*, name: str, out: dict, q_key: str, d: dict, extra: dict) -> None:
-    out_dir = fit.data_dir() / "fits"
+    out_dir = fit.data_dir() / ("fits" + (f"_{TAG}" if TAG else ""))
     out_dir.mkdir(parents=True, exist_ok=True)
     arrs: dict = {}
     for kind in ("real", "bank"):
@@ -406,41 +538,100 @@ def write(*, name: str, out: dict, q_key: str, d: dict, extra: dict) -> None:
 
 
 def main() -> None:
+    global BRANCH_LR, FREEZE_BRANCH, TAG, ENC_LR
     ap = argparse.ArgumentParser()
     ap.add_argument("arm", choices=("E1", "E2", "E3", "E3p"))
     ap.add_argument("month")
-    ap.add_argument("variant", choices=("lomo", "fc", "fc4"))
+    ap.add_argument("variant", choices=("lomo", "fcb"))
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
+    ap.add_argument("--branch-lr", type=float, default=BRANCH_LR)
+    ap.add_argument("--freeze-branch", action="store_true")
+    ap.add_argument("--enc-lr", type=float, default=ENC_LR)
+    ap.add_argument("--tag", default="")
     a = ap.parse_args()
+    BRANCH_LR, FREEZE_BRANCH, TAG, ENC_LR = a.branch_lr, a.freeze_branch, a.tag, a.enc_lr
     t_start = time.time()
-    print(f"START {a.arm} {a.month} {a.variant} seeds {a.seeds} at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}", flush=True)
+    print(
+        f"START {a.arm} {a.month} {a.variant} seeds {a.seeds} at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
+        flush=True,
+    )
     per_seed = {}
     for seed in a.seeds:
         per_seed[seed] = run_one(arm=a.arm, month=a.month, variant=a.variant, seed=seed)
         r = per_seed[seed]
         write(
-            name=f"{a.arm}_{a.month}_{a.variant}_s{seed}", out=r["res"], q_key="q", d=r["res"],
-            extra={"val_log": r["log"], "n_train": r["n_train"], "n_val": r["n_val"], "seconds": r["seconds"], "fit_seconds": r["fit_seconds"]},
+            name=f"{a.arm}_{a.month}_{a.variant}_s{seed}",
+            out=r["res"],
+            q_key="q",
+            d=r["res"],
+            extra={
+                "val_log": r["log"],
+                "branch_log": r["branch_log"],
+                "n_train": r["n_train"],
+                "n_val": r["n_val"],
+                "seconds": r["seconds"],
+                "fit_seconds": r["fit_seconds"],
+            },
         )
         if a.arm in {"E3", "E3p"}:
             write(
                 name=f"{a.arm}nra_{a.month}_{a.variant}_k{seed}",
-                out={k: {**v, "q": v["q_nra"]} for k, v in r["res"].items()}, q_key="q_nra",
-                d={k: {"d": np.zeros_like(v["d"]), "sigma": np.zeros_like(v["sigma"])} for k, v in r["res"].items()}, extra={},
+                out={k: {**v, "q": v["q_nra"]} for k, v in r["res"].items()},
+                q_key="q_nra",
+                d={
+                    k: {"d": np.zeros_like(v["d"]), "sigma": np.zeros_like(v["sigma"])}
+                    for k, v in r["res"].items()
+                },
+                extra={},
             )
     # average the per-seed outputs: quantiles and departures
     avg: dict = {}
     for kind in ("real", "bank"):
         rs = [per_seed[s]["res"][kind] for s in a.seeds]
-        avg[kind] = {k: np.mean([r[k] for r in rs], axis=0) if k in {"q", "d", "sigma", "q_nra"} else rs[0][k] for k in rs[0]}
-    write(name=f"{a.arm}a_{a.month}_{a.variant}_s0", out=avg, q_key="q", d=avg, extra={"seeds": np.array(a.seeds)})
+        avg[kind] = {
+            k: np.mean([r[k] for r in rs], axis=0)
+            if k in {"q", "d", "sigma", "q_nra"}
+            else rs[0][k]
+            for k in rs[0]
+        }
+    write(
+        name=f"{a.arm}a_{a.month}_{a.variant}_s0",
+        out=avg,
+        q_key="q",
+        d=avg,
+        extra={"seeds": np.array(a.seeds)},
+    )
     if a.arm in {"E3", "E3p"}:
         write(
-            name=f"{a.arm}nraa_{a.month}_{a.variant}_k0", out={k: {**v, "q": v["q_nra"]} for k, v in avg.items()}, q_key="q_nra",
-            d={k: {"d": np.zeros_like(v["d"]), "sigma": np.zeros_like(v["sigma"])} for k, v in avg.items()}, extra={},
+            name=f"{a.arm}nraa_{a.month}_{a.variant}_k0",
+            out={k: {**v, "q": v["q_nra"]} for k, v in avg.items()},
+            q_key="q_nra",
+            d={
+                k: {"d": np.zeros_like(v["d"]), "sigma": np.zeros_like(v["sigma"])}
+                for k, v in avg.items()
+            },
+            extra={},
         )
-        np.savez(fit.data_dir() / "fits" / f"{a.arm}nrarows_{a.month}_{a.variant}.npz", **{f"{k}_{s}": per_seed[s]["res"][k]["q_nra"] for k in ("real", "bank") for s in a.seeds})
-    print(f"DONE {a.arm} {a.month} {a.variant} in {time.time() - t_start:.0f}s at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}", flush=True)
+        np.savez(
+            fit.data_dir()
+            / ("fits" + (f"_{TAG}" if TAG else ""))
+            / f"{a.arm}nrarows_{a.month}_{a.variant}.npz",
+            **{
+                f"{k}_{s}": per_seed[s]["res"][k]["q_nra"]
+                for k in ("real", "bank")
+                for s in a.seeds
+            },
+        )
+    qdir = fit.data_dir() / ("fits_q" + (f"_{TAG}" if TAG else ""))
+    qdir.mkdir(exist_ok=True)
+    np.savez(
+        qdir / f"{a.arm}a_{a.month}_{a.variant}.npz",
+        **{f"{kind}_{k}": avg[kind][k] for kind in ("real", "bank") for k in ("q", "q_nra", "idx")},
+    )
+    print(
+        f"DONE {a.arm} {a.month} {a.variant} in {time.time() - t_start:.0f}s at {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

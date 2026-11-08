@@ -1,4 +1,4 @@
-# ruff: noqa: D103, E501, E402, ANN001, ANN201
+# ruff: noqa: ANN001, ANN201, ANN202, D103, E402, E501, PLR0915, PT018
 """Experiment 647, stage 3, step 1: check K1's stored weights and cache the encoder inputs (GPU).
 
 Runs experiment 591's A1 pipeline in inference mode (as experiment 613's `inject`) for one month and
@@ -22,8 +22,8 @@ CHECK = "--check" in sys.argv
 META = "--meta" in sys.argv
 sys.argv = ["e00591_arm.py", "A1", "inject", "--months", month, "--seeds", "0"]
 
-import e00591_arm as arm  # ty: ignore[unresolved-import]
 import e00581_bank as bank  # ty: ignore[unresolved-import]
+import e00591_arm as arm  # ty: ignore[unresolved-import]
 import e00647_common as c647  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
@@ -75,7 +75,13 @@ def encode_cached(*, model, x, prim, rows):
         pad = torch.zeros(len(row), model.n_b1, device=row.device)
         hw = torch.nn.functional.gelu(model.weather(torch.cat([row[:, :7], emb, pad], dim=-1)))
         hd = torch.nn.functional.gelu(model.datetime(torch.cat([row[:, 7:], emb], dim=-1)))
-        parts = [x[:, cols], hw, hd, emb, model.lag_id(torch.full((len(x),), j, dtype=torch.long, device=x.device))]
+        parts = [
+            x[:, cols],
+            hw,
+            hd,
+            emb,
+            model.lag_id(torch.full((len(x),), j, dtype=torch.long, device=x.device)),
+        ]
         outs.append(model.lag[0](torch.cat(parts, dim=-1)))
     return torch.nn.functional.gelu(torch.cat(outs, dim=-1))
 
@@ -91,19 +97,32 @@ def main() -> None:
     days = [e.f.day_of(month=month, cut=c) for c in cuts]
     assert days == [0, 14], days
     print(month, "test x", test.x.shape, test.x.dtype, "windows", windows, flush=True)
-    np.savez(OUT / f"{month}_meta.npz", target_mean=np.asarray(mr.base.target_mean), target_std=np.asarray(mr.base.target_std), windows=np.asarray(windows), n_knots=e.KNOTS, n_b1=e.N_B1)
+    np.savez(
+        OUT / f"{month}_meta.npz",
+        target_mean=np.asarray(mr.base.target_mean),
+        target_std=np.asarray(mr.base.target_std),
+        windows=np.asarray(windows),
+        n_knots=e.KNOTS,
+        n_b1=e.N_B1,
+    )
     if "--meta" in sys.argv[1:] or META:
         return
     start = e.c.month_start(month=month)
     start_idx = (e.c.us(t=start) - e.c.prep422.GRID_START_US) // e.c.prep422.STEP_US
-    key = (test.primary.astype(np.int64) * 10_000_000 + test.origin_idx) * 10_000_000 + test.target_idx
+    key = (
+        test.primary.astype(np.int64) * 10_000_000 + test.origin_idx
+    ) * 10_000_000 + test.target_idx
     order = np.argsort(key)
     skey = key[order]
 
     def locate(*, prim, oi, vi):
-        k = (prim.astype(np.int64) * 10_000_000 + oi.astype(np.int64)) * 10_000_000 + vi.astype(np.int64)
+        k = (prim.astype(np.int64) * 10_000_000 + oi.astype(np.int64)) * 10_000_000 + vi.astype(
+            np.int64
+        )
         pos = np.searchsorted(skey, k)
-        assert (pos < len(skey)).all() and (skey[np.clip(pos, 0, len(skey) - 1)] == k).all(), "head-data row missing in the rebuilt test rows"
+        assert (pos < len(skey)).all() and (skey[np.clip(pos, 0, len(skey) - 1)] == k).all(), (
+            "head-data row missing in the rebuilt test rows"
+        )
         return order[pos]
 
     real = np.load(c647.WORK / "head_data" / f"real_{month}.npz")
@@ -112,13 +131,29 @@ def main() -> None:
     refit = lambda t_rows: (test.origin[t_rows] >= windows[0][1]).astype(np.int8)  # noqa: E731
 
     if CHECK:
-        check(test=test, mr=mr, n_prim=n_prim, windows=windows, rows_real=rows_real, locate=locate, clean=clean, start_idx=start_idx, bk=bk)
+        check(
+            test=test,
+            mr=mr,
+            n_prim=n_prim,
+            windows=windows,
+            rows_real=rows_real,
+            locate=locate,
+            clean=clean,
+            start_idx=start_idx,
+            bk=bk,
+        )
         return
 
     # real rows
     xr = test.x[rows_real].astype(np.float32)
     pr = test.primary[rows_real].astype(np.int16)
-    np.savez(OUT / f"{month}_real.npz", x=xr, prim=pr, refit=refit(rows_real), tab=table_rows(x=xr, prim=pr).astype(np.float16))
+    np.savez(
+        OUT / f"{month}_real.npz",
+        x=xr,
+        prim=pr,
+        refit=refit(rows_real),
+        tab=table_rows(x=xr, prim=pr).astype(np.float16),
+    )
     print("real cached", xr.shape, flush=True)
     # bank rows, pass by pass (contaminated lag block)
     xs, ps, rs, ts = [], [], [], []
@@ -127,7 +162,12 @@ def main() -> None:
         t_rows = locate(prim=bk["prim"][sel], oi=bk["oi"][sel], vi=bk["vi"][sel])
         fixed, _ = bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)
         x = test.x[t_rows].astype(np.float32).copy()
-        x[:, SL] = e.block_of(clean=fixed, primary=test.primary[t_rows], target_idx=test.target_idx[t_rows], origin_idx=test.origin_idx[t_rows])
+        x[:, SL] = e.block_of(
+            clean=fixed,
+            primary=test.primary[t_rows],
+            target_idx=test.target_idx[t_rows],
+            origin_idx=test.origin_idx[t_rows],
+        )
         assert np.array_equal(x[:, 43:45], test.x[t_rows][:, 43:45])
         p = test.primary[t_rows].astype(np.int16)
         xs.append((sel, x))
@@ -153,31 +193,58 @@ def check(*, test, mr, n_prim, windows, rows_real, locate, clean, start_idx, bk)
     for seed, day, wi in ((0, 0, 0), (0, 14, 1), (2, 0, 0), (2, 14, 1)):
         model = load_model(seed=seed, day=day, n_primaries=n_prim)
         lo, hi = windows[wi]
-        frame = e.window_frame(model=model, test=test, mr=mr, lo=lo, hi=hi, flag=False, device="cuda")
+        frame = e.window_frame(
+            model=model, test=test, mr=mr, lo=lo, hi=hi, flag=False, device="cuda"
+        )
         stored = pl.read_parquet(STORED / "fits/P5" / f"{month}_d{day}_s{seed}.parquet")
-        j = frame.join(stored, on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_st")
+        j = frame.join(
+            stored, on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_st"
+        )
         d = max(float((j[c] - j[c + "_st"]).abs().max()) for c in levels)
-        lines.append(f"real  seed {seed} d{day}: rebuilt {frame.height}, stored {stored.height}, joined {j.height}, max |q rebuilt - q stored| = {d:.3e} of capacity")
+        lines.append(
+            f"real  seed {seed} d{day}: rebuilt {frame.height}, stored {stored.height}, joined {j.height}, max |q rebuilt - q stored| = {d:.3e} of capacity"
+        )
         # injected bank pass 3
         r = 3
         fixed, _ = bank.contaminate(clean=clean, month_start_idx=start_idx, r=r)
-        blk = e.block_of(clean=fixed, primary=test.primary, target_idx=test.target_idx, origin_idx=test.origin_idx)
+        blk = e.block_of(
+            clean=fixed,
+            primary=test.primary,
+            target_idx=test.target_idx,
+            origin_idx=test.origin_idx,
+        )
         x = test.x.copy()
         x[:, SL] = blk
-        fr = e.window_frame(model=model, test=dataclasses.replace(test, x=x), mr=mr, lo=lo, hi=hi, flag=False, device="cuda")
+        fr = e.window_frame(
+            model=model,
+            test=dataclasses.replace(test, x=x),
+            mr=mr,
+            lo=lo,
+            hi=hi,
+            flag=False,
+            device="cuda",
+        )
         st = pl.read_parquet(STORED / "inject" / f"{month}_r{r:02d}_d{day}_s{seed}.parquet")
         j = fr.join(st, on=["time_series_id", "power_fcst_init_time", "valid_time"], suffix="_st")
         d = max(float((j[c] - j[c + "_st"]).abs().max()) for c in levels)
-        lines.append(f"bank r{r:02d} seed {seed} d{day}: rebuilt {fr.height}, stored {st.height}, joined {j.height}, max diff = {d:.3e}")
+        lines.append(
+            f"bank r{r:02d} seed {seed} d{day}: rebuilt {fr.height}, stored {st.height}, joined {j.height}, max diff = {d:.3e}"
+        )
         # cached-input lag encoder vs the network's own
         idx = np.flatnonzero((test.origin >= lo) & (test.origin < hi))[::97][:50_000]
         xt = torch.from_numpy(test.x[idx]).cuda()
         pt = torch.from_numpy(test.primary[idx].astype(np.int64)).cuda()
-        rows = torch.from_numpy(table_rows(x=test.x[idx], prim=test.primary[idx]).astype(np.float16)).cuda()
+        rows = torch.from_numpy(
+            table_rows(x=test.x[idx], prim=test.primary[idx]).astype(np.float16)
+        ).cuda()
         with torch.no_grad():
-            own = torch.nn.functional.gelu(model.lag_embedding(x=xt, primary=pt, emb=model.embedding(pt)))
+            own = torch.nn.functional.gelu(
+                model.lag_embedding(x=xt, primary=pt, emb=model.embedding(pt))
+            )
             mine = encode_cached(model=model, x=xt, prim=pt, rows=rows)
-        lines.append(f"hl    seed {seed} d{day}: {len(idx)} rows, max |hl cached path - hl network| = {float((own - mine).abs().max()):.3e}")
+        lines.append(
+            f"hl    seed {seed} d{day}: {len(idx)} rows, max |hl cached path - hl network| = {float((own - mine).abs().max()):.3e}"
+        )
         del model
     print("\n".join(lines), flush=True)
     (OUT / f"check_{month}.txt").write_text("\n".join(lines) + "\n")
