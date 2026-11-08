@@ -126,6 +126,20 @@ fresh Sonnet agent that re-derives the headline numbers; the write-up; one Sonne
 Chat updates go to the manager only: plan pull request open, fits started, fits finished, pull
 request merged.
 
+## Margin (fixed before any arm is scored)
+
+`e00648_margin.py` reads experiment 613's stored event-free cells for seed sets 0 to 1 and 2 to 4 on
+the three screen months, 24-120 h, all Primaries. The seed standard deviation comes from the
+disagreement of the two seed-set means.
+
+- K1: CRPS 3.009 points of capacity, seed standard deviation 0.0407, minimum detectable effect for
+  one seed against one seed 0.1129, experiment 447's margin scaled 0.0640. **Margin 0.113 points.**
+- Class 2 candidate: CRPS 3.056 points, standard deviation 0.0393, minimum detectable effect 0.1089,
+  scaled 0.0650. **Margin 0.109 points.**
+- Caveat: the two seed sets differ by 0.064 in 2025-10 and by under 0.016 in the other two months, so
+  the standard deviation rests on one noisy month. The margin is a lower bound on what a single seed
+  can detect and is not tuned afterwards.
+
 ## Results
 
 Not yet run.
