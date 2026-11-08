@@ -56,13 +56,13 @@ ARMS: dict[str, dict[str, float | int | str]] = {
 _p = argparse.ArgumentParser()
 _p.add_argument("arm", choices=sorted(ARMS))
 _p.add_argument("net", choices=("k1", "c2"))
-_p.add_argument("command", choices=("pretrain", "step2", "fit", "inject"))
+_p.add_argument("command", choices=("pretrain", "step2", "fit", "inject", "assemble"))
 _p.add_argument("--months", nargs="+", default=["2025-10", "2026-01", "2026-06"])
 _p.add_argument("--seeds", nargs="+", type=int, default=[0])
 MINE = _p.parse_args()
 assert max(MINE.months) <= "2026-06", "July 2026 onwards is never opened"
 SET = ARMS[MINE.arm]
-assert MINE.net == "k1" or MINE.command in {"fit", "inject"}, "c2 runs only fit and inject"
+assert MINE.net == "k1" or MINE.command in {"fit", "inject", "assemble"}, "c2 runs fit, inject, and assemble"
 if SET.get("bn"):
     assert MINE.net == "c2", "the neighbour-summary bottleneck exists only in the candidate"
 
