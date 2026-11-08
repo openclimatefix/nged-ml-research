@@ -14,11 +14,10 @@ protocol: demand-v2
 size: >-
   Medium. (1) It stores one rebuilt K1 forecast table per shifted-bank pass and the head weights (a
   few thousand parameters each), and no new K1 weights; (2) more than one design would defensibly
-  test the hypothesis (heads trained on real bases or on generated bases, with and without a
-  matched placebo), so it runs the arms side by side; (3) it reuses experiment 647's head, scorer,
-  and K1 rebuild, experiment 581's bank interface, and experiment 613's K1 inference, whose callers
-  are named in the plan; (4) it touches no serving path or degradation rule; (5) it changes no
-  contract.
+  test the hypothesis (heads trained on real bases or on generated bases, with and without a matched
+  placebo), so it runs the arms side by side; (3) it reuses experiment 647's head, scorer, and K1
+  rebuild, experiment 581's bank interface, and experiment 613's K1 inference, whose callers are
+  named in the plan; (4) it touches no serving path or degradation rule; (5) it changes no contract.
 hypothesis: >-
   A departure head trained on an extended shift generator (shifts that end at random times, constant
   and proportional shapes, step and ramp onsets, depths from 3 to 50 points of capacity, donor and
@@ -33,19 +32,19 @@ prediction: >-
   0.03 points. The placebo scores within 0.05 of K1 after equal width scaling.
 decision_rule: >-
   R-new counts as beating R0-168 when the month-block 95% interval (percentile bootstrap over the 5
-  development months, seeds averaged within a month) of the scaled CRPS difference on the
-  out-of-support cells excludes zero in the predicted direction and the point estimate exceeds 0.05
-  points. With 5 blocks the interval is coarse, so it is reported with the fold-by-fold table.
-  The 0.05 limit on the after-shift loss (0.5) and the 0.03 limit on event-free rows are vetoes:
-  if either fails, R-new is reported as not ready for porting whatever the contrast says. R-old is
-  context and enters no stop rule. The first month pair
-  (2025-10 and 2025-12) is a feasibility gate, not a test, because two month blocks cannot support
-  an interval; a claim needs all 5 months. Drop R-new if its point estimate is not below R0-168
-  on the first pair. Drop arm G if it is worse than R-new by more than 0.05, or if the realness
-  classifier's AUC is above 0.6. The smallest gain worth porting is 0.05 points over R0-168 on the
-  out-of-support cells: R0-168 needs no fit, so a second neural network must beat it clearly. The
-  value is the brief's fixed minimum detectable effect, chosen before any score, and no power
-  calculation backs it; experiment 647 measured a 0.9 point gain on an in-distribution bank.
+  development months, seeds averaged within a month) of the scaled CRPS difference on the out-of-
+  support cells excludes zero in the predicted direction and the point estimate exceeds 0.05 points.
+  With 5 blocks the interval is coarse, so it is reported with the fold-by-fold table. Two vetoes
+  apply: the after-shift loss may exceed K1 by at most 0.5 points, and the event-free loss by at
+  most 0.03 points: if either fails, R-new is reported as not ready for porting whatever the
+  contrast says. R-old is context and enters no stop rule. The first month pair (2025-10 and
+  2025-12) is a feasibility gate, not a test, because two month blocks cannot support an interval; a
+  claim needs all 5 months. Drop R-new if its point estimate is not below R0-168 on the first pair.
+  Drop arm G if it is worse than R-new by more than 0.05, or if the realness classifier's AUC is
+  above 0.6. The smallest gain worth porting is 0.05 points over R0-168 on the out-of-support cells:
+  R0-168 needs no fit, so a second neural network must beat it clearly. The value is the brief's
+  fixed minimum detectable effect, chosen before any score, and no power calculation backs it;
+  experiment 647 measured a 0.9 point gain on an in-distribution bank.
 benchmark: >-
   R0-168 (K1's quantiles shifted by K1's own mean residual over valid days 2 to 8 before the origin,
   times exp(-lead/168 h)), K1 (experiments 612 and 613), and R-old (experiment 647's H1 as merged).
@@ -61,37 +60,28 @@ best_arm: >-
 headline: >-
   Trained on shifts with random ends, the departure head beats the no-fit shift R0 (168 h) by 2.29
   points inside held-out shifts after equal width scaling (-2.29 [-2.63, -1.95]), but scores 3.59
-  points
-  worse than K1 after a shift ends and trails K1 by 0.05 on event-free rows.
+  points worse than K1 after a shift ends and trails K1 by 0.05 on event-free rows.
 lessons: >-
   Training on the extended generator beats training on experiment 647's constant-shift bank by 1.45
   points inside shifts outside the training range, and equal width scaling does not remove the gain
-  over
-  the no-fit shift. The loss after a shift ends is larger with the extended bank (7.40 against 5.57
-  for
-  the head trained on the old bank), so random ends did not teach the head to let go.
+  over the no-fit shift. The loss after a shift ends is larger with the extended bank (7.40 against
+  5.57 for the head trained on the old bank), so random ends did not teach the head to let go.
 take_home_message: >-
   Training the departure head on shifts that end at random times, with varied shapes and depths,
-  makes it
-  beat the no-fit shift by 2.3 points of capacity inside shifts outside its training range, and beat
-  the
-  head trained on the old bank by 1.5 points. The head still carries a shift past its end and scores
-  3.6
-  points worse than K1 there, so it is not ready for production. The next step is a head that ends a
-  shift as soon as the gap signals say so.
+  makes it beat the no-fit shift by 2.3 points of capacity inside shifts outside its training range,
+  and beat the head trained on the old bank by 1.5 points. The head still carries a shift past its
+  end and scores 3.6 points worse than K1 there, so it is not ready for production. The next step is
+  a head that ends a shift as soon as the gap signals say so.
 advice:
   - >-
     Compare any departure head with R0 at 168 h and after equal width scaling, because scaling
-    removes
-    the gain that comes from a wider band alone (Results, first bullet).
+    removes the gain that comes from a wider band alone (Results, first bullet).
   - >-
     Do not port the departure head as it stands: it scores 3.59 points worse than K1 after a shift
-    ends
-    (Results, bullet on the vetoes).
+    ends (Results, bullet on the vetoes).
   - >-
     Test any change to the head's duration prior on shifts that end during the 10-day horizon,
-    because the
-    old bank, which ended every shift on day 14, hid the problem (Results, bullet on the vetoes).
+    because the old bank may have hidden the problem (Results, bullet on the vetoes).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -105,36 +95,43 @@ and the gap signals (differences between recent power and a lag-free forecast), 
 forecast towards the arrangement now in force. R0 (168 h) is the no-fit baseline: K1's quantiles
 plus K1's own mean error over valid days 2 to 8 before the forecast, decayed by exp(-lead / 168 h).
 
-**Take-home message.** Trained on shifts with random ends, varied shapes, and depths from 3 to 50
-points of capacity, the head beats R0 (168 h) by 2.29 points of capacity inside shifts that lie
-outside the training range, after every arm's band is scaled to the same coverage. After a shift
-ends, however, the head scores 3.59 points worse than K1, and 1.83 points worse than the head
-trained on the old bank. The head is therefore not ready for production. Verdict: partly supported.
+**Take-home message.** All shifts here are synthetic: they are injected into real history, and only
+one real episode (the verified pair, below) checks the result. Trained on shifts with random ends,
+varied shapes, and depths from 3 to 50 points of capacity, the head beats R0 (168 h) by 2.29 points
+of capacity inside shifts that lie outside the training range (R-new is the head trained on the
+extended generator, R-old the head trained on the old bank), after every arm's band is scaled to the
+same coverage. R0 (168 h) beats R-new on event-free rows and after a shift ends. After a shift ends,
+however, the head scores 3.59 points worse than K1, and 1.83 points worse than the head trained on
+the old bank. The head is therefore not ready for production. Verdict: partly supported.
 
 ## Figures
 
-![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig1_inside_scaled.svg)
+![Scaled CRPS inside held-out shifts: R-new is below R0 (168 h), R-old, and K1](fig1_inside_scaled.svg)
 
-![After a shift ends and on event-free rows: R-new is worse than K1 on both](fig2_vetoes.svg)
+![Vetoes: R-new is worse than K1 after the end, and level with K1 on event-free rows](fig2_vetoes.svg)
 
-![Scaled CRPS inside held-out shifts by depth: R-new leads at every depth](fig3_by_depth.svg)
+![Scaled CRPS inside held-out shifts by depth: R-new leads at each of the four depths](fig3_by_depth.svg)
 
-![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig4_example_1.svg)
+![Example 1: depth 0.40, 21 days, injected into December 2025](fig4_example_1.svg)
 
-![Example 2, December 2025: depth 0.20, 45 days](fig4_example_2.svg)
+![Example 2: depth 0.20, 45 days, injected into December 2025](fig4_example_2.svg)
 
-![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig4_example_3.svg)
+![Example 3: depth 0.65, 10 days, injected into December 2025](fig4_example_3.svg)
 
-![Example forecasts on real event-free rows, day-ahead and 24 to 240 h](fig5_real_examples.svg)
+![Real event-free rows: day-ahead over 14 days, and 24 to 240 h from one origin](fig5_real_examples.svg)
 
 ## Results
 
 Scores are CRPS (twice the mean pinball loss over the 11 stored quantiles) in points of capacity,
 where 1 point is 1% of a Primary's effective capacity. A negative difference favours the first arm.
 Intervals are percentile bootstraps over the 5 development months (2025-10, 2025-12, 2026-01,
-2026-03, 2026-06) of the two-seed mean. Equal width scaling multiplies every arm's quantile spread
+2026-03, 2026-06) of the mean of 2 seeds. Equal width scaling multiplies every arm's quantile spread
 about its median by one factor per month and phase, chosen so that the q05-q95 band covers 0.90 of
-the rows. It is fitted on the scored rows, so it is an oracle, and it applies to K1 and R0 as well.
+the rows. The factor is fitted on the scored rows and knows which phase each row is in (before,
+inside, or after the shift), so the scaling is an oracle that production cannot use. It applies to
+K1 and R0 as well. Pinball loss is the asymmetric quantile loss; CRPS is the continuous ranked
+probability score; MW and MVA Primaries are those metered in megawatts and in megavolt-amperes; NGED
+is National Grid Electricity Distribution.
 
 - **Inside a shift outside the training range, R-new beats every other arm (decision contrast).**
   Scaled CRPS: K1 21.01, R0 (168 h) 16.69, R-old 15.85, R-new 14.40, placebo 19.18. R-new minus R0
@@ -150,12 +147,13 @@ the rows. It is fitted on the scored rows, so it is an oracle, and it applies to
   6.52, R-old 5.57, R-new 7.40, and the placebo 4.08. R-new minus K1 is +3.59 [+2.70, +4.41] against
   the 0.5 limit, and R-new minus R-old is +1.83 [+1.24, +2.53]. On event-free real rows, R-new minus
   K1 is +0.05 [-0.24, +0.31] scaled and +0.03 [-0.28, +0.31] unscaled against the 0.03 limit, so the
-  experiment cannot tell whether the head costs anything there. R-new carries a shift for about 3
-  days past its end in the examples.
-- **The placebo moves K1's score as well.** On the decision rows the placebo scores 19.18 against
-  K1's 21.01 scaled (24.42 against 26.64 unscaled), because the shuffled targets still contain
-  shifts of the right size on average. R-new minus placebo is the clean contrast of the head's
-  signal.
+  experiment cannot tell whether the head scores worse there; at the point estimate the unscaled
+  loss is 0.034 above K1, which misses the 0.03 limit. R-new is also worse than R0 after the end
+  (+0.88 [+0.22, +1.55] scaled) and on event-free rows (+0.18 [+0.10, +0.27] scaled). R-new carries
+  a shift for about 3 days past its end in the examples.
+- **The placebo prediction failed.** The plan predicted the placebo within 0.05 of K1 after scaling.
+  On the decision rows the placebo scores 19.18 against K1's 21.01 scaled (24.42 against 26.64
+  unscaled). No table here explains the gap. R-new minus placebo is -4.78 [-5.72, -3.68].
 - **On the verified D5 and D16 pair (descriptive, 13,000 rows, one episode),** unscaled CRPS is K1
   15.02, R0 13.25, R-old 9.76, R-new 9.57, and the placebo 14.12. R-new and R-old are equal there.
 - **Tail calibration (unscaled).** Inside a shift, q05-q95 coverage is K1 0.23, R0 0.37, R-old 0.55,
@@ -165,24 +163,27 @@ the rows. It is fitted on the scored rows, so it is an oracle, and it applies to
   0.81, and the q99 pinball loss is 0.26, 0.98, 0.33, and 0.84. On event-free rows coverage is 0.87
   for K1, 0.88 for R0, 0.89 for R-old, and 0.89 for R-new, and the q99 pinball loss is 0.275, 0.250,
   0.256, and 0.258.
-- **Avoidable-curtailment cost** (experiment 601's function, in its own units with no pounds
-  conversion, six MW Primaries, leads 12 to 36 h, limit 0.9 of the earlier peak, mean over the
-  held-out rows; the range is the lowest and highest of the 5 months). Inside a shift: K1 549,533,
-  R0 213,749, R-old 167,632, R-new 147,900 (range 70,859 to 247,869), placebo 482,589. In the 7 days
-  after the end: K1 541, R0 13,980, R-old 8,087, R-new 10,512, placebo 1,967. Over all rows: K1
-  316,942, R0 126,244, R-old 97,594, R-new 87,208, placebo 278,503. Every head cuts the cost inside
-  a shift, and every head raises it after the end.
-- **The head's median is a better forecast too.** Median absolute error inside a shift is K1 30.59,
-  R0 21.92, R-old 22.18, and R-new 17.42 points of capacity, so CRPS and median error agree.
+- **Avoidable-curtailment cost** (experiment 601's function, in the units of its code, which labels
+  them pounds per Primary-day without a check against a tariff, six MW Primaries, leads 12 to 36 h,
+  limit 0.9 of the earlier peak, mean over the held-out rows; the range is the lowest and highest of
+  the 5 months). Inside a shift: K1 549,533, R0 213,749, R-old 167,632, R-new 147,900 (range 70,859
+  to 247,869), placebo 482,589. In the 7 days after the end: K1 541, R0 13,980, R-old 8,087, R-new
+  10,512, placebo 1,967. Over all rows: K1 316,942, R0 126,244, R-old 97,594, R-new 87,208, placebo
+  278,503. Every head cuts the cost inside a shift, and every head raises it after the end.
+- **The head's median is a better forecast too.** Over all held-out rows inside a shift, the mean
+  absolute error of the median is K1 30.59, R0 21.92, R-old 22.18, and R-new 17.42 points of
+  capacity. R-new leads on both CRPS and median error, but R0 beats R-old on median error and loses
+  to it on CRPS.
 
 ## Arms, data, and method
 
-- **Arms.** R0 (168 h), K1 (stored), R-old (experiment 647's head recipe refitted on the extended
-  experiment 647 constant-shift bank, because its stored weights were deleted to free disk), R-new
-  (the same head on the extended generator), placebo (R-new with the shifts shuffled across the bank
-  rows of the training fold). All heads read K1's 11 quantiles and experiment 647's inputs, one head
-  per scored month (trained on the other 4 months), 2 seeds, with early stopping on origin days 21
-  onward of the training months. The arm G (generated bases) was not run.
+- **Arms.** R0 (168 h), K1 (stored), R-old (experiment 647's head recipe refitted on experiment
+  647's constant-shift bank, because its stored weights were deleted to free disk), R-new (the same
+  head on the extended generator), placebo (R-new with the shifts shuffled across the bank rows of
+  the training fold). All heads read K1's 11 quantiles and experiment 647's inputs, one head per
+  scored month (trained on the other 4 months), 2 seeds, with early stopping on origin days 21
+  onward of the training months. Arm G (a head trained on generated bases instead of real ones) was
+  not run, and neither was the realness classifier planned beside it.
 - **Extended generator.** One shift per Primary per pass, 12 training passes per month. Constant or
   proportional shape (MVA Primaries constant only), step or 6 to 48 h ramp onset, depth log-uniform
   from 3 to 50 points, duration 3 to 14 or 28 to 112 days with onset from 10 days before the month
@@ -200,7 +201,8 @@ the rows. It is fitted on the scored rows, so it is an oracle, and it applies to
 - **Rows and cleaning.** The development months only; no row on or after 2026-07-01 is read
   (asserted). Power comes from the stored clean stack, with flagged rows excluded from real-row
   training and scoring; the count of flagged half-hours per fold was not tabulated separately. Rows
-  without R0 history are dropped from every arm (`score5/dropped.csv`).
+  without R0 history are dropped from every arm: 14% to 26% of held-out rows per month, and 37% of
+  the real rows in 2025-10 (`score5/dropped.csv`).
 - **Cadence.** K1 is stored and not refitted. The heads are small and are fitted once per scored
   month, so no refit cadence applies.
 - **Reused code.** Experiment 647 (data build, head, fit helpers, K1 rebuild pattern), experiment
@@ -209,10 +211,11 @@ the rows. It is fitted on the scored rows, so it is an oracle, and it applies to
 
 ## Checks
 
-- **Median minus mean forecast** (points of capacity, decision rows): K1 -0.75, R0 -0.75, R-old
-  -0.38, R-new -0.32. Event-free rows: -0.61, -0.61, -0.53, -0.53.
-- **Mean-forecast error beside the contrasts** (decision rows, mean absolute error of the mean
-  forecast): K1 30.59, R0 22.02, R-old 22.37, R-new 18.40; the order matches the CRPS order.
+- **Median minus mean forecast** (points of capacity, all held-out rows inside a shift): K1 -0.75,
+  R0 -0.75, R-old -0.38, R-new -0.32. Event-free real rows: -0.61, -0.61, -0.53, -0.53.
+- **Mean-forecast error beside the contrasts** (all held-out rows inside a shift, mean absolute
+  error of the mean forecast): K1 30.59, R0 22.02, R-old 22.37, R-new 18.40. R-new leads on both
+  measures; R0 beats R-old on this one only.
 - **Triggers fired.** The placebo moved the decision rows by 2.2 unscaled points against K1 (placebo
   trigger), and the two vetoes missed their bars (bar trigger). The leave-one-Primary-out, sister
   experiment, and later-dependency triggers were not assessed.
@@ -224,19 +227,22 @@ the rows. It is fitted on the scored rows, so it is an oracle, and it applies to
 
 ## Caveats
 
-- The fitted heads and the figures use 5 month blocks, so every interval is coarse.
+- The intervals use 5 month blocks, so every interval is coarse.
 - NGED's event labels are incomplete, so event-free rows may hold unlogged shifts. The event-free
   cost is therefore optimistic and the number of real flagged events is a lower bound.
 - The held-out shifts differ from the training family in a few attributes only, they are constant
   shapes, and an MVA Primary's target is clipped at zero.
-- Equal width scaling is an oracle fitted on the scored rows. It makes every arm look as well
-  calibrated as its sharpness allows, and it penalises sharper arms when their unscaled coverage is
-  below 0.90.
+- Equal width scaling is an oracle fitted on the scored rows. The scaling widens every under-covered
+  arm: inside held-out shifts the factors are 6.5 for K1, 5.5 for R0, and 3.6 for R-new, and R-new's
+  unscaled q05-q95 coverage is only 0.59. The scaled gain therefore depends on widening R-new's band
+  by about 3.6 times.
 - One episode (the verified pair) carries the real-row evidence; no real flagged day beyond it was
   scored.
 - R-old is a refit on the same one-bank training months as R-new, not the stored head of experiment
   647.
-- Arm G was not run.
+- Arm G and the realness classifier were not run.
+- The first-month-pair gate (2025-10 and 2025-12) passed: R-new minus R0 was -2.33 and -2.83.
+  Fold-by-fold values for every contrast are in the `per_month` column of `score5/contrasts.csv`.
 
 ## What to try next
 

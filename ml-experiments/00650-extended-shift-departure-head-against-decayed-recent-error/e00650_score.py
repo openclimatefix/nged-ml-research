@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, D103
+# ruff: noqa: E501, ANN001, ANN201, ANN202, D103, PLR0912, PLR0915, PLW0603, B007
 """Experiment 650, step 5: score the arms on the extended held-out family and on real event-free rows (CPU).
 
 Arms: K1 (stored forecast), R0-168 (K1 shifted by its own decayed recent error, tau 168 h), and the

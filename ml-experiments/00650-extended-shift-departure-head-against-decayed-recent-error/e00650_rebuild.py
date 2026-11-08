@@ -1,4 +1,4 @@
-# ruff: noqa: E501, E402, ANN001, D103
+# ruff: noqa: E501, E402, ANN001, ANN201, D103
 """Experiment 650, step 2: rebuild K1 on the extended-shift bank (CPU).
 
 K1 is the seed mean of five seeds, experiment 613's tail constants (fitted on earlier months' event-free
@@ -126,7 +126,7 @@ def one_pass(*, inp, t, m: str, r: int, own: np.ndarray, mirror: np.ndarray, eve
     }  # fmt: skip
 
 
-def old_bank_shifts(*, clean, month: str, r: int, nb: dict[int, list[int]], capacity):  # noqa: ANN201
+def old_bank_shifts(*, clean, month: str, r: int, nb: dict[int, list[int]], capacity):
     """Return experiment 647's own and mirrored shifts of experiment 581's pass `r` (for `--validate`)."""
     ms = c650.month_start_idx(month=month)
     fixed, ev = bank.contaminate(clean=clean, month_start_idx=ms, r=r)

@@ -46,7 +46,7 @@ def contaminate(
     return np.where(np.isfinite(clean), clean + own, clean), [e.row() for e in events]
 
 
-def out_path(out_dir, month, r, day, seed):  # noqa: ANN001, ANN201, ARG001
+def out_path(out_dir, month, r, day, seed):  # noqa: ANN001, ANN201
     """Return the output parquet of one cell in this experiment's folder."""
     return c650.INJECT / f"{month}_r{r:02d}_d{day}_s{seed}.parquet"
 

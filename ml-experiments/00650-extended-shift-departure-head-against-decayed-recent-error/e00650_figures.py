@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, E731
+# ruff: noqa: E501, ANN001, D103, PLC0206
 """Experiment 650, step 7: the figures (CPU). SVG and PNG go to `figures/` in the data folder.
 
 1. Scaled CRPS inside out-of-support held-out events, with month-block 95% intervals.
@@ -80,14 +80,14 @@ def bars(
                 legend=None,
             ),
         )
-        mark = base.mark_bar(size=14, aria=False).encode(
+        mark = base.mark_bar(size=14, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "point:Q",
                 title="Scaled CRPS, points of capacity (smaller is better)",
                 scale=alt.Scale(zero=True),
             )
         )  # ty: ignore[unresolved-attribute]
-        err = base.mark_rule(color=ocf.BLACK_1, strokeWidth=2, aria=False).encode(
+        err = base.mark_rule(color=ocf.BLACK_1, strokeWidth=2, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x="lo:Q", x2="hi:Q"
         )  # ty: ignore[unresolved-attribute]
         charts.append(
@@ -248,11 +248,11 @@ def examples() -> None:
                 ]
             )
             band = (
-                alt.Chart(df)
+                alt.Chart(df)  # ty: ignore[unresolved-attribute]
                 .mark_area(opacity=0.25, color=ocf.BRAND_ORANGE)
                 .encode(x="day:Q", y="rn_lo:Q", y2="rn_hi:Q")
             )  # ty: ignore[unresolved-attribute]
-            lines = alt.Chart(long).mark_line().encode(x=alt.X("day:Q", title="Day of the month (UTC)"), y=alt.Y("v:Q", title="Power, share of capacity", scale=alt.Scale(zero=False)), color=alt.Color("series:N", scale=alt.Scale(domain=["Observed plus shift (target)", "K1 median", "R0 (168 h) median", "R-new median"], range=[ocf.BLACK_1, ocf.DATA_BLUE, ocf.DATA_SKY, ocf.BRAND_ORANGE]), legend=alt.Legend(orient="top", title=None, columns=2)))  # fmt: skip
+            lines = alt.Chart(long).mark_line().encode(x=alt.X("day:Q", title="Day of the month (UTC)"), y=alt.Y("v:Q", title="Power, share of capacity", scale=alt.Scale(zero=False)), color=alt.Color("series:N", scale=alt.Scale(domain=["Observed plus shift (target)", "K1 median", "R0 (168 h) median", "R-new median"], range=[ocf.BLACK_1, ocf.DATA_BLUE, ocf.DATA_SKY, ocf.BRAND_ORANGE]), legend=alt.Legend(orient="top", title=None, columns=2)))  # fmt: skip  # ty: ignore[unresolved-attribute]
             panels.append(
                 (band + lines).properties(
                     width=W - 100,
@@ -336,11 +336,11 @@ def real_examples() -> None:
             ]
         )
         band = (
-            alt.Chart(d)
+            alt.Chart(d)  # ty: ignore[unresolved-attribute]
             .mark_area(opacity=0.25, color=ocf.BRAND_ORANGE)
             .encode(x=f"{x}:Q", y="lo:Q", y2="hi:Q")
         )  # ty: ignore[unresolved-attribute]
-        lines = alt.Chart(long).mark_line().encode(x=alt.X(f"{x}:Q", title=xt), y=alt.Y("v:Q", title="Power, share of capacity", scale=alt.Scale(zero=False)), color=alt.Color("series:N", scale=alt.Scale(domain=["Observed", "K1 median", "R-new median"], range=[ocf.BLACK_1, ocf.DATA_BLUE, ocf.BRAND_ORANGE]), legend=alt.Legend(orient="top", title=None)))  # fmt: skip
+        lines = alt.Chart(long).mark_line().encode(x=alt.X(f"{x}:Q", title=xt), y=alt.Y("v:Q", title="Power, share of capacity", scale=alt.Scale(zero=False)), color=alt.Color("series:N", scale=alt.Scale(domain=["Observed", "K1 median", "R-new median"], range=[ocf.BLACK_1, ocf.DATA_BLUE, ocf.BRAND_ORANGE]), legend=alt.Legend(orient="top", title=None)))  # fmt: skip  # ty: ignore[unresolved-attribute]
         panels.append(
             (band + lines).properties(
                 width=W - 100, height=200, title=alt.TitleParams(title, anchor="start", fontSize=12)

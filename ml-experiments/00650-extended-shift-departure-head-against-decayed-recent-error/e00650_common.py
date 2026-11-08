@@ -8,7 +8,7 @@ from typing import Final
 import e00578_common as k578  # ty: ignore[unresolved-import]
 import e00650_bank as gen
 import numpy as np
-from studies.sources import ML_EXPERIMENTS_DATA_DIR  # noqa: F401
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 NAME: Final[str] = "00650-extended-shift-departure-head-against-decayed-recent-error"
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / NAME

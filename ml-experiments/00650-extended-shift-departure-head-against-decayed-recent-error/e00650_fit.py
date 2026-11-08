@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, D103, PLR0915
+# ruff: noqa: E501, ANN001, D103, D107, PLR0915
 """Experiment 650, step 4: fit the departure heads on the first month pair and write per-row scores (CPU).
 
 Arms: `Rnew` (experiment 647's H1 recipe on real rows plus the extended-shift bank), `Rold` (the same
@@ -217,7 +217,7 @@ def fit_one(job: tuple[str, str, int, str]) -> str:
         res[f"{name}_q"] = q_all
     np.savez(
         out,
-        **res,
+        **res,  # ty: ignore[invalid-argument-type]
         val_log=np.array(log),
         n_train=n,
         n_val=len(val.y),
