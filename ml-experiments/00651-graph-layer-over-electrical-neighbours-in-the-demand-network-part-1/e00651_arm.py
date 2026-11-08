@@ -362,7 +362,7 @@ def set_bank(
 ) -> None:
     """Install the neighbour bank the graph network reads on its next forward pass."""
     assert len(x) < (1 << 24), "row numbers are carried in a float32 column"
-    mymodel.BANK.x = (x if torch.is_tensor(x) else torch.from_numpy(x)).to(device)
+    mymodel.BANK.x = (x if torch.is_tensor(x) else torch.from_numpy(x)).to(device)  # ty: ignore[unresolved-attribute]
     mymodel.BANK.p = torch.from_numpy(prim.astype(np.int64)).to(device)
     mymodel.BANK.nbr = torch.from_numpy(nbr).to(device)
 
