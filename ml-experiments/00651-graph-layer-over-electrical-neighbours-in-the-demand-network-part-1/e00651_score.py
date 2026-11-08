@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, S101, INP001
+# ruff: noqa: E501, D103, ANN001, D102,D107
 """Experiment 651: score the graph arms and the stored Candidate on one injected bank (no fit, no GPU).
 
 A thin wrapper around experiment 613's scorer (`e00613_nbscore`, which this experiment imports without

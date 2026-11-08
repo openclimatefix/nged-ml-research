@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, B008,D107,PT018
 """Experiment 651 (copy of 613): experiment 591's A1 network with extra lag-encoder columns and two options.
 
 The options are a scalar bottleneck and a load-shift label head.

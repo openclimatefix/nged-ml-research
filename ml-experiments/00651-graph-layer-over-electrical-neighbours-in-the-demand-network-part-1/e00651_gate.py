@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, S101, INP001
+# ruff: noqa: E501, D103
 """Experiment 651: the pre-registered gate to the confirmation experiment, checked by script.
 
 Reads the tables of `e00651_score.py` for banks M, S, and X. Systems are the arms rescaled to the

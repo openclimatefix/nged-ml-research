@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, S101, INP001
+# ruff: noqa: E501, D103, ANN201, C416
 """Experiment 651: CPU tests of the graph network, run before any fit (`pytest`-free script; exit code 0 means pass).
 
 1. Zero start: every graph kind gives exactly the own-signal network's output before training.
@@ -99,17 +99,20 @@ for kind_mod in ("GCN", "GAT", "GATR", "GATF", "FLOW"):
         nb_rows = {int(j) for j in nbr[r0] if j >= 0}
         far = next((i for i in non if i not in nb_rows), None)
         stable = True
+        assert mm.BANK is not None
+        bank_x = mm.BANK.x
+        assert bank_x is not None
         if far is not None:
-            mm.BANK.x[far, cols] += 3.0
+            bank_x[far, cols] += 3.0
             moved = m(feed(x), prim)
             stable = torch.equal(moved[r0], base[r0])
-            mm.BANK.x[far, cols] -= 3.0
+            bank_x[far, cols] -= 3.0
         # 2b. change a neighbour's bank entry: row 0's output must move (the test can fail)
         if nb_rows:
             j = next(iter(nb_rows))
-            mm.BANK.x[j, cols] += 3.0
+            bank_x[j, cols] += 3.0
             moved2 = m(feed(x), prim)
-            mm.BANK.x[j, cols] -= 3.0
+            bank_x[j, cols] -= 3.0
             reacts = not torch.equal(moved2[r0], base[r0])
         else:
             reacts = True
@@ -139,6 +142,7 @@ for kind_mod in ("GCN", "GAT", "GATR", "GATF", "FLOW"):
         xb = feed(x)
         _, mw = m.flow_correction(x=x, p=prim, rid=xb[:, -1].long())
         idx = mm.BANK.nbr
+        assert idx is not None
         tot, cnt = 0.0, 0
         for i in range(len(x)):
             for k in range(idx.shape[1]):

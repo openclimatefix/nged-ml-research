@@ -1,4 +1,4 @@
-# ruff: noqa: E501, D103, ANN001, ANN201, S101, INP001
+# ruff: noqa: E501, D103, ANN001, ANN201, E402,RET504
 """Experiment 651: the design's leak guard on the real input builders (CPU, before any fit).
 
 For one origin of 2025-10, every power reading from 24 h before the origin onwards (all 16 Primaries,
@@ -11,12 +11,11 @@ import sys
 
 sys.argv = ["e00651_arm.py", "G0+D50+GAT", "check", "--months", "2025-10", "--seeds", "0"]
 
-import dataclasses  # noqa: E402
 
-import e00651_arm as arm  # noqa: E402  # ty: ignore[unresolved-import]
-import e00651_nbmodel as mm  # noqa: E402  # ty: ignore[unresolved-import]
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
+import e00651_arm as arm  # ty: ignore[unresolved-import]
+import e00651_nbmodel as mm  # ty: ignore[unresolved-import]
+import numpy as np
+import torch
 
 e = arm.e
 MONTH, SEED = "2025-10", 0

@@ -27,7 +27,6 @@
 | 602 | What does each encoder of the modular demand network (datetime, weather, power lag) contribute to its forecast, on the December 2025 load-shift, on injected load-shifts, and on an event-free fortnight? | High (maintainer, 2026-11-06) | Nothing | Finished: partly supported, see experiment 602 |
 | 608 | Which parts of the combined lag-and-gate, lag-without-gate, and lag-free demand neural networks are needed, when each part is removed alone? | High (maintainer, 2026-11-06) | Nothing | Planned |
 | 647 | Can a small departure head on the frozen K1 neural network forecast the arrangement now in force better than K1 shifted by its own recent error? | High (maintainer, 2026-11-07) | Nothing | Finished: partly supported, see experiment 647 |
-| 651 | Does a graph layer over the electrical neighbours let the class 2 candidate keep its low follow of a load shift while removing its extra error on ordinary days at the six MW Primaries? | High (maintainer, 2026-11-08) | Experiment 648 frees the GPU | Planned |
 
 ## Planned experiments
 
