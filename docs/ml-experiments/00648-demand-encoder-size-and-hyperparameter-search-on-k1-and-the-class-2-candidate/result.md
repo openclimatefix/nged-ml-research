@@ -98,14 +98,14 @@ built, through a wrapper around experiment 612's and 613's arm scripts.
 |---|---|---|
 | Lag-encoder width (`LAG_HIDDEN`) | 32, **64**, 128 | K1, candidate |
 | Lag-encoder depth (`layers`) | **1**, 2 | K1, candidate |
-| Neighbour-summary encoder width (`BOTTLENECK_HIDDEN`) | 8, **16**, 32, 64 | candidate |
+| Neighbour-summary bottleneck width (`BOTTLENECK_HIDDEN`; the candidate has none, so the reference is the width-16 bottleneck arm) | 8, **16**, 32 | candidate |
 | Mixture components (`COMPONENTS`) | **3**, 5 | K1, candidate |
 | Hidden width of the encoders and the mixer (`ENCODER_HIDDEN`, `MIXER_HIDDEN`) | **64**, 128, 256, 384 | K1, candidate |
 | Dropout (`DROPOUT`) | 0.0, **0.1**, 0.2 | K1, candidate |
-| Learning rate (all stages) | x0.5, **x1**, x2 | K1, candidate |
+| Learning rate (pre-training, step 2 encoders and offsets, daily fine-tune; not the step-2 mixer's fixed 5e-4) | x0.5, **x1**, x2 | K1, candidate |
 | Maximum epochs and patience | **current**, both x2 | K1, candidate |
 
-That is 16 arms on the candidate and 14 on K1, each with 3 folds at seed 0. If one fold-seed fit
+That is 15 arms on the candidate and 13 on K1, each with 3 folds at seed 0. If one fold-seed fit
 chain takes long enough that all 30 arms exceed the 8 GPU-hour ceiling, the arms are dropped in this
 order until the projection fits: K1 arms for the neighbour-summary-free factors that the candidate
 arm already covers least (dropout, maximum epochs), then the hidden width 384, then the learning-
@@ -139,6 +139,17 @@ disagreement of the two seed-set means.
 - Caveat: the two seed sets differ by 0.064 in 2025-10 and by under 0.016 in the other two months, so
   the standard deviation rests on one noisy month. The margin is a lower bound on what a single seed
   can detect and is not tuned afterwards.
+
+## Code review triage
+
+A fresh Sonnet agent reviewed the launcher before the screen. Accepted: the bottleneck arms
+contrast with the width-16 bottleneck arm, not the reference (above); the learning-rate scale does
+not reach the step-2 mixer (above); the candidate's signal tables are experiment 598's and 610's
+tables built from the stock width-64 K1, so every candidate arm reads the same signals (a caveat for
+the write-up); the launcher now restricts commands, checks the tables exist, and records each chain's
+settings; the driver takes a lock so one GPU process runs at a time. The patches reach every place
+the constants are read, including the five-component output, which the agent checked by building the
+networks.
 
 ## Results
 
