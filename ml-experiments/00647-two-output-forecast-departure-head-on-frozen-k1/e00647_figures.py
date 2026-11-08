@@ -136,6 +136,7 @@ def bank_frame(month: str, r: int, prim: int) -> pl.DataFrame:
             "h1_med": pv["q50"][sel],
             "h1_hi": pv["q95"][sel],
             "target": d["y"][ii] + d["shift"][ii],
+            "observed": d["y"][ii],
             "shift": d["shift"][ii],
             "day": (d["vi"][ii] - ms) / PER,
         }
@@ -155,7 +156,11 @@ def ts_panel(
     lines = pl.concat([k1, h1]).sort(x)
     scale = alt.Scale(domain=["K1", "H1 (prevailing)"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE])
     base = alt.Chart(lines).encode(
-        x=alt.X(f"{x}:Q", title=xtitle),
+        x=alt.X(
+            f"{x}:Q",
+            title=xtitle,
+            axis=alt.Axis(values=list(range(1, 11))) if x == "days_ahead" else alt.Axis(),
+        ),
         color=alt.Color("arm:N", scale=scale, legend=alt.Legend(title=None, orient="top")),
     )
     band = base.mark_area(opacity=0.25, aria=False).encode(
@@ -167,7 +172,15 @@ def ts_panel(
         .mark_line(color=ocf.BLACK_1, strokeWidth=1.3, aria=False)
         .encode(x=f"{x}:Q", y="target:Q")
     )
-    return (band + med + tgt).properties(
+    layers = band + med + tgt
+    if "observed" in df.columns:
+        obs = (
+            alt.Chart(df.sort(x).select(x, "observed"))
+            .mark_line(color=ocf.DATA_PURPLE, strokeWidth=1.0, strokeDash=[3, 2], aria=False)
+            .encode(x=f"{x}:Q", y="observed:Q")
+        )
+        layers = layers + obs
+    return layers.properties(
         width=W, height=190, title=alt.TitleParams(title, anchor="start", fontSize=12)
     )
 
@@ -182,6 +195,17 @@ def group_prims() -> dict[str, int]:
         "six MW Primary": groups.index("six MW"),
         "eight MVA Primary": groups.index("eight MVA"),
     }
+
+
+def group_prims_in_bank(in_bank: set[int]) -> dict[str, int]:
+    import e00578_common as k578  # ty: ignore[unresolved-import]
+    from e00647_score import GROUPS
+
+    groups = [GROUPS[g] for g in k578.sites()["group"].to_list()]
+    out = {}
+    for name, grp in (("six MW Primary", "six MW"), ("eight MVA Primary", "eight MVA")):
+        out[name] = next(i for i, g in enumerate(groups) if g == grp and i in in_bank)
+    return out
 
 
 def fig2_3() -> None:
@@ -268,44 +292,48 @@ def fig2_3() -> None:
         )
     )
     save(chart, "fig2_verified_pair")
-    # figure 3: one origin, 10-day horizon
-    p = prims["six MW Primary"]
+    # figure 3: one origin, 24 to 240 h horizon, then the day-ahead series, one figure per group
     r = 5
-    df = bank_frame(month, r, p)
-    origin = ms + 8 * PER + 18
-    df = df.filter(pl.col("oi") == origin).with_columns(
-        ((pl.col("vi") - origin) / PER).alias("days_ahead")
-    )
-    depth, length, _ = event(primary=p, r=r)
-    end_ahead = (ms + 14 * PER - origin) / PER
-    panel = ts_panel(
-        df,
-        title=f"Six MW Primary {p}, pass {r}, one forecast issued on day 8 at 09:00",
-        xtitle="Days ahead of the forecast origin",
-        x="days_ahead",
-    )
-    rule = (
-        alt.Chart(pl.DataFrame({"x": [end_ahead], "t": ["injected shift ends"]}))
-        .mark_rule(strokeDash=[4, 3], color=ocf.BLACK_1, aria=False)
-        .encode(x="x:Q")
-    )
-    lab = (
-        alt.Chart(pl.DataFrame({"x": [end_ahead], "t": ["injected shift ends"]}))
-        .mark_text(align="left", dx=4, dy=-80, fontSize=10, color=ocf.BLACK_1, aria=False)
-        .encode(x="x:Q", text="t:N")
-    )
-    chart = (panel + rule + lab).properties(
-        title=alt.TitleParams(
-            [
-                "Over the 10-day horizon H1 follows the shift but keeps following it after the shift ends."
-            ],
-            subtitle=[
-                f"Shift {depth:+.2f} of capacity for {length} days. Black: shifted target. Bands: q05 to q95. {month}, mean over five seeds."
-            ],
-            anchor="start",
+    in_bank = set(d["prim"][d["pass_"] == r].tolist())
+    for gname, p in group_prims_in_bank(in_bank).items():
+        full = bank_frame(month, r, p)
+        origins = np.unique(full["oi"].to_numpy())
+        origin = int(origins[np.argmin(np.abs(origins - (ms + 8 * PER)))])
+        df = full.filter(pl.col("oi") == origin).with_columns(
+            ((pl.col("vi") - origin) / PER).alias("days_ahead")
         )
-    )
-    save(chart, "fig3_horizon")
+        depth, length, _ = event(primary=p, r=r)
+        end_ahead = (ms + 14 * PER - origin) / PER
+        top = ts_panel(
+            df,
+            title=f"{gname} {p}, pass {r}: one forecast, leads 24 to 240 h",
+            xtitle="Days ahead of the forecast origin",
+            x="days_ahead",
+        )
+        rule = (
+            alt.Chart(pl.DataFrame({"x": [end_ahead]}))
+            .mark_rule(strokeDash=[4, 3], color=ocf.BLACK_1, aria=False)
+            .encode(x="x:Q")
+        )
+        day = full.filter((pl.col("lead") >= 24) & (pl.col("lead") < 48) & (pl.col("day") >= 4))
+        bottom = ts_panel(
+            day,
+            title=f"{gname} {p}, pass {r}: day-ahead forecasts (leads 24 to 48 h) from every origin",
+        )
+        chart = alt.vconcat(top + rule, bottom).properties(
+            title=alt.TitleParams(
+                [
+                    f"A forecast issued on day {(origin - ms) / PER:.0f} of {month} on an injected pass."
+                ],
+                subtitle=[
+                    f"Shift {depth:+.2f} of capacity for {length} days, ending on day 14 (dashed rule, top panel).",
+                    "Black: shifted target (the series the forecast is scored against). Dashed purple: observed power.",
+                    "Bands: q05 to q95. Lines: medians. Leave-one-month-out, mean over five seeds.",
+                ],
+                anchor="start",
+            )
+        )
+        save(chart, f"fig3_horizon_{gname.split()[0]}_{gname.split()[1]}")
 
 
 def fig4() -> None:
