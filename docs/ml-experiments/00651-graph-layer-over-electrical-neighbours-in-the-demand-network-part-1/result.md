@@ -69,6 +69,20 @@ final-test window (2026-07-01 onwards) is never read. The target is the normal r
 - **Cadence.** Monthly folds (2025-10, 2025-12), refits on days 0 and 14, seeds 0 and 1, as the
   design says. The cleaning and the D15 and D18 cut before 2025-03-01 are those of experiment 613.
 
+## Training recipe shared by every arm
+
+All arms use experiment 613's recipe, so the graph layer is the only difference between a graph arm and
+G0. The synthetic load-shift generator is experiment 581's lag-only injection (`bank.synthetic_clean`,
+seeded by the fold month), which experiments 590, 591, 567, and 613 also use, and the target is never
+shifted. Pretraining is experiment 591's shared lag-encoder network (A1), pretrained on ERA5 and CAMS and
+then trained at step 2, and each arm starts its daily fine-tune from the same step-2 weights. The
+fine-tune keeps experiment 599's E3 rows (7-day embargo, half weight on the next 7 days), the D5 offset,
+50% signal dropout (D50), refits on days 0 and 14, and seeds 0 and 1. C is the stored class 2 candidate
+of experiment 612 (`P7_D50_e3`), trained with the same recipe plus the neighbour summaries. G0 drops the
+neighbour summaries and keeps the own gap signals. A graph arm adds one zero-initialised graph layer to
+G0, and FLOW-E adds an auxiliary loss on the synthetic shift. Experiment 650's extended shift generator
+is not used in G1.
+
 ## Arms
 
 | Arm | Neighbour block |
