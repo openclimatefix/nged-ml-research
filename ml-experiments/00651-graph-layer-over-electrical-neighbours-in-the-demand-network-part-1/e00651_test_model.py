@@ -16,7 +16,7 @@ sys.argv = ["e00651_arm.py", mode, "check", "--months", "2025-10", "--seeds", "0
 import e00651_arm as arm  # noqa: E402  # ty: ignore[unresolved-import]
 import e00651_nbmodel as mm  # noqa: E402  # ty: ignore[unresolved-import]
 import numpy as np  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 
 torch.manual_seed(0)
 N_PRIM, GRID, N_ROWS = 16, 200, 400

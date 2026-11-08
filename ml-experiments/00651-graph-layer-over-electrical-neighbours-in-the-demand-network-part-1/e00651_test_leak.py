@@ -15,7 +15,7 @@ sys.argv = ["e00651_arm.py", "G0+D50+GAT", "check", "--months", "2025-10", "--se
 import e00651_arm as arm  # ty: ignore[unresolved-import]
 import e00651_nbmodel as mm  # ty: ignore[unresolved-import]
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 e = arm.e
 MONTH, SEED = "2025-10", 0
