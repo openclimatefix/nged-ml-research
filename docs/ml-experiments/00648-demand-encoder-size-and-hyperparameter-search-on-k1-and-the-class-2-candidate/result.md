@@ -8,7 +8,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - calibration-and-uncertainty
   - production-reference-and-best-guess
-status: planned
+status: finished
 kind: change
 protocol: demand-v2
 size: >-
@@ -70,11 +70,176 @@ metric: >-
   Event-free CRPS at 24-120 h and 120-240 h by lead band and by Primary, pooled and without D15 and
   D18; q01, q05, q95, and q99 pinball loss and coverage; follow ratio and safe-side share on the
   injected bank; absorption not scored.
+verdict: not supported
+best_arm: >-
+  None. The best change, lag-encoder width 128 in the class 2 candidate, gains 0.044 points of
+  capacity (95% interval -0.036 to +0.130) against a margin of 0.109, and the gain disappears
+  without Primary D15.
+headline: >-
+  No one-factor change to the width or depth of the lag encoder, the neighbour-summary bottleneck,
+  the mixture components, the hidden width, the dropout, the learning rate, or the epochs lowers
+  24-120 h CRPS by the pre-registered margin (0.113 points for K1, 0.109 for the candidate), so the
+  five-fold step and any search did not run. The largest gains (0.04) come from one Primary.
+lessons: >-
+  K1 and the class 2 candidate sit near a flat optimum in their sizes and training settings, as the
+  S1 network of experiment 447 did. A wider network helps the two short-history Primaries D15 and
+  D18 and hurts the 6 MW Primaries, so pooled gains hide a trade.
+take_home_message: >-
+  Making the lag encoder wider, deeper, or the hidden layers bigger does not improve the K1 or class
+  2 candidate demand networks by the margin we required (0.11 CRPS points); the best gain is 0.04
+  points and comes from one short-history Primary (D15), while the six MW Primaries get slightly
+  worse. Dropout 0.0 and a doubled learning rate hurt. The neighbour-summary bottleneck gains 0.05
+  points but makes the forecast follow an injected load-shift more, so it fails its guard. Keep the
+  sizes as they are and look for gains in the inputs, as experiment 447 advised.
+advice:
+  - >-
+    Keep the K1 and class 2 candidate sizes and training settings as they are (lag-encoder width 64
+    and depth 1, hidden width 64, 3 mixture components, dropout 0.1, current learning rates and
+    epochs): no one-factor change passed the margin on 3 months (screen table).
+  - >-
+    Do not run a random search over these settings: no factor passed the screen, so the stop rule of
+    the plan applies (screen table).
+  - >-
+    Do not widen the networks for the short-history Primaries D15 and D18 on this evidence: a
+    lag-encoder width of 128 gains 0.74 points at D15 and loses 0.31 points at D10 and 0.18 at D8 in
+    the candidate (by-Primary figure in the results bullets).
+  - >-
+    Test the neighbour-summary bottleneck again only together with a loss that keeps the injected-shift
+    follow ratio down: it gains 0.05 points but raises the follow ratio by 0.04 (guards figure).
 production_status: not-for-production
 adopted_in: none
+code: ml-experiments/00648-demand-encoder-size-and-hyperparameter-search-on-k1-and-the-class-2-candidate/
 ---
 
-## Plan
+**Making the lag encoder wider or deeper, or the hidden layers bigger, does not improve the K1 or
+class 2 candidate demand networks by the margin we required, so their sizes and training settings
+stay as they are.** The best gain is 0.04 CRPS points of capacity (lower CRPS is better), against a
+margin of 0.11 points, and the gain comes from one short-history Primary (D15): without D15 and D18
+the same change is slightly negative. The neighbour-summary bottleneck is the only change whose
+interval excludes zero (+0.05 points), but it makes the candidate follow an injected load-shift
+more, which our guard forbids. The verdict is **not supported**: no change helped enough to adopt.
+
+We asked whether larger or differently shaped parts of two demand neural networks lower their
+forecast error. K1 is the neural network that reads the power 1 day and 1 week earlier; the class 2
+candidate also reads summaries of its electrical neighbours' power. We changed one setting at a
+time (15 settings in all), refitted the network, and scored the 24 to 120 hour forecasts for 3
+test months (2025-10, 2026-01, 2026-06) on one seed, against the unchanged network refitted the same
+way. The unchanged K1 reproduces [experiment
+613](../00613-nra-roster-contrasts-with-intervals-five-seeds/result.md)'s seed 0 to four decimals.
+The margin (0.113 points for K1, 0.109 for the candidate) is the larger of [experiment
+447](../00447-demand-network-hyperparameter-sweep-on-the-s1-skeleton/result.md)'s margin scaled to
+these networks and 1.96 x sqrt(2) x the seed standard deviation, fixed before any arm was scored.
+Because no change passed, the plan's five-fold, three-seed step and the random search did not run.
+
+## Figures
+
+![Gain of each change over the unchanged network](figure_1_headline.svg)
+
+*Figure 1. Gain in 24-120 h CRPS over the unchanged network (points of capacity; positive is
+better), 3 test months, one seed. The orange dashed line is the margin. No interval reaches it.*
+
+![Guards on injected load-shifts](figure_2_guards.svg)
+
+*Figure 2. The two guards on the injected load-shift bank (days 4 to the end): the change in the
+share of a shift that the median forecast follows (top; the dashed line is the limit, +0.03) and in
+the safe-side share at q95 (bottom; limit -0.03). The three neighbour-bottleneck arms fail the top
+guard.*
+
+![Day-ahead forecasts, January 2026](figure_3_day_ahead.svg)
+
+*Figure 3. Day-ahead forecasts of one Primary (MVA-only group): the unchanged candidate and the
+candidate with lag-encoder width 128. The two are almost identical.*
+
+![A full 10-day forecast, June 2026](figure_4_horizon.svg)
+
+*Figure 4. One forecast of one Primary (signed-MW group) from its origin to 10 days ahead, for the
+same two networks. The bands widen with horizon, in both networks.*
+
+## Results
+
+Gain is the unchanged network's CRPS minus the arm's (points of capacity, 24-120 h, all 16
+Primaries, 3 months, seed 0). The unchanged networks score 3.088 (K1) and 3.145 (candidate).
+
+| Change | K1 gain | Candidate gain (95% interval) | Candidate gain without D15 and D18 | Passes |
+|---|---|---|---|---|
+| Lag-encoder width 128 | +0.038 | +0.044 (-0.036, +0.130) | -0.009 | No |
+| Hidden width 128 | +0.024 | +0.040 (-0.045, +0.138) | -0.013 | No |
+| Lag-encoder depth 2 | +0.030 | +0.037 (-0.023, +0.101) | +0.013 | No |
+| Hidden width 256 | +0.007 | +0.028 (-0.040, +0.111) | -0.029 | No |
+| Epochs and patience x2 | +0.022 | +0.028 (-0.001, +0.060) | +0.024 | No |
+| 5 mixture components | +0.004 | +0.017 (-0.042, +0.085) | -0.014 | No |
+| Learning rate x0.5 | -0.005 | +0.011 (-0.051, +0.076) | +0.004 | No |
+| Dropout 0.2 | -0.005 | -0.008 | -0.021 | No |
+| Hidden width 384 | -0.035 | -0.016 | -0.054 | No |
+| Lag-encoder width 32 | -0.033 | -0.022 | -0.030 | No |
+| Learning rate x2 | -0.035 | -0.037 | +0.010 | No |
+| Dropout 0.0 | -0.087 | -0.096 (-0.176, -0.019) | -0.098 | No |
+| Neighbour bottleneck 8, 16, 32 (candidate only; reference has none) | - | +0.054, +0.052, +0.049 (all intervals exclude zero) | +0.053, +0.051, +0.048 | No: follow +0.04, q99 pinball +0.02 |
+
+- **Architecture and arms.** K1 and the class 2 candidate of experiment 613 (arm `P7+D50`, the
+  network's own quantiles with no G4 gate or band scaling), one setting changed per arm through
+  `e00648_run.py`, which patches the module constants of experiments 545, 559, 560, 510, and 613
+  before they run. Each arm repeats pre-training, step 2, and the daily fine-tune; the
+  learning-rate scale does not reach the step-2 mixer's fixed 5e-4.
+- **Row set and data.** `experiment_470_intersection_v1`, 24-120 h, 3 test months, seed 0, cleaned
+  data, D15 and D18 cut before 2025-03-01 (the cut is applied by the stored recipe). Rows scored
+  per arm: 211,126 (24-120 h), 52,482 (0-24 h), and 252,441 (120-240 h). Weather at lag times is the
+  source that experiments 612 and 613 use, unchanged, so the scores are a ceiling for the days
+  whose lag-time weather does not exist at forecast time.
+- **Reproduction.** The unchanged K1 matches experiment 613's seed 0 to four decimals (3.0882
+  points). The unchanged candidate scores 3.145 here; experiment 613's candidate seed 0 was scored
+  through the same script and arm folder (`c2_613`) as a reference.
+- **Margin.** The seed standard deviation is 0.041 (K1) and 0.039 (candidate) points, estimated
+  from experiment 613's seed sets 0 to 1 and 2 to 4, and rests on one noisy month (2025-10).
+- **Where the gain comes from.** Lag-encoder width 128 in the candidate gains 0.74 points at D15 and
+  0.14 at D18 but loses 0.31 at D10, 0.18 at D8, and 0.12 at D12 (24-120 h). By group, it gains
+  0.32 to 0.60 points at D15 and D18, about -0.005 at the eight MVA Primaries, and -0.015 to -0.049
+  at the six MW Primaries (three lead bands). Hidden width 128 shows the same pattern. The two
+  short-history Primaries have the highest CRPS (6.2 points against 2.3 to 2.9), so a wider network
+  has the most room there.
+- **Lead bands.** The 0-24 h and 120-240 h gains of the best arms follow the 24-120 h gains; no arm
+  helps at long lead while hurting at short lead, except for the D15 and D18 group (0.32 at 0-24 h,
+  0.60 at 120-240 h for lag-encoder width 128).
+- **Tails.** The unchanged candidate's event-free coverage is 0.860 of rows inside q05 to q95 at
+  24-120 h (0.071 below q05 would be ideal at 0.05; measured 0.053 below and 0.087 above), and K1's
+  is 0.871 (0.048 below, 0.080 above). No arm changes q05 or q95 pinball loss on event-free rows by
+  more than 0.02 points except the learning-rate x2 and dropout 0.0 arms (both worse) and hidden
+  width 384 (q95 +0.024). Bank q99 pinball loss rises by 0.02 points in the three bottleneck arms
+  and falls by 0.01 to 0.04 in most others.
+- **Curtailment cost.** The scorer's cost at limit 0.9 (six MW Primaries, 12-36 h, 3 months) is 4,009
+  for the unchanged candidate and 4,411 to 4,447 for the two best arms; only 5 of 15 cells are
+  non-zero, so three months cannot rank the arms. At limit 0.75 lag-encoder width 128 lowers the
+  cost from 103,813 to 89,178 and hidden width 128 raises it to 118,111. No result is
+  significant at the 5% level.
+- **Load-shift events.** The guards in Figure 2 use the injected bank. This page does not score the
+  real December 2025 load-shift events, so it carries no event plots. NGED's logs may miss
+  events, so the clean-lag rows can hold events that no label covers.
+- **Retraining.** Monthly refit with daily fine-tunes, as in experiment 613. No weekly check was run
+  because no change passed the screen.
+
+## Checks
+
+- **Median error beside the quantile score.** The stored forecasts hold quantiles and no mean, so
+  the median-minus-mean check cannot be run. The median's absolute error on the injected bank
+  before each event (24-120 h) is 0.0444 for the unchanged K1 and 0.0448 for the unchanged
+  candidate, in fractions of capacity.
+- **Triggers.** Trigger 4 fired: leaving out D15 and D18 turns the positive pooled gain of
+  lag-encoder width 128 and hidden width 128 (+0.04) negative (-0.01). The verdict does not depend
+  on it, because no arm passes the margin with or without D15 and D18. Prediction P3 (a wider lag
+  encoder raises the follow ratio by 0.01 to 0.05) failed: the change in follow was 0.000. The
+  other triggers did not fire. The unchanged K1 reproduces experiment 613, so no control failed.
+- **Reviews.** A fresh Sonnet agent reviewed the launcher before the first fit and all findings were
+  accepted. The results and write-up reviews follow in this pull request.
+
+## What to try next
+
+- The neighbour-summary bottleneck is the only change with an interval above zero. Test it with the
+  loss that keeps the follow ratio down before judging it.
+- Treat D15 and D18 as a separate question: the networks improve there with width, and nowhere
+  else.
+- Look for gains in the inputs rather than in the sizes, as experiment 447 advised.
+
+## Plan (written before any fit)
 
 **Question.** Experiment 447 changed one setting of the S1 demand network at a time and found no
 gain above 0.064 points. K1 and the class 2 candidate are different networks (a shared lag encoder
@@ -150,7 +315,3 @@ the write-up); the launcher now restricts commands, checks the tables exist, and
 settings; the driver takes a lock so one GPU process runs at a time. The patches reach every place
 the constants are read, including the five-component output, which the agent checked by building the
 networks.
-
-## Results
-
-Not yet run.

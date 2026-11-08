@@ -1,4 +1,4 @@
-# ruff: noqa: E402, S102, D103
+# ruff: noqa: E501, S102
 """Experiment 648: score one screen arm with experiment 613's scorer (CPU).
 
 Runs experiment 613's `e00613_score.py` with the arm's folder and the output folder in this
@@ -19,7 +19,10 @@ path = EXP613 / "e00613_score.py"
 src = path.read_text()
 for old, new in (
     ('OUT = ROOT / "score" / MINE.out', 'OUT = ROOT.parent / NAME648 / "score" / MINE.out'),
-    ('work = ROOT / "arms" / MINE.arm / "work"', 'work = ROOT.parent / NAME648 / "arms" / MINE.arm / "work"'),
+    (
+        'work = ROOT / "arms" / MINE.arm / "work"',
+        'work = ROOT.parent / NAME648 / "arms" / MINE.arm / "work"',
+    ),
 ):
     assert old in src, old
     src = src.replace(old, new)

@@ -55,7 +55,7 @@ def gain(*, ref: pl.DataFrame, arm: pl.DataFrame, col: str = "crps") -> pl.DataF
 
 
 def pooled(*, g: pl.DataFrame) -> float:
-    return float((g["gain"] * g["n_rows"]).sum() / g["n_rows"].sum())
+    return float((g["gain"] * g["n_rows"]).sum() / g["n_rows"].sum())  # ty: ignore[unsupported-operator]
 
 
 def interval(*, g: pl.DataFrame) -> tuple[float, float]:
@@ -81,7 +81,7 @@ for net in ("k1", "c2"):
         no_dd = pooled(g=g.filter(~pl.col("label").is_in(["D15", "D18"])))
         j = ref.join(a, on=["prim", "label", "month"], suffix="_a")
         pin = {
-            c: float((100 * (j[f"{c}_a"] - j[c]) * j["n_rows"]).sum() / j["n_rows"].sum())
+            c: float((100 * (j[f"{c}_a"] - j[c]) * j["n_rows"]).sum() / j["n_rows"].sum())  # ty: ignore[unsupported-operator]
             for c in ("pin05", "pin95")
         }
         guards = {

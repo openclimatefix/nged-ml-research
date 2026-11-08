@@ -1,4 +1,4 @@
-# ruff: noqa: E402, S102, D103
+# ruff: noqa: E501, S102, ANN201
 """Experiment 648: run one arm of the one-factor screen (GPU).
 
 A launcher around experiment 613's `e00613_arm.py` (K1) and `e00613_nbarm.py` (the class 2 candidate,
@@ -62,7 +62,9 @@ _p.add_argument("--seeds", nargs="+", type=int, default=[0])
 MINE = _p.parse_args()
 assert max(MINE.months) <= "2026-06", "July 2026 onwards is never opened"
 SET = ARMS[MINE.arm]
-assert MINE.net == "k1" or MINE.command in {"fit", "inject", "assemble"}, "c2 runs fit, inject, and assemble"
+assert MINE.net == "k1" or MINE.command in {"fit", "inject", "assemble"}, (
+    "c2 runs fit, inject, and assemble"
+)
 if SET.get("bn"):
     assert MINE.net == "c2", "the neighbour-summary bottleneck exists only in the candidate"
 
@@ -106,21 +108,33 @@ if "lag_layers" in SET:
 CHAIN_ARM = "ref" if SET.get("bn") else MINE.arm  # the bottleneck arms reuse the unchanged chain
 CHAIN = ROOT / "chains" / f"d5_{CHAIN_ARM}" / "work"
 os.environ["CHAIN613"] = str(CHAIN)
-if MINE.command in {"pretrain", "step2"}:  # a chain folder left over from other settings would be reused silently
+if MINE.command in {
+    "pretrain",
+    "step2",
+}:  # a chain folder left over from other settings would be reused silently
     CHAIN.mkdir(parents=True, exist_ok=True)
     setting = CHAIN.parent / "setting.json"
     if setting.exists():
         assert json.loads(setting.read_text()) == SET, f"{setting} holds other settings"
     else:
         setting.write_text(json.dumps(SET))
-if MINE.net == "c2":  # the signal tables are experiment 598's and 610's stock-K1 tables; never build one here
+if (
+    MINE.net == "c2"
+):  # the signal tables are experiment 598's and 610's stock-K1 tables; never build one here
     for month in MINE.months:
         for seed in MINE.seeds:
             assert any(
                 (ML_EXPERIMENTS_DATA_DIR / n / "tables" / f"T_{month}_s{seed}.npz").exists()
-                for n in (NAME613, "00598-nra-gate-against-signals-as-inputs-at-equal-band-width", "00610-nra-neighbour-summary-lag-encoder-inputs-iteration", "00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours")
+                for n in (
+                    NAME613,
+                    "00598-nra-gate-against-signals-as-inputs-at-equal-band-width",
+                    "00610-nra-neighbour-summary-lag-encoder-inputs-iteration",
+                    "00606-nra-lag-encoder-signal-permutations-gap-averages-and-neighbours",
+                )
             ), (month, seed)
-EXP613 = Path(__file__).resolve().parents[1] / "00613-nra-roster-contrasts-with-intervals-five-seeds"
+EXP613 = (
+    Path(__file__).resolve().parents[1] / "00613-nra-roster-contrasts-with-intervals-five-seeds"
+)
 common = ["--months", *MINE.months, "--seeds", *map(str, MINE.seeds)]
 if MINE.net == "k1":
     path = EXP613 / "e00613_arm.py"
@@ -129,10 +143,19 @@ if MINE.net == "k1":
     assert NAME648 in src
 else:
     path = EXP613 / "e00613_nbarm.py"
-    argv = [path.name, "P7+D50+BN" if SET.get("bn") else "P7+D50", MINE.command, "--work-suffix", f"_{MINE.arm}", *common]
+    argv = [
+        path.name,
+        "P7+D50+BN" if SET.get("bn") else "P7+D50",
+        MINE.command,
+        "--work-suffix",
+        f"_{MINE.arm}",
+        *common,
+    ]
     old = 'e.WORK = ROOT / f"{DIR}{MINE.work_suffix}"'
     assert old in path.read_text()
-    src = path.read_text().replace(old, f'e.WORK = (ROOT.parent / "{NAME648}") / f"{{DIR}}{{MINE.work_suffix}}"')
+    src = path.read_text().replace(
+        old, f'e.WORK = (ROOT.parent / "{NAME648}") / f"{{DIR}}{{MINE.work_suffix}}"'
+    )
 sys.argv = argv
 sys.path.insert(0, str(EXP613))
 exec(compile(src, str(path), "exec"), {"__name__": "__main__", "__file__": str(path)})

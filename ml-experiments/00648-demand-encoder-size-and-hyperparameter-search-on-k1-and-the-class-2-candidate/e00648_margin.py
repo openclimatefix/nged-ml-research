@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 648: the screen margin, from stored forecasts (CPU, no fits).
 
 Reads experiment 613's event-free cells for the seed sets {0, 1} and {2, 3, 4} on the three screen
@@ -21,7 +22,9 @@ MARGIN_447 = 0.064
 def pooled(*, arm: str, system: str) -> dict[str, float]:
     """Return the row-weighted CRPS (points of capacity) per month, 24-120 h, all Primaries."""
     df = pl.read_csv(SCORE / arm / "event_free_cells.csv").filter(
-        (pl.col("band") == "24-120 h") & (pl.col("system") == system) & pl.col("month").is_in(MONTHS)
+        (pl.col("band") == "24-120 h")
+        & (pl.col("system") == system)
+        & pl.col("month").is_in(MONTHS)
     )
     g = df.group_by("month").agg((pl.col("crps") * pl.col("n_rows")).sum() / pl.col("n_rows").sum())
     return {m: 100 * c for m, c in g.iter_rows()}
