@@ -219,6 +219,11 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
             for k, n_tr, n_va in (("real", N_REAL, N_VAL), ("bank", N_BANK, N_VAL_BANK)):
                 dom = (d[k]["oi"] - ms) // 48
                 # contiguous blocks: train on days 0-13, leave days 14-20 out as a gap, validate on days 21 onward
+                if variant == "fc4":  # every fourth origin day held out for the early stop, so both refit windows are trained
+                    for sel_, n, dst in ((dom % 4 != 3, n_tr * 3, tr), (dom % 4 == 3, n_va, va)):
+                        idx = np.flatnonzero(d[k]["train_ok"] & sel_)
+                        dst.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
+                    continue
                 for lo, hi, n, dst in ((0, 14, n_tr, tr), (21, 99, n_va, va)):
                     idx = np.flatnonzero(d[k]["train_ok"] & (dom >= lo) & (dom < hi))
                     dst.append((m, k, np.sort(rng.choice(idx, size=min(n, len(idx)), replace=False))))
@@ -313,7 +318,7 @@ def main() -> None:
     jobs = [
         (arm, m, v, s)
         for v in a.variants for m in a.months for arm in a.arms for s in a.seeds
-        if not (v == "fc" and m == MONTHS[0])
+        if not (v.startswith("fc") and m == MONTHS[0])
     ]  # fmt: skip
     print(f"{len(jobs)} fits", flush=True)
     ctx = mp.get_context("spawn")

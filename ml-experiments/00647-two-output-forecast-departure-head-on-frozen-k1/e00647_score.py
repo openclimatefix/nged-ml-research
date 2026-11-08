@@ -219,7 +219,7 @@ def main() -> None:
             fitted[(arm, variant, int(seed[1:]))] = (mr, mb, z)
 
         # widened-K1 control: match H1's lomo coverage on P2 and P4
-        for variant in ("lomo", "fc"):
+        for variant in ("lomo", "fc", "fc4"):
             for setname, kind, mask in (("P2 inside shift", "bank", sets_b["P2 inside shift"]), ("P4 flagged or verified", "real", sets_r["P4 flagged or verified"])):
                 hs = [fitted[k] for k in fitted if k[0] == "H1" and k[1] == variant]
                 if not hs or mask.sum() < 100:
@@ -263,7 +263,7 @@ def main() -> None:
             for bn, (lo_, hi_) in BANDS.items():
                 yield f"band {bn}", mask & (b["lead"] >= lo_) & (b["lead"] < hi_)
 
-        for variant in ("lomo", "fc"):
+        for variant in ("lomo", "fc", "fc4"):
             for arm in ("K1", "R0_72", "R0_168", "R0s_72", "R0s_168", "oracle", "widenK1@P2_" + variant, "widenK1@P4_" + variant):
                 for setname, mask in sets_r.items():
                     if arm in metr_r and not arm.startswith("widenK1@P2"):
@@ -286,7 +286,7 @@ def main() -> None:
         print(f"{month}: score sums done at {time.time() - t_start:.0f}s", flush=True)
         # ------------------------------------------------------------ detector read-out (bank + real)
         for (arm, v, seed), (_mr, _mb, z) in fitted.items():
-            if arm != "H1":
+            if arm not in ("H1", "E1a", "E2a", "E3a", "E3pa"):
                 continue
             for kind, rows_d, prim_, oi_, lead_ in (("real", r, r["prim"], r["oi"], r["lead"]), ("bank", b, b["prim"], b["oi"], b["lead"])):
                 dvals = z[f"{kind}_d"]
@@ -309,14 +309,14 @@ def main() -> None:
                     ef_o = (r["event_free"] & ~r["flagged"])[src]
                     ver_o = r["verified"][src]
                     for sig, al in alarms.items():
-                        det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": "false alarms per Primary-month (event-free origins)", "value": float(al[ef_o].sum() / 16.0), "n": int(ef_o.sum())})  # fmt: skip
-                        det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": "alarm share on verified D5/D16 origins", "value": float(al[ver_o].mean()) if ver_o.any() else float("nan"), "n": int(ver_o.sum())})  # fmt: skip
+                        det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": "false alarms per Primary-month (event-free origins)", "value": float(al[ef_o].sum() / 16.0), "n": int(ef_o.sum())})  # fmt: skip
+                        det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": "alarm share on verified D5/D16 origins", "value": float(al[ver_o].mean()) if ver_o.any() else float("nan"), "n": int(ver_o.sum())})  # fmt: skip
                         on_v_ = (datetime(2025, 12, 29, tzinfo=UTC) - k578.GRID_START).days * PER
                         off_v_ = (datetime(2026, 1, 13, tzinfo=UTC) - k578.GRID_START).days * PER
                         in_pair = np.isin(u_prim, (3, 11)) & (u_oi >= on_v_ + PER) & (u_oi < off_v_)
                         if in_pair.any():
                             first_alarm = np.min(np.where(al & in_pair, u_oi, 10**9))
-                            det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": "first alarm origin on verified pair (UTC date)", "value": float(first_alarm) if first_alarm < 10**9 else float("nan"), "n": 0})  # fmt: skip
+                            det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": "first alarm origin on verified pair (UTC date)", "value": float(first_alarm) if first_alarm < 10**9 else float("nan"), "n": 0})  # fmt: skip
                 else:
                     u_pass = bk["pass_"][bi][src]
                     for sig, al in alarms.items():
@@ -333,8 +333,8 @@ def main() -> None:
                                 ev_rows.append({"depth": abs(sgn), "length": ln, "detected": bool(hit.any()), "days": days})
                         edf = pl.DataFrame(ev_rows)
                         for (dp, ln), g in edf.group_by(["depth", "length"]):
-                            det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": f"bank recall depth {dp} length {ln}", "value": float(g["detected"].mean()), "n": g.height})  # fmt: skip
-                            det_out.append({"variant": v, "month": month, "seed": seed, "signal": sig, "what": f"bank days to first alarm depth {dp} length {ln}", "value": float(g["days"].mean()) if g["detected"].any() else float("nan"), "n": int(g["detected"].sum())})  # fmt: skip
+                            det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": f"bank recall depth {dp} length {ln}", "value": float(g["detected"].mean()), "n": g.height})  # fmt: skip
+                            det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": f"bank days to first alarm depth {dp} length {ln}", "value": float(g["days"].mean()) if g["detected"].any() else float("nan"), "n": int(g["detected"].sum())})  # fmt: skip
         # experiment 637's detector on the bank's contaminated power, and its flags on the real days
         if month in PAIR:
             ev_rows = []

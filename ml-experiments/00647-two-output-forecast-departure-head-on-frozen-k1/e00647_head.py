@@ -61,7 +61,7 @@ def _knots(*, q: torch.Tensor) -> torch.Tensor:
     lo = q[:, 0] - TAIL_SPACINGS * torch.clamp(q[:, 1] - q[:, 0], min=1e-3)
     hi = q[:, -1] + TAIL_SPACINGS * torch.clamp(q[:, -1] - q[:, -2], min=1e-3)
     x = torch.cat([lo[:, None], q, hi[:, None]], dim=1)
-    return x + torch.arange(x.shape[1], dtype=x.dtype)[None, :] * 2e-6
+    return x + torch.arange(x.shape[1], dtype=x.dtype, device=x.device)[None, :] * 2e-6
 
 
 def _cdf(*, x: torch.Tensor, knots: torch.Tensor) -> torch.Tensor:
@@ -116,5 +116,5 @@ class Head(nn.Module):
             p = survival_probability(age_days=age, lead_h=lead_h, short_weight=short_weight)
             return mixture_quantiles(q=q, d=d, sigma=sigma, p=p), d, sigma
         qq, _ = torch.sort(q + OFFSET_SCALE * out, dim=1)
-        zero = torch.zeros(len(q))
+        zero = torch.zeros(len(q), device=q.device)
         return qq, zero, zero
