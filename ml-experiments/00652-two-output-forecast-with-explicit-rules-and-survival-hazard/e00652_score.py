@@ -2,11 +2,11 @@
 """Experiment 652, step 2: score every arm by origin state and lead day (CPU).
 
 Arms: `K1` (the NRA output, scored against the observed-plus-shift truth), `K1_nra` (K1 scored
-against the unshifted base, bank rows only), `R0-168`, `Bhaz` (K1 plus the same residual times the conditional survival of the best single curve
-fitted to the training durations),
-`Rold` and `Rnew` (experiment 650's five-month fits), `Rhaz` (this experiment's survival head for
-the mixture), and `Placebo`. Mixtures: `m50`, `mshort`, `mlong` (event-class weights on rows; `Rhaz`
-and `Bhaz` are the arms trained or fitted under that mixture).
+against the unshifted base, bank rows only), `R0-168`, `Bhaz` (K1 plus the same residual times the
+conditional survival of the best single curve fitted to the training durations), `Rold` and `Rnew`
+(experiment 650's five-month fits), `Rhaz` (this experiment's survival head for the mixture), and
+`Placebo`. Mixtures: `m50`, `mshort`, `mlong` (event-class weights on rows; `Rhaz` and `Bhaz` are
+the arms trained or fitted under that mixture).
 
 Equal width scaling is fitted on unweighted rows, so the sensitivity mixtures reuse the unweighted
 factors. One factor per arm, month, set, and seed, fitted on all the month's scored rows pooled
