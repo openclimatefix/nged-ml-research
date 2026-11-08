@@ -38,7 +38,7 @@ import e00647_head as head  # ty: ignore[unresolved-import]
 import e00647_r0 as r0  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 PAIR = ("2025-10", "2025-12")
 VARIANTS = ("lomo", "fcb")

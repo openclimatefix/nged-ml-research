@@ -178,7 +178,7 @@ def row_inputs(*, q: np.ndarray, lead: np.ndarray) -> np.ndarray:
 
 
 def batch_inputs(*, x_org, age_org, pool: Pool, ix):  # noqa: ANN001, ANN201
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     o = pool.org[ix]
     rows = row_inputs(q=pool.q[ix], lead=pool.lead[ix])
@@ -216,7 +216,7 @@ def metrics(*, y: np.ndarray, q: np.ndarray) -> dict[str, np.ndarray]:
 
 def fit_one(job: tuple[str, str, str, int]) -> str:
     import e00647_head as h  # ty: ignore[unresolved-import]
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
     arm_name, month, variant, seed = job

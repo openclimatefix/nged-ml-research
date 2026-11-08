@@ -16,8 +16,8 @@ sorts them. The head's loss is the mean pinball loss over the 11 levels.
 from typing import Final
 
 import numpy as np
-import torch
-from torch import nn
+import torch  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
 
 TAUS: Final = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99], np.float32)
 F_KNOTS: Final = np.concatenate([[0.0], TAUS, [1.0]]).astype(np.float32)
