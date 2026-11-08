@@ -28,6 +28,7 @@
 | 608 | Which parts of the combined lag-and-gate, lag-without-gate, and lag-free demand neural networks are needed, when each part is removed alone? | High (maintainer, 2026-11-06) | Nothing | Planned |
 | 647 | Can a small departure head on the frozen K1 neural network forecast the arrangement now in force better than K1 shifted by its own recent error? | High (maintainer, 2026-11-07) | Nothing | Finished: partly supported, see experiment 647 |
 | 650 | Does a departure head trained on shifts with random ends, varied shapes, and varied depths beat K1 shifted by its own decayed recent error, once band widening is removed? | High (manager, 2026-11-08) | Nothing | Finished: partly supported, see experiment 650 |
+| 652 | Does a departure head with an explicit survival output beat the best forecast that does not know when a shift ends, once each forecast is scored under its own rules? | High (maintainer, 2026-11-08) | Nothing | Finished: not supported, see experiment 652 |
 
 ## Planned experiments
 
