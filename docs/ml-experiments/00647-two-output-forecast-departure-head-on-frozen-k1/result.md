@@ -59,39 +59,43 @@ metric: >-
 verdict: partly supported
 best_arm: >-
   H1 (the departure head with a survival mixture) inside an injected shift: CRPS 14.35 points of
-  capacity (P2) against K1's 24.37 and R0's 19.09. K1 widened with no signal scores 18.36, so the
-  gain from the gap signals alone is about 3.3 points. No arm is best after a shift ends.
+  capacity (P2) against K1's 24.37, R0 (tau 72 h) 19.09, and R0 (tau 168 h) 15.24. H1 is about 4.0
+  below K1 widened to H1's coverage (18.36) and about 3.3 below the best in-sample widening (17.61).
+  H1 is 0.9 below R0 at tau 168 h. No arm is best after a shift ends.
 headline: >-
   On injected shifts a departure head on K1's outputs scored 10.0 points of capacity below K1, but
-  60% to 68% of that gain comes from widening the band, which K1 widened by a fixed factor also
-  gets (-6.0 to -6.8), and about 3.3 points come from reading the gap signals. On real flagged days
-  the pooled gain (-2.12) rests on one event, and without 2026-01 it is -0.24.
+  a no-fit shift of K1 by its own recent error (R0, tau 168 h) already closes most of that gap
+  (P2 15.24 against H1's 14.35, H1 minus R0 -0.89 [-1.37, -0.50]), and widening K1 alone gets 60% to
+  68% of the head's gain. After a shift ends R0 at tau 168 h matches H1 (6.83 against 6.88). On
+  real flagged days the pooled gain rests on the verified pair in 2026-01.
 lessons: >-
-  Most of the head's gain inside a shift is a wider band, and the 10 points depend on the bank's
-  length mix (-0.8 for 3-day events, about -14 for 15- and 30-day events). The head's median does
-  move the right way on 90% to 98% of the rows it moves, but not in the first three days of an event.
-  The 3.7-point loss after a shift ends comes from a duration prior (mean survival 0.67) meeting a
-  bank whose events survive 0.28 of the time. Using the empirical survival cuts that loss (6.74 to
-  4.08) and raises the P2 score (14.5 to 16.9). The encoder arms added nothing measurable.
+  A no-fit shift with tau of 168 h closes most of the P2 gap, so the head is about 0.9 points better
+  than that baseline, not 4.7. Most of the rest of the head's gain over K1 is a wider band, and the
+  10 points depend on the bank's length mix (-0.8 for 3-day events, about -14 for 15- and 30-day
+  events). The head's median does move the right way on 90% to 98% of the rows it moves, but not in
+  the first three days of an event. The loss after a shift ends comes from a duration prior (mean
+  survival 0.67) meeting a bank whose events survive 0.28 of the time, and R0 at tau 168 h loses as
+  much. The encoder arms gave no gain and were slightly worse on event-free rows.
 take_home_message: >-
-  On injected load shifts the departure head beats K1 by 10.0 points of capacity, but 60% to 68% of
-  that is a wider band that K1 widened with no signal also gets (-6.0), and only about 3.3 points
-  come from reading the gap signals. The head's median does move the right way on 90% to 98% of the
-  rows it moves. The gain depends on the bank's length mix (-0.8 for 3-day events, about -14 for 15-
-  and 30-day events), and on real flagged days it rests on one event, so the next experiment should
-  separate the signal from the widening before any head is considered for production.
+  On injected load shifts the departure head beats K1 by 10.0 points of capacity, but shifting K1 by
+  its own recent error with no fit (tau 168 h) already closes most of that gap, so the head is only
+  about 0.9 points better, and it matches that baseline after a shift ends. Widening K1 alone gets
+  60% to 68% of the head's gain, and only about 3.3 points come from reading the gap signals. On
+  real flagged days the gain rests on two load shifts in one episode, so the next experiment should
+  separate the signal from the widening and from the no-fit shift before any head is considered for
+  production.
 advice:
+  - >-
+    Compare any departure head with R0 at tau of 168 h, not only 72 h: the no-fit shift scores 15.24
+    on P2 against H1's 14.35 and 6.83 on P3 against 6.88 (Results bullets).
   - >-
     Report widened K1 and the age-and-gate-only head (AG) beside every noise placebo, because the
     placebo has a random age and cannot widen (Checks).
   - >-
-    Do not port the head as it stands: its loss after a shift ends (+3.7) is a duration prior
-    meeting a bank that ends every event on day 14, and fixing the prior costs P2 (P3 bullet).
+    Do not port the head as it stands: its loss after a shift ends is a duration prior meeting a
+    bank that ends every event on day 14, and fixing the prior costs P2 (P3 bullet).
   - >-
-    Score R0 with tau of 168 h over all five months, because on the first month pair it came within
-    1.1 points of H1 on P2 (First month pair bullet).
-  - >-
-    Treat real-day results as one event until more are labelled: without 2026-01 the P4 gain is
+    Treat real-day results as one episode until more are labelled: without 2026-01 the P4 gain is
     -0.24 (P4 bullet).
 production_status: not-for-production
 ---
@@ -104,16 +108,20 @@ forecasts and on the gap between recent power and the lag-free forecast, and sco
 development months (2025-10 to 2026-06), leave-one-month-out. Scoring used shifts injected into real
 power (the injection bank of experiment 581), the days flagged by the experiment 637 detector, and
 the verified D5 and D16 pair. The head follows a shift that is already in the lags much better than
-K1 or R0 does, and it keeps forecasting the shift after the shift ends.
+K1 does, about 0.9 points better than a no-fit shift (R0, tau 168 h), and it keeps forecasting the
+shift after the shift ends.
 
-**Take-home message.** On injected shifts the head beats K1 by 10.0 points of capacity, but 60% to
-68% of that is band widening that K1 widened with no signal also gets (-6.0), and only about 3.3
-points come from reading the gap signals. The head's median moves the right way on 90% to 98% of the
-rows it moves. The 10 points depend on the bank's length mix (-0.8 for 3-day events, about -14 for
-15- and 30-day events). On real flagged days the gain rests on one event (the verified D5 and D16
-pair in 2026-01), and the head fails in the first three days of an event. After a synthetic end it
-scores 3.7 points worse than K1, which is mostly a duration prior meeting the bank's end rule. The
-encoder arms add nothing measurable. Verdict: partly supported.
+**Take-home message.** On injected shifts the head beats K1 by 10.0 points of capacity, but shifting
+K1 by its own recent error with no fit (R0, tau 168 h) already closes most of that gap: the head is
+about 0.9 points better (-0.89 [-1.37, -0.50]), not the 4.7 points it is better than R0 at tau 72 h.
+After a shift ends R0 at tau 168 h matches the head (6.83 against 6.88). Widening K1 with no signal
+gets 60% to 68% of the head's gain over K1, and only about 3.3 points come from reading the gap
+signals. The head's median moves the right way on 90% to 98% of the rows it moves. The 10 points
+depend on the bank's length mix (-0.8 for 3-day events, about -14 for 15- and 30-day events). On
+real flagged days the gain rests on two load shifts on two Primaries in one episode (the verified D5
+and D16 pair in 2026-01), and the head fails in the first three days of an event. After a synthetic
+end it scores 3.7 points worse than K1, mostly because of a duration prior meeting the bank's end
+rule. The encoder arms gave no gain. Verdict: partly supported.
 
 ## Figures
 
@@ -139,19 +147,30 @@ CRPS is in points of capacity (a CRPS proxy from the 11 stored quantiles), 95% i
 the 5 months and 5 seeds, and a negative contrast favours the first arm.
 
 - **Arms and architecture.** K1 is the stored forecast of experiments 612 and 613 (unchanged). R0 is
-  K1 shifted by its mean recent error times exp(-lead/tau), tau 72 h; R0\* is the variant that
-  matches the design answer's verified-pair figure. H1 is a two-layer, 64-unit network whose depth
-  and depth uncertainty drive a mixture of K1's distribution and K1 shifted by the depth, with a
-  stated duration prior. H2 is a free quantile head. H1-p is H1 with noise in place of its signals.
-  E1 reads K1's frozen encoder, E2 has its own copy, and E3 trains a joint network. AG (age and gate
-  only) and AS (age shuffled) are controls.
-- **Row set.** 5 months of the development window, 16 Primaries. P1 is 732,048 event-free rows, P2
-  is 1,281,930 rows inside an injected shift, P3 is 1,454,628 rows after a synthetic end, and P4 is
-  28,695 real rows on flagged days or in the verified pair. Leads run from 24 to 240 h. The head ran
-  with leave-one-month-out and 5 seeds on all months; K1 is the mean of 5 seeds.
+  K1 shifted by its mean recent error times exp(-lead/tau), tau 72 h unless stated (R0_168 is tau
+  168 h); R0\* is the variant that matches the design answer's verified-pair figure. H1 is a
+  two-layer, 64-unit network whose depth and depth uncertainty drive a mixture of K1's distribution
+  and K1 shifted by the depth, with a stated duration prior. H2 is a free quantile head. H1-p is H1
+  with noise in place of its signals. E1 reads K1's frozen encoder, E2 has its own copy, and E3
+  trains a joint network. AG (age and gate only) and AS (age shuffled) are controls.
+- **Row set.** The 5 months are 2025-10, 2025-12, 2026-01, 2026-03, and 2026-06, at 16 Primaries. P1
+  is 732,048 event-free rows, P2 is 1,281,930 rows inside an injected shift, P3 is 1,454,628 rows
+  after a synthetic end, and P4 is 28,695 real rows on flagged days or in the verified pair. Leads
+  run from 24 to 240 h. The head ran with leave-one-month-out and 5 seeds on all months; K1 is the
+  mean of 5 seeds. Rows whose origin has no R0 residual history are dropped from every arm
+  (`r0_dropped_rows.csv`): 691,356 of 1,973,286 P2 rows (35.0%, the early-month origins), 66,759 of
+  798,807 P1 rows (8.4%), 73,524 of 1,528,152 P3 rows (4.8%), and 1,212 of 29,907 P4 rows (4.1%).
+  Contrasts against R0 are valid on those subsets; H1 minus K1 changes by about 0.2 on all usable
+  rows.
 - **Inside a shift (P2).** K1 24.37 [23.97, 24.73], R0 19.09, R0\* 18.94, H1 14.35 [13.97, 14.68],
   H2 15.18, E1 15.33, E2 14.68, H1-p 23.78. H1 minus K1 is -10.02 [-10.65, -9.55], and H1 minus R0
   is -4.73 [-5.30, -4.31].
+- **Against R0 at tau of 168 h (all five months, no fit).** P1 3.536, P2 15.24 [15.03, 15.42], P3
+  6.83 [6.65, 7.04], P4 9.48 [8.19, 14.82], and P2 MAE 19.98 (H1 21.28). H1 minus R0_168 is -0.885
+  [-1.375, -0.501] on P2, +0.050 [-0.258, 0.486] on P3, -1.081 [-3.238, 0.092] on P4, and +0.149
+  [0.058, 0.277] on P1 (rows in `stage4_contrasts.csv`, same month-block and seed resampling). R0 at
+  tau 168 h therefore closes most of the P2 gap, matches H1 after a shift ends, and cannot be told
+  apart from H1 on P4.
 - **After a synthetic end (P3).** K1 3.19, R0 4.16, H1 6.88, H1-p 3.30. H1 minus K1 is +3.69 [3.29,
   4.09], which breaks the 0.03-point bar by a factor of about 120.
 - **Event-free rows (P1).** K1 3.713, R0 3.593, H1 3.685 [3.212, 4.421]. H1 minus K1 is -0.029
@@ -161,19 +180,22 @@ the 5 months and 5 seeds, and a negative contrast favours the first arm.
   13.01], H1-p 10.11, E2 8.22. H1 minus K1 is -2.12 [-6.93, -0.15], H1 minus R0 is -1.39 [-4.52,
   -0.10], and H1 minus H1-p is -1.71 [-6.45, 0.23]. Coverage is 0.62 for H1 (bar 0.75), 0.47 for R0,
   and 0.44 for K1. On the verified pair alone (13,068 rows) K1 scores 14.93, R0 13.77, R0\* 13.42,
-  H1-p 14.24, H1 10.90, and E2 9.93.
+  H1-p 14.24, H1 10.90, E2 10.22, and E1 10.97 (seed means; the 2-seed seed-averaged output E2a
+  scores 9.93).
 - **P4 rests on one event.** Per month, H1 minus K1 is -2.11 (2025-10), -0.14 (2025-12), -7.20
   (2026-01, the verified pair in progress), and -0.21 (2026-03). Without 2026-01, H1 minus K1 is
-  -0.24 and H1 minus H1-p is +0.15. The month-block interval treats one event as several months.
-  H1-p is a weak control, because its age input is noise and it cannot widen. Fairer controls on
-  pooled P4 (gain over K1 of -2.12 for H1): K1 widened to H1's coverage -1.28 (60%), K1 widened by
-  the best factor -1.89 (89%, in-sample), and AG -1.45 (68%). In the first three days of an event
-  H1's median agrees in direction on 42% of the rows it moves, and its CRPS rises from 13.40 to
-  13.79.
+  -0.24 and H1 minus H1-p is +0.15. The 2026-01 rows are the verified pair in progress: two load
+  shifts on two Primaries in one episode. The month-block interval treats that episode as several
+  independent months. H1-p is a weak control, because its age input is noise and it cannot widen.
+  Fairer controls on pooled P4 (gain over K1 of -2.12 for H1): K1 widened to H1's coverage -1.28
+  (60%), K1 widened by the best factor -1.89 (89%, in-sample), and AG -1.45 (68%). In the first
+  three days of an event H1's median agrees in direction on 42% of the rows it moves, and its CRPS
+  rises from 13.40 to 13.79.
 - **P3 is a prior-versus-bank mismatch.** Mean survival p is 0.67 against an empirical 0.28. With
-  the empirical p, P3 falls from 6.74 to 4.08 and P2 rises from 14.5 to 16.9, a trade-off. The bank
-  ends every event on day 14 (H1's depth shrinks at ages above 23 days), so P3 does not measure
-  behaviour after real shifts end.
+  the empirical p, P3 falls from 6.74 to 4.08 and P2 rises from 14.5 to 16.9, a trade-off. These are
+  the audit's rebuilt figures, on a different basis from the 6.88 and 14.35 above (the audit's own
+  rebuild of the mixture and scored rows). The bank ends every event on day 14 (H1's depth shrinks
+  at ages above 23 days), so P3 does not measure behaviour after real shifts end.
 - **Probability-weighted CRPS** (audit; 3 seeds, a subset of P2 and P3 rows). K1 to H1 is 26.6 to
   16.9 on P2, 4.02 to 8.63 on P3, and 12.08 to 10.00 on P4, so no sign changes. Widening gets 56% of
   the P4 gain on this score.
@@ -181,12 +203,13 @@ the 5 months and 5 seeds, and a negative contrast favours the first arm.
   19.051, R0 (tau 168 h) 15.183, H1 14.084, H2 14.508. P4: K1 9.406, R0 9.350, H1 9.162, H2 8.859,
   H1-p 9.024. The gate passed, but H1 minus H1-p on P4 was +0.139, so H1 was not better than its
   placebo there.
-- **Encoder arms.** E1 minus H1 is +0.977 [0.156, 2.485] on P2 and +0.195 [0.082, 0.289] on P1; E2
-  minus H1 is +0.328 [-0.551, 1.306] on P2 and +0.208 [0.091, 0.310] on P1. Both intervals on P4
-  include zero (E2 -0.180 [-0.281, 0.146]; E1 +0.109 [-0.082, 0.636]). E3 (joint network,
-  forward-chained, 2025-12 only) scored 3.164 on event-free rows against K1's 3.283, but its placebo
-  E3p scored 3.236, and E3 scored worse than K1 on flagged days (8.484 against 8.302) and on the
-  verified pair (13.976 against 13.774).
+- **Encoder arms.** Both arms gave no gain and were slightly worse on event-free rows (E1 +0.98 on
+  P2, and E1 and E2 about +0.2 on P1). E1 minus H1 is +0.977 [0.156, 2.485] on P2 and +0.195 [0.082,
+  0.289] on P1; E2 minus H1 is +0.328 [-0.551, 1.306] on P2 and +0.208 [0.091, 0.310] on P1. Both
+  intervals on P4 include zero (E2 -0.180 [-0.281, 0.146]; E1 +0.109 [-0.082, 0.636]). E3 (joint
+  network, forward-chained, 2025-12 only; figures from `score/enc_nra_2025-12_fcb.csv`) scored 3.164
+  on event-free rows against K1's 3.283, but its placebo E3p scored 3.236, and E3 scored worse than
+  K1 on flagged days (8.484 against 8.302) and on the verified pair (13.976 against 13.774).
 - **Tails.** On P2, pinball loss at q01 and q99 is 3.282 and 3.107 for H1 against 8.613 and 7.519
   for K1, and the share of rows above q99 falls from 0.393 to 0.149 (nominal 0.01). After a shift
   ends (P3), q01 and q99 pinball loss rise from 0.170 and 0.220 (K1) to 0.335 and 0.342 (H1). On P4,
@@ -201,14 +224,26 @@ the 5 months and 5 seeds, and a negative contrast favours the first arm.
   0.05 of capacity at leads 24 to 26 h). The head's survival probability alarms on 100% of injected
   shifts at every depth and length except 99% at 0.15 for 7 days, and its depth alarms on 95% at 0.3
   for 3 days. Experiment 637 alarms on 18% to 36% at 0.3 for 7 days and on 0% to 4% at 0.3 for 3
-  days. False alarms per Primary-month on event-free origins are 6.1 for the survival signal and 1.7
-  for the depth signal. Experiment 637's rate on the same basis was not computed; its flagged
-  Primary-days were 5, 27, 26, 2, and 0 in the five months. Days from onset to first alarm are 1.4
-  to 1.8 at depth 0.5 for lengths up to 15 days. On the verified pair the survival signal first
-  alarmed at grid index 110,994 against experiment 637's 111,090 and 111,186.
+  days. False alarms per Primary-month on event-free origins are 6.0 for the survival signal and 1.7
+  for the depth signal (the mean of the 25 month-by-seed leave-one-month-out values). Experiment
+  637's rate on the same basis was not computed; its flagged Primary-days were 5, 27, 26, 2, and 0
+  in the five months. Days from onset to first alarm are 1.4 to 1.8 at depth 0.5 for lengths up to
+  15 days. On the verified pair the survival signal first alarmed at grid index 110,994 against
+  experiment 637's 111,090 and 111,186.
 - **Absolute scores for the reference table.** K1 3.713 (P1), 24.37 (P2), 3.19 (P3), 10.52 (P4); R0
   3.593, 19.09, 4.16, 9.79; R0\* 3.578, 18.94, 4.24, 9.62; H1 3.685, 14.35, 6.88, 8.40; E1 3.880,
   15.33, 6.69, 8.51; E2 3.892, 14.68, 6.98, 8.22.
+
+## Prediction clauses
+
+| Clause | Result |
+|---|---|
+| P2: H1 at least 15% below K1 and below R0 by more than 0.05 | Met: 41% below K1; below R0 at tau 72 h by 4.73 and at tau 168 h by 0.89 [-1.37, -0.50] |
+| P4: H1 below R0 by more than 0.05 | Met at tau 72 h (-1.39 [-4.52, -0.10]); not met at tau 168 h (-1.08 [-3.24, 0.09]) |
+| P4: q05-q95 coverage at least 0.75 | Failed: 0.62 |
+| P1: no worse than K1 by more than 0.03 in any cell | Met pooled (-0.029) and per metering group (eight MVA +0.027, six MW -0.013); failed per Primary: 4 of 16 Primaries are +0.06 to +0.18 worse (Primary 8 +0.18). The plan's cell is group and lead band, not Primary |
+| Placebo H1-p within 0.05 of K1 on P2 | Failed: -0.59 |
+| P3: no worse than K1 by more than 0.03 | Failed: +3.69 |
 
 ## Checks
 
@@ -224,11 +259,11 @@ the 5 months and 5 seeds, and a negative contrast favours the first arm.
   pair. Trigger 2 (a result contradicts the prediction): P4 coverage is 0.62 against 0.75, and P3
   breaks its bar. Trigger 5 (a control moves the score): the age-and-gate head AG scores 20.98 and
   the shuffled-age head AS 19.26 on P2, closing 3.4 and 5.1 of H1's 10.0 points without the gap
-  signals. Trigger 3 did not fire on P1 to P3 and could not be checked on P4. Trigger 4 (leaving one
-  Primary out) was not run. Triggers 6 and 7 were not assessed. An audit
-  (`briefs/647_audit.md`, private) reproduced every headline contrast and found no code error that
-  changes a sign. All its points are accepted and are in the bullets above. It did not examine the
-  R0 contrasts, E1 to E3, per-Primary scores, the curtailment cost, or the detector read-out.
+  signals. Trigger 3 did not fire on P1 to P3 and could not be checked on P4. Trigger 4 was not run,
+  and triggers 6 and 7 were not assessed (Limits). An audit (`briefs/647_audit.md`, private)
+  reproduced every headline contrast and found no code error that changes a sign. All its points are
+  accepted and are in the bullets above. It did not examine the R0 contrasts, E1 to E3, per-Primary
+  scores, the curtailment cost, or the detector read-out.
 
 ## Limits
 
@@ -236,14 +271,19 @@ the 5 months and 5 seeds, and a negative contrast favours the first arm.
   control was not run. Every shift ends on day 14, so the head can learn the end date from the age
   input, and the 28 to 112 day part of the duration prior is not exercised.
 - **Coverage of the bank and the verified pair.** The bank covers 13 to 14 Primaries. The verified
-  D5 and D16 pair is two events. K1(Dec) is in-sample on the October rows.
+  D5 and D16 pair is two load shifts on two Primaries in one episode. K1(Dec) is in-sample on the
+  October rows. The 15- and 30-day events are 62% of P2 rows.
 - **R0.** R0's verified-pair figures do not reproduce the design answer's (the script gives 13.77
-  and 13.35 against 13.42 and 12.79), so R0\* is the baseline that matches 13.42. Only tau of 72 h
-  is scored over all 5 months.
+  and 13.35 against 13.42 and 12.79), so R0\* is the baseline that matches 13.42. P2 drops 35.0% of
+  its rows because R0 has no residual history for early-month origins, and the P1 and P4 populations
+  are a little smaller than K1's own counts.
 - **Lab shortcuts and labels.** The detector read-out is a lab test: the head was fitted on the same
   bank's shifts (leave-one-month-out), and the verified pair is the only real event. NGED's event
   labels are incomplete, so clean-lag rows may hold events no label covers, false alarms are an
   upper bound, and the harm on event-free rows is optimistic.
+- **Tests not run.** Leaving one Primary out (trigger 4) was not run. Triggers 6 and 7 were not
+  assessed because no sister experiment scored the same rows with a comparable interval and no later
+  experiment yet depends on this result's headline.
 - **Days to alarm.** The figure of about 16.7 days for 30-day shifts is inflated and should not be
   read as a detection delay.
 - **Horizon.** Leads run from 24 to 240 h only.
@@ -253,7 +293,7 @@ the 5 months and 5 seeds, and a negative contrast favours the first arm.
 Three questions follow from the result, and none is committed. First, whether a head that sees
 shifts ending on varied days, and shifts of 4 to 16 weeks, can keep the gain inside a shift without
 the cost after it; the departure that never ends (a permanent change in load) is not tested here.
-Second, whether R0 with tau of 168 h, scored over all 5 months, already matches the head on P2,
-since it came within 1.1 points on the first pair with no fit. Third, whether a head trained as a
-detector on the gap, with a separate forecast path, serves the use that needs a detector, which is
-masking rows when scoring NRA forecasts on new data.
+Second, whether a head still beats R0 at tau of 168 h by more than the 0.9 points seen here once it
+is trained on shifts of varied length, since that no-fit baseline already matches it after a shift
+ends. Third, whether a head trained as a detector on the gap, with a separate forecast path, serves
+the use that needs a detector, which is masking rows when scoring NRA forecasts on new data.
