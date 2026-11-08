@@ -293,7 +293,10 @@ KEY_BASE: Final = 1 << 20
 
 
 def rewired(*, adj: dict[int, list[int]], seed: int) -> dict[int, list[int]]:
-    """Return a degree-preserving rewiring of the undirected graph `adj`: double edge swaps, no self loops or repeats."""
+    """Return a degree-preserving rewiring of the undirected graph `adj`.
+
+    The rewiring uses double edge swaps and creates no self loops or repeated edges.
+    """
     edges = sorted({tuple(sorted((p, q))) for p, qs in adj.items() for q in qs})
     rng = np.random.default_rng(1_000 + seed)
     present = set(edges)
@@ -320,7 +323,10 @@ _ADJ: dict[int, dict[int, list[int]]] = {}
 
 
 def adjacency(*, seed: int) -> dict[int, list[int]]:
-    """Return the graph the arm's layer reads: electrical edges, a rewired copy (GATR), or every other Primary (GATF)."""
+    """Return the graph the arm's layer reads.
+
+    That is the electrical edges, a rewired copy (GATR), or every other Primary (GATF).
+    """
     if seed not in _ADJ:
         if GRAPH_MOD == "GATR":
             _ADJ[seed] = rewired(adj=NB.of, seed=seed)
@@ -560,7 +566,10 @@ class FoldSignals:
         return synth
 
     def train_block_msg(self) -> np.ndarray:
-        """Return the training rows' block as their neighbours see it (the mirrored power in every reading), same noise plan."""
+        """Return the training rows' block as their neighbours see it, with the same noise plan.
+
+        The mirrored power replaces the own power in every reading.
+        """
         if self._train_msg is None:
             self.train_block()
             synth = self._block(

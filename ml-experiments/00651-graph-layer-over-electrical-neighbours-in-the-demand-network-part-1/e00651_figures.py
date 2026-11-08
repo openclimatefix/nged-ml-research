@@ -5,9 +5,9 @@ Usage (through `cpu.sh`): `cpu.sh e00651_figures.py headline|tails|events|exampl
 
 * `headline` draws `headline.svg` (follow on banks M, S, X; six-MW event-free CRPS) and prints its numbers.
 * `tails` writes `score/tail_table.csv` and prints the tail pinball losses and coverage at 24-120 h.
-* `events` draws the load-shift event figures (`event_*.svg`): the December 2025 events of D5 and D16 on
-  real data, and six injected events of bank M, three on a six-MW Primary and three on an MVA-only eight
-  Primary. One arm per panel, two arms per figure.
+* `events` draws the load-shift event figures (`event_*.svg`): the December 2025 events of D5 and
+  D16 on real data, and six injected events of bank M, three on a six-MW Primary and three on an
+  MVA-only eight Primary. One arm per panel, two arms per figure.
 * `examples` draws `example_day_ahead.svg` and `example_5day.svg`.
 
 Demand series (Primaries) only; no generator is plotted. Development months 2025-10 and 2025-12 only.

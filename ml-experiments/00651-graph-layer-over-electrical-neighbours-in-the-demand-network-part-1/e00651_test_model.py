@@ -1,5 +1,7 @@
 # ruff: noqa: E501, D103, ANN201, C416
-"""Experiment 651: CPU tests of the graph network, run before any fit (`pytest`-free script; exit code 0 means pass).
+"""Experiment 651: CPU tests of the graph network, run before any fit.
+
+This is a script without `pytest`; exit code 0 means pass.
 
 1. Zero start: every graph kind gives exactly the own-signal network's output before training.
 2. Locality: GAT-E and GCN-E outputs do not change when a non-neighbour's bank row changes, and do change
