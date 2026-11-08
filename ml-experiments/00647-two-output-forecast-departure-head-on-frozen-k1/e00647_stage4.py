@@ -108,19 +108,38 @@ def main() -> None:
     text: list[str] = []
     # 1. levels and contrasts
     levels, contrasts = [], []
-    arms = ("K1", "R0_72", "R0s_72", "H1", "H1p", "H2", "H2p", "AG", "AS", "E1", "E2")
+    arms = (
+        "K1",
+        "R0_72",
+        "R0s_72",
+        "H1",
+        "H1p",
+        "H2",
+        "H2p",
+        "AG",
+        "AS",
+        "E1",
+        "E2",
+        "R0_168",
+        "widenK1",
+    )
     cuts = [("all", "all")] + [(f"length {n} d", f"length {n} d") for n in LENGTHS]
     for sname, sset in SETS.items():
         for cname, cut in cuts:
             if cname != "all" and not (sname.startswith(("P2", "P3"))):
                 continue
             for arm in arms:
+                real = arm
+                if arm == "widenK1":
+                    real = f"widenK1@{sname[:2]}"
+                    if real not in set(sc["arm"].to_list()) or cname != "all":
+                        continue
                 levels.append(
                     {
                         "set": sname,
                         "cut": cname,
                         "arm": arm,
-                        **interval(sc, a=arm, b=None, setname=sset, cut=cut),
+                        **interval(sc, a=real, b=None, setname=sset, cut=cut),
                     }
                 )
             for a, b in (

@@ -28,16 +28,22 @@ OUT.mkdir(exist_ok=True)
 W = 600
 ARM_LABEL = {
     "K1": "K1",
-    "R0_72": "R0",
-    "R0s_72": "R0*",
+    "R0_72": "R0 (72 h)",
+    "R0s_72": "R0* (72 h)",
+    "R0_168": "R0 (168 h)",
+    "widenK1": "K1 widened",
+    "AG": "Age and gate only",
     "H1": "H1",
     "H1p": "H1-p (noise placebo)",
     "E2": "E2 (own encoder)",
 }
 ARM_COLOUR = {
     "K1": ocf.DATA_BLUE,
-    "R0": ocf.DATA_SKY,
-    "R0*": ocf.DATA_PURPLE,
+    "R0 (72 h)": ocf.DATA_SKY,
+    "R0* (72 h)": ocf.DATA_SKY,
+    "R0 (168 h)": ocf.DATA_SKY,
+    "K1 widened": ocf.DATA_SKY,
+    "Age and gate only": ocf.DATA_PURPLE,
     "H1": ocf.BRAND_ORANGE,
     "H1-p (noise placebo)": ocf.BRAND_ORANGE_LIGHT,
     "E2 (own encoder)": ocf.DATA_GREEN,
@@ -51,25 +57,16 @@ def save(chart: alt.TopLevelMixin, name: str) -> None:
     print("saved", name, flush=True)
 
 
-def fig1() -> None:
+def bars(sets: list[tuple[str, str]], *, name: str, title: list[str], subtitle: list[str]) -> None:
     lv = pl.read_csv(SC / "stage4_levels.csv").filter(
         (pl.col("cut") == "all") & pl.col("arm").is_in(list(ARM_LABEL))
     )
     lv = lv.with_columns(pl.col("arm").replace(ARM_LABEL).alias("label"))
     order = list(ARM_COLOUR)
     panels = []
-    for sname, title in (
-        (
-            "P2 inside shift",
-            "P2: rows inside an injected shift (scored against the shifted target)",
-        ),
-        (
-            "P4 flagged or verified",
-            "P4: days flagged by experiment 637, and the verified D5 and D16 pair",
-        ),
-    ):
+    for sname, ptitle in sets:
         d = lv.filter(pl.col("set") == sname)
-        base = alt.Chart(d.to_pandas() if False else d).encode(
+        base = alt.Chart(d).encode(
             y=alt.Y("label:N", sort=order, title=None),
             color=alt.Color(
                 "label:N",
@@ -77,35 +74,66 @@ def fig1() -> None:
                 legend=None,
             ),
         )
-        bars = base.mark_bar(size=16, aria=False).encode(
+        mark = base.mark_bar(size=14, aria=False).encode(
             x=alt.X(
                 "point:Q",
                 title="CRPS proxy, points of capacity (smaller is better)",
                 scale=alt.Scale(zero=True),
+                axis=alt.Axis(tickMinStep=1),
             )
         )
-        err = base.mark_rule(color=ocf.BLACK_1, strokeWidth=1.5, aria=False).encode(
+        err = base.mark_rule(color=ocf.BLACK_1, strokeWidth=2, aria=False).encode(
             x="lo:Q", x2="hi:Q"
         )
         panels.append(
-            (bars + err).properties(
-                width=W - 150, height=150, title=alt.TitleParams(title, anchor="start", fontSize=12)
+            (mark + err).properties(
+                width=W - 150,
+                height=190,
+                title=alt.TitleParams(ptitle, anchor="start", fontSize=12),
             )
         )
     chart = alt.vconcat(*panels).properties(
-        title=alt.TitleParams(
-            [
-                "H1 and E2 beat K1 and both baselines where a shift is in the lags;",
-                "the noise placebo H1-p does not.",
-            ],
-            subtitle=[
-                "Bar: estimate pooled over the five development months (2025-10 to 2026-06), leave-one-month-out.",
-                "Black line: 95% interval from resampling the five months and the five seeds.",
-            ],
-            anchor="start",
-        )
+        title=alt.TitleParams(title, subtitle=subtitle, anchor="start")
     )
-    save(chart, "fig1_p2_p4_bars")
+    save(chart, name)
+
+
+def fig1() -> None:
+    sub = [
+        "Bar: pooled over the five development months (2025-10 to 2026-06), leave-one-month-out.",
+        "Black line: 95% interval from resampling the five months and the five seeds (months only for arms without seeds).",
+        "Sky blue marks the four rule-based baselines made from K1: R0, R0*, R0 at 168 h, and K1 with widened bands.",
+    ]
+    bars(
+        [
+            (
+                "P2 inside shift",
+                "P2: rows inside an injected shift (scored against the shifted target)",
+            ),
+            (
+                "P4 flagged or verified",
+                "P4: days flagged by experiment 637, and the verified D5 and D16 pair",
+            ),
+        ],
+        name="fig1_p2_p4_bars",
+        title=[
+            "On injected shifts H1 and E2 score about 10 points below K1;",
+            "on real flagged days the intervals overlap.",
+        ],
+        subtitle=sub,
+    )
+    bars(
+        [
+            ("P3 after end", "P3: rows after an injected shift has ended (origin before the end)"),
+            ("P1 event-free", "P1: event-free real rows"),
+        ],
+        name="fig1b_p3_p1_bars",
+        title=[
+            "After an injected shift ends H1 and E2 score about 3.7 points worse than K1;",
+            "on event-free rows every arm is within 0.4 points of K1.",
+        ],
+        subtitle=sub,
+    )
 
 
 def prevailing(kind: str, month: str, arm: str = "H1") -> dict[str, np.ndarray]:
@@ -144,7 +172,12 @@ def bank_frame(month: str, r: int, prim: int) -> pl.DataFrame:
 
 
 def ts_panel(
-    df: pl.DataFrame, *, title: str, xtitle: str = "Day of the month (valid time)", x: str = "day"
+    df: pl.DataFrame,
+    *,
+    title: str,
+    xtitle: str = "Day of the month (valid time)",
+    x: str = "day",
+    target_label: str = "Shifted target",
 ) -> alt.Chart:
     k1 = df.select(x, "k1_lo", "k1_hi", "k1_med").with_columns(arm=pl.lit("K1"))
     h1 = df.select(
@@ -154,30 +187,37 @@ def ts_panel(
         pl.col("h1_med").alias("k1_med"),
     ).with_columns(arm=pl.lit("H1 (prevailing)"))
     lines = pl.concat([k1, h1]).sort(x)
-    scale = alt.Scale(domain=["K1", "H1 (prevailing)"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE])
-    base = alt.Chart(lines).encode(
-        x=alt.X(
-            f"{x}:Q",
-            title=xtitle,
-            axis=alt.Axis(values=list(range(1, 11))) if x == "days_ahead" else alt.Axis(),
-        ),
-        color=alt.Color("arm:N", scale=scale, legend=alt.Legend(title=None, orient="top")),
+    domain = ["K1", "H1 (prevailing)", target_label]
+    colours = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.BLACK_1]
+    has_obs = "observed" in df.columns
+    if has_obs:
+        domain.append("Observed power (dashed)")
+        colours.append(ocf.DATA_PURPLE)
+    scale = alt.Scale(domain=domain, range=colours)
+    colour = alt.Color("arm:N", scale=scale, legend=alt.Legend(title=None, orient="top"))
+    xenc = alt.X(
+        f"{x}:Q",
+        title=xtitle,
+        axis=alt.Axis(values=list(range(1, 11))) if x == "days_ahead" else alt.Axis(),
     )
+    base = alt.Chart(lines).encode(x=xenc, color=colour)
     band = base.mark_area(opacity=0.25, aria=False).encode(
         y=alt.Y("k1_lo:Q", title="Power, share of capacity"), y2="k1_hi:Q"
     )
     med = base.mark_line(strokeWidth=1.3, aria=False).encode(y="k1_med:Q")
     tgt = (
-        alt.Chart(df.sort(x).select(x, "target"))
-        .mark_line(color=ocf.BLACK_1, strokeWidth=1.3, aria=False)
-        .encode(x=f"{x}:Q", y="target:Q")
+        alt.Chart(df.sort(x).select(x, "target").with_columns(arm=pl.lit(target_label)))
+        .mark_line(strokeWidth=1.3, aria=False)
+        .encode(x=xenc, y="target:Q", color=colour)
     )
     layers = band + med + tgt
-    if "observed" in df.columns:
+    if has_obs:
         obs = (
-            alt.Chart(df.sort(x).select(x, "observed"))
-            .mark_line(color=ocf.DATA_PURPLE, strokeWidth=1.0, strokeDash=[3, 2], aria=False)
-            .encode(x=f"{x}:Q", y="observed:Q")
+            alt.Chart(
+                df.sort(x).select(x, "observed").with_columns(arm=pl.lit("Observed power (dashed)"))
+            )
+            .mark_line(strokeWidth=1.0, strokeDash=[3, 2], aria=False)
+            .encode(x=xenc, y="observed:Q", color=colour)
         )
         layers = layers + obs
     return layers.properties(
@@ -208,10 +248,59 @@ def group_prims_in_bank(in_bank: set[int]) -> dict[str, int]:
     return out
 
 
+def verified(
+    *,
+    month: str,
+    days: tuple[int, int],
+    name: str,
+    xtitle: str,
+    title: list[str],
+    subtitle: list[str],
+) -> None:
+    zr = fit.load(month=month)["real"]
+    pv = prevailing("real", month)
+    idx = pv["idx"]
+    ms = dat.month_start_idx(month=month)
+    panels = []
+    for label, p in (("D5", 3), ("D16", 11)):
+        ctx = (
+            (zr["prim"][idx] == p)
+            & (zr["lead"][idx] >= 24)
+            & (zr["lead"][idx] < 48)
+            & (zr["vi"][idx] >= ms + days[0] * PER)
+            & (zr["vi"][idx] < ms + days[1] * PER)
+        )
+        ii = idx[ctx]
+        df = pl.DataFrame(
+            {
+                "day": (zr["vi"][ii] - ms) / PER,
+                "k1_lo": zr["q"][ii, 1],
+                "k1_med": zr["q"][ii, 5],
+                "k1_hi": zr["q"][ii, 9],
+                "h1_lo": pv["q05"][ctx],
+                "h1_med": pv["q50"][ctx],
+                "h1_hi": pv["q95"][ctx],
+                "target": zr["y"][ii],
+            }
+        )
+        panels.append(
+            ts_panel(
+                df,
+                title=f"{label}: Primary {p}",
+                xtitle=xtitle,
+                target_label="Observed power",
+            )
+        )
+    chart = alt.vconcat(*panels).properties(
+        title=alt.TitleParams(title, subtitle=subtitle, anchor="start")
+    )
+    save(chart, name)
+
+
 def fig2_3() -> None:
     month = "2025-12"
     d = fit.load(month=month)["bank"]
-    prims = group_prims()
+    prims = group_prims_in_bank(set(d["prim"].tolist()))
     for r in (2, 5, 9):
         panels = []
         for gname, p in prims.items():
@@ -232,67 +321,41 @@ def fig2_3() -> None:
                     "H1 moves towards the shifted target.",
                 ],
                 subtitle=[
-                    "Black: the shifted target (observed power plus the injected shift). Bands: q05 to q95. Lines: medians.",
+                    "Black: shifted target (observed power plus the injected shift). Dashed purple: observed power. Bands: q05 to q95.",
                     f"Forecasts with lead 24 to 48 h, {month}, leave-one-month-out, mean over five seeds.",
+                    "In these examples H1 lags the target by about 2 days at onset and carries the shift for about 3 days after it ends.",
                 ],
                 anchor="start",
             )
         )
         save(chart, f"fig2_pass{r}")
-    # verified pair
-    zr = fit.load(month=month)["real"]
-    pv = prevailing("real", month)
-    idx = pv["idx"]
-    ms = dat.month_start_idx(month=month)
-    panels = []
-    for name, p in (("D5", 3), ("D16", 11)):
-        sel = (
-            (zr["prim"][idx] == p)
-            & (zr["lead"][idx] >= 24)
-            & (zr["lead"][idx] < 48)
-            & zr["verified"][idx]
-        )
-        # include the weeks around the pair for context
-        ctx = (
-            (zr["prim"][idx] == p)
-            & (zr["lead"][idx] >= 24)
-            & (zr["lead"][idx] < 48)
-            & (zr["vi"][idx] >= ms + 20 * PER)
-            & (zr["vi"][idx] < ms + 31 * PER + 12 * PER)
-        )
-        ii = idx[ctx]
-        df = pl.DataFrame(
-            {
-                "day": (zr["vi"][ii] - ms) / PER,
-                "k1_lo": zr["q"][ii, 1],
-                "k1_med": zr["q"][ii, 5],
-                "k1_hi": zr["q"][ii, 9],
-                "h1_lo": pv["q05"][ctx],
-                "h1_med": pv["q50"][ctx],
-                "h1_hi": pv["q95"][ctx],
-                "target": zr["y"][ii],
-                "lead": zr["lead"][ii],
-            }
-        )
-        _ = sel
-        panels.append(
-            ts_panel(
-                df,
-                title=f"{name}: Primary {p}, observed power in black",
-                xtitle="Day counted from 1 December 2025 (valid time)",
-            )
-        )
-    chart = alt.vconcat(*panels).properties(
-        title=alt.TitleParams(
-            ["The verified D5 and D16 load shifts, December 2025 to January 2026."],
-            subtitle=[
-                "Black: observed power (it is not a shifted target here). Bands: q05 to q95; lead 24 to 48 h."
-            ],
-            anchor="start",
-        )
+    verified(
+        month="2025-12",
+        days=(20, 43),
+        name="fig2_verified_pair",
+        xtitle="Day counted from 1 December 2025 (valid time)",
+        title=[
+            "Onset of the verified D5 and D16 shifts, 29 December 2025:",
+            "on D5 H1 forecasts above K1 while observed power falls.",
+        ],
+        subtitle=[
+            "Black: observed power (no injected shift here). Bands: q05 to q95; leads 24 to 48 h.",
+            "The window runs from 20 December 2025 to the last forecast, early January 2026; leave-one-month-out, mean over five seeds.",
+        ],
     )
-    save(chart, "fig2_verified_pair")
+    verified(
+        month="2026-01",
+        days=(0, 31),
+        name="fig2_verified_january",
+        xtitle="Day counted from 1 January 2026 (valid time)",
+        title=["The established D5 and D16 shifts, January 2026."],
+        subtitle=[
+            "Black: observed power (no injected shift here). Bands: q05 to q95; leads 24 to 48 h.",
+            "The verified pair runs to 13 January 2026; leave-one-month-out, mean over five seeds.",
+        ],
+    )
     # figure 3: one origin, 24 to 240 h horizon, then the day-ahead series, one figure per group
+    ms = dat.month_start_idx(month=month)
     r = 5
     in_bank = set(d["prim"][d["pass_"] == r].tolist())
     for gname, p in group_prims_in_bank(in_bank).items():
@@ -329,6 +392,7 @@ def fig2_3() -> None:
                     f"Shift {depth:+.2f} of capacity for {length} days, ending on day 14 (dashed rule, top panel).",
                     "Black: shifted target (the series the forecast is scored against). Dashed purple: observed power.",
                     "Bands: q05 to q95. Lines: medians. Leave-one-month-out, mean over five seeds.",
+                    "H1 keeps carrying part of the shift for about 3 days after the shift ends, which the target no longer contains.",
                 ],
                 anchor="start",
             )
@@ -382,7 +446,7 @@ def fig4() -> None:
         .alias("system"),
     )
     days = (
-        days.filter(pl.col("value").is_finite())
+        days.filter(pl.col("value").is_finite() & (pl.col("length") < 30))
         .group_by("system", "depth", "length")
         .agg((pl.col("value") * pl.col("n")).sum() / pl.col("n").sum())
     )
@@ -432,15 +496,32 @@ def fig4() -> None:
         )
         .properties(width=W, height=170)
     )
+    fa = (
+        dt.filter(
+            pl.col("what").str.starts_with("false alarms")
+            & (pl.col("variant") == "lomo")
+            & (pl.col("signal") == "depth")
+            & pl.col("arm").is_in(["H1", "E2a"])
+        )
+        .group_by("arm")
+        .agg(pl.col("value").mean())
+        .sort("arm")
+    )
+    far = dict(zip(fa["arm"].to_list(), fa["value"].to_list(), strict=True))
+    flagged = dt.filter(pl.col("what") == "flagged Primary-days in the month")
+    flag_rate = float(flagged["value"].sum() / flagged["n"].sum())
     chart = alt.vconcat(p1, p2).properties(
         title=alt.TitleParams(
             [
-                "Alarm rate and delay: H1, E2, and the experiment 637 detector,",
+                "Recall and delay of the H1 and E2 depth signals and the experiment 637 detector,",
                 "by depth and length of the injected shift.",
             ],
             subtitle=[
-                "Alarm: |d| >= 0.05 of capacity at leads 24 to 26 h. Detected events only in the lower panel.",
-                "Injected bank, five development months, leave-one-month-out, mean over five seeds.",
+                "Depth signal: alarm when |d| >= 0.05 of capacity at leads 24 to 26 h.",
+                "H1 and E2: mean over five seeds; experiment 637 has no seeds.",
+                f"False alarms per Primary-month on event-free origins: H1 {far['H1']:.2f}, E2 {far['E2a']:.2f}. Experiment 637 flags {flag_rate:.1%} of all Primary-days (real events included).",
+                "Lower panel: cells where every event was detected in a month; the 30-day cells are left out,",
+                "because forecasts start at the month start, which inflates the delay.",
             ],
             anchor="start",
         )
