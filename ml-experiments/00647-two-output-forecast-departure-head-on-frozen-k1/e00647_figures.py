@@ -74,7 +74,7 @@ def bars(sets: list[tuple[str, str]], *, name: str, title: list[str], subtitle: 
                 legend=None,
             ),
         )
-        mark = base.mark_bar(size=14, aria=False).encode(
+        mark = base.mark_bar(size=14, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "point:Q",
                 title="CRPS proxy, points of capacity (smaller is better)",
@@ -82,7 +82,7 @@ def bars(sets: list[tuple[str, str]], *, name: str, title: list[str], subtitle: 
                 axis=alt.Axis(tickMinStep=1),
             )
         )
-        err = base.mark_rule(color=ocf.BLACK_1, strokeWidth=2, aria=False).encode(
+        err = base.mark_rule(color=ocf.BLACK_1, strokeWidth=2, aria=False).encode(  # ty: ignore[unresolved-attribute]
             x="lo:Q", x2="hi:Q"
         )
         panels.append(
@@ -201,19 +201,19 @@ def ts_panel(
         axis=alt.Axis(values=list(range(1, 11))) if x == "days_ahead" else alt.Axis(),
     )
     base = alt.Chart(lines).encode(x=xenc, color=colour)
-    band = base.mark_area(opacity=0.25, aria=False).encode(
+    band = base.mark_area(opacity=0.25, aria=False).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("k1_lo:Q", title="Power, share of capacity"), y2="k1_hi:Q"
     )
-    med = base.mark_line(strokeWidth=1.3, aria=False).encode(y="k1_med:Q")
+    med = base.mark_line(strokeWidth=1.3, aria=False).encode(y="k1_med:Q")  # ty: ignore[unresolved-attribute]
     tgt = (
-        alt.Chart(df.sort(x).select(x, "target").with_columns(arm=pl.lit(target_label)))
+        alt.Chart(df.sort(x).select(x, "target").with_columns(arm=pl.lit(target_label)))  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1.3, aria=False)
         .encode(x=xenc, y="target:Q", color=colour)
     )
     layers = band + med + tgt
     if has_obs:
         obs = (
-            alt.Chart(
+            alt.Chart(  # ty: ignore[unresolved-attribute]
                 df.sort(x).select(x, "observed").with_columns(arm=pl.lit("Observed power (dashed)"))
             )
             .mark_line(strokeWidth=1.0, strokeDash=[3, 2], aria=False)
@@ -374,7 +374,7 @@ def fig2_3() -> None:
             x="days_ahead",
         )
         rule = (
-            alt.Chart(pl.DataFrame({"x": [end_ahead]}))
+            alt.Chart(pl.DataFrame({"x": [end_ahead]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(strokeDash=[4, 3], color=ocf.BLACK_1, aria=False)
             .encode(x="x:Q")
         )
@@ -475,7 +475,7 @@ def fig4() -> None:
         axis=alt.Axis(labelAngle=-60),
     )
     p1 = (
-        alt.Chart(cat(rec))
+        alt.Chart(cat(rec))  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70, aria=False)
         .encode(
             x=xa,
@@ -487,7 +487,7 @@ def fig4() -> None:
         .properties(width=W, height=170)
     )
     p2 = (
-        alt.Chart(cat(days))
+        alt.Chart(cat(days))  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70, aria=False)
         .encode(
             x=xa,
@@ -509,7 +509,7 @@ def fig4() -> None:
     )
     far = dict(zip(fa["arm"].to_list(), fa["value"].to_list(), strict=True))
     flagged = dt.filter(pl.col("what") == "flagged Primary-days in the month")
-    flag_rate = float(flagged["value"].sum() / flagged["n"].sum())
+    flag_rate = float(flagged["value"].sum() / flagged["n"].sum())  # ty: ignore[unsupported-operator]
     chart = alt.vconcat(p1, p2).properties(
         title=alt.TitleParams(
             [

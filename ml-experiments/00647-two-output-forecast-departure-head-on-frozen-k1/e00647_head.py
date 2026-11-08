@@ -1,5 +1,7 @@
 # ruff: noqa: D102, D107, E501
-"""Experiment 647, stage 2: the departure heads (H1 survival mixture, H2 free quantile head) and the mixture quantiles.
+"""Experiment 647, stage 2: the departure heads and the mixture quantiles.
+
+The heads are H1 (survival mixture) and H2 (free quantile head).
 
 K1's 11 stored quantiles define a piecewise-linear distribution (two tail knots are added at 1.5
 times the outermost quantile spacing). The prevailing distribution of H1 is the mixture
@@ -95,9 +97,11 @@ def mixture_quantiles(
     )
     tau = torch.from_numpy(TAUS).to(q.device)[None, :].expand(len(q), -1).contiguous()
     j = torch.clamp(
-        torch.searchsorted(fm.detach().contiguous(), tau, right=False), 1, xs.shape[1] - 1
+        torch.searchsorted(fm.detach().contiguous(), tau, right=False),  # ty: ignore[unresolved-attribute]
+        1,
+        xs.shape[1] - 1,
     )
-    f0, f1 = torch.gather(fm, 1, j - 1), torch.gather(fm, 1, j)
+    f0, f1 = torch.gather(fm, 1, j - 1), torch.gather(fm, 1, j)  # ty: ignore[invalid-argument-type]
     x0, x1 = torch.gather(xs, 1, j - 1), torch.gather(xs, 1, j)
     frac = torch.clamp((tau - f0) / torch.clamp(f1 - f0, min=1e-9), 0.0, 1.0)
     return x0 + frac * (x1 - x0)
@@ -121,8 +125,8 @@ class Head(nn.Module):
             nn.Linear(n_in, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, n_out)
         )
         with torch.no_grad():
-            self.net[-1].weight.mul_(0.1)
-            self.net[-1].bias.zero_()
+            self.net[-1].weight.mul_(0.1)  # ty: ignore[call-non-callable]
+            self.net[-1].bias.zero_()  # ty: ignore[call-non-callable]
 
     def forward(
         self,

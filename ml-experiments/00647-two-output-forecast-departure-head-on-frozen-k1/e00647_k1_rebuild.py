@@ -4,7 +4,8 @@
 The stored forecasts on the bank are raw per-seed networks, so K1 has to be rebuilt: the seed mean of
 five seeds, experiment 613's tail constants (fitted on earlier months' event-free rows, so none for
 2025-10), and the G4 gated band from the gate state recomputed on the injected lags. This script
-runs experiment 613's own scorer (`e00613_score`, imported and not edited) with its output redirected to
+runs experiment 613's own scorer (`e00613_score`, imported and not edited) with its output
+redirected to
 this experiment's folder, spies on the two functions that carry the rebuilt quantiles, and saves per
 bank row the rebuilt K1 for the later steps. It then asserts three things:
 
@@ -104,11 +105,11 @@ def max_diff(*, new: pl.DataFrame, old: pl.DataFrame, keys: list[str], what: str
     diffs = {}
     for c in num:
         d = (j[c] - j[f"{c}_old"]).abs().drop_nulls()
-        diffs[c] = float(d.max()) if len(d) else 0.0
+        diffs[c] = float(d.max()) if len(d) else 0.0  # ty: ignore[invalid-argument-type]
     worst = max(diffs.values())
     print(f"{what}: {new.height} rebuilt rows vs {old.height} stored; only in rebuild {only_new}, only in stored {only_old}; largest column difference {worst:.2e}", flush=True)  # fmt: skip
     return {"rows_new": new.height, "rows_old": old.height, "only_new": only_new, "only_old": only_old,
-            "max_diff": worst, "worst_column": max(diffs, key=diffs.get)}  # fmt: skip
+            "max_diff": worst, "worst_column": max(diffs, key=diffs.get)}  # ty: ignore[no-matching-overload]  # fmt: skip
 
 
 def main() -> None:

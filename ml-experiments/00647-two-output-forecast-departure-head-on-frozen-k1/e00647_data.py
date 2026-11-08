@@ -8,7 +8,8 @@ the rows' NRA output and are never changed. Real rows come from the stored roste
 come from step 3's rebuilt K1 on experiment 581's injected bank (`k1_bank/rows_<month>_r<pass>.npz`).
 
 The head's inputs are origin-level (one vector per Primary and origin, see `origin_features`):
-experiment 606's `gap`, `ew`, and `nb` columns read at the newest allowed lag (origin minus 24 h) and a
+experiment 606's `gap`, `ew`, and `nb` columns read at the newest allowed lag (origin minus 24 h)
+and a
 week lag; the age of the current departure in days; the age of the freshest finite lag in hours; and
 the G4 state. Row-level inputs (lead, K1 band widths) are added at fit time. No date or calendar
 column enters.
@@ -104,8 +105,9 @@ def origin_residual(
 
 
 def departure_age(*, daily: np.ndarray, prim: np.ndarray, a0: np.ndarray) -> np.ndarray:
-    """Return the age in days of the departure at the lag index `a0`: consecutive same-signed daily mean gaps above 5% of capacity.
+    """Return the age in days of the departure at the lag index `a0`.
 
+    The age counts consecutive same-signed daily mean gaps above 5% of capacity.
     Zero where the daily mean gap at `a0` is missing or at most 5%. Capped at `AGE_CAP` days.
     """
     d0 = daily[prim, a0]

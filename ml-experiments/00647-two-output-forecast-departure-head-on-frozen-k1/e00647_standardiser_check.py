@@ -1,5 +1,8 @@
-# ruff: noqa: E501, D415
-"""Experiment 647, stage 3 follow-up: does a later month's K1 suffer from earlier-month inputs standardised differently? (GPU)
+# ruff: noqa: E501
+"""Experiment 647, stage 3 follow-up: input standardiser mismatch between months (GPU).
+
+The question is whether a later month's K1 suffers from earlier-month inputs standardised
+differently.
 
 K1 of the scored month is applied to rows of an earlier month whose input columns were standardised
 with that earlier month's standardiser (as the E2 and E3 training rows are). The check compares the

@@ -1,5 +1,7 @@
 # ruff: noqa: B007, B023, C416, D103, E501, F841, PERF401, PLR0912, PLR0915, PT018
-"""Experiment 647, stage 2: score the arms on the first month pair, the detector read-out, and the feasibility gate (CPU).
+"""Experiment 647, stage 2: scoring, the detector read-out, and the feasibility gate (CPU).
+
+The pair run scores the first two months; `all5` scores all five development months.
 
 Arms: K1 (the NRA output, unchanged), R0 and R0* (K1 shifted by its own decayed recent error, tau 72
 and 168 h; R0* is the variant of the design answer's verified figure), the fitted heads (seed means of
@@ -72,7 +74,9 @@ DETECT_FRACTION_NOTE = "alarm: |d| >= 0.05 of capacity at leads of 24 to 26 h"
 def window_flags(
     *, clean_c: np.ndarray, ref_clim: np.ndarray, day_lo: int, day_hi: int
 ) -> np.ndarray:
-    """Return experiment 637's flags (16, day_hi - day_lo) for the days `day_lo` to `day_hi - 1` of the (possibly contaminated) power `clean_c`.
+    """Return experiment 637's flags, shape (16, day_hi - day_lo).
+
+    The days run from `day_lo` to `day_hi - 1` of the (possibly contaminated) power `clean_c`.
 
     The same rule as `e00645_score.ara_flags`, with the heuristic reference and the residuals formed
     for the window only (the cross-Primary median is per day). The climatology reference reads only
@@ -389,7 +393,7 @@ def main() -> None:
         # score tables
         def add(*, variant, setname, cutname, mask, arm, seed, mr_=None, mb_=None, kind) -> None:  # noqa: ANN001
             m = mr_ if kind == "real" else mb_
-            per[(variant, month, setname, cutname, arm, seed)] = sums(m=m, mask=mask)
+            per[(variant, month, setname, cutname, arm, seed)] = sums(m=m, mask=mask)  # ty: ignore[invalid-argument-type]
 
         def cuts_real(mask, prim=False):  # noqa: ANN001, ANN202
             yield "all", mask
@@ -573,8 +577,8 @@ def main() -> None:
                                 )
                         edf = pl.DataFrame(ev_rows)
                         for (dp, ln), g in edf.group_by(["depth", "length"]):
-                            det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": f"bank recall depth {dp} length {ln}", "value": float(g["detected"].mean()), "n": g.height})  # fmt: skip
-                            det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": f"bank days to first alarm depth {dp} length {ln}", "value": float(g["days"].mean()) if g["detected"].any() else float("nan"), "n": int(g["detected"].sum())})  # fmt: skip
+                            det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": f"bank recall depth {dp} length {ln}", "value": float(g["detected"].mean()), "n": g.height})  # ty: ignore[invalid-argument-type]  # fmt: skip
+                            det_out.append({"variant": v, "arm": arm, "month": month, "seed": seed, "signal": sig, "what": f"bank days to first alarm depth {dp} length {ln}", "value": float(g["days"].mean()) if g["detected"].any() else float("nan"), "n": int(g["detected"].sum())})  # ty: ignore[invalid-argument-type]  # fmt: skip
         # experiment 637's detector on the bank's contaminated power, and its flags on the real days
         if month in PAIR:
             ev_rows = []
@@ -623,8 +627,8 @@ def main() -> None:
                     )
             edf = pl.DataFrame(ev_rows)
             for (dp, ln), g in edf.group_by(["depth", "length"]):
-                det_out.append({"variant": "n/a", "month": month, "seed": -1, "signal": "experiment 637", "what": f"bank recall depth {dp} length {ln}", "value": float(g["detected"].mean()), "n": g.height})  # fmt: skip
-                det_out.append({"variant": "n/a", "month": month, "seed": -1, "signal": "experiment 637", "what": f"bank days to first alarm depth {dp} length {ln}", "value": float(g["days"].mean()) if g["detected"].any() else float("nan"), "n": int(g["detected"].sum())})  # fmt: skip
+                det_out.append({"variant": "n/a", "month": month, "seed": -1, "signal": "experiment 637", "what": f"bank recall depth {dp} length {ln}", "value": float(g["detected"].mean()), "n": g.height})  # ty: ignore[invalid-argument-type]  # fmt: skip
+                det_out.append({"variant": "n/a", "month": month, "seed": -1, "signal": "experiment 637", "what": f"bank days to first alarm depth {dp} length {ln}", "value": float(g["days"].mean()) if g["detected"].any() else float("nan"), "n": int(g["detected"].sum())})  # ty: ignore[invalid-argument-type]  # fmt: skip
             if month == "2025-12":
                 on_v = (datetime(2025, 12, 29, tzinfo=UTC) - k578.GRID_START).days
                 off_v = (datetime(2026, 1, 13, tzinfo=UTC) - k578.GRID_START).days

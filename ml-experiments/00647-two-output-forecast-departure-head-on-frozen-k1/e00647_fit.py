@@ -14,13 +14,15 @@ early stop).
 
 Hyperparameters are the plan's: Adam, learning rate 0.003, weight decay 0.0001, batch 4096, up to 30
 epochs, early stop (patience 4) on the validation loss. The training set is a fixed random sample of
-each training month (`N_REAL` real rows and `N_BANK` bank rows, about 10% bank so that the share of departures is near deployment), a stated deviation made for run time.
+each training month (`N_REAL` real rows and `N_BANK` bank rows, about 10% bank so that the share
+of departures is near deployment), a stated deviation made for run time.
 
 Output per fit, `fits/<arm>_<month>_<variant>_s<seed>.npz`: for every scored real and bank row, the
 CRPS, coverage flags, band width, tail pinball losses, q05, q50, q95, the depth, and the spread; the
 model weights; and the training log. Nothing here writes to K1's rows.
 
-Usage: python e00647_fit.py [--arms H1 ...] [--months 2025-10 2025-12] [--variants lomo fc] [--seeds 0 1] [--workers 12]
+Usage: python e00647_fit.py [--arms H1 ...] [--months 2025-10 2025-12] [--variants lomo fc]
+[--seeds 0 1] [--workers 12]
 """
 
 import argparse
@@ -281,7 +283,7 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
         x_va = np.clip((r - stats[0]) / stats[1], -10.0, 10.0).astype(np.float32)
     torch.manual_seed(seed)
     n_in = x_tr.shape[1] + 3
-    head = h.Head(n_in=n_in, kind=arm["kind"])
+    head = h.Head(n_in=n_in, kind=arm["kind"])  # ty: ignore[invalid-argument-type]
     opt = torch.optim.Adam(head.parameters(), lr=LR, weight_decay=WD)
     best, best_state, bad, log = np.inf, None, 0, []
     n = len(train.y)
@@ -350,7 +352,7 @@ def fit_one(job: tuple[str, str, str, int]) -> str:
             res[f"{kind}_{k}"] = v
     np.savez(
         out,
-        **res,
+        **res,  # ty: ignore[invalid-argument-type]
         val_log=np.array(log),
         n_train=n,
         n_val=len(val.y),

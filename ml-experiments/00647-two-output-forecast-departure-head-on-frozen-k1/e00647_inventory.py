@@ -38,7 +38,7 @@ def date(i: int) -> str:
 
 def span(mask_row: np.ndarray) -> str:
     ix = np.flatnonzero(mask_row)
-    return f"{date(ix.min())} to {date(ix.max())}" if len(ix) else "none"
+    return f"{date(ix.min())} to {date(ix.max())}" if len(ix) else "none"  # ty: ignore[invalid-argument-type]
 
 
 T_DIRS = (
@@ -69,8 +69,8 @@ for m in c647.MONTHS:
          "first_origin": str(e["power_fcst_init_time"].min())[:10],
          "last_origin": str(e["power_fcst_init_time"].max())[:10],
          "first_valid": str(e["valid_time"].min())[:10], "last_valid": str(e["valid_time"].max())[:10],
-         "observed_share": float(e["observed_power"].is_not_null().mean()),
-         "event_free_share": float(e["event_free"].mean()),
+         "observed_share": float(e["observed_power"].is_not_null().mean()),  # ty: ignore[invalid-argument-type]
+         "event_free_share": float(e["event_free"].mean()),  # ty: ignore[invalid-argument-type]
          "verified_rows": int(e["in_verified_event"].sum())}
     )  # fmt: skip
 tab = pl.DataFrame(rows)
@@ -108,7 +108,7 @@ for m in c647.MONTHS:
         first = np.flatnonzero(filled)
         trows.append(
             {"month": m, "seed": seed, "file": f.parent.parent.name[:5], "filled": int(np.isfinite(med).sum()),
-             "first": date(first.min()), "last": date(first.max()),
+             "first": date(first.min()), "last": date(first.max()),  # ty: ignore[invalid-argument-type]
              "first_origin": date(int(z["origin_idx"][z["origin_idx"] >= 0].min()))}
         )  # fmt: skip
 ttab = pl.DataFrame(trows)
@@ -119,7 +119,7 @@ say(
 )
 for m in c647.MONTHS:
     o = origins.filter(pl.col("month") == m)
-    first_o = int(o["oi"].min())
+    first_o = int(o["oi"].min())  # ty: ignore[invalid-argument-type]
     med = t_by_month[m]
     pre = np.isfinite(med[:, first_o - 14 * PER : first_o]).mean()
     pre7 = np.isfinite(med[:, first_o - 7 * PER : first_o]).mean()
@@ -177,7 +177,7 @@ say(
 d_lo = int((c647.DEV_FIRST_DAY - GS).days)
 fl = np.flatnonzero(flags[:, d_lo:].any(axis=0)) + d_lo
 say(
-    f"Flagged Primary-days from {c647.DEV_FIRST_DAY:%Y-%m-%d} to 2026-06-30: {int(flags[:, d_lo:].sum())}; first flagged day {date(fl.min() * PER)}, last {date(fl.max() * PER)}"
+    f"Flagged Primary-days from {c647.DEV_FIRST_DAY:%Y-%m-%d} to 2026-06-30: {int(flags[:, d_lo:].sum())}; first flagged day {date(fl.min() * PER)}, last {date(fl.max() * PER)}"  # ty: ignore[invalid-argument-type]
 )
 fl_rows = exp_k1.with_columns(day=pl.col("vi") // PER)
 pr = np.array([prim_of[int(t)] for t in fl_rows["time_series_id"].to_list()])
@@ -209,14 +209,14 @@ bank = pl.read_parquet(
 say(
     f"Source: `e00581_bank.contaminate` and `00581-*/bank_events_x3syn_*.parquet` ({bank.height} events = 5 months x 24 passes x 16 Primaries)."
 )
-first_origin = {m: int(origins.filter(pl.col("month") == m)["oi"].min()) for m in c647.MONTHS}
+first_origin = {m: int(origins.filter(pl.col("month") == m)["oi"].min()) for m in c647.MONTHS}  # ty: ignore[invalid-argument-type]
 brows = []
 for m in c647.MONTHS:
     b = bank.filter(pl.col("month") == m)
     fo = first_origin[m]
     brows.append(
-        {"month": m, "events": b.height, "earliest_onset": date(int(b["onset_idx"].min())),
-         "end": date(int(b["end_idx"].max())),
+        {"month": m, "events": b.height, "earliest_onset": date(int(b["onset_idx"].min())),  # ty: ignore[invalid-argument-type]
+         "end": date(int(b["end_idx"].max())),  # ty: ignore[invalid-argument-type]
          "starts_before_first_origin": int((b["onset_idx"] < fo).sum()),
          "starts_in_previous_month": int((b["onset_idx"] < fo - fo % PER).sum())}
     )  # fmt: skip

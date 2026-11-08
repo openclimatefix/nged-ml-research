@@ -12,7 +12,8 @@ outputs of the K1 seeds are then averaged (arm names with a trailing `a`: `E1a`,
   weather and date-time embeddings it reads, and the Primary embedding, stay frozen as in K1's
   fine-tune), initialised from the scored month's K1 model of the row's refit, trained on the
   departure loss only. The NRA input of the head is the stored K1 forecast.
-- `E3`: as E2, plus an NRA branch: a copy of K1's mixer and the month's output-offset knot (initialised from the scored
+- `E3`: as E2, plus an NRA branch: a copy of K1's mixer and the month's output-offset knot
+  (initialised from the scored
   month's K1 model) that reads the detached embedding of the E2 encoder and trains on the unshifted
   observed target only (the mixture negative log-likelihood, as K1's fine-tune). The head reads this
   branch's quantiles as its NRA input. The encoder moves under the departure loss only.
@@ -95,7 +96,10 @@ def k1_model(*, month: str, seed: int, refit: int) -> nn.Module:
 
 
 def lag_hl(*, mdl, x, prim, tab) -> torch.Tensor:
-    """The network's lag encoder (activated) rebuilt from cached inputs; identical to `lag_embedding` (checked in the capture)."""
+    """The network's lag encoder (activated) rebuilt from cached inputs.
+
+    The output is identical to `lag_embedding` (checked in the capture).
+    """
     emb = mdl.embedding(prim)
     outs = []
     for j, cols in enumerate((m560.DAY, m560.WEEK)):
@@ -115,7 +119,10 @@ def lag_hl(*, mdl, x, prim, tab) -> torch.Tensor:
 
 
 class LagPath(nn.Module):
-    """A trainable copy of K1's lag encoder; the embeddings and the weather and date-time networks it reads are frozen."""
+    """A trainable copy of K1's lag encoder.
+
+    The embeddings and the weather and date-time networks it reads are frozen.
+    """
 
     def __init__(self, k1: nn.Module) -> None:
         super().__init__()
@@ -124,20 +131,20 @@ class LagPath(nn.Module):
             copy.deepcopy(k1.weather),
             copy.deepcopy(k1.datetime),
         )
-        self.lag = nn.ModuleList([copy.deepcopy(k1.lag[0])])
+        self.lag = nn.ModuleList([copy.deepcopy(k1.lag[0])])  # ty: ignore[invalid-argument-type, not-subscriptable]
         self.lag_id = copy.deepcopy(k1.lag_id)
         self.n_b1 = k1.n_b1
         for mm in (self.embedding, self.weather, self.datetime):
-            for p in mm.parameters():
+            for p in mm.parameters():  # ty: ignore[unresolved-attribute]
                 p.requires_grad_(False)
         for mm in (self.lag, self.lag_id):
-            for p in mm.parameters():
+            for p in mm.parameters():  # ty: ignore[unresolved-attribute]
                 p.requires_grad_(True)
 
     def train(self, mode: bool = True):
         super().train(mode)
         for mm in (self.embedding, self.weather, self.datetime):
-            mm.eval()
+            mm.eval()  # ty: ignore[unresolved-attribute]
         return self
 
     def forward(self, x, prim, tab):
@@ -167,13 +174,13 @@ class NraBranch(nn.Module):
         self.k1 = copy.deepcopy(k1)
         for p in self.k1.parameters():
             p.requires_grad_(False)
-        for p in (*self.k1.mixer_ft.parameters(), self.k1.knot_new):
+        for p in (*self.k1.mixer_ft.parameters(), self.k1.knot_new):  # ty: ignore[unresolved-attribute]
             p.requires_grad_(True)
 
     def train(self, mode: bool = True):
         super().train(mode)
         for mm in (self.k1.embedding, self.k1.weather, self.k1.datetime):
-            mm.eval()
+            mm.eval()  # ty: ignore[unresolved-attribute]
         return self
 
     def forward(self, x, prim, hl):
@@ -287,7 +294,7 @@ class Net(nn.Module):
         q = rows.q[sel]  # the head reads the stored K1 forecast, as H1 and E2 do
         nra_out, q_nra = self.nra(rows, sel, hl) if self.arm in {"E3", "E3p"} else (None, q)
         lead = rows.lead[sel]
-        hln = (hl - self.hl_stats[0]) / self.hl_stats[1]
+        hln = (hl - self.hl_stats[0]) / self.hl_stats[1]  # ty: ignore[not-subscriptable]
         x = torch.cat(
             [rows.xorg[sel], row_inputs(q=q, lead=lead), hln, rows.refit[sel][:, None].float()],
             dim=1,
@@ -339,7 +346,7 @@ def val_nll(*, net: Net, va: Rows) -> float:
     with torch.no_grad():
         for a in range(0, va.n, 20_000):
             sel = torch.arange(a, min(a + 20_000, va.n), device=DEV)
-            tot += float(losses(net=net, rows=va, sel=sel)[1]) * len(sel)
+            tot += float(losses(net=net, rows=va, sel=sel)[1]) * len(sel)  # ty: ignore[invalid-argument-type]
     return tot / va.n
 
 

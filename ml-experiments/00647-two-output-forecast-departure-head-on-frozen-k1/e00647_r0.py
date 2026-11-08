@@ -42,8 +42,9 @@ def origin_residual(
     *, origins: pl.DataFrame, daily: pl.DataFrame, first_day: int = c647.R0_FIRST_DAY,
     last_day: int = c647.R0_LAST_DAY, min_days: int = 1,
 ) -> pl.DataFrame:  # fmt: skip
-    """Return (time_series_id, od, res, n_days): the mean of the daily residuals over days `od - last_day` to `od - first_day`.
+    """Return (time_series_id, od, res, n_days) for the mean daily residual of each origin.
 
+    The mean runs over the days `od - last_day` to `od - first_day`.
     `origins` holds the distinct (time_series_id, od) pairs. An origin with fewer than `min_days`
     daily residuals gets no row, so R0 cannot be formed there.
     """
@@ -121,7 +122,7 @@ def main() -> None:
         hi=c647.R0_LEAD_H[1],
         d0=c647.R0_FIRST_DAY,
         d1=c647.R0_LAST_DAY,
-        **zero_fill,
+        **zero_fill,  # ty: ignore[invalid-argument-type]
     )
     rows = [
         {
@@ -132,7 +133,7 @@ def main() -> None:
     for lo_hi, (d0, d1) in itertools.product(
         ((0, 24), (24, 48), (24, 240)), ((1, 7), (2, 8), (2, 7), (1, 8))
     ):
-        rows.append({"spec": f"zero-fill: days {d0}-{d1}, lead {lo_hi[0]}-{lo_hi[1]} h", **run(lo=lo_hi[0], hi=lo_hi[1], d0=d0, d1=d1, **zero_fill)})  # fmt: skip
+        rows.append({"spec": f"zero-fill: days {d0}-{d1}, lead {lo_hi[0]}-{lo_hi[1]} h", **run(lo=lo_hi[0], hi=lo_hi[1], d0=d0, d1=d1, **zero_fill)})  # ty: ignore[invalid-argument-type]  # fmt: skip
     rows.append({"spec": "main, rows without R0 dropped", **run(lo=24, hi=48, d0=2, d1=8)})
     for lo_hi, (d0, d1), how in itertools.product(
         ((0, 24), (24, 48), (24, 240)), ((1, 7), (2, 8), (2, 7), (3, 9), (1, 8)), ("mean",)
