@@ -1,10 +1,11 @@
-# ruff: noqa: E501, D103
+# ruff: noqa: D103
 """Experiment 650, step 8: avoidable-curtailment cost on the six MW Primaries (CPU).
 
-Experiment 601's `avoidable_cost` with limit 0.9 times the Primary's peak before experiment 601's cut-off,
-q95 as the planned level, leads 12 to 36 h, in pounds per Primary-day (mean over rows x 48), by arm, over three
-row sets of the held-out bank: inside the shift, in the 7 days after it ends, and all rows. Seeds averaged;
-the interval is a percentile bootstrap over months. Unscaled forecasts. Writes `score5/cost.csv`.
+Experiment 601's `avoidable_cost` with limit 0.9 times the Primary's peak before experiment 601's
+cut-off, q95 as the planned level, leads 12 to 36 h, in pounds per Primary-day (mean over rows x
+48), by arm, over three row sets of the held-out bank: inside the shift, in the 7 days after it
+ends, and all rows. Seeds averaged; the interval is a percentile bootstrap over months. Unscaled
+forecasts. Writes `score5/cost.csv`.
 """
 
 import e00578_common as k578  # ty: ignore[unresolved-import]

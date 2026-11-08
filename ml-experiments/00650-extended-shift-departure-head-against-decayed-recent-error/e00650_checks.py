@@ -1,6 +1,7 @@
 # ruff: noqa: E501, ANN001, ANN201, D103, D205
-"""Experiment 650, step 9: the audit checks on the five-month fits (CPU): median minus mean forecast, the median's error
-beside the quantile contrasts, on the decision rows and on event-free rows. Writes `score5/checks.csv`.
+"""Experiment 650, step 9: the audit checks on the five-month fits (CPU): median minus mean forecast, the
+median's error beside the quantile contrasts, on the decision rows and on event-free rows. Writes
+`score5/checks.csv`.
 """
 
 import e00650_common as c650

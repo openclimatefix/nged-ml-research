@@ -1,9 +1,10 @@
 # ruff: noqa: E501, D103
 """Experiment 650, step 6: contrasts with month-block intervals, cell tables, and tail tables (CPU).
 
-Reads `score*/per_row_summary.parquet` and `score*/scorecard.csv` of step 5. Seeds are averaged within an
-arm and month; intervals are percentile bootstraps over the months of the scored set (10,000 resamples).
-The decision contrast is the inside phase of the out-of-support held-out events, after equal width scaling.
+Reads `score*/per_row_summary.parquet` and `score*/scorecard.csv` of step 5. Seeds are averaged
+within an arm and month; intervals are percentile bootstraps over the months of the scored set
+(10,000 resamples). The decision contrast is the inside phase of the out-of-support held-out events,
+after equal width scaling.
 
 Usage: python e00650_report.py [score|score5]
 """

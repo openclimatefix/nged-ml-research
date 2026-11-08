@@ -3,8 +3,8 @@
 
 A copy of `e00647_data.build_bank` with experiment 650's shifts. A pass's rows come from step 2's
 `k1_bank/rows_<month>_r<pass>.npz`. The Primary's own shift is added to its lags and to the target
-(`shift`); the receivers' mirrored shift is added only to the neighbour signals, as in experiment 647.
-Experiment 647's real-row files (`head_data/real_<month>.npz`) are reused unchanged by the fit.
+(`shift`); the receivers' mirrored shift is added only to the neighbour signals, as in experiment
+647. Experiment 647's real-row files (`head_data/real_<month>.npz`) are reused unchanged by the fit.
 
 Writes `head_data/bank_<month>.npz` with the keys of experiment 647's file plus `pass_`.
 

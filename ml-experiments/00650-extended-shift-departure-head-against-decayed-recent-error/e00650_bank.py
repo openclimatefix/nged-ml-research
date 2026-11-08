@@ -1,22 +1,23 @@
 # ruff: noqa: E501
 """Experiment 650: the extended shift generator and the held-out shift family (pure numpy).
 
-Same call shape as experiment 581's `contaminate`: a pass `r` and a month give one shift per Primary.
-Unlike experiment 581's bank, shifts here have random ends, constant or proportional shapes, step or
-ramp onsets, depths from 3 to 50 points of capacity (1 point = 1% of effective capacity), and a
-partial-conservation receiver at one or two real electrical neighbours.
+Same call shape as experiment 581's `contaminate`: a pass `r` and a month give one shift per
+Primary. Unlike experiment 581's bank, shifts here have random ends, constant or proportional
+shapes, step or ramp onsets, depths from 3 to 50 points of capacity (1 point = 1% of effective
+capacity), and a partial-conservation receiver at one or two real electrical neighbours.
 
 Two families, selected by the pass number:
 
 - training passes `0 <= r < N_TRAIN_PASSES` (`family="train"`);
 - held-out passes `HELD_OUT_FIRST <= r < HELD_OUT_FIRST + N_HELD_OUT_PASSES` (`family="held_out"`), whose
-  ramps (72 to 120 h), depth (0.65), and durations (45 days) include values outside the training support.
+  ramps (72 to 120 h), depth (0.65), and durations (45 days) include values outside the training
+  support.
 
 `build(...)` returns the Primary's own shift `own` (added to the lag inputs and to the target) and the
-receivers' mirrored shift `mirror` (added only to the head's neighbour signals, as experiment 647 did
-with `mirrored_power`), both (16, grid), plus the event table. Power is never summed across the MW and
-MVA groups with the same shape: a receiver in the other group gets the donor's mean shift as a constant
-and the stated power factor.
+receivers' mirrored shift `mirror` (added only to the head's neighbour signals, as experiment 647
+did with `mirrored_power`), both (16, grid), plus the event table. Power is never summed across the
+MW and MVA groups with the same shape: a receiver in the other group gets the donor's mean shift as
+a constant and the stated power factor.
 """
 
 from dataclasses import dataclass
@@ -134,9 +135,10 @@ def build(
 ) -> tuple[np.ndarray, np.ndarray, list[Event]]:  # fmt: skip
     """Return (`own`, `mirror`, events) for pass `r`: both arrays are (16, grid) shifts as shares of capacity.
 
-    A proportional shape scales the Primary's own clean series so that its mean over the event equals
-    the drawn depth. `mirror` carries each receiver's gain-weighted opposite shift in megawatts divided
-    by the receiver's capacity. NaN power stays NaN where the shifts are later added by the callers.
+    A proportional shape scales the Primary's own clean series so that its mean over the event
+    equals the drawn depth. `mirror` carries each receiver's gain-weighted opposite shift in
+    megawatts divided by the receiver's capacity. NaN power stays NaN where the shifts are later
+    added by the callers.
     """
     n_prim, n = clean.shape
     own = np.zeros((n_prim, n), np.float32)

@@ -3,17 +3,18 @@
 
 Arms: K1 (stored forecast), R0-168 (K1 shifted by its own decayed recent error, tau 168 h), and the
 fitted heads `Rnew`, `Rold`, `Placebo` (seeds averaged by score, not by forecast). Row sets, per
-scored month: `held` (the extended held-out passes, target = observed power plus the shift),
-`fam` (training-family passes of the scored month, unseen), and `real` event-free rows (target =
-observed power). Phases of a bank row: `pre` (valid time before the Primary's shift starts), `inside`, and
+scored month: `held` (the extended held-out passes, target = observed power plus the shift), `fam`
+(training-family passes of the scored month, unseen), and `real` event-free rows (target = observed
+power). Phases of a bank row: `pre` (valid time before the Primary's shift starts), `inside`, and
 `after` (from the shift's end).
 
-Equal width scaling: for each arm, month, set, and phase, every quantile is scaled about the median by
-one factor chosen so that the q05-q95 band covers 0.90 of the rows (the nominal level). The same rule
-applies to every arm including K1 and R0-168; the factor is fitted on the scored rows (an oracle).
+Equal width scaling: for each arm, month, set, and phase, every quantile is scaled about the median
+by one factor chosen so that the q05-q95 band covers 0.90 of the rows (the nominal level). The same
+rule applies to every arm including K1 and R0-168; the factor is fitted on the scored rows (an
+oracle).
 
-R0's residual history is missing for some rows; rows without it are dropped from every arm (the counts are
-written to `score/dropped.csv`).
+R0's residual history is missing for some rows; rows without it are dropped from every arm (the
+counts are written to `score/dropped.csv`).
 
 Usage: python e00650_score.py [--months 2025-10 2025-12]
 """

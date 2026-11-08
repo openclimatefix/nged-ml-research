@@ -1,18 +1,20 @@
 # ruff: noqa: E501, E402, ANN001, ANN201, D103
 """Experiment 650, step 2: rebuild K1 on the extended-shift bank (CPU).
 
-K1 is the seed mean of five seeds, experiment 613's tail constants (fitted on earlier months' event-free
-rows), and the G4 gated band, all through experiment 613's own `e00613_score` machinery (imported, not
-edited) as `e00647_k1_rebuild` did. This script differs from experiment 647's rebuild in three ways:
-the forecasts come from `inject/` (step 1), the shifts are this experiment's `own` and `mirror` arrays
-(any shape, not only a constant block), and the gate's gap is the daily mean of those arrays added
-to the fresh and stored gaps (experiment 613 added a constant to each day of a block).
+K1 is the seed mean of five seeds, experiment 613's tail constants (fitted on earlier months' event-
+free rows), and the G4 gated band, all through experiment 613's own `e00613_score` machinery
+(imported, not edited) as `e00647_k1_rebuild` did. This script differs from experiment 647's rebuild
+in three ways: the forecasts come from `inject/` (step 1), the shifts are this experiment's `own`
+and `mirror` arrays (any shape, not only a constant block), and the gate's gap is the daily mean of
+those arrays added to the fresh and stored gaps (experiment 613 added a constant to each day of a
+block).
 
 `--validate` runs the same code on experiment 581's passes and experiment 613's stored forecasts and
 compares the rebuilt K1 with experiment 647's stored `k1_bank` rows, so a difference between the two
 rebuilds shows up before any new pass is read.
 
-Writes `k1_bank/rows_<month>_r<pass>.npz` (same keys as experiment 647's) and `k1_bank/events_<month>.parquet`.
+Writes `k1_bank/rows_<month>_r<pass>.npz` (same keys as experiment 647's) and
+`k1_bank/events_<month>.parquet`.
 
 Usage: python e00650_rebuild.py --months 2025-10 2025-12 --passes 0 1 ... | --validate
 """
@@ -43,7 +45,7 @@ VALID_TOL = 1e-4
 
 
 def load_seed_mean(*, t, month: str, r: int, rows, order, sorted_keys, inject_dir) -> np.ndarray:
-    """Return the five-seed mean of the injected quantiles of pass `r` for the table rows `rows` (NaN where absent)."""
+    """Return the five-seed mean of pass `r`'s injected quantiles for the rows `rows` (NaN if absent)."""
     parts = []
     for d in ("d0", "d14"):
         seeds = []

@@ -3,9 +3,9 @@
 
 Runs experiment 613's `k1_d5` inject path (K1's five seeds, the d0 and d14 daily fits) through
 experiment 591's `run_inject`, with three patches and nothing else changed: `bank.contaminate`
-returns this experiment's shifted power (`own` added to the Primary's lags; receivers' mirrored shifts
-are not in K1's inputs, as in experiment 647), the output files go to this experiment's `inject/`
-folder, and the device is the CPU. The saved weights are read only.
+returns this experiment's shifted power (`own` added to the Primary's lags; receivers' mirrored
+shifts are not in K1's inputs, as in experiment 647), the output files go to this experiment's
+`inject/` folder, and the device is the CPU. The saved weights are read only.
 
 Usage: python e00650_inject.py --months 2025-10 2025-12 --seeds 0 1 2 3 4 --passes 0 1 2
 """

@@ -1,22 +1,25 @@
 # ruff: noqa: E501, ANN001, D103, D107, PLR0915
 """Experiment 650, step 4: fit the departure heads on the first month pair and write per-row scores (CPU).
 
-Arms: `Rnew` (experiment 647's H1 recipe on real rows plus the extended-shift bank), `Rold` (the same
-recipe on real rows plus experiment 647's constant-shift bank, refitted here because the stored weights
-of experiment 647 were deleted to free disk space), and `Placebo` (Rnew with the shifts shuffled across the
-bank rows of the training fold). Same head, loss, optimiser, batch, epochs, and early-stop patience as experiment 647's `e00647_fit.py`
-(imported for the head and inputs); 15,000 bank rows instead of 6,000, because one training month supplies
-the bank rows that four months supplied there.
+Arms: `Rnew` (experiment 647's H1 recipe on real rows plus the extended-shift bank), `Rold` (the
+same recipe on real rows plus experiment 647's constant-shift bank, refitted here because the stored
+weights of experiment 647 were deleted to free disk space), and `Placebo` (Rnew with the shifts
+shuffled across the bank rows of the training fold). Same head, loss, optimiser, batch, epochs, and
+early-stop patience as experiment 647's `e00647_fit.py` (imported for the head and inputs); 15,000
+bank rows instead of 6,000, because one training month supplies the bank rows that four months
+supplied there.
 
-Month pair: the scored month is trained on the other month of the pair (the bank passes of the scored
-month never enter training). Rows of the training month split by origin day: days 0 to 17 train, days 21
-onward early-stop (a gap of 3 days), for real and bank rows alike. The early-stop month is never the scored month.
+Month pair: the scored month is trained on the other month of the pair (the bank passes of the
+scored month never enter training). Rows of the training month split by origin day: days 0 to 17
+train, days 21 onward early-stop (a gap of 3 days), for real and bank rows alike. The early-stop
+month is never the scored month.
 
-Output per fit, `fits/<arm>_<month>_s<seed>.npz`: per row of the scored month's real rows, extended held-out
-rows (passes 200 onward), and training-family rows (passes 0 to 11): the head's q05, q50, q95, CRPS,
-coverage flags, tail pinball losses, and the row index.
+Output per fit, `fits/<arm>_<month>_s<seed>.npz`: per row of the scored month's real rows, extended
+held-out rows (passes 200 onward), and training-family rows (passes 0 to 11): the head's q05, q50,
+q95, CRPS, coverage flags, tail pinball losses, and the row index.
 
-Usage: python e00650_fit.py [--arms Rnew Rold Placebo] [--months 2025-10 2025-12] [--seeds 0 1] [--workers 6]
+Usage: python e00650_fit.py [--arms Rnew Rold Placebo] [--months 2025-10 2025-12]
+[--seeds 0 1] [--workers 6]
 """
 
 import argparse
