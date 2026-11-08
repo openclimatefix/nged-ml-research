@@ -17,7 +17,7 @@ step() {  # step ARM COMMAND [extra args]
   local used; used=$(awk '{s+=$NF} END {print s+0}' "$LOG")
   if [ "$used" -ge "$CEILING_S" ]; then echo "STOP: GPU ceiling reached (${used} s)" | tee -a "$LOG"; exit 4; fi
   local t0; t0=$(date +%s)
-  "$D/gpu.sh" e00651_arm.py "$arm" "$cmd" --months $M --seeds 0 1 "$@" || { echo "FAILED $arm $cmd" | tee -a "$LOG"; exit 5; }
+  flock /tmp/e648.gpu.lock "$D/gpu.sh" e00651_arm.py "$arm" "$cmd" --months $M --seeds 0 1 "$@" || { echo "FAILED $arm $cmd" | tee -a "$LOG"; exit 5; }
   echo "$arm $cmd $* $(( $(date +%s) - t0 ))" >> "$LOG"
 }
 
