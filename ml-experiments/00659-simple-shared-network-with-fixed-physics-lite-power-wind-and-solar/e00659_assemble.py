@@ -94,6 +94,27 @@ def solar(*, arm: str) -> pl.DataFrame:
     )
 
 
+def solar_730() -> pl.DataFrame | None:
+    """Return `a2_member` refitted with the 730-day capacity (this experiment's refits), if present."""
+    paths = sorted((common.DATA_DIR / "solar_a2_member_730" / "a2_member").glob("s?_*.parquet"))
+    if len(paths) < 12:
+        return None
+    frame = pl.concat([pl.read_parquet(p).filter(pl.col("setting") == "own_history") for p in paths])
+    frame = frame.select(
+        series=pl.lit("Solar ") + pl.col("time_series_id"),
+        init_time=pl.col("init_time"),
+        valid_time=pl.col("time"),
+        lead_hours=pl.col("lead_hours"),
+        actual=pl.col("actual"),
+        **{q: pl.col(q) for q in Q},
+    ).rename({q: f"q{i}" for i, q in enumerate(Q)})
+    keys = ["series", "init_time", "valid_time", "lead_hours"]
+    out = sorted_mean(frame=frame, keys=keys, extra=["actual"])
+    return keep_development(frame=out).with_columns(
+        tech=pl.lit("solar"), candidate=pl.lit("solar_a2_member_730")
+    )
+
+
 def scores(*, frame: pl.DataFrame, actual: str, drop_masked: bool = False) -> dict[str, float]:
     """Return the quantile score and normalised MAE of the median (points), coverage, tail share."""
     data = frame.filter(~pl.col("masked")) if drop_masked else frame
@@ -142,6 +163,11 @@ def main() -> None:
         table = solar(arm=arm).with_columns(masked=pl.lit(value=False))
         table.write_parquet(common.TABLE_DIR / f"solar_{arm}.parquet")
         rows.append({"candidate": f"solar_{arm}", "variant": "all_rows", **scores(frame=table, actual="actual")})
+    table = solar_730()
+    if table is not None:
+        table = table.with_columns(masked=pl.lit(value=False))
+        table.write_parquet(common.TABLE_DIR / "solar_a2_member_730.parquet")
+        rows.append({"candidate": "solar_a2_member_730", "variant": "all_rows", **scores(frame=table, actual="actual")})
     out = pl.DataFrame(rows)
     out.write_csv(common.TABLE_DIR / "overall_scores.csv")
     with pl.Config(tbl_rows=60, tbl_cols=12, float_precision=3):
