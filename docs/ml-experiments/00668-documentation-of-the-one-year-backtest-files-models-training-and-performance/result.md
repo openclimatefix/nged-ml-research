@@ -113,7 +113,7 @@ description of one year and not a ranking.
 | `primaries.parquet` | 16 Primaries | MW; MVA for the eight MVA-only Primaries | 7,848,960 (two rows per key) |
 | `bsps.parquet` | 2 BSPs (D13 Skegness, D17 Boston) | MW | 490,560 |
 | `gsps.parquet` | 2 GSPs (D6 Walpole, D1 Bicker Fen) | MW | 490,560 |
-| `wind.parquet` | 3 wind farms | MW | 735,840 |
+| `wind.parquet` | 3 wind farms | MW for one farm; MVA for the other two | 735,840 |
 | `solar.parquet` | 6 solar farms | MW | 1,471,680 |
 
 - **Columns, in this order.**
@@ -214,11 +214,9 @@ fixes the choices that the earlier experiments left open, and this section resta
     - Power lags: for each of a day lag and a week lag, the latest same-half-hour reading at least
       a minimum age before the network's origin, as a z-scored value, a missing flag, and an age
       code. The network's own origin is 09:00 UTC (the 00Z run plus 9 hours), and the lag cap counts
-      back from that origin. The stored Candidate used a cap of 24
-      hours. The backtest uses the existing 3.5-hour cap of experiment 574 (7 half-hours, the V35
-      arm), which reads power no newer than 05:30 UTC on the origin day: 6.5 hours before the 12:00
-      file origin and earlier than the 06:00 cut of the contract. The only change from the stored
-      Candidate is that the lag encoder is pre-trained at that cap (experiment 667's plan).
+      back from that origin. The Candidate in the backtest
+      keeps the stored cap of 24 hours, so the newest lag is the 09:00 reading of the day before the
+      origin day.
     - Thermal-lag and solar-gain columns (14): trailing temperature means (3, 6, and 24 hours),
       temperature changes (3 and 6 hours), the day's minimum and maximum, the count of cold-snap
       days, trailing shortwave means (3, 6, and 24 hours), the 3-hour change in the clear-sky
@@ -255,8 +253,8 @@ fixes the choices that the earlier experiments left open, and this section resta
   and each standard deviation is `exp` of the raw output clamped to plus or minus 3. The values are
   then rescaled to power and sorted within the row. The final test of experiment 620 averaged 5
   seeds quantile by quantile, sorted again, and widened the band about the median by a factor of
-  1.0934, which experiment 613 fixed before that test. Experiment 667 plans 2 seeds and, by
-  default, no widening.
+  1.0934, which experiment 613 fixed before that test. The backtest averages 2 seeds and applies no
+  widening.
 - **Loss.** The negative log-likelihood of the mixture on the standardised target, weighted, plus
   the knot penalty.
 - **Training, in three steps.**
@@ -286,12 +284,12 @@ fixes the choices that the earlier experiments left open, and this section resta
   3, 7, 15, or 30 days, random sign. Each shift on a Primary is subtracted, scaled by the capacity
   ratio, from one electrical neighbour, so the neighbour summaries see the transfer.
 - **R-haz, the prevailing head.** Experiment 652 fitted it on top of the frozen K1 network of
-  experiments 612 and 613, and experiment 667 plans to put it on the Candidate. It is a small
+  experiments 612 and 613, and the backtest puts it on the Candidate. It is a small
   network that reads 58 origin
   features (the gap and neighbour signals above, built from lags), 4 age columns (the log of the
   departure's age in days, the age over 30, the gate flag, and the age of the freshest lag), and
   3 row inputs (the lead over 240 hours and the lower and upper half-widths of the Candidate's
-  band). The counts here are those of experiment 652: removing the gate flag leaves 64 inputs. It
+  band). The gate flag is kept as a column and set to zero, so the head has 65 inputs. It
   has two hidden layers of 64 ReLU units and 12 outputs: a signed depth (0.5 times the
   hyperbolic tangent of the first output, so up to half of capacity), a spread, and daily hazards.
   Each hazard is `softplus(output - 3)`, and the survival probability `p` is the exponential of
@@ -310,10 +308,8 @@ fixes the choices that the earlier experiments left open, and this section resta
   to
   112 days (an assumed mixture) and each injected shift counted equally. Adam, learning rate 0.003,
   weight decay 1e-4, batch 4096, up to 30 epochs, patience 4, 2 seeds averaged by mean quantile.
-  The head of experiment 652 has 9,164 parameters (12 outputs) and no dropout. Experiment 667 plans
-  14 daily hazards (16 outputs, so about 9,360 parameters) and no gate flag, so the numbers above
-  are
-  stored values and the plan changes them.
+  The head of experiment 652 has 9,164 parameters (12 outputs) and no dropout. The backtest head has
+  14 daily hazards (16 outputs) and 65 inputs, which gives 9,424 parameters.
 - **Refits and embargo in the backtest.** Twelve monthly refits (test months 2025-11 to 2026-10),
   each trained on data before the first of the month with the 7-day embargo of the refit rule.
   The ensemble history starts 2024-04-01, so the early folds fine-tune on less ensemble history
@@ -598,7 +594,7 @@ generation, which no input models.
 - **Origin.** The network runs at its own origin of 09:00 UTC, the 00Z run plus 9 hours, and its
   output is relabelled with 12:00 UTC. Every input that the network reads at 09:00 was available at
   12:00.
-- **Refits (planned).** Twelve monthly refits, one per test month 2025-11 to 2026-10, with the
+- **Refits.** Twelve monthly refits, one per test month 2025-11 to 2026-10, with the
   3-day embargo of the schedule. The final-test network of experiment 633 was one fit at 2026-07-01.
 - **Where each piece came from.** As for the Candidate; the node harness and pooling: 564 and 611;
   the lag network at the nodes: 619; the matched rematch: 622; the final test: 633.
@@ -799,7 +795,7 @@ backtest is [experiment
   (experiment 210's idle mask) are set to zero in training
   and scoring. Three seeds are averaged quantile by quantile.
 - **Capacity.** The 99.9th percentile of the farm's power over the 730 days before each refit.
-- **Refits (planned).** Wind refits on day 0 of each month (12 refits), training on runs before 62
+- **Refits.** Wind refits on day 0 of each month (12 refits), training on runs before 62
   days earlier. No ERA5 or CAMS pre-training. Experiment 659 refitted twice a month.
 - **Missing inputs.** The network reads only the ensemble weather. The end date of the idle mask
   is read at run time, and the performance section states it.
@@ -922,7 +918,7 @@ experiment 666.
   negative log-likelihood on the last 61 days kept, and a lead range extended to 336 hours
   (experiments 430 and 659 stopped at 251.5 hours). Solar has no idle mask, and the target is the
   raw output.
-- **Refits (planned).** Quarterly: 2025-11-01, 2026-02-01, 2026-05-01, and 2026-08-01, each scoring
+- **Refits.** Quarterly: 2025-11-01, 2026-02-01, 2026-05-01, and 2026-08-01, each scoring
   the next
   three months, 3 seeds each, with no pre-training.
 - **Capacity.** As for wind.
