@@ -13,6 +13,7 @@
 | [PV-621](#planned-experiments) | Does the donor-day probe of a lag-free neural network recover an injected PV capacity at the six MW Primaries, read placebos near zero, and resist a cloud-following load? | 1 | Nothing | Experiment 00621 planned; one GPU process, about 0.7 GPU-hours |
 | [PV-616](#planned-experiments) | Does probing the stored lag-free neural networks with fixed datetime inputs and coherent donor weather return a stable, plausible PV capacity at the six MW Primaries? | 1 | Nothing | Experiment 00616 finished (partly supported): stable capacity, one placebo fails; step 2 (injected known-answer test) recommended |
 | [PV-655](#planned-experiments) | Does an explicit solar term computed per ensemble member, with a cell temperature, beat the free network, and does the 14-day error correction still work when applied by forecast sunniness? | 1 | Nothing | Experiment 00655 planned; one GPU process, about 0.5 GPU-hours |
+| [PV-664](#planned-experiments) | Does building the net-demand distribution as the gross-demand distribution minus a random ensemble member's solar curve beat the free network, and beat a plain recalibration of the free network's quantile widths? | 1 | Nothing | Experiment 00664 planned; inference only on stored networks, GPU under 1.5 hours |
 
 ## Planned experiments
 
