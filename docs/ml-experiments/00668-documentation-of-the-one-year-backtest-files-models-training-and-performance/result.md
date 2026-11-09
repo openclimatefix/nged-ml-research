@@ -123,10 +123,11 @@ fixes the choices that the earlier experiments left open, and this section resta
     - Power lags: for each of a day lag and a week lag, the latest same-half-hour reading at least
       a minimum age before the network's origin, as a z-scored value, a missing flag, and an age
       code. The network's own origin is 09:00 UTC (the 00Z run plus 9 hours), and the lag cap counts
-      back from that origin. The stored Candidate used a cap of 24 hours. Experiment 667 plans a
-      6-hour cap with the lag encoder pre-trained at that cap and the same cut on the neighbour
-      summaries. Which origin and which cap give a newest reading no younger than 06:00 UTC on the
-      12:00 file origin is fixed by that page, and this page restates it when the code lands.
+      back from that origin. The stored Candidate used a cap of 24
+      hours. The backtest uses the existing 3.5-hour cap of experiment 574 (7 half-hours, the V35
+      arm), which reads power no newer than 05:30 UTC on the origin day: 6.5 hours before the 12:00
+      file origin and earlier than the 06:00 cut of the contract. The only change from the stored
+      Candidate is that the lag encoder is pre-trained at that cap (experiment 667's plan).
     - Thermal-lag and solar-gain columns (14): trailing temperature means (3, 6, and 24 hours),
       temperature changes (3 and 6 hours), the day's minimum and maximum, the count of cold-snap
       days, trailing shortwave means (3, 6, and 24 hours), the 3-hour change in the clear-sky
