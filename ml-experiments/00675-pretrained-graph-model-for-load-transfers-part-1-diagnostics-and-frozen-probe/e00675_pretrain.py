@@ -24,7 +24,7 @@ from typing import Final
 import numpy as np
 import torch
 from e00653_common import SCORED_FROM
-from e00675_inputs import future_channels, node_inputs
+from e00675_inputs import causalise, node_inputs
 from e00675_net import Pretrainer
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -120,6 +120,19 @@ def student_t_nll(*, y: torch.Tensor, loc: torch.Tensor, log_scale: torch.Tensor
     return log_scale + 0.5 * (T_DF + 1) * torch.log1p(z * z / T_DF)
 
 
+def build_sample(
+    *, x_all: torch.Tensor, start: int, mask: torch.Tensor, sigma: torch.Tensor, mva: torch.Tensor, causal: bool,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Inputs of one masked sample: statistics are computed after the mask is applied."""
+    x = x_all[:, start : start + SPAN].clone()
+    mask = mask & torch.isfinite(x)
+    seen = torch.where(mask, torch.full_like(x, float("nan")), x)
+    h, d = node_inputs(x=seen, sigma=sigma, is_mva=mva, hour0=start)
+    if causal:
+        h, d = causalise(h, d)
+    return h, d, x, mask
+
+
 def make_batch(
     *, x_all: torch.Tensor, sigma: torch.Tensor, mva: torch.Tensor, gen: torch.Generator,
     causal: bool, device: torch.device,
@@ -129,13 +142,8 @@ def make_batch(
     hourly, daily, truth, masks = [], [], [], []
     for _ in range(BATCH):
         s = 24 * int(torch.randint(0, (PRE_HOURS - SPAN) // 24, (1,), generator=gen))
-        x = x_all[:, s : s + SPAN].clone()
         mask = torch.zeros(n, SPAN, dtype=torch.bool) if causal else draw_masks(gen=gen, n_nodes=n, hours=SPAN, centre=(360, SPAN - 360))
-        mask &= torch.isfinite(x)
-        seen = torch.where(mask, torch.full_like(x, float("nan")), x)
-        h, d = node_inputs(x=seen, sigma=sigma, is_mva=mva, hour0=s)
-        if causal:
-            h[..., future_channels()] = 0.0
+        h, d, x, mask = build_sample(x_all=x_all, start=s, mask=mask, sigma=sigma, mva=mva, causal=causal)
         hourly.append(h.float()); daily.append(d.float()); truth.append(x); masks.append(mask)  # fmt: skip
     return (
         torch.stack(hourly).to(device), torch.stack(daily).to(device),

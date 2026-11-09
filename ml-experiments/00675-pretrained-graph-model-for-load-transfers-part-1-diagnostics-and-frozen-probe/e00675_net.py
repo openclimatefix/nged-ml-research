@@ -16,6 +16,19 @@ HOURLY_DILATIONS = (1, 3, 9, 27, 81, 243)
 DAILY_DILATIONS = (1, 2, 4, 8)
 
 
+class ChannelNorm(nn.Module):
+    """Layer norm over channels at each time step (no statistics across time)."""
+
+    def __init__(self, ch: int) -> None:
+        """Build the norm."""
+        super().__init__()
+        self.ln = nn.LayerNorm(ch)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Normalise (batch, channels, time) over channels."""
+        return self.ln(x.transpose(1, 2)).transpose(1, 2)
+
+
 class Block(nn.Module):
     """A residual dilated convolution (kernel 3), bidirectional or causal."""
 
@@ -25,7 +38,7 @@ class Block(nn.Module):
         self.dilation, self.causal = dilation, causal
         self.conv = nn.Conv1d(ch, ch, 3, dilation=dilation)
         self.mix = nn.Conv1d(ch, ch, 1)
-        self.norm = nn.GroupNorm(1, ch)
+        self.norm = ChannelNorm(ch)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply the block to (batch, channels, time)."""
@@ -47,7 +60,7 @@ class Encoder(nn.Module):
         self.d_blocks = nn.ModuleList(Block(ch=dch, dilation=d, causal=causal) for d in DAILY_DILATIONS)
         self.fuse = nn.Conv1d(dch, ch, 1)
         self.nb = nn.Conv1d(ch, ch, 1)
-        self.out_norm = nn.GroupNorm(1, ch)
+        self.out_norm = ChannelNorm(ch)
 
     def forward(
         self, hourly: torch.Tensor, daily: torch.Tensor, adj: torch.Tensor

@@ -48,23 +48,31 @@ def truth_tables(*, worlds: list[int]) -> dict[int, pl.DataFrame]:
     return {w: pl.read_parquet(ROOT / "worlds" / f"test_{w}_truth.parquet") for w in worlds}
 
 
-def e1j_numbers(*, worlds: list[int], truth: dict[int, pl.DataFrame]) -> tuple[float, pl.DataFrame]:
-    """E1-J's false-donor rate per Primary-year and its donor-found rows."""
-    false = 0
-    rows = []
+def e1j_numbers(*, worlds: list[int], truth: dict[int, pl.DataFrame], sites: list[str]) -> tuple[float, pl.DataFrame]:
+    """E1-J's false-donor rate per Primary-year and its donor-found rows.
+
+    E1-J's alarms are its decoded downward events of 4 noise units or more, one hour each, merged
+    into episodes and compared with the injected downward windows exactly as the probe's are.
+    """
+    eps: dict = {}
     for w in worlds:
         ev = pl.read_parquet(ROOT / "worlds" / f"test_{w}_e1j.parquet").filter(
-            (pl.col("amp_mw") < 0) & (pl.col("start") >= SCORED_FROM)
+            (pl.col("amp_mw") < 0) & (pl.col("start") >= SCORED_FROM) & (pl.col("units") >= 4)
         )
-        neg = truth[w].filter(pl.col("amp_mw") < 0)
-        for e in ev.filter(pl.col("units") >= 4).iter_rows(named=True):
-            near = neg.filter((pl.col("site") == e["primary"]) & ((pl.col("start") - e["start"]).abs() <= 24))
-            false += near.is_empty()
-        donors = neg.filter((pl.col("kind") == "edge") & (pl.col("partners") != ""))
-        for d in donors.iter_rows(named=True):
-            hit = ev.filter((pl.col("primary") == d["site"]) & ((pl.col("start") - d["start"]).abs() <= 24))
-            rows.append({"world": w, "cell": cell(d), "amp": abs(d["amp_mw"]), "found": float(not hit.is_empty())})
-    return false / (len(worlds) * 15 * YEARS), pl.DataFrame(rows)
+        for i, site in enumerate(sites):
+            hot = np.zeros(GRID_LENGTH // 2 - SCORED_H + 48, bool)
+            for st in ev.filter(pl.col("primary") == site)["start"].to_list():
+                hot[st // 2 - SCORED_H] = True
+            eps[(w, i)] = episodes(hot=hot)
+    wins = windows_of(truth=truth, sites=sites)
+    rate = false_rate(eps=eps, wins=wins) / (len(worlds) * 15 * YEARS)
+    rows = []
+    for w in worlds:
+        for d in truth[w].filter((pl.col("amp_mw") < 0) & (pl.col("kind") == "edge") & (pl.col("partners") != "")).iter_rows(named=True):
+            h0 = d["start"] // 2 - SCORED_H
+            hit = any(a <= h0 + 24 and b >= h0 - 12 for a, b in eps[(w, sites.index(d["site"]))])
+            rows.append({"world": w, "cell": cell(d), "amp": abs(d["amp_mw"]), "found": float(hit)})
+    return rate, pl.DataFrame(rows)
 
 
 def episodes(*, hot: np.ndarray) -> list[tuple[int, int]]:
@@ -129,6 +137,8 @@ def score_arm(*, arm: str, seed: int, probe: Path, truth: dict, sites: list[str]
         rate = false_rate(eps=probe_episodes(scores=scores, thr=mid), wins=wins) / (len(WORLDS) * 15 * YEARS)
         lo, hi = (mid, hi) if rate > target else (lo, mid)
     thr = hi
+    achieved = false_rate(eps=probe_episodes(scores=scores, thr=thr), wins=wins) / (len(WORLDS) * 15 * YEARS)
+    print(f"{arm} seed {seed}: threshold {thr:.2f}, false-episode rate {achieved:.3f} (target {target:.3f})")
     eps = probe_episodes(scores=scores, thr=thr)
     rows = []
     for w in WORLDS:
@@ -155,7 +165,7 @@ def main() -> None:
     probe = ROOT / (sys.argv[1] if len(sys.argv) > 1 else "probe")
     sites = sites_of()
     truth = truth_tables(worlds=WORLDS)
-    target, e1j = e1j_numbers(worlds=WORLDS, truth=truth)
+    target, e1j = e1j_numbers(worlds=WORLDS, truth=truth, sites=sites)
     print(f"E1-J false-donor rate {target:.3f} per Primary-year")
     arms = {}
     for arm in ("P-M", "P-C", "R", "F"):

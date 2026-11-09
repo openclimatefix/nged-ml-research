@@ -21,9 +21,9 @@ import polars as pl
 import torch
 from e00653_common import DAY, SCORED_FROM
 from e00665_score import cell_of  # ty: ignore[unresolved-import]
-from e00675_inputs import STEP_WINDOWS, future_channels, node_inputs
+from e00675_inputs import causalise, node_inputs
 from e00675_net import Pretrainer
-from e00675_pretrain import ROOT, adjacency
+from e00675_pretrain import ROOT, SPAN, adjacency
 
 WORLDS: Final[Path] = ROOT / "worlds"
 OUT: Final[Path] = ROOT / ("probe_smoke" if os.environ.get("E675_SMOKE") else "probe")
@@ -44,20 +44,33 @@ def donor_rows(*, truth: pl.DataFrame) -> pl.DataFrame:
 
 
 def embed(*, model: Pretrainer | None, resid: np.ndarray, sigma: np.ndarray, mva: torch.Tensor, adj: torch.Tensor):
-    """Per-hour features (nodes, hours, d) and the raw channels (nodes, hours, C) of one world."""
+    """Per-hour features (nodes, hours, d) and the raw channels (nodes, hours, C) of one world.
+
+    The record is cut into windows of `SPAN` hours (the length pretraining saw), each encoded on
+    its own; the middle half of every window is kept, and the first and last windows keep their
+    outer quarter too.
+    """
     x = torch.tensor(resid, dtype=torch.float64)
-    hourly, daily = node_inputs(x=x, sigma=torch.tensor(sigma), is_mva=mva, hour0=0)
-    raw = hourly.float()
-    if model is None:
-        return None, raw
-    if model.causal:
-        raw_in = raw.clone()
-        raw_in[..., future_channels()] = 0.0
-    else:
-        raw_in = raw
-    with torch.no_grad():
-        h, _ = model.encoder(raw_in[None].to(DEV), daily.float()[None].to(DEV), adj.float().to(DEV))
-    return h[0].cpu(), raw
+    n_nodes, total = x.shape
+    quarter = SPAN // 4
+    starts = list(range(0, total - SPAN + 1, SPAN // 2))
+    if starts[-1] + SPAN < total:
+        starts.append(total - SPAN)
+    raw = torch.zeros(n_nodes, total, 35, dtype=torch.float32)
+    feat = None if model is None else torch.zeros(n_nodes, total, 64, dtype=torch.float32)
+    for k, s in enumerate(starts):
+        lo = 0 if k == 0 else s + quarter
+        hi = total if k == len(starts) - 1 else s + SPAN - quarter
+        lo_i, hi_i = lo - s, hi - s
+        hourly, daily = node_inputs(x=x[:, s : s + SPAN], sigma=torch.tensor(sigma), is_mva=mva, hour0=s)
+        raw[:, lo:hi] = hourly[:, lo_i:hi_i].float()  # pair features use the full inputs in every arm
+        if model is not None and model.causal:
+            hourly, daily = causalise(hourly, daily)
+        if model is not None:
+            with torch.no_grad():
+                h, _ = model.encoder(hourly.float()[None].to(DEV), daily.float()[None].to(DEV), adj.float().to(DEV))
+            feat[:, lo:hi] = h[0, :, lo_i:hi_i].cpu()
+    return feat, raw
 
 
 def pair_block(*, raw: torch.Tensor, donor: int, nb: int, t0: int) -> torch.Tensor:
@@ -96,6 +109,12 @@ def fit_logistic(*, x: torch.Tensor, y: torch.Tensor, steps: int = 300) -> tuple
     return lin, mu, sd
 
 
+def donor_scores(*, base: torch.Tensor, dl: tuple) -> torch.Tensor:
+    """Donor-probe score of every (node, hour); a function of the features alone."""
+    z = (base - dl[1]) / dl[2]
+    return (z @ dl[0].weight.T.detach()).squeeze(-1) + dl[0].bias.detach()
+
+
 def load_world(*, kind: str, seed: int):
     """Residual, noise units, and truth table of a cached world."""
     z = np.load(WORLDS / f"{kind}_{seed}.npz")
@@ -120,6 +139,7 @@ def run(*, arm: str, seed: int) -> None:
             name = {"P-M": "masked", "P-C": "causal"}[arm]
             model.load_state_dict(torch.load(ROOT / "weights" / f"encoder_{name}_seed{seed}.pt", map_location=DEV))
     rng = np.random.default_rng(seed)
+    torch.manual_seed(seed)
     xd, yd, xr, yr = [], [], [], []
     for w in range(100000, 100005 if SMOKE else 100200):
         resid, sigma, truth = load_world(kind="train", seed=w)
@@ -151,8 +171,7 @@ def run(*, arm: str, seed: int) -> None:
         resid, sigma, truth = load_world(kind="test", seed=w)
         feat, raw = embed(model=model, resid=resid, sigma=sigma, mva=mva, adj=adj)
         base = feat if feat is not None else torch.cat([raw, torch.einsum("ij,jtc->itc", adj.float(), raw)], -1)
-        z = ((base - dl[1]) / dl[2])
-        sc = (z @ dl[0].weight.T.detach()).squeeze(-1) + dl[0].bias.detach()
+        sc = donor_scores(base=base, dl=dl)
         np.save(OUT / f"score_{arm}_seed{seed}_world{w}.npy", sc.numpy().astype(np.float32))
         for r in donor_rows(truth=truth).iter_rows(named=True):
             days = None if r["end"] < 0 else (r["end"] - r["start"]) / DAY

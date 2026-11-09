@@ -37,15 +37,28 @@ D_CHANNELS: Final[int] = 7
 
 
 def future_channels() -> list[int]:
-    """Indices of the channels that use hours after t (the causal arm zeroes them)."""
+    """Indices of the hourly channels that use hours after t (the causal arm zeroes them)."""
     out = []
     for k in range(len(GAP_WINDOWS)):
         base = 2 + 6 * k
-        out += [base + 1, base + 3, base + 5]  # future mean, future gap, future coverage
+        out += [base + 3, base + 4, base + 5]  # future mean, future gap, future coverage
     base = 2 + 6 * len(GAP_WINDOWS)
     for k in range(len(STEP_WINDOWS)):
-        out += [base + 4 * k, base + 4 * k + 2]  # forward step and its coverage
+        out += [base + 4 * k, base + 4 * k + 1]  # forward step and its coverage
+    out.append(N_CHANNELS - 7)  # the whole-sample routine-step rate
     return out
+
+
+FUTURE_DAILY: Final[list[int]] = [4]
+"""Daily channel with the mean of the next 7 days."""
+
+
+def causalise(hourly: torch.Tensor, daily: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Zero every input channel that uses hours after t, for the causal arm."""
+    hourly, daily = hourly.clone(), daily.clone()
+    hourly[..., future_channels()] = 0.0
+    daily[..., FUTURE_DAILY] = 0.0
+    return hourly, daily
 
 
 def _window(cs: torch.Tensor, cn: torch.Tensor, lo: int, hi: int) -> tuple[torch.Tensor, torch.Tensor]:
