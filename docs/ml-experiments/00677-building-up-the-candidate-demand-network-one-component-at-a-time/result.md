@@ -85,8 +85,8 @@ Added where:
 
 | Step | Components added |
 |---|---|
-| 1 | Date-time encoder, Primary embedding, and mixer. The weather input is removed, so the mixer sees only the date-time embedding. |
-| 2 | Weather encoder alone (B1 columns included); the date-time encoder is removed. |
+| 1 | Date-time encoder, Primary embedding, and mixer. The weather, spread, and lead inputs are removed, so the mixer sees only the date-time embedding. |
+| 2 | Weather encoder alone (B1 columns included); the date-time and lead inputs are removed. The mixer sees the weather embedding and the Primary embedding. |
 | 3 | Both encoders into the mixer, with the spread and lead columns. Version a: trained on ENS only, no pre-training, nothing frozen. Version b: ERA5 and CAMS pre-training, then fine-tuning on ENS with both encoders frozen (the chain of experiment 620). |
 | 4 | One lag encoder at 24 hours, with its expected-weather and expected-date-time embeddings at the lag's own time, the lag-ID embedding, and block dropout of lags (30% of days). |
 | 5 | A second lag at one week through the shared lag encoder. Two versions: with and without injected events. |
