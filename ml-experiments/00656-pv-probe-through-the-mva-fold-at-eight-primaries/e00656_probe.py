@@ -33,6 +33,8 @@ import torch  # ty: ignore[unresolved-import]
 p621.MINUTES = tuple(range(5 * 60, 19 * 60 + 1, 30))
 p621.MIN_COS_ZENITH = 0.0976
 """Every half-hour with the sun 5.6 degrees up or more (sin 5.6 degrees = 0.0976)."""
+WIDE_STARTS = False
+"""Post hoc: also start the fold fit at 6 and 8 times the midday reading (set by `--wide-starts`; the pre-registered grid stops at 3)."""
 N_DONORS = 40
 """Donor rows kept per probe cell (a fixed random subsample, for speed)."""
 N_BOOT = 40
@@ -218,9 +220,9 @@ def fold_fit(
 
 
 def fold_multistart(*, y, cell, u, dt, n_cells, w, m_mw, mu=None, sd=None, y_scale=1.0, starts=None) -> dict:
-    """Return the best fold fit over three starting capacities (0.25, 1, and 3 times the midday reading)."""
+    """Return the best fold fit over the starting capacities (0.25, 1, and 3 times the midday reading; 6 and 8 too when `WIDE_STARTS`)."""
     best = None
-    for mult in (0.25, 1.0, 3.0):
+    for mult in ((0.25, 1.0, 3.0, 6.0, 8.0) if WIDE_STARTS else (0.25, 1.0, 3.0)):
         fit = fold_fit(y=y, cell=cell, u=u, dt=dt, n_cells=n_cells, w=w, c0=mult * m_mw, mu=mu, sd=sd, y_scale=y_scale)
         if best is None or fit["sse"] < best["sse"]:
             best = fit
@@ -318,8 +320,11 @@ def main() -> None:
     parser.add_argument("--sites", nargs="+", default=list(PROBED))
     parser.add_argument("--stored", action="store_true", help="Stage 0: probe experiment 621's stored `control` networks.")
     parser.add_argument("--threads", type=int, default=1)
+    parser.add_argument("--wide-starts", action="store_true", help="Post hoc: wider fold-fit starts; writes to `probes_wide`.")
     args = parser.parse_args()
     torch.set_num_threads(args.threads)
+    global WIDE_STARTS
+    WIDE_STARTS = args.wide_starts
     frame = load_frame(cutoff=args.cutoff)
     idx = k.index_of(sites=tuple(args.sites))
     cap = k621.effective_capacity_mw()
@@ -327,7 +332,7 @@ def main() -> None:
     for site, pp in probes.items():
         print(site, "rows", len(pp.cell), "cells", pp.n_cells, "m_mw", round(pp.m_mw, 2), flush=True)
     for name in args.conditions:
-        out = k.WORK / ("stage0" if args.stored else "probes") / args.cutoff / f"{name}.parquet"
+        out = k.WORK / ("stage0" if args.stored else "probes_wide" if args.wide_starts else "probes") / args.cutoff / f"{name}.parquet"
         if out.exists():
             continue
         boot = name in args.boot_conditions

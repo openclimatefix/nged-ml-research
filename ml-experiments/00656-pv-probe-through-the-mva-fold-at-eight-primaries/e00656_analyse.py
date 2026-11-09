@@ -42,7 +42,7 @@ def recoveries(*, res: pl.DataFrame) -> pl.DataFrame:
     }
     for r in res.iter_rows(named=True):
         cond = k.parse(name=r["condition"])
-        if cond.kind == "twin":
+        if cond.kind == "twin" or r["site"] in k.FOLDERS:
             continue
         twin = twins.get((r["cutoff"], f"{cond.arm}_twin", r["seed"], r["site"]))
         if twin is None:
