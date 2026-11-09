@@ -134,14 +134,15 @@ December 2025, and on the real record. No neural network is trained.
 and 2023 injected worlds, and the 2024 to 2026 years are scored once. NGED's labels enter no
 penalty, threshold, or mask.
 
-- **Step 0, before the generator is fixed.** On the two verified transfers, D5 and D16 (29 December
-  2025 to 13 January 2026) and D3 and D22 (26 October to 22 November 2024), measure the width of
-  each step in half-hours and whether the extra power during the event is a constant number of
-  megawatts or a share of the donor's own daily shape. The share is the slope of the event-minus-
-  baseline difference on the donor's baseline profile, set against a constant, and the better fit
-  by residual variance decides, with both reported. The medians fix the edge width and the shape of
-  injected events. If the two transfers disagree, both shapes are injected and scored as separate
-  arms. The two transfers are only two episodes, and the page says so.
+- **Step 0, before the generator is fixed.** Measure, on each verified transfer, the width of each
+  step in half-hours and whether the extra power during the event is a constant number of megawatts
+  or a share of the donor's own daily shape. The share is the slope of the event-minus-baseline
+  difference on the donor's baseline profile, set against a constant, and the better fit by
+  residual variance decides. The generator is fixed from D3 and D22 (26 October to 22 November
+  2024) alone. D5 and D16 (29 December 2025 to 13 January 2026) are measured too, but only to
+  compare, so that they stay a hold-out for the pair check. If the two transfers disagree, both
+  shapes are injected and scored as separate arms. Two transfers are only two episodes, and the
+  page says so.
 - **Generator.** Injected events follow the design answer's section 4 and the generator ideas file:
   a donor with 1, 2, or 3 recipients, or an unseen partner; a recipient share of 0.5 to 1.1;
   amounts from 1 to 20 noise units, half of the mass at 2 to 8; durations from 3 hours to 112 days
@@ -169,11 +170,14 @@ penalty, threshold, or mask.
   False events from solar growth and seasonal bias per Primary-year. A shape check: constant
   against proportional events, and a cross-generator check that trains the penalties on one and
   scores the other (recall may drop by at most 0.05).
-- **The verified pair.** D5 and D16 of December 2025 to January 2026, and D3 and D22 of 2024
-  (which falls in the tuning years and so is a descriptive check only). Dates, direction,
-  amplitude, class, and the movement of the slow level across the event. K3 sat about 11 points of
-  capacity above D5's demand before the event, so the check is repeated on the residual of an
-  ERA5-driven model, in case the offset belongs to K3.
+- **The verified pair.** D5 and D16 of December 2025 to January 2026 is the hold-out case. The
+  ranges in P6 were read off this residual in the design answer before this plan, so P6 is not
+  blind, and the page says so. D3 and D22 of 2024 lies in the scored years and fixed the generator,
+  so it is a seen case. For both: dates, direction, amplitude, class, and the movement of the slow
+  level across the event. K3 sat about 11 points of capacity above D5's demand before the event,
+  so the check is repeated on the residual of an ERA5-driven model, in case the offset belongs to
+  K3. The D10 episode of December 2025 and the unpaired D12 step of 8 December 2025 are descriptive
+  tests.
 - **The real record.** Edge events per Primary-year; the 35 logged shifts of more than 1 day found
   by experiment 254's strict and loose rules; the count of calls at D8 against the median Primary
   (it must stay within a factor of 2); the unconfirmed edge events per edge-year (an upper bound,
@@ -187,6 +191,42 @@ penalty, threshold, or mask.
   are descriptive.
 - **Event-free stratum.** Rows more than 14 days from any labelled or detected event are reported
   as their own stratum for each arm, beside the event rows.
+- **Definitions fixed after the plan review.**
+    - A *found* injected event has the right Primary and sign, a start within 12 hours, and (for an
+      edge transfer) the right donor, with at least half the recipient megawatts matched. A missed
+      event counts as infinite timing error in P2. Recall is printed both MW-weighted and
+      unweighted, for the P1 subset (4 noise units or more, 1 day or more) and for all events, with
+      a misclassification matrix of edge transfer, solo shift, routine step, and ramp.
+    - A *found* logged shift is one that has at least one decoded event passing experiment 254's
+      strict or loose rule; further events on the same shift count as false. The knob that equalises
+      alarm rates is the posterior confidence threshold. Baselines count alarms per Primary-year and
+      this method counts events per Primary-year. P4 counts only shifts starting on or after
+      2024-01-01, for every method.
+    - *Confirmed* means matched to a labelled or verified event under the loose rule. Unconfirmed
+      edge events are an upper bound on false events, are not false events, and are printed per
+      edge-year and per Primary-year with the number of edges that carry data (recomputed for the 15
+      Primaries). The label-free false-event measures are the rate in the event-free stratum and the
+      rewired-graph rate.
+    - The noise unit is computed once from the uninjected residual, in 3-day-step terms to match the
+      design answer, and frozen. The page prints each Primary's noise unit in megawatts and states
+      P1's threshold in megawatts as well.
+    - The slow level is refitted in every injected world (mask, three refits, freeze), and injected
+      windows that overlap a logged or verified event are left out of recall and absorption.
+    - Before segmentation, the median residual across all Primaries is removed (the common mode).
+    - A stress arm injects recipient shares of 0.2 to 1.8 and start offsets of up to 12 hours, and
+      reports edge recall there, because the pairing window and the generator share assumptions.
+    - Penalties are tuned label-free: recall on the 2022 and 2023 injected worlds at a fixed rate of
+      decoded events on the event-free stratum of those years.
+    - Two solo shifts at Primaries that share an unmetered neighbour, with starts within 1 hour, are
+      grouped as one unseen donor. Amplitudes at MVA Primaries use night-time rows.
+    - The temporary-against-permanent matrix covers only events that start at least 180 days before
+      the record ends; later ones are open. The generator draws durations to 180 days for this.
+    - Outcome bands: a rewired-graph share between a third and a half is reported as a grey zone and
+      the work proceeds to the neural stage; "matches LR_b20" means within 2 found shifts on the
+      same subset. The wobble check (state changes per edge-year at most 3 times the logged rate),
+      the rate check (within a factor of 2 of the median at 13 or more Primaries), the pair alarm of
+      experiments 156 and 253 as a baseline, and the discriminator and recall-by-size checks are
+      kept. The discriminator is reported only if time allows and is otherwise listed as not run.
 - **Baselines and intervals.** RO-NC, LR_b20, the 24-hour residual detector with the neighbour
   filter, the label-free pipeline of experiment 327, and the edge-flow fit of experiment 131, each
   from its stored alarms where they exist. Intervals resample whole events and whole calendar
