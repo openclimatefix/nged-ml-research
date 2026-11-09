@@ -91,8 +91,8 @@ lessons: >-
   table today is a list of events per Primary with a start, an end, and an amount.
 take_home_message: >-
   At 15 Primary substations, a penalised segmentation of the demand residuals finds about two
-  thirds of the injected load-shift megawatts, but it cannot say which neighbouring Primary the
-  power went to: only 18% of injected transfers were paired correctly, and on the real record a
+  thirds of the injected load-shift megawatts, but it did not say which neighbouring Primary the
+  power went to: only 18% of injected transfer ends were paired correctly, and on the real record a
   shuffled neighbour graph gives half as many pairs as the real graph (2 against 4, too few to be
   sure). A slow level that is seasonal, fitted with candidate events masked and then frozen, takes
   far less of a long event than a 30-day random walk does (median 4% against 90% for events of 21
@@ -167,7 +167,9 @@ bars below 7 days.
 
 - **Recall of injected events (default arm; 6 worlds; 227 events of 4 noise units or more that last
   1 day or more).** MW-weighted found 0.64 (0.58 to 0.70); unweighted 0.56. Edge transfers (109
-  events): paired correctly 0.18 MW-weighted (0.09 to 0.31); 0.17 unweighted. P1 asked for 0.70 on
+  donor or recipient ends, from 76 transfers): paired correctly 0.18 MW-weighted (0.09 to 0.31);
+  0.17 unweighted. This is a share of ends, and only 38% of the 76 transfers have every end found.
+  P1 asked for 0.70 on
   edge transfers; 0.18 fails. The all-event figure of 0.64 is below 0.70, but the 95% interval
   reaches 0.70. The intervals resample whole worlds, 2000 draws, so with 6 worlds they are
   probably too narrow.
@@ -195,7 +197,11 @@ bars below 7 days.
   classed as routine and 73 were called shifts without a partner.
 - **Where injected edge transfers went (231 events).** 148 decoded as no event at all, 51 as a
   shift without a partner, 31 as an edge event. Because the injected shares (0.5 to 1.1) lie inside
-  the pairing window (0.3 to 1.5), the window does not explain the failure.
+  the pairing window (0.3 to 1.5), the window does not explain the failure. A re-decode of the 6
+  worlds with a share window of 0.1 to 3 and conservation limit 10 pairs 0.22, and with wider start
+  and end windows 0.25, so relaxing the rule recovers at most 7 points. Half of the ends are not
+  found at all. All 31 ends called an edge transfer had the right partner, so the pairing has high
+  precision and low recall.
 - **Shape of the injected events.** Constant-megawatt events: found 0.66, paired 0.14. Events
   proportional to the donor's own power: found 0.56, paired 0.24. Short-heavy and long-heavy
   mixtures found 0.62 and 0.43. The stress arm (shares 0.2 to 1.8, starts up to 12 hours apart)
@@ -206,7 +212,9 @@ bars below 7 days.
   between the 15 Primaries. A 100-draw degree-preserving rewiring of the graph gave a median of 2 edge
   events (5th to 95th percentile 0 to 4), against 4 for the real graph. P3 (a third or fewer) fails,
   and the stop rule (half or more) fires at its boundary: 2 of 4 is exactly half, and 4 lies inside
-  the placebo's 0-to-4 range.
+  the placebo's 0-to-4 range. The 4 real edge events are 2 pairs (D10 with D21, D12 with D14),
+  neither of them the verified D3/D22 or D5/D16 pair. The rewired counts are all even, and 21 of
+  100 draws reach 4 or more (about 0.2 on a one-sided test), so the placebo is weak evidence.
 - **Logged shifts (P4).** Of 77 logged shifts of more than 1 day that start on or after 2024-01-01,
   LR_b20's 78 alarms in those years (2.1 per Primary-year) match 19 at the strict rule and 24 at the
   loose rule. All 246 events of this table (6.6 per Primary-year) match 8 and 17. No confidence
@@ -227,7 +235,8 @@ bars below 7 days.
   moved by 0.4 points of capacity or less across both, which meets that part of P6. P6 fails on
   timing, amplitude, and pairing.
 - **The October 2024 transfer between D3 and D22 (a seen case, because it set the generator).** The
-  masked and Huber arms find both ends, and only the Huber arm pairs them. The random-walk arm
+  masked and Huber arms find events at both Primaries, whose ends differ by about 19 days, and only
+  the Huber arm pairs them. The random-walk arm
   finds only a 2-day fragment of D3 (18 to 20 November 2024). The December 2025 episode at D10 and
   the unpaired step at D12 are not shown.
 - **Four scenarios (normalised MAE of the median forecast, in per cent of effective capacity; 15
@@ -293,6 +302,14 @@ bars below 7 days.
   6.57 in the scored years. Three settings tie at recall 0.6314 (on cost 6 with stay cost 0.05 or
   0.1, and on cost 8 with stay cost 0.1); the choice of stay cost 0.05 is a tie-break. The plan's
   event-free stratum was not used, because defining it needs labels.
+- **Audit (Sonnet, fresh).** It re-derived the found share (0.639, interval 0.575 to 0.703), the
+  pairing figure (0.179), and the logged-shift counts (8 and 17 against 19 and 24) from the stored
+  outputs, and found no leakage of 2024-onward years or labels into tuning, and no double matching
+  of a truth event. Accepted: the per-end wording of the pairing figure, the weak-placebo reading,
+  and the relaxed-rule result above. D8 and D5 account for 42 of the 77 logged shifts. The scripts
+  `e00653_inject.py` and `e00653_run.py` were edited about a minute after the injected score file
+  was written; the audit's re-run reproduced the stored default-spec results exactly but did not
+  re-run the other generator specs.
 - **Lab shortcuts.** Injected events are added to the stored residual and not to the power before
   the demand model is refitted, so recall is a ceiling for events as large as real events. The
   residual's demand model trained on all rows, so earlier real events leak into its baseline. The
