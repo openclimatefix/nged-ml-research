@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001
+# ruff: noqa: E501, ANN001, ANN202, PLR0915, PLW0603, RUF059
 """Experiment 656: the donor-day probe of a pretrained network with a fold model (CPU).
 
 The probe is experiment 621's: hold every datetime input and the Primary at one probe date and
@@ -15,7 +15,8 @@ regressed on the donor weather. Five regressions share the probe frames:
 - `FA`: `F4` with a Gaussian prior on each cell's `a_c` from the Primary's night reading and the daytime-to-night
   demand ratio measured at the six signed-MW Primaries.
 
-Usage: python e00656_probe.py --cutoff 2026-06 --conditions pf_twin --seeds 0 1 2 [--boot-conditions ...]
+Usage: python e00656_probe.py --cutoff 2026-06 --conditions pf_twin --seeds 0 1 2
+[--boot-conditions ...]
 """
 
 import argparse
@@ -51,7 +52,9 @@ def load_frame(*, cutoff: str) -> dict[str, np.ndarray]:
 class PrimaryProbe:
     """The probe inputs of one Primary: cells, donors, donor weather, and the unit curves."""
 
-    def __init__(self, *, frame: dict[str, np.ndarray], primary: int, site: str, cap: float) -> None:
+    def __init__(
+        self, *, frame: dict[str, np.ndarray], primary: int, site: str, cap: float
+    ) -> None:
         """Build the cells and donors, subsample donors per cell, and compute every regressor."""
         self.primary, self.site, self.cap = primary, site, cap
         raw = p621.cells_and_donors(frame=frame, primary=primary)
@@ -61,7 +64,12 @@ class PrimaryProbe:
             rows = np.nonzero(raw["cell"] == c)[0]
             keep.append(rng.choice(rows, size=min(N_DONORS, len(rows)), replace=False))
         keep = np.sort(np.concatenate(keep))
-        self.probe = {**raw, "base": raw["base"][keep], "donor": raw["donor"][keep], "cell": raw["cell"][keep]}
+        self.probe = {
+            **raw,
+            "base": raw["base"][keep],
+            "donor": raw["donor"][keep],
+            "cell": raw["cell"][keep],
+        }
         _, self.cell = np.unique(self.probe["cell"], return_inverse=True)
         self.n_cells = int(self.cell.max()) + 1
         x, b, d = self.probe["x"], self.probe["base"], self.probe["donor"]
@@ -77,7 +85,9 @@ class PrimaryProbe:
         t_b = self.probe["t_us"][b]
         self.u_basis = k.basis_curves(ghi=self.ghi_in, x=x[b], times_us=t_b, temp=self.temp)
         lit = self.u_basis > 0.01
-        self.basis_scale = np.array([np.percentile(self.u_basis[lit[:, i], i], 99) for i in range(self.u_basis.shape[1])])
+        self.basis_scale = np.array(
+            [np.percentile(self.u_basis[lit[:, i], i], 99) for i in range(self.u_basis.shape[1])]
+        )
         self.u_basis = self.u_basis / self.basis_scale
         self.u_std = k621.unit_curve(ghi=self.ghi_in, x=x[b], times_us=t_b, temp=self.temp)
         first = np.array([np.nonzero(self.cell == c)[0][0] for c in range(self.n_cells)])
@@ -109,8 +119,16 @@ class PrimaryProbe:
         self.set_arm(arm="pf")
 
     def set_arm(self, *, arm: str) -> None:
-        """Set the anchor's night reading for a reactive-power arm (the six Primaries read sqrt(P^2 + Q^2) in MVA worlds)."""
-        inflate = {"pf": 1.031, "floor": float(np.sqrt(1.0 + (0.10 * self.m_mw / max(self.night_raw, 1e-9)) ** 2)), "q0": 1.0, "sig": 1.0}[arm]
+        """Set the anchor's night reading for a reactive-power arm.
+
+        The six Primaries read sqrt(P^2 + Q^2) in MVA worlds.
+        """
+        inflate = {
+            "pf": 1.031,
+            "floor": float(np.sqrt(1.0 + (0.10 * self.m_mw / max(self.night_raw, 1e-9)) ** 2)),
+            "q0": 1.0,
+            "sig": 1.0,
+        }[arm]
         self.night_mw = self.night_raw * (inflate if self.site in k.SIX else 1.0)
         self.mu = self.rho_cells * self.night_mw
 
@@ -119,7 +137,9 @@ class PrimaryProbe:
         x, b, d = self.probe["x"], self.probe["base"], self.probe["donor"]
         inp = x[d, :35].copy()
         inp[:, 14:35] = x[b, 14:35]
-        inp[:, 0] = np.clip((self.ghi_in - self.std_mean[0]) / self.std_std[0], -5.0, 5.0).astype(np.float32)
+        inp[:, 0] = np.clip((self.ghi_in - self.std_mean[0]) / self.std_std[0], -5.0, 5.0).astype(
+            np.float32
+        )
         with torch.no_grad():
             xt = torch.cat([torch.from_numpy(inp), torch.zeros(len(inp), 2)], dim=1)
             pt = torch.full((len(xt),), self.primary, dtype=torch.long)
@@ -129,7 +149,9 @@ class PrimaryProbe:
                 log_w, mean, _ = base.mixture_parts(out=out, components=m.COMPONENTS)
                 mean_z.append((torch.softmax(log_w, dim=-1) * mean).sum(-1).numpy())
         z = np.concatenate(mean_z)
-        return (z * frame["target_std"][self.primary] + frame["target_mean"][self.primary]) * self.cap
+        return (
+            z * frame["target_std"][self.primary] + frame["target_mean"][self.primary]
+        ) * self.cap
 
 
 # --- the regressions ------------------------------------------------------------------------
@@ -151,7 +173,13 @@ def fold_fit(
     n, kk = u.shape
     cnt = np.bincount(cell, weights=w, minlength=n_cells)
     ybar = np.bincount(cell, weights=w * y, minlength=n_cells) / np.maximum(cnt, 1e-9)
-    ubar = np.stack([np.bincount(cell, weights=w * u[:, i], minlength=n_cells) / np.maximum(cnt, 1e-9) for i in range(kk)], 1)
+    ubar = np.stack(
+        [
+            np.bincount(cell, weights=w * u[:, i], minlength=n_cells) / np.maximum(cnt, 1e-9)
+            for i in range(kk)
+        ],
+        1,
+    )
     if start is None:
         cvec = np.full(kk, c0 / kk)
         theta = np.concatenate([cvec, [0.0, 0.05, 0.0]])
@@ -179,13 +207,18 @@ def fold_fit(
     for _ in range(iters):
         dm, dq = mm / s, qq / s
         ja = dm + dq * theta[kk + 2]
-        jt = np.concatenate([-u * dm[:, None], (dt * dm)[:, None], dq[:, None], (dq * a[cell])[:, None]], axis=1)
+        jt = np.concatenate(
+            [-u * dm[:, None], (dt * dm)[:, None], dq[:, None], (dq * a[cell])[:, None]], axis=1
+        )
         haa = np.bincount(cell, weights=w * ja * ja, minlength=n_cells)
         ga = np.bincount(cell, weights=w * ja * r, minlength=n_cells)
         if mu is not None:
-            haa = haa + y_scale**2 / sd**2
-            ga = ga + y_scale**2 * (a - mu) / sd**2
-        hat = np.stack([np.bincount(cell, weights=w * ja * jt[:, i], minlength=n_cells) for i in range(npar)], 1)
+            haa = haa + y_scale**2 / sd**2  # ty: ignore[unsupported-operator]
+            ga = ga + y_scale**2 * (a - mu) / sd**2  # ty: ignore[unsupported-operator]
+        hat = np.stack(
+            [np.bincount(cell, weights=w * ja * jt[:, i], minlength=n_cells) for i in range(npar)],
+            1,
+        )
         wj = jt * w[:, None]
         htt = jt.T @ wj
         gt = wj.T @ r
@@ -219,18 +252,37 @@ def fold_fit(
     return {"theta": theta, "a": a, "sse": cur, "c_total": float(theta[:kk].sum()), "c": theta[:kk]}
 
 
-def fold_multistart(*, y, cell, u, dt, n_cells, w, m_mw, mu=None, sd=None, y_scale=1.0, starts=None) -> dict:
-    """Return the best fold fit over the starting capacities (0.25, 1, and 3 times the midday reading; 6 and 8 too when `WIDE_STARTS`)."""
+def fold_multistart(
+    *, y, cell, u, dt, n_cells, w, m_mw, mu=None, sd=None, y_scale=1.0, starts=None
+) -> dict:
+    """Return the best fold fit over the starting capacities.
+
+    The starts are 0.25, 1, and 3 times the midday reading, and 6 and 8 too when `WIDE_STARTS`.
+    """
     best = None
-    for mult in ((0.25, 1.0, 3.0, 6.0, 8.0) if WIDE_STARTS else (0.25, 1.0, 3.0)):
-        fit = fold_fit(y=y, cell=cell, u=u, dt=dt, n_cells=n_cells, w=w, c0=mult * m_mw, mu=mu, sd=sd, y_scale=y_scale)
+    for mult in (0.25, 1.0, 3.0, 6.0, 8.0) if WIDE_STARTS else (0.25, 1.0, 3.0):
+        fit = fold_fit(
+            y=y,
+            cell=cell,
+            u=u,
+            dt=dt,
+            n_cells=n_cells,
+            w=w,
+            c0=mult * m_mw,
+            mu=mu,
+            sd=sd,
+            y_scale=y_scale,
+        )
         if best is None or fit["sse"] < best["sse"]:
             best = fit
-    return best
+    return best  # ty: ignore[invalid-return-type]
 
 
 def curve_class(*, y: np.ndarray, cell: np.ndarray, u: np.ndarray) -> tuple[str, float, float]:
-    """Return the class of S(u) (falling, rising, V, or mixed) and the median slopes in the lower and upper half of u."""
+    """Return the class of S(u) (falling, rising, V, or mixed).
+
+    Also returns the median slopes in the lower and upper half of u.
+    """
     lo, hi = [], []
     for c in np.unique(cell):
         sel = cell == c
@@ -258,7 +310,9 @@ def probe_network(*, pp: PrimaryProbe, y: np.ndarray, boot: bool, rng: np.random
     cell, kk = pp.cell, pp.u_basis.shape[1]
     one = np.ones(len(y))
     dt = pp.temp - pp.temp.mean()
-    y_scale = float(np.median([np.std(y[cell == c]) for c in range(pp.n_cells) if (cell == c).sum() > 3]))
+    y_scale = float(
+        np.median([np.std(y[cell == c]) for c in range(pp.n_cells) if (cell == c).sum() > 3])
+    )
     u1 = pp.u_std[:, None]
     sd = np.maximum(0.25 * pp.mu, 1e-3)
     out: dict = {}
@@ -266,13 +320,77 @@ def probe_network(*, pp: PrimaryProbe, y: np.ndarray, boot: bool, rng: np.random
     def run(*, w: np.ndarray, warm: dict | None = None) -> dict:
         res = {}
         res["L0"] = fit_linear(y=y, cell=cell, regs=[pp.u_std, pp.temp], w=w)
-        res["F4"] = fold_multistart(y=y, cell=cell, u=pp.u_basis, dt=dt, n_cells=pp.n_cells, w=w, m_mw=pp.m_mw) if warm is None else fold_fit(y=y, cell=cell, u=pp.u_basis, dt=dt, n_cells=pp.n_cells, w=w, c0=0.0, start=(warm["F4"]["theta"], warm["F4"]["a"]), iters=12)
-        res["F1"] = fold_multistart(y=y, cell=cell, u=u1, dt=dt, n_cells=pp.n_cells, w=w, m_mw=pp.m_mw) if warm is None else fold_fit(y=y, cell=cell, u=u1, dt=dt, n_cells=pp.n_cells, w=w, c0=0.0, start=(warm["F1"]["theta"], warm["F1"]["a"]), iters=12)
-        res["FA"] = fold_multistart(y=y, cell=cell, u=pp.u_basis, dt=dt, n_cells=pp.n_cells, w=w, m_mw=pp.m_mw, mu=pp.mu, sd=sd, y_scale=y_scale) if warm is None else fold_fit(y=y, cell=cell, u=pp.u_basis, dt=dt, n_cells=pp.n_cells, w=w, c0=0.0, mu=pp.mu, sd=sd, y_scale=y_scale, start=(warm["FA"]["theta"], warm["FA"]["a"]), iters=12)
-        q_hat = float(res["F4"]["theta"][kk + 1] + res["F4"]["theta"][kk + 2] * np.median(res["F4"]["a"]))
+        res["F4"] = (
+            fold_multistart(
+                y=y, cell=cell, u=pp.u_basis, dt=dt, n_cells=pp.n_cells, w=w, m_mw=pp.m_mw
+            )
+            if warm is None
+            else fold_fit(
+                y=y,
+                cell=cell,
+                u=pp.u_basis,
+                dt=dt,
+                n_cells=pp.n_cells,
+                w=w,
+                c0=0.0,
+                start=(warm["F4"]["theta"], warm["F4"]["a"]),
+                iters=12,
+            )
+        )
+        res["F1"] = (
+            fold_multistart(y=y, cell=cell, u=u1, dt=dt, n_cells=pp.n_cells, w=w, m_mw=pp.m_mw)
+            if warm is None
+            else fold_fit(
+                y=y,
+                cell=cell,
+                u=u1,
+                dt=dt,
+                n_cells=pp.n_cells,
+                w=w,
+                c0=0.0,
+                start=(warm["F1"]["theta"], warm["F1"]["a"]),
+                iters=12,
+            )
+        )
+        res["FA"] = (
+            fold_multistart(
+                y=y,
+                cell=cell,
+                u=pp.u_basis,
+                dt=dt,
+                n_cells=pp.n_cells,
+                w=w,
+                m_mw=pp.m_mw,
+                mu=pp.mu,
+                sd=sd,
+                y_scale=y_scale,
+            )
+            if warm is None
+            else fold_fit(
+                y=y,
+                cell=cell,
+                u=pp.u_basis,
+                dt=dt,
+                n_cells=pp.n_cells,
+                w=w,
+                c0=0.0,
+                mu=pp.mu,
+                sd=sd,
+                y_scale=y_scale,
+                start=(warm["FA"]["theta"], warm["FA"]["a"]),
+                iters=12,
+            )
+        )
+        q_hat = float(
+            res["F4"]["theta"][kk + 1] + res["F4"]["theta"][kk + 2] * np.median(res["F4"]["a"])
+        )
         thr = max(0.2 * pp.m_mw, min(2.0 * q_hat, 0.5 * pp.m_mw))
         keep = (y >= thr) & (w > 0)
-        res["L1"] = fit_linear(y=y, cell=cell, regs=[pp.u_std, pp.temp], w=w * keep) if keep.sum() > 50 else float("nan")
+        res["L1"] = (
+            fit_linear(y=y, cell=cell, regs=[pp.u_std, pp.temp], w=w * keep)
+            if keep.sum() > 50
+            else float("nan")
+        )
         res["thr"] = thr
         return res
 
@@ -289,8 +407,13 @@ def probe_network(*, pp: PrimaryProbe, y: np.ndarray, boot: bool, rng: np.random
         top_cell = np.zeros(pp.n_cells)
         np.maximum.at(top_cell, cell, top)
         out[f"{arm}_cross"] = (fit["a"] < top_cell).tolist()
-        out[f"{arm}_q0"], out[f"{arm}_q1"] = float(fit["theta"][len(cvec) + 1]), float(fit["theta"][len(cvec) + 2])
-        out[f"{arm}_mix"] = (fit["c"] / max(fit["c"].sum(), 1e-9)).tolist() if arm != "F1" else [1.0]
+        out[f"{arm}_q0"], out[f"{arm}_q1"] = (
+            float(fit["theta"][len(cvec) + 1]),
+            float(fit["theta"][len(cvec) + 2]),
+        )
+        out[f"{arm}_mix"] = (
+            (fit["c"] / max(fit["c"].sum(), 1e-9)).tolist() if arm != "F1" else [1.0]
+        )
     out["thr"], out["m_mw"], out["y_scale"] = point["thr"], pp.m_mw, y_scale
     cls, s_lo, s_hi = curve_class(y=y, cell=cell, u=pp.u_std)
     out["curve_class"], out["slope_lo"], out["slope_hi"] = cls, s_lo, s_hi
@@ -318,9 +441,17 @@ def main() -> None:
     parser.add_argument("--seeds", nargs="+", type=int, default=list(k.SEEDS))
     parser.add_argument("--boot-conditions", nargs="*", default=[])
     parser.add_argument("--sites", nargs="+", default=list(PROBED))
-    parser.add_argument("--stored", action="store_true", help="Stage 0: probe experiment 621's stored `control` networks.")
+    parser.add_argument(
+        "--stored",
+        action="store_true",
+        help="Stage 0: probe experiment 621's stored `control` networks.",
+    )
     parser.add_argument("--threads", type=int, default=1)
-    parser.add_argument("--wide-starts", action="store_true", help="Post hoc: wider fold-fit starts; writes to `probes_wide`.")
+    parser.add_argument(
+        "--wide-starts",
+        action="store_true",
+        help="Post hoc: wider fold-fit starts; writes to `probes_wide`.",
+    )
     args = parser.parse_args()
     torch.set_num_threads(args.threads)
     global WIDE_STARTS
@@ -328,11 +459,21 @@ def main() -> None:
     frame = load_frame(cutoff=args.cutoff)
     idx = k.index_of(sites=tuple(args.sites))
     cap = k621.effective_capacity_mw()
-    probes = {site: PrimaryProbe(frame=frame, primary=i, site=site, cap=float(cap[i])) for site, i in idx.items()}
+    probes = {
+        site: PrimaryProbe(frame=frame, primary=i, site=site, cap=float(cap[i]))
+        for site, i in idx.items()
+    }
     for site, pp in probes.items():
-        print(site, "rows", len(pp.cell), "cells", pp.n_cells, "m_mw", round(pp.m_mw, 2), flush=True)
+        print(
+            site, "rows", len(pp.cell), "cells", pp.n_cells, "m_mw", round(pp.m_mw, 2), flush=True
+        )
     for name in args.conditions:
-        out = k.WORK / ("stage0" if args.stored else "probes_wide" if args.wide_starts else "probes") / args.cutoff / f"{name}.parquet"
+        out = (
+            k.WORK
+            / ("stage0" if args.stored else "probes_wide" if args.wide_starts else "probes")
+            / args.cutoff
+            / f"{name}.parquet"
+        )
         if out.exists():
             continue
         boot = name in args.boot_conditions
@@ -353,7 +494,9 @@ def main() -> None:
                 y = pp.forward(model=model, frame=frame)
                 rng = np.random.default_rng(1000 * seed + pp.primary)
                 res = probe_network(pp=pp, y=y, boot=boot, rng=rng)
-                records.append({"cutoff": args.cutoff, "condition": name, "seed": seed, "site": site, **res})
+                records.append(
+                    {"cutoff": args.cutoff, "condition": name, "seed": seed, "site": site, **res}
+                )
         out.parent.mkdir(parents=True, exist_ok=True)
         pl.DataFrame(records).write_parquet(out)
         print("wrote", out, f"{time.monotonic() - started:.0f} s", flush=True)

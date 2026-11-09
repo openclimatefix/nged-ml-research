@@ -14,7 +14,14 @@ clean = c.clean_stack()
 refit_t = c.month_start(month=cutoff)
 rows = data.build_fold(refit=refit_t, clean=clean)
 pre = r448.pretrain_rows(rows=rows, refit=refit_t, clean=clean)
-world = k.WorldBuilder(primary=pre.primary, target_idx=pre.target_idx, x=pre.x, y=pre.y, standardiser=rows.standardiser, clean=clean)
+world = k.WorldBuilder(
+    primary=pre.primary,
+    target_idx=pre.target_idx,
+    x=pre.x,
+    y=pre.y,
+    standardiser=rows.standardiser,
+    clean=clean,
+)
 keep = ~world.gap
 print("rows", len(pre.y), "dropped", int(world.gap.sum()))
 print("median midday", {int(p): round(v, 3) for p, v in world.median_midday.items()})

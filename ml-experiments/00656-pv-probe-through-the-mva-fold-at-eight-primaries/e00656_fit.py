@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001
+# ruff: noqa: E501, ANN001, PLR0915
 """Experiment 656: pretrain experiment 554's network M0 on ERA5 and CAMS rows in an MVA world.
 
 The network, rows, loss, learning rate, early stopping and seeds are experiment 621's `train` (which
@@ -6,7 +6,8 @@ is experiment 554's `pretrain`, stage `pre`). The only change is the target of t
 (`e00656_common.WorldBuilder`). Rows of the eleven covered Primaries with a gap in any of the farms
 A, B, C, or F are dropped from every condition, the twins included.
 
-Usage: python e00656_fit.py --cutoff 2026-06 --conditions pf_twin pf_fleet_l1_r0 --seeds 0 1 2 [--device cpu --threads 4]
+Usage: python e00656_fit.py --cutoff 2026-06 --conditions pf_twin pf_fleet_l1_r0 --seeds 0 1 2
+[--device cpu --threads 4]
 """
 
 import argparse
@@ -27,7 +28,12 @@ import torch  # ty: ignore[unresolved-import]
 
 FRAME_HOURS = (4, 20)
 """UTC valid-time hours kept in the probe frame (the probe keeps rows with the sun 5.6 degrees up or more)."""
-E649 = k.ML_EXPERIMENTS_DATA_DIR / "00649-pv-capacity-table-season-year-from-stored-probes" / "work" / "capacity_table.parquet"
+E649 = (
+    k.ML_EXPERIMENTS_DATA_DIR
+    / "00649-pv-capacity-table-season-year-from-stored-probes"
+    / "work"
+    / "capacity_table.parquet"
+)
 PROBED: tuple[str, ...] = (*k.SIX, "D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
 
 
@@ -43,7 +49,9 @@ def night_and_rho(*, pre, rows, keep: np.ndarray) -> tuple[np.ndarray, np.ndarra
     hh = ((t_us % k621.DAY_US) // 1_800_000_000).astype(int)
     night = keep & (pre.x[:, 14] <= 0.0) & (months >= 4) & (months <= 9)
     n_prim = len(rows.target_mean)
-    night_pts = np.array([float(np.median(pre.y[night & (pre.primary == p)])) for p in range(n_prim)])
+    night_pts = np.array(
+        [float(np.median(pre.y[night & (pre.primary == p)])) for p in range(n_prim)]
+    )
     table = pl.read_parquet(E649).filter(pl.col("probe_year") == 2025)
     cal = table.group_by("site").agg(c=pl.col("cal_p50").median())
     cal_mw = dict(zip(cal["site"].to_list(), cal["c"].to_list(), strict=True))
@@ -67,7 +75,12 @@ def write_frame(*, cutoff: str, pre, rows, keep: np.ndarray) -> None:
     idx14 = k.index_of(sites=PROBED)
     t_us = k621.time_us(target_idx=pre.target_idx)
     hour = (t_us // 3_600_000_000) % 24
-    sel = keep & np.isin(pre.primary, list(idx14.values())) & (hour >= FRAME_HOURS[0]) & (hour <= FRAME_HOURS[1])
+    sel = (
+        keep
+        & np.isin(pre.primary, list(idx14.values()))
+        & (hour >= FRAME_HOURS[0])
+        & (hour <= FRAME_HOURS[1])
+    )
     key = pre.primary[sel].astype(np.int64) * 10_000_000 + pre.target_idx[sel]
     _, first = np.unique(key, return_index=True)
     idx = np.nonzero(sel)[0][first]
@@ -101,17 +114,38 @@ def main() -> None:
     refit_t = c.month_start(month=args.cutoff)
     rows = data.build_fold(refit=refit_t, clean=clean)
     pre = r448.pretrain_rows(rows=rows, refit=refit_t, clean=clean)
-    latest = datetime.fromtimestamp((pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC)
+    latest = datetime.fromtimestamp(
+        (pre.target_idx.max() * c.prep422.STEP_US + c.prep422.GRID_START_US) / 1e6, UTC
+    )
     assert latest <= refit_t - c.regimes.REFIT_CUTOFF_AGE, (latest, refit_t)
     world = k.WorldBuilder(
-        primary=pre.primary, target_idx=pre.target_idx, x=pre.x, y=pre.y, standardiser=rows.standardiser, clean=clean
+        primary=pre.primary,
+        target_idx=pre.target_idx,
+        x=pre.x,
+        y=pre.y,
+        standardiser=rows.standardiser,
+        clean=clean,
     )
     keep = ~world.gap
-    print(f"{args.cutoff}: {len(pre.y):,} rows, {int(world.gap.sum()):,} dropped for farm gaps; latest valid {latest.isoformat()}", flush=True)
-    print("median sunny-midday (points):", {int(p): round(v, 3) for p, v in world.median_midday.items()}, flush=True)
+    print(
+        f"{args.cutoff}: {len(pre.y):,} rows, {int(world.gap.sum()):,} dropped for farm gaps; latest valid {latest.isoformat()}",
+        flush=True,
+    )
+    print(
+        "median sunny-midday (points):",
+        {int(p): round(v, 3) for p, v in world.median_midday.items()},
+        flush=True,
+    )
     meta = k.WORK / "world" / f"{args.cutoff}.json"
     meta.parent.mkdir(parents=True, exist_ok=True)
-    meta.write_text(json.dumps({"median_midday": {int(p): v for p, v in world.median_midday.items()}, "n_dropped": int(world.gap.sum())}))
+    meta.write_text(
+        json.dumps(
+            {
+                "median_midday": {int(p): v for p, v in world.median_midday.items()},
+                "n_dropped": int(world.gap.sum()),
+            }
+        )
+    )
     write_frame(cutoff=args.cutoff, pre=pre, rows=rows, keep=keep)
     if args.frame_only:
         return
@@ -123,7 +157,11 @@ def main() -> None:
     fits = 0
     for name in args.conditions:
         cond = k.parse(name=name)
-        todo = [s for s in args.seeds if not k.weights_path(cutoff=args.cutoff, condition=name, seed=s).exists()]
+        todo = [
+            s
+            for s in args.seeds
+            if not k.weights_path(cutoff=args.cutoff, condition=name, seed=s).exists()
+        ]
         if not todo:
             continue
         y = world.target(cond=cond)
@@ -135,17 +173,34 @@ def main() -> None:
             started = time.monotonic()
             torch.manual_seed(seed)
             model = m.ModularMdn(n_primaries=len(rows.target_mean), stage="pre").to(device)
-            epochs, best = f621.train(model=model, x=x_d, z=z_d, w=w_d, p=p_d, is_val=v_d, seed=seed, lr=c.PRETRAIN_LR, device=device)
+            epochs, best = f621.train(
+                model=model,
+                x=x_d,
+                z=z_d,
+                w=w_d,
+                p=p_d,
+                is_val=v_d,
+                seed=seed,
+                lr=c.PRETRAIN_LR,
+                device=device,
+            )
             target.parent.mkdir(parents=True, exist_ok=True)
             tmp = target.with_suffix(".tmp")
             torch.save(model.cpu().state_dict(), tmp)
             tmp.rename(target)
             seconds = time.monotonic() - started
             fits += 1
-            print(f"  {args.cutoff} {name} s{seed}: {epochs} epochs, val NLL {best:.4f}, {seconds:.0f} s ({device})", flush=True)
+            print(
+                f"  {args.cutoff} {name} s{seed}: {epochs} epochs, val NLL {best:.4f}, {seconds:.0f} s ({device})",
+                flush=True,
+            )
             log = k.WORK / "logs" / args.cutoff / f"{name}_s{seed}.json"
             log.parent.mkdir(parents=True, exist_ok=True)
-            log.write_text(json.dumps({"epochs": epochs, "val_nll": best, "seconds": seconds, "device": device}))
+            log.write_text(
+                json.dumps(
+                    {"epochs": epochs, "val_nll": best, "seconds": seconds, "device": device}
+                )
+            )
         del z_d
         if device == "cuda":
             torch.cuda.empty_cache()

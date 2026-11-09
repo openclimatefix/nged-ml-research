@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PLR0911
 """Shared pieces of experiment 656: paths, the 24 conditions, and the MVA-world target.
 
 Each condition changes the pretraining target of the Primaries it covers. For the six signed-MW
@@ -85,7 +85,9 @@ def parse(*, name: str) -> Condition:
     assert match is not None, name
     level_key = match.group("level")
     level = LEVELS[level_key] if level_key else 0.0
-    return Condition(name, match.group("arm"), match.group("kind"), level, int(match.group("rot") or 0))
+    return Condition(
+        name, match.group("arm"), match.group("kind"), level, int(match.group("rot") or 0)
+    )
 
 
 def weights_path(*, cutoff: str, condition: str, seed: int) -> Path:
@@ -109,7 +111,9 @@ def index_of(*, sites: tuple[str, ...]) -> dict[str, int]:
 
 def doy_of(*, times_us: np.ndarray) -> np.ndarray:
     """Return the day of the year of each time."""
-    return pl.Series(times_us).cast(pl.Datetime("us")).dt.ordinal_day().to_numpy().astype(np.float64)
+    return (
+        pl.Series(times_us).cast(pl.Datetime("us")).dt.ordinal_day().to_numpy().astype(np.float64)
+    )
 
 
 def plant_curve(
@@ -118,7 +122,9 @@ def plant_curve(
     """Return the derated AC output per MW of AC capacity of one plant (clipped at AC capacity)."""
     cos_zenith = x[:, 14].astype(np.float64)
     zenith = np.degrees(np.arccos(np.clip(cos_zenith, -1.0, 1.0)))
-    sun_az = np.degrees(np.arctan2(x[:, 15].astype(np.float64), x[:, 16].astype(np.float64))) % 360.0
+    sun_az = (
+        np.degrees(np.arctan2(x[:, 15].astype(np.float64), x[:, 16].astype(np.float64))) % 360.0
+    )
     ghi = np.where(cos_zenith > 0.0, np.clip(ghi, 0.0, None), 0.0)
     split = pvlib.irradiance.erbs(ghi=ghi, zenith=zenith, datetime_or_doy=doy)
     sky = SunAndSky(
@@ -137,7 +143,9 @@ BASIS: Final[tuple[tuple[float, float], ...]] = ((15.0, 1.1), (35.0, 1.1), (35.0
 """The K = 4 basis curves of the fold model: (tilt, DC-to-AC ratio), azimuth 180."""
 
 
-def basis_curves(*, ghi: np.ndarray, x: np.ndarray, times_us: np.ndarray, temp: np.ndarray) -> np.ndarray:
+def basis_curves(
+    *, ghi: np.ndarray, x: np.ndarray, times_us: np.ndarray, temp: np.ndarray
+) -> np.ndarray:
     """Return the K = 4 basis unit curves, shape (rows, 4), each over the standard 99th percentile."""
     doy = doy_of(times_us=times_us)
     u99 = pv.u99()
@@ -158,7 +166,9 @@ def physics_mixture(
         tilt = float(rng.choice([15.0, 35.0]))
         az = float(rng.choice([120.0, 180.0, 240.0]))
         ratio = float(rng.uniform(1.0, 1.4))
-        total += w * plant_curve(ghi=ghi, x=x, doy=doy, temp=temp, tilt=tilt, azimuth=az, dc_ac=ratio)
+        total += w * plant_curve(
+            ghi=ghi, x=x, doy=doy, temp=temp, tilt=tilt, azimuth=az, dc_ac=ratio
+        )
     return total
 
 
@@ -196,7 +206,9 @@ class WorldBuilder:
         self.covered = np.isin(primary, list(self.idx6.values()) + list(self.idxn.values()))
         self.gap = self._gap_mask()
         cut_idx = int(target_idx.max()) + 1
-        self.week_median = {p: _week_median(clean_row=clean[p], cut_idx=cut_idx) for p in self.idx6.values()}
+        self.week_median = {
+            p: _week_median(clean_row=clean[p], cut_idx=cut_idx) for p in self.idx6.values()
+        }
         self.slot = target_idx % 336
         self._cache: dict[tuple, np.ndarray] = {}
         hour = (self.t_us // 3_600_000_000) % 24
@@ -207,7 +219,9 @@ class WorldBuilder:
         gap = np.zeros(len(self.unique), dtype=bool)
         for f in FARMS:
             for salt in (None, 0):
-                gap |= np.isnan(p9.series_at(times_us=self.unique, series=self.series[f], shuffle_salt=salt))
+                gap |= np.isnan(
+                    p9.series_at(times_us=self.unique, series=self.series[f], shuffle_salt=salt)
+                )
         return gap[self.inverse] & self.covered
 
     def _sunny_midday_median(self) -> dict[int, float]:
@@ -216,7 +230,14 @@ class WorldBuilder:
         kt = self.ghi / np.maximum(clear, 1.0)
         hour = (self.t_us // 3_600_000_000) % 24
         months = pl.Series(self.t_us).cast(pl.Datetime("us")).dt.month().to_numpy()
-        sel = (kt >= SUNNY_KT) & (hour >= 10) & (hour <= 15) & (months >= 4) & (months <= 8) & ~self.gap
+        sel = (
+            (kt >= SUNNY_KT)
+            & (hour >= 10)
+            & (hour <= 15)
+            & (months >= 4)
+            & (months <= 8)
+            & ~self.gap
+        )
         return {
             p: float(np.median(self.y[sel & (self.primary == p)]))
             for p in [*self.idx6.values(), *self.idxn.values()]
@@ -227,7 +248,9 @@ class WorldBuilder:
     def _farm(self, *, farm: str) -> np.ndarray:
         key = ("farm", farm)
         if key not in self._cache:
-            self._cache[key] = p9.series_at(times_us=self.unique, series=self.series[farm], shuffle_salt=None)
+            self._cache[key] = p9.series_at(
+                times_us=self.unique, series=self.series[farm], shuffle_salt=None
+            )
         return self._cache[key]
 
     def fleet(self, *, j: int, p: int, rotation: int, physics_only: bool = False) -> np.ndarray:
@@ -239,11 +262,22 @@ class WorldBuilder:
         if key not in self._cache:
             sel = self.primary == p
             rng = np.random.default_rng(656 + 7919 * p)
-            mix = physics_mixture(ghi=self.ghi[sel], x=self.x[sel], times_us=self.t_us[sel], temp=self.temp[sel], rng=rng) / pv.u99()
+            mix = (
+                physics_mixture(
+                    ghi=self.ghi[sel],
+                    x=self.x[sel],
+                    times_us=self.t_us[sel],
+                    temp=self.temp[sel],
+                    rng=rng,
+                )
+                / pv.u99()
+            )
             if physics_only:
                 shape = mix
             else:
-                farm = np.nan_to_num(self._farm(farm=FARMS[(j + rotation) % len(FARMS)])[self.inverse[sel]])
+                farm = np.nan_to_num(
+                    self._farm(farm=FARMS[(j + rotation) % len(FARMS)])[self.inverse[sel]]
+                )
                 shape = 0.5 * farm + 0.5 * mix * (farm.sum() / max(float(mix.sum()), 1e-9))
             lit = shape > 0.01
             shape = shape / max(float(np.percentile(shape[lit], 99)), 1e-9)
@@ -260,12 +294,16 @@ class WorldBuilder:
             shape = self.fleet(j=j, p=p, rotation=0)[sel]
             doy = doy_of(times_us=self.t_us[sel]).astype(int)
             hh = ((self.t_us[sel] % DAY_US) // 1_800_000_000).astype(int)
-            table = pl.DataFrame({"doy": doy, "hh": hh, "v": shape}).group_by(["doy", "hh"]).agg(m=pl.col("v").mean())
+            table = (
+                pl.DataFrame({"doy": doy, "hh": hh, "v": shape})
+                .group_by(["doy", "hh"])
+                .agg(m=pl.col("v").mean())
+            )
             grid = np.zeros((367, 48))
             grid[table["doy"].to_numpy(), table["hh"].to_numpy()] = table["m"].to_numpy()
             smooth = sum(np.roll(grid, off, axis=0) for off in range(-7, 8)) / 15.0
             full = np.zeros(len(self.primary))
-            full[sel] = smooth[doy, hh]
+            full[sel] = smooth[doy, hh]  # ty: ignore[not-subscriptable]
             self._cache[key] = full
         return self._cache[key]
 
@@ -306,10 +344,14 @@ class WorldBuilder:
             lit = clear > 10.0
             cloud = np.where(lit, np.clip(1.0 - self.ghi / np.maximum(clear, 1e-9), 0.0, 1.0), 0.0)
             day = self.t_us // DAY_US
-            frame = pl.DataFrame({"p": self.primary, "d": day, "t": self.target_idx, "cloud": cloud, "lit": lit})
+            frame = pl.DataFrame(
+                {"p": self.primary, "d": day, "t": self.target_idx, "cloud": cloud, "lit": lit}
+            )
             frame = frame.unique(subset=["p", "t"], keep="first")
             daily = frame.filter(pl.col("lit")).group_by(["p", "d"]).agg(r=pl.col("cloud").mean())
-            joined = pl.DataFrame({"p": self.primary, "d": day}).join(daily, on=["p", "d"], how="left")
+            joined = pl.DataFrame({"p": self.primary, "d": day}).join(
+                daily, on=["p", "d"], how="left"
+            )
             response = np.where(lit, joined["r"].fill_null(0.0).to_numpy(), 0.0) * sel
             scale = mean / max(float(response[sel & lit].mean()), 1e-9)
             self._cache[key] = response * scale
@@ -342,7 +384,9 @@ class WorldBuilder:
             phys = self.fleet(j=j, p=p, rotation=0, physics_only=True)
             fleet = self.fleet(j=j, p=p, rotation=0)
             mid = sel & self.slice_midday
-            k_scale = float(np.median(fleet[mid & (fleet > 0.3)])) / max(float(np.median(phys[mid & (phys > 0.3)])), 1e-9)
+            k_scale = float(np.median(fleet[mid & (fleet > 0.3)])) / max(
+                float(np.median(phys[mid & (phys > 0.3)])), 1e-9
+            )
             return -LEVELS["l6"] * m * k_scale * phys
         if cond.kind == "cloud":
             return -self.cloud(p=p, mean=CLOUD_SHARE * LEVELS[PLACEBO_LEVEL] * m)
@@ -372,6 +416,7 @@ class WorldBuilder:
                 sel = self.primary == p
                 inj = self.injection(cond=cond, p=p, j=len(self.idx6) + j)
                 y[sel] = np.sqrt(
-                    (NATIVE_P_SHARE * self.y[sel] - inj[sel]) ** 2 + (NATIVE_Q_SHARE * self.y[sel]) ** 2
+                    (NATIVE_P_SHARE * self.y[sel] - inj[sel]) ** 2
+                    + (NATIVE_Q_SHARE * self.y[sel]) ** 2
                 )
         return y
