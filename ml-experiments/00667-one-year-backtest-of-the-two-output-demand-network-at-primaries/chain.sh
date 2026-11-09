@@ -3,7 +3,8 @@
 # pretrain, step2 (K1's chain), table, fit (Candidate, train phase: held-out power hidden), then
 # ptable, pfit (Candidate, predict phase: the month's window opened, forecasts written).
 D="$(cd "$(dirname "$0")" && pwd)"
-R=$DATA_PATH_INTERNAL/ml-experiments/00667-one-year-backtest-of-the-two-output-demand-network-at-primaries
+R=${E00667_ROOT:-$DATA_PATH_INTERNAL/ml-experiments/00667-one-year-backtest-of-the-two-output-demand-network-at-primaries}
+export E00667_ROOT=$R
 M=$1; shift
 STEPS=${*:-pretrain step2 table fit ptable pfit}
 export E00667_MONTH=$M CHAIN667=$R/chains/$M/work

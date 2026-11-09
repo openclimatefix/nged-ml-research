@@ -39,7 +39,7 @@ def main() -> None:
     assert origins == [first + timedelta(days=d) for d in range(n_origin)], "origin days are not 365 consecutive 12:00 UTC"
     assert (df["nwp_init_time"] == df["power_fcst_init_time"].dt.truncate("1d")).all()
     ok = df.group_by("time_series_id", "power_fcst_init_time", "NRA_or_prevailing").agg(
-        n=pl.len(), first=pl.col("valid_time").min() - pl.col("power_fcst_init_time"), last=pl.col("valid_time").max() - pl.col("power_fcst_init_time")
+        n=pl.len(), first=pl.col("valid_time").min() - pl.col("power_fcst_init_time").first(), last=pl.col("valid_time").max() - pl.col("power_fcst_init_time").first()
     )
     assert (ok["n"] == 672).all() and (ok["first"] == timedelta(0)).all() and (ok["last"] == timedelta(days=14) - timedelta(minutes=30)).all()
     assert df["time_series_id"].n_unique() == 16

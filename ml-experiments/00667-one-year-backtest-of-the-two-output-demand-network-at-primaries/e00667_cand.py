@@ -65,7 +65,8 @@ import e00667_fold as fold
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00667_MONTH"
 
 NAME = "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
-ROOT = ML_EXPERIMENTS_DATA_DIR / NAME
+ROOT = Path(os.environ["E00667_ROOT"]) if os.environ.get("E00667_ROOT") else ML_EXPERIMENTS_DATA_DIR / NAME
+"""`E00667_ROOT` redirects every output to another folder, for the from-scratch re-run of one fold."""
 SHUFFLED = ARM.endswith("-p")
 SPEC_NAME = ARM[:-2] if SHUFFLED else ARM
 BASE_ARM, *MODS = SPEC_NAME.split("+")
