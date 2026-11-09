@@ -11,13 +11,12 @@ UTC (the first valid time of the one-year backtest). Writes `scores_668/stored_c
 backtest folder (private).
 """
 
-from pathlib import Path
-
 import e00668_score_lib as lib
 import numpy as np
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-R = Path("/home/jack/dev/nged-substation-forecast/data/ml-experiments")
+R = ML_EXPERIMENTS_DATA_DIR
 START = "2025-11-01 12:00:00"
 SYSTEMS = {
     "BG2": "loss_bg2",

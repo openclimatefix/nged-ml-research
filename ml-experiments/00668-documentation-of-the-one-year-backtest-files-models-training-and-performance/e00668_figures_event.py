@@ -300,7 +300,7 @@ def main(out: Path) -> None:
                 },
             }
         )
-    (out / "event_numbers.json").write_text(json.dumps(numbers, indent=1))
+    (out / "event_numbers.json").write_text(json.dumps(numbers, indent=1) + "\n")
     print(
         json.dumps(
             {

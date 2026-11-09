@@ -1,13 +1,11 @@
 """Render the scores of one demand node as markdown tables for the experiment 668 page."""
 
 import sys
-from pathlib import Path
 
 import polars as pl
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-FOLDER = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/backtest_year_2025-11_to_2026-10"
-)
+FOLDER = ML_EXPERIMENTS_DATA_DIR / "backtest_year_2025-11_to_2026-10"
 
 
 def generator_table(d: pl.DataFrame) -> str:
