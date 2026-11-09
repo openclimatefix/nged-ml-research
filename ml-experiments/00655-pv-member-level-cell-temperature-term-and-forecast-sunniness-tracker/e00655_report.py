@@ -229,7 +229,6 @@ def main() -> None:
         arms=("a", "d", "f", "tb"), title="CRPS on sunny middays by lead day", name="crps_by_lead"
     )
     forecast_examples()
-    curve_example()
     res = json.loads((fit.WORK / "analysis" / "contrasts.json").read_text())
     print(json.dumps(res["scores"], indent=1))
     for k, v in res["contrasts"].items():

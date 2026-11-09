@@ -55,7 +55,8 @@ metric: >-
   Continuous ranked probability score (CRPS) in points from the 11 quantiles of each forecast, on
   sunny middays and on all half-hours, by lead band; mean absolute error of the median forecast in
   points of effective capacity (the PV line's normalisation, the same as experiment 644); coverage
-  of the 5% to 95% interval; pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles (the
+  of the 5% to 95% interval; pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles
+  (the
   stored forecasts hold 11 quantiles).
 verdict: refuted
 best_arm: >-
@@ -81,7 +82,7 @@ lessons:
     On middays where forecast and observed sunniness disagree the observed-sunniness tracker still
     gains 0.33 to 0.41 points and the forecast-sunniness tracker gains nothing, so the
     observed-sunniness gain is consistent with a selection on the outcome, which a live service
-    cannot make (the slice does not separate the history from the gate).
+    cannot make (the slice does not separate the correction history from the choice of rows).
   - >-
     The cell-temperature scale fitted on six metered farms sits at the weak-heating end of the
     prior range (0.63 to 0.65 of the nominal Faiman rise), so the farms show less heat loss than
@@ -89,9 +90,11 @@ lessons:
 take_home_message: >-
   Giving the demand network a solar-output curve computed for each of the 51 ensemble members, with
   the panel temperature and not only the air temperature, still makes the sunny-midday forecast
-  worse than the plain network by 0.2 to 0.35 points of capacity, so the explicit-solar line stops.
+  worse than the free network (the network with no solar curve) by 0.2 to 0.35 points of capacity,
+  so this result gives no support for continuing the explicit-solar line.
   The 14-day error correction that looked 0.3 to 0.6 points better in experiment 644 gains almost
-  nothing once it can only use the ensemble forecast's own sunniness, so its earlier gain probably
+  nothing once it can only use the ensemble forecast's own sunniness, so the correction's earlier
+  gain probably
   depended on knowing what actually happened.
 advice:
   - >-
@@ -110,29 +113,43 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Giving the network a per-member solar curve with cell temperature does not help, and the tracker's gain was selection
+# A per-member solar curve with cell temperature does not help, and the tracker needed observed sunniness
 
-**Telling the demand network how much solar capacity sits behind a Primary substation still makes its
-forecast for sunny middays worse than the plain network, even when the solar curve is computed for
-each of the 51 ensemble members and uses a cell temperature. The 14-day error correction that
-[experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md) found 0.3 to 0.6
-points better than the plain network gains 0.03 points once it can use only what the ensemble
-forecast says about sunniness.** We therefore stop the explicit-solar line, and we do not take the
-14-day correction forward.
+**Giving the demand network a solar-output curve for each of the 51 ensemble members, with a panel
+temperature, still makes its sunny-midday forecast worse than the free network (the same network
+with no solar curve) (Part 1).** The error is 0.2 to 0.35 points, where a point is one percent of a
+Primary substation's effective capacity, in continuous ranked probability score (CRPS; smaller is
+better). An ensemble member is one of the 51 alternative weather forecasts that the European Centre
+for Medium-Range Weather Forecasts issues for each run.
 
-Experiment 644 built its solar curve from the ensemble-mean sunshine, and it applied the
-correction on half-hours observed to be sunny. We asked
-whether either choice caused those results. Part 1 computes the curve for each ensemble member
-(plane-of-array irradiance, a Faiman-model cell temperature, a 0.4% per degree derate, clipping at
-inverter capacity) and subtracts the member average. Part 2 applies the 14-day correction on
-half-hours the ensemble-mean forecast calls sunny. Both parts reuse experiment 644's rows, cutoffs,
-five seeds, and bars. The scores are the continuous ranked probability score (CRPS) in percent of
-effective capacity ("points"; smaller is better) on sunny middays (10:00 to 15:00 UTC, observed
-clear-sky index at least 0.7) of the 60 days after each of three cutoffs.
+**The 14-day error correction gains almost nothing once it uses only the ensemble forecast's
+sunniness (Part 2).** [Experiment 644](../00644-pv-explicit-term-with-ens-forecast-
+weather/result.md)
+found that the free network, plus its own mean error over the previous 14 days, scored 0.3 to 0.6
+points better than the free network alone. That experiment applied the correction on half-hours
+observed to be sunny, and the explicit-solar curve there used the ensemble-mean sunshine. This
+result gives no support for continuing the explicit-solar line or for the 14-day correction in its
+experiment 644 form.
+
+Part 1 computes the solar curve per ensemble member (plane-of-array irradiance, a Faiman-model cell
+temperature, a 0.4% per kelvin derate, clipping at inverter capacity) and subtracts the member
+average. Part 2 applies the 14-day correction on half-hours the ensemble-mean forecast calls sunny.
+Both parts reuse experiment 644's rows, cutoffs, five seeds, and bars. "Sunny middays" are 10:00 to
+15:00 UTC half-hours with an observed clear-sky index (observed over clear-sky irradiance) of at
+least 0.7, in the 60 days after each of three cutoff dates (2025-07, 2026-03, and 2026-06).
 
 ## Results
 
+**Arm key.** (a) free network; (b) experiment 644's explicit term on the ensemble-mean sky; (c0) the
+same with this experiment's physics; (c) the curve averaged over members, air-temperature derate;
+(d) as (c) with a cell temperature; (e) as (d) plus the spread of the curve over members as one
+network input; (p) and (s) placebos on (d): capacities swapped across Primaries, and the curve of
+another date.
+
 ![Gain over the free network](gain_over_free.svg)
+
+*Each arm's CRPS gain over the free network, with 99.9% intervals; a negative gain means the arm
+loses to the free network.*
 
 | Sunny middays, CRPS (points) | Day 1-2 | Day 3-5 | Day 6-10 |
 |---|---|---|---|
@@ -172,11 +189,23 @@ clear-sky index at least 0.7) of the 60 days after each of three cutoffs.
 
 ![CRPS by lead day](crps_by_lead.svg)
 
+*CRPS on sunny middays by lead day for four arms; bands are 95% day-block intervals.*
+
 ![Day-ahead forecast](example_day_ahead.svg)
+
+*Net demand of one MW Primary, forecast of the free network and arm (d) against the metered
+value (dashed), for one run in each of two seasons.*
 
 ![Full horizon of one run](example_14_day.svg)
 
-![The three curves](curve_example.svg)
+*The same two runs over the full 240-hour horizon.*
+
+## What the next experiment should answer
+
+**Does any bias correction of the free network, built only from forecast-time information, beat the
+plain network on sunny middays?** The 14-day tracker does not, and the explicit solar term does not.
+The remaining sunny-midday error then needs a different input (for example a satellite cloud
+product) rather than a correction.
 
 ## Checks
 
@@ -194,8 +223,10 @@ clear-sky index at least 0.7) of the 60 days after each of three cutoffs.
 - **Leave one Primary out.** The free-minus-(d) contrast stays negative at every band when any one
   of the six Primaries is left out (day 1-2 range -0.12 to -0.46).
 - **Audit triggers.** The shuffled-error placebo does not lose to the tracker by the bar (trigger
-  1), and the tracker result contradicts experiment 644 (trigger 2). The disagreement slice above is
-  the tested explanation. See the results review in the pull request for its findings.
+  1), and the tracker result contradicts experiment 644 (trigger 2). The disagreement slice above
+  tests the
+  explanation for the contradiction. A results review found no error in the three headline
+  contrasts.
 - **Confound in the disagreement slice.** The observed-sunniness tracker corrects only
   observed-sunny rows and the forecast tracker only forecast-sunny rows, so the two are scored on
   different corrected rows within one slice, and the observed tracker's gate uses the scored row's
@@ -206,14 +237,7 @@ clear-sky index at least 0.7) of the 60 days after each of three cutoffs.
   the 2025-07 cutoff and 0.63 (0.024) at the other two, against a prior range of 0.61 to 1.65; the
   data pull the scale to the range's weak-heating end.
 
-## What the next experiment should answer
-
-**Does any bias correction of the free network, built only from forecast-time information, beat the
-plain network on sunny middays?** The 14-day tracker does not, and the explicit solar term does not.
-The remaining sunny-midday error then needs a different input (for example a satellite cloud
-product) rather than a correction.
-
-## Departures and caveats
+### Departures and caveats
 
 - Real world only; experiment 644's step world is not repeated.
 - The cell-temperature scale is one value per cutoff for all six farms, not per Primary, because
@@ -233,8 +257,11 @@ product) rather than a correction.
 
 ## Method
 
+### Architecture
+
 - **Architecture, arm (d):** experiment 554's modular mixture-density network (a weather encoder, a
-  date-time encoder, and a fresh fine-tuning mixer), with 16 Primary embeddings, outputs 3 mixture
+  date-time encoder, and a fresh fine-tuning mixer), with an embedding for each of the 16
+  Primaries, outputs three mixture
   components, then 11 quantiles. The weather inputs are the cached ensemble mean and standard
   deviation of 7 variables (shortwave, longwave, 2 m temperature, dew point, surface pressure,
   precipitation, 10 m wind speed); there are no power lags.
@@ -253,6 +280,9 @@ product) rather than a correction.
   (e) adds one mixer input, the standard deviation over members of the curve, standardised; (p)
   swaps the capacities across Primaries (experiment 639's permutation) and (s) takes the curve of
   another date (same Primary, half-hour, and 21-day block of the year).
+
+### Training regime
+
 - **Training regime:** each network starts from experiment 639's pretrained weights (ERA5 and CAMS
   estimates of past weather), is fine-tuned on the 24 months of ensemble rows before the test
   month with a 90-day recency half-life (experiment 554's arm M0), monthly refits, five seeds
@@ -262,17 +292,21 @@ product) rather than a correction.
   a log-normal prior (standard deviation 0.25 in the logarithm, range 0.61 to 1.65), with the
   likelihood of the six farms' sunny-midday output (clear-sky index at least 0.7, 10:00 to 15:00
   UTC, before the cutoff) counted once per farm-day and a free amplitude per farm.
+
+### Measurement
+
+- **Measurement:** the 60 days after 2025-07, 2026-03, and 2026-06 (July 2025, August 2025, March
+  2026, April 2026, and June 2026; nothing from 2026-07-01), every ensemble run at lead 0 to 240
+  hours, 336,520 half-hours over all hours and six Primaries. CRPS from the 11 quantiles (levels
+  0.01
+  to 0.99), averaged over seeds; day-block bootstrap intervals (2,000 resamples) at 1 - 0.05/40;
+  bars
+  are experiment 644's. Row keys are asserted equal to experiment 644's.
 - **Tracker:** the free network (a) plus the weighted mean error of its day-1 forecasts (lead below
   24 hours) over the 14 dates before the forecast's origin date, on midday half-hours whose
   ensemble-mean clear-sky index is at least 0.7 (binary) or ramps from 0.5 to 0.8 (continuous), and
   applied on the same half-hours. Shuffled placebos permute the correction across origin dates of
   the same Primary and cutoff.
-- **Measurement:** the 60 days after 2025-07, 2026-03, and 2026-06 (July 2025, August 2025, March
-  2026, April 2026, and June 2026; nothing from 2026-07-01), every ensemble run at lead 0 to 240
-  hours, 336,520 half-hours over all hours and six Primaries. CRPS from the 11 quantiles (levels 0.01
-  to 0.99), averaged over seeds; day-block bootstrap intervals (2,000 resamples) at 1 - 0.05/40; bars
-  are experiment 644's. Row keys are asserted equal to experiment 644's.
-- **Audit checks:** listed under Checks.
 
 ## Files
 
@@ -287,10 +321,13 @@ product) rather than a correction.
   (`analysis/contrasts.json`).
 - `e00655_report.py`: draws the figures and prints the quoted numbers.
 - Data, all under
-  `data/ml-experiments/00655-pv-member-level-cell-temperature-term-and-forecast-sunniness-tracker/work/`
+  `data/ml-experiments/00655-pv-member-level-cell-temperature-term-and-forecast-sunniness-
+  tracker/work/`
   and never committed: `extract/` (1.4 GB, read from `data/NWP`), `curves/`, `fits/`, `analysis/`,
   `logs/`.
-- Reused from earlier experiments: [experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md)
-  (rows, fits of arms a and b, tracker, scoring), [experiment 639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md)
+- Reused from earlier experiments: [experiment 644](../00644-pv-explicit-term-with-ens-forecast-
+  weather/result.md)
+  (rows, fits of arms a and b, tracker, scoring), [experiment 639](../00639-pv-explicit-hindcast-
+  probe-set-capacity-step-world/result.md)
   (pretrained weights, capacities, placebo rules), and the modules of experiments 48, 87, 397, 405,
   428, 510, 554, 634, and 638.
