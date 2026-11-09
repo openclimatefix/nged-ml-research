@@ -21,7 +21,7 @@ HUBER_K: Final[float] = 1.345
 
 
 def design(*, n: int, valid: int) -> np.ndarray:
-    """Seasonal harmonics plus a yearly linear spline; short histories get one harmonic, one knot."""
+    """Seasonal harmonics plus a yearly linear spline; short histories get one harmonic and knot."""
     t = np.arange(n)
     phase = 2 * np.pi * t / (365.25 * 4)
     short = valid < 3 * KNOT_SPACING
@@ -49,7 +49,9 @@ def _huber_fit(*, y: np.ndarray, x: np.ndarray, weight: np.ndarray, scale: float
         b = y[ok] * w[ok]
         beta = np.linalg.lstsq(a.T @ a + 1e-6 * np.eye(x.shape[1]), a.T @ b, rcond=None)[0]
         r = (y - x @ beta) / scale
-        w = weight * np.sqrt(np.where(np.abs(r) <= HUBER_K, 1.0, HUBER_K / np.maximum(np.abs(r), 1e-9)))
+        w = weight * np.sqrt(
+            np.where(np.abs(r) <= HUBER_K, 1.0, HUBER_K / np.maximum(np.abs(r), 1e-9))
+        )
         w[~np.isfinite(y)] = 0
     return x @ beta
 

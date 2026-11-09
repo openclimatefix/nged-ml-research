@@ -8,9 +8,12 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from e00653_common import DAY, E580, GRID_LENGTH, GRID_START, SCORED_FROM as SCORED_START, Panel
+from e00653_common import DAY, E580, GRID_LENGTH, GRID_START, Panel
+from e00653_common import SCORED_FROM as SCORED_START
 
-OFFSET_2019: Final[int] = int((GRID_START - datetime(2019, 9, 1, tzinfo=UTC)).total_seconds() // 1800)
+OFFSET_2019: Final[int] = int(
+    (GRID_START - datetime(2019, 9, 1, tzinfo=UTC)).total_seconds() // 1800
+)
 """Half-hours from 2019-09-01 (the label tables' origin) to the grid origin."""
 PER_YEAR: Final[float] = 1.2
 """Injected donor events per Primary-year (about 5% of time inside an event)."""
@@ -62,7 +65,11 @@ def logged_start_times(*, before: int | None = None) -> np.ndarray:
 
 
 def _duration(rng: np.random.Generator, mix: str) -> int:
-    lo, hi = {"default": (3 * 2, 180 * DAY), "short": (3 * 2, 7 * DAY), "long": (7 * DAY, 180 * DAY)}[mix]
+    lo, hi = {
+        "default": (3 * 2, 180 * DAY),
+        "short": (3 * 2, 7 * DAY),
+        "long": (7 * DAY, 180 * DAY),
+    }[mix]
     return int(np.exp(rng.uniform(np.log(lo), np.log(hi))))
 
 
@@ -82,8 +89,9 @@ def _start(rng: np.random.Generator, starts: np.ndarray, lo: int, hi: int) -> in
     return int(rng.integers(lo, hi))
 
 
-def _profile(*, n: int, width: int, drift: float, mid_step: float | None, staged: int,
-             open_end: bool = False) -> np.ndarray:
+def _profile(
+    *, n: int, width: int, drift: float, mid_step: float | None, staged: int, open_end: bool = False
+) -> np.ndarray:
     """Unit profile of an event of `n` half-hours with smooth edges and optional shape changes."""
     p = np.ones(n)
     w = max(width, 1)
@@ -100,10 +108,20 @@ def _profile(*, n: int, width: int, drift: float, mid_step: float | None, staged
     return p
 
 
-def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, float],
-           rng: np.random.Generator, lo: int, hi: int, gen: GenParams = GenParams(),
-           kinds: tuple[str, ...] = ("transfer", "negatives"),
-           ) -> tuple[dict[str, np.ndarray], list[Truth]]:
+_DEFAULT_GEN = GenParams()
+
+
+def inject(  # noqa: PLR0912, PLR0915 - one long linear event-injection routine; not refactored
+    *,
+    panel: Panel,
+    residual: dict[str, np.ndarray],
+    sigma: dict[str, float],
+    rng: np.random.Generator,
+    lo: int,
+    hi: int,
+    gen: GenParams = _DEFAULT_GEN,
+    kinds: tuple[str, ...] = ("transfer", "negatives"),
+) -> tuple[dict[str, np.ndarray], list[Truth]]:
     """Add events to a copy of the residual between half-hours `lo` and `hi`; return the truth."""
     starts = logged_start_times(before=lo + (hi - lo) if hi <= SCORED_START else None)
     out = {s: v.copy() for s, v in residual.items()}
@@ -111,9 +129,19 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
     years = (hi - lo) / (365.25 * DAY)
     group = 0
 
-    def add(site: str, start: int, end: int | None, amp: float, prof: np.ndarray | None,
-            kind: str, partners: list[str], units: float, shape: str, gid: int,
-            tail: int | None = None) -> None:
+    def add(
+        site: str,
+        start: int,
+        end: int | None,
+        amp: float,
+        prof: np.ndarray | None,
+        kind: str,
+        partners: list[str],
+        units: float,
+        shape: str,
+        gid: int,
+        tail: int | None = None,
+    ) -> None:
         stop = hi if end is None else min(end, hi)
         n = stop - start
         if n <= 0:
@@ -151,9 +179,17 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
                 if perm and rng.random() < 0.5:
                     width = int(rng.integers(7 * DAY, 56 * DAY))
                 mid = float(rng.uniform(0.5, 1.5)) if rng.random() < gen.mid_step_frac else None
-                staged = int(max(1, 0.2 * n)) if (not perm and rng.random() < gen.staged_frac) else 0
-                prof = _profile(n=n, width=width, drift=float(rng.uniform(-0.2, 0.2)), mid_step=mid,
-                                staged=staged, open_end=(end is None or end >= hi))
+                staged = (
+                    int(max(1, 0.2 * n)) if (not perm and rng.random() < gen.staged_frac) else 0
+                )
+                prof = _profile(
+                    n=n,
+                    width=width,
+                    drift=float(rng.uniform(-0.2, 0.2)),
+                    mid_step=mid,
+                    staged=staged,
+                    open_end=(end is None or end >= hi),
+                )
                 shape, name = shape_of(site, st, n)
                 prof = prof * shape
                 mode = rng.random()
@@ -177,19 +213,31 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
                         off = int(rng.integers(-gen.start_jitter_hh, gen.start_jitter_hh + 1))
                         r_start = max(lo, st + off)
                         r_amp = rho * frac * units * sigma[site]
-                        r_prof = np.interp(np.linspace(0, 1, max(1, n - off)),
-                                           np.linspace(0, 1, len(prof)), prof)
+                        r_prof = np.interp(
+                            np.linspace(0, 1, max(1, n - off)), np.linspace(0, 1, len(prof)), prof
+                        )
                         both = donor_seen
-                        add(r, r_start, end, r_amp, r_prof, kind_pair if both else (
-                            "permanent_shift" if perm else "solo"),
-                            [site] if both else [], r_amp / sigma[r], name, group)
+                        add(
+                            r,
+                            r_start,
+                            end,
+                            r_amp,
+                            r_prof,
+                            kind_pair if both else ("permanent_shift" if perm else "solo"),
+                            [site] if both else [],
+                            r_amp / sigma[r],
+                            name,
+                            group,
+                        )
                 if donor_seen:
                     partners = list(recs) if rec_seen else []
                     k2 = ("permanent_transfer" if perm else "edge") if rec_seen else kind
                     add(site, st, end, amp, prof, k2, partners, units, name, group)
                     if rec_seen:
-                        truth[-1].partner_amp = {r: rho * f * units * sigma[site]
-                                                 for r, f in zip(recs, split, strict=True)}
+                        truth[-1].partner_amp = {
+                            r: rho * f * units * sigma[site]
+                            for r, f in zip(recs, split, strict=True)
+                        }
     if "negatives" in kinds:
         n_rout = 3
         for site in rng.choice(panel.sites, size=n_rout, replace=False):
@@ -200,7 +248,18 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
                 q = float(rng.choice([0.5, 1.0, 1.5, 2.0])) * float(rng.choice([-1, 1]))
                 shape, _ = shape_of(site, st, dur)
                 prof = _profile(n=dur, width=2, drift=0.0, mid_step=None, staged=0) * shape
-                add(site, st, st + dur, q, prof, "routine", [], abs(q) / sigma[site], "proportional", group)
+                add(
+                    site,
+                    st,
+                    st + dur,
+                    q,
+                    prof,
+                    "routine",
+                    [],
+                    abs(q) / sigma[site],
+                    "proportional",
+                    group,
+                )
         for site in panel.sites:
             for _ in range(rng.poisson(NEG_PER_YEAR * years)):
                 group += 1
@@ -209,23 +268,52 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
                 sign = float(rng.choice([-1, 1]))
                 dur = int(np.exp(rng.uniform(np.log(DAY), np.log(30 * DAY))))
                 width = int(rng.integers(4, 25))
-                add(site, st, st + dur, sign * units * sigma[site],
+                add(
+                    site,
+                    st,
+                    st + dur,
+                    sign * units * sigma[site],
                     _profile(n=dur, width=width, drift=0, mid_step=None, staged=0),
-                    "ramp", [], units, "constant", group)
+                    "ramp",
+                    [],
+                    units,
+                    "constant",
+                    group,
+                )
             for _ in range(rng.poisson(NEG_PER_YEAR * years)):
                 group += 1
                 st = int(rng.integers(lo, hi - 6))
                 dur = int(rng.integers(1, 6))
                 units = float(rng.uniform(3, 10))
-                add(site, st, st + dur, float(rng.choice([-1, 1])) * units * sigma[site], None,
-                    "pulse", [], units, "constant", group)
+                add(
+                    site,
+                    st,
+                    st + dur,
+                    float(rng.choice([-1, 1])) * units * sigma[site],
+                    None,
+                    "pulse",
+                    [],
+                    units,
+                    "constant",
+                    group,
+                )
             for _ in range(rng.poisson(NEG_PER_YEAR * years)):
                 group += 1
                 st = _start(rng, starts, lo, hi - 6)
                 dur = _duration(rng, "default")
                 units = _units(rng)
-                add(site, st, st + dur, float(rng.choice([-1, 1])) * units * sigma[site], None,
-                    "solo", [], units, "constant", group)
+                add(
+                    site,
+                    st,
+                    st + dur,
+                    float(rng.choice([-1, 1])) * units * sigma[site],
+                    None,
+                    "solo",
+                    [],
+                    units,
+                    "constant",
+                    group,
+                )
         for _ in range(rng.poisson(0.3 * years * len(panel.sites))):
             a, b = rng.choice(panel.sites, size=2, replace=False)
             if b in panel.neighbours[a]:
@@ -235,10 +323,26 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
             dur = _duration(rng, "default")
             units = _units(rng)
             add(a, st, st + dur, -units * sigma[a], None, "placebo", [], units, "constant", group)
-            add(b, st, st + dur, units * 0.8 * sigma[b], None, "placebo", [], units, "constant", group)
+            add(
+                b,
+                st,
+                st + dur,
+                units * 0.8 * sigma[b],
+                None,
+                "placebo",
+                [],
+                units,
+                "constant",
+                group,
+            )
         t = np.arange(hi - lo)
-        cm = sum(np.sin(2 * np.pi * t / (DAY * float(rng.uniform(3, 10))) + rng.uniform(0, 6.3))
-                 for _ in range(3)) / 3
+        cm = (
+            sum(
+                np.sin(2 * np.pi * t / (DAY * float(rng.uniform(3, 10))) + rng.uniform(0, 6.3))
+                for _ in range(3)
+            )
+            / 3
+        )
         for site in panel.sites:
             out[site][lo:hi] += float(rng.uniform(0.5, 1.5)) * 0.8 * sigma[site] * cm
     if "pv_growth" in kinds:

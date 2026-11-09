@@ -26,16 +26,21 @@ SERIES_PATH: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR.parent / "studies/per_study/stage1_pilot/demand/inputs/series.parquet"
 )
 E327: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00327-lsc-label-free-detect-mask-train-pipeline"
-E580: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00580-verified-load-shift-event-set-and-label-audit/work"
+E580: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00580-verified-load-shift-event-set-and-label-audit/work"
+)
 NEIGHBOURS: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00383-load-shift-xgboost-oracle-first-part-1/work/neighbours_nged.json"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00383-load-shift-xgboost-oracle-first-part-1/work/neighbours_nged.json"
 )
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00653-edge-state-event-table-penalised-segmentation"
 SERIES_IDS: Final[tuple[int, ...]] = (3, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 24, 25, 26)
 """The 15 series with a stored forecast (series 12, D15, is not on the grid)."""
 MVA_SITES: Final[frozenset[str]] = frozenset()
 """Sites whose reading is MVA; filled by `load_panel` from the series table's group column."""
-SHORT_HISTORY: Final[dict[str, int]] = {"D18": (datetime(2025, 3, 1, tzinfo=UTC) - GRID_START).days * DAY}
+SHORT_HISTORY: Final[dict[str, int]] = {
+    "D18": (datetime(2025, 3, 1, tzinfo=UTC) - GRID_START).days * DAY
+}
 """Rows before this half-hour index are dropped (the noisy start of a short-history Primary)."""
 
 
@@ -52,10 +57,13 @@ class Panel:
     """Residual, power, capacity, and neighbours of the 15 Primaries."""
 
     def __init__(self) -> None:
+        """Load the residual panel from `SERIES_PATH`."""
         table = pl.read_parquet(SERIES_PATH)
         info = {int(r["time_series_id"]): r for r in table.iter_rows(named=True)}
         self.sites = [info[s]["site"] for s in SERIES_IDS]
-        self.capacity = {info[s]["site"]: float(info[s]["effective_capacity_mw"]) for s in SERIES_IDS}
+        self.capacity = {
+            info[s]["site"]: float(info[s]["effective_capacity_mw"]) for s in SERIES_IDS
+        }
         self.group = {info[s]["site"]: info[s]["group"] for s in SERIES_IDS}
         self.residual: dict[str, np.ndarray] = {}
         self.power: dict[str, np.ndarray] = {}
@@ -70,9 +78,7 @@ class Panel:
             self.residual[site] = power - forecast
         raw = json.loads(NEIGHBOURS.read_text())
         known = set(self.sites)
-        self.neighbours = {
-            a: sorted(b for b in raw.get(a, []) if b in known) for a in self.sites
-        }
+        self.neighbours = {a: sorted(b for b in raw.get(a, []) if b in known) for a in self.sites}
         for a in self.sites:
             for b in self.neighbours[a]:
                 if a not in self.neighbours[b]:

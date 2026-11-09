@@ -1,6 +1,6 @@
 """Step 0: edge width and constant-versus-proportional shape on the verified transfers.
 
-    DATA_PATH_INTERNAL=... PYTHONPATH=. uv run --no-sync python e00653_step0.py
+DATA_PATH_INTERNAL=... PYTHONPATH=. uv run --no-sync python e00653_step0.py
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ import polars as pl
 from e00653_common import DAY, E580, GRID_START, WORK, Panel, idx_of
 from e00653_segment import step_width
 
-VERIFIED_OFFSET: int = (
-    idx_of(when=GRID_START) + int((GRID_START - datetime(2019, 9, 1, tzinfo=UTC)).total_seconds() // 1800)
+VERIFIED_OFFSET: int = idx_of(when=GRID_START) + int(
+    (GRID_START - datetime(2019, 9, 1, tzinfo=UTC)).total_seconds() // 1800
 )
 """Half-hours from 2019-09-01 (the verified tables' origin) to 2022-01-01 (this grid's origin)."""
 PAIRS: dict[str, tuple[str, str]] = {"D3/D22": ("D3", "D22"), "D5/D16": ("D5", "D16")}
@@ -62,7 +62,10 @@ def main() -> None:
         for site, tag in ((r["primary_a"], "a"), (r["primary_b"], "b")):
             shift = VERIFIED_OFFSET
             start, end = r[f"onset_{tag}_idx"] - shift, r[f"end_{tag}_idx"] - shift
-            res[site] = measure(power=panel.power[site], start=start, end=end) | {"start": start, "end": end}
+            res[site] = measure(power=panel.power[site], start=start, end=end) | {
+                "start": start,
+                "end": end,
+            }
         out[name] = res
     WORK.mkdir(parents=True, exist_ok=True)
     (WORK / "step0.json").write_text(json.dumps(out, indent=1))

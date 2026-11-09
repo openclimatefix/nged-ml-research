@@ -18,7 +18,7 @@ import polars as pl
 from e00653_common import DAY, GRID_LENGTH, SCORED_FROM, WORK, Panel
 from e00653_core import ARMS, absorption, decode_world, events_frame, freeze, match
 from e00653_inject import GenParams, inject
-from e00653_segment import Params, classify
+from e00653_segment import Event, Params, classify
 
 TUNE_ON = (4.0, 6.0, 8.0)
 TUNE_STAY = (0.02, 0.05, 0.1)
@@ -50,13 +50,24 @@ def tune() -> Params:
     """Pick penalties on the 2022 and 2023 worlds, label-free."""
     panel, res, _ = setup()
     n_years = SCORED_FROM / (365.25 * DAY)
-    tune_res = {s: np.where(np.arange(GRID_LENGTH) < SCORED_FROM, v, np.nan) for s, v in res.items()}
+    tune_res = {
+        s: np.where(np.arange(GRID_LENGTH) < SCORED_FROM, v, np.nan) for s, v in res.items()
+    }
     fz = freeze(panel=panel, residual=tune_res)
     fill = float(np.nanmedian(list(fz.sigma.values())))
     inj_sigma = {k: (v if np.isfinite(v) else fill) for k, v in fz.sigma.items()}
-    worlds = [inject(panel=panel, residual=tune_res, sigma=inj_sigma,
-                     rng=np.random.default_rng(100 + k), lo=0, hi=SCORED_FROM,
-                     kinds=("transfer",)) for k in range(N_TUNE_WORLDS)]
+    worlds = [
+        inject(
+            panel=panel,
+            residual=tune_res,
+            sigma=inj_sigma,
+            rng=np.random.default_rng(100 + k),
+            lo=0,
+            hi=SCORED_FROM,
+            kinds=("transfer",),
+        )
+        for k in range(N_TUNE_WORLDS)
+    ]
     out = []
     for on, stay in itertools.product(TUNE_ON, TUNE_STAY):
         p = Params(on_cost=on, off_cost=on, stay_cost=stay)
@@ -65,8 +76,11 @@ def tune() -> Params:
         recalls = []
         for w, truth in worlds:
             e, _ = decode_world(panel=panel, residual=w, frozen=fz, arm="masked", params=p)
-            rows = big(pl.DataFrame(match(truth=truth, events=e, world_end=SCORED_FROM)).filter(
-                pl.col("kind").is_in(["edge", "solo", "permanent_transfer", "permanent_shift"])))
+            rows = big(
+                pl.DataFrame(match(truth=truth, events=e, world_end=SCORED_FROM)).filter(
+                    pl.col("kind").is_in(["edge", "solo", "permanent_transfer", "permanent_shift"])
+                )
+            )
             recalls.append(mw_recall(rows, "found"))
         out.append({"on": on, "stay": stay, "real_rate": rate, "recall": float(np.mean(recalls))})
         print(out[-1], flush=True)
@@ -107,7 +121,7 @@ def rewire(*, edges: list[tuple[str, str]], rng: np.random.Generator) -> dict[st
     return nb
 
 
-def _overlap(a, b) -> float:
+def _overlap(a: Event, b: Event) -> float:
     """Intersection over union of two decoded events' spans."""
     ae = GRID_LENGTH if a.end is None else a.end
     be = GRID_LENGTH if b.end is None else b.end
@@ -126,18 +140,31 @@ def run_inject() -> None:
         ("proportional", GenParams(shape_prop=1.0), ("transfer", "negatives"), 2),
         ("short", GenParams(duration_mix="short"), ("transfer", "negatives"), 2),
         ("long", GenParams(duration_mix="long"), ("transfer", "negatives"), 2),
-        ("stress", GenParams(share=(0.2, 1.8), start_jitter_hh=24, width_hh=(0, 24)), ("transfer", "negatives"), 2),
+        (
+            "stress",
+            GenParams(share=(0.2, 1.8), start_jitter_hh=24, width_hh=(0, 24)),
+            ("transfer", "negatives"),
+            2,
+        ),
         ("pv_growth", GenParams(), ("pv_growth",), 2),
         ("seasonal_bias", GenParams(), ("seasonal_bias",), 2),
     ]
-    base_ev = {arm: decode_world(panel=panel, residual=res, frozen=fz, arm=arm, params=p)
-               for arm in ARMS}
-    rows_all, abs_all, fp_all = [], [], []
+    base_ev = {
+        arm: decode_world(panel=panel, residual=res, frozen=fz, arm=arm, params=p) for arm in ARMS
+    }
+    rows_all, fp_all = [], []
     for name, gen, kinds, n in specs:
         for k in range(n):
-            world, truth = inject(panel=panel, residual=res, sigma=fz.sigma,
-                                  rng=np.random.default_rng(1000 + 17 * k + len(name)),
-                                  lo=SCORED_FROM, hi=GRID_LENGTH, gen=gen, kinds=kinds)
+            world, truth = inject(
+                panel=panel,
+                residual=res,
+                sigma=fz.sigma,
+                rng=np.random.default_rng(1000 + 17 * k + len(name)),
+                lo=SCORED_FROM,
+                hi=GRID_LENGTH,
+                gen=gen,
+                kinds=kinds,
+            )
             for arm in ARMS:
                 ev, slows = decode_world(panel=panel, residual=world, frozen=fz, arm=arm, params=p)
                 scored = match(truth=truth, events=ev)
@@ -146,11 +173,25 @@ def run_inject() -> None:
                     rows_all.append({**r, "spec": name, "world": k, "arm": arm, "absorption": a})
                 if name in ("pv_growth", "seasonal_bias"):
                     sites = {t.site for t in truth}
-                    new = [e for e in ev if e.primary in sites and e.start >= SCORED_FROM
-                           and not any(b.primary == e.primary and _overlap(b, e) >= 0.2
-                                       for b in base_ev[arm][0])]
-                    fp_all.append({"spec": name, "world": k, "arm": arm, "new_events": len(new),
-                                   "n_sites": len(sites)})
+                    new = [
+                        e
+                        for e in ev
+                        if e.primary in sites
+                        and e.start >= SCORED_FROM
+                        and not any(
+                            b.primary == e.primary and _overlap(b, e) >= 0.2
+                            for b in base_ev[arm][0]
+                        )
+                    ]
+                    fp_all.append(
+                        {
+                            "spec": name,
+                            "world": k,
+                            "arm": arm,
+                            "new_events": len(new),
+                            "n_sites": len(sites),
+                        }
+                    )
             print(name, k, flush=True)
     pl.DataFrame(rows_all).write_parquet(WORK / "injected_truth_scored.parquet")
     pl.DataFrame(fp_all).write_parquet(WORK / "growth_bias_false_events.parquet")
@@ -160,12 +201,21 @@ def run_isolated() -> None:
     """Sparse long events, one at a time, to measure absorption by the slow level."""
     panel, res, fz = setup()
     p = load_params()
-    base = {arm: decode_world(panel=panel, residual=res, frozen=fz, arm=arm, params=p) for arm in ARMS}
+    base = {
+        arm: decode_world(panel=panel, residual=res, frozen=fz, arm=arm, params=p) for arm in ARMS
+    }
     rows = []
     for k in range(8):
-        world, truth = inject(panel=panel, residual=res, sigma=fz.sigma, rng=np.random.default_rng(5000 + k),
-                              lo=SCORED_FROM, hi=GRID_LENGTH, gen=GenParams(duration_mix="long", per_year=0.2,
-                              permanent_frac=0.3), kinds=("transfer",))
+        world, truth = inject(
+            panel=panel,
+            residual=res,
+            sigma=fz.sigma,
+            rng=np.random.default_rng(5000 + k),
+            lo=SCORED_FROM,
+            hi=GRID_LENGTH,
+            gen=GenParams(duration_mix="long", per_year=0.2, permanent_frac=0.3),
+            kinds=("transfer",),
+        )
         for arm in ARMS:
             ev, slows = decode_world(panel=panel, residual=world, frozen=fz, arm=arm, params=p)
             ab = absorption(truth=truth, slow_world=slows, slow_base=base[arm][1])
@@ -188,14 +238,19 @@ def run_real() -> None:
             counts = []
             for _ in range(100):
                 nb = rewire(edges=panel.edges, rng=rng)
-                e2 = classify(events=copy.deepcopy(ev), sigmas=fz.sigma,
-                              neighbours={s: nb.get(s, []) for s in panel.sites}, p=p)
+                e2 = classify(
+                    events=copy.deepcopy(ev),
+                    sigmas=fz.sigma,
+                    neighbours={s: nb.get(s, []) for s in panel.sites},
+                    p=p,
+                )
                 counts.append(sum(e.cls == "edge_transfer" and e.start >= SCORED_FROM for e in e2))
             real = sum(e.cls == "edge_transfer" and e.start >= SCORED_FROM for e in ev)
             (WORK / "rewired.json").write_text(json.dumps({"real": real, "rewired": counts}))
             print("edge events real", real, "rewired median", np.median(counts))
-    (WORK / "noise_units.json").write_text(json.dumps({"sigma_block_mw": fz.sigma,
-                                                       "sigma_3day_mw": fz.sigma3}, indent=1))
+    (WORK / "noise_units.json").write_text(
+        json.dumps({"sigma_block_mw": fz.sigma, "sigma_3day_mw": fz.sigma3}, indent=1)
+    )
 
 
 if __name__ == "__main__":

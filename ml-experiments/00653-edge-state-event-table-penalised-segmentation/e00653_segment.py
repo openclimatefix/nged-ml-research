@@ -149,7 +149,7 @@ def refine(*, xh: np.ndarray, boundary: int, width: int = 24, reach: int = 18) -
 
 
 def ramp_fraction(*, xh: np.ndarray, t: int) -> float:
-    """Smaller of the shares of a step already done just before it and still to come just after it."""
+    """Smaller of the shares of a step done just before it and still to come just after it."""
     if t < 48 or t + 48 > len(xh):
         return 0.0
     pre = np.nanmedian(xh[t - 48 : t - 18])
@@ -182,8 +182,9 @@ def step_width(*, xh: np.ndarray, t: int, span: int = 48) -> float:
     return float(max(0, i90 - i10))
 
 
-def extract(*, primary: str, path: np.ndarray, post: np.ndarray, x: np.ndarray, xh: np.ndarray,
-            sigma: float) -> list[Event]:
+def extract(
+    *, primary: str, path: np.ndarray, post: np.ndarray, x: np.ndarray, xh: np.ndarray, sigma: float
+) -> list[Event]:
     """Turn runs of non-zero states into events with half-hour starts and ends."""
     events: list[Event] = []
     nz = path != 0
@@ -215,15 +216,25 @@ MERGE_GAP: Final[int] = 3 * DAY
 
 
 def merge_fragments(*, events: list[Event]) -> list[Event]:
-    """Join same-sign events at one Primary that sit within `MERGE_GAP` and differ by under 2 times."""
+    """Join same-sign events at one Primary within `MERGE_GAP` that differ by under 2 times."""
     out: list[Event] = []
     for ev in sorted(events, key=lambda e: (e.primary, e.start)):
         prev = out[-1] if out else None
-        if (prev is not None and prev.primary == ev.primary and prev.end is not None
-                and ev.start - prev.end <= MERGE_GAP and prev.amp_mw * ev.amp_mw > 0
-                and 0.5 <= abs(ev.amp_mw / prev.amp_mw) <= 2.0):
-            span_a, span_b = prev.end - prev.start, (ev.end if ev.end is not None else prev.end) - ev.start
-            prev.amp_mw = (prev.amp_mw * span_a + ev.amp_mw * max(span_b, 1)) / max(span_a + span_b, 1)
+        if (
+            prev is not None
+            and prev.primary == ev.primary
+            and prev.end is not None
+            and ev.start - prev.end <= MERGE_GAP
+            and prev.amp_mw * ev.amp_mw > 0
+            and 0.5 <= abs(ev.amp_mw / prev.amp_mw) <= 2.0
+        ):
+            span_a, span_b = (
+                prev.end - prev.start,
+                (ev.end if ev.end is not None else prev.end) - ev.start,
+            )
+            prev.amp_mw = (prev.amp_mw * span_a + ev.amp_mw * max(span_b, 1)) / max(
+                span_a + span_b, 1
+            )
             prev.units = max(prev.units, ev.units)
             prev.end = ev.end
             prev.confidence = max(prev.confidence, ev.confidence)
@@ -232,9 +243,15 @@ def merge_fragments(*, events: list[Event]) -> list[Event]:
     return out
 
 
-def classify(*, events: list[Event], sigmas: dict[str, float], neighbours: dict[str, list[str]],
-             p: Params, record_end: int = GRID_LENGTH, edge_ok: set[tuple[str, str]] | None = None
-             ) -> list[Event]:
+def classify(  # noqa: PLR0912 - one long decision cascade over event classes; not refactored
+    *,
+    events: list[Event],
+    sigmas: dict[str, float],
+    neighbours: dict[str, list[str]],
+    p: Params,
+    record_end: int = GRID_LENGTH,
+    edge_ok: set[tuple[str, str]] | None = None,
+) -> list[Event]:
     """Pair events across connected Primaries and assign each event a class."""
     for ev in events:
         ev.cls, ev.partners, ev.share, ev.partner_amp = "shift_no_partner", [], None, {}
@@ -251,12 +268,18 @@ def classify(*, events: list[Event], sigmas: dict[str, float], neighbours: dict[
         if id(d) in used:
             continue
         cands = [
-            r for r in free
-            if r.amp_mw > 0 and id(r) not in used and r.primary in neighbours[d.primary]
+            r
+            for r in free
+            if r.amp_mw > 0
+            and id(r) not in used
+            and r.primary in neighbours[d.primary]
             and (edge_ok is None or tuple(sorted((d.primary, r.primary))) in edge_ok)
             and abs(r.start - d.start) <= p.start_window
-            and (d.end is None or r.end is None
-                 or abs(r.end - d.end) <= max(p.end_window, 0.25 * (d.end - d.start)))
+            and (
+                d.end is None
+                or r.end is None
+                or abs(r.end - d.end) <= max(p.end_window, 0.25 * (d.end - d.start))
+            )
         ]
         best, best_cost = None, float("inf")
         for k in range(1, min(3, len(cands)) + 1):
@@ -288,15 +311,23 @@ def classify(*, events: list[Event], sigmas: dict[str, float], neighbours: dict[
     solo = {id(e) for e in free if e.cls == "shift_no_partner"}
     for ev in free:
         if id(ev) in solo and ev.days is not None and ev.days <= 3:
-            near = [o for o in free if o.primary == ev.primary and id(o) in solo
-                    and o.days is not None and o.days <= 3 and abs(o.start - ev.start) <= 30 * DAY]
+            near = [
+                o
+                for o in free
+                if o.primary == ev.primary
+                and id(o) in solo
+                and o.days is not None
+                and o.days <= 3
+                and abs(o.start - ev.start) <= 30 * DAY
+            ]
             if len(near) >= p.routine_rate:
                 ev.cls = "routine"
     return events
 
 
-def segment_primary(*, name: str, y: np.ndarray, xh: np.ndarray, slow: np.ndarray, sigma: float,
-                    p: Params) -> list[Event]:
+def segment_primary(
+    *, name: str, y: np.ndarray, xh: np.ndarray, slow: np.ndarray, sigma: float, p: Params
+) -> list[Event]:
     """Decode one Primary's block series (slow level already removed in `xh`)."""
     x = y - slow
     valid = np.flatnonzero(np.isfinite(x))
@@ -304,7 +335,9 @@ def segment_primary(*, name: str, y: np.ndarray, xh: np.ndarray, slow: np.ndarra
         return []
     x = x[: valid[-1] + 1]
     path, post = decode(x=x, sigma=sigma, p=p)
-    ev = merge_fragments(events=extract(primary=name, path=path, post=post, x=x, xh=xh, sigma=sigma))
+    ev = merge_fragments(
+        events=extract(primary=name, path=path, post=post, x=x, xh=xh, sigma=sigma)
+    )
     return [e for e in ev if e.confidence >= p.min_confidence]
 
 
