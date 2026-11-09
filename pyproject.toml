@@ -335,6 +335,7 @@ exclude = '\.git|\.venv'
 extra-paths = [
     "tests",
     "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
+    "ml-experiments/00653-edge-state-event-table-penalised-segmentation",
     "ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth",
     "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
@@ -674,6 +675,7 @@ python_files = ["test_*.py", "*_test.py"]
 pythonpath = [
     "tests",
     "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
+    "ml-experiments/00653-edge-state-event-table-penalised-segmentation",
     "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
     "studies/embedded_battery_forecast",
