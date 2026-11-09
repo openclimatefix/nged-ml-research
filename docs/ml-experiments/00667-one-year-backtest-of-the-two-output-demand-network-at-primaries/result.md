@@ -77,6 +77,11 @@ page is planned and holds the plan only.
   power.
 - **Compute:** ceiling 10 GPU-hours (raised by the manager from 6). Up to 3 GPU processes run at
   once with at most 4 CPU cores each. Two seeds and 14 daily hazards are kept.
+- **Reviews (maintainer, 2026-11-09):** before the first fit, one Sonnet code review hunting
+  leakage and one hunting contract errors, then one Opus review of the leakage and fold logic;
+  after the file is written, one Sonnet file audit (including a from-scratch re-run of one fold)
+  and one Opus review of the file and scores, then the prose review. Each reviewer is fresh, works
+  from a brief file, and starts no sub-agents. A leak or a wrong file stops the run.
 - **Standing practices followed:** cleaned data, the D15 and D18 cut before 2025-03-01, monthly
   refits, saved weights, and tail and example-forecast plots.
 - **Open items before the first fit:** a one-fold timing run (the stored Candidate fit takes about
