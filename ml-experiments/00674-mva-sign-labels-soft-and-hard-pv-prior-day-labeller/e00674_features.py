@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Day features for experiment 674: shoulder minimum, W-shape score, export ratio, PV stratum.
 
 PYTHONPATH=ml-experiments/00087-*:ml-experiments/00506-*:ml-experiments/00508-*
@@ -36,6 +37,8 @@ GATE_SHARE: Final[float] = 0.5
 UNKNOWN_RATIO: Final[float] = 3.0
 LOW_DEMAND_SHARE: Final[float] = 0.2
 MIN_SHOULDER_HALF_HOURS: Final[int] = 3
+MIN_NEGATIVE_HALF_HOURS: Final[int] = 2
+"""A reverse-flow day has at least this many negative daylight half-hours (as in 417 and 508)."""
 
 # --- W-shape score, copied from experiment 417 (`e00417_day_flip.py`) ---------------------------
 U_LOW: Final[float] = 0.1
@@ -151,7 +154,9 @@ def build_profile(*, h: Hourly) -> Profile:
         .agg(pl.col("r").median().alias("mr"), pl.len().alias("n"))
     )
     return Profile(
-        median_r={(b, w, hh): mr for b, w, hh, mr, n in grouped.iter_rows() if n >= MIN_OVERCAST_HOURS}
+        median_r={
+            (b, w, hh): mr for b, w, hh, mr, n in grouped.iter_rows() if n >= MIN_OVERCAST_HOURS
+        }
     )
 
 
@@ -244,19 +249,24 @@ def pv_gate_table() -> dict[str, float]:
     """Return each Primary's AC p90 PV capacity (MW) from the latest season-year of experiment 474."""
     r4 = pl.read_parquet(R4_TABLE).sort("site", "season_year")
     return {
-        s: float(g["ac_p90"][-1]) for s, g in ((k[0], v) for k, v in r4.group_by("site", maintain_order=True))
+        s: float(g["ac_p90"][-1])
+        for s, g in ((k[0], v) for k, v in r4.group_by("site", maintain_order=True))
     }
 
 
 def load_mats(*, site: str) -> geo.Mats:
     """Return the site's day matrices (with the farm column for the six)."""
     extra = (
-        {"farm": data.farm_norm(farm=data.FARM_OF_SITE[site])} if site in data.FARM_OF_SITE else None
+        {"farm": data.farm_norm(farm=data.FARM_OF_SITE[site])}
+        if site in data.FARM_OF_SITE
+        else None
     )
     return geo.Mats(site=site, extra=extra)
 
 
-def day_table(*, site: str, mats: geo.Mats, level: float, gate_mw: dict[str, float]) -> pl.DataFrame:
+def day_table(
+    *, site: str, mats: geo.Mats, level: float, gate_mw: dict[str, float]
+) -> pl.DataFrame:
     """Return one row per complete UK day for one Primary and injection level.
 
     Columns: site, level, date, month, block, r (day export ratio), night_import (points), s
@@ -265,9 +275,7 @@ def day_table(*, site: str, mats: geo.Mats, level: float, gate_mw: dict[str, flo
     daylight), any_negative, low_demand, n_morning, n_evening, mid_min (lowest 10:00 to 15:00
     reading in points).
     """
-    cap_mw = float(
-        data.series_table().filter(pl.col("site") == site)["effective_capacity_mw"][0]
-    )
+    cap_mw = float(data.series_table().filter(pl.col("site") == site)["effective_capacity_mw"][0])
     sig, _ = geo.signed(mats=mats, level=level)
     reading = np.abs(sig)
     finite = np.isfinite(sig)
@@ -281,9 +289,14 @@ def day_table(*, site: str, mats: geo.Mats, level: float, gate_mw: dict[str, flo
     n_mid = mid.sum(axis=1)
     with np.errstate(all="ignore"):
         mid_median = np.array(
-            [np.median(reading[i, mid[i]]) if n_mid[i] >= 6 else np.nan for i in range(len(mats.dates))]
+            [
+                np.median(reading[i, mid[i]]) if n_mid[i] >= 6 else np.nan
+                for i in range(len(mats.dates))
+            ]
         )
-        k_mid = np.nanmean(np.where(mats.k[:, geo.MID_SLOTS] >= 0, mats.k[:, geo.MID_SLOTS], np.nan), axis=1)
+        k_mid = np.nanmean(
+            np.where(mats.k[:, geo.MID_SLOTS] >= 0, mats.k[:, geo.MID_SLOTS], np.nan), axis=1
+        )
     shoulder_min = {}
     n_shoulder = {}
     for name in ("morning", "evening"):
@@ -300,7 +313,8 @@ def day_table(*, site: str, mats: geo.Mats, level: float, gate_mw: dict[str, flo
     lit = finite & (mats.el > 0)
     smin = np.where(lit, sig, np.inf).min(axis=1)
     smax = np.where(lit, sig, -np.inf).max(axis=1)
-    crossing = (smin < 0) & (smax > 0)
+    n_negative = (lit & (sig < 0)).sum(axis=1)
+    crossing = (n_negative >= MIN_NEGATIVE_HALF_HOURS) & (smax > 0)
     # Low-demand days: lowest 20% of the Primary's own April to September days by the median
     # 10:00 to 15:00 reading *before* injection.
     raw_mid = np.array(
@@ -331,7 +345,10 @@ def day_table(*, site: str, mats: geo.Mats, level: float, gate_mw: dict[str, flo
             / 100.0
         )
     night_mw = night * cap_mw / 100.0
-    gate = bool(np.isfinite(gate_mw.get(site, np.nan)) and gate_mw.get(site, 0.0) + farm_mw >= GATE_SHARE * night_mw)
+    gate = bool(
+        np.isfinite(gate_mw.get(site, np.nan))
+        and gate_mw.get(site, 0.0) + farm_mw >= GATE_SHARE * night_mw
+    )
     return pl.DataFrame(
         {
             "site": site,

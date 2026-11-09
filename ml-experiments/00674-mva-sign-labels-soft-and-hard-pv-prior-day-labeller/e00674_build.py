@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 674, step 1: build the day tables for the six (levels 0 to 3) and the eight (level 0).
 
     PYTHONPATH=ml-experiments/00087-*:ml-experiments/00506-*:ml-experiments/00508-*:ml-experiments/00674-* \
@@ -34,7 +35,9 @@ def main() -> None:
     args = parser.parse_args()
     feat.WORK.mkdir(parents=True, exist_ok=True)
     if args.eight:
-        build(sites=data.MVA_ONLY, levels=(0.0,)).write_parquet(feat.WORK / "day_tables_eight.parquet")
+        build(sites=data.MVA_ONLY, levels=(0.0,)).write_parquet(
+            feat.WORK / "day_tables_eight.parquet"
+        )
     else:
         build(sites=data.SIGNED_SIX, levels=feat.LEVELS).write_parquet(
             feat.WORK / "day_tables_six.parquet"
