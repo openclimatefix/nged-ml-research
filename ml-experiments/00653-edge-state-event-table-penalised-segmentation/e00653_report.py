@@ -9,7 +9,7 @@ import json
 import math
 from datetime import timedelta
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import matplotlib
 
@@ -52,7 +52,9 @@ def band_col(df: pl.DataFrame) -> pl.DataFrame:
 def wrec(df: pl.DataFrame, col: str) -> float:
     """MW-weighted share with `col` true."""
     w = df["amp_mw"].abs()
-    return float((df[col].cast(pl.Float64) * w).sum() / w.sum()) if df.height else float("nan")
+    return (
+        float((df[col].cast(pl.Float64) * w).sum()) / float(w.sum()) if df.height else float("nan")
+    )
 
 
 def injected() -> None:  # noqa: PLR0915 - one linear printout of many tables
@@ -211,8 +213,13 @@ def injected() -> None:  # noqa: PLR0915 - one linear printout of many tables
     fig, ax = plt.subplots(figsize=(7.2, 3.6))
     for i, (arm, col) in enumerate((("masked", BLUE), ("huber", ORANGE), ("rw30", GREY))):
         v = [
-            (
-                isol.filter((pl.col("arm") == arm) & (pl.col("band") == b))["absorption"].median()
+            float(
+                cast(
+                    "float | None",
+                    isol.filter((pl.col("arm") == arm) & (pl.col("band") == b))[
+                        "absorption"
+                    ].median(),
+                )
                 or 0.0
             )
             for b in BANDS

@@ -12,11 +12,12 @@ import itertools
 import json
 import sys
 from dataclasses import asdict, replace
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
 from e00653_common import DAY, GRID_LENGTH, SCORED_FROM, WORK, Panel
-from e00653_core import ARMS, absorption, decode_world, events_frame, freeze, match
+from e00653_core import ARMS, Frozen, absorption, decode_world, events_frame, freeze, match
 from e00653_inject import GenParams, inject
 from e00653_segment import Event, Params, classify
 
@@ -28,7 +29,7 @@ N_TUNE_WORLDS = 3
 N_WORLDS = 6
 
 
-def setup() -> tuple[Panel, dict[str, np.ndarray], object]:
+def setup() -> tuple[Panel, dict[str, np.ndarray], Frozen]:
     """Panel, residual with the common mode removed, and the frozen noise units and slow levels."""
     panel = Panel()
     res = panel.mask_common_mode(residual=panel.residual)
@@ -43,7 +44,11 @@ def big(rows: pl.DataFrame) -> pl.DataFrame:
 def mw_recall(rows: pl.DataFrame, col: str) -> float:
     """MW-weighted share of rows with `col` true."""
     w = rows["amp_mw"].abs()
-    return float((rows[col].cast(pl.Float64) * w).sum() / w.sum()) if rows.height else float("nan")
+    return (
+        float((rows[col].cast(pl.Float64) * w).sum()) / float(w.sum())
+        if rows.height
+        else float("nan")
+    )
 
 
 def tune() -> Params:
@@ -232,7 +237,7 @@ def run_real() -> None:
     for arm in ARMS:
         ev, slows = decode_world(panel=panel, residual=res, frozen=fz, arm=arm, params=p)
         events_frame(events=ev).write_parquet(WORK / f"real_events_{arm}.parquet")
-        np.savez(WORK / f"real_slow_{arm}.npz", **slows)
+        np.savez(WORK / f"real_slow_{arm}.npz", **cast("dict[str, Any]", slows))
         if arm == "masked":
             rng = np.random.default_rng(7)
             counts = []

@@ -171,7 +171,7 @@ def inject(  # noqa: PLR0912, PLR0915 - one long linear event-injection routine;
                 st = _start(rng, starts, lo, hi - 6)
                 perm = rng.random() < gen.permanent_frac
                 dur = None if perm else _duration(rng, gen.duration_mix)
-                end = None if perm else st + dur
+                end = None if dur is None else st + dur
                 n = (hi if end is None else min(end, hi)) - st
                 units = _units(rng)
                 amp = -units * sigma[site]
@@ -212,7 +212,7 @@ def inject(  # noqa: PLR0912, PLR0915 - one long linear event-injection routine;
                     for r, frac in zip(recs, split, strict=True):
                         off = int(rng.integers(-gen.start_jitter_hh, gen.start_jitter_hh + 1))
                         r_start = max(lo, st + off)
-                        r_amp = rho * frac * units * sigma[site]
+                        r_amp = float(rho * frac * units * sigma[site])
                         r_prof = np.interp(
                             np.linspace(0, 1, max(1, n - off)), np.linspace(0, 1, len(prof)), prof
                         )
@@ -235,7 +235,7 @@ def inject(  # noqa: PLR0912, PLR0915 - one long linear event-injection routine;
                     add(site, st, end, amp, prof, k2, partners, units, name, group)
                     if rec_seen:
                         truth[-1].partner_amp = {
-                            r: rho * f * units * sigma[site]
+                            r: float(rho * f * units * sigma[site])
                             for r, f in zip(recs, split, strict=True)
                         }
     if "negatives" in kinds:
