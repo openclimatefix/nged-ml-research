@@ -20,6 +20,7 @@
 | 485 | Does treating 22 December to 2 January as its own regime (day type, lag substitute, Christmas weight with ERA5 replay, Christmas-weighted pretraining) improve the pretrained demand network's Christmas forecast without harming other days? | High (maintainer asked 2026-11-01) | Nothing | Finished: no arm gained more than one Christmas can detect; H2, H4, and P cost skill outside the window at the eight |
 | 633 | How does BG2 score on the held-out months July to October 2026 beside the three demand networks at the 16 Primaries, and how does the lag-enabled network score at the bulk and grid supply points? | High (maintainer decided 2026-11-07) | Experiment 620's scores | Planned |
 | 637 | How do the five bake-off systems score on July to October 2026 once days that a frozen detector flags as an abnormal running arrangement are removed? | High (maintainer approved 2026-11-07) | Nothing | Planned |
+| 669 | What does a one-year backtest of the lag-enabled demand network score at the 2 bulk and 2 grid supply points with 6-hour lags to 14 days? | High (maintainer asked 2026-11-09) | Designer answer received | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
 | Unnumbered | Pre-registered hard switch on the member share of cold ensemble members (D3b) with the replicate-year cold nights pooled, against Primary demand research default 3 | Medium | Nothing | Proposed |
 
