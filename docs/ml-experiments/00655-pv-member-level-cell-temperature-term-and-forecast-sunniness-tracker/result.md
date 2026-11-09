@@ -123,8 +123,7 @@ better). An ensemble member is one of the 51 alternative weather forecasts that 
 for Medium-Range Weather Forecasts issues for each run.
 
 **The 14-day error correction gains almost nothing once it uses only the ensemble forecast's
-sunniness (Part 2).** [Experiment 644](../00644-pv-explicit-term-with-ens-forecast-
-weather/result.md)
+sunniness (Part 2).** [Experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md)
 found that the free network, plus its own mean error over the previous 14 days, scored 0.3 to 0.6
 points better than the free network alone. That experiment applied the correction on half-hours
 observed to be sunny, and the explicit-solar curve there used the ensemble-mean sunshine. This
@@ -325,9 +324,9 @@ product) rather than a correction.
   tracker/work/`
   and never committed: `extract/` (1.4 GB, read from `data/NWP`), `curves/`, `fits/`, `analysis/`,
   `logs/`.
-- Reused from earlier experiments: [experiment 644](../00644-pv-explicit-term-with-ens-forecast-
-  weather/result.md)
-  (rows, fits of arms a and b, tracker, scoring), [experiment 639](../00639-pv-explicit-hindcast-
-  probe-set-capacity-step-world/result.md)
+- Reused from earlier experiments:
+  [experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md) (rows, fits of arms
+  a and b, tracker, scoring),
+  [experiment 639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md)
   (pretrained weights, capacities, placebo rules), and the modules of experiments 48, 87, 397, 405,
   428, 510, 554, 634, and 638.
