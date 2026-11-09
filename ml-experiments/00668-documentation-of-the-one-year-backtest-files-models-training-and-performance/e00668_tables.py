@@ -10,11 +10,33 @@ FOLDER = Path(
 )
 
 
+def generator_table(d: pl.DataFrame) -> str:
+    """One table for a generator file, which has no manual heuristic."""
+    lines = [
+        "| Group | Half-hours | Model | Climatology | Gain over climatology (%) |",
+        "|---|---:|---:|---:|---|",
+    ]
+    for g in d["group"].unique(maintain_order=True):
+        s = d.filter(pl.col("group") == g)
+        m = s.filter(pl.col("system") == "Model").row(0, named=True)
+        c = s.filter(pl.col("system") == "Climatology").row(0, named=True)
+        lines.append(
+            f"| {g} | {m['rows']:,} | {m['mean']:.2f} | {c['mean']:.2f} "
+            f"| {c['gain_pct']:.1f} ({c['gain_lo']:.1f} to {c['gain_hi']:.1f}) |"
+        )
+    return "\n".join(lines)
+
+
 def table(df: pl.DataFrame, slice_name: str, metric: str) -> str:
     """One table: a row per group, columns for the three systems and the two gains."""
     d = df.filter((pl.col("slice") == slice_name) & (pl.col("metric") == metric))
+    if "Manual heuristic" not in set(d["system"]):
+        return generator_table(d)
     lines = [
-        "| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |",
+        (
+            "| Group | Half-hours | Model | Manual heuristic | Climatology "
+            "| Gain over heuristic (%) | Gain over climatology (%) |"
+        ),
         "|---|---:|---:|---:|---:|---|---|",
     ]
     for g in d["group"].unique(maintain_order=True):

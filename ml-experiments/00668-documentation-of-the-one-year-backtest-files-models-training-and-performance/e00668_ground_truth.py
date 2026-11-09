@@ -47,7 +47,7 @@ def build(
 ) -> pl.DataFrame:
     """Return one file's frame on the full half-hourly grid."""
     last = raw["time"].max()
-    grid = pl.datetime_range(START, last, interval="30m", time_zone="UTC", eager=True)
+    grid = pl.datetime_range(START, last, interval="30m", time_zone="UTC", eager=True)  # ty: ignore[no-matching-overload]
     base = pl.DataFrame({"time_series_id": ids}, schema={"time_series_id": pl.Int32}).join(
         pl.DataFrame({"valid_time": grid}), how="cross"
     )

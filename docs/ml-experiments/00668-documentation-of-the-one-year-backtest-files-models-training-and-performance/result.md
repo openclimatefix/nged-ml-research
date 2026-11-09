@@ -347,8 +347,8 @@ generation, which no input models.
 **The network beats both baselines at every lead band, and the margin shrinks with the lead.** The
 tables give normalised error in points of capacity (percent of capacity; smaller is better), as the
 mean over scored half-hours, and the gain of the network over each baseline with a 95% day-block
-bootstrap interval from 2,000 resamples of origin days. The manual heuristic is the lagged-power rule
-and climatology is the month, half-hour, and weekend-flag quantiles, both described under
+bootstrap interval from 2,000 resamples of origin days. The manual heuristic is the lagged-power
+rule and climatology is the month, half-hour, and weekend-flag quantiles, both described under
 [Comparison baselines](#comparison-baselines-slices-and-summary-figures). Days 10 to 14 are reported
 separately because they lie beyond the 10-day horizon of the earlier stored backtests.
 
@@ -432,8 +432,8 @@ full at long leads, and a few half-hours inside the year are missing or flagged 
 **The network beats both baselines at every lead band, and the margin shrinks with the lead.** The
 tables give normalised error in points of capacity (percent of capacity; smaller is better), as the
 mean over scored half-hours, and the gain of the network over each baseline with a 95% day-block
-bootstrap interval from 2,000 resamples of origin days. The manual heuristic is the lagged-power rule
-and climatology is the month, half-hour, and weekend-flag quantiles, both described under
+bootstrap interval from 2,000 resamples of origin days. The manual heuristic is the lagged-power
+rule and climatology is the month, half-hour, and weekend-flag quantiles, both described under
 [Comparison baselines](#comparison-baselines-slices-and-summary-figures). Days 10 to 14 are reported
 separately because they lie beyond the 10-day horizon of the earlier stored backtests.
 
@@ -543,7 +543,99 @@ backtest is [experiment
 
 ### Performance
 
-To be added when `wind.parquet` is written.
+**The network beats climatology at short leads and the margin shrinks with the lead
+time.** All numbers are normalised error in points of capacity (percent of capacity; smaller is
+better), averaged over 709,776 half-hours with observed power (of 735,840 rows). The only baseline
+is climatology: the quantiles of the farm's own cleaned power in the same month, half-hour, and
+neighbouring cells, trained before the first day of the origin's month. No manual heuristic exists
+for wind farms, so none is shown. Gains are those of the network over climatology, with a 95%
+day-block bootstrap interval from 2,000 resamples of origin days. The observed power of half-hours
+inside experiment 210's idle mask, which ends in September of the backtest year, is set to zero, as
+it was when the network was fitted. Excluding those half-hours instead scores 655,288 half-hours
+(709,776 with the idle half-hours as zero), and the network's CRPS gain over climatology changes
+from 16.2% to 15.0%. The 26,064 rows with no observed power are not scored.
+
+#### By lead band
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| days 0 to 1 | 50,974 | 8.19 | 18.13 | 54.8 (52.5 to 57.1) |
+| days 1 to 3 | 101,918 | 9.86 | 18.14 | 45.6 (43.2 to 48.1) |
+| days 3 to 7 | 203,588 | 14.08 | 18.01 | 21.8 (19.6 to 24.1) |
+| days 7 to 10 | 152,020 | 17.36 | 18.05 | 3.8 (1.8 to 5.8) |
+| days 10 to 14 | 201,276 | 18.29 | 18.03 | -1.4 (-2.6 to -0.3) |
+
+CRPS (2 × mean pinball loss over the 11 levels):
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| days 0 to 1 | 50,974 | 4.58 | 9.72 | 52.9 (50.5 to 55.2) |
+| days 1 to 3 | 101,918 | 5.47 | 9.73 | 43.8 (41.4 to 46.2) |
+| days 3 to 7 | 203,588 | 7.68 | 9.67 | 20.6 (18.4 to 22.8) |
+| days 7 to 10 | 152,020 | 9.36 | 9.69 | 3.4 (1.3 to 5.4) |
+| days 10 to 14 | 201,276 | 9.86 | 9.68 | -1.8 (-3.3 to -0.4) |
+
+![Normalised MAE of the median by forecast horizon for 3 wind farms, network and climatology](wind_mae_by_horizon.svg)
+
+#### By season
+
+Seasons are meteorological and refer to the season of the forecast origin. The backtest year
+contains no complete autumn, so autumn is reported as its first month and its last two months. Dates
+are not given for generator series.
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| autumn (first month) | 58,226 | 20.33 | 22.59 | 10.0 (8.2 to 11.8) |
+| winter | 181,440 | 17.99 | 21.53 | 16.4 (14.4 to 18.4) |
+| spring | 180,678 | 14.63 | 18.44 | 20.7 (18.7 to 22.5) |
+| summer | 176,840 | 10.07 | 11.85 | 15.0 (13.0 to 16.7) |
+| autumn (last two months) | 112,592 | 15.45 | 19.24 | 19.7 (16.1 to 23.4) |
+
+CRPS:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| autumn (first month) | 58,226 | 11.04 | 11.86 | 6.9 (5.2 to 8.6) |
+| winter | 181,440 | 9.68 | 11.40 | 15.1 (13.4 to 16.9) |
+| spring | 180,678 | 7.92 | 9.84 | 19.6 (17.8 to 21.3) |
+| summer | 176,840 | 5.60 | 6.69 | 16.3 (14.7 to 17.8) |
+| autumn (last two months) | 112,592 | 8.38 | 10.29 | 18.6 (14.6 to 22.5) |
+
+![Normalised MAE of the median by season for 3 wind farms](wind_mae_by_season.svg)
+
+![Model error and CRPS gain over climatology by season and lead band for 3 wind farms](wind_season_by_horizon.svg)
+
+#### By month and by farm
+
+Normalised MAE of the median by month of the forecast origin (month number, 1 for January):
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| 01 | 62,496 | 18.91 | 21.62 | 12.5 (8.5 to 16.2) |
+| 02 | 56,448 | 17.61 | 21.11 | 16.6 (13.7 to 19.4) |
+| 03 | 62,046 | 17.89 | 24.05 | 25.6 (22.7 to 28.6) |
+| 04 | 58,456 | 14.31 | 17.14 | 16.5 (13.7 to 19.0) |
+| 05 | 60,176 | 11.57 | 13.92 | 16.8 (14.9 to 18.8) |
+| 06 | 58,501 | 10.71 | 12.65 | 15.3 (12.4 to 18.3) |
+| 07 | 59,726 | 9.54 | 11.63 | 18.0 (15.4 to 20.5) |
+| 08 | 58,613 | 9.98 | 11.26 | 11.4 (8.3 to 14.6) |
+| 09 | 57,492 | 12.79 | 14.59 | 12.4 (9.0 to 15.8) |
+| 10 | 55,100 | 18.22 | 24.08 | 24.3 (19.4 to 29.7) |
+| 11 | 58,226 | 20.33 | 22.59 | 10.0 (8.2 to 11.8) |
+| 12 | 62,496 | 17.40 | 21.81 | 20.2 (17.3 to 23.1) |
+
+Normalised MAE of the median by farm. The labels A to C are in the order of the
+farms' identifiers and are not the labels of earlier pages:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| Wind A | 239,594 | 16.75 | 20.40 | 17.9 (16.6 to 19.2) |
+| Wind B | 235,881 | 13.40 | 15.71 | 14.7 (13.1 to 16.3) |
+| Wind C | 234,301 | 14.67 | 18.01 | 18.6 (17.4 to 19.8) |
 
 ## Solar
 
@@ -575,7 +667,101 @@ experiment 666.
 
 ### Performance
 
-To be added when `solar.parquet` is written.
+**The network beats climatology at short leads and the margin shrinks with the lead
+time.** All numbers are normalised error in points of capacity (percent of capacity; smaller is
+better), averaged over 685,472 daylight half-hours with observed power (of 1,471,680 rows, which
+include night half-hours). The only baseline is climatology: the quantiles of the farm's own cleaned
+power in the same month, half-hour, and neighbouring cells, trained before the first day of the
+origin's month. No manual heuristic exists for solar farms, so none is shown. Gains are those of the
+network over climatology, with a 95% day-block bootstrap interval from 2,000 resamples of origin
+days. Only daylight half-hours are scored: those where the sun is above the horizon at the middle of
+the half-hour. 64,772 daylight half-hours have no observed power and are not scored, mostly in the
+warmer months (up to 14,010 in one month).
+
+#### By lead band
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| days 0 to 1 | 49,221 | 8.74 | 14.85 | 41.2 (38.1 to 44.1) |
+| days 1 to 3 | 98,409 | 9.75 | 14.85 | 34.4 (31.5 to 37.0) |
+| days 3 to 7 | 196,358 | 12.08 | 14.90 | 18.9 (16.4 to 21.4) |
+| days 7 to 10 | 146,927 | 13.48 | 14.96 | 9.9 (7.0 to 12.6) |
+| days 10 to 14 | 194,557 | 14.18 | 15.04 | 5.7 (3.4 to 7.9) |
+
+CRPS (2 × mean pinball loss over the 11 levels):
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| days 0 to 1 | 49,221 | 4.83 | 7.68 | 37.1 (34.6 to 39.6) |
+| days 1 to 3 | 98,409 | 5.33 | 7.69 | 30.7 (28.4 to 33.0) |
+| days 3 to 7 | 196,358 | 6.35 | 7.71 | 17.6 (15.7 to 19.6) |
+| days 7 to 10 | 146,927 | 6.89 | 7.73 | 10.8 (8.8 to 12.7) |
+| days 10 to 14 | 194,557 | 7.18 | 7.76 | 7.6 (6.0 to 9.0) |
+
+![Normalised MAE of the median by forecast horizon for 6 solar farms, network and climatology](solar_mae_by_horizon.svg)
+
+#### By season
+
+Seasons are meteorological and refer to the season of the forecast origin. The backtest year
+contains no complete autumn, so autumn is reported as its first month and its last two months. Dates
+are not given for generator series.
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| autumn (first month) | 40,712 | 8.81 | 9.70 | 9.3 (6.4 to 11.8) |
+| winter | 130,001 | 10.75 | 11.07 | 2.9 (-0.3 to 6.1) |
+| spring | 203,122 | 13.59 | 17.12 | 20.6 (17.5 to 23.6) |
+| summer | 215,329 | 11.98 | 15.42 | 22.3 (20.1 to 24.6) |
+| autumn (last two months) | 96,308 | 14.60 | 16.73 | 12.7 (9.9 to 15.4) |
+
+CRPS:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| autumn (first month) | 40,712 | 4.57 | 5.33 | 14.1 (11.6 to 16.5) |
+| winter | 130,001 | 5.45 | 6.04 | 9.7 (7.2 to 12.2) |
+| spring | 203,122 | 7.13 | 8.77 | 18.8 (16.6 to 20.9) |
+| summer | 215,329 | 6.32 | 7.85 | 19.4 (17.7 to 21.2) |
+| autumn (last two months) | 96,308 | 7.41 | 8.52 | 13.0 (10.9 to 15.1) |
+
+![Normalised MAE of the median by season for 6 solar farms](solar_mae_by_season.svg)
+
+![Model error and CRPS gain over climatology by season and lead band for 6 solar farms](solar_season_by_horizon.svg)
+
+#### By month and by farm
+
+Normalised MAE of the median by month of the forecast origin (month number, 1 for January):
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| 01 | 43,485 | 9.38 | 9.87 | 5.0 (1.5 to 8.3) |
+| 02 | 47,779 | 14.78 | 14.34 | -3.1 (-8.1 to 2.0) |
+| 03 | 60,031 | 16.63 | 18.38 | 9.5 (5.8 to 13.2) |
+| 04 | 66,162 | 13.10 | 18.23 | 28.2 (23.5 to 32.2) |
+| 05 | 76,929 | 11.63 | 15.17 | 23.4 (18.7 to 28.0) |
+| 06 | 77,465 | 11.49 | 14.58 | 21.2 (17.0 to 25.5) |
+| 07 | 69,141 | 12.42 | 16.40 | 24.2 (22.0 to 26.4) |
+| 08 | 68,723 | 12.07 | 15.37 | 21.5 (16.5 to 26.5) |
+| 09 | 55,978 | 15.17 | 17.79 | 14.7 (11.1 to 18.3) |
+| 10 | 40,330 | 13.81 | 15.27 | 9.5 (5.6 to 13.3) |
+| 11 | 40,712 | 8.81 | 9.70 | 9.3 (6.4 to 11.8) |
+| 12 | 38,737 | 7.34 | 8.40 | 12.6 (10.3 to 14.8) |
+
+Normalised MAE of the median by farm. The labels A to F are in the order of the
+farms' identifiers and are not the labels of earlier pages:
+
+| Group | Half-hours | Model | Climatology | Gain over climatology (%) |
+|---|---:|---:|---:|---|
+| Solar A | 120,463 | 11.79 | 14.23 | 17.2 (15.6 to 18.7) |
+| Solar B | 122,261 | 12.10 | 15.11 | 19.9 (18.0 to 21.7) |
+| Solar C | 98,671 | 12.62 | 15.84 | 20.3 (17.8 to 22.6) |
+| Solar D | 102,085 | 14.40 | 17.08 | 15.7 (14.0 to 17.4) |
+| Solar E | 123,904 | 11.50 | 13.64 | 15.7 (14.2 to 17.3) |
+| Solar F | 118,088 | 12.37 | 14.26 | 13.3 (11.5 to 14.9) |
 
 ## Performance by season
 

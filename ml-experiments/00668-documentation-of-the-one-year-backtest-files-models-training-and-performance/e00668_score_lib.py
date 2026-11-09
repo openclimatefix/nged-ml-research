@@ -110,9 +110,17 @@ def manual_heuristic(
 
 
 def climatology(
-    *, grid: np.ndarray, row: np.ndarray, vidx: np.ndarray, cutoff_idx: np.ndarray
+    *,
+    grid: np.ndarray,
+    row: np.ndarray,
+    vidx: np.ndarray,
+    cutoff_idx: np.ndarray,
+    use_weekend: bool = True,
 ) -> np.ndarray:
-    """Return the climatology's 11 quantiles, trained on the power before each row's cutoff."""
+    """Return the climatology's 11 quantiles, trained on the power before each row's cutoff.
+
+    `use_weekend` is `False` for generators, whose power does not follow the working week.
+    """
     n = grid.shape[1]
     times = pl.Series(
         pl.datetime_range(
@@ -126,7 +134,7 @@ def climatology(
     local = times.dt.convert_time_zone("Europe/London")
     month = (local.dt.month() - 1).to_numpy().astype(np.int64)
     half = (local.dt.hour() * 2 + local.dt.minute() // 30).to_numpy().astype(np.int64)
-    weekend = (local.dt.weekday() >= 6).to_numpy().astype(int)
+    weekend = (local.dt.weekday() >= 6).to_numpy().astype(int) * int(use_weekend)
     out = np.full((len(row), len(TAUS)), np.nan, np.float64)
     offsets = [(dm, dh) for dm in (-1, 0, 1) for dh in (-1, 0, 1)]
     for series in np.unique(row):

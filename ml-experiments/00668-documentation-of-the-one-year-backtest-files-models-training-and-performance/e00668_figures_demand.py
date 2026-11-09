@@ -20,7 +20,27 @@ SEASON_COLOURS = {
     "spring": "#17E58F",
     "summer": "#FF4901",
     "autumn (Sep to Oct 2026)": "#B701FF",
+    "autumn (first month)": "#FC9700",
+    "autumn (last two months)": "#B701FF",
 }
+BASELINES = ("Manual heuristic", "Climatology")
+
+
+def systems_in(*, scores: pl.DataFrame, model: str) -> list[str]:
+    """Return the model's name then the baselines present in the scores."""
+    present = set(scores["system"].unique().to_list())
+    return [model, *[s for s in BASELINES if s in present]]
+
+
+def season_scale_for(*, scores: pl.DataFrame) -> alt.Scale:
+    """Return the colour scale of the seasons present, in order of appearance."""
+    seasons = [s for s in SEASON_COLOURS if s in set(scores["group"].unique().to_list())]
+    seasons = seasons or [
+        s for s in SEASON_COLOURS if scores["group"].str.contains(s, literal=True).any()
+    ]
+    return alt.Scale(domain=seasons, range=[SEASON_COLOURS[s] for s in seasons])
+
+
 WIDTH, HEIGHT = 620, 300
 UNIT_NOTE = "points of capacity"
 
@@ -33,7 +53,7 @@ def horizon_chart(*, scores: pl.DataFrame, label: str, model: str) -> alt.Chart:
         .with_columns(system=pl.col("system").replace({"Model": model}))
         .to_pandas()
     )
-    domain = [model, "Manual heuristic", "Climatology"]
+    domain = systems_in(scores=scores, model=model)
     return (
         alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=2)
@@ -54,7 +74,7 @@ def horizon_chart(*, scores: pl.DataFrame, label: str, model: str) -> alt.Chart:
                 title=None,
                 scale=alt.Scale(
                     domain=domain,
-                    range=[COLOURS["Model"], COLOURS["Manual heuristic"], COLOURS["Climatology"]],
+                    range=[COLOURS["Model"], *[COLOURS[s] for s in domain[1:]]],
                 ),
                 legend=alt.Legend(orient="top", columns=3),
             ),
@@ -76,33 +96,36 @@ def horizon_chart(*, scores: pl.DataFrame, label: str, model: str) -> alt.Chart:
 
 def season_chart(*, scores: pl.DataFrame, label: str, model: str) -> alt.Chart:
     """Return the MAE of the median by season for the three systems, with 95% intervals."""
-    order = list(SEASON_COLOURS)
+    order = [s for s in SEASON_COLOURS if s in set(scores["group"].unique().to_list())]
+    domain = systems_in(scores=scores, model=model)
     frame = (
         scores.filter((pl.col("slice") == "season") & (pl.col("metric") == "mae"))
         .with_columns(system=pl.col("system").replace({"Model": model}))
         .to_pandas()
     )
-    base = alt.Chart(frame).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(
+        frame
+    ).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("group:N", title=None, sort=order, axis=alt.Axis(labelAngle=0, labelLimit=140)),
         color=alt.Color(
             "system:N",
             title=None,
             scale=alt.Scale(
-                domain=[model, "Manual heuristic", "Climatology"],
-                range=[COLOURS["Model"], COLOURS["Manual heuristic"], COLOURS["Climatology"]],
+                domain=domain,
+                range=[COLOURS["Model"], *[COLOURS[s] for s in domain[1:]]],
             ),
             legend=alt.Legend(orient="top", columns=3),
         ),
         xOffset=alt.XOffset("system:N"),
     )
-    points = base.mark_point(filled=True, size=70).encode(
+    points = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y(
             "mean:Q",
             title=f"Median-forecast MAE ({UNIT_NOTE}; smaller is better)",
             scale=alt.Scale(zero=False),
         )
     )
-    bars = base.mark_rule(strokeWidth=2).encode(y="lo:Q", y2="hi:Q")
+    bars = base.mark_rule(strokeWidth=2).encode(y="lo:Q", y2="hi:Q")  # ty: ignore[unresolved-attribute]
     return (points + bars).properties(
         width=WIDTH,
         height=HEIGHT,
@@ -124,14 +147,16 @@ def season_lead_chart(*, scores: pl.DataFrame, label: str) -> alt.VConcatChart:
         season=pl.col("group").str.split(" | ").list.get(0),
         band=pl.col("group").str.split(" | ").list.get(1),
     )
-    season_scale = alt.Scale(domain=list(SEASON_COLOURS), range=list(SEASON_COLOURS.values()))
+    season_scale = season_scale_for(scores=scores)
+    reference = "Manual heuristic" if "Manual heuristic" in set(scores["system"]) else "Climatology"
+    reference_name = reference.lower()
     colour = alt.Color(
         "season:N", title=None, scale=season_scale, legend=alt.Legend(orient="top", columns=3)
     )
     x = alt.X("band:N", title="Forecast horizon", sort=bands, axis=alt.Axis(labelAngle=0))
     mae = (
-        alt.Chart(
-            frame.filter((pl.col("system") == "Model") & (pl.col("metric") == "mae")).to_pandas()  # ty: ignore[unresolved-attribute]
+        alt.Chart(  # ty: ignore[unresolved-attribute]
+            frame.filter((pl.col("system") == "Model") & (pl.col("metric") == "mae")).to_pandas()
         )
         .mark_line(point=True, strokeWidth=2)
         .encode(
@@ -142,17 +167,15 @@ def season_lead_chart(*, scores: pl.DataFrame, label: str) -> alt.VConcatChart:
         .properties(width=WIDTH, height=HEIGHT)
     )
     gain = (
-        alt.Chart(
-            frame.filter(
-                (pl.col("system") == "Manual heuristic") & (pl.col("metric") == "crps")
-            ).to_pandas()  # ty: ignore[unresolved-attribute]
+        alt.Chart(  # ty: ignore[unresolved-attribute]
+            frame.filter((pl.col("system") == reference) & (pl.col("metric") == "crps")).to_pandas()
         )
         .mark_line(point=True, strokeWidth=2)
         .encode(
             x=x,
             y=alt.Y(
                 "gain_pct:Q",
-                title="CRPS gain over the manual heuristic (%; larger is better)",
+                title=f"CRPS gain over {reference_name} (%; larger is better)",
                 scale=alt.Scale(zero=False),
             ),
             color=alt.Color("season:N", legend=None, scale=season_scale),
@@ -162,8 +185,8 @@ def season_lead_chart(*, scores: pl.DataFrame, label: str) -> alt.VConcatChart:
     return alt.vconcat(mae, gain).properties(
         title=alt.TitleParams(
             [
-                f"Model error and gain over the manual heuristic by season and horizon, {label}",
-                "Season of the forecast origin. Gain: how far the model's CRPS is below the heuristic's, in percent.",
+                f"Model error and gain over {reference_name} by season and horizon, {label}",
+                f"Season of the forecast origin. Gain: how far the model's CRPS is below the {reference_name}'s, in percent.",
             ],
             anchor="start",
             fontSize=13,
