@@ -342,6 +342,13 @@ half-hour, or a baseline is missing. The manual heuristic and climatology are de
 output over the baseline, with a 95% day-block bootstrap interval from 2,000 resamples of origin
 days.
 
+Over all rows, the CRPS is 4.31 for normal running and 4.14 for prevailing, and the normalised MAE
+of the median is 7.58 and 7.38. The
+[experiment 667 page](../00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/result.md)
+reports 4.32 and 4.14 for CRPS and 7.59 and 7.39 for the normalised MAE. The values agree to within
+0.01. This page scores the 3,893,864 half-hour rows that have cleaned observed power, and the 667
+page scores the full ground truth, which may explain the 0.01.
+
 The two outputs of `NRA_or_prevailing` were scored separately. 2025-11 and 2025-12 use the B-haz
 fallback head and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks, so the
 prevailing output of the first two months comes from a different head. Every Primaries number on
