@@ -52,6 +52,7 @@ def positives_only() -> gen.GeneratorConfig:
         overlap_prob=0.0,
         chain_prob=0.0,
         events_per_primary_year=4.0,
+        recipient_start_offset_hh=(0, 0),
     )
 
 
@@ -129,7 +130,7 @@ def test_recipients_receive_the_stated_share_of_the_donors_change() -> None:
         received = sum(diff_of(world, r) for r in recipients["site"])
         # A site can sit in two groups, so test the table instead of the panel when it does.
         assert gid is not None
-        np.testing.assert_allclose(recipients["delta"].sum(), -share * donor["delta"][0], rtol=1e-9)
+        np.testing.assert_allclose(recipients["delta"].sum(), -share * donor["delta"][0], rtol=1e-9)  # ty: ignore[no-matching-overload]
         if (
             world.events.filter(pl.col("site").is_in([donor["site"][0], *recipients["site"]]))
             .get_column("group_id")
@@ -139,7 +140,7 @@ def test_recipients_receive_the_stated_share_of_the_donors_change() -> None:
             ok = np.isfinite(panel.power[donor["site"][0]])
             for r in recipients["site"]:
                 ok &= np.isfinite(panel.power[r])
-            np.testing.assert_allclose(received[ok], -share * donor_change[ok], atol=1e-9)
+            np.testing.assert_allclose(received[ok], -share * donor_change[ok], atol=1e-9)  # ty: ignore[not-subscriptable]
     assert groups >= 5
 
 
@@ -184,7 +185,7 @@ def test_no_event_starts_at_or_after_the_cutoff_and_the_cutoff_data_stays_empty(
     config = replace(gen.default_config(), cutoff=cutoff)
     world = gen.inject(panel=panel, config=config, seed=7)
     stop = panel.time_index(when=cutoff)
-    assert world.events["start"].max() < stop
+    assert world.events["start"].max() < stop  # ty: ignore[unsupported-operator]
     for s in panel.sites:
         assert np.isnan(world.power[s][stop:]).all()
 
@@ -279,6 +280,7 @@ def test_step_ramp_drift_staged_and_partial_return_profiles() -> None:
             "delta": 2.0,
             "units": 10.0,
             "shape": "constant",
+            "prop_share": 1.0,
             "shape_source": "A",
             "ramp_in_hh": 0,
             "ramp_out_hh": 0,
@@ -369,9 +371,9 @@ def test_no_event_of_any_class_sits_where_its_primary_has_no_data() -> None:
     )
     world = gen.inject(panel=gappy, seed=13)
     on_c = world.events.filter((pl.col("site") == "C") & (pl.col("event_class") != "common_mode"))
-    assert on_c["start"].min() >= 2 * 365 * gen.DAY - gen.DAY
+    assert on_c["start"].min() >= 2 * 365 * gen.DAY - gen.DAY  # ty: ignore[unsupported-operator]
     cm = world.events.filter((pl.col("site") == "C") & (pl.col("event_class") == "common_mode"))
-    assert cm["start"].min() >= 2 * 365 * gen.DAY
+    assert cm["start"].min() >= 2 * 365 * gen.DAY  # ty: ignore[unsupported-operator]
 
 
 def test_table_conserves_megawatts_even_when_gaps_differ() -> None:
@@ -394,3 +396,17 @@ def test_table_conserves_megawatts_even_when_gaps_differ() -> None:
         rec = rows.filter(pl.col("role") == "recipient")
         if donor.height == 1 and rec.height:
             assert rec["delta"].sum() == pytest.approx(-donor["share"][0] * donor["delta"][0])
+
+
+def test_shuffled_placebo_keeps_sizes_and_durations_but_moves_starts() -> None:
+    """A shuffled placebo keeps sizes and durations but moves starts."""
+    panel = make_panel()
+    world = gen.inject(panel=panel, config=positives_only(), seed=14)
+    placebo = gen.shuffled_placebo(panel=panel, events=world.events, seed=1)
+    assert placebo["delta"].to_list() == world.events["delta"].to_list()
+    both = world.events.join(placebo, on="event_id", suffix="_p")
+    closed = both.filter(pl.col("end").is_not_null())
+    assert (closed["end"] - closed["start"] == closed["end_p"] - closed["start_p"]).all()
+    assert (both["start"] != both["start_p"]).sum() > both.height // 2
+    assert placebo["start"].min() >= 0  # ty: ignore[unsupported-operator]
+    gen.apply_events(panel=panel, events=placebo)

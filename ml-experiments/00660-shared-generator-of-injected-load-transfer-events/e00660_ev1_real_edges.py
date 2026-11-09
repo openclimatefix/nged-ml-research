@@ -22,9 +22,9 @@ import polars as pl
 
 DAY: Final[int] = data.DAY
 HALF_WINDOW: Final[int] = 4 * DAY
-SHIFTS: Final[range] = range(-24, 25)
-WIDTHS: Final[range] = range(25)
-N_BOOT: Final[int] = 300
+SHIFTS: Final[range] = range(-48, 49)
+WIDTHS: Final[range] = range(49)
+N_BOOT: Final[int] = 200
 OFFSET_2019: Final[int] = int((data.GRID_START - data.LABEL_ORIGIN).total_seconds() // 1800)
 DONOR: Final[dict[str, str]] = {"D5/D16": "D5", "D3/D22": "D22"}
 """Donor of each verified transfer (the Primary whose power fell during the event)."""

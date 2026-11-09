@@ -70,6 +70,7 @@ EVENT_COLUMNS: Final[dict[str, pl.DataType | type[pl.DataType]]] = {
     "delta": pl.Float64,
     "units": pl.Float64,
     "shape": pl.String,
+    "prop_share": pl.Float64,
     "shape_source": pl.String,
     "ramp_in_hh": pl.Int64,
     "ramp_out_hh": pl.Int64,
@@ -187,8 +188,12 @@ class GeneratorConfig:
     """Chance of a second step to 0.5 to 1.5 times the level halfway through an event."""
     drift_range: tuple[float, float] = (-0.2, 0.2)
     """Linear drift of the level across an event, as a fraction of the level."""
-    proportional_prob: float = 0.5
-    """Chance that a step follows the donor's own daily profile instead of a constant MW."""
+    recipient_start_offset_hh: tuple[int, int] = (0, 36)
+    """Half-hours by which a recipient's start differs from the donor's (the end is shared)."""
+    proportional_prob: float = 1.0
+    """Chance that a step follows the donor's daily profile at least in part (else constant MW)."""
+    proportional_share_range: tuple[float, float] = (0.3, 1.0)
+    """Share of a proportional step that follows the donor's profile; the rest is constant MW."""
 
     # --- hard negatives
     hard_negatives: bool = True
@@ -252,6 +257,7 @@ def shaped_transfers(config: GeneratorConfig | None = None) -> GeneratorConfig:
     return replace(
         short_heavy(config),
         proportional_prob=1.0,
+        proportional_share_range=(0.5, 1.0),
         ramp_hh=(0, 4),
         staged_return_prob=0.5,
     )
@@ -294,9 +300,9 @@ def unit_profile(*, row: dict, source: np.ndarray | None, length: int) -> np.nda
     The profile is 1 on the plateau, ramps linearly over `ramp_in_hh` and `ramp_out_hh`
     half-hours, drifts linearly by `drift` across the event, steps by `mid_factor` halfway, drops
     to 0.5 for the last `staged_hh` half-hours, and settles at `residual_frac` after the end. A
-    proportional step is multiplied by the shape source's power over the event, divided by its
-    mean over the event, clipped to [0, 3], and renormalised to mean 1, so `delta` is the mean
-    change.
+    proportional step is multiplied by ``(1 - c) + c * q``, where ``c`` is `prop_share` and ``q`` is
+    the shape source's power over the event divided by its mean, clipped to [0, 3] and
+    renormalised to mean 1, so `delta` is the mean change.
     """
     lo, hi = window_of(row=row, length=length)
     out = np.zeros(max(hi - lo, 0))
@@ -329,7 +335,8 @@ def unit_profile(*, row: dict, source: np.ndarray | None, length: int) -> np.nda
         mean = float(seg[ok].mean()) if ok.any() else 0.0
         if mean > 0:
             q = np.where(ok, np.clip(seg / mean, 0.0, 3.0), 1.0)
-            p *= q / q.mean()
+            c = float(row["prop_share"])
+            p *= (1 - c) + c * q / q.mean()
     out[:n] = p
     out[n:] = row["residual_frac"]
     return out
@@ -428,6 +435,7 @@ class _Builder:
             "residual_frac": 0.0,
             "units": 0.0,
             "shape": "constant",
+            "prop_share": 0.0,
             "shape_source": "",
             "ramp_in_hh": 0,
             "ramp_out_hh": 0,
@@ -545,6 +553,7 @@ class _Builder:
         fields = self.shape_fields(n=n, permanent=permanent)
         proportional = rng.random() < c.proportional_prob
         shape = "proportional" if proportional else "constant"
+        prop_share = float(rng.uniform(*c.proportional_share_range)) if proportional else 0.0
         group = self.next_group
         self.next_group += 1
         nbrs = [x for x in panel.neighbours.get(donor, []) if x in able]
@@ -566,6 +575,7 @@ class _Builder:
             "start": st,
             "end": end,
             "shape": shape,
+            "prop_share": prop_share,
             "share": rho,
             "chain_parent": chain_parent,
             **fields,
@@ -583,13 +593,17 @@ class _Builder:
         if recipients:
             split = rng.dirichlet(np.ones(len(recipients)))
             for r, frac in zip(recipients, split, strict=True):
+                offset = int(
+                    rng.integers(c.recipient_start_offset_hh[0], c.recipient_start_offset_hh[1] + 1)
+                )
+                r_start = max(self.lo, min(st + offset, st + max(n - 6, 0)))
                 self.row(
                     site=r,
                     role="recipient",
                     delta=-rho * float(frac) * d_delta,
                     shape_source=donor if donor_seen else r,
                     partners=[donor] if donor_seen else [],
-                    **common,
+                    **{**common, "start": r_start},
                 )
         head = first if first is not None else self.rows[-1]
         parents.append(
@@ -626,6 +640,7 @@ class _Builder:
                     end=min(st + dur, self.hi),
                     delta=size,
                     shape="proportional",
+                    prop_share=1.0,
                     shape_source=site,
                     ramp_in_hh=2,
                     ramp_out_hh=2,
@@ -783,3 +798,32 @@ def start_times_from(*, onset_index: np.ndarray, origin: datetime) -> StartTimes
     hh = np.array([(w.hour * 60 + w.minute) // 30 for w in when], dtype=int)
     wd = np.array([w.weekday() for w in when], dtype=int)
     return StartTimes(half_hour_of_day=hh, weekday=wd)
+
+
+def shuffled_placebo(*, panel: PowerPanel, events: pl.DataFrame, seed: int) -> pl.DataFrame:
+    """The same events at random start times: sizes, durations, donors, and recipients unchanged.
+
+    Every group (a donor with its recipients) moves rigidly by one random shift, so the marginal
+    distribution of sizes, durations, and topology is kept while the link between an event and
+    the real power and weather around it is broken. Use it as the placebo arm beside a contrast.
+    Common-mode rows stay where they are.
+    """
+    rng = np.random.default_rng(seed)
+    stop = min(panel.length, panel.time_index(when=CUTOFF))
+    rows = events.to_dicts()
+    shift: dict[int, int] = {}
+    for row in rows:
+        gid = row["group_id"]
+        if gid in shift or row["event_class"] == "common_mode":
+            continue
+        group = [r for r in rows if r["group_id"] == gid]
+        first = min(r["start"] for r in group)
+        last = max((stop if r["end"] is None else r["end"]) for r in group)
+        lo, hi = -first, stop - 1 - last
+        shift[gid] = int(rng.integers(lo, hi + 1)) if hi > lo else 0
+    for row in rows:
+        d = shift.get(row["group_id"], 0)
+        row["start"] += d
+        if row["end"] is not None:
+            row["end"] += d
+    return pl.DataFrame(rows, schema=EVENT_COLUMNS)
