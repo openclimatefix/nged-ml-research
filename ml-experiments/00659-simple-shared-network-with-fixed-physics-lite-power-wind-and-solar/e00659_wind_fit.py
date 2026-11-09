@@ -28,7 +28,7 @@ runs from that date to `R`, as experiment 615 did.
 import argparse
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
@@ -60,6 +60,18 @@ ARMS: Final[dict[str, tuple[tuple[str, ...], bool]]] = {
     "PLP_cal": ((*common.RAW_NAMES, *common.PL_NAMES), True),
 }
 """Arm -> (weather columns, whether the calendar columns are added)."""
+
+
+SCHEDULES: Final = {
+    "twice_monthly": w615.refit_dates,
+    "quarterly": lambda: [
+        datetime(2025, 10, 1, tzinfo=UTC),
+        datetime(2026, 1, 1, tzinfo=UTC),
+        datetime(2026, 4, 1, tzinfo=UTC),
+    ],
+    "single": lambda: [datetime(2025, 10, 1, tzinfo=UTC)],
+}
+"""Refit dates of each schedule; the quarterly and single schedules score every run up to 2026-07-01."""
 
 
 def load_cases() -> pl.DataFrame:
@@ -196,18 +208,27 @@ def main() -> None:
     parser.add_argument("arm", choices=list(ARMS))
     parser.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     parser.add_argument("--first-only", action="store_true")
+    parser.add_argument("--schedule", choices=list(SCHEDULES), default="twice_monthly")
     args = parser.parse_args()
-    common.FIT_DIR.mkdir(parents=True, exist_ok=True)
+    fit_dir = (
+        common.FIT_DIR
+        if args.schedule == "twice_monthly"
+        else common.DATA_DIR / f"wind_fits_{args.schedule}"
+    )
+    fit_dir.mkdir(parents=True, exist_ok=True)
     frame = load_cases()
     labels = common461.WIND_LABEL
-    dates = w615.refit_dates()
+    dates = SCHEDULES[args.schedule]()
     started = time.time()
     for index, refit in enumerate(dates):
-        upper = (
-            dates[index + 1]
-            if index + 1 < len(dates) and dates[index + 1].month == refit.month
-            else w615.month_end(refit=refit)
-        )
+        if args.schedule == "twice_monthly":
+            upper = (
+                dates[index + 1]
+                if index + 1 < len(dates) and dates[index + 1].month == refit.month
+                else w615.month_end(refit=refit)
+            )
+        else:
+            upper = dates[index + 1] if index + 1 < len(dates) else common.VALID_LIMIT
         cap = {f: capacity_730(site_label=labels[f], refit=refit) for f in FARMS}
         ratio = {f: cap[f]["ratio"] for f in FARMS}
         scale = pl.col("site").replace_strict(ratio, return_dtype=pl.Float64)
@@ -218,7 +239,7 @@ def main() -> None:
             (pl.col("power_fcst_init_time") >= refit) & (pl.col("power_fcst_init_time") < upper)
         )
         for seed in args.seeds:
-            path = common.FIT_DIR / f"{args.arm}_refit={refit:%Y-%m-%d}_seed={seed}.parquet"
+            path = fit_dir / f"{args.arm}_refit={refit:%Y-%m-%d}_seed={seed}.parquet"
             if path.exists():
                 continue
             out = train_and_predict(

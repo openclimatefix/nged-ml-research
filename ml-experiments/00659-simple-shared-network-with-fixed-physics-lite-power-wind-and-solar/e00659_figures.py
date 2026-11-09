@@ -26,7 +26,7 @@ COLOUR = {
     "PLP_cal": "#17E58F",
     "default": "#000000",
     "climatology": "#9A9A9A",
-    "GAM": "#9A9A9A",
+    "GAM": "#8FB0FF",
 }
 LABEL = {
     "wind_S": "S (raw weather)",
@@ -65,7 +65,7 @@ def save(chart: alt.TopLevelMixin, out: Path, name: str) -> None:
 
 
 def score_chart(
-    *, csv: str, names: list[str], title: list[str], subtitle: list[str]
+    *, csv: str, names: list[str], title: list[str], subtitle: list[str], first_band: str = "0-24 h"
 ) -> alt.TopLevelMixin:
     frame = pl.read_csv(SCORES / csv).filter(
         pl.col("candidate").is_in(names) & (pl.col("band") != "all (0-240 h)")
@@ -77,7 +77,12 @@ def score_chart(
     order = [LABEL[n] for n in names]
     colours = [COLOUR[COL_OF[n]] for n in names]
     base = alt.Chart(frame.to_pandas()).encode(
-        y=alt.Y("band:N", title=None, sort=["0-24 h", "24-120 h", "120-240 h"]),
+        y=alt.Y(
+            "band:N",
+            title=None,
+            sort=["0-24 h", "24-120 h", "120-240 h"],
+            axis=alt.Axis(labelExpr=f"datum.label == '0-24 h' ? '{first_band}' : datum.label"),
+        ),
         color=alt.Color(
             "arm:N",
             sort=order,
@@ -122,13 +127,20 @@ def contrast_chart() -> alt.TopLevelMixin:
         rule = (
             alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(strokeDash=[4, 3], color="black")
-            .encode(x=alt.X("x:Q", scale=alt.Scale(domain=[-0.25, 0.25])))
+            .encode(
+                x=alt.X(
+                    "x:Q",
+                    scale=alt.Scale(domain=[-0.25, 0.25]),
+                    axis=alt.Axis(values=[-0.2, -0.1, 0, 0.1, 0.2]),
+                )
+            )
         )
         dots = base.mark_point(filled=True, size=70, color="#FF4901").encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "difference:Q",
                 title="Quantile score difference (points of capacity; negative: the arm scores better)",
                 scale=alt.Scale(domain=[-0.25, 0.25]),
+                axis=alt.Axis(values=[-0.2, -0.1, 0, 0.1, 0.2]),
             )
         )
         lines = base.mark_rule(color="#FF4901").encode(  # ty: ignore[unresolved-attribute]
@@ -137,7 +149,7 @@ def contrast_chart() -> alt.TopLevelMixin:
         panels.append((rule + lines + dots).properties(width=WIDTH, height=140, title=tech))
     return alt.vconcat(*panels).properties(
         title=alt.TitleParams(
-            "No simple arm scores detectably worse than the current default",
+            "No arm scores detectably worse than its current default",
             subtitle=[
                 "Dot: estimate over 0 to 240 h. Line: 99% interval from resampling the 5 forecast-origin months.",
                 "Dashed: same as the default.",
@@ -248,8 +260,9 @@ def main() -> None:
             title=["Solar: the simple arms score as well as a2_member at every lead"],
             subtitle=[
                 "Bar: quantile score, 6 solar farms, daylight half-hours, 5 development months.",
-                "Line: 99% interval from resampling the 5 months.",
+                "Line: 99% interval from resampling the 5 months. Leads run from 12 h.",
             ],
+            first_band="12-24 h",
         ),
         out,
         "solar_score_by_lead_band",
@@ -257,7 +270,7 @@ def main() -> None:
     save(contrast_chart(), out, "contrasts")
     sub = [
         "Black: observed power. Orange line: median forecast. Bands: 50% and 90% intervals.",
-        "Day-ahead forecasts (24 to 48 h ahead), 14 days of one month.",
+        "Forecasts issued 24 to 48 h ahead.",
     ]
     save(
         example(

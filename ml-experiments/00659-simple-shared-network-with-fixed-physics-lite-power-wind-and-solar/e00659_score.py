@@ -281,6 +281,8 @@ def main() -> None:
     wind = [f"wind_{a}" for a in ("S", "PLP", "PL", "S_cal", "PLP_cal")] + [
         "wind_default2_old_capacity",
         "wind_default2_730",
+        "wind_S_single",
+        "wind_S_quarterly",
         "wind_climatology",
     ]
     solar = [f"solar_{a}" for a in ("S", "PLP", "PL")] + [

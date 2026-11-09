@@ -168,10 +168,17 @@ def main() -> None:
     for directory, name in (
         (common.E615_DIR / "wind_default2", "wind_default2_old_capacity"),
         (common.DATA_DIR / "wind_default2_730", "wind_default2_730"),
+        (common.DATA_DIR / "wind_fits_single", "wind_S_single"),
+        (common.DATA_DIR / "wind_fits_quarterly", "wind_S_quarterly"),
     ):
-        if not list(directory.glob("refit=*_seed=*.parquet")):
+        if not list(directory.glob("*refit=*_seed=*.parquet")):
             continue
-        table = wind(arm="D2", directory=directory, pattern="refit=*_seed=*.parquet", name=name)
+        table = wind(
+            arm="D2",
+            directory=directory,
+            pattern="refit=*_seed=*.parquet" if "default2" in name else "S_refit=*_seed=*.parquet",
+            name=name,
+        )
         table.write_parquet(common.TABLE_DIR / f"{name}.parquet")
         for variant, col, drop in (
             ("cleaned_zeros", "actual", False),
