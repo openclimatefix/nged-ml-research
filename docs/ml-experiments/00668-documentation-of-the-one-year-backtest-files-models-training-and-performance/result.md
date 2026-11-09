@@ -60,6 +60,8 @@ This page documents the five Parquet files of the one-year backtest in
 `data/ml-experiments/backtest_year_2025-11_to_2026-10/`. It has two readers: the colleague at NGED
 who receives the files, and an engineer who must re-implement one of the five models behind them.
 A Primary is a primary substation, a BSP is a bulk supply point, and a GSP is a grid supply point.
+CRPS is the continuous ranked probability score, and MAE is the mean absolute error. Both are in
+points of capacity, and smaller is better.
 
 **Take-home message.** The five backtest files hold forecasts that are better than climatology at
 every lead band for the demand types and for solar, and better for wind out to day 10. The CRPS
@@ -131,7 +133,7 @@ description of one year and not a ranking.
   carrying a shift that is already running forward and widening the band with the probability
   that the shift ends. Each key (series, valid time, origin) has one row of each kind.
 - **Checks.** Each file is checked for the row count above, no duplicate key, no null or
-  non-finite quantile, no crossing quantiles, and UTC time-zone. Each worker's page states the
+  non-finite quantile, no crossing quantiles, and UTC time-zone. Each experiment's page states the
   results and a spot check that no input is newer than the limits above.
 
 ## The ground-truth files
@@ -181,7 +183,7 @@ forecast files never hold observed power. The script is
   files do not hold. They read the cleaned power table of the data store.
 - **Checks.** The row count equals the series count times the half-hours in the grid for every
   file, no key repeats, the time-zone is UTC, and the series are 16 Primaries, 2 BSPs, 2 GSPs,
-  3 wind farms, and 6 solar farms. A fresh Sonnet audit re-read all five files against the raw and
+  3 wind farms, and 6 solar farms. A fresh audit re-read all five files against the raw and
   cleaned tables for every series and found no mismatch.
 
 ## Primaries
@@ -326,15 +328,15 @@ fixes the choices that the earlier experiments left open, and this section resta
 ### Performance
 
 **Both outputs beat the manual heuristic and climatology at every lead band, and the prevailing
-output scores better than the normal-running output overall but worse in the 7 days after a load
-shift ends.** Every number is a normalised error in points of capacity (percent of capacity; smaller
-is better) over all 16 Primaries, pooled. For the MVA-only Primaries the denominator is the capacity
-in MVA, so the numbers mix real and apparent power. Of the 3,924,480 rows of each output, 3,893,864
-are scored: the rest have no observed power, the cleaning flagged the half-hour, or a baseline is missing.
-The manual
-heuristic and climatology are described under [Comparison
-baselines](#comparison-baselines-slices-and-summary-figures). Gains are those of the output over the
-baseline, with a 95% day-block bootstrap interval from 2,000 resamples of origin days.
+output scores better than the normal-running output overall but worse in the 7 days after the one
+verified load shift ends.** Every number is a normalised error in points of capacity (percent of
+capacity; smaller is better) over all 16 Primaries, pooled. For the MVA-only Primaries the
+denominator is the capacity in MVA, so the numbers mix real and apparent power. Of the 3,924,480
+rows of each output, 3,893,864 are scored: the rest have no observed power, the cleaning flagged the
+half-hour, or a baseline is missing. The manual heuristic and climatology are described under
+[Comparison baselines](#comparison-baselines-slices-and-summary-figures). Gains are those of the
+output over the baseline, with a 95% day-block bootstrap interval from 2,000 resamples of origin
+days.
 
 The two outputs of `NRA_or_prevailing` were scored separately. 2025-11 and 2025-12 use the B-haz
 fallback head and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks, so the
@@ -429,6 +431,8 @@ CRPS, prevailing:
 ![Model error and CRPS gain by season and lead band, 16 Primaries, normal running](primaries_NRA_season_by_horizon.svg)
 
 ![Normalised MAE of the median by season for 16 Primaries, prevailing](primaries_prevailing_mae_by_season.svg)
+
+![Model error and CRPS gain by season and lead band, 16 Primaries, prevailing](primaries_prevailing_season_by_horizon.svg)
 
 CRPS by month of the forecast origin, normal running:
 
@@ -1152,13 +1156,11 @@ set has no inside or outside rows):
 | 7 days after | 5.33 | 20.05 | 8.33 | 12.31 |
 | outside (same Primaries) | 5.64 | 5.66 | 6.40 | 8.19 |
 
-**After a shift ends, the prevailing output is worse than the normal-running output.** In the 7 days
-after the verified transfer ends, the CRPS of the prevailing output is
-11.60 against
-3.31 for the normal-running output; inside the
-transfer it is 12.40 against
-14.98. The time-series figures of the verified transfer are
-under [The load shift at D5 and D16](#the-load-shift-at-d5-and-d16).
+**After the one verified load shift ended, the prevailing output scored worse than the
+normal-running output.** In the 7 days after the verified transfer ends, the CRPS of the prevailing
+output is 11.60 against 3.31 for the normal-running output; inside the transfer it is 12.40 against
+14.98. The time-series figures of the verified transfer are under [The load shift at D5 and
+D16](#the-load-shift-at-d5-and-d16).
 
 ### Error by horizon and by condition
 
