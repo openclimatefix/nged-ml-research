@@ -1,5 +1,8 @@
 # ruff: noqa: E501, ANN001, PLR0915
-"""Experiment 661, Part 3: a bias adapter and a fleet-shape mixture in front of experiment 644's physics curve.
+"""Experiment 661, Part 3: a bias adapter and a fleet-shape mixture.
+
+Experiment 661, Part 3: a bias adapter and a fleet-shape mixture in front of experiment 644's
+physics curve.
 
 Arm A (`adapter`) is experiment 644's calibrated explicit network (arm b) with its fixed physics
 curve replaced by a differentiable one:
@@ -7,7 +10,8 @@ curve replaced by a differentiable one:
 1. A small adapter maps the ensemble inputs of each row (ensemble-mean clear-sky index, the ensemble
    standard deviation of shortwave as a share of clear-sky irradiance, lead in days, hour of day as
    sine and cosine, temperature) to a bounded correction of the clear-sky index, `kt' = kt + 0.25 *
-   tanh(MLP)`, clipped to 0 to 1.4. The last layer starts at zero, so training starts at the mean-sky curve.
+   tanh(MLP)`, clipped to 0 to 1.4. The last layer starts at zero, so training starts at the
+   mean-sky curve.
 2. The corrected irradiance `kt' * clear_sky` goes through plane-of-array irradiance tabulated on a
    grid of clear-sky indices (pvlib Erbs split, three tilts, south facing), interpolated linearly.
 3. A fleet-shape mixture per Primary weights 15 components (three tilts times five DC-to-AC ratios,
@@ -186,7 +190,11 @@ class AdaptedCurve(torch.nn.Module):
         return torch.softmax(self.logits, dim=1)
 
     def prior_penalty(self) -> torch.Tensor:
-        """Return the negative log Dirichlet density (up to a constant) of the weights of the six Primaries, per fine-tuning row."""
+        """Return the negative log Dirichlet density of the mixture weights.
+
+        Return the negative log Dirichlet density (up to a constant) of the weights of the six
+        Primaries, per fine-tuning row.
+        """
         w = self.weights()
         return -(DIRICHLET_ALPHA - 1.0) * torch.log(w + 1e-9).sum() / MIX_PENALTY_ROWS
 
@@ -199,7 +207,11 @@ class AdaptedCurve(torch.nn.Module):
         )
 
     def forward(self, r: Rows) -> torch.Tensor:
-        """Return the unit curve (AC output per MW of AC capacity, divided by the 99th-percentile constant) of each row."""
+        """Return the unit curve of each row.
+
+        Return the unit curve (AC output per MW of AC capacity, divided by the 99th-percentile
+        constant) of each row.
+        """
         kt = self.corrected_kt(r)
         pos = kt / float(KT_GRID[1] - KT_GRID[0])
         i0 = torch.clamp(pos.floor().long(), 0, len(KT_GRID) - 2)
@@ -303,7 +315,11 @@ def _train(*, model, curve, tr: Rows, y, r4, after, p, w, is_val, mean, std, ten
 def run_month(
     *, cutoff: str, month: str, arms: list[str], seeds: list[int], clean: np.ndarray, smoke: bool
 ) -> None:
-    """Fine-tune the adapter arms for one month of one cutoff and forecast it (experiment 644's `run_month`, real world, arm b's start)."""
+    """Fine-tune the adapter arms for one month of one cutoff and forecast it.
+
+    Fine-tune the adapter arms for one month of one cutoff and forecast it (experiment 644's
+    `run_month`, real world, arm b's start).
+    """
     six = k634.six_indices()
     world = "real"
     refit = c.month_start(month=month)

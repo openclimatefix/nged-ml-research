@@ -1,5 +1,8 @@
 # ruff: noqa: E501
-"""Experiment 661, step 6: experiment 644's explicit-minus-free contrast at 3-hourly and 6-hourly ensemble leads.
+"""Experiment 661, step 6: the contrast at 3-hourly and 6-hourly ensemble leads.
+
+Experiment 661, step 6: experiment 644's explicit-minus-free contrast at 3-hourly and 6-hourly
+ensemble leads.
 
 Reads experiment 644's stored quantiles (arms `a` free and `b` calibrated explicit, real months, five
 seeds) and splits the sunny-midday contrast by the ensemble's native step width: a power-forecast

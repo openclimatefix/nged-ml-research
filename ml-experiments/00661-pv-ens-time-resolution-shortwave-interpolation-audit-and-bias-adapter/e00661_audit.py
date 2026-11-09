@@ -107,7 +107,11 @@ def _frame(*, native: pl.DataFrame, run: datetime, table: pl.DataFrame) -> pl.La
 
 
 def method_production(*, native: pl.LazyFrame, table: pl.DataFrame) -> pl.DataFrame:
-    """Return production's half-hourly shortwave (ml_core `_radiation`: window-mean index interpolation, energy conserved)."""
+    """Return production's half-hourly shortwave.
+
+    Return production's half-hourly shortwave (ml_core `_radiation`: window-mean index
+    interpolation, energy conserved).
+    """
     coords = table.lazy().select("time_series_id", "latitude", "longitude")
     return _upsample_nwp_to_half_hourly(native, solar_coordinates=coords).collect()
 
@@ -133,7 +137,10 @@ def method_step(*, native: pl.DataFrame) -> pl.DataFrame:
 
 
 def method_linear(*, native: pl.DataFrame) -> pl.DataFrame:
-    """Return linear flux interpolation between native stamps, treating each period-ending mean as a value at its stamp.
+    """Return linear flux interpolation between native stamps.
+
+    Return linear flux interpolation between native stamps, treating each period-ending mean as
+    a value at its stamp.
 
     This is how the resampler worked before the 2026-10-12 radiation change: no de-accumulation, no
     clear-sky shape, no energy conservation.
@@ -202,7 +209,11 @@ def sunny_days(*, cams: pl.DataFrame, table: pl.DataFrame) -> pl.DataFrame:
 
 
 def cmd_lag() -> None:
-    """Find the shift that maximises the correlation of ensemble shortwave with CAMS, per Primary, and test CAMS's own stamp."""
+    """Find the shift that maximises the correlation with CAMS, per Primary.
+
+    Find the shift that maximises the correlation of ensemble shortwave with CAMS, per Primary,
+    and test CAMS's own stamp.
+    """
     table = six_table()
     cams = load_cams()
     sunny = sunny_days(cams=cams, table=table)
@@ -296,7 +307,11 @@ def degraded_native(
 
 
 def score_frame(*, joined: pl.DataFrame, group: list[str]) -> pl.DataFrame:
-    """Return error of `ens` against `cam` by group on sunny-day half-hours: RMSE, MAE, bias, % of peak, midday peak bias, energy bias."""
+    """Return the error of `ens` against `cam` by group on sunny-day half-hours.
+
+    Return error of `ens` against `cam` by group on sunny-day half-hours: RMSE, MAE, bias, % of
+    peak, midday peak bias, energy bias.
+    """
     d = joined.with_columns(
         date=(pl.col("valid_time") - pl.duration(minutes=1)).dt.date()
     ).with_columns(err=pl.col("ens") - pl.col("cam"))

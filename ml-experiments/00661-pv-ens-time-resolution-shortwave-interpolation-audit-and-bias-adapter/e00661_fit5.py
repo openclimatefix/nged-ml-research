@@ -1,5 +1,8 @@
 # ruff: noqa: E501
-"""Experiment 661, step 5: retrain experiment 639's free and calibrated explicit networks on degraded known weather.
+"""Experiment 661, step 5: retrain on degraded known weather.
+
+Experiment 661, step 5: retrain experiment 639's free and calibrated explicit networks on
+degraded known weather.
 
 Reuses experiment 639's code unchanged. The only changes are in this script: the raw input matrices
 come from `e00661_degrade` (shortwave degraded to 3-hour or 6-hour windows), and the weights, test
