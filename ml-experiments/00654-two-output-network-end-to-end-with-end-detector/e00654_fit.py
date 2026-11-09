@@ -1,28 +1,29 @@
 # ruff: noqa: ANN001, ANN201, E402, D103, E501, ANN003, PLR0915, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
-"""Experiment 654, step 1: fine-tune K1's network jointly with a prevailing head, and forecast (GPU).
+"""Experiment 654, step 1: fine-tune K1's network jointly with a prevailing head, and forecast
+(GPU).
 
-K1 is experiment 613's `k1_d5` network (experiment 591's A1 chain: shared lag encoder with lag ID, D5
-offset). This script replaces K1's daily fine-tune with one fine-tune that, as in K1, starts from the
-fold's step-2 weights and trains on the rows before the cut (embargo 7 days, newest 7 days at half
-weight), and adds three things:
+K1 is experiment 613's `k1_d5` network (experiment 591's A1 chain: shared lag encoder with lag
+ID, D5 offset). This script replaces K1's daily fine-tune with one fine-tune that, as in K1,
+starts from the fold's step-2 weights and trains on the rows before the cut (embargo 7 days,
+newest 7 days at half weight), and adds three things:
 
 1. The lags of the training rows carry injected shifts drawn by experiment 650's generator
-   (training family, constant or ramped shape, receivers ignored), using a draw key that no scoring
-   pass shares; the NRA target stays unshifted.
-2. A prevailing head reads the lag-encoder outputs (detached in arm J1, not detached in arm J2), the
-   Primary embedding, and the lead columns, and outputs a depth, a spread, an in-force logit, and
-   ten daily hazards. The prevailing quantiles are `mixture_quantiles` of experiment 647 on the NRA
-   quantiles, as in experiment 652.
-3. The loss is the NRA mixture negative log-likelihood plus `LAM_PIN` times the prevailing pinball
-   loss plus `LAM_BCE` times the binary cross-entropy of the shift-still-on probability.
+   (training family, constant or ramped shape, receivers ignored), using a draw key that no
+   scoring pass shares; the NRA target stays unshifted.
+2. A prevailing head reads the lag-encoder outputs (detached in arm J1, not detached in arm J2),
+   the Primary embedding, and the lead columns, and outputs a depth, a spread, an in-force logit,
+   and ten daily hazards. The prevailing quantiles are `mixture_quantiles` of experiment 647 on
+   the NRA quantiles, as in experiment 652.
+3. The loss is the NRA mixture negative log-likelihood plus `LAM_PIN` times the prevailing
+   pinball loss plus `LAM_BCE` times the binary cross-entropy of the shift-still-on probability.
 
-Arms: `C0` (no head, no prevailing loss: K1 fine-tuned the same way, the matched-compute control),
-`J1` (head reads detached encoder outputs, so the prevailing loss cannot change the NRA output), and
-`J2` (the prevailing loss reaches the lag encoder).
+Arms: `C0` (no head, no prevailing loss: K1 fine-tuned the same way, the matched-compute
+control), `J1` (head reads detached encoder outputs, so the prevailing loss cannot change the NRA
+output), and `J2` (the prevailing loss reaches the lag encoder).
 
 Cuts: day 0 and day 14 of the scored month, windows [0, 14) and the rest of the month. Output per
-(arm, month, cut, seed): `fits/<arm>_<month>_d<day>_s<seed>.npz` with, for the real, held-out, and
-training-family row sets of experiment 650's head data, the row index, the NRA quantiles, the
+(arm, month, cut, seed): `fits/<arm>_<month>_d<day>_s<seed>.npz` with, for the real, held-out,
+and training-family row sets of experiment 650's head data, the row index, the NRA quantiles, the
 prevailing quantiles (fractions of capacity), and the survival probability.
 
 Usage: python e00654_fit.py ARM [--months ...] [--seeds ...] [--cuts 0 14]
@@ -104,7 +105,8 @@ e.c.select_rows = select_rows
 
 
 def history_shifts(*, clean: np.ndarray, first: int, last: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return (own, on): injected shifts as shares of capacity and an in-force flag, shape (16, grid).
+    """Return (own, on): injected shifts as shares of capacity and an in-force flag, shape (16,
+    grid).
 
     One draw per (history month, Primary) from experiment 650's training family, kept with
     probability `HISTORY_KEEP`; constant or ramped shape (a proportional shape would read the

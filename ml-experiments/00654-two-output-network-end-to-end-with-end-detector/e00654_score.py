@@ -11,12 +11,13 @@ Reuses experiment 652's scorer parts (`survival_curve`, `cond_survival`, the str
   rows: `K1_nra`, `C0_nra`, `J1_nra`, `J2_nra`.
 
 Strata add three to experiment 652's: `all` (every stratum), `ended24` (the shift ended in the 24
-hours before the origin), and `free14` (event-free and more than 14 days from the event). The four
-scenarios of the ml-experiment skill are `all`, `free` (outside events and more than 7 days after
-one), `inforce` plus `onset_ahead` (inside events), and `just_ended` (7 days after an event ends).
+hours before the origin), and `free14` (event-free and more than 14 days from the event). The
+four scenarios of the ml-experiment skill are `all`, `free` (outside events and more than 7 days
+after one), `inforce` plus `onset_ahead` (inside events), and `just_ended` (7 days after an event
+ends).
 
-Output (data folder `score/`): `agg.parquet` (weighted sums, with the absolute error of the median
-as `mae`), `reliability.parquet`, `dropped.csv`.
+Output (data folder `score/`): `agg.parquet` (weighted sums, with the absolute error of the
+median as `mae`), `reliability.parquet`, `dropped.csv`.
 
 Usage: python e00654_score.py [--arms J1 J2 C0 ...] [--months ...]
 """

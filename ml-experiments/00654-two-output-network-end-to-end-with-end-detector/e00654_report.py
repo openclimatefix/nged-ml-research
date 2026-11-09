@@ -1,9 +1,9 @@
 # ruff: noqa: E501, D103, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
 """Experiment 654, step 3: tables and month-block intervals from `score/agg.parquet` (CPU).
 
-Cell value = mean over lead days 1 to 9 of the weighted mean, seeds averaged, then months. Intervals
-are percentile bootstraps over the 5 development months (month-block), as in experiment 652.
-Prints the tables the write-up quotes and writes `score/tables.json`.
+Cell value = mean over lead days 1 to 9 of the weighted mean, seeds averaged, then months.
+Intervals are percentile bootstraps over the 5 development months (month-block), as in
+experiment 652. Prints the tables the write-up quotes and writes `score/tables.json`.
 
 Usage: python e00654_report.py
 """

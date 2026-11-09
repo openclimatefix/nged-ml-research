@@ -1,12 +1,14 @@
 # ruff: noqa: E501, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
 """Experiment 654: write the release-candidate backtest parquet files, one per arm (CPU).
 
-E0 is experiment 652's R-haz (mixture m50, seed mean of 2 seeds) on K1's normal-running-arrangement
-(NRA) quantiles. Each development month is scored by the head fitted on the other four months. K1's
-quantiles and the observed power come from experiment 647's real-row head data. Values are written
-in MW (or MVA for the MVA-only Primaries): the stored fraction of capacity times `capacity_mw`.
+E0 is experiment 652's R-haz (mixture m50, seed mean of 2 seeds) on K1's
+normal-running-arrangement (NRA) quantiles. Each development month is scored by the head fitted
+on the other four months. K1's quantiles and the observed power come from experiment 647's
+real-row head data. Values are written in MW (or MVA for the MVA-only Primaries): the stored
+fraction of capacity times `capacity_mw`.
 
-Writes `<WORK>/release_candidate/<arm>.parquet` for E0, J2, J1, and C0, and `README.md` beside them.
+Writes `<WORK>/release_candidate/<arm>.parquet` for E0, J2, J1, and C0, and `README.md` beside
+them.
 
 Usage: python e00654_release_candidate.py
 """

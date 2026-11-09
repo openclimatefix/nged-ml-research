@@ -1,16 +1,18 @@
 # ruff: noqa: D103, E501, PLR0912, PLR0915, ANN001, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
 """Experiment 654: score the frozen candidates on the final-test window, once (CPU).
 
-Reads the frozen forecasts of `final/forecasts/<arm>_s<seed>.parquet` (seed-mean of the quantiles),
-the experiment 620 export of K1 for the 2026-07 fold (row keys, observed power, event flags), and
-regenerates the manual heuristic from the cleaned power with the same code as experiment 620.
-Writes `final/score/window.json`. Origins are those of the experiment 620 export (2026-07-01 to
-2026-10-31); lead 24 to 240 hours; scores in points of capacity; intervals blocked by origin month.
+Reads the frozen forecasts of `final/forecasts/<arm>_s<seed>.parquet` (seed-mean of the
+quantiles), the experiment 620 export of K1 for the 2026-07 fold (row keys, observed power, event
+flags), and regenerates the manual heuristic from the cleaned power with the same code as
+experiment 620. Writes `final/score/window.json`. Origins are those of the experiment 620 export
+(2026-07-01 to 2026-10-31); lead 24 to 240 hours; scores in points of capacity; intervals blocked
+by origin month.
 
 Scenarios, by the state of the target half-hour at the row's Primary: `all`; `outside` (no event
-in force and at least 7 days since the last event ended); `inside`; `after7` (outside, and under 7
-days since an event ended). Events are the half-hours on which the hand-built G4 gate of experiment 620 is on (the export's
-labelled and verified event columns are empty in the window). The counts are lower bounds.
+in force and at least 7 days since the last event ended); `inside`; `after7` (outside, and under
+7 days since an event ended). Events are the half-hours on which the hand-built G4 gate of
+experiment 620 is on (the export's labelled and verified event columns are empty in the window).
+The counts are lower bounds.
 """
 
 import json
@@ -86,8 +88,9 @@ def main() -> None:
             full = np.full((len(key), 11), np.nan)
             full[hit] = m[o][pos[hit]]
             q[arm if kind == "prevailing" else f"{arm}_nra"] = full
-    # event state of each (Primary, grid index) from the export's target half-hours
-    # the export holds no labelled or verified event in the window (all three flag columns are empty), so the detected state is the hand-built G4 gate
+    # event state of each (Primary, grid index) from the export's target half-hours the export holds
+    # no labelled or verified event in the window (all three flag columns are empty), so the
+    # detected state is the hand-built G4 gate
     ev = base["gate_on"].fill_null(False).to_numpy()
     n_idx = clean.shape[1]
     inev = np.zeros((16, n_idx), bool)

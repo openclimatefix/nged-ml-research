@@ -1,9 +1,9 @@
 # ruff: noqa: D103, E501, PLR0915, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
 """Experiment 654: diagnostics on the already-scored window (CPU, reads no new window data).
 
-Answers: how long are the gate-on spells; which lags does the manual heuristic use and how often is a
-lag half-hour itself gate-on; what do the prevailing and NRA outputs of J2 do on gate-on rows by
-whether the observed power really departs from K1's median (false alarms).
+Answers: how long are the gate-on spells; which lags does the manual heuristic use and how often
+is a lag half-hour itself gate-on; what do the prevailing and NRA outputs of J2 do on gate-on
+rows by whether the observed power really departs from K1's median (false alarms).
 """
 
 import json
