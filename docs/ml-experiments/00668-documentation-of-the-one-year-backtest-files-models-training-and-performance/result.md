@@ -281,7 +281,15 @@ fixes the choices that the earlier experiments left open, and this section resta
 
 ### Performance
 
-To be added when `primaries.parquet` is written.
+To be added when `primaries.parquet` is written. It will include the verified load shift between
+D5 and D16 (start 2025-12-30 01:00 UTC, end 2026-01-14 11:30 UTC). For each of D5 and D16 there will
+be figures of the observed power from 14 days before the start to at least 7 days after the end,
+with the start and end marked. One kind of figure shows the day-ahead series for the NRA and the
+prevailing outputs with the q05 to q95 band of each, and the other shows the full 14-day forecasts
+from several origins: before the start, early and late inside the shift, in the last 24 hours before
+the end, and just after the end. K1 or the manual heuristic is added as a labelled third line where
+it exists. The text states, from the file, how many hours the prevailing output took to move at the
+start and to return after the end, and that this is one descriptive event.
 
 ## BSPs and GSPs
 
