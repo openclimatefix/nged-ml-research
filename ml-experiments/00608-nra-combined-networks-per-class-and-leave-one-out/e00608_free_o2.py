@@ -1,11 +1,12 @@
 # ruff: noqa: ANN201, E402, E501, ANN003, PT018
-"""Experiment 608: fit the lag-free twin with the O2 offset (arm K3 with O2) with or without the E3 refit rule (GPU).
+"""Experiment 608: fit the lag-free twin with the O2 offset, with or without E3 (GPU).
 
-A wrapper over experiment 577's `e00577_fit.py` (arm O2: the lag-free network with the steadier output
-offset, one-step recipe: experiment 577's pretrained weights, a fresh mixer, frozen encoders, refits on
-days 0 and 14). Experiment 577's pretrained weights are read only. `--e3 1` (default) applies the same
-refit rule as `e00608_arm.py`: no rows from the newest 7 days before the cutoff, and half the weight
-for the 7 days before that. `--e3 0` is experiment 577's own recipe (a reproduction check).
+A wrapper over experiment 577's `e00577_fit.py` (arm O2: the lag-free network with the steadier
+output offset, one-step recipe: experiment 577's pretrained weights, a fresh mixer, frozen encoders,
+refits on days 0 and 14). Experiment 577's pretrained weights are read only. `--e3 1` (default)
+applies the same refit rule as `e00608_arm.py`: no rows from the newest 7 days before the cutoff,
+and half the weight for the 7 days before that. `--e3 0` is experiment 577's own recipe (a
+reproduction check).
 
 Usage: python e00608_free.py NAME [--e3 0|1] [--months ...] [--seeds ...]
 Outputs: `data/ml-experiments/00608-*/arms/NAME/work/{fits,models}`.
