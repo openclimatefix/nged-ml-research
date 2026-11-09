@@ -1,4 +1,4 @@
-# ruff: noqa: ANN201, E402, D103, E501, ANN003
+# ruff: noqa: ANN201, E402, D103, ANN003
 """Experiment 608: fit or inject the C1 wiring (584's P5, separate lag encoders) with E3 (GPU).
 
 A wrapper over experiment 584's `e00584_arm.py`, with the E3 refit rule of `e00608_arm.py` applied
