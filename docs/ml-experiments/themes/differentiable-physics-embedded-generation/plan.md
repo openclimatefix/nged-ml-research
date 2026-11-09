@@ -9,6 +9,7 @@
 | 352, capacity response surface | How much does the sunny-half-hour score of Primary demand research default 3 move with the solar capacity, with and without the Kalman filter? | Running | None | Planned |
 | 409, solar term with a day-of-year home | Can the explicit solar term read the sky once the network has a day-of-year by hour term and the known-answer test injects only the farm's day-to-day anomaly, and does it then lower the net-demand CRPS? | Running | Experiment 405 (merged, inconclusive) | Planned |
 | 477, neural PV module placebo gate | Does the PV module of the net demand neural network recover a placebo-gated capacity per Primary, and what does the explicit split cost and gain on sunny half-hours? | Done | Experiments 416 (merged) and 474 | Finished: placebo gate failed |
+| 674, sign labels for apparent-power Primaries | Can a per-Primary day labeller tell whether an MVA-only Primary was exporting, and does a soft or a hard PV prior help? | Running | Nothing | Planned |
 | N13, PV orientation mix | Does replacing the single south-facing solar shape with three non-negative capacities (south, east, west) keep the model convex and lower the summer morning and evening error? | Dropped | None. [Experiment 73](../../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) and [experiment 77](../../00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md) found the mix unidentified or immaterial, and experiment 114 dropped it | Dropped |
 
 ## N13: PV orientation mix
