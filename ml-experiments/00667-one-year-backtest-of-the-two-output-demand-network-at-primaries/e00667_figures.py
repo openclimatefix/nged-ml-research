@@ -44,7 +44,7 @@ def weighted(d: pl.DataFrame, by: list[str]) -> pl.DataFrame:
 def crps_by_band(d: pl.DataFrame) -> alt.Chart:
     b = weighted(d, ["arm", "band"])
     return (
-        alt.Chart(
+        alt.Chart(  # ty: ignore[unresolved-attribute]
             b,
             width=W,
             height=220,
@@ -75,7 +75,7 @@ def crps_by_band(d: pl.DataFrame) -> alt.Chart:
 def crps_by_month(d: pl.DataFrame) -> alt.Chart:
     m = weighted(d, ["arm", "origin_month"])
     return (
-        alt.Chart(
+        alt.Chart(  # ty: ignore[unresolved-attribute]
             m,
             width=W,
             height=240,
@@ -101,7 +101,7 @@ def crps_by_month(d: pl.DataFrame) -> alt.Chart:
 def coverage_by_month(d: pl.DataFrame) -> alt.Chart:
     m = weighted(d, ["arm", "origin_month"])
     line = (
-        alt.Chart(
+        alt.Chart(  # ty: ignore[unresolved-attribute]
             m,
             width=W,
             height=240,
@@ -128,19 +128,19 @@ def coverage_by_month(d: pl.DataFrame) -> alt.Chart:
         )
     )
     rule = (
-        alt.Chart(pl.DataFrame({"y": [0.9]}))
+        alt.Chart(pl.DataFrame({"y": [0.9]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 4], color="#555")
         .encode(y="y:Q")
     )
     tol = (
-        alt.Chart(pl.DataFrame({"y": [0.85, 0.95]}))
+        alt.Chart(pl.DataFrame({"y": [0.85, 0.95]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[1, 3], color="#888")
         .encode(y="y:Q")
     )
     return line + tol + rule
 
 
-def example(*, series: int, origin: str, name: str) -> alt.Chart:
+def example(*, series: int, origin: str, name: str) -> alt.FacetChart:
     f = pl.read_parquet(SHARED / "primaries.parquet").filter(
         (pl.col("time_series_id") == series)
         & (
@@ -160,13 +160,13 @@ def example(*, series: int, origin: str, name: str) -> alt.Chart:
             "valid_time:T", title="Valid time (UTC)", axis=alt.Axis(format="%a %d", tickCount=14)
         )
     )
-    band = base.mark_area(opacity=0.25).encode(
+    band = base.mark_area(opacity=0.25).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("q05:Q", title=f"Power ({unit})"),
         y2="q95:Q",
         color=alt.Color("arm:N", scale=COLOUR, legend=LEGEND),
     )
-    med = base.mark_line().encode(y="q50:Q", color=alt.Color("arm:N", scale=COLOUR, legend=None))
-    obs = base.mark_line(color="#222", strokeWidth=1).encode(y="power:Q")
+    med = base.mark_line().encode(y="q50:Q", color=alt.Color("arm:N", scale=COLOUR, legend=None))  # ty: ignore[unresolved-attribute]
+    obs = base.mark_line(color="#222", strokeWidth=1).encode(y="power:Q")  # ty: ignore[unresolved-attribute]
     return alt.layer(band, med, obs).facet(
         row=alt.Row("arm:N", title=None),
         title=alt.TitleParams(
