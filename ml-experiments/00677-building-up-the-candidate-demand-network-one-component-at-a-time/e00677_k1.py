@@ -114,6 +114,7 @@ if MINE.ens_only:  # no ERA5 or CAMS pre-training: random initialisation, nothin
         e.fresh_mixer(model=model)
 
     e.load_pretrained_fresh = load_random_fresh
+    e.pretrained_file = lambda *, month, seed: e.W / "no_pretraining" / f"{month}_s{seed}.pt"  # a name only: it carries the seed
 if fold.is_final(months=MINE.months):
     # the final fold has no stored B1 statistics: pre-training derives them into the chain folder
     # and every later command reads them from there
