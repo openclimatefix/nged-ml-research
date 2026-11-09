@@ -76,7 +76,8 @@ take_home_message: >-
   ends (-0.9 to -1.1 scaled points of capacity) and worse while the shift is in force (+0.2 to
   +0.3 for E0d), and the neighbour graph added no consistent gain, because three random rewirings of it scored within 0.08 points of the real graph. On the final-test window the detector made E0 worse (4.81 against 4.26) and J2 slightly
   better (4.85 against 5.02), and the plain E0 was the best prevailing forecast of all (4.26). The
-  veto on event-free rows is not met for E0d, and J2d passes it by its interval but not in every month. The detector is not worth the neighbour feed.
+  veto on event-free rows is not met for E0d, and J2d passes it by its interval but not in every
+  month. The detector is not worth the neighbour feed.
 advice:
   - >-
     Run a degree-preserving rewired-graph placebo beside any neighbour-based detector, because here
@@ -174,7 +175,6 @@ with the median across the 16 Primaries at each half-hour removed, and every inp
 origin.
 
 ## Results
-
 
 **All numbers below are scaled CRPS in points of capacity over lead days 1 to 9, averaged over seeds
 and then over the 5 development months.** They are measured over lead days 1 to 9 on experiment
