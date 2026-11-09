@@ -71,6 +71,10 @@ page is planned and holds the plan only.
   month with the 7-day embargo of experiment 613. Origins daily at 12:00 UTC; the weather is the
   00Z ENS run of the same day.
 - **Seeds:** 2 (experiment 612's choice), quantiles averaged across seeds.
+- **Full-row test matrices:** the stored test matrices drop every half-hour with no observed
+  reading, which leaves gaps after 2026-10-17. The inputs here are built for every valid time from
+  12:00 to 14 days later for every origin, and only the scoring is restricted to rows with observed
+  power.
 - **Standing practices followed:** cleaned data, the D15 and D18 cut before 2025-03-01, monthly
   refits, saved weights, and tail and example-forecast plots.
 - **Open items before the first fit:** a one-fold timing run (the stored Candidate fit takes about
