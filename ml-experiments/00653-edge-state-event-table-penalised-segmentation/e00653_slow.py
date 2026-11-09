@@ -86,6 +86,9 @@ def fit_slow(*, y: np.ndarray, sigma: float, arm: str) -> np.ndarray:
         y: Block means of the residual (NaN where missing).
         sigma: Noise unit in megawatts.
         arm: `masked` (default), `huber`, or `rw30`.
+
+    Returns:
+        The slow level, one value per block.
     """
     n = len(y)
     valid = int(np.isfinite(y).sum())
