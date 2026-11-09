@@ -52,7 +52,8 @@ benchmark: >-
   experiment 654, and on the window the manual heuristic.
 row_set_id: dev_months_origins_2025_10_to_2026_06_export_roster
 metric: >-
-  CRPS (twice the mean pinball loss over the 11 stored quantile levels) in points of capacity, scaled
+  CRPS (twice the mean pinball loss over the 11 stored quantile levels) in points of capacity,
+  scaled
   and unscaled, by lead day (1 to 9) and by origin stratum; normalised MAE of the median; q05-q95
   coverage; q01, q05, q95, and q99 pinball loss; follow; detection delay (days) and false-alarm rate
   per Primary-month for the detector alone; share of event-free rows with a departure of 3 points or
@@ -68,13 +69,17 @@ headline: >-
   against 4.26).
 lessons: >-
   The detector's own-Primary inputs carry the gain, because three degree-preserving rewirings of the
-  neighbour graph score within 0.08 points of the real graph (real minus rewired, seeds 0 to 2, for E0d: -0.05, +0.08, and +0.05; for J2d: -0.01, +0.01, and 0.00; ended-in-24-hours and near strata
+  neighbour graph score within 0.08 points of the real graph (real minus rewired, seeds 0 to 2,
+  for E0d: -0.05, +0.08, and +0.05; for J2d: -0.01, +0.01, and 0.00; ended-in-24-hours and near
+  strata
   pooled). The detector output rises only from about 0.19 to 0.39 in the days after a shift ends,
   so it is a weak signal that no arm turns into a sharp drop.
 take_home_message: >-
   A learned end detector made the prevailing forecast better in the 24 hours after an injected shift
   ends (-0.9 to -1.1 scaled points of capacity) and worse while the shift is in force (+0.2 to
-  +0.3 for E0d), and the neighbour graph added no consistent gain, because three random rewirings of it scored within 0.08 points of the real graph. On the final-test window the detector made E0 worse (4.81 against 4.26) and J2 slightly
+  +0.3 for E0d), and the neighbour graph added no consistent gain, because three random rewirings
+  of it scored within 0.08 points of the real graph. On the final-test window the detector made E0
+  worse (4.81 against 4.26) and J2 slightly
   better (4.85 against 5.02), and the plain E0 was the best prevailing forecast of all (4.26). The
   veto on event-free rows is not met for E0d, and J2d passes it by its interval but not in every
   month. The detector is not worth the neighbour feed.
