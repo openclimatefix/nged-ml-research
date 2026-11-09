@@ -2,12 +2,12 @@
 
     uv run --no-sync python e00675_score.py [probe|probe_smoke]
 
-The false-donor rate is E1-J's on the 40 scored worlds: decoded downward events of 4 noise units or
-more that match no injected downward event (any kind) within 24 half-hours at the same Primary,
-per Primary-year. A probe alarm episode is a run of hours with a score above the threshold (runs
-within 24 hours merge); it is false if it overlaps no injected downward event's window from 12
-hours before to 24 hours after its start. The threshold is the one whose false-episode rate equals
-E1-J's. A donor is found when an episode overlaps its window. Shares are weighted by |MW| and
+The false-donor rate is E1-J's on the 40 scored worlds, per Primary-year. A probe alarm is the
+highest-scoring hour of each run of hours above the threshold (runs within 24 hours merge), and
+E1-J's alarm is the first hour of each merged run of its decoded downward events of 4 noise units
+or more. An alarm is false if it lies in no injected downward event's window, from 12 hours before
+to 24 hours after the event's start. The probe's threshold is the one whose false-alarm rate equals
+E1-J's, and a donor is found when an alarm lies in its window. Shares are weighted by |MW| and
 intervals resample whole worlds.
 """
 
@@ -75,25 +75,32 @@ def e1j_numbers(*, worlds: list[int], truth: dict[int, pl.DataFrame], sites: lis
     return rate, pl.DataFrame(rows)
 
 
-def episodes(*, hot: np.ndarray) -> list[tuple[int, int]]:
-    """Runs of True in a boolean vector, merging runs less than 24 apart."""
+def episodes(*, hot: np.ndarray, score: np.ndarray | None = None) -> list[tuple[int, int]]:
+    """Alarm points: one hour per run of True (runs less than 24 hours apart merge).
+
+    The hour is the run's highest score when `score` is given (the probe) and the run's first
+    hour otherwise (E1-J, whose alarms are single hours), so both sides are credited by one hour.
+    """
     idx = np.flatnonzero(hot)
     if not len(idx):
         return []
-    out, start, prev = [], idx[0], idx[0]
+    runs, start, prev = [], idx[0], idx[0]
     for i in idx[1:]:
         if i - prev > 24:
-            out.append((int(start), int(prev)))
+            runs.append((int(start), int(prev)))
             start = i
         prev = i
-    out.append((int(start), int(prev)))
-    return out
+    runs.append((int(start), int(prev)))
+    if score is None:
+        return [(a, a) for a, _ in runs]
+    peaks = [a + int(np.argmax(score[a : b + 1])) for a, b in runs]
+    return [(p, p) for p in peaks]
 
 
 def probe_episodes(*, scores: dict[int, np.ndarray], thr: float) -> dict[tuple[int, int], list[tuple[int, int]]]:
     """Alarm episodes per (world, node) among the scored hours."""
     return {
-        (w, i): episodes(hot=sc[i, SCORED_H:] > thr) for w, sc in scores.items() for i in range(sc.shape[0])
+        (w, i): episodes(hot=sc[i, SCORED_H:] > thr, score=sc[i, SCORED_H:]) for w, sc in scores.items() for i in range(sc.shape[0])
     }
 
 
