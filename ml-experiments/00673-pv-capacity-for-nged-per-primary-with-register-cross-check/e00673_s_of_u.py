@@ -98,9 +98,11 @@ def main() -> None:
         "Fold fit, reactive terms free",
         "Fold fit, reactive terms zero",
     ]
-    rng = [theme.DATA_SKY, theme.BRAND_ORANGE, theme.DATA_BLUE, theme.DATA_PURPLE]
+    rng = [theme.DATA_BLUE, theme.BRAND_ORANGE, "#1b3a8a", theme.DATA_PURPLE]
     base = alt.Chart(df).encode(
-        x=alt.X("u:Q", title="Solar-output curve u (donor weather)"),
+        x=alt.X(
+            "u:Q", title="Solar-output curve u (donor weather)", scale=alt.Scale(domain=[0.25, 1.1])
+        ),
         y=alt.Y("S:Q", title="Probed reading S (MVA)", scale=alt.Scale(zero=False)),
         color=alt.Color(
             "series:N",
@@ -116,7 +118,7 @@ def main() -> None:
         strokeWidth=2, aria=False
     )
     chart = (
-        (pts + lines)
+        (pts + lines)  # ty: ignore[unsupported-operator]
         .properties(width=280, height=190)
         .facet(facet=alt.Facet("panel:N", sort=list(cells), title=None), columns=2)
         .properties(

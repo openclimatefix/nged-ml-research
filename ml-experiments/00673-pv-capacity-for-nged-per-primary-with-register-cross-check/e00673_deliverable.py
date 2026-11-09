@@ -25,7 +25,7 @@ from shapely.prepared import prep
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "studies/embedded_battery_forecast"))
-from ecr import read_ecr  # noqa: E402  # ty: ignore[unresolved-import]
+from ecr import read_ecr  # ty: ignore[unresolved-import]
 
 NAME: Final = "00673-pv-capacity-for-nged-per-primary-with-register-cross-check"
 WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / NAME / "work"
@@ -75,10 +75,27 @@ def to_lonlat(*, easting: np.ndarray, northing: np.ndarray) -> tuple[np.ndarray,
     return Transformer.from_crs(27700, 4326, always_xy=True).transform(easting, northing)
 
 
+def _rescale(column: pl.Expr, *, limit: float) -> pl.Expr:
+    """Divide a coordinate by 10 until it is under `limit` metres.
+
+    203 of the Embedded Capacity Register's connected solar rows carry a British National Grid
+    coordinate inflated by a power of 10 (for example 4.9e6 for a Lincoln postcode). Without this
+    repair those rows fall outside every polygon.
+    """
+    expr = column
+    for _ in range(12):
+        expr = pl.when(expr > limit).then(expr / 10.0).otherwise(expr)
+    return expr
+
+
 def read_ecr_solar() -> pl.DataFrame:
     """Return the connected solar rows of the Embedded Capacity Register with a position."""
     ecr = read_ecr(path=ECR_PATH).filter(
         pl.col("energy_source_1") == "Solar", pl.col("connection_status") == "Connected"
+    )
+    ecr = ecr.with_columns(
+        easting=_rescale(pl.col("easting"), limit=700_000.0),
+        northing=_rescale(pl.col("northing"), limit=1_300_000.0),
     )
     return ecr.select(
         "easting",
@@ -306,7 +323,7 @@ def reactive_arms() -> pl.DataFrame:
 
 def flag(*, p10: float, p90: float, floor: float, group: str) -> str:
     """Return the plain flag fixed in the plan."""
-    if group in ("report only",):
+    if group == "report only":
         return "not comparable"
     if p10 >= floor:
         return "probe above floor"
@@ -387,29 +404,32 @@ def draw_figure_a(*, table: pl.DataFrame) -> None:
         .otherwise(pl.lit("MVA Primary")),
     )
     order = list(ALL_SITES)
-    base = alt.Chart(df).encode(y=alt.Y("site:N", sort=order, title=None))
-    rule = base.mark_rule(strokeWidth=5).encode(
+    kinds = ["MW Primary", "MVA Primary", "Report only (MVA)", "Register floor"]
+    colours = [theme.BRAND_ORANGE, theme.DATA_BLUE, "#6b6b6b", "#000000"]
+    scale = alt.Scale(domain=kinds, range=colours)
+    legend = alt.Legend(orient="top", title=None, symbolType="square", symbolSize=220)
+    y = alt.Y("site:N", sort=order, title="Primary substation")
+    base = alt.Chart(df).encode(y=y)
+    bar = base.mark_bar(height=12).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("p10:Q", title="AC capacity of unmetered solar (MW)", scale=alt.Scale(zero=True)),
         x2="p90:Q",
-        color=alt.Color(
-            "kind:N",
-            scale=alt.Scale(
-                domain=["MW Primary", "MVA Primary", "Report only (MVA)"],
-                range=[theme.BRAND_ORANGE, theme.DATA_BLUE, "#b0b0b0"],
-            ),
-            legend=alt.Legend(orient="top", title=None),
-        ),
+        color=alt.Color("kind:N", scale=scale, legend=legend),
     )
-    dot = base.mark_point(filled=True, size=60, color="black").encode(x="probe:Q")
-    floor = base.mark_tick(color="black", thickness=2, size=18).encode(x="floor_main:Q")
-    chart = (rule + dot + floor).properties(
+    median = base.mark_tick(color="white", thickness=2, size=12).encode(x="probe:Q")  # ty: ignore[unresolved-attribute]
+    floor_df = df.with_columns(kind=pl.lit("Register floor"))
+    floor = (
+        alt.Chart(floor_df)  # ty: ignore[unresolved-attribute]
+        .mark_tick(thickness=3, size=22)
+        .encode(y=y, x="floor_main:Q", color=alt.Color("kind:N", scale=scale, legend=legend))
+    )
+    chart = (bar + median + floor).properties(
         width=420,
-        height=300,
+        height=320,
         title=alt.TitleParams(
             "Probe interval (80%) and register floor per Primary",
             subtitle=[
-                "Bar: probe 10th to 90th percentile. Dot: probe median.",
-                "Vertical tick: register floor (main definition, metered sites removed).",
+                "Bar: probe 10th to 90th percentile; white tick: probe median.",
+                "Report-only Primaries (D8, D22) are grey. MVA Primaries are read as AC MW.",
             ],
             anchor="start",
             fontSize=13,
@@ -447,7 +467,7 @@ def markdown_tables() -> str:
     out.append(
         "REG|"
         + "\n".join(
-            f"| {s} | {f(by[s]['fit_ac_le50kw'])} ({f(by[s]['fit_dc_le50kw'])}) | {f(by[s]['fit_ac_50kw_1mw'])} | {f(by[s]['ecr_mw_lt1'])} | {f(by[s]['ecr_mw_ge1'])} ({f(by[s]['ecr_mw_ge1_ge33kv'])}) | {f(by[s]['repd_mw_all'])} ({f(by[s]['repd_mw_dup_of_ecr'])}) | {by[s]['ecr_mw_metered_removed'] + by[s]['repd_mw_metered_removed']:.2f} |"
+            f"| {s} | {f(by[s]['fit_ac_le50kw'])} ({f(by[s]['fit_dc_le50kw'])}) | {f(by[s]['fit_ac_50kw_1mw'])} | {f(by[s]['ecr_mw_lt1'])} | {f(by[s]['ecr_mw_ge1'])} ({f(by[s]['ecr_mw_ge1_ge33kv'])}) | {f(by[s]['repd_mw_all'])} ({f(by[s]['repd_mw_dup_of_ecr'])}) |"
             for s in ALL_SITES
         )
     )

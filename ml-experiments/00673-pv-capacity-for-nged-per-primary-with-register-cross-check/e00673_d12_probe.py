@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201
+# ruff: noqa: E501
 """Experiment 673: re-probe D12 (and D19, as a check) from experiment 662's stored 2026-06 twin network.
 
 Experiment 671 stored the S(u) data of one probe cell for D2, D3, D4, D19, D21, D5, and D10, and no
