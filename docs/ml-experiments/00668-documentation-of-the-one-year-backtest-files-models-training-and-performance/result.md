@@ -133,6 +133,11 @@ forecast files never hold observed power. The script is
   half-hours. Earlier experiments scored the half-hours that the wind idle mask flags as zero, by
   setting the target to 0; a scorer that reproduces those numbers does the same, and a scorer
   that drops them gets different numbers.
+- **Capacity.** A private `series_capacity.parquet` in the same folder holds the capacity that the
+  scores divide by, one row per series. The rule is the production effective-capacity table, which
+  has one value per series. It is not the capacity that the wind and solar networks train with (the
+  99.9th percentile of the 730 days before each refit). This page lists no generator capacity or
+  identifier.
 - **Baselines.** The manual heuristic and climatology need power from before 2025-11-01, which these
   files do not hold. They read the cleaned power table of the data store.
 - **Checks.** The row count equals the series count times the half-hours in the grid for every

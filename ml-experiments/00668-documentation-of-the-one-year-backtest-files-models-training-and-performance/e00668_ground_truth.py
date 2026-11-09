@@ -123,6 +123,38 @@ def check(*, name: str, frame: pl.DataFrame, ids: list[int]) -> None:
     )
 
 
+def write_series_capacity(*, all_ids: dict[str, list[int]], metadata: pl.DataFrame) -> None:
+    """Write `series_capacity.parquet`: the capacity each score divides by, one row per series."""
+    capacity = (
+        pl.scan_delta(str(REPO_DATA_DIR / "effective_capacity"))
+        .sort("time")
+        .group_by("time_series_id")
+        .agg(pl.col("effective_capacity_mw").last(), pl.col("time").last().alias("capacity_date"))
+        .collect()
+    )
+    ids = sorted(i for group in all_ids.values() for i in group)
+    units = metadata.select("time_series_id", pl.col("units").cast(pl.String).alias("power_unit"))
+    frame = (
+        pl.DataFrame({"time_series_id": ids}, schema={"time_series_id": pl.Int32})
+        .join(capacity, on="time_series_id", how="left", validate="1:1")
+        .join(units, on="time_series_id", how="left", validate="1:1")
+    )
+    assert frame["effective_capacity_mw"].is_not_null().all()
+    out = frame.select(
+        pl.col("time_series_id").cast(pl.Int8),
+        pl.col("effective_capacity_mw").cast(pl.Float32).alias("capacity"),
+        "power_unit",
+        pl.format(
+            "production effective capacity table (data/effective_capacity), dated {}",
+            pl.col("capacity_date").dt.date().cast(pl.String),
+        ).alias("rule"),
+    ).sort("time_series_id")
+    tmp = OUT_DIR / ".series_capacity.parquet.tmp"
+    out.write_parquet(tmp)
+    tmp.replace(OUT_DIR / "series_capacity.parquet")
+    print("series_capacity rows", out.height, flush=True)
+
+
 def main() -> None:
     """Write the five files."""
     os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
@@ -139,8 +171,10 @@ def main() -> None:
     assert joined.height == raw.height == cleaned.height, "raw and cleaned rows differ"
     assert joined.filter(pl.col("power").ne_missing(pl.col("power_cleaned"))).is_empty()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    all_ids = {name: series_ids(name=name, metadata=metadata) for name in EXPECTED}
+    write_series_capacity(all_ids=all_ids, metadata=metadata)
     for name in EXPECTED:
-        ids = series_ids(name=name, metadata=metadata)
+        ids = all_ids[name]
         frame = build(name=name, ids=ids, raw=raw, cleaned=cleaned, metadata=metadata)
         check(name=name, frame=frame, ids=ids)
         tmp = OUT_DIR / f".ground_truth_{name}.parquet.tmp"
