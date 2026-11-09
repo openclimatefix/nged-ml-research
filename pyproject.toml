@@ -602,6 +602,8 @@ include = [
     "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_fits.py",
     "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_kat.py",
     "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_run.py",
+    "ml-experiments/00654-two-output-network-end-to-end-with-end-detector/e00654_fit.py",
+    "ml-experiments/00654-two-output-network-end-to-end-with-end-detector/e00654_final.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
 ]
@@ -618,6 +620,25 @@ include = ["src/studies/battery_recurrence.py"]
 invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 invalid-method-override = "ignore"
+
+[[tool.ty.overrides]]
+# Experiment 654's scripts wrap `torch` modules by monkey-patching attributes and index tensors
+# whose type `ty` cannot follow, and pass tuple-valued numpy results through untyped helpers. They
+# are checked for the other rules only.
+include = [
+    "ml-experiments/00654-two-output-network-end-to-end-with-end-detector/e00654_fit.py",
+    "ml-experiments/00654-two-output-network-end-to-end-with-end-detector/e00654_final.py",
+    "ml-experiments/00654-two-output-network-end-to-end-with-end-detector/e00654_figures.py",
+    "ml-experiments/00654-two-output-network-end-to-end-with-end-detector/e00654_release_candidate.py",
+]
+
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"
+invalid-assignment = "ignore"
+not-subscriptable = "ignore"
+invalid-return-type = "ignore"
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
 
 [tool.ty.rules]
 # With the `gpu` dependency group installed, `torch` resolves, so `ty` reports every
