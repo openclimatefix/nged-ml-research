@@ -80,7 +80,7 @@ def gate_against_660(*, raw: pl.DataFrame) -> None:
     for (lo, hi), s in zip(itertools.pairwise(bounds), stored, strict=False):
         sub = e1.filter((pl.col("units") >= lo) & (pl.col("units") < hi))
         per_world = [g["found"].cast(pl.Float64).mean() for _, g in sub.group_by("world")]
-        mine = float(np.mean(per_world)) if per_world else float("nan")  # ty: ignore[invalid-argument-type]
+        mine = float(np.mean(per_world)) if per_world else float("nan")  # ty: ignore[invalid-argument-type, no-matching-overload]
         print(f"GATE bin {lo:g}-{hi:g}: mine {mine:.3f} stored {s['injected_recall'][0]:.3f}")
 
 
