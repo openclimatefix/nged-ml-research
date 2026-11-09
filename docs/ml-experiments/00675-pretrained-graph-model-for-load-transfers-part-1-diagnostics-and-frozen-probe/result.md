@@ -57,8 +57,22 @@ decision_rule: >-
   before any GPU fit, or no fit runs. The porting threshold is zero, because the result is a
   research table that changes no production code. Verdict. `supported` if the P-M prediction
   holds in both deep cells for donor megawatts found against both R and F; `partly supported` if it
-  holds against R only, or in one deep cell only; `not supported` otherwise; `inconclusive` if a
-  deep cell has fewer than 20 events or 10 edge-transfer ends.
+  holds against R only (P-M beats R but not F), or in one deep cell only; `not supported`
+  otherwise. A deep cell with fewer than 20 events or 10 edge-transfer ends is unreadable and counts
+  neither for nor against the verdict or the probe stop rule, which are then judged on the readable
+  deep cell; the verdict is `inconclusive` only if both deep cells are unreadable. The recipient
+  AUROC bars, the long and shallow and medium and shallow bars, and the P-M minus P-C bar are
+  secondary: they are reported as held or failed and do not enter the verdict. P-C beating P-M
+  changes only which weights experiment 676 uses (chosen by the mean over the readable deep cells),
+  not the verdict. If stop rule 0 fires, experiment 676 is not run, the probe still runs and is
+  reported, and the verdict is read the same way. E1-J keeps experiment 670's recipient search
+  window (-6 to +42 half-hours after the donor start); the spec's 0 to 36 half-hours is the
+  recipient lag of experiment 676's edge head. The probe's operating point is the false-donor rate
+  of E1-J's step 0c re-run on the panel the probe uses, not experiment 670's stored rows. Probe
+  training worlds use seeds from 100000. Step 0b takes the first panel that succeeds; if the
+  maintainer-requested improved lag-free model is worse than experiment 327's residual in
+  out-of-fold noise, experiment 327's residual is used, and the page says so. Step 0a re-runs E1-J
+  on experiment 670's panel on CPU if the stored rows lack the link-level fields it needs.
 benchmark: >-
   E1-J on the new residual panel and on experiment 672's panel, from experiment 670's stored rows
   for the latter; the random-initialised encoder R and the no-encoder arm F for the probe.
