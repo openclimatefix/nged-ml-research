@@ -110,7 +110,7 @@ def graph_of(*, arm: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
         r = np.random.default_rng(7_000 + seed)
         real = p.neighbours
         best = None
-        for _ in range(30):
+        for _ in range(300):
             nb = rewire(edges=p.edges, rng=r)
             nb = {s: nb.get(s, []) for s in p.sites}
             kept = sum(b in real[a] for a in nb for b in nb[a]) / max(1, sum(map(len, nb.values())))

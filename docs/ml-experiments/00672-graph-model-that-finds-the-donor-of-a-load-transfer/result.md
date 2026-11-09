@@ -19,9 +19,10 @@ size: >-
   experiments 653, 657, 658, 660, 665, and 670; nothing imports them. GPU, behind the maintainer's
   one-year backtests; ceiling 8 GPU-hours.
 hypothesis: >-
-  Experiment 670 found that the event table with a recipient search pairs 0.29 of the injected
-  megawatts in the long and deep cell, and that the limit is finding the donor: given a found
-  donor, the search pairs about 0.65. A graph neural network that reads every Primary's residual
+  Experiment 670 found that the event table with a recipient search (E1-J) pairs 0.29 (0.20 to
+  0.40) of the injected megawatts in the long and deep cell, and that two losses limit it: the
+  event table finds only 0.44 of the donor megawatts, and the search pairs only 0.22 of the
+  recipient megawatts although it finds 0.73. A graph neural network that reads every Primary's residual
   and the electricity network's links together, and is trained on experiment 660's injected worlds
   with an objective for the donor itself, finds the donor of a transfer by the matching recipient
   step at a linked Primary, which a per-Primary detector cannot see when the donor step is small.
@@ -30,12 +31,13 @@ hypothesis: >-
 prediction: >-
   Written before any score is read; each is a mean over 3 seeds, and a prediction fails if any seed
   is more than 0.05 worse than its threshold. Cells are those of experiment 665, MW-weighted, in
-  experiment 660's default worlds. P1 (the pass bar): G pairs at least 0.10 more than E1-J in the
+  experiment 660's default worlds. P1 (the pass bar, set against E1-J's 0.29 in the long and deep cell): G pairs at least 0.10 more than E1-J in the
   long and deep cell and in the medium and deep cell, and at least 0.10 more in the long and
   shallow cell; at least 0.05 more in the medium and shallow and the short and deep cells. P2 (the
   donor objective): G finds at least 0.10 more of the donor megawatts of transfers than E1-J in the
-  long and deep and in the medium and deep cells (E1-J's share is about 0.44 and is re-measured
-  from experiment 670's worlds). P3: G's found share minus E1-J's is at least +0.03 in the long and
+  long and deep and in the medium and deep cells (E1 finds 0.44 of the long and deep donor megawatts and E1-J pairs
+  0.36; both are re-measured from experiment 670's worlds, and the margin is set against the
+  larger of the two). P3: G's found share minus E1-J's is at least +0.03 in the long and
   deep, medium and deep, and +0.08 in the long and shallow cell, +0.05 in the medium and shallow
   cell, and no worse than -0.03 in the short and deep and short and shallow cells; G's absolute
   paired share is at least 0.70 (long and deep), 0.60 (medium and deep), and 0.40 (long and
@@ -99,16 +101,19 @@ code: ml-experiments/00672-graph-model-that-finds-the-donor-of-a-load-transfer/
 [Experiment 670](../00670-event-table-recipient-search-on-six-cell-grid/result.md) gave the event
 table of [experiment 653](../00653-edge-state-event-table-penalised-segmentation/result.md) a
 search at connected Primaries for the recipient of each donor step. That event table (E1-J) paired
-0.29 of the injected megawatts in the long and deep cell, and the limit was finding the donor: E1
-finds about 0.44 of the donor megawatts, and given a found donor E1-J pairs about 0.65. This
-experiment asks whether a graph neural network, trained to find the donor and reading the
-recipient evidence at the linked Primaries, beats that bar.
+0.29 of the injected megawatts in the long and deep cell, against 0.09 without the search. Two
+losses limit it: E1 finds only 0.44 of the donor megawatts (E1-J pairs 0.36), and the search pairs
+only 0.22 of the recipient megawatts although it finds 0.73. E1-J also decodes false transfers (69%
+of its decoded transfers match no injected end, against 57% for E1). This experiment asks whether a
+graph neural network, trained to find the donor and reading the recipient evidence at the linked
+Primaries, improves both ends, by at least 0.10 of paired megawatts over E1-J.
 
 ## Arms
 
 - **G.** The donor-finding network on the real connection graph (below).
 - **G-R.** The same network trained and run on a degree-preserving rewired graph, the placebo (one
-  rewiring per seed, the one of 30 draws that keeps the fewest real links).
+  rewiring per seed, the one of 300 draws that keeps the fewest real links, because experiment
+  670's best of 30 kept 16% of the real links; the share kept is reported).
 - **G-0.** The same network with no links and no neighbour layer: each Primary sees only itself.
 - **GS.** G with the explicit solar term added to the residual at the six Primaries metered in
   megawatts: known weather from CAMS and ERA5 and the capacity table of
@@ -141,6 +146,9 @@ cross-injector test.
   specification priced at about 10 times the cost; boundaries are refined to the half-hour by
   experiment 653's refinement. If the timing prediction (P5) fails for this reason, the write-up
   says so.
+- **Ends reported separately.** As experiment 670's advice asks, every cell reports the donor end
+  and the recipient end separately (found and paired), and the false transfers (decoded transfers
+  that match no injected end) beside recall.
 - **Donor recall.** The share of the megawatts of injected donor events (negative step, an edge
   transfer with a metered recipient, 4 noise units or more) that the decoded table finds, by the
   matching rule of experiment 653, reported beside pairing for every cell.
