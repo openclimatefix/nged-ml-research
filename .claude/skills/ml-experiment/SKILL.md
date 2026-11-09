@@ -427,8 +427,21 @@ actual component, number, or product, and says what each number counts.
   vetoes, the leads covered, and the audit checks with their results.
 
 Write these bullets for the arm that carries the headline, then list only the differences for the
-other arms. A new experiment that shares its set-up with an earlier one links the earlier page and
-still states the choices that matter to the result.
+other arms.
+
+**A page may say that it reuses an earlier experiment's set-up, but it must still describe that
+set-up in full.** For example, "this experiment uses the same architecture as experiment 650" is
+allowed only when the sentence links the write-up of experiment 650 and the Method section then
+lists the architecture, in the same bullets as any other architecture. Each page has to be readable
+on its own, so a link alone never replaces the description. The same holds for the training regime
+and the measurement.
+
+**End every `result.md` with a "Files" section that describes the Python files and the data files
+the experiment used.** Write it as bullets, one per file or folder. For each Python file, say what
+it does and which step of the experiment it runs. For each data file or folder, say what it holds
+(the columns or the arrays that matter), whether the experiment read it or wrote it, and where it
+lives. Name files that an earlier experiment produced and link that experiment's write-up. Write the
+paths of files under `data/` as paths, not as links, because the data folder is never committed.
 
 **Cite the work an experiment builds on, generously, in the plan and in `result.md`.** Whenever an
 arm, a method, a metric, or a design choice comes from someone else's paper, software, or
