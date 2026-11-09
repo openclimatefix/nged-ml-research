@@ -124,9 +124,9 @@ and the event table's own features do not?
   page reports its out-of-fold residual noise per Primary against experiment 327's arm C residual
   (the one E1 and E1-J used), uses the better residual for E1, E1-J, and the network alike, and
   re-runs E1 and E1-J on it so that a better residual cannot pass for a better detector. If this
-  needs more than 1 GPU-hour in step 0, the plan pull request says so. The page names the panel used and whether its
-  weather exists at forecast time (it does not: ERA5 arrives about 5 days late, so the panel is a
-  laboratory residual, as in experiments 670 and 672).
+  needs more than 1 GPU-hour in step 0, the plan pull request says so. The page names the panel
+  used and whether its weather exists at forecast time (it does not: ERA5 arrives about 5 days
+  late, so the panel is a laboratory residual, as in experiments 670 and 672).
 - **Step 0c, equal treatment.** E1 and E1-J are re-run on the new panel with experiment 660's
   default generator, unchanged, and E1-J's penalties are retuned on validation worlds with
   experiment 670's grid. These re-runs are the baselines for the probe and for experiment 676.
