@@ -15,7 +15,7 @@ from pathlib import Path
 
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00611_pool as pool  # ty: ignore[unresolved-import]
-import e00633_common as k633
+import e00633_common as k633  # ty: ignore[unresolved-import]
 import e00669_common as k
 import e00669_score as sc
 import numpy as np

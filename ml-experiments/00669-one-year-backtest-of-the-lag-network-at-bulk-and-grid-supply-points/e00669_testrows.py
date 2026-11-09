@@ -13,7 +13,7 @@ Usage: python e00669_testrows.py
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
 import e00397_prep as prep  # ty: ignore[unresolved-import]
-import e00633_common as k633
+import e00633_common as k633  # ty: ignore[unresolved-import]
 import e00669_common as k
 import numpy as np
 import polars as pl

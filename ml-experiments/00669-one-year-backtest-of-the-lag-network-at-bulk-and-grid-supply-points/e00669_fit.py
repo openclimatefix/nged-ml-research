@@ -32,7 +32,7 @@ if MINE.limit is not None:
 import e00510_common as c  # ty: ignore[unresolved-import]
 import e00591_model as aux  # ty: ignore[unresolved-import]
 import e00611_pool as pool  # ty: ignore[unresolved-import]
-import e00633_common as k633
+import e00633_common as k633  # ty: ignore[unresolved-import]
 import e00669_common as k
 import e00669_fold as fold
 import polars as pl

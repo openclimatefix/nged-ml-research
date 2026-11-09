@@ -28,7 +28,7 @@ def month_start(*, month: str) -> datetime:
 def install(e, *, months: list[str], group: str) -> None:
     import e00428_data as data  # ty: ignore[unresolved-import]
     import e00437_features as f437  # ty: ignore[unresolved-import]
-    import e00633_common as k633
+    import e00633_common as k633  # ty: ignore[unresolved-import]
     import e00669_common as k
 
     k633.redirect()

@@ -51,7 +51,7 @@ def lead_chart(*, score: Path) -> alt.Chart:
             legend=alt.Legend(orient="top", columns=3),
         ),
     )
-    band = base.mark_area(opacity=0.2).encode(
+    band = base.mark_area(opacity=0.2).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y(
             "crps_lo:Q",
             title="CRPS (points of capacity; smaller is better)",
@@ -59,7 +59,7 @@ def lead_chart(*, score: Path) -> alt.Chart:
         ),
         y2="crps_hi:Q",
     )
-    line = base.mark_line(point=True, strokeWidth=2).encode(y="crps:Q")
+    line = base.mark_line(point=True, strokeWidth=2).encode(y="crps:Q")  # ty: ignore[unresolved-attribute]
     return (band + line).properties(
         width=620,
         height=300,
@@ -77,7 +77,7 @@ def lead_chart(*, score: Path) -> alt.Chart:
 def month_chart(*, scored: pl.DataFrame) -> alt.Chart:
     m = scored.group_by("group", "month").agg(crps=pl.col("crps").mean()).to_pandas()  # ty: ignore[unresolved-attribute]
     return (
-        alt.Chart(m)
+        alt.Chart(m)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=2)
         .encode(
             x=alt.X("month:N", title="Month of the forecast origin", axis=alt.Axis(labelAngle=-45)),
@@ -107,14 +107,14 @@ def forecast_panel(
     pdf = f.to_pandas()  # ty: ignore[unresolved-attribute]
     x = alt.X("valid_time:T", title=None)
     b90 = (
-        alt.Chart(pdf)
+        alt.Chart(pdf)  # ty: ignore[unresolved-attribute]
         .mark_area(opacity=0.2, color="#306BFF")
         .encode(x=x, y=alt.Y("q05:Q", title="MW"), y2="q95:Q")
     )
-    b50 = alt.Chart(pdf).mark_area(opacity=0.35, color="#306BFF").encode(x=x, y="q25:Q", y2="q75:Q")
-    med = alt.Chart(pdf).mark_line(color="#306BFF", strokeWidth=1.5).encode(x=x, y="q50:Q")
+    b50 = alt.Chart(pdf).mark_area(opacity=0.35, color="#306BFF").encode(x=x, y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+    med = alt.Chart(pdf).mark_line(color="#306BFF", strokeWidth=1.5).encode(x=x, y="q50:Q")  # ty: ignore[unresolved-attribute]
     act = (
-        alt.Chart(y.to_pandas())
+        alt.Chart(y.to_pandas())  # ty: ignore[unresolved-attribute]
         .mark_line(color="#FF4901", strokeWidth=1.5)
         .encode(x=x, y="power:Q")
     )  # ty: ignore[unresolved-attribute]

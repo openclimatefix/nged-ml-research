@@ -14,7 +14,7 @@ from pathlib import Path
 import e00087_common as common  # ty: ignore[unresolved-import]
 import e00087_fit_demand as fd  # ty: ignore[unresolved-import]
 import e00611_pool as pool  # ty: ignore[unresolved-import]
-import e00633_common as k633
+import e00633_common as k633  # ty: ignore[unresolved-import]
 import e00669_common as k
 import numpy as np
 import polars as pl
