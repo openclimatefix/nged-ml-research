@@ -8,7 +8,7 @@ theme: production-reference-and-best-guess
 also_relevant_to:
   - generator-forecasting
   - lagged-power-and-error-correction
-status: planned
+status: finished
 kind: other
 size: >-
   Medium. (1) It stores no forecasts: the page reads the five backtest files and the observed power
@@ -31,21 +31,60 @@ row_set_id: backtest_year_2025_11_to_2026_10
 metric: >-
   CRPS in points of capacity, normalised mean absolute error of the median, q05 to q95 coverage, by
   lead band and by month.
+verdict: inconclusive
+production_status: not-for-production
+adopted_in: none
+best_arm: >-
+  Not a comparison of arms; the headline number is the normal-running Primaries CRPS gain over
+  climatology of 35.3% at days 0 to 1 and 26.9% at days 10 to 14.
+headline: >-
+  The five backtest files beat climatology at every lead band except wind at days 10 to 14.
+lessons: >-
+  The CRPS gain over climatology falls with lead time for every type. The prevailing output is worse
+  than the normal-running output in the 7 days after the one verified load shift.
+take_home_message: >-
+  The five backtest files forecast better than climatology at every lead band for the Primaries,
+  BSPs, GSPs, and solar, and for wind out to day 10; the wind network is 1.8% worse at days 10 to 14.
+  The gain falls with lead time, for Primaries from 35.3% at days 0 to 1 to 26.9% at days 10 to 14.
+  The files describe one year that overlaps the development months, so the scores are not a ranking.
+advice:
+  - >-
+    Quote the lead-band tables of the backtest page, not one headline figure, when describing the
+    backtest year, because the gain over climatology falls with lead time (lead-band tables).
+  - >-
+    Score the prevailing output separately in the 7 days after a load shift, because it scores worse
+    than normal running there (verified transfer table).
 ---
 
 This page documents the five Parquet files of the one-year backtest in
 `data/ml-experiments/backtest_year_2025-11_to_2026-10/`. It has two readers: the colleague at NGED
 who receives the files, and an engineer who must re-implement one of the four models behind them.
 A Primary is a primary substation, a BSP is a bulk supply point, and a GSP is a grid supply point.
-This page is a draft: the files, model sections, and plan are written, and the performance
-sections (tables and figures) are added when each Parquet file exists.
 
-**Take-home message.** To be written once the scores exist.
+**Take-home message.** The five backtest files hold forecasts that are better than climatology at
+every lead band for the demand types and for solar, and better for wind out to day 10. The CRPS
+gain over climatology falls with lead time: for Primaries it falls from 35.3% at days 0 to 1 to
+26.9% at days 10 to 14 (normal running), and for BSPs from 41.0% to 12.5%. The wind network has a
+CRPS 1.8% worse than climatology at days 10 to 14 (interval -3.3 to -0.4). On the common rows of the
+six MW Primaries the backtest outputs and research default 3 are close, and the backtest outputs are
+better at the seven MVA-only Primaries. The prevailing output scores better than the normal-running
+output overall, and worse in the 7 days after the one verified load shift. The files describe one
+year that overlaps the development months, so the scores are not a ranking.
 
 ## Figures
 
-Figures are added in phase 2, starting with the headline figure: score against lead time for each
-model beside climatology.
+The five figures below show the normalised MAE of the median by forecast horizon, one per forecast
+type, beside the baselines. The y-axis does not start at zero.
+
+![Normalised MAE of the median by forecast horizon, 16 Primaries, normal running](primaries_NRA_mae_by_horizon.svg)
+
+![Normalised MAE of the median by forecast horizon, 2 BSPs](bsps_mae_by_horizon.svg)
+
+![Normalised MAE of the median by forecast horizon, 2 GSPs](gsps_mae_by_horizon.svg)
+
+![Normalised MAE of the median by forecast horizon, 3 wind farms](wind_mae_by_horizon.svg)
+
+![Normalised MAE of the median by forecast horizon, 6 solar farms](solar_mae_by_horizon.svg)
 
 ## The files
 
@@ -984,18 +1023,36 @@ farms' identifiers and are not the labels of earlier pages:
 
 ## Performance by season
 
-This section is written with the per-file performance, and holds one analysis for every forecast
-type (Primaries, BSPs, GSPs, wind, solar). The seasons are the four meteorological seasons: winter
-(December to February), spring (March to May), summer (June to August), and autumn (September to
-November). The backtest year runs from 2025-11 to 2026-10, so autumn is split across its two ends,
-and the section also reports by calendar month. For each type and season the tables give the
-normalised mean absolute error of the median and the CRPS of the model, the manual heuristic where
-one exists, and climatology, with the gain over the manual heuristic and over climatology as a
-percentage and a day-block bootstrap interval. Each type has a figure of the normalised error by
-season for the three arms, with a y-axis that does not start at zero. The demand types add the
-split by lead band (days 0 to 1, 1 to 3, 3 to 7, and 7 to 14) within each season. The section says
-what the tables show and asserts no cause that the numbers do not support. Generator series carry
-season labels and no calendar dates.
+**The CRPS gain over climatology is positive in all five seasons for all five types, and the season
+with the largest gain differs by type.** The GSPs gain most in summer (47.1%), the Primaries in the
+first autumn month (36.4%), and wind and solar in spring and summer. The seasons are the meteorological
+seasons: winter (December to February), spring (March to May), summer (June to August), and autumn
+(September to November). The backtest year runs from 2025-11 to 2026-10, so autumn is split into its
+first month and its last two months. Generator series carry season labels and no calendar dates. Each
+cell is the gain of the model's CRPS over the baseline, with a 95% day-block bootstrap interval from
+2,000 resamples of origin days.
+
+Gain in CRPS over climatology (%):
+
+| Type | autumn (first month) | winter | spring | summer | autumn (last two months) |
+|---|---:|---:|---:|---:|---:|
+| Primaries (normal running) | 36.4 (32.5 to 40.2) | 31.4 (29.8 to 32.9) | 31.5 (30.1 to 32.7) | 28.0 (26.2 to 29.8) | 22.7 (21.4 to 24.0) |
+| BSPs | 16.9 (14.7 to 19.0) | 21.6 (18.7 to 24.3) | 22.6 (20.8 to 24.5) | 21.4 (19.7 to 23.2) | 22.2 (19.6 to 24.5) |
+| GSPs | 9.9 (8.1 to 11.7) | 13.1 (10.4 to 15.8) | 35.4 (34.0 to 36.8) | 47.1 (45.5 to 48.5) | 22.9 (14.5 to 30.3) |
+| Wind | 6.9 (5.2 to 8.6) | 15.1 (13.4 to 16.9) | 19.6 (17.8 to 21.3) | 16.3 (14.7 to 17.8) | 18.6 (14.6 to 22.5) |
+| Solar | 14.1 (11.6 to 16.5) | 9.7 (7.2 to 12.2) | 18.8 (16.6 to 20.9) | 19.4 (17.7 to 21.2) | 13.0 (10.9 to 15.1) |
+
+Gain in CRPS over the manual heuristic (%); wind and solar have no manual heuristic:
+
+| Type | autumn (first month) | winter | spring | summer | autumn (last two months) |
+|---|---:|---:|---:|---:|---:|
+| Primaries (normal running) | 26.1 (23.7 to 28.3) | 17.9 (15.7 to 20.0) | 15.4 (13.9 to 16.9) | 6.7 (4.2 to 9.3) | 9.9 (7.7 to 12.1) |
+| BSPs | 27.2 (24.9 to 29.5) | 20.3 (17.7 to 22.7) | 15.7 (14.3 to 17.1) | 13.6 (12.2 to 15.1) | 17.6 (13.7 to 21.9) |
+| GSPs | 9.5 (6.3 to 12.3) | 16.7 (14.8 to 18.8) | 13.4 (11.3 to 15.3) | 18.7 (15.9 to 21.5) | 13.5 (8.7 to 18.3) |
+
+The per-season tables of the normalised MAE and the CRPS, with the figure for each type, are in the
+section of each type: [Primaries](#primaries), [BSPs and GSPs](#bsps-and-gsps), [Wind](#wind), and
+[Solar](#solar). The tables read as a description of one year; the seasons are not replicated.
 
 ## Comparison baselines, slices, and summary figures
 
@@ -1272,6 +1329,17 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
   on the sunniest days in experiment 659.
 - **The shift labels are an incomplete dump.** NGED has said that load-shift events may be missing
   from its logs, so clean rows can hold unlabelled shifts.
+- **Default 3 and BG2 comparisons use stored rows only.** Every fifth origin day is missing,
+  the hand-filtered load-shift rows are missing, nothing is stored after 2026-06-30, and the 09:00
+  origins are joined on valid time with 3 hours subtracted from the lead. BSPs and GSPs have no such
+  comparison.
+- **The Primaries heads change in January 2026.** 2025-11 and 2025-12 use the B-haz fallback
+  head, and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. The zero-flag mask
+  uses later-month climatology, which drops training rows only.
+- **The prevailing output over-persists after a load shift ends.** One verified load shift, at
+  D5 and D16, is the only example, so the size of the effect is not estimated.
+- **Numbers are provisional until the pages of experiments 667, 669, and 666 merge.** Those pages
+  own the models behind the files.
 - **The last origins cannot be fully scored.** Observed power ends on 2026-11-09 and the wind idle
   mask ends on 2026-09-13.
 
