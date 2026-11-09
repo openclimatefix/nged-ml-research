@@ -272,9 +272,10 @@ median and the 90% band track the observed peak.
   level change in its lags. NGED's event labels are incomplete and none were applied here.
 - **Reviews:** a Sonnet plan review (7 findings: 6 applied, 1 left), two Sonnet code reviews (2 and
   4 findings: all applied), an Opus leakage review (5 findings; the 2026-07 BSP fold was refitted
-  with the final code; a perturbation test found no leak), a Sonnet file audit with a from-scratch
-  re-run of one fold, and an Opus review of the file and scores. The Sonnet and Opus audit findings
-  are summarised in the pull request.
+  with the final code; a perturbation test found no leak), a Sonnet file audit (no contract
+  violation; the scores reproduced within 0.03 points; a GPU re-run of the 2026-03 GSP fold matched
+  the stored forecasts to 5e-6 of capacity), and an Opus review of the file and scores (8 findings,
+  all applied to this page).
 - **Compute:** about 2 GPU-hours on one process, 1 core.
 - **Standing practices:** cleaned data, monthly refits, saved weights (`.pt`, in the data folder),
   and tail plots. The D15 and D18 cut does not apply.
@@ -309,3 +310,6 @@ median and the 90% band track the observed peak.
 - **Leakage caveats from the Opus review:** the embargo of 9 days is shorter than the 14-day leads,
   and the `Extras` table is built with the grid end from before the redirect. Neither changed a
   result.
+- **Scoring end and the hardest series:** scoring stops where the cleaned observed power ends, about
+  midday on 2026-11-08. D1 (id 28) is the hardest series: its median is 18 MW below the observed
+  median overall, and its monthly mean error swings from -39.8 MW in 2025-11 to +25 MW in 2026-10.
