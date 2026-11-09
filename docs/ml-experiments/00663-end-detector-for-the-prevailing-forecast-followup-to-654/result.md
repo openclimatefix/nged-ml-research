@@ -98,6 +98,54 @@ network fine-tuned end to end). Experiment 654 did not run its end detector. Thi
   detector that multiplies the survival needs the head's depth and spread, so E0 is refitted with
   the same code and seeds (a minute per fit on CPU) and checked against the stored quantiles.
 
+## Plan review: what changed
+
+A fresh Sonnet reviewer read the plan. These amendments follow its findings; the rest of the page
+stands.
+
+- **Which NRA forecast the detector reads.** For half-hour `t`, the residual uses K1's forecast
+  issued at the latest origin at or before `t` minus 24 hours (a frozen K1 output, never a
+  fine-tuned output). J2d reads the same K1 panel as E0d, so the two detectors see identical
+  inputs, and the detector reads a K1 residual because K1 is the common NRA reference of both bases.
+  Every detector input ends at the scored origin. A unit test perturbs observed power after the
+  origin and checks that no detector input changes.
+- **No held-out leakage.** The noise unit, the per-Primary constant, and the rewiring are computed
+  inside each leave-one-month-out fold from the four training months only, then frozen. "Event-free"
+  for these statistics means not injected and not inside a labelled or detected event. The
+  all-Primaries median at each half-hour uses data up to the origin only. Nothing from the window
+  enters any of these quantities.
+- **Training rows.** The detector trains on the 650 bank, with hard negatives added to the
+  residual inputs of 30% of the rows (the lags are untouched). The 653-law world is never used for
+  training: it is an evaluation-only transfer test.
+- **Duration bands.** Every contrast is also reported for events of 3 to 14 days and of 28 to
+  112 days, and for the held-out family descriptively. A gain confined to one band is reported as
+  such, and the decision rule counts it as a gain for that band only. The hard negatives are absent
+  from the 650-bank contrasts, so false-alarm figures on that bank are not the figures of the
+  hard-negative world.
+- **Veto.** Reported with the minimum and maximum over the 5 months beside the interval. The veto
+  passes only if the interval bound and every month's point estimate are below 0.03 points.
+- **P4 and bars.** The false-alarm share is measured on rows that are event-free and more than 14
+  days from any event. Its base values for E0 and J2 are tabulated before any detector fit. E0d has
+  the same bar as J2d.
+- **P1 and P2 resolution.** A band of 0.1 points that the 5-month interval cannot resolve is read
+  as undecided, not confirmed. P2 passes only if the interval lies inside plus or minus 0.1. Row
+  counts per stratum are tabulated before the fits.
+- **Placebo.** Contrast 2 is the interval of (real graph minus rewired graph) excluding zero (the
+  ratio in P3 is dropped). Three rewirings (seeds 0 to 2) are used and their spread reported. If a
+  degree-preserving rewiring that keeps no edge does not exist, the fewest-kept-edges rewiring is
+  used and the count of kept edges stated. J2d-no-neighbours is added.
+- **E0 refit check.** Passes if the maximum absolute difference of any quantile from the stored
+  E0 is below 0.01 points of capacity. Otherwise the stored quantiles give the E0 scores and the
+  detector arms are labelled as built on a different head.
+- **Window freeze.** Only E0, J2, E0d (real graph), and J2d (real graph) are frozen; placebo and
+  no-neighbour arms are not scored on the window. The window segmenter uses experiment 653's
+  thresholds unchanged, with no tuning; if it cannot run that way, the G4 proxy is used. Window
+  residuals use K1 forecasts issued at earlier origins, as above.
+- **Compute.** The J2 forward pass is timed on one month first. The row count and the timing are
+  stated before the 4 GPU-hour ceiling is relied on.
+- **Ramp law.** Onsets are one half-hour step or a 6 to 48 hour ramp (half each); ends are
+  instantaneous in the 650 generator. The page says so.
+
 ## Method
 
 **Rows and folds.** The five development months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), the
