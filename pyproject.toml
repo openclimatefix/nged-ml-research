@@ -336,6 +336,11 @@ extra-paths = [
     "tests",
     "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
     "ml-experiments/00653-edge-state-event-table-penalised-segmentation",
+    "ml-experiments/00657-event-table-with-explicit-solar-term-against-plain-arm",
+    "ml-experiments/00658-edge-state-event-table-neural-network",
+    "ml-experiments/00660-shared-generator-of-injected-load-transfer-events",
+    "ml-experiments/00665-event-table-recall-by-length-and-depth",
+    "ml-experiments/00670-event-table-recipient-search-on-six-cell-grid",
     "ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth",
     "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
@@ -641,6 +646,22 @@ invalid-return-type = "ignore"
 invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 
+[[tool.ty.overrides]]
+# Experiment 663's scripts are copies and patches of experiment 654's `torch` wrappers and build
+# Altair charts through chained `mark_*` calls (see the `ty-workarounds` skill), and pass
+# tuple-valued numpy results through untyped helpers. They are checked for the other rules only.
+include = ["ml-experiments/00663-end-detector-for-the-prevailing-forecast-followup-to-654/*.py"]
+
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"
+invalid-assignment = "ignore"
+not-subscriptable = "ignore"
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+unresolved-import = "ignore"
+unsupported-operator = "ignore"
+redundant-condition = "ignore"
+
 [tool.ty.rules]
 # With the `gpu` dependency group installed, `torch` resolves, so `ty` reports every
 # `# ty: ignore[unresolved-import]` on a `torch` import as unused and every `nn.Module.forward`
@@ -676,6 +697,11 @@ pythonpath = [
     "tests",
     "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
     "ml-experiments/00653-edge-state-event-table-penalised-segmentation",
+    "ml-experiments/00657-event-table-with-explicit-solar-term-against-plain-arm",
+    "ml-experiments/00658-edge-state-event-table-neural-network",
+    "ml-experiments/00660-shared-generator-of-injected-load-transfer-events",
+    "ml-experiments/00665-event-table-recall-by-length-and-depth",
+    "ml-experiments/00670-event-table-recipient-search-on-six-cell-grid",
     "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
     "studies/embedded_battery_forecast",
