@@ -20,8 +20,8 @@ size: >-
   imports them. CPU only, at most 2 cores.
 hypothesis: >-
   Subtracting an explicit solar term (the capacity of unmetered solar behind a Primary from
-  experiment 649, times a physics curve built from recorded ERA5 irradiance, times a gain fitted on
-  the tuning years) from the six megawatt Primaries' residuals lowers the rate of false events on
+  experiment 649, times a physics curve built from recorded ERA5 irradiance, times one gain pooled over the six
+  Primaries and fitted on the tuning years) from the six megawatt Primaries' residuals lowers the rate of false events on
   sunny middays, and loses no more than 0.03 of the injected megawatts that the plain arm of
   experiment 653 finds.
 prediction: >-
@@ -29,9 +29,10 @@ prediction: >-
   at the six megawatt Primaries, in rows more than 14 days from any labelled or verified event,
   falls by 20% or more against the plain arm. P2: MW-weighted recall of injected events of 4 noise
   units or more that last 1 day or more, at the same six Primaries, changes by -0.03 or more
-  (a fall of at most 0.03). P3: the rate of decoded events on non-sunny days at those Primaries
+  (a fall of at most 0.03), judged on the paired difference over worlds. P3: the rate of decoded events on non-sunny days at those Primaries
   changes by less than 10% in either direction. P4: a placebo that gives each Primary another
-  Primary's capacity lowers the sunny-midday rate by at most half as much as the real capacity does.
+  Primary's capacity, with the same pooled gain, lowers the sunny-midday rate by at most half as
+  much as the real capacity does.
   P5: the normalised mean absolute error of the residual, in the sunny-midday half-hours at those
   Primaries, falls by 3% or more.
 decision_rule: >-
@@ -40,8 +41,8 @@ decision_rule: >-
   solar term's. The gain is fitted on 2022 and 2023 only, and the scored years are 2024-01-01 to
   2026-06-30. The final-test window from 2026-07-01 is never read. Contrasts are printed beside a
   neutral placebo (capacity swapped between Primaries, which leaves the decoder and every
-  non-solar row unchanged) and at equal width (the same decoded-event count, by lowering the
-  confidence threshold of the arm that has fewer events). The porting threshold is zero, because
+  non-solar row unchanged) and at equal width (the arm with more events is thinned to the other arm's count by
+  raising its confidence threshold). The porting threshold is zero, because
   the table is a research output and changes no production code.
 benchmark: >-
   The plain arm of experiment 653 (masked frozen seasonal slow level, no solar term), run on the
@@ -65,34 +66,48 @@ same decoder on the same injected worlds and the same real record. Nothing is tu
 
 ## Plan
 
-- **Solar curve.** For each of the six megawatt Primaries, the unit curve `u(t)` is the ERA5
-  surface shortwave irradiance (the `shortwave` column of experiment 6's feature table, interpolated
-  from hourly to half-hourly), divided by its 99th percentile over daylight half-hours at that
-  Primary in 2022 and 2023. It is zero at night.
+- **Solar curve.** For each of the six megawatt Primaries (D5, D9, D10, D11, D14, D16; mapped to
+  `time_series_id` through experiment 653's `SERIES_IDS` and the series table), the unit curve `u(t)`
+  is the ERA5 surface shortwave irradiance (the `shortwave` column of experiment 6's feature table,
+  already half-hourly on the 2022-01-01 to 2026-06-30 grid), divided by its 99th percentile over
+  daylight half-hours of 2022 and 2023 at that Primary. The code checks that the column is a
+  recorded-weather product, not a forecast, and prints the check.
 - **Capacity.** `C` is the calibrated 50th-percentile AC capacity of experiment 649 (probe cutoff
-  2026-06, no cloud template): the April-to-September 2025 value for dates from 2025-01-01, and
-  the April-to-September 2024 value for earlier dates. The table describes a summer half-year, so
-  the same `C` is used in every month, and the gain below absorbs the winter difference.
-- **Gain.** For each Primary, `g` is the slope of a Huber regression of the plain residual on
-  `C·u(t)` over daylight half-hours of 2022 and 2023, with half-hours inside logged or verified
-  events left out. The solar-arm residual is the plain residual minus `g·C·u(t)`. A `g` of zero
-  reproduces the plain arm, and `g` is clipped to 0 to 1.5.
+  2026-06, April to September 2025), one value per Primary for the whole record. The two probe
+  summers differ by at most 0.07 MW, so one vintage is used. The probe was pretrained to 2026-06,
+  so `C` carries information from the scored years; that is a lab shortcut, stated on the page.
+- **Gain.** One gain `g` is pooled over the six Primaries. The residual is observed minus forecast,
+  so unmetered solar that the demand model missed shows as `r ≈ -g·C·u(t)`. `g` is the slope of a
+  Huber regression of `-r` on `C·u(t)`, stacking the six Primaries, over daylight half-hours from
+  April to September of 2022 and 2023, with half-hours inside logged or verified events left out.
+  The solar-arm residual is `r + g·C·u(t)`, applied in every month. `g` is clipped to 0 to 1.5, and a
+  `g` of zero reproduces the plain arm.
+- **Gate.** The page reports `g` and the fall in the normalised MAE of the residual in sunny-midday
+  half-hours (P5) first. The demand model of experiment 130 already sees irradiance, so `g` may be
+  near zero; if `g` is under 0.05 or the fall is under 3%, the page says that the solar term adds
+  nothing the demand model had not already removed, and the other contrasts are reported as
+  expected to be small.
 - **Arms.** Plain (experiment 653's residual), solar (the arm above), and the placebo (each Primary
-  gets another Primary's `C`, in a fixed cycle, with its own `g` refitted).
+  gets another Primary's `C`, in a fixed cycle, with the same pooled `g`, not refitted).
 - **Decoder.** Experiment 653's, with its `params.json`, noise units, and slow level refitted on each
-  arm's residual. The noise unit is recomputed per arm, and the page prints both.
+  arm's residual. The noise units are those of the plain arm, frozen, so that an injected event has the same
+  megawatts in every arm; the slow level is refitted on each arm's residual.
 - **Injected worlds.** The six worlds of experiment 653 with the same seeds, added to each arm's
   residual after the solar term is subtracted. The solar term does not touch the injected events.
 - **Sunny-midday days.** A day is sunny-midday at a Primary when at least 70% of its half-hours from
   10:00 to 15:00 UTC have a clearness index (ERA5 shortwave divided by the Haurwitz clear-sky
   value) of at least 0.7. Decoded events are counted in the event-free stratum (rows more than 14
-  days from any labelled or verified event), by whether the event's start or end falls on such a day.
+  days from any labelled or verified event) by the day of the event's start.
   The denominator is the number of sunny-midday Primary-years, and likewise for other days.
 - **Measures.** Events per Primary-year in each stratum; recall of injected events by duration band
   and size; the normalised MAE of the median forecast in the four scenarios of experiment 653 (all
   rows, quiet rows, inside events, the 7 days after an event), before and after subtracting the slow
   level and the decoded events, for all 15 Primaries and for the six; logged shifts matched at the
-  strict and loose rules. Intervals resample whole worlds and whole months.
+  strict and loose rules. Intervals resample whole worlds and whole months, and
+  the plain-against-solar contrasts use paired differences over the same worlds. The sunny-day
+  definition uses the same irradiance as the solar term, so P1 is partly mechanical; the page says so.
+  The decoded-event counts at six Primaries are small (about 60 in the plain arm), and the page
+  prints them with their counts.
 - **Time series.** The D5 and D16 pair of December 2025 to January 2026 (D5 and D16 are both
   megawatt Primaries), 14 days before to 7 days after, with the K1 day-ahead median, the plain
   residual, the solar-term residual, and the decoded events. D5 and D16 are anonymised Primary
