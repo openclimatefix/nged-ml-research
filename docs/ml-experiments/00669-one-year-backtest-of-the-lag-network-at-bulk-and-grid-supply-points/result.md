@@ -25,18 +25,20 @@ hypothesis: >-
   2 grid supply points (GSPs: D6 Walpole and D1 Bicker Fen) every day for a year from 2025-11-01,
   at leads of 0 to 14 days, with no neighbour inputs and no model of load-shift events.
 prediction: >-
-  Written before any fit. P1: with a lag cut at 3.5 hours before the network's 09:00 origin (6.5
-  hours before the 12:00 origin), the CRPS at days 0 to 3 is no worse than the 24-hour-lag network's
-  stored 7.45 points of capacity (experiment 633, July to October 2026) by more than 0.5 points,
-  because a fresher lag should help. P2: the lag adds nothing beyond day 6, so CRPS at days 7 to 14
-  matches the CRPS at days 4 to 10 of experiment 633 within 1.0 point. P3: q05 to q95 coverage is
-  between 0.80 and 0.95 in every month. Each can fail.
+  Written before any fit. P1: pooled over the 4 series and the 12 months, CRPS at days 0 to 3 is
+  within 0.5 points of capacity of experiment 633's lag-enabled network (7.45 points, 24-hour lags,
+  July to October 2026), re-scored on the same July to October origins; a fresher lag should not
+  hurt. P2: CRPS at days 11 to 14 is no more than 1.0 point above CRPS at days 7 to 10, so the
+  bands do not blow up beyond the horizon the network was scored at before. P3: pooled q05 to q95
+  coverage is between 0.80 and 0.95 in at least 10 of the 12 months. Each can fail, and the page
+  reports a failure without changing the recipe.
 decision_rule: >-
   Descriptive. No ranking, no claim of benefit, and nothing adopted for production. The year
   overlaps the development months and the final-test months, so no number here is a held-out
-  score. A pre-flight gate on the 2026-07 fold decides whether the full year runs: the gate's
-  checks (no feature reads power newer than 06:00 UTC of the origin day, the row count of the
-  fold, no crossing quantiles) must pass.
+  score. A pre-flight gate on the 2026-07 fold decides whether the year runs: no feature reads
+  power newer than 06:00 UTC of the origin day, the fold's row count is series x origins x 672,
+  quantiles do not cross, and no quantile is null. If the gate fails, stop and report to the
+  manager before any other fold runs.
 benchmark: >-
   Experiment 633's stored lag-enabled network (24-hour lags, leads to 10 days, one fit at
   2026-07-01), as context for July to October 2026 only.
@@ -66,16 +68,38 @@ network. This page is planned and holds the plan only.
   using the same 00Z ENS run the contract names. Its output is relabelled `power_fcst_init_time` =
   12:00 UTC, and only valid times from 12:00 to 11:30 of day 14 are kept. Every input the network
   read at 09:00 was available at 12:00, so the relabelling does not leak.
-- **Leads:** the training rows already hold leads of 0.5 to 351 hours, so no retraining for the
-  longer horizon is needed. Only the scoring window of experiment 428 stops at 240 hours, and this
-  experiment lifts that limit to 351 hours. Days 11 to 14 were never scored before, so they are
-  reported separately.
+- **Leads:** the stored training matrices (`raw/summary/*.npz` of experiment 633) hold leads of 0.5
+  to 351 hours, so the network needs no retraining for the longer horizon. The 240-hour limits in
+  `build_test` (experiment 428's `HEADLINE_MAX_HOURS`), in the `assemble` assertion, and in the
+  scorers are lifted in this experiment's copies. The longest lead used is 338.5 hours. Days 11 to
+  14 were never scored before, so they are reported separately.
+- **Test rows without an observed target:** the stored matrices keep only half-hours with an
+  observed, unflagged reading, so they lack the rows for the last days (valid times after
+  2026-11-06 14:00, which the 2026-10-23 to 2026-10-31 origins need) and for every flagged or
+  missing half-hour. The file needs a row for every half-hour, so this experiment builds its own
+  test matrices from the ensemble summaries with the same code as experiment 633's `build_site`
+  but without the finite-power filter. Training rows are unchanged.
 - **Folds:** 12 monthly refits, test months 2025-11 to 2026-10. Each trains on data before the
-  first of the month and forecasts every origin in the month. A lag may read power observed inside
-  the month, but only from 3.5 hours before the 09:00 origin or earlier. The training phase hides
-  power from the cutoff on, as experiment 633's training phase does.
+  first of the month (the cutoff) and forecasts every origin in the month. The recipe's embargo is
+  3 days (the `3sE` schedule: the step-2 fit's newest valid time is 3 days before the cutoff,
+  as in experiment 633), not 7 days. A lag may read power observed inside the month, but only from
+  3.5 hours before the 09:00 origin or earlier. The training phase hides power from the cutoff on,
+  as experiment 633's training phase does. Pre-training runs per fold on ERA5 and CAMS rows before
+  the cutoff (the stored pre-training matrices end 2026-06-30, so folds from 2026-07 on share the
+  same pre-training rows). The page states, per fold, the number of ENS fine-tuning rows (the ENS
+  history starts 2024-04-01, so the 2025-11 fold has 19 months of it).
 - **Seeds:** 2 (experiment 622's choice); the quantiles are averaged across seeds, then sorted
   within the row.
+- **Compute:** experiment 633's fit took about 1 minute per group and seed, so 12 folds x 2
+  groups x 2 seeds is about 1 to 2 GPU-hours, inside the 6-hour ceiling. One GPU process at a
+  time, at most 4 CPU cores.
+- **Checks printed on the page:** row count (4 series x 365 origins x 672 half-hours), no duplicate
+  key, no null or non-finite quantile, no crossing, UTC, `time_series_id` fits Int8 (the ids are
+  1, 2, 27, 28), and a spot check that no lag index is newer than 05:30 on the origin day. The
+  3.5-hour cut leaves 6.5 hours to the 12:00 origin, 0.5 hours more than the contract needs.
+  `nwp_init_time` is the 00Z run of the origin day.
+- **Scoring:** against observed, unflagged power outside the file, in points of capacity; rows with
+  no observed reading are not scored, and their count is reported per month.
 - **Units:** the network forecasts shares of effective capacity; the Parquet files hold MW (all 4
   series are MW series), obtained by multiplying by `effective_capacity_mw`.
 - **Standing practices followed:** cleaned data (flagged half-hours dropped, counted per fold),
