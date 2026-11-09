@@ -1,4 +1,4 @@
-"""Run experiment 670: E1, E1-J, and E1-J on a rewired graph, on injected worlds and the real record.
+"""Run experiment 670: E1, E1-J, and E1-J on a rewired graph, on injected and real data.
 
 Run from the repository root with the data folder and the imported folders on the path:
 
@@ -24,8 +24,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Final
 
-import e00660_data as data
-import e00660_generator as gen
+import e00660_data as data  # ty: ignore[unresolved-import]
+import e00660_generator as gen  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from e00653_common import DAY, E580, GRID_LENGTH, SCORED_FROM, WORK
@@ -34,8 +34,8 @@ from e00653_inject import OFFSET_2019
 from e00653_run import rewire
 from e00653_segment import Event, Params, classify
 from e00653_slow import to_half_hours
-from e00660_ev34_detector import Rig, truths
-from e00665_score import cell_of, depth_units
+from e00660_ev34_detector import Rig, truths  # ty: ignore[unresolved-import]
+from e00665_score import cell_of, depth_units  # ty: ignore[unresolved-import]
 from e00670_search import search_recipients
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -124,8 +124,10 @@ def run_injected(*, config_name: str, first_seed: int, n_worlds: int) -> None:
             rng=np.random.default_rng(seed),
         )
         for method, events in variants.items():
-            for r in match(truth=truth, events=events, world_end=GRID_LENGTH):
-                rows.append({**r, "config": config_name, "world": seed, "method": method})
+            rows.extend(
+                {**r, "config": config_name, "world": seed, "method": method}
+                for r in match(truth=truth, events=events, world_end=GRID_LENGTH)
+            )
         print(config_name, seed, flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(rows).write_parquet(OUT / f"injected_{config_name}_{first_seed}.parquet")

@@ -74,7 +74,7 @@ def best_recipient_step(
     return best
 
 
-def search_recipients(
+def search_recipients(  # noqa: PLR0912 - one decision cascade, as experiment 653's classify
     *,
     events: list[Event],
     xh: dict[str, np.ndarray],

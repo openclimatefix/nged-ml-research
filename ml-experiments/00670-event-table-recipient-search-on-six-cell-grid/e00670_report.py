@@ -10,6 +10,7 @@ writes `injected_by_cell.json` there.
 
 from __future__ import annotations
 
+import itertools
 import json
 import sys
 from pathlib import Path
@@ -18,7 +19,13 @@ from typing import Final
 import numpy as np
 import polars as pl
 from e00653_common import DAY
-from e00665_score import CELLS, boot_intervals, cell_stats, with_cells, wrec
+from e00665_score import (  # ty: ignore[unresolved-import]
+    CELLS,
+    boot_intervals,
+    cell_stats,
+    with_cells,
+    wrec,
+)
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 OUT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00670-event-table-recipient-search-on-six-cell-grid"
@@ -70,10 +77,10 @@ def gate_against_660(*, raw: pl.DataFrame) -> None:
     e1 = raw.filter((pl.col("method") == "E1") & pl.col("world").is_between(900, 907))
     e1 = e1.filter((pl.col("days") >= 1) | (pl.col("days") < 0))
     bounds = [1.0, 2.0, 4.0, 6.0, 10.0, 20.01]
-    for (lo, hi), s in zip(zip(bounds, bounds[1:], strict=False), stored, strict=False):
+    for (lo, hi), s in zip(itertools.pairwise(bounds), stored, strict=False):
         sub = e1.filter((pl.col("units") >= lo) & (pl.col("units") < hi))
-        per_world = [float(g["found"].mean()) for _, g in sub.group_by("world")]
-        mine = float(np.mean(per_world)) if per_world else float("nan")
+        per_world = [g["found"].cast(pl.Float64).mean() for _, g in sub.group_by("world")]
+        mine = float(np.mean(per_world)) if per_world else float("nan")  # ty: ignore[invalid-argument-type]
         print(f"GATE bin {lo:g}-{hi:g}: mine {mine:.3f} stored {s['injected_recall'][0]:.3f}")
 
 
@@ -119,7 +126,8 @@ def main() -> None:
         c: report(config=c) for c in ("default", "long_heavy", "short_heavy", "constant_mw_square")
     }
     (OUT / "injected_by_cell.json").write_text(json.dumps(out, indent=1, default=float))
-    assert DAY == 48 and wrec is not None
+    assert DAY == 48
+    assert wrec is not None
     print(Path(sys.argv[0]).name, "done")
 
 
