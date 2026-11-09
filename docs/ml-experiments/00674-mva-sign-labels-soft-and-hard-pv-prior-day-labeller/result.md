@@ -43,7 +43,7 @@ arm
 decision_rule: >-
   Fixed before any score is read. Scoring is leave-one-Primary-out over the six signed-MW Primaries
   with injected solar farms at levels 1, 2, and 3 times the median sunny midday reading, plus the
-  uninjected world (real reverse flow at D10, 58 crossing days, and D5, 5 days). The training set
+  uninjected world (real reverse flow at D10, 54 crossing days, D5, 3, and D9, 2). The training set
   for a held-out Primary leaves out the Primary that carries the same injected farm (D5 with D11, D9
   with D14, D10 with D16), so no farm day is both fitted and scored. A reverse-flow day is a day
   with at least 2 daylight half-hours of negative signed power and at least one of positive signed
@@ -148,7 +148,7 @@ sign-unknown), false-reverse rate (flagged over all non-reverse days), the share
 share not scorable. **Low-demand days** are the 20% of each Primary's April to September days with
 the
 lowest median 10:00 to 15:00 reading before injection, reported separately. D5 and D10's real
-crossing days (level 0) give a no-injection recall (63 days, so the interval will be wide).
+crossing days (level 0) give a no-injection recall (59 days, so the interval will be wide).
 
 **Application to the eight.** Thresholds are frozen from all six Primaries and written to disk
 before any of the eight is read. Report label counts per class (reverse flow, no reverse flow,
@@ -196,7 +196,7 @@ this experiment's day-level figures, which use different rows.
 **Plan review (Sonnet, 2026-11-09).** Twenty-two findings. Accepted and applied above: the complete
 verdict mapping, the point-versus-firm bar wording, the P5 bars, the farm-leakage fix, the minimum
 cell size, the 2-half-hour crossing rule, the W-score cloud limit, the winter domain, the hindsight
-and oracle notes. Not applied: threshold uncertainty in the intervals (stated as a limit).
+and oracle notes. Also applied after the code review: days with no ratio count as not scorable, the false-reverse rate is reported over both known-label days and all non-reverse days, and low-demand membership no longer depends on the injection level. Not applied: threshold uncertainty in the intervals (stated as a limit).
 
 **Reviews.** One Sonnet plan review, one fresh Sonnet code review before any score is read, one
 Sonnet results check (re-derives the headline numbers), one Sonnet prose review. The audit triggers

@@ -45,23 +45,19 @@ def prepare(
 ) -> pl.DataFrame:
     """Add the stratum and ratio bin; keep days in `months` with a ratio and a stratum."""
     gate = pl.col("gate") if use_gate else pl.lit(True)
-    return (
-        table.filter(pl.col("month").is_in(months), pl.col("k_mid").is_not_null())
-        .with_columns(
-            stratum=pl.when((pl.col("k_mid") >= feat.SUNNY_K) & gate)
-            .then(pl.lit("high"))
-            .when(pl.col("k_mid") < feat.CLOUDY_K)
-            .then(pl.lit("cloudy"))
-            .otherwise(pl.lit("mixed")),
-            rbin=pl.when(pl.col("r").is_null())
-            .then(pl.lit("none"))
-            .when(pl.col("r") >= RATIO_EDGES[1])
-            .then(pl.lit("unknown"))
-            .when(pl.col("r") >= RATIO_EDGES[0])
-            .then(pl.lit("1.5-3"))
-            .otherwise(pl.lit("<1.5")),
-        )
-        .filter(pl.col("rbin") != "none")
+    return table.filter(pl.col("month").is_in(months)).with_columns(
+        stratum=pl.when((pl.col("k_mid") >= feat.SUNNY_K) & gate)
+        .then(pl.lit("high"))
+        .when(pl.col("k_mid") < feat.CLOUDY_K)
+        .then(pl.lit("cloudy"))
+        .otherwise(pl.lit("mixed")),
+        rbin=pl.when(pl.col("r").is_null())
+        .then(pl.lit("none"))
+        .when(pl.col("r") >= RATIO_EDGES[1])
+        .then(pl.lit("unknown"))
+        .when(pl.col("r") >= RATIO_EDGES[0])
+        .then(pl.lit("1.5-3"))
+        .otherwise(pl.lit("<1.5")),
     )
 
 
@@ -99,6 +95,8 @@ def label(*, days: pl.DataFrame, thresholds: dict) -> pl.DataFrame:
 
 
 def _label_day(*, row: dict, cells: dict, arm: str) -> str:
+    if row["rbin"] == "none":
+        return "not_scorable"
     if row["rbin"] == "unknown":
         return "unknown"
     s, w = row["s"], row["w"]
@@ -135,6 +133,7 @@ def block_counts(*, days: pl.DataFrame, arm: str) -> tuple[np.ndarray, list[str]
         hit=(cross & (cls == "reverse")).cast(pl.Float64),
         noncross_known=((~cross) & cls.is_in(["reverse", "no_reverse"])).cast(pl.Float64),
         false=((~cross) & (cls == "reverse")).cast(pl.Float64),
+        noncross_all=(~cross).cast(pl.Float64),
         labelled_cross=(cross & cls.is_in(["reverse", "no_reverse"])).cast(pl.Float64),
         unknown=(cls == "unknown").cast(pl.Float64),
         not_scorable=(cls == "not_scorable").cast(pl.Float64),
@@ -145,6 +144,7 @@ def block_counts(*, days: pl.DataFrame, arm: str) -> tuple[np.ndarray, list[str]
         "crossing",
         "hit",
         "noncross_known",
+        "noncross_all",
         "false",
         "labelled_cross",
         "unknown",
@@ -180,6 +180,7 @@ def metrics(*, days: pl.DataFrame, arm: str, rng: np.random.Generator) -> dict |
         "recall": ratio("hit", "crossing"),
         "recall_labelled": ratio("hit", "labelled_cross"),
         "false_reverse": ratio("false", "noncross_known"),
+        "false_reverse_all": ratio("false", "noncross_all"),
         "unknown": ratio("unknown", "n"),
         "not_scorable": ratio("not_scorable", "n"),
         "n_days": float(point[ix["n"]]),
@@ -203,12 +204,12 @@ def score_known() -> None:
         "other_demand": ~pl.col("low_demand"),
     }
     for arm in ALPHAS:
-        for rbin in ("<1.5", "1.5-3", "pooled_below_3", "all_with_unknown"):
+        for rbin in ("<1.5", "1.5-3", "pooled_below_3", "all_days"):
             base = {
                 "<1.5": days.filter(pl.col("rbin") == "<1.5"),
                 "1.5-3": days.filter(pl.col("rbin") == "1.5-3"),
                 "pooled_below_3": days.filter(pl.col("rbin").is_in(["<1.5", "1.5-3"])),
-                "all_with_unknown": days,
+                "all_days": days,
             }[rbin]
             for name, expr in subsets.items():
                 for level in ("all", 0.0, 1.0, 2.0, 3.0):

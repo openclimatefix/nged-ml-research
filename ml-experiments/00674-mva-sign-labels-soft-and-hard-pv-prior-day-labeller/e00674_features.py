@@ -317,9 +317,12 @@ def day_table(
     crossing = (n_negative >= MIN_NEGATIVE_HALF_HOURS) & (smax > 0)
     # Low-demand days: lowest 20% of the Primary's own April to September days by the median
     # 10:00 to 15:00 reading *before* injection.
+    raw_ok = np.zeros_like(finite)
+    raw_ok[:, geo.MID_SLOTS] = True
+    raw_ok = raw_ok & np.isfinite(mats.p)
     raw_mid = np.array(
         [
-            np.median(np.abs(mats.p[i, mid[i]])) if n_mid[i] >= 6 else np.nan
+            np.median(np.abs(mats.p[i, raw_ok[i]])) if raw_ok[i].sum() >= 6 else np.nan
             for i in range(len(mats.dates))
         ]
     )
