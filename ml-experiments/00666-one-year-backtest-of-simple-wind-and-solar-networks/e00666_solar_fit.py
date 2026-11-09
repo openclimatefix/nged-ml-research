@@ -18,7 +18,7 @@ before `R`; the target is the observed power over the farm's stored effective ca
 `new / old`. Quantiles are written in MW as the fraction of the new capacity times the new
 capacity. Night half-hours (no daylight) are not rows here; `e00666_export.py` sets them to zero.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=12G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00666-*/e00666_solar_fit.py [--seeds 0 1 2]
 """
@@ -153,7 +153,9 @@ def main() -> None:
         train = frame.filter(
             (pl.col("time") < cutoff) & (pl.col("init_time") < refit) & pl.col("actual").is_finite()
         ).with_columns(scaled=pl.col("actual").cast(pl.Float64) / ratio)
-        assert train["time"].max() < refit, "a training row is valid after the refit"
+        assert train.select(pl.col("time").max()).item() < refit, (
+            "a training row is valid after the refit"
+        )
         target = frame.filter((pl.col("init_time") >= refit) & (pl.col("init_time") < end))
         for seed in args.seeds:
             path = out_dir / f"refit={refit:%Y-%m-%d}_seed={seed}.parquet"

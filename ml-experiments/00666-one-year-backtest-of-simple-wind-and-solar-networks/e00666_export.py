@@ -8,7 +8,7 @@ half-hours from 12:00 on the origin day, so `series * 365 * 672` rows. Columns, 
 averaged over the 3 seeds quantile by quantile, then sorted within the row. Solar half-hours with
 no daylight carry zeros in every quantile. The files hold no observed power.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     uv run --no-sync python ml-experiments/00666-*/e00666_export.py
 """
 
