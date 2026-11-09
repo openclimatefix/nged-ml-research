@@ -165,10 +165,10 @@ clear-sky index at least 0.7) of the 60 days after each of three cutoffs.
   +0.17, +0.23, and +0.285. The binary tracker beats its shuffled-error placebo by 0.11 [-0.05,
   +0.27] at day 1-2 and loses to it at the later bands. The observed-sunniness tracker beats the
   forecast-sunniness tracker by 0.32 [0.08, 0.57], 0.52, and 0.69.
-- **The observed-sunniness gain is consistent with a selection on the outcome.** On the 3,657 middays (day
-  1-2) where observed and forecast sunniness disagree, the free network minus the observed tracker
-  is +0.33 [+0.11, +0.64] (0.41 at day 3-5 and day 6-10), and minus the forecast tracker -0.01
-  [-0.17, +0.17].
+- **The observed-sunniness gain is consistent with a selection on the outcome.** On the 3,657
+  middays (day 1-2) where observed and forecast sunniness disagree, the free network minus the
+  observed tracker is +0.33 [+0.11, +0.64] (0.41 at day 3-5 and day 6-10), and minus the forecast
+  tracker -0.01 [-0.17, +0.17].
 
 ![CRPS by lead day](crps_by_lead.svg)
 
