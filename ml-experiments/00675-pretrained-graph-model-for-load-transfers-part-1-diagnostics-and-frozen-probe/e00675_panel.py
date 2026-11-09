@@ -17,26 +17,55 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import sys
+import os
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Final
 
 import e00130_gam_panel as g  # ty: ignore[unresolved-import]
 import numpy as np
+import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.dp_gam import TrainingWindow, fit_gam, predict_gam
+from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity, read_vintages
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-OUT: Final[Path] = (
+VARIANT: Final[str] = os.environ.get("E675_VARIANT", "c")
+"""`c`: fitted capacity (the convex copy); `p649`: capacity pinned at experiment 649's calibrated
+median at the six Primaries it covers and fitted elsewhere; `v45`: capacity pinned at experiment
+45's latest real-time vintage wherever one exists and fitted elsewhere."""
+ROOT: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
     / "00675-pretrained-graph-model-for-load-transfers-part-1-diagnostics-and-frozen-probe"
-    / "forecast_loyo"
 )
+OUT: Final[Path] = ROOT / ("forecast_loyo" if VARIANT == "c" else f"forecast_loyo_{VARIANT}")
+WEEKS: Final = np.arange(np.datetime64("2019-06-24", "D"), np.datetime64("2027-01-04", "D"), 7)
 GRID_START64: Final = np.datetime64("2022-01-01T00:00", "us")
 YEARS: Final[tuple[int, ...]] = (2022, 2023, 2024, 2025, 2026)
 CUT: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
 """Fits may train on any row that ends before the held-out 2026-07-01."""
+
+
+def pin_for(*, site: str, series: int, cache: object) -> PinnedCapacity | None:
+    """The pinned capacity of this variant for a Primary, or None to fit the capacity."""
+    table = cache.sites[site].table  # ty: ignore[unresolved-attribute]
+    if VARIANT == "p649":
+        t = pl.read_parquet(ROOT.parent / "00649-pv-capacity-table-season-year-from-stored-probes/work/capacity_table.parquet")
+        t = t.filter((pl.col("probe_year") == 2025) & (pl.col("cutoff") == "2026-06") & (pl.col("site") == site))
+        if t.is_empty():
+            return None
+        points = 100.0 * float(t["cal_p50"][0]) / table.effective_capacity_mw
+        return PinnedCapacity(
+            site=site, cut=CUT, source="vintage", origin=date(2026, 6, 29), weeks=WEEKS,
+            points=np.full(len(WEEKS), points), held_points=points, n_unobserved=0,
+        )  # fmt: skip
+    if VARIANT == "v45":
+        try:
+            return pinned_capacity(vintages=read_vintages(), table=table, cut=CUT)
+        except ValueError:
+            return None
+    return None
 
 
 def fit_job(series: int) -> str:
@@ -55,10 +84,13 @@ def fit_job(series: int) -> str:
     for year in YEARS:
         rows = all_rows & (year_of != year)
         trial = replace(cache, sites={**cache.sites, site: replace(features, default_rows=rows)})
+        pin = pin_for(site=site, series=series, cache=cache)
+        spec = replace(g.base_spec(), capacity="pinned") if pin is not None else g.base_spec()
         fit = fit_gam(
             cache=trial,
             site=site,
-            specs=[g.base_spec()],
+            specs=[spec],
+            pinned=pin,
             cut=CUT,
             window=TrainingWindow(),
             season_years=g.SEASON_YEARS,
