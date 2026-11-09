@@ -132,7 +132,9 @@ take_home_message: >-
   placebo and no-link arms show that the links add a little pairing and no reliable donor finding.
 advice:
   - >-
-    Do not train a graph neural network on 6-hour blocks of 15 Primaries to pair transfers, because E1-J pairs far more; test a graph model again only on the fleet-scale adjacency of about 1,161 Primaries (paired shares).
+    Do not train a graph neural network on 6-hour blocks of 15 Primaries to pair transfers,
+    because E1-J pairs far more; test a graph model again only on the fleet-scale adjacency of
+    about 1,161 Primaries (paired shares).
   - >-
     Keep the donor and recipient ends separate when scoring any pairing method, because G finds
     0.47 of long and deep donor megawatts and pairs 0.09 of them (donor and recipient ends).
