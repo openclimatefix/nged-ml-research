@@ -112,27 +112,34 @@ fixes the choices that the earlier experiments left open, and this section resta
     - Weather: the mean over the 51 members of 7 variables (shortwave and longwave radiation,
       2 m temperature, 2 m dew point, surface pressure, precipitation after `log1p` of the value
       clipped at zero, and 10 m wind speed), and the standard deviation (`ddof=0`) of the same 7.
-      The means and `log1p` precipitation are z-scored with the training rows' mean and standard
-      deviation and clipped at plus or minus 5.
+      The 7 means (with `log1p` precipitation) and the 7 standard deviations are z-scored with the
+      training rows' mean and standard deviation and clipped at plus or minus 5. Each series reads
+      the
+      weather of the H3 resolution-5 cell that holds it.
     - Calendar and sun: 21 columns: solar zenith cosine, azimuth sine and cosine, the sine and
       cosine of the local hour at periods of 24 h and 12 h (Europe/London), a one-hot day of week,
       a COVID flag, three Christmas columns, and three bank-holiday columns.
     - Lead: the lead in hours divided by 336, and its square root.
     - Power lags: for each of a day lag and a week lag, the latest same-half-hour reading at least
-      a minimum age before the origin, as a z-scored value, a missing flag, and an age code. The
-      stored Candidate used a minimum age of 24 hours. The backtest lowers the minimum age to
-      6 hours (a cap of 12 half-hours), pre-trains the lag encoder with that cap, and applies the
-      same cut to the neighbour summaries.
+      a minimum age before the network's origin, as a z-scored value, a missing flag, and an age
+      code. The network's own origin is 09:00 UTC (the 00Z run plus 9 hours), and the lag cap counts
+      back from that origin. The stored Candidate used a cap of 24 hours. Experiment 667 plans a
+      6-hour cap with the lag encoder pre-trained at that cap and the same cut on the neighbour
+      summaries. Which origin and which cap give a newest reading no younger than 06:00 UTC on the
+      12:00 file origin is fixed by that page, and this page restates it when the code lands.
     - Thermal-lag and solar-gain columns (14): trailing temperature means (3, 6, and 24 hours),
       temperature changes (3 and 6 hours), the day's minimum and maximum, the count of cold-snap
       days, trailing shortwave means (3, 6, and 24 hours), the 3-hour change in the clear-sky
       index, and two columns from the previous day's CAMS irradiance.
     - Neighbour and gap signals (60 columns, read only by the lag encoder): for each lag, the gap
       between the observed power and a lag-free forecast table (the median of the lags-masked
-      network at its freshest earlier origin), exponentially weighted means of that gap with
+      network of the same seed at its freshest earlier origin with a lead of at most 24 hours),
+      exponentially weighted means of that gap with
       half-lives of 1, 3, and 7 days, and, over the electrical neighbours of the Primary,
       the sum, mean, minimum, and maximum of those quantities scaled by capacity ratio, the
-      own-plus-neighbour sum, a neighbour count, and a flag for no neighbour. During fine-tuning,
+      own-plus-neighbour sum, a neighbour count, and a flag for no neighbour. The neighbours are the
+      Primaries that NGED's "Primary Substation Interconnections" list links to the Primary. During
+      fine-tuning,
       all signal columns of a random 50% of rows are set to no information (the "D50" dropout).
     - Series identity: an 8-dimensional embedding of the Primary.
     - Target: cleaned power divided by effective capacity, then z-scored per Primary.
@@ -152,15 +159,21 @@ fixes the choices that the earlier experiments left open, and this section resta
   only the newest knot, and a penalty of 10 times the mean squared difference between neighbouring
   knots keeps the function smooth.
 - **Quantiles.** The 11 quantiles come from the mixture's cumulative distribution by 40 bisection
-  steps on a range of plus or minus 40 standard deviations. The values are then rescaled to power,
-  sorted within the row, averaged over 5 seeds quantile by quantile, sorted again, and widened about
-  the median by a factor of 1.0934. Experiment 613 fixed that factor before the final test.
+  steps on a range of plus or minus 40 standard deviations. The mixture weights are a log-softmax
+  and each standard deviation is `exp` of the raw output clamped to plus or minus 3. The values are
+  then rescaled to power and sorted within the row. The final test of experiment 620 averaged 5
+  seeds quantile by quantile, sorted again, and widened the band about the median by a factor of
+  1.0934, which experiment 613 fixed before that test. Experiment 667 plans 2 seeds and, by
+  default, no widening.
 - **Loss.** The negative log-likelihood of the mixture on the standardised target, weighted, plus
   the knot penalty.
 - **Training, in three steps.**
     - Pre-training uses ERA5 and CAMS (shortwave) as stand-in weather, in pseudo-runs every 2 days
       from 2019-09-01 at 09:00 UTC with leads of 0.5 to 351 hours (about 8.1 million rows for the
-      2026-07 fold). All weights train: AdamW, learning rate 5e-4, weight decay 1e-3, batch 8,192,
+      2026-07 fold). Five Primaries start later (D11 2019-09-17, D10 2019-12-01, D5 2020-02-01, D14
+      2020-07-01, D16 2021-02-01). ERA5 has no ensemble, so the 7 spread columns hold the fold's
+      median ensemble spread for each 24-hour lead band. All weights train: AdamW, learning rate
+      5e-4, weight decay 1e-3, batch 8,192,
       20% of the rows per epoch, up to 60 epochs, patience 8, gradient-norm clip 1.0.
     - Step 2 loads the pre-trained weights except the mixer, draws a fresh mixer with seed 12345,
       freezes the weather and datetime encoders, and trains on the whole 730-day history with
@@ -180,16 +193,20 @@ fixes the choices that the earlier experiments left open, and this section resta
   lag inputs only, until they cover 5% of its row span: depth 15%, 30%, or 50% of capacity, length
   3, 7, 15, or 30 days, random sign. Each shift on a Primary is subtracted, scaled by the capacity
   ratio, from one electrical neighbour, so the neighbour summaries see the transfer.
-- **R-haz, the prevailing head.** A small network on top of the frozen Candidate: it reads 58 origin
+- **R-haz, the prevailing head.** Experiment 652 fitted it on top of the frozen K1 network of
+  experiments 612 and 613, and experiment 667 plans to put it on the Candidate. It is a small
+  network that reads 58 origin
   features (the gap and neighbour signals above, built from lags), 4 age columns (the log of the
   departure's age in days, the age over 30, the gate flag, and the age of the freshest lag), and
   3 row inputs (the lead over 240 hours and the lower and upper half-widths of the Candidate's
-  band). It has two hidden layers of 64 ReLU units and 12 outputs: a signed depth (0.5 times the
+  band). The counts here are those of experiment 652: removing the gate flag leaves 64 inputs. It
+  has two hidden layers of 64 ReLU units and 12 outputs: a signed depth (0.5 times the
   hyperbolic tangent of the first output, so up to half of capacity), a spread, and daily hazards.
   Each hazard is `softplus(output - 3)`, and the survival probability `p` is the exponential of
   minus the hazards accumulated over the days before the lead. The probability is 0 when the
   departure is younger than half a day.
-- **How the prevailing quantiles are formed.** The Candidate's 11 quantiles define a piecewise-linear
+- **How the prevailing quantiles are formed.** The Candidate's 11 quantiles define a
+  piecewise-linear
   cumulative distribution with two tail knots 1.5 times the outer spacing beyond the 1% and 99%
   quantiles. The prevailing distribution is the mixture `(1 - p)` times the Candidate's
   distribution plus `p` times the Candidate's distribution shifted by the depth, with the depth
@@ -197,16 +214,19 @@ fixes the choices that the earlier experiments left open, and this section resta
   and are monotone by construction. When `p` is 0, the prevailing rows equal the NRA rows.
 - **Loss and training of R-haz.** The loss is the pinball loss over the 11 levels plus 0.05 times
   the binary cross-entropy of `p` against the observed state of an injected shift. The training rows
-  mix real rows with injected shifts, with durations drawn half from 3 to 14 days and half from 28 to
+  mix real rows with injected shifts, with durations drawn half from 3 to 14 days and half from 28
+  to
   112 days (an assumed mixture) and each injected shift counted equally. Adam, learning rate 0.003,
   weight decay 1e-4, batch 4096, up to 30 epochs, patience 4, 2 seeds averaged by mean quantile.
-  The head has about 9,000 parameters and no dropout. The backtest extends the hazards from 10 to 14
-  days and removes the gate flag from the inputs (experiment 667's plan).
+  The head of experiment 652 has 9,164 parameters (12 outputs) and no dropout. Experiment 667 plans
+  14 daily hazards (16 outputs, so about 9,360 parameters) and no gate flag, so the numbers above
+  are
+  stored values and the plan changes them.
 - **Refits and embargo in the backtest.** Twelve monthly refits (test months 2025-11 to 2026-10),
   each trained on data before the first of the month with the 7-day embargo of the refit rule.
   The ensemble history starts 2024-04-01, so the early folds fine-tune on less ensemble history
   than the later folds. The D15 and D18 rows before 2025-03-01 are cut, as in every recent
-  experiment.
+  experiment. The planned seeds are 2 for the Candidate and 2 for R-haz, an open item of that page.
 - **Where each piece came from.** The modular network and its widths: experiment 545. Frozen
   encoders and the three-step schedule: 559. ERA5 and CAMS pre-training: 418. The offset: 565 and
   572. The thermal-lag columns: 437 and 569. The embargoed schedule: 574. The shared lag encoder:
@@ -228,8 +248,10 @@ generation, which no input models.
 
 ### Method
 
-- **Inputs.** The same 37 lag-free columns, 8 lag columns, knot position, and 14 thermal-lag and
-  solar-gain columns as the Candidate network above, at the 4 series, with one embedding of
+- **Inputs.** The same 37 lag-free columns, 8 lag columns, knot position, expected-weather table
+  for the lag encoder (the weather and calendar columns of the freshest run issued at or before the
+  lag's own time, passed through the same encoders), and 14 thermal-lag and solar-gain columns as
+  the Candidate network above, at the 4 series, with one embedding of
   the series (2 entries per group), and no signal columns and no neighbour inputs. The 51-member
   means and standard deviations are taken at the series' H3 resolution-5 cell.
 - **Lags.** The stored network read lags at least 24 hours old. The backtest retrains it with the
@@ -237,7 +259,8 @@ generation, which no input models.
   05:30 reading, 6.5 hours before the 12:00 origin.
 - **Architecture.** The same encoders and mixer as the Candidate with a lag encoder of 83 inputs
   (3 lag columns, the two 32-wide expected-weather and expected-datetime embeddings, and the
-  embeddings of the series and the lag), and a mixer with 145 inputs. One network is fitted per group
+  embeddings of the series and the lag), and a mixer with 145 inputs. One network is fitted per
+  group
   (the two BSPs together, the two GSPs together), so the weights are shared across the 2 series of a
   group except for the series embedding and the offset.
 - **Offset, loss, and quantiles.** The offset, loss, quantile bisection, and sorting are those of
@@ -247,13 +270,14 @@ generation, which no input models.
 - **Training.** The same three steps as the Candidate (ERA5 and CAMS pre-training, a step 2 with a
   fresh mixer of seed 12345 and frozen encoders, and a fine-tune with a 90-day half-life), the same
   optimiser settings, and a 3-day embargo. Fine-tuning rows span 730 days before the cut-off, with
-  targets ending 3.5 hours before it. Lag block dropout is 30% of days (both lags), of which 15% mask
+  targets ending 3.5 hours before it. Lag block dropout is 30% of days (both lags), of which 15%
+  mask
   the day lag only. Two seeds are averaged quantile by quantile and sorted.
 - **Origin.** The network runs at its own origin of 09:00 UTC, the 00Z run plus 9 hours, and its
   output is relabelled with 12:00 UTC. Every input that the network reads at 09:00 was available at
   12:00.
-- **Refits.** Twelve monthly refits, one per test month 2025-11 to 2026-10, with the 3-day embargo
-  of the schedule. The final-test network of experiment 633 was one fit at 2026-07-01.
+- **Refits (planned).** Twelve monthly refits, one per test month 2025-11 to 2026-10, with the
+  3-day embargo of the schedule. The final-test network of experiment 633 was one fit at 2026-07-01.
 - **Where each piece came from.** As for the Candidate; the node harness and pooling: 564 and 611;
   the lag network at the nodes: 619; the matched rematch: 622; the final test: 633.
 
@@ -272,19 +296,23 @@ backtest is [experiment
 
 - **Inputs.** The mean and standard deviation over the 51 members of 10 m and 100 m wind speed,
   the sine and cosine of the 100 m wind direction, and 2 m air temperature, plus the lead (the
-  sine and cosine of its hour of day and the lead in hundreds of hours) and a one-hot wind-farm
+  sine and cosine of the lead in hours modulo 24, and the lead in hundreds of hours) and a one-hot
+  wind-farm
   column. There is no power lag, no calendar column, and no physics-lite input in network S.
 - **Architecture.** Two hidden layers of 64 units feeding a three-component Gaussian mixture over
   power as a fraction of capacity, centred on the training mean of the target. The 11 quantiles are
-  read from the mixture and capped at capacity.
-- **Training.** AdamW, learning rate 0.002, batch 2048, weight decay 0.0001, 40 epochs, stopping
-  early on the last 62 days. Idle readings (experiment 210's idle mask) are set to zero in training
+  read from the mixture and clamped to the range 0 to 1 of capacity. Inputs are standardised with
+  the
+  fit rows' mean and standard deviation.
+- **Training.** AdamW, learning rate 0.002, batch 2048, weight decay 0.0001, 40 epochs, and the
+  epoch with the lowest negative log-likelihood on the last 62 days is kept. Idle readings
+  (experiment 210's idle mask) are set to zero in training
   and scoring. Three seeds are averaged quantile by quantile.
 - **Capacity.** The 99.9th percentile of the farm's power over the 730 days before each refit.
-- **Refits.** Wind refits on day 0 of each month (12 refits), training on runs before 62 days
-  earlier. No ERA5 or CAMS pre-training.
-- **Missing inputs.** The network reads only the ensemble weather. A farm with no idle mask after
-  2026-09-13 is scored with its idle periods unmarked.
+- **Refits (planned).** Wind refits on day 0 of each month (12 refits), training on runs before 62
+  days earlier. No ERA5 or CAMS pre-training. Experiment 659 refitted twice a month.
+- **Missing inputs.** The network reads only the ensemble weather. The end date of the idle mask
+  is read at run time, and the performance section states it.
 
 ### Performance
 
@@ -300,19 +328,23 @@ experiment 666.
 - **Inputs.** The mean and standard deviation over the 51 members of shortwave radiation, air
   temperature, and 10 m wind speed; the ensemble means of relative humidity, longwave radiation,
   precipitation, and surface pressure; the sun's elevation and the sine and cosine of its azimuth;
-  the lead; and the mean and standard deviation of a physics-lite power. There is no farm column and
-  no calendar column.
+  the lead; and the mean and standard deviation of a physics-lite power and of the cell
+  temperature. There is no farm column and no calendar column.
 - **Physics-lite power.** Irradiance over 1000 W per square metre, times one minus 0.004 per kelvin
   times the cell temperature minus 25 degrees Celsius, clipped to the range 0 to 1, with the Faiman
-  cell temperature `T_air + G / (25 + 6.84 x wind speed)`. The formula runs on each of the 51 members
+  cell temperature `T_air + G / (25 + 6.84 x wind speed)`. The formula runs on each of the 51
+  members
   separately, and the network reads the mean and standard deviation. The mixture is centred on the
   mean physics-lite power.
-- **Architecture, loss, and optimiser.** As for wind, with 20 epochs and early stopping on the last
-  61 days, and a lead range extended to 336 hours (experiments 430 and 659 stopped at 251.5 hours).
-- **Refits.** Quarterly: 2025-11-01, 2026-02-01, 2026-05-01, and 2026-08-01, each scoring the next
+- **Architecture, loss, and optimiser.** As for wind, with 20 epochs, the epoch with the lowest
+  negative log-likelihood on the last 61 days kept, and a lead range extended to 336 hours
+  (experiments 430 and 659 stopped at 251.5 hours). Solar has no idle mask, and the target is the
+  raw output.
+- **Refits (planned).** Quarterly: 2025-11-01, 2026-02-01, 2026-05-01, and 2026-08-01, each scoring
+  the next
   three months, 3 seeds each, with no pre-training.
 - **Capacity.** As for wind.
-- **Missing inputs.** As for wind.
+- **Missing inputs.** The network reads only the ensemble weather.
 
 ### Performance
 
