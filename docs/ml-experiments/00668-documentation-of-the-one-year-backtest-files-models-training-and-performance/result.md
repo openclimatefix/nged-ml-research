@@ -342,7 +342,175 @@ generation, which no input models.
 
 ### Performance
 
-To be added when `bsps.parquet` and `gsps.parquet` are written.
+#### 2 bulk supply points: all rows and by lead band
+
+**The network beats both baselines at every lead band, and the margin shrinks with the lead.** The
+tables give normalised error in points of capacity (percent of capacity; smaller is better), as the
+mean over scored half-hours, and the gain of the network over each baseline with a 95% day-block
+bootstrap interval from 2,000 resamples of origin days. The manual heuristic is the lagged-power rule
+and climatology is the month, half-hour, and weekend-flag quantiles, both described under
+[Comparison baselines](#comparison-baselines-slices-and-summary-figures). Days 10 to 14 are reported
+separately because they lie beyond the 10-day horizon of the earlier stored backtests.
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| days 0 to 1 | 35,014 | 7.71 | 12.09 | 13.07 | 36.3 (34.0 to 38.4) | 41.0 (38.9 to 43.2) |
+| days 1 to 3 | 70,028 | 8.46 | 12.09 | 13.07 | 30.0 (28.0 to 31.9) | 35.3 (33.3 to 37.2) |
+| days 3 to 7 | 139,970 | 10.13 | 12.09 | 13.07 | 16.2 (14.5 to 17.8) | 22.5 (20.8 to 24.0) |
+| days 7 to 10 | 104,846 | 11.19 | 12.28 | 13.14 | 8.9 (6.9 to 10.8) | 14.9 (13.2 to 16.5) |
+| days 10 to 14 | 138,560 | 11.68 | 12.30 | 13.22 | 5.1 (3.5 to 6.7) | 11.7 (10.1 to 13.0) |
+
+CRPS (2 × mean pinball loss over the 11 levels):
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| days 0 to 1 | 35,014 | 4.27 | 6.83 | 7.23 | 37.5 (35.3 to 39.7) | 41.0 (39.0 to 43.1) |
+| days 1 to 3 | 70,028 | 4.67 | 6.83 | 7.24 | 31.5 (29.4 to 33.5) | 35.4 (33.5 to 37.3) |
+| days 3 to 7 | 139,970 | 5.55 | 6.82 | 7.24 | 18.7 (17.0 to 20.4) | 23.4 (21.7 to 24.9) |
+| days 7 to 10 | 104,846 | 6.13 | 6.98 | 7.28 | 12.3 (10.3 to 14.2) | 15.8 (14.2 to 17.4) |
+| days 10 to 14 | 138,560 | 6.41 | 7.00 | 7.32 | 8.5 (6.9 to 10.1) | 12.5 (10.9 to 13.9) |
+
+![Normalised MAE of the median by forecast horizon for 2 bulk supply points, three systems](bsps_mae_by_horizon.svg)
+
+#### 2 bulk supply points: by season
+
+Seasons are meteorological and refer to the season of the forecast origin. Autumn is split into the
+months at the start of the backtest (2025-11) and at its end (2026-09 and 2026-10), because the
+backtest year does not contain a full autumn.
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| autumn (Nov 2025) | 40,320 | 9.18 | 12.04 | 10.96 | 23.7 (21.7 to 25.8) | 16.2 (13.7 to 18.5) |
+| winter | 120,960 | 9.50 | 11.42 | 12.13 | 16.8 (14.5 to 19.0) | 21.7 (18.8 to 24.3) |
+| spring | 123,620 | 11.63 | 13.36 | 15.19 | 12.9 (11.5 to 14.4) | 23.4 (21.6 to 25.3) |
+| summer | 123,312 | 10.79 | 12.08 | 13.24 | 10.7 (9.4 to 12.1) | 18.5 (16.8 to 20.3) |
+| autumn (Sep to Oct 2026) | 80,206 | 9.78 | 11.80 | 12.38 | 17.1 (13.2 to 21.3) | 21.0 (18.7 to 23.0) |
+
+CRPS:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| autumn (Nov 2025) | 40,320 | 5.06 | 6.95 | 6.09 | 27.2 (24.9 to 29.5) | 16.9 (14.7 to 19.0) |
+| winter | 120,960 | 5.21 | 6.53 | 6.64 | 20.3 (17.7 to 22.7) | 21.6 (18.7 to 24.3) |
+| spring | 123,620 | 6.35 | 7.54 | 8.21 | 15.7 (14.3 to 17.1) | 22.6 (20.8 to 24.5) |
+| summer | 123,312 | 5.90 | 6.83 | 7.50 | 13.6 (12.2 to 15.1) | 21.4 (19.7 to 23.2) |
+| autumn (Sep to Oct 2026) | 80,206 | 5.45 | 6.61 | 7.00 | 17.6 (13.7 to 21.9) | 22.2 (19.6 to 24.5) |
+
+![Normalised MAE of the median by season for 2 bulk supply points](bsps_mae_by_season.svg)
+
+![Model error and CRPS gain over the manual heuristic, by season and lead band, for 2 bulk supply points](bsps_season_by_horizon.svg)
+
+#### 2 bulk supply points: by calendar month
+
+Normalised MAE of the median, by month of the forecast origin:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| 2025-11 | 40,320 | 9.18 | 12.04 | 10.96 | 23.7 (21.7 to 25.8) | 16.2 (13.7 to 18.5) |
+| 2025-12 | 41,664 | 8.12 | 10.45 | 10.64 | 22.3 (19.1 to 25.4) | 23.7 (20.3 to 27.0) |
+| 2026-01 | 41,664 | 9.26 | 10.51 | 12.33 | 11.9 (7.7 to 16.5) | 24.9 (20.3 to 29.3) |
+| 2026-02 | 37,632 | 11.31 | 13.50 | 13.55 | 16.2 (13.3 to 19.2) | 16.6 (12.0 to 21.2) |
+| 2026-03 | 41,636 | 12.85 | 14.84 | 16.16 | 13.4 (11.4 to 15.8) | 20.5 (18.4 to 22.9) |
+| 2026-04 | 40,320 | 11.51 | 13.72 | 16.36 | 16.1 (13.6 to 18.6) | 29.6 (26.8 to 32.3) |
+| 2026-05 | 41,664 | 10.52 | 11.51 | 13.08 | 8.6 (6.6 to 10.5) | 19.6 (17.6 to 21.6) |
+| 2026-06 | 40,320 | 10.21 | 11.87 | 13.61 | 14.0 (12.4 to 15.5) | 24.9 (22.1 to 27.6) |
+| 2026-07 | 41,664 | 10.92 | 11.77 | 12.74 | 7.2 (5.2 to 9.0) | 14.3 (12.1 to 16.3) |
+| 2026-08 | 41,328 | 11.21 | 12.60 | 13.39 | 11.0 (8.0 to 14.0) | 16.3 (13.2 to 19.2) |
+| 2026-09 | 40,320 | 9.52 | 10.97 | 12.44 | 13.2 (10.3 to 15.7) | 23.4 (20.6 to 26.1) |
+| 2026-10 | 39,886 | 10.03 | 12.64 | 12.31 | 20.6 (13.6 to 27.4) | 18.5 (15.3 to 21.8) |
+
+**Scored rows.** Of the 490,560 rows, 488,418 are scored. The rest have no observed power: the
+ground-truth files end at 2026-11-09 08:00 UTC, so the last origins of 2026-10 cannot be scored in
+full at long leads, and a few half-hours inside the year are missing or flagged by the cleaning.
+
+#### 2 grid supply points: all rows and by lead band
+
+**The network beats both baselines at every lead band, and the margin shrinks with the lead.** The
+tables give normalised error in points of capacity (percent of capacity; smaller is better), as the
+mean over scored half-hours, and the gain of the network over each baseline with a 95% day-block
+bootstrap interval from 2,000 resamples of origin days. The manual heuristic is the lagged-power rule
+and climatology is the month, half-hour, and weekend-flag quantiles, both described under
+[Comparison baselines](#comparison-baselines-slices-and-summary-figures). Days 10 to 14 are reported
+separately because they lie beyond the 10-day horizon of the earlier stored backtests.
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| days 0 to 1 | 35,036 | 19.27 | 28.30 | 36.38 | 31.9 (28.5 to 35.0) | 47.0 (43.9 to 49.9) |
+| days 1 to 3 | 70,072 | 21.06 | 28.41 | 36.46 | 25.8 (22.8 to 28.7) | 42.2 (39.4 to 45.0) |
+| days 3 to 7 | 140,058 | 24.48 | 28.49 | 36.46 | 14.1 (11.8 to 16.3) | 32.9 (30.2 to 35.5) |
+| days 7 to 10 | 104,912 | 27.02 | 28.93 | 36.65 | 6.6 (4.6 to 8.7) | 26.3 (23.5 to 29.1) |
+| days 10 to 14 | 138,648 | 27.64 | 28.82 | 36.72 | 4.1 (2.5 to 5.7) | 24.7 (21.9 to 27.4) |
+
+CRPS (2 × mean pinball loss over the 11 levels):
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| days 0 to 1 | 35,036 | 10.52 | 15.60 | 18.69 | 32.6 (29.4 to 35.4) | 43.7 (40.7 to 46.4) |
+| days 1 to 3 | 70,072 | 11.44 | 15.66 | 18.74 | 27.0 (24.3 to 29.5) | 39.0 (36.3 to 41.6) |
+| days 3 to 7 | 140,058 | 13.18 | 15.69 | 18.75 | 16.0 (14.1 to 17.9) | 29.7 (27.5 to 32.1) |
+| days 7 to 10 | 104,912 | 14.52 | 16.07 | 18.83 | 9.7 (7.8 to 11.6) | 22.9 (20.3 to 25.5) |
+| days 10 to 14 | 138,648 | 14.78 | 16.03 | 18.87 | 7.8 (6.3 to 9.4) | 21.7 (19.1 to 24.2) |
+
+![Normalised MAE of the median by forecast horizon for 2 grid supply points, three systems](gsps_mae_by_horizon.svg)
+
+#### 2 grid supply points: by season
+
+Seasons are meteorological and refer to the season of the forecast origin. Autumn is split into the
+months at the start of the backtest (2025-11) and at its end (2026-09 and 2026-10), because the
+backtest year does not contain a full autumn.
+
+Normalised MAE of the median:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| autumn (Nov 2025) | 40,320 | 35.48 | 38.76 | 40.75 | 8.5 (5.6 to 10.9) | 12.9 (11.3 to 14.6) |
+| winter | 120,960 | 31.93 | 38.59 | 37.44 | 17.3 (14.9 to 19.7) | 14.7 (11.4 to 18.0) |
+| spring | 123,620 | 23.00 | 25.98 | 37.93 | 11.5 (9.1 to 13.7) | 39.4 (38.1 to 40.7) |
+| summer | 123,620 | 16.28 | 18.50 | 34.17 | 12.0 (9.6 to 14.3) | 52.4 (51.0 to 53.6) |
+| autumn (Sep to Oct 2026) | 80,206 | 26.16 | 28.35 | 34.74 | 7.7 (2.3 to 13.1) | 24.7 (14.8 to 33.3) |
+
+CRPS:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| autumn (Nov 2025) | 40,320 | 18.10 | 19.99 | 20.08 | 9.5 (6.3 to 12.3) | 9.9 (8.1 to 11.7) |
+| winter | 120,960 | 16.55 | 19.88 | 19.05 | 16.7 (14.8 to 18.8) | 13.1 (10.4 to 15.8) |
+| spring | 123,620 | 12.80 | 14.78 | 19.82 | 13.4 (11.3 to 15.3) | 35.4 (34.0 to 36.8) |
+| summer | 123,620 | 9.20 | 11.32 | 17.39 | 18.7 (15.9 to 21.5) | 47.1 (45.5 to 48.5) |
+| autumn (Sep to Oct 2026) | 80,206 | 14.17 | 16.37 | 18.36 | 13.5 (8.7 to 18.3) | 22.9 (14.5 to 30.3) |
+
+![Normalised MAE of the median by season for 2 grid supply points](gsps_mae_by_season.svg)
+
+![Model error and CRPS gain over the manual heuristic, by season and lead band, for 2 grid supply points](gsps_season_by_horizon.svg)
+
+#### 2 grid supply points: by calendar month
+
+Normalised MAE of the median, by month of the forecast origin:
+
+| Group | Half-hours | Model | Manual heuristic | Climatology | Gain over heuristic (%) | Gain over climatology (%) |
+|---|---:|---:|---:|---:|---|---|
+| 2025-11 | 40,320 | 35.48 | 38.76 | 40.75 | 8.5 (5.6 to 10.9) | 12.9 (11.3 to 14.6) |
+| 2025-12 | 41,664 | 31.36 | 40.46 | 43.11 | 22.5 (17.8 to 27.0) | 27.3 (24.5 to 30.1) |
+| 2026-01 | 41,664 | 32.44 | 37.27 | 32.82 | 12.9 (10.4 to 15.5) | 1.1 (-2.6 to 5.0) |
+| 2026-02 | 37,632 | 31.99 | 37.98 | 36.29 | 15.8 (11.8 to 19.5) | 11.8 (5.8 to 17.1) |
+| 2026-03 | 41,636 | 25.41 | 32.09 | 40.29 | 20.8 (18.7 to 22.9) | 36.9 (34.8 to 38.9) |
+| 2026-04 | 40,320 | 21.40 | 23.13 | 34.83 | 7.5 (4.0 to 10.8) | 38.6 (35.8 to 41.3) |
+| 2026-05 | 41,664 | 22.14 | 22.64 | 38.57 | 2.2 (0.9 to 3.5) | 42.6 (41.3 to 44.0) |
+| 2026-06 | 40,320 | 15.99 | 18.81 | 34.75 | 15.0 (13.3 to 16.7) | 54.0 (53.0 to 54.9) |
+| 2026-07 | 41,664 | 15.93 | 15.40 | 28.77 | -3.5 (-6.7 to -0.5) | 44.6 (42.6 to 46.5) |
+| 2026-08 | 41,636 | 16.92 | 21.32 | 39.03 | 20.7 (18.1 to 23.2) | 56.7 (54.7 to 58.6) |
+| 2026-09 | 40,320 | 20.07 | 25.77 | 41.34 | 22.1 (19.6 to 24.6) | 51.5 (49.4 to 53.4) |
+| 2026-10 | 39,886 | 32.33 | 30.97 | 28.06 | -4.4 (-12.4 to 3.6) | -15.2 (-27.5 to -4.0) |
+
+**Scored rows.** Of the 490,560 rows, 488,726 are scored. The rest have no observed power: the
+ground-truth files end at 2026-11-09 08:00 UTC, so the last origins of 2026-10 cannot be scored in
+full at long leads, and a few half-hours inside the year are missing or flagged by the cleaning.
 
 ## Wind
 
