@@ -96,6 +96,12 @@ class PrimaryProbe:
         ok = (kt_all >= k.SUNNY_KT) & (hour >= 10) & (hour <= 15) & (months >= 4) & (months <= 8)
         self.m_mw = float(np.median(frame["y"][sel][ok])) * cap
         night = float(frame["night_pts"][primary]) * cap
+        order = np.argsort(frame["target_idx"][sel])
+        y_sorted = frame["y"][sel][order].astype(np.float64) * cap
+        first_row = np.array([np.nonzero(self.cell == c)[0][0] for c in range(self.n_cells)])
+        self.cell_p_mw = y_sorted[self.probe["base"][first_row]]
+        self.cell_umax = np.zeros(self.n_cells)
+        np.maximum.at(self.cell_umax, self.cell, self.u_std)
         self.night_raw = night
         self.rho_cells = frame["rho"][self.cell_month, self.cell_hh]
         self.set_arm(arm="pf")
@@ -287,6 +293,8 @@ def probe_network(*, pp: PrimaryProbe, y: np.ndarray, boot: bool, rng: np.random
     cls, s_lo, s_hi = curve_class(y=y, cell=cell, u=pp.u_std)
     out["curve_class"], out["slope_lo"], out["slope_hi"] = cls, s_lo, s_hi
     out["n_rows"] = len(y)
+    out["cell_p_mw"], out["cell_umax"] = pp.cell_p_mw.tolist(), pp.cell_umax.tolist()
+    out["cell_month"], out["cell_hh"] = pp.cell_month.tolist(), pp.cell_hh.tolist()
     if boot:
         draws = {arm: np.empty(N_BOOT) for arm in ARMS}
         for i in range(N_BOOT):
