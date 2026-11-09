@@ -35,9 +35,11 @@ prediction: >-
   long and deep cell and in the medium and deep cell, and at least 0.10 more in the long and
   shallow cell; at least 0.05 more in the medium and shallow and the short and deep cells. P2 (the
   donor objective): G finds at least 0.10 more of the donor megawatts of transfers than E1-J in the
-  long and deep and in the medium and deep cells (E1 finds 0.44 of the long and deep donor megawatts and E1-J pairs
-  0.36; both are re-measured from experiment 670's worlds, and the margin is set against the
-  larger of the two). P3: G's found share minus E1-J's is at least +0.03 in the long and
+  long and deep and in the medium and deep cells (the baseline is E1-J's own donor-found share in each cell,
+  re-measured from experiment 670's stored rows; E1 finds 0.44 of the long and deep donor
+  megawatts). P2 tests G as built, with the donor head and its loss. It does not separate the donor
+  objective from the graph, because no arm drops the donor loss; the decode weight `lambda` is the
+  only ablation of the donor head. P3 (found means any injected event of the cell, donors and recipients together): G's found share minus E1-J's is at least +0.03 in the long and
   deep, medium and deep, and +0.08 in the long and shallow cell, +0.05 in the medium and shallow
   cell, and no worse than -0.03 in the short and deep and short and shallow cells; G's absolute
   paired share is at least 0.70 (long and deep), 0.60 (medium and deep), and 0.40 (long and
@@ -60,22 +62,26 @@ decision_rule: >-
   start events in 2022-01-01 to 2023-06-30 and show the network nothing later; validation worlds
   start events up to 2023-12-31, and the loss counts only blocks from 2023-07-01; scored worlds are
   the 40 default worlds of experiment 670 (seeds 900 to 939) with events scored from 2024-01-01.
-  Training and validation seeds are at least 100000, so no world is shared. The final-test window
+  Training seeds start at 100000 and validation seeds at 105000, so the two sets and the scored seeds (900 to 939, and 1000 to 1009 for the cross-injector test) are disjoint. The lag-free forecast that makes the residual is experiment 327's, fitted before 2024 as in experiment 670. The final-test window
   from 2026-07-01 is never read. Decoder costs (onset cost, none boost, donor weight, link cut-off)
   are chosen on validation worlds from a grid frozen in `e00672_run.py`, by the highest found share
-  at no more than 6 events per Primary-year on the real validation months. Intervals resample whole
-  worlds. A cell with fewer than 20 events or 10 edge-transfer ends is too small to read, and a
-  prediction that needs it counts as not holding. Stop rule (the spec's, applied to the 3-seed
+  at no more than 6 events per Primary-year on the real record from 2023-07-01 to 2023-12-31, the
+  months of the validation worlds (experiment 670's E1-J decodes about 6 events per Primary-year
+  there as well; both are caps on false events, and the verified D5 and D16 transfer of December
+  2025 and the D3 and D22 transfer of October 2024 fall outside it). Intervals resample whole
+  worlds. A cell with fewer than 20 events or 10 edge-transfer ends is too small to read. A prediction that needs such a cell is reported as `unreadable`, and an unreadable cell counts neither for nor against stop rules (a) to (c) and the verdict; if the long and deep or the medium and deep cell is unreadable, the verdict is `inconclusive`. Stop rule (the spec's, applied to the 3-seed
   means): the graph line is closed at 15 Primaries, and the next step waits for the fleet-scale
   adjacency of about 1,161 Primaries, if any of these holds. (a) G misses the pairing margin of
   +0.10 in the long and deep or the medium and deep cell. (b) The cross-injector drop is above
   0.05. (c) G-R reaches half or more of G's real edge events. X3 (history length) is started only
   if none of (a) to (c) holds, and not by this experiment. Verdict. `supported` if P1 holds in the
   long and deep and the medium and deep cells, P2 holds, and none of (a) to (c) holds. `partly
-  supported` if P2 holds but P1 does not, or P1 holds but one of (b) and (c) fails. `not
-  supported` otherwise. The porting threshold is zero, because the result is a research table that
-  changes no production code. A reproduction gate must pass first, or the verdict is `invalid`:
-  E1-J's rows re-scored here from experiment 670's stored worlds must reproduce experiment 670's
+  supported` if P2 holds but P1 does not, or P1 holds in only one of the two cells, or P1 holds but
+  one of (b) and (c) fails. `not supported` otherwise. P3 to P10 do not enter the verdict; the
+  write-up lists every prediction that failed. If G-R reaches more than a third but under half of
+  G's real edge events, P7 fails and the graph line stays open. The porting threshold is zero, because the result is a research table that
+  changes no production code. A reproduction gate must pass first, or the verdict is `invalid` and no network is trained:
+  E1-J's rows in all six cells, re-scored here from experiment 670's stored worlds must reproduce experiment 670's
   headline cells within 0.01.
 benchmark: >-
   E1-J, experiment 670's event table with a recipient search, on the same 40 default worlds
@@ -125,9 +131,11 @@ Primaries, improves both ends, by at least 0.10 of paired megawatts over E1-J.
   would be an upper bound.
 - **Reference rows.** E1-J and E1 from experiment 670's stored scored rows on the same worlds.
 
-Each arm trains 3 seeds, on the `default` generator configuration. Two further networks (G on the
-`constant_mw_square` and on the `shaped_transfers` configuration of experiment 660) give the
-cross-injector test.
+Each arm trains 3 seeds, on the `default` generator configuration. Two further networks, each one seed, give the cross-injector test: G trained on the
+`constant_mw_square` configuration of experiment 660 and G trained on its `shaped_transfers`
+configuration. Each is scored on 10 worlds (seeds 1000 to 1009) of both configurations, so the
+test reads in-injector minus cross-injector found share in both directions. P9 is a one-seed
+reading.
 
 ## Plan
 
@@ -152,19 +160,21 @@ cross-injector test.
 - **Donor recall.** The share of the megawatts of injected donor events (negative step, an edge
   transfer with a metered recipient, 4 noise units or more) that the decoded table finds, by the
   matching rule of experiment 653, reported beside pairing for every cell.
-- **Panel.** Experiment 653's panel from 2022 (the 2019-onward panel is not on disk, and fetching
-  it is outside this experiment's scope); the history-length question belongs to X3.
+- **Panel.** Experiment 653's panel from 2022 (no 2019-onward panel exists on disk, and a fetch
+  is outside this experiment's scope); the history-length question belongs to X3.
 - **Real record.** As in experiment 670: events per Primary-year, logged shifts matched, edge
   events per cell, the verified D5 and D16 transfer, and the event-free stratum, for G, G-R, G-0,
   and GS.
-- **Compute.** 14 networks of about 2400 steps each. One network is timed first; if one takes more
-  than 30 minutes the step count falls so that the plan stays inside the ceiling of 8 GPU-hours.
+- **Compute.** 14 networks of about 2400 steps each. One network is timed first. If one takes more than 30 minutes, the step count is cut to 1200 for all 14 networks. Decoder tuning and scoring run on CPU while the GPU trains the next network, and the ceiling of 8 GPU-hours counts training time only.
   One GPU process at a time, at most 4 CPU cores, `MemoryMax=16G` per script. The one-year backtests
   hold priority: a fit pauses when a backtest worker needs the GPU.
-- **Earlier advice.** The plan follows experiment 665's advice to report cells with at least 20
-  events and 10 ends, and experiment 670's report of the donor-found share beside pairing.
-- **Standing practices.** NGED's logs are an incomplete one-off dump, so matched counts are lower
-  bounds; generators are anonymised; nothing from 2026-07-01 on is read.
+- **Definitions.** A cell is one of six groups of injected events by length (long over 7 days or no
+  end, medium over 1 up to 7 days, short up to 1 day) and depth (deep 8 noise units or more,
+  shallow 2 up to 8). An event is found when the decoded table has an event at the right Primary
+  and sign starting within 12 hours; an end is paired when the decoded table links it to the right
+  other end; an edge event is a decoded transfer. Shares are weighted by absolute megawatts.
+- **Caveat.** NGED's logs are an incomplete one-off dump, so matched logged shifts are lower
+  bounds.
 
 ## Reviews
 
