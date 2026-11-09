@@ -405,7 +405,7 @@ def probe_network(*, pp: PrimaryProbe, y: np.ndarray, boot: bool, rng: np.random
         top_cell = np.zeros(pp.n_cells)
         np.maximum.at(top_cell, cell, top)
         out[f"{arm}_cross"] = (fit["a"] < top_cell).tolist()
-        out[f"{arm}_bound"] = bool(cvec.sum() <= 1e-9 or np.mean(fit["a"] <= 1e-5) > 0.5)
+        out[f"{arm}_bound"] = bool(cvec.sum() < 1e-3 * pp.m_mw or np.mean(fit["a"] <= 1e-5) > 0.5)
         out[f"{arm}_q0"], out[f"{arm}_q1"] = (
             float(fit["theta"][len(cvec) + 1]),
             float(fit["theta"][len(cvec) + 2]),

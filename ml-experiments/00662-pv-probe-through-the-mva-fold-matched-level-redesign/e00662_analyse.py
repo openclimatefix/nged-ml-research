@@ -133,7 +133,7 @@ def coverage(
     f_lo, f_hi = min(factors.values()), max(factors.values())
     hit = 0
     n = 0
-    for (_, _), grp in sub.group_by(["condition", "site"]):
+    for (_, _, _), grp in sub.group_by(["cutoff", "condition", "site"]):
         diffs = grp["diff_mw"].to_numpy()
         half_boot = float(
             np.mean([np.subtract(*np.percentile(d, [90, 10])) / 2 for d in grp["diff_boot"]])
@@ -167,7 +167,7 @@ def bars(*, rec: pl.DataFrame, res: pl.DataFrame, cutoffs: tuple[str, ...]) -> d
         for meth in ("L0", "L1", "FA"):
             pf = med(rec=rec, condition=f"pf_fleet_{lv}_r0", method=meth, sites=six)
             sg = med(rec=rec, condition=f"sig_fleet_{lv}_r0", method=meth, sites=six)
-            a1[f"{lv}_{meth}"] = {s: pf[s] / sg[s] for s in pf if s in sg and abs(sg[s]) > 1e-6}
+            a1[f"{lv}_{meth}"] = {s: pf[s] / sg[s] for s in pf if s in sg and abs(sg[s]) > 0.05}
     ok1 = all(count_in(values=v, lo=0.9, hi=1.1) >= 5 for v in a1.values())
     out["A1"] = {
         "pass": ok1,
@@ -268,7 +268,7 @@ def bars(*, rec: pl.DataFrame, res: pl.DataFrame, cutoffs: tuple[str, ...]) -> d
     for s in six:
         a = sun.filter(pl.col("site") == s)["diff_mw"].median()
         b = real6.filter(pl.col("site") == s)["diff_mw"].median()
-        n_b4 += a < 0.25 * b  # ty: ignore[unsupported-operator]
+        n_b4 += abs(a) < 0.25 * abs(b)  # ty: ignore[invalid-argument-type]
     sun_res = res.filter((pl.col("condition") == "pf_sunload") & pl.col("site").is_in(six))
     flags = [f for r in sun_res.iter_rows(named=True) for f in r["FA_cross"]]
     cross_share = float(np.mean(flags)) if flags else float("nan")
@@ -288,7 +288,7 @@ def bars(*, rec: pl.DataFrame, res: pl.DataFrame, cutoffs: tuple[str, ...]) -> d
     out["Cloud"] = {
         "pass": True,
         "detail": cloud,
-        "note": "report only: cloud-following load over the real-farm read at 2 times",
+        "note": "report only: raw cloud-load read over the real-farm read at 2 times; the cloud load averages 0.3 of the 2-times capacity, so a probe that reads it as solar gives about 0.3 in magnitude",
     }
     # C1 (diagnostic): share of FA fits ending on a bound, over the injected PF fleets and the twins.
     bound_rows = res.filter(

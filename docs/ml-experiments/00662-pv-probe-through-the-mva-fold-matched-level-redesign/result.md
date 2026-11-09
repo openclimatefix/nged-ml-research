@@ -109,10 +109,14 @@ Tier B (decides whether capacity can be read through the fold; D8, D12, and D22 
 | B1 Crossing worlds | L1 and L2: calibrated recovery of FA in 0.75 to 1.25 at 4 of 6, in both the PF arm and the floor arm |
 | B2 Export-dominated | L6, PF arm: calibrated recovery of FA in 0.75 to 1.25 at 4 of 6 |
 | B3 Fold beats truncation | at L2, PF arm: median absolute (calibrated recovery − 1) of FA at least 0.10 below L1's; otherwise L1 is the method and the fold model is dropped |
-| B4 Sign placebo | the sun-rising-load world: FA reads under 0.25 of the L6 real recovery at 5 of 6, and the crossing flag is set on under 10% of cells |
+| B4 Sign placebo | the sun-rising-load world: the absolute FA read is under 0.25 of the absolute L6 real recovery at 5 of 6, and the crossing flag is set on under 10% of cells |
 | B5 Coverage | at least 60% in L1 and L2 (PF arm) |
 | B6 Crossing map (gates publication of the map, not the capacity) | balanced accuracy of the per-cell crossing call against the true sign at least 0.80 in L1 and L2, and false crossings on at most 10% of L0.5 cells |
 | C1 Start grid (diagnostic) | under 10% of FA fits end on a bound (all fold capacities zero, or most cell levels at their lower bound) |
+
+At D5, whose midday reading is 0.89 MW, the 0.5-, 1-, and 2-times worlds all inject the 2.0 MW
+floor, and the load-shift boxcar's height stays capped at the midday reading. A1 divides a ratio
+only where the signed recovery exceeds 0.05 in magnitude.
 
 The zero-reactive-power arm, the cloud-following load (reported as its read over the real-farm
 read at 2 times), the shape mix, and K = 1 against K = 4 are report-only rows. A bar is evaluated
