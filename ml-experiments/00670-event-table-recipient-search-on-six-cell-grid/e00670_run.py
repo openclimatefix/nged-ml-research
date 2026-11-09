@@ -48,6 +48,8 @@ CONFIGS: Final[dict[str, gen.GeneratorConfig]] = {
     "constant_mw_square": gen.constant_mw_square(),
 }
 N_REWIRE_REAL: Final[int] = 100
+rewired_kept: list[float] = []
+"""Share of each rewired graph's links that are also real links (the placebo's leakage)."""
 CELLS: Final[tuple[str, ...]] = (
     "long, deep",
     "long, shallow",
@@ -63,6 +65,21 @@ CELLS: Final[tuple[str, ...]] = (
 def params653() -> Params:
     """Experiment 653's tuned penalties."""
     return replace(Params(), **json.loads((WORK / "params.json").read_text()))
+
+
+def rewire_low_overlap(*, rig: Rig, rng: np.random.Generator) -> tuple[dict[str, list[str]], float]:
+    """The rewiring, out of 30 draws, that keeps the fewest real links, and its kept share."""
+    real = rig.p653.neighbours
+    best: tuple[dict[str, list[str]], float] | None = None
+    for _ in range(30):
+        nb = rewire(edges=rig.p653.edges, rng=rng)
+        nb = {s: nb.get(s, []) for s in rig.p653.sites}
+        links = sum(len(v) for v in nb.values())
+        kept = sum(b in real[a] for a in nb for b in nb[a]) / max(1, links)
+        if best is None or kept < best[1]:
+            best = (nb, kept)
+    assert best is not None
+    return best
 
 
 def record_end_of(*, residual: dict[str, np.ndarray]) -> int:
@@ -89,8 +106,8 @@ def decode_variants(
     )
     xh = {s: residual[s] - to_half_hours(slow=slows[s]) for s in slows}
     sigma = frozen.sigma
-    nb = rewire(edges=p653.edges, rng=rng)
-    nb = {s: nb.get(s, []) for s in p653.sites}
+    nb, kept = rewire_low_overlap(rig=rig, rng=rng)
+    rewired_kept.append(kept)
     rewired = classify(
         events=copy.deepcopy(events),
         sigmas={k: (v if np.isfinite(v) else 1.0) for k, v in sigma.items()},
@@ -124,9 +141,19 @@ def run_injected(*, config_name: str, first_seed: int, n_worlds: int) -> None:
             rng=np.random.default_rng(seed),
         )
         for method, events in variants.items():
+            scored = match(truth=truth, events=events, world_end=GRID_LENGTH)
+            n_edge = sum(e.cls.endswith("transfer") and e.start >= SCORED_FROM for e in events)
+            n_right = sum(bool(r["right_class"]) for r in scored)
             rows.extend(
-                {**r, "config": config_name, "world": seed, "method": method}
-                for r in match(truth=truth, events=events, world_end=GRID_LENGTH)
+                {
+                    **r,
+                    "config": config_name,
+                    "world": seed,
+                    "method": method,
+                    "world_edge_events": n_edge,
+                    "world_right_pairs": n_right,
+                }
+                for r in scored
             )
         print(config_name, seed, flush=True)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -230,6 +257,42 @@ def verified_d5_d16(*, events: list[Event]) -> dict:
     }
 
 
+def event_free(*, rig: Rig, tables: dict[str, pl.DataFrame], scored_years: float) -> dict:
+    """Events per Primary-year in time over 14 days from any logged or verified event."""
+    spans = []
+    lab = pl.read_parquet(E580 / "events_labelled_status.parquet")
+    spans += [
+        (r["label"], r["label_onset_idx"] - OFFSET_2019, r["label_end_idx"] - OFFSET_2019)
+        for r in lab.iter_rows(named=True)
+    ]
+    for r in pl.read_parquet(E580 / "events_verified.parquet").iter_rows(named=True):
+        spans += [
+            (r["primary_a"], r["onset_a_idx"] - OFFSET_2019, r["end_a_idx"] - OFFSET_2019),
+            (r["primary_b"], r["onset_b_idx"] - OFFSET_2019, r["end_b_idx"] - OFFSET_2019),
+        ]
+    busy_by = {}
+    free_hh = 0
+    for site in rig.p653.sites:
+        busy = np.zeros(GRID_LENGTH, bool)
+        for s, a, b in spans:
+            if s == site:
+                busy[max(0, a - 14 * DAY) : max(0, b + 14 * DAY)] = True
+        busy[:SCORED_FROM] = True
+        busy_by[site] = busy
+        free_hh += int((~busy & np.isfinite(rig.p653.residual[site])).sum())
+    free_years = free_hh / (DAY * 365.25)
+    out: dict = {"free_primary_years": free_years, "scored_primary_years": scored_years}
+    for m, t in tables.items():
+        n_all = n_edge = 0
+        for r in t.iter_rows(named=True):
+            end = GRID_LENGTH if r["end"] < 0 else r["end"]
+            if not busy_by[r["primary"]][r["start"] : max(end, r["start"] + 1)].any():
+                n_all += 1
+                n_edge += r["cls"] in ("edge_transfer", "permanent_transfer")
+        out[m] = {"events": n_all, "edge_events": n_edge, "edge_per_year": n_edge / free_years}
+    return out
+
+
 def run_real() -> None:
     """Decode the real record with each method and write the real-record tables."""
     rig = Rig()
@@ -245,8 +308,10 @@ def run_real() -> None:
     logged = logged_shifts(rig=rig, resid=resid)
     res: dict = {"scored_primary_years": scored_years, "logged_total": logged.height}
     OUT.mkdir(parents=True, exist_ok=True)
+    tables: dict[str, pl.DataFrame] = {}
     for m, ev in variants.items():
         t = events_table(events=ev)
+        tables[m] = t
         t.write_parquet(OUT / f"real_events_{m.replace(' ', '_')}.parquet")
         edge = t.filter(pl.col("cls").is_in(["edge_transfer", "permanent_transfer"]))
         res[m] = {
@@ -267,8 +332,8 @@ def run_real() -> None:
     sig = {k: (v if np.isfinite(v) else 1.0) for k, v in frozen.sigma.items()}
     counts = []
     for _ in range(N_REWIRE_REAL):
-        nb = rewire(edges=rig.p653.edges, rng=rng)
-        nb = {s: nb.get(s, []) for s in rig.p653.sites}
+        nb, kept = rewire_low_overlap(rig=rig, rng=rng)
+        rewired_kept.append(kept)
         e2 = classify(
             events=copy.deepcopy(ev0),
             sigmas=sig,
@@ -279,6 +344,12 @@ def run_real() -> None:
         e3 = search_recipients(events=e2, xh=xh, sigma=frozen.sigma, neighbours=nb)
         counts.append(sum(e.cls.endswith("transfer") and e.start >= SCORED_FROM for e in e3))
     res["rewired_edge_events"] = counts
+    res["rewired_share_of_real_links_kept"] = float(np.mean(rewired_kept))
+    stored = pl.read_parquet(WORK / "real_events_masked.parquet").filter(
+        pl.col("start") >= SCORED_FROM
+    )
+    res["gate2_e1_real_events"] = [res["E1"]["events"], stored.height]
+    res["event_free"] = event_free(rig=rig, tables=tables, scored_years=scored_years)
     res["real_graph_edge_events"] = res["E1-J"]["edge_events"]
     (OUT / "real.json").write_text(json.dumps(res, indent=1, default=float))
     for m in METHODS:

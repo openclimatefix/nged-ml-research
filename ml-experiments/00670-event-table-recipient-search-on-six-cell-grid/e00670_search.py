@@ -106,7 +106,13 @@ def search_recipients(  # noqa: PLR0912 - one decision cascade, as experiment 65
             if n not in xh or not np.isfinite(sigma.get(n, float("nan"))):
                 continue
             hit = best_recipient_step(xh=xh[n], donor=d, params=params)
-            if hit is not None and hit[1] >= params.recipient_units * sigma[n]:
+            taken = hit is not None and any(
+                e.primary == n
+                and abs(e.start - hit[0]) <= 12
+                and (id(e) in used or e.cls.endswith("transfer"))
+                for e in out + added
+            )
+            if hit is not None and not taken and hit[1] >= params.recipient_units * sigma[n]:
                 cands.append((n, hit[0], hit[1]))
         best, best_cost = None, float("inf")
         for k in range(1, min(params.max_recipients, len(cands)) + 1):
@@ -126,7 +132,7 @@ def search_recipients(  # noqa: PLR0912 - one decision cascade, as experiment 65
         cls = "permanent_transfer" if permanent else "edge_transfer"
         partner_amp = {}
         for n, s, amp in best:
-            reuse = next(
+            reuse = min(
                 (
                     e
                     for e in out + added
@@ -136,7 +142,8 @@ def search_recipients(  # noqa: PLR0912 - one decision cascade, as experiment 65
                     and abs(e.start - s) <= 12
                     and e.cls in (*UNPAIRED, "routine")
                 ),
-                None,
+                key=lambda e: abs(e.start - s),
+                default=None,
             )
             if reuse is None:
                 reuse = Event(

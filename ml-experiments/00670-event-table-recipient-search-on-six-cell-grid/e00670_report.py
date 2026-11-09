@@ -110,14 +110,55 @@ def report(*, config: str) -> dict:
                 f" | median err start {st['median_start_err_h']:.1f} h end"
                 f" {st['median_end_err_h']:.1f} h"
             )
+    for m, d in frames.items():
+        for cell in CELLS:
+            donors = d.filter(
+                (pl.col("cell") == cell) & pl.col("edge_truth") & (pl.col("amp_mw") < 0)
+            )
+            res[m][cell]["donor_found_mw"] = wrec(df=donors, col="found") if donors.height else None
+        w = (
+            raw.filter(pl.col("method") == m)
+            .group_by("world")
+            .agg(pl.col("world_edge_events").first(), pl.col("world_right_pairs").first())
+        )
+        res[m]["edge_events"] = int(w["world_edge_events"].sum())
+        res[m]["right_pairs"] = int(w["world_right_pairs"].sum())
+        print(
+            f"{m}: decoded edge events {res[m]['edge_events']},"
+            f" correct pair ends {res[m]['right_pairs']}"
+        )
     res["difference"] = {}
     for cell in CELLS:
         res["difference"][cell] = paired_difference(
             a=frames["E1-J"], b=frames["E1"], cell=cell, rng=rng
         )
         print(f"paired E1-J minus E1, {cell}: {res['difference'][cell]}")
-    # Pairing of the rewired placebo as a share of E1-J's pairing, long cells.
+    for cell in ("long, deep", "medium, deep"):
+        print(f"E1-J donor found (MW), {cell}: {res['E1-J'][cell]['donor_found_mw']}")
+    if config == "default":
+        res["verdict"] = decide(res=res)
+        print(json.dumps(res["verdict"], indent=1))
     return res
+
+
+def decide(*, res: dict) -> dict:
+    """Apply the pre-registered stop rule and count the held predictions (default worlds)."""
+    j = res["E1-J"]
+    held = {}
+    for cell, (f_min, p_min) in PREDICTED.items():
+        small = j[cell]["n_events"] < 20 or j[cell]["n_edge"] < 10
+        held[f"found {cell}"] = (not small) and j[cell]["found_mw"] >= f_min
+        if p_min is not None:
+            held[f"paired {cell}"] = (not small) and j[cell]["paired_mw"] >= p_min
+    for cell in ("long, deep", "medium, deep"):
+        held[f"diff {cell}"] = res["difference"][cell][0] >= 0.25
+    ld, md = j["long, deep"]["paired_mw"], j["medium, deep"]["paired_mw"]
+    branch = (
+        "a: adopt E1-J"
+        if ld >= 0.6 and md >= 0.6
+        else ("b: pairing unidentifiable at 15 Primaries" if ld < 0.3 else "c: X2 is the next step")
+    )
+    return {"held": held, "n_held": sum(held.values()), "branch": branch}
 
 
 def main() -> None:

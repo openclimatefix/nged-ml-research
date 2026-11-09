@@ -114,6 +114,19 @@ neural network proposed for the next experiment (X2) has anything to improve on.
 - **Realness.** Experiment 660's generator scored 0.55 on its realness classifier (the gate is
   under 0.65). X1 does not rerun it, because the generator is unchanged. The version that reads
   features at decoded times is the gate of X2.
+- **Clarifications fixed before any score is read (plan review).** (1) E1-J only searches from
+  donors that E1 decoded, so the report gives, beside every cell, the share of injected
+  edge-transfer megawatts whose donor E1 found. A branch (b) outcome is worded as "the donor
+  detector is the limit" when that share is under 0.60. (2) False pairing is measured on the
+  injected worlds as correct pair ends divided by decoded edge events, per method. (3) The real
+  record's rewired-graph prediction compares E1-J's edge events on the real graph with the median
+  of 100 rewirings, and the share of each rewired graph's links that are real links is reported.
+  (4) The verified D5 and D16 prediction holds when E1-J pairs D5 as donor with D16 and both starts
+  and both ends are within 24 half-hours of the verified ones. (5) Branch (c) also covers a long
+  and deep share of 0.60 or more with a medium and deep share under 0.60. (6) The event-free
+  stratum (time over 14 days from any logged or verified event) is reported per method. (7) The
+  real record's noise units use the whole record, as in experiment 653 (gate 2 needs them), and
+  the injected worlds use the tuning years, as in experiment 660.
 - **Standing practices.** Clean data, with D18 cut before 2025-03-01 (experiment 660's panel); no
   fits; no read of any half-hour from 2026-07-01 onward; NGED's logs are an incomplete one-off
   dump, so matched counts are lower bounds; generators are anonymised.
