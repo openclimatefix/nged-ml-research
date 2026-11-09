@@ -40,7 +40,6 @@ BANDS: Final[dict[str, tuple[float, float]]] = {
     "1-3 d": (1.0, 3.0),
     "3-7 d": (3.0, 7.0),
     "7-10 d": (7.0, 10.0),
-    "7-14 d": (7.0, 14.0),
     "10-14 d": (10.0, 14.0),
 }
 SCORES_DIR: Final = common.DATA_DIR / "scores"
@@ -126,9 +125,19 @@ def prepare(*, forecast: pl.DataFrame, sites: pl.DataFrame, mask: bool) -> pl.Da
 
 def summarise(*, frame: pl.DataFrame, by: str) -> pl.DataFrame:
     """Return the mean of every score column by `by`, with the row count."""
+    scored = losses(frame=frame)
+    if by == "band":
+        # "7-14 d" is the union of the disjoint "7-10 d" and "10-14 d" bands.
+        scored = pl.concat(
+            [
+                scored,
+                scored.filter(pl.col("band").is_in(["7-10 d", "10-14 d"])).with_columns(
+                    band=pl.lit("7-14 d")
+                ),
+            ]
+        )
     return (
-        losses(frame=frame)
-        .group_by(by)
+        scored.group_by(by)
         .agg(
             rows=pl.len(),
             **{
