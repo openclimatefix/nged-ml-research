@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 from e00653_common import GRID_START, Panel
-from e00665_score import CELLS
+from e00665_score import CELLS  # ty: ignore[unresolved-import]
 from e00670_report import OUT
 
 DOCS: Final[Path] = (
@@ -137,8 +137,8 @@ def placebo_figure() -> None:
     real = json.loads((OUT / "real.json").read_text())
     counts = real["rewired_edge_events"]
     fig, ax = plt.subplots(figsize=(WIDTH, 3.4))
-    bins = np.arange(-0.5, max(max(counts), real["real_graph_edge_events"]) + 1.5, 1)
-    ax.hist(counts, bins=bins, color=GREY, label="100 rewired graphs")
+    bins = np.arange(-0.5, max(*counts, real["real_graph_edge_events"]) + 1.5, 1)
+    ax.hist(counts, bins=bins, color=GREY, label="100 rewired graphs")  # ty: ignore[invalid-argument-type]
     ax.axvline(real["real_graph_edge_events"], color=ORANGE, lw=2, label="real graph")
     ax.set_xlabel("Edge events (transfers) of E1-J in 2024-01 to 2026-06")
     ax.set_ylabel("Rewired graphs")
