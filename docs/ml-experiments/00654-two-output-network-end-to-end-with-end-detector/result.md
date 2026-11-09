@@ -199,6 +199,15 @@ estimate is restated from the timed fold against the fit count before 8 hours ar
 - One line to the manager at: plan PR open, fits started, fits finished, final-test scored, PR
   merged.
 
+## Priority and reporting (manager, 2026-11-09)
+
+- The maintainer needs backtest forecasts on disk by the end of 2026-11-09, so the release-candidate
+  parquet files and README come first. The first file is built from E0's stored outputs (experiment
+  652's R-haz fits and K1's rebuilt quantiles on the real rows); each end-to-end arm adds its own
+  file when its fits finish.
+- Every metric table also reports the normalised MAE of the median forecast (MAE divided by the
+  Primary's effective capacity, as the other tables do).
+
 ## Compute and process
 
 - One GPU process at a time. One fold is timed first. The estimate is 4 to 8 GPU-hours, unmeasured;
