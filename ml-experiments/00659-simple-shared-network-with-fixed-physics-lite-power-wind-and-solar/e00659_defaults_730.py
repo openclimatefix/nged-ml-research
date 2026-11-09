@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Experiment C: refit the two current defaults with capacity at the 99.9th percentile of the previous 730 days.
+"""Experiment C: refit the two current defaults with a 730-day capacity.
+
+The capacity is the 99.9th percentile of the previous 730 days.
 
 Wind default 2 is experiment 615's refit (`e00615_wind_fit.py`) and solar `a2_member` is experiment
 430's job (`e00430_fit.run_job`), each run unchanged except for the capacity rule: the target is the
