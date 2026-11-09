@@ -24,7 +24,7 @@ hypothesis: >-
   quantile widths would give.
 prediction: >-
   Fixed before any score was read. The free network is already roughly calibrated (5% to 95%
-  coverage on sunny middays 88.0% against a nominal 90%), so I expect the recalibration (b) to
+  coverage on sunny middays about 88% against a nominal 90%), so I expect the recalibration (b) to
   gain at most 0.05 points of capacity at day 1-2, below the bar. I expect the sum-of-distributions
   arm (c) to widen the sunny-midday interval, raise coverage to 89% to 92%, and gain 0.05 to 0.15
   points over (a) at day 1-2 with a smaller gain at days 3-5 and 6-10, because member spread
@@ -63,33 +63,32 @@ best_arm: >-
 headline: >-
   Carrying the solar spread into the net-demand quantiles does not help. The sum of distributions is
   worse than the free network by 0.38, 0.29, and 0.33 CRPS points at the three lead bands, and a
-  recalibration of the free network's quantile widths gains nothing either (-0.07, +0.06, and
-  -0.26).
+  recalibration of the free network's quantile widths gains nothing at lead days 1 to 5 and loses
+  0.26 points at lead days 6 to 10.
 lessons:
   - >-
     The free network's miscalibration on sunny middays is a one-sided bias, not a wrong spread: the
-    realised power falls below the forecast's 5% quantile in 9.3% of half-hours at day 1-2 and
-    above its 95% quantile in 1.9%, so the upper band is too wide and the lower band too narrow.
+    realised power falls below the forecast's 5% quantile in 9.3% of half-hours at lead days 1 to 2
+    and above its 95% quantile in 1.9%, so the lower band is too narrow and the upper band too wide.
   - >-
-    A recalibration fitted on held-out fine-tuning rows does not transfer to the test months (it
-    is not better than no recalibration at any band and is worse at day 6-10), so the bias is not
-    stable across the
-    fine-tuning years and the test months.
+    A recalibration fitted on held-out fine-tuning rows is not better than no recalibration at any
+    lead band and is worse at lead days 6 to 10. The bias may not be stable between the fine-tuning
+    years and the test months; this experiment did not test that.
   - >-
     Drawing the solar curve of a random ensemble member widens the interval to 93% to 97% coverage
-    without lowering CRPS: the member draw costs 0.02, 0.06, and 0.12 points against subtracting
-    the member-average curve, so the spread between members is not informative about the error.
+    without lowering CRPS: against subtracting the member-average curve, the member draw costs 0.06
+    and 0.12 points at lead days 3 to 5 and 6 to 10, and nothing measurable at lead days 1 to 2.
   - >-
     Coupling the two draws at the same quantile level shrinks the interval to 19% to 63% coverage
-    and is the worst arm everywhere; the measured correlation (0.09) does not support it.
+    and is the worst arm at every lead band. The measured correlation between the member-average
+    solar curve and the gross-demand error (0.09) does not support such a strong coupling.
 take_home_message: >-
-  The free network's spread is not what is wrong on sunny middays. Its forecast is too high in
-  about 9% of half-hours at the 5% quantile where 5% is nominal, and too wide at the top, which is a
-  one-sided bias that a width recalibration cannot fix. Building the net-demand distribution from
-  the gross-demand distribution minus a randomly drawn ensemble member's solar curve is worse than
-  the free network at all three lead bands (0.29 to 0.38 points), and so is every recalibration, so
-  the explicit-solar line should stay stopped and no recalibration should be proposed for the
-  serving path.
+  The free network's spread is not what is wrong on sunny middays. The realised power falls below
+  its 5% quantile in about 9% of half-hours at lead days 1 to 2, where 5% is nominal, and its upper
+  band is too wide, which is a one-sided bias that a width recalibration cannot fix. Building the
+  net-demand distribution from the gross-demand distribution minus a randomly drawn ensemble
+  member's solar curve is worse than the free network at all three lead bands (0.29 to 0.38
+  points), and recalibrating the free network or the sum did not beat the free network either.
 advice:
   - >-
     Do not build the net-demand distribution from the gross-demand distribution and ensemble-member
@@ -99,8 +98,9 @@ advice:
     Do not add a width recalibration to the serving path on the strength of this experiment: a map
     fitted on fine-tuning rows did not beat the uncalibrated free network at any lead band (664).
   - >-
-    If the one-sided sunny-midday bias matters to NGED, test a correction on the median (a shift by
-    forecast sunniness, fitted on recent rows) rather than on the width (664, PIT histograms).
+    One option for the one-sided sunny-midday bias, untested here, is a correction on the median (a
+    shift by forecast sunniness, fitted on recent rows) rather than on the width (664, PIT
+    histograms).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -109,32 +109,37 @@ adopted_in: none
 
 **We asked whether the explicit solar curve helps mainly by getting the width of the net-demand
 forecast right, rather than by moving its centre.** Net demand is the power a substation draws after
-rooftop solar has been subtracted. We tested two ways to fix the width: widen or narrow the free
-network's forecast bands with a map fitted on earlier rows, and build the forecast as the network's
-gross-demand forecast minus the solar output of one randomly chosen ensemble member. An ensemble
-member is one of the 51 alternative weather forecasts that the European Centre for Medium-Range
-Weather Forecasts issues for each run. Neither way beat the free network, which is the same network
-without any solar curve.
+rooftop solar output has been subtracted, and gross demand is the power before that subtraction. The
+free neural network is experiment 644's forecasting model, which has weather inputs but no solar
+curve. We tested two ways to fix the width. The first widens or narrows the free neural network's
+forecast bands with a map fitted on earlier rows (the recalibration). The second builds the forecast
+as the gross-demand forecast of experiment 655's neural network minus the solar output of one
+randomly chosen ensemble member (the sum of distributions). An ensemble member is one of the 51
+alternative weather forecasts that the European Centre for Medium-Range Weather Forecasts (ECMWF)
+issues for each run. Neither approach beat the free neural network.
 
-**The free network is miscalibrated on sunny middays, but as a one-sided bias, not a wrong width.**
-On the 5% quantile of the free network, the realised power falls below the forecast 9.3% of the time
-at day 1-2, and above its 95% quantile only 1.9% of the time. Experiment 655 had already found that
-four explicit-solar forms lost to the free network. This result adds that the loss is not explained
-by the spread being missing.
+**The free neural network is miscalibrated on sunny middays, but as a one-sided bias, not a wrong
+width.** Sunny middays are the half-hours from 10:00 to 15:00 UTC whose observed clear-sky index is
+at least 0.7. At lead days 1 to 2, the realised power falls below the network's 5% quantile in 9.3%
+of those half-hours, and above its 95% quantile in 1.9%. Experiment 655 found that four
+explicit-solar
+forms lost to the free neural network. Experiment 664 finds that the loss is not explained by a
+missing spread.
 
-Scores are CRPS in points, where a point is one percent of a Primary substation's effective capacity
-(continuous ranked probability score; smaller is better), on "sunny middays" (10:00 to 15:00 UTC
-half-hours with an observed clear-sky index of at least 0.7) in the 60 days after each of three
-cutoffs (2025-07, 2026-03, and 2026-06), pooled over the six MW Primaries and five seeds.
+Scores are the continuous ranked probability score (CRPS; smaller is better) in points, where a
+point is one percent of a Primary substation's effective capacity. The test half-hours are those in
+the 60 days after each of three test-window start dates (2025-07, 2026-03, and 2026-06), pooled over
+the six Primary substations that are metered in MW and over five seeds.
 
 ## Results
 
 ![Gain over the free network](gain_over_free.svg)
 
 *Each arm's CRPS gain over the free network on sunny middays, with 99.9% day-block intervals (a
-negative gain means the arm is worse). Arm (b) is the recalibrated free network, (c) the sum of
-distributions with independent draws, (d) arm (c) recalibrated, and the last two are the coupled
-version and its recalibration.*
+negative gain means the arm is worse). Arm (b) is the recalibrated free network. Arm (c) is the sum
+of distributions with independent draws, and (d) is arm (c) recalibrated. The last two are the sum
+with coupled draws and its recalibration. Arm (c0) subtracts the member-average curve, and (p) and
+(s) are the placebos with another Primary's capacity and another date's curves.*
 
 ![PIT histograms](pit_histograms.svg)
 
@@ -171,12 +176,17 @@ and the lower band that dips below zero at night.*
   correlation between the member-average solar curve and the position of the realised gross demand
   in its forecast distribution is 0.09 (range -0.04 to 0.17 over the 25 month-and-seed runs), so the
   independence assumption is close and the coupling is unsupported.
-- **Placebos pass:** the sum of distributions beats the capacity-of-another-Primary version by 1.84,
-  1.48, and 0.97 points and the other-date version by 2.54, 2.02, and 1.05 points (intervals exclude
-  zero), so the member solar curve carries real information about the centre.
-- **What the member draw adds:** against subtracting the member-average curve from the same gross
-  draws, the random member costs 0.02 [-0.01, +0.04], 0.06 [+0.02, +0.12], and 0.12 [+0.02, +0.21]
-  points: the interval widens (coverage 93.1% against 90.0% at day 1-2) without a better score.
+- **Placebos pass pooled:** The sum of distributions beats the version with another Primary's
+  capacity by 1.84, 1.48, and 0.97 points, and the version with another date's curves by 2.54, 2.02,
+  and 1.05 points (intervals exclude zero). The member solar curve therefore carries information
+  about the centre. At D10 the other-Primary placebo (5.47 points) beats the sum (5.83), so the
+  placebo result does not hold at every Primary.
+- **What the member draw adds:** Against subtracting the member-average curve from the same gross
+  draws (arm c0), the random member costs 0.02 [-0.01, +0.04], 0.06 [+0.02, +0.12], and 0.12 [+0.02,
+  +0.21] points at the three lead bands. The interval widens (coverage 93.1% against 90.0% at lead
+  days 1 to 2) without a better score. The measured correlation between the spread of the member
+  curves and the size of the gross-demand error on the fine-tuning rows is 0.06, so the spread
+  carries little information about the error.
 - **Coverage on sunny middays (5% to 95%, nominal 90%):** free network 88.8%, 88.2%, 87.6% at the
   three bands; recalibrated 86.6%, 85.1%, 90.3%; sum 93.1%, 94.9%, 96.5%; recalibrated sum 89.6%,
   88.0%, 93.5%. Mean 5%-95% width, free network: 23.8, 26.8, and 31.2 points; sum: 27.9, 33.5,
@@ -184,7 +194,8 @@ and the lower band that dips below zero at night.*
 - **Tail calibration, sunny middays, all leads (free network / sum):** coverage below the 0.01
   quantile 2.5% / 0.6%, below 0.05 11.1% / 3.9%, below 0.95 99.2% / 99.2%, below 0.99 99.8% / 99.8%;
   pinball loss at 0.01, 0.05, 0.95, and 0.99 is 0.174 / 0.190, 0.700 / 0.716, 1.071 / 1.222, and
-  0.291 / 0.330 points. Both arms are far too wide at the upper tail.
+  0.291 / 0.330 points. At the upper tail both arms cover 99.2% below the 95% quantile, so the upper
+  band is too wide.
 - **PIT distance from uniform (total variation, sunny middays day 1-2):** free network 0.176,
   recalibrated 0.198, sum 0.125, recalibrated sum 0.144. The sum is closer to uniform and still
   scores worse, because CRPS also rewards a sharp centre.
@@ -199,17 +210,18 @@ and the lower band that dips below zero at night.*
   network at the other five Primaries on average.
 - **All half-hours:** free minus sum is -0.02 [-0.06, +0.03] and free minus recalibrated free is
   -0.09 [-0.13, -0.06], so the recalibration also hurts overall.
-- **Audit triggers:** the prediction (a 0.05 to 0.15 point gain at day 1-2) was contradicted
-  (trigger
-  2), and the explanation (the explicit curves already lost in experiment 655; the member draw adds
-  width without information; the bias is one-sided) was tested here with the `c0`, placebo, and
-  PIT checks. No placebo failed, the median and CRPS agree, leaving D5 out does not flip the sign,
-  No audit was run. The free
-  network's 3.75, 4.28, and 5.05 CRPS reproduce experiment 655's values exactly.
+- **Audit triggers:** The prediction (a gain of 0.05 to 0.15 points at lead days 1 to 2) was
+  contradicted, which is trigger 2. This page tests three explanations: the explicit curves already
+  lost in experiment 655, the member draw adds width without information, and the bias is one-sided.
+  The tests are the arm that subtracts the member-average curve from the same gross draws (arm c0),
+  the placebos, and the PIT histograms. The two placebos lose pooled, and the median and CRPS agree.
+  Leaving D5 out does not flip the sign. No audit was run. The free network's CRPS of 3.75, 4.28,
+  and 5.05 points reproduces experiment 655's values exactly.
 - **Reviews:** a fresh Sonnet agent reviewed the code before the first full run. It found no bug
   that
   biases the comparison; two findings were applied (clip the recalibrated levels to [0.001, 0.999],
-  assert the fine-tuning leads lie in 0 to 360 hours), and one was accepted as a caveat (below).
+  assert the fine-tuning leads lie in 0 to 360 hours), and one finding was accepted as a caveat
+  (below).
 - **Caveats:** arms using draws (c, d, and the coupled and placebo arms) rest on 2,000 draws per
   row,
   so their 0.01 and 0.99 quantiles use about 20 draws each and carry sampling noise that arms (a)
@@ -223,7 +235,8 @@ and the lower band that dips below zero at night.*
 ## Method
 
 - **Architecture:**
-    - Arm (a) is experiment 644's free network, a modular mixture-density network (three Gaussian
+    - Arm (a) is experiment 644's free network, a modular mixture-density neural network (three
+      Gaussian
       components) whose fresh fine-tuning mixer reads the ensemble-mean weather, date-time, and
       ensemble-spread columns and the lead time; it is read from its stored weights.
     - Arms (c) onward use experiment 655's arm d network, trained on gross demand (the target
@@ -232,7 +245,8 @@ and the lower band that dips below zero at night.*
     - The sum of distributions (c) draws 2,000 gross-demand values from arm d's mixture per row and
       subtracts the solar curve of an independently drawn ensemble member (curve per member,
       cell temperature, 655's physics); (c, coupled) sorts both sets of draws and pairs them.
-- **Training regime:** nothing is trained. Both networks come from experiments 644 and 655 (monthly
+- **Training regime:** nothing is trained. Both neural networks come from experiments 644 and 655
+  (monthly
   fine-tuning on the 24 months before each test month, five seeds); the
   per-member curves are recomputed from the 51-member extract of experiment 655 and match its
   member-average table. GPU time for this experiment is under 0.2 hours.
