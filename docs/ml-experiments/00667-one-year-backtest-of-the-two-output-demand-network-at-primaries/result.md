@@ -18,12 +18,11 @@ size: >-
   searching; (4) it touches no serving path and no degradation rule; (5) it changes no contract.
 hypothesis: >-
   Descriptive, not a hypothesis test. The one-year backtest is the first real-rows test of the
-  Candidate plus the R-haz head. Prediction that could fail: the Candidate's NRA output scores
-  within 0.10 points of capacity of its development-month score once its power lags are cut from
-  24 hours to 6 hours.
+  Candidate plus the R-haz head. Prediction that could fail: extending the Candidate from 10 to 14
+  days leaves its score at days 0 to 10 within 0.10 points of capacity of experiment 620's.
 prediction: >-
-  Written before any fit. P1: Candidate NRA CRPS with 6-hour lags is not worse than the 24-hour-lag
-  Candidate on the same fold by more than 0.10 points of capacity (a fresher lag should help). P2:
+  Written before any fit. P1: the 14-day extension leaves the Candidate's score at days 0 to 10
+  within 0.10 points of capacity of experiment 620's stored Candidate on the same months. P2:
   the survival output stays calibrated at days 10 to 14 (predicted survival within 0.10 of the
   observed share still on). P3: q05 to q95 coverage of the NRA output is within 0.05 of nominal
   in every month.
@@ -49,15 +48,14 @@ page is planned and holds the plan only.
   session advised. Pre-training chain: lag, weather, and date-time encoders pre-trained on ERA5 and
   CAMS (experiments 559, 565, 574), a fresh mixer on the whole ENS history (starts 2024-04-01),
   then the daily fine-tune with a 90-day recency half-life.
-- **Lags of at least 6 hours, against two origins:** the network keeps its native origin of
-  09:00 UTC (the 00Z ENS run plus 9 hours) and runs for the contract's 12:00 origin. Experiment
-  574's arm V35 caps lag age at 3.5 hours (`CAP_3_5H` = 7 half-hours) from the 09:00 origin, so the
-  newest power any lag reads is at 05:30 UTC on the origin day. That is 6.5 hours before the 12:00
-  origin and before the contract's 06:00 cut, so the existing 3.5-hour cap meets the contract and
-  no new cap is needed. The network ignores power between 05:30 and 06:00, and its lead feature
-  counts from 09:00, 3 hours before the contract's origin. Candidate arm `P7+D50` is rebuilt on
-  the V35 pre-training (3.5-hour lag encoder) instead of the 24-hour one. The neighbour summaries
-  obey the same cut. A check asserts that every lag is observed at or before 06:00 UTC.
+- **Lags:** the stored Candidate reads day and week lags observed at least 24 hours before its
+  native origin of 09:00 UTC (the 00Z ENS run plus 9 hours). The newest power it reads is
+  therefore from 09:00 UTC the day before, 27 hours before the contract's 12:00 origin and well
+  before the contract's 06:00 cut. The contract says a model whose lags are 24 hours or more needs
+  no change, so the stored lag recipe is kept. Experiment 574's 3.5-hour cap (`CAP_3_5H` = 7
+  half-hours) would also meet the cut, but no Candidate with neighbour summaries exists on it.
+  The neighbour summaries use the same 24-hour cut. A check asserts that every lag is observed
+  before 06:00 UTC on the origin day.
 - **Survival head:** R-haz of experiment 652 sits on the Candidate (`P7+D50`), not on K1. Its
   gate-state input is removed, so no explicit gate enters. The Candidate's frozen 11 quantiles
   are the NRA output. The prevailing output is the 11 quantiles of the mixture
