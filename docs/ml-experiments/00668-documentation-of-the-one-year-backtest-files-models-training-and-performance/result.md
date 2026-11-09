@@ -58,7 +58,7 @@ advice:
 
 This page documents the five Parquet files of the one-year backtest in
 `data/ml-experiments/backtest_year_2025-11_to_2026-10/`. It has two readers: the colleague at NGED
-who receives the files, and an engineer who must re-implement one of the four models behind them.
+who receives the files, and an engineer who must re-implement one of the five models behind them.
 A Primary is a primary substation, a BSP is a bulk supply point, and a GSP is a grid supply point.
 
 **Take-home message.** The five backtest files hold forecasts that are better than climatology at
@@ -321,7 +321,7 @@ fixes the choices that the earlier experiments left open, and this section resta
   encoders and the three-step schedule: 559. ERA5 and CAMS pre-training: 418. The offset: 565 and
   572. The thermal-lag columns: 437 and 569. The embargoed schedule: 574. The shared lag encoder:
   586 and 591. The signal columns: 598 and 606. The signal dropout: 610. The refit rule: 599. The
-  roster and the width factor: 612 and 613. The prevailing head: 647, 650, and 652.
+  list of series and the width factor: 612 and 613. The prevailing head: 647, 650, and 652.
 
 ### Performance
 
@@ -330,7 +330,8 @@ output scores better than the normal-running output overall but worse in the 7 d
 shift ends.** Every number is a normalised error in points of capacity (percent of capacity; smaller
 is better) over all 16 Primaries, pooled. For the MVA-only Primaries the denominator is the capacity
 in MVA, so the numbers mix real and apparent power. Of the 3,924,480 rows of each output, 3,893,864
-are scored: the rest have no observed power, or the cleaning flagged the half-hour. The manual
+are scored: the rest have no observed power, the cleaning flagged the half-hour, or a baseline is missing.
+The manual
 heuristic and climatology are described under [Comparison
 baselines](#comparison-baselines-slices-and-summary-figures). Gains are those of the output over the
 baseline, with a 95% day-block bootstrap interval from 2,000 resamples of origin days.
@@ -1025,7 +1026,7 @@ farms' identifiers and are not the labels of earlier pages:
 
 **The CRPS gain over climatology is positive in all five seasons for all five types, and the season
 with the largest gain differs by type.** The GSPs gain most in summer (47.1%), the Primaries in the
-first autumn month (36.4%), and wind and solar in spring and summer. The seasons are the meteorological
+first autumn month (36.4%), wind in spring, and solar in summer. The seasons are the meteorological
 seasons: winter (December to February), spring (March to May), summer (June to August), and autumn
 (September to November). The backtest year runs from 2025-11 to 2026-10, so autumn is split into its
 first month and its last two months. Generator series carry season labels and no calendar dates. Each
@@ -1064,14 +1065,15 @@ and the comparison with two earlier forecasts.
 ### Baselines beside every model
 
 - **Manual heuristic.** The median of the observed power at the valid time minus 1 to 6 weeks (168
-    to 1,008 hours) and minus 49 to 55 weeks, as in the production baseline code. A lag of h hours is
-    used only if h is at least the lead plus 6 hours, because observed power reaches the forecaster
-    only up to 6 hours before the origin. The 1-week lag therefore drops out beyond a lead of 162
-    hours, and the longer lags remain. The heuristic has the 11 quantiles of the same lags.
+    to 1,008 hours) and minus 49 to 55 weeks, as in the production baseline code. A lag of h hours
+    is used only if h is at least the lead plus 6 hours, because observed power reaches the
+    forecaster only up to 6 hours before the origin. The 1-week lag therefore drops out beyond a
+    lead of 162 hours, and the longer lags remain. The heuristic has the 11 quantiles of the same
+    lags.
 - **Climatology.** The quantiles of the series' cleaned power in the same cell of the Europe/London
-    month, half-hour, and weekend flag, pooled over the 9 neighbouring cells (months and half-hours),
-    and trained on the power before the first day of the origin's month. For wind and solar the
-    weekend flag is left out.
+    month, half-hour, and weekend flag, pooled over the 9 neighbouring cells (months and
+    half-hours), and trained on the power before the first day of the origin's month. For wind and
+    solar the weekend flag is left out.
 - **Not in the files.** Both baselines are computed for the same origins and valid times and are not
     written into the Parquet files. Wind and solar have no manual heuristic.
 
@@ -1092,15 +1094,15 @@ another.
 - **Verified transfer.** The verified D5 and D16 transfer of experiment 580, 2025-12-29 to
     2026-01-13.
 - **Gate-on origin days.** The origin days on which the G4 gate of [experiment
-    592](../00592-nra-snap-back-gate-faster-onset-and-snap-back-trigger/result.md) is on, stored only
-    for the five fold months of that experiment (October 2025, December 2025, January 2026, March
-    2026, and June 2026), beside the gate-off origin days of the same months.
+    592](../00592-nra-snap-back-gate-faster-onset-and-snap-back-trigger/result.md) is on, stored
+    only for the fold months of that experiment that fall in the backtest year (December 2025,
+    January 2026, March 2026, and June 2026), beside the gate-off origin days of the same months.
 
-Each slice is scored on all 3,893,864 scored rows' subset. A row is "inside" if its valid time falls
-within an event of its own Primary, "7 days after" if it falls in the 7 days after the end, and
-"outside" otherwise, for the same Primaries. Counts of events: the long and deep set has 0 events,
-the event-table proxy has 10 events at 7 Primaries inside the year, and the verified set has 2
-events.
+Each slice is scored on the subset of the 3,893,864 scored rows that fits it. A row is "inside" if
+its valid time falls within an event of its own Primary, "7 days after" if it falls in the 7 days
+after the end, and "outside" otherwise, for the same Primaries. Counts of events: the long and deep
+set has 0 events, the event-table proxy has 10 events at 7 Primaries inside the year, and the
+verified set has 2 events.
 
 CRPS by slice:
 
@@ -1128,14 +1130,15 @@ CRPS by slice:
 | 7 days after | 9,408 | 21 | 3.31 | 11.60 | 5.11 | 7.03 |
 | outside (same Primaries) | 454,868 | 356 | 3.19 | 3.16 | 3.64 | 4.46 |
 
-**Gate-on origin days** (the G4 gate, five fold months).
+**Gate-on origin days** (the G4 gate, fold months with stored gate states).
 
 | Slice | Half-hours | Origin days | Normal running | Prevailing | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|---:|---:|
 | gate-on origin days | 29,564 | 24 | 8.24 | 8.57 | 8.22 | 9.60 |
 | gate-off origin days | 1,286,150 | 123 | 4.27 | 4.19 | 5.16 | 6.30 |
 
-Normalised MAE of the median by slice (the three sets with rows):
+Normalised MAE of the median by slice (the event-table proxy and the verified transfer; the gate-on
+set has no inside or outside rows):
 
 | Slice | Normal running | Prevailing | Manual heuristic | Climatology |
 |---|---:|---:|---:|---:|
@@ -1165,12 +1168,17 @@ the twCRPS, which clips the observation and every quantile at a threshold, the 9
 the series' power in the earlier months, before taking the quantile score. The conditions are those
 of `slices.py`: winter (December to February), winter nights (winter and the sun more than 5 degrees
 below the horizon), cold nights (the sun more than 5 degrees below the horizon and the ERA5
-temperature at 3 degrees Celsius or below), Economy 7 step hours (local half-hours starting 00:30 to
-03:00 on day 1 to 6 of a lead), Christmas (24 December to 1 January), bank holidays, and sunny
-half-hours (the unit solar shape at or above the series' own two-thirds quantile of daylight rows).
-The lead bands are open at the bottom and closed at the top, so a day holds 48 half-hours. Units are
-points of capacity (percent of the Primary's effective capacity in MW, or in MVA for the MVA-only
-Primaries).
+temperature at 3 degrees Celsius or below), Economy 7 step hours (local half-hours 1 to 6 of the
+day, starting 00:30 to 03:00, whatever the lead), Christmas (24 December to 1 January), bank
+holidays, and sunny half-hours (the unit solar shape at or above the series' own two-thirds quantile
+of daylight rows). Each lead band includes its lower edge and excludes its upper edge, so a day
+holds 48 half-hours. Units are points of capacity (percent of the Primary's effective capacity in
+MW, or in MVA for the MVA-only Primaries).
+
+**The manual heuristic and climatology in the comparison tables are the stored arms of experiment
+87, not the baselines described above.** Their means differ from the baselines of this page by at
+most 0.003 points (heuristic) and 0.13 points (climatology) on the common rows, but their per-row
+errors differ.
 
 The comparison covers the common rows of the six forecasts: the backtest outputs, research default
 3, BG2, the manual heuristic, and climatology. The stored forecasts of default 3 (experiment 378)
@@ -1184,8 +1192,8 @@ no further. Default 3 below 168 hours equals research default 1. The comparison 
 because neither forecast exists for them.
 
 For the six Primaries that report signed real power (MW) the common rows hold 537,136 half-hours for
-the all-days row, and for the seven MVA-only Primaries 628,272. The other three of the 16 Primaries
-are in neither group.
+the all-days row, and for the seven MVA-only Primaries 628,272. The other three Primaries (D8, D15,
+and D18) are in neither group, and the comparison does not score them.
 
 **Six MW Primaries, MAE of the median:**
 
@@ -1319,29 +1327,29 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
 
 ## Caveats
 
-- **A descriptive year, not a ranking.** The year overlaps the development months and the
-  final-test window.
-- **Less ensemble history early.** The ensemble history starts 2024-04-01, so early folds train
-  on less ensemble data.
-- **Days 10 to 14 are untested for the demand networks.** The stored Candidate and the
-  lag network were trained and scored to 10 days. The files report days 10 to 14 separately.
-- **Solar's upper band fails on very sunny days.** About 11% of observations exceed `q99`
-  on the sunniest days in experiment 659.
+- **A descriptive year, not a ranking.** The year overlaps the development months and the final-test
+    window.
+- **Less ensemble history early.** The ensemble history starts 2024-04-01, so early folds train on
+    less ensemble data.
+- **Days 10 to 14 are reported separately.** The files hold 14 days, and the scores for days 10 to
+    14 are in their own lead band, so a reader can discount them.
+- **Solar's upper band fails on very sunny days.** About 11% of observations exceed `q99` on the
+    sunniest days in experiment 659.
 - **The shift labels are an incomplete dump.** NGED has said that load-shift events may be missing
-  from its logs, so clean rows can hold unlabelled shifts.
-- **Default 3 and BG2 comparisons use stored rows only.** Every fifth origin day is missing,
-  the hand-filtered load-shift rows are missing, nothing is stored after 2026-06-30, and the 09:00
-  origins are joined on valid time with 3 hours subtracted from the lead. BSPs and GSPs have no such
-  comparison.
-- **The Primaries heads change in January 2026.** 2025-11 and 2025-12 use the B-haz fallback
-  head, and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. The zero-flag mask
-  uses later-month climatology, which drops training rows only.
-- **The prevailing output over-persists after a load shift ends.** One verified load shift, at
-  D5 and D16, is the only example, so the size of the effect is not estimated.
+    from its logs, so clean rows can hold unlabelled shifts.
+- **Default 3 and BG2 comparisons use stored rows only.** Every fifth origin day is missing, the
+    hand-filtered load-shift rows are missing, nothing is stored after 2026-06-30, and the 09:00
+    origins are joined on valid time with 3 hours subtracted from the lead. BSPs and GSPs have no
+    such comparison.
+- **The Primaries heads change in January 2026.** 2025-11 and 2025-12 use the B-haz fallback head,
+    and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. The zero-flag mask uses
+    later-month climatology, which drops training rows only.
+- **The prevailing output over-persists after a load shift ends.** One verified load shift, at D5
+    and D16, is the only example, so the size of the effect is not estimated.
 - **Numbers are provisional until the pages of experiments 667, 669, and 666 merge.** Those pages
-  own the models behind the files.
+    own the models behind the files.
 - **The last origins cannot be fully scored.** Observed power ends on 2026-11-09 and the wind idle
-  mask ends on 2026-09-13.
+    mask ends on 2026-09-13.
 
 ## Anonymisation
 
