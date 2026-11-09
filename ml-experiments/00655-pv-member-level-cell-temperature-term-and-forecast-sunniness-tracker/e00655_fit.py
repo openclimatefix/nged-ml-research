@@ -36,7 +36,7 @@ import e00655_curves as cv
 import e00655_extract as ex
 import numpy as np
 import torch  # ty: ignore[unresolved-import]
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 NAME: Final = ex.NAME
 WORK: Final[Path] = ex.WORK
