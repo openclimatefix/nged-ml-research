@@ -245,7 +245,7 @@ fixes the choices that the earlier experiments left open, and this section resta
   of 64 units, and outputs 9 numbers: the logits, means, and log standard deviations of a
   3-component Gaussian mixture. Each hidden layer has 10% dropout.
 - **Offset.** A per-Primary piecewise-linear function of time with one knot for each month start
-  from 2019-09 (a slow drift term, "D5") is added to the three component means. Fine-tuning trains
+  from 2019-09 (a slow drift term) is added to the three component means. Fine-tuning trains
   only the newest knot, and a penalty of 10 times the mean squared difference between neighbouring
   knots keeps the function smooth.
 - **Quantiles.** The 11 quantiles come from the mixture's cumulative distribution by 40 bisection
@@ -934,6 +934,10 @@ experiment 666.
   negative log-likelihood on the last 61 days kept, and a lead range extended to 336 hours
   (experiments 430 and 659 stopped at 251.5 hours). Solar has no idle mask, and the target is the
   raw output.
+- **Night rows.** The network forecasts only the half-hours where the mean cosine of the solar
+  zenith angle over the ensemble step is above zero. The night quantiles of the file are set to 0.
+  This gate is not the daylight rule that the scores use, which takes the zenith at the middle of
+  the half-hour.
 - **Refits.** Quarterly: 2025-11-01, 2026-02-01, 2026-05-01, and 2026-08-01, each scoring
   the next
   three months, 3 seeds each, with no pre-training.
@@ -1206,8 +1210,9 @@ no further. Default 3 below 168 hours equals research default 1. The comparison 
 because neither forecast exists for them.
 
 For the six Primaries that report signed real power (MW) the common rows hold 537,136 half-hours for
-the all-days row, and for the seven MVA-only Primaries 628,272. The other three Primaries (D8, D15,
-and D18) are in neither group, and the comparison does not score them.
+the all-days row, and for the seven MVA-only Primaries 628,272.
+Of the 8 MW Primaries, 6 are in the comparison (D15 and D18 are not). Of the 8 MVA-only
+Primaries, 7 are in the comparison (D8 is not). The comparison does not score those three Primaries.
 
 **Six MW Primaries, MAE of the median:**
 
