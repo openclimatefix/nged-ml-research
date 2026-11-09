@@ -141,8 +141,9 @@ move with them.
 
 **Both outputs are too narrow, and the pre-registered coverage prediction P3 failed.** P3 said that
 the q05 to q95 coverage of the NRA output would lie within 0.05 of 0.90 in every month. The NRA
-coverage lies within 0.05 of 0.90 in 3 of 12 months (2025-11, 2026-02, 2026-06). The NRA coverage runs from 0.72 (August) to 0.89
-(November), the prevailing coverage from 0.80 (July) to 0.89 (November).
+coverage lies within 0.05 of 0.90 in 3 of 12 months (2025-11, 2026-02, 2026-06). The NRA coverage
+runs from 0.72 (August) to 0.89 (November), the prevailing coverage from 0.80 (July) to 0.89
+(November).
 
 ![Share of observed power inside the q05 to q95 band, by month](coverage_by_month.svg)
 
@@ -173,8 +174,8 @@ days 10 to 14 is read from the generator, not checked against observed events (s
 
 ## Method
 
-- **Base neural network:** the Candidate (arm `P7+D50`: neighbour power summaries, 50% signal dropout, no
-  explicit gate) of [experiment
+- **Base neural network:** the Candidate (arm `P7+D50`: neighbour power summaries, 50% signal
+  dropout, no explicit gate) of [experiment
   612](../00612-nra-combined-networks-three-class-roster-completion/result.md) and [experiment
   613](../00613-nra-roster-contrasts-with-intervals-five-seeds/result.md), as set up by [experiment
   610](../00610-nra-neighbour-summary-lag-encoder-inputs-iteration/result.md), [experiment
@@ -252,9 +253,9 @@ days 10 to 14 is read from the generator, not checked against observed events (s
   days, so hazards for days 11 to 14 are not estimated from observed events.
 - **The prevailing output has no floor at zero for MVA-only series.** Series 26, 14, and 15
   produce more negative `q01` rows than the NRA output (the lowest prevailing `q01` is -2.26 MVA at
-  series 26, against -1.21 for NRA). Neither arm is clamped.
-- **Series 12 exports power** (observed power runs from -0.92 MW to 1.28 MW, against a capacity of 3.0 MW), so
-  its CRPS (13.0 to 13.6 points) is about three times the pooled value and adds about 0.6 points to
+  series 26, against -1.21 for NRA). Neither output is clamped.
+- **Series 12 exports power** (observed power runs from -0.92 MW to 1.28 MW, against a capacity of
+  3.0 MW), so its CRPS (13.0 to 13.6 points) is about three times the pooled value and adds about 0.6 points to
   it.
 - **The prevailing output loses to the NRA output at series 14 and 26** (CRPS 7.16 against 6.90 at
   series 14, 7.41 against 7.37 at series 26), and its median at series 26 differs from the NRA
