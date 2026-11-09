@@ -775,12 +775,20 @@ YEAR_END_IDX: Final = int(
 """Events are clipped at the end of the backtest year, not at 2026-07-01 as in experiment 650."""
 
 
+def generator_view(*, clean: np.ndarray, month: str) -> np.ndarray:
+    """Return `clean` with every half-hour from the next month's start hidden (as `p667_data.generator_view`)."""
+    y, m = (int(v) for v in month.split("-"))
+    out = clean.copy()
+    out[:, c650.month_start_idx(month=f"{y + (m == 12)}-{m % 12 + 1:02d}") :] = np.nan
+    return out
+
+
 def contaminate_year(*, clean: np.ndarray, month: str, r: int) -> tuple[np.ndarray, np.ndarray]:
     """Return (`clean` plus pass `r`'s own shifts, that plus the receivers' mirrored shifts)."""
     nb_of, cap, is_mw = c650.world()
     ms = c650.month_start_idx(month=month)
     own, mirror, _events = gen650.build(
-        clean=clean,
+        clean=generator_view(clean=clean, month=month),
         month_idx=ms,
         month_start_idx=ms,
         r=r,

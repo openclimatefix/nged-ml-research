@@ -23,6 +23,10 @@ import polars as pl
 
 FITS: Final = dat.ROOT / "prevailing" / "fits"
 SEEDS: Final = x667.SEEDS
+MONTHS: Final = (
+    "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04",
+    "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10",
+)  # fmt: skip
 
 
 def head_quantiles(*, month: str) -> tuple[np.ndarray, str]:
@@ -64,6 +68,7 @@ def main() -> None:
     out.mkdir(exist_ok=True)
     for month in sys.argv[1:]:
         frame, method = prevailing_month(month=month)
+        earlier = [m for m in MONTHS if m < month]
         tmp = out / f"prevailing_{month}.parquet.tmp"
         frame.write_parquet(tmp)
         tmp.rename(out / f"prevailing_{month}.parquet")
@@ -79,10 +84,22 @@ def main() -> None:
         folds = out / "prevailing_folds.csv"
         lines = [
             ln
-            for ln in (folds.read_text().splitlines() if folds.exists() else ["month,method"])
+            for ln in (
+                folds.read_text().splitlines()
+                if folds.exists()
+                else ["month,method,earlier_banks,trained_on"]
+            )
             if not ln.startswith(month)
         ]
-        folds.write_text("\n".join([*lines, f"{month},{method}"]) + "\n")
+        folds.write_text(
+            "\n".join(
+                [
+                    *lines,
+                    f"{month},{method},{len(earlier)},{' '.join(earlier) if method == 'Rhaz' else 'none'}",
+                ]
+            )
+            + "\n"
+        )
 
 
 if __name__ == "__main__":

@@ -47,6 +47,24 @@ YEAR_END_IDX: Final[int] = int(
 """Events are clipped at the end of the backtest year."""
 
 
+def next_month_start_idx(*, month: str) -> int:
+    """Return the grid index of the first half-hour of the month after `month`, the earliest fold that may use this month's bank."""
+    y, m = (int(v) for v in month.split("-"))
+    return c650.month_start_idx(month=f"{y + (m == 12)}-{m % 12 + 1:02d}")
+
+
+def generator_view(*, clean: np.ndarray, month: str) -> np.ndarray:
+    """Return `clean` with every half-hour from the next month's start hidden, for the generator's means.
+
+    A proportional shift scales the Primary's own power by its mean over the event. Hiding the later
+    half-hours stops that mean reading observed power at or after the first fold that may use this
+    month's bank.
+    """
+    out = clean.copy()
+    out[:, next_month_start_idx(month=month) :] = np.nan
+    return out
+
+
 def prim_of() -> dict[int, int]:
     sm = k578.sites()
     return dict(zip(sm["time_series_id"].to_list(), sm["primary"].to_list(), strict=True))
@@ -126,7 +144,7 @@ def build_bank(*, month: str, clean: np.ndarray, table, nb, n_days: int) -> None
     for r in PASSES:
         z = seed_mean_rows(directory=inj, pattern=f"{month}_r{r:02d}_d0_s{{s}}.parquet")
         own, mirror, events = gen.build(
-            clean=clean, month_idx=ms, month_start_idx=ms, r=r, nb_of=nb_of, capacity=cap,
+            clean=generator_view(clean=clean, month=month), month_idx=ms, month_start_idx=ms, r=r, nb_of=nb_of, capacity=cap,
             is_mw=is_mw, window_end_idx=YEAR_END_IDX,
         )  # fmt: skip
         events_rows += [e.row() for e in events]
