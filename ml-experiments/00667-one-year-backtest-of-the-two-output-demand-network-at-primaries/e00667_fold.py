@@ -74,7 +74,9 @@ def redirect_to_extended_inputs(e) -> None:
                 pl.scan_parquet(summary).select(pl.col("power_fcst_init_time").unique()).collect()
             )
             assert origin.height == 1, summary
-            origin.with_columns(nwp_init_time=pl.lit(run)).write_parquet(stub)
+            tmp = stub.with_suffix(f".{os.getpid()}.tmp")
+            origin.with_columns(nwp_init_time=pl.lit(run)).write_parquet(tmp)
+            tmp.rename(stub)
         return stub
 
     e.common.demand_frame_path = demand_frame_path

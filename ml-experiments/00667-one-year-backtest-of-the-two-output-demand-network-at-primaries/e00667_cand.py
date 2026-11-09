@@ -365,11 +365,23 @@ def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> Non
         if CROSSFIT:
             q_mr = cross_fit_quantiles(mr=mr, month=month, seed=seed, q_full=q_mr, device=device)
         n_grid = GRID_SHAPE[1]
+        # The table also holds the previous month's rows (origins before the cutoff), as the train phase's
+        # table does: without them the days before the cutoff, purged from training, have no lag-free forecast.
+        ref_prim, ref_origin, ref_target, ref_median = (np.empty(0, np.int64),) * 3 + (np.empty(0, np.float32),)
+        if fold.PHASE == "predict":
+            e.CHECK["months"].setdefault(fold.PREVIOUS_MONTH, {})
+            ref = e.build_test(month=fold.PREVIOUS_MONTH, standardiser=mr.base.standardiser)
+            q_ref = s598.masked_quantiles(
+                model=model, x=ref.x, primary=ref.primary, target_mean=mr.base.target_mean,
+                target_std=mr.base.target_std, device=device,
+            )  # fmt: skip
+            ref_prim, ref_origin, ref_target = ref.primary, ref.origin_idx, ref.target_idx
+            ref_median = q_ref[:, 1]
         table = s598.build_lag_free_table(
-            prim=np.concatenate([mr.primary, test.primary]),
-            origin_idx=np.concatenate([origin_idx_of(origin_us=mr.origin_us), test.origin_idx]),
-            target_idx=np.concatenate([mr.target_idx, test.target_idx]),
-            median=np.concatenate([q_mr[:, 1], q_te[:, 1]]),
+            prim=np.concatenate([mr.primary, test.primary, ref_prim]),
+            origin_idx=np.concatenate([origin_idx_of(origin_us=mr.origin_us), test.origin_idx, ref_origin]),
+            target_idx=np.concatenate([mr.target_idx, test.target_idx, ref_target]),
+            median=np.concatenate([q_mr[:, 1], q_te[:, 1], ref_median]),
             n_primaries=len(mr.base.target_mean), n_grid=n_grid,
         )  # fmt: skip
         filled = table.check_no_lookahead()
@@ -674,9 +686,11 @@ def check_fingerprint(*, mr, month: str) -> None:
     path = e.WORK / f"standardiser_{month}.sha256"
     if fold.PHASE == "predict":
         assert path.exists() and path.read_text() == h.hexdigest(), "standardiser differs from the train phase"
-    else:
+    elif not path.exists():  # a rerun of the train phase never rewrites it
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(h.hexdigest())
+    else:
+        assert path.read_text() == h.hexdigest(), "standardiser changed between two train-phase runs"
 
 
 def run_fit(*, device: str = "cuda") -> None:
@@ -731,7 +745,7 @@ def run_fit(*, device: str = "cuda") -> None:
                 log["seconds"] = round(e.time.monotonic() - started, 2)
                 log["signal_report"] = fs.report if fs is not None else {}
                 e.c.write_json(
-                    obj=log, path=e.W / "logs" / e.SPEC.tag / f"{month}_d{day}_s{seed}.json"
+                    obj=log, path=e.W / "logs" / e.SPEC.tag / f"{month}_d{day}_s{seed}_{fold.PHASE}.json"
                 )
                 print(
                     f"{ARM} {log['name']}: {log.get('epochs', 'reused')} epochs, {log['seconds']} s",
@@ -741,7 +755,7 @@ def run_fit(*, device: str = "cuda") -> None:
         del g, mr, test
         FOLD.clear()
         torch.cuda.empty_cache()
-    out = e.WORK / f"checks_fit_{DIR}_s{'-'.join(map(str, e.ARGS.seeds))}.json"
+    out = e.WORK / f"checks_fit_{DIR}_s{'-'.join(map(str, e.ARGS.seeds))}_{fold.PHASE}.json"
     out.write_text(json.dumps(e.CHECK, indent=1, default=str))
     print("CHECKS PASSED", {a: v for a, v in e.CHECK.items() if a != "months"})
 
