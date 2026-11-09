@@ -46,17 +46,17 @@ def fig_a1() -> None:
         band = (
             alt.Chart(pl.DataFrame({"lo": [0.9], "hi": [1.1]}))
             .mark_rect(opacity=0.15, color=theme.DATA_GREEN)
-            .encode(y="lo:Q", y2="hi:Q")
+            .encode(y="lo:Q", y2="hi:Q")  # ty: ignore[unresolved-attribute]
         )
         ref = (
             alt.Chart(pl.DataFrame({"y": [1.0]}))
             .mark_rule(strokeDash=[5, 3], color=theme.BLACK_2)
-            .encode(y="y:Q")
+            .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
         )
         pts = (
             alt.Chart(sub)
             .mark_point(filled=True, size=70, aria=False)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("lab:N", sort=order, title=None, axis=alt.Axis(labelAngle=-45)),
                 y=alt.Y(
                     "ratio:Q",
@@ -166,7 +166,7 @@ def fig_curves(p2: dict) -> None:
         strokeWidth=2, aria=False
     )
     chart = (
-        (pts + lines)
+        (pts + lines)  # ty: ignore[unsupported-operator]
         .properties(width=190, height=150)
         .facet(facet=alt.Facet("site:N", sort=list(SITES), title=None), columns=3)
         .properties(
