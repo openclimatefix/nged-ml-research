@@ -119,10 +119,12 @@ lessons: >-
   The recurrent graph neural network trained on 120 injected worlds did not learn which neighbour
   received a transfer from the 6-hour residuals of 15 Primaries: its link head pairs at most the
   cases that the real graph's 25 links make obvious, and the network calls almost no transfers on
-  the real record. The donor is no easier to find with the graph than without it (G finds +0.02 more donor megawatts than the no-link arm in the long and deep cell, interval -0.18 to +0.25; its all-event found share is +0.06 higher, interval -0.03 to +0.15). Adding the explicit
-  solar term left paired share unchanged and moved found share by +0.02 and +0.01, inside wide
-  intervals, as experiment 657 found inside E1. In the long and deep cell, a wider decoder grid
-  moved the paired share only from 0.08 to 0.10.
+  the real record. The donor is no easier to find with the graph than without it (G finds +0.02
+  more donor megawatts than the no-link arm in the long and deep cell, interval -0.18 to +0.25; its
+  all-event found share is +0.06 higher, interval -0.03 to +0.15). Adding the explicit solar term
+  left paired share unchanged and moved found share by +0.02 and +0.01, inside wide intervals, as
+  experiment 657 found inside E1. In the long and deep cell, a wider decoder grid moved the paired
+  share only from 0.08 to 0.10.
 take_home_message: >-
   A graph neural network trained on injected transfers pairs the two ends of a transfer far less
   often than the search of experiment 670 (0.08 against 0.29 of megawatts in the longest and
@@ -372,4 +374,3 @@ reading.
 A Sonnet plan review and a Sonnet code review ran before the first fit and are triaged in the pull
 request. A Sonnet write-up review and a Sonnet prose review ran on the finished page and are triaged
 in the pull request.
-
