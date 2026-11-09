@@ -71,6 +71,8 @@ a learned detector for the end of a shift, does better than that frozen K1 plus 
 
 ## Updates to the brief after reading the merged pages
 
+- The maintainer approved opening the final-test window once for this candidate set on 2026-11-09
+  (the brief records it). The freeze-first rule and the message to the manager still apply.
 - Experiments 647, 650, and 652 are merged; the reference E0 is experiment 652's R-haz and its
   stored fits. The newest merged experiment, 651, does not change the design.
 - The brief asks that the final-test window (2026-07-01 to 2026-10-31) be opened once. The
@@ -87,8 +89,10 @@ by a daily fine-tune (d0 and d14 cut-offs), stored as `.pt` files under
 replacing the lag block of the stored input matrix and running the saved networks. Retraining the
 whole chain on injected shifts would repeat experiments 559, 574, 591, 612, and 613, which is not
 affordable. The plan therefore **starts each end-to-end arm from the saved K1 weights of the fold and
-seed, and fine-tunes jointly on a stored bank of input matrices with injected lags**, as one extra
-stage. Everything before that stage is K1 as stored. The cost is that the end-to-end arm differs from
+seed, and fine-tunes jointly on input matrices with injected lags**, as one extra stage. Nothing stores
+those matrices: experiment 591's `run_inject` rebuilds them per month (`_build_month_p5`,
+`build_test`) and overwrites the lag block with the injected power, so this experiment adds a cache
+of them on disk, built with the fold month's standardiser. Everything before that stage is K1 as stored. The cost is that the end-to-end arm differs from
 a network trained from scratch with the prevailing loss; the page says so.
 
 ## Arms (matched rows, epochs, seeds, folds: leave one development month out, 2 seeds)
@@ -131,6 +135,68 @@ plus the strata "event-free and more than 14 days from any event" and "ended in 
 The final test freezes candidates in a file before the window is read, then scores E0, the best
 end-to-end arm, and the manual heuristic once, in the four scenarios of the brief, with counts of
 real events per scenario stated as lower bounds.
+
+## Fold structure and leakage
+
+- K1's weights are keyed by (held-out month, daily cut, seed). The joint fine-tune uses the other
+  four development months for training and early stopping (origin days 0 to 17 train, 21 and later
+  validate, as in experiment 650); the scored month's bank passes and rows never enter either.
+  Fine-tuning from fold-month weights on later months is accepted, as in experiment 652's heads,
+  and the page states it.
+- K1's own daily fit uses month-m rows before its cut. The joint fine-tune trains on no month-m
+  row, so no row has a valid time at or after an origin it was trained under.
+- Equal-width scaling is pooled across strata, one factor per arm, month, and seed, as in 652.
+- The end detector's "observed minus NRA forecast" for past half-hours comes from the NRA forecast
+  issued at an earlier origin for that half-hour (a frozen K1 output), never from the network
+  scoring its own training rows. Whether the freshest half-hours exist at the origin in production
+  is stated on the page; the detector's gain is a ceiling if they do not.
+- Detector training rows contain the hard negatives (D8-style routine steps, pulses under 3 hours,
+  ramps, placebo pairs, common-mode perturbations) at 30% of injected rows, and detection is
+  reported separately on them.
+- Mirrored receiver shifts are not in K1's inputs, as in experiments 647 and 650.
+
+## Staging and the fit count
+
+The full design is about 5 months x 2 cuts x 2 seeds x 7 arms, roughly 140 joint fits. Stage 1
+fits E2 and E2d only, at the d0 cut, one seed, on 2025-10 and 2025-12, and times them; the
+head-only end detector is first fitted on the frozen body, as in experiment 652. Stage 2 adds E1
+(both variants), the second seed, and the other months if E2 minus E0 passes the feasibility gate:
+**E2 is no worse than E0 by more than 0.1 points and the veto bound holds on both months.** The
+placebo runs only if E2d shows an effect. The d14 cut is added only if d0 results are not
+cut-dependent in the stage 1 timing check. The manager is told the staging; the GPU-hour
+estimate is restated from the timed fold against the fit count before 8 hours are crossed.
+
+## Added controls and selection rules
+
+- **Matched-compute control C0:** K1 fine-tuned the same way and for the same epochs with only the
+  NRA loss and no prevailing head, so that E2 minus E0 is not read as a gain from extra epochs.
+  E2 minus E1 is the clean read on dropping the gate; the neighbour-summary inputs are new to the
+  pretrained body, and the page says so.
+- **Second contrast bar:** E2d minus E2 counts as a gain in a stratum when its month-block 95%
+  interval excludes zero and the point estimate is below -0.3 points there; elsewhere it is
+  descriptive.
+- **Best end-to-end arm for the final test:** the arm with the lowest pooled in-force scaled CRPS on
+  development months among those that clear the veto, fixed before the window is read.
+- The NRA prediction (within 0.03 of K1) is tested as the veto's interval bound, not as a point
+  estimate.
+
+## Deliverables
+
+- Figures (at most two panels each): headline loss by lead day and stratum; the time series of
+  observed power, K1, the NRA output, and the prevailing output from 14 days before to 7 days after
+  the verified D5/D16 pair and a few injected events; survival reliability on training-family and
+  held-out durations; the end-detector figure (delay by depth, false alarms); the Step 0 edge-width
+  figure; the four final-test scenario plots; day-ahead and 14-day example forecasts.
+- Sensitivity: short-heavy and long-heavy duration mixtures, with the sign of the primary contrast
+  under each; results by shape; the in-event level drift on a share of events; the staged-return arm
+  unless Step 0 finds pure steps.
+- Release candidate: one parquet per arm under
+  `data/ml-experiments/00654-*/release_candidate/` with the brief's columns, and a plain-words
+  README in that folder.
+- The Method section lists K1's body widths, read from experiments 545, 560, 591, and 612. The
+  manual-heuristic forecasts for the final-test origins are looked up first and computed if absent.
+- One line to the manager at: plan PR open, fits started, fits finished, final-test scored, PR
+  merged.
 
 ## Compute and process
 
