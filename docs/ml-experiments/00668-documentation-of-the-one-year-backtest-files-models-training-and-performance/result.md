@@ -318,6 +318,22 @@ experiment 666.
 
 To be added when `solar.parquet` is written.
 
+## Comparison baselines and Primaries slices
+
+This section is written last. It will hold two items.
+
+- **Baselines beside every model.** The manual heuristic and climatology for the demand files, and
+  climatology for wind and solar (the manual heuristic only where one exists for the technology).
+  Both are computed from the production baseline code for the same origins and valid times, and
+  are not written into the Parquet files. The heuristic uses only lags old enough for each lead
+  plus the 6-hour delay, or its fallback, and the section says how the 1-week lag is handled at long
+  leads.
+- **Four Primaries slices.** All rows; inside long and deep load-shift events (longer than 7 days
+  and 8 noise units or more, the definition of experiment 665); the 7 days after such an event
+  ends; and rows with no long and deep event and at least 7 days after one ended. The section gives
+  the rows and events per slice first, names the event source, says where a slice is too small,
+  and gives each slice a metrics table and at least one example time-series figure.
+
 ## Caveats
 
 - **A descriptive year, not a ranking.** The year overlaps the development months and the
