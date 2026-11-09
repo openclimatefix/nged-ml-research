@@ -6,8 +6,9 @@ spread, and survival are kept), `E0d` (plus the end detector on the real neighbo
 `E0d_rw0` to `E0d_rw2` (rewired graphs), and `E0d_noneigh` (neighbour inputs zeroed). The detector
 is a two-layer network with 64 units whose output `q_end` multiplies the survival: `p = p_haz * (1 -
 q_end)`. The loss is experiment 652's (weighted pinball of the mixture quantiles plus 0.05 times the
-survival cross-entropy on in-force rows) plus `LAMBDA_END` times the cross-entropy of `q_end` against "the shift has ended" on in-force and just-ended origins of the bank. Hard negatives enter the detector inputs of 30% of the
-training and early-stopping origins. The scored month's rows never enter training.
+survival cross-entropy on in-force rows) plus `LAMBDA_END` times the cross-entropy of `q_end`
+against "the shift has ended" on in-force and just-ended origins of the bank. Hard negatives enter
+the detector inputs of 30% of the training and early-stopping origins. The scored month's rows never enter training.
 
 Output `fits_e0/<arm>_<month>_s<seed>.npz`: per set (`real`, `held`, `fam`) the row index, the
 prevailing quantiles, the final survival, the head's depth and spread, the base survival, and `q_end`.

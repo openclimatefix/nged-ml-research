@@ -1,5 +1,7 @@
 # ruff: noqa: D103, E501, PLR0912, PLR0915, ANN001, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
-"""Experiment 663: score the frozen candidates (the experiment 654 arm J2 is read from its stored forecasts) on the final-test window, once (CPU).
+"""Experiment 663: score the frozen candidates on the final-test window, once (CPU).
+
+The experiment 654 arm J2 is read from its stored forecasts.
 
 Reads the frozen forecasts of `final/forecasts/<arm>_s<seed>.parquet` (seed-mean of the
 quantiles), the experiment 620 export of K1 for the 2026-07 fold (row keys, observed power, event
