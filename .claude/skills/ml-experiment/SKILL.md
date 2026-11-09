@@ -1,22 +1,20 @@
----
-name: ml-experiment
-description: >-
-  How to run a small, focused ML experiment that tests one hypothesis about improving the
-  Flexpectation production forecast, and keep its result where a later experiment can find it, as a
-  `result.md` of about a screen plus its Method and Files sections, and an immutable set of predictions. Load before planning, running, or
-  writing up an experiment under `ml-experiments/`, before adopting a change into a family's research
-  default, and before an overnight session. A question that
-  needs a long report, several scientific questions, or a new dataset as its main subject is a
-  study; use the `study` skill for it.
+--- name: ml-experiment description: >- How to run a small, focused ML experiment that tests one
+hypothesis about improving the Flexpectation production forecast, and keep its result where a later
+experiment can find it, as a `result.md` of about a screen plus its Method and Files sections, and
+an immutable set of predictions. Load before planning, running, or writing up an experiment under
+`ml-experiments/`, before adopting a change into a family's research default, and before an
+overnight session. A question that needs a long report, several scientific questions, or a new
+dataset as its main subject is a study; use the `study` skill for it.
 ---
 
 # Running an ml-experiment
 
 An ml-experiment tests **one hypothesis**, such as "adding ERA5 pre-training lowers the PV
 forecast's CRPS", and ends in a verdict: supported, refuted, or inconclusive. The write-up is about
-a screen long, plus a Method section and a Files section. An experiment is free to use its own metric or its own probabilistic output, so it
-often cannot post to the leaderboard. A **study** is the other kind of work: a long report that
-answers several scientific questions, often on a new dataset, run with the `study` skill.
+a screen long, plus a Method section and a Files section. An experiment is free to use its own
+metric or its own probabilistic output, so it often cannot post to the leaderboard. A **study** is
+the other kind of work: a long report that answers several scientific questions, often on a new
+dataset, run with the `study` skill.
 
 **"Experiment" means only an ml-experiment.** A pass of the production pipeline over the
 cross-validation folds is a cross-validation run, which the production repository
@@ -424,7 +422,8 @@ actual component, number, or product, and says what each number counts.
   schedule, and the GPU hours spent.
 - **Measurement:** the scoring months or folds, which rows are scored and why, the metrics and the
   truth each is scored against, the baselines, how the intervals are computed, the decision rule and
-  vetoes, the leads covered, and the audit checks (the results of the audit checks go in the "Checks" list).
+  vetoes, the leads covered, and the audit checks (the results of the audit checks go in the
+  "Checks" list).
 
 Write the Method bullets for the arm that carries the headline, then list only the differences for
 the other arms. The order of a `result.md` is: the opening sentences, the verdict, the figures, the
@@ -434,16 +433,17 @@ the other arms. The order of a `result.md` is: the opening sentences, the verdic
 measurement, but it must still describe each one in full.** For example, "this experiment uses the
 same architecture as [experiment 650](../00650-slug/result.md)" is allowed only when the sentence
 links the write-up of that experiment and the Method section then lists the architecture, in the
-same bullets as any other architecture (replace `00650-slug` with the real folder name). Each page has to be readable
-on its own, so a link alone never replaces the description. The same holds for the training regime
-and the measurement.
+same bullets as any other architecture (replace `00650-slug` with the real folder name). Each page
+has to be readable on its own, so a link alone never replaces the description. The same holds for
+the training regime and the measurement.
 
 **End every `result.md` with a "Files" section that describes the Python files and the data files
-the experiment used.** Write the Files section as bullets, one per file or folder. For each Python file, say what
-it does and which step of the experiment it runs. For each data file or folder, say what it holds
-(the columns or the arrays that matter), whether the experiment read it or wrote it, and where it
-lives. Name files that an earlier experiment produced and link that experiment's write-up. Write the
-paths of files under `data/` as paths, not as links, because the data folder is never committed.
+the experiment used.** Write the Files section as bullets, one per file or folder. For each Python
+file, say what it does and which step of the experiment it runs. For each data file or folder, say
+what it holds (the columns or the arrays that matter), whether the experiment read it or wrote it,
+and where it lives. Name files that an earlier experiment produced and link that experiment's
+write-up. Write the paths of files under `data/` as paths, not as links, because the data folder is
+never committed.
 
 **Cite the work an experiment builds on, generously, in the plan and in `result.md`.** Whenever an
 arm, a method, a metric, or a design choice comes from someone else's paper, software, or
@@ -455,12 +455,12 @@ model, says so in its opening sentences, so a reader never mistakes the idea for
 doubt, cite.
 
 **Keep the rest of `result.md`, apart from the "Method" and "Files" sections, to about a screen:**
-the verdict in one sentence, the winner with its interval, each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and
-the lessons for later experiments, which also become `advice`. **A published page never names a
-generator, gives its identifier, or shows its time series beside either.** Use the anonymised labels
-the `study` skill describes. Print every number the page quotes from a committed script, as the
-`study` skill requires. An experiment that plots feature importance follows the recipe in the
-`study` skill's "Design rules that keep a comparison fair".
+the verdict in one sentence, the winner with its interval, each arm's absolute score, 2 to 4 figures
+(load the `dataviz` skill), the failures, and the lessons for later experiments, which also become
+`advice`. **A published page never names a generator, gives its identifier, or shows its time series
+beside either.** Use the anonymised labels the `study` skill describes. Print every number the page
+quotes from a committed script, as the `study` skill requires. An experiment that plots feature
+importance follows the recipe in the `study` skill's "Design rules that keep a comparison fair".
 
 ## Running a night's experiments
 
