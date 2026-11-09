@@ -351,6 +351,21 @@ experiment 666.
 
 To be added when `solar.parquet` is written.
 
+## Performance by season
+
+This section is written with the per-file performance, and holds one analysis for every forecast
+type (Primaries, BSPs, GSPs, wind, solar). The seasons are the four meteorological seasons: winter
+(December to February), spring (March to May), summer (June to August), and autumn (September to
+November). The backtest year runs from 2025-11 to 2026-10, so autumn is split across its two ends,
+and the section also reports by calendar month. For each type and season the tables give the
+normalised mean absolute error of the median and the CRPS of the model, the manual heuristic where
+one exists, and climatology, with the gain over the manual heuristic and over climatology as a
+percentage and a day-block bootstrap interval. Each type has a figure of the normalised error by
+season for the three arms, with a y-axis that does not start at zero. The demand types add the
+split by lead band (days 0 to 1, 1 to 3, 3 to 7, and 7 to 14) within each season. The section says
+what the tables show and asserts no cause that the numbers do not support. Generator series carry
+season labels and no calendar dates.
+
 ## Comparison baselines, slices, and summary figures
 
 This section is written last. It will hold five items.
