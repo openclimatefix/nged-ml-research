@@ -1,11 +1,12 @@
 # ruff: noqa: E501, D103
-"""Experiment 669: compare 633's stored 24-hour-lag forecasts with the 3.5-hour-lag forecasts of this experiment.
+"""Experiment 669: compare 633's 24-hour-lag forecasts with this experiment's 3.5-hour-lag forecasts.
 
-Both are scored on the same rows (July to October 2026 origins, valid times 12:00 to 72 hours later), CPU.
-
+Both are scored on the same rows (July to October 2026 origins, valid times 12:00 to 72 hours
+later), CPU.
 
 Experiment 633's forecasts are shares of capacity at its 09:00 origin (leads to 240 h); this
-experiment's file is in MW at the relabelled 12:00 origin. Rows are matched on series, origin day, and valid time.
+experiment's file is in MW at the relabelled 12:00 origin. Rows are matched on series, origin day,
+and valid time.
 
 Usage: python e00669_compare633.py OUT_CSV
 """

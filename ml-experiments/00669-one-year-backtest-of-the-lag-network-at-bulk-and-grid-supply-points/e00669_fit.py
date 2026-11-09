@@ -1,4 +1,4 @@
-# ruff: noqa: E402, E501, PT018, D103, D205
+# ruff: noqa: E402, PT018, D103, D205
 """Experiment 669: the lag-enabled demand network with thermal-lag columns at the 4 BSP/GSP series,
 one monthly fold at a time, with a lag cut of 3.5 hours before the network's 09:00 origin (GPU).
 
@@ -7,7 +7,8 @@ changes: the lag cap is experiment 572's `3.5h` (7 half-hours, so the newest pow
 05:30 reading on the origin day, 6.5 hours before the contract's 12:00 origin), the fold is any of
 the 12 months of the year (`e00669_fold`), and the forecast keeps leads to 351 hours.
 
-Usage: python e00669_fit.py {pretrain-wt|step2|fit|assemble} --group {bsp|gsp} --months 2025-11 ... [--seeds 0 1]
+Usage: python e00669_fit.py {pretrain-wt|step2|fit|assemble} --group {bsp|gsp}
+    --months 2025-11 ... [--seeds 0 1]
 """
 
 import argparse
