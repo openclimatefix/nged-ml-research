@@ -13,11 +13,12 @@ size: >-
   and import experiments 397, 405, 409, 428, 448, 510, 554, and 621 and edit none of them. Asset
   graph: not touched. About 1.4 GPU-hours (ceiling 2) and 8 wall-clock hours.
 hypothesis: >-
-  The donor-day probe of experiment 621, with its linear regression replaced by a fold model,
-  reads the capacity of unmetered solar at the eight Primaries metered in megavolt-amperes.
-  Experiment 656 could not settle this, because its bar A1 compared two injection levels, its fold
-  fit started too low to reach a 6-times farm, and its intervals ignored the variation between
-  trained networks. This experiment repeats the test with those three faults removed.
+  The donor-day probe of experiment 621, with its linear regression replaced by a fold model, reads
+  the capacity of unmetered solar at the eight Primaries metered in megavolt-amperes. Experiment 656
+  could not settle whether the probe reads capacity through the fold, because its bar A1 compared
+  two injection levels, its fold fit started too low to reach a 6-times farm, and its intervals
+  ignored the variation between trained networks. This experiment repeats the test with those three
+  faults removed.
 prediction: >-
   Fixed before any recovery is read. Matched-level bar A1 passes at 0.5, 1, and 2 times, because
   experiment 656 found the linear probe's recovery close to level-free in the signed world (0.76
@@ -52,16 +53,17 @@ best_arm: >-
   The fold model with a night prior (FA): 0.73 to 0.90 of an injected fleet's megawatts at 0.5 to 6
   times the midday reading, against -0.12 at 2 times and -0.81 at 6 times for the linear probe.
 headline: >-
-  6 of 12 pre-registered bars passed at 2026-06, and the matched-level bar A1 failed, so 2026-03 ran
-  only the four uninjected networks. FA recovery is 0.73, 0.73, 0.80, and 0.89 at 0.5, 1, 2, and 6
-  times, and the fit ends on a bound in 0% of fits. Interval coverage rose from 0.18 to 0.36.
+  Six of 12 pre-registered bars passed at 2026-06, and the matched-level bar A1 failed, so 2026-03
+  ran only its 12 uninjected neural networks. FA recovery is 0.73, 0.73, 0.80, and 0.89 at 0.5, 1,
+  2, and 6 times, and the fit ends on a bound in 0% of fits. Interval coverage in bar A5 is 0.36
+  (experiment 656: 0.18).
 lessons:
   - >-
     The five fold-fit starting capacities (0.25 to 8 times the midday reading) fix the 6-times
     failure of experiment 656: FA reads 0.89 there, and 0% of FA fits end on a bound.
   - >-
     A fold model fitted to a signed target that never folds invents a fold: its recovery falls from
-    0.81 to -0.04 with level, so it is not a fair denominator for a fold-loss ratio.
+    0.81 to -0.04 with level, so the fold model is not a fair denominator for a fold-loss ratio.
   - >-
     D5 and D10, whose midday readings are about 1 MW, sit past the fold in every injected world
     under a 2.0 MW floor, and removing them flips A4, B5, and B6.
@@ -93,23 +95,26 @@ advice:
     cutoffs (the real-data table).
 ---
 
-# Can the solar-capacity probe read through the apparent-power fold, with a fair test?
+# Can a probe read the capacity of unmetered solar at substations that report apparent power?
 
-**The run is partly supported: a fold model reads 0.7 to 0.9 of an added solar fleet at every
-level, where the linear probes fail from 2 times upward, but the pre-registered gate failed and two
-Primaries, D5 and D10, decide several bars.** At 2026-06, 6 of 12 bars passed, and the matched-level
-bar A1 failed, so only the four uninjected networks ran at 2026-03. The fold fit now ends on a bound
-in 0% of fits, which removes the fault that sank experiment 656's 6-times worlds.
+**The hypothesis is partly supported: a fold model reads 0.7 to 0.9 of an added solar fleet at
+every level tested, and the linear probes fail from 2 times upward.** The pre-registered gate
+failed, and two Primaries, D5 and D10, decide several bars. Six of the 12 pre-registered bars passed
+at the 2026-06 cutoff. The matched-level bar A1 failed, so only the 12 uninjected neural networks
+(four conditions) ran at the 2026-03 cutoff. The fold fit now ends on a bound in 0% of fits, which
+removes the fault that sank experiment 656's 6-times worlds.
 
 We asked whether the unmetered solar capacity behind a substation can be read when the meter reports
 apparent power (megavolt-amperes, which never goes negative) rather than signed megawatts. Six
 Primary substations report signed megawatts. We converted their flow to synthetic apparent power,
 added a solar fleet of known size, and trained a neural network on the result. The probe holds the
-calendar inputs of that neural network fixed, feeds it the weather of other days, and regresses its
-output on a solar-output curve. The slope is the capacity it reads, in megawatts of alternating
+calendar inputs of the neural network fixed, feeds the neural network the weather of other days,
+and regresses the neural network's output on a solar-output curve. The slope is the capacity the
+probe reads, in megawatts of alternating
 current (AC). We compare the capacity read from a network trained with the fleet against its twin
-trained without it. This page covers 130 networks at 2026-06 (26 conditions, 5 seeds each) and 12
-uninjected twins at 2026-03.
+trained without it. This page covers 130 neural networks at the 2026-06 cutoff (26 conditions of 5
+seeds each, a condition being one world: a reactive-power arm, a kind of injection, and a level) and
+12 uninjected neural networks at the 2026-03 cutoff.
 
 **Terms used below.**
 
@@ -121,24 +126,24 @@ uninjected twins at 2026-03.
   linear fit reads the wrong sign.
 - **Midday reading.** A Primary's median flow over sunny half-hours from 10:00 to 15:00 UTC in April
   to August, in MW. D5's is 0.88 MW and D10's is 1.2 MW.
-- **Injection level.** The AC capacity of the added fleet is the larger of the level times the midday
-  reading and 2.0 MW. The floor makes the 0.5-, 1-, and 2-times worlds at D5 all 2.0 MW, and D10's
-  0.5- and 1-times worlds 2.0 MW.
+- **Injection level.** The AC capacity of the added fleet is the larger of the level times the
+  midday reading and 2.0 MW. The floor makes the 0.5-, 1-, and 2-times worlds at D5 all 2.0 MW, and
+  D10's 0.5- and 1-times worlds 2.0 MW.
 - **Recovery.** The capacity read from the network trained with the fleet, minus the capacity read
   from its twin, divided by the fleet's AC capacity.
 - **Probes.** L0 is the linear probe of experiment 621. L1 is L0 on rows well above the reactive
   floor. FA is the fold model with four solar-output curves and a prior on each probe cell's demand
   from the night reading. F4 is FA without the prior, and F1 is F4 with one curve.
 - **Worlds.** The PF world has reactive power 0.25 times the median real power of that half-hour of
-  the week (power factor 0.97). The signed world keeps the signed target. The floor and zero-reactive
-  worlds change the reactive power only.
+  the week (power factor 0.97). The signed world keeps the signed target. The floor and zero-
+  reactive worlds change the reactive power only.
 
 ![Recovery by injection level and probe, in the PF and signed worlds](recovery_by_level.svg)
 
 **Figure: in the upper panel the linear probes fall below zero at 2 times, and the fold model does
-not.** The signed panel shows the same farms with no fold. Linear recovery stays at 0.76 to 0.88
+not.** The signed panel shows the same farms with no fold. Linear recovery stays at 0.74 to 0.88
 there. The fold model falls from 0.81 to -0.04 as the level rises, because a model that can only
-add a fold fits a target that never folds badly (see the audit section).
+add a fold fits badly to a target that never folds (see the audit section).
 
 **At 2026-06, 6 of 12 pre-registered bars passed.** The bars are as fixed in the plan commit.
 
@@ -148,19 +153,20 @@ add a fold fits a target that never folds badly (see the audit section).
 | A2 Native worlds within ±0.12 of the six's median (0.68) at 4 of 5 | 4 of 5 (D3 at 0.82 is outside) | pass |
 | A3 Two-sided placebos under 0.25 of the real 0.5-times read | climatological 0 of 6 and 0 of 5; boxcar 4 of 6 and 5 of 5 | fail |
 | A4 Leave-one-Primary-out factor in 0.55 to 0.95, spread under 0.15 | 0.661 to 0.692 at all six | pass |
-| A5 Interval coverage at least 60% | 0.36 | fail |
+| A5 Interval coverage at least 60% (L0 at 0.5 times) | 0.36 | fail |
 | B1 FA calibrated recovery in 0.75 to 1.25 at 4 of 6 in four worlds (PF and floor, 1 and 2 times) | 3, 5, 3, and 4 of 6 | fail |
 | B2 PF 6 times: FA calibrated recovery in 0.75 to 1.25 at 4 of 6 | 5 of 6 (D5 is 0.72) | pass |
 | B3 At PF 2 times, FA's median absolute error from 1 at least 0.10 below L1's | 0.15 against 0.37 | pass |
 | B4 Sun-rising-load placebo: FA under 0.25 of the 6-times read at 5 of 6, and no crossing flags | 4 of 6; flags on 0.0% of cells | fail |
-| B5 Interval coverage at least 60% at PF 1 and 2 times | 0.50 and 0.42 | fail |
+| B5 Interval coverage at least 60% at PF 1 and 2 times (FA) | 0.50 and 0.42 | fail |
 | B6 Crossing map: balanced accuracy at least 0.80 at 1 and 2 times, false crossings at most 10% | 0.84 and 0.94; 3.1% | pass |
 | C1 Under 10% of FA fits end on a bound | 0.0% | pass |
 
 **Two changes from experiment 656 worked.** The fold fit's five starting capacities (0.25 to 8 times
 the midday reading) remove the 6-times failure: FA reads 0.89 and 0.90 there, against -0.11 in
-experiment 656. Intervals that add the between-seed spread raise coverage from 0.14 to 0.18 to 0.36
-to 0.50.
+experiment 656. Intervals that add the between-seed spread raise coverage in bar A5 to 0.36
+(experiment 656: 0.18) and in bar B5 to 0.50 and 0.42 (experiment 656: 0.17 and 0.14), still below
+the 0.60 bar.
 
 | Median recovery over the six MW Primaries | 0.5 times | 1 times | 2 times | 6 times |
 |---|---|---|---|---|
@@ -172,77 +178,88 @@ to 0.50.
 
 ## Audit of the failures
 
-An independent Sonnet audit (private file `briefs/e662_audit_brief.md` and its report) reproduced
-every bar and found these explanations. No bar is re-scored.
+**An independent Sonnet audit reproduced every bar and explained each failure below; no bar is
+re-scored.** The audit brief is `briefs/e662_audit_brief.md` in the private folder.
 
-- **A1 fails on the four Primaries that the floor does not touch as well.** At D9, D11, D14, and
-  D16 the linear probes read -0.01 to -0.18 at 2 times, so the fold itself, not only D5 and D10,
+- **A1 also fails at D9, D11, D14, and D16, where the floor does not apply.** At D9, D11, D14, and
+  D16 the linear probes read -0.01 to -0.15 at 2 times, so the fold itself, not only D5 and D10,
   breaks them. At D5 and D10 the floor injects 2.26 and 1.66 times the midday reading even at the
-  0.5-times level, so both sit past the fold at every level, and L0 reads them at -0.34 to -0.02.
+  0.5-times level. Both Primaries therefore sit past the fold at every level, and L0 reads them at
+  -0.34 to -0.02.
 - **The fold model is not a fair A1 denominator.** On the signed target, which never folds, FA sets
-  its reactive terms to zero in 100% of fits and flags crossings on 40 to 72% of cells at 2 and 6
-  times. A square-root output cannot match a target that goes negative. A1's FA ratios (2.1 to 3.8
-  at 2 times) come from this collapsed denominator.
+  at least one reactive term to zero in 59 to 74% of fits (both in 39 to 56%) and flags crossings on
+  41 to 72% of cells at the six MW Primaries at 2 and 6 times. A square-root output cannot match a
+  target that goes negative. A1's FA ratios (2.1 to 3.8 at 2 times) come from this collapsed
+  denominator.
 - **A3 fails because it is two-sided.** The linear probe reads the climatological placebo at -0.2 to
   -0.5, and experiment 656's one-sided bar would have passed it at 11 of 11 sites. FA reads it at
-  -0.05 to 0.08 except at D5 (-0.50). The placebo is sized at 2 times and compared with the
-  0.5-times read, a level mismatch in the bar. At D5 and D10 the real 0.5-times read is itself near
-  zero or negative, so the bar cannot pass there.
+  -0.05 to 0.08 except at D5 (-0.50), but several of those reads exceed 0.25 of the real FA
+  0.5-times read (D11 0.42, D16 0.33, D4 0.53), so FA would fail a one-sided bar too. The placebo is
+  sized at 2 times and compared with the 0.5-times read, a level mismatch in the bar. At D5 and D10
+  the real 0.5-times L0 read is itself near zero or negative (-0.34 and -0.03), so the bar cannot
+  pass there for L0.
 - **B4 and B5 depend on D5 and D10.** The sun-rising load reads 1.13 and 0.34 of the real read at D5
-  and D10, and 0.07 to 0.15 elsewhere. Without D5 and D10, B5 reads 0.875 at both levels. The same
-  exclusion fails A4 (only four Primaries) and B6 (balanced accuracy 0.71 at 1 time), so the
+  and D10, and 0.07 to 0.16 elsewhere. Without D5 and D10, B5 reads 0.875 at both levels. The same
+  exclusion fails A4 (only four Primaries) and B6 (balanced accuracy 0.71 at 1 times), so the
   verdicts rest on the two small-reading Primaries in both directions. B1 fails with or without
-  them, because D11 and D16 overshoot to 1.3 at 1 times.
+  them, because D11 and D16 overshoot to 1.3 and 1.4 at 1 times.
 - **Coverage is set by the seed spread alone.** The bootstrap half-width is 0.01 to 0.07 MW and the
-  seed term 0.04 to 0.71 MW. The leave-one-Primary-out factors barely differ (0.66 to 0.69), so
+  seed term 0.04 to 1.4 MW. The leave-one-Primary-out factors barely differ (0.66 to 0.69), so
   the intervals carry no uncertainty about the factor. Native Primaries are scored with the six
   Primaries' factor and miss at all five.
 - **The FA prior is stronger in the injected fit than in the twin fit.** The prior's weight scales
-  with the median within-cell spread of the probed reading, which is 0.9 to 2.4 times the twin's at
-  0.5 and 2 times and up to 12 times at 6 times, so some of FA's capacity difference is a change of
-  regularisation. We did not refit to measure it.
-- **C1 measures capacity collapse only.** The reactive terms sit at zero in 33 to 47% of PF FA fits
-  and 100% of signed FA fits, and a flag on those would not have passed.
+  with the median within-cell spread of the probed reading. The audit found that spread 0.9 to 2.4
+  times the twin's at 0.5 and 2 times and up to 12 times at 6 times (not re-checked here). Some of
+  FA's capacity difference is therefore a change of regularisation, which we did not refit to
+  measure.
+- **C1 measures capacity collapse only.** At least one reactive term sits at zero in 37 to 60% of PF
+  FA fits and 59 to 74% of signed FA fits, and a flag on fits with reactive terms at zero would not
+  have passed.
 
 ![Capacity read from worlds with no added solar farm, and the 0.5-times fleet for reference](placebos.svg)
 
-**Figure: the cloud-following load is read as solar by both probes.** The fold model reads it at 0.64
-of the real fleet's read at 2 times and the linear probe at 0.44, so neither separates solar output
-from demand that follows the clouds, as in experiment 656.
+**Figure: the cloud-following load is read as solar by both probes.** The fold model reads 0.64 of
+the load's size and the linear probe 0.44, so neither separates solar output from demand that
+follows the clouds, as in experiment 656. Against the real 2-times fleet's read, the ratios are 0.83
+for the fold model and -3.7 for the linear probe, which has the wrong sign there.
 
 ![Share of fold fits that end on a bound, by injection level](fits_on_a_bound.svg)
 
-**Figure: the only fits on a bound are one-curve fits at 6 times (5 to 13%).** Fits with the night prior
-never end on a bound.
+**Figure: in the real-farm fleets and twins, the only fits on a bound are one-curve fits at 6 times
+(about 7%).** The night-prior and four-curve fits never end on a bound there. In the sun-rising-load
+placebo, which has no solar to find, FA ends on a bound in 77% of fits, as it should.
 
 ## Real-data capacity (uninjected neural networks, both cutoffs)
 
-The calibrated columns divide the linear probe by 0.68 (bar A4's factor) and the fold model by 0.70
-(its PF 1-times factor on the six MW Primaries), so they assume power factor 0.97 and the six
-Primaries' response. The ranges are 80% intervals from the bootstrap and the seed spread.
+The calibrated columns divide the linear probe's capacity by 0.68 (bar A4's factor) and the fold
+model's capacity by 0.70 (its recovery in the power-factor (PF) world at 1 times on the six MW
+Primaries). Both calibrations therefore assume power factor 0.97 and the response of the six MW
+Primaries. The ranges are 80% intervals from the bootstrap and the seed spread.
 
 | Primary | Linear raw, 2026-06 / 2026-03 (MW) | Linear calibrated, 2026-06 (MW) | Fold model raw, 2026-06 / 2026-03 (MW) | Fold model calibrated, 2026-06 (MW) |
 |---|---|---|---|---|
-| D2 | 5.2 / 5.0 | 7.7 | 7.9 / 7.4 | 11.3 (10.4 to 12.1) |
+| D2 | 5.2 / 5.0 | 7.7 | 8.0 / 7.4 | 11.3 (10.4 to 12.1) |
 | D3 | 2.1 / 2.0 | 3.0 | 4.4 / 4.6 | 6.3 (4.0 to 8.6) |
-| D4 | 1.0 / 1.0 | 1.4 | 3.1 / 4.0 | 4.4 (1.1 to 7.7) |
+| D4 | 1.0 / 1.0 | 1.5 | 3.1 / 4.0 | 4.4 (1.1 to 7.7) |
 | D19 | 1.1 / 1.1 | 1.7 | 2.1 / 2.3 | 3.0 (2.0 to 4.1) |
 | D21 | 1.1 / 1.1 | 1.7 | 1.4 / 1.3 | 1.9 (1.3 to 2.5) |
 | D8 (report only) | 1.8 / 1.3 | 2.6 | 2.1 / 1.6 | 2.9 (2.0 to 3.9) |
 | D12 (report only) | -3.0 / -2.9 | not defined | 5.3 / 5.2 | 7.5 (7.2 to 7.8) |
 | D22 (report only) | 1.3 / 1.3 | 1.9 | 1.7 / 1.6 | 2.4 (2.3 to 2.5) |
 
-![Capacity read from the uninjected networks at fourteen Primaries, both cutoffs](capacity_at_fourteen_primaries.svg)
+![Capacity read from the uninjected networks at 14 Primaries, both cutoffs](capacity_at_fourteen_primaries.svg)
 
-**Figure: the two cutoffs' intervals overlap at all 14 Primaries, for both probes.** The fold model's
-medians differ most at D4 (3.1 and 4.0 MW), D8 (2.1 and 1.6 MW), and D2 (7.9 and 7.4 MW). D12 is the
-Primary whose linear read is negative at both cutoffs while the fold model reads +5 MW. The
-capacities are raw and uncalibrated.
+**Figure: the two cutoffs' intervals overlap at all 14 Primaries, for both probes.** The fold
+model's medians differ most at D4 (3.1 and 4.0 MW), D14 (3.9 and 3.3 MW), D2 (8.0 and 7.4 MW), and
+D8 (2.1 and 1.6 MW). D12 is the Primary whose linear read is negative at both cutoffs while the fold
+model reads +5 MW. The capacities are raw and uncalibrated.
 
 ![Where the fold model flags a crossing, at D12 and D22](crossing_map.svg)
 
-**Figure: D12 is flagged at midday in most months and D22 is not flagged.** The map passed bar B6 on
-injected worlds, which relied on D5 and D10 (see the audit section).
+**Figure: D12 is flagged at midday in all six months, April to September, and D22 is not flagged.**
+The map passed bar B6 on injected worlds, but that pass relied on D5 and D10 (see the audit
+section). On the uninjected twins, D8 and D22 are flagged on 0% of cells, so D8 does not behave as a
+folding Primary here, while D5 is flagged on 46% of cells and D4 on 19%.
 
 ## Deviations from the plan
 
@@ -251,8 +268,8 @@ injected worlds, which relied on D5 and D10 (see the audit section).
 - **2026-03.** Stop rule 2 fired when A1 failed, so only the four twins ran at that cutoff. The
   calibration at 2026-03 reuses the 2026-06 factors.
 - **B4.** Coded two-sided (the absolute read) after the code review; the plan table now states this.
-- **Boxcar placebo.** Its height stays capped at the midday reading, so at D5 and D10 it carries less
-  than the 2.0 MW floor's energy.
+- **Boxcar placebo.** The boxcar's height stays capped at the midday reading, so at D5 and D10 the
+  placebo carries less energy than the 2.0 MW fleet.
 - **Not run.** The signed-world energy conversion and the 2026-03 injected worlds.
 
 ## Caveats
@@ -268,11 +285,12 @@ injected worlds, which relied on D5 and D10 (see the audit section).
 - **Forecast checks:** the experiment scores no forecast, so the median-minus-mean and
   quantile-score checks do not apply.
 - **Audit triggers that fired:** a control failed (A1, A3), a leave-two-out flip (A4, B5, B6 with D5
-  and D10 removed), and a nested-arm result (FA on signed worlds). The audit report is in the private
-  briefs folder.
-- **Code review (Sonnet):** accepted the per-cutoff grouping in the coverage bar, the two-sided B4,
-  the 0.05 guard on A1's denominator, and the relative bound threshold. Rejected a change to the
-  boxcar cap, which stays because a load transfer cannot remove more than the load.
+  and D10 removed), and a nested-arm result (FA on signed worlds). The audit report is in the
+  private briefs folder.
+- **Code review (Sonnet):** the review accepted the per-cutoff grouping in the coverage bar, the
+  two-sided B4, the 0.05 guard on A1's denominator, and the relative bound threshold. It also
+  suggested raising the boxcar cap, which stays because a load transfer cannot remove more than the
+  load.
 - **Audit triage:** all findings are recorded above; none changes a pre-registered bar.
 
 ## What the next experiment should answer

@@ -162,7 +162,7 @@ def fig_bound(res: pl.DataFrame) -> None:
                 title="Injected capacity, as a multiple of the midday reading",
                 axis=alt.Axis(labelAngle=0),
             ),
-            y=alt.Y("share:Q", title="Share of fits on a bound", scale=alt.Scale(domain=[0, 1])),
+            y=alt.Y("share:Q", title="Share of fits on a bound", scale=alt.Scale(domain=[0, 0.2])),
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(
@@ -180,7 +180,8 @@ def fig_bound(res: pl.DataFrame) -> None:
             title=alt.TitleParams(
                 "How often the fold fit ends on a bound",
                 subtitle=[
-                    "2026-06 networks, all PF-arm real-farm fleets and twins, 11 Primaries, 5 seeds. A bound means every fold capacity is zero, or most cell levels sit at their lower limit. Target: under 10%."
+                    "2026-06 networks, PF-arm real-farm fleets and twins, 11 Primaries, 5 seeds. A bound means every fold capacity is zero,",
+                    "or most cell levels sit at their lower limit. Dashed line: the 10% target. FA and F4 bars have zero height.",
                 ],
                 anchor="start",
                 fontSize=13,
@@ -188,7 +189,12 @@ def fig_bound(res: pl.DataFrame) -> None:
             ),
         )
     )
-    chart.save(DOCS / "fits_on_a_bound.svg")
+    target = (
+        alt.Chart(pl.DataFrame({"y": [0.10]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[5, 3], strokeWidth=1.2, color=theme.BLACK_2)
+        .encode(y="y:Q")
+    )
+    (chart + target).save(DOCS / "fits_on_a_bound.svg")
 
 
 def fig_placebos(rec: pl.DataFrame) -> None:
@@ -223,7 +229,7 @@ def fig_placebos(rec: pl.DataFrame) -> None:
             y=alt.Y("case:N", sort=list(names.values()), title=None),
             x=alt.X(
                 "rec:Q",
-                title="Capacity read, as a share of the size of the added output or load",
+                title="Capacity read, as a share of the added size (2 times, 6 times for the sun-rising load, 0.5 times for the reference)",
                 scale=alt.Scale(domain=[-1, 1.2]),
             ),
             color=alt.Color(
@@ -237,7 +243,7 @@ def fig_placebos(rec: pl.DataFrame) -> None:
             title=alt.TitleParams(
                 "Capacity read from worlds with no real solar farm",
                 subtitle=[
-                    "2026-06 networks, one dot per Primary (median of 5 seeds). A placebo should read near 0; the reference row is a real fleet."
+                    "2026-06 networks, one dot per Primary (median of 5 seeds). A placebo should read near the dashed zero line; the reference row is a real fleet, not a placebo."
                 ],
                 anchor="start",
                 fontSize=13,
@@ -245,7 +251,12 @@ def fig_placebos(rec: pl.DataFrame) -> None:
             ),
         )
     )
-    chart.save(DOCS / "placebos.svg")
+    zero = (
+        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[5, 3], strokeWidth=1.2, color=theme.BLACK_2)
+        .encode(x="x:Q")
+    )
+    (chart + zero).save(DOCS / "placebos.svg")
 
 
 def real_table(res: pl.DataFrame) -> pl.DataFrame:
@@ -413,7 +424,7 @@ def fig_cross(res: pl.DataFrame) -> None:
                 legend=alt.Legend(orient="top"),
             ),
         )
-        .properties(width=W, height=170)
+        .properties(width=W, height=250)
         .facet(row=alt.Row("site:N", title=None))
         .properties(
             title=alt.TitleParams(
