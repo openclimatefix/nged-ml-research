@@ -17,6 +17,7 @@
 | 466 | Does weighting recent training rows more raise the quantile score of the wind and solar networks? | 1 | 461 | Finished (not supported); no half-life helps, line closed |
 | 473 | What makes Generators X, Y, and Z hard to forecast, and can any of them be forecast from weather and calendar? | 1 | nothing | Finished (refuted); stage 2 for Generator X, and Generator Y only with folds before mid-2024, awaits the manager |
 | 617 | Can a hidden Markov model find whole-turbine capacity steps at the metered wind farms from the daily upper envelope of power? | 1 | 453 | Finished (refuted); too few informative days, wind line stops |
+| 659 | Does one simple pooled network, with or without a fixed physics-lite power input, forecast the metered wind and solar farms as well as the current defaults? | 1 | nothing | Planned; fits run 2026-11-09 to 2026-11-10 |
 
 ## Planned experiments
 
