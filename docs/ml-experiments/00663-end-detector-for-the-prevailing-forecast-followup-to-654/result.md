@@ -8,7 +8,7 @@ theme: lagged-power-and-error-correction
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -57,207 +57,243 @@ metric: >-
   coverage; q01, q05, q95, and q99 pinball loss; follow; detection delay (days) and false-alarm rate
   per Primary-month for the detector alone; share of event-free rows with a departure of 3 points or
   more and its CRPS cost; avoidable-curtailment cost.
+verdict: not supported
+best_arm: >-
+  E0 (K1 plus R-haz, no detector) on the final-test window: 4.26 points of capacity over all rows,
+  against 4.81 for E0d, 4.85 for J2d, 5.02 for J2, 4.96 for K1, and 4.82 for the manual heuristic.
+headline: >-
+  The end detector helps within 24 hours of a shift ending (E0d minus E0 -1.08 [-1.68, -0.50], J2d
+  minus J2 -0.89 [-1.18, -0.63] scaled) but costs 0.2 to 0.3 points while a shift is in force,
+  scores the same on a rewired neighbour graph, and made E0 worse on the final-test window (4.81
+  against 4.26).
+lessons: >-
+  The detector's own-Primary inputs carry the gain, because a degree-preserving rewiring of the
+  neighbour graph and a no-neighbour arm score the same as the real graph (real minus rewired -0.05
+  [-0.17, +0.04] for E0d and -0.01 [-0.04, +0.03] for J2d, ended-in-24-hours and near strata
+  pooled). The detector output rises only from about 0.19 to 0.39 in the days after a shift ends,
+  so it is a weak signal that no arm turns into a sharp drop.
+take_home_message: >-
+  A learned end detector made the prevailing forecast better in the 24 hours after an injected shift
+  ends (-0.9 to -1.1 scaled points of capacity) and worse while the shift is in force (+0.2 to
+  +0.3 for E0d), and the neighbour graph added nothing, because a randomly rewired graph scored the
+  same. On the final-test window the detector made E0 worse (4.81 against 4.26) and J2 slightly
+  better (4.85 against 5.02), and the plain E0 was the best prevailing forecast of all (4.26). The
+  veto on event-free rows is not met for either detector arm. The detector is not worth the neighbour
+  feed.
+advice:
+  - >-
+    Run a degree-preserving rewired-graph placebo beside any neighbour-based detector, because here
+    the gain from the detector was the same with random neighbours (Results, placebo bullet).
+  - >-
+    Score a prevailing forecast on the real final-test window before judging a detector built on
+    injected shifts, because the detector that helped on injected shifts made E0 worse on the window
+    (Final-test window).
+  - >-
+    Report the share of event-free rows on which a prevailing forecast departs from the normal
+    forecast, because the gain after an ending can be bought with departures elsewhere (Results,
+    false-alarm bullet).
 production_status: not-for-production
 adopted_in: none
 ---
-**Status: planned. The sections below are the plan; the finished page replaces them.**
-
 A Primary is a primary substation. A load shift is a period when the electricity network operator
-moves part of one Primary's demand onto, or off, a neighbouring Primary. K1 is the neural network
-of experiments 612 and 613 that forecasts the normal running arrangement (NRA), the demand with no
-load shift. The prevailing forecast is the demand under the arrangement now in force.
+moves part of one Primary's demand onto, or off, a neighbouring Primary. K1 is the neural network of
+experiments 612 and 613 that forecasts the normal running arrangement (NRA), the demand with no load
+shift. The prevailing forecast is the demand under the arrangement now in force.
 [Experiment 654](../00654-two-output-network-end-to-end-with-end-detector/result.md) built two
 bases for it: E0 (frozen K1 plus the survival-hazard head R-haz of experiment 652) and J2 (one
-network fine-tuned end to end). Experiment 654 did not run its end detector. This experiment does.
+network fine-tuned end to end). This experiment adds an end detector to each: a two-layer neural
+network that reads the freshest 48 hours of observed power minus K1's day-ahead forecast, at the
+Primary and at its electrical neighbours, and outputs the probability that the shift has ended
+(`q_end`). The survival probability becomes `p_base * (1 - q_end)`. E0d is E0 with the detector and
+J2d is J2 with the detector. Scaled CRPS is the continuous ranked probability score in points of
+capacity after one equal-width factor per arm, month, and seed.
 
-## What it adds to experiment 654
+**Take-home message.** On injected shifts, the detector lowers the error in the 24 hours after a
+shift ends, by 1.08 scaled points for E0d and 0.89 for J2d, and it raises the error while a shift is
+in force, by 0.30 for E0d. The neighbours add nothing: the same detector on a randomly rewired graph
+scores the same as on the real graph. On the real final-test window, the detector made E0 worse
+(4.81 points against 4.26) and J2 better (4.85 against 5.02), and plain E0 remained the best
+prevailing forecast. Verdict: not supported.
 
-- **End detector** on E0 and on J2, development months only, with the opposite-sign neighbour
-  boost, the routine-step-rate column, the all-Primaries median removed, and a rewired-graph
-  placebo beside every contrast (Method below).
-- **E0 on the final-test window**: the final-fold R-haz head, which experiment 654 did not have, so
-  that the window scores E0 as well as J2.
-- **False-alarm accounting**: the share of event-free rows on which the prevailing output departs
-  from the NRA output by 3 points or more, and its CRPS cost, for every arm.
-- **Real events in the window scenarios**, with the count of events per scenario stated as a lower
-  bound, instead of only the G4 gate proxy.
-- **Time series** from 14 days before to at least 7 days after a real event.
+## Figures
 
-## Findings from reading the earlier experiments (what changed the plan)
+![On the final-test window E0 scores lowest, and the detector makes E0 worse](fig1_window.svg)
 
-- **NGED's labels do not reach the window.** The last labelled event ends at half-hour index
-  119,331 of the label origin (2019-09-01); the window starts at 119,760. Experiment 653's table of
-  detected real events also ends before 2026-07-01. Window scenarios therefore need events detected
-  by this experiment (Method, "Real events"), and the count will be small.
-- **The stored banks cannot be regenerated cheaply.** A different duration law for the injected
-  events needs K1 run again on every injected lag block (experiment 650's `inject` and `rebuild`
-  steps, five seeds, two cuts, five months, CPU hours) and the heads and J2 refitted on the new
-  banks. The detector reads only residuals, and residuals do not need K1 re-run, so the plan splits
-  the two jobs (below).
-- **Stored E0 fits keep quantiles and survival only.** Experiment 652 stored no weights, and a
-  detector that multiplies the survival needs the head's depth and spread, so E0 is refitted with
-  the same code and seeds (a minute per fit on CPU) and checked against the stored quantiles.
+On the final-test window, E0 scores 4.26 over all rows and 5.40 where the G4 gate marks a shift in
+force. E0d scores 4.81 and 8.52. J2d improves J2 (4.85 against 5.02) and stays above E0.
 
-## Plan review: what changed
+![Detector gain by stratum, with the rewired-graph placebo](fig2_dev_contrasts.svg)
 
-A fresh Sonnet reviewer read the plan. These amendments follow its findings; the rest of the page
-stands.
+On the five development months, orange dots are the detector's change against its own base. Blue
+dots are the real graph minus the rewired graph, which is zero within the intervals in every
+stratum, so the gain does not come from the neighbours.
 
-- **Which NRA forecast the detector reads.** For half-hour `t`, the residual uses K1's forecast
-  issued at the latest origin at or before `t` minus 24 hours (a frozen K1 output, never a
-  fine-tuned output). J2d reads the same K1 panel as E0d, so the two detectors see identical
-  inputs, and the detector reads a K1 residual because K1 is the common NRA reference of both bases.
-  Every detector input ends at the scored origin. A unit test perturbs observed power after the
-  origin and checks that no detector input changes.
-- **No held-out leakage.** The noise unit, the per-Primary constant, and the rewiring are computed
-  inside each leave-one-month-out fold from the four training months only, then frozen. "Event-free"
-  for these statistics means not injected and not inside a labelled or detected event. The
-  all-Primaries median at each half-hour uses data up to the origin only. Nothing from the window
-  enters any of these quantities.
-- **Training rows.** The detector trains on the 650 bank, with hard negatives added to the
-  residual inputs of 30% of the rows (the lags are untouched). The 653-law world is never used for
-  training: it is an evaluation-only transfer test.
-- **Duration bands.** Every contrast is also reported for events of 3 to 14 days and of 28 to
-  112 days, and for the held-out family descriptively. A gain confined to one band is reported as
-  such, and the decision rule counts it as a gain for that band only. The hard negatives are absent
-  from the 650-bank contrasts, so false-alarm figures on that bank are not the figures of the
-  hard-negative world.
-- **Veto.** Reported with the minimum and maximum over the 5 months beside the interval. The veto
-  passes only if the interval bound and every month's point estimate are below 0.03 points.
-- **P4 and bars.** The false-alarm share is measured on rows that are event-free and more than 14
-  days from any event. Its base values for E0 and J2 are tabulated before any detector fit. E0d has
-  the same bar as J2d.
-- **P1 and P2 resolution.** A band of 0.1 points that the 5-month interval cannot resolve is read
-  as undecided, not confirmed. P2 passes only if the interval lies inside plus or minus 0.1. Row
-  counts per stratum are tabulated before the fits.
-- **Placebo.** Contrast 2 is the interval of (real graph minus rewired graph) excluding zero (the
-  ratio in P3 is dropped). Three rewirings (seeds 0 to 2) are used and their spread reported. If a
-  degree-preserving rewiring that keeps no edge does not exist, the fewest-kept-edges rewiring is
-  used and the count of kept edges stated. J2d-no-neighbours is added.
-- **E0 refit check.** Passes if the maximum absolute difference of any quantile from the stored
-  E0 is below 0.01 points of capacity. Otherwise the stored quantiles give the E0 scores and the
-  detector arms are labelled as built on a different head.
-- **Window freeze.** Only E0, J2, E0d (real graph), and J2d (real graph) are frozen; placebo and
-  no-neighbour arms are not scored on the window. The window segmenter uses experiment 653's
-  thresholds unchanged, with no tuning; if it cannot run that way, the G4 proxy is used. Window
-  residuals use K1 forecasts issued at earlier origins, as above.
-- **Compute.** The J2 forward pass is timed on one month first. The row count and the timing are
-  stated before the 4 GPU-hour ceiling is relied on.
-- **Ramp law.** Onsets are one half-hour step or a 6 to 48 hour ramp (half each); ends are
-  instantaneous in the 650 generator. The page says so.
+![The detector output rises only from 0.19 to 0.39 after a shift ends](fig3_detector_delay.svg)
 
-## Method
+The detector output (`q_end`) is 0.19 on average in the week before an injected shift ends and 0.39
+in the days after. It never reaches 0.5 on average, and the real graph, the rewired graph, and the
+no-neighbour variant rise alike.
 
-**Rows and folds.** The five development months (2025-10, 2025-12, 2026-01, 2026-03, 2026-06), the
-16 Primaries, leads 24 to 240 hours, daily origins, leave one month out, 2 seeds, as in experiments
-652 and 654. Monthly refit, cleaned data, D15 and D18 cut before 2025-03-01, as the standing
-practices say. Every fitted network is saved under the experiment's data folder.
+![E0d departs from the normal forecast on more event-free rows than E0, and J2d on fewer than J2](fig4_false_alarms.svg)
 
-**Injected world for the base-versus-detector contrasts: experiment 650's bank, unchanged.**
-Durations are 3 to 14 days (half the events) and 28 to 112 days (half); depth log-uniform 3 to 50
-points of capacity; constant or proportional shape; step or 6 to 48 hour ramp onset. This is the
-bank on which E0 and J2 were scored, so the contrast against the base is a paired comparison on
-identical rows. The page states that its length distribution has no events of 1 to 3 or 14 to 28
-days, and that it is not the log-uniform 1 to 112 day law of experiment 653's injector.
+The false-alarm share is the share of rows with no shift in force on which the median of the
+prevailing forecast departs from the median of the NRA forecast by 3 points of capacity or more.
 
-**Injected world for the detector alone: experiment 653's duration law.** A second world draws the
-duration log-uniform from 1 to 112 days with a random end, plus a short band from 3 hours to 1 day
-(20% of events), keeps experiment 650's depths, shapes, and receivers, and adds the hard negatives
-(routine solo steps that follow the daily profile, pulses under 3 hours, ramps of 2 to 12 hours,
-opposite-sign steps at two unconnected Primaries, a smooth common-mode perturbation). It is injected
-into the residual panel only, because the detector reads residuals and no base arm is run on it.
-Un-injected time is unlabelled. It supplies the detector's delay and false-alarm figures and a
-check that the detector trained on the first world transfers to a different duration law. It is
-described as a deviation from "the 653 injector, unchanged", with the reason above.
+![Primary D5 in the December 2025 shift: the detector changes the forecast little](fig5_event_D5.svg)
 
-**Residual panel.** For each Primary and half-hour, observed cleaned power minus K1's median at the
-day-ahead lead (24 to 48 hours, from the previous day's origin), in capacity fractions, divided by
-the Primary's noise unit (1.4826 times the median absolute deviation of event-free residuals in the
-training months). The injected shift is added to the observed power before the subtraction. The
-median across Primaries at each half-hour is removed (common-mode weather error), and a constant
-per Primary (the median of the training months' event-free residuals) stands in for the slow
-seasonal level. A free 30-day level is not used, because it would absorb a long shift.
+![Primary D16 in the same shift](fig6_event_D16.svg)
 
-**Detector inputs, per Primary and origin.** The freshest 48 hours as 16 three-hour block means, the
-eight daily means before that, the same two summaries averaged over connected neighbours (the 29
-edges of `neighbours_nged.json`), the opposite-sign neighbour step (the neighbour's change in daily
-mean over the last day, signed against the Primary's own change; a score boost, never a
-requirement), the routine-step rate (the count of daily-mean changes larger than 3 noise units over
-the previous 60 days, per day), and the origin features experiment 647's heads already read. The
-detector is a two-layer network with 64 units per layer, whose output is `q_end`, the probability
-that the shift has ended. The prevailing quantiles use the survival `p_base * (1 - q_end)` in the
-mixture of experiment 647. The rewired-graph placebo replaces the neighbour sets by a
-degree-preserving rewiring of the 29 edges (fixed seed, no edge kept), and the no-neighbour variant
-drops the neighbour inputs.
+D5 and D16 are the verified pair of labelled shifts (29 December 2025 to 13 January 2026). Both
+prevailing forecasts follow the observed drop from the shift's start, and the E0 and E0d forecasts
+look alike: the detector changes them little. Each line is the day-ahead median (lead 24 to 48
+hours) at hourly means.
 
-**Fit.** The detector is fitted on frozen base outputs (the NRA quantiles, depth, spread, and
-base survival) with the loss of experiment 652 (weighted pinball of the mixture quantiles plus 0.05
-times the binary cross-entropy of the survival against the still-on label), one detector per base,
-month, and seed, the other four months training. Hard negatives enter the residual inputs of 30% of
-the training rows. For J2, depth, spread, and base survival come from a forward pass of the saved J2
-networks on the same rows (the models are in experiment 654's `models/` folder).
+![On Primary D14 E0d drifts far above the normal forecast through the autumn of 2026](fig7_event_window.svg)
 
-**Arms.**
+D14 holds the longest run of days with the gate on in the window (from 8 July to the window's end,
+a run that continues past it). E0 follows the observed power; E0d forecasts several megawatts above
+the observed power from late August. The cause is not diagnosed.
 
-- E0, E0d (real graph), E0d-rewired, E0d-no-neighbours.
-- J2, J2d (real graph), J2d-rewired.
-- References, not refitted: B-haz, R0, K1 (context), C0, and the experiment 654 results for J1.
+## Results
 
-**Strata, scenarios, and metrics** are those of experiments 652 and 654: strata by the state of the
-shift at the origin (event-free, event-free and more than 14 days from any event, onset ahead, far,
-middle, near, ended in the last 24 hours, just ended within 7 days), lead days 1 to 9, scaled and
-unscaled side by side with one scaling factor per arm, month, and seed fitted across strata. Every
-metric table reports the normalised MAE of the median, q05-q95 coverage, the tail losses at 0.01,
-0.05, 0.95, and 0.99, and the avoidable-curtailment cost. The four load-shift scenarios (all rows;
-outside events and 7 days after; inside; the 7 days after an event ends) are reported on the
-injected bank and, descriptively, on real events.
+Numbers are scaled CRPS in points of capacity over lead days 1 to 9 on experiment 650's injected
+bank (training family), averaged over seeds, then over the 5 development months. Intervals are
+percentile bootstraps over the 5 months. "Pooled" means the "ended in the last 24 hours" and
+"near" strata together.
 
-**Real events on the development months.** NGED's labelled events and experiment 653's detected
-events (counts stated, lower bounds). The unlogged-event caveat applies to every table.
+- **Gain after an ending (decision-rule contrast 1): met for both detectors.** Pooled, E0d minus E0
+  is -0.46 [-0.92, -0.03] and J2d minus J2 is -0.57 [-0.78, -0.37], against the bar of -0.3 with an
+  interval excluding zero. In the "ended in the last 24 hours" stratum alone they are -1.08
+  [-1.68, -0.50] and -0.89 [-1.18, -0.63]. For E0d the gain is confined to events of 3 to 14 days
+  (-0.48 [-0.90, -0.06]); for events of 28 to 112 days the pooled contrast is +1.14 [-1.12, +4.35].
+  For J2d both bands gain (-0.60 and -0.15).
+- **Loss while a shift is in force.** E0d minus E0 is +0.27 [+0.07, +0.47] in the "far" stratum and
+  +0.30 [+0.11, +0.45] over all in-force strata. J2d minus J2 is +0.16 [+0.05, +0.26] in "far" and
+  -0.23 [-0.34, -0.07] in "near". The prediction that the detector stays within 0.1 points of its
+  base away from the ending (P1) fails.
+- **Placebo (contrast 2): the gain is not graph-specific.** Pooled, real graph minus rewired graph
+  (seed 0) is -0.05 [-0.17, +0.04] for E0d and -0.01 [-0.04, +0.03] for J2d, and the
+  no-neighbour arm is within -0.11 [-0.40, +0.14] and -0.01 [-0.04, +0.03]. The prediction that the
+  rewired graph recovers at most half of the gain (P3) fails, because it recovers all of it. The
+  three rewirings keep 3, 2, and 3 of the 29 edges.
+- **False alarms.** On real development-month rows with no labelled shift, the share of rows on which
+  the prevailing median departs from the NRA median by 3 points or more is 10.4% for E0, 11.5% for
+  E0d, 16.8% for J2, and 12.1% for J2d. J2d cuts J2's share by 28%, which meets the prediction
+  (P4); E0d raises E0's. On the final-test window rows outside the gate's events the shares are
+  13.2% (E0), 15.1% (E0d), 11.7% (J2), and 9.8% (J2d).
+- **Veto on event-free rows: not met.** On injected bank rows with no shift, the unscaled CRPS of E0d
+  minus E0 is +0.01 [-0.19, +0.21], and its upper bound exceeds 0.03. J2d minus J2 is -0.11
+  [-0.25, -0.01], so its interval passes, but the 2026-03 month is +0.06, above the per-month bar of
+  0.03. On real event-free rows E0d minus E0 is +0.04 [+0.01, +0.09].
+- **Absolute scores.** Scaled CRPS, normalised mean absolute error of the median (as a fraction of
+  capacity), and unscaled CRPS, all lead days 1 to 9:
+
+| Stratum | K1 | E0 | E0d | J2 | J2d |
+|---|---|---|---|---|---|
+| Far from the end, scaled CRPS | 10.49 | 5.93 | 6.20 | 8.41 | 8.56 |
+| Near the end, scaled CRPS | 5.93 | 7.35 | 7.57 | 6.45 | 6.22 |
+| Ended in the last 24 h, scaled CRPS | 5.95 | 7.45 | 6.37 | 6.53 | 5.64 |
+| No shift, scaled CRPS | 5.24 | 3.75 | 3.81 | 4.53 | 4.43 |
+| All rows, scaled CRPS | 9.15 | 6.15 | 6.35 | 7.66 | 7.71 |
+| All rows, normalised MAE | 0.14 | 0.10 | 0.10 | 0.12 | 0.12 |
+| All rows, unscaled CRPS | 9.75 | 6.03 | 6.23 | 7.54 | 7.53 |
+
+Table: five development months, experiment 650's injected bank; the arms are scored on the same rows
+as in experiment 654.
 
 ## Final-test window (2026-07-01 to 2026-10-31)
 
-The maintainer approved a second opening for E0 and the detector arms on 2026-11-09. Every
-candidate choice uses development months only.
+The window was opened once for the frozen candidates (`final/freeze2.json` holds the hashes of 26
+files; it was written, and the manager messaged, before any window score). K1, the manual
+heuristic, and J2 are experiment 654's forecasts, not rescored. E0 is refitted on all five
+development months; E0d and J2d train on the same months. Scenarios come from the G4 gate of
+experiment 620, because NGED's labels end before the window and the window export holds no labelled
+or verified event. The gate marks 16.6% of scored rows as inside a shift, and the count is a
+lower bound. Intervals are bootstraps over the four origin months.
 
-- **Final-fold E0.** R-haz is fitted on all five development months and applied to the window's
-  K1 quantiles and origin features (experiment 620's extended inputs). The detector arms are
-  fitted the same way.
-- **Freeze, message, then score once.** `final/freeze2.json` lists E0, J2 (as frozen in
-  experiment 654), the detector arms, and the hashes of every fitted file. The manager is messaged,
-  and the window is scored once. J2, J1, C0, K1, and the manual heuristic are not rescored; their
-  window forecasts are reused from experiment 654.
-- **Real events in the window.** Labels: none (above). Detected events: experiment 653's
-  segmenter is run on a K1-based residual panel for the window. If it cannot be calibrated there
-  without reading the window to tune it, the window scenarios fall back to the G4 gate proxy and
-  the page says so and gives the count of spells.
-- **Scenarios and plots** as experiment 654: the four scenarios, intervals blocked by origin month
-  (4 months, coarse), counts as lower bounds.
+| Scenario | Rows | K1 | Manual heuristic | J2 | E0 | E0d | J2d |
+|---|---|---|---|---|---|---|---|
+| All rows | 820,893 | 4.96 | 4.82 | 5.02 | 4.26 | 4.81 | 4.85 |
+| No shift in force, 7 days or more after | 678,832 | 4.07 | 4.39 | 4.41 | 4.03 | 4.06 | 4.19 |
+| Shift in force | 136,578 | 9.37 | 6.94 | 8.07 | 5.40 | 8.52 | 8.14 |
+| No shift in force, under 7 days after | 5,483 | 4.36 | 5.28 | 4.46 | 4.34 | 4.39 | 4.44 |
 
-## Figures (at most two panels each)
+Table: CRPS in points of capacity. The 5,483 rows of the last scenario come from too few origin
+months for an interval (the cell is a point estimate).
 
-- Loss versus lead day by stratum, bases against detector arms, with intervals.
-- Detector alone: detection delay (in whole days, because origins are daily) by depth, and false
-  alarms per Primary-month on event-free origins, on the 650-world and the 653-law world.
-- False-alarm share and its CRPS cost per arm.
-- Time series from 14 days before to at least 7 days after a real event, with the observed power,
-  K1, the NRA output, and the prevailing output of the base and the detector arm: the verified
-  D5/D16 pair and the largest event in the window; anonymised wherever a metered generator is
-  involved; at least 280 pixels per panel.
-- Day-ahead and 14-day example forecasts.
+- **E0 is best over all rows and inside shifts.** The mean absolute error of the median over all rows,
+  in points of capacity, is 7.66 for E0, 8.55 for E0d, 8.61 for J2d, 8.90 for J2, 8.34 for K1, and
+  8.46 for the manual heuristic.
+- **The detector made E0 worse.** E0d minus E0 is +0.54 over all rows and +3.13 inside shifts.
+  The avoidable-curtailment cost at 0.9 of the peak, in pounds per day averaged over the six MW
+  Primaries, is 186 for E0, 309 for E0d, 187 for J2, 187 for J2d, 178 for K1, and 165 for the manual
+  heuristic.
+- **The detector made J2 better but not good.** J2d minus J2 is -0.17 over all rows, and J2d stays
+  above E0 and the manual heuristic over all rows.
 
-## Compute and process
+## What was not done
 
-- GPU: one process at a time, only for the J2 forward passes (minutes). CPU: at most 4 cores for
-  the head and detector fits, each a minute or so. Ceiling 4 GPU-hours (expected under one).
-  Memory: `MemoryMax=16G` per job, `OOMPolicy=continue`.
-- Standing practices followed: monthly refit, cleaned data, short-history cut, fitted networks saved,
-  stored predictions reused (K1, the 650 bank, the J2 fits, E0's stored quantiles as a check),
-  tails and curtailment cost reported, example forecasts and event plots, draft pull request.
-- Reviews: one Sonnet plan review, one Sonnet code review before the first fit, one results review,
-  one write-up review, one prose review.
-- Release candidate parquet files (E0 and the detector arms, 16 Primaries, five development months,
-  and the window) with a plain-words README in
-  `data/ml-experiments/00663-*/release_candidate/`, written as each arm finishes.
-- Reports to the manager, one line each: plan PR open, fits started, freeze2 written, window
-  scored, PR merged.
+- **The detector alone on a second duration law.** The plan also scored the detector on injected
+  shifts that follow experiment 653's duration law (log-uniform 1 to 112 days plus a short band).
+  It was not run; the figures above use experiment 650's bank only, whose events last 3 to 14 days
+  or 28 to 112 days. Experiment 660's shared injector (merged after this plan was written) draws
+  its durations from a different law, so it would change the delay and the false-alarm figures; the
+  detector-delay figure here shows the mean detector output by day instead, not a delay in days.
+- **Real events on the development months as a scenario table.** The window scenarios use the G4
+  gate. The four load-shift scenarios on the development months' labelled events are not tabulated.
+- **A "no shift within 14 days" stratum.** It holds no rows in the injected bank (the cause was not
+  checked), so the false-alarm share is measured on real event-free rows.
+- **Shallow shifts (P2), day-ahead and 14-day example forecasts, and detection delay per
+  Primary-month** were not run.
+- **The window segmenter** (experiment 653's) was not run, so the window events are the gate's.
+
+## Checks
+
+- **E0 refit reproduces experiment 652.** The refitted E0 head matches the stored E0 quantiles to
+  within 0.0 (maximum absolute difference).
+- **J2 forward pass reproduces experiment 654.** The stored J2 quantiles are matched for 2025-10; the
+  window forward pass of the frozen J2 networks reproduces experiment 654's window forecasts.
+- **No look-ahead.** A test perturbs observed power after the origin; no detector input changes
+  (maximum difference 0.0). The noise unit and constants use the four training months only.
+- **Detector training.** A first fit with no direct loss on the ending barely moved `q_end`; its
+  apparent gain was a constant shrink of the survival. The reported detectors add a cross-entropy
+  against "the shift has ended" (weight 0.5).
+- **Reviews.** One Sonnet agent reviewed the plan and one the code before the first fit (findings in
+  the plan page's history). Results, write-up, and prose reviews are in the pull request.
+
+## Caveats
+
+- Every development-month shift is injected, and the strata use the shift's future end. Scaled
+  numbers are pooled across strata, so unscaled CRPS sits beside them in `score/tables.json`.
+- The intervals use 5 development months (4 window months), so every interval is coarse.
+- NGED's event labels are an incomplete one-off dump. Rows counted as event-free can hold unlabelled
+  shifts, so false-alarm shares are upper bounds on false alarms. Window scenario counts are lower
+  bounds.
+- The G4 gate, not a human label, defines the window's "inside" scenario, so a gate error shifts
+  rows between scenarios for every arm alike.
+- Telemetry up to the origin is assumed available at forecast time. If it is not, the detector's
+  gain after an ending is a ceiling.
+- The window failure of E0d (Primary D14) is not diagnosed.
+
+## What to try next
+
+- Check why E0d departs upward on D14 in the autumn of 2026 (a distribution shift in the detector
+  inputs, or a refit artefact), before any further detector work.
+- Train the detector only on the "ended" label with the survival untouched, and score it as a
+  classifier (delay and false alarms per Primary-month) before using it to scale the survival.
+- If a detector is wanted, leave out the neighbour feed: the placebo shows it is not what helps.
+
+## Files
+
+All code is in `ml-experiments/00663-end-detector-for-the-prevailing-forecast-followup-to-654/`;
+run scripts through `e00663_run.sh`. Data (fits, scores, figures, `final/freeze2.json`, and the
+release-candidate parquet files with a README) is in
+`data/ml-experiments/00663-end-detector-for-the-prevailing-forecast-followup-to-654/`.
+
+- `e00663_panel.py`, `e00663_features.py`, `e00663_checks.py`: residual panel, detector inputs,
+  leakage tests.
+- `e00663_fit_e0.py`, `e00663_j2_base.py`, `e00663_fit_j2d.py`, `e00663_j2_final.py`: the E0 and
+  detector fits, the stored J2 forward passes, and the J2 window forward pass.
+- `e00663_score.py`, `e00663_report.py`, `e00663_window_data.py`, `e00663_freeze.py`,
+  `e00663_window_score.py`, `e00663_figures.py`, `e00663_release_candidate.py`: scoring, window
+  steps, figures, and the parquet export.
