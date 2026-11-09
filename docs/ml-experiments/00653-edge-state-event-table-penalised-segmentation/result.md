@@ -180,6 +180,13 @@ penalty, threshold, or mask.
   because NGED's logs are an incomplete one-off dump, and clean rows may hold events nobody logged).
   The 27 transfers that experiment 580 found in the telemetry are a second reference, with the
   caveat that its detector and this one read the same residual.
+- **Event time series.** Figures show the decoded edge events and flows from 14 days before to at
+  least 7 days after a real event, beside the observed power and the baseline forecast (K1), with
+  at most two panels per figure and any metered generator anonymised. The verified D5 and D16
+  pair (2025-12-29 to 2026-01-13) is the main case. Labelled real events are few, so these figures
+  are descriptive.
+- **Event-free stratum.** Rows more than 14 days from any labelled or detected event are reported
+  as their own stratum for each arm, beside the event rows.
 - **Baselines and intervals.** RO-NC, LR_b20, the 24-hour residual detector with the neighbour
   filter, the label-free pipeline of experiment 327, and the edge-flow fit of experiment 131, each
   from its stored alarms where they exist. Intervals resample whole events and whole calendar
