@@ -2,7 +2,7 @@
 
 Run from the repository root with the data folder and the imported folders on the path:
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     P=ml-experiments
     export PYTHONPATH=$P/00670-event-table-recipient-search-on-six-cell-grid:\
 $P/00660-shared-generator-of-injected-load-transfer-events:\
