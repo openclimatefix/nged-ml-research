@@ -14,9 +14,12 @@ refits on days 0 and 14. The final-test fold `2026-07` differs in three ways:
 same names) in place. Nothing in an earlier experiment's folder is edited.
 """
 
+import dataclasses
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Final
+
+from pathlib import Path
 
 import numpy as np
 
@@ -60,7 +63,7 @@ def redirect_to_extended_inputs(e) -> None:
     # the timing check of experiment 574 reads a run's demand frame; the runs after 2026-06-30 have
     # none, so a one-row frame holding the two timestamps it compares stands in (taken from the
     # run's own summary table: run time and run time plus 9 hours)
-    stub_dir = ext.OUT_ROOT / "inputs" / "frames"
+    stub_dir = Path(os.environ.get("E00677_ROOT", str(ext.OUT_ROOT))) / "inputs" / "frames"
     stub_dir.mkdir(parents=True, exist_ok=True)
     _frame_path = e.common.demand_frame_path
 
@@ -86,8 +89,21 @@ def redirect_to_extended_inputs(e) -> None:
     _inner = e._build_test
 
     def build_test_all_months(*, month, standardiser):
-        """Return the fold's test rows, with the lead cut raised to 14 days."""
-        return _inner(month=month, standardiser=standardiser)
+        """Return the fold's test rows for every scored month (the lead cut is 14 days, set in `install`).
+
+        Experiment 428's `build_test` takes the origins of one calendar month, so a fold that scores
+        `SPAN_MONTHS` months concatenates one call per month.
+        """
+        if month != FINAL_MONTH or SPAN_MONTHS == 1:
+            return _inner(month=month, standardiser=standardiser)
+        parts = []
+        for j in range(SPAN_MONTHS):
+            idx = _Y * 12 + (_M - 1) + j
+            parts.append(_inner(month=f"{idx // 12}-{idx % 12 + 1:02d}", standardiser=standardiser))
+        cat = {f.name: np.concatenate([getattr(p, f.name) for p in parts]) for f in dataclasses.fields(parts[0])}
+        test = type(parts[0])(**cat)
+        assert test.origin.max() >= (FINAL_STOP - timedelta(days=2)).timestamp() * 1e6, "the last scored month is missing"
+        return test
 
     e._build_test = build_test_all_months
 

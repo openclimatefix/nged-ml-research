@@ -73,8 +73,8 @@ Held fixed in every step that has the part they belong to:
 - Widths (8-wide Primary embedding, encoders 64 to 32, mixer 64), dropout 0.1, AdamW with weight
   decay 1e-3, batch 8192, 20% of rows per epoch, patience 8, gradient-norm clip 1.0.
 - The 730-day window, the 90-day recency half-life, the E3 refit rule (7-day embargo), and the slow
-  per-Primary output offset D5. In ENS-only fits the D5 knots start at 2024-04 because no earlier
-  ENS data exist.
+  per-Primary output offset D5. ENS-only fits (steps 1, 2, and 3a) have no pre-trained D5 knots: the offset keeps only
+  the newest knot, which departs from the Candidate and is named as a caveat.
 - The 7 weather means, the 7 spread columns, the 2 lead columns, the 21 date-time columns, and the
   14 B1 columns (thermal lag and solar gain) read by the weather encoder.
 - The cut of D15 and D18 before 2025-03-01.
@@ -87,7 +87,7 @@ Added where:
 |---|---|
 | 1 | Date-time encoder, Primary embedding, and mixer. The weather, spread, and lead inputs are removed, so the mixer sees only the date-time embedding. |
 | 2 | Weather encoder alone (B1 columns included); the date-time and lead inputs are removed. The mixer sees the weather embedding and the Primary embedding. |
-| 3 | Both encoders into the mixer, with the spread and lead columns. Version a: trained on ENS only, no pre-training, nothing frozen. Version b: ERA5 and CAMS pre-training, then fine-tuning on ENS with both encoders frozen (the chain of experiment 620). |
+| 3 | Both encoders into the mixer; the lead columns enter here (the spread columns enter with the weather encoder at step 2). Version a: trained on ENS only, no pre-training, nothing frozen. Version b: ERA5 and CAMS pre-training, then fine-tuning on ENS with both encoders frozen (the chain of experiment 620). |
 | 4 | One lag encoder at 24 hours, with its expected-weather and expected-date-time embeddings at the lag's own time, the lag-ID embedding, and block dropout of lags (30% of days). |
 | 5 | A second lag at one week through the shared lag encoder. Two versions: with and without injected events. |
 | 6 | The gap columns: power at the lag time minus the lag-free table, plus the `exp_missing` flags (arm P3 of experiment 606). Signal dropout D50 applies from here on, because the Candidate applies it whenever signal columns exist. |
@@ -102,7 +102,7 @@ means a ladder step.
 
 | Step | Stage 1 (pre-training) | Stage 2 | Stage 3 | Frozen after stage 1 |
 |---|---|---|---|---|
-| 1, 2, 3a | None | One fit on ENS, 730-day window | None | Nothing |
+| 1, 2, 3a | None; random initialisation | Same as other steps, learning rate 5e-4 throughout | Same as other steps | Nothing |
 | 3b | ERA5 and CAMS, lag-free | Yes | Yes | Both encoders |
 | 4 | ERA5 and CAMS, one lag | Yes | Yes | Both encoders |
 | 5 (with, without) | ERA5 and CAMS, two lags (shared) | Yes, shared by the two versions | Yes; "with" adds the 581 shifts to the lag inputs | Both encoders |
@@ -258,6 +258,8 @@ checked before each fit.
 - D15 and D18 are cut before 2025-03-01.
 - The ladder is one order of adding components.
 - ENS history starts 2024-04-01, so early folds have less ENS data.
+- ENS-only networks (steps 1, 2, and 3a) differ from step 3b in three ways, not one: no ERA5 and CAMS
+  pre-training, no frozen encoders, and only the newest D5 knot.
 
 ## Method
 

@@ -69,7 +69,9 @@ import e00677_fold as fold
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00677_MONTH"
 
 NAME = "00677-building-up-the-candidate-demand-network-one-component-at-a-time"
-OUT = ML_EXPERIMENTS_DATA_DIR / NAME / "arms" / MINE.name
+ROOT = Path(os.environ["E00677_ROOT"]) if os.environ.get("E00677_ROOT") else ML_EXPERIMENTS_DATA_DIR / NAME
+OUT = ROOT / "arms" / f"{MINE.name}_sp{fold.SPAN_MONTHS}"
+"""One folder per scored span, so the monthly pilot and the quarterly fold of 2026-05 never share fits."""
 DOWN_WEIGHT = 0.5
 DOWN_WEIGHT_DAYS = 7
 E3_EMBARGO_DAYS = 7
@@ -102,6 +104,13 @@ if MINE.ens_only:  # no ERA5 or CAMS pre-training: random initialisation, nothin
     e.SPEC = dataclasses.replace(e.SPEC, frozen=False, lr=e.c.PRETRAIN_LR)
 
     def load_random_fresh(*, model, path):
+        """Initialise every layer from the seed in the step-2 file name, then give the mixer its fixed fresh draw."""
+        seed = int(Path(path).stem.rsplit("_s", 1)[1])
+        with torch.random.fork_rng(devices=[]):
+            torch.manual_seed(seed)
+            for module in model.modules():
+                if hasattr(module, "reset_parameters"):
+                    module.reset_parameters()
         e.fresh_mixer(model=model)
 
     e.load_pretrained_fresh = load_random_fresh
@@ -109,7 +118,7 @@ if fold.is_final(months=MINE.months):
     # the final fold has no stored B1 statistics: pre-training derives them into the chain folder
     # and every later command reads them from there
     def _final_stats_file(*, month: str):
-        return CHAIN / "stats" / e.SPEC.b1 / f"{month}.npz"
+        return Path(os.environ.get("STATS677", CHAIN)) / "stats" / e.SPEC.b1 / f"{month}.npz"
 
     _dev_stats_file = arm._stats_file
     e.stats_file = lambda *, month: (
