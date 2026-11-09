@@ -2,6 +2,7 @@
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 677 | How much does each component of the Candidate demand network contribute to its one-year backtest score, when the network is built up from the date-time encoder alone, one component per step? | High (maintainer asked 2026-11-09) | Experiment 667 merged (step 8 reuses its file) | Planned |
 | 252 | Does the best-guess stack score within 0.05 points of BG2 at the eight Primaries with no stack forecast? | High (cards) | Nothing | Planned |
 | 353 | How well does Primary demand research default 3's stack forecast D8 when the MVA meter's fold is modelled? | High (maintainer asked) | Nothing | Planned |
 | 379 | What does each component of BG2 contribute at all 16 Primaries, out to 14 days, under `demand-v1`? | High (maintainer asked 2026-10-28) | Nothing | Planned |
