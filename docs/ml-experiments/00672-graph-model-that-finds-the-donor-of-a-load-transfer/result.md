@@ -119,8 +119,7 @@ lessons: >-
   The recurrent graph neural network trained on 120 injected worlds did not learn which neighbour
   received a transfer from the 6-hour residuals of 15 Primaries: its link head pairs at most the
   cases that the real graph's 25 links make obvious, and the network calls almost no transfers on
-  the real record. The donor is no easier to find with the graph than without it (G finds 0.06 more
-  than the no-link arm in the long and deep cell, interval -0.03 to +0.15). Adding the explicit
+  the real record. The donor is no easier to find with the graph than without it (G finds +0.02 more donor megawatts than the no-link arm in the long and deep cell, interval -0.18 to +0.25; its all-event found share is +0.06 higher, interval -0.03 to +0.15). Adding the explicit
   solar term left paired share unchanged and moved found share by +0.02 and +0.01, inside wide
   intervals, as experiment 657 found inside E1. In the long and deep cell, a wider decoder grid
   moved the paired share only from 0.08 to 0.10.
@@ -152,7 +151,8 @@ neural network (G) pairs 0.08 of the injected transfer megawatts in the long and
 against 0.25. G finds 0.47 of the long and deep donor megawatts, against 0.44 for E1-J, a gain of
 +0.03 (interval -0.16 to +0.23) where +0.10 was predicted. The verdict is *not supported*: the
 pairing margin of +0.10 failed in both deep cells, so stop rule (a) fires. Stop rules (b) and (c)
-did not fire: the cross-injector drop was 0.03, and G-R decoded no real edge events.
+did not fire: the cross-injector drop was 0.03 on the same-test-world reading, and G-R decoded no
+real edge events.
 
 ## Terms
 
@@ -214,16 +214,23 @@ links add 0.03 to 0.08 of found share over the no-link arm in the four cells of 
 - **Cross-injector test (one network per injector, 10 worlds each).** Found share in the long and
   deep and medium and deep cells together: a network trained on constant-megawatt square steps finds
   0.42 on those worlds and 0.35 on shaped transfers; a network trained on shaped transfers finds
-  0.32 on shaped transfers and 0.38 on constant-megawatt worlds. The in-injector minus
-  cross-injector drops are 0.03 and -0.03, below the 0.05 limit.
+  0.32 on shaped transfers and 0.38 on constant-megawatt worlds. The drop is read on the same test
+  worlds, as the network trained on that injector minus the network trained on the other: 0.416
+  minus 0.384 = +0.03 on constant-megawatt worlds, and 0.320 minus 0.352 = -0.03 on shaped worlds.
+  Read per network instead (each network's own injector minus the other injector's worlds), the
+  drops are +0.06 and -0.06, and stop rule (b) would also fire. Each reading rests on 10 worlds and
+  a handful of deep events, so P9 is not a firm result.
 - **Real record, 15 Primaries, scored years (36.0 Primary-years).** G calls 0.75 to 0.97 events per
   Primary-year (E1: 6.83) and 2 to 4 edge events, none in the long and deep or the medium and deep
-  cell (E1-J: 8, none in those cells). G-R calls 0 edge events, and G-0 calls none. G finds the D5
-  step (-1.08 MW) and the D16 step (+2.1 MW) of the verified December 2025 transfer in all 3
-  networks, and links neither. G matches 5 to 6 of 77 logged shifts of more than 1 day with the
+  cell (E1-J: 8, none in those cells). G-R calls 0 edge events, and G-0 calls none. G locates a D5
+  step of -1.08 MW 24 hours after the verified start and a D16 step of +2.1 MW 9.5 hours after it
+  (62 hours before it in one network), in all three networks, and links neither. The D5 step is
+  below the 1.2 MW bar of P6, and both starts miss P6's 6-hour bar. G matches 5 to 6 of 77 logged
+  shifts of more than 1 day with the
   start within 2 hours (E1: 8).
-- **Explicit solar term.** GS minus G is within +0.02 and -0.04 in found and donor-found share in
-  the two deep cells, with intervals of +-0.1 or more, and 0.00 in paired share. Experiment 657
+- **Explicit solar term.** GS minus G is -0.02 and -0.01 in found share, +0.04 and 0.00 in
+  donor-found share, and 0.00 in paired share in the long and deep and the medium and deep cells,
+  with found and donor-found intervals of +-0.1 or more. Experiment 657
   found the same inside E1.
 - **Post hoc wider decoder grid (arm `Gw`).** The tuned none-boost of G sat at the edge of its grid
   (10), the decoder weight that raises the cost of calling no event, so the three G networks were
@@ -241,16 +248,17 @@ links add 0.03 to 0.08 of found share over the no-link arm in the four cells of 
 - **P4 (G minus G-0): failed.** +0.03 and +0.04 in the long and shallow and medium and shallow cells
   (needed +0.05), and +0.06 in the long and deep cell (needed within 0.03).
 - **P5 (timing): held** in both deep cells.
-- **P6 (verified D5 and D16 pair): failed.** Both steps are found and neither is paired.
+- **P6 (verified D5 and D16 pair): failed** on pairing, on start timing, and on the size of the D5
+  step.
 - **P7 (G-R at most a third of G's real edge events in the two deep cells): unreadable.** G has no
   real edge events in those cells.
 - **P8 (events per Primary-year within a factor of 2 of E1's): failed.** 0.75 to 0.97 against 6.83.
-- **P9 (cross-injector drop at most 0.05): held** (one network per injector).
-- **P10 (GS within 0.03 of G): partly held.** Paired shares agree to 0.00, and the found-share
-  difference is +0.02 and +0.01 (but with wide intervals); the donor-found difference is -0.04 in
-  the long and deep cell.
-- **Reproduction gate: held.** The E1-J rows are read from experiment 670's stored rows on the same
-  worlds.
+- **P9 (cross-injector drop at most 0.05): held** on the same-test-world reading (0.03), failed on
+  the per-network reading (0.06); one network per injector.
+- **P10 (GS within 0.03 of G): failed in donor-found share in the long and deep cell** (GS is 0.04
+  higher, interval about +-0.2), and held in the other measures and cell.
+- **Reproduction gate: held by reading, not re-scoring.** The E1-J rows are experiment 670's stored
+  rows on the same worlds, and they match that page's headline cells (0.29 and 0.25 paired).
 
 ## Checks
 
@@ -268,7 +276,8 @@ links add 0.03 to 0.08 of found share over the no-link arm in the four cells of 
 - The pre-registered stop rule closes the graph line at 15 Primaries, and X3 (history length) is not
   started because the stop rule fired. Whether to reopen the graph line, and which event table to
   use, is for the roadmap.
-- Reduce the false transfers of E1-J (69% of its decoded transfers match no injected end) before any
+- Reduce the false transfers of E1-J (72% of its decoded transfers match no injected end in this
+  experiment's tally; experiment 670's page gave 69%) before any
   further pairing method is built.
 
 ## The plan as committed
@@ -363,3 +372,4 @@ reading.
 A Sonnet plan review and a Sonnet code review ran before the first fit and are triaged in the pull
 request. A Sonnet write-up review and a Sonnet prose review ran on the finished page and are triaged
 in the pull request.
+
