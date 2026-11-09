@@ -12,7 +12,7 @@ E615_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00615-bakeoff-wind-and-solar-development-month-backtests"
 )
 FEATURE_DIR: Final[Path] = DATA_DIR / "wind_features"
-"""One parquet per farm: the per-case mean and spread of raw weather and of the physics-lite power."""
+"""One parquet per farm: per-case mean and spread of raw weather and physics-lite power."""
 FIT_DIR: Final[Path] = DATA_DIR / "wind_fits"
 MODEL_DIR: Final[Path] = DATA_DIR / "models"
 TABLE_DIR: Final[Path] = DATA_DIR / "tables"

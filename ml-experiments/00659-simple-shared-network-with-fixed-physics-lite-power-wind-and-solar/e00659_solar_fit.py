@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E402
 """Fit the simple shared solar networks of experiment 659 at the four quarterly refits.
 
 Rows, refits, and scoring follow experiment 430's `a2_member` job: farms A to F pooled over the six
@@ -32,7 +32,7 @@ experiment 615's solar candidates.
 import argparse
 import os
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Final
 
 for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
@@ -87,7 +87,9 @@ def wind_array(*, farm: str, band: str) -> np.ndarray:
     )
 
 
-def physics_lite(*, ghi: np.ndarray, temp: np.ndarray, wind: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def physics_lite(
+    *, ghi: np.ndarray, temp: np.ndarray, wind: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Return the per-member physics-lite power (unit capacity) and the Faiman cell temperature."""
     cell = temp + ghi / (U0 + U1 * wind)
     power = np.clip(ghi / 1000.0 * (1.0 + GAMMA * (cell - 25.0)), 0.0, 1.0)
@@ -135,9 +137,7 @@ def farm_band_frame(*, farm: str, band: str) -> pl.DataFrame:
 
 def load_cases() -> pl.DataFrame:
     """Return every farm and band's rows, sorted by series, band, and time."""
-    return pl.concat(
-        [farm_band_frame(farm=f, band=b) for f in c310.FARMS for b in c310.BAND_ORDER]
-    )
+    return pl.concat([farm_band_frame(farm=f, band=b) for f in c310.FARMS for b in c310.BAND_ORDER])
 
 
 def capacity_730(*, farm: str, refit: datetime) -> dict[str, float]:
@@ -154,7 +154,9 @@ def capacity_730(*, farm: str, refit: datetime) -> dict[str, float]:
     return {"old_mw": old, "new_mw": new, "ratio": new / old, "n_history": len(values)}
 
 
-def train_and_predict(*, train: pl.DataFrame, target: pl.DataFrame, arm: str, seed: int, refit: datetime) -> np.ndarray:
+def train_and_predict(
+    *, train: pl.DataFrame, target: pl.DataFrame, arm: str, seed: int, refit: datetime
+) -> np.ndarray:
     """Train one network and return `target`'s 11 quantiles as fractions of the new capacity."""
     columns = ARMS[arm]
     torch.manual_seed(seed)
@@ -202,7 +204,9 @@ def train_and_predict(*, train: pl.DataFrame, target: pl.DataFrame, arm: str, se
     model.eval()
     common.MODEL_DIR.mkdir(parents=True, exist_ok=True)
     tmp = common.MODEL_DIR / f"solar_{arm}_{refit:%Y-%m}_seed{seed}.tmp"
-    torch.save({"state": best_state, "mean": mean.tolist(), "std": std.tolist(), "constant": constant}, tmp)
+    torch.save(
+        {"state": best_state, "mean": mean.tolist(), "std": std.tolist(), "constant": constant}, tmp
+    )
     tmp.rename(tmp.with_suffix(".pt"))
     xs_t = tensor(target.select(list(columns)).to_numpy().astype(np.float64))
     mu_s = centre(target)
@@ -234,17 +238,17 @@ def main() -> None:
         train = frame.filter(pl.col("time") < cutoff).with_columns(
             scaled=pl.col("output").cast(pl.Float64) / ratio
         )
-        target = frame.filter(
-            (pl.col("init_time") >= refit) & (pl.col("init_time") < end)
-        )
+        target = frame.filter((pl.col("init_time") >= refit) & (pl.col("init_time") < end))
         for seed in args.seeds:
             path = OUT_DIR / f"{args.arm}_refit={refit:%Y-%m}_seed={seed}.parquet"
             if path.exists():
                 continue
             q = train_and_predict(train=train, target=target, arm=args.arm, seed=seed, refit=refit)
-            r = target["series"].replace_strict(
-                {f: cap[f]["ratio"] for f in c310.FARMS}, return_dtype=pl.Float64
-            ).to_numpy()[:, None]
+            r = (
+                target["series"]
+                .replace_strict({f: cap[f]["ratio"] for f in c310.FARMS}, return_dtype=pl.Float64)
+                .to_numpy()[:, None]
+            )
             table = target.select(
                 "series", "band", "init_time", "time", "lead_hours", actual=pl.col("output")
             ).with_columns(

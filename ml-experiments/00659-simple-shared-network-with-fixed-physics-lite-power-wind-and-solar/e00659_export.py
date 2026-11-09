@@ -1,7 +1,6 @@
-# ruff: noqa: E501
 """Write experiment 659's forecasts to the private export folder, one file per arm and origin month.
 
-    uv run --no-sync python ml-experiments/00659-*/e00659_export.py
+uv run --no-sync python ml-experiments/00659-*/e00659_export.py
 """
 
 import os
@@ -13,7 +12,9 @@ import e00659_common as common
 import polars as pl
 
 OUT: Final = common.DATA_DIR.parent / "backtest_export_simple_shared_wind_solar_2026-11-09"
-README: Final[str] = """# Simple shared wind and solar networks, development-month backtests (experiment 659)
+README: Final[
+    str
+] = """# Simple shared wind and solar networks, development-month backtests (experiment 659)
 
 Private: these files hold the time series of NGED metered generators. Do not publish them. Series
 are labelled W1 to W3 (wind) and Solar A to Solar F (solar). No file holds a generator's name,
@@ -60,8 +61,12 @@ def main() -> None:
     """Split every arm's table by origin month."""
     OUT.mkdir(parents=True, exist_ok=True)
     for path in sorted(common.TABLE_DIR.glob("*.parquet")):
-        frame = pl.read_parquet(path).drop("tech", "candidate").with_columns(
-            exact_zero=pl.col("actual") == 0.0, month=pl.col("init_time").dt.strftime("%Y-%m")
+        frame = (
+            pl.read_parquet(path)
+            .drop("tech", "candidate")
+            .with_columns(
+                exact_zero=pl.col("actual") == 0.0, month=pl.col("init_time").dt.strftime("%Y-%m")
+            )
         )
         if "solar" in path.stem:
             frame = frame.drop("masked")

@@ -11,6 +11,7 @@ zero: "cleaned zeros"), `actual_raw` (the reading as metered), and `masked`.
 
 import json
 import os
+from pathlib import Path
 
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
 
@@ -28,9 +29,11 @@ BANDS = ((0, 24), (24, 120), (120, 1e9))
 
 def sorted_mean(*, frame: pl.DataFrame, keys: list[str], extra: list[str]) -> pl.DataFrame:
     """Average the seeds, then sort across the 11 levels."""
-    mean = frame.group_by(keys).agg(
-        pl.col([f"q{i}" for i in range(11)]).mean(), *[pl.col(c).first() for c in extra]
-    ).sort(keys)
+    mean = (
+        frame.group_by(keys)
+        .agg(pl.col([f"q{i}" for i in range(11)]).mean(), *[pl.col(c).first() for c in extra])
+        .sort(keys)
+    )
     matrix = np.sort(mean.select([f"q{i}" for i in range(11)]).to_numpy(), axis=1)
     return mean.drop([f"q{i}" for i in range(11)]).with_columns(
         *[pl.Series(q, matrix[:, i]) for i, q in enumerate(Q)]
@@ -45,17 +48,26 @@ def keep_development(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def wind(*, arm: str, directory=None, pattern: str | None = None, name: str | None = None) -> pl.DataFrame:  # noqa: ANN001
+def wind(
+    *, arm: str, directory: Path | None = None, pattern: str | None = None, name: str | None = None
+) -> pl.DataFrame:
     """Return one wind arm in the 615 layout (fits of this experiment, or another folder's refits)."""
     directory = directory or common.DATA_DIR / "wind_fits"
     paths = sorted(directory.glob(pattern or f"{arm}_refit=*_seed=*.parquet"))
     frame = pl.concat([pl.read_parquet(p) for p in paths])
-    if "actual_norm" not in frame.columns:  # experiment 615's refits keep the observed power in the cases
+    if (
+        "actual_norm" not in frame.columns
+    ):  # experiment 615's refits keep the observed power in the cases
         cases = pl.concat(
-            [pl.read_parquet(common.E615_DIR / "wind_inputs" / f"cases_{f}.parquet") for f in SCORING]
+            [
+                pl.read_parquet(common.E615_DIR / "wind_inputs" / f"cases_{f}.parquet")
+                for f in SCORING
+            ]
         ).select("site", "time_series_id", "power_fcst_init_time", "valid_time", "actual_norm")
         frame = frame.join(
-            cases, on=["site", "time_series_id", "power_fcst_init_time", "valid_time"], validate="m:1"
+            cases,
+            on=["site", "time_series_id", "power_fcst_init_time", "valid_time"],
+            validate="m:1",
         )
     if "actual_clean" not in frame.columns:  # experiment 615's refits: no idle-mask cleaning column
         frame = frame.with_columns(
@@ -99,7 +111,9 @@ def solar_730() -> pl.DataFrame | None:
     paths = sorted((common.DATA_DIR / "solar_a2_member_730" / "a2_member").glob("s?_*.parquet"))
     if len(paths) < 12:
         return None
-    frame = pl.concat([pl.read_parquet(p).filter(pl.col("setting") == "own_history") for p in paths])
+    frame = pl.concat(
+        [pl.read_parquet(p).filter(pl.col("setting") == "own_history") for p in paths]
+    )
     frame = frame.select(
         series=pl.lit("Solar ") + pl.col("time_series_id"),
         init_time=pl.col("init_time"),
@@ -144,7 +158,13 @@ def main() -> None:
             ("kept_rows", "actual_raw", True),
             ("all_rows", "actual_raw", False),
         ):
-            rows.append({"candidate": f"wind_{arm}", "variant": variant, **scores(frame=table, actual=col, drop_masked=drop)})
+            rows.append(
+                {
+                    "candidate": f"wind_{arm}",
+                    "variant": variant,
+                    **scores(frame=table, actual=col, drop_masked=drop),
+                }
+            )
     for directory, name in (
         (common.E615_DIR / "wind_default2", "wind_default2_old_capacity"),
         (common.DATA_DIR / "wind_default2_730", "wind_default2_730"),
@@ -158,16 +178,34 @@ def main() -> None:
             ("kept_rows", "actual_raw", True),
             ("all_rows", "actual_raw", False),
         ):
-            rows.append({"candidate": name, "variant": variant, **scores(frame=table, actual=col, drop_masked=drop)})
+            rows.append(
+                {
+                    "candidate": name,
+                    "variant": variant,
+                    **scores(frame=table, actual=col, drop_masked=drop),
+                }
+            )
     for arm in SOLAR_ARMS:
         table = solar(arm=arm).with_columns(masked=pl.lit(value=False))
         table.write_parquet(common.TABLE_DIR / f"solar_{arm}.parquet")
-        rows.append({"candidate": f"solar_{arm}", "variant": "all_rows", **scores(frame=table, actual="actual")})
+        rows.append(
+            {
+                "candidate": f"solar_{arm}",
+                "variant": "all_rows",
+                **scores(frame=table, actual="actual"),
+            }
+        )
     table = solar_730()
     if table is not None:
         table = table.with_columns(masked=pl.lit(value=False))
         table.write_parquet(common.TABLE_DIR / "solar_a2_member_730.parquet")
-        rows.append({"candidate": "solar_a2_member_730", "variant": "all_rows", **scores(frame=table, actual="actual")})
+        rows.append(
+            {
+                "candidate": "solar_a2_member_730",
+                "variant": "all_rows",
+                **scores(frame=table, actual="actual"),
+            }
+        )
     out = pl.DataFrame(rows)
     out.write_csv(common.TABLE_DIR / "overall_scores.csv")
     with pl.Config(tbl_rows=60, tbl_cols=12, float_precision=3):

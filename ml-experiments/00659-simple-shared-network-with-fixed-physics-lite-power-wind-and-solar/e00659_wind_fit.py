@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E402, E501
 """Fit the simple shared wind networks of experiment 659 at day 0 and day 14 of each development month.
 
 One pooled network per (arm, seed, refit): two hidden layers of 64 units (experiment 310's
@@ -28,7 +28,7 @@ runs from that date to `R`, as experiment 615 did.
 import argparse
 import os
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Final
 
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
@@ -176,7 +176,9 @@ def train_and_predict(
     model.eval()
     common.MODEL_DIR.mkdir(parents=True, exist_ok=True)
     tmp = common.MODEL_DIR / f"wind_{arm}_{refit:%Y-%m-%d}_seed{seed}.tmp"
-    torch.save({"state": best_state, "mean": mean.tolist(), "std": std.tolist(), "constant": constant}, tmp)
+    torch.save(
+        {"state": best_state, "mean": mean.tolist(), "std": std.tolist(), "constant": constant}, tmp
+    )
     tmp.rename(tmp.with_suffix(".pt"))
     xs_t = tensor(design(frame=target, weather=weather, calendar=calendar))
     mu_s = centre(frame=target, arm=arm, constant=constant)
@@ -219,10 +221,15 @@ def main() -> None:
             path = common.FIT_DIR / f"{args.arm}_refit={refit:%Y-%m-%d}_seed={seed}.parquet"
             if path.exists():
                 continue
-            out = train_and_predict(train=before, target=target, arm=args.arm, refit=refit, seed=seed)
-            mw = out * target["site"].replace_strict(
-                {f: cap[f]["new_mw"] for f in FARMS}, return_dtype=pl.Float64
-            ).to_numpy()[:, None]
+            out = train_and_predict(
+                train=before, target=target, arm=args.arm, refit=refit, seed=seed
+            )
+            mw = (
+                out
+                * target["site"]
+                .replace_strict({f: cap[f]["new_mw"] for f in FARMS}, return_dtype=pl.Float64)
+                .to_numpy()[:, None]
+            )
             table = target.select(
                 "site", *KEYS, "lead_hours", "masked", "actual_norm", "actual_clean"
             ).with_columns(

@@ -88,7 +88,11 @@ def predict_rows(**kwargs):  # noqa: ANN003, ANN201
         {f: ratio(farm=f, cutoff=cutoff) for f in c310.FARMS}, return_dtype=pl.Float64
     )
     return table.with_columns(
-        [(pl.col(c) * scale).alias(c) for c in table.columns if c.startswith("q") and c[1:].isdigit()]
+        [
+            (pl.col(c) * scale).alias(c)
+            for c in table.columns
+            if c.startswith("q") and c[1:].isdigit()
+        ]
     )
 
 
@@ -114,13 +118,21 @@ def main() -> None:
         refits = [datetime(2026, 6, 1, tzinfo=UTC)] if SOLAR_FORCE_ONE else list(f310.REFIT_STARTS)
         for seed in seeds:
             for start in refits:
-                print(f430.run_job(arm="a2_member", config=common430.ARMS["a2_member"], seed=seed, start=start), flush=True)
+                print(
+                    f430.run_job(
+                        arm="a2_member", config=common430.ARMS["a2_member"], seed=seed, start=start
+                    ),
+                    flush=True,
+                )
         if SOLAR_FORCE_ONE:
             new = pl.read_parquet(out / "a2_member" / "s0_2026-06.parquet")
             old = pl.read_parquet(common430.PRED_DIR / "a2_member" / "s0_2026-06.parquet")
             keys = ["time_series_id", "init_time", "time"]
             joined = new.join(old, on=keys, suffix="_old", validate="1:1")
-            diffs = [float((joined[q] - joined[f"{q}_old"]).abs().max()) for q in ("q01", "q50", "q99")]
+            diffs = [
+                joined.select((pl.col(q) - pl.col(f"{q}_old")).abs().max()).item()
+                for q in ("q01", "q50", "q99")
+            ]
             print("gate-solar: rows", new.height, old.height, "max abs diffs q01 q50 q99", diffs)
 
 

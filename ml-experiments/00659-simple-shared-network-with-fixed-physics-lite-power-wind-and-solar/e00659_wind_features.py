@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Build the per-case wind inputs of experiment 659 from the 51 stored ensemble members.
 
 For each farm and each daily run (the hindcast of experiment 259 to 2025-06-16, then experiment
