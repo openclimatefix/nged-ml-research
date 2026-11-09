@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E501, ANN201
+# ruff: noqa: D103, E501
 """Experiment 663: write the release-candidate backtest parquet files, one per arm (CPU).
 
 Arms `E0`, `E0d`, `J2d` (seed mean of 2 seeds). Development months: each month is scored by a
@@ -75,7 +75,17 @@ fit read once.
 """
 
 
-def frame(*, z: dict, idx: np.ndarray, nra: np.ndarray, prev: np.ndarray, surv: np.ndarray, qend: np.ndarray, label: str, sites: pl.DataFrame) -> pl.DataFrame:
+def frame(
+    *,
+    z: dict,
+    idx: np.ndarray,
+    nra: np.ndarray,
+    prev: np.ndarray,
+    surv: np.ndarray,
+    qend: np.ndarray,
+    label: str,
+    sites: pl.DataFrame,
+) -> pl.DataFrame:
     prim = z["prim"][idx].astype(int)
     cap = sites["capacity_mw"].to_numpy()[prim]
     at = lambda i: [k578.GRID_START + timedelta(minutes=30 * int(x)) for x in i]  # noqa: E731
@@ -96,7 +106,10 @@ def frame(*, z: dict, idx: np.ndarray, nra: np.ndarray, prev: np.ndarray, surv: 
     cols["flag_event_free"] = z["event_free"][idx]
     cols["flag_verified_transfer"] = z["verified"][idx]
     cols["flag_substation_zero"] = z["flagged"][idx]
-    return pl.DataFrame(cols).with_columns(pl.col("power_fcst_init_time").dt.replace_time_zone("UTC"), pl.col("valid_time").dt.replace_time_zone("UTC"))
+    return pl.DataFrame(cols).with_columns(
+        pl.col("power_fcst_init_time").dt.replace_time_zone("UTC"),
+        pl.col("valid_time").dt.replace_time_zone("UTC"),
+    )
 
 
 def month_frame(*, arm: str, month: str, sites: pl.DataFrame) -> pl.DataFrame:
@@ -105,7 +118,11 @@ def month_frame(*, arm: str, month: str, sites: pl.DataFrame) -> pl.DataFrame:
     for s in sc.SEEDS:
         r = sc.arm_rows(arm=arm, month=month, seed=s, setname="real", z=z)
         folder = "fits_e0" if arm.startswith("E0") else "fits_j2"
-        qe = np.load(c663.WORK / folder / f"{arm}_{month}_s{s}.npz")["real_q_end"] if arm in ("E0d", "J2d") else np.zeros(len(r["idx"]), np.float32)
+        qe = (
+            np.load(c663.WORK / folder / f"{arm}_{month}_s{s}.npz")["real_q_end"]
+            if arm in ("E0d", "J2d")
+            else np.zeros(len(r["idx"]), np.float32)
+        )
         rows.append((r, qe))
     idx = rows[0][0]["idx"]
     return frame(
@@ -120,7 +137,11 @@ def window_frame(*, arm: str, sites: pl.DataFrame) -> pl.DataFrame:
     fs = [np.load(c663.WORK / folder / f"{arm}_final_s{s}.npz") for s in sc.SEEDS]
     idx = fs[0]["window_idx"]
     nra = z["q"][idx] if arm.startswith("E0") else np.mean([f["window_nra"] for f in fs], axis=0)
-    qe = np.mean([f["window_q_end"] for f in fs], axis=0) if arm in ("E0d", "J2d") else np.zeros(len(idx), np.float32)
+    qe = (
+        np.mean([f["window_q_end"] for f in fs], axis=0)
+        if arm in ("E0d", "J2d")
+        else np.zeros(len(idx), np.float32)
+    )
     return frame(
         z=z, idx=idx, nra=nra, prev=np.mean([f["window_q"] for f in fs], axis=0), surv=np.mean([f["window_p"] for f in fs], axis=0),
         qend=qe, label="window", sites=sites,

@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E501, PLR0912, PLR0915, ANN201, C901
+# ruff: noqa: D103, PLR0915
 """Experiment 663, step 5: score every arm by origin state and lead day (CPU).
 
 Arms: `K1`, `R0-168`, `Bhaz` (experiment 652's no-fit references, recomputed), the E0 arms of
@@ -80,7 +80,11 @@ def main() -> None:
             assert z["vi"][idx].max() < c650.WINDOW_START_IDX
             if setname == "real":
                 y = base = z["y"][idx]
-                stratum = np.where(z["verified"][idx], "verified", np.where(z["event_free"][idx] & ~z["flagged"][idx], "real_free", "real_other"))
+                stratum = np.where(
+                    z["verified"][idx],
+                    "verified",
+                    np.where(z["event_free"][idx] & ~z["flagged"][idx], "real_free", "real_other"),
+                )
                 band = np.full(len(idx), "real")
                 far14 = np.zeros(len(idx), bool)
                 ended24 = np.zeros(len(idx), bool)
@@ -88,17 +92,43 @@ def main() -> None:
                 base = z["y"][idx]
                 y = (base + z["shift"][idx]).astype(np.float32)
                 stratum = z["stratum"][idx]
-                band = np.where(setname == "held", "held", np.where(z["short"][idx], "short", "long"))
+                band = np.where(
+                    setname == "held", "held", np.where(z["short"][idx], "short", "long")
+                )
                 oi = z["oi"][idx].astype(np.int64)
-                far14 = (stratum == "free") & ((oi < z["onset"][idx] - 14 * 48) | (oi >= z["end"][idx] + 14 * 48))
+                far14 = (stratum == "free") & (
+                    (oi < z["onset"][idx] - 14 * 48) | (oi >= z["end"][idx] + 14 * 48)
+                )
                 ended24 = (stratum == "just_ended") & (oi - z["end"][idx] <= 48)
             keep = np.isfinite(res) & np.isfinite(y)
             age = z["age"][z["org"][idx]].astype(np.float32)
             lead_day = np.clip((lead // 24).astype(int), 1, 10)
             arms: dict[str, list[tuple[int, np.ndarray, np.ndarray, np.ndarray | None]]] = {
                 "K1": [(0, k1, k1, None)],
-                "R0-168": [(0, np.sort(k1 + (res * np.exp(-lead / 168.0))[:, None], axis=1).astype(np.float32), k1, None)],
-                "Bhaz": [(0, np.sort(k1 + (res * s652.cond_survival(curve=curve, age_days=age, lead_h=lead))[:, None], axis=1).astype(np.float32), k1, None)],
+                "R0-168": [
+                    (
+                        0,
+                        np.sort(k1 + (res * np.exp(-lead / 168.0))[:, None], axis=1).astype(
+                            np.float32
+                        ),
+                        k1,
+                        None,
+                    )
+                ],
+                "Bhaz": [
+                    (
+                        0,
+                        np.sort(
+                            k1
+                            + (res * s652.cond_survival(curve=curve, age_days=age, lead_h=lead))[
+                                :, None
+                            ],
+                            axis=1,
+                        ).astype(np.float32),
+                        k1,
+                        None,
+                    )
+                ],
             }
             for arm in a.arms:
                 lst = []
@@ -120,20 +150,61 @@ def main() -> None:
                     crps, crps_s = 2 * p.mean(1), s650.crps(y=y, q=qsc)
                     crps_nra = 2 * s650.pin(y=base if setname != "real" else y, q=nra).mean(1)
                     dep = np.abs(q[:, 5] - nra[:, 5]) >= DEP
-                    df = pl.DataFrame({
-                        "stratum": stratum, "band": band, "lead_day": lead_day, "far14": far14, "ended24": ended24,
-                        "crps": crps, "crps_s": crps_s, "nmae": np.abs(y - q[:, 5]),
-                        "cov90": ((y >= q[:, 1]) & (y <= q[:, 9])).astype(float),
-                        "cov98": ((y >= q[:, 0]) & (y <= q[:, 10])).astype(float),
-                        "pin01": p[:, 0], "pin05": p[:, 1], "pin95": p[:, 9], "pin99": p[:, 10],
-                        "dep": dep.astype(float), "dep_crps": np.where(dep, crps, 0.0), "dep_crps_nra": np.where(dep, crps_nra, 0.0),
-                        "crps_nra": crps_nra,
-                    }).filter(pl.Series(keep))
-                    df = pl.concat([df, df.filter(pl.col("stratum").is_in(["far", "middle", "near"])).with_columns(stratum=pl.lit("inforce"))])
-                    df = pl.concat([df, df.filter(pl.col("far14")).with_columns(stratum=pl.lit("free_far14")), df.filter(pl.col("ended24")).with_columns(stratum=pl.lit("ended24")), df.with_columns(stratum=pl.lit("all"))])
-                    cols = [c for c in df.columns if c not in ("stratum", "band", "lead_day", "far14", "ended24")]
-                    g = df.group_by("stratum", "band", "lead_day").agg(pl.len().alias("n"), *[pl.col(c).sum() for c in cols])
-                    agg.append(g.with_columns(month=pl.lit(m), set=pl.lit(setname), arm=pl.lit(arm), seed=pl.lit(seed), factor=pl.lit(float(fac))))
+                    df = pl.DataFrame(
+                        {
+                            "stratum": stratum,
+                            "band": band,
+                            "lead_day": lead_day,
+                            "far14": far14,
+                            "ended24": ended24,
+                            "crps": crps,
+                            "crps_s": crps_s,
+                            "nmae": np.abs(y - q[:, 5]),
+                            "cov90": ((y >= q[:, 1]) & (y <= q[:, 9])).astype(float),
+                            "cov98": ((y >= q[:, 0]) & (y <= q[:, 10])).astype(float),
+                            "pin01": p[:, 0],
+                            "pin05": p[:, 1],
+                            "pin95": p[:, 9],
+                            "pin99": p[:, 10],
+                            "dep": dep.astype(float),
+                            "dep_crps": np.where(dep, crps, 0.0),
+                            "dep_crps_nra": np.where(dep, crps_nra, 0.0),
+                            "crps_nra": crps_nra,
+                        }
+                    ).filter(pl.Series(keep))
+                    df = pl.concat(
+                        [
+                            df,
+                            df.filter(
+                                pl.col("stratum").is_in(["far", "middle", "near"])
+                            ).with_columns(stratum=pl.lit("inforce")),
+                        ]
+                    )
+                    df = pl.concat(
+                        [
+                            df,
+                            df.filter(pl.col("far14")).with_columns(stratum=pl.lit("free_far14")),
+                            df.filter(pl.col("ended24")).with_columns(stratum=pl.lit("ended24")),
+                            df.with_columns(stratum=pl.lit("all")),
+                        ]
+                    )
+                    cols = [
+                        c
+                        for c in df.columns
+                        if c not in ("stratum", "band", "lead_day", "far14", "ended24")
+                    ]
+                    g = df.group_by("stratum", "band", "lead_day").agg(
+                        pl.len().alias("n"), *[pl.col(c).sum() for c in cols]
+                    )
+                    agg.append(
+                        g.with_columns(
+                            month=pl.lit(m),
+                            set=pl.lit(setname),
+                            arm=pl.lit(arm),
+                            seed=pl.lit(seed),
+                            factor=pl.lit(float(fac)),
+                        )
+                    )
             print(m, setname, "scored", flush=True)
     pl.concat(agg).write_parquet(OUT / "agg.parquet")
 

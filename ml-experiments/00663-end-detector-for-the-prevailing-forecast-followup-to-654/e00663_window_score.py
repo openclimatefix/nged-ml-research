@@ -208,7 +208,11 @@ def main() -> None:
                 dep = np.abs(vv[:, 5] - nra_q[sel][:, 5]) >= 0.03
                 r["departure_share"] = boot(grp=mm, vals=dep.astype(float))
                 r["crps_on_departure_rows"] = float(crps[dep].mean()) if dep.any() else None
-                r["nra_crps_on_departure_rows"] = float((2 * s.pinball(y=yy, q=nra_q[sel]).mean(axis=1) * 100)[dep].mean()) if dep.any() else None
+                r["nra_crps_on_departure_rows"] = (
+                    float((2 * s.pinball(y=yy, q=nra_q[sel]).mean(axis=1) * 100)[dep].mean())
+                    if dep.any()
+                    else None
+                )
             res[n] = r
         out[sname] = res
     (OUTD / "score").mkdir(parents=True, exist_ok=True)

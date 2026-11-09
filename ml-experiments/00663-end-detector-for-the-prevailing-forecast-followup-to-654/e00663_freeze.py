@@ -33,12 +33,23 @@ def files() -> dict[str, Path]:
             out[f"fits_e0/{arm}_final_s{sd}.pt"] = c663.WORK / "fits_e0" / f"{arm}_final_s{sd}.pt"
         out[f"fits_j2/J2d_final_s{sd}.npz"] = c663.WORK / "fits_j2" / f"J2d_final_s{sd}.npz"
         out[f"fits_j2/J2d_final_s{sd}.pt"] = c663.WORK / "fits_j2" / f"J2d_final_s{sd}.pt"
-        out[f"j2_final/forecasts/J2_s{sd}.parquet"] = c663.WORK / "j2_final" / "forecasts" / f"J2_s{sd}.parquet"
+        out[f"j2_final/forecasts/J2_s{sd}.parquet"] = (
+            c663.WORK / "j2_final" / "forecasts" / f"J2_s{sd}.parquet"
+        )
         out[f"654/final/models/J2_s{sd}.pt"] = c663.E654 / "final" / "models" / f"J2_s{sd}.pt"
-        out[f"654/final/forecasts/J2_s{sd}.parquet"] = c663.E654 / "final" / "forecasts" / f"J2_s{sd}.parquet"
+        out[f"654/final/forecasts/J2_s{sd}.parquet"] = (
+            c663.E654 / "final" / "forecasts" / f"J2_s{sd}.parquet"
+        )
     out["window/real_window.npz"] = c663.WORK / "window" / "real_window.npz"
     out["det_inputs_v2/final_window.npz"] = c663.WORK / "det_inputs_v2" / "final_window.npz"
-    for code in ("e00663_window_score.py", "e00663_fit_e0.py", "e00663_fit_j2d.py", "e00663_j2_final.py", "e00663_panel.py", "e00663_window_data.py"):
+    for code in (
+        "e00663_window_score.py",
+        "e00663_fit_e0.py",
+        "e00663_fit_j2d.py",
+        "e00663_j2_final.py",
+        "e00663_panel.py",
+        "e00663_window_data.py",
+    ):
         out[f"code/{code}"] = HERE / code
     return out
 

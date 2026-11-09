@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, D103, E501, PLR0912, PLR0915, C901
+# ruff: noqa: ANN001, ANN201, D103, E501
 """Experiment 663: the K1 residual panel and the end detector's inputs.
 
 The residual of half-hour `t` at a Primary is the observed cleaned power (plus the injected shift in
@@ -30,7 +30,9 @@ FEATURE_NAMES = (
     + ["nb_last24", "nb_prev48", "step_own", "opp_step", "nb_step_mean", "routine_rate"]
 )
 N_FEATURES = len(FEATURE_NAMES)
-NB_COLUMNS = tuple(FEATURE_NAMES.index(n) for n in ("nb_last24", "nb_prev48", "opp_step", "nb_step_mean"))
+NB_COLUMNS = tuple(
+    FEATURE_NAMES.index(n) for n in ("nb_last24", "nb_prev48", "opp_step", "nb_step_mean")
+)
 """Columns that read neighbours (zeroed in the no-neighbour arm)."""
 
 
@@ -40,7 +42,9 @@ class MonthPanel:
 
     month: str
     lo: int  # grid index of local column 0
-    obs: np.ndarray  # (16, T) observed cleaned power, capacity fraction; NaN where missing or flagged
+    obs: (
+        np.ndarray
+    )  # (16, T) observed cleaned power, capacity fraction; NaN where missing or flagged
     k1: np.ndarray  # (16, T) K1 day-ahead median; NaN where absent
     free: np.ndarray  # (16, T) True where the half-hour is event-free, unflagged, and unverified
 
@@ -54,7 +58,9 @@ def load_month_panel(*, month: str) -> MonthPanel:
 def load_window_panel() -> MonthPanel:
     """The final-test window's panel, from `window/real_window.npz` (K1's rows of experiment 620)."""
     z = np.load(c663.WORK / "window" / "real_window.npz")
-    return panel_from_rows(name="window", z=z, lo=int(z["oi"].min()) - PAD, hi=int(z["vi"].max()) + 1)
+    return panel_from_rows(
+        name="window", z=z, lo=int(z["oi"].min()) - PAD, hi=int(z["vi"].max()) + 1
+    )
 
 
 def panel_from_rows(*, name: str, z, lo: int, hi: int) -> MonthPanel:
@@ -67,7 +73,9 @@ def panel_from_rows(*, name: str, z, lo: int, hi: int) -> MonthPanel:
     ok = ~z["flagged"][day_ahead] & inside
     obs[p[ok], v[ok]] = z["y"][day_ahead][ok]
     k1[p[inside], v[inside]] = z["q"][day_ahead][inside][:, 5]
-    free[p[inside], v[inside]] = (z["event_free"] & ~z["verified"] & ~z["flagged"])[day_ahead][inside]
+    free[p[inside], v[inside]] = (z["event_free"] & ~z["verified"] & ~z["flagged"])[day_ahead][
+        inside
+    ]
     return MonthPanel(month=name, lo=lo, obs=obs, k1=k1, free=free)
 
 
@@ -75,7 +83,12 @@ def bank_k1(*, month: str, panel: MonthPanel) -> dict[int, np.ndarray]:
     """K1's day-ahead median on each bank pass's own (shifted-lag) rows, (16, T) per pass."""
     b = np.load(c650.WORK / "head_data" / f"bank_{month}.npz")
     day_ahead = (b["lead"] >= 24) & (b["lead"] < 48)
-    prim, vi, pas, q50 = b["prim"][day_ahead].astype(int), b["vi"][day_ahead].astype(int) - panel.lo, b["pass_"][day_ahead], b["q"][day_ahead][:, 5]
+    prim, vi, pas, q50 = (
+        b["prim"][day_ahead].astype(int),
+        b["vi"][day_ahead].astype(int) - panel.lo,
+        b["pass_"][day_ahead],
+        b["q"][day_ahead][:, 5],
+    )
     out = {}
     for r in np.unique(pas):
         k1 = np.full_like(panel.k1, np.nan)
@@ -94,12 +107,11 @@ class Fold:
 
 
 def fit_fold(*, panels: dict[str, MonthPanel], train_months: list[str]) -> Fold:
-    res = [
-        np.where(panels[m].free, panels[m].obs - panels[m].k1, np.nan)
-        for m in train_months
-    ]
+    res = [np.where(panels[m].free, panels[m].obs - panels[m].k1, np.nan) for m in train_months]
     res = np.concatenate(res, axis=1)
-    res = res - np.nan_to_num(np.nanmedian(res, axis=0))[None, :]  # as `world_z`: after the common-mode median
+    res = (
+        res - np.nan_to_num(np.nanmedian(res, axis=0))[None, :]
+    )  # as `world_z`: after the common-mode median
     const = np.nanmedian(res, axis=1)
     mad = np.nanmedian(np.abs(res - const[:, None]), axis=1)
     return Fold(sigma=np.maximum(1.4826 * mad, 1e-4), const=const)
@@ -128,7 +140,9 @@ def world_z(*, panel: MonthPanel, fold: Fold, own: np.ndarray | None, mirror: np
     return z.astype(np.float32)
 
 
-def hard_negatives(*, shape: tuple[int, int], nb_of: dict[int, list[int]], seed: int) -> tuple[np.ndarray, np.ndarray]:
+def hard_negatives(
+    *, shape: tuple[int, int], nb_of: dict[int, list[int]], seed: int
+) -> tuple[np.ndarray, np.ndarray]:
     """Return (per-Primary, common-mode) additive perturbations (noise units) that are not load shifts."""
     rng = np.random.default_rng(seed)
     n, t = shape
@@ -201,7 +215,9 @@ def features(*, z: np.ndarray, panel: MonthPanel, origins: np.ndarray, prims: np
              nb_of: dict[int, list[int]]) -> np.ndarray:  # fmt: skip
     """Return the detector inputs (n, N_FEATURES) for rows (`prims`, grid-index `origins`)."""
     fin = np.isfinite(z)
-    cs = np.concatenate([np.zeros((16, 1)), np.cumsum(np.where(fin, z, 0.0), axis=1, dtype=np.float64)], axis=1)
+    cs = np.concatenate(
+        [np.zeros((16, 1)), np.cumsum(np.where(fin, z, 0.0), axis=1, dtype=np.float64)], axis=1
+    )
     cn = np.concatenate([np.zeros((16, 1), int), np.cumsum(fin, axis=1)], axis=1)
     out = np.zeros((len(origins), N_FEATURES), np.float32)
     for r, (p, o) in enumerate(zip(prims.tolist(), (origins - panel.lo).tolist(), strict=True)):
@@ -218,7 +234,9 @@ def features(*, z: np.ndarray, panel: MonthPanel, origins: np.ndarray, prims: np
             avail += n > 0
         out[r, N_BLOCKS_FRESH + N_DAYS_BEFORE] = avail / (N_BLOCKS_FRESH + N_DAYS_BEFORE)
         for i in range(4):
-            out[r, N_BLOCKS_FRESH + N_DAYS_BEFORE + 1 + i] = float(_mean(cs, cn, p, o - (i + 1) * H3, o - i * H3)[1] == 0)
+            out[r, N_BLOCKS_FRESH + N_DAYS_BEFORE + 1 + i] = float(
+                _mean(cs, cn, p, o - (i + 1) * H3, o - i * H3)[1] == 0
+            )
         base = N_BLOCKS_FRESH + N_DAYS_BEFORE + 5
         l24, _ = _mean(cs, cn, p, o - DAY, o)
         p48, _ = _mean(cs, cn, p, o - 3 * DAY, o - DAY)
@@ -231,12 +249,21 @@ def features(*, z: np.ndarray, panel: MonthPanel, origins: np.ndarray, prims: np
             lasts.append(a)
             prevs.append(b)
             steps.append(a - b)
-        out[r, base : base + 2] = (np.mean(lasts) if lasts else 0.0, np.mean(prevs) if prevs else 0.0)
+        out[r, base : base + 2] = (
+            np.mean(lasts) if lasts else 0.0,
+            np.mean(prevs) if prevs else 0.0,
+        )
         out[r, base + 2] = own
         sgn = np.sign(own)
         out[r, base + 3] = max(0.0, max((-sgn * s for s in steps), default=0.0))
         out[r, base + 4] = np.mean(steps) if steps else 0.0
-        days = [_mean(cs, cn, p, o - (d + 1) * DAY, o - d * DAY) for d in range(2, ROUTINE_DAYS)]  # ends 2 days before the origin
+        days = [
+            _mean(cs, cn, p, o - (d + 1) * DAY, o - d * DAY) for d in range(2, ROUTINE_DAYS)
+        ]  # ends 2 days before the origin
         means = np.array([m for m, n in days if n > 0])
-        out[r, base + 5] = float((np.abs(np.diff(means)) > 3.0).sum() / max(len(means), 1)) if len(means) > 1 else 0.0
+        out[r, base + 5] = (
+            float((np.abs(np.diff(means)) > 3.0).sum() / max(len(means), 1))
+            if len(means) > 1
+            else 0.0
+        )
     return np.clip(out, -20.0, 20.0)

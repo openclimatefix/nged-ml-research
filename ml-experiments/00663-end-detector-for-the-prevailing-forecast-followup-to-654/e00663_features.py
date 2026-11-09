@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, ANN201, D103, E501, PLR0915
+# ruff: noqa: D103, E501, PLR0915, PLR0912
 """Experiment 663, step 1: the detector's inputs for every origin of every fold (CPU).
 
 Writes `det_inputs_v2/<fold month>_<data month>.npz` with, for the data month's real origins and bank
@@ -23,7 +23,12 @@ OUT = c663.WORK / "det_inputs_v2"
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--folds", nargs="+", default=list(c663.MONTHS), help="a month, or `final` (statistics from all five months, plus the window)")
+    ap.add_argument(
+        "--folds",
+        nargs="+",
+        default=list(c663.MONTHS),
+        help="a month, or `final` (statistics from all five months, plus the window)",
+    )
     ap.add_argument("--data-months", nargs="+", default=list(c663.MONTHS))
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -48,7 +53,16 @@ def main() -> None:
             wp = pan.load_window_panel()
             zw = pan.world_z(panel=wp, fold=stats, own=None)
             real = np.load(c663.WORK / "window" / "real_window.npz")
-            res = {f"real_{name}": pan.features(z=zw, panel=wp, origins=real["org_oi"].astype(np.int64), prims=real["org_prim"].astype(int), nb_of=g) for name, g in graphs.items()}
+            res = {
+                f"real_{name}": pan.features(
+                    z=zw,
+                    panel=wp,
+                    origins=real["org_oi"].astype(np.int64),
+                    prims=real["org_prim"].astype(int),
+                    nb_of=g,
+                )
+                for name, g in graphs.items()
+            }
             np.savez(OUT / "final_window.npz", **res)
             print("final_window.npz written", flush=True)
         for m in a.data_months:
@@ -60,14 +74,26 @@ def main() -> None:
             res: dict[str, np.ndarray] = {}
             real = np.load(c663.E647 / "head_data" / f"real_{m}.npz")
             bank = np.load(c650.WORK / "head_data" / f"bank_{m}.npz")
-            negs, negc = pan.hard_negatives(shape=panel.obs.shape, nb_of=nb_of, seed=663 + c663.MONTHS.index(m))
+            negs, negc = pan.hard_negatives(
+                shape=panel.obs.shape, nb_of=nb_of, seed=663 + c663.MONTHS.index(m)
+            )
             z_real = pan.world_z(panel=panel, fold=stats, own=None)
-            z_real_neg = pan.world_z(panel=panel, fold=stats, own=None, extra=negs, extra_common=negc[None, :])
+            z_real_neg = pan.world_z(
+                panel=panel, fold=stats, own=None, extra=negs, extra_common=negc[None, :]
+            )
             po, oo = real["org_prim"].astype(int), real["org_oi"].astype(np.int64)
             for name, g in graphs.items():
-                res[f"real_{name}"] = pan.features(z=z_real, panel=panel, origins=oo, prims=po, nb_of=g)
-                res[f"real_neg_{name}"] = pan.features(z=z_real_neg, panel=panel, origins=oo, prims=po, nb_of=g)
-            bp, bo, bq = bank["org_prim"].astype(int), bank["org_oi"].astype(np.int64), bank["org_pass"].astype(int)
+                res[f"real_{name}"] = pan.features(
+                    z=z_real, panel=panel, origins=oo, prims=po, nb_of=g
+                )
+                res[f"real_neg_{name}"] = pan.features(
+                    z=z_real_neg, panel=panel, origins=oo, prims=po, nb_of=g
+                )
+            bp, bo, bq = (
+                bank["org_prim"].astype(int),
+                bank["org_oi"].astype(np.int64),
+                bank["org_pass"].astype(int),
+            )
             for name in graphs:
                 for pre in ("bank_", "bank_neg_"):
                     res[f"{pre}{name}"] = np.zeros((len(bp), pan.N_FEATURES), np.float32)
@@ -75,11 +101,23 @@ def main() -> None:
             for r in np.unique(bq):
                 own, mirror, _ev = c650.shifts_for(clean=clean, month=m, r=int(r))
                 z_b = pan.world_z(panel=panel, fold=stats, own=own, mirror=mirror, k1=k1s[int(r)])
-                z_bn = pan.world_z(panel=panel, fold=stats, own=own, mirror=mirror, k1=k1s[int(r)], extra=negs, extra_common=negc[None, :])
+                z_bn = pan.world_z(
+                    panel=panel,
+                    fold=stats,
+                    own=own,
+                    mirror=mirror,
+                    k1=k1s[int(r)],
+                    extra=negs,
+                    extra_common=negc[None, :],
+                )
                 sel = np.flatnonzero(bq == r)
                 for name, g in graphs.items():
-                    res[f"bank_{name}"][sel] = pan.features(z=z_b, panel=panel, origins=bo[sel], prims=bp[sel], nb_of=g)
-                    res[f"bank_neg_{name}"][sel] = pan.features(z=z_bn, panel=panel, origins=bo[sel], prims=bp[sel], nb_of=g)
+                    res[f"bank_{name}"][sel] = pan.features(
+                        z=z_b, panel=panel, origins=bo[sel], prims=bp[sel], nb_of=g
+                    )
+                    res[f"bank_neg_{name}"][sel] = pan.features(
+                        z=z_bn, panel=panel, origins=bo[sel], prims=bp[sel], nb_of=g
+                    )
             np.savez(out.with_suffix(".tmp.npz"), **res, kept=np.array(kept))
             out.with_suffix(".tmp.npz").rename(out)
             print(f"{out.name}: {time.time() - t0:.0f}s", flush=True)

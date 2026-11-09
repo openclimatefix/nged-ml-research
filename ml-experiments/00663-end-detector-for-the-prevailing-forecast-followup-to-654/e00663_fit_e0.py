@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E501, PLR0912, PLR0915, C901, ANN201
+# ruff: noqa: ANN001, ANN202, D103, E501, PLR0912, PLR0915
 """Experiment 663, step 2: refit E0 (R-haz of experiment 652) and its detector arms (CPU).
 
 Arms: `E0` (experiment 652's `Rhaz_m50` recipe and data selection, refitted so that the head's depth,
@@ -97,8 +97,12 @@ def fit_one(job: tuple[str, str, int]) -> str:
             ("bank", f650.N_BANK_PER_MONTH, f650.N_VAL_BANK // 2),
         ):
             z = src[kind]
-            i_tr = f650.pick(z=z, kind=kind, month=train_month, lo=0, hi=18, n=n_tr, rng=rng, train_family=True)
-            i_va = f650.pick(z=z, kind=kind, month=train_month, lo=21, hi=99, n=n_va, rng=rng, train_family=True)
+            i_tr = f650.pick(
+                z=z, kind=kind, month=train_month, lo=0, hi=18, n=n_tr, rng=rng, train_family=True
+            )
+            i_va = f650.pick(
+                z=z, kind=kind, month=train_month, lo=21, hi=99, n=n_va, rng=rng, train_family=True
+            )
             tr.append((z, i_tr, None))
             va.append((z, i_va, None))
             ex_tr.append(fit652.extras(z=z, idx=i_tr, kind=kind, mixture="m50"))
@@ -134,7 +138,9 @@ def fit_one(job: tuple[str, str, int]) -> str:
             super().__init__(n_in=n_in)
             self.det = None
             if n_det:
-                self.det = nn.Sequential(nn.Linear(n_det, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, 1))
+                self.det = nn.Sequential(
+                    nn.Linear(n_det, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, 1)
+                )
                 with torch.no_grad():
                     self.det[-1].weight.mul_(0.1)
                     self.det[-1].bias.fill_(-3.0)
@@ -144,7 +150,11 @@ def fit_one(job: tuple[str, str, int]) -> str:
             d = h647.DEPTH_SCALE * torch.tanh(o[:, 0])
             sigma = h647.SIGMA_FLOOR + h647.SIGMA_SCALE * nn.functional.softplus(o[:, 1])
             p_haz = h652.survival(hazard_logits=o[:, 2:], lead_h=lead_h, age_days=age)
-            qe = torch.sigmoid(self.det(det)[:, 0]) if (self.det is not None and det is not None) else torch.zeros_like(p_haz)
+            qe = (
+                torch.sigmoid(self.det(det)[:, 0])
+                if (self.det is not None and det is not None)
+                else torch.zeros_like(p_haz)
+            )
             p = p_haz * (1.0 - qe)
             return h647.mixture_quantiles(q=q, d=d, sigma=sigma, p=p), p, d, sigma, p_haz, qe
 
@@ -158,12 +168,16 @@ def fit_one(job: tuple[str, str, int]) -> str:
         wt = torch.from_numpy(w[ix])
         pin = (h.pinball(y=y, q=qq) * wt).sum() / wt.sum()
         m = torch.from_numpy(inf[ix]) * (age >= h647.AGE_FLOOR_DAYS).to(torch.float32)
-        bce = nn.functional.binary_cross_entropy(torch.clamp(p, 1e-4, 1 - 1e-4), torch.from_numpy(lab[ix]), reduction="none")
+        bce = nn.functional.binary_cross_entropy(
+            torch.clamp(p, 1e-4, 1 - 1e-4), torch.from_numpy(lab[ix]), reduction="none"
+        )
         bce = (bce * m * wt).sum() / torch.clamp((m * wt).sum(), min=1e-6)
         loss = pin + fit652.LAMBDA * bce
         if dx is not None:
             wm = torch.from_numpy(em[ix]) * wt
-            aux = nn.functional.binary_cross_entropy(torch.clamp(qe, 1e-4, 1 - 1e-4), torch.from_numpy(el[ix]), reduction="none")
+            aux = nn.functional.binary_cross_entropy(
+                torch.clamp(qe, 1e-4, 1 - 1e-4), torch.from_numpy(el[ix]), reduction="none"
+            )
             loss = loss + LAMBDA_END * (aux * wm).sum() / torch.clamp(wm.sum(), min=1e-6)
         return loss
 
@@ -174,7 +188,18 @@ def fit_one(job: tuple[str, str, int]) -> str:
         perm = np.random.default_rng(seed * 100 + epoch).permutation(n)
         for a in range(0, n, f647.BATCH):
             ix = perm[a : a + f647.BATCH]
-            loss = loss_of(pool=train, x_org=x_tr, age_org=age_tr, dx=dx_tr, ix=ix, w=w_tr, lab=lab_tr, inf=inf_tr, el=el_tr, em=em_tr)
+            loss = loss_of(
+                pool=train,
+                x_org=x_tr,
+                age_org=age_tr,
+                dx=dx_tr,
+                ix=ix,
+                w=w_tr,
+                lab=lab_tr,
+                inf=inf_tr,
+                el=el_tr,
+                em=em_tr,
+            )
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -183,7 +208,20 @@ def fit_one(job: tuple[str, str, int]) -> str:
             vl = 0.0
             for a in range(0, len(val.y), 20000):
                 ix = np.arange(a, min(a + 20000, len(val.y)))
-                vl += float(loss_of(pool=val, x_org=x_va, age_org=age_va, dx=dx_va, ix=ix, w=w_va, lab=lab_va, inf=inf_va, el=el_va, em=em_va)) * len(ix)
+                vl += float(
+                    loss_of(
+                        pool=val,
+                        x_org=x_va,
+                        age_org=age_va,
+                        dx=dx_va,
+                        ix=ix,
+                        w=w_va,
+                        lab=lab_va,
+                        inf=inf_va,
+                        el=el_va,
+                        em=em_va,
+                    )
+                ) * len(ix)
             vl /= len(val.y)
         log.append(vl)
         if vl < best - 1e-7:
@@ -206,37 +244,71 @@ def fit_one(job: tuple[str, str, int]) -> str:
         data_month = month
         sets = {
             "real": ("real", test["real"], np.flatnonzero(test["real"]["usable"])),
-            "held": ("bank", test["bank"], np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] >= 200))),
-            "fam": ("bank", test["bank"], np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] < 200))),
+            "held": (
+                "bank",
+                test["bank"],
+                np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] >= 200)),
+            ),
+            "fam": (
+                "bank",
+                test["bank"],
+                np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] < 200)),
+            ),
         }
     for name, (kind, z, idx) in sets.items():
         pool = f650.Pool(parts=[(z, idx, None)])
         x_te, age_te, _ = f647.make_inputs(raw=pool.raw, arm=arm, stats=stats, seed=seed + 3)
         dx = None
         if variant is not None:
-            dte = det_part(fold=month, data_month=data_month, kind=kind, variant=variant, z=z, idx=idx, neg_share=0.0, rng=None, noneigh=noneigh)
+            dte = det_part(
+                fold=month,
+                data_month=data_month,
+                kind=kind,
+                variant=variant,
+                z=z,
+                idx=idx,
+                neg_share=0.0,
+                rng=None,
+                noneigh=noneigh,
+            )
             dx = np.clip((dte - dstats[0]) / dstats[1], -10, 10).astype(np.float32)
         cols: list[list] = [[] for _ in range(6)]
         with torch.no_grad():
             for a in range(0, len(idx), 50000):
                 ix = np.arange(a, min(a + 50000, len(idx)))
-                x, q, age, lead, _y = f647.batch_inputs(x_org=x_te, age_org=age_te, pool=pool, ix=ix)
+                x, q, age, lead, _y = f647.batch_inputs(
+                    x_org=x_te, age_org=age_te, pool=pool, ix=ix
+                )
                 det = None if dx is None else torch.from_numpy(dx[pool.org[ix]])
                 for c, v in zip(cols, head(x=x, q=q, age=age, lead_h=lead, det=det), strict=True):
                     c.append(v.numpy())
         res[f"{name}_idx"] = idx.astype(np.int32)
         for key, c in zip(("q", "p", "d", "sigma", "p_haz", "q_end"), cols, strict=True):
             res[f"{name}_{key}"] = np.concatenate(c).astype(np.float32)
-    np.savez(out.with_suffix(".tmp.npz"), **res, val_log=np.array(log), n_train=n, best=best, seconds=time.time() - t0)  # ty: ignore[invalid-argument-type]
+    np.savez(
+        out.with_suffix(".tmp.npz"),
+        **res,
+        val_log=np.array(log),
+        n_train=n,
+        best=best,
+        seconds=time.time() - t0,
+    )  # ty: ignore[invalid-argument-type]
     out.with_suffix(".tmp.npz").rename(out)
-    torch.save({"head": head.state_dict(), "stats": stats, "dstats": dstats}, OUT / f"{out.stem}.pt")
+    torch.save(
+        {"head": head.state_dict(), "stats": stats, "dstats": dstats}, OUT / f"{out.stem}.pt"
+    )
     return f"{out.name}: {len(log)} epochs, val {best:.5f}, {time.time() - t0:.0f}s"
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", nargs="+", default=list(ARMS))
-    ap.add_argument("--months", nargs="+", default=list(c652.MONTHS), help="scored months, or `final` for all five months and the window")
+    ap.add_argument(
+        "--months",
+        nargs="+",
+        default=list(c652.MONTHS),
+        help="scored months, or `final` for all five months and the window",
+    )
     ap.add_argument("--seeds", nargs="+", type=int, default=list(c652.SEEDS))
     ap.add_argument("--workers", type=int, default=4)
     a = ap.parse_args()

@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E501, PLR0912, PLR0915, C901, ANN201
+# ruff: noqa: ANN001, ANN202, D103, E501, PLR0912, PLR0915
 """Experiment 663, step 4: the end detector on frozen J2 outputs (CPU).
 
 Arms `J2d` (real neighbour graph), `J2d_rw0` to `J2d_rw2` (rewired graphs), and `J2d_noneigh`. The
@@ -41,7 +41,10 @@ def base_rows(*, month: str, seed: int, setname: str) -> dict[str, np.ndarray]:
     parts = [np.load(BASE / f"J2_{month}_d{d}_s{seed}.npz") for d in (0, 14)]
     idx = np.concatenate([p[f"{setname}_idx"] for p in parts])
     o = np.argsort(idx)
-    return {k: np.concatenate([p[f"{setname}_{k}"] for p in parts])[o] for k in ("idx", "nra", "d", "sigma", "p")} | {"idx": idx[o]}
+    return {
+        k: np.concatenate([p[f"{setname}_{k}"] for p in parts])[o]
+        for k in ("idx", "nra", "d", "sigma", "p")
+    } | {"idx": idx[o]}
 
 
 def variant_of(*, arm: str) -> str:
@@ -53,7 +56,9 @@ def gather(*, fold: str, data_month: str, seed: int, kind: str, z: dict, i: np.n
     """Return the arrays of rows `i` of `z`: base outputs, detector inputs, truth, and weights."""
     b = base if base is not None else base_rows(month=data_month, seed=seed, setname=setname)
     pos = np.searchsorted(b["idx"], i)
-    assert np.array_equal(b["idx"][np.clip(pos, 0, len(b["idx"]) - 1)], i), "rows missing from j2_base"
+    assert np.array_equal(b["idx"][np.clip(pos, 0, len(b["idx"]) - 1)], i), (
+        "rows missing from j2_base"
+    )
     d = np.load(c663.WORK / "det_inputs_v2" / f"{fold}_{data_month}.npz")
     org = z["org"][i]
     clean = d[f"{kind}_{variant}"][org]
@@ -64,7 +69,13 @@ def gather(*, fold: str, data_month: str, seed: int, kind: str, z: dict, i: np.n
     if noneigh:
         det = det.copy()
         det[:, list(pan.NB_COLUMNS)] = 0.0
-    return {"nra": b["nra"][pos], "d": b["d"][pos], "sigma": b["sigma"][pos], "p": b["p"][pos], "det": det.astype(np.float32)}
+    return {
+        "nra": b["nra"][pos],
+        "d": b["d"][pos],
+        "sigma": b["sigma"][pos],
+        "p": b["p"][pos],
+        "det": det.astype(np.float32),
+    }
 
 
 def fit_one(job: tuple[str, str, int]) -> str:
@@ -91,17 +102,30 @@ def fit_one(job: tuple[str, str, int]) -> str:
     for train_month in [m for m in c650.MONTHS if m != month]:
         src = f650.sources(month=train_month, bank="new")
         fit652.with_state(z=src["bank"], month=train_month)
-        for kind, n_tr, n_va in (("real", f650.N_REAL, f650.N_VAL), ("bank", f650.N_BANK_PER_MONTH, f650.N_VAL_BANK // 2)):
+        for kind, n_tr, n_va in (
+            ("real", f650.N_REAL, f650.N_VAL),
+            ("bank", f650.N_BANK_PER_MONTH, f650.N_VAL_BANK // 2),
+        ):
             z = src[kind]
             setname = "real" if kind == "real" else "fam"
             for lst, lo, hi, n in ((tr, 0, 18, n_tr), (va, 21, 99, n_va)):
-                i = f650.pick(z=z, kind=kind, month=train_month, lo=lo, hi=hi, n=n, rng=rng, train_family=True)
+                i = f650.pick(
+                    z=z, kind=kind, month=train_month, lo=lo, hi=hi, n=n, rng=rng, train_family=True
+                )
                 g = gather(fold=month, data_month=train_month, seed=seed, kind=kind, z=z, i=i, setname=setname, variant=variant,
                            neg_share=c663.HARD_NEGATIVE_SHARE, rng=rng_neg, noneigh=noneigh)  # fmt: skip
                 w, lab, inf, _prim = fit652.extras(z=z, idx=i, kind=kind, mixture="m50")
                 y = z["target"][i] if "target" in z else z["y"][i]
                 el, em = fe0.end_labels(z=z, idx=i, kind=kind)
-                g.update(w=w, lab=lab, inf=inf, y=y.astype(np.float32), lead=z["lead"][i].astype(np.float32), el=el, em=em)
+                g.update(
+                    w=w,
+                    lab=lab,
+                    inf=inf,
+                    y=y.astype(np.float32),
+                    lead=z["lead"][i].astype(np.float32),
+                    el=el,
+                    em=em,
+                )
                 lst.append(g)
 
     def cat(parts: list[dict]) -> dict[str, np.ndarray]:
@@ -117,7 +141,13 @@ def fit_one(job: tuple[str, str, int]) -> str:
 
     ttr, tva = tens(train), tens(val)
     torch.manual_seed(seed)
-    det_net = nn.Sequential(nn.Linear(train["det"].shape[1], 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU(), nn.Linear(64, 1))
+    det_net = nn.Sequential(
+        nn.Linear(train["det"].shape[1], 64),
+        nn.ReLU(),
+        nn.Linear(64, 64),
+        nn.ReLU(),
+        nn.Linear(64, 1),
+    )
     with torch.no_grad():
         det_net[-1].weight.mul_(0.1)
         det_net[-1].bias.fill_(-3.0)
@@ -134,11 +164,19 @@ def fit_one(job: tuple[str, str, int]) -> str:
         wt = t["w"][ix]
         pin = (h.pinball(y=t["y"][ix], q=q) * wt).sum() / wt.sum()
         m = t["inf"][ix]
-        bce = nn.functional.binary_cross_entropy(torch.clamp(p, 1e-4, 1 - 1e-4), t["lab"][ix], reduction="none")
+        bce = nn.functional.binary_cross_entropy(
+            torch.clamp(p, 1e-4, 1 - 1e-4), t["lab"][ix], reduction="none"
+        )
         bce = (bce * m * wt).sum() / torch.clamp((m * wt).sum(), min=1e-6)
         wm = t["em"][ix] * wt
-        aux = nn.functional.binary_cross_entropy(torch.clamp(qe, 1e-4, 1 - 1e-4), t["el"][ix], reduction="none")
-        return pin + fit652.LAMBDA * bce + fe0.LAMBDA_END * (aux * wm).sum() / torch.clamp(wm.sum(), min=1e-6)
+        aux = nn.functional.binary_cross_entropy(
+            torch.clamp(qe, 1e-4, 1 - 1e-4), t["el"][ix], reduction="none"
+        )
+        return (
+            pin
+            + fit652.LAMBDA * bce
+            + fe0.LAMBDA_END * (aux * wm).sum() / torch.clamp(wm.sum(), min=1e-6)
+        )
 
     best, best_state, bad, log = np.inf, None, 0, []
     n = len(train["y"])
@@ -152,7 +190,11 @@ def fit_one(job: tuple[str, str, int]) -> str:
             opt.step()
         det_net.eval()
         with torch.no_grad():
-            vl = sum(float(loss_of(tva, torch.arange(a, min(a + 20000, len(val["y"]))))) * min(20000, len(val["y"]) - a) for a in range(0, len(val["y"]), 20000)) / len(val["y"])
+            vl = sum(
+                float(loss_of(tva, torch.arange(a, min(a + 20000, len(val["y"])))))
+                * min(20000, len(val["y"]) - a)
+                for a in range(0, len(val["y"]), 20000)
+            ) / len(val["y"])
         log.append(vl)
         if vl < best - 1e-7:
             best, bad = vl, 0
@@ -165,27 +207,62 @@ def fit_one(job: tuple[str, str, int]) -> str:
     det_net.load_state_dict(best_state)
     det_net.eval()
     res: dict[str, np.ndarray] = {}
-    if final:  # the window: the frozen J2 networks' forward pass (`e00663_j2_final.py`) on the window rows
+    if (
+        final
+    ):  # the window: the frozen J2 networks' forward pass (`e00663_j2_final.py`) on the window rows
         zw = f650.load(path=c663.WORK / "window" / "real_window.npz", kind="real")
         idx_w = np.flatnonzero(zw["usable"])
         rows = pl.read_parquet(c663.WORK / "j2_final" / "forecasts" / f"J2_s{seed}.parquet")
-        key_rows = (rows["primary"].to_numpy().astype(np.int64) * 4_000_000 + rows["origin_idx"].to_numpy()) * 1024 + (rows["target_idx"].to_numpy() - rows["origin_idx"].to_numpy())
-        key_w = (zw["prim"][idx_w].astype(np.int64) * 4_000_000 + zw["oi"][idx_w]) * 1024 + (zw["vi"][idx_w] - zw["oi"][idx_w])
+        key_rows = (
+            rows["primary"].to_numpy().astype(np.int64) * 4_000_000 + rows["origin_idx"].to_numpy()
+        ) * 1024 + (rows["target_idx"].to_numpy() - rows["origin_idx"].to_numpy())
+        key_w = (zw["prim"][idx_w].astype(np.int64) * 4_000_000 + zw["oi"][idx_w]) * 1024 + (
+            zw["vi"][idx_w] - zw["oi"][idx_w]
+        )
         o = np.argsort(key_rows)
         pos = np.searchsorted(key_rows[o], key_w)
-        assert np.array_equal(key_rows[o][np.clip(pos, 0, len(o) - 1)], key_w), "window rows missing from the J2 forward pass"
+        assert np.array_equal(key_rows[o][np.clip(pos, 0, len(o) - 1)], key_w), (
+            "window rows missing from the J2 forward pass"
+        )
         sel = o[pos]
-        win_base = {"idx": idx_w, "nra": rows.select([f"nra_{i}" for i in range(11)]).to_numpy()[sel], "d": rows["depth"].to_numpy()[sel], "sigma": rows["spread"].to_numpy()[sel], "p": rows["survival_probability"].to_numpy()[sel]}
+        win_base = {
+            "idx": idx_w,
+            "nra": rows.select([f"nra_{i}" for i in range(11)]).to_numpy()[sel],
+            "d": rows["depth"].to_numpy()[sel],
+            "sigma": rows["spread"].to_numpy()[sel],
+            "p": rows["survival_probability"].to_numpy()[sel],
+        }
         sets = {"window": ("real", zw, idx_w)}
     else:
         test = f650.sources(month=month, bank="new")
         sets = {
-        "real": ("real", test["real"], np.flatnonzero(test["real"]["usable"])),
-        "held": ("bank", test["bank"], np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] >= 200))),
-        "fam": ("bank", test["bank"], np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] < 200))),
+            "real": ("real", test["real"], np.flatnonzero(test["real"]["usable"])),
+            "held": (
+                "bank",
+                test["bank"],
+                np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] >= 200)),
+            ),
+            "fam": (
+                "bank",
+                test["bank"],
+                np.flatnonzero(test["bank"]["usable"] & (test["bank"]["pass_"] < 200)),
+            ),
         }
     for name, (kind, z, idx) in sets.items():
-        g = gather(fold=month, data_month="window" if final else month, seed=seed, kind=kind, z=z, i=idx, setname=name, variant=variant, neg_share=0.0, rng=None, noneigh=noneigh, base=win_base if final else None)
+        g = gather(
+            fold=month,
+            data_month="window" if final else month,
+            seed=seed,
+            kind=kind,
+            z=z,
+            i=idx,
+            setname=name,
+            variant=variant,
+            neg_share=0.0,
+            rng=None,
+            noneigh=noneigh,
+            base=win_base if final else None,
+        )
         t = tens(g)
         qs, ps, es = [], [], []
         with torch.no_grad():
@@ -199,7 +276,14 @@ def fit_one(job: tuple[str, str, int]) -> str:
         res[f"{name}_q"] = np.concatenate(qs).astype(np.float32)
         res[f"{name}_p"] = np.concatenate(ps).astype(np.float32)
         res[f"{name}_q_end"] = np.concatenate(es).astype(np.float32)
-    np.savez(out.with_suffix(".tmp.npz"), **res, val_log=np.array(log), n_train=n, best=best, seconds=time.time() - t0)  # ty: ignore[invalid-argument-type]
+    np.savez(
+        out.with_suffix(".tmp.npz"),
+        **res,
+        val_log=np.array(log),
+        n_train=n,
+        best=best,
+        seconds=time.time() - t0,
+    )  # ty: ignore[invalid-argument-type]
     out.with_suffix(".tmp.npz").rename(out)
     torch.save({"det": det_net.state_dict(), "mu": mu, "sd": sd}, OUT / f"{out.stem}.pt")
     return f"{out.name}: {len(log)} epochs, val {best:.5f}, {time.time() - t0:.0f}s"

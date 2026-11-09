@@ -342,7 +342,13 @@ def forecast_rows(*, model: Joint, x, prim, lead_h, mu_all, sd_all, device: str)
         nq.append(n.cpu().numpy())
         pq.append(q.cpu().numpy() if q is not None else n.cpu().numpy())
         pp.append(p.cpu().numpy() if p is not None else np.zeros(len(n), np.float32))
-    return np.concatenate(nq), np.concatenate(pq), np.concatenate(pp), np.concatenate(dd), np.concatenate(ss)
+    return (
+        np.concatenate(nq),
+        np.concatenate(pq),
+        np.concatenate(pp),
+        np.concatenate(dd),
+        np.concatenate(ss),
+    )
 
 
 def main() -> None:

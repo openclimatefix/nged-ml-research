@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E501, PLR0912, PLR0915, ANN201, C901
+# ruff: noqa: D103, E501, PLR0912
 """Experiment 663, step 6: contrasts with month-block intervals, absolute tables, and the veto (CPU).
 
 Reads `score/agg.parquet`. A contrast is the difference between two arms in one metric over lead
@@ -21,16 +21,50 @@ CONTRASTS = (
     ("E0d", "E0"), ("J2d", "J2"), ("E0d", "E0d_rw0"), ("E0d", "E0d_rw1"), ("E0d", "E0d_rw2"), ("E0d", "E0d_noneigh"),
     ("J2d", "J2d_rw0"), ("J2d", "J2d_rw1"), ("J2d", "J2d_rw2"), ("J2d", "J2d_noneigh"), ("J2", "E0"),
 )  # fmt: skip
-STRATA = ("far", "middle", "near", "ended24", "just_ended", "free", "free_far14", "inforce", "all", "onset_ahead")
-METRICS = ("crps_s", "crps", "nmae", "cov90", "cov98", "pin01", "pin05", "pin95", "pin99", "dep", "dep_crps", "dep_crps_nra", "crps_nra")
+STRATA = (
+    "far",
+    "middle",
+    "near",
+    "ended24",
+    "just_ended",
+    "free",
+    "free_far14",
+    "inforce",
+    "all",
+    "onset_ahead",
+)
+METRICS = (
+    "crps_s",
+    "crps",
+    "nmae",
+    "cov90",
+    "cov98",
+    "pin01",
+    "pin05",
+    "pin95",
+    "pin99",
+    "dep",
+    "dep_crps",
+    "dep_crps_nra",
+    "crps_nra",
+)
 
 
-def month_means(*, a: pl.DataFrame, arm: str, stratum: str, band: str, metric: str, setname: str = "fam") -> dict[tuple[str, int], float]:
-    f = a.filter((pl.col("arm") == arm) & (pl.col("stratum") == stratum) & (pl.col("set") == setname) & pl.col("lead_day").is_between(1, 9))
+def month_means(
+    *, a: pl.DataFrame, arm: str, stratum: str, band: str, metric: str, setname: str = "fam"
+) -> dict[tuple[str, int], float]:
+    f = a.filter(
+        (pl.col("arm") == arm)
+        & (pl.col("stratum") == stratum)
+        & (pl.col("set") == setname)
+        & pl.col("lead_day").is_between(1, 9)
+    )
     if band != "all":
         f = f.filter(pl.col("band") == band)
     g = f.group_by("month", "seed").agg(pl.col(metric).sum(), pl.col("n").sum())
-    return {(r["month"], r["seed"]): r[metric] / r["n"] for r in g.iter_rows(named=True) if r["n"] > 0}
+    return {
+        (r["month"], r["seed"]): r[metric] / r["n"] for r in g.iter_rows(named=True) if r["n"] > 0
+    }
 
 
 def seed_mean(d: dict[tuple[str, int], float]) -> dict[str, float]:
@@ -46,7 +80,14 @@ def interval(per_month: dict[str, float], *, n: int = 20000, seed: int = 663) ->
         return {}
     pick = np.random.default_rng(seed).integers(0, len(v), size=(n, len(v)))
     boot = v[pick].mean(axis=1)
-    return {"mean": float(v.mean()), "lo": float(np.quantile(boot, 0.025)), "hi": float(np.quantile(boot, 0.975)), "min": float(v.min()), "max": float(v.max()), "months": len(v)}
+    return {
+        "mean": float(v.mean()),
+        "lo": float(np.quantile(boot, 0.025)),
+        "hi": float(np.quantile(boot, 0.975)),
+        "min": float(v.min()),
+        "max": float(v.max()),
+        "months": len(v),
+    }
 
 
 def main() -> None:
@@ -62,7 +103,12 @@ def main() -> None:
                         out["absolute"][f"{band}|{st}|{arm}|{met}"] = interval(pm)
     for band in ("all", "short", "long"):
         for st in STRATA:
-            cnt = a.filter((pl.col("arm") == "K1") & (pl.col("stratum") == st) & (pl.col("set") == "fam") & pl.col("lead_day").is_between(1, 9))
+            cnt = a.filter(
+                (pl.col("arm") == "K1")
+                & (pl.col("stratum") == st)
+                & (pl.col("set") == "fam")
+                & pl.col("lead_day").is_between(1, 9)
+            )
             if band != "all":
                 cnt = cnt.filter(pl.col("band") == band)
             out["counts"][f"{band}|{st}"] = int(cnt["n"].sum())
@@ -81,7 +127,11 @@ def main() -> None:
     # real rows (no injected shift): the false-alarm share and CRPS on event-free real rows
     for arm in arms:
         for met in ("crps", "nmae", "dep", "dep_crps", "dep_crps_nra", "cov90"):
-            pm = seed_mean(month_means(a=a, arm=arm, stratum="real_free", band="real", metric=met, setname="real"))
+            pm = seed_mean(
+                month_means(
+                    a=a, arm=arm, stratum="real_free", band="real", metric=met, setname="real"
+                )
+            )
             if pm:
                 out["absolute"][f"real|real_free|{arm}|{met}"] = interval(pm)
     (c663.WORK / "score" / "tables.json").write_text(json.dumps(out, indent=1))

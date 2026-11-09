@@ -393,7 +393,9 @@ def main() -> None:
                 net = e.new_model(n_primaries=len(mr.base.target_mean)).to(device)
                 model = Joint(net=net, with_head=True, detach=False).to(device)
                 model.load_state_dict(
-                    torch.load(c663.E654 / "models" / f"J2_{month}_d{day}_s{seed}.pt", map_location=device)
+                    torch.load(
+                        c663.E654 / "models" / f"J2_{month}_d{day}_s{seed}.pt", map_location=device
+                    )
                 )
                 model.eval()
                 lo_us = e.c.us(t=cut)
@@ -463,7 +465,10 @@ def main() -> None:
                 for name in ("real", "held", "fam"):
                     assert np.array_equal(ref[f"{name}_idx"], res[f"{name}_idx"]), name
                     assert np.allclose(ref[f"{name}_p"], res[f"{name}_p"], atol=2e-3), (name, "p")
-                    assert np.allclose(ref[f"{name}_nra"], res[f"{name}_nra"], atol=2e-3), (name, "nra")
+                    assert np.allclose(ref[f"{name}_nra"], res[f"{name}_nra"], atol=2e-3), (
+                        name,
+                        "nra",
+                    )
                 print(f"{out.name}: {time.monotonic() - t0:.0f}s", flush=True)
                 del model, net
                 torch.cuda.empty_cache()

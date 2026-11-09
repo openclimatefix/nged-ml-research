@@ -1,4 +1,4 @@
-# ruff: noqa: ANN001, D103, E501, PLR0915, ANN201
+# ruff: noqa: D103, E501
 """Experiment 663, window step 1: R-haz's inputs for the final-test window (CPU).
 
 A copy of experiment 647's `build_real` (the `real_<month>.npz` head data) for experiment 620's
@@ -43,7 +43,10 @@ def main() -> None:
         pl.read_parquet(E620 / "export" / "K1_2026-07.parquet")
         .join(sub, on="time_series_id", how="left", validate="m:1")
         .with_columns(
-            *(pl.col(c) / pl.col("capacity") for c in (*c647.QNAMES, "observed_power", "nra_power")),
+            *(
+                pl.col(c) / pl.col("capacity")
+                for c in (*c647.QNAMES, "observed_power", "nra_power")
+            ),
             vi=((pl.col("valid_time").dt.epoch("us") - t0) // step).cast(pl.Int64),
             oi=((pl.col("power_fcst_init_time").dt.epoch("us") - t0) // step).cast(pl.Int64),
         )
@@ -54,14 +57,18 @@ def main() -> None:
     q = df.select(c647.QNAMES).to_numpy().astype(np.float32)
     y = df["observed_power"].to_numpy().astype(np.float32)
     res = {
-        name: d647.origin_residual(prim=prim, oi=oi, vi=vi, lead=lead, q50=q[:, 5], obs=y, first=a, last=b, n_days=n_days)
+        name: d647.origin_residual(
+            prim=prim, oi=oi, vi=vi, lead=lead, q50=q[:, 5], obs=y, first=a, last=b, n_days=n_days
+        )
         for name, (a, b) in d647.R0_SPECS.items()
     }
     keep = lead >= 24.0
     org_key = prim * 10_000_000 + oi
     uniq, org = np.unique(org_key, return_inverse=True)
     o_prim, o_oi = (uniq // 10_000_000).astype(np.int64), (uniq % 10_000_000).astype(np.int64)
-    feat, age, lag_age = d647.origin_features(prim=o_prim, oi=o_oi, power_lag=clean, power_sig=clean, table=table, nb=nb)
+    feat, age, lag_age = d647.origin_features(
+        prim=o_prim, oi=o_oi, power_lag=clean, power_sig=clean, table=table, nb=nb
+    )
     gate = np.zeros(len(uniq), bool)
     np.logical_or.at(gate, org, df["gate_on"].fill_null(False).to_numpy())
     np.savez(
