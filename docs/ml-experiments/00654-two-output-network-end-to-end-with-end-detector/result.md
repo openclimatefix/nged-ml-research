@@ -154,7 +154,8 @@ Ended in the last 24 h:
 generator is experiment 650's, not the log-uniform draw the plan below describes. The training
 family draws half its durations uniformly from 3 to 14
 days and half uniformly from 28 to 112 days, so about a quarter of events last at most 8 days and
-half last at least 28 days; the held-out family uses 5, 10, 21, and 45 days. All injected tables on this page use that earlier generator. The generator agreed later with the
+half last at least 28 days; the held-out family uses 5, 10, 21, and 45 days. All injected tables on
+this page use that earlier generator. The generator agreed later with the
 graph-approach discussion (durations log-uniform from 1 to 112 days with random ends, plus a short
 band down to 3 hours, and experiment 653's injector) was not used, so these tables are not
 comparable with injected tables built on it. The follow-up experiment uses the later generator.
