@@ -505,6 +505,15 @@ assumes 3-hour periods misplaces the daily peak after lead 144 hours
 solar farms in the trial area at leads of 12 to 252 hours. The confidence is moderate, and the entry
 is provisional until the experiment has had its reviews.
 
+**Keep production's window-mean resampler for ensemble shortwave, and join it to CAMS without a time
+shift.** *Applies to: experiments and production.* The experiment pipeline's half-hourly ensemble
+shortwave equals production's (`ml_core.features._radiation`) to 0.0 W/m2 on 15 runs, the
+window-mean time stamp agrees with CAMS values stamped at the end of the hour (best correlation at a
+shift of zero, r 0.966 to 0.986 at six Primaries), and the resampler rebuilds 3-hour windows to
+within 5.3% of the midday peak, against 15.5% for linear interpolation ([experiment
+661](00661-pv-ens-time-resolution-shortwave-interpolation-audit-and-bias-adapter/result.md)). The
+confidence is medium, and the entry is provisional until the experiment has had its reviews.
+
 **Drop observations that were not known at run time when building the `manual_heuristic` and
 climatology references.** *Applies to: experiments and production.* `manual_heuristic` takes the
 quantiles of 13 earlier observed powers, 1 to 6 weeks and 49 to 55 weeks before the half-hour. When
