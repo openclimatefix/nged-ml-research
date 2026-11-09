@@ -259,7 +259,7 @@ median and the 90% band track the observed peak.
   [574](../00574-part-d-primaries-only-modular-recipe-lag-encoder-offset-and-add-one-arms/result.md),
   and [572](../00572-two-offset-part-1-lags-versus-the-slow-output-offset/result.md); the
   pre-training matrices follow [experiment
-  564](../00564-pooled-primary-bsp-gsp-m2-reduced/result.md) and the cleaning flags [experiment
+  564](../00564-pooled-primary-bsp-gsp-m2-reduced/result.md) and the flagged-zero-actuals cleaning [experiment
   398](../00398-load-shift-event-rescore-without-flagged-zero-actuals/result.md).
 - **Cleaning:** flagged half-hours come from the cleaned power of experiment 398's flag file, which
   holds no flags for these series after 2025-09, so no half-hour is dropped in the test year; the
