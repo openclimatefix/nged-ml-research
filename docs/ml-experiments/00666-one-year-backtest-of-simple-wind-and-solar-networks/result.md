@@ -40,20 +40,21 @@ metric: >-
 verdict: inconclusive
 best_arm: none (descriptive backtest)
 headline: >-
-  Over 365 daily origins, wind S scores 4.06 points of capacity (CRPS) and solar PLP scores 2.91
+  Over 365 daily origins, wind S scores 4.06 points of capacity (continuous ranked probability score, CRPS) and solar PLP scores 2.91
   points on daylight half-hours, with q05-q95 coverage 0.91 and 0.885. At days 10 to 14 solar PLP
-  scores 3.24 against 3.39 for climatology, but it is worse than climatology from November to March.
+  scores 3.24 against 3.39 for climatology, but at days 10 to 14 it is worse than climatology from November to March.
 take_home_message: >-
   The two simple networks produce complete, sorted 11-quantile forecasts to 14 days for 3 wind farms
   and 6 solar farms, and wind S matches experiment 659 on the rows both cover. Solar PLP at days 10
-  to 14 beats climatology from April to September but not from November to March, its median is
-  biased by season (high in spring, low in autumn), and its upper tail on very sunny days is still
-  too low, so use the 10 to 14 day solar band with care.
+  to 14 beats climatology from April to September but not from November to March. Its median is
+  high in spring and low in autumn (seasonal or caused by refit age; this experiment cannot
+  separate them), its lower tail is about three times too frequent, and its upper tail on very
+  sunny days is still too low, so use the 10 to 14 day solar band with care.
 production_status: not-for-production
 ---
-**The year-long backtest is complete: `wind.parquet` and `solar.parquet` hold forecasts for 365 daily
-origins, and the scores show both networks working at all leads out to 14 days, with solar at days
-10 to 14 only slightly better than climatology.** The files are private (they hold the time series of
+**The year-long backtest is complete.** `wind.parquet` and `solar.parquet` hold forecasts for 365
+daily origins. Both neural networks score sensibly at every lead out to 14 days, and solar at days
+10 to 14 is only slightly better than climatology. The files are private (they hold the time series of
 NGED's metered generators, labelled by their original `time_series_id`). The backtest is descriptive,
 not a ranking: the year overlaps the development months of
 [experiment 659](../00659-simple-shared-network-with-fixed-physics-lite-power-wind-and-solar/result.md),
@@ -61,9 +62,9 @@ and origins from 2026-07-01 to 2026-10-31 lie in the window earlier experiments 
 test, so those months are no longer a held-out test for choosing between the networks and the
 defaults. No figures are included on this page; the scores below come from `scores/*.csv`.
 
-**Scores.** CRPS is the mean pinball loss over 11 quantile levels, in points of capacity (smaller is
+**Scores fall with lead for both neural networks, and solar PLP stays below climatology in every band.** CRPS (continuous ranked probability score) is the mean pinball loss over 11 quantile levels, in points of capacity (smaller is
 better). Capacity is the production effective capacity, the same table as the shared folder's
-`series_capacity.parquet`. Bands are days from the 12:00 UTC origin to the valid time. Wind scores
+`series_capacity.parquet`. Bands are half-open ranges of days from the 12:00 UTC origin to the valid time; the "7-14 d" and "10-14 d" rows overlap the other rows, so the table is not a partition. Wind scores
 count idle readings (experiment 210's idle mask) as zero until 2026-09-13; solar is scored on
 daylight half-hours only.
 
@@ -76,7 +77,7 @@ daylight half-hours only.
 | 10-14 d | 4.93 | 0.922 | 3.24 | 0.886 | 3.39 |
 | All | 4.06 | 0.913 | 2.91 | 0.885 | 3.38 |
 
-Wind S median MAE (% of capacity) runs from 8.2 at 0-1 d to 18.3 at 10-14 d, and solar PLP from 7.9
+Wind S (raw ensemble weather only) and solar PLP (physics-lite power plus raw weather) are the networks of experiment 659. Wind S median mean absolute error (MAE, % of capacity) runs from 8.2 at 0-1 d to 18.3 at 10-14 d, and solar PLP from 7.9
 to 12.8 (climatology: 13.3). Share of observations above q99 (ideal 0.01): wind 0.016 at 0-1 d and
 0.023 at 10-14 d; solar 0.012 and 0.011. Share below q01: wind 0.011 and 0.007; solar 0.028 and
 0.032 (most solar rows below q01 have an observed power of zero or less). By origin month, wind S
@@ -90,11 +91,11 @@ in December (1.27) and worst in March (3.95) and September (3.74).
   4.179 when both use experiment 659's scoring capacity. The absolute numbers on this page are about
   5% higher than experiment 659's because the production effective capacity is 2.3% to 8.7% below
   experiment 659's wind capacity. Solar is 0.13 points worse than experiment 659 on 120,000 matched
-  rows (3.350 against 3.224), most likely because each refit here is one month older for the scored
-  months and the network trained to longer leads.
+  rows (3.350 against 3.224), possibly because each refit here is one month older for the scored
+  months and the solar neural network here trains on leads up to 348 h.
 - **Prediction (1)** (within 0.15 points of 3.684 on overlapping months) cannot be judged on that
   basis: the overlap-month score here is 4.011 because of the capacity difference and because the
-  3.684 includes October 2025. On matched rows and capacity the two agree. **Prediction (2)** holds
+  3.684 includes October 2025. On matched rows and matched capacity the two agree. **Prediction (2)** holds
   overall (3.24 against 3.39) but not from November to March, when solar PLP at 10-14 d scores
   worse than climatology by 0.03 to 0.42 points; it is better by 0.17 to 0.48 points from April to
   September. **Prediction (3)** holds for wind and solar coverage in every band (0.88 to 0.92; solar
@@ -103,10 +104,9 @@ in December (1.27) and worst in March (3.95) and September (3.74).
   comparable with experiment 659's 10.6% to 12.7%; the weak upper tail on very sunny days is not
   resolved.
 - **Seasonal bias.** The solar median is high in spring (+6.5 points of capacity in March) and low
-  in autumn (-6.9 in September, -8.5 in October, all 6 farms), and the network has no calendar
-  input. The wind median at 10-14 d is low in November and December (only 28% and 32% of
-  observations fall below q50). Coverage stays near 0.90 partly because the bands are very wide at
-  long leads.
+  in autumn (-6.9 in September, -8.5 in October, all 6 farms), and the solar neural network has no
+  calendar input; one year with quarterly refits cannot separate a seasonal effect from refit age. The wind median at 10-14 d is low in November and December (only 28% and 32% of
+  observations fall below q50). Wide bands at long leads may explain why coverage stays near 0.90.
 - **Wind idle mask ends on 2026-09-13.** From that date idle readings count as observed in scoring
   and in the 2026-10-01 refit's training target, so September and October are scored on a different
   target (one farm's share below q01 rises from 1.1% to 5.4%).
@@ -118,25 +118,27 @@ in December (1.27) and worst in March (3.95) and September (3.74).
   the 3-hour or 6-hour ensemble period, so about 3,000 half-hours around dusk and dawn at leads of
   6 days or more carry small non-zero quantiles (q99 at most 0.7% of capacity), and some dawn and
   dusk half-hours in a mostly dark period are forecast as zero. The solar all-half-hours tables in
-  `scores/` are diluted by night rows and by 3.8% negative night readings; use the daylight tables.
+  `scores/` are diluted by night rows and by 3.8% negative night readings; use the `solar_daylight_*.csv` tables.
 - **Scoring rows.** Rows without observed power are dropped, so origins after about 2026-10-26 are
   scored on part of their 14 days. Observed power is not in the files.
-- **No break at any refit boundary:** consecutive-origin forecasts for the same valid times differ by
+- **No break at any refit boundary in the median, band width, or q99:** consecutive-origin forecasts for the same valid times differ by
   no more than the ordinary day-to-day change at all 11 wind boundaries and all 3 solar boundaries.
   Median minus mean forecast per site was not computed (the mixture mean is not stored).
-- **Reviews** (all fresh agents; findings triaged against the code): code review before the first
-  fit by 2 Sonnet reviews (leakage, contract: 8 findings, all minor, accepted fixes were a 7-14 d
-  band, assertions that no training valid time reaches the refit, coverage and archive checks that
-  raise, and Int8 and origin-count checks) and 1 Opus review of leakage and fold logic (3 findings,
-  low or informational; no leakage). After the files were written: 1 Sonnet file audit (4 findings,
-  low; both files clean, one wind and one solar fold re-ran from scratch to 0.0 MW difference,
-  scores reproduced) and 1 Opus review of files and scores (12 findings: the band-label bug, which
-  gave the "7-14 d" row the 7-10 d rows and is fixed; the rest are the caveats above). Prose review
-  of this page: pending.
+- **Reviews** (all fresh agents; every finding was triaged against the code):
+    - Before the first fit, 2 Sonnet reviews (leakage and contract) found 8 minor points. The
+      accepted fixes were assertions that no training valid time reaches the refit, coverage and
+      archive checks that raise, and Int8 and origin-count checks.
+    - Before the first fit, 1 Opus review of leakage and fold logic found 3 low or informational
+      points and no leakage.
+    - After the files were written, 1 Sonnet file audit found 4 low points. Both files were clean,
+      one wind fold and one solar fold re-ran from scratch to 0.0 MW difference, and the scores
+      reproduced.
+    - 1 Opus review of the files and scores found 12 points, which are the caveats above.
+    - 1 Sonnet prose and number review found no wrong number; its prose findings are applied.
 
 ## Method
 
-- **Models.** Wind S and solar PLP of
+- **Neural networks and weather inputs.** Wind S and solar PLP of
   [experiment 659](../00659-simple-shared-network-with-fixed-physics-lite-power-wind-and-solar/result.md):
   a pooled network of two hidden layers of 64 units with a three-component Gaussian mixture over
   power as a fraction of capacity, 11 quantiles read from the mixture and capped at capacity, 3
@@ -155,7 +157,7 @@ in December (1.27) and worst in March (3.95) and September (3.74).
   ensemble steps are 3-hourly or 6-hourly, the value is interpolated as in experiments 310 and 430;
   the share of daylight half-hours lacking their own stamp is 0% at every lead.
 - **Power lags.** Neither network reads a power lag, so the 6-hour power delay changes no feature.
-  It sets only the training cut-off of each refit. The first forecast half-hour (valid 12:00) has
+  The power delay sets only the training cut-off of each refit. The first forecast half-hour (valid 12:00) has
   already ended at the origin; no power is an input, so this leaks nothing.
 - **Refits.** Wind S refits on day 0 of each month (12 refits), training on runs and valid times
   before 62 days earlier and stopping early on the last 62 days, 40 epochs. Solar PLP refits on
@@ -166,7 +168,7 @@ in December (1.27) and worst in March (3.95) and September (3.74).
   kept. Wind training leads run to 351 h from the 09:00 stamp, as in experiment 659. Capacity is the
   99.9th percentile of cleaned power over the 730 days before each refit. Wind idle readings are
   zero in training and scoring until 2026-09-13.
-- **Cost.** About 20 minutes of GPU time in 3 parallel processes (36 wind fits, 12 solar fits).
+- **Compute time.** About 20 minutes of GPU time in 3 parallel processes (36 wind fits, 12 solar fits).
 - **Scoring.** The 11-level pinball loss times 100 and the normalised median MAE, by origin-to-valid
   lead band and origin month, against cleaned observed power (outside the files). Solar climatology
   is the farm's own power at the same month and half-hour before each refit.
