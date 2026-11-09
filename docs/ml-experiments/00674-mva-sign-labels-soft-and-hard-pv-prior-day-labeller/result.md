@@ -146,7 +146,9 @@ mean clear-sky index from the Copernicus Atmosphere Monitoring Service (CAMS) fr
 (0.7 or more, between, below 0.3). The three arms differ in how they use the expectation that export
 happens on sunny days: C uses no prior, B flags only sunny days with enough solar capacity, and A
 raises the evidence needed on less sunny days. P1 to P5 are the pre-registered predictions in the
-plan below. NGED's "Monitor Direction" labels are a hint, not truth.
+plan below. NGED's "Reverse Power Flow?" column (file "Monitor Direction") is a hint, not
+truth: it has no confidence column, and this page reports agreement and conflicts with it as
+findings, never as labels or training truth.
 
 ## Figures
 
