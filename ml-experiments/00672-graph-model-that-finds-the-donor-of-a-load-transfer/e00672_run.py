@@ -37,17 +37,21 @@ from e00658_decode import CHUNK, STRIDE, DecodeCosts, decode_net
 from e00660_ev34_detector import truths  # ty: ignore[unresolved-import]
 from e00670_run import (  # ty: ignore[unresolved-import]
     CELLS,
-    CONFIGS,
     event_free,
     events_table,
     logged_shifts,
     matched,
     verified_d5_d16,
 )
+from e00670_run import (
+    CONFIGS as CONFIGS_670,
+)
 from e00672_data import TRAIN_END, build_world, inject_world, rig
 from e00672_net import DonorNet
 from e00672_train import MIXES, SEED0, WORK, _solar, graph_of
 
+CONFIGS: Final = {**CONFIGS_670, "shaped": MIXES["shaped"]}
+"""Experiment 670's configurations plus the shaped one of the cross-injector test."""
 DEV: Final = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ON_GRID: Final = (1.0, 2.0)
 BOOSTS: Final = (0.3, 1.0, 3.0, 10.0)
