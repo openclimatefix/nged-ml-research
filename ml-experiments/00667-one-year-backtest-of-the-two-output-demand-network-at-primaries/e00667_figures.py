@@ -82,7 +82,7 @@ def crps_by_month(d: pl.DataFrame) -> alt.Chart:
             title=alt.TitleParams(
                 [
                     "CRPS by month of the origin, all lead bands",
-                    "Points of capacity; smaller is better. 2025-11 and 2025-12 prevailing rows use the fallback survival curve.",
+                    "Points of capacity; smaller is better. Prevailing is lower in 9 of 12 months. 2025-11 and 2025-12 prevailing rows use the fallback survival curve.",
                 ],
                 anchor="start",
                 fontSize=12,
@@ -108,7 +108,8 @@ def coverage_by_month(d: pl.DataFrame) -> alt.Chart:
             title=alt.TitleParams(
                 [
                     "Share of observed power inside the q05 to q95 band, by month of the origin",
-                    "Dashed rule: 0.90, the nominal share. Closer to the rule is better.",
+                    "Dashed rule: 0.90 nominal. Dotted rules: 0.85 and 0.95, the range that prediction P3 required.",
+                    "NRA is scored against metered power, so event windows lower its share.",
                 ],
                 anchor="start",
                 fontSize=12,
@@ -131,7 +132,12 @@ def coverage_by_month(d: pl.DataFrame) -> alt.Chart:
         .mark_rule(strokeDash=[4, 4], color="#555")
         .encode(y="y:Q")
     )
-    return line + rule
+    tol = (
+        alt.Chart(pl.DataFrame({"y": [0.85, 0.95]}))
+        .mark_rule(strokeDash=[1, 3], color="#888")
+        .encode(y="y:Q")
+    )
+    return line + tol + rule
 
 
 def example(*, series: int, origin: str, name: str) -> alt.Chart:
@@ -149,8 +155,10 @@ def example(*, series: int, origin: str, name: str) -> alt.Chart:
     )
     f = f.join(t, on="valid_time", how="left").rename({"NRA_or_prevailing": "arm"})
     unit = CAPACITY.filter(pl.col("time_series_id") == series)["power_unit"][0]
-    base = alt.Chart(f, width=W - 80, height=180).encode(
-        x=alt.X("valid_time:T", title="Valid time (UTC)")
+    base = alt.Chart(f, width=W - 80, height=280).encode(
+        x=alt.X(
+            "valid_time:T", title="Valid time (UTC)", axis=alt.Axis(format="%a %d", tickCount=14)
+        )
     )
     band = base.mark_area(opacity=0.25).encode(
         y=alt.Y("q05:Q", title=f"Power ({unit})"),
@@ -164,7 +172,8 @@ def example(*, series: int, origin: str, name: str) -> alt.Chart:
         title=alt.TitleParams(
             [
                 name,
-                "Line: median. Shade: q05 to q95. Black: observed power. One 14-day forecast, origin 12:00 UTC.",
+                "Series 26 (MVA), origin 2026-02-01 12:00 UTC. Coloured line: median. Shade: q05 to q95.",
+                "Black line: observed power. The prevailing band falls below zero.",
             ],
             anchor="start",
             fontSize=12,

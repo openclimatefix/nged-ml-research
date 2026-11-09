@@ -40,26 +40,28 @@ metric: >-
 verdict: inconclusive
 best_arm: >-
   Not a ranking. The prevailing output has a lower CRPS than the NRA output in every lead band
-  (by 0.38 points of capacity at days 0 to 1, shrinking to 0.10 at days 7 to 14) and in 9 of 12
+  (by 0.37 points of capacity at days 0 to 1, shrinking to 0.10 at days 7 to 14) and in 9 of 12
   months.
 headline: >-
   Over the 365 daily origins 2025-11-01 to 2026-10-31 at the 16 Primaries, the prevailing output
-  scores a CRPS of 4.14 points of capacity and a median error of 7.39, and the NRA output 4.32 and
-  7.59. Scores rise from 3.46 (days 0 to 1) to 4.43 (days 7 to 14) for the prevailing output. The
+  scores a CRPS of 4.14 points of capacity and a median error of 7.39 points, and the NRA output
+  4.32 and 7.59. Scores rise from 3.46 (days 0 to 1) to 4.43 (days 7 to 14) for the prevailing output. The
   q05 to q95 band holds the observed power on 0.85 of half-hours (prevailing) and 0.81 (NRA),
   against a nominal 0.90.
 take_home_message: >-
   The Candidate with a 14-day survival head forecasts a year of daily origins at 16 Primaries with a
-  CRPS between 3.5 and 4.4 points of capacity, and the score worsens only gently with lead. Both
+  CRPS between 3.5 and 4.4 points of capacity, rising 28% (prevailing) or 18% (NRA) from days 0 to 1
+  to days 7 to 14. Both
   outputs are too narrow: the q05 to q95 band covers 0.81 (NRA) and 0.85 (prevailing) of
-  half-hours, and as little as 0.72 for the NRA output in August. The prevailing output beats the
-  NRA output on average and in 9 of 12 months, but the November and December folds use a fallback
+  half-hours, and as little as 0.72 for the NRA output in August. The prevailing output has the lower
+  CRPS on average and in 9 of 12 months (a comparison that is not like for like, because the NRA
+  output deliberately excludes load shifts that the metered power contains), but the November and December folds use a fallback
   survival curve with no trained head, and the prevailing output loses to the NRA output at two
   Primaries. The year overlaps the development months and the final test, so none of this is a ranking.
 advice:
   - >-
     Do not read the q05 to q95 columns as a 90% interval. Widen or recalibrate them before use;
-    the width is a follow-up, not something this backtest tuned (calibration table).
+    the width is a follow-up, not something this backtest tuned (coverage by lead band table).
   - >-
     Treat the prevailing rows of 2025-11 and 2025-12 as the fallback method: they equal the NRA
     rows on 74% and 65% of origins (Method).
@@ -70,18 +72,28 @@ production_status: candidate
 adopted_in: none
 ---
 
-**A one-year backtest of the class 2 Candidate demand network at the 16 Primaries scored a CRPS of
+**A one-year backtest of the Candidate demand neural network at the 16 Primaries scored a CRPS of
 4.14 points of capacity for the prevailing output and 4.32 for the NRA output.** The year runs from
 2025-11-01 to 2026-10-31, with one forecast origin per day at 12:00 UTC and 672 half-hours (14
-days) per origin. This is a descriptive backtest, not a ranking: the year overlaps the
+days) per origin. The backtest is descriptive, not a ranking: the year overlaps the
 development months and the final-test window, nothing was tuned on it, and nothing is adopted for
-production. A Primary is a primary substation. NRA is the normal running arrangement output (the
-Candidate's 11 quantiles). The prevailing output is the Candidate's 11 quantiles mixed with a
-shifted copy of themselves, weighted by a survival probability that a load shift is still in
-force.
+production. A Primary is a primary substation, metered in MW or MVA (megavolt-amperes, apparent power).
+The Candidate is the neural network that experiment 612 chose from three classes of demand
+network design: it reads lagged power, power summaries from neighbouring Primaries, and the
+ECMWF ensemble weather forecast (ENS, 51 members). It outputs 11 quantiles per half-hour.
 
-**The score worsens only gently with lead time.** The prevailing output's CRPS rises from 3.46
-points of capacity at days 0 to 1 to 4.43 at days 7 to 14.
+**The two outputs differ in how they treat a load shift.** A load shift is a transfer of load
+between Primaries, usually for days to weeks and not labelled in NGED's data. The NRA output
+(normal running arrangement) is the Candidate's 11 quantiles, which forecast power as if no
+load shift were in force. The prevailing output mixes those 11 quantiles with a copy of them
+shifted by a learned depth, weighted by the probability that a load shift is still in force
+(the survival probability, read from a small neural-network output called the survival head,
+which predicts a hazard for each of 14 days). In November and December 2025 the survival
+probability comes from a fixed log-normal curve (the fallback), because no earlier month had
+yet produced training data for the survival head.
+
+**The score rises with lead time by 28% (prevailing) and 18% (NRA).** The prevailing output's CRPS
+rises from 3.46 points of capacity at days 0 to 1 to 4.43 at days 7 to 14.
 
 ![CRPS by lead band for both outputs](crps_by_band.svg)
 
@@ -93,13 +105,15 @@ points of capacity at days 0 to 1 to 4.43 at days 7 to 14.
 | 7 to 14 days | 4.53 | 8.00 | 4.43 | 7.94 |
 | All | 4.32 | 7.59 | 4.14 | 7.39 |
 
-All values are points of capacity. "Median error" is the normalised mean absolute error of the
+**CRPS is twice the mean pinball loss, and median error is the normalised mean absolute error of
+the median.** All values are points of capacity. "Median error" is the normalised mean absolute error of the
 median (q50): 100 times the absolute error divided by the Primary's capacity, averaged over
 scored half-hours. CRPS is twice the mean pinball loss over the 11 quantile levels, divided by
 capacity, times 100. The pooled value weights each half-hour equally, so a Primary with a large
 spread counts once per half-hour, not once per Primary.
 
-**By month of the origin, the prevailing output has the lower CRPS in 9 of 12 months.** The NRA
+**By month of the origin, the prevailing output has the lower CRPS in 9 of 12 months, but the two
+outputs are not scored like for like.** The NRA
 output is lower in 2025-12 (the second fold that uses the fallback survival curve), 2026-01, and
 2026-06.
 
@@ -120,12 +134,14 @@ output is lower in 2025-12 (the second fold that uses the fallback survival curv
 | 2026-09 | 4.32 | 7.76 | 3.98 | 7.18 |
 | 2026-10 | 4.18 | 7.33 | 4.05 | 7.06 |
 
-The month is the month of the forecast origin, so an origin on 31 October scores valid times
-until 14 November under 2026-10.
+**The month is the month of the forecast origin.** An origin on 31 October scores valid times
+until 14 November under 2026-10. The NRA output deliberately excludes load shifts that the
+metered power contains, so a lower prevailing CRPS partly reflects that the prevailing output may
+move with them.
 
 **Both outputs are too narrow, and the pre-registered coverage prediction P3 failed.** P3 said that
-the q05 to q95 coverage of the NRA output would lie within 0.05 of 0.90 in every month. It does
-so in 3 of 12 months (2025-11, 2026-02, 2026-06). The NRA coverage runs from 0.72 (August) to 0.89
+the q05 to q95 coverage of the NRA output would lie within 0.05 of 0.90 in every month. The NRA
+coverage lies within 0.05 of 0.90 in 3 of 12 months (2025-11, 2026-02, 2026-06). The NRA coverage runs from 0.72 (August) to 0.89
 (November), the prevailing coverage from 0.80 (July) to 0.89 (November).
 
 ![Share of observed power inside the q05 to q95 band, by month](coverage_by_month.svg)
@@ -137,25 +153,27 @@ so in 3 of 12 months (2025-11, 2026-02, 2026-06). The NRA coverage runs from 0.7
 | 3 to 7 days | 0.815 | 0.408 | 0.851 | 0.440 |
 | 7 to 14 days | 0.810 | 0.403 | 0.839 | 0.426 |
 
-The NRA output is a counterfactual target, scored here against metered power, so event windows
-count against its coverage by construction. Part of the gap between the two outputs is that
-effect and not a fault in the NRA band. The band was not rescaled in this experiment.
+**Part of the NRA output's coverage shortfall is built in.** The NRA output is a counterfactual
+target, scored here against metered power, so event windows fall outside its band by construction.
+Part of the coverage gap between the two outputs comes from that effect and not from a fault in
+the NRA band. The band was not rescaled in this experiment.
 
 ![A 14-day forecast at one Primary: NRA output above, prevailing output below](example_forecast.svg)
 
-The example is one Primary (series 26, metered in MVA) from the origin of 2026-02-01 12:00 UTC,
-chosen because the prevailing median differs most from the NRA median on that origin (the
-prevailing output moves often at this Primary and does not beat NRA there; see Caveats).
+**The example shows a Primary where the two outputs differ visibly.** It is series 26 (metered in
+MVA) from the origin of 2026-02-01 12:00 UTC, one of the three origins at that Primary where the
+prevailing median differs most from the NRA median. The prevailing output moves often at this
+Primary and does not beat the NRA output there, and its q05 falls below zero MVA (see Caveats).
 
 **Predictions P1 and P2 were not tested.** P1 compared the Candidate's score at days 0 to 10
 after the extension to 14 days with experiment 620's stored Candidate on the same months. No
 matched run was made, so P1 is unevaluated. P2 asked whether the survival output stays
 calibrated at days 10 to 14, and the page has no measurement of it. The survival probability at
-those leads is read from the generator, not checked against observed events (see Caveats).
+days 10 to 14 is read from the generator, not checked against observed events (see Caveats).
 
 ## Method
 
-- **Base network:** the Candidate (arm `P7+D50`: neighbour power summaries, 50% signal dropout, no
+- **Base neural network:** the Candidate (arm `P7+D50`: neighbour power summaries, 50% signal dropout, no
   explicit gate) of [experiment
   612](../00612-nra-combined-networks-three-class-roster-completion/result.md) and [experiment
   613](../00613-nra-roster-contrasts-with-intervals-five-seeds/result.md), as set up by [experiment
@@ -205,7 +223,7 @@ those leads is read from the generator, not checked against observed events (see
 - **Units:** quantiles are scaled by each Primary's capacity and stored in MW for series 7, 8, 10,
   12, 13, 16, 17, and 18, and in MVA for series 3, 9, 11, 14, 15, 24, 25, and 26.
 - **Scoring:** against `ground_truth_primaries.parquet` (cleaned power, outside the file), divided
-  by `series_capacity.parquet`, as in the table captions above.
+  by `series_capacity.parquet`, as defined under the first table.
 - **Compute:** about 0.5 GPU-hours per fold for the Candidate chains, inside the 10 GPU-hour
   ceiling.
 
@@ -217,14 +235,14 @@ those leads is read from the generator, not checked against observed events (see
   pairs; all times are UTC.
 - Timing: the file's NRA rows for a 12:00 UTC origin equal the native 09:00 UTC fit's seed-mean
   quantiles times capacity exactly (maximum difference 0.0), so the 3-hour offset is applied once.
-- Leakage: a Sonnet review for leakage, a Sonnet review for the contract, and an Opus review of the
-  fold logic of the Candidate found no leak. The only defects were stale inputs for the later folds
-  and a hole in the lag-free tables, both fixed, with the affected folds rebuilt. A Sonnet review of
-  the prevailing-rows code found one lookahead (an automatic flag mask whose runs depend on the
-  first days of the scored month was applied to the head's training rows); the mask was removed and
-  all 12 prevailing fits were re-run. A Sonnet audit of the file and a from-scratch re-run of one
-  fold passed. An Opus review of the file and the scores reproduced every score to 3 decimals, and
-  found no unit, timing, or scaling error.
+- Leakage, fold logic: reviews by a Sonnet reviewer for leakage, a Sonnet reviewer for the
+  contract, and an Opus reviewer of the fold logic found no leak into any fold's training data.
+- Leakage, prevailing head: no automatic flag mask computed from the scored month is applied to the
+  head's training rows, and fold M's head trains only on banks of months before M. A Sonnet review
+  of the head's code checked both.
+- File and scores: a Sonnet audit of the file, with a from-scratch re-run of one fold, passed. An
+  Opus review of the file and the scores reproduced every score to 3 decimals and found no unit,
+  timing, or scaling error.
 - No observed power is stored in the file.
 
 ## Caveats
@@ -235,12 +253,12 @@ those leads is read from the generator, not checked against observed events (see
 - **The prevailing output has no floor at zero for MVA-only series.** Series 26, 14, and 15
   produce more negative `q01` rows than the NRA output (the lowest prevailing `q01` is -2.26 MVA at
   series 26, against -1.21 for NRA). Neither arm is clamped.
-- **Series 12 exports power** (observed power runs from -0.92 to 1.28 of its 3.0 MW capacity), so
+- **Series 12 exports power** (observed power runs from -0.92 MW to 1.28 MW, against a capacity of 3.0 MW), so
   its CRPS (13.0 to 13.6 points) is about three times the pooled value and adds about 0.6 points to
   it.
 - **The prevailing output loses to the NRA output at series 14 and 26** (CRPS 7.16 against 6.90 at
   series 14, 7.41 against 7.37 at series 26), and its median at series 26 differs from the NRA
-  median by more than 5 points on 52% of origins.
+  median by more than 5 points of capacity, at some lead, on 52% of origins.
 - **The first row of each origin covers the half-hour ending at the origin** (11:30 to 12:00 UTC):
   `valid_time` is the end of the half-hour, and lead 0 is that row.
 - **The bank's injected lags use the month's later power for proportional shifts,** which stays
