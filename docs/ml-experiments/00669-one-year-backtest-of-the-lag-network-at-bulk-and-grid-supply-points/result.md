@@ -8,7 +8,7 @@ title: >-
 theme: production-reference-and-best-guess
 also_relevant_to:
   - hierarchy-and-pooling
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -46,67 +46,210 @@ row_set_id: backtest_year_2025_11_to_2026_10_daily_12utc
 metric: >-
   CRPS in points of capacity and the normalised MAE of the median, by lead band (days 0 to 1, 1 to
   3, 3 to 7, 7 to 14) and by month, with q01, q05, q95, and q99 coverage.
+date: 2026-11-09
+verdict: supported
+best_arm: >-
+  The lag-enabled network with a 3.5-hour lag cut: CRPS 7.40 points of capacity at day 0 and 10.47 at
+  days 7 to 14, pooled over the 4 series and 365 daily origins.
+headline: >-
+  A one-year backtest of the lag-enabled network scores a CRPS of 4.3 to 6.3 points of capacity at the
+  2 bulk supply points and 10.5 to 14.6 at the 2 grid supply points, rising until about day 7 and flat
+  after. The 90% band holds 0.87 of readings against a nominal 0.90.
+lessons:
+  - >-
+    CRPS stops rising at about day 7 (10.17 at day 8 against 10.5 at days 11 to 14), so the days 11
+    to 14 that experiment 633 never scored add no extra error.
+  - >-
+    The 90% band is slightly too narrow in every lead band (coverage 0.87 to 0.88 against 0.90), and
+    the 98% band covers 0.97.
+  - >-
+    A load shift that the lags cannot see in advance is missed by the whole band: at Walpole on
+    2026-10-19 the observed demand rose to about 500 MW against a median near 250 MW.
+take_home_message: >-
+  The lag-enabled network forecasts the 2 bulk and 2 grid supply points with a CRPS of 7.4 points of
+  capacity on day 0, rising to about 10.5 from day 7 to day 14 (bulk supply points 4.3 to 6.3, grid supply
+  points 10.5 to 14.6), and its 90% band covers 0.87 of readings. On July to October 2026 origins, power
+  lags cut at 3.5 hours score 7.24 at hours 0 to 72 against 7.54 for experiment 633's 24-hour lags, but
+  the two runs also differ in refit cadence. The network follows no load shift, and the largest miss
+  in the year is one.
+advice:
+  - >-
+    Report days 11 to 14 for this network: they score no worse than days 7 to 10 (10.5 against 10.4),
+    so extending to 14 days needs no new recipe (Figure 1).
+  - >-
+    Widen the q05 to q95 band at these 4 series before a release: it covers 0.87 against 0.90 at every
+    lead band (Table 2).
+  - >-
+    Add a model of load shifts before judging the grid supply points on events like 2026-10-19 at
+    Walpole (Figure 4).
+production_status: not-for-production
+adopted_in: none
 ---
-A bulk supply point (BSP) is a substation that takes power from the transmission network, and a
-grid supply point (GSP) is a substation where the distribution network meets the transmission
-network. This page is planned and holds the plan only.
 
-## Method (plan)
+**The lag-enabled network forecasts the 2 bulk supply points (BSPs) and 2 grid supply points (GSPs)
+at a CRPS of 7.4 points of capacity on day 0, and its error rises to about 10.5 by day 7 and stays
+there to day 14.** CRPS is the continuous ranked probability score, here in percent of effective
+capacity, so smaller is better. The BSPs score 4.3 (day 0) to 6.3 (days 7 to 14) and the GSPs 10.5
+to 14.6. This is a descriptive backtest of 365 daily origins from 2025-11-01 to 2026-10-31. It
+overlaps the development months and the held-out months of experiment 633, so no number here is a
+held-out score and nothing is ranked.
 
-- **Network:** experiment 633's lag-enabled network, which is experiment 622's arm `lagged_b1`:
-  the pooled, group-of-2 mixture density network of experiment 619 with the D5 output offset of
-  experiment 565, the thermal-lag and solar-gain columns of experiment 569, the shared lag encoder
-  of experiment 591, frozen encoders in fine-tuning, and the three-step schedule with a 3-day
-  embargo of experiment 574 (arm P5). Pre-training on ERA5 and CAMS, then the ENS mixer, then the
-  fine-tune, as in those experiments. No neighbour inputs, no gate, and no load-shift model.
-- **Lags:** the stored network reads power at least 24 hours before its 09:00 origin (the
-  `24h` cap of experiments 560 and 572), which already satisfies the contract's cut. The
-  maintainer asked for lags of at least 6 hours, so this plan retrains with experiment 572's
-  `3.5h` cap (7 half-hours before the 09:00 origin, so the newest power is the 05:30 reading, 6.5
-  hours before the 12:00 origin). The lag encoder is pre-trained and fine-tuned with that cap.
-- **Origin:** the network runs at its own origin, 09:00 UTC on the day (the 00Z ENS run plus 9 hours),
-  using the same 00Z ENS run the contract names. Its output is relabelled `power_fcst_init_time` =
-  12:00 UTC, and only valid times from 12:00 to 11:30 of day 14 are kept. Every input the network
-  read at 09:00 was available at 12:00, so the relabelling does not leak.
-- **Leads:** the stored training matrices (`raw/summary/*.npz` of experiment 633) hold leads of 0.5
-  to 351 hours, so the network needs no retraining for the longer horizon. The 240-hour limits in
-  `build_test` (experiment 428's `HEADLINE_MAX_HOURS`), in the `assemble` assertion, and in the
-  scorers are lifted in this experiment's copies. The longest lead used is 338.5 hours. Days 11 to
-  14 were never scored before, so they are reported separately.
-- **Test rows without an observed target:** the stored matrices keep only half-hours with an
-  observed, unflagged reading, so they lack the rows for the last days (valid times after
-  2026-11-06 14:00, which the 2026-10-23 to 2026-10-31 origins need) and for every flagged or
-  missing half-hour. The file needs a row for every half-hour, so this experiment builds its own
-  test matrices from the ensemble summaries with the same code as experiment 633's `build_site`
-  but without the finite-power filter. Training rows are unchanged.
-- **Folds:** 12 monthly refits, test months 2025-11 to 2026-10. Each trains on data before the
-  first of the month (the cutoff) and forecasts every origin in the month. The recipe's embargo is
-  3 days (the `3sE` schedule: the step-2 fit's newest valid time is 3 days before the cutoff,
-  as in experiment 633), not 7 days. A lag may read power observed inside the month, but only from
-  3.5 hours before the 09:00 origin or earlier. The training phase hides power from the cutoff on,
-  as experiment 633's training phase does. Pre-training runs per fold on ERA5 and CAMS rows before
-  the cutoff (the stored pre-training matrices end 2026-06-30, so folds from 2026-07 on share the
-  same pre-training rows). The page states, per fold, the number of ENS fine-tuning rows (the ENS
-  history starts 2024-04-01, so the 2025-11 fold has 19 months of it).
-- **Seeds:** 2 (experiment 622's choice); the quantiles are averaged across seeds, then sorted
-  within the row.
-- **Compute:** experiment 633's fit took about 1 minute per group and seed, so 12 folds x 2
-  groups x 2 seeds is about 1 to 2 GPU-hours, inside the 6-hour ceiling. One GPU process at a
-  time, at most 4 CPU cores.
-- **Checks printed on the page:** row count (4 series x 365 origins x 672 half-hours), no duplicate
-  key, no null or non-finite quantile, no crossing, UTC, `time_series_id` fits Int8 (the ids are
-  1, 2, 27, 28), and a spot check that no lag index is newer than 05:30 on the origin day. The
-  3.5-hour cut leaves 6.5 hours to the 12:00 origin, 0.5 hours more than the contract needs.
-  `nwp_init_time` is the 00Z run of the origin day.
-- **Scoring:** against observed, unflagged power outside the file, in points of capacity; rows with
-  no observed reading are not scored, and their count is reported per month.
-- **Units:** the network forecasts shares of effective capacity; the Parquet files hold MW (all 4
-  series are MW series), obtained by multiplying by `effective_capacity_mw`.
-- **Standing practices followed:** cleaned data (flagged half-hours dropped, counted per fold),
-  monthly refits, saved weights, tail and example-forecast plots. The D15 and D18 cut does not
-  apply (no Primaries here).
+A bulk supply point is a substation that takes power from the transmission network. A grid supply
+point is a substation where the distribution network meets the transmission network. The 4 series
+are D13 Skegness and D17 Boston (BSPs) and D1 Bicker Fen and D6 Walpole (GSPs). Substations may be
+named, so the names stay.
+
+## Figures
+
+![CRPS by forecast day for the BSPs, the GSPs, and all four series, with intervals](figure_crps_by_day.svg)
+
+*Figure 1. CRPS rises over the first 7 days and then flattens, in both groups.*
+
+![CRPS by month of the forecast origin](figure_crps_by_month.svg)
+
+*Figure 2. CRPS by month: highest in November to March and in October, lowest in June to August.*
+
+In Figures 3 to 5, the blue line is the median, the dark band is the 50% interval, the light band is
+the 90% interval, and the red line is the observed power.
+
+![Day-ahead forecasts at Skegness](figure_day_ahead_D13.svg)
+
+![Day-ahead forecasts at Walpole](figure_day_ahead_D6.svg)
+
+*Figure 3. Day-ahead forecasts (first 24 hours of one forecast), one winter and one summer origin.*
+
+![14-day forecast at Skegness](figure_14_day_D13.svg)
+
+![14-day forecast at Walpole](figure_14_day_D6.svg)
+
+*Figure 4. The full 14-day horizon of one forecast. The bands widen with lead time.*
+
+![Largest observed demand of the year at each series](figure_largest_demand.svg)
+
+*Figure 5. The largest observed demand of the year at each of the 4 series, with the forecast issued
+two days before the day (3 days shown).* At Walpole (bottom panel), observed demand climbs to 497 MW
+on 2026-10-19, while the median stays near 250 MW and the 50% band lies below the observation for
+most of that day. The network has no model of load shifts, so a transfer between substations reads
+as an unforecast level change. At Skegness (top), the median and the 90% band track the observed
+peak.
+
+## Results
+
+- **Pooled CRPS by lead band** (points of capacity; day-block bootstrap 95% intervals over origin
+  days; all 4 series, 973,440 scored half-hours):
+
+| Lead band | CRPS | Normalised MAE of the median | q05-q95 coverage | q01-q99 coverage |
+|---|---|---|---|---|
+| Days 0 to 1 | 7.40 (7.16 to 7.63) | 13.49 | 0.883 | 0.974 |
+| Days 1 to 3 | 8.06 (7.84 to 8.30) | 14.76 | 0.877 | 0.973 |
+| Days 3 to 7 | 9.37 (9.16 to 9.58) | 17.32 | 0.869 | 0.972 |
+| Days 7 to 14 | 10.47 (10.25 to 10.70) | 19.40 | 0.870 | 0.973 |
+
+*Table 1. Normalised MAE is the mean absolute error of the median, in points of capacity.*
+
+| Group and lead band | CRPS | Normalised MAE of the median | q05-q95 coverage |
+|---|---|---|---|
+| BSPs, days 0 to 1 | 4.27 (4.15 to 4.38) | 7.71 | 0.88 |
+| BSPs, days 1 to 3 | 4.67 (4.55 to 4.81) | 8.46 | 0.87 |
+| BSPs, days 3 to 7 | 5.55 (5.44 to 5.68) | 10.14 | 0.86 |
+| BSPs, days 7 to 14 | 6.31 (6.18 to 6.42) | 11.51 | 0.87 |
+| GSPs, days 0 to 1 | 10.52 (10.05 to 10.96) | 19.27 | 0.89 |
+| GSPs, days 1 to 3 | 11.44 (11.01 to 11.88) | 21.06 | 0.88 |
+| GSPs, days 3 to 7 | 13.18 (12.80 to 13.62) | 24.49 | 0.88 |
+| GSPs, days 7 to 14 | 14.64 (14.17 to 15.09) | 27.30 | 0.87 |
+
+*Table 2. Scores by group and lead band.*
+
+- **Tails** (pooled, points of capacity): the 0.01 and 0.99 pinball losses are 0.50 and 0.43 at days
+  0 to 1 and 0.60 and 0.54 at days 7 to 14. At days 0 to 1, 1.1% of readings fall below q01 and 1.4%
+  above q99, against 1% nominal. At days 7 to 14, 6.8% fall below q05 and 6.2% above q95, against 5%
+  nominal, so the band is slightly too narrow on both sides.
+- **Months:** pooled CRPS is 11.6 (November), 10.3, 10.8, 11.5, 10.6, 9.1, 9.0, 7.4, 7.6, 7.7, 8.3,
+  and 11.3 (October). The q05-q95 coverage lies between 0.83 (October) and 0.92 (April) in all 12
+  months.
+- **Series:** at days 0 to 1 the CRPS is 3.5 at D13, 5.0 at D17, 10.7 at D1, and 10.3 at D6.
+- **Predictions.** P1 holds: at hours 0 to 72 on the July to October origins, this experiment scores
+  7.24 against 7.45 (24-hour lags, the figure that experiment 633 reports for days 1 to 3 on its own
+  rows, so within the 0.5 tolerance; 7.54 on the rows matched here). P2 holds: days 11 to 14 score
+  10.55 to 10.64 against 10.17 to 10.54 at days 8 to 11. P3 holds: coverage lies between 0.80 and
+  0.95 in all 12 months.
+- **Comparison with the 24-hour-lag network** (experiment 633's stored forecasts, one fit at
+  2026-07-01, scored on the same series, origin days, and valid times, July to October 2026
+  origins): at hours 0 to 72 the 3.5-hour-lag forecasts score 7.24 against 7.54 (3.5 hours better by
+  0.30), and at hours 72 to 240 8.77 against 8.84. By series at hours 0 to 72 the 3.5-hour lags
+  score lower at all 4 (D13 4.01 against 4.05, D17 5.64 against 6.17, D1 11.80 against 12.07, D6
+  7.51 against 7.85); at hours 72 to 240 they score lower at D17 and D6 and higher at D13 (4.73
+  against 4.72) and D1 (13.32 against 13.13). The comparison is confounded: this experiment refits
+  each month and experiment 633 fitted once, and the origin differs by 3 hours (9:00 against the
+  relabelled 12:00), so the 0.30 points are not attributable to the lag cut alone.
+
+## Method
+
+- **Network:** [experiment
+  633's](../00633-bakeoff-final-test-bg2-and-lag-enabled-bsp-gsp-network/result.md) lag-enabled
+  network, which is [experiment
+  622's](../00622-bsp-gsp-lagged-against-lag-free-matched-d5-thermal-lag-rematch/result.md) arm
+  `lagged_b1`: the pooled group-of-2 mixture density network of experiment 619, one network per
+  group (BSPs, GSPs), with the D5 output offset of experiment 565, the thermal-lag and solar-gain
+  columns of experiment 569, the shared lag encoder of experiment 591, frozen encoders in
+  fine-tuning, and the three-step schedule of experiment 574 (arm P5). No neighbour inputs, no gate,
+  and no model of load shifts. Two seeds, with the quantiles averaged and sorted within the row.
+- **Pre-training and weather:** the encoders pre-train on ERA5 and CAMS rows (experiment 564's
+  matrices, which end on 2026-07-31, so the folds from 2026-08 share the same pre-training rows);
+  the mixer and fine-tune use the 00Z ECMWF ENS run of each day (ensemble mean and spread) from
+  2024-04-01. The fine-tuning rows of each fold are given below.
+- **Why 3.5-hour lags, not experiment 633's 24-hour lags:** the stored network reads power at least
+  24 hours before its origin and needs no retraining to meet the contract, but the maintainer wants
+  the fresher lags that a 6-hour power delay allows. This network uses experiment 572's `3.5h` cap:
+  the newest power is the 05:30 reading on the origin day, which is 6.5 hours before the 12:00
+  label.
+- **Origin:** the network runs at its own origin, 09:00 UTC (the 00Z run plus 9 hours). The file
+  relabels it as 12:00 UTC and keeps valid times from 12:00 to 11:30 on day 14, so lead 0 is a
+  forecast made 3 hours before the label, and lead bands count from the 12:00 label. Every input the
+  network read at 09:00 was available at 12:00.
+- **Training regime:** 12 monthly refits (test months 2025-11 to 2026-10). Each trains on data
+  before the first of the month with the recipe's 3-day embargo (the contract's 7 days does not
+  apply to this recipe), forecasts every origin of the month, and may read in-month power only from
+  3.5 hours before the 09:00 origin. The early-stopping weeks of experiment 422 are purged by 9
+  days, shorter than the 14-day leads, so a held-out week's targets can sit in training rows of
+  later origins (inside the training period).
+- **Fine-tuning rows per fold** (BSP group; GSP group 2% to 3% fewer): 570,000 (2025-11), rising to
+  735,000 (2026-10). The ENS history starts on 2024-04-01, so the 2025-11 fold has 19 months of it.
+- **Leads and test rows:** the training matrices hold leads of 0.5 to 351 hours, so the network
+  needs no retraining for 14 days. The stored test matrices drop half-hours without an observed
+  reading, so this experiment rebuilds them with experiment 633's code and no filter
+  (`e00669_testrows.py`).
+- **Cleaning:** flagged half-hours come from the cleaned power of experiment 398's flag file, which
+  holds no flags for these series after 2025-09, so no half-hour is dropped in the test year; the
+  scores skip the 7,680 of 981,120 half-hours with no observed reading.
+- **Scoring:** against observed power outside the file (the cleaned power), in points of capacity
+  (effective capacity from `series_table`). CRPS is twice the mean pinball loss over the 11 levels,
+  so it is an approximation from 11 quantiles. Intervals are day-block bootstrap intervals (1,000
+  resamples) over origin days. No spread factor is applied.
+- **Load shifts:** the network assumes no load shifts, so a transfer between substations reads as a
+  level change in its lags. NGED's event labels are incomplete and none were applied here.
+- **Reviews:** a Sonnet plan review (7 findings: 6 applied, 1 left), two Sonnet code reviews (2 and
+  4 findings: all applied), an Opus leakage review (5 findings; the 2026-07 BSP fold was refitted
+  with the final code; a perturbation test found no leak), a Sonnet file audit with a from-scratch
+  re-run of one fold, and an Opus review of the file and scores. The Sonnet and Opus audit findings
+  are summarised in the pull request.
+- **Compute:** about 2 GPU-hours on one process, 1 core.
+- **Standing practices:** cleaned data, monthly refits, saved weights (`.pt`, in the data folder),
+  and tail plots. The D15 and D18 cut does not apply.
 
 ## Files
 
-To be written: `bsps.parquet` and `gsps.parquet` in
-`data/ml-experiments/backtest_year_2025-11_to_2026-10/` (private).
+- `data/ml-experiments/backtest_year_2025-11_to_2026-10/bsps.parquet` (D13 id 2, D17 id 1) and
+  `gsps.parquet` (D1 id 28, D6 id 27), private. Each holds 490,560 rows (2 series x 365 origins x
+  672 half-hours): `time_series_id` (Int8), `valid_time`, `nwp_init_time` (the 00Z run),
+  `power_fcst_init_time` (12:00 UTC), and the 11 quantiles `q01` to `q99` in MW (Float64). All 4
+  series are MW series.
+- The code is in
+  `ml-experiments/00669-one-year-backtest-of-the-lag-network-at-bulk-and-grid-supply-points/`
+  (`e00669_fit.py`, `e00669_fold.py`, `e00669_testrows.py`, `e00669_export.py`, `e00669_score.py`,
+  `e00669_compare633.py`, `e00669_figures.py`). The scores are in
+  `data/ml-experiments/00669-*/score/` and the fitted networks in
+  `data/ml-experiments/00669-*/work/{bsp,gsp}/models/`.
+- **Checks passed by the export:** the row count equals 4 series x 365 x 672 in total, there is no
+  duplicate key, no null or non-finite quantile, no crossing, the time zone is UTC, `time_series_id`
+  fits Int8, and no lag index is newer than 05:30 on the origin day.
