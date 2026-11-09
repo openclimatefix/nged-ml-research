@@ -350,9 +350,9 @@ experiment 666.
 
 To be added when `solar.parquet` is written.
 
-## Comparison baselines and Primaries slices
+## Comparison baselines, slices, and summary figures
 
-This section is written last. It will hold two items.
+This section is written last. It will hold four items.
 
 - **Baselines beside every model.** The manual heuristic and climatology for the demand files, and
   climatology for wind and solar (the manual heuristic only where one exists for the technology).
@@ -365,6 +365,18 @@ This section is written last. It will hold two items.
   ends; and rows with no long and deep event and at least 7 days after one ended. The section gives
   the rows and events per slice first, names the event source, says where a slice is too small,
   and gives each slice a metrics table and at least one example time-series figure.
+- **One score-against-horizon plot per forecast type** (Primaries, BSPs, GSPs, wind, solar). The
+  horizon (0 to 14 days) is on the x-axis and the normalised mean absolute error of the median on
+  the y-axis, which does not start at zero. Three lines: the manual heuristic, climatology, and
+  the model. Wind and solar have no manual heuristic unless one exists for that technology, and
+  the plot says so; solar counts daylight half-hours only.
+- **A dot-plot figure for each demand file** (Primaries, BSPs, GSPs), in the style of the
+  bake-off pages: panels for MAE, CRPS, and twCRPS side by side, one dot per arm (manual
+  heuristic, climatology, the model), and a half-hours column. One block is "By forecast horizon"
+  (day 1, day 2, days 3 to 4, days 5 to 7, days 8 to 10, days 11 to 14). The other block is "By
+  condition" (all days, winter, winter nights, cold nights, Economy 7 step hours, Christmas, bank
+  holidays). The page reuses the metric, threshold, and condition code of `studies.eval_protocol`
+  (`metrics.py`, `slices.py`) unchanged and restates each definition.
 
 ## Caveats
 
