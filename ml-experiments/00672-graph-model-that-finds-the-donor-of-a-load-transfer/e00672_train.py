@@ -127,7 +127,8 @@ def retarget(*, w: DWorld, edges: np.ndarray) -> None:
     The bank stores link state per real link. A rewired graph has other pairs, so each of its
     links takes the real state if the pair is a real link and 'off' otherwise.
     """
-    assert w.weight is not None and w.edge_state is not None
+    assert w.weight is not None
+    assert w.edge_state is not None
     p = rig().p653
     index = {s: i for i, s in enumerate(p.sites)}
     real = {(index[a], index[b]): k for k, (a, b) in enumerate(p.edges)}
