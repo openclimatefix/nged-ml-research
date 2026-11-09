@@ -407,6 +407,29 @@ checked how much of it a fitting method could find again. The method found about
 At 2 of the 8 substations, other checks suggested the answer could not be trusted." The verdict word
 and its numbers follow in the next paragraph, with each term defined where it first appears.
 
+**Give `result.md` a concise but thorough "Method" section, written as three groups of bullets:
+the architecture, the training regime, and how performance was measured.** This section is one of
+the most important parts of the write-up. A reader who wants to judge, reproduce, or build on the
+result should find every design choice here, without opening the code. Bullets are right in this
+section because each item is a simple, independent fact. Each bullet is one full sentence, names the
+actual component, number, or product, and says what each number counts.
+
+- **Architecture:** the inputs each encoder takes (weather, date-time, lag, neighbours), the layers
+  and widths, the outputs (for example quantiles, a signed depth, a survival probability), which
+  parts are frozen or reused from an earlier experiment, and how the forecast is kept from using
+  information after the forecast origin.
+- **Training regime:** the training data (which series, which years, which weather and solar
+  products, and whether the weather is ensemble forecasts or estimates of past weather), any
+  synthetic data and how it is generated, the loss, the optimiser, epochs, seeds, folds, the refit
+  schedule, and the GPU hours spent.
+- **Measurement:** the scoring months or folds, which rows are scored and why, the metrics and the
+  truth each is scored against, the baselines, how the intervals are computed, the decision rule and
+  vetoes, the leads covered, and the audit checks with their results.
+
+Write these bullets for the arm that carries the headline, then list only the differences for the
+other arms. A new experiment that shares its set-up with an earlier one links the earlier page and
+still states the choices that matter to the result.
+
 **Cite the work an experiment builds on, generously, in the plan and in `result.md`.** Whenever an
 arm, a method, a metric, or a design choice comes from someone else's paper, software, or
 published result, name the authors and link the work where it is first used, following the
@@ -416,7 +439,7 @@ re-implements a published method, such as a Kalman filter on the coefficients of
 model, says so in its opening sentences, so a reader never mistakes the idea for ours. When in
 doubt, cite.
 
-**Keep the rest of `result.md` to about a screen:** the verdict in one sentence, the winner with its
+**Keep the rest of `result.md`, apart from the "Method" section, to about a screen:** the verdict in one sentence, the winner with its
 interval, each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and
 the lessons for later experiments, which also become `advice`. **A published page never names a
 generator, gives its identifier, or shows its time series beside either.** Use the anonymised labels
