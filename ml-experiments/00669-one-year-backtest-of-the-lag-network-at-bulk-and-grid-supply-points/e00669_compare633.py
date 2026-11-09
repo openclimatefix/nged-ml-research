@@ -71,22 +71,25 @@ def main(out: Path) -> None:
             ):
                 d = y[:, None] - q
                 pin = np.maximum(sc.TAUS * d, (sc.TAUS - 1.0) * d)
-                for band, (lo, hi) in {
-                    "hours 0 to 72": (0, 72),
-                    "hours 72 to 240": (72, 240),
-                }.items():
-                    m = np.isfinite(y) & (lead >= lo) & (lead < hi)
-                    rows.append(
-                        {
-                            "group": group,
-                            "site": site,
-                            "network": name,
-                            "band": band,
-                            "rows": int(m.sum()),
-                            "crps_sum": float(200 * pin[m].mean(axis=1).sum()),
-                            "abs_sum": float(100 * np.abs(y - q[:, 5])[m].sum()),
-                        }
-                    )
+                month = s["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
+                for mon in sorted(set(month)):
+                    for band, (lo, hi) in {
+                        "hours 0 to 72": (0, 72),
+                        "hours 72 to 240": (72, 240),
+                    }.items():
+                        m = np.isfinite(y) & (lead >= lo) & (lead < hi) & (month == mon)
+                        rows.append(
+                            {
+                                "group": group,
+                                "site": site,
+                                "month": mon,
+                                "network": name,
+                                "band": band,
+                                "rows": int(m.sum()),
+                                "crps_sum": float(200 * pin[m].mean(axis=1).sum()),
+                                "abs_sum": float(100 * np.abs(y - q[:, 5])[m].sum()),
+                            }
+                        )
     df = pl.DataFrame(rows)
     pooled = (
         df.group_by("network", "band")
@@ -96,7 +99,20 @@ def main(out: Path) -> None:
         )
         .sort("band", "network")
     )
-    bysite = df.with_columns(crps=pl.col("crps_sum") / pl.col("rows")).sort(
+    bymonth = (
+        df.group_by("month", "network", "band")
+        .agg(pl.col("rows").sum(), pl.col("crps_sum").sum())
+        .with_columns(crps=pl.col("crps_sum") / pl.col("rows"))
+        .sort("band", "month", "network")
+    )
+    bymonth.write_csv(out.with_name(out.stem + "_by_month.csv"))
+    bysite = (
+        df.group_by("site", "network", "band")
+        .agg(pl.col("rows").sum(), pl.col("crps_sum").sum())
+        .with_columns(crps=pl.col("crps_sum") / pl.col("rows"))
+        .sort("band", "site", "network")
+    )
+    _unused = df.with_columns(crps=pl.col("crps_sum") / pl.col("rows")).sort(
         "band", "site", "network"
     )
     out.parent.mkdir(parents=True, exist_ok=True)

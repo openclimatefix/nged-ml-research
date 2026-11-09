@@ -57,38 +57,47 @@ headline: >-
   after. The 90% band holds 0.87 of readings against a nominal 0.90.
 lessons:
   - >-
-    CRPS stops rising at about day 7 (10.17 at day 8 against 10.5 at days 11 to 14), so the days 11
-    to 14 that experiment 633 never scored add no extra error.
+    CRPS rises by about 0.3 points more after forecast day 7 and then stays near 10.5 (average 10.33
+    at days 7 to 10 and 10.59 at days 11 to 14), so the days 11 to 14 that experiment 633 never
+    scored add little error.
   - >-
-    The 90% band is slightly too narrow in every lead band (coverage 0.87 to 0.88 against 0.90), and
-    the 98% band covers 0.97.
+    The pooled q05-q95 band covers 0.87 to 0.88 against 0.90, but the misses are one-sided by month
+    and group (for example 12.4% below q05 at the grid supply points in October and 10.0% above q95
+    in September), so a level drift, not only a narrow band, is at work.
   - >-
-    A load shift that the lags cannot see in advance is missed by the whole band: at Walpole on
-    2026-10-19 the observed demand rose to about 500 MW against a median near 250 MW.
+    Observed demand at Walpole stepped up to between 300 and 497 MW on 2026-10-19 while the median
+    fell to about 140 MW at midday and the 90% band stayed below the observation for most of the
+    daytime, a level step consistent with a load transfer (not confirmed in NGED's logs) that this
+    network does not model.
 take_home_message: >-
   The lag-enabled network forecasts the 2 bulk and 2 grid supply points with a CRPS of 7.4 points of
-  capacity on day 0, rising to about 10.5 from day 7 to day 14 (bulk supply points 4.3 to 6.3, grid supply
-  points 10.5 to 14.6), and its 90% band covers 0.87 of readings. On July to October 2026 origins, power
-  lags cut at 3.5 hours score 7.24 at hours 0 to 72 against 7.54 for experiment 633's 24-hour lags, but
-  the two runs also differ in refit cadence. The network follows no load shift, and the largest miss
-  in the year is one.
+  capacity on day 0, rising to about 10.5 from day 7 to day 14 (bulk supply points 4.3 to 6.3, grid
+  supply points 10.5 to 14.6), and its 90% band covers 0.87 of readings. Against experiment 633's
+  24-hour-lag network on July to October 2026 origins it scores 0.30 points lower at hours 0 to 72
+  (7.24 against 7.54), but only 0.16 of that in July, the one month in which both networks were
+  trained to the same date, so most of the gain is the monthly refits. The network follows no load
+  shift, and the largest miss in the year looks like one.
 advice:
   - >-
-    Report days 11 to 14 for this network: they score no worse than days 7 to 10 (10.5 against 10.4),
-    so extending to 14 days needs no new recipe (Figure 1).
+    Report days 11 to 14 for this network: they average 10.59 against 10.33 at days 7 to 10, so
+    extending to 14 days adds about 0.3 points beyond day 7 and needs no new recipe (Figure 1).
   - >-
-    Widen the q05 to q95 band at these 4 series before a release: it covers 0.87 against 0.90 at every
-    lead band (Table 2).
+    Check the one-sided band misses by month before widening the q05 to q95 band at these 4 series:
+    the pooled coverage is 0.87 against 0.90, but the misses switch sides between months, which a
+    level correction would address better than a wider band (Results, Tails).
   - >-
     Add a model of load shifts before judging the grid supply points on events like 2026-10-19 at
-    Walpole (Figure 4).
+    Walpole (Figure 5).
+  - >-
+    Compare lag cuts with the same refit schedule in both arms: only 0.16 of the 0.30 gain over
+    experiment 633's 24-hour lags is attributable to the lag cut (Results).
 production_status: not-for-production
 adopted_in: none
 ---
 
 **The lag-enabled network forecasts the 2 bulk supply points (BSPs) and 2 grid supply points (GSPs)
 at a CRPS of 7.4 points of capacity on day 0, and its error rises to about 10.5 by day 7 and stays
-there to day 14.** CRPS is the continuous ranked probability score, here in percent of effective
+near that to day 14.** CRPS is the continuous ranked probability score, here in percent of effective
 capacity, so smaller is better. The BSPs score 4.3 (day 0) to 6.3 (days 7 to 14) and the GSPs 10.5
 to 14.6. This is a descriptive backtest of 365 daily origins from 2025-11-01 to 2026-10-31. It
 overlaps the development months and the held-out months of experiment 633, so no number here is a
@@ -103,7 +112,8 @@ named, so the names stay.
 
 ![CRPS by forecast day for the BSPs, the GSPs, and all four series, with intervals](figure_crps_by_day.svg)
 
-*Figure 1. CRPS rises over the first 7 days and then flattens, in both groups.*
+*Figure 1. CRPS rises over the first 7 forecast days and then flattens, in both groups. Forecast day
+n covers leads of (n - 1) x 24 to n x 24 hours.*
 
 ![CRPS by month of the forecast origin](figure_crps_by_month.svg)
 
@@ -127,11 +137,13 @@ the 90% interval, and the red line is the observed power.
 ![Largest observed demand of the year at each series](figure_largest_demand.svg)
 
 *Figure 5. The largest observed demand of the year at each of the 4 series, with the forecast issued
-two days before the day (3 days shown).* At Walpole (bottom panel), observed demand climbs to 497 MW
-on 2026-10-19, while the median stays near 250 MW and the 50% band lies below the observation for
-most of that day. The network has no model of load shifts, so a transfer between substations reads
-as an unforecast level change. At Skegness (top), the median and the 90% band track the observed
-peak.
+two days before the day (3 days shown).* At Walpole (bottom panel), the observation sits about 100
+MW below the median in the daytime of 2026-10-18. From about 01:00 to 21:00 on 2026-10-19 it holds
+between 300 and 497 MW, while the median falls to about 140 MW at midday and the 90% band lies below
+the observation for most of the daytime. This is a level step consistent with a load transfer, which
+is not confirmed in NGED's logs, and the network has no model of load shifts. At Bicker Fen, a
+plateau of 220 to 229 MW lasting about 6 hours sits above the 50% band. At Skegness (top), the
+median and the 90% band track the observed peak.
 
 ## Results
 
@@ -163,25 +175,38 @@ peak.
 - **Tails** (pooled, points of capacity): the 0.01 and 0.99 pinball losses are 0.50 and 0.43 at days
   0 to 1 and 0.60 and 0.54 at days 7 to 14. At days 0 to 1, 1.1% of readings fall below q01 and 1.4%
   above q99, against 1% nominal. At days 7 to 14, 6.8% fall below q05 and 6.2% above q95, against 5%
-  nominal, so the band is slightly too narrow on both sides.
+  nominal. Pooled over lead, the misses change side by month: the grid supply points have 1.4% below
+  q05 and 8.7% above q95 in December, 1.3% and 10.0% in September, and 12.4% and 5.9% in October,
+  and the bulk supply points 11.1% and 3.8% in January and 12.0% and 3.8% in October. The q05-q95
+  coverage of the bulk supply points is 0.81 in July and 0.82 in August, and of the grid supply
+  points 0.82 in October. A level drift at D1 is part of the cause: its median is 1.9 points of
+  capacity too low on day 0 and 11.3 too low on lead day 13 (mean of forecast minus observed). A wider
+  band would not remove such a shift.
+
 - **Months:** pooled CRPS is 11.6 (November), 10.3, 10.8, 11.5, 10.6, 9.1, 9.0, 7.4, 7.6, 7.7, 8.3,
-  and 11.3 (October). The q05-q95 coverage lies between 0.83 (October) and 0.92 (April) in all 12
-  months.
+  and 11.3 (October). The normalised MAE of the median by month is 22.3, 19.7, 20.9, 21.7, 19.1,
+  16.5, 16.3, 13.1, 13.4, 14.1, 14.8, and 21.2. The q05-q95 coverage lies between 0.83 (October) and
+  0.92 (April) pooled, and between 0.81 and 0.95 by group and month.
+
 - **Series:** at days 0 to 1 the CRPS is 3.5 at D13, 5.0 at D17, 10.7 at D1, and 10.3 at D6.
-- **Predictions.** P1 holds: at hours 0 to 72 on the July to October origins, this experiment scores
-  7.24 against 7.45 (24-hour lags, the figure that experiment 633 reports for days 1 to 3 on its own
-  rows, so within the 0.5 tolerance; 7.54 on the rows matched here). P2 holds: days 11 to 14 score
-  10.55 to 10.64 against 10.17 to 10.54 at days 8 to 11. P3 holds: coverage lies between 0.80 and
-  0.95 in all 12 months.
-- **Comparison with the 24-hour-lag network** (experiment 633's stored forecasts, one fit at
+- **Predictions.** P1 holds: on the July to October origins at hours 0 to 72, this experiment scores
+  7.24 against 7.54 for experiment 633's 24-hour lags re-scored on the same rows (experiment 633
+  reports 7.45 on its own rows), well inside the 0.5-point tolerance. P2 holds: days 11 to 14
+  average 10.59 against 10.33 at days 7 to 10, a rise of 0.26 points, inside 1.0. P3 holds: pooled
+  coverage lies between 0.80 and 0.95 in all 12 months, but the group-level figures in the Tails
+  bullet show shorter exceptions.
+
+- **Comparison with the 24-hour-lag network** (experiment 633's stored forecasts, fitted once at
   2026-07-01, scored on the same series, origin days, and valid times, July to October 2026
-  origins): at hours 0 to 72 the 3.5-hour-lag forecasts score 7.24 against 7.54 (3.5 hours better by
-  0.30), and at hours 72 to 240 8.77 against 8.84. By series at hours 0 to 72 the 3.5-hour lags
-  score lower at all 4 (D13 4.01 against 4.05, D17 5.64 against 6.17, D1 11.80 against 12.07, D6
-  7.51 against 7.85); at hours 72 to 240 they score lower at D17 and D6 and higher at D13 (4.73
-  against 4.72) and D1 (13.32 against 13.13). The comparison is confounded: this experiment refits
-  each month and experiment 633 fitted once, and the origin differs by 3 hours (9:00 against the
-  relabelled 12:00), so the 0.30 points are not attributable to the lag cut alone.
+  origins). Both networks run at the native 09:00 origin, so the origin does not differ. At hours 0
+  to 72 the 3.5-hour-lag forecasts score 7.24 against 7.54, and at hours 72 to 240 8.77 against
+  8.84. By month the gain at hours 0 to 72 is 0.16 (July), 0.21, 0.30, and 0.51 points (October),
+  and at hours 72 to 240 0.07, 0.13, 0.28, and -0.20. July is the only month in which both networks
+  were trained to about 2026-07-01, so the lag cut is worth about 0.16 points of the 0.30, and the
+  rest comes from the monthly refits. The comparison has no interval on the difference, and the
+  training leads differ (351 hours here against 240 hours). By series at hours 0 to 72 the 3.5-hour
+  lags score lower at all 4 (D13 4.01 against 4.05, D17 5.64 against 6.17, D1 11.80 against 12.07,
+  D6 7.51 against 7.85).
 
 ## Method
 
@@ -219,6 +244,23 @@ peak.
   needs no retraining for 14 days. The stored test matrices drop half-hours without an observed
   reading, so this experiment rebuilds them with experiment 633's code and no filter
   (`e00669_testrows.py`).
+- **Weather at lag times:** the thermal-lag and solar-gain columns of [experiment
+  437](../00437-neural-demand-thermal-lag-solar-gain-and-tariff-feature-bundles/result.md) use,
+  before the origin, the analysis proxy built from the first day of the previous 00Z run, which
+  exists at forecast time. They never read ERA5 or power. ERA5 arrives about 5 days late, so the
+  last roughly 5 days of the ERA5 and CAMS pre-training rows could not be read at a real cutoff;
+  they are estimates of past weather from before the cutoff, so nothing from after the cutoff
+  enters.
+- **Set-ups reused** (each restated above): the network and its schedule follow experiments
+  [619](../00619-bsp-gsp-lag-enabled-network-for-the-bake-off/result.md),
+  [565](../00565-drift-embedding-variants-six-designs/result.md),
+  [569](../00569-modular-network-inputs-through-matching-encoders-in-pretraining-and-fine-tuning-run-1/result.md),
+  [591](../00591-shared-lag-encoder-auxiliary-shift-depth-loss/result.md),
+  [574](../00574-part-d-primaries-only-modular-recipe-lag-encoder-offset-and-add-one-arms/result.md),
+  and [572](../00572-two-offset-part-1-lags-versus-the-slow-output-offset/result.md); the
+  pre-training matrices follow [experiment
+  564](../00564-pooled-primary-bsp-gsp-m2-reduced/result.md) and the cleaning flags [experiment
+  398](../00398-cleaning-flags/result.md).
 - **Cleaning:** flagged half-hours come from the cleaned power of experiment 398's flag file, which
   holds no flags for these series after 2025-09, so no half-hour is dropped in the test year; the
   scores skip the 7,680 of 981,120 half-hours with no observed reading.
@@ -253,3 +295,17 @@ peak.
 - **Checks passed by the export:** the row count equals 4 series x 365 x 672 in total, there is no
   duplicate key, no null or non-finite quantile, no crossing, the time zone is UTC, `time_series_id`
   fits Int8, and no lag index is newer than 05:30 on the origin day.
+- **Reading the values:** a negative quantile is net export. The q01 is below zero in 94% of the D6
+  rows and 99.6% of the D1 rows. Effective capacity is a normalising constant, not a limit: observed
+  power reaches 1.34 times it at D1, and q99 sits above it in 33% of the D6 rows. The lead counted
+  from the 12:00 label is 3 hours shorter than the true lead from the 09:00 forecast origin.
+- **Unscored half-hours:** 7,260 of the 7,680 half-hours with no observed reading are October
+  origins past the last reading (2026-11-06). The remaining 420 are gaps inside the year.
+- **Weather spot check:** the weather columns at lag times were read from the analysis proxy of the
+  previous 00Z run, never from data newer than the origin day's 00Z run.
+- **Not reported:** the curtailment cost against the manual heuristic, because neither BSPs nor GSPs
+  have a manual heuristic baseline here. The 24-hour-lag network was not used for the file, since it
+  would read power the production service already has at 3.5 hours.
+- **Leakage caveats from the Opus review:** the embargo of 9 days is shorter than the 14-day leads,
+  and the `Extras` table is built with the grid end from before the redirect. Neither changed a
+  result.
