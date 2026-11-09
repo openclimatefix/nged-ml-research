@@ -1,4 +1,4 @@
-"""Tune the decoder on validation worlds, then score a network on injected worlds and the real record.
+"""Tune the decoder on validation worlds, then score a network on injected worlds and real data.
 
     export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
     P=ml-experiments
@@ -37,6 +37,7 @@ from e00658_decode import CHUNK, STRIDE, DecodeCosts, decode_net
 from e00660_ev34_detector import truths  # ty: ignore[unresolved-import]
 from e00670_run import (  # ty: ignore[unresolved-import]
     CELLS,
+    CONFIGS,
     event_free,
     events_table,
     logged_shifts,
@@ -45,7 +46,7 @@ from e00670_run import (  # ty: ignore[unresolved-import]
 )
 from e00672_data import TRAIN_END, build_world, inject_world, rig
 from e00672_net import DonorNet
-from e00672_train import MIXES, SEED0, WORK, graph_of, solar_term
+from e00672_train import MIXES, SEED0, WORK, _solar, graph_of
 
 DEV: Final = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ON_GRID: Final = (1.0, 2.0)
@@ -137,7 +138,9 @@ def with_donor(*, pred: dict, lam: float) -> dict:
 def decode(*, world: World, pred: dict, costs: Costs, edges: np.ndarray) -> list:
     """Event table of a world at the given costs."""
     r = rig()
-    c = DecodeCosts(on=costs.on, flip=2 * costs.on, edge_cutoff=costs.cutoff, none_boost=costs.boost)
+    c = DecodeCosts(
+        on=costs.on, flip=2 * costs.on, edge_cutoff=costs.cutoff, none_boost=costs.boost
+    )
     sigma = {s: (v if np.isfinite(v) else 1.0) for s, v in r.frozen.sigma.items()}
     return decode_net(
         panel=r.p653,
@@ -163,7 +166,7 @@ def donor_and_found(rows: pl.DataFrame) -> tuple[float, float]:
 def tune(*, tag: str) -> None:
     """Choose the decoder costs on validation worlds only (grid fixed in the plan)."""
     arm, mix, seed = parse(tag=tag)
-    solar = solar_term() if arm == "GS" else None
+    solar = _solar() if arm == "GS" else None
     net = load_net(tag=tag)
     nbr, edges = graph_of(arm=arm, seed=seed)
     vals = [
@@ -215,10 +218,16 @@ def tune(*, tag: str) -> None:
         out.append(one(Costs(on=on, boost=boost, cutoff=0.5, lam=lam)))
     t0 = pl.DataFrame(out)
     ok = t0.filter(pl.col("rate") <= MAX_VAL_RATE)
-    pick = (ok if ok.height else t0).sort("found", descending=True).row(0, named=True)
-    for cut in CUTOFFS:
-        if cut != 0.5:
-            out.append(one(Costs(on=pick["on"], boost=pick["boost"], cutoff=cut, lam=pick["lam"])))
+    pick = (
+        (ok if ok.height else t0)
+        .sort("found", descending=True, maintain_order=True)
+        .row(0, named=True)
+    )
+    out.extend(
+        one(Costs(on=pick["on"], boost=pick["boost"], cutoff=cut, lam=pick["lam"]))
+        for cut in CUTOFFS
+        if cut != 0.5
+    )
     t = pl.DataFrame(out)
     t.write_parquet(WORK / f"tuning_{tag}.parquet")
     same = t.filter(
@@ -226,7 +235,12 @@ def tune(*, tag: str) -> None:
         & (pl.col("boost") == pick["boost"])
         & (pl.col("lam") == pick["lam"])
     )
-    cut = same.sort("found", descending=True).row(0, named=True)["cutoff"]
+    same_ok = same.filter(pl.col("rate") <= MAX_VAL_RATE)
+    cut = (
+        (same_ok if same_ok.height else same)
+        .sort("found", descending=True, maintain_order=True)
+        .row(0, named=True)["cutoff"]
+    )
     (WORK / f"costs_{tag}.json").write_text(
         json.dumps({"on": pick["on"], "boost": pick["boost"], "cutoff": cut, "lam": pick["lam"]})
     )
@@ -241,13 +255,13 @@ def picked(*, tag: str) -> Costs:
 def score(*, tag: str, config: str, first_seed: int, n_worlds: int) -> None:
     """Score injected scored-year worlds; the seeds and generator are those of experiment 670."""
     arm, _, seed = parse(tag=tag)
-    solar = solar_term() if arm == "GS" else None
+    solar = _solar() if arm == "GS" else None
     net = load_net(tag=tag)
     nbr, edges = graph_of(arm=arm, seed=seed)
     c = picked(tag=tag)
     rows = []
     for s in range(first_seed, first_seed + n_worlds):
-        iw = inject_world(config=MIXES[config], seed=s, upto=None)
+        iw = inject_world(config=CONFIGS[config], seed=s, upto=None)
         w = build_world(world=iw, solar=solar)
         pred = predict(net=net, world=w, nbr=nbr, edges=edges)
         ev = decode(world=w, pred=pred, costs=c, edges=edges)
@@ -272,7 +286,7 @@ def score(*, tag: str, config: str, first_seed: int, n_worlds: int) -> None:
 def real(*, tag: str) -> None:
     """Decode the real record and write its event table and the checks of the plan."""
     arm, _, seed = parse(tag=tag)
-    solar = solar_term() if arm == "GS" else None
+    solar = _solar() if arm == "GS" else None
     net = load_net(tag=tag)
     nbr, edges = graph_of(arm=arm, seed=seed)
     c = picked(tag=tag)
@@ -315,4 +329,3 @@ if __name__ == "__main__":
         )
     else:
         real(tag=sys.argv[2])
-    assert CELLS and TRAIN_END and SEED0

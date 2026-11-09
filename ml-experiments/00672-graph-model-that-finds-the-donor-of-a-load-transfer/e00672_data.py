@@ -74,12 +74,12 @@ def rig() -> Rig:
 def hidden(*, panel: gen.PowerPanel, upto: int) -> gen.PowerPanel:
     """A copy of the panel with every reading from half-hour `upto` on set to NaN."""
     idx = np.arange(panel.length)
-    return replace(panel, power={s: np.where(idx < upto, v, np.nan) for s, v in panel.power.items()})
+    return replace(
+        panel, power={s: np.where(idx < upto, v, np.nan) for s, v in panel.power.items()}
+    )
 
 
-def inject_world(
-    *, config: gen.GeneratorConfig, seed: int, upto: int | None
-) -> gen.InjectedWorld:
+def inject_world(*, config: gen.GeneratorConfig, seed: int, upto: int | None) -> gen.InjectedWorld:
     """Inject into the real panel, or (with `upto`) into the part of it before `upto`.
 
     Events then start before `upto` and the readings from `upto` on are hidden, so a training
@@ -105,11 +105,11 @@ def residual_of(*, world: gen.InjectedWorld, solar: dict[str, np.ndarray] | None
     return {s: res[s] + solar.get(s, 0.0) for s in res}
 
 
-def _span(*, row: dict, length: int) -> tuple[int, int]:
+def _span(*, row: dict) -> tuple[int, int]:
     b0 = row["start"] // BLOCK
     end = row["end"]
     b1 = N_BLOCKS if end is None else -(-int(end) // BLOCK)
-    return b0, min(max(b1, b0 + 1), N_BLOCKS if length else 0)
+    return b0, min(max(b1, b0 + 1), N_BLOCKS)
 
 
 def build_world(
@@ -166,7 +166,7 @@ def _targets(*, out: DWorld, world: gen.InjectedWorld, p: Panel, sigma: dict[str
         c = _CLASS_OF.get(row["event_class"])
         if c is None or row["site"] not in index:
             continue
-        b0, b1 = _span(row=row, length=1)
+        b0, b1 = _span(row=row)
         i = index[row["site"]]
         if row["event_class"] == "pulse":
             fresh = ~covered[i, b0:b1]
@@ -178,7 +178,7 @@ def _targets(*, out: DWorld, world: gen.InjectedWorld, p: Panel, sigma: dict[str
     for row in rows:
         if row["role"] != "donor" or not row["partners"] or row["site"] not in index:
             continue
-        b0, b1 = _span(row=row, length=1)
+        b0, b1 = _span(row=row)
         donor[index[row["site"]], b0:b1] = 1.0
         for rec in row["partners"]:
             key = tuple(sorted((row["site"], rec)))

@@ -90,7 +90,7 @@ class DonorNet(nn.Module):
         return Out(cls=head[..., :4], sign=head[..., 4], amp=head[..., 5], donor=donor, edge=edge)
 
 
-def loss_fn(  # noqa: PLR0913
+def loss_fn(
     *,
     out: Out,
     cls: torch.Tensor,

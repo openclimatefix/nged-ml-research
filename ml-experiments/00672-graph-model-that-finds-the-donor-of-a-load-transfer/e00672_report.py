@@ -128,8 +128,10 @@ def main() -> None:
         if not frames:
             continue
         tabs[name] = {
-            cell: {m: [per_world(df=f, cell=cell, measure=m, worlds=worlds) for f in frames]
-                   for m in MEASURES}
+            cell: {
+                m: [per_world(df=f, cell=cell, measure=m, worlds=worlds) for f in frames]
+                for m in MEASURES
+            }
             for cell in CELLS
         }
         res["arms"][name] = {
@@ -147,16 +149,20 @@ def main() -> None:
         if name not in tabs:
             continue
         res["contrast"][f"{name} minus E1-J"] = {
-            cell: {m: contrast(a=tabs[name][cell][m], b=tabs["E1-J"][cell][m], rng=rng)
-                   for m in MEASURES}
+            cell: {
+                m: contrast(a=tabs[name][cell][m], b=tabs["E1-J"][cell][m], rng=rng)
+                for m in MEASURES
+            }
             for cell in CELLS
         }
     if "G" in tabs:
         for other in ("G0", "GS"):
             if other in tabs:
                 res["contrast"][f"G minus {other}"] = {
-                    cell: {m: contrast(a=tabs["G"][cell][m], b=tabs[other][cell][m], rng=rng)
-                           for m in MEASURES}
+                    cell: {
+                        m: contrast(a=tabs["G"][cell][m], b=tabs[other][cell][m], rng=rng)
+                        for m in MEASURES
+                    }
                     for cell in CELLS
                 }
     for name, frames in [*[(m, [d]) for m, d in refs.items()], *mine.items()]:
@@ -178,7 +184,12 @@ def main() -> None:
         for cell in CELLS[:3]:
             c = cells[cell]
             print(
-                name, cell, {m: round(c[m], 3) for m in MEASURES}, "n", c["n_events"], c["n_edge_ends"]
+                name,
+                cell,
+                {m: round(c[m], 3) for m in MEASURES},
+                "n",
+                c["n_events"],
+                c["n_edge_ends"],
             )
     print(json.dumps(res["false_transfers"]))
 

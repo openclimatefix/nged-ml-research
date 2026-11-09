@@ -20,8 +20,6 @@ import os
 import pickle
 import sys
 import time
-from dataclasses import replace
-from functools import cache
 from functools import cache
 from typing import Final
 
@@ -63,7 +61,7 @@ ARMS: Final[tuple[str, ...]] = ("G", "GR", "G0", "GS")
 
 def solar_term() -> dict[str, np.ndarray]:
     """Experiment 657's explicit solar term (known CAMS and ERA5 weather, capacity table of 649)."""
-    from e00657_solar import build  # noqa: PLC0415
+    from e00657_solar import build
 
     return build().delta["solar"]
 
@@ -123,12 +121,37 @@ def graph_of(*, arm: str, seed: int) -> tuple[np.ndarray, np.ndarray]:
     return graph_arrays(panel=p)
 
 
+def retarget(*, w: DWorld, edges: np.ndarray) -> None:
+    """Rebuild the link targets of a banked world for the links of the arm's own graph.
+
+    The bank stores link state per real link. A rewired graph has other pairs, so each of its
+    links takes the real state if the pair is a real link and 'off' otherwise.
+    """
+    p = rig().p653
+    index = {s: i for i, s in enumerate(p.sites)}
+    real = {(index[a], index[b]): k for k, (a, b) in enumerate(p.edges)}
+    covered = (w.weight > 0.5) & (w.weight > 0)
+    present = w.weight > 0
+    state = np.zeros((len(edges), w.edge_state.shape[1]), np.int8)
+    weight = np.zeros(state.shape, np.float32)
+    for k, (a, b) in enumerate(edges):
+        i, j = int(a), int(b)
+        if (i, j) in real:
+            state[k] = w.edge_state[real[(i, j)]]
+        elif (j, i) in real:
+            flip = w.edge_state[real[(j, i)]]
+            state[k] = np.where(flip == 0, 0, 3 - flip)
+        known = covered[i] | covered[j]
+        weight[k] = np.where(known, 1.0, UNKNOWN_WEIGHT) * present[i] * present[j]
+    w.edge_state, w.edge_weight = state, weight
+
+
 def _tensors(w: DWorld, sl: slice, dev: torch.device) -> list[torch.Tensor]:
     arrs = [w.feats, w.cls, w.weight, w.amp, w.donor, w.edge_state, w.edge_weight]
     return [torch.from_numpy(np.ascontiguousarray(a[:, sl])).to(dev) for a in arrs]
 
 
-def train(*, mix: str, arm: str, seed: int) -> str:  # noqa: PLR0915
+def train(*, mix: str, arm: str, seed: int) -> str:
     """Train one network; keep the checkpoint with the lowest validation loss.
 
     Returns:
@@ -141,6 +164,9 @@ def train(*, mix: str, arm: str, seed: int) -> str:  # noqa: PLR0915
     with (WORK / f"bank_{mix}{'_solar' if arm == 'GS' else ''}.pkl").open("rb") as f:
         bank = pickle.load(f)
     nbr, edges = graph_of(arm=arm, seed=seed)
+    if arm in ("GR", "G0"):
+        for w in bank["train"] + bank["val"]:
+            retarget(w=w, edges=edges)
     nbr_t, edges_t = torch.from_numpy(nbr).to(dev), torch.from_numpy(edges).to(dev)
     val_sl = slice(VAL_BLOCKS - 960, VAL_BLOCKS)
     val = []
@@ -193,7 +219,7 @@ def train(*, mix: str, arm: str, seed: int) -> str:  # noqa: PLR0915
             v = float(np.mean(vl))
             hist.append({"step": step, "train": float(loss), "val": v, **parts})
             print(tag, hist[-1], round(time.time() - t0), "s", flush=True)
-            if v < best:
+            if v < best or step == EVAL_EVERY:
                 best = v
                 torch.save(net.state_dict(), WORK / f"net_{tag}.pt")
     (WORK / f"train_log_{tag}.json").write_text(json.dumps(hist, indent=1))
@@ -206,4 +232,3 @@ if __name__ == "__main__":
         make_bank(mix=sys.argv[2], solar=len(sys.argv) > 3 and sys.argv[3] == "solar")
     else:
         train(mix=sys.argv[2], arm=sys.argv[3], seed=int(sys.argv[4]))
-    assert UNKNOWN_WEIGHT > 0 and replace is not None

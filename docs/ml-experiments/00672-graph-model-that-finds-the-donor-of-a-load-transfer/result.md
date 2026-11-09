@@ -173,6 +173,11 @@ reading.
   shallow 2 up to 8). An event is found when the decoded table has an event at the right Primary
   and sign starting within 12 hours; an end is paired when the decoded table links it to the right
   other end; an edge event is a decoded transfer. Shares are weighted by absolute megawatts.
+- **Inherited leaks, stated.** The noise units (experiment 653's, fitted before 2024-01-01) saw the
+  validation months, and the injected start hours and weekdays come from NGED's logged onsets up to
+  2026-07, so the scored window has shaped both. Both are shared with experiment 670, so the
+  contrast with E1-J is unaffected. The GS arm also carries the capacity table (cut-off 2026-06) and
+  a gain fitted before 2024-01-01, so a GS gain would be an upper bound.
 - **Caveat.** NGED's logs are an incomplete one-off dump, so matched logged shifts are lower
   bounds.
 
