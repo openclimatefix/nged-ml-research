@@ -49,15 +49,15 @@ page is planned and holds the plan only.
   session advised. Pre-training chain: lag, weather, and date-time encoders pre-trained on ERA5 and
   CAMS (experiments 559, 565, 574), a fresh mixer on the whole ENS history (starts 2024-04-01),
   then the daily fine-tune with a 90-day recency half-life.
-- **Lags of at least 6 hours, against two origins:** the stored networks use an origin of 09:00 UTC
-  (the 00Z ENS run plus 9 hours). This backtest uses the contract's origin of 12:00 UTC, so the
-  network's origin time moves to 12:00. Experiment 574's arm V35 caps lag age at 3.5 hours
-  (`CAP_3_5H` = 7 half-hours); this plan adds a cap of 12 half-hours (6 hours), measured from the
-  12:00 origin. The newest power any lag reads is therefore at 06:00 UTC on the origin day, which is
-  exactly 6 hours before 12:00. A 12-half-hour cap measured from the native 09:00 origin would read
-  power as new as 03:00 only by accident of arithmetic, and would leave unused power between 03:00
-  and 06:00; the plan does not use that reading. The lag encoder is pre-trained with the 6-hour cap.
-  The neighbour summaries obey the same cut.
+- **Lags of at least 6 hours, against two origins:** the network keeps its native origin of
+  09:00 UTC (the 00Z ENS run plus 9 hours) and runs for the contract's 12:00 origin. Experiment
+  574's arm V35 caps lag age at 3.5 hours (`CAP_3_5H` = 7 half-hours) from the 09:00 origin, so the
+  newest power any lag reads is at 05:30 UTC on the origin day. That is 6.5 hours before the 12:00
+  origin and before the contract's 06:00 cut, so the existing 3.5-hour cap meets the contract and
+  no new cap is needed. The network ignores power between 05:30 and 06:00, and its lead feature
+  counts from 09:00, 3 hours before the contract's origin. Candidate arm `P7+D50` is rebuilt on
+  the V35 pre-training (3.5-hour lag encoder) instead of the 24-hour one. The neighbour summaries
+  obey the same cut. A check asserts that every lag is observed at or before 06:00 UTC.
 - **Survival head:** R-haz of experiment 652 sits on the Candidate (`P7+D50`), not on K1. Its
   gate-state input is removed, so no explicit gate enters. The Candidate's frozen 11 quantiles
   are the NRA output. The prevailing output is the 11 quantiles of the mixture
