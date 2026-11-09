@@ -92,8 +92,9 @@ affordable. The plan therefore **starts each end-to-end arm from the saved K1 we
 seed, and fine-tunes jointly on input matrices with injected lags**, as one extra stage. Nothing stores
 those matrices: experiment 591's `run_inject` rebuilds them per month (`_build_month_p5`,
 `build_test`) and overwrites the lag block with the injected power, so this experiment adds a cache
-of them on disk, built with the fold month's standardiser. Everything before that stage is K1 as stored. The cost is that the end-to-end arm differs from
-a network trained from scratch with the prevailing loss; the page says so.
+of them on disk, built with the fold month's standardiser. Everything before that stage is K1
+as stored. The cost is that the end-to-end arm differs from a network trained from scratch with the
+prevailing loss; the page says so.
 
 ## Arms (matched rows, epochs, seeds, folds: leave one development month out, 2 seeds)
 
