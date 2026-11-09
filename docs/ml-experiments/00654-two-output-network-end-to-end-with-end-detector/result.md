@@ -208,6 +208,16 @@ estimate is restated from the timed fold against the fit count before 8 hours ar
 - Every metric table also reports the normalised MAE of the median forecast (MAE divided by the
   Primary's effective capacity, as the other tables do).
 
+## Four scenarios on the development months too (skill, PR 314)
+
+The ml-experiment skill (merged 2026-11-09) requires four scenarios for any experiment related to
+load-shift events, whatever the testing period: all rows; rows outside events and at least 7 days
+after one; rows inside events; and the 7 days after an event ends. The development-month tables
+therefore report all four scenarios for each arm, on the injected bank (events known exactly) and,
+descriptively, on the real labelled and detected events; the final test reports the same four. Each
+scenario gets its metrics (CRPS, normalised MAE of the median, coverage, tails) and an example time
+series from 14 days before to at least 7 days after an event.
+
 ## Compute and process
 
 - One GPU process at a time. One fold is timed first. The estimate is 4 to 8 GPU-hours, unmeasured;
