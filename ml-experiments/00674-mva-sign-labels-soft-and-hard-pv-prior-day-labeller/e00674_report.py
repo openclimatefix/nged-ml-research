@@ -1,8 +1,7 @@
 # ruff: noqa: E501
 """Experiment 674, step 3: print every number the write-up quotes.
 
-PYTHONPATH=ml-experiments/00087-*:ml-experiments/00506-*:ml-experiments/00508-*:ml-experiments/00674-* \
-        uv run --no-sync python ml-experiments/00674-*/e00674_report.py | tee ml-experiments/00674-*/printed_report.txt
+Run with `PYTHONPATH` set to the folders of experiments 87, 506, 508, and 674.
 """
 
 from pathlib import Path
@@ -94,6 +93,33 @@ def known() -> None:
             c.filter(pl.col(f"cls_{arm}") == "reverse").height,
             c.group_by(f"cls_{arm}").len().to_dicts(),
         )
+    print("\n=== post hoc (audit): the simple rule 'day ratio r < 0.3' on the level-0 worlds")
+    base0 = real.filter(pl.col("r").is_not_null())
+    flag = pl.col("r") < 0.3
+    cross0 = base0.filter(pl.col("crossing"))
+    non0 = base0.filter(~pl.col("crossing"))
+    print(
+        "recall",
+        cross0.filter(flag).height,
+        "of",
+        cross0.height,
+        "| false-reverse",
+        non0.filter(flag).height,
+        "of",
+        non0.height,
+        "| by site",
+        non0.filter(flag).group_by("site").len().to_dicts(),
+    )
+    print(
+        "w is 0 or null on",
+        cross0.filter(pl.col("w").is_null() | (pl.col("w") == 0)).height,
+        "of",
+        cross0.height,
+        "real days; median s",
+        cross0["s"].median(),
+        "median r",
+        cross0["r"].median(),
+    )
     print("\n=== P-check per arm at rbin 1.5-3 pooled (point estimates)")
     p = m.filter(
         (pl.col("rbin") == "1.5-3") & (pl.col("subset") == "all") & (pl.col("level") == "all")

@@ -7,7 +7,7 @@ title: >-
 theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - solar-disaggregation
-status: planned
+status: finished
 kind: other
 size: >-
   medium. Stored: small day tables, frozen thresholds, and label counts in this experiment's private
@@ -27,8 +27,7 @@ hypothesis: >-
 prediction: >-
   Fixed before any score is read. All figures pool the six held-out Primaries (month blocks as the
   resampling unit) over days with a day ratio `r` of 1.5 to 3; recall means flagged reverse-flow
-  days over all reverse-flow days, with sign-unknown and not-scorable days counted as misses. P1:
-arm
+  days over all reverse-flow days, with sign-unknown and not-scorable days counted as misses. P1: arm
   C (no prior) has recall of at least 0.6 and a false-reverse rate of at most 5% (point estimates).
   P2: arm B (hard mask) has at least 40% lower false-reverse rate and at least 25% lower recall than
   arm C (experiment 417: 12.0% to 3.6%, and 0.77 to 0.37). P3: arm A (soft prior) has pooled recall
@@ -55,8 +54,7 @@ decision_rule: >-
   P2 or P3 fails, or P1 holds for arm A only; not supported if P1 fails for both arms A and C;
   inconclusive instead of any of these if the deciding bar is met by the point estimate but not
   firmly. P4 and P5 do not change the verdict; they are reported as findings, with the take-home
-  message saying whether they held. If the held-out false-reverse rate of arm C exceeds 10% in
-either
+  message saying whether they held. If the held-out false-reverse rate of arm C exceeds 10% in either
   `r` bin, the thresholds count as uncalibrated and every count on the eight is labelled so. No gain
   in forecast score is claimed, because no forecast is fitted, and the threshold for porting is not
   applicable: nothing here enters production. Counts on the eight carry no claim about truth;
@@ -71,12 +69,158 @@ metric: >-
   Day-level recall, false-reverse rate, share labelled sign-unknown, and share not scorable, by arm,
   export-ratio bin, and PV stratum, each with a month-block bootstrap interval; label counts per
   class on the eight Primaries.
+verdict: inconclusive
+best_arm: >-
+  Arm C (no PV prior), export 1.5 to 3 times night import: recall 0.644 (0.598 to 0.690) at a
+  false-reverse rate of 0.030 (0.014 to 0.055), on injected solar output only.
+headline: >-
+  The day labeller finds about 64% of injected reverse-flow days at a 3% false rate when export is
+  1.5 to 3 times the night import, but only 5 of 59 real reverse-flow days at the signed-MW
+  Primaries, and on the eight apparent-power Primaries it flags 39% of D8's and 13% of D4's sunny
+  days, so it cannot yet be trusted to label them.
+take_home_message: >-
+  A day labeller built from the lowest reading at the edges of the sun's path and a W-shape score
+  finds injected solar export well but misses almost all real reverse-flow days, which are shallow
+  and short, so it is not a usable sign label for the eight apparent-power Primaries. A hard PV
+  mask removes most false calls at little cost in recall on injected days, but on real data the
+  soft prior is no better than no prior. A simple rule on the midday reading (day ratio below 0.3)
+  found 52 of the 59 real days, so the next labeller should start from the midday dip and treat
+  the shoulder minimum as a second, separate signal.
+lessons: >-
+  Injected farms make deep, long, sun-shaped exports, so a labeller validated on them can score
+  well and still miss real shallow exports. The shoulder minimum is not specific at a Primary whose
+  day ratio is 1.5 to 3 and whose own shoulders dip often.
+advice:
+  - >-
+    Do not validate a sign labeller only on injected farm output; it missed 54 of 59 real
+    reverse-flow days at D5, D9, and D10 that it caught 64% of when injected (Results, real days).
+  - >-
+    Treat a labeller trained on injected days with suspicion at any Primary whose day ratio is
+    1.5 to 3 on most days (D4: 71% of days); its shoulder threshold of 0.85 times night import
+    flags 13% to 44% of D4's sunny days (Results, the eight).
+  - >-
+    Keep the midday-dip rule (day ratio below 0.3) as the starting point for real shallow exports;
+    it found 52 of 59 real days at 3.2% false calls, mostly low-demand days at D5 (Checks, post
+    hoc).
+  - >-
+    Use a hard PV mask where false calls matter more than recall: it cut false reverse by 68% at
+    export 1.5 to 3 times for a 14% loss of recall on injected days, but it needs a capacity table
+    that is not circular at the eight (Results, arms).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00674-mva-sign-labels-soft-and-hard-pv-prior-day-labeller/
 ---
 
-## Plan
+## Summary
+
+**Take-home.** A day labeller built from the lowest reading at the edges of the sun's path and a
+W-shape score finds injected solar export well, but real reverse flow at the signed-MW Primaries is
+shallow and short, and the labeller finds 5 of 59 such days. On the eight apparent-power Primaries
+it
+flags a large share of days at D8 (39% of sunny April to August days) and D4 (13%), where NGED's
+hint says "Yes" and "No". So the labeller is not yet a usable sign label for the eight. A simple
+midday-dip rule does far better on real days, which narrows the next attempt to that rule. Verdict:
+`inconclusive` under the registered rule, because the bar of P1 was met by the point estimates but
+not firmly, and P2, P3, and P5 failed. All numbers below are validated on injected days or on 59
+real
+days only, not on truth at the eight. NGED's event labels are incomplete, so counts are lower
+bounds.
+
+**What we asked.** Eight of NGED's primary substations report apparent power, which is never
+negative, so a day on which one exported to the grid looks like a day of low demand. We built a
+simple per-day labeller (the lowest reading at the edges of the sun's path, and how well a V fits
+the demand-removed reading), tested it on six substations that report signed power (adding recorded
+output of real solar farms and hiding the sign), and applied it to the eight. Three arms differ in
+how they use the expectation that export happens on sunny days: no prior (C), a hard sunny-days
+mask (B), and a soft prior (A). The method re-uses experiment 508's shoulder windows and
+[experiment 417's W-shape score](../00417-hidden-sign-mva-export-gate-zero-crossing-labels/result.md);
+nothing is fitted.
+
+## Figures
+
+*Figure 1: recall and false-reverse rate by arm on the six, leave-one-Primary-out, 95% month-block
+intervals.*
+
+![Recall and false-reverse rate by arm](figure_1_recall_and_false_reverse_by_arm.svg)
+
+*Figure 2: share of April to September days in each label, on the eight.*
+
+![Labels on the eight](figure_2_labels_on_the_eight_apparent_power_primaries.svg)
+
+*Figure 3: example days with the reading and each arm's label (the real D10 days first).*
+
+![Example days](figure_3_example_days_and_labels.svg)
+
+## Results
+
+- **Known answers, export 1.5 to 3 times night import (1,004 reverse-flow days, all injected).**
+  Recall, false-reverse: C 0.644 (0.598 to 0.690), 0.030 (0.014 to 0.055); B 0.553 (0.503 to 0.602),
+  0.010 (0.002 to 0.021); A 0.578 (0.525 to 0.630), 0.038 (0.018 to 0.067). Share not scorable
+  0.216;
+  no day is sign-unknown on the six.
+- **Pre-registered predictions.** P1 holds by the point estimates for C but not firmly (both
+  intervals cross the bars), and fails for A (recall 0.578). P2 fails: B cuts false-reverse by 68%
+  (bar 40%) but recall by only 14% (bar 25%); experiment 417's drop was larger (0.77 to 0.37). P3
+  fails: A is within 0.10 of C on recall, but on mixed and cloudy days A's false-reverse rate is
+  0.034 against C's 0.030, not half. P4 holds vacuously, because no arm reaches recall 0.6 on any
+  subset; C's false-reverse rate is 0.104 on low-demand days against 0.026 on other days (pooled
+  below 3 times). P5 fails (below).
+- **All days below 3 times night import, pooled.** Recall C 0.314 (0.290 to 0.337), B 0.191
+  (0.174 to 0.208), A 0.277 (0.254 to 0.300); false-reverse 0.036, 0.018, 0.029. Not scorable: 0.237
+  (injected farm dropouts remove half-hours).
+- **Real reverse-flow days (59: D10 54, D5 3, D9 2).** C flags 5, A and B flag 2, A_flat 4. The
+  real days are shallow midday exports (median day ratio 0.15) whose shoulders stay near the night
+  import (median shoulder ratio 0.83); the W-shape score is 0 or null on 56 of 59.
+- **The eight, A, sunny April to August days.** Reverse-flow label: D2 0.2%, D3 1.1%, D19 0.8%,
+  D21 0%, D22 0.9% (all at most 5%); D4 13.3%; D8 38.9%; D12 5.7% of all days and 63.4% of the days
+  that are not sign-unknown (91.0% are sign-unknown, day ratio of 3 or more). Without the capacity
+  gate D4 rises to 44.3% for arms B and A. Hint agreement: D8 "Yes" agrees; D12 and D22 "Maybe" make
+  no claim; D2, D3, D19, and D21 "No" agree; D4 "No" disagrees.
+- **Counter-examples.** D8: 42 of the 44 dip days of experiment 508 that lie in April to September
+  are labelled reverse by C and A, and 32 of those also have the engine detector flag, so the
+  labeller does not separate the gas engine from solar. D22: its 11 dip days in the table are all
+  labelled no reverse flow by every arm. D12's winter dips: 27 of 28 days with a midday reading
+  below
+  6.9 points are labelled reverse by C and A (B: no reverse flow; the thresholds are calibrated on
+  April to September, so this is an extrapolation, with non-dip winter days flagged at about 18%
+  per the audit). A signed-MW series negative on 19,054 of 24,058 rows was not scored: the CAMS
+  arrays hold only the 16 demand Primaries.
+- **Soft-prior sweep (post hoc).** A_flat (5%, 5%, 5%) and A_steep (5%, 1.25%, 0.25%) move recall
+  by under 0.04 and do not change a conclusion.
+
+## Checks
+
+- **Median minus mean forecast per site.** Not applicable: no forecast is made.
+- **Mean-forecast error beside quantile contrasts.** Not applicable.
+- **Triggers fired (audit by a fresh Sonnet agent, `briefs/674_audit.md`).** Trigger 1 (real days
+  missed), trigger 2 (P2, P3, and the contradiction with experiment 417), and trigger 4 (leaving out
+  D10, which holds 453 of the 626 known non-reverse days at the headline bin, makes P3 true on a
+  small base and reverses the false-reverse contrast of B against C). The audit reproduced every
+  headline number and the leave-one-Primary-out thresholds. Findings accepted and written into this
+  page: the headline bin holds only injected days (9% of reverse-flow days), the W-shape threshold
+  is
+  degenerate (zero in every 1.5 to 3 cell, so the realised training flag rate is about 2.6%, not
+  5%), the D4 flag rate follows from its day ratio (71% of D4's days lie in the 1.5 to 3 bin against
+  7% of the six's uninjected days), and D8's flags come from the below-1.5 bin (the shoulder
+  minimum is bimodal). Not applied: none rejected.
+- **Post hoc (audit finding, reproduced in the printed report).** The rule "day ratio below 0.3"
+  flags 52 of the 59 real days and 198 of 6,231 other days (3.2%; D5 160, D10 32, D9 6).
+- **Lab shortcuts.** ERA5 temperature dropped from the W-shape profile; the capacity gate uses the
+  injected farm's true size in the injected worlds; the profile is built on the scored days.
+- **Resampling unit.** Month blocks (Primary and calendar month, four levels pooled), which is
+  stricter than resampling days; threshold uncertainty is not in the intervals.
+- **Data.** Cleaned data, nothing dated 2026-07-01 or later. Thresholds frozen from the six before
+  the eight were built (file digest starts 7cf8570b). Models: none fitted. Code and printed report:
+  `ml-experiments/00674-mva-sign-labels-soft-and-hard-pv-prior-day-labeller/`.
+
+## What to try next
+
+- Start from the midday dip (day ratio below 0.3), which found 52 of 59 real days, and test it at
+  the eight with the shoulder minimum as a separate second signal.
+- Calibrate on real days only where they exist (D10), and score on injected days as a stress test.
+- Ask NGED for a few weeks of signed power at D12 and D8, which would settle both without a fit.
+
+## Plan (as registered)
 
 **What we are asking.** Eight Primaries report apparent power, which is never negative, so a day on
 which a Primary exports to the grid looks like a day of low demand. We test a simple day labeller
@@ -196,7 +340,10 @@ this experiment's day-level figures, which use different rows.
 **Plan review (Sonnet, 2026-11-09).** Twenty-two findings. Accepted and applied above: the complete
 verdict mapping, the point-versus-firm bar wording, the P5 bars, the farm-leakage fix, the minimum
 cell size, the 2-half-hour crossing rule, the W-score cloud limit, the winter domain, the hindsight
-and oracle notes. Also applied after the code review: days with no ratio count as not scorable, the false-reverse rate is reported over both known-label days and all non-reverse days, and low-demand membership no longer depends on the injection level. Not applied: threshold uncertainty in the intervals (stated as a limit).
+and oracle notes. Also applied after the code review: days with no ratio count as not scorable, the
+false-reverse rate is reported over both known-label days and all non-reverse days, and low-demand
+membership no longer depends on the injection level. Not applied: threshold uncertainty in the
+intervals (stated as a limit).
 
 **Reviews.** One Sonnet plan review, one fresh Sonnet code review before any score is read, one
 Sonnet results check (re-derives the headline numbers), one Sonnet prose review. The audit triggers

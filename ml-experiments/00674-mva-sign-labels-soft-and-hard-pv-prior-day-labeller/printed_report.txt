@@ -131,11 +131,15 @@ C | pooled_below_3 | all | 2.0 | 0.257 | 0.228 | 0.285 | 0.037 | 0.023 | 0.052 |
 C | pooled_below_3 | all | 3.0 | 0.420 | 0.390 | 0.448 | 0.057 | 0.026 | 0.090 | 0.020 | 0.000 | 0.318 | 5241.000 | 280.000
 
 === real reverse-flow days at level 0, D5+D10 (+D9), recall by arm
-C crossing 59 flagged 5 [{'cls_C': 'not_scorable', 'len': 2}, {'cls_C': 'no_reverse', 'len': 52}, {'cls_C': 'reverse', 'len': 5}]
-B crossing 59 flagged 2 [{'cls_B': 'reverse', 'len': 2}, {'cls_B': 'no_reverse', 'len': 55}, {'cls_B': 'not_scorable', 'len': 2}]
-A crossing 59 flagged 2 [{'cls_A': 'not_scorable', 'len': 2}, {'cls_A': 'no_reverse', 'len': 55}, {'cls_A': 'reverse', 'len': 2}]
-A_flat crossing 59 flagged 4 [{'cls_A_flat': 'reverse', 'len': 4}, {'cls_A_flat': 'no_reverse', 'len': 53}, {'cls_A_flat': 'not_scorable', 'len': 2}]
-A_steep crossing 59 flagged 2 [{'cls_A_steep': 'not_scorable', 'len': 2}, {'cls_A_steep': 'reverse', 'len': 2}, {'cls_A_steep': 'no_reverse', 'len': 55}]
+C crossing 59 flagged 5 [{'cls_C': 'not_scorable', 'len': 2}, {'cls_C': 'reverse', 'len': 5}, {'cls_C': 'no_reverse', 'len': 52}]
+B crossing 59 flagged 2 [{'cls_B': 'not_scorable', 'len': 2}, {'cls_B': 'no_reverse', 'len': 55}, {'cls_B': 'reverse', 'len': 2}]
+A crossing 59 flagged 2 [{'cls_A': 'not_scorable', 'len': 2}, {'cls_A': 'reverse', 'len': 2}, {'cls_A': 'no_reverse', 'len': 55}]
+A_flat crossing 59 flagged 4 [{'cls_A_flat': 'no_reverse', 'len': 53}, {'cls_A_flat': 'not_scorable', 'len': 2}, {'cls_A_flat': 'reverse', 'len': 4}]
+A_steep crossing 59 flagged 2 [{'cls_A_steep': 'reverse', 'len': 2}, {'cls_A_steep': 'no_reverse', 'len': 55}, {'cls_A_steep': 'not_scorable', 'len': 2}]
+
+=== post hoc (audit): the simple rule 'day ratio r < 0.3' on the level-0 worlds
+recall 52 of 59 | false-reverse 198 of 6231 | by site [{'site': 'D5', 'len': 160}, {'site': 'D9', 'len': 6}, {'site': 'D10', 'len': 32}]
+w is 0 or null on 56 of 59 real days; median s 0.8267929403260736 median r 0.14884979170234003
 
 === P-check per arm at rbin 1.5-3 pooled (point estimates)
 arm | recall_est | false_reverse_est | recall_lo | recall_hi | false_reverse_lo | false_reverse_hi
@@ -343,11 +347,11 @@ D8 | 23 | 216 | 192
 
 === D8 engine overlap (experiment 508's 71 dip days)
 dip days in the April-September table: 44
-C [{'cls_C': 'no_reverse', 'len': 2}, {'cls_C': 'reverse', 'len': 42}] | engine-flag days labelled reverse: 32
+C [{'cls_C': 'reverse', 'len': 42}, {'cls_C': 'no_reverse', 'len': 2}] | engine-flag days labelled reverse: 32
 B [{'cls_B': 'no_reverse', 'len': 3}, {'cls_B': 'reverse', 'len': 41}] | engine-flag days labelled reverse: 31
 A [{'cls_A': 'no_reverse', 'len': 2}, {'cls_A': 'reverse', 'len': 42}] | engine-flag days labelled reverse: 32
-A_flat [{'cls_A_flat': 'reverse', 'len': 42}, {'cls_A_flat': 'no_reverse', 'len': 2}] | engine-flag days labelled reverse: 32
-A_steep [{'cls_A_steep': 'no_reverse', 'len': 2}, {'cls_A_steep': 'reverse', 'len': 42}] | engine-flag days labelled reverse: 32
+A_flat [{'cls_A_flat': 'no_reverse', 'len': 2}, {'cls_A_flat': 'reverse', 'len': 42}] | engine-flag days labelled reverse: 32
+A_steep [{'cls_A_steep': 'reverse', 'len': 42}, {'cls_A_steep': 'no_reverse', 'len': 2}] | engine-flag days labelled reverse: 32
 
 === D22 dip days of experiment 508
 D22 dip days in table: 11
@@ -359,11 +363,11 @@ A_steep [{'cls_A_steep': 'no_reverse', 'len': 11}]
 
 === D12 winter dips (all months, thresholds are April-September)
 dips (mid_min < 6.9 points): 28
-C [{'cls_C': 'unknown', 'len': 1}, {'cls_C': 'reverse', 'len': 27}]
+C [{'cls_C': 'reverse', 'len': 27}, {'cls_C': 'unknown', 'len': 1}]
 B [{'cls_B': 'unknown', 'len': 1}, {'cls_B': 'no_reverse', 'len': 27}]
 A [{'cls_A': 'unknown', 'len': 1}, {'cls_A': 'reverse', 'len': 27}]
 A_flat [{'cls_A_flat': 'unknown', 'len': 1}, {'cls_A_flat': 'reverse', 'len': 27}]
-A_steep [{'cls_A_steep': 'no_reverse', 'len': 3}, {'cls_A_steep': 'unknown', 'len': 1}, {'cls_A_steep': 'reverse', 'len': 24}]
+A_steep [{'cls_A_steep': 'unknown', 'len': 1}, {'cls_A_steep': 'no_reverse', 'len': 3}, {'cls_A_steep': 'reverse', 'len': 24}]
 
 === D8 flagged-day sky split (arm C vs A) already printed above; D12 ratio median 3.0729696259868993
 
