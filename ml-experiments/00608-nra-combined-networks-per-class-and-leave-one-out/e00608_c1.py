@@ -1,8 +1,8 @@
 # ruff: noqa: ANN201, E402, D103, E501, ANN003
-"""Experiment 608: fit or inject the C1 wiring (experiment 584's P5 with separate lag encoders) with E3 (GPU).
+"""Experiment 608: fit or inject the C1 wiring (584's P5, separate lag encoders) with E3 (GPU).
 
-A wrapper over experiment 584's `e00584_arm.py`, with the E3 refit rule of `e00608_arm.py` applied to
-the daily fine-tune. Experiment 574's stored step-2 weights and B1 statistics are read only.
+A wrapper over experiment 584's `e00584_arm.py`, with the E3 refit rule of `e00608_arm.py` applied
+to the daily fine-tune. Experiment 574's stored step-2 weights and B1 statistics are read only.
 
 Usage: python e00608_c1.py NAME {fit|inject} [--months ...] [--seeds ...]
 """
