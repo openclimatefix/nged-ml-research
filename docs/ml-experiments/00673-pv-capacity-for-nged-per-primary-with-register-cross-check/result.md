@@ -59,33 +59,44 @@ headline: >-
   Capacity Register, and Renewable Energy Planning Database, metered sites removed) at 8 of the 12
   Primaries that have a probe interval; D2 overlaps it, and D3, D5, and D21 lie below it.
 take_home_message: >-
-  For NGED: the probe reads 2.4 to 3.9 MW of unmetered solar at each of the six MW Primaries and
-  1.45
-  to 7.69 MW at the five main MVA Primaries, and at 8 of 12 Primaries the interval lies above the
-  solar capacity that three registers list inside the service area. The MVA figures may be
-  upper readings under power factor 1, and no figure says when capacity changed.
+  For National Grid Electricity Distribution (NGED): a neural-network probe reads 2.4 to 3.9 MW of
+  unmetered solar at each of the six MW Primaries and 1.45 to 7.69 MW at the five main MVA
+  Primaries. At 8 of the 12 Primaries that have a probe interval, the interval lies above the solar
+  capacity that three registers list inside the service area. The MVA figures may be upper readings
+  if NGED's meters see little reactive power, and every figure is a whole-summer value.
 ---
 
 # Unmetered solar capacity per Primary, beside what three registers list
 
-**Take-home.** The probe reads 2.4 to 3.9 MW of unmetered solar at each of the six Primaries metered
-in megawatts (MW), and 1.45 to 7.69 MW at the five Primaries metered in megavolt-amperes (MVA) that
-do not fold. At 8 of the 12 Primaries that have a probe interval, the interval lies above the solar
-capacity that the three registers list inside the Primary's service area. D2 overlaps its register
-floor, and D3, D5, and D21 lie below it. The MVA figures may be upper readings if NGED's meters have
-power factor 1, and no figure here says when capacity changed. The hypothesis as worded (every
-Primary) fails at D3, D5, and D21, and the count falls to 5 of 12 if the Feed-in Tariff band of 50
-kW to 1 MW is added to the floor.
+**At 8 of the 12 Primaries that have a probe interval, the probe's capacity lies above the solar
+capacity that three registers list.** A Primary is a primary substation of National Grid Electricity
+Distribution (NGED), which steps 33 kV down to 11 kV, and the project labels each one D followed by
+a number. The probe is a trained demand-forecasting neural network, asked how much a Primary's net
+demand falls for a given amount of sunshine. Its capacity is in MW of alternating current (AC) for
+unmetered solar only, so it excludes every generator that NGED meters. The three registers are the
+Feed-in Tariff, the Embedded Capacity Register, and the Renewable Energy Planning Database. The
+register floor is the capacity they list inside the Primary's service area, with the sites that NGED
+meters removed. D2 overlaps its floor, and D3, D5, and D21 lie below theirs.
 
-This page is for NGED. A Primary is an NGED primary substation, which steps 33 kV down to 11 kV. The
-page gives the probe's capacity per Primary, with the registers beside it, and fits nothing: every
-probe number is a stored row of experiments
+**The probe reads 2.4 to 3.9 MW at each of the six Primaries metered in megawatts (MW), and 1.45 to
+7.69 MW at the five main Primaries metered in megavolt-amperes (MVA).** The five main MVA Primaries
+(D2, D3, D4, D19, and D21) are those whose flow never comes near zero on a sunny midday. A reading
+"folds" where solar output exceeds demand, because an apparent-power meter cannot tell exporting
+from importing. A twelfth Primary, D12, has a fold-model reading only. D8 and D22 are reported but
+not compared with the floor. The MVA figures may be upper readings if NGED's meters see little
+reactive power (power factor 1). Every figure is a whole-summer value, so none shows how capacity
+grew from month to month.
+
+**The hypothesis, that the probe's 90th percentile is at or above the floor at every Primary, fails
+at D3, D5, and D21.** The verdict "supported" follows the decision rule fixed before any total was
+computed, which reads only the six MW Primaries (5 of 6). The count falls to 5 of 12 if the Feed-in
+Tariff band of 50 kW to 1 MW is added to the floor.
+
+Every probe number on this page is a stored row of experiments
 [649](../00649-pv-capacity-table-season-year-from-stored-probes/result.md),
 [662](../00662-pv-probe-through-the-mva-fold-matched-level-redesign/result.md), and
-[671](../00671-pv-mva-fold-probe-fair-denominator-and-d3-d4-disagreement/result.md). The probe is a
-trained demand-forecasting neural network asked how much a Primary's net demand falls for a given
-amount of sunshine. The capacity is in MW of alternating current (AC), for unmetered solar only, so
-it excludes every generator that NGED meters.
+[671](../00671-pv-mva-fold-probe-fair-denominator-and-d3-d4-disagreement/result.md), and this page
+trains no new neural network.
 
 ![Probe interval and register floor per Primary](probe_against_register_floor.svg)
 
@@ -169,27 +180,28 @@ raw linear reading by the linear probe's recovery in the signed (no apparent-pow
 0.68. It is the capacity if the apparent-power conversion cost no recovery. Experiments 656, 662,
 and 671 simulated apparent power with the PF arm. NGED's statement, relayed by the maintainer, is to
 assume power factor 1 for the substation meters, with some reactive power always present. Experiment
-662 also ran a floor arm (a constant reactive power of 0.10 times the median sunny-midday power,
-close to power factor 1 with a small always-present floor) and a zero-reactive arm (a reactive power
-of zero, so the reading is the absolute value of the real power). Median recovery of the injected
-farm over the six MW Primaries, first farm rotation:
+662 also ran a reactive-floor arm (a constant reactive power of 0.10 times the median sunny-midday
+power, close to power factor 1 with a small always-present floor) and a zero-reactive arm (a
+reactive power of zero, so the reading is the absolute value of the real power). Median recovery of
+the injected farm over the six MW Primaries, first farm rotation:
 
 | Probe and reactive model | 0.5 times | 1 times | 2 times | 6 times |
 |---|---|---|---|---|
 | Linear, PF arm | 0.68 | 0.53 | -0.12 | -0.80 |
-| Linear, floor arm | not run | 0.63 | -0.11 | -0.83 |
+| Linear, reactive-floor arm | not run | 0.63 | -0.11 | -0.83 |
 | Linear, zero-reactive arm | not run | not run | -0.10 | not run |
 | Linear, signed (no conversion) | 0.79 | 0.78 | 0.77 | 0.78 |
 | Fold model, PF arm | 0.73 | 0.71 | 0.78 | 0.88 |
-| Fold model, floor arm | not run | 0.67 | 0.78 | 0.88 |
+| Fold model, reactive-floor arm | not run | 0.67 | 0.78 | 0.88 |
 | Fold model, zero-reactive arm | not run | not run | 0.77 | not run |
 | Fold model, signed | 0.85 | 0.63 | 0.28 | -0.03 |
 
-**The floor arm shows less conversion loss than the PF arm at 1 times, and the other arms show none
-or no difference.** At 1 times the linear probe recovers 0.63 with the floor arm and 0.53 with the
-PF arm, against 0.78 without the conversion. At 2 times the floor arm (-0.11) and the zero-reactive
-arm (-0.10) match the PF arm (-0.12). The stored outputs hold no floor arm at 0.5 times, the level
-behind the 0.68 factor, so the loss at that level under power factor 1 cannot be measured here.
+**The reactive-floor arm shows less conversion loss than the PF arm at 1 times, and the other arms
+show none or no difference.** At 1 times the linear probe recovers 0.63 with the reactive-floor arm
+and 0.53 with the PF arm, against 0.78 without the conversion. At 2 times the reactive-floor arm
+(-0.11) and the zero-reactive arm (-0.10) match the PF arm (-0.12). The stored outputs hold no
+reactive-floor arm at 0.5 times, the level behind the 0.68 factor, so the loss at that level under
+power factor 1 cannot be measured here.
 
 **The direction under power factor 1 is therefore likely but not established: the MVA figures may be
 upper readings.** If recovery were 0.79, the median signed-world value on the six MW Primaries, the
@@ -201,7 +213,7 @@ and the loss measured at 0.5 times was 5 to 12 points at D9, D11, D14, and D16 (
 in its calibration and in the known-answer tests of experiments 662 and 671, unless a column says
 otherwise.
 
-## D12, D8, and D22
+## Three Primaries without a main figure to compare: D12, D8, and D22
 
 **D12 has a fold-model figure only, because its linear probe reads negative.** The fold model reads
 7.19 / 7.48 / 7.77 MW (10th / 50th / 90th percentile, calibrated by 0.704, experiment 662's
@@ -221,7 +233,7 @@ behind the negative linear reading.
   MW. The reactive-term setting then decides the recovery (experiment 671 reads 0.0 to 1.16 across
   the fold variants). Their main figures are the MW-probe values above, which need no conversion.
 
-## Register cross-check at all 14 Primaries
+## Register cross-check: probe against the register floor at 12 Primaries, and 2 reported only
 
 **The floor is the capacity that three registers list inside the Primary's service area, with the
 sites that NGED already meters removed.** The probe estimates unmetered solar, so the floor must
@@ -261,7 +273,8 @@ exclude metered sites. The definitions below were fixed before any total was com
   the floor is a lower bound. Sites of 1 MW and above that connect at 33 kV or above are left out of
   the main floor, because they connect above the Primary and are not behind its meter. They are in
   the all-sites sensitivity column, together with Renewable Energy Planning Database rows of 1 MW
-  and above that match no Embedded Capacity Register row (none changes a flag).
+  and above that match no Embedded Capacity Register row (adding the Renewable Energy Planning
+  Database rows of 1 MW and above changes no flag).
 
 | Primary | FiT to 50 kW: AC (DC) | FiT 50 kW to 1 MW | ECR below 1 MW | ECR 1 MW and above (of which 33 kV and above) | REPD operational (of which also in ECR) |
 |---|---|---|---|---|---|
@@ -286,10 +299,11 @@ Register's capacity is its "already connected registered capacity" and the Renew
 Database's is its "installed capacity (MWelec)". Neither register states a direct-current or
 alternating-current basis in these columns, so they are read as AC.
 
-**Per Primary, the probe interval against the floor, with a plain flag.** "Probe above floor" means
-the probe's 10th percentile is at or above the floor, "overlaps" means the floor lies inside the
-10th to 90th percentile, and "below floor" means the 90th percentile is below the floor. "Not
-comparable" marks the report-only Primaries. The ratio is the probe's median over the floor.
+**At 8 of 12 Primaries the probe's interval lies above the floor; D2 overlaps it, and D3, D5, and
+D21 lie below it.** "Probe above floor" means the probe's 10th percentile is at or above the floor,
+"overlaps" means the floor lies inside the 10th to 90th percentile, and "below floor" means the 90th
+percentile is below the floor. "Not comparable" marks the report-only Primaries. The ratio is the
+probe's median over the floor.
 
 | Primary | Probe 10th to 90th (MW) | Floor, main (MW) | Floor, all sites (MW) | Ratio | Flag |
 |---|---|---|---|---|---|
@@ -335,9 +349,10 @@ comparable" marks the report-only Primaries. The ratio is the probe's median ove
 
 ## Caveats
 
-- **0.68 per-MW calibration factor.** The probe finds 0.68 of an injected real farm's AC MW (0.676
-  to 0.708 across the four injected farms). The factor comes from four injected farms that resemble
-  each other, and may not transfer to a fleet of rooftop panels with other tilts.
+- **The 0.68 factor may not transfer to rooftop panels with other tilts.** The probe finds 0.68 of
+  an injected real farm's AC MW (0.676 to 0.708 across the four injected farms). The factor comes
+  from four injected farms that resemble each other, and may not transfer to a fleet of rooftop
+  panels with other tilts.
 - **Energy-basis spread.** Measured in energy, the recovery is 0.78 (donor rows) to 0.88 (all
   daylight rows), so the capacity of a physics-shaped plant carrying the same energy is 0.77 to 0.87
   times the megawatt-basis capacity.
@@ -350,10 +365,12 @@ comparable" marks the report-only Primaries. The ratio is the probe's median ove
 - **No month-by-month change.** Nothing here shows how capacity changed from one month or year to
   the next. The probe's 2024 and 2025 summers differ by at most 0.07 MW at every MW Primary.
 - **MVA Primaries.** The reactive model of every MVA figure is the PF arm (see the table above), and
-  the floor arm shows less conversion loss. The reactive power of the real meters is unknown.
-- **Dates.** The Embedded Capacity Register is the August 2026 release and the Renewable Energy
-  Planning Database the Q2 2026 release, so both can list sites connected after the probes' 2026-06
-  cutoff, and neither carries a date that could remove them. The Feed-in Tariff ends at 2025-03-31.
+  the reactive-floor arm shows less conversion loss. The reactive power of the real meters is
+  unknown.
+- **The two newest registers may list sites built after the probes' 2026-06 cutoff.** The Embedded
+  Capacity Register is the August 2026 release and the Renewable Energy Planning Database the Q2
+  2026 release, so both can list sites connected after the probes' 2026-06 cutoff, and neither
+  carries a date that could remove them. The Feed-in Tariff ends at 2025-03-31.
 - **Feed-in Tariff shares.** The district shares of overlapping Primary polygons can sum above 1
   over Primaries, so the Feed-in Tariff column can count one district's capacity twice.
 - **Registers.** The registers lag installations, list some sites twice, and list sites connected
@@ -368,8 +385,8 @@ comparable" marks the report-only Primaries. The ratio is the probe's median ove
   the probe's calibration or the floor's match to metered sites is wrong at that Primary. D3, D5,
   and D21 are the three where the flags already point that way, so those three records would settle
   most. D2's margin is 0.002 MW.
-- **A floor arm at 0.5 times, with the 0.68 factor re-measured under it.** That would replace the
-  14% bound above with a measured figure.
+- **A reactive-floor arm at 0.5 times, with the 0.68 factor re-measured under it.** That would
+  replace the 14% bound above with a measured figure.
 - **Knowing which of D5's and D2's large sites lie behind the Primary's meter would settle both
   flags.**
 
