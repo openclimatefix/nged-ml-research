@@ -13,7 +13,7 @@ run the full 15 days. The gate asserts that every case of experiment 659's store
 reproduced to 1e-5. The script then lists, per run from 2025-11-01, any missing member or valid
 time of the 672 half-hours from 12:00 to 347.5 h after the 00 UTC run.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00666-*/e00666_wind_features.py
 """
 

@@ -24,7 +24,7 @@ The lead feature is the hours from the run stamp (09:00 UTC) to the valid time, 
 Each daily origin is 12:00 UTC on the run's day, so the forecast rows are the 672 half-hours from
 12:00 on the run's day.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=12G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00666-*/e00666_wind_fit.py [--seeds 0 1 2]
 """
@@ -191,7 +191,9 @@ def main() -> None:
             & (pl.col("valid_time") < refit)
             & pl.col("actual_clean").is_finite()
         ).with_columns(target=pl.col("actual_clean") / scale)
-        assert train["valid_time"].max() < refit, "a training case is valid after the refit"
+        assert train.select(pl.col("valid_time").max()).item() < refit, (
+            "a training case is valid after the refit"
+        )
         # The 672 half-hours from 12:00 on the run's day; the run stamp is 09:00 on that day.
         first_valid = pl.col("power_fcst_init_time") + timedelta(
             hours=common.RUN_TO_ORIGIN_HOURS - common.RUN_TO_PUBLICATION_HOURS

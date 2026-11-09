@@ -5,7 +5,7 @@ valid-time limit moved to 2026-11-20 so every run keeps its full 15 days. Experi
 runs at 2026-07-01, which truncated the runs from 2026-06-16. The production feature engineer left
 joins power onto the NWP in bulk mode, so rows without observed power are kept.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=12G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00666-*/e00666_wind_members.py
 """

@@ -7,16 +7,19 @@ MW Primary and level, kept where |denominator| >= 0.05.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Final
 
 import polars as pl
 
-SRC: Final = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00662-pv-probe-through-the-mva-fold-matched-level-redesign/work/analysis/recoveries_2026-06.csv"
+DATA: Final = Path(os.environ["DATA_PATH_INTERNAL"])
+SRC: Final = (
+    DATA
+    / "ml-experiments/00662-pv-probe-through-the-mva-fold-matched-level-redesign/work/analysis/recoveries_2026-06.csv"
 )
-OUT: Final = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ml-experiments/00671-pv-mva-fold-probe-fair-denominator-and-d3-d4-disagreement/work"
+OUT: Final = (
+    DATA / "ml-experiments/00671-pv-mva-fold-probe-fair-denominator-and-d3-d4-disagreement/work"
 )
 SIX: Final = ("D5", "D9", "D10", "D11", "D14", "D16")
 LEVELS: Final = {"l05": 0.5, "l1": 1.0, "l2": 2.0}
