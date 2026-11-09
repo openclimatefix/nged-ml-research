@@ -14,6 +14,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Final
 
+import e00578_common as k578  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -41,26 +42,52 @@ def seed_mean(*, frames: list[pl.DataFrame]) -> pl.DataFrame:
     return mean.with_columns([pl.Series(name, q[:, i]) for i, name in enumerate(QCOLS)])
 
 
+CONTRACT_SCHEMA: Final = {
+    "time_series_id": pl.Int8,
+    "valid_time": pl.Datetime("us", "UTC"),
+    "nwp_init_time": pl.Datetime("us", "UTC"),
+    "power_fcst_init_time": pl.Datetime("us", "UTC"),
+    **dict.fromkeys(QCOLS, pl.Float32),
+}
+"""The contract's columns, in order (the extra column `NRA_or_prevailing` is added by the head's export)."""
+
+
+def capacity_mw() -> pl.DataFrame:
+    """Return each Primary's capacity (the unit of its metering: MVA for the eight MVA-only Primaries, MW otherwise)."""
+    return k578.sites().select("time_series_id", "capacity_mw", "group")
+
+
 def contract_rows(*, mean: pl.DataFrame) -> pl.DataFrame:
     """Relabel the network origin (09:00) as the contract origin (12:00) and keep 12:00 to +14 d."""
     assert (mean["power_fcst_init_time"].dt.hour() == NETWORK_ORIGIN_HOUR).all()
     assert (mean["power_fcst_init_time"].dt.minute() == 0).all()
     origin = pl.col("power_fcst_init_time") + timedelta(hours=CONTRACT_HOUR - NETWORK_ORIGIN_HOUR)
+    cap = capacity_mw().select(pl.col("time_series_id").cast(pl.Int64), "capacity_mw")
     out = (
-        mean.with_columns(contract_origin=origin)
+        mean.with_columns(contract_origin=origin, time_series_id=pl.col("time_series_id").cast(pl.Int64))
         .filter(
             (pl.col("valid_time") >= pl.col("contract_origin"))
             & (pl.col("valid_time") < pl.col("contract_origin") + timedelta(days=14))
         )
+        .join(cap, on="time_series_id", how="left")
+        .with_columns(*[(pl.col(q).cast(pl.Float64) * pl.col("capacity_mw")).cast(pl.Float32) for q in QCOLS])
         .select(
             pl.col("time_series_id").cast(pl.Int8),
             pl.col("valid_time"),
-            nwp_init_time=pl.col("contract_origin").dt.truncate("1d"),
-            power_fcst_init_time=pl.col("contract_origin"),
+            pl.col("contract_origin").dt.truncate("1d").alias("nwp_init_time"),
+            pl.col("contract_origin").alias("power_fcst_init_time"),
             *QCOLS,
         )
         .sort("time_series_id", "power_fcst_init_time", "valid_time")
     )
+    assert out.schema == pl.Schema(CONTRACT_SCHEMA), out.schema
+    assert out["q99"].is_finite().all() and out.select(pl.all_horizontal(pl.col(QCOLS).is_not_null())).to_series().all()
+    q = out.select(QCOLS).to_numpy()
+    assert (np.diff(q, axis=1) >= 0).all(), "quantiles cross"
+    per = out.group_by("time_series_id", "power_fcst_init_time").len()["len"].unique().to_list()
+    assert per == [HALF_HOURS], per
+    assert out.height == out.unique(["time_series_id", "power_fcst_init_time", "valid_time"]).height
+    assert out["time_series_id"].n_unique() == 16
     return out
 
 
@@ -70,6 +97,8 @@ def nra_month(*, month: str) -> pl.DataFrame:
         for s in SEEDS
     ]
     assert all(f.height == frames[0].height for f in frames), "seeds differ in rows"
+    keys = [f.select(KEYS).sort(KEYS) for f in frames]
+    assert all(k.equals(keys[0]) for k in keys), "seeds differ in keys"
     for f in frames:
         assert f.height == f.unique(KEYS).height, "duplicate keys in a seed's fit"
     return contract_rows(mean=seed_mean(frames=frames))
