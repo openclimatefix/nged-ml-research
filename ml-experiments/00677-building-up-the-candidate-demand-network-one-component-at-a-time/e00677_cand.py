@@ -42,6 +42,7 @@ _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 _p.add_argument("--passes", nargs="+", type=int, default=None)
 _p.add_argument("--work-suffix", default="")
 _p.add_argument("--e3", type=int, default=1)
+_p.add_argument("--synthetic", type=int, default=1)
 MINE = _p.parse_args()
 assert set(MINE.months) <= {
     "2025-11",
@@ -89,7 +90,8 @@ SHUFFLED = ARM.endswith("-p")
 SPEC_NAME = ARM[:-2] if SHUFFLED else ARM
 BASE_ARM, *MODS = SPEC_NAME.split("+")
 DIR = ARM.replace("-", "").replace("+", "_")
-TABLES = ROOT / "tables"
+TABLES = ROOT / f"tables_sp{fold.SPAN_MONTHS}"
+"""One folder per scored span: the table also covers the scored rows."""
 TABLES_610 = (
     ML_EXPERIMENTS_DATA_DIR / "00610-nra-neighbour-summary-lag-encoder-inputs-iteration/tables"
 )
@@ -108,6 +110,8 @@ def _stage1(*, spans: str, qs: str | None = None) -> tuple[str, ...]:
 
 
 BASES: dict[str, tuple[str, ...]] = {
+    "P3": ("gap", "exp"),
+    "P5": ("gap", "own:ew1,ew3,ew7", "exp"),
     "P7": _stage1(spans="ew1,ew3,ew7"),
     "B1": _stage1(spans="bx1"),
     "B3": _stage1(spans="bx3"),
@@ -255,6 +259,12 @@ def build_month_syn(*, month, clean):
     block.
     """
     mr = _build_month_p5(month=month, clean=clean)
+    if not MINE.synthetic:  # the version without injected events: the lag inputs stay as observed
+        zero = np.zeros(clean.shape, np.float32)
+        SYN[id(mr)] = (clean, zero)
+        LABELS[id(mr)] = np.full((len(mr.primary), mymodel.LABEL_COLUMNS), np.nan, np.float32)
+        print(f"{month}: no synthetic events (the version without injected events)", flush=True)
+        return mr
     origin_idx = origin_idx_of(origin_us=mr.origin_us)
     first, last = int(mr.target_idx.min()), int(mr.target_idx.max())
     fixed, n_events = bank.synthetic_clean(
