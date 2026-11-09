@@ -52,6 +52,51 @@ def table(df: pl.DataFrame, slice_name: str, metric: str) -> str:
     return "\n".join(lines)
 
 
+COMPARE_ARMS = {
+    "backtest_NRA": "Backtest, normal running",
+    "backtest_prevailing": "Backtest, prevailing",
+    "default_3": "Default 3",
+    "bg2": "BG2",
+    "manual_heuristic": "Manual heuristic",
+    "climatology": "Climatology",
+}
+
+
+def compare_table(*, group: str, slices: dict[str, str], metric: str) -> str:
+    """One table of the protocol comparison: a row per slice, a column per forecast."""
+    d = pl.read_csv(FOLDER / "scores_668" / "primaries_compare" / "scores.csv").filter(
+        (pl.col("group") == group) & (pl.col("metric") == metric)
+    )
+    lines = [
+        "| Slice | Half-hours | " + " | ".join(COMPARE_ARMS.values()) + " |",
+        "|---|---:|" + "---:|" * len(COMPARE_ARMS),
+    ]
+    for key, name in slices.items():
+        s = d.filter(pl.col("slice") == key)
+        cells = []
+        for arm in COMPARE_ARMS:
+            v = s.filter(pl.col("arm") == arm)
+            cells.append(f"{v['mean'][0]:.2f}" if v.height else "")
+        n = s.filter(pl.col("arm") == "default_3")["half_hours"]
+        lines.append(f"| {name} | {n[0]:,} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
-    name, slice_name, metric = sys.argv[1:4]
-    print(table(pl.read_csv(FOLDER / "scores_668" / name / "scores.csv"), slice_name, metric))
+    if sys.argv[1] == "compare":
+        from e00668_figures_dots import CONDITION, HORIZON
+
+        group, block, metric = sys.argv[2:5]
+        print(
+            compare_table(
+                group=group, slices=HORIZON if block == "horizon" else CONDITION, metric=metric
+            )
+        )
+    else:
+        name, slice_name, metric = sys.argv[1:4]
+        frame = pl.read_csv(FOLDER / "scores_668" / name / "scores.csv")
+        if name.startswith("primaries") and slice_name == "series":
+            site = pl.read_csv(next(FOLDER.parent.glob("00521-*/site_map.csv")))
+            labels = {str(i): s for i, s in zip(site["time_series_id"], site["label"], strict=True)}
+            frame = frame.with_columns(group=pl.col("group").cast(pl.String).replace(labels))
+        print(table(frame, slice_name, metric))
