@@ -1,6 +1,6 @@
 """Tune the decoder on validation worlds, then score a network on injected worlds and real data.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     P=ml-experiments
     export PYTHONPATH=$P/00672-graph-model-that-finds-the-donor-of-a-load-transfer:\
 $P/00670-event-table-recipient-search-on-six-cell-grid:\

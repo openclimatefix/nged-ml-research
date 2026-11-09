@@ -1,6 +1,6 @@
 """Build injected-world banks and train the donor-finding networks of experiment 672.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     P=ml-experiments  # then PYTHONPATH as in e00672_run.py
     uv run --no-sync python e00672_train.py bank <mix> [solar]
     uv run --no-sync python e00672_train.py train <mix> <arm> <seed>
