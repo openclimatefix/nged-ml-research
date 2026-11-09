@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00658_data import CLASS_NONE, CLASS_SHIFT, N_CHANNELS
-from torch import nn
-from torch.nn import functional
+from torch import nn  # ty: ignore[unresolved-import]
+from torch.nn import functional  # ty: ignore[unresolved-import]
 
 
 @dataclass

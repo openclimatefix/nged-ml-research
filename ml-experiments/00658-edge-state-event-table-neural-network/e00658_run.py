@@ -17,7 +17,7 @@ from dataclasses import asdict
 
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00653_common import DAY, GRID_LENGTH, SCORED_FROM
 from e00653_core import decode_world, events_frame, freeze, match
 from e00653_inject import GenParams

@@ -18,7 +18,7 @@ import time
 from typing import Final
 
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00653_common import WORK as WORK_653
 from e00653_common import Panel
 from e00653_core import freeze

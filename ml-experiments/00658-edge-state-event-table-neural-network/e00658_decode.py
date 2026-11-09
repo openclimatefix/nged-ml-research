@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00653_common import BLOCK, DAY, GRID_LENGTH, N_BLOCKS, Panel, block_means
 from e00653_segment import PERMANENT_DAYS, Event, merge_fragments, refine
 from e00658_data import World, graph_arrays
