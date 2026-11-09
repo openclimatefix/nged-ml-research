@@ -71,9 +71,10 @@ a learned detector for the end of a shift, does better than that frozen K1 plus 
 
 ## Results so far
 
-**Status: development-month fits and the first final-test scoring are done. The end detector, E0 on
-the final-test window, the Step 0 edge widths, and the figures are not run.** Numbers are CRPS in
-points of capacity. "J1" is the end-to-end network whose prevailing loss does not reach the lag
+**Status: development-month fits, the first final-test scoring, and a rough Step 0 are done. NOT RUN
+in this experiment, and left to a follow-up experiment: the end detector (E1d, E2d, and the
+placebo), the final-fold fits and window scoring of E0, and the staged-return arm.** Numbers are
+CRPS in points of capacity. "J1" is the end-to-end network whose prevailing loss does not reach the lag
 encoder (stop-gradient); "J2" lets the prevailing loss reach the lag encoder. Neither reads the G4
 gate state. "C0" is the matched-compute control with no prevailing head.
 
@@ -104,6 +105,64 @@ Table: scaled CRPS on the injected bank, training family, 5 development months, 
 These are injected shifts on real bases, not real events. The NRA column is scored against the
 unshifted base, so it is not comparable with the other columns. The unscaled values and the
 normalised mean absolute error of the median sit in `score/tables.json`.
+
+### Injected shifts by lead day
+
+![Far from the end of a shift J2 beats C0 and J1 but not E0, and after the end J2 beats E0](fig1_headline.svg)
+
+Far from the end of a shift, the prevailing outputs of J1 and J2 are 2 to 3 points worse than E0 on
+every lead day. After the end of a shift, J2 beats E0 on lead days 1 to 5 by 0.4 to 1.8 points, while
+K1 and C0, which carry no shift, are best. Scaled CRPS, the same rows as the table above:
+
+Far from the end (more than 10 days left):
+
+| Arm | Day 1 | Day 2 | Day 3 | Day 4 | Day 5 | Day 6 | Day 7 | Day 8 | Day 9 |
+|---|---|---|---|---|---|---|---|---|---|
+| K1 | 9.83 | 9.85 | 9.88 | 9.94 | 9.98 | 10.14 | 10.20 | 10.23 | 10.27 |
+| R0 (168 h) | 5.23 | 5.61 | 6.02 | 6.45 | 6.84 | 7.34 | 7.70 | 8.00 | 8.26 |
+| B-haz | 4.78 | 4.89 | 5.02 | 5.17 | 5.29 | 5.52 | 5.69 | 5.81 | 5.91 |
+| E0 | 4.95 | 5.09 | 5.24 | 5.38 | 5.51 | 5.71 | 5.88 | 5.98 | 6.07 |
+| C0 | 9.90 | 9.94 | 10.00 | 10.10 | 10.18 | 10.41 | 10.48 | 10.53 | 10.59 |
+| J1 | 8.07 | 8.10 | 8.13 | 8.21 | 8.26 | 8.60 | 8.66 | 8.70 | 8.74 |
+| J2 prevailing | 7.58 | 7.63 | 7.68 | 7.75 | 7.80 | 8.16 | 8.23 | 8.26 | 8.27 |
+
+Ended in the last 24 h:
+
+| Arm | Day 1 | Day 2 | Day 3 | Day 4 | Day 5 | Day 6 | Day 7 | Day 8 | Day 9 |
+|---|---|---|---|---|---|---|---|---|---|
+| K1 | 5.67 | 5.72 | 5.83 | 6.02 | 6.13 | 5.97 | 6.04 | 6.21 | 6.38 |
+| R0 (168 h) | 7.59 | 6.92 | 6.42 | 6.20 | 6.02 | 5.60 | 5.47 | 5.51 | 5.57 |
+| B-haz | 8.68 | 8.44 | 8.23 | 8.10 | 7.98 | 7.50 | 7.32 | 7.28 | 7.22 |
+| E0 | 8.31 | 7.89 | 7.66 | 7.50 | 7.39 | 7.04 | 6.93 | 6.97 | 6.93 |
+| C0 | 5.61 | 5.65 | 5.76 | 6.01 | 6.17 | 6.11 | 6.22 | 6.37 | 6.54 |
+| J1 | 6.62 | 6.65 | 6.85 | 7.07 | 7.07 | 6.22 | 6.35 | 6.61 | 6.74 |
+| J2 prevailing | 6.50 | 6.54 | 6.73 | 6.96 | 6.99 | 6.05 | 6.20 | 6.45 | 6.60 |
+
+**Injected event lengths.** The training family draws half its durations uniformly from 3 to 14
+days and half uniformly from 28 to 112 days, so about a quarter of events last at most 8 days and
+half last at least 28 days; the held-out family uses 5, 10, 21, and 45 days. The interval files
+`score/by_lead_day.csv` hold the 95% month-block interval of every cell. The manual heuristic and
+climatology are not scored on the injected bank: both need the shifted observed power rebuilt at
+each lag time, which is a separate piece of scoring code, so they appear on the final-test window
+only.
+
+### Step 0: edges of the verified transfers
+
+A rough measurement, from the cleaned power at each Primary, of the largest jump within 2 days of
+the stated start or end. Width is the number of half-hours between 10% and 90% of the step. Where a
+daily-profile jump is larger than the transfer's own edge, the method picks the wrong jump, so the
+D3 start (2024-10-28 instead of the 26th) is not usable.
+
+| Transfer and Primary | Start width (half-hours) | End width (half-hours) |
+|---|---|---|
+| D5/D16, D5 (step about 0.4 of capacity) | 6 | 7 |
+| D5/D16, D16 | 3 | 0 (one jump) |
+| D3/D22, D3 | unusable | 0 (one jump) |
+| D3/D22, D22 | 2 | 3 |
+
+The donor's edge at D5 spreads over about 3 hours, so not every edge is within one half-hour. The
+generator's training family already draws a ramp for half of its events, so the step-only rule did
+not need changing, and the staged-return arm was not run. The numbers sit in `score/edges.json`.
 
 ### Final-test window, scored once for J2, J1, C0, K1, and the manual heuristic
 
