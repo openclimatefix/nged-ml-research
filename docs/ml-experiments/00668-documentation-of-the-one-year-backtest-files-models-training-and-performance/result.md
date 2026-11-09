@@ -95,6 +95,51 @@ description of one year and not a ranking.
   non-finite quantile, no crossing quantiles, and UTC time-zone. Each worker's page states the
   results and a spot check that no input is newer than the limits above.
 
+## The ground-truth files
+
+Five more private files hold the observed power, so a reader can score the forecast files without
+the NGED data store: `ground_truth_primaries.parquet`, `ground_truth_bsps.parquet`,
+`ground_truth_gsps.parquet`, `ground_truth_wind.parquet`, and `ground_truth_solar.parquet`. The
+forecast files never hold observed power. The script is
+`ml-experiments/00668-documentation-of-the-one-year-backtest-files-models-training-and-performance/e00668_ground_truth.py`.
+
+- **Rows.** One row per series per half-hour, from 2025-11-01 00:00 UTC to 2026-11-09 08:00 UTC,
+  the last half-hour in the data store when the files were written. Every series has the full
+  time grid, and a missing reading is an explicit null row. No row exists after 2026-11-09 08:00
+  UTC, so the last origins of the forecast files have no observed power for their later valid
+  times, and a join from a forecast file gives no match there.
+- **Columns, in this order.**
+    - `time_series_id`: the series' original identifier, an 8-bit integer. The data store and the
+      metadata table hold it as a 32-bit integer, so a join to them needs a cast.
+    - `valid_time`: the half-hour, a UTC timestamp, with the same name and meaning as in the forecast
+      files so that the two join on `(time_series_id, valid_time)`. The stamp is the source `time`
+      column, which the power contract defines as the end of the observation period.
+    - `power`: the cleaned reading as a 32-bit float, null where the production cleaning flagged the
+      half-hour. The value is `power_raw` wherever `drop_reason` is null.
+    - `power_raw`: the reading as delivered, a 32-bit float, read from the raw power table, and null
+      where no reading exists.
+    - `drop_reason`: a nullable string, the production cleaning rule that flagged the half-hour.
+      The only rule in the cleaning code when the files were written is `substation_zero`, an
+      exact zero from a Primary, BSP, or GSP.
+    - `research_flag`: a nullable string, null in every file but the wind file. In the wind file it
+      holds the rule name of the idle mask of experiment 210 (`low_wind_idle` or
+      `outage_suspected`). The mask is a research tool and not part of the production cleaning.
+      It does not null `power`, and it ends at 2026-09-13 17:30 UTC, so a wind row after that
+      carries no flag whether or not the farm was idle.
+    - `power_unit`: `"MW"` or `"MVA"` for each series, never implicit. Some Primaries and two wind
+      farms are MVA series.
+- **How to read the nulls.** A null `power` means no usable reading and is not zero. Solar nulls
+  are frequent at night, because the feed omits many night readings, so solar scores use daylight
+  half-hours. Earlier experiments scored the half-hours that the wind idle mask flags as zero, by
+  setting the target to 0; a scorer that reproduces those numbers does the same, and a scorer
+  that drops them gets different numbers.
+- **Baselines.** The manual heuristic and climatology need power from before 2025-11-01, which these
+  files do not hold. They read the cleaned power table of the data store.
+- **Checks.** The row count equals the series count times the half-hours in the grid for every
+  file, no key repeats, the time-zone is UTC, and the series are 16 Primaries, 2 BSPs, 2 GSPs,
+  3 wind farms, and 6 solar farms. A fresh Sonnet audit re-read all five files against the raw and
+  cleaned tables for every series and found no mismatch.
+
 ## Primaries
 
 Primaries are forecast by the Candidate demand network ([experiment
