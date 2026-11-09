@@ -1,7 +1,8 @@
 """Print every number the page of experiment 658 quotes.
 
-DATA_PATH_INTERNAL=... PYTHONPATH=<folder of experiment 653>:. \
-        uv run --no-sync python e00658_report.py <injected|cross|real>
+    DATA_PATH_INTERNAL=.. PYTHONPATH=<dir of 653>:. uv run --no-sync python e00658_report.py STAGE
+
+Stages: `injected` and `cross`.
 """
 
 from __future__ import annotations

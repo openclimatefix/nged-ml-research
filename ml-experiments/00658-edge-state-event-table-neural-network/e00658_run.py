@@ -1,10 +1,10 @@
 """Tune the decoder on validation worlds, then score the network on experiment 653's worlds.
 
-DATA_PATH_INTERNAL=... PYTHONPATH=<folder of experiment 653>:. \
-        uv run --no-sync python e00658_run.py tune <tag>
-... e00658_run.py score <tag>          injected scored-year worlds, every decoder cost
-... e00658_run.py real <tag>           real record, rewired-graph placebo
-... e00658_run.py baseline             experiment 653's default arm on the same worlds
+    DATA_PATH_INTERNAL=.. PYTHONPATH=<dir of 653>:. uv run --no-sync python e00658_run.py STAGE TAG
+
+Stages: `tune`, `score` (injected scored-year worlds, every decoder penalty), `cross`, `real` (real
+record and the rewired-graph placebo), and `baseline` (experiment 653's default arm on the same
+worlds, which takes no tag).
 """
 
 from __future__ import annotations
