@@ -73,6 +73,22 @@ def main(name: str, kind: str | None) -> None:
         "Climatology": lib.losses(y=y, q=np.where(ok[:, None], q_clim, 0.0)),
     }
     day = oidx // 48
+    pl.DataFrame(
+        {
+            "series_index": row.astype(np.int8),
+            "time_series_id": np.asarray(ids, dtype=np.int8)[row],
+            "valid_idx": vidx.astype(np.int32),
+            "origin_idx": oidx.astype(np.int32),
+            "lead_h": lead_h.astype(np.float32),
+            "ok": ok,
+            **{
+                f"{tag}_{name}": arr.astype(np.float32)
+                for tag, d in per_system.items()
+                for name, arr in d.items()
+                if name in ("crps", "mae")
+            },
+        }
+    ).write_parquet(out_dir / "rows.parquet")
     band = np.select(
         [(lo <= lead_h) & (lead_h < hi) for lo, hi in lib.LEAD_BANDS.values()],
         list(lib.LEAD_BANDS),
