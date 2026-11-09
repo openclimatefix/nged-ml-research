@@ -83,7 +83,8 @@ lessons:
     19.5%), so the coarse step costs little accuracy on sunny days.
   - >-
     The explicit term's loss is the same size at 3-hourly leads (-0.28) and 6-hourly leads (-0.30),
-    so the step width is probably not the cause (the lead also differs between the two groups, so the test is weak); forecast cloud error is the likely remaining cause.
+    so the step width is probably not the cause (the lead also differs between the two groups, so
+    the test is weak); forecast cloud error is the likely remaining cause.
   - >-
     A learned correction of the clear-sky index and a mixture of fleet shapes recover 0.08 to 0.15
     points of the explicit network's loss and stay 0.13 to 0.29 points behind the free network.
@@ -91,19 +92,22 @@ take_home_message: >-
   The ensemble forecast's coarse time step (3 hours, then 6 hours) is not why telling the demand
   network each substation's solar capacity makes the forecast worse: the same capacity term still
   helps by about 0.8 points of capacity when real weather is averaged into 3-hour or 6-hour windows
-  first. The most likely remaining cause is the ensemble's cloud forecast error, which was not tested here, and a small neural correction
+  first. The most likely remaining cause is the ensemble's cloud forecast error, which was not
+  tested here, and a small neural correction
   of the sunshine input did not fix it.
 advice:
   - >-
     Do not blame the ensemble's 3-hour or 6-hour time step for a solar-term loss, because known
-    weather (shortwave only) degraded to those windows kept the whole explicit gain (0.84 and 0.77 against 0.75
+    weather (shortwave only) degraded to those windows kept the whole explicit gain (0.84 and 0.77
+    against 0.75
     points, experiment 661 step 5).
   - >-
     Keep production's window-mean resampler for ensemble shortwave, because it rebuilds 3-hour
     windows to within 5.3% of the midday peak against 15.5% for linear interpolation (experiment 661
     Part 1).
   - >-
-    Do not expect this learned clear-sky-index adapter to rescue the explicit solar term, because it stayed 0.13
+    Do not expect this learned clear-sky-index adapter to rescue the explicit solar term, because
+    it stayed 0.13
     to 0.29 points behind the free network (experiment 661 Part 3).
 production_status: not-for-production
 adopted_in: none
@@ -118,26 +122,33 @@ whether the ensemble's coarse time step is the reason, and the time step is not 
 averaged real weather (CAMS and ERA5 estimates of past weather) into 3-hour and 6-hour windows,
 rebuilt half-hourly values with production's window-mean resampler, and retrained the neural
 networks. The explicit gain did not fall. The audit found nothing wrong with how ensemble shortwave
-becomes half-hourly values, and a small neural adapter in front of the solar curve did not rescue the
+becomes half-hourly values, and a small neural adapter in front of the solar curve did not rescue
+the
 term. The most likely cause that remains is the ensemble's forecast cloud error, which this
 experiment did not test directly.
 
-This page follows [experiment 639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md)
-(real weather, gain 0.75), [experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md)
-and [experiment 655](../00655-pv-member-level-cell-temperature-term-and-forecast-sunniness-tracker/result.md)
+This page follows [experiment
+639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md)
+(real weather, gain 0.75), [experiment
+644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md)
+and [experiment
+655](../00655-pv-member-level-cell-temperature-term-and-forecast-sunniness-tracker/result.md)
 (ensemble weather, loss 0.25 to 0.37). Scores are the continuous ranked probability score (CRPS) in
 percent of each Primary's effective capacity ("points"), on sunny middays (10:00 to 15:00 UTC,
-clear-sky index at least 0.7), at the six MW Primaries. Smaller is better. The free network learns each
+clear-sky index at least 0.7), at the six MW Primaries. Smaller is better. The free network learns
+each
 Primary's solar response from the data alone; the explicit network is told the capacity. A positive
 contrast (free minus explicit) favours the explicit network.
 
 ![Explicit gain against input time resolution](gain_by_input_resolution.svg)
 
-- **Averaging real weather into 3-hour or 6-hour windows did not reduce the explicit gain.** Free minus explicit CRPS is
+- **Averaging real weather into 3-hour or 6-hour windows did not reduce the explicit gain.** Free
+  minus explicit CRPS is
   0.753 [0.478, 1.050] at hourly resolution, 0.839 [0.581, 1.127] with 3-hour windows, and 0.773
   [0.512, 1.058] with 6-hour windows (three cutoffs, five seeds, 99.6% day-block intervals). The
   3-hour gain exceeds the hourly gain by 0.086 [0.016, 0.162]; the 6-hour gain by 0.020 [-0.084,
-  0.120]. The decision rule (a fall of at least half) is not met. The gain is concentrated: Primary 6
+  0.120]. The decision rule (a fall of at least half) is not met. The gain is concentrated: Primary
+  6
   carries about 3 points, and the other five Primaries together gain 0.27 [0.07, 0.49] at hourly
   resolution, with 3-hour minus hourly still positive at 0.113 [0.053, 0.176].
 - **The ensemble loss is the same at both step widths.** Free minus explicit is -0.281 [-0.426,
@@ -154,8 +165,10 @@ contrast (free minus explicit) favours the explicit network.
 - **No time-stamp shift.** The ensemble's window-mean shortwave correlates best with CAMS (hourly
   values stamped at the end of the hour) at a shift of zero at all six Primaries (r 0.966 to 0.986).
   The other CAMS convention gives a shift of two half-hours and r of 0.878 to 0.914 at zero shift.
-- **Production's method is the best of the three methods tested (window mean, linear flux, step-holding).** Rebuilding known weather from 3-hour windows leaves
-  a root-mean-square error of 5.3% of the CAMS midday peak (peak bias -2.5%); linear flux gives 15.5% and step-holding
+- **Production's method is the best of the three methods tested (window mean, linear flux,
+  step-holding).** Rebuilding known weather from 3-hour windows leaves
+  a root-mean-square error of 5.3% of the CAMS midday peak (peak bias -2.5%); linear flux gives
+  15.5% and step-holding
   10.4%. With 6-hour windows the errors are 6.6%, 30.8%, and 19.5%.
 
 ![Interpolation error](interpolation_error.svg)
@@ -171,8 +184,10 @@ contrast (free minus explicit) favours the explicit network.
 | Adapter arm (A) | 4.04 | 4.42 | 5.18 |
 
 - **The adapter arm is not kept.** Free minus A is -0.291 [-0.479, -0.124], -0.135 [-0.316, 0.036],
-  and -0.129 [-0.275, 0.013]; the bar was a gain of 0.084 at day 1-2. A beats the explicit network by
-  0.075 [-0.006, 0.150], 0.115 [0.030, 0.190], and 0.146 [0.079, 0.217], and the 14-day tracker beats
+  and -0.129 [-0.275, 0.013]; the bar was a gain of 0.084 at day 1-2. A beats the explicit network
+  by
+  0.075 [-0.006, 0.150], 0.115 [0.030, 0.190], and 0.146 [0.079, 0.217], and the 14-day tracker
+  beats
   A by 0.63, 0.60, and 0.70.
 - **The mixture without the adapter scored about the same as the adapter arm at day 1-2.** The
   mixture-only arm (A0) is 0.024 [-0.070, 0.121] behind the adapter arm (A) there, and 0.081 and
@@ -197,7 +212,8 @@ contrast (free minus explicit) favours the explicit network.
 - **Caveats:** each day is its own trajectory in the degradation, so interpolation never crosses
   midnight (the 6-hour window that holds sunrise is affected in summer); only shortwave is degraded;
   capacities are experiment 639's, calibrated on undegraded weather; no example-forecast figure is
-  shown; the Part 2 gain is measured on real-weather rows (the figure's blue rows)  and the ensemble loss on ensemble rows, so
+  shown; the Part 2 gain is measured on real-weather rows (the figure's blue rows)  and the
+  ensemble loss on ensemble rows, so
   the two are not paired.
 
 ## Method
@@ -234,4 +250,5 @@ contrast (free minus explicit) favours the explicit network.
   (`work/adapter/analysis/part3.json`).
 - `e00661_report.py`: prints every number on this page and draws the figures.
 - Read from earlier experiments: 639 (pretraining, probes, stored predictions), 644 (rows and
-  stored quantiles), 418 (dense weather), 48 and 397 (summaries). Paths are under `data/ml-experiments/`.
+  stored quantiles), 418 (dense weather), 48 and 397 (summaries). Paths are under
+  `data/ml-experiments/`.
