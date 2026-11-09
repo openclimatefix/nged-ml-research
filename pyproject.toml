@@ -641,6 +641,22 @@ invalid-return-type = "ignore"
 invalid-argument-type = "ignore"
 unresolved-attribute = "ignore"
 
+[[tool.ty.overrides]]
+# Experiment 663's scripts are copies and patches of experiment 654's `torch` wrappers and build
+# Altair charts through chained `mark_*` calls (see the `ty-workarounds` skill), and pass
+# tuple-valued numpy results through untyped helpers. They are checked for the other rules only.
+include = ["ml-experiments/00663-end-detector-for-the-prevailing-forecast-followup-to-654/*.py"]
+
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"
+invalid-assignment = "ignore"
+not-subscriptable = "ignore"
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"
+unresolved-import = "ignore"
+unsupported-operator = "ignore"
+redundant-condition = "ignore"
+
 [tool.ty.rules]
 # With the `gpu` dependency group installed, `torch` resolves, so `ty` reports every
 # `# ty: ignore[unresolved-import]` on a `torch` import as unused and every `nn.Module.forward`
