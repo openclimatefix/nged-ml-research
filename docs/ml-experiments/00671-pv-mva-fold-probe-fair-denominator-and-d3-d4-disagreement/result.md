@@ -63,7 +63,7 @@ headline: >-
 lessons:
   - >-
     The apparent-power conversion costs the linear probe recovery even where the floor does not
-    apply, in proportion to the injected size, and costs the fold model almost none on average
+    apply, in proportion to the injected size, and costs the fold model little at the median
     but with a spread of -6 to +18 points between Primaries.
   - >-
     The fold model's extra capacity over the linear probe at D2, D3, D4, and D19 comes from its two
@@ -87,8 +87,8 @@ take_home_message: >-
   even where the flow never nears zero, and the cost grows with the size of the solar farm. The
   fold model avoids most of that loss, but its extra capacity at D2, D3, D4, and D19 comes almost
   entirely from two free reactive-power terms. For those five Primaries the linear probe, scaled by
-  the recovery measured on injected farms, is the one to trust, with the fold model's reading as
-  an upper bound.
+  the recovery measured on injected farms, is the better-supported reading, with the fold model's
+  reading as an upper bound.
 ---
 
 # Does the fold model lose recovery with a fair denominator, and which probe should be trusted at D2, D3, D4, D19, and D21?
@@ -104,7 +104,8 @@ model's free-reactive reading as an upper bound. Both parts re-use experiment 66
 
 ![A1': PF recovery over the signed-world linear recovery, by probe, level, and Primary](a1_prime.svg)
 
-**Figure: the linear probes sit at 0.9 only at 0.5 times and the fold model scatters around 1.**
+**Figure: L0 sits near 0.9 only at 0.5 times, L1 also at 1 times, and the fold model scatters
+around 1.**
 Each dot is one Primary at one level. D5 and D10 sit past the fold in every injected world (2.0 MW
 floor), so their ratios are shown apart.
 
@@ -117,6 +118,10 @@ class in one cell.
 
 ## Part 1: A1' at the six MW Primaries (median over seeds, first farm rotation)
 
+Terms: L0 is the linear probe, L1 the linear probe on rows above the reactive floor, and FA the
+fold model with a night prior (all as in experiment 662). "PF" is the apparent-power world with
+power factor 0.97. A ratio is valid where the signed-world denominator is at least 0.05.
+
 - **Bar.** 0.90 to 1.10 at 5 of 6. It passes for no probe at any level. Valid ratios in the bar:
   L0 2, 0, 0; L1 2, 2, 0; FA 3, 2, 2 of 6 at 0.5, 1, 2 times.
 - **Loss in points of recovery (PF minus signed L0), D9, D11, D14, D16.**
@@ -127,7 +132,14 @@ class in one cell.
 | L1 | -6 to -12 | -2 to -9 | -78 to -95 |
 | FA | -6 to +10 | -4 to +18 | +1 to +13 |
 
-- **Signed-world L0 denominators** are 0.74 to 0.82 at all six Primaries and levels.
+- **Pre-registered predictions.** The plan predicted that A1' passes for L0 and L1 at 0.5 times
+  and for FA at 0.5 and 1 times. All three failed (L0 2 of 6, L1 2 of 6, FA 3 and 2 of 6), so the
+  first hypothesis (no loss where the floor does not apply) is refuted for L0 and L1 and not
+  supported for FA. The prediction for Part 2 (curves not V-shaped; most of the extra capacity gone
+  with the reactive terms fixed) held.
+- **Deviation.** The plan said median over seeds and both farm rotations; only the first rotation
+  is used, because the signed arm has no second rotation.
+- **Signed-world L0 denominators** are 0.73 to 0.82 at all six Primaries and levels.
 - **D5 and D10** (2.0 MW at every level, past the fold): L0 and L1 lose 79 to 115 points; FA loses
   53 to 57 points at D5 and 6 to 12 points at D10.
 - **Bias reading (FA over signed L0).** FA's ratio is 0.85 to 1.22 at D9, D10, D11, D14, and D16
@@ -138,6 +150,11 @@ class in one cell.
   probe at 0.5 times and 22 to 25 points at 1 times.
 
 ## Part 2: D2, D3, D4, D19, D21 (and D5, D10)
+
+Terms: a "twin" is the network trained on the real data with no injected farm. "q = 0" fixes both
+reactive terms of FA at zero; "q1 = 0.25" fixes the reactive share at the power-factor 0.97 value.
+The midday reading is the median flow on sunny half-hours from 10:00 to 15:00 UTC, April to August.
+The "A2 rows" are experiment 662's recoveries in native apparent-power worlds.
 
 | Primary | Midday reading (MW) | L0 (MW) | FA free (MW) | FA, q = 0 | FA, q1 = 0.25 | Share of FA's extra gone with q = 0 |
 |---|---|---|---|---|---|---|
@@ -162,23 +179,26 @@ class in one cell.
 
 ## Recommendation
 
-Capacity ranges divide the raw linear capacity by the native-world 0.5-times recoveries (0.82 to
-0.63) of experiment 662; the "upper bound" divides the free fold fit by 0.70, the fold model's
-recovery at 1 times at the six MW Primaries. Both assume power factor 0.97.
+Capacity ranges divide the raw linear capacity by the native-world 0.5-times recoveries (0.63 to
+0.82) of experiment 662; the "upper bound" divides the free fold fit by 0.71, the median recovery
+of the fold model at 1 times at the six MW Primaries (a different level from the linear divisor,
+because the fold model's 0.5-times recovery at D3, D4, and D19 is lower). Both assume power factor
+0.97.
 
 | Primary | Probe to use | Capacity range (MW) | Upper bound, free fold (MW) | Confidence |
 |---|---|---|---|---|
-| D2 | L0 | 6.3 to 8.3 | 11.4 | provisional |
-| D3 | L0 | 2.5 to 3.3 | 6.3 | provisional |
-| D4 | L0 | 1.2 to 1.6 | 4.4 | provisional |
+| D2 | L0 | 6.3 to 8.3 | 11.2 | provisional |
+| D3 | L0 | 2.5 to 3.3 | 6.2 | provisional |
+| D4 | L0 | 1.2 to 1.6 | 4.3 | provisional |
 | D19 | L0 | 1.4 to 1.8 | 3.0 | provisional |
-| D21 | L0 (the fold model agrees within 0.2 MW) | 1.4 to 1.8 | 1.9 | high |
+| D21 | L0 (the fold model's median is 0.2 MW higher) | 1.4 to 1.8 | 1.9 | provisional |
 | D5, D10 | none | not defined | not defined | report-only |
 
-- **Why L0 for D3 and D4.** Fixing the reactive terms at zero or at the power-factor value returns
-  the linear capacity, so the extra 2.1 to 2.4 MW of the free fold fit is a reactive-term effect
-  that the injected farms do not support: the fold model recovers less than the linear probe at 0.5
-  times at D3, D4, and D19 (0.68, 0.55, 0.49 against 0.82, 0.74, 0.63).
+- **Why L0 for D3, D4, and D19.** Fixing the reactive terms at zero or at the power-factor
+  value returns the linear capacity, so the extra 1.0 to 2.4 MW of the free fold fit at D3, D4,
+  and D19 is a reactive-term effect that the injected farms give no sign of supporting. The fold
+  model recovers less than the linear probe at 0.5 times at D3, D4, and D19 (0.68, 0.55, 0.49
+  against 0.82, 0.74, 0.63).
 - **What stays open.** The injection tests difference a twin against a fleet, so they cannot show
   whether the twin's own absolute read of 3 to 4 MW is true. A real reactive floor of 3 to 5 MW at
   D3 and D4 would also produce the free fit's answer.
@@ -206,4 +226,4 @@ recovery at 1 times at the six MW Primaries. Both assume power factor 0.97.
 ## What the next experiment should answer
 
 Does a reactive floor of 3 to 5 MW exist at D3 and D4? A test needs the real meters' active and
-reactive power, which NGED can supply for one Primary.
+reactive power, which the meters may record.
