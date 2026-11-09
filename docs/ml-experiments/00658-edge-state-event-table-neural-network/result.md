@@ -40,21 +40,23 @@ prediction: >-
   end for 65% of injected events (experiment 653: 0.48). P7: inference on a degree-preserving rewired
   graph classes a third or fewer of the real edge events as edge events (experiment 653: 2 against 4).
 decision_rule: >-
-  Fixed before any score is read. Harness: experiment 653's residual panel (15 Primaries, half-hourly,
-  2022-01-01 to 2026-06-30, lag-free demand model of experiment 130, common mode removed), its
-  injector with its seeds, its truth table, and its scorer; the scored years are 2024-01-01 to
-  2026-06-30 and the final-test window from 2026-07-01 is never read. The network trains on injected
-  worlds built from 2022-01-01 to 2023-06-30 only, the decoder's costs and the stopping epoch are
-  chosen on injected worlds built from 2023-07-01 to 2023-12-31 only (largest recall with at most 6
-  decoded events per Primary-year on the real residual of those months), and nothing changes after the
-  first scored number is read. Three network seeds; every interval resamples whole worlds and the
-  seeds are reported side by side. The comparison with experiment 653 is read at equal real-record
-  event rate, and a rewired-graph placebo and equal-width scaling are not applicable (the table has no
-  bands) but the rewired-graph run is printed beside every pairing result. Support: P1 and P2 hold, and
-  P3 and P4 hold. Not supported and the neural line closes: recall does not beat experiment 653's by
-  0.08, or P3 fails, or P4 fails. If the failure is a bug found by the code review of the fitted
-  results, it is fixed and the experiment is run once more before closing. The porting threshold is
-  zero, because the table is a research output and changes no production code.
+  Fixed before any score is read. Data: experiment 653's residual panel and injector (same seeds).
+  Training worlds cover 2022-01-01 to 2023-06-30 and everything later is hidden from them;
+  validation worlds cover 2023-07-01 to 2023-12-31 with everything later hidden; scored years are
+  2024-01-01 to 2026-06-30; the final-test window from 2026-07-01 is never read. Tuning: decoder
+  costs, the edge-posterior cut-off, and the stopping epoch are chosen on validation worlds only, from
+  a grid frozen before any scored number is read. Rate: the scored-year comparison with experiment 653
+  is a curve of recall against real-record events per Primary-year over the same grid, with experiment
+  653's point (6.57) placed on it, and the headline point is the grid cost with the highest
+  validation recall and at most 6 events per Primary-year on the real validation months. P1 is read
+  at a real-record rate within 10% of 6.57 or lower. Seeds: three network seeds; a prediction holds
+  only if the mean over seeds holds and no seed is more than 0.05 worse than its threshold.
+  Verdict: supported if P1, P2, P3 and P4 all hold; partly supported if P1 holds and P2 fails (a
+  detector without pairing); not supported, neural line closed, if P1 fails, or P3 fails, or P4
+  fails. P5, P6 and P7 are reported and do not decide. A fixable bug found after scoring is fixed and
+  the experiment re-run once on a new set of scored-year worlds, and the page labels it a second look.
+  The porting threshold is zero, because the table is a research output and changes no production
+  code.
 benchmark: >-
   Experiment 653 (default arm: masked frozen seasonal slow level with penalised segmentation), re-run
   on the same worlds in this experiment's script; RO-NC and LR_b20 as in experiment 254 on the real
@@ -87,8 +89,30 @@ residuals, the same injected worlds, and the same scorer.
   with per-block cross-entropy and applies a fixed-cost Viterbi decode afterwards (switching costs
   chosen on validation worlds), which is the same persistence structure without backpropagation
   through the chain.
+- **Also left out, with the reason:** the four-stage curriculum and the swept duration prior (one
+  mixed-difficulty stage and fixed decode costs are simpler); injection into power before cleaning
+  (experiment 653's lab shortcut, so recall is a ceiling); the expected-power quantiles as input (the
+  residual panel has none); the rate-sanity and wobble checks of the answer file; the equal-width
+  scaling guard (the table has no bands to widen).
+- **Shared lab shortcuts:** the slow level, noise units, and common mode are fitted on the whole
+  record without labels, as in experiment 653; the injector draws start hours and weekdays from the
+  logged onsets before the world's end (training worlds see only pre-2023-07 onsets), and its edge
+  width and shape come from the verified D3 and D22 transfer of October 2024, as in experiment 653.
+  D18 has no data before 2025-03-01, so the network never sees it present in training; its scored
+  edge events are reported as their own stratum.
 - **Not built:** the causal variant and its distillation loss, the conservation loss, the boundary
   loss, the reconstruction loss, the 2019 to 2021 history, and recall-by-size on real events.
+
+## Terms used below
+
+- **Primary:** a substation that steps electricity down to a local distribution network; the
+  experiment covers 15. **Noise unit:** a Primary's typical difference between successive 6-hour
+  block means ([experiment 653](../00653-edge-state-event-table-penalised-segmentation/result.md)).
+  **Strict and loose match:** a logged shift counts as found when a decoded start lies within 2 hours
+  or 24 hours of the logged onset, as in
+  [experiment 254](../00254-lsc-alarm-precision-against-full-log-with-chance-base-rate/result.md),
+  which also defines LR_b20 and RO-NC. **K1:** the day-ahead median forecast of the leaderboard.
+  **D5, D16, D3, D22:** anonymised Primary names.
 
 ## Method (planned)
 
@@ -119,14 +143,31 @@ residuals, the same injected worlds, and the same scorer.
 - **Loss.** Weighted cross-entropy for class, sign, and edge state, Huber loss on amplitude, and a
   small penalty on the number of state changes per day. Adam, learning rate 0.003, early stopping on
   the validation worlds' recall at the validation false rate. Three seeds, GPU, one process at a time.
+- **Mix and crops.** The main network trains on experiment 653's default generator (half constant,
+  half proportional shapes, edges 0 to 4 half-hours). Each step draws a random world and a fresh
+  random 180-day crop; 20% of crops carry no injection and train only the 0.1-weight 'none' target.
 - **Cross-injector networks:** one trained on constant-megawatt events with square edges and default
   durations, one trained on events proportional to the donor's power with wide edges, loose shares,
-  and staggered starts; each tested on both injectors (seed 0 only).
+  and staggered starts; each tuned on validation worlds from its own training injector and tested on both injectors, three seeds if the timing allows. The drop is the same-injector score minus the cross score, in both directions; the check is weaker than the answer file's different-duration-law test because both injectors descend from experiment 653's generator.
 
 **Measurement.**
 
 - **Injected scoring:** experiment 653's worlds (same seeds), match rule, and recall definitions;
   experiment 653's default arm re-run beside it to confirm it reproduces the stored table.
+- **Pairing rules:** pairing recall (P2) is reported for the network's edge posterior (cut-off 0.5,
+  tuned on validation) and for experiment 653's rule applied to the network's events. Edge targets:
+  every donor-recipient link of an injected transfer, in the donor's direction; links touching a solo
+  shift or a placebo pair are 'off' with weight 1; elsewhere 'off' with weight 0.1.
+- **Placebo:** the rewired graph is applied at inference only (a degree-preserving rewiring, 100
+  draws) to the real scored years and to the injected worlds (where pairing recall should collapse),
+  with experiment 653's decoder on the same rewires as a control that separates topology use from
+  out-of-distribution failure.
+- **Definitions:** P6 counts a miss as a failure, as in experiment 653, and also reports the share
+  among found events. The event-free stratum is decoded events more than 14 days from every labelled
+  or verified event, reported per Primary-year for both methods at the same rate. P4 uses the
+  verified events and experiment 653's 4 real edge events against injected edge events of the same
+  Primary-years and size band, with a bootstrap interval; the sample is under 10 real events, so an
+  interval that straddles 0.65 is reported as not shown and the point value decides the verdict rule.
 - **Real record:** events per Primary-year by class, the D8 rate, logged shifts matched strictly and
   loosely against LR_b20, the rewired-graph placebo (100 draws), the verified D5 and D16 pair, and
   the injected-against-real classifier on the verified events and the experiment 653 edge events.
