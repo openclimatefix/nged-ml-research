@@ -62,11 +62,11 @@ def series_figure(
     panels = []
     for name, frame in stitched.items():
         base = alt.Chart(frame.to_pandas()).encode(x=alt.X("time:T", title="Date (UTC)"))  # ty: ignore[unresolved-attribute]
-        band = base.mark_area(opacity=0.25, color=COLOURS[name]).encode(
+        band = base.mark_area(opacity=0.25, color=COLOURS[name]).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title=f"{label} power (MW)", scale=alt.Scale(zero=False)), y2="q95:Q"
         )
-        med = base.mark_line(color=COLOURS[name], strokeWidth=1.5).encode(y="q50:Q")
-        heur = base.mark_line(
+        med = base.mark_line(color=COLOURS[name], strokeWidth=1.5).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
+        heur = base.mark_line(  # ty: ignore[unresolved-attribute]
             color=COLOURS["Manual heuristic"], strokeDash=[4, 3], strokeWidth=1.2
         ).encode(y="heur:Q")
         obs = (
@@ -75,7 +75,7 @@ def series_figure(
             .encode(x="time:T", y="power:Q")
         )
         rules = (
-            alt.Chart(
+            alt.Chart(  # ty: ignore[unresolved-attribute]
                 pl.DataFrame(
                     {"time": pl.Series(np.array([to_time(start), to_time(end)]))}
                 ).to_pandas()
@@ -118,11 +118,11 @@ def fan_figure(
     obs_frame = observed.filter((pl.col("idx") >= lo) & (pl.col("idx") < hi))
     for name, frame in fans.items():
         base = alt.Chart(frame.to_pandas()).encode(x=alt.X("time:T", title="Date (UTC)"))  # ty: ignore[unresolved-attribute]
-        outer = base.mark_area(opacity=0.2, color=COLOURS[name]).encode(
+        outer = base.mark_area(opacity=0.2, color=COLOURS[name]).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title=f"{label} power (MW)", scale=alt.Scale(zero=False)), y2="q95:Q"
         )
-        inner = base.mark_area(opacity=0.3, color=COLOURS[name]).encode(y="q25:Q", y2="q75:Q")
-        med = base.mark_line(color=COLOURS[name], strokeWidth=1.5).encode(y="q50:Q")
+        inner = base.mark_area(opacity=0.3, color=COLOURS[name]).encode(y="q25:Q", y2="q75:Q")  # ty: ignore[unresolved-attribute]
+        med = base.mark_line(color=COLOURS[name], strokeWidth=1.5).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
         obs = (
             alt.Chart(obs_frame.to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_line(color=COLOURS["Observed"], strokeWidth=1)
@@ -139,7 +139,7 @@ def fan_figure(
                 .mark_rule(color=c, strokeDash=d)
                 .encode(x="time:T")
                 for t, c, d in marks
-                if to_time(lo) <= t <= to_time(hi)
+                if to_time(lo) <= t <= to_time(hi)  # ty: ignore[unsupported-operator]
             ]
         )
         panels.append(
@@ -188,7 +188,7 @@ def main(out: Path) -> None:
         observed = (
             pl.DataFrame({"idx": np.arange(start - 20 * DAY, end + 12 * DAY)})
             .with_columns(
-                time=pl.Series(to_time(np.arange(start - 20 * DAY, end + 12 * DAY))),
+                time=pl.Series(to_time(np.arange(start - 20 * DAY, end + 12 * DAY))),  # ty: ignore[invalid-argument-type]
                 power=pl.Series(y[start - 20 * DAY : end + 12 * DAY]),
             )
             .drop_nulls("power")
@@ -215,7 +215,10 @@ def main(out: Path) -> None:
                 grid=grid, row=np.full(s.height, row), vidx=s["vidx"].to_numpy(), lead_h=lead
             )[:, 5]
             stitched[name] = s.select(
-                time=pl.Series(to_time(s["vidx"].to_numpy())), q05="q05", q50="q50", q95="q95"
+                time=pl.Series(to_time(s["vidx"].to_numpy())),  # ty: ignore[invalid-argument-type]
+                q05="q05",
+                q50="q50",
+                q95="q95",  # ty: ignore[invalid-argument-type]
             ).with_columns(heur=pl.Series(heur))
         series_figure(observed=observed, stitched=stitched, start=start, end=end, label=label).save(
             out / f"event_{label}_day_ahead.svg"
@@ -239,7 +242,7 @@ def main(out: Path) -> None:
             for name, f in kinds.items():
                 s = f.filter(pl.col("oidx") == o).sort("vidx")
                 fans[name] = s.select(
-                    time=pl.Series(to_time(s["vidx"].to_numpy())),
+                    time=pl.Series(to_time(s["vidx"].to_numpy())),  # ty: ignore[invalid-argument-type]
                     q05="q05",
                     q25="q25",
                     q50="q50",
@@ -281,10 +284,10 @@ def main(out: Path) -> None:
                 "step_start": str(to_time(start)),
                 "step_end": str(to_time(end)),
                 "step_mw": step,
-                "hours_until_prevailing_moved": (float(moved["oidx"].min() - start) / 2.0)
+                "hours_until_prevailing_moved": (float(moved["oidx"].min() - start) / 2.0)  # ty: ignore[unsupported-operator]
                 if moved.height
                 else None,
-                "hours_until_prevailing_returned": (float(returned["oidx"].min() - end) / 2.0)
+                "hours_until_prevailing_returned": (float(returned["oidx"].min() - end) / 2.0)  # ty: ignore[unsupported-operator]
                 if returned.height
                 else None,
                 "daily_deviation_mw": {

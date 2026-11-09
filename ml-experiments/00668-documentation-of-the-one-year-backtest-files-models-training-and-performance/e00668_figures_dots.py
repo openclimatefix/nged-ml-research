@@ -75,7 +75,7 @@ def block(
                 axis=alt.Axis(labels=metric == "mae_median", labelLimit=190),
             ),
         )
-        dots = base.mark_point(filled=True, size=55).encode(
+        dots = base.mark_point(filled=True, size=55).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("mean:Q", title=f"{name} ({unit})", scale=alt.Scale(zero=False)),
             color=alt.Color(
                 "system:N",
@@ -86,7 +86,7 @@ def block(
         )
         columns.append(dots.properties(width=280, height=24 * len(rows) + 30))
     counts = (
-        alt.Chart(frame[(frame["metric"] == "crps") & (frame["arm"] == "default_3")])
+        alt.Chart(frame[(frame["metric"] == "crps") & (frame["arm"] == "default_3")])  # ty: ignore[unresolved-attribute]
         .mark_text(align="left", fontSize=11)
         .encode(
             y=alt.Y("row:N", sort=order, title=None, axis=alt.Axis(labels=False)),
@@ -94,7 +94,7 @@ def block(
         )
         .properties(width=70, height=24 * len(rows) + 30, title="Half-hours")
     )
-    return alt.hconcat(*columns, counts).properties(
+    return alt.hconcat(*columns, counts).properties(  # ty: ignore[invalid-return-type]
         title=alt.TitleParams(title, anchor="start", fontSize=13)
     )
 
