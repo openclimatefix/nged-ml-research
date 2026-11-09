@@ -40,6 +40,8 @@ NAME: Final = "00661-pv-ens-time-resolution-shortwave-interpolation-audit-and-bi
 OUT: Final[Path] = ML_EXPERIMENTS_DATA_DIR / NAME / "work" / "audit"
 SW: Final = "downward_short_wave_radiation_flux_surface"
 TEST_MONTHS: Final[tuple[str, ...]] = ("2025-07", "2026-03", "2026-06")
+HOLDOUT_START: Final = datetime(2026, 7, 1, tzinfo=UTC)
+"""Half-hours ending after this stamp are never scored."""
 SUNNY_KT: Final = 0.80
 """A day is sunny when CAMS daily energy is at least this share of CAMS clear-sky energy."""
 LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
@@ -151,16 +153,6 @@ def method_linear(*, native: pl.DataFrame) -> pl.DataFrame:
     return joined.with_columns(pl.col(SW).interpolate().over(keys))
 
 
-def to_hourly_mean(*, series: pl.DataFrame, value: str) -> pl.DataFrame:
-    """Average half-hour-ending values over each clock hour, labelled by the hour end (:00)."""
-    return (
-        series.with_columns(hour_end=(pl.col("valid_time") + pl.duration(minutes=29)).dt.truncate("1h") + pl.duration(hours=0))
-        .group_by("time_series_id", "hour_end")
-        .agg(pl.col(value).mean())
-        .rename({"hour_end": "valid_time"})
-    )  # fmt: skip
-
-
 def cams_half_hourly(
     *, cams: pl.DataFrame, table: pl.DataFrame, stamp: str = "end"
 ) -> pl.DataFrame:
@@ -192,7 +184,8 @@ def ens_mean_half_hourly(*, run: datetime, table: pl.DataFrame, method: str) -> 
     else:
         raise ValueError(method)
     return (
-        hh.group_by("time_series_id", "valid_time").agg(pl.col(SW).mean().alias("ens"))
+        hh.filter(pl.col("valid_time") <= HOLDOUT_START)
+        .group_by("time_series_id", "valid_time").agg(pl.col(SW).mean().alias("ens"))
         .with_columns(run=pl.lit(run).cast(pl.Datetime("us", "UTC")))
     )  # fmt: skip
 
@@ -236,7 +229,7 @@ def cmd_lag() -> None:
                     (pl.col("ens") > 5) | (pl.col("cam") > 5)
                 )
                 row[k] = float(np.corrcoef(j["ens"].to_numpy(), j["cam"].to_numpy())[0, 1])
-            best = max(row, key=row.get)
+            best = max(row, key=row.get)  # ty: ignore[no-matching-overload]
             result["ens_vs_cams"][f"{site}/{stamp}"] = {
                 "best_lag_half_hours": best,
                 "corr_at_best": row[best],
@@ -307,7 +300,8 @@ def score_frame(*, joined: pl.DataFrame, group: list[str]) -> pl.DataFrame:
     d = joined.with_columns(
         date=(pl.col("valid_time") - pl.duration(minutes=1)).dt.date()
     ).with_columns(err=pl.col("ens") - pl.col("cam"))
-    peak = d.group_by("time_series_id", "date", *group).agg(
+    extra = ["run"] if "run" in d.columns else []
+    peak = d.group_by("time_series_id", "date", *extra, *group).agg(
         pl.col("cam").max().alias("cam_peak"), pl.col("ens").max().alias("ens_peak")
     )
     base = d.group_by(group).agg(
@@ -375,8 +369,18 @@ def cmd_score() -> None:
     # (B) ensemble forecasts against CAMS by lead band
     runs = run_days(months=TEST_MONTHS, every=3)
     rows = []
+    ens_by = {
+        mt: pl.concat([ens_mean_half_hourly(run=r, table=table, method=mt) for r in runs])
+        for mt in METHODS
+    }
+    keys = ["time_series_id", "valid_time", "run"]
+    common_keys = ens_by[METHODS[0]].select(keys)
+    for mt in METHODS[1:]:
+        common_keys = common_keys.join(
+            ens_by[mt].select(keys), on=keys
+        )  # all methods scored on the same half-hours
     for method in METHODS:
-        ens = pl.concat([ens_mean_half_hourly(run=r, table=table, method=method) for r in runs])
+        ens = ens_by[method].join(common_keys, on=keys)
         j = ens.join(hh.select("time_series_id", "valid_time", "cam"), on=["time_series_id", "valid_time"]).with_columns(
             date=(pl.col("valid_time") - pl.duration(minutes=1)).dt.date(), lead=(pl.col("valid_time") - pl.col("run")).dt.total_minutes() / 60.0
         ).join(sunny, on=["time_series_id", "date"])  # fmt: skip
