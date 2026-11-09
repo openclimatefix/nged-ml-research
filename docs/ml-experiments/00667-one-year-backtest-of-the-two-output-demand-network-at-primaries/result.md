@@ -49,12 +49,24 @@ page is planned and holds the plan only.
   session advised. Pre-training chain: lag, weather, and date-time encoders pre-trained on ERA5 and
   CAMS (experiments 559, 565, 574), a fresh mixer on the whole ENS history (starts 2024-04-01),
   then the daily fine-tune with a 90-day recency half-life.
-- **Lags of at least 6 hours:** experiment 574's arm V35 caps lags at 3.5 hours (`CAP_3_5H` = 7
-  half-hours); this plan adds a 6-hour cap (12 half-hours) and pre-trains the lag encoder with it.
+- **Lags of at least 6 hours, against two origins:** the stored networks use an origin of 09:00 UTC
+  (the 00Z ENS run plus 9 hours). This backtest uses the contract's origin of 12:00 UTC, so the
+  network's origin time moves to 12:00. Experiment 574's arm V35 caps lag age at 3.5 hours
+  (`CAP_3_5H` = 7 half-hours); this plan adds a cap of 12 half-hours (6 hours), measured from the
+  12:00 origin. The newest power any lag reads is therefore at 06:00 UTC on the origin day, which is
+  exactly 6 hours before 12:00. A 12-half-hour cap measured from the native 09:00 origin would read
+  power as new as 03:00 only by accident of arithmetic, and would leave unused power between 03:00
+  and 06:00; the plan does not use that reading. The lag encoder is pre-trained with the 6-hour cap.
   The neighbour summaries obey the same cut.
-- **Survival head:** R-haz of experiment 652 on the frozen Candidate quantiles, with the gate
-  state removed from its inputs and 14 daily hazards instead of 10. One ablation arm keeps the
-  gate input, on the development months only. The Candidate's NRA output is the `"NRA"` row.
+- **Survival head:** R-haz of experiment 652 sits on the Candidate (`P7+D50`), not on K1. Its
+  gate-state input is removed, so no explicit gate enters. The Candidate's frozen 11 quantiles
+  are the NRA output. The prevailing output is the 11 quantiles of the mixture
+  `(1 - p) NRA + p (NRA shifted by a learned depth d and spread by a learned sigma)`
+  (experiment 647's `mixture_quantiles`: the shifted part is 3 Gauss-Hermite components at
+  `d + g sigma`, the quantiles are read from the mixture's cumulative distribution at the 11
+  levels). The head has 14 daily hazards instead
+  of 10, so `p = exp(-cumulative hazard)` keeps falling to day 14. One ablation arm keeps the gate
+  input, on the development months only.
 - **Folds:** 12 monthly refits, test months 2025-11 to 2026-10, trained on data before the
   month with the 7-day embargo of experiment 613. Origins daily at 12:00 UTC; the weather is the
   00Z ENS run of the same day.
