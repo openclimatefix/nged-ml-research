@@ -1,10 +1,13 @@
---- name: ml-experiment description: >- How to run a small, focused ML experiment that tests one
-hypothesis about improving the Flexpectation production forecast, and keep its result where a later
-experiment can find it, as a `result.md` of about a screen plus its Method and Files sections, and
-an immutable set of predictions. Load before planning, running, or writing up an experiment under
-`ml-experiments/`, before adopting a change into a family's research default, and before an
-overnight session. A question that needs a long report, several scientific questions, or a new
-dataset as its main subject is a study; use the `study` skill for it.
+---
+name: ml-experiment
+description: >-
+  How to run a small, focused ML experiment that tests one hypothesis about improving the
+  Flexpectation production forecast, and keep its result where a later experiment can find it, as
+  a `result.md` of about a screen plus its Method and Files sections, and an immutable set of
+  predictions. Load before planning, running, or writing up an experiment under `ml-experiments/`,
+  before adopting a change into a family's research default, and before an overnight session. A
+  question that needs a long report, several scientific questions, or a new dataset as its main
+  subject is a study; use the `study` skill for it.
 ---
 
 # Running an ml-experiment
