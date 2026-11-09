@@ -97,12 +97,13 @@ December 2025, and on the real record. No neural network is trained.
   successive 6-hour block means, computed with a 90-day moving window so that it follows the season.
 - **Slow level (default arm).** A seasonal level per Primary, following the
   slow-level addendum of 9 November 2026 to the design answer
-  (`data/ml-experiments/briefs/edge_state_slow_level_addendum.md`): 3 day-of-year harmonics shared by all years plus a linear spline with knots
-  every 365 days, fitted with a Huber loss. The fit gives zero weight to any window whose 3-day mean
-  residual exceeds 1.5 noise units, widened by 2 days on each side. It refits three times and then
-  freezes, so the segmentation cannot change it. D15 and D18 share the pooled seasonal shape and fit
-  only its scale. A trend in unmetered solar panels multiplied by CAMS irradiance is left out of
-  the default arm, and the page counts the false events that solar growth causes instead.
+  (`data/ml-experiments/briefs/edge_state_slow_level_addendum.md`): 3 day-of-year harmonics shared
+  by all years plus a linear spline with knots every 365 days, fitted with a Huber loss. The fit
+  gives zero weight to any window whose 3-day mean residual exceeds 1.5 noise units, widened by 2
+  days on each side. It refits three times and then freezes, so the segmentation cannot change it.
+  D15 and D18 share the pooled seasonal shape and fit only its scale. A trend in unmetered solar
+  panels multiplied by CAMS irradiance is left out of the default arm,
+  and the page counts the false events that solar growth causes instead.
 - **Slow level (comparison arms).** Arm S0 is a 30-day random walk with a penalty on its curvature.
   Arm S1 is the same seasonal fit with a Huber loss and no mask.
 - **Segmentation.** Each Primary's residual, with the slow level removed, is cut into 6-hour block
