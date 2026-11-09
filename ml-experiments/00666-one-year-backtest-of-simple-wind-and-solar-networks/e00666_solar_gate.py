@@ -7,7 +7,7 @@ experiment's file on `(init_time, time)`. Rows with lead 252 h or more do not ex
 reference. It prints the largest absolute difference per column and the number of rows found on
 one side only.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     PYTHONPATH=ml-experiments/00310-*:ml-experiments/00430-*:ml-experiments/00461-*:\
 ml-experiments/00659-*:ml-experiments/00666-* OMP_NUM_THREADS=1 \
         uv run --no-sync python ml-experiments/00666-*/e00666_solar_gate.py

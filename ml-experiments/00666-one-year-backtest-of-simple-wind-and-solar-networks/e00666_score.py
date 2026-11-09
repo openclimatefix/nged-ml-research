@@ -17,7 +17,7 @@ half-hours (night half-hours score zero) and on daylight half-hours only. A clim
 (the quantiles of the farm's earlier power at the same calendar month and half-hour of day, taken
 before each refit date) is scored on the same rows.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     uv run --no-sync python ml-experiments/00666-*/e00666_score.py
 """
 

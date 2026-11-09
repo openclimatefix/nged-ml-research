@@ -19,7 +19,7 @@ the half-hour is not daylight or a stamp is missing. `actual` is the farm's clea
 farm's effective capacity from `studies.power.scan_power` (null where unobserved), which equals
 experiment 218's `output` to float precision.
 
-    export DATA_PATH_INTERNAL=/home/jack/dev/nged-substation-forecast/data
+    export DATA_PATH_INTERNAL=<path to the internal data folder>
     OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=12G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00666-*/e00666_solar_inputs.py
 """
@@ -322,8 +322,10 @@ def build_farm(site: str) -> None:
     for day in common.SOLAR_DAYS:
         rows = day_rows(grid=grid, stamp_keys=stamp_keys, day=day)
         daylight = rows.filter(pl.col("daylight"))
-        no_stamp = daylight["idx"].is_null().sum()
-        no_previous = daylight.filter(pl.col("idx").is_not_null())["previous_idx"].is_null().sum()
+        no_stamp = int(daylight["idx"].is_null().sum())
+        no_previous = int(
+            daylight.filter(pl.col("idx").is_not_null())["previous_idx"].is_null().sum()
+        )
         with_stamp = daylight.height - no_stamp
         print(
             f"{site} day {day}: {daylight.height:,} daylight half-hours, {no_stamp:,} without a "
