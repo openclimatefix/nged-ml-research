@@ -91,6 +91,12 @@ def load_net(*, tag: str) -> DonorNet:
 def predict(*, net: DonorNet, world: World, nbr: np.ndarray, edges: np.ndarray) -> dict:
     """Run the network over the whole grid in overlapping chunks.
 
+    Args:
+        net: The trained network.
+        world: The world (features for every block).
+        nbr: Neighbour matrix of the arm's graph.
+        edges: Link index pairs of the arm's graph.
+
     Returns:
         Probabilities `cls` (primaries, blocks, 4), `pos` (primaries, blocks), `donor`
         (primaries, blocks), and `edge` (links, blocks, 3).

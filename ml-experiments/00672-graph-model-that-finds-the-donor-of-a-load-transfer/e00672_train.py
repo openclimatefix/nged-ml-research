@@ -159,6 +159,11 @@ def _tensors(w: DWorld, sl: slice, dev: torch.device) -> list[torch.Tensor]:
 def train(*, mix: str, arm: str, seed: int) -> str:
     """Train one network; keep the checkpoint with the lowest validation loss.
 
+    Args:
+        mix: Generator configuration of the bank (`default`, `constant`, or `shaped`).
+        arm: `G`, `GR`, `G0`, or `GS`.
+        seed: Seed of the initial weights and of the batch sampling.
+
     Returns:
         The tag under which the checkpoint and log were saved.
     """
