@@ -92,6 +92,9 @@ def main(name: str, kind: str | None) -> None:
     add(everything, slice="all rows", group="all")
     for b in lib.LEAD_BANDS:
         add(band == b, slice="lead band", group=b)
+    lead_day = np.minimum(np.floor(lead_h / 24.0), 13).astype(int)
+    for k in range(14):
+        add(lead_day == k, slice="lead day", group=f"{k:02d}")
     for m in sorted(set(month)):
         add(month == m, slice="origin month", group=m)
     for s in dict.fromkeys(season):
