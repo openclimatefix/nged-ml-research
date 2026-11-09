@@ -32,7 +32,7 @@ class Params:
     end_window: int = 24
     share_low: float = 0.3
     share_high: float = 1.5
-    conservation_max: float = 6.0
+    conservation_max: float = 2.5
     extra_edge_cost: float = 1.0
     routine_rate: int = 4
     """Unpaired short events within 30 days that make a Primary's steps routine."""
@@ -49,11 +49,12 @@ class Event:
     amp_mw: float
     units: float
     confidence: float
-    start_width_hh: float
+    ramp_fraction: float
     kind: str = "temporary"
     cls: str = "shift_no_partner"
     partners: list[str] = field(default_factory=list)
     share: float | None = None
+    partner_amp: dict[str, float] = field(default_factory=dict)
 
     @property
     def days(self) -> float | None:
@@ -175,6 +176,8 @@ def step_width(*, xh: np.ndarray, t: int, span: int = 48) -> float:
     sm = np.convolve(np.nan_to_num(seg, nan=pre), np.ones(5) / 5, mode="same")
     frac = (sm - pre) / d
     i10 = np.argmax(frac[max(0, k - 24) :] > 0.1) + max(0, k - 24)
+    if not (frac[max(0, k - 24) :] > 0.9).any() or not (frac[max(0, k - 24) :] > 0.1).any():
+        return float("nan")
     i90 = np.argmax(frac[max(0, k - 24) :] > 0.9) + max(0, k - 24)
     return float(max(0, i90 - i10))
 
@@ -190,7 +193,7 @@ def extract(*, primary: str, path: np.ndarray, post: np.ndarray, x: np.ndarray, 
             b += 1
             continue
         e = b
-        while e + 1 < len(path) and nz[e + 1]:
+        while e + 1 < len(path) and nz[e + 1] and (path[e + 1] > N_LEVELS) == (path[b] > N_LEVELS):
             e += 1
         seg = x[b : e + 1]
         seg = seg[np.isfinite(seg)]
@@ -234,12 +237,12 @@ def classify(*, events: list[Event], sigmas: dict[str, float], neighbours: dict[
              ) -> list[Event]:
     """Pair events across connected Primaries and assign each event a class."""
     for ev in events:
-        ev.cls, ev.partners, ev.share = "shift_no_partner", [], None
+        ev.cls, ev.partners, ev.share, ev.partner_amp = "shift_no_partner", [], None, {}
         if ev.end is None:
             ev.kind = "permanent" if (record_end - ev.start) / DAY >= PERMANENT_DAYS else "open"
         else:
             ev.kind = "temporary"
-        if ev.start_width_hh >= RAMP_FRACTION:
+        if ev.ramp_fraction >= RAMP_FRACTION:
             ev.cls = "ramp"
     free = [e for e in events if e.cls != "ramp"]
     donors = sorted((e for e in free if e.amp_mw < 0), key=lambda e: e.amp_mw)
@@ -271,18 +274,21 @@ def classify(*, events: list[Event], sigmas: dict[str, float], neighbours: dict[
             for r in best:
                 used.add(id(r))
                 r.cls, r.partners, r.share = "edge_transfer", [d.primary], None
+                r.partner_amp = {d.primary: d.amp_mw}
             used.add(id(d))
             d.cls = "edge_transfer"
             d.partners = [r.primary for r in best]
+            d.partner_amp = {r.primary: r.amp_mw for r in best}
             d.share = sum(r.amp_mw for r in best) / abs(d.amp_mw)
     for ev in free:
         if ev.cls == "shift_no_partner" and ev.kind == "permanent":
             ev.cls = "permanent_shift"
         if ev.cls == "edge_transfer" and ev.kind == "permanent":
             ev.cls = "permanent_transfer"
+    solo = {id(e) for e in free if e.cls == "shift_no_partner"}
     for ev in free:
-        if ev.cls == "shift_no_partner" and ev.days is not None and ev.days <= 3:
-            near = [o for o in free if o.primary == ev.primary and o.cls == "shift_no_partner"
+        if id(ev) in solo and ev.days is not None and ev.days <= 3:
+            near = [o for o in free if o.primary == ev.primary and id(o) in solo
                     and o.days is not None and o.days <= 3 and abs(o.start - ev.start) <= 30 * DAY]
             if len(near) >= p.routine_rate:
                 ev.cls = "routine"
@@ -293,6 +299,10 @@ def segment_primary(*, name: str, y: np.ndarray, xh: np.ndarray, slow: np.ndarra
                     p: Params) -> list[Event]:
     """Decode one Primary's block series (slow level already removed in `xh`)."""
     x = y - slow
+    valid = np.flatnonzero(np.isfinite(x))
+    if len(valid) == 0:
+        return []
+    x = x[: valid[-1] + 1]
     path, post = decode(x=x, sigma=sigma, p=p)
     ev = merge_fragments(events=extract(primary=name, path=path, post=post, x=x, xh=xh, sigma=sigma))
     return [e for e in ev if e.confidence >= p.min_confidence]

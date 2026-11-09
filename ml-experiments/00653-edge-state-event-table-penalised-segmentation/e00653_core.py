@@ -32,11 +32,15 @@ def three_day_unit(*, y: np.ndarray) -> float:
     return float(1.4826 * np.median(np.abs(steps - np.median(steps))))
 
 
-def freeze(*, panel: Panel, residual: dict[str, np.ndarray]) -> Frozen:
-    """Fit the slow levels and fix the noise units on the uninjected residual."""
+def freeze(*, panel: Panel, residual: dict[str, np.ndarray], upto: int | None = None) -> Frozen:
+    """Fit the slow levels and fix the noise units on the uninjected residual (before `upto`)."""
     sigma, sigma3, slow = {}, {}, {}
     for s in panel.sites:
-        y = block_means(x=residual[s])
+        x = residual[s] if upto is None else np.where(np.arange(len(residual[s])) < upto, residual[s], np.nan)
+        y = block_means(x=x)
+        if np.isfinite(y).sum() < 1000:
+            sigma[s], sigma3[s], slow[s] = float("nan"), float("nan"), {}
+            continue
         base = noise_unit(y=y)
         sl = fit_slow(y=y, sigma=base, arm="masked")
         r = y - sl
@@ -55,14 +59,20 @@ def decode_world(*, panel: Panel, residual: dict[str, np.ndarray], frozen: Froze
     """Fit the slow level (refitted per world), decode every Primary, and pair across neighbours."""
     events: list[Event] = []
     slows: dict[str, np.ndarray] = {}
+    record_end = 0
     for s in panel.sites:
+        ok = np.flatnonzero(np.isfinite(residual[s]))
+        record_end = max(record_end, int(ok[-1]) + 1 if len(ok) else 0)
+    for s in panel.sites:
+        if not np.isfinite(frozen.sigma[s]):
+            continue
         y = block_means(x=residual[s])
         sl = fit_slow(y=y, sigma=frozen.sigma[s], arm=arm) if refit_slow else frozen.slow[s][arm]
         slows[s] = sl
         xh = residual[s] - to_half_hours(slow=sl)
         events += segment_primary(name=s, y=y, xh=xh, slow=sl, sigma=frozen.sigma[s], p=params)
-    classify(events=events, sigmas=frozen.sigma, neighbours=neighbours or panel.neighbours,
-             p=params, edge_ok=edge_ok)
+    classify(events=events, sigmas={k: (v if np.isfinite(v) else 1.0) for k, v in frozen.sigma.items()}, neighbours=neighbours or panel.neighbours,
+             p=params, edge_ok=edge_ok, record_end=record_end)
     return events, slows
 
 
@@ -73,25 +83,32 @@ def _iou(a: tuple[int, int], b: tuple[int, int]) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def match(*, truth: list[Truth], events: list[Event], start_tol: int = 24) -> list[dict]:
+def match(*, truth: list[Truth], events: list[Event], start_tol: int = 24,
+          world_end: int = GRID_LENGTH) -> list[dict]:
     """Score every truth event: found, class, timing error."""
     rows = []
-    for t in truth:
-        t_end = GRID_LENGTH if t.end is None else t.end
+    taken: set[int] = set()
+    for t in sorted(truth, key=lambda x: -abs(x.amp_mw)):
+        t_end = world_end if t.end is None else t.end
         best, best_iou = None, 0.0
         for e in events:
-            if e.primary != t.site or np.sign(e.amp_mw) != np.sign(t.amp_mw):
+            if id(e) in taken or e.primary != t.site or np.sign(e.amp_mw) != np.sign(t.amp_mw):
                 continue
-            e_end = GRID_LENGTH if e.end is None else e.end
+            e_end = world_end if e.end is None else e.end
             iou = _iou((t.start, t_end), (e.start, e_end))
             if abs(e.start - t.start) <= start_tol and iou >= 0.5 and iou > best_iou:
                 best, best_iou = e, iou
+        if best is not None:
+            taken.add(id(best))
         edge_truth = t.kind in ("edge", "permanent_transfer") and bool(t.partners)
         right_class = False
-        if best is not None and edge_truth:
-            right_class = best.cls in ("edge_transfer", "permanent_transfer") and (
-                bool(set(t.partners) & set(best.partners)) if t.amp_mw < 0
-                else bool(set(t.partners) & set(best.partners)))
+        if best is not None and edge_truth and best.cls in ("edge_transfer", "permanent_transfer"):
+            if t.amp_mw < 0:
+                total = sum(t.partner_amp.values()) or 1.0
+                got = sum(v for k, v in t.partner_amp.items() if k in best.partners)
+                right_class = got / total >= 0.5
+            else:
+                right_class = bool(set(t.partners) & set(best.partners))
         days = None if t.end is None else (t.end - t.start) / DAY
         rows.append({
             "site": t.site, "kind": t.kind, "group": t.group, "units": t.units,
@@ -128,8 +145,8 @@ def events_frame(*, events: list[Event]) -> pl.DataFrame:
         {"primary": e.primary, "start": e.start, "end": -1 if e.end is None else e.end,
          "amp_mw": e.amp_mw, "units": e.units, "confidence": e.confidence, "cls": e.cls,
          "kind": e.kind, "band": e.band, "partners": ",".join(e.partners),
-         "start_width_hh": e.start_width_hh}
+         "ramp_fraction": e.ramp_fraction}
         for e in events
     ], schema={"primary": pl.Utf8, "start": pl.Int64, "end": pl.Int64, "amp_mw": pl.Float64,
                "units": pl.Float64, "confidence": pl.Float64, "cls": pl.Utf8, "kind": pl.Utf8,
-               "band": pl.Utf8, "partners": pl.Utf8, "start_width_hh": pl.Float64})
+               "band": pl.Utf8, "partners": pl.Utf8, "ramp_fraction": pl.Float64})

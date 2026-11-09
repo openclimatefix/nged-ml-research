@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import numpy as np
 import polars as pl
-from e00653_common import DAY, E580, GRID_LENGTH, GRID_START, Panel
+from e00653_common import DAY, E580, GRID_LENGTH, GRID_START, SCORED_FROM as SCORED_START, Panel
 
+OFFSET_2019: Final[int] = int((GRID_START - datetime(2019, 9, 1, tzinfo=UTC)).total_seconds() // 1800)
+"""Half-hours from 2019-09-01 (the label tables' origin) to the grid origin."""
 PER_YEAR: Final[float] = 1.2
 """Injected donor events per Primary-year (about 5% of time inside an event)."""
 NEG_PER_YEAR: Final[float] = 1.0
@@ -28,6 +30,7 @@ class Truth:
     group: int
     partners: list[str] = field(default_factory=list)
     shape: str = "constant"
+    partner_amp: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -42,12 +45,15 @@ class GenParams:
     permanent_frac: float = 0.1
     staged_frac: float = 0.10
     mid_step_frac: float = 0.05
+    per_year: float = PER_YEAR
 
 
-def logged_start_times() -> np.ndarray:
+def logged_start_times(*, before: int | None = None) -> np.ndarray:
     """Hour-of-day (half-hours) and weekday of NGED's logged onsets, shape (n, 2)."""
     table = pl.read_parquet(E580 / "events_labelled_status.parquet")
     idx = table["label_onset_idx"].drop_nulls().to_numpy()
+    if before is not None:
+        idx = idx[idx < before + OFFSET_2019]
     base = np.datetime64("2019-09-01T00:00", "m")
     when = base + (idx * 30).astype("timedelta64[m]")
     minutes = (when - when.astype("datetime64[D]")).astype("timedelta64[m]").astype(int)
@@ -76,13 +82,15 @@ def _start(rng: np.random.Generator, starts: np.ndarray, lo: int, hi: int) -> in
     return int(rng.integers(lo, hi))
 
 
-def _profile(*, n: int, width: int, drift: float, mid_step: float | None, staged: int) -> np.ndarray:
+def _profile(*, n: int, width: int, drift: float, mid_step: float | None, staged: int,
+             open_end: bool = False) -> np.ndarray:
     """Unit profile of an event of `n` half-hours with smooth edges and optional shape changes."""
     p = np.ones(n)
     w = max(width, 1)
-    if n > 2 * w:
-        ramp = np.linspace(0, 1, w + 1)[1:] if width > 0 else np.array([1.0])
-        p[: len(ramp)] = np.minimum(p[: len(ramp)], ramp)
+    w = min(w, max(1, n // 2))
+    ramp = np.linspace(0, 1, w + 1)[1:] if width > 0 else np.array([1.0])
+    p[: len(ramp)] = np.minimum(p[: len(ramp)], ramp)
+    if not open_end:
         p[n - len(ramp) :] = np.minimum(p[n - len(ramp) :], ramp[::-1])
     p *= 1 + drift * (np.arange(n) / max(n, 1) - 0.5)
     if mid_step is not None:
@@ -97,7 +105,7 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
            kinds: tuple[str, ...] = ("transfer", "negatives"),
            ) -> tuple[dict[str, np.ndarray], list[Truth]]:
     """Add events to a copy of the residual between half-hours `lo` and `hi`; return the truth."""
-    starts = logged_start_times()
+    starts = logged_start_times(before=lo + (hi - lo) if hi <= SCORED_START else None)
     out = {s: v.copy() for s, v in residual.items()}
     truth: list[Truth] = []
     years = (hi - lo) / (365.25 * DAY)
@@ -130,7 +138,7 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
 
     if "transfer" in kinds:
         for site in panel.sites:
-            for _ in range(rng.poisson(PER_YEAR * years)):
+            for _ in range(rng.poisson(gen.per_year * years)):
                 group += 1
                 st = _start(rng, starts, lo, hi - 6)
                 perm = rng.random() < gen.permanent_frac
@@ -145,7 +153,7 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
                 mid = float(rng.uniform(0.5, 1.5)) if rng.random() < gen.mid_step_frac else None
                 staged = int(max(1, 0.2 * n)) if (not perm and rng.random() < gen.staged_frac) else 0
                 prof = _profile(n=n, width=width, drift=float(rng.uniform(-0.2, 0.2)), mid_step=mid,
-                                staged=staged)
+                                staged=staged, open_end=(end is None or end >= hi))
                 shape, name = shape_of(site, st, n)
                 prof = prof * shape
                 mode = rng.random()
@@ -179,6 +187,9 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
                     partners = list(recs) if rec_seen else []
                     k2 = ("permanent_transfer" if perm else "edge") if rec_seen else kind
                     add(site, st, end, amp, prof, k2, partners, units, name, group)
+                    if rec_seen:
+                        truth[-1].partner_amp = {r: rho * f * units * sigma[site]
+                                                 for r, f in zip(recs, split, strict=True)}
     if "negatives" in kinds:
         n_rout = 3
         for site in rng.choice(panel.sites, size=n_rout, replace=False):
@@ -240,14 +251,17 @@ def inject(*, panel: Panel, residual: dict[str, np.ndarray], sigma: dict[str, fl
             season = 0.6 + 0.4 * np.cos(2 * np.pi * (doy - 172) / 365)
             half_day = 4 + 4 * season
             sun = np.clip(np.sin(np.pi * (hour - (12 - half_day)) / (2 * half_day)), 0, None)
-            out[site][lo:hi] += rate * (t / (365.25 * DAY)) * season * sun * 2
+            out[site][lo:hi] -= rate * (t / (365.25 * DAY)) * season * sun
             truth.append(Truth(site, lo, None, rate, rate / sigma[site], "pv_growth", group))
     if "seasonal_bias" in kinds:
         for site in rng.choice(panel.sites, size=5, replace=False):
             group += 1
             t = np.arange(hi - lo)
             amp = float(rng.uniform(0.5, 1.5)) * sigma[site] * 2
-            out[site][lo:hi] += amp * np.sin(2 * np.pi * t / (365.25 * DAY) + rng.uniform(0, 6.3))
+            year = t // int(365.25 * DAY)
+            gain = rng.uniform(0.5, 1.5, size=int(year.max()) + 1)[year]
+            lag = rng.uniform(-20, 20, size=int(year.max()) + 1)[year] * DAY
+            out[site][lo:hi] += amp * gain * np.sin(2 * np.pi * (t - lag) / (365.25 * DAY) + 1.0)
             truth.append(Truth(site, lo, None, amp, amp / sigma[site], "seasonal_bias", group))
     assert GRID_LENGTH == 78816
     return out, truth
