@@ -6,7 +6,7 @@
 D="$(cd "$(dirname "$0")" && pwd)"
 R=${E00677_ROOT:-$DATA_PATH_INTERNAL/ml-experiments/00677-building-up-the-candidate-demand-network-one-component-at-a-time}
 export E00677_ROOT=$R E00677_SPAN=$2
-M=$1; S=$3; shift 3
+M=$1; SPAN=$2; S=$3; shift 3
 case $S in
   1|2|3a|3b|4|5w|5wo) ;;
   *) echo "bad step $S"; exit 1 ;;
@@ -28,7 +28,7 @@ for c in $CMDS; do
       E00677_PHASE=train $D/gpu.sh e00677_k1.py k1 $c --step $LADDER $EXTRA $A > $R/logs/${M}_${S}_$c.log 2>&1 ;;
     fit) [ "$S" = 5wo ] && [ ! -f $CHAIN677/step2/P5/${M}_s0.pt ] && { echo "run 5w first"; exit 1; }
       E00677_PHASE=train $D/gpu.sh e00677_k1.py k1_$S fit --step $LADDER --synthetic $SYN $EXTRA $A > $R/logs/${M}_${S}_fit.log 2>&1 ;;
-    pfit) rm -f $R/arms/k1_${S}_sp$2/work/fits/P5/${M}_d0_s?.empty  # the train phase's markers; fit_arm would skip on them
+    pfit) rm -f $R/arms/k1_${S}_sp$SPAN/work/fits/P5/${M}_d0_s?.empty  # the train phase's markers; fit_arm would skip on them
       E00677_PHASE=predict $D/gpu.sh e00677_k1.py k1_$S fit --step $LADDER --synthetic $SYN $EXTRA $A > $R/logs/${M}_${S}_pfit.log 2>&1 ;;
   esac
   echo "$M $S $c done $(date -u +%T)"
