@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import os
 import sys
 from dataclasses import dataclass
 from typing import Final
@@ -54,7 +55,8 @@ CONFIGS: Final = {**CONFIGS_670, "shaped": MIXES["shaped"]}
 """Experiment 670's configurations plus the shaped one of the cross-injector test."""
 DEV: Final = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ON_GRID: Final = (1.0, 2.0)
-BOOSTS: Final = (0.3, 1.0, 3.0, 10.0)
+BOOSTS: Final = tuple(float(x) for x in os.environ.get("E672_BOOSTS", "0.3,1,3,10").split(","))
+"""The none-boost grid. The environment variable widens it for the post hoc arm `Gw` only."""
 LAMBDAS: Final = (0.0, 1.0)
 CUTOFFS: Final = (0.3, 0.5, 0.7)
 MAX_VAL_RATE: Final[float] = 6.0
