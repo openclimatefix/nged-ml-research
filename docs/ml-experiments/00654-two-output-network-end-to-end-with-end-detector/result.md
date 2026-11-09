@@ -69,6 +69,74 @@ that a learned survival output ties a survival curve fitted to shift durations. 
 whether training one network end to end, with an NRA output and a prevailing output, and then adding
 a learned detector for the end of a shift, does better than that frozen K1 plus head.
 
+## Results so far
+
+**Status: development-month fits and the first final-test scoring are done. The end detector, E0 on
+the final-test window, the Step 0 edge widths, and the figures are not run.** Numbers are CRPS in
+points of capacity. "J1" is the end-to-end network whose prevailing loss does not reach the lag
+encoder (stop-gradient); "J2" lets the prevailing loss reach the lag encoder. Neither reads the G4
+gate state. "C0" is the matched-compute control with no prevailing head.
+
+**On the development months, the end-to-end networks lose to the frozen K1 plus R-haz (E0) while a
+shift is in force.** J2 minus E0 is +1.74 scaled points over the in-force strata (month-block 95%
+interval +1.00 to +2.47), so the predicted gain did not appear. J2 beats J1 by 0.32 points (interval
+-0.54 to -0.05), and both beat the matched-compute control C0.
+
+**The NRA veto fails on the development months.** On injected rows scored against the unshifted
+base, the NRA output of J2 scores 3.90 in the far stratum against 3.76 for K1 (+0.14). On event-free
+rows J2's NRA output scores 3.81 against 3.77 (+0.04). Both exceed the 0.03 limit, so the veto is
+reported as failed for the variant that lets the prevailing loss reach the lag encoder. The cause is
+the joint fine-tune recipe (cuts at day 0 and day 14, synthetic shifts), which is weaker than the
+daily fine-tune of the stored K1.
+
+**J2 does better than E0 near the end of a shift.** In the "ended in the last 24 hours" stratum J2
+scores 6.52 and E0 scores 7.44 on the scaled measure, and in the "near" stratum 6.44 against 7.34.
+
+| Stratum (origin state) | K1 | R0 (168 h) | B-haz | E0 | C0 | J1 | J2 NRA | J2 prevailing |
+|---|---|---|---|---|---|---|---|---|
+| Far from the end | 10.50 | 7.24 | 5.86 | 5.94 | 10.60 | 8.79 | 3.87 | 8.41 |
+| Middle | 7.79 | 6.36 | 6.75 | 6.55 | 7.90 | 7.32 | 3.76 | 7.06 |
+| Near the end (24 h) | 5.93 | 5.89 | 7.41 | 7.34 | 5.94 | 6.66 | 3.84 | 6.44 |
+| Ended in the last 24 h | 5.95 | 6.08 | 7.83 | 7.44 | 5.99 | 6.69 | 3.85 | 6.52 |
+| Event-free | 5.50 | 4.40 | 4.19 | 3.90 | 5.86 | 5.02 | 3.78 | 4.77 |
+
+Table: scaled CRPS on the injected bank, training family, 5 development months, seeds averaged.
+These are injected shifts on real bases, not real events. The NRA column is scored against the
+unshifted base, so it is not comparable with the other columns. The unscaled values and the
+normalised mean absolute error of the median sit in `score/tables.json`.
+
+### Final-test window, scored once for J2, J1, C0, K1, and the manual heuristic
+
+The frozen candidates are in `final/freeze.json` (hashes included). The window has no labelled
+events in the export, so "inside" means rows where the hand-built G4 gate is on: five spells, of
+20 to 121 days (median 37 days), so these are long detected states, not injected events. Lead 24 to
+240 h; intervals are blocked by origin month (4 months) and are coarse.
+
+| Rows | Count | K1 | Manual heuristic | J2 NRA | J2 prevailing | J1 prevailing | C0 |
+|---|---|---|---|---|---|---|---|
+| All | 837,868 | 4.98 | 4.86 | 4.82 | 5.05 | 5.15 | 4.84 |
+| Gate off, 7 or more days from a spell | 694,709 | 4.11 | 4.43 | 3.94 | 4.45 | 4.54 | 3.98 |
+| Gate on | 137,676 | 9.40 | 6.97 | 9.30 | 8.11 | 8.29 | 9.20 |
+| Gate off, under 7 days after a spell | 5,483 | 4.36 | 5.28 | 4.42 | 4.46 | 4.48 | 4.40 |
+
+The "after a spell" row holds a single month and one spell end, so it carries almost no weight.
+
+**Prevailing is not best on all rows, and the most likely reason is the false-alarm cost on rows
+with no gate.** On the 86% of rows with the gate off, J2's prevailing output scores 4.54 against 4.05
+for its NRA output. Its median differs from its NRA median by 2.75 points on average there, with a
+mean survival probability of 0.15, so the head carries a shift that is not in force. On gate-on rows
+that really depart from K1's median by 3 points or more, the prevailing output beats the NRA output
+(8.97 against 10.56). On the 12% of gate-on rows that do not depart (1.68 against 1.41) it is
+worse.
+
+**The manual heuristic wins on gate-on rows because the shift outlasts its lags.** The heuristic is
+the median-style quantile mix of the observed power 1 to 6 weeks and 49 to 55 weeks earlier. For
+gate-on rows, 94% of the 1-week members and 76% of the 6-week members lie inside the same gate-on
+spell, so the old lags already hold the shifted level. The spells last 20 to 121 days, which is
+close to the long half of the injected durations (28 to 112 days). The other half of the injected
+durations is 3 to 14 days, which no lag of a week or more can follow; on the window the old lags
+help for the reason the maintainer suspected, because the real spells are long.
+
 ## Updates to the brief after reading the merged pages
 
 - The maintainer approved opening the final-test window once for this candidate set on 2026-11-09

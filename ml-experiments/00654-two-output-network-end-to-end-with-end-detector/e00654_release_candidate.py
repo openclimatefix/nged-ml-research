@@ -1,12 +1,12 @@
-# ruff: noqa: E501
-"""Experiment 654: write the release-candidate backtest parquet for the reference arm E0 (CPU).
+# ruff: noqa: E501, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
+"""Experiment 654: write the release-candidate backtest parquet files, one per arm (CPU).
 
 E0 is experiment 652's R-haz (mixture m50, seed mean of 2 seeds) on K1's normal-running-arrangement
 (NRA) quantiles. Each development month is scored by the head fitted on the other four months. K1's
 quantiles and the observed power come from experiment 647's real-row head data. Values are written
 in MW (or MVA for the MVA-only Primaries): the stored fraction of capacity times `capacity_mw`.
 
-Writes `<WORK>/release_candidate/E0.parquet` and `README.md` beside it.
+Writes `<WORK>/release_candidate/<arm>.parquet` for E0, J2, J1, and C0, and `README.md` beside them.
 
 Usage: python e00654_release_candidate.py
 """
@@ -29,19 +29,42 @@ D647: Final = (
 D652: Final = (
     c650.WORK.parent / "00652-two-output-forecast-with-explicit-rules-and-survival-hazard" / "fits"
 )
-QNAMES: Final = [f"q{int(round(t * 100)):02d}" for t in c647.TAUS]
+QNAMES: Final = [f"q{round(t * 100):02d}" for t in c647.TAUS]
 SEEDS: Final = (0, 1)
+FITS: Final = WORK / "fits"
+ARMS: Final = ("E0", "J2", "J1", "C0")
 
 
-def month_frame(*, month: str, sites: pl.DataFrame) -> pl.DataFrame:
-    """Return E0's real-row forecasts for one scored month, in MW."""
+def joint_arm(*, arm: str, month: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Return (row index, NRA, prevailing, survival) of a joint arm's real rows, seed mean, both cuts."""
+    per_seed = []
+    for s in SEEDS:
+        parts = [np.load(FITS / f"{arm}_{month}_d{d}_s{s}.npz") for d in (0, 14)]
+        idx = np.concatenate([p["real_idx"] for p in parts])
+        o = np.argsort(idx)
+        per_seed.append(
+            (
+                idx[o],
+                *[np.concatenate([p[f"real_{k}"] for p in parts])[o] for k in ("nra", "q", "p")],
+            )
+        )
+    assert all(np.array_equal(per_seed[0][0], p[0]) for p in per_seed)
+    return (per_seed[0][0], *[np.mean([p[i] for p in per_seed], axis=0) for i in (1, 2, 3)])
+
+
+def month_frame(*, month: str, sites: pl.DataFrame, arm: str = "E0") -> pl.DataFrame:
+    """Return an arm's real-row forecasts for one scored month, in MW."""
     z = np.load(D647 / f"real_{month}.npz")
-    fits = [np.load(D652 / f"Rhaz_m50_{month}_s{s}.npz") for s in SEEDS]
-    idx = fits[0]["real_idx"]
-    assert all(np.array_equal(f["real_idx"], idx) for f in fits)
-    prev = np.sort(np.mean([f["real_q"] for f in fits], axis=0), axis=1)
-    surv = np.mean([f["real_p"] for f in fits], axis=0)
-    nra = np.sort(z["q"][idx], axis=1)
+    if arm == "E0":
+        fits = [np.load(D652 / f"Rhaz_m50_{month}_s{s}.npz") for s in SEEDS]
+        idx = fits[0]["real_idx"]
+        assert all(np.array_equal(f["real_idx"], idx) for f in fits)
+        prev = np.sort(np.mean([f["real_q"] for f in fits], axis=0), axis=1)
+        surv = np.mean([f["real_p"] for f in fits], axis=0)
+        nra = np.sort(z["q"][idx], axis=1)
+    else:
+        idx, nra_, prev_, surv = joint_arm(arm=arm, month=month)
+        nra, prev = np.sort(nra_, axis=1), np.sort(prev_, axis=1)
     cap = sites["capacity_mw"].to_numpy()[z["prim"][idx].astype(int)]
     ts_id = sites["time_series_id"].to_numpy()[z["prim"][idx].astype(int)]
     grid0 = k578.GRID_START
@@ -74,6 +97,15 @@ README: Final[str] = """# Release candidate backtest: experiment 654
 Backtest forecasts for the 16 Primary substations on five development months (2025-10, 2025-12,
 2026-01, 2026-03, and 2026-06), as one parquet file per arm. The months 2026-07 to 2026-10 are not
 in these files.
+
+## The files
+
+- `E0.parquet`: K1 (the normal-running-arrangement network of experiments 612 and 613) plus the
+  survival-hazard head of experiment 652. Best arm on injected shifts in the development months.
+- `J2.parquet`: one network, fine-tuned from K1's weights with the prevailing loss reaching the lag
+  encoder, with no gate. The end-to-end arm.
+- `J1.parquet`: as J2 with the prevailing loss detached from the lag encoder.
+- `C0.parquet`: the same fine-tune with no prevailing head. It has the NRA columns only.
 
 ## What each forecast is
 
@@ -116,11 +148,19 @@ def main() -> None:
     out = WORK / "release_candidate"
     out.mkdir(parents=True, exist_ok=True)
     sites = k578.sites()
-    df = pl.concat([month_frame(month=m, sites=sites) for m in c650.MONTHS])
-    df.write_parquet(out / "E0.parquet")
+    for arm in ARMS:
+        df = pl.concat([month_frame(month=m, sites=sites, arm=arm) for m in c650.MONTHS])
+        if arm == "C0":  # no prevailing head: only the NRA columns are meaningful
+            df = df.drop(
+                [
+                    c
+                    for c in df.columns
+                    if c.startswith("prevailing_") or c == "survival_probability"
+                ]
+            )
+        df.write_parquet(out / f"{arm}.parquet")
+        print(arm, df.shape, df["time_series_id"].n_unique(), "series")
     (out / "README.md").write_text(README)
-    print(df.shape, df["time_series_id"].n_unique(), "series")
-    print(df.group_by("scored_month").len().sort("scored_month"))
 
 
 if __name__ == "__main__":
