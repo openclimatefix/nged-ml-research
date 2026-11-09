@@ -1,8 +1,9 @@
 # ruff: noqa: DTZ001
 """Draw the three figures of experiment 665 from the stored JSON of `e00665_score.py`.
 
-DATA_PATH_INTERNAL=... PYTHONPATH=../00653-edge-state-event-table-penalised-segmentation \
-    uv run --no-sync python e00665_figures.py
+Run from this folder with `DATA_PATH_INTERNAL` set to the data folder and `PYTHONPATH` set to
+the folder of experiment 653 and this folder, using
+`uv run --no-sync python e00665_figures.py`.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ WIDTH: Final[float] = 6.8
 def recall_figure() -> None:
     """Found and paired shares per cell, with intervals."""
     res = json.loads((OUT / "injected_by_cell.json").read_text())
-    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 6.0), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 6.0), sharex=False)
     x = np.arange(len(CELLS))
     for ax, key, iv_key, title in (
         (axes[0], "found_mw", "found", "Share of injected megawatts found (larger is better)"),
@@ -62,17 +63,19 @@ def recall_figure() -> None:
         ax.set_ylim(0, 1)
         ax.set_title(title, fontsize=9, loc="left")
         ax.set_ylabel("Share")
-    labels = [f"{c}\n(n={int(res['653 default'][c]['n_events'])})" for c in CELLS]
-    axes[1].set_xticks(x, labels, fontsize=7)
+    top_labels = [f"{c}\nn={int(res['653 default'][c]['n_events'])} events" for c in CELLS]
+    bottom_labels = [f"{c}\nn={int(res['653 default'][c]['n_edge'])} ends" for c in CELLS]
+    axes[0].set_xticks(x, top_labels, fontsize=7.5)
+    axes[1].set_xticks(x, bottom_labels, fontsize=7.5)
     axes[0].legend(frameon=False, fontsize=8, loc="upper right")
     fig.text(
         0.01,
         0.005,
         "Bars: estimate. Black line: 95% interval from resampling the 6 injected worlds "
-        "(optimistic). Deep: 8 noise units or more.",
-        fontsize=7,
+        "(optimistic).\nDeep: 8 noise units or more. n: injected events or edge-transfer ends.",
+        fontsize=7.5,
     )
-    fig.tight_layout(rect=(0, 0.02, 1, 1))
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
     fig.savefig(DOCS / "figure_recall_by_cell.svg")
     fig.savefig("/tmp/e665_png/recall.png", dpi=100)
     plt.close(fig)
@@ -119,7 +122,7 @@ def event_series_figure() -> None:
                         + np.timedelta64(30 * (max(r["start"], lo_i) + min(end, hi_i)) // 2, "m"),
                         ax.get_ylim()[0] + (y0 + y1) / 2 * (ax.get_ylim()[1] - ax.get_ylim()[0]),
                         f"{r['amp_mw']:+.1f}",
-                        fontsize=6,
+                        fontsize=7.5,
                         ha="center",
                         va="center",
                         color="white",
@@ -130,7 +133,9 @@ def event_series_figure() -> None:
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%d %b"))
     handles = [
         plt.Line2D([], [], color="k", lw=0.8, label="observed power"),
-        plt.Line2D([], [], color="k", ls="--", lw=1, label="verified start and end"),
+        plt.Line2D(
+            [], [], color="k", ls="--", lw=1, label="verified start and end (experiment 580)"
+        ),
         plt.Rectangle((0, 0), 1, 1, color=BLUE, label="experiment 653 decoded events"),
         plt.Rectangle((0, 0), 1, 1, color=ORANGE, label="experiment 658 second look, seed 0"),
     ]
@@ -145,8 +150,9 @@ def event_series_figure() -> None:
     fig.text(
         0.01,
         0.005,
-        "Numbers on the bands: decoded step in MW (events of 2 noise units or more).",
-        fontsize=7,
+        "Numbers on the bands: decoded step in MW (events of 2 noise units or more). "
+        "Band height carries no meaning.",
+        fontsize=7.5,
     )
     fig.tight_layout(rect=(0, 0.11, 1, 1))
     fig.savefig(DOCS / "figure_event_series_D5_D16.svg")
@@ -158,10 +164,10 @@ def event_free_figure() -> None:
     """Events per Primary-year of event-free time, per cell and method."""
     res = json.loads((OUT / "real_by_cell.json").read_text())["event_free_per_primary_year"]
     methods = {
-        "653 default": ("experiment 653 default", BLUE),
-        "658": ("experiment 658 second look (mean of 3 seeds)", ORANGE),
-        "LR_b20": ("LR_b20", SKY),
-        "RO-NC": ("RO-NC", PURPLE),
+        "653 default": ("experiment 653 table", BLUE),
+        "658": ("experiment 658 network (mean of 3 seeds)", ORANGE),
+        "LR_b20": ("label-trained detector LR_b20", SKY),
+        "RO-NC": ("label-free detector RO-NC", PURPLE),
     }
     vals = {
         "653 default": res["653 default"],
@@ -172,11 +178,14 @@ def event_free_figure() -> None:
         "LR_b20": res["LR_b20"],
         "RO-NC": res["RO-NC"],
     }
-    fig, ax = plt.subplots(figsize=(WIDTH, 3.6))
-    x = np.arange(len(CELLS))
+    groups = [*CELLS, "none"]
+    fig, ax = plt.subplots(figsize=(WIDTH, 4.0))
+    x = np.arange(len(groups))
     for i, (k, (label, colour)) in enumerate(methods.items()):
-        ax.bar(x + (i - 1.5) * 0.2, [vals[k][c] for c in CELLS], 0.2, color=colour, label=label)
-    ax.set_xticks(x, CELLS, fontsize=7)
+        ax.bar(x + (i - 1.5) * 0.2, [vals[k][c] for c in groups], 0.2, color=colour, label=label)
+    ax.set_xticks(
+        x, [c.replace(", ", ",\n") for c in CELLS] + ["under 2\nnoise units"], fontsize=7.5
+    )
     ax.set_ylabel("Events per Primary-year")
     ax.set_title(
         "Events called in event-free time, more than 14 days from any logged or verified event "
@@ -184,8 +193,15 @@ def event_free_figure() -> None:
         fontsize=8,
         loc="left",
     )
-    ax.legend(frameon=False, fontsize=7)
-    fig.tight_layout()
+    ax.legend(frameon=False, fontsize=8)
+    fig.text(
+        0.01,
+        0.005,
+        "27.6 Primary-years of event-free time; one event is 0.04 per Primary-year.\n"
+        "NGED's logs miss events, so rates are upper bounds on false events.",
+        fontsize=7,
+    )
+    fig.tight_layout(rect=(0, 0.06, 1, 1))
     fig.savefig(DOCS / "figure_event_free_stratum.svg")
     fig.savefig("/tmp/e665_png/eventfree.png", dpi=100)
     plt.close(fig)

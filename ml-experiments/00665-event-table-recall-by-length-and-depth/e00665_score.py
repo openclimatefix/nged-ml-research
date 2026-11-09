@@ -1,7 +1,8 @@
 """Re-score the stored outputs of experiments 653 and 658 by event length and depth.
 
-DATA_PATH_INTERNAL=... PYTHONPATH=../00653-edge-state-event-table-penalised-segmentation \
-    uv run --no-sync python e00665_score.py injected|real
+Run from this folder with `DATA_PATH_INTERNAL` set to the data folder and `PYTHONPATH` set to
+the folder of experiment 653 and this folder, using
+`uv run --no-sync python e00665_score.py injected|real`.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -207,7 +208,7 @@ def injected() -> None:
     OUT.mkdir(exist_ok=True)
     frames = load_injected()
     gate(frames=frames)
-    res: dict[str, dict[str, dict[str, object]]] = {}
+    res: dict[str, Any] = {}
     for name, fr in frames.items():
         iv = boot_intervals(frames=fr)
         res[name] = {}
@@ -239,7 +240,7 @@ def injected() -> None:
             "found_mw": float(np.nanmean([wrec(df=p, col="found") for p in raw])),
         }
         print(f"{name:16s} n={raw[0].height} found MW {pulses[name]['found_mw']:.3f}")
-    res["pulses"] = pulses  # type: ignore[assignment]
+    res["pulses"] = pulses
     (OUT / "injected_by_cell.json").write_text(json.dumps(res, indent=1))
 
 
@@ -260,7 +261,7 @@ def real() -> None:  # noqa: PLR0915, PLR0912 - one linear printout
     sigma = json.loads((WORK / "noise_units.json").read_text())["sigma_block_mw"]
     n_prim = len(panel.sites)
     names = dict(zip(SERIES_IDS, panel.sites, strict=True))
-    res: dict[str, object] = {}
+    res: dict[str, Any] = {}
     scored_years = sum(
         int(np.isfinite(panel.residual[x][SCORED_FROM:GRID_LENGTH]).sum()) for x in panel.sites
     ) / (DAY * 365.25)
@@ -305,7 +306,7 @@ def real() -> None:  # noqa: PLR0915, PLR0912 - one linear printout
         )
 
     for m, d in methods.items():
-        assert d["start"].max() < GRID_LENGTH, m  # no row from 2026-07-01 onward
+        assert max(d["start"].to_list()) < GRID_LENGTH, m  # no row from 2026-07-01 onward
 
     def days_of(*, start: int, end: int) -> float | None:
         return None if end < 0 else (end - start) / DAY
@@ -322,9 +323,7 @@ def real() -> None:  # noqa: PLR0915, PLR0912 - one linear printout
         ]
         d = d.with_columns(cell=pl.Series(cells, dtype=pl.String))  # noqa: PLW2901
         methods[m] = d
-        per_cell[m] = {
-            c: float((d["cell"] == c).sum()) / (n_prim * YEARS) for c in [*CELLS, *OTHER]
-        }
+        per_cell[m] = {c: float((d["cell"] == c).sum()) / scored_years for c in [*CELLS, *OTHER]}
         print(
             f"{m:26s} total {d.height:4d} ({d.height / scored_years:.2f}/yr) | "
             + " | ".join(f"{c} {int((d['cell'] == c).sum())} ({per_cell[m][c]:.2f})" for c in CELLS)
