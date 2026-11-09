@@ -37,7 +37,11 @@ def fig_window() -> None:
         {"scenario": sc, "arm": a, "crps": WINDOW[sc][a]["crps"][0], "lo": WINDOW[sc][a]["crps"][1], "hi": WINDOW[sc][a]["crps"][2]}
         for sc in ("all", "outside", "inside") for a in arms if a in WINDOW[sc]
     ]  # fmt: skip
-    nice = {"all": "All rows", "outside": "No shift in force", "inside": "Shift in force"}
+    nice = {
+        "all": "All rows",
+        "outside": "No shift (7+ days after one)",
+        "inside": "Shift in force",
+    }
     df = pl.DataFrame(rows).with_columns(scenario=pl.col("scenario").replace(nice))
     base = alt.Chart(df).encode(
         x=alt.X("scenario:N", title=None, sort=list(nice.values()), axis=alt.Axis(labelAngle=0)),
@@ -162,7 +166,7 @@ def fig_false() -> None:
         xOffset="period:N",
         color=alt.Color(
             "period:N",
-            scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
+            scale=alt.Scale(range=[ocf.DATA_PURPLE, ocf.DATA_GREEN]),
             legend=alt.Legend(title=None, orient="top"),
         ),
     )
@@ -171,7 +175,7 @@ def fig_false() -> None:
         + ch.mark_point(filled=True, size=70).encode(y=alt.Y("share:Q", title="Share of rows (%)"))
     ).properties(
         width=W,
-        height=H,
+        height=H + 20,
         title=[
             "Rows with no shift in force where the prevailing forecast departs from the normal-running-arrangement forecast",
             "by 3 points of capacity or more (the false-alarm share; dot: estimate, line: 95% interval)",
@@ -187,17 +191,17 @@ def fig_false() -> None:
             rows2.append({"arm": arm, "extra": d1 - d0})
     ch2 = (
         alt.Chart(pl.DataFrame(rows2))
-        .mark_bar(color=ocf.BRAND_ORANGE)
+        .mark_bar(color=ocf.BLACK_1)
         .encode(
             x=alt.X("arm:N", sort=arms, title=None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y("extra:Q", title="Extra CRPS per row (points of capacity)"),
         )
         .properties(
             width=W,
-            height=H,
+            height=H + 20,
             title=[
-                "CRPS added by the departures on development-month rows with no shift in force,",
-                "against the normal-running-arrangement forecast on the same rows (positive is worse)",
+                "Development months: CRPS added by the departures on rows with no shift in force,",
+                "against the normal-running-arrangement forecast on the same rows (positive is worse; estimates, no interval)",
             ],
         )
     )
@@ -238,7 +242,7 @@ def fig_delay() -> None:
     ch = alt.Chart(df).mark_line(point=True).encode(
         x=alt.X("day:Q", title="Days from the end of the injected shift (negative: still in force)", axis=alt.Axis(values=list(range(-7, 8)))),
         y=alt.Y("q_end:Q", title="Mean detector output (probability the shift has ended)"),
-        color=alt.Color("arm:N", scale=alt.Scale(domain=list(arms.values()), range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_GREEN]), legend=alt.Legend(title=None, orient="top")),
+        color=alt.Color("arm:N", scale=alt.Scale(domain=list(arms.values()), range=[ocf.DATA_PURPLE, ocf.DATA_SKY, ocf.DATA_GREEN]), legend=alt.Legend(title=None, orient="top")),
     )  # fmt: skip
     rule = (
         alt.Chart(pl.DataFrame({"t": [0.0]}))
@@ -250,8 +254,8 @@ def fig_delay() -> None:
             width=W,
             height=H,
             title=[
-                "How fast the detector notices an ending, on experiment 650's injected shifts in the five development months.",
-                "Dashed line: the shift ends. Origins are daily, so a point is one day of origins.",
+                "Detector E0d on experiment 650's injected shifts in the 5 development months: mean detector output by day.",
+                "Dashed line: the shift ends. Each point is the mean over one day of origins (an estimate, no interval).",
             ],
         ),
         "detector_delay",

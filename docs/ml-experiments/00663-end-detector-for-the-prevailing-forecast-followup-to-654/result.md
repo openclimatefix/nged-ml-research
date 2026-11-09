@@ -67,19 +67,16 @@ headline: >-
   scores the same on a rewired neighbour graph, and made E0 worse on the final-test window (4.81
   against 4.26).
 lessons: >-
-  The detector's own-Primary inputs carry the gain, because a degree-preserving rewiring of the
-  neighbour graph and a no-neighbour arm score the same as the real graph (real minus rewired -0.05
-  [-0.17, +0.04] for E0d and -0.01 [-0.04, +0.03] for J2d, ended-in-24-hours and near strata
+  The detector's own-Primary inputs carry the gain, because three degree-preserving rewirings of the
+  neighbour graph score within 0.08 points of the real graph (real minus rewired, seeds 0 to 2, for E0d: -0.05, +0.08, and +0.05; for J2d: -0.01, +0.01, and 0.00; ended-in-24-hours and near strata
   pooled). The detector output rises only from about 0.19 to 0.39 in the days after a shift ends,
   so it is a weak signal that no arm turns into a sharp drop.
 take_home_message: >-
   A learned end detector made the prevailing forecast better in the 24 hours after an injected shift
   ends (-0.9 to -1.1 scaled points of capacity) and worse while the shift is in force (+0.2 to
-  +0.3 for E0d), and the neighbour graph added nothing, because a randomly rewired graph scored the
-  same. On the final-test window the detector made E0 worse (4.81 against 4.26) and J2 slightly
+  +0.3 for E0d), and the neighbour graph added no consistent gain, because three random rewirings of it scored within 0.08 points of the real graph. On the final-test window the detector made E0 worse (4.81 against 4.26) and J2 slightly
   better (4.85 against 5.02), and the plain E0 was the best prevailing forecast of all (4.26). The
-  veto on event-free rows is not met for either detector arm. The detector is not worth the neighbour
-  feed.
+  veto on event-free rows is not met for E0d, and J2d passes it by its interval but not in every month. The detector is not worth the neighbour feed.
 advice:
   - >-
     Run a degree-preserving rewired-graph placebo beside any neighbour-based detector, because here
@@ -130,8 +127,10 @@ and 8.52. J2d improves J2 (4.85 against 5.02) and stays above E0.
 ![Detector gain by stratum, with the rewired-graph placebo](fig2_dev_contrasts.svg)
 
 On the five development months, orange dots are the detector's change against its own base. Blue
-dots are the real graph minus the rewired graph; the interval includes zero in every stratum, so the
-gain does not come from the neighbours.
+dots are the real graph minus the rewired graph; the interval includes zero in every stratum for
+rewiring 0 (rewiring 1 is +0.14 [+0.06, +0.23] in the "ended in the last 24 hours" stratum for E0d),
+so the gain does not come from the neighbours that this experiment could measure. The "middle"
+stratum is omitted from the figure.
 
 ![The detector output rises only from 0.19 to 0.39 after a shift ends](fig3_detector_delay.svg)
 
@@ -151,18 +150,31 @@ little](fig5_event_D5.svg)
 ![Primary D16 in the same shift](fig6_event_D16.svg)
 
 D5 and D16 are the verified pair of labelled shifts (29 December 2025 to 13 January 2026). Both
-prevailing forecasts follow the observed drop from the shift's start, and the E0 and E0d forecasts
-look alike: the detector changes them little. Each line is the day-ahead median (lead 24 to 48
-hours) at hourly means.
+prevailing forecasts follow the drop only partly (on D5 the forecast stays near 4 to 5 MW for
+several days while the observed power falls to 2 to 3 MW), and the E0 and E0d forecasts look alike:
+the detector changes them little. The figures are not drawn for J2d, and they do not show `q_end`.
+Each line is the day-ahead median (lead 24 to 48 hours) at hourly means.
 
 ![On Primary D14 E0d drifts far above the normal forecast from late August to the end of the
 window](fig7_event_window.svg)
 
-D14 holds the longest run of days with the gate on in the window (from 8 July to the window's end, a
-run that continues past it). E0 follows the observed power; E0d forecasts several megawatts above
-the observed power from late August. The cause is not diagnosed.
+The window starts on 1 July, so the figure shows 7 days before the run starts, not 14. D14 holds the
+longest run of days with the gate on in the window (from 8 July to the window's end, a run that
+continues past it). E0 stays within about 1 MW of the observed power in August and September; E0d
+forecasts several megawatts above the observed power from late August. The cause is not diagnosed.
+
+## What the detector reads
+
+For each Primary and origin the detector reads 16 three-hour block means of the residual over the
+freshest 48 hours, 8 daily means before that, the same summaries averaged over the Primary's
+electrical neighbours, 4 flags for missing blocks, the opposite-sign neighbour step (a boost, never
+a requirement), and the routine-step rate over the previous 60 days (the count of daily-mean changes
+larger than 3 noise units, per day). The residual is observed power minus K1's day-ahead median,
+with the median across the 16 Primaries at each half-hour removed, and every input ends at the
+origin.
 
 ## Results
+
 
 **All numbers below are scaled CRPS in points of capacity over lead days 1 to 9, averaged over seeds
 and then over the 5 development months.** They are measured over lead days 1 to 9 on experiment
@@ -179,25 +191,39 @@ hours" and "near" strata together.
   days).
 - **E0d loses while a shift is in force, and J2d loses only in the "far" stratum.** E0d minus E0 is
   +0.27 [+0.07, +0.47] in the "far" stratum and +0.30 [+0.11, +0.45] over all in-force strata. J2d
-  minus J2 is +0.16 [+0.05, +0.26] in "far" and -0.23 [-0.34, -0.07] in "near". The prediction that
-  the detector stays within 0.1 points of its base away from the ending (P1) fails.
-- **Placebo (contrast 2): the gain is not graph-specific.** Pooled, real graph minus rewired graph
-  (seed 0) is -0.05 [-0.17, +0.04] for E0d and -0.01 [-0.04, +0.03] for J2d, and the real graph
-  minus the no-neighbour arm is -0.11 [-0.40, +0.14] for E0d and -0.01 [-0.04, +0.03] for J2d. The
-  prediction that the rewired graph recovers at most half of the gain (P3) fails, because the
-  rewired graph recovers all of the gain. The three rewirings keep 3, 2, and 3 of the 29 pairs of
-  electrical neighbours.
+  minus J2 is +0.16 [+0.05, +0.26] in "far" and -0.23 [-0.34, -0.07] in "near". The prediction P1
+  fails: the "near" stratum does not reach -0.3 for E0d (+0.22 [-0.11, +0.54]) or for J2d (-0.23),
+  and the detector moves the "far" stratum by more than 0.1 points for both arms (E0d +0.27, J2d
+  +0.16) and the "middle" stratum for E0d (+0.13).
+- **Placebo (contrast 2): the gain is not specific to the real graph.** Pooled, real graph minus
+  rewired graph is -0.05 [-0.17, +0.04], +0.08 [+0.02, +0.14], and +0.05 [-0.03, +0.17] for E0d
+  (rewirings 0, 1, and 2) and -0.01 [-0.04, +0.03], +0.01 [-0.02, +0.04], and 0.00 [-0.03, +0.04]
+  for J2d. The real graph minus the no-neighbour arm is -0.11 [-0.40, +0.14] for E0d and -0.01
+  [-0.04, +0.03] for J2d. Against a pooled gain of -0.46 (E0d) and -0.57 (J2d), rewiring 0 recovers
+  about 89% and 98% of the gain, and the other two rewirings recover all of it or more, so the
+  prediction that the rewired graph recovers at most half of the gain (P3) fails. For E0d the
+  no-neighbour interval is wide enough to hide a gain beyond the bar, so "adds no consistent gain"
+  is as much as 5 months support. The three rewirings keep 3, 2, and 3 of the 29 pairs of electrical
+  neighbours.
 - **False alarms.** On real development-month rows with no labelled shift, the share of rows on
   which the prevailing median departs from the NRA median by 3 points or more is 10.4% for E0, 11.5%
-  for E0d, 16.8% for J2, and 12.1% for J2d. J2d cuts J2's share by 28%, which meets the prediction
-  (P4); E0d raises the share relative to E0 (10.4% to 11.5%), which does not meet the prediction. On
-  the final-test window rows outside the gate's events the shares are 13.2% (E0), 15.1% (E0d), 11.7%
-  (J2), and 9.8% (J2d).
-- **Veto on event-free rows: not met.** On injected bank rows with no shift, the unscaled CRPS of
-  E0d minus E0 is +0.01 [-0.19, +0.21], and the upper bound of that interval exceeds 0.03. J2d minus
-  J2 is -0.11 [-0.25, -0.01], so the interval passes the bar of 0.03, but the 2026-03 month is
-  +0.06, above 0.03, and the plan's strict reading of the veto asks that every month stay below it.
-  On real event-free rows E0d minus E0 is +0.04 [+0.01, +0.09].
+  for E0d, 16.8% for J2, and 12.1% for J2d. J2d cuts J2's share by 28% (an estimate; J2's interval
+  is 10.7% to 23.1%), which meets the prediction (P4); E0d raises the share relative to E0 (10.4% to
+  11.5%), which does not meet the prediction. On the final-test window rows outside the gate's
+  events the shares are 13.2% (E0), 15.1% (E0d), 11.7% (J2), and 9.8% (J2d). On injected rows with
+  no shift the departure share of E0d minus E0 is -1.1 [-1.8, -0.4] percentage points, so E0d
+  departs less there.
+- **CRPS added by the departures.** The CRPS of the prevailing forecast minus the CRPS of the NRA
+  forecast on the departure rows, averaged over all real event-free rows, is +0.009 for E0, +0.046
+  for E0d, +0.265 for J2, and +0.012 for J2d (points of capacity, development months; figure 4,
+  lower panel). J2's departures cost far more than the others'.
+
+- **Veto on event-free rows: not met for E0d; J2d passes by its interval but not in every month.**
+  On injected bank rows with no shift, the unscaled CRPS of E0d minus E0 is +0.01 [-0.19, +0.21],
+  and the upper bound of that interval exceeds 0.03. J2d minus J2 is -0.11 [-0.25, -0.01], so the
+  interval passes the bar of 0.03, but the 2026-03 month is +0.06, above 0.03, and the plan's strict
+  reading of the veto asks that every month stay below it. On real event-free rows E0d minus E0 is
+  +0.04 [+0.01, +0.09].
 - **No arm is best in every stratum.** E0 is best far from the end and with no shift, K1 is best
   near the end, and J2d is best in the 24 hours after an ending. Scaled CRPS, normalised mean
   absolute error of the median (as a fraction of capacity), and unscaled CRPS, all lead days 1 to 9:
@@ -213,7 +239,9 @@ hours" and "near" strata together.
 | All rows, unscaled CRPS | 9.75 | 6.03 | 6.23 | 7.54 | 7.53 |
 
 Table: five development months, experiment 650's injected bank; the arms are scored on the same rows
-as in experiment 654.
+as in experiment 654. B-haz and R0 (168 h) score, in the order far, near, ended in the last 24 h, no
+shift, all rows (scaled CRPS): 5.86, 7.42, 7.84, 3.97, 6.13 and 7.22, 5.92, 6.11, 4.16, 6.89. The
+matched-compute control C0 of experiment 654 is not rescored here.
 
 ## Final-test window (2026-07-01 to 2026-10-31)
 
@@ -236,8 +264,10 @@ Table: unscaled CRPS in points of capacity. The 5,483 rows of the last scenario 
 origin months for an interval.
 
 - **E0 has the lowest CRPS over all rows and inside shifts, and the lowest mean absolute error of
-  the median.** The mean absolute error of the median over all rows, in points of capacity, is 7.66
-  for E0, 8.55 for E0d, 8.61 for J2d, 8.90 for J2, 8.34 for K1, and 8.46 for the manual heuristic.
+  the median.** On the avoidable-curtailment cost E0 (186) is above K1 (178) and the manual
+  heuristic (165). The mean absolute error of the median over all rows, in points of capacity, is
+  7.66 for E0, 8.55 for E0d, 8.61 for J2d, 8.90 for J2, 8.34 for K1, and 8.46 for the manual
+  heuristic.
 - **The detector made E0 worse.** E0d minus E0 is +0.54 over all rows and +3.13 inside shifts. The
   avoidable-curtailment cost, with the curtailment threshold at 90% of each Primary's peak demand
   and in pounds per day averaged over the six MW Primaries, is 186 for E0, 309 for E0d, 187 for J2,
@@ -247,12 +277,16 @@ origin months for an interval.
 
 ## What was not done
 
-- **The detector alone on a second duration law.** The plan also scored the detector on injected
-  shifts that follow experiment 653's duration law (log-uniform 1 to 112 days plus a short band). It
-  was not run. The figures above use experiment 650's bank only, whose events last 3 to 14 days or
-  28 to 112 days. Experiment 660's shared injector draws its durations from a different law, so
-  scoring on that injector would change the delay and false-alarm figures. The detector-delay figure
-  shows the mean detector output by day, not a delay in days.
+- **A second duration law, and a statement of the length distribution.** The brief asked for the 653
+  injector's length distribution (log-uniform 1 to 112 days plus a short band); this experiment
+  instead used experiment 650's bank, so its events last 3 to 14 days or 28 to 112 days, with none
+  of 1 to 3 or 14 to 28 days, which is a deviation from the brief. The detector alone on a second
+  duration law: The plan also scored the detector on injected shifts that follow experiment 653's
+  duration law (log-uniform 1 to 112 days plus a short band). It was not run. The figures above use
+  experiment 650's bank only, whose events last 3 to 14 days or 28 to 112 days. Experiment 660's
+  shared injector draws its durations from a different law, so scoring on that injector would change
+  the delay and false-alarm figures. The detector-delay figure shows the mean detector output by
+  day, not a delay in days.
 - **Real events on the development months as a scenario table.** The window scenarios use the G4
   gate. The four load-shift scenarios on the development months' labelled events are not tabulated.
 - **A "no shift within 14 days" stratum.** It holds no rows in the injected bank (the cause was not
@@ -260,6 +294,7 @@ origin months for an interval.
 - **Shallow shifts (P2), day-ahead and 14-day example forecasts, and detection delay per
   Primary-month** were not run.
 - **The window segmenter** (experiment 653's) was not run, so the window events are the gate's.
+- **Event time-series figures for J2d** are not drawn.
 
 ## Checks
 
