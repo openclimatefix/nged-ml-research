@@ -75,6 +75,7 @@ page is planned and holds the plan only.
   reading, which leaves gaps after 2026-10-17. The inputs here are built for every valid time from
   12:00 to 14 days later for every origin, and only the scoring is restricted to rows with observed
   power.
+- **Compute:** ceiling 10 GPU-hours (raised by the manager from 6), up to 3 GPU processes at once with at most 4 CPU cores each, 2 seeds and 14 daily hazards kept.
 - **Standing practices followed:** cleaned data, the D15 and D18 cut before 2025-03-01, monthly
   refits, saved weights, and tail and example-forecast plots.
 - **Open items before the first fit:** a one-fold timing run (the stored Candidate fit takes about
