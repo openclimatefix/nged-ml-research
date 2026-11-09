@@ -162,10 +162,10 @@ def donor_and_found(rows: pl.DataFrame) -> tuple[float, float]:
     """MW-weighted donor found share (edge-truth donors) and all-event found share."""
     big = rows.filter(pl.col("units") >= 4)
     w = big["amp_mw"].abs()
-    found = float((big["found"].cast(pl.Float64) * w).sum() / w.sum()) if big.height else np.nan
+    found = float((big["found"].cast(pl.Float64) * w).sum() / w.sum())  # ty: ignore[unsupported-operator] if big.height else np.nan
     don = big.filter(pl.col("edge_truth") & (pl.col("amp_mw") < 0))
     wd = don["amp_mw"].abs()
-    dfound = float((don["found"].cast(pl.Float64) * wd).sum() / wd.sum()) if don.height else np.nan
+    dfound = float((don["found"].cast(pl.Float64) * wd).sum() / wd.sum())  # ty: ignore[unsupported-operator] if don.height else np.nan
     return dfound, found
 
 

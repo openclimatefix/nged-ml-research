@@ -127,6 +127,7 @@ def retarget(*, w: DWorld, edges: np.ndarray) -> None:
     The bank stores link state per real link. A rewired graph has other pairs, so each of its
     links takes the real state if the pair is a real link and 'off' otherwise.
     """
+    assert w.weight is not None and w.edge_state is not None
     p = rig().p653
     index = {s: i for i, s in enumerate(p.sites)}
     real = {(index[a], index[b]): k for k, (a, b) in enumerate(p.edges)}
@@ -148,7 +149,10 @@ def retarget(*, w: DWorld, edges: np.ndarray) -> None:
 
 def _tensors(w: DWorld, sl: slice, dev: torch.device) -> list[torch.Tensor]:
     arrs = [w.feats, w.cls, w.weight, w.amp, w.donor, w.edge_state, w.edge_weight]
-    return [torch.from_numpy(np.ascontiguousarray(a[:, sl])).to(dev) for a in arrs]
+    return [
+        torch.from_numpy(np.ascontiguousarray(a[:, sl])).to(dev)  # ty: ignore[not-subscriptable]
+        for a in arrs
+    ]
 
 
 def train(*, mix: str, arm: str, seed: int) -> str:
