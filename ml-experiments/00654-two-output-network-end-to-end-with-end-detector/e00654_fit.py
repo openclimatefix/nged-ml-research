@@ -1,6 +1,5 @@
 # ruff: noqa: ANN001, ANN201, E402, D103, E501, ANN003, PLR0915, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
-"""Experiment 654, step 1: fine-tune K1's network jointly with a prevailing head, and forecast
-(GPU).
+"""Experiment 654, step 1: fine-tune K1 jointly with a prevailing head (GPU).
 
 K1 is experiment 613's `k1_d5` network (experiment 591's A1 chain: shared lag encoder with lag
 ID, D5 offset). This script replaces K1's daily fine-tune with one fine-tune that, as in K1,
@@ -105,8 +104,9 @@ e.c.select_rows = select_rows
 
 
 def history_shifts(*, clean: np.ndarray, first: int, last: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return (own, on): injected shifts as shares of capacity and an in-force flag, shape (16,
-    grid).
+    """Return (own, on): injected shifts as shares of capacity and an in-force flag.
+
+    Both arrays have shape (16, grid).
 
     One draw per (history month, Primary) from experiment 650's training family, kept with
     probability `HISTORY_KEEP`; constant or ramped shape (a proportional shape would read the

@@ -1,6 +1,5 @@
 # ruff: noqa: ANN001, ANN201, E402, D103, E501, ANN003, D102, D107, ANN201, ANN202, PT018, F841, PERF401, B007, RUF100
-"""Experiment 654, final test: train the joint networks on data before 2026-07-01, then forecast the
-window (GPU).
+"""Experiment 654, final test: train before 2026-07-01, then forecast the window (GPU).
 
 The same networks as `e00654_fit.py` (arms C0, J1, J2; K1's step-2 weights of the final fold from
 experiment 620's chain, then one fine-tune at the 2026-07-01 cutoff), run through experiment
@@ -91,8 +90,9 @@ e.row_nll = arm.row_nll
 
 
 def history_shifts(*, clean: np.ndarray, first: int, last: int) -> tuple[np.ndarray, np.ndarray]:
-    """Return (own, on): injected shifts as shares of capacity and an in-force flag, shape (16,
-    grid).
+    """Return (own, on): injected shifts as shares of capacity and an in-force flag.
+
+    Both arrays have shape (16, grid).
 
     One draw per (history month, Primary) from experiment 650's training family, kept with
     probability `HISTORY_KEEP`; constant or ramped shape (a proportional shape would read the
