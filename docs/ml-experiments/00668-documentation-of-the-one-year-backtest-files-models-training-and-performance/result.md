@@ -310,11 +310,19 @@ fixes the choices that the earlier experiments left open, and this section resta
   weight decay 1e-4, batch 4096, up to 30 epochs, patience 4, 2 seeds averaged by mean quantile.
   The head of experiment 652 has 9,164 parameters (12 outputs) and no dropout. The backtest head has
   14 daily hazards (16 outputs) and 65 inputs, which gives 9,424 parameters.
+- **B-haz, the fallback prevailing head (2025-11 and 2025-12).** B-haz fits a survival curve to
+  the durations of the injected shifts. It multiplies that curve by the residual of the Candidate's
+  day-ahead median over the days 2 to 8 before the origin, and adds the product to the normal-running
+  quantiles. R-haz replaces it from 2026-01.
+- **Training set of R-haz in the backtest.** A "bank" is the set of injected-shift training rows
+  built from one earlier test month. Each monthly fit of R-haz trains on the banks of all earlier
+  months. Each fit samples 60,000 real rows and 6,000 bank rows. Origin days 0 to 17 of an injected
+  shift train the head and origin days from 21 onward validate it.
 - **Refits and embargo in the backtest.** Twelve monthly refits (test months 2025-11 to 2026-10),
   each trained on data before the first of the month with the 7-day embargo of the refit rule.
   The ensemble history starts 2024-04-01, so the early folds fine-tune on less ensemble history
   than the later folds. The D15 and D18 rows before 2025-03-01 are cut, as in every recent
-  experiment. The planned seeds are 2 for the Candidate and 2 for R-haz, an open item of that page.
+  experiment. The Candidate and R-haz each average 2 seeds.
 - **Where each piece came from.** The modular network and its widths: experiment 545. Frozen
   encoders and the three-step schedule: 559. ERA5 and CAMS pre-training: 418. The offset: 565 and
   572. The thermal-lag columns: 437 and 569. The embargoed schedule: 574. The shared lag encoder:
