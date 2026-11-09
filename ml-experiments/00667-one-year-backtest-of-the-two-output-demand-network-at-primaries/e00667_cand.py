@@ -42,7 +42,20 @@ _p.add_argument("--passes", nargs="+", type=int, default=None)
 _p.add_argument("--work-suffix", default="")
 _p.add_argument("--e3", type=int, default=1)
 MINE = _p.parse_args()
-assert set(MINE.months) <= {"2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10"}
+assert set(MINE.months) <= {
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06",
+    "2026-07",
+    "2026-08",
+    "2026-09",
+    "2026-10",
+}
 ARM, CMD = MINE.arm, MINE.command
 _argv = ["e00574_fit.py", "fit", "--arm", "P5"]
 _argv += ["--months", *MINE.months]
@@ -65,7 +78,11 @@ import e00667_fold as fold
 assert list(MINE.months) == [fold.FINAL_MONTH], "one process per fold month: set E00667_MONTH"
 
 NAME = "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
-ROOT = Path(os.environ["E00667_ROOT"]) if os.environ.get("E00667_ROOT") else ML_EXPERIMENTS_DATA_DIR / NAME
+ROOT = (
+    Path(os.environ["E00667_ROOT"])
+    if os.environ.get("E00667_ROOT")
+    else ML_EXPERIMENTS_DATA_DIR / NAME
+)
 """`E00667_ROOT` redirects every output to another folder, for the from-scratch re-run of one fold."""
 SHUFFLED = ARM.endswith("-p")
 SPEC_NAME = ARM[:-2] if SHUFFLED else ARM
@@ -277,7 +294,9 @@ def table_file(*, month: str, seed: int):
         return TABLES / "predict" / f"T_{month}_s{seed}.npz"
     if CROSSFIT:
         return TABLES / f"T_cf_{month}_s{seed}.npz"
-    return TABLES / f"T_{month}_s{seed}.npz"  # never another experiment's tables: they come from another chain
+    return (
+        TABLES / f"T_{month}_s{seed}.npz"
+    )  # never another experiment's tables: they come from another chain
 
 
 def cross_fit_quantiles(
@@ -368,7 +387,9 @@ def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> Non
         n_grid = GRID_SHAPE[1]
         # The table also holds the previous month's rows (origins before the cutoff), as the train phase's
         # table does: without them the days before the cutoff, purged from training, have no lag-free forecast.
-        ref_prim, ref_origin, ref_target, ref_median = (np.empty(0, np.int64),) * 3 + (np.empty(0, np.float32),)
+        ref_prim, ref_origin, ref_target, ref_median = (np.empty(0, np.int64),) * 3 + (
+            np.empty(0, np.float32),
+        )
         if fold.PHASE == "predict":
             e.CHECK["months"].setdefault(fold.PREVIOUS_MONTH, {})
             ref = e.build_test(month=fold.PREVIOUS_MONTH, standardiser=mr.base.standardiser)
@@ -686,12 +707,16 @@ def check_fingerprint(*, mr, month: str) -> None:
         h.update(np.ascontiguousarray(np.asarray(a, dtype=np.float64)).tobytes())
     path = e.WORK / f"standardiser_{month}.sha256"
     if fold.PHASE == "predict":
-        assert path.exists() and path.read_text() == h.hexdigest(), "standardiser differs from the train phase"
+        assert path.exists() and path.read_text() == h.hexdigest(), (
+            "standardiser differs from the train phase"
+        )
     elif not path.exists():  # a rerun of the train phase never rewrites it
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(h.hexdigest())
     else:
-        assert path.read_text() == h.hexdigest(), "standardiser changed between two train-phase runs"
+        assert path.read_text() == h.hexdigest(), (
+            "standardiser changed between two train-phase runs"
+        )
 
 
 def run_fit(*, device: str = "cuda") -> None:
@@ -746,7 +771,8 @@ def run_fit(*, device: str = "cuda") -> None:
                 log["seconds"] = round(e.time.monotonic() - started, 2)
                 log["signal_report"] = fs.report if fs is not None else {}
                 e.c.write_json(
-                    obj=log, path=e.W / "logs" / e.SPEC.tag / f"{month}_d{day}_s{seed}_{fold.PHASE}.json"
+                    obj=log,
+                    path=e.W / "logs" / e.SPEC.tag / f"{month}_d{day}_s{seed}_{fold.PHASE}.json",
                 )
                 print(
                     f"{ARM} {log['name']}: {log.get('epochs', 'reused')} epochs, {log['seconds']} s",

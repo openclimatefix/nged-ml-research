@@ -68,7 +68,7 @@ def load(*, month: str, kind: str) -> dict:
         z["usable"] = (z["feat"][z["org"], miss] == 0.0) & np.isfinite(z["y"])
         if kind == "real":
             z["target"] = z["y"]
-            z["train_ok"] = z["usable"] & ~z["flagged"] & ~z["verified"] & ~z["gate"][z["org"]]
+            z["train_ok"] = z["usable"] & ~z["verified"] & ~z["gate"][z["org"]]
         else:
             z["target"] = (z["y"] + z["shift"]).astype(np.float32)
             z["train_ok"] = z["usable"]

@@ -97,7 +97,9 @@ def install(e, *, months: list[str], reference_month: str | None = None) -> None
     that development month's test rows, built with the final fold's standardiser.
     """
     e.data.HEADLINE_MAX_HOURS = HORIZON_HOURS
-    redirect_to_extended_inputs(e)  # both phases: a fold after 2026-06 trains on data newer than the stored cache
+    redirect_to_extended_inputs(
+        e
+    )  # both phases: a fold after 2026-06 trains on data newer than the stored cache
     if not is_final(months=months):
         return
     assert PHASE in {"train", "predict"}, "set E00667_PHASE to train or predict for the final fold"

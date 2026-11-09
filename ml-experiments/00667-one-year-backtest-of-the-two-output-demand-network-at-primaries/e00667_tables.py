@@ -27,10 +27,15 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-R = ML_EXPERIMENTS_DATA_DIR / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
+R = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
+)
 OUT = R / "inputs" / "trailing437"
 CAMS = ML_EXPERIMENTS_DATA_DIR.parent / "studies" / "weather" / "CAMS" / "demand_points"
-CAMS_EXTENDED = next(ML_EXPERIMENTS_DATA_DIR.glob("00620-*")) / "inputs" / "cams_demand_points_extended.parquet"
+CAMS_EXTENDED = (
+    next(ML_EXPERIMENTS_DATA_DIR.glob("00620-*")) / "inputs" / "cams_demand_points_extended.parquet"
+)
 """Experiment 620's combined CAMS file (read only)."""
 STORED = f437.TRAILING_DIR
 

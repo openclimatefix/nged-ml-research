@@ -34,7 +34,20 @@ _p.add_argument("--months", nargs="+", default=["2025-10", "2025-12"])
 _p.add_argument("--seeds", nargs="+", type=int, default=[0, 1])
 _p.add_argument("--passes", nargs="+", type=int, default=None)
 MINE = _p.parse_args()
-assert set(MINE.months) <= {"2025-11","2025-12","2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10"}
+assert set(MINE.months) <= {
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06",
+    "2026-07",
+    "2026-08",
+    "2026-09",
+    "2026-10",
+}
 assert MINE.offset == "d5" and MINE.e3 == 1 and not MINE.drop and MINE.synthetic == 1
 sys.argv = [
     "e00591_arm.py", "A1", MINE.command, "--months", *MINE.months, "--seeds", *map(str, MINE.seeds),

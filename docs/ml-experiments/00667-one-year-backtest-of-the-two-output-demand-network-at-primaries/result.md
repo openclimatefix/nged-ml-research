@@ -7,7 +7,7 @@ title: >-
 theme: production-reference-and-best-guess
 also_relevant_to:
   - lagged-power-and-error-correction
-status: planned
+status: finished
 kind: other
 protocol: demand-v2
 size: >-
@@ -37,57 +37,224 @@ row_set_id: backtest_year_2025_11_to_2026_10_daily_12utc
 metric: >-
   CRPS in points of capacity and the normalised MAE of the median, by lead band (days 0 to 1, 1 to
   3, 3 to 7, 7 to 14) and by month; q01, q05, q95, and q99 coverage.
+verdict: inconclusive
+best_arm: >-
+  Not a ranking. The prevailing output has a lower CRPS than the NRA output in every lead band
+  (by 0.38 points of capacity at days 0 to 1, shrinking to 0.10 at days 7 to 14) and in 9 of 12
+  months.
+headline: >-
+  Over the 365 daily origins 2025-11-01 to 2026-10-31 at the 16 Primaries, the prevailing output
+  scores a CRPS of 4.14 points of capacity and a median error of 7.39, and the NRA output 4.32 and
+  7.59. Scores rise from 3.46 (days 0 to 1) to 4.43 (days 7 to 14) for the prevailing output. The
+  q05 to q95 band holds the observed power on 0.85 of half-hours (prevailing) and 0.81 (NRA),
+  against a nominal 0.90.
+take_home_message: >-
+  The Candidate with a 14-day survival head forecasts a year of daily origins at 16 Primaries with a
+  CRPS between 3.5 and 4.4 points of capacity, and the score worsens only gently with lead. Both
+  outputs are too narrow: the q05 to q95 band covers 0.81 (NRA) and 0.85 (prevailing) of
+  half-hours, and as little as 0.72 for the NRA output in August. The prevailing output beats the
+  NRA output on average and in 9 of 12 months, but the November and December folds use a fallback
+  survival curve with no trained head, and the prevailing output loses to the NRA output at two
+  Primaries. The year overlaps the development months and the final test, so none of this is a ranking.
+advice:
+  - >-
+    Do not read the q05 to q95 columns as a 90% interval. Widen or recalibrate them before use;
+    the width is a follow-up, not something this backtest tuned (calibration table).
+  - >-
+    Treat the prevailing rows of 2025-11 and 2025-12 as the fallback method: they equal the NRA
+    rows on 74% and 65% of origins (Method).
+  - >-
+    Read the survival output beyond day 10 as the bank generator's duration prior, not as an
+    estimate from observed events (Caveats).
+production_status: candidate
+adopted_in: none
 ---
-A Primary is a primary substation. The Candidate is the class 2 neural network of experiments 612
-and 613 (arm P7 with D50: neighbour power summaries, 50% signal dropout, no explicit gate). This
-page is planned and holds the plan only.
 
-## Method (plan)
+**A one-year backtest of the class 2 Candidate demand network at the 16 Primaries scored a CRPS of
+4.14 points of capacity for the prevailing output and 4.32 for the NRA output.** The year runs from
+2025-11-01 to 2026-10-31, with one forecast origin per day at 12:00 UTC and 672 half-hours (14
+days) per origin. This is a descriptive backtest, not a ranking: the year overlaps the
+development months and the final-test window, nothing was tuned on it, and nothing is adopted for
+production. A Primary is a primary substation. NRA is the normal running arrangement output (the
+Candidate's 11 quantiles). The prevailing output is the Candidate's 11 quantiles mixed with a
+shifted copy of themselves, weighted by a survival probability that a load shift is still in
+force.
 
-- **Base network:** the Candidate (arm `P7+D50`, experiments 610, 612, 613, 620), as the designer
-  session advised. Pre-training chain: lag, weather, and date-time encoders pre-trained on ERA5 and
-  CAMS (experiments 559, 565, 574), a fresh mixer on the whole ENS history (starts 2024-04-01),
-  then the daily fine-tune with a 90-day recency half-life.
-- **Lags:** the stored Candidate reads day and week lags observed at least 24 hours before its
-  native origin of 09:00 UTC (the 00Z ENS run plus 9 hours). The newest power it reads is
-  therefore from 09:00 UTC the day before, 27 hours before the contract's 12:00 origin and well
-  before the contract's 06:00 cut. The contract says a model whose lags are 24 hours or more needs
-  no change, so the stored lag recipe is kept. Experiment 574's 3.5-hour cap (`CAP_3_5H` = 7
-  half-hours) would also meet the cut, but no Candidate with neighbour summaries exists on it.
-  The neighbour summaries use the same 24-hour cut. A check asserts that every lag is observed
-  before 06:00 UTC on the origin day.
-- **Survival head:** R-haz of experiment 652 sits on the Candidate (`P7+D50`), not on K1. Its
-  gate-state input is removed, so no explicit gate enters. The Candidate's frozen 11 quantiles
-  are the NRA output. The prevailing output is the 11 quantiles of the mixture
-  `(1 - p) NRA + p (NRA shifted by a learned depth d and spread by a learned sigma)`
-  (experiment 647's `mixture_quantiles`: the shifted part is 3 Gauss-Hermite components at
-  `d + g sigma`, the quantiles are read from the mixture's cumulative distribution at the 11
-  levels). The head has 14 daily hazards instead
-  of 10, so `p = exp(-cumulative hazard)` keeps falling to day 14. One ablation arm keeps the gate
-  input, on the development months only.
-- **Folds:** 12 monthly refits, test months 2025-11 to 2026-10, trained on data before the
-  month with the 7-day embargo of experiment 613. Origins daily at 12:00 UTC; the weather is the
-  00Z ENS run of the same day.
-- **Seeds:** 2 (experiment 612's choice), quantiles averaged across seeds.
-- **Full-row test matrices:** the stored test matrices drop every half-hour with no observed
-  reading, which leaves gaps after 2026-10-17. The inputs here are built for every valid time from
-  12:00 to 14 days later for every origin, and only the scoring is restricted to rows with observed
-  power.
-- **Compute:** ceiling 10 GPU-hours (raised by the manager from 6). Up to 3 GPU processes run at
-  once with at most 4 CPU cores each. Two seeds and 14 daily hazards are kept.
-- **Reviews (maintainer, 2026-11-09):** before the first fit, one Sonnet code review hunting
-  leakage and one hunting contract errors, then one Opus review of the leakage and fold logic;
-  after the file is written, one Sonnet file audit (including a from-scratch re-run of one fold)
-  and one Opus review of the file and scores, then the prose review. Each reviewer is fresh, works
-  from a brief file, and starts no sub-agents. A leak or a wrong file stops the run.
-- **Standing practices followed:** cleaned data, the D15 and D18 cut before 2025-03-01, monthly
-  refits, saved weights, and tail and example-forecast plots.
-- **Open items before the first fit:** a one-fold timing run (the stored Candidate fit takes about
-  65 s per seed on a final-test fold, but the cost of the daily fine-tune, the injected bank for the
-  head, and a 6-hour pre-train is not yet known); whether the Candidate's unscaled band is scaled
-  to K1's width (default: not scaled, with the width ratio stated).
+**The score worsens only gently with lead time.** The prevailing output's CRPS rises from 3.46
+points of capacity at days 0 to 1 to 4.43 at days 7 to 14.
+
+![CRPS by lead band for both outputs](crps_by_band.svg)
+
+| Lead band | NRA CRPS | NRA median error | Prevailing CRPS | Prevailing median error |
+|---|---|---|---|---|
+| 0 to 1 days | 3.84 | 6.70 | 3.46 | 6.12 |
+| 1 to 3 days | 3.96 | 6.92 | 3.66 | 6.48 |
+| 3 to 7 days | 4.23 | 7.43 | 4.04 | 7.19 |
+| 7 to 14 days | 4.53 | 8.00 | 4.43 | 7.94 |
+| All | 4.32 | 7.59 | 4.14 | 7.39 |
+
+All values are points of capacity. "Median error" is the normalised mean absolute error of the
+median (q50): 100 times the absolute error divided by the Primary's capacity, averaged over
+scored half-hours. CRPS is twice the mean pinball loss over the 11 quantile levels, divided by
+capacity, times 100. The pooled value weights each half-hour equally, so a Primary with a large
+spread counts once per half-hour, not once per Primary.
+
+**By month of the origin, the prevailing output has the lower CRPS in 9 of 12 months.** The NRA
+output is lower in 2025-12 (the second fold that uses the fallback survival curve), 2026-01, and
+2026-06.
+
+![CRPS by month of the origin](crps_by_month.svg)
+
+| Month of origin | NRA CRPS | NRA median error | Prevailing CRPS | Prevailing median error |
+|---|---|---|---|---|
+| 2025-11 | 3.63 | 6.45 | 3.59 | 6.39 |
+| 2025-12 | 4.32 | 7.42 | 4.42 | 7.56 |
+| 2026-01 | 4.11 | 7.06 | 4.14 | 7.46 |
+| 2026-02 | 3.80 | 6.98 | 3.73 | 6.83 |
+| 2026-03 | 5.45 | 9.73 | 4.88 | 8.95 |
+| 2026-04 | 4.26 | 7.78 | 4.15 | 7.39 |
+| 2026-05 | 3.98 | 7.27 | 3.88 | 7.03 |
+| 2026-06 | 3.64 | 6.45 | 3.79 | 6.76 |
+| 2026-07 | 5.12 | 8.50 | 4.62 | 8.09 |
+| 2026-08 | 4.89 | 8.18 | 4.38 | 7.86 |
+| 2026-09 | 4.32 | 7.76 | 3.98 | 7.18 |
+| 2026-10 | 4.18 | 7.33 | 4.05 | 7.06 |
+
+The month is the month of the forecast origin, so an origin on 31 October scores valid times
+until 14 November under 2026-10.
+
+**Both outputs are too narrow, and the pre-registered coverage prediction P3 failed.** P3 said that
+the q05 to q95 coverage of the NRA output would lie within 0.05 of 0.90 in every month. It does
+so in 3 of 12 months (2025-11, 2026-02, 2026-06). The NRA coverage runs from 0.72 (August) to 0.89
+(November), the prevailing coverage from 0.80 (July) to 0.89 (November).
+
+![Share of observed power inside the q05 to q95 band, by month](coverage_by_month.svg)
+
+| Lead band | NRA q05 to q95 | NRA q25 to q75 | Prevailing q05 to q95 | Prevailing q25 to q75 |
+|---|---|---|---|---|
+| 0 to 1 days | 0.826 | 0.425 | 0.872 | 0.465 |
+| 1 to 3 days | 0.821 | 0.418 | 0.864 | 0.456 |
+| 3 to 7 days | 0.815 | 0.408 | 0.851 | 0.440 |
+| 7 to 14 days | 0.810 | 0.403 | 0.839 | 0.426 |
+
+The NRA output is a counterfactual target, scored here against metered power, so event windows
+count against its coverage by construction. Part of the gap between the two outputs is that
+effect and not a fault in the NRA band. The band was not rescaled in this experiment.
+
+![A 14-day forecast at one Primary: NRA output above, prevailing output below](example_forecast.svg)
+
+The example is one Primary (series 26, metered in MVA) from the origin of 2026-02-01 12:00 UTC,
+chosen because the prevailing median differs most from the NRA median on that origin (the
+prevailing output moves often at this Primary and does not beat NRA there; see Caveats).
+
+**Predictions P1 and P2 were not tested.** P1 compared the Candidate's score at days 0 to 10
+after the extension to 14 days with experiment 620's stored Candidate on the same months. No
+matched run was made, so P1 is unevaluated. P2 asked whether the survival output stays
+calibrated at days 10 to 14, and the page has no measurement of it. The survival probability at
+those leads is read from the generator, not checked against observed events (see Caveats).
+
+## Method
+
+- **Base network:** the Candidate (arm `P7+D50`: neighbour power summaries, 50% signal dropout, no
+  explicit gate) of [experiment
+  612](../00612-nra-combined-networks-three-class-roster-completion/result.md) and [experiment
+  613](../00613-nra-roster-contrasts-with-intervals-five-seeds/result.md), as set up by [experiment
+  610](../00610-nra-neighbour-summary-lag-encoder-inputs-iteration/result.md), [experiment
+  620](../00620-bakeoff-final-test-demand-networks-at-primaries/result.md), and the encoder
+  pre-training of experiments 559, 565, and 574. The Candidate's seed-mean 11 quantiles are the NRA
+  output. The horizon limit is raised from 240 to 339 hours; ENS summaries reach about 351 hours.
+- **Origins and weather:** the weather is the ECMWF ENS 00Z run of the origin day (51 members),
+  which the Candidate treats as available at 09:00 UTC. The forecast is made at that native 09:00
+  UTC origin and relabelled to the contract's 12:00 UTC origin by adding 3 hours. Valid times
+  before 12:00 UTC are dropped, leaving 672 half-hours per origin. `nwp_init_time` is 00:00 UTC of
+  the origin day.
+- **Lags and the 6-hour cut:** the Candidate's lags and neighbour summaries read power observed at
+  least 24 hours before its native origin, so the newest power read is from 09:00 UTC on the day
+  before, 27 hours before the contract's 12:00 UTC origin. The contract's rule (nothing newer than
+  origin minus 6 hours) therefore needed no change to the recipe. A check asserts that every lag
+  time is at least 24 hours before the native origin.
+- **Folds and training:** 12 monthly refits, with test months 2025-11 to 2026-10. Each fold trains
+  on cleaned power and weather available before its month, with the embargoes of experiment 613
+  (3 days at the mixer step, 7 days at the daily fine-tune), 2 seeds with seed-mean-then-sort
+  quantiles, and the 90-day recency half-life. Lag, weather, and date-time encoders are
+  pre-trained on ERA5 and CAMS, a fresh mixer is trained on the whole ENS history (starting
+  2024-04-01, so the early folds have less ENS data), then the daily fine-tune runs. The cleaned
+  power drops the `substation_zero` rows, and the D15 and D18 histories are cut before
+  2025-03-01.
+- **Prevailing output:** the 11 quantiles of the mixture `(1 - p) NRA + p (NRA shifted by a
+  learned depth d, with spread sigma)`, with the shifted part as 3 Gauss-Hermite components at
+  `d + g sigma` and the quantiles read from the mixture's cumulative distribution (experiment
+  647's `mixture_quantiles`). `p = exp(-cumulative hazard)`, where the head outputs 14 daily
+  hazards, so `p` keeps falling to day 14. The head of [experiment
+  652](../00652-two-output-forecast-with-explicit-rules-and-survival-hazard/result.md) (R-haz)
+  sits on the Candidate and not on K1, with its gate-state input removed.
+- **Training the head:** the head trains on banks of injected shifts (the generator of experiment
+  650), one bank per earlier month, built from the real history of that month with synthetic
+  shifts and forecast by that month's Candidate chain (inference only). Fold M's head trains only
+  on banks of months before M and on rows whose valid time is before the start of M. Two seeds are
+  averaged.
+- **Fallback in the first two folds:** with fewer than 2 earlier banks (folds 2025-11 and
+  2025-12), the prevailing rows use B-haz instead: the Candidate plus its own recent residual
+  times a log-normal survival curve fitted on synthetic durations (no fit on observed power). The
+  prevailing rows equal the NRA rows exactly on 74% of November origins and 65% of December
+  origins (where the residual is missing), and on no origin from 2026-01 onward.
+- **Full-row test matrices:** inputs are built for every valid time from 12:00 UTC to 14 days
+  later for every origin, including half-hours with no observed power, so that no input gap
+  follows the stored matrices' gaps after 2026-10-17. Scoring is restricted to half-hours with
+  observed, unflagged power.
+- **Units:** quantiles are scaled by each Primary's capacity and stored in MW for series 7, 8, 10,
+  12, 13, 16, 17, and 18, and in MVA for series 3, 9, 11, 14, 15, 24, 25, and 26.
+- **Scoring:** against `ground_truth_primaries.parquet` (cleaned power, outside the file), divided
+  by `series_capacity.parquet`, as in the table captions above.
+- **Compute:** about 0.5 GPU-hours per fold for the Candidate chains, inside the 10 GPU-hour
+  ceiling.
+
+## Checks
+
+- Row count: 7,848,960 = 16 series x 365 origins x 672 half-hours x 2 outputs; 672 rows per
+  series-origin-output.
+- No duplicate keys; no null or non-finite quantile; no crossing in any of the 10 adjacent quantile
+  pairs; all times are UTC.
+- Timing: the file's NRA rows for a 12:00 UTC origin equal the native 09:00 UTC fit's seed-mean
+  quantiles times capacity exactly (maximum difference 0.0), so the 3-hour offset is applied once.
+- Leakage: a Sonnet review for leakage, a Sonnet review for the contract, and an Opus review of the
+  fold logic of the Candidate found no leak. The only defects were stale inputs for the later folds
+  and a hole in the lag-free tables, both fixed, with the affected folds rebuilt. A Sonnet review of
+  the prevailing-rows code found one lookahead (an automatic flag mask whose runs depend on the
+  first days of the scored month was applied to the head's training rows); the mask was removed and
+  all 12 prevailing fits were re-run. A Sonnet audit of the file and a from-scratch re-run of one
+  fold passed. An Opus review of the file and the scores reproduced every score to 3 decimals, and
+  found no unit, timing, or scaling error.
+- No observed power is stored in the file.
+
+## Caveats
+
+- **The survival probability beyond day 10 reflects the bank generator's duration prior.** The
+  generator draws short events of 3 to 14 days and long events of 28 to 112 days, none of 15 to 27
+  days, so hazards for days 11 to 14 are not estimated from observed events.
+- **The prevailing output has no floor at zero for MVA-only series.** Series 26, 14, and 15
+  produce more negative `q01` rows than the NRA output (the lowest prevailing `q01` is -2.26 MVA at
+  series 26, against -1.21 for NRA). Neither arm is clamped.
+- **Series 12 exports power** (observed power runs from -0.92 to 1.28 of its 3.0 MW capacity), so
+  its CRPS (13.0 to 13.6 points) is about three times the pooled value and adds about 0.6 points to
+  it.
+- **The prevailing output loses to the NRA output at series 14 and 26** (CRPS 7.16 against 6.90 at
+  series 14, 7.41 against 7.37 at series 26), and its median at series 26 differs from the NRA
+  median by more than 5 points on 52% of origins.
+- **The first row of each origin covers the half-hour ending at the origin** (11:30 to 12:00 UTC):
+  `valid_time` is the end of the half-hour, and lead 0 is that row.
+- **The bank's injected lags use the month's later power for proportional shifts,** which stays
+  within the months before the fold being scored.
 
 ## Files
 
-To be written: `primaries.parquet` in
-`data/ml-experiments/backtest_year_2025-11_to_2026-10/` (private).
+- `data/ml-experiments/backtest_year_2025-11_to_2026-10/primaries.parquet` (private): 7,848,960
+  rows. Columns in order: `time_series_id` (Int8, original id), `valid_time`, `nwp_init_time`,
+  `power_fcst_init_time` (UTC), `q01`, `q05`, `q10`, `q25`, `q40`, `q50`, `q60`, `q75`, `q90`,
+  `q95`, `q99` (Float32, MW or MVA as listed in Method), `NRA_or_prevailing` (`"NRA"` or
+  `"prevailing"`).
+- Code: `ml-experiments/00667-one-year-backtest-of-the-two-output-demand-network-at-primaries/`
+  (folds, export, merge, scoring, figures, and the `prevailing/` folder for the head).
+- Scores: `score/*_by_band_month.csv` and `score/*_by_band_primary.csv` in the experiment's data
+  folder, with columns for CRPS, median error, and the two coverages.
+- Reviews: `reviews/` in the experiment's data folder (the briefs and the answers).

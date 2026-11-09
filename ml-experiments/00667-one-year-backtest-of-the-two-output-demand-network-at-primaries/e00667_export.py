@@ -1,4 +1,4 @@
-# ruff: noqa: D103
+# ruff: noqa: D103, E501, PT018
 """Experiment 667: turn the Candidate's monthly fits into the contract's `primaries.parquet` rows.
 
 The network runs at its native origin of 09:00 UTC (the 00Z ENS run plus 9 hours). The contract's
@@ -20,7 +20,8 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 ROOT: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
 )
 QCOLS: Final = ("q01", "q05", "q10", "q25", "q40", "q50", "q60", "q75", "q90", "q95", "q99")
 KEYS: Final = ("time_series_id", "power_fcst_init_time", "valid_time")
@@ -64,13 +65,17 @@ def contract_rows(*, mean: pl.DataFrame) -> pl.DataFrame:
     origin = pl.col("power_fcst_init_time") + timedelta(hours=CONTRACT_HOUR - NETWORK_ORIGIN_HOUR)
     cap = capacity_mw().select(pl.col("time_series_id").cast(pl.Int64), "capacity_mw")
     out = (
-        mean.with_columns(contract_origin=origin, time_series_id=pl.col("time_series_id").cast(pl.Int64))
+        mean.with_columns(
+            contract_origin=origin, time_series_id=pl.col("time_series_id").cast(pl.Int64)
+        )
         .filter(
             (pl.col("valid_time") >= pl.col("contract_origin"))
             & (pl.col("valid_time") < pl.col("contract_origin") + timedelta(days=14))
         )
         .join(cap, on="time_series_id", how="left")
-        .with_columns(*[(pl.col(q).cast(pl.Float64) * pl.col("capacity_mw")).cast(pl.Float32) for q in QCOLS])
+        .with_columns(
+            *[(pl.col(q).cast(pl.Float64) * pl.col("capacity_mw")).cast(pl.Float32) for q in QCOLS]
+        )
         .select(
             pl.col("time_series_id").cast(pl.Int8),
             pl.col("valid_time"),
@@ -81,7 +86,10 @@ def contract_rows(*, mean: pl.DataFrame) -> pl.DataFrame:
         .sort("time_series_id", "power_fcst_init_time", "valid_time")
     )
     assert out.schema == pl.Schema(CONTRACT_SCHEMA), out.schema
-    assert out["q99"].is_finite().all() and out.select(pl.all_horizontal(pl.col(QCOLS).is_not_null())).to_series().all()
+    assert (
+        out["q99"].is_finite().all()
+        and out.select(pl.all_horizontal(pl.col(QCOLS).is_not_null())).to_series().all()
+    )
     q = out.select(QCOLS).to_numpy()
     assert (np.diff(q, axis=1) >= 0).all(), "quantiles cross"
     per = out.group_by("time_series_id", "power_fcst_init_time").len()["len"].unique().to_list()
@@ -113,8 +121,17 @@ def main() -> None:
         frame.write_parquet(tmp)
         tmp.rename(out / f"NRA_{month}.parquet")
         n_orig = frame["power_fcst_init_time"].n_unique()
-        print(month, frame.height, "rows;", n_orig, "origins; per series-origin",
-              frame.group_by("time_series_id", "power_fcst_init_time").len()["len"].unique().to_list())
+        print(
+            month,
+            frame.height,
+            "rows;",
+            n_orig,
+            "origins; per series-origin",
+            frame.group_by("time_series_id", "power_fcst_init_time")
+            .len()["len"]
+            .unique()
+            .to_list(),
+        )
 
 
 if __name__ == "__main__":

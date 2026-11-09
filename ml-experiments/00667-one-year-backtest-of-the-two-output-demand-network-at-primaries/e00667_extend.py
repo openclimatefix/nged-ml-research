@@ -24,7 +24,10 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-OUT_ROOT: Final[Path] = next(ML_EXPERIMENTS_DATA_DIR.glob("00667-*"), None) or (ML_EXPERIMENTS_DATA_DIR / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries")
+OUT_ROOT: Final[Path] = next(ML_EXPERIMENTS_DATA_DIR.glob("00667-*"), None) or (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00667-one-year-backtest-of-the-two-output-demand-network-at-primaries"
+)
 RAW_DIR: Final[Path] = OUT_ROOT / "inputs" / "raw"
 INPUTS_620: Final[Path] = next(ML_EXPERIMENTS_DATA_DIR.glob("00620-*")) / "inputs"
 """Experiment 620's extended weather-column tables (trailing437, w560, frames), read only."""
