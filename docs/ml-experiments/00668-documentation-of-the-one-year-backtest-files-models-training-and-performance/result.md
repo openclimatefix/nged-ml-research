@@ -352,7 +352,7 @@ To be added when `solar.parquet` is written.
 
 ## Comparison baselines, slices, and summary figures
 
-This section is written last. It will hold four items.
+This section is written last. It will hold five items.
 
 - **Baselines beside every model.** The manual heuristic and climatology for the demand files, and
   climatology for wind and solar (the manual heuristic only where one exists for the technology).
@@ -377,6 +377,12 @@ This section is written last. It will hold four items.
   condition" (all days, winter, winter nights, cold nights, Economy 7 step hours, Christmas, bank
   holidays). The page reuses the metric, threshold, and condition code of `studies.eval_protocol`
   (`metrics.py`, `slices.py`) unchanged and restates each definition.
+- **Two extra arms for the demand files:** Primary demand research default 3 and BG2, in the same
+  tables and plots. Both reach 10 days at most, and their stored forecasts cover the development
+  months and the final-test window, not the whole year, and may not exist for the BSPs and GSPs.
+  The comparison uses stored forecasts on the common rows only and states the rows and months it
+  uses. Gaps are not filled by guessing, and a CPU run to extend the comparison starts only after
+  the maintainer agrees to its stated cost.
 
 ## Caveats
 
