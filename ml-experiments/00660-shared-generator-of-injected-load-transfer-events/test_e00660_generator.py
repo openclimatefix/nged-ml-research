@@ -339,3 +339,58 @@ def test_sensitivity_constructors_change_only_what_they_name() -> None:
     assert shaped.proportional_prob == 1.0
     assert shaped.staged_return_prob > 0
     assert shaped.units_range == base.units_range
+
+
+def test_a_later_cutoff_cannot_switch_off_the_final_test_guard() -> None:
+    """A later cutoff cannot switch off the final test guard."""
+    panel = gen.PowerPanel(
+        power=make_panel().power,
+        is_mva=make_panel().is_mva,
+        noise=make_panel().noise,
+        neighbours=make_panel().neighbours,
+        origin=datetime(2025, 3, 1, tzinfo=UTC),
+    )
+    config = replace(gen.default_config(), cutoff=datetime(2030, 1, 1, tzinfo=UTC))
+    with pytest.raises(ValueError, match="cutoff"):
+        gen.inject(panel=panel, config=config, seed=1)
+
+
+def test_no_event_of_any_class_sits_where_its_primary_has_no_data() -> None:
+    """No event of any class sits where its Primary has no data."""
+    panel = make_panel()
+    power = {s: v.copy() for s, v in panel.power.items()}
+    power["C"][: 2 * 365 * gen.DAY] = np.nan
+    gappy = gen.PowerPanel(
+        power=power,
+        is_mva=panel.is_mva,
+        noise=panel.noise,
+        neighbours=panel.neighbours,
+        origin=ORIGIN,
+    )
+    world = gen.inject(panel=gappy, seed=13)
+    on_c = world.events.filter((pl.col("site") == "C") & (pl.col("event_class") != "common_mode"))
+    assert on_c["start"].min() >= 2 * 365 * gen.DAY - gen.DAY
+    cm = world.events.filter((pl.col("site") == "C") & (pl.col("event_class") == "common_mode"))
+    assert cm["start"].min() >= 2 * 365 * gen.DAY
+
+
+def test_table_conserves_megawatts_even_when_gaps_differ() -> None:
+    """The table conserves megawatts even when gaps differ; only the panel diff is masked."""
+    panel = make_panel(mva=())
+    power = {s: v.copy() for s, v in panel.power.items()}
+    power["B"][5000:5400] = np.nan
+    gappy = gen.PowerPanel(
+        power=power,
+        is_mva=panel.is_mva,
+        noise=panel.noise,
+        neighbours=panel.neighbours,
+        origin=ORIGIN,
+    )
+    world = gen.inject(panel=gappy, config=positives_only(), seed=5)
+    for _gid, rows in world.events.filter(pl.col("event_class") == "edge_transfer").group_by(
+        "group_id"
+    ):
+        donor = rows.filter(pl.col("role") == "donor")
+        rec = rows.filter(pl.col("role") == "recipient")
+        if donor.height == 1 and rec.height:
+            assert rec["delta"].sum() == pytest.approx(-donor["share"][0] * donor["delta"][0])

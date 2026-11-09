@@ -48,7 +48,7 @@ SHORT_HISTORY_CUT: Final[dict[str, int]] = {
 """Rows before this index are dropped (the noisy start of a short-history Primary)."""
 VERIFIED_PAIRS: Final[dict[str, tuple[str, str, str, str]]] = {
     "D5/D16": ("D5", "D16", "2025-12-29", "2026-01-13"),
-    "D3/D22": ("D3", "D22", "2024-10-26", "2024-11-22"),
+    "D3/D22": ("D22", "D3", "2024-10-26", "2024-11-22"),
 }
 """The two verified transfers: donor, recipient, first day, and last day of the event."""
 

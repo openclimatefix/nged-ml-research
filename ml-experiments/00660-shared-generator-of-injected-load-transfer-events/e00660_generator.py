@@ -16,7 +16,9 @@ Moving it to a shared package would need the maintainer's review.
 - Index ``i`` of every array is the half-hour starting at ``origin + 30 min * i`` (UTC).
 - ``end`` is exclusive. ``end is None`` means the event is still running at the end of the window.
 - A MW series is signed active power. An MVA series is apparent power (never negative), and an
-  injected value there is the magnitude ``|base + delta|``; MW and MVA are never summed.
+  injected value there is the magnitude ``|base + delta|``; MW and MVA are never summed. An MVA
+  magnitude can fold a large loss through zero; the table records the requested signed change,
+  not the folded one.
 - Time without an injected event is unlabelled, not negative.
 - The panel may hold no finite reading at or after ``GeneratorConfig.cutoff`` (default
   2026-07-01), and no event starts there; an open event changes only half-hours that have a
@@ -405,6 +407,12 @@ class _Builder:
             for site, v in panel.power.items()
         }
 
+    def first_data(self, *, site: str) -> int:
+        """Index of the first half-hour with a reading at the Primary (or the window start)."""
+        c = self._finite[site]
+        hit = np.flatnonzero(c[1:] > c[:-1])
+        return max(self.lo, int(hit[0])) if len(hit) else self.lo
+
     def has_data(self, *, site: str, at: int) -> bool:
         """True if the Primary has readings for at least half of the day starting at `at`."""
         c = self._finite[site]
@@ -594,7 +602,7 @@ class _Builder:
             }
         )
 
-    def hard_negatives(self) -> None:
+    def hard_negatives(self) -> None:  # noqa: PLR0912 - one list of independent draws
         """Append the hard negatives: routine steps, ramps, pulses, placebo pairs, common mode."""
         c, rng, panel = self.config, self.rng, self.panel
         sites = panel.sites
@@ -603,6 +611,8 @@ class _Builder:
             site = str(routine_site)
             for _ in range(rng.poisson(c.routine_steps_per_year * self.years)):
                 st = self.start_time(hi=self.hi - 6)
+                if not self.has_data(site=site, at=st):
+                    continue
                 dur = int(_log_uniform(rng, 6, 3 * DAY))
                 size = float(rng.choice(c.routine_steps)) * float(rng.choice([-1, 1]))
                 self.next_group += 1
@@ -623,6 +633,8 @@ class _Builder:
         for site in sites:
             for _ in range(rng.poisson(c.ramps_per_primary_year * self.years)):
                 st = int(rng.integers(self.lo, self.hi - 6))
+                if not self.has_data(site=site, at=st):
+                    continue
                 dur = int(_log_uniform(rng, DAY, 30 * DAY))
                 w = int(rng.integers(int(c.ramp_hours[0] * 2), int(c.ramp_hours[1] * 2) + 1))
                 units = float(_log_uniform(rng, 2.0, 8.0))
@@ -641,6 +653,8 @@ class _Builder:
                 )
             for _ in range(rng.poisson(c.pulses_per_primary_year * self.years)):
                 st = int(rng.integers(self.lo, self.hi - 6))
+                if not self.has_data(site=site, at=st):
+                    continue
                 dur = int(rng.integers(c.pulse_hh[0], c.pulse_hh[1] + 1))
                 units = float(rng.uniform(3.0, 10.0))
                 self.next_group += 1
@@ -660,6 +674,8 @@ class _Builder:
             if b in panel.neighbours.get(a, []):
                 continue
             st = self.start_time()
+            if not (self.has_data(site=a, at=st) and self.has_data(site=b, at=st)):
+                continue
             dur = self.duration()
             end = None if st + dur >= self.hi else st + dur
             units = self.units()
@@ -690,7 +706,7 @@ class _Builder:
                     role="common_mode",
                     event_class="common_mode",
                     label=HARD_NEGATIVE,
-                    start=self.lo,
+                    start=self.first_data(site=site),
                     end=None,
                     delta=gain * panel.noise[site],
                     period_hh=period,
@@ -724,8 +740,9 @@ def inject(
             window is too short to hold an event.
     """
     config = config or GeneratorConfig()
-    panel.validate(cutoff=config.cutoff)
-    stop = min(panel.length, panel.time_index(when=config.cutoff))
+    cutoff = min(config.cutoff, CUTOFF)  # a later cutoff never reaches the final-test window
+    panel.validate(cutoff=cutoff)
+    stop = min(panel.length, panel.time_index(when=cutoff))
     lo, hi = 0, stop
     if hi - lo < 4 * DAY:
         raise ValueError("the window is shorter than four days")
