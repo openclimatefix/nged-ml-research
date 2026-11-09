@@ -71,27 +71,38 @@ a learned detector for the end of a shift, does better than that frozen K1 plus 
 
 ## Results so far
 
-**Status: development-month fits, the first final-test scoring, and a rough Step 0 are done. NOT RUN
-in this experiment, and left to a follow-up experiment: the end detector (E1d, E2d, and the
-placebo), the final-fold fits and window scoring of E0, and the staged-return arm.** Numbers are
-CRPS in points of capacity. "J1" is the end-to-end network whose prevailing loss does not reach the lag
-encoder (stop-gradient); "J2" lets the prevailing loss reach the lag encoder. Neither reads the G4
-gate state. "C0" is the matched-compute control with no prevailing head.
+**Status: the development-month fits, the first final-test scoring, and a rough Step 0 are done.**
+This experiment did not run the end detector (E1d, E2d, and the placebo), the final-fold fits and
+window scoring of E0, or the staged-return arm. A follow-up experiment owns them.
+
+Numbers are CRPS in points of capacity. K1 is the neural network of experiments 612 and 613 that
+forecasts the normal running arrangement (NRA). E0 is the frozen K1 plus the survival-hazard head
+R-haz of experiment 652. B-haz is K1 plus its residual decayed by the best single survival curve,
+and R0 is the observed power one week earlier. "Scaled" CRPS multiplies each arm by one factor that
+equalises the width of its quantile band across strata, months, and seeds.
+
+"J1" is the end-to-end neural network whose prevailing loss does not reach the lag encoder
+(stop-gradient). "J2" lets the prevailing loss reach the lag encoder. Both read only the lag-encoder
+outputs: neither reads the hand-built G4 gate state or neighbour summaries, so J2 is the plan's E1
+and E2 without those inputs. "C0" is the matched-compute control with no prevailing head.
 
 **On the development months, the end-to-end networks lose to the frozen K1 plus R-haz (E0) while a
 shift is in force.** J2 minus E0 is +1.74 scaled points over the in-force strata (month-block 95%
 interval +1.00 to +2.47), so the predicted gain did not appear. J2 beats J1 by 0.32 points (interval
--0.54 to -0.05), and both beat the matched-compute control C0.
+-0.54 to -0.05), and J1 and J2 both beat the matched-compute control C0 in the far stratum.
 
-**The NRA veto fails on the development months.** On injected rows scored against the unshifted
-base, the NRA output of J2 scores 3.90 in the far stratum against 3.76 for K1 (+0.14). On event-free
-rows J2's NRA output scores 3.81 against 3.77 (+0.04). Both exceed the 0.03 limit, so the veto is
-reported as failed for the variant that lets the prevailing loss reach the lag encoder. The cause is
-the joint fine-tune recipe (cuts at day 0 and day 14, synthetic shifts), which is weaker than the
-daily fine-tune of the stored K1.
+**The NRA veto fails on the development months for all three jointly fine-tuned arms.** The veto
+asks for the upper bound of the 95% interval of each arm's NRA CRPS minus K1's NRA CRPS to stay
+below 0.03. Unscaled, on injected rows scored against the unshifted base in the far stratum, the NRA
+output scores 3.90 for J2, 3.91 for J1, and 3.91 for C0, against 3.76 for K1 (+0.14 to +0.15). On
+event-free rows it scores 3.81, 3.82, and 3.81 against 3.70 (+0.11 to +0.12). Every point estimate
+already exceeds 0.03. C0 has no prevailing head and fails by the same margin, so the most likely
+cause is the joint fine-tune recipe (cuts at day 0 and day 14, synthetic shifts), which is weaker
+than the daily fine-tune of the stored K1.
 
-**J2 does better than E0 near the end of a shift.** In the "ended in the last 24 hours" stratum J2
-scores 6.52 and E0 scores 7.44 on the scaled measure, and in the "near" stratum 6.44 against 7.34.
+**J2 does better than E0 near and after the end of a shift.** In the "ended in the last 24 hours"
+stratum J2 scores 6.52 and E0 scores 7.44 on the scaled measure, and J2 is lower on all 9 lead days
+(by 1.81 on day 1 down to 0.33 on day 9). In the "near" stratum J2 scores 6.44 against 7.34.
 
 | Stratum (origin state) | K1 | R0 (168 h) | B-haz | E0 | C0 | J1 | J2 NRA | J2 prevailing |
 |---|---|---|---|---|---|---|---|---|
@@ -102,7 +113,7 @@ scores 6.52 and E0 scores 7.44 on the scaled measure, and in the "near" stratum 
 | Event-free | 5.50 | 4.40 | 4.19 | 3.90 | 5.86 | 5.02 | 3.78 | 4.77 |
 
 Table: scaled CRPS on the injected bank, training family, 5 development months, seeds averaged.
-These are injected shifts on real bases, not real events. The NRA column is scored against the
+These are injected shifts on real bases, not real events. The J2 NRA column is scored against the
 unshifted base, so it is not comparable with the other columns. The unscaled values and the
 normalised mean absolute error of the median sit in `score/tables.json`.
 
@@ -110,9 +121,10 @@ normalised mean absolute error of the median sit in `score/tables.json`.
 
 ![Far from the end of a shift J2 beats C0 and J1 but not E0, and after the end J2 beats E0](fig1_headline.svg)
 
-Far from the end of a shift, the prevailing outputs of J1 and J2 are 2 to 3 points worse than E0 on
-every lead day. After the end of a shift, J2 beats E0 on lead days 1 to 5 by 0.4 to 1.8 points, while
-K1 and C0, which carry no shift, are best. Scaled CRPS, the same rows as the table above:
+Far from the end of a shift, the prevailing outputs of J1 and J2 are 2.2 to 3.1 points worse than E0
+on every lead day. After the end of a shift, J2 beats E0 on every lead day, by 0.3 to 1.8 points.
+K1, C0, and R0 are lower than J2 on most lead days, because K1 and C0 carry no shift. Scaled CRPS,
+the same rows as the table above:
 
 Far from the end (more than 10 days left):
 
@@ -138,10 +150,16 @@ Ended in the last 24 h:
 | J1 | 6.62 | 6.65 | 6.85 | 7.07 | 7.07 | 6.22 | 6.35 | 6.61 | 6.74 |
 | J2 prevailing | 6.50 | 6.54 | 6.73 | 6.96 | 6.99 | 6.05 | 6.20 | 6.45 | 6.60 |
 
-**Injected event lengths.** The training family draws half its durations uniformly from 3 to 14
+**Half the injected events are long, so lagged power can help on them.** The injected-event
+generator is experiment 650's, not the log-uniform draw the plan below describes. The training
+family draws half its durations uniformly from 3 to 14
 days and half uniformly from 28 to 112 days, so about a quarter of events last at most 8 days and
-half last at least 28 days; the held-out family uses 5, 10, 21, and 45 days. The interval files
-`score/by_lead_day.csv` hold the 95% month-block interval of every cell. The manual heuristic and
+half last at least 28 days; the held-out family uses 5, 10, 21, and 45 days. All injected tables on this page use that earlier generator. The generator agreed later with the
+graph-approach discussion (durations log-uniform from 1 to 112 days with random ends, plus a short
+band down to 3 hours, and experiment 653's injector) was not used, so these tables are not
+comparable with injected tables built on it. The follow-up experiment uses the later generator.
+The file
+`score/by_lead_day.csv` holds the 95% month-block interval of every cell. The manual heuristic and
 climatology are not scored on the injected bank: both need the shifted observed power rebuilt at
 each lag time, which is a separate piece of scoring code, so they appear on the final-test window
 only.
@@ -151,7 +169,8 @@ only.
 A rough measurement, from the cleaned power at each Primary, of the largest jump within 2 days of
 the stated start or end. Width is the number of half-hours between 10% and 90% of the step. Where a
 daily-profile jump is larger than the transfer's own edge, the method picks the wrong jump, so the
-D3 start (2024-10-28 instead of the 26th) is not usable.
+D3 start (2024-10-28 instead of the 26th) is not usable. At the D16 start one half-hour holds 149%
+of the step, so the width of 3 there is unreliable too.
 
 | Transfer and Primary | Start width (half-hours) | End width (half-hours) |
 |---|---|---|
@@ -161,15 +180,18 @@ D3 start (2024-10-28 instead of the 26th) is not usable.
 | D3/D22, D22 | 2 | 3 |
 
 The donor's edge at D5 spreads over about 3 hours, so not every edge is within one half-hour. The
-generator's training family already draws a ramp for half of its events, so the step-only rule did
-not need changing, and the staged-return arm was not run. The numbers sit in `score/edges.json`.
+generator's training family already draws a ramp for half of its events and a single half-hour step
+for the other half, so the plan's step-only rule was not applied and the staged-return arm was not
+run. The numbers sit in `score/edges.json`.
 
 ### Final-test window, scored once for J2, J1, C0, K1, and the manual heuristic
 
 The frozen candidates are in `final/freeze.json` (hashes included). The window has no labelled
 events in the export, so "inside" means rows where the hand-built G4 gate is on: five spells, of
-20 to 121 days (median 37 days), so these are long detected states, not injected events. Lead 24 to
-240 h; intervals are blocked by origin month (4 months) and are coarse.
+20 to 121 days (median 37 days), so these are long detected states, not injected events. The lead
+range is 24 to 240 hours. The scoring script holds intervals blocked by origin month (4 months),
+which are coarse, in `final/score/window.json`. A row counts as gate-on when the gate is on at the
+forecast's target half-hour.
 
 | Rows | Count | K1 | Manual heuristic | J2 NRA | J2 prevailing | J1 prevailing | C0 |
 |---|---|---|---|---|---|---|---|
@@ -178,10 +200,14 @@ events in the export, so "inside" means rows where the hand-built G4 gate is on:
 | Gate on | 137,676 | 9.40 | 6.97 | 9.30 | 8.11 | 8.29 | 9.20 |
 | Gate off, under 7 days after a spell | 5,483 | 4.36 | 5.28 | 4.42 | 4.46 | 4.48 | 4.40 |
 
-The "after a spell" row holds a single month and one spell end, so it carries almost no weight.
+The "after a spell" row holds 5,483 rows from one month and one spell end, so it carries almost no
+weight.
 
-**Prevailing is not best on all rows, and the most likely reason is the false-alarm cost on rows
-with no gate.** On the 86% of rows with the gate off, J2's prevailing output scores 4.54 against 4.05
+**Prevailing is not best on all rows, and for J2 the most likely reason is extra error from false
+alarms on rows with no gate.** The next figures come from a second split, which counts a row as
+gate-on when the gate flag stored on the row is on (119,050 rows, 14%) and gate-off otherwise
+(718,818 rows, 86%), so they differ slightly from the table above. On the gate-off rows, J2's
+prevailing output scores 4.54 against 4.05
 for its NRA output. Its median differs from its NRA median by 2.75 points on average there, with a
 mean survival probability of 0.15, so the head carries a shift that is not in force. On gate-on rows
 that really depart from K1's median by 3 points or more, the prevailing output beats the NRA output
@@ -193,8 +219,8 @@ the median-style quantile mix of the observed power 1 to 6 weeks and 49 to 55 we
 gate-on rows, 94% of the 1-week members and 76% of the 6-week members lie inside the same gate-on
 spell, so the old lags already hold the shifted level. The spells last 20 to 121 days, which is
 close to the long half of the injected durations (28 to 112 days). The other half of the injected
-durations is 3 to 14 days, which no lag of a week or more can follow; on the window the old lags
-help for the reason the maintainer suspected, because the real spells are long.
+durations is 3 to 14 days, which a lag of 1 week or more cannot follow. On the window the old lags
+help because the real spells are long, whereas many injected events are too short for them to help.
 
 ## Updates to the brief after reading the merged pages
 
