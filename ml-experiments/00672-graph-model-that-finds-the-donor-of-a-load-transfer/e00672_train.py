@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import multiprocessing as mp
+import os
 import pickle
 import sys
 import time
@@ -54,8 +55,9 @@ N_TRAIN_WORLDS: Final[int] = 120
 N_VAL_WORLDS: Final[int] = 6
 CROP: Final[int] = 720
 BATCH: Final[int] = 8
-STEPS: Final[int] = 2400
-EVAL_EVERY: Final[int] = 200
+STEPS: Final[int] = int(os.environ.get("E672_STEPS", "2400"))
+"""Training steps; the environment variable only shortens a smoke test."""
+EVAL_EVERY: Final[int] = min(200, STEPS)
 ARMS: Final[tuple[str, ...]] = ("G", "GR", "G0", "GS")
 
 

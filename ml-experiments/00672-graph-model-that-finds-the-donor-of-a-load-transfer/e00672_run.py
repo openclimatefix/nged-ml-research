@@ -255,7 +255,14 @@ def score(*, tag: str, config: str, first_seed: int, n_worlds: int) -> None:
         scored = match(truth=truth, events=ev, world_end=GRID_LENGTH)
         n_edge = sum(e.cls.endswith("transfer") and e.start >= SCORED_FROM for e in ev)
         rows.extend(
-            {**r, "config": config, "world": s, "method": tag, "world_edge_events": n_edge}
+            {
+                **r,
+                "config": config,
+                "world": s,
+                "method": tag,
+                "world_edge_events": n_edge,
+                "world_right_pairs": sum(bool(x["right_class"]) for x in scored),
+            }
             for r in scored
         )
         print(tag, config, s, flush=True)
