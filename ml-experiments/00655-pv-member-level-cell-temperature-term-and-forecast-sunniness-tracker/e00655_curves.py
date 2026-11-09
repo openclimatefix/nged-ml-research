@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, ANN001
 """Experiment 655: the physics curves, per member, and the cell-temperature scale fitted on the farms.
 
 Curves (all per MW of alternating-current capacity before the per-cutoff normalisation):
@@ -44,9 +44,7 @@ FARM_LONGITUDE: Final = -1.5
 """A nominal central-GB location: the farm frame holds no coordinates (the farms are anonymised)."""
 DAY_US: Final = 86_400_000_000
 STEP_US: Final = 1_800_000_000
-FIRST_ORIGIN_US: Final = int(
-    (ex.FIRST_RUN + ex.ORIGIN_DELAY).timestamp() * 1e6
-)
+FIRST_ORIGIN_US: Final = int((ex.FIRST_RUN + ex.ORIGIN_DELAY).timestamp() * 1e6)
 CURVES_DIR: Final[Path] = ex.WORK / "curves"
 VARIANTS: Final[tuple[str, ...]] = ("c0", "c", "d", "sd")
 
@@ -63,7 +61,9 @@ def _unit(*, ghi, zenith_deg, sun_az_deg, doy, temp_air, wind, s: float | None) 
         zenith_deg=zenith_deg,
         sun_azimuth_deg=sun_az_deg,
     )
-    poa = plane_of_array_w_m2(sky=sky, tilt_deg=TILT_DEG, azimuth_deg=PANEL_AZIMUTH_DEG, tracker=False)
+    poa = plane_of_array_w_m2(
+        sky=sky, tilt_deg=TILT_DEG, azimuth_deg=PANEL_AZIMUTH_DEG, tracker=False
+    )
     ac = ac_power_mw(poa_w_m2=poa, dc_capacity_mw=DC_AC_RATIO, ac_capacity_mw=1.0)
     if s is None:
         cell = temp_air
@@ -112,17 +112,30 @@ def build_tables(*, primary: int, s: float) -> dict[str, np.ndarray]:
         hi = min(lo + 20, n_runs)
         zz, aa, dd = (x[lo:hi, :, None] for x in (z, a, doy))
         args = {"zenith_deg": zz, "sun_az_deg": aa, "doy": dd}
-        member_air = _unit(ghi=sw[lo:hi].astype(np.float64), temp_air=t[lo:hi].astype(np.float64), wind=w[lo:hi].astype(np.float64), s=None, **args)
-        member_cell = _unit(ghi=sw[lo:hi].astype(np.float64), temp_air=t[lo:hi].astype(np.float64), wind=w[lo:hi].astype(np.float64), s=s, **args)
+        member_air = _unit(
+            ghi=sw[lo:hi].astype(np.float64),
+            temp_air=t[lo:hi].astype(np.float64),
+            wind=w[lo:hi].astype(np.float64),
+            s=None,
+            **args,
+        )
+        member_cell = _unit(
+            ghi=sw[lo:hi].astype(np.float64),
+            temp_air=t[lo:hi].astype(np.float64),
+            wind=w[lo:hi].astype(np.float64),
+            s=s,
+            **args,
+        )
         mean_sky = _unit(
-            ghi=sw[lo:hi].astype(np.float64).mean(axis=2, keepdims=True),
-            temp_air=t[lo:hi].astype(np.float64).mean(axis=2, keepdims=True),
-            wind=w[lo:hi].astype(np.float64).mean(axis=2, keepdims=True), s=None, **args,
+            ghi=np.nanmean(sw[lo:hi].astype(np.float64), axis=2, keepdims=True),
+            temp_air=np.nanmean(t[lo:hi].astype(np.float64), axis=2, keepdims=True),
+            wind=np.nanmean(w[lo:hi].astype(np.float64), axis=2, keepdims=True), s=None, **args,
         )  # fmt: skip
         out["c0"][lo:hi] = mean_sky[:, :, 0]
-        out["c"][lo:hi] = member_air.mean(axis=2)
-        out["d"][lo:hi] = member_cell.mean(axis=2)
-        out["sd"][lo:hi] = member_cell.std(axis=2)
+        # A member with a missing value is left out of the mean, as the cached summaries do (polars skips nulls).
+        out["c"][lo:hi] = np.nanmean(member_air, axis=2)
+        out["d"][lo:hi] = np.nanmean(member_cell, axis=2)
+        out["sd"][lo:hi] = np.nanstd(member_cell, axis=2)
     return out
 
 
@@ -171,7 +184,11 @@ def fit_scale(*, cutoff: str) -> dict:
     n_days = 0
     for farm in sorted(frame["site"].unique().to_list()):
         f = frame.filter(pl.col("site") == farm, pl.col("time") < stop).sort("time")
-        f = f.with_columns(t_us=pl.col("time").dt.epoch("us")).drop("temperature_2m").join(proxy, on="t_us", how="inner")
+        f = (
+            f.with_columns(t_us=pl.col("time").dt.epoch("us"))
+            .drop("temperature_2m")
+            .join(proxy, on="t_us", how="inner")
+        )
         t_us, norm = p5.farm_norm_series(farm=farm)
         f = f.with_columns(
             norm=pl.Series(
@@ -204,13 +221,25 @@ def fit_scale(*, cutoff: str) -> dict:
     sse = sum(e for e, _ in per_farm)
     # Half-hours of one farm-day are strongly correlated, so the likelihood counts one observation
     # per farm-day (the mean number of sunny-midday half-hours per farm-day is `inflate`).
-    sigma2 = float(sse.min() / n_rows)
-    log_post = -sse / (2 * sigma2 * (n_rows / n_days)) - (np.log(grid) ** 2) / (2 * S_PRIOR_SD_LOG**2)
+    sigma2 = float(sse.min() / n_rows)  # ty: ignore[unresolved-attribute]
+    log_post = -sse / (2 * sigma2 * (n_rows / n_days)) - (np.log(grid) ** 2) / (
+        2 * S_PRIOR_SD_LOG**2
+    )
     post = np.exp(log_post - log_post.max())
     post /= post.sum()
     mean = float((post * grid).sum())
     sd = float(np.sqrt((post * (grid - mean) ** 2).sum()))
-    return {"cutoff": cutoff, "s_mean": mean, "s_sd": sd, "s_mle": float(grid[np.argmin(sse)]), "grid_lo": float(grid[0]), "grid_hi": float(grid[-1]), "farm_days": n_days, "rows": n_rows, "farms": len(per_farm)}
+    return {
+        "cutoff": cutoff,
+        "s_mean": mean,
+        "s_sd": sd,
+        "s_mle": float(grid[np.argmin(sse)]),
+        "grid_lo": float(grid[0]),
+        "grid_hi": float(grid[-1]),
+        "farm_days": n_days,
+        "rows": n_rows,
+        "farms": len(per_farm),
+    }
 
 
 def scale_path(*, cutoff: str) -> Path:

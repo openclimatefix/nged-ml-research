@@ -3,7 +3,7 @@ id: "00655"
 slug: pv-member-level-cell-temperature-term-and-forecast-sunniness-tracker
 theme: solar-disaggregation
 also_relevant_to: []
-status: planned
+status: finished
 kind: other
 size: >-
   complex. Stored: fine-tuned neural-network weights and test-window quantiles in this experiment's
@@ -16,7 +16,8 @@ size: >-
 hypothesis: >-
   Experiment 644's explicit solar term lost to the free network, and its physics curve used the
   ensemble-mean shortwave irradiance (no spread), a 35-degree tilt, and a cell temperature equal to
-  the air temperature plus 25 K times the output per unit capacity, with no wind term. A curve computed for each of the
+  the air temperature plus 25 K times the output per unit capacity, with no wind term. A curve
+  computed for each of the
   51 ensemble members and then averaged, with a cell temperature in place of the air temperature,
   beats the free network on sunny middays. Separately, the 14-day error correction of experiment 644
   keeps at least half of its gain when it is applied by the ensemble forecast's sunniness instead of
@@ -27,7 +28,8 @@ prediction: >-
   and 0.27 points at day 1-2, 3-5, and 6-10); I expect a gain of at most 0.1 points at day 1-2, with
   the largest part of any gain coming from averaging over members (c against c0) and a smaller part
   from the cell temperature (d against c). Part 2: the tracker by forecast sunniness keeps 60% to
-  90% of the 644 gain (0.20 to 0.31 points at day 1-2, from the 0.34 gain) and beats the shuffled-error placebo by
+  90% of the 644 gain (0.20 to 0.31 points at day 1-2, from the 0.34 gain) and beats the shuffled-
+  error placebo by
   more than the bar.
 decision_rule: >-
   Fixed before any result was read. CRPS is in points (percent of effective capacity), pooled over
@@ -53,127 +55,242 @@ metric: >-
   Continuous ranked probability score (CRPS) in points from the 11 quantiles of each forecast, on
   sunny middays and on all half-hours, by lead band; mean absolute error of the median forecast in
   points of effective capacity (the PV line's normalisation, the same as experiment 644); coverage
-  of the 5% to 95% interval; pinball loss and coverage at the 0.05 and 0.95 quantiles (the stored
-  forecasts hold 11 quantiles and no 0.01 or 0.99).
+  of the 5% to 95% interval; pinball loss and coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles (the
+  stored forecasts hold 11 quantiles).
+verdict: refuted
+best_arm: >-
+  The free network (arm a): sunny-midday CRPS 3.75, 4.28, and 5.05 points of capacity at lead days
+  1-2, 3-5, and 6-10, against 4.10, 4.51, and 5.26 for the member-level cell-temperature network
+  (arm d). No explicit arm beat it.
+headline: >-
+  Computing the solar term per ensemble member and with a cell temperature does not rescue it: the
+  member-level cell-temperature network is worse than the free network by 0.35, 0.23, and 0.21
+  CRPS points at the three lead bands (intervals exclude zero), exactly as the mean-sky term of
+  experiment 644 was. The 14-day tracker keeps 0.03 of its 0.34 gain when applied by forecast
+  sunniness, so its gain in experiment 644 depended on knowing the observed sunniness.
+lessons:
+  - >-
+    The loss of the explicit solar term is not caused by averaging the curve over the ensemble
+    mean sky or by ignoring the cell temperature: the member-level curve gains 0.02 to 0.04 points
+    over the mean-sky curve (not significant), and the cell temperature gains nothing (0.00).
+  - >-
+    The 14-day tracker's gain in experiment 644 vanishes when the correction is chosen from the
+    ensemble forecast's sunniness: 0.03 [-0.12, +0.17] at day 1-2, against 0.34 with observed
+    sunniness, and it does not beat a shuffled-error placebo by the bar.
+  - >-
+    On middays where forecast and observed sunniness disagree the observed-sunniness tracker still
+    gains 0.33 to 0.41 points and the forecast-sunniness tracker gains nothing, so the
+    observed-sunniness gain is consistent with a selection on the outcome, which a live service
+    cannot make (the slice does not separate the history from the gate).
+  - >-
+    The cell-temperature scale fitted on six metered farms sits at the weak-heating end of the
+    prior range (0.63 to 0.65 of the nominal Faiman rise), so the farms show less heat loss than
+    the nominal model.
+take_home_message: >-
+  Giving the demand network a solar-output curve computed for each of the 51 ensemble members, with
+  the panel temperature and not only the air temperature, still makes the sunny-midday forecast
+  worse than the plain network by 0.2 to 0.35 points of capacity, so the explicit-solar line stops.
+  The 14-day error correction that looked 0.3 to 0.6 points better in experiment 644 gains almost
+  nothing once it can only use the ensemble forecast's own sunniness, so its earlier gain probably
+  depended on knowing what actually happened.
+advice:
+  - >-
+    Do not build an explicit solar term into the ensemble-weather demand network, in mean-sky,
+    member-level, or cell-temperature form, because all four forms lost to the free network at every
+    lead band in experiments 644 and 655.
+  - >-
+    Do not carry the 14-day error correction into production on the strength of experiment 644,
+    because its gain needs the observed sunniness and fell to 0.03 points when applied by forecast
+    sunniness (655, tracker contrasts).
+  - >-
+    Apply any bias correction on a selection a live service could make, never on rows chosen by the
+    outcome being scored, and report its gain on the rows where the two selections disagree (655,
+    disagreement slice).
+production_status: not-for-production
+adopted_in: none
 ---
 
-# Does a member-level solar term with cell temperature, or a tracker by forecast sunniness, help?
+# Giving the network a per-member solar curve with cell temperature does not help, and the tracker's gain was selection
 
-**Planned, no result yet.** [Experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md)
-found that telling the demand network each Primary substation's solar capacity made its forecast
-worse than the plain network once the weather was an ensemble forecast. That experiment computed
-its solar curve from the ensemble-mean sunshine, with a cell temperature that depended on the output
-but not on the wind. Solar output is not a
-straight line in sunshine, so the curve at the mean sky is not the mean output over the ensemble's 51
-members, and the smooth mean also removes the spread caused by cloud edges. Cell temperature, not
-air temperature, sets how much a panel loses to heat, and it can be 20 K above air temperature on
-a sunny day. We ask whether a curve built per member, with a cell temperature, changes the verdict.
-We also ask whether the 14-day error correction of experiment 644, which that experiment applied
-on half-hours observed to be sunny, still works when it is applied on half-hours the ensemble
-forecast calls sunny, the only call a live service can make.
+**Telling the demand network how much solar capacity sits behind a Primary substation still makes its
+forecast for sunny middays worse than the plain network, even when the solar curve is computed for
+each of the 51 ensemble members and uses a cell temperature. The 14-day error correction that
+[experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md) found 0.3 to 0.6
+points better than the plain network gains 0.03 points once it can use only what the ensemble
+forecast says about sunniness.** We therefore stop the explicit-solar line, and we do not take the
+14-day correction forward.
 
-## Plan
+Experiment 644 built its solar curve from the ensemble-mean sunshine, and it applied the
+correction on half-hours observed to be sunny. We asked
+whether either choice caused those results. Part 1 computes the curve for each ensemble member
+(plane-of-array irradiance, a Faiman-model cell temperature, a 0.4% per degree derate, clipping at
+inverter capacity) and subtracts the member average. Part 2 applies the 14-day correction on
+half-hours the ensemble-mean forecast calls sunny. Both parts reuse experiment 644's rows, cutoffs,
+five seeds, and bars. The scores are the continuous ranked probability score (CRPS) in percent of
+effective capacity ("points"; smaller is better) on sunny middays (10:00 to 15:00 UTC, observed
+clear-sky index at least 0.7) of the 60 days after each of three cutoffs.
 
-**Size, one line per question.**
+## Results
 
-- Stored: fits and quantiles (private folder) and a member-level weather extract (1.5 GB).
-- Designs: more than one defensible; the member-level construction, the cell-temperature fit, and
-  the tracker's dating are fixed here.
-- Callers: imports experiments 48, 87, 397, 405, 428, 510, 554, 634, 638, 639, and 644, editing
-  none; the names are in Files.
-- Serving path and degradation rule: not touched. Asset graph: not touched.
+![Gain over the free network](gain_over_free.svg)
 
-**Standing practices followed.** Monthly refits (the fine-tune of each month, as experiment 644).
-Cleaned power only, with the flagged half-hours dropped, and the D15 and D18 cut not relevant
-(the six MW Primaries only). Fitted networks saved as `.pt` in the experiment's data folder. Stored
-predictions of experiment 644 reused for arms (a) and (b). Development months only: nothing dated
-2026-07-01 or later is read.
+| Sunny middays, CRPS (points) | Day 1-2 | Day 3-5 | Day 6-10 |
+|---|---|---|---|
+| Free network (a) | 3.75 | 4.28 | 5.05 |
+| Mean-sky term of experiment 644 (b) | 4.11 | 4.53 | 5.33 |
+| Mean-sky, new physics (c0) | 4.12 | 4.53 | 5.29 |
+| Member-level, air temperature (c) | 4.10 | 4.50 | 5.25 |
+| Member-level, cell temperature (d) | 4.10 | 4.51 | 5.26 |
+| Member-level, cell temperature, plus spread input (e) | 4.07 | 4.55 | 5.32 |
+| Capacity-permuted placebo on d | 4.22 | 4.67 | 5.45 |
+| Shuffled-day placebo on d | 5.26 | 5.51 | 6.09 |
+| 14-day tracker, observed sunniness (644's arm d) | 3.41 | 3.82 | 4.48 |
+| 14-day tracker, forecast sunniness (binary) | 3.72 | 4.35 | 5.17 |
+| 14-day tracker, forecast sunniness (continuous) | 3.71 | 4.31 | 5.15 |
+| Shuffled-error placebo of the binary tracker | 3.83 | 4.30 | 5.08 |
 
-**Departures from the brief, all small.**
+- **Part 1 fails the decision rule.** The free network minus arm (d) is -0.35 [-0.62, -0.16],
+  -0.23 [-0.47, -0.03], and -0.21 [-0.34, -0.06] (negative favours the free network; intervals are
+  99.9% day-block bootstraps, Bonferroni over 40 contrasts). Over all half-hours the difference is
+  -0.010 [-0.046, +0.025], inside the 0.02 limit, but arm (d) does not beat the free network.
+- **Members and cell temperature each add almost nothing.** Mean-sky (c0) minus member-level (c) is
+  +0.02 [-0.01, +0.05], +0.03 [0.00, +0.07], and +0.04 [-0.01, +0.09]. Air (c) minus cell
+  temperature (d) is -0.002 [-0.024, +0.014], -0.006, and -0.005. The spread input (e) is 0.03
+  better than (d) at day 1-2 [-0.06, +0.14] and worse at the other bands.
+- **The placebos lose as they should.** The capacity-permuted placebo is 0.12 [+0.01, +0.23],
+  0.16, and 0.19 worse than (d), above experiment 644's bars (0.084, 0.093, 0.123) but with lower
+  interval ends under them at day 1-2. The shuffled-day placebo is 0.8 to 1.2 worse.
+- **Part 2 fails the decision rule.** The free network minus the forecast-sunniness tracker is
+  +0.03 [-0.12, +0.17] at day 1-2, and -0.06 and -0.12 at days 3-5 and 6-10, against the required
+  +0.17, +0.23, and +0.285. The binary tracker beats its shuffled-error placebo by 0.11 [-0.05,
+  +0.27] at day 1-2 and loses to it at the later bands. The observed-sunniness tracker beats the
+  forecast-sunniness tracker by 0.32 [0.08, 0.57], 0.52, and 0.69.
+- **The observed-sunniness gain is consistent with a selection on the outcome.** On the 3,657 middays (day
+  1-2) where observed and forecast sunniness disagree, the free network minus the observed tracker
+  is +0.33 [+0.11, +0.64] (0.41 at day 3-5 and day 6-10), and minus the forecast tracker -0.01
+  [-0.17, +0.17].
 
-- Real world only. The brief names the real months' rows and bars; experiment 644's step world is
-  not repeated.
-- The cell-temperature scale is fitted once per cutoff against the farms, not once per Primary.
-  The metered farms (Solar A to F) are not located at the Primaries, so a per-Primary fit would be
-  a prior only.
-- Arm (c0) is added: the mean-sky curve with the new physics (tilt 20 degrees, air-temperature
-  derate). It separates "members" from "new physics" in the contrast of arm (c) with arm (b).
-- Experiment 644's curve already had clipping and a cell temperature (output-driven, no wind). The
-  new cell temperature differs by being driven by the plane-of-array irradiance and the member wind.
+![CRPS by lead day](crps_by_lead.svg)
 
-**Arms.**
+![Day-ahead forecast](example_day_ahead.svg)
 
-- (a) free network. (b) experiment 644's explicit network with the mean-sky, air-temperature
-  curve (calibrated capacity). Both are re-scored from experiment 644's stored quantiles.
-- (c0) explicit network, new physics, mean sky (ensemble-mean irradiance, temperature, and wind),
-  air temperature in the derate. (c) as (c0) but the curve is computed for each of the 51 members
-  and averaged. (d) as (c) but the derate uses a cell temperature. (e) as (d), plus one network
-  input, the standard deviation over members of the per-member curve.
-- (pd) capacity-permuted placebo and (sd) shuffled-day placebo, each on arm (d)'s curve, with
-  experiment 639's permutation and donor-day rules.
-- (f) the 14-day tracker (experiment 644's arm d, observed sunniness), re-scored from the stored
-  fits, beside (T-bin), the tracker on half-hours whose ensemble-mean clear-sky index (stored per
-  row by experiment 644, the same clear-sky model as the observed index) is at least 0.7;
-  (T-cont), weight `clip((kt - 0.5) / 0.3, 0, 1)` on the ensemble-mean index `kt`; and (T-shuf),
-  (T-cont-shuf), the same corrections with the correction series shuffled across the days of the
-  same Primary and cutoff. The tracker is applied to the free network (a). The history of a row
-  with origin date O holds the day-1 forecasts (lead below 24 hours) of the dates O-14 to O-1 on
-  half-hours the ensemble calls sunny (weighted for T-cont), so no history uses observed sunniness
-  or a date on or after O. Scoring stays on observed-sunny middays; the page also reports each
-  tracker's gain on middays where forecast and observed sunniness disagree.
+![Full horizon of one run](example_14_day.svg)
 
-**The physics, fixed here.**
+![The three curves](curve_example.svg)
 
-- Plane of array: Erbs split of the shortwave irradiance into direct and diffuse, then the plane of
-  array at tilt 20 degrees, azimuth 180 degrees (experiment 474's C1), by `studies.pv_physics`.
-- Direct-current to alternating-current ratio 1.15, clipped at the alternating-current capacity.
-- Derate: output times `1 - 0.004 (T - 25)`, floored at zero, where T is the air temperature (c0,
-  c) or the cell temperature (d, e, pd, sd).
-- Cell temperature: `T_air + s * G_poa / (25 + 6.84 * wind)`, with `G_poa` in W/m2, wind the 10 m
-  speed in m/s, and the constants of the Faiman model. The scale `s` is 1 in the nominal model.
-- The farm fit reads past-weather estimates (the irradiance and 2 m temperature of the frame of
-  experiment 39), and its fixed 3 m/s wind differs from the ensemble wind used in the arms. The
-  scale `s` is fitted per cutoff on the six farms' sunny-midday output (clear-sky index at
-  least 0.7, 10:00 to 15:00 UTC) before the cutoff, against the farm's irradiance and temperature
-  from the frame of experiment 39 and a fixed wind of 3 m/s, with a log-normal prior of standard
-  deviation 0.25 around 1, and a free amplitude per farm. The Primaries' own demand is never used. The fitted `s` and its posterior width are reported; if
-  `s` returns its prior, the page says that arm (d) against arm (c) cannot be resolved.
-- Each curve is divided by one constant per cutoff and arm: the 99th percentile, pooled over the
-  six Primaries, of the member-mean curve over daylight half-hours of the fine-tuning window. The
-  standard deviation over members that arm (e) takes as input is divided by the same constant and
-  then standardised on the fine-tuning rows.
-- The ensemble members, irradiance, temperature, and wind come from the archive of already
-  downloaded ensemble runs (`data/NWP`, 51 members, one 00:00 UTC run per day), cut to each Primary's
-  H3 cell and resampled to half-hours by `_upsample_nwp_to_half_hourly`, as experiment 48 did for the
-  cached summaries. The extract is checked against the cached summaries (mean over members equals
-  the cached mean to float precision) before any fit.
-- Fine-tuning starts from experiment 639's pretrained weights, which were pretrained with its
-  curve on estimates of past weather. The new curve is substituted at fine-tuning. Arm (b)
-  matches its pretraining and arms (c0) to (sd) do not, so contrasts against (a) and (b) mix the
-  curve with the mismatch. The contrasts (c) against (c0), (d) against (c0), and (d) against (c)
-  are free of it and are reported beside the decision-rule contrast. Re-pretraining is outside this
-  plan.
+## Checks
 
-**The 40 contrasts.** Per lead band (3 bands): d-a, d-b, d-c, c-c0, d-c0, e-d, d-pd, d-sd (24);
-T-bin-a, T-cont-a, T-bin-T-shuf, T-cont-T-cont-shuf, T-bin-f (15); plus d-a over all half-hours
-(1). Each is the control's CRPS minus the arm's.
+- **Median and mean forecast.** The median forecast minus the mean of the 11 quantiles averages
+  -0.2 to -1.2 points per Primary for arm (a) and -0.2 to -0.9 for arm (d), so both forecasts are
+  skewed in the same direction.
+- **Mean-forecast error beside the quantile score.** The mean absolute error of the median forecast
+  on sunny middays (points of capacity, mean over seeds) is 6.42 (a), 6.85 (b), 6.79 (d), 6.52
+  (forecast-sunniness tracker), and 5.67 (observed-sunniness tracker), so it ranks the arms as CRPS
+  does.
+- **Tails on sunny middays.** Coverage of the 0.05 quantile is 11.1% (a) and 9.3% (d), and of the
+  0.95 quantile 99.2% (a) and 98.9% (d), so the lower band is too narrow and the upper band is too
+  wide for all arms. Pinball loss at q01, q05, q95, and q99: 0.174, 0.700, 1.071, 0.291 (a) and
+  0.193, 0.752, 1.075, 0.287 (d).
+- **Leave one Primary out.** The free-minus-(d) contrast stays negative at every band when any one
+  of the six Primaries is left out (day 1-2 range -0.12 to -0.46).
+- **Audit triggers.** The shuffled-error placebo does not lose to the tracker by the bar (trigger
+  1), and the tracker result contradicts experiment 644 (trigger 2). The disagreement slice above is
+  the tested explanation. See the results review in the pull request for its findings.
+- **Confound in the disagreement slice.** The observed-sunniness tracker corrects only
+  observed-sunny rows and the forecast tracker only forecast-sunny rows, so the two are scored on
+  different corrected rows within one slice, and the observed tracker's gate uses the scored row's
+  own realised sunniness. A test that applies one tracker's history to the other's gate is not run.
+  A results review re-derived the three headline contrasts (-0.354, +0.025, and +0.34) with its own
+  code and matched them.
+- **Fitted cell-temperature scale.** The farms' posterior mean is 0.65 (standard deviation 0.047) at
+  the 2025-07 cutoff and 0.63 (0.024) at the other two, against a prior range of 0.61 to 1.65; the
+  data pull the scale to the range's weak-heating end.
 
-**Coverage of the ensemble archive.** The archive holds 953 daily 00:00 UTC runs from 2024-04-01 to
-2026-11-09 with no missing day. The development months need runs from 2024-04-01 (the start of the
-fine-tuning window of the first cutoff) to 2026-06-30, all present.
+## What the next experiment should answer
 
-**Compute.** The extract is CPU only. Fits: 6 new arms (c0, c, d, e, and the two placebos on d)
-over 5 months and 5 seeds is 150 fine-tunes of about 11 s each (experiment 644: 300
-fits in 0.94 GPU-hours), so about 0.5 GPU-hours, below the 4-hour ceiling.
+**Does any bias correction of the free network, built only from forecast-time information, beat the
+plain network on sunny middays?** The 14-day tracker does not, and the explicit solar term does not.
+The remaining sunny-midday error then needs a different input (for example a satellite cloud
+product) rather than a correction.
 
-**Reviews.** A Sonnet plan review, a Sonnet code review before the first fit, a Sonnet review of
-the results, and a Sonnet review of the write-up and its prose. Every review is a fresh agent that
-starts no sub-agent.
+## Departures and caveats
+
+- Real world only; experiment 644's step world is not repeated.
+- The cell-temperature scale is one value per cutoff for all six farms, not per Primary, because
+  the farms are not at the Primaries. Its air temperature is the ensemble-mean day-1 forecast (the
+  farm frame has no temperature), and its wind is a fixed 3 m/s.
+- Arms (c0) to (s) were fine-tuned from experiment 639's pretrained weights, which used the old
+  curve; only arm (b) matches its pretraining. Contrasts (c) against (c0), (d) against (c0), and
+  (d) against (c) are free of this mismatch, and they also show no gain.
+- The continuous tracker multiplies the correction by its weight as well as using the weight to
+  average the history.
+- The scoring rows keep experiment 644's selection on observed sunniness, which favours any arm
+  that knows the observed sunniness; this is why the tracker by observed sunniness is shown, not
+  proposed.
+- Per-seed mean absolute errors differ slightly from experiment 644's printed 6.33 for arm (a)
+  because this page averages the error per seed instead of the seeds' mean median.
+- Fewer than 3 dates of history give no correction to a tracker row.
 
 ## Method
 
-To be completed with the write-up.
+- **Architecture, arm (d):** experiment 554's modular mixture-density network (a weather encoder, a
+  date-time encoder, and a fresh fine-tuning mixer), with 16 Primary embeddings, outputs 3 mixture
+  components, then 11 quantiles. The weather inputs are the cached ensemble mean and standard
+  deviation of 7 variables (shortwave, longwave, 2 m temperature, dew point, surface pressure,
+  precipitation, 10 m wind speed); there are no power lags.
+- **The explicit term:** the network's target is the demand plus `C * u`, with `C` the Primary's
+  calibrated capacity in MW (experiment 639's `cal` arm, offset learned within a 0.25 MW prior) and
+  `u` the solar curve per MW divided by one constant per cutoff (the 99th percentile over
+  daylight half-hours of the 24 months before the cutoff, pooled over the six Primaries). The
+  same term is subtracted from every forecast quantile.
+- **The curve, per ensemble member:** Erbs split of the member's shortwave irradiance, plane of
+  array at tilt 20 degrees and azimuth 180 degrees, direct-current to alternating-current ratio
+  1.15 clipped at 1, then a derate of 0.4% per kelvin above 25 degrees C on the cell temperature
+  `T_air + s * G_poa / (25 + 6.84 * wind)`. The curve is averaged over the 51 members (a member
+  with a missing value is left out of the mean).
+- **Differences of the other arms:** (c0) uses the ensemble-mean sunshine, temperature, and wind
+  and an air-temperature derate; (c) averages the per-member curve with an air-temperature derate;
+  (e) adds one mixer input, the standard deviation over members of the curve, standardised; (p)
+  swaps the capacities across Primaries (experiment 639's permutation) and (s) takes the curve of
+  another date (same Primary, half-hour, and 21-day block of the year).
+- **Training regime:** each network starts from experiment 639's pretrained weights (ERA5 and CAMS
+  estimates of past weather), is fine-tuned on the 24 months of ensemble rows before the test
+  month with a 90-day recency half-life (experiment 554's arm M0), monthly refits, five seeds
+  (0 to 4), 150 fine-tunes in total, 0.49 GPU-hours on one GPU shared with another experiment.
+  Cleaned power only; the six MW Primaries. Experiment 644's farm-gap rows are dropped.
+- **Cell-temperature scale:** for each cutoff, the posterior mean over a grid of 81 values on
+  a log-normal prior (standard deviation 0.25 in the logarithm, range 0.61 to 1.65), with the
+  likelihood of the six farms' sunny-midday output (clear-sky index at least 0.7, 10:00 to 15:00
+  UTC, before the cutoff) counted once per farm-day and a free amplitude per farm.
+- **Tracker:** the free network (a) plus the weighted mean error of its day-1 forecasts (lead below
+  24 hours) over the 14 dates before the forecast's origin date, on midday half-hours whose
+  ensemble-mean clear-sky index is at least 0.7 (binary) or ramps from 0.5 to 0.8 (continuous), and
+  applied on the same half-hours. Shuffled placebos permute the correction across origin dates of
+  the same Primary and cutoff.
+- **Measurement:** the 60 days after 2025-07, 2026-03, and 2026-06 (July 2025, August 2025, March
+  2026, April 2026, and June 2026; nothing from 2026-07-01), every ensemble run at lead 0 to 240
+  hours, 336,520 half-hours over all hours and six Primaries. CRPS from the 11 quantiles (levels 0.01
+  to 0.99), averaged over seeds; day-block bootstrap intervals (2,000 resamples) at 1 - 0.05/40; bars
+  are experiment 644's. Row keys are asserted equal to experiment 644's.
+- **Audit checks:** listed under Checks.
 
 ## Files
 
-To be completed with the write-up.
+- `e00655_extract.py` (CPU): writes `extract/run=<date>.npz`, the 51-member shortwave, temperature,
+  and wind speed of each Primary for each daily run from the archive; checks three runs' member
+  means against the cached summaries.
+- `e00655_curves.py` (CPU): fits the cell-temperature scale, builds the curve tables
+  (`curves/<cutoff>/p<index>.npz`: c0, c, d, and the spread) for each cutoff.
+- `e00655_fit.py` (GPU): fine-tunes arms k (c0), c, d, e, p, and s and writes
+  `fits/<cutoff>/<month>_real_<arm>_s<seed>.pt`, `.npz` (quantiles), and `.json`.
+- `e00655_analyse.py`: scores every arm and tracker, the 40 contrasts, tails, and slices
+  (`analysis/contrasts.json`).
+- `e00655_report.py`: draws the figures and prints the quoted numbers.
+- Data, all under
+  `data/ml-experiments/00655-pv-member-level-cell-temperature-term-and-forecast-sunniness-tracker/work/`
+  and never committed: `extract/` (1.4 GB, read from `data/NWP`), `curves/`, `fits/`, `analysis/`,
+  `logs/`.
+- Reused from earlier experiments: [experiment 644](../00644-pv-explicit-term-with-ens-forecast-weather/result.md)
+  (rows, fits of arms a and b, tracker, scoring), [experiment 639](../00639-pv-explicit-hindcast-probe-set-capacity-step-world/result.md)
+  (pretrained weights, capacities, placebo rules), and the modules of experiments 48, 87, 397, 405,
+  428, 510, 554, 634, and 638.

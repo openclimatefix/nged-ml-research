@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001
+# ruff: noqa: E501
 """Experiment 655: score every arm and print the planned contrasts.
 
 Rows, CRPS, and the day-block bootstrap are experiment 644's (`e00644_analyse`, `e00639_analyse`).
@@ -111,7 +111,11 @@ def arm_crps(*, arm: str, rows: dict, seeds: tuple[int, ...]) -> np.ndarray:
     """Return CRPS (points) per seed and row: shape (seeds, rows)."""
     return np.stack(
         [
-            100.0 * a639.crps(actual=rows["y"].astype(np.float64), q=arm_quantiles(arm=arm, seed=s, rows=rows).astype(np.float64))
+            100.0
+            * a639.crps(
+                actual=rows["y"].astype(np.float64),
+                q=arm_quantiles(arm=arm, seed=s, rows=rows).astype(np.float64),
+            )
             for s in seeds
         ]
     )
@@ -122,7 +126,13 @@ def contrast(*, rows: dict, control: np.ndarray, arm: np.ndarray, mask: np.ndarr
     diff = (control - arm).mean(axis=0)
     mean, lo, hi = a639.bootstrap(diff=diff[mask], day=rows["day"][mask], level=LEVEL)
     per_seed = (control - arm)[:, mask].mean(axis=1)
-    return {"diff": mean, "lo": lo, "hi": hi, "n_rows": int(mask.sum()), "per_seed": per_seed.tolist()}
+    return {
+        "diff": mean,
+        "lo": lo,
+        "hi": hi,
+        "n_rows": int(mask.sum()),
+        "per_seed": per_seed.tolist(),
+    }
 
 
 PART1: Final[tuple[tuple[str, str], ...]] = (
@@ -142,14 +152,24 @@ def contrasts(*, seeds: tuple[int, ...]) -> dict:
     arms = ("a", "b", "k", "c", "d", "e", "p", "s", "f", "tb", "tc", "tbs", "tcs")
     scores = {arm: arm_crps(arm=arm, rows=rows, seeds=seeds) for arm in arms}
     disagree = rows["midday"] & (rows["sunny"] != rows["sunny_forecast"]) & rows["in_window"]
-    out: dict = {"seeds": list(seeds), "level": LEVEL, "n_contrasts": N_CONTRASTS, "bars": BARS, "scores": {}, "contrasts": {}, "extra": {}}
+    out: dict = {
+        "seeds": list(seeds),
+        "level": LEVEL,
+        "n_contrasts": N_CONTRASTS,
+        "bars": BARS,
+        "scores": {},
+        "contrasts": {},
+        "extra": {},
+    }
     slices = {**masks, "disagree": disagree}
     for name, mask in slices.items():
         out["scores"][name] = {arm: float(scores[arm][:, mask].mean()) for arm in arms}
     for band in BANDS:
         name = f"sunny_{band}"
         out["contrasts"][name] = {
-            f"{ctl}-{arm}": contrast(rows=rows, control=scores[ctl], arm=scores[arm], mask=masks[name])
+            f"{ctl}-{arm}": contrast(
+                rows=rows, control=scores[ctl], arm=scores[arm], mask=masks[name]
+            )
             for ctl, arm in (*PART1, *PART2)
         }
         dis = disagree & masks[f"allhh_{band}"]
@@ -159,14 +179,24 @@ def contrasts(*, seeds: tuple[int, ...]) -> dict:
         }
         out["extra"][f"lopo_{band}"] = {
             int(p): {
-                f"{ctl}-{arm}": contrast(rows=rows, control=scores[ctl], arm=scores[arm], mask=masks[name] & (rows["primary"] != p))["diff"]
+                f"{ctl}-{arm}": contrast(
+                    rows=rows,
+                    control=scores[ctl],
+                    arm=scores[arm],
+                    mask=masks[name] & (rows["primary"] != p),
+                )["diff"]
                 for ctl, arm in (("a", "d"), ("a", "tb"), ("k", "c"), ("c", "d"))
             }
             for p in np.unique(rows["primary"])
         }
-    out["contrasts"]["all_half_hours"] = {"a-d": contrast(rows=rows, control=scores["a"], arm=scores["d"], mask=masks["all"])}
+    out["contrasts"]["all_half_hours"] = {
+        "a-d": contrast(rows=rows, control=scores["a"], arm=scores["d"], mask=masks["all"])
+    }
     out["by_lead_day"] = {
-        str(dd): {arm: float(scores[arm][:, rows["sunny"] & (rows["lead_day"] == dd)].mean()) for arm in arms}
+        str(dd): {
+            arm: float(scores[arm][:, rows["sunny"] & (rows["lead_day"] == dd)].mean())
+            for arm in arms
+        }
         for dd in range(1, 11)
     }
     sun = rows["sunny"] & rows["in_window"]
@@ -176,7 +206,15 @@ def contrasts(*, seeds: tuple[int, ...]) -> dict:
         t = {"mae_median": float(np.mean([np.abs(q[:, 5] - rows["y"])[sun].mean() * 100 for q in qs])), "coverage_5_95": float(np.mean([((rows["y"] >= q[:, 1]) & (rows["y"] <= q[:, 9]))[sun].mean() for q in qs]))}  # fmt: skip
         for i, lev in ((0, "q01"), (1, "q05"), (9, "q95"), (10, "q99")):
             diff = [rows["y"] - q[:, i] for q in qs]
-            t[f"pinball_{lev}"] = float(np.mean([100 * np.where(d >= 0, k639.LEVELS[i] * d, (k639.LEVELS[i] - 1) * d)[sun].mean() for d in diff]))
+            t[f"pinball_{lev}"] = float(
+                np.mean(
+                    [
+                        100
+                        * np.where(d >= 0, k639.LEVELS[i] * d, (k639.LEVELS[i] - 1) * d)[sun].mean()
+                        for d in diff
+                    ]
+                )
+            )
             t[f"coverage_{lev}"] = float(np.mean([(rows["y"] <= q[:, i])[sun].mean() for q in qs]))
         out["tails_sunny"][arm] = t
     # Median minus mean forecast per Primary (arms a and d), a check for a spread that shifts the forecast.
@@ -184,7 +222,10 @@ def contrasts(*, seeds: tuple[int, ...]) -> dict:
     for arm in ("a", "d"):
         q = qs_all[arm][0]
         mean_q = q.mean(axis=1)
-        out["extra"]["median_minus_mean_q"][arm] = {int(p): float(100 * (q[:, 5] - mean_q)[rows["primary"] == p].mean()) for p in np.unique(rows["primary"])}
+        out["extra"]["median_minus_mean_q"][arm] = {
+            int(p): float(100 * (q[:, 5] - mean_q)[rows["primary"] == p].mean())
+            for p in np.unique(rows["primary"])
+        }
     out["share_without_realised_kt"] = float(rows["share_without_realised_kt"])
     return out
 

@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, PLR0912, PLR0915
+# ruff: noqa: E501, PT018, PLR0915
 """Experiment 655: fine-tune the member-level explicit solar networks and forecast the test months.
 
 The recipe is experiment 644's (`e00644_fit`), run on its real-world rows: a network starts from
@@ -63,7 +63,11 @@ class PvSpreadMdn(m.ModularMdn):
         super().__init__(n_primaries=n_primaries, stage="ft")
         wide = 2 * m.ENCODER_OUT + m.EMBEDDING
         self.mixer_ft = base.mlp(
-            n_in=wide + 7 + 2 + 1, hidden=m.MIXER_HIDDEN, layers=2, n_out=3 * m.COMPONENTS, dropout=m.DROPOUT
+            n_in=wide + 7 + 2 + 1,
+            hidden=m.MIXER_HIDDEN,
+            layers=2,
+            n_out=3 * m.COMPONENTS,
+            dropout=m.DROPOUT,
         )
         base.init_head(head=self.mixer_ft, components=m.COMPONENTS)
 
@@ -74,7 +78,9 @@ class PvSpreadMdn(m.ModularMdn):
         hw = nn.functional.gelu(self.weather(torch.cat([x[:, m.WEATHER_COLS], emb], dim=-1)))
         hd = nn.functional.gelu(self.datetime(torch.cat([x[:, m.DATETIME_COLS], emb], dim=-1)))
         core = torch.cat([hw, hd, emb], dim=-1)
-        return self.mixer_ft(torch.cat([core, x[:, m.SPREAD_COLS], x[:, m.LEAD_COLS], x[:, -1:]], dim=-1))
+        return self.mixer_ft(
+            torch.cat([core, x[:, m.SPREAD_COLS], x[:, m.LEAD_COLS], x[:, -1:]], dim=-1)
+        )
 
 
 class Bank:
@@ -140,7 +146,10 @@ def run_month(
     if smoke:
         idx = idx[::20]
     inj = k638.Injector(
-        primary=mr.primary[idx], target_idx=mr.target_idx[idx], x=mr.x[idx], standardiser=mr.base.standardiser
+        primary=mr.primary[idx],
+        target_idx=mr.target_idx[idx],
+        x=mr.x[idx],
+        standardiser=mr.base.standardiser,
     )
     keep = ~inj.gap
     y = mr.y[idx].astype(np.float64)
@@ -158,7 +167,10 @@ def run_month(
     ok &= np.isfinite(y_test)
     tid = np.flatnonzero(ok)
     tinj = k638.Injector(
-        primary=test.primary[tid], target_idx=test.target_idx[tid], x=test.x[tid], standardiser=mr.base.standardiser
+        primary=test.primary[tid],
+        target_idx=test.target_idx[tid],
+        x=test.x[tid],
+        standardiser=mr.base.standardiser,
     )
     tblk = d639._decorate(
         cutoff=cutoff, world="real", x=test.x[tid], y=y_test[tid].astype(np.float64),
@@ -214,6 +226,11 @@ def run_month(
         pre = spec["pre"]
         params = k639.capacity_parameters(cutoff=cutoff, arm=pre)
         tensors = net.parameter_tensors(params=params, six=six, device=DEVICE)
+        assert np.isfinite(u_tr).all() and np.isfinite(inc_tr).all() and np.isfinite(u_te).all(), (
+            arm,
+            np.isfinite(u_tr).mean(),
+            np.isfinite(inc_tr).mean(),
+        )
         u_inc_tr = _f32(u_tr * inc_tr)
         u_inc_te = _f32(u_te * inc_te)
         for seed in seeds:
@@ -223,21 +240,36 @@ def run_month(
                 continue
             started = time.monotonic()
             torch.manual_seed(seed)
-            model = (PvSpreadMdn(n_primaries=16) if spec.get("spread") else m.ModularMdn(n_primaries=16, stage="ft")).to(DEVICE)
+            model = (
+                PvSpreadMdn(n_primaries=16)
+                if spec.get("spread")
+                else m.ModularMdn(n_primaries=16, stage="ft")
+            ).to(DEVICE)
             pre_path = k639.explicit_weights_path(cutoff=cutoff, world="real", arm=pre, seed=seed)
             f644._load_for_finetune(model=model, path=pre_path)
             model.to(DEVICE)
             js = pre_path.with_suffix(".json")
-            init = torch.tensor(json.loads(js.read_text())["delta_mw"], dtype=torch.float32, device=DEVICE) if js.exists() else None
+            init = (
+                torch.tensor(
+                    json.loads(js.read_text())["delta_mw"], dtype=torch.float32, device=DEVICE
+                )
+                if js.exists()
+                else None
+            )
             epochs, best, delta = f644._train(
                 model=model, x=x_tr, y=g["y"], u_inc=u_inc_tr, r4=g["r4"], after=g["after"], p=g["p"], w=g["w"],
                 is_val=g["is_val"], mean=mean, std=std, tensors=tensors, seed=seed, init_delta=init,
             )  # fmt: skip
             p_test = torch.from_numpy(tblk.primary).to(DEVICE)
-            cap = net.capacity_mw(t=tensors, delta=delta, p=p_test, r4=_f32(tblk.r4), after=_f32(tblk.after))
+            cap = net.capacity_mw(
+                t=tensors, delta=delta, p=p_test, r4=_f32(tblk.r4), after=_f32(tblk.after)
+            )
             q = net.forecast(model=model, x=x_te, p=tblk.primary, mean=mean, std=std, subtract=(cap * u_inc_te).cpu(), device=DEVICE)  # fmt: skip
             if smoke:
-                print(f"SMOKE {cutoff} {month} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows", flush=True)
+                print(
+                    f"SMOKE {cutoff} {month} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows",
+                    flush=True,
+                )
                 continue
             out.parent.mkdir(parents=True, exist_ok=True)
             torch.save(model.state_dict(), out.with_suffix(".tmp"))
@@ -248,7 +280,10 @@ def run_month(
             out.with_suffix(".json").write_text(
                 json.dumps({"epochs": epochs, "val_nll": best, "seconds": round(time.monotonic() - started), "rows": len(tr.x), "delta_mw": delta.cpu().tolist(), "norm": bank.norm})
             )  # fmt: skip
-            print(f"{cutoff} {month} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows", flush=True)
+            print(
+                f"{cutoff} {month} {arm} s{seed}: {epochs} epochs, val NLL {best:.4f}, {time.monotonic() - started:.0f} s, {len(tr.x):,} rows",
+                flush=True,
+            )
             del model
     del g
     torch.cuda.empty_cache()
@@ -267,8 +302,19 @@ def main() -> None:
     clean = c.clean_stack()
     bank = Bank(cutoff=a.cutoff)
     for month in MONTHS[a.cutoff]:
-        run_month(cutoff=a.cutoff, month=month, arms=a.arms, seeds=a.seeds, clean=clean, bank=bank, smoke=a.smoke)
-    print(json.dumps({"done": a.phase, "cutoff": a.cutoff, "at": datetime.now(UTC).isoformat()}), flush=True)
+        run_month(
+            cutoff=a.cutoff,
+            month=month,
+            arms=a.arms,
+            seeds=a.seeds,
+            clean=clean,
+            bank=bank,
+            smoke=a.smoke,
+        )
+    print(
+        json.dumps({"done": a.phase, "cutoff": a.cutoff, "at": datetime.now(UTC).isoformat()}),
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PT018
 """Experiment 655: extract the 51-member weather of the six MW Primaries from the ensemble archive.
 
 For each daily 00:00 UTC run, the archive (`data/NWP`, 51 members) is cut to each of the six MW
@@ -108,14 +108,22 @@ def check() -> None:
         worst = 0.0
         for row in targets.iter_rows(named=True):
             s = summary.filter(pl.col("time_series_id") == row["time_series_id"]).sort("valid_time")
-            frame = pl.DataFrame({"valid_time": valid}).with_columns(
-                pl.col("valid_time").dt.replace_time_zone("UTC").dt.cast_time_unit("us"),
-                sw=z[f"p{row['primary']}_sw"].mean(axis=1),
-                t=z[f"p{row['primary']}_t"].mean(axis=1),
-                w=z[f"p{row['primary']}_w"].mean(axis=1),
-            ).join(s, on="valid_time", how="inner")
+            frame = (
+                pl.DataFrame({"valid_time": valid})
+                .with_columns(
+                    pl.col("valid_time").dt.replace_time_zone("UTC").dt.cast_time_unit("us"),
+                    sw=z[f"p{row['primary']}_sw"].mean(axis=1),
+                    t=z[f"p{row['primary']}_t"].mean(axis=1),
+                    w=z[f"p{row['primary']}_w"].mean(axis=1),
+                )
+                .join(s, on="valid_time", how="inner")
+            )
             assert frame.height > 400, frame.height
-            for mine, cached in (("sw", "mean_shortwave"), ("t", "mean_temperature_2m"), ("w", "mean_wind_speed_10m")):
+            for mine, cached in (
+                ("sw", "mean_shortwave"),
+                ("t", "mean_temperature_2m"),
+                ("w", "mean_wind_speed_10m"),
+            ):
                 err = float((frame[mine] - frame[cached]).abs().max())  # ty: ignore[invalid-argument-type]
                 scale = float(frame[cached].abs().max())  # ty: ignore[invalid-argument-type]
                 worst = max(worst, err / max(scale, 1.0))
