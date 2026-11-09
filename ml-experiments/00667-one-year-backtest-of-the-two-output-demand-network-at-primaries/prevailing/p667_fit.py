@@ -273,10 +273,10 @@ def fit_rhaz(*, month: str, seed: int, train_months: list[str]) -> str:
     real, bank = load(month=month, kind="real"), load(month=month, kind="bank")
     real_q, real_p = predict_rows(head=head, z=real, stats=stats, seed=seed, with_q=True)
     _none, bank_p = predict_rows(head=head, z=bank, stats=stats, seed=seed, with_q=False)
-    assert np.isfinite(real_q).all() and np.isfinite(real_p).all()
+    assert np.isfinite(real_q).all() and np.isfinite(real_p).all()  # ty: ignore[no-matching-overload]
     np.savez(
         out,
-        real_q=real_q,
+        real_q=real_q,  # ty: ignore[invalid-argument-type]
         real_p=real_p,
         bank_p=bank_p,
         val_log=np.array(log),

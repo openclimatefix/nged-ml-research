@@ -197,7 +197,7 @@ def build_bank(*, month: str, clean: np.ndarray, table, nb, n_days: int) -> None
     dt = {"prim": np.int8, "oi": np.int32, "vi": np.int32, "pass_": np.int16, "org": np.int32}
     out = {k: (v.astype(dt[k]) if k in dt else v) for k, v in cat.items()}
     np.savez(
-        HEAD_DATA / f"bank_{month}.npz", **out, feat=np.concatenate(feats),
+        HEAD_DATA / f"bank_{month}.npz", **out, feat=np.concatenate(feats),  # ty: ignore[invalid-argument-type]
         age=np.concatenate(ages), lag_age=np.concatenate(lag_ages),
         gate=np.zeros(n_org, bool), org_prim=np.concatenate(o_prims).astype(np.int8),
         org_oi=np.concatenate(o_ois).astype(np.int32), org_pass=np.concatenate(o_pass).astype(np.int16),

@@ -27,7 +27,7 @@ def main() -> None:
         prev = pl.read_parquet(exp.ROOT / "exports" / f"prevailing_{m}.parquet")
         assert prev.columns == nra.columns, (m, prev.columns)
         assert set(prev["NRA_or_prevailing"].unique()) == {"prevailing"}
-        parts += [nra, prev.cast(dict(nra.schema))]
+        parts += [nra, prev.cast(dict(nra.schema))]  # ty: ignore[no-matching-overload]
     df = pl.concat(parts).sort(KEY)
     assert df.schema == pl.Schema(SCHEMA), df.schema
     n_origin = 365
