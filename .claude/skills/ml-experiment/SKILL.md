@@ -190,6 +190,16 @@ model trains or scores on it.
   reference experiment's row keys may post to the leaderboard, as the `study` skill describes.
   The scoring script lives in the production repository, so a session here prepares the file and
   leaves the posting to a session there.
+- **Always report the normalised MAE of the median forecast.** Every metric table of every
+  experiment includes the mean absolute error of the median forecast, normalised as the family's
+  evaluation protocol defines, beside the experiment's own metrics.
+- **Report four scenarios for any experiment related to load-shift events.** This covers every
+  experiment that involves load-shifts even loosely, whatever the testing period. Score each arm
+  and each baseline separately on four sets of rows: all rows; rows outside events and at least 7
+  days after one; rows inside events; and the 7 days after an event ends. Give the performance
+  metrics for each scenario, and show an example time series of each scenario, from 14 days before
+  to at least 7 days after a real event where one exists. The plots follow the "Method" and
+  "Files" rules of the write-up, and anonymise any generator.
 
 **An experiment that finds leakage is `invalid`.** Change the verdict, say so in the first line of
 `result.md`, and leave the predictions, because another experiment may have read them.
