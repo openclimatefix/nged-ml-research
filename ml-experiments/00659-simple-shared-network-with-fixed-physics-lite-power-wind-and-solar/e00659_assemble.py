@@ -45,10 +45,22 @@ def keep_development(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def wind(*, arm: str) -> pl.DataFrame:
-    """Return one wind arm in the 615 layout."""
-    paths = sorted((common.DATA_DIR / "wind_fits").glob(f"{arm}_refit=*_seed=*.parquet"))
+def wind(*, arm: str, directory=None, pattern: str | None = None, name: str | None = None) -> pl.DataFrame:  # noqa: ANN001
+    """Return one wind arm in the 615 layout (fits of this experiment, or another folder's refits)."""
+    directory = directory or common.DATA_DIR / "wind_fits"
+    paths = sorted(directory.glob(pattern or f"{arm}_refit=*_seed=*.parquet"))
     frame = pl.concat([pl.read_parquet(p) for p in paths])
+    if "actual_norm" not in frame.columns:  # experiment 615's refits keep the observed power in the cases
+        cases = pl.concat(
+            [pl.read_parquet(common.E615_DIR / "wind_inputs" / f"cases_{f}.parquet") for f in SCORING]
+        ).select("site", "time_series_id", "power_fcst_init_time", "valid_time", "actual_norm")
+        frame = frame.join(
+            cases, on=["site", "time_series_id", "power_fcst_init_time", "valid_time"], validate="m:1"
+        )
+    if "actual_clean" not in frame.columns:  # experiment 615's refits: no idle-mask cleaning column
+        frame = frame.with_columns(
+            actual_clean=pl.when(pl.col("masked")).then(0.0).otherwise(pl.col("actual_norm"))
+        )
     scale = pl.col("site").replace_strict(
         {f: float(v["new_mw"]) for f, v in SCORING.items()}, return_dtype=pl.Float64
     )
@@ -65,7 +77,7 @@ def wind(*, arm: str) -> pl.DataFrame:
     keys = ["series", "init_time", "valid_time", "lead_hours"]
     out = sorted_mean(frame=frame, keys=keys, extra=["actual", "actual_raw", "masked"])
     out = keep_development(frame=out.filter(pl.col("actual_raw").is_finite()))
-    return out.with_columns(tech=pl.lit("wind"), candidate=pl.lit(f"wind_{arm}"))
+    return out.with_columns(tech=pl.lit("wind"), candidate=pl.lit(name or f"wind_{arm}"))
 
 
 def solar(*, arm: str) -> pl.DataFrame:
@@ -112,6 +124,20 @@ def main() -> None:
             ("all_rows", "actual_raw", False),
         ):
             rows.append({"candidate": f"wind_{arm}", "variant": variant, **scores(frame=table, actual=col, drop_masked=drop)})
+    for directory, name in (
+        (common.E615_DIR / "wind_default2", "wind_default2_old_capacity"),
+        (common.DATA_DIR / "wind_default2_730", "wind_default2_730"),
+    ):
+        if not list(directory.glob("refit=*_seed=*.parquet")):
+            continue
+        table = wind(arm="D2", directory=directory, pattern="refit=*_seed=*.parquet", name=name)
+        table.write_parquet(common.TABLE_DIR / f"{name}.parquet")
+        for variant, col, drop in (
+            ("cleaned_zeros", "actual", False),
+            ("kept_rows", "actual_raw", True),
+            ("all_rows", "actual_raw", False),
+        ):
+            rows.append({"candidate": name, "variant": variant, **scores(frame=table, actual=col, drop_masked=drop)})
     for arm in SOLAR_ARMS:
         table = solar(arm=arm).with_columns(masked=pl.lit(value=False))
         table.write_parquet(common.TABLE_DIR / f"solar_{arm}.parquet")
