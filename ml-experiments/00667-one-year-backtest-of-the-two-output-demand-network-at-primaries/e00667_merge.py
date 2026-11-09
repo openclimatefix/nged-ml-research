@@ -1,7 +1,7 @@
 # ruff: noqa: D103, E501, PT018
 """Experiment 667: write `primaries.parquet` from the NRA rows and the prevailing rows, and check it.
 
-Usage: python e00667_merge.py   (reads exports/NRA_<month>.parquet and exports/prevailing_<month>.parquet)
+Usage: python e00667_merge.py   (reads `exports/NRA_MONTH.parquet` and `exports/prevailing_MONTH.parquet`)
 """
 
 from datetime import UTC, datetime, timedelta

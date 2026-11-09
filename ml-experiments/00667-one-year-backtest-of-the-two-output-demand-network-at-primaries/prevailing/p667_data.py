@@ -1,12 +1,13 @@
 # ruff: noqa: ANN001, D103, E501
-"""Experiment 667, prevailing rows, step 2: build the head's real and bank rows for one fold month (CPU).
+"""Experiment 667, prevailing rows, step 2: build the head's rows for one fold month (CPU).
 
-A copy of experiment 647's `e00647_data.build_real` and experiment 650's `e00650_data.build_bank`,
-with the Candidate's quantiles (seed mean of the fold's two seeds, as a fraction of capacity) in
-place of K1's. Rows keep the leads from 3 h to below 339 h after the 09:00 network origin, which are
-the contract's valid times (12:00 on the origin day to 14 days later). Bank rows come from the
-injected passes written by `p667_inject.py`; only the even half-hours inside each event's window
-(7 days before the onset to 14 days after the end) are kept, as in experiment 650.
+A copy of experiment 647's `e00647_data.build_real` and experiment 650's
+`e00650_data.build_bank`, with the Candidate's quantiles (seed mean of the fold's two seeds, as a
+fraction of capacity) in place of K1's. Rows keep the leads from 3 h to below 339 h after the
+09:00 network origin, which are the contract's valid times (12:00 on the origin day to 14 days
+later). Bank rows come from the injected passes written by `p667_inject.py`; only the even
+half-hours inside each event's window (7 days before the onset to 14 days after the end) are
+kept, as in experiment 650.
 
 Writes `head_data/real_<month>.npz`, `head_data/bank_<month>.npz`, and
 `head_data/events_<month>.parquet` (the generator's events of every pass).
@@ -48,17 +49,20 @@ YEAR_END_IDX: Final[int] = int(
 
 
 def next_month_start_idx(*, month: str) -> int:
-    """Return the grid index of the first half-hour of the month after `month`, the earliest fold that may use this month's bank."""
+    """Return the grid index of the first half-hour of the month after `month`.
+
+    That month is the earliest fold that may use the bank of `month`.
+    """
     y, m = (int(v) for v in month.split("-"))
     return c650.month_start_idx(month=f"{y + (m == 12)}-{m % 12 + 1:02d}")
 
 
 def generator_view(*, clean: np.ndarray, month: str) -> np.ndarray:
-    """Return `clean` with every half-hour from the next month's start hidden, for the generator's means.
+    """Return `clean` with every half-hour from the next month's start hidden.
 
-    A proportional shift scales the Primary's own power by its mean over the event. Hiding the later
-    half-hours stops that mean reading observed power at or after the first fold that may use this
-    month's bank.
+    A proportional shift scales the Primary's own power by its mean over the event. Hiding the
+    later half-hours stops that mean reading observed power at or after the first fold that may
+    use this month's bank.
     """
     out = clean.copy()
     out[:, next_month_start_idx(month=month) :] = np.nan
@@ -71,7 +75,7 @@ def prim_of() -> dict[int, int]:
 
 
 def seed_mean_rows(*, directory, pattern: str) -> dict[str, np.ndarray]:
-    """Return (prim, oi, vi, lead, q) of the seed-mean quantiles of the parquet files `pattern` formats for s=0, 1."""
+    """Return (prim, oi, vi, lead, q) of the seed-mean quantiles of the files `pattern` names."""
     frames = [pl.read_parquet(directory / pattern.format(s=s)) for s in x667.SEEDS]
     mean = x667.seed_mean(frames=frames)
     pm = prim_of()

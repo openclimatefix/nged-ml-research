@@ -2,20 +2,21 @@
 """Experiment 620: pre-train, step-2, and fit K1 (class 1) on the final-test fold 2026-07 (GPU).
 
 A copy of experiment 613's `e00613_arm.py` (K1 with D5 and E3 only), with `e00667_fold` patched
-onto it so that the fold `2026-07` has one cutoff (2026-07-01) and the held-out power is hidden in
-the training phase. Development months still run unchanged. Original docstring:
+onto it so that the fold `2026-07` has one cutoff (2026-07-01) and the held-out power is hidden
+in the training phase. Development months still run unchanged. Original docstring:
 
-A wrapper over experiment 591's `e00591_arm.py` (arm A1: shared lag encoder with lag ID, no auxiliary
-loss), imported with its module state patched as experiment 599 did. The pretrained and step-2
-weights are experiment 591's stored A1 chain, read only. The arm sets the fine-tune recipe:
+A wrapper over experiment 591's `e00591_arm.py` (arm A1: shared lag encoder with lag ID, no
+auxiliary loss), imported with its module state patched as experiment 599 did. The pretrained and
+step-2 weights are experiment 591's stored A1 chain, read only. The arm sets the fine-tune
+recipe:
 
 - `--e3 1` (default): the daily fine-tune embargo is 7 days and the newest 7 days left after the
   embargo get half weight (experiment 599's E3); `--e3 0` keeps experiment 591's 3-day embargo;
-- `--synthetic 1` (default): lag-only synthetic load-shifts in the fine-tune rows (experiment 584's
-  C1); `--synthetic 0` uses the plain P5 rows.
+- `--synthetic 1` (default): lag-only synthetic load-shifts in the fine-tune rows (experiment
+  584's C1); `--synthetic 0` uses the plain P5 rows.
 
-Usage: python e00613_arm.py NAME {fit|inject} [--e3 0|1] [--synthetic 0|1] [--months ...] [--seeds ...]
-Outputs: `data/ml-experiments/00613-*/arms/NAME/work/{fits,inject,models}`.
+Usage: python e00613_arm.py NAME {fit|inject} [--e3 0|1] [--synthetic 0|1] [--months ...]
+[--seeds ...] Outputs: `data/ml-experiments/00613-*/arms/NAME/work/{fits,inject,models}`.
 """
 
 import argparse

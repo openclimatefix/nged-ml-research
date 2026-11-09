@@ -1,18 +1,19 @@
 # ruff: noqa: D103, E501, PT018
-"""Experiment 667 (copy of 620): extend experiment 437's weather-column tables to the final-test window.
+"""Experiment 667 (copy of 620): extend experiment 437's weather-column tables to 2026-10-31.
 
 The tables are per Primary (CPU, weather only).
 
 Experiment 437's tables hold, for every (forecast run, valid time), the trailing temperature and
-shortwave means, the clear-sky index and the CAMS previous-day irradiance (the B1 columns, bundles
-T and S), plus calendar and national columns. They stop before the window. This script rebuilds each
-table with experiment 437's own `site_table` from the extended ensemble summaries of experiment 607
-(runs to 2026-10-31) and the CAMS irradiance of 2019-09-01 to 2026-11-01. No power is read.
+shortwave means, the clear-sky index and the CAMS previous-day irradiance (the B1 columns,
+bundles T and S), plus calendar and national columns. They stop before the window. This script
+rebuilds each table with experiment 437's own `site_table` from the extended ensemble summaries
+of experiment 607 (runs to 2026-10-31) and the CAMS irradiance of 2019-09-01 to 2026-11-01. No
+power is read.
 
-`check` proves the extension changes nothing for the past: on every key that both the stored table
-and the rebuilt table hold, every column must be bit-equal. The national columns (prices to
-2026-10-12, demand to 2026-10-01, no data after those dates) are forward-filled by 437's code
-and are not read by K1, K3 or the candidate; the B1 columns do not use them.
+`check` proves the extension changes nothing for the past: on every key that both the stored
+table and the rebuilt table hold, every column must be bit-equal. The national columns (prices to
+2026-10-12, demand to 2026-10-01, no data after those dates) are forward-filled by 437's code and
+are not read by K1, K3 or the candidate; the B1 columns do not use them.
 
 Usage: python e00667_tables.py build | check
 """

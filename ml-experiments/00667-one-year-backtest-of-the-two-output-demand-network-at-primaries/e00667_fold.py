@@ -10,8 +10,8 @@ refits on days 0 and 14. The final-test fold `2026-07` differs in three ways:
 - in the training phase (`E00667_PHASE=train`) the cleaned power is set to NaN from 2026-07-01
   onwards, so no code path can read a held-out reading.
 
-`install(e)` patches the module of experiment 574 (`e00574_fit`, or a wrapper that exposes the same
-names) in place. Nothing in an earlier experiment's folder is edited.
+`install(e)` patches the module of experiment 574 (`e00574_fit`, or a wrapper that exposes the
+same names) in place. Nothing in an earlier experiment's folder is edited.
 """
 
 import os
@@ -39,10 +39,10 @@ def is_final(*, months) -> bool:
 
 
 def redirect_to_extended_inputs(e) -> None:
-    """Point the pipeline at the extended inputs (grid to 2026-11-10, raw matrices, ensemble summaries).
+    """Point the pipeline at the extended inputs (grid, raw matrices, ensemble summaries).
 
-    The held-out power is readable after this call, so it only runs in the prediction phase.
-    `e` is experiment 574's module (or experiment 565's, which exposes the same names).
+    The held-out power is readable after this call, so it only runs in the prediction phase. `e`
+    is experiment 574's module (or experiment 565's, which exposes the same names).
     """
     import e00667_extend as ext
 

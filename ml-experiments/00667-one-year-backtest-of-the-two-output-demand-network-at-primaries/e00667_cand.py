@@ -7,15 +7,16 @@ The final fold `2026-07` has one cutoff and, in the training phase, a hidden hel
 `e00667_fold`. The training noise of the signal columns is calibrated against the real inputs of
 2026-06, the last month before the cutoff, not against the held-out window. Original docstring:
 
-A wrapper around experiment 574's `e00574_fit.py`, as experiment 598's `e00598_arm.py` and experiment
-606's `e00606_arm.py` are, which this file copies and changes. The rows, recency weights, early
-stopping, seeds, scoring windows, origin-time weather assertions, refit days 0 and 14, the embargoed
-daily fine-tune with synthetic lag-only load-shifts, and the A1 chain's step-2 weights are experiment
-591's A1. What is new is the choice of signal columns (`e00613_nbsignals`) and the changes to the
-training of the lag encoder (`MODIFIERS`).
+A wrapper around experiment 574's `e00574_fit.py`, as experiment 598's `e00598_arm.py` and
+experiment 606's `e00606_arm.py` are, which this file copies and changes. The rows, recency
+weights, early stopping, seeds, scoring windows, origin-time weather assertions, refit days 0 and
+14, the embargoed daily fine-tune with synthetic lag-only load-shifts, and the A1 chain's step-2
+weights are experiment 591's A1. What is new is the choice of signal columns (`e00613_nbsignals`)
+and the changes to the training of the lag encoder (`MODIFIERS`).
 
-An arm name is a stage 1 base followed by modifiers joined with `+`, for example `B7+CF+D30`, and may
-end in `-p` (the placebo: each Primary reads another Primary's neighbours, a fixed derangement).
+An arm name is a stage 1 base followed by modifiers joined with `+`, for example `B7+CF+D30`, and
+may end in `-p` (the placebo: each Primary reads another Primary's neighbours, a fixed
+derangement).
 
 Usage: python e00613_nbarm.py ARM COMMAND [--months ...] [--seeds ...] [--passes ...]
 [--work-suffix X]
@@ -167,8 +168,8 @@ fold.install(e, months=MINE.months, reference_month=fold.PREVIOUS_MONTH)
 
 E3_EMBARGO_DAYS, DOWN_WEIGHT, DOWN_WEIGHT_DAYS = 7, 0.5, 7
 if MINE.e3 and CMD in {"fit", "inject"}:
-    # experiment 599's E3 in the daily fine-tune: no rows from the newest 7 days before the cutoff, and
-    # half the weight for the 7 days before those; the step-2 embargo stays at 3 days
+    # experiment 599's E3 in the daily fine-tune: no rows from the newest 7 days before the cutoff,
+    # and half the weight for the 7 days before those; the step-2 embargo stays at 3 days
     assert e.EMBARGO_DAYS == 3, "the base embargo is experiment 574's 3 days"
     e.EMBARGO_DAYS = E3_EMBARGO_DAYS
     _select_rows = e.c.select_rows
@@ -247,9 +248,11 @@ def origin_idx_of(*, origin_us: np.ndarray) -> np.ndarray:
 
 
 def build_month_syn(*, month, clean):
-    """Build the month's P5 rows with experiment 591's synthetic lag-only load-shifts in the lag columns.
+    """Build the month's P5 rows with experiment 591's synthetic lag-only load-shifts in the lag
+    columns.
 
-    The lag columns are exactly A1's. The synthetic power and its shift are kept for the signal block.
+    The lag columns are exactly A1's. The synthetic power and its shift are kept for the signal
+    block.
     """
     mr = _build_month_p5(month=month, clean=clean)
     origin_idx = origin_idx_of(origin_us=mr.origin_us)
@@ -304,9 +307,10 @@ def cross_fit_quantiles(
 ) -> np.ndarray:
     """Return `q_full`, with cross-fitted lags-masked quantiles on step 2's training rows.
 
-    Step 2's recipe is experiment 574's `step2` (the pre-trained weights, a fresh mixer, no recency
-    weighting, the embargoed rows up to the fold's cutoff). The rows are split into `CF_BLOCKS`
-    contiguous blocks by valid time; the network of block `b` is trained on the rows outside the block.
+    Step 2's recipe is experiment 574's `step2` (the pre-trained weights, a fresh mixer, no
+    recency weighting, the embargoed rows up to the fold's cutoff). The rows are split into
+    `CF_BLOCKS` contiguous blocks by valid time; the network of block `b` is trained on the rows
+    outside the block.
     """
     cut = e.c.month_start(month=month)
     refit = e.c.select_rows(rows=mr, cutoff=cut, half_life_days=e.UNIFORM_HALF_LIFE)
@@ -385,8 +389,9 @@ def ensure_tables(*, mr, test, month: str, seeds: list[int], device: str) -> Non
         if CROSSFIT:
             q_mr = cross_fit_quantiles(mr=mr, month=month, seed=seed, q_full=q_mr, device=device)
         n_grid = GRID_SHAPE[1]
-        # The table also holds the previous month's rows (origins before the cutoff), as the train phase's
-        # table does: without them the days before the cutoff, purged from training, have no lag-free forecast.
+        # The table also holds the previous month's rows (origins before the cutoff), as the train
+        # phase's table does: without them the days before the cutoff, purged from training, have no
+        # lag-free forecast.
         ref_prim, ref_origin, ref_target, ref_median = (np.empty(0, np.int64),) * 3 + (
             np.empty(0, np.float32),
         )
@@ -462,8 +467,8 @@ class FoldSignals:
         return {"x": t.x[:, :45], "prim": t.primary, "origin": t.origin_idx}
 
     def train_block(self) -> np.ndarray:
-        """Return the training rows' block: synthetic shifts in the own and neighbour power, training
-        noise where the training-to-test spread ratio is low. Cached.
+        """Return the training rows' block: synthetic shifts in the own and neighbour power,
+        training noise where the training-to-test spread ratio is low. Cached.
         """
         if self._train is not None:
             return self._train
@@ -694,7 +699,8 @@ def row_nll(*, out, z, p):
 
 
 def check_fingerprint(*, mr, month: str) -> None:
-    """Write the training standardiser and target statistics (train phase) or assert they are unchanged (predict phase).
+    """Write the training standardiser and target statistics (train phase) or assert they are
+    unchanged (predict phase).
 
     The predict phase reloads the network fitted in the train phase, so a standardiser built from
     different rows would shift every forecast silently.

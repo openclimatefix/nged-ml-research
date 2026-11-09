@@ -6,7 +6,7 @@ the absolute error of its median, both divided by the Primary's capacity and mul
 (points of capacity). Rows whose observed power is missing or flagged are not scored. Output:
 `score/<name>_by_band_month.csv` and `score/<name>_by_band_primary.csv`.
 
-Usage: python e00667_score.py NAME   (reads exports/<NAME>_<month>.parquet for the 12 months)
+Usage: python e00667_score.py NAME   (reads `exports/NAME_MONTH.parquet` for the 12 months)
 """
 
 import sys

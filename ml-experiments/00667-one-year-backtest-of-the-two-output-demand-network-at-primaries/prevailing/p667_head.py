@@ -1,5 +1,5 @@
 # ruff: noqa: D107, E501
-"""Experiment 667, prevailing rows: the survival-hazard head of experiment 652 with 14 daily hazards.
+"""Experiment 667, prevailing rows: the survival-hazard head of experiment 652, 14 daily hazards.
 
 A copy of `e00652_head` with `N_DAYS = 14`, so that the survival probability covers leads to 14
 days (the contract's longest valid time is 339 h after the network origin). Nothing else changes.

@@ -1,12 +1,12 @@
 # ruff: noqa: D103, E501
-"""Experiment 667, prevailing rows, step 4: write the contract rows of the prevailing forecast of each fold month.
+"""Experiment 667, prevailing rows, step 4: write the contract rows of each fold month.
 
-Reads the head's real-row quantiles (`fits/Rhaz_<month>_s<seed>.npz`, seed mean then sorted, or the
-fallback `fits/Bhaz_<month>.npz`) and turns them into the contract's columns with experiment 667's
-own `contract_rows` (origin relabelled 09:00 to 12:00, valid times 12:00 to +14 days, capacity in MW
-or MVA, 672 half-hours per series and origin), plus `NRA_or_prevailing = "prevailing"` as the last
-column. Writes `exports/prevailing_<month>.parquet` and appends the fold's method to
-`exports/prevailing_folds.csv`.
+Reads the head's real-row quantiles (`fits/Rhaz_<month>_s<seed>.npz`, seed mean then sorted, or
+the fallback `fits/Bhaz_<month>.npz`) and turns them into the contract's columns with experiment
+667's own `contract_rows` (origin relabelled 09:00 to 12:00, valid times 12:00 to +14 days,
+capacity in MW or MVA, 672 half-hours per series and origin), plus `NRA_or_prevailing =
+"prevailing"` as the last column. Writes `exports/prevailing_<month>.parquet` and appends the
+fold's method to `exports/prevailing_folds.csv`.
 
 Usage: python p667_export.py MONTH ...
 """

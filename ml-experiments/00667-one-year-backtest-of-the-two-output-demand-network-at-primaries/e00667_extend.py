@@ -1,13 +1,13 @@
 # ruff: noqa: E501, D103
-"""Experiment 667 (copy of experiment 620's): rebuild the per-Primary raw ensemble-summary matrices for runs to 2026-10-31.
+"""Experiment 667 (copy of 620's): rebuild the raw ensemble-summary matrices to 2026-10-31.
 
 Experiment 397's `write_raw` builds `work/raw/summary/<site>.npz` (feature matrix `x`, power over
 capacity `y`, `valid`, `origin`, and `lead`) from the control member's rows joined with the
 ensemble summary. The control member's frames stop at the run of 2026-06-29, so this script takes
-the keys and weather from the summary tables of experiment 607 (944 runs, 2024-04-01 to 2026-10-31)
-and everything else (solar angles, calendar, and capped lags) from the extended power grid. It
-writes to this experiment's data folder; no earlier file is edited. `check` compares the rebuilt
-rows with experiment 397's stored rows wherever both exist.
+the keys and weather from the summary tables of experiment 607 (944 runs, 2024-04-01 to
+2026-10-31) and everything else (solar angles, calendar, and capped lags) from the extended power
+grid. It writes to this experiment's data folder; no earlier file is edited. `check` compares the
+rebuilt rows with experiment 397's stored rows wherever both exist.
 
 Usage: python e00667_extend.py {build|check} [SITE ...]
 """
@@ -82,9 +82,10 @@ def build_site(*, site: str) -> dict[str, np.ndarray]:
         "origin": rows["power_fcst_init_time"].dt.epoch("us").to_numpy(),
         "lead": rows["lead_hours"].to_numpy().astype(np.float32),
     }
-    # Experiment 397's stored rows before 2025-07-01 are kept as they are, because the fold's training rows (and so
-    # its standardiser) must not change: before 2025-07-01 they hold every fifth day's run only,
-    # while the summary tables hold every day. Only the runs after the stored rows are added.
+    # Experiment 397's stored rows before 2025-07-01 are kept as they are, because the fold's
+    # training rows (and so its standardiser) must not change: before 2025-07-01 they hold every
+    # fifth day's run only, while the summary tables hold every day. Only the runs after the stored
+    # rows are added.
     old = np.load(prep.RAW_DIR / "summary" / f"{site}.npz")
     cut = int(REPLACE_FROM.timestamp() * 1_000_000) - 1
     before_old, after = old["origin"] <= cut, new["origin"] > cut

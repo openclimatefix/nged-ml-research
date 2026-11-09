@@ -1,16 +1,16 @@
 # ruff: noqa: D107, PT018, PLC3002, ANN001, D103, E501, PLR0915
-"""Experiment 667, prevailing rows, step 3: fit the head of fold month M on the banks of earlier months (CPU).
+"""Experiment 667, prevailing rows, step 3: fit the head of fold month M (CPU).
 
 Fold M's head is trained on the real rows and the injected bank rows of the fold months BEFORE M
 only, and only on rows whose valid time is before the first half-hour of M (so no target at or
-after the fold start is read). Early stopping uses origin days 21 onward of each training month; the
-origin days 0 to 17 train (experiment 650's split). The loss, optimiser, batch size, epochs, and
-patience are those of experiments 647 and 652, and the head is experiment 652's `R-haz` with 14 daily
-hazards (`p667_head`), on the mixture `m50` (shifts short and long in equal shares).
+after the fold start is read). Early stopping uses origin days 21 onward of each training month;
+the origin days 0 to 17 train (experiment 650's split). The loss, optimiser, batch size, epochs,
+and patience are those of experiments 647 and 652, and the head is experiment 652's `R-haz` with
+14 daily hazards (`p667_head`), on the mixture `m50` (shifts short and long in equal shares).
 
-Folds with fewer than `MIN_BANKS` earlier banks get `B-haz` instead: the Candidate's quantiles plus
-its own recent residual (experiment 647's `res`) times the conditional survival of the best curve
-fitted to the generator's synthetic shift durations. No observed power enters its fit.
+Folds with fewer than `MIN_BANKS` earlier banks get `B-haz` instead: the Candidate's quantiles
+plus its own recent residual (experiment 647's `res`) times the conditional survival of the best
+curve fitted to the generator's synthetic shift durations. No observed power enters its fit.
 
 Output `fits/<arm>_<month>_s<seed>.npz` (arm `Rhaz` or `Bhaz`): for the month's real rows, the
 quantiles `real_q` (sorted) and survival probability `real_p`; for its bank rows, the survival
@@ -289,7 +289,7 @@ def fit_rhaz(*, month: str, seed: int, train_months: list[str]) -> str:
 
 
 def generator_durations(*, month: str) -> tuple[np.ndarray, np.ndarray]:
-    """Return (durations in days, class weights) of the generator's draws for `month`, all 16 Primaries and 12 passes.
+    """Return (durations in days, class weights) of the generator's draws for `month`.
 
     The draws are synthetic and read no observed power.
     """

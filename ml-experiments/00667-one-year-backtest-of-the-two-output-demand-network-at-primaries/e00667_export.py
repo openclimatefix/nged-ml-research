@@ -6,7 +6,7 @@ origin is 12:00 UTC the same day, valid from 12:00 to 11:30 UTC 14 days later (6
 this module keeps the valid times in that window, labels `power_fcst_init_time` 12:00 UTC and
 `nwp_init_time` 00:00 UTC of the same day, averages the two seeds' quantiles, and sorts them.
 
-Usage: python e00667_export.py MONTH ...   (writes the NRA rows of each month to exports/NRA_<month>.parquet)
+Usage: python e00667_export.py MONTH ...   (writes the NRA rows of each month to `exports/NRA_MONTH.parquet`)
 """
 
 import sys
