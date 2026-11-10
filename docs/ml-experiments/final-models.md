@@ -490,8 +490,8 @@ one-year backtest at leads of 0 to 14 days, on the 3,879,313 half-hours that eve
   cold nights.
 - **Caveats.** The Candidate's settings were tuned on 5 of the 12 months, which favours the later
   steps, and the year overlaps the final-test window. The ladder is one order of adding components,
-  so the ladder says what each component adds given those already present, not what removing it from the
-  Candidate would cost. NGED's event labels are incomplete, so every event count is a lower bound.
+  so the ladder says what each component adds given those already present, not what removing it
+  from the Candidate would cost. NGED's event labels are incomplete, so every event count is a lower bound.
 
 ### Input tables
 
