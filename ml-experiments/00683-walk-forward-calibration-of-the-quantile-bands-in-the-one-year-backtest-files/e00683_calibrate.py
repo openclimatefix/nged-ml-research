@@ -89,6 +89,8 @@ def fit_month(
     shift = np.zeros(n_series)
     count = np.zeros((n_series, 4), dtype=np.int64)
     clipped = np.zeros((n_series, 4), dtype=bool)
+    clipped3 = np.zeros((n_series, 4), dtype=bool)
+    used = np.zeros((n_series, 4), dtype=np.int64)
     for i in range(n_series):
         sel_i = window & (row == i)
         if len(np.unique(vidx[sel_i] // 48)) < MIN_FIT_DAYS:
@@ -109,7 +111,17 @@ def fit_month(
                 scale2[i, b] = np.clip(raw2, *SCALE_BOUNDS)
                 scale3[i, b] = np.clip(raw3, *SCALE_BOUNDS)
                 clipped[i, b] = not (SCALE_BOUNDS[0] < raw2 < SCALE_BOUNDS[1])
-    return {"scale2": scale2, "scale3": scale3, "shift": shift, "count": count, "clipped": clipped}
+                clipped3[i, b] = not (SCALE_BOUNDS[0] < raw3 < SCALE_BOUNDS[1])
+                used[i, b] = len(z2)
+    return {
+        "scale2": scale2,
+        "scale3": scale3,
+        "shift": shift,
+        "count": count,
+        "clipped": clipped,
+        "clipped3": clipped3,
+        "used": used,
+    }
 
 
 def apply_arm(
@@ -227,7 +239,10 @@ def main(name: str, kind: str | None) -> None:  # noqa: PLR0915
                 "origin_month": m,
                 "band": BAND_LABELS[k],
                 "fit_rows": int(fit["count"][i, k]),
+                "fit_rows_after_half_width_filter": int(fit["used"][i, k]),
+                "fallback_scale_1": bool(fit["used"][i, k] == 0),
                 "arm2_clipped": bool(fit["clipped"][i, k]),
+                "arm3_clipped": bool(fit["clipped3"][i, k]),
                 "scale_arm2": float(fit["scale2"][i, k]),
                 "scale_arm3": float(fit["scale3"][i, k]),
                 "shift_arm3_pct_capacity": float(fit["shift"][i]),
