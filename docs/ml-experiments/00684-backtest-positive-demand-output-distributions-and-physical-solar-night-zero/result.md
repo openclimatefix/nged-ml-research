@@ -36,8 +36,8 @@ decision_rule: >-
   series. Solar passes if P4 holds at both farms. A worsening of 0.01 to 0.05 points fails P2 without
   triggering the stop rule, and is reported as a cost. A change is read against the Gaussian refit,
   whose distance from the stored files is the seed noise floor. The model-level fix is compared
-  with the post hoc clamp of the stored files as a fourth arm. No ranking beyond that, and no claim of benefit
-  from two test months.
+  with the post hoc clamp of the stored files as a fourth arm. No ranking beyond that, and no claim
+  of benefit from two test months.
 benchmark: >-
   The stored forecasts of experiment 667 (demand, normal-running output) and experiment 666 (solar),
   with and without the post hoc clamp of the stored backtest files.
@@ -60,10 +60,10 @@ half-hour's own sun position (solar), and whether the refit costs accuracy.
 ## Plan
 
 **Scope.** Demand: Primaries with ids 14, 15, and 26 (MVA, median within one band-width of zero on
-65% to 97% of rows, upper half-width 1.2 to 1.5 times the lower) and id 17 (MW, observed power
-never negative, kept as a control that must not get worse). Solar: Solar B and Solar E. Original ids stay out of this page. Only the normal-running (NRA) output of
-experiment 667 is refitted. The prevailing output mixes the NRA quantiles with a shifted copy, so a
-fix there waits for the NRA result.
+65% to 97% of rows, upper half-width 1.2 to 1.5 times the lower) and id 17 (MW, observed power never
+negative, kept as a control that must not get worse). Solar: Solar B and Solar E. Original ids stay
+out of this page. Only the normal-running (NRA) output of experiment 667 is refitted. The prevailing
+output mixes the NRA quantiles with a shifted copy, so a fix there waits for the NRA result.
 
 **Demand arms.** Each arm is a refit of experiment 667's Candidate on two folds, with test months
 2026-02 and 2026-05 (the fold recipe is experiment 667's, monthly refit, 2 seeds, D15 and D18 cut
@@ -84,19 +84,19 @@ the Gaussian mixture, so a Gaussian mixture also remains for ids 10 and 12, whic
   component's mean and coefficient of variation read from the head's outputs. The negative log
   likelihood uses the gamma log density (observed power is clipped to 1e-4 of capacity), and the
   quantiles are read by bisection on the mixture's cumulative distribution (the regularised
-  incomplete gamma function). A log-normal mixture is not run: the log-normal mixture needs a positive offset that
+  incomplete gamma function). A log-normal mixture is not run: it would need a positive offset that
   re-creates negative quantiles.
 
 **What is refitted.** The Candidate's `fit` loads the K1 chain's step-2 weights and continues them,
 so the mixer is not re-initialised there. A new output family therefore re-runs the chain from the
-step-2 stage: `step2`, `table`, `fit`, `ptable`, and `pfit` of `chain.sh`, per fold and seed, under a
-new `E00667_ROOT`. The encoder pre-training (`pretrain`) is reused unchanged, so the encoders were
+step-2 stage: `step2`, `table`, `fit`, `ptable`, and `pfit` of `chain.sh`, per fold and seed, under
+a new `E00667_ROOT`. The encoder pre-training (`pretrain`) is reused unchanged, so the encoders were
 pre-trained under the Gaussian loss, and the write-up says so. The new loss must be patched into
 `step2` and `fit` (`e.row_nll`), and the cross-fit tables keep the Gaussian read-out because they
 only supply the Candidate's inputs; the code review checks both. The check that comes first in
 implementation is that a Gaussian-loss run of this chain reproduces experiment 667's stored
-quantiles on one fold to within seed-level differences. If the check fails, the plan is revised
-and the manager told.
+quantiles on one fold to within seed-level differences. If the check fails, the plan is revised and
+the manager told.
 
 **Injecting the family.** `mixture_nll` and `mixture_quantiles` see only the standardised target, so
 the implementation passes the Primary index and the per-Primary target mean and standard deviation
@@ -144,9 +144,9 @@ not arise because the inputs are the ENS forecast and the lags are at least 24 h
 experiment 667.
 
 **Compute.** About 2 GPU-hours for the demand refits (three chains of two folds, each about 0.3 of
-experiment 667's 0.5 GPU-hours per fold without the encoder pre-training) and about 20 minutes for solar, inside the
-ceiling of 4 GPU-hours, with one GPU process at a time and at most 4 CPU cores, sharing the GPU with
-experiment 677.
+experiment 667's 0.5 GPU-hours per fold without the encoder pre-training) and about 20 minutes for
+solar, inside the ceiling of 4 GPU-hours, with one GPU process at a time and at most 4 CPU cores,
+sharing the GPU with experiment 677.
 
 **Reviews.** One Sonnet plan review, one Sonnet code review before the first fit, a Sonnet check of
 the printed numbers, and one Sonnet prose review. The audit triggers are run on the results.
