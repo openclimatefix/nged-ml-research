@@ -12,9 +12,9 @@ Per cutoff index the features are (names in `FEATURE_NAMES`):
 - `step_<w>`: D4, the block mean ending at `t` minus the block mean ending w half-hours earlier, in
   noise units.
 - `cstep_<w>`: the same step with the all-Primaries median step removed.
-- `mir_12`, `mir_48`, `mir_dt`: D2, the largest value over the electrical neighbours of minus the sign
-  of the Primary's own step times the neighbour's step (neighbour signal read from `gap_sig`), and the
-  hours between the Primary's last 2-noise-unit step and that neighbour's.
+- `mir_12`, `mir_48`, `mir_dt`: D2, the largest value over the electrical neighbours of minus the
+  sign of the Primary's own step times the neighbour's step (neighbour signal read from
+  `gap_sig`), and the hours between the Primary's last 2-noise-unit step and that neighbour's.
 - `cu_depth`, `cu_age`, `cu_ratio`, `cu_ret`: D5 and D6, a two-sided cumulative-sum detector over
   the previous 24 six-hour blocks of the common-mode-removed level: the depth at the excursion's
   extreme, hours since the excursion started, the sum over its threshold, and the return towards the
@@ -50,9 +50,12 @@ N_FEATURES: Final[int] = len(FEATURE_NAMES)
 
 
 def block_unit(*, gaps: list[np.ndarray], w: int) -> np.ndarray:
-    """Return per Primary 1.4826 x the median absolute deviation of consecutive non-overlapping w-block mean differences.
+    """Return the per-Primary noise unit of the w-block mean differences.
 
-    `gaps` holds one (Primary, time) array per development month; differences are pooled over months.
+    The unit is 1.4826 x the median absolute deviation of consecutive non-overlapping differences.
+
+    `gaps` holds one (Primary, time) array per development month; differences are pooled over
+    months.
     """
     n_p = gaps[0].shape[0]
     pooled: list[list[np.ndarray]] = [[] for _ in range(n_p)]
@@ -143,7 +146,10 @@ def build_grids(
 def features_at(
     *, g: Grids, prim: np.ndarray, t: np.ndarray, neighbours: dict[int, list[int]]
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return ((n, N_FEATURES) features, (n,) explicit flag) at cutoff grid indices `t` (absolute); reads indices <= t only."""
+    """Return the (n, N_FEATURES) features and the (n,) explicit flag at cutoff grid indices `t`.
+
+    The indices are absolute, and the function reads indices <= t only.
+    """
     i = (t - g.start).astype(np.int64)
     assert (i >= 0).all()
     n = len(prim)

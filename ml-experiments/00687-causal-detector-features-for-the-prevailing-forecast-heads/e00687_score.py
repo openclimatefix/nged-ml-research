@@ -1,14 +1,15 @@
 # ruff: noqa: E501, D103, PLR0915, F841
 """Experiment 687, step 3: score every arm by origin state, lead band, and reaction time (CPU).
 
-Arms: `K1` (the NRA output), `R0-168`, `R652` (experiment 652's stored R-haz m50 fit, the gate), and the
-fits of `e00687_fit.ARMS`. Equal width scaling is that of experiment 652 (one factor per arm, month,
-set, and seed, fitted on all scored rows pooled across strata). Lead bands: `d1` (24 to 48 h), `d2_4`
-(48 to 120 h), `d5_10` (120 to 240 h).
+Arms: `K1` (the NRA output), `R0-168`, `R652` (experiment 652's stored R-haz m50 fit, the gate),
+and the fits of `e00687_fit.ARMS`. Equal width scaling is that of experiment 652 (one factor per
+arm, month, set, and seed, fitted on all scored rows pooled across strata). Lead bands: `d1` (24
+to 48 h), `d2_4` (48 to 120 h), `d5_10` (120 to 240 h).
 
-Writes to `score/`: `agg.parquet` (weighted sums by month, set, arm, seed, stratum, band: CRPS scaled
-and unscaled, absolute error of the median, coverage, tail pinball loss, false-alarm count), `reaction.parquet`
-(per event, arm, seed: start and end reaction in origin days, censored), and `cost.csv`.
+Writes to `score/`: `agg.parquet` (weighted sums by month, set, arm, seed, stratum, band: CRPS
+scaled and unscaled, absolute error of the median, coverage, tail pinball loss, false-alarm
+count), `reaction.parquet` (per event, arm, seed: start and end reaction in origin days,
+censored), and `cost.csv`.
 
 Usage: python e00687_score.py
 """

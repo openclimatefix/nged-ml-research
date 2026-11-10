@@ -1,13 +1,16 @@
 # ruff: noqa: ANN001, D103, PLR0915, E501
-"""Experiment 687, step 2: fit the hazard head of experiment 652 with detector features or extra lags (CPU).
+"""Experiment 687, step 2: fit the hazard head with detector features or extra lags (CPU).
 
-Arms (`ARMS`): `B0` (experiment 652's R-haz, refitted), `B0x` (B0 with L1's age rule), `B0g` (B0 with F1's age rule and no extra columns),
-`L1` (experiment 681's lag block), `F1` (features D1 to D6 at the day lag, week lag, and the 6-hour
-cutoff), `F1d46` (D4 to D6 at the 6-hour cutoff only), `F2` (F1 plus the explicit flag), `P` (F1 with
-every feature from an unrelated Primary), `F1h4` (F1 with the 4-hour cutoff), and `F1nd` (F1 without
-dropout). Training data, folds, optimiser, loss, and early stopping are those of experiment 652's
-`e00652_fit.py`; the extra inputs are appended to the origin-level raw inputs, and the age input
-(which gates the survival probability) is the larger of the day-lag age and the arm's own newest-reading age.
+The hazard head is the one of experiment 652.
+
+Arms (`ARMS`): `B0` (experiment 652's R-haz, refitted), `B0x` (B0 with L1's age rule), `B0g` (B0
+with F1's age rule and no extra columns), `L1` (experiment 681's lag block), `F1` (features D1 to
+D6 at the day lag, week lag, and the 6-hour cutoff), `F1d46` (D4 to D6 at the 6-hour cutoff only),
+`F2` (F1 plus the explicit flag), `P` (F1 with every feature from an unrelated Primary), `F1h4`
+(F1 with the 4-hour cutoff), and `F1nd` (F1 without dropout). Training data, folds, optimiser,
+loss, and early stopping are those of experiment 652's `e00652_fit.py`; the extra inputs are
+appended to the origin-level raw inputs, and the age input (which gates the survival probability)
+is the larger of the day-lag age and the arm's own newest-reading age.
 
 Output per fit, `fits/<arm>_<month>_s<seed>.npz` (same keys as experiment 652) and `fits/<...>.pt`.
 

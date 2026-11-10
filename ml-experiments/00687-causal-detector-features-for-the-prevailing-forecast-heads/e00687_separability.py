@@ -1,12 +1,13 @@
 # ruff: noqa: E501, D103, ANN001
 """Experiment 687, step 1: does adding D1 to D5 separate 'this lag lies inside an injected shift'?
 
-Logistic regression on each input and its absolute value (shift signs are random), standardised inputs, folds that hold out the scored month. Three scorers:
-`base` (experiment 606's origin summaries), `plus` (summaries plus D1 to D5 at the day and week
-cutoffs), and `placebo` (summaries plus D1 to D5 of an unrelated Primary of the same metering group).
-Rows are the bank's origins. AUROC is reported per bank version, per lag label, and per family
-(training passes below 200, held-out passes from 200), with a month-block bootstrap (5 blocks) and an
-event-block bootstrap (Primary x pass).
+Logistic regression on each input and its absolute value (shift signs are random), standardised
+inputs, folds that hold out the scored month. Three scorers: `base` (experiment 606's origin
+summaries), `plus` (summaries plus D1 to D5 at the day and week cutoffs), and `placebo` (summaries
+plus D1 to D5 of an unrelated Primary of the same metering group). Rows are the bank's origins.
+AUROC is reported per bank version, per lag label, and per family (training passes below 200,
+held-out passes from 200), with a month-block bootstrap (5 blocks) and an event-block bootstrap
+(Primary x pass).
 
 Usage: python e00687_separability.py
 """

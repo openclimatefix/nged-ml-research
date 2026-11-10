@@ -1,5 +1,8 @@
-# ruff: noqa: E501, D103
-"""Experiment 687: causality check. Perturbing the gap after the cutoff must not change any feature at the cutoff."""
+# ruff: noqa: D103
+"""Experiment 687: causality check.
+
+Perturbing the gap after the cutoff must not change any feature at the cutoff.
+"""
 
 import e00687_features as f
 import numpy as np

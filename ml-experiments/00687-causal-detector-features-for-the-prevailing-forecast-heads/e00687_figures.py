@@ -1,5 +1,9 @@
 # ruff: noqa: E501, D103, ANN001, RUF059, PERF401
-"""Experiment 687: figures. Writes SVGs to docs/ml-experiments/00687-*/ (run `npx svgo@4 --multipass --precision=1 --final-newline` after)."""
+"""Experiment 687: figures.
+
+Writes SVGs to docs/ml-experiments/00687-*/. Run
+`npx svgo@4 --multipass --precision=1 --final-newline` on them after.
+"""
 
 import json
 from pathlib import Path

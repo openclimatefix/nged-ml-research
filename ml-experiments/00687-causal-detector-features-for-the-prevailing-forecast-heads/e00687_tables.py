@@ -1,16 +1,19 @@
 # ruff: noqa: E501, D103
-"""Experiment 687, step 1: causal feature tables for the stored banks of experiments 650 and 652 (CPU).
+"""Experiment 687, step 1: causal feature tables for the stored banks (CPU).
 
-For each development month, writes `feats/<month>_<bank>.npz` where `<bank>` is `M` (the stored bank,
-neighbour signals carry the mirror), `X` (no mirror: neighbour signals read the neighbour's unshifted power), `S` (mirror at 60% of its stored strength), or `real` (experiment 647's real rows, no shift).
-Keys, with one row per (pass, origin, Primary) of the *full grid* of that month's origins and all 16
-Primaries, so a placebo can read another Primary's row:
+The stored banks are those of experiments 650 and 652.
+
+For each development month, writes `feats/<month>_<bank>.npz` where `<bank>` is `M` (the stored
+bank, neighbour signals carry the mirror), `X` (no mirror: neighbour signals read the neighbour's
+unshifted power), `S` (mirror at 60% of its stored strength), or `real` (experiment 647's real
+rows, no shift). Keys, with one row per (pass, origin, Primary) of the *full grid* of that month's
+origins and all 16 Primaries, so a placebo can read another Primary's row:
 
 - `prim`, `oi`, `pass_`: the row's key.
 - `feat` (n, 4, N_FEATURES), `flag` (n, 4): the features and the explicit flag at the four cutoffs
   `day` (origin - 48), `week` (origin - 336), `new4` (origin - 8), and `new6` (origin - 12).
-- `lags` (n, 8), `lags_miss` (n, 8): the residual (x10, clipped) of the power at 6, 9, 12, 18, 24, 36,
-  48, and 72 hours before the origin (experiment 681's L1 block).
+- `lags` (n, 8), `lags_miss` (n, 8): the residual (x10, clipped) of the power at 6, 9, 12, 18, 24,
+  36, 48, and 72 hours before the origin (experiment 681's L1 block).
 - `in_day`, `in_week`, `in_new4` (n,): 1 where that cutoff lies inside the Primary's injected shift
   (zero for `real`).
 
