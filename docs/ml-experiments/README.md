@@ -20,6 +20,8 @@ started. A folder holds `result.md` and its figures.
   and cope with drift in the demand level.
 - **[Generator forecasting](themes/generator-forecasting/index.md):** Forecasting the output of
   solar and wind farms.
+- **[Gross-demand simulation](themes/gross-demand-simulation/index.md):** Whether a simulator of
+  the assets behind a substation, fitted to its metered power, would be useful to NGED.
 - **[Hierarchy and pooling](themes/hierarchy-and-pooling/index.md):** Forecasts that share
   information across substations or across levels of the electricity network hierarchy.
 - **[Lagged power and error correction](themes/lagged-power-and-error-correction/index.md):** Where
