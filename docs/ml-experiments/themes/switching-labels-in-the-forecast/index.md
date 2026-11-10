@@ -1,5 +1,8 @@
 # Load-shift labels in the forecast
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **Giving the Primary demand forecast switching labels has not yet improved it on real data. On
 injected transfers it recovers the lost accuracy only when the megawatts (MW) moved are known: it
 closes 83% of the extra error with the true MW, against 16% (interval -17% to +67%, so not

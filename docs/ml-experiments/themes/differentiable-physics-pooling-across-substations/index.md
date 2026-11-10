@@ -1,5 +1,8 @@
 # Differentiable physics: pooling across substations
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **The summary of this theme is in progress.** The differentiable-physics series builds models from
 physical terms (demand, heating, solar) whose parameters are fitted by gradient descent. This theme
 covers whether one such model fitted across many Primary substations can match a model per

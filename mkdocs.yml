@@ -134,10 +134,12 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/state-and-next-steps.md
           - Embedded generation:
               - Summary: ml-experiments/themes/differentiable-physics-embedded-generation/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-embedded-generation/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-embedded-generation/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-embedded-generation/state-and-next-steps.md
           - Long history and drift:
               - Summary: ml-experiments/themes/differentiable-physics-long-history-and-drift/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-long-history-and-drift/experiments.md
@@ -146,10 +148,12 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-pooling-across-substations/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-pooling-across-substations/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-pooling-across-substations/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-pooling-across-substations/state-and-next-steps.md
           - Forecast engine:
               - Summary: ml-experiments/themes/differentiable-physics-forecast-engine/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-forecast-engine/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-forecast-engine/plan.md
+              - State and next steps: ml-experiments/themes/differentiable-physics-forecast-engine/state-and-next-steps.md
           - Network:
               - Summary: ml-experiments/themes/differentiable-physics-network/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-network/experiments.md
@@ -200,6 +204,7 @@ nav:
           - Summary: ml-experiments/themes/switching-labels-in-the-forecast/index.md
           - Experiments: ml-experiments/themes/switching-labels-in-the-forecast/experiments.md
           - Research plan: ml-experiments/themes/switching-labels-in-the-forecast/plan.md
+          - State and next steps: ml-experiments/themes/switching-labels-in-the-forecast/state-and-next-steps.md
       - Weather products and blending:
           - Summary: ml-experiments/themes/weather-products-and-blending/index.md
           - Experiments: ml-experiments/themes/weather-products-and-blending/experiments.md
