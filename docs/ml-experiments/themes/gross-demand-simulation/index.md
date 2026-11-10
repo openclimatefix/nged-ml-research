@@ -2,9 +2,9 @@
 
 **It is worth running one small known-answer test of a simulator that fits, to each Primary
 substation's metered power, a list of the assets behind the meter and a few parameters per asset.**
-The simulator's value would be an asset list per Primary, which NGED cannot confirm beyond the
-register and so is shown as inferred, and scenarios mostly at long horizons, not a better
-short-range forecast. Gross demand is the demand before the embedded generation behind a substation
+The simulator's value would be an asset list per Primary and scenarios mostly at long horizons,
+not a better short-range forecast. NGED cannot confirm the asset list beyond the register, so the
+list is shown as inferred. Gross demand is the demand before the embedded generation behind a substation
 is netted off; a Primary's meter records only the net. No experiment in this theme has run yet.
 
 **The asset list has to come from NGED's Embedded Capacity Register.** In the four experiments read

@@ -13,7 +13,7 @@ failed in the gas-engine experiments read for this page: deciding when each asse
 
 **The maintainer's answers make the asset list a deliverable and long-horizon scenarios the main
 use.** NGED hold nothing beyond the Embedded Capacity Register about what sits under each
-substation, so the list has no ground truth to be checked against and is shown as inferred. See
+substation, so no ground truth exists to check the list against, and the list is shown as inferred. See
 [Maintainer's answers (2026-11-10)](#maintainers-answers-2026-11-10).
 
 **Two conditions, drawn from the merged experiments, decide whether the idea can work.** The asset
@@ -77,9 +77,9 @@ discussion that led to it is recorded on [The simulator discussion of
   price-driven generators. A gas generator is a physical model written as equations that capture its
   ramping time, its minimum on-duration, and similar limits.
 - **Training the forecaster on simulated series is conceivable if the simulator becomes good
-  enough.** The maintainer calls that "a bit sketchy".
+  enough.** The maintainer calls training on simulated series "a bit sketchy".
 - **Not yet answered:** whether the decoy rule should apply to solar too (see [Open
-  questions](#open-questions-for-the-maintainer)).
+  question](#open-question-for-the-maintainer)).
 
 ## What the forward direction means
 
@@ -89,15 +89,15 @@ which parts of the research repository (`nged-ml-research`) already hold such a 
 
 | Asset type | Forward model wanted | In the repository today |
 |---|---|---|
-| Battery | A scheduler with the price signals available and the state of charge, in several profiles | Partly. `studies.battery_dispatch` holds a daily linear-programme schedule for a price taker, with a state of charge, an energy limit, a cycle cap, and a rank-rule schedule; `studies.battery_templates` holds tariff-window, charge-only, merchant, Agile-tariff, and home-battery schedules; `studies.battery_state_space` holds the differentiable estimator that mixes them. The estimator fits them to substation data, and the schedules are not yet run forward as a simulator of a registered battery |
-| Other price-driven generator | An optimiser that follows the price signal within the plant's limits | No. No `studies` module or merged experiment holds one |
+| Battery | A scheduler with the price signals available and the state of charge, in several profiles | Partly. `studies.battery_dispatch` holds a daily linear-programme schedule for a price taker, with a state of charge, an energy limit, a cycle cap, and a rank-rule schedule; `studies.battery_templates` holds tariff-window, charge-only, merchant, Agile-tariff, and home-battery schedules; `studies.battery_state_space` holds the differentiable estimator that mixes them. The estimator fits the schedules to substation data. We found no module that runs the schedules forward for a registered battery |
+| Other price-driven generator | An optimiser that follows the price signal within the plant's limits | No. We found none in `src/studies` or in the experiments read for this page |
 | Gas engine | Plant equations with ramping time, minimum on-duration, and similar limits | No. The engine detector is a hidden Markov model of whole-number units and spell lengths, fitted to the residual (experiments 196 and 291), and has no ramping or minimum-on-duration equation |
 | Solar | Output from sunshine and panel geometry | Yes: the physics solar plant curve (experiment 282), with the assumed tilt fitting worse than the farms' best |
-| Wind | Output from each ensemble member | Yes: the physics wind plant with a small neural-network correction (experiment 347) |
+| Wind | Output from each ensemble member | Yes: the physics wind plant run on each ensemble member, followed by a mixture-density head (experiment 347) |
 | Demand under the assets | Calendar, temperature, heating, holidays, and the night step | Yes: the demand GAM (`studies.dp_gam`) |
 
-**The battery schedules and the solar and wind plants are the nearest parts, and the gas-engine
-equations and the other price-driven generators do not exist.** The only recorded gas-engine output
+**The demand GAM, the solar and wind plants, and the battery schedules exist. The gas-engine
+equations and the other price-driven generators do not.** The only recorded gas-engine output
 we read for this page is Gas A's, which covers 44 days.
 
 ## Strict and relaxed disaggregation identify different quantities
@@ -261,16 +261,16 @@ and the battery term into one fit, with the register deciding which terms exist 
 ## Candidate uses, ranked
 
 **The two uses that rank highest are an asset list per Primary, shown as inferred, and scenarios
-months and years ahead for curtailment and planning.** The ranking is a judgement of the value to
-NGED against the effort of building and testing, and the maintainer's answers of 2026-11-10 moved
-the asset list and the long-horizon scenarios up. The values are our estimates. Each use carries a
-prediction that could fail and the measurement that would show it.
+at long horizons for curtailment and planning.** The ranking is a judgement of the value to
+NGED against the effort of building and testing, and the ranking puts the asset list and the
+long-horizon scenarios first because the maintainer gave them most weight. The values are our
+estimates. Each use carries a prediction that could fail and the measurement that would show it.
 
 | Rank | Use | Value to NGED | Effort to build and test | Prediction that could fail | How it would be measured |
 |---|---|---|---|---|---|
 | 1 | An asset list per Primary, with parameters, beside the register | High: a stated main benefit; shows where the register name and the meter disagree, as for the D8 engine registered under D14 | Low: reuses the parts above | On injected known answers, capacity within 20% for every listed asset that steps 8 noise units or more, and under 0.5 MW for a listed asset that is absent | The smallest test below; the list is then shown as inferred |
-| 2 | Scenarios months and years ahead, for curtailment and planning | High: a stated aim of the forecast, and the long-horizon use the maintainer values most | Medium to high: needs a running-time model per asset, forward models with real operating logic, and a demand scenario model | Issued a month ahead, between 0.5% and 2% of held-out half-hours fall above the scenarios' 0.99 quantile, and likewise below the 0.01 quantile, with a narrower 0.01-to-0.99 band than a block bootstrap of the Primary's own residual history | Coverage and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles on held-out months of 2026-01 to 2026-06 |
-| 3 | A what-if at days 1 to 10, such as a dormant generator that turns on | Medium to high: a question the maintainer named | Medium: needs a gas-engine plant model, which does not exist | Replaying a known start or stop, such as the D8 engine's change on 2023-08-15, the simulated change in the net series is within 30% of the observed change | Error of the simulated step against the observed step on the known events |
+| 2 | Scenarios at long horizons (months ahead), for curtailment and planning | High: a stated aim of the forecast, and the horizon the maintainer says matters most | Medium to high: needs a running-time model per asset, forward models with real operating logic, and a demand scenario model | Issued a month ahead, between 0.5% and 2% of held-out half-hours fall above the scenarios' 0.99 quantile, and likewise below the 0.01 quantile, with a narrower 0.01-to-0.99 band than a block bootstrap of the Primary's own residual history | Coverage and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles on held-out months of 2026-01 to 2026-06 |
+| 3 | A what-if at days 1 to 10, such as a dormant generator that turns on | Medium to high: a question the maintainer named | Medium: needs a gas-engine plant model, which does not exist | Replaying a known start or stop, such as the D8 engine's change on 2023-08-15, the simulated change in the net series is within 30% of the observed change (a proposed threshold) | Error of the simulated step against the observed step on the known events |
 | 4 | A new connection added from the register before it appears in the data | Medium to high for planning; needs NGED to say which connections matter | Medium | For assets connected in 2024 to 2026, a scenario that adds the registered asset at its connection date moves the post-connection error of the solar or step term by at least half the asset's registered MW | Retrospective: hold out the data after each connection date and compare with and without the registered asset |
 | 5 | A fallback when telemetry is missing or wrong | Medium: the service must degrade, not fail | Low | The forward simulator scores better than climatology at days 1 to 10 when no recent power is available | CRPS and tail pinball loss against climatology and the lag-free forecast on the same rows |
 | 6 | Simulated series for a known-answer test bed, and conceivably for training the forecaster | Medium: helps the evaluation problem behind the discussion; the maintainer calls training on simulated series "a bit sketchy" | Low once use 1 exists | Existing forecasting methods keep their ranking on the simulated series (Kendall rank correlation of at least 0.8 with their real scores, where 1 means the same ranking) | Rank transfer, as proposed in the discussion |
@@ -318,6 +318,9 @@ an option for the maintainer, not a planned experiment.
   month and is no longer informative. Each scenario test must report the band width beside the
   coverage, and compare with a block bootstrap of the Primary's own history, which needs no asset
   inventory at all.
+- **What NGED could still say.** NGED's records may cover the running hours of the larger engines,
+  which Primaries have export limits or flexible connections, and whether any metered generator's
+  output is still added back into a Primary's reading. We have not asked.
 - **Validation of the asset list.** NGED cannot confirm which assets sit behind which meter beyond
   the register, so only known-answer tests validate the list. The D8 engine registered under D14
   shows that agreement with the register is not proof.
@@ -326,7 +329,7 @@ an option for the maintainer, not a planned experiment.
   (experiment 264). A scenario use must beat that simpler widening before an engine term is worth
   adding.
 
-## Open questions for the maintainer
+## Open question for the maintainer
 
 - **Should the decoy rule apply to solar too?** Every register name lists solar, so a decoy can only
   be tested for engines, batteries, and wind. If solar matters most, the existing solar-capacity
