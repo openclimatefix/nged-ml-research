@@ -1,10 +1,13 @@
 # ruff: noqa: ANN201
-"""GAM columns for the weekly XGBoost model: stage-1 fitted value and partial effects (385).
+"""Experiment 385, `e00385_gam.py`: kept for the record.
 
-Uses experiment 377's T-all fit (its design, penalty, and pinned capacity) at a cut, refitted here
-from the cut's per-month Gram matrices so that each calendar month of the 24-month training window
-can be left out in turn. A value for a training row of month m comes from the fit that leaves month
-m out (out of fold); a value for a scored row comes from the fit on the whole window.
+GAM columns for the weekly XGBoost model: stage-1 fitted value and partial effects (385).
+
+Uses experiment 377's T-all fit (its design, penalty, and pinned capacity) at a cut, refitted
+here from the cut's per-month Gram matrices so that each calendar month of the 24-month training
+window can be left out in turn. A value for a training row of month m comes from the fit that
+leaves month m out (out of fold); a value for a scored row comes from the fit on the whole
+window.
 
 Columns, all in points of effective capacity:
 

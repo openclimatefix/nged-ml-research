@@ -1,7 +1,11 @@
-# ruff: noqa: D103, E501
-"""Injected-shift leak (511's stress world, seed 0) of the 534 arms: median shift in points of capacity, signed by the injected sign.
+# ruff: noqa: D103
+"""Experiment 534, `e00534_leak.py`: kept for the record.
 
-Ensembles: the per-row mean of the members' q50 shifts (the quantile average is linear in q50). R-90 is 511's L-1d.
+Injected-shift leak (511's stress world, seed 0) of the 534 arms: median shift in points of
+capacity, signed by the injected sign.
+
+Ensembles: the per-row mean of the members' q50 shifts (the quantile average is linear in q50).
+R-90 is 511's L-1d.
 """
 
 import e00511_common as k  # ty: ignore[unresolved-import]

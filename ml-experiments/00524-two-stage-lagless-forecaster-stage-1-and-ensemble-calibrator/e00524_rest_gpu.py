@@ -1,16 +1,17 @@
 # ruff: noqa: ANN001, ANN201, ANN202, ANN204, D102, D103, D107, E501, F841, PLR0915, PT018, RUF059
 r"""GPU arms of the 524 remaining arms (interim, unaudited, not for merge).
 
-`e2e`: S0-E2E. Stage 0 (form 2) is first fitted on the ENS-to-ERA5/CAMS pairs (ERA5 <= cutoff - 5 d,
-CAMS <= cutoff - 1 d), then trained end to end through the frozen month's stage 1 against the power
-negative log-likelihood on the cutoff's ENS rows (valid time <= cutoff - 3.5 h), stage 1 untouched.
-`stress`: S2-J-0.4x leak stress. Refit week 3 with the last 7 days of targets shifted by +-3 standard
-deviations of the Primary's 7-day mean (experiment 510's world), control and both signs, one seed;
-the leak is sign x 100 x the change in the median forecast of the following week (points of capacity).
-Also stores the control S2-J weights.
-`s2r`: S2-R. Stage 1 refitted at each weekly cutoff from the month's pretrained weights on ERA5 and CAMS
-rows up to cutoff - 5 d with a 90-day recency weight, then frozen; stage 2 (form B, NLL) is trained on
-cross-fitted outputs (6 contiguous blocks of the history, each block-model refitted without its block).
+`e2e`: S0-E2E. Stage 0 (form 2) is first fitted on the ENS-to-ERA5/CAMS pairs (ERA5 <= cutoff -
+5 d, CAMS <= cutoff - 1 d), then trained end to end through the frozen month's stage 1 against
+the power negative log-likelihood on the cutoff's ENS rows (valid time <= cutoff - 3.5 h), stage
+1 untouched. `stress`: S2-J-0.4x leak stress. Refit week 3 with the last 7 days of targets
+shifted by +-3 standard deviations of the Primary's 7-day mean (experiment 510's world), control
+and both signs, one seed; the leak is sign x 100 x the change in the median forecast of the
+following week (points of capacity). Also stores the control S2-J weights. `s2r`: S2-R. Stage 1
+refitted at each weekly cutoff from the month's pretrained weights on ERA5 and CAMS rows up to
+cutoff - 5 d with a 90-day recency weight, then frozen; stage 2 (form B, NLL) is trained on
+cross-fitted outputs (6 contiguous blocks of the history, each block-model refitted without its
+block).
 """
 
 import argparse

@@ -1,5 +1,8 @@
-# ruff: noqa: E501
-"""Part A of experiment 532: refit 404's lag-free "further" module for seeds 0 to 4 and score ensembles of 3, 4 and 5 heads on origin-time weather (origin mode only; reuses 531's code)."""
+"""Experiment 532, `e00532_a.py`: kept for the record.
+
+Part A of experiment 532: refit 404's lag-free "further" module for seeds 0 to 4 and score
+ensembles of 3, 4 and 5 heads on origin-time weather (origin mode only; reuses 531's code).
+"""
 
 import sys
 import time

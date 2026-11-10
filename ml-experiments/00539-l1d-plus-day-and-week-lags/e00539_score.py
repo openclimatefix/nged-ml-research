@@ -1,5 +1,9 @@
-# ruff: noqa: ANN201, D103, E402, E501, PTH123, SIM115
-"""Score R-DW (539) and R1, R9 (538) against L-1d and A-pool on 533's rows. Reuses 533's loader and 521's statistics."""
+# ruff: noqa: ANN201, D103, E402, PTH123, SIM115
+"""Experiment 539, `e00539_score.py`: kept for the record.
+
+Score R-DW (539) and R1, R9 (538) against L-1d and A-pool on 533's rows. Reuses 533's loader and
+521's statistics.
+"""
 
 import json
 import math

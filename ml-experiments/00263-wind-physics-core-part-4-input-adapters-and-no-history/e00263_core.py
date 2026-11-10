@@ -1,11 +1,13 @@
-"""The wind-farm physics core, fitted by gradient descent, and its residual-quantile layer.
+"""Experiment 263, `e00263_core.py`: kept for the record.
+
+The wind-farm physics core, fitted by gradient descent, and its residual-quantile layer.
 
 One farm's core turns the ERA5 or ENS 10 m and 100 m wind speeds and the 2 m temperature into an
 expected power as a fraction of capacity: a shear exponent from the two speeds takes the 100 m
-speed to a fitted hub height, an air-density factor adjusts it, a smooth monotone power curve with a
-logistic cut-out and a Gaussian blur (the 25 km weather cell's sub-grid wind) gives the active
-power, and an optional idle layer turns active power into apparent power for the MVA series. The
-spread of the observation about the expected power comes from `ResidualQuantiles`.
+speed to a fitted hub height, an air-density factor adjusts it, a smooth monotone power curve
+with a logistic cut-out and a Gaussian blur (the 25 km weather cell's sub-grid wind) gives the
+active power, and an optional idle layer turns active power into apparent power for the MVA
+series. The spread of the observation about the expected power comes from `ResidualQuantiles`.
 """
 
 import os

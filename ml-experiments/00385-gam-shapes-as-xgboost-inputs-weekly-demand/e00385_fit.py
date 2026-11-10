@@ -1,4 +1,6 @@
-"""Refit experiment 87's XGBoost member with GAM-learnt shapes as input columns (385).
+"""Experiment 385, `e00385_fit.py`: kept for the record.
+
+Refit experiment 87's XGBoost member with GAM-learnt shapes as input columns (385).
 
 Each arm refits the `n1h` configuration of experiment 87 (the BG2 weekly and monthly member) at
 the monthly (default) or weekly refit times, with experiment 87's training rows, parameters, and

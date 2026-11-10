@@ -1,5 +1,7 @@
 # ruff: noqa: E402
-"""Fit the member arms of experiment 00263 and write their forecasts.
+"""Experiment 263, `e00263_arms.py`: kept for the record.
+
+Fit the member arms of experiment 00263 and write their forecasts.
 
 Arms: A0r (the experiment 33 recipe refitted with the 0.01 and 0.99 levels, ERA5-trained XGBoost
 mixture over the 51 ENS members), A1 (A0r trained on the ENS control member's weather), B1 (the

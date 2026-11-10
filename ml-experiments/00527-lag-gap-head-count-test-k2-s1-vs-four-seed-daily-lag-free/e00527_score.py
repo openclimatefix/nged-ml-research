@@ -1,17 +1,22 @@
 # ruff: noqa: E501, PERF401
-r"""Score the arms of experiment 527 on experiment 511's rows (stored outputs plus L-1d seeds 2 and 3).
+r"""Experiment 527, `e00527_score.py`: kept for the record.
+
+Score the arms of experiment 527 on experiment 511's rows (stored outputs plus L-1d seeds 2 and
+3).
 
 Commands:
 
 - `old`: score experiment 454's `LL-ens2`, `S1-ens2` (three pair cells each) and a new `LL-ens4`
-  (the four lag-free heads of fit seeds 0 to 3, mixed with equal weights, built from 454's code).
-- `seeds`: score L-1d seeds 2 and 3, and the 4-seed L-1d averaged by quantile (`L-1d-4q`) and by an
-  approximate mixture (`L-1d-4m`). Only the 11 quantiles of each seed are stored, so the mixture is
-  built from a piecewise-linear CDF through each seed's quantiles (0 at q01 - 5% of the q01-q99
-  range, 1 at q99 + 5%); it is an approximation of 454's Gaussian-mixture solve.
+  (the four lag-free heads of fit seeds 0 to 3, mixed with equal weights, built from 454's
+  code).
+- `seeds`: score L-1d seeds 2 and 3, and the 4-seed L-1d averaged by quantile (`L-1d-4q`) and by
+  an approximate mixture (`L-1d-4m`). Only the 11 quantiles of each seed are stored, so the
+  mixture is built from a piecewise-linear CDF through each seed's quantiles (0 at q01 - 5% of
+  the q01-q99 range, 1 at q99 + 5%); it is an approximation of 454's Gaussian-mixture solve.
 - `stats`: the contrasts, the minimum detectable effects, per-fold signs.
 
-Everything is written to `work/new_{month}.parquet` and `scores/` of this experiment's data folder.
+Everything is written to `work/new_{month}.parquet` and `scores/` of this experiment's data
+folder.
 """
 
 import argparse

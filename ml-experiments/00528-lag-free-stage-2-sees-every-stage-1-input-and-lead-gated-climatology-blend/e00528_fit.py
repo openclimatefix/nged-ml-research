@@ -1,12 +1,15 @@
 # ruff: noqa: ANN001, ANN201, ANN204, D101, D102, D103, D107, E501, N802, PLR0915
-"""Experiment 528 (interim, unaudited, not for merge): stage 2 sees every stage-1 input.
+"""Experiment 528, `e00528_fit.py`: kept for the record.
+
+Experiment 528 (interim, unaudited, not for merge): stage 2 sees every stage-1 input.
 
 S2-X : stage 2 = zero-initialised residual MLP (2 x 64) on [9 stage-1 outputs, all 37 input columns
        (28 weather/solar/calendar/holiday means and geometry, 7 spreads, lead, lead_sqrt), group flag,
        Primary embedding(8)]; NLL; trained on 524's cross-fitted stage-1 outputs under 510's row rule.
 S2-G : stage-1 mixture (3 components) blended with a calendar-only mixture (3 components, a pooled
        MDN on the calendar, holiday and solar-geometry columns only) by a gate g(lead, 7 spreads);
-       mixture weights g * w_weather and (1 - g) * w_calendar; gate trained by NLL, both mixtures frozen.
+       mixture weights `g * w_weather` and `(1 - g) * w_calendar`;
+       gate trained by NLL, both mixtures frozen.
 S2-XG: the same gate over the S2-X output.
 """
 

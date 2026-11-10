@@ -1,5 +1,9 @@
 # ruff: noqa: E501
-"""Part B of experiment 531: score the stored L-1d weights (511, seeds 0 and 1) with a chosen weather feed. Inference only."""
+"""Experiment 531, `e00531_b.py`: kept for the record.
+
+Part B of experiment 531: score the stored L-1d weights (511, seeds 0 and 1) with a chosen
+weather feed. Inference only.
+"""
 
 import argparse
 import time

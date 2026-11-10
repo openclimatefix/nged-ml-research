@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Write the two reference arms of experiment 00263: climatology and persistence.
+"""Experiment 263, `e00263_references.py`: kept for the record.
+
+Write the two reference arms of experiment 00263: climatology and persistence.
 
 Climatology: the empirical 11 quantiles of the observed fraction of capacity in each cell of
 (month of the valid time, half-hour of the day, weekend or not), from the training window of

@@ -1,9 +1,12 @@
-# ruff: noqa: ANN001, ANN201, E501
-r"""Fit the daily recency half-life arms of experiment 534 with experiment 511's harness (outputs redirected).
+# ruff: noqa: ANN001, ANN201
+r"""Experiment 536, `e00536_fit.py`: kept for the record.
 
-Arms `R-3`, `R-7`, `R-14`, `R-30` (daily refit, pretrained start, half-life in days). Half-life 90 days
-is 511's stored L-1d. A 6-hourly refit is not run: the harness's cutoffs, windows, and tiling are
-day-based.
+Fit the daily recency half-life arms of experiment 534 with experiment 511's harness (outputs
+redirected).
+
+Arms `R-3`, `R-7`, `R-14`, `R-30` (daily refit, pretrained start, half-life in days). Half-life
+90 days is 511's stored L-1d. A 6-hourly refit is not run: the harness's cutoffs, windows, and
+tiling are day-based.
 """
 
 import argparse
@@ -22,7 +25,10 @@ _PRETRAINED_510 = f511.E510 / "pretrained" / "L0PT"
 
 
 def pretrained_file(*, arm, month, seed):
-    """Return 510's own pretrained weights when it has them, else 448's (the harness looks under W, which is redirected)."""
+    """Return 510's own pretrained weights when it has them, else 448's.
+
+    The harness looks under `W`, which is redirected.
+    """
     own = _PRETRAINED_510 / f"{month}_s{seed}.pt"
     return own if own.exists() else c.E448_PRETRAINED / f"{month}_s{seed}.pt"
 

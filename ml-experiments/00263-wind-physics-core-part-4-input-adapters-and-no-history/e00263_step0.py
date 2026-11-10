@@ -1,5 +1,7 @@
 # ruff: noqa: E402, E501
-"""Step 0 of experiment 00263: the oracle ceiling with ERA5 as the weather at inference too.
+"""Experiment 263, `e00263_step0.py`: kept for the record.
+
+Step 0 of experiment 00263: the oracle ceiling with ERA5 as the weather at inference too.
 
 Fits, for each farm and on valid times before 2025-06-17, (P) the physics core with its idle layer,
 (S) a binned power curve, and (X) a flexible ERA5-trained XGBoost quantile model, each turned into

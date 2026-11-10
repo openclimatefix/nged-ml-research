@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Re-apply the spread factor to every stored mixture, so the arms need no refit.
+"""Experiment 263, `e00263_respread.py`: kept for the record.
+
+Re-apply the spread factor to every stored mixture, so the arms need no refit.
 
 Reads `work/arms/<arm>_mixture.parquet` (keys, `seed`, and the 11 mixture quantiles) and writes
 `work/arms/<arm>_spread.parquet` with the spread factor of `e00263_common.apply_spread`.

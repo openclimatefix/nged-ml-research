@@ -1,5 +1,9 @@
-# ruff: noqa: D103, E501, E731, PTH123, SIM115
-"""Score experiment 534's arms against A-pool, L-1d (= R-90), and K2-S1 with experiment 521's row sets, bands, bootstrap, and MDE formula."""
+# ruff: noqa: D103, E731, PTH123, SIM115
+"""Experiment 536, `e00536_stats.py`: kept for the record.
+
+Score experiment 534's arms against A-pool, L-1d (= R-90), and K2-S1 with experiment 521's row
+sets, bands, bootstrap, and MDE formula.
+"""
 
 import json
 import math

@@ -1,10 +1,14 @@
 # ruff: noqa: ANN001, ANN003, ANN201, E501
-r"""Fit the arms of experiment 529 with experiment 511's harness (outputs redirected to this experiment's folder).
+r"""Experiment 529, `e00529_fit.py`: kept for the record.
 
-New arms (all weekly cutoffs unless named): `W-none` (no recency weight), `W-365` (half-life 365 days),
-`W-scratch` (random start, trained on the month's ENS rows alone at the pretraining rate, half-life
-90 days), `M-90` (one fit at the month's first day, scored on the whole month, half-life 90 days).
-Stored references: L-1d (511, daily), L-Ww (510, weekly, half-life 90 days, pretrained start).
+Fit the arms of experiment 529 with experiment 511's harness (outputs redirected to this
+experiment's folder).
+
+New arms (all weekly cutoffs unless named): `W-none` (no recency weight), `W-365` (half-life 365
+days), `W-scratch` (random start, trained on the month's ENS rows alone at the pretraining rate,
+half-life 90 days), `M-90` (one fit at the month's first day, scored on the whole month,
+half-life 90 days). Stored references: L-1d (511, daily), L-Ww (510, weekly, half-life 90 days,
+pretrained start).
 
 ```bash
 PYTHONPATH=<every folder under ml-experiments/> DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1 \
@@ -80,7 +84,7 @@ c.train = train
 
 
 def assemble(*, arm: f511.Arm) -> None:
-    """Concatenate window forecasts into one table per month and seed under seed_preds/<arm>/."""
+    """Concatenate window forecasts into one table per month and seed under `seed_preds/<arm>/`."""
     for month in c.MONTHS:
         cuts = k.cutoffs(month=month, cadence=arm.cadence)
         for seed in SEEDS:

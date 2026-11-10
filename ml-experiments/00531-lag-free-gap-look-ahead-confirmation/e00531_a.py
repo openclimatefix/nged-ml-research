@@ -1,10 +1,14 @@
 # ruff: noqa: E501
-"""Part A of experiment 531: experiment 404's lag-free head scored with the weather of the run published at the forecast origin.
+"""Experiment 531, `e00531_a.py`: kept for the record.
 
-Experiment 404 stored the lag-free head only as output tables, never as weights. This script therefore refits
-the table's "further" module (the one that forecasts the scored month) with 404's own code and seed, checks that
-the refit reproduces the stored table, and then feeds it either 404's freshest-run weather (reproduction) or the
-weather of 511's rows (the run published at the forecast origin).
+Part A of experiment 531: experiment 404's lag-free head scored with the weather of the run
+published at the forecast origin.
+
+Experiment 404 stored the lag-free head only as output tables, never as weights. This script
+therefore refits the table's "further" module (the one that forecasts the scored month) with
+404's own code and seed, checks that the refit reproduces the stored table, and then feeds it
+either 404's freshest-run weather (reproduction) or the weather of 511's rows (the run published
+at the forecast origin).
 """
 
 import argparse
@@ -27,7 +31,11 @@ SEEDS = (0, 1, 2)
 def fit_further(
     *, month: str, seed: int, device: str
 ) -> tuple[models.LaglessModule, lagless.Scaler, lagless.Pool]:
-    """Refit the further module of 404's table (copy of the last fit in `crossfit_table`); return it, its scaler, and the pool it forecasts."""
+    """Refit the further module of 404's table.
+
+    This copies the last fit in `crossfit_table`. It returns the module, its scaler, and the pool
+    it forecasts.
+    """
     refit = prep.refit_of(month=month)
     end = int(common.grid_index(times=refit))
     start = max(lagless.data.FIRST_VALID_INDEX, end - lagless.WINDOW_STEPS)

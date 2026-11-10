@@ -1,5 +1,8 @@
-# ruff: noqa: E501
-"""Shared pieces of experiment 531: 511's test rows with a choice of weather feed (origin-time or 404's freshest run)."""
+"""Experiment 531, `e00531_common.py`: kept for the record.
+
+Shared pieces of experiment 531: 511's test rows with a choice of weather feed (origin-time or
+404's freshest run).
+"""
 
 from datetime import timedelta
 from typing import Final
@@ -33,9 +36,9 @@ def dense_by_primary() -> dict[int, d404.DenseInputs]:
 def raw_test(*, month: str, mode: str, dense: dict[int, d404.DenseInputs]) -> dict[str, np.ndarray]:
     """Return experiment 511's test rows of a month with raw (unstandardised) non-lag inputs.
 
-    `mode` is "origin" (the run published at the forecast origin, as 511 uses) or "fresh" (the 14 weather
-    columns replaced by 404's freshest published run for the target's valid time). Rows with no freshest
-    run are dropped in "fresh" mode. Same filters as `e00428_data.build_test`.
+    `mode` is "origin" (the run published at the forecast origin, as 511 uses) or "fresh" (the 14
+    weather columns replaced by 404's freshest published run for the target's valid time). Rows
+    with no freshest run are dropped in "fresh" mode. Same filters as `e00428_data.build_test`.
     """
     keep_cols, names, _ = data.non_lag_layout()
     assert names[:-2] == d404.lagless_columns(), "column order differs from 404's lag-free inputs"

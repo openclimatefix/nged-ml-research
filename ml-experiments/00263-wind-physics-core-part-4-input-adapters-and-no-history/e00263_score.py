@@ -1,5 +1,7 @@
 # ruff: noqa: E402, E501, PLR0912
-"""Score experiment 00263's arms and read the planned contrasts.
+"""Experiment 263, `e00263_score.py`: kept for the record.
+
+Score experiment 00263's arms and read the planned contrasts.
 
 Reads the stored best guess (A0, nine levels) and `work/arms/<arm>_spread.parquet`, scores every arm
 on the quantile score of experiment 33 (nine levels, points of capacity), the pinball loss at the

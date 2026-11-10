@@ -1,17 +1,23 @@
 # ruff: noqa: E501
-r"""Fit the ladder arms of experiment 530: experiment 404's lag-free recipe moved towards experiment 511's network.
+r"""Experiment 530, `e00530_fit.py`: kept for the record.
 
-All arms are monthly-cadence (one fit at the month's first day, scored on the whole month), 2 seeds, the
-5 folds of experiment 511, on experiment 511's rows (the weather of the run published at the forecast
-origin, so the weather's age grows with the lead). Differences from experiment 404's stored lag-free head:
+Fit the ladder arms of experiment 530: experiment 404's lag-free recipe moved towards experiment
+511's network.
 
-- `N1`: 404's training recipe (no dropout, no weight decay, Adam at 2e-3, 6 passes over all rows, batches of 4096,
-  no early stopping, recency half-life 182.6 days) on 511's rows with the lead columns removed.
+All arms are monthly-cadence (one fit at the month's first day, scored on the whole month), 2
+seeds, the 5 folds of experiment 511, on experiment 511's rows (the weather of the run published
+at the forecast origin, so the weather's age grows with the lead). Differences from experiment
+404's stored lag-free head:
+
+- `N1`: 404's training recipe (no dropout, no weight decay, Adam at 2e-3, 6 passes over all
+  rows, batches of 4096, no early stopping, recency half-life 182.6 days) on 511's rows with the
+  lead columns removed.
 - `N2`: `N1` plus 511's two lead columns (`lead`, `lead_sqrt`).
-- `N3`: `N2` trained with 511's loop from scratch (dropout 0.1, AdamW weight decay 1e-3, gradient clip 1.0, batches of
-  8192, 20% of the rows per epoch, early stopping on 511's held-out weeks) at 511's pretraining rate 5e-4.
-- `N4`: `N3` with 511's recency half-life of 90 days.
-The endpoint (`M-90`, experiment 529) adds the ERA5, CAMS, and ENS pretraining and a fine-tune at 2e-4.
+- `N3`: `N2` trained with 511's loop from scratch (dropout 0.1, AdamW weight decay 1e-3,
+  gradient clip 1.0, batches of 8192, 20% of the rows per epoch, early stopping on 511's
+  held-out weeks) at 511's pretraining rate 5e-4.
+- `N4`: `N3` with 511's recency half-life of 90 days. The endpoint (`M-90`, experiment 529) adds
+  the ERA5, CAMS, and ENS pretraining and a fine-tune at 2e-4.
 
 ```bash
 PYTHONPATH=<every folder under ml-experiments/> DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1 \

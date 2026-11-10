@@ -1,12 +1,16 @@
 # ruff: noqa: ANN001, ANN003, ANN201, D101, D102, D103, E501
-"""Experiment 538: 511's daily-refit L-1d recipe plus recent-level inputs (R1: 3 inputs; R9: all 9 lag inputs).
+"""Experiment 539, `e00539_fit.py`: kept for the record.
 
-Rows, cutoffs, recency weights, early stopping, seeds, and scoring windows are 511's. The lag columns
-(value, missing flag, age) are the ones in experiment 397's raw summary matrices, which are the columns
-experiment 425 (A-pool) reads, standardised the same way. They are appended after the 37 lag-free
-columns, so the first network layer keeps the pretrained weights of ERA5/CAMS pretraining (37 inputs
-and the 8-wide Primary embedding) and the new inputs start with zero first-layer weights. The new
-inputs are therefore added at fine-tuning only; pretraining is the unchanged lag-free L0PT.
+Experiment 538: 511's daily-refit L-1d recipe plus recent-level inputs (R1: 3 inputs; R9: all 9
+lag inputs).
+
+Rows, cutoffs, recency weights, early stopping, seeds, and scoring windows are 511's. The lag
+columns (value, missing flag, age) are the ones in experiment 397's raw summary matrices, which
+are the columns experiment 425 (A-pool) reads, standardised the same way. They are appended after
+the 37 lag-free columns, so the first network layer keeps the pretrained weights of ERA5/CAMS
+pretraining (37 inputs and the 8-wide Primary embedding) and the new inputs start with zero
+first-layer weights. The new inputs are therefore added at fine-tuning only; pretraining is the
+unchanged lag-free L0PT.
 
 Usage: python e00539_fit.py {fit|assemble} --arm R1|R9 [--stress]
 """
@@ -93,7 +97,11 @@ def lag_time_us(*, x, valid_us, name):
 
 
 def check_rows(*, x, valid_us, origin_us, lead, label):
-    """Row by row: ages equal the independent recomputation, every lag observed <= origin - data delay, weather run <= origin."""
+    """Check the rows one by one.
+
+    Ages equal the independent recomputation, every lag was observed at or before the origin
+    minus the data delay, and the weather run is at or before the origin.
+    """
     ages = prep.lag_ages_hours(lead_hours=lead.astype(np.float64))
     delay_us = int(common.NEWEST_AGE * 30 * 60 * 1e6)
     pub_us = int(common.PUBLICATION_DELAY.total_seconds() * 1e6)

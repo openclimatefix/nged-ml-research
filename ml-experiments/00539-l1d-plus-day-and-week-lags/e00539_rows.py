@@ -1,5 +1,8 @@
 # ruff: noqa: ANN001, ANN201, ANN202, D103
-"""Write per-row CRPS of R-DW with 470's scorer on 511's rows (mirrors e00537_rows)."""
+"""Experiment 539, `e00539_rows.py`: kept for the record.
+
+Write per-row CRPS of R-DW with 470's scorer on 511's rows (mirrors e00537_rows).
+"""
 
 from pathlib import Path
 

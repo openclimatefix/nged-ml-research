@@ -1,5 +1,7 @@
 # ruff: noqa: ANN201, D103, E402, F841, PTH123, SIM115
-"""Score L-1d (511, 2 seeds; 527, 4 seeds) against A-pool on the same stored rows. No fit, no GPU.
+"""Experiment 533, `e00533_score.py`: kept for the record.
+
+Score L-1d (511, 2 seeds; 527, 4 seeds) against A-pool on the same stored rows. No fit, no GPU.
 
 Reuses experiment 521's row sets, lead bands, bootstrap and MDE formula (imported from the
 nged-ml-research checkout) and 511's, 521's, 524's, and 527's stored per-row scores.

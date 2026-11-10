@@ -1,5 +1,9 @@
 # ruff: noqa: E501, E731
-"""Step 1 of experiment 532: row-level check that each target's weather run was issued at or before the forecast origin (397 summary tables)."""
+"""Experiment 532, `e00532_step1.py`: kept for the record.
+
+Step 1 of experiment 532: row-level check that each target's weather run was issued at or before
+the forecast origin (397 summary tables).
+"""
 
 from datetime import UTC, datetime, timedelta
 

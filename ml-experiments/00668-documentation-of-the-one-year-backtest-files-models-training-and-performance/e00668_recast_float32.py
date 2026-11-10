@@ -1,15 +1,16 @@
 """Experiment 668: recast the Float64 quantiles of the BSP and GSP backtest files to Float32.
 
-Reads `pre_float32/<name>.parquet` in the backtest folder, casts every quantile column
-(`q01` to `q99`) to Float32 with Arrow, and writes `<name>.parquet` with the settings of the stored
-file: ZSTD compression, dictionary encoding, the same row-group size as the original, and the same
-row order. Every Float32 value equals `float32` of the Float64 original.
+Reads `pre_float32/<name>.parquet` in the backtest folder, casts every quantile column (`q01` to
+`q99`) to Float32 with Arrow, and writes `<name>.parquet` with the settings of the stored file:
+ZSTD compression, dictionary encoding, the same row-group size as the original, and the same row
+order. Every Float32 value equals `float32` of the Float64 original.
 
 By default the script writes to `<out-dir>/<name>.parquet` (a scratch folder, never the stored
-file), then prints the SHA-256 prefix of the result next to the prefix the backtest README states.
-With `pyarrow` 25.0.1 the written bytes match the stored files (`f8f4b3ca0123b367266d` for
-`bsps.parquet`, `86111148ef1be55331c7` for `gsps.parquet`). A different `pyarrow` version can write
-different bytes for the same values, and the script then reports a mismatch without failing.
+file), then prints the SHA-256 prefix of the result next to the prefix the backtest README
+states. With `pyarrow` 25.0.1 the written bytes match the stored files (`f8f4b3ca0123b367266d`
+for `bsps.parquet`, `86111148ef1be55331c7` for `gsps.parquet`). A different `pyarrow` version can
+write different bytes for the same values, and the script then reports a mismatch without
+failing.
 
 Usage: `python e00668_recast_float32.py <out-dir>`.
 """

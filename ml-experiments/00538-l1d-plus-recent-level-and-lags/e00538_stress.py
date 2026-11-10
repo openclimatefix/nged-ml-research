@@ -1,5 +1,8 @@
-# ruff: noqa: E501
-"""Injected-shift leak of R1, R9 (538) and L-1d (511): sign x change in the median forecast, points of capacity, by block age and lead band."""
+"""Experiment 538, `e00538_stress.py`: kept for the record.
+
+Injected-shift leak of R1, R9 (538) and L-1d (511): sign x change in the median forecast, points
+of capacity, by block age and lead band.
+"""
 
 from pathlib import Path
 

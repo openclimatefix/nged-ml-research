@@ -1,7 +1,9 @@
-"""The small neural components of experiment 00263: the power-curve calibrator and the free network.
+"""Experiment 263, `e00263_neural.py`: kept for the record.
 
-The calibrator (B9) adds a bounded correction to the physics core's expected power. The free network
-(B6) has no physics: it maps the same inputs straight to 11 monotone quantiles.
+The small neural components of experiment 00263: the power-curve calibrator and the free network.
+
+The calibrator (B9) adds a bounded correction to the physics core's expected power. The free
+network (B6) has no physics: it maps the same inputs straight to 11 monotone quantiles.
 """
 
 from typing import Final
@@ -32,8 +34,9 @@ def network_inputs(*, frame: pl.DataFrame, hub_speed: np.ndarray) -> np.ndarray:
     """Return shape (rows, 6) float32 inputs: wind speed, direction, density, and stability proxy.
 
     Columns: the density-adjusted hub-height wind speed (m/s over 10), the sine and cosine of the
-    100 m wind direction, the cube-root air-density factor from the 2 m temperature, the log of the
-    100 m to 10 m speed ratio (a lapse-rate stability proxy, clipped), and the 100 m speed over 10.
+    100 m wind direction, the cube-root air-density factor from the 2 m temperature, the log of
+    the 100 m to 10 m speed ratio (a lapse-rate stability proxy, clipped), and the 100 m speed
+    over 10.
     """
     speed_10m = np.maximum(frame["wind_speed_10m"].to_numpy(), 0.5)
     speed_100m = np.maximum(frame["wind_speed_100m"].to_numpy(), 0.5)

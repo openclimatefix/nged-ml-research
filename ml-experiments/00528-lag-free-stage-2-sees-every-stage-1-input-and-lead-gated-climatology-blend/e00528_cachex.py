@@ -1,5 +1,9 @@
-# ruff: noqa: E501, PT018
-"""Experiment 528 (interim, unaudited): cache every stage-1 input column for the rows of 524's stage-2 cache."""
+# ruff: noqa: PT018
+"""Experiment 528, `e00528_cachex.py`: kept for the record.
+
+Experiment 528 (interim, unaudited): cache every stage-1 input column for the rows of 524's
+stage-2 cache.
+"""
 
 import e00428_data as data  # ty: ignore[unresolved-import]
 import e00510_common as c  # ty: ignore[unresolved-import]

@@ -1,5 +1,9 @@
-# ruff: noqa: E501, PERF401
-"""Score experiment 531's arms on experiment 511's rows with 521's statistics. Commands: `rows`, `stats`."""
+# ruff: noqa: PERF401
+"""Experiment 531, `e00531_score.py`: kept for the record.
+
+Score experiment 531's arms on experiment 511's rows with 521's statistics. Commands: `rows`,
+`stats`.
+"""
 
 import argparse
 import json

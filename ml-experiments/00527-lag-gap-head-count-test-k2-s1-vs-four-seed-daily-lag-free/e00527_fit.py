@@ -1,10 +1,14 @@
 # ruff: noqa: E501
-r"""Fit L-1d seeds 2 and 3 (experiment 511's daily-refit lag-free network) into this experiment's folder.
+r"""Experiment 527, `e00527_fit.py`: kept for the record.
 
-Reuses experiment 511's and 510's code unchanged; only the output folder is redirected, so no stored
-file of 511 or 510 is touched. Seeds 0 and 1 stay in 511's folder.
+Fit L-1d seeds 2 and 3 (experiment 511's daily-refit lag-free network) into this experiment's
+folder.
 
-Commands: `pretrain` (5 folds x seeds 2 and 3, same recipe as experiment 510's `L0PT`), `fit`, `assemble`.
+Reuses experiment 511's and 510's code unchanged; only the output folder is redirected, so no
+stored file of 511 or 510 is touched. Seeds 0 and 1 stay in 511's folder.
+
+Commands: `pretrain` (5 folds x seeds 2 and 3, same recipe as experiment 510's `L0PT`), `fit`,
+`assemble`.
 
 ```bash
 PYTHONPATH=<every folder under ml-experiments/> DATA_PATH_INTERNAL=<private data folder> OMP_NUM_THREADS=1 \

@@ -1,9 +1,11 @@
 # ruff: noqa: ANN001, ANN201, D103, E501, RET504
-"""Experiment 537: experiment 425 arm A with the 9 lag input columns removed (46 -> 37 inputs).
+"""Experiment 537, `e00537_fit.py`: kept for the record.
 
-Wraps 425's fit code unchanged; only the input matrix loses the "lags" columns, in the fine-tuning rows,
-the pretraining rows, and the test-month inputs. Cuts and rows are the same as A-pool's.
-Run from the worktree root after `source ml-experiments/00524*/env.sh`.
+Experiment 537: experiment 425 arm A with the 9 lag input columns removed (46 -> 37 inputs).
+
+Wraps 425's fit code unchanged; only the input matrix loses the "lags" columns, in the
+fine-tuning rows, the pretraining rows, and the test-month inputs. Cuts and rows are the same as
+A-pool's. Run from the worktree root after `source ml-experiments/00524*/env.sh`.
 """
 
 from pathlib import Path

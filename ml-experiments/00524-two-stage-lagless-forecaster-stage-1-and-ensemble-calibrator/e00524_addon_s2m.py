@@ -2,11 +2,11 @@
 """Add-on to experiment 524 (interim, unaudited, not for merge): S2-M, member-wise stage 1.
 
 Each of the 51 ensemble members goes through the frozen stage-1 network (no refit). Arms:
-`S2-M-0`: exact quantiles of the equal-weight 153-component mixture, no stage 2.
-`S2-M-0c`: the same mixture collapsed to 3 components (component k of every member moment-matched
-into one component, weights averaged), no stage 2.
-`S2-M-B`: the collapsed mixture through the form-B (nll) calibrator of S2-F-B-nll, refitted at each
-weekly cutoff exactly as `e00524_stage2.py fit` does (S2-J's per-week weights were never stored).
+`S2-M-0`: exact quantiles of the equal-weight 153-component mixture, no stage 2. `S2-M-0c`: the
+same mixture collapsed to 3 components (component k of every member moment-matched into one
+component, weights averaged), no stage 2. `S2-M-B`: the collapsed mixture through the form-B
+(nll) calibrator of S2-F-B-nll, refitted at each weekly cutoff exactly as `e00524_stage2.py fit`
+does (S2-J's per-week weights were never stored).
 
 Commands: `members`, `build`, `rows`, `baseline`, `stats`.
 """

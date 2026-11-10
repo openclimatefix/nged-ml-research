@@ -1,9 +1,11 @@
 # ruff: noqa: ANN001, ANN201, C408, D103, E402, RET503
-"""Scoring for the 524 remaining arms (interim, unaudited, not for merge).
+"""Experiment 528, `e00528_score.py`: kept for the record.
 
-Commands: `build`, `rows`, `baseline`, `stats`, `tails`, `curtailment`, `bands`.
-Reads the new arms' seed forecasts from `addon_rest/work/seed_preds`; the 524 arms are linked from
-the 524 folder. Writes only under `addon_rest/work`.
+Scoring for the 524 remaining arms (interim, unaudited, not for merge).
+
+Commands: `build`, `rows`, `baseline`, `stats`, `tails`, `curtailment`, `bands`. Reads the new
+arms' seed forecasts from `addon_rest/work/seed_preds`; the 524 arms are linked from the 524
+folder. Writes only under `addon_rest/work`.
 """
 
 import argparse

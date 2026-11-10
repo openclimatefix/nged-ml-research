@@ -1,4 +1,6 @@
-"""The input adapters, the gated hybrid, and the pooled and no-history fits of experiment 00263.
+"""Experiment 263, `e00263_adapters.py`: kept for the record.
+
+The input adapters, the gated hybrid, and the pooled and no-history fits of experiment 00263.
 
 One module holds every arm that trains a small neural network jointly with the physics core:
 

@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Draw experiment 00263's figures from `work/score.json` and `work/step0.json`, as SVG.
+"""Experiment 263, `e00263_charts.py`: kept for the record.
+
+Draw experiment 00263's figures from `work/score.json` and `work/step0.json`, as SVG.
 
 1. The planned and exploratory contrasts, on the rows kept by experiment 210's mask.
 2. Each arm's absolute quantile score by lead band, on the same rows.

@@ -1,8 +1,10 @@
-"""Paths, constants, readers, and scoring shared by the scripts of experiment 00263.
+"""Experiment 263, `e00263_common.py`: kept for the record.
 
-Copied from experiments 00033 and 00052 (`e00033_gen_common.py`, `e00052_common.py`); an experiment
-may not import another experiment. The inputs it reads are read only. Farms are labelled W1 to W3,
-and no farm's coordinates, identifier, or series leaves this process.
+Paths, constants, readers, and scoring shared by the scripts of experiment 00263.
+
+Copied from experiments 00033 and 00052 (`e00033_gen_common.py`, `e00052_common.py`); an
+experiment may not import another experiment. The inputs it reads are read only. Farms are
+labelled W1 to W3, and no farm's coordinates, identifier, or series leaves this process.
 """
 
 from datetime import UTC, datetime
@@ -190,8 +192,8 @@ def era5_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
 def observed_training_power(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return power over capacity from the ERA5 era to the end of training, as experiment 52 did.
 
-    The rows of a farm's first weeks after a new meter, defined as experiment 33 defined them (the
-    first run of 48 half-hours above 5% of capacity, plus 6 weeks), are dropped.
+    The rows of a farm's first weeks after a new meter, defined as experiment 33 defined them
+    (the first run of 48 half-hours above 5% of capacity, plus 6 weeks), are dropped.
     """
     power = (
         scan_power()

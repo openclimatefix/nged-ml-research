@@ -1,8 +1,10 @@
 # ruff: noqa: E501, PERF401
-r"""Score the arms of experiment 529 on experiment 511's rows, with 527's statistics.
+r"""Experiment 529, `e00529_score.py`: kept for the record.
 
-Commands: `rows` (per-row scores of each new arm and each seed into `work/new_{month}.parquet`, plus
-experiment 524's S2-J columns), `stats` (absolute scores, contrasts, per-fold signs, MDE).
+Score the arms of experiment 529 on experiment 511's rows, with 527's statistics.
+
+Commands: `rows` (per-row scores of each new arm and each seed into `work/new_{month}.parquet`,
+plus experiment 524's S2-J columns), `stats` (absolute scores, contrasts, per-fold signs, MDE).
 """
 
 import argparse

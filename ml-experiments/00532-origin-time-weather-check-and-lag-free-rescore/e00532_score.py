@@ -1,5 +1,8 @@
-# ruff: noqa: E501
-"""Score experiment 532's origin-time lag-free arms with 521's statistics against L-1d, L-Ww, S2-J and K2-S1. Commands: `rows`, `stats`."""
+"""Experiment 532, `e00532_score.py`: kept for the record.
+
+Score experiment 532's origin-time lag-free arms with 521's statistics against L-1d, L-Ww, S2-J
+and K2-S1. Commands: `rows`, `stats`.
+"""
 
 import argparse
 import json

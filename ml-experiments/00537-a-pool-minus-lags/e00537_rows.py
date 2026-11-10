@@ -1,5 +1,9 @@
-# ruff: noqa: ANN001, ANN201, ANN202, D103, E501
-"""Write per-row CRPS of A-pool-minus-lags with 470's scorer, on 511's rows (mirrors e00511_score.configure)."""
+# ruff: noqa: ANN001, ANN201, ANN202, D103
+"""Experiment 537, `e00537_rows.py`: kept for the record.
+
+Write per-row CRPS of A-pool-minus-lags with 470's scorer, on 511's rows (mirrors
+e00511_score.configure).
+"""
 
 from pathlib import Path
 

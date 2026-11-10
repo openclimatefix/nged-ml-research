@@ -1,9 +1,12 @@
-# ruff: noqa: D103, E501
-"""Build arms' pooled-seed predictions, the member ensembles, and the per-row scores of experiment 534.
+# ruff: noqa: D103
+"""Experiment 534, `e00534_score.py`: kept for the record.
 
-Reuses experiment 511's scorer (via 470's) with this experiment's work folder. Stored controls and L-1d are
-linked from 511. Ensembles: `ENS-3` = uniform quantile average of R-7, R-30, R-90 (R-90 = 511's L-1d);
-`ENS-5` = all five members. Commands: `build`, `rows`.
+Build arms' pooled-seed predictions, the member ensembles, and the per-row scores of
+experiment 534.
+
+Reuses experiment 511's scorer (via 470's) with this experiment's work folder. Stored controls
+and L-1d are linked from 511. Ensembles: `ENS-3` = uniform quantile average of R-7, R-30, R-90
+(R-90 = 511's L-1d); `ENS-5` = all five members. Commands: `build`, `rows`.
 """
 
 import argparse
