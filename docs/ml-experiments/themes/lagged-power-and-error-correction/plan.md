@@ -31,6 +31,7 @@
 | 652 | Does a departure head with an explicit survival output beat the best forecast that does not know when a shift ends, once each forecast is scored under its own rules? | High (maintainer, 2026-11-08) | Nothing | Finished: not supported, see experiment 652 |
 | 654 | Does one network with an NRA output and a prevailing output, trained end to end with a learned end detector, beat a frozen K1 plus a separate survival head? | High (maintainer, 2026-11-09) | Nothing | Planned |
 | 681 | Do extra lagged power inputs make the prevailing output of the two-output demand network react faster to a load shift, without worsening the NRA output? | High (maintainer, 2026-11-10) | Nothing | Planned |
+| 691 | Does a prevailing head that reads both the causal detector features and the extra lagged power inputs react to a load shift sooner than a head that reads only one of them? | High (maintainer, 2026-11-10) | Experiments 681 and 687 merged | Finished: not supported, see experiment 691 |
 
 ## Planned experiments
 
