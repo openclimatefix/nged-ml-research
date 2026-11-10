@@ -302,9 +302,9 @@ fixes the choices that the earlier experiments left open, and this section resta
   features (the gap and neighbour signals above, built from lags), 4 age columns (the log of the
   departure's age in days, the age over 30, the gate flag, and the age of the freshest lag), and
   3 row inputs (the lead over 240 hours and the lower and upper half-widths of the Candidate's
-  band). The gate flag is kept as a column and set to zero, so these columns number 65. The backtest
+  band). The gate flag is kept as a column and set to zero, so there are 65 such columns. The backtest
   head appends 28 more columns, the extra lagged power inputs described next, so it has 93 inputs.
-  It has two hidden layers of 64 ReLU units and 12 outputs: a signed depth (0.5 times the
+  R-haz has two hidden layers of 64 ReLU units and 12 outputs: a signed depth (0.5 times the
   hyperbolic tangent of the first output, so up to half of capacity), a spread, and daily hazards.
   Each hazard is `softplus(output - 3)`, and the survival probability `p` is the exponential of
   minus the hazards accumulated over the days before the lead. The probability is 0 when the
@@ -318,14 +318,16 @@ fixes the choices that the earlier experiments left open, and this section resta
   and are monotone by construction. When `p` is 0, the prevailing rows equal the NRA rows.
 - **Extra lagged power inputs of R-haz.** The head reads 14 lagged inputs of the Primary's own
   cleaned power, each as a residual plus a missing flag (28 columns), appended after the 65 columns
-  above. [Experiment
-  681](../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md) chose them. Every
-  time below is measured back from the network origin, and every residual is the cleaned power
-  minus the Candidate's lag-free median at that time, as a fraction of capacity. The 14 inputs are
-  the residuals at 6, 9, 12, 18, 24, 36, 48, and 72 hours; the means of the residuals over the last
-  6, 12, and 24 hours, each window ending 6 hours before the origin; and the three differences
-  between consecutive trailing 24-hour means (the 24 hours ending 6 hours before the origin minus
-  the 24 hours before that, and the next two pairs). A mean is missing when under half of its
+  above. The inputs
+  come from [experiment
+  681](../00681-extra-lagged-power-inputs-for-the-prevailing-forecast/result.md). Every time below
+  is measured back from the origin of the neural network (09:00 UTC), and every residual is the
+  cleaned power minus the Candidate's lag-free median forecast for that time, as a fraction of
+  capacity. The 14 inputs are the residuals at 6, 9, 12, 18, 24, 36, 48, and 72 hours; the means
+  of the residuals over the last 6, 12, and 24 hours, each window ending 6 hours before the origin;
+  and three differences between the means of four adjacent 24-hour windows, the newest window
+  ending 6 hours before the origin: newest minus second newest, second minus third, and third
+  minus fourth. A mean is missing when under half of its
   window holds a reading. The newest reading any input uses is 6 hours old, and a test perturbs
   every later half-hour and checks that no input moves. Each of the 12 monthly refits trains on
   the banks of earlier months only, and the lag inputs of an injected shift are built from the same
@@ -379,9 +381,9 @@ scores the prevailing head without the extra lagged inputs, so its prevailing nu
 with this page to within 0.01. This page scores the 3,895,784 half-hour rows that have cleaned
 observed power, and the 667 page scores the full ground truth.
 
-**From 2026-01, when the prevailing head has its trained weights and the extra lagged inputs, the
-prevailing output scores lower than the normal-running output, and its margin is larger from 2026-07
-than before.** The table splits the pooled scores by the months of the forecast origin. The months
+**From 2026-01 the prevailing output has a lower (better) CRPS than the normal-running output, by
+0.17 points of capacity in 2026-01 to 2026-06 and by 0.42 in 2026-07 to 2026-10.** The prevailing
+head has trained weights and the extra lagged inputs from 2026-01. The table splits the pooled scores by the months of the forecast origin. The months
 from 2026-07 form the final-test window, so no choice rests on them.
 
 | Origin months | Half-hours | CRPS, normal running | CRPS, prevailing | MAE, normal running | MAE, prevailing | q05 to q95 coverage, prevailing |
@@ -569,7 +571,8 @@ Normalised MAE of the median, prevailing, by Primary:
 #### The load shift at D5 and D16
 
 **The December 2025 transfer of load between D5 and D16 is the one verified load shift in the
-backtest year, and the prevailing output took 61 hours (D5) and 52 hours (D16) to move.** The
+backtest year, and the prevailing output first moved at the first origin of January 2026, 61 hours (D5) and 52
+hours (D16) after the step starts.** The
 transfer is experiment 580's transfer 23: a fitted -1.47 MW at D5 and +1.37 MW at D16, 15 days from
 2025-12-29. The step found in the observed power is at 2025-12-29 23:00 UTC and ends at 2026-01-14
 11:30 UTC at D5, and starts at 2025-12-30 08:30 UTC and ends at 2026-01-14 19:30 UTC at D16. These
@@ -584,10 +587,11 @@ at D16. Origins are daily, so each figure has a resolution of one day. This is o
 at two Primaries, so it supports no general statement about the delay.
 
 The prevailing output of December 2025 comes from the B-haz fallback head, and the end of the shift
-in January 2026 from R-haz, so the two ends of the event are forecast by different heads. The D5
-step starts on 2025-12-29, in a fallback month, so the first origin with a trained head is
-2026-01-01 12:00 UTC, which is 61 hours after the step start: 61 hours is the earliest reaction
-that the D5 start allows.
+in January 2026 from R-haz, so the two ends of the event are forecast by different heads. Both
+step starts fall in December 2025, a fallback month, and the first origin with a trained head is
+2026-01-01 12:00 UTC. The two start delays equal the gaps from the step starts to that origin (61
+hours at D5 and 51.5 hours at D16), so they show no reaction speed. The fallback head has no
+inputs that could react to a step.
 
 ![D5, day-ahead forecasts through the load shift, normal running above and prevailing below](event_D5_day_ahead.svg)
 
@@ -1411,9 +1415,9 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
 - **The Primaries heads change in January 2026.** 2025-11 and 2025-12 use the B-haz fallback head,
     and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. Only R-haz reads the extra
     lagged power inputs.
-- **Time-series figures of the load shift other than the day-ahead ones.** The 14-day forecast
-    figures from five origins (`event_D5_fan_*.svg` and `event_D16_fan_*.svg`) were drawn before the
-    extra lagged inputs, so their prevailing panels show the earlier head.
+- **Fan figures of the load shift.** The prevailing panels of the 14-day forecast figures from five
+    origins (`event_D5_fan_*.svg` and `event_D16_fan_*.svg`) show the prevailing head without the
+    extra lagged inputs.
 - **The prevailing output over-persists after a load shift ends.** One verified load shift, at D5
     and D16, is the only example, so the size of the effect is not estimated.
 - **Quantiles exceed table capacity in the files.** The highest quantile reaches 2.1 times
