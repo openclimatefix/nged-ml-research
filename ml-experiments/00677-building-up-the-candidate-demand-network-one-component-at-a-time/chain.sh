@@ -25,11 +25,17 @@ case $S in
       case $c in
         table|fit) E00677_PHASE=train $D/gpu.sh e00677_cand.py $ARM $c --work-suffix _${M}_${S}_sp$SPAN --synthetic $SYN $A > $R/logs/${M}_${S}_sp${SPAN}_$c.log 2>&1 ;;
         ptable) E00677_PHASE=predict $D/gpu.sh e00677_cand.py $ARM table --work-suffix _${M}_${S}_sp$SPAN --synthetic $SYN $A > $R/logs/${M}_${S}_sp${SPAN}_$c.log 2>&1 ;;
+        bank) E00677_PHASE=predict $D/gpu.sh e00677_cand.py $ARM bank --work-suffix _${M}_${S}_sp$SPAN --synthetic $SYN $A > $R/logs/${M}_${S}_sp${SPAN}_$c.log 2>&1 ;;
         pfit) rm -f $R/$DIRNAME/work/fits/P5/${M}_d0_s?.empty  # the train phase's markers; fit_arm would skip on them
           E00677_PHASE=predict $D/gpu.sh e00677_cand.py $ARM fit --work-suffix _${M}_${S}_sp$SPAN --synthetic $SYN $A > $R/logs/${M}_${S}_sp${SPAN}_$c.log 2>&1 ;;
       esac
       echo "$M $S $c done $(date -u +%T)"
     done ;;
+  5wbank|5wobank)  # the held-out bank on the K1-type step-5 models, through the Candidate's code with no signal columns
+    S=${S%bank}; SYN=1; [ "$S" = 5wo ] && SYN=0
+    export CHAIN677=$R/chains/5/$M/work
+    E00677_PHASE=predict $D/gpu.sh e00677_cand.py P0+D50 bank --models-from $R/arms/k1_${S}_sp$SPAN/work/models/P5 --work-suffix _${M}_${S}_sp$SPAN --synthetic $SYN $A > $R/logs/${M}_${S}_sp${SPAN}_bank.log 2>&1
+    echo "$M $S bank done $(date -u +%T)" ;;
   1|2|3a|3b|4|5w|5wo)
     LADDER=${S%%[a-z]*}
     EXTRA=""; case $S in 3a|1|2) EXTRA="--ens-only 1" ;; esac
