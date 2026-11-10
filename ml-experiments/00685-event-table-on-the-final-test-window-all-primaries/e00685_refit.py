@@ -14,10 +14,12 @@ loop for the new cuts only) and differs in four ways, all in service of reading 
 4. The output is the stored forecast array padded to the new grid, with the window filled in from
    the new cuts, at `e327_extended/forecast/C/forecast_<series>.npy`.
 
+Run from the repository root:
+
     export DATA_PATH_INTERNAL=<path to the internal data folder>
     PYTHONPATH=ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual \
         systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        env OMP_NUM_THREADS=1 uv run --no-sync python e00685_refit.py
+        env OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00685-*/e00685_refit.py
 """
 
 from __future__ import annotations

@@ -196,7 +196,6 @@ the two rows of the one edge transfer (the per-Primary and per-month counts are 
   fitting code that exclude the window.
 - `e00685_run.py`: extends the power panel, removes the common median, runs E1-J-sym, checks the
   earlier events against experiment 680, and writes the tables.
-- `NOTE.md`: the working note.
 - Private tables, not in git:
   `data/ml-experiments/00685-event-table-on-the-final-test-window-all-primaries/event_table/`
   (`candidate_events.parquet` and `.csv`, `SUMMARY.md`, `reproduction_gate.json`, and the lists of
