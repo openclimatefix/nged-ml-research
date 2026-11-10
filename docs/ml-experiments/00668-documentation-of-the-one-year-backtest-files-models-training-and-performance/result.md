@@ -597,29 +597,6 @@ inputs that could react to a step.
 
 ![D16, day-ahead forecasts through the load shift, normal running above and prevailing below](event_D16_day_ahead.svg)
 
-The 14-day forecasts from five origins follow, for D5 and then D16. Each figure holds the
-normal-running output above and the prevailing output below.
-
-![D5, 14-day forecast from an origin 3 days before the step start](event_D5_fan_before_start.svg)
-
-![D5, 14-day forecast from an origin 3 days after the step start](event_D5_fan_early_inside.svg)
-
-![D5, 14-day forecast from an origin 4 days before the step end](event_D5_fan_late_inside.svg)
-
-![D5, 14-day forecast from the last origin before the step end](event_D5_fan_last_day.svg)
-
-![D5, 14-day forecast from the first origin after the step end](event_D5_fan_after_end.svg)
-
-![D16, 14-day forecast from an origin 3 days before the step start](event_D16_fan_before_start.svg)
-
-![D16, 14-day forecast from an origin 3 days after the step start](event_D16_fan_early_inside.svg)
-
-![D16, 14-day forecast from an origin 4 days before the step end](event_D16_fan_late_inside.svg)
-
-![D16, 14-day forecast from the last origin before the step end](event_D16_fan_last_day.svg)
-
-![D16, 14-day forecast from the first origin after the step end](event_D16_fan_after_end.svg)
-
 ## BSPs and GSPs
 
 The two BSPs and two GSPs are forecast by the lag-enabled network of [experiment
@@ -1415,9 +1392,6 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
 - **The Primaries heads change in January 2026.** 2025-11 and 2025-12 use the B-haz fallback head,
     and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. Only R-haz reads the extra
     lagged power inputs.
-- **Fan figures of the load shift.** The prevailing panels of the 14-day forecast figures from five
-    origins (`event_D5_fan_*.svg` and `event_D16_fan_*.svg`) show the prevailing head without the
-    extra lagged inputs.
 - **The prevailing output over-persists after a load shift ends.** One verified load shift, at D5
     and D16, is the only example, so the size of the effect is not estimated.
 - **Quantiles exceed table capacity in the files.** The highest quantile reaches 2.1 times
