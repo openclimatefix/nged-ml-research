@@ -101,8 +101,8 @@ lessons: >-
   everywhere (the bulk and grid supply points, solar, the prevailing Primaries) and cannot fix
   normal-running Primaries coverage in winter, where the shortfall (77.7% in 2026-01) comes from
   error in the median that widening does not remove. A scale fitted through a load transfer
-  overshoots after it ends (Primary 13: 97.5% in 2026-09), and a level shift fitted per series
-  pools those events into the median and lowers skill.
+  overshoots after it ends (Primary 13: 97.5% in 2026-09), and the median bias of the stored files
+  changes sign from month to month, so a level shift fitted on earlier months lowers skill.
 take_home_message: >-
   Widening the stored bands by a factor fitted only on earlier months brings the bulk supply
   points, grid supply points, solar, and the prevailing Primaries output to within 2 points of the
@@ -130,9 +130,10 @@ production_status: candidate
 adopted_in: none
 ---
 
-**The stored quantile bands cover the actual power less often than their 90% label says, and a
-scale fitted on earlier months fixes that for five of the six outputs but not for the normal-running
-Primaries.** We took the five stored one-year forecast files (the 16 Primaries, with a normal-running
+**The stored quantile bands cover the actual power less often than their 90% label says, and a scale
+  fitted on earlier months fixes that for five of the six outputs but not for the normal-running
+  Primaries.** We took the five stored one-year forecast files (the 16 Primaries, with a
+  normal-running
 and a prevailing output, the 2 bulk supply points, the 2 grid supply points, 3 wind farms, and 6
 solar farms) and rescaled the distance of every quantile from the median by a number fitted only
 on forecasts whose actual power was already known at the start of each month. We then counted how
@@ -210,11 +211,11 @@ of the ratio between the two seeds of one fold in experiment 667 (0.89 to 1.10).
   66.2%. The stored file has 81.7% and 77.7%. So the sensitivity runs at 45 and 180 days and the
   refit-ratio diagnostic were not run.
 - **Primaries 13 and 16 in 2026-07 and 2026-08.** Stored coverage is 28.3% and 22.9% at Primary 13
-  and 24.5% and 22.1% at Primary 16. Arm 2 gives 25.5% and 49.4% at Primary 13 (P5 holds: below
-  0.80). Without those two series in those two months, pooled normal-running coverage of the other
-  Primaries is 80.6% and 79.5% stored and 88.9% and 86.0% under arm 2 (all 16 series: 73.9% and
-  72.4% stored, 81.1% and 82.6% under arm 2). After the event, the scale overshoots: Primary 13 has
-  97.5% in 2026-09 and 97.8% in 2026-10 under arm 2.
+  and 24.5% and 22.1% at Primary 16. Arm 2 gives 25.5% and 49.4% at Primary 13 and 26.1% and 66.7%
+  at Primary 16 (P5 holds: all below 0.80). Without those two series in those two months, pooled
+  normal-running coverage of the other Primaries is 80.6% and 79.5% stored and 88.9% and 86.0% under
+  arm 2 (all 16 series: 73.9% and 72.4% stored, 81.1% and 82.6% under arm 2). After the event, the
+  scale overshoots: Primary 13 has 97.5% in 2026-09 and 97.8% in 2026-10 under arm 2.
 - **Final-test window (2026-07 to 2026-10, descriptive).** Arm 2 coverage: normal-running
   Primaries 85.9% to 86.7% (stored 76.9% to 77.5%), prevailing 88.7% to 89.0%, bulk supply points
   86.8% to 88.5% (stored 83.7% to 84.9%), grid supply points 87.5% to 88.1% (stored 86.9% to
@@ -241,17 +242,24 @@ of the ratio between the two seeds of one fold in experiment 667 (0.89 to 1.10).
 
 ## Checks
 
-- **Median minus mean forecast:** not applicable, since the stored files hold no mean forecast.
-  Arms 1 and 2 leave `q50` unchanged, so the error of the median is the same as the stored file's;
-  arm 3 moves it. The mean fitted shift (stored median bias, points of capacity) is 0.9 for the
-  normal-running Primaries, -0.2 for the prevailing, -0.4 for bulk supply points, 5.9 for grid
-  supply points, 1.7 for wind, and 0.2 for solar; the grid supply points' bias is the reason arm 3
-  hurts them most (CRPS +0.842 points of capacity).
-- **Triggers fired:** trigger 5 (arm 3, which contains arm 2, is worse than arm 2). The explanation
-  is the grid supply points' and the load transfers' effect on a per-series shift pooled over all
-  lead bands; a fresh Sonnet audit is listed in the pull request. Triggers 1, 3, 4, 6, and 7 do
-  not apply; trigger 2 does not fire, because the P2 failure is explained by the monthly and
-  Primary 13 and 16 slices above.
+- **Median minus mean forecast:** not applicable, since the stored files hold no mean forecast. Arms
+  1 and 2 leave `q50` unchanged, so the error of the median is the same as the stored file's; arm 3
+  moves it. The mean fitted shift (stored median bias, points of capacity; the unweighted mean over
+  the fitted series-by-month cells, 2025-12 to 2026-10) is 0.9 for the normal-running Primaries,
+  -0.2 for the prevailing, -0.4 for bulk supply points, 5.9 for grid supply points, 1.7 for wind,
+  and 0.2 for solar. The audit found that a shift-only counterfactual (stored quantiles plus the
+  fitted shift, no rescale) reproduces nearly all of arm 3's damage (grid supply points' CRPS 13.88
+  stored, 14.75 shift-only, 14.72 arm 3; normal-running Primaries 4.23, 4.47, 4.54), and that the
+  fitted shift does not persist: its correlation with the next month's median error is -0.41 at the
+  grid supply points and +0.26 for the normal-running Primaries.
+- **Triggers fired:** trigger 5 (arm 3, which contains arm 2, is worse than arm 2). A fresh Sonnet
+  audit re-derived the BSP and normal-running Primaries coverage and CRPS from the raw files,
+  rebuilt the Primary 17 scale for 2026-01 (matching the stored arm 2 to 6 significant figures, with
+  no fitting row after the cut-off), and confirmed the stop rule and the Primary 13 and 16 figures.
+  It found no bug, and it showed that the median bias of the stored files changes sign from month to
+  month, so a shift fitted on earlier months does not carry forward (the audit report is private).
+  Triggers 1, 3, 4, 6, and 7 do not apply; trigger 2 does not fire, because the P2 failure is
+  explained by the monthly and Primary 13 and 16 slices above.
 - **Scale clipping.** The scale hit its bounds in 24 of 704 normal-running Primaries cells
   (bounds 0.5 and 3), in none elsewhere, and no cell fell back to a scale of 1.
 - **Caveats stated in advance.** The first calibrated month, 2025-12, fits on about 30 days. The
