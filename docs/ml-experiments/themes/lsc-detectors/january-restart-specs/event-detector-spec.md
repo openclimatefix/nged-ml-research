@@ -442,4 +442,3 @@ the features that the simple detector uses (per-lag causal step statistics in no
 scales, the gap with the all-Primaries median removed, the opposite-sign neighbour gap, the
 routine-step rate, the return-to-level statistic), and let the network learn how to use them. Test
 the explicit flag only as a comparison arm: features only against features plus flag.
-

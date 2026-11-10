@@ -195,4 +195,3 @@ improve the result at 15 Primaries.
 `edge_flow_reconstruction_spec.md`, and their addenda) describe work that experiments 676, 680, and
 682 have run (676 and 682 closed their lines of work). The worker briefs, the simulator briefs, and
 the PV-session replies are conversation, and their findings are in the merged pages.
-
