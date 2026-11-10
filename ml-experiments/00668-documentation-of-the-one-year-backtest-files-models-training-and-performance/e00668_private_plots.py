@@ -25,8 +25,11 @@ FOLDER = lib.FOLDER
 WIDTH, HEIGHT = 640, 300
 DAY = 48
 BLACK, BLUE, PURPLE, ORANGE, TEAL = "#000000", "#306BFF", "#B701FF", "#FF4901", "#0E9F6E"
-LEAD_COLOURS = {"0-1 d": BLUE, "2-3 d": TEAL, "6-7 d": PURPLE, "13-14 d": ORANGE}
-LEAD_WINDOWS = {"0-1 d": (0, 1), "2-3 d": (2, 3), "6-7 d": (6, 7), "13-14 d": (13, 14)}
+# Each line is the forecast made at 12:00 UTC on the day `k` days before the valid day, so one
+# origin covers a whole valid UTC day (lead from 24k-12 to 24k+12 hours) and the line never
+# switches origin at midday, when a solar farm's output peaks.
+LEAD_COLOURS = {"0.5-1.5 d": BLUE, "2.5-3.5 d": TEAL, "6.5-7.5 d": PURPLE, "12.5-13.5 d": ORANGE}
+LEAD_DAYS_BEFORE = {"0.5-1.5 d": 1, "2.5-3.5 d": 3, "6.5-7.5 d": 7, "12.5-13.5 d": 13}
 GROUPS = {
     "BSPs": ("bsps", "demand", [1, 2], "BSP"),
     "GSPs": ("gsps", "demand", [27, 28], "GSP"),
@@ -118,7 +121,7 @@ def weeks_figure(
         title=title(
             [
                 f"{label}: day-ahead forecasts, stitched day by day",
-                "Black: observed. Blue: median with q05 to q95 band."
+                "Black: observed. Blue: median with q05 to q95 band. Each UTC day comes from the previous day's 12:00 UTC origin."
                 + (" Orange dashes: manual heuristic." if has_heur else ""),
             ]
         )
@@ -184,7 +187,7 @@ def leads_figure(
         title=title(
             [
                 f"{label}: the median at four lead times",
-                "Black: observed. Colours: the median forecast for the same half-hours made 0-1, 2-3, 6-7, and 13-14 days ahead.",
+                "Black: observed. Colours: the median forecast for the same half-hours made about 1, 3, 7, and 13 days ahead (lead ranges in the legend).",
             ]
         )
     )
@@ -193,12 +196,17 @@ def leads_figure(
 def stitched_week(
     *, fc: pl.DataFrame, start: datetime, grid: np.ndarray | None, row: int
 ) -> pl.DataFrame:
-    """Return the day-ahead (lead up to 24 hours) quantiles for one week, with the heuristic if a grid is given."""
+    """Return the day-ahead quantiles for one week, with the heuristic if a grid is given.
+
+    Each valid UTC day comes from the 12:00 UTC origin of the day before (lead 12 to 36 hours), so
+    the line joins two origins at midnight UTC and never at midday.
+    """
     s0 = lib.grid_index(times=pl.Series([start]).dt.replace_time_zone("UTC"))[0]
     s = fc.filter(
-        (pl.col("vidx") - pl.col("oidx") <= DAY)
-        & (pl.col("vidx") > s0)
-        & (pl.col("vidx") <= s0 + 7 * DAY)
+        (pl.col("vidx") - pl.col("oidx") >= DAY // 2)
+        & (pl.col("vidx") - pl.col("oidx") < DAY + DAY // 2)
+        & (pl.col("vidx") >= s0)
+        & (pl.col("vidx") < s0 + 7 * DAY)
     ).sort("vidx")
     out = s.select(time=pl.Series(to_time(s["vidx"].to_numpy())), q05="q05", q50="q50", q95="q95")  # ty: ignore[invalid-argument-type]
     if grid is not None:
@@ -274,10 +282,10 @@ def main(out: Path) -> None:  # noqa: PLR0915
             )
             desc1 = (
                 f"{label} (original id {sid}, {unit}). Two example weeks, {WEEK_RULES[kind]}: top {panels[0][0]}; bottom {panels[1][0]}. "
-                "Each forecast point is the first 24 hours of the daily 12:00 UTC origin, so the blue line joins one day-long forecast to the next. "
+                "Each UTC day is forecast from the 12:00 UTC origin of the day before (lead 12 to 36 hours), so the blue line joins one day-long forecast to the next at midnight UTC. "
                 "Black is observed power; blue is the median with the q05 to q95 band"
                 + ("; orange dashes are NGED's manual heuristic" if grid is not None else "")
-                + ". Look for the band holding the black line about 90% of the time, jumps at the 12:00 joins, and the heating, solar, or wind pattern the median misses."
+                + ". Look for the band holding the black line about 90% of the time, jumps at the midnight joins, and the heating, solar, or wind pattern the median misses."
             )
             # (2) fans
             origins = np.sort(fc["oidx"].unique().to_numpy())
@@ -321,12 +329,12 @@ def main(out: Path) -> None:  # noqa: PLR0915
             for name, start in zip(names, weeks, strict=True):
                 s0 = lib.grid_index(times=pl.Series([start]).dt.replace_time_zone("UTC"))[0]
                 parts = []
-                for lead_name, (d0, d1) in LEAD_WINDOWS.items():
+                for lead_name, k in LEAD_DAYS_BEFORE.items():
                     s = fc.filter(
-                        (pl.col("vidx") - pl.col("oidx") >= d0 * DAY)
-                        & (pl.col("vidx") - pl.col("oidx") < d1 * DAY)
-                        & (pl.col("vidx") > s0)
-                        & (pl.col("vidx") <= s0 + 7 * DAY)
+                        (pl.col("vidx") - pl.col("oidx") >= k * DAY - DAY // 2)
+                        & (pl.col("vidx") - pl.col("oidx") < k * DAY + DAY // 2)
+                        & (pl.col("vidx") >= s0)
+                        & (pl.col("vidx") < s0 + 7 * DAY)
                     ).sort("vidx")
                     parts.append(
                         s.select(
@@ -344,7 +352,7 @@ def main(out: Path) -> None:  # noqa: PLR0915
             f3 = f"{slug}_lead_times.svg"
             leads_figure(panels=lp, label=label, unit=unit).save(out / f3)
             desc3 = (
-                f"{label} (original id {sid}, {unit}). The same two weeks as the first figure. Each coloured line is the median forecast for the same half-hours made 0-1 days, 2-3 days, 6-7 days, and 13-14 days ahead; black is observed power. "
+                f"{label} (original id {sid}, {unit}). The same two weeks as the first figure. Each coloured line is the median forecast for the same half-hours made from the 12:00 UTC origin 1, 3, 7, and 13 days before the valid day, so each valid UTC day has one origin and its lead runs from 12 hours below to 12 hours above the legend's centre (for example 12.5 to 13.5 days for the orange line); a line joins two origins at midnight UTC, when solar output is zero, and never at midday. Black is observed power. "
                 "Look for how quickly the longer-lead lines lose the daily shape and drift from the black line."
             )
             files += [f1, f2, f3]
