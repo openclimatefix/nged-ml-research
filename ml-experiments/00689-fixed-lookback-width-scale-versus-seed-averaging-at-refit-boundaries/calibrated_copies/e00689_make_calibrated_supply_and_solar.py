@@ -46,8 +46,10 @@ def make_copy(*, name: str, out_dir: Path) -> None:
         msg = f"{name}: the arm 2 file does not have the stored file's keys in the same order"
         raise ValueError(msg)
     out = original.select(KEYS).with_columns([arm[c].cast(pl.Float32) for c in lib.QCOLS])
-    shift = (out["q50"].cast(pl.Float64) - original["q50"].cast(pl.Float64)).abs().max()
-    if shift > Q50_TOLERANCE * max(1.0, original["q50"].abs().max()):
+    diff = (out["q50"].cast(pl.Float64) - original["q50"].cast(pl.Float64)).abs()
+    shift = float(diff.max())  # ty: ignore[invalid-argument-type]
+    scale = float(original["q50"].abs().max())  # ty: ignore[invalid-argument-type]
+    if shift > Q50_TOLERANCE * max(1.0, scale):
         msg = f"{name}: q50 changed by {shift}"
         raise ValueError(msg)
     out.write_parquet(

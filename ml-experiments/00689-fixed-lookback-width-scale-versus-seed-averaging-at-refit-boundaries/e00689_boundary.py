@@ -18,7 +18,7 @@ from typing import Final
 import e00668_score_lib as lib  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-from e00683_calibrate import (
+from e00683_calibrate import (  # ty: ignore[unresolved-import]
     DELAY_HALF_HOURS,
     MIN_FIT_DAYS,
     SCALE_BOUNDS,
@@ -76,7 +76,7 @@ def load_rows(*, frame: pl.DataFrame, ids: list[int], cap: np.ndarray, grid: np.
 
 
 def fit_scales(*, d: dict, month: str, lookback: int, n: int) -> np.ndarray:
-    """Return the (series, band) scale for an origin month, fitted on the previous `lookback` days."""
+    """Return the (series, band) scale for an origin month, fitted on the last `lookback` days."""
     start = pl.select(pl.datetime(int(month[:4]), int(month[5:]), 1, time_zone="UTC")).to_series()
     cut = int(lib.grid_index(times=start)[0]) - DELAY_HALF_HOURS
     win = (d["vidx"] <= cut) & (d["vidx"] > cut - 48 * lookback) & d["ok"]
@@ -210,7 +210,7 @@ def shift_to_contract(*, frame: pl.DataFrame, capacity: pl.DataFrame) -> pl.Data
     )
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Run all arms and write the tables."""
     OUT.mkdir(parents=True, exist_ok=True)
     capacity = pl.read_parquet(lib.FOLDER / "series_capacity.parquet")
@@ -236,10 +236,10 @@ def main() -> None:
             )
         )
     mean_check = (
-        stored.select(KEYS + ["q05", "q95"])
+        stored.select([*KEYS, "q05", "q95"])
         .with_columns(pl.col("time_series_id").cast(pl.Int32))
-        .join(seeds[0].select(KEYS + ["q05", "q95"]), on=KEYS, suffix="_0")
-        .join(seeds[1].select(KEYS + ["q05", "q95"]), on=KEYS, suffix="_1")
+        .join(seeds[0].select([*KEYS, "q05", "q95"]), on=KEYS, suffix="_0")
+        .join(seeds[1].select([*KEYS, "q05", "q95"]), on=KEYS, suffix="_1")
         .select(
             rows=pl.len(),
             max_abs_q05_where_stored_positive=(

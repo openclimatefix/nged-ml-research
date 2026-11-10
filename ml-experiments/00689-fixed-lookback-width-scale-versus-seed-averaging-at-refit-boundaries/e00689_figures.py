@@ -4,11 +4,14 @@ DATA_PATH_INTERNAL=... uv run --no-sync python ml-experiments/00689-*/e00689_fig
 """
 
 from pathlib import Path
+from typing import Any
 
 import altair as alt
 import polars as pl
 from e00689_boundary import OUT
 
+Chart: Any = alt.Chart
+"""`alt.Chart` typed loosely: `ty` loses the chart type after `mark_*()`."""
 DOCS = Path(__file__).resolve().parents[2] / "docs/ml-experiments"
 FOLDER = next(DOCS.glob("00689-*"))
 COLOURS = {
@@ -31,7 +34,7 @@ def share_chart() -> None:
         lo=pl.col("lo") * 100,
         hi=pl.col("hi") * 100,
     )
-    base = alt.Chart(s.to_pandas()).encode(  # ty: ignore[unresolved-attribute]
+    base = Chart(s.to_pandas()).encode(
         y=alt.Y("arm:N", title=None, sort=None),
     )
     bars = base.mark_bar(size=14, color="#306BFF").encode(
@@ -43,10 +46,8 @@ def share_chart() -> None:
     )
     err = base.mark_rule(strokeWidth=1, color="black").encode(x="lo:Q", x2="hi:Q")
     line = (
-        alt.Chart(pl.DataFrame({"x": [90.0]}).to_pandas())
-        .mark_rule(  # ty: ignore[unresolved-attribute]
-            strokeWidth=1, strokeDash=[4, 3], color="#FF4901"
-        )
+        Chart(pl.DataFrame({"x": [90.0]}).to_pandas())
+        .mark_rule(strokeWidth=1, strokeDash=[4, 3], color="#FF4901")
         .encode(x="x:Q")
     )
     (bars + err + line).properties(width=620, height=220).save(
@@ -73,7 +74,7 @@ def scatter() -> None:
     )
     scale = alt.Scale(type="log", domain=[0.5, 4], base=2)
     pts = (
-        alt.Chart()
+        Chart()
         .mark_point(size=18, filled=True, opacity=0.6)
         .encode(
             x=alt.X("stored:Q", title="Ratio after / before, stored", scale=scale),
@@ -87,24 +88,20 @@ def scatter() -> None:
         )
     )
     box = (
-        alt.Chart(pl.DataFrame({"a": [0.5], "b": [4.0], "lo": [0.9], "hi": [1.1]}).to_pandas())
-        .mark_rect(  # ty: ignore[unresolved-attribute]
-            color="#D9D9D9", opacity=0.6
-        )
+        Chart(pl.DataFrame({"a": [0.5], "b": [4.0], "lo": [0.9], "hi": [1.1]}).to_pandas())
+        .mark_rect(color="#D9D9D9", opacity=0.6)
         .encode(x="a:Q", x2="b:Q", y="lo:Q", y2="hi:Q")
     )
     diag = (
-        alt.Chart(pl.DataFrame({"x": [0.5, 4.0]}).to_pandas())
-        .mark_line(  # ty: ignore[unresolved-attribute]
-            strokeWidth=1, color="black"
-        )
+        Chart(pl.DataFrame({"x": [0.5, 4.0]}).to_pandas())
+        .mark_line(strokeWidth=1, color="black")
         .encode(x="x:Q", y="x:Q")
     )
     panel = (box + diag + pts).properties(width=300, height=300)
     chart = (
         alt.layer(box, diag, pts, data=d.to_pandas())
         .properties(width=300, height=300)
-        .facet(  # ty: ignore[unresolved-attribute]
+        .facet(
             facet=alt.Facet(
                 "band_name:N",
                 title=None,

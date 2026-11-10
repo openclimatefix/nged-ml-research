@@ -55,52 +55,56 @@ verdict: not supported
 best_arm: >-
   None. No arm removes the steps: 15.2% of the 151 affected cells have a calibrated ratio of 0.90
   to 1.10 under arm A (90 days), 15.9% under arm B (per seed), 9.9% and 7.3% under the 45-day and
-  180-day lookbacks (stored: 0.7%).
+  180-day lookbacks (stored: 0.7%, which is near zero by construction).
 headline: >-
-  A fixed lookback does not remove the band-width steps at the refits. 23 of 151 affected cells
-  (15.2%, percentile interval 14.6% to 24.5%) end inside 0.90 to 1.10 under the 90-day scale,
-  against the predicted 90%. The scale widens the step in 67% of the affected cells, because it is
-  fitted on the model that the refit replaces. Seed averaging does not drive the steps: arm B's
-  ratio is within 0.05 of arm A's in 89.4% of cells.
+  A fixed lookback does not remove the band-width steps at the refits of Primaries 11 and the
+  six February widenings (the September step of Primary 13 lies after June and was not tested). 23
+  of 151 affected cells (15.2%, percentile interval 14.6% to 24.5%) end inside 0.90 to 1.10 under
+  the 90-day scale, against the predicted 90%. The scale moves the ratio farther from 1 in 67% of
+  the affected cells. Arm B's ratio is within 0.05 of arm A's in 89.4% of cells, just under the
+  pre-registered 90%, so we read the seed average as having no material effect on the steps.
 lessons: >-
-  The steps at the refits come from the new model's raw band width differing from the old model's,
-  not from the seed average and not from the lookback. The scale carries the old model's width
-  correction into the new model, so after a refit it can add to the step: Primary 18 at the
-  February refit goes from a stored ratio of 1.39 to 3.62 at days 7 to 14.
+  A scale fitted on the previous 45, 90, or 180 days leaves 7.3% to 15.2% of the affected cells
+  inside 0.90 to 1.10. A scale fitted per seed gives nearly the same ratios. We expect the new
+  model's raw band width to differ from the old model's, and the scale for a month is fitted on the
+  old model's forecasts; this experiment did not test that mechanism. Primary 18 at the February
+  refit goes from a stored ratio of 1.39 to 3.62 at days 7 to 14.
 take_home_message: >-
   A single width scale fitted on the previous 90, 45, or 180 days does not remove the steps in
-  band width at the model refits, and often makes them larger (the median step of an affected
-  cell goes from 15% stored to 24%). Fitting the scale per seed and averaging gives nearly the
-  same ratios, so seed averaging is not the cause. The scale for a month is fitted on forecasts of
-  the model that the refit replaces; a calibration that follows refits needs the new model's own
-  forecasts, which do not exist before the refit.
+  band width at the refits of Primary 11 and the six February widenings, and moves the ratio
+  farther from 1 in 67% of affected cells (the median step of an affected cell goes from 15%
+  stored to 24%). Fitting the scale per seed and averaging gives nearly the same ratios, so seed
+  averaging is not what drives the steps. A scale fitted on the new model's own forecasts could
+  follow a refit, but those forecasts do not exist until after it; this experiment did not test one.
 advice:
   - >-
     Do not rely on a fixed-lookback width scale to hold band width steady across a refit: 15.2% of
     affected cells ended inside 0.90 to 1.10, and Primary 18's days 7 to 14 step grew from 1.39 to
     3.62 (arm A against stored).
   - >-
-    A scale fitted per seed and averaged is not needed for the boundary question: its ratios are
-    within 0.05 of the seed-mean scale's in 89.4% of affected cells (arm B against arm A).
+    A scale fitted per seed and averaged is not what drives the steps: its ratios are within 0.05
+    of the seed-mean scale's in 89.4% of affected cells, just under the pre-registered 90% (arm B
+    against arm A).
 production_status: not-for-production
 adopted_in: none
 ---
 
 **A width scale fitted on a fixed lookback does not remove the steps in band width at the model
-refits, and seed averaging is not their cause.** Under the 90-day scale of experiment 683 (arm A),
+refits, and seed averaging does not drive them.** Under the 90-day scale of experiment 683 (arm A),
 23 of the 151 affected cells (15.2%) end with a ratio of 0.90 to 1.10 across the refit, against the
-predicted 90%. The scale makes the step larger in 67% of the affected cells, because the scale for
-a month is fitted on forecasts of the model that the refit replaces. Fitting the scale on each
-seed's quantiles and then averaging (arm B) changes the ratios by at most 0.05 in 89.4% of the
-cells, so seed averaging does not matter for the steps.
+predicted 90%. The scale moves the ratio farther from 1 in 67% of the affected cells. Fitting the
+scale on each seed's quantiles and then averaging (arm B) changes the ratios by at most 0.05 in
+89.4% of the cells, just under the pre-registered 90%, so we read the seed average as having no
+material effect on the steps.
 
 The question was whether the steps that experiment 683 measured (Primaries 11 and 13, and six
-widenings in February) are removed by one scale per series and lead band, or whether they come from
-the seed average of the quantiles changing at a refit. The answer is neither: the new model's raw
-band width differs from the old model's, and a lookback of 45, 90, or 180 days changes the share of
-cells that pass by a few points only. This narrows the search for a calibration that follows refits
-to one that has some forecasts of the new model, such as a scale refitted a few weeks after each
-refit, or a refit-aware scale; this experiment does not test either.
+widenings in February) are removed by one scale per series and lead band, or come from the seed
+average of the quantiles changing at a refit. The September step of Primary 13 lies after the last
+scored origin month, so this experiment tests Primary 11 and the February widenings only. A
+lookback of 45, 90, or 180 days leaves 7.3% to 15.2% of cells inside 0.90 to 1.10, far below 90%. We
+expect the new model's raw band width to differ from the old model's, and the scale for a month is
+fitted on the old model's forecasts, but this experiment did not test that mechanism and did not
+fit a scale on any new-model forecasts.
 
 ## Figures
 
@@ -119,7 +123,8 @@ steps that the scale has enlarged.*
 ## Arms and rows
 
 - **Rows:** the 16 Primaries, normal-running output, origin months 2025-12 to 2026-06 (refit
-  boundaries 2026-01 to 2026-06; 2025-11 has no scale and 2026-07 onward is not loaded). 384 cells
+  boundaries 2026-01 to 2026-06; 2025-11 has no earlier forecast to fit on, and origin months from
+  2026-07 lie in the final-test window and are not loaded). 384 cells
   (16 series, 6 boundaries, 4 lead bands); 151 are affected (stored ratio above 1.10 or below
   1/1.10). Affected cells by boundary: 36, 20, 15, 25, 31, 24 (January to June).
 - **Cell ratio:** median band width (q95 minus q05, after the zero clamp for the MVA Primaries) of
@@ -130,22 +135,26 @@ steps that the scale has enlarged.*
   3 hours to the 12:00 UTC origin, times capacity), applied to the same seed, averaged, then clamped.
   The seed fits are clamped at zero for the fit only. **B-cross:** each seed scaled by the other
   seed's fit. **Arm C:** arm A at 45 and 180 days.
-- **Seed check:** the mean of the two seed files reproduces the stored file to 4e-6 (3,924,480
-  rows). Only the normal-running output has per-seed files, so the prevailing output is not
-  tested.
+- **Seed check:** the mean of the two seed files reproduces the stored file to a maximum absolute
+  difference of 4e-6 in the stored units (3,924,480 rows). Only the normal-running output has
+  per-seed files, so the prevailing output is not tested.
 - **Code reuse:** the fitting rule is copied from `ml-experiments/00683-*/e00683_calibrate.py`,
   which also supplies `z_scores`, `band_index`, and `load_truth`; scoring helpers come from
-  experiment 668. No cost cap or retraining involved: CPU only, no fits.
+  experiment 668. The experiment fits no forecasting model and ran on CPU only.
 
 ## Results
 
 - **P1 (at least 90% of affected cells within 0.90 to 1.10 under arm A): not supported.** 15.2%
   (23 of 151; interval 14.6% to 24.5%). By lead band: 7 of 44, 8 of 46, 4 of 27, 4 of 34 for days 0
   to 1, 1 to 3, 3 to 7, and 7 to 14. Stored: 1 of 151.
+- **Stored: 1 of 151 is near zero by construction**, because affected cells are those whose stored
+  ratio lies outside 0.909 to 1.10. Resampling regresses extreme cells towards 1, which favours the
+  calibrated arms, so the not-supported verdict is not weakened by it.
 - **P2 (expected to fail): held.** The median absolute step of an affected cell is 15% stored and
-  24% under arm A; arm A is farther from 1 than stored in 67% of cells.
+  24% under arm A; arm A moves the ratio farther from 1 than stored in 67% of cells (in either direction).
 - **P3 (arm B within 0.05 of arm A in at least 90% of cells): narrowly not met, at 89.4%** (135 of
-  151); B-cross is 86.8%. Arm B passes 24 of 151 cells (15.9%), against 23 for arm A.
+  151); B-cross is 86.8%. No interval was computed for this share. Arm B passes 24 of 151 cells
+  (15.9%), against 23 for arm A.
 - **Lookback (arm C):** 15 of 151 cells (9.9%) at 45 days and 11 (7.3%) at 180 days, against 23 at
   90 days. The steps do not follow the lookback.
 - **Named steps:** at the February refit, days 7 to 14 ratios (stored, arm A, arm B) are 1.21, 1.25,
@@ -156,24 +165,24 @@ steps that the scale has enlarged.*
 - **Coverage, q05 to q95, pooled by lead band, origin months 2025-12 to 2026-06 (weekly-block 95%
   intervals about 1.7 points wide each side):** stored 82.4% to 84.5%, arm A 87.1%, arm B 88.0% to
   88.1%, B-cross 88.0% to 88.2%, 45 days 86.8% to 86.9%, 180 days 86.9% to 87.0%. Arm B's coverage is
-  about 1 point above arm A's; this experiment does not test why.
+  about 1 point above arm A's, which is inside the width of the intervals.
 
 ## Checks
 
-- **Median minus mean forecast, mean-forecast error, scoring triggers:** not applicable, because the
-  experiment writes no forecast and scores no CRPS. No audit trigger fired.
-- **Code review:** a fresh Sonnet reviewer found the clamp before averaging in arm B, a fit on
-  unclamped seed quantiles, independent day draws per cell, the final-test months being loaded, and
-  duplicate-key and month-pairing guards. All were fixed before the numbers above were produced; the
-  basic interval the reviewer suggested was tried and rejected, because cells chosen for an extreme
-  stored ratio regress towards 1 under resampling and a basic interval then falls below 0.
-- **Bias in the intervals:** the percentile interval for the stored arm (11.9% to 29.2%) lies above
-  its point share (0.7%) for the same reason, so read the intervals as spread.
+- **Audit checks (median minus mean forecast, mean-forecast error, audit triggers):** not
+  applicable, because the experiment writes no forecast and scores no CRPS. No audit trigger fired.
+- **Code review:** a fresh Sonnet reviewer found five problems: arm B clamped before averaging,
+  arm B fitted on unclamped seed quantiles, independent day draws per cell, the final-test months
+  loaded, and missing duplicate-key and month-pairing guards. All were fixed before the numbers
+  above were produced.
+- **Bias in the intervals:** cells are chosen for an extreme stored ratio, so resampled days regress
+  towards 1 and every percentile interval sits above its point share (the stored arm: 11.9% to 29.2%
+  against 0.7%). Read the intervals as spread, not as bounds.
 
 ## Caveats and what to try next
 
-- **Caveat:** the 7-day windows are short; one cell's ratio has noise of the order of the 10% limit.
-  The pass share rests on 151 cells that share 6 boundaries.
+- **Caveat:** each ratio rests on two windows of 7 origin days and may be noisy. The pass share
+  rests on 151 cells that share 6 boundaries.
 - **Caveat:** the per-seed files exist for the normal-running output only, and for two seeds.
-- **Next:** test a scale refitted from the first weeks of forecasts after each refit, or fitted on
-  the new model's own back-test forecasts; either needs a refit-aware design.
+- **Options for a later experiment, not a plan:** fit the scale on the first weeks of forecasts
+  after each refit, or on the new model's own back-test forecasts.
