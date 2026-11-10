@@ -59,7 +59,7 @@ def extended_cams() -> pl.DataFrame:
     if out.group_by("site", "time").len()["len"].max() != 1:
         msg = "CAMS has a duplicated (site, time) key"
         raise ValueError(msg)
-    if out["time"].max() < WINDOW_LAST:
+    if out["time"].max() < WINDOW_LAST:  # ty: ignore[unsupported-operator]
         msg = f"CAMS ends at {out['time'].max()}, before {WINDOW_LAST}"
         raise ValueError(msg)
     return out
@@ -172,7 +172,7 @@ def window_rows(*, stored: pl.DataFrame, cams: pl.DataFrame) -> pl.DataFrame:
         )
         .with_columns(default_rows=pl.col("in_pool"))
     )
-    return frame.select(stored.columns).cast(dict(stored.schema))
+    return frame.select(stored.columns).cast(dict(stored.schema))  # ty: ignore[no-matching-overload]
 
 
 def main() -> None:

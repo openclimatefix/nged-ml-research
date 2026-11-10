@@ -10,6 +10,8 @@ keep the earlier events identical to experiment 680's, so that the window is the
   (on arrays cut at 78,816 half-hours), as experiment 680 froze them on the whole of its record.
 - The slow level is refitted on the whole panel, as in experiment 680.
 
+Run from the repository root:
+
     export DATA_PATH_INTERNAL=<path to the internal data folder>
     P=ml-experiments
     export PYTHONPATH=$P/00653-edge-state-event-table-penalised-segmentation:\
@@ -56,7 +58,7 @@ c653.E327 = E327_EXTENDED
 from e00653_core import decode_world, freeze  # noqa: E402  # isort: skip
 from e00653_segment import Event, Params  # noqa: E402  # isort: skip
 from e00653_slow import to_half_hours  # noqa: E402  # isort: skip
-from e00680_search import search_both_ends  # noqa: E402  # isort: skip
+from e00680_search import search_both_ends  # noqa: E402  # isort: skip  # ty: ignore[unresolved-import]
 
 
 class ExtendedPanel(c653.Panel):
@@ -70,7 +72,7 @@ class ExtendedPanel(c653.Panel):
 
 
 def write_extended_power() -> None:
-    """Pad experiment 327's stored power with the window's cleaned power from `inputs/rows.parquet`."""
+    """Pad experiment 327's stored power with the window's power from `inputs/rows.parquet`."""
     rows = pl.read_parquet(
         EXPERIMENT_DIR / "inputs" / "rows.parquet",
         columns=["time_series_id", "time", "power", "present"],
@@ -87,7 +89,11 @@ def write_extended_power() -> None:
         new[:OLD_LENGTH] = old
         sub = rows.filter(pl.col("time_series_id") == s)
         idx = (
-            (sub["time"].dt.replace_time_zone(None) - datetime(2022, 1, 1)).dt.total_minutes() // 30
+            (
+                sub["time"].dt.replace_time_zone(None)
+                - datetime(2022, 1, 1, tzinfo=UTC).replace(tzinfo=None)
+            ).dt.total_minutes()
+            // 30
         ).to_numpy()
         keep = (idx >= OLD_LENGTH) & (idx < NEW_LENGTH)
         new[idx[keep]] = sub["power"].to_numpy()[keep]
@@ -173,7 +179,7 @@ def write_summary(*, table: pl.DataFrame, out: Path, gate: dict) -> None:
         "",
         "Every row is a candidate, never a label: NGED's event labels are an incomplete dump. An",
         "edge transfer appears as two rows (the fall and the rise). Onset is the end time of the",
-        "first affected half-hour (UTC). `time_series_id` 13 is D18, 16 is D14, 11 is D4, 18 is D16.",
+        "first affected half-hour (UTC). `time_series_id` 13 is D18, 16 is D14, 11 is D4, 18 is D16.",  # noqa: E501
         "",
         "## Priority 1: transfers between time_series_id 13 and 16, July and August 2026",
         show(months(pair, 7, 8)),
