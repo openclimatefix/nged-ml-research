@@ -1375,9 +1375,8 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
 
 ## Caveats
 
-- **A descriptive year, not a ranking.** The year overlaps the development months and the final-test
-    window. The origin months 2026-07 to 2026-10 lie inside the final-test window, so the scores
-    there are descriptive.
+- **A descriptive year, not a ranking.** The year overlaps the development months and the
+    final-test window. The origin months 2026-07 to 2026-10 lie inside the final-test window.
 - **Less ensemble history early.** The ensemble history starts 2024-04-01, so early folds train on
     less ensemble data.
 - **Days 10 to 14 are reported separately.** The files hold 14 days, and the scores for days 10 to
@@ -1391,44 +1390,45 @@ The gaps in the stored default 3 and BG2 are stated plainly here:
     origins are joined on valid time with 3 hours subtracted from the lead. BSPs and GSPs have no
     such comparison.
 - **The Primaries heads change in January 2026.** 2025-11 and 2025-12 use the B-haz fallback head,
-    and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. Only R-haz reads the extra
-    lagged power inputs.
+    and 2026-01 to 2026-10 use R-haz trained on all earlier months' banks. Only R-haz reads the
+    extra lagged power inputs.
 - **The prevailing output over-persists after a load shift ends.** One verified load shift, at D5
     and D16, is the only example, so the size of the effect is not estimated.
-- **Quantiles exceed table capacity in the files.** The highest quantile reaches 2.1 times
-    the capacity table's value for D15 and 2.2 times for GSP D1 (observed maxima 1.28 and 1.34 times),
-    1.4 times for GSP D6, and 1.35 to 1.7 times for five more Primaries (D5, D12, D16, D18, and D22;
-    observed maxima 1.2 to 1.55 times). Capacity is therefore not a ceiling for the demand series.
-    The wind and solar files exceed it by up to 12%. The files keep these quantiles on purpose.
-    Capping them at the larger of the table capacity and the highest cleaned power before the
-    origin's month would change 2,604 rows of GSP D1, 4 rows of GSP D6, and no rows of D15.
-- **The q05 to q95 band covers less than 90% of observations.** Coverage is 81.4% for the Primaries
-    in normal running and 85.1% for the prevailing output, 86.7% for the BSPs, 87.7% for the GSPs,
-    91.3% for wind, and 89.3% for solar on daylight half-hours. The nominal coverage is 90%.
-- **The calibrated copies are post-processing, not the models.** The folder holds four calibrated
-    copies beside the originals: the prevailing Primaries rows, the BSPs, the GSPs, and the solar
-    file. Each scales the distance of every quantile from `q50` by one factor per series, origin
-    month, and lead band, fitted walk-forward on earlier power, so `q50` is unchanged. The
-    originals are the models as run, and the scores on this page use the originals. D18 and D14
-    keep their 2026-06 factor from 2026-07, a rule chosen after seeing the final-test months, so it
-    is post hoc. D18 stays at 63% to 77% coverage in 2026-07, 2026-08, and 2026-10 even in the
-    calibrated copy, because a load transfer moves its power outside any band fitted on earlier
-    months. The normal-running Primaries rows are not recalibrated, and wind has no calibrated
-    copy.
+- **Quantiles exceed table capacity in the files.** The highest quantile reaches 2.1 times the
+    capacity table's value for D15 and 2.2 times for GSP D1 (observed maxima 1.28 and 1.34 times),
+    1.4 times for GSP D6, and 1.35 to 1.7 times for five more Primaries (D5, D12, D16, D18, and
+    D22; observed maxima 1.2 to 1.55 times). Capacity is therefore not a ceiling for the demand
+    series. The wind and solar files exceed it by up to 12%. The files keep the quantiles above
+    capacity on purpose. Capping them at the larger of the table capacity and the highest cleaned
+    power before the origin's month would change 2,604 rows of GSP D1, 4 rows of GSP D6, and no
+    rows of D15.
+- **The q05 to q95 band covers less than 90% of observations.** Coverage is 81.4% for the
+    Primaries in normal running and 85.1% for the prevailing output, 86.7% for the BSPs, 87.7% for
+    the GSPs, 91.3% for wind, and 89.3% for solar on daylight half-hours.
+- **The calibrated copies are post-processing, not part of the neural networks.** The folder holds
+    four calibrated copies beside the originals: the prevailing Primaries rows, the BSPs, the
+    GSPs, and the solar file. Each scales the distance of every quantile from `q50` by one factor
+    per series, origin month, and lead band, fitted walk-forward on earlier power, so `q50` is
+    unchanged. The originals are the files as first written, with the clamps described above, and
+    the scores on this page use the originals. D18 and D14 keep their 2026-06 factor from 2026-07,
+    a rule chosen after seeing the final-test months, so the rule is post hoc. D18 stays at 63% to
+    77% coverage in 2026-07, 2026-08, and 2026-10 even in the calibrated copy, because a load
+    transfer moves its power outside any band fitted on earlier months. The normal-running
+    Primaries rows are not recalibrated, and wind has no calibrated copy.
 - **The positive-output fix and the physical solar night gate are not applied to the files.**
-    Experiment 684 validated both as model-level fixes
-    ([experiment 684](../00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)).
+    Experiment 684 tested both as fixes inside the neural network, at four Primaries and two solar
+    farms, and found them to be candidates to replace the clamps ([experiment
+    684](../00684-backtest-positive-demand-output-distributions-and-physical-solar-night-zero/result.md)).
     The files carry the post hoc clamps instead: the quantiles of D12, D22, and D8 are clamped at
     zero, and the solar quantiles are zero at night. D5 and D18 are measured in MW and never go
     negative in the observed power, yet their lower quantiles go below zero in 703 and 6 rows, and
     the files keep those rows.
-- **Band widths step at some refits.** D4 narrows by about a third at the refit that starts May 2026;
-    D18 widens by about half at the refit that starts September 2026; six Primaries widen by
+- **Band widths step at some refits.** D4 narrows by about a third at the refit that starts May
+    2026; D18 widens by about half at the refit that starts September 2026; six Primaries widen by
     1.2 to 1.5 times at the refit that starts February 2026.
 - **Two Primaries miss for two months.** The normal-running band of D18 and D14 covers about 22%
-    to 28% of observations in July and August 2026, probably because of a load shift
-    that normal running deliberately ignores; the cause has not been checked against the event
-    table.
+    to 28% of observations in July and August 2026, probably because of a load shift that normal
+    running deliberately ignores; the cause has not been checked against the event table.
 - **Numbers are provisional until the pages of experiments 667, 669, and 666 merge.** Those pages
     own the models behind the files.
 - **The last origins cannot be fully scored.** Observed power ends on 2026-11-09 and the wind idle
