@@ -8,7 +8,7 @@ distribution, that Gaussian rows equal the original functions, and that no quant
 
 import e00684_family as fam
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from scipy import integrate
 
 torch.manual_seed(0)
