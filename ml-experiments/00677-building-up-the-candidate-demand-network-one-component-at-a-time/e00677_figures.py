@@ -118,9 +118,7 @@ def horizon(*, span: int, which: str) -> alt.Chart:
     lo_hi = alt.Scale(domain=[6.4, 9.1], zero=False) if late else alt.Scale(zero=False)
     prefix = "INTERIM, quarterly refits (steps 1 to 8). " if INTERIM else ""
     sub = (
-        "Steps 5 to 8 and the monthly refits 9a and 9b, zoomed in; all trained with injected events. "
-        if late
-        else "Steps 1 to 5. "
+        "Steps 5 to 9b, zoomed in; all trained with injected events. " if late else "Steps 1 to 5. "
     )
     return (
         alt.Chart(frame)  # ty: ignore[unresolved-attribute]
@@ -236,7 +234,9 @@ def contrasts(*, span: int) -> alt.Chart:
         title=alt.TitleParams(
             [
                 "Change in score from each added component, all rows, 16 Primaries",
-                "Dot: mean change. Line: 95% interval from resampling 7-day blocks of origin days. Dashed line: no change.",
+                '"X vs Y" is the score of X minus the score of Y. Dot: mean change. Line: 95% interval from',
+                "resampling 7-day blocks of origin days. Dashed line: no change. Steps 9a and 9b are compared with",
+                "steps 5 and 8 on seeds 0 to 2; the other contrasts use seeds 0 to 4 for steps 5 to 8.",
             ],
             anchor="start",
             fontSize=12,
@@ -428,7 +428,9 @@ def band_panel(
         .to_pandas()
     )
     colour = ARM_COLOUR[step] if not kind else {"NRA": "#B701FF", "prevailing": "#009C75"}[kind]
-    x = alt.X("valid_time:T", title=None)
+    x = alt.X(
+        "valid_time:T", title=None, axis=alt.Axis(format="%d %b", tickCount="day", labelAngle=-45)
+    )
     wide = (
         alt.Chart(f)  # ty: ignore[unresolved-attribute]
         .mark_area(opacity=0.2, color=colour)
@@ -463,14 +465,16 @@ def prevailing_figure(
             lead_day=lead_day,
             kind=k,
             event=EVENT,
-            title=prefix
-            + f"{label}, Candidate (experiment 667, monthly refits), {name} output: {note}",
+            title=prefix + f"{label}, experiment 667 Candidate, {name} output: {note}",
         )
         for k, name in (("NRA", "NRA"), ("prevailing", "prevailing-conditions"))
     ]
     return alt.vconcat(*panels).properties(
         title=alt.TitleParams(
-            "Median (line), 50% band (dark shade), 90% band (light shade); observed power in orange. Prevailing output: the extra-lag head of experiment 681 (folds 2025-11 and 2025-12 keep the earlier head). Ladder steps 1 to 8 have no prevailing output.",
+            [
+                "Median (line), 50% band (dark shade), 90% band (light shade), each the mean over seeds;",
+                "observed power in orange. Ladder steps have no prevailing output.",
+            ],
             anchor="start",
             fontSize=11,
         )
@@ -505,7 +509,10 @@ def band_figure(
     ]
     return alt.vconcat(*panels).properties(
         title=alt.TitleParams(
-            "Median (line), 50% band (dark shade), 90% band (light shade) of the forecast; observed power in orange.",
+            [
+                "Median (line), 50% band (dark shade), 90% band (light shade), each the mean over seeds;",
+                "observed power in orange.",
+            ],
             anchor="start",
             fontSize=11,
         )

@@ -90,12 +90,15 @@ weather encoders pre-trained on ERA5 and CAMS.** (ERA5 and CAMS are two reanalys
 estimates of past weather.) Step 3b scores 8.30 against 8.73 for the manual heuristic. Step 5, the
 first step with both lags, scores 7.88.
 
-![Normalised MAE of the median by forecast horizon, steps 1 to 5](ladder_horizon_early.svg)
+![Normalised MAE of the median by forecast horizon, steps 1 to 5, with the manual heuristic, climatology, and experiment 667](ladder_horizon_early.svg)
 
 **Steps 6 to 8 add no skill over step 5 on the annual mean.** Step 8 is the Candidate. It scores
 7.99, which is 0.105 worse than step 5 (95% interval 0.078 to 0.132). Monthly refits improve both
 step 5 and step 8 by about 0.47 points, which is a larger gain than any component added after step
 3b.
+
+Colours are assigned within each figure, not across the page. In the second figure the lines of
+steps 7 and 8 nearly coincide.
 
 ![Normalised MAE of the median by forecast horizon, steps 5 to 8 and the monthly refits](ladder_horizon_late.svg)
 
@@ -171,10 +174,11 @@ scores themselves, because the two steps are scored on the same rows.
 ### Whether the later steps ride through load shifts better
 
 **The logged events cannot show which step handles a load shift better, because every step's error
-jumps at the event start.** The figure pools 12 logged events (10 shifts that lasted more than 7
-days and involved two units or more, plus the verified transfer at D5 and D16). NGED's event labels
-are an incomplete dump, so these counts are lower bounds. The normal-running output is meant to
-carry on as if the shift had not happened, so a jump in error is expected at every step.
+jumps at the event start.** The figure pools 12 logged events (10 at days −7 to 3 after the start,
+because two began before the backtest) (10 shifts that lasted more than 7 days and involved two
+units or more, plus the verified transfer at D5 and D16). NGED's event labels are an incomplete
+dump, so these counts are lower bounds. The normal-running output is meant to carry on as if the
+shift had not happened, so a jump in error is expected at every step.
 
 ![Error of the median forecast by whole days since the event start](event_aligned_start.svg)
 
@@ -197,7 +201,8 @@ forecast ignores the shift, and smaller is better for the normal-running output.
 
 Each cell is the mean over seeds 0 to 2 of the pooled share over days 0 to 14, and the standard
 deviation over seeds is 0.002 to 0.008. The monthly column is the "trained with" version. Steps 7
-and 8 copy similar shares (0.033 and 0.028), so the neighbour columns add little here.
+and 8 copy similar shares (0.033 and 0.028), so their lines overlap in the figure and the neighbour
+columns add little here.
 
 **Away from the logged events, the later steps have a higher MAE.** On rows more than 14 days from
 any logged event of the same series, MAE rises against step 5 by 0.049 (interval 0.037 to 0.061) at
@@ -226,13 +231,16 @@ over the verified transfer.
 
 ### Time series of the forecasts
 
-**Both step 5 and step 8 follow the daily shape of D16 and D5 but stay well below the observed peaks
-during the confirmed shift.** Each figure has one arm per panel. The line is the median, the dark
-band is q25 to q75, the light band is q05 to q95, and the orange line is the observed power. The
-grey rectangle marks the confirmed load shift of D5 and D16 from 2025-12-30 to 2026-01-15, with at
-least 14 days either side. At D16 the observed peaks reach about 13 MW, and the medians of both
-steps stay near 9 to 10 MW through the shift. The normal-running output is meant to carry on as if
-the shift had not happened.
+**At D16 both step 5 and step 8 follow the daily shape but stay well below the observed peaks during
+the confirmed shift, and at D5 they stay above the observed power.** D5 and D16 are the two
+Primaries between which load was transferred. Each figure has one arm per panel, where an arm is
+one step. The line is the median, the dark band is q25 to q75, the light band is q05 to q95, and
+each is the mean over seeds. The orange line is the observed power. The grey rectangle marks the
+confirmed load shift from 2025-12-30 to 2026-01-15, with 14 days either side. The scored
+"verified transfer" window starts and ends one day earlier, on 2025-12-29 and 2026-01-14. At D16 the
+observed peaks reach about 13 MW, and the medians of both steps stay near 9 to 10 MW through the
+shift. At D5, which gave up load, the observed power falls and the medians stay above it. The
+normal-running output is meant to carry on as if the shift had not happened.
 
 ![D16, verified transfer, steps 5 and 8, forecasts made 1 to 2 days ahead](bands_verified_transfer_D16_lead1.svg)
 
@@ -240,11 +248,7 @@ the shift had not happened.
 
 ![D16, verified transfer, steps 5 and 8, forecasts made 5 to 6 days ahead](bands_verified_transfer_D16_lead5.svg)
 
-![D16, verified transfer, steps 6 and 7, forecasts made 1 to 2 days ahead](bands_verified_transfer_D16_lead1_steps6_7.svg)
-
-A cold week and a warm week at D16 show the same arms away from the event.
-
-![D16, cold week, steps 5 and 8, forecasts made 1 to 2 days ahead](bands_cold_week_D16_lead1.svg)
+A warm week at D16 shows the same arms away from the event.
 
 ![D16, warm week, steps 5 and 8, forecasts made 1 to 2 days ahead](bands_warm_week_D16_lead1.svg)
 

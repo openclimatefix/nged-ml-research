@@ -150,12 +150,12 @@ def line_chart(
     import pandas as pd  # noqa: TID251  (Altair takes pandas frames)
 
     rect = (
-        alt.Chart(pd.DataFrame({"a": [shade[0]], "b": [shade[1]], "t": ["confirmed load shift"]}))  # ty: ignore[unresolved-attribute]
+        alt.Chart(pd.DataFrame({"a": [shade[0]], "b": [shade[1]], "t": ["median event length"]}))  # ty: ignore[unresolved-attribute]
         .mark_rect(color="#D9D9D9", opacity=0.6)
         .encode(x="a:Q", x2="b:Q")
     )
     text = (
-        alt.Chart(pd.DataFrame({"a": [shade[0]], "t": ["confirmed load shift"]}))  # ty: ignore[unresolved-attribute]
+        alt.Chart(pd.DataFrame({"a": [shade[0]], "t": ["median event length"]}))  # ty: ignore[unresolved-attribute]
         .mark_text(align="left", baseline="top", dx=4, dy=2, fontSize=11, color="#555555")
         .encode(x="a:Q", y=alt.value(0), text="t:N")
     )
@@ -277,7 +277,7 @@ def main() -> None:
         line_chart(
             frame=pool,
             title=[  # ty: ignore[invalid-argument-type]
-                f"Error of the median forecast by whole days since the event {anchor}; {ev.height} logged events pooled.",
+                f"Error of the median forecast by whole days since the event {anchor}; 10 to {ev.height} logged events pooled (two began before the backtest).",
                 "Mean over events and seeds 0 to 4. The steps nearly coincide.",
             ],
             xtitle=f"Days since the event {anchor} (shading: the median event length, {length:.0f} days)",
