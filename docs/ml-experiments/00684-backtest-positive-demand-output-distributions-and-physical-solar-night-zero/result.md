@@ -37,7 +37,7 @@ decision_rule: >-
   Stop rule for demand: if a family worsens the CRPS of any of the four series by 0.05 points or
   more, keep the clamp and drop that family. A family passes if P1, P2, and P3 hold for all four
   series. Solar arm a passes if P4 holds at both farms. A worsening of 0.01 to 0.05 points fails P2 without
-  triggering the stop rule, and is reported as a cost. A change is read against the Gaussian refit,
+  triggering the stop rule, and is reported as a loss. A change is read against the Gaussian refit,
   whose distance from the stored files is the seed noise floor. The model-level fix is compared
   with the post hoc clamp of the stored files as a fourth arm. No ranking beyond that, and no claim
   of benefit from two test months.
@@ -59,19 +59,20 @@ best_arm: >-
 headline: >-
   Conditioning the Gaussian mixture on power at or above zero removes every negative q01 at the four
   Primaries and leaves CRPS within 0.07 points of capacity of the stored forecasts (it improves
-  three of the four). The gamma mixture fails its stop rule at two Primaries and is dropped. At the two
-  solar farms the night gate leaves no non-zero night quantile and changes no daylight score.
+  two clearly, leaves one indistinguishable, and worsens one by 0.03). The gamma mixture fails its stop rule at two Primaries and is dropped.
+  At the two solar farms the night gate leaves no non-zero night quantile and changes no daylight score.
 lessons: >-
   A mixture cut at zero is a drop-in positive output for Primaries that cannot go negative. The gamma
   head, trained inside the shared network, hurt the Gaussian Primaries as well, so a mixed-family
   shared head needs its own design.
 take_home_message: >-
   A Gaussian mixture conditioned on power at or above zero fixes the negative lower quantiles at the
-  four demand series at a cost of no more than 0.03 points of capacity of CRPS (and a gain at three
-  of the four), so the model can replace the post hoc clamp. A gamma
+  four demand series. CRPS improves clearly at two series, is indistinguishable at one, and worsens
+  by 0.03 points of capacity at one, so the model is a candidate to replace the post hoc clamp. A gamma
   mixture inside the same shared network made two series much worse and is dropped. A hard zero at
-  night at each half-hour's own sun position removes every non-zero solar night quantile and changes
-  no daylight score.
+  night at each half-hour's own sun position removes every non-zero solar night quantile, changes
+  no daylight score, and lowers night CRPS, while the share of night observations above q99 rises
+  because the gate sets those quantiles to zero.
 advice:
   - >-
     Use a Gaussian mixture conditioned on power at or above zero as the output of Primaries whose
@@ -85,16 +86,18 @@ advice:
 ---
 
 **A Gaussian mixture conditioned on power at or above zero gives the four demand series positive
-quantiles without losing accuracy, and a gamma mixture does not.** The one-year backtest files held
+quantiles with CRPS (continuous ranked probability score) improved at two series and worsened by 0.03
+points of capacity at one, and a gamma mixture does not.** The one-year backtest files held
 negative lower quantiles at Primaries that meter apparent power (MVA), and small non-zero solar
 quantiles at night. A post hoc clamp had removed both. We refitted the demand network with two output
 families that cannot go below zero, on two test months (2026-02 and 2026-05), and gated the solar
 quantiles at night at each half-hour's own sun position. The truncated Gaussian mixture changed CRPS
 by -0.070, -0.015, -0.010, and +0.030 points of capacity at four Primaries, and the gamma mixture
 raised it by 0.68 to 1.48 points at two of them, so it failed its stop rule. Both new families
-remove every negative q01. The gate removes every non-zero night quantile and changes no daylight or
-dawn score. Two test months and one pair of seeds can rank these ideas but cannot support a claim of
-benefit.
+remove every negative q01. The gate removes every non-zero night quantile, lowers night CRPS, and changes no daylight or
+dawn score. Its zero quantiles lie below night observations that are slightly positive, so the
+share above q99 at night rises. Two test months and one pair of seeds can rank these ideas but
+cannot support a claim of benefit.
 
 ![Change in CRPS against the stored forecasts at four Primaries, truncated Gaussian (orange) and gamma
 (purple)](crps_change.svg)
@@ -126,7 +129,7 @@ refit adds no noise floor, and its rows are not repeated below.
   family is dropped. P3 held for the truncated Gaussian (coverage change from -0.001 to +0.016) and
   failed for the gamma mixture at Primaries 15 and 17.
 - **The sign differs by month at one series.** The truncated Gaussian's CRPS change at Primary 17 is
-  -0.085 in 2026-02 and +0.066 in 2026-05. At Primary 14 it is +0.029 and +0.031 (worse in both
+  -0.085 in 2026-02 and +0.066 in 2026-05. At Primary 14 it is +0.028 and +0.032 (worse in both
   months), and at Primaries 15 and 26 it is negative in both.
 - **The other 12 Primaries** (same shared network, Gaussian output): CRPS 3.468 stored, 3.465
   truncated-Gaussian run, 3.496 gamma run. The gamma head therefore also hurt Primaries that kept a
@@ -154,7 +157,8 @@ zero.
 **Solar: the gate leaves no night quantile and changes nothing else.** The gate (arm a) keeps the
 stored networks of experiment 666 and sets every quantile to zero where the sun's elevation at the
 middle of the half-hour is at or below zero. The stored output has a non-zero quantile at 21,968
-of 57,890 night half-hours of the two farms (origins from 2026-02-01 to 2026-04-30); the gated
+of 57,890 night half-hours of the two farms (32,200 of them have observed power and are scored in
+the table) (origins from 2026-02-01 to 2026-04-30); the gated
 output has none. Arm b (the physics-lite power at each half-hour's own zenith as a network input)
 was not run, because experiment 666's network already reads that power as an input and as the
 mixture's centre (`pl_mean` of its `build_day`), so the refit would repeat the network it was meant
@@ -187,14 +191,16 @@ gate.
   stored rows' own.
 - Reviews run: a Sonnet plan review and a Sonnet code review (it found that the target statistics
   were hooked on the wrong class, which would have stopped the first fit, and that the gamma floor
-  depended on each Primary's standard deviation; both were fixed before any fit). The Sonnet reviews
-  of the numbers and of the prose are not yet run.
+  depended on each Primary's standard deviation; both were fixed before any fit). A Sonnet numbers review
+  recomputed every table from the stored forecasts and agreed, apart from the 2026-02 split at
+  Primary 14 (corrected here) and bootstrap bounds that differ by 0.003 to 0.02 between random
+  seeds. A Sonnet prose review led to the rewording of this page.
 - Audit triggers: trigger 2 fired for the gamma mixture, whose result contradicts its prediction
   with no tested explanation (the shared head reading Gaussian parameters at some Primaries and
   gamma parameters at others is the likely cause, untested). The gamma result does not support any
   conclusion beyond dropping the family. The median-error contrast was not run.
-- Not checked: the effect of a second seed. The truncated Gaussian's differences of 0.01 to 0.07 may
-  include training variation, because refitting under a different loss moves every later fit.
+- Not checked: seed-to-seed variation. The two seeds are averaged, so no spread between seeds is
+  available, and the truncated Gaussian's differences of 0.01 to 0.07 may include training variation.
 
 ## Method
 
