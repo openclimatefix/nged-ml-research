@@ -1,5 +1,8 @@
 # Hierarchy and pooling
 
+The current understanding and the options for next work are on the [state and next
+steps](state-and-next-steps.md) page.
+
 **One XGBoost model shared by a group of Primary substations forecasts almost as well as one model
 per substation (0.15 points of capacity worse, 99.44% interval +0.03 to +0.26), but the one test
 of a substation outside the pool (8 Primaries, one seed) found fingerprints made it worse, and
