@@ -46,6 +46,10 @@ SMALL_FIT_KW: Final = 50.0
 """The Embedded Capacity Register starts at 50 kW, so Feed-in Tariff sites up to this size cannot be in it."""
 MATCH_M: Final = 1000.0
 """Two register rows within this distance count as one site; a metered farm removes register rows within it."""
+SIGNED_RECOVERY: Final = 0.7858
+"""Experiment 662's median recovery of the linear probe at 0.5 times in the signed world (no apparent-power conversion).
+
+The five non-folding MVA Primaries divide the raw reading by this value, because experiment 679 finds the conversion loss under power factor 1 with a small reactive floor to be 0.5 points (80% interval -1.0 to 7.7)."""
 PV_METERED_IDS: Final[tuple[int, ...]] = (21, 22, 23, 29, 30, 31, 32)
 """Metadata ids of NGED's metered solar generators. They are lettered A to G by id; the page names none."""
 
@@ -279,12 +283,16 @@ def probe_table() -> pl.DataFrame:
         src = fold if site == "D12" else lin
         r = src.filter(pl.col("site") == site).row(0, named=True)
         f = fold.filter(pl.col("site") == site).row(0, named=True)
+        rescale = r["factor"] / SIGNED_RECOVERY if site in MVA_MAIN else 1.0
         mva_rows.append(
             {
                 "site": site,
-                "probe": r["cal_p50"],
-                "p10": r["cal_p10"],
-                "p90": r["cal_p90"],
+                "probe": r["cal_p50"] * rescale,
+                "p10": r["cal_p10"] * rescale,
+                "p90": r["cal_p90"] * rescale,
+                "pf_probe": r["cal_p50"],
+                "pf_p10": r["cal_p10"],
+                "pf_p90": r["cal_p90"],
                 "raw_p10": r["p10"],
                 "raw_p50": r["p50"],
                 "raw_p90": r["p90"],
@@ -460,7 +468,7 @@ def markdown_tables() -> str:
     out.append(
         "MVA|"
         + "\n".join(
-            f"| {s} | {f(by[s]['raw_p50'])} | {f(by[s]['p10'])} / {f(by[s]['probe'])} / {f(by[s]['p90'])} | {f(by[s]['raw_p50'] / 0.7858)} / {f(by[s]['raw_p50'] / 0.6765)} | {f(by[s]['fold_upper_p10'])} / {f(by[s]['fold_upper_p50'])} / {f(by[s]['fold_upper_p90'])} |"
+            f"| {s} | {f(by[s]['raw_p50'])} | {f(by[s]['p10'])} / {f(by[s]['probe'])} / {f(by[s]['p90'])} | {f(by[s]['pf_p10'])} / {f(by[s]['pf_probe'])} / {f(by[s]['pf_p90'])} | {f(by[s]['fold_upper_p10'])} / {f(by[s]['fold_upper_p50'])} / {f(by[s]['fold_upper_p90'])} |"
             for s in (*MVA_MAIN, "D12", *REPORT_ONLY)
         )
     )
